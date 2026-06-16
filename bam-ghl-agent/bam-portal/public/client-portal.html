@@ -5488,6 +5488,16 @@
         KPIs
       </div>
 
+      <div class="nav-item" data-feature="v15" style="display:none" onclick="switchView('v15cal', this)">
+        <span class="nav-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="4" width="18" height="18" rx="2"/>
+            <path d="M16 2v4M8 2v4M3 10h18"/>
+          </svg>
+        </span>
+        Calendars
+      </div>
+
       <div class="nav-item" onclick="switchView('action-items', this)">
         <span class="nav-icon" aria-hidden="true">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -8371,6 +8381,19 @@ Then the call to action."]</div>
       </div>
     </div>
 
+    <div class="view" id="view-v15cal">
+      <div class="topbar">
+        <div>
+          <span class="topbar-kicker">§ Calendars</span>
+          <div class="topbar-title">Calendars</div>
+        </div>
+        <button onclick="_v15calNewBooking()" style="background:var(--gold);color:#0B0B0D;border:none;padding:9px 18px;border-radius:7px;font-weight:700;font-size:13px;cursor:pointer">+ New booking</button>
+      </div>
+      <div class="content">
+        <div id="v15cal-content"></div>
+      </div>
+    </div>
+
     <div class="view" id="view-action-items">
       <div class="topbar">
         <div>
@@ -8906,6 +8929,460 @@ function _v15kRender() {
 }
 
 // ══════════════════════════════════════════════════════════════
+// CALENDARS VIEW (V1.5) — booking management over the academy's GHL calendars.
+// Weekly grid (faint-dotted availability, filled where booked) → slot drawer →
+// appointment drawer (status + full contact + SMS/email) · settings (regular +
+// special hours + capacity) · create a booking for an existing contact.
+// Backend: /api/ghl/calendars-v15 (list/events/appointment/settings/set-status/
+// create-appointment). SMS/email reuses /api/ghl/send-message; contact search
+// reuses /api/contacts.
+// ══════════════════════════════════════════════════════════════
+let _V15CAL = { calendars: [], selected: new Set(), weekOffset: 0, events: [], settings: {}, tz: 'America/Toronto', activeContact: null, msgType: 'SMS', editSpecial: [] };
+
+function _v15hm(s) { const p = String(s || '').split(':'); const v = (+p[0]) + (+p[1] || 0) / 60; return isNaN(v) ? NaN : v; }
+function _v15calHoursToRows(openHours) {
+  const rows = [0,1,2,3,4,5,6].map(() => ({ on: false, open: '17:00', close: '20:00' }));
+  for (const blk of openHours || []) {
+    const h = (blk.hours || [])[0]; if (!h) continue;
+    for (const d of blk.daysOfTheWeek || []) if (rows[d]) rows[d] = { on: true, open: bkPad(h.openHour) + ':' + bkPad(h.openMinute), close: bkPad(h.closeHour) + ':' + bkPad(h.closeMinute) };
+  }
+  return rows;
+}
+
+async function openV15Cal() {
+  const host = document.getElementById('v15cal-content');
+  if (!host || typeof CLIENT_ID === 'undefined') return;
+  host.innerHTML = `<div class="req-empty" style="padding:24px 0"><span class="req-spin"></span> Loading calendars…</div>`;
+  try {
+    const token = await _mreqAuthToken();
+    const r = await fetch('/api/ghl/calendars-v15?action=list&client_id=' + encodeURIComponent(CLIENT_ID), { headers: { Authorization: 'Bearer ' + token } });
+    const j = await _safeJson(r);
+    if (!r.ok) throw new Error(j.error || ('HTTP ' + r.status));
+    _V15CAL.calendars = j.calendars || [];
+    _V15CAL.tz = j.timezone || _V15CAL.tz;
+    _V15CAL.selected = new Set(_V15CAL.calendars.map(c => c.id));
+    _V15CAL.settings = {};
+    if (!_V15CAL.calendars.length) { host.innerHTML = `<div class="req-empty" style="padding:24px 0">No calendars found in GoHighLevel yet.</div>`; return; }
+    await _v15calLoadSettings();
+    _v15calRender();
+    _v15calLoadEvents();
+  } catch (e) {
+    host.innerHTML = `<div class="req-empty" style="padding:24px 0;color:#9a3b2f">Couldn't load calendars — ${escapeHTML(e.message || String(e))}</div>`;
+  }
+}
+
+async function _v15calLoadSettings() {
+  const token = await _mreqAuthToken();
+  await Promise.all([..._V15CAL.selected].filter(id => !_V15CAL.settings[id]).map(async id => {
+    try {
+      const r = await fetch(`/api/ghl/calendars-v15?action=settings&client_id=${encodeURIComponent(CLIENT_ID)}&calendar=${encodeURIComponent(id)}`, { headers: { Authorization: 'Bearer ' + token } });
+      const j = await _safeJson(r); if (r.ok) _V15CAL.settings[id] = j.calendar;
+    } catch (_) {}
+  }));
+}
+
+async function _v15calToggleCal(id) {
+  if (_V15CAL.selected.has(id)) _V15CAL.selected.delete(id); else _V15CAL.selected.add(id);
+  await _v15calLoadSettings();
+  _v15calRender();
+  _v15calLoadEvents();
+}
+function _v15calWeek(delta) { _V15CAL.weekOffset = delta === 0 ? 0 : _V15CAL.weekOffset + delta; _v15calRender(); _v15calLoadEvents(); }
+
+function _v15calRender() {
+  const host = document.getElementById('v15cal-content'); if (!host) return;
+  const chips = _V15CAL.calendars.map((c, i) => {
+    const on = _V15CAL.selected.has(c.id); const col = bkColor(i);
+    return `<span style="display:inline-flex;align-items:center;gap:6px;border:1px solid var(--border-med);border-radius:999px;padding:5px 10px 5px 8px;margin:0 6px 6px 0;background:${on ? col.bg : 'transparent'}">
+      <input type="checkbox" ${on ? 'checked' : ''} onchange="_v15calToggleCal('${c.id}')" style="accent-color:${col.text}">
+      <span style="font-size:12.5px;color:var(--text)">${escapeHTML(c.name || c.id)}</span>
+      <button onclick="_v15calSettings('${c.id}')" title="Settings" style="background:none;border:none;color:var(--text-mute);cursor:pointer;font-size:13px;padding:0 2px">⚙</button>
+    </span>`;
+  }).join('');
+  const start = calStartOfWeek(_V15CAL.weekOffset);
+  host.innerHTML = `
+    <div style="display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-bottom:8px">${chips}</div>
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
+      <button onclick="_v15calWeek(-1)" style="background:var(--surface);border:1px solid var(--border-med);border-radius:7px;color:var(--text);padding:6px 11px;cursor:pointer">‹</button>
+      <button onclick="_v15calWeek(0)" style="background:var(--surface);border:1px solid var(--border-med);border-radius:7px;color:var(--text);padding:6px 12px;cursor:pointer;font-size:12.5px">Today</button>
+      <button onclick="_v15calWeek(1)" style="background:var(--surface);border:1px solid var(--border-med);border-radius:7px;color:var(--text);padding:6px 11px;cursor:pointer">›</button>
+      <div style="font-weight:700;color:var(--text);font-size:14px">${calFormatRange(start)}</div>
+      <div style="margin-left:auto;font-size:11.5px;color:var(--text-mute)"><span style="display:inline-block;width:10px;height:10px;border:1px dashed var(--border-med);border-radius:2px;vertical-align:-1px;margin-right:4px"></span>available &nbsp; <span style="display:inline-block;width:10px;height:10px;background:var(--gold);border-radius:2px;vertical-align:-1px;margin:0 4px 0 6px"></span>booked</div>
+    </div>
+    <div id="v15cal-grid"></div>`;
+  _v15calRenderGrid();
+}
+
+function _v15calHourRange() {
+  let lo = 23, hi = 0, found = false;
+  for (const id of _V15CAL.selected) {
+    const s = _V15CAL.settings[id]; if (!s) continue;
+    for (const blk of (s.openHours || [])) { const h = (blk.hours || [])[0]; if (!h) continue; lo = Math.min(lo, h.openHour); hi = Math.max(hi, h.closeHour + (h.closeMinute > 0 ? 1 : 0)); found = true; }
+    for (const sp of (s.special || [])) { if (sp.closed) continue; const o = _v15hm(sp.open), c = _v15hm(sp.close); if (!isNaN(o)) { lo = Math.min(lo, Math.floor(o)); found = true; } if (!isNaN(c)) hi = Math.max(hi, Math.ceil(c)); }
+  }
+  for (const ev of _V15CAL.events) { const d = new Date(ev.start); if (!isNaN(d.getTime())) { lo = Math.min(lo, d.getHours()); hi = Math.max(hi, d.getHours() + 1); } }
+  if (!found && !_V15CAL.events.length) { lo = 8; hi = 21; }
+  lo = Math.max(0, Math.min(lo, 12)); hi = Math.min(24, Math.max(hi, lo + 4));
+  return [lo, hi];
+}
+function _v15calOpenAt(calId, dateObj, hour) {
+  const s = _V15CAL.settings[calId]; if (!s) return false;
+  const dk = calDateKey(dateObj);
+  const sp = (s.special || []).find(x => x.date === dk);
+  if (sp) { if (sp.closed) return false; const o = _v15hm(sp.open), c = _v15hm(sp.close); return hour >= Math.floor(o) && hour < Math.ceil(c); }
+  const dow = dateObj.getDay();
+  for (const blk of (s.openHours || [])) { if (!(blk.daysOfTheWeek || []).includes(dow)) continue; const h = (blk.hours || [])[0]; if (!h) continue; const o = h.openHour + h.openMinute / 60, c = h.closeHour + h.closeMinute / 60; if (hour >= Math.floor(o) && hour < Math.ceil(c)) return true; }
+  return false;
+}
+function _v15calCellBookings(dateKey, hour) {
+  return _V15CAL.events.filter(ev => {
+    if (!_V15CAL.selected.has(ev.calendarId)) return false;
+    const d = new Date(ev.start); if (isNaN(d.getTime())) return false;
+    return calDateKey(d) === dateKey && d.getHours() === hour && ev.status !== 'cancelled';
+  });
+}
+
+function _v15calRenderGrid() {
+  const host = document.getElementById('v15cal-grid'); if (!host) return;
+  const start = calStartOfWeek(_V15CAL.weekOffset);
+  const todayKey = calDateKey(new Date());
+  const days = [0,1,2,3,4,5,6].map(i => { const d = new Date(start); d.setDate(d.getDate() + i); return d; });
+  const [h0, h1] = _v15calHourRange();
+  const dotted = `background-image:radial-gradient(var(--border-med) 0.6px,transparent 0.6px);background-size:8px 8px`;
+
+  let head = `<div style="font-size:10px"></div>` + days.map(d => {
+    const isToday = calDateKey(d) === todayKey;
+    return `<div style="text-align:center;padding:6px 2px;font-size:11px;font-weight:700;color:${isToday ? 'var(--gold)' : 'var(--text)'}">${['SUN','MON','TUE','WED','THU','FRI','SAT'][d.getDay()]}<div style="font-size:13px;font-weight:600;color:${isToday ? 'var(--gold)' : 'var(--text-mute)'}">${d.getDate()}</div></div>`;
+  }).join('');
+
+  let rows = '';
+  for (let h = h0; h < h1; h++) {
+    let cells = `<div style="font-size:10.5px;color:var(--text-mute);text-align:right;padding:2px 6px 0 0">${calFormatHour(h)}</div>`;
+    for (const d of days) {
+      const dk = calDateKey(d);
+      const books = _v15calCellBookings(dk, h);
+      const avail = [..._V15CAL.selected].some(id => _v15calOpenAt(id, d, h));
+      if (books.length) {
+        const label = books.length > 1 ? `${books.length} bookings` : escapeHTML(books[0].contactName || 'Booked');
+        cells += `<div onclick="_v15calOpenSlot('${dk}',${h})" title="${label}" style="min-height:34px;border:1px solid var(--border);border-radius:5px;margin:1px;background:rgba(232,197,71,0.18);border-color:rgba(232,197,71,0.5);cursor:pointer;padding:3px 5px;overflow:hidden">
+          <div style="font-size:10.5px;font-weight:700;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${label}</div></div>`;
+      } else if (avail) {
+        cells += `<div style="min-height:34px;border:1px dashed var(--border-med);border-radius:5px;margin:1px;${dotted}"></div>`;
+      } else {
+        cells += `<div style="min-height:34px;margin:1px"></div>`;
+      }
+    }
+    rows += `<div style="display:grid;grid-template-columns:46px repeat(7,1fr);align-items:stretch">${cells}</div>`;
+  }
+  host.innerHTML = `<div style="border:1px solid var(--border);border-radius:10px;overflow:hidden">
+    <div style="display:grid;grid-template-columns:46px repeat(7,1fr);border-bottom:1px solid var(--border);background:var(--surface)">${head}</div>
+    <div>${rows}</div></div>`;
+}
+
+async function _v15calLoadEvents() {
+  const ids = [..._V15CAL.selected];
+  const grid = document.getElementById('v15cal-grid');
+  if (!ids.length) { _V15CAL.events = []; _v15calRenderGrid(); return; }
+  if (grid) grid.innerHTML = `<div class="req-empty" style="padding:18px 0"><span class="req-spin"></span> Loading bookings…</div>`;
+  const start = calStartOfWeek(_V15CAL.weekOffset); const end = new Date(start); end.setDate(end.getDate() + 7);
+  try {
+    const token = await _mreqAuthToken();
+    const r = await fetch(`/api/ghl/calendars-v15?action=events&client_id=${encodeURIComponent(CLIENT_ID)}&calendar_ids=${encodeURIComponent(ids.join(','))}&start=${start.getTime()}&end=${end.getTime()}`, { headers: { Authorization: 'Bearer ' + token } });
+    const j = await _safeJson(r); if (!r.ok) throw new Error(j.error || ('HTTP ' + r.status));
+    _V15CAL.events = j.events || [];
+  } catch (e) { _V15CAL.events = []; }
+  _v15calRenderGrid();
+}
+
+// ── Drawer infra ──
+function _v15calCloseDrawer() { const o = document.getElementById('v15cal-ov'); if (o) o.remove(); }
+function _v15calShowDrawer(title, bodyHtml) {
+  _v15calCloseDrawer();
+  const ov = document.createElement('div'); ov.id = 'v15cal-ov';
+  ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9000;display:flex;justify-content:flex-end';
+  ov.onclick = (e) => { if (e.target === ov) _v15calCloseDrawer(); };
+  ov.innerHTML = `<div style="width:min(460px,100%);height:100%;background:var(--bg);border-left:1px solid var(--border);overflow:auto;padding:20px 22px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+      <div style="font-size:16px;font-weight:700;color:var(--text)">${title}</div>
+      <button onclick="_v15calCloseDrawer()" style="background:none;border:none;color:var(--text-mute);font-size:24px;cursor:pointer;line-height:1">×</button>
+    </div>
+    <div id="v15cal-drawer-body">${bodyHtml}</div></div>`;
+  document.body.appendChild(ov);
+}
+
+function _v15calOpenSlot(dateKey, hour) {
+  const list = _v15calCellBookings(dateKey, hour);
+  const d = new Date(dateKey + 'T00:00:00');
+  const title = `${d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })} · ${calFormatHour(hour)}`;
+  const rows = list.map(ev => {
+    const cal = _V15CAL.calendars.find(c => c.id === ev.calendarId);
+    const t = new Date(ev.start);
+    return `<button onclick="_v15calOpenAppt('${ev.id}')" style="display:block;width:100%;text-align:left;background:var(--surface);border:1px solid var(--border);border-radius:9px;padding:11px 13px;margin-bottom:8px;cursor:pointer">
+      <div style="font-weight:700;font-size:13.5px;color:var(--text)">${escapeHTML(ev.contactName || 'Booked')}</div>
+      <div style="font-size:11.5px;color:var(--text-mute);margin-top:2px">${calFormatTime(t.getHours() + t.getMinutes() / 60)} · ${escapeHTML(cal ? cal.name : '')}${ev.status ? ' · ' + escapeHTML(_v15calStatusLabel(ev.status)) : ''}</div>
+    </button>`;
+  }).join('') || `<div class="req-empty" style="padding:10px 0">No bookings.</div>`;
+  _v15calShowDrawer(title, rows);
+}
+
+function _v15calStatusLabel(s) { return ({ confirmed: 'Confirmed', showed: 'Showed', noshow: 'No-show', cancelled: 'Cancelled', invalid: 'Invalid' })[s] || s; }
+
+async function _v15calOpenAppt(apptId) {
+  _v15calShowDrawer('Booking', `<div class="req-empty" style="padding:14px 0"><span class="req-spin"></span> Loading…</div>`);
+  try {
+    const token = await _mreqAuthToken();
+    const r = await fetch(`/api/ghl/calendars-v15?action=appointment&client_id=${encodeURIComponent(CLIENT_ID)}&id=${encodeURIComponent(apptId)}`, { headers: { Authorization: 'Bearer ' + token } });
+    const j = await _safeJson(r); if (!r.ok) throw new Error(j.error || ('HTTP ' + r.status));
+    _V15CAL.activeContact = j.contact || null;
+    _V15CAL.msgType = 'SMS';
+    const body = document.getElementById('v15cal-drawer-body'); if (body) body.innerHTML = _v15calApptBody(j);
+  } catch (e) {
+    const body = document.getElementById('v15cal-drawer-body'); if (body) body.innerHTML = `<div class="req-empty" style="padding:14px 0;color:#9a3b2f">${escapeHTML(e.message || String(e))}</div>`;
+  }
+}
+
+function _v15calApptBody(j) {
+  const a = j.appointment || {}, c = j.contact || null;
+  const statuses = j.statuses || ['confirmed','showed','noshow','cancelled','invalid'];
+  const when = a.start ? new Date(a.start).toLocaleString('en-US', { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : '—';
+  const cal = _V15CAL.calendars.find(x => x.id === a.calendarId);
+  const statusSel = `<select id="v15cal-status" onchange="_v15calSetStatus('${a.id}', this.value)" style="background:var(--surface);border:1px solid var(--border-med);border-radius:7px;color:var(--text);padding:7px 10px;font:inherit;font-size:13px;cursor:pointer">
+    ${statuses.map(s => `<option value="${s}" ${s === a.status ? 'selected' : ''}>${_v15calStatusLabel(s)}</option>`).join('')}</select>`;
+  let contactHtml = `<div class="req-empty" style="padding:8px 0">No contact linked.</div>`;
+  if (c) {
+    const cf = (c.customFields || []).filter(f => f.value != null && f.value !== '');
+    const tags = (c.tags || []).map(t => `<span style="font-size:11px;background:var(--surface);border:1px solid var(--border);border-radius:999px;padding:2px 8px;margin:0 4px 4px 0;display:inline-block">${escapeHTML(t)}</span>`).join('');
+    const row = (k, v) => v ? `<div style="display:flex;gap:8px;font-size:12.5px;margin-bottom:4px"><span style="color:var(--text-mute);min-width:64px">${k}</span><span style="color:var(--text);word-break:break-word">${escapeHTML(String(v))}</span></div>` : '';
+    contactHtml = `${row('Name', c.name)}${row('Email', c.email)}${row('Phone', c.phone)}${c.dnd ? `<div style="font-size:11.5px;color:#c9871f;margin:4px 0">⚠ Do-not-contact is ON</div>` : ''}${row('Source', c.source)}
+      ${tags ? `<div style="margin-top:8px">${tags}</div>` : ''}
+      ${cf.length ? `<div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border)">${cf.map(f => row(f.id.slice(0, 8), f.value)).join('')}</div>` : ''}`;
+  }
+  const canMsg = c && (c.phone || c.email);
+  const composer = canMsg ? `
+    <div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--border)">
+      <div style="display:flex;gap:8px;margin-bottom:8px">
+        ${['SMS','Email'].map(t => `<button onclick="_v15calMsgType('${t}')" id="v15cal-mt-${t}" style="flex:1;padding:7px;border-radius:7px;border:1px solid var(--border-med);background:${t === 'SMS' ? 'var(--gold)' : 'var(--surface)'};color:${t === 'SMS' ? '#0B0B0D' : 'var(--text)'};font-weight:700;font-size:12.5px;cursor:pointer">${t}</button>`).join('')}
+      </div>
+      <input id="v15cal-msg-subject" placeholder="Subject" style="display:none;width:100%;box-sizing:border-box;background:var(--surface);border:1px solid var(--border-med);border-radius:7px;color:var(--text);padding:8px 10px;font:inherit;font-size:13px;margin-bottom:8px">
+      <textarea id="v15cal-msg-text" rows="3" placeholder="Type a message…" style="width:100%;box-sizing:border-box;background:var(--surface);border:1px solid var(--border-med);border-radius:7px;color:var(--text);padding:8px 10px;font:inherit;font-size:13px;resize:vertical"></textarea>
+      <button onclick="_v15calSendMsg()" id="v15cal-msg-send" style="margin-top:8px;width:100%;background:var(--gold);color:#0B0B0D;border:none;padding:9px;border-radius:7px;font-weight:700;font-size:13px;cursor:pointer">Send</button>
+    </div>` : '';
+  return `
+    <div style="font-size:12.5px;color:var(--text-mute);margin-bottom:4px">${escapeHTML(cal ? cal.name : '')}</div>
+    <div style="font-size:14px;font-weight:600;color:var(--text);margin-bottom:12px">${when}</div>
+    <div style="font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--text-mute);margin-bottom:6px">Status</div>
+    ${statusSel}
+    <div style="font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--text-mute);margin:16px 0 6px">Contact</div>
+    ${contactHtml}
+    ${composer}`;
+}
+
+function _v15calMsgType(t) {
+  _V15CAL.msgType = t;
+  for (const x of ['SMS','Email']) { const b = document.getElementById('v15cal-mt-' + x); if (b) { b.style.background = x === t ? 'var(--gold)' : 'var(--surface)'; b.style.color = x === t ? '#0B0B0D' : 'var(--text)'; } }
+  const sub = document.getElementById('v15cal-msg-subject'); if (sub) sub.style.display = t === 'Email' ? 'block' : 'none';
+}
+async function _v15calSendMsg() {
+  const c = _V15CAL.activeContact; if (!c) return;
+  const text = (document.getElementById('v15cal-msg-text')?.value || '').trim();
+  const subject = (document.getElementById('v15cal-msg-subject')?.value || '').trim();
+  if (!text) return;
+  if (_V15CAL.msgType === 'Email' && !subject) { alert('Email needs a subject.'); return; }
+  const btn = document.getElementById('v15cal-msg-send'); if (btn) { btn.disabled = true; btn.textContent = 'Sending…'; }
+  try {
+    const token = await _mreqAuthToken();
+    const r = await fetch('/api/ghl/send-message', {
+      method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+      body: JSON.stringify({ client_id: CLIENT_ID, type: _V15CAL.msgType, contact_phone: c.phone || undefined, contact_email: c.email || undefined, contact_name: c.name || undefined, message: text, subject: _V15CAL.msgType === 'Email' ? subject : undefined }),
+    });
+    const j = await _safeJson(r);
+    if (!r.ok || j.error) throw new Error(j.error || ('HTTP ' + r.status));
+    if (btn) { btn.textContent = 'Sent ✓'; }
+    const ta = document.getElementById('v15cal-msg-text'); if (ta) ta.value = '';
+    setTimeout(() => { if (btn) { btn.disabled = false; btn.textContent = 'Send'; } }, 1200);
+  } catch (e) { alert('Send failed: ' + (e.message || e)); if (btn) { btn.disabled = false; btn.textContent = 'Send'; } }
+}
+
+async function _v15calSetStatus(id, status) {
+  const sel = document.getElementById('v15cal-status'); if (sel) sel.disabled = true;
+  try {
+    const token = await _mreqAuthToken();
+    const r = await fetch('/api/ghl/calendars-v15?action=set-status&client_id=' + encodeURIComponent(CLIENT_ID), {
+      method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+      body: JSON.stringify({ action: 'set-status', id, status }),
+    });
+    const j = await _safeJson(r); if (!r.ok) throw new Error(j.error || ('HTTP ' + r.status));
+    const ev = _V15CAL.events.find(e => e.id === id); if (ev) ev.status = status;
+    _v15calRenderGrid();
+  } catch (e) { alert("Couldn't change status: " + (e.message || e)); }
+  finally { if (sel) sel.disabled = false; }
+}
+
+// ── Settings drawer (regular + special hours + capacity) ──
+async function _v15calSettings(calId) {
+  _v15calShowDrawer('Calendar settings', `<div class="req-empty" style="padding:14px 0"><span class="req-spin"></span> Loading…</div>`);
+  try {
+    const token = await _mreqAuthToken();
+    const r = await fetch(`/api/ghl/calendars-v15?action=settings&client_id=${encodeURIComponent(CLIENT_ID)}&calendar=${encodeURIComponent(calId)}`, { headers: { Authorization: 'Bearer ' + token } });
+    const j = await _safeJson(r); if (!r.ok) throw new Error(j.error || ('HTTP ' + r.status));
+    _V15CAL.settings[calId] = j.calendar;
+    _V15CAL.editSpecial = (j.calendar.special || []).map(s => ({ date: s.date, closed: !!s.closed, open: s.open || '17:00', close: s.close || '20:00' }));
+    const body = document.getElementById('v15cal-drawer-body'); if (body) body.innerHTML = _v15calSettingsBody(calId);
+  } catch (e) {
+    const body = document.getElementById('v15cal-drawer-body'); if (body) body.innerHTML = `<div class="req-empty" style="padding:14px 0;color:#9a3b2f">${escapeHTML(e.message || String(e))}</div>`;
+  }
+}
+function _v15calSettingsBody(calId) {
+  const s = _V15CAL.settings[calId] || {};
+  const rows = _v15calHoursToRows(s.openHours);
+  const order = [1,2,3,4,5,6,0];
+  const dayRows = order.map(d => {
+    const row = rows[d];
+    return `<div style="display:flex;align-items:center;gap:8px;padding:3px 0;font-size:13px">
+      <input type="checkbox" id="v15cal-on-${d}" ${row.on ? 'checked' : ''} style="accent-color:var(--gold)">
+      <span style="width:38px;color:var(--text-mute);font-weight:600;font-size:12px">${['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][d]}</span>
+      <input type="time" id="v15cal-open-${d}" value="${row.open}" style="background:var(--surface);border:1px solid var(--border-med);border-radius:6px;color:var(--text);padding:4px 6px;font:inherit;font-size:12px">
+      <span style="color:var(--text-mute)">to</span>
+      <input type="time" id="v15cal-close-${d}" value="${row.close}" style="background:var(--surface);border:1px solid var(--border-med);border-radius:6px;color:var(--text);padding:4px 6px;font:inherit;font-size:12px">
+    </div>`;
+  }).join('');
+  return `
+    <div style="font-weight:700;font-size:14px;color:var(--text);margin-bottom:8px">${escapeHTML(s.name || '')}</div>
+    <div style="font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--text-mute);margin-bottom:6px">Regular hours</div>
+    ${dayRows}
+    <div style="margin-top:14px"><div style="font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--text-mute);margin-bottom:6px">Spots per slot</div>
+      <input type="number" min="1" id="v15cal-cap" value="${s.capacity ?? 1}" style="width:90px;background:var(--surface);border:1px solid var(--border-med);border-radius:6px;color:var(--text);padding:6px 8px;font:inherit;font-size:13px"></div>
+    <div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--border)">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+        <div style="font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--text-mute)">Special hours</div>
+        <button onclick="_v15calAddSpecial()" style="background:none;border:1px solid var(--border-med);border-radius:6px;color:var(--accent);padding:4px 9px;font-size:12px;font-weight:700;cursor:pointer">+ Date</button>
+      </div>
+      <div style="font-size:11.5px;color:var(--text-mute);margin-bottom:8px">Override a specific date — custom hours, or mark it closed.</div>
+      <div id="v15cal-special">${_v15calSpecialRows()}</div>
+    </div>
+    <div id="v15cal-set-err" style="display:none;color:#9a3b2f;font-size:12.5px;margin-top:10px"></div>
+    <button onclick="_v15calSaveSettings('${calId}')" id="v15cal-save" style="margin-top:16px;width:100%;background:var(--gold);color:#0B0B0D;border:none;padding:10px;border-radius:8px;font-weight:700;font-size:13.5px;cursor:pointer">Save changes</button>`;
+}
+function _v15calSpecialRows() {
+  if (!_V15CAL.editSpecial.length) return `<div style="font-size:12px;color:var(--text-mute)">None.</div>`;
+  return _V15CAL.editSpecial.map((sp, i) => `
+    <div style="display:flex;align-items:center;gap:7px;margin-bottom:7px;flex-wrap:wrap">
+      <input type="date" value="${sp.date}" onchange="_V15CAL.editSpecial[${i}].date=this.value" style="background:var(--surface);border:1px solid var(--border-med);border-radius:6px;color:var(--text);padding:4px 6px;font:inherit;font-size:12px">
+      <label style="display:flex;align-items:center;gap:4px;font-size:12px;color:var(--text)"><input type="checkbox" ${sp.closed ? 'checked' : ''} onchange="_V15CAL.editSpecial[${i}].closed=this.checked;_v15calRenderSpecial()" style="accent-color:var(--gold)">Closed</label>
+      ${sp.closed ? '' : `<input type="time" value="${sp.open}" onchange="_V15CAL.editSpecial[${i}].open=this.value" style="background:var(--surface);border:1px solid var(--border-med);border-radius:6px;color:var(--text);padding:4px 6px;font:inherit;font-size:12px">
+      <span style="color:var(--text-mute);font-size:12px">to</span>
+      <input type="time" value="${sp.close}" onchange="_V15CAL.editSpecial[${i}].close=this.value" style="background:var(--surface);border:1px solid var(--border-med);border-radius:6px;color:var(--text);padding:4px 6px;font:inherit;font-size:12px">`}
+      <button onclick="_v15calRemoveSpecial(${i})" style="background:none;border:none;color:var(--text-mute);cursor:pointer;font-size:15px;margin-left:auto">×</button>
+    </div>`).join('');
+}
+function _v15calRenderSpecial() { const el = document.getElementById('v15cal-special'); if (el) el.innerHTML = _v15calSpecialRows(); }
+function _v15calAddSpecial() { const t = new Date(); t.setDate(t.getDate() + 1); _V15CAL.editSpecial.push({ date: calDateKey(t), closed: true, open: '17:00', close: '20:00' }); _v15calRenderSpecial(); }
+function _v15calRemoveSpecial(i) { _V15CAL.editSpecial.splice(i, 1); _v15calRenderSpecial(); }
+async function _v15calSaveSettings(calId) {
+  const openHours = [];
+  for (let d = 0; d < 7; d++) {
+    if (!document.getElementById('v15cal-on-' + d)?.checked) continue;
+    const o = (document.getElementById('v15cal-open-' + d)?.value || '').split(':');
+    const c = (document.getElementById('v15cal-close-' + d)?.value || '').split(':');
+    if (o.length < 2 || c.length < 2) continue;
+    openHours.push({ daysOfTheWeek: [d], hours: [{ openHour: +o[0], openMinute: +o[1], closeHour: +c[0], closeMinute: +c[1] }] });
+  }
+  const capacity = document.getElementById('v15cal-cap')?.value;
+  const special = _V15CAL.editSpecial.filter(s => s.date);
+  const btn = document.getElementById('v15cal-save'); const err = document.getElementById('v15cal-set-err');
+  if (err) err.style.display = 'none';
+  if (btn) { btn.disabled = true; btn.textContent = 'Saving…'; }
+  try {
+    const token = await _mreqAuthToken();
+    const r = await fetch('/api/ghl/calendars-v15?action=settings&client_id=' + encodeURIComponent(CLIENT_ID), {
+      method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+      body: JSON.stringify({ action: 'settings', calendar: calId, openHours, capacity, special }),
+    });
+    const j = await _safeJson(r); if (!r.ok) throw new Error(j.error || ('HTTP ' + r.status));
+    _V15CAL.settings[calId] = j.calendar;
+    if (btn) { btn.textContent = 'Saved ✓'; }
+    _v15calRenderGrid();
+    setTimeout(() => _v15calCloseDrawer(), 700);
+  } catch (e) {
+    if (err) { err.textContent = e.message || String(e); err.style.display = 'block'; }
+    if (btn) { btn.disabled = false; btn.textContent = 'Save changes'; }
+  }
+}
+
+// ── New booking for an existing contact ──
+let _v15nbSearchT = null;
+function _v15calNewBooking() {
+  if (!_V15CAL.calendars.length) { alert('Load the Calendars tab first.'); return; }
+  _V15CAL.nbContact = null;
+  const calOpts = _V15CAL.calendars.map(c => `<option value="${c.id}">${escapeHTML(c.name || c.id)}</option>`).join('');
+  const t = new Date(); t.setDate(t.getDate() + 1);
+  _v15calShowDrawer('New booking', `
+    <div style="font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--text-mute);margin-bottom:6px">Calendar</div>
+    <select id="v15nb-cal" style="width:100%;box-sizing:border-box;background:var(--surface);border:1px solid var(--border-med);border-radius:7px;color:var(--text);padding:8px 10px;font:inherit;font-size:13px;margin-bottom:14px">${calOpts}</select>
+    <div style="font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--text-mute);margin-bottom:6px">Contact</div>
+    <input id="v15nb-search" oninput="_v15calNbSearch()" placeholder="Search name, phone or email…" style="width:100%;box-sizing:border-box;background:var(--surface);border:1px solid var(--border-med);border-radius:7px;color:var(--text);padding:8px 10px;font:inherit;font-size:13px">
+    <div id="v15nb-results" style="margin-top:6px"></div>
+    <div id="v15nb-picked" style="margin-top:6px"></div>
+    <div style="display:flex;gap:10px;margin-top:14px">
+      <div style="flex:1"><div style="font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--text-mute);margin-bottom:6px">Date</div>
+        <input type="date" id="v15nb-date" value="${calDateKey(t)}" style="width:100%;box-sizing:border-box;background:var(--surface);border:1px solid var(--border-med);border-radius:7px;color:var(--text);padding:8px 10px;font:inherit;font-size:13px"></div>
+      <div style="flex:1"><div style="font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--text-mute);margin-bottom:6px">Time</div>
+        <input type="time" id="v15nb-time" value="17:00" style="width:100%;box-sizing:border-box;background:var(--surface);border:1px solid var(--border-med);border-radius:7px;color:var(--text);padding:8px 10px;font:inherit;font-size:13px"></div>
+    </div>
+    <div id="v15nb-err" style="display:none;color:#9a3b2f;font-size:12.5px;margin-top:10px"></div>
+    <button onclick="_v15calCreateBooking()" id="v15nb-create" style="margin-top:16px;width:100%;background:var(--gold);color:#0B0B0D;border:none;padding:10px;border-radius:8px;font-weight:700;font-size:13.5px;cursor:pointer">Create booking</button>`);
+}
+function _v15calNbSearch() {
+  clearTimeout(_v15nbSearchT);
+  const q = (document.getElementById('v15nb-search')?.value || '').trim();
+  const box = document.getElementById('v15nb-results');
+  if (q.length < 2) { if (box) box.innerHTML = ''; return; }
+  _v15nbSearchT = setTimeout(async () => {
+    try {
+      const token = await _mreqAuthToken();
+      const r = await fetch(`/api/contacts?client_id=${encodeURIComponent(CLIENT_ID)}&q=${encodeURIComponent(q)}`, { headers: { Authorization: 'Bearer ' + token } });
+      const j = await _safeJson(r); if (!r.ok) throw new Error(j.error || 'search failed');
+      const list = (j.contacts || []).slice(0, 8);
+      if (!box) return;
+      box.innerHTML = list.length ? list.map(ct => `<button onclick='_v15calNbPick(${JSON.stringify(ct).replace(/'/g, "&#39;")})' style="display:block;width:100%;text-align:left;background:var(--surface);border:1px solid var(--border);border-radius:7px;padding:8px 10px;margin-bottom:5px;cursor:pointer">
+        <div style="font-size:13px;font-weight:600;color:var(--text)">${escapeHTML(ct.name || 'Unnamed')}${ct.athlete_name ? ` <span style="color:var(--text-mute);font-weight:400">· ${escapeHTML(ct.athlete_name)}</span>` : ''}</div>
+        <div style="font-size:11px;color:var(--text-mute)">${escapeHTML(ct.phone || '')}${ct.phone && ct.email ? ' · ' : ''}${escapeHTML(ct.email || '')}</div></button>`).join('') : `<div style="font-size:12px;color:var(--text-mute);padding:4px 0">No matches.</div>`;
+    } catch (e) { if (box) box.innerHTML = `<div style="font-size:12px;color:#9a3b2f">${escapeHTML(e.message || String(e))}</div>`; }
+  }, 280);
+}
+function _v15calNbPick(ct) {
+  _V15CAL.nbContact = ct;
+  const box = document.getElementById('v15nb-results'); if (box) box.innerHTML = '';
+  const picked = document.getElementById('v15nb-picked');
+  const search = document.getElementById('v15nb-search'); if (search) search.value = ct.name || '';
+  if (picked) picked.innerHTML = `<div style="font-size:12px;color:var(--accent);padding:4px 0">✓ ${escapeHTML(ct.name || 'contact')} selected</div>`;
+}
+async function _v15calCreateBooking() {
+  const err = document.getElementById('v15nb-err'); if (err) err.style.display = 'none';
+  const ct = _V15CAL.nbContact;
+  const calId = document.getElementById('v15nb-cal')?.value;
+  const date = document.getElementById('v15nb-date')?.value;
+  const time = document.getElementById('v15nb-time')?.value;
+  if (!ct || !ct.ghl_contact_id) { if (err) { err.textContent = 'Pick a contact first.'; err.style.display = 'block'; } return; }
+  if (!calId || !date || !time) { if (err) { err.textContent = 'Pick a calendar, date and time.'; err.style.display = 'block'; } return; }
+  const btn = document.getElementById('v15nb-create'); if (btn) { btn.disabled = true; btn.textContent = 'Creating…'; }
+  try {
+    const token = await _mreqAuthToken();
+    const r = await fetch('/api/ghl/calendars-v15?action=create-appointment&client_id=' + encodeURIComponent(CLIENT_ID), {
+      method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+      body: JSON.stringify({ action: 'create-appointment', calendar: calId, contactId: ct.ghl_contact_id, start: `${date}T${time}` }),
+    });
+    const j = await _safeJson(r); if (!r.ok) throw new Error(j.error || ('HTTP ' + r.status));
+    _v15calCloseDrawer();
+    if (!_V15CAL.selected.has(calId)) { _V15CAL.selected.add(calId); await _v15calLoadSettings(); _v15calRender(); }
+    _v15calLoadEvents();
+  } catch (e) {
+    if (err) { err.textContent = e.message || String(e); err.style.display = 'block'; }
+    if (btn) { btn.disabled = false; btn.textContent = 'Create booking'; }
+  }
+}
+
+// ══════════════════════════════════════════════════════════════
 // INBOX VIEW (V1.5) — fresh GHL inbox: recent SMS+email, threads, send
 // SMS/email + attachments, unread filter, setup (synced sender email+phone).
 // Reuses /api/ghl/inbox (list + thread) + /api/ghl/send-message. (P2 adds
@@ -9406,6 +9883,7 @@ function switchView(name, el) {
   if (name === 'v15inbox') openV15Inbox();
 
   if (name === 'v15kpis') openV15Kpis();
+  if (name === 'v15cal') openV15Cal();
 
   // When entering Action Items, load the list
   if (name === 'action-items') fetchAndRenderActionItems();
