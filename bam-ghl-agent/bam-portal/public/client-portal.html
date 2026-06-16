@@ -8486,28 +8486,60 @@ function _renderAssets() {
 
 function _assetCard(a) {
   const url = _assetUrl(a.storage_path);
-  const opt = (list, val, getLabel, ph) => `<option value="">${ph}</option>` + list.map(x => `<option value="${x.id}" ${val === x.id ? 'selected' : ''}>${escapeHTML(getLabel(x))}</option>`).join('');
+  const selStyle = "width:100%;background:var(--bg);border:1px solid var(--border);border-radius:5px;color:var(--text);padding:6px 8px;font:inherit;font-size:11.5px";
+  const lbl = (t) => `<div style="font-size:9.5px;color:var(--text-mute);text-transform:uppercase;letter-spacing:.06em;margin:9px 0 3px">${t}</div>`;
+  // Step 1 — Type
   const catOpts = _ASSET_CATS.map(c => `<option value="${c}" ${a.category === c ? 'selected' : ''}>${c}</option>`).join('');
-  const sel = (field, html) => `<select onchange="_assetSetTag('${a.id}','${field}',this.value)" style="width:100%;background:var(--bg);border:1px solid var(--border);border-radius:5px;color:var(--text);padding:5px 7px;font:inherit;font-size:11.5px;margin-top:5px">${html}</select>`;
+  // Step 2 — Tagged to (Brand / one Offer / Staff / Location, all in one dropdown)
+  const cur = a.offer_id ? `offer:${a.offer_id}` : a.staff_id ? `staff:${a.staff_id}` : a.location_id ? `location:${a.location_id}` : '';
+  const grp = (label, list, kind, getLabel) => list.length
+    ? `<optgroup label="${label}">${list.map(x => `<option value="${kind}:${x.id}" ${cur === kind + ':' + x.id ? 'selected' : ''}>${escapeHTML(getLabel(x))}</option>`).join('')}</optgroup>`
+    : '';
+  const tagSel = `<select onchange="_assetSetTag2('${a.id}',this.value)" style="${selStyle}">
+      <option value="" ${cur === '' ? 'selected' : ''}>Brand (no tag)</option>
+      ${grp('Offers',    _ASSET_TARGETS.offers,    'offer',    x => x.title)}
+      ${grp('Staff',     _ASSET_TARGETS.staff,     'staff',    x => x.name || x.email)}
+      ${grp('Locations', _ASSET_TARGETS.locations, 'location', x => x.title)}
+    </select>`;
   return `
     <div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;overflow:hidden;display:flex;flex-direction:column">
       <div style="aspect-ratio:16/10;background:#0a0a0a;display:flex;align-items:center;justify-content:center;overflow:hidden">
         <img src="${escapeHTML(url)}" alt="${escapeHTML(a.alt || '')}" loading="lazy" style="max-width:100%;max-height:100%;object-fit:contain">
       </div>
-      <div style="padding:10px 11px;display:flex;flex-direction:column;gap:2px">
+      <div style="padding:11px 12px;display:flex;flex-direction:column">
         <input value="${escapeHTML(a.label || '')}" placeholder="Label" onchange="_assetSetTag('${a.id}','label',this.value)" style="background:transparent;border:none;border-bottom:1px solid transparent;color:var(--text);font:inherit;font-size:13px;font-weight:600;padding:2px 0" onfocus="this.style.borderBottomColor='var(--border)'" onblur="this.style.borderBottomColor='transparent'">
-        <div style="font-size:10.5px;color:var(--gold);font-weight:700;letter-spacing:.04em;margin:2px 0 4px">${_assetTargetName(a)}</div>
-        ${sel('category', catOpts)}
-        ${sel('offer_id',    opt(_ASSET_TARGETS.offers,    a.offer_id,    x => x.title,            'Tag to offer…'))}
-        ${sel('staff_id',    opt(_ASSET_TARGETS.staff,     a.staff_id,    x => x.name || x.email,  'Tag to staff…'))}
-        ${sel('location_id', opt(_ASSET_TARGETS.locations, a.location_id, x => x.title,            'Tag to location…'))}
-        <input value="${escapeHTML(a.alt || '')}" placeholder="Alt text (accessibility)" onchange="_assetSetTag('${a.id}','alt',this.value)" style="background:var(--bg);border:1px solid var(--border);border-radius:5px;color:var(--text);font:inherit;font-size:11px;padding:5px 7px;margin-top:5px">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px">
+        <div style="font-size:10.5px;color:var(--gold);font-weight:700;letter-spacing:.04em;margin:2px 0 0">${_assetTargetName(a)}</div>
+        ${lbl('1 · Type')}
+        <select onchange="_assetSetTag('${a.id}','category',this.value)" style="${selStyle}">${catOpts}</select>
+        ${lbl('2 · Tagged to')}
+        ${tagSel}
+        ${lbl('Alt text')}
+        <input value="${escapeHTML(a.alt || '')}" placeholder="Describe the image" onchange="_assetSetTag('${a.id}','alt',this.value)" style="${selStyle}">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:11px">
           <a href="${escapeHTML(url)}" target="_blank" rel="noopener" style="font-size:11px;color:var(--text-mute);text-decoration:none">Open ↗</a>
           <button onclick="_assetRemove('${a.id}')" style="background:none;border:none;color:var(--text-mute);font-size:11px;cursor:pointer">Remove</button>
         </div>
       </div>
     </div>`;
+}
+
+// Combined "Tagged to" — value is '' (brand) | 'offer:<id>' | 'staff:<id>' |
+// 'location:<id>'. An asset belongs to one thing, so the other two clear.
+async function _assetSetTag2(id, value) {
+  const sep = (value || '').indexOf(':');
+  const kind = sep > -1 ? value.slice(0, sep) : '';
+  const tid = sep > -1 ? value.slice(sep + 1) : null;
+  const patch = { offer_id: null, staff_id: null, location_id: null, updated_at: new Date().toISOString() };
+  if (kind === 'offer') patch.offer_id = tid;
+  else if (kind === 'staff') patch.staff_id = tid;
+  else if (kind === 'location') patch.location_id = tid;
+  const a = _ASSETS.find(x => x.id === id);
+  if (a) { a.offer_id = patch.offer_id; a.staff_id = patch.staff_id; a.location_id = patch.location_id; }
+  try {
+    const { error } = await _sb.from('client_assets').update(patch).eq('id', id);
+    if (error) throw error;
+    _renderAssets();
+  } catch (e) { alert('Update failed: ' + (e.message || e)); }
 }
 
 function _assetSetFilter(k) { _ASSET_FILTER = k; _renderAssets(); }
