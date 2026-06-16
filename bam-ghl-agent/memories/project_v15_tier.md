@@ -68,8 +68,14 @@ exclusions; undo restores; source untouched); Setup = **extend Price Match**.
   w/ spend/leads/cpl); shows spend · leads · cost-per-lead as PLAIN numbers,
   **all good/bad indicators stripped** (no verdicts, no CPL-vs-target coloring,
   no ▲▼ trend colors) — "control the narrative." Other sections = shells.
-- **Setup (pending):** extend Price Match — tie every Stripe price/product/sub
-  ever paid → an offer (+ create offer by title); tie GHL pipelines → offer.
+- **Setup (done):** `api/offers/kpi-setup.js` + `kpi_offer_links` table (attribution
+  only — distinct from `pricing_catalog` which routes checkout). GET assembles
+  offers + Stripe products (ever-paid, w/ sub_count, from `status=all` sub scan +
+  product list) + GHL pipelines + existing links. UI = a per-row offer dropdown
+  for each Stripe product and each pipeline (saves instantly via POST
+  `action=link`; offer_id null unties) + "+ New offer by title" (POST
+  `action=create-offer` → lightweight `offers` row type=training/draft). Lazy
+  loaded after Marketing (Stripe+GHL fetch is slow). These ties feed Sales/Revenue/Members.
 - **Sales (pending):** per offer — # entered pipeline (GHL truth) + # new
   payments (Stripe truth); each expands to its contacts → delete a contact
   (+undo) via the exclusions table to adjust the count.

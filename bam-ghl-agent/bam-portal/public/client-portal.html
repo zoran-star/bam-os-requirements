@@ -8743,7 +8743,7 @@ async function _assetBankRemove(assetId, field, id, category) {
 // meta-report, good/bad indicators stripped) + the month selector + section
 // shells. Sales / Revenue / Members / Setup come in later phases.
 // ══════════════════════════════════════════════════════════════
-let _V15K = { periods: [], monthKey: null, mkt: null, mktEmpty: false };
+let _V15K = { periods: [], monthKey: null, mkt: null, mktEmpty: false, setup: null, setupLoaded: false, setupErr: null };
 
 function _v15kMoney(n) { return (n == null || isNaN(n)) ? '—' : '$' + Number(n).toLocaleString(undefined, { maximumFractionDigits: 2 }); }
 function _v15kNum(n) { return (n == null || isNaN(n)) ? '—' : Number(n).toLocaleString(); }
@@ -8778,9 +8778,97 @@ async function openV15Kpis() {
     _V15K.mktEmpty = !!j.empty || _V15K.periods.length === 0;
     _V15K.monthKey = _V15K.periods[0]?.key || null;
     _v15kRender();
+    _v15kLoadSetup();   // lazy, non-blocking (Stripe + GHL fetch is slow)
   } catch (e) {
     host.innerHTML = `<div class="req-empty" style="padding:24px 0;color:#9a3b2f">Couldn't load KPIs — ${escapeHTML(e.message || String(e))}</div>`;
   }
+}
+
+// ── SETUP section: tie Stripe products + GHL pipelines → offers (powers Sales/
+// Revenue/Members grouping). Lazy-loaded; offer ties save instantly. ──
+async function _v15kLoadSetup() {
+  if (_V15K.setupLoaded) return;
+  _V15K.setupLoaded = true;
+  try {
+    const token = await _mreqAuthToken();
+    const r = await fetch('/api/offers/kpi-setup?client_id=' + encodeURIComponent(CLIENT_ID), { headers: { Authorization: 'Bearer ' + token } });
+    const j = await _safeJson(r);
+    if (!r.ok) throw new Error(j.error || ('HTTP ' + r.status));
+    _V15K.setup = j;
+  } catch (e) { _V15K.setupErr = e.message || String(e); }
+  _v15kRenderSetup();
+}
+function _v15kRenderSetup() { const el = document.getElementById('v15k-setup'); if (el) el.innerHTML = _v15kSetupHtml(); }
+function _v15kOfferOpts(sel) {
+  const blank = `<option value="">— not tied —</option>`;
+  return blank + ((_V15K.setup && _V15K.setup.offers) || []).map(o =>
+    `<option value="${escapeHTML(o.id)}" ${o.id === sel ? 'selected' : ''}>${escapeHTML(o.title)}</option>`).join('');
+}
+async function _v15kLinkEl(el) {
+  const kind = el.getAttribute('data-kind'), ref = el.getAttribute('data-ref'), label = el.getAttribute('data-label') || '';
+  const offerId = el.value || null;
+  el.disabled = true;
+  try {
+    const token = await _mreqAuthToken();
+    const r = await fetch('/api/offers/kpi-setup?client_id=' + encodeURIComponent(CLIENT_ID), {
+      method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+      body: JSON.stringify({ action: 'link', kind, ref_id: ref, label, offer_id: offerId }),
+    });
+    const j = await _safeJson(r);
+    if (!r.ok) throw new Error(j.error || ('HTTP ' + r.status));
+    const arr = kind === 'stripe_product' ? _V15K.setup.stripeProducts : _V15K.setup.pipelines;
+    const row = (arr || []).find(x => x.id === ref); if (row) row.offer_id = offerId;
+  } catch (e) { alert("Couldn't save: " + (e.message || e)); }
+  finally { el.disabled = false; }
+}
+async function _v15kCreateOffer() {
+  const title = (prompt('New offer title (used only to group KPIs):') || '').trim();
+  if (!title) return;
+  try {
+    const token = await _mreqAuthToken();
+    const r = await fetch('/api/offers/kpi-setup?client_id=' + encodeURIComponent(CLIENT_ID), {
+      method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+      body: JSON.stringify({ action: 'create-offer', title }),
+    });
+    const j = await _safeJson(r);
+    if (!r.ok) throw new Error(j.error || ('HTTP ' + r.status));
+    _V15K.setup.offers.push(j.offer);
+    _V15K.setup.offers.sort((a, b) => String(a.title).localeCompare(String(b.title)));
+    _v15kRenderSetup();
+  } catch (e) { alert("Couldn't create offer: " + (e.message || e)); }
+}
+function _v15kSetupHtml() {
+  if (_V15K.setupErr) return `<div class="req-empty" style="padding:14px 0;color:#9a3b2f">Couldn't load setup — ${escapeHTML(_V15K.setupErr)}</div>`;
+  if (!_V15K.setup) return `<div class="req-empty" style="padding:14px 0"><span class="req-spin"></span> Loading offers, Stripe products &amp; pipelines…</div>`;
+  const s = _V15K.setup;
+  const ssty = 'padding:7px 9px;border-radius:7px;border:1px solid var(--border-med);background:var(--surface);color:var(--text);font:inherit;font-size:12px;cursor:pointer';
+  const linkRow = (label, sub, kind, ref, offerId) => `
+    <div style="display:grid;grid-template-columns:1fr 190px;gap:10px;align-items:center;padding:9px 12px;border:1px solid var(--border);border-radius:9px;margin-bottom:7px">
+      <div style="min-width:0"><div style="font-weight:600;font-size:13px;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escapeHTML(label)}</div>${sub ? `<div style="font-size:11px;color:var(--text-mute)">${escapeHTML(sub)}</div>` : ''}</div>
+      <select data-kind="${kind}" data-ref="${escapeHTML(ref)}" data-label="${escapeHTML(label)}" onchange="_v15kLinkEl(this)" style="${ssty}">${_v15kOfferOpts(offerId)}</select>
+    </div>`;
+  const sub = (t) => `<div style="font-size:12px;font-weight:700;color:var(--text);margin:14px 0 6px;letter-spacing:.02em">${t}</div>`;
+
+  // OFFERS
+  let offersBlock = sub('Offers') + `<div style="font-size:12px;color:var(--text-mute);margin-bottom:8px">These are the buckets KPIs group by. Tie each Stripe product and pipeline below to one.</div>`;
+  if (!s.offers.length) offersBlock += `<div class="req-empty" style="padding:6px 0;color:var(--text-mute)">No offers yet — create one to start grouping.</div>`;
+  else offersBlock += `<div style="display:flex;flex-wrap:wrap;gap:6px">` + s.offers.map(o => `<span style="font-size:12px;padding:5px 10px;border:1px solid var(--border-med);border-radius:999px;color:var(--text)">${escapeHTML(o.title)}</span>`).join('') + `</div>`;
+  offersBlock += `<div style="margin-top:8px"><button onclick="_v15kCreateOffer()" style="${ssty};font-weight:700;border-color:var(--accent);color:var(--accent);background:rgba(232,197,71,0.10)">+ New offer by title</button></div>`;
+
+  // STRIPE PRODUCTS
+  let stripeBlock = sub('Stripe products → offer');
+  if (!s.stripeConnected) stripeBlock += `<div class="req-empty" style="padding:6px 0;color:var(--text-mute)">Stripe is not connected for this academy.</div>`;
+  else if (!s.stripeProducts.length) stripeBlock += `<div class="req-empty" style="padding:6px 0;color:var(--text-mute)">No Stripe products found.</div>`;
+  else stripeBlock += s.stripeProducts.map(p => linkRow(p.name || p.id,
+    `${p.sub_count} sub${p.sub_count === 1 ? '' : 's'} ever${p.active ? '' : ' · archived'} · ${p.id}`,
+    'stripe_product', p.id, p.offer_id)).join('');
+
+  // GHL PIPELINES
+  let pipeBlock = sub('GHL pipelines → offer');
+  if (!s.pipelines.length) pipeBlock += `<div class="req-empty" style="padding:6px 0;color:var(--text-mute)">No GHL pipelines found.</div>`;
+  else pipeBlock += s.pipelines.map(p => linkRow(p.name || p.id, p.id, 'ghl_pipeline', p.id, p.offer_id)).join('');
+
+  return offersBlock + stripeBlock + pipeBlock;
 }
 
 function _v15kSetMonth(k) { _V15K.monthKey = k; _v15kRender(); }
@@ -8811,7 +8899,10 @@ function _v15kRender() {
     ${marketing}
     ${sectionHead('Sales')}${_v15kSoon('Per-offer: entered pipeline + new payments (human-cleaned)')}
     ${sectionHead('Revenue')}${_v15kSoon('Net + gross · payouts · failed payments')}
-    ${sectionHead('Members')}${_v15kSoon('Month’s payments · cancelled subs · manual cancellation')}`;
+    ${sectionHead('Members')}${_v15kSoon('Month’s payments · cancelled subs · manual cancellation')}
+    ${sectionHead('Setup')}
+    <div style="font-size:12.5px;color:var(--text-mute);margin-top:4px">Connect Stripe and GoHighLevel to your offers. This powers the Sales, Revenue, and Members numbers.</div>
+    <div id="v15k-setup">${_v15kSetupHtml()}</div>`;
 }
 
 // ══════════════════════════════════════════════════════════════
