@@ -8449,25 +8449,39 @@ function _assetMatchesFilter(a) {
   }
 }
 
+function _assetFilterCount(k) {
+  if (k === 'all') return _ASSETS.length;
+  return _ASSETS.filter(a => {
+    const tagged = a.offer_id || a.staff_id || a.location_id;
+    return k === 'brand' ? !tagged : k === 'offers' ? !!a.offer_id : k === 'staff' ? !!a.staff_id : !!a.location_id;
+  }).length;
+}
+
 function _renderAssets() {
   const host = document.getElementById('assets-content');
   if (!host) return;
-  const pills = [['all','All'],['brand','Brand'],['offers','Offers'],['staff','Staff'],['locations','Locations']]
-    .map(([k,l]) => `<button class="res-cat-pill ${_ASSET_FILTER === k ? 'active' : ''}" onclick="_assetSetFilter('${k}')">${l}${k === 'all' ? ' (' + _ASSETS.length + ')' : ''}</button>`).join('');
+  const pill = (k, l) => {
+    const on = _ASSET_FILTER === k;
+    return `<button onclick="_assetSetFilter('${k}')" style="display:inline-flex;align-items:center;gap:6px;padding:7px 14px;border-radius:999px;font:inherit;font-size:12.5px;font-weight:600;cursor:pointer;white-space:nowrap;border:1px solid ${on ? 'var(--gold)' : 'var(--border-med)'};background:${on ? 'var(--gold)' : 'transparent'};color:${on ? '#0B0B0D' : 'var(--text-sub)'}">${l}<span style="font-size:11px;opacity:.65">${_assetFilterCount(k)}</span></button>`;
+  };
+  const pills = [['all','All'],['brand','Brand'],['offers','Offers'],['staff','Staff'],['locations','Locations']].map(([k, l]) => pill(k, l)).join('');
   const shown = _ASSETS.filter(_assetMatchesFilter);
   const cards = shown.length
-    ? shown.map(_assetCard).join('')
-    : '<div class="req-empty" style="padding:24px 0;color:var(--text-mute)">No assets here yet. Use “Upload assets” above.</div>';
+    ? `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:14px">${shown.map(_assetCard).join('')}</div>`
+    : `<div style="border:1px dashed var(--border-med);border-radius:12px;padding:52px 24px;text-align:center;color:var(--text-mute)">
+         <div style="font-size:14px;color:var(--text-sub)">No assets ${_ASSET_FILTER === 'all' ? 'yet' : 'in this filter'}.</div>
+         <div style="font-size:12.5px;margin-top:6px">Use <b style="color:var(--text-sub)">＋ Upload assets</b> above to add images.</div>
+       </div>`;
   host.innerHTML = `
-    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:14px">
-      <label style="display:inline-flex;align-items:center;gap:8px;padding:9px 14px;background:var(--gold);color:#0B0B0D;font-weight:700;font-size:13px;border-radius:6px;cursor:pointer">
+    <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:18px">
+      <label style="display:inline-flex;align-items:center;gap:8px;padding:10px 16px;background:var(--gold);color:#0B0B0D;font-weight:700;font-size:13px;border-radius:8px;cursor:pointer">
         ＋ Upload assets
         <input type="file" accept="image/*" multiple style="display:none" onchange="_uploadAssets(this)">
       </label>
-      <span style="font-size:12px;color:var(--text-mute)">Drag images in, then tag each to an offer, staff member, or location.</span>
+      <span style="font-size:12.5px;color:var(--text-mute);max-width:420px">Drag images in, then tag each to an offer, staff member, or location.</span>
     </div>
-    <div class="res-cats" style="margin-bottom:16px">${pills}</div>
-    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:14px">${cards}</div>`;
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:20px">${pills}</div>
+    ${cards}`;
 }
 
 function _assetCard(a) {
@@ -8537,6 +8551,77 @@ async function _assetRemove(id) {
     const { error } = await _sb.from('client_assets').delete().eq('id', id);
     if (error) throw error;
     await openAssetsView();
+  } catch (e) { alert("Couldn't remove: " + (e.message || e)); }
+}
+
+// ── In-context asset uploader ────────────────────────────────────────────────
+// Drop into any editor (offer / staff / location) to upload + manage images
+// tagged to that thing — everything lands in the one client_assets library and
+// shows in the Assets tab. Self-loads after its HTML is in the DOM.
+//   _assetBankHtml('offer_id'|'staff_id'|'location_id', <uuid>, { category })
+function _assetBankHtml(field, id, opts) {
+  opts = opts || {};
+  setTimeout(() => _assetBankLoad(field, id, opts.category || 'photo'), 0);
+  return `<div id="assetbank-${field}-${id}" class="asset-bank-inline">
+    <div style="font-size:12px;color:var(--text-mute)"><span class="req-spin"></span> Loading images…</div>
+  </div>`;
+}
+async function _assetBankLoad(field, id, category) {
+  const el = document.getElementById(`assetbank-${field}-${id}`);
+  if (!el || !_sb || typeof CLIENT_ID === 'undefined') return;
+  let rows = [];
+  try {
+    const { data, error } = await _sb.from('client_assets')
+      .select('id,label,alt,storage_path').eq('client_id', CLIENT_ID).eq(field, id)
+      .order('created_at', { ascending: false });
+    if (error) throw error;
+    rows = data || [];
+  } catch (e) {
+    el.innerHTML = `<div style="font-size:12px;color:#9a3b2f">Couldn't load images — ${escapeHTML(e.message || String(e))}</div>`;
+    return;
+  }
+  const thumbs = rows.map(a => `
+    <div style="position:relative;width:88px">
+      <div style="aspect-ratio:1;background:#0a0a0a;border:1px solid var(--border);border-radius:6px;overflow:hidden;display:flex;align-items:center;justify-content:center">
+        <img src="${escapeHTML(_assetUrl(a.storage_path))}" alt="${escapeHTML(a.alt || '')}" loading="lazy" style="max-width:100%;max-height:100%;object-fit:contain">
+      </div>
+      <button onclick="_assetBankRemove('${a.id}','${field}','${id}','${category}')" title="Remove" style="position:absolute;top:-6px;right:-6px;width:20px;height:20px;border-radius:50%;border:none;background:var(--surface);color:var(--text-mute);cursor:pointer;font-size:13px;line-height:1;box-shadow:0 1px 4px rgba(0,0,0,.4)">×</button>
+    </div>`).join('');
+  el.innerHTML = `
+    <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+      ${thumbs}
+      <label style="display:inline-flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;width:88px;height:88px;border:1px dashed var(--border-med);border-radius:6px;color:var(--text-sub);font-size:11px;cursor:pointer;text-align:center">
+        <span style="font-size:18px">＋</span> Add image
+        <input type="file" accept="image/*" multiple style="display:none" onchange="_assetBankUpload(this,'${field}','${id}','${category}')">
+      </label>
+    </div>
+    <div style="font-size:10.5px;color:var(--text-mute);margin-top:6px">Lands in the Assets tab, tagged automatically.</div>`;
+}
+async function _assetBankUpload(inputEl, field, id, category) {
+  const files = Array.from(inputEl.files || []); inputEl.value = '';
+  if (!files.length || !_sb || typeof CLIENT_ID === 'undefined') return;
+  for (const file of files) {
+    try {
+      const clean = file.name.replace(/[^a-zA-Z0-9._-]+/g, '_');
+      const stamp = Date.now() + '-' + Math.random().toString(36).slice(2, 7);
+      const path = `${CLIENT_ID}/${stamp}-${clean}`;
+      const { error: upErr } = await _sb.storage.from('client-assets').upload(path, file, { cacheControl: '3600', upsert: false, contentType: file.type || 'application/octet-stream' });
+      if (upErr) throw upErr;
+      const row = { client_id: CLIENT_ID, label: file.name.replace(/\.[^.]+$/, ''), category: category || 'photo', storage_path: path, mime_type: file.type || null, size_bytes: file.size };
+      row[field] = id;
+      const { error: insErr } = await _sb.from('client_assets').insert(row);
+      if (insErr) { await _sb.storage.from('client-assets').remove([path]).catch(() => {}); throw insErr; }
+    } catch (e) { alert("Couldn't upload " + file.name + ' — ' + (e.message || e)); }
+  }
+  await _assetBankLoad(field, id, category);
+}
+async function _assetBankRemove(assetId, field, id, category) {
+  if (!confirm('Remove this image?')) return;
+  try {
+    const { data } = await _sb.from('client_assets').select('storage_path').eq('id', assetId).single();
+    if (data && data.storage_path) await _sb.storage.from('client-assets').remove([data.storage_path]).catch(() => {});
+    await _sb.from('client_assets').delete().eq('id', assetId);
+    await _assetBankLoad(field, id, category);
   } catch (e) { alert("Couldn't remove: " + (e.message || e)); }
 }
 
@@ -10570,14 +10655,20 @@ async function _bbRenderStaffCard(panel, meta) {
     const isMe = r.user_id === myId;
     const canRevoke = myRow?.role === 'owner' && !isOwner && !isMe;
     const initial = (r.name || r.email || '?').trim().slice(0, 1).toUpperCase();
-    return `<div class="team-row" style="margin-bottom:8px">
-      <div class="team-avatar">${escapeHTML(initial)}</div>
-      <div class="team-meta">
-        <div class="team-name">${escapeHTML(r.name || '(no name)')}${isMe ? '<span class="team-you">You</span>' : ''}</div>
-        <div class="team-email">${escapeHTML(r.email || '')}</div>
+    return `<div style="margin-bottom:10px">
+      <div class="team-row">
+        <div class="team-avatar">${escapeHTML(initial)}</div>
+        <div class="team-meta">
+          <div class="team-name">${escapeHTML(r.name || '(no name)')}${isMe ? '<span class="team-you">You</span>' : ''}</div>
+          <div class="team-email">${escapeHTML(r.email || '')}</div>
+        </div>
+        <div class="team-role-badge${isOwner ? ' owner' : ''}">${isOwner ? 'Owner' : 'Member'}</div>
+        ${canRevoke ? `<button class="team-revoke-btn" onclick="openRevokeTeamModal('${r.id}')">Revoke</button>` : ''}
       </div>
-      <div class="team-role-badge${isOwner ? ' owner' : ''}">${isOwner ? 'Owner' : 'Member'}</div>
-      ${canRevoke ? `<button class="team-revoke-btn" onclick="openRevokeTeamModal('${r.id}')">Revoke</button>` : ''}
+      <div style="margin-top:6px;padding:10px 12px;background:var(--surface);border:1px solid var(--border-med);border-radius:10px">
+        <div style="font-size:11px;color:var(--text-mute);margin-bottom:8px">Photo / headshot</div>
+        ${_assetBankHtml('staff_id', r.id, { category: 'photo' })}
+      </div>
     </div>`;
   }).join('');
 }
@@ -10635,13 +10726,19 @@ function _bbRenderLocationsListInPanel() {
     return;
   }
   list.innerHTML = _bbLocations.map(loc => `
-    <div style="display:flex;align-items:flex-start;gap:12px;padding:14px 16px;background:var(--surface);border:1px solid var(--border-med);border-radius:10px;margin-bottom:10px">
-      <div style="flex:1;min-width:0">
-        <div style="font-size:14px;font-weight:600;color:var(--text);margin-bottom:4px">${_bbEscapeHtml(loc.title || '(untitled location)')}</div>
-        ${loc.address ? `<div style="font-size:12px;color:var(--text-sub);margin-bottom:4px">${_bbEscapeHtml(loc.address)}</div>` : ''}
-        ${loc.notes ? `<div style="font-size:11px;color:var(--text-mute);font-style:italic">${_bbEscapeHtml(loc.notes)}</div>` : ''}
+    <div style="padding:14px 16px;background:var(--surface);border:1px solid var(--border-med);border-radius:10px;margin-bottom:10px">
+      <div style="display:flex;align-items:flex-start;gap:12px">
+        <div style="flex:1;min-width:0">
+          <div style="font-size:14px;font-weight:600;color:var(--text);margin-bottom:4px">${_bbEscapeHtml(loc.title || '(untitled location)')}</div>
+          ${loc.address ? `<div style="font-size:12px;color:var(--text-sub);margin-bottom:4px">${_bbEscapeHtml(loc.address)}</div>` : ''}
+          ${loc.notes ? `<div style="font-size:11px;color:var(--text-mute);font-style:italic">${_bbEscapeHtml(loc.notes)}</div>` : ''}
+        </div>
+        <button class="bb-block-remove" onclick="_bbDeleteLocation('${loc.id}')" title="Delete location">Remove</button>
       </div>
-      <button class="bb-block-remove" onclick="_bbDeleteLocation('${loc.id}')" title="Delete location">Remove</button>
+      <div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border)">
+        <div style="font-size:11px;color:var(--text-mute);margin-bottom:8px">Photos</div>
+        ${_assetBankHtml('location_id', loc.id, { category: 'photo' })}
+      </div>
     </div>
   `).join('');
 }
@@ -11884,7 +11981,7 @@ const _bbStdOnboarding = (intakeFieldDefaults, intakeFieldAddons) => ([
     addonOptions: intakeFieldAddons },
   { key:'notify_on_signup', type:'staff_select', label:'Notify on new sign-up',
     hint:'Who gets pinged when someone signs up' },
-  { key:'assets', type:'files', label:'Assets',
+  { key:'assets', type:'asset_bank', label:'Assets',
     hint:'Marketing / promo material — graphics, photos, posters, social cards' },
   _bbCommonExtraNotes
 ]);
@@ -12192,7 +12289,7 @@ const _bbOfferConfigs = {
         hint:'Roster confirmation, schedule release, equipment, comm channel. Attach files.' },
       { key:'standings_link', type:'link', label:'Standings page link' },
       { key:'notify_on_signup', type:'staff_select', label:'Notify on new sign-up' },
-      { key:'assets', type:'files', label:'Assets',
+      { key:'assets', type:'asset_bank', label:'Assets',
         hint:'Marketing / promo material' },
       _bbCommonExtraNotes
     ]}
@@ -12289,7 +12386,7 @@ const _bbOfferConfigs = {
       { key:'scorekeeper', type:'staff_select', label:'Score-keeper assignments',
         hint:'Who runs the table per court (operational)' },
       { key:'notify_on_signup', type:'staff_select', label:'Notify on new sign-up' },
-      { key:'assets', type:'files', label:'Assets',
+      { key:'assets', type:'asset_bank', label:'Assets',
         hint:'Marketing / promo + bracket templates, social cards' },
       _bbCommonExtraNotes
     ]}
@@ -12395,7 +12492,7 @@ const _bbOfferConfigs = {
       { key:'day_of_contact', type:'staff_select', label:'Day-of point of contact',
         hint:'Who renter calls during the rental' },
       { key:'notify_on_signup', type:'staff_select', label:'Notify on new sign-up' },
-      { key:'assets', type:'files', label:'Assets',
+      { key:'assets', type:'asset_bank', label:'Assets',
         hint:'Marketing / promo material (separate from floor plan)' },
       _bbCommonExtraNotes
     ]}
@@ -12584,6 +12681,16 @@ function _bbRenderField(field, sectionId) {
           teamId: null,
           sectionKey: sectionId + ':' + field.key,
         });
+      }
+      break;
+    }
+    case 'asset_bank': {
+      // Images land in the academy-wide asset library (client_assets), tagged to
+      // this offer, so they show in the Assets tab and feed the offer's website.
+      if (!_bbState.offer || !_bbState.offer.id) {
+        body = `<div style="padding:14px;background:var(--surface-alt);border:1px dashed var(--border-med);border-radius:8px;color:var(--text-mute);font-size:13px">Save the offer first, then come back to add images.</div>`;
+      } else {
+        body = _assetBankHtml('offer_id', _bbState.offer.id, { category: field.category || 'photo' });
       }
       break;
     }

@@ -31,13 +31,24 @@ images live here in Supabase, fed by the Business Blueprint).
   funnel). Staff + locations get images too. The Assets tab is the central
   place to view/add/remove/**tag** everything.
 
-## Pending (Phases 2–3, not built)
-- **Phase 2:** `GET /api/website/assets?client_id=` (clone `offer-media.js` CORS
-  pattern) so sites pull by tag; wire the offer-builder `assets` field + staff +
-  location editors to write INTO `client_assets` (one store, no double-entry).
-- **Phase 3:** sites reference assets by key/tag (`<img data-asset>` + fallback);
-  migrate GTA's `clients/bam-gta/gta-assets/*` (git) + the 49MB Claude Design
-  photo library into BAM's bank. Image optimization via Supabase transforms.
+## Phase 2 — DONE
+- **`GET /api/website/assets?client_id=&offer_id=?`** (`api/website/assets.js`,
+  public, CORS-gated): full asset list (public URLs + tags) + `byCategory` map
+  (first per category; offer-tagged wins over brand when `offer_id` passed).
+- **Upload buttons everywhere** (Zoran chose "buttons everywhere"): one reusable
+  in-context widget `_assetBankHtml(field,id,{category})` (+ `_assetBankLoad`/
+  `_assetBankUpload`/`_assetBankRemove`) dropped into 3 editors, all writing to
+  `client_assets` tagged: the offer builder's `assets` field (now field type
+  **`asset_bank`** → tagged `offer_id`; the 4 offer `assets` configs converted
+  from `files`), each **location** card (`location_id`), each **staff** row
+  (`staff_id`). The offer `assets` field NO LONGER uses offer_files.
+
+## Phase 3 — pending (human-driven, per Zoran)
+- Sites reference assets by tag/category (`<img data-asset>` + fallback) via
+  `/api/website/assets`. Migrate GTA's `clients/bam-gta/gta-assets/*` (git) + the
+  49MB Claude Design photo library into BAM's bank. Image optimization via
+  Supabase transforms. Site create/edit flow stays human-driven (Claude Design →
+  Claude Code → preview → human approve → ship).
 
 Related: [[project_offer_architecture]] (per-offer files in `offer_files`/`offers`
 bucket — separate from this academy-level library).
