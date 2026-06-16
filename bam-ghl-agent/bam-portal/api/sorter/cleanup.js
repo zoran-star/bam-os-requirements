@@ -102,6 +102,48 @@ async function stripePost(path, body, stripeAccount) {
 
 const ACTIVEISH = new Set(["active", "trialing", "past_due", "paused", "unpaid"]);
 
+// Next-payment facts pulled off a raw Stripe subscription — WHEN the next charge
+// lands and any reason it won't (canceling, paused). Spread onto the link entries
+// so the cleanup list can flag "should bill but won't".
+function subBillingFacts(sub) {
+  const item = sub.items && sub.items.data && sub.items.data[0];
+  const price = item && item.price;
+  return {
+    current_period_end: sub.current_period_end || null,
+    trial_end: sub.trial_end || null,
+    cancel_at_period_end: !!sub.cancel_at_period_end,
+    cancel_at: sub.cancel_at || null,
+    paused: !!sub.pause_collection,
+    sub_interval: price && price.recurring
+      ? `${price.recurring.interval_count > 1 ? price.recurring.interval_count + " " : ""}${price.recurring.interval}`
+      : null,
+  };
+}
+
+// Per-member "Next payment" verdict for the cleanup list. Pure function of the
+// member's live link + their catalog offer — no extra Stripe calls. `fixable`
+// means the fix-payment modal can offer a one-click correction.
+// states: scheduled | none | missing | paused | ending | at_risk | unknown
+function computeNextPayment({ link, cat, offerKey, altPay }) {
+  const iso = (unix) => (unix ? new Date(unix * 1000).toISOString().slice(0, 10) : null);
+  if (altPay) return { state: "none", date: null, label: "— pays another way", fixable: false, reason: "alternate payment method" };
+  const recurringExpected = !!(cat && cat.interval) || /month|week|3_month|6_month|12_month|year/i.test(offerKey || "");
+  if (!link) {
+    if (recurringExpected) return { state: "missing", date: null, label: "⚠ none — set one up", fixable: true, reason: "no subscription, but this plan should bill on a schedule" };
+    return { state: "none", date: null, label: "—", fixable: false, reason: "no recurring plan" };
+  }
+  const st = link.status;
+  if (st === "canceled" || link.cancel_at_period_end || link.cancel_at) {
+    return { state: "ending", date: iso(link.cancel_at || link.current_period_end), label: "⚠ canceling — no next", fixable: true, reason: "subscription is set to cancel (or already canceled)" };
+  }
+  if (link.paused) return { state: "paused", date: null, label: "⚠ paused — no next", fixable: true, reason: "billing is paused (pause_collection)" };
+  if (st === "past_due" || st === "unpaid") return { state: "at_risk", date: iso(link.current_period_end), label: "⚠ payment failing", fixable: true, reason: "the last payment failed (past_due / unpaid)" };
+  if (st === "incomplete" || st === "incomplete_expired") return { state: "missing", date: null, label: "⚠ never started", fixable: true, reason: "the subscription never completed its first payment" };
+  if (st === "trialing") { const d = iso(link.trial_end); return d ? { state: "scheduled", date: d, label: d, fixable: false, reason: "first charge when the trial ends" } : { state: "unknown", date: null, label: "⚠ unknown", fixable: true, reason: "trialing but no trial_end set" }; }
+  if (st === "active") { const d = iso(link.current_period_end); return d ? { state: "scheduled", date: d, label: d, fixable: false, reason: "next billing date" } : { state: "unknown", date: null, label: "⚠ unknown", fixable: true, reason: "active but no period end" }; }
+  return { state: "unknown", date: null, label: "⚠ unknown", fixable: true, reason: `unexpected subscription status: ${st}` };
+}
+
 // Pull all subscriptions on the connected account (any status), expanded, and
 // build an email → { customer_id, sub_id, price_id, status } map for both-ways
 // linking. Mirrors fetchLiveSubs() in offers/match-prices.js.
@@ -138,6 +180,7 @@ function buildEmailMap(subs) {
       status: sub.status,
       amount_cents: price ? price.unit_amount : null,
       name: (cust && cust.name) || null,
+      ...subBillingFacts(sub),
     };
     const prev = map.get(email);
     // keep the first active-ish sub; otherwise keep whatever we already have.
@@ -904,6 +947,7 @@ async function handler(req, res) {
             amount_cents: price ? price.unit_amount : null,
             name: (cust && cust.name) || null,
             email: normEmail(cust && cust.email) || null,
+            ...subBillingFacts(sub),
           };
           bySubId.set(sub.id, entry);
           if (entry.customer_id) {
@@ -1160,6 +1204,7 @@ async function handler(req, res) {
       const cat = priceId ? catalogByPrice[priceId] : null;
       const key = s.offer_price_key || (cat && cat.offer_price_key) || null;
       const amount = cat && cat.amount_cents != null ? cat.amount_cents : (link && link.amount_cents) || null;
+      const next_payment = computeNextPayment({ link, cat, offerKey: key, altPay });
       const issues = [];
       if (dupIds.has(s.id)) issues.push("duplicate");
       if (noOfferIds.has(s.id)) issues.push("no offer");
@@ -1184,6 +1229,7 @@ async function handler(req, res) {
         is_dup_copy: dupCopyIds.has(s.id),
         dup_key: dupKeyById[s.id] || null,
         suggestion: suggById[s.id] || null,
+        next_payment, // { state, date, label, fixable, reason }
       };
     }).sort((a, b) =>
       (b.needs_work - a.needs_work) ||
