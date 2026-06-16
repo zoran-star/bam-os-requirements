@@ -121,6 +121,9 @@ POST `action=set-status` · `action=create-appointment` · `action=settings`.
   more).
 
 ## Gotchas / pending
+- ⚠️ **BAM GTA is temporarily flipped to V1.5 for testing** (2026-06-16, by Zoran).
+  Its live account is normally **V2** — `v2_access=true, v15_access=false`
+  (id `39875f07-0a4b-4429-a201-2249bc1f24df`). **Revert when testing is done.**
 - `athlete_name` only fills AFTER the mapping is set AND a sync runs (≤10 min) —
   a fresh V1.5 academy's athlete search is empty until then. No manual backfill
   trigger yet (relies on the cron).
