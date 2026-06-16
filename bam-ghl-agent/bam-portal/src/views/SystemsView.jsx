@@ -101,6 +101,9 @@ export default function SystemsView({ tokens: t, dark, me, session }) {
   const [pool, setPool] = useState([]);
   const [selected, setSelected] = useState(null);
   const [loading, setLoading] = useState(true);
+  // Completed-tab filters (the archive is large — search text + academy).
+  const [completedSearch, setCompletedSearch] = useState("");
+  const [completedAcademy, setCompletedAcademy] = useState("");
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -141,6 +144,23 @@ export default function SystemsView({ tokens: t, dark, me, session }) {
     if (tab === "completed") return ["done","approved","cancelled"].includes(x.status) && inScope(x);
     return false;
   });
+
+  // Completed tab: title + academy/assignee/details search and an academy
+  // dropdown. Academy options come from the completed tickets in scope.
+  const ticketTitle = (x) => x.menu_item || (x.type === "error" ? "Error report" : x.type === "change" ? "Change request" : "Build request");
+  const completedAcademies = [...new Set(
+    visibleTickets.map(x => x.client?.business_name).filter(Boolean)
+  )].sort((a, b) => a.localeCompare(b));
+  const q = completedSearch.trim().toLowerCase();
+  const matchesCompletedFilters = (x) => {
+    if (completedAcademy && (x.client?.business_name || "") !== completedAcademy) return false;
+    if (!q) return true;
+    const hay = [ticketTitle(x), x.client?.business_name, x.assignee?.name, Object.values(x.fields || {}).filter(Boolean).join(" ")]
+      .filter(Boolean).join(" ").toLowerCase();
+    return hay.includes(q);
+  };
+  const completedFiltered = tab === "completed" && (q || completedAcademy);
+  const displayedTickets = tab === "completed" ? visibleTickets.filter(matchesCompletedFilters) : visibleTickets;
 
   // Shared tab structure. Managers additionally get an Overview tab at
   // the front. Counts reuse the same scope as visibleTickets above
@@ -189,20 +209,49 @@ export default function SystemsView({ tokens: t, dark, me, session }) {
         />
       ) : (
         <>
+          {/* Completed tab: search + filter by academy (the archive is large). */}
+          {tab === "completed" && (
+            <div style={{ display: "flex", gap: 10, marginBottom: 16, flexWrap: "wrap", alignItems: "center" }}>
+              <input
+                value={completedSearch}
+                onChange={e => setCompletedSearch(e.target.value)}
+                placeholder="Search completed tasks…"
+                style={{ flex: 1, minWidth: 240, padding: "10px 14px", borderRadius: 9, border: `1px solid ${t.border}`, background: t.surface, color: t.text, fontSize: 14, outline: "none" }}
+              />
+              <select
+                value={completedAcademy}
+                onChange={e => setCompletedAcademy(e.target.value)}
+                style={{ padding: "10px 14px", borderRadius: 9, border: `1px solid ${t.border}`, background: t.surface, color: t.text, fontSize: 14, cursor: "pointer", outline: "none" }}
+              >
+                <option value="">All academies</option>
+                {completedAcademies.map(a => <option key={a} value={a}>{a}</option>)}
+              </select>
+              {(completedSearch || completedAcademy) && (
+                <button
+                  onClick={() => { setCompletedSearch(""); setCompletedAcademy(""); }}
+                  style={{ padding: "10px 14px", borderRadius: 9, border: `1px solid ${t.border}`, background: "transparent", color: t.textMute, fontSize: 13, cursor: "pointer" }}
+                >Clear</button>
+              )}
+              <span style={{ fontSize: 12, color: t.textMute, marginLeft: "auto" }}>
+                {displayedTickets.length}{completedFiltered ? ` of ${visibleTickets.length}` : ""}
+              </span>
+            </div>
+          )}
+
           {loading && <div style={{ color: t.textMute, fontSize: 14 }}>Loading tickets…</div>}
 
-          {!loading && visibleTickets.length === 0 && (
+          {!loading && displayedTickets.length === 0 && (
             <div style={{ color: t.textMute, fontSize: 14, padding: "40px 0", textAlign: "center" }}>
-              No tickets in this tab.
+              {completedFiltered ? "No completed tasks match your search." : "No tickets in this tab."}
             </div>
           )}
 
           {/* Managers get an assignee-grouped view on any multi-person tab.
               Executors only see their own tickets, so grouping is redundant. */}
-          {isManager && ["lobby","ongoing","awaiting","review"].includes(tab) && visibleTickets.length > 0 ? (
+          {isManager && ["lobby","ongoing","awaiting","review"].includes(tab) && displayedTickets.length > 0 ? (
             (() => {
               const groups = {};
-              visibleTickets.forEach(x => {
+              displayedTickets.forEach(x => {
                 const name = x.assignee?.name || "Unassigned";
                 (groups[name] = groups[name] || []).push(x);
               });
@@ -231,7 +280,7 @@ export default function SystemsView({ tokens: t, dark, me, session }) {
             })()
           ) : (
             <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-              {visibleTickets.map(x => (
+              {displayedTickets.map(x => (
                 <TicketCard key={x.id} ticket={x} tokens={t} onOpen={() => setSelected(x)} completed={tab === "completed"} />
               ))}
             </div>
