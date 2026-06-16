@@ -27,6 +27,10 @@
     {
       "path": "/api/clients?action=cron-feedback-digest",
       "schedule": "30 13 * * *"
+    },
+    {
+      "path": "/api/clients?action=ship-queue-notify",
+      "schedule": "0 * * * *"
     }
   ],
   "headers": [
