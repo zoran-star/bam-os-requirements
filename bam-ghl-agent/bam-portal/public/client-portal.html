@@ -5143,6 +5143,21 @@
     .mobile-more-search { width: 100%; box-sizing: border-box; margin: 0 0 8px; padding: 11px 12px;
       background: var(--surface); border: 1px solid var(--border-med); border-radius: 10px; color: var(--text); font: inherit; font-size: 15px; }
     .mobile-more-divider { height: 1px; background: var(--border); margin: 8px 4px 4px; }
+    /* V1.5 bottom bar swap: Inbox · Sales · KPIs · Support replace Home/Messages/
+       Systems/Marketing when the academy is on V1.5. */
+    .mobile-nav .mnav-v15 { display: none; }
+    .mobile-nav.is-v15 .mnav-default { display: none !important; }
+    .mobile-nav.is-v15 .mnav-v15 { display: flex; }
+    /* Support popover — two boxes floating above the bar. */
+    .mobile-support-overlay { position: fixed; inset: 0; z-index: 1150; display: none; }
+    .mobile-support-overlay.open { display: block; }
+    .mobile-support-pop { position: absolute; right: 8px; left: 8px; display: flex; gap: 10px; justify-content: flex-end;
+      bottom: calc(var(--mobnav-h) + env(safe-area-inset-bottom) + 10px); }
+    .mobile-support-box { display: flex; flex-direction: column; align-items: center; gap: 7px; width: 104px; padding: 15px 8px;
+      background: var(--bg); border: 1px solid var(--border-med); border-radius: 14px; color: var(--text);
+      font: inherit; font-size: 12px; font-weight: 600; cursor: pointer; box-shadow: var(--shadow-lg, 0 10px 30px rgba(0,0,0,.35)); }
+    .mobile-support-box:active { background: var(--surface); }
+    .mobile-support-box svg { width: 22px; height: 22px; color: var(--gold); }
     .mobile-nav-badge {
       position: absolute;
       top: 5px; left: calc(50% + 6px);
@@ -8479,36 +8494,62 @@ Then the call to action."]</div>
 
   <!-- ── Mobile bottom nav (phones only — replaces the hidden sidebar) ── -->
   <nav class="mobile-nav" id="mobileNav" aria-label="Primary">
-    <button type="button" class="mobile-nav-item" data-view="home" onclick="mobileSwitchView('home')" aria-label="Home">
+    <button type="button" class="mobile-nav-item mnav-default" data-view="home" onclick="mobileSwitchView('home')" aria-label="Home">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
         <path d="M3 9.5L12 3l9 6.5V20a1 1 0 0 1-1 1h-5v-7H9v7H4a1 1 0 0 1-1-1z"/>
       </svg>
       <span class="mobile-nav-label">Home</span>
     </button>
-    <button type="button" class="mobile-nav-item" data-view="messages" onclick="mobileSwitchView('messages')" aria-label="Messages">
+    <button type="button" class="mobile-nav-item mnav-default" data-view="messages" onclick="mobileSwitchView('messages')" aria-label="Messages">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
         <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
       </svg>
       <span class="mobile-nav-label">Messages</span>
       <span class="mobile-nav-badge" id="mnav-messages-badge" style="display:none"></span>
     </button>
-    <button type="button" class="mobile-nav-item active" data-view="systems" onclick="mobileSwitchView('systems')" aria-label="Systems">
+    <button type="button" class="mobile-nav-item mnav-default active" data-view="systems" onclick="mobileSwitchView('systems')" aria-label="Systems">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
         <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/>
         <circle cx="12" cy="12" r="3"/>
       </svg>
       <span class="mobile-nav-label">Systems</span>
     </button>
-    <button type="button" class="mobile-nav-item" data-view="marketing" onclick="mobileSwitchView('marketing')" aria-label="Marketing">
+    <button type="button" class="mobile-nav-item mnav-default" data-view="marketing" onclick="mobileSwitchView('marketing')" aria-label="Marketing">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
         <path d="m3 11 18-5v12L3 14v-3z"/>
         <path d="M11.6 16.8a3 3 0 1 1-5.8-1.6"/>
       </svg>
       <span class="mobile-nav-label">Marketing</span>
     </button>
-    <!-- "More" opens a sheet with every other enabled tab (Contacts, Inbox,
-         Sales, Calendars, KPIs, Blueprint, …) so nothing is sidebar-only on
-         phones. -->
+    <!-- V1.5 bottom bar: Inbox · Sales · KPIs · Support · More. Shown only when
+         #mobileNav has .is-v15 (toggled by applyV15NavState); the mnav-default
+         set above is hidden then. Support pops Marketing/Systems boxes. -->
+    <button type="button" class="mobile-nav-item mnav-v15" data-view="v15inbox" onclick="mobileSwitchView('v15inbox')" aria-label="Inbox">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.45 5.11L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/>
+      </svg>
+      <span class="mobile-nav-label">Inbox</span>
+    </button>
+    <button type="button" class="mobile-nav-item mnav-v15" data-view="pipelines" onclick="mobileSwitchView('pipelines')" aria-label="Sales">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <rect x="3" y="4" width="4" height="16" rx="1"/><rect x="10" y="4" width="4" height="10" rx="1"/><rect x="17" y="4" width="4" height="6" rx="1"/>
+      </svg>
+      <span class="mobile-nav-label">Sales</span>
+    </button>
+    <button type="button" class="mobile-nav-item mnav-v15" data-view="v15kpis" onclick="mobileSwitchView('v15kpis')" aria-label="KPIs">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M3 3v18h18"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/>
+      </svg>
+      <span class="mobile-nav-label">KPIs</span>
+    </button>
+    <button type="button" class="mobile-nav-item mnav-v15" data-view="support" onclick="_mobileSupport()" aria-label="Support">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="4"/><path d="m4.93 4.93 4.24 4.24M14.83 14.83l4.24 4.24M14.83 9.17l4.24-4.24M14.83 9.17l3.53-3.53M4.93 19.07l4.24-4.24"/>
+      </svg>
+      <span class="mobile-nav-label">Support</span>
+    </button>
+    <!-- "More" opens a sheet with the academy switcher + every other enabled tab
+         (Contacts, Calendars, Blueprint, …) so nothing is sidebar-only on phones. -->
     <button type="button" class="mobile-nav-item" data-view="more" onclick="_mobileMore()" aria-label="More">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
         <rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/>
@@ -8539,6 +8580,20 @@ Then the call to action."]</div>
     <div class="mobile-more-sheet" role="dialog" aria-label="More">
       <div class="mobile-more-grip"></div>
       <div id="mobileMoreList"></div>
+    </div>
+  </div>
+
+  <!-- Support popover (V1.5) — two boxes above the bar for Marketing / Systems. -->
+  <div class="mobile-support-overlay" id="mobileSupportOverlay" onclick="if(event.target===this)_mobileSupportClose()">
+    <div class="mobile-support-pop">
+      <button type="button" class="mobile-support-box" onclick="_mobileSupportPick('marketing')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m3 11 18-5v12L3 14v-3z"/><path d="M11.6 16.8a3 3 0 1 1-5.8-1.6"/></svg>
+        Marketing
+      </button>
+      <button type="button" class="mobile-support-box" onclick="_mobileSupportPick('systems')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        Systems
+      </button>
     </div>
   </div>
 </div>
@@ -10162,13 +10217,31 @@ function switchView(name, el) {
 
 // ── Mobile bottom-nav helpers ──
 // The sidebar is hidden on phones; the fixed bottom tab bar drives nav.
-const _MOBILE_PRIMARY = new Set(['home', 'messages', 'systems', 'marketing']);
-function syncMobileNav(name) {
-  document.querySelectorAll('.mobile-nav-item').forEach(b => {
-    if (b.dataset.view === 'more') b.classList.toggle('active', !_MOBILE_PRIMARY.has(name)); // any "More" view active → light up More
-    else b.classList.toggle('active', b.dataset.view === name);
-  });
+// Views that already live on the bottom bar (so they're excluded from the More
+// sheet). Mode-aware: V1.5 swaps the bar to Inbox/Sales/KPIs (+ Marketing &
+// Systems behind Support).
+function _mobileBarViews() {
+  return V15_ACCESS
+    ? new Set(['v15inbox', 'pipelines', 'v15kpis', 'marketing', 'systems'])
+    : new Set(['home', 'messages', 'systems', 'marketing']);
 }
+function syncMobileNav(name) {
+  let matched = false;
+  document.querySelectorAll('.mobile-nav-item').forEach(b => {
+    if (b.dataset.view === 'more' || b.dataset.view === 'support') return;
+    const on = b.dataset.view === name;
+    b.classList.toggle('active', on);
+    if (on && b.offsetParent !== null) matched = true;   // a visible bar item owns this view
+  });
+  // Support owns Marketing/Systems in V1.5; light it then.
+  const support = document.querySelector('.mobile-nav-item[data-view="support"]');
+  if (support) { const owns = V15_ACCESS && (name === 'marketing' || name === 'systems'); support.classList.toggle('active', owns); if (owns) matched = true; }
+  const more = document.querySelector('.mobile-nav-item[data-view="more"]');
+  if (more) more.classList.toggle('active', !matched);
+}
+function _mobileSupport() { const o = document.getElementById('mobileSupportOverlay'); if (o) o.classList.add('open'); }
+function _mobileSupportClose() { const o = document.getElementById('mobileSupportOverlay'); if (o) o.classList.remove('open'); }
+function _mobileSupportPick(view) { _mobileSupportClose(); mobileSwitchView(view); }
 
 // "More" sheet — the mobile home for everything the bottom bar can't hold:
 //   1) the multi-academy switcher (sidebar-only otherwise, so unreachable on a
@@ -10206,6 +10279,7 @@ function _mobileMoreRender() {
     html += `<div class="mobile-more-title">All tabs</div>`;
   }
   // ── Tabs not already on the bottom bar ──
+  const onBar = _mobileBarViews();
   const seen = new Set();
   const items = [];
   document.querySelectorAll('.sidebar .nav-item').forEach(el => {
@@ -10213,7 +10287,7 @@ function _mobileMoreRender() {
     const m = /switchView\('([^']+)'/.exec(oc);
     if (!m) return;
     const view = m[1];
-    if (_MOBILE_PRIMARY.has(view) || seen.has(view)) return;
+    if (onBar.has(view) || seen.has(view)) return;
     if (el.style.display === 'none') return;           // feature-gated off (sidebar itself is hidden on mobile, so check the inline gate, not offsetParent)
     seen.add(view);
     const label = (el.textContent || '').replace(/\s+/g, ' ').trim();
@@ -10541,6 +10615,9 @@ let V15_ACCESS = false;
 function applyV15NavState(v15) {
   V15_ACCESS = !!v15;
   document.querySelectorAll('.nav-item[data-feature="v15"]').forEach(el => { el.style.display = v15 ? '' : 'none'; });
+  // Swap the mobile bottom bar to the V1.5 set (Inbox · Sales · KPIs · Support).
+  const mNav = document.getElementById('mobileNav');
+  if (mNav) mNav.classList.toggle('is-v15', !!v15);
 }
 
 // ── Member Management feature flag ──

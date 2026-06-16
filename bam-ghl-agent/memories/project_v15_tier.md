@@ -121,6 +121,21 @@ POST `action=set-status` · `action=create-appointment` · `action=settings`.
   via `/api/contacts` mirror → date/time → `create-appointment` (GHL contactId).
 - Drawer infra = a dynamically-injected right-side overlay (`#v15cal-ov`).
 
+## Mobile / PWA
+- Phones hide the desktop `.sidebar`; nav is the fixed `.mobile-nav` bottom bar.
+- **V1.5 bottom bar** (when `#mobileNav.is-v15`, toggled in `applyV15NavState`):
+  **Inbox · Sales · KPIs · Support · More** (the `mnav-v15` buttons; the default
+  `mnav-default` Home/Messages/Systems/Marketing are hidden). **Support**
+  (`_mobileSupport`) pops a small overlay with **Marketing** + **Systems** boxes.
+- **More** sheet (`_mobileMoreRender`) = the **academy switcher** (CLIENT_ROWS,
+  searchable, `_mobileMorePickClient` → `switchClient`) + every enabled tab not on
+  the bar (`_mobileBarViews()` decides exclusions per mode). This is the ONLY way
+  to switch academies on mobile (the sidebar switcher is hidden there).
+- `syncMobileNav` is DOM-based (lights whichever bar item owns the active view;
+  Support lights on marketing/systems; else More).
+- Mobile-friendly grids: `v15cal-board` (560px min-width + horizontal scroll),
+  `v15k-2col`/`v15k-linkrow` stack ≤768px.
+
 ## Data + sync
 - **`ghl_contacts`** table = per-academy GHL contact mirror (name/email/phone,
   `tags text[]`, `custom_fields jsonb`, resolved `athlete_name`). pg_trgm GIN
