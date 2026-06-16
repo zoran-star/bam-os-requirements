@@ -5454,6 +5454,18 @@
         Assets
       </div>
 
+      <div class="nav-item" data-feature="v15" style="display:none" onclick="switchView('contacts', this)">
+        <span class="nav-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/>
+            <circle cx="9" cy="7" r="4"/>
+            <path d="M22 21v-2a4 4 0 0 0-3-3.87"/>
+            <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+          </svg>
+        </span>
+        Contacts
+      </div>
+
       <div class="nav-item" onclick="switchView('action-items', this)">
         <span class="nav-icon" aria-hidden="true">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -8290,6 +8302,18 @@ Then the call to action."]</div>
       </div>
     </div>
 
+    <div class="view" id="view-contacts">
+      <div class="topbar">
+        <div>
+          <span class="topbar-kicker">§ Contacts</span>
+          <div class="topbar-title">Contacts</div>
+        </div>
+      </div>
+      <div class="content">
+        <div id="contacts-content"></div>
+      </div>
+    </div>
+
     <div class="view" id="view-action-items">
       <div class="topbar">
         <div>
@@ -8657,6 +8681,134 @@ async function _assetBankRemove(assetId, field, id, category) {
   } catch (e) { alert("Couldn't remove: " + (e.message || e)); }
 }
 
+// ══════════════════════════════════════════════════════════════
+// CONTACTS VIEW (V1.5) — search the synced GHL-contact mirror (ghl_contacts).
+// Search: parent/athlete name · phone · email. Filter: by tag. Setup maps the
+// athlete-name custom field (live GHL) so the sync can resolve athlete_name.
+// ══════════════════════════════════════════════════════════════
+let _CONTACTS = [];
+let _contactsQ = '';
+let _contactsTag = '';
+let _contactsSearchTimer = null;
+
+async function _contactsAuthHeaders() {
+  const { data: { session } } = await _sb.auth.getSession();
+  const tok = session?.access_token;
+  return tok ? { Authorization: 'Bearer ' + tok } : {};
+}
+
+async function openContactsView() {
+  const host = document.getElementById('contacts-content');
+  if (!host || typeof CLIENT_ID === 'undefined') return;
+  host.innerHTML = `
+    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:14px">
+      <input id="contacts-search" type="text" placeholder="Search name, athlete, phone, email…" value="${escapeHTML(_contactsQ)}"
+        oninput="_contactsOnSearch(this.value)"
+        style="flex:1;min-width:220px;background:var(--surface);border:1px solid var(--border);border-radius:8px;color:var(--text);padding:10px 12px;font:inherit;font-size:14px;outline:none">
+      <select id="contacts-tag" onchange="_contactsSetTag(this.value)"
+        style="background:var(--surface);border:1px solid var(--border);border-radius:8px;color:var(--text);padding:10px 12px;font:inherit;font-size:13px;cursor:pointer">
+        <option value="">All tags</option>
+      </select>
+      <button onclick="_contactsOpenSetup()" style="background:none;border:1px solid var(--border);border-radius:8px;color:var(--text-sub);padding:9px 12px;font:inherit;font-size:12px;cursor:pointer">⚙ Setup</button>
+    </div>
+    <div id="contacts-list"><div class="req-empty" style="padding:24px 0"><span class="req-spin"></span> Loading…</div></div>`;
+  await _contactsLoad();
+}
+
+async function _contactsLoad() {
+  const list = document.getElementById('contacts-list');
+  if (!list) return;
+  try {
+    const params = new URLSearchParams({ client_id: CLIENT_ID });
+    if (_contactsQ) params.set('q', _contactsQ);
+    if (_contactsTag) params.set('tag', _contactsTag);
+    const r = await fetch('/api/contacts?' + params, { headers: await _contactsAuthHeaders() });
+    const j = await r.json();
+    if (!r.ok) throw new Error(j.error || ('HTTP ' + r.status));
+    _CONTACTS = j.contacts || [];
+    _contactsRender();
+  } catch (e) {
+    list.innerHTML = `<div class="req-empty" style="padding:24px 0;color:#9a3b2f">Couldn't load contacts — ${escapeHTML(e.message || String(e))}</div>`;
+  }
+}
+
+function _contactsRender() {
+  const list = document.getElementById('contacts-list');
+  if (!list) return;
+  const tagSel = document.getElementById('contacts-tag');
+  if (tagSel) {
+    const tags = Array.from(new Set(_CONTACTS.flatMap(c => c.tags || []))).sort();
+    tagSel.innerHTML = '<option value="">All tags</option>' + tags.map(t => `<option value="${escapeHTML(t)}" ${t === _contactsTag ? 'selected' : ''}>${escapeHTML(t)}</option>`).join('');
+  }
+  if (!_CONTACTS.length) {
+    list.innerHTML = `<div class="req-empty" style="padding:32px 0;color:var(--text-mute)">${_contactsQ || _contactsTag ? 'No contacts match.' : 'No contacts synced yet — a new V1.5 academy syncs within a few minutes.'}</div>`;
+    return;
+  }
+  const rows = _CONTACTS.map(c => `
+    <div style="display:grid;grid-template-columns:1.4fr 1.2fr 1fr 1.2fr;gap:12px;padding:12px 14px;border-bottom:1px solid var(--border);font-size:13px;align-items:center">
+      <div style="font-weight:600;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHTML(c.name || '—')}</div>
+      <div style="color:var(--text-sub);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${c.athlete_name ? escapeHTML(c.athlete_name) : '<span style="color:var(--text-mute)">—</span>'}</div>
+      <div style="color:var(--text-sub)">${c.phone ? `<a href="tel:${escapeHTML(c.phone)}" style="color:var(--text-sub);text-decoration:none">${escapeHTML(c.phone)}</a>` : '—'}</div>
+      <div style="color:var(--text-sub);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${c.email ? escapeHTML(c.email) : '—'}</div>
+    </div>`).join('');
+  list.innerHTML = `
+    <div style="border:1px solid var(--border);border-radius:10px;overflow:hidden">
+      <div style="display:grid;grid-template-columns:1.4fr 1.2fr 1fr 1.2fr;gap:12px;padding:9px 14px;background:var(--surface);font-size:10.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--text-mute);font-weight:700">
+        <div>Parent</div><div>Athlete</div><div>Phone</div><div>Email</div>
+      </div>
+      ${rows}
+    </div>
+    <div style="font-size:11px;color:var(--text-mute);margin-top:8px">${_CONTACTS.length} contact${_CONTACTS.length === 1 ? '' : 's'}${_CONTACTS.length >= 200 ? ' (first 200 — refine your search)' : ''}</div>`;
+}
+
+function _contactsOnSearch(v) { _contactsQ = v; clearTimeout(_contactsSearchTimer); _contactsSearchTimer = setTimeout(_contactsLoad, 300); }
+function _contactsSetTag(v) { _contactsTag = v; _contactsLoad(); }
+
+async function _contactsOpenSetup() {
+  const host = document.getElementById('contacts-content');
+  if (!host) return;
+  host.innerHTML = `<div class="req-empty" style="padding:24px 0"><span class="req-spin"></span> Loading custom fields…</div>`;
+  try {
+    const r = await fetch('/api/contacts?action=custom-fields&client_id=' + encodeURIComponent(CLIENT_ID), { headers: await _contactsAuthHeaders() });
+    const j = await r.json();
+    if (!r.ok) throw new Error(j.error || ('HTTP ' + r.status));
+    const sel = new Set((j.selected || []).map(String));
+    const rows = (j.fields || []).map(f => `
+      <label style="display:flex;align-items:center;gap:10px;padding:9px 12px;border:1px solid var(--border);border-radius:8px;margin-bottom:6px;cursor:pointer">
+        <input type="checkbox" data-fid="${escapeHTML(f.id)}" ${sel.has(f.id) ? 'checked' : ''} style="width:15px;height:15px;accent-color:var(--gold)">
+        <span style="font-size:13px;color:var(--text);font-weight:600;flex:1">${escapeHTML(f.name)}</span>
+        ${f.suggested ? '<span style="font-size:10px;font-weight:700;color:var(--gold);text-transform:uppercase;letter-spacing:.04em">suggested</span>' : ''}
+        <span style="font-size:10px;color:var(--text-mute);${f.hasData ? '' : 'opacity:.55'}">${f.hasData ? 'has data' : 'empty'}</span>
+      </label>`).join('');
+    host.innerHTML = `
+      <div style="max-width:560px">
+        <button onclick="openContactsView()" style="background:none;border:none;color:var(--text-sub);font-size:13px;cursor:pointer;padding:0 0 12px">← Back to contacts</button>
+        <div style="font-size:18px;font-weight:700;color:var(--text);margin-bottom:4px">Which custom field holds the athlete's name?</div>
+        <div style="font-size:12.5px;color:var(--text-mute);margin-bottom:16px">Pick the field(s) that store the athlete / player name. Ones with data and a matching title are pre-selected. This is what the "athlete name" search matches.</div>
+        ${rows || '<div class="req-empty">No custom fields found in GHL.</div>'}
+        <button id="contacts-setup-save" onclick="_contactsSaveSetup()" style="margin-top:14px;background:var(--gold);color:#0B0B0D;border:none;padding:10px 18px;border-radius:8px;font-weight:700;font-size:13px;cursor:pointer">Save</button>
+      </div>`;
+  } catch (e) {
+    host.innerHTML = `<div class="req-empty" style="padding:24px 0;color:#9a3b2f">Couldn't load setup — ${escapeHTML(e.message || String(e))}</div>`;
+  }
+}
+async function _contactsSaveSetup() {
+  const btn = document.getElementById('contacts-setup-save');
+  if (btn) { btn.disabled = true; btn.textContent = 'Saving…'; }
+  const ids = Array.from(document.querySelectorAll('#contacts-content input[type=checkbox][data-fid]')).filter(c => c.checked).map(c => c.getAttribute('data-fid'));
+  try {
+    const r = await fetch('/api/contacts?action=set-athlete-fields&client_id=' + encodeURIComponent(CLIENT_ID), {
+      method: 'POST', headers: { 'Content-Type': 'application/json', ...(await _contactsAuthHeaders()) },
+      body: JSON.stringify({ field_ids: ids }),
+    });
+    if (!r.ok) { const j = await r.json().catch(() => ({})); throw new Error(j.error || ('HTTP ' + r.status)); }
+    openContactsView();
+  } catch (e) {
+    alert('Save failed: ' + (e.message || e));
+    if (btn) { btn.disabled = false; btn.textContent = 'Save'; }
+  }
+}
+
 function switchView(name, el) {
   // Clients without marketing have the Marketing nav greyed + click-blocked
   if (name === 'marketing' && !MARKETING_INCLUDED) return;
@@ -8705,6 +8857,8 @@ function switchView(name, el) {
   if (name === 'resources') openResourcesView();
 
   if (name === 'assets') openAssetsView();
+
+  if (name === 'contacts') openContactsView();
 
   // When entering Action Items, load the list
   if (name === 'action-items') fetchAndRenderActionItems();
@@ -9016,6 +9170,15 @@ function applyV2NavState(v2Access) {
   // Re-run V2-gated feature gates.
   applyMemberMgmtNavState();
   applyCalendarNavState();
+}
+
+// ── V1.5 feature gate ──
+// V1.5 academies run the portal as their full CRM (no GoHighLevel UI). The
+// Contacts tab is gated to them via data-feature="v15".
+let V15_ACCESS = false;
+function applyV15NavState(v15) {
+  V15_ACCESS = !!v15;
+  document.querySelectorAll('.nav-item[data-feature="v15"]').forEach(el => { el.style.display = v15 ? '' : 'none'; });
 }
 
 // ── Member Management feature flag ──
@@ -14268,6 +14431,7 @@ async function switchClient(newId) {
   // Reapply per-client UI state
   applyMarketingNavState();
   applyV2NavState(row.v2_access === true);   // re-gate Members/Calendar for the new client
+  applyV15NavState(row.v15_access === true); // re-gate the Contacts tab
   renderClientSwitcher();
   // Refresh the point-of-contact name/avatar for the newly-selected academy
   // (was stuck on the first-loaded academy — switchClient never re-set it).
@@ -25050,7 +25214,7 @@ async function boot() {
   // to exactly the caller's clients via my_client_ids(). One auth user can
   // belong to multiple clients — the bottom-left switcher lets them flip.
   const { data: clientRows } = await _sb.from('clients')
-    .select('id, business_name, owner_name, email, onboarding_completed_at, marketing_included, v2_access')
+    .select('id, business_name, owner_name, email, onboarding_completed_at, marketing_included, v2_access, v15_access')
     .is('archived_at', null)
     .order('business_name');
   const clientRow = (clientRows && clientRows.length) ? clientRows[0] : null;
@@ -25083,6 +25247,7 @@ async function boot() {
   // V2 nav state — calls applyMemberMgmtNavState inside (Members is
   // the only V2-gated thing right now). Sets V2_ACCESS global.
   applyV2NavState(clientRow.v2_access === true);
+  applyV15NavState(clientRow.v15_access === true);
   _stripeConnectMaybeSwitch();
   renderClientSwitcher();
   document.getElementById('login-overlay').style.display = 'none';
