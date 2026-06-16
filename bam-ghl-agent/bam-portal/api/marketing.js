@@ -148,7 +148,7 @@ async function enrichWithClient(tickets) {
   if (!tickets.length) return tickets;
   const clientIds = [...new Set(tickets.map(t => t.client_id).filter(Boolean))];
   if (!clientIds.length) return tickets;
-  const clients = await sb(`clients?id=in.(${clientIds.join(",")})&select=id,business_name`);
+  const clients = await sb(`clients?id=in.(${clientIds.join(",")})&select=id,business_name,brand_data,scaling_manager_id`);
   const clientMap = Object.fromEntries((clients || []).map(c => [c.id, c]));
   return tickets.map(t => ({ ...t, client: clientMap[t.client_id] || null }));
 }
