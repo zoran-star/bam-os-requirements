@@ -17395,6 +17395,10 @@ function openPricingSorter(step) {
   if (modal) modal.style.display = 'flex';
   _sorterRender();
   if (startStep === 1) _sorterLoadStep1();
+  // Progress is DB-backed — every cleanup action writes through immediately. So
+  // landing on Cleanup auto-restores the saved list (no "Run checks" click), and
+  // refreshing / reopening never loses your work.
+  else if (startStep === 3) _sorterRunChecks();
 }
 
 // Fingerprint of the current price-match assignments — compared against the
@@ -18316,7 +18320,15 @@ function _sorterRenderStep3(host) {
     const issuesLine = work ? `<div style="font-size:10px;color:#e0a93f;font-weight:700;margin-bottom:3px;">${escapeHTML((m.issues || []).join(' · '))}</div>` : '';
     const readyTag = work ? '' : '<span style="font-size:11px;color:#7BC47F;">ready ✓</span>';
     const todo = `${issuesLine}<div style="display:flex;flex-wrap:wrap;gap:4px;align-items:center;">${readyTag}${btns}${removeX}</div>`;
-    return `<tr style="border-bottom:1px solid var(--border,#2a2a31);">${nameCell(work, m.athlete_name, m.parent_name, m.parent_email, `_sorterOpenInfo('${sid}')`)}${td(where)}${td(`<span style="font-size:12px;font-weight:700;">${price}</span>`)}${td(todo)}</tr>`;
+    // Next-payment cell — a date when scheduled, a clickable ⚠️ chip when it
+    // should bill but won't (opens the fix-payment modal).
+    const np = m.next_payment || { state: 'unknown', label: '—', fixable: false };
+    const npGood = np.state === 'scheduled';
+    const npMuted = np.state === 'none';
+    const npCell = np.fixable
+      ? `<button onclick="_sorterOpenFixPayment('${sid}')" title="${escapeHTML(np.reason || 'Fix the next payment')}" style="font-size:11px;font-weight:700;padding:4px 9px;border-radius:7px;border:1px solid #b8862b;background:rgba(232,197,71,0.12);color:#e0a93f;cursor:pointer;">${escapeHTML(np.label || '⚠ fix')}</button>`
+      : `<span style="font-size:12px;font-weight:${npGood ? '700' : '600'};color:${npGood ? 'var(--text,#eee)' : 'var(--text-mute,#888)'};">${escapeHTML(np.label || '—')}</span>`;
+    return `<tr style="border-bottom:1px solid var(--border,#2a2a31);">${nameCell(work, m.athlete_name, m.parent_name, m.parent_email, `_sorterOpenInfo('${sid}')`)}${td(where)}${td(`<span style="font-size:12px;font-weight:700;">${price}</span>`)}${td(npCell)}${td(todo)}</tr>`;
   };
 
   // In Stripe, not in the CSV — subscription (name → Stripe inspector)
@@ -18338,7 +18350,7 @@ function _sorterRenderStep3(host) {
       <button onclick="_sorterUndo()" ${undoN ? '' : 'disabled'} title="Undo the last action" style="flex:none;font-size:11.5px;font-weight:700;padding:6px 12px;border-radius:8px;border:1px solid var(--border,#2a2a31);background:transparent;color:${undoN ? 'var(--text,#eee)' : 'var(--text-mute,#888)'};cursor:${undoN ? 'pointer' : 'not-allowed'};opacity:${undoN ? '1' : '0.5'};">↩ Undo${undoN ? ' (' + undoN + ')' : ''}</button>
     </div>
     <table style="width:100%;border-collapse:collapse;">
-      <thead><tr>${th('Member')}${th('Where')}${th('Price')}${th('To do')}</tr></thead>
+      <thead><tr>${th('Member')}${th('Where')}${th('Price')}${th('Next payment')}${th('To do')}</tr></thead>
       <tbody>${attentionRows}${readyRows || ''}</tbody>
     </table>
     <div id="pc-sorter-connect-host"></div>`;
@@ -18987,6 +18999,157 @@ function _sorterConnectApply() {
       _sorterCloseConnect();
     },
     () => ({ label: 'connect plan', action: 'patch-staging', body: { staging_id: sid, fields: { offer_price_key: null } } }));
+}
+
+// ── Fix next payment ──────────────────────────────────────────────────────
+// Click a ⚠️ in the "Next payment" column → diagnose why the member won't bill,
+// show the deterministic fix + Claude's plain-English sanity-check, confirm,
+// apply. Blocked subs (can't fix) fall back to replace-and-cancel.
+let _SORTER_FIX = null;
+function _sorterCloseFix() { _SORTER_FIX = null; const h = document.getElementById('pc-sorter-connect-host'); if (h) h.innerHTML = ''; }
+
+async function _sorterOpenFixPayment(stagingId) {
+  const host = document.getElementById('pc-sorter-connect-host');
+  if (!host) return;
+  host.innerHTML = `<div onclick="_sorterCloseFix()" style="position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:140;"></div>
+    <div style="position:fixed;z-index:141;top:50%;left:50%;transform:translate(-50%,-50%);width:min(620px,94vw);max-height:86vh;overflow:auto;background:var(--surface,#16161a);border:1px solid var(--border,#2a2a31);border-radius:14px;padding:18px 20px;">${_sorterLoading('Diagnosing the next payment…')}</div>`;
+  try {
+    const token = await _mreqAuthToken();
+    const r = await fetch('/api/sorter/fix-payment', {
+      method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+      body: JSON.stringify({ client_id: _aiClientId(), staging_id: stagingId, mode: 'preview' }),
+    });
+    const json = await _safeJson(r);
+    if (!r.ok) throw new Error(_sorterErr(json.error) || ('HTTP ' + r.status));
+    _SORTER_FIX = { stagingId, data: json };
+    _sorterRenderFixPayment();
+  } catch (e) { _sorterCloseFix(); alert("Couldn't diagnose the payment: " + _sorterErr(e)); }
+}
+
+function _sorterRenderFixPayment() {
+  const host = document.getElementById('pc-sorter-connect-host');
+  if (!host || !_SORTER_FIX) return;
+  const d = _SORTER_FIX.data, m = d.member || {}, p = d.problem || {}, plan = d.plan || {}, ai = d.ai || {};
+  const scheduled = plan.kind === 'none';
+  const warns = (ai.warnings || []).length ? `<ul style="margin:6px 0 0;padding-left:18px;">${ai.warnings.map(w => `<li style="font-size:11px;color:#e0a93f;">${escapeHTML(w)}</li>`).join('')}</ul>` : '';
+  const primaryLabel = plan.kind === 'setup_monthly' ? '💳 Set up monthly billing'
+    : plan.action === 'uncancel' ? '↩ Remove the cancellation'
+    : plan.action === 'resume' ? '▶ Resume billing'
+    : plan.action === 'card_link' ? '🔗 Create card link'
+    : 'Apply fix';
+  host.innerHTML = `
+    <div onclick="_sorterCloseFix()" style="position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:140;"></div>
+    <div style="position:fixed;z-index:141;top:50%;left:50%;transform:translate(-50%,-50%);width:min(620px,94vw);max-height:86vh;overflow:auto;background:var(--surface,#16161a);border:1px solid var(--border,#2a2a31);border-radius:14px;padding:18px 20px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+        <div style="font-size:15px;font-weight:800;">Fix next payment — ${escapeHTML(m.athlete_name || 'member')}</div>
+        <button onclick="_sorterCloseFix()" style="background:none;border:none;color:var(--text-mute,#888);font-size:20px;cursor:pointer;">×</button>
+      </div>
+      <div style="border:1px solid ${scheduled ? '#1f7a3d' : '#b8862b'};background:${scheduled ? 'rgba(123,196,127,0.08)' : 'rgba(232,197,71,0.08)'};border-radius:10px;padding:11px 13px;margin-bottom:11px;">
+        <div style="font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:var(--text-mute,#888);margin-bottom:3px;">${scheduled ? '✅ Status' : '⚠️ Problem'}</div>
+        <div style="font-size:12.5px;line-height:1.5;">${escapeHTML(p.reason || '')}</div>
+      </div>
+      <div style="border:1px solid var(--border,#2a2a31);border-radius:10px;padding:11px 13px;margin-bottom:11px;">
+        <div style="font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:var(--text-mute,#888);margin-bottom:3px;">🤖 AI check${ai.caution ? ' · <span style="color:#e0a93f;font-weight:700;">caution</span>' : ''}</div>
+        <div style="font-size:12.5px;line-height:1.5;">${escapeHTML(ai.explanation || '')}</div>
+        ${warns}
+      </div>
+      ${scheduled ? '' : `
+      <div style="border:1px solid var(--accent,#E8C547);background:rgba(232,197,71,0.06);border-radius:10px;padding:11px 13px;margin-bottom:14px;">
+        <div style="font-size:12.5px;font-weight:800;color:var(--accent,#E8C547);margin-bottom:2px;">Recommended: ${escapeHTML(plan.title || 'fix')}</div>
+        <div style="font-size:11.5px;color:var(--text-sub,#bbb);line-height:1.5;">${escapeHTML(plan.detail || '')}</div>
+      </div>`}
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;border-top:1px solid var(--border,#2a2a31);padding-top:12px;flex-wrap:wrap;">
+        <div>${d.stripe_sub_url ? `<a href="${escapeHTML(d.stripe_sub_url)}" target="_blank" rel="noopener" style="font-size:11px;font-weight:700;color:var(--accent,#E8C547);text-decoration:none;">Open in Stripe ↗</a>` : ''}</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          ${scheduled ? '' : `<button onclick="_sorterFixReplace()" title="Can't fix it? Create a fresh subscription and cancel this one." style="font-size:11.5px;font-weight:700;padding:8px 13px;border-radius:9px;border:1px solid var(--border,#2a2a31);background:transparent;color:var(--text-sub,#bbb);cursor:pointer;">Can't fix — replace it</button>`}
+          <button onclick="_sorterCloseFix()" style="font-size:12.5px;padding:8px 14px;border-radius:9px;border:1px solid var(--border,#2a2a31);background:transparent;color:var(--text,#eee);cursor:pointer;">${scheduled ? 'Close' : 'Cancel'}</button>
+          ${scheduled ? '' : `<button onclick="_sorterFixApply()" style="font-size:12.5px;font-weight:700;padding:8px 16px;border-radius:9px;border:none;background:var(--accent,#E8C547);color:#1a1a1a;cursor:pointer;">${primaryLabel}</button>`}
+        </div>
+      </div>
+    </div>`;
+}
+
+// Apply the recommended deterministic fix.
+async function _sorterFixApply() {
+  if (!_SORTER_FIX) return;
+  const d = _SORTER_FIX.data, plan = d.plan || {}, m = d.member || {};
+  if (plan.kind === 'setup_monthly') return _sorterFixSetupMonthly(m, plan);
+  try {
+    const token = await _mreqAuthToken();
+    const r = await fetch('/api/sorter/fix-payment', {
+      method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+      body: JSON.stringify({ client_id: _aiClientId(), staging_id: _SORTER_FIX.stagingId, mode: 'apply', action: plan.action }),
+    });
+    const json = await _safeJson(r);
+    if (!r.ok) throw new Error(_sorterErr(json.error) || ('HTTP ' + r.status));
+    if (plan.action === 'card_link') {
+      const url = json.url || '';
+      if (url) { try { await navigator.clipboard.writeText(url); } catch (_) {} prompt('Card-update link (copied) — send it to the member. Billing retries once they update their card.', url); }
+      else alert("Couldn't create a card link — try again.");
+      return; // nothing changed yet — leave the list as-is
+    }
+    _sorterCloseFix(); _sorterRunChecks();
+  } catch (e) { alert('Fix failed: ' + _sorterErr(e)); }
+}
+
+// Prepaid member with no recurring sub → create a portal monthly sub anchored to
+// when the prepaid term ends (reuses /api/sorter/setup-monthly; confirms first).
+async function _sorterFixSetupMonthly(m, plan) {
+  if (!m.customer_id) { alert("No Stripe customer on this member — can't set up billing."); return; }
+  const base = { client_id: _aiClientId(), customer_id: m.customer_id, offer_price_key: m.offer_price_key, charge_date: plan.anchor_date || null, member_email: m.parent_email || null, staging_id: _SORTER_FIX.stagingId };
+  try {
+    const token = await _mreqAuthToken();
+    const prev = await _safeJson(await fetch('/api/sorter/setup-monthly', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token }, body: JSON.stringify({ ...base, mode: 'preview' }) }));
+    if (prev.error) throw new Error(_sorterErr(prev.error));
+    const amt = '$' + ((prev.amount_cents || 0) / 100).toFixed(2);
+    if (prev.needs_card) {
+      const link = prev.payment_link || '';
+      if (link) { try { await navigator.clipboard.writeText(link); } catch (_) {} prompt('No card on file. Send this link to collect a card, then run the fix again. (Copied.)', link); }
+      else alert('No card on file and a link couldn’t be created. Collect a card in Stripe first.');
+      return;
+    }
+    const card = prev.card_last4 ? `card ····${prev.card_last4}` : 'the card on file';
+    if (!confirm(`Set up monthly billing for ${m.athlete_name || 'this member'}?\n\n${amt}/month, first charge ${prev.trial_end_iso} (when the prepaid term ends), on ${card}.\n\nThis creates a real subscription in Stripe.`)) return;
+    const made = await _safeJson(await fetch('/api/sorter/setup-monthly', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token }, body: JSON.stringify({ ...base, mode: 'create' }) }));
+    if (made.error) throw new Error(_sorterErr(made.error));
+    alert(`✓ Monthly billing set up — ${amt}/month starts ${made.trial_end_iso}. They’re not charged until then.`);
+    _sorterCloseFix(); _sorterRunChecks();
+  } catch (e) { alert("Couldn't set up monthly billing: " + _sorterErr(e)); }
+}
+
+// Blocked fallback: create a fresh correct subscription, then cancel the old one.
+// If Stripe refuses the cancel, hand staff a Stripe link to do it by hand.
+async function _sorterFixReplace() {
+  if (!_SORTER_FIX) return;
+  const d = _SORTER_FIX.data, m = d.member || {}, plan = d.plan || {};
+  if (!m.customer_id) { alert("No Stripe customer — can't create a replacement."); return; }
+  if (!confirm("Replace this subscription?\n\nCreates a NEW correct monthly subscription, then cancels the old one. If the old one can't be cancelled automatically, you'll get a Stripe link to cancel it by hand.")) return;
+  try {
+    const token = await _mreqAuthToken();
+    const base = { client_id: _aiClientId(), customer_id: m.customer_id, offer_price_key: m.offer_price_key, charge_date: plan.anchor_date || null, member_email: m.parent_email || null, staging_id: _SORTER_FIX.stagingId };
+    const prev = await _safeJson(await fetch('/api/sorter/setup-monthly', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token }, body: JSON.stringify({ ...base, mode: 'preview' }) }));
+    if (prev.error) throw new Error(_sorterErr(prev.error));
+    if (prev.needs_card) {
+      const link = prev.payment_link || '';
+      if (link) { try { await navigator.clipboard.writeText(link); } catch (_) {} prompt('No card on file — collect one with this link, then replace again. (Copied.)', link); }
+      else alert('No card on file and no link could be created. Collect a card in Stripe first.');
+      return;
+    }
+    const amt = '$' + ((prev.amount_cents || 0) / 100).toFixed(2);
+    if (!confirm(`Create new subscription: ${amt}/month, first charge ${prev.trial_end_iso}. Then cancel the old one. Continue?`)) return;
+    const made = await _safeJson(await fetch('/api/sorter/setup-monthly', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token }, body: JSON.stringify({ ...base, mode: 'create' }) }));
+    if (made.error) throw new Error(_sorterErr(made.error));
+    let tail = '\n\nOld subscription cancelled.';
+    if (m.subscription_id) {
+      const can = await _safeJson(await fetch('/api/sorter/fix-payment', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token }, body: JSON.stringify({ client_id: _aiClientId(), staging_id: _SORTER_FIX.stagingId, mode: 'apply', action: 'cancel_old', cancel_sub_id: m.subscription_id }) }));
+      if (can && can.manual) {
+        try { await navigator.clipboard.writeText(can.stripe_url || ''); } catch (_) {}
+        tail = `\n\n⚠️ BLOCKED — couldn't cancel the old subscription automatically (${_sorterErr(can.error)}).\nCancel it by hand in Stripe (link copied):\n${can.stripe_url || ''}`;
+      }
+    }
+    alert(`✓ New subscription created — ${amt}/month starts ${made.trial_end_iso}.${tail}`);
+    _sorterCloseFix(); _sorterRunChecks();
+  } catch (e) { alert('Replace failed: ' + _sorterErr(e)); }
 }
 
 // Set up monthly billing for a prepaid member: preview → confirm → create a
