@@ -225,6 +225,33 @@ async function postGhlSummary(headers, ghlLocationId, contactId, body, urls) {
 }
 
 /* ============================================
+   WORKFLOW ENROLLMENT
+   ============================================ */
+const ONBOARDING_WORKFLOWS = {
+  adapt_onboarding: "e2bf555a-8c10-4f1f-b87b-edc8cbb8e408",
+  summer_academy:   "eea7c2ba-56bf-4b86-89d3-ae653abbd314",
+};
+
+async function enrollInWorkflow(apiKey, contactId, workflowId) {
+  if (!contactId || !workflowId || !apiKey) return;
+  try {
+    const r = await fetch(`${GHL_V2}/contacts/${contactId}/workflow/${workflowId}`, {
+      method: "POST",
+      headers: {
+        Authorization:  `Bearer ${apiKey}`,
+        Version:        V2_VERSION,
+        "Content-Type": "application/json",
+        Accept:         "application/json",
+      },
+      body: JSON.stringify({ eventStartTime: new Date().toISOString().replace(/\.\d{3}Z$/, "+00:00") }),
+    });
+    if (!r.ok) console.error("GHL workflow enroll failed:", r.status, (await r.text()).slice(0, 150));
+  } catch (e) {
+    console.error("GHL workflow enroll failed (non-fatal):", e.message);
+  }
+}
+
+/* ============================================
    MAIN HANDLER
    ============================================ */
 async function handler(req, res) {
@@ -360,6 +387,9 @@ async function handler(req, res) {
           b,
           { passportFrontUrl, passportBackUrl, athletePhotoUrl, signatureUrl }
         );
+        const workflowId = ONBOARDING_WORKFLOWS[form_type];
+        const apiKey = loc.apiKeyV2 || loc.apiKey;
+        await enrollInWorkflow(apiKey, contactId, workflowId);
       }
 
       // Stamp lead with GHL receipt

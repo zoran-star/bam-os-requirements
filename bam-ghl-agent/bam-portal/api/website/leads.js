@@ -431,10 +431,19 @@ async function handler(req, res) {
 // V1 automations: enroll the GHL contact into an existing GHL workflow
 // (the entry point's ghl_workflow_id). The portal is the trigger now —
 // the workflow's own steps (texts, emails, waits) keep running in GHL.
+// Falls back to the location API key when no OAuth token is present —
+// workflow enrollment doesn't require calendar scopes.
 async function enrollInWorkflow(client, contactId, workflowId) {
   if (!contactId || !workflowId) return;
   try {
-    const token = await getClientGhlToken(client);
+    let token;
+    try {
+      token = await getClientGhlToken(client);
+    } catch {
+      const loc = loadLocations().find(l => l.name === client.ghl_kpi_config?.ghl_location);
+      token = loc?.apiKeyV2 || loc?.apiKey || null;
+    }
+    if (!token) { console.error("GHL workflow enroll skipped: no token or API key available"); return; }
     const r = await fetch(`${GHL_V2}/contacts/${contactId}/workflow/${workflowId}`, {
       method: "POST",
       headers: { Authorization: `Bearer ${token}`, Version: V2_VERSION, "Content-Type": "application/json", Accept: "application/json" },
