@@ -26,6 +26,19 @@ Client portal, gated to V1.5 via `applyV15NavState()` + nav `data-feature="v15"`
   `clients.v15_config.athlete_name_field_ids`. Default `GET /api/contacts` =
   search the mirror.
 
+## Inbox tab (V1.5) — P1 DONE (fresh tab, Zoran chose "build fresh" not extend)
+Separate from the existing V2 inbox: `switchView('v15inbox')` → `openV15Inbox()`,
+gated by `data-feature="v15"`. Reuses the GHL backend (`/api/ghl/inbox` list +
+thread, `/api/ghl/send-message` for SMS/Email + `attachments` URLs).
+- **P1 (done):** conversation list (recent SMS+email), **unread** filter, thread
+  view, composer (SMS/Email toggle + email subject + attachment upload to the
+  `message-attachments` bucket), and **Setup** = synced sender email + phone
+  (new `GET /api/ghl/inbox?action=sender-info` → GHL location phone/email).
+- **P2 (pending):** filter by pipeline + stage, filter by failed messages.
+- **P3 (pending):** **mass send** — tag-filtered audience (hundreds) → queued,
+  throttled, DND-respecting SMS/email blast following GHL's bulk rules. Its own
+  subsystem (queue table + worker).
+
 ## Data + sync
 - **`ghl_contacts`** table = per-academy GHL contact mirror (name/email/phone,
   `tags text[]`, `custom_fields jsonb`, resolved `athlete_name`). pg_trgm GIN

@@ -185,6 +185,25 @@ async function handler(req, res) {
   if (!creds) return res.status(500).json({ error: "GHL not configured for this academy." });
   const { token, locationId } = creds;
 
+  // Mode S: sender info — the email + phone number synced with GHL (V1.5 Inbox
+  // setup just lists these so staff know what they send from).
+  if (req.query.action === "sender-info") {
+    try {
+      const loc = (await ghl("GET", `/locations/${encodeURIComponent(locationId)}`, { token })).location || {};
+      let phone = loc.phone || null;
+      // Prefer a real SMS-capable number from the location's phone numbers, if exposed.
+      try {
+        const nums = await ghl("GET", `/phone-system/numbers/location/${encodeURIComponent(locationId)}`, { token });
+        const list = nums?.numbers || nums?.data || [];
+        const first = list.find(n => n.phoneNumber || n.number);
+        if (first) phone = first.phoneNumber || first.number || phone;
+      } catch (_) { /* numbers endpoint not available on this plan — fall back to location.phone */ }
+      return res.status(200).json({ email: loc.email || null, phone, location_name: loc.name || null });
+    } catch (e) {
+      return res.status(e.status || 500).json({ error: e.message });
+    }
+  }
+
   const conversationId = req.query.conversation_id;
   const contactId = req.query.contact_id;
 

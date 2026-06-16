@@ -5466,6 +5466,16 @@
         Contacts
       </div>
 
+      <div class="nav-item" data-feature="v15" style="display:none" onclick="switchView('v15inbox', this)">
+        <span class="nav-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
+            <polyline points="22,6 12,13 2,6"/>
+          </svg>
+        </span>
+        Inbox
+      </div>
+
       <div class="nav-item" onclick="switchView('action-items', this)">
         <span class="nav-icon" aria-hidden="true">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -8314,6 +8324,18 @@ Then the call to action."]</div>
       </div>
     </div>
 
+    <div class="view" id="view-v15inbox">
+      <div class="topbar">
+        <div>
+          <span class="topbar-kicker">§ Inbox</span>
+          <div class="topbar-title">Inbox</div>
+        </div>
+      </div>
+      <div class="content">
+        <div id="v15inbox-content"></div>
+      </div>
+    </div>
+
     <div class="view" id="view-action-items">
       <div class="topbar">
         <div>
@@ -8682,6 +8704,195 @@ async function _assetBankRemove(assetId, field, id, category) {
 }
 
 // ══════════════════════════════════════════════════════════════
+// INBOX VIEW (V1.5) — fresh GHL inbox: recent SMS+email, threads, send
+// SMS/email + attachments, unread filter, setup (synced sender email+phone).
+// Reuses /api/ghl/inbox (list + thread) + /api/ghl/send-message. (P2 adds
+// pipeline/stage + failed filters; P3 adds mass send.)
+// ══════════════════════════════════════════════════════════════
+let _V15IB = { convos: [], unreadOnly: false, active: null, messages: [], type: 'SMS', pending: [] };
+
+async function openV15Inbox() {
+  const host = document.getElementById('v15inbox-content');
+  if (!host || typeof CLIENT_ID === 'undefined') return;
+  _V15IB.active = null; _V15IB.pending = [];
+  host.innerHTML = `
+    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:14px">
+      <button id="v15ib-all" onclick="_v15ibSetUnread(false)" style="${_v15ibPill(!_V15IB.unreadOnly)}">All</button>
+      <button id="v15ib-unread" onclick="_v15ibSetUnread(true)" style="${_v15ibPill(_V15IB.unreadOnly)}">Unread</button>
+      <span style="flex:1"></span>
+      <button onclick="_v15ibSetup()" style="background:none;border:1px solid var(--border);border-radius:8px;color:var(--text-sub);padding:9px 12px;font:inherit;font-size:12px;cursor:pointer">⚙ Setup</button>
+    </div>
+    <div id="v15ib-body"><div class="req-empty" style="padding:24px 0"><span class="req-spin"></span> Loading messages…</div></div>`;
+  await _v15ibLoadList();
+}
+function _v15ibPill(on) {
+  return `padding:7px 16px;border-radius:999px;font:inherit;font-size:12.5px;font-weight:600;cursor:pointer;border:1px solid ${on ? 'var(--gold)' : 'var(--border-med)'};background:${on ? 'var(--gold)' : 'transparent'};color:${on ? '#0B0B0D' : 'var(--text-sub)'}`;
+}
+function _v15ibSetUnread(v) { _V15IB.unreadOnly = v; openV15Inbox(); }
+
+async function _v15ibLoadList() {
+  const body = document.getElementById('v15ib-body');
+  if (!body) return;
+  try {
+    const token = await _mreqAuthToken();
+    const r = await fetch('/api/ghl/inbox?client_id=' + encodeURIComponent(CLIENT_ID), { headers: { Authorization: 'Bearer ' + token } });
+    const j = await _safeJson(r);
+    if (!r.ok) throw new Error(j.error || ('HTTP ' + r.status));
+    _V15IB.convos = j.conversations || [];
+    _v15ibRenderList();
+  } catch (e) {
+    body.innerHTML = `<div class="req-empty" style="padding:24px 0;color:#9a3b2f">Couldn't load inbox — ${escapeHTML(e.message || String(e))}</div>`;
+  }
+}
+
+function _v15ibRenderList() {
+  const body = document.getElementById('v15ib-body');
+  if (!body) return;
+  let rows = _V15IB.convos;
+  if (_V15IB.unreadOnly) rows = rows.filter(c => (c.unreadCount || 0) > 0);
+  if (!rows.length) {
+    body.innerHTML = `<div class="req-empty" style="padding:32px 0;color:var(--text-mute)">${_V15IB.unreadOnly ? 'No unread messages.' : 'No conversations yet.'}</div>`;
+    return;
+  }
+  body.innerHTML = `<div style="border:1px solid var(--border);border-radius:10px;overflow:hidden">` + rows.map(c => {
+    const unread = (c.unreadCount || 0) > 0;
+    const ch = String(c.channel || c.lastMessageType || '').replace(/^TYPE_/, '').toUpperCase().includes('MAIL') ? 'Email' : 'SMS';
+    return `<div onclick='_v15ibOpen(${JSON.stringify(c.id)},${JSON.stringify(c.contactId || "")},${JSON.stringify(c.phone || "")},${JSON.stringify(c.email || "")},${JSON.stringify(c.contactName || "")})'
+      style="display:flex;align-items:center;gap:12px;padding:12px 14px;border-bottom:1px solid var(--border);cursor:pointer">
+      ${unread ? '<span style="width:8px;height:8px;border-radius:50%;background:var(--gold);flex:none"></span>' : '<span style="width:8px;flex:none"></span>'}
+      <div style="flex:1;min-width:0">
+        <div style="font-size:13px;font-weight:${unread ? 700 : 600};color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHTML(c.contactName || '(no name)')}</div>
+        <div style="font-size:12px;color:var(--text-mute);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHTML(c.lastMessageBody || '')}</div>
+      </div>
+      <div style="text-align:right;flex:none">
+        <div style="font-size:10px;color:var(--text-mute);text-transform:uppercase;letter-spacing:.04em">${ch}</div>
+        <div style="font-size:11px;color:var(--text-mute)">${escapeHTML(_ibFormatDate(c.lastMessageDate))}</div>
+      </div>
+    </div>`;
+  }).join('') + `</div>`;
+}
+
+async function _v15ibOpen(convId, contactId, phone, email, name) {
+  _V15IB.active = { convId, contactId, phone, email, name };
+  _V15IB.pending = [];
+  _V15IB.type = phone ? 'SMS' : 'Email';
+  const body = document.getElementById('v15ib-body');
+  if (body) body.innerHTML = `<div class="req-empty" style="padding:24px 0"><span class="req-spin"></span> Loading thread…</div>`;
+  try {
+    const token = await _mreqAuthToken();
+    const r = await fetch(`/api/ghl/inbox?client_id=${encodeURIComponent(CLIENT_ID)}&conversation_id=${encodeURIComponent(convId)}`, { headers: { Authorization: 'Bearer ' + token } });
+    const j = await _safeJson(r);
+    if (!r.ok) throw new Error(j.error || ('HTTP ' + r.status));
+    _V15IB.messages = j.messages || [];
+    _v15ibRenderThread();
+  } catch (e) {
+    if (body) body.innerHTML = `<div class="req-empty" style="padding:24px 0;color:#9a3b2f">Couldn't load thread — ${escapeHTML(e.message || String(e))}</div>`;
+  }
+}
+
+function _v15ibRenderThread() {
+  const body = document.getElementById('v15ib-body');
+  if (!body || !_V15IB.active) return;
+  const a = _V15IB.active;
+  const sorted = [..._V15IB.messages].sort((x, y) => (x.date ? new Date(x.date).getTime() : 0) - (y.date ? new Date(y.date).getTime() : 0));
+  const bubbles = sorted.length ? sorted.map(m => {
+    const out = (m.direction || '').toLowerCase() === 'outbound';
+    return `<div style="max-width:78%;align-self:${out ? 'flex-end' : 'flex-start'};background:${out ? 'var(--gold)' : 'var(--surface)'};color:${out ? '#0B0B0D' : 'var(--text)'};border:1px solid ${out ? 'var(--gold)' : 'var(--border)'};padding:8px 12px;border-radius:12px;font-size:13px;line-height:1.45;word-break:break-word">
+      ${escapeHTML(m.body || '(no body)')}
+      <div style="font-size:10px;opacity:.6;margin-top:3px">${escapeHTML(_ghlChannelLabel(m.type))} · ${escapeHTML(_ibFormatDate(m.date))}</div>
+    </div>`;
+  }).join('') : '<div style="color:var(--text-mute);font-size:13px;text-align:center;padding:20px">No messages yet.</div>';
+  const isEmail = _V15IB.type === 'Email';
+  const chips = _V15IB.pending.map((u, i) => `<span style="display:inline-flex;align-items:center;gap:5px;background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:3px 8px;font-size:11px;color:var(--text-sub)">📎 file ${i + 1}<button onclick="_v15ibRmFile(${i})" style="background:none;border:none;color:var(--text-mute);cursor:pointer;font-size:12px">×</button></span>`).join('');
+  body.innerHTML = `
+    <button onclick="openV15Inbox()" style="background:none;border:none;color:var(--text-sub);font-size:13px;cursor:pointer;padding:0 0 10px">← All conversations</button>
+    <div style="font-size:15px;font-weight:700;color:var(--text);margin-bottom:10px">${escapeHTML(a.name || a.phone || a.email || 'Conversation')}</div>
+    <div style="display:flex;flex-direction:column;gap:8px;max-height:46vh;overflow-y:auto;padding:4px;border:1px solid var(--border);border-radius:10px;background:var(--bg)">${bubbles}</div>
+    <div style="margin-top:12px;border:1px solid var(--border);border-radius:10px;padding:10px">
+      <div style="display:flex;gap:6px;margin-bottom:8px">
+        <button onclick="_v15ibSetType('SMS')" ${a.phone ? '' : 'disabled title="No phone on file"'} style="${_v15ibPill(_V15IB.type === 'SMS')};opacity:${a.phone ? 1 : .4}">SMS</button>
+        <button onclick="_v15ibSetType('Email')" ${a.email ? '' : 'disabled title="No email on file"'} style="${_v15ibPill(isEmail)};opacity:${a.email ? 1 : .4}">Email</button>
+      </div>
+      ${isEmail ? `<input id="v15ib-subject" placeholder="Subject" style="width:100%;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:8px 10px;font:inherit;font-size:13px;margin-bottom:8px">` : ''}
+      <textarea id="v15ib-text" placeholder="Type a message…" style="width:100%;min-height:70px;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:9px 11px;font:inherit;font-size:13px;resize:vertical;outline:none"></textarea>
+      <div id="v15ib-chips" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px">${chips}</div>
+      <div style="display:flex;align-items:center;gap:8px;margin-top:8px">
+        <label title="Attach" style="display:inline-flex;align-items:center;justify-content:center;width:34px;height:34px;border:1px solid var(--border);border-radius:6px;cursor:pointer;color:var(--text-sub)">📎<input type="file" multiple style="display:none" onchange="_v15ibPickFiles(this)"></label>
+        <button id="v15ib-send" onclick="_v15ibSend()" style="margin-left:auto;background:var(--gold);color:#0B0B0D;border:none;padding:9px 20px;border-radius:6px;font-weight:700;font-size:13px;cursor:pointer">Send</button>
+      </div>
+    </div>`;
+}
+
+function _v15ibSetType(t) { _V15IB.type = t; _v15ibRenderThread(); }
+function _v15ibRmFile(i) { _V15IB.pending.splice(i, 1); _v15ibRenderThread(); }
+
+async function _v15ibPickFiles(input) {
+  const files = Array.from(input.files || []); input.value = '';
+  for (const file of files) {
+    try {
+      const clean = file.name.replace(/[^a-zA-Z0-9._-]+/g, '_');
+      const path = `${CLIENT_ID}/${Date.now()}-${Math.random().toString(36).slice(2, 7)}-${clean}`;
+      const { error } = await _sb.storage.from('message-attachments').upload(path, file, { contentType: file.type || 'application/octet-stream', upsert: false });
+      if (error) throw error;
+      const { data } = _sb.storage.from('message-attachments').getPublicUrl(path);
+      if (data?.publicUrl) _V15IB.pending.push(data.publicUrl);
+    } catch (e) { alert("Couldn't attach " + file.name + ' — ' + (e.message || e)); }
+  }
+  _v15ibRenderThread();
+}
+
+async function _v15ibSend() {
+  const a = _V15IB.active; if (!a) return;
+  const text = (document.getElementById('v15ib-text')?.value || '').trim();
+  const subject = (document.getElementById('v15ib-subject')?.value || '').trim();
+  if (!text && !_V15IB.pending.length) return;
+  if (_V15IB.type === 'Email' && !subject) { alert('Email needs a subject.'); return; }
+  const btn = document.getElementById('v15ib-send'); if (btn) { btn.disabled = true; btn.textContent = 'Sending…'; }
+  try {
+    const token = await _mreqAuthToken();
+    const r = await fetch('/api/ghl/send-message', {
+      method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+      body: JSON.stringify({
+        client_id: CLIENT_ID, type: _V15IB.type,
+        contact_phone: a.phone || undefined, contact_email: a.email || undefined, contact_name: a.name || undefined,
+        message: text, subject: _V15IB.type === 'Email' ? subject : undefined,
+        attachments: _V15IB.pending,
+      }),
+    });
+    const j = await _safeJson(r);
+    if (!r.ok || j.error) throw new Error(j.error || ('HTTP ' + r.status));
+    _V15IB.pending = [];
+    await _v15ibOpen(a.convId, a.contactId, a.phone, a.email, a.name);
+  } catch (e) {
+    alert('Send failed: ' + (e.message || e));
+    if (btn) { btn.disabled = false; btn.textContent = 'Send'; }
+  }
+}
+
+async function _v15ibSetup() {
+  const body = document.getElementById('v15ib-body');
+  if (!body) return;
+  body.innerHTML = `<div class="req-empty" style="padding:24px 0"><span class="req-spin"></span> Loading sender info…</div>`;
+  try {
+    const token = await _mreqAuthToken();
+    const r = await fetch('/api/ghl/inbox?action=sender-info&client_id=' + encodeURIComponent(CLIENT_ID), { headers: { Authorization: 'Bearer ' + token } });
+    const j = await _safeJson(r);
+    if (!r.ok) throw new Error(j.error || ('HTTP ' + r.status));
+    const row = (k, v) => `<div style="display:flex;justify-content:space-between;gap:16px;padding:12px 14px;border:1px solid var(--border);border-radius:8px;margin-bottom:8px"><span style="color:var(--text-mute);font-size:12px;text-transform:uppercase;letter-spacing:.05em">${k}</span><span style="color:var(--text);font-size:14px;font-weight:600">${v ? escapeHTML(v) : '<span style=\"color:var(--text-mute)\">not set in GHL</span>'}</span></div>`;
+    body.innerHTML = `
+      <div style="max-width:520px">
+        <button onclick="openV15Inbox()" style="background:none;border:none;color:var(--text-sub);font-size:13px;cursor:pointer;padding:0 0 12px">← Back to inbox</button>
+        <div style="font-size:17px;font-weight:700;color:var(--text);margin-bottom:4px">What you send from</div>
+        <div style="font-size:12.5px;color:var(--text-mute);margin-bottom:16px">The phone number and email synced with GoHighLevel for this academy.</div>
+        ${row('Phone', j.phone)}
+        ${row('Email', j.email)}
+      </div>`;
+  } catch (e) {
+    body.innerHTML = `<div class="req-empty" style="padding:24px 0;color:#9a3b2f">Couldn't load sender info — ${escapeHTML(e.message || String(e))}</div>`;
+  }
+}
+
+// ══════════════════════════════════════════════════════════════
 // CONTACTS VIEW (V1.5) — search the synced GHL-contact mirror (ghl_contacts).
 // Search: parent/athlete name · phone · email. Filter: by tag. Setup maps the
 // athlete-name custom field (live GHL) so the sync can resolve athlete_name.
@@ -8859,6 +9070,8 @@ function switchView(name, el) {
   if (name === 'assets') openAssetsView();
 
   if (name === 'contacts') openContactsView();
+
+  if (name === 'v15inbox') openV15Inbox();
 
   // When entering Action Items, load the list
   if (name === 'action-items') fetchAndRenderActionItems();
