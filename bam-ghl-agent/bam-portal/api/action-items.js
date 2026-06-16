@@ -235,10 +235,11 @@ const ONBOARDING_STEPS = [
   { key: "kpis",           title: "Fill out your KPIs",                  sort: 9, col: "kpi_marked_done_at",            writable: true },
   { key: "offers",         title: "Set up your Offers",                  sort: 10, col: "offers_marked_done_at",       writable: true },
   { key: "book_call",      title: "Book a call with your Scaling Manager", sort: 11, col: "call_booked_at",            writable: true },
-  { key: "book_call_cam",  title: "Book a call with Cam (marketing)",    sort: 12, col: "cam_call_booked_at",          writable: true },
-  { key: "submit_content", title: "Submit your raw content",             sort: 13, col: "content_submitted_at",        writable: true },
   // Staff-only: hidden from clients. Checking it CREATES the systems ticket.
-  { key: "trigger_buildout", title: "Trigger systems buildout",         sort: 14, col: "systems_buildout_triggered_at", writable: true, staff_only: true },
+  // Sits right AFTER the SM call — the build gets scoped on that call.
+  { key: "trigger_buildout", title: "Trigger systems buildout",         sort: 12, col: "systems_buildout_triggered_at", writable: true, staff_only: true },
+  { key: "book_call_cam",  title: "Book a call with Cam (marketing)",    sort: 13, col: "cam_call_booked_at",          writable: true },
+  { key: "submit_content", title: "Submit your raw content",             sort: 14, col: "content_submitted_at",        writable: true },
   // Staff-only gate. Flipping it UNLOCKS the client's "Book review call" step.
   { key: "ready_for_review", title: "Ready for review call?",           sort: 15, col: "ready_for_review_at",         writable: true, staff_only: true },
   // Client step — locked (greyed) until ready_for_review is done.
@@ -259,7 +260,7 @@ async function loadClientSignals(clientId) {
 async function syncOnboardingItems(clientId) {
   const signals = await loadClientSignals(clientId);
   const existing = await sb(
-    `action_items?client_id=eq.${clientId}&onboarding_key=not.is.null&select=id,onboarding_key,completed_at,onboarding_overridden`
+    `action_items?client_id=eq.${clientId}&onboarding_key=not.is.null&select=id,onboarding_key,completed_at,onboarding_overridden,sort_order`
   );
   const byKey = {};
   (existing || []).forEach(r => { byKey[r.onboarding_key] = r; });
@@ -281,6 +282,14 @@ async function syncOnboardingItems(clientId) {
         }),
       });
       continue;
+    }
+    // Keep the step ORDER in sync with the code (source of truth) — without
+    // this, reordering ONBOARDING_STEPS only affected brand-new clients.
+    if (row.sort_order !== step.sort) {
+      await sb(`action_items?id=eq.${row.id}`, {
+        method: "PATCH", headers: { Prefer: "return=minimal" },
+        body: JSON.stringify({ sort_order: step.sort }),
+      });
     }
     // Writable steps always mirror col (toggling writes col, so they're already
     // consistent; this picks up changes made via the BB "mark done" buttons).
