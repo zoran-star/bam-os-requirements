@@ -45,6 +45,19 @@ thread, `/api/ghl/send-message` for SMS/Email + `attachments` URLs).
   minute (vercel.json). `ghl_contacts.dnd` added + synced (skips do-not-contact).
   Modal polls status for a live progress bar; sending continues in the background.
 
+## Pipelines tab (V1.5) — DONE (adjusted the existing board, kept simple)
+Reuses the existing GHL kanban board (`view-pipelines`, drag/drop `_plDrop`, the
+lead drawer w/ contact info + SMS/email). Added a V1.5-gated nav item "Pipelines"
+→ `switchView('pipelines')` (data-feature="v15"). New:
+- **Won/Lost/Abandoned + free-text reason:** `_plMarkWon/Lost/Abandoned` →
+  `_plOutcome()` modal (reason textarea) → `_plSetStatus()` PATCHes GHL status +
+  the pipelines API saves the reason to **`pipeline_outcomes`** (migration). Won
+  is no longer a stub — it sets status 'won' (member-tie stays the separate
+  "Convert to member" button).
+- **Undo:** `_plShowUndo()` toast after a status change OR a drag move;
+  `_plUndo()` reverses (status→'open', or move back to fromStageId).
+Per Zoran: did NOT add a full "all GHL fields" dump — kept the drawer simple.
+
 ## Data + sync
 - **`ghl_contacts`** table = per-academy GHL contact mirror (name/email/phone,
   `tags text[]`, `custom_fields jsonb`, resolved `athlete_name`). pg_trgm GIN

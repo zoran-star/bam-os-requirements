@@ -5531,6 +5531,17 @@
         Sales
       </div>
 
+      <div class="nav-item" data-feature="v15" style="display:none" onclick="switchView('pipelines', this)">
+        <span class="nav-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="4" width="4" height="16" rx="1"/>
+            <rect x="10" y="4" width="4" height="10" rx="1"/>
+            <rect x="17" y="4" width="4" height="6" rx="1"/>
+          </svg>
+        </span>
+        Pipelines
+      </div>
+
       <div class="nav-item" data-feature="calendar" style="display:none" onclick="switchView('calendar', this)">
         <span class="nav-icon" aria-hidden="true">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -16930,46 +16941,84 @@ async function _ptfSubmit() {
 
 // Mark won — will link the contact to an existing member. Deferred until the
 // member work is done; stub for now (no GHL change yet).
-function _plMarkWon(oppId) {
-  alert('Mark as won — coming soon.\n\nThis will tie the trial to an existing member in the member list. We’ll wire it up once the member work is done.');
+// Mark won / lost / abandoned — each captures a free-text reason, updates the
+// GHL opportunity status, and offers an Undo. (V1.5 pipelines.)
+const _PL_STATUS_LABEL = { won: 'Won', lost: 'Lost', abandoned: 'Abandoned' };
+let _plUndoState = null, _plUndoTimer = null;
+
+function _plMarkWon(oppId) { _plOutcome(oppId, 'won'); }
+function _plMarkLost(oppId) { _plOutcome(oppId, 'lost'); }
+function _plMarkAbandoned(oppId) { _plOutcome(oppId, 'abandoned'); }
+
+function _plOutcome(oppId, status) {
+  const label = _PL_STATUS_LABEL[status] || status;
+  document.body.insertAdjacentHTML('beforeend', `<div id="pl-outcome-overlay" style="position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9100;display:flex;align-items:center;justify-content:center;padding:18px" onclick="if(event.target===this)this.remove()">
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;width:100%;max-width:420px;padding:22px">
+      <div style="font-size:17px;font-weight:700;color:var(--text);margin-bottom:4px">Mark ${label}</div>
+      <div style="font-size:12px;color:var(--text-mute);margin-bottom:14px">Add a quick reason (optional).</div>
+      <textarea id="pl-outcome-reason" placeholder="Reason…" style="width:100%;min-height:70px;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:9px 11px;font:inherit;font-size:13px;resize:vertical;margin-bottom:14px"></textarea>
+      <div style="display:flex;justify-content:flex-end;gap:10px">
+        <button onclick="document.getElementById('pl-outcome-overlay').remove()" style="background:none;border:1px solid var(--border);border-radius:8px;color:var(--text-sub);padding:9px 16px;font:inherit;font-size:13px;cursor:pointer">Cancel</button>
+        <button id="pl-outcome-go" onclick="_plOutcomeConfirm('${escapeHTML(oppId)}','${status}')" style="background:var(--gold);color:#0B0B0D;border:none;border-radius:8px;padding:9px 18px;font:inherit;font-size:13px;font-weight:700;cursor:pointer">Mark ${label}</button>
+      </div>
+    </div></div>`);
+  setTimeout(() => document.getElementById('pl-outcome-reason')?.focus(), 30);
 }
 
-// Mark lost — sets the GHL opportunity status to lost.
-async function _plMarkLost(oppId) {
-  if (!confirm('Mark this trial as LOST?')) return;
+async function _plOutcomeConfirm(oppId, status) {
+  const reason = (document.getElementById('pl-outcome-reason')?.value || '').trim();
+  const btn = document.getElementById('pl-outcome-go'); if (btn) { btn.disabled = true; btn.textContent = 'Saving…'; }
   try {
-    const token = await _mreqAuthToken();
-    const r = await fetch(`/api/ghl/pipelines?client_id=${encodeURIComponent(CLIENT_ID)}&opportunity_id=${encodeURIComponent(oppId)}`, {
-      method: 'PATCH',
-      headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ status: 'lost' }),
-    });
-    const json = await _safeJson(r);
-    if (!r.ok) throw new Error(json.error || ('HTTP ' + r.status));
+    await _plSetStatus(oppId, status, reason);
+    document.getElementById('pl-outcome-overlay')?.remove();
     closePipelineDrawer();
     fetchAndRenderPipelines();
+    _plShowUndo({ type: 'status', oppId }, `Marked ${_PL_STATUS_LABEL[status] || status}`);
   } catch (e) {
-    alert('Couldn’t mark lost: ' + e.message);
+    alert('Couldn’t mark ' + status + ': ' + e.message);
+    if (btn) { btn.disabled = false; btn.textContent = 'Mark ' + (_PL_STATUS_LABEL[status] || status); }
   }
 }
 
-// Mark abandoned — sets the GHL opportunity status to abandoned.
-async function _plMarkAbandoned(oppId) {
-  if (!confirm('Mark this trial as ABANDONED?')) return;
+async function _plSetStatus(oppId, status, reason) {
+  const token = await _mreqAuthToken();
+  const r = await fetch(`/api/ghl/pipelines?client_id=${encodeURIComponent(CLIENT_ID)}&opportunity_id=${encodeURIComponent(oppId)}`, {
+    method: 'PATCH', headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ status, reason: reason || '' }),
+  });
+  const json = await _safeJson(r);
+  if (!r.ok) throw new Error(json.error || ('HTTP ' + r.status));
+  return json;
+}
+
+// ── Undo toast (status changes + drag moves) ──
+function _plShowUndo(action, label) {
+  _plUndoState = action;
+  clearTimeout(_plUndoTimer);
+  document.getElementById('pl-undo-toast')?.remove();
+  document.body.insertAdjacentHTML('beforeend', `<div id="pl-undo-toast" style="position:fixed;bottom:24px;left:50%;transform:translateX(-50%);z-index:9200;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:10px 16px;display:flex;align-items:center;gap:16px;box-shadow:0 8px 30px rgba(0,0,0,.45)">
+    <span style="font-size:13px;color:var(--text)">${escapeHTML(label)}</span>
+    <button onclick="_plUndo()" style="background:none;border:none;color:var(--gold);font-weight:700;font-size:13px;cursor:pointer">Undo</button>
+  </div>`);
+  _plUndoTimer = setTimeout(() => document.getElementById('pl-undo-toast')?.remove(), 7000);
+}
+
+async function _plUndo() {
+  const a = _plUndoState; _plUndoState = null;
+  document.getElementById('pl-undo-toast')?.remove();
+  if (!a) return;
   try {
-    const token = await _mreqAuthToken();
-    const r = await fetch(`/api/ghl/pipelines?client_id=${encodeURIComponent(CLIENT_ID)}&opportunity_id=${encodeURIComponent(oppId)}`, {
-      method: 'PATCH',
-      headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ status: 'abandoned' }),
-    });
-    const json = await _safeJson(r);
-    if (!r.ok) throw new Error(json.error || ('HTTP ' + r.status));
-    closePipelineDrawer();
+    if (a.type === 'status') {
+      await _plSetStatus(a.oppId, 'open', '');
+    } else if (a.type === 'move') {
+      const token = await _mreqAuthToken();
+      await fetch(`/api/ghl/pipelines?client_id=${encodeURIComponent(CLIENT_ID)}&opportunity_id=${encodeURIComponent(a.oppId)}`, {
+        method: 'PATCH', headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pipeline_id: a.pipelineId, stage_id: a.fromStageId }),
+      });
+    }
     fetchAndRenderPipelines();
-  } catch (e) {
-    alert('Couldn’t mark abandoned: ' + e.message);
-  }
+  } catch (e) { alert('Undo failed: ' + e.message); }
 }
 
 function _plAgeShort(iso) {
@@ -17103,6 +17152,7 @@ async function _plDrop(e, toStageId, pipelineId) {
     });
     const json = await _safeJson(r);
     if (!r.ok) throw new Error(json.error || ('HTTP ' + r.status));
+    _plShowUndo({ type: 'move', oppId, pipelineId, fromStageId }, 'Card moved');
   } catch (err) {
     alert('Move failed: ' + err.message);
     // Roll back
