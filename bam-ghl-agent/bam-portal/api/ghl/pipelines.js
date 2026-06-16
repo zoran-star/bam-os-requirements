@@ -207,6 +207,14 @@ async function handler(req, res) {
         const out = await ghl("PUT", `/opportunities/${encodeURIComponent(oppId)}`, {
           token, body: { status: body.status },
         });
+        // V1.5: record the outcome + free-text reason (status 'open' = an undo).
+        const cid = req.query.client_id;
+        if (cid && body.status !== "open") {
+          await sb(`pipeline_outcomes`, {
+            method: "POST", headers: { Prefer: "return=minimal" },
+            body: JSON.stringify([{ client_id: cid, opportunity_id: oppId, status: body.status, reason: (body.reason || "").toString().trim() || null }]),
+          }).catch(() => {});
+        }
         return res.status(200).json({ ok: true, opportunity_id: oppId, status: body.status, raw: out });
       } catch (e) {
         return res.status(e.status || 502).json({ error: `GHL: ${e.message}`, detail: e.body || null });
