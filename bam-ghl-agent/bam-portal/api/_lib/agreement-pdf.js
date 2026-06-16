@@ -15,16 +15,20 @@ const INK = rgb(0.04, 0.04, 0.05);
 const MUTE = rgb(0.4, 0.4, 0.42);
 const GOLD = rgb(0.886, 0.867, 0.624); // #E2DD9F (BAM gold)
 
-// Sample agreement body. Real per-academy contract text replaces this later;
-// for now every academy gets this placeholder so the flow is end-to-end.
+// Agreement body — MUST match the on-screen waiver the parent reads + signs in
+// the funnel (gta/enroll.jsx EN_CLAUSES). The signed PDF is the legal record, so
+// the text here and on screen have to stay identical. Wording is BAM GTA's
+// Athlete Participation, Waiver & Media Release (clause 6 billing added because
+// this is a recurring charge). Keep both in sync if either changes.
 function sampleClauses(academyName) {
   return [
-    ["1. Membership", `This agreement enrolls the athlete named below into a recurring training membership with ${academyName}. Billing recurs automatically on the cycle shown until cancelled in writing.`],
-    ["2. Payment & cancellation", "The card on file is charged each billing cycle. You may cancel with written notice before the next billing date. Fees already charged are non-refundable except where required by law."],
-    ["3. Assumption of risk", "Basketball training involves physical activity and inherent risk of injury. The parent/guardian confirms the athlete is medically fit to participate and assumes responsibility for these risks."],
-    ["4. Liability waiver", `To the extent permitted by law, the parent/guardian releases ${academyName}, its coaches and staff from liability for ordinary-negligence injury or loss arising from participation.`],
-    ["5. Media release", `The parent/guardian grants ${academyName} permission to use photos and video of the athlete for promotional purposes, and may revoke this in writing at any time.`],
-    ["6. Code of conduct", "The athlete and family agree to respect coaches, teammates, and facilities. Conduct that endangers others may end the membership without refund."],
+    ["1. Participation acknowledgment", "By signing, the participant and/or the parent or legal guardian of the minor participant (“Participant”) affirms their intention to participate in athletic training, games, practices, skills training, strength and conditioning, yoga, psychological training, and other related activities organized by By Any Means GTA and its partners, affiliates, and associated organizations (the “Program Providers”), including By Any Means Basketball, ADAPT Academy, and other affiliate members. If signing for a minor, the undersigned confirms they are the lawful parent or legal guardian with full authority to consent on the minor's behalf."],
+    ["2. Acknowledgment of risk and medical consent", "Participation involves inherent risks of injury, illness (including communicable diseases such as COVID-19, MRSA, and influenza), disability, or death. The Participant knowingly accepts and assumes all such risks, known and unknown, and accepts full responsibility for their participation or that of their minor child. The Participant authorizes the Program Providers and their staff to obtain medical treatment deemed necessary in an emergency, and agrees to bear full financial responsibility for resulting medical expenses regardless of insurance. The Participant certifies the athlete has valid accident or medical insurance and proper medical care for any current condition."],
+    ["3. Release of liability and indemnification", "In consideration of participation, the Participant, on behalf of themselves and/or their minor child, releases and discharges the Program Providers and their officers, directors, agents, officials, volunteers, employees, affiliates, sponsors, advertisers, and facility owners from any and all claims for illness, disability, death, personal injury, or property damage, even if arising from the active or passive negligence of the Program Providers or others; and agrees to defend and indemnify the Program Providers against any such claims connected to their participation. The Participant agrees to comply with all rules and safety protocols, and acknowledges that failure to do so may result in dismissal without refund."],
+    ["4. Parent or guardian certification (minors only)", "For participants under 18 at registration, the undersigned certifies they have read and explained this agreement to the athlete, including all risks, responsibilities, and expectations, and that the athlete understands and accepts these risks. As parent or legal guardian, the undersigned agrees to all terms and releases and indemnifies the Program Providers to the fullest extent allowed by law, even if arising from negligence."],
+    ["5. Media release", "The Participant grants the Program Providers permission to photograph or video the athlete during events and activities and to use these materials in marketing, social media, publications, and online platforms without compensation or right of approval, and waives any right to inspect or approve the final product."],
+    ["6. Membership, billing and cancellation", `This enrolls the athlete in a recurring membership with ${academyName}. The card on file is charged automatically each billing cycle at the price shown (taxes included) until cancelled. You may cancel by written notice to info@byanymeanstoronto.ca before your next billing date, which stops future charges. Fees already charged are non-refundable except where required by law.`],
+    ["7. Electronic signature consent", "By signing electronically, the Participant agrees their electronic signature is the legal equivalent of a handwritten signature, confirming full understanding and acceptance of all terms, and is legally binding to the fullest extent allowed by law."],
   ];
 }
 
@@ -72,7 +76,7 @@ export async function renderAgreementPdf({
   };
 
   // Header
-  page.drawText("ENROLLMENT AGREEMENT", { x: M, y, size: 20, font: bold, color: INK });
+  page.drawText("PARTICIPATION & WAIVER AGREEMENT", { x: M, y, size: 16, font: bold, color: INK });
   y -= 26;
   page.drawText(academyName, { x: M, y, size: 12, font, color: MUTE });
   y -= 10;
