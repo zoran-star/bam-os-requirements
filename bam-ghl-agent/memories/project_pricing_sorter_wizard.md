@@ -35,6 +35,35 @@ metadata:
 > ⚠️ CONCURRENT EDITS: other sessions/Rosano edit client-portal.html live —
 > `git pull` before editing, commit ONLY your files.
 
+> **2026-06-15 (pm) — NEXT PAYMENT column + AI fix modal + blocked fallback (PR #348).**
+> Cleanup table gained a **"Next payment"** column (right of Price). Backend
+> `cleanup.js`: `subBillingFacts(sub)` spreads current_period_end/trial_end/
+> cancel_at/pause_collection onto the link entries (both buildEmailMap + the
+> check loop); `computeNextPayment({link,cat,offerKey,altPay})` classifies each
+> member → state `scheduled` (shows date) | missing | ending | paused |
+> at_risk | none; `fixable` drives a clickable ⚠️ chip. Each member in the
+> check response carries `next_payment`.
+> **New endpoint `api/sorter/fix-payment.js`** (maxDuration 60): `mode=preview`
+> runs the deterministic `classify()` (source of truth) → plan kind
+> setup_monthly | uncancel | resume | card_link, then `aiSanityCheck()` (Claude
+> **haiku**, raw fetch like ai/search.js) explains in plain English + flags
+> caution — **AI is advisory only**. `mode=apply` actions: uncancel
+> (cancel_at_period_end=false + cancel_at=''), resume (pause_collection=''),
+> card_link (setup Checkout session), cancel_old (DELETE sub; on Stripe refusal
+> returns `{manual:true, stripe_url}`). Frontend: `_sorterOpenFixPayment` →
+> `_sorterRenderFixPayment` modal (problem + 🤖 AI check + recommended fix +
+> confirm); `_sorterFixApply`; `_sorterFixSetupMonthly` reuses
+> `/api/sorter/setup-monthly`; **`_sorterFixReplace`** = blocked fallback
+> (create fresh sub → cancel old → if blocked, copies Stripe link for manual
+> cancel). KEY FACT: any sub on the connected account is editable/cancellable
+> via API regardless of where it was "created" — true "blocked" only = a sub on
+> an account we don't manage (never seen in import). **Progress-restore:**
+> `openPricingSorter` auto-runs `_sorterRunChecks()` when landing on step 3, so
+> DB-backed cleanup work reappears instantly (no "Run checks" click, survives
+> refresh). ⚠️ Stripe WRITES need live verification (no sandbox locally).
+> Directly addresses [[project_bamgta_billing_hygiene]] (failed/prepaid-no-card
+> renewals).
+
 > **2026-06-12 — OFFER-CENTRIC SPLIT (PR #252).** ⭐ Everything (sales,
 > members, funnels, agents, KPIs…) is structured AROUND EACH OFFER — Training
 > offer first (Zoran, also in [[project_website_leads]]). The wizard split
