@@ -5140,6 +5140,9 @@
       background: none; border: none; border-radius: 11px; color: var(--text); font: inherit; font-size: 15.5px; cursor: pointer; text-align: left; }
     .mobile-more-item:active { background: var(--surface); }
     .mobile-more-item svg { width: 21px; height: 21px; color: var(--text-mute); flex: 0 0 auto; }
+    .mobile-more-search { width: 100%; box-sizing: border-box; margin: 0 0 8px; padding: 11px 12px;
+      background: var(--surface); border: 1px solid var(--border-med); border-radius: 10px; color: var(--text); font: inherit; font-size: 15px; }
+    .mobile-more-divider { height: 1px; background: var(--border); margin: 8px 4px 4px; }
     .mobile-nav-badge {
       position: absolute;
       top: 5px; left: calc(50% + 6px);
@@ -8524,7 +8527,6 @@ Then the call to action."]</div>
   <div class="mobile-more-overlay" id="mobileMoreOverlay" onclick="if(event.target===this)_mobileMoreClose()">
     <div class="mobile-more-sheet" role="dialog" aria-label="More">
       <div class="mobile-more-grip"></div>
-      <div class="mobile-more-title">All tabs</div>
       <div id="mobileMoreList"></div>
     </div>
   </div>
@@ -10157,13 +10159,42 @@ function syncMobileNav(name) {
   });
 }
 
-// "More" sheet — list every enabled sidebar tab that isn't one of the 4 primary
-// bottom-bar items, so V1.5 (and Blueprint, Action Items, …) are reachable on a
-// phone. Built fresh each open so feature-gating (v15/members/marketing) is live.
+// "More" sheet — the mobile home for everything the bottom bar can't hold:
+//   1) the multi-academy switcher (sidebar-only otherwise, so unreachable on a
+//      phone), and 2) every enabled tab not on the 4 primary bottom items
+//      (V1.5: Contacts/Inbox/Sales/Calendars/KPIs, plus Blueprint, Action
+//      Items, …). Rebuilt each render so account + feature-gating stay live.
+let _mMoreAcctFilter = '';
 function _mobileMore() {
-  const list = document.getElementById('mobileMoreList');
   const overlay = document.getElementById('mobileMoreOverlay');
-  if (!list || !overlay) return;
+  if (!overlay) return;
+  _mMoreAcctFilter = '';
+  _mobileMoreRender();
+  overlay.classList.add('open');
+}
+function _mobileMoreClose() { const o = document.getElementById('mobileMoreOverlay'); if (o) o.classList.remove('open'); }
+function _mobileMoreRender() {
+  const list = document.getElementById('mobileMoreList');
+  if (!list) return;
+  let html = '';
+  // ── Accounts (only when the user belongs to more than one academy) ──
+  const rows = (typeof CLIENT_ROWS !== 'undefined' && CLIENT_ROWS) ? CLIENT_ROWS : [];
+  if (rows.length > 1) {
+    const f = _mMoreAcctFilter.toLowerCase().trim();
+    const shown = f ? rows.filter(c => (c.business_name || '').toLowerCase().includes(f)) : rows;
+    html += `<div class="mobile-more-title">Your accounts (${rows.length})</div>`;
+    if (rows.length > 6) html += `<input type="text" class="mobile-more-search" placeholder="Search academies…" value="${_mMoreAcctFilter.replace(/"/g, '&quot;')}" oninput="_mobileMoreAcctFilter(this.value)">`;
+    html += shown.map(c => {
+      const active = c.id === (typeof CLIENT_ID !== 'undefined' ? CLIENT_ID : null);
+      return `<button type="button" class="mobile-more-item" onclick="_mobileMorePickClient('${c.id}')">
+        <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHTML(c.business_name || '(unnamed)')}</span>
+        ${active ? '<span style="color:var(--gold);font-weight:700">✓</span>' : ''}</button>`;
+    }).join('') || `<div style="padding:10px 12px;color:var(--text-mute)">No matches</div>`;
+    html += `<div class="mobile-more-divider"></div><div class="mobile-more-title">Tabs</div>`;
+  } else {
+    html += `<div class="mobile-more-title">All tabs</div>`;
+  }
+  // ── Tabs not already on the bottom bar ──
   const seen = new Set();
   const items = [];
   document.querySelectorAll('.sidebar .nav-item').forEach(el => {
@@ -10178,12 +10209,24 @@ function _mobileMore() {
     const svg = el.querySelector('.nav-icon svg');
     items.push({ view, label, icon: svg ? svg.outerHTML : '' });
   });
-  list.innerHTML = items.length
+  html += items.length
     ? items.map(it => `<button type="button" class="mobile-more-item" onclick="_mobileMorePick('${it.view}')">${it.icon}<span>${escapeHTML(it.label)}</span></button>`).join('')
     : '<div style="padding:16px 12px;color:var(--text-mute)">Nothing else here yet.</div>';
-  overlay.classList.add('open');
+  list.innerHTML = html;
 }
-function _mobileMoreClose() { const o = document.getElementById('mobileMoreOverlay'); if (o) o.classList.remove('open'); }
+function _mobileMoreAcctFilter(v) {
+  _mMoreAcctFilter = v;
+  _mobileMoreRender();
+  const inp = document.querySelector('#mobileMoreList .mobile-more-search');
+  if (inp) { inp.focus(); try { inp.setSelectionRange(v.length, v.length); } catch (_) {} }
+}
+async function _mobileMorePickClient(id) {
+  if (typeof CLIENT_ID !== 'undefined' && id !== CLIENT_ID && typeof switchClient === 'function') {
+    await switchClient(id);   // re-gates V1.5/Members/Marketing for the picked academy
+  }
+  _mMoreAcctFilter = '';
+  _mobileMoreRender();        // keep the sheet open; tabs now reflect the new academy
+}
 function _mobileMorePick(view) { _mobileMoreClose(); mobileSwitchView(view); }
 // ── Home / dashboard (MVP) ──────────────────────────────────────────────
 // Landing screen: a time-of-day greeting + 4 "needs you" tiles that deep-link
