@@ -76,15 +76,27 @@ exclusions; undo restores; source untouched); Setup = **extend Price Match**.
   `action=link`; offer_id null unties) + "+ New offer by title" (POST
   `action=create-offer` → lightweight `offers` row type=training/draft). Lazy
   loaded after Marketing (Stripe+GHL fetch is slow). These ties feed Sales/Revenue/Members.
-- **Sales (pending):** per offer — # entered pipeline (GHL truth) + # new
-  payments (Stripe truth); each expands to its contacts → delete a contact
-  (+undo) via the exclusions table to adjust the count.
-- **Revenue (pending):** net + gross · payouts · failed payments (copy
-  card-update link · open Stripe customer).
-- **Members (pending):** month's payments (drawer = full Stripe info + Stripe
-  link) · cancelled-subs count (human-cleaned) · add manual cancellation
-  (name → search GHL+Stripe → reason → date).
-- Useful existing resource for Sales: `/api/marketing?resource=ghl-kpis-monthly`.
+- **Sales / Revenue / Members (DONE):** backend `api/kpis-v15.js`
+  (`?section=sales|revenue|members&month=YYYY-MM`) + tables `kpi_exclusions`
+  (human-cleaning) + `kpi_manual_cancellations`. Frontend = `_v15kSecHtml` /
+  `_v15kEnsureSection` (per-month cache in `_V15K.sec`), painted into
+  `#v15k-sales|revenue|members`.
+  - **Sales:** per offer (from `kpi_offer_links`) — # **entered pipeline** = GHL
+    opportunities created in the month in tied pipeline(s); # **new payments** =
+    Stripe subs created in the month for tied products. Each count expands to its
+    items; **×** excludes (with optional reason) → count drops; **Undo** removes
+    the exclusion. Raw source untouched.
+  - **Revenue:** gross / **net** (= gross − refunds − Stripe fees, via
+    balance_transaction expand) / payouts; **failed payments** list with **Copy
+    card link** (POST `action=billing-portal` → Stripe billing-portal session URL)
+    + Customer ↗ (dashboard).
+  - **Members:** month's succeeded payments (click → drawer w/ full info + Stripe
+    receipt) · **cancelled subscriptions** count (subs `canceled_at` in month,
+    human-cleaned via exclusions) · **manual cancellations** (search GHL mirror +
+    Stripe customers → reason → date → `kpi_manual_cancellations`).
+  - Cleaning model = exclusions table + undo (metrics `sales_pipeline` /
+    `sales_payments` / `members_cancelled`, scoped by month + offer_id + ref_id).
+- KPIs tab is now COMPLETE (all 5 sections live).
 
 ## Calendars tab (V1.5) — DONE (fresh booking-management surface)
 Gated v15: `switchView('v15cal')` → `openV15Cal()`. Distinct from the V2

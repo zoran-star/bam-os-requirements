@@ -8766,7 +8766,7 @@ async function _assetBankRemove(assetId, field, id, category) {
 // meta-report, good/bad indicators stripped) + the month selector + section
 // shells. Sales / Revenue / Members / Setup come in later phases.
 // ══════════════════════════════════════════════════════════════
-let _V15K = { periods: [], monthKey: null, mkt: null, mktEmpty: false, setup: null, setupLoaded: false, setupErr: null };
+let _V15K = { periods: [], monthKey: null, mkt: null, mktEmpty: false, setup: null, setupLoaded: false, setupErr: null, sec: { sales: {}, revenue: {}, members: {} } };
 
 function _v15kMoney(n) { return (n == null || isNaN(n)) ? '—' : '$' + Number(n).toLocaleString(undefined, { maximumFractionDigits: 2 }); }
 function _v15kNum(n) { return (n == null || isNaN(n)) ? '—' : Number(n).toLocaleString(); }
@@ -8920,12 +8920,221 @@ function _v15kRender() {
     </div>
     ${sectionHead('Marketing')}
     ${marketing}
-    ${sectionHead('Sales')}${_v15kSoon('Per-offer: entered pipeline + new payments (human-cleaned)')}
-    ${sectionHead('Revenue')}${_v15kSoon('Net + gross · payouts · failed payments')}
-    ${sectionHead('Members')}${_v15kSoon('Month’s payments · cancelled subs · manual cancellation')}
+    ${sectionHead('Sales')}<div id="v15k-sales">${_v15kSecHtml('sales')}</div>
+    ${sectionHead('Revenue')}<div id="v15k-revenue">${_v15kSecHtml('revenue')}</div>
+    ${sectionHead('Members')}<div id="v15k-members">${_v15kSecHtml('members')}</div>
     ${sectionHead('Setup')}
     <div style="font-size:12.5px;color:var(--text-mute);margin-top:4px">Connect Stripe and GoHighLevel to your offers. This powers the Sales, Revenue, and Members numbers.</div>
     <div id="v15k-setup">${_v15kSetupHtml()}</div>`;
+  _v15kEnsureSection('sales'); _v15kEnsureSection('revenue'); _v15kEnsureSection('members');
+}
+
+// ── Sales / Revenue / Members sections (month-filtered, human-cleaned) ──
+function _v15kDate(sec) { return new Date(sec * 1000).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }); }
+function _v15kToggle(id) { const el = document.getElementById(id); if (el) el.style.display = el.style.display === 'none' ? 'block' : 'none'; }
+function _v15kPaintSection(name) { const el = document.getElementById('v15k-' + name); if (el) el.innerHTML = _v15kSecHtml(name); }
+function _v15kSecHtml(name) {
+  const m = _V15K.monthKey; const cache = (_V15K.sec[name] || {})[m];
+  if (!cache) return `<div class="req-empty" style="padding:14px 0"><span class="req-spin"></span> Loading…</div>`;
+  if (cache.error) return `<div class="req-empty" style="padding:12px 0;color:#9a3b2f">${escapeHTML(cache.error)}</div>`;
+  if (name === 'sales') return _v15kSalesHtml(cache);
+  if (name === 'revenue') return _v15kRevenueHtml(cache);
+  if (name === 'members') return _v15kMembersHtml(cache);
+  return '';
+}
+async function _v15kEnsureSection(name) {
+  const m = _V15K.monthKey; if (!m) return;
+  _V15K.sec[name] = _V15K.sec[name] || {};
+  if (_V15K.sec[name][m]) { _v15kPaintSection(name); return; }
+  try {
+    const token = await _mreqAuthToken();
+    const r = await fetch(`/api/kpis-v15?section=${name}&month=${encodeURIComponent(m)}&client_id=${encodeURIComponent(CLIENT_ID)}`, { headers: { Authorization: 'Bearer ' + token } });
+    const j = await _safeJson(r); if (!r.ok) throw new Error(j.error || ('HTTP ' + r.status));
+    _V15K.sec[name][m] = j;
+  } catch (e) { _V15K.sec[name][m] = { error: e.message || String(e) }; }
+  _v15kPaintSection(name);
+}
+
+const _v15kBtn = 'background:none;border:1px solid var(--border-med);border-radius:6px;color:var(--text-mute);cursor:pointer;font-size:11px;padding:3px 8px';
+const _v15kLbl = 'font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--text-mute);margin-bottom:6px';
+
+function _v15kCleanList(items, metric, offerId) {
+  const oid = offerId || 'null';
+  return (items || []).map(it => `<div style="display:flex;align-items:center;gap:8px;padding:5px 0;font-size:12.5px;${it.excluded ? 'opacity:.5;text-decoration:line-through' : ''}">
+    <span style="flex:1;color:var(--text);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHTML(it.label || it.ref_id)}</span>
+    ${it.excluded
+      ? `<button onclick="_v15kUndo('${metric}','${oid}','${it.ref_id}')" style="${_v15kBtn}">Undo</button>`
+      : `<button onclick="_v15kExclude('${metric}','${oid}','${it.ref_id}',this)" title="Remove from count" style="${_v15kBtn}">×</button>`}
+  </div>`).join('') || '<div style="font-size:12px;color:var(--text-mute)">None.</div>';
+}
+
+function _v15kSalesHtml(d) {
+  if (!d.offers || !d.offers.length) return `<div class="req-empty" style="padding:12px 0;color:var(--text-mute)">${escapeHTML(d.note || 'No offers tied yet.')}</div>`;
+  return d.offers.map(o => {
+    const block = (group, metric, tiedLabel, untiedLabel, tied) => {
+      const id = `v15ks-${metric}-${o.offer_id}`;
+      return `<div>
+        <button onclick="_v15kToggle('${id}')" style="background:none;border:none;cursor:pointer;text-align:left;width:100%;padding:0">
+          <span style="font-size:24px;font-weight:700;color:var(--text)">${tied ? group.count : '—'}</span>
+          <span style="font-size:12px;color:var(--text-mute);margin-left:6px">${tied ? tiedLabel : untiedLabel}</span>
+        </button>
+        <div id="${id}" style="display:none;margin-top:6px;border-top:1px solid var(--border);padding-top:6px">${_v15kCleanList(group.items, metric, o.offer_id)}</div>
+      </div>`;
+    };
+    return `<div style="border:1px solid var(--border);border-radius:10px;padding:14px 16px;margin-top:12px">
+      <div style="font-weight:700;font-size:14px;color:var(--text);margin-bottom:10px">${escapeHTML(o.title)}</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+        ${block(o.pipeline, 'sales_pipeline', 'entered pipeline', 'no pipeline tied', o.has_pipelines)}
+        ${block(o.payments, 'sales_payments', 'new payments', 'no product tied', o.has_products)}
+      </div></div>`;
+  }).join('');
+}
+
+function _v15kRevenueHtml(d) {
+  if (!d.stripe_ok) return `<div class="req-empty" style="padding:12px 0;color:var(--text-mute)">Stripe is not connected.</div>`;
+  let failed;
+  if (d.failed && d.failed.length) {
+    failed = `<div style="margin-top:16px"><div style="${_v15kLbl}">Failed payments (${d.failed.length})</div>` + d.failed.map(f => `
+      <div style="display:flex;align-items:center;gap:10px;border:1px solid var(--border);border-radius:9px;padding:9px 12px;margin-bottom:7px">
+        <div style="flex:1;min-width:0"><div style="font-size:13px;font-weight:600;color:var(--text)">${escapeHTML(f.name || '—')} · ${_v15kMoney(f.amount)}</div>
+          <div style="font-size:11px;color:var(--text-mute)">${escapeHTML(f.email || '')}${f.reason ? ' · ' + escapeHTML(f.reason) : ''}</div></div>
+        ${f.customer ? `<button onclick="_v15kCardLink('${f.customer}',this)" style="${_v15kBtn}">Copy card link</button>
+        <button onclick="_v15kStripeCust('${f.customer}')" style="${_v15kBtn}">Customer ↗</button>` : ''}
+      </div>`).join('') + `</div>`;
+  } else failed = `<div style="font-size:12.5px;color:var(--text-mute);margin-top:12px">No failed payments this month.</div>`;
+  return `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-top:12px">
+    ${_v15kStat('Gross', _v15kMoney(d.gross))}
+    ${_v15kStat('Net', _v15kMoney(d.net))}
+    ${_v15kStat('Payouts', _v15kMoney(d.payouts) + (d.payouts_count ? ` · ${d.payouts_count}` : ''))}
+  </div>
+  <div style="font-size:11.5px;color:var(--text-mute);margin-top:6px">Net = gross − refunds (${_v15kMoney(d.refunds)}) − Stripe fees (${_v15kMoney(d.fees)}).</div>
+  ${failed}`;
+}
+async function _v15kCardLink(customer, btn) {
+  if (btn) { btn.disabled = true; btn.textContent = '…'; }
+  try {
+    const token = await _mreqAuthToken();
+    const r = await fetch(`/api/kpis-v15?action=billing-portal&client_id=${encodeURIComponent(CLIENT_ID)}`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token }, body: JSON.stringify({ action: 'billing-portal', customer }) });
+    const j = await _safeJson(r); if (!r.ok) throw new Error(j.error || ('HTTP ' + r.status));
+    await navigator.clipboard.writeText(j.url);
+    if (btn) { btn.textContent = 'Copied ✓'; setTimeout(() => { btn.disabled = false; btn.textContent = 'Copy card link'; }, 1400); }
+  } catch (e) { alert("Couldn't create card link: " + (e.message || e)); if (btn) { btn.disabled = false; btn.textContent = 'Copy card link'; } }
+}
+function _v15kStripeCust(id) { window.open('https://dashboard.stripe.com/customers/' + encodeURIComponent(id), '_blank'); }
+
+function _v15kMembersHtml(d) {
+  if (!d.stripe_ok) return `<div class="req-empty" style="padding:12px 0;color:var(--text-mute)">Stripe is not connected.</div>`;
+  const pays = (d.payments || []).map(p => `<button onclick='_v15kPayDrawer(${JSON.stringify(p).replace(/'/g, "&#39;")})' style="display:block;width:100%;text-align:left;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:9px 12px;margin-bottom:6px;cursor:pointer">
+    <div style="display:flex;justify-content:space-between;gap:8px"><span style="font-size:13px;font-weight:600;color:var(--text);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHTML(p.name || '—')}</span><span style="font-size:13px;font-weight:700;color:var(--text)">${_v15kMoney(p.amount)}</span></div>
+    <div style="font-size:11px;color:var(--text-mute)">${_v15kDate(p.created)}${p.email ? ' · ' + escapeHTML(p.email) : ''}</div></button>`).join('') || '<div style="font-size:12.5px;color:var(--text-mute)">No payments this month.</div>';
+  const c = d.cancelled || { count: 0, items: [] };
+  const man = (d.manual || []).map(mc => `<div style="display:flex;align-items:center;gap:8px;border:1px solid var(--border);border-radius:8px;padding:8px 11px;margin-bottom:6px">
+    <div style="flex:1;min-width:0"><div style="font-size:13px;color:var(--text)">${escapeHTML(mc.contact_name || '—')}</div><div style="font-size:11px;color:var(--text-mute)">${mc.cancelled_on ? escapeHTML(mc.cancelled_on) : ''}${mc.reason ? ' · ' + escapeHTML(mc.reason) : ''}</div></div>
+    <button onclick="_v15kDelManualCancel('${mc.id}')" style="${_v15kBtn}">×</button></div>`).join('');
+  return `<div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-top:12px">
+    <div><div style="${_v15kLbl}">Payments (${(d.payments || []).length})</div>${pays}</div>
+    <div>
+      <div style="${_v15kLbl}">Cancelled subscriptions</div>
+      <button onclick="_v15kToggle('v15k-canc')" style="background:none;border:none;cursor:pointer;padding:0;text-align:left"><span style="font-size:24px;font-weight:700;color:var(--text)">${c.count}</span> <span style="font-size:12px;color:var(--text-mute)">this month</span></button>
+      <div id="v15k-canc" style="display:none;margin-top:6px;border-top:1px solid var(--border);padding-top:6px">${_v15kCleanList(c.items, 'members_cancelled', null)}</div>
+      <div style="${_v15kLbl};margin-top:16px">Manual cancellations</div>
+      ${man}
+      <button onclick="_v15kManualCancelForm()" style="${_v15kBtn};color:var(--accent);border-color:var(--accent);font-weight:700;margin-top:4px">+ Add manual cancellation</button>
+    </div></div>`;
+}
+function _v15kPayDrawer(p) {
+  const row = (k, v) => v ? `<div style="display:flex;gap:8px;font-size:12.5px;margin-bottom:5px"><span style="color:var(--text-mute);min-width:80px">${k}</span><span style="color:var(--text);word-break:break-word">${escapeHTML(String(v))}</span></div>` : '';
+  const link = p.receipt_url ? `<a href="${escapeHTML(p.receipt_url)}" target="_blank" style="color:var(--accent);font-size:12.5px;text-decoration:none">Open Stripe receipt ↗</a>` : (p.customer ? `<button onclick="_v15kStripeCust('${p.customer}')" style="${_v15kBtn}">Open customer in Stripe ↗</button>` : '');
+  _v15calShowDrawer('Payment', `
+    <div style="font-size:22px;font-weight:700;color:var(--text);margin-bottom:12px">${_v15kMoney(p.amount)}</div>
+    ${row('Customer', p.name)}${row('Email', p.email)}${row('Date', new Date(p.created * 1000).toLocaleString('en-US'))}${row('Card', p.last4 ? '•••• ' + p.last4 : null)}${row('Description', p.description)}${row('Charge', p.id)}
+    <div style="margin-top:14px">${link}</div>`);
+}
+async function _v15kDelManualCancel(id) {
+  if (!confirm('Remove this manual cancellation?')) return;
+  try {
+    const token = await _mreqAuthToken();
+    const r = await fetch(`/api/kpis-v15?action=delete-manual-cancel&client_id=${encodeURIComponent(CLIENT_ID)}`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token }, body: JSON.stringify({ action: 'delete-manual-cancel', id }) });
+    const j = await _safeJson(r); if (!r.ok) throw new Error(j.error || ('HTTP ' + r.status));
+    delete _V15K.sec.members[_V15K.monthKey]; _v15kEnsureSection('members');
+  } catch (e) { alert("Couldn't delete: " + (e.message || e)); }
+}
+let _v15mcPicked = null, _v15mcSearchT = null;
+function _v15kManualCancelForm() {
+  _v15mcPicked = null;
+  const today = new Date().toISOString().slice(0, 10);
+  _v15calShowDrawer('Manual cancellation', `
+    <div style="${_v15kLbl}">Who cancelled?</div>
+    <input id="v15mc-search" oninput="_v15kMcSearch()" placeholder="Search name, email or phone…" style="width:100%;box-sizing:border-box;background:var(--surface);border:1px solid var(--border-med);border-radius:7px;color:var(--text);padding:8px 10px;font:inherit;font-size:13px">
+    <div id="v15mc-results" style="margin-top:6px"></div>
+    <div id="v15mc-picked" style="margin-top:6px"></div>
+    <div style="${_v15kLbl};margin-top:14px">Reason</div>
+    <textarea id="v15mc-reason" rows="2" placeholder="Why did they cancel?" style="width:100%;box-sizing:border-box;background:var(--surface);border:1px solid var(--border-med);border-radius:7px;color:var(--text);padding:8px 10px;font:inherit;font-size:13px;resize:vertical"></textarea>
+    <div style="${_v15kLbl};margin-top:14px">Cancelled on</div>
+    <input type="date" id="v15mc-date" value="${today}" style="background:var(--surface);border:1px solid var(--border-med);border-radius:7px;color:var(--text);padding:8px 10px;font:inherit;font-size:13px">
+    <div id="v15mc-err" style="display:none;color:#9a3b2f;font-size:12.5px;margin-top:10px"></div>
+    <button onclick="_v15kSaveManualCancel()" id="v15mc-save" style="margin-top:16px;width:100%;background:var(--gold);color:#0B0B0D;border:none;padding:10px;border-radius:8px;font-weight:700;font-size:13.5px;cursor:pointer">Save</button>`);
+}
+function _v15kMcSearch() {
+  clearTimeout(_v15mcSearchT);
+  const q = (document.getElementById('v15mc-search')?.value || '').trim();
+  const box = document.getElementById('v15mc-results');
+  if (q.length < 2) { if (box) box.innerHTML = ''; return; }
+  _v15mcSearchT = setTimeout(async () => {
+    try {
+      const token = await _mreqAuthToken();
+      const r = await fetch(`/api/kpis-v15?action=customer-search&client_id=${encodeURIComponent(CLIENT_ID)}&q=${encodeURIComponent(q)}`, { headers: { Authorization: 'Bearer ' + token } });
+      const j = await _safeJson(r); if (!r.ok) throw new Error(j.error || 'search failed');
+      const ghl = (j.ghl || []).map(c => ({ ...c, _src: 'ghl' }));
+      const stripe = (j.stripe || []).map(c => ({ ...c, _src: 'stripe' }));
+      const all = [...ghl, ...stripe];
+      if (!box) return;
+      box.innerHTML = all.length ? all.map(c => `<button onclick='_v15kMcPick(${JSON.stringify(c).replace(/'/g, "&#39;")})' style="display:block;width:100%;text-align:left;background:var(--surface);border:1px solid var(--border);border-radius:7px;padding:8px 10px;margin-bottom:5px;cursor:pointer">
+        <div style="font-size:13px;font-weight:600;color:var(--text)">${escapeHTML(c.name || 'Unnamed')} <span style="font-size:10px;color:var(--text-mute);font-weight:400">${c._src === 'stripe' ? 'Stripe' : 'GHL'}</span></div>
+        <div style="font-size:11px;color:var(--text-mute)">${escapeHTML(c.email || c.phone || '')}</div></button>`).join('') : `<div style="font-size:12px;color:var(--text-mute);padding:4px 0">No matches.</div>`;
+    } catch (e) { if (box) box.innerHTML = `<div style="font-size:12px;color:#9a3b2f">${escapeHTML(e.message || String(e))}</div>`; }
+  }, 280);
+}
+function _v15kMcPick(c) {
+  _v15mcPicked = c;
+  const box = document.getElementById('v15mc-results'); if (box) box.innerHTML = '';
+  const s = document.getElementById('v15mc-search'); if (s) s.value = c.name || '';
+  const picked = document.getElementById('v15mc-picked'); if (picked) picked.innerHTML = `<div style="font-size:12px;color:var(--accent);padding:4px 0">✓ ${escapeHTML(c.name || 'contact')} (${c._src === 'stripe' ? 'Stripe' : 'GHL'})</div>`;
+}
+async function _v15kSaveManualCancel() {
+  const err = document.getElementById('v15mc-err'); if (err) err.style.display = 'none';
+  const name = _v15mcPicked?.name || (document.getElementById('v15mc-search')?.value || '').trim();
+  if (!name) { if (err) { err.textContent = 'Search and pick (or type) who cancelled.'; err.style.display = 'block'; } return; }
+  const reason = (document.getElementById('v15mc-reason')?.value || '').trim();
+  const date = document.getElementById('v15mc-date')?.value || null;
+  const btn = document.getElementById('v15mc-save'); if (btn) { btn.disabled = true; btn.textContent = 'Saving…'; }
+  try {
+    const token = await _mreqAuthToken();
+    const r = await fetch(`/api/kpis-v15?action=manual-cancel&client_id=${encodeURIComponent(CLIENT_ID)}`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token }, body: JSON.stringify({ action: 'manual-cancel', month: _V15K.monthKey, contact_name: name, ghl_contact_id: _v15mcPicked?._src === 'ghl' ? _v15mcPicked.id : null, stripe_customer_id: _v15mcPicked?._src === 'stripe' ? _v15mcPicked.id : null, reason, cancelled_on: date }) });
+    const j = await _safeJson(r); if (!r.ok) throw new Error(j.error || ('HTTP ' + r.status));
+    _v15calCloseDrawer();
+    delete _V15K.sec.members[_V15K.monthKey]; _v15kEnsureSection('members');
+  } catch (e) { if (err) { err.textContent = e.message || String(e); err.style.display = 'block'; } if (btn) { btn.disabled = false; btn.textContent = 'Save'; } }
+}
+
+async function _v15kExclude(metric, offerId, refId, btn) {
+  if (btn) btn.disabled = true;
+  const reason = prompt('Reason for removing this from the count? (optional)') || '';
+  await _v15kCleanPost('exclude', { metric, offer_id: (offerId && offerId !== 'null') ? offerId : null, ref_id: refId, reason });
+}
+async function _v15kUndo(metric, offerId, refId) {
+  await _v15kCleanPost('unexclude', { metric, offer_id: (offerId && offerId !== 'null') ? offerId : null, ref_id: refId });
+}
+async function _v15kCleanPost(action, body) {
+  const m = _V15K.monthKey;
+  try {
+    const token = await _mreqAuthToken();
+    const r = await fetch(`/api/kpis-v15?action=${action}&client_id=${encodeURIComponent(CLIENT_ID)}`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token }, body: JSON.stringify({ action, month: m, ...body }) });
+    const j = await _safeJson(r); if (!r.ok) throw new Error(j.error || ('HTTP ' + r.status));
+    const sec = body.metric === 'members_cancelled' ? 'members' : 'sales';
+    if (_V15K.sec[sec]) delete _V15K.sec[sec][m];
+    _v15kEnsureSection(sec);
+  } catch (e) { alert("Couldn't update: " + (e.message || e)); }
 }
 
 // ══════════════════════════════════════════════════════════════
