@@ -8709,49 +8709,88 @@ async function _assetBankRemove(assetId, field, id, category) {
 // Reuses /api/ghl/inbox (list + thread) + /api/ghl/send-message. (P2 adds
 // pipeline/stage + failed filters; P3 adds mass send.)
 // ══════════════════════════════════════════════════════════════
-let _V15IB = { convos: [], unreadOnly: false, active: null, messages: [], type: 'SMS', pending: [] };
+let _V15IB = { convos: [], pipelines: [], contactPipe: {}, unreadOnly: false, failedOnly: false, fPipeline: '', fStage: '', active: null, messages: [], type: 'SMS', pending: [] };
+const _V15IB_FAILED = ['failed', 'undelivered', 'error', 'rejected'];
 
 async function openV15Inbox() {
   const host = document.getElementById('v15inbox-content');
   if (!host || typeof CLIENT_ID === 'undefined') return;
   _V15IB.active = null; _V15IB.pending = [];
-  host.innerHTML = `
-    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:14px">
-      <button id="v15ib-all" onclick="_v15ibSetUnread(false)" style="${_v15ibPill(!_V15IB.unreadOnly)}">All</button>
-      <button id="v15ib-unread" onclick="_v15ibSetUnread(true)" style="${_v15ibPill(_V15IB.unreadOnly)}">Unread</button>
-      <span style="flex:1"></span>
-      <button onclick="_v15ibSetup()" style="background:none;border:1px solid var(--border);border-radius:8px;color:var(--text-sub);padding:9px 12px;font:inherit;font-size:12px;cursor:pointer">⚙ Setup</button>
-    </div>
-    <div id="v15ib-body"><div class="req-empty" style="padding:24px 0"><span class="req-spin"></span> Loading messages…</div></div>`;
-  await _v15ibLoadList();
+  host.innerHTML = `<div class="req-empty" style="padding:24px 0"><span class="req-spin"></span> Loading messages…</div>`;
+  try {
+    const token = await _mreqAuthToken();
+    const [ir, pr] = await Promise.all([
+      fetch('/api/ghl/inbox?client_id=' + encodeURIComponent(CLIENT_ID), { headers: { Authorization: 'Bearer ' + token } }),
+      fetch('/api/ghl/pipelines?client_id=' + encodeURIComponent(CLIENT_ID), { headers: { Authorization: 'Bearer ' + token } }).catch(() => null),
+    ]);
+    const ij = await _safeJson(ir);
+    if (!ir.ok) throw new Error(ij.error || ('HTTP ' + ir.status));
+    _V15IB.convos = ij.conversations || [];
+    // Build contactId → {pipeline, stage} from the pipeline board.
+    _V15IB.pipelines = []; _V15IB.contactPipe = {};
+    try {
+      const pj = pr && pr.ok ? await _safeJson(pr) : null;
+      _V15IB.pipelines = (pj && pj.pipelines) || [];
+      for (const p of _V15IB.pipelines) {
+        const stageName = {}; for (const s of (p.stages || [])) stageName[s.id] = s.name;
+        for (const o of (p.opportunities || [])) {
+          if (o.contactId) _V15IB.contactPipe[o.contactId] = { pipelineId: p.id, pipelineName: p.name, stageId: o.stageId, stageName: stageName[o.stageId] || '' };
+        }
+      }
+    } catch (_) { /* pipelines optional */ }
+    _v15ibRenderAll();
+  } catch (e) {
+    host.innerHTML = `<div class="req-empty" style="padding:24px 0;color:#9a3b2f">Couldn't load inbox — ${escapeHTML(e.message || String(e))}</div>`;
+  }
 }
 function _v15ibPill(on) {
   return `padding:7px 16px;border-radius:999px;font:inherit;font-size:12.5px;font-weight:600;cursor:pointer;border:1px solid ${on ? 'var(--gold)' : 'var(--border-med)'};background:${on ? 'var(--gold)' : 'transparent'};color:${on ? '#0B0B0D' : 'var(--text-sub)'}`;
 }
-function _v15ibSetUnread(v) { _V15IB.unreadOnly = v; openV15Inbox(); }
+function _v15ibSetUnread(v) { _V15IB.unreadOnly = v; if (v) _V15IB.failedOnly = false; _v15ibRenderAll(); }
+function _v15ibSetFailed(v) { _V15IB.failedOnly = v; if (v) _V15IB.unreadOnly = false; _v15ibRenderAll(); }
+function _v15ibSetPipeline(v) { _V15IB.fPipeline = v; _V15IB.fStage = ''; _v15ibRenderAll(); }
+function _v15ibSetStage(v) { _V15IB.fStage = v; _v15ibRenderAll(); }
 
-async function _v15ibLoadList() {
-  const body = document.getElementById('v15ib-body');
-  if (!body) return;
-  try {
-    const token = await _mreqAuthToken();
-    const r = await fetch('/api/ghl/inbox?client_id=' + encodeURIComponent(CLIENT_ID), { headers: { Authorization: 'Bearer ' + token } });
-    const j = await _safeJson(r);
-    if (!r.ok) throw new Error(j.error || ('HTTP ' + r.status));
-    _V15IB.convos = j.conversations || [];
-    _v15ibRenderList();
-  } catch (e) {
-    body.innerHTML = `<div class="req-empty" style="padding:24px 0;color:#9a3b2f">Couldn't load inbox — ${escapeHTML(e.message || String(e))}</div>`;
-  }
+function _v15ibFiltered() {
+  return _V15IB.convos.filter(c => {
+    if (_V15IB.unreadOnly && !((c.unreadCount || 0) > 0)) return false;
+    if (_V15IB.failedOnly && !_V15IB_FAILED.includes(c.lastMessageStatus || '')) return false;
+    if (_V15IB.fPipeline) {
+      const cp = _V15IB.contactPipe[c.contactId];
+      if (!cp || cp.pipelineId !== _V15IB.fPipeline) return false;
+      if (_V15IB.fStage && cp.stageId !== _V15IB.fStage) return false;
+    }
+    return true;
+  });
+}
+
+function _v15ibRenderAll() {
+  const host = document.getElementById('v15inbox-content');
+  if (!host) return;
+  const selStyle = "background:var(--surface);border:1px solid var(--border-med);border-radius:999px;color:var(--text-sub);padding:7px 12px;font:inherit;font-size:12.5px;cursor:pointer";
+  const pipeOpts = `<option value="">All pipelines</option>` + _V15IB.pipelines.map(p => `<option value="${escapeHTML(p.id)}" ${_V15IB.fPipeline === p.id ? 'selected' : ''}>${escapeHTML(p.name)}</option>`).join('');
+  const curPipe = _V15IB.pipelines.find(p => p.id === _V15IB.fPipeline);
+  const stageOpts = `<option value="">All stages</option>` + (curPipe ? (curPipe.stages || []).map(s => `<option value="${escapeHTML(s.id)}" ${_V15IB.fStage === s.id ? 'selected' : ''}>${escapeHTML(s.name)}</option>`).join('') : '');
+  host.innerHTML = `
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:16px">
+      <button onclick="_v15ibSetUnread(false);_v15ibSetFailed(false)" style="${_v15ibPill(!_V15IB.unreadOnly && !_V15IB.failedOnly)}">All</button>
+      <button onclick="_v15ibSetUnread(${!_V15IB.unreadOnly})" style="${_v15ibPill(_V15IB.unreadOnly)}">Unread</button>
+      <button onclick="_v15ibSetFailed(${!_V15IB.failedOnly})" style="${_v15ibPill(_V15IB.failedOnly)}">Failed</button>
+      <select onchange="_v15ibSetPipeline(this.value)" style="${selStyle}">${pipeOpts}</select>
+      ${curPipe ? `<select onchange="_v15ibSetStage(this.value)" style="${selStyle}">${stageOpts}</select>` : ''}
+      <span style="flex:1"></span>
+      <button onclick="_v15ibSetup()" style="background:none;border:1px solid var(--border);border-radius:8px;color:var(--text-sub);padding:9px 12px;font:inherit;font-size:12px;cursor:pointer">⚙ Setup</button>
+    </div>
+    <div id="v15ib-body"></div>`;
+  _v15ibRenderList();
 }
 
 function _v15ibRenderList() {
   const body = document.getElementById('v15ib-body');
   if (!body) return;
-  let rows = _V15IB.convos;
-  if (_V15IB.unreadOnly) rows = rows.filter(c => (c.unreadCount || 0) > 0);
+  const rows = _v15ibFiltered();
   if (!rows.length) {
-    body.innerHTML = `<div class="req-empty" style="padding:32px 0;color:var(--text-mute)">${_V15IB.unreadOnly ? 'No unread messages.' : 'No conversations yet.'}</div>`;
+    body.innerHTML = `<div class="req-empty" style="padding:32px 0;color:var(--text-mute)">No conversations match these filters.</div>`;
     return;
   }
   body.innerHTML = `<div style="border:1px solid var(--border);border-radius:10px;overflow:hidden">` + rows.map(c => {
