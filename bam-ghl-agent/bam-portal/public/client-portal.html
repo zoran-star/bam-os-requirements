@@ -5476,6 +5476,18 @@
         Inbox
       </div>
 
+      <div class="nav-item" data-feature="v15" style="display:none" onclick="switchView('v15kpis', this)">
+        <span class="nav-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M3 3v18h18"/>
+            <path d="M18 17V9"/>
+            <path d="M13 17V5"/>
+            <path d="M8 17v-3"/>
+          </svg>
+        </span>
+        KPIs
+      </div>
+
       <div class="nav-item" onclick="switchView('action-items', this)">
         <span class="nav-icon" aria-hidden="true">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -8347,6 +8359,18 @@ Then the call to action."]</div>
       </div>
     </div>
 
+    <div class="view" id="view-v15kpis">
+      <div class="topbar">
+        <div>
+          <span class="topbar-kicker">§ KPIs</span>
+          <div class="topbar-title">KPIs</div>
+        </div>
+      </div>
+      <div class="content">
+        <div id="v15kpis-content"></div>
+      </div>
+    </div>
+
     <div class="view" id="view-action-items">
       <div class="topbar">
         <div>
@@ -8712,6 +8736,82 @@ async function _assetBankRemove(assetId, field, id, category) {
     await _sb.from('client_assets').delete().eq('id', assetId);
     await _assetBankLoad(field, id, category);
   } catch (e) { alert("Couldn't remove: " + (e.message || e)); }
+}
+
+// ══════════════════════════════════════════════════════════════
+// KPIS VIEW (V1.5) — month-filtered dashboard. P1: Marketing (reuses the V2
+// meta-report, good/bad indicators stripped) + the month selector + section
+// shells. Sales / Revenue / Members / Setup come in later phases.
+// ══════════════════════════════════════════════════════════════
+let _V15K = { periods: [], monthKey: null, mkt: null, mktEmpty: false };
+
+function _v15kMoney(n) { return (n == null || isNaN(n)) ? '—' : '$' + Number(n).toLocaleString(undefined, { maximumFractionDigits: 2 }); }
+function _v15kNum(n) { return (n == null || isNaN(n)) ? '—' : Number(n).toLocaleString(); }
+function _v15kMonthLabel(p) {
+  if (!p) return '';
+  if (p.label) return p.label;
+  const m = /^(\d{4})-(\d{2})$/.exec(p.key || '');
+  if (m) return new Date(+m[1], +m[2] - 1, 1).toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+  return p.key || '';
+}
+function _v15kStat(label, value) {
+  return `<div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:16px 18px">
+    <div style="font-size:11px;color:var(--text-mute);text-transform:uppercase;letter-spacing:.06em">${label}</div>
+    <div style="font-size:26px;font-weight:700;color:var(--text);margin-top:6px">${value}</div></div>`;
+}
+function _v15kSoon(title) {
+  return `<div style="border:1px dashed var(--border-med);border-radius:12px;padding:22px;margin-top:14px">
+    <div style="font-size:14px;font-weight:700;color:var(--text)">${title}</div>
+    <div style="font-size:12.5px;color:var(--text-mute);margin-top:4px">Coming in a later phase.</div></div>`;
+}
+
+async function openV15Kpis() {
+  const host = document.getElementById('v15kpis-content');
+  if (!host || typeof CLIENT_ID === 'undefined') return;
+  host.innerHTML = `<div class="req-empty" style="padding:24px 0"><span class="req-spin"></span> Loading KPIs…</div>`;
+  try {
+    const token = await _mreqAuthToken();
+    const r = await fetch(`/api/marketing?resource=meta-report&months=12&client_id=${encodeURIComponent(CLIENT_ID)}`, { headers: { Authorization: 'Bearer ' + token } });
+    const j = await _safeJson(r);
+    if (!r.ok) throw new Error(j.error || ('HTTP ' + r.status));
+    _V15K.periods = j.periods || [];
+    _V15K.mktEmpty = !!j.empty || _V15K.periods.length === 0;
+    _V15K.monthKey = _V15K.periods[0]?.key || null;
+    _v15kRender();
+  } catch (e) {
+    host.innerHTML = `<div class="req-empty" style="padding:24px 0;color:#9a3b2f">Couldn't load KPIs — ${escapeHTML(e.message || String(e))}</div>`;
+  }
+}
+
+function _v15kSetMonth(k) { _V15K.monthKey = k; _v15kRender(); }
+
+function _v15kRender() {
+  const host = document.getElementById('v15kpis-content');
+  if (!host) return;
+  const monthOpts = _V15K.periods.map(p => `<option value="${escapeHTML(p.key)}" ${p.key === _V15K.monthKey ? 'selected' : ''}>${escapeHTML(_v15kMonthLabel(p))}</option>`).join('');
+  const period = _V15K.periods.find(p => p.key === _V15K.monthKey) || null;
+  // MARKETING — plain numbers, no verdicts / good-bad coloring.
+  let marketing;
+  if (_V15K.mktEmpty || !period) {
+    marketing = `<div class="req-empty" style="padding:18px 0;color:var(--text-mute)">No marketing data for this month.</div>`;
+  } else {
+    marketing = `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-top:12px">
+      ${_v15kStat('Ad spend', _v15kMoney(period.spend))}
+      ${_v15kStat('Leads', _v15kNum(period.leads))}
+      ${_v15kStat('Cost per lead', period.cpl != null ? _v15kMoney(period.cpl) : '—')}
+    </div>`;
+  }
+  const sectionHead = (t) => `<div style="font-family:var(--font-display,inherit);font-size:15px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--text);margin-top:26px">${t}</div>`;
+  host.innerHTML = `
+    <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:6px">
+      <label style="font-size:12px;color:var(--text-mute)">Month</label>
+      <select onchange="_v15kSetMonth(this.value)" style="background:var(--surface);border:1px solid var(--border-med);border-radius:8px;color:var(--text);padding:8px 12px;font:inherit;font-size:13px;cursor:pointer">${monthOpts || '<option>—</option>'}</select>
+    </div>
+    ${sectionHead('Marketing')}
+    ${marketing}
+    ${sectionHead('Sales')}${_v15kSoon('Per-offer: entered pipeline + new payments (human-cleaned)')}
+    ${sectionHead('Revenue')}${_v15kSoon('Net + gross · payouts · failed payments')}
+    ${sectionHead('Members')}${_v15kSoon('Month’s payments · cancelled subs · manual cancellation')}`;
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -9213,6 +9313,8 @@ function switchView(name, el) {
   if (name === 'contacts') openContactsView();
 
   if (name === 'v15inbox') openV15Inbox();
+
+  if (name === 'v15kpis') openV15Kpis();
 
   // When entering Action Items, load the list
   if (name === 'action-items') fetchAndRenderActionItems();
