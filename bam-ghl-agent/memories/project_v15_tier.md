@@ -58,6 +58,28 @@ lead drawer w/ contact info + SMS/email). Added a V1.5-gated nav item "Pipelines
   `_plUndo()` reverses (status→'open', or move back to fromStageId).
 Per Zoran: did NOT add a full "all GHL fields" dump — kept the drawer simple.
 
+## KPIs tab (V1.5) — month-filtered dashboard, 5 sections (BIG, phased)
+Gated v15: `switchView('v15kpis')` → `openV15Kpis()`. Month selector drives all
+sections. Decisions (Zoran 2026-06-16): human-cleaned counts = **exclusions
+table + undo** (raw count from GHL/Stripe, minus per offer/metric/month/contact
+exclusions; undo restores; source untouched); Setup = **extend Price Match**.
+- **P1 (done):** tab shell + month selector + **Marketing** — reuses
+  `/api/marketing?resource=meta-report&months=12` (returns monthly `periods`
+  w/ spend/leads/cpl); shows spend · leads · cost-per-lead as PLAIN numbers,
+  **all good/bad indicators stripped** (no verdicts, no CPL-vs-target coloring,
+  no ▲▼ trend colors) — "control the narrative." Other sections = shells.
+- **Setup (pending):** extend Price Match — tie every Stripe price/product/sub
+  ever paid → an offer (+ create offer by title); tie GHL pipelines → offer.
+- **Sales (pending):** per offer — # entered pipeline (GHL truth) + # new
+  payments (Stripe truth); each expands to its contacts → delete a contact
+  (+undo) via the exclusions table to adjust the count.
+- **Revenue (pending):** net + gross · payouts · failed payments (copy
+  card-update link · open Stripe customer).
+- **Members (pending):** month's payments (drawer = full Stripe info + Stripe
+  link) · cancelled-subs count (human-cleaned) · add manual cancellation
+  (name → search GHL+Stripe → reason → date).
+- Useful existing resource for Sales: `/api/marketing?resource=ghl-kpis-monthly`.
+
 ## Data + sync
 - **`ghl_contacts`** table = per-academy GHL contact mirror (name/email/phone,
   `tags text[]`, `custom_fields jsonb`, resolved `athlete_name`). pg_trgm GIN
