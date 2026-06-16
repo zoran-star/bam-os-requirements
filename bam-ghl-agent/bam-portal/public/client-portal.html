@@ -18959,10 +18959,28 @@ function _sorterCloseConnect() {
 function _sorterConnectApply() {
   if (!_SORTER_CONNECT || !_SORTER_CONNECT.chosen) return;
   const sid = _SORTER_CONNECT.stagingId;
-  const tgt = (_SORTER_CONNECT.detail.targets || []).find(t => t.key === _SORTER_CONNECT.chosen);
+  const chosenKey = _SORTER_CONNECT.chosen;
+  const tgt = (_SORTER_CONNECT.detail.targets || []).find(t => t.key === chosenKey);
   _sorterFixAction('connect-offer',
-    { staging_id: sid, offer_price_key: _SORTER_CONNECT.chosen, offer_id: tgt ? tgt.offer_id : null },
+    { staging_id: sid, offer_price_key: chosenKey, offer_id: tgt ? tgt.offer_id : null },
     () => {
+      // The table renders from _SORTER.checks.members — update Alain THERE so the
+      // row reflects the connect immediately (mirrors the server's check logic:
+      // drop the "no offer" issue, set the price label, recompute needs_work).
+      const mm = (_SORTER.checks.members || []).find(x => String(x.id) === String(sid));
+      if (mm) {
+        mm.no_offer = false;
+        mm.issues = (mm.issues || []).filter(t => t !== 'no offer');
+        mm.needs_work = mm.issues.length > 0;
+        mm.price_label = chosenKey || mm.price_label;
+      }
+      // Re-sort so a now-resolved member drops below the ones still needing work.
+      if (Array.isArray(_SORTER.checks.members)) {
+        _SORTER.checks.members.sort((a, b) =>
+          (Number(b.needs_work) - Number(a.needs_work)) ||
+          (a.athlete_name || '').localeCompare(b.athlete_name || ''));
+      }
+      // Keep the legacy bucket + count in sync too.
       const ch = _SORTER.checks.checks || {};
       ch.no_offer = (ch.no_offer || []).filter(x => String(x.id) !== String(sid));
       if (_SORTER.checks.counts) _SORTER.checks.counts.no_offer = (ch.no_offer || []).length;
