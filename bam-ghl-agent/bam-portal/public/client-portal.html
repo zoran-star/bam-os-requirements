@@ -6493,6 +6493,17 @@ Then the call to action."]</div>
                 If you leave this blank, we'll send leads to your default funnel. You can change this later.
               </div>
             </div>
+            <div class="card" style="margin-top:12px">
+              <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;margin:0">
+                <input type="checkbox" id="wizardUrgentInput" style="margin-top:3px;width:16px;height:16px;accent-color:var(--accent);cursor:pointer" />
+                <span>
+                  <span style="font-weight:600;color:var(--text)">⚡ Mark as urgent</span>
+                  <span style="display:block;color:var(--text-mute);font-size:12px;margin-top:2px">
+                    Check this if you need it fast — e.g. a camp starting soon. Urgent requests are turned around in ~3 business days instead of ~5.
+                  </span>
+                </span>
+              </label>
+            </div>
             <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:18px">
               <button class="btn-modal-secondary" onclick="wizardGoBack()">Back</button>
               <button class="btn-modal-primary" onclick="wizardSubmitFinal(false)">Submit Request</button>
@@ -23339,6 +23350,7 @@ function _wizardInitState() {
     creatives: [],
     budget: '',
     landingPage: '',
+    priority: 'normal',
   };
 }
 
@@ -23358,11 +23370,13 @@ function openNewCampaignWizard() {
   const newDesc = document.getElementById('wizardNewOfferDesc');
   const budgetInput = document.getElementById('wizardBudgetInput');
   const landingInput = document.getElementById('wizardLandingInput');
+  const urgentInput = document.getElementById('wizardUrgentInput');
   if (offerSearch) offerSearch.value = '';
   if (newName) newName.value = '';
   if (newDesc) newDesc.value = '';
   if (budgetInput) budgetInput.value = '';
   if (landingInput) landingInput.value = '';
+  if (urgentInput) urgentInput.checked = false;
   filterWizardOffers('');
   window.scrollTo(0, 0);
 }
@@ -23812,6 +23826,7 @@ async function wizardSubmitFinal(skipped) {
   if (!_wizard) return;
   const landingVal = (document.getElementById('wizardLandingInput')?.value || '').trim();
   _wizard.landingPage = skipped ? '' : landingVal;
+  _wizard.priority = document.getElementById('wizardUrgentInput')?.checked ? 'high' : 'normal';
 
   const offerLabel = _wizard.selectedOffer || _wizard.newOfferName || 'New offer';
 
@@ -23879,6 +23894,7 @@ async function wizardSubmitFinal(skipped) {
         new_offer_description: _wizard.newOfferDescription || '',
         monthly_spend: _wizard.budget,
         landing_page: _wizard.landingPage,
+        priority: _wizard.priority || 'normal',
         campaign_title: offerLabel,
         creatives: creativesPayload,
       },

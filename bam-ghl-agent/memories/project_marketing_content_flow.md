@@ -123,6 +123,25 @@ Upload paths:
 - **Per-client storage isolation** (signed URLs) on `ticket-files` bucket — currently public.
 - **Cleanup orphaned test tickets/files** for DETAIL Miami (~4 empty content tickets, ~8 orphan files from Mike's testing 2026-05-15).
 
+## Cam marketing flow — priority, deadline, assignment, DMs (added 2026-06-16)
+
+From a team call with Cam. Goal: each marketing ticket is a complete brief + real alerts, so Cam stops chasing Mike for offers and Google Drive for files. Option A ("V1 lite" — surface what exists + add light collection; full offer-pairing is V2). Lives on branch `feat/marketing-content-flow`.
+
+**Priority** — stored on `marketing_tickets.fields.priority` = `high` | `normal` (jsonb, no schema change; absent → normal).
+- Client sets it via an **"⚡ Mark as urgent"** checkbox on the new-campaign wizard's final step → rides in content-ticket `context.priority` → copied into `mktFields.priority` on send-to-marketing handoff.
+- SLA turnaround: **High = 3 business days, Normal = 5** (`PRIORITY_META`/`deadlineInfo`/`bizDaysUntil` in `MarketingView.jsx`). Staff view shows a priority chip + auto "Due in N biz days / Overdue", a red left-border on urgent rows, and a **"Priority (urgent first)"** sort (now the default).
+
+**Assigned SM** — `marketing_tickets.assigned_to` (uuid → staff). Auto-set to the client's `scaling_manager_id` on every new marketing ticket (both direct create + content handoff). `enrichWithClient` resolves it → `assigned_to_name`; the staff detail's **Client card** shows "Assigned SM". Decision: SM = the client's assigned manager.
+
+**Client card (staff detail)** — `renderClientInfo` surfaces client site (`clients.brand_data.website_url`), landing page (`fields.landing_page`), offer name. No landing page → one-tap **"Ask SM for landing page"** copies a Slack-ready message (the V1 stopgap from the call). API client join widened to return `brand_data, scaling_manager_id`.
+
+**Alerts (Slack)** — `postStaffSlackDM(slackUserId, …)` DMs a staff member (Slack accepts a user ID as `channel`).
+- New marketing ticket → DM **Cam** (`pingMarketingOnNewTicket`). Cam's id from env `MARKETING_DM_SLACK_ID`, else `staff` row by email (`MARKETING_MANAGER_EMAIL`, default `cameron@byanymeansbusiness.com`).
+- Completion → client pinged in-channel (existing) **+ assigned SM gets a DM**.
+- ⚠️ **No `staff.slack_user_id` is populated yet** (all rows null) — DMs no-op silently until Cam's Slack ID is set (env var or his staff row). This is the one thing blocking alerts from firing.
+
+Not done (deferred): stale-ticket nudge cron; urgency toggle on budget/remove flows (default normal); linking tickets to the real `offers` record (= V2); merging Content+Marketing into one page (open question, kept separate for V1).
+
 ## Test data
 
 - Client `test business` (id `71d01c0f-...`, auth user `543cc072-...`, email `zoransavic2000@gmail.com`) is the safe sandbox. Use this account on the client portal.
