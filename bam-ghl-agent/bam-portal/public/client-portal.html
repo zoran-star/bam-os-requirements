@@ -18899,12 +18899,29 @@ async function _sorterRunCustomerSearch(stagingId) {
     if (!cs.length) { if (out) out.innerHTML = `${searched}<div style="font-size:12px;color:var(--text-mute,#888);padding:8px 0;">No Stripe customer found. They're likely not in Stripe yet — use a card link or mark them as paying another way below.</div>`; return; }
     const sid = escapeHTML(String(stagingId));
     out.innerHTML = searched + cs.map(cu => {
-      const amt = cu.amount_cents != null ? '$' + (cu.amount_cents / 100).toFixed(0) : '';
-      const subTxt = cu.sub_id ? `${escapeHTML(cu.status || '')}${amt ? ' · ' + amt : ''}` : 'no subscription';
-      return `<div style="display:flex;align-items:center;gap:8px;border:1px solid var(--border,#2a2a31);border-radius:9px;padding:9px 11px;margin-bottom:7px;">
+      const money = (c) => c != null ? '$' + (c / 100).toFixed(2) : '';
+      // A small labelled fact row, only when there's a value.
+      const fact = (label, val) => val ? `<div style="display:flex;gap:6px;font-size:10.5px;padding:1px 0;"><span style="color:var(--text-mute,#888);flex:none;width:78px;">${label}</span><span style="min-width:0;color:var(--text,#eee);">${val}</span></div>` : '';
+      let badges = '';
+      if (cu.cancel_at_period_end) badges += ' <span style="font-size:8.5px;font-weight:800;color:#e0a93f;border:1px solid #b8862b;border-radius:5px;padding:1px 5px;">CANCELING</span>';
+      if (cu.paused) badges += ' <span style="font-size:8.5px;font-weight:800;color:#e0a93f;border:1px solid #b8862b;border-radius:5px;padding:1px 5px;">PAUSED</span>';
+      const stripeBlock = cu.sub_id
+        ? `${fact('Plan', `${escapeHTML(cu.product_name || cu.price_id || 'subscription')}${cu.amount_cents != null ? ' · ' + money(cu.amount_cents) + (cu.interval ? '/' + escapeHTML(cu.interval) : '') : ''}`)}
+           ${fact('Status', `${escapeHTML((cu.status || '').toUpperCase())}${badges}`)}
+           ${fact('Next pay', cu.next_payment ? escapeHTML(cu.next_payment) : '<span style="color:#e0a93f;">— none scheduled</span>')}
+           ${fact('Since', cu.since ? escapeHTML(cu.since) : '')}
+           ${cu.sub_count > 1 ? fact('Other subs', (cu.sub_count - 1) + ' more') : ''}`
+        : `${fact('Subscription', '<span style="color:var(--text-mute,#888);">none</span>')}`;
+      const lastPay = cu.last_charge
+        ? fact('Last paid', `${money(cu.last_charge.amount_cents)} · ${escapeHTML(cu.last_charge.date || '')}${cu.last_charge.one_time ? ' · one-time' : ''}${cu.last_charge.refunded ? ' · refunded' : ''}`)
+        : (cu.charge_count === 0 ? fact('Payments', '<span style="color:var(--text-mute,#888);">none yet</span>') : '');
+      return `<div style="display:flex;align-items:flex-start;gap:8px;border:1px solid var(--border,#2a2a31);border-radius:9px;padding:10px 12px;margin-bottom:7px;">
         <div style="flex:1;min-width:0;">
           <div style="font-size:12.5px;font-weight:700;">${escapeHTML(cu.name || cu.email || cu.id)}</div>
-          <div style="font-size:10.5px;color:var(--text-mute,#888);">${escapeHTML(cu.email || '')}${cu.phone ? ' · ' + escapeHTML(cu.phone) : ''} · ${subTxt}</div>
+          <div style="font-size:10.5px;color:var(--text-mute,#888);margin-bottom:6px;">${escapeHTML(cu.email || '')}${cu.phone ? ' · ' + escapeHTML(cu.phone) : ''}</div>
+          <div style="border-top:1px solid var(--border,#2a2a31);padding-top:6px;">${stripeBlock}${lastPay}
+            <a href="https://dashboard.stripe.com/${escapeHTML(json.stripe_account_id ? json.stripe_account_id + '/' : '')}customers/${escapeHTML(cu.id)}" target="_blank" rel="noopener" style="display:inline-block;margin-top:5px;font-size:10px;font-weight:700;color:var(--accent,#E8C547);text-decoration:none;">Open in Stripe ↗</a>
+          </div>
         </div>
         <button onclick="_sorterLinkCustomer('${sid}','${escapeHTML(cu.id)}','${escapeHTML(cu.sub_id || '')}','${escapeHTML(cu.price_id || '')}')" style="flex:none;font-size:11.5px;font-weight:700;padding:6px 12px;border-radius:8px;border:none;background:var(--accent,#E8C547);color:#1a1a1a;cursor:pointer;">Connect</button>
       </div>`;

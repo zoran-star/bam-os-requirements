@@ -247,6 +247,11 @@ async function handler(req, res) {
       try { sub = await stripeFetch(`/subscriptions/${encodeURIComponent(subId)}?expand[]=items.data.price.product`, { stripeAccount: acct }); }
       catch (_) { sub = null; }
     }
+    // current_period_end moved onto the items in recent Stripe API versions —
+    // backfill the sub-level field so classify()/facts read it consistently.
+    if (sub && sub.items && sub.items.data && sub.items.data[0] && !sub.current_period_end) {
+      sub.current_period_end = sub.items.data[0].current_period_end || null;
+    }
     // The latest one-time (prepaid) charge → anchor for setup_monthly.
     let lastPrepaidDate = null, charges = [];
     if (custId) {

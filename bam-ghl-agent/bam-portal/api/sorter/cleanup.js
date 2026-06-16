@@ -109,7 +109,10 @@ function subBillingFacts(sub) {
   const item = sub.items && sub.items.data && sub.items.data[0];
   const price = item && item.price;
   return {
-    current_period_end: sub.current_period_end || null,
+    // Stripe moved current_period_end off the Subscription and onto its items in
+    // recent API versions (2025-04+ "basil"); read the item first, fall back to
+    // the legacy sub-level field. Without this, ACTIVE subs showed "unknown".
+    current_period_end: (item && item.current_period_end) || sub.current_period_end || null,
     trial_end: sub.trial_end || null,
     cancel_at_period_end: !!sub.cancel_at_period_end,
     cancel_at: sub.cancel_at || null,
@@ -765,21 +768,43 @@ async function handler(req, res) {
         try { const r = await stripeGet(`/customers?email=${encodeURIComponent(t.toLowerCase())}&limit=5`, acct); (r.data || []).forEach(c => found.set(c.id, c)); } catch (_) {}
       }
       const customers = [...found.values()].map(cu => ({ id: cu.id, name: cu.name || null, email: cu.email || null, phone: cu.phone || null }));
-      // attach each customer's best sub (active-ish preferred) for context
+      // attach the FULL Stripe picture per candidate (best sub + next payment +
+      // last charge) so staff see everything before connecting — not just a name.
       for (const cu of customers) {
         try {
-          const sr = await stripeGet(`/subscriptions?customer=${encodeURIComponent(cu.id)}&status=all&limit=5&expand[]=data.items.data.price`, acct);
+          const sr = await stripeGet(`/subscriptions?customer=${encodeURIComponent(cu.id)}&status=all&limit=5&expand[]=data.items.data.price.product`, acct);
           const subs = sr.data || [];
+          cu.sub_count = subs.length;
           const best = subs.find(s2 => ACTIVEISH.has(s2.status)) || subs[0];
           if (best) {
-            const price = best.items && best.items.data && best.items.data[0] && best.items.data[0].price;
+            const item = best.items && best.items.data && best.items.data[0];
+            const price = item && item.price;
+            const product = price && price.product;
             cu.sub_id = best.id; cu.status = best.status;
             cu.price_id = price ? price.id : null;
             cu.amount_cents = price ? price.unit_amount : null;
+            cu.product_name = (product && typeof product === "object" && product.name) || null;
+            cu.interval = price && price.recurring ? `${price.recurring.interval_count > 1 ? price.recurring.interval_count + " " : ""}${price.recurring.interval}` : null;
+            cu.cancel_at_period_end = !!best.cancel_at_period_end;
+            cu.paused = !!best.pause_collection;
+            cu.since = best.created ? new Date(best.created * 1000).toISOString().slice(0, 10) : null;
+            const cpe = (item && item.current_period_end) || best.current_period_end || null;
+            cu.next_payment = best.status === "trialing"
+              ? (best.trial_end ? new Date(best.trial_end * 1000).toISOString().slice(0, 10) : null)
+              : (best.cancel_at_period_end || best.cancel_at || best.pause_collection) ? null
+              : (cpe ? new Date(cpe * 1000).toISOString().slice(0, 10) : null);
           }
         } catch (_) {}
+        // Last payment — useful even with no sub (prepaid one-times).
+        try {
+          const ch = await stripeGet(`/charges?customer=${encodeURIComponent(cu.id)}&limit=3`, acct);
+          const list = ch.data || [];
+          cu.charge_count = list.length;
+          const paid = list.find(c => c.status === "succeeded" && !c.refunded) || list[0];
+          if (paid) cu.last_charge = { amount_cents: paid.amount, date: paid.created ? new Date(paid.created * 1000).toISOString().slice(0, 10) : null, one_time: !paid.invoice, refunded: !!paid.refunded };
+        } catch (_) {}
       }
-      return res.status(200).json({ ok: true, customers, searched });
+      return res.status(200).json({ ok: true, customers, searched, stripe_account_id: acct });
     }
 
     // link-customer: tie an existing Stripe customer (+ their best sub/price) to
