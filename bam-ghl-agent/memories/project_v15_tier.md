@@ -86,6 +86,29 @@ exclusions; undo restores; source untouched); Setup = **extend Price Match**.
   (name → search GHL+Stripe → reason → date).
 - Useful existing resource for Sales: `/api/marketing?resource=ghl-kpis-monthly`.
 
+## Calendars tab (V1.5) — DONE (fresh booking-management surface)
+Gated v15: `switchView('v15cal')` → `openV15Cal()`. Distinct from the V2
+website-availability panel (`view-calendar`/`bk*`). Backend
+`api/ghl/calendars-v15.js` (uses `getClientGhlToken` from website/availability):
+GET `action=list` (all GHL calendars) · `action=events&calendar_ids=&start=ms&end=ms`
+(week events across cals) · `action=appointment&id=` (appt + full live contact) ·
+`action=settings&calendar=` (regular openHours + special = date overrides + capacity);
+POST `action=set-status` · `action=create-appointment` · `action=settings`.
+- **Weekly grid** (`_v15calRenderGrid`): 7-day × hour grid. Faint **dotted** cells =
+  availability (union of selected calendars' regular hours + special-date overrides,
+  via `_v15calOpenAt`); cells with ≥1 booking render **filled gold** + click →
+  `_v15calOpenSlot` slot drawer listing that slot's bookings. Calendar multi-select
+  chips (default all) + ⚙ per calendar + week nav.
+- **Booking drawer** (`_v15calOpenAppt`): status `<select>` (confirmed/showed/noshow/
+  cancelled/invalid → `_v15calSetStatus`), full contact (name/email/phone/tags/custom
+  fields/DND), SMS/Email composer reusing `/api/ghl/send-message`.
+- **Settings drawer** (`_v15calSettings`): regular hours (7 day rows) + capacity +
+  **special hours** = add a date → custom open/close OR mark closed (Zoran's choice);
+  merges with existing availabilities (reuses ids, marks removed dates deleted).
+- **New booking** (`+ New booking` topbar): pick calendar → search existing contact
+  via `/api/contacts` mirror → date/time → `create-appointment` (GHL contactId).
+- Drawer infra = a dynamically-injected right-side overlay (`#v15cal-ov`).
+
 ## Data + sync
 - **`ghl_contacts`** table = per-academy GHL contact mirror (name/email/phone,
   `tags text[]`, `custom_fields jsonb`, resolved `athlete_name`). pg_trgm GIN
