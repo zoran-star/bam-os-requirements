@@ -58,6 +58,13 @@ const PRICE_TO_PLAN = {
 
 function nowIso() { return new Date().toISOString(); }
 
+// Subscriptions WE create + own (the parent funnels): the portal /funnel/
+// (fullcontrol-portal) and the academy-site enrollment (fullcontrol-website-
+// enrollment). Both are created `incomplete` and activated on first paid
+// invoice. Keep external subs (CoachIQ/GHL/manual) out of the onboarding path.
+const PORTAL_OWNED_ORIGINS = new Set(["fullcontrol-portal", "fullcontrol-website-enrollment"]);
+function isPortalOwnedOrigin(origin) { return PORTAL_OWNED_ORIGINS.has(origin); }
+
 async function readRawBody(req) {
   const chunks = [];
   for await (const chunk of req) {
@@ -190,7 +197,7 @@ async function handleSubCreated(event, connectedAccount, res) {
   // `incomplete` and already carry their member's stripe_subscription_id. Do NOT
   // flip them to live here (payment isn't confirmed yet) — handleInvoiceSucceeded
   // activates them on the first paid invoice.
-  if (sub.metadata && sub.metadata.origin === "fullcontrol-portal") {
+  if (sub.metadata && isPortalOwnedOrigin(sub.metadata.origin)) {
     return res.status(200).json({ skipped: "portal-owned sub — activated on first paid invoice" });
   }
   const customerId = sub.customer;
@@ -451,7 +458,7 @@ async function handleInvoiceSucceeded(event, connectedAccount, res) {
   if (member.status === "payment_method_required" && subId) {
     let onbSub = null;
     try { onbSub = await stripeFetch(`/subscriptions/${subId}`, connectedAccount); } catch (_) { onbSub = null; }
-    if (onbSub && onbSub.metadata && onbSub.metadata.origin === "fullcontrol-portal") {
+    if (onbSub && onbSub.metadata && isPortalOwnedOrigin(onbSub.metadata.origin)) {
       await sb(`members?id=eq.${member.id}`, {
         method: "PATCH", headers: { Prefer: "return=minimal" },
         body: JSON.stringify({ status: "live", updated_at: nowIso() }),
