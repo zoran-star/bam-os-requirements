@@ -35,9 +35,15 @@ thread, `/api/ghl/send-message` for SMS/Email + `attachments` URLs).
   `message-attachments` bucket), and **Setup** = synced sender email + phone
   (new `GET /api/ghl/inbox?action=sender-info` → GHL location phone/email).
 - **P2 (done):** filter by pipeline + stage (contact→opp map from `/api/ghl/pipelines`) + filter by failed messages (`lastMessageStatus` added to the inbox API; failed = failed/undelivered/error/rejected). Toolbar pills + pipeline/stage selects; client-side filtering of the cached list.
-- **P3 (pending):** **mass send** — tag-filtered audience (hundreds) → queued,
-  throttled, DND-respecting SMS/email blast following GHL's bulk rules. Its own
-  subsystem (queue table + worker).
+- **P3 (done):** **mass send** — `✉ Mass send` in the inbox toolbar → modal
+  (channel SMS/Email · tag audience · body/subject) → queues a job. Subsystem:
+  `mass_send_jobs` + `mass_send_recipients` tables; `api/mass-send.js`
+  (?action=create resolves audience from the mirror — tag + has-channel + **NOT
+  dnd**; ?action=tags for the picker; ?action=status for progress;
+  ?action=work = the **worker cron**, Bearer CRON_SECRET, drains 25 recipients/run
+  with a 400ms gap, marks job done). Cron `/api/mass-send?action=work` every
+  minute (vercel.json). `ghl_contacts.dnd` added + synced (skips do-not-contact).
+  Modal polls status for a live progress bar; sending continues in the background.
 
 ## Data + sync
 - **`ghl_contacts`** table = per-academy GHL contact mirror (name/email/phone,

@@ -178,6 +178,7 @@ async function syncContactsForAcademy(client, deadline) {
           first_name: c.firstName || null, last_name: c.lastName || null, name,
           email: (c.email || "").toLowerCase().trim() || null, phone: c.phone || null,
           tags, athlete_name: athleteName, custom_fields: cfMap,
+          dnd: c.dnd === true || !!(c.dndSettings && Object.values(c.dndSettings).some(s => s && s.status === "active")),
           date_added: c.dateAdded || c.createdAt || null, synced_at: nowIso(),
         };
       }).filter(Boolean);
