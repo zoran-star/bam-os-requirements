@@ -819,6 +819,9 @@ async function handleContentTickets(req, res) {
         const mktFields = {
           campaign_title: ctxObj.campaign_title || "",
           note: ctxObj.note || "",
+          // Priority rides along from the client's submission (content ctx) so the
+          // marketing team sees urgency without re-asking. Defaults to normal.
+          priority: ctxObj.priority === "high" ? "high" : "normal",
         };
         if (mktType === "campaign-create") {
           mktFields.offer = ctxObj.offer || "";
