@@ -3625,6 +3625,18 @@
     .grid-2, .grid-3 { grid-template-columns: 1fr; }
   }
 
+  /* ── V1.5 mobile-friendly layouts (KPIs + Calendars) ── */
+  .v15k-2col   { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 12px; }
+  .v15k-linkrow{ display: grid; grid-template-columns: 1fr 190px; gap: 10px; align-items: center;
+                 padding: 9px 12px; border: 1px solid var(--border); border-radius: 9px; margin-bottom: 7px; }
+  .v15cal-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .v15cal-board  { border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+  @media (max-width: 768px) {
+    .v15k-2col    { grid-template-columns: 1fr; gap: 22px; }
+    .v15k-linkrow { grid-template-columns: 1fr; }
+    .v15cal-board { min-width: 560px; }   /* keep the 7-day grid usable; scroll instead of squish */
+  }
+
   /* ── Theme toggle button ── */
   .theme-toggle {
     width: 100%;
@@ -8866,9 +8878,9 @@ function _v15kSetupHtml() {
   const s = _V15K.setup;
   const ssty = 'padding:7px 9px;border-radius:7px;border:1px solid var(--border-med);background:var(--surface);color:var(--text);font:inherit;font-size:12px;cursor:pointer';
   const linkRow = (label, sub, kind, ref, offerId) => `
-    <div style="display:grid;grid-template-columns:1fr 190px;gap:10px;align-items:center;padding:9px 12px;border:1px solid var(--border);border-radius:9px;margin-bottom:7px">
+    <div class="v15k-linkrow">
       <div style="min-width:0"><div style="font-weight:600;font-size:13px;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escapeHTML(label)}</div>${sub ? `<div style="font-size:11px;color:var(--text-mute)">${escapeHTML(sub)}</div>` : ''}</div>
-      <select data-kind="${kind}" data-ref="${escapeHTML(ref)}" data-label="${escapeHTML(label)}" onchange="_v15kLinkEl(this)" style="${ssty}">${_v15kOfferOpts(offerId)}</select>
+      <select data-kind="${kind}" data-ref="${escapeHTML(ref)}" data-label="${escapeHTML(label)}" onchange="_v15kLinkEl(this)" style="${ssty};width:100%;box-sizing:border-box">${_v15kOfferOpts(offerId)}</select>
     </div>`;
   const sub = (t) => `<div style="font-size:12px;font-weight:700;color:var(--text);margin:14px 0 6px;letter-spacing:.02em">${t}</div>`;
 
@@ -9031,7 +9043,7 @@ function _v15kMembersHtml(d) {
   const man = (d.manual || []).map(mc => `<div style="display:flex;align-items:center;gap:8px;border:1px solid var(--border);border-radius:8px;padding:8px 11px;margin-bottom:6px">
     <div style="flex:1;min-width:0"><div style="font-size:13px;color:var(--text)">${escapeHTML(mc.contact_name || '—')}</div><div style="font-size:11px;color:var(--text-mute)">${mc.cancelled_on ? escapeHTML(mc.cancelled_on) : ''}${mc.reason ? ' · ' + escapeHTML(mc.reason) : ''}</div></div>
     <button onclick="_v15kDelManualCancel('${mc.id}')" style="${_v15kBtn}">×</button></div>`).join('');
-  return `<div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-top:12px">
+  return `<div class="v15k-2col">
     <div><div style="${_v15kLbl}">Payments (${(d.payments || []).length})</div>${pays}</div>
     <div>
       <div style="${_v15kLbl}">Cancelled subscriptions</div>
@@ -9211,7 +9223,7 @@ function _v15calRender() {
   const start = calStartOfWeek(_V15CAL.weekOffset);
   host.innerHTML = `
     <div style="display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-bottom:8px">${chips}</div>
-    <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;flex-wrap:wrap">
       <button onclick="_v15calWeek(-1)" style="background:var(--surface);border:1px solid var(--border-med);border-radius:7px;color:var(--text);padding:6px 11px;cursor:pointer">‹</button>
       <button onclick="_v15calWeek(0)" style="background:var(--surface);border:1px solid var(--border-med);border-radius:7px;color:var(--text);padding:6px 12px;cursor:pointer;font-size:12.5px">Today</button>
       <button onclick="_v15calWeek(1)" style="background:var(--surface);border:1px solid var(--border-med);border-radius:7px;color:var(--text);padding:6px 11px;cursor:pointer">›</button>
@@ -9283,9 +9295,9 @@ function _v15calRenderGrid() {
     }
     rows += `<div style="display:grid;grid-template-columns:46px repeat(7,1fr);align-items:stretch">${cells}</div>`;
   }
-  host.innerHTML = `<div style="border:1px solid var(--border);border-radius:10px;overflow:hidden">
+  host.innerHTML = `<div class="v15cal-scroll"><div class="v15cal-board">
     <div style="display:grid;grid-template-columns:46px repeat(7,1fr);border-bottom:1px solid var(--border);background:var(--surface)">${head}</div>
-    <div>${rows}</div></div>`;
+    <div>${rows}</div></div></div>`;
 }
 
 async function _v15calLoadEvents() {
