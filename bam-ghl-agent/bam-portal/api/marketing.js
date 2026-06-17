@@ -789,7 +789,16 @@ async function handleContentTickets(req, res) {
         messages: [],
       }]),
     });
-    return res.status(201).json({ ticket: inserted?.[0] || null });
+    const newCt = inserted?.[0] || null;
+    if (newCt) {
+      // DM Cam personally that a new content request landed (carries the urgent flag).
+      const code = String(newCt.id || "").slice(0, 3).toUpperCase();
+      const pr = (context?.priority === "high") ? "⚡ HIGH priority " : "";
+      marketingManagerSlackId().then(sid => {
+        if (sid) postStaffSlackDM(sid, `🆕 New content request ${pr}— ${ctx.client.business_name || "client"} [${code}]`, req);
+      });
+    }
+    return res.status(201).json({ ticket: newCt });
   }
 
   // ─── PATCH (actions) ───────────────────────────────────────
