@@ -42,8 +42,19 @@ from [[project_coachiq_integration]], now built. Offer-driven end to end.
 ## Going live / member creation
 - Member is upserted `payment_method_required`. It flips to **live** + GHL
   convert/tag (opportunity → WON) via the EXISTING `invoice.paid` webhook +
-  `fireOnboardingActivations` (no new code). So "convert the lead" is the GHL
-  workflow, not a portal step.
+  `fireOnboardingActivations`. So "convert the lead" is the GHL workflow, not a
+  portal step.
+- **2026-06-17 — onboarding GHL automation CONNECTED in prod (PR #415).** Before
+  this, `fireOnboardingActivations` silently SKIPPED in production: (1) the GHL hook
+  only fired when `ONBOARDING_PRODUCT_MAP` had a `ghl_product_id` for the plan|term,
+  and GTA's live "Summer Unlimited" offer has none; (2) `GHL_ONBOARDING_WEBHOOK_URL`
+  was set only on the `feat/onboarding-checkout` PREVIEW branch, not prod. Fixes:
+  the hook now fires on `GHL_ONBOARDING_WEBHOOK_URL` + `parent_email` alone (product
+  id optional; `plan`+`term` now sent in `details` for tag branching), and the
+  webhook URL was added to PRODUCTION env. Do NOT copy the preview
+  `ONBOARDING_STRIPE_SECRET_KEY` (it's `sk_test`) to prod — checkout falls back to
+  the live `STRIPE_CONNECT_SECRET_KEY`. **End-to-end still needs a real test payment
+  to confirm the GHL workflow actually runs.**
 
 ## Welcome video moved
 - `welcome_video` moved from the offer **Onboarding** section to **Sales**
