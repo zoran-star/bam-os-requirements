@@ -9034,17 +9034,36 @@ function _v15kRender() {
     <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:6px">
       <label style="font-size:12px;color:var(--text-mute)">Month</label>
       <select onchange="_v15kSetMonth(this.value)" style="background:var(--surface);border:1px solid var(--border-med);border-radius:8px;color:var(--text);padding:8px 12px;font:inherit;font-size:13px;cursor:pointer">${monthOpts || '<option>—</option>'}</select>
+      <button onclick="_v15kOpenSetup()" style="margin-left:auto;background:var(--surface);border:1px solid var(--border-med);border-radius:8px;color:var(--text);padding:8px 14px;font:inherit;font-size:13px;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:7px">⚙ Setup</button>
     </div>
     ${sectionHead('Marketing')}
     ${marketing}
     ${sectionHead('Sales')}<div id="v15k-sales">${_v15kSecHtml('sales')}</div>
     ${sectionHead('Revenue')}<div id="v15k-revenue">${_v15kSecHtml('revenue')}</div>
-    ${sectionHead('Members')}<div id="v15k-members">${_v15kSecHtml('members')}</div>
-    ${sectionHead('Setup')}
-    <div style="font-size:12.5px;color:var(--text-mute);margin-top:4px">Connect Stripe and GoHighLevel to your offers. This powers the Sales, Revenue, and Members numbers.</div>
-    <div id="v15k-setup">${_v15kSetupHtml()}</div>`;
+    ${sectionHead('Members')}<div id="v15k-members">${_v15kSecHtml('members')}</div>`;
   _v15kEnsureSection('sales'); _v15kEnsureSection('revenue'); _v15kEnsureSection('members');
 }
+
+// Setup moved into a modal opened from the top-right ⚙ Setup button. The
+// #v15k-setup container now lives inside the modal; _v15kRenderSetup targets it.
+function _v15kOpenSetup() {
+  let ov = document.getElementById('v15k-setup-ov');
+  if (!ov) {
+    ov = document.createElement('div'); ov.id = 'v15k-setup-ov';
+    ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9000;display:flex;align-items:center;justify-content:center;padding:20px';
+    ov.onclick = (e) => { if (e.target === ov) _v15kCloseSetup(); };
+    document.body.appendChild(ov);
+  }
+  ov.innerHTML = `<div style="background:var(--bg);border:1px solid var(--border);border-radius:14px;max-width:640px;width:100%;max-height:85vh;overflow:auto;padding:22px 24px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+      <div style="font-family:var(--font-display,inherit);font-size:18px;font-weight:700;color:var(--text)">KPIs Setup</div>
+      <button onclick="_v15kCloseSetup()" style="background:none;border:none;color:var(--text-mute);font-size:24px;cursor:pointer;line-height:1">×</button>
+    </div>
+    <div style="font-size:12.5px;color:var(--text-mute);margin-bottom:4px">Connect Stripe and GoHighLevel to your offers. This powers the Sales, Revenue, and Members numbers.</div>
+    <div id="v15k-setup">${_v15kSetupHtml()}</div>`;
+  if (!_V15K.setupLoaded) _v15kLoadSetup();   // fetch on first open (cached after)
+}
+function _v15kCloseSetup() { const ov = document.getElementById('v15k-setup-ov'); if (ov) ov.remove(); }
 
 // ── Sales / Revenue / Members sections (month-filtered, human-cleaned) ──
 function _v15kDate(sec) { return new Date(sec * 1000).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }); }
