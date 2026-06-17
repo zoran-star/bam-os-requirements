@@ -6172,7 +6172,8 @@
 
         <div class="content">
 
-          <!-- ── Ad Performance report (auto from Meta) ── -->
+          <!-- ── Ad Performance report (auto from Meta) — hidden for V1.5 ── -->
+          <div id="ad-performance-section">
           <div class="report-head">
             <div class="readout" style="margin:0">Ad Performance</div>
             <div class="report-controls">
@@ -6186,6 +6187,7 @@
           </div>
           <div id="ad-report-container">
             <div class="req-empty" style="padding:20px 0"><span class="req-spin"></span>Loading performance…</div>
+          </div>
           </div>
 
           <div class="readout" style="margin-top:48px">Active Campaigns</div>
@@ -10737,6 +10739,9 @@ function applyV15NavState(v15) {
   // Assets is hidden for V1.5 (also drops it from the mobile More sheet).
   const assetsNav = document.getElementById('nav-assets');
   if (assetsNav) assetsNav.style.display = v15 ? 'none' : '';
+  // V1.5 Marketing: drop the whole Ad Performance report section.
+  const adPerf = document.getElementById('ad-performance-section');
+  if (adPerf) adPerf.style.display = v15 ? 'none' : '';
   applyTalkToBamNav();
 }
 
@@ -22671,11 +22676,11 @@ function _buildDemoCampaignsHTML(_metaConnected) {
       <div class="campaign-card-main">
         <div class="card-title" style="margin-bottom:6px">${escapeHTML(c.name)} <span style="font-size:10px;color:var(--text-mute);font-weight:500;margin-left:6px">SAMPLE</span></div>
         <div style="font-family:var(--mono);font-size:10px;letter-spacing:0.16em;text-transform:uppercase;color:var(--text-mute);margin-bottom:14px">This month</div>
-        <div class="campaign-stats">
+        ${(typeof V15_ACCESS !== 'undefined' && V15_ACCESS) ? '' : `<div class="campaign-stats">
           <div class="campaign-stat"><div class="campaign-stat-value">$${c.spend.toFixed(2)}</div><div class="campaign-stat-label">Spend</div></div>
-          ${(typeof V15_ACCESS !== 'undefined' && V15_ACCESS) ? '' : `<div class="campaign-stat"><div class="campaign-stat-value">${c.results}</div><div class="campaign-stat-label">Results</div></div>
-          <div class="campaign-stat"><div class="campaign-stat-value">$${c.cpr.toFixed(2)}</div><div class="campaign-stat-label">Cost / Result</div></div>`}
-        </div>
+          <div class="campaign-stat"><div class="campaign-stat-value">${c.results}</div><div class="campaign-stat-label">Results</div></div>
+          <div class="campaign-stat"><div class="campaign-stat-value">$${c.cpr.toFixed(2)}</div><div class="campaign-stat-label">Cost / Result</div></div>
+        </div>`}
       </div>
     </div>`).join('');
   return banner + cards;
@@ -22823,12 +22828,12 @@ async function _renderMarketingCampaigns() {
           <div class="campaign-card-main">
             <div class="card-title" style="margin-bottom:6px">${escapeHTML(c.name || '(unnamed)')}</div>
             <div style="font-family:var(--mono);font-size:10px;letter-spacing:0.16em;text-transform:uppercase;color:var(--text-mute);margin-bottom:14px">This month</div>
+            ${(typeof V15_ACCESS !== 'undefined' && V15_ACCESS) ? '' : `
             <div class="campaign-stats">
               <div class="campaign-stat">
                 <div class="campaign-stat-value">${escapeHTML(c.spend_display)}</div>
                 <div class="campaign-stat-label">Spend</div>
               </div>
-              ${(typeof V15_ACCESS !== 'undefined' && V15_ACCESS) ? '' : `
               <div class="campaign-stat">
                 <div class="campaign-stat-value">${c.results}</div>
                 <div class="campaign-stat-label">Results</div>
@@ -22836,8 +22841,8 @@ async function _renderMarketingCampaigns() {
               <div class="campaign-stat">
                 <div class="campaign-stat-value">${escapeHTML(c.cpr_display)}</div>
                 <div class="campaign-stat-label">Cost / Result</div>
-              </div>`}
-            </div>
+              </div>
+            </div>`}
           </div>
           <button class="btn-change-campaign" onclick='openCampaignDetail(${JSON.stringify(c.id)}, ${JSON.stringify(c.name || "")}, ${stats})'>Change Campaign</button>
         </div>`;
