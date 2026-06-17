@@ -17,11 +17,13 @@
 // is an inert no-op (safe to ship before the academy is configured).
 //
 // CONFIG (env for the BAM GTA proof; per-academy `clients` columns later):
-//   GHL_ONBOARDING_WEBHOOK_URL   the inbound-webhook URL of the GHL workflow
-//   ONBOARDING_PRODUCT_MAP       JSON: { "<plan>|<term>": { ghl_product_id,
-//                                coachiq_automation_id } }  e.g.
-//                                { "2/wk|4_weeks": { "ghl_product_id": "...",
-//                                  "coachiq_automation_id": "..." } }
+//   GHL_ONBOARDING_WEBHOOK_URL   the inbound-webhook URL of the GHL workflow.
+//                                THIS IS ALL THAT'S NEEDED to fire the onboarding
+//                                automation — the hook posts on email alone.
+//   ONBOARDING_PRODUCT_MAP       OPTIONAL JSON: { "<plan>|<term>": { ghl_product_id,
+//                                coachiq_automation_id } }. Only needed if the GHL
+//                                workflow branches by product, or for CoachIQ. With
+//                                portal/Stripe collecting payment, GTA doesn't need it.
 //   (CoachIQ key/group via api/coachiq.js → COACHIQ_API_KEY / COACHIQ_GROUP_ID)
 
 import { coachiqEnabled, triggerCoachiqAutomation, createCoachiqUser } from "../coachiq.js";
@@ -54,23 +56,31 @@ export async function fireOnboardingActivations(member, ctx = {}) {
   };
 
   // ── 1. GHL webhook (portal is the only trigger) ──
+  // Fires on email alone. Payment is collected by the portal/Stripe (not CoachIQ),
+  // so the GHL onboarding workflow no longer branches by product — it just needs the
+  // contact's email to find/create, tag, mark WON, and send welcome emails. We still
+  // send product.id when a product map entry exists (forward-compat / branching
+  // academies), plus plan+term so the workflow can tag the right plan if it wants.
   const ghlUrl = process.env.GHL_ONBOARDING_WEBHOOK_URL;
-  if (ghlUrl && map.ghl_product_id && member.parent_email) {
+  if (ghlUrl && member.parent_email) {
     try {
-      const payload = { details: { user: { email: member.parent_email }, product: { id: map.ghl_product_id } } };
+      const user = { email: member.parent_email };
+      if (member.parent_name) user.name = member.parent_name;
+      const details = { user, plan: plan || null, term: term || null };
+      if (map.ghl_product_id) details.product = { id: map.ghl_product_id };
       const r = await fetch(ghlUrl, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
+        body: JSON.stringify({ details }),
       });
       results.ghl = { ok: r.ok, status: r.status };
-      await audit(r.ok ? "onboarding-ghl-fired" : "onboarding-ghl-error", { product_id: map.ghl_product_id, status: r.status });
+      await audit(r.ok ? "onboarding-ghl-fired" : "onboarding-ghl-error", { product_id: map.ghl_product_id || null, plan, term, status: r.status });
     } catch (e) {
       results.ghl = { ok: false, error: String(e && e.message || e) };
-      await audit("onboarding-ghl-error", { product_id: map.ghl_product_id, error: results.ghl.error });
+      await audit("onboarding-ghl-error", { product_id: map.ghl_product_id || null, plan, term, error: results.ghl.error });
     }
   } else {
-    results.ghl = { skipped: "GHL not configured (need GHL_ONBOARDING_WEBHOOK_URL + product map)" };
+    results.ghl = { skipped: "GHL not configured (need GHL_ONBOARDING_WEBHOOK_URL) or member has no parent_email" };
   }
 
   // ── 2. CoachIQ (only if the academy uses it) ──
