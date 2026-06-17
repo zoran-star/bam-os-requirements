@@ -9037,10 +9037,12 @@ function _v15kRender() {
   if (_V15K.mktEmpty || !period) {
     marketing = `<div class="req-empty" style="padding:18px 0;color:var(--text-mute)">No marketing data for this month.</div>`;
   } else {
+    // meta-report monthly periods carry totals under period.totals (spend/leads/cpl).
+    const t = period.totals || period || {};
     marketing = `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-top:12px">
-      ${_v15kStat('Ad spend', _v15kMoney(period.spend))}
-      ${_v15kStat('Leads', _v15kNum(period.leads))}
-      ${_v15kStat('Cost per lead', period.cpl != null ? _v15kMoney(period.cpl) : '—')}
+      ${_v15kStat('Ad spend', _v15kMoney(t.spend))}
+      ${_v15kStat('Leads', _v15kNum(t.leads))}
+      ${_v15kStat('Cost per lead', t.cpl != null ? _v15kMoney(t.cpl) : '—')}
     </div>`;
   }
   const sectionHead = (t) => `<div style="font-family:var(--font-display,inherit);font-size:15px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--text);margin-top:26px">${t}</div>`;
@@ -9074,7 +9076,11 @@ function _v15kOpenSetup() {
       <button onclick="_v15kCloseSetup()" style="background:none;border:none;color:var(--text-mute);font-size:24px;cursor:pointer;line-height:1">×</button>
     </div>
     <div style="font-size:12.5px;color:var(--text-mute);margin-bottom:4px">Connect Stripe and GoHighLevel to your offers. This powers the Sales, Revenue, and Members numbers.</div>
-    <div id="v15k-setup">${_v15kSetupHtml()}</div>`;
+    <div id="v15k-setup">${_v15kSetupHtml()}</div>
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:18px;padding-top:14px;border-top:1px solid var(--border)">
+      <span style="font-size:11.5px;color:var(--text-mute)">Changes save automatically as you pick.</span>
+      <button onclick="_v15kCloseSetup()" style="background:var(--gold);color:#0B0B0D;border:none;padding:9px 20px;border-radius:8px;font-weight:700;font-size:13px;cursor:pointer">Save &amp; close</button>
+    </div>`;
   if (!_V15K.setupLoaded) _v15kLoadSetup();   // fetch on first open (cached after)
 }
 function _v15kCloseSetup() { const ov = document.getElementById('v15k-setup-ov'); if (ov) ov.remove(); }
