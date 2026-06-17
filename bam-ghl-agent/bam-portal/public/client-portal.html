@@ -5452,13 +5452,13 @@
         Home
       </div>
 
-      <div class="nav-item" onclick="switchView('messages', this)">
+      <div class="nav-item" id="nav-messages" onclick="switchView('messages', this)">
         <span class="nav-icon" aria-hidden="true">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
           </svg>
         </span>
-        Messages
+        <span id="nav-messages-label">Messages</span>
         <span class="nav-badge" id="messages-unread-badge" style="display:none;background:var(--accent);color:#0B0B0D;font-size:10px;font-weight:700;padding:2px 7px;border-radius:999px;margin-left:auto"></span>
       </div>
 
@@ -7067,6 +7067,7 @@ Then the call to action."]</div>
           <span class="topbar-kicker">§ 03 · Inbox</span>
           <div class="topbar-title">Inbox</div>
         </div>
+        <button onclick="switchView('messages')" style="background:var(--surface);border:1px solid var(--border-med);border-radius:8px;color:var(--text);padding:9px 16px;font-weight:700;font-size:13px;cursor:pointer;display:inline-flex;align-items:center;gap:7px">💬 Talk to BAM Business</button>
       </div>
       <div class="content">
         <div class="ib-toolbar">
@@ -8423,6 +8424,7 @@ Then the call to action."]</div>
           <span class="topbar-kicker">§ Inbox</span>
           <div class="topbar-title">Inbox</div>
         </div>
+        <button onclick="switchView('messages')" style="background:var(--surface);border:1px solid var(--border-med);border-radius:8px;color:var(--text);padding:9px 16px;font-weight:700;font-size:13px;cursor:pointer;display:inline-flex;align-items:center;gap:7px">💬 Talk to BAM Business</button>
       </div>
       <div class="content">
         <div id="v15inbox-content"></div>
@@ -10610,6 +10612,7 @@ function applyV2NavState(v2Access) {
   // Re-run V2-gated feature gates.
   applyMemberMgmtNavState();
   applyCalendarNavState();
+  if (typeof applyTalkToBamNav === 'function') applyTalkToBamNav();
 }
 
 // ── V1.5 feature gate ──
@@ -10622,6 +10625,24 @@ function applyV15NavState(v15) {
   // Swap the mobile bottom bar to the V1.5 set (Inbox · Sales · KPIs · Support).
   const mNav = document.getElementById('mobileNav');
   if (mNav) mNav.classList.toggle('is-v15', !!v15);
+  applyTalkToBamNav();
+}
+
+// "Messages" (the academy↔BAM team chat) is only a left-nav/bottom-bar item on
+// V1 — there renamed "Talk to BAM Business". V1.5/V2 drop the nav item; they
+// reach it via the "Talk to BAM Business" button inside their Inbox tab.
+function applyTalkToBamNav() {
+  const isV1 = !(typeof V2_ACCESS !== 'undefined' && V2_ACCESS) && !(typeof V15_ACCESS !== 'undefined' && V15_ACCESS);
+  const navItem = document.getElementById('nav-messages');
+  const navLabel = document.getElementById('nav-messages-label');
+  if (navItem) navItem.style.display = isV1 ? '' : 'none';
+  if (navLabel) navLabel.textContent = isV1 ? 'Talk to BAM Business' : 'Messages';
+  const mItem = document.querySelector('.mobile-nav-item[data-view="messages"]');
+  if (mItem) {
+    mItem.style.display = isV1 ? '' : 'none';
+    const mLabel = mItem.querySelector('.mobile-nav-label');
+    if (mLabel) mLabel.textContent = isV1 ? 'Talk to BAM' : 'Messages';
+  }
 }
 
 // ── Member Management feature flag ──
