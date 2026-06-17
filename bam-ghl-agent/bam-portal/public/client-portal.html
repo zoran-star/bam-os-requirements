@@ -9231,13 +9231,16 @@ function _v15kRevenueHtml(d) {
   if (!d.stripe_ok) return `<div class="req-empty" style="padding:12px 0;color:var(--text-mute)">Stripe is not connected.</div>`;
   let failed;
   if (d.failed && d.failed.length) {
-    failed = `<div style="margin-top:16px"><div style="${_v15kLbl}">Failed payments (${d.failed.length})</div>` + d.failed.map(f => `
+    const rows = d.failed.map(f => `
       <div style="display:flex;align-items:center;gap:10px;border:1px solid var(--border);border-radius:9px;padding:9px 12px;margin-bottom:7px">
         <div style="flex:1;min-width:0"><div style="font-size:13px;font-weight:600;color:var(--text)">${escapeHTML(f.name || '—')} · ${_v15kMoney(f.amount)}</div>
-          <div style="font-size:11px;color:var(--text-mute)">${escapeHTML(f.email || '')}${f.reason ? ' · ' + escapeHTML(f.reason) : ''}</div></div>
+          <div style="font-size:11px;color:var(--text-mute)">${f.created ? _v15kDate(f.created) + ' · ' : ''}${escapeHTML(f.email || '')}${f.reason ? ' · ' + escapeHTML(f.reason) : ''}</div></div>
         ${f.customer ? `<button onclick="_v15kCardLink('${f.customer}',this)" style="${_v15kBtn}">Copy card link</button>
         <button onclick="_v15kStripeCust('${f.customer}')" style="${_v15kBtn}">Customer ↗</button>` : ''}
-      </div>`).join('') + `</div>`;
+      </div>`).join('');
+    failed = `<div style="margin-top:16px">
+      <button onclick="_v15kToggle('v15k-failed')" style="background:none;border:none;cursor:pointer;text-align:left;padding:0;${_v15kLbl}">Failed payments (${d.failed.length}) <span id="v15k-failed-chev" style="display:inline-block;color:var(--text-mute);font-size:11px;transition:transform .15s">▾</span></button>
+      <div id="v15k-failed" style="display:none;margin-top:8px">${rows}</div></div>`;
   } else failed = `<div style="font-size:12.5px;color:var(--text-mute);margin-top:12px">No failed payments this month.</div>`;
   return `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-top:12px">
     ${_v15kStat('Gross', _v15kMoney(d.gross))}
@@ -9269,7 +9272,10 @@ function _v15kMembersHtml(d) {
     <div style="flex:1;min-width:0"><div style="font-size:13px;color:var(--text)">${escapeHTML(mc.contact_name || '—')}</div><div style="font-size:11px;color:var(--text-mute)">${mc.cancelled_on ? escapeHTML(mc.cancelled_on) : ''}${mc.reason ? ' · ' + escapeHTML(mc.reason) : ''}</div></div>
     <button onclick="_v15kDelManualCancel('${mc.id}')" style="${_v15kBtn}">×</button></div>`).join('');
   return `<div class="v15k-2col">
-    <div><div style="${_v15kLbl}">Payments (${(d.payments || []).length})</div>${pays}</div>
+    <div>
+      <button onclick="_v15kToggle('v15k-pays')" style="background:none;border:none;cursor:pointer;text-align:left;padding:0;${_v15kLbl}">Payments (${(d.payments || []).length}) <span id="v15k-pays-chev" style="display:inline-block;color:var(--text-mute);font-size:11px;transition:transform .15s">▾</span></button>
+      <div id="v15k-pays" style="display:none;margin-top:6px">${pays}</div>
+    </div>
     <div>
       <div style="${_v15kLbl}">Cancelled subscriptions</div>
       <button onclick="_v15kToggle('v15k-canc')" style="background:none;border:none;cursor:pointer;padding:0;text-align:left"><span id="v15kc-members_cancelled-null" style="font-size:24px;font-weight:700;color:var(--text)">${c.count}</span> <span style="font-size:12px;color:var(--text-mute)">this month</span> ${c.items && c.items.length ? `<span id="v15k-canc-chev" title="Click to review &amp; clean" style="display:inline-block;margin-left:3px;color:var(--text-mute);font-size:11px;transition:transform .15s">▾</span>` : ''}</button>
@@ -26287,6 +26293,14 @@ async function openMessagesView() {
   try {
     const json = await _msgApi('/api/messages?action=list-conversations');
     _msgConversations = json.conversations || [];
+
+    // "Talk to BAM Business" is ONE private channel between this academy and BAM.
+    // Lock to the active academy's thread so a multi-academy login can never see
+    // (or message into) other academies' conversations.
+    if (typeof CLIENT_ID !== 'undefined' && CLIENT_ID) {
+      const mine = _msgConversations.filter(c => String(c.client_id) === String(CLIENT_ID));
+      if (mine.length) _msgConversations = mine;
+    }
 
     const sidebar = document.getElementById('messages-sidebar');
     const isMultiClient = _msgConversations.length > 1;
