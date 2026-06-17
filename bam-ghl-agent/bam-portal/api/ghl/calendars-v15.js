@@ -203,6 +203,30 @@ async function handler(req, res) {
         });
       }
 
+      // Full GHL contact by id — used by the KPIs "click a name" drawer.
+      if (action === "contact") {
+        const cid = req.query.id;
+        if (!cid) return res.status(400).json({ error: "id required" });
+        let cfNames = {};
+        try {
+          const fr = await ghl(token, "GET", `/locations/${encodeURIComponent(locationId)}/customFields`);
+          for (const d of (fr.customFields || [])) cfNames[d.id] = d.name || d.fieldKey || null;
+        } catch (_) {}
+        const cr = await ghl(token, "GET", `/contacts/${encodeURIComponent(cid)}`);
+        const c = cr.contact || cr;
+        return res.status(200).json({
+          contact: {
+            id: c.id, name: c.contactName || [c.firstName, c.lastName].filter(Boolean).join(" ") || c.name || null,
+            firstName: c.firstName || null, lastName: c.lastName || null,
+            email: c.email || null, phone: c.phone || null,
+            tags: c.tags || [], dnd: !!c.dnd,
+            source: c.source || null, type: c.type || null,
+            dateAdded: c.dateAdded || null,
+            customFields: (c.customFields || c.customField || []).map(f => ({ id: f.id, name: cfNames[f.id] || null, value: f.value != null ? f.value : f.field_value })),
+          },
+        });
+      }
+
       if (action === "settings") {
         const calId = req.query.calendar;
         if (!calId) return res.status(400).json({ error: "calendar required" });

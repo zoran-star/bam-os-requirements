@@ -192,6 +192,15 @@ async function fetchPipelines(client) {
     return (r.pipelines || []).map(p => ({ id: p.id, name: p.name }));
   } catch (_) { return []; }
 }
+async function fetchCalendars(client) {
+  let creds;
+  try { creds = await pickGhlToken(client); } catch (_) { creds = null; }
+  if (!creds || !creds.token || !creds.locationId) return [];
+  try {
+    const r = await ghl("GET", `/calendars/?locationId=${encodeURIComponent(creds.locationId)}`, { token: creds.token });
+    return (r.calendars || []).map(c => ({ id: c.id, name: c.name }));
+  } catch (_) { return []; }
+}
 
 async function handler(req, res) {
   try {
@@ -220,7 +229,7 @@ async function handler(req, res) {
       if (action === "link") {
         const kind = body.kind;
         const refId = String(body.ref_id || "").trim();
-        if (!["stripe_product", "ghl_pipeline"].includes(kind) || !refId) {
+        if (!["stripe_product", "ghl_pipeline", "ghl_calendar"].includes(kind) || !refId) {
           return res.status(400).json({ error: "kind + ref_id required" });
         }
         const offerId = body.offer_id || null;
@@ -281,18 +290,22 @@ async function handler(req, res) {
       } catch (e) { stripeProducts = []; }
     }
 
-    // GHL pipelines.
-    let pipelines = [];
+    // GHL pipelines + calendars.
+    let pipelines = [], calendars = [];
     try {
       const pl = await fetchPipelines(client);
       pipelines = pl.map(p => ({ id: p.id, name: p.name, offer_id: linkOf[`ghl_pipeline:${p.id}`] || null }));
     } catch (_) { pipelines = []; }
+    try {
+      const cl = await fetchCalendars(client);
+      calendars = cl.map(c => ({ id: c.id, name: c.name, offer_id: linkOf[`ghl_calendar:${c.id}`] || null }));
+    } catch (_) { calendars = []; }
 
     return res.status(200).json({
       ok: true,
       academy: client.business_name,
       stripeConnected: !!client.stripe_connect_account_id,
-      offers, stripeProducts, pipelines, links,
+      offers, stripeProducts, pipelines, calendars, links,
     });
   } catch (e) {
     let msg = e && e.message; if (!msg) { try { msg = JSON.stringify(e); } catch (_) { msg = String(e); } }

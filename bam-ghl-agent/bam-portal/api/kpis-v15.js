@@ -111,9 +111,10 @@ async function loadLinks(clientId) {
   const byOffer = {};
   for (const l of links) {
     if (!l.offer_id) continue;
-    (byOffer[l.offer_id] = byOffer[l.offer_id] || { offer_id: l.offer_id, title: titleOf[l.offer_id] || "(untitled offer)", products: [], pipelines: [] });
+    (byOffer[l.offer_id] = byOffer[l.offer_id] || { offer_id: l.offer_id, title: titleOf[l.offer_id] || "(untitled offer)", products: [], pipelines: [], calendars: [] });
     if (l.kind === "stripe_product") byOffer[l.offer_id].products.push(l.ref_id);
     else if (l.kind === "ghl_pipeline") byOffer[l.offer_id].pipelines.push({ id: l.ref_id, name: l.label });
+    else if (l.kind === "ghl_calendar") byOffer[l.offer_id].calendars.push({ id: l.ref_id, name: l.label });
   }
   return Object.values(byOffer);
 }
@@ -241,7 +242,7 @@ async function handler(req, res) {
               for (const op of (r.opportunities || r.data || [])) {
                 const created = op.createdAt ? Math.floor(new Date(op.createdAt).getTime() / 1000) : null;
                 if (created != null && created >= start && created < end) {
-                  pipeItems.push({ ref_id: op.id, label: op.contact?.name || op.contactName || op.name || "Lead" });
+                  pipeItems.push({ ref_id: op.id, label: op.contact?.name || op.contactName || op.name || "Lead", contactId: op.contactId || op.contact?.id || null });
                 }
               }
             } catch (_) {}
@@ -251,14 +252,30 @@ async function handler(req, res) {
         const payItems = [];
         for (const pid of o.products) for (const it of (subsByProduct[pid] || [])) payItems.push(it);
 
+        // bookings: appointments starting in the month for tied calendars
+        const bookItems = [];
+        if (ghlToken) {
+          for (const cal of (o.calendars || [])) {
+            try {
+              const r = await ghl(ghlToken, "GET", `/calendars/events?locationId=${encodeURIComponent(client.ghl_location_id)}&calendarId=${encodeURIComponent(cal.id)}&startTime=${start * 1000}&endTime=${end * 1000}`);
+              for (const ev of (r.events || [])) {
+                if (ev.appointmentStatus === "cancelled") continue;
+                bookItems.push({ ref_id: ev.id || ev._id, label: (ev.contact && ev.contact.name) || ev.contactName || ev.title || "Booking", contactId: ev.contactId || (ev.contact && ev.contact.id) || null });
+              }
+            } catch (_) {}
+          }
+        }
+
         const decorate = (items, metric) => items.map(it => ({ ...it, excluded: isExcluded(excl, metric, o.offer_id, it.ref_id) }));
         const pipe = decorate(pipeItems, "sales_pipeline");
         const pay = decorate(payItems, "sales_payments");
+        const book = decorate(bookItems, "sales_bookings");
         out.push({
           offer_id: o.offer_id, title: o.title,
           pipeline: { count: pipe.filter(i => !i.excluded).length, items: pipe },
           payments: { count: pay.filter(i => !i.excluded).length, items: pay },
-          has_pipelines: o.pipelines.length > 0, has_products: o.products.length > 0,
+          bookings: { count: book.filter(i => !i.excluded).length, items: book },
+          has_pipelines: o.pipelines.length > 0, has_products: o.products.length > 0, has_calendars: (o.calendars || []).length > 0,
         });
       }
       return res.status(200).json({ ok: true, offers: out, ghl_ok: !!ghlToken, stripe_ok: !!acct });
