@@ -513,6 +513,14 @@ async function handler(req, res) {
         try { await createSystemsOnboardingTicket(existing.client_id); }
         catch (e) { console.error("createSystemsOnboardingTicket failed:", e?.message || e); }
       }
+      // Un-checking clears the saved ticket pointer so re-triggering builds a
+      // FRESH systems ticket (createSystemsOnboardingTicket is idempotent on it).
+      if (obStep && obStep.key === "trigger_buildout" && b.completed === false) {
+        await sb(`clients?id=eq.${existing.client_id}`, {
+          method: "PATCH", headers: { Prefer: "return=minimal" },
+          body: JSON.stringify({ systems_onboarding_ticket_id: null }),
+        }).catch((e) => console.error("clear systems_onboarding_ticket_id failed:", e?.message || e));
+      }
 
       // Slack ping only on a genuine reassignment to a person.
       if (reassignedTo) {
