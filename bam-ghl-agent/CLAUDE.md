@@ -1,5 +1,18 @@
 # BAM GHL Agent
 
+## ⛔ HARD RULE — never touch V1 unless explicitly told
+**V1 is the live production tier** (academies still using GoHighLevel; a client
+where `clients.v2_access = false AND clients.v15_access = false`). Do NOT let any
+edit change V1 behavior **unless Zoran explicitly says "we're editing V1"** for
+that task.
+
+- New features / changes default to **V1.5 and/or V2 only** — gate them so V1
+  academies are unaffected (e.g. `if (V2_ACCESS || V15_ACCESS)`, `data-feature`
+  gates, or the `_bbIsV1()` pattern that hides things for V1).
+- When a change *could* affect V1, call it out and confirm before shipping.
+- Bug fixes that clearly apply to all tiers are fine, but say so explicitly.
+- This rule is the default; only an explicit "edit V1" instruction lifts it.
+
 ## Project memory
 Project notes live in [`memories/`](memories/). Scan [`memories/MEMORY.md`](memories/MEMORY.md) first (index of one-liners), then open the specific note. See [`memories/README.md`](memories/README.md) for conventions.
 
