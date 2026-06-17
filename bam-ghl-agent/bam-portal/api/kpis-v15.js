@@ -196,8 +196,11 @@ async function handler(req, res) {
     if (section === "sales") {
       const offers = await loadLinks(clientId);
       if (!offers.length) return res.status(200).json({ ok: true, offers: [], note: "Tie Stripe products and GHL pipelines to offers in Setup first." });
-      // Subs created in the month (for new-payments), grouped by product.
-      let subsByProduct = {};
+      // New payments this month, grouped by product:
+      //  • subscriptions created in the month, AND
+      //  • one-time (non-subscription) PAID invoices in the month → covers
+      //    one-time products/packages, not just subs.
+      let payByProduct = {};
       if (acct) {
         try {
           const subs = await stripeGetAll(`/subscriptions?status=all&created[gte]=${start}&created[lt]=${end}&expand[]=data.items.data.price&expand[]=data.customer`, acct);
@@ -205,10 +208,25 @@ async function handler(req, res) {
             const price = s.items?.data?.[0]?.price;
             const pid = price && (typeof price.product === "string" ? price.product : price.product?.id);
             if (!pid) continue;
-            (subsByProduct[pid] = subsByProduct[pid] || []).push({ ref_id: s.id, label: custName(s.customer), email: custEmail(s.customer) });
+            (payByProduct[pid] = payByProduct[pid] || []).push({ ref_id: s.id, label: custName(s.customer), email: custEmail(s.customer) });
+          }
+        } catch (_) {}
+        try {
+          const invs = await stripeGetAll(`/invoices?status=paid&created[gte]=${start}&created[lt]=${end}&expand[]=data.lines.data.price&expand[]=data.customer`, acct);
+          for (const inv of invs) {
+            if (inv.subscription) continue; // sub invoices already counted via the sub itself
+            const seen = new Set();
+            for (const line of (inv.lines && inv.lines.data) || []) {
+              const price = line.price || line.plan;
+              const pid = price && (typeof price.product === "string" ? price.product : price.product?.id);
+              if (!pid || seen.has(pid)) continue;
+              seen.add(pid);
+              (payByProduct[pid] = payByProduct[pid] || []).push({ ref_id: inv.id, label: custName(inv.customer), email: custEmail(inv.customer), one_time: true });
+            }
           }
         } catch (_) {}
       }
+      const subsByProduct = payByProduct;
       // GHL token (for pipeline opportunity counts)
       let ghlToken = null;
       try { ghlToken = await getClientGhlToken(client); } catch (_) {}

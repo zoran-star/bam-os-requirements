@@ -100,6 +100,33 @@ async function countSubsByProduct(stripeAccount) {
   return counts;
 }
 
+// Paid, non-subscription (one-time) invoices → product id → count sold.
+// This is how one-time products/packages get a real "N sold" instead of the
+// misleading "0 subs ever". Bounded scan (same spirit as the sub scan).
+async function countOneTimeByProduct(stripeAccount) {
+  const counts = {};
+  let startingAfter = null;
+  for (let page = 0; page < 15; page++) { // 15×100 = 1500 invoices cap
+    const qs = new URLSearchParams({ status: "paid", limit: "100" });
+    qs.append("expand[]", "data.lines.data.price");
+    if (startingAfter) qs.set("starting_after", startingAfter);
+    const r = await stripeGet(`/invoices?${qs.toString()}`, stripeAccount);
+    const data = r.data || [];
+    for (const inv of data) {
+      if (inv.subscription) continue; // subscription invoices already counted as subs
+      const seen = new Set();
+      for (const line of (inv.lines && inv.lines.data) || []) {
+        const price = line.price || line.plan;
+        const pid = price && (typeof price.product === "string" ? price.product : price.product && price.product.id);
+        if (pid && !seen.has(pid)) { counts[pid] = (counts[pid] || 0) + 1; seen.add(pid); }
+      }
+    }
+    if (!r.has_more || data.length === 0) break;
+    startingAfter = data[data.length - 1].id;
+  }
+  return counts;
+}
+
 // All products on the connected account → id, name, active flag.
 async function fetchProducts(stripeAccount) {
   const out = [];
@@ -239,17 +266,18 @@ async function handler(req, res) {
     let stripeProducts = [];
     if (client.stripe_connect_account_id) {
       try {
-        const [subCounts, prods] = await Promise.all([
+        const [subCounts, oneTimeCounts, prods] = await Promise.all([
           countSubsByProduct(client.stripe_connect_account_id),
+          countOneTimeByProduct(client.stripe_connect_account_id).catch(() => ({})),
           fetchProducts(client.stripe_connect_account_id),
         ]);
         const byId = {};
-        for (const p of prods) byId[p.id] = { id: p.id, name: p.name, active: p.active, sub_count: subCounts[p.id] || 0 };
-        // products referenced by a sub but missing from the list (deleted product)
-        for (const pid of Object.keys(subCounts)) if (!byId[pid]) byId[pid] = { id: pid, name: "(deleted product)", active: false, sub_count: subCounts[pid] };
+        for (const p of prods) byId[p.id] = { id: p.id, name: p.name, active: p.active, sub_count: subCounts[p.id] || 0, onetime_count: oneTimeCounts[p.id] || 0 };
+        // products referenced by a sub/one-time sale but missing from the list (deleted product)
+        for (const pid of Object.keys({ ...subCounts, ...oneTimeCounts })) if (!byId[pid]) byId[pid] = { id: pid, name: "(deleted product)", active: false, sub_count: subCounts[pid] || 0, onetime_count: oneTimeCounts[pid] || 0 };
         stripeProducts = Object.values(byId)
           .map(p => ({ ...p, offer_id: linkOf[`stripe_product:${p.id}`] || null }))
-          .sort((a, b) => (b.sub_count - a.sub_count) || String(a.name || "").localeCompare(String(b.name || "")));
+          .sort((a, b) => ((b.sub_count + b.onetime_count) - (a.sub_count + a.onetime_count)) || String(a.name || "").localeCompare(String(b.name || "")));
       } catch (e) { stripeProducts = []; }
     }
 
