@@ -9114,17 +9114,47 @@ async function _v15kEnsureSection(name) {
 const _v15kBtn = 'background:none;border:1px solid var(--border-med);border-radius:6px;color:var(--text-mute);cursor:pointer;font-size:11px;padding:3px 8px';
 const _v15kLbl = 'font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--text-mute);margin-bottom:6px';
 
+function _v15kActBtn(metric, oid, refId, excluded) {
+  return excluded
+    ? `<button onclick="_v15kUndo('${metric}','${oid}','${refId}')" style="${_v15kBtn}">Undo</button>`
+    : `<button onclick="_v15kExclude('${metric}','${oid}','${refId}')" title="Remove from count" style="${_v15kBtn}">×</button>`;
+}
 function _v15kCleanList(items, metric, offerId) {
   const oid = offerId || 'null';
   return (items || []).map(it => {
     const p = JSON.stringify({ c: it.contactId || null, e: it.email || null, n: it.label || '' }).replace(/'/g, '&#39;');
-    return `<div style="display:flex;align-items:center;gap:8px;padding:5px 0;font-size:12.5px">
-      <button onclick='_v15kPersonDrawer(${p})' title="View GHL info" style="flex:1;min-width:0;text-align:left;background:none;border:none;color:var(--text);font:inherit;font-size:12.5px;cursor:pointer;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding:0;${it.excluded ? 'opacity:.5;text-decoration:line-through' : ''}">${escapeHTML(it.label || it.ref_id)}</button>
-      ${it.excluded
-        ? `<button onclick="_v15kUndo('${metric}','${oid}','${it.ref_id}')" style="${_v15kBtn}">Undo</button>`
-        : `<button onclick="_v15kExclude('${metric}','${oid}','${it.ref_id}',this)" title="Remove from count" style="${_v15kBtn}">×</button>`}
+    return `<div id="v15kr-${metric}-${oid}-${escapeHTML(it.ref_id)}" style="display:flex;align-items:center;gap:8px;padding:5px 0;font-size:12.5px">
+      <button class="v15k-nm" onclick='_v15kPersonDrawer(${p})' title="View GHL info" style="flex:1;min-width:0;text-align:left;background:none;border:none;color:var(--text);font:inherit;font-size:12.5px;cursor:pointer;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding:0;opacity:${it.excluded ? '.5' : '1'};text-decoration:${it.excluded ? 'line-through' : 'none'}">${escapeHTML(it.label || it.ref_id)}</button>
+      <span class="v15k-act">${_v15kActBtn(metric, oid, it.ref_id, it.excluded)}</span>
     </div>`;
   }).join('') || '<div style="font-size:12px;color:var(--text-mute)">None.</div>';
+}
+// Find the cached group (items + count) for a metric/offer so excludes update
+// in place — no server refetch, no list collapse.
+function _v15kGroupFor(metric, oid) {
+  const m = _V15K.monthKey;
+  if (metric === 'members_cancelled') { const d = (_V15K.sec.members || {})[m]; return d && d.cancelled; }
+  const d = (_V15K.sec.sales || {})[m]; if (!d || !d.offers) return null;
+  const o = d.offers.find(x => String(x.offer_id) === String(oid)); if (!o) return null;
+  return metric === 'sales_pipeline' ? o.pipeline : metric === 'sales_bookings' ? o.bookings : o.payments;
+}
+// Optimistic, in-place toggle: update cache + count + the single row's DOM.
+function _v15kApplyExclude(metric, oid, refId, excluded) {
+  const grp = _v15kGroupFor(metric, oid);
+  if (grp) {
+    const it = (grp.items || []).find(x => String(x.ref_id) === String(refId));
+    if (it) it.excluded = excluded;
+    grp.count = (grp.items || []).filter(x => !x.excluded).length;
+    const cnt = document.getElementById(`v15kc-${metric}-${oid}`);
+    if (cnt) cnt.textContent = grp.count;
+  }
+  const row = document.getElementById(`v15kr-${metric}-${oid}-${refId}`);
+  if (row) {
+    const nm = row.querySelector('.v15k-nm');
+    if (nm) { nm.style.opacity = excluded ? '.5' : '1'; nm.style.textDecoration = excluded ? 'line-through' : 'none'; }
+    const act = row.querySelector('.v15k-act');
+    if (act) act.innerHTML = _v15kActBtn(metric, oid, refId, excluded);
+  }
 }
 
 // Click a name in a Sales KPI list → side drawer with all GHL info. Pipeline
@@ -9169,7 +9199,7 @@ function _v15kSalesHtml(d) {
       const id = `v15ks-${metric}-${o.offer_id}`;
       return `<div>
         <button onclick="_v15kToggle('${id}')" style="background:none;border:none;cursor:pointer;text-align:left;width:100%;padding:0">
-          <span style="font-size:24px;font-weight:700;color:var(--text)">${tied ? group.count : '—'}</span>
+          <span id="v15kc-${metric}-${o.offer_id}" style="font-size:24px;font-weight:700;color:var(--text)">${tied ? group.count : '—'}</span>
           <span style="font-size:12px;color:var(--text-mute);margin-left:6px">${tied ? tiedLabel : untiedLabel}</span>
         </button>
         <div id="${id}" style="display:none;margin-top:6px;border-top:1px solid var(--border);padding-top:6px">${_v15kCleanList(group.items, metric, o.offer_id)}</div>
@@ -9230,7 +9260,7 @@ function _v15kMembersHtml(d) {
     <div><div style="${_v15kLbl}">Payments (${(d.payments || []).length})</div>${pays}</div>
     <div>
       <div style="${_v15kLbl}">Cancelled subscriptions</div>
-      <button onclick="_v15kToggle('v15k-canc')" style="background:none;border:none;cursor:pointer;padding:0;text-align:left"><span style="font-size:24px;font-weight:700;color:var(--text)">${c.count}</span> <span style="font-size:12px;color:var(--text-mute)">this month</span></button>
+      <button onclick="_v15kToggle('v15k-canc')" style="background:none;border:none;cursor:pointer;padding:0;text-align:left"><span id="v15kc-members_cancelled-null" style="font-size:24px;font-weight:700;color:var(--text)">${c.count}</span> <span style="font-size:12px;color:var(--text-mute)">this month</span></button>
       <div id="v15k-canc" style="display:none;margin-top:6px;border-top:1px solid var(--border);padding-top:6px">${_v15kCleanList(c.items, 'members_cancelled', null)}</div>
       <div style="${_v15kLbl};margin-top:16px">Manual cancellations</div>
       ${man}
@@ -9312,25 +9342,25 @@ async function _v15kSaveManualCancel() {
   } catch (e) { if (err) { err.textContent = e.message || String(e); err.style.display = 'block'; } if (btn) { btn.disabled = false; btn.textContent = 'Save'; } }
 }
 
-async function _v15kExclude(metric, offerId, refId, btn) {
-  if (btn) btn.disabled = true;
-  // No reason prompt — KPI counts are just cleaned silently. (Reasons are only
-  // for marking leads Lost/Abandoned in the Pipelines board.)
-  await _v15kCleanPost('exclude', { metric, offer_id: (offerId && offerId !== 'null') ? offerId : null, ref_id: refId });
+// Optimistic: flip the row + count instantly, save in the background. No refetch
+// (the old version re-scanned Stripe/GHL on every click → flash + collapse).
+function _v15kExclude(metric, offerId, refId) {
+  const oid = offerId || 'null';
+  _v15kApplyExclude(metric, oid, refId, true);
+  _v15kCleanPost('exclude', { metric, offer_id: (oid !== 'null') ? oid : null, ref_id: refId })
+    .catch((e) => { _v15kApplyExclude(metric, oid, refId, false); alert("Couldn't remove: " + (e.message || e)); });
 }
-async function _v15kUndo(metric, offerId, refId) {
-  await _v15kCleanPost('unexclude', { metric, offer_id: (offerId && offerId !== 'null') ? offerId : null, ref_id: refId });
+function _v15kUndo(metric, offerId, refId) {
+  const oid = offerId || 'null';
+  _v15kApplyExclude(metric, oid, refId, false);
+  _v15kCleanPost('unexclude', { metric, offer_id: (oid !== 'null') ? oid : null, ref_id: refId })
+    .catch((e) => { _v15kApplyExclude(metric, oid, refId, true); alert("Couldn't undo: " + (e.message || e)); });
 }
 async function _v15kCleanPost(action, body) {
   const m = _V15K.monthKey;
-  try {
-    const token = await _mreqAuthToken();
-    const r = await fetch(`/api/kpis-v15?action=${action}&client_id=${encodeURIComponent(CLIENT_ID)}`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token }, body: JSON.stringify({ action, month: m, ...body }) });
-    const j = await _safeJson(r); if (!r.ok) throw new Error(j.error || ('HTTP ' + r.status));
-    const sec = body.metric === 'members_cancelled' ? 'members' : 'sales';
-    if (_V15K.sec[sec]) delete _V15K.sec[sec][m];
-    _v15kEnsureSection(sec);
-  } catch (e) { alert("Couldn't update: " + (e.message || e)); }
+  const token = await _mreqAuthToken();
+  const r = await fetch(`/api/kpis-v15?action=${action}&client_id=${encodeURIComponent(CLIENT_ID)}`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token }, body: JSON.stringify({ action, month: m, ...body }) });
+  const j = await _safeJson(r); if (!r.ok) throw new Error(j.error || ('HTTP ' + r.status));
 }
 
 // ══════════════════════════════════════════════════════════════
