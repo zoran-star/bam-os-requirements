@@ -9196,7 +9196,8 @@ async function _v15kPersonDrawer(obj) {
 
 function _v15kSalesHtml(d) {
   if (!d.offers || !d.offers.length) return `<div class="req-empty" style="padding:12px 0;color:var(--text-mute)">${escapeHTML(d.note || 'No offers tied yet.')}</div>`;
-  return d.offers.map(o => {
+  const ghlWarn = d.ghl_error ? `<div style="font-size:12px;color:#c9871f;background:rgba(201,135,31,0.08);border:1px solid rgba(201,135,31,0.3);border-radius:8px;padding:8px 12px;margin-top:10px">⚠ Couldn't fully reach GoHighLevel just now — entered-pipeline and bookings counts may be understated. Refresh in a moment to retry.</div>` : '';
+  return ghlWarn + d.offers.map(o => {
     const block = (group, metric, tiedLabel, untiedLabel, tied) => {
       const id = `v15ks-${metric}-${o.offer_id}`;
       return `<div>
