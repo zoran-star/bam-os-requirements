@@ -9047,7 +9047,7 @@ function _v15kRender() {
       ${_v15kStat('Cost per lead', t.cpl != null ? _v15kMoney(t.cpl) : '—')}
     </div>`;
   }
-  const sectionHead = (t) => `<div style="font-family:var(--font-display,inherit);font-size:15px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--text);margin-top:26px">${t}</div>`;
+  const sectionHead = (t) => `<div style="font-family:var(--font-display,inherit);font-size:24px;font-weight:800;letter-spacing:.02em;text-transform:uppercase;color:var(--text);margin-top:34px;padding-bottom:8px;border-bottom:1px solid var(--border)">${t}</div>`;
   host.innerHTML = `
     <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:6px">
       <label style="font-size:12px;color:var(--text-mute)">Month</label>
@@ -9089,7 +9089,14 @@ function _v15kCloseSetup() { const ov = document.getElementById('v15k-setup-ov')
 
 // ── Sales / Revenue / Members sections (month-filtered, human-cleaned) ──
 function _v15kDate(sec) { return new Date(sec * 1000).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }); }
-function _v15kToggle(id) { const el = document.getElementById(id); if (el) el.style.display = el.style.display === 'none' ? 'block' : 'none'; }
+function _v15kToggle(id) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  const open = el.style.display === 'none';
+  el.style.display = open ? 'block' : 'none';
+  const chev = document.getElementById(id + '-chev');
+  if (chev) chev.style.transform = open ? 'rotate(180deg)' : '';
+}
 function _v15kPaintSection(name) { const el = document.getElementById('v15k-' + name); if (el) el.innerHTML = _v15kSecHtml(name); }
 function _v15kSecHtml(name) {
   const m = _V15K.monthKey; const cache = (_V15K.sec[name] || {})[m];
@@ -9204,6 +9211,7 @@ function _v15kSalesHtml(d) {
         <button onclick="_v15kToggle('${id}')" style="background:none;border:none;cursor:pointer;text-align:left;width:100%;padding:0">
           <span id="v15kc-${metric}-${o.offer_id}" style="font-size:24px;font-weight:700;color:var(--text)">${tied ? group.count : '—'}</span>
           <span style="font-size:12px;color:var(--text-mute);margin-left:6px">${tied ? tiedLabel : untiedLabel}</span>
+          ${tied ? `<span id="${id}-chev" title="Click to review &amp; clean" style="display:inline-block;margin-left:5px;color:var(--text-mute);font-size:11px;transition:transform .15s">▾</span>` : ''}
         </button>
         <div id="${id}" style="display:none;margin-top:6px;border-top:1px solid var(--border);padding-top:6px">${_v15kCleanList(group.items, metric, o.offer_id)}</div>
       </div>`;
@@ -9263,7 +9271,7 @@ function _v15kMembersHtml(d) {
     <div><div style="${_v15kLbl}">Payments (${(d.payments || []).length})</div>${pays}</div>
     <div>
       <div style="${_v15kLbl}">Cancelled subscriptions</div>
-      <button onclick="_v15kToggle('v15k-canc')" style="background:none;border:none;cursor:pointer;padding:0;text-align:left"><span id="v15kc-members_cancelled-null" style="font-size:24px;font-weight:700;color:var(--text)">${c.count}</span> <span style="font-size:12px;color:var(--text-mute)">this month</span></button>
+      <button onclick="_v15kToggle('v15k-canc')" style="background:none;border:none;cursor:pointer;padding:0;text-align:left"><span id="v15kc-members_cancelled-null" style="font-size:24px;font-weight:700;color:var(--text)">${c.count}</span> <span style="font-size:12px;color:var(--text-mute)">this month</span> ${c.items && c.items.length ? `<span id="v15k-canc-chev" title="Click to review &amp; clean" style="display:inline-block;margin-left:3px;color:var(--text-mute);font-size:11px;transition:transform .15s">▾</span>` : ''}</button>
       <div id="v15k-canc" style="display:none;margin-top:6px;border-top:1px solid var(--border);padding-top:6px">${_v15kCleanList(c.items, 'members_cancelled', null)}</div>
       <div style="${_v15kLbl};margin-top:16px">Manual cancellations</div>
       ${man}
