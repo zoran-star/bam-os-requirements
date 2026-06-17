@@ -159,6 +159,10 @@ async function handler(req, res) {
   if (tag) path += `&tags=cs.${encodeURIComponent(`{"${tag.replace(/"/g, "")}"}`)}`;
   try {
     const contacts = await sb(path);
+    // Real (lettered) names first; phone-only / nameless leads sink to the
+    // bottom (otherwise "(416)…" names sort above letters and fill the top).
+    const named = (c) => !!(c && c.name && /[a-z]/i.test(c.name));
+    (contacts || []).sort((a, b) => (named(b) ? 1 : 0) - (named(a) ? 1 : 0) || String(a.name || "").localeCompare(String(b.name || "")));
     return res.status(200).json({ contacts: contacts || [] });
   } catch (e) {
     return res.status(500).json({ error: e.message });
