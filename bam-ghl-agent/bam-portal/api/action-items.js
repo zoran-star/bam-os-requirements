@@ -239,12 +239,16 @@ const ONBOARDING_STEPS = [
   // Sits right AFTER the SM call — the build gets scoped on that call.
   { key: "trigger_buildout", title: "Trigger systems buildout",         sort: 12, col: "systems_buildout_triggered_at", writable: true, staff_only: true },
   { key: "book_call_cam",  title: "Book a call with Cam (marketing)",    sort: 13, col: "cam_call_booked_at",          writable: true },
-  { key: "submit_content", title: "Submit your raw content",             sort: 14, col: "content_submitted_at",        writable: true },
+  // Self-serve marketing setup — replaces the old "Book a call with Ximena"
+  // and "Submit your raw content" steps. Client connects their ad account via
+  // the Leadsie share link, then launches campaigns in the Marketing tab
+  // (each campaign collects budget + assets via the new-campaign wizard).
+  { key: "connect_ads",    title: "Connect your ad account",             sort: 14, col: "ads_connected_at",            writable: true },
+  { key: "add_campaign",   title: "Add a new campaign",                  sort: 15, col: "content_submitted_at",        writable: true },
   // Staff-only gate. Flipping it UNLOCKS the client's "Book review call" step.
-  { key: "ready_for_review", title: "Ready for review call?",           sort: 15, col: "ready_for_review_at",         writable: true, staff_only: true },
+  { key: "ready_for_review", title: "Ready for review call?",           sort: 16, col: "ready_for_review_at",         writable: true, staff_only: true },
   // Client step — locked (greyed) until ready_for_review is done.
-  { key: "book_review_call", title: "Book review call with Scaling Manager", sort: 16, col: "review_call_booked_at", writable: true, locked_by: "ready_for_review" },
-  { key: "book_call_ximena", title: "Book a call with Ximena (ads)",        sort: 17, col: "ximena_call_booked_at",      writable: true },
+  { key: "book_review_call", title: "Book review call with Scaling Manager", sort: 17, col: "review_call_booked_at", writable: true, locked_by: "ready_for_review" },
 ];
 const ONBOARDING_BY_KEY = Object.fromEntries(ONBOARDING_STEPS.map(s => [s.key, s]));
 const ONBOARDING_SIGNAL_COLS = [...new Set(ONBOARDING_STEPS.map(s => s.col))].join(",");
