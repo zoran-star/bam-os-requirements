@@ -931,6 +931,19 @@ function ContentTicketDetail({ tk, session, ticket, onBack, onRefetch, patchTick
             {academyName} · Submitted {ticket.submitted_at ? new Date(ticket.submitted_at).toLocaleString() : "—"}
             {ctkLastActivityIso(ticket) ? ` · Last activity ${ctkFormatRelative(ctkLastActivityIso(ticket))}` : ""}
           </div>
+          {/* Owner (Cam) + the client's SM contact to reach out to */}
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 8 }}>
+            <span style={{
+              fontSize: 11, fontWeight: 600, color: tk.accent, letterSpacing: "0.04em",
+              padding: "3px 10px", borderRadius: 999,
+              border: `1px solid ${tk.accent}`, background: `${tk.accent}14`,
+            }}>👤 Owner · {ticket.assigned_to_name || "Cam"}</span>
+            <span style={{
+              fontSize: 11, fontWeight: 500, color: tk.textSub, letterSpacing: "0.04em",
+              padding: "3px 10px", borderRadius: 999,
+              border: `1px solid ${tk.border}`,
+            }}>SM contact · {ticket.sm_name || "Unassigned"}</span>
+          </div>
         </div>
         <StatusBadge ticket={ticket} tk={tk} />
       </div>
