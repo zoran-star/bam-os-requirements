@@ -231,6 +231,14 @@ async function handler(req, res) {
       // GHL token (for pipeline opportunity counts)
       let ghlToken = null;
       try { ghlToken = await getClientGhlToken(client); } catch (_) {}
+      // contactId → name from the synced mirror — calendar events return only a
+      // title (the calendar name) + contactId, so bookings need this to show the
+      // person's name instead of "By Any Means Free Trial".
+      const nameById = {};
+      try {
+        const rows = await sb(`ghl_contacts?client_id=eq.${encodeURIComponent(clientId)}&select=ghl_contact_id,name,athlete_name&limit=5000`);
+        for (const r of (rows || [])) if (r.ghl_contact_id) nameById[r.ghl_contact_id] = r.name || r.athlete_name || null;
+      } catch (_) {}
       const out = [];
       for (const o of offers) {
         // entered pipeline: opportunities created in month across tied pipelines
@@ -260,7 +268,8 @@ async function handler(req, res) {
               const r = await ghl(ghlToken, "GET", `/calendars/events?locationId=${encodeURIComponent(client.ghl_location_id)}&calendarId=${encodeURIComponent(cal.id)}&startTime=${start * 1000}&endTime=${end * 1000}`);
               for (const ev of (r.events || [])) {
                 if (ev.appointmentStatus === "cancelled") continue;
-                bookItems.push({ ref_id: ev.id || ev._id, label: (ev.contact && ev.contact.name) || ev.contactName || ev.title || "Booking", contactId: ev.contactId || (ev.contact && ev.contact.id) || null });
+                const cid = ev.contactId || (ev.contact && ev.contact.id) || null;
+                bookItems.push({ ref_id: ev.id || ev._id, label: nameById[cid] || (ev.contact && ev.contact.name) || ev.contactName || ev.title || "Booking", contactId: cid });
               }
             } catch (_) {}
           }
