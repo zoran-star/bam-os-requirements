@@ -86,7 +86,13 @@ async function stripeFetch(path, { method = "GET", body, stripeAccount, idempote
   return json;
 }
 function piSecretFromSub(sub) {
-  const pi = sub && sub.latest_invoice && sub.latest_invoice.payment_intent;
+  const inv = sub && sub.latest_invoice;
+  if (!inv || typeof inv !== "object") return null;
+  // Stripe's newer "flexible" billing mode exposes the first-payment client
+  // secret on invoice.confirmation_secret; classic billing used
+  // invoice.payment_intent. Prefer the new field, fall back to the old one.
+  if (inv.confirmation_secret && inv.confirmation_secret.client_secret) return inv.confirmation_secret.client_secret;
+  const pi = inv.payment_intent;
   return pi && typeof pi === "object" ? pi.client_secret : null;
 }
 
@@ -173,7 +179,7 @@ async function handler(req, res) {
 
     if (member && member.stripe_subscription_id) {
       let sub = null;
-      try { sub = await stripeFetch(`/subscriptions/${member.stripe_subscription_id}?expand[]=latest_invoice.payment_intent`, { stripeAccount }); } catch { sub = null; }
+      try { sub = await stripeFetch(`/subscriptions/${member.stripe_subscription_id}?expand[]=latest_invoice.payment_intent&expand[]=latest_invoice.confirmation_secret`, { stripeAccount }); } catch { sub = null; }
       if (sub) {
         if (sub.status === "incomplete") {
           const secret = piSecretFromSub(sub);
@@ -229,6 +235,7 @@ async function handler(req, res) {
         payment_behavior: "default_incomplete",
         "payment_settings[save_default_payment_method]": "on_subscription",
         "expand[0]": "latest_invoice.payment_intent",
+        "expand[1]": "latest_invoice.confirmation_secret",
         "metadata[origin]": "fullcontrol-website-enrollment",
         "metadata[offer_id]": offerId, "metadata[offer_price_key]": priceKey,
         "metadata[plan]": planText, "metadata[term]": term,
