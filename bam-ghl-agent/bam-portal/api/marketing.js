@@ -195,6 +195,17 @@ async function clientScalingManager(clientId) {
   }
 }
 
+// The marketing manager's (Cam's) staff id — owner of content tickets.
+async function marketingManagerStaffId() {
+  try {
+    const email = process.env.MARKETING_MANAGER_EMAIL || "cameron@byanymeansbusiness.com";
+    const rows = await sb(`staff?email=eq.${encodeURIComponent(email)}&select=id`);
+    return rows?.[0]?.id || null;
+  } catch (_) {
+    return null;
+  }
+}
+
 // Fire Cam a DM that a fresh marketing request landed. Safe to call unawaited.
 function pingMarketingOnNewTicket({ ticketId, academy, priority }, req) {
   const code = String(ticketId || "").slice(0, 3).toUpperCase();
@@ -225,7 +236,15 @@ async function enrichWithClient(tickets) {
   return tickets.map(t => {
     const client = clientMap[t.client_id] || null;
     const assigneeId = t.assigned_to || client?.scaling_manager_id || null;
-    return { ...t, client, assigned_to_name: assigneeId ? (staffMap[assigneeId] || null) : null };
+    const smId = client?.scaling_manager_id || null;
+    return {
+      ...t,
+      client,
+      assigned_to_name: assigneeId ? (staffMap[assigneeId] || null) : null,
+      // The client's SM (scaling manager) — the contact to reach out to, shown
+      // even when the ticket is owned by someone else (e.g. content → Cam).
+      sm_name: smId ? (staffMap[smId] || null) : null,
+    };
   });
 }
 
@@ -787,6 +806,9 @@ async function handleContentTickets(req, res) {
         raw_files: Array.isArray(raw_files) ? raw_files : [],
         context: (context && typeof context === "object") ? context : {},
         messages: [],
+        // Content tickets are owned by Cam (marketing manager); the client's SM
+        // is surfaced separately as the contact (sm_name on enrich).
+        assigned_to: await marketingManagerStaffId(),
       }]),
     });
     const newCt = inserted?.[0] || null;
