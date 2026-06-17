@@ -12546,6 +12546,7 @@ function _bbOfferPlanKeys(offer) {
 // _bbApplyLivePills(). Clicking deep-links into Price Match with the
 // missing/drifted plans glowing.
 function _bbLivePill(keys) {
+  if (typeof _bbIsV1 === 'function' && _bbIsV1()) return '';  // V1: no Stripe connection on offers
   if (!keys || !keys.length) return '';
   // Fill in right after this render settles (idempotent; fetches once).
   setTimeout(_bbApplyLivePills, 0);
@@ -15366,6 +15367,15 @@ async function _bbSaveTeam(teamId) {
 // ──────────────────────────────────────────────────────────────────
 // Top-level section renderer — config-aware
 // ──────────────────────────────────────────────────────────────────
+// V1 academies (no V2, no V1.5) keep offers simple: no Stripe price-match, no
+// GHL tag/calendar/entry-point connections. Those are gated out below; V1.5/V2
+// still see everything (they depend on the connections).
+function _bbIsV1() {
+  return !(typeof V2_ACCESS !== 'undefined' && V2_ACCESS) && !(typeof V15_ACCESS !== 'undefined' && V15_ACCESS);
+}
+const _V1_HIDE_TYPES = new Set(['ghl_tags_multi', 'ghl_tag', 'entry_points']);
+const _V1_HIDE_KEYS = new Set(['discovery_call_calendar', 'existing_calendar_link', 'call_host', 'call_duration', 'avail_windows', 'buffer']);
+
 function _bbRenderStepFields(offer, sectionId) {
   const config = (_bbOfferConfigs[offer.type] || []).find(s => s.id === sectionId);
   if (!config) return `<p style="font-size:13px;color:var(--text-sub)">No config for this section.</p>`;
@@ -15380,7 +15390,9 @@ function _bbRenderStepFields(offer, sectionId) {
     return _bbRenderTeamPerTeam();
   }
 
-  return config.fields.map(f => _bbRenderField(f, sectionId)).join('');
+  let fields = config.fields;
+  if (_bbIsV1()) fields = fields.filter(f => !_V1_HIDE_TYPES.has(f.type) && !_V1_HIDE_KEYS.has(f.key));
+  return fields.map(f => _bbRenderField(f, sectionId)).join('');
 }
 
 let _bbTeamLoadedFor = null;
