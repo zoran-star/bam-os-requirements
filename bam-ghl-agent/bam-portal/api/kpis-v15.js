@@ -79,8 +79,18 @@ async function stripeGetAll(path, acct, cap = 12) {
 }
 
 // ── GHL ──
+const _sleep = (ms) => new Promise(r => setTimeout(r, ms));
 async function ghl(token, method, path) {
-  const r = await fetch(`${GHL_V2}${path}`, { method, headers: { Authorization: `Bearer ${token}`, Version: V2_VERSION, Accept: "application/json", "Content-Type": "application/json" } });
+  // Retry on GHL rate-limit (429) with backoff — the contacts-sync cron can
+  // briefly saturate the location's GHL quota, which otherwise made KPI
+  // pipeline/booking counts silently fall to 0.
+  let r;
+  for (let attempt = 0; attempt < 4; attempt++) {
+    r = await fetch(`${GHL_V2}${path}`, { method, headers: { Authorization: `Bearer ${token}`, Version: V2_VERSION, Accept: "application/json", "Content-Type": "application/json" } });
+    if (r.status !== 429) break;
+    const ra = Number(r.headers.get("retry-after"));
+    await _sleep(ra > 0 ? Math.min(ra * 1000, 5000) : Math.min(400 * 2 ** attempt, 4000));
+  }
   const txt = await r.text();
   let json = null; try { json = txt ? JSON.parse(txt) : null; } catch { json = { raw: txt }; }
   if (!r.ok) { const e = new Error(json?.message || json?.error || `GHL ${r.status}`); e.status = r.status; throw e; }
@@ -239,6 +249,7 @@ async function handler(req, res) {
         const rows = await sb(`ghl_contacts?client_id=eq.${encodeURIComponent(clientId)}&select=ghl_contact_id,name,athlete_name&limit=5000`);
         for (const r of (rows || [])) if (r.ghl_contact_id) nameById[r.ghl_contact_id] = r.name || r.athlete_name || null;
       } catch (_) {}
+      let ghlError = false;   // a GHL call failed (rate-limit/token) → counts may be understated
       const out = [];
       for (const o of offers) {
         // entered pipeline: opportunities created in month across tied pipelines
@@ -253,7 +264,7 @@ async function handler(req, res) {
                   pipeItems.push({ ref_id: op.id, label: op.contact?.name || op.contactName || op.name || "Lead", contactId: op.contactId || op.contact?.id || null });
                 }
               }
-            } catch (_) {}
+            } catch (_) { ghlError = true; }
           }
         }
         // new payments: subs created in month for tied products
@@ -271,7 +282,7 @@ async function handler(req, res) {
                 const cid = ev.contactId || (ev.contact && ev.contact.id) || null;
                 bookItems.push({ ref_id: ev.id || ev._id, label: nameById[cid] || (ev.contact && ev.contact.name) || ev.contactName || ev.title || "Booking", contactId: cid });
               }
-            } catch (_) {}
+            } catch (_) { ghlError = true; }
           }
         }
 
@@ -287,7 +298,7 @@ async function handler(req, res) {
           has_pipelines: o.pipelines.length > 0, has_products: o.products.length > 0, has_calendars: (o.calendars || []).length > 0,
         });
       }
-      return res.status(200).json({ ok: true, offers: out, ghl_ok: !!ghlToken, stripe_ok: !!acct });
+      return res.status(200).json({ ok: true, offers: out, ghl_ok: !!ghlToken, ghl_error: ghlError || !ghlToken, stripe_ok: !!acct });
     }
 
     // ─────────── REVENUE ───────────
