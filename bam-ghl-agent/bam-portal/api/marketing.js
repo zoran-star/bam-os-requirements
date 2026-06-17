@@ -79,7 +79,13 @@ async function resolveUser(req) {
   const clientRows = await sb(`clients?auth_user_id=eq.${user.id}&select=id,business_name`);
   const clientRow = Array.isArray(clientRows) && clientRows[0] ? clientRows[0] : null;
 
-  return { user, staff: staffRow, client: clientRow };
+  // Multi-academy members: a user linked to many academies via client_users
+  // (no single clients.auth_user_id) can still scope to any academy they belong
+  // to by passing ?client_id (honored below).
+  const memberships = await sb(`client_users?user_id=eq.${user.id}&status=eq.active&select=client_id`);
+  const clientIds = Array.isArray(memberships) ? memberships.map(m => String(m.client_id)) : [];
+
+  return { user, staff: staffRow, client: clientRow, clientIds };
 }
 
 function nowIso() { return new Date().toISOString(); }
@@ -1301,7 +1307,7 @@ async function handleMetaCampaigns(req, res) {
   // the caller might also resolve to (otherwise a staff user who is also a client
   // would silently read THEIR data, not the academy they opened).
   let targetClientId = null;
-  if (ctx.staff && req.query.client_id) targetClientId = String(req.query.client_id);
+  if (req.query.client_id && (ctx.staff || (ctx.clientIds || []).includes(String(req.query.client_id)))) targetClientId = String(req.query.client_id);
   else if (ctx.client) targetClientId = ctx.client.id;
   if (!targetClientId) return res.status(403).json({ error: "client_id required (client login or staff with ?client_id)" });
 
@@ -1424,7 +1430,7 @@ async function handleMetaKpis(req, res) {
   // the caller might also resolve to (otherwise a staff user who is also a client
   // would silently read THEIR data, not the academy they opened).
   let targetClientId = null;
-  if (ctx.staff && req.query.client_id) targetClientId = String(req.query.client_id);
+  if (req.query.client_id && (ctx.staff || (ctx.clientIds || []).includes(String(req.query.client_id)))) targetClientId = String(req.query.client_id);
   else if (ctx.client) targetClientId = ctx.client.id;
   if (!targetClientId) return res.status(403).json({ error: "client_id required (client login or staff with ?client_id)" });
 
@@ -1605,7 +1611,7 @@ async function handleMetaReport(req, res) {
   // the caller might also resolve to (otherwise a staff user who is also a client
   // would silently read THEIR data, not the academy they opened).
   let targetClientId = null;
-  if (ctx.staff && req.query.client_id) targetClientId = String(req.query.client_id);
+  if (req.query.client_id && (ctx.staff || (ctx.clientIds || []).includes(String(req.query.client_id)))) targetClientId = String(req.query.client_id);
   else if (ctx.client) targetClientId = ctx.client.id;
   if (!targetClientId) return res.status(403).json({ error: "client_id required (client login or staff with ?client_id)" });
 
@@ -1919,7 +1925,7 @@ async function handleGhlKpis(req, res) {
   // the caller might also resolve to (otherwise a staff user who is also a client
   // would silently read THEIR data, not the academy they opened).
   let targetClientId = null;
-  if (ctx.staff && req.query.client_id) targetClientId = String(req.query.client_id);
+  if (req.query.client_id && (ctx.staff || (ctx.clientIds || []).includes(String(req.query.client_id)))) targetClientId = String(req.query.client_id);
   else if (ctx.client) targetClientId = ctx.client.id;
   if (!targetClientId) return res.status(403).json({ error: "client_id required (client login or staff with ?client_id)" });
 
@@ -2010,7 +2016,7 @@ async function handleGhlKpisMonthly(req, res) {
   const ctx = await resolveUser(req);
   if (ctx.error) return res.status(ctx.error.status).json({ error: ctx.error.message });
   let targetClientId = null;
-  if (ctx.staff && req.query.client_id) targetClientId = String(req.query.client_id);
+  if (req.query.client_id && (ctx.staff || (ctx.clientIds || []).includes(String(req.query.client_id)))) targetClientId = String(req.query.client_id);
   else if (ctx.client) targetClientId = ctx.client.id;
   if (!targetClientId) return res.status(403).json({ error: "client_id required (client login or staff with ?client_id)" });
 
@@ -2155,7 +2161,7 @@ async function handleGhlKpiDetail(req, res) {
   const ctx = await resolveUser(req);
   if (ctx.error) return res.status(ctx.error.status).json({ error: ctx.error.message });
   let targetClientId = null;
-  if (ctx.staff && req.query.client_id) targetClientId = String(req.query.client_id);
+  if (req.query.client_id && (ctx.staff || (ctx.clientIds || []).includes(String(req.query.client_id)))) targetClientId = String(req.query.client_id);
   else if (ctx.client) targetClientId = ctx.client.id;
   if (!targetClientId) return res.status(403).json({ error: "client_id required" });
 
@@ -2283,7 +2289,7 @@ async function handleGhlKpiTrash(req, res) {
   const ctx = await resolveUser(req);
   if (ctx.error) return res.status(ctx.error.status).json({ error: ctx.error.message });
   let targetClientId = null;
-  if (ctx.staff && req.query.client_id) targetClientId = String(req.query.client_id);
+  if (req.query.client_id && (ctx.staff || (ctx.clientIds || []).includes(String(req.query.client_id)))) targetClientId = String(req.query.client_id);
   else if (ctx.client) targetClientId = ctx.client.id;
   if (!targetClientId) return res.status(403).json({ error: "client_id required" });
 
@@ -2323,7 +2329,7 @@ async function handleGhlKpiStripe(req, res) {
   const ctx = await resolveUser(req);
   if (ctx.error) return res.status(ctx.error.status).json({ error: ctx.error.message });
   let targetClientId = null;
-  if (ctx.staff && req.query.client_id) targetClientId = String(req.query.client_id);
+  if (req.query.client_id && (ctx.staff || (ctx.clientIds || []).includes(String(req.query.client_id)))) targetClientId = String(req.query.client_id);
   else if (ctx.client) targetClientId = ctx.client.id;
   if (!targetClientId) return res.status(403).json({ error: "client_id required" });
 
