@@ -17073,8 +17073,9 @@ const ONB_UI = {
   book_call:      { auto: false, cta: null },   // CTA is dynamic — see _aiBookCallCta()
   kpis:           { auto: false, cta: { label: 'Open ↗',      fn: "_aiOpenBB('kpis')" } },
   book_call_cam:  { auto: false, cta: null },   // CTA is dynamic — see _aiCamCallCta()
-  book_call_ximena: { auto: false, cta: null }, // CTA is dynamic — see _aiXimenaCallCta()
-  submit_content: { auto: false, cta: { label: 'Submit content ↗', fn: '_aiOpenNewCampaign()' } },
+  // Self-serve marketing setup (replaced "Book a call with Ximena" + "Submit content").
+  connect_ads:    { auto: false, cta: { label: 'Open connection link ↗', fn: "window.open(LEADSIE_CONNECT_URL,'_blank')" } },
+  add_campaign:   { auto: false, cta: { label: 'Add a campaign ↗', fn: '_aiOpenNewCampaign()' } },
   book_review_call: { auto: false, cta: null }, // locked until staff are ready; dynamic SM CTA
 };
 
@@ -17245,7 +17246,6 @@ function _aiOnbHTML(it) {
     ? `<button class="ai-onb-cta" onclick="${cfg.cta.fn}">${cfg.cta.label}</button>` : '';
   if (it.onboarding_key === 'book_call' && !isDone) cta = _aiBookCallCta();
   if (it.onboarding_key === 'book_call_cam' && !isDone) cta = _aiCamCallCta();
-  if (it.onboarding_key === 'book_call_ximena' && !isDone) cta = _aiXimenaCallCta();
   if (it.onboarding_key === 'book_review_call' && !isDone) cta = _aiBookCallCta();
   // Subway "stop": a circle node on a vertical line + the step body to the right.
   const circle = `<button class="ai-stop-circle${isDone ? ' on' : ''}" onclick="toggleActionItem('${it.id}', ${isDone ? 'false' : 'true'})" aria-label="${isDone ? 'Mark not done' : 'Mark done'}" title="${cfg.auto ? 'Auto-completes when connected — or tick by hand' : ''}">${isDone ? _AI_CHECK_ICON : ''}</button>`;
