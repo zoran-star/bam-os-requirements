@@ -10755,9 +10755,12 @@ function applyV15NavState(v15) {
   // Assets is hidden for V1.5 (also drops it from the mobile More sheet).
   const assetsNav = document.getElementById('nav-assets');
   if (assetsNav) assetsNav.style.display = v15 ? 'none' : '';
-  // V1.5 Marketing: drop the whole Ad Performance report section.
+  // V1.5 Marketing: drop the whole Ad Performance report section + the
+  // month-progress indicator in the topbar.
   const adPerf = document.getElementById('ad-performance-section');
   if (adPerf) adPerf.style.display = v15 ? 'none' : '';
+  const monthProg = document.getElementById('month-progress');
+  if (monthProg) monthProg.style.display = v15 ? 'none' : '';
   applyTalkToBamNav();
 }
 
@@ -27266,7 +27269,7 @@ function toggleTheme() {
     <div class="modal-title">Change monthly spend</div>
     <div class="modal-sub">Your account manager will review and update the campaign for you. No change happens automatically.</div>
 
-    <label class="modal-label">Current monthly spend</label>
+    <label class="modal-label">Spent this month</label>
     <div class="modal-current" id="budgetModalCurrent">$465</div>
 
     <label class="modal-label" for="budgetModalInput">New monthly spend</label>
