@@ -128,7 +128,23 @@ async function pickGhlToken(client) {
   if (client.ghl_access_token) {
     const expiresAt = client.ghl_token_expires_at ? new Date(client.ghl_token_expires_at).getTime() : 0;
     if (expiresAt - Date.now() <= 60_000 && client.ghl_refresh_token) {
-      try { return await refreshGhlToken(client); } catch (_) {}
+      try { return await refreshGhlToken(client); }
+      catch (_) {
+        // Refresh failed — GHL refresh tokens are single-use, so a concurrent
+        // process (e.g. the contacts-sync cron) likely just consumed it and saved
+        // a fresh access token. Re-read the row and use that instead of falling
+        // back to the now-stale in-memory token (which caused "Invalid JWT").
+        try {
+          const rows = await sb(`clients?id=eq.${client.id}&select=ghl_access_token,ghl_location_id,ghl_token_expires_at,ghl_refresh_token`);
+          const fresh = rows && rows[0];
+          if (fresh && fresh.ghl_access_token && fresh.ghl_access_token !== client.ghl_access_token) {
+            const fexp = fresh.ghl_token_expires_at ? new Date(fresh.ghl_token_expires_at).getTime() : 0;
+            if (fexp - Date.now() > 60_000) return { token: fresh.ghl_access_token, locationId: fresh.ghl_location_id || client.ghl_location_id };
+            try { return await refreshGhlToken(fresh); } catch (_) {}
+            return { token: fresh.ghl_access_token, locationId: fresh.ghl_location_id || client.ghl_location_id };
+          }
+        } catch (_) {}
+      }
     }
     return { token: client.ghl_access_token, locationId: client.ghl_location_id };
   }

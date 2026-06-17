@@ -5058,6 +5058,10 @@
 
   /* Bottom tab bar — hidden on desktop, revealed ≤768px */
   .mobile-nav { display: none; }
+  /* Mobile sheets/overlays: hidden by default everywhere (their show rules live
+     in the ≤768px block). Without this, desktop has no display:none for them and
+     the Support boxes leak onto every page. */
+  .mobile-more-overlay, .mobile-support-overlay { display: none; }
 
   @keyframes sheetIn {
     from { transform: translateY(100%); }
@@ -10451,7 +10455,7 @@ async function renderHomeWeek() {
   render(null, null, null);
   try {
     const token = await _mreqAuthToken();
-    const res = await fetch('/api/meta/campaigns', { headers: { Authorization: 'Bearer ' + token } });
+    const res = await fetch('/api/meta/campaigns?client_id=' + encodeURIComponent(CLIENT_ID), { headers: { Authorization: 'Bearer ' + token } });
     const json = await _safeJson(res);
     const sampleReasons = ['no_staff_token', 'not_connected', 'no_ad_account'];
     const camps = (json && sampleReasons.includes(json.reason))
@@ -22653,7 +22657,7 @@ async function _renderMarketingCampaigns() {
 
   try {
     const token = await _mreqAuthToken();
-    const res = await fetch('/api/meta/campaigns', { headers: { Authorization: 'Bearer ' + token } });
+    const res = await fetch('/api/meta/campaigns?client_id=' + encodeURIComponent(CLIENT_ID), { headers: { Authorization: 'Bearer ' + token } });
     const json = await _safeJson(res);
     if (!res.ok) {
       containerEl.innerHTML = `<div class="req-empty" style="padding:18px 0">Couldn't load campaigns: ${escapeHTML(json.error || ('HTTP ' + res.status))}</div>`;
@@ -23016,7 +23020,7 @@ function _currentPeriod() {
 async function _fetchInsight(period, goals, bm) {
   try {
     const token = await _mreqAuthToken();
-    const res = await fetch('/api/marketing?resource=meta-insight', {
+    const res = await fetch('/api/marketing?resource=meta-insight&client_id=' + encodeURIComponent(CLIENT_ID), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
       body: JSON.stringify({ label: period.label, totals: period.totals, campaigns: period.campaigns, goals, benchmarks: bm, audience: 'client' }),
@@ -23123,7 +23127,7 @@ function _buildDemoLast7() {
 async function _loadLast7() {
   try {
     const token = await _mreqAuthToken();
-    const res = await fetch('/api/marketing?resource=meta-report&window=last7', { headers: { Authorization: 'Bearer ' + token } });
+    const res = await fetch('/api/marketing?resource=meta-report&window=last7&client_id=' + encodeURIComponent(CLIENT_ID), { headers: { Authorization: 'Bearer ' + token } });
     const json = await _safeJson(res);
     if (res.ok && !json.reason && Array.isArray(json.periods) && json.periods.length) {
       _reportLast7 = json;
@@ -23139,7 +23143,7 @@ async function _loadAdReport() {
   if (!el) return;
   try {
     const token = await _mreqAuthToken();
-    const res = await fetch('/api/marketing?resource=meta-report&months=8', { headers: { Authorization: 'Bearer ' + token } });
+    const res = await fetch('/api/marketing?resource=meta-report&months=8&client_id=' + encodeURIComponent(CLIENT_ID), { headers: { Authorization: 'Bearer ' + token } });
     const json = await _safeJson(res);
     if (!res.ok) {
       el.innerHTML = `<div class="req-empty" style="padding:18px 0">Couldn't load report: ${escapeHTML(json.error || ('HTTP ' + res.status))}</div>`;
