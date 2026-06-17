@@ -133,7 +133,7 @@ async function syncContactsForAcademy(client, deadline) {
     return { skipped: true, reason: "no GHL token / location" };
   }
 
-  let startAfterId = null;
+  let startAfterId = null, startAfter = null;
   let totalSeen = 0, totalUpdated = 0;
   const sampleChanges = [];
 
@@ -141,7 +141,10 @@ async function syncContactsForAcademy(client, deadline) {
     if (Date.now() > deadline) return { partial: true, reason: "deadline reached", totalSeen, totalUpdated };
 
     const params = new URLSearchParams({ locationId: tok.locationId, limit: "100" });
-    if (startAfterId) params.set("startAfterId", startAfterId);
+    // GHL contacts paging needs BOTH the timestamp (startAfter) and the id
+    // (startAfterId) — passing only the id stalls after the first page (~100).
+    if (startAfterId) params.set("startAfterId", String(startAfterId));
+    if (startAfter != null) params.set("startAfter", String(startAfter));
 
     let data;
     try { data = await ghlFetchWithBackoff(`/contacts/?${params}`, tok.token); }
@@ -249,9 +252,12 @@ async function syncContactsForAcademy(client, deadline) {
       }
     }
 
-    // Pagination — pick a next-page anchor; bail when we get a partial page
+    // Pagination — advance with BOTH meta.startAfter (timestamp) + startAfterId;
+    // bail when we get a partial page.
     const last = contacts[contacts.length - 1];
-    startAfterId = data?.meta?.lastId || last?.id || last?.contactId || null;
+    const meta = data?.meta || {};
+    startAfterId = meta.startAfterId || meta.lastId || last?.id || last?.contactId || null;
+    startAfter = (meta.startAfter != null) ? meta.startAfter : (last?.dateAdded ? new Date(last.dateAdded).getTime() : null);
     if (!startAfterId || contacts.length < 100) break;
 
     await sleep(PER_REQUEST_SLEEP_MS);

@@ -151,7 +151,7 @@ async function handler(req, res) {
   const tag = (req.query.tag || "").trim();
   let path = `ghl_contacts?client_id=eq.${encodeURIComponent(clientId)}` +
     `&select=id,ghl_contact_id,name,athlete_name,email,phone,tags` +
-    `&order=name.asc.nullslast&limit=200`;
+    `&order=name.asc.nullslast&limit=1000`;
   if (q) {
     const term = encodeURIComponent(q);
     path += `&or=(name.ilike.*${term}*,athlete_name.ilike.*${term}*,email.ilike.*${term}*,phone.ilike.*${term}*)`;
