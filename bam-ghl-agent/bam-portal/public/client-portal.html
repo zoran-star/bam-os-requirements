@@ -8999,9 +8999,12 @@ function _v15kSetupHtml() {
   let stripeBlock = sub('Stripe products → offer');
   if (!s.stripeConnected) stripeBlock += `<div class="req-empty" style="padding:6px 0;color:var(--text-mute)">Stripe is not connected for this academy.</div>`;
   else if (!s.stripeProducts.length) stripeBlock += `<div class="req-empty" style="padding:6px 0;color:var(--text-mute)">No Stripe products found.</div>`;
-  else stripeBlock += s.stripeProducts.map(p => linkRow(p.name || p.id,
-    `${p.sub_count} sub${p.sub_count === 1 ? '' : 's'} ever${p.active ? '' : ' · archived'} · ${p.id}`,
-    'stripe_product', p.id, p.offer_id)).join('');
+  else stripeBlock += s.stripeProducts.map(p => {
+    const cnt = p.sub_count > 0
+      ? `${p.sub_count} sub${p.sub_count === 1 ? '' : 's'} ever`
+      : (p.onetime_count > 0 ? `one-time · ${p.onetime_count} sold` : '0 subs ever');
+    return linkRow(p.name || p.id, `${cnt}${p.active ? '' : ' · archived'} · ${p.id}`, 'stripe_product', p.id, p.offer_id);
+  }).join('');
 
   // GHL PIPELINES
   let pipeBlock = sub('GHL pipelines → offer');
