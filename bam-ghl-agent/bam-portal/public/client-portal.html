@@ -5492,7 +5492,7 @@
         Resources
       </div>
 
-      <div class="nav-item" onclick="switchView('assets', this)">
+      <div class="nav-item" id="nav-assets" onclick="switchView('assets', this)">
         <span class="nav-icon" aria-hidden="true">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <rect x="3" y="3" width="18" height="18" rx="2"/>
@@ -10704,6 +10704,9 @@ function applyV15NavState(v15) {
   // Swap the mobile bottom bar to the V1.5 set (Inbox · Sales · KPIs · Support).
   const mNav = document.getElementById('mobileNav');
   if (mNav) mNav.classList.toggle('is-v15', !!v15);
+  // Assets is hidden for V1.5 (also drops it from the mobile More sheet).
+  const assetsNav = document.getElementById('nav-assets');
+  if (assetsNav) assetsNav.style.display = v15 ? 'none' : '';
   applyTalkToBamNav();
 }
 
@@ -23055,6 +23058,20 @@ function _reportCardHTML(c, ctx) {
   const cplDelta = prev ? _deltaHTML(c.cpl, prev.cpl, 'lower', deltaSuffix) : '';
   const budgetLine = budget == null ? '' : `<div class="stat-delta" style="color:var(--text-sub)">${Math.round((c.spend / budget) * 100)}% of ${_fmtMoney(budget)} budget</div>`;
 
+  // V1.5: action-oriented Marketing — only the ad spend, no leads/CPL/metrics.
+  if (typeof V15_ACCESS !== 'undefined' && V15_ACCESS) {
+    return `<div class="report-card ${cls}">
+      <div class="report-card-head"><span class="report-dot"></span><span class="report-card-title">${escapeHTML(c.name)}</span>${badge}</div>
+      <div class="report-bigstats" style="grid-template-columns:1fr">
+        <div class="report-bigstat">
+          <div class="v">${_fmtMoney(c.spend)}</div>
+          <div class="l">Amount spent <span class="lterm">Ad spend</span></div>
+          ${budgetLine}
+        </div>
+      </div>
+    </div>`;
+  }
+
   const advanced = _reportMode === 'advanced' ? (_funnelHTML(c) + `<div class="report-grid">
     ${_metricCell('reach', _fmtNum(c.reach), c, bm)}
     ${_metricCell('impressions', _fmtNum(c.impressions), c, bm)}
@@ -23106,6 +23123,9 @@ function _paintReport(el, period, goals, bm, compare, insight, demo) {
   const cards = period.campaigns.length
     ? period.campaigns.map(c => _reportCardHTML(c, { ...ctx, insightNote: notes[c.id] || '' })).join('')
     : '<div class="req-empty" style="padding:18px 0">No campaigns ran in this period.</div>';
+  // V1.5: action-oriented — drop the verdict + win/fix analysis (numbers); keep
+  // the ad-spend cards.
+  if (typeof V15_ACCESS !== 'undefined' && V15_ACCESS) { el.innerHTML = demoNote + cards; return; }
   el.innerHTML = demoNote + verdict + winfix + cards;
 }
 
