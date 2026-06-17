@@ -9475,7 +9475,7 @@ function _v15calApptBody(j) {
     const row = (k, v) => v ? `<div style="display:flex;gap:8px;font-size:12.5px;margin-bottom:4px"><span style="color:var(--text-mute);min-width:64px">${k}</span><span style="color:var(--text);word-break:break-word">${escapeHTML(String(v))}</span></div>` : '';
     contactHtml = `${row('Name', c.name)}${row('Email', c.email)}${row('Phone', c.phone)}${c.dnd ? `<div style="font-size:11.5px;color:#c9871f;margin:4px 0">⚠ Do-not-contact is ON</div>` : ''}${row('Source', c.source)}
       ${tags ? `<div style="margin-top:8px">${tags}</div>` : ''}
-      ${cf.length ? `<div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border)">${cf.map(f => row(f.id.slice(0, 8), f.value)).join('')}</div>` : ''}`;
+      ${cf.length ? `<div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border)">${cf.map(f => row(escapeHTML(f.name || 'Field'), f.value)).join('')}</div>` : ''}`;
   }
   const canMsg = c && (c.phone || c.email);
   const composer = canMsg ? `

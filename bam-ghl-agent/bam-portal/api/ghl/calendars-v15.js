@@ -169,6 +169,13 @@ async function handler(req, res) {
           try {
             const cr = await ghl(token, "GET", `/contacts/${encodeURIComponent(cid)}`);
             const c = cr.contact || cr;
+            // Resolve custom-field IDs → human labels so the drawer shows
+            // "Skill level: Intermediate", not "894T652B: Intermediate".
+            let cfNames = {};
+            try {
+              const fr = await ghl(token, "GET", `/locations/${encodeURIComponent(locationId)}/customFields`);
+              for (const d of (fr.customFields || [])) cfNames[d.id] = d.name || d.fieldKey || null;
+            } catch (_) {}
             contact = {
               id: c.id, name: c.contactName || [c.firstName, c.lastName].filter(Boolean).join(" ") || c.name || null,
               firstName: c.firstName || null, lastName: c.lastName || null,
@@ -176,7 +183,7 @@ async function handler(req, res) {
               tags: c.tags || [], dnd: !!c.dnd,
               source: c.source || null, type: c.type || null,
               dateAdded: c.dateAdded || null,
-              customFields: (c.customFields || c.customField || []).map(f => ({ id: f.id, value: f.value != null ? f.value : f.field_value })),
+              customFields: (c.customFields || c.customField || []).map(f => ({ id: f.id, name: cfNames[f.id] || null, value: f.value != null ? f.value : f.field_value })),
             };
           } catch (_) { contact = { id: cid }; }
         }
