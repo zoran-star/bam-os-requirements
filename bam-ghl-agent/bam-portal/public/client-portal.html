@@ -22673,8 +22673,8 @@ function _buildDemoCampaignsHTML(_metaConnected) {
         <div style="font-family:var(--mono);font-size:10px;letter-spacing:0.16em;text-transform:uppercase;color:var(--text-mute);margin-bottom:14px">This month</div>
         <div class="campaign-stats">
           <div class="campaign-stat"><div class="campaign-stat-value">$${c.spend.toFixed(2)}</div><div class="campaign-stat-label">Spend</div></div>
-          <div class="campaign-stat"><div class="campaign-stat-value">${c.results}</div><div class="campaign-stat-label">Results</div></div>
-          <div class="campaign-stat"><div class="campaign-stat-value">$${c.cpr.toFixed(2)}</div><div class="campaign-stat-label">Cost / Result</div></div>
+          ${(typeof V15_ACCESS !== 'undefined' && V15_ACCESS) ? '' : `<div class="campaign-stat"><div class="campaign-stat-value">${c.results}</div><div class="campaign-stat-label">Results</div></div>
+          <div class="campaign-stat"><div class="campaign-stat-value">$${c.cpr.toFixed(2)}</div><div class="campaign-stat-label">Cost / Result</div></div>`}
         </div>
       </div>
     </div>`).join('');
@@ -22828,6 +22828,7 @@ async function _renderMarketingCampaigns() {
                 <div class="campaign-stat-value">${escapeHTML(c.spend_display)}</div>
                 <div class="campaign-stat-label">Spend</div>
               </div>
+              ${(typeof V15_ACCESS !== 'undefined' && V15_ACCESS) ? '' : `
               <div class="campaign-stat">
                 <div class="campaign-stat-value">${c.results}</div>
                 <div class="campaign-stat-label">Results</div>
@@ -22835,7 +22836,7 @@ async function _renderMarketingCampaigns() {
               <div class="campaign-stat">
                 <div class="campaign-stat-value">${escapeHTML(c.cpr_display)}</div>
                 <div class="campaign-stat-label">Cost / Result</div>
-              </div>
+              </div>`}
             </div>
           </div>
           <button class="btn-change-campaign" onclick='openCampaignDetail(${JSON.stringify(c.id)}, ${JSON.stringify(c.name || "")}, ${stats})'>Change Campaign</button>
