@@ -1370,7 +1370,7 @@ async function handleMetaCampaigns(req, res) {
   // covers nuances like CAMPAIGN_PAUSED, ADSET_PAUSED, DISAPPROVED — we want
   // strictly ACTIVE (delivering ads right now).
   const cRes = await fetch(`${META_GRAPH}/${adAcct}/campaigns?` + new URLSearchParams({
-    fields: "id,name,status,effective_status,objective,insights.date_preset(this_month){spend,actions,cost_per_action_type,results}",
+    fields: "id,name,status,effective_status,objective,daily_budget,lifetime_budget,insights.date_preset(this_month){spend,actions,cost_per_action_type,results}",
     filtering: JSON.stringify([{ field: "effective_status", operator: "IN", value: ["ACTIVE"] }]),
     access_token: tok.access_token,
     limit: "50",
@@ -1391,6 +1391,12 @@ async function handleMetaCampaigns(req, res) {
       resultsCount = link ? parseInt(link.value, 10) || 0 : 0;
     }
     const cpr = resultsCount > 0 ? spend / resultsCount : 0;
+    // Preset/planned ad spend = the campaign's Meta budget (minor units → $).
+    // Only present when set at the CAMPAIGN level (CBO); ad-set-level budgets
+    // aren't returned on the campaign object, so this can be null.
+    const daily = c.daily_budget ? parseFloat(c.daily_budget) / 100 : null;
+    const lifetime = c.lifetime_budget ? parseFloat(c.lifetime_budget) / 100 : null;
+    const budget_display = lifetime ? `$${lifetime.toFixed(2)} lifetime` : (daily ? `$${daily.toFixed(2)}/day` : null);
     return {
       id: c.id,
       name: c.name,
@@ -1401,6 +1407,7 @@ async function handleMetaCampaigns(req, res) {
       results: resultsCount,
       cpr,
       cpr_display: resultsCount > 0 ? `$${cpr.toFixed(2)}` : "—",
+      budget_display,
     };
   });
 

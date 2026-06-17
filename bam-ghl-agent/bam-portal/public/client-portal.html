@@ -6247,6 +6247,7 @@
           <div class="spend-bar">
             <span class="spend-bar-label">Spend</span>
             <span class="spend-bar-value" id="detail-spend">$465</span>
+            <span id="detail-budget" style="font-family:var(--mono);font-size:11px;letter-spacing:.04em;text-transform:uppercase;color:var(--text-mute);margin-left:14px"></span>
             <button class="edit-pencil" onclick="openBudgetModal()" title="Edit spend" aria-label="Edit spend">
               <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
                 <path d="M11.5 1.5l3 3-9 9H2.5V10.5l9-9z"/>
@@ -16121,6 +16122,9 @@ function openCampaignDetail(campaignId, title, stats) {
   // V1.5: hide the Results / Cost-per-Result numbers in the header (action-only).
   const topRight = document.getElementById('detail-topright-stats');
   if (topRight) topRight.style.display = (typeof V15_ACCESS !== 'undefined' && V15_ACCESS) ? 'none' : '';
+  // Preset (planned) ad spend = the campaign's Meta budget, when set.
+  const bEl = document.getElementById('detail-budget');
+  if (bEl) bEl.textContent = stats.budget ? 'Preset budget · ' + stats.budget : '';
   // Reset any selected creatives
   document.querySelectorAll('.creative-tile.selected').forEach(t => t.classList.remove('selected'));
   // Fetch real ad creatives for this campaign in the background
@@ -22834,7 +22838,7 @@ async function _renderMarketingCampaigns() {
     }
     containerEl.innerHTML = campaigns.map(c => {
       const safeName = (c.name || '').replace(/"/g, '&quot;');
-      const stats = `{ spend: ${JSON.stringify(c.spend_display)}, results: ${c.results}, cpr: ${JSON.stringify(c.cpr_display)} }`;
+      const stats = `{ spend: ${JSON.stringify(c.spend_display)}, results: ${c.results}, cpr: ${JSON.stringify(c.cpr_display)}, budget: ${JSON.stringify(c.budget_display || '')} }`;
       return `
         <div class="campaign-card">
           <div class="campaign-card-main">
