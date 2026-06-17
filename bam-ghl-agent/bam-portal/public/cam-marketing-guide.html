@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Your Marketing Board — Quick Guide</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet" />
+<style>
+  :root{
+    --bg:#0F0E0C; --surface:#1A1813; --surface-2:#211E18;
+    --border:rgba(255,255,255,.09); --border-soft:rgba(255,255,255,.06);
+    --text:#F2EFE6; --sub:#B7B2A4; --mute:#827D70;
+    --gold:#E8C547; --red:#ED7969; --blue:#7E9CD9; --green:#7ED996;
+    --display:'Space Grotesk',-apple-system,system-ui,sans-serif;
+    --body:'Inter',-apple-system,system-ui,sans-serif;
+    --mono:'JetBrains Mono',ui-monospace,monospace;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{-webkit-text-size-adjust:100%}
+  body{
+    background:var(--bg); color:var(--text); font-family:var(--body);
+    line-height:1.6; font-size:16px; padding:0 20px 80px;
+    background-image:radial-gradient(circle at 50% -10%, rgba(232,197,71,.06), transparent 55%);
+  }
+  .wrap{max-width:760px;margin:0 auto}
+
+  /* Header */
+  header{padding:64px 0 40px;border-bottom:1px solid var(--border)}
+  .kicker{font-family:var(--mono);font-size:12px;letter-spacing:.28em;text-transform:uppercase;color:var(--gold);margin-bottom:18px}
+  h1{font-family:var(--display);font-weight:600;font-size:40px;line-height:1.1;letter-spacing:-.02em;margin-bottom:14px}
+  h1 .for{color:var(--gold)}
+  .lede{font-size:18px;color:var(--sub);max-width:560px}
+
+  /* Sections */
+  section{padding:40px 0;border-bottom:1px solid var(--border-soft)}
+  .step{font-family:var(--mono);font-size:12px;letter-spacing:.2em;text-transform:uppercase;color:var(--mute);margin-bottom:10px}
+  h2{font-family:var(--display);font-weight:600;font-size:25px;letter-spacing:-.01em;margin-bottom:12px}
+  p{color:var(--sub);margin-bottom:14px}
+  p strong{color:var(--text);font-weight:600}
+  .gold{color:var(--gold)}
+
+  /* Cards / mock UI */
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:18px 20px;margin:18px 0}
+  .demo-label{font-family:var(--mono);font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:var(--mute);margin-bottom:12px}
+
+  /* Priority chips (mirror the app) */
+  .chip{display:inline-flex;align-items:center;gap:5px;font-family:var(--mono);font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;padding:4px 10px;border-radius:999px;white-space:nowrap}
+  .chip.high{color:var(--red);border:1px solid var(--red);background:rgba(237,121,105,.10)}
+  .chip.normal{color:var(--blue);border:1px solid var(--blue);background:rgba(126,156,217,.10)}
+  .due{font-size:13px;font-weight:600;color:var(--mute)}
+  .due.over{color:var(--red)}
+
+  /* Mock ticket row */
+  .ticket{display:flex;align-items:center;gap:14px;padding:14px 16px;border:1px solid var(--border);border-radius:6px;background:var(--surface);margin-bottom:10px}
+  .ticket.urgent{border-left:3px solid var(--red)}
+  .code{font-family:var(--mono);font-size:10px;letter-spacing:.1em;color:var(--mute);padding:2px 6px;border-radius:4px;background:rgba(255,255,255,.04);border:1px solid var(--border)}
+  .ticket .who{font-weight:600;flex:1;min-width:0}
+  .ticket .who small{display:block;font-weight:400;color:var(--mute);font-size:12px;margin-top:2px}
+  .ticket .meta{text-align:right;display:flex;flex-direction:column;gap:5px;align-items:flex-end}
+
+  /* Key-value rows (client card mock) */
+  .kv{display:flex;gap:16px;padding:10px 0;border-bottom:1px solid var(--border-soft)}
+  .kv:last-child{border-bottom:0}
+  .kv .k{font-family:var(--mono);font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--mute);width:110px;flex-shrink:0;padding-top:3px}
+  .kv .v{flex:1;min-width:0}
+  .kv .v a{color:var(--gold);text-decoration:none}
+  .btn-ghost{display:inline-flex;align-items:center;gap:6px;font-family:var(--body);font-size:12px;font-weight:600;color:var(--gold);border:1px solid var(--gold);background:transparent;border-radius:6px;padding:6px 12px;cursor:default}
+
+  /* Callout */
+  .note{display:flex;gap:12px;background:rgba(232,197,71,.06);border:1px solid rgba(232,197,71,.28);border-left:3px solid var(--gold);border-radius:6px;padding:14px 16px;margin:18px 0;font-size:14px;color:var(--sub)}
+  .note b{color:var(--text)}
+  .note .ic{font-size:18px;line-height:1.4}
+
+  /* Flow strip */
+  .flow{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:8px}
+  .flow .box{background:var(--surface-2);border:1px solid var(--border);border-radius:6px;padding:10px 14px;font-size:13px;font-weight:500}
+  .flow .arr{color:var(--gold);font-weight:700}
+
+  /* SLA table */
+  .sla{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:6px}
+  .sla .cell{background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:16px}
+  .sla .cell .top{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px}
+  .sla .big{font-family:var(--display);font-size:30px;font-weight:600;line-height:1}
+  .sla .lbl{font-size:13px;color:var(--mute)}
+
+  ul.clean{list-style:none;margin:10px 0}
+  ul.clean li{position:relative;padding:6px 0 6px 24px;color:var(--sub)}
+  ul.clean li:before{content:"→";position:absolute;left:0;color:var(--gold);font-weight:700}
+
+  footer{padding:40px 0 0;color:var(--mute);font-size:13px;text-align:center}
+  .pill-row{display:flex;flex-wrap:wrap;gap:8px;margin-top:6px}
+
+  @media(max-width:560px){
+    h1{font-size:30px}
+    .lede{font-size:16px}
+    h2{font-size:21px}
+    .sla{grid-template-columns:1fr}
+    .ticket{flex-wrap:wrap}
+    .ticket .meta{text-align:left;align-items:flex-start;width:100%;flex-direction:row;gap:10px}
+    .kv{flex-direction:column;gap:4px}
+    .kv .k{width:auto}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div class="kicker">FullControl · Marketing</div>
+    <h1>Your marketing board,<br/><span class="for">upgraded for you, Cam.</span></h1>
+    <p class="lede">Every ticket now tells you who it's for, what the offer is, how urgent it is, and when it's due — so you stop chasing Mike and Google Drive. Here's the 2-minute tour.</p>
+  </header>
+
+  <!-- 1 -->
+  <section>
+    <div class="step">01 · Priority</div>
+    <h2>Every ticket is now tagged <span class="gold">High</span> or <span class="gold">Normal</span></h2>
+    <p>When a client submits a request, they can flag it <strong>urgent</strong>. Urgent requests show up as <strong>High</strong> priority; everything else is <strong>Normal</strong>. Your board is sorted <strong>urgent-first by default</strong>, so the top of the list is always what to do next.</p>
+    <div class="card">
+      <div class="demo-label">What you'll see on a ticket</div>
+      <div class="pill-row">
+        <span class="chip high">⚡ High</span>
+        <span class="chip normal">Normal</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- 2 -->
+  <section>
+    <div class="step">02 · Deadlines</div>
+    <h2>Each ticket gets an automatic due date</h2>
+    <p>No more guessing turnaround. The board calculates a deadline from the priority and counts it down in <strong>business days</strong>. When it's past due, it turns red.</p>
+    <div class="sla">
+      <div class="cell">
+        <div class="top"><span class="chip high">⚡ High</span></div>
+        <div class="big gold">3</div>
+        <div class="lbl">business days to turn around</div>
+      </div>
+      <div class="cell">
+        <div class="top"><span class="chip normal">Normal</span></div>
+        <div class="big">5</div>
+        <div class="lbl">business days to turn around</div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="demo-label">On the card it reads like this</div>
+      <div class="pill-row" style="align-items:center;gap:16px">
+        <span class="due">Due in 2 biz days</span>
+        <span class="due over">⚠ Overdue</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- 3 -->
+  <section>
+    <div class="step">03 · The list</div>
+    <h2>Scan the board at a glance</h2>
+    <p>Urgent tickets get a red edge and sit up top. You can re-sort by priority or date, and filter by type, from the toolbar.</p>
+    <div class="card" style="background:transparent;border:0;padding:0">
+      <div class="ticket urgent">
+        <span class="code">A7F</span>
+        <div class="who">Supreme Hoops <small>Summer Camp reel</small></div>
+        <div class="meta"><span class="chip high">⚡ High</span><span class="due over">⚠ Overdue</span></div>
+      </div>
+      <div class="ticket">
+        <span class="code">B3C</span>
+        <div class="who">Nico Brooks <small>New ad creative</small></div>
+        <div class="meta"><span class="chip normal">Normal</span><span class="due">Due in 4 biz days</span></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 4 -->
+  <section>
+    <div class="step">04 · The full brief</div>
+    <h2>Open a ticket → everything you need is right there</h2>
+    <p>Tap a ticket and the new <strong>Client card</strong> sits at the top with the client's site, the landing page, and the offer — all in one place. No more messaging Mike to ask "what's their offer?"</p>
+    <div class="card">
+      <div class="demo-label">Client card</div>
+      <div class="kv"><div class="k">Client</div><div class="v"><strong>Supreme Hoops</strong></div></div>
+      <div class="kv"><div class="k">Assigned SM</div><div class="v">Alex Silva</div></div>
+      <div class="kv"><div class="k">Client site</div><div class="v"><a>supremehoops.com ↗</a></div></div>
+      <div class="kv"><div class="k">Landing page</div><div class="v"><span style="color:var(--mute)">Not attached &nbsp;</span><span class="btn-ghost">🔗 Ask SM for landing page</span></div></div>
+      <div class="kv"><div class="k">Offer</div><div class="v">Summer Camp</div></div>
+    </div>
+    <p>No landing page attached? Hit <strong>“Ask SM for landing page”</strong> — it copies a ready-to-send message to your clipboard. Just paste it to the SM in Slack.</p>
+  </section>
+
+  <!-- 5 -->
+  <section>
+    <div class="step">05 · Ownership &amp; alerts</div>
+    <h2>Every ticket has an owner, and nobody gets forgotten</h2>
+    <ul class="clean">
+      <li>Each ticket is <strong>auto-assigned to the client's SM</strong> (their manager) — shown right on the card.</li>
+      <li>When a <strong>new request lands</strong>, you get a heads-up so you're never digging to find what's new.</li>
+      <li>When you hit <strong>Mark Completed</strong>, the <strong>client and the assigned SM are both notified automatically</strong> — no manual "hey it's done" messages.</li>
+    </ul>
+    <div class="note"><span class="ic">🔔</span><div><b>Heads up:</b> the Slack DM pings turn on once your Slack is linked to the portal. Everything else above already works today. Ping Zoran to flip that on.</div></div>
+  </section>
+
+  <!-- recap -->
+  <section style="border-bottom:0">
+    <div class="step">The flow</div>
+    <h2>Start to finish</h2>
+    <div class="flow">
+      <span class="box">Content team sends finals</span>
+      <span class="arr">→</span>
+      <span class="box">Lands on your board (sorted by priority)</span>
+      <span class="arr">→</span>
+      <span class="box">Open it → full brief</span>
+      <span class="arr">→</span>
+      <span class="box">Build the ad</span>
+      <span class="arr">→</span>
+      <span class="box">Mark Completed</span>
+      <span class="arr">→</span>
+      <span class="box">Client + SM notified</span>
+    </div>
+    <div class="note" style="margin-top:24px"><span class="ic">⚡</span><div><b>The one habit:</b> work top-down. The board already put the most urgent, closest-to-deadline tickets first — so just start at the top.</div></div>
+  </section>
+
+  <footer>
+    FullControl · Marketing board guide · Built for Cam<br/>
+    Questions or something missing? Ping Zoran.
+  </footer>
+
+</div>
+</body>
+</html>
