@@ -6226,9 +6226,9 @@
               <span class="topbar-kicker">§ 02 · Marketing</span>
               <div class="topbar-title">Change a campaign.</div>
               <div class="topbar-sub" id="detail-campaign-title">Title of campaign 1</div>
-              <div style="font-family:var(--mono);font-size:10px;letter-spacing:0.16em;text-transform:uppercase;color:var(--text-mute);margin-top:4px">Stats: last 30 days</div>
+              <div id="detail-stats-period" style="font-family:var(--mono);font-size:10px;letter-spacing:0.16em;text-transform:uppercase;color:var(--text-mute);margin-top:4px">Stats: this month</div>
             </div>
-            <div style="margin-left:auto;display:flex;gap:40px;align-items:flex-end">
+            <div id="detail-topright-stats" style="margin-left:auto;display:flex;gap:40px;align-items:flex-end">
               <div style="text-align:right">
                 <div id="detail-results" style="font-family:var(--display);font-size:30px;font-weight:600;color:var(--text);line-height:1">44</div>
                 <div style="font-family:var(--mono);font-size:10px;letter-spacing:0.18em;text-transform:uppercase;color:var(--text-mute);margin-top:6px">Results</div>
@@ -16118,6 +16118,9 @@ function openCampaignDetail(campaignId, title, stats) {
   document.getElementById('detail-spend').textContent = stats.spend;
   document.getElementById('detail-results').textContent = stats.results;
   document.getElementById('detail-cpr').textContent = stats.cpr;
+  // V1.5: hide the Results / Cost-per-Result numbers in the header (action-only).
+  const topRight = document.getElementById('detail-topright-stats');
+  if (topRight) topRight.style.display = (typeof V15_ACCESS !== 'undefined' && V15_ACCESS) ? 'none' : '';
   // Reset any selected creatives
   document.querySelectorAll('.creative-tile.selected').forEach(t => t.classList.remove('selected'));
   // Fetch real ad creatives for this campaign in the background
