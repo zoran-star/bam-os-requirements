@@ -62,6 +62,19 @@ function deadlineInfo(submittedIso, priority) {
   return { due, label: `Due in ${rem} biz day${rem === 1 ? "" : "s"}`, overdue: false };
 }
 
+// Resolve the client's website from brand_data, wherever it was entered.
+// Different input paths have used different keys (website_url from Brand Basics,
+// domain from older imports), so check them all so Cam always sees a site if one
+// exists. Returns a clickable absolute URL (prepends https:// for bare domains).
+function clientWebsiteFrom(brand) {
+  if (!brand || typeof brand !== "object") return "";
+  const raw = [brand.website_url, brand.domain, brand.website, brand.url]
+    .map(v => (typeof v === "string" ? v.trim() : ""))
+    .find(Boolean);
+  if (!raw) return "";
+  return /^https?:\/\//i.test(raw) ? raw : `https://${raw}`;
+}
+
 // Ticket types that include uploaded files → need content review by Cam/Ximena
 const CONTENT_TYPES = new Set(["replace", "add", "campaign-create"]);
 
@@ -113,7 +126,7 @@ function normalizeTicket(apiTicket) {
   return {
     id: apiTicket.id,
     academyName: apiTicket.client?.business_name || "—",
-    clientWebsite: apiTicket.client?.brand_data?.website_url || "",
+    clientWebsite: clientWebsiteFrom(apiTicket.client?.brand_data),
     assignedSm: apiTicket.assigned_to_name || "",
     priority: priorityOf(fields),
     campaignTitle: fields.campaign_title || "",
