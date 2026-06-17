@@ -318,7 +318,13 @@ function OverviewTab({ tickets, loading, tokens: t, dark, onOpenTicket, onJumpTo
   const pingClient = async (x) => {
     if (pingState[x.id] === "sending" || pingState[x.id] === "done") return;
     setPingState(p => ({ ...p, [x.id]: "sending" }));
-    try { await nudgeClientSlack(x.id); setPingState(p => ({ ...p, [x.id]: "done" })); }
+    try {
+      const res = await nudgeClientSlack(x.id);
+      // The API now reports whether Slack actually accepted the message — a
+      // stale/invalid channel used to look like success.
+      const ok = !res || !res.slack || res.slack.ok !== false;
+      setPingState(p => ({ ...p, [x.id]: ok ? "done" : "error" }));
+    }
     catch { setPingState(p => ({ ...p, [x.id]: "error" })); }
   };
   // "Completed in the last 5 days" — done/approved/cancelled tickets whose
