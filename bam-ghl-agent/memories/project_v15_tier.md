@@ -12,6 +12,16 @@ need a little manual setup/cleanup to work right (Zoran).
 - Backed by two booleans: `clients.v2_access` + `clients.v15_access` (V1 = both
   false). The selector posts both via `/api/clients?action=update-fields`.
 
+## V1 offer builder = simplified (no connections)
+For **V1** academies (`!v2_access && !v15_access`, via `_bbIsV1()`) the offer
+builder hides all integration/"connection" UI: Stripe price-match pill
+(`_bbLivePill` returns '') — the matcher panel `_bbRenderOffersPricing` was
+already V2-only — plus GHL tags (`ghl_tags_multi`/`ghl_tag`), entry points
+(`entry_points`), and discovery-call calendar fields. Gated in
+`_bbRenderStepFields` via `_V1_HIDE_TYPES`/`_V1_HIDE_KEYS`. V1.5/V2 keep
+everything (they depend on it). Plain offer fields (sales path, pricing options,
+info-to-collect, upsells, onboarding) stay for V1.
+
 ## Contacts tab (V1.5) — DONE (first V1.5 surface)
 Client portal, gated to V1.5 via `applyV15NavState()` + nav `data-feature="v15"`
 (mirrors the V2 gate). `openContactsView()` in client-portal.html.
