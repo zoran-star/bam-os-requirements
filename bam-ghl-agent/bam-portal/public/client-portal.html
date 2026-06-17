@@ -8987,16 +8987,16 @@ function _v15kSetupHtml() {
       <div style="min-width:0"><div style="font-weight:600;font-size:13px;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escapeHTML(label)}</div>${sub ? `<div style="font-size:11px;color:var(--text-mute)">${escapeHTML(sub)}</div>` : ''}</div>
       <select data-kind="${kind}" data-ref="${escapeHTML(ref)}" data-label="${escapeHTML(label)}" onchange="_v15kLinkEl(this)" style="${ssty};width:100%;box-sizing:border-box">${_v15kOfferOpts(offerId)}</select>
     </div>`;
-  const sub = (t) => `<div style="font-size:12px;font-weight:700;color:var(--text);margin:14px 0 6px;letter-spacing:.02em">${t}</div>`;
+  const tab = _V15K.setupTab || 'stripe';
 
   // OFFERS
-  let offersBlock = sub('Offers') + `<div style="font-size:12px;color:var(--text-mute);margin-bottom:8px">These are the buckets KPIs group by. Tie each Stripe product and pipeline below to one.</div>`;
+  let offersBlock = `<div style="font-size:12px;color:var(--text-mute);margin-bottom:8px">These are the buckets KPIs group by. Tie each Stripe product and pipeline to one.</div>`;
   if (!s.offers.length) offersBlock += `<div class="req-empty" style="padding:6px 0;color:var(--text-mute)">No offers yet — create one to start grouping.</div>`;
   else offersBlock += `<div style="display:flex;flex-wrap:wrap;gap:6px">` + s.offers.map(o => `<span style="font-size:12px;padding:5px 10px;border:1px solid var(--border-med);border-radius:999px;color:var(--text)">${escapeHTML(o.title)}</span>`).join('') + `</div>`;
-  offersBlock += `<div style="margin-top:8px"><button onclick="_v15kCreateOffer()" style="${ssty};font-weight:700;border-color:var(--accent);color:var(--accent);background:rgba(232,197,71,0.10)">+ New offer by title</button></div>`;
+  offersBlock += `<div style="margin-top:10px"><button onclick="_v15kCreateOffer()" style="${ssty};font-weight:700;border-color:var(--accent);color:var(--accent);background:rgba(232,197,71,0.10)">+ New offer by title</button></div>`;
 
   // STRIPE PRODUCTS
-  let stripeBlock = sub('Stripe products → offer');
+  let stripeBlock = `<div style="font-size:12px;color:var(--text-mute);margin-bottom:8px">Tie each Stripe product to an offer — powers Sales "# new payments".</div>`;
   if (!s.stripeConnected) stripeBlock += `<div class="req-empty" style="padding:6px 0;color:var(--text-mute)">Stripe is not connected for this academy.</div>`;
   else if (!s.stripeProducts.length) stripeBlock += `<div class="req-empty" style="padding:6px 0;color:var(--text-mute)">No Stripe products found.</div>`;
   else stripeBlock += s.stripeProducts.map(p => {
@@ -9007,12 +9007,18 @@ function _v15kSetupHtml() {
   }).join('');
 
   // GHL PIPELINES
-  let pipeBlock = sub('GHL pipelines → offer');
+  let pipeBlock = `<div style="font-size:12px;color:var(--text-mute);margin-bottom:8px">Tie each GHL pipeline to an offer — powers Sales "# entered pipeline".</div>`;
   if (!s.pipelines.length) pipeBlock += `<div class="req-empty" style="padding:6px 0;color:var(--text-mute)">No GHL pipelines found.</div>`;
   else pipeBlock += s.pipelines.map(p => linkRow(p.name || p.id, p.id, 'ghl_pipeline', p.id, p.offer_id)).join('');
 
-  return offersBlock + stripeBlock + pipeBlock;
+  const tabs = [['offers', 'Offers'], ['stripe', 'Stripe products'], ['pipelines', 'Pipelines']];
+  const tabBar = `<div style="display:flex;gap:4px;border-bottom:1px solid var(--border);margin-bottom:14px">` +
+    tabs.map(([k, l]) => `<button onclick="_v15kSetupTab('${k}')" style="background:none;border:none;border-bottom:2px solid ${tab === k ? 'var(--gold)' : 'transparent'};color:${tab === k ? 'var(--text)' : 'var(--text-mute)'};font-weight:700;font-size:13px;padding:8px 12px;margin-bottom:-1px;cursor:pointer">${l}</button>`).join('') +
+    `</div>`;
+  const body = tab === 'offers' ? offersBlock : tab === 'pipelines' ? pipeBlock : stripeBlock;
+  return tabBar + body;
 }
+function _v15kSetupTab(name) { _V15K.setupTab = name; _v15kRenderSetup(); }
 
 function _v15kSetMonth(k) { _V15K.monthKey = k; _v15kRender(); }
 
