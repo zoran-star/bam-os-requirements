@@ -4,6 +4,11 @@ The canonical doc for how onboarding, V2 access, the Business Blueprint, the tra
 
 > ⚠ **KEEP THIS UPDATED.** Any change to the staff toggle, the V2/V1 split, the BB cards, the tracker visibility logic, the mark-done flow, or the welcome Slack flow MUST update this note in the same commit. If something here is stale, the next session will burn an hour re-deriving the model and probably get it wrong.
 
+> **2026-06-18:** the V1.5→V2 jump is member management, and members are now
+> **offer-scoped** — `members.offer_id`/`members_staging.offer_id` derived at
+> import from the member's Stripe price (`pricing_catalog.offer_id`), mirroring
+> `entry_points.offer_id`. See [[project_member_management_portal]] Session 7.
+
 ## V1 vs V2 — what each client sees
 
 The staff "V2 access" toggle (per client) is the only switch. Today V2 unlocks **5 nav items**: Members, Pricing, Inbox, Pipelines, Calendar. Everything else is V1 and visible to every client.

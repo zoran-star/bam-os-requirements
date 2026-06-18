@@ -619,11 +619,24 @@ async function handler(req, res) {
         method: "PATCH", headers: { Prefer: "return=minimal" },
         body: JSON.stringify({
           offer_price_key: key,
+          ...(offerId ? { offer_id: offerId } : {}),
           match_status: s.is_duplicate ? "duplicate" : (s.stripe_linked || priceId ? "ok" : "needs_fix"),
           cleanup_notes: `connected to ${key}`,
           updated_at: nowIso(),
         }),
       });
+      // Backfill any already-promoted live members on this same price — connecting
+      // the price to an offer should scope them too, not just future imports.
+      if (priceId && offerId) {
+        try {
+          await sb(
+            `members?client_id=eq.${encodeURIComponent(clientId)}` +
+            `&stripe_price_id=eq.${encodeURIComponent(priceId)}&offer_id=is.null`,
+            { method: "PATCH", headers: { Prefer: "return=minimal" },
+              body: JSON.stringify({ offer_id: offerId, updated_at: nowIso() }) }
+          );
+        } catch (_) { /* non-fatal */ }
+      }
       return res.status(200).json({ ok: true, counts: await flagCounts(clientId, batchId) });
     }
 
@@ -635,6 +648,28 @@ async function handler(req, res) {
       const skipped = [];
       const memberIds = [];
 
+      // Offer scoping (V2): a member belongs to the offer its Stripe price maps
+      // to. Build a price_id → offer_id map once from this academy's catalog, plus
+      // an offer_price_key → offer_id fallback (member matched to a plan slot but
+      // not yet on a concrete Stripe price). Members whose price isn't mapped to
+      // an offer stay NULL and surface in the "no offer" cleanup flag.
+      const priceToOffer = new Map();
+      const keyToOffer = new Map();
+      try {
+        const catRows = await sb(
+          `pricing_catalog?client_id=eq.${encodeURIComponent(clientId)}` +
+          `&offer_id=not.is.null&select=stripe_price_id,offer_price_key,offer_id`
+        );
+        for (const c of (Array.isArray(catRows) ? catRows : [])) {
+          if (c.stripe_price_id && c.offer_id) priceToOffer.set(c.stripe_price_id, c.offer_id);
+          if (c.offer_price_key && c.offer_id && !keyToOffer.has(c.offer_price_key)) keyToOffer.set(c.offer_price_key, c.offer_id);
+        }
+      } catch (_) { /* non-fatal — promote without offer scoping */ }
+      const resolveOfferId = (s) =>
+        (s.stripe_price_id && priceToOffer.get(s.stripe_price_id)) ||
+        (s.offer_price_key && keyToOffer.get(s.offer_price_key)) ||
+        null;
+
       for (const s of staging) {
         if (onlyIds && !onlyIds.has(String(s.id))) continue;
         if (s.promoted) { skipped.push({ id: s.id, reason: "already promoted" }); continue; }
@@ -642,6 +677,8 @@ async function handler(req, res) {
         const athleteName = (s.athlete_name || "").toString().trim();
         const parentEmail = normEmail(s.parent_email);
         if (!athleteName || !parentEmail) { skipped.push({ id: s.id, reason: "missing athlete_name or parent_email" }); continue; }
+
+        const offerId = resolveOfferId(s);
 
         // 1:1 column copy matching the live `members` insert shape in checkout.js.
         const memberFields = {
@@ -659,6 +696,9 @@ async function handler(req, res) {
           joined_date:            s.joined_date || null,
           updated_at:             nowIso(),
         };
+        // Only set offer_id when resolved, so re-importing a member whose price
+        // isn't (yet) offer-mapped never clobbers an existing member's offer.
+        if (offerId) memberFields.offer_id = offerId;
 
         // Idempotency on (client_id, parent_email, athlete_name): PATCH if exists, else POST.
         const existingRows = await sb(
@@ -692,6 +732,7 @@ async function handler(req, res) {
             promoted: true,
             promoted_member_id: memberId,
             match_status: "ok",
+            ...(offerId ? { offer_id: offerId } : {}),
             updated_at: nowIso(),
           }),
         });

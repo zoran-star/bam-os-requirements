@@ -7,6 +7,14 @@ metadata:
 
 # The Pricing Sorter (onboarding wizard)
 
+> **2026-06-18 — IMPORT NOW WRITES `members.offer_id` (offer-centric).** Promote
+> (`cleanup.js`) resolves each member's offer from their Stripe price via
+> `pricing_catalog.offer_id` (price→offer + offer_price_key→offer maps), sets
+> `offer_id` on `members` + `members_staging`. `connect-offer` also backfills
+> live members on that price. Roster shows an offer pill + filter (gated on 2+
+> offers). Migration `20260618000000_member_offer_scope.sql`. Full writeup in
+> [[project_member_management_portal]] Session 7.
+
 > **2026-06-15 — CLEANUP STEP = ONE TABLE + lots of polish (PRs #303–#335).**
 > Cleanup (step 3) is now a SINGLE table of every person — CSV members AND
 > Stripe-payers not in the CSV — columns: Member (athlete + "parent: X" +

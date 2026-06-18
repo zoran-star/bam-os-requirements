@@ -365,6 +365,20 @@ async function handler(req, res) {
             }
           }
         }
+
+        // Offer scoping (V2): attach each member's offer { id, title } so the
+        // roster can show + filter by offer. offer_id is derived at import from
+        // the member's Stripe price (pricing_catalog.offer_id).
+        const offerIds = [...new Set(memberList.map(m => m.offer_id).filter(Boolean))];
+        if (offerIds.length) {
+          const offerRows = await sb(
+            `offers?id=in.(${offerIds.join(",")})&select=id,title`
+          ).catch(() => []);
+          const offers = new Map((Array.isArray(offerRows) ? offerRows : []).map(o => [o.id, o.title]));
+          for (const m of memberList) {
+            if (m.offer_id) m.offer = { id: m.offer_id, title: offers.get(m.offer_id) || null };
+          }
+        }
       }
 
       const targetClient = targetClientId ? await loadClientRow(targetClientId) : null;
