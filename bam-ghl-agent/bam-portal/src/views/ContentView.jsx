@@ -857,6 +857,26 @@ function ContentTicketDetail({ tk, session, ticket, onBack, onRefetch, patchTick
     }
   }
 
+  // Organic tickets go back to the CLIENT for review (not to marketing/Meta).
+  async function sendForReview() {
+    if (busy) return;
+    if (!finalsExisting.length) {
+      alert("Upload at least one final creative before sending for review.");
+      return;
+    }
+    setBusy(true);
+    try {
+      await patchTicket(ticket.id, { action: "send-for-review" });
+      showBanner(`Sent ${academyName}'s creative for client review.`);
+      onBack();
+      await onRefetch();
+    } catch (e) {
+      alert("Send for review failed: " + e.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function sendToMarketing(marketingNotes) {
     if (busy) return;
     if (!finalsExisting.length) {
@@ -1058,13 +1078,16 @@ function ContentTicketDetail({ tk, session, ticket, onBack, onRefetch, patchTick
             padding: "10px 20px", borderRadius: 8, cursor: "pointer",
             fontFamily: "inherit", fontSize: 13, fontWeight: 500,
           }}>Request Client Action</button>
-          <button onClick={() => setSendModalOpen(true)} disabled={busy || !finalsExisting.length} style={{
-            background: tk.accent, color: "#0A0A0B", border: 0,
-            padding: "10px 22px", borderRadius: 8,
-            cursor: (busy || !finalsExisting.length) ? "not-allowed" : "pointer",
-            fontFamily: "inherit", fontSize: 13, fontWeight: 700,
-            opacity: (busy || !finalsExisting.length) ? 0.5 : 1,
-          }}>📤  Send to Marketing</button>
+          <button
+            onClick={() => ticket.channel === "organic" ? sendForReview() : setSendModalOpen(true)}
+            disabled={busy || !finalsExisting.length}
+            style={{
+              background: tk.accent, color: "#0A0A0B", border: 0,
+              padding: "10px 22px", borderRadius: 8,
+              cursor: (busy || !finalsExisting.length) ? "not-allowed" : "pointer",
+              fontFamily: "inherit", fontSize: 13, fontWeight: 700,
+              opacity: (busy || !finalsExisting.length) ? 0.5 : 1,
+            }}>{ticket.channel === "organic" ? "📤  Send for client review" : "📤  Send to Marketing"}</button>
         </div>
       )}
 
