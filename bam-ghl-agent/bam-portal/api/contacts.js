@@ -135,9 +135,17 @@ async function handler(req, res) {
         const id = String(d.id);
         const name = d.name || d.fieldKey || id;
         const hasData = withData.has(id);
-        const suggested = hasData && /athlete\s*name|player\s*name|child\s*name|kid\s*name/i.test(name);
-        return { id, name, hasData, suggested };
+        // Strong = clearly an athlete/player/child name field; weak = mentions
+        // athlete/player/child/etc. anywhere.
+        const strong = /athlete\s*(full\s*)?name|player\s*(full\s*)?name|child\s*name|kid\s*name|name\s*of\s*(athlete|player|child)/i.test(name);
+        const weak = /\b(athlete|player|child|kid|son|daughter|camper|participant)\b/i.test(name);
+        const suggested = hasData && strong;
+        // Sort score: athlete-like first, then has-data, then the rest.
+        const score = (strong ? 4 : 0) + (weak ? 2 : 0) + (hasData ? 1 : 0);
+        return { id, name, hasData, suggested, score };
       });
+      // Most-likely (athlete-sounding) fields bubble to the top.
+      fields.sort((a, b) => b.score - a.score || String(a.name).localeCompare(String(b.name)));
       // If never configured, default the selection to the suggestions.
       const selected = current.length ? current : fields.filter(f => f.suggested).map(f => f.id);
       return res.status(200).json({ fields, selected });
