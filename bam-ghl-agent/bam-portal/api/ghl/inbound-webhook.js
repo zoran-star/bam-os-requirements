@@ -65,16 +65,42 @@ async function handler(req, res) {
   const direction = String(pick(p, ["direction"]) || "").toLowerCase();
   if (direction === "outbound") return res.status(200).json({ skipped: "outbound" });
 
-  const locationId      = pick(p, ["locationId", "location_id"]);
-  const contactId       = pick(p, ["contactId", "contact_id"]);
-  const conversationId  = pick(p, ["conversationId", "conversation_id"]);
-  const messageId       = pick(p, ["messageId", "message_id", "id"]);
-  const body            = pick(p, ["body", "message"]) || "";
-  const channelRaw      = pick(p, ["messageType", "message_type", "channel", "type"]) || "";
-  const channel         = String(channelRaw).replace(/^TYPE_/i, "").toLowerCase() || null;
-  const occurredAtRaw   = pick(p, ["dateAdded", "createdAt", "timestamp", "date"]);
+  // GHL's standard "contact's details" webhook nests fields under objects
+  // (location, contact, message) and also merges any Custom Data at the top
+  // level. Custom-data merge fields like {{location.id}} don't always resolve,
+  // so read from the top level AND the known nested objects.
+  const nested = (key, ...paths) => {
+    const top = pick(p, key);
+    if (top != null && top !== "") return top;
+    for (const path of paths) {
+      const obj = p[path];
+      if (obj && typeof obj === "object") {
+        const v = pick(obj, key);
+        if (v != null && v !== "") return v;
+      }
+    }
+    return null;
+  };
 
-  if (!locationId) return res.status(200).json({ skipped: "no locationId in payload" });
+  const locationId =
+    nested(["locationId", "location_id"], "customData", "contact", "extras") ||
+    (p.location && typeof p.location === "object" ? pick(p.location, ["id", "_id", "locationId"]) : pick(p, ["location"]));
+  const contactId =
+    nested(["contactId", "contact_id"], "customData", "extras") ||
+    (p.contact && typeof p.contact === "object" ? pick(p.contact, ["id", "_id", "contactId"]) : null);
+  const conversationId  = nested(["conversationId", "conversation_id"], "customData", "message");
+  const messageId       = nested(["messageId", "message_id"], "customData", "message")
+    || (p.message && typeof p.message === "object" ? pick(p.message, ["id"]) : null);
+  const body            = nested(["body", "message"], "customData", "message") || "";
+  const channelRaw      = nested(["messageType", "message_type", "channel", "type"], "customData", "message") || "";
+  const channel         = String(channelRaw).replace(/^TYPE_/i, "").toLowerCase() || null;
+  const occurredAtRaw   = nested(["dateAdded", "createdAt", "timestamp", "date"], "message");
+
+  // No academy id anywhere → echo what GHL sent (visible in GHL's webhook
+  // execution log) so the payload shape can be diagnosed in one shot.
+  if (!locationId) {
+    return res.status(200).json({ skipped: "no locationId in payload", payload_keys: Object.keys(p), raw: p });
+  }
 
   // Resolve the academy by GHL location, and GATE to V1.5/V2 only.
   let client;
