@@ -9052,7 +9052,7 @@ function _v15kSetupHtml() {
   if (!s.calendars || !s.calendars.length) calBlock += `<div class="req-empty" style="padding:6px 0;color:var(--text-mute)">No GHL calendars found.</div>`;
   else calBlock += s.calendars.map(c => linkRow(c.name || c.id, c.id, 'ghl_calendar', c.id, c.offer_id)).join('');
 
-  const tabs = [['offers', 'Offers'], ['stripe', 'Stripe products'], ['pipelines', 'Pipelines'], ['calendars', 'Calendars']];
+  const tabs = [['offers', '1. Offers'], ['stripe', '2. Stripe products'], ['pipelines', '3. Pipelines'], ['calendars', '4. Calendars']];
   const tabBar = `<div style="display:flex;gap:4px;border-bottom:1px solid var(--border);margin-bottom:14px;flex-wrap:wrap">` +
     tabs.map(([k, l]) => `<button onclick="_v15kSetupTab('${k}')" style="background:none;border:none;border-bottom:2px solid ${tab === k ? 'var(--gold)' : 'transparent'};color:${tab === k ? 'var(--text)' : 'var(--text-mute)'};font-weight:700;font-size:13px;padding:8px 12px;margin-bottom:-1px;cursor:pointer">${l}</button>`).join('') +
     `</div>`;
