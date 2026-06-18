@@ -53,8 +53,18 @@ from [[project_coachiq_integration]], now built. Offer-driven end to end.
   id optional; `plan`+`term` now sent in `details` for tag branching), and the
   webhook URL was added to PRODUCTION env. Do NOT copy the preview
   `ONBOARDING_STRIPE_SECRET_KEY` (it's `sk_test`) to prod — checkout falls back to
-  the live `STRIPE_CONNECT_SECRET_KEY`. **End-to-end still needs a real test payment
-  to confirm the GHL workflow actually runs.**
+  the live `STRIPE_CONNECT_SECRET_KEY`.
+- **2026-06-18 — switched from inbound-webhook to DIRECT workflow enrollment by ID
+  (PR #442).** Zoran's old webhook workflow was CoachIQ-era; he built a fresh
+  workflow and didn't want to make a webhook trigger. Now `fireOnboardingActivations`
+  uses the academy's GHL OAuth token (`clients.ghl_access_token`, auto-refresh via
+  `getClientGhlToken`) to **upsert the contact** then **enroll it by id**:
+  `POST /contacts/{id}/workflow/{workflowId}`. The workflow needs NO trigger — API
+  enrollment runs its steps (tag `website-enrollment`, mark WON, welcome emails).
+  Config: `GHL_ONBOARDING_WORKFLOW_ID` in prod (BAM GTA =
+  `5a90b9fd-2395-4f7f-a02d-036d0b2d989b`). `GHL_ONBOARDING_WEBHOOK_URL` REMOVED from
+  prod (no longer read). BAM GTA GHL location = `Le9phlhqKyjLyd0JTECv`.
+  **End-to-end still needs a real test payment to confirm the workflow runs.**
 
 ## Welcome video moved
 - `welcome_video` moved from the offer **Onboarding** section to **Sales**
