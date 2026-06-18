@@ -10198,9 +10198,14 @@ async function _v15ibSetup() {
   body.innerHTML = `<div class="req-empty" style="padding:24px 0"><span class="req-spin"></span> Loading sender info…</div>`;
   try {
     const token = await _mreqAuthToken();
-    const r = await fetch('/api/ghl/inbox?action=sender-info&client_id=' + encodeURIComponent(CLIENT_ID), { headers: { Authorization: 'Bearer ' + token } });
-    const j = await _safeJson(r);
-    if (!r.ok) throw new Error(j.error || ('HTTP ' + r.status));
+    const [sr, cr] = await Promise.all([
+      fetch('/api/ghl/inbox?action=sender-info&client_id=' + encodeURIComponent(CLIENT_ID), { headers: { Authorization: 'Bearer ' + token } }),
+      fetch('/api/ghl/comms-config?client_id=' + encodeURIComponent(CLIENT_ID), { headers: { Authorization: 'Bearer ' + token } }).catch(() => null),
+    ]);
+    const j = await _safeJson(sr);
+    if (!sr.ok) throw new Error(j.error || ('HTTP ' + sr.status));
+    let signupUrl = '';
+    try { const cj = cr && cr.ok ? await _safeJson(cr) : null; signupUrl = (cj && cj.signup_url) || ''; } catch (_) {}
     const row = (k, v) => `<div style="display:flex;justify-content:space-between;gap:16px;padding:12px 14px;border:1px solid var(--border);border-radius:8px;margin-bottom:8px"><span style="color:var(--text-mute);font-size:12px;text-transform:uppercase;letter-spacing:.05em">${k}</span><span style="color:var(--text);font-size:14px;font-weight:600">${v ? escapeHTML(v) : '<span style=\"color:var(--text-mute)\">not set in GHL</span>'}</span></div>`;
     body.innerHTML = `
       <div style="max-width:520px">
@@ -10209,10 +10214,33 @@ async function _v15ibSetup() {
         <div style="font-size:12.5px;color:var(--text-mute);margin-bottom:16px">The phone number and email synced with GoHighLevel for this academy.</div>
         ${row('Phone', j.phone)}
         ${row('Email', j.email)}
+        <div style="font-size:17px;font-weight:700;color:var(--text);margin:24px 0 4px">Sign-up link</div>
+        <div style="font-size:12.5px;color:var(--text-mute);margin-bottom:12px">Texted to a parent when "Send onboarding link" is on in the post-trial form.</div>
+        <input id="v15ib-signup-url" type="url" value="${escapeHTML(signupUrl)}" placeholder="https://…" style="width:100%;background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);padding:10px 12px;font:inherit;font-size:14px;margin-bottom:10px;outline:none">
+        <button id="v15ib-signup-save" onclick="_v15ibSaveSignup()" style="background:var(--gold);color:#0B0B0D;border:none;border-radius:8px;padding:9px 18px;font:inherit;font-size:13px;font-weight:700;cursor:pointer">Save link</button>
+        <span id="v15ib-signup-msg" style="margin-left:10px;font-size:12px;color:var(--text-mute)"></span>
       </div>`;
   } catch (e) {
     body.innerHTML = `<div class="req-empty" style="padding:24px 0;color:#9a3b2f">Couldn't load sender info — ${escapeHTML(e.message || String(e))}</div>`;
   }
+}
+async function _v15ibSaveSignup() {
+  const inp = document.getElementById('v15ib-signup-url');
+  const msg = document.getElementById('v15ib-signup-msg');
+  const btn = document.getElementById('v15ib-signup-save');
+  if (!inp) return;
+  if (btn) { btn.disabled = true; btn.textContent = 'Saving…'; }
+  try {
+    const token = await _mreqAuthToken();
+    const r = await fetch('/api/ghl/comms-config?client_id=' + encodeURIComponent(CLIENT_ID), {
+      method: 'PATCH', headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ signup_url: inp.value.trim() }),
+    });
+    const j = await _safeJson(r);
+    if (!r.ok) throw new Error(j.error || ('HTTP ' + r.status));
+    if (msg) { msg.textContent = 'Saved ✓'; msg.style.color = '#3a7d44'; }
+  } catch (e) { if (msg) { msg.textContent = 'Failed: ' + (e.message || e); msg.style.color = '#9a3b2f'; } }
+  finally { if (btn) { btn.disabled = false; btn.textContent = 'Save link'; } }
 }
 
 // ── Mass send (V1.5 Inbox) — tag-filtered, queued, DND-safe blast ──
@@ -14292,6 +14320,8 @@ const _bbOfferConfigs = {
     { id:'onboarding', label:'Onboarding', fields:[
       { key:'client_tag', type:'ghl_tag', label:'Member tag', default:'liveclient',
         hint:'The GHL tag that marks a contact as a paying member. Defaults to "liveclient" — added automatically when GHL connects and by the website onboarding flow. Members always win over lead tags in the Inbox.' },
+      { key:'signup_url', type:'text', label:'Sign-up link',
+        hint:'Texted to a parent when "Send onboarding link" is checked on the post-trial form, e.g. your checkout or membership sign-up URL.' },
       // Welcome video lives in the Sales section for training (it plays on the
       // post-trial website confirmation page), so drop it from onboarding here.
       ..._bbStdOnboarding(
@@ -18732,12 +18762,12 @@ function _plIsDoneTrialStage(stage) {
 // trainer leading the sale, and notes. On "good fit" the opportunity moves
 // to Done Trial, the trainer is assigned, and a signup-link text is queued
 // (not sent until the comms tab exists).
-let _PTF_OPP = null, _PTF_FIT = null, _PTF_SHOW = null;
+let _PTF_OPP = null, _PTF_FIT = null, _PTF_SHOW = null, _PTF_SENDLINK = true;
 function _plPostTrialForm(oppId) {
   let o = null;
   for (const pl of (_PL_DATA?.pipelines || [])) { const f = pl.opportunities.find(x => x.id === oppId); if (f) { o = f; break; } }
   if (!o) return;
-  _PTF_OPP = oppId; _PTF_FIT = null; _PTF_SHOW = null;
+  _PTF_OPP = oppId; _PTF_FIT = null; _PTF_SHOW = null; _PTF_SENDLINK = true;
   const tr = _plTrialInfo(o.trialDate);
   const trainers = _PL_DATA?.trainers || [];
   const trainerControl = trainers.length
@@ -18772,6 +18802,13 @@ function _plPostTrialForm(oppId) {
         </div>
       </div>
       <div class="ptf-field">
+        <label>Send onboarding link?</label>
+        <div class="ptf-seg">
+          <button type="button" id="ptf-link-yes" class="ptf-segbtn on" onclick="_ptfSetSendLink(true)">Yes, text it</button>
+          <button type="button" id="ptf-link-no" class="ptf-segbtn" onclick="_ptfSetSendLink(false)">No</button>
+        </div>
+      </div>
+      <div class="ptf-field">
         <label>Trainer leading the sale</label>
         ${trainerControl}
       </div>
@@ -18780,7 +18817,7 @@ function _plPostTrialForm(oppId) {
         <textarea id="ptf-notes" class="ptf-input" rows="3" placeholder="Anything worth noting about this trial…"></textarea>
       </div>
       <div class="ptf-err" id="ptf-err"></div>
-      <div class="ptf-note">On a good fit: card moves to Done Trial, trainer is assigned, and a signup-link text is queued (sending goes live with the comms tab).</div>
+      <div class="ptf-note">On a good fit the card moves to Done Trial + the trainer is assigned. With "Send onboarding link" on, we text the academy's sign-up link to the parent — set the link in Inbox → Setup (or the Blueprint Onboarding section).</div>
       <button class="ptf-submit" id="ptf-submit" onclick="_ptfSubmit()">Submit review</button>
     </div>`;
   ov.classList.add('open');
@@ -18826,6 +18863,11 @@ function _ptfSetFit(v) {
   document.getElementById('ptf-fit-yes')?.classList.toggle('on', v === true);
   document.getElementById('ptf-fit-no')?.classList.toggle('on', v === false);
 }
+function _ptfSetSendLink(v) {
+  _PTF_SENDLINK = v;
+  document.getElementById('ptf-link-yes')?.classList.toggle('on', v === true);
+  document.getElementById('ptf-link-no')?.classList.toggle('on', v === false);
+}
 function _ptfClose() { document.getElementById('ptf-overlay')?.classList.remove('open'); _PTF_OPP = null; }
 async function _ptfSubmit() {
   const err = document.getElementById('ptf-err');
@@ -18839,10 +18881,11 @@ async function _ptfSubmit() {
     const r = await fetch(`/api/ghl/post-trial?client_id=${encodeURIComponent(CLIENT_ID)}`, {
       method: 'POST',
       headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ opportunity_id: _PTF_OPP, good_fit: _PTF_FIT, showed_up: _PTF_SHOW, trainer, notes }),
+      body: JSON.stringify({ opportunity_id: _PTF_OPP, good_fit: _PTF_FIT, showed_up: _PTF_SHOW, trainer, notes, send_onboarding_link: _PTF_SENDLINK }),
     });
     const json = await _safeJson(r);
     if (!r.ok) throw new Error(json.error || ('HTTP ' + r.status));
+    if (_PTF_SENDLINK && json.signup_text === 'no_link') { alert('Saved — but no sign-up link is set yet, so nothing was texted. Add it in Inbox → Setup (or the Blueprint Onboarding section).'); }
     _ptfClose();
     closePipelineDrawer();
     fetchAndRenderPipelines();
