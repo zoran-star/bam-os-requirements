@@ -153,3 +153,9 @@ GET also returns `mktg` (first `marketing_manager` = **Cam**, link set 2026-06-0
 - Mobile bottom-nav got a 6th item ("Actions"). Watch for crowding on very small screens.
 - Staff assignees + notifications-to-staff are the obvious v2.
 - Onboarding **manual** flags now have TWO writers: the BB onboarding tracker AND the Action Items step — both write the same `clients.*_done_at` columns, so they stay consistent. Keep it that way.
+
+## Staff-side mirror + buildout re-trigger (2026-06-18)
+
+- **Staff now see the onboarding checklist too.** `ClientsCombinedView` OverviewTab renders `<ClientOnboardingItems>` — fetches `/api/action-items?client_id=<client.id>` (staff GET returns ALL steps, incl. staff-only), shows toggles, badges staff-only steps. The API already allowed staff (`canAccessClient` = `isStaff || ...`).
+- **Re-trigger a systems buildout** = uncheck → re-check `trigger_buildout`. Unchecking clears `clients.systems_onboarding_ticket_id`; re-checking calls `createSystemsOnboardingTicket` (idempotent — bails if the id is set) which inserts a `tickets` row (type=onboarding, due +7d, fields = full client snapshot, assigned to first `systems_manager`) and sets the id. Staff can now do this from the OverviewTab checklist.
+- Did this manually for **Pro Precision** on 2026-06-18 (new systems ticket created) via SQL replicating `createSystemsOnboardingTicket`.
