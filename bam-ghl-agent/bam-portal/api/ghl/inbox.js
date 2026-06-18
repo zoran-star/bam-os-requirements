@@ -272,7 +272,7 @@ async function handler(req, res) {
   // ────────────────────────────────────────────────────────
   let convos = [];
   try {
-    const params = new URLSearchParams({ locationId, limit: "50" });
+    const params = new URLSearchParams({ locationId, limit: "100" });
     const data = await ghl("GET", `/conversations/search?${params}`, { token });
     convos = data.conversations || data.data || [];
   } catch (e) {

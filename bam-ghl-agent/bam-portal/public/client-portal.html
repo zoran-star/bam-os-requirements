@@ -6594,7 +6594,7 @@ Then the call to action."]</div>
         <!-- Active thread -->
         <div class="chat-main" id="messages-main">
           <div class="chat-header" id="messages-header" style="display:flex;align-items:center;gap:12px">
-            <button id="messages-back" onclick="_msgBack()" aria-label="Back" title="Back" style="display:none;background:var(--surface);border:1px solid var(--border-med);border-radius:8px;color:var(--text);width:34px;height:34px;cursor:pointer;flex:0 0 auto;font-size:16px;line-height:1">←</button>
+            <button id="messages-back" onclick="_msgBack()" aria-label="Back" title="Back" style="align-items:center;justify-content:center;gap:6px;background:rgba(232,197,71,0.12);border:1px solid var(--accent);border-radius:10px;color:var(--accent);height:40px;padding:0 14px;cursor:pointer;flex:0 0 auto;font:inherit;font-size:14px;font-weight:700;line-height:1">← Back</button>
             <div>
               <div class="chat-header-name" id="messages-header-name">Chat with the team</div>
             </div>
@@ -6804,6 +6804,44 @@ Then the call to action."]</div>
         display:inline-block; width:8px; height:8px; border-radius:50%;
         background:var(--accent); margin-right:6px; vertical-align:middle;
       }
+
+      /* V1.5 inbox toolbar (status pills · filters · actions) */
+      #view-inbox .v15ib-bar { margin-bottom:14px; }
+      #view-inbox .v15ib-pills { display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-bottom:10px; }
+      #view-inbox .v15ib-filters { display:flex; gap:8px; align-items:center; }
+      #view-inbox .v15ib-sel {
+        background:var(--surface); border:1px solid var(--border-med); border-radius:10px;
+        color:var(--text); padding:9px 12px; font:inherit; font-size:13px; cursor:pointer; flex:1; min-width:0;
+      }
+      #view-inbox .v15ib-clear {
+        background:none; border:1px solid var(--border-med); border-radius:10px;
+        color:var(--text-mute); width:38px; height:38px; flex:0 0 auto; cursor:pointer; font-size:13px;
+      }
+      #view-inbox .v15ib-icon {
+        width:38px; height:38px; border-radius:10px; border:1px solid var(--border-med);
+        background:var(--surface); color:var(--text-sub); cursor:pointer; font-size:16px;
+        flex:0 0 auto; display:inline-flex; align-items:center; justify-content:center;
+      }
+      #view-inbox .v15ib-icon.v15ib-send { background:var(--gold); border-color:var(--gold); color:#0B0B0D; }
+      #view-inbox .v15ib-icon:hover { color:var(--text); border-color:var(--text-mute); }
+      #view-inbox .v15ib-icon.v15ib-send:hover { color:#0B0B0D; filter:brightness(1.05); }
+      #view-inbox .v15ib-count { font-size:11px; color:var(--text-mute); margin-top:9px; }
+      #view-inbox .v15ib-avatar {
+        width:40px; height:40px; border-radius:50%; flex:0 0 auto;
+        background:var(--surface); border:1px solid var(--border-med); color:var(--text-sub);
+        display:flex; align-items:center; justify-content:center; font-size:14px; font-weight:700;
+      }
+      @media (max-width:640px) {
+        #view-inbox .v15ib-setup { display:none; }            /* Setup not needed on mobile */
+        #view-inbox .v15ib-filters { flex-direction:column; align-items:stretch; }
+        #view-inbox .v15ib-sel { width:100%; flex:none; }
+        #view-inbox .v15ib-filters .v15ib-clear { width:100%; }
+      }
+
+      /* Team-chat back button — mobile-only. On desktop the left nav handles
+         navigation, so the button is hidden (it looked out of place there). */
+      #messages-back { display:none; }
+      @media (max-width:768px) { #messages-back.show { display:inline-flex; } }
 
       /* Thread drawer */
       #ib-drawer-overlay { position:fixed; inset:0; background:rgba(0,0,0,0.45); opacity:0; pointer-events:none; transition:opacity 250ms; z-index:60; }
@@ -9894,7 +9932,7 @@ async function _v15calCreateBooking() {
 // Reuses /api/ghl/inbox (list + thread) + /api/ghl/send-message. (P2 adds
 // pipeline/stage + failed filters; P3 adds mass send.)
 // ══════════════════════════════════════════════════════════════
-let _V15IB = { convos: [], pipelines: [], contactPipe: {}, unreadOnly: false, failedOnly: false, fPipeline: '', fStage: '', active: null, messages: [], type: 'SMS', pending: [] };
+let _V15IB = { convos: [], pipelines: [], contactPipe: {}, pipeOppCount: 0, unreadOnly: false, failedOnly: false, fPipeline: '', fStage: '', active: null, messages: [], type: 'SMS', pending: [] };
 const _V15IB_FAILED = ['failed', 'undelivered', 'error', 'rejected'];
 
 async function openV15Inbox() {
@@ -9912,14 +9950,20 @@ async function openV15Inbox() {
     if (!ir.ok) throw new Error(ij.error || ('HTTP ' + ir.status));
     _V15IB.convos = ij.conversations || [];
     // Build contactId → {pipeline, stage} from the pipeline board.
-    _V15IB.pipelines = []; _V15IB.contactPipe = {};
+    _V15IB.pipelines = []; _V15IB.contactPipe = {}; _V15IB.pipeOppCount = 0;
     try {
       const pj = pr && pr.ok ? await _safeJson(pr) : null;
       _V15IB.pipelines = (pj && pj.pipelines) || [];
+      // Index each opportunity by EVERY key we might match a conversation on —
+      // contactId, normalized phone, lowercased email — so a filter never drops
+      // a conversation just because one id doesn't line up across GHL endpoints.
       for (const p of _V15IB.pipelines) {
         const stageName = {}; for (const s of (p.stages || [])) stageName[s.id] = s.name;
         for (const o of (p.opportunities || [])) {
-          if (o.contactId) _V15IB.contactPipe[o.contactId] = { pipelineId: p.id, pipelineName: p.name, stageId: o.stageId, stageName: stageName[o.stageId] || '' };
+          const rec = { pipelineId: p.id, pipelineName: p.name, stageId: o.stageId, stageName: stageName[o.stageId] || '' };
+          for (const key of [o.contactId, _ibNormKey(o.contact && o.contact.phone), _ibNormKey((o.contact && o.contact.email || '').toLowerCase())]) {
+            if (key) { _V15IB.contactPipe[key] = rec; _V15IB.pipeOppCount++; }
+          }
         }
       }
     } catch (_) { /* pipelines optional */ }
@@ -9936,12 +9980,27 @@ function _v15ibSetFailed(v) { _V15IB.failedOnly = v; if (v) _V15IB.unreadOnly = 
 function _v15ibSetPipeline(v) { _V15IB.fPipeline = v; _V15IB.fStage = ''; _v15ibRenderAll(); }
 function _v15ibSetStage(v) { _V15IB.fStage = v; _v15ibRenderAll(); }
 
+// Strip a phone/email down to a stable match key (digits-only for phones).
+function _ibNormKey(v) {
+  if (!v) return '';
+  const s = String(v).trim().toLowerCase();
+  if (s.includes('@')) return s;            // email
+  const digits = s.replace(/\D+/g, '');     // phone → digits only
+  return digits || s;
+}
+// Resolve a conversation's pipeline/stage by any matching key.
+function _v15ibPipeOf(c) {
+  return _V15IB.contactPipe[c.contactId]
+    || _V15IB.contactPipe[_ibNormKey(c.phone)]
+    || _V15IB.contactPipe[_ibNormKey((c.email || '').toLowerCase())]
+    || null;
+}
 function _v15ibFiltered() {
   return _V15IB.convos.filter(c => {
     if (_V15IB.unreadOnly && !((c.unreadCount || 0) > 0)) return false;
     if (_V15IB.failedOnly && !_V15IB_FAILED.includes(c.lastMessageStatus || '')) return false;
     if (_V15IB.fPipeline) {
-      const cp = _V15IB.contactPipe[c.contactId];
+      const cp = _v15ibPipeOf(c);
       if (!cp || cp.pipelineId !== _V15IB.fPipeline) return false;
       if (_V15IB.fStage && cp.stageId !== _V15IB.fStage) return false;
     }
@@ -9949,49 +10008,83 @@ function _v15ibFiltered() {
   });
 }
 
+function _v15ibClearPipe() { _V15IB.fPipeline = ''; _V15IB.fStage = ''; _v15ibRenderAll(); }
+
 function _v15ibRenderAll() {
   const host = document.getElementById('v15inbox-content');
   if (!host) return;
-  const selStyle = "background:var(--surface);border:1px solid var(--border-med);border-radius:999px;color:var(--text-sub);padding:7px 12px;font:inherit;font-size:12.5px;cursor:pointer";
+  const unread = _V15IB.unreadOnly, failed = _V15IB.failedOnly;
   const pipeOpts = `<option value="">All pipelines</option>` + _V15IB.pipelines.map(p => `<option value="${escapeHTML(p.id)}" ${_V15IB.fPipeline === p.id ? 'selected' : ''}>${escapeHTML(p.name)}</option>`).join('');
   const curPipe = _V15IB.pipelines.find(p => p.id === _V15IB.fPipeline);
   const stageOpts = `<option value="">All stages</option>` + (curPipe ? (curPipe.stages || []).map(s => `<option value="${escapeHTML(s.id)}" ${_V15IB.fStage === s.id ? 'selected' : ''}>${escapeHTML(s.name)}</option>`).join('') : '');
+  const n = _v15ibFiltered().length;
+  const filterActive = _V15IB.fPipeline || _V15IB.fStage;
+  const countLabel = `${n} conversation${n === 1 ? '' : 's'}${filterActive ? ' in filter' : ''}`;
   host.innerHTML = `
-    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:16px">
-      <button onclick="_v15ibSetUnread(false);_v15ibSetFailed(false)" style="${_v15ibPill(!_V15IB.unreadOnly && !_V15IB.failedOnly)}">All</button>
-      <button onclick="_v15ibSetUnread(${!_V15IB.unreadOnly})" style="${_v15ibPill(_V15IB.unreadOnly)}">Unread</button>
-      <button onclick="_v15ibSetFailed(${!_V15IB.failedOnly})" style="${_v15ibPill(_V15IB.failedOnly)}">Failed</button>
-      <select onchange="_v15ibSetPipeline(this.value)" style="${selStyle}">${pipeOpts}</select>
-      ${curPipe ? `<select onchange="_v15ibSetStage(this.value)" style="${selStyle}">${stageOpts}</select>` : ''}
-      <span style="flex:1"></span>
-      <button onclick="_v15ibMassSend()" style="background:var(--gold);color:#0B0B0D;border:none;border-radius:8px;padding:9px 14px;font:inherit;font-size:12px;font-weight:700;cursor:pointer">✉ Mass send</button>
-      <button onclick="_v15ibSetup()" style="background:none;border:1px solid var(--border);border-radius:8px;color:var(--text-sub);padding:9px 12px;font:inherit;font-size:12px;cursor:pointer">⚙ Setup</button>
+    <div class="v15ib-bar">
+      <div class="v15ib-pills">
+        <button onclick="_v15ibSetUnread(false);_v15ibSetFailed(false)" style="${_v15ibPill(!unread && !failed)}">All</button>
+        <button onclick="_v15ibSetUnread(${!unread})" style="${_v15ibPill(unread)}">Unread</button>
+        <button onclick="_v15ibSetFailed(${!failed})" style="${_v15ibPill(failed)}">Failed</button>
+        <span style="flex:1"></span>
+        <button onclick="_v15ibMassSend()" class="v15ib-icon v15ib-send" title="Mass send" aria-label="Mass send">✉</button>
+        <button onclick="_v15ibSetup()" class="v15ib-icon v15ib-setup" title="Setup" aria-label="Setup">⚙</button>
+      </div>
+      <div class="v15ib-filters">
+        <select onchange="_v15ibSetPipeline(this.value)" class="v15ib-sel">${pipeOpts}</select>
+        ${curPipe ? `<select onchange="_v15ibSetStage(this.value)" class="v15ib-sel">${stageOpts}</select>` : ''}
+        ${filterActive ? `<button onclick="_v15ibClearPipe()" class="v15ib-clear" title="Clear pipeline filter" aria-label="Clear filter">✕</button>` : ''}
+      </div>
+      <div class="v15ib-count">${countLabel}</div>
     </div>
     <div id="v15ib-body"></div>`;
   _v15ibRenderList();
 }
 
+// Initials for the row avatar — first letters of up to two name words; falls
+// back to a generic glyph for phone-number / nameless contacts.
+function _ibInitials(name) {
+  const words = String(name || '').trim().split(/\s+/).filter(w => /[a-z0-9]/i.test(w));
+  if (!words.length) return '•';
+  const ltrs = words.slice(0, 2).map(w => (w.match(/[a-z0-9]/i) || [''])[0]).join('');
+  return ltrs.toUpperCase() || '•';
+}
 function _v15ibRenderList() {
   const body = document.getElementById('v15ib-body');
   if (!body) return;
   const rows = _v15ibFiltered();
   if (!rows.length) {
-    body.innerHTML = `<div class="req-empty" style="padding:32px 0;color:var(--text-mute)">No conversations match these filters.</div>`;
+    let msg = 'No conversations yet.';
+    if (_V15IB.unreadOnly) msg = 'No unread conversations.';
+    else if (_V15IB.failedOnly) msg = 'No failed messages — all good.';
+    else if (_V15IB.fPipeline) {
+      msg = _V15IB.pipeOppCount === 0
+        ? "Couldn't load this pipeline's contacts. Pull to refresh and try again."
+        : "No one in this stage has a recent conversation. The inbox shows your 100 most recent threads.";
+    }
+    body.innerHTML = `<div class="req-empty" style="padding:32px 16px;color:var(--text-mute);text-align:center;line-height:1.5">${escapeHTML(msg)}</div>`;
     return;
   }
-  body.innerHTML = `<div style="border:1px solid var(--border);border-radius:10px;overflow:hidden">` + rows.map(c => {
+  body.innerHTML = `<div style="border:1px solid var(--border);border-radius:12px;overflow:hidden">` + rows.map(c => {
     const unread = (c.unreadCount || 0) > 0;
     const ch = String(c.channel || c.lastMessageType || '').replace(/^TYPE_/, '').toUpperCase().includes('MAIL') ? 'Email' : 'SMS';
+    const name = c.contactName || '(no name)';
+    const cp = _v15ibPipeOf(c);
+    const chip = cp ? `<div style="margin-top:5px"><span style="font-size:10px;color:var(--text-mute);background:var(--surface);border:1px solid var(--border);border-radius:999px;padding:2px 8px;display:inline-block;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHTML(cp.pipelineName)}${cp.stageName ? ' · ' + escapeHTML(cp.stageName) : ''}</span></div>` : '';
     return `<div onclick='_v15ibOpen(${JSON.stringify(c.id)},${JSON.stringify(c.contactId || "")},${JSON.stringify(c.phone || "")},${JSON.stringify(c.email || "")},${JSON.stringify(c.contactName || "")})'
-      style="display:flex;align-items:center;gap:12px;padding:12px 14px;border-bottom:1px solid var(--border);cursor:pointer">
-      ${unread ? '<span style="width:8px;height:8px;border-radius:50%;background:var(--gold);flex:none"></span>' : '<span style="width:8px;flex:none"></span>'}
+      style="display:flex;align-items:flex-start;gap:12px;padding:13px 14px;border-bottom:1px solid var(--border);cursor:pointer">
+      <div style="position:relative;flex:none">
+        <div class="v15ib-avatar">${escapeHTML(_ibInitials(name))}</div>
+        ${unread ? '<span style="position:absolute;top:-1px;right:-1px;width:11px;height:11px;border-radius:50%;background:var(--gold);border:2px solid var(--bg)"></span>' : ''}
+      </div>
       <div style="flex:1;min-width:0">
-        <div style="font-size:13px;font-weight:${unread ? 700 : 600};color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHTML(c.contactName || '(no name)')}</div>
-        <div style="font-size:12px;color:var(--text-mute);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHTML(c.lastMessageBody || '')}</div>
+        <div style="font-size:14px;font-weight:${unread ? 700 : 600};color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHTML(name)}</div>
+        <div style="font-size:12.5px;color:${unread ? 'var(--text-sub)' : 'var(--text-mute)'};overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-top:2px">${escapeHTML(c.lastMessageBody || '')}</div>
+        ${chip}
       </div>
       <div style="text-align:right;flex:none">
-        <div style="font-size:10px;color:var(--text-mute);text-transform:uppercase;letter-spacing:.04em">${ch}</div>
         <div style="font-size:11px;color:var(--text-mute)">${escapeHTML(_ibFormatDate(c.lastMessageDate))}</div>
+        <div style="font-size:9px;color:var(--text-mute);text-transform:uppercase;letter-spacing:.05em;margin-top:3px">${ch}</div>
       </div>
     </div>`;
   }).join('') + `</div>`;
@@ -26803,7 +26896,9 @@ async function openMessagesView() {
     // Single locked thread (the academy view) → show a Back button (no sidebar
     // to navigate away with).
     const backBtn = document.getElementById('messages-back');
-    if (backBtn) backBtn.style.display = isMultiClient ? 'none' : 'inline-flex';
+    // Single locked thread → eligible for a back button, but CSS only reveals it
+    // on mobile (≤768px); on desktop the left nav is the way out.
+    if (backBtn) backBtn.classList.toggle('show', !isMultiClient);
 
     if (isMultiClient) {
       renderMessagesInbox();
