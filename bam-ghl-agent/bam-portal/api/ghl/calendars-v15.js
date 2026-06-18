@@ -239,6 +239,7 @@ async function handler(req, res) {
             dateAdded: c.dateAdded || null,
             customFields: (c.customFields || c.customField || []).map(f => ({ id: f.id, name: cfNames[f.id] || null, value: f.value != null ? f.value : f.field_value })),
           },
+          location_id: locationId,   // for the "Open in GHL" deep link
         });
       }
 

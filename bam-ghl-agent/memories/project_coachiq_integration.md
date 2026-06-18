@@ -7,6 +7,33 @@ metadata:
 
 # CoachIQ integration
 
+## ⭐ 2026-06-18 — TRACK A ONBOARDING CODED + DEPLOYED (gated, inert until env set)
+
+The post-payment CoachIQ leg is now built and live on prod (PR #454), behind config
+so it does nothing until env is set. Files:
+- `api/coachiq.js` — `createCoachiqUser(member)` fires the **Zapier "Create User"**
+  catch-hook (async; can't return the id synchronously). `addCoachiqProduct(id,
+  {plan,term})` fires the **"Add a Product Purchase"** automation (product + access +
+  starter credits, no payment). Per-plan map via `COACHIQ_PRODUCT_MAP`.
+- `api/coachiq/user-created.js` — callback the Zap POSTs the new id to → stores
+  `members.coachiq_member_id` + grants the product. Secret-gated.
+- `api/coachiq/test-onboard.js` — **secret-gated test harness**, exercise each link
+  alone WITHOUT a payment: `POST /api/coachiq/test-onboard {secret, mode}` where mode =
+  `status` | `create` | `product` | `callback` | `full`.
+- `api/onboarding/activations.js` — on paid signup: returning member (has id) → grant
+  product inline; new member → fire Zap (product grants via callback). Non-fatal.
+
+**ENV TO FLIP IT ON (none set yet):** `COACHIQ_CREATE_USER_WEBHOOK_URL` (Zapier hook),
+`COACHIQ_PRODUCT_AUTOMATION_ID` (or `COACHIQ_PRODUCT_MAP`), `COACHIQ_API_KEY`,
+`COACHIQ_GROUP_ID` (719bb0cf for GTA), `COACHIQ_WEBHOOK_SECRET` (guards callback+test).
+Zapier final step must POST `{member_id, coachiq_user_id, secret}` to
+`/api/coachiq/user-created`. **Rotate the API key pasted in chat 2026-06-01.**
+
+**Confirmation-page UX (download app / set password / book / credits) = NOT built yet**
+— next step, lives in bam-client-sites enroll.jsx. "See credits" on our page can only
+show the granted amount (no public API for live balance); live balance is in the app.
+
+
 ## Why this matters (the strategic goal)
 
 **The point of all this: figure out how to connect CoachIQ to the FullControl
