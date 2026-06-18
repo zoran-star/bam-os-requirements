@@ -4,6 +4,29 @@ The canonical doc for how onboarding, V2 access, the Business Blueprint, the tra
 
 > ⚠ **KEEP THIS UPDATED.** Any change to the staff toggle, the V2/V1 split, the BB cards, the tracker visibility logic, the mark-done flow, or the welcome Slack flow MUST update this note in the same commit. If something here is stale, the next session will burn an hour re-deriving the model and probably get it wrong.
 
+> **2026-06-18:** the V1.5→V2 jump is member management, and members are now
+> **offer-scoped** — `members.offer_id`/`members_staging.offer_id` derived at
+> import from the member's Stripe price (`pricing_catalog.offer_id`), mirroring
+> `entry_points.offer_id`. See [[project_member_management_portal]] Session 7.
+>
+> **2026-06-18 — V2 ⊇ V1.5 (Contacts):** V2 is now a SUPERSET of V1.5 for the
+> **Contacts** (full-CRM) tab — a V2 academy still manages leads/contacts, so
+> Contacts shows when `v15_access OR v2_access`. New `applyContactsNavState()`
+> (client-portal.html) targets ONLY `#nav-contacts` (the Contacts item got an
+> id), called from BOTH `applyV2NavState` + `applyV15NavState` (V15 runs last at
+> boot/switch so it resolves correctly). The other `data-feature="v15"` items
+> (v15inbox/v15kpis/v15cal/pipelines) are NOT surfaced for V2 — V2 has its own
+> Inbox/Pricing/Members/Calendar/Pipelines, so showing the v15 variants would
+> duplicate. Web-only (`!isNativeApp()`). On branch `feat/member-import-offer-scope`.
+>
+> **Tier flags are mutually exclusive** (`v15_access` XOR `v2_access`). BAM GTA
+> itself is currently **V1.5** (`v15_access=true`) — the older "GTA is the only
+> V2 client" line below is STALE. A V2 demo clone exists: **"BAM GTA (V2)"**
+> `50c14b2c-3f89-4438-ab73-3067bc0f7017` (cloned 2026-06-18 — offers/pricing/
+> members/entry_points/locations/ghl_contacts copied; Stripe sub ids + GHL
+> location NULLed so it never touches real billing/GHL; all 4 members
+> auto-resolved an `offer_id`). Use it to compare V1.5 vs V2 side by side.
+
 ## V1 vs V2 — what each client sees
 
 The staff "V2 access" toggle (per client) is the only switch. Today V2 unlocks **5 nav items**: Members, Pricing, Inbox, Pipelines, Calendar. Everything else is V1 and visible to every client.

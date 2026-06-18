@@ -5503,7 +5503,7 @@
         Assets
       </div>
 
-      <div class="nav-item" data-feature="v15" style="display:none" onclick="switchView('contacts', this)">
+      <div class="nav-item" id="nav-contacts" data-feature="v15" style="display:none" onclick="switchView('contacts', this)">
         <span class="nav-icon" aria-hidden="true">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/>
@@ -11087,7 +11087,22 @@ function applyV2NavState(v2Access) {
   // Re-run V2-gated feature gates.
   applyMemberMgmtNavState();
   applyCalendarNavState();
+  applyContactsNavState();
   if (typeof applyTalkToBamNav === 'function') applyTalkToBamNav();
+}
+
+// V2 is a SUPERSET of V1.5: a V2 academy still manages leads/contacts, so the
+// full-CRM Contacts tab (a V1.5 surface) shows for V2 too. Targets only the
+// Contacts item by id — V2 has its own Inbox/KPIs/Calendar/Pipelines, so we do
+// NOT surface the other data-feature="v15" items here (that would duplicate).
+// Web-only, like the other V1.5/V2 tabs. Called from both nav gates so it's
+// correct regardless of which runs last at boot.
+function applyContactsNavState() {
+  const show = ((typeof V15_ACCESS !== 'undefined' && V15_ACCESS) ||
+                (typeof V2_ACCESS !== 'undefined' && V2_ACCESS)) &&
+               !(typeof isNativeApp === 'function' && isNativeApp());
+  const el = document.getElementById('nav-contacts');
+  if (el) el.style.display = show ? '' : 'none';
 }
 
 // ── V1.5 feature gate ──
@@ -11113,6 +11128,7 @@ function applyV15NavState(v15) {
   // top margin (which left a gap below the topbar).
   const acHead = document.getElementById('active-campaigns-head');
   if (acHead) acHead.style.marginTop = v15 ? '0' : '48px';
+  applyContactsNavState(); // V2 keeps Contacts too — override the bulk v15 toggle above
   applyTalkToBamNav();
 }
 
@@ -17593,7 +17609,10 @@ async function _safeJson(res) {
 // re-renders without re-fetching).
 let _MEMBERS_ALL = [];
 let _MEMBERS_SORTER = null; // import-strip done-flags from /api/members `sorter`
-let _MEMBERS_FILTER = { q: '', status: 'all', trainer: 'all', engagement: 'all', sort: 'name' };
+let _MEMBERS_FILTER = { q: '', status: 'all', trainer: 'all', engagement: 'all', offer: 'all', sort: 'name' };
+// Set during render: true when the roster spans 2+ offers, so the offer pill +
+// filter only appear once a second offer exists (mirrors the Sales page).
+let _MEMBERS_MULTI_OFFER = false;
 let _MEMBERS_FILTER_OPEN = false;
 
 // ───────── Action Items (v1) ─────────
@@ -18076,6 +18095,33 @@ function _memberPricingPill(pricing) {
   return `<span title="${escapeHTML(title)}" style="display:inline-block;font-size:11px;font-weight:600;padding:1px 8px;border-radius:999px;background:transparent;border:1px solid ${color};color:${color}">${escapeHTML(label)}</span>`;
 }
 
+// Offer scoping (V2): which offer a member belongs to, derived at import from
+// their Stripe price. Only shown once the roster spans 2+ offers — a single-offer
+// academy (today's GTA) would just see the same pill on every card.
+function _memberOfferPill(m) {
+  if (!_MEMBERS_MULTI_OFFER) return '';
+  if (!m.offer || !m.offer.title) return '';
+  const label = m.offer.title.length > 18 ? m.offer.title.slice(0, 17) + '…' : m.offer.title;
+  return `<span title="Offer: ${escapeHTML(m.offer.title)}" style="display:inline-block;font-size:11px;font-weight:600;padding:1px 8px;border-radius:999px;background:transparent;border:1px solid var(--gold,#E8C547);color:var(--gold,#E8C547)">${escapeHTML(label)}</span>`;
+}
+
+// Plan name + actual price, shown right on the roster card so you see who's on
+// what at a glance (offer pill answers "which offer", this answers "which price").
+// Pulls from the pricing_catalog enrichment (amount_cents + interval + name).
+function _memberPriceLabel(pricing) {
+  if (!pricing || !pricing.amount_cents) return '';
+  const dollars = (pricing.amount_cents / 100);
+  const amt = '$' + (Number.isInteger(dollars) ? dollars : dollars.toFixed(2));
+  const intervalMap = {
+    '4_weeks': '/4wk', 'week': '/wk', 'month': '/mo', '3_months': '/3mo',
+    '6_months': '/6mo', 'year': '/yr', 'one_time': ' one-time',
+  };
+  const per = intervalMap[pricing.interval] || (pricing.interval ? '/' + pricing.interval : '');
+  const name = pricing.display_name || pricing.canonical_plan || '';
+  const text = (name ? name + ' · ' : '') + amt + per;
+  return `<span title="${escapeHTML(text)}" style="display:inline-block;font-size:11px;font-weight:600;color:var(--text-mute);white-space:nowrap">${escapeHTML(text)}</span>`;
+}
+
 // Circular avatar — uses uploaded image if present, otherwise initials on
 // a deterministic colored circle.
 function _memberAvatar(m, size) {
@@ -18102,6 +18148,7 @@ function _filterMembers(all) {
     if (f.status === 'issues' && !isIssue(m.status))    return false;
     if (f.trainer    !== 'all' && (m.trainer    || '') !== f.trainer)    return false;
     if (f.engagement !== 'all' && (m.engagement || '') !== f.engagement) return false;
+    if (f.offer      !== 'all' && ((m.offer && m.offer.id) || 'none') !== f.offer) return false;
     if (f.q) {
       const q = f.q.toLowerCase();
       const hay = ((m.athlete_name || '') + ' ' + (m.parent_name || '')).toLowerCase();
@@ -18179,6 +18226,7 @@ function _membersClearFilters() {
   _MEMBERS_FILTER.status     = 'all';
   _MEMBERS_FILTER.trainer    = 'all';
   _MEMBERS_FILTER.engagement = 'all';
+  _MEMBERS_FILTER.offer      = 'all';
   _renderMembersView();
 }
 
@@ -18209,7 +18257,18 @@ function _renderMembersView() {
     .filter(t => trainerSet.has(t))
     .concat([...trainerSet].filter(t => !['Filip','Zoran','Adrian','Sergio'].includes(t)).sort());
 
-  const activeFilterCount = ['status','trainer','engagement'].filter(k => f[k] !== 'all').length;
+  // Offers present in the roster (id → title), + a "none" bucket for members
+  // whose price isn't offer-mapped yet. Multi-offer flag drives the pill+filter.
+  const offerMap = new Map();
+  let hasUnoffered = false;
+  for (const m of all) {
+    if (m.offer && m.offer.id) offerMap.set(m.offer.id, m.offer.title || 'Untitled offer');
+    else hasUnoffered = true;
+  }
+  const offerList = [...offerMap.entries()]; // [ [id, title], ... ]
+  _MEMBERS_MULTI_OFFER = offerList.length > 1;
+
+  const activeFilterCount = ['status','trainer','engagement','offer'].filter(k => f[k] !== 'all').length;
 
   // Pill-style chip used inside the filter popover.
   const filterChip = (field, value, label, count) => {
@@ -18240,6 +18299,13 @@ function _renderMembersView() {
         ${filterChip('engagement','consistent','Consistent')}
         ${filterChip('engagement','at_risk','At risk')}
       </div>
+      ${offerList.length > 1 ? `
+      <div style="${popoverLabel};margin-bottom:8px">Offer</div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px">
+        ${filterChip('offer','all','Any')}
+        ${offerList.map(([id, title]) => filterChip('offer', id, title)).join('')}
+        ${hasUnoffered ? filterChip('offer','none','No offer') : ''}
+      </div>` : ''}
       <div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px;padding-top:12px;border-top:1px solid var(--border)">
         <button onclick="_membersClearFilters()" style="background:transparent;border:none;color:var(--text-mute);font-size:12px;cursor:pointer;text-decoration:underline;padding:4px 0">Clear all</button>
         <button onclick="_membersToggleFilterPopover()" style="background:var(--gold,#E8C547);color:#0B0B0D;border:none;padding:6px 16px;font-size:12px;font-weight:700;border-radius:4px;cursor:pointer;font-family:inherit">Done</button>
@@ -18325,7 +18391,7 @@ function _renderMembersView() {
         <div class="member-card-parent">Parent: ${escapeHTML(m.parent_name || '—')}</div>
       </div>
       <div class="member-card-trainer">${escapeHTML(m.trainer || '—')}</div>
-      <div class="member-card-pills">${_memberStatusPill(m.status, m)}${_memberEngagementChip(m.engagement)}${_memberPricingPill(m.pricing)}</div>
+      <div class="member-card-pills">${_memberPriceLabel(m.pricing)}${_memberStatusPill(m.status, m)}${_memberEngagementChip(m.engagement)}${_memberOfferPill(m)}${_memberPricingPill(m.pricing)}</div>
     </div>`).join('');
 
   container.innerHTML = importStrip + toolbar + cards;
