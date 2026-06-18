@@ -1234,6 +1234,28 @@ export function MarketingTab({ client, tokens, role, session, onChanged, forceCa
     }
   }
 
+  // Organic content — when on, the client's Marketing tab gets an Ads | Organic split.
+  const organicContent = client.organic_content === true;
+  const [savingOrganic, setSavingOrganic] = useState(false);
+  async function toggleOrganicContent(nextValue) {
+    setSavingOrganic(true);
+    try {
+      const tok = session?.access_token;
+      const res = await fetch(`/api/clients?action=update-fields&id=${client.id}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${tok}` },
+        body: JSON.stringify({ client_id: client.id, organic_content: nextValue }),
+      });
+      const j = await res.json().catch(() => ({}));
+      if (!res.ok) { alert("Couldn't save: " + (j.error || res.statusText)); }
+      else onChanged?.();
+    } catch (err) {
+      alert("Couldn't save: " + (err?.message || err));
+    } finally {
+      setSavingOrganic(false);
+    }
+  }
+
   // Setup state
   const [adAccounts, setAdAccounts] = useState([]);
   const [metaConnected, setMetaConnected] = useState(null); // null=loading
@@ -1429,6 +1451,44 @@ export function MarketingTab({ client, tokens, role, session, onChanged, forceCa
               background: "#fff",
               transition: "left 0.2s ease",
               boxShadow: "0 1px 3px rgba(0,0,0,0.2)",
+            }} />
+          </button>
+        )}
+      </div>
+
+      {/* Organic content toggle — gives the client an Ads | Organic split in their Marketing tab */}
+      <div style={{
+        padding: "14px 18px", marginBottom: 22, borderRadius: 8,
+        background: t.surfaceEl, border: `1px solid ${organicContent ? `${t.green}55` : t.border}`,
+        display: "flex", alignItems: "center", gap: 14,
+      }}>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontSize: 13, fontWeight: 600, color: t.text }}>
+            {organicContent ? "Organic content: ON" : "Organic content: off"}
+          </div>
+          <div style={{ fontSize: 12, color: t.textMute, marginTop: 2 }}>
+            {organicContent
+              ? "Client's Marketing tab shows an Ads | Organic split; they can request organic creatives."
+              : "Client only sees Ads in their Marketing tab."}
+          </div>
+        </div>
+        {canEdit && (
+          <button
+            type="button"
+            onClick={() => toggleOrganicContent(!organicContent)}
+            disabled={savingOrganic}
+            aria-label={organicContent ? "Turn off organic content" : "Turn on organic content"}
+            style={{
+              width: 44, height: 24, borderRadius: 999, position: "relative",
+              background: organicContent ? t.green : t.borderStr || t.border,
+              border: "none", cursor: savingOrganic ? "wait" : "pointer",
+              transition: "background 0.2s ease", opacity: savingOrganic ? 0.6 : 1, flexShrink: 0,
+            }}
+          >
+            <span style={{
+              position: "absolute", top: 2, left: organicContent ? 22 : 2,
+              width: 20, height: 20, borderRadius: "50%", background: "#fff",
+              transition: "left 0.2s ease", boxShadow: "0 1px 3px rgba(0,0,0,0.2)",
             }} />
           </button>
         )}

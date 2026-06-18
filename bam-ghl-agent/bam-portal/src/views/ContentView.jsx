@@ -948,6 +948,17 @@ function ContentTicketDetail({ tk, session, ticket, onBack, onRefetch, patchTick
         <StatusBadge ticket={ticket} tk={tk} />
       </div>
 
+      {/* Brand reference (collapsible) — colors/fonts/logos so the team builds on-brand */}
+      <details style={{ marginBottom: 22, background: tk.surface, border: `1px solid ${tk.border}`, borderRadius: 10, padding: "12px 16px" }}>
+        <summary style={{
+          cursor: "pointer", userSelect: "none",
+          fontFamily: "monospace", fontSize: 10, letterSpacing: "0.22em", textTransform: "uppercase", color: tk.textMute,
+        }}>🎨 Brand</summary>
+        <div style={{ marginTop: 12 }}>
+          <BrandCard brand={ticket.client?.brand_data} tk={tk} />
+        </div>
+      </details>
+
       {/* Client inputs */}
       <SectionLabel tk={tk}>What the client submitted</SectionLabel>
       <Card tk={tk} style={{ marginBottom: 22 }}>
@@ -1244,6 +1255,59 @@ function ClientInputs({ ticket, tk }) {
         </>
       )}
     </>
+  );
+}
+
+// Client brand reference — colors, fonts, logos — so the content team builds
+// on-brand without leaving the ticket. Reads clients.brand_data.
+function BrandCard({ brand, tk }) {
+  const b = brand || {};
+  const colors = [["Primary", b.color_primary], ["Secondary", b.color_secondary], ["Accent", b.color_accent]].filter(c => c[1]);
+  const logos = [["Dark bg", b.logo_dark_url], ["Light bg", b.logo_light_url], ["Icon", b.icon_url]].filter(l => l[1]);
+  const hasAny = colors.length || logos.length || b.font_display || b.font_body || b.notes || b.stats;
+  if (!hasAny) {
+    return <div style={{ color: tk.textMute, fontSize: 13, fontStyle: "italic" }}>No brand info on file yet.</div>;
+  }
+  const row = (label, value) => value ? (
+    <div style={{ display: "flex", gap: 14, padding: "8px 0", borderBottom: `1px solid ${tk.borderSoft || tk.border}` }}>
+      <div style={{ fontFamily: "monospace", fontSize: 10, letterSpacing: "0.16em", textTransform: "uppercase", color: tk.textMute, width: 90, flexShrink: 0, paddingTop: 3 }}>{label}</div>
+      <div style={{ flex: 1, minWidth: 0, fontSize: 14, color: tk.text }}>{value}</div>
+    </div>
+  ) : null;
+  return (
+    <div>
+      {colors.length > 0 && row("Colors", (
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
+          {colors.map(([name, hex]) => (
+            <div key={name} style={{ display: "flex", alignItems: "center", gap: 7 }}>
+              <span style={{ width: 22, height: 22, borderRadius: 5, background: hex, border: `1px solid ${tk.border}`, display: "inline-block" }} />
+              <span style={{ fontFamily: "monospace", fontSize: 12 }}>{hex}</span>
+              <span style={{ fontSize: 11, color: tk.textMute }}>{name}</span>
+            </div>
+          ))}
+        </div>
+      ))}
+      {(b.font_display || b.font_body) && row("Fonts", (
+        <span>{[b.font_display && `Display: ${b.font_display}`, b.font_body && `Body: ${b.font_body}`].filter(Boolean).join("  ·  ")}</span>
+      ))}
+      {logos.length > 0 && row("Logos", (
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+          {logos.map(([name, url]) => (
+            <a key={name} href={url} target="_blank" rel="noreferrer" title={name} style={{
+              display: "flex", flexDirection: "column", alignItems: "center", gap: 3,
+              padding: 6, borderRadius: 6, border: `1px solid ${tk.border}`, background: name === "Light bg" ? "#fff" : tk.surfaceHov,
+              textDecoration: "none",
+            }}>
+              <img src={url} alt={name} style={{ width: 48, height: 36, objectFit: "contain" }} />
+              <span style={{ fontSize: 9, color: tk.textMute }}>{name}</span>
+            </a>
+          ))}
+        </div>
+      ))}
+      {row("Website", b.website_url || b.domain ? <a href={(b.website_url || b.domain).startsWith("http") ? (b.website_url || b.domain) : `https://${b.website_url || b.domain}`} target="_blank" rel="noreferrer" style={{ color: tk.accent, textDecoration: "none" }}>{b.website_url || b.domain} ↗</a> : null)}
+      {row("Brand notes", b.notes ? <span style={{ whiteSpace: "pre-wrap" }}>{b.notes}</span> : null)}
+      {row("Stats", b.stats || null)}
+    </div>
   );
 }
 
