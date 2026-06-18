@@ -10,50 +10,36 @@
 //              manual API enrollment runs the workflow's action steps (tag, mark
 //              opportunity WON, send welcome emails) for that contact. Decided
 //              2026-06-18: direct-by-ID replaced the old inbound-webhook approach.
-//   2. COACHIQ (if the academy uses it) — create the CoachIQ user (Zapier; still
-//              a stub until wired) and fire the per-product automation that grants
-//              the product + credits.
+//   2. COACHIQ (if the academy uses it) — create + enroll the CoachIQ user via the
+//              Zapier "Create User" hook (the only proven create+enroll path), then
+//              grant the product (= product + program access + starter credits, no
+//              payment). New users: the id returns via /api/coachiq/user-created,
+//              which grants the product. Returning members (id already stored): grant
+//              the product inline. See api/coachiq.js + memories/project_coachiq_integration.md.
 //
 // Each hook is INDEPENDENT and NON-FATAL: one failing never blocks the other or
 // the Stripe webhook. Everything is GATED behind config, so with nothing set this
 // is an inert no-op (safe to ship before the academy is configured).
 //
 // CONFIG (env for the BAM GTA proof; per-academy `clients` columns later):
-//   GHL_ONBOARDING_WORKFLOW_ID   the GHL workflow id to enroll new paid members into
-//                                (the long id after /workflows/ in the GHL URL).
-//                                THIS IS ALL THAT'S NEEDED to fire the onboarding
-//                                automation. The academy's GHL OAuth token (clients
-//                                .ghl_access_token, auto-refresh) does the API calls.
-//   ONBOARDING_PRODUCT_MAP       OPTIONAL JSON: { "<plan>|<term>": { coachiq_automation_id } }.
-//                                Only used by the CoachIQ hook below. GTA doesn't need it.
-//   (CoachIQ key/group via api/coachiq.js → COACHIQ_API_KEY / COACHIQ_GROUP_ID)
+//   GHL_ONBOARDING_WORKFLOW_ID       the GHL workflow id to enroll new paid members
+//                                    into (the long id after /workflows/ in the URL).
+//                                    The academy's GHL OAuth token does the API calls.
+//   COACHIQ_CREATE_USER_WEBHOOK_URL  Zapier "Create User" catch-hook URL.
+//   COACHIQ_PRODUCT_AUTOMATION_ID    "Add a Product Purchase" automation (+ optional
+//                                    COACHIQ_PRODUCT_MAP per plan|term).
+//   COACHIQ_API_KEY / COACHIQ_GROUP_ID / COACHIQ_WEBHOOK_SECRET  (see api/coachiq.js)
 
-import { coachiqEnabled, triggerCoachiqAutomation, createCoachiqUser } from "../coachiq.js";
+import { coachiqOnboardingEnabled, createCoachiqUser, addCoachiqProduct } from "../coachiq.js";
 import { getClientGhlToken } from "../website/availability.js";
 
 const GHL_V2     = "https://services.leadconnectorhq.com";
 const V2_VERSION = "2021-07-28";
 
-function productMap() {
-  try {
-    const raw = process.env.ONBOARDING_PRODUCT_MAP;
-    return raw ? JSON.parse(raw) : {};
-  } catch (_) {
-    return {};
-  }
-}
-
-// Resolve the per-plan+term ids the two hooks need. Returns {} when unmapped.
-function mappingFor(plan, term) {
-  const map = productMap();
-  return map[`${plan}|${term}`] || map[plan] || {};
-}
-
 // member: the members row (needs parent_email, id, client_id, coachiq_member_id?)
 // ctx:    { plan, term, sb, writeAudit }
 export async function fireOnboardingActivations(member, ctx = {}) {
   const { plan, term, sb, writeAudit } = ctx;
-  const map = mappingFor(plan, term);
   const results = { ghl: null, coachiq: null };
 
   const audit = async (action_type, args) => {
@@ -118,38 +104,42 @@ export async function fireOnboardingActivations(member, ctx = {}) {
   }
 
   // ── 2. CoachIQ (only if the academy uses it) ──
-  if (coachiqEnabled()) {
+  // Two paths:
+  //   • Returning member (already has coachiq_member_id) → grant the product NOW.
+  //   • New member → fire the Zapier "Create User" hook. It can't return the id
+  //     synchronously, so the id arrives via /api/coachiq/user-created, which then
+  //     grants the product. (If the Zap IS set up to respond with an id, we store
+  //     it + grant here.) Non-fatal throughout.
+  if (coachiqOnboardingEnabled()) {
     try {
-      // Ensure a CoachIQ user id (create via Zapier if we don't have one).
-      let coachiqUserId = member.coachiq_member_id || null;
-      if (!coachiqUserId) {
-        // createCoachiqUser is still a stub until the Zapier "Create User" path is
-        // wired — this will throw and be logged as blocked (expected for now).
-        const created = await createCoachiqUser({
-          email: member.parent_email, firstName: member.parent_name,
-        });
-        coachiqUserId = created && created.id;
-        if (coachiqUserId && sb) {
-          await sb(`members?id=eq.${member.id}`, {
-            method: "PATCH", headers: { Prefer: "return=minimal" },
-            body: JSON.stringify({ coachiq_member_id: coachiqUserId }),
-          }).catch(() => {});
-        }
-      }
-      if (coachiqUserId && map.coachiq_automation_id) {
-        await triggerCoachiqAutomation(map.coachiq_automation_id, { user: { id: coachiqUserId } });
-        results.coachiq = { ok: true, automation_id: map.coachiq_automation_id };
-        await audit("onboarding-coachiq-allocated", { coachiq_user_id: coachiqUserId, automation_id: map.coachiq_automation_id });
+      const existingId = member.coachiq_member_id || null;
+      if (existingId) {
+        const product = await addCoachiqProduct(existingId, { plan, term, source: "website-enrollment" });
+        results.coachiq = { ok: true, coachiq_user_id: existingId, product };
+        await audit("onboarding-coachiq-product", { coachiq_user_id: existingId, plan, term });
       } else {
-        results.coachiq = { skipped: "missing coachiq user id or automation id" };
-        await audit("onboarding-coachiq-skipped", { reason: results.coachiq.skipped });
+        const created = await createCoachiqUser({ ...member, plan: plan || member.plan, term });
+        if (created.id) {
+          if (sb) {
+            await sb(`members?id=eq.${member.id}`, {
+              method: "PATCH", headers: { Prefer: "return=minimal" },
+              body: JSON.stringify({ coachiq_member_id: created.id }),
+            }).catch(() => {});
+          }
+          const product = await addCoachiqProduct(created.id, { plan, term, source: "website-enrollment" });
+          results.coachiq = { ok: true, coachiq_user_id: created.id, product };
+          await audit("onboarding-coachiq-created", { coachiq_user_id: created.id, plan, term });
+        } else {
+          results.coachiq = { pending: "user created via Zapier; product grants on /user-created callback" };
+          await audit("onboarding-coachiq-pending", { member_id: member.id, plan, term });
+        }
       }
     } catch (e) {
       results.coachiq = { ok: false, error: String(e && e.message || e) };
       await audit("onboarding-coachiq-error", { error: results.coachiq.error });
     }
   } else {
-    results.coachiq = { skipped: "CoachIQ not enabled for this academy" };
+    results.coachiq = { skipped: "CoachIQ onboarding not configured for this academy" };
   }
 
   return results;

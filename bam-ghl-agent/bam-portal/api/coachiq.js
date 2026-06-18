@@ -2,19 +2,16 @@
 // engine) while FullControl owns billing. See the full design + proof in
 // memories/project_coachiq_integration.md.
 //
-// STATUS (2026-06-03):
-//   ✅ addCoachiqCredits()  — PROVEN live. Fires a CoachIQ "Incoming Webhook"
-//      automation that adds credits/products to a user, resolved by CoachIQ
-//      user id. This is the only piece confirmed working end-to-end.
-//   ⏳ createCoachiqUser()  — NOT yet wired. Direct create+enroll needs an
-//      admin-scoped session (emailLogin gives only an athlete/"Guest" token;
-//      adminAddUser → "not allowed"). Pending: admin token OR Zapier "Create
-//      User". Left as a documented stub so the call site is ready.
-//
-// Nothing here is invoked by a live flow yet — it's a tested building block.
-// Wire addCoachiqCredits() into api/stripe/webhook.js handleInvoiceSucceeded
-// ONLY for PORTAL-OWNED subs (sub.application == null AND created by us), so we
-// never double-credit subs CoachIQ still bills natively.
+// STATUS (2026-06-18 — onboarding flow wired):
+//   ✅ triggerCoachiqAutomation()/addCoachiqCredits() — PROVEN webhook bridge.
+//   ✅ addCoachiqProduct()    — fires the "Add a Product Purchase" automation
+//      (product + program access + starter credits, no payment). Same proven shape.
+//   ✅ createCoachiqUser()    — fires the Zapier "Create User" catch-hook (the only
+//      proven create+ENROLL path). Async: the new id returns via the Zap's callback
+//      to /api/coachiq/user-created, which stores it + grants the product.
+//   Wired into api/onboarding/activations.js (post-payment) and testable in isolation
+//      via api/coachiq/test-onboard.js. GATED behind config — inert until env is set.
+//   ⚠️ COACHIQ_API_KEY pasted in chat 2026-06-01 must be ROTATED before go-live.
 
 import { firstEnv, requireEnv } from "./_env.js";
 
@@ -26,16 +23,53 @@ const COACHIQ_API_BASE = "https://api-v3.coachiq.io";
 // it can come from env. Pass an explicit `cfg` to override.
 function coachiqConfig(cfg = {}) {
   return {
-    apiKey:            cfg.apiKey            || firstEnv("COACHIQ_API_KEY"),
-    groupId:           cfg.groupId           || firstEnv("COACHIQ_GROUP_ID"),
+    apiKey:             cfg.apiKey             || firstEnv("COACHIQ_API_KEY"),
+    groupId:            cfg.groupId            || firstEnv("COACHIQ_GROUP_ID"),
     creditAutomationId: cfg.creditAutomationId || firstEnv("COACHIQ_CREDIT_AUTOMATION_ID"),
+    // Zapier "Create User" catch-hook URL — the only proven create+enroll path
+    // (api-v3 signUp_V2 makes bare, unenrolled accounts; adminAddUser is blocked).
+    createUserWebhookUrl: cfg.createUserWebhookUrl || firstEnv("COACHIQ_CREATE_USER_WEBHOOK_URL"),
+    // "Add a Product Purchase to a User" automation id (grants product + credits,
+    // no payment). One default + optional per-plan map (COACHIQ_PRODUCT_MAP JSON:
+    // { "<plan>|<term>": "<automationId>" }).
+    productAutomationId: cfg.productAutomationId || firstEnv("COACHIQ_PRODUCT_AUTOMATION_ID"),
+    productMap:          cfg.productMap          || coachiqProductMap(),
+    // Shared secret guarding the inbound callback + the test endpoint.
+    webhookSecret:      cfg.webhookSecret      || firstEnv("COACHIQ_WEBHOOK_SECRET"),
   };
+}
+
+function coachiqProductMap() {
+  try {
+    const raw = firstEnv("COACHIQ_PRODUCT_MAP");
+    return raw ? JSON.parse(raw) : {};
+  } catch (_) {
+    return {};
+  }
+}
+
+// Resolve the product automation id for a plan|term (map → default).
+export function coachiqProductAutomationFor(plan, term, cfg = {}) {
+  const c = coachiqConfig(cfg);
+  const map = c.productMap || {};
+  return map[`${plan}|${term}`] || map[plan] || c.productAutomationId || null;
 }
 
 export function coachiqEnabled(cfg = {}) {
   const c = coachiqConfig(cfg);
   return !!(c.apiKey && c.groupId && c.creditAutomationId);
 }
+
+// Onboarding (create user + grant product) is enabled when we can create the user
+// (Zapier hook) and grant a product (api key + group + a product automation).
+export function coachiqOnboardingEnabled(cfg = {}) {
+  const c = coachiqConfig(cfg);
+  const canCreate  = !!c.createUserWebhookUrl;
+  const canProduct = !!(c.apiKey && c.groupId && (c.productAutomationId || Object.keys(c.productMap || {}).length));
+  return canCreate && canProduct;
+}
+
+export { coachiqConfig };
 
 // Fire a CoachIQ automation by webhook. PROVEN call shape:
 //   POST {base}/hook/automation/trigger/{automationId}
@@ -86,15 +120,60 @@ export async function addCoachiqCredits(coachiqUserId, extra = {}, cfg = {}) {
   return triggerCoachiqAutomation(automationId, { user: { id: coachiqUserId }, ...extra }, cfg);
 }
 
-// ── Create + enroll a CoachIQ user — NOT YET AVAILABLE via the API key ──
-// emailLogin yields only an athlete/"Guest" token; adminAddUser needs an
-// admin-scoped session we can't get with the key. Options being evaluated:
-//   (a) admin session token (from the dashboard) used against api-v3/graphql
-//   (b) Zapier "Create User" action (integration scope; may enroll in group)
-// Capture the returned CoachIQ user id and store it in members.coachiq_member_id.
-export async function createCoachiqUser(/* { firstName, lastName, email, phone }, cfg */) {
-  throw new Error(
-    "createCoachiqUser: not implemented — admin-scoped create+enroll path unresolved. " +
-    "See memories/project_coachiq_integration.md (#2 / login-perms)."
-  );
+// Grant a CoachIQ product (+ program access + starter credits) to a user, with no
+// payment — they already paid in the portal. Fires the "Add a Product Purchase to a
+// User" automation, resolved per plan|term (map → default). Same proven webhook
+// shape as addCoachiqCredits; target is the CoachIQ USER id.
+export async function addCoachiqProduct(coachiqUserId, { plan, term, ...extra } = {}, cfg = {}) {
+  if (!coachiqUserId) throw new Error("CoachIQ: coachiqUserId is required");
+  const automationId = coachiqProductAutomationFor(plan, term, cfg);
+  if (!automationId) throw new Error("CoachIQ: no product automation id for plan|term (set COACHIQ_PRODUCT_AUTOMATION_ID or COACHIQ_PRODUCT_MAP)");
+  const res = await triggerCoachiqAutomation(automationId, { user: { id: coachiqUserId }, plan, term, ...extra }, cfg);
+  return { ok: true, automationId, res };
+}
+
+// ── Create + enroll a CoachIQ user via the Zapier "Create User" action ──
+// Direct-API create+enroll is a DEAD END (signUp_V2 makes bare unenrolled accounts;
+// adminAddUser is blocked; admin.coachiq.io is WAF-locked). Zapier "Create User" is
+// the ONLY proven create+ENROLL path (returns a real, creditable user id).
+//
+// Zapier catch-hooks respond 200 immediately and run async, so they can't return the
+// new user id synchronously. So this fires the hook FIRE-AND-FORGET; the id comes back
+// via the Zap's final step POSTing to /api/coachiq/user-created (then we store it and
+// grant the product). Returns { fired: true, pending: true }.
+//
+// `member` needs: id, client_id, parent_email, parent_name, parent_phone, plan, term.
+export async function createCoachiqUser(member, cfg = {}) {
+  const c = coachiqConfig(cfg);
+  if (!c.createUserWebhookUrl) throw new Error("CoachIQ: missing COACHIQ_CREATE_USER_WEBHOOK_URL");
+  if (!member?.parent_email)   throw new Error("CoachIQ: member has no parent_email");
+
+  const nameParts = (member.parent_name || "").trim().split(/\s+/);
+  const payload = {
+    // Fields the Zapier "Create User" action maps:
+    first: nameParts[0] || "",
+    last:  nameParts.slice(1).join(" ") || "",
+    email: member.parent_email.toLowerCase(),
+    phone: member.parent_phone || "",
+    // Echoed back so the callback can match this to the member + grant the product:
+    member_id: member.id,
+    client_id: member.client_id,
+    plan:      member.plan || null,
+    term:      member.term || null,
+    callback_secret: c.webhookSecret || null,
+  };
+
+  const resp = await fetch(c.createUserWebhookUrl, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (!resp.ok) {
+    throw new Error(`CoachIQ create-user hook failed (${resp.status}): ${(await resp.text()).slice(0, 150)}`);
+  }
+  // Some Zaps CAN return JSON synchronously (Webhook Response). If an id comes back,
+  // surface it; otherwise it arrives later via the callback.
+  let id = null;
+  try { const j = await resp.json(); id = j?.id || j?.coachiq_user_id || j?.userId || null; } catch { /* async hook */ }
+  return id ? { fired: true, id } : { fired: true, pending: true };
 }
