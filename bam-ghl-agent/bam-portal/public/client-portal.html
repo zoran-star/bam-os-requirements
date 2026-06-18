@@ -5809,7 +5809,10 @@
             </div>
           </div>
 
-          <div class="home-sec"><span class="home-sec-label">Needs your attention</span></div>
+          <!-- V1.5 dashboard (trials today · missed calls · action items) -->
+          <div id="home-v15" style="display:none"></div>
+
+          <div class="home-sec" id="home-tiles-sec"><span class="home-sec-label">Needs your attention</span></div>
           <div class="home-tiles" id="home-tiles"></div>
 
           <div class="home-sec" id="home-week-sec"><span class="home-sec-label">This week</span></div>
@@ -10808,6 +10811,20 @@ async function openHomeView() {
   if (g) g.textContent = (first && first !== '—') ? `${part}, ${first}` : part;
   loadMyAvatar();   // show / refresh my profile photo
 
+  // V1.5 academies get a dedicated dashboard (trials today · missed calls ·
+  // action items) instead of the ticket-centric tiles.
+  const isV15 = (typeof V15_ACCESS !== 'undefined' && V15_ACCESS);
+  const GENERIC_SECTIONS = ['home-tiles-sec', 'home-tiles', 'home-week-sec', 'home-week', 'home-activity-sec', 'home-activity'];
+  const v15El = document.getElementById('home-v15');
+  if (isV15) {
+    if (v15El) v15El.style.display = '';
+    GENERIC_SECTIONS.forEach(id => { const e = document.getElementById(id); if (e) e.style.display = 'none'; });
+    renderHomeV15();
+    return;
+  }
+  if (v15El) v15El.style.display = 'none';
+  GENERIC_SECTIONS.forEach(id => { const e = document.getElementById(id); if (e) e.style.display = ''; });
+
   const counts = {};
   try {
     const terminal = new Set(['done', 'approved', 'cancelled']);
@@ -10832,6 +10849,110 @@ async function openHomeView() {
       renderHomeStatus(counts);
     }
   } catch (e) { /* leave the action-items tile dashed */ }
+}
+
+// ── V1.5 Home dashboard ──────────────────────────────────────────────────
+// Trials today · Missed calls (approx: last inbound activity was a call/voicemail,
+// dismissable per-device) · Unfinished action items. Each loads independently.
+const _HV_ROW   = 'display:flex;align-items:center;gap:12px;padding:12px 14px;border-bottom:1px solid var(--border);cursor:pointer';
+const _HV_TITLE = 'font-size:14px;font-weight:600;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap';
+const _HV_SUB   = 'font-size:12px;color:var(--text-mute);margin-top:2px';
+const _HV_CHEV  = 'flex:none;color:var(--text-mute);font-size:18px';
+const _HV_MORE  = 'padding:11px 14px;text-align:center;font-size:12px;color:var(--gold);cursor:pointer';
+function _hvCard(inner) { return `<div style="border:1px solid var(--border);border-radius:12px;overflow:hidden">${inner}</div>`; }
+function _hvEmpty(msg) { return `<div style="border:1px solid var(--border);border-radius:12px;padding:18px 14px;font-size:13px;color:var(--text-mute);text-align:center">${escapeHTML(msg)}</div>`; }
+function _hvTime(iso, tz) { if (!iso) return ''; try { return new Date(iso).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', timeZone: tz || undefined }); } catch (_) { return ''; } }
+function _hvOpenContact(loc, cid) { const u = _ghlContactUrl(loc, cid); if (u) window.open(u, '_blank', 'noopener'); }
+function _hvMissedKey() { return 'bam_missed_cleared_' + (typeof CLIENT_ID !== 'undefined' ? CLIENT_ID : ''); }
+function _hvMissedDismissed() { try { return new Set(JSON.parse(localStorage.getItem(_hvMissedKey()) || '[]')); } catch (_) { return new Set(); } }
+function _hvMissedClear(id) { try { const s = _hvMissedDismissed(); s.add(id); localStorage.setItem(_hvMissedKey(), JSON.stringify([...s])); } catch (_) {} _hvLoadMissed(); }
+
+function renderHomeV15() {
+  const host = document.getElementById('home-v15');
+  if (!host) return;
+  const loading = `<div class="req-empty" style="padding:14px 0"><span class="req-spin"></span> Loading…</div>`;
+  host.innerHTML = `
+    <div class="home-sec"><span class="home-sec-label">Trials today</span></div>
+    <div id="hv-trials">${loading}</div>
+    <div class="home-sec"><span class="home-sec-label">Missed calls</span></div>
+    <div id="hv-missed">${loading}</div>
+    <div class="home-sec"><span class="home-sec-label">Action items</span></div>
+    <div id="hv-actions">${loading}</div>`;
+  _hvLoadTrials();
+  _hvLoadMissed();
+  _hvLoadActions();
+}
+
+async function _hvLoadTrials() {
+  const el = document.getElementById('hv-trials'); if (!el) return;
+  try {
+    const token = await _mreqAuthToken();
+    const r = await fetch('/api/ghl/calendars-v15?action=trials-today&client_id=' + encodeURIComponent(CLIENT_ID), { headers: { Authorization: 'Bearer ' + token } });
+    const j = await _safeJson(r);
+    if (!r.ok) throw new Error(j.error || ('HTTP ' + r.status));
+    if (j.no_config) { el.innerHTML = _hvEmpty('No trial calendar set yet — pick one in KPIs setup.'); return; }
+    const trials = j.trials || [];
+    if (!trials.length) { el.innerHTML = _hvEmpty('No trials booked today.'); return; }
+    el.innerHTML = _hvCard(trials.map(t => `
+      <div onclick="_v15calOpenAppt(${JSON.stringify(t.id)})" style="${_HV_ROW}">
+        <span style="flex:none;font-weight:700;color:var(--gold);font-size:13px;min-width:62px">${escapeHTML(_hvTime(t.start, j.timezone))}</span>
+        <div style="flex:1;min-width:0"><div style="${_HV_TITLE}">${escapeHTML(t.contactName || 'Trial booking')}</div>${t.status ? `<div style="${_HV_SUB}">${escapeHTML(t.status)}</div>` : ''}</div>
+        <span style="${_HV_CHEV}">›</span>
+      </div>`).join(''));
+  } catch (e) { el.innerHTML = _hvEmpty("Couldn't load trials — " + (e.message || e)); }
+}
+
+async function _hvLoadMissed() {
+  const el = document.getElementById('hv-missed'); if (!el) return;
+  try {
+    const token = await _mreqAuthToken();
+    const r = await fetch('/api/ghl/inbox?client_id=' + encodeURIComponent(CLIENT_ID), { headers: { Authorization: 'Bearer ' + token } });
+    const j = await _safeJson(r);
+    if (!r.ok) throw new Error(j.error || ('HTTP ' + r.status));
+    const loc = j.location_id || '';
+    const dismissed = _hvMissedDismissed();
+    const calls = (j.conversations || []).filter(c => {
+      const lbl = _ghlChannelLabel(c.lastMessageType);
+      const inbound = (c.lastMessageDirection || '').toLowerCase() === 'inbound';
+      return inbound && (lbl === 'Call' || lbl === 'Voicemail') && !dismissed.has(c.id);
+    });
+    if (!calls.length) { el.innerHTML = _hvEmpty('No missed calls.'); return; }
+    el.innerHTML = _hvCard(calls.slice(0, 12).map(c => {
+      const nm = c.contactName || c.phone || '(no name)';
+      const hasLink = !!_ghlContactUrl(loc, c.contactId);
+      return `<div style="${_HV_ROW}">
+        <input type="checkbox" onclick="event.stopPropagation();_hvMissedClear(${JSON.stringify(c.id)})" title="Clear" style="flex:none;width:17px;height:17px;accent-color:var(--gold);cursor:pointer">
+        <div style="flex:1;min-width:0" ${hasLink ? `onclick="_hvOpenContact(${JSON.stringify(loc)},${JSON.stringify(c.contactId || '')})"` : ''}>
+          <div style="${_HV_TITLE}">📞 ${escapeHTML(nm)}</div>
+          <div style="${_HV_SUB}">${escapeHTML(_ghlChannelLabel(c.lastMessageType))} · ${escapeHTML(_ibFormatDate(c.lastMessageDate))} · call back ↗</div>
+        </div>
+      </div>`;
+    }).join(''));
+  } catch (e) { el.innerHTML = _hvEmpty("Couldn't load calls — " + (e.message || e)); }
+}
+
+async function _hvLoadActions() {
+  const el = document.getElementById('hv-actions'); if (!el) return;
+  try {
+    const { data, error } = await _sb.from('action_items')
+      .select('id,title,due_date,onboarding_key,completed_at')
+      .eq('client_id', CLIENT_ID).is('completed_at', null);
+    if (error) throw error;
+    const items = (data || []).sort((a, b) => {
+      const da = a.due_date ? new Date(a.due_date).getTime() : Infinity;
+      const db = b.due_date ? new Date(b.due_date).getTime() : Infinity;
+      return da - db;
+    });
+    if (!items.length) { el.innerHTML = _hvEmpty('All caught up — no open action items.'); return; }
+    const rows = items.slice(0, 8).map(it => `
+      <div onclick="switchView('action-items')" style="${_HV_ROW}">
+        <span style="flex:none;width:9px;height:9px;border-radius:50%;background:var(--gold)"></span>
+        <div style="flex:1;min-width:0"><div style="${_HV_TITLE}">${escapeHTML(it.title || 'Action item')}</div>${it.due_date ? `<div style="${_HV_SUB}">Due ${escapeHTML(_ibFormatDate(it.due_date))}</div>` : (it.onboarding_key ? `<div style="${_HV_SUB}">Onboarding step</div>` : '')}</div>
+        <span style="${_HV_CHEV}">›</span>
+      </div>`).join('');
+    const more = items.length > 8 ? `<div onclick="switchView('action-items')" style="${_HV_MORE}">+${items.length - 8} more · view all</div>` : '';
+    el.innerHTML = _hvCard(rows + more);
+  } catch (e) { el.innerHTML = _hvEmpty("Couldn't load action items."); }
 }
 
 // #2 — one-line status. "Needs you" = tickets awaiting your reply + unread
