@@ -9,15 +9,28 @@ The canonical doc for how onboarding, V2 access, the Business Blueprint, the tra
 > import from the member's Stripe price (`pricing_catalog.offer_id`), mirroring
 > `entry_points.offer_id`. See [[project_member_management_portal]] Session 7.
 >
-> **2026-06-18 — V2 ⊇ V1.5 (Contacts):** V2 is now a SUPERSET of V1.5 for the
-> **Contacts** (full-CRM) tab — a V2 academy still manages leads/contacts, so
-> Contacts shows when `v15_access OR v2_access`. New `applyContactsNavState()`
-> (client-portal.html) targets ONLY `#nav-contacts` (the Contacts item got an
-> id), called from BOTH `applyV2NavState` + `applyV15NavState` (V15 runs last at
-> boot/switch so it resolves correctly). The other `data-feature="v15"` items
-> (v15inbox/v15kpis/v15cal/pipelines) are NOT surfaced for V2 — V2 has its own
-> Inbox/Pricing/Members/Calendar/Pipelines, so showing the v15 variants would
-> duplicate. Web-only (`!isNativeApp()`). On branch `feat/member-import-offer-scope`.
+> **2026-06-18 — V2 ⊇ V1.5 (full superset).** V2 now inherits the V1.5 full-CRM
+> surfaces on top of its member-management tabs. Helper `_isCrmTier()` = `V15_ACCESS
+> || V2_ACCESS`; `applyCrmSupersetNav()` (renamed from applyContactsNavState,
+> called from BOTH `applyV2NavState` + `applyV15NavState`) shows these V1.5 items
+> for V2 too, by id:
+> - **Contacts** (`#nav-contacts`) — full CRM
+> - **Inbox** (`#nav-v15inbox`) — the UPGRADED v15 inbox (filters, attachments,
+>   sender setup, **MASS SEND**). V2's older inbox nav (`#nav-v2inbox`,
+>   switchView('inbox')) is **retired/hidden** for V2; `_msgBack` + default both
+>   point V2 at `v15inbox` now.
+> - **KPIs** (`#nav-v15kpis`) — the v15kpis dashboard (V2 previously had NO KPIs tab).
+>
+> NOT surfaced for V2: `v15cal` + the v15 pipelines item — V2 has its own Calendar
+> + Pipelines (Pipelines is the SAME view for both). **Marketing** gets the V1.5
+> action-oriented "narrative" treatment for V2 too (no Ad-Performance report / month
+> progress / Results-CPL header / verdict+winfix — only ad-spend cards): the 3
+> render gates now use `_isCrmTier()`. **Mobile bottom bar** uses the v15 set
+> (Inbox·Sales·KPIs·Marketing·Systems) for V2 as well (`is-v15` class + `_mobileBarViews`
+> via `_isCrmTier()`). The v15 view openers (openV15Inbox/openV15Kpis) have no
+> V15-only guard, so they work for V2. Shipped on branch `feat/v2-superset-v15`.
+> (Per-academy note: V2's old member-classifying inbox view still EXISTS as a view,
+> just no nav — revisit if member-linking in the inbox is wanted.)
 >
 > **Tier flags are mutually exclusive** (`v15_access` XOR `v2_access`). **BAM GTA
 > is now V2** (`v2_access=true`, set 2026-06-18) — flipped from V1.5 so Zoran

@@ -5515,7 +5515,7 @@
         Contacts
       </div>
 
-      <div class="nav-item" data-feature="v15" style="display:none" onclick="switchView('v15inbox', this)">
+      <div class="nav-item" id="nav-v15inbox" data-feature="v15" style="display:none" onclick="switchView('v15inbox', this)">
         <span class="nav-icon" aria-hidden="true">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
@@ -5525,7 +5525,7 @@
         Inbox
       </div>
 
-      <div class="nav-item" data-feature="v15" style="display:none" onclick="switchView('v15kpis', this)">
+      <div class="nav-item" id="nav-v15kpis" data-feature="v15" style="display:none" onclick="switchView('v15kpis', this)">
         <span class="nav-icon" aria-hidden="true">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M3 3v18h18"/>
@@ -5581,7 +5581,7 @@
 
       <!-- Pricing nav removed 2026-06-10 — price matching now lives in
            Business Blueprint → Offers (view-pricing markup retired below). -->
-      <div class="nav-item" data-feature="members" style="display:none" onclick="switchView('inbox', this)">
+      <div class="nav-item" id="nav-v2inbox" data-feature="members" style="display:none" onclick="switchView('inbox', this)">
         <span class="nav-icon" aria-hidden="true">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M22 12h-6l-2 3h-4l-2-3H2"/>
@@ -10732,7 +10732,7 @@ function switchView(name, el) {
 // sheet). Mode-aware: V1.5 swaps the bar to Inbox/Sales/KPIs (+ Marketing &
 // Systems behind Support).
 function _mobileBarViews() {
-  return V15_ACCESS
+  return _isCrmTier()
     ? new Set(['v15inbox', 'pipelines', 'v15kpis', 'marketing', 'systems'])
     : new Set(['home', 'messages', 'systems', 'marketing']);
 }
@@ -11235,48 +11235,68 @@ function applyV2NavState(v2Access) {
   // Re-run V2-gated feature gates.
   applyMemberMgmtNavState();
   applyCalendarNavState();
-  applyContactsNavState();
+  applyCrmSupersetNav();
   if (typeof applyTalkToBamNav === 'function') applyTalkToBamNav();
 }
 
-// V2 is a SUPERSET of V1.5: a V2 academy still manages leads/contacts, so the
-// full-CRM Contacts tab (a V1.5 surface) shows for V2 too. Targets only the
-// Contacts item by id — V2 has its own Inbox/KPIs/Calendar/Pipelines, so we do
-// NOT surface the other data-feature="v15" items here (that would duplicate).
-// Web-only, like the other V1.5/V2 tabs. Called from both nav gates so it's
-// correct regardless of which runs last at boot.
-function applyContactsNavState() {
-  const show = ((typeof V15_ACCESS !== 'undefined' && V15_ACCESS) ||
-                (typeof V2_ACCESS !== 'undefined' && V2_ACCESS)) &&
-               !(typeof isNativeApp === 'function' && isNativeApp());
-  const el = document.getElementById('nav-contacts');
-  if (el) el.style.display = show ? '' : 'none';
+// V2 is a SUPERSET of V1.5. A V2 academy gets the full-CRM V1.5 surfaces on top
+// of its member-management tabs, so these V1.5 items show for V2 too:
+//   • Contacts (full CRM)
+//   • the upgraded Inbox (v15inbox — filters, attachments, sender setup, MASS SEND)
+//   • the KPIs dashboard (v15kpis)
+// V2 has its OWN Calendar + Pipelines, so v15cal / the v15 pipelines item are NOT
+// surfaced for V2 (would duplicate). And since V2 now uses the upgraded inbox,
+// the older V2 inbox nav (#nav-v2inbox) is retired. Marketing also gets the V1.5
+// "narrative" treatment (no ad-performance report / month progress). Web-only.
+// Called from both nav gates so it's correct regardless of which runs last.
+function applyCrmSupersetNav() {
+  const crm = (typeof V15_ACCESS !== 'undefined' && V15_ACCESS) ||
+              (typeof V2_ACCESS !== 'undefined' && V2_ACCESS);
+  const isV2 = (typeof V2_ACCESS !== 'undefined' && V2_ACCESS);
+  const native = (typeof isNativeApp === 'function' && isNativeApp());
+  const show = crm && !native;
+  // Full-CRM nav items shared by V1.5 + V2
+  ['nav-contacts', 'nav-v15inbox', 'nav-v15kpis'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.style.display = show ? '' : 'none';
+  });
+  // V2 uses the upgraded v15 inbox → retire the older V2 inbox nav item
+  const oldInbox = document.getElementById('nav-v2inbox');
+  if (oldInbox && isV2) oldInbox.style.display = 'none';
+  // Marketing: V1.5/V2 get the cleaner view (no Ad Performance report / month progress)
+  const adPerf = document.getElementById('ad-performance-section');
+  if (adPerf) adPerf.style.display = crm ? 'none' : '';
+  const monthProg = document.getElementById('month-progress');
+  if (monthProg) monthProg.style.display = crm ? 'none' : '';
+  const acHead = document.getElementById('active-campaigns-head');
+  if (acHead) acHead.style.marginTop = crm ? '0' : '48px';
 }
 
 // ── V1.5 feature gate ──
 // V1.5 academies run the portal as their full CRM (no GoHighLevel UI). The
 // Contacts tab is gated to them via data-feature="v15".
 let V15_ACCESS = false;
+
+// "Full CRM" tier = V1.5 OR V2. V2 is a superset of V1.5, so the shared CRM
+// surfaces (Contacts/Inbox/KPIs) AND the action-oriented Marketing treatment
+// apply to both. Use this anywhere V1.5-vs-rest behavior should also cover V2.
+function _isCrmTier() {
+  return (typeof V15_ACCESS !== 'undefined' && V15_ACCESS) ||
+         (typeof V2_ACCESS !== 'undefined' && V2_ACCESS);
+}
 function applyV15NavState(v15) {
   V15_ACCESS = !!v15;
   document.querySelectorAll('.nav-item[data-feature="v15"]').forEach(el => { el.style.display = v15 ? '' : 'none'; });
-  // Swap the mobile bottom bar to the V1.5 set (Inbox · Sales · KPIs · Support).
+  // Swap the mobile bottom bar to the CRM set (Inbox · Sales · KPIs · Support) —
+  // V2 too, so its upgraded Inbox + KPIs are reachable on mobile.
   const mNav = document.getElementById('mobileNav');
-  if (mNav) mNav.classList.toggle('is-v15', !!v15);
+  if (mNav) mNav.classList.toggle('is-v15', _isCrmTier());
   // Assets is hidden for V1.5 (also drops it from the mobile More sheet).
   const assetsNav = document.getElementById('nav-assets');
   if (assetsNav) assetsNav.style.display = v15 ? 'none' : '';
-  // V1.5 Marketing: drop the whole Ad Performance report section + the
-  // month-progress indicator in the topbar.
-  const adPerf = document.getElementById('ad-performance-section');
-  if (adPerf) adPerf.style.display = v15 ? 'none' : '';
-  const monthProg = document.getElementById('month-progress');
-  if (monthProg) monthProg.style.display = v15 ? 'none' : '';
-  // With Ad Performance hidden for V1.5, Active Campaigns shouldn't keep its big
-  // top margin (which left a gap below the topbar).
-  const acHead = document.getElementById('active-campaigns-head');
-  if (acHead) acHead.style.marginTop = v15 ? '0' : '48px';
-  applyContactsNavState(); // V2 keeps Contacts too — override the bulk v15 toggle above
+  // Contacts/Inbox/KPIs sharing + the Marketing "narrative" treatment now live in
+  // applyCrmSupersetNav so V2 gets them too — override the bulk v15 toggle above.
+  applyCrmSupersetNav();
   applyTalkToBamNav();
 }
 
@@ -16647,9 +16667,9 @@ function openCampaignDetail(campaignId, title, stats) {
   document.getElementById('detail-spend').textContent = stats.spend;
   document.getElementById('detail-results').textContent = stats.results;
   document.getElementById('detail-cpr').textContent = stats.cpr;
-  // V1.5: hide the Results / Cost-per-Result numbers in the header (action-only).
+  // V1.5/V2: hide the Results / Cost-per-Result numbers in the header (action-only).
   const topRight = document.getElementById('detail-topright-stats');
-  if (topRight) topRight.style.display = (typeof V15_ACCESS !== 'undefined' && V15_ACCESS) ? 'none' : '';
+  if (topRight) topRight.style.display = _isCrmTier() ? 'none' : '';
   // Preset (planned) ad spend = the campaign's Meta budget, when set.
   const bEl = document.getElementById('detail-budget');
   if (bEl) bEl.textContent = stats.budget ? 'Preset budget · ' + stats.budget : '';
@@ -23931,8 +23951,8 @@ function _reportCardHTML(c, ctx) {
   const cplDelta = prev ? _deltaHTML(c.cpl, prev.cpl, 'lower', deltaSuffix) : '';
   const budgetLine = budget == null ? '' : `<div class="stat-delta" style="color:var(--text-sub)">${Math.round((c.spend / budget) * 100)}% of ${_fmtMoney(budget)} budget</div>`;
 
-  // V1.5: action-oriented Marketing — only the ad spend, no leads/CPL/metrics.
-  if (typeof V15_ACCESS !== 'undefined' && V15_ACCESS) {
+  // V1.5/V2: action-oriented Marketing — only the ad spend, no leads/CPL/metrics.
+  if (_isCrmTier()) {
     return `<div class="report-card ${cls}">
       <div class="report-card-head"><span class="report-dot"></span><span class="report-card-title">${escapeHTML(c.name)}</span>${badge}</div>
       <div class="report-bigstats" style="grid-template-columns:1fr">
@@ -23998,7 +24018,7 @@ function _paintReport(el, period, goals, bm, compare, insight, demo) {
     : '<div class="req-empty" style="padding:18px 0">No campaigns ran in this period.</div>';
   // V1.5: action-oriented — drop the verdict + win/fix analysis (numbers); keep
   // the ad-spend cards.
-  if (typeof V15_ACCESS !== 'undefined' && V15_ACCESS) { el.innerHTML = demoNote + cards; return; }
+  if (_isCrmTier()) { el.innerHTML = demoNote + cards; return; }
   el.innerHTML = demoNote + verdict + winfix + cards;
 }
 
@@ -27117,8 +27137,7 @@ async function _msgApi(url, opts = {}) {
 // (the Inbox tab on V1.5/V2, else Home).
 function _msgBack() {
   const dest = _MSG_RETURN_VIEW
-    || ((typeof V15_ACCESS !== 'undefined' && V15_ACCESS) ? 'v15inbox'
-      : ((typeof V2_ACCESS !== 'undefined' && V2_ACCESS) ? 'inbox' : 'home'));
+    || (_isCrmTier() ? 'v15inbox' : 'home'); // V1.5 + V2 both use the upgraded inbox
   switchView(dest);
 }
 
