@@ -30,7 +30,7 @@
 //                                    COACHIQ_PRODUCT_MAP per plan|term).
 //   COACHIQ_API_KEY / COACHIQ_GROUP_ID / COACHIQ_WEBHOOK_SECRET  (see api/coachiq.js)
 
-import { coachiqOnboardingEnabled, createCoachiqUser, addCoachiqProduct } from "../coachiq.js";
+import { coachiqOnboardingEnabled, addCoachiqProduct } from "../coachiq.js";
 import { getClientGhlToken } from "../website/availability.js";
 
 const GHL_V2     = "https://services.leadconnectorhq.com";
@@ -103,13 +103,12 @@ export async function fireOnboardingActivations(member, ctx = {}) {
     results.ghl = { skipped: "GHL not configured (need GHL_ONBOARDING_WORKFLOW_ID + parent_email)" };
   }
 
-  // ── 2. CoachIQ (only if the academy uses it) ──
-  // Two paths:
+  // ── 2. CoachIQ (self-signup model — only if the academy uses it) ──
   //   • Returning member (already has coachiq_member_id) → grant the product NOW.
-  //   • New member → fire the Zapier "Create User" hook. It can't return the id
-  //     synchronously, so the id arrives via /api/coachiq/user-created, which then
-  //     grants the product. (If the Zap IS set up to respond with an id, we store
-  //     it + grant here.) Non-fatal throughout.
+  //   • New member → do nothing here. The parent creates their CoachIQ account on
+  //     the academy's group login page (enrolled); CoachIQ's "New User" automation
+  //     webhooks the id to /api/coachiq/user-created, which matches by email + grants
+  //     the product then. The confirmation page tells them to sign up. Non-fatal.
   if (coachiqOnboardingEnabled()) {
     try {
       const existingId = member.coachiq_member_id || null;
@@ -118,21 +117,8 @@ export async function fireOnboardingActivations(member, ctx = {}) {
         results.coachiq = { ok: true, coachiq_user_id: existingId, product };
         await audit("onboarding-coachiq-product", { coachiq_user_id: existingId, plan, term });
       } else {
-        const created = await createCoachiqUser({ ...member, plan: plan || member.plan, term });
-        if (created.id) {
-          if (sb) {
-            await sb(`members?id=eq.${member.id}`, {
-              method: "PATCH", headers: { Prefer: "return=minimal" },
-              body: JSON.stringify({ coachiq_member_id: created.id }),
-            }).catch(() => {});
-          }
-          const product = await addCoachiqProduct(created.id, { plan, term, source: "website-enrollment" });
-          results.coachiq = { ok: true, coachiq_user_id: created.id, product };
-          await audit("onboarding-coachiq-created", { coachiq_user_id: created.id, plan, term });
-        } else {
-          results.coachiq = { pending: "user created via Zapier; product grants on /user-created callback" };
-          await audit("onboarding-coachiq-pending", { member_id: member.id, plan, term });
-        }
+        results.coachiq = { pending: "awaiting parent self-signup → /api/coachiq/user-created grants product" };
+        await audit("onboarding-coachiq-await-signup", { member_id: member.id, parent_email: member.parent_email, plan, term });
       }
     } catch (e) {
       results.coachiq = { ok: false, error: String(e && e.message || e) };

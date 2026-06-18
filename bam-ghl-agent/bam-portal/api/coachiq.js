@@ -60,13 +60,15 @@ export function coachiqEnabled(cfg = {}) {
   return !!(c.apiKey && c.groupId && c.creditAutomationId);
 }
 
-// Onboarding (create user + grant product) is enabled when we can create the user
-// (Zapier hook) and grant a product (api key + group + a product automation).
+// Onboarding (grant a product to a CoachIQ user) is enabled when we can fire the
+// product automation (api key + group + a product automation id/map). User CREATION
+// is NOT our job in the self-signup model — the parent signs up on the academy's
+// CoachIQ group login page (enrolled), CoachIQ's "New User" automation webhooks us
+// the id, and we grant the product. (createUserWebhookUrl is only for the optional
+// Zapier create path; not required here.)
 export function coachiqOnboardingEnabled(cfg = {}) {
   const c = coachiqConfig(cfg);
-  const canCreate  = !!c.createUserWebhookUrl;
-  const canProduct = !!(c.apiKey && c.groupId && (c.productAutomationId || Object.keys(c.productMap || {}).length));
-  return canCreate && canProduct;
+  return !!(c.apiKey && c.groupId && (c.productAutomationId || Object.keys(c.productMap || {}).length));
 }
 
 export { coachiqConfig };
