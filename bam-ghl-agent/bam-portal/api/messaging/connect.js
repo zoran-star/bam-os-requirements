@@ -114,6 +114,12 @@ const SCOPES = [
   "emails/builder.readonly",
   "emails/builder.write",
 
+  // Phone system — read a location's numbers (incl. isUnderLc: LC Phone vs BYO
+  // Twilio) + search/purchase. Matches the "Phone System" scopes ticked in the
+  // Marketplace app. Note GHL's naming here is `.read` (not `.readonly`).
+  "phonenumbers.read",
+  "numberpools.read",
+
   // Notes on dropped scopes (2026-05-30):
   //   snapshots.readonly                — not available for Sub-Account apps
   //   socialplanner/medialibrary.readonly — same
