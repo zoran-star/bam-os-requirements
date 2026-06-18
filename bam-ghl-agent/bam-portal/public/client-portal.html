@@ -18071,6 +18071,23 @@ function _memberOfferPill(m) {
   return `<span title="Offer: ${escapeHTML(m.offer.title)}" style="display:inline-block;font-size:11px;font-weight:600;padding:1px 8px;border-radius:999px;background:transparent;border:1px solid var(--gold,#E8C547);color:var(--gold,#E8C547)">${escapeHTML(label)}</span>`;
 }
 
+// Plan name + actual price, shown right on the roster card so you see who's on
+// what at a glance (offer pill answers "which offer", this answers "which price").
+// Pulls from the pricing_catalog enrichment (amount_cents + interval + name).
+function _memberPriceLabel(pricing) {
+  if (!pricing || !pricing.amount_cents) return '';
+  const dollars = (pricing.amount_cents / 100);
+  const amt = '$' + (Number.isInteger(dollars) ? dollars : dollars.toFixed(2));
+  const intervalMap = {
+    '4_weeks': '/4wk', 'week': '/wk', 'month': '/mo', '3_months': '/3mo',
+    '6_months': '/6mo', 'year': '/yr', 'one_time': ' one-time',
+  };
+  const per = intervalMap[pricing.interval] || (pricing.interval ? '/' + pricing.interval : '');
+  const name = pricing.display_name || pricing.canonical_plan || '';
+  const text = (name ? name + ' · ' : '') + amt + per;
+  return `<span title="${escapeHTML(text)}" style="display:inline-block;font-size:11px;font-weight:600;color:var(--text-mute);white-space:nowrap">${escapeHTML(text)}</span>`;
+}
+
 // Circular avatar — uses uploaded image if present, otherwise initials on
 // a deterministic colored circle.
 function _memberAvatar(m, size) {
@@ -18340,7 +18357,7 @@ function _renderMembersView() {
         <div class="member-card-parent">Parent: ${escapeHTML(m.parent_name || '—')}</div>
       </div>
       <div class="member-card-trainer">${escapeHTML(m.trainer || '—')}</div>
-      <div class="member-card-pills">${_memberStatusPill(m.status, m)}${_memberEngagementChip(m.engagement)}${_memberOfferPill(m)}${_memberPricingPill(m.pricing)}</div>
+      <div class="member-card-pills">${_memberPriceLabel(m.pricing)}${_memberStatusPill(m.status, m)}${_memberEngagementChip(m.engagement)}${_memberOfferPill(m)}${_memberPricingPill(m.pricing)}</div>
     </div>`).join('');
 
   container.innerHTML = importStrip + toolbar + cards;
