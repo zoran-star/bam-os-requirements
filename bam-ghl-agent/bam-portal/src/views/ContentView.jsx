@@ -1271,6 +1271,18 @@ function FilePreviewTile({ file, tk, compact }) {
           width: "100%", aspectRatio: "1 / 1", objectFit: "cover",
           borderRadius: 4, background: tk.surfaceHov,
         }} />
+      ) : isVideo ? (
+        <div style={{ position: "relative", width: "100%", aspectRatio: "1 / 1" }}>
+          {/* Poster frame: seek a fraction in so browsers paint a real frame, not black */}
+          <video
+            src={`${file.url}#t=0.5`}
+            muted playsInline preload="metadata"
+            style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: 4, background: tk.surfaceHov, display: "block" }}
+          />
+          <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", pointerEvents: "none" }}>
+            <span style={{ width: 32, height: 32, borderRadius: "50%", background: "rgba(0,0,0,0.55)", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, paddingLeft: 2 }}>▶</span>
+          </div>
+        </div>
       ) : (
         <div style={{
           width: "100%", aspectRatio: "1 / 1",
