@@ -2128,6 +2128,14 @@ async function handler(req, res) {
           patch.v15_access = v;
         }
 
+        if (wasSet("organic_content")) {
+          const v = body.organic_content;
+          if (typeof v !== "boolean") {
+            return res.status(400).json({ error: "organic_content must be a boolean" });
+          }
+          patch.organic_content = v;
+        }
+
         // Meta Ads onboarding-tracker flag. Staff flips this on/off — the
         // body sends a boolean, we store NOW() / NULL on the timestamp
         // column. The client-portal tracker reads it via get_onboarding_progress().

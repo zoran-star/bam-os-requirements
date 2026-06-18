@@ -763,10 +763,13 @@ async function handleContentTickets(req, res) {
     const limit = Math.min(parseInt(req.query.limit, 10) || 50, 200);
     const offset = Math.max(parseInt(req.query.offset, 10) || 0, 0);
     const pageQS = `&limit=${limit}&offset=${offset}`;
+    // Optional channel filter ('ads' | 'organic').
+    const channel = req.query.channel;
+    const channelFilter = (channel === "organic" || channel === "ads") ? `&channel=eq.${channel}` : "";
 
     if (asStaff) {
       // Staff list — oldest first per spec (so content team works FIFO)
-      const tickets = await sb(`content_tickets?select=*&order=submitted_at.asc${pageQS}`);
+      const tickets = await sb(`content_tickets?select=*${channelFilter}&order=submitted_at.asc${pageQS}`);
       const out = await enrichWithClient(tickets || []);
       return res.status(200).json({ tickets: out, hasMore: (tickets || []).length === limit });
     }
@@ -777,7 +780,7 @@ async function handleContentTickets(req, res) {
     const filter = onlyActionable
       ? `&client_action_status=eq.requested`
       : "";
-    const tickets = await sb(`content_tickets?select=*&client_id=eq.${ctx.client.id}${filter}&order=submitted_at.desc${pageQS}`);
+    const tickets = await sb(`content_tickets?select=*&client_id=eq.${ctx.client.id}${filter}${channelFilter}&order=submitted_at.desc${pageQS}`);
     return res.status(200).json({
       tickets: (tickets || []).map(stripInternalMessages),
       hasMore: (tickets || []).length === limit,
@@ -800,6 +803,7 @@ async function handleContentTickets(req, res) {
       body: JSON.stringify([{
         client_id: ctx.client.id,
         type,
+        channel: body.channel === "organic" ? "organic" : "ads",
         status: "active",
         client_action_status: "none",
         notes: notes || "",
@@ -835,11 +839,11 @@ async function handleContentTickets(req, res) {
     if (!ticket) return res.status(404).json({ error: "not found" });
 
     const staffActions = new Set([
-      "upload-final", "send-to-marketing",
+      "upload-final", "send-to-marketing", "send-for-review",
       "request-client-action", "mark-completed",
       "assign", "edit-context",
     ]);
-    const clientActions = new Set(["cancel", "respond", "edit"]);
+    const clientActions = new Set(["cancel", "respond", "edit", "approve", "request-changes"]);
 
     if (staffActions.has(action)) {
       if (!isStaff) return res.status(403).json({ error: "staff only" });
@@ -1069,6 +1073,41 @@ async function handleContentTickets(req, res) {
       patch.messages = appendMessage(ticket.messages, {
         author_type: "client", author_name: authorName,
         body: message, is_action_request: false,
+      });
+
+    } else if (action === "send-for-review") {
+      // Organic: content team sends the finished creative to the client to review.
+      if (!Array.isArray(ticket.final_files) || !ticket.final_files.length) {
+        return res.status(400).json({ error: "upload at least one final creative before sending for review" });
+      }
+      patch.status = "client-dependent";
+      patch.client_action_status = "requested";
+      const note = (body.message || "").trim();
+      patch.messages = appendMessage(ticket.messages, {
+        author_type: "staff", author_id: ctx.staff.id, author_name: authorName,
+        body: note ? `Sent for your review: "${note}"` : "Sent for your review.",
+        is_action_request: true,
+      });
+
+    } else if (action === "approve") {
+      // Organic: client approves the creative → moves to their Creative Bank.
+      patch.status = "completed";
+      patch.client_action_status = "responded";
+      patch.resolved_at = nowIso();
+      patch.messages = appendMessage(ticket.messages, {
+        author_type: "client", author_name: authorName,
+        body: "Approved — added to the creative bank.", is_action_request: false,
+      });
+
+    } else if (action === "request-changes") {
+      // Organic: client wants changes → back to the content team.
+      const message = (body.message || "").trim();
+      if (!message) return res.status(400).json({ error: "tell us what to change" });
+      patch.status = "active";
+      patch.client_action_status = "responded";
+      patch.messages = appendMessage(ticket.messages, {
+        author_type: "client", author_name: authorName,
+        body: `Requested changes: "${message}"`, is_action_request: false,
       });
     }
 
