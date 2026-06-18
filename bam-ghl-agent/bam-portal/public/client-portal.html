@@ -16439,6 +16439,9 @@ function openAddCreativeModal() {
   _renderInputAssetsFilesList();
   const notes = document.getElementById('inputAssetsNotes');
   if (notes) notes.value = '';
+  const fld = document.getElementById('inputAssetsFolder');
+  if (fld) fld.value = '';
+  _refreshInputAssetsFolderList();
   document.getElementById('inputAssetsModal').style.display = 'flex';
 }
 
@@ -16522,22 +16525,40 @@ function _buildAssetLinkEntry(url) {
   };
 }
 
-function _inputAssetsAddFiles(filesList) {
+function _inputAssetsAddFiles(filesList, fromFolderUpload) {
   const incoming = _filterOversizeFiles(filesList || []);
-  if (!incoming.length) {
-    const input = document.getElementById('inputAssetsFileInput');
-    if (input) input.value = '';
-    return;
+  // Tag each file with its folder: a folder upload keeps its own directory name,
+  // otherwise files inherit whatever's typed in the folder field.
+  const activeFolder = (document.getElementById('inputAssetsFolder')?.value || '').trim();
+  incoming.forEach(f => {
+    if (fromFolderUpload) {
+      const rel = f.webkitRelativePath || '';
+      f._folder = (rel.indexOf('/') !== -1 ? rel.slice(0, rel.indexOf('/')) : '') || activeFolder;
+    } else {
+      f._folder = activeFolder;
+    }
+  });
+  if (incoming.length) {
+    _inputAssetsState.files = _inputAssetsState.files.concat(incoming);
+    _renderInputAssetsFilesList();
+    _refreshInputAssetsFolderList();
   }
-  _inputAssetsState.files = _inputAssetsState.files.concat(incoming);
-  _renderInputAssetsFilesList();
-  const input = document.getElementById('inputAssetsFileInput');
-  if (input) input.value = '';
+  const input = document.getElementById('inputAssetsFileInput');   if (input) input.value = '';
+  const finput = document.getElementById('inputAssetsFolderInput'); if (finput) finput.value = '';
 }
 
 function _inputAssetsRemoveFile(idx) {
   _inputAssetsState.files.splice(idx, 1);
   _renderInputAssetsFilesList();
+  _refreshInputAssetsFolderList();
+}
+
+// Populate the folder autocomplete with folders already in use this submission.
+function _refreshInputAssetsFolderList() {
+  const dl = document.getElementById('inputAssetsFolderList');
+  if (!dl) return;
+  const folders = [...new Set(_inputAssetsState.files.map(f => f._folder).filter(Boolean))];
+  dl.innerHTML = folders.map(f => `<option value="${escapeHTML(f)}"></option>`).join('');
 }
 
 function _renderInputAssetsFilesList() {
@@ -16547,20 +16568,33 @@ function _renderInputAssetsFilesList() {
     listEl.innerHTML = '';
     return;
   }
-  listEl.innerHTML = _inputAssetsState.files.map((f, i) => {
-    const isImage = (f.type || '').startsWith('image/');
-    const thumb = isImage
-      ? `<img class="wizard-file-thumb" src="${URL.createObjectURL(f)}" alt="${escapeHTML(f.name)}" />`
-      : `<div class="wizard-file-thumb">${(f.type || '').startsWith('video/') ? '🎬' : '📄'}</div>`;
-    const sizeKB = (f.size / 1024).toFixed(0);
-    const sizeLabel = sizeKB < 1024 ? sizeKB + ' KB' : (sizeKB / 1024).toFixed(1) + ' MB';
-    return `
-      <div class="wizard-file-item">
-        ${thumb}
-        <div class="wizard-file-name">${escapeHTML(f.name)}</div>
-        <div class="wizard-file-size">${sizeLabel}</div>
-        <button class="wizard-file-remove" onclick="_inputAssetsRemoveFile(${i})" aria-label="Remove">×</button>
-      </div>`;
+  // Group staged files by folder (uncategorized last).
+  const groups = {};
+  _inputAssetsState.files.forEach((f, i) => {
+    const key = f._folder || '';
+    (groups[key] = groups[key] || []).push({ f, i });
+  });
+  const names = Object.keys(groups).sort((a, b) => (a === '' ? 1 : b === '' ? -1 : a.localeCompare(b)));
+  listEl.innerHTML = names.map(name => {
+    const header = name
+      ? `<div style="font-family:var(--mono,monospace);font-size:11px;color:var(--gold,#E8C547);letter-spacing:.04em;margin:10px 0 4px">📁 ${escapeHTML(name)}</div>`
+      : (names.length > 1 ? `<div style="font-size:11px;color:var(--text-mute);margin:10px 0 4px">Uncategorized</div>` : '');
+    const items = groups[name].map(({ f, i }) => {
+      const isImage = (f.type || '').startsWith('image/');
+      const thumb = isImage
+        ? `<img class="wizard-file-thumb" src="${URL.createObjectURL(f)}" alt="${escapeHTML(f.name)}" />`
+        : `<div class="wizard-file-thumb">${(f.type || '').startsWith('video/') ? '🎬' : '📄'}</div>`;
+      const sizeKB = (f.size / 1024).toFixed(0);
+      const sizeLabel = sizeKB < 1024 ? sizeKB + ' KB' : (sizeKB / 1024).toFixed(1) + ' MB';
+      return `
+        <div class="wizard-file-item">
+          ${thumb}
+          <div class="wizard-file-name">${escapeHTML(f.name)}</div>
+          <div class="wizard-file-size">${sizeLabel}</div>
+          <button class="wizard-file-remove" onclick="_inputAssetsRemoveFile(${i})" aria-label="Remove">×</button>
+        </div>`;
+    }).join('');
+    return header + items;
   }).join('');
 }
 
@@ -16994,20 +17028,32 @@ async function _mreqAuthToken() {
   return session.access_token;
 }
 
+// The folder/category a staged file belongs to — set explicitly via the folder
+// field (file._folder), or derived from a folder upload (webkitRelativePath's
+// top-level directory). Empty string = uncategorized.
+function _assetFolderOf(file) {
+  if (file && file._folder) return String(file._folder).trim();
+  const rel = file && file.webkitRelativePath;
+  if (rel && rel.indexOf('/') !== -1) return rel.slice(0, rel.indexOf('/'));
+  return '';
+}
+
 async function _mreqUploadFiles(files) {
   if (!files || !files.length) return [];
   const out = [];
   for (const file of files) {
     const uid = (crypto?.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`);
     const safe = (file.name || 'file').replace(/[^a-zA-Z0-9._-]/g, '_');
-    const path = `marketing-tickets/${uid}-${safe}`;
+    const folder = _assetFolderOf(file);
+    const safeFolder = folder ? folder.replace(/[^a-zA-Z0-9._-]/g, '_') + '/' : '';
+    const path = `marketing-tickets/${safeFolder}${uid}-${safe}`;
     const { error: upErr } = await _sb.storage.from('ticket-files').upload(path, file, {
       contentType: file.type || 'application/octet-stream',
       cacheControl: '3600',
     });
     if (upErr) throw new Error(upErr.message);
     const { data: urlData } = _sb.storage.from('ticket-files').getPublicUrl(path);
-    out.push({ name: file.name, url: urlData.publicUrl, size: file.size || 0, mime: file.type || '' });
+    out.push({ name: file.name, url: urlData.publicUrl, size: file.size || 0, mime: file.type || '', folder });
   }
   return out;
 }
@@ -24001,12 +24047,23 @@ function wizardSetCreativeType(id, type) {
   _renderWizardCreatives();
 }
 
-function wizardCreativeAddFiles(id, filesList) {
+function wizardCreativeAddFiles(id, filesList, fromFolderUpload) {
   const c = _wizard?.creatives.find(x => x.id === id);
   if (!c) return;
   const incoming = _filterOversizeFiles(filesList || []);
+  const activeFolder = (document.getElementById('wizardFolder_' + id)?.value || '').trim();
+  incoming.forEach(f => {
+    if (fromFolderUpload) {
+      const rel = f.webkitRelativePath || '';
+      f._folder = (rel.indexOf('/') !== -1 ? rel.slice(0, rel.indexOf('/')) : '') || activeFolder;
+    } else {
+      f._folder = activeFolder;
+    }
+  });
   const input = document.getElementById('wizardFiles_' + id);
   if (input) input.value = '';
+  const finput = document.getElementById('wizardFolderInput_' + id);
+  if (finput) finput.value = '';
   if (!incoming.length) return;
   c.files = c.files.concat(incoming);
   _renderWizardCreatives();
@@ -24057,6 +24114,11 @@ function _renderWizardCreatives() {
       </div>
 
       <label class="modal-label">Raw files</label>
+      <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:8px">
+        <input id="wizardFolder_${c.id}" class="modal-input" placeholder="📁 Folder (optional) — e.g. Game footage" style="flex:1 1 180px;min-width:140px" />
+        <label for="wizardFolderInput_${c.id}" class="btn-modal-secondary" style="cursor:pointer;white-space:nowrap;margin:0">🗂 Upload a folder</label>
+        <input type="file" id="wizardFolderInput_${c.id}" webkitdirectory directory multiple style="display:none" onchange="wizardCreativeAddFiles('${c.id}', this.files, true)" />
+      </div>
       <label for="wizardFiles_${c.id}" class="file-drop-label" style="padding:18px;margin-bottom:8px">
         <span class="file-drop-icon">↑</span>
         <span class="file-drop-text">Click to upload (multiple OK)</span>
@@ -24064,21 +24126,32 @@ function _renderWizardCreatives() {
       </label>
       <input type="file" id="wizardFiles_${c.id}" accept="image/*,video/*,.psd,.ai,.zip" multiple style="display:none" onchange="wizardCreativeAddFiles('${c.id}', this.files)" />
       <div class="wizard-files-list">
-        ${c.files.map((f, fi) => {
-          const isImage = (f.type || '').startsWith('image/');
-          const thumb = isImage
-            ? `<img class="wizard-file-thumb" src="${URL.createObjectURL(f)}" alt="${escapeHTML(f.name)}" />`
-            : `<div class="wizard-file-thumb">${(f.type || '').startsWith('video/') ? '🎬' : '📄'}</div>`;
-          const sizeKB = (f.size / 1024).toFixed(0);
-          const sizeLabel = sizeKB < 1024 ? sizeKB + ' KB' : (sizeKB / 1024).toFixed(1) + ' MB';
-          return `
-            <div class="wizard-file-item">
-              ${thumb}
-              <div class="wizard-file-name">${escapeHTML(f.name)}</div>
-              <div class="wizard-file-size">${sizeLabel}</div>
-              <button class="wizard-file-remove" onclick="wizardCreativeRemoveFile('${c.id}', ${fi})" aria-label="Remove">×</button>
-            </div>`;
-        }).join('')}
+        ${(() => {
+          const groups = {};
+          c.files.forEach((f, fi) => { const k = f._folder || ''; (groups[k] = groups[k] || []).push({ f, fi }); });
+          const ns = Object.keys(groups).sort((a, b) => (a === '' ? 1 : b === '' ? -1 : a.localeCompare(b)));
+          return ns.map(name => {
+            const header = name
+              ? `<div style="font-family:var(--mono,monospace);font-size:11px;color:var(--gold,#E8C547);letter-spacing:.04em;margin:10px 0 4px">📁 ${escapeHTML(name)}</div>`
+              : (ns.length > 1 ? `<div style="font-size:11px;color:var(--text-mute);margin:10px 0 4px">Uncategorized</div>` : '');
+            const items = groups[name].map(({ f, fi }) => {
+              const isImage = (f.type || '').startsWith('image/');
+              const thumb = isImage
+                ? `<img class="wizard-file-thumb" src="${URL.createObjectURL(f)}" alt="${escapeHTML(f.name)}" />`
+                : `<div class="wizard-file-thumb">${(f.type || '').startsWith('video/') ? '🎬' : '📄'}</div>`;
+              const sizeKB = (f.size / 1024).toFixed(0);
+              const sizeLabel = sizeKB < 1024 ? sizeKB + ' KB' : (sizeKB / 1024).toFixed(1) + ' MB';
+              return `
+                <div class="wizard-file-item">
+                  ${thumb}
+                  <div class="wizard-file-name">${escapeHTML(f.name)}</div>
+                  <div class="wizard-file-size">${sizeLabel}</div>
+                  <button class="wizard-file-remove" onclick="wizardCreativeRemoveFile('${c.id}', ${fi})" aria-label="Remove">×</button>
+                </div>`;
+            }).join('');
+            return header + items;
+          }).join('');
+        })()}
       </div>
 
       <label class="modal-label" style="margin-top:12px">Link to file <span style="color:var(--text-mute);font-weight:400">(use if your file is over 500MB — Drive, Dropbox, WeTransfer, OneDrive, etc.)</span></label>
@@ -27280,6 +27353,13 @@ function toggleTheme() {
     </div>
 
     <label class="modal-label" style="margin-top:18px">Raw files</label>
+    <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:8px">
+      <input id="inputAssetsFolder" class="modal-input" list="inputAssetsFolderList" placeholder="📁 Folder (optional) — e.g. Game footage" style="flex:1 1 200px;min-width:150px" />
+      <datalist id="inputAssetsFolderList"></datalist>
+      <label for="inputAssetsFolderInput" class="btn-modal-secondary" style="cursor:pointer;white-space:nowrap;margin:0">🗂 Upload a folder</label>
+      <input type="file" id="inputAssetsFolderInput" webkitdirectory directory multiple style="display:none" onchange="_inputAssetsAddFiles(this.files, true)" />
+    </div>
+    <div style="font-size:11px;color:var(--text-mute);margin-bottom:8px">Type a folder name to group what you upload next, or upload a whole folder at once — keeps your categories for the team.</div>
     <label for="inputAssetsFileInput" class="file-drop-label">
       <span class="file-drop-icon">↑</span>
       <span class="file-drop-text">Click to upload (you can pick multiple)</span>

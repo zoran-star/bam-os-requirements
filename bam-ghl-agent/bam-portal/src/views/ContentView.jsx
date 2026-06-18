@@ -1221,9 +1221,7 @@ function ClientInputs({ ticket, tk }) {
                 <div style={{ fontSize: 13, color: tk.text, marginBottom: 10, whiteSpace: "pre-wrap" }}>
                   {c.notes || <span style={{ color: tk.textMute, fontStyle: "italic" }}>(no notes)</span>}
                 </div>
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))", gap: 8 }}>
-                  {(c.raw_files || []).map((f, fi) => <FilePreviewTile key={fi} file={f} tk={tk} compact />)}
-                </div>
+                <FilesByFolder files={c.raw_files} tk={tk} compact minmax={160} />
               </div>
             ))}
           </div>
@@ -1238,9 +1236,7 @@ function ClientInputs({ ticket, tk }) {
               Raw files ({raw.length})
             </div>
             {raw.length ? (
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: 10 }}>
-                {raw.map((f, i) => <FilePreviewTile key={i} file={f} tk={tk} />)}
-              </div>
+              <FilesByFolder files={raw} tk={tk} />
             ) : (
               <div style={{ color: tk.textMute, fontSize: 13, fontStyle: "italic" }}>None</div>
             )}
@@ -1248,6 +1244,35 @@ function ClientInputs({ ticket, tk }) {
         </>
       )}
     </>
+  );
+}
+
+// Render a set of files grouped by their `folder` (the client's categories).
+// Falls back to a flat grid when nothing is foldered.
+function FilesByFolder({ files, tk, compact, minmax = 180 }) {
+  const list = Array.isArray(files) ? files : [];
+  if (!list.length) return null;
+  const groups = {};
+  list.forEach(f => { const k = (f.folder || "").trim(); (groups[k] = groups[k] || []).push(f); });
+  const names = Object.keys(groups).sort((a, b) => (a === "" ? 1 : b === "" ? -1 : a.localeCompare(b)));
+  const grid = (items) => (
+    <div style={{ display: "grid", gridTemplateColumns: `repeat(auto-fill, minmax(${minmax}px, 1fr))`, gap: 10 }}>
+      {items.map((f, i) => <FilePreviewTile key={i} file={f} tk={tk} compact={compact} />)}
+    </div>
+  );
+  if (names.length === 1 && names[0] === "") return grid(groups[""]);
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+      {names.map(name => (
+        <div key={name || "_uncat"}>
+          <div style={{
+            fontFamily: "monospace", fontSize: 10, letterSpacing: "0.16em", textTransform: "uppercase",
+            color: name ? tk.accent : tk.textMute, marginBottom: 8,
+          }}>{name ? `📁 ${name}` : "Uncategorized"}</div>
+          {grid(groups[name])}
+        </div>
+      ))}
+    </div>
   );
 }
 
