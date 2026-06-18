@@ -259,10 +259,11 @@ async function handler(req, res) {
 
     // ── GET: assemble offers + Stripe products + GHL pipelines + existing links ──
     const clientRows = await sb(
-      `clients?id=eq.${encodeURIComponent(clientId)}&select=id,business_name,stripe_connect_account_id,ghl_location_id,ghl_access_token,ghl_refresh_token,ghl_token_expires_at&limit=1`
+      `clients?id=eq.${encodeURIComponent(clientId)}&select=id,business_name,stripe_connect_account_id,ghl_location_id,ghl_access_token,ghl_refresh_token,ghl_token_expires_at,v2_access,v15_access&limit=1`
     );
     const client = Array.isArray(clientRows) && clientRows[0];
     if (!client) return res.status(404).json({ error: "academy not found" });
+    const tier = client.v2_access ? "v2" : client.v15_access ? "v15" : "v1";
 
     const offersRows = await sb(`offers?client_id=eq.${encodeURIComponent(clientId)}&status=neq.archived&select=id,title&order=title.asc`) || [];
     const offers = offersRows.map(o => ({ id: o.id, title: o.title }));
@@ -304,6 +305,7 @@ async function handler(req, res) {
     return res.status(200).json({
       ok: true,
       academy: client.business_name,
+      tier,
       stripeConnected: !!client.stripe_connect_account_id,
       offers, stripeProducts, pipelines, calendars, links,
     });

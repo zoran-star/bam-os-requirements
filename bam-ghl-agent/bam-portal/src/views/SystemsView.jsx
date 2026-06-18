@@ -625,8 +625,90 @@ function TicketCard({ ticket, tokens: t, onOpen, completed }) {
   );
 }
 
+// Systems-team "Connect to offers" panel — shown on the V1.5/V2 systems-buildout
+// ticket. The team builds pipelines/calendars in GHL, then ties them (+ Stripe
+// products) to the academy's offers here before marking the build complete.
+// Reuses /api/offers/kpi-setup (staff-aware). Reports link count + tier up so
+// the parent can hard-block completion until something's connected.
+function OfferConnect({ clientId, tokens: t, onCount }) {
+  const [d, setD] = useState(null);
+  const [err, setErr] = useState("");
+  const [loading, setLoading] = useState(true);
+
+  const authHeaders = async () => {
+    const { data: { session } } = await supabase.auth.getSession();
+    return { Authorization: `Bearer ${session?.access_token || ""}` };
+  };
+  const load = useCallback(async () => {
+    setLoading(true); setErr("");
+    try {
+      const h = await authHeaders();
+      const r = await fetch(`/api/offers/kpi-setup?client_id=${encodeURIComponent(clientId)}`, { headers: h });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.error || `HTTP ${r.status}`);
+      setD(j);
+      onCount && onCount((j.links || []).length, j.tier);
+    } catch (e) { setErr(e.message || String(e)); }
+    finally { setLoading(false); }
+  }, [clientId]);
+  useEffect(() => { load(); }, [load]);
+
+  const setLink = async (kind, ref_id, label, offer_id) => {
+    try {
+      const h = await authHeaders();
+      await fetch(`/api/offers/kpi-setup?client_id=${encodeURIComponent(clientId)}`, {
+        method: "POST", headers: { ...h, "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "link", kind, ref_id, label, offer_id: offer_id || null }),
+      });
+      load();
+    } catch (e) { alert("Couldn't save: " + (e.message || e)); }
+  };
+
+  if (loading && !d) return <div style={{ fontSize: 13, color: t.textMute }}>Loading offers & connections…</div>;
+  if (err) return <div style={{ fontSize: 13, color: t.red }}>Couldn't load: {err}</div>;
+  if (!d) return null;
+  if (d.tier === "v1") return <div style={{ fontSize: 13, color: t.textMute }}>KPI connections aren't used on V1 academies.</div>;
+
+  const selSty = { background: t.surface, border: `1px solid ${t.borderMed || t.border}`, borderRadius: 7, color: t.text, padding: "6px 8px", fontSize: 12, fontFamily: "inherit", maxWidth: 200 };
+  const lbl = { fontSize: 11, fontWeight: 700, color: t.textMute, textTransform: "uppercase", letterSpacing: 0.5, margin: "14px 0 4px" };
+  const rowWrap = { display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, padding: "7px 0", borderTop: `1px solid ${t.border}` };
+  const offerOpts = () => [<option key="_none" value="">— not tied —</option>, ...(d.offers || []).map(o => <option key={o.id} value={o.id}>{o.title}</option>)];
+  const section = (title, items, kind, nameOf, subOf) => (
+    <div>
+      <div style={lbl}>{title}</div>
+      {items.length === 0
+        ? <div style={{ fontSize: 12, color: t.textMute }}>{kind === "stripe_product" ? "No Stripe products found." : "None yet — build them in GHL, then ↻ Refresh."}</div>
+        : items.map(it => (
+          <div key={it.id} style={rowWrap}>
+            <div style={{ minWidth: 0 }}>
+              <div style={{ fontSize: 13, color: t.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{nameOf(it)}</div>
+              {subOf && <div style={{ fontSize: 11, color: t.textMute }}>{subOf(it)}</div>}
+            </div>
+            <select style={selSty} value={it.offer_id || ""} onMouseDown={e => e.stopPropagation()} onChange={e => setLink(kind, it.id, nameOf(it), e.target.value)}>{offerOpts()}</select>
+          </div>
+        ))}
+    </div>
+  );
+  return (
+    <div style={{ display: "flex", flexDirection: "column" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10 }}>
+        <div style={{ fontSize: 12, color: t.textMute }}>Tie the pipelines, calendars & Stripe products you built to this academy's offers. KPIs stay empty until at least one is connected.</div>
+        <button onMouseDown={e => e.preventDefault()} onClick={load} style={{ ...selSty, cursor: "pointer", fontWeight: 700, whiteSpace: "nowrap", maxWidth: "none" }}>↻ Refresh</button>
+      </div>
+      {(!d.offers || d.offers.length === 0) && <div style={{ fontSize: 12, color: t.red, marginTop: 6 }}>This academy has no offers yet — they need to set one up first.</div>}
+      {section("Stripe products → offer", d.stripeProducts || [], "stripe_product", (p) => p.name || p.id, (p) => `${p.sub_count} sub${p.sub_count === 1 ? "" : "s"}${p.onetime_count ? ` · one-time ${p.onetime_count}` : ""}`)}
+      {section("GHL pipelines → offer", d.pipelines || [], "ghl_pipeline", (p) => p.name || p.id, null)}
+      {section("GHL calendars → offer", d.calendars || [], "ghl_calendar", (c) => c.name || c.id, null)}
+    </div>
+  );
+}
+
 export function TicketModal({ ticket: initial, me, isManager, pool, tokens: t, dark, onClose, onAction }) {
   const [ticket, setTicket] = useState(initial);
+  const [offerLinkCount, setOfferLinkCount] = useState(null);
+  const [offerTier, setOfferTier] = useState(null);
+  // Hard-block completing a V1.5/V2 systems-buildout until offers are connected.
+  const connectBlocks = ticket.type === "onboarding" && (offerTier === "v15" || offerTier === "v2") && offerLinkCount === 0;
   const [notes, setNotes] = useState(initial.staff_notes || "");
   const [userGuide, setUserGuide] = useState(initial.user_guide || "");
   const [clientRequest, setClientRequest] = useState("");
@@ -792,6 +874,13 @@ export function TicketModal({ ticket: initial, me, isManager, pool, tokens: t, d
 
         {/* Body */}
         <div style={{ padding: "24px 28px", overflowY: "auto", flex: 1, display: "flex", flexDirection: "column", gap: 20 }}>
+          {/* Systems-team: connect the built pipelines/calendars/products to the
+              academy's offers before completing the build (V1.5/V2 only). */}
+          {ticket.type === "onboarding" && (
+            <Section title="Connect to offers" tokens={t}>
+              <OfferConnect clientId={ticket.client_id || ticket.client?.id} tokens={t} onCount={(n, tier) => { setOfferLinkCount(n); setOfferTier(tier); }} />
+            </Section>
+          )}
           {/* Submission fields — editable, gated to non-terminal statuses */}
           {(() => {
             const fieldsLocked = ["done", "approved", "cancelled"].includes(ticket.status);
@@ -1118,9 +1207,9 @@ export function TicketModal({ ticket: initial, me, isManager, pool, tokens: t, d
           {/* Manager: approve / good-to-finalize / deny / send-for-final-review on in_review */}
           {isManager && ticket.status === "in_review" && (
             <>
-              <button disabled={busy} onMouseDown={e => e.preventDefault()} onClick={() => wrap(() => approveTicket(ticket.id))} style={btn(t, "primary")}>Approve</button>
+              <button disabled={busy || connectBlocks} onMouseDown={e => e.preventDefault()} onClick={() => wrap(() => approveTicket(ticket.id))} style={btn(t, "primary")} title={connectBlocks ? "Connect at least one pipeline/product/calendar to an offer first" : ""}>Approve</button>
               <button disabled={busy} onMouseDown={e => e.preventDefault()} onClick={() => wrap(() => goodToFinalize(ticket.id))} style={btn(t, "ghost")} title="Work looks good — back to the executor for final touches, then Mark complete">Good to finalize</button>
-              <button disabled={busy} onMouseDown={e => e.preventDefault()} onClick={() => wrap(() => sendForFinalReview(ticket.id))} style={btn(t, "primary")} title="Send to client for final sign-off">Mark complete for review</button>
+              <button disabled={busy || connectBlocks} onMouseDown={e => e.preventDefault()} onClick={() => wrap(() => sendForFinalReview(ticket.id))} style={btn(t, "primary")} title={connectBlocks ? "Connect at least one pipeline/product/calendar to an offer first" : "Send to client for final sign-off"}>Mark complete for review</button>
               {!showDeny && <button disabled={busy} onMouseDown={e => e.preventDefault()} onClick={() => setShowDeny(true)} style={btn(t, "danger-ghost")}>Deny</button>}
             </>
           )}
@@ -1130,11 +1219,15 @@ export function TicketModal({ ticket: initial, me, isManager, pool, tokens: t, d
               action as Approve, different label (nothing to approve here). */}
           {canExec && !["done","approved","cancelled","in_review"].includes(ticket.status) && (
             <button
-              disabled={busy}
+              disabled={busy || connectBlocks}
               onMouseDown={e => e.preventDefault()}
               onClick={() => { if (confirm("Mark this ticket complete?")) wrap(() => approveTicket(ticket.id)); }}
               style={btn(t, "primary")}
+              title={connectBlocks ? "Connect at least one pipeline/product/calendar to an offer first" : ""}
             >✓ Mark complete</button>
+          )}
+          {connectBlocks && (
+            <div style={{ fontSize: 12, color: t.amber || t.red, alignSelf: "center" }}>⚠ Connect at least one pipeline / product / calendar to an offer before completing.</div>
           )}
 
           {/* Cancel ticket — any systems staff can cancel at any non-final
