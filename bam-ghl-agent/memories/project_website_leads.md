@@ -34,9 +34,24 @@ client site form
   (`G5y4QI0MsFq3159IhFU7`). Sends athlete_age (→ GHL "Athlete's Age"
   numeric field) + group label. Grade was dropped 2026-06-12 (GHL grade
   field only had options 5-9).
-- Opportunity names are PLAIN contact names (GHL-native convention) so the
-  workflows' create/update-opportunity card-search matches our card —
-  Zoran kept stage-move actions inside the GHL workflows on purpose.
+- **Pipeline ownership = the GHL workflow, NOT the portal (decided 2026-06-18).**
+  For GTA's website **free-trial** and **contact** forms, `entry_points.pipeline_name`
+  + `stage_name` were set to NULL, so the portal no longer creates/places an
+  opportunity for them. The form's GHL workflow ("trial form filled in" /
+  "contact form filled in") owns the pipeline entirely (create + stage moves).
+  Reason: V1.5 = integrate with GHL's existing automations, and having both the
+  portal AND the workflow add to the pipeline risked duplicate cards (the old
+  design relied on the workflow's create/update-opportunity matching the portal's
+  card by plain contact name — fragile). Portal still: saves the lead, upserts the
+  contact, adds tags, posts the note/inbox entry, and ENROLLS the contact into the
+  form's `ghl_workflow_id`. **Assumes those workflows create the pipeline card
+  themselves** — if a workflow only MOVES an existing card, leads won't appear in
+  the pipeline.
+- ⚠️ **Calendars still place via the portal** (entry_points type calendar still has
+  pipeline_name=TRAINING PIPELINE, stage_name="scheduled trial"). Booking also
+  enrolls the "free trial booked" workflow. If that workflow also moves the stage
+  it's the SAME card (a move, not a dup) so it's lower-risk — left as-is pending
+  Zoran's call on whether to hand calendar pipeline fully to the workflow too.
 
 ## Booking Calendars panel (portal-managed availability, Jun 2026)
 - Client portal → Calendar tab → "Booking Calendars" section (above the
