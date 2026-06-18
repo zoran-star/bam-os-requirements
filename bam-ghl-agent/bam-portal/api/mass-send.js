@@ -161,26 +161,32 @@ async function handler(req, res) {
     if (!ctx.isStaff && !ctx.clientIds.includes(clientId)) return res.status(403).json({ error: "not your academy" });
     const body = (req.body && typeof req.body === "object") ? req.body : {};
     const channel = body.channel === "Email" ? "Email" : "SMS";
-    const tag = (body.tag || "").trim();
+    // Accept `tags` (array, multi-select) or legacy single `tag`. Dedup + trim.
+    const rawTags = Array.isArray(body.tags) ? body.tags : (body.tag ? [body.tag] : []);
+    const tags = [...new Set(rawTags.map(t => String(t || "").trim()).filter(Boolean))];
+    const tagLabel = tags.join(", ");
     const text = (body.body || "").trim();
     const subject = (body.subject || "").trim();
     const attachments = Array.isArray(body.attachments) ? body.attachments.filter(u => typeof u === "string" && u) : [];
-    if (!tag) return res.status(400).json({ error: "a tag (audience) is required" });
+    if (!tags.length) return res.status(400).json({ error: "at least one tag (audience) is required" });
     if (!text && !attachments.length) return res.status(400).json({ error: "a message body or attachment is required" });
     if (channel === "Email" && !subject) return res.status(400).json({ error: "email needs a subject" });
 
-    // Audience from the mirror: the tag, NOT dnd, with the right channel field.
+    // Audience from the mirror: contacts with ANY of the chosen tags (overlap),
+    // NOT dnd, with the right channel field. Each contact is one mirror row, so
+    // overlap naturally dedups across tags.
     const channelFilter = channel === "Email" ? "&email=not.is.null" : "&phone=not.is.null";
+    const tagsArrLiteral = `{${tags.map(t => `"${t.replace(/"/g, "")}"`).join(",")}}`;
     const audience = await sb(
       `ghl_contacts?client_id=eq.${encodeURIComponent(clientId)}&dnd=eq.false` +
-      `&tags=cs.${encodeURIComponent(`{"${tag.replace(/"/g, "")}"}`)}${channelFilter}` +
+      `&tags=ov.${encodeURIComponent(tagsArrLiteral)}${channelFilter}` +
       `&select=ghl_contact_id,name,phone,email&limit=5000`
     );
     const list = (audience || []).filter(c => c.ghl_contact_id);
     if (!list.length) return res.status(200).json({ ok: true, total: 0, message: "No eligible contacts (after removing do-not-contact + missing " + (channel === "Email" ? "email" : "phone") + ")." });
 
     const jobRows = await sb(`mass_send_jobs?select=id`, { method: "POST", headers: { Prefer: "return=representation" },
-      body: JSON.stringify([{ client_id: clientId, channel, tag, subject: channel === "Email" ? subject : null, body: text, attachments, status: "queued", total: list.length }]) });
+      body: JSON.stringify([{ client_id: clientId, channel, tag: tagLabel, subject: channel === "Email" ? subject : null, body: text, attachments, status: "queued", total: list.length }]) });
     const jobId = Array.isArray(jobRows) && jobRows[0] && jobRows[0].id;
     // Insert recipients in chunks.
     for (let i = 0; i < list.length; i += 500) {
