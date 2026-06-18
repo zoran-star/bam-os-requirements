@@ -5,6 +5,13 @@ GoHighLevel — the BAM portal is their full CRM. GHL stays the data backend,
 **synced live** into the portal. Lighter than V2 (fewer user requirements). May
 need a little manual setup/cleanup to work right (Zoran).
 
+> **2026-06-18 — V2 is a SUPERSET of V1.5 for Contacts.** The Contacts (full-CRM)
+> tab now shows for V2 academies too (`v15_access OR v2_access`), since a V2
+> academy still manages leads/contacts. Only the Contacts item is shared — V2
+> keeps its own Inbox/KPIs/Calendar/Pipelines. Gated by `applyContactsNavState()`.
+> See [[project_v2_onboarding_model]]. V2 demo clone to compare side-by-side:
+> **"BAM GTA (V2)"** `50c14b2c-3f89-4438-ab73-3067bc0f7017`.
+
 ## Tier model
 - Three tiers V1 / V1.5 / V2, mutually exclusive, set by staff via the **Portal
   tier** segmented control on the client Profile (`ClientsCombinedView.jsx`,
