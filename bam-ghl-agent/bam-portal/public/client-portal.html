@@ -6561,7 +6561,8 @@ Then the call to action."]</div>
 
         <!-- Active thread -->
         <div class="chat-main" id="messages-main">
-          <div class="chat-header" id="messages-header">
+          <div class="chat-header" id="messages-header" style="display:flex;align-items:center;gap:12px">
+            <button id="messages-back" onclick="_msgBack()" aria-label="Back" title="Back" style="display:none;background:var(--surface);border:1px solid var(--border-med);border-radius:8px;color:var(--text);width:34px;height:34px;cursor:pointer;flex:0 0 auto;font-size:16px;line-height:1">←</button>
             <div>
               <div class="chat-header-name" id="messages-header-name">Chat with the team</div>
             </div>
@@ -10282,10 +10283,18 @@ async function _contactsSaveSetup() {
   }
 }
 
+let _MSG_RETURN_VIEW = null;
 function switchView(name, el) {
   // Clients without marketing have the Marketing nav greyed + click-blocked
   if (name === 'marketing' && !MARKETING_INCLUDED) return;
   hapticTap('Light'); // #12 — tactile feedback on tab change (native only)
+
+  // Remember where we came from so the "Talk to BAM Business" view can go back.
+  if (name === 'messages') {
+    const _cur = document.querySelector('.view.active');
+    const _curName = _cur ? _cur.id.replace('view-', '') : null;
+    if (_curName && _curName !== 'messages') _MSG_RETURN_VIEW = _curName;
+  }
 
   // Update nav
   document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
@@ -26290,6 +26299,15 @@ async function _msgApi(url, opts = {}) {
   return json;
 }
 
+// Back from the locked "Talk to BAM Business" thread → wherever we came from
+// (the Inbox tab on V1.5/V2, else Home).
+function _msgBack() {
+  const dest = _MSG_RETURN_VIEW
+    || ((typeof V15_ACCESS !== 'undefined' && V15_ACCESS) ? 'v15inbox'
+      : ((typeof V2_ACCESS !== 'undefined' && V2_ACCESS) ? 'inbox' : 'home'));
+  switchView(dest);
+}
+
 // Entry point — called by switchView('messages').
 async function openMessagesView() {
   initMessageLongPress();
@@ -26308,6 +26326,10 @@ async function openMessagesView() {
     const sidebar = document.getElementById('messages-sidebar');
     const isMultiClient = _msgConversations.length > 1;
     sidebar.style.display = isMultiClient ? 'flex' : 'none';
+    // Single locked thread (the academy view) → show a Back button (no sidebar
+    // to navigate away with).
+    const backBtn = document.getElementById('messages-back');
+    if (backBtn) backBtn.style.display = isMultiClient ? 'none' : 'inline-flex';
 
     if (isMultiClient) {
       renderMessagesInbox();
