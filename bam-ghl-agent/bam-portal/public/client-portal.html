@@ -9442,11 +9442,15 @@ async function _v15kCleanPost(action, body) {
 let _V15CAL = { calendars: [], selected: new Set(), weekOffset: 0, events: [], settings: {}, tz: 'America/Toronto', activeContact: null, msgType: 'SMS', editSpecial: [] };
 
 function _v15hm(s) { const p = String(s || '').split(':'); const v = (+p[0]) + (+p[1] || 0) / 60; return isNaN(v) ? NaN : v; }
+// GHL sometimes returns openHours / daysOfTheWeek as an object map instead of an
+// array — for...of on that throws "not iterable". Coerce to an array (recovering
+// object values) so the Calendars tab never dies on an odd payload shape.
+function _v15arr(x) { return Array.isArray(x) ? x : (x && typeof x === 'object' ? Object.values(x) : []); }
 function _v15calHoursToRows(openHours) {
   const rows = [0,1,2,3,4,5,6].map(() => ({ on: false, open: '17:00', close: '20:00' }));
-  for (const blk of openHours || []) {
-    const h = (blk.hours || [])[0]; if (!h) continue;
-    for (const d of blk.daysOfTheWeek || []) if (rows[d]) rows[d] = { on: true, open: bkPad(h.openHour) + ':' + bkPad(h.openMinute), close: bkPad(h.closeHour) + ':' + bkPad(h.closeMinute) };
+  for (const blk of _v15arr(openHours)) {
+    const h = _v15arr(blk.hours)[0]; if (!h) continue;
+    for (const d of _v15arr(blk.daysOfTheWeek)) if (rows[d]) rows[d] = { on: true, open: bkPad(h.openHour) + ':' + bkPad(h.openMinute), close: bkPad(h.closeHour) + ':' + bkPad(h.closeMinute) };
   }
   return rows;
 }
@@ -9519,7 +9523,7 @@ function _v15calHourRange() {
   let lo = 23, hi = 0, found = false;
   for (const id of _V15CAL.selected) {
     const s = _V15CAL.settings[id]; if (!s) continue;
-    for (const blk of (s.openHours || [])) { const h = (blk.hours || [])[0]; if (!h) continue; lo = Math.min(lo, h.openHour); hi = Math.max(hi, h.closeHour + (h.closeMinute > 0 ? 1 : 0)); found = true; }
+    for (const blk of _v15arr(s.openHours)) { const h = _v15arr(blk.hours)[0]; if (!h) continue; lo = Math.min(lo, h.openHour); hi = Math.max(hi, h.closeHour + (h.closeMinute > 0 ? 1 : 0)); found = true; }
     for (const sp of (s.special || [])) { if (sp.closed) continue; const o = _v15hm(sp.open), c = _v15hm(sp.close); if (!isNaN(o)) { lo = Math.min(lo, Math.floor(o)); found = true; } if (!isNaN(c)) hi = Math.max(hi, Math.ceil(c)); }
   }
   for (const ev of _V15CAL.events) { const d = new Date(ev.start); if (!isNaN(d.getTime())) { lo = Math.min(lo, d.getHours()); hi = Math.max(hi, d.getHours() + 1); } }
@@ -9533,7 +9537,7 @@ function _v15calOpenAt(calId, dateObj, hour) {
   const sp = (s.special || []).find(x => x.date === dk);
   if (sp) { if (sp.closed) return false; const o = _v15hm(sp.open), c = _v15hm(sp.close); return hour >= Math.floor(o) && hour < Math.ceil(c); }
   const dow = dateObj.getDay();
-  for (const blk of (s.openHours || [])) { if (!(blk.daysOfTheWeek || []).includes(dow)) continue; const h = (blk.hours || [])[0]; if (!h) continue; const o = h.openHour + h.openMinute / 60, c = h.closeHour + h.closeMinute / 60; if (hour >= Math.floor(o) && hour < Math.ceil(c)) return true; }
+  for (const blk of _v15arr(s.openHours)) { if (!_v15arr(blk.daysOfTheWeek).includes(dow)) continue; const h = _v15arr(blk.hours)[0]; if (!h) continue; const o = h.openHour + h.openMinute / 60, c = h.closeHour + h.closeMinute / 60; if (hour >= Math.floor(o) && hour < Math.ceil(c)) return true; }
   return false;
 }
 function _v15calCellBookings(dateKey, hour) {

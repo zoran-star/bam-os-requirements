@@ -67,11 +67,14 @@ async function ghl(token, method, path, body) {
 }
 
 const pad = n => String(n).padStart(2, "0");
+// GHL occasionally returns array-ish fields (openHours, availabilities) as an
+// object map. Coerce to a real array so downstream iteration never breaks.
+const toArr = x => Array.isArray(x) ? x : (x && typeof x === "object" ? Object.values(x) : []);
 
 // availabilities[] (date overrides) → friendly {date, closed, open, close}.
 function readSpecial(c) {
   const today = new Date().toISOString().slice(0, 10);
-  return (c.availabilities || [])
+  return toArr(c.availabilities)
     .filter(a => !a.deleted)
     .map(a => {
       const h = (a.hours || [])[0];
@@ -95,7 +98,7 @@ function summarize(c) {
     slotDuration: c.slotDuration,
     slotDurationUnit: c.slotDurationUnit || "mins",
     capacity: c.appoinmentPerSlot ?? null,
-    openHours: c.openHours || [],
+    openHours: toArr(c.openHours),
     special: readSpecial(c),
   };
 }
@@ -123,6 +126,7 @@ async function handler(req, res) {
 
     const client = await loadClient(clientId);
     if (!client) return res.status(404).json({ error: "academy not found" });
+    const locationId = client.ghl_location_id;
     let token;
     try { token = await getClientGhlToken(client); }
     catch (e) {
@@ -130,7 +134,6 @@ async function handler(req, res) {
       if (!apiKey) return res.status(502).json({ error: `GHL access: ${e.message}` });
       token = apiKey;
     }
-    const locationId = client.ghl_location_id;
     const action = (req.query && req.query.action) || (req.body && req.body.action) || "";
 
     // ─────────────── GET ───────────────
