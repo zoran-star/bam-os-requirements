@@ -6473,14 +6473,14 @@ Then the call to action."]</div>
           <div class="wizard-step" data-wstep="asset-upload">
             <div class="section-label">Input assets</div>
             <div style="color:var(--text-sub);font-size:13px;line-height:1.5;margin-bottom:14px">
-              For each creative you want, submit your raw assets and notes.
-              Our content team will turn them into the finished creative and add them to your campaign.
+              Organize your raw assets into folders. Name each folder and drop in your assets
+              (or a whole folder) plus any links. Our content team turns them into the finished creative.
             </div>
 
             <div id="wizardCreativesList"></div>
 
             <button class="wizard-new-offer-btn" onclick="wizardAddCreativeBlock()" style="margin-top:14px;margin-bottom:6px">
-              + Add another creative
+              + Create new folder
             </button>
 
             <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:18px">
@@ -24045,7 +24045,8 @@ let _wizardCreativeSeq = 0;
 function wizardAddCreativeBlock() {
   if (!_wizard) return;
   _wizardCreativeSeq += 1;
-  _wizard.creatives.push({ id: 'c' + _wizardCreativeSeq, type: 'graphic', files: [], notes: '', driveLink: '' });
+  // Each block is now a named FOLDER (the content drop is folder-first).
+  _wizard.creatives.push({ id: 'c' + _wizardCreativeSeq, name: '', type: 'graphic', files: [], notes: '', driveLink: '' });
   _renderWizardCreatives();
 }
 
@@ -24055,26 +24056,19 @@ function wizardRemoveCreativeBlock(id) {
   _renderWizardCreatives();
 }
 
-function wizardSetCreativeType(id, type) {
+function wizardSetFolderName(id, value) {
   const c = _wizard?.creatives.find(x => x.id === id);
-  if (!c) return;
-  c.type = type;
-  _renderWizardCreatives();
+  if (c) c.name = value;
+  // Don't re-render on every keystroke (would lose focus); name is read at submit.
 }
 
 function wizardCreativeAddFiles(id, filesList, fromFolderUpload) {
   const c = _wizard?.creatives.find(x => x.id === id);
   if (!c) return;
+  // The whole block is one folder, so we FLATTEN folder uploads (no nesting) —
+  // every file just joins this block's files; the folder label (the block's
+  // name) is applied at submit time.
   const incoming = _filterOversizeFiles(filesList || []);
-  const activeFolder = (document.getElementById('wizardFolder_' + id)?.value || '').trim();
-  incoming.forEach(f => {
-    if (fromFolderUpload) {
-      const rel = f.webkitRelativePath || '';
-      f._folder = (rel.indexOf('/') !== -1 ? rel.slice(0, rel.indexOf('/')) : '') || activeFolder;
-    } else {
-      f._folder = activeFolder;
-    }
-  });
   const input = document.getElementById('wizardFiles_' + id);
   if (input) input.value = '';
   const finput = document.getElementById('wizardFolderInput_' + id);
@@ -24110,7 +24104,7 @@ function _renderWizardCreatives() {
   if (!_wizard.creatives.length) {
     list.innerHTML = `
       <div style="padding:24px;border:1.5px dashed var(--line-str);border-radius:8px;text-align:center;color:var(--text-mute)">
-        No creatives yet. Click "+ Add another creative" below to start.
+        No folders yet. Click "+ Create new folder" below to start.
       </div>`;
     _updateWizardContinueBtn();
     return;
@@ -24118,60 +24112,45 @@ function _renderWizardCreatives() {
 
   list.innerHTML = _wizard.creatives.map((c, idx) => `
     <div class="card" style="margin-bottom:14px;position:relative">
-      <button onclick="wizardRemoveCreativeBlock('${c.id}')" title="Remove this creative" aria-label="Remove" style="position:absolute;top:14px;right:14px;width:28px;height:28px;border-radius:50%;border:1px solid var(--line);background:transparent;color:var(--text-mute);cursor:pointer;font-size:14px">×</button>
+      ${_wizard.creatives.length > 1 ? `<button onclick="wizardRemoveCreativeBlock('${c.id}')" title="Remove this folder" aria-label="Remove" style="position:absolute;top:14px;right:14px;width:28px;height:28px;border-radius:50%;border:1px solid var(--line);background:transparent;color:var(--text-mute);cursor:pointer;font-size:14px">×</button>` : ''}
 
-      <div class="card-title" style="margin-bottom:14px;font-size:15px">Creative ${idx + 1}</div>
+      <label class="modal-label">📁 Folder name</label>
+      <input class="modal-input" placeholder="e.g. Game footage, Logos, Testimonials" value="${escapeHTML(c.name || '')}" oninput="wizardSetFolderName('${c.id}', this.value)" style="margin-bottom:14px" />
 
-      <label class="modal-label">Raw files</label>
-      <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:8px">
-        <input id="wizardFolder_${c.id}" class="modal-input" placeholder="📁 Folder (optional) — e.g. Game footage" style="flex:1 1 180px;min-width:140px" />
-        <label for="wizardFolderInput_${c.id}" class="btn-modal-secondary" style="cursor:pointer;white-space:nowrap;margin:0">🗂 Upload a folder</label>
-        <input type="file" id="wizardFolderInput_${c.id}" webkitdirectory directory multiple style="display:none" onchange="wizardCreativeAddFiles('${c.id}', this.files, true)" />
-      </div>
-      <label for="wizardFiles_${c.id}" class="file-drop-label" style="padding:18px;margin-bottom:8px">
+      <label class="modal-label">Upload assets or folder</label>
+      <label for="wizardFiles_${c.id}" class="file-drop-label" style="padding:18px;margin-bottom:6px">
         <span class="file-drop-icon">↑</span>
-        <span class="file-drop-text">Click to upload (multiple OK)</span>
+        <span class="file-drop-text">Click to upload files</span>
         <span class="file-drop-meta">JPG · PNG · MP4 · MOV · PSD · AI · ZIP</span>
       </label>
       <input type="file" id="wizardFiles_${c.id}" accept="image/*,video/*,.psd,.ai,.zip" multiple style="display:none" onchange="wizardCreativeAddFiles('${c.id}', this.files)" />
+      <div style="text-align:center;margin-bottom:8px">
+        <label for="wizardFolderInput_${c.id}" style="cursor:pointer;color:var(--gold,#E8C547);font-size:12px;font-weight:600">🗂 …or upload a whole folder</label>
+        <input type="file" id="wizardFolderInput_${c.id}" webkitdirectory directory multiple style="display:none" onchange="wizardCreativeAddFiles('${c.id}', this.files, true)" />
+      </div>
       <div class="wizard-files-list">
-        ${(() => {
-          const groups = {};
-          c.files.forEach((f, fi) => { const k = f._folder || ''; (groups[k] = groups[k] || []).push({ f, fi }); });
-          const ns = Object.keys(groups).sort((a, b) => (a === '' ? 1 : b === '' ? -1 : a.localeCompare(b)));
-          const flat = ns.length === 1 && ns[0] === '';
-          return ns.map(name => {
-            const items = groups[name].map(({ f, fi }) => {
-              const isImage = (f.type || '').startsWith('image/');
-              const thumb = isImage
-                ? `<img class="wizard-file-thumb" src="${URL.createObjectURL(f)}" alt="${escapeHTML(f.name)}" />`
-                : `<div class="wizard-file-thumb">${(f.type || '').startsWith('video/') ? '🎬' : '📄'}</div>`;
-              const sizeKB = (f.size / 1024).toFixed(0);
-              const sizeLabel = sizeKB < 1024 ? sizeKB + ' KB' : (sizeKB / 1024).toFixed(1) + ' MB';
-              return `
-                <div class="wizard-file-item">
-                  ${thumb}
-                  <div class="wizard-file-name">${escapeHTML(f.name)}</div>
-                  <div class="wizard-file-size">${sizeLabel}</div>
-                  <button class="wizard-file-remove" onclick="wizardCreativeRemoveFile('${c.id}', ${fi})" aria-label="Remove">×</button>
-                </div>`;
-            }).join('');
-            if (flat) return items;
-            const label = name ? `📁 ${escapeHTML(name)}` : 'Uncategorized';
-            const color = name ? 'var(--gold,#E8C547)' : 'var(--text-mute)';
-            return `<details open style="border:1px solid var(--line-soft,rgba(255,255,255,.06));border-radius:8px;padding:6px 10px;margin-top:8px">
-              <summary style="cursor:pointer;user-select:none;font-family:var(--mono,monospace);font-size:11px;color:${color};letter-spacing:.04em">${label} <span style="color:var(--text-mute);font-weight:400">(${groups[name].length})</span></summary>
-              <div style="margin-top:6px">${items}</div>
-            </details>`;
-          }).join('');
-        })()}
+        ${c.files.map((f, fi) => {
+          const isImage = (f.type || '').startsWith('image/');
+          const thumb = isImage
+            ? `<img class="wizard-file-thumb" src="${URL.createObjectURL(f)}" alt="${escapeHTML(f.name)}" />`
+            : `<div class="wizard-file-thumb">${(f.type || '').startsWith('video/') ? '🎬' : '📄'}</div>`;
+          const sizeKB = (f.size / 1024).toFixed(0);
+          const sizeLabel = sizeKB < 1024 ? sizeKB + ' KB' : (sizeKB / 1024).toFixed(1) + ' MB';
+          return `
+            <div class="wizard-file-item">
+              ${thumb}
+              <div class="wizard-file-name">${escapeHTML(f.name)}</div>
+              <div class="wizard-file-size">${sizeLabel}</div>
+              <button class="wizard-file-remove" onclick="wizardCreativeRemoveFile('${c.id}', ${fi})" aria-label="Remove">×</button>
+            </div>`;
+        }).join('')}
       </div>
 
       <label class="modal-label" style="margin-top:12px">Link to file <span style="color:var(--text-mute);font-weight:400">(use if your file is over 500MB — Drive, Dropbox, WeTransfer, OneDrive, etc.)</span></label>
       <input class="modal-input" type="url" placeholder="https://..." value="${escapeHTML(c.driveLink || '')}" oninput="wizardSetCreativeDriveLink('${c.id}', this.value)" />
       <div style="font-size:12px;color:var(--text-mute);margin-top:4px">Set sharing to "Anyone with the link" so we can open it.</div>
 
-      <label class="modal-label" style="margin-top:12px">Notes</label>
+      <label class="modal-label" style="margin-top:12px">Notes (optional)</label>
       <textarea class="modal-textarea" placeholder="What's the vibe? Hook? Key copy? Anything special the team should know?" oninput="wizardSetCreativeNotes('${c.id}', this.value)">${escapeHTML(c.notes)}</textarea>
     </div>
   `).join('');
@@ -24238,10 +24217,14 @@ async function wizardSubmitFinal(skipped) {
       const hasFiles = c.files.length > 0;
       const validDrive = _isValidAssetLink(c.driveLink);
       if (!hasFiles && !validDrive) continue; // skip blocks with neither files nor a Drive link
+      // Apply this block's folder name to every file (flattened — no nesting).
+      const folderName = (c.name || '').trim();
+      c.files.forEach(f => { f._folder = folderName; });
       const uploaded = hasFiles ? await _mreqUploadFiles(c.files) : [];
-      if (validDrive) uploaded.push(_buildAssetLinkEntry(c.driveLink));
+      if (validDrive) uploaded.push({ ..._buildAssetLinkEntry(c.driveLink), folder: folderName });
       creativesPayload.push({
         local_id: c.id,
+        folder: folderName,
         type: _deriveAssetType(c.files),
         notes: c.notes || '',
         raw_files: uploaded,
