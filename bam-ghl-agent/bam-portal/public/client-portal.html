@@ -5503,7 +5503,7 @@
         Assets
       </div>
 
-      <div class="nav-item" data-feature="v15" style="display:none" onclick="switchView('contacts', this)">
+      <div class="nav-item" id="nav-contacts" data-feature="v15" style="display:none" onclick="switchView('contacts', this)">
         <span class="nav-icon" aria-hidden="true">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/>
@@ -11069,7 +11069,22 @@ function applyV2NavState(v2Access) {
   // Re-run V2-gated feature gates.
   applyMemberMgmtNavState();
   applyCalendarNavState();
+  applyContactsNavState();
   if (typeof applyTalkToBamNav === 'function') applyTalkToBamNav();
+}
+
+// V2 is a SUPERSET of V1.5: a V2 academy still manages leads/contacts, so the
+// full-CRM Contacts tab (a V1.5 surface) shows for V2 too. Targets only the
+// Contacts item by id — V2 has its own Inbox/KPIs/Calendar/Pipelines, so we do
+// NOT surface the other data-feature="v15" items here (that would duplicate).
+// Web-only, like the other V1.5/V2 tabs. Called from both nav gates so it's
+// correct regardless of which runs last at boot.
+function applyContactsNavState() {
+  const show = ((typeof V15_ACCESS !== 'undefined' && V15_ACCESS) ||
+                (typeof V2_ACCESS !== 'undefined' && V2_ACCESS)) &&
+               !(typeof isNativeApp === 'function' && isNativeApp());
+  const el = document.getElementById('nav-contacts');
+  if (el) el.style.display = show ? '' : 'none';
 }
 
 // ── V1.5 feature gate ──
@@ -11095,6 +11110,7 @@ function applyV15NavState(v15) {
   // top margin (which left a gap below the topbar).
   const acHead = document.getElementById('active-campaigns-head');
   if (acHead) acHead.style.marginTop = v15 ? '0' : '48px';
+  applyContactsNavState(); // V2 keeps Contacts too — override the bulk v15 toggle above
   applyTalkToBamNav();
 }
 
