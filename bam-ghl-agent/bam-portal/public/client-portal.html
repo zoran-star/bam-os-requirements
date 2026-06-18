@@ -18503,7 +18503,7 @@ async function _ptfSubmit() {
 const _PL_STATUS_LABEL = { won: 'Won', lost: 'Lost', abandoned: 'Abandoned' };
 let _plUndoState = null, _plUndoTimer = null;
 
-function _plMarkWon(oppId) { _plOutcome(oppId, 'won'); }
+function _plMarkWon(oppId) { _plSetStatus(oppId, 'won', ''); }   // Won never asks for a reason — only Lost/Abandoned do.
 function _plMarkLost(oppId) { _plOutcome(oppId, 'lost'); }
 function _plMarkAbandoned(oppId) { _plOutcome(oppId, 'abandoned'); }
 
