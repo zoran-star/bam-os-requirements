@@ -6594,7 +6594,7 @@ Then the call to action."]</div>
         <!-- Active thread -->
         <div class="chat-main" id="messages-main">
           <div class="chat-header" id="messages-header" style="display:flex;align-items:center;gap:12px">
-            <button id="messages-back" onclick="_msgBack()" aria-label="Back" title="Back" style="display:none;align-items:center;justify-content:center;gap:6px;background:rgba(232,197,71,0.12);border:1px solid var(--accent);border-radius:10px;color:var(--accent);height:40px;padding:0 14px;cursor:pointer;flex:0 0 auto;font:inherit;font-size:14px;font-weight:700;line-height:1">← Back</button>
+            <button id="messages-back" onclick="_msgBack()" aria-label="Back" title="Back" style="align-items:center;justify-content:center;gap:6px;background:rgba(232,197,71,0.12);border:1px solid var(--accent);border-radius:10px;color:var(--accent);height:40px;padding:0 14px;cursor:pointer;flex:0 0 auto;font:inherit;font-size:14px;font-weight:700;line-height:1">← Back</button>
             <div>
               <div class="chat-header-name" id="messages-header-name">Chat with the team</div>
             </div>
@@ -6837,6 +6837,11 @@ Then the call to action."]</div>
         #view-inbox .v15ib-sel { width:100%; flex:none; }
         #view-inbox .v15ib-filters .v15ib-clear { width:100%; }
       }
+
+      /* Team-chat back button — mobile-only. On desktop the left nav handles
+         navigation, so the button is hidden (it looked out of place there). */
+      #messages-back { display:none; }
+      @media (max-width:768px) { #messages-back.show { display:inline-flex; } }
 
       /* Thread drawer */
       #ib-drawer-overlay { position:fixed; inset:0; background:rgba(0,0,0,0.45); opacity:0; pointer-events:none; transition:opacity 250ms; z-index:60; }
@@ -26891,7 +26896,9 @@ async function openMessagesView() {
     // Single locked thread (the academy view) → show a Back button (no sidebar
     // to navigate away with).
     const backBtn = document.getElementById('messages-back');
-    if (backBtn) backBtn.style.display = isMultiClient ? 'none' : 'inline-flex';
+    // Single locked thread → eligible for a back button, but CSS only reveals it
+    // on mobile (≤768px); on desktop the left nav is the way out.
+    if (backBtn) backBtn.classList.toggle('show', !isMultiClient);
 
     if (isMultiClient) {
       renderMessagesInbox();
