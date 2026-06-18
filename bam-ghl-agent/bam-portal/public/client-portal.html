@@ -10307,11 +10307,11 @@ function _contactsRender() {
     list.innerHTML = `<div class="req-empty" style="padding:32px 0;color:var(--text-mute)">${_contactsQ || _contactsTag ? 'No contacts match.' : 'No contacts synced yet — a new V1.5 academy syncs within a few minutes.'}</div>`;
     return;
   }
-  const rows = _CONTACTS.map(c => `
-    <div style="display:grid;grid-template-columns:1.4fr 1.2fr 1fr 1.2fr;gap:12px;padding:12px 14px;border-bottom:1px solid var(--border);font-size:13px;align-items:center">
+  const rows = _CONTACTS.map((c, i) => `
+    <div onclick="_contactsOpenDrawer(${i})" style="display:grid;grid-template-columns:1.4fr 1.2fr 1fr 1.2fr;gap:12px;padding:12px 14px;border-bottom:1px solid var(--border);font-size:13px;align-items:center;cursor:pointer" onmouseover="this.style.background='var(--surface)'" onmouseout="this.style.background='transparent'">
       <div style="font-weight:600;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHTML(c.name || '—')}</div>
       <div style="color:var(--text-sub);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${c.athlete_name ? escapeHTML(c.athlete_name) : '<span style="color:var(--text-mute)">—</span>'}</div>
-      <div style="color:var(--text-sub)">${c.phone ? `<a href="tel:${escapeHTML(c.phone)}" style="color:var(--text-sub);text-decoration:none">${escapeHTML(c.phone)}</a>` : '—'}</div>
+      <div style="color:var(--text-sub)" onclick="event.stopPropagation()">${c.phone ? `<a href="tel:${escapeHTML(c.phone)}" style="color:var(--text-sub);text-decoration:none">${escapeHTML(c.phone)}</a>` : '—'}</div>
       <div style="color:var(--text-sub);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${c.email ? escapeHTML(c.email) : '—'}</div>
     </div>`).join('');
   list.innerHTML = `
@@ -10326,6 +10326,144 @@ function _contactsRender() {
 
 function _contactsOnSearch(v) { _contactsQ = v; clearTimeout(_contactsSearchTimer); _contactsSearchTimer = setTimeout(_contactsLoad, 300); }
 function _contactsSetTag(v) { _contactsTag = v; _contactsLoad(); }
+
+// ── Contact drawer (V1.5) — GHL info + Stripe billing + SMS/Email composer ──
+let _CDRAWER = { contact: null, ghl: null, msgType: 'SMS' };
+function _cdMoney(cents, cur) { if (cents == null) return '—'; const v = cents / 100; try { return new Intl.NumberFormat(undefined, { style: 'currency', currency: (cur || 'usd').toUpperCase() }).format(v); } catch (_) { return '$' + v.toFixed(2); } }
+function _cdDate(unix) { if (!unix) return ''; try { return new Date(unix * 1000).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }); } catch (_) { return ''; } }
+function _contactsCloseDrawer() { const o = document.getElementById('contacts-drawer-ov'); if (o) o.remove(); }
+function _contactsShowDrawer(title, bodyHtml) {
+  _contactsCloseDrawer();
+  const ov = document.createElement('div'); ov.id = 'contacts-drawer-ov';
+  ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9000;display:flex;justify-content:flex-end';
+  ov.onclick = (e) => { if (e.target === ov) _contactsCloseDrawer(); };
+  ov.innerHTML = `<div style="width:min(460px,100%);height:100%;background:var(--bg);border-left:1px solid var(--border);overflow:auto;padding:20px 22px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+      <div style="font-size:17px;font-weight:700;color:var(--text)">${title}</div>
+      <button onclick="_contactsCloseDrawer()" style="background:none;border:none;color:var(--text-sub);font-size:22px;line-height:1;cursor:pointer">×</button>
+    </div>
+    <div id="contacts-drawer-body">${bodyHtml}</div></div>`;
+  document.body.appendChild(ov);
+}
+async function _contactsOpenDrawer(idx) {
+  const c = _CONTACTS[idx]; if (!c) return;
+  _CDRAWER = { contact: c, ghl: null, msgType: c.phone ? 'SMS' : 'Email' };
+  _contactsShowDrawer(escapeHTML(c.name || 'Contact'), `<div class="req-empty" style="padding:24px 0"><span class="req-spin"></span> Loading…</div>`);
+  try {
+    const token = await _mreqAuthToken();
+    const r = await fetch(`/api/ghl/calendars-v15?action=contact&client_id=${encodeURIComponent(CLIENT_ID)}&id=${encodeURIComponent(c.ghl_contact_id || '')}`, { headers: { Authorization: 'Bearer ' + token } });
+    const j = await _safeJson(r);
+    if (!r.ok) throw new Error(j.error || ('HTTP ' + r.status));
+    _CDRAWER.ghl = j.contact || null;
+  } catch (e) {
+    _CDRAWER.ghl = { name: c.name, email: c.email, phone: c.phone, tags: c.tags || [], _error: e.message || String(e) };
+  }
+  const body = document.getElementById('contacts-drawer-body');
+  if (body) body.innerHTML = _cdBody();
+  _contactsLoadStripe(c);
+}
+function _cdBody() {
+  const g = _CDRAWER.ghl || {};
+  const row = (k, v) => v ? `<div style="display:flex;gap:8px;padding:3px 0;font-size:13px"><span style="color:var(--text-mute);min-width:64px">${k}</span><span style="color:var(--text);word-break:break-word">${escapeHTML(String(v))}</span></div>` : '';
+  const tags = (g.tags || []).map(t => `<span style="display:inline-block;background:var(--surface);border:1px solid var(--border);border-radius:999px;padding:2px 9px;font-size:11px;color:var(--text-sub);margin:0 5px 5px 0">${escapeHTML(t)}</span>`).join('');
+  const cf = (g.customFields || []).filter(f => f.value != null && f.value !== '');
+  const sect = (t) => `<div style="font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--text-mute);font-weight:700;margin:16px 0 8px">${t}</div>`;
+  const ghlHtml = `${sect('Contact')}
+    ${row('Name', g.name)}${row('Email', g.email)}${row('Phone', g.phone)}
+    ${g.dnd ? `<div style="margin-top:6px;font-size:12px;color:#c9742f">⚠ Do-not-contact is ON</div>` : ''}
+    ${row('Source', g.source)}${row('Added', g.dateAdded ? _cdDate(Math.floor(new Date(g.dateAdded).getTime() / 1000)) : '')}
+    ${tags ? `<div style="margin-top:8px">${tags}</div>` : ''}
+    ${cf.length ? `<div style="margin-top:10px;border-top:1px solid var(--border);padding-top:8px">${cf.map(f => row(escapeHTML(f.name || 'Field'), f.value)).join('')}</div>` : ''}
+    ${g._error ? `<div style="margin-top:6px;font-size:11px;color:var(--text-mute)">Full GHL detail unavailable (${escapeHTML(g._error)})</div>` : ''}`;
+  return `${ghlHtml}
+    ${sect('Billing (Stripe)')}
+    <div id="cd-stripe"><div class="req-empty" style="padding:8px 0"><span class="req-spin"></span> Checking Stripe…</div></div>
+    ${_cdComposer()}`;
+}
+async function _contactsLoadStripe(c) {
+  const host = () => document.getElementById('cd-stripe');
+  try {
+    const token = await _mreqAuthToken();
+    const p = new URLSearchParams({ client_id: CLIENT_ID });
+    if (c.ghl_contact_id) p.set('ghl_contact_id', c.ghl_contact_id);
+    if (c.email) p.set('email', c.email);
+    const r = await fetch('/api/stripe/contact?' + p, { headers: { Authorization: 'Bearer ' + token } });
+    const j = await _safeJson(r);
+    if (!r.ok) throw new Error(j.error || ('HTTP ' + r.status));
+    const el = host(); if (el) el.innerHTML = _cdStripeSection(j);
+  } catch (e) {
+    const el = host(); if (el) el.innerHTML = `<div style="font-size:12px;color:var(--text-mute)">Stripe unavailable — ${escapeHTML(e.message || String(e))}</div>`;
+  }
+}
+function _cdStripeSection(j) {
+  if (!j.connected) return `<div style="font-size:12px;color:var(--text-mute)">This academy hasn't connected Stripe.</div>`;
+  const cust = j.customer;
+  if (!cust) return `<div style="font-size:12px;color:var(--text-mute)">No Stripe customer matched this contact.</div>`;
+  const money = (cents, cur) => _cdMoney(cents, cur || cust.currency);
+  const pill = (s) => { const ok = s === 'active' || s === 'trialing'; const bad = ['canceled', 'unpaid', 'incomplete_expired', 'past_due'].includes(s); const col = ok ? '#3a7d44' : bad ? '#9a3b2f' : 'var(--text-sub)'; return `<span style="display:inline-block;border:1px solid ${col};color:${col};border-radius:999px;padding:1px 8px;font-size:10.5px;text-transform:capitalize">${escapeHTML(s)}</span>`; };
+  const subs = (cust.subscriptions || []).map(s => `
+    <div style="border:1px solid var(--border);border-radius:8px;padding:9px 11px;margin-bottom:6px">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:8px">
+        <span style="font-weight:600;color:var(--text);font-size:13px">${escapeHTML(s.plan_name || 'Subscription')}</span>${pill(s.status)}
+      </div>
+      <div style="font-size:12px;color:var(--text-sub);margin-top:3px">${s.amount_cents != null ? money(s.amount_cents, s.currency) + (s.interval ? ` / ${s.interval_count > 1 ? s.interval_count + ' ' : ''}${s.interval}` : '') : '—'}${s.current_period_end ? ` · ${s.cancel_at_period_end ? 'ends' : 'renews'} ${_cdDate(s.current_period_end)}` : ''}</div>
+    </div>`).join('') || `<div style="font-size:12px;color:var(--text-mute)">No subscriptions.</div>`;
+  const pays = (cust.payments || []).map(p => `
+    <div style="display:grid;grid-template-columns:auto 1fr auto auto;gap:10px;align-items:center;padding:5px 0;border-bottom:1px solid var(--border);font-size:12px">
+      <span style="color:var(--text-sub)">${_cdDate(p.created)}</span>
+      <span style="color:var(--text);font-weight:600">${money(p.amount_cents, p.currency)}</span>
+      <span style="color:${p.status === 'succeeded' ? 'var(--text-sub)' : '#9a3b2f'};text-transform:capitalize">${escapeHTML(p.status)}</span>
+      <span>${p.receipt_url ? `<a href="${escapeHTML(p.receipt_url)}" target="_blank" rel="noopener" style="color:var(--gold);text-decoration:none">receipt</a>` : ''}</span>
+    </div>`).join('') || `<div style="font-size:12px;color:var(--text-mute)">No payments.</div>`;
+  return `
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+      <div style="font-size:13px;color:var(--text-sub)">Total spend <span style="color:var(--text);font-weight:700">${money(cust.total_spend_cents)}</span></div>
+      ${cust.dashboard_url ? `<a href="${escapeHTML(cust.dashboard_url)}" target="_blank" rel="noopener" style="font-size:12px;color:var(--gold);text-decoration:none">Open in Stripe ↗</a>` : ''}
+    </div>
+    <div style="font-size:11px;color:var(--text-mute);margin-bottom:5px">Subscriptions</div>
+    ${subs}
+    <div style="font-size:11px;color:var(--text-mute);margin:10px 0 5px">Payments${cust.more_payments ? ' (recent)' : ''}</div>
+    ${pays}`;
+}
+function _cdComposer() {
+  const c = _CDRAWER.contact || {};
+  if (!c.phone && !c.email) return `<div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--border);font-size:12px;color:var(--text-mute)">No phone or email on file — can't message.</div>`;
+  const tab = (t) => { const dis = (t === 'SMS' && !c.phone) || (t === 'Email' && !c.email); const on = t === _CDRAWER.msgType; return `<button onclick="_contactsMsgType('${t}')" id="cd-mt-${t}" ${dis ? 'disabled' : ''} style="flex:1;border:1px solid var(--border);border-radius:7px;padding:7px;font:inherit;font-size:13px;cursor:${dis ? 'not-allowed' : 'pointer'};background:${on ? 'var(--gold)' : 'var(--surface)'};color:${on ? '#0B0B0D' : 'var(--text-sub)'};${dis ? 'opacity:.4' : ''}">${t}</button>`; };
+  return `<div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--border)">
+      <div style="font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--text-mute);font-weight:700;margin-bottom:8px">Message</div>
+      <div style="display:flex;gap:8px;margin-bottom:8px">${tab('SMS')}${tab('Email')}</div>
+      <input id="cd-msg-subject" placeholder="Subject" style="display:${_CDRAWER.msgType === 'Email' ? 'block' : 'none'};width:100%;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:8px 10px;font:inherit;font-size:13px;margin-bottom:8px">
+      <textarea id="cd-msg-text" rows="3" placeholder="Type a message…" style="width:100%;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:9px 11px;font:inherit;font-size:13px;resize:vertical;margin-bottom:8px"></textarea>
+      <button onclick="_contactsSendMsg()" id="cd-msg-send" style="width:100%;background:var(--gold);color:#0B0B0D;border:none;border-radius:8px;padding:10px;font:inherit;font-size:13px;font-weight:700;cursor:pointer">Send</button>
+    </div>`;
+}
+function _contactsMsgType(t) {
+  const c = _CDRAWER.contact || {};
+  if (t === 'SMS' && !c.phone) return;
+  if (t === 'Email' && !c.email) return;
+  _CDRAWER.msgType = t;
+  ['SMS', 'Email'].forEach(x => { const b = document.getElementById('cd-mt-' + x); if (b && !b.disabled) { const on = x === t; b.style.background = on ? 'var(--gold)' : 'var(--surface)'; b.style.color = on ? '#0B0B0D' : 'var(--text-sub)'; } });
+  const subj = document.getElementById('cd-msg-subject'); if (subj) subj.style.display = t === 'Email' ? 'block' : 'none';
+}
+async function _contactsSendMsg() {
+  const c = _CDRAWER.contact; if (!c) return;
+  const text = (document.getElementById('cd-msg-text')?.value || '').trim();
+  const subject = (document.getElementById('cd-msg-subject')?.value || '').trim();
+  if (!text) return;
+  if (_CDRAWER.msgType === 'Email' && !subject) { alert('Email needs a subject.'); return; }
+  const btn = document.getElementById('cd-msg-send'); if (btn) { btn.disabled = true; btn.textContent = 'Sending…'; }
+  try {
+    const token = await _mreqAuthToken();
+    const r = await fetch('/api/ghl/send-message', {
+      method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+      body: JSON.stringify({ client_id: CLIENT_ID, type: _CDRAWER.msgType, contact_id: c.ghl_contact_id || undefined, contact_phone: c.phone || undefined, contact_email: c.email || undefined, contact_name: c.name || undefined, message: text, subject: _CDRAWER.msgType === 'Email' ? subject : undefined }),
+    });
+    const j = await _safeJson(r);
+    if (!r.ok || j.error) throw new Error(j.error || ('HTTP ' + r.status));
+    const ta = document.getElementById('cd-msg-text'); if (ta) ta.value = '';
+    if (btn) { btn.textContent = 'Sent ✓'; btn.style.background = '#3a7d44'; btn.style.color = '#fff'; setTimeout(() => { if (btn) { btn.disabled = false; btn.textContent = 'Send'; btn.style.background = 'var(--gold)'; btn.style.color = '#0B0B0D'; } }, 1600); }
+  } catch (e) { alert('Failed: ' + (e.message || e)); if (btn) { btn.disabled = false; btn.textContent = 'Send'; } }
+}
 
 async function _contactsOpenSetup() {
   const host = document.getElementById('contacts-content');
