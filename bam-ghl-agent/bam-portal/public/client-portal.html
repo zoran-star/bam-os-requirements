@@ -17114,6 +17114,9 @@ const ONB_UI = {
   connect_ads:    { auto: false, cta: { label: 'Open connection link ↗', fn: "window.open(LEADSIE_CONNECT_URL,'_blank')" } },
   add_campaign:   { auto: false, cta: { label: 'Add a campaign ↗', fn: '_aiOpenNewCampaign()' } },
   book_review_call: { auto: false, cta: null }, // locked until staff are ready; dynamic SM CTA
+  // V1.5-only steps.
+  v15_athlete_map: { auto: false, cta: { label: 'Map field ↗',     fn: '_aiOpenContactsSetup()' } },
+  v15_kpi_setup:   { auto: false, cta: { label: 'Open KPI Setup ↗', fn: '_aiOpenKpiSetup()' } },
 };
 
 // Booking CTA: a person's booking link, or a Slack fallback when not set.
@@ -17148,6 +17151,17 @@ function _aiOpenNewCampaign() {
 function _aiOpenBB(card) {
   switchView('blueprint');
   _bbNavigate(card);
+}
+
+// V1.5 onboarding deep-links: open Contacts → Setup (athlete-name mapping) and
+// KPIs → Setup (tie Stripe/pipelines/calendars to offers).
+function _aiOpenContactsSetup() {
+  switchView('contacts');
+  setTimeout(() => { if (typeof _contactsOpenSetup === 'function') _contactsOpenSetup(); }, 350);
+}
+function _aiOpenKpiSetup() {
+  switchView('v15kpis');
+  setTimeout(() => { if (typeof _v15kOpenSetup === 'function') _v15kOpenSetup(); }, 350);
 }
 
 // Jump from an Action Items ticket row straight to that ticket's detail page.

@@ -12,6 +12,18 @@ need a little manual setup/cleanup to work right (Zoran).
 - Backed by two booleans: `clients.v2_access` + `clients.v15_access` (V1 = both
   false). The selector posts both via `/api/clients?action=update-fields`.
 
+## V1.5 onboarding checklist (Action Items)
+V1.5 academies get the full V2 onboarding checklist PLUS two V1.5-only steps,
+tier-gated in `api/action-items.js` (`ONBOARDING_STEPS` entries with `tier:"v15"`;
+`onboardingStepsForTier(isV15)` filters; `syncOnboardingItems` seeds only
+applicable + deletes leftover tier-gated steps if an academy stops being V1.5).
+New steps + columns (`clients.athlete_map_done_at`, `kpi_setup_done_at`):
+- **v15_athlete_map** "Map your athlete-name field" → CTA `_aiOpenContactsSetup()`
+  (Contacts → ⚙ Setup).
+- **v15_kpi_setup** "Connect your KPIs" → CTA `_aiOpenKpiSetup()` (KPIs → ⚙ Setup modal).
+V2/V1 never see these (hard rule respected). The checklist auto-hides once every
+step is done (`showOnb` in `_renderActionItems`).
+
 ## V1 offer builder = simplified (no connections)
 For **V1** academies (`!v2_access && !v15_access`, via `_bbIsV1()`) the offer
 builder hides all integration/"connection" UI: Stripe price-match pill
