@@ -180,10 +180,27 @@ POST `action=set-status` · `action=create-appointment` · `action=settings`.
 - `clients.v15_config jsonb` holds V1.5 config (athlete_name_field_ids; room for
   more).
 
+## Session state / open loops (2026-06-18 — heavy V1.5 build session)
+- ⚠️ **BAM GTA flipped to V1.5 for testing** (id `39875f07-0a4b-4429-a201-2249bc1f24df`);
+  normally **V2**. **Revert to V2 when done** (`v2_access=true, v15_access=false`).
+- ⚠️ **GTA onboarding was RESET** for testing (all 17 action_items.completed_at
+  cleared + writable mirror cols nulled), so its Business Blueprint "marked done"
+  flags read as not-done. Reversible by re-checking. Athlete field IS mapped for
+  GTA (`v15_config.athlete_name_field_ids=['RqNojS2YaVGQNjMAo4HB']`) + backfilled.
+- **DETAIL Miami** (V1.5, id `4708a68d-5365-48bf-a404-72a69fadd34d`): Marketing
+  shows nothing because `meta_ad_account_id` IS set but `meta_campaign_ids` is
+  **null** — no campaigns selected. NOT a bug; staff must pick campaigns
+  (meta-report returns `no_campaigns_selected` → no periods). 31 offer ties.
+- Shipped this session (all live, V1/V2 hard-rule respected): KPIs Sales/Revenue/
+  Members + bookings + one-time products + optimistic ×/Undo + ▾ hints + numbered
+  Setup tabs; KPIs load without Meta (12-mo selector always) + parallel GHL;
+  Calendars/Inbox/Contacts (athlete sort, full-sync pagination); Marketing
+  stripped for V1.5 (Ad Performance + month-progress hidden, spend-only cards);
+  Talk-to-BAM (locked to academy + Back btn); mobile bottom bar + More + account
+  switcher; V1.5 onboarding steps (athlete-map, connect-KPIs); systems-team
+  Connect-to-offers panel (hard-block); Pipelines Won needs no reason.
+
 ## Gotchas / pending
-- ⚠️ **BAM GTA is temporarily flipped to V1.5 for testing** (2026-06-16, by Zoran).
-  Its live account is normally **V2** — `v2_access=true, v15_access=false`
-  (id `39875f07-0a4b-4429-a201-2249bc1f24df`). **Revert when testing is done.**
 - `athlete_name` only fills AFTER the mapping is set AND a sync runs (≤10 min) —
   a fresh V1.5 academy's athlete search is empty until then. No manual backfill
   trigger yet (relies on the cron).
