@@ -8941,23 +8941,33 @@ function _v15kSoon(title) {
     <div style="font-size:12.5px;color:var(--text-mute);margin-top:4px">Coming in a later phase.</div></div>`;
 }
 
+// Last N months (UTC) for the selector — keys match the meta-report's 'YYYY-MM'.
+// Built independently of Meta so KPIs work even when there's no marketing data.
+function _v15kBuildMonths(n) {
+  const out = []; const now = new Date();
+  for (let i = 0; i < n; i++) {
+    const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - i, 1));
+    out.push({ key: `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`, label: d.toLocaleDateString('en-US', { month: 'long', year: 'numeric', timeZone: 'UTC' }) });
+  }
+  return out;
+}
 async function openV15Kpis() {
   const host = document.getElementById('v15kpis-content');
   if (!host || typeof CLIENT_ID === 'undefined') return;
   host.innerHTML = `<div class="req-empty" style="padding:24px 0"><span class="req-spin"></span> Loading KPIs…</div>`;
+  // Always have a month list so Sales/Revenue/Members load even with no Meta.
+  _V15K.periods = _v15kBuildMonths(12);
+  _V15K.monthKey = _V15K.periods[0].key;
+  _V15K.mkt = {};
+  _v15kRender();
+  _v15kLoadSetup();   // lazy, non-blocking (Stripe + GHL fetch is slow)
+  // Marketing data (Meta) is separate + optional — fold it in when it arrives.
   try {
     const token = await _mreqAuthToken();
     const r = await fetch(`/api/marketing?resource=meta-report&months=12&client_id=${encodeURIComponent(CLIENT_ID)}`, { headers: { Authorization: 'Bearer ' + token } });
     const j = await _safeJson(r);
-    if (!r.ok) throw new Error(j.error || ('HTTP ' + r.status));
-    _V15K.periods = j.periods || [];
-    _V15K.mktEmpty = !!j.empty || _V15K.periods.length === 0;
-    _V15K.monthKey = _V15K.periods[0]?.key || null;
-    _v15kRender();
-    _v15kLoadSetup();   // lazy, non-blocking (Stripe + GHL fetch is slow)
-  } catch (e) {
-    host.innerHTML = `<div class="req-empty" style="padding:24px 0;color:#9a3b2f">Couldn't load KPIs — ${escapeHTML(e.message || String(e))}</div>`;
-  }
+    if (r.ok) { for (const p of (j.periods || [])) _V15K.mkt[p.key] = p; _v15kRender(); }
+  } catch (_) { /* marketing stays "no data"; the rest still works */ }
 }
 
 // ── SETUP section: tie Stripe products + GHL pipelines → offers (powers Sales/
@@ -9070,16 +9080,22 @@ function _v15kRender() {
   const period = _V15K.periods.find(p => p.key === _V15K.monthKey) || null;
   // MARKETING — plain numbers, no verdicts / good-bad coloring.
   let marketing;
-  if (_V15K.mktEmpty || !period) {
+  if (!period) {
     marketing = `<div class="req-empty" style="padding:18px 0;color:var(--text-mute)">No marketing data for this month.</div>`;
   } else {
-    // meta-report monthly periods carry totals under period.totals (spend/leads/cpl).
-    const t = period.totals || period || {};
-    marketing = `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-top:12px">
-      ${_v15kStat('Ad spend', _v15kMoney(t.spend))}
-      ${_v15kStat('Leads', _v15kNum(t.leads))}
-      ${_v15kStat('Cost per lead', t.cpl != null ? _v15kMoney(t.cpl) : '—')}
-    </div>`;
+    // Marketing (Meta) totals are keyed by month in _V15K.mkt — independent of
+    // the selector. period.totals carries spend/leads/cpl.
+    const mp = (_V15K.mkt || {})[_V15K.monthKey];
+    const t = mp && mp.totals ? mp.totals : null;
+    if (!t) {
+      marketing = `<div class="req-empty" style="padding:18px 0;color:var(--text-mute)">No marketing data for this month.</div>`;
+    } else {
+      marketing = `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-top:12px">
+        ${_v15kStat('Ad spend', _v15kMoney(t.spend))}
+        ${_v15kStat('Leads', _v15kNum(t.leads))}
+        ${_v15kStat('Cost per lead', t.cpl != null ? _v15kMoney(t.cpl) : '—')}
+      </div>`;
+    }
   }
   const sectionHead = (t) => `<div style="font-family:var(--font-display,inherit);font-size:24px;font-weight:800;letter-spacing:.02em;text-transform:uppercase;color:var(--text);margin-top:34px;padding-bottom:8px;border-bottom:1px solid var(--border)">${t}</div>`;
   host.innerHTML = `

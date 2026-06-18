@@ -250,41 +250,41 @@ async function handler(req, res) {
         for (const r of (rows || [])) if (r.ghl_contact_id) nameById[r.ghl_contact_id] = r.name || r.athlete_name || null;
       } catch (_) {}
       let ghlError = false;   // a GHL call failed (rate-limit/token) → counts may be understated
-      const out = [];
-      for (const o of offers) {
-        // entered pipeline: opportunities created in month across tied pipelines
-        const pipeItems = [];
-        if (ghlToken) {
-          for (const p of o.pipelines) {
+      // Pre-fetch each UNIQUE tied pipeline + calendar ONCE, in parallel. (Was a
+      // sequential GHL call per offer×pipeline — slow + redundant on academies
+      // with many ties, and could blow past the function timeout.)
+      const uniqPipes = [...new Map(offers.flatMap(o => o.pipelines).map(p => [p.id, p])).values()];
+      const uniqCals = [...new Map(offers.flatMap(o => o.calendars || []).map(c => [c.id, c])).values()];
+      const pipeById = {}, bookById = {};
+      if (ghlToken) {
+        await Promise.all([
+          ...uniqPipes.map(async (p) => {
             try {
               const r = await ghl(ghlToken, "GET", `/opportunities/search?location_id=${encodeURIComponent(client.ghl_location_id)}&pipeline_id=${encodeURIComponent(p.id)}&limit=100`);
-              for (const op of (r.opportunities || r.data || [])) {
-                const created = op.createdAt ? Math.floor(new Date(op.createdAt).getTime() / 1000) : null;
-                if (created != null && created >= start && created < end) {
-                  pipeItems.push({ ref_id: op.id, label: op.contact?.name || op.contactName || op.name || "Lead", contactId: op.contactId || op.contact?.id || null });
-                }
-              }
-            } catch (_) { ghlError = true; }
-          }
-        }
-        // new payments: subs created in month for tied products
-        const payItems = [];
-        for (const pid of o.products) for (const it of (subsByProduct[pid] || [])) payItems.push(it);
-
-        // bookings: appointments starting in the month for tied calendars
-        const bookItems = [];
-        if (ghlToken) {
-          for (const cal of (o.calendars || [])) {
+              pipeById[p.id] = (r.opportunities || r.data || []).filter((op) => {
+                const c = op.createdAt ? Math.floor(new Date(op.createdAt).getTime() / 1000) : null;
+                return c != null && c >= start && c < end;
+              }).map((op) => ({ ref_id: op.id, label: op.contact?.name || op.contactName || op.name || "Lead", contactId: op.contactId || op.contact?.id || null }));
+            } catch (_) { ghlError = true; pipeById[p.id] = []; }
+          }),
+          ...uniqCals.map(async (cal) => {
             try {
               const r = await ghl(ghlToken, "GET", `/calendars/events?locationId=${encodeURIComponent(client.ghl_location_id)}&calendarId=${encodeURIComponent(cal.id)}&startTime=${start * 1000}&endTime=${end * 1000}`);
-              for (const ev of (r.events || [])) {
-                if (ev.appointmentStatus === "cancelled") continue;
+              bookById[cal.id] = (r.events || []).filter((ev) => ev.appointmentStatus !== "cancelled").map((ev) => {
                 const cid = ev.contactId || (ev.contact && ev.contact.id) || null;
-                bookItems.push({ ref_id: ev.id || ev._id, label: nameById[cid] || (ev.contact && ev.contact.name) || ev.contactName || ev.title || "Booking", contactId: cid });
-              }
-            } catch (_) { ghlError = true; }
-          }
-        }
+                return { ref_id: ev.id || ev._id, label: nameById[cid] || (ev.contact && ev.contact.name) || ev.contactName || ev.title || "Booking", contactId: cid };
+              });
+            } catch (_) { ghlError = true; bookById[cal.id] = []; }
+          }),
+        ]);
+      }
+      const out = [];
+      for (const o of offers) {
+        const pipeItems = o.pipelines.flatMap((p) => pipeById[p.id] || []);
+        // new payments: subs/one-time created in month for tied products
+        const payItems = [];
+        for (const pid of o.products) for (const it of (subsByProduct[pid] || [])) payItems.push(it);
+        const bookItems = (o.calendars || []).flatMap((c) => bookById[c.id] || []);
 
         const decorate = (items, metric) => items.map(it => ({ ...it, excluded: isExcluded(excl, metric, o.offer_id, it.ref_id) }));
         const pipe = decorate(pipeItems, "sales_pipeline");
