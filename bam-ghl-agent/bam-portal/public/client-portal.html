@@ -16525,6 +16525,17 @@ function _buildAssetLinkEntry(url) {
   };
 }
 
+// Derive the content-ticket asset type from the files (the manual Graphic/Video
+// toggle was removed on the marketing side — the files tell us).
+function _deriveAssetType(files) {
+  const arr = Array.from(files || []);
+  const hasVideo = arr.some(f => (f.type || '').startsWith('video/'));
+  const hasImage = arr.some(f => (f.type || '').startsWith('image/'));
+  if (hasVideo && hasImage) return 'mixed';
+  if (hasVideo) return 'video';
+  return 'graphic';
+}
+
 function _inputAssetsAddFiles(filesList, fromFolderUpload) {
   const incoming = _filterOversizeFiles(filesList || []);
   // Tag each file with its folder: a folder upload keeps its own directory name,
@@ -16575,10 +16586,8 @@ function _renderInputAssetsFilesList() {
     (groups[key] = groups[key] || []).push({ f, i });
   });
   const names = Object.keys(groups).sort((a, b) => (a === '' ? 1 : b === '' ? -1 : a.localeCompare(b)));
+  const flat = names.length === 1 && names[0] === '';
   listEl.innerHTML = names.map(name => {
-    const header = name
-      ? `<div style="font-family:var(--mono,monospace);font-size:11px;color:var(--gold,#E8C547);letter-spacing:.04em;margin:10px 0 4px">📁 ${escapeHTML(name)}</div>`
-      : (names.length > 1 ? `<div style="font-size:11px;color:var(--text-mute);margin:10px 0 4px">Uncategorized</div>` : '');
     const items = groups[name].map(({ f, i }) => {
       const isImage = (f.type || '').startsWith('image/');
       const thumb = isImage
@@ -16594,7 +16603,13 @@ function _renderInputAssetsFilesList() {
           <button class="wizard-file-remove" onclick="_inputAssetsRemoveFile(${i})" aria-label="Remove">×</button>
         </div>`;
     }).join('');
-    return header + items;
+    if (flat) return items;
+    const label = name ? `📁 ${escapeHTML(name)}` : 'Uncategorized';
+    const color = name ? 'var(--gold,#E8C547)' : 'var(--text-mute)';
+    return `<details open style="border:1px solid var(--line-soft,rgba(255,255,255,.06));border-radius:8px;padding:6px 10px;margin-top:8px">
+      <summary style="cursor:pointer;user-select:none;font-family:var(--mono,monospace);font-size:11px;color:${color};letter-spacing:.04em">${label} <span style="color:var(--text-mute);font-weight:400">(${groups[name].length})</span></summary>
+      <div style="margin-top:6px">${items}</div>
+    </details>`;
   }).join('');
 }
 
@@ -16614,7 +16629,7 @@ async function submitInputAssets() {
   // resets _inputAssetsState to { files: [] } which would otherwise wipe the
   // upload list and silently submit a ticket with no files attached.
   const filesToUpload = _inputAssetsState.files.slice();
-  const assetType = _inputAssetsState.type;
+  const assetType = _deriveAssetType(filesToUpload);
   const fileCount = filesToUpload.length;
   closeInputAssetsModal();
   showLoading(
@@ -24107,12 +24122,6 @@ function _renderWizardCreatives() {
 
       <div class="card-title" style="margin-bottom:14px;font-size:15px">Creative ${idx + 1}</div>
 
-      <label class="modal-label">Asset type</label>
-      <div class="binary-toggle" style="margin-bottom:14px">
-        <button type="button" class="binary-toggle-opt ${c.type === 'graphic' ? 'active' : ''}" onclick="wizardSetCreativeType('${c.id}','graphic')">🖼 Graphic</button>
-        <button type="button" class="binary-toggle-opt ${c.type === 'video' ? 'active' : ''}" onclick="wizardSetCreativeType('${c.id}','video')">🎬 Video</button>
-      </div>
-
       <label class="modal-label">Raw files</label>
       <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:8px">
         <input id="wizardFolder_${c.id}" class="modal-input" placeholder="📁 Folder (optional) — e.g. Game footage" style="flex:1 1 180px;min-width:140px" />
@@ -24130,10 +24139,8 @@ function _renderWizardCreatives() {
           const groups = {};
           c.files.forEach((f, fi) => { const k = f._folder || ''; (groups[k] = groups[k] || []).push({ f, fi }); });
           const ns = Object.keys(groups).sort((a, b) => (a === '' ? 1 : b === '' ? -1 : a.localeCompare(b)));
+          const flat = ns.length === 1 && ns[0] === '';
           return ns.map(name => {
-            const header = name
-              ? `<div style="font-family:var(--mono,monospace);font-size:11px;color:var(--gold,#E8C547);letter-spacing:.04em;margin:10px 0 4px">📁 ${escapeHTML(name)}</div>`
-              : (ns.length > 1 ? `<div style="font-size:11px;color:var(--text-mute);margin:10px 0 4px">Uncategorized</div>` : '');
             const items = groups[name].map(({ f, fi }) => {
               const isImage = (f.type || '').startsWith('image/');
               const thumb = isImage
@@ -24149,7 +24156,13 @@ function _renderWizardCreatives() {
                   <button class="wizard-file-remove" onclick="wizardCreativeRemoveFile('${c.id}', ${fi})" aria-label="Remove">×</button>
                 </div>`;
             }).join('');
-            return header + items;
+            if (flat) return items;
+            const label = name ? `📁 ${escapeHTML(name)}` : 'Uncategorized';
+            const color = name ? 'var(--gold,#E8C547)' : 'var(--text-mute)';
+            return `<details open style="border:1px solid var(--line-soft,rgba(255,255,255,.06));border-radius:8px;padding:6px 10px;margin-top:8px">
+              <summary style="cursor:pointer;user-select:none;font-family:var(--mono,monospace);font-size:11px;color:${color};letter-spacing:.04em">${label} <span style="color:var(--text-mute);font-weight:400">(${groups[name].length})</span></summary>
+              <div style="margin-top:6px">${items}</div>
+            </details>`;
           }).join('');
         })()}
       </div>
@@ -24229,7 +24242,7 @@ async function wizardSubmitFinal(skipped) {
       if (validDrive) uploaded.push(_buildAssetLinkEntry(c.driveLink));
       creativesPayload.push({
         local_id: c.id,
-        type: c.type,
+        type: _deriveAssetType(c.files),
         notes: c.notes || '',
         raw_files: uploaded,
       });
@@ -27346,13 +27359,7 @@ function toggleTheme() {
     <div class="modal-title">Input assets</div>
     <div class="modal-sub">Submit raw assets here. Our content team will turn them into a finished creative and add it to your campaign.</div>
 
-    <label class="modal-label">Asset type</label>
-    <div class="binary-toggle" id="inputAssetsTypeToggle">
-      <button type="button" class="binary-toggle-opt active" data-value="graphic" onclick="_selectInputAssetsType('graphic')">🖼 Graphic</button>
-      <button type="button" class="binary-toggle-opt" data-value="video" onclick="_selectInputAssetsType('video')">🎬 Video</button>
-    </div>
-
-    <label class="modal-label" style="margin-top:18px">Raw files</label>
+    <label class="modal-label">Raw files</label>
     <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:8px">
       <input id="inputAssetsFolder" class="modal-input" list="inputAssetsFolderList" placeholder="📁 Folder (optional) — e.g. Game footage" style="flex:1 1 200px;min-width:150px" />
       <datalist id="inputAssetsFolderList"></datalist>

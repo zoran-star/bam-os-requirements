@@ -1262,15 +1262,20 @@ function FilesByFolder({ files, tk, compact, minmax = 180 }) {
   );
   if (names.length === 1 && names[0] === "") return grid(groups[""]);
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
       {names.map(name => (
-        <div key={name || "_uncat"}>
-          <div style={{
-            fontFamily: "monospace", fontSize: 10, letterSpacing: "0.16em", textTransform: "uppercase",
-            color: name ? tk.accent : tk.textMute, marginBottom: 8,
-          }}>{name ? `📁 ${name}` : "Uncategorized"}</div>
-          {grid(groups[name])}
-        </div>
+        <details key={name || "_uncat"} style={{
+          border: `1px solid ${tk.borderSoft || tk.border}`, borderRadius: 8, padding: "8px 10px",
+        }}>
+          <summary style={{
+            cursor: "pointer", userSelect: "none",
+            fontFamily: "monospace", fontSize: 11, letterSpacing: "0.1em", textTransform: "uppercase",
+            color: name ? tk.accent : tk.textMute,
+          }}>
+            {name ? `📁 ${name}` : "Uncategorized"} <span style={{ color: tk.textMute }}>({groups[name].length})</span>
+          </summary>
+          <div style={{ marginTop: 10 }}>{grid(groups[name])}</div>
+        </details>
       ))}
     </div>
   );
