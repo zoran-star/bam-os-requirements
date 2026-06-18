@@ -7,31 +7,51 @@ metadata:
 
 # CoachIQ integration
 
-## ⭐ 2026-06-18 — TRACK A ONBOARDING CODED + DEPLOYED (gated, inert until env set)
+## ⭐ 2026-06-18 — TRACK A ONBOARDING = SELF-SIGNUP MODEL (NO ZAPIER), live + tested
 
-The post-payment CoachIQ leg is now built and live on prod (PR #454), behind config
-so it does nothing until env is set. Files:
-- `api/coachiq.js` — `createCoachiqUser(member)` fires the **Zapier "Create User"**
-  catch-hook (async; can't return the id synchronously). `addCoachiqProduct(id,
-  {plan,term})` fires the **"Add a Product Purchase"** automation (product + access +
-  starter credits, no payment). Per-plan map via `COACHIQ_PRODUCT_MAP`.
-- `api/coachiq/user-created.js` — callback the Zap POSTs the new id to → stores
-  `members.coachiq_member_id` + grants the product. Secret-gated.
-- `api/coachiq/test-onboard.js` — **secret-gated test harness**, exercise each link
-  alone WITHOUT a payment: `POST /api/coachiq/test-onboard {secret, mode}` where mode =
-  `status` | `create` | `product` | `callback` | `full`.
-- `api/onboarding/activations.js` — on paid signup: returning member (has id) → grant
-  product inline; new member → fire Zap (product grants via callback). Non-fatal.
+**Decision: NO Zapier.** Zapier gates webhooks + multi-step Zaps behind a paid plan
+(~$20/mo), needed ONLY to auto-create the CoachIQ user. Instead the **parent creates
+their own CoachIQ account** on the academy's group login page
+(`app.coachiq.io/bam-gta/athletes`) — group-scoped signup = ENROLLED user (Zoran
+confirmed). Then CoachIQ tells us and we grant the product. Flow:
 
-**ENV TO FLIP IT ON (none set yet):** `COACHIQ_CREATE_USER_WEBHOOK_URL` (Zapier hook),
-`COACHIQ_PRODUCT_AUTOMATION_ID` (or `COACHIQ_PRODUCT_MAP`), `COACHIQ_API_KEY`,
-`COACHIQ_GROUP_ID` (719bb0cf for GTA), `COACHIQ_WEBHOOK_SECRET` (guards callback+test).
-Zapier final step must POST `{member_id, coachiq_user_id, secret}` to
-`/api/coachiq/user-created`. **Rotate the API key pasted in chat 2026-06-01.**
+```
+pay → confirmation page: "make your account at the group login page (use paid email)"
+→ parent signs up (enrolled) → CoachIQ "New User → Send to External Webhook" automation
+→ POST /api/coachiq/user-created → match member by EMAIL → store id + grant product
+```
 
-**Confirmation-page UX (download app / set password / book / credits) = NOT built yet**
-— next step, lives in bam-client-sites enroll.jsx. "See credits" on our page can only
-show the granted amount (no public API for live balance); live balance is in the app.
+Files (live on prod, PR #454 + #461):
+- `api/coachiq.js` — `addCoachiqProduct(id,{plan,term})` fires the **"Add a Product
+  Purchase"** automation (`18c05158-…`; product + access + starter credits, no payment).
+  `coachiqOnboardingEnabled()` = api key + group + product automation (no Zapier).
+  `createCoachiqUser()` (Zapier hook) kept but UNUSED in this model.
+- `api/coachiq/user-created.js` — matches member by **email** (or member_id), stores
+  `coachiq_member_id` on all members sharing that parent_email (siblings), grants the
+  product. Secret via body/query/header. Idempotent (retry → "already linked"); accepts
+  + skips signups with no matching paid member.
+- `api/coachiq/test-onboard.js` — secret-gated harness (`status|create|product|callback|full`).
+- `api/onboarding/activations.js` — on payment: returning member (has id) → grant inline;
+  new member → audit `coachiq-await-signup` (the New-User webhook grants later).
+
+**ENV SET IN PROD (2026-06-18):** `COACHIQ_API_KEY` (…53f2 — **ROTATE**, was in chat),
+`COACHIQ_GROUP_ID` `719bb0cf-5a17-4172-ac55-c28e19238824`, `COACHIQ_PRODUCT_AUTOMATION_ID`
+`18c05158-d981-4429-b568-495479428d26`, `COACHIQ_WEBHOOK_SECRET`, `COACHIQ_CREATE_USER_WEBHOOK_URL`
+(Zapier hook — now unused, can delete). Org ID `349b6d2d-…` (Zapier connection only).
+
+**TESTED LIVE 2026-06-18:** product automation fires (success ✅); email-match callback
+stores id + grants product ✅; idempotent retry ✅. (Test user `2578c9b2-…` ZAPTEST +
+test member deleted.)
+
+**REMAINING:**
+1. Zoran builds the CoachIQ **"New User → Send to External Webhook"** automation →
+   URL `https://portal.byanymeansbusiness.com/api/coachiq/user-created?secret=<secret>`,
+   map `coachiq_user_id={{user.id}}` + `email={{user.email}}`.
+2. **Confirmation-page UX** (download app / make account at group login / book / credits)
+   — NOT built; lives in bam-client-sites `enroll.jsx`. "See credits" can only show the
+   GRANTED amount (no public API for live balance; live balance is in the app).
+3. Confirm **Summer Unlimited** credit count (other plans: 1/wk:4, 2/wk:8, 3/wk:12, unltd:48).
+4. **Rotate the API key.**
 
 
 ## Why this matters (the strategic goal)
