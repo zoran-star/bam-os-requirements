@@ -24,6 +24,17 @@ New steps + columns (`clients.athlete_map_done_at`, `kpi_setup_done_at`):
 V2/V1 never see these (hard rule respected). The checklist auto-hides once every
 step is done (`showOnb` in `_renderActionItems`).
 
+## Systems-team "Connect to offers" (staff app — build ticket)
+New clients have NO pipelines/calendars until the systems team builds them (after
+Trigger Buildout, which is after the Offer step). So connecting offers↔
+pipelines/calendars/products is a STAFF action inside the systems-buildout ticket,
+not a client one. `OfferConnect` panel in `src/views/SystemsView.jsx` TicketModal
+(shown when `ticket.type==='onboarding'`): fetches `/api/offers/kpi-setup?client_id=`
+(now returns `tier`), renders offer-link dropdowns for Stripe products / GHL
+pipelines / GHL calendars + a ↻ Refresh (they build in GHL then refresh). **Hard-
+block:** for V1.5/V2 onboarding tickets, Approve / Mark-complete are disabled
+until ≥1 link exists (`connectBlocks`). V1 academies → panel shows "not used".
+
 ## V1 offer builder = simplified (no connections)
 For **V1** academies (`!v2_access && !v15_access`, via `_bbIsV1()`) the offer
 builder hides all integration/"connection" UI: Stripe price-match pill
