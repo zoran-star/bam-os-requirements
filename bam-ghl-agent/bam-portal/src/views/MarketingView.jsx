@@ -916,6 +916,7 @@ function renderSubmittedInfo(t, tk) {
     <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
       {(t.files || []).map((f, i) => {
         const isImage = (f.mime || "").startsWith("image/");
+        const isVideo = (f.mime || "").startsWith("video/");
         return (
           <a key={i} href={f.url} target="_blank" rel="noreferrer" download={f.name} style={{
             display: "flex", flexDirection: "column", gap: 4, alignItems: "center",
@@ -926,7 +927,12 @@ function renderSubmittedInfo(t, tk) {
           }}>
             {isImage
               ? <img src={f.url} alt={f.name} style={{ width: 56, height: 56, objectFit: "cover", borderRadius: 4 }} />
-              : <div style={{ width: 56, height: 56, display: "flex", alignItems: "center", justifyContent: "center", borderRadius: 4, background: tk.surface, fontSize: 22, color: tk.textMute }}>{(f.mime || "").startsWith("video/") ? "🎬" : "📄"}</div>
+              : isVideo
+              ? <div style={{ position: "relative", width: 56, height: 56 }}>
+                  <video src={`${f.url}#t=0.5`} muted playsInline preload="metadata" style={{ width: 56, height: 56, objectFit: "cover", borderRadius: 4, background: tk.surface, display: "block" }} />
+                  <span style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 11, textShadow: "0 1px 3px rgba(0,0,0,0.7)", pointerEvents: "none" }}>▶</span>
+                </div>
+              : <div style={{ width: 56, height: 56, display: "flex", alignItems: "center", justifyContent: "center", borderRadius: 4, background: tk.surface, fontSize: 22, color: tk.textMute }}>📄</div>
             }
             <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 110 }}>{f.name}</span>
             <span style={{ color: tk.accent, fontSize: 10, letterSpacing: "0.05em" }}>Download ↓</span>
