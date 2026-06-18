@@ -142,6 +142,27 @@ From a team call with Cam. Goal: each marketing ticket is a complete brief + rea
 
 Not done (deferred): stale-ticket nudge cron; urgency toggle on budget/remove flows (default normal); linking tickets to the real `offers` record (= V2); merging Content+Marketing into one page (open question, kept separate for V1).
 
+## Folder uploads + content-drop redesign (2026-06-18)
+
+- **Folder-first content drop:** the new-campaign wizard's "Input assets" step is now **named folder blocks** (not "Creative 1/2/3"). Each block: a folder name, an "Upload assets or folder" zone (webkitdirectory; **flattened — no nesting**), a link, optional notes. Starts with one. `+ Create new folder` adds blocks. `wizardSetFolderName`. At submit each block's files get `file._folder = block.name`.
+- **raw_files carry `folder`:** `_mreqUploadFiles` reads `_assetFolderOf(file)` (file._folder OR top dir of webkitRelativePath) → stores `folder` on each raw_file + nests the storage path. The Add Creative modal also has folder support.
+- **Staff sees folders grouped + collapsible:** `ContentView.FilesByFolder` groups raw files by `folder` under `<details>` (collapsed by default on staff; client staging open).
+- **Asset type toggle REMOVED** (wizard + Add Creative modal). Type auto-derived from files via `_deriveAssetType` (graphic/video/mixed).
+- **Video thumbnails:** staff `FilePreviewTile` + MarketingView final-creatives render videos as a `<video src=…#t=0.5 preload=metadata>` poster frame + ▶ badge (no server processing).
+- **🎨 Brand card on content tickets:** `ContentView` shows a collapsible Brand card (`BrandCard`) reading `ticket.client.brand_data` — colors (`color_primary/secondary/accent`), fonts (`font_display/body`), logos (`logo_dark/light_url`, `icon_url`), website, notes/stats.
+- **Organic content** is a whole separate pipeline now — see [[project_organic_content]].
+
+## Slack DMs to staff — blocked on a scope (2026-06-18)
+
+- New marketing/content tickets DM **Cam**; on completion the assigned SM is DM'd. `postStaffSlackDM` posts to a Slack user id; Cam = `marketingManagerSlackId()` (env `MARKETING_DM_SLACK_ID` else staff row by email `cameron@byanymeansbusiness.com`).
+- **Cam's Slack id IS set:** `staff.slack_user_id = 'U09A66BCBNJ'` (Cam Wells).
+- ⚠️ **STILL DORMANT — the bam_portal Slack app is missing the `im:write` scope.** `chat.postMessage` to a user fails `missing_scope` (verified via conversations.open). Client-CHANNEL notifications work (chat:write present). **Fix: add `im:write` to the app's Bot Token Scopes at api.slack.com/apps → reinstall.** Until then NO person-to-person DM fires.
+
+## Cam marketing guide (sendable HTML)
+
+- Live: `https://portal.byanymeansbusiness.com/cam-marketing-guide.html` (from `bam-portal/public/cam-marketing-guide.html`). Has a 6-screen fake-data walkthrough. Roles in it: **content team = Cam (uploads/sends) → Ximena = marketing (posts on Meta)**.
+- OPEN TODO: Zoran flagged the guide's "Start to finish" flow as "wrong" but didn't say what; unresolved. Best guess: drop the "build the ad" box.
+
 ## Test data
 
 - Client `test business` (id `71d01c0f-...`, auth user `543cc072-...`, email `zoransavic2000@gmail.com`) is the safe sandbox. Use this account on the client portal.
