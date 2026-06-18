@@ -71,6 +71,22 @@ const pad = n => String(n).padStart(2, "0");
 // object map. Coerce to a real array so downstream iteration never breaks.
 const toArr = x => Array.isArray(x) ? x : (x && typeof x === "object" ? Object.values(x) : []);
 
+// [midnight today, midnight tomorrow) as epoch-ms in an IANA timezone, so
+// "trials today" matches the academy's local day, not the server's.
+function todayBoundsMs(tz) {
+  const tzOffsetMs = (d) => {
+    const p = new Intl.DateTimeFormat("en-US", { timeZone: tz, hour12: false, year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", second: "2-digit" })
+      .formatToParts(d).reduce((a, x) => (a[x.type] = x.value, a), {});
+    return Date.UTC(+p.year, +p.month - 1, +p.day, +p.hour, +p.minute, +p.second) - d.getTime();
+  };
+  const now = new Date();
+  const p = new Intl.DateTimeFormat("en-CA", { timeZone: tz, year: "numeric", month: "2-digit", day: "2-digit" })
+    .formatToParts(now).reduce((a, x) => (a[x.type] = x.value, a), {});
+  const guess = Date.UTC(+p.year, +p.month - 1, +p.day, 0, 0, 0);
+  const start = guess - tzOffsetMs(new Date(guess));
+  return { start, end: start + 24 * 3600 * 1000 };
+}
+
 // availabilities[] (date overrides) → friendly {date, closed, open, close}.
 function readSpecial(c) {
   const today = new Date().toISOString().slice(0, 10);
@@ -104,7 +120,7 @@ function summarize(c) {
 }
 
 async function loadClient(clientId) {
-  const rows = await sb(`clients?id=eq.${clientId}&select=id,business_name,time_zone,ghl_location_id,ghl_access_token,ghl_refresh_token,ghl_token_expires_at&limit=1`);
+  const rows = await sb(`clients?id=eq.${clientId}&select=id,business_name,time_zone,ghl_location_id,ghl_access_token,ghl_refresh_token,ghl_token_expires_at,ghl_kpi_config&limit=1`);
   return rows?.[0] || null;
 }
 
@@ -171,6 +187,40 @@ async function handler(req, res) {
           } catch (_) { /* one calendar failing shouldn't kill the week */ }
         }
         return res.status(200).json({ events });
+      }
+
+      // Today's trial bookings — for the V1.5 Home dashboard. Trial calendars are
+      // whatever staff picked in KPI config (clients.ghl_kpi_config.booking_calendar_ids).
+      if (action === "trials-today") {
+        const cfg = client.ghl_kpi_config || {};
+        const calIds = Array.isArray(cfg.booking_calendar_ids) ? cfg.booking_calendar_ids.filter(Boolean) : [];
+        if (!calIds.length) return res.status(200).json({ trials: [], no_config: true });
+        const { start, end } = todayBoundsMs(client.time_zone || "America/Toronto");
+        const nameById = {};
+        let trials = [];
+        for (const calId of calIds) {
+          try {
+            const r = await ghl(token, "GET", `/calendars/events?locationId=${encodeURIComponent(locationId)}&calendarId=${encodeURIComponent(calId)}&startTime=${start}&endTime=${end}`);
+            for (const ev of (r.events || [])) {
+              if (ev.appointmentStatus === "cancelled") continue;
+              const cid = ev.contactId || (ev.contact && ev.contact.id) || null;
+              trials.push({ id: ev.id || ev._id, start: ev.startTime, status: ev.appointmentStatus || null, contactId: cid, contactName: (ev.contact && ev.contact.name) || ev.contactName || null });
+            }
+          } catch (_) {}
+        }
+        // Calendar events rarely carry the contact name — resolve the misses from
+        // GHL so we show the person, not the calendar title (capped).
+        const missing = [...new Set(trials.filter(t => !t.contactName && t.contactId).map(t => t.contactId))].slice(0, 25);
+        await Promise.all(missing.map(async (cid) => {
+          try {
+            const cr = await ghl(token, "GET", `/contacts/${encodeURIComponent(cid)}`);
+            const c = cr.contact || cr;
+            nameById[cid] = c.contactName || [c.firstName, c.lastName].filter(Boolean).join(" ") || c.name || null;
+          } catch (_) {}
+        }));
+        trials = trials.map(t => ({ ...t, contactName: t.contactName || (t.contactId && nameById[t.contactId]) || "Trial booking" }))
+          .sort((a, b) => new Date(a.start || 0) - new Date(b.start || 0));
+        return res.status(200).json({ trials, timezone: client.time_zone || "America/Toronto" });
       }
 
       if (action === "appointment") {
