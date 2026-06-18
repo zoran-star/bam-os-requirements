@@ -47,6 +47,7 @@ export async function renderAgreementPdf({
   priceText = "",
   signaturePngDataUrl = null,
   signedAtIso = null,
+  clauses = null,   // optional clause override; defaults to sampleClauses(academyName)
 } = {}) {
   const doc = await PDFDocument.create();
   const font = await doc.embedFont(StandardFonts.Helvetica);
@@ -92,7 +93,7 @@ export async function renderAgreementPdf({
   y -= 10;
 
   // Clauses
-  for (const [h, body] of sampleClauses(academyName)) {
+  for (const [h, body] of (clauses || sampleClauses(academyName))) {
     line(h, { f: bold, size: 12, gap: 4 });
     line(body, { size: 10.5, color: INK, gap: 8 });
   }
