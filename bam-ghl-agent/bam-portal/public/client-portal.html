@@ -6155,6 +6155,7 @@
 
       <!-- ── LIST: campaigns overview ── -->
       <div id="marketing-list">
+        <button id="marketing-ads-back" onclick="_backToChannelSplit()" style="display:none;background:none;border:none;color:var(--text-mute);font-size:13px;cursor:pointer;padding:0;margin-bottom:12px">← Back to Ads / Organic</button>
         <div class="topbar">
           <div>
             <span class="topbar-kicker">§ 02 · Marketing</span>
@@ -6261,7 +6262,7 @@
           </div>
 
           <!-- Add new creative -->
-          <button class="btn-add-creative" onclick="openAddCreativeModal()">+ Add New Creative</button>
+          <button class="btn-add-creative" onclick="_inputAssetsChannel='ads'; openAddCreativeModal()">+ Add New Creative</button>
 
         </div>
       </div><!-- /#marketing-detail -->
@@ -6544,6 +6545,37 @@ Then the call to action."]</div>
 
         </div>
       </div><!-- /#marketing-new-campaign -->
+
+      <!-- ── Channel split (Ads | Organic) — shown when ORGANIC_CONTENT is on ── -->
+      <div id="marketing-channel-split" style="display:none">
+        <div class="section-label">Marketing</div>
+        <div style="color:var(--text-sub);font-size:13px;margin:4px 0 14px">What do you want to work on?</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+          <button onclick="_chooseChannel('ads')" style="display:flex;flex-direction:column;align-items:center;gap:4px;padding:34px 16px;border:1px solid var(--line);border-radius:12px;background:var(--surface-el);cursor:pointer;color:var(--text);transition:border-color .15s">
+            <div style="font-size:32px">📣</div>
+            <div style="font-weight:700;font-size:17px;font-family:var(--display)">Ads</div>
+            <div style="font-size:12px;color:var(--text-mute)">Paid campaigns on Meta</div>
+          </button>
+          <button onclick="_chooseChannel('organic')" style="display:flex;flex-direction:column;align-items:center;gap:4px;padding:34px 16px;border:1px solid var(--line);border-radius:12px;background:var(--surface-el);cursor:pointer;color:var(--text);transition:border-color .15s">
+            <div style="font-size:32px">🌱</div>
+            <div style="font-weight:700;font-size:17px;font-family:var(--display)">Organic</div>
+            <div style="font-size:12px;color:var(--text-mute)">Content for your socials</div>
+          </button>
+        </div>
+      </div>
+
+      <!-- ── Organic content view ── -->
+      <div id="marketing-organic" style="display:none">
+        <button onclick="_backToChannelSplit()" style="background:none;border:none;color:var(--text-mute);font-size:13px;cursor:pointer;padding:0;margin-bottom:14px">← Back to Ads / Organic</button>
+        <div class="section-label">🌱 Organic content</div>
+        <button class="btn-add-campaign" style="margin-top:10px;margin-bottom:22px" onclick="openOrganicRequestModal()">+ Request a new creative</button>
+
+        <div class="section-label">Status of creatives</div>
+        <div id="organic-status-list" style="margin-top:8px;margin-bottom:24px"></div>
+
+        <div class="section-label">Creative bank</div>
+        <div id="organic-bank" style="margin-top:8px"></div>
+      </div>
 
     </div>
 
@@ -10315,8 +10347,9 @@ function switchView(name, el) {
   // When leaving Marketing, reset to list view
   if (name !== 'marketing') closeCampaignDetail();
 
-  // When entering Marketing, refresh tickets from the API
-  if (name === 'marketing') fetchAndRenderMarketingRequests();
+  // When entering Marketing, refresh tickets from the API + (if Organic is on)
+  // land on the Ads | Organic split.
+  if (name === 'marketing') { fetchAndRenderMarketingRequests(); _marketingEnter(); }
 
   // When entering Messages, load conversations
   if (name === 'messages') openMessagesView();
@@ -16289,6 +16322,151 @@ function closeCampaignDetail() {
   document.querySelectorAll('.creative-tile.selected').forEach(t => t.classList.remove('selected'));
 }
 
+// ─────────── Ads | Organic channel split ───────────
+function _hideAllMarketingSub() {
+  ['marketing-list','marketing-detail','marketing-request-detail','marketing-new-campaign','marketing-channel-split','marketing-organic']
+    .forEach(id => { const e = document.getElementById(id); if (e) e.style.display = 'none'; });
+  const back = document.getElementById('marketing-ads-back'); if (back) back.style.display = 'none';
+}
+function _marketingEnter() {
+  if (typeof ORGANIC_CONTENT !== 'undefined' && ORGANIC_CONTENT) {
+    _showChannelSplit();
+  } else {
+    _hideAllMarketingSub();
+    const l = document.getElementById('marketing-list'); if (l) l.style.display = 'block';
+  }
+}
+function _showChannelSplit() {
+  _hideAllMarketingSub();
+  const e = document.getElementById('marketing-channel-split'); if (e) e.style.display = 'block';
+}
+function _chooseChannel(ch) {
+  _hideAllMarketingSub();
+  if (ch === 'organic') {
+    const e = document.getElementById('marketing-organic'); if (e) e.style.display = 'block';
+    _fetchAndRenderOrganic();
+  } else {
+    const l = document.getElementById('marketing-list'); if (l) l.style.display = 'block';
+    const b = document.getElementById('marketing-ads-back'); if (b) b.style.display = (ORGANIC_CONTENT ? 'block' : 'none');
+  }
+}
+function _backToChannelSplit() {
+  if (typeof ORGANIC_CONTENT !== 'undefined' && ORGANIC_CONTENT) {
+    _showChannelSplit();
+  } else {
+    _hideAllMarketingSub();
+    const l = document.getElementById('marketing-list'); if (l) l.style.display = 'block';
+  }
+}
+
+// ─────────── Organic content (request → status → bank) ───────────
+let _ORGANIC_TICKETS = [];
+async function _fetchAndRenderOrganic() {
+  const statusEl = document.getElementById('organic-status-list');
+  const bankEl = document.getElementById('organic-bank');
+  if (statusEl) statusEl.innerHTML = '<div style="color:var(--text-mute);font-size:13px;padding:8px 0">Loading…</div>';
+  if (bankEl) bankEl.innerHTML = '';
+  try {
+    const token = await _mreqAuthToken();
+    const res = await fetch('/api/marketing?resource=content-tickets&scope=client&channel=organic&all=1', {
+      headers: { 'Authorization': 'Bearer ' + token },
+    });
+    const json = await _safeJson(res);
+    if (!res.ok) throw new Error(json.error || ('HTTP ' + res.status));
+    _ORGANIC_TICKETS = Array.isArray(json.tickets) ? json.tickets : [];
+    _renderOrganic();
+  } catch (e) {
+    if (statusEl) statusEl.innerHTML = `<div style="color:var(--text-mute);font-size:13px;padding:8px 0">Couldn't load — ${escapeHTML(e.message)}</div>`;
+  }
+}
+function _renderOrganic() {
+  const statusEl = document.getElementById('organic-status-list');
+  const bankEl = document.getElementById('organic-bank');
+  const active = _ORGANIC_TICKETS.filter(t => t.status === 'active' || t.status === 'client-dependent');
+  const done   = _ORGANIC_TICKETS.filter(t => t.status === 'completed');
+  if (statusEl) {
+    statusEl.innerHTML = active.length ? active.map(_organicStatusCard).join('')
+      : '<div style="color:var(--text-mute);font-size:13px;font-style:italic;padding:8px 0">Nothing in progress. Request a creative above.</div>';
+  }
+  if (bankEl) {
+    bankEl.innerHTML = done.length
+      ? `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px">${done.map(_organicBankCard).join('')}</div>`
+      : '<div style="color:var(--text-mute);font-size:13px;font-style:italic;padding:8px 0">No completed creatives yet.</div>';
+  }
+}
+function _organicStatusCard(t) {
+  const inReview = t.status === 'client-dependent';
+  const code = String(t.id || '').slice(0, 3).toUpperCase();
+  const finals = Array.isArray(t.final_files) ? t.final_files : [];
+  const statusPill = inReview
+    ? '<span style="font-size:10px;font-weight:700;color:var(--gold);background:rgba(232,197,71,.15);padding:3px 9px;border-radius:999px;text-transform:uppercase;letter-spacing:.06em">Review</span>'
+    : '<span style="font-size:10px;font-weight:700;color:var(--text-mute);background:rgba(255,255,255,.05);padding:3px 9px;border-radius:999px;text-transform:uppercase;letter-spacing:.06em">In progress</span>';
+  const title = ((t.notes || '').split('\n')[0] || 'Organic creative').slice(0, 80);
+  const finalsHtml = (inReview && finals.length) ? `<div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:10px">${finals.map(_organicFileTile).join('')}</div>` : '';
+  const actions = inReview ? `
+    <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">
+      <button onclick="_organicRequestChanges('${t.id}')" style="background:transparent;border:1px solid var(--line);color:var(--text-sub);padding:8px 14px;border-radius:7px;font-size:12px;font-weight:600;cursor:pointer">Request changes</button>
+      <button onclick="_organicApprove('${t.id}')" style="background:var(--gold);border:none;color:#0B0B0D;padding:8px 16px;border-radius:7px;font-size:12px;font-weight:700;cursor:pointer">✓ Approve</button>
+    </div>` : '';
+  return `<div style="border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:10px;background:var(--surface)">
+    <div style="display:flex;align-items:center;gap:10px">
+      <span style="font-family:var(--mono);font-size:10px;color:var(--text-mute)">${code}</span>
+      <div style="flex:1;font-weight:600">${escapeHTML(title)}</div>
+      ${statusPill}
+    </div>${finalsHtml}${actions}
+  </div>`;
+}
+function _organicBankCard(t) {
+  const finals = Array.isArray(t.final_files) ? t.final_files : [];
+  const f = finals[0];
+  const inner = f ? _organicFileTile(f) : '<div style="height:80px;display:flex;align-items:center;justify-content:center;color:var(--text-mute)">✓</div>';
+  return `<div style="border:1px solid var(--line);border-radius:8px;padding:8px;background:var(--surface)">${inner}<div style="font-size:11px;color:var(--text-mute);margin-top:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHTML((t.notes || '').split('\n')[0] || 'Creative')}</div></div>`;
+}
+function _organicFileTile(f) {
+  const isImage = (f.mime || '').startsWith('image/');
+  const isVideo = (f.mime || '').startsWith('video/');
+  const thumb = isImage
+    ? `<img src="${f.url}" style="width:100%;height:80px;object-fit:cover;border-radius:5px" />`
+    : isVideo
+    ? `<video src="${f.url}#t=0.5" muted preload="metadata" style="width:100%;height:80px;object-fit:cover;border-radius:5px;background:#000"></video>`
+    : `<div style="height:80px;display:flex;align-items:center;justify-content:center;background:var(--surface-el);border-radius:5px">📄</div>`;
+  return `<a href="${f.url}" target="_blank" rel="noreferrer" download="${escapeHTML(f.name || '')}" style="display:block;text-decoration:none;color:inherit;max-width:120px">${thumb}</a>`;
+}
+
+// Request modal in organic mode (reuses the input-assets modal, tags channel=organic).
+let _inputAssetsChannel = 'ads';
+function openOrganicRequestModal() {
+  _inputAssetsChannel = 'organic';
+  openAddCreativeModal();
+}
+async function _organicApprove(id) {
+  try {
+    const token = await _mreqAuthToken();
+    const res = await fetch('/api/marketing?resource=content-tickets&id=' + encodeURIComponent(id), {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+      body: JSON.stringify({ action: 'approve' }),
+    });
+    if (!res.ok) { const j = await _safeJson(res); throw new Error(j.error || ('HTTP ' + res.status)); }
+    _fetchAndRenderOrganic();
+  } catch (e) { alert('Approve failed: ' + e.message); }
+}
+async function _organicRequestChanges(id) {
+  const msg = prompt('What would you like changed?');
+  if (msg === null) return;
+  if (!msg.trim()) { alert('Add a quick note on what to change.'); return; }
+  try {
+    const token = await _mreqAuthToken();
+    const res = await fetch('/api/marketing?resource=content-tickets&id=' + encodeURIComponent(id), {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+      body: JSON.stringify({ action: 'request-changes', message: msg.trim() }),
+    });
+    if (!res.ok) { const j = await _safeJson(res); throw new Error(j.error || ('HTTP ' + res.status)); }
+    _fetchAndRenderOrganic();
+  } catch (e) { alert('Failed: ' + e.message); }
+}
+
 function toggleCreativeActions(tileEl) {
   const wasSelected = tileEl.classList.contains('selected');
   // Single-select: clear all, then toggle this one
@@ -16637,25 +16815,35 @@ async function submitInputAssets() {
     `Uploading ${fileCount} file${fileCount === 1 ? '' : 's'}…`,
     "This can take a minute for video. Don't close this tab."
   );
+  const channel = (typeof _inputAssetsChannel !== 'undefined') ? _inputAssetsChannel : 'ads';
   try {
     const uploaded = await _mreqUploadFiles(filesToUpload);
     if (hasDriveLink) uploaded.push(_buildAssetLinkEntry(driveLinkRaw));
     await _ctkCreateTicket({
       type: assetType,
+      channel,
       notes,
       raw_files: uploaded,
       context: {
-        source: 'add-creative',
+        source: channel === 'organic' ? 'organic-request' : 'add-creative',
         campaign_title: _detailCampaignTitle(),
       },
     });
-    await fetchAndRenderMarketingRequests();
     hideLoading();
-    showConfirmation('Assets received',
-      'We got your ' + assetType + ' assets. Our content team will craft the creative and add it to your campaign within 1-2 business days.');
+    if (channel === 'organic') {
+      _fetchAndRenderOrganic();
+      showConfirmation('Request received',
+        'We got your organic content request. Our content team will create it and send it back to you for review.');
+    } else {
+      await fetchAndRenderMarketingRequests();
+      showConfirmation('Assets received',
+        'We got your ' + assetType + ' assets. Our content team will craft the creative and add it to your campaign within 1-2 business days.');
+    }
   } catch (e) {
     hideLoading();
     alert('Submit failed: ' + e.message);
+  } finally {
+    _inputAssetsChannel = 'ads'; // reset for the next opener
   }
 }
 
