@@ -402,6 +402,7 @@ async function handler(req, res) {
 
   return res.status(200).json({
     conversations: annotated,
+    location_id: locationId,   // for the "Open in GHL" deep link
     trainers,
     tagConfig,
     counts: {
