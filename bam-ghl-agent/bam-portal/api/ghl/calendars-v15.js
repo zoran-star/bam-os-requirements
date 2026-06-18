@@ -105,6 +105,14 @@ async function loadClient(clientId) {
   return rows?.[0] || null;
 }
 
+// Fallback for locations that have a GHL_LOCATIONS_JSON API key but no OAuth yet.
+function apiKeyForLocation(locationId) {
+  try {
+    const locs = JSON.parse(process.env.GHL_LOCATIONS_JSON || "[]");
+    return locs.find(l => l.locationId === locationId)?.apiKeyV2 || null;
+  } catch { return null; }
+}
+
 async function handler(req, res) {
   try {
     if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY) return res.status(500).json({ error: "Supabase not configured" });
@@ -117,7 +125,11 @@ async function handler(req, res) {
     if (!client) return res.status(404).json({ error: "academy not found" });
     let token;
     try { token = await getClientGhlToken(client); }
-    catch (e) { return res.status(502).json({ error: `GHL access: ${e.message}` }); }
+    catch (e) {
+      const apiKey = apiKeyForLocation(locationId);
+      if (!apiKey) return res.status(502).json({ error: `GHL access: ${e.message}` });
+      token = apiKey;
+    }
     const locationId = client.ghl_location_id;
     const action = (req.query && req.query.action) || (req.body && req.body.action) || "";
 
