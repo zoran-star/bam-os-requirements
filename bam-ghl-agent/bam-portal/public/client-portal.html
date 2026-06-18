@@ -10118,13 +10118,13 @@ async function _v15ibSetup() {
 }
 
 // ── Mass send (V1.5 Inbox) — tag-filtered, queued, DND-safe blast ──
-let _V15MS = { tags: [], channel: 'SMS', tag: '', pollTimer: null };
+let _V15MS = { tags: [], channel: 'SMS', selected: [], pollTimer: null };
 async function _v15ibMassSend() {
   document.body.insertAdjacentHTML('beforeend', `<div id="v15ms-overlay" style="position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9000;display:flex;align-items:center;justify-content:center;padding:18px" onclick="if(event.target===this)_v15msClose()">
     <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;width:100%;max-width:520px;max-height:90vh;overflow-y:auto;padding:22px">
       <div id="v15ms-inner"><div class="req-empty" style="padding:20px"><span class="req-spin"></span> Loading tags…</div></div>
     </div></div>`);
-  _V15MS = { tags: [], channel: 'SMS', tag: '', pollTimer: null };
+  _V15MS = { tags: [], channel: 'SMS', selected: [], pollTimer: null };
   try {
     const token = await _mreqAuthToken();
     const r = await fetch('/api/mass-send?action=tags&client_id=' + encodeURIComponent(CLIENT_ID), { headers: { Authorization: 'Bearer ' + token } });
@@ -10142,16 +10142,31 @@ function _v15msSetChannel(c) { _V15MS.channel = c; _v15msForm(); }
 function _v15msForm() {
   const inner = document.getElementById('v15ms-inner'); if (!inner) return;
   const isEmail = _V15MS.channel === 'Email';
-  const tagOpts = '<option value="">Pick a tag…</option>' + _V15MS.tags.map(t => `<option value="${escapeHTML(t.tag)}" ${_V15MS.tag === t.tag ? 'selected' : ''}>${escapeHTML(t.tag)} (${t.count})</option>`).join('');
+  const rows = _V15MS.tags.length
+    ? _V15MS.tags.map(t => {
+        const on = _V15MS.selected.includes(t.tag);
+        return `<div data-v15ms-tag="${escapeHTML(t.tag)}" role="checkbox" aria-checked="${on}" onclick="_v15msToggleTag(this.dataset.v15msTag)" style="display:flex;align-items:center;gap:10px;padding:8px 10px;cursor:pointer;font-size:13px;color:var(--text)" onmouseover="this.style.background='var(--bg)'" onmouseout="this.style.background='transparent'">
+          <span class="v15ms-cb" style="flex:none;width:16px;height:16px;border:1px solid ${on ? 'var(--gold)' : 'var(--border)'};border-radius:4px;background:${on ? 'var(--gold)' : 'transparent'};color:${on ? '#0B0B0D' : 'transparent'};display:flex;align-items:center;justify-content:center;font-size:11px;line-height:1">${on ? '✓' : ''}</span>
+          <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHTML(t.tag)}</span>
+          <span style="color:var(--text-mute);font-size:11px;flex:none">${t.count}</span>
+        </div>`;
+      }).join('')
+    : `<div style="padding:10px;font-size:12px;color:var(--text-mute)">No tags found.</div>`;
   inner.innerHTML = `
     <div style="font-size:18px;font-weight:700;color:var(--text);margin-bottom:4px">Mass ${isEmail ? 'email' : 'text'}</div>
-    <div style="font-size:12px;color:var(--text-mute);margin-bottom:16px">Sends to everyone with the chosen tag. Skips do-not-contact + anyone missing a ${isEmail ? 'email' : 'phone'}, and paces the sends to respect GHL's limits.</div>
+    <div style="font-size:12px;color:var(--text-mute);margin-bottom:16px">Sends to everyone with any of the chosen tags. Skips do-not-contact + anyone missing a ${isEmail ? 'email' : 'phone'}, and paces the sends to respect GHL's limits.</div>
     <div style="display:flex;gap:8px;margin-bottom:14px">
       <button onclick="_v15msSetChannel('SMS')" style="${_v15ibPill(!isEmail)}">SMS</button>
       <button onclick="_v15msSetChannel('Email')" style="${_v15ibPill(isEmail)}">Email</button>
     </div>
-    <div style="font-size:10px;color:var(--text-mute);text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">Audience (tag)</div>
-    <select id="v15ms-tag" onchange="_V15MS.tag=this.value" style="width:100%;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:8px 10px;font:inherit;font-size:13px;margin-bottom:12px">${tagOpts}</select>
+    <div style="font-size:10px;color:var(--text-mute);text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">Audience (tags)</div>
+    <div style="margin-bottom:12px">
+      <button type="button" id="v15ms-tagbtn" onclick="_v15msTogglePanel()" style="width:100%;display:flex;align-items:center;justify-content:space-between;gap:8px;text-align:left;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:8px 10px;font:inherit;font-size:13px;cursor:pointer">
+        <span class="v15ms-tagsum" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:${_V15MS.selected.length ? 'var(--text)' : 'var(--text-mute)'}">${_V15MS.selected.length ? escapeHTML(_V15MS.selected.join(', ')) : 'Pick tags…'}</span>
+        <span id="v15ms-tagcaret" style="flex:none;transition:transform .15s">▾</span>
+      </button>
+      <div id="v15ms-tagpanel" style="display:none;margin-top:4px;background:var(--surface);border:1px solid var(--border);border-radius:6px;max-height:200px;overflow-y:auto">${rows}</div>
+    </div>
     ${isEmail ? `<input id="v15ms-subject" placeholder="Subject" style="width:100%;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:8px 10px;font:inherit;font-size:13px;margin-bottom:10px">` : ''}
     <textarea id="v15ms-body" placeholder="Message…" style="width:100%;min-height:90px;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:9px 11px;font:inherit;font-size:13px;resize:vertical;margin-bottom:14px"></textarea>
     <div style="display:flex;justify-content:flex-end;gap:10px">
@@ -10159,20 +10174,42 @@ function _v15msForm() {
       <button id="v15ms-send" onclick="_v15msConfirm()" style="background:var(--gold);color:#0B0B0D;border:none;border-radius:8px;padding:9px 18px;font:inherit;font-size:13px;font-weight:700;cursor:pointer">Send</button>
     </div>`;
 }
+function _v15msTogglePanel(forceOpen) {
+  const p = document.getElementById('v15ms-tagpanel'); if (!p) return;
+  const open = forceOpen != null ? forceOpen : p.style.display === 'none';
+  p.style.display = open ? 'block' : 'none';
+  const car = document.getElementById('v15ms-tagcaret'); if (car) car.style.transform = open ? 'rotate(180deg)' : '';
+}
+function _v15msToggleTag(tag) {
+  if (!tag) return;
+  const i = _V15MS.selected.indexOf(tag);
+  if (i >= 0) _V15MS.selected.splice(i, 1); else _V15MS.selected.push(tag);
+  _v15msSyncTagUI();
+}
+function _v15msSyncTagUI() {
+  const sum = document.querySelector('#v15ms-tagbtn .v15ms-tagsum');
+  if (sum) { sum.textContent = _V15MS.selected.length ? _V15MS.selected.join(', ') : 'Pick tags…'; sum.style.color = _V15MS.selected.length ? 'var(--text)' : 'var(--text-mute)'; }
+  document.querySelectorAll('[data-v15ms-tag]').forEach(el => {
+    const on = _V15MS.selected.includes(el.dataset.v15msTag);
+    el.setAttribute('aria-checked', on ? 'true' : 'false');
+    const box = el.querySelector('.v15ms-cb');
+    if (box) { box.textContent = on ? '✓' : ''; box.style.background = on ? 'var(--gold)' : 'transparent'; box.style.borderColor = on ? 'var(--gold)' : 'var(--border)'; box.style.color = on ? '#0B0B0D' : 'transparent'; }
+  });
+}
 async function _v15msConfirm() {
-  const tag = _V15MS.tag;
+  const tags = _V15MS.selected.slice();
   const bodyText = (document.getElementById('v15ms-body')?.value || '').trim();
   const subject = (document.getElementById('v15ms-subject')?.value || '').trim();
-  if (!tag) { alert('Pick a tag.'); return; }
+  if (!tags.length) { alert('Pick at least one tag.'); return; }
   if (!bodyText) { alert('Type a message.'); return; }
   if (_V15MS.channel === 'Email' && !subject) { alert('Email needs a subject.'); return; }
-  if (!confirm(`Send this ${_V15MS.channel} to everyone tagged "${tag}"?`)) return;
+  if (!confirm(`Send this ${_V15MS.channel} to everyone tagged ${tags.map(t => `"${t}"`).join(' or ')}?`)) return;
   const btn = document.getElementById('v15ms-send'); if (btn) { btn.disabled = true; btn.textContent = 'Queuing…'; }
   try {
     const token = await _mreqAuthToken();
     const r = await fetch('/api/mass-send?action=create&client_id=' + encodeURIComponent(CLIENT_ID), {
       method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
-      body: JSON.stringify({ channel: _V15MS.channel, tag, body: bodyText, subject: _V15MS.channel === 'Email' ? subject : undefined }),
+      body: JSON.stringify({ channel: _V15MS.channel, tags, body: bodyText, subject: _V15MS.channel === 'Email' ? subject : undefined }),
     });
     const j = await _safeJson(r);
     if (!r.ok || j.error) throw new Error(j.error || ('HTTP ' + r.status));
