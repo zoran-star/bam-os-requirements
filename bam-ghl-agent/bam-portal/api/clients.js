@@ -311,6 +311,44 @@ async function specFeedbackToIssue(item) {
   return { url, created: true };
 }
 
+// Ping the approver(s) on Slack when something is freshly ready to ship.
+// "Fresh" = PR created within the cron window (hourly), so each ready change is
+// announced once without persisting notified state. Links to the portal Ship
+// Queue, never GitHub.
+async function cronShipQueueNotify(req, res) {
+  if (!process.env.GITHUB_TOKEN || !process.env.GITHUB_REPO) {
+    return res.status(200).json({ ok: true, notified: 0, reason: "github_not_configured" });
+  }
+  const prs = await listShipQueue();
+  const cutoff = Date.now() - 70 * 60 * 1000; // hourly cron + margin
+  const fresh = prs.filter(p => p.created_at && new Date(p.created_at).getTime() >= cutoff);
+  if (!fresh.length) return res.status(200).json({ ok: true, ready: prs.length, notified: 0 });
+
+  const token = process.env.SLACK_BOT_TOKEN;
+  const channel = process.env.FEEDBACK_SLACK_CHANNEL;
+  if (!token || !channel) return res.status(200).json({ ok: true, notified: 0, reason: "slack_not_configured" });
+
+  const mentionIds = (process.env.FEEDBACK_APPROVER_SLACK_IDS || "")
+    .split(",").map(s => s.trim()).filter(Boolean);
+  const mention = mentionIds.map(id => `<@${id}>`).join(" ");
+  const base = "https://portal.byanymeansbusiness.com";
+  const lines = fresh.map(p => `• *${p.title}*${p.checks === "success" ? " ✓" : ""}`).join("\n");
+  const n = fresh.length;
+  const text = `${mention ? mention + " " : ""}:rocket: *${n} change${n === 1 ? "" : "s"} ready to ship*\n${lines}\n\n→ Approve in the portal: <${base}/?nav=feedback|Feedback → 🚀 Ship queue>`;
+
+  try {
+    const r = await fetch("https://slack.com/api/chat.postMessage", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ channel, text, unfurl_links: false }),
+    });
+    const j = await r.json().catch(() => ({}));
+    return res.status(200).json({ ok: true, notified: j.ok ? n : 0, ready: prs.length, slack_error: j.ok ? null : (j.error || null) });
+  } catch (e) {
+    return res.status(500).json({ error: e.message });
+  }
+}
+
 async function cronFeedbackDigest(req, res) {
   try {
     // Open = not yet resolved. Newest first; cap so the digest stays scannable.
@@ -972,6 +1010,18 @@ async function handler(req, res) {
     if (!expected) return res.status(500).json({ error: "CRON_SECRET not configured" });
     if (auth !== `Bearer ${expected}`) return res.status(401).json({ error: "unauthorized" });
     return cronFeedbackDigest(req, res);
+  }
+
+  // ── Cron job: ping Zoran on Slack when a change is ready to ship ──
+  // Hourly. If a feedback PR is freshly ready in the Ship Queue, Slack-pings the
+  // approver(s) (FEEDBACK_APPROVER_SLACK_IDS) with a link straight to the portal
+  // Ship Queue — never GitHub. Auth: Bearer CRON_SECRET.
+  if (req.query.action === "ship-queue-notify") {
+    const auth = req.headers.authorization || "";
+    const expected = process.env.CRON_SECRET;
+    if (!expected) return res.status(500).json({ error: "CRON_SECRET not configured" });
+    if (auth !== `Bearer ${expected}`) return res.status(401).json({ error: "unauthorized" });
+    return cronShipQueueNotify(req, res);
   }
 
   // ── Cron job: auto-resend invite links to clients who never accepted ──

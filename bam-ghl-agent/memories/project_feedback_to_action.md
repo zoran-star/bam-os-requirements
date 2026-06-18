@@ -35,6 +35,19 @@ shit"). So approval moved INTO the staff portal — he never opens GitHub.
 - **Frontend:** `ShipQueuePanel` in `FeedbackView.jsx` — one card per PR
   (summary + checks badge + "🚀 Approve & ship"). Tapping ships it; GitHub stays
   invisible. "view diff" link is there for Coleman, ignorable by Zoran.
+- **Slack ping (2026-06-15):** hourly cron `?action=ship-queue-notify` (Bearer
+  `CRON_SECRET`, in vercel.json) pings the approver(s) when a change is freshly
+  ready (PR created within the last ~70 min — time-window dedup, no stored
+  state). @-mentions `FEEDBACK_APPROVER_SLACK_IDS` (comma-sep Slack user IDs) in
+  `FEEDBACK_SLACK_CHANNEL`, links to the portal Ship Queue (not GitHub). Quiet
+  when nothing's fresh. Set `FEEDBACK_APPROVER_SLACK_IDS` = Zoran's Slack user ID
+  on the LIVE project for the @-mention.
+
+> ⚠️ **Vercel project gotcha (2026-06-15):** the repo deploys to
+> `zoran-stars-projects/bam-portal` (the GitHub-connected project serving
+> `portal.byanymeansbusiness.com`), NOT `bam-coaches/bam-portal`. Env vars must
+> go on the **deploying** project or functions won't see them — this cost an
+> hour. Confirm via the project's Settings → Domains.
 - Decision (Zoran 2026-06-15): approve in the portal (not Slack, not GitHub).
 
 **Engine choice (Zoran):** 2026-06-14 = "auto-spec → ready-to-build issue".
