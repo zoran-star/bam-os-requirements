@@ -881,6 +881,7 @@ function OverviewTab({ client, staffMap, tokens, role, session, onChanged }) {
   return (
     <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: 24 }}>
       <div>
+        <ClientOnboardingItems client={client} session={session} tokens={t} />
         <SectionTitle>Profile</SectionTitle>
         <Field k="Business Name" v={client.business_name} tokens={t} />
         <Field k="Point of contact" v={client.owner_name} tokens={t} />
@@ -1170,6 +1171,74 @@ function suggestAdAccount(clientName, adAccounts) {
     if (s > bestScore) { best = a; bestScore = s; }
   }
   return bestScore >= 15 ? best : null;
+}
+
+// Staff-side mirror of the client's onboarding action-items checklist.
+// Staff GET returns ALL steps (incl. staff-only like trigger_buildout); toggling
+// a step PATCHes the same row the client portal reads — and checking
+// 'trigger_buildout' (re)creates the systems onboarding ticket server-side.
+const ONBOARDING_STAFF_ONLY_KEYS = new Set(["trigger_buildout", "ready_for_review"]);
+function ClientOnboardingItems({ client, session, tokens }) {
+  const t = tokens;
+  const [items, setItems] = useState(null);
+  const [busyId, setBusyId] = useState(null);
+
+  async function load() {
+    try {
+      const tok = session?.access_token;
+      const res = await fetch(`/api/action-items?client_id=${client.id}`, { headers: { Authorization: `Bearer ${tok}` } });
+      const j = await res.json();
+      if (!res.ok) throw new Error(j.error || `HTTP ${res.status}`);
+      const onb = (j.items || []).filter(i => i.onboarding_key).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+      setItems(onb);
+    } catch (_) { setItems([]); }
+  }
+  useEffect(() => { load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [client.id]);
+
+  async function toggle(it) {
+    setBusyId(it.id);
+    try {
+      const tok = session?.access_token;
+      const res = await fetch(`/api/action-items?id=${it.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${tok}` },
+        body: JSON.stringify({ completed: !it.completed_at }),
+      });
+      if (!res.ok) { const j = await res.json().catch(() => ({})); alert("Couldn't save: " + (j.error || res.statusText)); }
+      await load();
+    } catch (e) { alert("Failed: " + (e?.message || e)); }
+    finally { setBusyId(null); }
+  }
+
+  if (!items || !items.length) return null;
+  const done = items.filter(i => i.completed_at).length;
+  return (
+    <details open style={{ marginBottom: 18, background: t.surfaceEl, border: `1px solid ${t.border}`, borderRadius: 10, padding: "12px 16px" }}>
+      <summary style={{ cursor: "pointer", userSelect: "none", fontSize: 12, fontWeight: 700, letterSpacing: "0.04em", color: t.text }}>
+        Onboarding checklist <span style={{ color: t.textMute, fontWeight: 400 }}>· {done}/{items.length}</span>
+      </summary>
+      <div style={{ marginTop: 10, display: "flex", flexDirection: "column" }}>
+        {items.map(it => {
+          const isDone = !!it.completed_at;
+          const staffOnly = ONBOARDING_STAFF_ONLY_KEYS.has(it.onboarding_key);
+          return (
+            <div key={it.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "7px 0", borderBottom: `1px solid ${t.borderSoft || t.border}` }}>
+              <button onClick={() => toggle(it)} disabled={busyId === it.id} style={{
+                width: 20, height: 20, borderRadius: 5, flexShrink: 0,
+                border: `1px solid ${isDone ? t.green : t.border}`, background: isDone ? t.green : "transparent",
+                color: "#0A0A0B", cursor: busyId === it.id ? "wait" : "pointer", fontSize: 12, fontWeight: 800,
+                display: "flex", alignItems: "center", justifyContent: "center",
+              }}>{isDone ? "✓" : ""}</button>
+              <span style={{ flex: 1, fontSize: 13, color: isDone ? t.textMute : t.text, textDecoration: isDone ? "line-through" : "none" }}>{it.title}</span>
+              {staffOnly && (
+                <span style={{ fontSize: 9, color: t.amber, border: `1px solid ${t.amber}55`, borderRadius: 4, padding: "1px 5px", textTransform: "uppercase", letterSpacing: "0.08em" }}>staff</span>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </details>
+  );
 }
 
 export function MarketingTab({ client, tokens, role, session, onChanged, forceCanEdit = false }) {
