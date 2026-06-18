@@ -6190,7 +6190,7 @@
           </div>
           </div>
 
-          <div class="readout" style="margin-top:48px">Active Campaigns</div>
+          <div class="readout" id="active-campaigns-head" style="margin-top:48px">Active Campaigns</div>
 
           <!-- Dynamic campaigns container — populated by _renderMarketingCampaigns() -->
           <div id="marketing-campaigns-container">
@@ -10770,6 +10770,10 @@ function applyV15NavState(v15) {
   if (adPerf) adPerf.style.display = v15 ? 'none' : '';
   const monthProg = document.getElementById('month-progress');
   if (monthProg) monthProg.style.display = v15 ? 'none' : '';
+  // With Ad Performance hidden for V1.5, Active Campaigns shouldn't keep its big
+  // top margin (which left a gap below the topbar).
+  const acHead = document.getElementById('active-campaigns-head');
+  if (acHead) acHead.style.marginTop = v15 ? '0' : '48px';
   applyTalkToBamNav();
 }
 
