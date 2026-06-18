@@ -249,13 +249,22 @@ const ONBOARDING_STEPS = [
   { key: "ready_for_review", title: "Ready for review call?",           sort: 16, col: "ready_for_review_at",         writable: true, staff_only: true },
   // Client step — locked (greyed) until ready_for_review is done.
   { key: "book_review_call", title: "Book review call with Scaling Manager", sort: 17, col: "review_call_booked_at", writable: true, locked_by: "ready_for_review" },
+  // ── V1.5-only steps (tier:"v15") — only seeded for V1.5 academies; V2/V1
+  // never see them. They get tier-gated in syncOnboardingItems. ──
+  { key: "v15_athlete_map", title: "Map your athlete-name field", sort: 18, col: "athlete_map_done_at", writable: true, tier: "v15" },
+  { key: "v15_kpi_setup",   title: "Connect your KPIs",           sort: 19, col: "kpi_setup_done_at",   writable: true, tier: "v15" },
 ];
 const ONBOARDING_BY_KEY = Object.fromEntries(ONBOARDING_STEPS.map(s => [s.key, s]));
 const ONBOARDING_SIGNAL_COLS = [...new Set(ONBOARDING_STEPS.map(s => s.col))].join(",");
 const ONBOARDING_STAFF_ONLY = new Set(ONBOARDING_STEPS.filter(s => s.staff_only).map(s => s.key));
+const ONBOARDING_TIER_KEYS = new Set(ONBOARDING_STEPS.filter(s => s.tier).map(s => s.key));
+// Which steps apply to a client of a given tier (no `tier` = all tiers).
+function onboardingStepsForTier(isV15) {
+  return ONBOARDING_STEPS.filter(s => !s.tier || (s.tier === "v15" && isV15));
+}
 
 async function loadClientSignals(clientId) {
-  const rows = await sb(`clients?id=eq.${clientId}&select=${ONBOARDING_SIGNAL_COLS}`);
+  const rows = await sb(`clients?id=eq.${clientId}&select=${ONBOARDING_SIGNAL_COLS},v15_access`);
   return (Array.isArray(rows) && rows[0]) || {};
 }
 
@@ -263,13 +272,24 @@ async function loadClientSignals(clientId) {
 // reconcile each against its clients-row column. Safe to call on every GET.
 async function syncOnboardingItems(clientId) {
   const signals = await loadClientSignals(clientId);
+  const isV15 = signals.v15_access === true;
+  const steps = onboardingStepsForTier(isV15);
+  const applicableKeys = new Set(steps.map(s => s.key));
   const existing = await sb(
     `action_items?client_id=eq.${clientId}&onboarding_key=not.is.null&select=id,onboarding_key,completed_at,onboarding_overridden,sort_order`
   );
   const byKey = {};
   (existing || []).forEach(r => { byKey[r.onboarding_key] = r; });
 
-  for (const step of ONBOARDING_STEPS) {
+  // Remove tier-gated steps that no longer apply (e.g. V1.5 steps left over on an
+  // academy that's no longer V1.5). Only ever deletes tier-gated keys.
+  for (const r of (existing || [])) {
+    if (ONBOARDING_TIER_KEYS.has(r.onboarding_key) && !applicableKeys.has(r.onboarding_key)) {
+      await sb(`action_items?id=eq.${r.id}`, { method: "DELETE", headers: { Prefer: "return=minimal" } }).catch(() => {});
+    }
+  }
+
+  for (const step of steps) {
     const colVal = signals[step.col] || null; // timestamp or null
     const row = byKey[step.key];
 
