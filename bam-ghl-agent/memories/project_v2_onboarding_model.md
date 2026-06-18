@@ -19,13 +19,17 @@ The canonical doc for how onboarding, V2 access, the Business Blueprint, the tra
 > Inbox/Pricing/Members/Calendar/Pipelines, so showing the v15 variants would
 > duplicate. Web-only (`!isNativeApp()`). On branch `feat/member-import-offer-scope`.
 >
-> **Tier flags are mutually exclusive** (`v15_access` XOR `v2_access`). BAM GTA
-> itself is currently **V1.5** (`v15_access=true`) — the older "GTA is the only
-> V2 client" line below is STALE. A V2 demo clone exists: **"BAM GTA (V2)"**
-> `50c14b2c-3f89-4438-ab73-3067bc0f7017` (cloned 2026-06-18 — offers/pricing/
-> members/entry_points/locations/ghl_contacts copied; Stripe sub ids + GHL
-> location NULLed so it never touches real billing/GHL; all 4 members
-> auto-resolved an `offer_id`). Use it to compare V1.5 vs V2 side by side.
+> **Tier flags are mutually exclusive** (`v15_access` XOR `v2_access`). **BAM GTA
+> is now V2** (`v2_access=true`, set 2026-06-18) — flipped from V1.5 so Zoran
+> could see V2 with its live Stripe + GHL on real data. The older "GTA is the
+> only V2 client" line below is true again (toggle it back to V1.5 anytime via
+> the staff tier control). A "BAM GTA (V2)" DB-only demo clone existed briefly
+> (id 50c14b2c…) but was **DELETED 2026-06-18** — a second client row can't share
+> GTA's GHL location (`ghl_location_id` is UNIQUE) or Stripe (webhook matches
+> members by sub-id with no client filter → collision), so the clone showed
+> "not connected" everywhere; flipping the real client is the only way to see a
+> fully-connected V2. **Portal can't create GHL pipelines** — built in GHL by the
+> systems team, then linked to offers (GHL API doesn't expose pipeline creation).
 
 ## V1 vs V2 — what each client sees
 
