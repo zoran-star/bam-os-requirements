@@ -47,11 +47,14 @@ client site form
   form's `ghl_workflow_id`. **Assumes those workflows create the pipeline card
   themselves** — if a workflow only MOVES an existing card, leads won't appear in
   the pipeline.
-- ⚠️ **Calendars still place via the portal** (entry_points type calendar still has
-  pipeline_name=TRAINING PIPELINE, stage_name="scheduled trial"). Booking also
-  enrolls the "free trial booked" workflow. If that workflow also moves the stage
-  it's the SAME card (a move, not a dup) so it's lower-risk — left as-is pending
-  Zoran's call on whether to hand calendar pipeline fully to the workflow too.
+- **Calendars also workflow-owned now (2026-06-18).** `entry_points` type=calendar
+  (both GTA booking calendars) had pipeline_name/stage_name set to NULL too, so the
+  portal no longer advances the pipeline on booking. Booking still (a) CREATES the
+  GHL appointment and (b) enrolls the "free trial booked" workflow — only the
+  portal's stage-advance was removed (leads.js ~line 390, gated on
+  pipeline_name+stage_name). The "free trial booked" workflow owns the stage move to
+  "scheduled trial". Net: the portal places ZERO opportunities for GTA — every
+  pipeline action (create + stage moves + WON) lives in the GHL workflows. V1.5.
 
 ## Booking Calendars panel (portal-managed availability, Jun 2026)
 - Client portal → Calendar tab → "Booking Calendars" section (above the
