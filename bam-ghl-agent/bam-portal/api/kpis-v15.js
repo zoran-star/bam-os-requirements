@@ -270,9 +270,23 @@ async function handler(req, res) {
           ...uniqCals.map(async (cal) => {
             try {
               const r = await ghl(ghlToken, "GET", `/calendars/events?locationId=${encodeURIComponent(client.ghl_location_id)}&calendarId=${encodeURIComponent(cal.id)}&startTime=${start * 1000}&endTime=${end * 1000}`);
-              bookById[cal.id] = (r.events || []).filter((ev) => ev.appointmentStatus !== "cancelled").map((ev) => {
+              const evs = (r.events || []).filter((ev) => ev.appointmentStatus !== "cancelled");
+              // Calendar events carry only the calendar TITLE (e.g. "By Any Means
+              // Free Trial") + a contactId — never the person's name. Resolve any
+              // contactIds the mirror didn't cover straight from GHL so a booking
+              // shows the booker, not the calendar name.
+              const missing = [...new Set(evs.map((ev) => ev.contactId || (ev.contact && ev.contact.id)).filter((cid) => cid && !nameById[cid]))].slice(0, 30);
+              await Promise.all(missing.map(async (cid) => {
+                try {
+                  const cr = await ghl(ghlToken, "GET", `/contacts/${encodeURIComponent(cid)}`);
+                  const c = cr.contact || cr;
+                  nameById[cid] = c.contactName || [c.firstName, c.lastName].filter(Boolean).join(" ") || c.name || nameById[cid] || null;
+                } catch (_) {}
+              }));
+              bookById[cal.id] = evs.map((ev) => {
                 const cid = ev.contactId || (ev.contact && ev.contact.id) || null;
-                return { ref_id: ev.id || ev._id, label: nameById[cid] || (ev.contact && ev.contact.name) || ev.contactName || ev.title || "Booking", contactId: cid };
+                const nm = (cid && nameById[cid]) || (ev.contact && ev.contact.name) || ev.contactName || null;
+                return { ref_id: ev.id || ev._id, label: nm || "Trial booking", contactId: cid };
               });
             } catch (_) { ghlError = true; bookById[cal.id] = []; }
           }),
