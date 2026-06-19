@@ -195,7 +195,10 @@ async function handler(req, res) {
 
   // 2) OAuth callback → store company token → mint all.
   if (req.query.code) {
-    try { verifyState(req.query.state); } catch (e) { return res.status(400).send(page("Couldn't connect", `<p>Invalid or expired link. Re-open the connect link and try again.</p><p class="muted">${esc(e.message)}</p>`)); }
+    // State is best-effort CSRF protection for the ?action=start path. GHL's
+    // own draft-app "Install link" doesn't carry our HMAC state, so we don't
+    // hard-require it — this is a one-time owner-initiated agency install.
+    if (req.query.state) { try { verifyState(req.query.state); } catch (_) { /* foreign/absent state (install-link flow) — allow */ } }
     try {
       const tok = await exchangeCode(req.query.code, redirectUri(req));
       const companyId = tok.companyId || tok.company_id || null;
