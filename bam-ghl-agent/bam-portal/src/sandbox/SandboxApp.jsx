@@ -23,6 +23,7 @@ async function api(action, payload = {}) {
 
 export default function SandboxApp() {
   const [session, setSession] = useState(undefined);
+  const [view, setView] = useState("chat");          // 'chat' | 'brain'
   const [messages, setMessages] = useState([]);     // {role:'parent'|'agent', text, meta?}
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
@@ -98,10 +99,15 @@ export default function SandboxApp() {
           <span style={{ fontSize: 11, padding: "3px 10px", borderRadius: 99, background: tk.amberSoft, color: tk.amber, border: `1px solid ${tk.amber}33`, fontWeight: 600 }}>
             ⚠ TRAINING ONLY — nothing is sent
           </span>
+          <div style={{ display: "flex", gap: 4, marginLeft: 8, background: tk.surfaceEl, borderRadius: 9, padding: 3, border: `1px solid ${tk.border}` }}>
+            <Tab on={view === "chat"} onClick={() => setView("chat")}>💬 Chat</Tab>
+            <Tab on={view === "brain"} onClick={() => setView("brain")}>📝 Brain</Tab>
+          </div>
           <div style={{ flex: 1 }} />
-          <BtnGhost onClick={() => setMessages([])}>↺ Reset chat</BtnGhost>
+          {view === "chat" && <BtnGhost onClick={() => setMessages([])}>↺ Reset chat</BtnGhost>}
         </div>
 
+        {view === "brain" ? <BrainEditor /> :
         <div style={{ flex: 1, display: "flex", minHeight: 0 }}>
           {/* Chat */}
           <div style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0 }}>
@@ -156,7 +162,7 @@ export default function SandboxApp() {
               </div>
             ))}
           </div>
-        </div>
+        </div>}
       </div>
     </>
   );
@@ -211,6 +217,75 @@ function AgentBubble({ m, onTeach, teaching, teachText, setTeachText, onSave, on
     </div>
   );
 }
+
+// ── Brain editor (categorized prompt sections) ──────────────────────
+const GROUPS = [
+  { key: "identity",   label: "🪪 Identity",            hint: "Who the agent is" },
+  { key: "academy",    label: "🏠 Academy facts",       hint: "Schedule, pricing, program — the truth it speaks from" },
+  { key: "behavior",   label: "🧠 Behavior",            hint: "How it talks, qualifies, handles objections" },
+  { key: "guardrails", label: "🛡️ Guardrails & examples", hint: "Hard rules + sample conversations" },
+];
+
+function BrainEditor() {
+  const [sections, setSections] = useState(null);
+  const [err, setErr] = useState("");
+  useEffect(() => { load(); }, []);
+  async function load() { try { const d = await api("sections"); setSections(d.sections || []); } catch (e) { setErr(e.message); } }
+  if (err) return <div style={{ flex: 1, padding: 24, color: tk.red }}>⚠ {err}</div>;
+  if (!sections) return <div style={{ flex: 1, padding: 24, color: tk.textSub, fontSize: 14 }}>Loading the brain…</div>;
+  const editedCount = sections.filter(s => !s.is_default).length;
+  return (
+    <div style={{ flex: 1, overflowY: "auto", padding: "24px 28px" }}>
+      <div style={{ maxWidth: 780, margin: "0 auto" }}>
+        <div style={{ fontSize: 13, color: tk.textSub, marginBottom: 20, lineHeight: 1.6 }}>
+          Edit any section — saved changes hit the very next sandbox message. <span style={{ color: tk.accent }}>✏️ edited</span> marks sections you've customized{editedCount ? ` (${editedCount} so far)` : ""}.
+        </div>
+        {GROUPS.map(g => (
+          <div key={g.key} style={{ marginBottom: 26 }}>
+            <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 2 }}>{g.label}</div>
+            <div style={{ fontSize: 12, color: tk.textMute, marginBottom: 12 }}>{g.hint}</div>
+            {sections.filter(s => s.group === g.key).map(s => <SectionCard key={s.key} s={s} reload={load} />)}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function SectionCard({ s, reload }) {
+  const [body, setBody] = useState(s.body);
+  const [open, setOpen] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const dirty = body !== s.body;
+  async function save() { setSaving(true); try { await api("update-section", { key: s.key, body }); await reload(); } finally { setSaving(false); } }
+  async function reset() { setSaving(true); try { await api("reset-section", { key: s.key }); setBody(s.default_body); await reload(); } finally { setSaving(false); } }
+  return (
+    <div style={{ background: tk.surface, border: `1px solid ${dirty ? tk.accentBorder : tk.border}`, borderRadius: 10, marginBottom: 10, overflow: "hidden" }}>
+      <div onClick={() => setOpen(o => !o)} style={{ padding: "12px 14px", display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
+        <span style={{ display: "inline-block", transform: open ? "rotate(90deg)" : "none", transition: "transform .15s", color: tk.textMute, fontSize: 11 }}>▶</span>
+        <span style={{ fontSize: 13.5, fontWeight: 600 }}>{s.label}</span>
+        {!s.is_default && <span style={{ fontSize: 10, color: tk.accent, background: tk.accentGhost, border: `1px solid ${tk.accentBorder}`, borderRadius: 99, padding: "1px 8px" }}>✏️ edited</span>}
+        <div style={{ flex: 1 }} />
+        <span style={{ fontSize: 11, color: tk.textMute }}>{open ? "hide" : "edit"}</span>
+      </div>
+      {open && (
+        <div style={{ padding: "0 14px 14px" }}>
+          <textarea value={body} onChange={e => setBody(e.target.value)} rows={Math.min(20, Math.max(4, body.split("\n").length + 1))}
+            style={{ width: "100%", resize: "vertical", background: tk.surfaceEl, color: tk.text, border: `1px solid ${tk.borderMed}`, borderRadius: 8, padding: "10px 12px", fontFamily: F, fontSize: 13, lineHeight: 1.55, outline: "none" }} />
+          <div style={{ display: "flex", gap: 8, marginTop: 8, alignItems: "center" }}>
+            <button onClick={save} disabled={!dirty || saving} style={{ background: dirty ? tk.accent : tk.surfaceHov, color: dirty ? "#000" : tk.textMute, border: "none", borderRadius: 7, padding: "6px 16px", fontSize: 12.5, fontWeight: 700, cursor: dirty ? "pointer" : "default", fontFamily: F }}>{saving ? "saving…" : "Save"}</button>
+            {!s.is_default && <button onClick={reset} disabled={saving} style={{ background: "transparent", color: tk.textSub, border: `1px solid ${tk.borderMed}`, borderRadius: 7, padding: "6px 14px", fontSize: 12.5, cursor: "pointer", fontFamily: F }}>Reset to default</button>}
+            {dirty && <span style={{ fontSize: 11, color: tk.amber }}>unsaved</span>}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+const Tab = ({ on, onClick, children }) => (
+  <button onClick={onClick} style={{ background: on ? tk.accent : "transparent", color: on ? "#000" : tk.textSub, border: "none", borderRadius: 7, padding: "5px 14px", fontSize: 12.5, fontWeight: 600, cursor: "pointer", fontFamily: F }}>{children}</button>
+);
 
 const Center = ({ children }) => (
   <div style={{ background: tk.bg, minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", color: tk.textSub, fontFamily: F, fontSize: 14 }}>{children}</div>
