@@ -5537,7 +5537,7 @@
         KPIs
       </div>
 
-      <div class="nav-item" data-feature="v15" style="display:none" onclick="switchView('v15cal', this)">
+      <div id="nav-v15cal" class="nav-item" data-feature="v15" style="display:none" onclick="switchView('v15cal', this)">
         <span class="nav-icon" aria-hidden="true">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <rect x="3" y="4" width="18" height="18" rx="2"/>
@@ -11363,12 +11363,25 @@ function applyMemberMgmtNavState() {
 }
 
 // Calendar is V2-only, web-only (same treatment as Members for now).
+// V4 clients also get the V2 calendar (in place of the v15 Calendars view).
 const CALENDAR_ENABLED = true;
 function applyCalendarNavState() {
-  const showCalendar = CALENDAR_ENABLED && V2_ACCESS && !isNativeApp();
+  const showCalendar = CALENDAR_ENABLED && (V2_ACCESS || V4_ACCESS) && !isNativeApp();
   document.querySelectorAll('[data-feature="calendar"]').forEach(el => {
     el.style.display = showCalendar ? '' : 'none';
   });
+}
+
+// ── V4 access gate ──────────────────────────────────────────────────────────
+// V4 = V1.5 features + V2 Calendar (no member management). The v15 Calendars
+// nav item is suppressed so only the v2 Calendar tab shows.
+let V4_ACCESS = false;
+function applyV4NavState(v4) {
+  V4_ACCESS = !!v4;
+  applyCalendarNavState();
+  // Hide the v15 Calendars nav for V4 clients — v2 Calendar replaces it.
+  const v15CalNav = document.getElementById('nav-v15cal');
+  if (v15CalNav && V4_ACCESS) v15CalNav.style.display = 'none';
 }
 
 // ── Calendar (read-only weekly schedule, mock data) ──────────────────────
@@ -27987,7 +28000,7 @@ async function boot() {
   // to exactly the caller's clients via my_client_ids(). One auth user can
   // belong to multiple clients — the bottom-left switcher lets them flip.
   const { data: clientRows } = await _sb.from('clients')
-    .select('id, business_name, owner_name, email, onboarding_completed_at, marketing_included, v2_access, v15_access, organic_content')
+    .select('id, business_name, owner_name, email, onboarding_completed_at, marketing_included, v2_access, v15_access, v4_access, organic_content')
     .is('archived_at', null)
     .order('business_name');
   const clientRow = (clientRows && clientRows.length) ? clientRows[0] : null;
@@ -28022,6 +28035,7 @@ async function boot() {
   // the only V2-gated thing right now). Sets V2_ACCESS global.
   applyV2NavState(clientRow.v2_access === true);
   applyV15NavState(clientRow.v15_access === true);
+  applyV4NavState(clientRow.v4_access === true);
   _stripeConnectMaybeSwitch();
   renderClientSwitcher();
   document.getElementById('login-overlay').style.display = 'none';
