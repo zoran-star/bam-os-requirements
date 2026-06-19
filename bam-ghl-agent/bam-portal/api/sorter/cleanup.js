@@ -365,6 +365,7 @@ async function handler(req, res) {
         server_now: nowIso(),
         members: staging.map(s => ({
           id: s.id, athlete_name: s.athlete_name, parent_name: s.parent_name, parent_email: s.parent_email,
+          stripe_subscription_id: s.stripe_subscription_id || null,
           coachiq_member_id: s.coachiq_member_id || null, coachiq_not_applicable: !!s.coachiq_not_applicable,
         })),
         unmatched: events.filter(e => !e.matched).map(e => ({ email: e.email, coachiq_user_id: e.coachiq_user_id, at: e.created_at })),
