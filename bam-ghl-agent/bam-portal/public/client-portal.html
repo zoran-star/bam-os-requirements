@@ -8562,12 +8562,11 @@ Then the call to action."]</div>
     </div>
 
     <div class="view" id="view-blueprint">
-      <div class="topbar" style="display:flex;align-items:center;">
+      <div class="topbar">
         <div>
           <span class="topbar-kicker">§ Business Blueprint</span>
           <div class="topbar-title" id="bb-topbar-title">Business Blueprint</div>
         </div>
-        <button data-feature="members" onclick="openCoachiqLinks()" style="display:none; margin-left:auto; align-self:center; font-size:13px; font-weight:700; padding:9px 15px; border-radius:9px; border:1px solid var(--accent,#E8C547); background:rgba(232,197,71,0.12); color:var(--accent,#E8C547); cursor:pointer;">🔗 CoachIQ links</button>
       </div>
       <div class="content">
         <div id="bb-panel"><!-- rendered by openBlueprintView() based on hash --></div>
@@ -13205,6 +13204,13 @@ async function _bbRenderOffersPricing() {
         <div style="display:flex;align-items:center;gap:10px;">${pill}</div>
       </div>
       ${_bbMatcherStrip(connected, sorterProgress)}
+      <div onclick="openCoachiqLinks()" style="margin-top:12px;border:1px solid var(--border,#2a2a31);border-radius:10px;padding:12px 14px;display:flex;align-items:center;justify-content:space-between;gap:10px;cursor:pointer;">
+        <div>
+          <div style="font-weight:700;font-size:13px;">🔗 CoachIQ Links</div>
+          <div style="font-size:12px;color:var(--text-mute,#888);margin-top:2px;">Set the CoachIQ product each price grants on signup.</div>
+        </div>
+        <div style="color:var(--text-mute,#888);font-size:16px;">›</div>
+      </div>
     </div>`;
 }
 
