@@ -86,7 +86,8 @@ export default function SandboxApp() {
         role: "agent",
         text: d.reply,
         meta: { reasoning: d.reasoning, confidence: d.confidence, escalate: d.escalate, escalate_reason: d.escalate_reason,
-                followup: d.followup, followup_when: d.followup_when, followup_message: d.followup_message },
+                followup: d.followup, followup_when: d.followup_when, followup_message: d.followup_message,
+                asked_to_book: d.asked_to_book, sources: d.sources || [] },
       }]);
     } catch (e) {
       setError(e.message);
@@ -242,7 +243,7 @@ function ParentBubble({ text }) {
 }
 
 function AgentBubble({ m, parentText, onSaveExample, onTeach, teaching, teachText, setTeachText, onSave, onCancel }) {
-  const { reasoning, confidence, escalate, escalate_reason, followup, followup_when, followup_message } = m.meta || {};
+  const { reasoning, confidence, escalate, escalate_reason, followup, followup_when, followup_message, sources } = m.meta || {};
   const conf = typeof confidence === "number" ? Math.round(confidence * 100) : null;
   const confColor = conf == null ? tk.textMute : (conf >= 70 ? tk.green : conf >= 40 ? tk.amber : tk.red);
   return (
@@ -263,6 +264,14 @@ function AgentBubble({ m, parentText, onSaveExample, onTeach, teaching, teachTex
       {reasoning && (
         <div style={{ marginTop: 6, background: tk.surface, border: `1px dashed ${tk.borderMed}`, borderRadius: 8, padding: "7px 11px", fontSize: 12, color: tk.textSub, lineHeight: 1.5 }}>
           🧠 {reasoning}{conf != null && <span style={{ color: tk.textMute }}>  ·  {conf}% sure</span>}
+          {Array.isArray(sources) && sources.length > 0 && (
+            <div style={{ marginTop: 6, display: "flex", flexWrap: "wrap", gap: 5, alignItems: "center" }}>
+              <span style={{ fontSize: 10.5, color: tk.textMute }}>📍 from:</span>
+              {sources.map((s, i) => (
+                <span key={i} style={{ fontSize: 10.5, color: tk.blue, background: "rgba(96,165,250,0.10)", border: `1px solid ${tk.blue}33`, borderRadius: 99, padding: "1px 8px" }}>{s}</span>
+              ))}
+            </div>
+          )}
         </div>
       )}
 
