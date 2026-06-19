@@ -1515,7 +1515,7 @@ async function handler(req, res) {
       // OR by a client portal user (the academy owner or a teammate). Auth
       // is resolved per-action below, so these MUST sit before the staff-only
       // gate — that gate would 403 a legitimate client-portal caller.
-      if (publicSignupAction === "invite-team-member" || publicSignupAction === "revoke-team-member") {
+      if (publicSignupAction === "invite-team-member" || publicSignupAction === "revoke-team-member" || publicSignupAction === "set-staff-tabs") {
         const teamAuth = req.headers.authorization || "";
         const teamToken = teamAuth.startsWith("Bearer ") ? teamAuth.slice(7) : null;
         if (!teamToken) return res.status(401).json({ error: "auth required" });
@@ -1547,6 +1547,40 @@ async function handler(req, res) {
         );
         if (!teamClientRows?.length) return res.status(404).json({ error: "client not found" });
         const teamClient = teamClientRows[0];
+
+        // ---- action=set-staff-tabs ----
+        // The academy OWNER (or BAM staff) sets which tabs a teammate can see.
+        // allowed_tabs = array of logical tab keys, or null = all tabs.
+        if (publicSignupAction === "set-staff-tabs") {
+          if (!isStaffCaller && callerRole !== "owner") {
+            return res.status(403).json({ error: "only the account owner can set tab access" });
+          }
+          const memberId = typeof teamBody.member_id === "string" ? teamBody.member_id.trim() : "";
+          if (!memberId) return res.status(400).json({ error: "member_id required" });
+          let allowed = teamBody.allowed_tabs;
+          if (allowed !== null) {
+            if (!Array.isArray(allowed)) return res.status(400).json({ error: "allowed_tabs must be an array or null" });
+            allowed = [...new Set(allowed.filter((t) => typeof t === "string").map((t) => t.trim()).filter(Boolean))].slice(0, 50);
+          }
+          // Target must belong to THIS client and not be the owner.
+          const targetRows = await supabaseSelect(
+            `client_users?id=eq.${encodeURIComponent(memberId)}&client_id=eq.${client_id}&select=id,role`
+          ).catch(() => []);
+          if (!targetRows?.length) return res.status(404).json({ error: "teammate not found for this client" });
+          if (targetRows[0].role === "owner") return res.status(400).json({ error: "the owner always sees every tab" });
+          const upd = await fetch(`${SUPABASE_URL}/rest/v1/client_users?id=eq.${encodeURIComponent(memberId)}`, {
+            method: "PATCH",
+            headers: {
+              apikey: SUPABASE_SERVICE_KEY,
+              Authorization: `Bearer ${SUPABASE_SERVICE_KEY}`,
+              "Content-Type": "application/json",
+              Prefer: "return=minimal",
+            },
+            body: JSON.stringify({ allowed_tabs: allowed, updated_at: new Date().toISOString() }),
+          });
+          if (!upd.ok) return res.status(502).json({ error: `couldn't save tab access — ${await upd.text()}` });
+          return res.status(200).json({ ok: true, member_id: memberId, allowed_tabs: allowed });
+        }
 
         // ---- action=invite-team-member ----
         // Any BAM staff OR any active portal user of this client can invite.
