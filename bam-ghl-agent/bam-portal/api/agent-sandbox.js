@@ -284,7 +284,7 @@ async function handler(req, res) {
         sections: SECTIONS.map(s => ({
           key:          s.key,
           label:        s.label,
-          group:        s.group,
+          group:        s.layer,
           body:         ov[s.key] != null ? ov[s.key] : s.body,  // current (override or default)
           default_body: s.body,
           is_default:   ov[s.key] == null,
