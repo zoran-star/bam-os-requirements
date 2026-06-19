@@ -566,7 +566,7 @@ async function handler(req, res) {
     }
   } catch (_) { /* non-fatal — cards just show parent-only */ }
 
-  return res.status(200).json({ pipelines: enriched, trainers: trainerOptions, totals: {
+  return res.status(200).json({ pipelines: enriched, trainers: trainerOptions, location_id: locationId, totals: {
     pipelines: enriched.length,
     opportunities: enriched.reduce((s, p) => s + p.opportunities.length, 0),
   } });
