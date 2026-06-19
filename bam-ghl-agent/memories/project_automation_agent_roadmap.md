@@ -70,6 +70,15 @@ TRAINING ONLY: zero GHL/SMS side effects. Pieces:
   the next message. Defaults to BAM GTA client.
 - `agent_lessons` table (migration 20260618160000) — per-academy corrections.
 - `src/sandbox/SandboxApp.jsx` + `/sandbox` lazy route in main.jsx.
+- BRAIN EDITOR (PR #471): `api/agent/prompt-structure.js` = the prompt parsed
+  into 20 ordered, grouped sections (identity/academy/behavior/guardrails) +
+  `assemblePrompt(overrides)`. `agent_prompt_sections` table (migration
+  20260618170000) holds per-academy per-section overrides (only edited sections
+  get a row). Sandbox builds the system prompt = section defaults + overrides +
+  active lessons. Endpoint actions: sections / update-section / reset-section.
+  UI: 💬 Chat / 📝 Brain tab; Brain = collapsible editable section cards with
+  Save / Reset-to-default. To change DEFAULTS, edit the source .txt and
+  regenerate prompt-structure.js.
 NOT YET BUILT (next): tools (check availability / book / move card), reading the
 P1 spine to wake on a real reply, sending via GHL. Base-prompt editor (Playbook)
 + lesson promotion-to-global also later.
