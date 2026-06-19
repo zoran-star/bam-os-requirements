@@ -357,9 +357,12 @@ async function handler(req, res) {
       let events = [];
       try { events = await sb(`coachiq_link_events?select=email,coachiq_user_id,matched,created_at&order=created_at.desc&limit=60`) || []; }
       catch (_) { events = []; }
+      const lastEventAt = events.length ? events[0].created_at : null;
       return res.status(200).json({
         ok: true,
         coachiq_enabled: !!client.coachiq_enabled,
+        last_event_at: lastEventAt,   // most recent webhook of ANY kind → "connected" signal
+        server_now: nowIso(),
         members: staging.map(s => ({
           id: s.id, athlete_name: s.athlete_name, parent_name: s.parent_name, parent_email: s.parent_email,
           coachiq_member_id: s.coachiq_member_id || null, coachiq_not_applicable: !!s.coachiq_not_applicable,

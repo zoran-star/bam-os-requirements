@@ -22503,7 +22503,20 @@ function _sorterCiqRender(json) {
   const linked = members.filter(m => m.coachiq_member_id).length;
   const na = members.filter(m => m.coachiq_not_applicable).length;
   const waiting = members.length - linked - na;
-  const intro = `<div style="font-size:12.5px;color:var(--text-mute,#888);margin-bottom:12px;">Add your CoachIQ link tag to each client in CoachIQ — as the tag fires they check off here automatically. <b style="color:var(--text,#eee);">${linked}</b> linked · ${waiting} waiting · ${na} not on CoachIQ.</div>`;
+  // Listening / connected status — the automation fires on ANY tag, so "connected" =
+  // we've received a webhook recently (within 15 min). "Listening" = this panel is polling.
+  const lastAt = json.last_event_at ? new Date(json.last_event_at).getTime() : 0;
+  const srvNow = json.server_now ? new Date(json.server_now).getTime() : Date.now();
+  const secs = lastAt ? Math.max(0, Math.round((srvNow - lastAt) / 1000)) : null;
+  const connected = !!(lastAt && secs <= 900);
+  const ago = secs == null ? '' : (secs < 60 ? secs + 's ago' : Math.round(secs / 60) + 'm ago');
+  const dotCol = connected ? '#7BC47F' : '#e0a93f';
+  const statusBanner = `<div style="display:flex;align-items:center;gap:9px;border:1px solid ${connected ? '#1f7a3d' : 'var(--border,#2a2a31)'};border-radius:10px;padding:10px 12px;margin-bottom:12px;background:${connected ? 'rgba(123,196,127,0.08)' : 'transparent'};">
+      <span style="width:9px;height:9px;border-radius:50%;flex:none;background:${dotCol};box-shadow:0 0 0 3px ${connected ? 'rgba(123,196,127,0.22)' : 'rgba(224,169,63,0.18)'};"></span>
+      <span style="font-size:12.5px;font-weight:800;color:var(--text,#eee);">Listening${connected ? ' · connected' : ''}</span>
+      <span style="font-size:11.5px;color:var(--text-mute,#888);">${connected ? ('last webhook ' + ago) : 'waiting for a webhook — add any tag to a client to test the connection'}</span>
+    </div>`;
+  const intro = statusBanner + `<div style="font-size:12.5px;color:var(--text-mute,#888);margin-bottom:12px;">Add your CoachIQ link tag to each client in CoachIQ — as the tag fires they check off here automatically. <b style="color:var(--text,#eee);">${linked}</b> linked · ${waiting} waiting · ${na} not on CoachIQ.</div>`;
   const rows = members.map(m => {
     const name = escapeHTML(m.athlete_name || m.parent_name || m.parent_email || '');
     const email = escapeHTML(m.parent_email || '');
