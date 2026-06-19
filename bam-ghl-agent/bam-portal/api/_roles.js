@@ -6,7 +6,12 @@
 // the two in sync when roles change.
 //
 // Known staff roles: admin, scaling_manager, marketing_manager, marketing_executor,
-// systems_manager, systems_executor, systems (legacy/extra — gateable but NOT assignable).
+// content_executor, systems_manager, systems_executor, systems (legacy/extra —
+// gateable but NOT assignable).
+//
+// content_executor is a CONTENT-ONLY role: it works content_tickets but is
+// deliberately excluded from MARKETING_ROLES / MARKETING_OPS_ROLES / META_OPS_ROLES,
+// so it can NOT launch campaigns, change budgets, or touch Meta/Client Setup.
 
 // Admin only.
 export const ADMIN_ROLES = new Set(["admin"]);
@@ -21,8 +26,21 @@ export const MARKETING_ROLES = new Set([
 
 // Marketing OPS (guide cards + Meta ops). NOTE: intentionally NO scaling_manager —
 // this matches the original marketing.js GUIDE_WRITE_ROLES / META_OPS_ROLES.
+// NOTE: NO content_executor — content people must not touch Meta/budgets/campaigns.
 export const MARKETING_OPS_ROLES = new Set([
   "admin", "marketing_manager", "marketing_executor",
+]);
+
+// Content side (work content_tickets: upload finals, send-to-marketing, send-for-review).
+// Includes content_executor — the content-only role — plus everyone with marketing reach.
+export const CONTENT_ROLES = new Set([
+  "admin", "scaling_manager", "marketing_manager", "marketing_executor", "content_executor",
+]);
+
+// Content manager-level (assign/override who owns a creative, manage the roster).
+// content_executor is NOT here — executors work their own queue, they don't reassign.
+export const CONTENT_MANAGER_ROLES = new Set([
+  "admin", "scaling_manager", "marketing_manager",
 ]);
 
 // Systems side (build/tickets).
@@ -38,14 +56,14 @@ export const SYSTEMS_MANAGER_ROLES = new Set([
 // Any authenticated staff (has a row in `staff`). Includes legacy "systems".
 export const ANY_STAFF_ROLES = new Set([
   "admin", "scaling_manager", "marketing_manager", "marketing_executor",
-  "systems_manager", "systems_executor", "systems",
+  "content_executor", "systems_manager", "systems_executor", "systems",
 ]);
 
 // Roles that may be ASSIGNED when creating/updating a staff member. Excludes the
 // legacy "systems" role on purpose (it exists in data but isn't offered in the UI).
 export const ASSIGNABLE_STAFF_ROLES = new Set([
   "admin", "scaling_manager", "marketing_manager", "marketing_executor",
-  "systems_manager", "systems_executor",
+  "content_executor", "systems_manager", "systems_executor",
 ]);
 
 // Convenience: is `role` in `set`? (null/undefined-safe)

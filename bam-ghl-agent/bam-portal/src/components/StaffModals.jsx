@@ -8,6 +8,7 @@ export const STAFF_ROLES = [
   { value: "systems_executor",   label: "Systems Executor" },
   { value: "marketing_manager",  label: "Marketing Manager" },
   { value: "marketing_executor", label: "Marketing Executor" },
+  { value: "content_executor",   label: "Content Executor" },
   { value: "scaling_manager",    label: "Scaling Manager" },
 ];
 

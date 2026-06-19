@@ -32,5 +32,22 @@ Shipped 2026-06-18. A second content pipeline alongside Ads, gated per-client.
 ## Staff content view (`ContentView.jsx`)
 - For `ticket.channel === 'organic'` the end button is **"Send for client review"** (calls `send-for-review`) instead of "Send to Marketing".
 
+## Content routing / assignment (added 2026-06-19, branch `feat/content-routing-assignees`)
+
+New `content_executor` role — CONTENT-ONLY. In `_roles.js` it's in `ANY_STAFF_ROLES`/`ASSIGNABLE_STAFF_ROLES` + new `CONTENT_ROLES`, but deliberately NOT in `MARKETING_ROLES`/`MARKETING_OPS_ROLES`/`META_OPS_ROLES` → can't launch campaigns, change budgets, or touch Meta/Client Setup. New `CONTENT_MANAGER_ROLES` (admin/scaling_manager/marketing_manager) = who may reassign + manage the roster. Eli White = content_executor. `canSeeContent` (App.jsx) includes it; `canSeeMarketing` does NOT; content_executor lands on the Content tab.
+
+**Routing precedence** at content-ticket create (`marketing.js` `resolveContentAssignee`): `ticket.assigned_to` override → `clients.content_assignee_<channel>_id` (admin roster) → channel default (organic→Eli via `CONTENT_ORGANIC_ASSIGNEE_EMAIL`/first content_executor, ads→Cam via `MARKETING_MANAGER_EMAIL`). New-ticket Slack DM now pings the **resolved owner**, not always Cam.
+
+**Schema** (migration `20260619150000_content_assignment_routing.sql`): `content_tickets.assigned_to → staff(id)`; `clients.content_assignee_organic_id` + `content_assignee_ads_id → staff(id)` (all `on delete set null`, nullable → V1-safe).
+
+**Surfaces:**
+- `ClientsCombinedView` SetupTab → "Organic content owner" + "Ads content owner" pickers (gated `ROLES.canAssignContent`). Saves via `update-fields` (field-gated to `CONTENT_MANAGER_ROLES` in `clients.js`).
+- `ContentView` → new manager-only **Routing** tab (`ContentRoutingTab`): per-client grid of organic/ads owners; organic picker disabled when `organic_content` off. Writes the same fields.
+- `ContentView` queue scoping: `content_executor` sees only `assigned_to===me.id`; managers see all.
+
+**Client never sees assignee:** `stripInternalMessages` now also deletes `assigned_to` (runs only on client GET/PATCH; staff use `enrichWithClient`). Client portal selects `clients` by explicit column list (no `content_assignee_*`). `assign` PATCH action gated to `CONTENT_MANAGER_ROLES`.
+
+**Env to set in Vercel:** `CONTENT_ORGANIC_ASSIGNEE_EMAIL` = Eli's staff email (else falls back to first `content_executor` row). `MARKETING_MANAGER_EMAIL` already defaults to `cameron@byanymeansbusiness.com`.
+
 ## To demo
 Flip the staff "Organic content" toggle on a client → their Marketing tab shows the Ads | Organic split.

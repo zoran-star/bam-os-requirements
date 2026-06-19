@@ -40,6 +40,9 @@ const ROLES = {
   canEditMeta:       (role) => role === "admin" || role === "scaling_manager" || role === "marketing_manager" || role === "marketing_executor",
   canEditBasics:     () => true, // any staff
   canArchive:        (role) => role === "admin" || role === "scaling_manager",
+  // Assign/override who owns a client's content (per channel). Managers only —
+  // mirrors CONTENT_MANAGER_ROLES in api/_roles.js. Executors can't reassign.
+  canAssignContent:  (role) => role === "admin" || role === "scaling_manager" || role === "marketing_manager",
 };
 
 const STATUS_OPTIONS = ["onboarding", "active", "paused", "churned"];
@@ -852,6 +855,15 @@ function SetupTab({ client, staff, tokens, role, session, onChanged, onBack }) {
   const canEditBilling = ROLES.canEditBilling(role);
   const canEditAuth = ROLES.canEditAuth(role);
   const canArchive = ROLES.canArchive(role);
+  const canAssignContent = ROLES.canAssignContent(role);
+
+  // Content owners shown in the per-channel pickers: people who actually work
+  // content (content_executor + marketing). Mirrors CONTENT_ROLES server-side.
+  const CONTENT_OWNER_ROLES = ["admin", "scaling_manager", "marketing_manager", "marketing_executor", "content_executor"];
+  const contentOwnerOptions = [
+    { value: "", label: "(use channel default)" },
+    ...staff.filter(s => CONTENT_OWNER_ROLES.includes(s.role)).map(s => ({ value: s.id, label: `${s.name} · ${s.role}` })),
+  ];
 
   const set = (field, value) => setEdits(e => ({ ...e, [field]: value }));
 
@@ -919,6 +931,28 @@ function SetupTab({ client, staff, tokens, role, session, onChanged, onBack }) {
         options={[{ value: "", label: "(unassigned)" }, ...staff.map(s => ({ value: s.id, label: `${s.name} · ${s.role}` }))]}
         tokens={t}
       />
+
+      {/* Content routing — who owns this client's creatives, per channel.
+          Manager/admin only; left as "channel default" routes organic→Eli, ads→Cam.
+          Internal only — clients never see who's assigned. */}
+      {canAssignContent && (
+        <>
+          <EditSelect
+            label="Organic content owner"
+            value={currentValue("content_assignee_organic_id") || ""}
+            onChange={v => set("content_assignee_organic_id", v || null)}
+            options={contentOwnerOptions}
+            tokens={t}
+          />
+          <EditSelect
+            label="Ads content owner"
+            value={currentValue("content_assignee_ads_id") || ""}
+            onChange={v => set("content_assignee_ads_id", v || null)}
+            options={contentOwnerOptions}
+            tokens={t}
+          />
+        </>
+      )}
 
       {/* Onboarding Method (Call / Send link / Call done) removed 2026-06-03 —
           onboarding is driven by the Action Items checklist now. */}

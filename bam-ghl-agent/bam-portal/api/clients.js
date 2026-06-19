@@ -4,7 +4,7 @@ import { withSentryApiRoute } from "./_sentry.js";
 // GET /api/clients               → list all clients
 // GET /api/clients?id=<uuid>     → single client
 
-import { ADMIN_LIKE_ROLES, ANY_STAFF_ROLES, ASSIGNABLE_STAFF_ROLES } from "./_roles.js";
+import { ADMIN_LIKE_ROLES, ANY_STAFF_ROLES, ASSIGNABLE_STAFF_ROLES, CONTENT_MANAGER_ROLES } from "./_roles.js";
 
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
@@ -2054,6 +2054,17 @@ async function handler(req, res) {
         if (wasSet("slack_channel_id"))   patch.slack_channel_id   = setText("slack_channel_id");
         if (wasSet("ghl_location_id"))    patch.ghl_location_id    = setText("ghl_location_id");
         if (wasSet("scaling_manager_id")) patch.scaling_manager_id = body.scaling_manager_id || null;
+
+        // Content roster: per-channel content owner. Manager/admin only — content
+        // executors pass the ANY_STAFF action gate, so guard these fields here so
+        // they can't reassign who owns a client's content.
+        if (wasSet("content_assignee_organic_id") || wasSet("content_assignee_ads_id")) {
+          if (!CONTENT_MANAGER_ROLES.has(role)) {
+            return res.status(403).json({ error: "manager or admin role required to assign content owners" });
+          }
+          if (wasSet("content_assignee_organic_id")) patch.content_assignee_organic_id = body.content_assignee_organic_id || null;
+          if (wasSet("content_assignee_ads_id"))     patch.content_assignee_ads_id     = body.content_assignee_ads_id || null;
+        }
 
         if (wasSet("status")) {
           const s = body.status;

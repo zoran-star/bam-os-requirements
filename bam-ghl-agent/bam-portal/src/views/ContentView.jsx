@@ -4,6 +4,61 @@ import { supabase } from "../lib/supabase";
 const STORAGE_BUCKET = "ticket-files";
 const STORAGE_FOLDER = "guide-cards";
 
+// ─── Priority + turnaround SLA (mirrors MarketingView) ───
+// Client-flagged urgent = High (3 business days); everything else = Normal (5).
+// Content tickets carry priority on context.priority (the wizard "Mark as urgent"),
+// whereas marketing tickets use fields.priority — same SLA math either way.
+const CT_PRIORITY_META = {
+  high:   { label: "High",   sla: 3, color: "#ED7969" },
+  normal: { label: "Normal", sla: 5, color: "#7E9CD9" },
+};
+function ctkPriorityOf(ticket) {
+  return (ticket?.context?.priority === "high") ? "high" : "normal";
+}
+function ctkAddBusinessDays(start, days) {
+  const d = new Date(start);
+  let added = 0;
+  while (added < days) {
+    d.setDate(d.getDate() + 1);
+    const dow = d.getDay();
+    if (dow !== 0 && dow !== 6) added++;
+  }
+  return d;
+}
+function ctkBizDaysUntil(due) {
+  const now = new Date(); now.setHours(0, 0, 0, 0);
+  const d = new Date(due);  d.setHours(0, 0, 0, 0);
+  if (d.getTime() < now.getTime()) return -1;
+  let count = 0;
+  const cur = new Date(now);
+  while (cur.getTime() < d.getTime()) {
+    cur.setDate(cur.getDate() + 1);
+    const dow = cur.getDay();
+    if (dow !== 0 && dow !== 6) count++;
+  }
+  return count;
+}
+// { due, label, overdue } from submit date + priority SLA, or null with no date.
+function ctkDeadlineInfo(submittedIso, priority) {
+  if (!submittedIso) return null;
+  const sla = (CT_PRIORITY_META[priority] || CT_PRIORITY_META.normal).sla;
+  const due = ctkAddBusinessDays(new Date(submittedIso), sla);
+  const rem = ctkBizDaysUntil(due);
+  if (rem < 0) return { due, label: "Overdue", overdue: true };
+  if (rem === 0) return { due, label: "Due today", overdue: false };
+  return { due, label: `Due in ${rem} biz day${rem === 1 ? "" : "s"}`, overdue: false };
+}
+function CtkPriorityChip({ priority, tk }) {
+  const meta = CT_PRIORITY_META[priority] || CT_PRIORITY_META.normal;
+  return (
+    <span style={{
+      fontSize: 10, fontWeight: 700, letterSpacing: "0.04em",
+      padding: "2px 7px", borderRadius: 999, whiteSpace: "nowrap",
+      color: meta.color, border: `1px solid ${meta.color}66`, background: `${meta.color}1A`,
+    }}>{priority === "high" ? "⚡ " : ""}{meta.label}</span>
+  );
+}
+
 export default function ContentView({ tokens: tk, dark, me, session }) {
   const [mainTab, setMainTab]     = useState("tickets"); // tickets | guides
   const [guides, setGuides]       = useState([]);
@@ -12,6 +67,10 @@ export default function ContentView({ tokens: tk, dark, me, session }) {
   const [creating, setCreating]   = useState(false);
   const [banner, setBanner]       = useState(null);
   const [error, setError]         = useState("");
+
+  // Managers/admin can manage the content routing roster (who owns each client's
+  // organic vs ads content). Executors don't see this tab. Mirrors CONTENT_MANAGER_ROLES.
+  const canManageRouting = ["admin", "scaling_manager", "marketing_manager"].includes(me?.role);
 
   // ─── fetchGuides must be defined BEFORE the useEffect that calls it
   //     (it's an arrow-function const, not a hoisted function declaration).
@@ -107,6 +166,9 @@ export default function ContentView({ tokens: tk, dark, me, session }) {
     <div style={{ display: "flex", gap: 4, borderBottom: `1px solid ${tk.border}`, marginBottom: 24 }}>
       <MainTab label="Tickets" active={mainTab === "tickets"} onClick={() => setMainTab("tickets")} tk={tk} />
       <MainTab label="Guide cards" active={mainTab === "guides"} onClick={() => setMainTab("guides")} tk={tk} />
+      {canManageRouting && (
+        <MainTab label="Routing" active={mainTab === "routing"} onClick={() => setMainTab("routing")} tk={tk} />
+      )}
     </div>
   );
 
@@ -116,6 +178,16 @@ export default function ContentView({ tokens: tk, dark, me, session }) {
       <div style={{ padding: "24px 28px", color: tk.text }}>
         {renderMainTabs()}
         <ContentTicketsTab tk={tk} session={session} me={me} />
+      </div>
+    );
+  }
+
+  // Routing roster — managers only (guarded by canManageRouting on the tab).
+  if (mainTab === "routing" && canManageRouting) {
+    return (
+      <div style={{ padding: "24px 28px", color: tk.text }}>
+        {renderMainTabs()}
+        <ContentRoutingTab tk={tk} session={session} />
       </div>
     );
   }
@@ -618,10 +690,17 @@ function ContentTicketsTab({ tk, session, me }) {
     return json.ticket;
   }
 
+  // Queue scoping: content executors only work their own assigned creatives;
+  // managers + marketing see the whole board. (Routing assigns organic→Eli,
+  // ads→Cam, so Eli's queue is naturally his organic work.)
+  const scoped = me?.role === "content_executor"
+    ? tickets.filter(t => t.assigned_to === me.id)
+    : tickets;
+
   // Filter rows by sub-tab; sort oldest first per spec
-  const active     = tickets.filter(t => t.status === "active");
-  const clientDep  = tickets.filter(t => t.status === "client-dependent");
-  const completed  = tickets.filter(t => t.status === "completed" || t.status === "cancelled");
+  const active     = scoped.filter(t => t.status === "active");
+  const clientDep  = scoped.filter(t => t.status === "client-dependent");
+  const completed  = scoped.filter(t => t.status === "completed" || t.status === "cancelled");
   const tabRows =
     subTab === "active"           ? active
     : subTab === "client-dependent" ? clientDep
@@ -642,6 +721,13 @@ function ContentTicketsTab({ tk, session, me }) {
     list = [...list].sort((a, b) => {
       const aDate = new Date(a.submitted_at || 0).getTime();
       const bDate = new Date(b.submitted_at || 0).getTime();
+      if (sortOrder === "priority") {
+        // Urgent first; within the same priority, oldest first (FIFO work order).
+        const rank = p => (p === "high" ? 0 : 1);
+        const diff = rank(ctkPriorityOf(a)) - rank(ctkPriorityOf(b));
+        if (diff !== 0) return diff;
+        return aDate - bDate;
+      }
       return sortOrder === "newest" ? bDate - aDate : aDate - bDate;
     });
     return list;
@@ -715,6 +801,7 @@ function ContentTicketsTab({ tk, session, me }) {
             cursor: "pointer", fontFamily: "inherit",
           }}
         >
+          <option value="priority">Priority (urgent first)</option>
           <option value="newest">Newest first</option>
           <option value="oldest">Oldest first</option>
         </select>
@@ -753,6 +840,10 @@ function ContentTicketsTab({ tk, session, me }) {
           const academyName = t.client?.business_name || "—";
           const previewNotes = (t.notes || "").split("\n").filter(Boolean).slice(0, 1).join(" ").slice(0, 110) || "(no notes)";
           const dateStr = t.submitted_at ? new Date(t.submitted_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "—";
+          const pri = ctkPriorityOf(t);
+          // Deadline is only meaningful while the ticket is still being worked.
+          const inProgress = t.status === "active" || t.status === "client-dependent";
+          const dl = inProgress ? ctkDeadlineInfo(t.submitted_at, pri) : null;
           return (
             <div
               key={t.id}
@@ -763,6 +854,8 @@ function ContentTicketsTab({ tk, session, me }) {
                 gap: 16,
                 padding: "14px 16px",
                 borderBottom: `1px solid ${tk.borderSoft || tk.border}`,
+                borderLeft: pri === "high" && inProgress
+                  ? `3px solid ${CT_PRIORITY_META.high.color}` : "3px solid transparent",
                 cursor: "pointer",
                 alignItems: "center",
                 transition: "background 0.12s ease",
@@ -770,19 +863,28 @@ function ContentTicketsTab({ tk, session, me }) {
               onMouseEnter={e => e.currentTarget.style.background = tk.surfaceHov}
               onMouseLeave={e => e.currentTarget.style.background = "transparent"}
             >
-              <div style={{ fontWeight: 500, color: tk.text, fontSize: 14, display: "flex", alignItems: "center", gap: 8 }}>
+              <div style={{ fontWeight: 500, color: tk.text, fontSize: 14, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
                 <span style={{
                   fontFamily: "monospace", fontSize: 10, letterSpacing: "0.12em",
                   color: tk.textMute, padding: "2px 6px", borderRadius: 4,
                   background: "rgba(255,255,255,0.04)", border: `1px solid ${tk.border}`,
                 }}>{ctkCode(t.id)}</span>
                 <span>{academyName}</span>
+                <CtkPriorityChip priority={pri} tk={tk} />
               </div>
               <div style={{ color: tk.textSub, fontSize: 13, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{previewNotes}</div>
               <div style={{ color: tk.textSub, fontSize: 13 }}>
                 <span style={{ marginRight: 6 }}>{meta.icon}</span>{meta.label}
               </div>
-              <div style={{ color: tk.textMute, fontSize: 12, fontFamily: "monospace", letterSpacing: "0.05em", textAlign: "right" }}>{dateStr}</div>
+              <div style={{ textAlign: "right" }}>
+                <div style={{ color: tk.textMute, fontSize: 12, fontFamily: "monospace", letterSpacing: "0.05em" }}>{dateStr}</div>
+                {dl && (
+                  <div style={{
+                    fontSize: 11, fontWeight: 600, marginTop: 3,
+                    color: dl.overdue ? CT_PRIORITY_META.high.color : tk.textSub,
+                  }}>{dl.overdue ? "⚠ " : ""}{dl.label}</div>
+                )}
+              </div>
             </div>
           );
         })}
@@ -951,13 +1053,26 @@ function ContentTicketDetail({ tk, session, ticket, onBack, onRefetch, patchTick
             {academyName} · Submitted {ticket.submitted_at ? new Date(ticket.submitted_at).toLocaleString() : "—"}
             {ctkLastActivityIso(ticket) ? ` · Last activity ${ctkFormatRelative(ctkLastActivityIso(ticket))}` : ""}
           </div>
-          {/* Owner (Cam) + the client's SM contact to reach out to */}
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 8 }}>
+          {/* Priority + SLA deadline, content owner (channel-routed), and SM contact */}
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 8, alignItems: "center" }}>
+            <CtkPriorityChip priority={ctkPriorityOf(ticket)} tk={tk} />
+            {(() => {
+              const inProg = ticket.status === "active" || ticket.status === "client-dependent";
+              const dl = inProg ? ctkDeadlineInfo(ticket.submitted_at, ctkPriorityOf(ticket)) : null;
+              return dl ? (
+                <span style={{
+                  fontSize: 11, fontWeight: 600, letterSpacing: "0.04em",
+                  padding: "3px 10px", borderRadius: 999,
+                  color: dl.overdue ? CT_PRIORITY_META.high.color : tk.textSub,
+                  border: `1px solid ${dl.overdue ? CT_PRIORITY_META.high.color + "66" : tk.border}`,
+                }}>{dl.overdue ? "⚠ " : "⏱ "}{dl.label}</span>
+              ) : null;
+            })()}
             <span style={{
               fontSize: 11, fontWeight: 600, color: tk.accent, letterSpacing: "0.04em",
               padding: "3px 10px", borderRadius: 999,
               border: `1px solid ${tk.accent}`, background: `${tk.accent}14`,
-            }}>👤 Owner · {ticket.assigned_to_name || "Cam"}</span>
+            }}>👤 Owner · {ticket.assigned_to_name || "Unassigned"}</span>
             <span style={{
               fontSize: 11, fontWeight: 500, color: tk.textSub, letterSpacing: "0.04em",
               padding: "3px 10px", borderRadius: 999,
@@ -1434,5 +1549,150 @@ function Card({ children, tk, style }) {
       padding: 18,
       ...style,
     }}>{children}</div>
+  );
+}
+
+// ─── Content Routing roster (managers/admin) ────────────────────────────────
+// One screen: who owns each client's organic vs ads content. Blank = the global
+// channel default (organic → Eli, ads → Cam). Writes clients.content_assignee_*.
+// Internal only — clients never see these assignments.
+const ROUTING_OWNER_ROLES = ["admin", "scaling_manager", "marketing_manager", "marketing_executor", "content_executor"];
+
+function ContentRoutingTab({ tk, session }) {
+  const [clients, setClients] = useState([]);
+  const [staff, setStaff]     = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [err, setErr]         = useState("");
+  const [savingKey, setSavingKey] = useState(null);
+  const [q, setQ]             = useState("");
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      setLoading(true); setErr("");
+      try {
+        const [cRes, sRes] = await Promise.all([
+          supabase.from("clients")
+            .select("id,business_name,status,organic_content,content_assignee_organic_id,content_assignee_ads_id")
+            .order("business_name"),
+          supabase.from("staff").select("id,name,role").order("name"),
+        ]);
+        if (cRes.error) throw cRes.error;
+        if (sRes.error) throw sRes.error;
+        if (cancelled) return;
+        setClients((cRes.data || []).filter(c => c.status !== "archived"));
+        setStaff(sRes.data || []);
+      } catch (e) {
+        if (!cancelled) setErr(e.message || String(e));
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  const owners = staff.filter(s => ROUTING_OWNER_ROLES.includes(s.role));
+
+  async function setAssignee(client, channel, staffId) {
+    const field = channel === "organic" ? "content_assignee_organic_id" : "content_assignee_ads_id";
+    const key = `${client.id}:${channel}`;
+    const prevVal = client[field] || null;
+    setSavingKey(key);
+    setClients(prev => prev.map(c => c.id === client.id ? { ...c, [field]: staffId || null } : c));
+    try {
+      const tok = session?.access_token;
+      const res = await fetch(`/api/clients?action=update-fields&id=${client.id}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${tok}` },
+        body: JSON.stringify({ client_id: client.id, [field]: staffId || null }),
+      });
+      const j = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(j.error || `HTTP ${res.status}`);
+    } catch (e) {
+      setClients(prev => prev.map(c => c.id === client.id ? { ...c, [field]: prevVal } : c));
+      alert("Save failed: " + (e.message || e));
+    } finally {
+      setSavingKey(null);
+    }
+  }
+
+  const selStyle = {
+    width: "100%", padding: "7px 9px", fontSize: 13, borderRadius: 6,
+    background: tk.bg, color: tk.text, border: `1px solid ${tk.border}`, cursor: "pointer",
+  };
+
+  const renderSelect = (client, channel) => {
+    const field = channel === "organic" ? "content_assignee_organic_id" : "content_assignee_ads_id";
+    const disabled = channel === "organic" && !client.organic_content;
+    const key = `${client.id}:${channel}`;
+    if (disabled) {
+      return <span style={{ fontSize: 12, color: tk.textMute, fontStyle: "italic" }}>organic off</span>;
+    }
+    return (
+      <select
+        value={client[field] || ""}
+        disabled={savingKey === key}
+        onChange={e => setAssignee(client, channel, e.target.value || null)}
+        style={{ ...selStyle, opacity: savingKey === key ? 0.6 : 1 }}
+      >
+        <option value="">{channel === "organic" ? "Default → Eli" : "Default → Cam"}</option>
+        {owners.map(o => <option key={o.id} value={o.id}>{o.name} · {o.role}</option>)}
+      </select>
+    );
+  };
+
+  const filtered = clients.filter(c =>
+    !q.trim() || (c.business_name || "").toLowerCase().includes(q.trim().toLowerCase())
+  );
+
+  return (
+    <div>
+      <div style={{ fontSize: 13, color: tk.textSub, marginBottom: 16, lineHeight: 1.5 }}>
+        Who produces each client's creatives, per channel. <b style={{ color: tk.text }}>Blank = the channel default</b> —
+        organic routes to the content team (Eli), ads routes to marketing (Cam). New creatives auto-assign by this table; the owner can still be overridden per creative. <b style={{ color: tk.text }}>Clients never see this.</b>
+      </div>
+
+      <input
+        value={q}
+        onChange={e => setQ(e.target.value)}
+        placeholder="Search clients…"
+        style={{
+          width: 260, maxWidth: "100%", padding: "8px 11px", fontSize: 13, marginBottom: 14,
+          background: tk.bg, color: tk.text, border: `1px solid ${tk.border}`, borderRadius: 6,
+        }}
+      />
+
+      {loading && <div style={{ color: tk.textMute, fontSize: 13 }}>Loading roster…</div>}
+      {err && <div style={{ color: tk.red || "#e5484d", fontSize: 13 }}>Failed to load: {err}</div>}
+
+      {!loading && !err && (
+        <div style={{ border: `1px solid ${tk.border}`, borderRadius: 10, overflow: "hidden" }}>
+          <div style={{
+            display: "grid", gridTemplateColumns: "1fr 220px 220px", gap: 0,
+            padding: "10px 14px", background: tk.surfaceEl || tk.surface,
+            fontSize: 10, letterSpacing: "0.14em", textTransform: "uppercase", color: tk.textMute, fontWeight: 700,
+          }}>
+            <span>Client</span><span>🌱 Organic owner</span><span>📣 Ads owner</span>
+          </div>
+          {filtered.map((c, i) => (
+            <div key={c.id} style={{
+              display: "grid", gridTemplateColumns: "1fr 220px 220px", gap: 12,
+              alignItems: "center", padding: "10px 14px",
+              borderTop: `1px solid ${tk.border}`,
+              background: i % 2 ? "transparent" : (tk.surfaceHov ? `${tk.surfaceHov}55` : "transparent"),
+            }}>
+              <span style={{ fontSize: 13, color: tk.text, fontWeight: 600 }}>{c.business_name || "—"}</span>
+              <div>{renderSelect(c, "organic")}</div>
+              <div>{renderSelect(c, "ads")}</div>
+            </div>
+          ))}
+          {!filtered.length && (
+            <div style={{ padding: "14px", color: tk.textMute, fontSize: 13, borderTop: `1px solid ${tk.border}` }}>
+              No clients match “{q}”.
+            </div>
+          )}
+        </div>
+      )}
+    </div>
   );
 }
