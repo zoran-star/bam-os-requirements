@@ -206,8 +206,25 @@ function redirectBack(res, status, msg) {
 
 async function handler(req, res) {
   if (req.method === "POST") return handlePrepare(req, res);
+  if (req.method === "GET" && req.query.action === "list") return handleList(req, res);
   if (req.method === "GET")  return handleCallback(req, res);
   return res.status(405).json({ error: "method not allowed" });
+}
+
+// ── Staff connect console: list academies + their GHL-connected status ──
+async function handleList(req, res) {
+  const ctx = await resolveUser(req);
+  if (ctx.error) return res.status(ctx.error.status).json({ error: ctx.error.message });
+  if (!ctx.staff) return res.status(403).json({ error: "staff only" });
+  const rows = await sb(`clients?select=id,business_name,ghl_location_id,ghl_access_token,ghl_connect_status,v15_access,v2_access&order=business_name.asc`);
+  const academies = (rows || []).map(r => ({
+    id: r.id,
+    name: r.business_name,
+    has_location: !!r.ghl_location_id,
+    connected: !!r.ghl_access_token || r.ghl_connect_status === "connected",
+    tier: r.v2_access ? "v2" : (r.v15_access ? "v1.5" : "v1"),
+  }));
+  return res.status(200).json({ academies });
 }
 
 // ── Step 1: prepare ───────────────────────────────────────
