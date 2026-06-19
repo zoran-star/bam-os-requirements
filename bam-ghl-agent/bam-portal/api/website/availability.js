@@ -19,13 +19,18 @@ const GHL_V2 = "https://services.leadconnectorhq.com";
 const GHL_TOKEN_URL = "https://services.leadconnectorhq.com/oauth/token";
 const V2_VERSION = "2021-07-28";
 
+function loadLocations() {
+  try { return process.env.GHL_LOCATIONS_JSON ? JSON.parse(process.env.GHL_LOCATIONS_JSON) : []; }
+  catch { return []; }
+}
+
 const DEV_ORIGINS = new Set([
   "http://localhost:3000",
   "http://localhost:5173",
   "http://127.0.0.1:5500",
 ]);
 
-let originsCache = { set: null, at: 0 };
+let originsCache = { set: null, patterns: null, at: 0 };
 const ORIGINS_TTL_MS = 60_000;
 
 async function sbReq(path, init = {}) {
@@ -45,24 +50,32 @@ async function sbReq(path, init = {}) {
 
 async function getAllowedOrigins() {
   if (originsCache.set && Date.now() - originsCache.at < ORIGINS_TTL_MS) {
-    return originsCache.set;
+    return originsCache;
   }
   const set = new Set(DEV_ORIGINS);
+  const patterns = [];
   const rows = await sbReq("clients?select=allowed_domains&allowed_domains=not.is.null");
   for (const row of rows || []) {
     for (const domain of row.allowed_domains || []) {
-      set.add(`https://${domain}`);
-      set.add(`https://www.${domain}`);
+      if (domain.includes("*")) {
+        patterns.push(new RegExp(`^https://${domain.replace(/\./g, "\\.").replace(/\*/g, "[a-z0-9-]+")}$`));
+      } else {
+        set.add(`https://${domain}`);
+        set.add(`https://www.${domain}`);
+      }
     }
   }
-  originsCache = { set, at: Date.now() };
-  return set;
+  originsCache = { set, patterns, at: Date.now() };
+  return originsCache;
 }
 
 async function setCors(req, res) {
   const origin = req.headers.origin || "";
   let allowed = false;
-  try { allowed = (await getAllowedOrigins()).has(origin); } catch { /* 403 below */ }
+  try {
+    const { set, patterns } = await getAllowedOrigins();
+    allowed = set.has(origin) || patterns.some(p => p.test(origin));
+  } catch { /* DB hiccup — treat as not allowed; GET will 403 */ }
   if (allowed) {
     res.setHeader("Access-Control-Allow-Origin", origin);
     res.setHeader("Vary", "Origin");
@@ -105,7 +118,16 @@ export async function refreshGhlToken(client) {
 }
 
 export async function getClientGhlToken(client) {
-  if (!client.ghl_access_token) throw new Error("academy not connected to GHL (no OAuth token)");
+  if (!client.ghl_access_token) {
+    // Fall back to Private Integration API key from GHL_LOCATIONS_JSON.
+    // The entry must have apiKeyV2 set to a Private Integration token with calendar scopes.
+    const locName = client.ghl_kpi_config?.ghl_location;
+    if (locName) {
+      const loc = loadLocations().find(l => l.name === locName);
+      if (loc?.apiKeyV2) return loc.apiKeyV2;
+    }
+    throw new Error("academy not connected to GHL (no OAuth token or Private Integration key)");
+  }
   const exp = client.ghl_token_expires_at ? new Date(client.ghl_token_expires_at).getTime() : 0;
   if (exp - Date.now() <= 60_000 && client.ghl_refresh_token) {
     return await refreshGhlToken(client);
@@ -128,7 +150,7 @@ async function handler(req, res) {
   let client;
   try {
     const rows = await sbReq(
-      `clients?id=eq.${client_id}&select=id,time_zone,ghl_location_id,ghl_access_token,ghl_refresh_token,ghl_token_expires_at&limit=1`
+      `clients?id=eq.${client_id}&select=id,time_zone,ghl_location_id,ghl_kpi_config,ghl_access_token,ghl_refresh_token,ghl_token_expires_at&limit=1`
     );
     client = rows?.[0];
   } catch (e) { return res.status(500).json({ error: e.message }); }
