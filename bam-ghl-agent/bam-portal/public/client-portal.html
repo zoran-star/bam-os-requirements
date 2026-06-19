@@ -21617,7 +21617,7 @@ function _sorterRenderStep3(host) {
   const list = (arr, fmt) => (arr && arr.length) ? arr.slice(0, 60).map(fmt).join('') : '';
   const links = (c.checks && c.checks.links) || {};
 
-  const denyBtn = (fn, label) => `<button onclick="${fn}" title="${label || 'Not right — dismiss'}" style="margin-left:6px;font-size:11px;font-weight:700;padding:3px 9px;border-radius:7px;border:1px solid var(--border,#2a2a31);background:transparent;color:var(--text-mute,#888);cursor:pointer;">✕ No</button>`;
+  const denyBtn = (fn, label) => `<button onclick="${fn}" title="${label || 'Not right — dismiss'}" style="margin-left:6px;font-size:11px;font-weight:700;padding:3px 9px;border-radius:7px;border:1px solid var(--border,#2a2a31);background:transparent;color:var(--text-mute,#888);cursor:pointer;">${label || 'Not right'}</button>`;
 
   // Staged member without a Stripe match. "Alternate payment" and "no card
   // yet" are the same question (how do they pay?) → one "Set up payment
