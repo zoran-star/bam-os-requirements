@@ -57,11 +57,12 @@ async function handler(req, res) {
   // Find the member: exact id if given, else most-recent member with that email.
   let member, matchedBy;
   try {
+    const sel = "id,plan,parent_email,coachiq_member_id,stripe_price_id,stripe_subscription_id";
     if (memberId) {
-      const rows = await sb(`members?id=eq.${encodeURIComponent(memberId)}&select=id,plan,parent_email,coachiq_member_id&limit=1`);
+      const rows = await sb(`members?id=eq.${encodeURIComponent(memberId)}&select=${sel}&limit=1`);
       member = Array.isArray(rows) && rows[0]; matchedBy = "member_id";
     } else {
-      const rows = await sb(`members?parent_email=eq.${encodeURIComponent(email)}&select=id,plan,parent_email,coachiq_member_id&order=created_at.desc&limit=1`);
+      const rows = await sb(`members?parent_email=eq.${encodeURIComponent(email)}&select=${sel}&order=created_at.desc&limit=1`);
       member = Array.isArray(rows) && rows[0]; matchedBy = "email";
     }
   } catch (e) {
@@ -86,11 +87,25 @@ async function handler(req, res) {
     return res.status(500).json({ ok: false, error: `failed to store coachiq id: ${e.message}` });
   }
 
-  // Grant the product once (skip if this was already a linked retry).
+  // Resolve the product automation from the member's PURCHASED Stripe price
+  // (pricing_catalog.coachiq_automation_url) → the right product per what they bought.
+  let automationUrl = null;
+  if (member.stripe_price_id) {
+    try {
+      const pr = await sb(`pricing_catalog?stripe_price_id=eq.${encodeURIComponent(member.stripe_price_id)}&select=coachiq_automation_url&limit=1`);
+      automationUrl = (Array.isArray(pr) && pr[0] && pr[0].coachiq_automation_url) || null;
+    } catch (_) { /* fall back to env map */ }
+  }
+
+  // Grant the product once (skip if this was already a linked retry). sub_id lets the
+  // CoachIQ automation track renewals.
   let product = { skipped: alreadyLinked ? "already linked (retry)" : "grant_product=false" };
   if (grantProduct && !alreadyLinked) {
     try {
-      product = await addCoachiqProduct(coachiqUserId, { plan: b.plan || member.plan, term: b.term, source: "self-signup" });
+      product = await addCoachiqProduct(coachiqUserId, {
+        plan: b.plan || member.plan, term: b.term, automationUrl,
+        sub_id: member.stripe_subscription_id || null, source: "self-signup",
+      });
     } catch (e) {
       product = { ok: false, error: String(e && e.message || e) };
     }

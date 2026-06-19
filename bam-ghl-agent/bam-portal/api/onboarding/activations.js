@@ -113,7 +113,14 @@ export async function fireOnboardingActivations(member, ctx = {}) {
     try {
       const existingId = member.coachiq_member_id || null;
       if (existingId) {
-        const product = await addCoachiqProduct(existingId, { plan, term, source: "website-enrollment" });
+        let automationUrl = null;
+        if (sb && member.stripe_price_id) {
+          const pr = await sb(`pricing_catalog?stripe_price_id=eq.${encodeURIComponent(member.stripe_price_id)}&select=coachiq_automation_url&limit=1`).catch(() => null);
+          automationUrl = (Array.isArray(pr) && pr[0] && pr[0].coachiq_automation_url) || null;
+        }
+        const product = await addCoachiqProduct(existingId, {
+          plan, term, automationUrl, sub_id: member.stripe_subscription_id || null, source: "website-enrollment",
+        });
         results.coachiq = { ok: true, coachiq_user_id: existingId, product };
         await audit("onboarding-coachiq-product", { coachiq_user_id: existingId, plan, term });
       } else {
