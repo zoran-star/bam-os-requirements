@@ -7151,6 +7151,7 @@ Then the call to action."]</div>
           <button class="ib-tab on" data-tab="all"     onclick="_ibSetTab('all')">All <span id="ib-count-all"></span></button>
           <button class="ib-tab"    data-tab="members" onclick="_ibSetTab('members')">Members <span id="ib-count-members"></span></button>
           <button class="ib-tab"    data-tab="leads"   onclick="_ibSetTab('leads')">Leads <span id="ib-count-leads"></span></button>
+          <button class="ib-tab"    data-tab="bot"     onclick="_ibSetTab('bot')" title="Replies the bot drafted for leads in the Responded stage — you approve each one">🤖 Bot <span id="ib-count-bot"></span></button>
           <input id="ib-search" class="ib-search" type="text" placeholder="🔍  Search by name or content…" oninput="_ibSetSearch(this.value)">
           <button onclick="_ibComposeNew()" title="New message" style="background:var(--accent);border:1px solid var(--accent);color:#08080A;padding:7px 12px;border-radius:4px;cursor:pointer;font-size:12px;font-weight:600">✏️ New</button>
           <button onclick="fetchAndRenderInbox()" title="Refresh" style="background:transparent;border:1px solid var(--border);color:var(--text);padding:7px 12px;border-radius:4px;cursor:pointer;font-size:12px">↻</button>
@@ -19606,7 +19607,145 @@ function _ibSetTab(tab) {
   document.querySelectorAll('#view-inbox .ib-tab').forEach(b => {
     b.classList.toggle('on', b.getAttribute('data-tab') === tab);
   });
-  _renderInboxList();
+  if (tab === 'bot') { _botRenderQueue(); } else { _renderInboxList(); }
+}
+
+// ── Bot approval queue (responded-stage free-trial booking agent) ──
+let _BOT_QUEUE = [];
+let _BOT_CUR = null;
+
+async function _botApi(action, payload) {
+  const token = await _mreqAuthToken();
+  const r = await fetch('/api/agent-approvals', {
+    method: 'POST',
+    headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action, client_id: CLIENT_ID, ...(payload || {}) }),
+  });
+  const json = await _safeJson(r);
+  if (!r.ok) throw new Error(json.error || ('HTTP ' + r.status));
+  return json;
+}
+
+async function _botRenderQueue() {
+  const container = document.getElementById('inbox-list-container');
+  if (!container) return;
+  container.innerHTML = '<div class="req-empty" style="padding:20px 0"><span class="req-spin"></span>Finding chats that need a reply…</div>';
+  try {
+    const json = await _botApi('list', {});
+    _BOT_QUEUE = json.queue || [];
+    const badge = document.getElementById('ib-count-bot');
+    if (badge) badge.textContent = _BOT_QUEUE.length ? `(${_BOT_QUEUE.length})` : '';
+    if (!_BOT_QUEUE.length) {
+      container.innerHTML = '<div class="req-empty" style="padding:20px 0">✅ All caught up — no chats waiting for a reply.</div>';
+      return;
+    }
+    container.innerHTML = _BOT_QUEUE.map((q, i) => `
+      <div class="ib-row" onclick="_botOpenApproval(${i})">
+        <div style="min-width:0">
+          <div class="ib-row-name"><span class="ib-unread"></span>${escapeHTML(q.name)} <span class="ib-tag ib-tag-lead">needs reply</span></div>
+          <div class="ib-row-preview">${escapeHTML(q.last_message || '')}</div>
+        </div>
+        <div class="ib-row-date">${escapeHTML(_ibFormatDate(q.last_at))}</div>
+      </div>`).join('');
+  } catch (e) {
+    container.innerHTML = `<div class="req-empty" style="padding:20px 0">Couldn't load the bot queue — ${escapeHTML(e.message)}</div>`;
+  }
+}
+
+async function _botOpenApproval(idx) {
+  const q = _BOT_QUEUE[idx];
+  if (!q) return;
+  _BOT_CUR = { ...q, idx };
+  const overlay = document.getElementById('ib-drawer-overlay');
+  const drawer  = document.getElementById('ib-drawer');
+  if (!overlay || !drawer) return;
+  overlay.classList.add('open'); drawer.classList.add('open');
+  drawer.innerHTML = `<div style="padding:24px"><div class="req-empty"><span class="req-spin"></span>Drafting a reply for ${escapeHTML(q.name)}…</div></div>`;
+  try {
+    const d = await _botApi('draft', { contact_id: q.contact_id });
+    if (d.error) { drawer.innerHTML = `<div style="padding:24px;color:var(--text)">Couldn't draft: ${escapeHTML(d.error)}<br><br><button onclick="closeInboxDrawer()" style="background:transparent;border:1px solid var(--border-med);color:var(--text);border-radius:8px;padding:8px 16px;cursor:pointer">Close</button></div>`; return; }
+    _BOT_CUR.draft = d;
+    _botRenderApproval();
+  } catch (e) {
+    drawer.innerHTML = `<div style="padding:24px;color:var(--text)">Couldn't draft: ${escapeHTML(e.message)}<br><br><button onclick="closeInboxDrawer()" style="background:transparent;border:1px solid var(--border-med);color:var(--text);border-radius:8px;padding:8px 16px;cursor:pointer">Close</button></div>`;
+  }
+}
+
+function _botRenderApproval() {
+  const drawer = document.getElementById('ib-drawer');
+  if (!drawer || !_BOT_CUR) return;
+  const q = _BOT_CUR, d = q.draft;
+  const conf = (typeof d.confidence === 'number') ? Math.round(d.confidence * 100) : null;
+  const confColor = conf == null ? 'var(--text-mute)' : (conf >= 70 ? '#34D399' : conf >= 40 ? '#FBBF24' : '#FB7185');
+  drawer.innerHTML = `
+    <div style="padding:20px 22px;display:flex;flex-direction:column;gap:14px;height:100%;overflow-y:auto">
+      <div style="display:flex;align-items:center;gap:10px">
+        <div style="font-size:16px;font-weight:700">🤖 ${escapeHTML(q.name)}</div>
+        <div style="flex:1"></div>
+        <span style="font-size:12px;color:var(--text-mute)">${_BOT_QUEUE.length} in queue</span>
+        <button onclick="closeInboxDrawer()" style="background:none;border:none;color:var(--text-mute);font-size:18px;cursor:pointer">✕</button>
+      </div>
+      <div style="font-size:12px;color:var(--text-mute)">Lead said: <span style="color:var(--text)">"${escapeHTML(q.last_message || '')}"</span></div>
+      ${d.escalate ? `<div style="background:rgba(251,191,36,0.1);border:1px solid rgba(251,191,36,0.35);color:#FBBF24;border-radius:10px;padding:12px;font-size:13px">🙋 The bot wants to escalate this to you${d.escalate_reason ? ` — ${escapeHTML(d.escalate_reason)}` : ''}. Handle it yourself — review the suggestion below before sending.</div>` : ''}
+      <div>
+        <div style="font-size:11px;color:var(--text-mute);margin-bottom:5px">SUGGESTED REPLY${d.asked_to_book ? '  ·  📨 asks to book' : ''}</div>
+        <textarea id="bot-reply" rows="4" style="width:100%;background:var(--surface-el,#16161A);color:var(--text);border:1px solid var(--border-med);border-radius:10px;padding:11px 13px;font-size:14px;line-height:1.5;outline:none;resize:vertical">${escapeHTML(d.reply || '')}</textarea>
+      </div>
+      <div style="background:var(--surface);border:1px dashed var(--border-med);border-radius:8px;padding:9px 12px;font-size:12px;color:var(--text-sub,#8E8E93);line-height:1.5">
+        🧠 ${escapeHTML(d.reasoning || '')}
+        <div style="margin-top:7px;display:flex;gap:16px;flex-wrap:wrap">
+          <span>✅ <b style="color:${confColor}">${conf == null ? '—' : conf + '%'}</b> sure</span>
+          <span>💬 ${d.reply_count || 0} prior replies</span>
+          <span>🎯 ${d.booking_asks || 0} book-asks so far</span>
+        </div>
+      </div>
+      <div id="bot-learn-wrap" style="display:none">
+        <label style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--text);margin-bottom:6px"><input type="checkbox" id="bot-learn-chk" onchange="document.getElementById('bot-learn-box').style.display=this.checked?'block':'none'"> Save my change as a learning <span style="color:var(--text-mute)">(stays with this academy)</span></label>
+        <textarea id="bot-learn-box" rows="2" placeholder="What should it learn? e.g. Don't offer a second trial unless they ask." style="display:none;width:100%;background:var(--surface-el,#16161A);color:var(--text);border:1px solid var(--border-med);border-radius:8px;padding:9px;font-size:13px;outline:none"></textarea>
+      </div>
+      <div style="display:flex;gap:10px;margin-top:auto">
+        <button onclick="_botSend()" style="flex:1;background:var(--accent);border:none;color:#08080A;border-radius:10px;padding:12px;font-weight:700;font-size:14px;cursor:pointer">✓ Confirm &amp; send</button>
+        <button onclick="_botToggleAdjust()" id="bot-adjust-btn" style="background:transparent;border:1px solid var(--border-med);color:var(--text);border-radius:10px;padding:12px 16px;font-size:13px;cursor:pointer">✎ Adjust</button>
+        <button onclick="_botSkip()" title="skip for now" style="background:transparent;border:1px solid var(--border);color:var(--text-mute);border-radius:10px;padding:12px 14px;font-size:13px;cursor:pointer">Skip</button>
+      </div>
+    </div>`;
+}
+
+function _botToggleAdjust() {
+  const w = document.getElementById('bot-learn-wrap');
+  const btn = document.getElementById('bot-adjust-btn');
+  if (w) { const showing = w.style.display !== 'none'; w.style.display = showing ? 'none' : 'block'; if (btn) btn.textContent = showing ? '✎ Adjust' : '✎ Adjusting'; }
+  document.getElementById('bot-reply')?.focus();
+}
+
+async function _botSend() {
+  const q = _BOT_CUR; if (!q) return;
+  const reply = (document.getElementById('bot-reply')?.value || '').trim();
+  if (!reply) { alert('Reply is empty.'); return; }
+  const adjusted = reply !== (q.draft.reply || '').trim();
+  const chk = document.getElementById('bot-learn-chk');
+  const lesson = (chk && chk.checked) ? (document.getElementById('bot-learn-box')?.value || '').trim() : '';
+  try {
+    await _botApi('send', {
+      contact_id: q.contact_id, conversation_id: q.draft.conversation_id || q.conversation_id, contact_name: q.name,
+      reply, suggested_reply: q.draft.reply, reasoning: q.draft.reasoning, confidence: q.draft.confidence,
+      reply_count: q.draft.reply_count, booking_asks: q.draft.booking_asks, adjusted, lesson: lesson || undefined,
+    });
+    _botAdvance(q.idx);
+  } catch (e) { alert('Could not send: ' + e.message); }
+}
+
+function _botSkip() {
+  const q = _BOT_CUR; if (!q) return;
+  _botAdvance(q.idx);
+}
+
+function _botAdvance(idx) {
+  _BOT_QUEUE.splice(idx, 1);
+  const badge = document.getElementById('ib-count-bot');
+  if (badge) badge.textContent = _BOT_QUEUE.length ? `(${_BOT_QUEUE.length})` : '';
+  if (_BOT_QUEUE.length) { _botOpenApproval(Math.min(idx, _BOT_QUEUE.length - 1)); }
+  else { closeInboxDrawer(); _botRenderQueue(); }
 }
 
 function _ibSetSearch(v) {
