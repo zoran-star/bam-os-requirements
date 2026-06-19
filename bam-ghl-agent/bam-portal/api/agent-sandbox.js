@@ -13,7 +13,7 @@ import { withSentryApiRoute } from "./_sentry.js";
 // It calls Claude and returns the proposed reply for a trainer to review. The
 // agent's behaviour = the vendored BAM GTA booking prompt + active lessons.
 
-import { BAM_GTA_BOOKING_PROMPT } from "./agent/bam-gta-prompt.js";
+import { assemblePrompt, SECTIONS } from "./agent/prompt-structure.js";
 
 const SUPABASE_URL         = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
@@ -64,8 +64,18 @@ async function activeLessons(clientId) {
   } catch (_) { return []; }
 }
 
-function buildSystem(lessons) {
-  let sys = BAM_GTA_BOOKING_PROMPT;
+// Per-academy overrides for individual prompt sections → { section_key: body }.
+async function sectionOverrides(clientId) {
+  try {
+    const rows = await sb(`agent_prompt_sections?client_id=eq.${clientId}&select=section_key,body`);
+    const map = {};
+    for (const r of (Array.isArray(rows) ? rows : [])) map[r.section_key] = r.body;
+    return map;
+  } catch (_) { return {}; }
+}
+
+function buildSystem(lessons, overrides) {
+  let sys = assemblePrompt(overrides || {});
   const fixes = lessons.filter(l => l.kind !== "good").map(l => l.lesson).filter(Boolean);
   if (fixes.length) {
     sys += `\n\n<learned_lessons>\n` +
@@ -102,8 +112,8 @@ async function handleChat(messages, clientId, res) {
   if (!ANTHROPIC_KEY) return res.status(500).json({ error: "ANTHROPIC_API_KEY not configured on server" });
   if (!Array.isArray(messages) || !messages.length) return res.status(400).json({ error: "messages required" });
 
-  const lessons = await activeLessons(clientId);
-  const system = buildSystem(lessons);
+  const [lessons, overrides] = await Promise.all([activeLessons(clientId), sectionOverrides(clientId)]);
+  const system = buildSystem(lessons, overrides);
 
   // Map sandbox turns → Anthropic roles. parent = user, agent = assistant.
   const anthropicMsgs = messages
@@ -186,6 +196,47 @@ async function handler(req, res) {
         method: "PATCH",
         headers: { Prefer: "return=minimal" },
         body: JSON.stringify({ active: false }),
+      });
+      return res.status(200).json({ ok: true });
+    }
+
+    // ── Prompt "Brain" editor ──────────────────────────────
+    if (action === "sections") {
+      const ov = await sectionOverrides(clientId);
+      return res.status(200).json({
+        sections: SECTIONS.map(s => ({
+          key:          s.key,
+          label:        s.label,
+          group:        s.group,
+          body:         ov[s.key] != null ? ov[s.key] : s.body,  // current (override or default)
+          default_body: s.body,
+          is_default:   ov[s.key] == null,
+        })),
+      });
+    }
+
+    if (action === "update-section") {
+      if (!b.key || !SECTIONS.some(s => s.key === b.key)) return res.status(400).json({ error: "unknown section key" });
+      if (b.body == null || !String(b.body).trim()) return res.status(400).json({ error: "body required" });
+      await sb(`agent_prompt_sections?on_conflict=client_id,section_key`, {
+        method: "POST",
+        headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
+        body: JSON.stringify([{
+          client_id:   clientId,
+          section_key: b.key,
+          body:        String(b.body),
+          updated_by:  staffEmail,
+          updated_at:  new Date().toISOString(),
+        }]),
+      });
+      return res.status(200).json({ ok: true });
+    }
+
+    if (action === "reset-section") {
+      if (!b.key) return res.status(400).json({ error: "key required" });
+      await sb(`agent_prompt_sections?client_id=eq.${clientId}&section_key=eq.${encodeURIComponent(b.key)}`, {
+        method: "DELETE",
+        headers: { Prefer: "return=minimal" },
       });
       return res.status(200).json({ ok: true });
     }
