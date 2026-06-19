@@ -94,8 +94,8 @@ async function exchangeCode(code, redirect) {
   const r = await fetch(GHL_TOKEN_URL, {
     method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams({
-      client_id: (process.env.GHL_OAUTH_CLIENT_ID || "").trim(),
-      client_secret: (process.env.GHL_OAUTH_CLIENT_SECRET || "").trim(),
+      client_id: (process.env.GHL_AGENCY_OAUTH_CLIENT_ID || process.env.GHL_OAUTH_CLIENT_ID || "").trim(),
+      client_secret: (process.env.GHL_AGENCY_OAUTH_CLIENT_SECRET || process.env.GHL_OAUTH_CLIENT_SECRET || "").trim(),
       grant_type: "authorization_code", code, user_type: "Company", redirect_uri: redirect,
     }),
   });
@@ -114,8 +114,8 @@ async function getAgencyToken() {
       const r = await fetch(GHL_TOKEN_URL, {
         method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" },
         body: new URLSearchParams({
-          client_id: (process.env.GHL_OAUTH_CLIENT_ID || "").trim(),
-          client_secret: (process.env.GHL_OAUTH_CLIENT_SECRET || "").trim(),
+          client_id: (process.env.GHL_AGENCY_OAUTH_CLIENT_ID || process.env.GHL_OAUTH_CLIENT_ID || "").trim(),
+          client_secret: (process.env.GHL_AGENCY_OAUTH_CLIENT_SECRET || process.env.GHL_OAUTH_CLIENT_SECRET || "").trim(),
           grant_type: "refresh_token", refresh_token: t.refresh_token, user_type: "Company",
         }),
       });
@@ -178,7 +178,7 @@ async function handler(req, res) {
   // 1) Kick off the agency consent.
   if (action === "start") {
     const state = signState({ k: "agency", exp: Date.now() + 15 * 60 * 1000 });
-    const params = new URLSearchParams({ response_type: "code", client_id: (process.env.GHL_OAUTH_CLIENT_ID || "").trim(), redirect_uri: redirectUri(req), scope: SCOPES, state });
+    const params = new URLSearchParams({ response_type: "code", client_id: (process.env.GHL_AGENCY_OAUTH_CLIENT_ID || process.env.GHL_OAUTH_CLIENT_ID || "").trim(), redirect_uri: redirectUri(req), scope: SCOPES, state });
     res.writeHead(302, { Location: `${GHL_AUTHORIZE_URL}?${params.toString()}` });
     return res.end();
   }
