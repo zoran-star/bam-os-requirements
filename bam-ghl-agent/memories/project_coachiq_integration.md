@@ -39,19 +39,38 @@ Files (live on prod, PR #454 + #461):
 `18c05158-d981-4429-b568-495479428d26`, `COACHIQ_WEBHOOK_SECRET`, `COACHIQ_CREATE_USER_WEBHOOK_URL`
 (Zapier hook — now unused, can delete). Org ID `349b6d2d-…` (Zapier connection only).
 
-**TESTED LIVE 2026-06-18:** product automation fires (success ✅); email-match callback
-stores id + grants product ✅; idempotent retry ✅. (Test user `2578c9b2-…` ZAPTEST +
-test member deleted.)
+**PER-PRICE PRODUCT AUTOMATION (2026-06-18, PR #467):** the product granted is now
+chosen by what the member BOUGHT, not a global default. `pricing_catalog` gained
+**`coachiq_automation_url`** (the "Add a Product Purchase" webhook link pasted per
+Stripe price). The grant path resolves it from the member's `stripe_price_id` →
+`addCoachiqProduct(..., {automationUrl, sub_id})` POSTs to that URL; falls back to
+`COACHIQ_PRODUCT_AUTOMATION_ID`/map if a price has none. **GTA "Summer Unlimited"
+(monthly + 3mo routable prices) prefilled** with `…/18c05158`. The payload now also
+sends **`sub_id`** (member.stripe_subscription_id) so Zoran's automation can store it
+on the product → CoachIQ tracks the Stripe sub's renewal date to refresh credits.
+Tested live: callback resolved the price's URL + fired success ✅.
+
+**ZORAN'S CoachIQ AUTOMATION must map (in "Add a Product Purchase"):** `{{payload.user.id}}`
+as target, and `{{payload.sub_id}}` into the product's subscription/sub-id field (for
+renewal refresh). Per-product: create one automation per product, paste each link into
+that price's `coachiq_automation_url` (UI to fill this per-price NOT built yet — DB only).
+
+**TESTED LIVE 2026-06-18:** product automation fires ✅; email-match callback stores id +
+grants product ✅; idempotent retry ✅; per-price URL resolution ✅. Full chain (real
+self-signup → New-User webhook payload → email match → grant) proven with user
+`2d4452f5-…`. (Test users `2578c9b2`/`2d4452f5` + test members cleaned up.)
 
 **REMAINING:**
-1. Zoran builds the CoachIQ **"New User → Send to External Webhook"** automation →
-   URL `https://portal.byanymeansbusiness.com/api/coachiq/user-created?secret=<secret>`,
-   map `coachiq_user_id={{user.id}}` + `email={{user.email}}`.
-2. **Confirmation-page UX** (download app / make account at group login / book / credits)
-   — NOT built; lives in bam-client-sites `enroll.jsx`. "See credits" can only show the
-   GRANTED amount (no public API for live balance; live balance is in the app).
-3. Confirm **Summer Unlimited** credit count (other plans: 1/wk:4, 2/wk:8, 3/wk:12, unltd:48).
-4. **Rotate the API key.**
+1. Zoran's **"New User → Send to External Webhook"** automation is BUILT + fired in
+   testing (URL `…/api/coachiq/user-created?secret=…`, body `coachiq_user_id={{user.id}}`
+   + `email={{user.email}}`). Confirm it's published/on.
+2. **Per-price UI** — a field in the Pricing Catalog to paste each price's CoachIQ link
+   (Zoran wants to fill them in himself). NOT built; GTA prefilled via DB.
+3. **Confirmation-page UX** (download app / make account at group login / book / credits)
+   — NOT built; bam-client-sites `enroll.jsx`. "See credits" can only show the GRANTED
+   amount (no public API for live balance; live balance is in the app).
+4. Per-product automations for the other plans + confirm Summer Unlimited credit count.
+5. **Rotate the API key.**
 
 
 ## Why this matters (the strategic goal)
