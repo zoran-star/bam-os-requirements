@@ -19414,7 +19414,7 @@ function _plOpenCard(oppId) {
         ? `<button class="pl-d-btn ${(trialPassed && !_plIsDoneTrialStage(s)) ? '' : ''}" onclick="closePipelineDrawer(); openMemberPopup('${escapeHTML(o.member.id)}')">Open member popup</button>`
         : `<button class="pl-d-btn" onclick="_plConvert('${escapeHTML(o.id)}')">Convert to member</button>`}
       ${o.contactId
-        ? `<a class="pl-d-btn" target="_blank" rel="noopener noreferrer" style="text-decoration:none;display:block;text-align:center" href="https://app.gohighlevel.com/v2/location/${escapeHTML((_GHL_CONNECT_STATE && _GHL_CONNECT_STATE.location_id) || '')}/contacts/detail/${escapeHTML(o.contactId)}">Open in GHL ↗</a>`
+        ? `<a class="pl-d-btn" target="_blank" rel="noopener noreferrer" style="text-decoration:none;display:block;text-align:center" href="https://app.gohighlevel.com/v2/location/${escapeHTML((_PL_DATA && _PL_DATA.location_id) || (_GHL_CONNECT_STATE && _GHL_CONNECT_STATE.location_id) || '')}/contacts/detail/${escapeHTML(o.contactId)}">👤 Open contact in GHL ↗</a>`
         : ''}
     </div>`;
   _plLoadLeadDetail(o);
