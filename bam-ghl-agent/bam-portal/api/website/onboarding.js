@@ -176,7 +176,7 @@ async function postGhlSummary(headers, ghlLocationId, contactId, body, urls) {
     athlete_first, athlete_last, athlete_dob, athlete_country,
     parent_name, parent_email, parent_phone, legal_meta,
   } = body;
-  const { passportFrontUrl, passportBackUrl, athletePhotoUrl, signatureUrl } = urls;
+  const { passportFrontUrl, passportBackUrl, athletePhotoUrl, signatureUrl, waiverPdfUrl } = urls;
 
   const noteBody = [
     `ADAPT Global AAU Onboarding Submitted`,
@@ -196,6 +196,7 @@ async function postGhlSummary(headers, ghlLocationId, contactId, body, urls) {
     `Passport (back):  ${passportBackUrl  || 'not uploaded'}`,
     `Athlete photo:    ${athletePhotoUrl  || 'not uploaded'}`,
     `Signature:        ${signatureUrl     || 'not uploaded'}`,
+    `Waiver PDF:       ${waiverPdfUrl     || 'not generated'}`,
   ].join('\n');
 
   // Note on contact (always works, holds full text)
@@ -280,6 +281,7 @@ async function handler(req, res) {
     passport_back_b64,
     athlete_photo_b64,
     signature_b64,
+    waiver_pdf_b64,
     agreed,
     legal_meta   = {},
   } = b;
@@ -311,9 +313,10 @@ async function handler(req, res) {
   let passportBackUrl  = null;
   let athletePhotoUrl  = null;
   let signatureUrl     = null;
+  let waiverPdfUrl     = null;
 
   try {
-    [passportFrontUrl, passportBackUrl, athletePhotoUrl, signatureUrl] = await Promise.all([
+    [passportFrontUrl, passportBackUrl, athletePhotoUrl, signatureUrl, waiverPdfUrl] = await Promise.all([
       passport_front_b64
         ? uploadFile("member-files", `${fileBase}/passport_front.jpg`, passport_front_b64, "image/jpeg")
         : Promise.resolve(null),
@@ -325,6 +328,9 @@ async function handler(req, res) {
         : Promise.resolve(null),
       signature_b64
         ? uploadFile("member-files", `${fileBase}/signature.png`, signature_b64, "image/png")
+        : Promise.resolve(null),
+      waiver_pdf_b64
+        ? uploadFile("member-files", `${fileBase}/waiver.pdf`, waiver_pdf_b64, "application/pdf")
         : Promise.resolve(null),
     ]);
   } catch (e) {
@@ -355,6 +361,7 @@ async function handler(req, res) {
           passport_back_url:  passportBackUrl,
           athlete_photo_url:  athletePhotoUrl,
           signature_url:      signatureUrl,
+          waiver_pdf_url:     waiverPdfUrl,
           legal_meta,
           agreed: true,
         },
@@ -385,7 +392,7 @@ async function handler(req, res) {
           ghlLocationId,
           contactId,
           b,
-          { passportFrontUrl, passportBackUrl, athletePhotoUrl, signatureUrl }
+          { passportFrontUrl, passportBackUrl, athletePhotoUrl, signatureUrl, waiverPdfUrl }
         );
         const workflowId = ONBOARDING_WORKFLOWS[form_type];
         const apiKey = loc.apiKeyV2 || loc.apiKey;
