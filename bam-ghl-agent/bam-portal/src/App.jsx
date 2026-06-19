@@ -28,6 +28,7 @@ const FeedbackView         = lazy(() => import('./views/FeedbackView'));
 const InboxView            = lazy(() => import('./views/InboxView'));
 const ResourcesView        = lazy(() => import('./views/ResourcesView'));
 const OurAdsView           = lazy(() => import('./views/OurAdsView'));
+const AgentTrainingView    = lazy(() => import('./views/AgentTrainingView'));
 import AlertsPanel from './components/overlays/AlertsPanel';
 import LoginView from './views/LoginView';
 import UniversalFeedbackWidget from './components/UniversalFeedbackWidget';
@@ -490,6 +491,7 @@ export default function BAMPortal() {
         ...(canSeeResources ? [{ label: "Resources", key: "resources" }] : []),
         ...(canSeeOurAds ? [{ label: "Our Ads", key: "ourads" }] : []),
         ...(canSeeFeedback ? [{ label: "Feedback", key: "feedback" }] : []),
+        ...(canSeeFeedback ? [{ label: "Agent training", key: "training" }] : []),
       ];
 
   return (
@@ -830,6 +832,7 @@ export default function BAMPortal() {
               {nav === "team" && canSeeTeam && <TeamView tokens={tk} dark={dark} session={session} me={me} />}
               {nav === "content" && canSeeContent && <ContentView tokens={tk} dark={dark} me={me} session={session} />}
               {nav === "feedback" && canSeeFeedback && <FeedbackView tokens={tk} dark={dark} session={session} />}
+              {nav === "training" && canSeeFeedback && <AgentTrainingView tokens={tk} dark={dark} session={session} />}
               {nav === "resources" && canSeeResources && <ResourcesView tokens={tk} dark={dark} me={me} />}
               {nav === "ourads" && canSeeOurAds && <OurAdsView tokens={tk} session={session} me={me} />}
             </Suspense>

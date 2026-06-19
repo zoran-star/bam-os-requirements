@@ -15,8 +15,9 @@ import { withSentryApiRoute } from "./_sentry.js";
 // stage. Every send is human-approved (no autonomy). Learnings default to
 // scope 'academy' (stay with this academy).
 
-import { pickGhlToken, ghl } from "./ghl/_core.js";
+import { pickGhlToken, ghl, sendSms } from "./ghl/_core.js";
 import { assemblePrompt } from "./agent/prompt-structure.js";
+import { respondedStage, contactInRespondedStage, computeQueue } from "./agent/_stage.js";
 
 const SUPABASE_URL         = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
@@ -137,29 +138,40 @@ async function threadMessages(token, conversationId) {
   return msgs.map(m => ({ role: m.direction === "outbound" ? "agent" : "parent", text: m.text }));
 }
 
-// Find the Training Pipeline + its "responded" stage id.
-async function respondedStage(token, locationId) {
-  const data = await ghl("GET", `/opportunities/pipelines?locationId=${encodeURIComponent(locationId)}`, { token });
-  const pipelines = data.pipelines || data.data || [];
-  const pipe = pipelines.find(p => /training/i.test(p.name || "")) || pipelines[0];
-  if (!pipe) return null;
-  const stage = (pipe.stages || []).find(s => /respond/i.test(s.name || ""));
-  return stage ? { pipelineId: pipe.id, stageId: stage.id } : null;
-}
-
-// HARD GUARD: the agent only ever drafts/sends for a contact whose opportunity
-// is currently in the Responded stage. Never replies to members, Interested,
-// booked, won/lost, etc.
-async function contactInRespondedStage(token, locationId, contactId, rs) {
+// 2-hourly approval digest: text each enabled academy's configured number the
+// count of chats waiting for approval (only when > 0).
+async function runDigest(res) {
+  const out = [];
+  let clients = [];
   try {
-    const params = new URLSearchParams({ location_id: locationId, contact_id: contactId, pipeline_id: rs.pipelineId, limit: "20" });
-    const d = await ghl("GET", `/opportunities/search?${params}`, { token });
-    const opps = d.opportunities || d.data || [];
-    return opps.some(o => (o.pipelineStageId || o.stageId) === rs.stageId);
-  } catch (_) { return false; }
+    clients = await sb(`clients?select=id,business_name,ghl_location_id,ghl_access_token,ghl_refresh_token,ghl_token_expires_at,ghl_kpi_config&or=(v15_access.eq.true,v2_access.eq.true)`);
+  } catch (_) {}
+  for (const client of (Array.isArray(clients) ? clients : [])) {
+    const cfg = client.ghl_kpi_config || {};
+    if (!cfg.agent_approvals_enabled || !cfg.agent_notify_phone) continue;
+    try {
+      const creds = await pickGhlToken(client);
+      if (!creds) continue;
+      const { queue } = await computeQueue(creds.token, creds.locationId);
+      if (queue.length > 0) {
+        const msg = `🤖 ${queue.length} chat${queue.length === 1 ? "" : "s"} waiting for your approval (${client.business_name || "academy"}). Open the portal → Inbox → 🤖 Bot.`;
+        const r = await sendSms({ client, toPhone: cfg.agent_notify_phone, message: msg, contactName: "BAM Agent" });
+        out.push({ client_id: client.id, count: queue.length, sent: !!r.ok });
+      } else {
+        out.push({ client_id: client.id, count: 0 });
+      }
+    } catch (e) { out.push({ client_id: client.id, error: e.message }); }
+  }
+  return res.status(200).json({ ok: true, academies: out });
 }
 
 async function handler(req, res) {
+  // Cron: 2-hourly approval digest (Vercel cron sends Bearer CRON_SECRET).
+  if (req.method === "GET" && req.query.action === "cron-digest") {
+    const got = (req.headers.authorization || "").replace(/^Bearer\s+/i, "");
+    if (!process.env.CRON_SECRET || got !== process.env.CRON_SECRET) return res.status(401).json({ error: "unauthorized" });
+    return await runDigest(res);
+  }
   if (req.method !== "POST") return res.status(405).json({ error: "POST only" });
   const staffEmail = await requireStaff(req);
   if (!staffEmail) return res.status(401).json({ error: "staff only" });
@@ -175,20 +187,7 @@ async function handler(req, res) {
 
   try {
     if (b.action === "list") {
-      const rs = await respondedStage(token, locationId);
-      if (!rs) return res.status(200).json({ queue: [], note: "no Responded stage found" });
-      // Opportunities in the responded stage.
-      const oppParams = new URLSearchParams({ location_id: locationId, pipeline_id: rs.pipelineId, pipeline_stage_id: rs.stageId, limit: "100" });
-      let opps = [];
-      try { const od = await ghl("GET", `/opportunities/search?${oppParams}`, { token }); opps = od.opportunities || od.data || []; } catch (_) {}
-      const respondedContactIds = new Set(opps.map(o => o.contactId || o.contact?.id).filter(Boolean));
-      // One conversations search; keep those whose last message is inbound.
-      const cd = await ghl("GET", `/conversations/search?${new URLSearchParams({ locationId, limit: "100" })}`, { token });
-      const convos = cd.conversations || cd.data || [];
-      const queue = convos
-        .filter(c => respondedContactIds.has(c.contactId) && String(c.lastMessageDirection || "").toLowerCase() === "inbound")
-        .map(c => ({ contact_id: c.contactId, conversation_id: c.id, name: c.fullName || c.contactName || "Unknown", last_message: c.lastMessageBody || "", last_at: c.lastMessageDate || c.dateUpdated || null }))
-        .sort((a, b2) => new Date(b2.last_at || 0) - new Date(a.last_at || 0));
+      const { queue } = await computeQueue(token, locationId);
       return res.status(200).json({ queue, count: queue.length });
     }
 

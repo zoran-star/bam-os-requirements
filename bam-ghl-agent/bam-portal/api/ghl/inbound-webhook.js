@@ -1,4 +1,6 @@
 import { withSentryApiRoute } from "../_sentry.js";
+import { pickGhlToken, sendSms } from "./_core.js";
+import { respondedStage, contactInRespondedStage } from "../agent/_stage.js";
 // Vercel Serverless Function — GHL inbound-message webhook  ("P1 Spine")
 //
 //   POST /api/ghl/inbound-webhook
@@ -111,7 +113,7 @@ async function handler(req, res) {
   try {
     const rows = await sb(
       `clients?ghl_location_id=eq.${encodeURIComponent(String(locationId))}` +
-      `&select=id,business_name,v15_access,v2_access&limit=1`
+      `&select=id,business_name,v15_access,v2_access,ghl_access_token,ghl_refresh_token,ghl_token_expires_at,ghl_location_id,ghl_kpi_config&limit=1`
     );
     client = Array.isArray(rows) && rows[0];
   } catch (e) {
@@ -149,6 +151,22 @@ async function handler(req, res) {
     console.error("ghl inbound-webhook insert error:", e.message);
     return res.status(200).json({ error: e.message });
   }
+
+  // Instant notify: when a Responded-stage lead replies (a chat that needs
+  // approval), text the academy's configured number. Best-effort — never blocks.
+  try {
+    const cfg = client.ghl_kpi_config || {};
+    if (cfg.agent_approvals_enabled && cfg.agent_notify_phone && contactId) {
+      const creds = await pickGhlToken(client);
+      if (creds) {
+        const rs = await respondedStage(creds.token, creds.locationId);
+        if (rs && await contactInRespondedStage(creds.token, creds.locationId, String(contactId), rs)) {
+          const who = pick(p, ["full_name", "fullName", "contactName", "name", "first_name"]) || "a lead";
+          await sendSms({ client, toPhone: cfg.agent_notify_phone, message: `🤖 New chat to approve — ${who} just replied (${client.business_name || "academy"}). Portal → Inbox → 🤖 Bot.`, contactName: "BAM Agent" });
+        }
+      }
+    }
+  } catch (e) { console.error("ghl inbound-webhook notify error:", e.message); }
 
   return res.status(200).json({ ok: true, client_id: client.id, recorded: true });
 }

@@ -12424,7 +12424,8 @@ const _bbCards = [
   { id:'brand',     label:'Brand',     desc:'Logos, colors, fonts, website spec, photos' },
   { id:'kpis',      label:'KPIs',      desc:'Your baseline numbers — revenue, clients, sales, expenses' },
   { id:'offers',    label:'Offers',    desc:'Every offer you sell — training, teams, camps, leagues, tournaments, gym rentals' },
-  { id:'member_onboarding', label:'Member Onboarding', desc:'Bring your existing members in — import your roster, link GHL contacts, go live' }
+  { id:'member_onboarding', label:'Member Onboarding', desc:'Bring your existing members in — import your roster, link GHL contacts, go live' },
+  { id:'agent-learnings', label:'Agent learnings', desc:'What your booking agent has learned from your coaching' }
 ];
 
 let _bbState = {
@@ -12487,6 +12488,7 @@ function _bbRenderFromHash() {
   if (card === 'offers' && id) return _bbRenderOfferWizard(panel, id);
   if (card === 'offers') return _bbRenderOffersList(panel);
   if (card === 'member_onboarding') return _bbRenderMemberOnboarding(panel);
+  if (card === 'agent-learnings') return _bbRenderAgentLearnings(panel);
   return _bbRenderCardPlaceholder(panel, card);
 }
 
@@ -13556,6 +13558,31 @@ function _membersImportStrip(sorter) {
 // matched before a roster import can map plans). Steps 2/3 reuse the Pricing
 // Sorter engine; the GHL-link step fixes the sync-cron gap for imported
 // members (they arrive with no ghl_contact_id).
+async function _bbRenderAgentLearnings(panel) {
+  panel.innerHTML = `
+    <button class="bb-back" onclick="_bbNavigate(null)">← Business Blueprint</button>
+    <h2 style="font-family:'Space Grotesk',sans-serif;font-size:22px;margin:8px 0 4px">🤖 Agent learnings</h2>
+    <p style="color:var(--text-sub,#8E8E93);font-size:14px;margin:0 0 18px">Everything your booking agent has learned from your coaching — in the sandbox and when you approve replies. These shape every reply it drafts, and they stay with your academy.</p>
+    <div id="bb-learn-list"><div class="req-empty"><span class="req-spin"></span>Loading…</div></div>`;
+  try {
+    const token = await _mreqAuthToken();
+    const r = await fetch('/api/agent-learnings', { method:'POST', headers:{ 'Authorization':'Bearer '+token, 'Content-Type':'application/json' }, body: JSON.stringify({ action:'list', client_id: CLIENT_ID }) });
+    const json = await _safeJson(r);
+    const host = document.getElementById('bb-learn-list');
+    if (!host) return;
+    if (!r.ok) { host.innerHTML = `<div class="bb-empty">Couldn't load — ${escapeHTML(json.error || ('HTTP ' + r.status))}</div>`; return; }
+    const lessons = (json.lessons || []).filter(l => l.active !== false);
+    if (!lessons.length) { host.innerHTML = `<div class="bb-empty">No learnings yet. As you coach the agent (in the sandbox, or when you adjust a reply in Inbox → 🤖 Bot), what it learns shows up here.</div>`; return; }
+    host.innerHTML = lessons.map(l => `
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px 16px;margin-bottom:10px">
+        <div style="color:var(--text);font-size:14px;line-height:1.5">${escapeHTML(l.lesson)}</div>
+        <div style="margin-top:6px;font-size:11px;color:var(--text-mute,#5A5A60);font-family:'JetBrains Mono',monospace">learned ${escapeHTML(_ibFormatDate(l.created_at))}${l.scope === 'general' ? ' · shared brain' : ''}</div>
+      </div>`).join('');
+  } catch (e) {
+    const host = document.getElementById('bb-learn-list'); if (host) host.innerHTML = `<div class="bb-empty">Couldn't load — ${escapeHTML(e.message)}</div>`;
+  }
+}
+
 async function _bbRenderMemberOnboarding(panel) {
   const back = `
     <button class="bb-back" onclick="_bbNavigate(null)">
