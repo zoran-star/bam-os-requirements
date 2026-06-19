@@ -108,7 +108,8 @@ function buildSystem(lessons, overrides, leadContext, examples) {
     `If you decide you should follow up with the lead LATER (e.g. they said to check back, or they went quiet and your follow-up logic applies), ` +
     `set 'followup' = true, 'followup_when' to a short human description of when (e.g. "Sunday evening", "tomorrow afternoon", "in 2 days"), ` +
     `and 'followup_message' to exactly what you'd send then. Still give your immediate 'reply' too. If no later follow-up is needed, leave 'followup' false.\n` +
-    `Set 'asked_to_book' = true whenever your reply invites the lead to come in, book, try a session, or check it out — even subtly.\n</sandbox_mode>`;
+    `Set 'asked_to_book' = true whenever your reply invites the lead to come in, book, try a session, or check it out — even subtly.\n` +
+    `In 'sources', list the section tag(s) of your knowledge you actually used for this reply (e.g. pricing, schedule, tone, objection_handling, conversation_flow, qualification, guardrails, learned_lessons) so the trainer can see where the info came from.\n</sandbox_mode>`;
   return sys;
 }
 
@@ -127,6 +128,7 @@ const REPLY_TOOL = {
       followup_when:  { type: "string", description: "If followup is true: short human description of when to send it (e.g. 'Sunday evening', 'in 2 days')." },
       followup_message:{ type: "string", description: "If followup is true: the exact message to send at that time." },
       asked_to_book:  { type: "boolean", description: "True if THIS reply asks/invites the lead to book or come to a free trial (so we can count booking nudges)." },
+      sources:        { type: "array", items: { type: "string" }, description: "The section tag(s) of your knowledge/instructions you drew this reply from — e.g. pricing, schedule, program, policies, tone, objection_handling, conversation_flow, qualification, guardrails. List the 1-3 most relevant. Use 'learned_lessons' if a trainer lesson drove it." },
     },
     required: ["reply", "reasoning", "confidence", "escalate"],
   },
@@ -191,6 +193,15 @@ async function handleChat(messages, clientId, leadContext, res) {
     followup_when: tool.input.followup_when || null,
     followup_message: tool.input.followup_message || null,
     asked_to_book: bookAsk,
+    sources: (Array.isArray(tool.input.sources) ? tool.input.sources : [])
+      .map(t => {
+        const key = String(t).toLowerCase().trim();
+        if (key === "learned_lessons" || key === "lessons") return "Trainer lesson";
+        const s = SECTIONS.find(x => x.key === key || x.tag === key);
+        return s ? s.label : t;
+      })
+      .filter(Boolean)
+      .slice(0, 4),
     lessons_applied: lessons.filter(l => l.kind !== "good").length,
   });
 }
