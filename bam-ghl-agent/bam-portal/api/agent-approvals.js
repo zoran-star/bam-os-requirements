@@ -147,6 +147,18 @@ async function respondedStage(token, locationId) {
   return stage ? { pipelineId: pipe.id, stageId: stage.id } : null;
 }
 
+// HARD GUARD: the agent only ever drafts/sends for a contact whose opportunity
+// is currently in the Responded stage. Never replies to members, Interested,
+// booked, won/lost, etc.
+async function contactInRespondedStage(token, locationId, contactId, rs) {
+  try {
+    const params = new URLSearchParams({ location_id: locationId, contact_id: contactId, pipeline_id: rs.pipelineId, limit: "20" });
+    const d = await ghl("GET", `/opportunities/search?${params}`, { token });
+    const opps = d.opportunities || d.data || [];
+    return opps.some(o => (o.pipelineStageId || o.stageId) === rs.stageId);
+  } catch (_) { return false; }
+}
+
 async function handler(req, res) {
   if (req.method !== "POST") return res.status(405).json({ error: "POST only" });
   const staffEmail = await requireStaff(req);
@@ -182,6 +194,11 @@ async function handler(req, res) {
 
     if (b.action === "draft") {
       if (!b.contact_id) return res.status(400).json({ error: "contact_id required" });
+      const rs = await respondedStage(token, locationId);
+      if (!rs) return res.status(200).json({ error: "No Responded stage found in the Training Pipeline." });
+      if (!(await contactInRespondedStage(token, locationId, b.contact_id, rs))) {
+        return res.status(200).json({ error: "This lead isn't in the Responded stage — the bot only replies to Responded-stage leads." });
+      }
       const convo = await findConversation(token, locationId, b.contact_id);
       if (!convo) return res.status(200).json({ error: "no conversation for contact" });
       const messages = await threadMessages(token, convo.id);
@@ -203,6 +220,11 @@ async function handler(req, res) {
 
     if (b.action === "send") {
       if (!b.contact_id || !b.reply || !String(b.reply).trim()) return res.status(400).json({ error: "contact_id and reply required" });
+      // HARD GUARD: refuse to send unless the lead is still in the Responded stage.
+      const rsSend = await respondedStage(token, locationId);
+      if (!rsSend || !(await contactInRespondedStage(token, locationId, b.contact_id, rsSend))) {
+        return res.status(409).json({ error: "This lead is no longer in the Responded stage — not sending." });
+      }
       // Send via GHL (human-approved).
       try {
         await ghl("POST", `/conversations/messages`, { token, body: { type: "SMS", contactId: b.contact_id, message: String(b.reply) } });
