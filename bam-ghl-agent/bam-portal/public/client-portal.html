@@ -13544,12 +13544,14 @@ function _bbMatcherStrip(connected, sorter) {
 // Member Import strip (Members tab): Import → Cleanup → Link GHL.
 function _membersImportStrip(sorter) {
   const steps = [
-    ['Import',   !!(sorter && sorter.imported)],
-    ['Cleanup',  !!(sorter && sorter.promoted)],
-    ['Link GHL', !!(sorter && sorter.ghl_linked)],
+    ['Import',  !!(sorter && sorter.imported)],
+    ['Stripe',  !!(sorter && sorter.promoted)],
+    ['CoachIQ', !!(sorter && sorter.promoted)],
+    ['GHL',     !!(sorter && sorter.ghl_linked)],
+    ['Finish',  !!(sorter && sorter.promoted)],
   ];
   const currentIdx = steps.findIndex(([, done]) => !done);
-  const startStep = currentIdx === -1 ? 2 : currentIdx + 2; // strip index 0/1/2 = sorter step 2/3/4
+  const startStep = currentIdx === -1 ? 2 : currentIdx + 2; // strip index 0..4 = sorter step 2..6
   return _sorterStrip({ title: '👥 Member Import', steps, onclick: `openPricingSorter(${startStep})`, ariaLabel: 'Open Member Import' });
 }
 
@@ -20779,7 +20781,8 @@ function _sorterRender() {
     ? [['2', 'Import'], ['3', 'Stripe'], ['4', 'CoachIQ'], ['5', 'GHL'], ['6', 'Finish']]
     : [['1', 'Match']];
   const minStep = members ? 2 : 1;
-  const dots = steps.map(([n, label]) => {
+  const dots = steps.map(([n, label], i) => {
+    const disp = members ? (i + 1) : n; // display 1-based for members (internal step stays 2-6)
     const active = Number(n) === _SORTER.step;
     const done = Number(n) < _SORTER.step;
     const bg = active ? 'var(--accent,#E8C547)' : (done ? 'rgba(123,196,127,0.25)' : 'rgba(255,255,255,0.06)');
@@ -20787,7 +20790,7 @@ function _sorterRender() {
     // Earlier steps are clickable — you can always go back.
     const back = done ? ` onclick="_sorterGoto(${n})" title="Go back to ${label}"` : '';
     return `<span${back} style="display:inline-flex;align-items:center;gap:7px;${done ? 'cursor:pointer;' : ''}">
-      <span style="width:24px;height:24px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-weight:800;font-size:12px;background:${bg};color:${col};">${done ? '✓' : n}</span>
+      <span style="width:24px;height:24px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-weight:800;font-size:12px;background:${bg};color:${col};">${done ? '✓' : disp}</span>
       <span style="font-size:12.5px;font-weight:${active ? '800' : '600'};color:${active ? 'var(--text,#eee)' : 'var(--text-mute,#888)'};${done ? 'text-decoration:underline;text-underline-offset:3px;' : ''}">${label}</span>
     </span>`;
   }).join('<span style="color:var(--text-mute,#888);margin:0 6px;">·</span>');
