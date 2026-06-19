@@ -154,6 +154,25 @@ async function handler(req, res) {
 
   const result = { ok: true, good_fit: goodFit, showed_up: showedUp, moved: false, trainer, signup_text: "none" };
 
+  // Missed-trial automation: when the trainer marks the athlete as NOT attended,
+  // fire the academy's chosen GHL workflow. Configured per-academy on the training
+  // offer (offers.data.missed_trial_workflow), same pattern as signup_url. Non-fatal.
+  if (showedUp === false && contactId) {
+    try {
+      const offers = await sb(`offers?client_id=eq.${encodeURIComponent(clientId)}&type=eq.training&select=data&order=sort_order.asc&limit=1`);
+      const wfId = ((offers && offers[0] && offers[0].data && offers[0].data.missed_trial_workflow) || "").trim();
+      if (!wfId) {
+        result.missed_trial = "no_workflow";   // not set up on the offer yet
+      } else {
+        await ghl("POST", `/contacts/${encodeURIComponent(contactId)}/workflow/${encodeURIComponent(wfId)}`, { token });
+        result.missed_trial = "fired";
+      }
+    } catch (e) {
+      console.error("missed-trial workflow failed (non-fatal):", e.message);
+      result.missed_trial = "failed";
+    }
+  }
+
   if (goodFit) {
     // Move to the Done Trial stage of the opp's pipeline.
     try {
