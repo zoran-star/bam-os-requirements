@@ -13799,7 +13799,13 @@ async function _bbDeleteOfferFile(fileId) {
 
 function _bbWizardSections(offer) {
   if (offer.type === 'team') return _bbTeamSections.map(s => ({ id: s, label: _bbTeamSectionLabels[s] }));
-  return _bbSections.map(s => ({ id: s, label: _bbSectionLabels[s] }));
+  const base = _bbSections.map(s => ({ id: s, label: _bbSectionLabels[s] }));
+  // CoachIQ links tab — training offers only, V1.5/V2 only (CoachIQ is a V2 concept).
+  if (offer.type === 'training' && !_bbIsV1()) {
+    const at = base.findIndex(s => s.id === 'pricing');
+    base.splice(at >= 0 ? at + 1 : base.length, 0, { id: 'coachiq', label: 'CoachIQ' });
+  }
+  return base;
 }
 
 function _bbRenderWizardBody() {
@@ -16087,6 +16093,7 @@ const _V1_HIDE_TYPES = new Set(['ghl_tags_multi', 'ghl_tag', 'entry_points']);
 const _V1_HIDE_KEYS = new Set(['discovery_call_calendar', 'existing_calendar_link', 'call_host', 'call_duration', 'avail_windows', 'buffer']);
 
 function _bbRenderStepFields(offer, sectionId) {
+  if (sectionId === 'coachiq') return _ciqStepHtml(offer);
   const config = (_bbOfferConfigs[offer.type] || []).find(s => s.id === sectionId);
   if (!config) return `<p style="font-size:13px;color:var(--text-sub)">No config for this section.</p>`;
 
@@ -20213,6 +20220,88 @@ function closeCoachiqLinks() {
   const overlay = document.getElementById('ciq-links-overlay');
   if (modal) modal.style.display = 'none';
   if (overlay) overlay.style.display = 'none';
+}
+
+// ── CoachIQ links inside the offer builder (per plan) ────────────────
+// A plan (membership offering) maps to its LIVE Stripe price(s) via
+// offer_price_key; one CoachIQ automation URL applies to all the plan's
+// prices (monthly + commitment terms) since it's one product.
+let _CIQ_CAT = null; // { byKey: { offer_price_key: { price_id, url } } }
+async function _ciqLoadCat(force) {
+  if (_CIQ_CAT && !force) return _CIQ_CAT;
+  const token = await _mreqAuthToken();
+  const qs = (typeof CLIENT_ID !== 'undefined' && CLIENT_ID) ? '?client_id=' + encodeURIComponent(CLIENT_ID) : '';
+  const r = await fetch('/api/pricing' + qs, { headers: { Authorization: 'Bearer ' + token } });
+  const json = await _safeJson(r);
+  if (!r.ok) throw new Error(json.error || ('HTTP ' + r.status));
+  const byKey = {};
+  ((json && json.catalog) || []).forEach(row => {
+    if (!row.offer_price_key || !row.stripe_price_id || row.is_routable === false) return;
+    const cur = byKey[row.offer_price_key];
+    if (!cur || row.tier === 'canonical') byKey[row.offer_price_key] = { price_id: row.stripe_price_id, url: row.coachiq_automation_url || '' };
+  });
+  _CIQ_CAT = { byKey };
+  return _CIQ_CAT;
+}
+// price ids + current url for one offering (plan) row
+function _ciqRowInfo(row) {
+  const keys = (typeof _bbPlanKeys === 'function' ? (_bbPlanKeys(row) || []) : []).map(k => k.key);
+  const out = { keys, priceIds: [], url: '' };
+  if (!_CIQ_CAT) return out;
+  keys.forEach(k => {
+    const e = _CIQ_CAT.byKey[k];
+    if (e) { out.priceIds.push(e.price_id); if (!out.url && e.url) out.url = e.url; }
+  });
+  return out;
+}
+async function _ciqSavePriceIds(priceIds, url, statusEl) {
+  if (statusEl) { statusEl.textContent = 'Saving…'; statusEl.style.color = 'var(--text-mute,#888)'; }
+  try {
+    if (!priceIds || !priceIds.length) throw new Error('No live Stripe price for this plan yet — match it in Price Match first.');
+    const token = await _mreqAuthToken();
+    const r = await fetch('/api/pricing', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+      body: JSON.stringify({ client_id: (typeof CLIENT_ID !== 'undefined' ? CLIENT_ID : null), stripe_price_ids: priceIds, coachiq_automation_url: (url || '').trim() }),
+    });
+    const json = await _safeJson(r);
+    if (!r.ok || !json.ok) throw new Error(json.error || ('HTTP ' + r.status));
+    if (_CIQ_CAT) Object.values(_CIQ_CAT.byKey).forEach(e => { if (priceIds.indexOf(e.price_id) >= 0) e.url = (url || '').trim(); });
+    if (statusEl) { statusEl.textContent = (url || '').trim() ? '✅ Saved' : '✅ Cleared'; statusEl.style.color = 'var(--ok,#7bc47f)'; }
+  } catch (e) {
+    if (statusEl) { statusEl.textContent = '❌ ' + (e.message || String(e)); statusEl.style.color = 'var(--danger,#e0654f)'; }
+  }
+}
+function _ciqSaveFromInput(inputId, statusId) {
+  const input = document.getElementById(inputId);
+  if (!input) return;
+  let ids = [];
+  try { ids = JSON.parse(input.getAttribute('data-ciq-ids') || '[]'); } catch (_) {}
+  _ciqSavePriceIds(ids, input.value, document.getElementById(statusId));
+}
+// Body for the offer-builder "CoachIQ" step (per-plan inputs)
+function _ciqStepHtml(offer) {
+  if (typeof _bbIsV1 === 'function' && _bbIsV1()) return '<p style="font-size:13px;color:var(--text-sub)">CoachIQ is available on V1.5 / V2.</p>';
+  if (!_CIQ_CAT) { _ciqLoadCat().then(() => { if (typeof _bbRenderWizardBody === 'function') _bbRenderWizardBody(); }).catch(() => {}); return '<div class="bb-empty">Loading CoachIQ links…</div>'; }
+  const offerings = ((offer.data && offer.data.pricing && offer.data.pricing.pricing_offerings) || [])
+    .filter(o => o && !o.archived && String(o.type || '').toLowerCase() === 'membership');
+  const intro = '<div style="font-size:12px;color:var(--text-mute,#888);margin-bottom:14px;">Paste each plan\'s CoachIQ <b>"Add a Product Purchase"</b> automation URL. One link per plan — it applies to all that plan\'s prices (monthly + terms). Fired on signup to grant the product + credits.</div>';
+  if (!offerings.length) return intro + '<p style="font-size:13px;color:var(--text-sub)">No membership plans on this offer yet — add them in the Pricing step.</p>';
+  return intro + offerings.map((o, i) => {
+    const info = _ciqRowInfo(o);
+    const title = escapeHTML(o.title || ('Plan ' + (i + 1)));
+    const idsAttr = escapeHTML(JSON.stringify(info.priceIds));
+    const url = escapeHTML(info.url || '');
+    const noPrice = info.priceIds.length === 0;
+    return `<div style="border:1px solid var(--border,#2a2a31);border-radius:10px;padding:12px 14px;margin-bottom:10px;">
+      <div style="font-weight:700;font-size:13px;margin-bottom:6px;color:var(--text,#eee);">${title}${noPrice ? ' <span style="font-size:11px;color:var(--text-mute,#888);font-weight:400;">(no live Stripe price yet)</span>' : ''}</div>
+      <div style="display:flex;gap:8px;align-items:center;">
+        <input id="ciq-step-${i}" data-ciq-ids='${idsAttr}' type="url" ${noPrice ? 'disabled' : ''} placeholder="https://api-v3.coachiq.io/hook/automation/trigger/…" value="${url}" style="flex:1;min-width:0;padding:8px 10px;border-radius:8px;border:1px solid var(--border,#2a2a31);background:var(--bg,#0e0e11);color:var(--text,#eee);font-size:12px;" />
+        <button ${noPrice ? 'disabled' : ''} onclick="_ciqSaveFromInput('ciq-step-${i}','ciq-step-st-${i}')" style="padding:8px 14px;border-radius:8px;border:1px solid var(--accent,#E8C547);background:rgba(232,197,71,0.12);color:var(--accent,#E8C547);font-weight:700;font-size:12px;cursor:${noPrice ? 'default' : 'pointer'};opacity:${noPrice ? '0.5' : '1'};">Save</button>
+      </div>
+      <span id="ciq-step-st-${i}" style="font-size:11px;margin-top:6px;display:inline-block;"></span>
+    </div>`;
+  }).join('');
 }
 
 async function applyAiMatch() {

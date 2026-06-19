@@ -62,19 +62,22 @@ async function handler(req, res) {
       return res.status(403).json({ error: "not your academy" });
     }
 
-    // ── PATCH: save a price's CoachIQ automation URL ───────────────
+    // ── PATCH: save a price's CoachIQ automation URL (one or many) ──
     if (req.method === "PATCH") {
-      const priceId = (req.body && req.body.stripe_price_id) || null;
-      if (!priceId) return res.status(400).json({ error: "stripe_price_id required" });
+      const ids = Array.isArray(req.body && req.body.stripe_price_ids)
+        ? req.body.stripe_price_ids.filter(Boolean)
+        : ((req.body && req.body.stripe_price_id) ? [req.body.stripe_price_id] : []);
+      if (!ids.length) return res.status(400).json({ error: "stripe_price_id or stripe_price_ids required" });
       let url = req.body && req.body.coachiq_automation_url;
       url = (url == null || String(url).trim() === "") ? null : String(url).trim();
       if (url && !/^https:\/\//i.test(url)) return res.status(400).json({ error: "coachiq_automation_url must be an https URL (or blank to clear)" });
+      const inList = ids.map(id => `"${String(id).replace(/"/g, "")}"`).join(",");
       const updated = await sb(
-        `pricing_catalog?client_id=eq.${encodeURIComponent(targetClientId)}&stripe_price_id=eq.${encodeURIComponent(priceId)}`,
+        `pricing_catalog?client_id=eq.${encodeURIComponent(targetClientId)}&stripe_price_id=in.(${encodeURIComponent(inList)})`,
         { method: "PATCH", headers: { Prefer: "return=representation" }, body: JSON.stringify({ coachiq_automation_url: url }) }
       );
       if (!Array.isArray(updated) || !updated.length) return res.status(404).json({ error: "price not found for this academy" });
-      return res.status(200).json({ ok: true, stripe_price_id: priceId, coachiq_automation_url: url });
+      return res.status(200).json({ ok: true, updated: updated.length, stripe_price_ids: ids, coachiq_automation_url: url });
     }
 
     const singlePriceId = (req.query && req.query.price_id) || null;
