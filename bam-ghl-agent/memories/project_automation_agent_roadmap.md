@@ -112,8 +112,22 @@ send is human-approved (no autonomy yet). Phase A SHIPPED (PRs #504 backend,
 - Learnings model (decided): ONE source (agent_lessons), TWO views — client
   portal "Agent learnings" tab (read-only, builds trust) + staff portal manage/
   promote panel. Academy-specific (offer/pricing/local) learnings NEVER promoted.
-TODO: Phase B learnings tabs (client + staff). Phase C reminders to 4165733718
-(every 2h: # waiting; + per-new-chat text) — needs a cron + spine hook.
+Phase B SHIPPED (PR #515): `api/agent-learnings.js` (list — academy owners see
+own, staff see all; staff set-scope/archive/edit). Client: Business Blueprint →
+"Agent learnings" tab (`_bbRenderAgentLearnings` in client-portal.html, card id
+'agent-learnings'). Staff: `src/views/AgentTrainingView.jsx` + App.jsx nav key
+"training" (gated by canSeeFeedback) — manage lessons across academies, mark a
+lesson 'general' (promotable) vs 'academy' (local), archive/edit.
+Phase C SHIPPED (PR #515): 2-hourly digest cron (vercel.json
+`/api/agent-approvals?action=cron-digest`, Bearer CRON_SECRET → runDigest texts
+each enabled academy's `ghl_kpi_config.agent_notify_phone` the count waiting,
+only when >0) + instant per-new-chat text from `api/ghl/inbound-webhook.js`
+(when a Responded-stage lead replies). BAM GTA config: ghl_kpi_config
+.agent_notify_phone=4165733718, agent_approvals_enabled=true. Shared stage logic
+extracted to `api/agent/_stage.js` (respondedStage/contactInRespondedStage/
+computeQueue), reused by approvals + cron + webhook. Hard guard: draft+send only
+for Responded-stage contacts (PR #511). Shareable HTML guide at
+`/agent-training-guide.html` (PR #508, updated #515).
 
 ## Training rollout (Zoran's 5 steps)
 1. Draft the shared system prompt together (seed: sales-conversation-agents/
