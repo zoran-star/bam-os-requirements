@@ -107,6 +107,50 @@ function money(cents, currency) {
 }
 const TERM_NOUN = { "4_weeks": "every 4 weeks", "3_months": "every 3 months", "6_months": "every 6 months" };
 
+// ── Commitment → revert-to-monthly (billing schedule) ──────────────────────
+// A 3/6-month commitment term whose offer says "Goes back to monthly" should
+// bill the committed term once, then drop to the plan's monthly price. We do NOT
+// build the Stripe subscription_schedule here — that would complicate the
+// default_incomplete payment collection. Instead we resolve the plan's monthly
+// canonical price and stamp it on the sub metadata; api/stripe/webhook.js
+// attaches the schedule AFTER the first invoice is paid (from_subscription →
+// phase1 = committed ×1 iteration → phase2 = monthly, then release). If anything
+// here is uncertain we return null → plain sub (today's behavior), never a wrong
+// revert. LIVE money: conservative by design.
+const COMMITMENT_TERMS = new Set(["3_months", "6_months"]);
+function lengthMatchesTerm(length, term) {
+  const s = norm(length);
+  if (term === "3_months") return /(^|[^0-9])3\s*month/.test(s) || /12\s*week/.test(s);
+  if (term === "6_months") return /(^|[^0-9])6\s*month/.test(s) || /24\s*week/.test(s);
+  return false;
+}
+async function resolveCommitmentRevert({ clientId, offerId, planText, term }) {
+  if (!COMMITMENT_TERMS.has(term)) return null;
+  // 1) Confirm the offer's commitment for this plan+term reverts to monthly.
+  let offerRows = null;
+  try { offerRows = await sb(`offers?id=eq.${encodeURIComponent(offerId)}&select=data&limit=1`); } catch { return null; }
+  const data = Array.isArray(offerRows) && offerRows[0] && offerRows[0].data;
+  const offerings = (data && data.pricing && data.pricing.pricing_offerings) || [];
+  const offering = offerings.find((o) => norm(o.title) === norm(planText));
+  const commitment = offering && Array.isArray(offering.commitments)
+    ? offering.commitments.find((c) => lengthMatchesTerm(c.length, term)) : null;
+  if (!commitment || norm(commitment.after) !== norm("Goes back to monthly")) return null;
+  // 2) Find the plan's canonical monthly price to revert to (prefer the 4_weeks row).
+  let monthlyRows = null;
+  try {
+    monthlyRows = await sb(
+      `pricing_catalog?client_id=eq.${encodeURIComponent(clientId)}&offer_id=eq.${encodeURIComponent(offerId)}` +
+      `&offer_price_key=eq.${encodeURIComponent(planText + "|monthly")}&tier=eq.canonical` +
+      `&select=stripe_price_id,interval`
+    );
+  } catch { return null; }
+  const monthly = (Array.isArray(monthlyRows) ? monthlyRows : [])
+    .filter((r) => r.stripe_price_id)
+    .sort((a, b) => (b.interval === "4_weeks" ? 1 : 0) - (a.interval === "4_weeks" ? 1 : 0))[0];
+  if (!monthly || !monthly.stripe_price_id) return null;
+  return { revertToPriceId: monthly.stripe_price_id };
+}
+
 async function handler(req, res) {
   // CORS
   const origin = req.headers.origin || "";
@@ -226,6 +270,11 @@ async function handler(req, res) {
       priceIdToUse = testPrice.id;
     }
 
+    // ── Commitment terms that revert to monthly: resolve the monthly price now,
+    //    stamp it on the sub; webhook.js attaches the schedule after first payment.
+    //    Live only (test mode charges an inline price unrelated to the catalog). ──
+    const revert = !testMode ? await resolveCommitmentRevert({ clientId, offerId, planText, term }) : null;
+
     // ── Portal-owned subscription (default_incomplete → client_secret) ──
     const sub = await stripeFetch(`/subscriptions`, {
       method: "POST", stripeAccount,
@@ -240,6 +289,7 @@ async function handler(req, res) {
         "metadata[offer_id]": offerId, "metadata[offer_price_key]": priceKey,
         "metadata[plan]": planText, "metadata[term]": term,
         "metadata[client_id]": clientId, "metadata[parent_email]": parentEmail, "metadata[athlete_name]": athleteName,
+        ...(revert ? { "metadata[commitment_reverts]": "monthly", "metadata[revert_to_price]": revert.revertToPriceId } : {}),
       },
     });
     const clientSecret = piSecretFromSub(sub);
