@@ -10660,6 +10660,9 @@ let _MSG_RETURN_VIEW = null;
 function switchView(name, el) {
   // Clients without marketing have the Marketing nav greyed + click-blocked
   if (name === 'marketing' && !MARKETING_INCLUDED) return;
+  // Per-staff tab permissions: a restricted teammate can't open a hidden tab
+  // even via hash/deep-link. Owner/unrestricted users pass through.
+  if (typeof _isViewTabAllowed === 'function' && !_isViewTabAllowed(name)) { switchView('home'); return; }
   hapticTap('Light'); // #12 — tactile feedback on tab change (native only)
 
   // Remember where we came from so the "Talk to BAM Business" view can go back.
@@ -11230,6 +11233,67 @@ async function startPresenceHeartbeat(userId) {
 }
 
 // ── V2 access gate (formerly "onboarding_in_progress") ──────────────────
+// ── Per-staff tab permissions ──
+// The academy OWNER picks which tabs each teammate sees (BB → Staff). Stored on
+// client_users.allowed_tabs (array of keys; null = all). SUBTRACTIVE — only ever
+// HIDES nav the tier already allows, never reveals. Owner role = never restricted.
+const _PERMISSIONABLE_TABS = [
+  { key: 'marketing', label: 'Marketing',          icon: '📣', views: ['marketing'] },
+  { key: 'resources', label: 'Resources',          icon: '📚', views: ['resources'] },
+  { key: 'assets',    label: 'Assets',             icon: '🖼️', views: ['assets'] },
+  { key: 'blueprint', label: 'Business Blueprint', icon: '🗂', views: ['blueprint'] },
+  { key: 'members',   label: 'Members',            icon: '👥', views: ['members'] },
+  { key: 'inbox',     label: 'Inbox',              icon: '💬', views: ['inbox', 'v15inbox'] },
+  { key: 'pipelines', label: 'Sales',              icon: '🛣', views: ['pipelines'] },
+  { key: 'calendar',  label: 'Calendar',           icon: '📅', views: ['calendar', 'v15cal'] },
+  { key: 'contacts',  label: 'Contacts',           icon: '👤', views: ['contacts'] },
+  { key: 'kpis',      label: 'KPIs',               icon: '📊', views: ['v15kpis'] },
+  { key: 'systems',   label: 'Systems',            icon: '🛠', views: ['systems'] },
+];
+let _MY_ALLOWED_TABS = null;   // null = all tabs (default / owner / BAM staff)
+let _MY_TAB_ROLE = null;       // 'owner' | 'member' | null
+
+// Hide nav items the current user isn't permitted to see. Runs AFTER the tier
+// gates so it only ever subtracts. No-op for owners or when no perms are set.
+function applyTabPermissions() {
+  if (_MY_TAB_ROLE === 'owner') return;
+  if (!Array.isArray(_MY_ALLOWED_TABS)) return; // null = unrestricted
+  const allowed = new Set(_MY_ALLOWED_TABS);
+  for (const tab of _PERMISSIONABLE_TABS) {
+    if (allowed.has(tab.key)) continue;
+    for (const v of tab.views) {
+      document.querySelectorAll(`.nav-item[onclick*="switchView('${v}'"]`).forEach(el => { el.style.display = 'none'; });
+      document.querySelectorAll(`.mobile-nav-item[data-view="${v}"]`).forEach(el => { el.style.display = 'none'; });
+    }
+  }
+}
+
+// Is a view allowed for the current user? Owner/unrestricted = always yes.
+// Views not under a permissionable tab (home, messages…) = always yes.
+function _isViewTabAllowed(view) {
+  if (_MY_TAB_ROLE === 'owner') return true;
+  if (!Array.isArray(_MY_ALLOWED_TABS)) return true;
+  const tab = _PERMISSIONABLE_TABS.find(t => t.views.includes(view));
+  if (!tab) return true;
+  return _MY_ALLOWED_TABS.includes(tab.key);
+}
+
+// Load the current user's membership row for CLIENT_ID, then apply permissions.
+async function loadMyPermissionsAndApply() {
+  try {
+    if (typeof CLIENT_ID === 'undefined' || !CLIENT_ID) return;
+    if (!_myAuthUserId) { const u = await _sb.auth.getUser(); _myAuthUserId = u?.data?.user?.id || null; }
+    if (!_myAuthUserId) return;
+    const { data } = await _sb.from('client_users')
+      .select('role, allowed_tabs')
+      .eq('user_id', _myAuthUserId).eq('client_id', CLIENT_ID).eq('status', 'active').limit(1);
+    const row = (data || [])[0] || null;
+    _MY_TAB_ROLE = row?.role || null;
+    _MY_ALLOWED_TABS = Array.isArray(row?.allowed_tabs) ? row.allowed_tabs : null;
+  } catch (_) { _MY_ALLOWED_TABS = null; }
+  applyTabPermissions();
+}
+
 // Per-client opt-in to V2 features. Today V2 = Members tab only.
 // Everything else (BB nav, tracker, Messages, Systems, etc.) is V1 and
 // visible to everyone. Staff flips this per-client from the staff
@@ -11241,6 +11305,7 @@ function applyV2NavState(v2Access) {
   applyMemberMgmtNavState();
   applyCalendarNavState();
   applyCrmSupersetNav();
+  applyTabPermissions(); // re-subtract per-staff tab perms after the tier re-gate
   if (typeof applyTalkToBamNav === 'function') applyTalkToBamNav();
 }
 
@@ -11302,6 +11367,7 @@ function applyV15NavState(v15) {
   // Contacts/Inbox/KPIs sharing + the Marketing "narrative" treatment now live in
   // applyCrmSupersetNav so V2 gets them too — override the bulk v15 toggle above.
   applyCrmSupersetNav();
+  applyTabPermissions(); // re-subtract per-staff tab perms after the tier re-gate
   applyTalkToBamNav();
 }
 
@@ -12976,7 +13042,7 @@ async function _bbRenderStaffCard(panel, meta) {
   // existing Team tab. Mirror its TEAM_ROWS / TEAM_MY_ROLE side-effects
   // so the invite/revoke modals (which read those globals) keep working.
   const { data, error } = await _sb.from('client_users')
-    .select('id, name, email, role, user_id')
+    .select('id, name, email, role, user_id, allowed_tabs')
     .eq('client_id', CLIENT_ID)
     .eq('status', 'active');
   const list = document.getElementById('bb-staff-list');
@@ -12999,11 +13065,33 @@ async function _bbRenderStaffCard(panel, meta) {
     if (a.role !== b.role) return a.role === 'owner' ? -1 : 1;
     return (a.name || '').localeCompare(b.name || '');
   });
+  const iAmOwner = myRow?.role === 'owner';
+  // Only offer toggles for tabs this academy's tier actually shows (the owner's
+  // own visible nav = the tier set, since the owner is never restricted).
+  const relevantTabs = _PERMISSIONABLE_TABS.filter(t => t.views.some(v => {
+    const el = document.querySelector(`.nav-item[onclick*="switchView('${v}'"]`);
+    return el && el.style.display !== 'none';
+  }));
   list.innerHTML = sorted.map(r => {
     const isOwner = r.role === 'owner';
     const isMe = r.user_id === myId;
-    const canRevoke = myRow?.role === 'owner' && !isOwner && !isMe;
+    const canRevoke = iAmOwner && !isOwner && !isMe;
+    const canManageTabs = iAmOwner && !isOwner && relevantTabs.length > 0;
     const initial = (r.name || r.email || '?').trim().slice(0, 1).toUpperCase();
+    const tabsHtml = !canManageTabs ? '' : `
+      <details class="staff-tabs" style="margin-top:6px">
+        <summary style="cursor:pointer;font-size:12px;color:var(--text-sub);padding:9px 12px;background:var(--surface);border:1px solid var(--border-med);border-radius:10px;display:flex;justify-content:space-between;align-items:center">
+          <span>🎛 Tab access</span><span id="staff-tabs-status-${r.id}" style="font-size:11px;color:var(--text-mute)"></span>
+        </summary>
+        <div id="staff-tabs-${r.id}" style="padding:11px 13px;background:var(--surface);border:1px solid var(--border-med);border-top:none;border-radius:0 0 10px 10px;display:flex;flex-wrap:wrap;gap:9px 18px">
+          ${relevantTabs.map(t => {
+            const on = !Array.isArray(r.allowed_tabs) || r.allowed_tabs.includes(t.key);
+            return `<label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer">
+              <input type="checkbox" data-tabkey="${t.key}" ${on ? 'checked' : ''} onchange="_bbStaffTabsSave('${r.id}')"> ${t.icon} ${escapeHTML(t.label)}</label>`;
+          }).join('')}
+          <div style="flex-basis:100%;font-size:11px;color:var(--text-mute)">🏠 Home &amp; 💬 Messages are always visible. Unchecked = hidden for this teammate.</div>
+        </div>
+      </details>`;
     return `<div style="margin-bottom:10px">
       <div class="team-row">
         <div class="team-avatar">${escapeHTML(initial)}</div>
@@ -13014,12 +13102,39 @@ async function _bbRenderStaffCard(panel, meta) {
         <div class="team-role-badge${isOwner ? ' owner' : ''}">${isOwner ? 'Owner' : 'Member'}</div>
         ${canRevoke ? `<button class="team-revoke-btn" onclick="openRevokeTeamModal('${r.id}')">Revoke</button>` : ''}
       </div>
+      ${tabsHtml}
       <div style="margin-top:6px;padding:10px 12px;background:var(--surface);border:1px solid var(--border-med);border-radius:10px">
         <div style="font-size:11px;color:var(--text-mute);margin-bottom:8px">Photo / headshot</div>
         ${_assetBankHtml('staff_id', r.id, { category: 'photo' })}
       </div>
     </div>`;
   }).join('');
+}
+
+// Owner saves a teammate's tab access. Collects the checked tab keys in that
+// member's container; all-checked → null (= all tabs, future-proof). POSTs to
+// the owner-gated set-staff-tabs action.
+async function _bbStaffTabsSave(memberId) {
+  const cont = document.getElementById('staff-tabs-' + memberId);
+  if (!cont) return;
+  const boxes = [...cont.querySelectorAll('input[type=checkbox][data-tabkey]')];
+  const checked = boxes.filter(b => b.checked).map(b => b.dataset.tabkey);
+  const allowed = (checked.length === boxes.length) ? null : checked;
+  const statusEl = document.getElementById('staff-tabs-status-' + memberId);
+  if (statusEl) statusEl.textContent = 'Saving…';
+  try {
+    const token = await _mreqAuthToken();
+    const res = await fetch('/api/clients?action=set-staff-tabs', {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ client_id: CLIENT_ID, member_id: memberId, allowed_tabs: allowed }),
+    });
+    const j = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(j.error || ('HTTP ' + res.status));
+    if (statusEl) { statusEl.textContent = '✓ Saved'; setTimeout(() => { if (statusEl) statusEl.textContent = ''; }, 1500); }
+  } catch (e) {
+    if (statusEl) statusEl.textContent = '⚠ ' + e.message;
+  }
 }
 
 // Owner / primary contact block on the Staff card → clients.owner_name/email/phone.
@@ -16609,6 +16724,7 @@ async function switchClient(newId) {
   applyMarketingNavState();
   applyV2NavState(row.v2_access === true);   // re-gate Members/Calendar for the new client
   applyV15NavState(row.v15_access === true); // re-gate the Contacts tab
+  loadMyPermissionsAndApply();               // per-staff tab perms for the new academy
   renderClientSwitcher();
   // Refresh the point-of-contact name/avatar for the newly-selected academy
   // (was stuck on the first-loaded academy — switchClient never re-set it).
@@ -28302,6 +28418,7 @@ async function boot() {
   applyV2NavState(clientRow.v2_access === true);
   applyV15NavState(clientRow.v15_access === true);
   applyV4NavState(clientRow.v4_access === true);
+  loadMyPermissionsAndApply(); // per-staff tab perms (subtractive, async)
   _stripeConnectMaybeSwitch();
   renderClientSwitcher();
   document.getElementById('login-overlay').style.display = 'none';
