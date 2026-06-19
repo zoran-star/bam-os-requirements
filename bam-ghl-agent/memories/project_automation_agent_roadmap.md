@@ -100,6 +100,25 @@ P1 spine to wake on a real reply, sending via GHL. Base-prompt editor (Playbook)
    onboarding data — {{PLACEHOLDER}} style)
 3. Local lessons (never copied across academies)
 
+## Brain layering (decided 2026-06-19) — Sandbox sections grouped by OWNER
+The prompt sections (api/agent/prompt-structure.js) each carry a `layer` =
+who owns/trains them, shown as groups in the Brain editor:
+- 🌐 GENERAL — shared sales craft (role, tone, core_behavior, qualification
+  approach, objection_handling, conversation_flow, follow_up_logic, guardrails,
+  boundaries, examples). BAM-owned; every academy inherits. This is the future
+  "shared brain."
+- 📍 LOCATION — this academy (business_info, schedule, coaches, social_proof,
+  selling_points). Auto-fillable from `clients` later.
+- 🎁 OFFER — the product (program, pricing, policies, qualification_config /
+  "who qualifies"). Auto-fillable from `offers` later.
+- 🎯 GOAL — objective & cadence (follow_up_config).
+IMPORTANT: assembly order in assemblePrompt() is FIXED and DECOUPLED from the
+`layer` grouping (ACADEMY_ORDER / INSTRUCTIONS_ORDER) — regrouping the UI never
+scrambles the actual prompt. Lead/user context (who they are, funnel stage,
+client?) is NOT a layer — it's LIVE runtime data fed via the Lead-info panel
+(<lead_context>), pulled from CRM later. Multi-academy inheritance + per-layer
+ownership + lesson promotion-to-global = build when academy #2 onboards.
+
 ## Local vs global lessons: "born local, earns global"
 Every lesson is local by default. Weekly promotion queue: AI clusters
 similar lessons across academies → BAM approves promotion into the shared
