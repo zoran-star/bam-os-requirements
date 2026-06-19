@@ -75,9 +75,12 @@ self-signup → New-User webhook payload → email match → grant) proven with 
    - The earlier standalone "CoachIQ" offer-builder TAB was REMOVED (Zoran: links live only
      in Price Match + the row pill). `coachiq_automation_url` is per pricing_catalog row;
      one plan's terms share one product so set the same URL on each of its prices.
-3. **Confirmation-page UX** (download app / make account at group login / book / credits)
-   — NOT built; bam-client-sites `enroll.jsx`. "See credits" can only show the GRANTED
-   amount (no public API for live balance; live balance is in the app).
+3. **Confirmation-page UX** — ✅ BUILT (bam-client-sites PR #21, enroll.jsx v17). The
+   "You're in" screen after payment shows a "Set up your athlete app" card: create CoachIQ
+   account with the same email → set password → book first class → credits load
+   automatically, with a button to `app.coachiq.io/bam-gta/athletes`. This is the parent
+   trigger for the self-signup → New-User-webhook → product-grant flow. (No live credit
+   number shown — credits live in the app.) Brand: no emoji/dashes, gold accent.
 4. Per-product automations for the other plans + confirm Summer Unlimited credit count.
 5. **Rotate the API key.**
 
