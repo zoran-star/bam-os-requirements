@@ -7184,6 +7184,10 @@ Then the call to action."]</div>
     <div id="pc-aimatch-overlay" onclick="closeAiMatch()" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.55); z-index:120;"></div>
     <div id="pc-aimatch-modal" role="dialog" aria-modal="true" style="display:none; position:fixed; z-index:121; top:50%; left:50%; transform:translate(-50%,-50%); width:min(820px,94vw); max-height:88vh; overflow:auto; background:var(--surface,#16161a); border:1px solid var(--border,#2a2a31); border-radius:14px; padding:20px 22px;"></div>
 
+    <!-- CoachIQ product-automation links per price (additive; V2 only) -->
+    <div id="ciq-links-overlay" onclick="closeCoachiqLinks()" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.55); z-index:120;"></div>
+    <div id="ciq-links-modal" role="dialog" aria-modal="true" aria-label="CoachIQ product links" style="display:none; position:fixed; z-index:121; top:50%; left:50%; transform:translate(-50%,-50%); width:min(820px,94vw); max-height:88vh; overflow:auto; background:var(--surface,#16161a); border:1px solid var(--border,#2a2a31); border-radius:14px; padding:20px 22px;"></div>
+
     <!-- ══════════════════════════════
          THE PRICING SORTER — 3-step onboarding wizard (additive)
          Step 1 boxes+arrows match · Step 2 CSV import · Step 3 cleanup→promote.
@@ -8558,11 +8562,12 @@ Then the call to action."]</div>
     </div>
 
     <div class="view" id="view-blueprint">
-      <div class="topbar">
+      <div class="topbar" style="display:flex;align-items:center;">
         <div>
           <span class="topbar-kicker">§ Business Blueprint</span>
           <div class="topbar-title" id="bb-topbar-title">Business Blueprint</div>
         </div>
+        <button data-feature="members" onclick="openCoachiqLinks()" style="display:none; margin-left:auto; align-self:center; font-size:13px; font-weight:700; padding:9px 15px; border-radius:9px; border:1px solid var(--accent,#E8C547); background:rgba(232,197,71,0.12); color:var(--accent,#E8C547); cursor:pointer;">🔗 CoachIQ links</button>
       </div>
       <div class="content">
         <div id="bb-panel"><!-- rendered by openBlueprintView() based on hash --></div>
@@ -20121,6 +20126,85 @@ function _renderAiMatchModal() {
 function closeAiMatch() {
   const modal = document.getElementById('pc-aimatch-modal');
   const overlay = document.getElementById('pc-aimatch-overlay');
+  if (modal) modal.style.display = 'none';
+  if (overlay) overlay.style.display = 'none';
+}
+
+// ── CoachIQ product-automation links per price (V2) ──────────────────
+// Lists the academy's live (routable) prices; paste each price's CoachIQ
+// "Add a Product Purchase" automation webhook URL → saved to
+// pricing_catalog.coachiq_automation_url via PATCH /api/pricing. On a paid
+// signup the portal fires that URL to grant the product.
+async function openCoachiqLinks() {
+  const modal = document.getElementById('ciq-links-modal');
+  const overlay = document.getElementById('ciq-links-overlay');
+  if (!modal) return;
+  modal.innerHTML = `<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
+      <div style="font-size:17px;font-weight:800;color:var(--text,#eee);">🔗 CoachIQ product links</div>
+      <button onclick="closeCoachiqLinks()" style="background:none;border:none;color:var(--text-mute,#888);font-size:22px;cursor:pointer;">×</button>
+    </div>
+    <div style="font-size:12px;color:var(--text-mute,#888);margin-bottom:14px;">Paste each price's CoachIQ <b>"Add a Product Purchase"</b> automation webhook URL. When someone buys that price, the portal fires it to grant the product + credits.</div>
+    <div id="ciq-links-body" style="font-size:13px;color:var(--text-mute,#888);">Loading…</div>`;
+  if (overlay) overlay.style.display = 'block';
+  modal.style.display = 'block';
+  try {
+    const token = await _mreqAuthToken();
+    const qs = (typeof CLIENT_ID !== 'undefined' && CLIENT_ID) ? '?client_id=' + encodeURIComponent(CLIENT_ID) : '';
+    const r = await fetch('/api/pricing' + qs, { headers: { Authorization: 'Bearer ' + token } });
+    const json = await _safeJson(r);
+    if (!r.ok) throw new Error(json.error || ('HTTP ' + r.status));
+    _renderCoachiqLinks(json);
+  } catch (e) {
+    const b = document.getElementById('ciq-links-body');
+    if (b) b.innerHTML = '<div style="color:var(--danger,#e0654f);">' + escapeHTML(e.message || String(e)) + '</div>';
+  }
+}
+
+function _renderCoachiqLinks(json) {
+  const body = document.getElementById('ciq-links-body');
+  if (!body) return;
+  const rows = ((json && json.catalog) || []).filter(r => r && r.stripe_price_id && r.is_routable !== false);
+  if (!rows.length) { body.innerHTML = 'No live prices found.'; return; }
+  body.innerHTML = rows.map((row, i) => {
+    const pid = escapeHTML(row.stripe_price_id);
+    const name = escapeHTML(row.display_name || row.stripe_price_id);
+    const url = escapeHTML(row.coachiq_automation_url || '');
+    return `<div style="border:1px solid var(--border,#2a2a31);border-radius:10px;padding:12px 14px;margin-bottom:10px;">
+      <div style="font-weight:700;color:var(--text,#eee);margin-bottom:2px;">${name}</div>
+      <div style="font-family:monospace;font-size:11px;color:var(--text-mute,#888);margin-bottom:8px;">${pid}</div>
+      <div style="display:flex;gap:8px;align-items:center;">
+        <input id="ciq-in-${i}" type="url" placeholder="https://api-v3.coachiq.io/hook/automation/trigger/…" value="${url}" style="flex:1;min-width:0;padding:8px 10px;border-radius:8px;border:1px solid var(--border,#2a2a31);background:var(--bg,#0e0e11);color:var(--text,#eee);font-size:12px;" />
+        <button onclick="saveCoachiqLink('${pid}','ciq-in-${i}','ciq-st-${i}')" style="padding:8px 14px;border-radius:8px;border:1px solid var(--accent,#E8C547);background:rgba(232,197,71,0.12);color:var(--accent,#E8C547);font-weight:700;font-size:12px;cursor:pointer;">Save</button>
+      </div>
+      <span id="ciq-st-${i}" style="font-size:11px;margin-top:6px;display:inline-block;"></span>
+    </div>`;
+  }).join('');
+}
+
+async function saveCoachiqLink(priceId, inputId, statusId) {
+  const input = document.getElementById(inputId);
+  const status = document.getElementById(statusId);
+  if (!input) return;
+  const url = input.value.trim();
+  if (status) { status.textContent = 'Saving…'; status.style.color = 'var(--text-mute,#888)'; }
+  try {
+    const token = await _mreqAuthToken();
+    const r = await fetch('/api/pricing', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+      body: JSON.stringify({ client_id: (typeof CLIENT_ID !== 'undefined' ? CLIENT_ID : null), stripe_price_id: priceId, coachiq_automation_url: url }),
+    });
+    const json = await _safeJson(r);
+    if (!r.ok || !json.ok) throw new Error(json.error || ('HTTP ' + r.status));
+    if (status) { status.textContent = url ? '✅ Saved' : '✅ Cleared'; status.style.color = 'var(--ok,#7bc47f)'; }
+  } catch (e) {
+    if (status) { status.textContent = '❌ ' + (e.message || String(e)); status.style.color = 'var(--danger,#e0654f)'; }
+  }
+}
+
+function closeCoachiqLinks() {
+  const modal = document.getElementById('ciq-links-modal');
+  const overlay = document.getElementById('ciq-links-overlay');
   if (modal) modal.style.display = 'none';
   if (overlay) overlay.style.display = 'none';
 }
