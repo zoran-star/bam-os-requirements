@@ -41,4 +41,4 @@ create policy kpi_mc_read on public.kpi_manual_cancellations
   for select using (is_staff() or client_id in (select my_client_ids()));
 drop policy if exists kpi_mc_write on public.kpi_manual_cancellations;
 create policy kpi_mc_write on public.kpi_manual_cancellations
-  for all using (is_staff()) with check (is_staff());
+  for all using (is_staff()) with check (is_staff());;

@@ -38,7 +38,6 @@ BEGIN
     END IF;
 END;
 $$;
-
 DO $$
 BEGIN
     IF NOT EXISTS (
@@ -51,7 +50,6 @@ BEGIN
     END IF;
 END;
 $$;
-
 -- ── 1. slot_templates — reusable class definitions ─────────────────────────
 
 CREATE TABLE IF NOT EXISTS public.slot_templates (
@@ -84,7 +82,6 @@ CREATE TABLE IF NOT EXISTS public.slot_templates (
         REFERENCES public.locations(id, client_id)
         ON DELETE SET NULL (location_id)
 );
-
 CREATE INDEX IF NOT EXISTS ix_slot_templates_tenant_active
     ON public.slot_templates USING btree (tenant_id, is_active);
 CREATE INDEX IF NOT EXISTS ix_slot_templates_default_instructor_id
@@ -95,7 +92,6 @@ CREATE INDEX IF NOT EXISTS ix_slot_templates_source_offer
     ON public.slot_templates USING btree (source_offer_id, source_offer_class_key);
 CREATE INDEX IF NOT EXISTS ix_slot_templates_offer_team_id
     ON public.slot_templates USING btree (offer_team_id);
-
 -- ── 2. schedule_slots — materialized bookable sessions ─────────────────────
 
 CREATE TABLE IF NOT EXISTS public.schedule_slots (
@@ -131,7 +127,6 @@ CREATE TABLE IF NOT EXISTS public.schedule_slots (
         REFERENCES public.locations(id, client_id)
         ON DELETE SET NULL (location_id)
 );
-
 CREATE INDEX IF NOT EXISTS ix_schedule_slots_tenant_start
     ON public.schedule_slots USING btree (tenant_id, start_time);
 CREATE INDEX IF NOT EXISTS ix_schedule_slots_tenant_type
@@ -149,7 +144,6 @@ CREATE INDEX IF NOT EXISTS ix_schedule_slots_source_offer
     ON public.schedule_slots USING btree (source_offer_id, source_offer_class_key);
 CREATE INDEX IF NOT EXISTS ix_schedule_slots_offer_team_id
     ON public.schedule_slots USING btree (offer_team_id);
-
 -- ── 3. reservations — confirmed/cancelled booked sessions ──────────────────
 
 CREATE TABLE IF NOT EXISTS public.reservations (
@@ -180,7 +174,6 @@ CREATE TABLE IF NOT EXISTS public.reservations (
         REFERENCES public.locations(id, client_id)
         ON DELETE SET NULL (location_id)
 );
-
 CREATE INDEX IF NOT EXISTS ix_reservations_slot_id
     ON public.reservations USING btree (slot_id);
 CREATE INDEX IF NOT EXISTS ix_reservations_membership_id
@@ -195,7 +188,6 @@ CREATE INDEX IF NOT EXISTS ix_reservations_tenant_status
     ON public.reservations USING btree (tenant_id, status);
 CREATE INDEX IF NOT EXISTS ix_reservations_membership_status
     ON public.reservations USING btree (membership_id, status);
-
 -- ── 4. waitlist_entries — FIFO waitlist rows per slot ──────────────────────
 
 CREATE TABLE IF NOT EXISTS public.waitlist_entries (
@@ -224,7 +216,6 @@ CREATE TABLE IF NOT EXISTS public.waitlist_entries (
         REFERENCES public.locations(id, client_id)
         ON DELETE SET NULL (location_id)
 );
-
 CREATE INDEX IF NOT EXISTS ix_waitlist_entries_slot_id
     ON public.waitlist_entries USING btree (slot_id);
 CREATE INDEX IF NOT EXISTS ix_waitlist_entries_membership_id
@@ -237,7 +228,6 @@ CREATE INDEX IF NOT EXISTS ix_waitlist_slot_status
     ON public.waitlist_entries USING btree (slot_id, status);
 CREATE INDEX IF NOT EXISTS ix_waitlist_slot_created
     ON public.waitlist_entries USING btree (slot_id, created_at);
-
 -- ── updated_at triggers ────────────────────────────────────────────────────
 
 DO $$
@@ -253,7 +243,6 @@ BEGIN
     END IF;
 END;
 $$;
-
 DO $$
 BEGIN
     IF NOT EXISTS (
@@ -267,7 +256,6 @@ BEGIN
     END IF;
 END;
 $$;
-
 DO $$
 BEGIN
     IF NOT EXISTS (
@@ -281,7 +269,6 @@ BEGIN
     END IF;
 END;
 $$;
-
 DO $$
 BEGIN
     IF NOT EXISTS (
@@ -295,7 +282,6 @@ BEGIN
     END IF;
 END;
 $$;
-
 -- ── RLS: deny-all on every parent-domain schedule table ────────────────────
 -- Zero policies on purpose. Service-role Vercel fns are the only access path.
 

@@ -13,12 +13,9 @@ CREATE TABLE public.portal_feedback (
   CONSTRAINT portal_feedback_source_check CHECK (source IN ('text', 'voice')),
   CONSTRAINT portal_feedback_status_check CHECK (status IN ('pending', 'approved', 'rejected', 'done'))
 );
-
 CREATE INDEX idx_portal_feedback_status ON public.portal_feedback (status);
 CREATE INDEX idx_portal_feedback_created ON public.portal_feedback (created_at DESC);
-
 ALTER TABLE public.portal_feedback ENABLE ROW LEVEL SECURITY;
-
 CREATE POLICY "Allow all for authenticated"
   ON public.portal_feedback
   FOR ALL TO authenticated

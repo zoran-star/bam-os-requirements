@@ -1,13 +1,8 @@
--- Per-academy overrides for individual sections of the sales-agent system
--- prompt (Role, Pricing, Tone, Objection handling, etc.). Only edited sections
--- get a row; the rest fall back to the vendored default in
--- api/agent/prompt-structure.js. The sandbox endpoint reassembles the full
--- prompt = defaults with these overrides patched in.
 create table if not exists public.agent_prompt_sections (
   id           uuid primary key default gen_random_uuid(),
   client_id    uuid not null references public.clients(id) on delete cascade,
-  section_key  text not null,          -- e.g. 'pricing', 'tone', 'objection_handling'
-  body         text not null,          -- the trainer's edited content for that section
+  section_key  text not null,
+  body         text not null,
   updated_by   text,
   updated_at   timestamptz not null default now(),
   unique (client_id, section_key)
@@ -22,4 +17,4 @@ create policy agent_prompt_sections_write on public.agent_prompt_sections
   for all using (is_staff()) with check (is_staff());
 
 comment on table public.agent_prompt_sections is
-  'Per-academy overrides for individual sections of the sales-agent system prompt. Sandbox reassembles defaults (api/agent/prompt-structure.js) + these overrides.';
+  'Per-academy overrides for individual sections of the sales-agent system prompt. Sandbox reassembles defaults (api/agent/prompt-structure.js) + these overrides.';;

@@ -1,7 +1,7 @@
--- Bot approval queue (responded-stage free-trial booking agent). The live queue
--- is computed from GHL; this table is the audit of what the bot proposed vs what
--- a human approved/adjusted + sent. Plus a `scope` flag on lessons so academy-
--- specific learnings stay local. (Applied via Supabase MCP 2026-06-19.)
+-- Log of bot-drafted replies that a human approved/adjusted + sent, for the
+-- "responded" stage free-trial booking agent. The live queue is computed from
+-- GHL (responded-stage contacts whose last message is inbound); this table is
+-- the audit/analytics record of what the bot proposed vs what went out.
 create table if not exists public.agent_approvals (
   id                   uuid primary key default gen_random_uuid(),
   client_id            uuid references public.clients(id) on delete cascade,
@@ -15,7 +15,7 @@ create table if not exists public.agent_approvals (
   reply_count          int,
   booking_asks         int,
   adjusted             boolean not null default false,
-  status               text not null default 'sent',
+  status               text not null default 'sent',  -- 'sent' | 'skipped'
   lesson_id            uuid,
   created_by           text,
   created_at           timestamptz not null default now()
@@ -27,9 +27,12 @@ create policy agent_approvals_select on public.agent_approvals
 create policy agent_approvals_write on public.agent_approvals
   for all using (is_staff()) with check (is_staff());
 
+-- Learnings scope: 'academy' = stays with this academy (offer/pricing/local —
+-- NEVER auto-promoted); 'general' = sales-craft eligible for promotion to the
+-- shared brain. Default academy (born local).
 alter table public.agent_lessons add column if not exists scope text not null default 'academy';
 
 comment on table public.agent_approvals is
-  'Audit of bot-drafted replies (responded-stage free-trial booking agent) approved/adjusted and sent by a human.';
+  'Audit of bot-drafted replies (responded-stage free-trial booking agent) that a human approved/adjusted and sent.';
 comment on column public.agent_lessons.scope is
-  'academy = local to this academy, never auto-promoted; general = sales-craft, promotable to the shared brain by BAM staff.';
+  'academy = local to this academy, never auto-promoted (offer/pricing/local facts); general = sales-craft, promotable to shared brain by BAM staff.';;

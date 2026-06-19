@@ -24,4 +24,4 @@ create policy kpi_offer_links_read on public.kpi_offer_links
 
 drop policy if exists kpi_offer_links_write on public.kpi_offer_links;
 create policy kpi_offer_links_write on public.kpi_offer_links
-  for all using (is_staff()) with check (is_staff());
+  for all using (is_staff()) with check (is_staff());;
