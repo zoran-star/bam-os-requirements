@@ -56,6 +56,24 @@ replaces them later.
    escalate. Sends via GHL so replies stay in the team inbox.
 4. **Agent auto + retire GHL workflows** (escalation rails stay).
 
+## Agent Sandbox — BUILT 2026-06-18 (PR #469, live)
+Step 1 of the brain. Staff-only `/sandbox` page (portal.byanymeansbusiness.com/
+sandbox) — trainer role-plays as a parent, the Claude agent proposes replies.
+TRAINING ONLY: zero GHL/SMS side effects. Pieces:
+- `api/agent/bam-gta-prompt.js` — BAM GTA booking prompt vendored into the portal
+  (source of truth stays sales-conversation-agents/...-bam-gta.txt; regenerate
+  the .js if it changes).
+- `api/agent-sandbox.js` — staff-gated; action `chat` → Claude `claude-sonnet-4-6`
+  via forced `propose_reply` tool → {reply, reasoning, confidence, escalate};
+  `teach`/`lessons`/`forget` manage training lessons. ACTIVE LESSONS ARE
+  INJECTED into the system prompt at reply time → a correction takes effect on
+  the next message. Defaults to BAM GTA client.
+- `agent_lessons` table (migration 20260618160000) — per-academy corrections.
+- `src/sandbox/SandboxApp.jsx` + `/sandbox` lazy route in main.jsx.
+NOT YET BUILT (next): tools (check availability / book / move card), reading the
+P1 spine to wake on a real reply, sending via GHL. Base-prompt editor (Playbook)
++ lesson promotion-to-global also later.
+
 ## Training rollout (Zoran's 5 steps)
 1. Draft the shared system prompt together (seed: sales-conversation-agents/
    conversation-ai-booking-agent-bam-gta.txt, versioned).
