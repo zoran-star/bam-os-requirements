@@ -1,7 +1,8 @@
 -- Trainer-curated few-shot examples for the sales agent, captured in the
 -- Sandbox ("⭐ Save as example" on a good exchange). When an academy has any
 -- saved examples, they're injected into the prompt as the style guide IN PLACE
--- OF the default examples. (Applied via Supabase MCP 2026-06-19.)
+-- OF the default examples — so the agent's tone follows the trainer's own
+-- approved exchanges. Per-academy.
 create table if not exists public.agent_examples (
   id          uuid primary key default gen_random_uuid(),
   client_id   uuid not null references public.clients(id) on delete cascade,
@@ -20,4 +21,4 @@ create policy agent_examples_write on public.agent_examples
   for all using (is_staff()) with check (is_staff());
 
 comment on table public.agent_examples is
-  'Trainer-curated few-shot examples for the sales agent (captured in the Sandbox). When present, injected into the prompt in place of the default examples.';
+  'Trainer-curated few-shot examples for the sales agent (captured in the Sandbox). When present, injected into the prompt in place of the default examples.';;
