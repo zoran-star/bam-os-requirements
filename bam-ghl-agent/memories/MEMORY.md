@@ -2,6 +2,8 @@
 
 Project notes for the BAM GHL Agent / portal work. Read the relevant file when its topic comes up.
 
+- [V1.5 Onboarding Tracker](project_v15_onboarding_tracker.md) — **living board** for getting every training academy onto V1.5 (text leads + use pipelines). Definition of done (core vs polish), per-academy status, per-location connect process. DETAIL Miami = first one live.
+
 - [Session pickup — KPI + Sales (2026-06-10)](project_session_pickup_kpi_sales.md) — **READ FIRST when resuming.** What's live (KPI dashboard, journey board, Sales tab wizard, member docs, clients status bar) + open follow-ups.
 
 - [Per-member documents (waivers etc)](project_member_documents.md) — signed waivers/media/medical stored per member in a PRIVATE `member-files` bucket + `member_files` table (signed URLs), shown in the Members popup → Documents. Mirrors `offer_files` but private. Vercel intake-form auto-drop is the follow-up.
