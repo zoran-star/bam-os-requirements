@@ -64,8 +64,12 @@ self-signup → New-User webhook payload → email match → grant) proven with 
 1. Zoran's **"New User → Send to External Webhook"** automation is BUILT + fired in
    testing (URL `…/api/coachiq/user-created?secret=…`, body `coachiq_user_id={{user.id}}`
    + `email={{user.email}}`). Confirm it's published/on.
-2. **Per-price UI** — a field in the Pricing Catalog to paste each price's CoachIQ link
-   (Zoran wants to fill them in himself). NOT built; GTA prefilled via DB.
+2. **Per-price UI** — ✅ BUILT (PR #473). "🔗 CoachIQ links" button in client-portal.html
+   **Business Blueprint topbar** (V2-gated `data-feature="members"`) → modal lists live
+   routable prices, paste/save each price's CoachIQ automation URL. Backed by new
+   **PATCH /api/pricing** ({client_id, stripe_price_id, coachiq_automation_url}; staff or
+   the client's own users; https-or-blank). pricing_catalog GET is `select=*` so the field
+   round-trips automatically.
 3. **Confirmation-page UX** (download app / make account at group login / book / credits)
    — NOT built; bam-client-sites `enroll.jsx`. "See credits" can only show the GRANTED
    amount (no public API for live balance; live balance is in the app).
