@@ -7,6 +7,34 @@ metadata:
 
 # CoachIQ integration
 
+## ⭐ 2026-06-19 — MEMBER IMPORT + CoachIQ (5-step wizard, built + live)
+
+Member Import (Pricing Sorter `members` mode) restructured to: **Import → Stripe →
+CoachIQ → GHL → Finish(promote)**. Lives in client-portal.html, launched from the
+Members tab. Promote moved from the old step-3 to the final Finish step.
+
+- Schema: `clients.coachiq_enabled` (per-academy toggle; GTA=true), `members_staging`
+  `coachiq_member_id` + `coachiq_not_applicable`. Promote copies coachiq_member_id → members.
+- **Auto-link**: cleanup `link-customer` harvests the member's CoachIQ USER id from the
+  resolved Stripe sub's `metadata.userId` (CoachIQ stamps it on subs it created) → staging.
+- **CoachIQ "listening session" step** (step 4, only if coachiq_enabled): polls
+  `/api/sorter/cleanup?action=coachiq-status` every 4s, lists members, checks each off live
+  as ids arrive; per-member paste user-id or "not on CoachIQ"; flags unmatched tag webhooks.
+  Never blocks promote. Backed by `coachiq-status` + `coachiq-set` cleanup actions.
+- **Tag-listening webhook (VERIFIED 2026-06-19):** CoachIQ "User Tag Added" automation →
+  Send to External Webhook → `POST /api/coachiq/link-user?secret=…` with
+  `coachiq_user_id={{user.id}}` + `email={{user.email}}`. CONFIRMED the tag-added payload
+  carries the real **user id** (not profile id). link-user matches by email across
+  members_staging + members, stamps coachiq_member_id, NO product grant, logs to
+  `coachiq_link_events` (matched/unmatched) for the listening UI.
+- ⚠️ The CoachIQ admin URL `admin.coachiq.io/…?profile=<id>` = PROFILE id, which does NOT
+  grant. The user id only comes from Stripe metadata (auto) or the tag webhook. No CoachIQ
+  page exposes the user id directly.
+
+**REMAINING for import:** Zoran builds the real "tag added → link-user" automation (tested
+with tag "intro"); then upload GTA's CSV → run the 5 steps → promote. Then member-mgmt buttons.
+
+
 ## ⭐ 2026-06-18 — TRACK A ONBOARDING = SELF-SIGNUP MODEL (NO ZAPIER), live + tested
 
 **Decision: NO Zapier.** Zapier gates webhooks + multi-step Zaps behind a paid plan
