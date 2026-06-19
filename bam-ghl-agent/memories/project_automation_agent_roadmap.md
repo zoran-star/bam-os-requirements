@@ -94,6 +94,27 @@ NOT YET BUILT (next): tools (check availability / book / move card), reading the
 P1 spine to wake on a real reply, sending via GHL. Base-prompt editor (Playbook)
 + lesson promotion-to-global also later.
 
+## Bot takeover — human-approved (building 2026-06-19)
+Agent's job here = book a free trial for leads in the "responded" stage; EVERY
+send is human-approved (no autonomy yet). Phase A SHIPPED (PRs #504 backend,
+#505 inbox UI):
+- `api/agent-approvals.js` (staff-gated): `list` (responded-stage contacts whose
+  last GHL msg is inbound) · `draft` (pulls real GHL thread, runs the same brain
+  as the sandbox — assemblePrompt + lessons + examples — returns reply +
+  reasoning + confidence + reply_count + booking_asks) · `send` (fires the
+  human-approved reply via GHL conversations/messages, logs `agent_approvals`,
+  optional learning). Reuses pickGhlToken/ghl from ghl/_core.js.
+- Inbox "🤖 Bot" tab in client-portal.html (`_botRenderQueue`/`_botOpenApproval`/
+  `_botRenderApproval`/`_botSend`): approval drawer, Confirm&send / Adjust(+save
+  learning) / Skip, auto-advance. Confirm = LIVE real SMS (Zoran's choice).
+- `agent_approvals` table + `agent_lessons.scope` ('academy' default = stays
+  local, never auto-promoted; 'general' = promotable). Migration 20260619160000.
+- Learnings model (decided): ONE source (agent_lessons), TWO views — client
+  portal "Agent learnings" tab (read-only, builds trust) + staff portal manage/
+  promote panel. Academy-specific (offer/pricing/local) learnings NEVER promoted.
+TODO: Phase B learnings tabs (client + staff). Phase C reminders to 4165733718
+(every 2h: # waiting; + per-new-chat text) — needs a cron + spine hook.
+
 ## Training rollout (Zoran's 5 steps)
 1. Draft the shared system prompt together (seed: sales-conversation-agents/
    conversation-ai-booking-agent-bam-gta.txt, versioned).
