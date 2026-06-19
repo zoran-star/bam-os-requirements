@@ -20588,7 +20588,7 @@ function openPricingSorter(step) {
   //   mode 'match'   (step 1)      → "Price Match", lives in BB → Offers
   //   mode 'members' (steps 2/3/4) → Import / Cleanup / Link GHL, lives in
   //                                  the Members section
-  const startStep = (step === 2 || step === 3 || step === 4) ? step : 1;
+  const startStep = (step >= 2 && step <= 6) ? step : 1;
   _SORTER = { step: startStep, mode: startStep === 1 ? 'match' : 'members', batchId: null, match: { proposals: [], targets: [] }, map: { headers: [], rows: [], mapping: [] }, staging: [], checks: null };
   const overlay = document.getElementById('pc-sorter-overlay');
   const modal = document.getElementById('pc-sorter-modal');
@@ -20612,6 +20612,7 @@ function _sorterSnapshot() {
 }
 
 function closePricingSorter() {
+  if (_SORTER && _SORTER._ciqPoll) { clearInterval(_SORTER._ciqPoll); _SORTER._ciqPoll = null; }
   // Unsaved-matches guard (Price Match only): dragging assignments around
   // does nothing until Approve & Save — closing would silently lose them.
   if (_SORTER && _SORTER.mode === 'match' && _SORTER.savedSnapshot != null
@@ -20638,7 +20639,7 @@ function _sorterRender() {
   const members = _SORTER.mode === 'members';
   const title = members ? '👥 Member Import' : '🧮 Price Match';
   const steps = members
-    ? [['2', 'Import'], ['3', 'Cleanup'], ['4', 'Link GHL']]
+    ? [['2', 'Import'], ['3', 'Stripe'], ['4', 'CoachIQ'], ['5', 'GHL'], ['6', 'Finish']]
     : [['1', 'Match']];
   const minStep = members ? 2 : 1;
   const dots = steps.map(([n, label]) => {
@@ -20674,7 +20675,9 @@ function _sorterRenderBody() {
   if (_SORTER.step === 1) _sorterRenderStep1(host);
   else if (_SORTER.step === 2) _sorterRenderStep2(host);
   else if (_SORTER.step === 3) _sorterRenderStep3(host);
-  else if (_SORTER.step === 4) _sorterRenderStep4(host);
+  else if (_SORTER.step === 4) _sorterRenderStepCoachiq(host);
+  else if (_SORTER.step === 5) _sorterRenderStep4(host);
+  else if (_SORTER.step === 6) _sorterRenderStepFinish(host);
 }
 
 // Navigate to a step (backwards from the stepper dots or the Back button),
@@ -20684,6 +20687,7 @@ function _sorterGoto(n) {
   if (n === _SORTER.step) return;
   const minStep = _SORTER.mode === 'members' ? 2 : 1;
   if (n < minStep) return;
+  if (_SORTER._ciqPoll) { clearInterval(_SORTER._ciqPoll); _SORTER._ciqPoll = null; }
   _SORTER.step = n;
   _sorterRender();
   if (n === 1 && !(_SORTER.match.targets || []).length) _sorterLoadStep1();
@@ -21556,8 +21560,7 @@ function _sorterRenderStep3(host) {
     </table>
     <div id="pc-sorter-connect-host"></div>`;
 
-  const canPromote = (counts.clean || 0) > 0;
-  _sorterSetNext(`<button onclick="_sorterPromote()" ${canPromote ? '' : 'disabled'} style="font-size:13px;font-weight:700;padding:9px 18px;border-radius:9px;border:none;background:${canPromote ? 'var(--accent,#E8C547)' : 'rgba(255,255,255,0.08)'};color:${canPromote ? '#1a1a1a' : 'var(--text-mute,#888)'};cursor:${canPromote ? 'pointer' : 'not-allowed'};">✅ Promote ${counts.clean || 0} clean members</button>`);
+  _sorterSetNext(`<button onclick="_sorterGoto(4)" style="font-size:13px;font-weight:700;padding:9px 18px;border-radius:9px;border:none;background:var(--accent,#E8C547);color:#1a1a1a;cursor:pointer;">Next: CoachIQ &rarr;</button>`);
 }
 
 // ── Step 3 one-tap fixes — mutate staging server-side, update local state, re-render ──
@@ -22461,11 +22464,93 @@ async function _sorterPromote() {
     alert('Promoted ' + n + ' member' + (n === 1 ? '' : 's') + ' to your live roster.');
     if (typeof fetchAndRenderPricing === 'function') fetchAndRenderPricing();
     if (typeof fetchAndRenderMembers === 'function') fetchAndRenderMembers();
-    // Last leg of the Members flow: link the new roster to GHL contacts.
-    _sorterGoto(4);
+    // Finish step — import complete.
+    closePricingSorter();
   } catch (e) {
     alert('Promote failed: ' + e.message);
   }
+}
+
+// ───────────────────────────── STEP 4 — CoachIQ (listening session) ─────────────────────
+// Add your CoachIQ link tag to each client → tag-added webhook → /api/coachiq/link-user
+// stamps coachiq_member_id on the matching staging row. This panel polls + checks off live.
+function _sorterRenderStepCoachiq(host) {
+  host.innerHTML = `<div id="pc-sorter-ciq-host" style="font-size:13px;color:var(--text-mute,#888);">Loading…</div>`;
+  _sorterSetNext(`<button onclick="_sorterGoto(5)" style="font-size:13px;font-weight:700;padding:9px 18px;border-radius:9px;border:none;background:var(--accent,#E8C547);color:#1a1a1a;cursor:pointer;">Next: GHL &rarr;</button>`);
+  _sorterCiqLoad();
+  if (_SORTER._ciqPoll) clearInterval(_SORTER._ciqPoll);
+  _SORTER._ciqPoll = setInterval(() => {
+    if (_SORTER.step === 4 && document.getElementById('pc-sorter-ciq-host')) _sorterCiqLoad();
+    else { clearInterval(_SORTER._ciqPoll); _SORTER._ciqPoll = null; }
+  }, 4000);
+}
+async function _sorterCiqLoad() {
+  const host = document.getElementById('pc-sorter-ciq-host');
+  if (!host) return;
+  try {
+    const token = await _mreqAuthToken();
+    const r = await fetch('/api/sorter/cleanup?action=coachiq-status', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token }, body: JSON.stringify({ client_id: _aiClientId(), batch_id: _SORTER.batchId, import_batch_id: _SORTER.batchId }) });
+    const json = await _safeJson(r);
+    if (!r.ok) throw new Error(json.error || ('HTTP ' + r.status));
+    _sorterCiqRender(json);
+  } catch (e) { host.innerHTML = '<div style="color:var(--danger,#e0654f);">' + escapeHTML(e.message || String(e)) + '</div>'; }
+}
+function _sorterCiqRender(json) {
+  const host = document.getElementById('pc-sorter-ciq-host');
+  if (!host) return;
+  if (!json.coachiq_enabled) { host.innerHTML = '<div style="border:1px solid var(--border,#2a2a31);border-radius:10px;padding:14px 16px;">CoachIQ is off for this academy — nothing to link here. Click Next.</div>'; return; }
+  const members = json.members || [];
+  const linked = members.filter(m => m.coachiq_member_id).length;
+  const na = members.filter(m => m.coachiq_not_applicable).length;
+  const waiting = members.length - linked - na;
+  const intro = `<div style="font-size:12.5px;color:var(--text-mute,#888);margin-bottom:12px;">Add your CoachIQ link tag to each client in CoachIQ — as the tag fires they check off here automatically. <b style="color:var(--text,#eee);">${linked}</b> linked · ${waiting} waiting · ${na} not on CoachIQ.</div>`;
+  const rows = members.map(m => {
+    const name = escapeHTML(m.athlete_name || m.parent_name || m.parent_email || '');
+    const email = escapeHTML(m.parent_email || '');
+    let badge, controls = '';
+    if (m.coachiq_member_id) { badge = '<span style="color:#7BC47F;font-weight:700;font-size:11px;">● linked</span>'; }
+    else if (m.coachiq_not_applicable) { badge = '<span style="color:var(--text-mute,#888);font-size:11px;">○ not on CoachIQ</span>'; controls = `<button onclick="_sorterCiqSet('${m.id}',{not_applicable:false})" style="font-size:10px;border:1px solid var(--border,#2a2a31);background:transparent;color:var(--text-mute,#888);border-radius:6px;padding:3px 7px;cursor:pointer;">undo</button>`; }
+    else { badge = '<span style="color:#e0a93f;font-size:11px;">&#9203; waiting</span>'; controls = `<input id="ciqin-${m.id}" placeholder="paste user id" style="width:120px;font-size:11px;padding:4px 6px;border-radius:6px;border:1px solid var(--border,#2a2a31);background:var(--bg,#0e0e11);color:var(--text,#eee);" /><button onclick="_sorterCiqSet('${m.id}',{coachiq_member_id:(document.getElementById('ciqin-${m.id}')||{}).value||''})" style="font-size:10px;border:1px solid var(--accent,#E8C547);background:rgba(232,197,71,0.12);color:var(--accent,#E8C547);border-radius:6px;padding:3px 7px;cursor:pointer;">save</button><button onclick="_sorterCiqSet('${m.id}',{not_applicable:true})" style="font-size:10px;border:1px solid var(--border,#2a2a31);background:transparent;color:var(--text-mute,#888);border-radius:6px;padding:3px 7px;cursor:pointer;">not on CoachIQ</button>`; }
+    return `<div style="display:flex;align-items:center;gap:8px;border:1px solid var(--border,#2a2a31);border-radius:8px;padding:8px 10px;margin-bottom:6px;">
+      <div style="flex:1;min-width:0;font-size:12px;"><b style="color:var(--text,#eee);">${name}</b> <span style="color:var(--text-mute,#888);">${email}</span></div>
+      <div style="flex:none;display:flex;align-items:center;gap:6px;flex-wrap:wrap;justify-content:flex-end;">${badge} ${controls}</div>
+    </div>`;
+  }).join('');
+  const um = json.unmatched || [];
+  const flags = um.length ? `<div style="margin-top:12px;font-size:11px;color:#e0a93f;">&#9888; ${um.length} tag(s) fired for emails not in this import: ${um.slice(0, 5).map(u => escapeHTML(u.email || '?')).join(', ')}${um.length > 5 ? '…' : ''}</div>` : '';
+  host.innerHTML = intro + (rows || '<div style="color:var(--text-mute,#888);">No members in this import.</div>') + flags;
+}
+async function _sorterCiqSet(stagingId, patch) {
+  try {
+    const token = await _mreqAuthToken();
+    const r = await fetch('/api/sorter/cleanup?action=coachiq-set', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token }, body: JSON.stringify({ client_id: _aiClientId(), batch_id: _SORTER.batchId, import_batch_id: _SORTER.batchId, staging_id: stagingId, ...patch }) });
+    const json = await _safeJson(r);
+    if (!r.ok) throw new Error(json.error || ('HTTP ' + r.status));
+    _sorterCiqLoad();
+  } catch (e) { alert('Save failed: ' + e.message); }
+}
+
+// ───────────────────────────── STEP 6 — Finish (promote to live roster) ─────────────────
+function _sorterRenderStepFinish(host) {
+  host.innerHTML = `
+    <div style="font-size:12.5px;color:var(--text-mute,#888);margin-bottom:14px;">Last step. Promote your cleaned-up members to the live roster. Only members that passed Stripe cleanup are promoted; anything still flagged stays in staging.</div>
+    <div id="pc-sorter-finish-host" style="font-size:13px;color:var(--text-mute,#888);">Checking…</div>`;
+  _sorterSetNext('');
+  (async () => {
+    try {
+      const token = await _mreqAuthToken();
+      const r = await fetch('/api/sorter/cleanup?action=check', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token }, body: JSON.stringify({ client_id: _aiClientId(), batch_id: _SORTER.batchId, import_batch_id: _SORTER.batchId }) });
+      const json = await _safeJson(r);
+      const counts = (json && json.counts) || {};
+      const clean = counts.clean || 0;
+      const fhost = document.getElementById('pc-sorter-finish-host');
+      if (fhost) fhost.innerHTML = `<div style="border:1px solid var(--border,#2a2a31);border-radius:10px;padding:14px 16px;"><b style="color:var(--text,#eee);">${clean}</b> member${clean === 1 ? '' : 's'} ready to promote${counts.needs_work ? ` · <span style="color:#e0a93f;font-weight:700;">${counts.needs_work} still flagged (left in staging)</span>` : ''}.</div>`;
+      _sorterSetNext(`<button onclick="_sorterPromote()" ${clean > 0 ? '' : 'disabled'} style="font-size:13px;font-weight:700;padding:9px 18px;border-radius:9px;border:none;background:${clean > 0 ? 'var(--accent,#E8C547)' : 'rgba(255,255,255,0.08)'};color:${clean > 0 ? '#1a1a1a' : 'var(--text-mute,#888)'};cursor:${clean > 0 ? 'pointer' : 'not-allowed'};">&#9989; Promote ${clean} to live roster</button>`);
+    } catch (e) {
+      const fhost = document.getElementById('pc-sorter-finish-host');
+      if (fhost) fhost.innerHTML = '<div style="color:var(--danger,#e0654f);">' + escapeHTML(e.message || String(e)) + '</div>';
+    }
+  })();
 }
 
 // ───────────────────────────── STEP 4 — link GHL contacts ─────────────────────────────
@@ -22477,7 +22562,7 @@ function _sorterRenderStep4(host) {
     <div id="pc-sorter-ghl-host">
       <button onclick="_sorterRunGhlLink()" style="font-size:13px;font-weight:700;padding:9px 16px;border-radius:9px;border:1px solid var(--accent,#E8C547);background:rgba(232,197,71,0.12);color:var(--accent,#E8C547);cursor:pointer;">Find GHL matches</button>
     </div>`;
-  _sorterSetNext(`<button onclick="closePricingSorter();if(typeof fetchAndRenderMembers==='function')fetchAndRenderMembers();" style="font-size:13px;font-weight:700;padding:9px 18px;border-radius:9px;border:none;background:var(--accent,#E8C547);color:#1a1a1a;cursor:pointer;">Done ✓</button>`);
+  _sorterSetNext(`<button onclick="_sorterGoto(6)" style="font-size:13px;font-weight:700;padding:9px 18px;border-radius:9px;border:none;background:var(--accent,#E8C547);color:#1a1a1a;cursor:pointer;">Next: Finish &rarr;</button>`);
 }
 
 async function _sorterRunGhlLink() {
