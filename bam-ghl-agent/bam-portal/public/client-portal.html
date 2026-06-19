@@ -20142,7 +20142,7 @@ function closeAiMatch() {
 // "Add a Product Purchase" automation webhook URL → saved to
 // pricing_catalog.coachiq_automation_url via PATCH /api/pricing. On a paid
 // signup the portal fires that URL to grant the product.
-async function openCoachiqLinks() {
+async function openCoachiqLinks(highlightKeys) {
   const modal = document.getElementById('ciq-links-modal');
   const overlay = document.getElementById('ciq-links-overlay');
   if (!modal) return;
@@ -20160,30 +20160,31 @@ async function openCoachiqLinks() {
     const r = await fetch('/api/pricing' + qs, { headers: { Authorization: 'Bearer ' + token } });
     const json = await _safeJson(r);
     if (!r.ok) throw new Error(json.error || ('HTTP ' + r.status));
-    _renderCoachiqLinks(json);
+    _renderCoachiqLinks(json, highlightKeys);
   } catch (e) {
     const b = document.getElementById('ciq-links-body');
     if (b) b.innerHTML = '<div style="color:var(--danger,#e0654f);">' + escapeHTML(e.message || String(e)) + '</div>';
   }
 }
 
-function _renderCoachiqLinks(json) {
+function _renderCoachiqLinks(json, highlightKeys) {
   const body = document.getElementById('ciq-links-body');
   if (!body) return;
   let rows = ((json && json.catalog) || []).filter(r => r && r.stripe_price_id);
   if (!rows.length) { body.innerHTML = 'No Stripe prices found.'; return; }
-  // LIVE (canonical) first, then legacy
-  rows = rows.slice().sort((a, b) => ((b.tier === 'canonical') ? 1 : 0) - ((a.tier === 'canonical') ? 1 : 0));
+  // LIVE (routable — the price new signups actually use) first, then legacy/archived.
+  rows = rows.slice().sort((a, b) => ((b.is_routable === true) ? 1 : 0) - ((a.is_routable === true) ? 1 : 0));
   body.innerHTML = rows.map((row, i) => {
     const pid = escapeHTML(row.stripe_price_id);
+    const opk = escapeHTML(row.offer_price_key || '');
     const name = escapeHTML(row.display_name || row.stripe_price_id);
     const url = row.coachiq_automation_url || '';
     const on = !!url;
-    const live = row.tier === 'canonical';
+    const live = row.is_routable === true;
     const badge = live
       ? '<span style="font-size:10px;font-weight:700;color:#7BC47F;border:1px solid #1f7a3d;border-radius:999px;padding:2px 8px;">LIVE</span>'
       : '<span style="font-size:10px;font-weight:700;color:var(--text-mute,#888);border:1px solid var(--border,#2a2a31);border-radius:999px;padding:2px 8px;">LEGACY</span>';
-    return `<div style="border:1px solid var(--border,#2a2a31);border-radius:10px;padding:12px 14px;margin-bottom:10px;">
+    return `<div data-ciq-opk="${opk}" style="border:1px solid var(--border,#2a2a31);border-radius:10px;padding:12px 14px;margin-bottom:10px;">
       <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:6px;">
         <div style="min-width:0;"><span style="font-weight:700;color:var(--text,#eee);">${name}</span> ${badge}
           <div style="font-family:monospace;font-size:11px;color:var(--text-mute,#888);">${pid}</div></div>
@@ -20198,6 +20199,19 @@ function _renderCoachiqLinks(json) {
       <span id="ciq-st-${i}" style="font-size:11px;margin-top:6px;display:inline-block;"></span>
     </div>`;
   }).join('');
+  // When opened from a plan's pill, scroll to + highlight that plan's price rows.
+  const hk = Array.isArray(highlightKeys) ? highlightKeys.filter(Boolean) : [];
+  if (hk.length) {
+    let first = null;
+    body.querySelectorAll('[data-ciq-opk]').forEach(el => {
+      if (hk.indexOf(el.getAttribute('data-ciq-opk')) >= 0) {
+        el.style.borderColor = 'var(--accent,#E8C547)';
+        el.style.boxShadow = '0 0 0 1px var(--accent,#E8C547)';
+        if (!first) first = el;
+      }
+    });
+    if (first && first.scrollIntoView) first.scrollIntoView({ block: 'center' });
+  }
 }
 
 // Switch toggled: ON → reveal + focus input; OFF → hide + immediately clear the link.
@@ -20307,7 +20321,12 @@ function _ciqPill(keys) {
   if (!keys || !keys.length) return '';
   setTimeout(_ciqApplyPills, 0);
   const ks = keys.map(k => k.key).join(',');
-  return `<span class="bb-ciq-pill" data-bb-ciq-pill="${_bbEscapeAttr(ks)}" style="font-size:11px;font-weight:700;border-radius:999px;padding:3px 9px;border:1px solid var(--border,#2a2a31);color:var(--text-mute,#888);">CoachIQ…</span>`;
+  return `<span class="bb-ciq-pill" data-bb-ciq-pill="${_bbEscapeAttr(ks)}" onclick="event.stopPropagation();_ciqPillClick(this)" style="font-size:11px;font-weight:700;border-radius:999px;padding:3px 9px;border:1px solid var(--border,#2a2a31);color:var(--text-mute,#888);cursor:pointer;">CoachIQ…</span>`;
+}
+// Click the CoachIQ pill → open the CoachIQ Links popup scrolled to this plan.
+function _ciqPillClick(el) {
+  const keys = (el.getAttribute('data-bb-ciq-pill') || '').split(',').filter(Boolean);
+  openCoachiqLinks(keys);
 }
 function _ciqApplyPills() {
   const els = document.querySelectorAll('[data-bb-ciq-pill]');
