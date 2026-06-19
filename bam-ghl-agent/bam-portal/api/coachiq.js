@@ -122,15 +122,47 @@ export async function addCoachiqCredits(coachiqUserId, extra = {}, cfg = {}) {
   return triggerCoachiqAutomation(automationId, { user: { id: coachiqUserId }, ...extra }, cfg);
 }
 
+// POST to a full CoachIQ automation webhook URL (the value pasted per Stripe price in
+// pricing_catalog.coachiq_automation_url) with the CoachIQ auth headers. Same success
+// semantics as triggerCoachiqAutomation.
+async function postCoachiqWebhook(url, payload, cfg = {}) {
+  const c = coachiqConfig(cfg);
+  if (!c.apiKey)  throw new Error("CoachIQ: missing COACHIQ_API_KEY");
+  if (!c.groupId) throw new Error("CoachIQ: missing COACHIQ_GROUP_ID");
+  const resp = await fetch(url, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${c.apiKey}`,
+      "x-group-id": c.groupId,
+    },
+    body: JSON.stringify(payload || {}),
+  });
+  const text = await resp.text();
+  let json = null; try { json = JSON.parse(text); } catch { /* non-JSON */ }
+  if (!resp.ok || (json && json.success === false)) {
+    const msg = (json && (json.message || json.error)) || text.slice(0, 200);
+    throw new Error(`CoachIQ webhook failed (${resp.status}): ${msg}`);
+  }
+  return json || { raw: text };
+}
+
 // Grant a CoachIQ product (+ program access + starter credits) to a user, with no
-// payment — they already paid in the portal. Fires the "Add a Product Purchase to a
-// User" automation, resolved per plan|term (map → default). Same proven webhook
-// shape as addCoachiqCredits; target is the CoachIQ USER id.
-export async function addCoachiqProduct(coachiqUserId, { plan, term, ...extra } = {}, cfg = {}) {
+// payment — they already paid in the portal. The product automation is resolved by:
+//   1. an explicit `automationUrl` (the per-Stripe-price coachiq_automation_url) — preferred,
+//   2. else the per-plan|term env map / COACHIQ_PRODUCT_AUTOMATION_ID default.
+// `sub_id` (the portal-owned Stripe subscription) is sent so the CoachIQ automation can
+// store it on the product → CoachIQ knows the renewal date to refresh credits.
+export async function addCoachiqProduct(coachiqUserId, { plan, term, automationUrl, ...extra } = {}, cfg = {}) {
   if (!coachiqUserId) throw new Error("CoachIQ: coachiqUserId is required");
+  const payload = { user: { id: coachiqUserId }, plan, term, ...extra };
+  if (automationUrl) {
+    const res = await postCoachiqWebhook(automationUrl, payload, cfg);
+    return { ok: true, automationUrl, res };
+  }
   const automationId = coachiqProductAutomationFor(plan, term, cfg);
-  if (!automationId) throw new Error("CoachIQ: no product automation id for plan|term (set COACHIQ_PRODUCT_AUTOMATION_ID or COACHIQ_PRODUCT_MAP)");
-  const res = await triggerCoachiqAutomation(automationId, { user: { id: coachiqUserId }, plan, term, ...extra }, cfg);
+  if (!automationId) throw new Error("CoachIQ: no product automation (price has no coachiq_automation_url, and no COACHIQ_PRODUCT_AUTOMATION_ID/MAP)");
+  const res = await triggerCoachiqAutomation(automationId, payload, cfg);
   return { ok: true, automationId, res };
 }
 
