@@ -107,7 +107,8 @@ function buildSystem(lessons, overrides, leadContext, examples) {
     `When escalating, still give a short reasoning and leave 'reply' empty.\n` +
     `If you decide you should follow up with the lead LATER (e.g. they said to check back, or they went quiet and your follow-up logic applies), ` +
     `set 'followup' = true, 'followup_when' to a short human description of when (e.g. "Sunday evening", "tomorrow afternoon", "in 2 days"), ` +
-    `and 'followup_message' to exactly what you'd send then. Still give your immediate 'reply' too. If no later follow-up is needed, leave 'followup' false.\n</sandbox_mode>`;
+    `and 'followup_message' to exactly what you'd send then. Still give your immediate 'reply' too. If no later follow-up is needed, leave 'followup' false.\n` +
+    `Set 'asked_to_book' = true whenever your reply invites the lead to come in, book, try a session, or check it out — even subtly.\n</sandbox_mode>`;
   return sys;
 }
 
@@ -174,8 +175,14 @@ async function handleChat(messages, clientId, leadContext, res) {
   const tool = (data.content || []).find(b => b.type === "tool_use" && b.name === "propose_reply");
   if (!tool?.input) return res.status(502).json({ error: "no structured reply from Claude" });
 
+  // Book-ask detection: trust the model's flag OR detect an invite phrase in the
+  // reply (the model under-reports the flag, so back it with a keyword check).
+  const replyText = tool.input.reply || "";
+  const BOOK_ASK = /(would you like to|want to|wanna|do you want to|happy to have you|can you make it|are you free).*(come|book|try|drop by|stop by|swing by|check|visit|session)|come (by|in|on (in|by)|and (see|try|check)|check (it|us) out)|check (it|us) out|book(ing)? (a|the|your|in)?\s*(free\s*)?(trial|session|spot)|(grab|reserve|save) (a|the|your)?\s*spot|see if it'?s a (good )?fit|pop (by|in)|see you (there|then)/i;
+  const bookAsk = !!tool.input.asked_to_book || BOOK_ASK.test(replyText);
+
   return res.status(200).json({
-    reply:        tool.input.reply || "",
+    reply:        replyText,
     reasoning:    tool.input.reasoning || "",
     confidence:   typeof tool.input.confidence === "number" ? tool.input.confidence : null,
     escalate:     !!tool.input.escalate,
@@ -183,7 +190,7 @@ async function handleChat(messages, clientId, leadContext, res) {
     followup:     !!tool.input.followup,
     followup_when: tool.input.followup_when || null,
     followup_message: tool.input.followup_message || null,
-    asked_to_book: !!tool.input.asked_to_book,
+    asked_to_book: bookAsk,
     lessons_applied: lessons.filter(l => l.kind !== "good").length,
   });
 }
