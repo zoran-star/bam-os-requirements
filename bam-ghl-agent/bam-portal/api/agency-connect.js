@@ -1,4 +1,4 @@
-import { withSentryApiRoute } from "../_sentry.js";
+import { withSentryApiRoute } from "./_sentry.js";
 import crypto from "node:crypto";
 // ── Path B: GHL Agency (Company) connect + bulk sub-account token minting ──
 //
