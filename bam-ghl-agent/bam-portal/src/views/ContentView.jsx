@@ -13,6 +13,10 @@ export default function ContentView({ tokens: tk, dark, me, session }) {
   const [banner, setBanner]       = useState(null);
   const [error, setError]         = useState("");
 
+  // Managers/admin can manage the content routing roster (who owns each client's
+  // organic vs ads content). Executors don't see this tab. Mirrors CONTENT_MANAGER_ROLES.
+  const canManageRouting = ["admin", "scaling_manager", "marketing_manager"].includes(me?.role);
+
   // ─── fetchGuides must be defined BEFORE the useEffect that calls it
   //     (it's an arrow-function const, not a hoisted function declaration).
   //     And both must live ABOVE any conditional return so the hook order
@@ -107,6 +111,9 @@ export default function ContentView({ tokens: tk, dark, me, session }) {
     <div style={{ display: "flex", gap: 4, borderBottom: `1px solid ${tk.border}`, marginBottom: 24 }}>
       <MainTab label="Tickets" active={mainTab === "tickets"} onClick={() => setMainTab("tickets")} tk={tk} />
       <MainTab label="Guide cards" active={mainTab === "guides"} onClick={() => setMainTab("guides")} tk={tk} />
+      {canManageRouting && (
+        <MainTab label="Routing" active={mainTab === "routing"} onClick={() => setMainTab("routing")} tk={tk} />
+      )}
     </div>
   );
 
@@ -116,6 +123,16 @@ export default function ContentView({ tokens: tk, dark, me, session }) {
       <div style={{ padding: "24px 28px", color: tk.text }}>
         {renderMainTabs()}
         <ContentTicketsTab tk={tk} session={session} me={me} />
+      </div>
+    );
+  }
+
+  // Routing roster — managers only (guarded by canManageRouting on the tab).
+  if (mainTab === "routing" && canManageRouting) {
+    return (
+      <div style={{ padding: "24px 28px", color: tk.text }}>
+        {renderMainTabs()}
+        <ContentRoutingTab tk={tk} session={session} />
       </div>
     );
   }
@@ -618,10 +635,17 @@ function ContentTicketsTab({ tk, session, me }) {
     return json.ticket;
   }
 
+  // Queue scoping: content executors only work their own assigned creatives;
+  // managers + marketing see the whole board. (Routing assigns organic→Eli,
+  // ads→Cam, so Eli's queue is naturally his organic work.)
+  const scoped = me?.role === "content_executor"
+    ? tickets.filter(t => t.assigned_to === me.id)
+    : tickets;
+
   // Filter rows by sub-tab; sort oldest first per spec
-  const active     = tickets.filter(t => t.status === "active");
-  const clientDep  = tickets.filter(t => t.status === "client-dependent");
-  const completed  = tickets.filter(t => t.status === "completed" || t.status === "cancelled");
+  const active     = scoped.filter(t => t.status === "active");
+  const clientDep  = scoped.filter(t => t.status === "client-dependent");
+  const completed  = scoped.filter(t => t.status === "completed" || t.status === "cancelled");
   const tabRows =
     subTab === "active"           ? active
     : subTab === "client-dependent" ? clientDep
@@ -951,13 +975,13 @@ function ContentTicketDetail({ tk, session, ticket, onBack, onRefetch, patchTick
             {academyName} · Submitted {ticket.submitted_at ? new Date(ticket.submitted_at).toLocaleString() : "—"}
             {ctkLastActivityIso(ticket) ? ` · Last activity ${ctkFormatRelative(ctkLastActivityIso(ticket))}` : ""}
           </div>
-          {/* Owner (Cam) + the client's SM contact to reach out to */}
+          {/* Content owner (channel-routed) + the client's SM contact to reach out to */}
           <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 8 }}>
             <span style={{
               fontSize: 11, fontWeight: 600, color: tk.accent, letterSpacing: "0.04em",
               padding: "3px 10px", borderRadius: 999,
               border: `1px solid ${tk.accent}`, background: `${tk.accent}14`,
-            }}>👤 Owner · {ticket.assigned_to_name || "Cam"}</span>
+            }}>👤 Owner · {ticket.assigned_to_name || "Unassigned"}</span>
             <span style={{
               fontSize: 11, fontWeight: 500, color: tk.textSub, letterSpacing: "0.04em",
               padding: "3px 10px", borderRadius: 999,
@@ -1434,5 +1458,150 @@ function Card({ children, tk, style }) {
       padding: 18,
       ...style,
     }}>{children}</div>
+  );
+}
+
+// ─── Content Routing roster (managers/admin) ────────────────────────────────
+// One screen: who owns each client's organic vs ads content. Blank = the global
+// channel default (organic → Eli, ads → Cam). Writes clients.content_assignee_*.
+// Internal only — clients never see these assignments.
+const ROUTING_OWNER_ROLES = ["admin", "scaling_manager", "marketing_manager", "marketing_executor", "content_executor"];
+
+function ContentRoutingTab({ tk, session }) {
+  const [clients, setClients] = useState([]);
+  const [staff, setStaff]     = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [err, setErr]         = useState("");
+  const [savingKey, setSavingKey] = useState(null);
+  const [q, setQ]             = useState("");
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      setLoading(true); setErr("");
+      try {
+        const [cRes, sRes] = await Promise.all([
+          supabase.from("clients")
+            .select("id,business_name,status,organic_content,content_assignee_organic_id,content_assignee_ads_id")
+            .order("business_name"),
+          supabase.from("staff").select("id,name,role").order("name"),
+        ]);
+        if (cRes.error) throw cRes.error;
+        if (sRes.error) throw sRes.error;
+        if (cancelled) return;
+        setClients((cRes.data || []).filter(c => c.status !== "archived"));
+        setStaff(sRes.data || []);
+      } catch (e) {
+        if (!cancelled) setErr(e.message || String(e));
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  const owners = staff.filter(s => ROUTING_OWNER_ROLES.includes(s.role));
+
+  async function setAssignee(client, channel, staffId) {
+    const field = channel === "organic" ? "content_assignee_organic_id" : "content_assignee_ads_id";
+    const key = `${client.id}:${channel}`;
+    const prevVal = client[field] || null;
+    setSavingKey(key);
+    setClients(prev => prev.map(c => c.id === client.id ? { ...c, [field]: staffId || null } : c));
+    try {
+      const tok = session?.access_token;
+      const res = await fetch(`/api/clients?action=update-fields&id=${client.id}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${tok}` },
+        body: JSON.stringify({ client_id: client.id, [field]: staffId || null }),
+      });
+      const j = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(j.error || `HTTP ${res.status}`);
+    } catch (e) {
+      setClients(prev => prev.map(c => c.id === client.id ? { ...c, [field]: prevVal } : c));
+      alert("Save failed: " + (e.message || e));
+    } finally {
+      setSavingKey(null);
+    }
+  }
+
+  const selStyle = {
+    width: "100%", padding: "7px 9px", fontSize: 13, borderRadius: 6,
+    background: tk.bg, color: tk.text, border: `1px solid ${tk.border}`, cursor: "pointer",
+  };
+
+  const renderSelect = (client, channel) => {
+    const field = channel === "organic" ? "content_assignee_organic_id" : "content_assignee_ads_id";
+    const disabled = channel === "organic" && !client.organic_content;
+    const key = `${client.id}:${channel}`;
+    if (disabled) {
+      return <span style={{ fontSize: 12, color: tk.textMute, fontStyle: "italic" }}>organic off</span>;
+    }
+    return (
+      <select
+        value={client[field] || ""}
+        disabled={savingKey === key}
+        onChange={e => setAssignee(client, channel, e.target.value || null)}
+        style={{ ...selStyle, opacity: savingKey === key ? 0.6 : 1 }}
+      >
+        <option value="">{channel === "organic" ? "Default → Eli" : "Default → Cam"}</option>
+        {owners.map(o => <option key={o.id} value={o.id}>{o.name} · {o.role}</option>)}
+      </select>
+    );
+  };
+
+  const filtered = clients.filter(c =>
+    !q.trim() || (c.business_name || "").toLowerCase().includes(q.trim().toLowerCase())
+  );
+
+  return (
+    <div>
+      <div style={{ fontSize: 13, color: tk.textSub, marginBottom: 16, lineHeight: 1.5 }}>
+        Who produces each client's creatives, per channel. <b style={{ color: tk.text }}>Blank = the channel default</b> —
+        organic routes to the content team (Eli), ads routes to marketing (Cam). New creatives auto-assign by this table; the owner can still be overridden per creative. <b style={{ color: tk.text }}>Clients never see this.</b>
+      </div>
+
+      <input
+        value={q}
+        onChange={e => setQ(e.target.value)}
+        placeholder="Search clients…"
+        style={{
+          width: 260, maxWidth: "100%", padding: "8px 11px", fontSize: 13, marginBottom: 14,
+          background: tk.bg, color: tk.text, border: `1px solid ${tk.border}`, borderRadius: 6,
+        }}
+      />
+
+      {loading && <div style={{ color: tk.textMute, fontSize: 13 }}>Loading roster…</div>}
+      {err && <div style={{ color: tk.red || "#e5484d", fontSize: 13 }}>Failed to load: {err}</div>}
+
+      {!loading && !err && (
+        <div style={{ border: `1px solid ${tk.border}`, borderRadius: 10, overflow: "hidden" }}>
+          <div style={{
+            display: "grid", gridTemplateColumns: "1fr 220px 220px", gap: 0,
+            padding: "10px 14px", background: tk.surfaceEl || tk.surface,
+            fontSize: 10, letterSpacing: "0.14em", textTransform: "uppercase", color: tk.textMute, fontWeight: 700,
+          }}>
+            <span>Client</span><span>🌱 Organic owner</span><span>📣 Ads owner</span>
+          </div>
+          {filtered.map((c, i) => (
+            <div key={c.id} style={{
+              display: "grid", gridTemplateColumns: "1fr 220px 220px", gap: 12,
+              alignItems: "center", padding: "10px 14px",
+              borderTop: `1px solid ${tk.border}`,
+              background: i % 2 ? "transparent" : (tk.surfaceHov ? `${tk.surfaceHov}55` : "transparent"),
+            }}>
+              <span style={{ fontSize: 13, color: tk.text, fontWeight: 600 }}>{c.business_name || "—"}</span>
+              <div>{renderSelect(c, "organic")}</div>
+              <div>{renderSelect(c, "ads")}</div>
+            </div>
+          ))}
+          {!filtered.length && (
+            <div style={{ padding: "14px", color: tk.textMute, fontSize: 13, borderTop: `1px solid ${tk.border}` }}>
+              No clients match “{q}”.
+            </div>
+          )}
+        </div>
+      )}
+    </div>
   );
 }

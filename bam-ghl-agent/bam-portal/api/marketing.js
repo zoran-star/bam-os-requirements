@@ -1,6 +1,6 @@
 import { withSentryApiRoute, captureApiMessage } from "./_sentry.js";
 import crypto from "node:crypto";
-import { MARKETING_OPS_ROLES } from "./_roles.js";
+import { MARKETING_OPS_ROLES, CONTENT_MANAGER_ROLES } from "./_roles.js";
 import { CANONICAL_FUNNEL, mapStageName, buildKpis } from "./_ghl_funnel.js";
 import { notifyClientPush } from "./push/_send.js";
 
@@ -97,9 +97,17 @@ function appendMessage(existing, msg) {
 // Strip messages flagged internal:true before returning to clients.
 // Keeps staff-only chatter (revision handoffs, content team upload notes,
 // internal marketing_notes) out of the client conversation thread.
+// Sanitize a ticket for CLIENT output: drop staff-internal messages AND the
+// internal `assigned_to` owner — clients never see who's assigned to their
+// creative/campaign. Staff reads go through enrichWithClient instead, so this
+// only ever runs on client-facing responses.
 function stripInternalMessages(ticket) {
-  if (!ticket || !Array.isArray(ticket.messages)) return ticket;
-  return { ...ticket, messages: ticket.messages.filter(m => !m?.internal) };
+  if (!ticket) return ticket;
+  const { assigned_to, ...rest } = ticket;
+  if (Array.isArray(rest.messages)) {
+    rest.messages = rest.messages.filter(m => !m?.internal);
+  }
+  return rest;
 }
 
 // ─────────────────────────────────────────────────────────
@@ -195,12 +203,53 @@ async function clientScalingManager(clientId) {
   }
 }
 
-// The marketing manager's (Cam's) staff id — owner of content tickets.
+// The marketing manager's (Cam's) staff id — global default owner of ADS content.
 async function marketingManagerStaffId() {
   try {
     const email = process.env.MARKETING_MANAGER_EMAIL || "cameron@byanymeansbusiness.com";
     const rows = await sb(`staff?email=eq.${encodeURIComponent(email)}&select=id`);
     return rows?.[0]?.id || null;
+  } catch (_) {
+    return null;
+  }
+}
+
+// Global default owner of ORGANIC content. Env override first, else the (first)
+// content_executor on the team. Returns null if neither resolves.
+async function organicDefaultStaffId() {
+  try {
+    const email = process.env.CONTENT_ORGANIC_ASSIGNEE_EMAIL;
+    if (email) {
+      const rows = await sb(`staff?email=eq.${encodeURIComponent(email)}&select=id`);
+      if (rows?.[0]?.id) return rows[0].id;
+    }
+    const ce = await sb(`staff?role=eq.content_executor&select=id&order=created_at.asc&limit=1`);
+    return ce?.[0]?.id || null;
+  } catch (_) {
+    return null;
+  }
+}
+
+// Channel-aware content-ticket routing. Precedence:
+//   1. the client's per-channel roster assignment (admin-set), else
+//   2. the global channel default (organic -> Eli, ads -> Cam).
+// The explicit per-ticket override (admin "assign" action) is applied separately.
+async function resolveContentAssignee(clientId, channel) {
+  const col = channel === "organic" ? "content_assignee_organic_id" : "content_assignee_ads_id";
+  try {
+    const rows = await sb(`clients?id=eq.${clientId}&select=${col}`);
+    const rosterId = rows?.[0]?.[col];
+    if (rosterId) return rosterId;
+  } catch (_) { /* fall through to default */ }
+  return channel === "organic" ? await organicDefaultStaffId() : await marketingManagerStaffId();
+}
+
+// Slack-DM id for a staff member by id (for pinging the resolved content owner).
+async function staffSlackIdById(staffId) {
+  if (!staffId) return null;
+  try {
+    const rows = await sb(`staff?id=eq.${staffId}&select=slack_user_id`);
+    return rows?.[0]?.slack_user_id || null;
   } catch (_) {
     return null;
   }
@@ -797,31 +846,36 @@ async function handleContentTickets(req, res) {
       return res.status(400).json({ error: "type must be 'graphic', 'video', or 'mixed'" });
     }
 
+    const channel = body.channel === "organic" ? "organic" : "ads";
+    // Channel-aware routing: organic -> content team (Eli), ads -> marketing (Cam),
+    // unless the admin roster assigns this client's channel to someone specific.
+    const assignedTo = await resolveContentAssignee(ctx.client.id, channel);
     const inserted = await sb("content_tickets", {
       method: "POST",
       headers: { Prefer: "return=representation" },
       body: JSON.stringify([{
         client_id: ctx.client.id,
         type,
-        channel: body.channel === "organic" ? "organic" : "ads",
+        channel,
         status: "active",
         client_action_status: "none",
         notes: notes || "",
         raw_files: Array.isArray(raw_files) ? raw_files : [],
         context: (context && typeof context === "object") ? context : {},
         messages: [],
-        // Content tickets are owned by Cam (marketing manager); the client's SM
-        // is surfaced separately as the contact (sm_name on enrich).
-        assigned_to: await marketingManagerStaffId(),
+        // Internal owner; never surfaced to the client. The client's SM is shown
+        // separately as the contact (sm_name on enrich).
+        assigned_to: assignedTo,
       }]),
     });
     const newCt = inserted?.[0] || null;
     if (newCt) {
-      // DM Cam personally that a new content request landed (carries the urgent flag).
+      // DM the resolved owner that a new content request landed (carries the urgent flag).
       const code = String(newCt.id || "").slice(0, 3).toUpperCase();
       const pr = (context?.priority === "high") ? "⚡ HIGH priority " : "";
-      marketingManagerSlackId().then(sid => {
-        if (sid) postStaffSlackDM(sid, `🆕 New content request ${pr}— ${ctx.client.business_name || "client"} [${code}]`, req);
+      const label = channel === "organic" ? "organic content" : "content";
+      staffSlackIdById(assignedTo).then(sid => {
+        if (sid) postStaffSlackDM(sid, `🆕 New ${label} request ${pr}— ${ctx.client.business_name || "client"} [${code}]`, req);
       });
     }
     return res.status(201).json({ ticket: newCt });
@@ -1041,6 +1095,11 @@ async function handleContentTickets(req, res) {
       });
 
     } else if (action === "assign") {
+      // Reassigning a creative's owner is a manager/admin override — executors
+      // (content_executor) work their own queue but can't hand tickets around.
+      if (!CONTENT_MANAGER_ROLES.has(ctx.staff.role)) {
+        return res.status(403).json({ error: "manager or admin role required to reassign" });
+      }
       if (body.assigned_to !== undefined) patch.assigned_to = body.assigned_to || null;
 
     } else if (action === "edit-context") {

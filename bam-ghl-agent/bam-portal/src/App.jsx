@@ -158,7 +158,7 @@ export default function BAMPortal() {
   const canSeeSystems = me && (me.role === "admin" || me.role === "scaling_manager" || me.role === "systems_manager" || me.role === "systems_executor");
   const canSeeMarketing = me && (me.role === "admin" || me.role === "scaling_manager" || me.role === "marketing_manager" || me.role === "marketing_executor");
   const canSeeTeam = me && (me.role === "admin" || me.role === "scaling_manager");
-  const canSeeContent = me && (me.role === "admin" || me.role === "scaling_manager" || me.role === "marketing_manager" || me.role === "marketing_executor");
+  const canSeeContent = me && (me.role === "admin" || me.role === "scaling_manager" || me.role === "marketing_manager" || me.role === "marketing_executor" || me.role === "content_executor");
   const canSeeFinancials = me && (me.role === "admin" || me.role === "scaling_manager");
   // Resources: admins + the content/marketing team (they upload + manage the
   // library). Writes are enforced server-side by RLS is_resource_editor().
@@ -206,7 +206,8 @@ export default function BAMPortal() {
       financials: canSeeFinancials, ourads: canSeeOurAds,
     };
     if (nav === "dashboard" || (Object.prototype.hasOwnProperty.call(gated, nav) && !gated[nav])) {
-      setNav("inbox");
+      // Content executors live in the Content tab — land them there, not Inbox.
+      setNav(me.role === "content_executor" ? "content" : "inbox");
     }
   }, [me, nav, canSeeSystems, canSeeMarketing, canSeeContent, canSeeTeam, canSeeResources, canSeeFeedback, canSeeFinancials, canSeeOurAds]);
 
