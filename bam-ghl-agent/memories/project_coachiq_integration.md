@@ -64,12 +64,17 @@ self-signup → New-User webhook payload → email match → grant) proven with 
 1. Zoran's **"New User → Send to External Webhook"** automation is BUILT + fired in
    testing (URL `…/api/coachiq/user-created?secret=…`, body `coachiq_user_id={{user.id}}`
    + `email={{user.email}}`). Confirm it's published/on.
-2. **Per-price UI** — ✅ BUILT (PR #473). "🔗 CoachIQ links" button in client-portal.html
-   **Business Blueprint topbar** (V2-gated `data-feature="members"`) → modal lists live
-   routable prices, paste/save each price's CoachIQ automation URL. Backed by new
-   **PATCH /api/pricing** ({client_id, stripe_price_id, coachiq_automation_url}; staff or
-   the client's own users; https-or-blank). pricing_catalog GET is `select=*` so the field
-   round-trips automatically.
+2. **Per-price UI** — ✅ BUILT, final design after 2026-06-19 redesign (PRs #473/#476/#481):
+   - **Editing** = the "🔗 CoachIQ Links" card under **BB → Offers → Pricing → Price Match**
+     → modal listing **live + legacy** prices; each has a **"CoachIQ product" switch** →
+     ON reveals a link input (paste the "Add a Product Purchase" URL) → Save; OFF clears it.
+   - **Status** = a CoachIQ pill on each plan row in the Pricing step (`● CoachIQ` /
+     `○ No CoachIQ`), next to "● LIVE on Stripe", filled async from /api/pricing.
+   - Backed by **PATCH /api/pricing** ({client_id, stripe_price_id|stripe_price_ids[],
+     coachiq_automation_url}; staff or client's own users; https-or-blank).
+   - The earlier standalone "CoachIQ" offer-builder TAB was REMOVED (Zoran: links live only
+     in Price Match + the row pill). `coachiq_automation_url` is per pricing_catalog row;
+     one plan's terms share one product so set the same URL on each of its prices.
 3. **Confirmation-page UX** (download app / make account at group login / book / credits)
    — NOT built; bam-client-sites `enroll.jsx`. "See credits" can only show the GRANTED
    amount (no public API for live balance; live balance is in the app).
