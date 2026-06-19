@@ -12,6 +12,17 @@ duplicate exists in GHL). The GHL workflow steps (texts/waits) keep running;
 only the trigger moved to the portal. The native engine (phases below)
 replaces them later.
 
+## Manual "Summer special" enroll button (shipped 2026-06-19, PR #499)
+V2 Sales pipeline (client-portal.html, #view-pipelines) — each early-funnel card
+(not done, not trial-started) shows a "📨 Summer special" button (V2_ACCESS-gated)
+→ `_plEnrollSpecial()` → POST /api/ghl/pipelines?action=enroll-workflow → GHL
+`POST /contacts/{id}/workflow/{wfId}` (eventStartTime with +00:00, NOT Z). Target
+workflow id is read server-side from `clients.ghl_kpi_config.summer_special_workflow_id`
+(NOT clients.v15_config — that column doesn't exist; the jsonb config col is
+ghl_kpi_config). BAM GTA's is set to 1319f52a-2784-4d29-992c-639b2417b5ac. The
+GHL workflow needs NO trigger (manual add) but MUST be Published. Plan: when a
+lead replies, GHL moves them to Responded and the sales agent takes over.
+
 ## Per-academy setup process (repeat for every academy)
 1. Site from template → wire submitLead() with their client_id
 2. `clients.allowed_domains` += their domain(s)
