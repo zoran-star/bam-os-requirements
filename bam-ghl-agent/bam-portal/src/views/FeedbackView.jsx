@@ -137,6 +137,7 @@ export default function FeedbackView({ tokens, dark, session }) {
       <div style={{ display: "flex", gap: 6, marginBottom: 24 }}>
         {[
           { key: "feedback", label: "Feedback" },
+          { key: "ship", label: "🚀 Ship queue" },
           { key: "app-errors", label: "App errors" },
           { key: "sessions", label: "Agent sessions" },
         ].map(s => {
@@ -166,6 +167,8 @@ export default function FeedbackView({ tokens, dark, session }) {
         <AgentSessionsPanel tokens={t} dark={dark} />
       ) : section === "app-errors" ? (
         <AppErrorsPanel tokens={t} session={session} />
+      ) : section === "ship" ? (
+        <ShipQueuePanel tokens={t} session={session} />
       ) : (<>
       {/* Header counts */}
       <div style={{ display: "flex", gap: 32, marginBottom: 24, alignItems: "baseline", flexWrap: "wrap" }}>
@@ -400,6 +403,99 @@ function FeedbackRow({ f, staff, tokens, onToggleResolved, onSpec }) {
           )}
         </div>
       </div>
+    </div>
+  );
+}
+
+// Portal-native Ship Queue — approve auto-built changes here; never touch GitHub.
+function ShipQueuePanel({ tokens, session }) {
+  const t = tokens;
+  const [prs, setPrs] = useState(null);          // null = loading
+  const [reason, setReason] = useState(null);
+  const [busyPr, setBusyPr] = useState(null);
+  const [shippedCount, setShippedCount] = useState(0);
+
+  const load = async () => {
+    try {
+      const tok = session?.access_token;
+      const res = await fetch("/api/clients?action=ship-queue", { headers: { Authorization: `Bearer ${tok}` } });
+      const j = await res.json().catch(() => ({}));
+      if (j.reason === "github_not_configured") setReason("github_not_configured");
+      setPrs(Array.isArray(j.prs) ? j.prs : []);
+    } catch { setPrs([]); }
+  };
+  useEffect(() => { load(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const ship = async (pr) => {
+    if (!window.confirm(`Ship "${pr.title}"?\n\nThis merges it and deploys to production.`)) return;
+    setBusyPr(pr.number);
+    try {
+      const tok = session?.access_token;
+      const res = await fetch(`/api/clients?action=ship-merge&pr=${pr.number}`, { method: "POST", headers: { Authorization: `Bearer ${tok}` } });
+      const j = await res.json().catch(() => ({}));
+      if (!res.ok || !j.ok) { alert("Couldn't ship: " + (j.error || res.statusText)); return; }
+      setPrs(prev => (prev || []).filter(p => p.number !== pr.number));
+      setShippedCount(n => n + 1);
+    } catch (e) { alert("Ship failed: " + (e?.message || e)); }
+    finally { setBusyPr(null); }
+  };
+
+  const checkBadge = (state) => {
+    const map = {
+      success: { c: t.green, label: "✓ checks passed" },
+      pending: { c: t.amber, label: "… checks running" },
+      failure: { c: t.red || "#ED7969", label: "✕ checks failing" },
+      unknown: { c: t.textMute, label: "checks: n/a" },
+    };
+    const m = map[state] || map.unknown;
+    return <span style={{ fontSize: 11, fontWeight: 700, color: m.c }}>{m.label}</span>;
+  };
+
+  if (prs === null) return <div style={{ color: t.textMute, padding: 24 }}>Loading…</div>;
+
+  if (reason === "github_not_configured") {
+    return (
+      <div style={{ color: t.textMute, padding: 24, lineHeight: 1.6 }}>
+        Auto-build isn't connected yet. Once the Claude GitHub App + <code>ANTHROPIC_API_KEY</code> are set up,
+        built changes show up here to approve in one tap.
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <div style={{ display: "flex", alignItems: "baseline", gap: 12, marginBottom: 16 }}>
+        <div style={{ fontSize: 14, color: t.text, fontWeight: 600 }}>Ready to ship</div>
+        <div style={{ fontSize: 12, color: t.textMute }}>{prs.length} waiting{shippedCount ? ` · ${shippedCount} shipped` : ""}</div>
+        <button onClick={load} style={{ marginLeft: "auto", fontSize: 11, fontWeight: 600, padding: "4px 10px", borderRadius: 6, border: `1px solid ${t.border}`, background: t.surface, color: t.text, cursor: "pointer" }}>Refresh</button>
+      </div>
+
+      {prs.length === 0 ? (
+        <div style={{ color: t.textMute, padding: 24, fontStyle: "italic" }}>Nothing waiting to ship. Built changes from feedback land here.</div>
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+          {prs.map(pr => (
+            <div key={pr.number} style={{ background: t.surfaceEl, border: `1px solid ${t.border}`, borderRadius: 8, padding: "14px 18px" }}>
+              <div style={{ display: "flex", alignItems: "baseline", gap: 10, flexWrap: "wrap", marginBottom: 8 }}>
+                <span style={{ fontSize: 14, fontWeight: 600, color: t.text }}>{pr.title}</span>
+                {checkBadge(pr.checks)}
+                <a href={pr.url} target="_blank" rel="noreferrer" style={{ marginLeft: "auto", fontSize: 11, color: t.textMute, textDecoration: "none" }}>view diff ↗</a>
+              </div>
+              {pr.summary && (
+                <div style={{ fontSize: 13, color: t.textSub || t.textMute, lineHeight: 1.6, whiteSpace: "pre-wrap", marginBottom: 12, maxHeight: 160, overflow: "auto" }}>{pr.summary}</div>
+              )}
+              <button
+                onClick={() => ship(pr)}
+                disabled={busyPr === pr.number}
+                style={{
+                  fontSize: 13, fontWeight: 700, padding: "8px 16px", borderRadius: 6, border: "none",
+                  background: t.accent, color: "#000", cursor: busyPr === pr.number ? "default" : "pointer",
+                }}
+              >{busyPr === pr.number ? "Shipping…" : "🚀 Approve & ship"}</button>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

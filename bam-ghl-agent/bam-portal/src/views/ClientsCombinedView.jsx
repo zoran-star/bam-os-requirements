@@ -497,19 +497,27 @@ function clientStatusPct(client) {
   return total ? Math.round((done / total) * 100) : 0;
 }
 
+// Canonical onboarding steps — mirror of ONBOARDING_STEPS in api/action-items.js.
+// Each maps to a timestamp column on the client row, so the bar counts the SAME
+// steps the action-items checklist (Onboarding tab) shows and the two always
+// agree. V1.5 academies get two extra steps; everyone else has 17.
+const ONBOARDING_STEP_COLS = [
+  "slack_join_done_at", "stripe_connect_connected_at", "ghl_signup_done_at", "ghl_connected_at",
+  "general_marked_done_at", "staff_marked_done_at", "locations_marked_done_at", "brand_marked_done_at",
+  "kpi_marked_done_at", "offers_marked_done_at", "call_booked_at", "systems_buildout_triggered_at",
+  "cam_call_booked_at", "ads_connected_at", "content_submitted_at", "ready_for_review_at", "review_call_booked_at",
+];
+const ONBOARDING_STEP_COLS_V15 = ["athlete_map_done_at", "kpi_setup_done_at"];
 function onboardingProgress(client) {
+  const cols = client.v15_access ? [...ONBOARDING_STEP_COLS, ...ONBOARDING_STEP_COLS_V15] : ONBOARDING_STEP_COLS;
+  // general_info auto-completes from the basics even without an explicit mark.
   const generalAutoOk = !!(client.business_name && client.owner_name && client.email);
-  const flags = [
-    !!client.ghl_signup_done_at,
-    !!client.slack_join_done_at,
-    generalAutoOk || !!client.general_marked_done_at,
-    !!client.staff_marked_done_at,
-    !!client.locations_marked_done_at,
-    !!client.brand_marked_done_at,
-    !!client.offers_marked_done_at,
-    !!client.meta_ads_marked_done_at,
-  ];
-  return { done: flags.filter(Boolean).length, total: flags.length };
+  let done = 0;
+  for (const c of cols) {
+    if (c === "general_marked_done_at") { if (generalAutoOk || client[c]) done++; }
+    else if (client[c]) done++;
+  }
+  return { done, total: cols.length };
 }
 
 function StatusPill({ client, tokens }) {
@@ -549,251 +557,106 @@ function StatusPill({ client, tokens }) {
   );
 }
 
+// Onboarding steps that only BAM staff complete (rendered with a STAFF pill).
+const ONBOARDING_STAFF_ONLY_KEYS = new Set(["trigger_buildout", "ready_for_review"]);
+
 // ─── ONBOARDING tab ─────────────────────────────────────────────────────────
-// Sequential checklist of all 8 onboarding sections in chronological order
-// so SMs can see "where is this client right now?" at a glance. Each row
-// shows: status dot + section name + who flips it + meta/last-activity +
-// inline check (for staff-owned) OR jump link (for client-owned).
-//
-// Staff toggles here are MIRRORED with their original homes (GHL/Slack on
-// the Overview Setup section, Meta Ads on the Marketing tab) so the SM can
-// flip from whichever tab they're already on.
-function OnboardingTab({ client, tokens, role, session, onChanged, setTab }) {
+// Exact mirror of the client's onboarding action items (/api/action-items) —
+// the SAME 19-step checklist shown to the client. A progress bar at the top is
+// driven by the same items, so it always matches the checklist (and the header/
+// list StatusPill, which counts the same steps via onboardingProgress).
+// Staff GET returns ALL steps (incl. staff-only); toggling a step PATCHes the
+// same action_items row the client portal reads, and checking 'trigger_buildout'
+// (re)creates the systems onboarding ticket server-side.
+function OnboardingTab({ client, tokens, session, onChanged }) {
   const t = tokens;
-  const [counts, setCounts] = useState({ offers: null, locations: null, teammates: null });
-  const [saving, setSaving] = useState({}); // per-flag saving state
+  const [items, setItems] = useState(null);
+  const [busyId, setBusyId] = useState(null);
 
-  // Load row counts for offers + locations + teammates so the SM can see
-  // the actual data the client has provided without leaving the tab.
-  useEffect(() => {
-    let cancelled = false;
-    const tok = session?.access_token;
-    if (!tok || !client.id) return;
-    const headers = { Authorization: `Bearer ${tok}` };
-    (async () => {
-      try {
-        const [offersRes, locsRes, teammatesRes] = await Promise.all([
-          fetch(`/api/clients?action=count-offers&client_id=${client.id}`, { headers }),
-          fetch(`/api/clients?action=count-locations&client_id=${client.id}`, { headers }),
-          fetch(`/api/clients?action=count-teammates&client_id=${client.id}`, { headers }),
-        ]);
-        // Endpoints may not exist yet — fall back gracefully; the row
-        // count is nice-to-have, not load-blocking.
-        const offers = offersRes.ok ? (await offersRes.json()).count : null;
-        const locations = locsRes.ok ? (await locsRes.json()).count : null;
-        const teammates = teammatesRes.ok ? (await teammatesRes.json()).count : null;
-        if (!cancelled) setCounts({ offers, locations, teammates });
-      } catch (_) { /* best-effort */ }
-    })();
-    return () => { cancelled = true; };
-  }, [client.id, session]);
-
-  async function setFlag(field, next) {
-    setSaving(s => ({ ...s, [field]: true }));
+  async function load() {
     try {
       const tok = session?.access_token;
-      const res = await fetch(`/api/clients?action=update-fields&id=${client.id}`, {
-        method: "POST",
+      const res = await fetch(`/api/action-items?client_id=${client.id}`, { headers: { Authorization: `Bearer ${tok}` } });
+      const j = await res.json();
+      if (!res.ok) throw new Error(j.error || `HTTP ${res.status}`);
+      const onb = (j.items || []).filter(i => i.onboarding_key).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+      setItems(onb);
+    } catch (_) { setItems([]); }
+  }
+  useEffect(() => { load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [client.id]);
+
+  async function toggle(it) {
+    setBusyId(it.id);
+    try {
+      const tok = session?.access_token;
+      const res = await fetch(`/api/action-items?id=${it.id}`, {
+        method: "PATCH",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${tok}` },
-        body: JSON.stringify({ client_id: client.id, [field]: next }),
+        body: JSON.stringify({ completed: !it.completed_at }),
       });
-      if (!res.ok) {
-        const j = await res.json().catch(() => ({}));
-        alert("Couldn't save: " + (j.error || res.statusText));
-      } else if (onChanged) onChanged();
-    } finally {
-      setSaving(s => ({ ...s, [field]: false }));
-    }
+      if (!res.ok) { const j = await res.json().catch(() => ({})); alert("Couldn't save: " + (j.error || res.statusText)); }
+      await load();
+      if (onChanged) onChanged();
+    } catch (e) { alert("Failed: " + (e?.message || e)); }
+    finally { setBusyId(null); }
   }
 
-  // Derived done-flags pulled straight from the client row.
-  const ghlDone        = !!client.ghl_signup_done_at;
-  const slackDone      = !!client.slack_join_done_at;
-  const generalAutoOk  = !!(client.business_name && client.owner_name && client.email);
-  const generalOverride = !!client.general_marked_done_at;
-  const generalDone    = generalAutoOk || generalOverride;
-  const staffDone      = !!client.staff_marked_done_at;
-  const locsDone       = !!client.locations_marked_done_at;
-  const brandDone      = !!client.brand_marked_done_at;
-  const offersDone     = !!client.offers_marked_done_at;
-  const metaDone       = !!client.meta_ads_marked_done_at;
+  if (!items) return <div style={{ color: t.textMute, fontSize: 13, padding: "8px 0" }}>Loading onboarding…</div>;
+  if (!items.length) return <div style={{ color: t.textMute, fontSize: 13, padding: "8px 0" }}>No onboarding steps for this academy yet.</div>;
 
-  // Every section now has an inline staff toggle (Zoran 2026-05-30).
-  // Owner pill stays as "BAM check" / "Client" / "Auto" so the SM knows
-  // who normally owns each one, but staff can flip ANY of them to
-  // unblock a stuck client or mark out-of-band completion.
-  const sections = [
-    { id: "ghl",       label: "GoHighLevel signup",        owner: "staff",  done: ghlDone,
-      meta: ghlDone ? `Checked ${fmtDate(client.ghl_signup_done_at)}` : "Waiting on BAM to verify payment + provisioning",
-      toggle: { field: "ghl_signup_done", checked: ghlDone } },
-    { id: "slack",     label: "Joined BAM Slack",          owner: "staff",  done: slackDone,
-      meta: slackDone ? `Checked ${fmtDate(client.slack_join_done_at)}` : "Waiting on BAM to verify client joined workspace",
-      toggle: { field: "slack_join_done", checked: slackDone } },
-    { id: "general",   label: "General — business basics", owner: "auto",   done: generalDone,
-      meta: generalDone
-        ? (generalOverride
-            ? `Staff override ${fmtDate(client.general_marked_done_at)}`
-            : `Auto-derived from business_name + owner_name + email`)
-        : `Missing: ${[!client.business_name && "business_name", !client.owner_name && "owner_name", !client.email && "email"].filter(Boolean).join(", ")}`,
-      toggle: { field: "general_marked_done", checked: generalOverride } },
-    { id: "staff",     label: "Staff — academy teammates", owner: "client", done: staffDone,
-      meta: staffDone
-        ? `Marked done ${fmtDate(client.staff_marked_done_at)}${counts.teammates != null ? ` · ${counts.teammates} teammate${counts.teammates === 1 ? '' : 's'}` : ''}`
-        : "Waiting on client to mark done on BB Staff card",
-      toggle: { field: "staff_marked_done", checked: staffDone } },
-    { id: "locations", label: "Locations",                 owner: "client", done: locsDone,
-      meta: locsDone
-        ? `Marked done ${fmtDate(client.locations_marked_done_at)}${counts.locations != null ? ` · ${counts.locations} location${counts.locations === 1 ? '' : 's'}` : ''}`
-        : "Waiting on client to mark done on BB Locations card",
-      toggle: { field: "locations_marked_done", checked: locsDone } },
-    { id: "brand",     label: "Brand",                     owner: "client", done: brandDone,
-      meta: brandDone
-        ? `Marked done ${fmtDate(client.brand_marked_done_at)}`
-        : "Waiting on client to mark done on BB Brand card",
-      toggle: { field: "brand_marked_done", checked: brandDone } },
-    { id: "offers",    label: "Offers",                    owner: "client", done: offersDone,
-      meta: offersDone
-        ? `Marked done ${fmtDate(client.offers_marked_done_at)}${counts.offers != null ? ` · ${counts.offers} offer${counts.offers === 1 ? '' : 's'}` : ''}`
-        : "Waiting on client to mark done on BB Offers list",
-      toggle: { field: "offers_marked_done", checked: offersDone } },
-    { id: "meta",      label: "Meta Ads onboarding",       owner: "staff",  done: metaDone,
-      meta: metaDone
-        ? `Checked ${fmtDate(client.meta_ads_marked_done_at)}`
-        : "Waiting on BAM to verify Meta connection + ad account is producing",
-      toggle: { field: "meta_ads_marked_done", checked: metaDone } },
-  ];
-
-  const doneCount = sections.filter(s => s.done).length;
-  const total = sections.length;
-
-  // SM's next action: first staff section that isn't done OR generic.
-  const nextStaffAction = sections.find(s => s.owner === "staff" && !s.done);
-  const nextClientWaitOn = sections.find(s => s.owner === "client" && !s.done);
+  const done = items.filter(i => i.completed_at).length;
+  const total = items.length;
+  const pct = total ? Math.round((done / total) * 100) : 0;
+  const next = items.find(i => !i.completed_at);
 
   return (
     <div>
-      {/* Progress banner */}
+      {/* Progress banner — driven by the SAME action items as the checklist below */}
       <div style={{
         background: t.surfaceEl, border: `1px solid ${t.border}`,
         borderRadius: 12, padding: "16px 18px", marginBottom: 22,
       }}>
         <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 10 }}>
           <div style={{ fontSize: 12, color: t.textMute, fontWeight: 600, letterSpacing: 0.4, textTransform: "uppercase" }}>Onboarding progress</div>
-          <div style={{ fontSize: 22, color: t.text, fontWeight: 700, fontVariantNumeric: "tabular-nums" }}>{doneCount}<span style={{ color: t.textMute, fontSize: 14, fontWeight: 500 }}> / {total}</span></div>
+          <div style={{ fontSize: 22, color: t.text, fontWeight: 700, fontVariantNumeric: "tabular-nums" }}>{done}<span style={{ color: t.textMute, fontSize: 14, fontWeight: 500 }}> / {total}</span></div>
         </div>
         <div style={{ height: 6, background: t.border, borderRadius: 999, overflow: "hidden" }}>
           <div style={{
-            width: `${Math.round((doneCount / total) * 100)}%`,
+            width: `${pct}%`,
             height: "100%",
-            background: doneCount === total ? t.green : t.accent,
+            background: done === total ? t.green : t.accent,
             transition: "width 0.2s",
           }} />
         </div>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginTop: 14 }}>
-          <div style={{ fontSize: 12, color: t.textMute }}>
-            <div style={{ color: t.textSub, fontWeight: 600, marginBottom: 2 }}>Next BAM action</div>
-            {nextStaffAction
-              ? <span style={{ color: t.text }}>{nextStaffAction.label}</span>
-              : <span>None — all staff checks done.</span>}
-          </div>
-          <div style={{ fontSize: 12, color: t.textMute }}>
-            <div style={{ color: t.textSub, fontWeight: 600, marginBottom: 2 }}>Waiting on client</div>
-            {nextClientWaitOn
-              ? <span style={{ color: t.text }}>{nextClientWaitOn.label}</span>
-              : <span>Nothing — they're caught up.</span>}
-          </div>
+        <div style={{ fontSize: 12, color: t.textMute, marginTop: 14 }}>
+          <span style={{ color: t.textSub, fontWeight: 600 }}>Next up: </span>
+          {next ? <span style={{ color: t.text }}>{next.title}</span> : <span>All steps complete 🎉</span>}
         </div>
       </div>
 
-      {/* Section rows */}
-      <SectionTitle>Sections</SectionTitle>
-      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-        {sections.map((s, i) => (
-          <div key={s.id} style={{
-            display: "flex", alignItems: "flex-start", gap: 14,
-            padding: "14px 16px",
-            background: s.done ? `${t.accent}08` : t.surfaceEl,
-            border: `1px solid ${s.done ? t.accentBorder : t.border}`,
-            borderRadius: 10,
-          }}>
-            {/* Status dot */}
-            <div style={{
-              flexShrink: 0, marginTop: 2,
-              width: 22, height: 22, borderRadius: "50%",
-              background: s.done ? t.accent : "transparent",
-              border: `1.5px solid ${s.done ? t.accent : t.border}`,
-              display: "flex", alignItems: "center", justifyContent: "center",
-              fontSize: 11, fontWeight: 700, color: s.done ? "#0A0A0B" : t.textMute,
-              fontFamily: "monospace",
-            }}>{s.done ? "✓" : i + 1}</div>
-
-            {/* Label + meta */}
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
-                <span style={{ fontSize: 14, color: t.text, fontWeight: 600 }}>{s.label}</span>
-                <OwnerPill owner={s.owner} tokens={t} />
-              </div>
-              <div style={{ fontSize: 12, color: t.textMute, lineHeight: 1.5 }}>{s.meta}</div>
-            </div>
-
-            {/* Inline action — either a staff checkbox or a jump link */}
-            <div style={{ flexShrink: 0 }}>
-              {s.toggle ? (
-                <label style={{ display: "inline-flex", alignItems: "center", gap: 8, cursor: "pointer", fontSize: 12, color: t.textSub }}>
-                  <input
-                    type="checkbox"
-                    checked={s.toggle.checked}
-                    disabled={!!saving[s.toggle.field]}
-                    onChange={(e) => setFlag(s.toggle.field, e.target.checked)}
-                    style={{ width: 16, height: 16, cursor: "pointer", accentColor: t.accent }}
-                  />
-                  <span>{s.toggle.checked ? "Done" : "Mark done"}</span>
-                </label>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => {
-                    // Quick deep-links from the SM's perspective: Staff →
-                    // Team tab; Locations/Brand/Offers/General → Setup
-                    // tab (where the staff has the closest equivalent).
-                    if (s.id === "staff")      setTab && setTab("team");
-                    else if (s.id === "general") setTab && setTab("overview");
-                    else                       setTab && setTab("setup");
-                  }}
-                  style={{
-                    background: "transparent", border: `1px solid ${t.border}`,
-                    color: t.textSub, padding: "6px 12px", borderRadius: 6,
-                    fontSize: 12, cursor: "pointer", fontFamily: "inherit",
-                  }}
-                >View</button>
+      {/* Checklist — exact mirror of the onboarding action items */}
+      <SectionTitle>Onboarding checklist</SectionTitle>
+      <div style={{ display: "flex", flexDirection: "column" }}>
+        {items.map(it => {
+          const isDone = !!it.completed_at;
+          const staffOnly = ONBOARDING_STAFF_ONLY_KEYS.has(it.onboarding_key);
+          return (
+            <div key={it.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "11px 2px", borderBottom: `1px solid ${t.borderSoft || t.border}` }}>
+              <button onClick={() => toggle(it)} disabled={busyId === it.id} style={{
+                width: 22, height: 22, borderRadius: 6, flexShrink: 0,
+                border: `1px solid ${isDone ? t.green : t.border}`, background: isDone ? t.green : "transparent",
+                color: "#0A0A0B", cursor: busyId === it.id ? "wait" : "pointer", fontSize: 13, fontWeight: 800,
+                display: "flex", alignItems: "center", justifyContent: "center",
+              }}>{isDone ? "✓" : ""}</button>
+              <span style={{ flex: 1, fontSize: 14, color: isDone ? t.textMute : t.text, textDecoration: isDone ? "line-through" : "none" }}>{it.title}</span>
+              {staffOnly && (
+                <span style={{ fontSize: 9, color: t.amber, border: `1px solid ${t.amber}55`, borderRadius: 4, padding: "1px 5px", textTransform: "uppercase", letterSpacing: "0.08em" }}>staff</span>
               )}
             </div>
-          </div>
-        ))}
-      </div>
-
-      {/* Legend */}
-      <div style={{ marginTop: 22, padding: "10px 14px", background: t.surfaceEl, border: `1px solid ${t.border}`, borderRadius: 8, fontSize: 11, color: t.textMute, lineHeight: 1.6 }}>
-        <b style={{ color: t.textSub }}>Owner legend</b> · <b style={{ color: t.text }}>staff</b> = BAM checks it · <b style={{ color: t.text }}>client</b> = client clicks "I'm done" on their portal card · <b style={{ color: t.text }}>auto</b> = derived from data the client provides. Staff toggles here mirror the same toggles on Overview Setup + Marketing tabs.
+          );
+        })}
       </div>
     </div>
-  );
-}
-
-function OwnerPill({ owner, tokens }) {
-  const t = tokens;
-  const map = {
-    staff:  { label: "BAM check",  bg: `${t.accent}22`,  color: t.accent },
-    client: { label: "Client",     bg: "rgba(122,184,245,0.18)", color: "#7AB8F5" },
-    auto:   { label: "Auto",       bg: "rgba(74,222,128,0.15)",  color: t.green },
-  };
-  const m = map[owner] || map.auto;
-  return (
-    <span style={{
-      fontSize: 10, padding: "2px 8px", borderRadius: 999,
-      background: m.bg, color: m.color, fontWeight: 600, letterSpacing: 0.3,
-      textTransform: "uppercase",
-    }}>{m.label}</span>
   );
 }
 
@@ -811,19 +674,21 @@ function OverviewTab({ client, staffMap, tokens, role, session, onChanged }) {
   const [savingOnb, setSavingOnb] = useState(false);
   const canViewFinancials = ROLES.canViewFinancials(role);
 
-  // V2 access toggle (renamed 2026-05-27 from "onboarding_in_progress").
-  // When ON, client sees the V2 portal — currently just adds the Members
-  // tab. Everything else (BB nav, tracker, etc.) is V1 = visible to all.
-  const v2Access = !!client.v2_access;
+  // Portal tier — V1 / V1.5 / V2, mutually exclusive. Backed by two booleans:
+  // v2_access + v15_access (V1 = both false). V1.5 = no GoHighLevel, lighter
+  // than V2 (requirements still being built out). The selector posts BOTH flags
+  // so the tiers can never overlap.
+  const tier = client.v2_access ? "v2" : client.v15_access ? "v15" : "v1";
 
-  async function toggleV2Access(next) {
+  async function setTier(next) {
+    if (next === tier) return;
     setSavingOnb(true);
     const tok = session?.access_token;
     try {
       const res = await fetch(`/api/clients?action=update-fields&id=${client.id}`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${tok}` },
-        body: JSON.stringify({ client_id: client.id, v2_access: next }),
+        body: JSON.stringify({ client_id: client.id, v2_access: next === "v2", v15_access: next === "v15" }),
       });
       if (!res.ok) {
         const j = await res.json().catch(() => ({}));
@@ -902,28 +767,40 @@ function OverviewTab({ client, staffMap, tokens, role, session, onChanged }) {
 
         <div style={{
           marginTop: 14, padding: "12px 14px",
-          background: v2Access ? `${t.accent}10` : t.surfaceEl,
-          border: `1px solid ${v2Access ? t.accentBorder : t.border}`,
+          background: tier !== "v1" ? `${t.accent}10` : t.surfaceEl,
+          border: `1px solid ${tier !== "v1" ? t.accentBorder : t.border}`,
           borderRadius: 8,
         }}>
-          <label style={{
-            display: "flex", alignItems: "center", gap: 10,
-            cursor: "pointer", fontSize: 13, color: t.text,
-          }}>
-            <input
-              type="checkbox"
-              checked={v2Access}
-              disabled={savingOnb}
-              onChange={(e) => toggleV2Access(e.target.checked)}
-              style={{ width: 16, height: 16, cursor: "pointer", accentColor: t.accent }}
-            />
-            <span style={{ fontWeight: 600 }}>V2 access</span>
-            {savingOnb && <span style={{ color: t.textMute, fontSize: 11, fontFamily: "monospace" }}>saving…</span>}
-          </label>
-          <div style={{ fontSize: 11, color: t.textMute, marginTop: 6, marginLeft: 26, lineHeight: 1.5 }}>
-            {v2Access
+          <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, fontWeight: 600, color: t.text, marginBottom: 8 }}>
+            Portal tier
+            {savingOnb && <span style={{ color: t.textMute, fontSize: 11, fontFamily: "monospace", fontWeight: 400 }}>saving…</span>}
+          </div>
+          <div style={{ display: "inline-flex", border: `1px solid ${t.border}`, borderRadius: 8, overflow: "hidden" }}>
+            {[["v1", "V1"], ["v15", "V1.5"], ["v2", "V2"]].map(([k, label], i) => {
+              const on = tier === k;
+              return (
+                <button
+                  key={k}
+                  type="button"
+                  disabled={savingOnb}
+                  onClick={() => setTier(k)}
+                  style={{
+                    padding: "7px 18px", fontSize: 13, fontWeight: 600,
+                    cursor: savingOnb ? "default" : "pointer",
+                    border: "none", borderLeft: i ? `1px solid ${t.border}` : "none",
+                    background: on ? t.accent : "transparent",
+                    color: on ? "#0B0B0D" : t.textMute,
+                  }}
+                >{label}</button>
+              );
+            })}
+          </div>
+          <div style={{ fontSize: 11, color: t.textMute, marginTop: 8, lineHeight: 1.5 }}>
+            {tier === "v2"
               ? "V2 portal: Members tab is visible (in addition to the standard V1 nav)."
-              : "V1 portal — standard nav. Members tab is hidden until V2 is flipped on."}
+              : tier === "v15"
+                ? "V1.5: no GoHighLevel, lighter than V2. May need a little manual setup/cleanup to work right. (Requirements still being built out.)"
+                : "V1 portal — standard nav (uses GoHighLevel)."}
           </div>
         </div>
 
@@ -1220,6 +1097,28 @@ export function MarketingTab({ client, tokens, role, session, onChanged, forceCa
     }
   }
 
+  // Organic content — when on, the client's Marketing tab gets an Ads | Organic split.
+  const organicContent = client.organic_content === true;
+  const [savingOrganic, setSavingOrganic] = useState(false);
+  async function toggleOrganicContent(nextValue) {
+    setSavingOrganic(true);
+    try {
+      const tok = session?.access_token;
+      const res = await fetch(`/api/clients?action=update-fields&id=${client.id}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${tok}` },
+        body: JSON.stringify({ client_id: client.id, organic_content: nextValue }),
+      });
+      const j = await res.json().catch(() => ({}));
+      if (!res.ok) { alert("Couldn't save: " + (j.error || res.statusText)); }
+      else onChanged?.();
+    } catch (err) {
+      alert("Couldn't save: " + (err?.message || err));
+    } finally {
+      setSavingOrganic(false);
+    }
+  }
+
   // Setup state
   const [adAccounts, setAdAccounts] = useState([]);
   const [metaConnected, setMetaConnected] = useState(null); // null=loading
@@ -1415,6 +1314,44 @@ export function MarketingTab({ client, tokens, role, session, onChanged, forceCa
               background: "#fff",
               transition: "left 0.2s ease",
               boxShadow: "0 1px 3px rgba(0,0,0,0.2)",
+            }} />
+          </button>
+        )}
+      </div>
+
+      {/* Organic content toggle — gives the client an Ads | Organic split in their Marketing tab */}
+      <div style={{
+        padding: "14px 18px", marginBottom: 22, borderRadius: 8,
+        background: t.surfaceEl, border: `1px solid ${organicContent ? `${t.green}55` : t.border}`,
+        display: "flex", alignItems: "center", gap: 14,
+      }}>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontSize: 13, fontWeight: 600, color: t.text }}>
+            {organicContent ? "Organic content: ON" : "Organic content: off"}
+          </div>
+          <div style={{ fontSize: 12, color: t.textMute, marginTop: 2 }}>
+            {organicContent
+              ? "Client's Marketing tab shows an Ads | Organic split; they can request organic creatives."
+              : "Client only sees Ads in their Marketing tab."}
+          </div>
+        </div>
+        {canEdit && (
+          <button
+            type="button"
+            onClick={() => toggleOrganicContent(!organicContent)}
+            disabled={savingOrganic}
+            aria-label={organicContent ? "Turn off organic content" : "Turn on organic content"}
+            style={{
+              width: 44, height: 24, borderRadius: 999, position: "relative",
+              background: organicContent ? t.green : t.borderStr || t.border,
+              border: "none", cursor: savingOrganic ? "wait" : "pointer",
+              transition: "background 0.2s ease", opacity: savingOrganic ? 0.6 : 1, flexShrink: 0,
+            }}
+          >
+            <span style={{
+              position: "absolute", top: 2, left: organicContent ? 22 : 2,
+              width: 20, height: 20, borderRadius: "50%", background: "#fff",
+              transition: "left 0.2s ease", boxShadow: "0 1px 3px rgba(0,0,0,0.2)",
             }} />
           </button>
         )}

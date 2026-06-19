@@ -7,6 +7,76 @@ metadata:
 
 # CoachIQ integration
 
+## ⭐ 2026-06-18 — TRACK A ONBOARDING = SELF-SIGNUP MODEL (NO ZAPIER), live + tested
+
+**Decision: NO Zapier.** Zapier gates webhooks + multi-step Zaps behind a paid plan
+(~$20/mo), needed ONLY to auto-create the CoachIQ user. Instead the **parent creates
+their own CoachIQ account** on the academy's group login page
+(`app.coachiq.io/bam-gta/athletes`) — group-scoped signup = ENROLLED user (Zoran
+confirmed). Then CoachIQ tells us and we grant the product. Flow:
+
+```
+pay → confirmation page: "make your account at the group login page (use paid email)"
+→ parent signs up (enrolled) → CoachIQ "New User → Send to External Webhook" automation
+→ POST /api/coachiq/user-created → match member by EMAIL → store id + grant product
+```
+
+Files (live on prod, PR #454 + #461):
+- `api/coachiq.js` — `addCoachiqProduct(id,{plan,term})` fires the **"Add a Product
+  Purchase"** automation (`18c05158-…`; product + access + starter credits, no payment).
+  `coachiqOnboardingEnabled()` = api key + group + product automation (no Zapier).
+  `createCoachiqUser()` (Zapier hook) kept but UNUSED in this model.
+- `api/coachiq/user-created.js` — matches member by **email** (or member_id), stores
+  `coachiq_member_id` on all members sharing that parent_email (siblings), grants the
+  product. Secret via body/query/header. Idempotent (retry → "already linked"); accepts
+  + skips signups with no matching paid member.
+- `api/coachiq/test-onboard.js` — secret-gated harness (`status|create|product|callback|full`).
+- `api/onboarding/activations.js` — on payment: returning member (has id) → grant inline;
+  new member → audit `coachiq-await-signup` (the New-User webhook grants later).
+
+**ENV SET IN PROD (2026-06-18):** `COACHIQ_API_KEY` (…53f2 — **ROTATE**, was in chat),
+`COACHIQ_GROUP_ID` `719bb0cf-5a17-4172-ac55-c28e19238824`, `COACHIQ_PRODUCT_AUTOMATION_ID`
+`18c05158-d981-4429-b568-495479428d26`, `COACHIQ_WEBHOOK_SECRET`, `COACHIQ_CREATE_USER_WEBHOOK_URL`
+(Zapier hook — now unused, can delete). Org ID `349b6d2d-…` (Zapier connection only).
+
+**PER-PRICE PRODUCT AUTOMATION (2026-06-18, PR #467):** the product granted is now
+chosen by what the member BOUGHT, not a global default. `pricing_catalog` gained
+**`coachiq_automation_url`** (the "Add a Product Purchase" webhook link pasted per
+Stripe price). The grant path resolves it from the member's `stripe_price_id` →
+`addCoachiqProduct(..., {automationUrl, sub_id})` POSTs to that URL; falls back to
+`COACHIQ_PRODUCT_AUTOMATION_ID`/map if a price has none. **GTA "Summer Unlimited"
+(monthly + 3mo routable prices) prefilled** with `…/18c05158`. The payload now also
+sends **`sub_id`** (member.stripe_subscription_id) so Zoran's automation can store it
+on the product → CoachIQ tracks the Stripe sub's renewal date to refresh credits.
+Tested live: callback resolved the price's URL + fired success ✅.
+
+**ZORAN'S CoachIQ AUTOMATION must map (in "Add a Product Purchase"):** `{{payload.user.id}}`
+as target, and `{{payload.sub_id}}` into the product's subscription/sub-id field (for
+renewal refresh). Per-product: create one automation per product, paste each link into
+that price's `coachiq_automation_url` (UI to fill this per-price NOT built yet — DB only).
+
+**TESTED LIVE 2026-06-18:** product automation fires ✅; email-match callback stores id +
+grants product ✅; idempotent retry ✅; per-price URL resolution ✅. Full chain (real
+self-signup → New-User webhook payload → email match → grant) proven with user
+`2d4452f5-…`. (Test users `2578c9b2`/`2d4452f5` + test members cleaned up.)
+
+**REMAINING:**
+1. Zoran's **"New User → Send to External Webhook"** automation is BUILT + fired in
+   testing (URL `…/api/coachiq/user-created?secret=…`, body `coachiq_user_id={{user.id}}`
+   + `email={{user.email}}`). Confirm it's published/on.
+2. **Per-price UI** — ✅ BUILT (PR #473). "🔗 CoachIQ links" button in client-portal.html
+   **Business Blueprint topbar** (V2-gated `data-feature="members"`) → modal lists live
+   routable prices, paste/save each price's CoachIQ automation URL. Backed by new
+   **PATCH /api/pricing** ({client_id, stripe_price_id, coachiq_automation_url}; staff or
+   the client's own users; https-or-blank). pricing_catalog GET is `select=*` so the field
+   round-trips automatically.
+3. **Confirmation-page UX** (download app / make account at group login / book / credits)
+   — NOT built; bam-client-sites `enroll.jsx`. "See credits" can only show the GRANTED
+   amount (no public API for live balance; live balance is in the app).
+4. Per-product automations for the other plans + confirm Summer Unlimited credit count.
+5. **Rotate the API key.**
+
+
 ## Why this matters (the strategic goal)
 
 **The point of all this: figure out how to connect CoachIQ to the FullControl

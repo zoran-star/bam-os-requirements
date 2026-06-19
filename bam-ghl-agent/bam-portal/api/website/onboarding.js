@@ -17,6 +17,7 @@
 // Returns: { ok: true, id: submissionId } or { ok: false, error: "..." }
 
 import { withSentryApiRoute } from "../_sentry.js";
+import { renderAgreementPdf } from "../_lib/agreement-pdf.js";
 
 // Vercel body size override — base64 images are large
 export const config = {
@@ -196,7 +197,7 @@ async function postGhlSummary(headers, ghlLocationId, contactId, body, urls) {
     `Passport (back):  ${passportBackUrl  || 'not uploaded'}`,
     `Athlete photo:    ${athletePhotoUrl  || 'not uploaded'}`,
     `Signature:        ${signatureUrl     || 'not uploaded'}`,
-    `Waiver PDF:       ${waiverPdfUrl     || 'not generated'}`,
+    `Signed waiver PDF: ${waiverPdfUrl    || 'not generated'}`,
   ].join('\n');
 
   // Note on contact (always works, holds full text)
@@ -223,6 +224,133 @@ async function postGhlSummary(headers, ghlLocationId, contactId, body, urls) {
   } catch (e) {
     console.error("GHL conversation create failed (non-fatal):", e.message);
   }
+}
+
+/* ============================================
+   ADAPT WAIVER CLAUSES (mirrors adapt-funnel-waiver.html)
+   ============================================ */
+const ADAPT_CLAUSES = [
+  ["Introduction",
+   "This Agreement is entered into between By Any Means Basketball LLC (\"BAM\") and the undersigned parent or legal guardian (\"Parent/Guardian\") on behalf of the above-named participant (\"Athlete\"). By providing an electronic signature, Parent/Guardian acknowledges having read, understood, and agreed to all terms set forth herein."],
+  ["1. Release of Liability & Assumption of Risk",
+   "Parent/Guardian acknowledges that participation in basketball training sessions, drills, scrimmages, competitions, travel, and related activities involves inherent physical risks, including but not limited to physical injury, illness, emotional distress, property loss, and other unforeseen circumstances. To the fullest extent permitted by applicable law, Parent/Guardian voluntarily assumes all such risks on behalf of the Athlete and hereby releases, waives, discharges, and covenants not to sue By Any Means Basketball LLC, its officers, directors, coaches, staff, volunteers, agents, successors, and affiliated entities from any and all claims, demands, damages, losses, liabilities, costs, or causes of action, whether known or unknown, arising out of or in connection with the Athlete's participation in any BAM program, activity, or event."],
+  ["2. Medical Authorization",
+   "In the event of illness, injury, or emergency during the program, Parent/Guardian authorizes BAM staff to seek and consent to emergency medical, surgical, dental, or other treatment for the Athlete at the nearest appropriate medical facility. Parent/Guardian accepts full financial responsibility for all costs associated with such treatment and agrees to maintain adequate health insurance coverage for the Athlete during the program. Parent/Guardian agrees to disclose all known medical conditions, allergies, dietary restrictions, and current medications to BAM staff prior to the program start date. BAM is not liable for complications arising from undisclosed medical information."],
+  ["3. Photo & Video Release",
+   "Parent/Guardian grants By Any Means Basketball LLC and its affiliates a worldwide, perpetual, royalty-free, irrevocable license to photograph, record, broadcast, publish, and otherwise use images, video recordings, and audio of the Athlete in connection with BAM's programs, activities, and events. This includes use on social media, websites, marketing materials, news releases, broadcast media, and commercial purposes. No compensation shall be owed for any such use."],
+  ["4. Code of Conduct & Program Standards",
+   "The Athlete agrees to abide by all BAM program standards and conduct expectations, including: treating all participants, coaches, and staff with respect and dignity; attending all scheduled sessions on time and prepared; refraining from the use of alcohol, tobacco, marijuana, or any illegal substances; complying with all facility rules and regulations; and representing BAM and their home country with integrity, character, and sportsmanship at all times. Violation of these standards may result in the Athlete's immediate removal from the program without refund, at BAM's sole discretion."],
+  ["5. Housing & Accommodation",
+   "Athletes residing in BAM-arranged housing agree to: comply with all house rules including curfew policies communicated at check-in; maintain cleanliness and respectful use of all common areas; refrain from hosting unauthorized guests; and promptly report any facility issues, safety concerns, or emergencies to designated BAM staff. BAM shall not be held responsible for any lost, stolen, or damaged personal property belonging to the Athlete during the program."],
+  ["6. Cancellation & Refund Policy",
+   "30 or more days before program start: full refund less a $150 USD administrative processing fee. 15 to 29 days before program start: 50% refund of program fees paid. 14 days or fewer before program start: no refund. No-show: no refund. If BAM cancels or substantially modifies a program due to unforeseen circumstances (including natural disaster, government restrictions, or force majeure), participants will receive a full refund or a credit toward a future session, at BAM's discretion."],
+  ["7. Governing Law",
+   "This Agreement shall be governed by and construed in accordance with the laws of the State of Florida, United States of America, without regard to its conflict of law provisions. Any disputes arising under this Agreement shall be resolved exclusively in the courts of Miami-Dade County, Florida."],
+  ["8. Electronic Signature & Agreement",
+   "By providing a signature, I, the undersigned Parent/Guardian, confirm that: (1) I have read and fully understand all terms of this Agreement; (2) I am the parent or legal guardian of the above-named Athlete and have full authority to enter into this Agreement on their behalf; (3) I agree to be legally bound by all terms herein; (4) I understand this electronic signature carries the same legal weight and validity as a handwritten signature under the Electronic Signatures in Global and National Commerce Act (ESIGN, 15 U.S.C. Section 7001 et seq.) and the Uniform Electronic Transactions Act (UETA). This Agreement constitutes the entire understanding between the parties regarding the subject matter herein."],
+];
+
+/* ============================================
+   PDF GENERATION + UPLOAD
+   ============================================ */
+async function generateAndUploadAdaptPdf({ slug, parentName, athleteName, signatureB64, signedAt }) {
+  const pdfBytes = await renderAgreementPdf({
+    academyName:        "By Any Means Basketball",
+    parentName:         parentName || "",
+    athleteName:        athleteName || "",
+    planLabel:          "ADAPT Global AAU Experience",
+    signaturePngDataUrl: signatureB64 || null,
+    signedAtIso:        signedAt || new Date().toISOString(),
+    clauses:            ADAPT_CLAUSES,
+  });
+
+  const pdfPath = `adapt/${slug}/waiver.pdf`;
+  const r = await fetch(`${SB_URL}/storage/v1/object/member-files/${pdfPath}`, {
+    method:  "POST",
+    headers: {
+      apikey:          SB_KEY,
+      Authorization:  `Bearer ${SB_KEY}`,
+      "Content-Type": "application/pdf",
+      "x-upsert":     "true",
+    },
+    body: Buffer.from(pdfBytes),
+  });
+  if (!r.ok) throw new Error(`PDF upload ${r.status}: ${(await r.text()).slice(0, 120)}`);
+  return `${SB_URL}/storage/v1/object/public/member-files/${pdfPath}`;
+}
+
+/* ============================================
+   ONBOARDING EMAILS (via Resend)
+   ============================================ */
+async function sendOnboardingEmails({ parentEmail, parentName, athleteName, athleteCountry, signedAt, pdfUrl }) {
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey) return;
+
+  const dateLabel = signedAt
+    ? new Date(signedAt).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })
+    : "today";
+
+  const btnStyle = 'display:inline-block;background:#E2DD9F;color:#0A0A0A;font-family:sans-serif;font-size:14px;font-weight:700;padding:12px 28px;text-decoration:none;letter-spacing:0.05em';
+
+  // Parent confirmation
+  const parentHtml = `
+<div style="background:#0A0A0A;padding:40px 20px;font-family:sans-serif">
+  <div style="max-width:560px;margin:0 auto;background:#141414;padding:36px">
+    <p style="color:#E2DD9F;font-size:11px;font-weight:700;letter-spacing:0.12em;margin:0 0 24px">BY ANY MEANS BASKETBALL &middot; ADAPT GLOBAL</p>
+    <h1 style="color:#fff;font-size:24px;margin:0 0 8px">Application Confirmed</h1>
+    <p style="color:rgba(255,255,255,0.5);font-size:14px;margin:0 0 32px">Signed ${dateLabel}</p>
+    <p style="color:rgba(255,255,255,0.8);font-size:15px;line-height:1.6;margin:0 0 12px">Hi ${parentName || "there"},</p>
+    <p style="color:rgba(255,255,255,0.8);font-size:15px;line-height:1.6;margin:0 0 32px">The ADAPT Global AAU Experience application for <strong style="color:#fff">${athleteName}</strong> has been received and your waiver has been signed. Our team will review your application and reach out within 48 hours.</p>
+    ${pdfUrl ? `<p style="margin:0 0 32px"><a href="${pdfUrl}" style="${btnStyle}">DOWNLOAD SIGNED WAIVER</a></p>` : ""}
+    <p style="color:rgba(255,255,255,0.8);font-size:15px;line-height:1.6;margin:0 0 8px">Questions? Reply to this email or contact us at <a href="mailto:info@byanymeansbball.com" style="color:#E2DD9F">info@byanymeansbball.com</a>.</p>
+    <p style="color:rgba(255,255,255,0.3);font-size:12px;margin:32px 0 0">By Any Means Basketball LLC &middot; Miami, FL</p>
+  </div>
+</div>`;
+
+  const parentText = `ADAPT Global Application Confirmed\n\nHi ${parentName || "there"},\n\nThe application for ${athleteName} has been received and your waiver has been signed on ${dateLabel}. Our team will reach out within 48 hours.\n\n${pdfUrl ? `Download your signed waiver: ${pdfUrl}\n\n` : ""}Questions? Email info@byanymeansbball.com\n\nBy Any Means Basketball LLC`;
+
+  const r1 = await fetch("https://api.resend.com/emails", {
+    method:  "POST",
+    headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+    body:    JSON.stringify({
+      from:    "ADAPT Academy <portal@byanymeansbball.com>",
+      to:      [parentEmail],
+      subject: `Application confirmed — ${athleteName} | ADAPT Global`,
+      html:    parentHtml,
+      text:    parentText,
+    }),
+  });
+  if (!r1.ok) console.error("Parent confirmation email failed:", (await r1.text()).slice(0, 200));
+
+  // Staff notification
+  const staffEmail = process.env.ADAPT_STAFF_EMAIL || "admin@byanymeansbusiness.com";
+  const staffHtml = `
+<div style="background:#0A0A0A;padding:40px 20px;font-family:sans-serif">
+  <div style="max-width:560px;margin:0 auto;background:#141414;padding:36px">
+    <p style="color:#E2DD9F;font-size:11px;font-weight:700;letter-spacing:0.12em;margin:0 0 24px">ADAPT GLOBAL &middot; NEW ONBOARDING</p>
+    <h1 style="color:#fff;font-size:22px;margin:0 0 28px">New Application Received</h1>
+    <table style="color:rgba(255,255,255,0.8);font-size:14px;line-height:1.8;border-collapse:collapse;width:100%">
+      <tr><td style="color:rgba(255,255,255,0.4);padding-right:16px;white-space:nowrap">Athlete</td><td style="color:#fff;font-weight:600">${athleteName}</td></tr>
+      <tr><td style="color:rgba(255,255,255,0.4);padding-right:16px">Country</td><td>${athleteCountry || "n/a"}</td></tr>
+      <tr><td style="color:rgba(255,255,255,0.4);padding-right:16px">Guardian</td><td>${parentName || "n/a"}</td></tr>
+      <tr><td style="color:rgba(255,255,255,0.4);padding-right:16px">Email</td><td>${parentEmail}</td></tr>
+      <tr><td style="color:rgba(255,255,255,0.4);padding-right:16px">Signed</td><td>${dateLabel}</td></tr>
+    </table>
+    ${pdfUrl ? `<p style="margin:28px 0 0"><a href="${pdfUrl}" style="${btnStyle}">VIEW SIGNED WAIVER</a></p>` : ""}
+  </div>
+</div>`;
+
+  const r2 = await fetch("https://api.resend.com/emails", {
+    method:  "POST",
+    headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+    body:    JSON.stringify({
+      from:    "ADAPT Academy <portal@byanymeansbball.com>",
+      to:      [staffEmail],
+      subject: `New ADAPT Application — ${athleteName}`,
+      html:    staffHtml,
+    }),
+  });
+  if (!r2.ok) console.error("Staff notification email failed:", (await r2.text()).slice(0, 200));
 }
 
 /* ============================================
@@ -281,7 +409,6 @@ async function handler(req, res) {
     passport_back_b64,
     athlete_photo_b64,
     signature_b64,
-    waiver_pdf_b64,
     agreed,
     legal_meta   = {},
   } = b;
@@ -313,10 +440,9 @@ async function handler(req, res) {
   let passportBackUrl  = null;
   let athletePhotoUrl  = null;
   let signatureUrl     = null;
-  let waiverPdfUrl     = null;
 
   try {
-    [passportFrontUrl, passportBackUrl, athletePhotoUrl, signatureUrl, waiverPdfUrl] = await Promise.all([
+    [passportFrontUrl, passportBackUrl, athletePhotoUrl, signatureUrl] = await Promise.all([
       passport_front_b64
         ? uploadFile("member-files", `${fileBase}/passport_front.jpg`, passport_front_b64, "image/jpeg")
         : Promise.resolve(null),
@@ -329,13 +455,26 @@ async function handler(req, res) {
       signature_b64
         ? uploadFile("member-files", `${fileBase}/signature.png`, signature_b64, "image/png")
         : Promise.resolve(null),
-      waiver_pdf_b64
-        ? uploadFile("member-files", `${fileBase}/waiver.pdf`, waiver_pdf_b64, "application/pdf")
-        : Promise.resolve(null),
     ]);
   } catch (e) {
     console.error("File upload failed:", e.message);
     return res.status(500).json({ ok: false, error: `File upload failed: ${e.message}` });
+  }
+
+  /* ------------------------------------------
+     Generate + upload signed waiver PDF (non-fatal)
+  ------------------------------------------ */
+  let waiverPdfUrl = null;
+  try {
+    waiverPdfUrl = await generateAndUploadAdaptPdf({
+      slug,
+      parentName:  parent_name || "",
+      athleteName: `${athlete_first} ${athlete_last}`,
+      signatureB64: signature_b64,
+      signedAt:    legal_meta?.timestamp || new Date().toISOString(),
+    });
+  } catch (e) {
+    console.error("PDF generation failed (non-fatal):", e.message);
   }
 
   /* ------------------------------------------
@@ -424,6 +563,22 @@ async function handler(req, res) {
         console.error("Failed to stamp GHL error on lead", leadId, stampErr.message);
       }
     }
+  }
+
+  /* ------------------------------------------
+     Send confirmation + staff notification emails (non-fatal)
+  ------------------------------------------ */
+  try {
+    await sendOnboardingEmails({
+      parentEmail:    parent_email,
+      parentName:     parent_name || "",
+      athleteName:    `${athlete_first} ${athlete_last}`,
+      athleteCountry: athlete_country || "",
+      signedAt:       legal_meta?.timestamp || null,
+      pdfUrl:         waiverPdfUrl,
+    });
+  } catch (e) {
+    console.error("Onboarding emails failed (non-fatal):", e.message);
   }
 
   return res.status(200).json({ ok: true, id: leadId, ghl: ghlStatus });

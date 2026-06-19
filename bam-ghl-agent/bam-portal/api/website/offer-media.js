@@ -63,8 +63,11 @@ async function handler(req, res) {
     const offer = offers?.[0];
     if (!offer) return res.status(200).json({ welcome_video: null });
 
+    // The welcome video moved to the offer's Sales section ("sales:welcome_video").
+    // Stay tolerant of the older Onboarding location and the original bare key so
+    // any previously uploaded video still resolves; newest upload wins.
     const files = await sbReq(
-      `offer_files?offer_id=eq.${offer.id}&section=eq.welcome_video&select=storage_path&order=created_at.desc&limit=1`
+      `offer_files?offer_id=eq.${offer.id}&section=in.("sales:welcome_video","onboarding:welcome_video","welcome_video")&select=storage_path&order=created_at.desc&limit=1`
     );
     const path = files?.[0]?.storage_path || null;
     const url = path ? `${SB_URL}/storage/v1/object/public/offers/${path}` : null;

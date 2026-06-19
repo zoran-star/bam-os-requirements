@@ -4,48 +4,42 @@
 // is paid. Fires the two downstream systems — the portal is the SINGLE trigger
 // (decided 2026-06-06; CoachIQ's own "send to GHL" step is turned OFF):
 //
-//   1. GHL   — POST the academy's existing inbound-webhook workflow with
-//              { details: { user: { email }, product: { id } } }. That workflow
-//              (already built by Zoran) finds/creates the contact, branches by
-//              product id, tags, marks the opportunity WON, and sends emails.
-//   2. COACHIQ (if the academy uses it) — create the CoachIQ user (Zapier; still
-//              a stub until wired) and fire the per-product automation that grants
-//              the product + credits.
+//   1. GHL   — using the academy's GHL OAuth token: upsert the contact, then
+//              ENROLL them directly into the onboarding workflow by ID
+//              (POST /contacts/{id}/workflow/{workflowId}). No inbound webhook —
+//              manual API enrollment runs the workflow's action steps (tag, mark
+//              opportunity WON, send welcome emails) for that contact. Decided
+//              2026-06-18: direct-by-ID replaced the old inbound-webhook approach.
+//   2. COACHIQ (if the academy uses it) — create + enroll the CoachIQ user via the
+//              Zapier "Create User" hook (the only proven create+enroll path), then
+//              grant the product (= product + program access + starter credits, no
+//              payment). New users: the id returns via /api/coachiq/user-created,
+//              which grants the product. Returning members (id already stored): grant
+//              the product inline. See api/coachiq.js + memories/project_coachiq_integration.md.
 //
 // Each hook is INDEPENDENT and NON-FATAL: one failing never blocks the other or
 // the Stripe webhook. Everything is GATED behind config, so with nothing set this
 // is an inert no-op (safe to ship before the academy is configured).
 //
 // CONFIG (env for the BAM GTA proof; per-academy `clients` columns later):
-//   GHL_ONBOARDING_WEBHOOK_URL   the inbound-webhook URL of the GHL workflow
-//   ONBOARDING_PRODUCT_MAP       JSON: { "<plan>|<term>": { ghl_product_id,
-//                                coachiq_automation_id } }  e.g.
-//                                { "2/wk|4_weeks": { "ghl_product_id": "...",
-//                                  "coachiq_automation_id": "..." } }
-//   (CoachIQ key/group via api/coachiq.js → COACHIQ_API_KEY / COACHIQ_GROUP_ID)
+//   GHL_ONBOARDING_WORKFLOW_ID       the GHL workflow id to enroll new paid members
+//                                    into (the long id after /workflows/ in the URL).
+//                                    The academy's GHL OAuth token does the API calls.
+//   COACHIQ_CREATE_USER_WEBHOOK_URL  Zapier "Create User" catch-hook URL.
+//   COACHIQ_PRODUCT_AUTOMATION_ID    "Add a Product Purchase" automation (+ optional
+//                                    COACHIQ_PRODUCT_MAP per plan|term).
+//   COACHIQ_API_KEY / COACHIQ_GROUP_ID / COACHIQ_WEBHOOK_SECRET  (see api/coachiq.js)
 
-import { coachiqEnabled, triggerCoachiqAutomation, createCoachiqUser } from "../coachiq.js";
+import { coachiqOnboardingEnabled, addCoachiqProduct } from "../coachiq.js";
+import { getClientGhlToken } from "../website/availability.js";
 
-function productMap() {
-  try {
-    const raw = process.env.ONBOARDING_PRODUCT_MAP;
-    return raw ? JSON.parse(raw) : {};
-  } catch (_) {
-    return {};
-  }
-}
-
-// Resolve the per-plan+term ids the two hooks need. Returns {} when unmapped.
-function mappingFor(plan, term) {
-  const map = productMap();
-  return map[`${plan}|${term}`] || map[plan] || {};
-}
+const GHL_V2     = "https://services.leadconnectorhq.com";
+const V2_VERSION = "2021-07-28";
 
 // member: the members row (needs parent_email, id, client_id, coachiq_member_id?)
 // ctx:    { plan, term, sb, writeAudit }
 export async function fireOnboardingActivations(member, ctx = {}) {
   const { plan, term, sb, writeAudit } = ctx;
-  const map = mappingFor(plan, term);
   const results = { ghl: null, coachiq: null };
 
   const audit = async (action_type, args) => {
@@ -53,59 +47,92 @@ export async function fireOnboardingActivations(member, ctx = {}) {
     catch (_) { /* non-fatal */ }
   };
 
-  // ── 1. GHL webhook (portal is the only trigger) ──
-  const ghlUrl = process.env.GHL_ONBOARDING_WEBHOOK_URL;
-  if (ghlUrl && map.ghl_product_id && member.parent_email) {
+  // ── 1. GHL — upsert contact + enroll directly into the onboarding workflow by ID ──
+  // No inbound webhook. We use the academy's GHL OAuth token (auto-refresh) to upsert
+  // the contact (match on email/phone), then POST it into GHL_ONBOARDING_WORKFLOW_ID.
+  // Manual API enrollment runs the workflow's steps (tag, mark WON, welcome emails) —
+  // the workflow itself needs no trigger.
+  const workflowId = process.env.GHL_ONBOARDING_WORKFLOW_ID;
+  if (workflowId && member.parent_email && sb) {
     try {
-      const payload = { details: { user: { email: member.parent_email }, product: { id: map.ghl_product_id } } };
-      const r = await fetch(ghlUrl, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
+      const rows = await sb(`clients?id=eq.${member.client_id}&select=id,ghl_location_id,ghl_access_token,ghl_refresh_token,ghl_token_expires_at&limit=1`);
+      const client = Array.isArray(rows) && rows[0];
+      if (!client || !client.ghl_location_id) throw new Error("academy has no GHL location");
+
+      const token = await getClientGhlToken(client);
+      const headers = {
+        Authorization:  `Bearer ${token}`,
+        Version:        V2_VERSION,
+        "Content-Type": "application/json",
+        Accept:         "application/json",
+      };
+
+      // Upsert the contact (GHL matches on email/phone → creates or updates in one call).
+      const nameParts = (member.parent_name || "").trim().split(/\s+/);
+      const contactPayload = {
+        locationId: client.ghl_location_id,
+        firstName:  nameParts[0] || undefined,
+        lastName:   nameParts.slice(1).join(" ") || undefined,
+        email:      member.parent_email.toLowerCase(),
+        phone:      member.parent_phone || undefined,
+        source:     "Website enrollment",
+        tags:       ["website-enrollment"],
+      };
+      const upsertRes = await fetch(`${GHL_V2}/contacts/upsert`, {
+        method: "POST", headers, body: JSON.stringify(contactPayload),
       });
-      results.ghl = { ok: r.ok, status: r.status };
-      await audit(r.ok ? "onboarding-ghl-fired" : "onboarding-ghl-error", { product_id: map.ghl_product_id, status: r.status });
+      if (!upsertRes.ok) throw new Error(`GHL upsert ${upsertRes.status}: ${(await upsertRes.text()).slice(0, 120)}`);
+      const upserted  = await upsertRes.json();
+      const contactId = (upserted.contact || upserted).id || null;
+      if (!contactId) throw new Error("GHL upsert returned no contact id");
+
+      // Enroll the contact into the onboarding workflow.
+      const enrollRes = await fetch(`${GHL_V2}/contacts/${contactId}/workflow/${workflowId}`, {
+        method: "POST", headers,
+        body: JSON.stringify({ eventStartTime: new Date().toISOString().replace(/\.\d{3}Z$/, "+00:00") }),
+      });
+      if (!enrollRes.ok) throw new Error(`GHL workflow enroll ${enrollRes.status}: ${(await enrollRes.text()).slice(0, 120)}`);
+
+      results.ghl = { ok: true, contact_id: contactId, workflow_id: workflowId };
+      await audit("onboarding-ghl-fired", { contact_id: contactId, workflow_id: workflowId, plan, term });
     } catch (e) {
       results.ghl = { ok: false, error: String(e && e.message || e) };
-      await audit("onboarding-ghl-error", { product_id: map.ghl_product_id, error: results.ghl.error });
+      await audit("onboarding-ghl-error", { workflow_id: workflowId, plan, term, error: results.ghl.error });
     }
   } else {
-    results.ghl = { skipped: "GHL not configured (need GHL_ONBOARDING_WEBHOOK_URL + product map)" };
+    results.ghl = { skipped: "GHL not configured (need GHL_ONBOARDING_WORKFLOW_ID + parent_email)" };
   }
 
-  // ── 2. CoachIQ (only if the academy uses it) ──
-  if (coachiqEnabled()) {
+  // ── 2. CoachIQ (self-signup model — only if the academy uses it) ──
+  //   • Returning member (already has coachiq_member_id) → grant the product NOW.
+  //   • New member → do nothing here. The parent creates their CoachIQ account on
+  //     the academy's group login page (enrolled); CoachIQ's "New User" automation
+  //     webhooks the id to /api/coachiq/user-created, which matches by email + grants
+  //     the product then. The confirmation page tells them to sign up. Non-fatal.
+  if (coachiqOnboardingEnabled()) {
     try {
-      // Ensure a CoachIQ user id (create via Zapier if we don't have one).
-      let coachiqUserId = member.coachiq_member_id || null;
-      if (!coachiqUserId) {
-        // createCoachiqUser is still a stub until the Zapier "Create User" path is
-        // wired — this will throw and be logged as blocked (expected for now).
-        const created = await createCoachiqUser({
-          email: member.parent_email, firstName: member.parent_name,
-        });
-        coachiqUserId = created && created.id;
-        if (coachiqUserId && sb) {
-          await sb(`members?id=eq.${member.id}`, {
-            method: "PATCH", headers: { Prefer: "return=minimal" },
-            body: JSON.stringify({ coachiq_member_id: coachiqUserId }),
-          }).catch(() => {});
+      const existingId = member.coachiq_member_id || null;
+      if (existingId) {
+        let automationUrl = null;
+        if (sb && member.stripe_price_id) {
+          const pr = await sb(`pricing_catalog?stripe_price_id=eq.${encodeURIComponent(member.stripe_price_id)}&select=coachiq_automation_url&limit=1`).catch(() => null);
+          automationUrl = (Array.isArray(pr) && pr[0] && pr[0].coachiq_automation_url) || null;
         }
-      }
-      if (coachiqUserId && map.coachiq_automation_id) {
-        await triggerCoachiqAutomation(map.coachiq_automation_id, { user: { id: coachiqUserId } });
-        results.coachiq = { ok: true, automation_id: map.coachiq_automation_id };
-        await audit("onboarding-coachiq-allocated", { coachiq_user_id: coachiqUserId, automation_id: map.coachiq_automation_id });
+        const product = await addCoachiqProduct(existingId, {
+          plan, term, automationUrl, sub_id: member.stripe_subscription_id || null, source: "website-enrollment",
+        });
+        results.coachiq = { ok: true, coachiq_user_id: existingId, product };
+        await audit("onboarding-coachiq-product", { coachiq_user_id: existingId, plan, term });
       } else {
-        results.coachiq = { skipped: "missing coachiq user id or automation id" };
-        await audit("onboarding-coachiq-skipped", { reason: results.coachiq.skipped });
+        results.coachiq = { pending: "awaiting parent self-signup → /api/coachiq/user-created grants product" };
+        await audit("onboarding-coachiq-await-signup", { member_id: member.id, parent_email: member.parent_email, plan, term });
       }
     } catch (e) {
       results.coachiq = { ok: false, error: String(e && e.message || e) };
       await audit("onboarding-coachiq-error", { error: results.coachiq.error });
     }
   } else {
-    results.coachiq = { skipped: "CoachIQ not enabled for this academy" };
+    results.coachiq = { skipped: "CoachIQ onboarding not configured for this academy" };
   }
 
   return results;

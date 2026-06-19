@@ -857,6 +857,26 @@ function ContentTicketDetail({ tk, session, ticket, onBack, onRefetch, patchTick
     }
   }
 
+  // Organic tickets go back to the CLIENT for review (not to marketing/Meta).
+  async function sendForReview() {
+    if (busy) return;
+    if (!finalsExisting.length) {
+      alert("Upload at least one final creative before sending for review.");
+      return;
+    }
+    setBusy(true);
+    try {
+      await patchTicket(ticket.id, { action: "send-for-review" });
+      showBanner(`Sent ${academyName}'s creative for client review.`);
+      onBack();
+      await onRefetch();
+    } catch (e) {
+      alert("Send for review failed: " + e.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function sendToMarketing(marketingNotes) {
     if (busy) return;
     if (!finalsExisting.length) {
@@ -931,9 +951,33 @@ function ContentTicketDetail({ tk, session, ticket, onBack, onRefetch, patchTick
             {academyName} · Submitted {ticket.submitted_at ? new Date(ticket.submitted_at).toLocaleString() : "—"}
             {ctkLastActivityIso(ticket) ? ` · Last activity ${ctkFormatRelative(ctkLastActivityIso(ticket))}` : ""}
           </div>
+          {/* Owner (Cam) + the client's SM contact to reach out to */}
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 8 }}>
+            <span style={{
+              fontSize: 11, fontWeight: 600, color: tk.accent, letterSpacing: "0.04em",
+              padding: "3px 10px", borderRadius: 999,
+              border: `1px solid ${tk.accent}`, background: `${tk.accent}14`,
+            }}>👤 Owner · {ticket.assigned_to_name || "Cam"}</span>
+            <span style={{
+              fontSize: 11, fontWeight: 500, color: tk.textSub, letterSpacing: "0.04em",
+              padding: "3px 10px", borderRadius: 999,
+              border: `1px solid ${tk.border}`,
+            }}>SM contact · {ticket.sm_name || "Unassigned"}</span>
+          </div>
         </div>
         <StatusBadge ticket={ticket} tk={tk} />
       </div>
+
+      {/* Brand reference (collapsible) — colors/fonts/logos so the team builds on-brand */}
+      <details style={{ marginBottom: 22, background: tk.surface, border: `1px solid ${tk.border}`, borderRadius: 10, padding: "12px 16px" }}>
+        <summary style={{
+          cursor: "pointer", userSelect: "none",
+          fontFamily: "monospace", fontSize: 10, letterSpacing: "0.22em", textTransform: "uppercase", color: tk.textMute,
+        }}>🎨 Brand</summary>
+        <div style={{ marginTop: 12 }}>
+          <BrandCard brand={ticket.client?.brand_data} tk={tk} />
+        </div>
+      </details>
 
       {/* Client inputs */}
       <SectionLabel tk={tk}>What the client submitted</SectionLabel>
@@ -1034,13 +1078,16 @@ function ContentTicketDetail({ tk, session, ticket, onBack, onRefetch, patchTick
             padding: "10px 20px", borderRadius: 8, cursor: "pointer",
             fontFamily: "inherit", fontSize: 13, fontWeight: 500,
           }}>Request Client Action</button>
-          <button onClick={() => setSendModalOpen(true)} disabled={busy || !finalsExisting.length} style={{
-            background: tk.accent, color: "#0A0A0B", border: 0,
-            padding: "10px 22px", borderRadius: 8,
-            cursor: (busy || !finalsExisting.length) ? "not-allowed" : "pointer",
-            fontFamily: "inherit", fontSize: 13, fontWeight: 700,
-            opacity: (busy || !finalsExisting.length) ? 0.5 : 1,
-          }}>📤  Send to Marketing</button>
+          <button
+            onClick={() => ticket.channel === "organic" ? sendForReview() : setSendModalOpen(true)}
+            disabled={busy || !finalsExisting.length}
+            style={{
+              background: tk.accent, color: "#0A0A0B", border: 0,
+              padding: "10px 22px", borderRadius: 8,
+              cursor: (busy || !finalsExisting.length) ? "not-allowed" : "pointer",
+              fontFamily: "inherit", fontSize: 13, fontWeight: 700,
+              opacity: (busy || !finalsExisting.length) ? 0.5 : 1,
+            }}>{ticket.channel === "organic" ? "📤  Send for client review" : "📤  Send to Marketing"}</button>
         </div>
       )}
 
@@ -1208,9 +1255,7 @@ function ClientInputs({ ticket, tk }) {
                 <div style={{ fontSize: 13, color: tk.text, marginBottom: 10, whiteSpace: "pre-wrap" }}>
                   {c.notes || <span style={{ color: tk.textMute, fontStyle: "italic" }}>(no notes)</span>}
                 </div>
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))", gap: 8 }}>
-                  {(c.raw_files || []).map((f, fi) => <FilePreviewTile key={fi} file={f} tk={tk} compact />)}
-                </div>
+                <FilesByFolder files={c.raw_files} tk={tk} compact minmax={160} />
               </div>
             ))}
           </div>
@@ -1225,9 +1270,7 @@ function ClientInputs({ ticket, tk }) {
               Raw files ({raw.length})
             </div>
             {raw.length ? (
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: 10 }}>
-                {raw.map((f, i) => <FilePreviewTile key={i} file={f} tk={tk} />)}
-              </div>
+              <FilesByFolder files={raw} tk={tk} />
             ) : (
               <div style={{ color: tk.textMute, fontSize: 13, fontStyle: "italic" }}>None</div>
             )}
@@ -1235,6 +1278,93 @@ function ClientInputs({ ticket, tk }) {
         </>
       )}
     </>
+  );
+}
+
+// Client brand reference — colors, fonts, logos — so the content team builds
+// on-brand without leaving the ticket. Reads clients.brand_data.
+function BrandCard({ brand, tk }) {
+  const b = brand || {};
+  const colors = [["Primary", b.color_primary], ["Secondary", b.color_secondary], ["Accent", b.color_accent]].filter(c => c[1]);
+  const logos = [["Dark bg", b.logo_dark_url], ["Light bg", b.logo_light_url], ["Icon", b.icon_url]].filter(l => l[1]);
+  const hasAny = colors.length || logos.length || b.font_display || b.font_body || b.notes || b.stats;
+  if (!hasAny) {
+    return <div style={{ color: tk.textMute, fontSize: 13, fontStyle: "italic" }}>No brand info on file yet.</div>;
+  }
+  const row = (label, value) => value ? (
+    <div style={{ display: "flex", gap: 14, padding: "8px 0", borderBottom: `1px solid ${tk.borderSoft || tk.border}` }}>
+      <div style={{ fontFamily: "monospace", fontSize: 10, letterSpacing: "0.16em", textTransform: "uppercase", color: tk.textMute, width: 90, flexShrink: 0, paddingTop: 3 }}>{label}</div>
+      <div style={{ flex: 1, minWidth: 0, fontSize: 14, color: tk.text }}>{value}</div>
+    </div>
+  ) : null;
+  return (
+    <div>
+      {colors.length > 0 && row("Colors", (
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
+          {colors.map(([name, hex]) => (
+            <div key={name} style={{ display: "flex", alignItems: "center", gap: 7 }}>
+              <span style={{ width: 22, height: 22, borderRadius: 5, background: hex, border: `1px solid ${tk.border}`, display: "inline-block" }} />
+              <span style={{ fontFamily: "monospace", fontSize: 12 }}>{hex}</span>
+              <span style={{ fontSize: 11, color: tk.textMute }}>{name}</span>
+            </div>
+          ))}
+        </div>
+      ))}
+      {(b.font_display || b.font_body) && row("Fonts", (
+        <span>{[b.font_display && `Display: ${b.font_display}`, b.font_body && `Body: ${b.font_body}`].filter(Boolean).join("  ·  ")}</span>
+      ))}
+      {logos.length > 0 && row("Logos", (
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+          {logos.map(([name, url]) => (
+            <a key={name} href={url} target="_blank" rel="noreferrer" title={name} style={{
+              display: "flex", flexDirection: "column", alignItems: "center", gap: 3,
+              padding: 6, borderRadius: 6, border: `1px solid ${tk.border}`, background: name === "Light bg" ? "#fff" : tk.surfaceHov,
+              textDecoration: "none",
+            }}>
+              <img src={url} alt={name} style={{ width: 48, height: 36, objectFit: "contain" }} />
+              <span style={{ fontSize: 9, color: tk.textMute }}>{name}</span>
+            </a>
+          ))}
+        </div>
+      ))}
+      {row("Website", b.website_url || b.domain ? <a href={(b.website_url || b.domain).startsWith("http") ? (b.website_url || b.domain) : `https://${b.website_url || b.domain}`} target="_blank" rel="noreferrer" style={{ color: tk.accent, textDecoration: "none" }}>{b.website_url || b.domain} ↗</a> : null)}
+      {row("Brand notes", b.notes ? <span style={{ whiteSpace: "pre-wrap" }}>{b.notes}</span> : null)}
+      {row("Stats", b.stats || null)}
+    </div>
+  );
+}
+
+// Render a set of files grouped by their `folder` (the client's categories).
+// Falls back to a flat grid when nothing is foldered.
+function FilesByFolder({ files, tk, compact, minmax = 180 }) {
+  const list = Array.isArray(files) ? files : [];
+  if (!list.length) return null;
+  const groups = {};
+  list.forEach(f => { const k = (f.folder || "").trim(); (groups[k] = groups[k] || []).push(f); });
+  const names = Object.keys(groups).sort((a, b) => (a === "" ? 1 : b === "" ? -1 : a.localeCompare(b)));
+  const grid = (items) => (
+    <div style={{ display: "grid", gridTemplateColumns: `repeat(auto-fill, minmax(${minmax}px, 1fr))`, gap: 10 }}>
+      {items.map((f, i) => <FilePreviewTile key={i} file={f} tk={tk} compact={compact} />)}
+    </div>
+  );
+  if (names.length === 1 && names[0] === "") return grid(groups[""]);
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+      {names.map(name => (
+        <details key={name || "_uncat"} style={{
+          border: `1px solid ${tk.borderSoft || tk.border}`, borderRadius: 8, padding: "8px 10px",
+        }}>
+          <summary style={{
+            cursor: "pointer", userSelect: "none",
+            fontFamily: "monospace", fontSize: 11, letterSpacing: "0.1em", textTransform: "uppercase",
+            color: name ? tk.accent : tk.textMute,
+          }}>
+            {name ? `📁 ${name}` : "Uncategorized"} <span style={{ color: tk.textMute }}>({groups[name].length})</span>
+          </summary>
+          <div style={{ marginTop: 10 }}>{grid(groups[name])}</div>
+        </details>
+      ))}
+    </div>
   );
 }
 
@@ -1258,6 +1388,18 @@ function FilePreviewTile({ file, tk, compact }) {
           width: "100%", aspectRatio: "1 / 1", objectFit: "cover",
           borderRadius: 4, background: tk.surfaceHov,
         }} />
+      ) : isVideo ? (
+        <div style={{ position: "relative", width: "100%", aspectRatio: "1 / 1" }}>
+          {/* Poster frame: seek a fraction in so browsers paint a real frame, not black */}
+          <video
+            src={`${file.url}#t=0.5`}
+            muted playsInline preload="metadata"
+            style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: 4, background: tk.surfaceHov, display: "block" }}
+          />
+          <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", pointerEvents: "none" }}>
+            <span style={{ width: 32, height: 32, borderRadius: "50%", background: "rgba(0,0,0,0.55)", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, paddingLeft: 2 }}>▶</span>
+          </div>
+        </div>
       ) : (
         <div style={{
           width: "100%", aspectRatio: "1 / 1",

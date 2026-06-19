@@ -1,0 +1,242 @@
+// Public endpoint — feeds the website enrollment funnel for one offer.
+//
+//   GET /api/website/offer?client_id=<uuid>&offer_id=<uuid?>
+//     → { offer, intake_fields[], pricing[], agreement_url, welcome_video }
+//
+// Powers the parent-facing "join" funnel that lives on the academy's own site:
+//   • intake_fields — the questions to render in step 1 (offer-builder defaults
+//     that are always on + the academy's selected add-ons + any custom fields),
+//     each given a concrete input `type` inferred from its label.
+//   • pricing       — the offer's pricing options (step 2), each resolved to its
+//     Price-Matched, routable Stripe price so the funnel shows the real charge
+//     and the checkout can bill the exact matched price. Unmatched options come
+//     back with available:false so the UI can hide/disable them.
+//   • agreement_url — the signed-waiver PDF the parent reads + signs in step 3.
+//
+// Read-only and CORS-gated by clients.allowed_domains, same as the other
+// api/website/* endpoints. No price/amount is ever trusted from the client —
+// this endpoint only reports what the DB already says is routable.
+
+import { withSentryApiRoute } from "../_sentry.js";
+
+const SB_URL = (process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || "").trim();
+const SB_KEY = (process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY || "").trim();
+
+const DEV_ORIGINS = new Set([
+  "http://localhost:3000",
+  "http://localhost:5173",
+  "http://127.0.0.1:5500",
+]);
+
+let originsCache = { set: null, at: 0 };
+const ORIGINS_TTL_MS = 60_000;
+
+async function sbReq(path) {
+  const r = await fetch(`${SB_URL}/rest/v1/${path}`, {
+    headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` },
+  });
+  if (!r.ok) throw new Error(`Supabase ${r.status}`);
+  const txt = await r.text();
+  return txt ? JSON.parse(txt) : null;
+}
+
+async function getAllowedOrigins() {
+  if (originsCache.set && Date.now() - originsCache.at < ORIGINS_TTL_MS) return originsCache.set;
+  const set = new Set(DEV_ORIGINS);
+  const rows = await sbReq("clients?select=allowed_domains&allowed_domains=not.is.null");
+  for (const row of rows || []) {
+    for (const d of row.allowed_domains || []) { set.add(`https://${d}`); set.add(`https://www.${d}`); }
+  }
+  originsCache = { set, at: Date.now() };
+  return set;
+}
+
+// ── Intake fields ──────────────────────────────────────────────────────────
+// The offer builder's Training "Intake form fields" are these defaults (always
+// on) plus whatever add-ons the academy checked (saved in
+// offers.data.onboarding.intake_form_fields). Keep this list in sync with
+// _bbStdOnboarding(...) in public/client-portal.html for the training type.
+const TRAINING_INTAKE_DEFAULTS = [
+  "Parent name", "Phone", "Email", "Emergency contact name", "Emergency contact phone",
+];
+
+function fieldKey(label) {
+  return String(label).toLowerCase().trim().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "");
+}
+
+// Infer a concrete input type (+ options) from a question label. The offer
+// builder only stores labels, so the funnel derives how to render each one.
+function inferField(label) {
+  const l = String(label).toLowerCase();
+  const base = { key: fieldKey(label), label: String(label), type: "text", required: false };
+  if (/\bemail\b/.test(l)) return { ...base, type: "email", placeholder: "you@email.com" };
+  if (/phone|mobile|cell/.test(l)) return { ...base, type: "tel", placeholder: "(289) 000-0000" };
+  if (/\b(dob|date of birth|birthday|birthdate)\b/.test(l)) return { ...base, type: "date" };
+  if (/gender/.test(l)) return { ...base, type: "select", options: ["Boy", "Girl"] };
+  if (/t-?shirt|jersey|shirt size/.test(l)) return { ...base, type: "select", options: ["YS", "YM", "YL", "AS", "AM", "AL", "AXL"] };
+  if (/skill level|experience/.test(l)) return { ...base, type: "select", options: ["Beginner", "Intermediate", "Advanced"] };
+  if (/relationship/.test(l)) return { ...base, type: "select", options: ["Parent", "Guardian", "Other"] };
+  if (/grade/.test(l)) return { ...base, type: "text", placeholder: "e.g. Grade 7" };
+  if (/medical|allergies|allergy|conditions|goals|notes|why|anything else/.test(l)) return { ...base, type: "textarea" };
+  if (/address/.test(l)) return { ...base, type: "textarea", placeholder: "Street, city, postal code" };
+  return base;
+}
+
+function buildIntakeFields(offer) {
+  const onb = (offer.data && offer.data.onboarding) || {};
+  const selected = Array.isArray(onb.intake_form_fields) ? onb.intake_form_fields : [];
+  const custom = Array.isArray(onb.intake_form_fields_custom) ? onb.intake_form_fields_custom : [];
+
+  // Defaults first (always on), then the academy's checked add-ons, then any
+  // custom fields. Drop the "Add custom" toggle itself and de-dupe by label.
+  const labels = [];
+  const seen = new Set();
+  const push = (lbl) => {
+    const s = String(lbl || "").trim();
+    if (!s || /^add (custom|another)/i.test(s)) return;
+    const k = s.toLowerCase();
+    if (seen.has(k)) return;
+    seen.add(k);
+    labels.push(s);
+  };
+  TRAINING_INTAKE_DEFAULTS.forEach(push);
+  selected.forEach(push);
+  custom.forEach((c) => push(typeof c === "string" ? c : (c && c.name)));
+
+  return labels.map((lbl, i) => {
+    const f = inferField(lbl);
+    // Contact basics are required; everything else optional by default.
+    if (/^(parent name|email|phone)$/i.test(lbl)) f.required = true;
+    return { ...f, key: `${f.key}__${i}` };
+  });
+}
+
+// ── Pricing ──────────────────────────────────────────────────────────────────
+// Mirror _bbTermFromLength / _bbPlanKeys in client-portal.html: a Membership
+// offering yields a "<title>|monthly" base key plus "<title>|<term>" per
+// commitment. We resolve each key to its routable Price-Matched catalog row.
+function termFromLength(length) {
+  const l = String(length || "").toLowerCase();
+  const m = l.match(/(\d+)\s*month/);
+  if (m) { const n = +m[1]; if (n >= 6) return "6_months"; if (n >= 3) return "3_months"; }
+  if (/24\s*week/.test(l)) return "6_months";
+  if (/12\s*week/.test(l)) return "3_months";
+  return null;
+}
+
+const TERM_LABELS = { monthly: "Monthly (billed every 4 weeks)", "3_months": "3 months", "6_months": "6 months" };
+
+// Pick the catalog row to charge for one offer_price_key: must be routable;
+// prefer the canonical tier; otherwise the first routable row.
+function pickRoutable(rows) {
+  const routable = (rows || []).filter((r) => r.is_routable);
+  if (!routable.length) return null;
+  return routable.find((r) => r.tier === "canonical") || routable[0];
+}
+
+function buildPricing(offer, catalogRows) {
+  const offerings = ((offer.data && offer.data.pricing && offer.data.pricing.pricing_offerings) || [])
+    .filter((o) => o && !o.archived && String(o.type || "").toLowerCase() === "membership" && String(o.title || "").trim());
+
+  // Index catalog rows by offer_price_key.
+  const byKey = new Map();
+  for (const r of catalogRows || []) {
+    if (!r.offer_price_key) continue;
+    if (!byKey.has(r.offer_price_key)) byKey.set(r.offer_price_key, []);
+    byKey.get(r.offer_price_key).push(r);
+  }
+
+  const out = [];
+  for (const o of offerings) {
+    const title = String(o.title).trim();
+    const options = [{ term: "monthly", key: `${title}|monthly`, included: o.whats_included || "" }];
+    for (const c of (o.commitments || [])) {
+      const term = termFromLength(c.length);
+      if (term) options.push({ term, key: `${title}|${term}`, included: c.whats_included || o.whats_included || "" });
+    }
+    for (const opt of options) {
+      const row = pickRoutable(byKey.get(opt.key));
+      out.push({
+        offer_price_key: opt.key,
+        title,
+        term: opt.term,
+        term_label: TERM_LABELS[opt.term] || opt.term,
+        whats_included: opt.included,
+        available: !!row,
+        amount_cents: row ? row.amount_cents : null,
+        currency: row ? (row.currency || "cad") : null,
+        plan: row ? row.canonical_plan : null,
+        interval: row ? row.interval : null,
+      });
+    }
+  }
+  return out;
+}
+
+// Newest matching file's public URL for a given set of section keys.
+async function fileUrl(offerId, sections) {
+  const list = sections.map((s) => `"${s}"`).join(",");
+  const files = await sbReq(
+    `offer_files?offer_id=eq.${offerId}&section=in.(${list})&select=storage_path&order=created_at.desc&limit=1`
+  );
+  const path = files && files[0] && files[0].storage_path;
+  return path ? `${SB_URL}/storage/v1/object/public/offers/${path}` : null;
+}
+
+async function handler(req, res) {
+  if (!SB_URL || !SB_KEY) return res.status(500).json({ error: "Supabase not configured" });
+  const origin = req.headers.origin || "";
+  let allowed = false;
+  try { allowed = (await getAllowedOrigins()).has(origin); } catch { /* 403 below */ }
+  if (allowed) { res.setHeader("Access-Control-Allow-Origin", origin); res.setHeader("Vary", "Origin"); }
+  res.setHeader("Access-Control-Allow-Methods", "GET, OPTIONS");
+  if (req.method === "OPTIONS") return res.status(204).end();
+  if (req.method !== "GET") return res.status(405).json({ error: "GET required" });
+  if (!allowed) return res.status(403).json({ error: "Forbidden" });
+
+  const { client_id } = req.query;
+  const offerId = req.query.offer_id;
+  if (!client_id) return res.status(400).json({ error: "client_id required" });
+
+  try {
+    // Pick the offer: explicit id, else the published training offer, else any
+    // training offer (newest config wins).
+    let offer;
+    if (offerId) {
+      const rows = await sbReq(`offers?id=eq.${encodeURIComponent(offerId)}&client_id=eq.${encodeURIComponent(client_id)}&select=id,title,type,status,data&limit=1`);
+      offer = rows && rows[0];
+    } else {
+      const rows = await sbReq(`offers?client_id=eq.${encodeURIComponent(client_id)}&type=eq.training&select=id,title,type,status,data&order=status.asc,updated_at.desc`);
+      offer = (rows || []).find((o) => o.status === "published") || (rows || [])[0];
+    }
+    if (!offer) return res.status(404).json({ error: "offer not found" });
+
+    const catalogRows = await sbReq(
+      `pricing_catalog?client_id=eq.${encodeURIComponent(client_id)}&offer_id=eq.${offer.id}` +
+      `&select=offer_price_key,canonical_plan,interval,tier,is_routable,amount_cents,currency,stripe_price_id`
+    );
+
+    const [agreementUrl, welcomeVideo] = await Promise.all([
+      fileUrl(offer.id, ["onboarding:agreement", "agreement"]),
+      fileUrl(offer.id, ["sales:welcome_video", "onboarding:welcome_video", "welcome_video"]),
+    ]);
+
+    res.setHeader("Cache-Control", "s-maxage=60, stale-while-revalidate=300");
+    return res.status(200).json({
+      offer: {
+        id: offer.id,
+        title: offer.title || "Training",
+        type: offer.type,
+        sales_path: (offer.data && offer.data.sales && offer.data.sales.sales_path) || null,
+      },
+      intake_fields: buildIntakeFields(offer),
+      pricing: buildPricing(offer, catalogRows),
+      agreement_url: agreementUrl,
+      welcome_video: welcomeVideo,
+    });
+  } catch (e) {
+    return res.status(500).json({ error: e.message });
+  }
+}
+
+export default withSentryApiRoute(handler);

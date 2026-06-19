@@ -51,16 +51,18 @@ function clientPortalLink(req) {
   return `${base}/client-portal.html`;
 }
 
+// Returns { ok, error } so callers can surface a failure instead of the old
+// silent no-op (a stale/invalid slack_channel_id used to "succeed" quietly).
 async function postClientSlackNotification(clientId, text, req) {
   try {
     const token = process.env.SLACK_BOT_TOKEN;
-    if (!token) return;
-    if (!clientId || !text) return;
+    if (!token) return { ok: false, error: "slack_not_configured" };
+    if (!clientId || !text) return { ok: false, error: "missing_args" };
     const rows = await sb(`clients?id=eq.${clientId}&select=slack_channel_id`);
     const r = rows?.[0];
-    if (!r?.slack_channel_id) return;
+    if (!r?.slack_channel_id) return { ok: false, error: "no_slack_channel" };
     const body = `${text}\n→ ${clientPortalLink(req)}`;
-    await fetch("https://slack.com/api/chat.postMessage", {
+    const resp = await fetch("https://slack.com/api/chat.postMessage", {
       method: "POST",
       headers: {
         Authorization: `Bearer ${token}`,
@@ -72,8 +74,16 @@ async function postClientSlackNotification(clientId, text, req) {
         unfurl_links: false,
       }),
     });
+    const json = await resp.json().catch(() => ({}));
+    if (!json.ok) {
+      // e.g. channel_not_found / not_in_channel / channel_is_archived
+      console.error(`Slack notify failed for client ${clientId} (channel ${r.slack_channel_id}):`, json.error);
+      return { ok: false, error: json.error || "slack_error" };
+    }
+    return { ok: true };
   } catch (err) {
     console.error("Slack notify failed:", err?.message || err);
+    return { ok: false, error: err?.message || "exception" };
   }
 }
 
@@ -564,8 +574,10 @@ async function handler(req, res) {
         const ask = t.status === "final_review"
           ? "your final sign-off"
           : "a reply from you";
-        postClientSlackNotification(t.client_id,
+        // Awaited so the staff UI knows if the Slack ping actually landed.
+        const slack = await postClientSlackNotification(t.client_id,
           `⏰ Reminder — ${ticketTitle} [${code}] is waiting on ${ask}`, req);
+        return res.status(200).json({ data: enriched[0], slack });
       } else if (action === "approve") {
         postClientSlackNotification(t.client_id,
           `✅ Completed — Systems [${code}]`, req);

@@ -26,7 +26,25 @@ replaces them later.
 
 ## Build phases
 1. **Spine** — GHL inbound-message webhook → portal (instant reply events).
-   Shared by nudges + agent. No blockers.
+   Shared by nudges + agent. **✅ LIVE + PROVEN END-TO-END 2026-06-18** (PRs
+   #459/#464/#465, on main + deployed). Table `ghl_inbound_messages` (migration
+   20260618130000) + endpoint `api/ghl/inbound-webhook.js`. Auth: shared-secret
+   header `X-Webhook-Secret`, env `GHL_WEBHOOK_SECRET` (set in Vercel
+   production). Gated to v15/v2 academies. GHL side: a Workflow named
+   "agent trigger" on BAM GTA (location `Le9phlhqKyjLyd0JTECv`) with trigger
+   "Customer Replied" → Webhook POST to
+   `https://portal.byanymeansbusiness.com/api/ghl/inbound-webhook`, header
+   `X-Webhook-Secret`, custom data `locationId={{location.id}}`,
+   `contactId={{contact.id}}`, `body={{message.body}}`, `direction=inbound`.
+   GOTCHAS LEARNED: (a) GHL's "contact's details" webhook puts the location id
+   in `customData.locationId` AND nested `location.id` — NOT top-level; the
+   endpoint reads all those paths. (b) `{{message.body}}` is empty on the
+   contact-detail trigger (no real message text) — that's fine, P1 only needs
+   the EVENT (who/which academy replied); the agent (P3) fetches the full
+   thread from the inbox. (c) GHL "Test workflow" DOES fire the webhook (shows
+   in Enrollment history). Consumers (nudge cancel / agent wake) read
+   `ghl_inbound_messages` in later phases. Per-academy rollout: add the same
+   workflow to each v15/v2 academy's GHL.
 2. **Nudge engine** ("sms ghosted" first): enroll when a website lead lands
    at "interested"; strict-schedule texts/emails; instant exits (reply via
    webhook, booking via our endpoint, stage-leave). BLOCKED ON: Zoran's
@@ -37,6 +55,33 @@ replaces them later.
    move pipeline card, schedule_followup (reschedules on every event),
    escalate. Sends via GHL so replies stay in the team inbox.
 4. **Agent auto + retire GHL workflows** (escalation rails stay).
+
+## Agent Sandbox — BUILT 2026-06-18 (PR #469, live)
+Step 1 of the brain. Staff-only `/sandbox` page (portal.byanymeansbusiness.com/
+sandbox) — trainer role-plays as a parent, the Claude agent proposes replies.
+TRAINING ONLY: zero GHL/SMS side effects. Pieces:
+- `api/agent/bam-gta-prompt.js` — BAM GTA booking prompt vendored into the portal
+  (source of truth stays sales-conversation-agents/...-bam-gta.txt; regenerate
+  the .js if it changes).
+- `api/agent-sandbox.js` — staff-gated; action `chat` → Claude `claude-sonnet-4-6`
+  via forced `propose_reply` tool → {reply, reasoning, confidence, escalate};
+  `teach`/`lessons`/`forget` manage training lessons. ACTIVE LESSONS ARE
+  INJECTED into the system prompt at reply time → a correction takes effect on
+  the next message. Defaults to BAM GTA client.
+- `agent_lessons` table (migration 20260618160000) — per-academy corrections.
+- `src/sandbox/SandboxApp.jsx` + `/sandbox` lazy route in main.jsx.
+- BRAIN EDITOR (PR #471): `api/agent/prompt-structure.js` = the prompt parsed
+  into 20 ordered, grouped sections (identity/academy/behavior/guardrails) +
+  `assemblePrompt(overrides)`. `agent_prompt_sections` table (migration
+  20260618170000) holds per-academy per-section overrides (only edited sections
+  get a row). Sandbox builds the system prompt = section defaults + overrides +
+  active lessons. Endpoint actions: sections / update-section / reset-section.
+  UI: 💬 Chat / 📝 Brain tab; Brain = collapsible editable section cards with
+  Save / Reset-to-default. To change DEFAULTS, edit the source .txt and
+  regenerate prompt-structure.js.
+NOT YET BUILT (next): tools (check availability / book / move card), reading the
+P1 spine to wake on a real reply, sending via GHL. Base-prompt editor (Playbook)
++ lesson promotion-to-global also later.
 
 ## Training rollout (Zoran's 5 steps)
 1. Draft the shared system prompt together (seed: sales-conversation-agents/

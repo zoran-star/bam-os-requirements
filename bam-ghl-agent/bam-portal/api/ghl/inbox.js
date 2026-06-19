@@ -128,7 +128,23 @@ async function pickGhlToken(client) {
   if (client.ghl_access_token) {
     const expiresAt = client.ghl_token_expires_at ? new Date(client.ghl_token_expires_at).getTime() : 0;
     if (expiresAt - Date.now() <= 60_000 && client.ghl_refresh_token) {
-      try { return await refreshGhlToken(client); } catch (_) {}
+      try { return await refreshGhlToken(client); }
+      catch (_) {
+        // Refresh failed — GHL refresh tokens are single-use, so a concurrent
+        // process (e.g. the contacts-sync cron) likely just consumed it and saved
+        // a fresh access token. Re-read the row and use that instead of falling
+        // back to the now-stale in-memory token (which caused "Invalid JWT").
+        try {
+          const rows = await sb(`clients?id=eq.${client.id}&select=ghl_access_token,ghl_location_id,ghl_token_expires_at,ghl_refresh_token`);
+          const fresh = rows && rows[0];
+          if (fresh && fresh.ghl_access_token && fresh.ghl_access_token !== client.ghl_access_token) {
+            const fexp = fresh.ghl_token_expires_at ? new Date(fresh.ghl_token_expires_at).getTime() : 0;
+            if (fexp - Date.now() > 60_000) return { token: fresh.ghl_access_token, locationId: fresh.ghl_location_id || client.ghl_location_id };
+            try { return await refreshGhlToken(fresh); } catch (_) {}
+            return { token: fresh.ghl_access_token, locationId: fresh.ghl_location_id || client.ghl_location_id };
+          }
+        } catch (_) {}
+      }
     }
     return { token: client.ghl_access_token, locationId: client.ghl_location_id };
   }
@@ -185,6 +201,25 @@ async function handler(req, res) {
   if (!creds) return res.status(500).json({ error: "GHL not configured for this academy." });
   const { token, locationId } = creds;
 
+  // Mode S: sender info — the email + phone number synced with GHL (V1.5 Inbox
+  // setup just lists these so staff know what they send from).
+  if (req.query.action === "sender-info") {
+    try {
+      const loc = (await ghl("GET", `/locations/${encodeURIComponent(locationId)}`, { token })).location || {};
+      let phone = loc.phone || null;
+      // Prefer a real SMS-capable number from the location's phone numbers, if exposed.
+      try {
+        const nums = await ghl("GET", `/phone-system/numbers/location/${encodeURIComponent(locationId)}`, { token });
+        const list = nums?.numbers || nums?.data || [];
+        const first = list.find(n => n.phoneNumber || n.number);
+        if (first) phone = first.phoneNumber || first.number || phone;
+      } catch (_) { /* numbers endpoint not available on this plan — fall back to location.phone */ }
+      return res.status(200).json({ email: loc.email || null, phone, location_name: loc.name || null });
+    } catch (e) {
+      return res.status(e.status || 500).json({ error: e.message });
+    }
+  }
+
   const conversationId = req.query.conversation_id;
   const contactId = req.query.contact_id;
 
@@ -237,7 +272,7 @@ async function handler(req, res) {
   // ────────────────────────────────────────────────────────
   let convos = [];
   try {
-    const params = new URLSearchParams({ locationId, limit: "50" });
+    const params = new URLSearchParams({ locationId, limit: "100" });
     const data = await ghl("GET", `/conversations/search?${params}`, { token });
     convos = data.conversations || data.data || [];
   } catch (e) {
@@ -348,6 +383,7 @@ async function handler(req, res) {
       lastMessageDate:   c.lastMessageDate || c.dateUpdated || null,
       lastMessageType:   c.lastMessageType || "",
       lastMessageDirection: c.lastMessageDirection || "",
+      lastMessageStatus: String(c.lastMessageStatus || c.status || "").toLowerCase(),
       unreadCount:       c.unreadCount || 0,
       classification:    isMember ? "member" : (isLead ? "lead" : "other"),
       member: m ? { id: m.id, athlete_name: m.athlete_name, status: m.status } : null,
@@ -366,6 +402,7 @@ async function handler(req, res) {
 
   return res.status(200).json({
     conversations: annotated,
+    location_id: locationId,   // for the "Open in GHL" deep link
     trainers,
     tagConfig,
     counts: {

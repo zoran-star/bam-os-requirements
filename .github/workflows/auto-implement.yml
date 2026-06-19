@@ -1,0 +1,74 @@
+name: Auto-build from feedback
+
+# Feedback → Action, the auto-build layer. When an issue is labelled
+# `auto-implement` (our feedback "Build spec" / auto-spec engine adds that
+# label), Claude Code implements it on a branch and opens a PR for a human to
+# review + merge. It NEVER merges — approval is always human. You can also just
+# open the issue/PR in Claude Code on the web to take over and edit instead.
+#
+# Requires:
+#   - the Claude GitHub App installed on this repo (github.com/apps/claude)
+#   - repo secret ANTHROPIC_API_KEY  (Settings → Secrets and variables → Actions)
+# Inert until both exist + an issue actually gets the `auto-implement` label.
+
+on:
+  issues:
+    types: [labeled]
+
+# Don't pile up runs for the same issue.
+concurrency:
+  group: auto-build-${{ github.event.issue.number }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+  id-token: write
+
+jobs:
+  implement:
+    # Only the explicit label triggers a build — keeps cost scoped and nothing
+    # runs on every issue.
+    if: github.event.label.name == 'auto-implement'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          # Sonnet is the right balance for real multi-file edits; bump max-turns
+          # if builds get cut off. Keep it bounded so a run can't spiral.
+          # allowedTools must include Bash (+ the file tools) or the action can
+          # edit in memory but cannot run git/gh/npm to push a branch + open the
+          # PR. Safe here: this runs on an ephemeral CI runner, not a dev machine.
+          claude_args: '--max-turns 30 --model claude-sonnet-4-6 --allowedTools "Edit Write Read Glob Grep Bash"'
+          prompt: |
+            You are implementing a change in the BAM monorepo from a product-feedback issue.
+
+            Issue #${{ github.event.issue.number }}: "${{ github.event.issue.title }}"
+
+            ${{ github.event.issue.body }}
+
+            Rules (this repo deploys to production on merge to main):
+            - The app lives in `bam-ghl-agent/bam-portal/`. READ
+              `bam-ghl-agent/docs/portal-engineering-guide.md` first and follow its
+              safe-build protocol and conventions.
+            - Make the SMALLEST diff that satisfies the issue. Don't refactor or
+              reformat unrelated code. Don't touch `archive/` or legacy root HTML.
+            - If you change a schema, workflow, path, or gotcha, update the paired
+              `bam-ghl-agent/memories/` note in the same change.
+            - Before opening the PR, run the pre-ship checks from the guide
+              (`cd bam-ghl-agent/bam-portal && npm ci && npm run build`); fix what
+              breaks.
+            - Open a pull request on a new branch `feedback/issue-${{ github.event.issue.number }}`,
+              titled "Implement: ${{ github.event.issue.title }}", body containing
+              "Closes #${{ github.event.issue.number }}" and a short summary of what
+              changed and how you verified it.
+            - DO NOT merge. Leave the PR for a human to review.
+            - If the issue is too vague or too large to implement safely, do NOT
+              guess — instead comment on the issue explaining what's unclear or why
+              it needs to be split, and stop without opening a PR.

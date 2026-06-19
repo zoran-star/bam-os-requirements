@@ -79,7 +79,13 @@ async function resolveUser(req) {
   const clientRows = await sb(`clients?auth_user_id=eq.${user.id}&select=id,business_name`);
   const clientRow = Array.isArray(clientRows) && clientRows[0] ? clientRows[0] : null;
 
-  return { user, staff: staffRow, client: clientRow };
+  // Multi-academy members: a user linked to many academies via client_users
+  // (no single clients.auth_user_id) can still scope to any academy they belong
+  // to by passing ?client_id (honored below).
+  const memberships = await sb(`client_users?user_id=eq.${user.id}&status=eq.active&select=client_id`);
+  const clientIds = Array.isArray(memberships) ? memberships.map(m => String(m.client_id)) : [];
+
+  return { user, staff: staffRow, client: clientRow, clientIds };
 }
 
 function nowIso() { return new Date().toISOString(); }
@@ -144,13 +150,102 @@ async function postClientSlackNotification(clientId, text, req) {
   }
 }
 
+// Direct-message a single staff member via the BAM Portal bot. Slack accepts a
+// user ID as the `channel` for chat.postMessage (opens/uses the IM). Fire-and-
+// forget; no-ops if the bot token or the user's slack_user_id is missing.
+async function postStaffSlackDM(slackUserId, text, req) {
+  try {
+    const token = process.env.SLACK_BOT_TOKEN;
+    if (!token || !slackUserId || !text) return;
+    const portalLink = clientPortalLinkForTicket(req);
+    await fetch("https://slack.com/api/chat.postMessage", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json; charset=utf-8",
+      },
+      body: JSON.stringify({ channel: slackUserId, text: `${text}\n→ ${portalLink}`, unfurl_links: false }),
+    });
+  } catch (err) {
+    console.error("Slack DM failed:", err?.message || err);
+  }
+}
+
+// Resolve the marketing manager's (Cam's) Slack user ID for new-ticket pings.
+// Prefers an explicit env override; else looks up the staff row by email.
+// Returns null — ping silently no-ops — until a slack_user_id is on file.
+async function marketingManagerSlackId() {
+  if (process.env.MARKETING_DM_SLACK_ID) return process.env.MARKETING_DM_SLACK_ID;
+  try {
+    const email = process.env.MARKETING_MANAGER_EMAIL || "cameron@byanymeansbusiness.com";
+    const rows = await sb(`staff?email=eq.${encodeURIComponent(email)}&select=slack_user_id`);
+    return rows?.[0]?.slack_user_id || null;
+  } catch (_) {
+    return null;
+  }
+}
+
+// The client's assigned manager (the "SM") — auto-owner of their marketing tickets.
+async function clientScalingManager(clientId) {
+  try {
+    const rows = await sb(`clients?id=eq.${clientId}&select=scaling_manager_id`);
+    return rows?.[0]?.scaling_manager_id || null;
+  } catch (_) {
+    return null;
+  }
+}
+
+// The marketing manager's (Cam's) staff id — owner of content tickets.
+async function marketingManagerStaffId() {
+  try {
+    const email = process.env.MARKETING_MANAGER_EMAIL || "cameron@byanymeansbusiness.com";
+    const rows = await sb(`staff?email=eq.${encodeURIComponent(email)}&select=id`);
+    return rows?.[0]?.id || null;
+  } catch (_) {
+    return null;
+  }
+}
+
+// Fire Cam a DM that a fresh marketing request landed. Safe to call unawaited.
+function pingMarketingOnNewTicket({ ticketId, academy, priority }, req) {
+  const code = String(ticketId || "").slice(0, 3).toUpperCase();
+  const pr = priority === "high" ? "⚡ HIGH priority " : "";
+  marketingManagerSlackId().then(sid => {
+    if (sid) postStaffSlackDM(sid, `🆕 New marketing request ${pr}— ${academy || "client"} [${code}]`, req);
+  });
+}
+
 async function enrichWithClient(tickets) {
   if (!tickets.length) return tickets;
   const clientIds = [...new Set(tickets.map(t => t.client_id).filter(Boolean))];
-  if (!clientIds.length) return tickets;
-  const clients = await sb(`clients?id=in.(${clientIds.join(",")})&select=id,business_name`);
-  const clientMap = Object.fromEntries((clients || []).map(c => [c.id, c]));
-  return tickets.map(t => ({ ...t, client: clientMap[t.client_id] || null }));
+  const clientMap = {};
+  if (clientIds.length) {
+    const clients = await sb(`clients?id=in.(${clientIds.join(",")})&select=id,business_name,brand_data,scaling_manager_id`);
+    Object.assign(clientMap, Object.fromEntries((clients || []).map(c => [c.id, c])));
+  }
+  // Resolve the assignee name: explicit assigned_to, else the client's manager.
+  const staffIds = [...new Set([
+    ...tickets.map(t => t.assigned_to),
+    ...Object.values(clientMap).map(c => c?.scaling_manager_id),
+  ].filter(Boolean))];
+  const staffMap = {};
+  if (staffIds.length) {
+    const staff = await sb(`staff?id=in.(${staffIds.join(",")})&select=id,name`);
+    Object.assign(staffMap, Object.fromEntries((staff || []).map(s => [s.id, s.name])));
+  }
+  return tickets.map(t => {
+    const client = clientMap[t.client_id] || null;
+    const assigneeId = t.assigned_to || client?.scaling_manager_id || null;
+    const smId = client?.scaling_manager_id || null;
+    return {
+      ...t,
+      client,
+      assigned_to_name: assigneeId ? (staffMap[assigneeId] || null) : null,
+      // The client's SM (scaling manager) — the contact to reach out to, shown
+      // even when the ticket is owned by someone else (e.g. content → Cam).
+      sm_name: smId ? (staffMap[smId] || null) : null,
+    };
+  });
 }
 
 // ─────────────────────────────────────────────────────────
@@ -306,9 +401,19 @@ async function handleMarketingTickets(req, res) {
         fields: fields || {},
         files: files || [],
         messages: [],
+        // Auto-assign to the client's manager (the "SM") — owner of their tickets.
+        assigned_to: await clientScalingManager(ctx.client.id),
       }]),
     });
-    return res.status(201).json({ ticket: inserted?.[0] || null });
+    const newTicket = inserted?.[0] || null;
+    if (newTicket) {
+      pingMarketingOnNewTicket({
+        ticketId: newTicket.id,
+        academy: ctx.client.business_name,
+        priority: fields?.priority,
+      }, req);
+    }
+    return res.status(201).json({ ticket: newTicket });
   }
 
   if (req.method === "PATCH") {
@@ -499,11 +604,20 @@ async function handleMarketingTickets(req, res) {
         ticketTitle: "a marketing request", ticketId: ticket.id, view: "marketing",
       }).catch(() => {});
     } else if (action === "mark-completed") {
+      // Client gets pinged in their channel...
       postClientSlackNotification(ticket.client_id,
         `✅ Completed — Marketing [${code}]`, req);
       notifyClientPush(ticket.client_id, "ticket-complete", {
         ticketTitle: "Your marketing request", ticketId: ticket.id, view: "marketing",
       }).catch(() => {});
+      // ...and the assigned SM (else the client's manager) gets a DM.
+      (async () => {
+        const smId = ticket.assigned_to || await clientScalingManager(ticket.client_id);
+        if (!smId) return;
+        const rows = await sb(`staff?id=eq.${smId}&select=slack_user_id`);
+        const sid = rows?.[0]?.slack_user_id;
+        if (sid) postStaffSlackDM(sid, `✅ Marketing request completed — [${code}]`, req);
+      })();
     } else if (action === "cancel") {
       postClientSlackNotification(ticket.client_id,
         `❌ Cancelled — Marketing [${code}]`, req);
@@ -649,10 +763,13 @@ async function handleContentTickets(req, res) {
     const limit = Math.min(parseInt(req.query.limit, 10) || 50, 200);
     const offset = Math.max(parseInt(req.query.offset, 10) || 0, 0);
     const pageQS = `&limit=${limit}&offset=${offset}`;
+    // Optional channel filter ('ads' | 'organic').
+    const channel = req.query.channel;
+    const channelFilter = (channel === "organic" || channel === "ads") ? `&channel=eq.${channel}` : "";
 
     if (asStaff) {
       // Staff list — oldest first per spec (so content team works FIFO)
-      const tickets = await sb(`content_tickets?select=*&order=submitted_at.asc${pageQS}`);
+      const tickets = await sb(`content_tickets?select=*${channelFilter}&order=submitted_at.asc${pageQS}`);
       const out = await enrichWithClient(tickets || []);
       return res.status(200).json({ tickets: out, hasMore: (tickets || []).length === limit });
     }
@@ -663,7 +780,7 @@ async function handleContentTickets(req, res) {
     const filter = onlyActionable
       ? `&client_action_status=eq.requested`
       : "";
-    const tickets = await sb(`content_tickets?select=*&client_id=eq.${ctx.client.id}${filter}&order=submitted_at.desc${pageQS}`);
+    const tickets = await sb(`content_tickets?select=*&client_id=eq.${ctx.client.id}${filter}${channelFilter}&order=submitted_at.desc${pageQS}`);
     return res.status(200).json({
       tickets: (tickets || []).map(stripInternalMessages),
       hasMore: (tickets || []).length === limit,
@@ -686,15 +803,28 @@ async function handleContentTickets(req, res) {
       body: JSON.stringify([{
         client_id: ctx.client.id,
         type,
+        channel: body.channel === "organic" ? "organic" : "ads",
         status: "active",
         client_action_status: "none",
         notes: notes || "",
         raw_files: Array.isArray(raw_files) ? raw_files : [],
         context: (context && typeof context === "object") ? context : {},
         messages: [],
+        // Content tickets are owned by Cam (marketing manager); the client's SM
+        // is surfaced separately as the contact (sm_name on enrich).
+        assigned_to: await marketingManagerStaffId(),
       }]),
     });
-    return res.status(201).json({ ticket: inserted?.[0] || null });
+    const newCt = inserted?.[0] || null;
+    if (newCt) {
+      // DM Cam personally that a new content request landed (carries the urgent flag).
+      const code = String(newCt.id || "").slice(0, 3).toUpperCase();
+      const pr = (context?.priority === "high") ? "⚡ HIGH priority " : "";
+      marketingManagerSlackId().then(sid => {
+        if (sid) postStaffSlackDM(sid, `🆕 New content request ${pr}— ${ctx.client.business_name || "client"} [${code}]`, req);
+      });
+    }
+    return res.status(201).json({ ticket: newCt });
   }
 
   // ─── PATCH (actions) ───────────────────────────────────────
@@ -709,11 +839,11 @@ async function handleContentTickets(req, res) {
     if (!ticket) return res.status(404).json({ error: "not found" });
 
     const staffActions = new Set([
-      "upload-final", "send-to-marketing",
+      "upload-final", "send-to-marketing", "send-for-review",
       "request-client-action", "mark-completed",
       "assign", "edit-context",
     ]);
-    const clientActions = new Set(["cancel", "respond", "edit"]);
+    const clientActions = new Set(["cancel", "respond", "edit", "approve", "request-changes"]);
 
     if (staffActions.has(action)) {
       if (!isStaff) return res.status(403).json({ error: "staff only" });
@@ -819,6 +949,9 @@ async function handleContentTickets(req, res) {
         const mktFields = {
           campaign_title: ctxObj.campaign_title || "",
           note: ctxObj.note || "",
+          // Priority rides along from the client's submission (content ctx) so the
+          // marketing team sees urgency without re-asking. Defaults to normal.
+          priority: ctxObj.priority === "high" ? "high" : "normal",
         };
         if (mktType === "campaign-create") {
           mktFields.offer = ctxObj.offer || "";
@@ -861,9 +994,20 @@ async function handleContentTickets(req, res) {
             files: ticket.final_files,
             messages: [initialMessage],
             originated_from_content_ticket_id: ticket.id,
+            // Auto-assign to the client's manager (the "SM").
+            assigned_to: await clientScalingManager(ticket.client_id),
           }]),
         });
-        patch.marketing_ticket_id = marketingInsert?.[0]?.id || null;
+        const spawnedId = marketingInsert?.[0]?.id || null;
+        patch.marketing_ticket_id = spawnedId;
+        // Ping Cam that a fresh marketing request just hit his board.
+        if (spawnedId) {
+          pingMarketingOnNewTicket({
+            ticketId: spawnedId,
+            academy: ctxObj.campaign_title || mktFields.campaign_title,
+            priority: mktFields.priority,
+          }, req);
+        }
       }
 
       patch.status = "completed";
@@ -929,6 +1073,41 @@ async function handleContentTickets(req, res) {
       patch.messages = appendMessage(ticket.messages, {
         author_type: "client", author_name: authorName,
         body: message, is_action_request: false,
+      });
+
+    } else if (action === "send-for-review") {
+      // Organic: content team sends the finished creative to the client to review.
+      if (!Array.isArray(ticket.final_files) || !ticket.final_files.length) {
+        return res.status(400).json({ error: "upload at least one final creative before sending for review" });
+      }
+      patch.status = "client-dependent";
+      patch.client_action_status = "requested";
+      const note = (body.message || "").trim();
+      patch.messages = appendMessage(ticket.messages, {
+        author_type: "staff", author_id: ctx.staff.id, author_name: authorName,
+        body: note ? `Sent for your review: "${note}"` : "Sent for your review.",
+        is_action_request: true,
+      });
+
+    } else if (action === "approve") {
+      // Organic: client approves the creative → moves to their Creative Bank.
+      patch.status = "completed";
+      patch.client_action_status = "responded";
+      patch.resolved_at = nowIso();
+      patch.messages = appendMessage(ticket.messages, {
+        author_type: "client", author_name: authorName,
+        body: "Approved — added to the creative bank.", is_action_request: false,
+      });
+
+    } else if (action === "request-changes") {
+      // Organic: client wants changes → back to the content team.
+      const message = (body.message || "").trim();
+      if (!message) return res.status(400).json({ error: "tell us what to change" });
+      patch.status = "active";
+      patch.client_action_status = "responded";
+      patch.messages = appendMessage(ticket.messages, {
+        author_type: "client", author_name: authorName,
+        body: `Requested changes: "${message}"`, is_action_request: false,
       });
     }
 
@@ -1198,7 +1377,7 @@ async function handleMetaCampaigns(req, res) {
   // the caller might also resolve to (otherwise a staff user who is also a client
   // would silently read THEIR data, not the academy they opened).
   let targetClientId = null;
-  if (ctx.staff && req.query.client_id) targetClientId = String(req.query.client_id);
+  if (req.query.client_id && (ctx.staff || (ctx.clientIds || []).includes(String(req.query.client_id)))) targetClientId = String(req.query.client_id);
   else if (ctx.client) targetClientId = ctx.client.id;
   if (!targetClientId) return res.status(403).json({ error: "client_id required (client login or staff with ?client_id)" });
 
@@ -1230,7 +1409,7 @@ async function handleMetaCampaigns(req, res) {
   // covers nuances like CAMPAIGN_PAUSED, ADSET_PAUSED, DISAPPROVED — we want
   // strictly ACTIVE (delivering ads right now).
   const cRes = await fetch(`${META_GRAPH}/${adAcct}/campaigns?` + new URLSearchParams({
-    fields: "id,name,status,effective_status,objective,insights.date_preset(this_month){spend,actions,cost_per_action_type,results}",
+    fields: "id,name,status,effective_status,objective,daily_budget,lifetime_budget,insights.date_preset(this_month){spend,actions,cost_per_action_type,results}",
     filtering: JSON.stringify([{ field: "effective_status", operator: "IN", value: ["ACTIVE"] }]),
     access_token: tok.access_token,
     limit: "50",
@@ -1251,6 +1430,12 @@ async function handleMetaCampaigns(req, res) {
       resultsCount = link ? parseInt(link.value, 10) || 0 : 0;
     }
     const cpr = resultsCount > 0 ? spend / resultsCount : 0;
+    // Preset/planned ad spend = the campaign's Meta budget (minor units → $).
+    // Only present when set at the CAMPAIGN level (CBO); ad-set-level budgets
+    // aren't returned on the campaign object, so this can be null.
+    const daily = c.daily_budget ? parseFloat(c.daily_budget) / 100 : null;
+    const lifetime = c.lifetime_budget ? parseFloat(c.lifetime_budget) / 100 : null;
+    const budget_display = lifetime ? `$${lifetime.toFixed(2)} lifetime` : (daily ? `$${daily.toFixed(2)}/day` : null);
     return {
       id: c.id,
       name: c.name,
@@ -1261,6 +1446,7 @@ async function handleMetaCampaigns(req, res) {
       results: resultsCount,
       cpr,
       cpr_display: resultsCount > 0 ? `$${cpr.toFixed(2)}` : "—",
+      budget_display,
     };
   });
 
@@ -1321,7 +1507,7 @@ async function handleMetaKpis(req, res) {
   // the caller might also resolve to (otherwise a staff user who is also a client
   // would silently read THEIR data, not the academy they opened).
   let targetClientId = null;
-  if (ctx.staff && req.query.client_id) targetClientId = String(req.query.client_id);
+  if (req.query.client_id && (ctx.staff || (ctx.clientIds || []).includes(String(req.query.client_id)))) targetClientId = String(req.query.client_id);
   else if (ctx.client) targetClientId = ctx.client.id;
   if (!targetClientId) return res.status(403).json({ error: "client_id required (client login or staff with ?client_id)" });
 
@@ -1502,7 +1688,7 @@ async function handleMetaReport(req, res) {
   // the caller might also resolve to (otherwise a staff user who is also a client
   // would silently read THEIR data, not the academy they opened).
   let targetClientId = null;
-  if (ctx.staff && req.query.client_id) targetClientId = String(req.query.client_id);
+  if (req.query.client_id && (ctx.staff || (ctx.clientIds || []).includes(String(req.query.client_id)))) targetClientId = String(req.query.client_id);
   else if (ctx.client) targetClientId = ctx.client.id;
   if (!targetClientId) return res.status(403).json({ error: "client_id required (client login or staff with ?client_id)" });
 
@@ -1816,7 +2002,7 @@ async function handleGhlKpis(req, res) {
   // the caller might also resolve to (otherwise a staff user who is also a client
   // would silently read THEIR data, not the academy they opened).
   let targetClientId = null;
-  if (ctx.staff && req.query.client_id) targetClientId = String(req.query.client_id);
+  if (req.query.client_id && (ctx.staff || (ctx.clientIds || []).includes(String(req.query.client_id)))) targetClientId = String(req.query.client_id);
   else if (ctx.client) targetClientId = ctx.client.id;
   if (!targetClientId) return res.status(403).json({ error: "client_id required (client login or staff with ?client_id)" });
 
@@ -1907,7 +2093,7 @@ async function handleGhlKpisMonthly(req, res) {
   const ctx = await resolveUser(req);
   if (ctx.error) return res.status(ctx.error.status).json({ error: ctx.error.message });
   let targetClientId = null;
-  if (ctx.staff && req.query.client_id) targetClientId = String(req.query.client_id);
+  if (req.query.client_id && (ctx.staff || (ctx.clientIds || []).includes(String(req.query.client_id)))) targetClientId = String(req.query.client_id);
   else if (ctx.client) targetClientId = ctx.client.id;
   if (!targetClientId) return res.status(403).json({ error: "client_id required (client login or staff with ?client_id)" });
 
@@ -2052,7 +2238,7 @@ async function handleGhlKpiDetail(req, res) {
   const ctx = await resolveUser(req);
   if (ctx.error) return res.status(ctx.error.status).json({ error: ctx.error.message });
   let targetClientId = null;
-  if (ctx.staff && req.query.client_id) targetClientId = String(req.query.client_id);
+  if (req.query.client_id && (ctx.staff || (ctx.clientIds || []).includes(String(req.query.client_id)))) targetClientId = String(req.query.client_id);
   else if (ctx.client) targetClientId = ctx.client.id;
   if (!targetClientId) return res.status(403).json({ error: "client_id required" });
 
@@ -2180,7 +2366,7 @@ async function handleGhlKpiTrash(req, res) {
   const ctx = await resolveUser(req);
   if (ctx.error) return res.status(ctx.error.status).json({ error: ctx.error.message });
   let targetClientId = null;
-  if (ctx.staff && req.query.client_id) targetClientId = String(req.query.client_id);
+  if (req.query.client_id && (ctx.staff || (ctx.clientIds || []).includes(String(req.query.client_id)))) targetClientId = String(req.query.client_id);
   else if (ctx.client) targetClientId = ctx.client.id;
   if (!targetClientId) return res.status(403).json({ error: "client_id required" });
 
@@ -2220,7 +2406,7 @@ async function handleGhlKpiStripe(req, res) {
   const ctx = await resolveUser(req);
   if (ctx.error) return res.status(ctx.error.status).json({ error: ctx.error.message });
   let targetClientId = null;
-  if (ctx.staff && req.query.client_id) targetClientId = String(req.query.client_id);
+  if (req.query.client_id && (ctx.staff || (ctx.clientIds || []).includes(String(req.query.client_id)))) targetClientId = String(req.query.client_id);
   else if (ctx.client) targetClientId = ctx.client.id;
   if (!targetClientId) return res.status(403).json({ error: "client_id required" });
 

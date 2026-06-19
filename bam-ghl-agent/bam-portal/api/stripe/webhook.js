@@ -36,6 +36,7 @@ import { withSentryApiRoute } from "../_sentry.js";
 
 import crypto from "node:crypto";
 import { fireOnboardingActivations } from "../onboarding/activations.js";
+import { sendSms } from "../ghl/_core.js";
 
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
@@ -56,6 +57,13 @@ const PRICE_TO_PLAN = {
 };
 
 function nowIso() { return new Date().toISOString(); }
+
+// Subscriptions WE create + own (the parent funnels): the portal /funnel/
+// (fullcontrol-portal) and the academy-site enrollment (fullcontrol-website-
+// enrollment). Both are created `incomplete` and activated on first paid
+// invoice. Keep external subs (CoachIQ/GHL/manual) out of the onboarding path.
+const PORTAL_OWNED_ORIGINS = new Set(["fullcontrol-portal", "fullcontrol-website-enrollment"]);
+function isPortalOwnedOrigin(origin) { return PORTAL_OWNED_ORIGINS.has(origin); }
 
 async function readRawBody(req) {
   const chunks = [];
@@ -189,7 +197,7 @@ async function handleSubCreated(event, connectedAccount, res) {
   // `incomplete` and already carry their member's stripe_subscription_id. Do NOT
   // flip them to live here (payment isn't confirmed yet) — handleInvoiceSucceeded
   // activates them on the first paid invoice.
-  if (sub.metadata && sub.metadata.origin === "fullcontrol-portal") {
+  if (sub.metadata && isPortalOwnedOrigin(sub.metadata.origin)) {
     return res.status(200).json({ skipped: "portal-owned sub — activated on first paid invoice" });
   }
   const customerId = sub.customer;
@@ -450,7 +458,7 @@ async function handleInvoiceSucceeded(event, connectedAccount, res) {
   if (member.status === "payment_method_required" && subId) {
     let onbSub = null;
     try { onbSub = await stripeFetch(`/subscriptions/${subId}`, connectedAccount); } catch (_) { onbSub = null; }
-    if (onbSub && onbSub.metadata && onbSub.metadata.origin === "fullcontrol-portal") {
+    if (onbSub && onbSub.metadata && isPortalOwnedOrigin(onbSub.metadata.origin)) {
       await sb(`members?id=eq.${member.id}`, {
         method: "PATCH", headers: { Prefer: "return=minimal" },
         body: JSON.stringify({ status: "live", updated_at: nowIso() }),
@@ -463,13 +471,35 @@ async function handleInvoiceSucceeded(event, connectedAccount, res) {
       } catch (e) {
         activations = { error: String((e && e.message) || e) };
       }
+      // Text staff that a new parent just signed up + paid. Non-fatal: an SMS
+      // failure must never break webhook handling. Destination = the academy's
+      // configured staff phone (clients.staff_notify_phone), else env fallback.
+      let staffNotify = null;
+      try {
+        const cRows = await sb(`clients?id=eq.${member.client_id}&select=id,business_name,ghl_location_id,ghl_access_token,ghl_refresh_token,ghl_token_expires_at,staff_notify_phone&limit=1`);
+        const client = Array.isArray(cRows) && cRows[0];
+        const toPhone = (client && client.staff_notify_phone) || process.env.STAFF_NOTIFY_PHONE || null;
+        if (client && toPhone) {
+          const amt = inv.amount_paid != null ? `$${(inv.amount_paid / 100).toFixed(2)}` : "—";
+          const msg = `🎉 New signup — ${client.business_name || "academy"}\n`
+            + `Athlete: ${member.athlete_name || "—"}\n`
+            + `Parent: ${member.parent_name || "—"}${member.parent_email ? " · " + member.parent_email : ""}${member.parent_phone ? " · " + member.parent_phone : ""}\n`
+            + `Plan: ${onbSub.metadata.plan || "—"} · ${onbSub.metadata.term || "—"}\n`
+            + `Paid: ${amt} · status LIVE`;
+          staffNotify = await sendSms({ client, toPhone, message: msg, contactName: "BAM Staff" });
+        } else {
+          staffNotify = { ok: false, error: "no staff_notify_phone configured" };
+        }
+      } catch (e) {
+        staffNotify = { ok: false, error: String((e && e.message) || e) };
+      }
       await writeAudit({
         client_id: member.client_id, member_id: member.id,
         action_type: "onboarding-activated",
-        args: { invoice_id: inv.id, sub_id: subId, plan: onbSub.metadata.plan, term: onbSub.metadata.term, activations },
+        args: { invoice_id: inv.id, sub_id: subId, plan: onbSub.metadata.plan, term: onbSub.metadata.term, activations, staff_notify: staffNotify },
         db_changes: { members: { status: { from: "payment_method_required", to: "live" } } },
       });
-      return res.status(200).json({ ok: true, action: "onboarding-activated", member_id: member.id, activations });
+      return res.status(200).json({ ok: true, action: "onboarding-activated", member_id: member.id, activations, staff_notify: staffNotify });
     }
   }
 
