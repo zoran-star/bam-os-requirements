@@ -26,14 +26,25 @@ replaces them later.
 
 ## Build phases
 1. **Spine** — GHL inbound-message webhook → portal (instant reply events).
-   Shared by nudges + agent. **BACKEND BUILT 2026-06-18** (branch
-   `feat/gta-interested-agent`): table `ghl_inbound_messages` (migration
-   20260618130000, applied via MCP) + endpoint `api/ghl/inbound-webhook.js`
-   (shared-secret `X-Webhook-Secret`, env `GHL_WEBHOOK_SECRET`; gated to
-   v15/v2 academies). REMAINING SETUP (non-code): set GHL_WEBHOOK_SECRET in
-   Vercel; per academy add a GHL Workflow "Customer replied" → Webhook POST to
-   `/api/ghl/inbound-webhook` with the X-Webhook-Secret header. Consumers
-   (nudge cancel / agent wake) read `ghl_inbound_messages` in later phases.
+   Shared by nudges + agent. **✅ LIVE + PROVEN END-TO-END 2026-06-18** (PRs
+   #459/#464/#465, on main + deployed). Table `ghl_inbound_messages` (migration
+   20260618130000) + endpoint `api/ghl/inbound-webhook.js`. Auth: shared-secret
+   header `X-Webhook-Secret`, env `GHL_WEBHOOK_SECRET` (set in Vercel
+   production). Gated to v15/v2 academies. GHL side: a Workflow named
+   "agent trigger" on BAM GTA (location `Le9phlhqKyjLyd0JTECv`) with trigger
+   "Customer Replied" → Webhook POST to
+   `https://portal.byanymeansbusiness.com/api/ghl/inbound-webhook`, header
+   `X-Webhook-Secret`, custom data `locationId={{location.id}}`,
+   `contactId={{contact.id}}`, `body={{message.body}}`, `direction=inbound`.
+   GOTCHAS LEARNED: (a) GHL's "contact's details" webhook puts the location id
+   in `customData.locationId` AND nested `location.id` — NOT top-level; the
+   endpoint reads all those paths. (b) `{{message.body}}` is empty on the
+   contact-detail trigger (no real message text) — that's fine, P1 only needs
+   the EVENT (who/which academy replied); the agent (P3) fetches the full
+   thread from the inbox. (c) GHL "Test workflow" DOES fire the webhook (shows
+   in Enrollment history). Consumers (nudge cancel / agent wake) read
+   `ghl_inbound_messages` in later phases. Per-academy rollout: add the same
+   workflow to each v15/v2 academy's GHL.
 2. **Nudge engine** ("sms ghosted" first): enroll when a website lead lands
    at "interested"; strict-schedule texts/emails; instant exits (reply via
    webhook, booking via our endpoint, stage-leave). BLOCKED ON: Zoran's
