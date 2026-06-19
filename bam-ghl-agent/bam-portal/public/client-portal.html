@@ -14634,6 +14634,8 @@ const _bbOfferConfigs = {
         hint:'GHL tags that mark a contact as a lead. Pick as many as apply — a contact is a lead if they carry ANY of them. ★ = AI suggestion. (Members always win over lead tags.)' },
       { key:'signup_url', type:'text', label:'Sign-up link',
         hint:'Texted to a parent when "Send onboarding link" is checked on the post-trial form, e.g. your checkout or membership sign-up URL.' },
+      { key:'missed_trial_workflow', type:'ghl_workflow', label:'Missed-trial automation',
+        hint:'GHL workflow that fires automatically when a trainer marks an athlete as "Didn\'t show up" on the post-trial form. Pick the workflow that handles a no-show (reschedule nudge, re-book sequence, etc.).' },
       { key:'sales_path', type:'check_one', label:'Sales path', required:true,
         options:['Free trial','Paid trial','Discovery call first','Direct signup','Other'],
         hint:'Gates the next set of questions' },
@@ -15302,6 +15304,27 @@ function _bbRenderField(field, sectionId) {
         const opts = ['<option value="">— none —</option>'].concat(tagPool.map(tg =>
           `<option value="${_bbEscapeAttr(tg)}" ${tg === cur ? 'selected' : ''}>${_bbEscapeHtml(tg)}${tg === def ? ' (default)' : ''}</option>`
         )).join('');
+        body = `<select class="bb-input" onchange="_bbUpdateOfferTopKey('${field.key}', this.value); _bbAutoSave()">${opts}</select>`;
+      }
+      break;
+    }
+    case 'ghl_workflow': {
+      // Single GHL workflow picker → top-level offer.data[field.key] (the
+      // workflow id). Stores the id; the post-trial endpoint fires it on a
+      // no-show. Lazy-loads the academy's workflows on first render.
+      const cur = (_bbState.offer && _bbState.offer.data && _bbState.offer.data[field.key]) || '';
+      if (_bbWorkflowsLoadedFor !== CLIENT_ID) {
+        _bbLoadWorkflows();
+        body = `<div style="padding:14px;color:var(--text-mute);font-size:13px"><span class="req-spin"></span> Loading workflows…</div>`;
+      } else if (!_bbWorkflowList.length) {
+        const keepCur = cur ? `<div style="font-size:12px;color:var(--text-mute);margin-top:6px">Current: <code>${_bbEscapeHtml(cur)}</code></div>` : '';
+        body = `<div style="padding:14px;background:var(--surface-alt);border:1px dashed var(--border-med);border-radius:8px;color:var(--text-mute);font-size:13px">No GHL workflows found (or GHL not connected). Create a workflow in GHL, then reopen this offer.${keepCur}</div>`;
+      } else {
+        const inList = _bbWorkflowList.some(w => w.id === cur);
+        const opts = ['<option value="">— none —</option>']
+          .concat(_bbWorkflowList.map(w => `<option value="${_bbEscapeAttr(w.id)}" ${w.id === cur ? 'selected' : ''}>${_bbEscapeHtml(w.name)}</option>`))
+          .concat(cur && !inList ? [`<option value="${_bbEscapeAttr(cur)}" selected>Saved workflow (${_bbEscapeHtml(cur)})</option>`] : [])
+          .join('');
         body = `<select class="bb-input" onchange="_bbUpdateOfferTopKey('${field.key}', this.value); _bbAutoSave()">${opts}</select>`;
       }
       break;
@@ -16317,7 +16340,7 @@ async function _bbSaveTeam(teamId) {
 function _bbIsV1() {
   return !(typeof V2_ACCESS !== 'undefined' && V2_ACCESS) && !(typeof V15_ACCESS !== 'undefined' && V15_ACCESS);
 }
-const _V1_HIDE_TYPES = new Set(['ghl_tags_multi', 'ghl_tag', 'entry_points']);
+const _V1_HIDE_TYPES = new Set(['ghl_tags_multi', 'ghl_tag', 'entry_points', 'ghl_workflow']);
 const _V1_HIDE_KEYS = new Set(['discovery_call_calendar', 'existing_calendar_link', 'call_host', 'call_duration', 'avail_windows', 'buffer']);
 
 function _bbRenderStepFields(offer, sectionId) {
@@ -16391,6 +16414,24 @@ async function _bbLoadTags() {
     }
   } catch (_) {}
   return _bbTagList;
+}
+
+// GHL workflow picker — powers the `ghl_workflow` field (Missed-trial automation
+// on the Sales step). Lists the academy's workflows; re-renders the open wizard
+// once they land so the dropdown fills in.
+let _bbWorkflowList = [];
+let _bbWorkflowsLoadedFor = null;
+async function _bbLoadWorkflows() {
+  if (!CLIENT_ID || _bbWorkflowsLoadedFor === CLIENT_ID) return _bbWorkflowList;
+  _bbWorkflowsLoadedFor = CLIENT_ID; // mark in-flight so the field doesn't loop-fetch
+  try {
+    const token = await _mreqAuthToken();
+    const r = await fetch('/api/ghl/workflows?client_id=' + encodeURIComponent(CLIENT_ID), { headers: { 'Authorization': 'Bearer ' + token } });
+    const j = await _safeJson(r);
+    _bbWorkflowList = (r.ok && Array.isArray(j.workflows)) ? j.workflows : [];
+  } catch (_) { _bbWorkflowList = []; }
+  if (_bbState.offer) _bbRenderWizardBody();
+  return _bbWorkflowList;
 }
 
 // Default GHL tag that marks a contact as a paying member/client. Added when
