@@ -1549,25 +1549,41 @@ async function handler(req, res) {
         const teamClient = teamClientRows[0];
 
         // ---- action=set-staff-tabs ----
-        // The academy OWNER (or BAM staff) sets which tabs a teammate can see.
-        // allowed_tabs = array of logical tab keys, or null = all tabs.
+        // The academy OWNER (or BAM staff) sets a teammate's portal access:
+        //   allowed_tabs   = array of logical tab keys, or null = all tabs
+        //   allowed_stages = array of GHL stage ids, or null = all stages
+        // Either or both may be present; only the provided fields are patched.
         if (publicSignupAction === "set-staff-tabs") {
           if (!isStaffCaller && callerRole !== "owner") {
-            return res.status(403).json({ error: "only the account owner can set tab access" });
+            return res.status(403).json({ error: "only the account owner can set staff access" });
           }
           const memberId = typeof teamBody.member_id === "string" ? teamBody.member_id.trim() : "";
           if (!memberId) return res.status(400).json({ error: "member_id required" });
-          let allowed = teamBody.allowed_tabs;
-          if (allowed !== null) {
-            if (!Array.isArray(allowed)) return res.status(400).json({ error: "allowed_tabs must be an array or null" });
-            allowed = [...new Set(allowed.filter((t) => typeof t === "string").map((t) => t.trim()).filter(Boolean))].slice(0, 50);
+          const normArr = (v) => {
+            if (v === null) return null;
+            if (!Array.isArray(v)) return undefined; // signals invalid
+            return [...new Set(v.filter((x) => typeof x === "string").map((x) => x.trim()).filter(Boolean))].slice(0, 200);
+          };
+          const patch = { updated_at: new Date().toISOString() };
+          if ("allowed_tabs" in teamBody) {
+            const a = normArr(teamBody.allowed_tabs);
+            if (a === undefined) return res.status(400).json({ error: "allowed_tabs must be an array or null" });
+            patch.allowed_tabs = a;
+          }
+          if ("allowed_stages" in teamBody) {
+            const a = normArr(teamBody.allowed_stages);
+            if (a === undefined) return res.status(400).json({ error: "allowed_stages must be an array or null" });
+            patch.allowed_stages = a;
+          }
+          if (!("allowed_tabs" in patch) && !("allowed_stages" in patch)) {
+            return res.status(400).json({ error: "provide allowed_tabs and/or allowed_stages" });
           }
           // Target must belong to THIS client and not be the owner.
           const targetRows = await supabaseSelect(
             `client_users?id=eq.${encodeURIComponent(memberId)}&client_id=eq.${client_id}&select=id,role`
           ).catch(() => []);
           if (!targetRows?.length) return res.status(404).json({ error: "teammate not found for this client" });
-          if (targetRows[0].role === "owner") return res.status(400).json({ error: "the owner always sees every tab" });
+          if (targetRows[0].role === "owner") return res.status(400).json({ error: "the owner always sees everything" });
           const upd = await fetch(`${SUPABASE_URL}/rest/v1/client_users?id=eq.${encodeURIComponent(memberId)}`, {
             method: "PATCH",
             headers: {
@@ -1576,10 +1592,10 @@ async function handler(req, res) {
               "Content-Type": "application/json",
               Prefer: "return=minimal",
             },
-            body: JSON.stringify({ allowed_tabs: allowed, updated_at: new Date().toISOString() }),
+            body: JSON.stringify(patch),
           });
-          if (!upd.ok) return res.status(502).json({ error: `couldn't save tab access — ${await upd.text()}` });
-          return res.status(200).json({ ok: true, member_id: memberId, allowed_tabs: allowed });
+          if (!upd.ok) return res.status(502).json({ error: `couldn't save staff access — ${await upd.text()}` });
+          return res.status(200).json({ ok: true, member_id: memberId, ...patch });
         }
 
         // ---- action=invite-team-member ----

@@ -11251,7 +11251,15 @@ const _PERMISSIONABLE_TABS = [
   { key: 'systems',   label: 'Systems',            icon: '🛠', views: ['systems'] },
 ];
 let _MY_ALLOWED_TABS = null;   // null = all tabs (default / owner / BAM staff)
+let _MY_ALLOWED_STAGES = null; // null = all pipeline stages
 let _MY_TAB_ROLE = null;       // 'owner' | 'member' | null
+
+// Is a pipeline stage allowed for the current user? Owner/unrestricted = yes.
+function _isStageAllowed(stageId) {
+  if (_MY_TAB_ROLE === 'owner') return true;
+  if (!Array.isArray(_MY_ALLOWED_STAGES)) return true; // null = all
+  return _MY_ALLOWED_STAGES.includes(stageId);
+}
 
 // Hide nav items the current user isn't permitted to see. Runs AFTER the tier
 // gates so it only ever subtracts. No-op for owners or when no perms are set.
@@ -11285,12 +11293,13 @@ async function loadMyPermissionsAndApply() {
     if (!_myAuthUserId) { const u = await _sb.auth.getUser(); _myAuthUserId = u?.data?.user?.id || null; }
     if (!_myAuthUserId) return;
     const { data } = await _sb.from('client_users')
-      .select('role, allowed_tabs')
+      .select('role, allowed_tabs, allowed_stages')
       .eq('user_id', _myAuthUserId).eq('client_id', CLIENT_ID).eq('status', 'active').limit(1);
     const row = (data || [])[0] || null;
     _MY_TAB_ROLE = row?.role || null;
     _MY_ALLOWED_TABS = Array.isArray(row?.allowed_tabs) ? row.allowed_tabs : null;
-  } catch (_) { _MY_ALLOWED_TABS = null; }
+    _MY_ALLOWED_STAGES = Array.isArray(row?.allowed_stages) ? row.allowed_stages : null;
+  } catch (_) { _MY_ALLOWED_TABS = null; _MY_ALLOWED_STAGES = null; }
   applyTabPermissions();
 }
 
@@ -13044,7 +13053,7 @@ async function _bbRenderStaffCard(panel, meta) {
   // existing Team tab. Mirror its TEAM_ROWS / TEAM_MY_ROLE side-effects
   // so the invite/revoke modals (which read those globals) keep working.
   const { data, error } = await _sb.from('client_users')
-    .select('id, name, email, role, user_id, allowed_tabs')
+    .select('id, name, email, role, user_id, allowed_tabs, allowed_stages')
     .eq('client_id', CLIENT_ID)
     .eq('status', 'active');
   const list = document.getElementById('bb-staff-list');
@@ -13079,7 +13088,19 @@ async function _bbRenderStaffCard(panel, meta) {
     const isMe = r.user_id === myId;
     const canRevoke = iAmOwner && !isOwner && !isMe;
     const canManageTabs = iAmOwner && !isOwner && relevantTabs.length > 0;
+    // Stage picker only when the Sales/Pipelines tab is available to this academy.
+    const canManageStages = iAmOwner && !isOwner && relevantTabs.some(t => t.key === 'pipelines');
+    _BB_STAGE_PERMS[r.id] = Array.isArray(r.allowed_stages) ? r.allowed_stages : null;
     const initial = (r.name || r.email || '?').trim().slice(0, 1).toUpperCase();
+    const stagesHtml = !canManageStages ? '' : `
+      <details class="staff-stages" style="margin-top:6px" ontoggle="if(this.open) _bbStaffStagesLoad('${r.id}')">
+        <summary style="cursor:pointer;font-size:12px;color:var(--text-sub);padding:9px 12px;background:var(--surface);border:1px solid var(--border-med);border-radius:10px;display:flex;justify-content:space-between;align-items:center">
+          <span>🛣 Pipeline stages</span><span id="staff-stages-status-${r.id}" style="font-size:11px;color:var(--text-mute)"></span>
+        </summary>
+        <div id="staff-stages-${r.id}" style="padding:11px 13px;background:var(--surface);border:1px solid var(--border-med);border-top:none;border-radius:0 0 10px 10px;display:flex;flex-wrap:wrap;gap:9px 18px">
+          <div style="color:var(--text-mute);font-size:12px">Open to load stages…</div>
+        </div>
+      </details>`;
     const tabsHtml = !canManageTabs ? '' : `
       <details class="staff-tabs" style="margin-top:6px">
         <summary style="cursor:pointer;font-size:12px;color:var(--text-sub);padding:9px 12px;background:var(--surface);border:1px solid var(--border-med);border-radius:10px;display:flex;justify-content:space-between;align-items:center">
@@ -13105,6 +13126,7 @@ async function _bbRenderStaffCard(panel, meta) {
         ${canRevoke ? `<button class="team-revoke-btn" onclick="openRevokeTeamModal('${r.id}')">Revoke</button>` : ''}
       </div>
       ${tabsHtml}
+      ${stagesHtml}
       <div style="margin-top:6px;padding:10px 12px;background:var(--surface);border:1px solid var(--border-med);border-radius:10px">
         <div style="font-size:11px;color:var(--text-mute);margin-bottom:8px">Photo / headshot</div>
         ${_assetBankHtml('staff_id', r.id, { category: 'photo' })}
@@ -13133,6 +13155,65 @@ async function _bbStaffTabsSave(memberId) {
     });
     const j = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(j.error || ('HTTP ' + res.status));
+    if (statusEl) { statusEl.textContent = '✓ Saved'; setTimeout(() => { if (statusEl) statusEl.textContent = ''; }, 1500); }
+  } catch (e) {
+    if (statusEl) statusEl.textContent = '⚠ ' + e.message;
+  }
+}
+
+// ── Owner: per-staff pipeline STAGE access ──
+// Stage list is data-driven (GHL pipelines), so it's lazy-loaded on expand.
+let _BB_PIPE_CACHE = null;        // [{id,name,stages:[{id,name}]}] for the academy
+const _BB_STAGE_PERMS = {};       // memberId → allowed_stages (array | null)
+
+async function _bbStaffStagesLoad(memberId) {
+  const host = document.getElementById('staff-stages-' + memberId);
+  if (!host || host.dataset.loaded === '1') return;
+  host.dataset.loaded = '1';
+  host.innerHTML = '<div style="color:var(--text-mute);font-size:12px"><span class="req-spin"></span> Loading stages…</div>';
+  try {
+    if (!_BB_PIPE_CACHE) {
+      const token = await _mreqAuthToken();
+      const r = await fetch(`/api/ghl/pipelines?client_id=${encodeURIComponent(CLIENT_ID)}`, { headers: { 'Authorization': 'Bearer ' + token } });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(j.error || ('HTTP ' + r.status));
+      _BB_PIPE_CACHE = j.pipelines || [];
+    }
+    if (!_BB_PIPE_CACHE.length) { host.innerHTML = '<div style="color:var(--text-mute);font-size:12px">No pipelines in GHL yet.</div>'; return; }
+    const allowed = _BB_STAGE_PERMS[memberId];
+    const allowAll = !Array.isArray(allowed);
+    host.innerHTML = _BB_PIPE_CACHE.map(p => `
+      <div style="flex-basis:100%;font-size:11px;font-weight:700;color:var(--text-mute);text-transform:uppercase;letter-spacing:.04em;margin-top:4px">🛣 ${escapeHTML(p.name)}</div>
+      ${(p.stages || []).map(s => {
+        const on = allowAll || allowed.includes(s.id);
+        return `<label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer">
+          <input type="checkbox" data-stageid="${escapeHTML(s.id)}" ${on ? 'checked' : ''} onchange="_bbStaffStagesSave('${memberId}')"> ${escapeHTML(s.name)}</label>`;
+      }).join('')}`).join('') +
+      `<div style="flex-basis:100%;font-size:11px;color:var(--text-mute)">Unchecked stages are hidden from this teammate in the Sales board.</div>`;
+  } catch (e) {
+    host.dataset.loaded = '';
+    host.innerHTML = `<div style="color:#9a3b2f;font-size:12px">Couldn't load — ${escapeHTML(e.message)}</div>`;
+  }
+}
+
+async function _bbStaffStagesSave(memberId) {
+  const cont = document.getElementById('staff-stages-' + memberId);
+  if (!cont) return;
+  const boxes = [...cont.querySelectorAll('input[type=checkbox][data-stageid]')];
+  const checked = boxes.filter(b => b.checked).map(b => b.dataset.stageid);
+  const allowed = (checked.length === boxes.length) ? null : checked;
+  const statusEl = document.getElementById('staff-stages-status-' + memberId);
+  if (statusEl) statusEl.textContent = 'Saving…';
+  try {
+    const token = await _mreqAuthToken();
+    const res = await fetch('/api/clients?action=set-staff-tabs', {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ client_id: CLIENT_ID, member_id: memberId, allowed_stages: allowed }),
+    });
+    const j = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(j.error || ('HTTP ' + res.status));
+    _BB_STAGE_PERMS[memberId] = allowed;
     if (statusEl) { statusEl.textContent = '✓ Saved'; setTimeout(() => { if (statusEl) statusEl.textContent = ''; }, 1500); }
   } catch (e) {
     if (statusEl) statusEl.textContent = '⚠ ' + e.message;
@@ -19329,11 +19410,14 @@ function _renderPipelineBoard() {
   const p = _PL_DATA.pipelines.find(x => x.id === _PL_PIPELINE) || _PL_DATA.pipelines[0];
   if (!p) { container.innerHTML = ''; return; }
 
-  // Group opportunities by stage
+  // Per-staff stage permissions: a restricted teammate only sees allowed stages.
+  const visibleStages = p.stages.filter(s => _isStageAllowed(s.id));
+
+  // Group opportunities by stage (only the stages this user can see)
   const byStage = new Map();
-  for (const s of p.stages) byStage.set(s.id, []);
+  for (const s of visibleStages) byStage.set(s.id, []);
   for (const o of p.opportunities) {
-    if (!byStage.has(o.stageId)) byStage.set(o.stageId, []);
+    if (!byStage.has(o.stageId)) continue; // opp sits in a stage this user can't see
     byStage.get(o.stageId).push(o);
   }
 
@@ -19374,7 +19458,7 @@ function _renderPipelineBoard() {
       </div>`;
   };
 
-  const colHtml = p.stages.map(s => {
+  const colHtml = visibleStages.map(s => {
     const opps = byStage.get(s.id) || [];
     return `
       <div class="pl-col"
