@@ -91,10 +91,14 @@ async function handler(req, res) {
   const conversationId  = nested(["conversationId", "conversation_id"], "customData", "message");
   const messageId       = nested(["messageId", "message_id"], "customData", "message")
     || (p.message && typeof p.message === "object" ? pick(p.message, ["id"]) : null);
-  const body            = nested(["body", "message"], "customData", "message") || "";
-  const channelRaw      = nested(["messageType", "message_type", "channel", "type"], "customData", "message") || "";
-  const channel         = String(channelRaw).replace(/^TYPE_/i, "").toLowerCase() || null;
-  const occurredAtRaw   = nested(["dateAdded", "createdAt", "timestamp", "date"], "message");
+  // Body: string-only. Never fall back to the `message` object key (that stored
+  // "[object Object]"). On contact-detail triggers it's often empty — the agent
+  // fetches the full thread from the inbox later; P1 only needs the event.
+  const bodyRaw         = nested(["body"], "customData", "message");
+  const body            = typeof bodyRaw === "string" ? bodyRaw : "";
+  const channelRaw      = nested(["messageType", "message_type", "channel"], "customData", "message");
+  const channel         = channelRaw != null && channelRaw !== "" ? String(channelRaw).replace(/^TYPE_/i, "").toLowerCase() : null;
+  const occurredAtRaw   = nested(["dateAdded", "createdAt", "timestamp", "date", "date_created"], "message");
 
   // No academy id anywhere → echo what GHL sent (visible in GHL's webhook
   // execution log) so the payload shape can be diagnosed in one shot.
