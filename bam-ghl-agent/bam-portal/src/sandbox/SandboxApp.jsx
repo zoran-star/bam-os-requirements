@@ -306,10 +306,10 @@ function AgentBubble({ m, parentText, onSaveExample, onTeach, teaching, teachTex
 
 // ── Brain editor (categorized prompt sections) ──────────────────────
 const GROUPS = [
-  { key: "identity",   label: "🪪 Identity",            hint: "Who the agent is" },
-  { key: "academy",    label: "🏠 Academy facts",       hint: "Schedule, pricing, program — the truth it speaks from" },
-  { key: "behavior",   label: "🧠 Behavior",            hint: "How it talks, qualifies, handles objections" },
-  { key: "guardrails", label: "🛡️ Guardrails & examples", hint: "Hard rules + sample conversations" },
+  { key: "general",  label: "🌐 General — how it sells", hint: "Shared sales craft: tone, objections, flow, guardrails, examples. BAM-owned — every location inherits this." },
+  { key: "location", label: "📍 Location — this academy", hint: "Address, schedule, coaches, proof, selling points." },
+  { key: "offer",    label: "🎁 Offer — the product",     hint: "Program, pricing, policies, who qualifies." },
+  { key: "goal",     label: "🎯 Goal — objective & cadence", hint: "Follow-up cadence and when to stop chasing." },
 ];
 
 function BrainEditor() {
