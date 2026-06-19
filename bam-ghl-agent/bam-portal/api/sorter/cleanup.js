@@ -694,6 +694,7 @@ async function handler(req, res) {
           stripe_price_id:        s.stripe_price_id || null,
           billing_mode:           s.billing_mode || null,
           joined_date:            s.joined_date || null,
+          coachiq_member_id:      s.coachiq_member_id || null,
           updated_at:             nowIso(),
         };
         // Only set offer_id when resolved, so re-importing a member whose price
@@ -857,14 +858,18 @@ async function handler(req, res) {
       const acct = client.stripe_connect_account_id;
       const custId = body.customer_id;
       if (!acct || !custId) return res.status(400).json({ error: "customer_id required" });
-      let subId = body.sub_id || null, priceId = body.price_id || null;
+      let subId = body.sub_id || null, priceId = body.price_id || null, coachiqUserId = null;
       if (!subId) {
         try {
           const sr = await stripeGet(`/subscriptions?customer=${encodeURIComponent(custId)}&status=all&limit=5&expand[]=data.items.data.price`, acct);
           const subs = sr.data || [];
           const best = subs.find(s2 => ACTIVEISH.has(s2.status)) || subs[0];
-          if (best) { subId = best.id; const p = best.items && best.items.data && best.items.data[0] && best.items.data[0].price; priceId = priceId || (p && p.id) || null; }
+          if (best) { subId = best.id; const p = best.items && best.items.data && best.items.data[0] && best.items.data[0].price; priceId = priceId || (p && p.id) || null; coachiqUserId = (best.metadata && best.metadata.userId) || null; }
         } catch (_) {}
+      }
+      // CoachIQ stamps the member's USER id on subs it created → auto-link it.
+      if (subId && !coachiqUserId) {
+        try { const sub = await stripeGet(`/subscriptions/${encodeURIComponent(subId)}`, acct); coachiqUserId = (sub.metadata && sub.metadata.userId) || null; } catch (_) {}
       }
       const status = s.is_duplicate ? "duplicate" : await priceVerdict(priceId);
       await sb(`members_staging?id=eq.${s.id}`, {
@@ -872,6 +877,7 @@ async function handler(req, res) {
         body: JSON.stringify({
           stripe_customer_id: custId, stripe_subscription_id: subId, stripe_price_id: priceId,
           stripe_linked: true, billing_mode: null, match_status: status,
+          ...(coachiqUserId ? { coachiq_member_id: coachiqUserId } : {}),
           cleanup_notes: "connected to an existing Stripe customer", updated_at: nowIso(),
         }),
       });
