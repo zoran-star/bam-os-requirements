@@ -162,7 +162,7 @@ async function loadAcademyAndToken(clientId, ctx, res) {
   }
   const rows = await sb(
     `clients?id=eq.${clientId}` +
-    `&select=id,business_name,ghl_location_id,ghl_access_token,ghl_refresh_token,ghl_token_expires_at` +
+    `&select=id,business_name,ghl_location_id,ghl_access_token,ghl_refresh_token,ghl_token_expires_at,ghl_kpi_config` +
     `&limit=1`
   );
   const client = Array.isArray(rows) && rows[0];
@@ -306,6 +306,41 @@ async function handler(req, res) {
     } catch (_) {}
 
     return res.status(200).json({ ok: true, member });
+  }
+
+  // ── POST ?action=enroll-workflow: drop the opportunity's contact into the
+  // academy's configured nudge automation (e.g. the summer special). The
+  // workflow id is read from config server-side so the UI never needs it. ──
+  if (req.method === "POST" && req.query.action === "enroll-workflow") {
+    const body = (req.body && typeof req.body === "object") ? req.body : {};
+    const oppId = body.opportunity_id || req.query.opportunity_id;
+    const workflowId = body.workflow_id || client.ghl_kpi_config?.summer_special_workflow_id;
+    if (!workflowId) {
+      return res.status(400).json({ error: "No automation configured for this academy yet.", hint: "Set ghl_kpi_config.summer_special_workflow_id." });
+    }
+
+    // Resolve the contact: explicit contact_id, else fetch it from the opportunity.
+    let contactId = body.contact_id;
+    if (!contactId) {
+      if (!oppId) return res.status(400).json({ error: "opportunity_id or contact_id required" });
+      let opp;
+      try { opp = await ghl("GET", `/opportunities/${encodeURIComponent(oppId)}`, { token }); }
+      catch (e) { return res.status(e.status || 502).json({ error: `GHL fetch opp: ${e.message}` }); }
+      const oppObj = opp.opportunity || opp;
+      contactId = oppObj.contactId || oppObj.contact?.id;
+    }
+    if (!contactId) return res.status(400).json({ error: "no contact for this opportunity" });
+
+    // GHL rejects a trailing 'Z' on eventStartTime — send an explicit +00:00 offset.
+    const eventStartTime = new Date().toISOString().replace(/\.\d{3}Z$/, "+00:00");
+    try {
+      await ghl("POST", `/contacts/${encodeURIComponent(contactId)}/workflow/${encodeURIComponent(workflowId)}`, {
+        token, body: { eventStartTime },
+      });
+    } catch (e) {
+      return res.status(e.status || 502).json({ error: `GHL enroll: ${e.message}`, detail: e.body || null });
+    }
+    return res.status(200).json({ ok: true, contact_id: contactId, workflow_id: workflowId });
   }
 
   // ── GET: list pipelines + stages + opportunities ───────────
