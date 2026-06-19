@@ -19112,6 +19112,31 @@ async function _plSetStatus(oppId, status, reason) {
   return json;
 }
 
+// Simple transient toast (no undo) — reuses the undo-toast slot.
+function _plToast(msg) {
+  clearTimeout(_plUndoTimer);
+  document.getElementById('pl-undo-toast')?.remove();
+  document.body.insertAdjacentHTML('beforeend', `<div id="pl-undo-toast" style="position:fixed;bottom:24px;left:50%;transform:translateX(-50%);z-index:9200;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:10px 16px;font-size:13px;color:var(--text);box-shadow:0 8px 30px rgba(0,0,0,.45)">${escapeHTML(msg)}</div>`);
+  _plUndoTimer = setTimeout(() => document.getElementById('pl-undo-toast')?.remove(), 4000);
+}
+
+// Drop the contact into the academy's configured nudge automation (summer special).
+async function _plEnrollSpecial(oppId) {
+  if (!confirm('Send this lead into the Summer Special automation? They\'ll start getting the text sequence.')) return;
+  try {
+    const token = await _mreqAuthToken();
+    const r = await fetch(`/api/ghl/pipelines?client_id=${encodeURIComponent(CLIENT_ID)}&action=enroll-workflow`, {
+      method: 'POST', headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ opportunity_id: oppId }),
+    });
+    const json = await _safeJson(r);
+    if (!r.ok) throw new Error(json.error || ('HTTP ' + r.status));
+    _plToast('📨 Sent to Summer Special');
+  } catch (e) {
+    alert('Could not send: ' + (e.message || e));
+  }
+}
+
 // ── Undo toast (status changes + drag moves) ──
 function _plShowUndo(action, label) {
   _plUndoState = action;
@@ -19201,7 +19226,11 @@ function _renderPipelineBoard() {
                <button class="pl-card-abandon" onclick="event.stopPropagation(); _plMarkAbandoned('${escapeHTML(o.id)}')">Abandon</button>
                <button class="pl-card-lost" onclick="event.stopPropagation(); _plMarkLost('${escapeHTML(o.id)}')">Lost</button>
              </div>`
-          : (trialStarted ? `<button class="pl-card-ptf" onclick="event.stopPropagation(); _plPostTrialForm('${escapeHTML(o.id)}')">Post trial form</button>` : '')}
+          : (trialStarted
+              ? `<button class="pl-card-ptf" onclick="event.stopPropagation(); _plPostTrialForm('${escapeHTML(o.id)}')">Post trial form</button>`
+              : (typeof V2_ACCESS !== 'undefined' && V2_ACCESS
+                  ? `<button onclick="event.stopPropagation(); _plEnrollSpecial('${escapeHTML(o.id)}')" style="margin-top:6px;width:100%;background:var(--gold-ghost,rgba(212,207,138,0.1));color:var(--gold);border:1px solid var(--gold);border-radius:6px;padding:5px 8px;font-size:11px;font-weight:600;cursor:pointer">📨 Summer special</button>`
+                  : ''))}
       </div>`;
   };
 
