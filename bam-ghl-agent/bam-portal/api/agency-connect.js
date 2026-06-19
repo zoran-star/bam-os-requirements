@@ -7,14 +7,14 @@ import crypto from "node:crypto";
 // level; we store the Company token and mint a Location token per sub-account
 // via /oauth/locationToken. Future academies connect with one click too.
 //
-//   GET /api/ghl/agency-connect?action=start   → redirect to GHL agency consent
-//   GET /api/ghl/agency-connect?code=&state=   → callback: store company token,
+//   GET /api/agency-connect?action=start   → redirect to GHL agency consent
+//   GET /api/agency-connect?code=&state=   → callback: store company token,
 //                                                 then mint a token for every
 //                                                 sub-account, render results
-//   GET /api/ghl/agency-connect?action=mint&key=<CRON_SECRET>  → re-mint later
+//   GET /api/agency-connect?action=mint&key=<CRON_SECRET>  → re-mint later
 //
 // Marketplace app must have Distribution = Agency (or Agency + Sub-Account) and
-// this redirect URL registered: https://portal.byanymeansbusiness.com/api/ghl/agency-connect
+// this redirect URL registered: https://portal.byanymeansbusiness.com/api/agency-connect
 
 export const maxDuration = 60;
 
@@ -63,7 +63,7 @@ function getOrigin(req) {
   if (/localhost|127\.0\.0\.1/.test(origin)) return origin.replace(/\/+$/, "");
   return "https://portal.byanymeansbusiness.com";
 }
-function redirectUri(req) { return `${getOrigin(req)}/api/ghl/agency-connect`; }
+function redirectUri(req) { return `${getOrigin(req)}/api/agency-connect`; }
 
 function stateSecret() { return process.env.GHL_OAUTH_STATE_SECRET || SUPABASE_SERVICE_KEY; }
 function signState(payload) {
