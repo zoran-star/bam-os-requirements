@@ -131,6 +131,11 @@ async function handler(req, res) {
       const d = new Date(body.charge_date);
       if (!isNaN(d.getTime())) { d.setMonth(d.getMonth() + months); trialEnd = Math.max(Math.floor(d.getTime() / 1000), trialEnd); }
     }
+    // Direct first-charge-date override (staff picked it in the modal). Wins over charge_date.
+    if (body.first_charge_date) {
+      const fd = new Date(body.first_charge_date);
+      if (!isNaN(fd.getTime())) trialEnd = Math.max(Math.floor(fd.getTime() / 1000), Math.floor(Date.now() / 1000) + 60);
+    }
 
     // Reusable card? prefer the customer's default PM, else any attached card.
     const cust = await stripeFetch(`/customers/${encodeURIComponent(customerId)}?expand[]=invoice_settings.default_payment_method`, { stripeAccount: acct });
