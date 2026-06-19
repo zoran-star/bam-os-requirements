@@ -29,9 +29,26 @@ export default function SandboxApp() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [lessons, setLessons] = useState([]);
+  const [examples, setExamples] = useState([]);
   const [teachFor, setTeachFor] = useState(null);    // index of agent msg being corrected
   const [teachText, setTeachText] = useState("");
+  const [lead, setLead] = useState({ form: "", age: "", location: "", notes: "" });
+  const [leadOpen, setLeadOpen] = useState(false);
   const scrollRef = useRef(null);
+
+  // Stats for the tracker bar.
+  const agentMsgs = messages.filter(m => m.role === "agent");
+  const bookAsks = agentMsgs.filter(m => m.meta?.asked_to_book).length;
+  const lastConf = agentMsgs.length ? agentMsgs[agentMsgs.length - 1].meta?.confidence : null;
+
+  function leadContext() {
+    const parts = [];
+    if (lead.form) parts.push(`Form submitted: ${lead.form}`);
+    if (lead.age) parts.push(`Athlete age: ${lead.age}`);
+    if (lead.location) parts.push(`Location: ${lead.location}`);
+    if (lead.notes) parts.push(`Notes: ${lead.notes}`);
+    return parts.join("\n");
+  }
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session: s } }) => setSession(s));
@@ -39,11 +56,20 @@ export default function SandboxApp() {
     return () => subscription.unsubscribe();
   }, []);
 
-  useEffect(() => { if (session) loadLessons(); }, [session]);
+  useEffect(() => { if (session) { loadLessons(); loadExamples(); } }, [session]);
   useEffect(() => { scrollRef.current?.scrollTo(0, scrollRef.current.scrollHeight); }, [messages, busy]);
 
   async function loadLessons() {
     try { const d = await api("lessons"); setLessons(d.lessons || []); } catch (_) {}
+  }
+  async function loadExamples() {
+    try { const d = await api("examples"); setExamples(d.examples || []); } catch (_) {}
+  }
+  async function saveExample(parent_text, agent_text) {
+    try { await api("save-example", { parent_text, agent_text }); await loadExamples(); } catch (e) { setError(e.message); }
+  }
+  async function forgetExample(id) {
+    try { await api("forget-example", { id }); await loadExamples(); } catch (e) { setError(e.message); }
   }
 
   async function send() {
@@ -55,7 +81,7 @@ export default function SandboxApp() {
     setInput("");
     setBusy(true);
     try {
-      const d = await api("chat", { messages: next.map(m => ({ role: m.role, text: m.text })) });
+      const d = await api("chat", { messages: next.map(m => ({ role: m.role, text: m.text })), lead_context: leadContext() });
       setMessages(m => [...m, {
         role: "agent",
         text: d.reply,
@@ -112,6 +138,29 @@ export default function SandboxApp() {
         <div style={{ flex: 1, display: "flex", minHeight: 0 }}>
           {/* Chat */}
           <div style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0 }}>
+            {/* Trackers + lead info */}
+            <div style={{ borderBottom: `1px solid ${tk.border}`, padding: "8px 16px", display: "flex", alignItems: "center", gap: 16, flexWrap: "wrap", fontSize: 12, color: tk.textSub }}>
+              <span>💬 <b style={{ color: tk.text }}>{agentMsgs.length}</b> replies</span>
+              <span>🎯 <b style={{ color: tk.text }}>{bookAsks}</b> book-asks</span>
+              <span>✅ last confidence: <b style={{ color: lastConf == null ? tk.textMute : (lastConf >= 0.7 ? tk.green : lastConf >= 0.4 ? tk.amber : tk.red) }}>{lastConf == null ? "—" : Math.round(lastConf * 100) + "%"}</b></span>
+              <div style={{ flex: 1 }} />
+              <span onClick={() => setLeadOpen(o => !o)} style={{ cursor: "pointer", color: tk.accent }}>
+                📋 Lead info {leadContext() ? "✓" : ""} {leadOpen ? "▲" : "▼"}
+              </span>
+            </div>
+            {leadOpen && (
+              <div style={{ borderBottom: `1px solid ${tk.border}`, padding: "12px 16px", background: tk.surface, display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
+                <span style={{ fontSize: 11, color: tk.textMute, width: "100%" }}>Pre-filled form data (used to qualify, like a real lead who submitted a form):</span>
+                <select value={lead.form} onChange={e => setLead({ ...lead, form: e.target.value })} style={inp(140)}>
+                  <option value="">no form</option>
+                  <option value="Contact form">Contact form</option>
+                  <option value="Free trial form">Free trial form</option>
+                </select>
+                <input value={lead.age} onChange={e => setLead({ ...lead, age: e.target.value })} placeholder="athlete age" style={inp(110)} />
+                <input value={lead.location} onChange={e => setLead({ ...lead, location: e.target.value })} placeholder="location" style={inp(140)} />
+                <input value={lead.notes} onChange={e => setLead({ ...lead, notes: e.target.value })} placeholder="notes (e.g. plays rep)" style={inp(220)} />
+              </div>
+            )}
             <div ref={scrollRef} style={{ flex: 1, overflowY: "auto", padding: "24px", display: "flex", flexDirection: "column", gap: 16 }}>
               {messages.length === 0 && (
                 <div style={{ margin: "auto", textAlign: "center", color: tk.textMute, maxWidth: 420 }}>
@@ -123,9 +172,11 @@ export default function SandboxApp() {
               )}
               {messages.map((m, i) => m.role === "parent"
                 ? <ParentBubble key={i} text={m.text} />
-                : <AgentBubble key={i} m={m} onTeach={() => { setTeachFor(i); setTeachText(""); }}
+                : <AgentBubble key={i} m={m} parentText={messages[i - 1]?.role === "parent" ? messages[i - 1].text : ""}
+                    onTeach={() => { setTeachFor(i); setTeachText(""); }}
                     teaching={teachFor === i} teachText={teachText} setTeachText={setTeachText}
-                    onSave={() => saveLesson(i)} onCancel={() => setTeachFor(null)} />
+                    onSave={() => saveLesson(i)} onCancel={() => setTeachFor(null)}
+                    onSaveExample={saveExample} />
               )}
               {busy && <div style={{ color: tk.textMute, fontSize: 13, fontStyle: "italic" }}>agent is thinking…</div>}
               {error && <div style={{ color: tk.red, fontSize: 13, background: tk.redSoft, padding: "8px 12px", borderRadius: 8 }}>⚠ {error}</div>}
@@ -162,6 +213,18 @@ export default function SandboxApp() {
                   style={{ position: "absolute", top: 8, right: 10, color: tk.textMute, cursor: "pointer", fontSize: 13 }}>✕</div>
               </div>
             ))}
+
+            {/* Saved examples */}
+            <div style={{ fontSize: 13, fontWeight: 700, margin: "20px 0 4px" }}>⭐ Example replies</div>
+            <div style={{ fontSize: 11, color: tk.textMute, marginBottom: 10 }}>Saved good answers — these set the tone and replace the default examples.</div>
+            {examples.length === 0 && <div style={{ fontSize: 12, color: tk.textMute, lineHeight: 1.6 }}>None yet. Hit ⭐ on a great reply to save it.</div>}
+            {examples.map(ex => (
+              <div key={ex.id} style={{ background: tk.surfaceEl, border: `1px solid ${tk.border}`, borderRadius: 8, padding: "9px 11px", marginBottom: 8, fontSize: 12, lineHeight: 1.5, position: "relative" }}>
+                <div style={{ color: tk.textMute, paddingRight: 16 }}>👤 {ex.parent_text}</div>
+                <div style={{ color: tk.text, marginTop: 3 }}>🤖 {ex.agent_text}</div>
+                <div title="remove" onClick={() => forgetExample(ex.id)} style={{ position: "absolute", top: 8, right: 10, color: tk.textMute, cursor: "pointer", fontSize: 13 }}>✕</div>
+              </div>
+            ))}
           </div>
         </div>}
       </div>
@@ -178,12 +241,16 @@ function ParentBubble({ text }) {
   );
 }
 
-function AgentBubble({ m, onTeach, teaching, teachText, setTeachText, onSave, onCancel }) {
+function AgentBubble({ m, parentText, onSaveExample, onTeach, teaching, teachText, setTeachText, onSave, onCancel }) {
   const { reasoning, confidence, escalate, escalate_reason, followup, followup_when, followup_message } = m.meta || {};
   const conf = typeof confidence === "number" ? Math.round(confidence * 100) : null;
+  const confColor = conf == null ? tk.textMute : (conf >= 70 ? tk.green : conf >= 40 ? tk.amber : tk.red);
   return (
     <div style={{ alignSelf: "flex-start", maxWidth: "78%" }}>
-      <div style={{ fontSize: 10, color: tk.textMute, marginBottom: 4 }}>🤖 agent</div>
+      <div style={{ fontSize: 10, color: tk.textMute, marginBottom: 4, display: "flex", alignItems: "center", gap: 8 }}>
+        🤖 agent
+        {conf != null && <span style={{ fontSize: 10, fontWeight: 700, color: confColor, background: `${confColor}1a`, border: `1px solid ${confColor}44`, borderRadius: 99, padding: "1px 7px" }}>{conf}% sure</span>}
+      </div>
       {escalate ? (
         <div style={{ background: tk.amberSoft, border: `1px solid ${tk.amber}44`, color: tk.amber, padding: "10px 14px", borderRadius: "14px 14px 14px 4px", fontSize: 13.5, lineHeight: 1.5 }}>
           🙋 <b>Would escalate to you</b>{escalate_reason ? ` — ${escalate_reason}` : ""}<br />
@@ -210,6 +277,7 @@ function AgentBubble({ m, onTeach, teaching, teachText, setTeachText, onSave, on
       {!teaching ? (
         <div style={{ marginTop: 6, display: "flex", gap: 14 }}>
           <Mini onClick={onTeach}>📝 teach</Mini>
+          {!escalate && m.text && parentText && <Mini onClick={() => onSaveExample(parentText, m.text)}>⭐ save as example</Mini>}
         </div>
       ) : (
         <div style={{ marginTop: 8, background: tk.surface, border: `1px solid ${tk.borderMed}`, borderRadius: 10, padding: 12 }}>
@@ -291,6 +359,8 @@ function SectionCard({ s, reload }) {
     </div>
   );
 }
+
+const inp = (w) => ({ width: w, background: tk.surfaceEl, color: tk.text, border: `1px solid ${tk.borderMed}`, borderRadius: 7, padding: "6px 9px", fontFamily: F, fontSize: 12.5, outline: "none" });
 
 const Tab = ({ on, onClick, children }) => (
   <button onClick={onClick} style={{ background: on ? tk.accent : "transparent", color: on ? "#000" : tk.textSub, border: "none", borderRadius: 7, padding: "5px 14px", fontSize: 12.5, fontWeight: 600, cursor: "pointer", fontFamily: F }}>{children}</button>

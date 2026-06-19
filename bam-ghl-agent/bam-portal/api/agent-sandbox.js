@@ -74,7 +74,7 @@ async function sectionOverrides(clientId) {
   } catch (_) { return {}; }
 }
 
-function buildSystem(lessons, overrides) {
+function buildSystem(lessons, overrides, leadContext, examples) {
   let sys = assemblePrompt(overrides || {});
   const fixes = lessons.filter(l => l.kind !== "good").map(l => l.lesson).filter(Boolean);
   if (fixes.length) {
@@ -83,6 +83,22 @@ function buildSystem(lessons, overrides) {
       fixes.map(l => `- ${l}`).join("\n") +
       `\n</learned_lessons>`;
   }
+  // Trainer-approved examples override the default ones when present.
+  if (Array.isArray(examples) && examples.length) {
+    sys += `\n\n<trainer_examples>\n` +
+      `These are your trainer's APPROVED example exchanges. They define the exact tone, length, and style to use — follow them over any examples above:\n` +
+      examples.map(e => `Lead: "${e.parent_text}"\nYou: "${e.agent_text}"`).join("\n\n") +
+      `\n</trainer_examples>`;
+  }
+
+  // Known lead info (e.g. from a pre-filled contact / free-trial form).
+  if (leadContext && String(leadContext).trim()) {
+    sys += `\n\n<lead_context>\n` +
+      `What you already know about this lead (from the form they submitted). Use it to qualify and personalize — do NOT re-ask for info you already have here:\n` +
+      String(leadContext).trim() +
+      `\n</lead_context>`;
+  }
+
   sys += `\n\n<sandbox_mode>\n` +
     `You are in a TRAINING SANDBOX talking to a coach role-playing as a parent/lead — NOT a real customer. ` +
     `Do not actually send anything. Instead, ALWAYS respond by calling the propose_reply tool: ` +
@@ -109,17 +125,27 @@ const REPLY_TOOL = {
       followup:       { type: "boolean", description: "True if you should send a follow-up message LATER (lead asked to check back, or went quiet)." },
       followup_when:  { type: "string", description: "If followup is true: short human description of when to send it (e.g. 'Sunday evening', 'in 2 days')." },
       followup_message:{ type: "string", description: "If followup is true: the exact message to send at that time." },
+      asked_to_book:  { type: "boolean", description: "True if THIS reply asks/invites the lead to book or come to a free trial (so we can count booking nudges)." },
     },
     required: ["reply", "reasoning", "confidence", "escalate"],
   },
 };
 
-async function handleChat(messages, clientId, res) {
+async function savedExamples(clientId) {
+  try {
+    const rows = await sb(`agent_examples?client_id=eq.${clientId}&select=parent_text,agent_text&order=created_at.asc`);
+    return Array.isArray(rows) ? rows : [];
+  } catch (_) { return []; }
+}
+
+async function handleChat(messages, clientId, leadContext, res) {
   if (!ANTHROPIC_KEY) return res.status(500).json({ error: "ANTHROPIC_API_KEY not configured on server" });
   if (!Array.isArray(messages) || !messages.length) return res.status(400).json({ error: "messages required" });
 
-  const [lessons, overrides] = await Promise.all([activeLessons(clientId), sectionOverrides(clientId)]);
-  const system = buildSystem(lessons, overrides);
+  const [lessons, overrides, examples] = await Promise.all([
+    activeLessons(clientId), sectionOverrides(clientId), savedExamples(clientId),
+  ]);
+  const system = buildSystem(lessons, overrides, leadContext, examples);
 
   // Map sandbox turns → Anthropic roles. parent = user, agent = assistant.
   const anthropicMsgs = messages
@@ -157,6 +183,7 @@ async function handleChat(messages, clientId, res) {
     followup:     !!tool.input.followup,
     followup_when: tool.input.followup_when || null,
     followup_message: tool.input.followup_message || null,
+    asked_to_book: !!tool.input.asked_to_book,
     lessons_applied: lessons.filter(l => l.kind !== "good").length,
   });
 }
@@ -173,7 +200,30 @@ async function handler(req, res) {
 
   try {
     if (action === "chat") {
-      return await handleChat(b.messages, clientId, res);
+      return await handleChat(b.messages, clientId, b.lead_context || "", res);
+    }
+
+    if (action === "save-example") {
+      if (!b.parent_text || !b.agent_text) return res.status(400).json({ error: "parent_text and agent_text required" });
+      const [row] = await sb(`agent_examples`, {
+        method: "POST", headers: { Prefer: "return=representation" },
+        body: JSON.stringify([{
+          client_id: clientId, parent_text: String(b.parent_text), agent_text: String(b.agent_text),
+          note: b.note || null, created_by: staffEmail,
+        }]),
+      });
+      return res.status(200).json({ ok: true, example: row });
+    }
+
+    if (action === "examples") {
+      const rows = await sb(`agent_examples?client_id=eq.${clientId}&select=id,parent_text,agent_text,created_at&order=created_at.desc`);
+      return res.status(200).json({ examples: Array.isArray(rows) ? rows : [] });
+    }
+
+    if (action === "forget-example") {
+      if (!b.id) return res.status(400).json({ error: "id required" });
+      await sb(`agent_examples?id=eq.${encodeURIComponent(b.id)}`, { method: "DELETE", headers: { Prefer: "return=minimal" } });
+      return res.status(200).json({ ok: true });
     }
 
     if (action === "teach") {
