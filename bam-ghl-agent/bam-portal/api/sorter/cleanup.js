@@ -347,10 +347,42 @@ async function handler(req, res) {
     ) || [];
 
     // Client row (Stripe account + persisted dismissals) — used by most actions.
-    const clientRows = await sb(`clients?id=eq.${encodeURIComponent(clientId)}&select=id,business_name,stripe_connect_account_id,sorter_dismissals&limit=1`);
+    const clientRows = await sb(`clients?id=eq.${encodeURIComponent(clientId)}&select=id,business_name,stripe_connect_account_id,sorter_dismissals,coachiq_enabled&limit=1`);
     const client = Array.isArray(clientRows) && clientRows[0];
     if (!client) return res.status(404).json({ error: "academy not found" });
     const dismissed = new Set(Array.isArray(client.sorter_dismissals) ? client.sorter_dismissals : []);
+
+    // ── CoachIQ cleanup: read status (the "listening session") ──
+    if (action === "coachiq-status") {
+      let events = [];
+      try { events = await sb(`coachiq_link_events?select=email,coachiq_user_id,matched,created_at&order=created_at.desc&limit=60`) || []; }
+      catch (_) { events = []; }
+      return res.status(200).json({
+        ok: true,
+        coachiq_enabled: !!client.coachiq_enabled,
+        members: staging.map(s => ({
+          id: s.id, athlete_name: s.athlete_name, parent_name: s.parent_name, parent_email: s.parent_email,
+          coachiq_member_id: s.coachiq_member_id || null, coachiq_not_applicable: !!s.coachiq_not_applicable,
+        })),
+        unmatched: events.filter(e => !e.matched).map(e => ({ email: e.email, coachiq_user_id: e.coachiq_user_id, at: e.created_at })),
+      });
+    }
+
+    // ── CoachIQ cleanup: set a member's id manually / mark not-applicable ──
+    if (action === "coachiq-set") {
+      const s = staging.find(x => String(x.id) === String(body.staging_id));
+      if (!s) return res.status(404).json({ error: "staging row not found" });
+      const patch = { updated_at: nowIso() };
+      if (body.not_applicable === true)  { patch.coachiq_not_applicable = true; patch.coachiq_member_id = null; }
+      else if (body.not_applicable === false) { patch.coachiq_not_applicable = false; }
+      if (typeof body.coachiq_member_id === "string") {
+        const v = body.coachiq_member_id.trim();
+        patch.coachiq_member_id = v || null;
+        if (v) patch.coachiq_not_applicable = false;
+      }
+      await sb(`members_staging?id=eq.${s.id}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify(patch) });
+      return res.status(200).json({ ok: true, staging_id: s.id });
+    }
 
     // dismiss: "this finding is wrong / not relevant" — persists per client so
     // it never resurfaces on future checks.
