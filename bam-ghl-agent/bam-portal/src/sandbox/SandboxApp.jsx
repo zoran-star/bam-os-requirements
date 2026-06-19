@@ -59,7 +59,8 @@ export default function SandboxApp() {
       setMessages(m => [...m, {
         role: "agent",
         text: d.reply,
-        meta: { reasoning: d.reasoning, confidence: d.confidence, escalate: d.escalate, escalate_reason: d.escalate_reason },
+        meta: { reasoning: d.reasoning, confidence: d.confidence, escalate: d.escalate, escalate_reason: d.escalate_reason,
+                followup: d.followup, followup_when: d.followup_when, followup_message: d.followup_message },
       }]);
     } catch (e) {
       setError(e.message);
@@ -178,7 +179,7 @@ function ParentBubble({ text }) {
 }
 
 function AgentBubble({ m, onTeach, teaching, teachText, setTeachText, onSave, onCancel }) {
-  const { reasoning, confidence, escalate, escalate_reason } = m.meta || {};
+  const { reasoning, confidence, escalate, escalate_reason, followup, followup_when, followup_message } = m.meta || {};
   const conf = typeof confidence === "number" ? Math.round(confidence * 100) : null;
   return (
     <div style={{ alignSelf: "flex-start", maxWidth: "78%" }}>
@@ -195,6 +196,14 @@ function AgentBubble({ m, onTeach, teaching, teachText, setTeachText, onSave, on
       {reasoning && (
         <div style={{ marginTop: 6, background: tk.surface, border: `1px dashed ${tk.borderMed}`, borderRadius: 8, padding: "7px 11px", fontSize: 12, color: tk.textSub, lineHeight: 1.5 }}>
           🧠 {reasoning}{conf != null && <span style={{ color: tk.textMute }}>  ·  {conf}% sure</span>}
+        </div>
+      )}
+
+      {followup && (
+        <div style={{ marginTop: 6, background: tk.blueGlow ? "rgba(96,165,250,0.08)" : tk.surface, border: `1px solid ${tk.blue}44`, borderRadius: 8, padding: "8px 11px", fontSize: 12.5, color: tk.text, lineHeight: 1.5 }}>
+          🕒 <b style={{ color: tk.blue }}>Would follow up</b>{followup_when ? ` — ${followup_when}` : ""}
+          {followup_message && <div style={{ marginTop: 4, color: tk.textSub, fontStyle: "italic" }}>"{followup_message}"</div>}
+          <div style={{ marginTop: 3, fontSize: 10.5, color: tk.textMute }}>(sandbox — not actually scheduled yet)</div>
         </div>
       )}
 

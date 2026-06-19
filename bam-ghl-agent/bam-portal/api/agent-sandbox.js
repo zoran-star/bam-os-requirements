@@ -88,7 +88,10 @@ function buildSystem(lessons, overrides) {
     `Do not actually send anything. Instead, ALWAYS respond by calling the propose_reply tool: ` +
     `'reply' is the exact text you'd send the lead, 'reasoning' is a short (1-2 sentence) explanation of why you said it / what stage you're at, ` +
     `and set 'escalate' = true (with 'escalate_reason') in any case where your instructions say to silently flag the conversation to the admin. ` +
-    `When escalating, still give a short reasoning and leave 'reply' empty.\n</sandbox_mode>`;
+    `When escalating, still give a short reasoning and leave 'reply' empty.\n` +
+    `If you decide you should follow up with the lead LATER (e.g. they said to check back, or they went quiet and your follow-up logic applies), ` +
+    `set 'followup' = true, 'followup_when' to a short human description of when (e.g. "Sunday evening", "tomorrow afternoon", "in 2 days"), ` +
+    `and 'followup_message' to exactly what you'd send then. Still give your immediate 'reply' too. If no later follow-up is needed, leave 'followup' false.\n</sandbox_mode>`;
   return sys;
 }
 
@@ -103,6 +106,9 @@ const REPLY_TOOL = {
       confidence:     { type: "number", description: "0..1 — how confident you are this is the right reply." },
       escalate:       { type: "boolean", description: "True if your instructions say to silently flag this to a human admin instead of replying." },
       escalate_reason:{ type: "string", description: "If escalate is true, why (e.g. complaint, off-topic, uncertain, repeat question)." },
+      followup:       { type: "boolean", description: "True if you should send a follow-up message LATER (lead asked to check back, or went quiet)." },
+      followup_when:  { type: "string", description: "If followup is true: short human description of when to send it (e.g. 'Sunday evening', 'in 2 days')." },
+      followup_message:{ type: "string", description: "If followup is true: the exact message to send at that time." },
     },
     required: ["reply", "reasoning", "confidence", "escalate"],
   },
@@ -148,6 +154,9 @@ async function handleChat(messages, clientId, res) {
     confidence:   typeof tool.input.confidence === "number" ? tool.input.confidence : null,
     escalate:     !!tool.input.escalate,
     escalate_reason: tool.input.escalate_reason || null,
+    followup:     !!tool.input.followup,
+    followup_when: tool.input.followup_when || null,
+    followup_message: tool.input.followup_message || null,
     lessons_applied: lessons.filter(l => l.kind !== "good").length,
   });
 }
