@@ -50,20 +50,36 @@ index is 2..6 since step 1 = Price Match's Match). Launched from Members tab str
 `99b8c3fab16ea75bb0b2027ad90b9216`, `COACHIQ_CREATE_USER_WEBHOOK_URL` (Zapier — unused),
 `GHL_ONBOARDING_WORKFLOW_ID` `5a90b9fd-…`.
 
-## 💳 Summer billing spec — CONFIRMED, ready to build (not built)
+## 💳 Summer billing spec — ✅ BUILT 2026-06-19 (code merged? see below; NOT yet deployed/tested)
 - Summer Unlimited: monthly **$315.27 / 4 weeks** (`price_1Ti6PCRxInSEtAh89gUsOSFj`);
   3-month **$850.89 / 3 months** (`price_1Ti6PLRxInSEtAh8OprQcH9Q`); offer commitment
-  `after = "Goes back to monthly"` (training offer `52a6285c-…`).
-- BUILD: `api/website/checkout.js` currently makes a plain `interval_count=N` sub (3-month
-  just re-bills every 3 mo, no revert). Change: when the chosen price is a commitment term
-  AND the offer commitment `after === "Goes back to monthly"`, create a Stripe
-  **subscription_schedule**: phase1 = committed price ×1 iteration → phase2 = the plan's
-  monthly price ongoing. Else plain sub. (Pattern designed in
-  [[project_coachiq_integration]] create-sub; not yet on the website funnel.)
+  `after = "Goes back to monthly"` (training offer `52a6285c-7832-44e1-b531-ab7ef9d8fc21`).
+- **CONFIRMED behavior (Zoran):** upfront → revert. Charge the full commitment price ONCE,
+  cover the term, then drop to the plan's monthly price ongoing. (Not installments.)
+- **How it's built (2-file split, lowest risk for live money):**
+  - `api/website/checkout.js` — payment collection UNCHANGED. New `resolveCommitmentRevert()`:
+    if term ∈ {3_months,6_months} AND the offer's matching commitment `after==="Goes back to
+    monthly"` AND a canonical `{plan}|monthly` pricing_catalog row exists → stamps
+    `metadata.commitment_reverts=monthly` + `metadata.revert_to_price=<monthly price id>` on the
+    sub. Live only (test mode skips). Any uncertainty → null → plain sub (today's behavior).
+  - `api/stripe/webhook.js` — in `handleInvoiceSucceeded` portal-owned block, AFTER first
+    invoice paid, `maybeAttachCommitmentSchedule()`: `from_subscription` (adopts the paid sub,
+    no re-charge) → update phases: phase0 committed ×1 iteration → phase1 monthly, `end_behavior:
+    release`, `proration_behavior: none`. Idempotent (skips if `sub.schedule` already set).
+    Non-fatal. Logged in the `onboarding-activated` audit row as `commitment_schedule`.
+  - Stripe pattern verified vs docs (from_subscription + iterations:1 on both phases + release).
+  - Offer length-match handles messy strings ("3 Months", "12 Weeks (3 Months)", "24 Weeks
+    (6 Months)"). All 5 commitment plans (Steady/Accelerate/Elevate/Dominate/Summer) have a
+    canonical `{plan}|monthly` row, all say "Goes back to monthly".
+- ⚠️ NOT handled (out of scope): commitments with `after` = "Ends" (would need cancel_at) or
+  "Renews same length" (= today's plain sub, re-bills every N — correct already).
+- ⏳ TODO: deploy (`vercel deploy --prod`, bam-portal doesn't auto-deploy) + a real test
+  payment on a commitment term + refund to prove the schedule attaches (this IS "Test A").
 
-## ⏳ REMAINING (4 builds — Zoran to pick order)
+## ⏳ REMAINING (3 builds left — Zoran to pick order)
 1. **member-detail popup** (`_sorterOpenInfo` in client-portal.html) → show "Next payment".
-2. **Billing schedule** on website checkout (spec above). LIVE money — careful.
+2. ✅ **Billing schedule** on website checkout — BUILT 2026-06-19 (see Summer billing spec
+   above). Pending deploy + live test payment.
 3. **CoachIQ staff toggle** in the **staff portal** (bam-portal React) → writes
    `clients.coachiq_enabled` (currently DB-only). "make coachiq a staff selection."
 4. **Move Member Import into the Training Offer setup** wizard (`_bbOfferConfigs.training`
