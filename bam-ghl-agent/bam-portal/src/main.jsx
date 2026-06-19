@@ -6,6 +6,7 @@ import BAMPortal from './App'
 import { TicketIntake, TicketStatus, ContentPortal } from './PublicTicket'
 
 const TrainingApp = lazy(() => import('./training/TrainingApp'))
+const SandboxApp = lazy(() => import('./sandbox/SandboxApp'))
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
@@ -17,6 +18,11 @@ ReactDOM.createRoot(document.getElementById('root')).render(
         <Route path="/training/*" element={
           <Suspense fallback={<div style={{ background: "#08080A", minHeight: "100vh" }} />}>
             <TrainingApp />
+          </Suspense>
+        } />
+        <Route path="/sandbox" element={
+          <Suspense fallback={<div style={{ background: "#08080A", minHeight: "100vh" }} />}>
+            <SandboxApp />
           </Suspense>
         } />
         <Route path="*" element={<BAMPortal />} />
