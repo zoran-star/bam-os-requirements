@@ -22453,6 +22453,31 @@ async function _sorterFixApply() {
   } catch (e) { alert('Fix failed: ' + _sorterErr(e)); }
 }
 
+// Styled confirm for "set up monthly billing" — shows amount/card + an editable
+// first-charge date. Resolves to the chosen YYYY-MM-DD, or null if cancelled.
+function _sorterMonthlyModal(prev, m) {
+  return new Promise(resolve => {
+    const amt = '$' + ((prev.amount_cents || 0) / 100).toFixed(2);
+    const card = prev.card_last4 ? `card ····${escapeHTML(String(prev.card_last4))}` : 'the card on file';
+    const ov = document.createElement('div');
+    ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:9300;display:flex;align-items:center;justify-content:center;padding:20px;';
+    ov.innerHTML = `<div style="background:var(--surface,#16161a);border:1px solid var(--border,#2a2a31);border-radius:14px;max-width:440px;width:100%;padding:22px 24px;">
+      <div style="font-size:16px;font-weight:800;color:var(--text,#eee);margin-bottom:8px;">Set up monthly billing</div>
+      <div style="font-size:13px;color:var(--text-mute,#888);margin-bottom:18px;line-height:1.5;"><b style="color:var(--text,#eee);">${escapeHTML(m.athlete_name || 'this member')}</b> · <b style="color:var(--text,#eee);">${amt}/month</b> on ${card}.<br>Creates a real subscription in Stripe. They are not charged until the first-charge date below.</div>
+      <label style="font-size:11px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--text-mute,#888);">First charge date</label>
+      <input id="sdc-date" type="date" value="${escapeHTML(prev.trial_end_iso || '')}" style="width:100%;margin-top:6px;padding:10px 12px;border-radius:8px;border:1px solid var(--border,#2a2a31);background:var(--bg,#0e0e11);color:var(--text,#eee);font-size:14px;box-sizing:border-box;" />
+      <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:22px;">
+        <button id="sdc-cancel" style="font-size:13px;padding:9px 16px;border-radius:9px;border:1px solid var(--border,#2a2a31);background:transparent;color:var(--text,#eee);cursor:pointer;">Cancel</button>
+        <button id="sdc-ok" style="font-size:13px;font-weight:700;padding:9px 18px;border-radius:9px;border:none;background:var(--accent,#E8C547);color:#1a1a1a;cursor:pointer;">Create subscription</button>
+      </div></div>`;
+    document.body.appendChild(ov);
+    const done = (val) => { ov.remove(); resolve(val); };
+    ov.querySelector('#sdc-cancel').onclick = () => done(null);
+    ov.querySelector('#sdc-ok').onclick = () => done(document.getElementById('sdc-date').value || prev.trial_end_iso || null);
+    ov.onclick = (e) => { if (e.target === ov) done(null); };
+  });
+}
+
 // Prepaid member with no recurring sub → create a portal monthly sub anchored to
 // when the prepaid term ends (reuses /api/sorter/setup-monthly; confirms first).
 async function _sorterFixSetupMonthly(m, plan) {
@@ -22469,9 +22494,9 @@ async function _sorterFixSetupMonthly(m, plan) {
       else alert('No card on file and a link couldn’t be created. Collect a card in Stripe first.');
       return;
     }
-    const card = prev.card_last4 ? `card ····${prev.card_last4}` : 'the card on file';
-    if (!confirm(`Set up monthly billing for ${m.athlete_name || 'this member'}?\n\n${amt}/month, first charge ${prev.trial_end_iso} (when the prepaid term ends), on ${card}.\n\nThis creates a real subscription in Stripe.`)) return;
-    const made = await _safeJson(await fetch('/api/sorter/setup-monthly', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token }, body: JSON.stringify({ ...base, mode: 'create' }) }));
+    const chosen = await _sorterMonthlyModal(prev, m);
+    if (!chosen) return;
+    const made = await _safeJson(await fetch('/api/sorter/setup-monthly', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token }, body: JSON.stringify({ ...base, mode: 'create', first_charge_date: chosen }) }));
     if (made.error) throw new Error(_sorterErr(made.error));
     alert(`✓ Monthly billing set up — ${amt}/month starts ${made.trial_end_iso}. They’re not charged until then.`);
     _sorterCloseFix(); _sorterRunChecks();
