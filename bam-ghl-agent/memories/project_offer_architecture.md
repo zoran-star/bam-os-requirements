@@ -122,6 +122,21 @@ Both support: `text`, `textarea`, `link`, `phone`, `email`, `currency`, `number`
 - **Brand-derived styling** — landing pages built from offer data don't yet pull colors / fonts from BB > Brand. Planned.
 - **Stripe wiring** — Pricing fields capture intent but don't create Stripe products / prices yet. Manual today.
 
+## Field type: `ghl_workflow` (2026-06-19)
+
+New offer field type — a single GHL **workflow** picker (Sales step). Used by the
+**Missed-trial automation** field (`key:'missed_trial_workflow'`): the owner picks
+the GHL workflow that auto-fires when a trainer marks an athlete **"Didn't show
+up"** on the post-trial form. Stored at top-level `offer.data.missed_trial_workflow`
+(workflow id) via `_bbUpdateOfferTopKey`. Renderer lazy-loads the academy's
+workflows via `_bbLoadWorkflows()` → new `GET /api/ghl/workflows?client_id=`
+(lists `{id,name}` from GHL `/workflows/?locationId=`). Hidden for V1 offers
+(`_V1_HIDE_TYPES`). Enforcement lives in `api/ghl/post-trial.js`: on
+`showed_up === false` it reads the training offer's `missed_trial_workflow` and
+POSTs `/contacts/{id}/workflow/{wfId}` (non-fatal; `result.missed_trial =
+fired|no_workflow|failed`). Same per-academy offer-data pattern as `signup_url`.
+See [[project_sales_comms]].
+
 ## When to update this note
 
 - New offer type added → update the 6-types table + section list
