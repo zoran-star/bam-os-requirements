@@ -303,8 +303,11 @@ async function handler(req, res) {
       if (action === "mark_cancellation") {
         // Only valid when there's no LIVE sub (the UI gates this). Records a
         // cancellation row (member_id may be null — it's a historical record) tied
-        // to the member's offer, then drops them from the import.
-        if (sub && (sub.status === "active" || sub.status === "trialing" || sub.status === "past_due")) {
+        // to the member's offer, then drops them from the import. Safety net: fetch
+        // the sub fresh here (the preview-scoped `sub` isn't in scope in this block).
+        let liveSub = null;
+        if (subId) { try { liveSub = await stripeFetch(`/subscriptions/${encodeURIComponent(subId)}`, { stripeAccount: acct }); } catch (_) { liveSub = null; } }
+        if (liveSub && (liveSub.status === "active" || liveSub.status === "trialing" || liveSub.status === "past_due")) {
           return res.status(409).json({ error: "this member still has a live subscription — cancel it first" });
         }
         await sb(`cancellations`, {

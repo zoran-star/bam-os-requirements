@@ -22499,11 +22499,14 @@ async function _sorterStripeInfo(customerId) {
         <span style="min-width:0;overflow:hidden;text-overflow:ellipsis;">${escapeHTML(s2.product_name || s2.sub_id)}<span style="color:var(--text-mute,#888);"> · since ${escapeHTML(s2.started || '?')}${s2.canceled_at ? ' · ended ' + escapeHTML(s2.canceled_at) : ''}</span></span>
         <span style="flex:none;"><b>${s2.amount_cents != null ? '$' + (s2.amount_cents / 100).toFixed(2) : '—'}</b>${s2.interval ? ' / ' + escapeHTML(s2.interval) : ''} <span style="font-size:9.5px;font-weight:800;letter-spacing:.3px;padding:1px 6px;border-radius:6px;border:1px solid ${['active','trialing','paused','past_due'].includes(s2.status) ? '#1f7a3d;color:#7BC47F' : 'var(--border,#2a2a31);color:var(--text-mute,#888)'};">${escapeHTML((s2.status || '').toUpperCase())}</span></span>
       </div>`).join('') || `<div style="font-size:12px;color:var(--text-mute,#888);">No subscriptions.</div>`;
-    const charges = (json.charges || []).map(c2 => `
-      <div style="display:flex;justify-content:space-between;font-size:11.5px;padding:2px 0;color:${c2.refunded ? 'var(--text-mute,#888)' : 'var(--text,#eee)'};">
-        <span style="min-width:0;overflow:hidden;text-overflow:ellipsis;">${escapeHTML(c2.date || '')}${c2.one_time ? ' · one-time' : ''}${c2.refunded ? ' · refunded' : ''}${c2.description ? ' · ' + escapeHTML(c2.description) : ''}</span>
+    const charges = (json.charges || []).map(c2 => {
+      const failed = c2.status && c2.status !== 'succeeded' && !c2.refunded;
+      return `
+      <div style="display:flex;justify-content:space-between;font-size:11.5px;padding:2px 0;color:${c2.refunded ? 'var(--text-mute,#888)' : (failed ? '#e0654f' : 'var(--text,#eee)')};">
+        <span style="min-width:0;overflow:hidden;text-overflow:ellipsis;">${escapeHTML(c2.date || '')}${c2.one_time ? ' · one-time' : ''}${c2.refunded ? ' · refunded' : (failed ? ' · failed' : '')}${c2.description ? ' · ' + escapeHTML(c2.description) : ''}</span>
         <span style="flex:none;font-weight:700;">$${((c2.amount_cents || 0) / 100).toFixed(2)}</span>
-      </div>`).join('') || `<div style="font-size:11.5px;color:var(--text-mute,#888);">No payments found.</div>`;
+      </div>`;
+    }).join('') || `<div style="font-size:11.5px;color:var(--text-mute,#888);">No payments found.</div>`;
     const stripeUrl = json.stripe_account_id ? `https://dashboard.stripe.com/${encodeURIComponent(json.stripe_account_id)}/customers/${encodeURIComponent(cu.id || customerId)}` : null;
     host.innerHTML = `
       <div onclick="_sorterCloseConnect()" style="position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:140;"></div>
@@ -22554,11 +22557,14 @@ async function _sorterOpenInfo(stagingId) {
         <span style="flex:none;"><b>${s2.amount_cents != null ? '$' + (s2.amount_cents / 100).toFixed(2) : '—'}</b>${s2.interval ? '/' + escapeHTML(s2.interval) : ''} <span style="font-size:9px;font-weight:800;padding:1px 6px;border-radius:6px;border:1px solid ${live ? '#1f7a3d;color:#7BC47F' : 'var(--border,#2a2a31);color:var(--text-mute,#888)'};">${escapeHTML((s2.status || '').toUpperCase())}</span></span>
       </div>`;
     }).join('') : '<div style="font-size:12px;color:var(--text-mute,#888);">No subscriptions.</div>';
-    const chargesHtml = charges.length ? charges.map(c2 => `
-      <div style="display:flex;justify-content:space-between;font-size:11.5px;padding:2px 0;color:${c2.refunded ? 'var(--text-mute,#888)' : 'var(--text,#eee)'};">
-        <span style="min-width:0;">${escapeHTML(c2.date || '')}${c2.one_time ? ' · one-time' : ''}${c2.refunded ? ' · refunded' : ''}${c2.description ? ' · ' + escapeHTML(c2.description) : ''}</span>
+    const chargesHtml = charges.length ? charges.map(c2 => {
+      const failed = c2.status && c2.status !== 'succeeded' && !c2.refunded;
+      return `
+      <div style="display:flex;justify-content:space-between;font-size:11.5px;padding:2px 0;color:${c2.refunded ? 'var(--text-mute,#888)' : (failed ? '#e0654f' : 'var(--text,#eee)')};">
+        <span style="min-width:0;">${escapeHTML(c2.date || '')}${c2.one_time ? ' · one-time' : ''}${c2.refunded ? ' · refunded' : (failed ? ' · failed' : '')}${c2.description ? ' · ' + escapeHTML(c2.description) : ''}</span>
         <span style="flex:none;font-weight:700;">$${((c2.amount_cents || 0) / 100).toFixed(2)}</span>
-      </div>`).join('') : '<div style="font-size:11.5px;color:var(--text-mute,#888);">No payments found.</div>';
+      </div>`;
+    }).join('') : '<div style="font-size:11.5px;color:var(--text-mute,#888);">No payments found.</div>';
     // Link to the Stripe customer dashboard (account-scoped) when we have one.
     const acct = json.stripe_account_id ? json.stripe_account_id + '/' : '';
     const custUrl = (json.stripe_account_id && m.stripe_customer_id)
@@ -24622,6 +24628,7 @@ function _renderMemberModalBody(m, stripe, history) {
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
       ${setupBtn}
       ${toggleBtn}
+      ${btn('⏸ Pause date fix', `mPauseDateFix('${m.id}')`)}
       ${gbtn('Change plan', `mChange('${m.id}','${escapeHTML(m.plan||'')}')`, canManage)}
       ${gbtn('Refund',      `mRefund('${m.id}')`, canManage)}
       ${gbtn('Cancel',      `mCancel('${m.id}','${escapeHTML((m.athlete_name||'').replace(/'/g, ''))}')`, canManage)}
@@ -24912,6 +24919,46 @@ async function mGetCardLink(memberId) {
     const r = await _memberAction(memberId, 'card-setup-link', {});
     _openPaymentLinkModal(memberId, r);
   } catch (e) { alert('Card link failed: ' + (e.message || e)); }
+}
+
+// Styled start/end date picker → resolves { start, end } or null.
+function _memberDateRangeModal(heading, body, okLabel) {
+  return new Promise(resolve => {
+    const el = document.createElement('div');
+    el.innerHTML = `<div style="position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:200;"></div>
+      <div style="position:fixed;z-index:201;top:50%;left:50%;transform:translate(-50%,-50%);width:min(400px,92vw);background:var(--surface,#16161a);border:1px solid var(--border,#2a2a31);border-radius:14px;padding:20px;">
+        <div style="font-size:15px;font-weight:800;margin-bottom:6px;">${escapeHTML(heading)}</div>
+        <div style="font-size:12px;color:var(--text-sub,#bbb);line-height:1.5;margin-bottom:12px;">${escapeHTML(body)}</div>
+        <label style="display:block;font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:var(--text-mute,#888);margin-bottom:3px;">Start date</label>
+        <input id="_mdr-start" type="date" style="width:100%;font-size:12px;padding:7px 8px;border-radius:8px;border:1px solid var(--border,#2a2a31);background:var(--bg,#0e0e11);color:var(--text,#eee);margin-bottom:10px;">
+        <label style="display:block;font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:var(--text-mute,#888);margin-bottom:3px;">End date</label>
+        <input id="_mdr-end" type="date" style="width:100%;font-size:12px;padding:7px 8px;border-radius:8px;border:1px solid var(--border,#2a2a31);background:var(--bg,#0e0e11);color:var(--text,#eee);">
+        <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:16px;">
+          <button id="_mdr-cancel" style="font-size:12.5px;padding:9px 16px;border-radius:9px;border:1px solid var(--border,#2a2a31);background:transparent;color:var(--text,#eee);cursor:pointer;">Cancel</button>
+          <button id="_mdr-ok" style="font-size:12.5px;font-weight:800;padding:9px 18px;border-radius:9px;border:none;background:var(--accent,#E8C547);color:#1a1a1a;cursor:pointer;">${escapeHTML(okLabel || 'Save')}</button>
+        </div>
+      </div>`;
+    document.body.appendChild(el);
+    const done = (v) => { el.remove(); resolve(v); };
+    el.querySelector('#_mdr-cancel').onclick = () => done(null);
+    el.querySelector('#_mdr-ok').onclick = () => {
+      const start = (document.getElementById('_mdr-start') || {}).value;
+      const end = (document.getElementById('_mdr-end') || {}).value;
+      if (!start || !end) { return; }
+      done({ start, end });
+    };
+  });
+}
+
+// "Pause date fix" — record a pause with start/end dates, NO Stripe change.
+async function mPauseDateFix(memberId) {
+  const dates = await _memberDateRangeModal('⏸ Pause date fix', 'Record a pause with these dates. No Stripe change — works on any subscription (or none).', 'Save pause');
+  if (!dates) return;
+  try {
+    await _memberAction(memberId, 'pause-date-fix', { start_date: dates.start, end_date: dates.end });
+    if (typeof fetchAndRenderMembers === 'function') fetchAndRenderMembers();
+    if (typeof openMemberPopup === 'function') openMemberPopup(memberId);
+  } catch (e) { alert('Pause date fix failed: ' + (e.message || e)); }
 }
 
 // "Set up billing" — put a no-sub / foreign-sub member onto a portal-owned sub:

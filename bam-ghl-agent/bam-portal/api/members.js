@@ -518,6 +518,7 @@ async function handler(req, res) {
     try {
       switch (action) {
         case "pause":         return await actionPause(res, member, stripeAccount, ctx, body);
+        case "pause-date-fix": return await actionPauseDateFix(res, member, ctx, body);
         case "unpause":       return await actionUnpause(res, member, stripeAccount, ctx, body);
         case "cancel":        return await actionCancel(res, member, stripeAccount, ctx, body);
         case "refund":        return await actionRefund(res, member, stripeAccount, ctx, body);
@@ -555,6 +556,40 @@ async function handler(req, res) {
 //
 // Capped at Stripe's 730-day trial max. Rejects past-due / payment_failed /
 // cancelling members. Rejects past end_date.
+// ── PAUSE DATE FIX ──
+// Record a pause (start/end dates) WITHOUT touching Stripe — for foreign/no-sub
+// members, or to correct pause dates. DB-only: inserts a cancellations pause row +
+// flips status to paused. No trial_end, no pause_collection.
+async function actionPauseDateFix(res, member, ctx, body) {
+  const { start_date, end_date } = body;
+  if (!start_date || !end_date) return res.status(400).json({ error: "start_date and end_date required (YYYY-MM-DD)" });
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(start_date) || !/^\d{4}-\d{2}-\d{2}$/.test(end_date)) return res.status(400).json({ error: "dates must be YYYY-MM-DD" });
+  if (isoToUnix(end_date) <= isoToUnix(start_date)) return res.status(400).json({ error: "end_date must be after start_date" });
+  const inserted = await sb(`cancellations?select=id`, {
+    method: "POST", headers: { Prefer: "return=representation" },
+    body: JSON.stringify([{
+      client_id: member.client_id, member_id: member.id, athlete_name: member.athlete_name,
+      archetype: member.archetype, parent_name: member.parent_name, type: "pause",
+      pause_start: start_date, pause_end: end_date,
+      reason: body.reason || "pause date fix (no Stripe change)",
+      stripe_subscription_id: member.stripe_subscription_id, stripe_customer_id: member.stripe_customer_id,
+      activated_at: nowIso(),
+    }]),
+  });
+  const newRowId = Array.isArray(inserted) && inserted[0]?.id;
+  if (!newRowId) return res.status(500).json({ error: "failed to insert pause row" });
+  await sb(`cancellations?member_id=eq.${member.id}&type=eq.pause&completed_at=is.null&id=neq.${newRowId}`, {
+    method: "PATCH", headers: { Prefer: "return=minimal" },
+    body: JSON.stringify({ activated_at: nowIso(), completed_at: nowIso(), reason: "superseded by pause date fix" }),
+  }).catch(() => {});
+  await sb(`members?id=eq.${member.id}`, {
+    method: "PATCH", headers: { Prefer: "return=minimal" },
+    body: JSON.stringify({ status: "paused", pause_scheduled_for: null, updated_at: nowIso() }),
+  });
+  await writeAudit({ client_id: member.client_id, member_id: member.id, action_type: "pause-date-fix", args: { pause_start: start_date, pause_end: end_date }, performed_by: ctx.user.id, performed_by_name: ctx.staff?.name || null, db_changes: { members: { status: { to: "paused" } }, cancellations: "inserted (date fix)" } });
+  return res.status(200).json({ ok: true, action: "pause-date-fix", pause_start: start_date, pause_end: end_date });
+}
+
 async function actionPause(res, member, stripeAccount, ctx, body) {
   if (!member.stripe_subscription_id) {
     return res.status(400).json({ error: "member has no Stripe subscription to pause" });
