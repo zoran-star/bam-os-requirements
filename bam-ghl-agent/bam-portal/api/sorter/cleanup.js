@@ -137,7 +137,7 @@ function computeNextPayment({ link, cat, offerKey, altPay }) {
   }
   const st = link.status;
   if (st === "canceled" || link.cancel_at_period_end || link.cancel_at) {
-    return { state: "ending", date: iso(link.cancel_at || link.current_period_end), label: "⚠ canceling — no next", fixable: true, reason: "subscription is set to cancel (or already canceled)" };
+    return { state: "ending", date: iso(link.cancel_at || link.current_period_end), label: "⚠ no next payment", fixable: true, reason: "subscription is set to cancel (or already canceled)" };
   }
   if (link.paused) return { state: "paused", date: null, label: "⚠ paused — no next", fixable: true, reason: "billing is paused (pause_collection)" };
   if (st === "past_due" || st === "unpaid") return { state: "at_risk", date: iso(link.current_period_end), label: "⚠ payment failing", fixable: true, reason: "the last payment failed (past_due / unpaid)" };

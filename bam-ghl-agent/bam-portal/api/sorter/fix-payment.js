@@ -131,8 +131,36 @@ function classify({ sub, offerKey, recurringExpected, lastPrepaidDate }) {
       plan: { kind: "card_link", endpoint: "/api/sorter/fix-payment", action: "card_link", title: "Send a card link to start billing", detail: "Collect a working card; once paid the subscription activates and bills on schedule." },
     };
   }
+  // Fully canceled: the cancel_at_period_end flag clears once Stripe actually
+  // cancels, so this falls through the "ending" check above. A canceled sub can't
+  // be revived — the fix is a fresh portal sub.
+  if (sub.status === "canceled") {
+    return {
+      problem: { state: "missing", reason: `This subscription was canceled${sub.canceled_at ? " on " + iso(sub.canceled_at) : (sub.current_period_end ? " (ended " + iso(sub.current_period_end) + ")" : "")} — there's no active billing.` },
+      plan: {
+        kind: "setup_monthly", endpoint: "/api/sorter/setup-monthly", action: null,
+        title: "Set up new billing",
+        detail: "The old subscription is canceled and can't be revived — create a fresh portal-owned subscription so they bill again.",
+        anchor_date: lastPrepaidDate || null,
+      },
+    };
+  }
+  // Period end is in the PAST but not flagged canceled/past_due — stale/ended sub.
+  // Never report a past date as a "scheduled" next payment.
+  const nextUnix = sub.status === "trialing" ? sub.trial_end : sub.current_period_end;
+  if (nextUnix && nextUnix * 1000 < Date.now()) {
+    return {
+      problem: { state: "missing", reason: `The last billing period ended ${iso(nextUnix)} and nothing is scheduled after it.` },
+      plan: {
+        kind: "setup_monthly", endpoint: "/api/sorter/setup-monthly", action: null,
+        title: "Set up new billing",
+        detail: "Create a fresh portal-owned subscription so they bill on schedule again.",
+        anchor_date: lastPrepaidDate || null,
+      },
+    };
+  }
   // active / trialing with a future charge → already fine
-  const next = sub.status === "trialing" ? iso(sub.trial_end) : iso(sub.current_period_end);
+  const next = iso(nextUnix);
   return {
     problem: { state: "scheduled", reason: `Next payment is already scheduled${next ? " for " + next : ""}.` },
     plan: { kind: "none", title: "Already scheduled — no fix needed" },
