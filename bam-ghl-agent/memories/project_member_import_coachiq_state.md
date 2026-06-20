@@ -130,6 +130,10 @@ your application") → take-over billing is what unlocks them. Decisions:
    copy sub_id + CoachIQ link) but AUTOMATE it — on sub create, using the linked
    `coachiq_member_id`, fire the CoachIQ automation/webhook to attach the sub to that member.
    So: take-over makes sub → webhook → push sub_id to CoachIQ for live linked products.
+   ⛔ UPDATE 2026-06-19: Zoran CHECKED CoachIQ — it CANNOT do this via automation (CoachIQ
+   exposes triggers, not field-writes; no API to set a sub on a user). So sub-id push stays
+   **MANUAL** — the existing `copy sub` button + `admin.coachiq.io` link (paste sub_id into
+   the member's CoachIQ product). Surface that button in the take-over step. NOT automatable.
 3. **Agreement = SKIP** for imported members (existing members signed elsewhere; no portal waiver).
 4. **Change-plan multi-tenant = PARKED.** `PLAN_TO_PRICE` is GTA-hardcoded (1/wk,2/wk,3/wk,unlmtd);
    Summer/commitment/other academies unsupported. Restructure per-academy + systemize LATER.
