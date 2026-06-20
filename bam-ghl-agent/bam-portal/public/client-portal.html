@@ -22316,9 +22316,9 @@ function _sorterRenderStep3(host) {
   };
 
   // In Stripe, not in the CSV — subscription (name → Stripe inspector)
-  const subTr = (x) => `<tr style="border-bottom:1px solid var(--border,#2a2a31);">${nameCell(true, x.name || x.email, null, x.email, x.customer_id ? `_sorterStripeInfo('${escapeHTML(x.customer_id)}')` : '')}${td(wherePill('STRIPE ONLY', '#e0a93f'))}${td(`<span style="font-size:12px;font-weight:700;">${x.amount_cents != null ? money(x.amount_cents) + '/sub' : 'subscription'}</span>`)}${td('<span style="color:var(--text-mute,#888);">—</span>')}${td(`<div style="display:flex;flex-wrap:wrap;gap:4px;">${fixBtn('+ Add', `_sorterAddFromStripe('${escapeHTML(x.email || '')}','${escapeHTML((x.name || '').replace(/'/g, ''))}','${escapeHTML(x.customer_id || '')}','${escapeHTML(x.sub_id || '')}','${escapeHTML(x.price_id || '')}')`)}${denyBtn(`_sorterStripeNotMember('${escapeHTML(x.email || x.customer_id || '')}','${escapeHTML(x.customer_id || '')}','${escapeHTML(x.sub_id || '')}')`, 'Not a member')}</div>`)}</tr>`;
+  const subTr = (x) => `<tr style="border-bottom:1px solid var(--border,#2a2a31);">${nameCell(true, x.name || x.email, null, x.email, x.customer_id ? `_sorterStripeInfo('${escapeHTML(x.customer_id)}')` : '')}${td(wherePill('STRIPE ONLY', '#e0a93f'))}${td(`<span style="font-size:12px;font-weight:700;">${x.amount_cents != null ? money(x.amount_cents) + '/sub' : 'subscription'}</span>`)}${td(`<div style="display:flex;flex-wrap:wrap;gap:4px;">${fixBtn('+ Add', `_sorterAddFromStripe('${escapeHTML(x.email || '')}','${escapeHTML((x.name || '').replace(/'/g, ''))}','${escapeHTML(x.customer_id || '')}','${escapeHTML(x.sub_id || '')}','${escapeHTML(x.price_id || '')}')`)}</div>`)}${td(`<div style="display:flex;flex-wrap:wrap;gap:4px;">${denyBtn(`_sorterStripeNotMember('${escapeHTML(x.email || x.customer_id || '')}','${escapeHTML(x.customer_id || '')}','${escapeHTML(x.sub_id || '')}')`, 'Not a member')}</div>`)}</tr>`;
   // In Stripe, not in the CSV — one-time / prepaid
-  const oneTimeTr = (x) => `<tr style="border-bottom:1px solid var(--border,#2a2a31);">${nameCell(true, x.name || x.email, null, x.email, x.customer_id ? `_sorterStripeInfo('${escapeHTML(x.customer_id)}')` : '')}${td(wherePill('STRIPE ONLY', '#e0a93f'))}${td(`<span style="font-size:12px;font-weight:700;">$${((x.amount_cents || 0) / 100).toFixed(0)} one-time</span><div style="font-size:10px;color:var(--text-mute,#888);">${escapeHTML(x.date || '')}</div>`)}${td('<span style="color:var(--text-mute,#888);">—</span>')}${td(`${x.maybe_staged ? `<div style="font-size:10px;color:#e0a93f;font-weight:700;margin-bottom:3px;">⚠ maybe ${escapeHTML(x.maybe_staged.athlete_name || '')}</div>` : ''}<div style="display:flex;flex-wrap:wrap;gap:4px;">${x.maybe_staged ? fixBtn('Link ✓', `_sorterLinkPrepaid('${escapeHTML(String(x.maybe_staged.id))}','${escapeHTML(x.email || '')}','${escapeHTML(x.customer_id || '')}')`) : ''}${fixBtn('+ Add &amp; match', `_sorterAddPrepaid('${escapeHTML(x.email || '')}','${escapeHTML((x.name || '').replace(/'/g, ''))}','${escapeHTML(x.customer_id || '')}')`)}${denyBtn(`_sorterDenyPrepaid('${escapeHTML(x.email || x.customer_id || '')}')`, 'Not a member')}</div>`)}</tr>`;
+  const oneTimeTr = (x) => `<tr style="border-bottom:1px solid var(--border,#2a2a31);">${nameCell(true, x.name || x.email, null, x.email, x.customer_id ? `_sorterStripeInfo('${escapeHTML(x.customer_id)}')` : '')}${td(wherePill('STRIPE ONLY', '#e0a93f'))}${td(`<span style="font-size:12px;font-weight:700;">$${((x.amount_cents || 0) / 100).toFixed(0)} one-time</span><div style="font-size:10px;color:var(--text-mute,#888);">${escapeHTML(x.date || '')}</div>`)}${td(`${x.maybe_staged ? `<div style="font-size:10px;color:#e0a93f;font-weight:700;margin-bottom:3px;">⚠ maybe ${escapeHTML(x.maybe_staged.athlete_name || '')}</div>` : ''}<div style="display:flex;flex-wrap:wrap;gap:4px;">${x.maybe_staged ? fixBtn('Link ✓', `_sorterLinkPrepaid('${escapeHTML(String(x.maybe_staged.id))}','${escapeHTML(x.email || '')}','${escapeHTML(x.customer_id || '')}')`) : ''}${fixBtn('+ Add &amp; match', `_sorterAddPrepaid('${escapeHTML(x.email || '')}','${escapeHTML((x.name || '').replace(/'/g, ''))}','${escapeHTML(x.customer_id || '')}')`)}</div>`)}${td(`<div style="display:flex;flex-wrap:wrap;gap:4px;">${denyBtn(`_sorterDenyPrepaid('${escapeHTML(x.email || x.customer_id || '')}')`, 'Not a member')}</div>`)}</tr>`;
 
   // Build the rows — attention first (Stripe-only additions + needs-work
   // members), then everyone ready. One <tbody>, nothing else.
@@ -23641,10 +23641,13 @@ async function _sorterTakeoverCardLink(memberId, btn) {
     const r = await fetch('/api/sorter/take-over', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token }, body: JSON.stringify({ client_id: _aiClientId(), member_id: memberId, mode: 'preview' }) });
     const json = await _safeJson(r);
     if (!r.ok) throw new Error(_sorterErr(json.error) || ('HTTP ' + r.status));
-    if (json.payment_link) { _sorterCopy(json.payment_link, btn); if (btn) btn.textContent = 'link copied ✓ — send it'; }
+    if (json.payment_link) {
+      _sorterCopy(json.payment_link, btn); if (btn) btn.textContent = 'link copied ✓ — send it';
+      _sorterNotice('Card link copied', 'Copied to your clipboard — send it to the member so they can add their card on file.');
+    }
     else if (!json.needs_card) { if (btn) { btn.textContent = 'card on file ✓'; } _sorterTakeoverLoad(); }
     else if (btn) btn.textContent = 'no link';
-  } catch (e) { if (btn) { btn.disabled = false; btn.textContent = 'retry'; } alert('Card link failed: ' + _sorterErr(e)); }
+  } catch (e) { if (btn) { btn.disabled = false; btn.textContent = 'retry'; } _sorterNotice('Card link failed', _sorterErr(e), true); }
 }
 async function _sorterTakeoverVerify(memberId) {
   const pc = (_SORTER._takeover.pendingCancel || {})[memberId];
@@ -24524,14 +24527,29 @@ function _renderMemberModalBody(m, stripe, history) {
 
   const btn = (label, onclick, primary) =>
     `<button onclick="${onclick}" style="background:${primary ? 'var(--gold,#E8C547)' : 'transparent'};color:${primary ? '#0B0B0D' : 'var(--text)'};border:1px solid var(--border);padding:10px 12px;font-weight:600;border-radius:4px;cursor:pointer;font-size:13px;font-family:inherit">${label}</button>`;
+  // Can the portal act on this member's Stripe sub? Only subs the portal CREATED
+  // (Standard-account rule). Foreign subs (CoachIQ/GHL/dashboard) + no-sub members
+  // → these billing actions can't work, so grey them out and point at "Set up billing".
+  const canManage = !!(stripe && stripe.can_manage);
+  const mgmtWhy = !m.stripe_subscription_id ? 'No active subscription — use “Set up billing”.'
+    : (stripe && stripe.portal_owned === false) ? 'This subscription was created outside the portal — use “Set up billing” to manage it here.'
+    : 'No active subscription to manage here.';
+  const gbtn = (label, onclick, enabled) => enabled
+    ? btn(label, onclick)
+    : `<button disabled title="${escapeHTML(mgmtWhy)}" style="background:transparent;color:var(--text-mute,#888);border:1px solid var(--border);padding:10px 12px;font-weight:600;border-radius:4px;cursor:not-allowed;font-size:13px;font-family:inherit;opacity:0.45">${label}</button>`;
   // Pause/Unpause button — hidden on cancelling members (backend rejects).
-  // 'paused' → Unpause; otherwise Pause (with 'Update pause' inference in mPause).
+  // Gated on manageability (a no-sub or foreign-sub member can't be paused here).
   let toggleBtn = '';
   if (m.status === 'paused') {
-    toggleBtn = btn('Unpause', `mUnpause('${m.id}')`);
+    toggleBtn = gbtn('Unpause', `mUnpause('${m.id}')`, canManage);
   } else if (m.status !== 'cancelling') {
-    toggleBtn = btn('Pause', `mPause('${m.id}')`);
+    toggleBtn = gbtn('Pause', `mPause('${m.id}')`, canManage);
   }
+  // "Set up billing" — for no-sub / foreign-sub members: pick an offer price + start
+  // date → create a portal-owned sub they can then be managed by. Prominent when
+  // the member can't be managed today.
+  const setupBtn = canManage ? '' :
+    `<button onclick="mSetupBilling('${m.id}')" style="grid-column:1/-1;background:var(--gold,#E8C547);color:#0B0B0D;border:none;padding:11px 12px;font-weight:800;border-radius:4px;cursor:pointer;font-size:13px;font-family:inherit">💳 Set up billing</button>`;
 
   // "View in Stripe" — opens the customer page on the academy's connected
   // Stripe account in a new tab. Requires both a connected account id
@@ -24602,13 +24620,14 @@ function _renderMemberModalBody(m, stripe, history) {
     <!-- Actions -->
     <div style="${labelCss};margin-bottom:12px">Actions</div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+      ${setupBtn}
       ${toggleBtn}
-      ${btn('Change plan', `mChange('${m.id}','${escapeHTML(m.plan||'')}')`)}
-      ${btn('Refund',      `mRefund('${m.id}')`)}
-      ${btn('Cancel',      `mCancel('${m.id}','${escapeHTML((m.athlete_name||'').replace(/'/g, ''))}')`)}
+      ${gbtn('Change plan', `mChange('${m.id}','${escapeHTML(m.plan||'')}')`, canManage)}
+      ${gbtn('Refund',      `mRefund('${m.id}')`, canManage)}
+      ${gbtn('Cancel',      `mCancel('${m.id}','${escapeHTML((m.athlete_name||'').replace(/'/g, ''))}')`, canManage)}
       ${btn('Payment link',`mPaymentLink('${m.id}')`)}
       ${btn('💳 Get card link',`mGetCardLink('${m.id}')`)}
-      ${btn('Referred',    `mReferred('${m.id}')`)}
+      ${gbtn('Referred',    `mReferred('${m.id}')`, canManage)}
       ${m.billing_mode === 'alternate'
         ? btn('Switch to Stripe billing', `_memberUpdateField('${m.id}','billing_mode','')`)
         : btn('💵 Alternate payment', `_memberUpdateField('${m.id}','billing_mode','alternate')`)}
