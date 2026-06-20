@@ -22344,6 +22344,9 @@ function _sorterRenderStep3(host) {
 
 // ── Step 3 one-tap fixes — mutate staging server-side, update local state, re-render ──
 async function _sorterFixAction(action, payload, prune, undoFactory) {
+  // Snapshot the pre-action state so Undo can restore it instantly (no Stripe re-check).
+  let _snapshot = null;
+  try { _snapshot = _SORTER.checks ? JSON.parse(JSON.stringify(_SORTER.checks)) : null; } catch (_) {}
   try {
     const token = await _mreqAuthToken();
     const r = await fetch('/api/sorter/cleanup?action=' + action, {
@@ -22358,7 +22361,7 @@ async function _sorterFixAction(action, payload, prune, undoFactory) {
       _SORTER.checks.counts.clean = json.counts.clean;
     }
     if (prune) prune(json);
-    if (undoFactory) { const u = undoFactory(json); if (u) _sorterPushUndo(u); }
+    if (undoFactory) { const u = undoFactory(json); if (u) { u._snapshot = _snapshot; _sorterPushUndo(u); } }
     // keep the derived counts in sync with the pruned lists
     const ch = _SORTER.checks.checks || {};
     const cs = _SORTER.checks.counts || {};
@@ -22387,7 +22390,12 @@ async function _sorterUndoApi(action, body) {
 async function _sorterUndo() {
   const e = (_SORTER.undo || []).pop();
   if (!e) return;
-  try { await _sorterUndoApi(e.action, e.body); _sorterRunChecks(); }
+  try {
+    await _sorterUndoApi(e.action, e.body);
+    // Restore the snapshot instantly — no full Stripe re-check.
+    if (e._snapshot) { _SORTER.checks = e._snapshot; _sorterRenderBody(); }
+    else _sorterRunChecks();
+  }
   catch (err) { (_SORTER.undo = _SORTER.undo || []).push(e); alert('Undo failed: ' + _sorterErr(err)); }
 }
 
