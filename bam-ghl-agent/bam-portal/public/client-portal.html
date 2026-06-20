@@ -14013,13 +14013,20 @@ function _bbMatcherStrip(connected, sorter) {
 }
 
 // Member Import strip (Members tab): Import → Cleanup → Link GHL.
-function _membersImportStrip(sorter) {
+function _membersImportStrip(sorter, subsToCancel) {
+  const imported = !!(sorter && sorter.imported);
+  const stripe   = !!(sorter && sorter.promoted);
+  const coachiq  = !!(sorter && sorter.coachiq_done);
+  const ghl      = !!(sorter && sorter.ghl_linked);
+  // Finish only greens when every prior step is done AND no old subs are still
+  // waiting to be cancelled (the take-over leaves those action items behind).
+  const finish   = imported && stripe && coachiq && ghl && !(subsToCancel > 0);
   const steps = [
-    ['Import',  !!(sorter && sorter.imported)],
-    ['Stripe',  !!(sorter && sorter.promoted)],
-    ['CoachIQ', !!(sorter && sorter.promoted)],
-    ['GHL',     !!(sorter && sorter.ghl_linked)],
-    ['Finish',  !!(sorter && sorter.promoted)],
+    ['Import',  imported],
+    ['Stripe',  stripe],
+    ['CoachIQ', coachiq],
+    ['GHL',     ghl],
+    ['Finish',  finish],
   ];
   const currentIdx = steps.findIndex(([, done]) => !done);
   const startStep = currentIdx === -1 ? 2 : currentIdx + 2; // strip index 0..4 = sorter step 2..6
@@ -19261,7 +19268,7 @@ function _renderMembersView() {
   // Cleanup → Link GHL) lives HERE now; Price Match stays in BB → Offers.
   // V2/web only (the import flow is a desktop onboarding tool).
   const importStrip = (typeof V2_ACCESS !== 'undefined' && V2_ACCESS && !(typeof isNativeApp === 'function' && isNativeApp()))
-    ? _membersImportStrip(_MEMBERS_SORTER) : '';
+    ? _membersImportStrip(_MEMBERS_SORTER, _MEMBERS_SUBS_TO_CANCEL) : '';
   // Banner: old foreign subs the import replaced still need a manual Stripe cancel.
   // Tied to the Action Items — count drops as the owner completes them.
   const n = _MEMBERS_SUBS_TO_CANCEL || 0;
@@ -21437,11 +21444,15 @@ function closePricingSorter() {
     }
     _SORTER.savedSnapshot = null; // user chose to discard — don't re-ask
   }
+  const wasMembers = _SORTER && _SORTER.mode === 'members';
   const overlay = document.getElementById('pc-sorter-overlay');
   const modal = document.getElementById('pc-sorter-modal');
   if (overlay) overlay.style.display = 'none';
   if (modal) modal.style.display = 'none';
   window.removeEventListener('resize', _sorterDrawArrows);
+  // Refresh the roster so the Member Import progress strip reflects what was
+  // just done (steps check off as you go through the flow).
+  if (wasMembers && typeof fetchAndRenderMembers === 'function') { try { fetchAndRenderMembers(); } catch (_) {} }
 }
 
 // ── Shell: stepper header + body slot + Back/Next footer ──
@@ -23968,6 +23979,21 @@ async function _sorterTakeoverCardLink(memberId, btn) {
     else if (btn) btn.textContent = 'no link';
   } catch (e) { if (btn) { btn.disabled = false; btn.textContent = 'retry'; } _sorterNotice('Card link failed', _sorterErr(e), true); }
 }
+// "I cancelled the old sub" → Save & close: verify-cancel server-side (completes
+// the double-bill action item if Stripe confirms), drop the local cancel prompt
+// since staff manually confirmed, then close the member modal + refresh the list.
+async function _sorterTakeoverDoneClose(memberId) {
+  const pc = (_SORTER._takeover.pendingCancel || {})[memberId];
+  if (pc && pc.old_sub_id) {
+    try {
+      const token = await _mreqAuthToken();
+      await fetch('/api/sorter/take-over', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token }, body: JSON.stringify({ client_id: _aiClientId(), mode: 'verify-cancel', old_sub_id: pc.old_sub_id }) });
+    } catch (_) {}
+    delete _SORTER._takeover.pendingCancel[memberId];
+  }
+  _sorterCloseConnect();
+  _sorterTakeoverLoad();
+}
 async function _sorterTakeoverVerify(memberId) {
   const pc = (_SORTER._takeover.pendingCancel || {})[memberId];
   if (!pc) return;
@@ -24006,10 +24032,17 @@ function _sorterTakeoverModalRender(memberId) {
   }).join('');
   let actionBlock;
   if (d.done) {
+    const hasOld = !!(d.done.cancel_old_url && d.done.old_sub_id);
+    const confirmed = !!d.cancelConfirmed;
     actionBlock = `<div style="border:1px solid #1f7a3d;background:rgba(123,196,127,0.08);border-radius:10px;padding:11px 13px;font-size:12px;">
         <div style="color:#7BC47F;font-weight:800;margin-bottom:5px;">✓ New portal sub created</div>
-        <div style="color:var(--text-mute,#888);margin-bottom:9px;">Now cancel the old one (we can't — Stripe blocks it).</div>
-        <a href="${escapeHTML(d.done.cancel_old_url || '#')}" target="_blank" rel="noopener" style="display:inline-block;font-size:12px;font-weight:700;padding:7px 12px;border-radius:8px;border:1px solid var(--accent,#E8C547);color:var(--accent,#E8C547);text-decoration:none;">Cancel old sub in Stripe ↗</a>
+        ${hasOld ? `<div style="color:var(--text-mute,#888);margin-bottom:9px;">Now cancel the old one (we can't — Stripe blocks it).</div>
+        <a href="${escapeHTML(d.done.cancel_old_url)}" target="_blank" rel="noopener" style="display:inline-block;font-size:12px;font-weight:700;padding:7px 12px;border-radius:8px;border:1px solid var(--accent,#E8C547);color:var(--accent,#E8C547);text-decoration:none;">Cancel old sub in Stripe ↗</a>
+        <label style="display:flex;align-items:center;gap:8px;justify-content:flex-end;margin-top:12px;font-size:11.5px;color:var(--text,#eee);cursor:pointer;">
+          <input type="checkbox" ${confirmed ? 'checked' : ''} onchange="_SORTER._takeover.detail['${memberId}'].cancelConfirmed=this.checked;_sorterTakeoverModalRender('${memberId}')">
+          I cancelled the old sub in Stripe
+        </label>` : ''}
+        ${(!hasOld || confirmed) ? `<button onclick="_sorterTakeoverDoneClose('${memberId}')" style="width:100%;margin-top:10px;font-size:12.5px;font-weight:800;padding:9px;border-radius:9px;border:none;background:var(--accent,#E8C547);color:#1a1a1a;cursor:pointer;">Save &amp; close</button>` : ''}
       </div>`;
   } else {
     const canon = rec.canonical_amount_cents != null && rec.price_differs;
@@ -24021,6 +24054,13 @@ function _sorterTakeoverModalRender(memberId) {
       <div style="font-size:11px;color:var(--text-mute,#888);margin:4px 0 10px;">First charge: <b style="color:var(--text,#eee);">${escapeHTML(rec.first_charge_iso || 'next cycle')}</b> · ${cur.card_on_file === false || (f.card && f.card.on_file === false) ? '<span style="color:#e0a93f;">no card — get a link first</span>' : 'reuses card on file'}</div>
       <button onclick="_sorterTakeoverMake('${memberId}',this)" style="width:100%;font-size:13px;font-weight:800;padding:10px;border-radius:9px;border:none;background:var(--accent,#E8C547);color:#1a1a1a;cursor:pointer;">Make the portal sub</button>`;
   }
+  const subUrl = cur.stripe_url || '';
+  const nextPay = (cur.next_charge || '').slice(0, 10);
+  const subInfoBlock = (nextPay || subUrl) ? `
+      <div style="flex:none;display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:10px;font-size:11.5px;">
+        <span style="color:var(--text-mute,#888);">${nextPay ? 'Next payment: <b style="color:var(--text,#eee);">' + escapeHTML(nextPay) + '</b>' : ''}</span>
+        ${subUrl ? '<a href="' + escapeHTML(subUrl) + '" target="_blank" rel="noopener" style="flex:none;font-size:11px;font-weight:700;padding:5px 10px;border-radius:7px;border:1px solid var(--border,#2a2a31);color:var(--accent,#E8C547);text-decoration:none;">Open Stripe sub &#8599;</a>' : ''}
+      </div>` : '';
   const pays = f.recent_payments || [];
   const paymentsBlock = pays.length ? `
       <div style="flex:none;margin-bottom:10px;border:1px solid var(--border,#2a2a31);border-radius:10px;padding:8px 11px;">
@@ -24033,6 +24073,7 @@ function _sorterTakeoverModalRender(memberId) {
         <div style="font-size:15px;font-weight:800;">${athlete} <span style="font-size:11px;font-weight:600;color:var(--text-mute,#888);">· ${escapeHTML(cur.made_by || '')}${cur.amount ? ' · ' + escapeHTML(cur.amount) : ''}</span></div>
         <button onclick="_sorterCloseConnect()" style="background:none;border:none;color:var(--text-mute,#888);font-size:20px;cursor:pointer;">×</button>
       </div>
+      ${subInfoBlock}
       ${paymentsBlock}
       <div style="flex:1;min-height:0;overflow:auto;margin-bottom:10px;">${chat}</div>
       <div style="display:flex;gap:6px;margin-bottom:12px;flex:none;">

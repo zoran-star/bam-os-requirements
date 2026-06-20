@@ -140,7 +140,7 @@ async function gatherFacts({ clientId, acct, member }) {
 
   return {
     member: { athlete: member.athlete_name, plan: member.plan, coachiq_linked: !!member.coachiq_member_id },
-    current_sub: sub ? { amount: money(curAmount), amount_cents: curAmount, interval, status: sub.status, made_by: originLabel, next_charge: iso(nextCharge) } : null,
+    current_sub: sub ? { id: sub.id, amount: money(curAmount), amount_cents: curAmount, interval, status: sub.status, made_by: originLabel, next_charge: iso(nextCharge), stripe_url: `https://dashboard.stripe.com/${acct}/subscriptions/${sub.id}` } : null,
     card: { on_file: !needsCard, last4 },
     offer_should_pay: canonical ? { amount: money(canonical.amount_cents), amount_cents: canonical.amount_cents, price_id: canonical.stripe_price_id } : null,
     recent_payments: recentPayments,

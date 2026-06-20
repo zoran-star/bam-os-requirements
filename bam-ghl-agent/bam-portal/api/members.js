@@ -446,14 +446,29 @@ async function handler(req, res) {
             });
           } catch (_) { return false; }
         })();
-        const [matched, imported, promoted, unlinked] = await Promise.all([
+        // CoachIQ step is "done" when there's nothing left to triage: either the
+        // academy isn't on CoachIQ, or every imported member has been linked /
+        // marked not-applicable / flagged collecting (none left raw "waiting").
+        const coachiqDone = (async () => {
+          try {
+            const cr = await sb(`clients?id=eq.${targetClientId}&select=coachiq_enabled&limit=1`);
+            if (!(Array.isArray(cr) && cr[0] && cr[0].coachiq_enabled)) return true;
+            const waiting = await sb(
+              `members_staging?client_id=eq.${targetClientId}` +
+              `&coachiq_member_id=is.null&coachiq_not_applicable=is.false&coachiq_collecting=is.false&select=id&limit=1`
+            );
+            return !(Array.isArray(waiting) && waiting.length > 0);
+          } catch (_) { return false; }
+        })();
+        const [matched, imported, promoted, unlinked, coachiq_done] = await Promise.all([
           matchedAll,
           exists(`members_staging?client_id=eq.${targetClientId}&select=id&limit=1`),
           exists(`members_staging?client_id=eq.${targetClientId}&promoted=is.true&select=id&limit=1`),
           exists(`members?client_id=eq.${targetClientId}&ghl_contact_id=is.null&select=id&limit=1`),
+          coachiqDone,
         ]);
         // ghl_linked = the roster exists and every member has a GHL contact.
-        sorter = { matched, imported, promoted, ghl_linked: memberList.length > 0 && !unlinked };
+        sorter = { matched, imported, promoted, coachiq_done, ghl_linked: memberList.length > 0 && !unlinked };
       }
 
       // Open "cancel old Stripe sub" action items — the import leaves these when it
