@@ -10101,6 +10101,20 @@ function _ibInitials(name) {
   const ltrs = words.slice(0, 2).map(w => (w.match(/[a-z0-9]/i) || [''])[0]).join('');
   return ltrs.toUpperCase() || '•';
 }
+// Clean a message body for a 1-line preview: drop attachment/URLs (e.g. the
+// storage.googleapis.com/msgsndr/… links GHL inlines), collapse whitespace, and
+// fall back to "📎 Attachment" when nothing readable remains.
+function _ibCleanPreview(s) {
+  if (!s) return '';
+  let t = String(s)
+    .replace(/https?:\/\/\S+/gi, ' ')   // drop URLs
+    .replace(/\[\s*\]|\(\s*\)|<\s*>/g, ' ') // drop now-empty brackets/parens/angles
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (!t) t = '📎 Attachment';
+  return t;
+}
+
 function _v15ibRenderList() {
   const body = document.getElementById('v15ib-body');
   if (!body) return;
@@ -10131,7 +10145,7 @@ function _v15ibRenderList() {
       </div>
       <div style="flex:1;min-width:0">
         <div style="font-size:14px;font-weight:${unread ? 700 : 600};color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHTML(name)}</div>
-        <div style="font-size:12.5px;color:${unread ? 'var(--text-sub)' : 'var(--text-mute)'};overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-top:2px">${escapeHTML(c.lastMessageBody || '')}</div>
+        <div style="font-size:12.5px;color:${unread ? 'var(--text-sub)' : 'var(--text-mute)'};overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-top:2px">${escapeHTML(_ibCleanPreview(c.lastMessageBody))}</div>
         ${chip}
       </div>
       <div style="text-align:right;flex:none">
@@ -20317,7 +20331,7 @@ async function _botRenderQueue() {
       <div class="ib-row" onclick="_botOpenApproval(${i})">
         <div style="min-width:0">
           <div class="ib-row-name"><span class="ib-unread"></span>${escapeHTML(q.name)} <span class="ib-tag ib-tag-lead">needs reply</span></div>
-          <div class="ib-row-preview">${escapeHTML(q.last_message || '')}</div>
+          <div class="ib-row-preview">${escapeHTML(_ibCleanPreview(q.last_message))}</div>
         </div>
         <div class="ib-row-date">${escapeHTML(_ibFormatDate(q.last_at))}</div>
       </div>`).join('');
@@ -20359,7 +20373,7 @@ function _botRenderApproval() {
         <span style="font-size:12px;color:var(--text-mute)">${_BOT_QUEUE.length} in queue</span>
         <button onclick="closeInboxDrawer()" style="background:none;border:none;color:var(--text-mute);font-size:18px;cursor:pointer">✕</button>
       </div>
-      <div style="font-size:12px;color:var(--text-mute)">Lead said: <span style="color:var(--text)">"${escapeHTML(q.last_message || '')}"</span></div>
+      <div style="font-size:12px;color:var(--text-mute)">Lead said: <span style="color:var(--text)">"${escapeHTML(_ibCleanPreview(q.last_message))}"</span></div>
       ${d.escalate ? `<div style="background:rgba(251,191,36,0.1);border:1px solid rgba(251,191,36,0.35);color:#FBBF24;border-radius:10px;padding:12px;font-size:13px">🙋 The bot wants to escalate this to you${d.escalate_reason ? ` — ${escapeHTML(d.escalate_reason)}` : ''}. Handle it yourself — review the suggestion below before sending.</div>` : ''}
       <div>
         <div style="font-size:11px;color:var(--text-mute);margin-bottom:5px">SUGGESTED REPLY${d.asked_to_book ? '  ·  📨 asks to book' : ''}</div>
@@ -20479,7 +20493,7 @@ function _renderInboxList() {
             ${unread ? '<span class="ib-unread"></span>' : ''}${escapeHTML(c.contactName)}
             ${tag}
           </div>
-          <div class="ib-row-preview">${escapeHTML(c.lastMessageBody || '(no message)')}</div>
+          <div class="ib-row-preview">${escapeHTML(_ibCleanPreview(c.lastMessageBody) || '(no message)')}</div>
         </div>
         <div class="ib-row-type">${escapeHTML(String(c.lastMessageType || '').replace(/^TYPE_/, ''))}</div>
         <div class="ib-row-date">${escapeHTML(_ibFormatDate(c.lastMessageDate))}</div>
