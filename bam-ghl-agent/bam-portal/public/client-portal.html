@@ -23937,8 +23937,10 @@ async function _sorterTakeoverMake(memberId, btn) {
 function _sorterRenderStepFinish(host) {
   host.innerHTML = `
     <div style="font-size:12.5px;color:var(--text-mute,#888);margin-bottom:14px;">Last step. Promote your cleaned-up members to the live roster. Only members that passed Stripe cleanup are promoted; anything still flagged stays in staging.</div>
-    <div id="pc-sorter-finish-host" style="font-size:13px;color:var(--text-mute,#888);">Checking…</div>`;
+    <div id="pc-sorter-finish-host" style="font-size:13px;color:var(--text-mute,#888);">Checking…</div>
+    <div id="pc-sorter-coachiq-sync" style="margin-top:14px;"></div>`;
   _sorterSetNext('');
+  _sorterFinishCoachiqSync();
   (async () => {
     try {
       const token = await _mreqAuthToken();
@@ -23962,6 +23964,35 @@ function _sorterRenderStepFinish(host) {
       if (fhost) fhost.innerHTML = '<div style="color:var(--danger,#e0654f);">' + escapeHTML(e.message || String(e)) + '</div>';
     }
   })();
+}
+
+// Post-billing CoachIQ sync — at Finish, each linked member + their FINAL sub_id
+// (after take-over), so staff paste the real portal sub_id into CoachIQ (not a stale one).
+async function _sorterFinishCoachiqSync() {
+  const host = document.getElementById('pc-sorter-coachiq-sync');
+  if (!host) return;
+  try {
+    const token = await _mreqAuthToken();
+    const r = await fetch('/api/sorter/cleanup?action=coachiq-sync', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token }, body: JSON.stringify({ client_id: _aiClientId(), batch_id: _SORTER.batchId, import_batch_id: _SORTER.batchId }) });
+    const json = await _safeJson(r);
+    if (!r.ok || !json.coachiq_enabled) { host.innerHTML = ''; return; }
+    const members = json.members || [];
+    if (!members.length) { host.innerHTML = ''; return; }
+    const rows = members.map(m => {
+      const sid = escapeHTML(m.sub_id || '');
+      return `<div style="display:flex;align-items:center;gap:8px;border-bottom:1px solid var(--border,#2a2a31);padding:7px 2px;">
+        <div style="flex:1;min-width:0;font-size:12px;"><b style="color:var(--text,#eee);">${escapeHTML(m.athlete_name || '')}</b></div>
+        <code style="font-size:10px;color:var(--text-mute,#888);max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${sid}</code>
+        <button onclick="_sorterCopy('${sid}',this)" title="Copy the FINAL sub id, then paste it into this member's CoachIQ product" style="font-size:10px;border:1px solid var(--border,#2a2a31);background:transparent;color:var(--text,#eee);border-radius:6px;padding:3px 7px;cursor:pointer;">copy sub</button>
+        <a href="https://admin.coachiq.io" target="_blank" rel="noopener noreferrer" style="font-size:10px;border:1px solid var(--border,#2a2a31);border-radius:6px;padding:3px 7px;color:var(--accent,#E8C547);text-decoration:none;">CoachIQ ↗</a>
+      </div>`;
+    }).join('');
+    host.innerHTML = `<div style="border:1px solid #1f5f7a;background:rgba(31,95,122,0.08);border-radius:10px;padding:12px 14px;">
+      <div style="font-size:12.5px;font-weight:800;color:var(--text,#eee);margin-bottom:3px;">🟦 CoachIQ — paste these sub IDs</div>
+      <div style="font-size:11px;color:var(--text-mute,#888);margin-bottom:8px;">Billing is final now, so these are the real sub IDs. Paste each into the member's CoachIQ product so CoachIQ renews against the right sub.</div>
+      ${rows}
+    </div>`;
+  } catch (_) { host.innerHTML = ''; }
 }
 
 // ───────────────────────────── STEP 4 — link GHL contacts ─────────────────────────────
