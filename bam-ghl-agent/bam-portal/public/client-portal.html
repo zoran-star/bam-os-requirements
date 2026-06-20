@@ -18488,6 +18488,7 @@ async function _safeJson(res) {
 // re-renders without re-fetching).
 let _MEMBERS_ALL = [];
 let _MEMBERS_SORTER = null; // import-strip done-flags from /api/members `sorter`
+let _MEMBERS_SUBS_TO_CANCEL = 0; // open "cancel old Stripe sub" action items (banner)
 let _MEMBERS_FILTER = { q: '', status: 'all', trainer: 'all', engagement: 'all', offer: 'all', sort: 'name' };
 // Set during render: true when the roster spans 2+ offers, so the offer pill +
 // filter only appear once a second offer exists (mirrors the Sales page).
@@ -18920,6 +18921,7 @@ async function fetchAndRenderMembers() {
     renderGhlConnectButton(json.ghl || { status: 'not_connected' });
     _MEMBERS_ALL = Array.isArray(json.members) ? json.members : [];
     _MEMBERS_SORTER = json.sorter || null;
+    _MEMBERS_SUBS_TO_CANCEL = json.subs_to_cancel || 0;
     _renderMembersView();
   } catch (e) {
     container.innerHTML = `<div class="req-empty" style="padding:20px 0">Couldn't load members — ${escapeHTML(e.message)}</div>`;
@@ -19258,13 +19260,21 @@ function _renderMembersView() {
   // V2/web only (the import flow is a desktop onboarding tool).
   const importStrip = (typeof V2_ACCESS !== 'undefined' && V2_ACCESS && !(typeof isNativeApp === 'function' && isNativeApp()))
     ? _membersImportStrip(_MEMBERS_SORTER) : '';
+  // Banner: old foreign subs the import replaced still need a manual Stripe cancel.
+  // Tied to the Action Items — count drops as the owner completes them.
+  const n = _MEMBERS_SUBS_TO_CANCEL || 0;
+  const cancelBanner = n > 0
+    ? `<div style="display:flex;align-items:center;gap:11px;border:1px solid #7a2f2f;background:rgba(224,101,79,0.1);border-radius:10px;padding:11px 14px;margin-bottom:12px;">
+        <span style="font-size:18px;flex:none;">⚠️</span>
+        <div style="flex:1;min-width:0;font-size:12.5px;color:var(--text,#eee);line-height:1.45;"><b style="color:#e0654f;">${n} old sub${n === 1 ? '' : 's'} still need cancelling in Stripe.</b> Do these in your Action Items before the next charge — otherwise those members get double-billed.</div>
+      </div>` : '';
 
   if (!all.length) {
-    container.innerHTML = importStrip + '<div class="req-empty" style="padding:20px 0">No members yet.</div>';
+    container.innerHTML = importStrip + cancelBanner + '<div class="req-empty" style="padding:20px 0">No members yet.</div>';
     return;
   }
   if (!filtered.length) {
-    container.innerHTML = importStrip + toolbar + '<div class="req-empty" style="padding:20px 0">No members match this filter.</div>';
+    container.innerHTML = importStrip + cancelBanner + toolbar + '<div class="req-empty" style="padding:20px 0">No members match this filter.</div>';
     if (wasFocused) _membersRestoreSearchFocus(cursorPos);
     return;
   }
@@ -19281,7 +19291,7 @@ function _renderMembersView() {
       <div class="member-card-pills">${_memberPriceLabel(m.pricing)}${_memberStatusPill(m.status, m)}${_memberSetupBadge(m)}${_memberEngagementChip(m.engagement)}${_memberOfferPill(m)}${_memberPricingPill(m.pricing)}</div>
     </div>`).join('');
 
-  container.innerHTML = importStrip + toolbar + cards;
+  container.innerHTML = importStrip + cancelBanner + toolbar + cards;
   if (wasFocused) _membersRestoreSearchFocus(cursorPos);
 }
 
@@ -22653,11 +22663,20 @@ async function _sorterRowFetchBilling(stagingId) {
   if (!r.ok) throw new Error(_sorterErr(json.error) || ('HTTP ' + r.status));
   return json;
 }
+// Logs a HIGH-priority, due-dated Action Item to cancel the member's old (foreign)
+// sub in Stripe. Title prefix "🔴 Cancel old Stripe sub —" is the tag the banners count.
 async function _sorterCancelOldSubItem(d) {
   if (!d || !d.stripe_sub_url) return;
+  const sub = (d.facts || {}).subscription || {};
+  const due = sub.current_period_end || sub.trial_end || null; // cancel BEFORE the next charge
   try {
     const token = await _mreqAuthToken();
-    await fetch('/api/action-items', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token }, body: JSON.stringify({ client_id: _aiClientId(), title: `Cancel ${(d.member && d.member.athlete_name) || 'member'}'s old Stripe subscription`, description: `From the member import — the portal can't cancel it (created outside the portal). Cancel it in Stripe: ${d.stripe_sub_url}` }) });
+    await fetch('/api/action-items', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token }, body: JSON.stringify({
+      client_id: _aiClientId(),
+      title: `🔴 Cancel old Stripe sub — ${(d.member && d.member.athlete_name) || 'member'}`,
+      description: `Replaced during the member import. The portal CAN'T cancel it (created outside the portal). Cancel it in Stripe BEFORE the next charge to avoid double-billing them: ${d.stripe_sub_url}`,
+      due_date: due,
+    }) });
   } catch (_) {}
 }
 async function _sorterRowBilling(stagingId) {
@@ -22820,7 +22839,7 @@ async function _sorterStripeNotMember(email, customerId, subId) {
       const token = await _mreqAuthToken();
       await fetch('/api/action-items', {
         method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
-        body: JSON.stringify({ client_id: _aiClientId(), title: `Cancel ${email || 'a non-member'}'s Stripe subscription`, description: `Marked 'not a member' during import but still has a live sub. Cancel it in Stripe: ${url}` }),
+        body: JSON.stringify({ client_id: _aiClientId(), title: `🔴 Cancel old Stripe sub — ${email || 'a non-member'}`, description: `Marked 'not a member' during import but still has a live sub. Cancel it in Stripe to avoid charging them: ${url}` }),
       });
     } catch (_) {}
     window.open(url, '_blank', 'noopener');
@@ -23381,7 +23400,7 @@ async function _sorterFixRemoveMember() {
       const token = await _mreqAuthToken();
       await fetch('/api/action-items', {
         method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
-        body: JSON.stringify({ client_id: _aiClientId(), title: `Cancel ${m.athlete_name || 'member'}'s Stripe subscription`, description: `Removed from import but still has a live sub${sub.amount ? ' (' + sub.amount + ')' : ''}. Cancel it in Stripe: ${d.stripe_sub_url}` }),
+        body: JSON.stringify({ client_id: _aiClientId(), title: `🔴 Cancel old Stripe sub — ${m.athlete_name || 'member'}`, description: `Removed from import but still has a live sub${sub.amount ? ' (' + sub.amount + ')' : ''}. Cancel it in Stripe to avoid charging them: ${d.stripe_sub_url}` }),
       });
     } catch (_) {}
     window.open(d.stripe_sub_url, '_blank', 'noopener');
@@ -23927,8 +23946,16 @@ function _sorterRenderStepFinish(host) {
       const json = await _safeJson(r);
       const counts = (json && json.counts) || {};
       const clean = counts.clean || 0;
+      // Count open "cancel old sub" action items so we can warn before they walk away.
+      let toCancel = 0;
+      try {
+        const air = await fetch('/api/action-items?client_id=' + encodeURIComponent(_aiClientId()), { headers: { Authorization: 'Bearer ' + token } });
+        const aij = await _safeJson(air);
+        toCancel = ((aij && aij.items) || []).filter(it => !it.completed_at && /cancel old stripe sub/i.test(it.title || '')).length;
+      } catch (_) {}
+      const cancelBanner = toCancel > 0 ? `<div style="display:flex;align-items:center;gap:10px;border:1px solid #7a2f2f;background:rgba(224,101,79,0.1);border-radius:10px;padding:11px 14px;margin-bottom:12px;"><span style="font-size:18px;flex:none;">⚠️</span><div style="flex:1;min-width:0;font-size:12.5px;color:var(--text,#eee);line-height:1.45;"><b style="color:#e0654f;">${toCancel} old sub${toCancel === 1 ? '' : 's'} still need cancelling in Stripe.</b> Do these in your Action Items before the next charge — otherwise those members get double-billed.</div></div>` : '';
       const fhost = document.getElementById('pc-sorter-finish-host');
-      if (fhost) fhost.innerHTML = `<div style="border:1px solid var(--border,#2a2a31);border-radius:10px;padding:14px 16px;"><b style="color:var(--text,#eee);">${clean}</b> member${clean === 1 ? '' : 's'} ready to promote${counts.needs_work ? ` · <span style="color:#e0a93f;font-weight:700;">${counts.needs_work} still flagged (left in staging)</span>` : ''}.</div>`;
+      if (fhost) fhost.innerHTML = cancelBanner + `<div style="border:1px solid var(--border,#2a2a31);border-radius:10px;padding:14px 16px;"><b style="color:var(--text,#eee);">${clean}</b> member${clean === 1 ? '' : 's'} ready to promote${counts.needs_work ? ` · <span style="color:#e0a93f;font-weight:700;">${counts.needs_work} still flagged (left in staging)</span>` : ''}.</div>`;
       _sorterSetNext(`<button onclick="_sorterPromote()" ${clean > 0 ? '' : 'disabled'} style="font-size:13px;font-weight:700;padding:9px 18px;border-radius:9px;border:none;background:${clean > 0 ? 'var(--accent,#E8C547)' : 'rgba(255,255,255,0.08)'};color:${clean > 0 ? '#1a1a1a' : 'var(--text-mute,#888)'};cursor:${clean > 0 ? 'pointer' : 'not-allowed'};">&#9989; Promote ${clean} to live roster</button>`);
     } catch (e) {
       const fhost = document.getElementById('pc-sorter-finish-host');

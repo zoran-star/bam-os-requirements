@@ -454,9 +454,21 @@ async function handler(req, res) {
         sorter = { matched, imported, promoted, ghl_linked: memberList.length > 0 && !unlinked };
       }
 
+      // Open "cancel old Stripe sub" action items — the import leaves these when it
+      // replaces a foreign sub (portal can't cancel it). Surfaced as a banner so the
+      // owner doesn't walk away with old subs still billing. Count drops as they're done.
+      let subsToCancel = 0;
+      if (targetClientId) {
+        try {
+          const rows = await sb(`action_items?client_id=eq.${encodeURIComponent(targetClientId)}&completed_at=is.null&title=ilike.*Cancel%20old%20Stripe%20sub*&select=id`);
+          subsToCancel = Array.isArray(rows) ? rows.length : 0;
+        } catch (_) { /* non-fatal */ }
+      }
+
       return res.status(200).json({
         members: memberList,
         sorter,
+        subs_to_cancel: subsToCancel,
         stripe: {
           client_id: targetClientId,
           status: targetClient?.stripe_connect_status || "not_connected",
