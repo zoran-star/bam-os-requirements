@@ -511,6 +511,7 @@ async function handler(req, res) {
         case "refund":        return await actionRefund(res, member, stripeAccount, ctx, body);
         case "change":        return await actionChange(res, member, stripeAccount, ctx, body);
         case "payment-link":  return await actionPaymentLink(res, member, stripeAccount, ctx, body, req);
+        case "card-setup-link": return await actionCardSetupLink(res, member, stripeAccount, ctx, body, req);
         case "referred":      return await actionReferred(res, member, stripeAccount, ctx, body);
         default:              return res.status(400).json({ error: `unknown action: ${action}` });
       }
@@ -1091,6 +1092,59 @@ async function actionPaymentLink(res, member, stripeAccount, ctx, body, req) {
       sms_text:     suggestedSms,
       email_subject: suggestedEmailSubject,
       email_html:   suggestedEmailHtml,
+    },
+  });
+}
+
+// ─────────────────────────────────────────────────────────
+// Action: CARD-SETUP-LINK
+// ─────────────────────────────────────────────────────────
+// Standalone "save your card" link (Stripe setup-mode Checkout) — collects a card
+// and saves it to the customer with NO subscription attached. For members who have
+// no card on file ("collecting payment"); the portal uses the saved card later.
+// body: { mark_collecting?: bool }  → optionally flips status to payment_method_required.
+async function actionCardSetupLink(res, member, stripeAccount, ctx, body, req) {
+  if (!member.stripe_customer_id) {
+    return res.status(400).json({ error: "member has no Stripe customer — can't collect a card" });
+  }
+  const origin = req.headers.origin || `https://${req.headers.host || ""}`;
+  const isLocal = /localhost|127\.0\.0\.1/.test(origin);
+  const base = isLocal ? origin : "https://portal.byanymeansbusiness.com";
+
+  const session = await stripeFetch(`/checkout/sessions`, {
+    method: "POST", stripeAccount,
+    body: {
+      mode: "setup", customer: member.stripe_customer_id,
+      success_url: `${base}/client-portal.html?card=saved`,
+      cancel_url: `${base}/client-portal.html?card=cancelled`,
+    },
+  });
+
+  if (body.mark_collecting) {
+    await sb(`members?id=eq.${member.id}`, {
+      method: "PATCH", headers: { Prefer: "return=minimal" },
+      body: JSON.stringify({ status: "payment_method_required", updated_at: nowIso() }),
+    }).catch(() => {});
+  }
+
+  await writeAudit({
+    client_id: member.client_id, member_id: member.id,
+    action_type: "card-setup-link", args: body,
+    performed_by: ctx.user.id, performed_by_name: ctx.staff?.name || null,
+    stripe_response: { id: session.id, url: session.url },
+    db_changes: body.mark_collecting ? { members: { status: { to: "payment_method_required" } } } : null,
+  });
+
+  const academyName = ctx.client?.business_name || "your academy";
+  const suggestedSms = `Hi, please add your card on file with ${academyName}: ${session.url}`;
+  return res.status(200).json({
+    ok: true, url: session.url, expires_at: session.expires_at || null,
+    parent: { name: member.parent_name || null, phone: member.parent_phone || null, email: member.parent_email || null },
+    ghl: { ready: Boolean(ctx.client?.ghl_location_id), location_id: ctx.client?.ghl_location_id || null },
+    suggested: {
+      sms_text: suggestedSms,
+      email_subject: `Add your card on file — ${academyName}`,
+      email_html: `<p>Hi${member.parent_name ? ` ${member.parent_name.split(/\s+/)[0]}` : ""},</p><p>Please add your card on file with ${academyName}:</p><p><a href="${session.url}">${session.url}</a></p><p>Thanks!<br>${academyName}</p>`,
     },
   });
 }

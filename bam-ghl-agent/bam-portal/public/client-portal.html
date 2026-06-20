@@ -18524,6 +18524,14 @@ function _memberStatusPill(status, opts) {
   return main;
 }
 
+// "✓ set up" — at-a-glance "fully wired in": live + linked to GHL (+ CoachIQ when
+// the member carries one). Lets staff scan the roster for who's done after an import.
+function _memberSetupBadge(m) {
+  if (!m || m.status !== 'live' || !m.ghl_contact_id) return '';
+  const ciq = m.coachiq_member_id ? ' + CoachIQ' : '';
+  return `<span title="Live, billing on the portal, linked to GHL${ciq}" style="display:inline-block;font-size:10px;font-weight:800;padding:2px 8px;border-radius:999px;background:transparent;border:1px solid #1f7a3d;color:#7BC47F">✓ set up</span>`;
+}
+
 function _memberEngagementChip(eng) {
   if (!eng) return '';
   const map = {
@@ -18848,7 +18856,7 @@ function _renderMembersView() {
         <div class="member-card-parent">Parent: ${escapeHTML(m.parent_name || '—')}</div>
       </div>
       <div class="member-card-trainer">${escapeHTML(m.trainer || '—')}</div>
-      <div class="member-card-pills">${_memberPriceLabel(m.pricing)}${_memberStatusPill(m.status, m)}${_memberEngagementChip(m.engagement)}${_memberOfferPill(m)}${_memberPricingPill(m.pricing)}</div>
+      <div class="member-card-pills">${_memberPriceLabel(m.pricing)}${_memberStatusPill(m.status, m)}${_memberSetupBadge(m)}${_memberEngagementChip(m.engagement)}${_memberOfferPill(m)}${_memberPricingPill(m.pricing)}</div>
     </div>`).join('');
 
   container.innerHTML = importStrip + toolbar + cards;
@@ -23895,6 +23903,7 @@ function _renderMemberModalBody(m, stripe, history) {
       ${btn('Refund',      `mRefund('${m.id}')`)}
       ${btn('Cancel',      `mCancel('${m.id}','${escapeHTML((m.athlete_name||'').replace(/'/g, ''))}')`)}
       ${btn('Payment link',`mPaymentLink('${m.id}')`)}
+      ${btn('💳 Get card link',`mGetCardLink('${m.id}')`)}
       ${btn('Referred',    `mReferred('${m.id}')`)}
       ${m.billing_mode === 'alternate'
         ? btn('Switch to Stripe billing', `_memberUpdateField('${m.id}','billing_mode','')`)
@@ -24171,6 +24180,15 @@ async function mPaymentLink(memberId) {
     const r = await _memberAction(memberId, 'payment-link', {});
     _openPaymentLinkModal(memberId, r);
   } catch (e) { alert('Payment link failed: ' + e.message); }
+}
+
+// Standalone "save your card" link (no sub attached) — for members with no card on
+// file ("collecting payment"). Reuses the payment-link send modal (same response shape).
+async function mGetCardLink(memberId) {
+  try {
+    const r = await _memberAction(memberId, 'card-setup-link', {});
+    _openPaymentLinkModal(memberId, r);
+  } catch (e) { alert('Card link failed: ' + (e.message || e)); }
 }
 
 // Right-side modal: shows the Stripe portal URL + pre-formatted SMS/email
