@@ -19488,6 +19488,8 @@ function _renderPipelineTabs() {
   if (!pls.length) { host.innerHTML = ''; return; }
   // If the selected pipeline isn't visible to this user, snap to the first one.
   if (!pls.some(p => p.id === _PL_PIPELINE)) _PL_PIPELINE = pls[0].id;
+  // One pipeline = no need for a selector tab; drop the redundant header.
+  if (pls.length <= 1) { _PL_PIPELINE = pls[0].id; host.innerHTML = ''; return; }
   host.innerHTML = pls.map(p => {
     const on = p.id === _PL_PIPELINE;
     const visibleCount = (p.opportunities || []).filter(o => _isStageAllowed(o.stageId)).length;
@@ -19720,9 +19722,11 @@ function _plToast(msg) {
   _plUndoTimer = setTimeout(() => document.getElementById('pl-undo-toast')?.remove(), 4000);
 }
 
-// Drop the contact into the academy's configured nudge automation (summer special).
+// Drop the contact into the academy's configured nudge automation (summer
+// special) AND auto-move the card to the "Interested" stage (portal-side, no
+// GHL automation). Works from any card / any stage.
 async function _plEnrollSpecial(oppId) {
-  if (!confirm('Send this lead into the Summer Special automation? They\'ll start getting the text sequence.')) return;
+  if (!confirm('Send this lead into the Summer Special automation? They\'ll start getting the text sequence, and the card moves to the Interested stage.')) return;
   try {
     const token = await _mreqAuthToken();
     const r = await fetch(`/api/ghl/pipelines?client_id=${encodeURIComponent(CLIENT_ID)}&action=enroll-workflow`, {
@@ -19731,7 +19735,23 @@ async function _plEnrollSpecial(oppId) {
     });
     const json = await _safeJson(r);
     if (!r.ok) throw new Error(json.error || ('HTTP ' + r.status));
-    _plToast('📨 Sent to Summer Special');
+
+    // Auto-move to the "Interested" stage of this opp's pipeline.
+    let moved = false, opp = null, pipe = null;
+    for (const pl of (_PL_DATA && _PL_DATA.pipelines) || []) {
+      const f = (pl.opportunities || []).find(x => x.id === oppId);
+      if (f) { opp = f; pipe = pl; break; }
+    }
+    const interested = pipe && (pipe.stages || []).find(s => /interested/i.test(s.name || ''));
+    if (opp && pipe && interested && opp.stageId !== interested.id) {
+      const pr = await fetch(`/api/ghl/pipelines?client_id=${encodeURIComponent(CLIENT_ID)}&opportunity_id=${encodeURIComponent(oppId)}`, {
+        method: 'PATCH', headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pipeline_id: pipe.id, stage_id: interested.id }),
+      });
+      if (pr.ok) { opp.stageId = interested.id; opp.lastStageChangeAt = new Date().toISOString(); moved = true; }
+    }
+    if (moved && typeof _renderPipelineBoard === 'function') _renderPipelineBoard();
+    _plToast(moved ? '📨 Sent + moved to Interested' : '📨 Sent to Summer Special');
   } catch (e) {
     alert('Could not send: ' + (e.message || e));
   }
@@ -19813,11 +19833,14 @@ function _renderPipelineBoard() {
     const isDone = _plIsDoneTrialStage(stage);
     return `
       <div class="pl-card ${stale ? 'pl-card-stale' : ''} ${missingTrial ? 'pl-card-notrial' : ''}"
+           style="position:relative"
            draggable="true"
            ondragstart="_plDragStart(event,'${escapeHTML(o.id)}','${escapeHTML(o.stageId || '')}','${escapeHTML(p.id)}')"
            ondragend="_plDragEnd(event)"
            onclick="_plOpenCard('${escapeHTML(o.id)}')">
-        <div class="pl-card-name"><span class="pl-card-tag">Parent</span> ${escapeHTML(parent)}</div>
+        <button class="pl-card-special" title="Send Summer special" onclick="event.stopPropagation(); _plEnrollSpecial('${escapeHTML(o.id)}')"
+           style="position:absolute;top:6px;right:6px;background:var(--gold-ghost,rgba(212,207,138,0.12));color:var(--gold);border:1px solid var(--gold);border-radius:6px;padding:3px 8px;font-size:11px;font-weight:700;cursor:pointer;line-height:1.3;z-index:2">📨 Special</button>
+        <div class="pl-card-name" style="padding-right:78px"><span class="pl-card-tag">Parent</span> ${escapeHTML(parent)}</div>
         <div class="pl-card-contact"><span class="pl-card-tag">Athlete</span> ${o.athlete ? escapeHTML(o.athlete) : '<span style="opacity:0.5">—</span>'}</div>
         ${o.trainer ? `<div class="pl-card-coach"><span class="pl-card-tag">Coach</span> ${escapeHTML(o.trainer)}</div>` : ''}
         ${trialStr
@@ -19833,9 +19856,7 @@ function _renderPipelineBoard() {
              </div>`
           : (trialStarted
               ? `<button class="pl-card-ptf" onclick="event.stopPropagation(); _plPostTrialForm('${escapeHTML(o.id)}')">Post trial form</button>`
-              : (typeof V2_ACCESS !== 'undefined' && V2_ACCESS
-                  ? `<button onclick="event.stopPropagation(); _plEnrollSpecial('${escapeHTML(o.id)}')" style="margin-top:6px;width:100%;background:var(--gold-ghost,rgba(212,207,138,0.1));color:var(--gold);border:1px solid var(--gold);border-radius:6px;padding:5px 8px;font-size:11px;font-weight:600;cursor:pointer">📨 Summer special</button>`
-                  : ''))}
+              : '')}
       </div>`;
   };
 
