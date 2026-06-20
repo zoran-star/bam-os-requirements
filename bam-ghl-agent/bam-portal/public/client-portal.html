@@ -11365,15 +11365,23 @@ function _renderPreviewBanner() {
 let _IS_BAM_STAFF = null;        // null = unknown (lookup once)
 let _PREVIEW_STAFF_LIST = [];    // non-owner, non-hidden teammates
 
+// Resolve whether the logged-in user is a BAM staff admin (once). BAM staff can
+// manage any academy's team — same as the owner — for setup/support.
+async function _ensureStaffFlag() {
+  if (_IS_BAM_STAFF !== null) return _IS_BAM_STAFF;
+  try {
+    const { data: { session } } = await _sb.auth.getSession();
+    const em = session?.user?.email;
+    if (em) { const { data: sr } = await _sb.from('staff').select('id').eq('email', em).maybeSingle(); _IS_BAM_STAFF = !!sr; }
+    else _IS_BAM_STAFF = false;
+  } catch (_) { _IS_BAM_STAFF = false; }
+  return _IS_BAM_STAFF;
+}
+
 async function _loadPreviewStaff() {
   try {
     if (!CLIENT_ID || !_sb) return;
-    if (_IS_BAM_STAFF === null) {
-      const { data: { session } } = await _sb.auth.getSession();
-      const em = session?.user?.email;
-      if (em) { const { data: sr } = await _sb.from('staff').select('id').eq('email', em).maybeSingle(); _IS_BAM_STAFF = !!sr; }
-      else _IS_BAM_STAFF = false;
-    }
+    await _ensureStaffFlag();
     const { data } = await _sb.from('client_users')
       .select('id, name, email, role, allowed_tabs, allowed_stages')
       .eq('client_id', CLIENT_ID).eq('status', 'active').eq('hide_from_team', false);
@@ -13181,6 +13189,7 @@ async function _bbRenderStaffCard(panel, meta) {
 // so the list reflects the new state without re-opening the card.
 async function _bbStaffRefreshList() {
   if (!CLIENT_ID || !_sb) return;
+  if (_IS_BAM_STAFF === null && typeof _ensureStaffFlag === 'function') await _ensureStaffFlag();
   // Pull the list straight from client_users — same source as the
   // existing Team tab. Mirror its TEAM_ROWS / TEAM_MY_ROLE side-effects
   // so the invite/revoke modals (which read those globals) keep working.
@@ -13209,7 +13218,9 @@ async function _bbStaffRefreshList() {
     if (a.role !== b.role) return a.role === 'owner' ? -1 : 1;
     return (a.name || '').localeCompare(b.name || '');
   });
-  const iAmOwner = myRow?.role === 'owner';
+  // Controls show for the academy OWNER or a BAM staff admin (BAM manages teams
+  // for setup/support). The backend actions already allow BAM staff.
+  const iAmOwner = myRow?.role === 'owner' || _IS_BAM_STAFF === true;
   // Only offer toggles for tabs this academy's tier actually shows (the owner's
   // own visible nav = the tier set, since the owner is never restricted).
   const relevantTabs = _PERMISSIONABLE_TABS.filter(t => t.views.some(v => {
