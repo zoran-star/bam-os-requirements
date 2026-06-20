@@ -81,6 +81,33 @@ Flowchart of all flows + edge cases: **portal.byanymeansbusiness.com/member-impo
   none is passed (mirrors cleanup.js) + returns `batch_id` so the front-end captures batchId on
   resume. Spot cleared on reaching Finish (step 7).
 
+## Shipped 2026-06-20 (round 5 — live testing fixes, all deployed)
+- **🔴 "Make the portal sub" Stripe error** (`take-over.js`): grandfather path passed
+  `items[0][price_data][product_data]` — Stripe SUBSCRIPTION price_data needs an existing
+  `product` id, not inline product_data. Now mints a portal product first (idempotent) +
+  refs it. (Offers/checkout `product_data` usages are fine — those are /prices + Checkout.)
+- **🔴 GHL link matched 4/45 + "checked 10000"** on a 1,700-contact academy: the
+  paginate-all-contacts scan wasn't advancing → re-scanned page 1 until the 100-page cap.
+  `link-ghl.js` rewritten to look each member up DIRECTLY via GHL `query=` search (email then
+  phone, exact-match verified, concurrency 5). No pagination/cap. Returns `searched`.
+- **GHL "Link checked" button removed** — `_sorterRunGhlLink` now finds AND auto-links exact
+  matches in one step (read-only ✓ result). Removed checkboxes + `_sorterApplyGhlLinks`. (BB
+  `_moRunGhlLink` flow untouched.)
+- **Take-over modal upgrades:** recent payments (last 6 paid Stripe invoices, via
+  `take-over-ai` gatherFacts → `facts.recent_payments`; bot can now answer payment questions) +
+  "Next payment" line + "Open Stripe sub ↗" (`current_sub.id`+`stripe_url`) + an "I cancelled
+  the old sub" checkbox gating "Save & close".
+- **Cancel-confirm unified:** `_sorterTakeoverConfirmCancel(memberId)` (verify-cancel + clear
+  pending + reload) is shared by the modal Save&close AND a new per-row **"cancelled" checkbox**
+  on the Billing list (replaced the "check" button). Removed orphan `_sorterTakeoverVerify`.
+- **Import progress strip accuracy:** CoachIQ no longer mirrors `promoted` — new server
+  `sorter.coachiq_done` (not-on-CoachIQ OR everyone linked/N-A/collecting). Finish greens only
+  when Import+Stripe+CoachIQ+GHL done AND no old subs pending cancel. Strip re-renders on wizard
+  close (`fetchAndRenderMembers`). CoachIQ list shows BOTH kid + parent names.
+- **Save-my-spot:** Member Import resumes the last step (per-client localStorage), header × →
+  "Save & close" in members mode, `take-over-ai` batch resolves latest import batch when none
+  passed. **"Review & move" fixed** — `pc-sorter-connect-host` was missing from the Takeover step.
+
 ## PENDING — pick up here
 1. **AUTO CONFLICT-SCAN (offered, not built)** — flag cleanup rows where the live Stripe sub's
    price ≠ the CSV-implied offer (the Bradley root cause). Today the auto-match trusts the CSV
