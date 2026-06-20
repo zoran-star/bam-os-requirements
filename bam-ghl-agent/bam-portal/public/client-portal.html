@@ -9441,7 +9441,26 @@ async function _v15kCardLink(customer, btn) {
     if (btn) { btn.textContent = 'Copied ✓'; setTimeout(() => { btn.disabled = false; btn.textContent = 'Copy card link'; }, 1400); }
   } catch (e) { alert("Couldn't create card link: " + (e.message || e)); if (btn) { btn.disabled = false; btn.textContent = 'Copy card link'; } }
 }
-function _v15kStripeCust(id) { window.open('https://dashboard.stripe.com/customers/' + encodeURIComponent(id), '_blank'); }
+function _v15kStripeCust(id) { _openStripeUrl('https://dashboard.stripe.com/customers/' + encodeURIComponent(id)); }
+
+// Open a Stripe dashboard URL. On mobile, navigate in the SAME tab so the OS can
+// route the dashboard.stripe.com universal link to the Stripe app (a new tab /
+// window.open usually forces the browser instead). Desktop opens a new tab.
+function _openStripeUrl(url) {
+  if (!url) return;
+  const mobile = window.matchMedia && window.matchMedia('(max-width: 768px)').matches;
+  if (mobile) window.location.href = url;
+  else window.open(url, '_blank', 'noopener');
+}
+// Catch every "View in Stripe" <a> too — same-tab on mobile so the app opens.
+document.addEventListener('click', function (e) {
+  const a = e.target && e.target.closest && e.target.closest('a[href^="https://dashboard.stripe.com"]');
+  if (!a) return;
+  if (window.matchMedia && window.matchMedia('(max-width: 768px)').matches) {
+    e.preventDefault();
+    window.location.href = a.href;
+  }
+}, true);
 
 function _v15kMembersHtml(d) {
   if (!d.stripe_ok) return `<div class="req-empty" style="padding:12px 0;color:var(--text-mute)">Stripe is not connected.</div>`;
