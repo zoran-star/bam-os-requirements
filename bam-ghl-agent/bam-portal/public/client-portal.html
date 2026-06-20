@@ -18539,6 +18539,16 @@ async function fetchAndRenderActionItems() {
     _AI_REVIEW_READY = !!json.review_ready;
     _renderActionItems();
     _updateActionItemsBadge();
+    // V2: load member-import status so the onboarding panel can render the
+    // Member Import strip (it lives here now, not on the Members roster).
+    if (typeof V2_ACCESS !== 'undefined' && V2_ACCESS && !(typeof isNativeApp === 'function' && isNativeApp())) {
+      try {
+        const mqs = (typeof CLIENT_ID !== 'undefined' && CLIENT_ID) ? '?scope=client&client_id=' + encodeURIComponent(CLIENT_ID) : '?scope=client';
+        const mres = await fetch('/api/members' + mqs, { headers: { 'Authorization': 'Bearer ' + token } });
+        const mjson = await _safeJson(mres);
+        if (mres.ok) { _MEMBERS_SORTER = mjson.sorter || null; _MEMBERS_SUBS_TO_CANCEL = mjson.subs_to_cancel || 0; _renderActionItems(); }
+      } catch (_) {}
+    }
     // Ticket-derived action items need the tickets list; hydrate it if the
     // Systems tab hasn't been opened yet this session, then re-render.
     if (typeof loadTickets === 'function' && (typeof tickets === 'undefined' || !Array.isArray(tickets) || tickets.length === 0)) {
@@ -18697,6 +18707,18 @@ function _renderActionItems() {
       <div class="ai-onb-bar"><div class="ai-onb-bar-fill" style="width:${pct}%"></div></div>
       <div class="ai-section-bd"><div class="ai-subway">${onb.map(_aiOnbHTML).join('')}</div></div>
     </div>`;
+  }
+
+  // ── Member Import (V2 onboarding tool) — lives right after the onboarding
+  //    subway so it's the natural "after onboarding" step. Stays visible even
+  //    once complete so staff can reopen it. Desktop/web only. ──
+  if (typeof V2_ACCESS !== 'undefined' && V2_ACCESS && !(typeof isNativeApp === 'function' && isNativeApp())) {
+    const _miN = _MEMBERS_SUBS_TO_CANCEL || 0;
+    const _miBanner = _miN > 0 ? `<div style="display:flex;align-items:center;gap:11px;border:1px solid #7a2f2f;background:rgba(224,101,79,0.1);border-radius:10px;padding:11px 14px;margin-top:10px;">
+        <span style="font-size:18px;flex:none;">⚠️</span>
+        <div style="flex:1;min-width:0;font-size:12.5px;color:var(--text,#eee);line-height:1.45;"><b style="color:#e0654f;">${_miN} old sub${_miN === 1 ? '' : 's'} still need cancelling in Stripe.</b> Do these before the next charge — otherwise those members get double-billed.</div>
+      </div>` : '';
+    html += `<div style="margin-top:10px;">${_membersImportStrip(_MEMBERS_SORTER, _MEMBERS_SUBS_TO_CANCEL)}${_miBanner}</div>`;
   }
 
   // ── Tasks panel (ad-hoc to-dos) ──
@@ -19233,26 +19255,15 @@ function _renderMembersView() {
     </div>
   `;
 
-  // Member Import strip — the members half of the old wizard (Import →
-  // Cleanup → Link GHL) lives HERE now; Price Match stays in BB → Offers.
-  // V2/web only (the import flow is a desktop onboarding tool).
-  const importStrip = (typeof V2_ACCESS !== 'undefined' && V2_ACCESS && !(typeof isNativeApp === 'function' && isNativeApp()))
-    ? _membersImportStrip(_MEMBERS_SORTER, _MEMBERS_SUBS_TO_CANCEL) : '';
-  // Banner: old foreign subs the import replaced still need a manual Stripe cancel.
-  // Tied to the Action Items — count drops as the owner completes them.
-  const n = _MEMBERS_SUBS_TO_CANCEL || 0;
-  const cancelBanner = n > 0
-    ? `<div style="display:flex;align-items:center;gap:11px;border:1px solid #7a2f2f;background:rgba(224,101,79,0.1);border-radius:10px;padding:11px 14px;margin-bottom:12px;">
-        <span style="font-size:18px;flex:none;">⚠️</span>
-        <div style="flex:1;min-width:0;font-size:12.5px;color:var(--text,#eee);line-height:1.45;"><b style="color:#e0654f;">${n} old sub${n === 1 ? '' : 's'} still need cancelling in Stripe.</b> Do these in your Action Items before the next charge — otherwise those members get double-billed.</div>
-      </div>` : '';
+  // Member Import strip + double-bill banner moved to the Action Items
+  // onboarding section (V2 onboarding tool) — see _renderActionItems.
 
   if (!all.length) {
-    container.innerHTML = importStrip + cancelBanner + '<div class="req-empty" style="padding:20px 0">No members yet.</div>';
+    container.innerHTML = '<div class="req-empty" style="padding:20px 0">No members yet.</div>';
     return;
   }
   if (!filtered.length) {
-    container.innerHTML = importStrip + cancelBanner + toolbar + '<div class="req-empty" style="padding:20px 0">No members match this filter.</div>';
+    container.innerHTML = toolbar + '<div class="req-empty" style="padding:20px 0">No members match this filter.</div>';
     if (wasFocused) _membersRestoreSearchFocus(cursorPos);
     return;
   }
@@ -19269,7 +19280,7 @@ function _renderMembersView() {
       <div class="member-card-pills">${_memberPriceLabel(m.pricing)}${_memberStatusPill(m.status, m)}${_memberSetupBadge(m)}${_memberEngagementChip(m.engagement)}${_memberOfferPill(m)}${_memberPricingPill(m.pricing)}</div>
     </div>`).join('');
 
-  container.innerHTML = importStrip + cancelBanner + toolbar + cards;
+  container.innerHTML = toolbar + cards;
   if (wasFocused) _membersRestoreSearchFocus(cursorPos);
 }
 
@@ -21419,9 +21430,13 @@ function closePricingSorter() {
   if (overlay) overlay.style.display = 'none';
   if (modal) modal.style.display = 'none';
   window.removeEventListener('resize', _sorterDrawArrows);
-  // Refresh the roster so the Member Import progress strip reflects what was
-  // just done (steps check off as you go through the flow).
-  if (wasMembers && typeof fetchAndRenderMembers === 'function') { try { fetchAndRenderMembers(); } catch (_) {} }
+  // Refresh so the Member Import progress strip reflects what was just done
+  // (steps check off as you go). The strip lives in the Action Items onboarding
+  // section now; also refresh the roster in case it's the open view.
+  if (wasMembers) {
+    if (typeof fetchAndRenderActionItems === 'function') { try { fetchAndRenderActionItems(); } catch (_) {} }
+    if (typeof fetchAndRenderMembers === 'function') { try { fetchAndRenderMembers(); } catch (_) {} }
+  }
 }
 
 // ── Shell: stepper header + body slot + Back/Next footer ──
