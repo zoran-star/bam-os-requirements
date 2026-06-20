@@ -6864,10 +6864,22 @@ Then the call to action."]</div>
       #view-inbox .v15ib-icon.v15ib-send:hover { color:#0B0B0D; filter:brightness(1.05); }
       #view-inbox .v15ib-count { font-size:11px; color:var(--text-mute); margin-top:9px; }
       #view-inbox .v15ib-avatar {
-        width:40px; height:40px; border-radius:50%; flex:0 0 auto;
+        width:42px; height:42px; border-radius:50%; flex:0 0 auto;
         background:var(--surface); border:1px solid var(--border-med); color:var(--text-sub);
         display:flex; align-items:center; justify-content:center; font-size:14px; font-weight:700;
       }
+      /* Conversation list rows */
+      #view-inbox .v15ib-list { border:1px solid var(--border); border-radius:14px; overflow:hidden; background:var(--surface-el,var(--surface)); }
+      #view-inbox .v15ib-conv { display:flex; align-items:center; gap:12px; padding:13px 15px; border-bottom:1px solid var(--border); cursor:pointer; transition:background .12s ease; }
+      #view-inbox .v15ib-conv:last-child { border-bottom:none; }
+      #view-inbox .v15ib-conv:hover { background:rgba(232,197,71,0.06); }
+      #view-inbox .v15ib-conv.unread { background:rgba(232,197,71,0.045); }
+      #view-inbox .v15ib-conv .v15ib-name { font-size:14.5px; color:var(--text); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+      #view-inbox .v15ib-conv .v15ib-prev { font-size:12.5px; color:var(--text-mute); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; margin-top:2px; }
+      #view-inbox .v15ib-conv.unread .v15ib-name { font-weight:700; }
+      #view-inbox .v15ib-conv.unread .v15ib-prev { color:var(--text-sub); }
+      #view-inbox .v15ib-chip { font-size:10px; color:var(--text-mute); background:var(--bg); border:1px solid var(--border); border-radius:999px; padding:2px 9px; display:inline-flex; align-items:center; gap:5px; max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+      #view-inbox .v15ib-chip::before { content:""; width:5px; height:5px; border-radius:50%; background:var(--gold); flex:0 0 auto; }
       @media (max-width:640px) {
         #view-inbox .v15ib-setup { display:none; }            /* Setup not needed on mobile */
         #view-inbox .v15ib-filters { flex-direction:column; align-items:stretch; }
@@ -10170,29 +10182,32 @@ function _v15ibRenderList() {
     body.innerHTML = `<div class="req-empty" style="padding:32px 16px;color:var(--text-mute);text-align:center;line-height:1.5">${escapeHTML(msg)}</div>`;
     return;
   }
-  body.innerHTML = `<div style="border:1px solid var(--border);border-radius:12px;overflow:hidden">` + rows.map(c => {
+  body.innerHTML = `<div class="v15ib-list">` + rows.map(c => {
     const unread = (c.unreadCount || 0) > 0;
-    const ch = String(c.channel || c.lastMessageType || '').replace(/^TYPE_/, '').toUpperCase().includes('MAIL') ? 'Email' : 'SMS';
     const name = c.contactName || '(no name)';
     const cp = _v15ibPipeOf(c);
-    const chip = cp ? `<div style="margin-top:5px"><span style="font-size:10px;color:var(--text-mute);background:var(--surface);border:1px solid var(--border);border-radius:999px;padding:2px 8px;display:inline-block;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHTML(cp.pipelineName)}${cp.stageName ? ' · ' + escapeHTML(cp.stageName) : ''}</span></div>` : '';
-    return `<div onclick='_v15ibOpen(${JSON.stringify(c.id)},${JSON.stringify(c.contactId || "")},${JSON.stringify(c.phone || "")},${JSON.stringify(c.email || "")},${JSON.stringify(c.contactName || "")})'
-      style="display:flex;align-items:flex-start;gap:12px;padding:13px 14px;border-bottom:1px solid var(--border);cursor:pointer">
+    const chip = cp ? `<div style="margin-top:6px"><span class="v15ib-chip">${escapeHTML(cp.pipelineName)}${cp.stageName ? ' · ' + escapeHTML(cp.stageName) : ''}</span></div>` : '';
+    return `<div class="v15ib-conv ${unread ? 'unread' : ''}" onclick='_v15ibOpen(${JSON.stringify(c.id)},${JSON.stringify(c.contactId || "")},${JSON.stringify(c.phone || "")},${JSON.stringify(c.email || "")},${JSON.stringify(c.contactName || "")})'>
       <div style="position:relative;flex:none">
-        <div class="v15ib-avatar">${escapeHTML(_ibInitials(name))}</div>
-        ${unread ? '<span style="position:absolute;top:-1px;right:-1px;width:11px;height:11px;border-radius:50%;background:var(--gold);border:2px solid var(--bg)"></span>' : ''}
+        <div class="v15ib-avatar" style="${_ibAvatarStyle(name)}">${escapeHTML(_ibInitials(name))}</div>
+        ${unread ? '<span style="position:absolute;top:-1px;right:-1px;width:11px;height:11px;border-radius:50%;background:var(--gold);border:2px solid var(--surface-el,var(--surface))"></span>' : ''}
       </div>
       <div style="flex:1;min-width:0">
-        <div style="font-size:14px;font-weight:${unread ? 700 : 600};color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHTML(name)}</div>
-        <div style="font-size:12.5px;color:${unread ? 'var(--text-sub)' : 'var(--text-mute)'};overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-top:2px">${escapeHTML(_ibCleanPreview(c.lastMessageBody))}</div>
+        <div class="v15ib-name">${escapeHTML(name)}</div>
+        <div class="v15ib-prev">${escapeHTML(_ibCleanPreview(c.lastMessageBody))}</div>
         ${chip}
       </div>
-      <div style="text-align:right;flex:none">
-        <div style="font-size:11px;color:var(--text-mute)">${escapeHTML(_ibFormatDate(c.lastMessageDate))}</div>
-        <div style="font-size:9px;color:var(--text-mute);text-transform:uppercase;letter-spacing:.05em;margin-top:3px">${ch}</div>
-      </div>
+      <div style="flex:none;align-self:flex-start;font-size:11px;color:var(--text-mute);white-space:nowrap;padding-top:2px">${escapeHTML(_ibFormatDate(c.lastMessageDate))}</div>
     </div>`;
   }).join('') + `</div>`;
+}
+
+// Deterministic avatar color from a name (matches the member-card palette feel).
+function _ibAvatarStyle(name) {
+  const palette = ['#1f7a3d', '#8a6d1f', '#9a3b2f', '#4a5a8a', '#5a4a8a', '#8a4a5a', '#6b5a2f', '#3f6b5a', '#2f6b8a', '#7a3f6b'];
+  const s = String(name || '?');
+  const c = palette[Math.abs((s.charCodeAt(0) || 0) + (s.charCodeAt(1) || 0)) % palette.length];
+  return `background:${c};border-color:${c};color:#fff`;
 }
 
 async function _v15ibOpen(convId, contactId, phone, email, name) {
