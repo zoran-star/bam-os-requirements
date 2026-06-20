@@ -14172,7 +14172,7 @@ async function _moRunGhlLink() {
       <div style="font-size:10.5px;color:var(--text-mute,#888);margin-top:4px;">Add them as contacts in GHL, then run this again.</div>` : '';
     host.innerHTML = `
       <div style="border:1px solid var(--accent,#E8C547);border-radius:12px;padding:14px 16px;margin-top:4px;">
-        <div style="font-weight:800;font-size:13px;margin-bottom:8px;">Found ${props.length} match${props.length === 1 ? '' : 'es'} <span style="font-weight:400;color:var(--text-mute,#888);">(checked ${json.total_contacts} GHL contacts)</span></div>
+        <div style="font-weight:800;font-size:13px;margin-bottom:8px;">Found ${props.length} match${props.length === 1 ? '' : 'es'} <span style="font-weight:400;color:var(--text-mute,#888);">(searched ${json.searched != null ? json.searched : (json.total_unlinked || 0)} members in GHL)</span></div>
         ${rows || '<div style="font-size:12px;color:var(--text-mute,#888)">No automatic matches.</div>'}
         ${missedHtml}
         ${props.length ? `<button onclick="_moApplyGhlLinks(this)" style="margin-top:10px;font-size:12.5px;font-weight:700;padding:8px 16px;border-radius:9px;border:none;background:var(--accent,#E8C547);color:#1a1a1a;cursor:pointer;">Link selected →</button>` : ''}
@@ -24178,7 +24178,7 @@ async function _sorterRunGhlLink() {
       <div style="font-size:10.5px;color:var(--text-mute,#888);margin-top:4px;">Add them as contacts in GHL, then run this again.</div>` : '';
     host.innerHTML = `
       <div style="border:1px solid var(--accent,#E8C547);border-radius:12px;padding:14px 16px;">
-        <div style="font-weight:800;font-size:13px;margin-bottom:8px;">Found ${props.length} match${props.length === 1 ? '' : 'es'} <span style="font-weight:400;color:var(--text-mute,#888);">(checked ${json.total_contacts} GHL contacts)</span></div>
+        <div style="font-weight:800;font-size:13px;margin-bottom:8px;">Found ${props.length} match${props.length === 1 ? '' : 'es'} <span style="font-weight:400;color:var(--text-mute,#888);">(searched ${json.searched != null ? json.searched : (json.total_unlinked || 0)} members in GHL)</span></div>
         ${rows}
         ${props.length ? `<button onclick="_sorterApplyGhlLinks()" style="margin-top:8px;font-size:12.5px;font-weight:700;padding:8px 15px;border-radius:9px;border:none;background:var(--accent,#E8C547);color:#1a1a1a;cursor:pointer;">Link checked ✓</button>` : ''}
         ${missedHtml}
