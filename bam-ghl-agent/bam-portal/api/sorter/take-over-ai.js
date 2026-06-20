@@ -155,12 +155,46 @@ async function handler(req, res) {
     const clientId = body.client_id || ctx.clientIds[0];
     if (!clientId) return res.status(400).json({ error: "client_id required" });
     if (!ctx.isStaff && !ctx.clientIds.includes(clientId)) return res.status(403).json({ error: "forbidden" });
-    if (!body.member_id) return res.status(400).json({ error: "member_id required" });
 
     const clientRows = await sb(`clients?id=eq.${encodeURIComponent(clientId)}&select=stripe_connect_account_id&limit=1`);
     const acct = Array.isArray(clientRows) && clientRows[0] && clientRows[0].stripe_connect_account_id;
     if (!acct) return res.status(409).json({ error: "academy not connected to Stripe" });
 
+    // ── batch: a deterministic verdict per promoted member in an import (no Claude) ──
+    // The roster view loads this once; Claude only runs when a member's chat opens.
+    if (body.mode === "batch") {
+      const batchId = body.import_batch_id || body.batch_id;
+      if (!batchId) return res.status(400).json({ error: "import_batch_id required" });
+      const staging = await sb(
+        `members_staging?import_batch_id=eq.${encodeURIComponent(batchId)}&client_id=eq.${encodeURIComponent(clientId)}` +
+        `&promoted_member_id=not.is.null&select=promoted_member_id,coachiq_member_id`
+      );
+      const ids = Array.from(new Set((Array.isArray(staging) ? staging : []).map(s => s.promoted_member_id).filter(Boolean)));
+      if (!ids.length) return res.status(200).json({ ok: true, mode: "batch", members: [] });
+      const memberRows = await sb(`members?id=in.(${ids.map(encodeURIComponent).join(",")})&client_id=eq.${encodeURIComponent(clientId)}&select=id,athlete_name,plan,stripe_customer_id,stripe_subscription_id,coachiq_member_id`);
+      const list = Array.isArray(memberRows) ? memberRows : [];
+      const out = await Promise.all(list.map(async (m) => {
+        try {
+          const f = await gatherFacts({ clientId, acct, member: m });
+          const { sub, originLabel, needsCard, curAmount, nextCharge } = f._internal;
+          const v = computeVerdict({ sub, originLabel, needsCard });
+          return {
+            member_id: m.id, athlete: m.athlete_name, coachiq_linked: !!m.coachiq_member_id,
+            tag: v.tag, title: v.title, made_by: originLabel,
+            amount: money(curAmount), amount_cents: curAmount,
+            next_charge: iso(nextCharge), card_on_file: !needsCard,
+            old_sub_id: m.stripe_subscription_id || null,
+          };
+        } catch (e) {
+          return { member_id: m.id, athlete: m.athlete_name, tag: "error", title: "Couldn't read", error: String(e && e.message || e) };
+        }
+      }));
+      const order = { needs_card: 0, move: 1, no_sub: 2, fine: 3, error: 4 };
+      out.sort((a, b) => (order[a.tag] ?? 9) - (order[b.tag] ?? 9));
+      return res.status(200).json({ ok: true, mode: "batch", members: out });
+    }
+
+    if (!body.member_id) return res.status(400).json({ error: "member_id required" });
     const memberRows = await sb(`members?id=eq.${encodeURIComponent(body.member_id)}&client_id=eq.${encodeURIComponent(clientId)}&select=id,athlete_name,plan,stripe_customer_id,stripe_subscription_id,coachiq_member_id&limit=1`);
     const member = Array.isArray(memberRows) && memberRows[0];
     if (!member) return res.status(404).json({ error: "member not found for this academy" });
