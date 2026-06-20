@@ -266,11 +266,19 @@ async function handler(req, res) {
       subBody["items[0][price]"] = resolvedPriceId;
       billedPriceId = resolvedPriceId;
     } else {
+      // Stripe SUBSCRIPTION items' price_data accepts an existing `product` id —
+      // NOT inline `product_data` (that's only valid for invoice items / checkout).
+      // So mint a portal product for this grandfathered price first, then ref it.
+      const prod = await stripeFetch(`/products`, {
+        method: "POST", stripeAccount: acct,
+        idempotencyKey: `takeover-prod-${clientId}-${member.id}-${oldSubId || "none"}`.slice(0, 200),
+        body: { name: oldProductName, "metadata[origin]": "fullcontrol-portal", "metadata[client_id]": clientId, "metadata[member_id]": member.id },
+      });
       subBody["items[0][price_data][currency]"] = curCurrency;
       subBody["items[0][price_data][unit_amount]"] = curAmount;
       subBody["items[0][price_data][recurring][interval]"] = curInterval;
       subBody["items[0][price_data][recurring][interval_count]"] = curIntervalCount;
-      subBody["items[0][price_data][product_data][name]"] = oldProductName;
+      subBody["items[0][price_data][product]"] = prod.id;
     }
 
     const sub = await stripeFetch(`/subscriptions`, {
