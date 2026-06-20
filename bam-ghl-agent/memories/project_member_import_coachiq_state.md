@@ -127,14 +127,20 @@ portal then READS Stripe to confirm it's gone and auto-greens the row).
 - ✅ **Piece 3 — AI verdict + chat** (`api/sorter/take-over-ai.js`): advisory only (AI never
   moves money; execution stays in take-over.js). mode=verdict (deterministic fine/move/needs_card/
   no_sub + Claude one-liner), mode=chat (haiku). COMMITTED.
-- ⏳ **Piece 4 — UI step** (client-portal.html): NOT built. Needs renumbering the sorter step
-  machine (Finish 6→7, new Billing step at index 6; steps array :20906, dispatch :20940-20945,
-  Next-button host, _sorterGoto/minStep). New `_sorterRenderStepTakeover` (roster table w/ AI
-  verdicts via take-over-ai, per-member AI chat modal, [Make it]→take-over.js create, [Jump to
-  Stripe ↗] cancel deep link, poll verify-cancel → green, copy-sub button for CoachIQ manual).
-- ⏳ **Piece 5 — gap fixes**: surface promote-skipped rows at Finish; "✓ set up" badge on member
-  card; [Get card link] button + collecting-payment status on member card.
-- NONE deployed yet (bam-portal no auto-deploy). Backend endpoints committed but untested live.
+- ✅ **Piece 4 — UI step** (client-portal.html): BUILT. Sorter step machine renumbered (Billing
+  at index 6, Finish→7; steps array, dispatch, GHL Next label). `_sorterRenderStepTakeover`:
+  promote-on-demand → take-over-ai `mode=batch` verdicts → roster table (move/needs-card/on-portal)
+  → per-member AI chat modal (`_sorterTakeoverOpen` → verdict+chat, price choice grandfather/
+  canonical, [Make the portal sub]→take-over.js create) → [Jump to Stripe ↗] cancel deep link +
+  `_sorterTakeoverVerify` poll → green. [Get card link] for no-card. COMMITTED.
+- ✅ **Piece 5 — gap fixes** (members.js + client-portal.html): `card-setup-link` action (standalone
+  setup Checkout, reuses payment-link modal) + [💳 Get card link] button in member popup
+  (`mGetCardLink`); `_memberSetupBadge` "✓ set up" pill on member card (live + ghl_contact_id
+  [+ CoachIQ]). Promote-skipped rows: existing Finish "X flagged" count surfaces them; per-row
+  reasons = future enhancement. COMMITTED.
+- ⚠️ Change-plan multi-tenant still PARKED (PLAN_TO_PRICE GTA-only). 
+- 🚀 ALL pieces committed on `feat/member-popup-next-payment`. NOT deployed yet (bam-portal no
+  auto-deploy). Endpoints untested live — needs a deploy + click-through + a real take-over test.
 
 ### Integration analysis + DECISIONS (Zoran, 2026-06-19)
 Mapped against the goal: after import, Members tab has everyone, tied to onboarding, all
