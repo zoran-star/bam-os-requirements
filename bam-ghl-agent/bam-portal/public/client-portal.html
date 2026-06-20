@@ -13555,29 +13555,37 @@ async function _bbStaffStagesLoad(memberId) {
     const allowAll = !Array.isArray(allowed);
     host.innerHTML = _BB_PIPE_CACHE.map(p => {
       const stages = p.stages || [];
-      const pipeAllOn = stages.length > 0 && stages.every(s => allowAll || allowed.includes(s.id));
+      // Pipeline checkbox = "is this pipeline visible at all" (any stage on).
+      // Stages only show once the pipeline is ticked; then pick which stages.
+      const pipeViewable = stages.length > 0 && (allowAll || stages.some(s => allowed.includes(s.id)));
       return `
       <label style="flex-basis:100%;display:flex;align-items:center;gap:7px;font-size:11px;font-weight:700;color:var(--text-mute);text-transform:uppercase;letter-spacing:.04em;margin-top:6px;cursor:pointer">
-        <input type="checkbox" data-pipe-toggle="${escapeHTML(p.id)}" ${pipeAllOn ? 'checked' : ''} onchange="_bbStaffPipeToggle('${memberId}','${escapeHTML(p.id)}', this.checked)"> 🛣 ${escapeHTML(p.name)} <span style="font-weight:400;opacity:.7;text-transform:none">(whole pipeline)</span>
+        <input type="checkbox" data-pipe-toggle="${escapeHTML(p.id)}" ${pipeViewable ? 'checked' : ''} onchange="_bbStaffPipeToggle('${memberId}','${escapeHTML(p.id)}', this.checked)"> 🛣 ${escapeHTML(p.name)} <span style="font-weight:400;opacity:.7;text-transform:none">(visible)</span>
       </label>
+      <div data-pipe-stages="${escapeHTML(p.id)}" style="flex-basis:100%;display:${pipeViewable ? 'flex' : 'none'};flex-wrap:wrap;gap:8px 16px;margin-left:14px">
       ${stages.map(s => {
         const on = allowAll || allowed.includes(s.id);
-        return `<label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;margin-left:14px">
+        return `<label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer">
           <input type="checkbox" data-stageid="${escapeHTML(s.id)}" data-pipe="${escapeHTML(p.id)}" ${on ? 'checked' : ''} onchange="_bbStaffStagesSave('${memberId}')"> ${escapeHTML(s.name)}</label>`;
-      }).join('')}`;
+      }).join('')}
+      </div>`;
     }).join('') +
-      `<div style="flex-basis:100%;font-size:11px;color:var(--text-mute)">Tick the pipeline name to select/clear all its stages. Unchecked stages are hidden from this teammate in the Sales board.</div>`;
+      `<div style="flex-basis:100%;font-size:11px;color:var(--text-mute)">Tick a pipeline to make it visible to this teammate, then choose which stages they see. Unticking a pipeline hides it entirely.</div>`;
   } catch (e) {
     host.dataset.loaded = '';
     host.innerHTML = `<div style="color:#9a3b2f;font-size:12px">Couldn't load — ${escapeHTML(e.message)}</div>`;
   }
 }
 
-// Select/clear every stage of one pipeline at once, then save.
+// Toggle a whole pipeline's visibility. ON → reveal stages + select them all
+// (the teammate sees the pipeline; narrow by unchecking stages). OFF → hide +
+// clear every stage (pipeline disappears for this teammate).
 function _bbStaffPipeToggle(memberId, pipeId, checked) {
   const cont = document.getElementById('staff-stages-' + memberId);
   if (!cont) return;
   cont.querySelectorAll(`input[type=checkbox][data-stageid][data-pipe="${pipeId}"]`).forEach(b => { b.checked = checked; });
+  const box = cont.querySelector(`[data-pipe-stages="${pipeId}"]`);
+  if (box) box.style.display = checked ? 'flex' : 'none';
   _bbStaffStagesSave(memberId);
 }
 
@@ -13587,6 +13595,12 @@ async function _bbStaffStagesSave(memberId) {
   const boxes = [...cont.querySelectorAll('input[type=checkbox][data-stageid]')];
   const checked = boxes.filter(b => b.checked).map(b => b.dataset.stageid);
   const allowed = (checked.length === boxes.length) ? null : checked;
+  // Keep each pipeline's master checkbox in sync: a pipeline is "visible" when
+  // any of its stages is on (so unchecking the last stage clears the master).
+  cont.querySelectorAll('input[data-pipe-toggle]').forEach(master => {
+    const pid = master.getAttribute('data-pipe-toggle');
+    master.checked = boxes.some(b => b.dataset.pipe === pid && b.checked);
+  });
   const statusEl = document.getElementById('staff-stages-status-' + memberId);
   if (statusEl) statusEl.textContent = 'Saving…';
   try {
