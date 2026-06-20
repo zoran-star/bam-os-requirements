@@ -5091,7 +5091,10 @@
       bottom: calc(var(--mobnav-h, 56px) + env(safe-area-inset-bottom) + 12px) !important;
       min-width: 0 !important; max-width: none !important;
       max-height: 62vh !important; overflow-y: auto !important;
+      z-index: 60 !important;
     }
+    .members-filter-popover .members-filter-title { display: block !important; }
+    .members-filter-backdrop { display: block; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 59; }
 
     /* Dynamic viewport height so iOS browser chrome never clips content */
     html, body { height: 100dvh; }
@@ -6671,13 +6674,12 @@ Then the call to action."]</div>
           <span class="topbar-kicker">§ 03 · Members</span>
           <div class="topbar-title">Member Management</div>
         </div>
-        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:6px">
+        <div style="display:none">
           <div id="stripe-connect-button-host"></div>
           <div id="ghl-connect-button-host"></div>
         </div>
       </div>
       <div class="content">
-        <div class="readout">Your Roster</div>
         <div id="members-list-container">
           <div class="req-empty" style="padding:20px 0"><span class="req-spin"></span>Loading members…</div>
         </div>
@@ -9471,7 +9473,12 @@ function _v15kMembersHtml(d) {
   const man = (d.manual || []).map(mc => `<div style="display:flex;align-items:center;gap:8px;border:1px solid var(--border);border-radius:8px;padding:8px 11px;margin-bottom:6px">
     <div style="flex:1;min-width:0"><div style="font-size:13px;color:var(--text)">${escapeHTML(mc.contact_name || '—')}</div><div style="font-size:11px;color:var(--text-mute)">${mc.cancelled_on ? escapeHTML(mc.cancelled_on) : ''}${mc.reason ? ' · ' + escapeHTML(mc.reason) : ''}</div></div>
     <button onclick="_v15kDelManualCancel('${mc.id}')" style="${_v15kBtn}">×</button></div>`).join('');
-  return `<div class="v15k-2col">
+  const roster = d.roster || { live: 0, paused: 0 };
+  const rosterRow = `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:12px;margin-bottom:18px">
+    ${_v15kStat('Live members', _v15kNum(roster.live))}
+    ${_v15kStat('Paused members', _v15kNum(roster.paused))}
+  </div>`;
+  return rosterRow + `<div class="v15k-2col">
     <div>
       <button onclick="_v15kToggle('v15k-pays')" style="background:none;border:none;cursor:pointer;text-align:left;padding:0;${_v15kLbl}">Payments (${(d.payments || []).length}) <span id="v15k-pays-chev" style="display:inline-block;color:var(--text-mute);font-size:11px;transition:transform .15s">▾</span></button>
       <div id="v15k-pays" style="display:none;margin-top:6px">${pays}</div>
@@ -19164,7 +19171,7 @@ function _filterMembers(all) {
 
 function _membersSetSearch(q) {
   _MEMBERS_FILTER.q = q;
-  _renderMembersView();
+  _membersRenderCardsOnly(); // cards-only → the search input keeps focus (no jump)
 }
 
 function _membersSetSort(value) {
@@ -19251,7 +19258,9 @@ function _renderMembersView() {
   const popoverLabel = 'font-size:11px;font-weight:700;color:var(--text-mute);letter-spacing:0.5px;text-transform:uppercase';
 
   const popover = !_MEMBERS_FILTER_OPEN ? '' : `
+    <div class="members-filter-backdrop" onclick="_membersToggleFilterPopover()"></div>
     <div class="members-filter-popover" style="position:absolute;top:calc(100% + 8px);right:0;background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:16px;box-shadow:0 10px 28px rgba(0,0,0,0.35);z-index:50;min-width:300px;max-width:360px">
+      <div style="display:none;font-size:15px;font-weight:700;color:var(--text);margin-bottom:12px" class="members-filter-title">Filters</div>
       <div style="${popoverLabel};margin-bottom:8px">Status</div>
       <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:16px">
         ${filterChip('status','all','All',     all.length)}
@@ -19304,6 +19313,7 @@ function _renderMembersView() {
       .member-card-trainer { font-size:13px; color:var(--text-mute); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
       .member-card-pills { display:flex; gap:6px; align-items:center; justify-content:flex-end; flex-wrap:wrap; }
       .member-pills-extra { display:contents; }
+      .members-filter-backdrop { display:none; }
       @media (max-width: 640px) {
         .member-card {
           grid-template-columns: 42px 1fr;
@@ -19342,9 +19352,6 @@ function _renderMembersView() {
         ${popover}
       </div>
     </div>
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;gap:10px;flex-wrap:wrap">
-      <div style="font-size:12px;color:var(--text-mute)">${filtered.length} shown${(f.q || activeFilterCount) ? ` of ${all.length}` : ''}</div>
-    </div>
   `;
 
   // Member Import strip + double-bill banner moved to the Action Items
@@ -19355,13 +19362,21 @@ function _renderMembersView() {
     return;
   }
   if (!filtered.length) {
-    container.innerHTML = toolbar + '<div class="req-empty" style="padding:20px 0">No members match this filter.</div>';
+    container.innerHTML = toolbar + '<div id="members-cards"><div class="req-empty" style="padding:20px 0">No members match this filter.</div></div>';
     if (wasFocused) _membersRestoreSearchFocus(cursorPos);
     return;
   }
 
   // Grid layout — keeps every column aligned across all cards.
-  const cards = filtered.map(m => `
+  const cards = filtered.map(_memberCardHtml).join('');
+
+  container.innerHTML = toolbar + `<div id="members-cards">${cards}</div>`;
+  if (wasFocused) _membersRestoreSearchFocus(cursorPos);
+}
+
+// One member card's markup (shared by the full render + the search-only render).
+function _memberCardHtml(m) {
+  return `
     <div class="card member-card" onclick="openMemberPopup('${escapeHTML(m.id)}')">
       ${_memberAvatar(m, 38)}
       <div class="member-card-main">
@@ -19370,10 +19385,18 @@ function _renderMembersView() {
       </div>
       <div class="member-card-trainer">${escapeHTML(m.trainer || '—')}</div>
       <div class="member-card-pills">${_memberStatusPill(m.status, m)}${_memberPriceLabel(m.pricing)}<span class="member-pills-extra">${_memberSetupBadge(m)}${_memberEngagementChip(m.engagement)}${_memberOfferPill(m)}${_memberPricingPill(m.pricing)}</span></div>
-    </div>`).join('');
+    </div>`;
+}
 
-  container.innerHTML = toolbar + cards;
-  if (wasFocused) _membersRestoreSearchFocus(cursorPos);
+// Re-render ONLY the cards (used by search) so the search input keeps focus —
+// no full re-render means no cursor jump / lost keystrokes.
+function _membersRenderCardsOnly() {
+  const host = document.getElementById('members-cards');
+  if (!host) { _renderMembersView(); return; }
+  const filtered = _filterMembers(_MEMBERS_ALL || []);
+  host.innerHTML = filtered.length
+    ? filtered.map(_memberCardHtml).join('')
+    : '<div class="req-empty" style="padding:20px 0">No members match this filter.</div>';
 }
 
 // ══════════════════════════════════════════════════════════════
