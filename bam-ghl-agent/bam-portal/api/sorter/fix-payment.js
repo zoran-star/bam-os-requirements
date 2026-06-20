@@ -261,13 +261,18 @@ async function handler(req, res) {
     if (body.mode === "apply") {
       const action = body.action;
       if (action === "pause_member") {
-        // Indefinitely paused: a member with no active billing, kept on the roster.
-        // Pure status (no Stripe) — promote maps 'paused' → member status 'paused'.
+        // Paused member, kept on the roster. Pure status (no Stripe) — promote maps
+        // 'paused' → member status 'paused'. Indefinite, or dated (next-payment +
+        // pause-end recorded in the note for staff reference).
+        const dated = body.next_payment && body.pause_end;
+        const note = dated
+          ? `paused → resumes ${body.pause_end} · next payment ${body.next_payment} (no billing change)`
+          : "indefinitely paused — no billing";
         await sb(`members_staging?id=eq.${encodeURIComponent(stagingId)}`, {
           method: "PATCH", headers: { Prefer: "return=minimal" },
-          body: JSON.stringify({ status: "paused", cleanup_notes: "indefinitely paused — no billing", match_status: "ok", updated_at: new Date().toISOString() }),
+          body: JSON.stringify({ status: "paused", cleanup_notes: note, match_status: "ok", updated_at: new Date().toISOString() }),
         });
-        return res.status(200).json({ ok: true, action, paused: true });
+        return res.status(200).json({ ok: true, action, paused: true, dated: !!dated });
       }
       if (action === "uncancel") {
         if (!subId) return res.status(409).json({ error: "no subscription to un-cancel" });
@@ -301,15 +306,10 @@ async function handler(req, res) {
         return res.status(200).json({ ok: true, action, url: sess.url || null });
       }
       if (action === "mark_cancellation") {
-        // Only valid when there's no LIVE sub (the UI gates this). Records a
-        // cancellation row (member_id may be null — it's a historical record) tied
-        // to the member's offer, then drops them from the import. Safety net: fetch
-        // the sub fresh here (the preview-scoped `sub` isn't in scope in this block).
-        let liveSub = null;
-        if (subId) { try { liveSub = await stripeFetch(`/subscriptions/${encodeURIComponent(subId)}`, { stripeAccount: acct }); } catch (_) { liveSub = null; } }
-        if (liveSub && (liveSub.status === "active" || liveSub.status === "trialing" || liveSub.status === "past_due")) {
-          return res.status(409).json({ error: "this member still has a live subscription — cancel it first" });
-        }
+        // Records a cancellation row (member_id may be null — it's a historical record)
+        // tied to the member's offer, then drops them from the import. If they still have
+        // a live sub, the UI logs an Action Item to cancel it in Stripe (the portal can't
+        // cancel foreign subs) — so we record regardless here.
         await sb(`cancellations`, {
           method: "POST", headers: { Prefer: "return=minimal" },
           body: JSON.stringify([{
@@ -382,8 +382,8 @@ async function handler(req, res) {
     };
 
     const ai = plan.kind === "none" ? { explanation: problem.reason, caution: false, warnings: [] } : await aiSanityCheck({ facts, problem, plan });
-    // Offer-price options only when staff can act on them (the "set up new billing" case).
-    const targets = plan.kind === "setup_monthly" ? await buildTargets(clientId).catch(() => []) : null;
+    // Offer-price options — always returned so the row Billing menu (change sub) has them.
+    const targets = await buildTargets(clientId).catch(() => []);
 
     return res.status(200).json({
       ok: true,

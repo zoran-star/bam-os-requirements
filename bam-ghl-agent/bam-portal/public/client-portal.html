@@ -22303,7 +22303,8 @@ function _sorterRenderStep3(host) {
     }
     const issuesLine = work ? `<div style="font-size:10px;color:#e0a93f;font-weight:700;margin-bottom:3px;">${escapeHTML((m.issues || []).join(' · '))}</div>` : '';
     const readyTag = work ? '' : '<span style="font-size:11px;color:#7BC47F;">ready ✓</span>';
-    const todo = `${issuesLine}<div style="display:flex;flex-wrap:wrap;gap:4px;align-items:center;">${readyTag}${btns}${removeX}</div>`;
+    const billingBtn = `<button onclick="_sorterRowBilling('${sid}')" title="Change sub · pause · mark cancelled" style="font-size:11px;font-weight:700;padding:3px 8px;border-radius:7px;border:1px solid #b8862b;background:rgba(232,197,71,0.12);color:#e0a93f;cursor:pointer;">⚙ Billing</button>`;
+    const todo = `${issuesLine}<div style="display:flex;flex-wrap:wrap;gap:4px;align-items:center;">${readyTag}${btns}${billingBtn}${removeX}</div>`;
     // Next-payment cell — a date when scheduled, a clickable ⚠️ chip when it
     // should bill but won't (opens the fix-payment modal).
     const np = m.next_payment || { state: 'unknown', label: '—', fixable: false };
@@ -22644,6 +22645,163 @@ function _sorterDenySuggestion(stagingId) {
     (l.staged_no_stripe || []).forEach(x => { if (String(x.id) === String(stagingId)) x.suggestion = null; });
   }, () => ({ label: 'dismiss', action: 'undismiss', body: { key: 'suggestion:' + stagingId } }));
 }
+// ════ Row Billing menu (cleanup): Change sub · Pause · Mark cancelled ════
+async function _sorterRowFetchBilling(stagingId) {
+  const token = await _mreqAuthToken();
+  const r = await fetch('/api/sorter/fix-payment', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token }, body: JSON.stringify({ client_id: _aiClientId(), staging_id: stagingId, mode: 'preview' }) });
+  const json = await _safeJson(r);
+  if (!r.ok) throw new Error(_sorterErr(json.error) || ('HTTP ' + r.status));
+  return json;
+}
+async function _sorterCancelOldSubItem(d) {
+  if (!d || !d.stripe_sub_url) return;
+  try {
+    const token = await _mreqAuthToken();
+    await fetch('/api/action-items', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token }, body: JSON.stringify({ client_id: _aiClientId(), title: `Cancel ${(d.member && d.member.athlete_name) || 'member'}'s old Stripe subscription`, description: `From the member import — the portal can't cancel it (created outside the portal). Cancel it in Stripe: ${d.stripe_sub_url}` }) });
+  } catch (_) {}
+}
+async function _sorterRowBilling(stagingId) {
+  const host = document.getElementById('pc-sorter-connect-host');
+  if (!host) return;
+  host.innerHTML = `<div onclick="_sorterCloseConnect()" style="position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:140;"></div><div style="position:fixed;z-index:141;top:50%;left:50%;transform:translate(-50%,-50%);width:min(380px,92vw);background:var(--surface,#16161a);border:1px solid var(--border,#2a2a31);border-radius:14px;padding:18px;">${_sorterLoading('Reading their billing…')}</div>`;
+  let d;
+  try { d = await _sorterRowFetchBilling(stagingId); } catch (e) { _sorterCloseConnect(); _sorterNotice('Couldn\'t load billing', _sorterErr(e), true); return; }
+  _SORTER._billing = { stagingId, data: d };
+  const sub = (d.facts || {}).subscription || {};
+  const curLine = sub.amount ? `${escapeHTML((d.member && d.member.offer_price_key) || '')} · ${escapeHTML(sub.amount)}${sub.interval ? '/' + escapeHTML(sub.interval) : ''} · ${escapeHTML((sub.status || '').toUpperCase())}` : 'No active subscription';
+  const opt = (icon, label, fn, color) => `<button onclick="${fn}" style="display:flex;align-items:center;gap:9px;width:100%;text-align:left;font-size:13px;font-weight:700;padding:11px 13px;border-radius:9px;border:1px solid var(--border,#2a2a31);background:transparent;color:${color || 'var(--text,#eee)'};cursor:pointer;"><span>${icon}</span> ${label}</button>`;
+  host.innerHTML = `<div onclick="_sorterCloseConnect()" style="position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:140;"></div>
+    <div style="position:fixed;z-index:141;top:50%;left:50%;transform:translate(-50%,-50%);width:min(380px,92vw);background:var(--surface,#16161a);border:1px solid var(--border,#2a2a31);border-radius:14px;padding:18px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;"><div style="font-size:15px;font-weight:800;">${escapeHTML((d.member && d.member.athlete_name) || 'Member')}</div><button onclick="_sorterCloseConnect()" style="background:none;border:none;color:var(--text-mute,#888);font-size:20px;cursor:pointer;">×</button></div>
+      <div style="font-size:11.5px;color:var(--text-mute,#888);margin-bottom:14px;">Current: ${curLine}</div>
+      <div style="display:flex;flex-direction:column;gap:8px;">
+        ${opt('🔄', 'Change sub', '_sorterChangeSubModal()')}
+        ${opt('⏸', 'Mark paused', '_sorterRowMarkPaused()')}
+        ${opt('✕', 'Mark cancelled', '_sorterRowMarkCancelled()', '#e0654f')}
+      </div>
+    </div>`;
+}
+async function _sorterRowMarkCancelled() {
+  const b = _SORTER._billing; if (!b) return;
+  const res = await _sorterConfirmModal({ heading: 'Mark as cancellation?', body: 'Records a cancellation tied to the offer. If they still have a live sub, we also log an Action Item to cancel it in Stripe. Then removes them from the import.', confirmLabel: '✕ Mark cancelled', danger: true, dateField: true });
+  if (!res) return;
+  const d = b.data, sub = (d.facts || {}).subscription || {};
+  const live = sub.status && ['active', 'trialing', 'past_due', 'unpaid', 'paused'].includes(sub.status);
+  try {
+    if (live) await _sorterCancelOldSubItem(d);
+    const token = await _mreqAuthToken();
+    const r = await fetch('/api/sorter/fix-payment', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token }, body: JSON.stringify({ client_id: _aiClientId(), staging_id: b.stagingId, mode: 'apply', action: 'mark_cancellation', cancel_date: res.date }) });
+    const json = await _safeJson(r);
+    if (!r.ok) throw new Error(_sorterErr(json.error) || ('HTTP ' + r.status));
+    _sorterCloseConnect();
+    _sorterDropMemberRow(b.stagingId);
+    _sorterNotice('Marked cancelled', live ? 'Cancellation recorded + an Action Item to cancel their sub in Stripe.' : 'Cancellation recorded.');
+  } catch (e) { _sorterNotice('Couldn\'t mark cancelled', _sorterErr(e), true); }
+}
+// Pause choice → { indefinite:true } OR { next_payment, pause_end } OR null
+function _sorterPauseChoiceModal(nextPrefill) {
+  return new Promise(resolve => {
+    const el = document.createElement('div');
+    el.innerHTML = `<div style="position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:150;"></div>
+      <div style="position:fixed;z-index:151;top:50%;left:50%;transform:translate(-50%,-50%);width:min(400px,92vw);background:var(--surface,#16161a);border:1px solid #8a6d1f;border-radius:14px;padding:20px;">
+        <div style="font-size:15px;font-weight:800;margin-bottom:12px;">⏸ Mark paused</div>
+        <label style="display:flex;gap:8px;align-items:center;font-size:13px;margin-bottom:10px;cursor:pointer;"><input type="radio" name="_pz" id="_pz-ind" checked onchange="document.getElementById('_pz-dates').style.display='none';"> Pause indefinitely</label>
+        <label style="display:flex;gap:8px;align-items:center;font-size:13px;margin-bottom:8px;cursor:pointer;"><input type="radio" name="_pz" id="_pz-dat" onchange="document.getElementById('_pz-dates').style.display='block';"> Set dates</label>
+        <div id="_pz-dates" style="display:none;padding-left:8px;border-left:2px solid var(--border,#2a2a31);margin-bottom:4px;">
+          <label style="display:block;font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:var(--text-mute,#888);margin:6px 0 3px;">Next payment date</label>
+          <input id="_pz-next" type="date" value="${escapeHTML(nextPrefill || '')}" style="width:100%;font-size:12px;padding:7px 8px;border-radius:8px;border:1px solid var(--border,#2a2a31);background:var(--bg,#0e0e11);color:var(--text,#eee);margin-bottom:8px;">
+          <label style="display:block;font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:var(--text-mute,#888);margin-bottom:3px;">Pause ends</label>
+          <input id="_pz-end" type="date" style="width:100%;font-size:12px;padding:7px 8px;border-radius:8px;border:1px solid var(--border,#2a2a31);background:var(--bg,#0e0e11);color:var(--text,#eee);">
+        </div>
+        <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:16px;">
+          <button id="_pz-cancel" style="font-size:12.5px;padding:9px 16px;border-radius:9px;border:1px solid var(--border,#2a2a31);background:transparent;color:var(--text,#eee);cursor:pointer;">Cancel</button>
+          <button id="_pz-ok" style="font-size:12.5px;font-weight:800;padding:9px 18px;border-radius:9px;border:none;background:#cfa647;color:#1a1a1a;cursor:pointer;">Pause</button>
+        </div>
+      </div>`;
+    document.body.appendChild(el);
+    const done = (v) => { el.remove(); resolve(v); };
+    el.querySelector('#_pz-cancel').onclick = () => done(null);
+    el.querySelector('#_pz-ok').onclick = () => {
+      if (document.getElementById('_pz-ind').checked) { done({ indefinite: true }); return; }
+      const next = (document.getElementById('_pz-next') || {}).value, end = (document.getElementById('_pz-end') || {}).value;
+      if (!next || !end) return;
+      done({ next_payment: next, pause_end: end });
+    };
+  });
+}
+async function _sorterRowMarkPaused() {
+  const b = _SORTER._billing; if (!b) return;
+  const d = b.data, sub = (d.facts || {}).subscription || {};
+  const choice = await _sorterPauseChoiceModal(sub.current_period_end || '');
+  if (!choice) return;
+  const live = sub.status && ['active', 'trialing', 'past_due', 'unpaid', 'paused'].includes(sub.status);
+  try {
+    if (live) await _sorterCancelOldSubItem(d);
+    const token = await _mreqAuthToken();
+    const body = { client_id: _aiClientId(), staging_id: b.stagingId, mode: 'apply', action: 'pause_member' };
+    if (!choice.indefinite) { body.next_payment = choice.next_payment; body.pause_end = choice.pause_end; }
+    const r = await fetch('/api/sorter/fix-payment', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token }, body: JSON.stringify(body) });
+    const json = await _safeJson(r);
+    if (!r.ok) throw new Error(_sorterErr(json.error) || ('HTTP ' + r.status));
+    _sorterCloseConnect();
+    _sorterResolveMember(b.stagingId, mm => { _sorterClearIssues(mm); mm.next_payment = { state: 'paused', label: choice.indefinite ? 'paused' : ('paused → ' + choice.pause_end) }; });
+    _sorterNotice('Paused', (live ? 'Action Item logged to cancel their old sub. ' : '') + (choice.indefinite ? 'Paused indefinitely.' : 'Paused with dates recorded.'));
+  } catch (e) { _sorterNotice('Couldn\'t pause', _sorterErr(e), true); }
+}
+function _sorterChangeSubModal() {
+  const b = _SORTER._billing; if (!b) return;
+  const d = b.data, sub = (d.facts || {}).subscription || {}, targets = d.targets || [];
+  const host = document.getElementById('pc-sorter-connect-host');
+  if (!host) return;
+  const curKey = (d.member && d.member.offer_price_key) || '';
+  const start = sub.current_period_end || '';
+  const opts = targets.map(t => `<option value="${escapeHTML(t.key)}" ${t.key === curKey ? 'selected' : ''}>${escapeHTML(t.label)} · $${((t.amount_cents || 0) / 100).toFixed(2)}</option>`).join('') || `<option value="">No offer prices found</option>`;
+  host.innerHTML = `<div onclick="_sorterCloseConnect()" style="position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:140;"></div>
+    <div style="position:fixed;z-index:141;top:50%;left:50%;transform:translate(-50%,-50%);width:min(420px,93vw);background:var(--surface,#16161a);border:1px solid var(--border,#2a2a31);border-radius:14px;padding:20px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;"><div style="font-size:15px;font-weight:800;">🔄 Change sub — ${escapeHTML((d.member && d.member.athlete_name) || '')}</div><button onclick="_sorterCloseConnect()" style="background:none;border:none;color:var(--text-mute,#888);font-size:20px;cursor:pointer;">×</button></div>
+      <div style="font-size:12px;color:var(--text-sub,#bbb);border:1px solid var(--border,#2a2a31);border-radius:9px;padding:9px 11px;margin-bottom:12px;">Current: <b>${escapeHTML(curKey || '—')}</b>${sub.amount ? ' · ' + escapeHTML(sub.amount) + (sub.interval ? '/' + escapeHTML(sub.interval) : '') : ' · no active sub'}</div>
+      <label style="display:block;font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:var(--text-mute,#888);margin-bottom:4px;">Switch to (live offer price)</label>
+      <select id="_cs-key" style="width:100%;font-size:12px;padding:8px;border-radius:8px;border:1px solid var(--border,#2a2a31);background:var(--bg,#0e0e11);color:var(--text,#eee);margin-bottom:12px;">${opts}</select>
+      <label style="display:block;font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:var(--text-mute,#888);margin-bottom:4px;">Start date (first charge)</label>
+      <input id="_cs-date" type="date" value="${escapeHTML(start)}" style="width:100%;font-size:12px;padding:7px 8px;border-radius:8px;border:1px solid var(--border,#2a2a31);background:var(--bg,#0e0e11);color:var(--text,#eee);">
+      <div style="font-size:10.5px;color:var(--text-mute,#888);margin:6px 0 0;">${sub.status ? 'Creates the new sub, then logs an Action Item to cancel the old one in Stripe.' : 'Creates the new portal sub.'}</div>
+      <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:16px;">
+        <button onclick="_sorterCloseConnect()" style="font-size:12.5px;padding:9px 16px;border-radius:9px;border:1px solid var(--border,#2a2a31);background:transparent;color:var(--text,#eee);cursor:pointer;">Cancel</button>
+        <button onclick="_sorterChangeSubApply(this)" style="font-size:12.5px;font-weight:800;padding:9px 18px;border-radius:9px;border:none;background:var(--accent,#E8C547);color:#1a1a1a;cursor:pointer;">Switch sub</button>
+      </div>
+    </div>`;
+}
+async function _sorterChangeSubApply(btn) {
+  const b = _SORTER._billing; if (!b) return;
+  const key = (document.getElementById('_cs-key') || {}).value;
+  const date = (document.getElementById('_cs-date') || {}).value;
+  if (!key) { _sorterNotice('Pick a plan', 'Choose an offer price to switch to.', true); return; }
+  const d = b.data, sub = (d.facts || {}).subscription || {};
+  const cust = d.member && d.member.customer_id;
+  if (!cust) { _sorterNotice('No Stripe customer', 'This member has no Stripe customer to bill.', true); return; }
+  if (btn) { btn.disabled = true; btn.textContent = 'Switching…'; }
+  try {
+    const token = await _mreqAuthToken();
+    const base = { client_id: _aiClientId(), customer_id: cust, offer_price_key: key, staging_id: b.stagingId };
+    const prev = await _safeJson(await fetch('/api/sorter/setup-monthly', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token }, body: JSON.stringify({ ...base, mode: 'preview', first_charge_date: date || null }) }));
+    if (prev.error) throw new Error(_sorterErr(prev.error));
+    if (prev.needs_card) {
+      const link = prev.payment_link || '';
+      if (link) { try { await navigator.clipboard.writeText(link); } catch (_) {} }
+      _sorterCloseConnect();
+      _sorterNotice('Needs a card first', 'No card on file — the card link is copied to your clipboard. Send it, then switch again.', true);
+      return;
+    }
+    const made = await _safeJson(await fetch('/api/sorter/setup-monthly', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token }, body: JSON.stringify({ ...base, mode: 'create', first_charge_date: date || null }) }));
+    if (made.error) throw new Error(_sorterErr(made.error));
+    const live = sub.status && ['active', 'trialing', 'past_due', 'unpaid', 'paused'].includes(sub.status);
+    if (live) await _sorterCancelOldSubItem(d);
+    _sorterCloseConnect();
+    _sorterResolveMember(b.stagingId, mm => { _sorterClearIssues(mm); mm.on_stripe = true; mm.next_payment = { state: 'scheduled', label: made.trial_end_iso || (date || 'next cycle') }; });
+    _sorterNotice('Sub switched ✓', `New ${key.split('|')[0]} sub starts ${made.trial_end_iso || date || 'next cycle'}.` + (live ? ' Action Item logged to cancel the old one in Stripe.' : ''));
+  } catch (e) { if (btn) { btn.disabled = false; btn.textContent = 'Switch sub'; } _sorterNotice('Couldn\'t switch', _sorterErr(e), true); }
+}
+
 function _sorterDenyStripe(email) {
   _sorterFixAction('dismiss', { key: 'stripe:' + email }, () => {
     const l = (_SORTER.checks.checks || {}).links || {};

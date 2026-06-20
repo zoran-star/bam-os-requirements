@@ -38,6 +38,17 @@ in-app modals instead — model them on `_sorterFixSuccess(heading, body, stripe
 4. **Adjustable cancellation date** — Mark-as-cancellation should let staff pick the
    cancel date (currently hardcoded today in fix-payment.js mark_cancellation).
 
+## PENDING (bigger build — Zoran 2026-06-20, captured not built)
+5. **Cleanup row → "Mark paused"** (TO-DO col): popup asks → indefinitely? OR when next
+   payment should be? AND when pause ends. + add an Action Item to cancel that sub in Stripe
+   (same copy-over as the take-over/billing step). Then confirm the sub you'll put them on.
+   (Backend `pause-date-fix` + `mark_cancellation` exist; needs the richer cleanup-row modal.)
+6. **Cleanup row → "Mark cancelled"** in the TO-DO column (button alongside the others).
+7. **"Change a sub" — NEW separate popup** (from todos + member card): shows the CURRENT
+   sub / offer / price → asks which LIVE offer-price to switch to → asks start date
+   (prefilled with the old sub's next-payment if it exists) → prompts to DELETE the old sub
+   + creates the new one. (Replaces the broken GTA-hardcoded Change-plan for real flexibility.)
+
 ## Gotchas
 - `currency:'cad'` is hardcoded on setup-mode Checkout (all academies are CAD now);
   multi-tenant should derive it later.
