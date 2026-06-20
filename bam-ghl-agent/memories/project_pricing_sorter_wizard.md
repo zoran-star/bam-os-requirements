@@ -63,9 +63,14 @@ metadata:
 > confirm); `_sorterFixApply`; `_sorterFixSetupMonthly` reuses
 > `/api/sorter/setup-monthly`; **`_sorterFixReplace`** = blocked fallback
 > (create fresh sub → cancel old → if blocked, copies Stripe link for manual
-> cancel). KEY FACT: any sub on the connected account is editable/cancellable
-> via API regardless of where it was "created" — true "blocked" only = a sub on
-> an account we don't manage (never seen in import). **Progress-restore:**
+> cancel). ⚠️ CORRECTED 2026-06-19: the old "KEY FACT" here claimed any sub on the
+> connected account is cancellable via API regardless of who created it — that is
+> **WRONG**. On a Standard connected account Stripe only lets the portal write to
+> subs **it created**; CoachIQ/GHL/dashboard subs are hard-blocked (pause/cancel/
+> change all fail). So `cancel_old` on a foreign sub will usually be refused →
+> `{manual:true, stripe_url}` is the NORMAL path, not a rare edge. See the
+> doc-verified [[project_stripe_app_created_subs]] for the authoritative rule.
+> **Progress-restore:**
 > `openPricingSorter` auto-runs `_sorterRunChecks()` when landing on step 3, so
 > DB-backed cleanup work reappears instantly (no "Run checks" click, survives
 > refresh). ⚠️ Stripe WRITES need live verification (no sandbox locally).
