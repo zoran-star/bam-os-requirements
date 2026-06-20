@@ -22316,9 +22316,9 @@ function _sorterRenderStep3(host) {
   };
 
   // In Stripe, not in the CSV — subscription (name → Stripe inspector)
-  const subTr = (x) => `<tr style="border-bottom:1px solid var(--border,#2a2a31);">${nameCell(true, x.name || x.email, null, x.email, x.customer_id ? `_sorterStripeInfo('${escapeHTML(x.customer_id)}')` : '')}${td(wherePill('STRIPE ONLY', '#e0a93f'))}${td(`<span style="font-size:12px;font-weight:700;">${x.amount_cents != null ? money(x.amount_cents) + '/sub' : 'subscription'}</span>`)}${td(`<div style="display:flex;flex-wrap:wrap;gap:4px;">${fixBtn('+ Add', `_sorterAddFromStripe('${escapeHTML(x.email || '')}','${escapeHTML((x.name || '').replace(/'/g, ''))}','${escapeHTML(x.customer_id || '')}','${escapeHTML(x.sub_id || '')}','${escapeHTML(x.price_id || '')}')`)}${denyBtn(`_sorterDenyStripe('${escapeHTML(x.email || x.customer_id || '')}')`, 'Not a member')}</div>`)}</tr>`;
+  const subTr = (x) => `<tr style="border-bottom:1px solid var(--border,#2a2a31);">${nameCell(true, x.name || x.email, null, x.email, x.customer_id ? `_sorterStripeInfo('${escapeHTML(x.customer_id)}')` : '')}${td(wherePill('STRIPE ONLY', '#e0a93f'))}${td(`<span style="font-size:12px;font-weight:700;">${x.amount_cents != null ? money(x.amount_cents) + '/sub' : 'subscription'}</span>`)}${td('<span style="color:var(--text-mute,#888);">—</span>')}${td(`<div style="display:flex;flex-wrap:wrap;gap:4px;">${fixBtn('+ Add', `_sorterAddFromStripe('${escapeHTML(x.email || '')}','${escapeHTML((x.name || '').replace(/'/g, ''))}','${escapeHTML(x.customer_id || '')}','${escapeHTML(x.sub_id || '')}','${escapeHTML(x.price_id || '')}')`)}${denyBtn(`_sorterStripeNotMember('${escapeHTML(x.email || x.customer_id || '')}','${escapeHTML(x.customer_id || '')}','${escapeHTML(x.sub_id || '')}')`, 'Not a member')}</div>`)}</tr>`;
   // In Stripe, not in the CSV — one-time / prepaid
-  const oneTimeTr = (x) => `<tr style="border-bottom:1px solid var(--border,#2a2a31);">${nameCell(true, x.name || x.email, null, x.email, x.customer_id ? `_sorterStripeInfo('${escapeHTML(x.customer_id)}')` : '')}${td(wherePill('STRIPE ONLY', '#e0a93f'))}${td(`<span style="font-size:12px;font-weight:700;">$${((x.amount_cents || 0) / 100).toFixed(0)} one-time</span><div style="font-size:10px;color:var(--text-mute,#888);">${escapeHTML(x.date || '')}</div>`)}${td(`${x.maybe_staged ? `<div style="font-size:10px;color:#e0a93f;font-weight:700;margin-bottom:3px;">⚠ maybe ${escapeHTML(x.maybe_staged.athlete_name || '')}</div>` : ''}<div style="display:flex;flex-wrap:wrap;gap:4px;">${x.maybe_staged ? fixBtn('Link ✓', `_sorterLinkPrepaid('${escapeHTML(String(x.maybe_staged.id))}','${escapeHTML(x.email || '')}','${escapeHTML(x.customer_id || '')}')`) : ''}${fixBtn('+ Add &amp; match', `_sorterAddPrepaid('${escapeHTML(x.email || '')}','${escapeHTML((x.name || '').replace(/'/g, ''))}','${escapeHTML(x.customer_id || '')}')`)}${denyBtn(`_sorterDenyPrepaid('${escapeHTML(x.email || x.customer_id || '')}')`, 'Not a member')}</div>`)}</tr>`;
+  const oneTimeTr = (x) => `<tr style="border-bottom:1px solid var(--border,#2a2a31);">${nameCell(true, x.name || x.email, null, x.email, x.customer_id ? `_sorterStripeInfo('${escapeHTML(x.customer_id)}')` : '')}${td(wherePill('STRIPE ONLY', '#e0a93f'))}${td(`<span style="font-size:12px;font-weight:700;">$${((x.amount_cents || 0) / 100).toFixed(0)} one-time</span><div style="font-size:10px;color:var(--text-mute,#888);">${escapeHTML(x.date || '')}</div>`)}${td('<span style="color:var(--text-mute,#888);">—</span>')}${td(`${x.maybe_staged ? `<div style="font-size:10px;color:#e0a93f;font-weight:700;margin-bottom:3px;">⚠ maybe ${escapeHTML(x.maybe_staged.athlete_name || '')}</div>` : ''}<div style="display:flex;flex-wrap:wrap;gap:4px;">${x.maybe_staged ? fixBtn('Link ✓', `_sorterLinkPrepaid('${escapeHTML(String(x.maybe_staged.id))}','${escapeHTML(x.email || '')}','${escapeHTML(x.customer_id || '')}')`) : ''}${fixBtn('+ Add &amp; match', `_sorterAddPrepaid('${escapeHTML(x.email || '')}','${escapeHTML((x.name || '').replace(/'/g, ''))}','${escapeHTML(x.customer_id || '')}')`)}${denyBtn(`_sorterDenyPrepaid('${escapeHTML(x.email || x.customer_id || '')}')`, 'Not a member')}</div>`)}</tr>`;
 
   // Build the rows — attention first (Stripe-only additions + needs-work
   // members), then everyone ready. One <tbody>, nothing else.
@@ -22643,6 +22643,25 @@ function _sorterDenyStripe(email) {
     const l = (_SORTER.checks.checks || {}).links || {};
     l.stripe_no_member = (l.stripe_no_member || []).filter(x => x.email !== email);
   }, () => ({ label: 'dismiss', action: 'undismiss', body: { key: 'stripe:' + email } }));
+}
+// "Not a member" on a Stripe-only row: if they still have an ACTIVE sub, open the
+// Stripe cancellation flow + log an Action Item before dismissing them.
+async function _sorterStripeNotMember(email, customerId, subId) {
+  if (subId) {
+    const acct = (_SORTER.checks && _SORTER.checks.stripe_account_id) || '';
+    const url = `https://dashboard.stripe.com/${acct ? acct + '/' : ''}subscriptions/${subId}`;
+    const ok = await _sorterConfirmModal({ heading: 'Not a member — cancel their sub?', body: 'This Stripe customer still has an active subscription. Open Stripe to cancel it — we\'ll log an Action Item to track it, then drop them from the import.', confirmLabel: 'Cancel in Stripe ↗', danger: true });
+    if (!ok) return;
+    try {
+      const token = await _mreqAuthToken();
+      await fetch('/api/action-items', {
+        method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+        body: JSON.stringify({ client_id: _aiClientId(), title: `Cancel ${email || 'a non-member'}'s Stripe subscription`, description: `Marked 'not a member' during import but still has a live sub. Cancel it in Stripe: ${url}` }),
+      });
+    } catch (_) {}
+    window.open(url, '_blank', 'noopener');
+  }
+  _sorterDenyStripe(email);
 }
 function _sorterDenyPrepaid(email) {
   _sorterFixAction('dismiss', { key: 'prepaid:' + email }, () => {
@@ -23152,6 +23171,41 @@ function _sorterFixSuccess(heading, body, stripeUrl) {
     </div>`;
 }
 
+// Styled confirm (replaces native confirm) → resolves { confirmed, date } or null.
+function _sorterConfirmModal({ heading, body, confirmLabel = 'Confirm', danger = false, dateField = false }) {
+  return new Promise(resolve => {
+    const today = new Date().toISOString().slice(0, 10);
+    const el = document.createElement('div');
+    el.innerHTML = `<div style="position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:150;"></div>
+      <div style="position:fixed;z-index:151;top:50%;left:50%;transform:translate(-50%,-50%);width:min(400px,92vw);background:var(--surface,#16161a);border:1px solid ${danger ? '#7a2f2f' : 'var(--border,#2a2a31)'};border-radius:14px;padding:20px;">
+        <div style="font-size:15px;font-weight:800;margin-bottom:8px;">${escapeHTML(heading)}</div>
+        <div style="font-size:12.5px;color:var(--text-sub,#bbb);line-height:1.5;">${escapeHTML(body)}</div>
+        ${dateField ? `<div style="margin:12px 0 2px;"><label style="display:block;font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:var(--text-mute,#888);margin-bottom:4px;">Cancellation date</label><input id="_sc-date" type="date" value="${today}" style="width:100%;font-size:12px;padding:7px 8px;border-radius:8px;border:1px solid var(--border,#2a2a31);background:var(--bg,#0e0e11);color:var(--text,#eee);"></div>` : ''}
+        <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:16px;">
+          <button id="_sc-cancel" style="font-size:12.5px;padding:9px 16px;border-radius:9px;border:1px solid var(--border,#2a2a31);background:transparent;color:var(--text,#eee);cursor:pointer;">Cancel</button>
+          <button id="_sc-ok" style="font-size:12.5px;font-weight:800;padding:9px 18px;border-radius:9px;border:none;background:${danger ? '#e0654f' : 'var(--accent,#E8C547)'};color:#1a1a1a;cursor:pointer;">${escapeHTML(confirmLabel)}</button>
+        </div>
+      </div>`;
+    document.body.appendChild(el);
+    const done = (val) => { el.remove(); resolve(val); };
+    el.querySelector('#_sc-cancel').onclick = () => done(null);
+    el.querySelector('#_sc-ok').onclick = () => done({ confirmed: true, date: dateField ? ((document.getElementById('_sc-date') || {}).value || today) : null });
+  });
+}
+// Styled notice (replaces native alert).
+function _sorterNotice(heading, body, danger = false) {
+  const el = document.createElement('div');
+  el.innerHTML = `<div style="position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:150;"></div>
+    <div style="position:fixed;z-index:151;top:50%;left:50%;transform:translate(-50%,-50%);width:min(400px,92vw);background:var(--surface,#16161a);border:1px solid ${danger ? '#7a2f2f' : '#1f7a3d'};border-radius:14px;padding:20px;text-align:center;">
+      <div style="font-size:30px;line-height:1;margin-bottom:6px;">${danger ? '⚠️' : '✅'}</div>
+      <div style="font-size:14.5px;font-weight:800;margin-bottom:5px;">${escapeHTML(heading)}</div>
+      <div style="font-size:12.5px;color:var(--text-sub,#bbb);line-height:1.5;margin-bottom:16px;">${escapeHTML(body)}</div>
+      <button id="_sn-ok" style="font-size:12.5px;font-weight:800;padding:9px 18px;border-radius:9px;border:none;background:var(--accent,#E8C547);color:#1a1a1a;cursor:pointer;">OK</button>
+    </div>`;
+  document.body.appendChild(el);
+  el.querySelector('#_sn-ok').onclick = () => el.remove();
+}
+
 // "Remove as member" — if they still have a LIVE sub the portal can't cancel it
 // (Stripe blocks foreign subs), so pop the Stripe link + log an Action Item.
 async function _sorterFixRemoveMember() {
@@ -23167,7 +23221,7 @@ async function _sorterFixRemoveMember() {
       });
     } catch (_) {}
     window.open(d.stripe_sub_url, '_blank', 'noopener');
-    alert('Opened Stripe to cancel their sub — and added an Action Item to track it.');
+    _sorterNotice('Opened Stripe', 'Opened Stripe to cancel their sub — and added an Action Item to track it.');
   }
   _sorterCloseFix();
   if (id) _sorterRemoveStaged(id);
@@ -23176,7 +23230,8 @@ async function _sorterFixRemoveMember() {
 // "Pause indefinitely" — keep them as a member with no billing (pure status, no Stripe).
 async function _sorterFixPauseMember() {
   if (!_SORTER_FIX) return;
-  if (!confirm('Mark this member indefinitely paused? They stay on the roster but won\'t be billed until you set up billing later.')) return;
+  const ok = await _sorterConfirmModal({ heading: 'Pause indefinitely?', body: 'They stay on the roster but won\'t be billed until you set up billing later.', confirmLabel: '⏸ Pause' });
+  if (!ok) return;
   const id = _SORTER_FIX.stagingId;
   try {
     const token = await _mreqAuthToken();
@@ -23188,25 +23243,27 @@ async function _sorterFixPauseMember() {
     if (!r.ok) throw new Error(_sorterErr(json.error) || ('HTTP ' + r.status));
     _sorterCloseFix();
     _sorterResolveMember(id, mm => { _sorterClearIssues(mm); mm.next_payment = { state: 'paused', label: 'paused' }; });
-  } catch (e) { alert('Couldn\'t pause: ' + _sorterErr(e)); }
+  } catch (e) { _sorterNotice('Couldn\'t pause', _sorterErr(e), true); }
 }
 
-// "Mark as cancellation" — only when no live sub. Records a cancellation + drops them.
+// "Mark as cancellation" — only when no live sub. Records a cancellation (with a
+// staff-picked date) + drops them.
 async function _sorterFixMarkCancellation() {
   if (!_SORTER_FIX) return;
-  if (!confirm('Record this as a cancellation? Logs it (tied to the offer) and removes them from the import.')) return;
+  const res = await _sorterConfirmModal({ heading: 'Mark as cancellation?', body: 'Logs a cancellation (tied to the offer) and removes them from the import. Pick the date it was cancelled.', confirmLabel: '✕ Mark cancelled', danger: true, dateField: true });
+  if (!res) return;
   const id = _SORTER_FIX.stagingId;
   try {
     const token = await _mreqAuthToken();
     const r = await fetch('/api/sorter/fix-payment', {
       method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
-      body: JSON.stringify({ client_id: _aiClientId(), staging_id: id, mode: 'apply', action: 'mark_cancellation' }),
+      body: JSON.stringify({ client_id: _aiClientId(), staging_id: id, mode: 'apply', action: 'mark_cancellation', cancel_date: res.date }),
     });
     const json = await _safeJson(r);
     if (!r.ok) throw new Error(_sorterErr(json.error) || ('HTTP ' + r.status));
     _sorterCloseFix();
     _sorterDropMemberRow(id);
-  } catch (e) { alert('Couldn\'t mark cancellation: ' + _sorterErr(e)); }
+  } catch (e) { _sorterNotice('Couldn\'t mark cancellation', _sorterErr(e), true); }
 }
 
 // Apply the recommended deterministic fix.
