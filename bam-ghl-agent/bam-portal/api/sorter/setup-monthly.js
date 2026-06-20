@@ -160,7 +160,7 @@ async function handler(req, res) {
           const sess = await stripeFetch(`/checkout/sessions`, {
             method: "POST", stripeAccount: acct,
             body: {
-              mode: "setup", customer: customerId,
+              mode: "setup", currency: "cad", customer: customerId,
               success_url: `${origin}/client-portal.html?card=saved`,
               cancel_url: `${origin}/client-portal.html?card=cancelled`,
             },

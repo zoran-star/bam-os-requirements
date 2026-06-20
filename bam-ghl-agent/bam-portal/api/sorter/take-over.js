@@ -183,7 +183,7 @@ async function handler(req, res) {
           const origin = (req.headers.origin || "https://portal.byanymeansbusiness.com").replace(/\/+$/, "");
           const sess = await stripeFetch(`/checkout/sessions`, {
             method: "POST", stripeAccount: acct,
-            body: { mode: "setup", customer: customerId, success_url: `${origin}/client-portal.html?card=saved`, cancel_url: `${origin}/client-portal.html?card=cancelled` },
+            body: { mode: "setup", currency: "cad", customer: customerId, success_url: `${origin}/client-portal.html?card=saved`, cancel_url: `${origin}/client-portal.html?card=cancelled` },
           });
           payment_link = sess.url || null;
         } catch (_) {}
