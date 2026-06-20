@@ -241,7 +241,7 @@ async function handler(req, res) {
   // ────────────────────────────────────────────────────────
   if (conversationId) {
     try {
-      const data = await ghl("GET", `/conversations/${encodeURIComponent(conversationId)}/messages`, { token });
+      const data = await ghl("GET", `/conversations/${encodeURIComponent(conversationId)}/messages?limit=100`, { token });
       const messages = (data.messages?.messages || data.messages || data.data || []).map(mapMsg);
       return res.status(200).json({ conversation_id: conversationId, messages });
     } catch (e) {

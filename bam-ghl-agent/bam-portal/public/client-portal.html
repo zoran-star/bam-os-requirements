@@ -10106,12 +10106,8 @@ function _v15ibRenderAll() {
   host.innerHTML = `
     <div class="v15ib-bar">
       <div class="v15ib-pills">
-        <button onclick="_v15ibSetUnread(false);_v15ibSetFailed(false)" style="${_v15ibPill(!unread && !failed)}">All</button>
-        <button onclick="_v15ibSetUnread(${!unread})" style="${_v15ibPill(unread)}">Unread</button>
-        <button onclick="_v15ibSetFailed(${!failed})" style="${_v15ibPill(failed)}">Failed</button>
         <span style="flex:1"></span>
-        <button onclick="_v15ibMassSend()" class="v15ib-icon v15ib-send" title="Mass send" aria-label="Mass send">✉</button>
-        <button onclick="_v15ibSetup()" class="v15ib-icon v15ib-setup" title="Setup" aria-label="Setup">⚙</button>
+        <button onclick="_v15ibMassSend()" class="v15ib-icon v15ib-send" title="Mass send" aria-label="Mass send" style="width:auto;padding:0 12px;gap:6px">✉ Mass send</button>
       </div>
       <div class="v15ib-filters">
         <select onchange="_v15ibSetPipeline(this.value)" class="v15ib-sel">${pipeOpts}</select>
@@ -10220,6 +10216,9 @@ async function _v15ibOpen(convId, contactId, phone, email, name) {
 function _v15ibRenderThread() {
   const body = document.getElementById('v15ib-body');
   if (!body || !_V15IB.active) return;
+  // Hide the list filters/toolbar while viewing a single conversation.
+  const _bar = document.querySelector('.v15ib-bar');
+  if (_bar) _bar.style.display = 'none';
   const a = _V15IB.active;
   const sorted = [..._V15IB.messages].sort((x, y) => (x.date ? new Date(x.date).getTime() : 0) - (y.date ? new Date(y.date).getTime() : 0));
   const _visibleMsgs = sorted.filter(m => !_ibIsActivity(m));
@@ -10234,12 +10233,13 @@ function _v15ibRenderThread() {
   const ghlUrl = _ghlContactUrl(_V15IB.ghlLoc, a.contactId);
   const chips = _V15IB.pending.map((u, i) => `<span style="display:inline-flex;align-items:center;gap:5px;background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:3px 8px;font-size:11px;color:var(--text-sub)">📎 file ${i + 1}<button onclick="_v15ibRmFile(${i})" style="background:none;border:none;color:var(--text-mute);cursor:pointer;font-size:12px">×</button></span>`).join('');
   body.innerHTML = `
-    <button onclick="openV15Inbox()" style="background:none;border:none;color:var(--text-sub);font-size:13px;cursor:pointer;padding:0 0 10px">← All conversations</button>
+    <button onclick="openV15Inbox()" style="display:inline-flex;align-items:center;gap:7px;background:var(--surface);border:1px solid var(--border-med);border-radius:999px;color:var(--text);font:inherit;font-size:13px;font-weight:600;cursor:pointer;padding:8px 14px;margin-bottom:12px">
+      <span style="font-size:15px;line-height:1">←</span> All conversations</button>
     <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px">
       <div style="font-size:15px;font-weight:700;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHTML(a.name || a.phone || a.email || 'Conversation')}</div>
       ${ghlUrl ? `<a href="${escapeHTML(ghlUrl)}" target="_blank" rel="noopener" title="Open this contact in GHL to call" style="flex:none;display:inline-flex;align-items:center;gap:6px;background:rgba(232,197,71,0.12);border:1px solid var(--gold);border-radius:8px;color:var(--gold);padding:6px 10px;font:inherit;font-size:12px;font-weight:700;text-decoration:none">📞 Call in GHL</a>` : ''}
     </div>
-    <div style="display:flex;flex-direction:column;gap:8px;max-height:46vh;overflow-y:auto;padding:4px;border:1px solid var(--border);border-radius:10px;background:var(--bg)">${bubbles}</div>
+    <div style="display:flex;flex-direction:column;gap:8px;max-height:min(62vh,560px);overflow-y:auto;-webkit-overflow-scrolling:touch;padding:8px;border:1px solid var(--border);border-radius:10px;background:var(--bg)">${bubbles}</div>
     <div style="margin-top:12px;border:1px solid var(--border);border-radius:10px;padding:10px">
       ${!a.phone ? `<div style="font-size:11px;color:#c47424;margin-bottom:8px">⚠ No phone on file — add one in GHL to text this contact.</div>` : ''}
       <textarea id="v15ib-text" placeholder="Type a message…" style="width:100%;min-height:70px;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:9px 11px;font:inherit;font-size:13px;resize:vertical;outline:none"></textarea>
@@ -19257,12 +19257,21 @@ function _renderMembersView() {
       .member-card-pills { display:flex; gap:6px; align-items:center; justify-content:flex-end; flex-wrap:wrap; }
       @media (max-width: 640px) {
         .member-card {
-          grid-template-columns: 38px 1fr auto;
-          gap: 10px;
-          padding: 10px 12px;
+          grid-template-columns: 38px 1fr;
+          gap: 4px 11px;
+          padding: 11px 13px;
+          align-items: start;
         }
         .member-card-trainer { display:none; }
-        .member-card-pills { flex-direction:column; align-items:flex-end; gap:4px; }
+        /* Pills drop to their own full-width row under the name and wrap left. */
+        .member-card-pills {
+          grid-column: 1 / -1;
+          justify-content: flex-start;
+          flex-direction: row;
+          flex-wrap: wrap;
+          gap: 5px;
+          margin-top: 5px;
+        }
       }
     </style>
     <div style="display:flex;gap:10px;align-items:center;margin-bottom:14px;flex-wrap:wrap">
