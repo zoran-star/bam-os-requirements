@@ -31,9 +31,10 @@
   .dot{width:11px;height:11px;border-radius:3px;display:inline-block}
   .gaps{display:grid;grid-template-columns:repeat(auto-fill,minmax(380px,1fr));gap:14px;margin-top:22px}
   .gap{background:var(--bg-card);border:1px solid var(--border);border-left:3px solid var(--text-mute);border-radius:10px;padding:14px 16px}
-  .gap.hi{border-left-color:var(--red)} .gap.med{border-left-color:var(--amber)} .gap.lo{border-left-color:var(--text-mute)}
+  .gap.hi{border-left-color:var(--red)} .gap.med{border-left-color:var(--amber)} .gap.lo{border-left-color:var(--text-mute)} .gap.fixed{border-left-color:var(--green)}
   .gap .tag{font-size:10.5px;font-weight:800;letter-spacing:.4px;text-transform:uppercase;font-family:'JetBrains Mono',monospace}
-  .gap.hi .tag{color:var(--red)} .gap.med .tag{color:var(--amber)} .gap.lo .tag{color:var(--text-mute)}
+  .gap.hi .tag{color:var(--red)} .gap.med .tag{color:var(--amber)} .gap.lo .tag{color:var(--text-mute)} .gap.fixed .tag{color:var(--green)}
+  .gap.fixed h4{text-decoration:line-through;text-decoration-color:var(--text-mute);opacity:.85}
   .gap h4{font-size:14px;font-weight:700;margin:5px 0 6px}
   .gap p{font-size:12.5px;color:var(--text-sub);line-height:1.5;margin:0}
   .gap code{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--blue);background:rgba(122,184,245,0.1);padding:1px 5px;border-radius:4px}
@@ -155,10 +156,10 @@ flowchart TD
   <div class="callout"><b>Root cause behind most highs:</b> three out-of-sync "portal-owned" markers — <span class="key">metadata.origin</span> (take-over/onboarding), <span class="key">metadata.source</span> (setup-monthly), and two different <span class="key">PORTAL_OWNED_ORIGINS</span> lists (webhook ≠ members.js). A member whose sub uses <code>source</code> instead of <code>origin</code> falls through activation, badge, and management gates. Standardize the marker → fixes #1, #2, #3.</div>
 
   <div class="gaps">
-    <div class="gap hi"><div class="tag">🔴 High · bug</div><h4>setup-monthly subs never activate</h4><p>Sub stamps <code>metadata.source</code>, the webhook checks <code>metadata.origin</code> → member stuck <code>payment_method_required</code> forever after they pay. <code>setup-monthly.js:192</code></p></div>
-    <div class="gap hi"><div class="tag">🔴 High · bug</div><h4>No-sub dated pause → wrongly resurrected</h4><p>pause-date-fix inserts a pause row; the cron Phase B flips status <code>paused→live</code> at <code>pause_end</code> even with no sub → a "live" member billing nothing. <code>members.js:1450</code></p></div>
-    <div class="gap hi"><div class="tag">🔴 High · bug</div><h4>verify-cancel ≠ action item done</h4><p>Cancelling the old sub greens the take-over row but doesn't complete the Action Item or clear the <code>subs_to_cancel</code> banner — they're decoupled. <code>take-over.js:136</code></p></div>
-    <div class="gap hi"><div class="tag">🔴 High · bug</div><h4>"✓ set up" badge lies</h4><p>Checks only <code>live + ghl_contact_id</code>, not whether the portal can actually manage the sub → a foreign-sub member shows "billing on the portal" falsely. <code>client-portal.html:18955</code></p></div>
+    <div class="gap fixed"><div class="tag">✅ Fixed 06-20</div><h4>setup-monthly subs never activate</h4><p>Now stamps the standard <code>metadata.origin=fullcontrol-portal</code> + <code>import_silent=1</code> → webhook flips them live (silently). Marker sets aligned across webhook.js + members.js.</p></div>
+    <div class="gap fixed"><div class="tag">✅ Fixed 06-20</div><h4>No-sub dated pause → wrongly resurrected</h4><p>Cron Phase B now only flips <code>paused→live</code> when the member <i>has</i> a sub; no-sub paused members stay paused (pause row still completes).</p></div>
+    <div class="gap fixed"><div class="tag">✅ Fixed 06-20</div><h4>verify-cancel ≠ action item done</h4><p>verify-cancel was also 400ing (member_id ordering) — fixed; and on confirmed cancel it now completes the matching Action Item → the banner drops in sync.</p></div>
+    <div class="gap fixed"><div class="tag">✅ Fixed 06-20</div><h4>"✓ set up" badge lies</h4><p>Tooltip no longer claims "billing on the portal" (the list can't verify it) — reads "Live · linked to GHL, open the member to confirm billing." The popup is the source of truth for manageability.</p></div>
     <div class="gap med"><div class="tag">🟡 Med</div><h4>Commitment terms lost</h4><p>Take-over / change-sub bill month-to-month with no commitment record → a mid-commitment member loses the remaining term.</p></div>
     <div class="gap med"><div class="tag">🟡 Med</div><h4>CoachIQ invite writes nothing</h4><p>"Supposed to be on it" only copies text — no <code>invited_at</code>, no nudge if they never sign up; member lingers <code>⏳ waiting</code>.</p></div>
     <div class="gap med"><div class="tag">🟡 Med · multi-tenant</div><h4>GTA-hardcoded billing</h4><p>Change-plan (<code>PLAN_TO_PRICE</code>), currency <code>"cad"</code>, HST <code>1.13</code> hardcoded → breaks for non-Ontario / non-GTA academies.</p></div>
