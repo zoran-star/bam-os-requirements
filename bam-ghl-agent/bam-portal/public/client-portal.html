@@ -22962,12 +22962,22 @@ function _sorterRenderFixPayment() {
       <div style="border:1px solid var(--accent,#E8C547);background:rgba(232,197,71,0.06);border-radius:10px;padding:11px 13px;margin-bottom:14px;">
         <div style="font-size:12.5px;font-weight:800;color:var(--accent,#E8C547);margin-bottom:2px;">Recommended: ${escapeHTML(plan.title || 'fix')}</div>
         <div style="font-size:11.5px;color:var(--text-sub,#bbb);line-height:1.5;">${escapeHTML(plan.detail || '')}</div>
+        ${plan.kind === 'setup_monthly' ? `
+        <div style="margin-top:10px;">
+          <label style="display:block;font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:var(--text-mute,#888);margin-bottom:4px;">Add to an offer price</label>
+          <select id="tkfix-offer" style="width:100%;font-size:12px;padding:7px 8px;border-radius:8px;border:1px solid var(--border,#2a2a31);background:var(--bg,#0e0e11);color:var(--text,#eee);">
+            ${(d.targets || []).map(t => `<option value="${escapeHTML(t.key)}" ${t.key === m.offer_price_key ? 'selected' : ''}>${escapeHTML(t.label)} · $${((t.amount_cents || 0) / 100).toFixed(2)}</option>`).join('') || `<option value="${escapeHTML(m.offer_price_key || '')}">${escapeHTML(m.offer_price_key || 'current plan')}</option>`}
+          </select>
+          <div style="font-size:10.5px;color:var(--text-mute,#888);margin-top:5px;">You'll pick the next-payment date next. Or pause them indefinitely (no billing).</div>
+        </div>` : ''}
       </div>`}
       <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;border-top:1px solid var(--border,#2a2a31);padding-top:12px;flex-wrap:wrap;">
         <div>${d.stripe_sub_url ? `<a href="${escapeHTML(d.stripe_sub_url)}" target="_blank" rel="noopener" style="font-size:11px;font-weight:700;color:var(--accent,#E8C547);text-decoration:none;">Open in Stripe ↗</a>` : ''}</div>
         <div style="display:flex;gap:8px;flex-wrap:wrap;">
           ${scheduled ? '' : (plan.action === 'card_link'
             ? `<button onclick="_sorterFixRemoveMember()" title="Drop this person from the import roster" style="font-size:11.5px;font-weight:700;padding:8px 13px;border-radius:9px;border:1px solid #7a2f2f;background:transparent;color:#e0654f;cursor:pointer;">Remove as member</button>`
+            : plan.kind === 'setup_monthly'
+            ? `<button onclick="_sorterFixPauseMember()" title="Keep them as a member but don't bill them — no Stripe sub, no auto-resume." style="font-size:11.5px;font-weight:700;padding:8px 13px;border-radius:9px;border:1px solid #8a6d1f;background:transparent;color:#cfa647;cursor:pointer;">⏸ Pause indefinitely</button>`
             : `<button onclick="_sorterFixReplace()" title="Can't fix it? Create a fresh subscription and cancel this one." style="font-size:11.5px;font-weight:700;padding:8px 13px;border-radius:9px;border:1px solid var(--border,#2a2a31);background:transparent;color:var(--text-sub,#bbb);cursor:pointer;">Can't fix — replace it</button>`)}
           <button onclick="_sorterCloseFix()" style="font-size:12.5px;padding:8px 14px;border-radius:9px;border:1px solid var(--border,#2a2a31);background:transparent;color:var(--text,#eee);cursor:pointer;">${scheduled ? 'Close' : 'Cancel'}</button>
           ${scheduled ? '' : `<button onclick="_sorterFixApply()" style="font-size:12.5px;font-weight:700;padding:8px 16px;border-radius:9px;border:none;background:var(--accent,#E8C547);color:#1a1a1a;cursor:pointer;">${primaryLabel}</button>`}
@@ -22981,6 +22991,22 @@ function _sorterFixRemoveMember() {
   const id = _SORTER_FIX && _SORTER_FIX.stagingId;
   _sorterCloseFix();
   if (id) _sorterRemoveStaged(id);
+}
+
+// "Pause indefinitely" — keep them as a member with no billing (pure status, no Stripe).
+async function _sorterFixPauseMember() {
+  if (!_SORTER_FIX) return;
+  if (!confirm('Mark this member indefinitely paused? They stay on the roster but won\'t be billed until you set up billing later.')) return;
+  try {
+    const token = await _mreqAuthToken();
+    const r = await fetch('/api/sorter/fix-payment', {
+      method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+      body: JSON.stringify({ client_id: _aiClientId(), staging_id: _SORTER_FIX.stagingId, mode: 'apply', action: 'pause_member' }),
+    });
+    const json = await _safeJson(r);
+    if (!r.ok) throw new Error(_sorterErr(json.error) || ('HTTP ' + r.status));
+    _sorterCloseFix(); _sorterRunChecks();
+  } catch (e) { alert('Couldn\'t pause: ' + _sorterErr(e)); }
 }
 
 // Apply the recommended deterministic fix.
@@ -23035,7 +23061,9 @@ function _sorterMonthlyModal(prev, m) {
 // when the prepaid term ends (reuses /api/sorter/setup-monthly; confirms first).
 async function _sorterFixSetupMonthly(m, plan) {
   if (!m.customer_id) { alert("No Stripe customer on this member — can't set up billing."); return; }
-  const base = { client_id: _aiClientId(), customer_id: m.customer_id, offer_price_key: m.offer_price_key, charge_date: plan.anchor_date || null, member_email: m.parent_email || null, staging_id: _SORTER_FIX.stagingId };
+  // Use the offer price the staffer picked in the dropdown (defaults to their matched one).
+  const chosenKey = (document.getElementById('tkfix-offer') || {}).value || m.offer_price_key;
+  const base = { client_id: _aiClientId(), customer_id: m.customer_id, offer_price_key: chosenKey, charge_date: plan.anchor_date || null, member_email: m.parent_email || null, staging_id: _SORTER_FIX.stagingId };
   try {
     const token = await _mreqAuthToken();
     const prev = await _safeJson(await fetch('/api/sorter/setup-monthly', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token }, body: JSON.stringify({ ...base, mode: 'preview' }) }));

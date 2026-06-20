@@ -90,6 +90,35 @@ const iso = (unix) => (unix ? new Date(unix * 1000).toISOString().slice(0, 10) :
 // Deterministic classifier: given the live sub (or null) + the member's plan,
 // return the problem + the recommended fix plan. This is the SOURCE OF TRUTH —
 // the AI only explains/sanity-checks it, never decides.
+// Academy's offer-price options (for the "add to an offer price" dropdown).
+const _HST = 1.13;
+function _termFromLen(len) {
+  const s = String(len || "").toLowerCase();
+  if (/3\s*month|12\s*week/.test(s)) return "3_months";
+  if (/6\s*month|24\s*week/.test(s)) return "6_months";
+  if (/12\s*month|year|52\s*week/.test(s)) return "12_months";
+  return null;
+}
+async function buildTargets(clientId) {
+  const offers = await sb(`offers?client_id=eq.${encodeURIComponent(clientId)}&status=neq.archived&select=id,title,data`) || [];
+  const out = [];
+  for (const o of offers) {
+    const offerings = (o.data && o.data.pricing && o.data.pricing.pricing_offerings) || [];
+    for (const off of offerings) {
+      if (String(off.type || "").toLowerCase() !== "membership") continue;
+      const title = String(off.title || "").trim();
+      if (!title) continue;
+      const base = parseFloat(off.price);
+      if (!isNaN(base)) out.push({ key: `${title}|monthly`, label: `${title} · Monthly`, amount_cents: Math.round(base * _HST * 100) });
+      for (const c of (off.commitments || [])) {
+        const term = _termFromLen(c.length); const cb = parseFloat(c.price);
+        if (term && !isNaN(cb)) out.push({ key: `${title}|${term}`, label: `${title} · ${term.replace("_", " ")}`, amount_cents: Math.round(cb * _HST * 100) });
+      }
+    }
+  }
+  return out;
+}
+
 function classify({ sub, offerKey, recurringExpected, lastPrepaidDate }) {
   if (!sub) {
     if (recurringExpected) {
@@ -231,6 +260,15 @@ async function handler(req, res) {
     // ── apply: a single, explicit write ──
     if (body.mode === "apply") {
       const action = body.action;
+      if (action === "pause_member") {
+        // Indefinitely paused: a member with no active billing, kept on the roster.
+        // Pure status (no Stripe) — promote maps 'paused' → member status 'paused'.
+        await sb(`members_staging?id=eq.${encodeURIComponent(stagingId)}`, {
+          method: "PATCH", headers: { Prefer: "return=minimal" },
+          body: JSON.stringify({ status: "paused", cleanup_notes: "indefinitely paused — no billing", match_status: "ok", updated_at: new Date().toISOString() }),
+        });
+        return res.status(200).json({ ok: true, action, paused: true });
+      }
       if (action === "uncancel") {
         if (!subId) return res.status(409).json({ error: "no subscription to un-cancel" });
         const sub = await stripeFetch(`/subscriptions/${encodeURIComponent(subId)}`, {
@@ -312,11 +350,13 @@ async function handler(req, res) {
     };
 
     const ai = plan.kind === "none" ? { explanation: problem.reason, caution: false, warnings: [] } : await aiSanityCheck({ facts, problem, plan });
+    // Offer-price options only when staff can act on them (the "set up new billing" case).
+    const targets = plan.kind === "setup_monthly" ? await buildTargets(clientId).catch(() => []) : null;
 
     return res.status(200).json({
       ok: true,
       member: { id: s.id, athlete_name: s.athlete_name, parent_email: s.parent_email, customer_id: custId, subscription_id: subId, offer_price_key: offerKey },
-      problem, plan, ai, facts,
+      problem, plan, ai, facts, targets,
       stripe_account_id: acct,
       stripe_sub_url: subId ? `${stripeUrlBase}/subscriptions/${subId}` : null,
     });
