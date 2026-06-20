@@ -90,6 +90,35 @@ const iso = (unix) => (unix ? new Date(unix * 1000).toISOString().slice(0, 10) :
 // Deterministic classifier: given the live sub (or null) + the member's plan,
 // return the problem + the recommended fix plan. This is the SOURCE OF TRUTH —
 // the AI only explains/sanity-checks it, never decides.
+// Academy's offer-price options (for the "add to an offer price" dropdown).
+const _HST = 1.13;
+function _termFromLen(len) {
+  const s = String(len || "").toLowerCase();
+  if (/3\s*month|12\s*week/.test(s)) return "3_months";
+  if (/6\s*month|24\s*week/.test(s)) return "6_months";
+  if (/12\s*month|year|52\s*week/.test(s)) return "12_months";
+  return null;
+}
+async function buildTargets(clientId) {
+  const offers = await sb(`offers?client_id=eq.${encodeURIComponent(clientId)}&status=neq.archived&select=id,title,data`) || [];
+  const out = [];
+  for (const o of offers) {
+    const offerings = (o.data && o.data.pricing && o.data.pricing.pricing_offerings) || [];
+    for (const off of offerings) {
+      if (String(off.type || "").toLowerCase() !== "membership") continue;
+      const title = String(off.title || "").trim();
+      if (!title) continue;
+      const base = parseFloat(off.price);
+      if (!isNaN(base)) out.push({ key: `${title}|monthly`, label: `${title} · Monthly`, amount_cents: Math.round(base * _HST * 100) });
+      for (const c of (off.commitments || [])) {
+        const term = _termFromLen(c.length); const cb = parseFloat(c.price);
+        if (term && !isNaN(cb)) out.push({ key: `${title}|${term}`, label: `${title} · ${term.replace("_", " ")}`, amount_cents: Math.round(cb * _HST * 100) });
+      }
+    }
+  }
+  return out;
+}
+
 function classify({ sub, offerKey, recurringExpected, lastPrepaidDate }) {
   if (!sub) {
     if (recurringExpected) {
@@ -131,8 +160,36 @@ function classify({ sub, offerKey, recurringExpected, lastPrepaidDate }) {
       plan: { kind: "card_link", endpoint: "/api/sorter/fix-payment", action: "card_link", title: "Send a card link to start billing", detail: "Collect a working card; once paid the subscription activates and bills on schedule." },
     };
   }
+  // Fully canceled: the cancel_at_period_end flag clears once Stripe actually
+  // cancels, so this falls through the "ending" check above. A canceled sub can't
+  // be revived — the fix is a fresh portal sub.
+  if (sub.status === "canceled") {
+    return {
+      problem: { state: "missing", reason: `This subscription was canceled${sub.canceled_at ? " on " + iso(sub.canceled_at) : (sub.current_period_end ? " (ended " + iso(sub.current_period_end) + ")" : "")} — there's no active billing.` },
+      plan: {
+        kind: "setup_monthly", endpoint: "/api/sorter/setup-monthly", action: null,
+        title: "Set up new billing",
+        detail: "The old subscription is canceled and can't be revived — create a fresh portal-owned subscription so they bill again.",
+        anchor_date: lastPrepaidDate || null,
+      },
+    };
+  }
+  // Period end is in the PAST but not flagged canceled/past_due — stale/ended sub.
+  // Never report a past date as a "scheduled" next payment.
+  const nextUnix = sub.status === "trialing" ? sub.trial_end : sub.current_period_end;
+  if (nextUnix && nextUnix * 1000 < Date.now()) {
+    return {
+      problem: { state: "missing", reason: `The last billing period ended ${iso(nextUnix)} and nothing is scheduled after it.` },
+      plan: {
+        kind: "setup_monthly", endpoint: "/api/sorter/setup-monthly", action: null,
+        title: "Set up new billing",
+        detail: "Create a fresh portal-owned subscription so they bill on schedule again.",
+        anchor_date: lastPrepaidDate || null,
+      },
+    };
+  }
   // active / trialing with a future charge → already fine
-  const next = sub.status === "trialing" ? iso(sub.trial_end) : iso(sub.current_period_end);
+  const next = iso(nextUnix);
   return {
     problem: { state: "scheduled", reason: `Next payment is already scheduled${next ? " for " + next : ""}.` },
     plan: { kind: "none", title: "Already scheduled — no fix needed" },
@@ -203,6 +260,15 @@ async function handler(req, res) {
     // ── apply: a single, explicit write ──
     if (body.mode === "apply") {
       const action = body.action;
+      if (action === "pause_member") {
+        // Indefinitely paused: a member with no active billing, kept on the roster.
+        // Pure status (no Stripe) — promote maps 'paused' → member status 'paused'.
+        await sb(`members_staging?id=eq.${encodeURIComponent(stagingId)}`, {
+          method: "PATCH", headers: { Prefer: "return=minimal" },
+          body: JSON.stringify({ status: "paused", cleanup_notes: "indefinitely paused — no billing", match_status: "ok", updated_at: new Date().toISOString() }),
+        });
+        return res.status(200).json({ ok: true, action, paused: true });
+      }
       if (action === "uncancel") {
         if (!subId) return res.status(409).json({ error: "no subscription to un-cancel" });
         const sub = await stripeFetch(`/subscriptions/${encodeURIComponent(subId)}`, {
@@ -284,11 +350,13 @@ async function handler(req, res) {
     };
 
     const ai = plan.kind === "none" ? { explanation: problem.reason, caution: false, warnings: [] } : await aiSanityCheck({ facts, problem, plan });
+    // Offer-price options only when staff can act on them (the "set up new billing" case).
+    const targets = plan.kind === "setup_monthly" ? await buildTargets(clientId).catch(() => []) : null;
 
     return res.status(200).json({
       ok: true,
       member: { id: s.id, athlete_name: s.athlete_name, parent_email: s.parent_email, customer_id: custId, subscription_id: subId, offer_price_key: offerKey },
-      problem, plan, ai, facts,
+      problem, plan, ai, facts, targets,
       stripe_account_id: acct,
       stripe_sub_url: subId ? `${stripeUrlBase}/subscriptions/${subId}` : null,
     });
