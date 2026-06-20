@@ -6843,48 +6843,48 @@ Then the call to action."]</div>
       }
 
       /* V1.5 inbox toolbar (status pills · filters · actions) */
-      #view-inbox .v15ib-bar { margin-bottom:14px; }
-      #view-inbox .v15ib-pills { display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-bottom:10px; }
-      #view-inbox .v15ib-filters { display:flex; gap:8px; align-items:center; }
-      #view-inbox .v15ib-sel {
+      .v15ib-bar { margin-bottom:14px; }
+      .v15ib-pills { display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-bottom:10px; }
+      .v15ib-filters { display:flex; gap:8px; align-items:center; }
+      .v15ib-sel {
         background:var(--surface); border:1px solid var(--border-med); border-radius:10px;
         color:var(--text); padding:9px 12px; font:inherit; font-size:13px; cursor:pointer; flex:1; min-width:0;
       }
-      #view-inbox .v15ib-clear {
+      .v15ib-clear {
         background:none; border:1px solid var(--border-med); border-radius:10px;
         color:var(--text-mute); width:38px; height:38px; flex:0 0 auto; cursor:pointer; font-size:13px;
       }
-      #view-inbox .v15ib-icon {
+      .v15ib-icon {
         width:38px; height:38px; border-radius:10px; border:1px solid var(--border-med);
         background:var(--surface); color:var(--text-sub); cursor:pointer; font-size:16px;
         flex:0 0 auto; display:inline-flex; align-items:center; justify-content:center;
       }
-      #view-inbox .v15ib-icon.v15ib-send { background:var(--gold); border-color:var(--gold); color:#0B0B0D; }
-      #view-inbox .v15ib-icon:hover { color:var(--text); border-color:var(--text-mute); }
-      #view-inbox .v15ib-icon.v15ib-send:hover { color:#0B0B0D; filter:brightness(1.05); }
-      #view-inbox .v15ib-count { font-size:11px; color:var(--text-mute); margin-top:9px; }
-      #view-inbox .v15ib-avatar {
+      .v15ib-icon.v15ib-send { background:var(--gold); border-color:var(--gold); color:#0B0B0D; }
+      .v15ib-icon:hover { color:var(--text); border-color:var(--text-mute); }
+      .v15ib-icon.v15ib-send:hover { color:#0B0B0D; filter:brightness(1.05); }
+      .v15ib-count { font-size:11px; color:var(--text-mute); margin-top:9px; }
+      .v15ib-avatar {
         width:42px; height:42px; border-radius:50%; flex:0 0 auto;
         background:var(--surface); border:1px solid var(--border-med); color:var(--text-sub);
         display:flex; align-items:center; justify-content:center; font-size:14px; font-weight:700;
       }
-      /* Conversation list rows */
-      #view-inbox .v15ib-list { border:1px solid var(--border); border-radius:14px; overflow:hidden; background:var(--surface-el,var(--surface)); }
-      #view-inbox .v15ib-conv { display:flex; align-items:center; gap:12px; padding:13px 15px; border-bottom:1px solid var(--border); cursor:pointer; transition:background .12s ease; }
-      #view-inbox .v15ib-conv:last-child { border-bottom:none; }
-      #view-inbox .v15ib-conv:hover { background:rgba(232,197,71,0.06); }
-      #view-inbox .v15ib-conv.unread { background:rgba(232,197,71,0.045); }
-      #view-inbox .v15ib-conv .v15ib-name { font-size:14.5px; color:var(--text); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-      #view-inbox .v15ib-conv .v15ib-prev { font-size:12.5px; color:var(--text-mute); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; margin-top:2px; }
-      #view-inbox .v15ib-conv.unread .v15ib-name { font-weight:700; }
-      #view-inbox .v15ib-conv.unread .v15ib-prev { color:var(--text-sub); }
-      #view-inbox .v15ib-chip { font-size:10px; color:var(--text-mute); background:var(--bg); border:1px solid var(--border); border-radius:999px; padding:2px 9px; display:inline-flex; align-items:center; gap:5px; max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-      #view-inbox .v15ib-chip::before { content:""; width:5px; height:5px; border-radius:50%; background:var(--gold); flex:0 0 auto; }
+      /* Conversation list — each convo in its OWN box. Unscoped (the v1.5 inbox
+         lives in #view-v15inbox, so #view-inbox-scoped rules wouldn't apply). */
+      .v15ib-list { display:flex; flex-direction:column; gap:10px; }
+      .v15ib-conv { display:flex; align-items:center; gap:12px; padding:13px 15px; border:1px solid var(--border); border-radius:12px; background:var(--surface); cursor:pointer; transition:background .12s ease, border-color .12s ease; }
+      .v15ib-conv:hover { background:rgba(232,197,71,0.06); border-color:rgba(232,197,71,0.45); }
+      .v15ib-conv.unread { border-color:rgba(232,197,71,0.4); background:rgba(232,197,71,0.05); }
+      .v15ib-conv .v15ib-name { font-size:14.5px; color:var(--text); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+      .v15ib-conv .v15ib-prev { font-size:12.5px; color:var(--text-mute); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; margin-top:2px; }
+      .v15ib-conv.unread .v15ib-name { font-weight:700; }
+      .v15ib-conv.unread .v15ib-prev { color:var(--text-sub); }
+      .v15ib-chip { font-size:10px; color:var(--text-mute); background:var(--bg); border:1px solid var(--border); border-radius:999px; padding:2px 9px; display:inline-flex; align-items:center; gap:5px; max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+      .v15ib-chip::before { content:""; width:5px; height:5px; border-radius:50%; background:var(--gold); flex:0 0 auto; }
       @media (max-width:640px) {
-        #view-inbox .v15ib-setup { display:none; }            /* Setup not needed on mobile */
-        #view-inbox .v15ib-filters { flex-direction:column; align-items:stretch; }
-        #view-inbox .v15ib-sel { width:100%; flex:none; }
-        #view-inbox .v15ib-filters .v15ib-clear { width:100%; }
+        .v15ib-setup { display:none; }            /* Setup not needed on mobile */
+        .v15ib-filters { flex-direction:column; align-items:stretch; }
+        .v15ib-sel { width:100%; flex:none; }
+        .v15ib-filters .v15ib-clear { width:100%; }
       }
 
       /* Team-chat back button — mobile-only. On desktop the left nav handles
@@ -10189,8 +10189,8 @@ function _v15ibRenderList() {
     const chip = cp ? `<div style="margin-top:6px"><span class="v15ib-chip">${escapeHTML(cp.pipelineName)}${cp.stageName ? ' · ' + escapeHTML(cp.stageName) : ''}</span></div>` : '';
     return `<div class="v15ib-conv ${unread ? 'unread' : ''}" onclick='_v15ibOpen(${JSON.stringify(c.id)},${JSON.stringify(c.contactId || "")},${JSON.stringify(c.phone || "")},${JSON.stringify(c.email || "")},${JSON.stringify(c.contactName || "")})'>
       <div style="position:relative;flex:none">
-        <div class="v15ib-avatar" style="${_ibAvatarStyle(name)}">${escapeHTML(_ibInitials(name))}</div>
-        ${unread ? '<span style="position:absolute;top:-1px;right:-1px;width:11px;height:11px;border-radius:50%;background:var(--gold);border:2px solid var(--surface-el,var(--surface))"></span>' : ''}
+        <div style="width:42px;height:42px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;flex:none;${_ibAvatarStyle(name)}">${escapeHTML(_ibInitials(name))}</div>
+        ${unread ? '<span style="position:absolute;top:-1px;right:-1px;width:11px;height:11px;border-radius:50%;background:var(--gold);border:2px solid var(--surface)"></span>' : ''}
       </div>
       <div style="flex:1;min-width:0">
         <div class="v15ib-name">${escapeHTML(name)}</div>
