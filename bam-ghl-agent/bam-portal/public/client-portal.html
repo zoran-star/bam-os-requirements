@@ -23786,8 +23786,14 @@ function _sorterCiqRender(json) {
     </div>`;
   const intro = statusBanner + `<div style="font-size:12.5px;color:var(--text-mute,#888);margin-bottom:12px;">Add your CoachIQ link tag to each client in CoachIQ — as the tag fires they check off here automatically. <b style="color:var(--text,#eee);">${linked}</b> linked · ${waiting} waiting · ${na} not on CoachIQ.</div>`;
   const rows = members.map(m => {
-    const name = escapeHTML(m.athlete_name || m.parent_name || m.parent_email || '');
+    const kid = escapeHTML(m.athlete_name || '');
+    const parent = escapeHTML(m.parent_name || '');
     const email = escapeHTML(m.parent_email || '');
+    // Show BOTH kid + parent names. Kid is the headline; parent shown as a sub-label.
+    // Fall back gracefully if one is missing (legacy rows / parent-only imports).
+    const nameHtml = kid && parent
+      ? `<b style="color:var(--text,#eee);">${kid}</b> <span style="color:var(--text-mute,#888);">· parent ${parent}</span>`
+      : `<b style="color:var(--text,#eee);">${kid || parent || email}</b>`;
     let badge, controls = '';
     if (m.coachiq_member_id) {
       badge = '<span style="color:#7BC47F;font-weight:700;font-size:11px;">● linked</span>';
@@ -23799,7 +23805,7 @@ function _sorterCiqRender(json) {
     else if (m.coachiq_not_applicable) { badge = '<span style="color:var(--text-mute,#888);font-size:11px;">○ not on CoachIQ</span>'; controls = `<button onclick="_sorterCiqSet('${m.id}',{not_applicable:false})" style="font-size:10px;border:1px solid var(--border,#2a2a31);background:transparent;color:var(--text-mute,#888);border-radius:6px;padding:3px 7px;cursor:pointer;">undo</button>`; }
     else { badge = '<span style="color:#e0a93f;font-size:11px;">&#9203; waiting</span>'; controls = `<input id="ciqin-${m.id}" placeholder="paste user id" style="width:110px;font-size:11px;padding:4px 6px;border-radius:6px;border:1px solid var(--border,#2a2a31);background:var(--bg,#0e0e11);color:var(--text,#eee);" /><button onclick="_sorterCiqSet('${m.id}',{coachiq_member_id:(document.getElementById('ciqin-${m.id}')||{}).value||''})" style="font-size:10px;border:1px solid var(--accent,#E8C547);background:rgba(232,197,71,0.12);color:var(--accent,#E8C547);border-radius:6px;padding:3px 7px;cursor:pointer;">save</button><button onclick="_sorterCiqInvite('${m.id}','${escapeHTML((m.parent_email || '').replace(/'/g, ''))}','${escapeHTML((m.athlete_name || '').replace(/'/g, ''))}')" title="Send them the CoachIQ signup link" style="font-size:10px;border:1px solid #1f5f7a;background:rgba(31,95,122,0.12);color:#5fb0d9;border-radius:6px;padding:3px 7px;cursor:pointer;">supposed to be on it</button><button onclick="_sorterCiqSet('${m.id}',{not_applicable:true})" style="font-size:10px;border:1px solid var(--border,#2a2a31);background:transparent;color:var(--text-mute,#888);border-radius:6px;padding:3px 7px;cursor:pointer;">not on CoachIQ</button>`; }
     return `<div style="display:flex;align-items:center;gap:8px;border:1px solid var(--border,#2a2a31);border-radius:8px;padding:8px 10px;margin-bottom:6px;">
-      <div style="flex:1;min-width:0;font-size:12px;"><b style="color:var(--text,#eee);">${name}</b> <span style="color:var(--text-mute,#888);">${email}</span></div>
+      <div style="flex:1;min-width:0;font-size:12px;">${nameHtml} <span style="color:var(--text-mute,#888);">${email}</span></div>
       <div style="flex:none;display:flex;align-items:center;gap:6px;flex-wrap:wrap;justify-content:flex-end;">${badge} ${controls}</div>
     </div>`;
   }).join('');
