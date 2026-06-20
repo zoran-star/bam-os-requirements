@@ -5443,7 +5443,7 @@
     <nav class="nav">
       <div class="nav-label">§ Navigate</div>
 
-      <div class="nav-item" onclick="switchView('home', this)">
+      <div class="nav-item" id="nav-home" onclick="switchView('home', this)">
         <span class="nav-icon" aria-hidden="true">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M3 9.5L12 3l9 6.5V20a1 1 0 0 1-1 1h-5v-7H9v7H4a1 1 0 0 1-1-1z"/>
@@ -10699,9 +10699,11 @@ let _MSG_RETURN_VIEW = null;
 function switchView(name, el) {
   // Clients without marketing have the Marketing nav greyed + click-blocked
   if (name === 'marketing' && !MARKETING_INCLUDED) return;
+  // Home is hidden for V2 users (BAM staff keep it) → bounce to their landing tab.
+  if (name === 'home' && typeof _homeHiddenForMe === 'function' && _homeHiddenForMe()) { switchView(_landingView()); return; }
   // Per-staff tab permissions: a restricted teammate can't open a hidden tab
   // even via hash/deep-link. Owner/unrestricted users pass through.
-  if (typeof _isViewTabAllowed === 'function' && !_isViewTabAllowed(name)) { switchView('home'); return; }
+  if (typeof _isViewTabAllowed === 'function' && !_isViewTabAllowed(name)) { switchView(_landingView ? _landingView() : 'home'); return; }
   hapticTap('Light'); // #12 — tactile feedback on tab change (native only)
 
   // Remember where we came from so the "Talk to BAM Business" view can go back.
@@ -11429,6 +11431,8 @@ async function _ensureStaffFlag() {
     if (em) { const { data: sr } = await _sb.from('staff').select('id').eq('email', em).maybeSingle(); _IS_BAM_STAFF = !!sr; }
     else _IS_BAM_STAFF = false;
   } catch (_) { _IS_BAM_STAFF = false; }
+  // Now that we know staff status, re-apply Home visibility (staff keep Home).
+  try { if (typeof applyHomeNavState === 'function') applyHomeNavState(); } catch (_) {}
   return _IS_BAM_STAFF;
 }
 
@@ -11504,7 +11508,29 @@ function applyV2NavState(v2Access) {
   applyCalendarNavState();
   applyCrmSupersetNav();
   applyTabPermissions(); // re-subtract per-staff tab perms after the tier re-gate
+  applyHomeNavState();   // hide Home for V2 users (BAM staff keep it)
   if (typeof applyTalkToBamNav === 'function') applyTalkToBamNav();
+}
+
+// Home is hidden for V2 academies for now — BAM staff admins keep it.
+function _homeHiddenForMe() {
+  return (typeof V2_ACCESS !== 'undefined' && V2_ACCESS) && _IS_BAM_STAFF !== true;
+}
+function applyHomeNavState() {
+  const hide = _homeHiddenForMe();
+  const el = document.getElementById('nav-home');
+  if (el) el.style.display = hide ? 'none' : '';
+  document.querySelectorAll('.mobile-nav-item[data-view="home"]').forEach(m => { m.style.display = hide ? 'none' : ''; });
+}
+
+// Where a user lands when Home isn't available to them — first visible tab.
+function _landingView() {
+  if (!_homeHiddenForMe()) return 'home';
+  for (const v of ['pipelines', 'members', 'v15inbox', 'contacts', 'v15kpis', 'marketing', 'systems']) {
+    const el = document.querySelector(`.nav-item[onclick*="switchView('${v}'"]`);
+    if (el && el.style.display !== 'none') return v;
+  }
+  return 'systems';
 }
 
 // V2 is a SUPERSET of V1.5. A V2 academy gets the full-CRM V1.5 surfaces on top
@@ -29332,9 +29358,9 @@ async function boot() {
   if (!clientRow?.onboarding_completed_at) {
     setTimeout(() => startOnboardingTour(), 600);
   } else if (!location.hash) {
-    // Returning user (tour already done) → land on the Home dashboard.
-    // Skip when a deep link (e.g. #resource=…) already targets another view.
-    switchView('home');
+    // Returning user (tour already done) → land on Home, or their first tab when
+    // Home is hidden (V2 users). Skip when a deep link already targets a view.
+    switchView(typeof _landingView === 'function' ? _landingView() : 'home');
   }
 
   // Strip any leftover ?meta=connected / ?meta=error query params if a
