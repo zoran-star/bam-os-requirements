@@ -22412,9 +22412,19 @@ function _sorterFixLink(stagingId, email, customerId, subId, priceId) {
 function _sorterAddFromStripe(email, name, customerId, subId, priceId) {
   _sorterFixAction('add-from-stripe',
     { email, name, customer_id: customerId, sub_id: subId, price_id: priceId },
-    () => {
+    (json) => {
       const l = (_SORTER.checks.checks || {}).links || {};
       l.stripe_no_member = (l.stripe_no_member || []).filter(x => x.email !== email);
+      // Show the newly-added member in the roster right away (don't let them vanish).
+      if (json && json.staging_id && Array.isArray(_SORTER.checks.members)) {
+        _SORTER.checks.members.push({
+          id: json.staging_id, athlete_name: name || (email || '').split('@')[0], parent_name: name || null, parent_email: email,
+          on_stripe: true, stripe_customer_id: customerId, stripe_subscription_id: subId, stripe_price_id: priceId,
+          no_offer: json.match_status === 'no_offer', needs_work: json.match_status !== 'ok',
+          issues: json.match_status === 'no_offer' ? ['no offer'] : [],
+          next_payment: { state: 'unknown', label: '—' },
+        });
+      }
     },
     (json) => json.staging_id ? ({ label: 'add member', action: 'remove-staged', body: { staging_id: json.staging_id } }) : null);
 }

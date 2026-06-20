@@ -1114,7 +1114,7 @@ async function actionCardSetupLink(res, member, stripeAccount, ctx, body, req) {
   const session = await stripeFetch(`/checkout/sessions`, {
     method: "POST", stripeAccount,
     body: {
-      mode: "setup", customer: member.stripe_customer_id,
+      mode: "setup", currency: "cad", customer: member.stripe_customer_id,
       success_url: `${base}/client-portal.html?card=saved`,
       cancel_url: `${base}/client-portal.html?card=cancelled`,
     },

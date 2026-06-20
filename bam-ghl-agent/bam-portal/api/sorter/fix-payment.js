@@ -288,7 +288,7 @@ async function handler(req, res) {
         const origin = (req.headers.origin || "https://portal.byanymeansbusiness.com").replace(/\/+$/, "");
         const sess = await stripeFetch(`/checkout/sessions`, {
           method: "POST", stripeAccount: acct,
-          body: { mode: "setup", customer: custId, success_url: `${origin}/client-portal.html?card=saved`, cancel_url: `${origin}/client-portal.html?card=cancelled` },
+          body: { mode: "setup", currency: "cad", customer: custId, success_url: `${origin}/client-portal.html?card=saved`, cancel_url: `${origin}/client-portal.html?card=cancelled` },
         });
         // "Set to collecting payment": flip the member's status so the roster shows
         // they're waiting on a card (promote maps it to member status).
