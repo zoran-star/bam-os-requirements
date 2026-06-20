@@ -1515,7 +1515,7 @@ async function handler(req, res) {
       // OR by a client portal user (the academy owner or a teammate). Auth
       // is resolved per-action below, so these MUST sit before the staff-only
       // gate — that gate would 403 a legitimate client-portal caller.
-      if (publicSignupAction === "invite-team-member" || publicSignupAction === "revoke-team-member" || publicSignupAction === "set-staff-tabs") {
+      if (publicSignupAction === "invite-team-member" || publicSignupAction === "revoke-team-member" || publicSignupAction === "set-staff-tabs" || publicSignupAction === "add-teammate" || publicSignupAction === "update-teammate") {
         const teamAuth = req.headers.authorization || "";
         const teamToken = teamAuth.startsWith("Bearer ") ? teamAuth.slice(7) : null;
         if (!teamToken) return res.status(401).json({ error: "auth required" });
@@ -1598,8 +1598,57 @@ async function handler(req, res) {
           return res.status(200).json({ ok: true, member_id: memberId, ...patch });
         }
 
+        // ---- action=add-teammate ----
+        // Create a placeholder teammate (no invite, email optional). The owner
+        // fills the email + clicks Invite later. user_id stays null = "not invited".
+        if (publicSignupAction === "add-teammate") {
+          if (!isStaffCaller && !callerRole) return res.status(403).json({ error: "not authorized for this client" });
+          const name = typeof teamBody.name === "string" ? teamBody.name.trim() : "";
+          if (!name) return res.status(400).json({ error: "name required" });
+          let email = typeof teamBody.email === "string" ? teamBody.email.trim().toLowerCase() : "";
+          if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return res.status(400).json({ error: "enter a valid email or leave it blank" });
+          try {
+            const rows = await supabaseInsert("client_users", {
+              client_id, name, email: email || null,
+              role: "member", status: "active", user_id: null, hide_from_team: false,
+            });
+            return res.status(200).json({ ok: true, member: Array.isArray(rows) ? rows[0] : rows });
+          } catch (e) { return res.status(500).json({ error: `add teammate failed: ${e.message}` }); }
+        }
+
+        // ---- action=update-teammate ----
+        // Edit a NOT-YET-INVITED teammate's email/name (owner only). Once they
+        // have a login, edits go through their own account.
+        if (publicSignupAction === "update-teammate") {
+          if (!isStaffCaller && callerRole !== "owner") return res.status(403).json({ error: "only the account owner can edit a teammate" });
+          const memberId = typeof teamBody.member_id === "string" ? teamBody.member_id.trim() : "";
+          if (!memberId) return res.status(400).json({ error: "member_id required" });
+          const targetRows = await supabaseSelect(
+            `client_users?id=eq.${encodeURIComponent(memberId)}&client_id=eq.${client_id}&select=id,user_id,role`
+          ).catch(() => []);
+          if (!targetRows?.length) return res.status(404).json({ error: "teammate not found for this client" });
+          if (targetRows[0].role === "owner") return res.status(400).json({ error: "can't edit the owner here" });
+          if (targetRows[0].user_id) return res.status(400).json({ error: "this teammate already has a login — edits go through their account" });
+          const patch = { updated_at: new Date().toISOString() };
+          if ("email" in teamBody) {
+            let email = typeof teamBody.email === "string" ? teamBody.email.trim().toLowerCase() : "";
+            if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return res.status(400).json({ error: "enter a valid email or leave it blank" });
+            patch.email = email || null;
+          }
+          if ("name" in teamBody) { const nm = (teamBody.name || "").trim(); if (nm) patch.name = nm; }
+          const upd = await fetch(`${SUPABASE_URL}/rest/v1/client_users?id=eq.${encodeURIComponent(memberId)}`, {
+            method: "PATCH",
+            headers: { apikey: SUPABASE_SERVICE_KEY, Authorization: `Bearer ${SUPABASE_SERVICE_KEY}`, "Content-Type": "application/json", Prefer: "return=minimal" },
+            body: JSON.stringify(patch),
+          });
+          if (!upd.ok) return res.status(502).json({ error: `couldn't save — ${await upd.text()}` });
+          return res.status(200).json({ ok: true, member_id: memberId, ...patch });
+        }
+
         // ---- action=invite-team-member ----
         // Any BAM staff OR any active portal user of this client can invite.
+        // Optional `member_id` invites an existing placeholder row (links it to
+        // the auth user) instead of creating a new membership.
         if (publicSignupAction === "invite-team-member") {
           if (!isStaffCaller && !callerRole) {
             return res.status(403).json({ error: "not authorized for this client" });
@@ -1659,13 +1708,38 @@ async function handler(req, res) {
           }
           if (!memberUserId) return res.status(500).json({ error: "could not resolve the invited user" });
 
+          let memberRow;
+
+          // Inviting an existing PLACEHOLDER row → link it to the auth user
+          // instead of creating a duplicate membership.
+          const draftId = typeof teamBody.member_id === "string" ? teamBody.member_id.trim() : "";
+          if (draftId) {
+            const draftRows = await supabaseSelect(
+              `client_users?id=eq.${encodeURIComponent(draftId)}&client_id=eq.${client_id}&select=id,user_id,role`
+            ).catch(() => []);
+            if (!draftRows?.length) return res.status(404).json({ error: "teammate not found for this client" });
+            // Guard: that email isn't already an active member on a different row.
+            const dupe = await supabaseSelect(
+              `client_users?user_id=eq.${memberUserId}&client_id=eq.${client_id}&status=eq.active&select=id`
+            ).catch(() => []);
+            if (dupe?.length && dupe[0].id !== draftId) return res.status(409).json({ error: "that email already has access to this portal" });
+            const updRes = await fetch(`${SUPABASE_URL}/rest/v1/client_users?id=eq.${encodeURIComponent(draftId)}`, {
+              method: "PATCH",
+              headers: { apikey: SUPABASE_SERVICE_KEY, Authorization: `Bearer ${SUPABASE_SERVICE_KEY}`, "Content-Type": "application/json", Prefer: "return=representation" },
+              body: JSON.stringify({ user_id: memberUserId, name, email, status: "active", last_invite_sent_at: new Date().toISOString() }),
+            });
+            if (!updRes.ok) return res.status(500).json({ error: `membership link failed: ${await updRes.text()}` });
+            memberRow = (await updRes.json())[0];
+          }
+
           // Upsert the membership. A previously-revoked row for this
           // user+client is reactivated; otherwise a fresh row is inserted.
-          const existingMembership = await supabaseSelect(
+          const existingMembership = memberRow ? [] : await supabaseSelect(
             `client_users?user_id=eq.${memberUserId}&client_id=eq.${client_id}&select=id,role,status`
           ).catch(() => []);
-          let memberRow;
-          if (existingMembership?.length) {
+          if (memberRow) {
+            // already linked the placeholder above — skip the upsert
+          } else if (existingMembership?.length) {
             const ex = existingMembership[0];
             if (ex.status === "active") {
               return res.status(409).json({ error: "that person already has access to this portal" });
