@@ -373,6 +373,28 @@ async function handler(req, res) {
       });
     }
 
+    // coachiq-sync: POST-billing list for the Finish step — each CoachIQ-linked
+    // member + their FINAL sub_id (from the live promoted member, which take-over
+    // updated), so staff paste the real portal sub_id into CoachIQ (not a stale one).
+    if (action === "coachiq-sync") {
+      const linked = staging.filter(s => s.coachiq_member_id);
+      const ids = linked.map(s => s.promoted_member_id).filter(Boolean);
+      const memberMap = {};
+      if (ids.length) {
+        try {
+          const rows = await sb(`members?id=in.(${ids.map(encodeURIComponent).join(",")})&select=id,stripe_subscription_id`);
+          (rows || []).forEach(m => { memberMap[m.id] = m.stripe_subscription_id; });
+        } catch (_) { /* fall back to staging sub below */ }
+      }
+      return res.status(200).json({
+        ok: true, coachiq_enabled: !!client.coachiq_enabled,
+        members: linked.map(s => ({
+          id: s.id, athlete_name: s.athlete_name, coachiq_member_id: s.coachiq_member_id,
+          sub_id: (s.promoted_member_id && memberMap[s.promoted_member_id]) || s.stripe_subscription_id || null,
+        })).filter(m => m.sub_id),
+      });
+    }
+
     // ── CoachIQ cleanup: set a member's id manually / mark not-applicable ──
     if (action === "coachiq-set") {
       const s = staging.find(x => String(x.id) === String(body.staging_id));
