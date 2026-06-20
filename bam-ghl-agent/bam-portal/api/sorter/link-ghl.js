@@ -144,6 +144,22 @@ async function ghlFetchWithBackoff(path, token) {
 const normEmail = (e) => String(e || "").trim().toLowerCase();
 const normPhone = (p) => String(p || "").replace(/\D/g, "").slice(-10); // last 10 digits
 
+// Targeted GHL contact lookup by a search term (email or phone). GHL's
+// `query` param searches name/email/phone — we match the returned rows back
+// against the EXACT normalized email/phone so a fuzzy hit can't link the wrong
+// contact. Mirrors api/ghl/contacts-search.js (proven pattern).
+async function ghlSearchContacts(tok, term) {
+  const params = new URLSearchParams({ locationId: tok.locationId, limit: "20", query: term });
+  const data = await ghlFetchWithBackoff(`/contacts/?${params}`, tok.token);
+  const list = data?.contacts || data?.data || [];
+  return list.map(c => ({
+    id:    c.id || c.contactId,
+    name:  c.contactName || [c.firstName, c.lastName].filter(Boolean).join(" ") || null,
+    email: c.email || null,
+    phone: c.phone || null,
+  })).filter(c => c.id);
+}
+
 async function runPropose(res, client) {
   const tok = await pickGhlToken(client);
   if (!tok?.token || !tok?.locationId) {
@@ -159,55 +175,48 @@ async function runPropose(res, client) {
     return res.status(200).json({ ok: true, proposals: [], unmatched: [], total_unlinked: 0, note: "every member already has a GHL contact linked" });
   }
 
-  // Paginate ALL contacts on the location, build email + phone lookup maps.
-  const byEmail = new Map(), byPhone = new Map();
-  let startAfterId = null, totalContacts = 0;
-  for (let page = 0; page < 100; page++) { // safety cap 100×100 = 10k contacts
-    const params = new URLSearchParams({ locationId: tok.locationId, limit: "100" });
-    if (startAfterId) params.set("startAfterId", startAfterId);
-    const data = await ghlFetchWithBackoff(`/contacts/?${params}`, tok.token);
-    const contacts = data?.contacts || data?.data || [];
-    if (contacts.length === 0) break;
-    totalContacts += contacts.length;
-    for (const c of contacts) {
-      const id = c.id || c.contactId;
-      if (!id) continue;
-      const slim = {
-        id,
-        name:  c.contactName || [c.firstName, c.lastName].filter(Boolean).join(" ") || null,
-        email: c.email || null,
-        phone: c.phone || null,
-      };
-      const em = normEmail(c.email);
-      if (em && !byEmail.has(em)) byEmail.set(em, slim);
-      const ph = normPhone(c.phone);
-      if (ph.length === 10 && !byPhone.has(ph)) byPhone.set(ph, slim);
-    }
-    startAfterId = contacts[contacts.length - 1].id || contacts[contacts.length - 1].contactId;
-    await sleep(200); // stay friendly with GHL's per-location budget
-  }
-
+  // Look each member up DIRECTLY by email then phone. This replaces the old
+  // "paginate every contact and build a map" approach, which silently capped at
+  // 10k contacts — so on academies with >10k GHL contacts most members fell
+  // outside the window and never matched. A targeted query has no such cap.
   const proposals = [], unmatched = [];
-  for (const m of members) {
-    const em = normEmail(m.parent_email);
-    const ph = normPhone(m.parent_phone);
-    const hit = (em && byEmail.get(em)) || (ph.length === 10 && byPhone.get(ph)) || null;
-    if (hit) {
-      proposals.push({
-        member_id: m.id,
-        athlete_name: m.athlete_name,
-        parent_name: m.parent_name,
-        parent_email: m.parent_email,
-        ghl_contact_id: hit.id,
-        contact_name: hit.name,
-        contact_email: hit.email,
-        matched_by: (em && byEmail.get(em)) ? "email" : "phone",
-      });
-    } else {
-      unmatched.push({ member_id: m.id, athlete_name: m.athlete_name, parent_email: m.parent_email, parent_phone: m.parent_phone });
+  const CONCURRENCY = 5; // ~5 req/s — friendly with GHL's per-location budget
+  let cursor = 0, searched = 0;
+  async function worker() {
+    while (cursor < members.length) {
+      const m = members[cursor++];
+      const em = normEmail(m.parent_email);
+      const ph = normPhone(m.parent_phone);
+      let hit = null, matchedBy = null;
+      try {
+        if (em) {
+          const list = await ghlSearchContacts(tok, em);
+          const c = list.find(x => normEmail(x.email) === em);
+          if (c) { hit = c; matchedBy = "email"; }
+        }
+        if (!hit && ph.length === 10) {
+          const list = await ghlSearchContacts(tok, ph);
+          const c = list.find(x => normPhone(x.phone) === ph);
+          if (c) { hit = c; matchedBy = "phone"; }
+        }
+      } catch (_) { /* a single lookup failing → treat that member as unmatched */ }
+      searched++;
+      if (hit) {
+        proposals.push({
+          member_id: m.id, athlete_name: m.athlete_name, parent_name: m.parent_name,
+          parent_email: m.parent_email, ghl_contact_id: hit.id, contact_name: hit.name,
+          contact_email: hit.email, matched_by: matchedBy,
+        });
+      } else {
+        unmatched.push({ member_id: m.id, athlete_name: m.athlete_name, parent_email: m.parent_email, parent_phone: m.parent_phone });
+      }
     }
   }
-  return res.status(200).json({ ok: true, proposals, unmatched, total_unlinked: members.length, total_contacts: totalContacts });
+  await Promise.all(Array.from({ length: Math.min(CONCURRENCY, members.length) }, worker));
+  // Concurrency scrambles push order — restore stable alphabetical display.
+  const byName = (a, b) => String(a.athlete_name || "").localeCompare(String(b.athlete_name || ""));
+  proposals.sort(byName); unmatched.sort(byName);
+  return res.status(200).json({ ok: true, proposals, unmatched, total_unlinked: members.length, searched, lookup: "search" });
 }
 
 async function runApply(res, client, body) {
