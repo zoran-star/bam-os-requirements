@@ -10055,6 +10055,9 @@ async function openV15Inbox() {
       for (const p of _V15IB.pipelines) {
         const stageName = {}; for (const s of (p.stages || [])) stageName[s.id] = s.name;
         for (const o of (p.opportunities || [])) {
+          // Only LIVE opportunities count — a won/lost/abandoned lead isn't
+          // "in" the pipeline anymore, so the pipeline filter should skip them.
+          if (['won', 'lost', 'abandoned'].includes(String(o.status || '').toLowerCase())) continue;
           const rec = { pipelineId: p.id, pipelineName: p.name, stageId: o.stageId, stageName: stageName[o.stageId] || '' };
           for (const key of [o.contactId, _ibNormKey(o.contact && o.contact.phone), _ibNormKey((o.contact && o.contact.email || '').toLowerCase())]) {
             if (key) { _V15IB.contactPipe[key] = rec; _V15IB.pipeOppCount++; }
