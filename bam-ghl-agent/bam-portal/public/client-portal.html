@@ -18868,6 +18868,14 @@ function _memberStatusPill(status, opts) {
   return main;
 }
 
+// "✓ set up" — at-a-glance "fully wired in": live + linked to GHL (+ CoachIQ when
+// the member carries one). Lets staff scan the roster for who's done after an import.
+function _memberSetupBadge(m) {
+  if (!m || m.status !== 'live' || !m.ghl_contact_id) return '';
+  const ciq = m.coachiq_member_id ? ' + CoachIQ' : '';
+  return `<span title="Live, billing on the portal, linked to GHL${ciq}" style="display:inline-block;font-size:10px;font-weight:800;padding:2px 8px;border-radius:999px;background:transparent;border:1px solid #1f7a3d;color:#7BC47F">✓ set up</span>`;
+}
+
 function _memberEngagementChip(eng) {
   if (!eng) return '';
   const map = {
@@ -19192,7 +19200,7 @@ function _renderMembersView() {
         <div class="member-card-parent">Parent: ${escapeHTML(m.parent_name || '—')}</div>
       </div>
       <div class="member-card-trainer">${escapeHTML(m.trainer || '—')}</div>
-      <div class="member-card-pills">${_memberPriceLabel(m.pricing)}${_memberStatusPill(m.status, m)}${_memberEngagementChip(m.engagement)}${_memberOfferPill(m)}${_memberPricingPill(m.pricing)}</div>
+      <div class="member-card-pills">${_memberPriceLabel(m.pricing)}${_memberStatusPill(m.status, m)}${_memberSetupBadge(m)}${_memberEngagementChip(m.engagement)}${_memberOfferPill(m)}${_memberPricingPill(m.pricing)}</div>
     </div>`).join('');
 
   container.innerHTML = importStrip + toolbar + cards;
@@ -21305,7 +21313,7 @@ function _sorterRender() {
   const members = _SORTER.mode === 'members';
   const title = members ? '👥 Member Import' : '🧮 Price Match';
   const steps = members
-    ? [['2', 'Import'], ['3', 'Stripe'], ['4', 'CoachIQ'], ['5', 'GHL'], ['6', 'Finish']]
+    ? [['2', 'Import'], ['3', 'Stripe'], ['4', 'CoachIQ'], ['5', 'GHL'], ['6', 'Billing'], ['7', 'Finish']]
     : [['1', 'Match']];
   const minStep = members ? 2 : 1;
   const dots = steps.map(([n, label], i) => {
@@ -21344,7 +21352,8 @@ function _sorterRenderBody() {
   else if (_SORTER.step === 3) _sorterRenderStep3(host);
   else if (_SORTER.step === 4) _sorterRenderStepCoachiq(host);
   else if (_SORTER.step === 5) _sorterRenderStep4(host);
-  else if (_SORTER.step === 6) _sorterRenderStepFinish(host);
+  else if (_SORTER.step === 6) _sorterRenderStepTakeover(host);
+  else if (_SORTER.step === 7) _sorterRenderStepFinish(host);
 }
 
 // Navigate to a step (backwards from the stepper dots or the Back button),
@@ -22422,6 +22431,13 @@ async function _sorterOpenInfo(stagingId) {
     const custLink = custUrl
       ? `<a href="${escapeHTML(custUrl)}" target="_blank" rel="noopener" style="font-size:11px;font-weight:700;color:var(--accent,#E8C547);text-decoration:none;white-space:nowrap;">View customer in Stripe ↗</a>`
       : '';
+    // Next payment — the same verdict shown in the cleanup table's column.
+    const np2 = json.next_payment || null;
+    const npColor = np2 && np2.state === 'scheduled' ? 'var(--text,#eee)' : '#e0a93f';
+    const npRow = np2 ? `<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:12px;padding:7px 9px;margin-bottom:10px;border:1px solid var(--border,#2a2a31);border-radius:9px;background:rgba(255,255,255,0.02);">
+        <span style="color:var(--text-mute,#888);text-transform:uppercase;letter-spacing:.5px;font-size:10px;">Next payment</span>
+        <span style="font-weight:800;color:${npColor};" title="${escapeHTML(np2.reason || '')}">${escapeHTML(np2.label || '—')}</span>
+      </div>` : '';
     host.innerHTML = `
       <div onclick="_sorterCloseConnect()" style="position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:140;"></div>
       <div style="position:fixed;z-index:141;top:50%;left:50%;transform:translate(-50%,-50%);width:min(820px,95vw);max-height:86vh;display:flex;flex-direction:column;background:var(--surface,#16161a);border:1px solid var(--border,#2a2a31);border-radius:14px;padding:18px 20px;">
@@ -22440,6 +22456,7 @@ async function _sorterOpenInfo(stagingId) {
               <span style="font-size:10.5px;text-transform:uppercase;letter-spacing:.5px;color:var(--text-mute,#888);">Stripe</span>
               ${custLink}
             </div>
+            ${npRow}
             <div style="font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:var(--text-mute,#888);margin-bottom:4px;">Subscriptions</div>
             ${subsHtml}
             <div style="font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:var(--text-mute,#888);margin:12px 0 4px;">Recent payments</div>
@@ -23244,7 +23261,191 @@ async function _sorterCiqSet(stagingId, patch) {
   } catch (e) { alert('Save failed: ' + e.message); }
 }
 
-// ───────────────────────────── STEP 6 — Finish (promote to live roster) ─────────────────
+// ───────────────────────────── STEP 6 — Take over billing ─────────────────
+// Move each imported member onto a PORTAL-OWNED sub so member actions work
+// (foreign CoachIQ/GHL subs reject every action). The portal CREATES the new sub;
+// the old foreign sub is a manual cancel (Stripe blocks it) — we deep-link + poll
+// to confirm. AI (advisory) tags each member + chats; execution stays explicit.
+function _sorterRenderStepTakeover(host) {
+  host.innerHTML = `<div style="font-size:12.5px;color:var(--text-mute,#888);margin-bottom:12px;">Move each member onto portal billing so you can pause, cancel & change their plan here. The portal makes the new subscription; you cancel the old one (we link straight to it).</div>
+    <div id="pc-sorter-takeover-host">${_sorterLoading('Promoting members & reading their billing…')}</div>`;
+  _sorterSetNext(`<button onclick="_sorterGoto(7)" style="font-size:13px;font-weight:700;padding:9px 18px;border-radius:9px;border:none;background:var(--accent,#E8C547);color:#1a1a1a;cursor:pointer;">Next: Finish &rarr;</button>`);
+  if (!_SORTER._takeover) _SORTER._takeover = { pendingCancel: {}, detail: {} };
+  _sorterTakeoverLoad();
+}
+async function _sorterTakeoverLoad() {
+  const host = document.getElementById('pc-sorter-takeover-host');
+  if (!host) return;
+  try {
+    const token = await _mreqAuthToken();
+    const auth = { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token };
+    const base = { client_id: _aiClientId(), batch_id: _SORTER.batchId, import_batch_id: _SORTER.batchId };
+    // Promote-on-demand (idempotent) so take-over operates on live members.
+    await fetch('/api/sorter/cleanup?action=promote', { method: 'POST', headers: auth, body: JSON.stringify(base) }).catch(() => {});
+    const r = await fetch('/api/sorter/take-over-ai', { method: 'POST', headers: auth, body: JSON.stringify({ ...base, mode: 'batch' }) });
+    const json = await _safeJson(r);
+    if (!r.ok) throw new Error(_sorterErr(json.error) || ('HTTP ' + r.status));
+    _SORTER._takeover.members = json.members || [];
+    _sorterTakeoverRender();
+  } catch (e) { host.innerHTML = `<div style="color:var(--danger,#e0654f);">${escapeHTML(_sorterErr(e))}</div>`; }
+}
+function _sorterTakeoverRender() {
+  const host = document.getElementById('pc-sorter-takeover-host');
+  if (!host) return;
+  const members = _SORTER._takeover.members || [];
+  if (!members.length) { host.innerHTML = '<div style="border:1px solid var(--border,#2a2a31);border-radius:10px;padding:14px 16px;color:var(--text-mute,#888);">No promoted members yet — finish the Stripe step first.</div>'; return; }
+  const pend = _SORTER._takeover.pendingCancel || {};
+  const tagPill = (t, label) => {
+    const c = t === 'fine' ? ['#1f7a3d', '#7BC47F'] : t === 'needs_card' ? ['#c9871f', '#e0a93f'] : t === 'move' ? ['#7a5a2f', '#e0a93f'] : ['#2a2a31', '#888'];
+    return `<span style="font-size:10px;font-weight:800;padding:2px 7px;border-radius:6px;border:1px solid ${c[0]};color:${c[1]};white-space:nowrap;">${label}</span>`;
+  };
+  const counts = { move: 0, needs_card: 0, fine: 0 };
+  const rows = members.map(m => {
+    const name = escapeHTML(m.athlete || '');
+    const moved = m.tag === 'fine';
+    const cancelOld = pend[m.member_id];
+    if (m.tag in counts) counts[m.tag]++;
+    let right = '';
+    if (cancelOld) {
+      // New sub made this session; old one still needs a manual cancel.
+      right = `<span style="font-size:10px;color:#e0a93f;font-weight:700;">⚠ cancel old sub</span>
+        <a href="${escapeHTML(cancelOld.url || '#')}" target="_blank" rel="noopener" onclick="setTimeout(()=>_sorterTakeoverVerify('${m.member_id}'),600)" style="font-size:10px;border:1px solid var(--border,#2a2a31);border-radius:6px;padding:3px 7px;color:var(--accent,#E8C547);text-decoration:none;">Jump to Stripe ↗</a>
+        <button onclick="_sorterTakeoverVerify('${m.member_id}')" style="font-size:10px;border:1px solid var(--border,#2a2a31);background:transparent;color:var(--text-mute,#888);border-radius:6px;padding:3px 7px;cursor:pointer;">check</button>`;
+    } else if (moved) {
+      right = tagPill('fine', '✓ on portal');
+    } else if (m.tag === 'needs_card') {
+      right = `${tagPill('needs_card', 'needs card')}<button onclick="_sorterTakeoverCardLink('${m.member_id}',this)" style="font-size:10px;border:1px solid var(--accent,#E8C547);background:rgba(232,197,71,0.12);color:var(--accent,#E8C547);border-radius:6px;padding:3px 8px;cursor:pointer;">Get card link</button>`;
+    } else if (m.tag === 'move') {
+      right = `<button onclick="_sorterTakeoverOpen('${m.member_id}')" style="font-size:11px;font-weight:700;border:1px solid var(--accent,#E8C547);background:rgba(232,197,71,0.12);color:var(--accent,#E8C547);border-radius:7px;padding:5px 10px;cursor:pointer;">Review &amp; move →</button>`;
+    } else if (m.tag === 'no_sub') {
+      right = `<span style="font-size:10px;color:var(--text-mute,#888);">set up in Cleanup</span>`;
+    } else {
+      right = `<span style="font-size:10px;color:var(--danger,#e0654f);">${escapeHTML(m.title || 'error')}</span>`;
+    }
+    const made = m.made_by ? `<span style="color:var(--text-mute,#888);"> · ${escapeHTML(m.made_by)}</span>` : '';
+    const sub = (m.amount && m.amount !== '—') ? `<span style="color:var(--text-mute,#888);"> · ${escapeHTML(m.amount)}${m.next_charge ? ' · next ' + escapeHTML(m.next_charge) : ''}</span>` : '';
+    return `<div style="display:flex;align-items:center;gap:8px;border:1px solid var(--border,#2a2a31);border-radius:8px;padding:8px 10px;margin-bottom:6px;">
+      <div style="flex:1;min-width:0;font-size:12px;"><b style="color:var(--text,#eee);">${name}</b>${made}${sub}</div>
+      <div style="flex:none;display:flex;align-items:center;gap:6px;flex-wrap:wrap;justify-content:flex-end;">${right}</div>
+    </div>`;
+  }).join('');
+  const summary = `<div style="font-size:12px;color:var(--text-mute,#888);margin-bottom:10px;"><b style="color:#e0a93f;">${counts.move}</b> to move · <b style="color:#e0a93f;">${counts.needs_card}</b> need a card · <b style="color:#7BC47F;">${counts.fine}</b> on portal</div>`;
+  host.innerHTML = summary + rows;
+}
+async function _sorterTakeoverCardLink(memberId, btn) {
+  if (btn) { btn.disabled = true; btn.textContent = '…'; }
+  try {
+    const token = await _mreqAuthToken();
+    const r = await fetch('/api/sorter/take-over', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token }, body: JSON.stringify({ client_id: _aiClientId(), member_id: memberId, mode: 'preview' }) });
+    const json = await _safeJson(r);
+    if (!r.ok) throw new Error(_sorterErr(json.error) || ('HTTP ' + r.status));
+    if (json.payment_link) { _sorterCopy(json.payment_link, btn); if (btn) btn.textContent = 'link copied ✓ — send it'; }
+    else if (!json.needs_card) { if (btn) { btn.textContent = 'card on file ✓'; } _sorterTakeoverLoad(); }
+    else if (btn) btn.textContent = 'no link';
+  } catch (e) { if (btn) { btn.disabled = false; btn.textContent = 'retry'; } alert('Card link failed: ' + _sorterErr(e)); }
+}
+async function _sorterTakeoverVerify(memberId) {
+  const pc = (_SORTER._takeover.pendingCancel || {})[memberId];
+  if (!pc) return;
+  try {
+    const token = await _mreqAuthToken();
+    const r = await fetch('/api/sorter/take-over', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token }, body: JSON.stringify({ client_id: _aiClientId(), mode: 'verify-cancel', old_sub_id: pc.old_sub_id }) });
+    const json = await _safeJson(r);
+    if (r.ok && json.cancelled) { delete _SORTER._takeover.pendingCancel[memberId]; _sorterTakeoverLoad(); }
+    else { _sorterTakeoverRender(); }
+  } catch (_) {}
+}
+// ── Per-member AI chat + make modal (reuses the connect-host overlay) ──
+async function _sorterTakeoverOpen(memberId) {
+  const hostEl = document.getElementById('pc-sorter-connect-host');
+  if (!hostEl) return;
+  hostEl.innerHTML = `<div onclick="_sorterCloseConnect()" style="position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:140;"></div>
+    <div style="position:fixed;z-index:141;top:50%;left:50%;transform:translate(-50%,-50%);width:min(560px,95vw);max-height:86vh;overflow:auto;background:var(--surface,#16161a);border:1px solid var(--border,#2a2a31);border-radius:14px;padding:18px 20px;">${_sorterLoading('Reading their billing…')}</div>`;
+  try {
+    const token = await _mreqAuthToken();
+    const r = await fetch('/api/sorter/take-over-ai', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token }, body: JSON.stringify({ client_id: _aiClientId(), member_id: memberId, mode: 'verdict' }) });
+    const json = await _safeJson(r);
+    if (!r.ok) throw new Error(_sorterErr(json.error) || ('HTTP ' + r.status));
+    _SORTER._takeover.detail[memberId] = { ...json, chat: [{ role: 'assistant', content: json.explanation || (json.verdict && json.verdict.reason) || '' }], priceChoice: 'grandfather', done: null };
+    _sorterTakeoverModalRender(memberId);
+  } catch (e) { _sorterCloseConnect(); alert("Couldn't load: " + _sorterErr(e)); }
+}
+function _sorterTakeoverModalRender(memberId) {
+  const hostEl = document.getElementById('pc-sorter-connect-host');
+  const d = _SORTER._takeover.detail[memberId];
+  if (!hostEl || !d) return;
+  const f = d.facts || {}, rec = d.recommend || {}, cur = f.current_sub || {};
+  const athlete = escapeHTML((f.member && f.member.athlete) || 'Member');
+  const chat = (d.chat || []).map(m => {
+    const me = m.role === 'user';
+    return `<div style="display:flex;justify-content:${me ? 'flex-end' : 'flex-start'};margin-bottom:7px;"><div style="max-width:82%;font-size:12px;line-height:1.45;padding:7px 10px;border-radius:10px;background:${me ? 'rgba(232,197,71,0.14)' : 'rgba(255,255,255,0.04)'};color:var(--text,#eee);border:1px solid var(--border,#2a2a31);">${me ? '' : '🤖 '}${escapeHTML(m.content)}</div></div>`;
+  }).join('');
+  let actionBlock;
+  if (d.done) {
+    actionBlock = `<div style="border:1px solid #1f7a3d;background:rgba(123,196,127,0.08);border-radius:10px;padding:11px 13px;font-size:12px;">
+        <div style="color:#7BC47F;font-weight:800;margin-bottom:5px;">✓ New portal sub created</div>
+        <div style="color:var(--text-mute,#888);margin-bottom:9px;">Now cancel the old one (we can't — Stripe blocks it).</div>
+        <a href="${escapeHTML(d.done.cancel_old_url || '#')}" target="_blank" rel="noopener" style="display:inline-block;font-size:12px;font-weight:700;padding:7px 12px;border-radius:8px;border:1px solid var(--accent,#E8C547);color:var(--accent,#E8C547);text-decoration:none;">Cancel old sub in Stripe ↗</a>
+      </div>`;
+  } else {
+    const canon = rec.canonical_amount_cents != null && rec.price_differs;
+    const gf = (cur.amount || (rec.grandfather_amount_cents != null ? ('$' + (rec.grandfather_amount_cents / 100).toFixed(2)) : '—'));
+    const opt = (val, label, sub) => `<label style="display:flex;gap:8px;align-items:center;font-size:12px;padding:7px 9px;border:1px solid ${d.priceChoice === val ? 'var(--accent,#E8C547)' : 'var(--border,#2a2a31)'};border-radius:8px;cursor:pointer;margin-bottom:6px;"><input type="radio" name="tkprice-${memberId}" ${d.priceChoice === val ? 'checked' : ''} onchange="_SORTER._takeover.detail['${memberId}'].priceChoice='${val}';_sorterTakeoverModalRender('${memberId}')"><span><b style="color:var(--text,#eee);">${label}</b> <span style="color:var(--text-mute,#888);">${sub}</span></span></label>`;
+    actionBlock = `<div style="font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--text-mute,#888);margin-bottom:6px;">What to bill on the new sub</div>
+      ${opt('grandfather', 'Keep current price', gf + (cur.interval ? '/' + escapeHTML(cur.interval) : '') + ' — no change')}
+      ${canon ? opt('canonical', 'Move to offer price', '$' + (rec.canonical_amount_cents / 100).toFixed(2) + '/mo') : ''}
+      <div style="font-size:11px;color:var(--text-mute,#888);margin:4px 0 10px;">First charge: <b style="color:var(--text,#eee);">${escapeHTML(rec.first_charge_iso || 'next cycle')}</b> · ${cur.card_on_file === false || (f.card && f.card.on_file === false) ? '<span style="color:#e0a93f;">no card — get a link first</span>' : 'reuses card on file'}</div>
+      <button onclick="_sorterTakeoverMake('${memberId}',this)" style="width:100%;font-size:13px;font-weight:800;padding:10px;border-radius:9px;border:none;background:var(--accent,#E8C547);color:#1a1a1a;cursor:pointer;">Make the portal sub</button>`;
+  }
+  hostEl.innerHTML = `<div onclick="_sorterCloseConnect()" style="position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:140;"></div>
+    <div style="position:fixed;z-index:141;top:50%;left:50%;transform:translate(-50%,-50%);width:min(560px,95vw);max-height:88vh;display:flex;flex-direction:column;background:var(--surface,#16161a);border:1px solid var(--border,#2a2a31);border-radius:14px;padding:18px 20px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex:none;">
+        <div style="font-size:15px;font-weight:800;">${athlete} <span style="font-size:11px;font-weight:600;color:var(--text-mute,#888);">· ${escapeHTML(cur.made_by || '')}${cur.amount ? ' · ' + escapeHTML(cur.amount) : ''}</span></div>
+        <button onclick="_sorterCloseConnect()" style="background:none;border:none;color:var(--text-mute,#888);font-size:20px;cursor:pointer;">×</button>
+      </div>
+      <div style="flex:1;min-height:0;overflow:auto;margin-bottom:10px;">${chat}</div>
+      <div style="display:flex;gap:6px;margin-bottom:12px;flex:none;">
+        <input id="tkchat-${memberId}" placeholder="Ask about this member…" onkeydown="if(event.key==='Enter')_sorterTakeoverChat('${memberId}')" style="flex:1;font-size:12px;padding:8px 10px;border-radius:8px;border:1px solid var(--border,#2a2a31);background:var(--bg,#0e0e11);color:var(--text,#eee);">
+        <button onclick="_sorterTakeoverChat('${memberId}')" style="font-size:12px;font-weight:700;padding:8px 12px;border-radius:8px;border:1px solid var(--border,#2a2a31);background:transparent;color:var(--text,#eee);cursor:pointer;">Ask</button>
+      </div>
+      <div style="flex:none;border-top:1px solid var(--border,#2a2a31);padding-top:12px;">${actionBlock}</div>
+    </div>`;
+}
+async function _sorterTakeoverChat(memberId) {
+  const d = _SORTER._takeover.detail[memberId];
+  const inp = document.getElementById('tkchat-' + memberId);
+  if (!d || !inp || !inp.value.trim()) return;
+  d.chat.push({ role: 'user', content: inp.value.trim() });
+  d.chat.push({ role: 'assistant', content: '…' });
+  _sorterTakeoverModalRender(memberId);
+  try {
+    const token = await _mreqAuthToken();
+    const r = await fetch('/api/sorter/take-over-ai', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token }, body: JSON.stringify({ client_id: _aiClientId(), member_id: memberId, mode: 'chat', messages: d.chat.filter(m => m.content !== '…') }) });
+    const json = await _safeJson(r);
+    d.chat.pop();
+    d.chat.push({ role: 'assistant', content: (r.ok && json.reply) ? json.reply : ('Sorry — ' + _sorterErr(json.error)) });
+    if (r.ok && json.suggest && json.suggest.price_choice) d.priceChoice = json.suggest.price_choice;
+    _sorterTakeoverModalRender(memberId);
+  } catch (e) { d.chat.pop(); d.chat.push({ role: 'assistant', content: 'Error: ' + _sorterErr(e) }); _sorterTakeoverModalRender(memberId); }
+}
+async function _sorterTakeoverMake(memberId, btn) {
+  const d = _SORTER._takeover.detail[memberId];
+  if (!d) return;
+  if (btn) { btn.disabled = true; btn.textContent = 'Making the sub…'; }
+  try {
+    const token = await _mreqAuthToken();
+    const payload = { client_id: _aiClientId(), member_id: memberId, mode: 'create' };
+    if (d.priceChoice === 'canonical' && d.recommend && d.recommend.canonical_price_id) payload.price_id = d.recommend.canonical_price_id;
+    const r = await fetch('/api/sorter/take-over', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token }, body: JSON.stringify(payload) });
+    const json = await _safeJson(r);
+    if (!r.ok) throw new Error(_sorterErr(json.error) || ('HTTP ' + r.status));
+    d.done = json;
+    if (json.old_sub_id) _SORTER._takeover.pendingCancel[memberId] = { old_sub_id: json.old_sub_id, url: json.cancel_old_url };
+    _sorterTakeoverModalRender(memberId);
+  } catch (e) { if (btn) { btn.disabled = false; btn.textContent = 'Make the portal sub'; } alert('Couldn\'t make the sub: ' + _sorterErr(e)); }
+}
+
+// ───────────────────────────── STEP 7 — Finish (promote to live roster) ─────────────────
 function _sorterRenderStepFinish(host) {
   host.innerHTML = `
     <div style="font-size:12.5px;color:var(--text-mute,#888);margin-bottom:14px;">Last step. Promote your cleaned-up members to the live roster. Only members that passed Stripe cleanup are promoted; anything still flagged stays in staging.</div>
@@ -23276,7 +23477,7 @@ function _sorterRenderStep4(host) {
     <div id="pc-sorter-ghl-host">
       <button onclick="_sorterRunGhlLink()" style="font-size:13px;font-weight:700;padding:9px 16px;border-radius:9px;border:1px solid var(--accent,#E8C547);background:rgba(232,197,71,0.12);color:var(--accent,#E8C547);cursor:pointer;">Find GHL matches</button>
     </div>`;
-  _sorterSetNext(`<button onclick="_sorterGoto(6)" style="font-size:13px;font-weight:700;padding:9px 18px;border-radius:9px;border:none;background:var(--accent,#E8C547);color:#1a1a1a;cursor:pointer;">Next: Finish &rarr;</button>`);
+  _sorterSetNext(`<button onclick="_sorterGoto(6)" style="font-size:13px;font-weight:700;padding:9px 18px;border-radius:9px;border:none;background:var(--accent,#E8C547);color:#1a1a1a;cursor:pointer;">Next: Billing &rarr;</button>`);
 }
 
 async function _sorterRunGhlLink() {
@@ -24104,6 +24305,7 @@ function _renderMemberModalBody(m, stripe, history) {
       ${btn('Refund',      `mRefund('${m.id}')`)}
       ${btn('Cancel',      `mCancel('${m.id}','${escapeHTML((m.athlete_name||'').replace(/'/g, ''))}')`)}
       ${btn('Payment link',`mPaymentLink('${m.id}')`)}
+      ${btn('💳 Get card link',`mGetCardLink('${m.id}')`)}
       ${btn('Referred',    `mReferred('${m.id}')`)}
       ${m.billing_mode === 'alternate'
         ? btn('Switch to Stripe billing', `_memberUpdateField('${m.id}','billing_mode','')`)
@@ -24380,6 +24582,15 @@ async function mPaymentLink(memberId) {
     const r = await _memberAction(memberId, 'payment-link', {});
     _openPaymentLinkModal(memberId, r);
   } catch (e) { alert('Payment link failed: ' + e.message); }
+}
+
+// Standalone "save your card" link (no sub attached) — for members with no card on
+// file ("collecting payment"). Reuses the payment-link send modal (same response shape).
+async function mGetCardLink(memberId) {
+  try {
+    const r = await _memberAction(memberId, 'card-setup-link', {});
+    _openPaymentLinkModal(memberId, r);
+  } catch (e) { alert('Card link failed: ' + (e.message || e)); }
 }
 
 // Right-side modal: shows the Stripe portal URL + pre-formatted SMS/email

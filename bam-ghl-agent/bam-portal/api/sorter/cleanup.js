@@ -537,6 +537,12 @@ async function handler(req, res) {
           interval: price && price.recurring ? `${price.recurring.interval_count > 1 ? price.recurring.interval_count + " " : ""}${price.recurring.interval}` : null,
           started: sub.created ? new Date(sub.created * 1000).toISOString().slice(0, 10) : null,
           canceled_at: sub.canceled_at ? new Date(sub.canceled_at * 1000).toISOString().slice(0, 10) : null,
+          // Raw billing fields (unix) so the popup can compute "Next payment".
+          current_period_end: (item && item.current_period_end) || sub.current_period_end || null,
+          trial_end: sub.trial_end || null,
+          cancel_at: sub.cancel_at || null,
+          cancel_at_period_end: !!sub.cancel_at_period_end,
+          paused: !!sub.pause_collection,
         };
       };
       if (client.stripe_connect_account_id && cust) {
@@ -585,6 +591,16 @@ async function handler(req, res) {
       let candidates = [];
       try { candidates = await gatherCandidates(client.stripe_connect_account_id, s, cust); } catch (_) {}
       const ambiguous = candidates.length > 1;
+      // "Next payment" verdict for the primary sub — same logic as the cleanup
+      // table column, so the popup and the row always agree.
+      const next_payment = computeNextPayment({
+        link: stripe ? {
+          status: stripe.status, current_period_end: stripe.current_period_end,
+          trial_end: stripe.trial_end, cancel_at: stripe.cancel_at,
+          cancel_at_period_end: stripe.cancel_at_period_end, paused: stripe.paused,
+        } : null,
+        cat: stripe ? { interval: stripe.interval } : null, offerKey: s.plan || "", altPay: false,
+      });
       return res.status(200).json({
         ok: true,
         member: {
@@ -596,7 +612,7 @@ async function handler(req, res) {
           promoted: !!s.promoted, promoted_member_id: s.promoted_member_id || null,
           raw: s.raw && typeof s.raw === "object" ? s.raw : null, // extra CSV columns
         },
-        stripe, subs, charges, targets, recommendation,
+        stripe, subs, charges, targets, recommendation, next_payment,
         stripe_error: stripeError, candidates, ambiguous,
         stripe_account_id: client.stripe_connect_account_id || null,
       });

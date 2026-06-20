@@ -500,17 +500,26 @@ async function handleInvoiceSucceeded(event, connectedAccount, res) {
     let onbSub = null;
     try { onbSub = await stripeFetch(`/subscriptions/${subId}`, connectedAccount); } catch (_) { onbSub = null; }
     if (onbSub && onbSub.metadata && isPortalOwnedOrigin(onbSub.metadata.origin)) {
+      // Silent import: this sub was created by the member-import "take over billing"
+      // step for an EXISTING member, not a new signup. Flip to live, but suppress the
+      // whole welcome side — no GHL workflow enrollment / welcome emails, no CoachIQ
+      // re-grant (they already have access + credits), no "new signup" staff SMS.
+      const silent = onbSub.metadata.import_silent === "1";
       await sb(`members?id=eq.${member.id}`, {
         method: "PATCH", headers: { Prefer: "return=minimal" },
         body: JSON.stringify({ status: "live", updated_at: nowIso() }),
       });
       let activations = null;
-      try {
-        activations = await fireOnboardingActivations(member, {
-          plan: onbSub.metadata.plan, term: onbSub.metadata.term, sb, writeAudit,
-        });
-      } catch (e) {
-        activations = { error: String((e && e.message) || e) };
+      if (silent) {
+        activations = { skipped: "import_silent" };
+      } else {
+        try {
+          activations = await fireOnboardingActivations(member, {
+            plan: onbSub.metadata.plan, term: onbSub.metadata.term, sb, writeAudit,
+          });
+        } catch (e) {
+          activations = { error: String((e && e.message) || e) };
+        }
       }
       // Commitment terms that "go back to monthly": attach the revert schedule now
       // that the upfront commitment invoice is paid. Non-fatal.
@@ -523,32 +532,35 @@ async function handleInvoiceSucceeded(event, connectedAccount, res) {
       // Text staff that a new parent just signed up + paid. Non-fatal: an SMS
       // failure must never break webhook handling. Destination = the academy's
       // configured staff phone (clients.staff_notify_phone), else env fallback.
-      let staffNotify = null;
-      try {
-        const cRows = await sb(`clients?id=eq.${member.client_id}&select=id,business_name,ghl_location_id,ghl_access_token,ghl_refresh_token,ghl_token_expires_at,staff_notify_phone&limit=1`);
-        const client = Array.isArray(cRows) && cRows[0];
-        const toPhone = (client && client.staff_notify_phone) || process.env.STAFF_NOTIFY_PHONE || null;
-        if (client && toPhone) {
-          const amt = inv.amount_paid != null ? `$${(inv.amount_paid / 100).toFixed(2)}` : "—";
-          const msg = `🎉 New signup — ${client.business_name || "academy"}\n`
-            + `Athlete: ${member.athlete_name || "—"}\n`
-            + `Parent: ${member.parent_name || "—"}${member.parent_email ? " · " + member.parent_email : ""}${member.parent_phone ? " · " + member.parent_phone : ""}\n`
-            + `Plan: ${onbSub.metadata.plan || "—"} · ${onbSub.metadata.term || "—"}\n`
-            + `Paid: ${amt} · status LIVE`;
-          staffNotify = await sendSms({ client, toPhone, message: msg, contactName: "BAM Staff" });
-        } else {
-          staffNotify = { ok: false, error: "no staff_notify_phone configured" };
+      // Skipped for silent imports (existing members, not new signups).
+      let staffNotify = silent ? { skipped: "import_silent" } : null;
+      if (!silent) {
+        try {
+          const cRows = await sb(`clients?id=eq.${member.client_id}&select=id,business_name,ghl_location_id,ghl_access_token,ghl_refresh_token,ghl_token_expires_at,staff_notify_phone&limit=1`);
+          const client = Array.isArray(cRows) && cRows[0];
+          const toPhone = (client && client.staff_notify_phone) || process.env.STAFF_NOTIFY_PHONE || null;
+          if (client && toPhone) {
+            const amt = inv.amount_paid != null ? `$${(inv.amount_paid / 100).toFixed(2)}` : "—";
+            const msg = `🎉 New signup — ${client.business_name || "academy"}\n`
+              + `Athlete: ${member.athlete_name || "—"}\n`
+              + `Parent: ${member.parent_name || "—"}${member.parent_email ? " · " + member.parent_email : ""}${member.parent_phone ? " · " + member.parent_phone : ""}\n`
+              + `Plan: ${onbSub.metadata.plan || "—"} · ${onbSub.metadata.term || "—"}\n`
+              + `Paid: ${amt} · status LIVE`;
+            staffNotify = await sendSms({ client, toPhone, message: msg, contactName: "BAM Staff" });
+          } else {
+            staffNotify = { ok: false, error: "no staff_notify_phone configured" };
+          }
+        } catch (e) {
+          staffNotify = { ok: false, error: String((e && e.message) || e) };
         }
-      } catch (e) {
-        staffNotify = { ok: false, error: String((e && e.message) || e) };
       }
       await writeAudit({
         client_id: member.client_id, member_id: member.id,
-        action_type: "onboarding-activated",
-        args: { invoice_id: inv.id, sub_id: subId, plan: onbSub.metadata.plan, term: onbSub.metadata.term, activations, staff_notify: staffNotify, commitment_schedule: commitmentSchedule },
+        action_type: silent ? "import-activated-silent" : "onboarding-activated",
+        args: { invoice_id: inv.id, sub_id: subId, plan: onbSub.metadata.plan, term: onbSub.metadata.term, silent, activations, staff_notify: staffNotify, commitment_schedule: commitmentSchedule },
         db_changes: { members: { status: { from: "payment_method_required", to: "live" } } },
       });
-      return res.status(200).json({ ok: true, action: "onboarding-activated", member_id: member.id, activations, staff_notify: staffNotify, commitment_schedule: commitmentSchedule });
+      return res.status(200).json({ ok: true, action: silent ? "import-activated-silent" : "onboarding-activated", member_id: member.id, activations, staff_notify: staffNotify, commitment_schedule: commitmentSchedule });
     }
   }
 
