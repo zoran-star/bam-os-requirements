@@ -100,21 +100,24 @@ function _termFromLen(len) {
   return null;
 }
 async function buildTargets(clientId) {
-  const offers = await sb(`offers?client_id=eq.${encodeURIComponent(clientId)}&status=neq.archived&select=id,title,data`) || [];
+  // LIVE offer-prices ONLY: routable canonical pricing_catalog rows on non-archived
+  // offers (what the portal actually bills) — not every configured combo.
+  const offers = await sb(`offers?client_id=eq.${encodeURIComponent(clientId)}&status=neq.archived&select=id`).catch(() => []) || [];
+  const liveOfferIds = new Set((offers || []).map(o => o.id));
+  const rows = await sb(
+    `pricing_catalog?client_id=eq.${encodeURIComponent(clientId)}&tier=eq.canonical&is_routable=is.true` +
+    `&offer_price_key=not.is.null&select=offer_price_key,amount_cents,offer_id`
+  ).catch(() => []) || [];
+  const termLabel = (t) => (t === "monthly" || t === "4_weeks") ? "Monthly"
+    : t === "3_months" ? "3 months" : t === "6_months" ? "6 months" : t === "12_months" ? "12 months" : String(t || "").replace("_", " ");
+  const seen = new Set();
   const out = [];
-  for (const o of offers) {
-    const offerings = (o.data && o.data.pricing && o.data.pricing.pricing_offerings) || [];
-    for (const off of offerings) {
-      if (String(off.type || "").toLowerCase() !== "membership") continue;
-      const title = String(off.title || "").trim();
-      if (!title) continue;
-      const base = parseFloat(off.price);
-      if (!isNaN(base)) out.push({ key: `${title}|monthly`, label: `${title} · Monthly`, amount_cents: Math.round(base * _HST * 100) });
-      for (const c of (off.commitments || [])) {
-        const term = _termFromLen(c.length); const cb = parseFloat(c.price);
-        if (term && !isNaN(cb)) out.push({ key: `${title}|${term}`, label: `${title} · ${term.replace("_", " ")}`, amount_cents: Math.round(cb * _HST * 100) });
-      }
-    }
+  for (const r of (rows || [])) {
+    if (!r.offer_price_key || seen.has(r.offer_price_key)) continue;
+    if (r.offer_id && !liveOfferIds.has(r.offer_id)) continue; // offer archived → skip
+    seen.add(r.offer_price_key);
+    const [plan, term] = String(r.offer_price_key).split("|");
+    out.push({ key: r.offer_price_key, label: `${plan} · ${termLabel(term)}`, amount_cents: r.amount_cents });
   }
   return out;
 }
@@ -370,7 +373,7 @@ async function handler(req, res) {
       subscription: sub ? {
         status: sub.status,
         amount: subPrice ? `$${((subPrice.unit_amount || 0) / 100).toFixed(2)}` : null,
-        interval: subPrice && subPrice.recurring ? subPrice.recurring.interval : null,
+        interval: subPrice && subPrice.recurring ? `${subPrice.recurring.interval_count > 1 ? subPrice.recurring.interval_count + " " : ""}${subPrice.recurring.interval}${subPrice.recurring.interval_count > 1 ? "s" : ""}` : null,
         current_period_end: iso(sub.current_period_end),
         trial_end: iso(sub.trial_end),
         cancel_at_period_end: !!sub.cancel_at_period_end,
