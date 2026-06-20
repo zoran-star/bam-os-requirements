@@ -10867,6 +10867,19 @@ function _mobileMoreRender() {
   html += items.length
     ? items.map(it => `<button type="button" class="mobile-more-item" onclick="_mobileMorePick('${it.view}')">${it.icon}<span>${escapeHTML(it.label)}</span></button>`).join('')
     : '<div style="padding:16px 12px;color:var(--text-mute)">Nothing else here yet.</div>';
+
+  // ── Preview as <teammate> (owner / BAM staff only) — bottom of the sheet ──
+  const _canPv = (_MY_TAB_ROLE === 'owner') || _IS_BAM_STAFF === true;
+  if (_canPv) {
+    html += `<div class="mobile-more-divider"></div>`;
+    if (typeof _PREVIEW_AS !== 'undefined' && _PREVIEW_AS) {
+      html += `<div class="mobile-more-title">👁 Previewing as ${escapeHTML(_PREVIEW_AS.name)}</div>`;
+      html += `<button type="button" class="mobile-more-item" onclick="_exitPreview(); _mobileMoreClose();"><span>✕ Exit preview</span></button>`;
+    } else if ((typeof _PREVIEW_STAFF_LIST !== 'undefined' ? _PREVIEW_STAFF_LIST : []).length) {
+      html += `<div class="mobile-more-title">👁 Preview as</div>`;
+      html += _PREVIEW_STAFF_LIST.map(r => `<button type="button" class="mobile-more-item" onclick="_previewAsStaff('${r.id}'); _mobileMoreClose();"><span>${escapeHTML(r.name || r.email || 'teammate')}</span></button>`).join('');
+    }
+  }
   list.innerHTML = html;
 }
 function _mobileMoreAcctFilter(v) {
