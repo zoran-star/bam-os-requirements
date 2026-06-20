@@ -115,6 +115,27 @@ portal then READS Stripe to confirm it's gone and auto-greens the row).
   `payment_method.attached` (already handled) → portal makes the sub → row greens. New build =
   button + status wiring only; link/card-page/auto-detect already exist.
 
+### BUILD PROGRESS (2026-06-19, branch `feat/member-popup-next-payment` has #1; take-over on a new branch)
+- ✅ **Piece 1 — silent mode** (`api/stripe/webhook.js`): sub metadata `import_silent=1` →
+  webhook flips member live but skips GHL workflow/welcome/SMS + CoachIQ re-grant. Audit
+  `import-activated-silent`. COMMITTED.
+- ✅ **Piece 2 — backend take-over** (`api/sorter/take-over.js`): modes preview / create /
+  verify-cancel. Grandfathers current amount via portal-owned inline price (price_id overrides),
+  trial_end = next-charge anchor, metadata origin=fullcontrol-portal + import_silent=1, points
+  members.stripe_subscription_id at new sub, returns old_sub_id + Stripe deep link for manual
+  cancel. COMMITTED.
+- ✅ **Piece 3 — AI verdict + chat** (`api/sorter/take-over-ai.js`): advisory only (AI never
+  moves money; execution stays in take-over.js). mode=verdict (deterministic fine/move/needs_card/
+  no_sub + Claude one-liner), mode=chat (haiku). COMMITTED.
+- ⏳ **Piece 4 — UI step** (client-portal.html): NOT built. Needs renumbering the sorter step
+  machine (Finish 6→7, new Billing step at index 6; steps array :20906, dispatch :20940-20945,
+  Next-button host, _sorterGoto/minStep). New `_sorterRenderStepTakeover` (roster table w/ AI
+  verdicts via take-over-ai, per-member AI chat modal, [Make it]→take-over.js create, [Jump to
+  Stripe ↗] cancel deep link, poll verify-cancel → green, copy-sub button for CoachIQ manual).
+- ⏳ **Piece 5 — gap fixes**: surface promote-skipped rows at Finish; "✓ set up" badge on member
+  card; [Get card link] button + collecting-payment status on member card.
+- NONE deployed yet (bam-portal no auto-deploy). Backend endpoints committed but untested live.
+
 ### Integration analysis + DECISIONS (Zoran, 2026-06-19)
 Mapped against the goal: after import, Members tab has everyone, tied to onboarding, all
 member actions work. Key finding: **member actions REJECT on foreign subs** ("not created by
