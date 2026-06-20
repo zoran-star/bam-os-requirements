@@ -37,7 +37,9 @@ const STRIPE_API = "https://api.stripe.com/v1";
 
 // Subs the portal CREATED (so Stripe lets us pause/cancel/change them). Foreign
 // subs (CoachIQ/GHL/dashboard) reject every write — the popup greys those actions.
-const PORTAL_OWNED_ORIGINS = new Set(["fullcontrol-portal", "fullcontrol-website-enrollment", "fullcontrol-prepaid-monthly"]);
+// One standard portal-owned marker = metadata.origin in this set (matches webhook.js).
+// setup-monthly subs now also stamp origin=fullcontrol-portal (no more divergent 'source').
+const PORTAL_OWNED_ORIGINS = new Set(["fullcontrol-portal", "fullcontrol-website-enrollment"]);
 
 const PLAN_TO_PRICE = {
   "1/wk":   "plan_ToNwa96lQ5I1Bs",   // Steady       $226 / 4-wk all-in
@@ -1460,7 +1462,7 @@ async function cronProcessScheduledPauses(res) {
       });
       if (!Array.isArray(claimRows) || claimRows.length === 0) continue;
 
-      const memberRows = await sb(`members?id=eq.${row.member_id}&select=id,client_id,status`);
+      const memberRows = await sb(`members?id=eq.${row.member_id}&select=id,client_id,status,stripe_subscription_id`);
       const member = Array.isArray(memberRows) && memberRows[0];
 
       // Member row gone — pause already cleaned up implicitly.
@@ -1477,10 +1479,12 @@ async function cronProcessScheduledPauses(res) {
         continue;
       }
 
-      // Only flip to 'live' if still 'paused'. Other statuses (cancelling,
-      // payment_failed) shouldn't be overridden by the cron.
+      // Only flip to 'live' if still 'paused' AND there's a real subscription to
+      // resume. A no-sub paused member (e.g. pause-date-fix, no Stripe) has nothing
+      // to bill — flipping them 'live' would falsely show an active member paying $0.
+      // Leave them paused; the pause row is still completed so it stops re-triggering.
       let flipped = false;
-      if (member.status === "paused") {
+      if (member.status === "paused" && member.stripe_subscription_id) {
         await sb(`members?id=eq.${member.id}`, {
           method: "PATCH",
           headers: { Prefer: "return=minimal" },

@@ -18955,7 +18955,7 @@ function _memberStatusPill(status, opts) {
 function _memberSetupBadge(m) {
   if (!m || m.status !== 'live' || !m.ghl_contact_id) return '';
   const ciq = m.coachiq_member_id ? ' + CoachIQ' : '';
-  return `<span title="Live, billing on the portal, linked to GHL${ciq}" style="display:inline-block;font-size:10px;font-weight:800;padding:2px 8px;border-radius:999px;background:transparent;border:1px solid #1f7a3d;color:#7BC47F">✓ set up</span>`;
+  return `<span title="Live · linked to GHL${ciq}. Open the member to confirm billing is portal-managed." style="display:inline-block;font-size:10px;font-weight:800;padding:2px 8px;border-radius:999px;background:transparent;border:1px solid #1f7a3d;color:#7BC47F">✓ set up</span>`;
 }
 
 function _memberEngagementChip(eng) {
