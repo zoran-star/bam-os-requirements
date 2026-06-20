@@ -49,5 +49,7 @@ New `content_executor` role — CONTENT-ONLY. In `_roles.js` it's in `ANY_STAFF_
 
 **Env to set in Vercel:** `CONTENT_ORGANIC_ASSIGNEE_EMAIL` = Eli's staff email (else falls back to first `content_executor` row). `MARKETING_MANAGER_EMAIL` already defaults to `cameron@byanymeansbusiness.com`.
 
+⚠️ **GOTCHA — `staff.role` has a DB CHECK constraint `staff_role_check`** enumerating allowed role strings. Adding a new staff role needs BOTH the app-layer sets in `api/_roles.js`/`StaffModals` AND a migration that rebuilds `staff_role_check` to include it — otherwise invite-staff fails with `new row for relation "staff" violates check constraint "staff_role_check"`. Fixed for content_executor in `20260620120000_staff_role_add_content_executor.sql`. Keep the constraint's role list in sync with `ANY_STAFF_ROLES`.
+
 ## To demo
 Flip the staff "Organic content" toggle on a client → their Marketing tab shows the Ads | Organic split.
