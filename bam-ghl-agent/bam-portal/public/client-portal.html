@@ -19099,8 +19099,9 @@ function _memberPriceLabel(pricing) {
   };
   const per = intervalMap[pricing.interval] || (pricing.interval ? '/' + pricing.interval : '');
   const name = pricing.display_name || pricing.canonical_plan || '';
-  const text = (name ? name + ' · ' : '') + amt + per;
-  return `<span title="${escapeHTML(text)}" style="display:inline-block;font-size:11px;font-weight:600;color:var(--text-mute);white-space:nowrap">${escapeHTML(text)}</span>`;
+  const full = (name ? name + ' · ' : '') + amt + per;   // tooltip
+  const short = amt + per;                                 // clean on-card label
+  return `<span title="${escapeHTML(full)}" style="display:inline-block;font-size:11px;font-weight:600;color:var(--text-mute);white-space:nowrap">${escapeHTML(short)}</span>`;
 }
 
 // Circular avatar — uses uploaded image if present, otherwise initials on
@@ -19280,22 +19281,24 @@ function _renderMembersView() {
       .member-card-parent { font-size:12px; color:var(--text-mute); margin-top:2px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
       .member-card-trainer { font-size:13px; color:var(--text-mute); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
       .member-card-pills { display:flex; gap:6px; align-items:center; justify-content:flex-end; flex-wrap:wrap; }
+      .member-pills-extra { display:contents; }
       @media (max-width: 640px) {
         .member-card {
-          grid-template-columns: 38px 1fr;
-          gap: 4px 11px;
+          grid-template-columns: 42px 1fr;
+          gap: 2px 11px;
           padding: 11px 13px;
-          align-items: start;
+          align-items: center;
         }
         .member-card-trainer { display:none; }
-        /* Pills drop to their own full-width row under the name and wrap left. */
+        /* Keep mobile cards clean: only status + price; hide the rest. */
+        .member-pills-extra { display:none; }
         .member-card-pills {
-          grid-column: 1 / -1;
+          grid-column: 2 / -1;          /* under the name, not the avatar */
           justify-content: flex-start;
           flex-direction: row;
           flex-wrap: wrap;
-          gap: 5px;
-          margin-top: 5px;
+          gap: 6px;
+          margin-top: 4px;
         }
       }
     </style>
@@ -19344,7 +19347,7 @@ function _renderMembersView() {
         <div class="member-card-parent">Parent: ${escapeHTML(m.parent_name || '—')}</div>
       </div>
       <div class="member-card-trainer">${escapeHTML(m.trainer || '—')}</div>
-      <div class="member-card-pills">${_memberPriceLabel(m.pricing)}${_memberStatusPill(m.status, m)}${_memberSetupBadge(m)}${_memberEngagementChip(m.engagement)}${_memberOfferPill(m)}${_memberPricingPill(m.pricing)}</div>
+      <div class="member-card-pills">${_memberStatusPill(m.status, m)}${_memberPriceLabel(m.pricing)}<span class="member-pills-extra">${_memberSetupBadge(m)}${_memberEngagementChip(m.engagement)}${_memberOfferPill(m)}${_memberPricingPill(m.pricing)}</span></div>
     </div>`).join('');
 
   container.innerHTML = toolbar + cards;
