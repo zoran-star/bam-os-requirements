@@ -186,6 +186,11 @@ async function handler(req, res) {
       const fd = new Date(body.first_charge_date);
       if (!isNaN(fd.getTime())) anchor = Math.max(Math.floor(fd.getTime() / 1000), Math.floor(Date.now() / 1000) + 60);
     }
+    // Stripe rejects trial_end more than 730 days out — clamp so a far-future
+    // first-charge date (e.g. "in a year" from an already-distant next charge)
+    // can't throw a 400. Mirrors members.js STRIPE_TRIAL_MAX_SECS.
+    const STRIPE_TRIAL_MAX_SECS = 729 * 86400;
+    anchor = Math.min(anchor, Math.floor(Date.now() / 1000) + STRIPE_TRIAL_MAX_SECS);
     const anchorIso = new Date(anchor * 1000).toISOString().slice(0, 10);
 
     // Reusable card? prefer the customer's default PM, else any attached card.
