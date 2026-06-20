@@ -9351,6 +9351,16 @@ function _v15kSalesHtml(d) {
         ${block(o.pipeline, 'sales_pipeline', 'entered pipeline', 'no pipeline tied', o.has_pipelines)}
         ${block(o.bookings || { count: 0, items: [] }, 'sales_bookings', 'bookings', 'no calendar tied', o.has_calendars)}
         ${block(o.payments, 'sales_payments', 'new payments', 'no product tied', o.has_products)}
+        ${(() => {
+          // CAC = month ad spend ÷ new payments (for this offer).
+          const adSpend = (_V15K.mkt && _V15K.mkt[_V15K.monthKey] && _V15K.mkt[_V15K.monthKey].totals && _V15K.mkt[_V15K.monthKey].totals.spend) || 0;
+          const np = (o.has_products && o.payments) ? (o.payments.count || 0) : 0;
+          const cac = (np > 0 && adSpend > 0) ? (adSpend / np) : null;
+          return `<div>
+            <span style="font-size:24px;font-weight:700;color:var(--text)">${cac != null ? _v15kMoney(cac) : '—'}</span>
+            <span style="font-size:12px;color:var(--text-mute);margin-left:6px" title="Ad spend ÷ new payments">CAC</span>
+          </div>`;
+        })()}
       </div></div>`;
   }).join('');
 }
@@ -19492,7 +19502,7 @@ function _renderPipelineTabs() {
   if (pls.length <= 1) { _PL_PIPELINE = pls[0].id; host.innerHTML = ''; return; }
   host.innerHTML = pls.map(p => {
     const on = p.id === _PL_PIPELINE;
-    const visibleCount = (p.opportunities || []).filter(o => _isStageAllowed(o.stageId)).length;
+    const visibleCount = (p.opportunities || []).filter(o => _isStageAllowed(o.stageId) && !['won', 'lost', 'abandoned'].includes(String(o.status || '').toLowerCase())).length;
     return `<button class="pl-tab ${on ? 'on' : ''}" onclick="_plSelectPipeline('${escapeHTML(p.id)}')">${escapeHTML(p.name)} <span style="opacity:0.7">${visibleCount}</span></button>`;
   }).join('');
 }
@@ -19536,7 +19546,17 @@ function _plPostTrialForm(oppId) {
   if (!o) return;
   _PTF_OPP = oppId; _PTF_FIT = null; _PTF_SHOW = null; _PTF_SENDLINK = true;
   const tr = _plTrialInfo(o.trialDate);
-  const trainers = _PL_DATA?.trainers || [];
+  // Merge the GHL "Lead Sales Person" picklist with the academy's teammates
+  // (client_users), so staff added in BB → Staff show up as trainer options.
+  const _teamNames = (typeof _PREVIEW_STAFF_LIST !== 'undefined' ? _PREVIEW_STAFF_LIST : []).map(r => r.name).filter(Boolean);
+  const trainers = (() => {
+    const seen = new Set(), out = [];
+    for (const t of [...(_PL_DATA?.trainers || []), ..._teamNames]) {
+      const k = String(t).trim().toLowerCase();
+      if (k && !seen.has(k)) { seen.add(k); out.push(t); }
+    }
+    return out;
+  })();
   const trainerControl = trainers.length
     ? `<select id="ptf-trainer" class="ptf-input"><option value="">Select trainer…</option>${trainers.map(t => `<option>${escapeHTML(t)}</option>`).join('')}</select>`
     : `<input id="ptf-trainer" class="ptf-input" type="text" placeholder="Trainer name">`;
@@ -19669,9 +19689,27 @@ async function _ptfSubmit() {
 const _PL_STATUS_LABEL = { won: 'Won', lost: 'Lost', abandoned: 'Abandoned' };
 let _plUndoState = null, _plUndoTimer = null;
 
-function _plMarkWon(oppId) { _plSetStatus(oppId, 'won', ''); }   // Won never asks for a reason — only Lost/Abandoned do.
+// Won is instant (no reason): mark + remove from the pipeline board.
+async function _plMarkWon(oppId) {
+  try {
+    await _plSetStatus(oppId, 'won', '');
+    closePipelineDrawer();
+    _plRemoveOppLocal(oppId);
+    _plShowUndo({ type: 'status', oppId }, 'Marked Won — removed from pipeline');
+  } catch (e) { alert('Couldn’t mark won: ' + e.message); }
+}
 function _plMarkLost(oppId) { _plOutcome(oppId, 'lost'); }
 function _plMarkAbandoned(oppId) { _plOutcome(oppId, 'abandoned'); }
+
+// Drop an opportunity from the local board immediately (Won/Lost/Abandoned are
+// removed from the pipeline by the portal). Re-renders tabs + board.
+function _plRemoveOppLocal(oppId) {
+  if (!_PL_DATA) return;
+  for (const pl of (_PL_DATA.pipelines || [])) {
+    pl.opportunities = (pl.opportunities || []).filter(o => o.id !== oppId);
+  }
+  try { _renderPipelineTabs(); _renderPipelineBoard(); } catch (_) {}
+}
 
 function _plOutcome(oppId, status) {
   const label = _PL_STATUS_LABEL[status] || status;
@@ -19695,8 +19733,8 @@ async function _plOutcomeConfirm(oppId, status) {
     await _plSetStatus(oppId, status, reason);
     document.getElementById('pl-outcome-overlay')?.remove();
     closePipelineDrawer();
-    fetchAndRenderPipelines();
-    _plShowUndo({ type: 'status', oppId }, `Marked ${_PL_STATUS_LABEL[status] || status}`);
+    _plRemoveOppLocal(oppId); // remove from the pipeline board (Lost automation runs in GHL)
+    _plShowUndo({ type: 'status', oppId }, `Marked ${_PL_STATUS_LABEL[status] || status} — removed from pipeline`);
   } catch (e) {
     alert('Couldn’t mark ' + status + ': ' + e.message);
     if (btn) { btn.disabled = false; btn.textContent = 'Mark ' + (_PL_STATUS_LABEL[status] || status); }
@@ -19814,10 +19852,13 @@ function _renderPipelineBoard() {
   // Per-staff stage permissions: a restricted teammate only sees allowed stages.
   const visibleStages = p.stages.filter(s => _isStageAllowed(s.id));
 
+  // Won / Lost / Abandoned are removed from the pipeline board (kept in GHL).
+  const _PL_CLOSED = new Set(['won', 'lost', 'abandoned']);
   // Group opportunities by stage (only the stages this user can see)
   const byStage = new Map();
   for (const s of visibleStages) byStage.set(s.id, []);
   for (const o of p.opportunities) {
+    if (_PL_CLOSED.has(String(o.status || '').toLowerCase())) continue; // closed → off the board
     if (!byStage.has(o.stageId)) continue; // opp sits in a stage this user can't see
     byStage.get(o.stageId).push(o);
   }
