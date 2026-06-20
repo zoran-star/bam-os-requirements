@@ -136,6 +136,10 @@ async function handler(req, res) {
       const fd = new Date(body.first_charge_date);
       if (!isNaN(fd.getTime())) trialEnd = Math.max(Math.floor(fd.getTime() / 1000), Math.floor(Date.now() / 1000) + 60);
     }
+    // Stripe rejects trial_end more than 730 days out — clamp (a 12-month prepaid
+    // anchored from an old charge date can otherwise exceed it → 400).
+    const STRIPE_TRIAL_MAX_SECS = 729 * 86400;
+    trialEnd = Math.min(trialEnd, Math.floor(Date.now() / 1000) + STRIPE_TRIAL_MAX_SECS);
 
     // Reusable card? prefer the customer's default PM, else any attached card.
     const cust = await stripeFetch(`/customers/${encodeURIComponent(customerId)}?expand[]=invoice_settings.default_payment_method`, { stripeAccount: acct });
