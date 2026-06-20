@@ -4,6 +4,11 @@ The canonical doc for how onboarding, V2 access, the Business Blueprint, the tra
 
 > ⚠ **KEEP THIS UPDATED.** Any change to the staff toggle, the V2/V1 split, the BB cards, the tracker visibility logic, the mark-done flow, or the welcome Slack flow MUST update this note in the same commit. If something here is stale, the next session will burn an hour re-deriving the model and probably get it wrong.
 
+> **2026-06-20 — companion notes for the big V2 build:** per-staff access control
+> (tabs/stages/KPIs), preview-as, hide BAM staff, default-to-owned-academy, Home
+> hidden for V2, mobile V2 bottom bar → [[project_staff_permissions]]. Sales
+> drawer / inbox / mobile UI / missed-trial / CAC / email-off → [[project_v2_sales_inbox_ui]].
+
 > **2026-06-18:** the V1.5→V2 jump is member management, and members are now
 > **offer-scoped** — `members.offer_id`/`members_staging.offer_id` derived at
 > import from the member's Stripe price (`pricing_catalog.offer_id`), mirroring
