@@ -8723,7 +8723,7 @@ async function openAssetsView() {
     const [assets, offers, staff, locations] = await Promise.all([
       _sb.from('client_assets').select('*').eq('client_id', CLIENT_ID).order('created_at', { ascending: false }),
       _sb.from('offers').select('id,title').eq('client_id', CLIENT_ID).order('sort_order'),
-      _sb.from('client_users').select('id,name,email').eq('client_id', CLIENT_ID),
+      _sb.from('client_users').select('id,name,email').eq('client_id', CLIENT_ID).eq('hide_from_team', false),
       _sb.from('locations').select('id,title').eq('client_id', CLIENT_ID).order('sort_order'),
     ]);
     _ASSETS = assets.data || [];
@@ -13117,13 +13117,21 @@ async function _bbRenderStaffCard(panel, meta) {
     return;
   }
 
+  await _bbStaffRefreshList();
+}
+
+// Re-queryable staff list render — called on card open and after an invite/edit
+// so the list reflects the new state without re-opening the card.
+async function _bbStaffRefreshList() {
+  if (!CLIENT_ID || !_sb) return;
   // Pull the list straight from client_users — same source as the
   // existing Team tab. Mirror its TEAM_ROWS / TEAM_MY_ROLE side-effects
   // so the invite/revoke modals (which read those globals) keep working.
   const { data, error } = await _sb.from('client_users')
     .select('id, name, email, role, user_id, allowed_tabs, allowed_stages')
     .eq('client_id', CLIENT_ID)
-    .eq('status', 'active');
+    .eq('status', 'active')
+    .eq('hide_from_team', false);
   const list = document.getElementById('bb-staff-list');
   if (!list) return;
   if (error) { list.innerHTML = `<div class="bb-empty">Couldn't load — ${_bbEscapeHtml(error.message)}</div>`; return; }
@@ -13189,17 +13197,29 @@ async function _bbRenderStaffCard(panel, meta) {
           <div style="flex-basis:100%;font-size:11px;color:var(--text-mute)">🏠 Home &amp; 💬 Messages are always visible. Unchecked = hidden for this teammate.</div>
         </div>
       </details>`;
+    const notInvited = !r.user_id;
+    const canInvite = iAmOwner && !isOwner && notInvited;
+    const inviteHtml = !canInvite ? '' : `
+      <div style="margin-top:6px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:10px 12px;background:var(--surface);border:1px solid var(--border-med);border-radius:10px">
+        <input id="staff-email-${r.id}" type="email" value="${_bbEscapeAttr(r.email || '')}" placeholder="email@example.com"
+          onchange="_bbStaffEmailSave('${r.id}', this.value)"
+          style="flex:1;min-width:180px;background:var(--bg);color:var(--text);border:1px solid var(--border-med);border-radius:8px;padding:8px 11px;font-size:13px;outline:none">
+        <button onclick="_bbStaffInvite('${r.id}')" style="background:var(--gold,#E8C547);color:#0B0B0D;border:none;border-radius:8px;padding:8px 16px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">✉ Invite</button>
+        <span id="staff-invite-status-${r.id}" style="flex-basis:100%;font-size:11px;color:var(--text-mute)"></span>
+      </div>`;
     return `<div style="margin-bottom:10px">
       <div class="team-row">
         <div class="team-avatar">${escapeHTML(initial)}</div>
         <div class="team-meta">
           <div class="team-name">${escapeHTML(r.name || '(no name)')}${isMe ? '<span class="team-you">You</span>' : ''}</div>
-          <div class="team-email">${escapeHTML(r.email || '')}</div>
+          <div class="team-email">${escapeHTML(r.email || (notInvited ? 'No email yet' : ''))}</div>
         </div>
         <div class="team-role-badge${isOwner ? ' owner' : ''}">${isOwner ? 'Owner' : 'Member'}</div>
+        ${notInvited ? `<div class="team-role-badge" style="border-color:#c47424;color:#c47424">Not invited</div>` : ''}
         ${canPreview ? `<button class="team-revoke-btn" style="border-color:var(--gold,#E8C547);color:var(--gold,#E8C547)" onclick="_previewAsStaff('${r.id}')">👁 Preview</button>` : ''}
         ${canRevoke ? `<button class="team-revoke-btn" onclick="openRevokeTeamModal('${r.id}')">Revoke</button>` : ''}
       </div>
+      ${inviteHtml}
       ${tabsHtml}
       ${stagesHtml}
       <div style="margin-top:6px;padding:10px 12px;background:var(--surface);border:1px solid var(--border-med);border-radius:10px">
@@ -13231,6 +13251,50 @@ async function _bbStaffTabsSave(memberId) {
     const j = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(j.error || ('HTTP ' + res.status));
     if (statusEl) { statusEl.textContent = '✓ Saved'; setTimeout(() => { if (statusEl) statusEl.textContent = ''; }, 1500); }
+  } catch (e) {
+    if (statusEl) statusEl.textContent = '⚠ ' + e.message;
+  }
+}
+
+// ── Owner: placeholder teammate email + invite ──
+// Save the email on a not-yet-invited teammate (no login yet).
+async function _bbStaffEmailSave(memberId, email) {
+  const statusEl = document.getElementById('staff-invite-status-' + memberId);
+  if (statusEl) statusEl.textContent = 'Saving…';
+  try {
+    const token = await _mreqAuthToken();
+    const res = await fetch('/api/clients?action=update-teammate', {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ client_id: CLIENT_ID, member_id: memberId, email: (email || '').trim() }),
+    });
+    const j = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(j.error || ('HTTP ' + res.status));
+    if (statusEl) { statusEl.textContent = '✓ Saved'; setTimeout(() => { if (statusEl) statusEl.textContent = ''; }, 1500); }
+  } catch (e) {
+    if (statusEl) statusEl.textContent = '⚠ ' + e.message;
+  }
+}
+
+// Send the invite to a placeholder teammate using the email in their field.
+async function _bbStaffInvite(memberId) {
+  const input = document.getElementById('staff-email-' + memberId);
+  const email = (input && input.value || '').trim();
+  const statusEl = document.getElementById('staff-invite-status-' + memberId);
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { if (statusEl) statusEl.textContent = '⚠ Enter a valid email first'; return; }
+  const name = (_BB_STAFF_META[memberId] && _BB_STAFF_META[memberId].name) || 'teammate';
+  if (statusEl) statusEl.textContent = 'Sending invite…';
+  try {
+    const token = await _mreqAuthToken();
+    const res = await fetch('/api/clients?action=invite-team-member', {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ client_id: CLIENT_ID, member_id: memberId, name, email }),
+    });
+    const j = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(j.error || ('HTTP ' + res.status));
+    if (statusEl) statusEl.textContent = '✓ Invite sent to ' + email;
+    setTimeout(() => { _bbStaffRefreshList(); }, 900);
   } catch (e) {
     if (statusEl) statusEl.textContent = '⚠ ' + e.message;
   }
@@ -16456,7 +16520,8 @@ async function _bbLoadStaff() {
   const { data } = await _sb.from('client_users')
     .select('id, name, email, role')
     .eq('client_id', CLIENT_ID)
-    .eq('status', 'active');
+    .eq('status', 'active')
+    .eq('hide_from_team', false);
   _bbStaffList = (data || []).sort(
     (a, b) => (a.name || a.email || '').localeCompare(b.name || b.email || '')
   );
@@ -16792,7 +16857,8 @@ async function fetchAndRenderTeam() {
     const { data: rows } = await _sb.from('client_users')
       .select('id, name, email, role, user_id')
       .eq('client_id', CLIENT_ID)
-      .eq('status', 'active');
+      .eq('status', 'active')
+      .eq('hide_from_team', false);
     TEAM_ROWS = rows || [];
     const { data: { session } } = await _sb.auth.getSession();
     const myId = session?.user?.id || null;
@@ -16881,10 +16947,38 @@ async function submitInviteTeam() {
     setTeamMsg('inviteTeamMsg', '✓ Invite sent to ' + email, 'ok');
     btn.textContent = 'Sent';
     fetchAndRenderTeam();
+    if (typeof _bbStaffRefreshList === 'function') _bbStaffRefreshList();
     setTimeout(closeInviteTeamModal, 1600);
   } catch (e) {
     setTeamMsg('inviteTeamMsg', e.message, 'err');
     btn.disabled = false; btn.textContent = 'Send invite';
+  }
+}
+
+// Add a teammate WITHOUT sending an invite (placeholder, email optional). The
+// owner fills the email + clicks Invite later from the Staff card.
+async function submitAddTeammate() {
+  const name = document.getElementById('inviteTeamName').value.trim();
+  const email = document.getElementById('inviteTeamEmail').value.trim();
+  if (!name) return setTeamMsg('inviteTeamMsg', 'Enter their name.', 'err');
+  if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return setTeamMsg('inviteTeamMsg', 'Enter a valid email or leave it blank.', 'err');
+  setTeamMsg('inviteTeamMsg', '');
+  try {
+    const { data: { session } } = await _sb.auth.getSession();
+    if (!session) throw new Error('Your session expired — please sign in again.');
+    const res = await fetch('/api/clients?action=add-teammate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + session.access_token },
+      body: JSON.stringify({ client_id: CLIENT_ID, name, email }),
+    });
+    const j = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(j.error || ('HTTP ' + res.status));
+    setTeamMsg('inviteTeamMsg', '✓ Added ' + name + (email ? '' : ' — add their email + Invite when ready'), 'ok');
+    if (typeof _bbStaffRefreshList === 'function') _bbStaffRefreshList();
+    try { fetchAndRenderTeam(); } catch (_) {}
+    setTimeout(closeInviteTeamModal, 1600);
+  } catch (e) {
+    setTeamMsg('inviteTeamMsg', e.message, 'err');
   }
 }
 
@@ -28864,19 +28958,20 @@ function toggleTheme() {
 <div id="inviteTeamModal" class="modal-backdrop" style="display:none" onclick="if(event.target===this)closeInviteTeamModal()">
   <div class="modal-card" onclick="event.stopPropagation()">
     <div class="modal-kicker">§ Team</div>
-    <div class="modal-title">Invite a teammate</div>
-    <div class="modal-sub">They'll get an email to set their password, then they can log in with full access to this portal.</div>
+    <div class="modal-title">Add a teammate</div>
+    <div class="modal-sub">Add them now and invite later, or send the invite straight away. An invited teammate gets an email to set their password, then logs in.</div>
 
     <label class="modal-label" for="inviteTeamName">Name</label>
     <input type="text" id="inviteTeamName" class="modal-input" placeholder="e.g. Jordan Lee" />
 
-    <label class="modal-label" for="inviteTeamEmail" style="margin-top:14px">Email</label>
+    <label class="modal-label" for="inviteTeamEmail" style="margin-top:14px">Email <span style="color:var(--text-mute);font-weight:400">(optional — needed only to invite)</span></label>
     <input type="email" id="inviteTeamEmail" class="modal-input" placeholder="jordan@academy.com" inputmode="email" autocomplete="off" />
 
     <div class="team-msg" id="inviteTeamMsg"></div>
 
     <div class="modal-footer">
       <button class="btn-modal-secondary" onclick="closeInviteTeamModal()">Cancel</button>
+      <button class="btn-modal-secondary" onclick="submitAddTeammate()">Add without invite</button>
       <button class="btn-modal-primary" id="inviteTeamSubmitBtn" onclick="submitInviteTeam()">Send invite</button>
     </div>
   </div>
