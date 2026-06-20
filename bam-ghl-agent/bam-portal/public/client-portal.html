@@ -5152,6 +5152,15 @@
     .mobile-nav .mnav-v15 { display: none; }
     .mobile-nav.is-v15 .mnav-default { display: none !important; }
     .mobile-nav.is-v15 .mnav-v15 { display: flex; }
+    /* V2 bottom bar: Members · Sales · Inbox · KPIs · More. */
+    .mobile-nav .mnav-v2 { display: none; }
+    .mobile-nav.is-v2 .mobile-nav-item { display: none !important; }
+    .mobile-nav.is-v2 .mnav-v2 { display: flex !important; }
+    .mobile-nav.is-v2 [data-view="members"]   { order: 1; }
+    .mobile-nav.is-v2 [data-view="pipelines"] { order: 2; }
+    .mobile-nav.is-v2 [data-view="v15inbox"]  { order: 3; }
+    .mobile-nav.is-v2 [data-view="v15kpis"]   { order: 4; }
+    .mobile-nav.is-v2 [data-view="more"]      { order: 5; }
     /* Support popover — two boxes floating above the bar. */
     .mobile-support-overlay { position: fixed; inset: 0; z-index: 1150; display: none; }
     .mobile-support-overlay.open { display: block; }
@@ -8615,19 +8624,19 @@ Then the call to action."]</div>
     <!-- V1.5 bottom bar: Inbox · Sales · KPIs · Support · More. Shown only when
          #mobileNav has .is-v15 (toggled by applyV15NavState); the mnav-default
          set above is hidden then. Support pops Marketing/Systems boxes. -->
-    <button type="button" class="mobile-nav-item mnav-v15" data-view="v15inbox" onclick="mobileSwitchView('v15inbox')" aria-label="Inbox">
+    <button type="button" class="mobile-nav-item mnav-v15 mnav-v2" data-view="v15inbox" onclick="mobileSwitchView('v15inbox')" aria-label="Inbox">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
         <path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.45 5.11L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/>
       </svg>
       <span class="mobile-nav-label">Inbox</span>
     </button>
-    <button type="button" class="mobile-nav-item mnav-v15" data-view="pipelines" onclick="mobileSwitchView('pipelines')" aria-label="Sales">
+    <button type="button" class="mobile-nav-item mnav-v15 mnav-v2" data-view="pipelines" onclick="mobileSwitchView('pipelines')" aria-label="Sales">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
         <rect x="3" y="4" width="4" height="16" rx="1"/><rect x="10" y="4" width="4" height="10" rx="1"/><rect x="17" y="4" width="4" height="6" rx="1"/>
       </svg>
       <span class="mobile-nav-label">Sales</span>
     </button>
-    <button type="button" class="mobile-nav-item mnav-v15" data-view="v15kpis" onclick="mobileSwitchView('v15kpis')" aria-label="KPIs">
+    <button type="button" class="mobile-nav-item mnav-v15 mnav-v2" data-view="v15kpis" onclick="mobileSwitchView('v15kpis')" aria-label="KPIs">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
         <path d="M3 3v18h18"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/>
       </svg>
@@ -8641,7 +8650,7 @@ Then the call to action."]</div>
     </button>
     <!-- "More" opens a sheet with the academy switcher + every other enabled tab
          (Contacts, Calendars, Blueprint, …) so nothing is sidebar-only on phones. -->
-    <button type="button" class="mobile-nav-item" data-view="more" onclick="_mobileMore()" aria-label="More">
+    <button type="button" class="mobile-nav-item mnav-v2" data-view="more" onclick="_mobileMore()" aria-label="More">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
         <rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/>
         <rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/>
@@ -8654,7 +8663,7 @@ Then the call to action."]</div>
       </svg>
       <span class="mobile-nav-label">Blueprint</span>
     </button>
-    <button type="button" class="mobile-nav-item" data-feature="members" style="display:none" data-view="members" onclick="mobileSwitchView('members')" aria-label="Members">
+    <button type="button" class="mobile-nav-item mnav-v2" data-feature="members" style="display:none" data-view="members" onclick="mobileSwitchView('members')" aria-label="Members">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
         <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
         <circle cx="9" cy="7" r="4"/>
@@ -10781,7 +10790,8 @@ function switchView(name, el) {
 // sheet). Mode-aware: V1.5 swaps the bar to Inbox/Sales/KPIs (+ Marketing &
 // Systems behind Support).
 function _mobileBarViews() {
-  return _isCrmTier()
+  if (typeof V2_ACCESS !== 'undefined' && V2_ACCESS) return new Set(['members', 'pipelines', 'v15inbox', 'v15kpis']);
+  return _isCrmTier() // pure V1.5
     ? new Set(['v15inbox', 'pipelines', 'v15kpis', 'marketing', 'systems'])
     : new Set(['home', 'messages', 'systems', 'marketing']);
 }
@@ -11347,7 +11357,8 @@ function applyTabPermissions() {
     if (allowed.has(tab.key)) continue;
     for (const v of tab.views) {
       document.querySelectorAll(`.nav-item[onclick*="switchView('${v}'"]`).forEach(el => { el.style.display = 'none'; });
-      document.querySelectorAll(`.mobile-nav-item[data-view="${v}"]`).forEach(el => { el.style.display = 'none'; });
+      // !important so it beats the is-v2/is-v15 bar CSS (which is !important).
+      document.querySelectorAll(`.mobile-nav-item[data-view="${v}"]`).forEach(el => { el.style.setProperty('display', 'none', 'important'); });
     }
   }
 }
@@ -11581,10 +11592,14 @@ function _isCrmTier() {
 function applyV15NavState(v15) {
   V15_ACCESS = !!v15;
   document.querySelectorAll('.nav-item[data-feature="v15"]').forEach(el => { el.style.display = v15 ? '' : 'none'; });
-  // Swap the mobile bottom bar to the CRM set (Inbox · Sales · KPIs · Support) —
-  // V2 too, so its upgraded Inbox + KPIs are reachable on mobile.
+  // Swap the mobile bottom bar: V1.5 = Inbox·Sales·KPIs·Support·More;
+  // V2 = Members·Sales·Inbox·KPIs·More. Mutually exclusive tier classes.
   const mNav = document.getElementById('mobileNav');
-  if (mNav) mNav.classList.toggle('is-v15', _isCrmTier());
+  if (mNav) {
+    const onV2 = (typeof V2_ACCESS !== 'undefined' && V2_ACCESS === true);
+    mNav.classList.toggle('is-v2', onV2);
+    mNav.classList.toggle('is-v15', !onV2 && V15_ACCESS === true);
+  }
   // Assets is hidden for V1.5 (also drops it from the mobile More sheet).
   const assetsNav = document.getElementById('nav-assets');
   if (assetsNav) assetsNav.style.display = v15 ? 'none' : '';
