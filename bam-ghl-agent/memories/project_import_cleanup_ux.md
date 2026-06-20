@@ -26,46 +26,63 @@ in-app modals instead — model them on `_sorterFixSuccess(heading, body, stripe
   updates, dup-survivor un-flag, undo snapshot (no re-check), setup-mode `currency:'cad'`
   fix, Add-from-Stripe no-vanish.
 
-## PENDING polish (Zoran live-test backlog, not yet built)
-1. **Styled popups everywhere** — replace the remaining `confirm()`/`alert()` in the
-   sorter flow (_sorterFixPauseMember, _sorterFixMarkCancellation, _sorterFixRemoveMember,
-   error alerts) with the styled modal. STANDING (see rule above).
-2. **"Not a member" → cancellation popup** — on a STRIPE-ONLY row, clicking "Not a member"
-   should, IF they have an active Stripe sub, open the full Stripe-cancellation popup
-   (cancel link + action item), not just dismiss.
-3. **"Not a member" button placement** — move it into the TO-DO column (stripe-only rows
-   `subTr`/`oneTimeTr` have only 4 tds → misaligned; add an empty Next-payment td).
-4. **Adjustable cancellation date** — Mark-as-cancellation should let staff pick the
-   cancel date (currently hardcoded today in fix-payment.js mark_cancellation).
+## Shipped 2026-06-20 (rounds 2 & 3 — ALL deployed; the above round-1 + these)
+- ⚙ **Billing menu** on every cleanup row: 🔄 Change sub · 🏷 Change offer (keep price) ·
+  ⏸ Mark paused (indefinite OR next-payment+pause-end dates) · ✕ Mark cancelled (date). Plus
+  member-card `pause-date-fix` (DB-only dated pause) + 🟦 Set up CoachIQ + 💳 Get card link.
+- **Styled popups everywhere** — `_sorterConfirmModal` (+ optional date field) + `_sorterNotice`
+  (+ optional link button) replaced all native confirm()/alert() in the sorter flow.
+- **Double-bill guard:** cancel→Action Item is `🔴 Cancel old Stripe sub — {name}` (urgent,
+  due_date = old sub's next charge). members.js GET returns `subs_to_cancel`; red "N old subs
+  still need cancelling" banner in Members + import Finish. **verify-cancel now COMPLETES the
+  matching action item** (matched by sub-id in description) → banner drops in sync.
+- **CoachIQ:** sub-id paste moved to FINISH (post-billing, `coachiq-sync` returns FINAL sub_id).
+  "CoachIQ ↗" → academy client list `admin.coachiq.io/<slug>/athletes/people/clients` (no
+  per-member deep link possible — profile id ≠ user id; webhook only gives user.id). No-account
+  flow: "not on CoachIQ" (N/A) vs "supposed to be on it" → invite (signup URL + email, copy+show).
+  `clients.coachiq_signup_url` column added, GTA seeded `app.coachiq.io/bam-gta/athletes`.
+- **🏷 Change offer (keep price)** — the Stripe-vs-CSV-conflict fix (Bradley/Christine Choi:
+  CSV 2/wk Accelerate but actually paying Summer Unlimited). Reassigns offer_price_key/offer_id
+  WITHOUT touching the Stripe sub + sets `offer_overridden` flag; optional "also map this Stripe
+  price → this offer" (pricing_catalog). New cleanup `change-offer` action.
+- **Remove-with-live-sub** → confirm + cancel Action Item + opens Stripe, then removes.
+- Polish: pause no longer logs a cancel action item (pause keeps their sub); "Switch to" list =
+  LIVE offer-prices only (buildTargets reads routable-canonical pricing_catalog, not config);
+  interval "/week"→"/4 weeks" (includes interval_count); "Sub switched" card has a cancel button.
 
-## Shipped 2026-06-20 (round 2 — all deployed)
-- Member-card: `pause-date-fix` action (DB-only dated pause, any sub) + failed payments RED.
-- Cleanup row **⚙ Billing menu**: 🔄 Change sub (pick live offer-price + date → setup-monthly
-  + Action Item to cancel old sub) · ⏸ Mark paused (indefinite OR next-payment+pause-end dates)
-  · ✕ Mark cancelled (date + Action Item). `mark_cancellation` no longer blocks on a live sub.
-- **Double-bill guard:** every cancel→Action Item is now `🔴 Cancel old Stripe sub — {name}`
-  (urgent, `due_date` = old sub's next charge). members.js GET returns `subs_to_cancel`;
-  red banner "N old subs still need cancelling" in the Members view AND import Finish — count
-  drops as the owner completes the items.
-- **CoachIQ sub-id paste moved to FINISH (post-billing).** The CoachIQ step (4) is before
-  Billing (6), so a sub_id pasted there goes stale after take-over. New cleanup `coachiq-sync`
-  action returns each linked member's FINAL sub_id (from the live promoted member). Finish shows
-  a "🟦 CoachIQ — paste these sub IDs" panel (copy-sub + admin.coachiq.io). DO the paste at
-  Finish, not step 4. (The step-4 copy-sub still exists for kept-as-is members.)
+### ✅ The 4 RED bugs — ALL FIXED 2026-06-20 (root cause: divergent portal-owned markers)
+- **Marker standardized:** portal-owned = `metadata.origin ∈ {fullcontrol-portal,
+  fullcontrol-website-enrollment}` (webhook.js + members.js sets now identical). **setup-monthly
+  now stamps `origin=fullcontrol-portal` + `import_silent=1`** (was `source` → never activated).
+- Cron Phase B no longer flips a NO-SUB paused member to 'live'. verify-cancel was also 400ing
+  (member_id check ran first) — fixed. "✓ set up" badge tooltip no longer falsely claims "billing
+  on the portal" (list can't verify; popup's can_manage is the source of truth).
+- Sabeen "No subscriptions" bug: customer-detail sub query now has the deep→light→bare expand
+  fallback (deep price.product expand threw on legacy prices → silently empty list).
 
-## PENDING (bigger build — Zoran 2026-06-20, captured not built)
-5. **Cleanup row → "Mark paused"** (TO-DO col): popup asks → indefinitely? OR when next
-   payment should be? AND when pause ends. + add an Action Item to cancel that sub in Stripe
-   (same copy-over as the take-over/billing step). Then confirm the sub you'll put them on.
-   (Backend `pause-date-fix` + `mark_cancellation` exist; needs the richer cleanup-row modal.)
-6. **Cleanup row → "Mark cancelled"** in the TO-DO column (button alongside the others).
-7. **"Change a sub" — NEW separate popup** (from todos + member card): shows the CURRENT
-   sub / offer / price → asks which LIVE offer-price to switch to → asks start date
-   (prefilled with the old sub's next-payment if it exists) → prompts to DELETE the old sub
-   + creates the new one. (Replaces the broken GTA-hardcoded Change-plan for real flexibility.)
+## 📄 Published doc
+Flowchart of all flows + edge cases: **portal.byanymeansbusiness.com/member-import-flows.html**
+(`public/member-import-flows.html`, mermaid). Gap grid shows the 4 reds as ✅ fixed.
 
-## Gotchas
-- `currency:'cad'` is hardcoded on setup-mode Checkout (all academies are CAD now);
-  multi-tenant should derive it later.
-- Mark-as-cancellation inserts a `cancellations` row with `member_id` null (allowed);
-  no `offer_id` column on cancellations → offer recorded in `reason`.
+## PENDING — pick up here
+1. **AUTO CONFLICT-SCAN (offered, not built)** — flag cleanup rows where the live Stripe sub's
+   price ≠ the CSV-implied offer (the Bradley root cause). Today the auto-match trusts the CSV
+   plan; the 🏷 Change-offer fix is the manual cure. Plug a price-vs-offer check into the cleanup
+   `check` → surface a ⚠️ + offer the Change-offer fix. **Zoran was deciding whether to build this.**
+2. **BB card to EDIT the CoachIQ signup URL** per academy (GTA seeded so it works now; other
+   academies need a UI). `clients.coachiq_signup_url` exists; clients.js update-fields must
+   whitelist it; add the card where CoachIQ config lives (BB → Offers, near `openCoachiqLinks`).
+3. **Medium gaps** (from the gap-scan, still open): commitment terms lost on take-over/change-sub
+   (setup-monthly bills monthly only); CoachIQ "supposed to be on it" invite writes nothing
+   (no tracking if they never sign up); change-plan `PLAN_TO_PRICE` + currency `'cad'` + HST `1.13`
+   GTA-hardcoded (multi-tenant); coachiq-sync at Finish omits members who SHOULD be on CoachIQ but
+   were never linked; promote silently drops duplicate/nameless rows; GHL step (4) runs before
+   promote → can find "0 to link".
+
+## Gotchas / schema
+- New columns: `clients.coachiq_signup_url`, `members_staging.offer_overridden`,
+  `members.offer_overridden` (added via supabase MCP migrations 2026-06-20).
+- Cleanup actions added: `coachiq-sync`, `change-offer`. fix-payment: `pause_member` (dated),
+  `mark_cancellation` (no live-sub block; cancellations.member_id nullable, offer in `reason`).
+- `currency:'cad'` + HST `1.13` hardcoded (all academies CAD now); multi-tenant TODO.
+- buildTargets (fix-payment.js) now returns LIVE routable-canonical offer-prices only (+ offer_id).
