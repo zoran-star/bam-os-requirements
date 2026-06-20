@@ -18489,6 +18489,7 @@ async function _safeJson(res) {
 let _MEMBERS_ALL = [];
 let _MEMBERS_SORTER = null; // import-strip done-flags from /api/members `sorter`
 let _MEMBERS_SUBS_TO_CANCEL = 0; // open "cancel old Stripe sub" action items (banner)
+let _MEMBERS_CIQ = { enabled: false, signup_url: null }; // CoachIQ config for "Set up CoachIQ"
 let _MEMBERS_FILTER = { q: '', status: 'all', trainer: 'all', engagement: 'all', offer: 'all', sort: 'name' };
 // Set during render: true when the roster spans 2+ offers, so the offer pill +
 // filter only appear once a second offer exists (mirrors the Sales page).
@@ -18922,6 +18923,7 @@ async function fetchAndRenderMembers() {
     _MEMBERS_ALL = Array.isArray(json.members) ? json.members : [];
     _MEMBERS_SORTER = json.sorter || null;
     _MEMBERS_SUBS_TO_CANCEL = json.subs_to_cancel || 0;
+    _MEMBERS_CIQ = json.coachiq || { enabled: false, signup_url: null };
     _renderMembersView();
   } catch (e) {
     container.innerHTML = `<div class="req-empty" style="padding:20px 0">Couldn't load members — ${escapeHTML(e.message)}</div>`;
@@ -23689,10 +23691,18 @@ async function _sorterCiqLoad() {
     _sorterCiqRender(json);
   } catch (e) { host.innerHTML = '<div style="color:var(--danger,#e0654f);">' + escapeHTML(e.message || String(e)) + '</div>'; }
 }
+// app.coachiq.io/<slug>/athletes → admin.coachiq.io/<slug>/athletes/people/clients (the
+// academy's client list — best we can deep-link to; no per-member profile id available).
+function _coachiqAdminUrl(signupUrl) {
+  try { const m = String(signupUrl || '').match(/coachiq\.io\/([^/?#]+)\/athletes/i); if (m && m[1]) return `https://admin.coachiq.io/${m[1]}/athletes/people/clients`; } catch (_) {}
+  return 'https://admin.coachiq.io';
+}
 function _sorterCiqRender(json) {
   const host = document.getElementById('pc-sorter-ciq-host');
   if (!host) return;
   if (!json.coachiq_enabled) { host.innerHTML = '<div style="border:1px solid var(--border,#2a2a31);border-radius:10px;padding:14px 16px;">CoachIQ is off for this academy — nothing to link here. Click Next.</div>'; return; }
+  _SORTER._ciqSignup = json.coachiq_signup_url || '';
+  const ciqAdmin = _coachiqAdminUrl(json.coachiq_signup_url);
   const members = json.members || [];
   const linked = members.filter(m => m.coachiq_member_id).length;
   const na = members.filter(m => m.coachiq_not_applicable).length;
@@ -23719,11 +23729,11 @@ function _sorterCiqRender(json) {
       badge = '<span style="color:#7BC47F;font-weight:700;font-size:11px;">● linked</span>';
       if (m.stripe_subscription_id) {
         const sid = escapeHTML(m.stripe_subscription_id);
-        controls = `<code style="font-size:10px;color:var(--text-mute,#888);max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${sid}</code><button onclick="_sorterCopy('${sid}',this)" title="Copy the Stripe sub id, then paste it into this member's CoachIQ product so CoachIQ tracks renewals" style="font-size:10px;border:1px solid var(--border,#2a2a31);background:transparent;color:var(--text,#eee);border-radius:6px;padding:3px 7px;cursor:pointer;">copy sub</button><a href="https://admin.coachiq.io" target="_blank" rel="noopener noreferrer" style="font-size:10px;border:1px solid var(--border,#2a2a31);border-radius:6px;padding:3px 7px;color:var(--accent,#E8C547);text-decoration:none;">CoachIQ &#8599;</a>`;
+        controls = `<code style="font-size:10px;color:var(--text-mute,#888);max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${sid}</code><button onclick="_sorterCopy('${sid}',this)" title="Copy the Stripe sub id, then paste it into this member's CoachIQ product so CoachIQ tracks renewals" style="font-size:10px;border:1px solid var(--border,#2a2a31);background:transparent;color:var(--text,#eee);border-radius:6px;padding:3px 7px;cursor:pointer;">copy sub</button><a href="${escapeHTML(ciqAdmin)}" target="_blank" rel="noopener noreferrer" style="font-size:10px;border:1px solid var(--border,#2a2a31);border-radius:6px;padding:3px 7px;color:var(--accent,#E8C547);text-decoration:none;">CoachIQ &#8599;</a>`;
       }
     }
     else if (m.coachiq_not_applicable) { badge = '<span style="color:var(--text-mute,#888);font-size:11px;">○ not on CoachIQ</span>'; controls = `<button onclick="_sorterCiqSet('${m.id}',{not_applicable:false})" style="font-size:10px;border:1px solid var(--border,#2a2a31);background:transparent;color:var(--text-mute,#888);border-radius:6px;padding:3px 7px;cursor:pointer;">undo</button>`; }
-    else { badge = '<span style="color:#e0a93f;font-size:11px;">&#9203; waiting</span>'; controls = `<input id="ciqin-${m.id}" placeholder="paste user id" style="width:120px;font-size:11px;padding:4px 6px;border-radius:6px;border:1px solid var(--border,#2a2a31);background:var(--bg,#0e0e11);color:var(--text,#eee);" /><button onclick="_sorterCiqSet('${m.id}',{coachiq_member_id:(document.getElementById('ciqin-${m.id}')||{}).value||''})" style="font-size:10px;border:1px solid var(--accent,#E8C547);background:rgba(232,197,71,0.12);color:var(--accent,#E8C547);border-radius:6px;padding:3px 7px;cursor:pointer;">save</button><button onclick="_sorterCiqSet('${m.id}',{not_applicable:true})" style="font-size:10px;border:1px solid var(--border,#2a2a31);background:transparent;color:var(--text-mute,#888);border-radius:6px;padding:3px 7px;cursor:pointer;">not on CoachIQ</button>`; }
+    else { badge = '<span style="color:#e0a93f;font-size:11px;">&#9203; waiting</span>'; controls = `<input id="ciqin-${m.id}" placeholder="paste user id" style="width:110px;font-size:11px;padding:4px 6px;border-radius:6px;border:1px solid var(--border,#2a2a31);background:var(--bg,#0e0e11);color:var(--text,#eee);" /><button onclick="_sorterCiqSet('${m.id}',{coachiq_member_id:(document.getElementById('ciqin-${m.id}')||{}).value||''})" style="font-size:10px;border:1px solid var(--accent,#E8C547);background:rgba(232,197,71,0.12);color:var(--accent,#E8C547);border-radius:6px;padding:3px 7px;cursor:pointer;">save</button><button onclick="_sorterCiqInvite('${m.id}','${escapeHTML((m.parent_email || '').replace(/'/g, ''))}','${escapeHTML((m.athlete_name || '').replace(/'/g, ''))}')" title="Send them the CoachIQ signup link" style="font-size:10px;border:1px solid #1f5f7a;background:rgba(31,95,122,0.12);color:#5fb0d9;border-radius:6px;padding:3px 7px;cursor:pointer;">supposed to be on it</button><button onclick="_sorterCiqSet('${m.id}',{not_applicable:true})" style="font-size:10px;border:1px solid var(--border,#2a2a31);background:transparent;color:var(--text-mute,#888);border-radius:6px;padding:3px 7px;cursor:pointer;">not on CoachIQ</button>`; }
     return `<div style="display:flex;align-items:center;gap:8px;border:1px solid var(--border,#2a2a31);border-radius:8px;padding:8px 10px;margin-bottom:6px;">
       <div style="flex:1;min-width:0;font-size:12px;"><b style="color:var(--text,#eee);">${name}</b> <span style="color:var(--text-mute,#888);">${email}</span></div>
       <div style="flex:none;display:flex;align-items:center;gap:6px;flex-wrap:wrap;justify-content:flex-end;">${badge} ${controls}</div>
@@ -23744,6 +23754,27 @@ async function _sorterCiqSet(stagingId, patch) {
     if (!r.ok) throw new Error(json.error || ('HTTP ' + r.status));
     _sorterCiqLoad();
   } catch (e) { alert('Save failed: ' + e.message); }
+}
+// "Supposed to be on CoachIQ" → build a signup invite (copy + show), so the parent
+// creates their account with their email → CoachIQ auto-links them on signup.
+async function _sorterCiqInvite(stagingId, email, name) {
+  const signup = _SORTER._ciqSignup || '';
+  if (!signup) { _sorterNotice('No CoachIQ signup link', 'Set the academy\'s CoachIQ athlete signup URL in the Business Blueprint (Offers → CoachIQ) first.', true); return; }
+  const text = `Hi! To get on your training app, create a CoachIQ account with this email: ${email || '(your email)'}\n\nSign up here: ${signup}\n\nThat's it — your membership links up automatically once you're in.`;
+  try { await navigator.clipboard.writeText(text); } catch (_) {}
+  const el = document.createElement('div');
+  el.innerHTML = `<div style="position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:160;"></div>
+    <div style="position:fixed;z-index:161;top:50%;left:50%;transform:translate(-50%,-50%);width:min(440px,93vw);background:var(--surface,#16161a);border:1px solid #1f5f7a;border-radius:14px;padding:20px;">
+      <div style="font-size:15px;font-weight:800;margin-bottom:4px;">📲 Invite ${escapeHTML(name || 'member')} to CoachIQ</div>
+      <div style="font-size:11.5px;color:var(--text-mute,#888);margin-bottom:10px;">Copied to your clipboard — text or email it to the parent. They sign up with their email → CoachIQ auto-links them.</div>
+      <textarea readonly style="width:100%;height:118px;font-size:12px;padding:9px;border-radius:8px;border:1px solid var(--border,#2a2a31);background:var(--bg,#0e0e11);color:var(--text,#eee);resize:none;box-sizing:border-box;">${escapeHTML(text)}</textarea>
+      <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:14px;">
+        <a href="${escapeHTML(signup)}" target="_blank" rel="noopener" style="font-size:12.5px;font-weight:700;padding:9px 14px;border-radius:9px;border:1px solid var(--accent,#E8C547);color:var(--accent,#E8C547);text-decoration:none;">Open signup ↗</a>
+        <button id="_ciqinv-close" style="font-size:12.5px;font-weight:800;padding:9px 18px;border-radius:9px;border:none;background:var(--accent,#E8C547);color:#1a1a1a;cursor:pointer;">Done</button>
+      </div>
+    </div>`;
+  document.body.appendChild(el);
+  el.querySelector('#_ciqinv-close').onclick = () => el.remove();
 }
 
 // ───────────────────────────── STEP 6 — Take over billing ─────────────────
@@ -23978,13 +24009,14 @@ async function _sorterFinishCoachiqSync() {
     if (!r.ok || !json.coachiq_enabled) { host.innerHTML = ''; return; }
     const members = json.members || [];
     if (!members.length) { host.innerHTML = ''; return; }
+    const ciqAdmin = _coachiqAdminUrl(json.coachiq_signup_url);
     const rows = members.map(m => {
       const sid = escapeHTML(m.sub_id || '');
       return `<div style="display:flex;align-items:center;gap:8px;border-bottom:1px solid var(--border,#2a2a31);padding:7px 2px;">
         <div style="flex:1;min-width:0;font-size:12px;"><b style="color:var(--text,#eee);">${escapeHTML(m.athlete_name || '')}</b></div>
         <code style="font-size:10px;color:var(--text-mute,#888);max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${sid}</code>
         <button onclick="_sorterCopy('${sid}',this)" title="Copy the FINAL sub id, then paste it into this member's CoachIQ product" style="font-size:10px;border:1px solid var(--border,#2a2a31);background:transparent;color:var(--text,#eee);border-radius:6px;padding:3px 7px;cursor:pointer;">copy sub</button>
-        <a href="https://admin.coachiq.io" target="_blank" rel="noopener noreferrer" style="font-size:10px;border:1px solid var(--border,#2a2a31);border-radius:6px;padding:3px 7px;color:var(--accent,#E8C547);text-decoration:none;">CoachIQ ↗</a>
+        <a href="${escapeHTML(ciqAdmin)}" target="_blank" rel="noopener noreferrer" style="font-size:10px;border:1px solid var(--border,#2a2a31);border-radius:6px;padding:3px 7px;color:var(--accent,#E8C547);text-decoration:none;">CoachIQ ↗</a>
       </div>`;
     }).join('');
     host.innerHTML = `<div style="border:1px solid #1f5f7a;background:rgba(31,95,122,0.08);border-radius:10px;padding:12px 14px;">
@@ -24850,6 +24882,7 @@ function _renderMemberModalBody(m, stripe, history) {
       ${gbtn('Cancel',      `mCancel('${m.id}','${escapeHTML((m.athlete_name||'').replace(/'/g, ''))}')`, canManage)}
       ${btn('Payment link',`mPaymentLink('${m.id}')`)}
       ${btn('💳 Get card link',`mGetCardLink('${m.id}')`)}
+      ${(_MEMBERS_CIQ && _MEMBERS_CIQ.enabled && !m.coachiq_member_id) ? btn('🟦 Set up CoachIQ', `mSetupCoachiq('${m.id}','${escapeHTML((m.parent_email||'').replace(/'/g,''))}','${escapeHTML((m.athlete_name||'').replace(/'/g,''))}')`) : ''}
       ${gbtn('Referred',    `mReferred('${m.id}')`, canManage)}
       ${m.billing_mode === 'alternate'
         ? btn('Switch to Stripe billing', `_memberUpdateField('${m.id}','billing_mode','')`)
@@ -25135,6 +25168,27 @@ async function mGetCardLink(memberId) {
     const r = await _memberAction(memberId, 'card-setup-link', {});
     _openPaymentLinkModal(memberId, r);
   } catch (e) { alert('Card link failed: ' + (e.message || e)); }
+}
+
+// "Set up CoachIQ" on the member card → build the signup invite (copy + show).
+function mSetupCoachiq(memberId, email, name) {
+  const signup = (_MEMBERS_CIQ && _MEMBERS_CIQ.signup_url) || '';
+  if (!signup) { alert('Set the academy\'s CoachIQ athlete signup URL in the Business Blueprint (Offers → CoachIQ) first.'); return; }
+  const text = `Hi! To get on your training app, create a CoachIQ account with this email: ${email || '(your email)'}\n\nSign up here: ${signup}\n\nThat's it — your membership links up automatically once you're in.`;
+  try { navigator.clipboard.writeText(text); } catch (_) {}
+  const el = document.createElement('div');
+  el.innerHTML = `<div style="position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:200;"></div>
+    <div style="position:fixed;z-index:201;top:50%;left:50%;transform:translate(-50%,-50%);width:min(440px,93vw);background:var(--surface,#16161a);border:1px solid #1f5f7a;border-radius:14px;padding:20px;">
+      <div style="font-size:15px;font-weight:800;margin-bottom:4px;">🟦 Invite ${escapeHTML(name || 'member')} to CoachIQ</div>
+      <div style="font-size:11.5px;color:var(--text-mute,#888);margin-bottom:10px;">Copied to your clipboard — text or email it to the parent. They sign up with their email → CoachIQ auto-links them.</div>
+      <textarea readonly style="width:100%;height:118px;font-size:12px;padding:9px;border-radius:8px;border:1px solid var(--border,#2a2a31);background:var(--bg,#0e0e11);color:var(--text,#eee);resize:none;box-sizing:border-box;">${escapeHTML(text)}</textarea>
+      <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:14px;">
+        <a href="${escapeHTML(signup)}" target="_blank" rel="noopener" style="font-size:12.5px;font-weight:700;padding:9px 14px;border-radius:9px;border:1px solid var(--accent,#E8C547);color:var(--accent,#E8C547);text-decoration:none;">Open signup ↗</a>
+        <button id="_mciq-close" style="font-size:12.5px;font-weight:800;padding:9px 18px;border-radius:9px;border:none;background:var(--accent,#E8C547);color:#1a1a1a;cursor:pointer;">Done</button>
+      </div>
+    </div>`;
+  document.body.appendChild(el);
+  el.querySelector('#_mciq-close').onclick = () => el.remove();
 }
 
 // Styled start/end date picker → resolves { start, end } or null.

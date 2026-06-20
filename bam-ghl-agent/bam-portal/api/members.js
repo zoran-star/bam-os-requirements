@@ -465,10 +465,20 @@ async function handler(req, res) {
         } catch (_) { /* non-fatal */ }
       }
 
+      // CoachIQ config (for the "Set up CoachIQ" member-card invite).
+      let coachiq = { enabled: false, signup_url: null };
+      if (targetClientId) {
+        try {
+          const cr = await sb(`clients?id=eq.${encodeURIComponent(targetClientId)}&select=coachiq_enabled,coachiq_signup_url&limit=1`);
+          if (Array.isArray(cr) && cr[0]) coachiq = { enabled: !!cr[0].coachiq_enabled, signup_url: cr[0].coachiq_signup_url || null };
+        } catch (_) { /* non-fatal */ }
+      }
+
       return res.status(200).json({
         members: memberList,
         sorter,
         subs_to_cancel: subsToCancel,
+        coachiq,
         stripe: {
           client_id: targetClientId,
           status: targetClient?.stripe_connect_status || "not_connected",

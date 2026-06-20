@@ -30,6 +30,14 @@ Members tab. Promote moved from the old step-3 to the final Finish step.
 - ⚠️ The CoachIQ admin URL `admin.coachiq.io/…?profile=<id>` = PROFILE id, which does NOT
   grant. The user id only comes from Stripe metadata (auto) or the tag webhook. No CoachIQ
   page exposes the user id directly.
+- ⚠️ **CoachIQ webhook JSON-body tokens (confirmed 2026-06-20):** the `@ Users` dropdown in
+  the automation's External-Webhook builder ONLY inserts `{{user.id:<specific-user-uuid>}}`
+  (pick a SPECIFIC user) — the dynamic triggering-user token is `{{user.id}}` + `{{user.email}}`.
+  There is **NO profile-id or profile-URL token** available. Other dropdowns: `# Fields`
+  (custom fields), `Forms`, `Media`, `Products`, `Scheduler`. So we CANNOT get a deep-link
+  profile id from the webhook — only the user id we already capture. A direct "open this member
+  in CoachIQ" link is only possible IF CoachIQ's member-page URL itself is built from the user
+  id (unverified — admin is WAF-locked; needs Zoran to check a real member-page URL).
 
 **REMAINING for import:** Zoran builds the real "tag added → link-user" automation (tested
 with tag "intro"); then upload GTA's CSV → run the 5 steps → promote. Then member-mgmt buttons.

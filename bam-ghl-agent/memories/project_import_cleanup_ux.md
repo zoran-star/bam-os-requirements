@@ -38,6 +38,21 @@ in-app modals instead — model them on `_sorterFixSuccess(heading, body, stripe
 4. **Adjustable cancellation date** — Mark-as-cancellation should let staff pick the
    cancel date (currently hardcoded today in fix-payment.js mark_cancellation).
 
+## Shipped 2026-06-20 (round 2 — all deployed)
+- Member-card: `pause-date-fix` action (DB-only dated pause, any sub) + failed payments RED.
+- Cleanup row **⚙ Billing menu**: 🔄 Change sub (pick live offer-price + date → setup-monthly
+  + Action Item to cancel old sub) · ⏸ Mark paused (indefinite OR next-payment+pause-end dates)
+  · ✕ Mark cancelled (date + Action Item). `mark_cancellation` no longer blocks on a live sub.
+- **Double-bill guard:** every cancel→Action Item is now `🔴 Cancel old Stripe sub — {name}`
+  (urgent, `due_date` = old sub's next charge). members.js GET returns `subs_to_cancel`;
+  red banner "N old subs still need cancelling" in the Members view AND import Finish — count
+  drops as the owner completes the items.
+- **CoachIQ sub-id paste moved to FINISH (post-billing).** The CoachIQ step (4) is before
+  Billing (6), so a sub_id pasted there goes stale after take-over. New cleanup `coachiq-sync`
+  action returns each linked member's FINAL sub_id (from the live promoted member). Finish shows
+  a "🟦 CoachIQ — paste these sub IDs" panel (copy-sub + admin.coachiq.io). DO the paste at
+  Finish, not step 4. (The step-4 copy-sub still exists for kept-as-is members.)
+
 ## PENDING (bigger build — Zoran 2026-06-20, captured not built)
 5. **Cleanup row → "Mark paused"** (TO-DO col): popup asks → indefinitely? OR when next
    payment should be? AND when pause ends. + add an Action Item to cancel that sub in Stripe
