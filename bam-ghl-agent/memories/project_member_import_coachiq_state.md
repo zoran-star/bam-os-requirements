@@ -90,6 +90,31 @@ index is 2..6 since step 1 = Price Match's Match). Launched from Members tab str
    + `_bbWizardSections`): add an "Import Roster" step that launches the 5-step import —
    "do all the training offer in one place." Connections (Stripe/GHL/CoachIQ) already in V2.
 
+## 🆕 PLANNED: "Take over billing" import step (designed 2026-06-19, not built)
+Goal: end every imported member on ONE **portal-owned** Stripe sub so the portal can
+manage + automate it. KEY CONSTRAINT (doc-verified [[project_stripe_app_created_subs]]):
+on a Standard connected account the portal can ONLY write to subs it created → it
+**cannot cancel** CoachIQ/GHL/dashboard subs. So a "move to portal" = portal CREATES the
+new sub (it can), but the staff must CANCEL the old one by hand (portal gives a deep link;
+portal then READS Stripe to confirm it's gone and auto-greens the row).
+- **Placement:** new step right before Finish → `Import → Stripe → CoachIQ → GHL →
+  💳 Take over billing → Finish`.
+- **AI-driven (reuse `fix-payment.js` diagnose+Claude pattern):** AI reads the offer pricing
+  + what the member has paid + their sub, tags each member: ✅ fine/already-portal · 🔁 move
+  to portal · ⚠️ needs card. Click a member → **AI chat modal** (interactive) recommending
+  the action + explaining; staff can ask why / override price / "leave him" / "go". On "go"
+  AI makes the new portal sub (first charge anchored to their **next-payment date** = build #1)
+  and hands the cancel link.
+- **Scope split:** wrong-price / failing / no-sub problems are the EXISTING **Cleanup** step's
+  job — this step is ONLY ownership (fine / move / needs-card). The remake itself fixes wrong
+  price (new sub = correct offer price).
+- **ACTION ITEM (its own task):** "no usable card" → mark member status **collecting payment**
+  (reuse `payment_method_required`); add a **[Get card link]** button on the member card that
+  calls the existing `fix-payment.js card_link` (Stripe **setup-mode** Checkout = STANDALONE
+  card capture, NOT tied to a sub — saves card to the customer). Parent inputs card → webhook
+  `payment_method.attached` (already handled) → portal makes the sub → row greens. New build =
+  button + status wiring only; link/card-page/auto-detect already exist.
+
 ## Also pending
 - **Test A**: a REAL test payment on /enroll + refund — proves the live chain end-to-end.
   Never run on a real `invoice.paid` yet (16 checkouts created, 0 activated). Deferred to LAST.
