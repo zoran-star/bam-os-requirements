@@ -11254,11 +11254,19 @@ let _MY_ALLOWED_TABS = null;   // null = all tabs (default / owner / BAM staff)
 let _MY_ALLOWED_STAGES = null; // null = all pipeline stages
 let _MY_TAB_ROLE = null;       // 'owner' | 'member' | null
 
+// Owner "Preview as <staff>" — when set, the owner temporarily adopts a
+// teammate's permissions to see exactly what that teammate sees.
+let _PREVIEW_AS = null;        // { id, name, allowed_tabs, allowed_stages }
+function _effTabRole()       { return _PREVIEW_AS ? 'member' : _MY_TAB_ROLE; }
+function _effAllowedTabs()   { return _PREVIEW_AS ? (Array.isArray(_PREVIEW_AS.allowed_tabs) ? _PREVIEW_AS.allowed_tabs : null) : _MY_ALLOWED_TABS; }
+function _effAllowedStages() { return _PREVIEW_AS ? (Array.isArray(_PREVIEW_AS.allowed_stages) ? _PREVIEW_AS.allowed_stages : null) : _MY_ALLOWED_STAGES; }
+
 // Is a pipeline stage allowed for the current user? Owner/unrestricted = yes.
 function _isStageAllowed(stageId) {
-  if (_MY_TAB_ROLE === 'owner') return true;
-  if (!Array.isArray(_MY_ALLOWED_STAGES)) return true; // null = all
-  return _MY_ALLOWED_STAGES.includes(stageId);
+  if (_effTabRole() === 'owner') return true;
+  const st = _effAllowedStages();
+  if (!Array.isArray(st)) return true; // null = all
+  return st.includes(stageId);
 }
 
 // Pipelines the current user can see at least one stage of. A staff restricted
@@ -11272,9 +11280,10 @@ function _plVisiblePipelines() {
 // Hide nav items the current user isn't permitted to see. Runs AFTER the tier
 // gates so it only ever subtracts. No-op for owners or when no perms are set.
 function applyTabPermissions() {
-  if (_MY_TAB_ROLE === 'owner') return;
-  if (!Array.isArray(_MY_ALLOWED_TABS)) return; // null = unrestricted
-  const allowed = new Set(_MY_ALLOWED_TABS);
+  if (_effTabRole() === 'owner') return;
+  const tabs = _effAllowedTabs();
+  if (!Array.isArray(tabs)) return; // null = unrestricted
+  const allowed = new Set(tabs);
   for (const tab of _PERMISSIONABLE_TABS) {
     if (allowed.has(tab.key)) continue;
     for (const v of tab.views) {
@@ -11287,11 +11296,62 @@ function applyTabPermissions() {
 // Is a view allowed for the current user? Owner/unrestricted = always yes.
 // Views not under a permissionable tab (home, messages…) = always yes.
 function _isViewTabAllowed(view) {
-  if (_MY_TAB_ROLE === 'owner') return true;
-  if (!Array.isArray(_MY_ALLOWED_TABS)) return true;
+  if (_effTabRole() === 'owner') return true;
+  const tabs = _effAllowedTabs();
+  if (!Array.isArray(tabs)) return true;
   const tab = _PERMISSIONABLE_TABS.find(t => t.views.includes(view));
   if (!tab) return true;
-  return _MY_ALLOWED_TABS.includes(tab.key);
+  return tabs.includes(tab.key);
+}
+
+// ── Owner: preview a teammate's view ──
+const _BB_STAFF_META = {};   // memberId → { name, allowed_tabs, allowed_stages }
+
+function _previewAsStaff(memberId) {
+  const m = _BB_STAFF_META[memberId];
+  if (!m) return;
+  _PREVIEW_AS = { id: memberId, name: m.name || 'teammate', allowed_tabs: m.allowed_tabs, allowed_stages: m.allowed_stages };
+  _renderPreviewBanner();
+  _previewReapply();
+  // If the view we're on is hidden for this teammate, go somewhere they can see.
+  const cur = (document.querySelector('.view.active') || {}).id || '';
+  const curView = cur.replace('view-', '');
+  if (curView && !_isViewTabAllowed(curView)) switchView('home');
+  else _previewRefreshPipelines();
+}
+
+function _exitPreview() {
+  _PREVIEW_AS = null;
+  _renderPreviewBanner();
+  _previewReapply();
+  _previewRefreshPipelines();
+}
+
+// Re-run the tier gates (which call applyTabPermissions) so nav reflects the
+// effective (preview or real) permissions.
+function _previewReapply() {
+  try { if (typeof V2_ACCESS !== 'undefined') applyV2NavState(V2_ACCESS); } catch (_) {}
+  try { if (typeof V15_ACCESS !== 'undefined') applyV15NavState(V15_ACCESS); } catch (_) {}
+  applyTabPermissions();
+}
+
+function _previewRefreshPipelines() {
+  const v = document.getElementById('view-pipelines');
+  if (v && v.classList.contains('active') && typeof _PL_DATA !== 'undefined' && _PL_DATA) {
+    try { _renderPipelineTabs(); _renderPipelineBoard(); } catch (_) {}
+  }
+}
+
+function _renderPreviewBanner() {
+  let el = document.getElementById('preview-banner');
+  if (!_PREVIEW_AS) { if (el) el.remove(); return; }
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'preview-banner';
+    el.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:9999;background:var(--gold,#E8C547);color:#0B0B0D;display:flex;align-items:center;justify-content:center;gap:12px;padding:9px 16px;font-size:13px;font-weight:600;box-shadow:0 2px 10px rgba(0,0,0,0.3)';
+    document.body.appendChild(el);
+  }
+  el.innerHTML = `👁 Previewing as <strong>${escapeHTML(_PREVIEW_AS.name)}</strong> — you only see what they see. <button onclick="_exitPreview()" style="background:#0B0B0D;color:var(--gold,#E8C547);border:none;border-radius:6px;padding:5px 12px;font-weight:700;cursor:pointer;font-family:inherit">Exit preview</button>`;
 }
 
 // Load the current user's membership row for CLIENT_ID, then apply permissions.
@@ -13098,7 +13158,13 @@ async function _bbRenderStaffCard(panel, meta) {
     const canManageTabs = iAmOwner && !isOwner && relevantTabs.length > 0;
     // Stage picker only when the Sales/Pipelines tab is available to this academy.
     const canManageStages = iAmOwner && !isOwner && relevantTabs.some(t => t.key === 'pipelines');
+    const canPreview = iAmOwner && !isOwner;
     _BB_STAGE_PERMS[r.id] = Array.isArray(r.allowed_stages) ? r.allowed_stages : null;
+    _BB_STAFF_META[r.id] = {
+      name: r.name || r.email || 'teammate',
+      allowed_tabs: Array.isArray(r.allowed_tabs) ? r.allowed_tabs : null,
+      allowed_stages: Array.isArray(r.allowed_stages) ? r.allowed_stages : null,
+    };
     const initial = (r.name || r.email || '?').trim().slice(0, 1).toUpperCase();
     const stagesHtml = !canManageStages ? '' : `
       <details class="staff-stages" style="margin-top:6px" ontoggle="if(this.open) _bbStaffStagesLoad('${r.id}')">
@@ -13131,6 +13197,7 @@ async function _bbRenderStaffCard(panel, meta) {
           <div class="team-email">${escapeHTML(r.email || '')}</div>
         </div>
         <div class="team-role-badge${isOwner ? ' owner' : ''}">${isOwner ? 'Owner' : 'Member'}</div>
+        ${canPreview ? `<button class="team-revoke-btn" style="border-color:var(--gold,#E8C547);color:var(--gold,#E8C547)" onclick="_previewAsStaff('${r.id}')">👁 Preview</button>` : ''}
         ${canRevoke ? `<button class="team-revoke-btn" onclick="openRevokeTeamModal('${r.id}')">Revoke</button>` : ''}
       </div>
       ${tabsHtml}
