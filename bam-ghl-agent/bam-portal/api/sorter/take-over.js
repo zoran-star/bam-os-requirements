@@ -90,6 +90,24 @@ async function stripeFetch(path, { method = "GET", body, stripeAccount, idempote
   return json;
 }
 
+// Academy's offer-price options (for the "Set up billing" dropdown on the member card).
+async function buildTargets(clientId) {
+  const offers = await sb(`offers?client_id=eq.${encodeURIComponent(clientId)}&status=neq.archived&select=id,title,data`) || [];
+  const out = [];
+  const termOf = (len) => { const s = String(len || "").toLowerCase(); if (/3\s*month|12\s*week/.test(s)) return "3_months"; if (/6\s*month|24\s*week/.test(s)) return "6_months"; if (/12\s*month|year|52\s*week/.test(s)) return "12_months"; return null; };
+  for (const o of offers) {
+    const offerings = (o.data && o.data.pricing && o.data.pricing.pricing_offerings) || [];
+    for (const off of offerings) {
+      if (String(off.type || "").toLowerCase() !== "membership") continue;
+      const title = String(off.title || "").trim(); if (!title) continue;
+      const base = parseFloat(off.price);
+      if (!isNaN(base)) out.push({ key: `${title}|monthly`, label: `${title} · Monthly`, amount_cents: Math.round(base * 1.13 * 100) });
+      for (const c of (off.commitments || [])) { const term = termOf(c.length); const cb = parseFloat(c.price); if (term && !isNaN(cb)) out.push({ key: `${title}|${term}`, label: `${title} · ${term.replace("_", " ")}`, amount_cents: Math.round(cb * 1.13 * 100) }); }
+    }
+  }
+  return out;
+}
+
 // The old sub's next charge → anchor for the new sub's first charge (no gap/double-bill).
 function nextChargeUnix(sub) {
   const item = sub && sub.items && sub.items.data && sub.items.data[0];
@@ -188,13 +206,14 @@ async function handler(req, res) {
           payment_link = sess.url || null;
         } catch (_) {}
       }
+      const targets = await buildTargets(clientId).catch(() => []);
       return res.status(200).json({
         ok: true, mode: "preview", member_id: member.id, old_sub_id: oldSubId,
         old_sub_origin: (oldSub && oldSub.application) || null,
         current_amount_cents: curAmount, currency: curCurrency,
         interval: curIntervalCount > 1 ? `${curIntervalCount} ${curInterval}` : curInterval,
         first_charge: anchor, first_charge_iso: anchorIso,
-        card_last4: last4 || null, needs_card: !defaultPm, payment_link,
+        card_last4: last4 || null, needs_card: !defaultPm, payment_link, targets,
       });
     }
 
@@ -202,8 +221,19 @@ async function handler(req, res) {
     if (!defaultPm) {
       return res.status(409).json({ error: "No card on file — collect one with the card link first (member is 'collecting payment')." });
     }
-    if (curAmount == null && !body.price_id) {
-      return res.status(409).json({ error: "Couldn't read the member's current price to grandfather. Pass price_id to bill a specific price." });
+    // "Set up billing" from the member card passes an offer_price_key → resolve it to
+    // the offer's canonical Stripe price (so no-sub members can be put on a real plan).
+    let resolvedPriceId = body.price_id || null;
+    if (!resolvedPriceId && body.offer_price_key) {
+      const pr = await sb(
+        `pricing_catalog?client_id=eq.${encodeURIComponent(clientId)}&offer_price_key=eq.${encodeURIComponent(body.offer_price_key)}` +
+        `&tier=eq.canonical&select=stripe_price_id&limit=1`
+      ).catch(() => null);
+      resolvedPriceId = (Array.isArray(pr) && pr[0] && pr[0].stripe_price_id) || null;
+      if (!resolvedPriceId) return res.status(409).json({ error: `No canonical Stripe price for "${body.offer_price_key}" — match it in Price Match first.` });
+    }
+    if (curAmount == null && !resolvedPriceId) {
+      return res.status(409).json({ error: "Couldn't read the member's current price to grandfather. Pick an offer price to bill." });
     }
 
     // Bill price: explicit catalog price_id, else a portal-owned inline price at the
@@ -221,9 +251,9 @@ async function handler(req, res) {
       "metadata[prior_sub_id]": oldSubId || undefined,
     };
     let billedPriceId = null;
-    if (body.price_id) {
-      subBody["items[0][price]"] = body.price_id;
-      billedPriceId = body.price_id;
+    if (resolvedPriceId) {
+      subBody["items[0][price]"] = resolvedPriceId;
+      billedPriceId = resolvedPriceId;
     } else {
       subBody["items[0][price_data][currency]"] = curCurrency;
       subBody["items[0][price_data][unit_amount]"] = curAmount;

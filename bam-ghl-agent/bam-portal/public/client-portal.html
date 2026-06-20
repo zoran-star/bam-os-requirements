@@ -24549,7 +24549,7 @@ function _renderMemberModalBody(m, stripe, history) {
   // date → create a portal-owned sub they can then be managed by. Prominent when
   // the member can't be managed today.
   const setupBtn = canManage ? '' :
-    `<button onclick="mSetupBilling('${m.id}')" style="grid-column:1/-1;background:var(--gold,#E8C547);color:#0B0B0D;border:none;padding:11px 12px;font-weight:800;border-radius:4px;cursor:pointer;font-size:13px;font-family:inherit">💳 Set up billing</button>`;
+    `<button onclick="mSetupBilling('${m.id}','${m.client_id || ''}')" style="grid-column:1/-1;background:var(--gold,#E8C547);color:#0B0B0D;border:none;padding:11px 12px;font-weight:800;border-radius:4px;cursor:pointer;font-size:13px;font-family:inherit">💳 Set up billing</button>`;
 
   // "View in Stripe" — opens the customer page on the academy's connected
   // Stripe account in a new tab. Requires both a connected account id
@@ -24912,6 +24912,67 @@ async function mGetCardLink(memberId) {
     const r = await _memberAction(memberId, 'card-setup-link', {});
     _openPaymentLinkModal(memberId, r);
   } catch (e) { alert('Card link failed: ' + (e.message || e)); }
+}
+
+// "Set up billing" — put a no-sub / foreign-sub member onto a portal-owned sub:
+// pick an offer price + start date → create. Reuses api/sorter/take-over.
+let _SETUP_BILL = null;
+async function mSetupBilling(memberId, clientId) {
+  const host = document.getElementById('member-modal-host');
+  if (!host) return;
+  const overlay = document.createElement('div');
+  overlay.id = 'setup-bill-host';
+  host.appendChild(overlay);
+  overlay.innerHTML = `<div onclick="_closeSetupBilling()" style="position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:10001;"></div>
+    <div style="position:fixed;z-index:10002;top:50%;left:50%;transform:translate(-50%,-50%);width:min(440px,92vw);background:var(--surface,#16161a);border:1px solid var(--border,#2a2a31);border-radius:14px;padding:20px;"><div class="req-empty" style="padding:18px 0;text-align:center;"><span class="req-spin"></span> Reading billing…</div></div>`;
+  try {
+    const token = await _mreqAuthToken();
+    const pv = await _safeJson(await fetch('/api/sorter/take-over', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token }, body: JSON.stringify({ client_id: clientId || _aiClientId(), member_id: memberId, mode: 'preview' }) }));
+    if (pv.error) throw new Error(_sorterErr(pv.error));
+    _SETUP_BILL = { memberId, clientId: clientId || _aiClientId(), pv };
+    _renderSetupBilling();
+  } catch (e) { _closeSetupBilling(); alert("Couldn't open billing setup: " + _sorterErr(e)); }
+}
+function _closeSetupBilling() { const h = document.getElementById('setup-bill-host'); if (h) h.remove(); _SETUP_BILL = null; }
+function _renderSetupBilling() {
+  const h = document.getElementById('setup-bill-host'); if (!h || !_SETUP_BILL) return;
+  const pv = _SETUP_BILL.pv, targets = pv.targets || [];
+  const today = pv.first_charge_iso || new Date().toISOString().slice(0, 10);
+  const opts = targets.length
+    ? targets.map(t => `<option value="${escapeHTML(t.key)}">${escapeHTML(t.label)} · $${((t.amount_cents || 0) / 100).toFixed(2)}</option>`).join('')
+    : '<option value="">No offer prices found — add an offer first</option>';
+  const cardLine = pv.needs_card
+    ? `<div style="font-size:11.5px;color:#e0a93f;margin:4px 0 12px;">⚠ No card on file — <button onclick="mGetCardLink('${_SETUP_BILL.memberId}')" style="background:none;border:none;color:var(--accent,#E8C547);text-decoration:underline;cursor:pointer;font-size:11.5px;padding:0;">get a card link</button> first.</div>`
+    : `<div style="font-size:11.5px;color:var(--text-mute,#888);margin:4px 0 12px;">Card on file ····${escapeHTML(pv.card_last4 || '')} — will be used.</div>`;
+  const blocked = pv.needs_card || !targets.length;
+  h.innerHTML = `<div onclick="_closeSetupBilling()" style="position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:10001;"></div>
+    <div style="position:fixed;z-index:10002;top:50%;left:50%;transform:translate(-50%,-50%);width:min(440px,92vw);background:var(--surface,#16161a);border:1px solid var(--border,#2a2a31);border-radius:14px;padding:20px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+        <div style="font-size:15px;font-weight:800;">💳 Set up billing</div>
+        <button onclick="_closeSetupBilling()" style="background:none;border:none;color:var(--text-mute,#888);font-size:20px;cursor:pointer;">×</button>
+      </div>
+      <label style="display:block;font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:var(--text-mute,#888);margin-bottom:4px;">Offer &amp; pricing</label>
+      <select id="setup-bill-offer" style="width:100%;font-size:13px;padding:8px;border-radius:8px;border:1px solid var(--border,#2a2a31);background:var(--bg,#0e0e11);color:var(--text,#eee);margin-bottom:12px;">${opts}</select>
+      <label style="display:block;font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:var(--text-mute,#888);margin-bottom:4px;">Start date (first charge)</label>
+      <input id="setup-bill-date" type="date" value="${escapeHTML(today)}" style="width:100%;font-size:13px;padding:8px;border-radius:8px;border:1px solid var(--border,#2a2a31);background:var(--bg,#0e0e11);color:var(--text,#eee);margin-bottom:4px;">
+      ${cardLine}
+      <button onclick="_setupBillingCreate()" ${blocked ? 'disabled' : ''} style="width:100%;font-size:13.5px;font-weight:800;padding:11px;border-radius:9px;border:none;background:${blocked ? 'rgba(255,255,255,0.08)' : 'var(--gold,#E8C547)'};color:${blocked ? 'var(--text-mute,#888)' : '#0B0B0D'};cursor:${blocked ? 'not-allowed' : 'pointer'};">Create subscription</button>
+    </div>`;
+}
+async function _setupBillingCreate() {
+  if (!_SETUP_BILL) return;
+  const key = (document.getElementById('setup-bill-offer') || {}).value;
+  const date = (document.getElementById('setup-bill-date') || {}).value;
+  if (!key) { alert('Pick an offer price.'); return; }
+  try {
+    const token = await _mreqAuthToken();
+    const r = await _safeJson(await fetch('/api/sorter/take-over', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token }, body: JSON.stringify({ client_id: _SETUP_BILL.clientId, member_id: _SETUP_BILL.memberId, mode: 'create', offer_price_key: key, first_charge_date: date }) }));
+    if (r.error) throw new Error(_sorterErr(r.error));
+    const mid = _SETUP_BILL.memberId;
+    _closeSetupBilling();
+    if (typeof openMemberPopup === 'function') openMemberPopup(mid);
+    if (typeof fetchAndRenderMembers === 'function') fetchAndRenderMembers();
+  } catch (e) { alert("Couldn't create the subscription: " + _sorterErr(e)); }
 }
 
 // Right-side modal: shows the Stripe portal URL + pre-formatted SMS/email
