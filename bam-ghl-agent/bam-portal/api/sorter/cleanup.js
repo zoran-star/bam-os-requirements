@@ -512,8 +512,15 @@ async function handler(req, res) {
         };
       } catch (e2) { return res.status(404).json({ error: `Stripe customer not found — ${e2.message}` }); }
       try {
-        const subsR = await stripeGet(`/subscriptions?customer=${encodeURIComponent(custId)}&status=all&limit=10&expand[]=data.items.data.price.product`, client.stripe_connect_account_id);
-        subsOut = (subsR.data || []).map(sub => {
+        // Fallback chain like member-detail: a deep price.product expand can throw on
+        // legacy plan_ prices → without this, the whole list silently shows "No subscriptions"
+        // even when the customer HAS a live (e.g. unpaid) sub.
+        const subBase = `/subscriptions?customer=${encodeURIComponent(custId)}&status=all&limit=10`;
+        let subsR = null;
+        for (const q of [`${subBase}&expand[]=data.items.data.price.product`, `${subBase}&expand[]=data.items.data.price`, subBase]) {
+          try { subsR = await stripeGet(q, client.stripe_connect_account_id); break; } catch (_) { subsR = null; }
+        }
+        subsOut = ((subsR && subsR.data) || []).map(sub => {
           const item = sub.items && sub.items.data && sub.items.data[0];
           const price = item && item.price;
           return {

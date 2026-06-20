@@ -189,6 +189,11 @@ async function handler(req, res) {
         "items[0][price]": mp.stripe_price_id,
         trial_end: trialEnd,
         default_payment_method: defaultPm,
+        // origin=fullcontrol-portal is the STANDARD portal-owned marker the webhook +
+        // members.js both read — without it these subs never flip live or get can_manage.
+        // import_silent=1 → flip live without firing the new-signup welcome (existing members).
+        "metadata[origin]": "fullcontrol-portal",
+        "metadata[import_silent]": "1",
         "metadata[source]": "fullcontrol-prepaid-monthly",
         "metadata[offer_price_key]": mKey,
         "metadata[member_email]": body.member_email || undefined,

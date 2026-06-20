@@ -125,23 +125,34 @@ async function handler(req, res) {
     const clientId = body.client_id || ctx.clientIds[0];
     if (!clientId) return res.status(400).json({ error: "client_id required" });
     if (!ctx.isStaff && !ctx.clientIds.includes(clientId)) return res.status(403).json({ error: "forbidden" });
-    if (!body.member_id) return res.status(400).json({ error: "member_id required" });
-
     const clientRows = await sb(`clients?id=eq.${encodeURIComponent(clientId)}&select=stripe_connect_account_id&limit=1`);
     const acct = Array.isArray(clientRows) && clientRows[0] && clientRows[0].stripe_connect_account_id;
     if (!acct) return res.status(409).json({ error: "academy not connected to Stripe" });
 
     // verify-cancel: did staff actually cancel the old foreign sub yet? The portal
-    // can READ it (only writes are blocked) → poll this to auto-green the row.
+    // can READ it (only writes are blocked) → poll this to auto-green the row. When
+    // it IS cancelled, also COMPLETE the matching "cancel old sub" action item (matched
+    // by the sub id in its description) so the subs_to_cancel banner drops in sync.
     if (body.mode === "verify-cancel") {
       const target = body.old_sub_id;
       if (!target) return res.status(400).json({ error: "old_sub_id required" });
+      const completeItem = async () => {
+        try {
+          await sb(`action_items?client_id=eq.${encodeURIComponent(clientId)}&completed_at=is.null&description=ilike.*${encodeURIComponent(target)}*`, {
+            method: "PATCH", headers: { Prefer: "return=minimal" },
+            body: JSON.stringify({ completed_at: new Date().toISOString(), completed_by_name: "Portal — old sub confirmed cancelled", updated_at: new Date().toISOString() }),
+          });
+        } catch (_) { /* non-fatal */ }
+      };
       let s = null;
       try { s = await stripeFetch(`/subscriptions/${encodeURIComponent(target)}`, { stripeAccount: acct }); }
-      catch (e) { if (e.stripeStatus === 404) return res.status(200).json({ ok: true, cancelled: true, status: "deleted" }); throw e; }
+      catch (e) { if (e.stripeStatus === 404) { await completeItem(); return res.status(200).json({ ok: true, cancelled: true, status: "deleted" }); } throw e; }
       const cancelled = s.status === "canceled" || (!!s.canceled_at && s.status !== "active" && s.status !== "trialing");
+      if (cancelled) await completeItem();
       return res.status(200).json({ ok: true, cancelled, status: s.status, cancel_at_period_end: !!s.cancel_at_period_end });
     }
+
+    if (!body.member_id) return res.status(400).json({ error: "member_id required" });
 
     const memberRows = await sb(
       `members?id=eq.${encodeURIComponent(body.member_id)}&client_id=eq.${encodeURIComponent(clientId)}` +
