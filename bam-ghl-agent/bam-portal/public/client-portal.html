@@ -23939,10 +23939,12 @@ function _sorterTakeoverRender() {
     if (m.tag in counts) counts[m.tag]++;
     let right = '';
     if (cancelOld) {
-      // New sub made this session; old one still needs a manual cancel.
+      // New sub made this session; old one still needs a manual cancel. The
+      // checkbox = "I cancelled the old sub" (same action as the modal's),
+      // confirming via verify-cancel and flipping the row to ✓ on portal.
       right = `<span style="font-size:10px;color:#e0a93f;font-weight:700;">⚠ cancel old sub</span>
-        <a href="${escapeHTML(cancelOld.url || '#')}" target="_blank" rel="noopener" onclick="setTimeout(()=>_sorterTakeoverVerify('${m.member_id}'),600)" style="font-size:10px;border:1px solid var(--border,#2a2a31);border-radius:6px;padding:3px 7px;color:var(--accent,#E8C547);text-decoration:none;">Jump to Stripe ↗</a>
-        <button onclick="_sorterTakeoverVerify('${m.member_id}')" style="font-size:10px;border:1px solid var(--border,#2a2a31);background:transparent;color:var(--text-mute,#888);border-radius:6px;padding:3px 7px;cursor:pointer;">check</button>`;
+        <a href="${escapeHTML(cancelOld.url || '#')}" target="_blank" rel="noopener" style="font-size:10px;border:1px solid var(--border,#2a2a31);border-radius:6px;padding:3px 7px;color:var(--accent,#E8C547);text-decoration:none;">Jump to Stripe ↗</a>
+        <label style="display:flex;align-items:center;gap:5px;font-size:10px;color:var(--text-mute,#888);cursor:pointer;white-space:nowrap;"><input type="checkbox" onchange="if(this.checked)_sorterTakeoverConfirmCancel('${m.member_id}')"> cancelled</label>`;
     } else if (moved) {
       right = tagPill('fine', '✓ on portal');
     } else if (m.tag === 'needs_card') {
@@ -23979,10 +23981,11 @@ async function _sorterTakeoverCardLink(memberId, btn) {
     else if (btn) btn.textContent = 'no link';
   } catch (e) { if (btn) { btn.disabled = false; btn.textContent = 'retry'; } _sorterNotice('Card link failed', _sorterErr(e), true); }
 }
-// "I cancelled the old sub" → Save & close: verify-cancel server-side (completes
-// the double-bill action item if Stripe confirms), drop the local cancel prompt
-// since staff manually confirmed, then close the member modal + refresh the list.
-async function _sorterTakeoverDoneClose(memberId) {
+// "I cancelled the old sub" — verify-cancel server-side (completes the double-bill
+// action item if Stripe confirms), drop the local cancel prompt since staff
+// manually confirmed, then refresh the list so the row flips to "✓ on portal".
+// Shared by the modal checkbox (Save & close) and the per-row list checkbox.
+async function _sorterTakeoverConfirmCancel(memberId) {
   const pc = (_SORTER._takeover.pendingCancel || {})[memberId];
   if (pc && pc.old_sub_id) {
     try {
@@ -23991,20 +23994,15 @@ async function _sorterTakeoverDoneClose(memberId) {
     } catch (_) {}
     delete _SORTER._takeover.pendingCancel[memberId];
   }
-  _sorterCloseConnect();
   _sorterTakeoverLoad();
 }
-async function _sorterTakeoverVerify(memberId) {
-  const pc = (_SORTER._takeover.pendingCancel || {})[memberId];
-  if (!pc) return;
-  try {
-    const token = await _mreqAuthToken();
-    const r = await fetch('/api/sorter/take-over', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token }, body: JSON.stringify({ client_id: _aiClientId(), mode: 'verify-cancel', old_sub_id: pc.old_sub_id }) });
-    const json = await _safeJson(r);
-    if (r.ok && json.cancelled) { delete _SORTER._takeover.pendingCancel[memberId]; _sorterTakeoverLoad(); }
-    else { _sorterTakeoverRender(); }
-  } catch (_) {}
+// Modal "Save & close": confirm the cancel, then close the member modal.
+async function _sorterTakeoverDoneClose(memberId) {
+  _sorterCloseConnect();
+  await _sorterTakeoverConfirmCancel(memberId);
 }
+// (_sorterTakeoverVerify removed — replaced by _sorterTakeoverConfirmCancel,
+// shared by the modal "Save & close" and the per-row "cancelled" checkbox.)
 // ── Per-member AI chat + make modal (reuses the connect-host overlay) ──
 async function _sorterTakeoverOpen(memberId) {
   const hostEl = document.getElementById('pc-sorter-connect-host');
