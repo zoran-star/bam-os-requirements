@@ -5071,6 +5071,9 @@
   @media (max-width: 768px) {
     :root { --mobnav-h: 56px; }
 
+    /* Preview-as banner is hidden on mobile — Exit preview lives in the More sheet. */
+    #preview-banner { display: none !important; }
+
     /* Dynamic viewport height so iOS browser chrome never clips content */
     html, body { height: 100dvh; }
     .app { height: 100dvh; }
