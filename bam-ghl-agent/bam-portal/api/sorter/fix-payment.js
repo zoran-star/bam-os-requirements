@@ -312,7 +312,7 @@ async function handler(req, res) {
           body: JSON.stringify([{
             client_id: clientId, member_id: s.promoted_member_id || null,
             athlete_name: s.athlete_name, parent_name: s.parent_name,
-            type: "cancel", cancel_date: new Date().toISOString().slice(0, 10),
+            type: "cancel", cancel_date: body.cancel_date || new Date().toISOString().slice(0, 10),
             reason: `Imported — already canceled${offerKey ? " · " + offerKey.split("|")[0] : ""}`,
             stripe_subscription_id: s.stripe_subscription_id || null,
             stripe_customer_id: custId,

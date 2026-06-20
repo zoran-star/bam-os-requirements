@@ -1365,6 +1365,7 @@ async function handler(req, res) {
       ok: true,
       academy: client.business_name,
       batch_id: batchId,
+      stripe_account_id: client.stripe_connect_account_id || null,
       counts: {
         staged: staging.length,
         staged_no_stripe: stagedNoStripe.length,
