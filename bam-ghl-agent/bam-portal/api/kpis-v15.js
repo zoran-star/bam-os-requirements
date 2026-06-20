@@ -359,11 +359,16 @@ async function handler(req, res) {
       const cancelledItems = canceledSubs
         .filter(s => s.canceled_at && s.canceled_at >= start && s.canceled_at < end)
         .map(s => ({ ref_id: s.id, label: custName(s.customer), email: custEmail(s.customer), canceled_at: s.canceled_at, excluded: isExcluded(excl, "members_cancelled", null, s.id) }));
+      // Current roster snapshot: live + paused member counts.
+      const memberRows = await sb(`members?client_id=eq.${encodeURIComponent(clientId)}&select=status`).catch(() => []) || [];
+      const liveCount = memberRows.filter(m => m.status === "live" || m.status === "cancelling").length;
+      const pausedCount = memberRows.filter(m => m.status === "paused").length;
       return res.status(200).json({
         ok: true, stripe_ok: true,
         payments,
         cancelled: { count: cancelledItems.filter(i => !i.excluded).length, items: cancelledItems },
         manual,
+        roster: { live: liveCount, paused: pausedCount },
       });
     }
 
