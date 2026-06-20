@@ -14023,7 +14023,7 @@ function _membersImportStrip(sorter) {
   ];
   const currentIdx = steps.findIndex(([, done]) => !done);
   const startStep = currentIdx === -1 ? 2 : currentIdx + 2; // strip index 0..4 = sorter step 2..6
-  return _sorterStrip({ title: '👥 Member Import', steps, onclick: `openPricingSorter(${startStep})`, ariaLabel: 'Open Member Import' });
+  return _sorterStrip({ title: '👥 Member Import', steps, onclick: `openMemberImportResume(${startStep})`, ariaLabel: 'Open Member Import' });
 }
 
 // ── BB → Member Onboarding: GHL gate + import / cleanup / GHL-link steps ──
@@ -21400,7 +21400,32 @@ function _sorterSnapshot() {
     .sort().join('|');
 }
 
+// ── Save-my-spot: remember where the Member Import flow was left off, per client,
+// so reopening lands you back on the same step (DB holds the actual data). ──
+function _sorterSpotKey() { try { return 'bam_sorter_spot_' + (_aiClientId() || 'x'); } catch (_) { return 'bam_sorter_spot_x'; } }
+function _sorterSaveSpot() {
+  try {
+    if (!_SORTER || _SORTER.mode !== 'members') return;
+    if (_SORTER.step >= 7) { _sorterClearSpot(); return; } // reached Finish — nothing to resume into
+    if (!(_SORTER.step >= 2 && _SORTER.step <= 6)) return;
+    localStorage.setItem(_sorterSpotKey(), JSON.stringify({ step: _SORTER.step, batchId: _SORTER.batchId || null }));
+  } catch (_) {}
+}
+function _sorterReadSpot() { try { return JSON.parse(localStorage.getItem(_sorterSpotKey()) || 'null'); } catch (_) { return null; } }
+function _sorterClearSpot() { try { localStorage.removeItem(_sorterSpotKey()); } catch (_) {} }
+// Open Member Import, resuming the saved spot if it's further along than the
+// computed default (the strip can't otherwise land you on Billing, step 6).
+function openMemberImportResume(computedStep) {
+  const spot = _sorterReadSpot();
+  const step = (spot && spot.step >= 2 && spot.step <= 6 && spot.step > computedStep) ? spot.step : computedStep;
+  openPricingSorter(step);
+}
+// Explicit "Save & close" — DB already persists every action; this also stamps
+// the resume spot, then closes. Same path the × uses now.
+function saveAndClosePricingSorter() { _sorterSaveSpot(); closePricingSorter(); }
+
 function closePricingSorter() {
+  _sorterSaveSpot();
   if (_SORTER && _SORTER._ciqPoll) { clearInterval(_SORTER._ciqPoll); _SORTER._ciqPoll = null; }
   // Unsaved-matches guard (Price Match only): dragging assignments around
   // does nothing until Approve & Save — closing would silently lose them.
@@ -21446,9 +21471,11 @@ function _sorterRender() {
   }).join('<span style="color:var(--text-mute,#888);margin:0 6px;">·</span>');
 
   modal.innerHTML = `
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;gap:10px;">
       <div style="font-size:18px;font-weight:800;">${title}</div>
-      <button onclick="closePricingSorter()" style="background:none;border:none;color:var(--text-mute,#888);font-size:22px;cursor:pointer;">×</button>
+      ${members
+        ? `<button onclick="saveAndClosePricingSorter()" title="Your progress is saved — reopen to pick up right here" style="flex:none;font-size:12px;font-weight:700;padding:7px 14px;border-radius:8px;border:1px solid var(--border,#2a2a31);background:transparent;color:var(--text,#eee);cursor:pointer;">Save &amp; close</button>`
+        : `<button onclick="closePricingSorter()" style="background:none;border:none;color:var(--text-mute,#888);font-size:22px;cursor:pointer;">×</button>`}
     </div>
     <div style="display:flex;align-items:center;gap:4px;margin-bottom:16px;flex:none;${steps.length === 1 ? 'display:none;' : ''}">${dots}</div>
     <div id="pc-sorter-body" style="overflow-y:auto;flex:1 1 auto;min-height:0;"></div>
@@ -21480,6 +21507,7 @@ function _sorterGoto(n) {
   if (n < minStep) return;
   if (_SORTER._ciqPoll) { clearInterval(_SORTER._ciqPoll); _SORTER._ciqPoll = null; }
   _SORTER.step = n;
+  _sorterSaveSpot(); // stamp the resume spot on every move (survives a refresh)
   _sorterRender();
   if (n === 1 && !(_SORTER.match.targets || []).length) _sorterLoadStep1();
 }
@@ -23769,8 +23797,9 @@ function _sorterCiqRender(json) {
   const ciqAdmin = _coachiqAdminUrl(json.coachiq_signup_url);
   const members = json.members || [];
   const linked = members.filter(m => m.coachiq_member_id).length;
-  const na = members.filter(m => m.coachiq_not_applicable).length;
-  const waiting = members.length - linked - na;
+  const na = members.filter(m => !m.coachiq_member_id && m.coachiq_not_applicable).length;
+  const collecting = members.filter(m => !m.coachiq_member_id && !m.coachiq_not_applicable && m.coachiq_collecting).length;
+  const waiting = members.length - linked - na - collecting;
   // Listening / connected status — the automation fires on ANY tag, so "connected" =
   // we've received a webhook recently (within 15 min). "Listening" = this panel is polling.
   const lastAt = json.last_event_at ? new Date(json.last_event_at).getTime() : 0;
@@ -23784,7 +23813,7 @@ function _sorterCiqRender(json) {
       <span style="font-size:12.5px;font-weight:800;color:var(--text,#eee);">Listening${connected ? ' · connected' : ''}</span>
       <span style="font-size:11.5px;color:var(--text-mute,#888);">${connected ? ('last webhook ' + ago) : 'waiting for a webhook — add any tag to a client to test the connection'}</span>
     </div>`;
-  const intro = statusBanner + `<div style="font-size:12.5px;color:var(--text-mute,#888);margin-bottom:12px;">Add your CoachIQ link tag to each client in CoachIQ — as the tag fires they check off here automatically. <b style="color:var(--text,#eee);">${linked}</b> linked · ${waiting} waiting · ${na} not on CoachIQ.</div>`;
+  const intro = statusBanner + `<div style="font-size:12.5px;color:var(--text-mute,#888);margin-bottom:12px;">Add your CoachIQ link tag to each client in CoachIQ — as the tag fires they check off here automatically. <b style="color:var(--text,#eee);">${linked}</b> linked · ${waiting} waiting · ${collecting} collecting · ${na} not on CoachIQ.</div>`;
   const rows = members.map(m => {
     const kid = escapeHTML(m.athlete_name || '');
     const parent = escapeHTML(m.parent_name || '');
@@ -23803,6 +23832,7 @@ function _sorterCiqRender(json) {
       }
     }
     else if (m.coachiq_not_applicable) { badge = '<span style="color:var(--text-mute,#888);font-size:11px;">○ not on CoachIQ</span>'; controls = `<button onclick="_sorterCiqSet('${m.id}',{not_applicable:false})" style="font-size:10px;border:1px solid var(--border,#2a2a31);background:transparent;color:var(--text-mute,#888);border-radius:6px;padding:3px 7px;cursor:pointer;">undo</button>`; }
+    else if (m.coachiq_collecting) { badge = '<span style="color:#5fb0d9;font-weight:700;font-size:11px;">&#128229; collecting a CoachIQ</span>'; controls = `<input id="ciqin-${m.id}" placeholder="paste user id" style="width:110px;font-size:11px;padding:4px 6px;border-radius:6px;border:1px solid var(--border,#2a2a31);background:var(--bg,#0e0e11);color:var(--text,#eee);" /><button onclick="_sorterCiqSet('${m.id}',{coachiq_member_id:(document.getElementById('ciqin-${m.id}')||{}).value||''})" style="font-size:10px;border:1px solid var(--accent,#E8C547);background:rgba(232,197,71,0.12);color:var(--accent,#E8C547);border-radius:6px;padding:3px 7px;cursor:pointer;">save</button><button onclick="_sorterCiqInvite('${m.id}','${escapeHTML((m.parent_email || '').replace(/'/g, ''))}','${escapeHTML((m.athlete_name || '').replace(/'/g, ''))}')" title="Re-send the CoachIQ signup link" style="font-size:10px;border:1px solid #1f5f7a;background:rgba(31,95,122,0.12);color:#5fb0d9;border-radius:6px;padding:3px 7px;cursor:pointer;">re-send invite</button><button onclick="_sorterCiqSet('${m.id}',{collecting:false})" style="font-size:10px;border:1px solid var(--border,#2a2a31);background:transparent;color:var(--text-mute,#888);border-radius:6px;padding:3px 7px;cursor:pointer;">undo</button>`; }
     else { badge = '<span style="color:#e0a93f;font-size:11px;">&#9203; waiting</span>'; controls = `<input id="ciqin-${m.id}" placeholder="paste user id" style="width:110px;font-size:11px;padding:4px 6px;border-radius:6px;border:1px solid var(--border,#2a2a31);background:var(--bg,#0e0e11);color:var(--text,#eee);" /><button onclick="_sorterCiqSet('${m.id}',{coachiq_member_id:(document.getElementById('ciqin-${m.id}')||{}).value||''})" style="font-size:10px;border:1px solid var(--accent,#E8C547);background:rgba(232,197,71,0.12);color:var(--accent,#E8C547);border-radius:6px;padding:3px 7px;cursor:pointer;">save</button><button onclick="_sorterCiqInvite('${m.id}','${escapeHTML((m.parent_email || '').replace(/'/g, ''))}','${escapeHTML((m.athlete_name || '').replace(/'/g, ''))}')" title="Send them the CoachIQ signup link" style="font-size:10px;border:1px solid #1f5f7a;background:rgba(31,95,122,0.12);color:#5fb0d9;border-radius:6px;padding:3px 7px;cursor:pointer;">supposed to be on it</button><button onclick="_sorterCiqSet('${m.id}',{not_applicable:true})" style="font-size:10px;border:1px solid var(--border,#2a2a31);background:transparent;color:var(--text-mute,#888);border-radius:6px;padding:3px 7px;cursor:pointer;">not on CoachIQ</button>`; }
     return `<div style="display:flex;align-items:center;gap:8px;border:1px solid var(--border,#2a2a31);border-radius:8px;padding:8px 10px;margin-bottom:6px;">
       <div style="flex:1;min-width:0;font-size:12px;">${nameHtml} <span style="color:var(--text-mute,#888);">${email}</span></div>
@@ -23832,6 +23862,9 @@ async function _sorterCiqInvite(stagingId, email, name) {
   if (!signup) { _sorterNotice('No CoachIQ signup link', 'Set the academy\'s CoachIQ athlete signup URL in the Business Blueprint (Offers → CoachIQ) first.', true); return; }
   const text = `Hi! To get on your training app, create a CoachIQ account with this email: ${email || '(your email)'}\n\nSign up here: ${signup}\n\nThat's it — your membership links up automatically once you're in.`;
   try { await navigator.clipboard.writeText(text); } catch (_) {}
+  // Flag them as "collecting a CoachIQ" (invite sent, awaiting signup) so the status
+  // is tracked — not just a one-off copy. Re-sending the invite is harmless (stays collecting).
+  if (stagingId) _sorterCiqSet(stagingId, { collecting: true });
   const el = document.createElement('div');
   el.innerHTML = `<div style="position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:160;"></div>
     <div style="position:fixed;z-index:161;top:50%;left:50%;transform:translate(-50%,-50%);width:min(440px,93vw);background:var(--surface,#16161a);border:1px solid #1f5f7a;border-radius:14px;padding:20px;">
@@ -23854,7 +23887,8 @@ async function _sorterCiqInvite(stagingId, email, name) {
 // to confirm. AI (advisory) tags each member + chats; execution stays explicit.
 function _sorterRenderStepTakeover(host) {
   host.innerHTML = `<div style="font-size:12.5px;color:var(--text-mute,#888);margin-bottom:12px;">Move each member onto portal billing so you can pause, cancel & change their plan here. The portal makes the new subscription; you cancel the old one (we link straight to it).</div>
-    <div id="pc-sorter-takeover-host">${_sorterLoading('Promoting members & reading their billing…')}</div>`;
+    <div id="pc-sorter-takeover-host">${_sorterLoading('Promoting members & reading their billing…')}</div>
+    <div id="pc-sorter-connect-host"></div>`;
   _sorterSetNext(`<button onclick="_sorterGoto(7)" style="font-size:13px;font-weight:700;padding:9px 18px;border-radius:9px;border:none;background:var(--accent,#E8C547);color:#1a1a1a;cursor:pointer;">Next: Finish &rarr;</button>`);
   if (!_SORTER._takeover) _SORTER._takeover = { pendingCancel: {}, detail: {} };
   _sorterTakeoverLoad();
@@ -23871,6 +23905,7 @@ async function _sorterTakeoverLoad() {
     const r = await fetch('/api/sorter/take-over-ai', { method: 'POST', headers: auth, body: JSON.stringify({ ...base, mode: 'batch' }) });
     const json = await _safeJson(r);
     if (!r.ok) throw new Error(_sorterErr(json.error) || ('HTTP ' + r.status));
+    if (json.batch_id) _SORTER.batchId = json.batch_id; // capture resolved batch when resuming on Billing
     _SORTER._takeover.members = json.members || [];
     _sorterTakeoverRender();
   } catch (e) { host.innerHTML = `<div style="color:var(--danger,#e0654f);">${escapeHTML(_sorterErr(e))}</div>`; }
