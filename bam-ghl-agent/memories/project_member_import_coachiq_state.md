@@ -115,6 +115,28 @@ portal then READS Stripe to confirm it's gone and auto-greens the row).
   `payment_method.attached` (already handled) → portal makes the sub → row greens. New build =
   button + status wiring only; link/card-page/auto-detect already exist.
 
+### Integration analysis + DECISIONS (Zoran, 2026-06-19)
+Mapped against the goal: after import, Members tab has everyone, tied to onboarding, all
+member actions work. Key finding: **member actions REJECT on foreign subs** ("not created by
+your application") → take-over billing is what unlocks them. Decisions:
+1. **Silent mode = YES.** When take-over's new portal sub is paid, the webhook normally fires
+   `fireOnboardingActivations` (GHL "new signup" workflow + welcome emails + "🎉 New signup"
+   staff SMS). For IMPORTED members suppress all of that — set live + link, NO welcome
+   sequence/SMS. Add an import/silent flag (sub metadata e.g. `import_silent=1`) that
+   `fireOnboardingActivations` honors.
+2. **CoachIQ does NOT revoke on Stripe cancel** (risk cleared). BUT: for every member's NEW
+   portal sub we must **push the new sub_id into CoachIQ** so CoachIQ's record points at the
+   portal sub. Mechanism: reuse the existing "renewal sub-link" (CoachIQ step already lets you
+   copy sub_id + CoachIQ link) but AUTOMATE it — on sub create, using the linked
+   `coachiq_member_id`, fire the CoachIQ automation/webhook to attach the sub to that member.
+   So: take-over makes sub → webhook → push sub_id to CoachIQ for live linked products.
+3. **Agreement = SKIP** for imported members (existing members signed elsewhere; no portal waiver).
+4. **Change-plan multi-tenant = PARKED.** `PLAN_TO_PRICE` is GTA-hardcoded (1/wk,2/wk,3/wk,unlmtd);
+   Summer/commitment/other academies unsupported. Restructure per-academy + systemize LATER.
+Other gaps noted (not yet decided): promote silently skips duplicates/missing-name rows;
+ordering (GHL + take-over need live members but promote is last → use the existing
+promote-on-demand `_sorterManageBilling` pattern); no single "fully onboarded" badge on the card.
+
 ## Also pending
 - **Test A**: a REAL test payment on /enroll + refund — proves the live chain end-to-end.
   Never run on a real `invoice.paid` yet (16 checkouts created, 0 activated). Deferred to LAST.
