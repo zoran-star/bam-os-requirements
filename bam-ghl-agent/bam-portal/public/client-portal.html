@@ -22755,9 +22755,9 @@ async function _sorterRowMarkPaused() {
   const d = b.data, sub = (d.facts || {}).subscription || {};
   const choice = await _sorterPauseChoiceModal(sub.current_period_end || '');
   if (!choice) return;
-  const live = sub.status && ['active', 'trialing', 'past_due', 'unpaid', 'paused'].includes(sub.status);
   try {
-    if (live) await _sorterCancelOldSubItem(d);
+    // Pausing is just a status change — it does NOT replace their sub, so no
+    // cancel-old-sub action item (unlike Change sub / Mark cancelled).
     const token = await _mreqAuthToken();
     const body = { client_id: _aiClientId(), staging_id: b.stagingId, mode: 'apply', action: 'pause_member' };
     if (!choice.indefinite) { body.next_payment = choice.next_payment; body.pause_end = choice.pause_end; }
@@ -22766,7 +22766,7 @@ async function _sorterRowMarkPaused() {
     if (!r.ok) throw new Error(_sorterErr(json.error) || ('HTTP ' + r.status));
     _sorterCloseConnect();
     _sorterResolveMember(b.stagingId, mm => { _sorterClearIssues(mm); mm.next_payment = { state: 'paused', label: choice.indefinite ? 'paused' : ('paused → ' + choice.pause_end) }; });
-    _sorterNotice('Paused', (live ? 'Action Item logged to cancel their old sub. ' : '') + (choice.indefinite ? 'Paused indefinitely.' : 'Paused with dates recorded.'));
+    _sorterNotice('Paused', choice.indefinite ? 'Paused indefinitely.' : 'Paused with dates recorded.');
   } catch (e) { _sorterNotice('Couldn\'t pause', _sorterErr(e), true); }
 }
 function _sorterChangeSubModal() {
@@ -22819,7 +22819,7 @@ async function _sorterChangeSubApply(btn) {
     if (live) await _sorterCancelOldSubItem(d);
     _sorterCloseConnect();
     _sorterResolveMember(b.stagingId, mm => { _sorterClearIssues(mm); mm.on_stripe = true; mm.next_payment = { state: 'scheduled', label: made.trial_end_iso || (date || 'next cycle') }; });
-    _sorterNotice('Sub switched ✓', `New ${key.split('|')[0]} sub starts ${made.trial_end_iso || date || 'next cycle'}.` + (live ? ' Action Item logged to cancel the old one in Stripe.' : ''));
+    _sorterNotice('Sub switched ✓', `New ${key.split('|')[0]} sub starts ${made.trial_end_iso || date || 'next cycle'}.` + (live ? ' Now cancel the old one in Stripe (also logged as an Action Item).' : ''), false, (live && d.stripe_sub_url) ? { url: d.stripe_sub_url, label: 'Cancel old sub in Stripe ↗' } : null);
   } catch (e) { if (btn) { btn.disabled = false; btn.textContent = 'Switch sub'; } _sorterNotice('Couldn\'t switch', _sorterErr(e), true); }
 }
 
@@ -23378,14 +23378,18 @@ function _sorterConfirmModal({ heading, body, confirmLabel = 'Confirm', danger =
   });
 }
 // Styled notice (replaces native alert).
-function _sorterNotice(heading, body, danger = false) {
+// link (optional) = { url, label } → renders a link button next to OK.
+function _sorterNotice(heading, body, danger = false, link = null) {
   const el = document.createElement('div');
+  const linkBtn = (link && link.url) ? `<a href="${escapeHTML(link.url)}" target="_blank" rel="noopener" style="font-size:12.5px;font-weight:700;padding:9px 15px;border-radius:9px;border:1px solid var(--accent,#E8C547);color:var(--accent,#E8C547);text-decoration:none;">${escapeHTML(link.label || 'Open ↗')}</a>` : '';
   el.innerHTML = `<div style="position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:150;"></div>
     <div style="position:fixed;z-index:151;top:50%;left:50%;transform:translate(-50%,-50%);width:min(400px,92vw);background:var(--surface,#16161a);border:1px solid ${danger ? '#7a2f2f' : '#1f7a3d'};border-radius:14px;padding:20px;text-align:center;">
       <div style="font-size:30px;line-height:1;margin-bottom:6px;">${danger ? '⚠️' : '✅'}</div>
       <div style="font-size:14.5px;font-weight:800;margin-bottom:5px;">${escapeHTML(heading)}</div>
       <div style="font-size:12.5px;color:var(--text-sub,#bbb);line-height:1.5;margin-bottom:16px;">${escapeHTML(body)}</div>
-      <button id="_sn-ok" style="font-size:12.5px;font-weight:800;padding:9px 18px;border-radius:9px;border:none;background:var(--accent,#E8C547);color:#1a1a1a;cursor:pointer;">OK</button>
+      <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap;">${linkBtn}
+        <button id="_sn-ok" style="font-size:12.5px;font-weight:800;padding:9px 18px;border-radius:9px;border:none;background:var(--accent,#E8C547);color:#1a1a1a;cursor:pointer;">OK</button>
+      </div>
     </div>`;
   document.body.appendChild(el);
   el.querySelector('#_sn-ok').onclick = () => el.remove();
