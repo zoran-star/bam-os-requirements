@@ -1,0 +1,189 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Member Import — Flows & Edge Cases</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet" />
+<script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+<style>
+  :root{
+    --bg:#0B0B0D; --bg-el:#131318; --bg-card:#16161C;
+    --border:rgba(255,255,255,0.08); --border-strong:rgba(255,255,255,0.16);
+    --text:#F5F5F7; --text-sub:#B0B0BA; --text-mute:#6E6E78;
+    --gold:#E8C547; --green:#4ADE80; --red:#ED7969; --amber:#F5A524; --blue:#7AB8F5; --purple:#C78EF5;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0;background:var(--bg);color:var(--text);font-family:'Inter',system-ui,sans-serif;min-height:100vh}
+  .page{max-width:1240px;margin:0 auto;padding:48px 24px 120px}
+  h1{font-family:'Space Grotesk',sans-serif;font-size:34px;font-weight:700;margin:0 0 8px;letter-spacing:-0.5px}
+  .sub{color:var(--text-sub);font-size:15px;margin:0 0 8px;line-height:1.55}
+  .stamp{color:var(--text-mute);font-size:12.5px;font-family:'JetBrains Mono',monospace;margin-bottom:40px}
+  h2{font-family:'Space Grotesk',sans-serif;font-size:23px;font-weight:600;margin:56px 0 6px;letter-spacing:-0.3px;display:flex;align-items:center;gap:10px}
+  h2 .n{font-size:13px;font-family:'JetBrains Mono',monospace;color:var(--gold);border:1px solid var(--border-strong);border-radius:6px;padding:2px 8px}
+  .lead{color:var(--text-sub);font-size:14px;line-height:1.6;margin:0 0 22px;max-width:880px}
+  .card{background:var(--bg-card);border:1px solid var(--border);border-radius:14px;padding:8px 8px;margin:18px 0;overflow-x:auto}
+  .mermaid{display:flex;justify-content:center;min-width:0}
+  .legend{display:flex;gap:18px;flex-wrap:wrap;margin:14px 0 0;font-size:12.5px;color:var(--text-sub)}
+  .legend span{display:inline-flex;align-items:center;gap:7px}
+  .dot{width:11px;height:11px;border-radius:3px;display:inline-block}
+  .gaps{display:grid;grid-template-columns:repeat(auto-fill,minmax(380px,1fr));gap:14px;margin-top:22px}
+  .gap{background:var(--bg-card);border:1px solid var(--border);border-left:3px solid var(--text-mute);border-radius:10px;padding:14px 16px}
+  .gap.hi{border-left-color:var(--red)} .gap.med{border-left-color:var(--amber)} .gap.lo{border-left-color:var(--text-mute)}
+  .gap .tag{font-size:10.5px;font-weight:800;letter-spacing:.4px;text-transform:uppercase;font-family:'JetBrains Mono',monospace}
+  .gap.hi .tag{color:var(--red)} .gap.med .tag{color:var(--amber)} .gap.lo .tag{color:var(--text-mute)}
+  .gap h4{font-size:14px;font-weight:700;margin:5px 0 6px}
+  .gap p{font-size:12.5px;color:var(--text-sub);line-height:1.5;margin:0}
+  .gap code{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--blue);background:rgba(122,184,245,0.1);padding:1px 5px;border-radius:4px}
+  .callout{background:rgba(232,197,71,0.07);border:1px solid rgba(232,197,71,0.25);border-radius:12px;padding:16px 20px;margin:22px 0;font-size:13.5px;line-height:1.6;color:var(--text-sub)}
+  .callout b{color:var(--gold)}
+  .rule{height:1px;background:var(--border);margin:56px 0 0}
+  .key{font-family:'JetBrains Mono',monospace;font-size:11.5px;color:var(--text-mute)}
+</style>
+</head>
+<body>
+<div class="page">
+  <h1>Member Import — Flows &amp; Edge Cases</h1>
+  <p class="sub">Every path an academy goes through when importing its existing roster and restructuring pricing — the happy path, every per-member decision, billing take-over, CoachIQ sync, and the known gaps marked in red/amber.</p>
+  <p class="stamp">BAM Business · portal.byanymeansbusiness.com · generated 2026-06-20</p>
+
+  <div class="legend">
+    <span><span class="dot" style="background:#7AB8F5"></span> step / system</span>
+    <span><span class="dot" style="background:#E8C547"></span> decision</span>
+    <span><span class="dot" style="background:#4ADE80"></span> automatic (portal)</span>
+    <span><span class="dot" style="background:#F5A524"></span> manual (staff)</span>
+    <span><span class="dot" style="background:#ED7969"></span> ⚠ known gap / bug</span>
+  </div>
+
+  <!-- ════════ 1. MASTER FLOW ════════ -->
+  <h2><span class="n">01</span> The master flow</h2>
+  <p class="lead">The 6-step import wizard. Pricing decisions happen at the Stripe/Cleanup step; billing is finalized at the Take-over step; CoachIQ sub-ids are pasted at Finish (after billing is locked).</p>
+  <div class="card"><div class="mermaid">
+flowchart TD
+  A([Academy uploads CSV]):::sys --> B["1 · Import<br/>→ members_staging"]:::sys
+  B --> C["2 · Stripe / Cleanup<br/>match each member to their Stripe sub"]:::sys
+  C --> D{"Per member:<br/>what's the situation?"}:::dec
+  D --> E["3 · CoachIQ<br/>listening → stamp coachiq_member_id"]:::sys
+  E --> F["4 · GHL<br/>link contacts by email/phone"]:::sys
+  F --> G["5 · 💳 Take over billing<br/>create PORTAL subs"]:::sys
+  G --> H["6 · Finish<br/>promote · cancel-old banner · CoachIQ paste"]:::sys
+  H --> I([Live roster · ✓ set up]):::done
+  F -.->|"runs before promote → can find 0 to link"| GAP9{{⚠ ordering hazard}}:::gap
+  classDef sys fill:#13202e,stroke:#7AB8F5,color:#dbeafe,stroke-width:1px;
+  classDef dec fill:#241f0a,stroke:#E8C547,color:#fbeebb;
+  classDef done fill:#0e2417,stroke:#4ADE80,color:#bbf7d0;
+  classDef gap fill:#2a1412,stroke:#ED7969,color:#fecaca;
+  </div></div>
+
+  <!-- ════════ 2. PER-MEMBER DECISION TREE ════════ -->
+  <h2><span class="n">02</span> Per-member decision tree (Stripe / Cleanup step)</h2>
+  <p class="lead">For every imported member the staff picks a path. The ⚙ Billing menu (Change sub / Pause / Mark cancelled) + the Fix-next-payment modal cover the cases.</p>
+  <div class="card"><div class="mermaid">
+flowchart TD
+  M([Imported member]):::sys --> Q1{Has a live<br/>Stripe sub?}:::dec
+  Q1 -->|"yes · keep price"| K["Grandfather<br/>(take-over preserves amount)"]:::auto
+  Q1 -->|"yes · wrong/legacy price"| CH["🔄 Change sub<br/>pick live offer-price + date"]:::auto
+  Q1 -->|"no · canceled / ended"| Q2{Want them<br/>billing again?}:::dec
+  Q1 -->|"failing card"| COL["💳 Set to collecting payment<br/>card link + status"]:::manual
+  Q1 -->|"duplicate row"| RM["Remove duplicate<br/>→ survivor turns green"]:::auto
+  Q2 -->|yes| SB["Set up billing<br/>offer-price + start date"]:::auto
+  Q2 -->|"pause"| PA["⏸ Mark paused<br/>indefinite OR dates"]:::auto
+  Q2 -->|"they cancelled"| CX["✕ Mark cancelled<br/>+ date · logs cancellation"]:::auto
+  Q2 -->|"not a member"| NM["Remove from import"]:::manual
+  CH --> OLD["Old foreign sub → 🔴 Action Item to cancel in Stripe"]:::gap
+  SB --> OLD
+  PA --> OLD
+  CX --> OLD
+  COL -.->|no sub created| GAP1{{⚠ setup-monthly never activates}}:::gap
+  classDef sys fill:#13202e,stroke:#7AB8F5,color:#dbeafe;
+  classDef dec fill:#241f0a,stroke:#E8C547,color:#fbeebb;
+  classDef auto fill:#0e2417,stroke:#4ADE80,color:#bbf7d0;
+  classDef manual fill:#2a2009,stroke:#F5A524,color:#fde9c3;
+  classDef gap fill:#2a1412,stroke:#ED7969,color:#fecaca;
+  </div></div>
+
+  <!-- ════════ 3. TAKE-OVER ════════ -->
+  <h2><span class="n">03</span> Take over billing — the core constraint</h2>
+  <p class="lead">The portal can <b>create</b> a new sub but <b>cannot cancel</b> a foreign (CoachIQ/GHL/dashboard) sub — Stripe Connect blocks writes to subs it didn't create. So every change leaves a manual cancel.</p>
+  <div class="card"><div class="mermaid">
+flowchart TD
+  T([Take over a member]):::sys --> C1{Card on file?}:::dec
+  C1 -->|no| CL["Set to collecting payment<br/>send card link"]:::manual
+  C1 -->|yes| NEW["Create PORTAL sub<br/>origin=fullcontrol-portal · import_silent=1<br/>first charge = old sub's next-payment date"]:::auto
+  NEW --> PAID["invoice.paid → webhook flips LIVE<br/>(silent: no welcome spam)"]:::auto
+  NEW --> CANCEL["🔴 Old foreign sub still LIVE"]:::gap
+  CANCEL --> AI["Action Item: Cancel old Stripe sub<br/>(due = next charge date)"]:::manual
+  AI --> STR["Staff cancels in Stripe by hand"]:::manual
+  STR --> VER["Portal reads Stripe → row greens"]:::auto
+  VER -.->|"does NOT clear the<br/>subs_to_cancel banner"| GAP6{{⚠ verify ≠ action-item done}}:::gap
+  classDef sys fill:#13202e,stroke:#7AB8F5,color:#dbeafe;
+  classDef dec fill:#241f0a,stroke:#E8C547,color:#fbeebb;
+  classDef auto fill:#0e2417,stroke:#4ADE80,color:#bbf7d0;
+  classDef manual fill:#2a2009,stroke:#F5A524,color:#fde9c3;
+  classDef gap fill:#2a1412,stroke:#ED7969,color:#fecaca;
+  </div></div>
+  <div class="callout"><b>Double-bill guard:</b> the new sub is anchored to the old sub's next-charge date, and the cancel becomes a 🔴 urgent due-dated Action Item + a red "N old subs still need cancelling" banner in Members &amp; Finish. The banner counts open action items → drops as staff complete them.</div>
+
+  <!-- ════════ 4. COACHIQ ════════ -->
+  <h2><span class="n">04</span> CoachIQ — link, paste, invite</h2>
+  <p class="lead">CoachIQ linking is automatic (tag webhook); the sub-id paste is manual (no API) and must happen <b>after</b> billing is final. No CoachIQ account → two clean paths.</p>
+  <div class="card"><div class="mermaid">
+flowchart TD
+  CQ([CoachIQ step]):::sys --> L{Tag fired?<br/>(listening)}:::dec
+  L -->|yes| LK["● linked · stamp coachiq_member_id"]:::auto
+  L -->|"no / missed"| W{On CoachIQ?}:::dec
+  W -->|"genuinely not"| NA["○ Not on CoachIQ (N/A)"]:::manual
+  W -->|"supposed to be"| INV["📲 Invite: signup link + their email"]:::manual
+  INV --> SU["Parent signs up with that email"]:::manual
+  SU --> AUTO["CoachIQ New-User automation →<br/>/api/coachiq/user-created → auto-links"]:::auto
+  INV -.->|"writes nothing · no follow-up"| GAP4{{⚠ no invite tracking}}:::gap
+  LK --> FIN["At FINISH (post-billing):<br/>🟦 paste FINAL sub_id into CoachIQ"]:::manual
+  FIN --> ADMIN["CoachIQ ↗ → academy client list<br/>(no per-member deep link possible)"]:::manual
+  classDef sys fill:#13202e,stroke:#7AB8F5,color:#dbeafe;
+  classDef dec fill:#241f0a,stroke:#E8C547,color:#fbeebb;
+  classDef auto fill:#0e2417,stroke:#4ADE80,color:#bbf7d0;
+  classDef manual fill:#2a2009,stroke:#F5A524,color:#fde9c3;
+  classDef gap fill:#2a1412,stroke:#ED7969,color:#fecaca;
+  </div></div>
+  <div class="callout"><b>Why the paste is manual:</b> CoachIQ has no API to set a sub-id, and the webhook only sends <span class="key">{{user.id}}</span> — never the profile id its admin URL uses. So "CoachIQ ↗" can only land on the academy's client list, and the sub-id paste is a human step at Finish.</div>
+
+  <!-- ════════ 5. KNOWN GAPS ════════ -->
+  <h2><span class="n">05</span> Known gaps &amp; edge cases</h2>
+  <p class="lead">From an independent gap-scan of the flow. The high ones are real bugs; most trace back to one root cause (below).</p>
+
+  <div class="callout"><b>Root cause behind most highs:</b> three out-of-sync "portal-owned" markers — <span class="key">metadata.origin</span> (take-over/onboarding), <span class="key">metadata.source</span> (setup-monthly), and two different <span class="key">PORTAL_OWNED_ORIGINS</span> lists (webhook ≠ members.js). A member whose sub uses <code>source</code> instead of <code>origin</code> falls through activation, badge, and management gates. Standardize the marker → fixes #1, #2, #3.</div>
+
+  <div class="gaps">
+    <div class="gap hi"><div class="tag">🔴 High · bug</div><h4>setup-monthly subs never activate</h4><p>Sub stamps <code>metadata.source</code>, the webhook checks <code>metadata.origin</code> → member stuck <code>payment_method_required</code> forever after they pay. <code>setup-monthly.js:192</code></p></div>
+    <div class="gap hi"><div class="tag">🔴 High · bug</div><h4>No-sub dated pause → wrongly resurrected</h4><p>pause-date-fix inserts a pause row; the cron Phase B flips status <code>paused→live</code> at <code>pause_end</code> even with no sub → a "live" member billing nothing. <code>members.js:1450</code></p></div>
+    <div class="gap hi"><div class="tag">🔴 High · bug</div><h4>verify-cancel ≠ action item done</h4><p>Cancelling the old sub greens the take-over row but doesn't complete the Action Item or clear the <code>subs_to_cancel</code> banner — they're decoupled. <code>take-over.js:136</code></p></div>
+    <div class="gap hi"><div class="tag">🔴 High · bug</div><h4>"✓ set up" badge lies</h4><p>Checks only <code>live + ghl_contact_id</code>, not whether the portal can actually manage the sub → a foreign-sub member shows "billing on the portal" falsely. <code>client-portal.html:18955</code></p></div>
+    <div class="gap med"><div class="tag">🟡 Med</div><h4>Commitment terms lost</h4><p>Take-over / change-sub bill month-to-month with no commitment record → a mid-commitment member loses the remaining term.</p></div>
+    <div class="gap med"><div class="tag">🟡 Med</div><h4>CoachIQ invite writes nothing</h4><p>"Supposed to be on it" only copies text — no <code>invited_at</code>, no nudge if they never sign up; member lingers <code>⏳ waiting</code>.</p></div>
+    <div class="gap med"><div class="tag">🟡 Med · multi-tenant</div><h4>GTA-hardcoded billing</h4><p>Change-plan (<code>PLAN_TO_PRICE</code>), currency <code>"cad"</code>, HST <code>1.13</code> hardcoded → breaks for non-Ontario / non-GTA academies.</p></div>
+    <div class="gap med"><div class="tag">🟡 Med</div><h4>coachiq-sync omits the un-linked</h4><p>Finish CoachIQ list only shows linked members → "invited, never signed up" members vanish from the post-billing paste step with no warning.</p></div>
+    <div class="gap med"><div class="tag">🟡 Med</div><h4>Promote drops rows silently</h4><p>Duplicates / nameless rows are skipped; take-over's bulk promote fire-and-forgets the skip list → nothing tells the academy who didn't make it.</p></div>
+    <div class="gap med"><div class="tag">🟡 Med</div><h4>GHL step ordering</h4><p>GHL link (step 4) reads live members but runs before promote → can find "0 to link"; members promoted later never get GHL-linked in the pass.</p></div>
+    <div class="gap lo"><div class="tag">⚪ Low</div><h4>Re-import duplicates</h4><p>Re-running take-over makes a new sub each time; cancel Action Items + cancellation rows have no dedup → pile up on re-runs.</p></div>
+    <div class="gap lo"><div class="tag">⚪ Low</div><h4>cancel-at-period-end invisible</h4><p>A foreign sub set to cancel-at-period-end still bills once more, but staff get no "will bill once more on DATE" surfacing.</p></div>
+  </div>
+
+  <div class="rule"></div>
+  <p class="stamp" style="margin-top:24px">Standardizing the portal-owned marker is the single highest-leverage fix — it clears 3 of the 4 high bugs at once.</p>
+</div>
+
+<script>
+  mermaid.initialize({
+    startOnLoad:true, theme:'base', securityLevel:'loose',
+    flowchart:{ curve:'basis', nodeSpacing:42, rankSpacing:52, padding:10 },
+    themeVariables:{
+      fontFamily:'Inter, sans-serif', fontSize:'13px',
+      lineColor:'#5a5a66', textColor:'#F5F5F7',
+      primaryColor:'#16161C', primaryBorderColor:'#3a3a44', primaryTextColor:'#F5F5F7'
+    }
+  });
+</script>
+</body>
+</html>
