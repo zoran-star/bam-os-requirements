@@ -290,7 +290,36 @@ async function handler(req, res) {
           method: "POST", stripeAccount: acct,
           body: { mode: "setup", customer: custId, success_url: `${origin}/client-portal.html?card=saved`, cancel_url: `${origin}/client-portal.html?card=cancelled` },
         });
+        // "Set to collecting payment": flip the member's status so the roster shows
+        // they're waiting on a card (promote maps it to member status).
+        if (body.mark_collecting) {
+          await sb(`members_staging?id=eq.${encodeURIComponent(stagingId)}`, {
+            method: "PATCH", headers: { Prefer: "return=minimal" },
+            body: JSON.stringify({ status: "payment_method_required", match_status: "ok", cleanup_notes: "collecting payment — card link sent", updated_at: new Date().toISOString() }),
+          });
+        }
         return res.status(200).json({ ok: true, action, url: sess.url || null });
+      }
+      if (action === "mark_cancellation") {
+        // Only valid when there's no LIVE sub (the UI gates this). Records a
+        // cancellation row (member_id may be null — it's a historical record) tied
+        // to the member's offer, then drops them from the import.
+        if (sub && (sub.status === "active" || sub.status === "trialing" || sub.status === "past_due")) {
+          return res.status(409).json({ error: "this member still has a live subscription — cancel it first" });
+        }
+        await sb(`cancellations`, {
+          method: "POST", headers: { Prefer: "return=minimal" },
+          body: JSON.stringify([{
+            client_id: clientId, member_id: s.promoted_member_id || null,
+            athlete_name: s.athlete_name, parent_name: s.parent_name,
+            type: "cancel", cancel_date: new Date().toISOString().slice(0, 10),
+            reason: `Imported — already canceled${offerKey ? " · " + offerKey.split("|")[0] : ""}`,
+            stripe_subscription_id: s.stripe_subscription_id || null,
+            stripe_customer_id: custId,
+          }]),
+        });
+        await sb(`members_staging?id=eq.${encodeURIComponent(stagingId)}&client_id=eq.${encodeURIComponent(clientId)}`, { method: "DELETE", headers: { Prefer: "return=minimal" } });
+        return res.status(200).json({ ok: true, action, cancellation_recorded: true });
       }
       if (action === "cancel_old") {
         // Blocked-fallback step 2: cancel the OLD sub after a replacement is made.

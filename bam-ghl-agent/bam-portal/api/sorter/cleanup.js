@@ -37,6 +37,7 @@ function normName(s) { return (s || "").toString().trim().toLowerCase().replace(
 function toMemberStatus(raw) {
   const s = (raw || "").toString().trim().toLowerCase();
   if (s === "paused" || s === "pause" || s === "on hold" || s === "hold") return "paused";
+  if (s === "payment_method_required" || s === "collecting" || s === "collecting payment") return "payment_method_required";
   return "live";
 }
 
