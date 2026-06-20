@@ -64,6 +64,23 @@ in-app modals instead — model them on `_sorterFixSuccess(heading, body, stripe
 Flowchart of all flows + edge cases: **portal.byanymeansbusiness.com/member-import-flows.html**
 (`public/member-import-flows.html`, mermaid). Gap grid shows the 4 reds as ✅ fixed.
 
+## Shipped 2026-06-20 (round 4 — deployed)
+- **CoachIQ list shows BOTH names** — kid headline + `· parent <name>` sub-label (was kid-only).
+- **CoachIQ "supposed to be on it" → tracked status** "collecting a CoachIQ" (📥). New
+  `members_staging.coachiq_collecting` col (migration), returned by `coachiq-status`, set via
+  `coachiq-set {collecting}`. Invite still copies the link but now also flags collecting; badge +
+  count + re-send/undo controls. Partially closes the gap-3 "invite writes nothing" item.
+- **Billing "Review & move" did nothing** — FIXED. `pc-sorter-connect-host` modal host only
+  existed in the Cleanup step → `_sorterTakeoverOpen` returned silently. Added the host div to the
+  Takeover step (`_sorterRenderStepTakeover`).
+- **Save-my-spot** — Member Import now resumes where you left off. Per-client localStorage spot
+  (`bam_sorter_spot_<clientId>`) stamped on every `_sorterGoto` + on close; strip onclick →
+  `openMemberImportResume(computedStep)` (resumes if saved step is further along — the strip alone
+  can't land on Billing since step 6 isn't in its dots). Header × → explicit **"Save & close"**
+  button in members mode. `take-over-ai` mode `batch` now resolves the latest import batch when
+  none is passed (mirrors cleanup.js) + returns `batch_id` so the front-end captures batchId on
+  resume. Spot cleared on reaching Finish (step 7).
+
 ## PENDING — pick up here
 1. **AUTO CONFLICT-SCAN (offered, not built)** — flag cleanup rows where the live Stripe sub's
    price ≠ the CSV-implied offer (the Bradley root cause). Today the auto-match trusts the CSV
