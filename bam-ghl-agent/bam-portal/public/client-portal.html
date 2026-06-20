@@ -11261,6 +11261,14 @@ function _isStageAllowed(stageId) {
   return _MY_ALLOWED_STAGES.includes(stageId);
 }
 
+// Pipelines the current user can see at least one stage of. A staff restricted
+// to certain stages only sees the pipelines those stages live in — so hiding
+// every stage of a pipeline hides the whole pipeline (tab + board).
+function _plVisiblePipelines() {
+  const pls = (_PL_DATA && _PL_DATA.pipelines) || [];
+  return pls.filter(p => (p.stages || []).some(s => _isStageAllowed(s.id)));
+}
+
 // Hide nav items the current user isn't permitted to see. Runs AFTER the tier
 // gates so it only ever subtracts. No-op for owners or when no perms are set.
 function applyTabPermissions() {
@@ -19150,10 +19158,14 @@ async function _epWizSave(disconnect) {
 function _renderPipelineTabs() {
   const host = document.getElementById('pl-pipeline-tabs');
   if (!host || !_PL_DATA) return;
-  if (!_PL_DATA.pipelines.length) { host.innerHTML = ''; return; }
-  host.innerHTML = _PL_DATA.pipelines.map(p => {
+  const pls = _plVisiblePipelines();
+  if (!pls.length) { host.innerHTML = ''; return; }
+  // If the selected pipeline isn't visible to this user, snap to the first one.
+  if (!pls.some(p => p.id === _PL_PIPELINE)) _PL_PIPELINE = pls[0].id;
+  host.innerHTML = pls.map(p => {
     const on = p.id === _PL_PIPELINE;
-    return `<button class="pl-tab ${on ? 'on' : ''}" onclick="_plSelectPipeline('${escapeHTML(p.id)}')">${escapeHTML(p.name)} <span style="opacity:0.7">${p.opportunities.length}</span></button>`;
+    const visibleCount = (p.opportunities || []).filter(o => _isStageAllowed(o.stageId)).length;
+    return `<button class="pl-tab ${on ? 'on' : ''}" onclick="_plSelectPipeline('${escapeHTML(p.id)}')">${escapeHTML(p.name)} <span style="opacity:0.7">${visibleCount}</span></button>`;
   }).join('');
 }
 
@@ -19448,7 +19460,9 @@ function _renderPipelineBoard() {
     container.innerHTML = '<div class="req-empty" style="padding:20px 0">No pipelines in GHL yet.</div>';
     return;
   }
-  const p = _PL_DATA.pipelines.find(x => x.id === _PL_PIPELINE) || _PL_DATA.pipelines[0];
+  const _vis = _plVisiblePipelines();
+  if (!_vis.length) { container.innerHTML = '<div class="req-empty" style="padding:20px 0">No pipelines available.</div>'; return; }
+  const p = _vis.find(x => x.id === _PL_PIPELINE) || _vis[0];
   if (!p) { container.innerHTML = ''; return; }
 
   // Per-staff stage permissions: a restricted teammate only sees allowed stages.
