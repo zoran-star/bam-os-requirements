@@ -24046,10 +24046,21 @@ function _sorterTakeoverModalRender(memberId) {
     const canon = rec.canonical_amount_cents != null && rec.price_differs;
     const gf = (cur.amount || (rec.grandfather_amount_cents != null ? ('$' + (rec.grandfather_amount_cents / 100).toFixed(2)) : '—'));
     const opt = (val, label, sub) => `<label style="display:flex;gap:8px;align-items:center;font-size:12px;padding:7px 9px;border:1px solid ${d.priceChoice === val ? 'var(--accent,#E8C547)' : 'var(--border,#2a2a31)'};border-radius:8px;cursor:pointer;margin-bottom:6px;"><input type="radio" name="tkprice-${memberId}" ${d.priceChoice === val ? 'checked' : ''} onchange="_SORTER._takeover.detail['${memberId}'].priceChoice='${val}';_sorterTakeoverModalRender('${memberId}')"><span><b style="color:var(--text,#eee);">${label}</b> <span style="color:var(--text-mute,#888);">${sub}</span></span></label>`;
+    const today = new Date().toISOString().slice(0, 10);
+    const fcVal = d.firstCharge || rec.first_charge_iso || '';
+    const gfDollars = rec.grandfather_amount_cents != null ? (rec.grandfather_amount_cents / 100).toFixed(2) : (cur.amount_cents != null ? (cur.amount_cents / 100).toFixed(2) : '');
+    const amtVal = (d.customAmountStr != null ? d.customAmountStr : gfDollars);
+    const noCard = cur.card_on_file === false || (f.card && f.card.on_file === false);
+    const fld = 'width:100%;margin-top:3px;font-size:12px;padding:6px 7px;border-radius:7px;border:1px solid var(--border,#2a2a31);background:var(--bg,#0e0e11);color:var(--text,#eee);box-sizing:border-box;';
+    const lbl = 'flex:1;font-size:10px;text-transform:uppercase;letter-spacing:.4px;color:var(--text-mute,#888);';
     actionBlock = `<div style="font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--text-mute,#888);margin-bottom:6px;">What to bill on the new sub</div>
-      ${opt('grandfather', 'Keep current price', gf + (cur.interval ? '/' + escapeHTML(cur.interval) : '') + ' — no change')}
+      ${opt('grandfather', 'Keep current price', gf + (cur.interval ? '/' + escapeHTML(cur.interval) : '') + ' — editable below')}
       ${canon ? opt('canonical', 'Move to offer price', '$' + (rec.canonical_amount_cents / 100).toFixed(2) + '/mo') : ''}
-      <div style="font-size:11px;color:var(--text-mute,#888);margin:4px 0 10px;">First charge: <b style="color:var(--text,#eee);">${escapeHTML(rec.first_charge_iso || 'next cycle')}</b> · ${cur.card_on_file === false || (f.card && f.card.on_file === false) ? '<span style="color:#e0a93f;">no card — get a link first</span>' : 'reuses card on file'}</div>
+      <div style="display:flex;gap:8px;margin:6px 0 4px;">
+        <label style="${lbl}">First charge<input type="date" min="${today}" value="${escapeHTML(fcVal)}" onchange="_SORTER._takeover.detail['${memberId}'].firstCharge=this.value" style="${fld}"></label>
+        ${d.priceChoice === 'grandfather' ? `<label style="${lbl}">Amount ($)<input type="number" step="0.01" min="0" value="${escapeHTML(amtVal)}" onchange="_SORTER._takeover.detail['${memberId}'].customAmountStr=this.value" style="${fld}"></label>` : ''}
+      </div>
+      <div style="font-size:11px;color:${noCard ? '#e0a93f' : 'var(--text-mute,#888)'};margin:2px 0 10px;">${noCard ? 'no card — get a link first' : 'reuses card on file'}</div>
       <button onclick="_sorterTakeoverMake('${memberId}',this)" style="width:100%;font-size:13px;font-weight:800;padding:10px;border-radius:9px;border:none;background:var(--accent,#E8C547);color:#1a1a1a;cursor:pointer;">Make the portal sub</button>`;
   }
   const subUrl = cur.stripe_url || '';
@@ -24106,6 +24117,12 @@ async function _sorterTakeoverMake(memberId, btn) {
     const token = await _mreqAuthToken();
     const payload = { client_id: _aiClientId(), member_id: memberId, mode: 'create' };
     if (d.priceChoice === 'canonical' && d.recommend && d.recommend.canonical_price_id) payload.price_id = d.recommend.canonical_price_id;
+    if (d.firstCharge) payload.first_charge_date = d.firstCharge; // staff-adjusted next charge
+    // Custom amount only applies to the grandfather path (canonical uses a fixed price_id).
+    if (d.priceChoice !== 'canonical' && d.customAmountStr != null && d.customAmountStr !== '') {
+      const cents = Math.round(parseFloat(d.customAmountStr) * 100);
+      if (!isNaN(cents) && cents > 0) payload.custom_amount_cents = cents;
+    }
     const r = await fetch('/api/sorter/take-over', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token }, body: JSON.stringify(payload) });
     const json = await _safeJson(r);
     if (!r.ok) throw new Error(_sorterErr(json.error) || ('HTTP ' + r.status));
