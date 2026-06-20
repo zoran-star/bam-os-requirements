@@ -109,6 +109,23 @@ async function gatherFacts({ clientId, acct, member }) {
     } catch (_) {}
   }
 
+  // Recent payment history — the customer's last few PAID invoices (covers the
+  // foreign CoachIQ/GHL sub too, since they all bill on the academy's Stripe).
+  // Gives the AI real numbers to answer "when were their last payments?".
+  let recentPayments = [];
+  if (custId) {
+    try {
+      const inv = await stripeGet(`/invoices?customer=${encodeURIComponent(custId)}&limit=6`, acct);
+      recentPayments = (inv.data || [])
+        .filter(i => (i.amount_paid || 0) > 0)
+        .map(i => ({
+          amount: money(i.amount_paid),
+          amount_cents: i.amount_paid,
+          paid_at: iso((i.status_transitions && i.status_transitions.paid_at) || i.created),
+        }));
+    } catch (_) {}
+  }
+
   // What the OFFER says they should pay (canonical monthly for their plan).
   let canonical = null;
   const planTitle = String(member.plan || "").split("|")[0];
@@ -126,6 +143,7 @@ async function gatherFacts({ clientId, acct, member }) {
     current_sub: sub ? { amount: money(curAmount), amount_cents: curAmount, interval, status: sub.status, made_by: originLabel, next_charge: iso(nextCharge) } : null,
     card: { on_file: !needsCard, last4 },
     offer_should_pay: canonical ? { amount: money(canonical.amount_cents), amount_cents: canonical.amount_cents, price_id: canonical.stripe_price_id } : null,
+    recent_payments: recentPayments,
     _internal: { sub, originLabel, needsCard, curAmount, nextCharge, canonical },
   };
 }
