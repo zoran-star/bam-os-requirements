@@ -13389,18 +13389,32 @@ async function _bbStaffStagesLoad(memberId) {
     if (!_BB_PIPE_CACHE.length) { host.innerHTML = '<div style="color:var(--text-mute);font-size:12px">No pipelines in GHL yet.</div>'; return; }
     const allowed = _BB_STAGE_PERMS[memberId];
     const allowAll = !Array.isArray(allowed);
-    host.innerHTML = _BB_PIPE_CACHE.map(p => `
-      <div style="flex-basis:100%;font-size:11px;font-weight:700;color:var(--text-mute);text-transform:uppercase;letter-spacing:.04em;margin-top:4px">🛣 ${escapeHTML(p.name)}</div>
-      ${(p.stages || []).map(s => {
+    host.innerHTML = _BB_PIPE_CACHE.map(p => {
+      const stages = p.stages || [];
+      const pipeAllOn = stages.length > 0 && stages.every(s => allowAll || allowed.includes(s.id));
+      return `
+      <label style="flex-basis:100%;display:flex;align-items:center;gap:7px;font-size:11px;font-weight:700;color:var(--text-mute);text-transform:uppercase;letter-spacing:.04em;margin-top:6px;cursor:pointer">
+        <input type="checkbox" data-pipe-toggle="${escapeHTML(p.id)}" ${pipeAllOn ? 'checked' : ''} onchange="_bbStaffPipeToggle('${memberId}','${escapeHTML(p.id)}', this.checked)"> 🛣 ${escapeHTML(p.name)} <span style="font-weight:400;opacity:.7;text-transform:none">(whole pipeline)</span>
+      </label>
+      ${stages.map(s => {
         const on = allowAll || allowed.includes(s.id);
-        return `<label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer">
-          <input type="checkbox" data-stageid="${escapeHTML(s.id)}" ${on ? 'checked' : ''} onchange="_bbStaffStagesSave('${memberId}')"> ${escapeHTML(s.name)}</label>`;
-      }).join('')}`).join('') +
-      `<div style="flex-basis:100%;font-size:11px;color:var(--text-mute)">Unchecked stages are hidden from this teammate in the Sales board.</div>`;
+        return `<label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;margin-left:14px">
+          <input type="checkbox" data-stageid="${escapeHTML(s.id)}" data-pipe="${escapeHTML(p.id)}" ${on ? 'checked' : ''} onchange="_bbStaffStagesSave('${memberId}')"> ${escapeHTML(s.name)}</label>`;
+      }).join('')}`;
+    }).join('') +
+      `<div style="flex-basis:100%;font-size:11px;color:var(--text-mute)">Tick the pipeline name to select/clear all its stages. Unchecked stages are hidden from this teammate in the Sales board.</div>`;
   } catch (e) {
     host.dataset.loaded = '';
     host.innerHTML = `<div style="color:#9a3b2f;font-size:12px">Couldn't load — ${escapeHTML(e.message)}</div>`;
   }
+}
+
+// Select/clear every stage of one pipeline at once, then save.
+function _bbStaffPipeToggle(memberId, pipeId, checked) {
+  const cont = document.getElementById('staff-stages-' + memberId);
+  if (!cont) return;
+  cont.querySelectorAll(`input[type=checkbox][data-stageid][data-pipe="${pipeId}"]`).forEach(b => { b.checked = checked; });
+  _bbStaffStagesSave(memberId);
 }
 
 async function _bbStaffStagesSave(memberId) {
