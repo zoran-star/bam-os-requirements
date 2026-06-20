@@ -369,6 +369,7 @@ async function handler(req, res) {
           id: s.id, athlete_name: s.athlete_name, parent_name: s.parent_name, parent_email: s.parent_email,
           stripe_subscription_id: s.stripe_subscription_id || null,
           coachiq_member_id: s.coachiq_member_id || null, coachiq_not_applicable: !!s.coachiq_not_applicable,
+          coachiq_collecting: !!s.coachiq_collecting,
         })),
         unmatched: events.filter(e => !e.matched).map(e => ({ email: e.email, coachiq_user_id: e.coachiq_user_id, at: e.created_at })),
       });
@@ -401,12 +402,16 @@ async function handler(req, res) {
       const s = staging.find(x => String(x.id) === String(body.staging_id));
       if (!s) return res.status(404).json({ error: "staging row not found" });
       const patch = { updated_at: nowIso() };
-      if (body.not_applicable === true)  { patch.coachiq_not_applicable = true; patch.coachiq_member_id = null; }
+      if (body.not_applicable === true)  { patch.coachiq_not_applicable = true; patch.coachiq_member_id = null; patch.coachiq_collecting = false; }
       else if (body.not_applicable === false) { patch.coachiq_not_applicable = false; }
+      // "supposed to be on it" → collecting a CoachIQ (invite sent, awaiting signup).
+      // Not N/A and not yet linked — it's a tracked in-between state.
+      if (body.collecting === true)  { patch.coachiq_collecting = true; patch.coachiq_not_applicable = false; }
+      else if (body.collecting === false) { patch.coachiq_collecting = false; }
       if (typeof body.coachiq_member_id === "string") {
         const v = body.coachiq_member_id.trim();
         patch.coachiq_member_id = v || null;
-        if (v) patch.coachiq_not_applicable = false;
+        if (v) { patch.coachiq_not_applicable = false; patch.coachiq_collecting = false; } // linked → no longer collecting
       }
       await sb(`members_staging?id=eq.${s.id}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify(patch) });
       return res.status(200).json({ ok: true, staging_id: s.id });

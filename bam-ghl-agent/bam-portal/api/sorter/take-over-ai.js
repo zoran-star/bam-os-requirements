@@ -163,7 +163,17 @@ async function handler(req, res) {
     // ── batch: a deterministic verdict per promoted member in an import (no Claude) ──
     // The roster view loads this once; Claude only runs when a member's chat opens.
     if (body.mode === "batch") {
-      const batchId = body.import_batch_id || body.batch_id;
+      // batch_id is only known in-session right after an Import. When the modal
+      // is reopened on a later step (e.g. resuming on Billing), fall back to the
+      // client's most recent import batch — same resolution cleanup.js uses.
+      let batchId = body.import_batch_id || body.batch_id;
+      if (!batchId) {
+        const last = await sb(
+          `members_staging?client_id=eq.${encodeURIComponent(clientId)}` +
+          `&select=import_batch_id&order=created_at.desc&limit=1`
+        );
+        batchId = Array.isArray(last) && last[0] ? last[0].import_batch_id : null;
+      }
       if (!batchId) return res.status(400).json({ error: "import_batch_id required" });
       const staging = await sb(
         `members_staging?import_batch_id=eq.${encodeURIComponent(batchId)}&client_id=eq.${encodeURIComponent(clientId)}` +
@@ -191,7 +201,7 @@ async function handler(req, res) {
       }));
       const order = { needs_card: 0, move: 1, no_sub: 2, fine: 3, error: 4 };
       out.sort((a, b) => (order[a.tag] ?? 9) - (order[b.tag] ?? 9));
-      return res.status(200).json({ ok: true, mode: "batch", members: out });
+      return res.status(200).json({ ok: true, mode: "batch", batch_id: batchId, members: out });
     }
 
     if (!body.member_id) return res.status(400).json({ error: "member_id required" });
