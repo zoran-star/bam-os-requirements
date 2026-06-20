@@ -22405,7 +22405,21 @@ function _sorterRemoveStaged(stagingId) {
       .map(g => ({ ...g, ids: g.ids.filter(id => String(id) !== String(stagingId)) }))
       .filter(g => g.ids.length > 1);
     // also drop from the member roster so the row disappears without a re-check
-    if (Array.isArray(_SORTER.checks.members)) _SORTER.checks.members = _SORTER.checks.members.filter(m => String(m.id) !== String(stagingId));
+    if (Array.isArray(_SORTER.checks.members)) {
+      const removed = _SORTER.checks.members.find(m => String(m.id) === String(stagingId));
+      const dupKey = removed && removed.dup_key;
+      _SORTER.checks.members = _SORTER.checks.members.filter(m => String(m.id) !== String(stagingId));
+      // Removing one of a dup pair → un-flag the lone survivor so it turns green live.
+      if (dupKey) {
+        const survivors = _SORTER.checks.members.filter(m => m.dup_key === dupKey);
+        if (survivors.length === 1) {
+          const sv = survivors[0];
+          sv.is_dup_copy = false;
+          sv.issues = (sv.issues || []).filter(i => !/duplicate/i.test(i));
+          sv.needs_work = !!(sv.issues.length || sv.no_offer || sv.no_payment || sv.suggestion);
+        }
+      }
+    }
   },
     (json) => json.removed_row ? ({ label: 'remove', action: 'restore-staged', body: { row: json.removed_row } }) : null);
 }
@@ -23030,7 +23044,7 @@ function _sorterRenderFixPayment() {
   const primaryLabel = plan.kind === 'setup_monthly' ? '💳 Set up monthly billing'
     : plan.action === 'uncancel' ? '↩ Remove the cancellation'
     : plan.action === 'resume' ? '▶ Resume billing'
-    : plan.action === 'card_link' ? '🔗 Create card link'
+    : plan.action === 'card_link' ? '💳 Set to collecting payment'
     : 'Apply fix';
   host.innerHTML = `
     <div onclick="_sorterCloseFix()" style="position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:140;"></div>
@@ -23067,7 +23081,8 @@ function _sorterRenderFixPayment() {
           ${scheduled ? '' : (plan.action === 'card_link'
             ? `<button onclick="_sorterFixRemoveMember()" title="Drop this person from the import roster" style="font-size:11.5px;font-weight:700;padding:8px 13px;border-radius:9px;border:1px solid #7a2f2f;background:transparent;color:#e0654f;cursor:pointer;">Remove as member</button>`
             : plan.kind === 'setup_monthly'
-            ? `<button onclick="_sorterFixPauseMember()" title="Keep them as a member but don't bill them — no Stripe sub, no auto-resume." style="font-size:11.5px;font-weight:700;padding:8px 13px;border-radius:9px;border:1px solid #8a6d1f;background:transparent;color:#cfa647;cursor:pointer;">⏸ Pause indefinitely</button>`
+            ? `<button onclick="_sorterFixMarkCancellation()" title="Record this as a cancellation (no live sub). Tied to the offer; removes them from the import." style="font-size:11.5px;font-weight:700;padding:8px 13px;border-radius:9px;border:1px solid #7a2f2f;background:transparent;color:#e0654f;cursor:pointer;">✕ Mark as cancellation</button>
+               <button onclick="_sorterFixPauseMember()" title="Keep them as a member but don't bill them — no Stripe sub, no auto-resume." style="font-size:11.5px;font-weight:700;padding:8px 13px;border-radius:9px;border:1px solid #8a6d1f;background:transparent;color:#cfa647;cursor:pointer;">⏸ Pause indefinitely</button>`
             : `<button onclick="_sorterFixReplace()" title="Can't fix it? Create a fresh subscription and cancel this one." style="font-size:11.5px;font-weight:700;padding:8px 13px;border-radius:9px;border:1px solid var(--border,#2a2a31);background:transparent;color:var(--text-sub,#bbb);cursor:pointer;">Can't fix — replace it</button>`)}
           <button onclick="_sorterCloseFix()" style="font-size:12.5px;padding:8px 14px;border-radius:9px;border:1px solid var(--border,#2a2a31);background:transparent;color:var(--text,#eee);cursor:pointer;">${scheduled ? 'Close' : 'Cancel'}</button>
           ${scheduled ? '' : `<button onclick="_sorterFixApply()" style="font-size:12.5px;font-weight:700;padding:8px 16px;border-radius:9px;border:none;background:var(--accent,#E8C547);color:#1a1a1a;cursor:pointer;">${primaryLabel}</button>`}
@@ -23076,9 +23091,53 @@ function _sorterRenderFixPayment() {
     </div>`;
 }
 
-// "Remove as member" — drop this person from the import (reuses remove-staged, undoable).
-function _sorterFixRemoveMember() {
-  const id = _SORTER_FIX && _SORTER_FIX.stagingId;
+// ── In-import optimistic helpers — resolve/drop a row WITHOUT a full Stripe re-check ──
+function _sorterResolveMember(stagingId, mutator) {
+  if (_SORTER.checks && Array.isArray(_SORTER.checks.members)) {
+    const mm = _SORTER.checks.members.find(x => String(x.id) === String(stagingId));
+    if (mm && mutator) mutator(mm);
+  }
+  _sorterRenderBody();
+}
+function _sorterDropMemberRow(stagingId) {
+  if (_SORTER.checks && Array.isArray(_SORTER.checks.members)) _SORTER.checks.members = _SORTER.checks.members.filter(x => String(x.id) !== String(stagingId));
+  _sorterRenderBody();
+}
+function _sorterClearIssues(mm) { mm.needs_work = false; mm.issues = []; mm.no_payment = false; mm.no_offer = false; mm.suggestion = null; }
+
+// In-app success card (replaces the browser alert) — optional Stripe link.
+function _sorterFixSuccess(heading, body, stripeUrl) {
+  const host = document.getElementById('pc-sorter-connect-host');
+  if (!host) return;
+  host.innerHTML = `<div onclick="_sorterCloseFix()" style="position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:140;"></div>
+    <div style="position:fixed;z-index:141;top:50%;left:50%;transform:translate(-50%,-50%);width:min(420px,92vw);background:var(--surface,#16161a);border:1px solid #1f7a3d;border-radius:14px;padding:22px;text-align:center;">
+      <div style="font-size:38px;line-height:1;margin-bottom:8px;">✅</div>
+      <div style="font-size:16px;font-weight:800;margin-bottom:6px;">${escapeHTML(heading)}</div>
+      <div style="font-size:12.5px;color:var(--text-sub,#bbb);line-height:1.5;margin-bottom:18px;">${escapeHTML(body)}</div>
+      <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap;">
+        ${stripeUrl ? `<a href="${escapeHTML(stripeUrl)}" target="_blank" rel="noopener" style="font-size:12.5px;font-weight:700;padding:9px 15px;border-radius:9px;border:1px solid var(--accent,#E8C547);color:var(--accent,#E8C547);text-decoration:none;">View in Stripe ↗</a>` : ''}
+        <button onclick="_sorterCloseFix()" style="font-size:12.5px;font-weight:800;padding:9px 18px;border-radius:9px;border:none;background:var(--accent,#E8C547);color:#1a1a1a;cursor:pointer;">Done</button>
+      </div>
+    </div>`;
+}
+
+// "Remove as member" — if they still have a LIVE sub the portal can't cancel it
+// (Stripe blocks foreign subs), so pop the Stripe link + log an Action Item.
+async function _sorterFixRemoveMember() {
+  const d = _SORTER_FIX && _SORTER_FIX.data; if (!d) return;
+  const id = _SORTER_FIX.stagingId, m = d.member || {}, sub = (d.facts || {}).subscription || {};
+  const live = sub.status && ['active', 'trialing', 'past_due', 'unpaid', 'paused'].includes(sub.status);
+  if (live && d.stripe_sub_url) {
+    try {
+      const token = await _mreqAuthToken();
+      await fetch('/api/action-items', {
+        method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+        body: JSON.stringify({ client_id: _aiClientId(), title: `Cancel ${m.athlete_name || 'member'}'s Stripe subscription`, description: `Removed from import but still has a live sub${sub.amount ? ' (' + sub.amount + ')' : ''}. Cancel it in Stripe: ${d.stripe_sub_url}` }),
+      });
+    } catch (_) {}
+    window.open(d.stripe_sub_url, '_blank', 'noopener');
+    alert('Opened Stripe to cancel their sub — and added an Action Item to track it.');
+  }
   _sorterCloseFix();
   if (id) _sorterRemoveStaged(id);
 }
@@ -23087,16 +23146,36 @@ function _sorterFixRemoveMember() {
 async function _sorterFixPauseMember() {
   if (!_SORTER_FIX) return;
   if (!confirm('Mark this member indefinitely paused? They stay on the roster but won\'t be billed until you set up billing later.')) return;
+  const id = _SORTER_FIX.stagingId;
   try {
     const token = await _mreqAuthToken();
     const r = await fetch('/api/sorter/fix-payment', {
       method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
-      body: JSON.stringify({ client_id: _aiClientId(), staging_id: _SORTER_FIX.stagingId, mode: 'apply', action: 'pause_member' }),
+      body: JSON.stringify({ client_id: _aiClientId(), staging_id: id, mode: 'apply', action: 'pause_member' }),
     });
     const json = await _safeJson(r);
     if (!r.ok) throw new Error(_sorterErr(json.error) || ('HTTP ' + r.status));
-    _sorterCloseFix(); _sorterRunChecks();
+    _sorterCloseFix();
+    _sorterResolveMember(id, mm => { _sorterClearIssues(mm); mm.next_payment = { state: 'paused', label: 'paused' }; });
   } catch (e) { alert('Couldn\'t pause: ' + _sorterErr(e)); }
+}
+
+// "Mark as cancellation" — only when no live sub. Records a cancellation + drops them.
+async function _sorterFixMarkCancellation() {
+  if (!_SORTER_FIX) return;
+  if (!confirm('Record this as a cancellation? Logs it (tied to the offer) and removes them from the import.')) return;
+  const id = _SORTER_FIX.stagingId;
+  try {
+    const token = await _mreqAuthToken();
+    const r = await fetch('/api/sorter/fix-payment', {
+      method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+      body: JSON.stringify({ client_id: _aiClientId(), staging_id: id, mode: 'apply', action: 'mark_cancellation' }),
+    });
+    const json = await _safeJson(r);
+    if (!r.ok) throw new Error(_sorterErr(json.error) || ('HTTP ' + r.status));
+    _sorterCloseFix();
+    _sorterDropMemberRow(id);
+  } catch (e) { alert('Couldn\'t mark cancellation: ' + _sorterErr(e)); }
 }
 
 // Apply the recommended deterministic fix.
@@ -23106,19 +23185,25 @@ async function _sorterFixApply() {
   if (plan.kind === 'setup_monthly') return _sorterFixSetupMonthly(m, plan);
   try {
     const token = await _mreqAuthToken();
+    const collecting = plan.action === 'card_link';
     const r = await fetch('/api/sorter/fix-payment', {
       method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
-      body: JSON.stringify({ client_id: _aiClientId(), staging_id: _SORTER_FIX.stagingId, mode: 'apply', action: plan.action }),
+      body: JSON.stringify({ client_id: _aiClientId(), staging_id: _SORTER_FIX.stagingId, mode: 'apply', action: plan.action, mark_collecting: collecting }),
     });
     const json = await _safeJson(r);
     if (!r.ok) throw new Error(_sorterErr(json.error) || ('HTTP ' + r.status));
-    if (plan.action === 'card_link') {
+    if (collecting) {
+      // "Set to collecting payment": copy the card link + flip the member to collecting.
       const url = json.url || '';
-      if (url) { try { await navigator.clipboard.writeText(url); } catch (_) {} prompt('Card-update link (copied) — send it to the member. Billing retries once they update their card.', url); }
-      else alert("Couldn't create a card link — try again.");
-      return; // nothing changed yet — leave the list as-is
+      if (url) { try { await navigator.clipboard.writeText(url); } catch (_) {} }
+      const id = _SORTER_FIX.stagingId;
+      _sorterFixSuccess('Set to collecting payment', `Card link copied to your clipboard — send it to the member. Their status is now "collecting payment".`, null);
+      _sorterResolveMember(id, mm => { _sorterClearIssues(mm); mm.status = 'payment_method_required'; mm.next_payment = { state: 'collecting', label: 'collecting payment' }; });
+      return;
     }
-    _sorterCloseFix(); _sorterRunChecks();
+    const doneId = _SORTER_FIX.stagingId;
+    _sorterCloseFix();
+    _sorterResolveMember(doneId, mm => { _sorterClearIssues(mm); });
   } catch (e) { alert('Fix failed: ' + _sorterErr(e)); }
 }
 
@@ -23169,8 +23254,10 @@ async function _sorterFixSetupMonthly(m, plan) {
     if (!chosen) return;
     const made = await _safeJson(await fetch('/api/sorter/setup-monthly', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token }, body: JSON.stringify({ ...base, mode: 'create', first_charge_date: chosen }) }));
     if (made.error) throw new Error(_sorterErr(made.error));
-    alert(`✓ Monthly billing set up — ${amt}/month starts ${made.trial_end_iso}. They’re not charged until then.`);
-    _sorterCloseFix(); _sorterRunChecks();
+    const okId = _SORTER_FIX && _SORTER_FIX.stagingId;
+    const custUrl = (_SORTER_FIX && _SORTER_FIX.data && _SORTER_FIX.data.stripe_account_id && m.customer_id) ? `https://dashboard.stripe.com/${_SORTER_FIX.data.stripe_account_id}/customers/${m.customer_id}` : null;
+    _sorterFixSuccess('Billing set up ✓', `${amt}/month, starts ${made.trial_end_iso}. They're not charged until then.`, custUrl);
+    _sorterResolveMember(okId, mm => { _sorterClearIssues(mm); mm.on_stripe = true; mm.next_payment = { state: 'scheduled', label: made.trial_end_iso }; });
   } catch (e) { alert("Couldn't set up monthly billing: " + _sorterErr(e)); }
 }
 
