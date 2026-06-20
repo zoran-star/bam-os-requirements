@@ -35,6 +35,10 @@ const STRIPE_API = "https://api.stripe.com/v1";
 // targets in v1. Everything else (one-time prepay, lil-sale, legacy) is
 // frozen to its current holder.
 
+// Subs the portal CREATED (so Stripe lets us pause/cancel/change them). Foreign
+// subs (CoachIQ/GHL/dashboard) reject every write — the popup greys those actions.
+const PORTAL_OWNED_ORIGINS = new Set(["fullcontrol-portal", "fullcontrol-website-enrollment", "fullcontrol-prepaid-monthly"]);
+
 const PLAN_TO_PRICE = {
   "1/wk":   "plan_ToNwa96lQ5I1Bs",   // Steady       $226 / 4-wk all-in
   "2/wk":   "plan_ThYK86w2Zd8fp3",   // Accelerated  $316 / 4-wk all-in
@@ -274,6 +278,10 @@ async function handler(req, res) {
               { stripeAccount: client.stripe_connect_account_id }
             );
             const item = sub.items?.data?.[0];
+            // Can the portal manage this sub? Only subs IT created (Standard-account
+            // rule). Drives which billing buttons are enabled vs greyed in the popup.
+            const liveStatus = ["active", "trialing", "past_due", "unpaid", "paused"].includes(sub.status);
+            const portalOwned = PORTAL_OWNED_ORIGINS.has(sub.metadata?.origin);
             stripe = {
               status: sub.status,
               trial_end: sub.trial_end,
@@ -286,6 +294,10 @@ async function handler(req, res) {
               interval: item?.price?.recurring?.interval || null,
               interval_count: item?.price?.recurring?.interval_count || null,
               latest_invoice_url: sub.latest_invoice?.hosted_invoice_url || null,
+              application: sub.application || null,
+              origin: sub.metadata?.origin || null,
+              portal_owned: portalOwned,
+              can_manage: liveStatus && portalOwned, // gate for pause/cancel/change/refund
             };
 
             // Lazy backfill: if we just learned the sub's created date and
