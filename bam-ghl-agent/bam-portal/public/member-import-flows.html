@@ -90,8 +90,7 @@ flowchart TD
   Q1 -->|"duplicate row"| RM["Remove duplicate<br/>→ survivor turns green"]:::auto
   Q2 -->|yes| SB["Set up billing<br/>offer-price + start date"]:::auto
   Q2 -->|"pause"| PA["⏸ Mark paused<br/>indefinite OR dates"]:::auto
-  Q2 -->|"they cancelled"| CX["✕ Mark cancelled<br/>+ date · logs cancellation"]:::auto
-  Q2 -->|"not a member"| NM["Remove from import"]:::manual
+  Q2 -->|"not a member / cancelled"| CX["✕ Mark cancelled<br/>+ date · logs cancellation · removes"]:::auto
   CH --> OLD["Old foreign sub → 🔴 Action Item to cancel in Stripe"]:::gap
   SB --> OLD
   PA --> OLD
