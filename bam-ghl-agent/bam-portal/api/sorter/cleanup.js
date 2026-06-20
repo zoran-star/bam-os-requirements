@@ -649,6 +649,52 @@ async function handler(req, res) {
       });
     }
 
+    // change-offer: reassign which OFFER-PRICE this member is on, WITHOUT touching
+    // their Stripe price/sub. Flags it as manually set. (For when Stripe + the CSV
+    // disagree on the offer — e.g. CSV says 2/wk but they actually pay for Summer.)
+    // body.map_price=true ALSO maps their Stripe price → this offer-price in the catalog.
+    if (action === "change-offer") {
+      const s = staging.find(x => String(x.id) === String(body.staging_id));
+      if (!s) return res.status(404).json({ error: "staging row not found" });
+      const key = (body.offer_price_key || "").toString();
+      if (!key) return res.status(400).json({ error: "offer_price_key required" });
+      const offerId = body.offer_id || null;
+      await sb(`members_staging?id=eq.${s.id}`, {
+        method: "PATCH", headers: { Prefer: "return=minimal" },
+        body: JSON.stringify({
+          offer_price_key: key,
+          ...(offerId ? { offer_id: offerId } : {}),
+          offer_overridden: true,
+          match_status: s.is_duplicate ? "duplicate" : "ok",
+          cleanup_notes: `offer set manually to ${key} (price unchanged)`,
+          updated_at: nowIso(),
+        }),
+      });
+      // Carry to the live member if already promoted.
+      if (s.promoted_member_id && offerId) {
+        await sb(`members?id=eq.${encodeURIComponent(s.promoted_member_id)}`, {
+          method: "PATCH", headers: { Prefer: "return=minimal" },
+          body: JSON.stringify({ offer_id: offerId, updated_at: nowIso() }),
+        }).catch(() => {});
+      }
+      // Optional: also map their Stripe price → this offer-price (fixes everyone on it).
+      let priceMapped = false;
+      if (body.map_price && s.stripe_price_id) {
+        try {
+          const slotCanon = await sb(
+            `pricing_catalog?client_id=eq.${encodeURIComponent(clientId)}&offer_price_key=eq.${encodeURIComponent(key)}&tier=eq.canonical&stripe_price_id=neq.${encodeURIComponent(s.stripe_price_id)}&select=stripe_price_id&limit=1`
+          );
+          const tier = (Array.isArray(slotCanon) && slotCanon[0]) ? "legacy_match" : "canonical";
+          await sb(`pricing_catalog?client_id=eq.${encodeURIComponent(clientId)}&stripe_price_id=eq.${encodeURIComponent(s.stripe_price_id)}`, {
+            method: "PATCH", headers: { Prefer: "return=minimal" },
+            body: JSON.stringify({ offer_id: offerId, offer_price_key: key, tier, is_routable: tier === "canonical", match_status: "confirmed", match_source: "cleanup-change-offer", matched_at: nowIso(), updated_at: nowIso() }),
+          });
+          priceMapped = true;
+        } catch (_) { /* non-fatal */ }
+      }
+      return res.status(200).json({ ok: true, offer_price_key: key, price_mapped: priceMapped });
+    }
+
     // connect-offer: tie a staged member's price to an offer-price slot. With a
     // price id this also writes the pricing_catalog mapping (Match-step apply
     // semantics, legacy unless the slot has no Live price yet).

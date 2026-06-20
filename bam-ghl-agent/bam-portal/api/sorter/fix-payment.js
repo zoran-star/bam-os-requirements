@@ -117,7 +117,7 @@ async function buildTargets(clientId) {
     if (r.offer_id && !liveOfferIds.has(r.offer_id)) continue; // offer archived → skip
     seen.add(r.offer_price_key);
     const [plan, term] = String(r.offer_price_key).split("|");
-    out.push({ key: r.offer_price_key, label: `${plan} · ${termLabel(term)}`, amount_cents: r.amount_cents });
+    out.push({ key: r.offer_price_key, label: `${plan} · ${termLabel(term)}`, amount_cents: r.amount_cents, offer_id: r.offer_id || null });
   }
   return out;
 }
