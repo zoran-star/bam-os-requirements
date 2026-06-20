@@ -76,10 +76,14 @@ index is 2..6 since step 1 = Price Match's Match). Launched from Members tab str
 - ⏳ TODO: deploy (`vercel deploy --prod`, bam-portal doesn't auto-deploy) + a real test
   payment on a commitment term + refund to prove the schedule attaches (this IS "Test A").
 
-## ⏳ REMAINING (3 builds left — Zoran to pick order)
-1. **member-detail popup** (`_sorterOpenInfo` in client-portal.html) → show "Next payment".
-2. ✅ **Billing schedule** on website checkout — BUILT 2026-06-19 (see Summer billing spec
-   above). Pending deploy + live test payment.
+## ⏳ REMAINING (Zoran renumbered to 1/2/3 on 2026-06-19)
+1. ✅ **member-detail popup** "Next payment" — BUILT 2026-06-19, pushed
+   `feat/member-popup-next-payment` (not yet merged/deployed). `_sorterOpenInfo` popup
+   now shows a Next-payment line in the Stripe column, fed by a new `next_payment`
+   field on `cleanup.js` member-detail (reuses `computeNextPayment`, same as the table
+   column). mapSub now carries current_period_end/trial_end/cancel_at/paused.
+   ✅ **Billing schedule** on website checkout — BUILT + DEPLOYED 2026-06-19 (PR #526). See
+   Summer billing spec above. Pending only the live test payment.
 3. **CoachIQ staff toggle** in the **staff portal** (bam-portal React) → writes
    `clients.coachiq_enabled` (currently DB-only). "make coachiq a staff selection."
 4. **Move Member Import into the Training Offer setup** wizard (`_bbOfferConfigs.training`

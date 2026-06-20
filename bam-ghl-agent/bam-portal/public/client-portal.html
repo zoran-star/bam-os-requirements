@@ -22020,6 +22020,13 @@ async function _sorterOpenInfo(stagingId) {
     const custLink = custUrl
       ? `<a href="${escapeHTML(custUrl)}" target="_blank" rel="noopener" style="font-size:11px;font-weight:700;color:var(--accent,#E8C547);text-decoration:none;white-space:nowrap;">View customer in Stripe ↗</a>`
       : '';
+    // Next payment — the same verdict shown in the cleanup table's column.
+    const np2 = json.next_payment || null;
+    const npColor = np2 && np2.state === 'scheduled' ? 'var(--text,#eee)' : '#e0a93f';
+    const npRow = np2 ? `<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:12px;padding:7px 9px;margin-bottom:10px;border:1px solid var(--border,#2a2a31);border-radius:9px;background:rgba(255,255,255,0.02);">
+        <span style="color:var(--text-mute,#888);text-transform:uppercase;letter-spacing:.5px;font-size:10px;">Next payment</span>
+        <span style="font-weight:800;color:${npColor};" title="${escapeHTML(np2.reason || '')}">${escapeHTML(np2.label || '—')}</span>
+      </div>` : '';
     host.innerHTML = `
       <div onclick="_sorterCloseConnect()" style="position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:140;"></div>
       <div style="position:fixed;z-index:141;top:50%;left:50%;transform:translate(-50%,-50%);width:min(820px,95vw);max-height:86vh;display:flex;flex-direction:column;background:var(--surface,#16161a);border:1px solid var(--border,#2a2a31);border-radius:14px;padding:18px 20px;">
@@ -22038,6 +22045,7 @@ async function _sorterOpenInfo(stagingId) {
               <span style="font-size:10.5px;text-transform:uppercase;letter-spacing:.5px;color:var(--text-mute,#888);">Stripe</span>
               ${custLink}
             </div>
+            ${npRow}
             <div style="font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:var(--text-mute,#888);margin-bottom:4px;">Subscriptions</div>
             ${subsHtml}
             <div style="font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:var(--text-mute,#888);margin:12px 0 4px;">Recent payments</div>
