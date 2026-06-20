@@ -5074,6 +5074,25 @@
     /* Preview-as banner is hidden on mobile — Exit preview lives in the More sheet. */
     #preview-banner { display: none !important; }
 
+    /* Member detail drawer: full-screen + scrollable, with room for the bottom
+       nav + safe area so the bottom never gets cut off. */
+    #member-drawer {
+      width: 100vw !important;
+      height: 100dvh !important;
+      -webkit-overflow-scrolling: touch;
+      padding-bottom: calc(var(--mobnav-h, 56px) + env(safe-area-inset-bottom) + 16px) !important;
+    }
+
+    /* Members filter popover → bottom sheet that fits the screen + scrolls. */
+    .members-filter-popover {
+      position: fixed !important;
+      left: 12px !important; right: 12px !important;
+      top: auto !important;
+      bottom: calc(var(--mobnav-h, 56px) + env(safe-area-inset-bottom) + 12px) !important;
+      min-width: 0 !important; max-width: none !important;
+      max-height: 62vh !important; overflow-y: auto !important;
+    }
+
     /* Dynamic viewport height so iOS browser chrome never clips content */
     html, body { height: 100dvh; }
     .app { height: 100dvh; }
@@ -19170,7 +19189,7 @@ function _renderMembersView() {
   const popoverLabel = 'font-size:11px;font-weight:700;color:var(--text-mute);letter-spacing:0.5px;text-transform:uppercase';
 
   const popover = !_MEMBERS_FILTER_OPEN ? '' : `
-    <div style="position:absolute;top:calc(100% + 8px);right:0;background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:16px;box-shadow:0 10px 28px rgba(0,0,0,0.35);z-index:50;min-width:300px;max-width:360px">
+    <div class="members-filter-popover" style="position:absolute;top:calc(100% + 8px);right:0;background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:16px;box-shadow:0 10px 28px rgba(0,0,0,0.35);z-index:50;min-width:300px;max-width:360px">
       <div style="${popoverLabel};margin-bottom:8px">Status</div>
       <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:16px">
         ${filterChip('status','all','All',     all.length)}
@@ -19601,6 +19620,15 @@ function _plSelectPipeline(pipelineId) {
 // Parse a trial date that may be a full ISO timestamp (website booking) or a
 // date-only string like "2026-06-13" (GHL custom field). Returns a display
 // string + whether it's in the past.
+// Is the trial scheduled for TODAY (local calendar day)? Drives the "today's
+// trials up top + glow" treatment on the Sales board.
+function _plIsTrialToday(raw) {
+  if (!raw) return false;
+  const d = new Date(raw); if (isNaN(d.getTime())) return false;
+  const n = new Date();
+  return d.getFullYear() === n.getFullYear() && d.getMonth() === n.getMonth() && d.getDate() === n.getDate();
+}
+
 function _plTrialInfo(raw) {
   if (!raw) return { str: null, passed: false, started: false };
   const dateOnly = /^\d{4}-\d{2}-\d{2}$/.test(String(raw).trim());
@@ -19985,9 +20013,11 @@ function _renderPipelineBoard() {
     // A card in a trial-booking stage with no resolvable date gets flagged.
     const missingTrial = stage && stage.expectsTrial && !trialStr;
     const isDone = _plIsDoneTrialStage(stage);
+    const todayTrial = _plIsTrialToday(o.trialDate);
+    const glow = todayTrial ? 'box-shadow:0 0 0 1px var(--gold,#E8C547),0 0 18px rgba(232,197,71,0.5);border-color:var(--gold,#E8C547);' : '';
     return `
-      <div class="pl-card ${stale ? 'pl-card-stale' : ''} ${missingTrial ? 'pl-card-notrial' : ''}"
-           style="position:relative"
+      <div class="pl-card ${stale ? 'pl-card-stale' : ''} ${missingTrial ? 'pl-card-notrial' : ''} ${todayTrial ? 'pl-card-today' : ''}"
+           style="position:relative;${glow}"
            draggable="true"
            ondragstart="_plDragStart(event,'${escapeHTML(o.id)}','${escapeHTML(o.stageId || '')}','${escapeHTML(p.id)}')"
            ondragend="_plDragEnd(event)"
@@ -20015,7 +20045,8 @@ function _renderPipelineBoard() {
   };
 
   const colHtml = visibleStages.map(s => {
-    const opps = byStage.get(s.id) || [];
+    const opps = (byStage.get(s.id) || []).slice()
+      .sort((a, b) => (_plIsTrialToday(b.trialDate) ? 1 : 0) - (_plIsTrialToday(a.trialDate) ? 1 : 0)); // today's trials first
     return `
       <div class="pl-col"
            ondragover="_plDragOver(event,'${escapeHTML(s.id)}')"
