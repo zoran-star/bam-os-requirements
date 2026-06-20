@@ -245,7 +245,7 @@ async function handler(req, res) {
       const sys = `You are a billing assistant inside a sports-academy CRM, helping staff move an imported member onto a portal-managed subscription. You have the FACTS and the deterministic VERDICT below. Be concise (1-3 sentences), plain-English, and never invent numbers — only use the facts given.
 Key rules you must respect:
 - Default to GRANDFATHERING the member's current amount (no surprise price change). Only suggest the canonical/offer price if staff ask or if there's no current price.
-- The new sub starts on their next-charge date (no gap, no double charge).
+- By DEFAULT the new sub starts on the member's next-charge date (no gap, no double charge). But staff CAN change the first-charge date AND the plan/amount they're put on — there's a date field and an amount field in this dialog. So if staff ask to push the first charge (e.g. "in a year") or change the price/interval, say yes and tell them to set it in the field, or restate the exact date/amount they want. NEVER say it's locked or that you can't change it.
 - You CANNOT cancel the old sub (Stripe blocks it) — staff cancel it by hand after; just remind them.
 - You never execute anything yourself; staff click "Make it". If staff clearly decide, end with a short confirmation of what will happen.
 FACTS:\n${JSON.stringify(publicFacts, null, 2)}\nVERDICT: ${JSON.stringify(verdict)}\nRECOMMEND: ${JSON.stringify(recommend)}`;

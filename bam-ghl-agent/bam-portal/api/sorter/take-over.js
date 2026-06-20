@@ -274,10 +274,17 @@ async function handler(req, res) {
         idempotencyKey: `takeover-prod-${clientId}-${member.id}-${oldSubId || "none"}`.slice(0, 200),
         body: { name: oldProductName, "metadata[origin]": "fullcontrol-portal", "metadata[client_id]": clientId, "metadata[member_id]": member.id },
       });
+      // Default = grandfather the current amount/interval, but staff can adjust
+      // the plan they're put on (custom amount and/or billing interval).
+      const amt = (body.custom_amount_cents != null && Number(body.custom_amount_cents) > 0)
+        ? Math.round(Number(body.custom_amount_cents)) : curAmount;
+      const ivl = ["day", "week", "month", "year"].includes(body.custom_interval) ? body.custom_interval : curInterval;
+      const ivlCount = (body.custom_interval_count != null && Number(body.custom_interval_count) >= 1)
+        ? Math.round(Number(body.custom_interval_count)) : curIntervalCount;
       subBody["items[0][price_data][currency]"] = curCurrency;
-      subBody["items[0][price_data][unit_amount]"] = curAmount;
-      subBody["items[0][price_data][recurring][interval]"] = curInterval;
-      subBody["items[0][price_data][recurring][interval_count]"] = curIntervalCount;
+      subBody["items[0][price_data][unit_amount]"] = amt;
+      subBody["items[0][price_data][recurring][interval]"] = ivl;
+      subBody["items[0][price_data][recurring][interval_count]"] = ivlCount;
       subBody["items[0][price_data][product]"] = prod.id;
     }
 
