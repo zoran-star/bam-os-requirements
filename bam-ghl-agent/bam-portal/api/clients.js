@@ -1575,8 +1575,13 @@ async function handler(req, res) {
             if (a === undefined) return res.status(400).json({ error: "allowed_stages must be an array or null" });
             patch.allowed_stages = a;
           }
-          if (!("allowed_tabs" in patch) && !("allowed_stages" in patch)) {
-            return res.status(400).json({ error: "provide allowed_tabs and/or allowed_stages" });
+          if ("allowed_kpis" in teamBody) {
+            const a = normArr(teamBody.allowed_kpis);
+            if (a === undefined) return res.status(400).json({ error: "allowed_kpis must be an array or null" });
+            patch.allowed_kpis = a;
+          }
+          if (!("allowed_tabs" in patch) && !("allowed_stages" in patch) && !("allowed_kpis" in patch)) {
+            return res.status(400).json({ error: "provide allowed_tabs, allowed_stages, and/or allowed_kpis" });
           }
           // Target must belong to THIS client and not be the owner.
           const targetRows = await supabaseSelect(

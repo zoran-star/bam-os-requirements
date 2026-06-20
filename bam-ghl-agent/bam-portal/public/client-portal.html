@@ -9174,18 +9174,21 @@ function _v15kRender() {
     }
   }
   const sectionHead = (t) => `<div style="font-family:var(--font-display,inherit);font-size:24px;font-weight:800;letter-spacing:.02em;text-transform:uppercase;color:var(--text);margin-top:34px;padding-bottom:8px;border-bottom:1px solid var(--border)">${t}</div>`;
+  // Per-staff KPI category permissions — hide sections this teammate can't see.
+  const kpiOn = (cat) => (typeof _isKpiAllowed === 'function') ? _isKpiAllowed(cat) : true;
   host.innerHTML = `
     <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:6px">
       <label style="font-size:12px;color:var(--text-mute)">Month</label>
       <select onchange="_v15kSetMonth(this.value)" style="background:var(--surface);border:1px solid var(--border-med);border-radius:8px;color:var(--text);padding:8px 12px;font:inherit;font-size:13px;cursor:pointer">${monthOpts || '<option>—</option>'}</select>
       <button onclick="_v15kOpenSetup()" style="margin-left:auto;background:var(--surface);border:1px solid var(--border-med);border-radius:8px;color:var(--text);padding:8px 14px;font:inherit;font-size:13px;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:7px">⚙ Setup</button>
     </div>
-    ${sectionHead('Marketing')}
-    ${marketing}
-    ${sectionHead('Sales')}<div id="v15k-sales">${_v15kSecHtml('sales')}</div>
-    ${sectionHead('Revenue')}<div id="v15k-revenue">${_v15kSecHtml('revenue')}</div>
-    ${sectionHead('Members')}<div id="v15k-members">${_v15kSecHtml('members')}</div>`;
-  _v15kEnsureSection('sales'); _v15kEnsureSection('revenue'); _v15kEnsureSection('members');
+    ${kpiOn('marketing') ? `${sectionHead('Marketing')}${marketing}` : ''}
+    ${kpiOn('sales')    ? `${sectionHead('Sales')}<div id="v15k-sales">${_v15kSecHtml('sales')}</div>` : ''}
+    ${kpiOn('revenue')  ? `${sectionHead('Revenue')}<div id="v15k-revenue">${_v15kSecHtml('revenue')}</div>` : ''}
+    ${kpiOn('members')  ? `${sectionHead('Members')}<div id="v15k-members">${_v15kSecHtml('members')}</div>` : ''}`;
+  if (kpiOn('sales')) _v15kEnsureSection('sales');
+  if (kpiOn('revenue')) _v15kEnsureSection('revenue');
+  if (kpiOn('members')) _v15kEnsureSection('members');
 }
 
 // Setup moved into a modal opened from the top-right ⚙ Setup button. The
@@ -11251,18 +11254,28 @@ const _PERMISSIONABLE_TABS = [
   { key: 'calendar',  label: 'Calendar',           icon: '📅', views: ['calendar', 'v15cal'] },
   { key: 'contacts',  label: 'Contacts',           icon: '👤', views: ['contacts'] },
   { key: 'kpis',      label: 'KPIs',               icon: '📊', views: ['v15kpis'] },
+  { key: 'action_items', label: 'Action Items',    icon: '✅', views: ['action-items'] },
   { key: 'systems',   label: 'Systems',            icon: '🛠', views: ['systems'] },
+];
+// KPI dashboard sections a teammate can be limited to (v15kpis view).
+const _KPI_CATEGORIES = [
+  { key: 'marketing', label: 'Marketing', icon: '📣' },
+  { key: 'sales',     label: 'Sales',     icon: '🤝' },
+  { key: 'revenue',   label: 'Revenue',   icon: '💰' },
+  { key: 'members',   label: 'Members',   icon: '👥' },
 ];
 let _MY_ALLOWED_TABS = null;   // null = all tabs (default / owner / BAM staff)
 let _MY_ALLOWED_STAGES = null; // null = all pipeline stages
+let _MY_ALLOWED_KPIS = null;   // null = all KPI categories
 let _MY_TAB_ROLE = null;       // 'owner' | 'member' | null
 
 // Owner "Preview as <staff>" — when set, the owner temporarily adopts a
 // teammate's permissions to see exactly what that teammate sees.
-let _PREVIEW_AS = null;        // { id, name, allowed_tabs, allowed_stages }
+let _PREVIEW_AS = null;        // { id, name, allowed_tabs, allowed_stages, allowed_kpis }
 function _effTabRole()       { return _PREVIEW_AS ? 'member' : _MY_TAB_ROLE; }
 function _effAllowedTabs()   { return _PREVIEW_AS ? (Array.isArray(_PREVIEW_AS.allowed_tabs) ? _PREVIEW_AS.allowed_tabs : null) : _MY_ALLOWED_TABS; }
 function _effAllowedStages() { return _PREVIEW_AS ? (Array.isArray(_PREVIEW_AS.allowed_stages) ? _PREVIEW_AS.allowed_stages : null) : _MY_ALLOWED_STAGES; }
+function _effAllowedKpis()   { return _PREVIEW_AS ? (Array.isArray(_PREVIEW_AS.allowed_kpis) ? _PREVIEW_AS.allowed_kpis : null) : _MY_ALLOWED_KPIS; }
 
 // Is a pipeline stage allowed for the current user? Owner/unrestricted = yes.
 function _isStageAllowed(stageId) {
@@ -11270,6 +11283,14 @@ function _isStageAllowed(stageId) {
   const st = _effAllowedStages();
   if (!Array.isArray(st)) return true; // null = all
   return st.includes(stageId);
+}
+
+// Is a KPI category allowed for the current user? Owner/unrestricted = yes.
+function _isKpiAllowed(cat) {
+  if (_effTabRole() === 'owner') return true;
+  const k = _effAllowedKpis();
+  if (!Array.isArray(k)) return true; // null = all
+  return k.includes(cat);
 }
 
 // Pipelines the current user can see at least one stage of. A staff restricted
@@ -11313,7 +11334,7 @@ const _BB_STAFF_META = {};   // memberId → { name, allowed_tabs, allowed_stage
 function _previewAsStaff(memberId) {
   const m = _BB_STAFF_META[memberId];
   if (!m) return;
-  _PREVIEW_AS = { id: memberId, name: m.name || 'teammate', allowed_tabs: m.allowed_tabs, allowed_stages: m.allowed_stages };
+  _PREVIEW_AS = { id: memberId, name: m.name || 'teammate', allowed_tabs: m.allowed_tabs, allowed_stages: m.allowed_stages, allowed_kpis: m.allowed_kpis };
   _renderPreviewBanner();
   _previewReapply();
   // If the view we're on is hidden for this teammate, go somewhere they can see.
@@ -11383,7 +11404,7 @@ async function _loadPreviewStaff() {
     if (!CLIENT_ID || !_sb) return;
     await _ensureStaffFlag();
     const { data } = await _sb.from('client_users')
-      .select('id, name, email, role, allowed_tabs, allowed_stages')
+      .select('id, name, email, role, allowed_tabs, allowed_stages, allowed_kpis')
       .eq('client_id', CLIENT_ID).eq('status', 'active').eq('hide_from_team', false);
     _PREVIEW_STAFF_LIST = (data || []).filter(r => r.role !== 'owner');
     for (const r of _PREVIEW_STAFF_LIST) {
@@ -11391,6 +11412,7 @@ async function _loadPreviewStaff() {
         name: r.name || r.email || 'teammate',
         allowed_tabs: Array.isArray(r.allowed_tabs) ? r.allowed_tabs : null,
         allowed_stages: Array.isArray(r.allowed_stages) ? r.allowed_stages : null,
+        allowed_kpis: Array.isArray(r.allowed_kpis) ? r.allowed_kpis : null,
       };
     }
   } catch (_) { _PREVIEW_STAFF_LIST = []; }
@@ -11425,13 +11447,14 @@ async function loadMyPermissionsAndApply() {
     if (!_myAuthUserId) { const u = await _sb.auth.getUser(); _myAuthUserId = u?.data?.user?.id || null; }
     if (!_myAuthUserId) return;
     const { data } = await _sb.from('client_users')
-      .select('role, allowed_tabs, allowed_stages')
+      .select('role, allowed_tabs, allowed_stages, allowed_kpis')
       .eq('user_id', _myAuthUserId).eq('client_id', CLIENT_ID).eq('status', 'active').limit(1);
     const row = (data || [])[0] || null;
     _MY_TAB_ROLE = row?.role || null;
     _MY_ALLOWED_TABS = Array.isArray(row?.allowed_tabs) ? row.allowed_tabs : null;
     _MY_ALLOWED_STAGES = Array.isArray(row?.allowed_stages) ? row.allowed_stages : null;
-  } catch (_) { _MY_ALLOWED_TABS = null; _MY_ALLOWED_STAGES = null; }
+    _MY_ALLOWED_KPIS = Array.isArray(row?.allowed_kpis) ? row.allowed_kpis : null;
+  } catch (_) { _MY_ALLOWED_TABS = null; _MY_ALLOWED_STAGES = null; _MY_ALLOWED_KPIS = null; }
   applyTabPermissions();
   if (typeof _renderPreviewAsMenu === 'function') _renderPreviewAsMenu(); // owner role now known
 }
@@ -13234,12 +13257,15 @@ async function _bbStaffRefreshList() {
     const canManageTabs = iAmOwner && !isOwner && relevantTabs.length > 0;
     // Stage picker only when the Sales/Pipelines tab is available to this academy.
     const canManageStages = iAmOwner && !isOwner && relevantTabs.some(t => t.key === 'pipelines');
+    // KPI-category picker only when the KPIs tab is available.
+    const canManageKpis = iAmOwner && !isOwner && relevantTabs.some(t => t.key === 'kpis');
     const canPreview = iAmOwner && !isOwner;
     _BB_STAGE_PERMS[r.id] = Array.isArray(r.allowed_stages) ? r.allowed_stages : null;
     _BB_STAFF_META[r.id] = {
       name: r.name || r.email || 'teammate',
       allowed_tabs: Array.isArray(r.allowed_tabs) ? r.allowed_tabs : null,
       allowed_stages: Array.isArray(r.allowed_stages) ? r.allowed_stages : null,
+      allowed_kpis: Array.isArray(r.allowed_kpis) ? r.allowed_kpis : null,
     };
     const initial = (r.name || r.email || '?').trim().slice(0, 1).toUpperCase();
     const stagesHtml = !canManageStages ? '' : `
@@ -13249,6 +13275,20 @@ async function _bbStaffRefreshList() {
         </summary>
         <div id="staff-stages-${r.id}" style="padding:11px 13px;background:var(--surface);border:1px solid var(--border-med);border-top:none;border-radius:0 0 10px 10px;display:flex;flex-wrap:wrap;gap:9px 18px">
           <div style="color:var(--text-mute);font-size:12px">Open to load stages…</div>
+        </div>
+      </details>`;
+    const kpisHtml = !canManageKpis ? '' : `
+      <details class="staff-kpis" style="margin-top:6px">
+        <summary style="cursor:pointer;font-size:12px;color:var(--text-sub);padding:9px 12px;background:var(--surface);border:1px solid var(--border-med);border-radius:10px;display:flex;justify-content:space-between;align-items:center">
+          <span>📊 KPI categories</span><span id="staff-kpis-status-${r.id}" style="font-size:11px;color:var(--text-mute)"></span>
+        </summary>
+        <div id="staff-kpis-${r.id}" style="padding:11px 13px;background:var(--surface);border:1px solid var(--border-med);border-top:none;border-radius:0 0 10px 10px;display:flex;flex-wrap:wrap;gap:9px 18px">
+          ${_KPI_CATEGORIES.map(c => {
+            const on = !Array.isArray(r.allowed_kpis) || r.allowed_kpis.includes(c.key);
+            return `<label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer">
+              <input type="checkbox" data-kpicat="${c.key}" ${on ? 'checked' : ''} onchange="_bbStaffKpisSave('${r.id}')"> ${c.icon} ${escapeHTML(c.label)}</label>`;
+          }).join('')}
+          <div style="flex-basis:100%;font-size:11px;color:var(--text-mute)">Unchecked categories are hidden from this teammate in the KPIs tab.</div>
         </div>
       </details>`;
     const tabsHtml = !canManageTabs ? '' : `
@@ -13290,6 +13330,7 @@ async function _bbStaffRefreshList() {
       ${inviteHtml}
       ${tabsHtml}
       ${stagesHtml}
+      ${kpisHtml}
       <div style="margin-top:6px;padding:10px 12px;background:var(--surface);border:1px solid var(--border-med);border-radius:10px">
         <div style="font-size:11px;color:var(--text-mute);margin-bottom:8px">Photo / headshot</div>
         ${_assetBankHtml('staff_id', r.id, { category: 'photo' })}
@@ -13318,10 +13359,24 @@ async function _bbStaffTabsSave(memberId) {
     });
     const j = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(j.error || ('HTTP ' + res.status));
+    _bbStaffMetaSet(memberId, 'allowed_tabs', allowed);
     if (statusEl) { statusEl.textContent = '✓ Saved'; setTimeout(() => { if (statusEl) statusEl.textContent = ''; }, 1500); }
   } catch (e) {
     if (statusEl) statusEl.textContent = '⚠ ' + e.message;
   }
+}
+
+// Keep the in-memory preview metadata fresh so the "Preview as" feature is LIVE:
+// re-clicking Preview uses the latest perms, and if we're currently previewing
+// this teammate, re-apply the gates immediately (no navigation).
+function _bbStaffMetaSet(memberId, key, value) {
+  if (!_BB_STAFF_META[memberId]) _BB_STAFF_META[memberId] = { name: 'teammate' };
+  _BB_STAFF_META[memberId][key] = value;
+  if (typeof _PREVIEW_AS !== 'undefined' && _PREVIEW_AS && _PREVIEW_AS.id === memberId) {
+    _PREVIEW_AS[key] = value;
+    try { _previewReapply(); _previewRefreshPipelines(); } catch (_) {}
+  }
+  if (typeof _renderPreviewAsMenu === 'function') _renderPreviewAsMenu();
 }
 
 // ── Owner: placeholder teammate email + invite ──
@@ -13435,6 +13490,33 @@ async function _bbStaffStagesSave(memberId) {
     const j = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(j.error || ('HTTP ' + res.status));
     _BB_STAGE_PERMS[memberId] = allowed;
+    _bbStaffMetaSet(memberId, 'allowed_stages', allowed);
+    if (statusEl) { statusEl.textContent = '✓ Saved'; setTimeout(() => { if (statusEl) statusEl.textContent = ''; }, 1500); }
+  } catch (e) {
+    if (statusEl) statusEl.textContent = '⚠ ' + e.message;
+  }
+}
+
+// Owner saves a teammate's KPI categories (Marketing/Sales/Revenue/Members).
+// All-checked → null (= all). Live-updates the preview.
+async function _bbStaffKpisSave(memberId) {
+  const cont = document.getElementById('staff-kpis-' + memberId);
+  if (!cont) return;
+  const boxes = [...cont.querySelectorAll('input[type=checkbox][data-kpicat]')];
+  const checked = boxes.filter(b => b.checked).map(b => b.dataset.kpicat);
+  const allowed = (checked.length === boxes.length) ? null : checked;
+  const statusEl = document.getElementById('staff-kpis-status-' + memberId);
+  if (statusEl) statusEl.textContent = 'Saving…';
+  try {
+    const token = await _mreqAuthToken();
+    const res = await fetch('/api/clients?action=set-staff-tabs', {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ client_id: CLIENT_ID, member_id: memberId, allowed_kpis: allowed }),
+    });
+    const j = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(j.error || ('HTTP ' + res.status));
+    _bbStaffMetaSet(memberId, 'allowed_kpis', allowed);
     if (statusEl) { statusEl.textContent = '✓ Saved'; setTimeout(() => { if (statusEl) statusEl.textContent = ''; }, 1500); }
   } catch (e) {
     if (statusEl) statusEl.textContent = '⚠ ' + e.message;
