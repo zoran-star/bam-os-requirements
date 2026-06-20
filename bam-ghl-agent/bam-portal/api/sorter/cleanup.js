@@ -348,7 +348,7 @@ async function handler(req, res) {
     ) || [];
 
     // Client row (Stripe account + persisted dismissals) — used by most actions.
-    const clientRows = await sb(`clients?id=eq.${encodeURIComponent(clientId)}&select=id,business_name,stripe_connect_account_id,sorter_dismissals,coachiq_enabled&limit=1`);
+    const clientRows = await sb(`clients?id=eq.${encodeURIComponent(clientId)}&select=id,business_name,stripe_connect_account_id,sorter_dismissals,coachiq_enabled,coachiq_signup_url&limit=1`);
     const client = Array.isArray(clientRows) && clientRows[0];
     if (!client) return res.status(404).json({ error: "academy not found" });
     const dismissed = new Set(Array.isArray(client.sorter_dismissals) ? client.sorter_dismissals : []);
@@ -362,6 +362,7 @@ async function handler(req, res) {
       return res.status(200).json({
         ok: true,
         coachiq_enabled: !!client.coachiq_enabled,
+        coachiq_signup_url: client.coachiq_signup_url || null,
         last_event_at: lastEventAt,   // most recent webhook of ANY kind → "connected" signal
         server_now: nowIso(),
         members: staging.map(s => ({
@@ -387,7 +388,7 @@ async function handler(req, res) {
         } catch (_) { /* fall back to staging sub below */ }
       }
       return res.status(200).json({
-        ok: true, coachiq_enabled: !!client.coachiq_enabled,
+        ok: true, coachiq_enabled: !!client.coachiq_enabled, coachiq_signup_url: client.coachiq_signup_url || null,
         members: linked.map(s => ({
           id: s.id, athlete_name: s.athlete_name, coachiq_member_id: s.coachiq_member_id,
           sub_id: (s.promoted_member_id && memberMap[s.promoted_member_id]) || s.stripe_subscription_id || null,
