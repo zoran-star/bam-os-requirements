@@ -1483,6 +1483,17 @@ function FilesByFolder({ files, tk, compact, minmax = 180 }) {
   );
 }
 
+// Resize a Supabase public-storage image to a small thumbnail on the fly (Supabase
+// image transforms). Camera-original JPEGs are multi-MB each; the grid only needs
+// ~400px. Non-Supabase URLs (e.g. Google Drive links) pass through untouched, and
+// the <img> onError falls back to the full file if transforms aren't available.
+function ctkThumbUrl(url, width = 400) {
+  if (typeof url !== "string" || !url.includes("/storage/v1/object/public/")) return url;
+  const base = url.replace("/storage/v1/object/public/", "/storage/v1/render/image/public/");
+  const sep = base.includes("?") ? "&" : "?";
+  return `${base}${sep}width=${width}&quality=70&resize=contain`;
+}
+
 function FilePreviewTile({ file, tk, compact }) {
   const isImage = (file.mime || "").startsWith("image/");
   const isVideo = (file.mime || "").startsWith("video/");
@@ -1499,10 +1510,21 @@ function FilePreviewTile({ file, tk, compact }) {
       onMouseLeave={e => e.currentTarget.style.borderColor = tk.border}
     >
       {isImage ? (
-        <img src={file.url} alt={file.name} style={{
-          width: "100%", aspectRatio: "1 / 1", objectFit: "cover",
-          borderRadius: 4, background: tk.surfaceHov,
-        }} />
+        <img
+          src={ctkThumbUrl(file.url)}
+          alt={file.name}
+          loading="lazy"
+          decoding="async"
+          onError={e => {
+            // Transform endpoint unavailable (or errored) → fall back to the original once.
+            const img = e.currentTarget;
+            if (!img.dataset.fellBack && file.url) { img.dataset.fellBack = "1"; img.src = file.url; }
+          }}
+          style={{
+            width: "100%", aspectRatio: "1 / 1", objectFit: "cover",
+            borderRadius: 4, background: tk.surfaceHov,
+          }}
+        />
       ) : isVideo ? (
         <div style={{ position: "relative", width: "100%", aspectRatio: "1 / 1" }}>
           {/* Poster frame: seek a fraction in so browsers paint a real frame, not black */}
