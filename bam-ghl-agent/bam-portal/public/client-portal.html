@@ -5665,6 +5665,9 @@
       <button class="user-tour-link" onclick="openChangePassword()" style="margin-bottom:6px">Change password</button>
       <button class="user-tour-link" onclick="startOnboardingTour()">↻ Take the tour</button>
 
+      <!-- Owner / BAM-staff: preview a teammate's restricted view -->
+      <div id="previewAsBlock" style="display:none"></div>
+
       <!-- Hidden compat — the userAvatar id is referenced by JS, keep it for now -->
       <span id="userAvatar" style="display:none"></span>
     </div>
@@ -11318,6 +11321,7 @@ function _previewAsStaff(memberId) {
   const curView = cur.replace('view-', '');
   if (curView && !_isViewTabAllowed(curView)) switchView('home');
   else _previewRefreshPipelines();
+  _renderPreviewAsMenu();
 }
 
 function _exitPreview() {
@@ -11325,6 +11329,7 @@ function _exitPreview() {
   _renderPreviewBanner();
   _previewReapply();
   _previewRefreshPipelines();
+  _renderPreviewAsMenu();
 }
 
 // Re-run the tier gates (which call applyTabPermissions) so nav reflects the
@@ -11354,6 +11359,57 @@ function _renderPreviewBanner() {
   el.innerHTML = `👁 Previewing as <strong>${escapeHTML(_PREVIEW_AS.name)}</strong> — you only see what they see. <button onclick="_exitPreview()" style="background:#0B0B0D;color:var(--gold,#E8C547);border:none;border-radius:6px;padding:5px 12px;font-weight:700;cursor:pointer;font-family:inherit">Exit preview</button>`;
 }
 
+// ── "Preview as" switcher in the bottom-left account menu ──
+// Visible to the owner OR a BAM staff admin. Lets you flip into any teammate's
+// restricted view from anywhere, without going to BB → Staff.
+let _IS_BAM_STAFF = null;        // null = unknown (lookup once)
+let _PREVIEW_STAFF_LIST = [];    // non-owner, non-hidden teammates
+
+async function _loadPreviewStaff() {
+  try {
+    if (!CLIENT_ID || !_sb) return;
+    if (_IS_BAM_STAFF === null) {
+      const { data: { session } } = await _sb.auth.getSession();
+      const em = session?.user?.email;
+      if (em) { const { data: sr } = await _sb.from('staff').select('id').eq('email', em).maybeSingle(); _IS_BAM_STAFF = !!sr; }
+      else _IS_BAM_STAFF = false;
+    }
+    const { data } = await _sb.from('client_users')
+      .select('id, name, email, role, allowed_tabs, allowed_stages')
+      .eq('client_id', CLIENT_ID).eq('status', 'active').eq('hide_from_team', false);
+    _PREVIEW_STAFF_LIST = (data || []).filter(r => r.role !== 'owner');
+    for (const r of _PREVIEW_STAFF_LIST) {
+      _BB_STAFF_META[r.id] = {
+        name: r.name || r.email || 'teammate',
+        allowed_tabs: Array.isArray(r.allowed_tabs) ? r.allowed_tabs : null,
+        allowed_stages: Array.isArray(r.allowed_stages) ? r.allowed_stages : null,
+      };
+    }
+  } catch (_) { _PREVIEW_STAFF_LIST = []; }
+  _renderPreviewAsMenu();
+}
+
+function _renderPreviewAsMenu() {
+  const host = document.getElementById('previewAsBlock');
+  if (!host) return;
+  const canPreview = (_MY_TAB_ROLE === 'owner') || _IS_BAM_STAFF === true;
+  if (!canPreview) { host.innerHTML = ''; host.style.display = 'none'; return; }
+  if (_PREVIEW_AS) {
+    host.style.display = '';
+    host.innerHTML = `
+      <div class="user-divider"></div>
+      <div style="font-size:11px;color:var(--text-mute);text-transform:uppercase;letter-spacing:.06em;margin:8px 0 4px">👁 Previewing as ${escapeHTML(_PREVIEW_AS.name)}</div>
+      <button class="user-tour-link" onclick="_exitPreview()">✕ Exit preview</button>`;
+    return;
+  }
+  if (!_PREVIEW_STAFF_LIST.length) { host.innerHTML = ''; host.style.display = 'none'; return; }
+  host.style.display = '';
+  host.innerHTML = `
+    <div class="user-divider"></div>
+    <div style="font-size:11px;color:var(--text-mute);text-transform:uppercase;letter-spacing:.06em;margin:8px 0 4px">👁 Preview as</div>
+    ${_PREVIEW_STAFF_LIST.map(r => `<button class="user-tour-link" onclick="_previewAsStaff('${r.id}')">${escapeHTML(r.name || r.email || 'teammate')}</button>`).join('')}`;
+}
+
 // Load the current user's membership row for CLIENT_ID, then apply permissions.
 async function loadMyPermissionsAndApply() {
   try {
@@ -11369,6 +11425,7 @@ async function loadMyPermissionsAndApply() {
     _MY_ALLOWED_STAGES = Array.isArray(row?.allowed_stages) ? row.allowed_stages : null;
   } catch (_) { _MY_ALLOWED_TABS = null; _MY_ALLOWED_STAGES = null; }
   applyTabPermissions();
+  if (typeof _renderPreviewAsMenu === 'function') _renderPreviewAsMenu(); // owner role now known
 }
 
 // Per-client opt-in to V2 features. Today V2 = Members tab only.
@@ -17039,6 +17096,7 @@ async function switchClient(newId) {
   applyV2NavState(row.v2_access === true);   // re-gate Members/Calendar for the new client
   applyV15NavState(row.v15_access === true); // re-gate the Contacts tab
   loadMyPermissionsAndApply();               // per-staff tab perms for the new academy
+  _PREVIEW_STAFF_LIST = []; _loadPreviewStaff(); // refresh "Preview as" for the new academy
   renderClientSwitcher();
   // Refresh the point-of-contact name/avatar for the newly-selected academy
   // (was stuck on the first-loaded academy — switchClient never re-set it).
@@ -28777,6 +28835,7 @@ async function boot() {
   applyV15NavState(clientRow.v15_access === true);
   applyV4NavState(clientRow.v4_access === true);
   loadMyPermissionsAndApply(); // per-staff tab perms (subtractive, async)
+  _loadPreviewStaff();         // populate the "Preview as" account-menu switcher
   _stripeConnectMaybeSwitch();
   renderClientSwitcher();
   document.getElementById('login-overlay').style.display = 'none';
