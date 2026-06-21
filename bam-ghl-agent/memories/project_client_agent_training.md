@@ -120,6 +120,18 @@ now cancels pending/approved `agent_ready_replies` too (+ notify gate uses agent
 ⚠️ Inbox is staff-operated for now (endpoints staff-gated); opening it to academy
 owners (can_train_agent) is a later step.
 
+## 5. Per-contact memory — agent remembers each person (PR #612, 2026-06-21)
+The agent personalizes per lead. `api/agent/contact-memory.js` → `loadContactMemory(sb, clientId, contactId)`
+assembles a `<contact_memory>` block from: `post_trial_reviews` (attended? showed_up?
+good_fit? trainer + notes), `ghl_contacts` (athlete_name, tags), and `agent_contact_notes`
+(freeform team notes, NEW table migration 20260621000000). Appended to the system prompt in
+BOTH `agent-approvals.js` draftForContact AND `agent-followups.js` detector. So it won't
+re-pitch a first trial to someone who already attended, and honors trainer steers.
+- `api/agent-contact-notes.js`: get/add/remove (staff or academy member).
+- `client-portal.html`: '🧠 Agent memory' section in the contacts drawer (`_cdLoadMemory`/
+  `_cdMemoryHtml`/`_cdAddNote`/`_cdRemoveNote`) — facts + notes + add box.
+- Post-trial form (post-trial.js → post_trial_reviews) is the auto source of trial context.
+
 ## ⚠️ Known gap (same as roadmap): no global SINK yet
 `scope='general'` is still only a flag — `activeLessons()` queries by client_id,
 so an approved "global" lesson doesn't actually propagate to other academies. The
