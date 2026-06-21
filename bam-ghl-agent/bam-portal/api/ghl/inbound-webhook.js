@@ -152,6 +152,18 @@ async function handler(req, res) {
     return res.status(200).json({ error: e.message });
   }
 
+  // Nudge engine: the lead just replied → cancel any pending/approved scheduled
+  // follow-ups for them (don't text someone who's already talking to us).
+  try {
+    if (contactId) {
+      await sb(`agent_followups?client_id=eq.${client.id}&ghl_contact_id=eq.${encodeURIComponent(String(contactId))}&status=in.(pending,approved)`, {
+        method: "PATCH",
+        headers: { Prefer: "return=minimal" },
+        body: JSON.stringify({ status: "canceled", send_error: "lead replied", updated_at: new Date().toISOString() }),
+      });
+    }
+  } catch (e) { console.error("ghl inbound-webhook followup-cancel error:", e.message); }
+
   // Instant notify: when a Responded-stage lead replies (a chat that needs
   // approval), text the academy's configured number. Best-effort — never blocks.
   try {

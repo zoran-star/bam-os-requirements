@@ -35,6 +35,14 @@
     {
       "path": "/api/agent-approvals?action=cron-digest",
       "schedule": "0 */2 * * *"
+    },
+    {
+      "path": "/api/agent-followups?action=detect",
+      "schedule": "*/30 * * * *"
+    },
+    {
+      "path": "/api/agent-followups?action=work",
+      "schedule": "* * * * *"
     }
   ],
   "headers": [

@@ -1,6 +1,7 @@
 import { useState, useEffect, Suspense, lazy } from "react";
 import { authFetch } from "../lib/authFetch";
 const SandboxApp = lazy(() => import("../sandbox/SandboxApp"));
+const FollowupsPanel = lazy(() => import("./FollowupsPanel"));
 
 // Staff view: manage the sales agent's learnings across academies.
 // 'academy' lessons stay local; 'general' flags a sales-craft lesson as
@@ -32,6 +33,7 @@ export default function AgentTrainingView({ tokens }) {
   const Tabs = () => (
     <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
       <button style={tabBtn(mode === "manage")} onClick={() => setMode("manage")}>🤖 Learnings & approvals</button>
+      <button style={tabBtn(mode === "followups")} onClick={() => setMode("followups")}>⏰ Follow-ups</button>
       <button style={tabBtn(mode === "sandbox")} onClick={() => setMode("sandbox")}>🎮 Sandbox</button>
     </div>
   );
@@ -53,6 +55,15 @@ export default function AgentTrainingView({ tokens }) {
       <Tabs />
       <Suspense fallback={<div style={{ color: sub, padding: 24 }}>Loading sandbox…</div>}>
         <SandboxApp embedded />
+      </Suspense>
+    </div>
+  );
+
+  if (mode === "followups") return (
+    <div style={{ padding: "8px 4px", fontFamily: F, color: text }}>
+      <Tabs />
+      <Suspense fallback={<div style={{ color: sub, padding: 24 }}>Loading follow-ups…</div>}>
+        <FollowupsPanel tokens={c} />
       </Suspense>
     </div>
   );
