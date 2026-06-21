@@ -10184,6 +10184,7 @@ function _v15ibRenderAll() {
     <div class="v15ib-bar">
       <div class="v15ib-pills">
         <span style="flex:1"></span>
+        <button id="v15ib-approve-btn" onclick="_apxOpen()" title="Approve the agent's drafted messages before they send" aria-label="Approve agent messages" class="v15ib-icon" style="display:none;width:auto;padding:0 12px;gap:6px;border-color:var(--accent);color:var(--accent);font-weight:700">📨 Approve <span id="v15-apx-count" style="font-weight:800"></span></button>
         <button onclick="_v15ibMassSend()" class="v15ib-icon v15ib-send" title="Mass send" aria-label="Mass send" style="width:auto;padding:0 12px;gap:6px">✉ Mass send</button>
       </div>
       <div class="v15ib-filters">
@@ -10195,6 +10196,7 @@ function _v15ibRenderAll() {
     </div>
     <div id="v15ib-body"></div>`;
   _v15ibRenderList();
+  _apxRefreshCount();
 }
 
 // Initials for the row avatar - first letters of up to two name words; falls
@@ -14331,7 +14333,7 @@ async function _taConfigApi(action, extra) {
 }
 
 const _TA_MODES = [
-  { key: 'off',        label: 'Off',          hint: 'Agent is silent — nothing drafts or sends.' },
+  { key: 'off',        label: 'Off',          hint: 'Agent is silent - nothing drafts or sends.' },
   { key: 'hawkeye',    label: '👁 Hawkeye',    hint: 'Agent drafts every message; you approve each one in Inbox → 📨 Approve before it sends.' },
   { key: 'self_drive', label: '🚀 Self-drive', hint: "Agent sends high-confidence messages itself. Anything it's unsure about still drops to the inbox." },
 ];
@@ -14344,12 +14346,12 @@ async function _taRenderMode() {
     const d = await _taConfigApi('list');
     const row = (d.academies || []).find(a => a.client_id === CLIENT_ID);
     cur = (row && row.mode) || 'off';
-  } catch (e) { p.innerHTML = `<div style="color:#e07070;font-size:13px">Couldn't load — ${escapeHTML(e.message)}</div>`; return; }
+  } catch (e) { p.innerHTML = `<div style="color:#e07070;font-size:13px">Couldn't load - ${escapeHTML(e.message)}</div>`; return; }
   _TA.mode = cur;
   const seg = (on, danger) => `background:${on ? (danger ? '#e05a42' : 'var(--gold)') : 'transparent'};color:${on ? '#0B0B0D' : 'var(--text-sub)'};border:1px solid ${on ? (danger ? '#e05a42' : 'var(--gold)') : 'var(--border)'};border-radius:9px;padding:9px 16px;font-size:13.5px;font-weight:700;cursor:pointer;font-family:inherit`;
   const curMode = _TA_MODES.find(m => m.key === cur) || _TA_MODES[0];
   p.innerHTML = `
-    <p style="color:var(--text-mute);font-size:12.5px;margin:0 0 14px;line-height:1.55;max-width:620px">One switch for this academy — it controls <b style="color:var(--text)">both</b> the Responded-stage reply bot and the follow-up nudges. <b style="color:var(--text)">BAM staff only.</b></p>
+    <p style="color:var(--text-mute);font-size:12.5px;margin:0 0 14px;line-height:1.55;max-width:620px">One switch for this academy - it controls <b style="color:var(--text)">both</b> the Responded-stage reply bot and the follow-up nudges. <b style="color:var(--text)">BAM staff only.</b></p>
     <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">
       ${_TA_MODES.map(m => `<button onclick="_taSetMode('${m.key}')" style="${seg(cur === m.key, m.key === 'self_drive')}">${m.label}</button>`).join('')}
     </div>
@@ -14362,7 +14364,7 @@ async function _taSetMode(mode) {
     _plConfirmModal({
       icon: '⚠️',
       title: 'Turn on Self-drive?',
-      body: 'The agent will <b>text real leads on its own</b> — no approval — whenever it\'s confident. Unsure messages still drop to the inbox. Make sure the brain is trained and any duplicate GHL workflow texts are off first.',
+      body: 'The agent will <b>text real leads on its own</b> - no approval - whenever it\'s confident. Unsure messages still drop to the inbox. Make sure the brain is trained and any duplicate GHL workflow texts are off first.',
       okLabel: 'Yes, let it drive',
       onOk: () => _taSetModeGo(mode),
     });
@@ -21033,13 +21035,18 @@ async function _apxPost(endpoint, action, payload) {
   return json;
 }
 
-// Show the 📨 button + a live count, for staff only.
+// Show the 📨 button + a live count, for staff only. Drives BOTH inboxes:
+// the v2 inbox (#ib-approve-btn / #apx-count) and the v1.5 inbox
+// (#v15ib-approve-btn / #v15-apx-count) - whichever this academy uses.
 async function _apxRefreshCount() {
-  const btn = document.getElementById('ib-approve-btn');
-  if (!btn) return;
+  const btns = [
+    { btn: document.getElementById('ib-approve-btn'), span: document.getElementById('apx-count') },
+    { btn: document.getElementById('v15ib-approve-btn'), span: document.getElementById('v15-apx-count') },
+  ].filter(x => x.btn);
+  if (!btns.length) return;
   const staff = (typeof _IS_BAM_STAFF !== 'undefined' && _IS_BAM_STAFF === true);
-  if (!staff) { btn.style.display = 'none'; return; }
-  btn.style.display = '';
+  if (!staff) { btns.forEach(({ btn }) => { btn.style.display = 'none'; }); return; }
+  btns.forEach(({ btn }) => { btn.style.display = ''; });
   try {
     const [fu, rd] = await Promise.all([
       _apxPost('/api/agent-followups', 'list', {}).catch(() => ({ followups: [] })),
@@ -21049,10 +21056,11 @@ async function _apxRefreshCount() {
     const ready = (rd.ready || []).filter(r => r.status === 'pending');
     _APX_DATA = { followups: fups, ready };
     const n = fups.length + ready.length;
-    const span = document.getElementById('apx-count');
-    if (span) span.textContent = n ? `(${n})` : '';
-    btn.style.borderColor = n ? 'var(--accent)' : 'var(--border)';
-    btn.style.color = n ? 'var(--accent)' : 'var(--text-mute)';
+    btns.forEach(({ btn, span }) => {
+      if (span) span.textContent = n ? `(${n})` : '';
+      btn.style.borderColor = n ? 'var(--accent)' : 'var(--border)';
+      btn.style.color = n ? 'var(--accent)' : 'var(--text-mute)';
+    });
   } catch (_) {}
 }
 
