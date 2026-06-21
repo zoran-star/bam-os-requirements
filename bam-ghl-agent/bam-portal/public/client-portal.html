@@ -5685,7 +5685,7 @@
       <div class="user-info">
         <div class="user-name" id="userName" title="">-</div>
         <div class="user-email" id="userEmail" title="">-</div>
-        <div class="user-role">Point of Contact</div>
+        <div class="user-role">Signed in</div>
       </div>
 
       <div class="user-divider"></div>
@@ -11409,6 +11409,42 @@ function setMyAvatarDisplay(url) {
       initialsEl.style.display = '';
       initialsEl.textContent = _initials(document.getElementById('userName')?.textContent || '?');
     }
+  }
+}
+
+// Set the footer name/email + home greeting to the LOGGED-IN user (their
+// client_users row for the active academy), NOT the academy's point-of-contact.
+// Multi-user safe; falls back to the auth email. Used on boot + academy switch.
+async function setMyIdentity() {
+  const un = document.getElementById('userName');
+  const ue = document.getElementById('userEmail');
+  const av = document.getElementById('userAvatar');
+  let name = '', email = '';
+  try {
+    const u = await _sb.auth.getUser();
+    _myAuthUserId = u?.data?.user?.id || _myAuthUserId || null;
+    email = (u?.data?.user?.email || '').trim();
+    if (_myAuthUserId && typeof CLIENT_ID !== 'undefined' && CLIENT_ID) {
+      const { data } = await _sb.from('client_users')
+        .select('name,email')
+        .eq('user_id', _myAuthUserId).eq('client_id', CLIENT_ID).limit(1);
+      if (data && data[0]) {
+        name = (data[0].name || '').trim();
+        email = (data[0].email || email || '').trim();
+      }
+    }
+  } catch (_) { /* fall back to whatever we resolved */ }
+  const display = name || email || 'You';
+  if (un) { un.textContent = display; un.title = display; }
+  if (ue) { ue.textContent = name ? email : ''; ue.title = email; ue.style.display = name ? 'block' : 'none'; }
+  if (av) av.textContent = (name || email || '·').slice(0, 1).toUpperCase();
+  // Refresh the greeting if home is on screen (identity may resolve after render).
+  const g = document.getElementById('home-greeting');
+  if (g) {
+    const hour = new Date().getHours();
+    const part = hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening';
+    const first = display.split(/\s+/)[0];
+    g.textContent = (first && first !== '-' && !first.includes('@')) ? `${part}, ${first}` : part;
   }
 }
 
@@ -17913,18 +17949,9 @@ async function switchClient(newId) {
   loadMyPermissionsAndApply();               // per-staff tab perms for the new academy
   _PREVIEW_STAFF_LIST = []; _loadPreviewStaff(); // refresh "Preview as" for the new academy
   renderClientSwitcher();
-  // Refresh the point-of-contact name/avatar for the newly-selected academy
-  // (was stuck on the first-loaded academy - switchClient never re-set it).
-  (function () {
-    const un = document.getElementById('userName');
-    const ue = document.getElementById('userEmail');
-    const av = document.getElementById('userAvatar');
-    const on = (row.owner_name || '').trim();
-    const em = (row.email || '').trim();   // the selected academy's contact email
-    if (un) { un.textContent = on || em; un.title = on || em; }
-    if (ue) { ue.textContent = on ? em : ''; ue.style.display = on ? 'block' : 'none'; }
-    if (av) av.textContent = (on || em).slice(0, 1).toUpperCase() || '·';
-  })();
+  // Re-resolve the logged-in user's identity for the newly-selected academy
+  // (their client_users name/email can differ per academy).
+  setMyIdentity();
   await loadAcademyName();
   await loadTickets();
   subscribeTicketsRealtime();   // re-scope tickets subscription to new CLIENT_ID
@@ -31039,17 +31066,8 @@ async function boot() {
     })();
   }
 
-  // Populate user-row from authed email + clients.owner_name
-  const email = (clientRow?.email || '').trim();   // the ACADEMY's contact email (not the logged-in user)
-  const ownerName = clientRow?.owner_name?.trim() || '';
-  const userNameEl = document.getElementById('userName');
-  const userEmailEl = document.getElementById('userEmail');
-  userNameEl.textContent = ownerName || email;       // fallback to email if no name on file
-  userNameEl.title = ownerName || email;
-  userEmailEl.textContent = ownerName ? email : '';  // only show email line if name is present
-  userEmailEl.title = email;
-  userEmailEl.style.display = ownerName ? 'block' : 'none';
-  document.getElementById('userAvatar').textContent = (ownerName || email).slice(0, 1).toUpperCase() || '·';
+  // Footer name/email + greeting = the LOGGED-IN user (not the academy's POC).
+  setMyIdentity();
 
   await loadAcademyName();
   await loadTickets();
