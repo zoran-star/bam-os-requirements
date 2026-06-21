@@ -10241,6 +10241,7 @@ function _v15ibRenderAll() {
     </div>
     <div id="v15ib-body"></div>`;
   _v15ibRenderList();
+  try { _apxDbg('openV15Inbox ran - calling _apxRefreshCount...'); } catch (_) {}
   _apxRefreshCount();
 }
 
@@ -18254,7 +18255,7 @@ function _renderOrganicCredits() {
     btn.disabled = !anyCapacity;
     btn.style.opacity = anyCapacity ? '' : '0.5';
     btn.style.cursor = anyCapacity ? '' : 'not-allowed';
-    btn.title = anyCapacity ? '' : "You've used all your creatives this month — resets the 1st";
+    btn.title = anyCapacity ? '' : "You've used all your creatives this month - resets the 1st";
   }
 }
 function _renderOrganic() {
@@ -21160,26 +21161,43 @@ async function _apxPost(endpoint, action, payload) {
 // Show the 📨 button + a live count, for staff only. Drives BOTH inboxes:
 // the v2 inbox (#ib-approve-btn / #apx-count) and the v1.5 inbox
 // (#v15ib-approve-btn / #v15-apx-count) - whichever this academy uses.
+// TEMP DEBUG - visible on-screen readout of the Hawkeye reveal. Remove once solved.
+function _apxDbg(msg) {
+  let d = document.getElementById('apx-debug');
+  if (!d) {
+    d = document.createElement('div');
+    d.id = 'apx-debug';
+    d.style.cssText = 'position:fixed;left:6px;right:6px;bottom:92px;z-index:99999;background:#15151a;border:1px solid #E8C547;border-radius:8px;color:#E8C547;font:11px/1.45 ui-monospace,monospace;padding:8px 10px;white-space:pre-wrap;word-break:break-word;box-shadow:0 6px 24px rgba(0,0,0,.6)';
+    d.onclick = () => d.remove();
+    document.body.appendChild(d);
+  }
+  d.textContent = '🐛 HAWKEYE DEBUG (tap to dismiss)\n' + msg;
+}
+
 async function _apxRefreshCount() {
+  const ib = document.getElementById('ib-approve-btn');
+  const v15 = document.getElementById('v15ib-approve-btn');
   const btns = [
-    { btn: document.getElementById('ib-approve-btn'), span: document.getElementById('apx-count') },
-    { btn: document.getElementById('v15ib-approve-btn'), span: document.getElementById('v15-apx-count') },
+    { btn: ib, span: document.getElementById('apx-count') },
+    { btn: v15, span: document.getElementById('v15-apx-count') },
   ].filter(x => x.btn);
-  if (!btns.length) return;
-  // Let the SERVER decide who sees this - the approval APIs are staff-gated, so
-  // if they answer, this user is authorized. This avoids the client-side staff
-  // flag racing on mobile (where it can resolve false before the session loads).
+  let dbg = `CLIENT_ID=${typeof CLIENT_ID !== 'undefined' ? CLIENT_ID : 'UNDEFINED'}`
+    + `\nstaffFlag=${typeof _IS_BAM_STAFF !== 'undefined' ? _IS_BAM_STAFF : 'undef'}`
+    + `\nbuttons in DOM: ib=${!!ib} v15=${!!v15} (found ${btns.length})`;
+  if (!btns.length) { _apxDbg(dbg + '\n=> NO BUTTON ELEMENT IN DOM (wrong inbox view?)'); return; }
+  // Let the SERVER decide who sees this - the approval APIs are staff-gated.
   const [fuR, rdR] = await Promise.allSettled([
     _apxPost('/api/agent-followups', 'list', {}),
     _apxPost('/api/agent-approvals', 'list-ready', {}),
   ]);
-  // ONLY hide on an explicit "not authorized" (401/403) - a non-staff user. A
-  // server/rate-limit error (429/500) or network blip is NOT a reason to hide
-  // the button; the button is visible by default and stays put. (This was the
-  // bug: during a GHL 429 storm both calls errored and the button vanished.)
+  const st = (r) => r.status === 'fulfilled' ? 'OK' : ('FAIL http=' + (r.reason?.status || '?') + ' ' + String(r.reason?.message || '').slice(0, 50));
+  dbg += `\nfollowups list: ${st(fuR)}\nready list: ${st(rdR)}`;
+  // ONLY hide on an explicit "not authorized" (401/403). A 429/500/network blip
+  // is NOT a reason to hide (the button is visible by default and stays put).
   const denied = (r) => r.status === 'rejected' && (r.reason?.status === 401 || r.reason?.status === 403);
   if (denied(fuR) && denied(rdR)) {
     btns.forEach(({ btn }) => { btn.style.display = 'none'; });
+    _apxDbg(dbg + '\n=> DENIED (401/403 on both) => BUTTON HIDDEN');
     return;
   }
   const fu = fuR.status === 'fulfilled' ? fuR.value : {};
@@ -21194,6 +21212,8 @@ async function _apxRefreshCount() {
     btn.style.borderColor = n ? 'var(--accent)' : 'var(--border)';
     btn.style.color = n ? 'var(--accent)' : 'var(--text-mute)';
   });
+  const vis = v15 ? getComputedStyle(v15).display : (ib ? getComputedStyle(ib).display : '?');
+  _apxDbg(dbg + `\npending: followups=${fups.length} ready=${ready.length} (n=${n})\n=> BUTTON SHOWN (computed display='${vis}')`);
 }
 
 function _apxOpen() {
