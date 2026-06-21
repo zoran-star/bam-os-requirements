@@ -15375,6 +15375,8 @@ const _bbOfferConfigs = {
         hint:'Texted to a parent when "Send onboarding link" is checked on the post-trial form, e.g. your checkout or membership sign-up URL.' },
       { key:'missed_trial_workflow', type:'ghl_workflow', label:'Missed-trial automation',
         hint:'GHL workflow that fires automatically when a trainer marks an athlete as "Didn\'t show up" on the post-trial form. Pick the workflow that handles a no-show (reschedule nudge, re-book sequence, etc.).' },
+      { key:'ghosted_workflow', type:'ghl_workflow', label:'Ghosted automation',
+        hint:'GHL workflow fired when staff hit "Ghosted" on a lead card. It should text the lead a few times, then move them to the Responded stage if they reply or mark them lost if they don\'t. (The card auto-moves to Interested when you enroll.)' },
       { key:'sales_path', type:'check_one', label:'Sales path', required:true,
         options:['Free trial','Paid trial','Discovery call first','Direct signup','Other'],
         hint:'Gates the next set of questions' },
@@ -20253,6 +20255,25 @@ function _plConfirmModal(opts) {
   };
 }
 
+// Move an opp's card to its pipeline's "Interested" stage (portal-side, optimistic).
+// Returns true if it actually moved. Shared by Summer Special + Ghosted enroll.
+async function _plMoveToInterested(oppId, token) {
+  let opp = null, pipe = null;
+  for (const pl of (_PL_DATA && _PL_DATA.pipelines) || []) {
+    const f = (pl.opportunities || []).find(x => x.id === oppId);
+    if (f) { opp = f; pipe = pl; break; }
+  }
+  const interested = pipe && (pipe.stages || []).find(s => /interested/i.test(s.name || ''));
+  if (!opp || !pipe || !interested || opp.stageId === interested.id) return false;
+  const pr = await fetch(`/api/ghl/pipelines?client_id=${encodeURIComponent(CLIENT_ID)}&opportunity_id=${encodeURIComponent(oppId)}`, {
+    method: 'PATCH', headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ pipeline_id: pipe.id, stage_id: interested.id }),
+  });
+  if (!pr.ok) return false;
+  opp.stageId = interested.id; opp.lastStageChangeAt = new Date().toISOString();
+  return true;
+}
+
 async function _plEnrollSpecialGo(oppId) {
   try {
     const token = await _mreqAuthToken();
@@ -20262,25 +20283,42 @@ async function _plEnrollSpecialGo(oppId) {
     });
     const json = await _safeJson(r);
     if (!r.ok) throw new Error(json.error || ('HTTP ' + r.status));
-
-    // Auto-move to the "Interested" stage of this opp's pipeline.
-    let moved = false, opp = null, pipe = null;
-    for (const pl of (_PL_DATA && _PL_DATA.pipelines) || []) {
-      const f = (pl.opportunities || []).find(x => x.id === oppId);
-      if (f) { opp = f; pipe = pl; break; }
-    }
-    const interested = pipe && (pipe.stages || []).find(s => /interested/i.test(s.name || ''));
-    if (opp && pipe && interested && opp.stageId !== interested.id) {
-      const pr = await fetch(`/api/ghl/pipelines?client_id=${encodeURIComponent(CLIENT_ID)}&opportunity_id=${encodeURIComponent(oppId)}`, {
-        method: 'PATCH', headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ pipeline_id: pipe.id, stage_id: interested.id }),
-      });
-      if (pr.ok) { opp.stageId = interested.id; opp.lastStageChangeAt = new Date().toISOString(); moved = true; }
-    }
+    const moved = await _plMoveToInterested(oppId, token);
     if (moved && typeof _renderPipelineBoard === 'function') _renderPipelineBoard();
     _plToast(moved ? '📨 Sent + moved to Interested' : '📨 Sent to Summer Special');
   } catch (e) {
     alert('Could not send: ' + (e.message || e));
+  }
+}
+
+// Ghosted: enroll the lead in the academy's ghosted automation (chosen on the
+// training offer's Sales step) and move the card to Interested. The GHL workflow
+// then texts them — reply → Responded stage, no reply → marked lost.
+function _plGhost(oppId) {
+  _plConfirmModal({
+    icon: '👻',
+    title: 'Send to Ghosted automation?',
+    body: 'They\'ll get the ghosted text sequence and the card moves to <b>Interested</b>. If they reply they go to <b>Responded</b>; if they don\'t, they get marked <b>lost</b> automatically.',
+    okLabel: 'Send',
+    onOk: () => _plGhostGo(oppId),
+  });
+}
+
+async function _plGhostGo(oppId) {
+  try {
+    const token = await _mreqAuthToken();
+    const r = await fetch(`/api/ghl/pipelines?client_id=${encodeURIComponent(CLIENT_ID)}&action=enroll-workflow`, {
+      method: 'POST', headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ opportunity_id: oppId, source: 'ghosted' }),
+    });
+    const json = await _safeJson(r);
+    if (!r.ok) throw new Error(json.error || ('HTTP ' + r.status));
+    const moved = await _plMoveToInterested(oppId, token);
+    if (moved && typeof _renderPipelineBoard === 'function') _renderPipelineBoard();
+    closePipelineDrawer();
+    _plToast(moved ? '👻 Ghosted — texting them + moved to Interested' : '👻 Sent to Ghosted automation');
+  } catch (e) {
+    alert('Could not send to Ghosted automation: ' + (e.message || e));
   }
 }
 
@@ -20526,19 +20564,12 @@ function _plOpenCard(oppId) {
     <div class="pl-d-section">
       <div class="pl-d-row"><div class="lbl2">Parent</div><div>${escapeHTML(o.contact.name || '—')}</div></div>
       <div class="pl-d-row"><div class="lbl2">Athlete</div><div>${escapeHTML(o.athlete || '—')}</div></div>
+      <div class="pl-d-row"><div class="lbl2">Athlete age</div><div id="pl-d-age">—</div></div>
+      <div class="pl-d-row"><div class="lbl2">Last trial</div><div style="color:${trialStr ? (trialPassed ? '#c47424' : 'var(--accent)') : 'var(--text-mute)'};font-weight:${trialStr ? '600' : '400'}">${trialStr ? escapeHTML(trialStr) : '—'}</div></div>
       <div class="pl-d-row"><div class="lbl2">Phone</div><div>${o.contact.phone ? `<a href="tel:${escapeHTML(o.contact.phone)}" style="color:var(--accent)">${escapeHTML(o.contact.phone)}</a>` : '—'}</div></div>
       <div class="pl-d-row"><div class="lbl2">Email</div><div>${o.contact.email ? `<a href="mailto:${escapeHTML(o.contact.email)}" style="color:var(--accent)">${escapeHTML(o.contact.email)}</a>` : '—'}</div></div>
-      ${trialStr ? `<div class="pl-d-row"><div class="lbl2">Trial</div><div style="color:${trialPassed ? '#c47424' : 'var(--accent)'};font-weight:600">${escapeHTML(trialStr)}</div></div>` : ''}
       ${o.trainer ? `<div class="pl-d-row"><div class="lbl2">Coach</div><div>${escapeHTML(o.trainer)}</div></div>` : ''}
-      <div class="pl-d-row"><div class="lbl2">Status</div><div>${escapeHTML(o.status || '—')}</div></div>
-      <div class="pl-d-row"><div class="lbl2">Stage age</div><div>${escapeHTML(_plAgeShort(o.lastStageChangeAt))}</div></div>
     </div>
-    ${timelineHtml}
-    <div class="pl-d-section" id="pl-d-lead">
-      <div class="lbl">Lead details</div>
-      <div class="pl-d-row" id="pl-d-lead-loading" style="color:var(--text-mute)"><div class="lbl2"><span class="req-spin"></span></div><div>Loading…</div></div>
-    </div>
-    ${rv && rv.notes ? `<div class="pl-d-section"><div class="lbl">Post-trial notes</div><div style="font-size:13px;white-space:pre-wrap">${escapeHTML(rv.notes)}</div></div>` : ''}
     <div class="pl-d-section" id="pl-d-msg">
       <div class="lbl">Messages</div>
       ${o.contactId ? `
@@ -20559,11 +20590,22 @@ function _plOpenCard(oppId) {
       ` : `<div style="font-size:13px;color:var(--text-mute)">No GHL contact linked to this card.</div>`}
     </div>
     <div class="pl-d-actions">
+      <div style="display:flex;gap:8px">
+        <button class="pl-d-btn" style="flex:1;border-color:#e07070;color:#e07070" onclick="_plMarkLost('${escapeHTML(o.id)}')">Mark as lost</button>
+        <button class="pl-d-btn" style="flex:1;border-color:var(--gold,#E8C547);color:var(--gold,#E8C547)" onclick="_plGhost('${escapeHTML(o.id)}')">👻 Ghosted</button>
+      </div>
+    </div>
+    ${timelineHtml}
+    <div class="pl-d-section" id="pl-d-lead">
+      <div class="lbl">Lead details</div>
+      <div class="pl-d-row" id="pl-d-lead-loading" style="color:var(--text-mute)"><div class="lbl2"><span class="req-spin"></span></div><div>Loading…</div></div>
+    </div>
+    ${rv && rv.notes ? `<div class="pl-d-section"><div class="lbl">Post-trial notes</div><div style="font-size:13px;white-space:pre-wrap">${escapeHTML(rv.notes)}</div></div>` : ''}
+    <div class="pl-d-actions">
       ${_plIsDoneTrialStage(s)
         ? `<div style="display:flex;gap:8px">
              <button class="pl-d-btn primary" style="flex:1" onclick="_plMarkWon('${escapeHTML(o.id)}')">Mark won</button>
              <button class="pl-d-btn" style="flex:1;border-color:#5a96e0;color:#5a96e0" onclick="_plMarkAbandoned('${escapeHTML(o.id)}')">Abandon</button>
-             <button class="pl-d-btn" style="flex:1" onclick="_plMarkLost('${escapeHTML(o.id)}')">Mark lost</button>
            </div>`
         : (trialStarted ? `<button class="pl-d-btn primary" onclick="_plPostTrialForm('${escapeHTML(o.id)}')">Post trial form</button>` : '')}
       <button class="pl-d-btn" style="border-color:var(--gold,#E8C547);color:var(--gold,#E8C547)" onclick="_plEnrollSpecial('${escapeHTML(o.id)}')">📨 Summer special</button>
@@ -20691,12 +20733,17 @@ async function _plMsgSend() {
 async function _plLoadLeadDetail(o) {
   const sec = document.getElementById('pl-d-lead');
   if (!sec || !o.contactId) { document.getElementById('pl-d-lead-loading')?.remove(); return; }
-  const shown = new Set(['parent', 'athlete', 'phone', 'email', "athlete's full name"]);
+  // Age is surfaced in the top section (#pl-d-age), so keep it out of this list.
+  const shown = new Set(['parent', 'athlete', 'phone', 'email', "athlete's full name", "athlete's age", 'athlete age', 'age']);
   try {
     const token = await _mreqAuthToken();
     const r = await fetch(`/api/ghl/contact-detail?client_id=${encodeURIComponent(CLIENT_ID)}&contact_id=${encodeURIComponent(o.contactId)}`, { headers: { 'Authorization': 'Bearer ' + token } });
     const d = await _safeJson(r);
     if (!r.ok) throw new Error(d.error || 'detail failed');
+    // Lift athlete age into the top section.
+    const ageField = (d.fields || []).find(f => /athlete'?s?\s*age|^age$/i.test((f.label || '').trim()));
+    const ageEl = document.getElementById('pl-d-age');
+    if (ageEl && ageField && ageField.value) ageEl.textContent = ageField.value;
     const rows = (d.fields || []).filter(f => f.label && !shown.has(f.label.toLowerCase()));
     sec.innerHTML = `<div class="lbl">Lead details</div>` + (rows.length
       ? rows.map(f => `<div class="pl-d-row"><div class="lbl2">${escapeHTML(f.label)}</div><div>${escapeHTML(f.value)}</div></div>`).join('')
