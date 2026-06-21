@@ -27,6 +27,9 @@
   }
 </script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<!-- Resumable (TUS) uploads for large files so they don't time out. If this fails
+     to load, uploads fall back to the standard supabase-js upload (see _storageUpload). -->
+<script src="https://cdn.jsdelivr.net/npm/tus-js-client@4/dist/tus.min.js"></script>
 <script>
   window.sentryOnLoad = function () {
     var prodHosts = ["portal.byanymeansbusiness.com", "fullcontrol.vercel.app"];
@@ -9065,8 +9068,7 @@ async function _uploadAssets(inputEl, fromFolder) {
       const rel = (fromFolder && file.webkitRelativePath) ? file.webkitRelativePath : '';
       const folder = rel.includes('/') ? rel.split('/')[0] : null;
       const category = (file.type || '').startsWith('video/') ? 'video' : 'photo';
-      const { error: upErr } = await _sb.storage.from('client-assets').upload(path, file, { cacheControl: '3600', upsert: false, contentType: file.type || 'application/octet-stream' });
-      if (upErr) throw upErr;
+      await _storageUpload('client-assets', path, file);
       const { error: insErr } = await _sb.from('client_assets').insert({
         client_id: CLIENT_ID, label: file.name.replace(/\.[^.]+$/, ''), category,
         folder, storage_path: path, mime_type: file.type || null, size_bytes: file.size,
@@ -19244,6 +19246,53 @@ function _assetFolderOf(file) {
   return '';
 }
 
+// Supabase Storage upload that survives large files. Files at/above the threshold
+// use the resumable (TUS) protocol (chunked + resumable) so a big upload doesn't die
+// on a single multi-minute request. Smaller files keep the proven standard upload.
+// Any resumable failure falls back to standard, so this can't regress what works today.
+const _SUPABASE_STORAGE_URL = 'https://jnojmfmpnsfmtqmwhopz.supabase.co';
+const _RESUMABLE_THRESHOLD = 50 * 1024 * 1024;   // 50MB
+
+function _resumableUpload(bucket, path, file) {
+  return new Promise((resolve, reject) => {
+    if (typeof tus === 'undefined') { reject(new Error('tus not loaded')); return; }
+    _sb.auth.getSession().then(({ data }) => {
+      const token = data && data.session && data.session.access_token;
+      if (!token) { reject(new Error('not signed in')); return; }
+      const upload = new tus.Upload(file, {
+        endpoint: _SUPABASE_STORAGE_URL + '/storage/v1/upload/resumable',
+        retryDelays: [0, 1000, 3000, 5000, 10000],
+        headers: { authorization: 'Bearer ' + token, 'x-upsert': 'false' },
+        uploadDataDuringCreation: true,
+        removeFingerprintOnSuccess: true,
+        chunkSize: 6 * 1024 * 1024,   // Supabase requires exactly 6MB chunks
+        metadata: {
+          bucketName: bucket, objectName: path,
+          contentType: file.type || 'application/octet-stream', cacheControl: '3600',
+        },
+        onError: (err) => reject(err),
+        onSuccess: () => resolve(),
+      });
+      upload.findPreviousUploads().then((prev) => {
+        if (prev && prev.length) upload.resumeFromPreviousUpload(prev[0]);
+        upload.start();
+      }).catch(() => upload.start());
+    }).catch(reject);
+  });
+}
+
+async function _storageUpload(bucket, path, file) {
+  if (typeof tus !== 'undefined' && file.size >= _RESUMABLE_THRESHOLD) {
+    try { await _resumableUpload(bucket, path, file); return; }
+    catch (e) { console.warn('Resumable upload failed, falling back to standard:', (e && e.message) || e); }
+  }
+  const { error } = await _sb.storage.from(bucket).upload(path, file, {
+    contentType: file.type || 'application/octet-stream',
+    cacheControl: '3600',
+  });
+  if (error) throw new Error(error.message || String(error));
+}
+
 async function _mreqUploadFiles(files) {
   if (!files || !files.length) return [];
   const out = [];
@@ -19253,11 +19302,7 @@ async function _mreqUploadFiles(files) {
     const folder = _assetFolderOf(file);
     const safeFolder = folder ? folder.replace(/[^a-zA-Z0-9._-]/g, '_') + '/' : '';
     const path = `marketing-tickets/${safeFolder}${uid}-${safe}`;
-    const { error: upErr } = await _sb.storage.from('ticket-files').upload(path, file, {
-      contentType: file.type || 'application/octet-stream',
-      cacheControl: '3600',
-    });
-    if (upErr) throw new Error(upErr.message);
+    await _storageUpload('ticket-files', path, file);
     const { data: urlData } = _sb.storage.from('ticket-files').getPublicUrl(path);
     out.push({ name: file.name, url: urlData.publicUrl, size: file.size || 0, mime: file.type || '', folder });
   }
