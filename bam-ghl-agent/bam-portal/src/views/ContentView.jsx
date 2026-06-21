@@ -670,6 +670,7 @@ function ContentTicketsTab({ tk, session, me }) {
   const [banner, setBanner] = useState(null);
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState("all"); // all | graphic | video | mixed
+  const [channelFilter, setChannelFilter] = useState("all"); // all | ads | organic
   const [sortOrder, setSortOrder] = useState("newest"); // newest | oldest
 
   const showBanner = (text) => { setBanner(text); setTimeout(() => setBanner(null), 3500); };
@@ -713,10 +714,16 @@ function ContentTicketsTab({ tk, session, me }) {
     ? tickets.filter(t => t.assigned_to === me.id)
     : tickets;
 
+  // Channel filter (All / Ads / Organic) - applied before the sub-tab split so the
+  // tab counts reflect it too.
+  const channelScoped = channelFilter === "all"
+    ? scoped
+    : scoped.filter(t => (t.channel || "ads") === channelFilter);
+
   // Filter rows by sub-tab; sort oldest first per spec
-  const active     = scoped.filter(t => t.status === "active");
-  const clientDep  = scoped.filter(t => t.status === "client-dependent");
-  const completed  = scoped.filter(t => t.status === "completed" || t.status === "cancelled");
+  const active     = channelScoped.filter(t => t.status === "active");
+  const clientDep  = channelScoped.filter(t => t.status === "client-dependent");
+  const completed  = channelScoped.filter(t => t.status === "completed" || t.status === "cancelled");
   const tabRows =
     subTab === "active"           ? active
     : subTab === "client-dependent" ? clientDep
@@ -792,6 +799,20 @@ function ContentTicketsTab({ tk, session, me }) {
             outline: "none", fontFamily: "inherit",
           }}
         />
+        <div style={{ display: "flex", gap: 4, background: tk.surfaceEl, border: `1px solid ${tk.border}`, borderRadius: 8, padding: 3 }}>
+          {[["all", "All"], ["ads", "Ads"], ["organic", "Organic"]].map(([k, label]) => {
+            const on = channelFilter === k;
+            const color = k === "organic" ? "#7BC47F" : k === "ads" ? "#7E9CD9" : tk.accent;
+            return (
+              <button key={k} type="button" onClick={() => setChannelFilter(k)} style={{
+                padding: "6px 12px", fontSize: 12.5, fontWeight: 600, borderRadius: 6, border: "none",
+                cursor: "pointer", fontFamily: "inherit",
+                background: on ? `${color}22` : "transparent",
+                color: on ? (k === "all" ? tk.text : color) : tk.textMute,
+              }}>{label}</button>
+            );
+          })}
+        </div>
         <select
           value={typeFilter}
           onChange={e => setTypeFilter(e.target.value)}
