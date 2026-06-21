@@ -21403,14 +21403,39 @@ function _apxRemove(id) {
   if (span) span.textContent = n ? `(${n})` : '';
 }
 
+// When you fix a draft, optionally teach the agent WHY. Routes through the same
+// classify-and-promote pipeline as the Train Agent tab: born local to this
+// academy, applied to the next draft immediately, and (if the AI judges it
+// general sales-craft) queued for BAM to promote into the shared brain.
+async function _apxTeach(before, after, context) {
+  const lesson = prompt(
+    "Teach the agent from this edit? One line - what should it learn?\n" +
+    "e.g. \"Don't quote price before the trial is booked.\"\n\n(Leave blank to skip.)",
+    ''
+  );
+  if (lesson == null || !lesson.trim()) return;
+  try {
+    const j = await _apxPost('/api/agent-train', 'teach', {
+      lesson: lesson.trim(), kind: 'fix',
+      context: { ...(context || {}), ai_drafted: before, you_sent: after },
+    });
+    _plToast(j && j.proposed_global ? '📚 Lesson saved - sent to BAM to review for all academies' : '📚 Lesson saved + applied');
+  } catch (e) { _plToast('Edit kept, but lesson not saved: ' + (e.message || 'error')); }
+}
+
 // ── Follow-up actions ──
 async function _apxFollowupSend(id) { try { await _apxPost('/api/agent-followups', 'send-now', { id }); _apxRemove(id); _plToast('✓ Sent'); } catch (e) { alert(e.message); } }
 async function _apxFollowupSkip(id) { try { await _apxPost('/api/agent-followups', 'skip', { id }); _apxRemove(id); } catch (e) { alert(e.message); } }
 async function _apxFollowupEdit(id) {
   const r = _APX_DATA.followups.find(x => x.id === id); if (!r) return;
-  const t = prompt('Edit the follow-up message:', r.draft_message || '');
-  if (t == null || !t.trim() || t.trim() === r.draft_message) return;
-  try { await _apxPost('/api/agent-followups', 'edit', { id, message: t.trim() }); r.draft_message = t.trim(); _apxRender(); } catch (e) { alert(e.message); }
+  const before = r.draft_message || '';
+  const t = prompt('Edit the follow-up message:', before);
+  if (t == null || !t.trim() || t.trim() === before) return;
+  try {
+    await _apxPost('/api/agent-followups', 'edit', { id, message: t.trim() });
+    r.draft_message = t.trim(); _apxRender();
+    await _apxTeach(before, t.trim(), { source: 'hawkeye-followup', contact: r.contact_name || null });
+  } catch (e) { alert(e.message); }
 }
 
 // ── Ready-reply actions (send = approve + fire via agent-approvals) ──
@@ -21429,11 +21454,15 @@ async function _apxReadySend(id) {
 async function _apxReadySkip(id) { try { await _apxPost('/api/agent-approvals', 'skip-ready', { ready_id: id }); _apxRemove(id); } catch (e) { alert(e.message); } }
 async function _apxReadyEdit(id) {
   const r = _APX_DATA.ready.find(x => x.id === id); if (!r) return;
-  const t = prompt('Edit the reply before sending:', r.draft_message || '');
+  const before = r.draft_message || '';
+  const t = prompt('Edit the reply before sending:', before);
   if (t == null || !t.trim()) return;
   r.draft_message = t.trim();
   const el = document.getElementById('apx-msg-' + id);
   if (el) el.textContent = r.draft_message;
+  if (r.draft_message !== before) {
+    await _apxTeach(before, r.draft_message, { source: 'hawkeye-ready', contact: r.contact_name || null });
+  }
 }
 
 function _ibSetTab(tab) {
