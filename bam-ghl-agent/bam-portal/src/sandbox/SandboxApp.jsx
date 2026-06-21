@@ -21,7 +21,7 @@ async function api(action, payload = {}) {
   return data;
 }
 
-export default function SandboxApp() {
+export default function SandboxApp({ embedded = false } = {}) {
   const [session, setSession] = useState(undefined);
   const [view, setView] = useState("chat");          // 'chat' | 'brain'
   const [messages, setMessages] = useState([]);     // {role:'parent'|'agent', text, meta?}
@@ -118,8 +118,8 @@ export default function SandboxApp() {
 
   return (
     <>
-      <style>{`html,body{margin:0;padding:0;background:${tk.bg};} *{box-sizing:border-box;}`}</style>
-      <div style={{ background: tk.bg, minHeight: "100vh", color: tk.text, fontFamily: F, display: "flex", flexDirection: "column" }}>
+      {!embedded && <style>{`html,body{margin:0;padding:0;background:${tk.bg};} *{box-sizing:border-box;}`}</style>}
+      <div style={{ background: tk.bg, minHeight: embedded ? 0 : "100vh", height: embedded ? "calc(100vh - 150px)" : undefined, border: embedded ? `1px solid ${tk.border}` : undefined, borderRadius: embedded ? 12 : undefined, overflow: embedded ? "hidden" : undefined, color: tk.text, fontFamily: F, display: "flex", flexDirection: "column" }}>
         {/* Header */}
         <div style={{ padding: "16px 24px", borderBottom: `1px solid ${tk.border}`, display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap" }}>
           <div style={{ fontSize: 18, fontWeight: 700 }}>🎮 Agent Sandbox</div>
