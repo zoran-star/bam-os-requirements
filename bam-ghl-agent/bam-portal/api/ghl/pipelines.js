@@ -314,9 +314,21 @@ async function handler(req, res) {
   if (req.method === "POST" && req.query.action === "enroll-workflow") {
     const body = (req.body && typeof req.body === "object") ? req.body : {};
     const oppId = body.opportunity_id || req.query.opportunity_id;
-    const workflowId = body.workflow_id || client.ghl_kpi_config?.summer_special_workflow_id;
+    const isGhosted = body.source === "ghosted";
+    let workflowId = body.workflow_id;
+    // Ghosted automation is configured per-academy on the training offer
+    // (offers.data.ghosted_workflow), same place as missed_trial_workflow.
+    if (!workflowId && isGhosted) {
+      try {
+        const offers = await sb(`offers?client_id=eq.${encodeURIComponent(client.id)}&type=eq.training&select=data&order=sort_order.asc&limit=1`);
+        workflowId = ((offers && offers[0] && offers[0].data && offers[0].data.ghosted_workflow) || "").trim();
+      } catch (_) { /* fall through to error below */ }
+    }
+    if (!workflowId) workflowId = client.ghl_kpi_config?.summer_special_workflow_id;
     if (!workflowId) {
-      return res.status(400).json({ error: "No automation configured for this academy yet.", hint: "Set ghl_kpi_config.summer_special_workflow_id." });
+      return res.status(400).json(isGhosted
+        ? { error: "No ghosted automation set up yet.", hint: "Pick a Ghosted automation on the training offer's Sales step (offers.data.ghosted_workflow)." }
+        : { error: "No automation configured for this academy yet.", hint: "Set ghl_kpi_config.summer_special_workflow_id." });
     }
 
     // Resolve the contact: explicit contact_id, else fetch it from the opportunity.
