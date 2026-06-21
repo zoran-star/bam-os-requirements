@@ -1109,6 +1109,21 @@
     color: var(--gold);
   }
 
+  /* Segmented option group (Format) - branded, matches the binary toggle */
+  .seg-group { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+  .seg-opt {
+    display: flex; flex-direction: column; gap: 3px; align-items: flex-start; text-align: left;
+    background: rgba(255,255,255,0.02); border: 1px solid var(--line); border-radius: 8px;
+    padding: 10px 12px; cursor: pointer; color: var(--text-mute); font: inherit;
+    transition: border-color 0.15s ease, background 0.15s ease, color 0.15s ease;
+  }
+  .seg-opt:hover { border-color: var(--border-med); color: var(--text); }
+  .seg-opt.active { border-color: var(--gold); background: rgba(232,197,71,0.08); color: var(--text); }
+  .seg-opt-main { font-size: 13px; font-weight: 700; }
+  .seg-opt.active .seg-opt-main { color: var(--gold); }
+  .seg-opt-sub { font-size: 10.5px; color: var(--text-mute); }
+  @media (max-width: 480px) { .seg-group { grid-template-columns: 1fr; } }
+
   /* X-delete button on each creative tile (new workflow) */
   .creative-delete {
     position: absolute;
@@ -18619,9 +18634,8 @@ function openAddCreativeModal(channel) {
   if (notes) notes.value = '';
   const fld = document.getElementById('inputAssetsFolder');
   if (fld) fld.value = '';
-  // Reset the creative-spec fields each open.
-  const fmt = document.getElementById('inputAssetsFormat'); if (fmt) fmt.value = '9:16 Vertical';
-  const cap = document.getElementById('inputAssetsCaptions'); if (cap) cap.checked = false;
+  // Reset the creative-spec controls each open.
+  _resetCreativeSpec();
   // Channel-aware copy: organic goes back to the client to review, not into a campaign.
   const sub = document.getElementById('inputAssetsSub');
   if (sub) sub.textContent = _inputAssetsChannel === 'organic'
@@ -18645,6 +18659,24 @@ function _selectInputAssetsType(t) {
   document.querySelectorAll('#inputAssetsTypeToggle .binary-toggle-opt').forEach(el => {
     el.classList.toggle('active', el.dataset.value === t);
   });
+}
+
+// Creative-spec segmented controls (Format + captions) - branded, not native dropdowns.
+let _inputAssetsFormat = '9:16 Vertical';
+let _inputAssetsCaptions = false;
+function _selectFormat(el) {
+  _inputAssetsFormat = el.dataset.value;
+  document.querySelectorAll('#inputAssetsFormatToggle .seg-opt').forEach(o => o.classList.toggle('active', o === el));
+}
+function _selectCaptions(el) {
+  _inputAssetsCaptions = el.dataset.value === 'yes';
+  document.querySelectorAll('#inputAssetsCaptionsToggle .binary-toggle-opt').forEach(o => o.classList.toggle('active', o === el));
+}
+function _resetCreativeSpec() {
+  _inputAssetsFormat = '9:16 Vertical';
+  _inputAssetsCaptions = false;
+  document.querySelectorAll('#inputAssetsFormatToggle .seg-opt').forEach(o => o.classList.toggle('active', o.dataset.value === '9:16 Vertical'));
+  document.querySelectorAll('#inputAssetsCaptionsToggle .binary-toggle-opt').forEach(o => o.classList.toggle('active', o.dataset.value === 'no'));
 }
 
 // Files larger than this can't reliably upload directly to Supabase storage
@@ -18811,8 +18843,8 @@ async function submitInputAssets() {
     return;
   }
   const notes = document.getElementById('inputAssetsNotes')?.value?.trim() || '';
-  const format = document.getElementById('inputAssetsFormat')?.value || '';
-  const captions = !!(document.getElementById('inputAssetsCaptions') || {}).checked;
+  const format = _inputAssetsFormat;
+  const captions = _inputAssetsCaptions;
   // Snapshot files + type BEFORE closing the modal - closeInputAssetsModal()
   // resets _inputAssetsState to { files: [] } which would otherwise wipe the
   // upload list and silently submit a ticket with no files attached.
@@ -31526,17 +31558,24 @@ function toggleTheme() {
     <input id="inputAssetsDriveLink" class="modal-input" type="url" placeholder="https://..." />
     <div style="font-size:12px;color:var(--text-mute);margin-top:4px">Set sharing to "Anyone with the link" so we can open it.</div>
 
-    <label class="modal-label" for="inputAssetsFormat" style="margin-top:18px">Format</label>
-    <select id="inputAssetsFormat" class="modal-input">
-      <option value="9:16 Vertical">9:16 - Vertical (Reels / Stories / TikTok)</option>
-      <option value="16:9 Landscape">16:9 - Landscape (YouTube)</option>
-      <option value="4:5 Feed">4:5 - Feed (Instagram / Facebook post)</option>
-    </select>
+    <label class="modal-label" style="margin-top:18px">Format</label>
+    <div class="seg-group" id="inputAssetsFormatToggle">
+      <button type="button" class="seg-opt active" data-value="9:16 Vertical" onclick="_selectFormat(this)">
+        <span class="seg-opt-main">9:16 Vertical</span><span class="seg-opt-sub">Reels / Stories / TikTok</span>
+      </button>
+      <button type="button" class="seg-opt" data-value="16:9 Landscape" onclick="_selectFormat(this)">
+        <span class="seg-opt-main">16:9 Landscape</span><span class="seg-opt-sub">Website / YouTube</span>
+      </button>
+      <button type="button" class="seg-opt" data-value="4:5 Feed" onclick="_selectFormat(this)">
+        <span class="seg-opt-main">4:5 Feed</span><span class="seg-opt-sub">Instagram / Facebook</span>
+      </button>
+    </div>
 
-    <label class="modal-label" style="margin-top:16px;display:flex;align-items:center;gap:10px;cursor:pointer;font-weight:400">
-      <input type="checkbox" id="inputAssetsCaptions" style="width:16px;height:16px;accent-color:var(--gold);cursor:pointer;flex:none">
-      <span>Add on-screen captions</span>
-    </label>
+    <label class="modal-label" style="margin-top:18px">On-screen captions</label>
+    <div class="binary-toggle" id="inputAssetsCaptionsToggle" style="max-width:220px">
+      <button type="button" class="binary-toggle-opt active" data-value="no" onclick="_selectCaptions(this)">No</button>
+      <button type="button" class="binary-toggle-opt" data-value="yes" onclick="_selectCaptions(this)">Yes</button>
+    </div>
 
     <label class="modal-label" for="inputAssetsNotes" style="margin-top:18px">Notes for the content team</label>
     <textarea id="inputAssetsNotes" class="modal-textarea" placeholder="What's the vibe? Hook? Key copy? Brand colors? Anything special the team should know?"></textarea>
