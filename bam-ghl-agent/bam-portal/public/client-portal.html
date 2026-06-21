@@ -14266,8 +14266,14 @@ function _taRenderTest() {
 
 function _taRenderChatLog() {
   const log = document.getElementById('ta-chat'); if (!log) return;
-  if (!_TA.chat.length) { log.innerHTML = `<div style="color:var(--text-mute);font-size:13px;padding:8px 0">No messages yet — say something as the lead.</div>`; return; }
-  log.innerHTML = _TA.chat.map((m, i) => {
+  // Inject the typing-dots animation once.
+  if (!document.getElementById('ta-think-style')) {
+    const st = document.createElement('style'); st.id = 'ta-think-style';
+    st.textContent = '.ta-typing-dot{width:7px;height:7px;border-radius:50%;background:var(--text-mute,#8a8a8a);display:inline-block;animation:taTyping 1.1s infinite ease-in-out}@keyframes taTyping{0%,60%,100%{opacity:.25;transform:translateY(0)}30%{opacity:1;transform:translateY(-3px)}}';
+    document.head.appendChild(st);
+  }
+  if (!_TA.chat.length && !_TA.sending) { log.innerHTML = `<div style="color:var(--text-mute);font-size:13px;padding:8px 0">No messages yet — say something as the lead.</div>`; return; }
+  let html = _TA.chat.map((m, i) => {
     if (m.role === 'parent') {
       return `<div style="align-self:flex-end;max-width:80%;background:var(--gold);color:#0B0B0D;border-radius:14px 14px 4px 14px;padding:9px 13px;font-size:14px">${escapeHTML(m.text)}</div>`;
     }
@@ -14292,6 +14298,17 @@ function _taRenderChatLog() {
       <div id="ta-chat-teach-${i}"></div>
     </div>`;
   }).join('');
+  // "Bot is thinking" indicator while a reply is being generated.
+  if (_TA.sending) {
+    html += `<div style="align-self:flex-start;max-width:88%">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:3px"><span style="font-size:12px;color:var(--text-sub)">🤖 agent</span><span style="font-size:11px;color:var(--text-mute)">thinking…</span></div>
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:14px 14px 14px 4px;padding:13px 15px;display:inline-flex;align-items:center;gap:5px">
+        <span class="ta-typing-dot"></span><span class="ta-typing-dot" style="animation-delay:.18s"></span><span class="ta-typing-dot" style="animation-delay:.36s"></span>
+      </div>
+    </div>`;
+  }
+  log.innerHTML = html;
+  if (log.lastElementChild) log.lastElementChild.scrollIntoView({ block: "nearest" });
 }
 
 // Inline "teach a correction" box under an agent reply.
