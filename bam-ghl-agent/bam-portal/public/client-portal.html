@@ -8838,7 +8838,8 @@ function hapticTap(style) {
 let _ASSETS = [];
 let _ASSET_FILTER = 'all';
 let _ASSET_TARGETS = { offers: [], staff: [], locations: [] };
-const _ASSET_CATS = ['logo','wordmark','hero','photo','crest','icon','og','favicon','other'];
+let _assetUploadNudge = '';   // one-shot message shown when over-limit files were skipped
+const _ASSET_CATS = ['logo','wordmark','hero','photo','video','crest','icon','og','favicon','other'];
 
 function _assetUrl(path) {
   try { return _sb.storage.from('client-assets').getPublicUrl(path).data.publicUrl; } catch (e) { return ''; }
@@ -8898,26 +8899,61 @@ function _renderAssets() {
   };
   const pills = [['all','All'],['brand','Brand'],['offers','Offers'],['staff','Staff'],['locations','Locations']].map(([k, l]) => pill(k, l)).join('');
   const shown = _ASSETS.filter(_assetMatchesFilter);
-  const cards = shown.length
-    ? `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:14px">${shown.map(_assetCard).join('')}</div>`
-    : `<div style="border:1px dashed var(--border-med);border-radius:12px;padding:52px 24px;text-align:center;color:var(--text-mute)">
+  const grid = (list) => `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:14px">${list.map(_assetCard).join('')}</div>`;
+  let cards;
+  if (!shown.length) {
+    cards = `<div style="border:1px dashed var(--border-med);border-radius:12px;padding:52px 24px;text-align:center;color:var(--text-mute)">
          <div style="font-size:14px;color:var(--text-sub)">No assets ${_ASSET_FILTER === 'all' ? 'yet' : 'in this filter'}.</div>
-         <div style="font-size:12.5px;margin-top:6px">Use <b style="color:var(--text-sub)">＋ Upload assets</b> above to add images.</div>
+         <div style="font-size:12.5px;margin-top:6px">Use <b style="color:var(--text-sub)">＋ Upload files</b> or <b style="color:var(--text-sub)">Upload a folder</b> above to add images and videos.</div>
        </div>`;
+  } else {
+    // Single-level folder grouping: ungrouped assets first, then a collapsible
+    // section per uploaded folder.
+    const byFolder = {}; const ungrouped = [];
+    shown.forEach(a => { const f = (a.folder || '').trim(); if (f) (byFolder[f] = byFolder[f] || []).push(a); else ungrouped.push(a); });
+    const folderIcon = `<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;color:var(--gold)"><path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.93a2 2 0 0 1-1.66-.9l-.82-1.2A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/></svg>`;
+    const sections = [];
+    if (ungrouped.length) sections.push(grid(ungrouped));
+    Object.keys(byFolder).sort((a, b) => a.localeCompare(b)).forEach(f => {
+      sections.push(`<details open style="margin-top:16px;border:1px solid var(--border-med);border-radius:10px;padding:10px 14px">
+        <summary style="cursor:pointer;user-select:none;font-weight:700;font-size:13px;color:var(--text);font-family:var(--display)">${folderIcon} ${escapeHTML(f)} <span style="color:var(--text-mute);font-weight:400;font-size:12px">(${byFolder[f].length})</span></summary>
+        <div style="margin-top:12px">${grid(byFolder[f])}</div>
+      </details>`);
+    });
+    cards = sections.join('');
+  }
   host.innerHTML = `
-    <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:18px">
+    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:18px">
       <label style="display:inline-flex;align-items:center;gap:8px;padding:10px 16px;background:var(--gold);color:#0B0B0D;font-weight:700;font-size:13px;border-radius:8px;cursor:pointer">
-        ＋ Upload assets
-        <input type="file" accept="image/*" multiple style="display:none" onchange="_uploadAssets(this)">
+        ＋ Upload files
+        <input type="file" accept="image/*,video/*" multiple style="display:none" onchange="_uploadAssets(this)">
       </label>
-      <span style="font-size:12.5px;color:var(--text-mute);max-width:420px">Drag images in, then tag each to an offer, staff member, or location.</span>
+      <label style="display:inline-flex;align-items:center;gap:8px;padding:10px 16px;background:transparent;color:var(--text);font-weight:600;font-size:13px;border:1px solid var(--border-med);border-radius:8px;cursor:pointer">
+        Upload a folder
+        <input type="file" webkitdirectory directory multiple style="display:none" onchange="_uploadAssets(this, true)">
+      </label>
+      <span style="font-size:12.5px;color:var(--text-mute);max-width:420px">Add images or videos. Upload a folder to keep them grouped, then tag each to an offer, staff member, or location.</span>
+    </div>
+    <div id="asset-link-nudge" style="display:${_assetUploadNudge ? 'block' : 'none'};margin-bottom:12px;padding:10px 14px;border-radius:8px;background:rgba(232,197,71,.08);border:1px solid var(--gold);color:var(--text);font-size:12.5px">${escapeHTML(_assetUploadNudge || '')}</div>
+    <div style="margin-bottom:18px">
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+        <input id="asset-link-input" type="url" placeholder="Paste a share link for large files (Google Drive, Dropbox, WeTransfer…)" onkeydown="if(event.key==='Enter'){event.preventDefault();_addAssetLink();}"
+          style="flex:1;min-width:280px;background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);padding:9px 12px;font:inherit;font-size:13px;outline:none">
+        <button onclick="_addAssetLink()" style="padding:9px 16px;background:transparent;color:var(--text);font-weight:600;font-size:13px;border:1px solid var(--border-med);border-radius:8px;cursor:pointer">Add link</button>
+      </div>
+      <div style="font-size:11.5px;color:var(--text-mute);margin-top:7px;max-width:560px;line-height:1.5">
+        Files over 50&nbsp;MB can't be uploaded here - add them as a link instead.
+        <b style="color:var(--text-sub)">Set the link's sharing to "Anyone with the link can view"</b> before adding it, otherwise your team won't be able to open it.
+      </div>
     </div>
     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:20px">${pills}</div>
     ${cards}`;
+  _assetUploadNudge = '';   // one-shot: clear after it's been rendered
 }
 
 function _assetCard(a) {
-  const url = _assetUrl(a.storage_path);
+  const isLink = !!a.link_url;
+  const url = isLink ? a.link_url : _assetUrl(a.storage_path);
   const selStyle = "width:100%;background:var(--bg);border:1px solid var(--border);border-radius:5px;color:var(--text);padding:6px 8px;font:inherit;font-size:11.5px";
   const lbl = (t) => `<div style="font-size:9.5px;color:var(--text-mute);text-transform:uppercase;letter-spacing:.06em;margin:9px 0 3px">${t}</div>`;
   // Step 1 - Type
@@ -8936,7 +8972,14 @@ function _assetCard(a) {
   return `
     <div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;overflow:hidden;display:flex;flex-direction:column">
       <div style="aspect-ratio:16/10;background:#0a0a0a;display:flex;align-items:center;justify-content:center;overflow:hidden">
-        <img src="${escapeHTML(url)}" alt="${escapeHTML(a.alt || '')}" loading="lazy" style="max-width:100%;max-height:100%;object-fit:contain">
+        ${isLink
+          ? `<a href="${escapeHTML(url)}" target="_blank" rel="noopener" style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;width:100%;height:100%;text-decoration:none;color:var(--text-sub)">
+              <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+              <span style="font-size:11.5px;font-weight:600">Open link ↗</span>
+            </a>`
+          : ((a.mime_type || '').startsWith('video/') || a.category === 'video')
+          ? `<video src="${escapeHTML(url)}#t=0.5" preload="metadata" muted playsinline controls style="max-width:100%;max-height:100%;background:#000"></video>`
+          : `<img src="${escapeHTML(url)}" alt="${escapeHTML(a.alt || '')}" loading="lazy" style="max-width:100%;max-height:100%;object-fit:contain">`}
       </div>
       <div style="padding:11px 12px;display:flex;flex-direction:column">
         <input value="${escapeHTML(a.label || '')}" placeholder="Label" onchange="_assetSetTag('${a.id}','label',this.value)" style="background:transparent;border:none;border-bottom:1px solid transparent;color:var(--text);font:inherit;font-size:13px;font-weight:600;padding:2px 0" onfocus="this.style.borderBottomColor='var(--border)'" onblur="this.style.borderBottomColor='transparent'">
@@ -8976,20 +9019,55 @@ async function _assetSetTag2(id, value) {
 
 function _assetSetFilter(k) { _ASSET_FILTER = k; _renderAssets(); }
 
-async function _uploadAssets(inputEl) {
-  const files = Array.from(inputEl.files || []);
+// Add a large file as a share link (Drive/Dropbox/etc.) instead of uploading it.
+// Reuses _isValidAssetLink from the content flow. Link assets have no storage_path.
+async function _addAssetLink() {
+  const inp = document.getElementById('asset-link-input');
+  const raw = (inp && inp.value || '').trim();
+  if (!raw) { if (inp) inp.focus(); return; }
+  if (!_isValidAssetLink(raw)) {
+    alert("That doesn't look like a valid link. Paste a full URL starting with https:// (Google Drive, Dropbox, WeTransfer, etc.).");
+    return;
+  }
+  if (!_sb || typeof CLIENT_ID === 'undefined') return;
+  try {
+    const host = raw.replace(/^https?:\/\//, '').split(/[\/?#]/)[0] || 'link';
+    const { error } = await _sb.from('client_assets').insert({
+      client_id: CLIENT_ID, label: 'Link - ' + host, category: 'other',
+      link_url: raw, storage_path: null, mime_type: 'text/uri-list',
+    });
+    if (error) throw error;
+    if (inp) inp.value = '';
+    await openAssetsView();
+  } catch (e) { alert("Couldn't add link - " + (e.message || e)); }
+}
+
+async function _uploadAssets(inputEl, fromFolder) {
+  const all = Array.from(inputEl.files || []);
   inputEl.value = '';
-  if (!files.length || !_sb || typeof CLIENT_ID === 'undefined') return;
+  if (!all.length || !_sb || typeof CLIENT_ID === 'undefined') return;
+  // Skip files over the 50MB project Storage limit and nudge them toward a link.
+  const MAX = 50 * 1024 * 1024;
+  const files = all.filter(f => f.size <= MAX);
+  const tooBig = all.filter(f => f.size > MAX);
+  if (tooBig.length) {
+    const names = tooBig.map(f => f.name).join(', ');
+    _assetUploadNudge = `${tooBig.length} file${tooBig.length === 1 ? ' was' : 's were'} over the 50 MB upload limit and skipped (${names}). Add ${tooBig.length === 1 ? 'it' : 'them'} as a link below instead.`;
+  }
   for (const file of files) {
     try {
       const clean = file.name.replace(/[^a-zA-Z0-9._-]+/g, '_');
       const stamp = Date.now() + '-' + Math.random().toString(36).slice(2, 7);
       const path = `${CLIENT_ID}/${stamp}-${clean}`;
+      // Folder = the top directory of a folder upload (webkitRelativePath = "Folder/sub/file.mp4").
+      const rel = (fromFolder && file.webkitRelativePath) ? file.webkitRelativePath : '';
+      const folder = rel.includes('/') ? rel.split('/')[0] : null;
+      const category = (file.type || '').startsWith('video/') ? 'video' : 'photo';
       const { error: upErr } = await _sb.storage.from('client-assets').upload(path, file, { cacheControl: '3600', upsert: false, contentType: file.type || 'application/octet-stream' });
       if (upErr) throw upErr;
       const { error: insErr } = await _sb.from('client_assets').insert({
-        client_id: CLIENT_ID, label: file.name.replace(/\.[^.]+$/, ''), category: 'photo',
-        storage_path: path, mime_type: file.type || null, size_bytes: file.size,
+        client_id: CLIENT_ID, label: file.name.replace(/\.[^.]+$/, ''), category,
+        folder, storage_path: path, mime_type: file.type || null, size_bytes: file.size,
       });
       if (insErr) { await _sb.storage.from('client-assets').remove([path]).catch(() => {}); throw insErr; }
     } catch (e) { alert("Couldn't upload " + file.name + ' - ' + (e.message || e)); }
@@ -9011,7 +9089,7 @@ async function _assetRemove(id) {
   if (!confirm('Remove this asset?')) return;
   const a = _ASSETS.find(x => x.id === id);
   try {
-    if (a) await _sb.storage.from('client-assets').remove([a.storage_path]).catch(() => {});
+    if (a && a.storage_path) await _sb.storage.from('client-assets').remove([a.storage_path]).catch(() => {});
     const { error } = await _sb.from('client_assets').delete().eq('id', id);
     if (error) throw error;
     await openAssetsView();
