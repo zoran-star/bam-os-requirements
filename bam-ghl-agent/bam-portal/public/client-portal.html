@@ -20657,6 +20657,7 @@ function _plOpenCard(oppId) {
     <div class="pl-d-actions">
       <div style="display:flex;gap:8px">
         <button class="pl-d-btn" style="flex:1;border-color:#e07070;color:#e07070" onclick="_plMarkLost('${escapeHTML(o.id)}')">Mark as lost</button>
+        <button class="pl-d-btn" style="flex:1;border-color:#5a96e0;color:#5a96e0" onclick="_plMarkAbandoned('${escapeHTML(o.id)}')">Abandoned</button>
         <button class="pl-d-btn" style="flex:1;border-color:var(--gold,#E8C547);color:var(--gold,#E8C547)" onclick="_plGhost('${escapeHTML(o.id)}')">👻 Ghosted</button>
       </div>
     </div>
@@ -20668,10 +20669,7 @@ function _plOpenCard(oppId) {
     ${rv && rv.notes ? `<div class="pl-d-section"><div class="lbl">Post-trial notes</div><div style="font-size:13px;white-space:pre-wrap">${escapeHTML(rv.notes)}</div></div>` : ''}
     <div class="pl-d-actions">
       ${_plIsDoneTrialStage(s)
-        ? `<div style="display:flex;gap:8px">
-             <button class="pl-d-btn primary" style="flex:1" onclick="_plMarkWon('${escapeHTML(o.id)}')">Mark won</button>
-             <button class="pl-d-btn" style="flex:1;border-color:#5a96e0;color:#5a96e0" onclick="_plMarkAbandoned('${escapeHTML(o.id)}')">Abandon</button>
-           </div>`
+        ? `<button class="pl-d-btn primary" onclick="_plMarkWon('${escapeHTML(o.id)}')">Mark won</button>`
         : (trialStarted ? `<button class="pl-d-btn primary" onclick="_plPostTrialForm('${escapeHTML(o.id)}')">Post trial form</button>` : '')}
       <button class="pl-d-btn" style="border-color:var(--gold,#E8C547);color:var(--gold,#E8C547)" onclick="_plEnrollSpecial('${escapeHTML(o.id)}')">📨 Summer special</button>
       ${o.member
