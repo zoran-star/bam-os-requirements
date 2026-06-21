@@ -1353,6 +1353,11 @@ function ClientInputs({ ticket, tk }) {
       {ctx.source === "add-creative" && row("Source", <span>Add-creative on <b>{ctx.campaign_title || "(unspecified)"}</b></span>)}
       {ctx.source === "marketing-revision" && row("Source", <span style={{ color: tk.red || "#ED7969" }}>↩ Revision requested by marketing</span>)}
 
+      {ctx.format && row("Format", <b style={{ color: tk.accent }}>{ctx.format}</b>)}
+      {ctx.captions !== undefined && row("On-screen captions", ctx.captions
+        ? <span style={{ color: tk.green || "#7BC47F", fontWeight: 600 }}>Yes</span>
+        : <span style={{ color: tk.textMute }}>No</span>)}
+
       {subCreatives ? (
         <div style={{ padding: "10px 0" }}>
           <div style={{ fontSize: 10, color: tk.textMute, letterSpacing: "0.2em", textTransform: "uppercase", marginBottom: 10 }}>
