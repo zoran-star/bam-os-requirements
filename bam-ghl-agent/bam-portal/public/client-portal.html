@@ -6618,9 +6618,10 @@ Then the call to action."]</div>
 
       <!-- ── Organic content view ── -->
       <div id="marketing-organic" style="display:none">
-        <button onclick="_backToChannelSplit()" style="background:none;border:none;color:var(--text-mute);font-size:13px;cursor:pointer;padding:0;margin-bottom:14px">← Back to Ads / Organic</button>
+        <button id="organic-back-btn" onclick="_backToChannelSplit()" style="background:none;border:none;color:var(--text-mute);font-size:13px;cursor:pointer;padding:0;margin-bottom:14px">← Back to Ads / Organic</button>
         <div class="section-label">🌱 Organic content</div>
-        <button class="btn-add-campaign" style="margin-top:10px;margin-bottom:22px" onclick="openOrganicRequestModal()">+ Request a new creative</button>
+        <div id="organic-credit-meter" style="margin:10px 0 4px"></div>
+        <button id="organic-request-btn" class="btn-add-campaign" style="margin-top:10px;margin-bottom:22px" onclick="openOrganicRequestModal()">+ Request a new creative</button>
 
         <div class="section-label">Status of creatives</div>
         <div id="organic-status-list" style="margin-top:8px;margin-bottom:24px"></div>
@@ -10876,7 +10877,7 @@ async function _contactsSaveSetup() {
 let _MSG_RETURN_VIEW = null;
 function switchView(name, el) {
   // Clients without marketing have the Marketing nav greyed + click-blocked
-  if (name === 'marketing' && !MARKETING_INCLUDED) return;
+  if (name === 'marketing' && !MARKETING_INCLUDED && !(typeof ORGANIC_CONTENT !== 'undefined' && ORGANIC_CONTENT)) return;
   // Home is hidden for V2 users (BAM staff keep it) → bounce to their landing tab.
   if (name === 'home' && typeof _homeHiddenForMe === 'function' && _homeHiddenForMe()) { switchView(_landingView()); return; }
   // Per-staff tab permissions: a restricted teammate can't open a hidden tab
@@ -11404,7 +11405,7 @@ async function uploadMyAvatar(evt) {
 }
 
 function mobileSwitchView(name) {
-  if (name === 'marketing' && typeof MARKETING_INCLUDED !== 'undefined' && !MARKETING_INCLUDED) return;
+  if (name === 'marketing' && typeof MARKETING_INCLUDED !== 'undefined' && !MARKETING_INCLUDED && !(typeof ORGANIC_CONTENT !== 'undefined' && ORGANIC_CONTENT)) return;
   // Route through switchView via the matching sidebar item so every
   // existing view-switch side effect still fires.
   const sidebarItem = Array.from(document.querySelectorAll('.sidebar .nav-item'))
@@ -11417,11 +11418,22 @@ function mobileSwitchView(name) {
 // isn't included for this client. Called once after the client row
 // loads. Visual only - the click is blocked in switchView() above.
 function applyMarketingNavState() {
-  const navItems = document.querySelectorAll('.nav-item');
-  navItems.forEach(item => {
+  const hasOrganic = typeof ORGANIC_CONTENT !== 'undefined' && ORGANIC_CONTENT;
+  const hasSurface = MARKETING_INCLUDED || hasOrganic;
+  // Content-only client (organic on, ads off) → relabel the nav "Content".
+  const contentOnly = hasOrganic && !MARKETING_INCLUDED;
+  const label = contentOnly ? 'Content' : 'Marketing';
+  const relabel = (node) => {
+    // Replace the bare text node next to the icon (keeps the icon span intact).
+    for (const ch of node.childNodes) {
+      if (ch.nodeType === 3 && ch.nodeValue.trim()) { ch.nodeValue = ' ' + label + ' '; return; }
+    }
+  };
+  document.querySelectorAll('.nav-item').forEach(item => {
     const onclick = item.getAttribute('onclick') || '';
     if (!onclick.includes("'marketing'")) return;
-    if (MARKETING_INCLUDED) {
+    relabel(item);
+    if (hasSurface) {
       item.style.opacity = '';
       item.style.cursor = '';
       item.title = '';
@@ -11432,9 +11444,13 @@ function applyMarketingNavState() {
     }
   });
 
-  // Mirror the disabled state onto the mobile bottom-nav button
+  // Mirror onto the mobile bottom-nav button (label + disabled state).
   const mNav = document.querySelector('.mobile-nav-item[data-view="marketing"]');
-  if (mNav) mNav.classList.toggle('disabled', !MARKETING_INCLUDED);
+  if (mNav) {
+    mNav.classList.toggle('disabled', !hasSurface);
+    const lbl = mNav.querySelector('.mobile-nav-label');
+    if (lbl) lbl.textContent = label;
+  }
 }
 
 // ── Presence heartbeat ─────────────────────────────────────────────────
@@ -18089,8 +18105,19 @@ function _hideAllMarketingSub() {
     .forEach(id => { const e = document.getElementById(id); if (e) e.style.display = 'none'; });
   const back = document.getElementById('marketing-ads-back'); if (back) back.style.display = 'none';
 }
+function _hasOrganic() { return typeof ORGANIC_CONTENT !== 'undefined' && ORGANIC_CONTENT; }
+function _hasAds() { return typeof MARKETING_INCLUDED === 'undefined' || MARKETING_INCLUDED; }
+function _showOrganicOnly() {
+  _hideAllMarketingSub();
+  const back = document.getElementById('organic-back-btn'); if (back) back.style.display = 'none';
+  const e = document.getElementById('marketing-organic'); if (e) e.style.display = 'block';
+  _fetchAndRenderOrganic();
+}
 function _marketingEnter() {
-  if (typeof ORGANIC_CONTENT !== 'undefined' && ORGANIC_CONTENT) {
+  if (_hasOrganic() && !_hasAds()) {
+    // Content-only client: straight to organic, no Ads | Organic split.
+    _showOrganicOnly();
+  } else if (_hasOrganic()) {
     _showChannelSplit();
   } else {
     _hideAllMarketingSub();
@@ -18112,7 +18139,9 @@ function _chooseChannel(ch) {
   }
 }
 function _backToChannelSplit() {
-  if (typeof ORGANIC_CONTENT !== 'undefined' && ORGANIC_CONTENT) {
+  if (_hasOrganic() && !_hasAds()) {
+    _showOrganicOnly();           // content-only: no Ads | Organic split to return to
+  } else if (_hasOrganic()) {
     _showChannelSplit();
   } else {
     _hideAllMarketingSub();
@@ -18122,11 +18151,13 @@ function _backToChannelSplit() {
 
 // ─────────── Organic content (request → status → bank) ───────────
 let _ORGANIC_TICKETS = [];
+let _ORGANIC_CREDITS = null;   // { video:{used,allowance,left}, graphic:{...} }
 async function _fetchAndRenderOrganic() {
   const statusEl = document.getElementById('organic-status-list');
   const bankEl = document.getElementById('organic-bank');
   if (statusEl) statusEl.innerHTML = '<div style="color:var(--text-mute);font-size:13px;padding:8px 0">Loading…</div>';
   if (bankEl) bankEl.innerHTML = '';
+  _fetchAndRenderOrganicCredits();   // fire alongside; meter renders independently
   try {
     const token = await _mreqAuthToken();
     const res = await fetch('/api/marketing?resource=content-tickets&scope=client&channel=organic&all=1', {
@@ -18138,6 +18169,48 @@ async function _fetchAndRenderOrganic() {
     _renderOrganic();
   } catch (e) {
     if (statusEl) statusEl.innerHTML = `<div style="color:var(--text-mute);font-size:13px;padding:8px 0">Couldn't load - ${escapeHTML(e.message)}</div>`;
+  }
+}
+async function _fetchAndRenderOrganicCredits() {
+  try {
+    const token = await _mreqAuthToken();
+    const res = await fetch('/api/marketing?resource=content-tickets&scope=client&summary=credits', {
+      headers: { 'Authorization': 'Bearer ' + token },
+    });
+    const json = await _safeJson(res);
+    _ORGANIC_CREDITS = (res.ok && json && json.credits) ? json.credits : null;
+  } catch (e) { _ORGANIC_CREDITS = null; }
+  _renderOrganicCredits();
+}
+// A type has capacity if unlimited (allowance null) or it has credits left.
+function _typeHasCapacity(type) {
+  if (!_ORGANIC_CREDITS || !_ORGANIC_CREDITS[type]) return true;   // unknown → don't block (backend still enforces)
+  const c = _ORGANIC_CREDITS[type];
+  return c.allowance == null || (c.left == null ? true : c.left > 0);
+}
+function _renderOrganicCredits() {
+  const el = document.getElementById('organic-credit-meter');
+  if (!el) return;
+  const c = _ORGANIC_CREDITS;
+  if (!c) { el.innerHTML = ''; return; }
+  const pill = (icon, label, d) => {
+    if (!d) return '';
+    if (d.allowance == null) return `<span style="display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;color:var(--text-sub);background:var(--surface-el);border:1px solid var(--line);padding:5px 11px;border-radius:999px">${icon} ${label}: <b style="color:var(--text)">Unlimited</b></span>`;
+    if (d.allowance === 0) return `<span style="display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;color:var(--text-mute);background:var(--surface-el);border:1px solid var(--line);padding:5px 11px;border-radius:999px;opacity:.7">${icon} ${label}: <b>Not included</b></span>`;
+    const out = d.left <= 0;
+    const col = out ? 'var(--red)' : 'var(--text)';
+    return `<span style="display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;color:var(--text-sub);background:var(--surface-el);border:1px solid ${out ? 'var(--red)' : 'var(--line)'};padding:5px 11px;border-radius:999px">${icon} ${label}: <b style="color:${col}">${d.used} / ${d.allowance}</b>${out ? ' · used up' : ''}</span>`;
+  };
+  el.innerHTML = `<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">${pill('🎬', 'Videos', c.video)}${pill('🖼', 'Graphics', c.graphic)}</div>
+    <div style="font-size:11px;color:var(--text-mute);margin-top:6px">Resets the 1st of each month</div>`;
+  // Disable the request button only when NO type has capacity left.
+  const btn = document.getElementById('organic-request-btn');
+  if (btn) {
+    const anyCapacity = _typeHasCapacity('video') || _typeHasCapacity('graphic');
+    btn.disabled = !anyCapacity;
+    btn.style.opacity = anyCapacity ? '' : '0.5';
+    btn.style.cursor = anyCapacity ? '' : 'not-allowed';
+    btn.title = anyCapacity ? '' : "You've used all your creatives this month — resets the 1st";
   }
 }
 function _renderOrganic() {
@@ -18602,7 +18675,12 @@ async function submitInputAssets() {
     }
   } catch (e) {
     hideLoading();
-    alert('Submit failed: ' + e.message);
+    // Monthly credit cap (or any quota message) reads cleanly on its own; refresh
+    // the meter so the client sees they're maxed.
+    if (channel === 'organic') _fetchAndRenderOrganicCredits();
+    const msg = e.message || String(e);
+    if (/month|creative|limit|plan|included|separate request/i.test(msg)) alert(msg);
+    else alert('Submit failed: ' + msg);
   } finally {
     _inputAssetsChannel = 'ads'; // reset for the next opener
   }
