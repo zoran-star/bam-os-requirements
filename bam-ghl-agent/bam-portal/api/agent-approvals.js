@@ -255,7 +255,7 @@ async function runDetect(res, onlyClientId) {
   try {
     clients = onlyClientId
       ? [await loadClient(onlyClientId)].filter(Boolean)
-      : await sb(`clients?select=id,business_name,ghl_location_id,ghl_access_token,ghl_refresh_token,ghl_token_expires_at,ghl_kpi_config&or=(v15_access.eq.true,v2_access.eq.true)`);
+      : await sb(`clients?select=id,business_name,ghl_location_id,ghl_access_token,ghl_refresh_token,ghl_token_expires_at,ghl_kpi_config&v2_access=eq.true`);
   } catch (_) {}
   const out = [];
   for (const client of (Array.isArray(clients) ? clients : [])) {
@@ -271,7 +271,7 @@ async function runDigest(res) {
   const out = [];
   let clients = [];
   try {
-    clients = await sb(`clients?select=id,business_name,ghl_location_id,ghl_access_token,ghl_refresh_token,ghl_token_expires_at,ghl_kpi_config&or=(v15_access.eq.true,v2_access.eq.true)`);
+    clients = await sb(`clients?select=id,business_name,ghl_location_id,ghl_access_token,ghl_refresh_token,ghl_token_expires_at,ghl_kpi_config&v2_access=eq.true`);
   } catch (_) {}
   for (const client of (Array.isArray(clients) ? clients : [])) {
     const cfg = client.ghl_kpi_config || {};

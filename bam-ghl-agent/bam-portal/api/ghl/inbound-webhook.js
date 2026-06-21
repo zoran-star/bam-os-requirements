@@ -169,7 +169,7 @@ async function handler(req, res) {
   // approval), text the academy's configured number. Best-effort — never blocks.
   try {
     const cfg = client.ghl_kpi_config || {};
-    if (modeIsOn(agentMode(client)) && cfg.agent_notify_phone && contactId) {
+    if (client.v2_access && modeIsOn(agentMode(client)) && cfg.agent_notify_phone && contactId) {
       const creds = await pickGhlToken(client);
       if (creds) {
         const rs = await respondedStage(creds.token, creds.locationId);

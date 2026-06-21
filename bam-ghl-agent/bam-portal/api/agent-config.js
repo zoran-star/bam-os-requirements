@@ -44,7 +44,8 @@ async function handler(req, res) {
 
   try {
     if (b.action === "list") {
-      const rows = await sb(`clients?select=id,business_name,ghl_kpi_config&or=(v15_access.eq.true,v2_access.eq.true)&order=business_name.asc`);
+      // Agent feature is V2-only (currently just BAM GTA).
+      const rows = await sb(`clients?select=id,business_name,ghl_kpi_config&v2_access=eq.true&order=business_name.asc`);
       const academies = (Array.isArray(rows) ? rows : []).map(c => ({
         client_id: c.id,
         business_name: c.business_name || "(academy)",
