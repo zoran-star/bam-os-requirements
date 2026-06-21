@@ -6,209 +6,376 @@
   <title>Book Your Free Trial — CH3 Training</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Anton&family=Inter+Tight:wght@400;500;600&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Anton&family=Inter+Tight:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet" />
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
     :root {
-      --bg:       #0a0a0a;
-      --surface:  #141414;
-      --border:   rgba(255,255,255,0.10);
-      --teal:     #00B8C8;
-      --fg:       #ffffff;
-      --fg-sub:   rgba(255,255,255,0.65);
-      --fg-muted: rgba(255,255,255,0.38);
-      --font-display: 'Anton', sans-serif;
-      --font-body:    'Inter Tight', sans-serif;
+      --bg:        #0a0a0a;
+      --surface:   #141414;
+      --surface2:  #1c1c1c;
+      --border:    rgba(255,255,255,0.09);
+      --teal:      #00B8C8;
+      --teal-dim:  rgba(0,184,200,0.10);
+      --teal-glow: rgba(0,184,200,0.18);
+      --fg:        #ffffff;
+      --fg-sub:    rgba(255,255,255,0.62);
+      --fg-muted:  rgba(255,255,255,0.36);
+      --green:     #22c55e;
+      --font-d:    'Anton', sans-serif;
+      --font-b:    'Inter Tight', sans-serif;
+      --r:         10px;
     }
 
     html, body {
       background: var(--bg);
       color: var(--fg);
-      font-family: var(--font-body);
+      font-family: var(--font-b);
       min-height: 100vh;
+      -webkit-font-smoothing: antialiased;
     }
 
-    /* Header */
-    .cal-header {
-      padding: 14px 20px 12px;
-      border-bottom: 1px solid var(--border);
+    /* ── TOPBAR ── */
+    .topbar {
+      position: sticky;
+      top: 0;
+      z-index: 50;
       background: var(--surface);
+      border-bottom: 1px solid var(--border);
       display: flex;
       align-items: center;
       justify-content: space-between;
-      position: sticky;
-      top: 0;
-      z-index: 10;
+      padding: 13px 20px 11px;
     }
-    .cal-brand {
-      font-family: var(--font-display);
+    .topbar__brand {
+      font-family: var(--font-d);
       font-size: 17px;
       letter-spacing: 0.04em;
     }
-    .cal-brand em { color: var(--teal); font-style: normal; }
-    .cal-step {
+    .topbar__brand em { color: var(--teal); font-style: normal; }
+    .topbar__pill {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      background: var(--teal-dim);
+      border: 1px solid rgba(0,184,200,0.22);
+      border-radius: 999px;
+      padding: 4px 10px 4px 8px;
+    }
+    .topbar__pill-dot {
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: var(--green);
+      box-shadow: 0 0 6px var(--green);
+      animation: pulse 2s ease-in-out infinite;
+    }
+    .topbar__pill-text {
       font-size: 11px;
       font-weight: 600;
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
-      color: var(--fg-muted);
-    }
-    .cal-progress {
-      height: 3px;
-      background: var(--surface);
-    }
-    .cal-progress__fill {
-      height: 100%;
-      width: 100%;
-      background: var(--teal);
-    }
-
-    /* Intro section */
-    .cal-intro {
-      padding: 28px 20px 20px;
-      max-width: 600px;
-      margin: 0 auto;
-    }
-    .cal-intro__name {
-      font-size: 12px;
-      font-weight: 600;
-      letter-spacing: 0.10em;
+      letter-spacing: 0.07em;
       text-transform: uppercase;
       color: var(--teal);
-      margin-bottom: 6px;
     }
-    .cal-intro__title {
-      font-family: var(--font-display);
-      font-size: 26px;
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50%       { opacity: 0.4; }
+    }
+
+    /* ── PROGRESS ── */
+    .progress { height: 2px; background: var(--surface2); }
+    .progress__fill { height: 100%; width: 100%; background: var(--teal); }
+
+    /* ── CONFIRM BANNER ── */
+    .confirm-banner {
+      margin: 20px 16px 0;
+      background: rgba(34,197,94,0.08);
+      border: 1px solid rgba(34,197,94,0.22);
+      border-radius: var(--r);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 12px 14px;
+    }
+    .confirm-banner__icon {
+      width: 22px; height: 22px;
+      border-radius: 50%;
+      background: var(--green);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+    .confirm-banner__icon svg { display: block; }
+    .confirm-banner__text {
+      font-size: 13px;
+      color: rgba(255,255,255,0.80);
+      line-height: 1.4;
+    }
+    .confirm-banner__text strong { color: var(--fg); }
+
+    /* ── HERO ── */
+    .hero {
+      padding: 24px 16px 0;
+    }
+    .hero__eyebrow {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--teal);
+      margin-bottom: 8px;
+    }
+    .hero__title {
+      font-family: var(--font-d);
+      font-size: 30px;
       letter-spacing: 0.02em;
       text-transform: uppercase;
-      line-height: 1.15;
+      line-height: 1.1;
       margin-bottom: 10px;
     }
-    .cal-intro__title em { color: var(--teal); font-style: normal; }
-    .cal-intro__sub {
+    .hero__title em { color: var(--teal); font-style: normal; }
+    .hero__sub {
       font-size: 14px;
       color: var(--fg-sub);
       line-height: 1.55;
     }
 
-    /* Group badge */
-    .cal-group-badge {
-      display: inline-flex;
+    /* ── GROUP CARD ── */
+    .group-card {
+      margin: 20px 16px 0;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--r);
+      overflow: hidden;
+    }
+    .group-card__header {
+      display: flex;
       align-items: center;
-      gap: 7px;
-      background: rgba(0,184,200,0.10);
-      border: 1px solid rgba(0,184,200,0.25);
-      border-radius: 6px;
-      padding: 7px 12px;
-      margin: 18px 20px 0;
-      max-width: calc(100% - 40px);
+      justify-content: space-between;
+      padding: 12px 14px 10px;
+      border-bottom: 1px solid var(--border);
     }
-    .cal-group-badge__dot {
-      width: 7px;
-      height: 7px;
-      border-radius: 50%;
-      background: var(--teal);
-      flex-shrink: 0;
-    }
-    .cal-group-badge__text {
+    .group-card__name {
       font-size: 13px;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+    .group-card__badge {
+      font-size: 11px;
       font-weight: 600;
       color: var(--teal);
+      background: var(--teal-dim);
+      border: 1px solid rgba(0,184,200,0.20);
+      border-radius: 999px;
+      padding: 2px 8px;
     }
-    .cal-group-badge__sub {
-      font-size: 12px;
-      color: var(--fg-muted);
-      margin-left: 2px;
+    .group-card__body { padding: 10px 14px 12px; }
+    .sched-row {
+      display: flex;
+      align-items: baseline;
+      gap: 10px;
+      padding: 5px 0;
+      border-bottom: 1px solid var(--border);
+      font-size: 13px;
     }
+    .sched-row:last-child { border-bottom: none; }
+    .sched-row__label {
+      font-weight: 600;
+      color: var(--fg);
+      white-space: nowrap;
+      min-width: 52px;
+    }
+    .sched-row__times { color: var(--fg-sub); }
+    .sched-row--lift .sched-row__label { color: var(--fg-muted); }
+    .sched-row--lift .sched-row__times { color: var(--fg-muted); }
 
-    /* Calendar embed container */
-    .cal-embed-wrap {
-      padding: 20px 0 40px;
-      max-width: 700px;
-      margin: 0 auto;
-    }
-    .cal-embed-wrap iframe {
-      width: 100%;
-      border: none;
-      min-height: 650px;
-      background: var(--bg);
-    }
-
-    /* Reassurance strip */
-    .cal-reassure {
+    /* ── WHAT'S FREE banner ── */
+    .free-banner {
+      margin: 14px 16px 0;
+      padding: 11px 14px;
+      background: var(--teal-glow);
+      border: 1px solid rgba(0,184,200,0.20);
+      border-radius: var(--r);
       display: flex;
       align-items: center;
       gap: 8px;
-      padding: 14px 20px;
-      border-top: 1px solid var(--border);
+      font-size: 13px;
+      color: var(--fg-sub);
+    }
+    .free-banner strong { color: var(--teal); }
+
+    /* ── CALENDAR SECTION ── */
+    .cal-section {
+      margin: 24px 16px 0;
+    }
+    .cal-section__label {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.10em;
+      text-transform: uppercase;
+      color: var(--fg-muted);
+      margin-bottom: 10px;
+    }
+    .cal-frame-wrap {
+      border-radius: var(--r);
+      overflow: hidden;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      position: relative;
+    }
+    .cal-frame-wrap::before {
+      content: 'Loading calendar…';
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 13px;
+      color: var(--fg-muted);
+      z-index: 0;
+    }
+    .cal-frame-wrap iframe {
+      position: relative;
+      z-index: 1;
+      width: 100%;
+      border: none;
+      min-height: 680px;
+      display: block;
+      background: transparent;
+    }
+
+    /* ── FOOTER NOTE ── */
+    .footer-note {
+      margin: 16px 16px 40px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
       font-size: 12px;
       color: var(--fg-muted);
     }
-    .cal-reassure svg { flex-shrink: 0; }
+    .footer-note svg { flex-shrink: 0; }
+
+    /* ── DESKTOP ── */
+    @media (min-width: 680px) {
+      .confirm-banner,
+      .hero,
+      .group-card,
+      .free-banner,
+      .cal-section,
+      .footer-note {
+        max-width: 640px;
+        margin-left: auto;
+        margin-right: auto;
+      }
+      .confirm-banner { margin-top: 28px; }
+      .hero { padding: 28px 0 0; }
+    }
   </style>
 </head>
 <body>
 
-  <header class="cal-header">
-    <div class="cal-brand">CH3 <em>TRAINING</em></div>
-    <div class="cal-step">Step 3 of 3 &middot; Pick a time</div>
+  <!-- Topbar -->
+  <header class="topbar">
+    <div class="topbar__brand">CH3 <em>TRAINING</em></div>
+    <div class="topbar__pill">
+      <div class="topbar__pill-dot"></div>
+      <span class="topbar__pill-text">Free Trial</span>
+    </div>
   </header>
-  <div class="cal-progress"><div class="cal-progress__fill"></div></div>
+  <div class="progress"><div class="progress__fill"></div></div>
 
-  <div id="group-badge" class="cal-group-badge" style="display:none">
-    <div class="cal-group-badge__dot"></div>
-    <span class="cal-group-badge__text" id="group-label"></span>
-    <span class="cal-group-badge__sub" id="group-times"></span>
+  <!-- Confirm banner -->
+  <div class="confirm-banner">
+    <div class="confirm-banner__icon">
+      <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+        <path d="M2 6l3 3 5-5" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </div>
+    <div class="confirm-banner__text">
+      <strong id="confirm-name">You're in.</strong>
+      <span id="confirm-sub"> Pick a time below — your spot is free until you book.</span>
+    </div>
   </div>
 
-  <div class="cal-intro">
-    <div class="cal-intro__name" id="name-greeting"></div>
-    <h1 class="cal-intro__title">Book your <em>free</em> session.</h1>
-    <p class="cal-intro__sub">
-      Pick any open slot below. First session is 100% free — no payment required.
-      Coach Haynes will confirm via text before your session.
-    </p>
+  <!-- Hero -->
+  <div class="hero">
+    <div class="hero__eyebrow" id="hero-eyebrow">Your group</div>
+    <h1 class="hero__title">Pick your <em>session.</em></h1>
+    <p class="hero__sub">Choose any open slot. Coach Haynes confirms by text before your first session.</p>
   </div>
 
-  <div class="cal-embed-wrap">
-    <!-- GHL calendar embed — swap the src with your actual calendar URL -->
-    <iframe
-      id="cal-frame"
-      src=""
-      title="Book a free trial session"
-      allow="payment"
-      loading="lazy"
-    ></iframe>
+  <!-- Group schedule card -->
+  <div class="group-card" id="group-card">
+    <div class="group-card__header">
+      <span class="group-card__name" id="card-group-name"></span>
+      <span class="group-card__badge" id="card-group-ages"></span>
+    </div>
+    <div class="group-card__body" id="card-sched"></div>
   </div>
 
-  <div class="cal-reassure">
+  <!-- Free trial note -->
+  <div class="free-banner">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <circle cx="12" cy="12" r="10"/>
+      <path d="M12 8v4M12 16h.01"/>
+    </svg>
+    <span><strong>First session is free.</strong> No payment, no contract. Just show up.</span>
+  </div>
+
+  <!-- Calendar -->
+  <div class="cal-section">
+    <div class="cal-section__label">Available times</div>
+    <div class="cal-frame-wrap">
+      <iframe
+        id="cal-frame"
+        src=""
+        title="Book your free trial session"
+        loading="lazy"
+        allow="payment"
+      ></iframe>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <div class="footer-note">
     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-      <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+      <rect x="3" y="11" width="18" height="11" rx="2"/>
       <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
     </svg>
-    No payment info needed — this is just to reserve your free trial spot.
+    No payment info needed to book your free trial.
   </div>
 
   <script>
-    // ─── Calendar IDs — replace these with your actual GHL calendar embed URLs ───
-    // Youth calendar (Grades 5–8)
-    var YOUTH_CALENDAR_URL = 'https://api.leadconnectorhq.com/widget/booking/YOUTH_CALENDAR_ID_HERE';
-    // HS / College calendar (Grades 9–12 + College)
-    var HS_CALENDAR_URL    = 'https://api.leadconnectorhq.com/widget/booking/HS_CALENDAR_ID_HERE';
-    // ─────────────────────────────────────────────────────────────────────────────
-
-    var GROUP_META = {
+    var CALENDARS = {
       youth: {
-        label: 'Youth Group',
-        times: 'Mon 6–7 PM · Fri 5:45–6:45 PM · Sun 5–6 PM',
-        url: YOUTH_CALENDAR_URL,
+        id:    'sfnJdd2WAk2lHVTymTOh',
+        url:   'https://api.leadconnectorhq.com/widget/booking/sfnJdd2WAk2lHVTymTOh',
+        name:  'Youth Group',
+        ages:  'Grades 5–8',
+        times: [
+          { day: 'Mon',      t: '6:00 – 7:00 PM' },
+          { day: 'Fri',      t: '5:45 – 6:45 PM' },
+          { day: 'Sun',      t: '5:00 – 6:00 PM' },
+        ],
+        lift: [
+          { day: 'Mon & Wed', t: '4:30 – 5:30 PM' },
+          { day: 'Tue & Thu', t: '5:00 – 6:00 PM' },
+        ],
       },
       hs: {
-        label: 'HS / College Group',
-        times: 'Mon & Wed 7–8 PM · Tue & Thu 6:30–7:30 PM',
-        url: HS_CALENDAR_URL,
+        id:    'f6d7oYjVJRiGr9JPqkow',
+        url:   'https://api.leadconnectorhq.com/widget/booking/f6d7oYjVJRiGr9JPqkow',
+        name:  'HS / College Group',
+        ages:  'Grades 9–12 & College',
+        times: [
+          { day: 'Mon & Wed', t: '7:00 – 8:00 PM' },
+          { day: 'Tue & Thu', t: '6:30 – 7:30 PM' },
+        ],
+        lift: [
+          { day: 'Mon & Wed', t: '4:30 – 5:30 PM' },
+          { day: 'Tue & Thu', t: '5:00 – 6:00 PM' },
+        ],
       },
     };
 
@@ -216,22 +383,33 @@
       var params = new URLSearchParams(window.location.search);
       var group  = (params.get('group') || 'hs').toLowerCase();
       var name   = params.get('name') || '';
+      var cal    = CALENDARS[group] || CALENDARS.hs;
 
-      var meta = GROUP_META[group] || GROUP_META.hs;
-
-      // Name greeting
+      // Confirm banner
       if (name) {
-        var el = document.getElementById('name-greeting');
-        el.textContent = "You're in, " + name + ".";
+        document.getElementById('confirm-name').textContent = "You're in, " + name + ".";
       }
 
-      // Group badge
-      document.getElementById('group-label').textContent = meta.label;
-      document.getElementById('group-times').textContent = '· ' + meta.times;
-      document.getElementById('group-badge').style.display = 'inline-flex';
+      // Hero eyebrow
+      document.getElementById('hero-eyebrow').textContent = cal.name;
 
-      // Calendar iframe
-      document.getElementById('cal-frame').src = meta.url;
+      // Group card
+      document.getElementById('card-group-name').textContent = cal.name;
+      document.getElementById('card-group-ages').textContent = cal.ages;
+
+      var schedHtml = '';
+      cal.times.forEach(function (row) {
+        schedHtml += '<div class="sched-row"><span class="sched-row__label">' + row.day + '</span><span class="sched-row__times">' + row.t + '</span></div>';
+      });
+      schedHtml += '<div style="height:6px"></div>';
+      schedHtml += '<div class="sched-row" style="margin-top:4px"><span class="sched-row__label" style="color:var(--fg-muted);font-size:11px;font-weight:600;letter-spacing:0.06em;text-transform:uppercase">Lift</span><span class="sched-row__times" style="font-size:12px;color:var(--fg-muted)">Included with all groups</span></div>';
+      cal.lift.forEach(function (row) {
+        schedHtml += '<div class="sched-row sched-row--lift"><span class="sched-row__label">' + row.day + '</span><span class="sched-row__times">' + row.t + '</span></div>';
+      });
+      document.getElementById('card-sched').innerHTML = schedHtml;
+
+      // Calendar embed
+      document.getElementById('cal-frame').src = cal.url;
     })();
   </script>
 </body>
