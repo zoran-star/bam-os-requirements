@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from "react";
+import JSZip from "jszip";
 import { supabase } from "../lib/supabase";
 
 const STORAGE_BUCKET = "ticket-files";
@@ -1495,36 +1496,128 @@ function BrandCard({ brand, tk }) {
 
 // Render a set of files grouped by their `folder` (the client's categories).
 // Falls back to a flat grid when nothing is foldered.
-function FilesByFolder({ files, tk, compact, minmax = 180 }) {
+// Fetch the given files and download them as a single .zip (one click instead of
+// N). Files that fail to fetch are skipped. Names are de-duped inside the zip.
+async function ctkDownloadZip(files, baseName) {
+  const zip = new JSZip();
+  const used = new Set();
+  await Promise.all(files.map(async (f) => {
+    try {
+      const res = await fetch(f.url);
+      if (!res.ok) return;
+      const blob = await res.blob();
+      const safe = (f.name || "file").replace(/[\\/]/g, "_");
+      let name = safe, n = 1;
+      while (used.has(name)) {
+        const dot = safe.lastIndexOf(".");
+        name = dot > 0 ? `${safe.slice(0, dot)}-${n}${safe.slice(dot)}` : `${safe}-${n}`;
+        n++;
+      }
+      used.add(name);
+      zip.file(name, blob);
+    } catch (_) { /* skip files that can't be fetched */ }
+  }));
+  const out = await zip.generateAsync({ type: "blob" });
+  const url = URL.createObjectURL(out);
+  const a = document.createElement("a");
+  a.href = url; a.download = `${baseName || "files"}.zip`;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 5000);
+}
+
+function FilesByFolder({ files, tk, compact, minmax = 180, zipName = "creatives" }) {
   const list = Array.isArray(files) ? files : [];
+  const keyOf = (f) => f.url || f.name || "";
+  const isDl = (f) => !!f.url && (f.mime || "") !== "text/uri-list";   // skip drive-link entries
+  const dlList = list.filter(isDl);
+  const [selected, setSelected] = useState(() => new Set());
+  const [zipping, setZipping] = useState(false);
   if (!list.length) return null;
+
+  const toggle = (f) => setSelected(s => {
+    const n = new Set(s); const k = keyOf(f); n.has(k) ? n.delete(k) : n.add(k); return n;
+  });
+  const selCount = dlList.filter(f => selected.has(keyOf(f))).length;
+  const allSelected = dlList.length > 0 && selCount === dlList.length;
+  const selectAll = () => setSelected(allSelected ? new Set() : new Set(dlList.map(keyOf)));
+  const download = async (which) => {
+    const picked = which === "all" ? dlList : dlList.filter(f => selected.has(keyOf(f)));
+    if (!picked.length) return;
+    setZipping(true);
+    try { await ctkDownloadZip(picked, zipName); }
+    catch (e) { alert("Download failed: " + (e.message || e)); }
+    finally { setZipping(false); }
+  };
+
+  const btn = (accent) => ({
+    padding: "6px 12px", fontSize: 12, fontWeight: 600, borderRadius: 6, fontFamily: "inherit",
+    cursor: zipping ? "wait" : "pointer",
+    border: `1px solid ${accent ? tk.accent : tk.border}`,
+    background: accent ? tk.accent : "transparent",
+    color: accent ? "#0A0A0B" : tk.textSub,
+  });
+
   const groups = {};
   list.forEach(f => { const k = (f.folder || "").trim(); (groups[k] = groups[k] || []).push(f); });
   const names = Object.keys(groups).sort((a, b) => (a === "" ? 1 : b === "" ? -1 : a.localeCompare(b)));
+
+  const tile = (f, i) => (
+    <div key={i} style={{ position: "relative" }}>
+      {isDl(f) && (
+        <label onClick={e => e.stopPropagation()} style={{
+          position: "absolute", top: 7, left: 7, zIndex: 3,
+          width: 22, height: 22, display: "flex", alignItems: "center", justifyContent: "center",
+          background: "rgba(0,0,0,0.55)", borderRadius: 5, cursor: "pointer",
+        }}>
+          <input type="checkbox" checked={selected.has(keyOf(f))} onChange={() => toggle(f)}
+            style={{ width: 15, height: 15, accentColor: tk.accent, cursor: "pointer", margin: 0 }} />
+        </label>
+      )}
+      <FilePreviewTile file={f} tk={tk} compact={compact} />
+    </div>
+  );
   const grid = (items) => (
     <div style={{ display: "grid", gridTemplateColumns: `repeat(auto-fill, minmax(${minmax}px, 1fr))`, gap: 10 }}>
-      {items.map((f, i) => <FilePreviewTile key={i} file={f} tk={tk} compact={compact} />)}
+      {items.map(tile)}
     </div>
   );
-  if (names.length === 1 && names[0] === "") return grid(groups[""]);
-  return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-      {names.map(name => (
-        <details key={name || "_uncat"} style={{
-          border: `1px solid ${tk.borderSoft || tk.border}`, borderRadius: 8, padding: "8px 10px",
-        }}>
-          <summary style={{
-            cursor: "pointer", userSelect: "none",
-            fontFamily: "monospace", fontSize: 11, letterSpacing: "0.1em", textTransform: "uppercase",
-            color: name ? tk.accent : tk.textMute,
+
+  const toolbar = dlList.length > 1 ? (
+    <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", marginBottom: 12 }}>
+      <button type="button" onClick={selectAll} style={btn(false)}>{allSelected ? "Clear" : "Select all"}</button>
+      {selCount > 0 && (
+        <button type="button" onClick={() => download("selected")} disabled={zipping} style={btn(true)}>
+          {zipping ? "Zipping…" : `↓ Download ${selCount} selected`}
+        </button>
+      )}
+      <button type="button" onClick={() => download("all")} disabled={zipping} style={btn(false)}>
+        {zipping ? "Zipping…" : `↓ Download all (${dlList.length})`}
+      </button>
+    </div>
+  ) : null;
+
+  const body = (names.length === 1 && names[0] === "")
+    ? grid(groups[""])
+    : (
+      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+        {names.map(name => (
+          <details key={name || "_uncat"} style={{
+            border: `1px solid ${tk.borderSoft || tk.border}`, borderRadius: 8, padding: "8px 10px",
           }}>
-            {name ? `📁 ${name}` : "Uncategorized"} <span style={{ color: tk.textMute }}>({groups[name].length})</span>
-          </summary>
-          <div style={{ marginTop: 10 }}>{grid(groups[name])}</div>
-        </details>
-      ))}
-    </div>
-  );
+            <summary style={{
+              cursor: "pointer", userSelect: "none",
+              fontFamily: "monospace", fontSize: 11, letterSpacing: "0.1em", textTransform: "uppercase",
+              color: name ? tk.accent : tk.textMute,
+            }}>
+              {name ? `📁 ${name}` : "Uncategorized"} <span style={{ color: tk.textMute }}>({groups[name].length})</span>
+            </summary>
+            <div style={{ marginTop: 10 }}>{grid(groups[name])}</div>
+          </details>
+        ))}
+      </div>
+    );
+
+  return <div>{toolbar}{body}</div>;
 }
 
 // Resize a Supabase public-storage image to a small thumbnail on the fly (Supabase
