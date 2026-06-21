@@ -2276,9 +2276,9 @@ async function handler(req, res) {
           patch.organic_content = v;
         }
 
-        // Per-type monthly organic credits. null/"" = unlimited; otherwise a
-        // non-negative integer (0 = none allowed, e.g. a graphics-only client).
-        for (const f of ["organic_video_credits_per_month", "organic_graphic_credits_per_month"]) {
+        // Monthly organic credits: total = combined pool; video/graphic = optional
+        // hard caps. null/"" = unlimited; otherwise a non-negative integer (0 = none).
+        for (const f of ["organic_total_credits_per_month", "organic_video_credits_per_month", "organic_graphic_credits_per_month"]) {
           if (wasSet(f)) {
             const raw = body[f];
             if (raw === null || raw === "") {
