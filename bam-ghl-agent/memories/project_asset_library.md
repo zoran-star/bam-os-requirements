@@ -28,11 +28,14 @@ A client reported the Assets picker wouldn't let them select videos — the file
 - The secondary per-offer/staff/location "asset bank" picker (`_assetBankUpload`) stays
   **image-only** on purpose (headshots/logos).
 
-**Large-file link fallback (50MB Storage limit).** The project-wide Storage upload limit is
-**50MB** (confirmed 2026-06-21), so a single phone video can't upload. Migration `20260621140000`
-also adds **`client_assets.link_url`** + drops the `storage_path` NOT NULL constraint:
-- `_uploadAssets` pre-checks `file.size`; files > 50MB are skipped + a one-shot `_assetUploadNudge`
-  points them to the link field.
+**Large-file link fallback.** Project-wide Storage upload limit was 50MB, **raised to 500MB
+2026-06-21**. Migration `20260621140000` also adds **`client_assets.link_url`** + drops the
+`storage_path` NOT NULL constraint:
+- `_uploadAssets` pre-checks `file.size` against **`MAX_DIRECT_UPLOAD_BYTES`** (= 500MB, the
+  SAME constant the content/creative flow uses — single source of truth; the message follows it).
+  Over-limit files are skipped + a one-shot `_assetUploadNudge` points them to the link field.
+- ⚠️ If the Supabase project Storage limit changes again, update `MAX_DIRECT_UPLOAD_BYTES` in
+  `client-portal.html` to match (both Assets + the content flow read it).
 - Toolbar has a "Paste a share link" input + `_addAssetLink()` (reuses `_isValidAssetLink`),
   with a note to set sharing to **"Anyone with the link can view."** Link assets have
   `link_url` set, `storage_path` null; `_assetCard` renders an "Open link" tile; `_assetRemove`

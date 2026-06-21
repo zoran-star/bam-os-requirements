@@ -8942,7 +8942,7 @@ function _renderAssets() {
         <button onclick="_addAssetLink()" style="padding:9px 16px;background:transparent;color:var(--text);font-weight:600;font-size:13px;border:1px solid var(--border-med);border-radius:8px;cursor:pointer">Add link</button>
       </div>
       <div style="font-size:11.5px;color:var(--text-mute);margin-top:7px;max-width:560px;line-height:1.5">
-        Files over 50&nbsp;MB can't be uploaded here - add them as a link instead.
+        Files over ${Math.round(MAX_DIRECT_UPLOAD_BYTES / 1024 / 1024)}&nbsp;MB can't be uploaded here - add them as a link instead.
         <b style="color:var(--text-sub)">Set the link's sharing to "Anyone with the link can view"</b> before adding it, otherwise your team won't be able to open it.
       </div>
     </div>
@@ -9046,13 +9046,15 @@ async function _uploadAssets(inputEl, fromFolder) {
   const all = Array.from(inputEl.files || []);
   inputEl.value = '';
   if (!all.length || !_sb || typeof CLIENT_ID === 'undefined') return;
-  // Skip files over the 50MB project Storage limit and nudge them toward a link.
-  const MAX = 50 * 1024 * 1024;
+  // Skip files over the project Storage limit and nudge them toward a link.
+  // Shares MAX_DIRECT_UPLOAD_BYTES with the content flow so the limit lives in one place.
+  const MAX = MAX_DIRECT_UPLOAD_BYTES;
+  const MB = Math.round(MAX / 1024 / 1024);
   const files = all.filter(f => f.size <= MAX);
   const tooBig = all.filter(f => f.size > MAX);
   if (tooBig.length) {
     const names = tooBig.map(f => f.name).join(', ');
-    _assetUploadNudge = `${tooBig.length} file${tooBig.length === 1 ? ' was' : 's were'} over the 50 MB upload limit and skipped (${names}). Add ${tooBig.length === 1 ? 'it' : 'them'} as a link below instead.`;
+    _assetUploadNudge = `${tooBig.length} file${tooBig.length === 1 ? ' was' : 's were'} over the ${MB} MB upload limit and skipped (${names}). Add ${tooBig.length === 1 ? 'it' : 'them'} as a link below instead.`;
   }
   for (const file of files) {
     try {
