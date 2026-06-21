@@ -75,15 +75,35 @@ async function resolveUser(req) {
   }
   const staffRow = Array.isArray(staffRows) && staffRows[0] ? staffRows[0] : null;
 
-  // Always also resolve client (a user can be both)
-  const clientRows = await sb(`clients?auth_user_id=eq.${user.id}&select=id,business_name`);
-  const clientRow = Array.isArray(clientRows) && clientRows[0] ? clientRows[0] : null;
+  // Resolve the EFFECTIVE client for this request. A user reaches a client two
+  // ways: as the academy's original owner (clients.auth_user_id) OR as an invited
+  // teammate via client_users (the multi-user model). The client portal passes
+  // ?client_id for the academy it's currently showing - honor it as long as the
+  // caller actually belongs to that client (owner row or active membership).
+  // Falls back to the owner row, then a sole membership. Single-owner clients keep
+  // working unchanged; teammates can now use the Marketing/Content tabs.
+  const ownerRows = await sb(`clients?auth_user_id=eq.${user.id}&select=id,business_name`);
+  const ownerRow = Array.isArray(ownerRows) && ownerRows[0] ? ownerRows[0] : null;
 
-  // Multi-academy members: a user linked to many academies via client_users
-  // (no single clients.auth_user_id) can still scope to any academy they belong
-  // to by passing ?client_id (honored below).
   const memberships = await sb(`client_users?user_id=eq.${user.id}&status=eq.active&select=client_id`);
   const clientIds = Array.isArray(memberships) ? memberships.map(m => String(m.client_id)) : [];
+
+  const ownerId = ownerRow ? String(ownerRow.id) : null;
+  const belongsTo = (id) => !!id && (id === ownerId || clientIds.includes(id));
+  const requested = req.query && req.query.client_id ? String(req.query.client_id) : null;
+
+  let targetId = null;
+  if (requested && belongsTo(requested)) targetId = requested;   // validated - no IDOR
+  else if (ownerId) targetId = ownerId;
+  else if (clientIds.length === 1) targetId = clientIds[0];
+
+  let clientRow = null;
+  if (targetId && targetId === ownerId) {
+    clientRow = ownerRow;
+  } else if (targetId) {
+    const rows = await sb(`clients?id=eq.${targetId}&select=id,business_name`);
+    clientRow = Array.isArray(rows) && rows[0] ? rows[0] : null;
+  }
 
   return { user, staff: staffRow, client: clientRow, clientIds };
 }
