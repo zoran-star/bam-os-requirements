@@ -59,6 +59,22 @@ function CtkPriorityChip({ priority, tk }) {
   );
 }
 
+// Which pipeline a content ticket belongs to: ads (digital marketing) vs organic.
+const CT_CHANNEL_META = {
+  organic: { label: "Organic", color: "#7BC47F" },
+  ads:     { label: "Ads",     color: "#7E9CD9" },
+};
+function CtkChannelBadge({ channel }) {
+  const meta = CT_CHANNEL_META[channel] || CT_CHANNEL_META.ads;
+  return (
+    <span style={{
+      fontSize: 10, fontWeight: 700, letterSpacing: "0.04em",
+      padding: "2px 7px", borderRadius: 999, whiteSpace: "nowrap",
+      color: meta.color, border: `1px solid ${meta.color}66`, background: `${meta.color}1A`,
+    }}>{meta.label}</span>
+  );
+}
+
 export default function ContentView({ tokens: tk, dark, me, session }) {
   const [mainTab, setMainTab]     = useState("tickets"); // tickets | guides
   const [guides, setGuides]       = useState([]);
@@ -870,6 +886,7 @@ function ContentTicketsTab({ tk, session, me }) {
                   background: "rgba(255,255,255,0.04)", border: `1px solid ${tk.border}`,
                 }}>{ctkCode(t.id)}</span>
                 <span>{academyName}</span>
+                <CtkChannelBadge channel={t.channel} />
                 <CtkPriorityChip priority={pri} tk={tk} />
               </div>
               <div style={{ color: tk.textSub, fontSize: 13, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{previewNotes}</div>
@@ -1055,6 +1072,7 @@ function ContentTicketDetail({ tk, session, ticket, onBack, onRefetch, patchTick
           </div>
           {/* Priority + SLA deadline, content owner (channel-routed), and SM contact */}
           <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 8, alignItems: "center" }}>
+            <CtkChannelBadge channel={ticket.channel} />
             <CtkPriorityChip priority={ctkPriorityOf(ticket)} tk={tk} />
             {(() => {
               const inProg = ticket.status === "active" || ticket.status === "client-dependent";
