@@ -10652,6 +10652,7 @@ async function _contactsOpenDrawer(idx) {
   const body = document.getElementById('contacts-drawer-body');
   if (body) body.innerHTML = _cdBody();
   _contactsLoadStripe(c);
+  _cdLoadMemory(c);
 }
 function _cdBody() {
   const g = _CDRAWER.ghl || {};
@@ -10672,9 +10673,73 @@ function _cdBody() {
     : '';
   return `${ghlHtml}
     ${callBtn}
+    ${sect('🧠 Agent memory')}
+    <div id="cd-memory"><div class="req-empty" style="padding:8px 0"><span class="req-spin"></span> Loading…</div></div>
     ${sect('Billing (Stripe)')}
     <div id="cd-stripe"><div class="req-empty" style="padding:8px 0"><span class="req-spin"></span> Checking Stripe…</div></div>
     ${_cdComposer()}`;
+}
+
+// Agent memory: what the bot knows about this contact - post-trial facts +
+// freeform team notes. Notes here get injected into the agent's prompt.
+async function _cdLoadMemory(c) {
+  const host = () => document.getElementById('cd-memory');
+  const contactId = c.ghl_contact_id || (_CDRAWER.ghl && _CDRAWER.ghl.id);
+  if (!contactId) { const el = host(); if (el) el.innerHTML = `<div style="font-size:12px;color:var(--text-mute)">No GHL contact id - can't track memory.</div>`; return; }
+  _CDRAWER._memContact = contactId;
+  try {
+    const token = await _mreqAuthToken();
+    const r = await fetch('/api/agent-contact-notes', { method: 'POST', headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'get', client_id: CLIENT_ID, contact_id: contactId }) });
+    const j = await _safeJson(r);
+    if (!r.ok) throw new Error(j.error || ('HTTP ' + r.status));
+    const el = host(); if (el) el.innerHTML = _cdMemoryHtml(j);
+  } catch (e) {
+    const el = host(); if (el) el.innerHTML = `<div style="font-size:12px;color:var(--text-mute)">Memory unavailable - ${escapeHTML(e.message || String(e))}</div>`;
+  }
+}
+function _cdMemoryHtml(j) {
+  const pt = j.post_trial;
+  let facts = '';
+  if (pt) {
+    const bits = [];
+    if (pt.showed_up === false) bits.push('🚫 Booked a trial but did <b>not</b> show');
+    else if (pt.showed_up === true || pt.good_fit != null || pt.trainer || pt.notes) bits.push('✅ <b>Attended</b> a free trial');
+    if (pt.good_fit === true) bits.push('👍 coach: good fit');
+    else if (pt.good_fit === false) bits.push('👎 coach: maybe not a fit');
+    if (pt.trainer) bits.push('trainer: ' + escapeHTML(pt.trainer));
+    if (bits.length) facts += `<div style="font-size:12.5px;color:var(--text-sub);line-height:1.6">${bits.join(' · ')}</div>`;
+    if (pt.notes) facts += `<div style="font-size:12.5px;color:var(--text);margin-top:4px;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 10px">📋 ${escapeHTML(pt.notes)}</div>`;
+  }
+  const notes = (j.notes || []).map(n => `
+    <div style="display:flex;justify-content:space-between;gap:8px;align-items:flex-start;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 10px;margin-bottom:6px">
+      <div><div style="font-size:13px;color:var(--text);line-height:1.45">${escapeHTML(n.note)}</div><div style="font-size:10.5px;color:var(--text-mute);margin-top:3px;font-family:'JetBrains Mono',monospace">${escapeHTML(n.created_by || '')} · ${escapeHTML(_ibFormatDate(n.created_at))}</div></div>
+      <button onclick="_cdRemoveNote('${n.id}')" title="Remove" style="background:none;border:none;color:var(--text-mute);font-size:13px;cursor:pointer">✕</button>
+    </div>`).join('');
+  return `${facts || ''}
+    <div style="font-size:11px;color:var(--text-mute);margin:${facts ? '12' : '2'}px 0 6px">Team notes <span style="color:var(--text-mute)">(the agent reads these)</span></div>
+    ${notes || `<div style="font-size:12px;color:var(--text-mute);margin-bottom:6px">No notes yet.</div>`}
+    <div style="display:flex;gap:8px;align-items:flex-end;margin-top:4px">
+      <textarea id="cd-note-input" rows="2" placeholder="e.g. Mom is price-sensitive - lead with the 1x/week option" style="flex:1;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 10px;color:var(--text);font-size:13px;resize:vertical;font-family:inherit"></textarea>
+      <button onclick="_cdAddNote()" style="background:var(--gold);color:#0B0B0D;border:none;border-radius:8px;padding:8px 14px;font-weight:700;font-size:13px;cursor:pointer">Add</button>
+    </div>`;
+}
+async function _cdAddNote() {
+  const ta = document.getElementById('cd-note-input'); if (!ta) return;
+  const note = ta.value.trim(); if (!note) return;
+  const contactId = _CDRAWER._memContact; if (!contactId) return;
+  try {
+    const token = await _mreqAuthToken();
+    const r = await fetch('/api/agent-contact-notes', { method: 'POST', headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'add', client_id: CLIENT_ID, contact_id: contactId, note }) });
+    const j = await _safeJson(r); if (!r.ok) throw new Error(j.error || ('HTTP ' + r.status));
+    _cdLoadMemory({ ghl_contact_id: contactId });
+  } catch (e) { alert(e.message || String(e)); }
+}
+async function _cdRemoveNote(id) {
+  try {
+    const token = await _mreqAuthToken();
+    await fetch('/api/agent-contact-notes', { method: 'POST', headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'remove', id }) });
+    _cdLoadMemory({ ghl_contact_id: _CDRAWER._memContact });
+  } catch (e) { alert(e.message || String(e)); }
 }
 async function _contactsLoadStripe(c) {
   const host = () => document.getElementById('cd-stripe');

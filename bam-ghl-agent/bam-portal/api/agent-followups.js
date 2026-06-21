@@ -21,6 +21,7 @@ import { withSentryApiRoute } from "./_sentry.js";
 
 import { pickGhlToken, ghl } from "./ghl/_core.js";
 import { assemblePrompt } from "./agent/prompt-structure.js";
+import { loadContactMemory } from "./agent/contact-memory.js";
 import { buildAgentSystem } from "./agent/brain.js";
 import { agentMode, modeIsOn, modeSelfDrives, SELF_DRIVE_MIN_CONFIDENCE } from "./agent/_mode.js";
 
@@ -179,8 +180,10 @@ async function detectForClient(client) {
     const quietHrs = Math.round(hoursSince(c.lastMessageDate || c.dateUpdated));
 
     let decision;
-    try { decision = await runScheduleAgent(buildFollowupSystem(cfgBrain, quietHrs), transcript); }
-    catch (_) { skipped++; continue; }
+    try {
+      const sys = buildFollowupSystem(cfgBrain, quietHrs) + await loadContactMemory(sb, client.id, contactId);
+      decision = await runScheduleAgent(sys, transcript);
+    } catch (_) { skipped++; continue; }
 
     if (!decision.should_followup || !decision.message || !String(decision.message).trim()) { stopped++; continue; }
     const sendInH = clamp(Number(decision.send_in_hours) || 24, 1, MAX_AGE_DAYS * 24);
