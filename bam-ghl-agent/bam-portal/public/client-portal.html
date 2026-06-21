@@ -21047,16 +21047,18 @@ async function _apxRefreshCount() {
   // Let the SERVER decide who sees this - the approval APIs are staff-gated, so
   // if they answer, this user is authorized. This avoids the client-side staff
   // flag racing on mobile (where it can resolve false before the session loads).
-  let fu, rd;
-  try {
-    [fu, rd] = await Promise.all([
-      _apxPost('/api/agent-followups', 'list', {}),
-      _apxPost('/api/agent-approvals', 'list-ready', {}),
-    ]);
-  } catch (_) {
-    btns.forEach(({ btn }) => { btn.style.display = 'none'; });  // not authorized / offline
+  const [fuR, rdR] = await Promise.allSettled([
+    _apxPost('/api/agent-followups', 'list', {}),
+    _apxPost('/api/agent-approvals', 'list-ready', {}),
+  ]);
+  // Authorized if EITHER staff-gated call answered - one flaky mobile request
+  // shouldn't hide the button. Both failing = not staff (or offline) → hide.
+  if (fuR.status !== 'fulfilled' && rdR.status !== 'fulfilled') {
+    btns.forEach(({ btn }) => { btn.style.display = 'none'; });
     return;
   }
+  const fu = fuR.status === 'fulfilled' ? fuR.value : {};
+  const rd = rdR.status === 'fulfilled' ? rdR.value : {};
   const fups = (fu.followups || []).filter(f => f.status === 'pending');
   const ready = (rd.ready || []).filter(r => r.status === 'pending');
   _APX_DATA = { followups: fups, ready };
@@ -31575,7 +31577,7 @@ function toggleTheme() {
 <script>
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', function () {
-      navigator.serviceWorker.register('/sw.js', { scope: '/client-portal.html' })
+      navigator.serviceWorker.register('/sw.js?v=2', { scope: '/client-portal.html' })
         .catch(function () { /* PWA install is a progressive enhancement - ignore failures */ });
     });
   }
