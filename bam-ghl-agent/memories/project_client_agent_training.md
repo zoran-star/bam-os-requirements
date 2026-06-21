@@ -50,6 +50,37 @@ guard in `switchView`. View = `openTrainAgentView()` with 3 sub-tabs:
 agent_lessons += promotion_status, promotion_reason, submitted_by_client_user,
 reviewed_by, reviewed_at.
 
+## 3. Follow-up engine — scheduled nudges, approve-each (PR #595, 2026-06-20)
+The nudge engine, human-gated. Detector drafts the next nudge for quiet leads
+onto a timeline; admin approves before it auto-sends.
+
+**Table `agent_followups`** (migration 20260620230000): client_id, ghl_contact_id,
+ghl_conversation_id, contact_name, goal, draft_message, scheduled_at, status
+(pending/approved/sent/skipped/canceled/failed), trigger_reason, last_lead_at,
+confidence, approved_by/at, sent_at, send_error. Unique partial index
+one-active-per-contact (status in pending/approved). RLS select staff/member.
+
+**`api/agent-followups.js`:**
+- `?action=detect` (cron */30, Bearer CRON_SECRET): per engine-enabled academy,
+  GHL conversations/search → quiet leads (lastMessageDirection=outbound, between
+  MIN_QUIET_HOURS=12 and MAX_AGE_DAYS=14), skip if active/recent followup exists,
+  pull thread, Claude `schedule_followup` tool reads the brain's follow-up rules
+  and returns {should_followup, send_in_hours, message, goal, reason, stop} →
+  insert status=pending. Cap 12/run.
+- `?action=work` (cron * * * * *): send status=approved & scheduled_at<=now via
+  GHL `/conversations/messages`; cancels if lead replied since draft. APPROVE-EACH:
+  pending never auto-sends.
+- staff POST: list / approve / skip / edit / snooze / send-now / detect-now.
+- inbound-webhook.js cancels pending+approved for a contact on their reply.
+
+**UI:** `FollowupsPanel.jsx` → `⏰ Follow-ups` tab in staff AgentTrainingView
+(alongside Learnings & approvals + Sandbox). approve/edit/skip/+1d/send-now,
+"↻ check for new" runs detect-now.
+
+**Gate:** per-academy `clients.ghl_kpi_config.followup_engine_enabled` (true for
+BAM GTA). ⚠️ Before approving live: turn OFF GHL's follow-up workflow steps for
+that academy or it double-texts. This engine is what retires those (roadmap step 4).
+
 ## ⚠️ Known gap (same as roadmap): no global SINK yet
 `scope='general'` is still only a flag — `activeLessons()` queries by client_id,
 so an approved "global" lesson doesn't actually propagate to other academies. The
