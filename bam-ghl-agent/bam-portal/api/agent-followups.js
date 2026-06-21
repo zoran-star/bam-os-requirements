@@ -21,6 +21,7 @@ import { withSentryApiRoute } from "./_sentry.js";
 
 import { pickGhlToken, ghl } from "./ghl/_core.js";
 import { assemblePrompt } from "./agent/prompt-structure.js";
+import { buildAgentSystem } from "./agent/brain.js";
 
 const SUPABASE_URL         = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
@@ -75,16 +76,12 @@ async function loadConfig(clientId) {
 }
 
 function buildFollowupSystem({ lessons, overrides, examples }, quietHours) {
-  let sys = assemblePrompt(overrides || {});
-  const fixes = lessons.filter(l => l.kind !== "good").map(l => l.lesson).filter(Boolean);
-  if (fixes.length) sys += `\n\n<learned_lessons>\nYour trainer's corrections — they override the guidance above when they apply:\n${fixes.map(l => `- ${l}`).join("\n")}\n</learned_lessons>`;
-  if (Array.isArray(examples) && examples.length) sys += `\n\n<trainer_examples>\nApproved example exchanges — match this tone/length/style:\n${examples.map(e => `Lead: "${e.parent_text}"\nYou: "${e.agent_text}"`).join("\n\n")}\n</trainer_examples>`;
-  sys += `\n\n<followup_scheduling>\n` +
+  const trailer = `<followup_scheduling>\n` +
     `A lead went quiet — they have not replied to your last message for about ${quietHours} hour(s). Decide the next SCHEDULED follow-up using YOUR follow-up rules (triggers, timing, and especially "when NOT to").\n` +
     `- If your "when NOT to" rules apply (they firmly said no / already booked / complaint / handed to a human / off-topic), set should_followup=false and stop=true.\n` +
     `- Otherwise set should_followup=true and decide: how many HOURS from now to send it (interpret your timing rules relative to how long they've already been quiet), the EXACT short message to send, and a one-line goal for this nudge.\n` +
     `A human approves your draft before it sends. Respond ONLY by calling schedule_followup.\n</followup_scheduling>`;
-  return sys;
+  return buildAgentSystem({ lessons, overrides, examples, trailer });
 }
 
 const SCHEDULE_TOOL = {

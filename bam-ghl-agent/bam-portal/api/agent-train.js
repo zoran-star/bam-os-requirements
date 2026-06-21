@@ -23,6 +23,7 @@ import { withSentryApiRoute } from "./_sentry.js";
 // general-scope lesson. Global strategy changes go through the admin approval queue.
 
 import { assemblePrompt, SECTIONS } from "./agent/prompt-structure.js";
+import { buildAgentSystem } from "./agent/brain.js";
 
 const SUPABASE_URL         = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
@@ -132,22 +133,10 @@ const REPLY_TOOL = {
   },
 };
 
+const TRAIN_TRAILER =
+  `<sandbox_mode>\nYou are in a TRAINING TEST talking to a coach role-playing as a lead — NOT a real customer. Do not actually send anything. ALWAYS respond by calling propose_reply: 'reply' is the exact text you'd send, 'reasoning' is a short why. Set 'escalate'=true when your instructions say to silently flag to admin (leave 'reply' empty then).\n</sandbox_mode>`;
 function buildSystem(lessons, overrides, examples, leadContext) {
-  let sys = assemblePrompt(overrides || {});
-  const fixes = lessons.filter(l => l.kind !== "good").map(l => l.lesson).filter(Boolean);
-  if (fixes.length) {
-    sys += `\n\n<learned_lessons>\nYour trainer has given you these corrections from past practice. They OVERRIDE the guidance above whenever they apply:\n` +
-      fixes.map(l => `- ${l}`).join("\n") + `\n</learned_lessons>`;
-  }
-  if (Array.isArray(examples) && examples.length) {
-    sys += `\n\n<trainer_examples>\nApproved example exchanges — follow them over any examples above:\n` +
-      examples.map(e => `Lead: "${e.parent_text}"\nYou: "${e.agent_text}"`).join("\n\n") + `\n</trainer_examples>`;
-  }
-  if (leadContext && String(leadContext).trim()) {
-    sys += `\n\n<lead_context>\nWhat you already know about this lead (do NOT re-ask):\n${String(leadContext).trim()}\n</lead_context>`;
-  }
-  sys += `\n\n<sandbox_mode>\nYou are in a TRAINING TEST talking to a coach role-playing as a lead — NOT a real customer. Do not actually send anything. ALWAYS respond by calling propose_reply: 'reply' is the exact text you'd send, 'reasoning' is a short why. Set 'escalate'=true when your instructions say to silently flag to admin (leave 'reply' empty then).\n</sandbox_mode>`;
-  return sys;
+  return buildAgentSystem({ lessons, overrides, examples, leadContext, trailer: TRAIN_TRAILER });
 }
 
 async function handleChat(messages, clientId, leadContext, res) {

@@ -14,6 +14,7 @@ import { withSentryApiRoute } from "./_sentry.js";
 // agent's behaviour = the vendored BAM GTA booking prompt + active lessons.
 
 import { assemblePrompt, SECTIONS } from "./agent/prompt-structure.js";
+import { buildAgentSystem } from "./agent/brain.js";
 
 const SUPABASE_URL         = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
@@ -74,44 +75,19 @@ async function sectionOverrides(clientId) {
   } catch (_) { return {}; }
 }
 
-function buildSystem(lessons, overrides, leadContext, examples) {
-  let sys = assemblePrompt(overrides || {});
-  const fixes = lessons.filter(l => l.kind !== "good").map(l => l.lesson).filter(Boolean);
-  if (fixes.length) {
-    sys += `\n\n<learned_lessons>\n` +
-      `Your trainer has given you these corrections from past practice. They OVERRIDE the guidance above whenever they apply. Follow them strictly:\n` +
-      fixes.map(l => `- ${l}`).join("\n") +
-      `\n</learned_lessons>`;
-  }
-  // Trainer-approved examples override the default ones when present.
-  if (Array.isArray(examples) && examples.length) {
-    sys += `\n\n<trainer_examples>\n` +
-      `These are your trainer's APPROVED example exchanges. They define the exact tone, length, and style to use — follow them over any examples above:\n` +
-      examples.map(e => `Lead: "${e.parent_text}"\nYou: "${e.agent_text}"`).join("\n\n") +
-      `\n</trainer_examples>`;
-  }
-
-  // Known lead info (e.g. from a pre-filled contact / free-trial form).
-  if (leadContext && String(leadContext).trim()) {
-    sys += `\n\n<lead_context>\n` +
-      `What you already know about this lead (from the form they submitted). Use it to qualify and personalize — do NOT re-ask for info you already have here:\n` +
-      String(leadContext).trim() +
-      `\n</lead_context>`;
-  }
-
-  sys += `\n\n<sandbox_mode>\n` +
-    `You are in a TRAINING SANDBOX talking to a coach role-playing as a parent/lead — NOT a real customer. ` +
-    `Do not actually send anything. Instead, ALWAYS respond by calling the propose_reply tool: ` +
-    `'reply' is the exact text you'd send the lead, 'reasoning' is a short (1-2 sentence) explanation of why you said it / what stage you're at, ` +
-    `and set 'escalate' = true (with 'escalate_reason') in any case where your instructions say to silently flag the conversation to the admin. ` +
-    `When escalating, still give a short reasoning and leave 'reply' empty.\n` +
-    `If you decide you should follow up with the lead LATER (e.g. they said to check back, or they went quiet and your follow-up logic applies), ` +
-    `set 'followup' = true, 'followup_when' to a short human description of when (e.g. "Sunday evening", "tomorrow afternoon", "in 2 days"), ` +
-    `and 'followup_message' to exactly what you'd send then. Still give your immediate 'reply' too. If no later follow-up is needed, leave 'followup' false.\n` +
-    `Set 'asked_to_book' = true whenever your reply invites the lead to come in, book, try a session, or check it out — even subtly.\n` +
-    `In 'sources', list the section tag(s) of your knowledge you actually used for this reply (e.g. pricing, schedule, tone, objection_handling, conversation_flow, qualification, guardrails, learned_lessons) so the trainer can see where the info came from.\n</sandbox_mode>`;
-  return sys;
-}
+// Per-mode trailer only — the prompt body is built by the shared brain builder.
+const SANDBOX_TRAILER =
+  `<sandbox_mode>\n` +
+  `You are in a TRAINING SANDBOX talking to a coach role-playing as a parent/lead — NOT a real customer. ` +
+  `Do not actually send anything. Instead, ALWAYS respond by calling the propose_reply tool: ` +
+  `'reply' is the exact text you'd send the lead, 'reasoning' is a short (1-2 sentence) explanation of why you said it / what stage you're at, ` +
+  `and set 'escalate' = true (with 'escalate_reason') in any case where your instructions say to silently flag the conversation to the admin. ` +
+  `When escalating, still give a short reasoning and leave 'reply' empty.\n` +
+  `If you decide you should follow up with the lead LATER (e.g. they said to check back, or they went quiet and your follow-up logic applies), ` +
+  `set 'followup' = true, 'followup_when' to a short human description of when (e.g. "Sunday evening", "tomorrow afternoon", "in 2 days"), ` +
+  `and 'followup_message' to exactly what you'd send then. Still give your immediate 'reply' too. If no later follow-up is needed, leave 'followup' false.\n` +
+  `Set 'asked_to_book' = true whenever your reply invites the lead to come in, book, try a session, or check it out — even subtly.\n` +
+  `In 'sources', list the section tag(s) of your knowledge you actually used for this reply (e.g. pricing, schedule, tone, objection_handling, conversation_flow, qualification, guardrails, learned_lessons) so the trainer can see where the info came from.\n</sandbox_mode>`;
 
 const REPLY_TOOL = {
   name: "propose_reply",
@@ -148,7 +124,7 @@ async function handleChat(messages, clientId, leadContext, res) {
   const [lessons, overrides, examples] = await Promise.all([
     activeLessons(clientId), sectionOverrides(clientId), savedExamples(clientId),
   ]);
-  const system = buildSystem(lessons, overrides, leadContext, examples);
+  const system = buildAgentSystem({ lessons, overrides, examples, leadContext, trailer: SANDBOX_TRAILER });
 
   // Map sandbox turns → Anthropic roles. parent = user, agent = assistant.
   const anthropicMsgs = messages

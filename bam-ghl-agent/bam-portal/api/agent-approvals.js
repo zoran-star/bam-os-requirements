@@ -17,6 +17,7 @@ import { withSentryApiRoute } from "./_sentry.js";
 
 import { pickGhlToken, ghl, sendSms } from "./ghl/_core.js";
 import { assemblePrompt } from "./agent/prompt-structure.js";
+import { buildAgentSystem } from "./agent/brain.js";
 import { respondedStage, contactInRespondedStage, computeQueue } from "./agent/_stage.js";
 
 const SUPABASE_URL         = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
@@ -66,22 +67,13 @@ async function loadConfig(clientId) {
   return { lessons: Array.isArray(lessons) ? lessons : [], overrides, examples: Array.isArray(exRows) ? exRows : [] };
 }
 
+const LIVE_BOOKING_TRAILER =
+  `<live_booking>\n` +
+  `You are drafting the next SMS to a REAL lead who just replied and is in the "Responded" stage. Your single goal is to book them into a free trial. A human reviews your draft before it sends. ` +
+  `Respond ONLY by calling propose_reply: 'reply' = the exact text to send; 'reasoning' = 1-2 sentence why; 'confidence' = 0..1; ` +
+  `'asked_to_book' = true if your reply invites them to book/come in; 'escalate' = true (with 'escalate_reason', reply empty) if your guardrails say to hand to a human instead of replying.\n</live_booking>`;
 function buildSystem({ lessons, overrides, examples }) {
-  let sys = assemblePrompt(overrides || {});
-  const fixes = lessons.filter(l => l.kind !== "good").map(l => l.lesson).filter(Boolean);
-  if (fixes.length) {
-    sys += `\n\n<learned_lessons>\nYour trainer's corrections — follow them strictly, they override the guidance above when they apply:\n` +
-      fixes.map(l => `- ${l}`).join("\n") + `\n</learned_lessons>`;
-  }
-  if (Array.isArray(examples) && examples.length) {
-    sys += `\n\n<trainer_examples>\nApproved example exchanges — match this exact tone/length/style:\n` +
-      examples.map(e => `Lead: "${e.parent_text}"\nYou: "${e.agent_text}"`).join("\n\n") + `\n</trainer_examples>`;
-  }
-  sys += `\n\n<live_booking>\n` +
-    `You are drafting the next SMS to a REAL lead who just replied and is in the "Responded" stage. Your single goal is to book them into a free trial. A human reviews your draft before it sends. ` +
-    `Respond ONLY by calling propose_reply: 'reply' = the exact text to send; 'reasoning' = 1-2 sentence why; 'confidence' = 0..1; ` +
-    `'asked_to_book' = true if your reply invites them to book/come in; 'escalate' = true (with 'escalate_reason', reply empty) if your guardrails say to hand to a human instead of replying.\n</live_booking>`;
-  return sys;
+  return buildAgentSystem({ lessons, overrides, examples, trailer: LIVE_BOOKING_TRAILER });
 }
 
 const REPLY_TOOL = {
