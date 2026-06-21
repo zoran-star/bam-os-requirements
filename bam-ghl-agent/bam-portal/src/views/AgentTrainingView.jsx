@@ -1,5 +1,6 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense, lazy } from "react";
 import { authFetch } from "../lib/authFetch";
+const SandboxApp = lazy(() => import("../sandbox/SandboxApp"));
 
 // Staff view: manage the sales agent's learnings across academies.
 // 'academy' lessons stay local; 'general' flags a sales-craft lesson as
@@ -25,6 +26,15 @@ export default function AgentTrainingView({ tokens }) {
   const [pending, setPending] = useState([]);
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(null);
+  const [mode, setMode] = useState("manage");   // 'manage' | 'sandbox'
+
+  const tabBtn = (on) => ({ background: on ? accent : "transparent", color: on ? "#0B0B0D" : sub, border: `1px solid ${on ? accent : border}`, borderRadius: 8, padding: "6px 14px", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: F });
+  const Tabs = () => (
+    <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
+      <button style={tabBtn(mode === "manage")} onClick={() => setMode("manage")}>🤖 Learnings & approvals</button>
+      <button style={tabBtn(mode === "sandbox")} onClick={() => setMode("sandbox")}>🎮 Sandbox</button>
+    </div>
+  );
 
   useEffect(() => { load(); }, []);
   async function load() {
@@ -38,8 +48,17 @@ export default function AgentTrainingView({ tokens }) {
 
   const btn = (color, bord) => ({ background: "transparent", border: `1px solid ${bord}`, color, borderRadius: 7, padding: "5px 11px", fontSize: 12, cursor: "pointer", fontFamily: F });
 
-  if (err) return <div style={{ padding: 24, color: red, fontFamily: F }}>⚠ {err}</div>;
-  if (!lessons) return <div style={{ padding: 24, color: sub, fontFamily: F }}>Loading…</div>;
+  if (mode === "sandbox") return (
+    <div style={{ padding: "8px 4px", fontFamily: F, color: text }}>
+      <Tabs />
+      <Suspense fallback={<div style={{ color: sub, padding: 24 }}>Loading sandbox…</div>}>
+        <SandboxApp embedded />
+      </Suspense>
+    </div>
+  );
+
+  if (err) return <div style={{ padding: 24, color: red, fontFamily: F }}><Tabs />⚠ {err}</div>;
+  if (!lessons) return <div style={{ padding: 24, color: sub, fontFamily: F }}><Tabs />Loading…</div>;
 
   const active = lessons.filter(l => l.active !== false);
   const byAcademy = {};
@@ -47,6 +66,7 @@ export default function AgentTrainingView({ tokens }) {
 
   return (
     <div style={{ padding: "8px 4px", fontFamily: F, color: text }}>
+      <Tabs />
       <div style={{ fontSize: 20, fontWeight: 700, marginBottom: 4 }}>🤖 Agent training</div>
       <div style={{ fontSize: 13, color: sub, marginBottom: 12, lineHeight: 1.6, maxWidth: 660 }}>
         Lessons the booking agent has learned, per academy. <b style={{ color: text }}>Academy</b> lessons stay local (their offer, pricing, local facts). Mark a general sales-craft lesson <b style={{ color: accent }}>general</b> to flag it for the shared brain. Archive ones that no longer apply.
@@ -64,6 +84,7 @@ export default function AgentTrainingView({ tokens }) {
               <div style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 8, flexWrap: "wrap" }}>
                 <span style={{ fontSize: 10.5, fontFamily: "JetBrains Mono, monospace", color: mute }}>{l.business_name || "(academy)"} · {l.created_by || ""}</span>
                 <div style={{ flex: 1 }} />
+                <button disabled={busy === l.id} onClick={() => { const t = prompt("Edit lesson before approving:", l.lesson); if (t && t.trim() && t.trim() !== l.lesson) act(() => api("edit", { id: l.id, lesson: t.trim() }), l.id); }} style={btn(sub, border)}>✎ edit</button>
                 <button disabled={busy === l.id} onClick={() => act(() => api("approve-promotion", { id: l.id }), l.id)} style={btn(accent, accent)}>✓ approve → global</button>
                 <button disabled={busy === l.id} onClick={() => act(() => api("reject-promotion", { id: l.id }), l.id)} style={btn(sub, border)}>✕ keep local</button>
               </div>
