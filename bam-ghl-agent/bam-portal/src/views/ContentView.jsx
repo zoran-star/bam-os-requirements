@@ -59,6 +59,22 @@ function CtkPriorityChip({ priority, tk }) {
   );
 }
 
+// Which pipeline a content ticket belongs to: ads (digital marketing) vs organic.
+const CT_CHANNEL_META = {
+  organic: { label: "Organic", color: "#7BC47F" },
+  ads:     { label: "Ads",     color: "#7E9CD9" },
+};
+function CtkChannelBadge({ channel }) {
+  const meta = CT_CHANNEL_META[channel] || CT_CHANNEL_META.ads;
+  return (
+    <span style={{
+      fontSize: 10, fontWeight: 700, letterSpacing: "0.04em",
+      padding: "2px 7px", borderRadius: 999, whiteSpace: "nowrap",
+      color: meta.color, border: `1px solid ${meta.color}66`, background: `${meta.color}1A`,
+    }}>{meta.label}</span>
+  );
+}
+
 export default function ContentView({ tokens: tk, dark, me, session }) {
   const [mainTab, setMainTab]     = useState("tickets"); // tickets | guides
   const [guides, setGuides]       = useState([]);
@@ -654,6 +670,7 @@ function ContentTicketsTab({ tk, session, me }) {
   const [banner, setBanner] = useState(null);
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState("all"); // all | graphic | video | mixed
+  const [channelFilter, setChannelFilter] = useState("all"); // all | ads | organic
   const [sortOrder, setSortOrder] = useState("newest"); // newest | oldest
 
   const showBanner = (text) => { setBanner(text); setTimeout(() => setBanner(null), 3500); };
@@ -697,10 +714,16 @@ function ContentTicketsTab({ tk, session, me }) {
     ? tickets.filter(t => t.assigned_to === me.id)
     : tickets;
 
+  // Channel filter (All / Ads / Organic) - applied before the sub-tab split so the
+  // tab counts reflect it too.
+  const channelScoped = channelFilter === "all"
+    ? scoped
+    : scoped.filter(t => (t.channel || "ads") === channelFilter);
+
   // Filter rows by sub-tab; sort oldest first per spec
-  const active     = scoped.filter(t => t.status === "active");
-  const clientDep  = scoped.filter(t => t.status === "client-dependent");
-  const completed  = scoped.filter(t => t.status === "completed" || t.status === "cancelled");
+  const active     = channelScoped.filter(t => t.status === "active");
+  const clientDep  = channelScoped.filter(t => t.status === "client-dependent");
+  const completed  = channelScoped.filter(t => t.status === "completed" || t.status === "cancelled");
   const tabRows =
     subTab === "active"           ? active
     : subTab === "client-dependent" ? clientDep
@@ -776,6 +799,20 @@ function ContentTicketsTab({ tk, session, me }) {
             outline: "none", fontFamily: "inherit",
           }}
         />
+        <div style={{ display: "flex", gap: 4, background: tk.surfaceEl, border: `1px solid ${tk.border}`, borderRadius: 8, padding: 3 }}>
+          {[["all", "All"], ["ads", "Ads"], ["organic", "Organic"]].map(([k, label]) => {
+            const on = channelFilter === k;
+            const color = k === "organic" ? "#7BC47F" : k === "ads" ? "#7E9CD9" : tk.accent;
+            return (
+              <button key={k} type="button" onClick={() => setChannelFilter(k)} style={{
+                padding: "6px 12px", fontSize: 12.5, fontWeight: 600, borderRadius: 6, border: "none",
+                cursor: "pointer", fontFamily: "inherit",
+                background: on ? `${color}22` : "transparent",
+                color: on ? (k === "all" ? tk.text : color) : tk.textMute,
+              }}>{label}</button>
+            );
+          })}
+        </div>
         <select
           value={typeFilter}
           onChange={e => setTypeFilter(e.target.value)}
@@ -870,6 +907,7 @@ function ContentTicketsTab({ tk, session, me }) {
                   background: "rgba(255,255,255,0.04)", border: `1px solid ${tk.border}`,
                 }}>{ctkCode(t.id)}</span>
                 <span>{academyName}</span>
+                <CtkChannelBadge channel={t.channel} />
                 <CtkPriorityChip priority={pri} tk={tk} />
               </div>
               <div style={{ color: tk.textSub, fontSize: 13, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{previewNotes}</div>
@@ -1055,6 +1093,7 @@ function ContentTicketDetail({ tk, session, ticket, onBack, onRefetch, patchTick
           </div>
           {/* Priority + SLA deadline, content owner (channel-routed), and SM contact */}
           <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 8, alignItems: "center" }}>
+            <CtkChannelBadge channel={ticket.channel} />
             <CtkPriorityChip priority={ctkPriorityOf(ticket)} tk={tk} />
             {(() => {
               const inProg = ticket.status === "active" || ticket.status === "client-dependent";
