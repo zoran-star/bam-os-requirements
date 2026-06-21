@@ -3,6 +3,7 @@ import { Navigate } from "react-router-dom";
 import { supabase } from "../lib/supabase";
 import { authFetch } from "../lib/authFetch";
 import { T } from "../tokens/tokens";
+import FollowupsPanel from "../views/FollowupsPanel";
 
 // 🎮 Agent Sandbox — a private chat to TRAIN the BAM GTA sales agent.
 // You play the parent/lead; the agent proposes replies (never sent anywhere).
@@ -131,6 +132,7 @@ export default function SandboxApp({ embedded = false } = {}) {
             <Tab on={view === "chat"} onClick={() => setView("chat")}>💬 Chat</Tab>
             <Tab on={view === "brain"} onClick={() => setView("brain")}>📝 Brain</Tab>
             <Tab on={view === "tests"} onClick={() => setView("tests")}>🧪 Break it</Tab>
+            <Tab on={view === "followups"} onClick={() => setView("followups")}>⏰ Follow-ups</Tab>
           </div>
           <div style={{ flex: 1 }} />
           {view === "chat" && <BtnGhost onClick={() => setMessages([])}>↺ Reset chat</BtnGhost>}
@@ -138,6 +140,11 @@ export default function SandboxApp({ embedded = false } = {}) {
 
         {view === "brain" ? <BrainEditor /> :
          view === "tests" ? <TestLab onTry={(msg) => { setMessages([]); setError(""); setInput(msg); setView("chat"); }} /> :
+         view === "followups" ? (
+          <div style={{ flex: 1, overflowY: "auto", padding: "20px 24px", minHeight: 0 }}>
+            <FollowupsPanel tokens={{ text: tk.text, textSub: tk.textSub, textMute: tk.textMute, surface: tk.surface, border: tk.border, accent: tk.amber, red: tk.red }} />
+          </div>
+         ) :
         <div style={{ flex: 1, display: "flex", minHeight: 0 }}>
           {/* Chat */}
           <div style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0 }}>
