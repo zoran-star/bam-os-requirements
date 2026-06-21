@@ -9031,14 +9031,35 @@ function _v15kBuildMonths(n) {
   }
   return out;
 }
+// ── Tab cache (V1.5 / V2 only) — stale-while-revalidate ──────────────
+// GHL-backed tabs blank to a spinner and refetch on EVERY visit, so revisiting
+// a tab you saw seconds ago pays the full GoHighLevel round-trip again (the lag
+// Zoran felt jumping between tabs). The hidden views keep their rendered DOM in
+// memory — the only reason it flashes is the loader wiping it with a spinner.
+// _swrKeep() lets a loader skip that wipe on re-entry: the already-rendered
+// (and still-interactive) content stays visible while the fetch refreshes in
+// the background, then swaps in fresh data. First load (empty host) still shows
+// the spinner; a failed background refresh keeps the stale view instead of
+// clobbering it with an error. V1 is untouched — the cache only engages for
+// V1.5 / V2.
+function _swrKeep(host) {
+  const on = (typeof V15_ACCESS !== 'undefined' && V15_ACCESS)
+          || (typeof V2_ACCESS !== 'undefined' && V2_ACCESS);
+  if (!on || !host) return false;
+  const html = host.innerHTML;
+  if (!html || !html.trim()) return false;            // nothing cached yet → spinner
+  if (host.querySelector('.req-spin')) return false;  // a load is already in flight
+  return true;
+}
+
 async function openV15Kpis() {
   const host = document.getElementById('v15kpis-content');
   if (!host || typeof CLIENT_ID === 'undefined') return;
-  host.innerHTML = `<div class="req-empty" style="padding:24px 0"><span class="req-spin"></span> Loading KPIs…</div>`;
+  if (!_swrKeep(host)) host.innerHTML = `<div class="req-empty" style="padding:24px 0"><span class="req-spin"></span> Loading KPIs…</div>`;
   // Always have a month list so Sales/Revenue/Members load even with no Meta.
   _V15K.periods = _v15kBuildMonths(12);
   _V15K.monthKey = _V15K.periods[0].key;
-  _V15K.mkt = {};
+  _V15K.mkt = _V15K.mkt || {};   // keep last Meta numbers visible while refreshing
   _v15kRender();
   _v15kLoadSetup();   // lazy, non-blocking (Stripe + GHL fetch is slow)
   // Marketing data (Meta) is separate + optional — fold it in when it arrives.
@@ -9578,7 +9599,7 @@ function _v15calHoursToRows(openHours) {
 async function openV15Cal() {
   const host = document.getElementById('v15cal-content');
   if (!host || typeof CLIENT_ID === 'undefined') return;
-  host.innerHTML = `<div class="req-empty" style="padding:24px 0"><span class="req-spin"></span> Loading calendars…</div>`;
+  if (!_swrKeep(host)) host.innerHTML = `<div class="req-empty" style="padding:24px 0"><span class="req-spin"></span> Loading calendars…</div>`;
   try {
     const token = await _mreqAuthToken();
     const r = await fetch('/api/ghl/calendars-v15?action=list&client_id=' + encodeURIComponent(CLIENT_ID), { headers: { Authorization: 'Bearer ' + token } });
@@ -9593,7 +9614,7 @@ async function openV15Cal() {
     _v15calRender();
     _v15calLoadEvents();
   } catch (e) {
-    host.innerHTML = `<div class="req-empty" style="padding:24px 0;color:#9a3b2f">Couldn't load calendars — ${escapeHTML(e.message || String(e))}</div>`;
+    if (!_swrKeep(host)) host.innerHTML = `<div class="req-empty" style="padding:24px 0;color:#9a3b2f">Couldn't load calendars — ${escapeHTML(e.message || String(e))}</div>`;
   }
 }
 
@@ -10021,7 +10042,7 @@ async function openV15Inbox() {
   const host = document.getElementById('v15inbox-content');
   if (!host || typeof CLIENT_ID === 'undefined') return;
   _V15IB.active = null; _V15IB.pending = [];
-  host.innerHTML = `<div class="req-empty" style="padding:24px 0"><span class="req-spin"></span> Loading messages…</div>`;
+  if (!_swrKeep(host)) host.innerHTML = `<div class="req-empty" style="padding:24px 0"><span class="req-spin"></span> Loading messages…</div>`;
   try {
     const token = await _mreqAuthToken();
     const [ir, pr] = await Promise.all([
@@ -10052,7 +10073,7 @@ async function openV15Inbox() {
     } catch (_) { /* pipelines optional */ }
     _v15ibRenderAll();
   } catch (e) {
-    host.innerHTML = `<div class="req-empty" style="padding:24px 0;color:#9a3b2f">Couldn't load inbox — ${escapeHTML(e.message || String(e))}</div>`;
+    if (!_swrKeep(host)) host.innerHTML = `<div class="req-empty" style="padding:24px 0;color:#9a3b2f">Couldn't load inbox — ${escapeHTML(e.message || String(e))}</div>`;
   }
 }
 function _v15ibPill(on) {
@@ -19349,7 +19370,7 @@ let _PL_DRAG_OPP   = null;   // { oppId, fromStageId, pipelineId } during drag
 async function fetchAndRenderPipelines() {
   const container = document.getElementById('pl-board-container');
   if (!container) return;
-  container.innerHTML = '<div class="req-empty" style="padding:20px 0"><span class="req-spin"></span>Loading pipelines…</div>';
+  if (!_swrKeep(container)) container.innerHTML = '<div class="req-empty" style="padding:20px 0"><span class="req-spin"></span>Loading pipelines…</div>';
   try {
     if (typeof CLIENT_ID === 'undefined' || !CLIENT_ID) throw new Error('CLIENT_ID not in scope');
     const token = await _mreqAuthToken();
@@ -19365,7 +19386,7 @@ async function fetchAndRenderPipelines() {
     _renderPipelineTabs();
     _renderPipelineBoard();
   } catch (e) {
-    container.innerHTML = `<div class="req-empty" style="padding:20px 0">Couldn't load pipelines — ${escapeHTML(e.message)}</div>`;
+    if (!_swrKeep(container)) container.innerHTML = `<div class="req-empty" style="padding:20px 0">Couldn't load pipelines — ${escapeHTML(e.message)}</div>`;
   }
 }
 
