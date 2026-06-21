@@ -53,8 +53,10 @@ New `content_executor` role — CONTENT-ONLY. In `_roles.js` it's in `ANY_STAFF_
 
 ## Organic credits + content-only clients (V1, added 2026-06-20, branch `feat/organic-content-credits`)
 
-**Per-type monthly credits (hard cap, no billing).** Migration `20260620180000`:
-- `clients.organic_video_credits_per_month` + `organic_graphic_credits_per_month` (int; **NULL = unlimited, 0 = none**).
+**Monthly credits (hard cap, no billing).** Migrations `20260620180000` (per-type) + `20260621120000` (combined pool):
+- `clients.organic_total_credits_per_month` = **combined pool** (video + graphic share it, e.g. Jeremy Major = 12 any mix). NULL = no combined limit. **This is the common case.**
+- `clients.organic_video_credits_per_month` + `organic_graphic_credits_per_month` = optional **per-type hard caps** for restricted clients (int; **NULL = no cap, 0 = type not included** e.g. graphics-only = video cap 0).
+- A request must pass **BOTH** the pool (if set) AND the per-type cap (if set). Enforced in `api/marketing.js`; `organicUsedThisMonth(clientId, null)` counts the whole pool, `organicCreditSummary` returns `{total, video, graphic}`. Staff inputs: "Total / mo" + "Video cap" + "Graphic cap" in MarketingTab. Client meter shows the **Creatives x/N** pool pill (per-type pills only when a cap is set).
 - "Used" = COUNT of this-calendar-month organic content_tickets of that type with `status != cancelled` (counted **at request**; cancelling frees one; revisions reuse the same ticket so never double-count). No counter column.
 - **Enforced server-side** in `api/marketing.js` content-tickets POST: organic graphic/video request past allowance → `403 {code:'credit_limit'}` with a friendly message. This is the real "can't go past" guarantee.
 - `GET ?resource=content-tickets&summary=credits` (client scope, or staff w/ `client_id`) → `{ video:{used,allowance,left}, graphic:{...} }` for the meter.

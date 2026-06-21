@@ -286,14 +286,19 @@ function startOfMonthIso() {
 // ticket, so they never double-count.
 async function organicUsedThisMonth(clientId, type) {
   const since = encodeURIComponent(startOfMonthIso());
-  const rows = await sb(`content_tickets?client_id=eq.${clientId}&channel=eq.organic&type=eq.${type}&status=neq.cancelled&submitted_at=gte.${since}&select=id`);
+  const typeFilter = type ? `&type=eq.${type}` : "";   // omit type -> count ALL organic (the pool)
+  const rows = await sb(`content_tickets?client_id=eq.${clientId}&channel=eq.organic${typeFilter}&status=neq.cancelled&submitted_at=gte.${since}&select=id`);
   return Array.isArray(rows) ? rows.length : 0;
 }
-// { video:{used,allowance,left}, graphic:{...} }. allowance null = unlimited.
+// { total:{used,allowance,left}, video:{...}, graphic:{...} }. allowance null = no limit.
+// total = combined pool (any type draws from it); video/graphic = optional hard caps.
 async function organicCreditSummary(clientId) {
-  const crows = await sb(`clients?id=eq.${clientId}&select=organic_video_credits_per_month,organic_graphic_credits_per_month`);
+  const crows = await sb(`clients?id=eq.${clientId}&select=organic_total_credits_per_month,organic_video_credits_per_month,organic_graphic_credits_per_month`);
   const c = crows?.[0] || {};
   const out = {};
+  const totalAllow = c.organic_total_credits_per_month == null ? null : Number(c.organic_total_credits_per_month);
+  const totalUsed = await organicUsedThisMonth(clientId, null);
+  out.total = { used: totalUsed, allowance: totalAllow, left: totalAllow == null ? null : Math.max(0, totalAllow - totalUsed) };
   for (const type of ["video", "graphic"]) {
     const col = type === "video" ? "organic_video_credits_per_month" : "organic_graphic_credits_per_month";
     const allowance = c[col] == null ? null : Number(c[col]);
@@ -907,7 +912,7 @@ async function handleContentTickets(req, res) {
     // = unlimited; 0 = none. Counts at request; cancelling a request frees the credit.
     if (channel === "organic") {
       // Organic requests are single-type so each counts toward the right limit —
-      // a graphic+video upload (mixed) would otherwise bypass the cap entirely.
+      // a graphic+video upload (mixed) would otherwise bypass the caps entirely.
       if (type === "mixed") {
         return res.status(400).json({
           error: "For organic content, please submit videos and graphics as separate requests so each counts toward the right monthly limit.",
@@ -915,22 +920,35 @@ async function handleContentTickets(req, res) {
         });
       }
       if (type === "video" || type === "graphic") {
-        const col = type === "video" ? "organic_video_credits_per_month" : "organic_graphic_credits_per_month";
-        const crows = await sb(`clients?id=eq.${ctx.client.id}&select=${col}`);
-        const allowance = crows?.[0]?.[col];
-        if (allowance != null) {
+        const crows = await sb(`clients?id=eq.${ctx.client.id}&select=organic_total_credits_per_month,organic_video_credits_per_month,organic_graphic_credits_per_month`);
+        const c = crows?.[0] || {};
+        // 1. Per-type hard cap (optional; 0 = type not included).
+        const typeCol = type === "video" ? "organic_video_credits_per_month" : "organic_graphic_credits_per_month";
+        const typeAllow = c[typeCol];
+        if (typeAllow != null) {
           const label = type === "video" ? "Video" : "Graphic";
-          if (Number(allowance) === 0) {
+          if (Number(typeAllow) === 0) {
             return res.status(403).json({
               error: `${label} creatives aren't included in your current plan.`,
               code: "credit_limit", type, used: 0, allowance: 0,
             });
           }
-          const used = await organicUsedThisMonth(ctx.client.id, type);
-          if (used >= Number(allowance)) {
+          const typeUsed = await organicUsedThisMonth(ctx.client.id, type);
+          if (typeUsed >= Number(typeAllow)) {
             return res.status(403).json({
-              error: `You've used all ${allowance} ${type} creative${allowance === 1 ? "" : "s"} for this month. Your allowance resets on the 1st.`,
-              code: "credit_limit", type, used, allowance: Number(allowance),
+              error: `You've used all ${typeAllow} ${type} creative${typeAllow === 1 ? "" : "s"} for this month. Your allowance resets on the 1st.`,
+              code: "credit_limit", type, used: typeUsed, allowance: Number(typeAllow),
+            });
+          }
+        }
+        // 2. Combined monthly pool (videos + graphics share it).
+        const totalAllow = c.organic_total_credits_per_month;
+        if (totalAllow != null) {
+          const totalUsed = await organicUsedThisMonth(ctx.client.id, null);
+          if (totalUsed >= Number(totalAllow)) {
+            return res.status(403).json({
+              error: `You've used all ${totalAllow} creative${totalAllow === 1 ? "" : "s"} for this month. Your allowance resets on the 1st.`,
+              code: "credit_limit", type: "total", used: totalUsed, allowance: Number(totalAllow),
             });
           }
         }

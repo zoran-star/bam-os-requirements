@@ -1153,16 +1153,20 @@ export function MarketingTab({ client, tokens, role, session, onChanged, forceCa
     finally { setSavingOrganic(false); }
   }
 
-  // Per-type organic credit allowances (V1 hard cap). "" = unlimited, 0 = none.
+  // Organic credits. total = combined pool (any mix); video/graphic = optional hard
+  // caps. "" = unlimited, 0 = none.
+  const [totCredits, setTotCredits] = useState(client.organic_total_credits_per_month ?? "");
   const [vidCredits, setVidCredits] = useState(client.organic_video_credits_per_month ?? "");
   const [gfxCredits, setGfxCredits] = useState(client.organic_graphic_credits_per_month ?? "");
   const [savingCredits, setSavingCredits] = useState(false);
-  const creditsDirty = String(vidCredits) !== String(client.organic_video_credits_per_month ?? "")
+  const creditsDirty = String(totCredits) !== String(client.organic_total_credits_per_month ?? "")
+    || String(vidCredits) !== String(client.organic_video_credits_per_month ?? "")
     || String(gfxCredits) !== String(client.organic_graphic_credits_per_month ?? "");
   async function saveCredits() {
     setSavingCredits(true);
     try {
       await saveClientFields({
+        organic_total_credits_per_month: totCredits === "" ? null : Number(totCredits),
         organic_video_credits_per_month: vidCredits === "" ? null : Number(vidCredits),
         organic_graphic_credits_per_month: gfxCredits === "" ? null : Number(gfxCredits),
       });
@@ -1431,17 +1435,24 @@ export function MarketingTab({ client, tokens, role, session, onChanged, forceCa
           </div>
           <div style={{ display: "flex", gap: 16, flexWrap: "wrap", alignItems: "flex-end" }}>
             <label style={{ fontSize: 12, color: t.textSub }}>
-              🎬 Videos / mo
-              <input type="number" min="0" step="1" value={vidCredits}
-                onChange={e => setVidCredits(e.target.value)} placeholder="∞"
-                style={{ display: "block", marginTop: 5, width: 110, padding: "9px 12px", fontSize: 13,
+              Total / mo (any type)
+              <input type="number" min="0" step="1" value={totCredits}
+                onChange={e => setTotCredits(e.target.value)} placeholder="∞"
+                style={{ display: "block", marginTop: 5, width: 130, padding: "9px 12px", fontSize: 13,
                   background: t.surface, color: t.text, border: `1px solid ${t.border}`, borderRadius: 6 }} />
             </label>
             <label style={{ fontSize: 12, color: t.textSub }}>
-              🖼 Graphics / mo
+              Video cap
+              <input type="number" min="0" step="1" value={vidCredits}
+                onChange={e => setVidCredits(e.target.value)} placeholder="∞"
+                style={{ display: "block", marginTop: 5, width: 100, padding: "9px 12px", fontSize: 13,
+                  background: t.surface, color: t.text, border: `1px solid ${t.border}`, borderRadius: 6 }} />
+            </label>
+            <label style={{ fontSize: 12, color: t.textSub }}>
+              Graphic cap
               <input type="number" min="0" step="1" value={gfxCredits}
                 onChange={e => setGfxCredits(e.target.value)} placeholder="∞"
-                style={{ display: "block", marginTop: 5, width: 110, padding: "9px 12px", fontSize: 13,
+                style={{ display: "block", marginTop: 5, width: 100, padding: "9px 12px", fontSize: 13,
                   background: t.surface, color: t.text, border: `1px solid ${t.border}`, borderRadius: 6 }} />
             </label>
             <button type="button" onClick={saveCredits} disabled={savingCredits || !creditsDirty}
@@ -1450,6 +1461,9 @@ export function MarketingTab({ client, tokens, role, session, onChanged, forceCa
                 cursor: creditsDirty && !savingCredits ? "pointer" : "default" }}>
               {savingCredits ? "Saving…" : "Save credits"}
             </button>
+          </div>
+          <div style={{ fontSize: 11, color: t.textMute, marginTop: 10, lineHeight: 1.5 }}>
+            <b>Total</b> = combined pool videos + graphics share (e.g. 12 / mo, any mix). <b>Caps</b> are optional hard sub-limits - set a cap to <b>0</b> to disallow that type. Leave caps blank for a pure shared pool.
           </div>
         </div>
       )}

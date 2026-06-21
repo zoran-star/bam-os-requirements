@@ -18226,11 +18226,16 @@ async function _fetchAndRenderOrganicCredits() {
   } catch (e) { _ORGANIC_CREDITS = null; }
   _renderOrganicCredits();
 }
-// A type has capacity if unlimited (allowance null) or it has credits left.
+// A type can be requested only if the combined pool (if set) has room AND its own
+// per-type cap (if set) has room. Unknown credits → don't block (backend enforces).
 function _typeHasCapacity(type) {
-  if (!_ORGANIC_CREDITS || !_ORGANIC_CREDITS[type]) return true;   // unknown → don't block (backend still enforces)
-  const c = _ORGANIC_CREDITS[type];
-  return c.allowance == null || (c.left == null ? true : c.left > 0);
+  const c = _ORGANIC_CREDITS;
+  if (!c) return true;
+  const tot = c.total;
+  if (tot && tot.allowance != null && (tot.left == null ? false : tot.left <= 0)) return false;
+  const d = c[type];
+  if (!d || d.allowance == null) return true;
+  return d.left == null ? true : d.left > 0;
 }
 function _renderOrganicCredits() {
   const el = document.getElementById('organic-credit-meter');
@@ -18245,8 +18250,15 @@ function _renderOrganicCredits() {
     const col = out ? 'var(--red)' : 'var(--text)';
     return `<span style="display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;color:var(--text-sub);background:var(--surface-el);border:1px solid ${out ? 'var(--red)' : 'var(--line)'};padding:5px 11px;border-radius:999px">${label}: <b style="color:${col}">${d.used} / ${d.allowance}</b>${out ? ' · used up' : ''}</span>`;
   };
-  el.innerHTML = `<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">${pill('Videos', c.video)}${pill('Graphics', c.graphic)}</div>
-    <div style="font-size:11px;color:var(--text-mute);margin-top:6px">Resets the 1st of each month</div>`;
+  // Combined pool is the headline; per-type pills only when a cap is actually set.
+  const pills = [];
+  if (c.total && c.total.allowance != null) pills.push(pill('Creatives', c.total));
+  if (c.video && c.video.allowance != null) pills.push(pill('Videos', c.video));
+  if (c.graphic && c.graphic.allowance != null) pills.push(pill('Graphics', c.graphic));
+  el.innerHTML = pills.length
+    ? `<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">${pills.join('')}</div>
+       <div style="font-size:11px;color:var(--text-mute);margin-top:6px">Resets the 1st of each month</div>`
+    : '';
   // Disable the request button only when NO type has capacity left.
   const btn = document.getElementById('organic-request-btn');
   if (btn) {
@@ -18254,7 +18266,7 @@ function _renderOrganicCredits() {
     btn.disabled = !anyCapacity;
     btn.style.opacity = anyCapacity ? '' : '0.5';
     btn.style.cursor = anyCapacity ? '' : 'not-allowed';
-    btn.title = anyCapacity ? '' : "You've used all your creatives this month — resets the 1st";
+    btn.title = anyCapacity ? '' : "You've used all your creatives this month - resets the 1st";
   }
 }
 function _renderOrganic() {
