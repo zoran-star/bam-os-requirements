@@ -1640,7 +1640,7 @@ function ContentRoutingTab({ tk, session }) {
 
   const selStyle = {
     width: "100%", padding: "7px 9px", fontSize: 13, borderRadius: 6,
-    background: tk.bg, color: tk.text, border: `1px solid ${tk.border}`, cursor: "pointer",
+    background: tk.surfaceEl, color: tk.text, border: `1px solid ${tk.border}`, cursor: "pointer",
   };
 
   const renderSelect = (client, channel) => {
@@ -1680,7 +1680,7 @@ function ContentRoutingTab({ tk, session }) {
         placeholder="Search clients…"
         style={{
           width: 260, maxWidth: "100%", padding: "8px 11px", fontSize: 13, marginBottom: 14,
-          background: tk.bg, color: tk.text, border: `1px solid ${tk.border}`, borderRadius: 6,
+          background: tk.surfaceEl, color: tk.text, border: `1px solid ${tk.border}`, borderRadius: 6,
         }}
       />
 

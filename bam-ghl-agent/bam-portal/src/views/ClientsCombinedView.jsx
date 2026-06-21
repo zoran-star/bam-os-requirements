@@ -1434,15 +1434,15 @@ export function MarketingTab({ client, tokens, role, session, onChanged, forceCa
               🎬 Videos / mo
               <input type="number" min="0" step="1" value={vidCredits}
                 onChange={e => setVidCredits(e.target.value)} placeholder="∞"
-                style={{ display: "block", marginTop: 5, width: 110, padding: "8px 10px", fontSize: 13,
-                  background: t.bg, color: t.text, border: `1px solid ${t.border}`, borderRadius: 6 }} />
+                style={{ display: "block", marginTop: 5, width: 110, padding: "9px 12px", fontSize: 13,
+                  background: t.surface, color: t.text, border: `1px solid ${t.border}`, borderRadius: 6 }} />
             </label>
             <label style={{ fontSize: 12, color: t.textSub }}>
               🖼 Graphics / mo
               <input type="number" min="0" step="1" value={gfxCredits}
                 onChange={e => setGfxCredits(e.target.value)} placeholder="∞"
-                style={{ display: "block", marginTop: 5, width: 110, padding: "8px 10px", fontSize: 13,
-                  background: t.bg, color: t.text, border: `1px solid ${t.border}`, borderRadius: 6 }} />
+                style={{ display: "block", marginTop: 5, width: 110, padding: "9px 12px", fontSize: 13,
+                  background: t.surface, color: t.text, border: `1px solid ${t.border}`, borderRadius: 6 }} />
             </label>
             <button type="button" onClick={saveCredits} disabled={savingCredits || !creditsDirty}
               style={{ padding: "9px 16px", fontSize: 13, fontWeight: 600, borderRadius: 6, border: "none",
