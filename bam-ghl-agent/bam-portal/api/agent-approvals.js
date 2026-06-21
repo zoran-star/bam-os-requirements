@@ -18,6 +18,7 @@ import { withSentryApiRoute } from "./_sentry.js";
 import { pickGhlToken, ghl, sendSms } from "./ghl/_core.js";
 import { assemblePrompt } from "./agent/prompt-structure.js";
 import { buildAgentSystem } from "./agent/brain.js";
+import { loadContactMemory } from "./agent/contact-memory.js";
 import { respondedStage, contactInRespondedStage, computeQueue } from "./agent/_stage.js";
 import { agentMode, modeIsOn, shouldAutoSend } from "./agent/_mode.js";
 
@@ -143,7 +144,8 @@ async function draftForContact(token, locationId, clientId, contactId, cfg, rs) 
   const convo = await findConversation(token, locationId, contactId);
   if (!convo) return { error: "no conversation for contact" };
   const messages = await threadMessages(token, convo.id);
-  const out = await runAgent(buildSystem(cfg), messages);
+  const system = buildSystem(cfg) + await loadContactMemory(sb, clientId, contactId);
+  const out = await runAgent(system, messages);
   const agentMsgs = messages.filter(m => m.role === "agent");
   return {
     conversation_id: convo.id,
