@@ -6621,7 +6621,7 @@ Then the call to action."]</div>
       <!-- ── Organic content view ── -->
       <div id="marketing-organic" style="display:none">
         <button id="organic-back-btn" onclick="_backToChannelSplit()" style="background:none;border:none;color:var(--text-mute);font-size:13px;cursor:pointer;padding:0;margin-bottom:14px">← Back to Ads / Organic</button>
-        <div class="section-label">🌱 Organic content</div>
+        <div class="section-label">Organic content</div>
         <div id="organic-credit-meter" style="margin:10px 0 4px"></div>
         <button id="organic-request-btn" class="btn-add-campaign" style="margin-top:10px;margin-bottom:22px" onclick="openOrganicRequestModal()">+ Request a new creative</button>
 
@@ -18237,15 +18237,15 @@ function _renderOrganicCredits() {
   if (!el) return;
   const c = _ORGANIC_CREDITS;
   if (!c) { el.innerHTML = ''; return; }
-  const pill = (icon, label, d) => {
+  const pill = (label, d) => {
     if (!d) return '';
-    if (d.allowance == null) return `<span style="display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;color:var(--text-sub);background:var(--surface-el);border:1px solid var(--line);padding:5px 11px;border-radius:999px">${icon} ${label}: <b style="color:var(--text)">Unlimited</b></span>`;
-    if (d.allowance === 0) return `<span style="display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;color:var(--text-mute);background:var(--surface-el);border:1px solid var(--line);padding:5px 11px;border-radius:999px;opacity:.7">${icon} ${label}: <b>Not included</b></span>`;
+    if (d.allowance == null) return `<span style="display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;color:var(--text-sub);background:var(--surface-el);border:1px solid var(--line);padding:5px 11px;border-radius:999px">${label}: <b style="color:var(--text)">Unlimited</b></span>`;
+    if (d.allowance === 0) return `<span style="display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;color:var(--text-mute);background:var(--surface-el);border:1px solid var(--line);padding:5px 11px;border-radius:999px;opacity:.7">${label}: <b>Not included</b></span>`;
     const out = d.left <= 0;
     const col = out ? 'var(--red)' : 'var(--text)';
-    return `<span style="display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;color:var(--text-sub);background:var(--surface-el);border:1px solid ${out ? 'var(--red)' : 'var(--line)'};padding:5px 11px;border-radius:999px">${icon} ${label}: <b style="color:${col}">${d.used} / ${d.allowance}</b>${out ? ' · used up' : ''}</span>`;
+    return `<span style="display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;color:var(--text-sub);background:var(--surface-el);border:1px solid ${out ? 'var(--red)' : 'var(--line)'};padding:5px 11px;border-radius:999px">${label}: <b style="color:${col}">${d.used} / ${d.allowance}</b>${out ? ' · used up' : ''}</span>`;
   };
-  el.innerHTML = `<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">${pill('🎬', 'Videos', c.video)}${pill('🖼', 'Graphics', c.graphic)}</div>
+  el.innerHTML = `<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">${pill('Videos', c.video)}${pill('Graphics', c.graphic)}</div>
     <div style="font-size:11px;color:var(--text-mute);margin-top:6px">Resets the 1st of each month</div>`;
   // Disable the request button only when NO type has capacity left.
   const btn = document.getElementById('organic-request-btn');
