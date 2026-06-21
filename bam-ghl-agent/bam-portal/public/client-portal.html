@@ -7222,7 +7222,7 @@ Then the call to action."]</div>
           <button class="ib-tab"    data-tab="leads"   onclick="_ibSetTab('leads')">Leads <span id="ib-count-leads"></span></button>
           <button class="ib-tab"    data-tab="bot"     onclick="_ibSetTab('bot')" title="Replies the bot drafted for leads in the Responded stage - you approve each one">🤖 Bot <span id="ib-count-bot"></span></button>
           <input id="ib-search" class="ib-search" type="text" placeholder="🔍  Search by name or content…" oninput="_ibSetSearch(this.value)">
-          <button id="ib-approve-btn" onclick="_apxOpen()" title="Approve the agent's drafted messages before they send" style="display:none;background:transparent;border:1px solid var(--accent);color:var(--accent);padding:7px 12px;border-radius:4px;cursor:pointer;font-size:12px;font-weight:700">📨 Approve <span id="apx-count" style="font-weight:800"></span></button>
+          <button id="ib-approve-btn" onclick="_apxOpen()" title="Hawkeye - approve the agent's drafted messages before they send" style="display:none;background:transparent;border:1px solid var(--accent);color:var(--accent);padding:7px 12px;border-radius:4px;cursor:pointer;font-size:12px;font-weight:700">👁 Hawkeye <span id="apx-count" style="font-weight:800"></span></button>
           <button onclick="_ibComposeNew()" title="New message" style="background:var(--accent);border:1px solid var(--accent);color:#08080A;padding:7px 12px;border-radius:4px;cursor:pointer;font-size:12px;font-weight:600">✏️ New</button>
           <button onclick="fetchAndRenderInbox()" title="Refresh" style="background:transparent;border:1px solid var(--border);color:var(--text);padding:7px 12px;border-radius:4px;cursor:pointer;font-size:12px">↻</button>
         </div>
@@ -10184,7 +10184,7 @@ function _v15ibRenderAll() {
     <div class="v15ib-bar">
       <div class="v15ib-pills">
         <span style="flex:1"></span>
-        <button id="v15ib-approve-btn" onclick="_apxOpen()" title="Approve the agent's drafted messages before they send" aria-label="Approve agent messages" class="v15ib-icon" style="display:none;width:auto;padding:0 12px;gap:6px;border-color:var(--accent);color:var(--accent);font-weight:700">📨 Approve <span id="v15-apx-count" style="font-weight:800"></span></button>
+        <button id="v15ib-approve-btn" onclick="_apxOpen()" title="Hawkeye - approve the agent's drafted messages before they send" aria-label="Hawkeye agent approvals" class="v15ib-icon" style="display:none;width:auto;padding:0 12px;gap:6px;border-color:var(--accent);color:var(--accent);font-weight:700">👁 Hawkeye <span id="v15-apx-count" style="font-weight:800"></span></button>
         <button onclick="_v15ibMassSend()" class="v15ib-icon v15ib-send" title="Mass send" aria-label="Mass send" style="width:auto;padding:0 12px;gap:6px">✉ Mass send</button>
       </div>
       <div class="v15ib-filters">
@@ -14261,7 +14261,7 @@ async function _bbRenderAgentLearnings(panel) {
     if (!host) return;
     if (!r.ok) { host.innerHTML = `<div class="bb-empty">Couldn't load - ${escapeHTML(json.error || ('HTTP ' + r.status))}</div>`; return; }
     const lessons = (json.lessons || []).filter(l => l.active !== false);
-    if (!lessons.length) { host.innerHTML = `<div class="bb-empty">No learnings yet. As you coach the agent (in the sandbox, or when you adjust a reply in Inbox → 🤖 Bot), what it learns shows up here.</div>`; return; }
+    if (!lessons.length) { host.innerHTML = `<div class="bb-empty">No learnings yet. As you coach the agent (in the sandbox, or when you adjust a reply in Inbox → 👁 Hawkeye), what it learns shows up here.</div>`; return; }
     host.innerHTML = lessons.map(l => `
       <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px 16px;margin-bottom:10px">
         <div style="color:var(--text);font-size:14px;line-height:1.5">${escapeHTML(l.lesson)}</div>
@@ -14334,7 +14334,7 @@ async function _taConfigApi(action, extra) {
 
 const _TA_MODES = [
   { key: 'off',        label: 'Off',          hint: 'Agent is silent - nothing drafts or sends.' },
-  { key: 'hawkeye',    label: '👁 Hawkeye',    hint: 'Agent drafts every message; you approve each one in Inbox → 📨 Approve before it sends.' },
+  { key: 'hawkeye',    label: '👁 Hawkeye',    hint: 'Agent drafts every message; you approve each one in Inbox → 👁 Hawkeye before it sends.' },
   { key: 'self_drive', label: '🚀 Self-drive', hint: "Agent sends high-confidence messages itself. Anything it's unsure about still drops to the inbox." },
 ];
 
@@ -21044,6 +21044,10 @@ async function _apxRefreshCount() {
     { btn: document.getElementById('v15ib-approve-btn'), span: document.getElementById('v15-apx-count') },
   ].filter(x => x.btn);
   if (!btns.length) return;
+  // Resolve staff status first - on mobile the flag may still be null at render.
+  if (typeof _IS_BAM_STAFF !== 'undefined' && _IS_BAM_STAFF === null && typeof _ensureStaffFlag === 'function') {
+    try { await _ensureStaffFlag(); } catch (_) {}
+  }
   const staff = (typeof _IS_BAM_STAFF !== 'undefined' && _IS_BAM_STAFF === true);
   if (!staff) { btns.forEach(({ btn }) => { btn.style.display = 'none'; }); return; }
   btns.forEach(({ btn }) => { btn.style.display = ''; });
@@ -21070,7 +21074,7 @@ function _apxOpen() {
     <div id="apx-overlay" onclick="if(event.target===this)_apxClose()" style="position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9400;display:flex;justify-content:flex-end">
       <div style="width:480px;max-width:100vw;height:100%;background:var(--bg);border-left:1px solid var(--border);display:flex;flex-direction:column">
         <div style="padding:16px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px">
-          <div style="font-size:17px;font-weight:800">📨 Approve</div>
+          <div style="font-size:17px;font-weight:800">👁 Hawkeye</div>
           <div style="font-size:12px;color:var(--text-mute)">agent drafts - approve before they send</div>
           <div style="flex:1"></div>
           <button onclick="_apxClose()" aria-label="Close" style="background:none;border:none;color:var(--text-mute);font-size:22px;cursor:pointer;padding:2px 8px">×</button>
