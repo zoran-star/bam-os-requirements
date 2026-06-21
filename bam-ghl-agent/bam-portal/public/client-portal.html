@@ -18160,7 +18160,7 @@ async function _fetchAndRenderOrganic() {
   _fetchAndRenderOrganicCredits();   // fire alongside; meter renders independently
   try {
     const token = await _mreqAuthToken();
-    const res = await fetch('/api/marketing?resource=content-tickets&scope=client&channel=organic&all=1', {
+    const res = await fetch('/api/marketing?resource=content-tickets&scope=client&channel=organic&all=1&client_id=' + encodeURIComponent(CLIENT_ID), {
       headers: { 'Authorization': 'Bearer ' + token },
     });
     const json = await _safeJson(res);
@@ -18168,13 +18168,13 @@ async function _fetchAndRenderOrganic() {
     _ORGANIC_TICKETS = Array.isArray(json.tickets) ? json.tickets : [];
     _renderOrganic();
   } catch (e) {
-    if (statusEl) statusEl.innerHTML = `<div style="color:var(--text-mute);font-size:13px;padding:8px 0">Couldn't load - ${escapeHTML(e.message)}</div>`;
+    if (statusEl) statusEl.innerHTML = `<div style="color:var(--text-mute);font-size:13px;padding:8px 0">Couldn't load right now - please refresh and try again.</div>`;
   }
 }
 async function _fetchAndRenderOrganicCredits() {
   try {
     const token = await _mreqAuthToken();
-    const res = await fetch('/api/marketing?resource=content-tickets&scope=client&summary=credits', {
+    const res = await fetch('/api/marketing?resource=content-tickets&scope=client&summary=credits&client_id=' + encodeURIComponent(CLIENT_ID), {
       headers: { 'Authorization': 'Bearer ' + token },
     });
     const json = await _safeJson(res);
@@ -18276,7 +18276,7 @@ function openOrganicRequestModal() {
 async function _organicApprove(id) {
   try {
     const token = await _mreqAuthToken();
-    const res = await fetch('/api/marketing?resource=content-tickets&id=' + encodeURIComponent(id), {
+    const res = await fetch('/api/marketing?resource=content-tickets&client_id=' + encodeURIComponent(CLIENT_ID) + '&id=' + encodeURIComponent(id), {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
       body: JSON.stringify({ action: 'approve' }),
@@ -18291,7 +18291,7 @@ async function _organicRequestChanges(id) {
   if (!msg.trim()) { alert('Add a quick note on what to change.'); return; }
   try {
     const token = await _mreqAuthToken();
-    const res = await fetch('/api/marketing?resource=content-tickets&id=' + encodeURIComponent(id), {
+    const res = await fetch('/api/marketing?resource=content-tickets&client_id=' + encodeURIComponent(CLIENT_ID) + '&id=' + encodeURIComponent(id), {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
       body: JSON.stringify({ action: 'request-changes', message: msg.trim() }),
@@ -18689,7 +18689,7 @@ async function submitInputAssets() {
 // ── Content-tickets API helper (creates content_tickets row) ──
 async function _ctkCreateTicket(payload) {
   const token = await _mreqAuthToken();
-  const res = await fetch('/api/marketing?resource=content-tickets', {
+  const res = await fetch('/api/marketing?resource=content-tickets&client_id=' + encodeURIComponent(CLIENT_ID), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
     body: JSON.stringify(payload),
@@ -18701,7 +18701,7 @@ async function _ctkCreateTicket(payload) {
 
 async function _ctkPatchTicket(id, body) {
   const token = await _mreqAuthToken();
-  const res = await fetch('/api/marketing?resource=content-tickets&id=' + encodeURIComponent(id), {
+  const res = await fetch('/api/marketing?resource=content-tickets&client_id=' + encodeURIComponent(CLIENT_ID) + '&id=' + encodeURIComponent(id), {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
     body: JSON.stringify(body),
@@ -26478,7 +26478,7 @@ async function mReferred(memberId) {
 
 async function _mreqCreateTicket(payload) {
   const token = await _mreqAuthToken();
-  const res = await fetch('/api/marketing-tickets', {
+  const res = await fetch('/api/marketing-tickets?client_id=' + encodeURIComponent(CLIENT_ID), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
     body: JSON.stringify(payload),
@@ -26490,7 +26490,7 @@ async function _mreqCreateTicket(payload) {
 
 async function _mreqPatchTicket(id, body) {
   const token = await _mreqAuthToken();
-  const res = await fetch('/api/marketing-tickets?id=' + encodeURIComponent(id), {
+  const res = await fetch('/api/marketing-tickets?client_id=' + encodeURIComponent(CLIENT_ID) + '&id=' + encodeURIComponent(id), {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
     body: JSON.stringify(body),
@@ -26502,7 +26502,7 @@ async function _mreqPatchTicket(id, body) {
 
 async function _mreqFetchAll() {
   const token = await _mreqAuthToken();
-  const res = await fetch('/api/marketing-tickets?scope=client', {
+  const res = await fetch('/api/marketing-tickets?scope=client&client_id=' + encodeURIComponent(CLIENT_ID), {
     headers: { 'Authorization': 'Bearer ' + token },
   });
   const json = await _safeJson(res);
@@ -26517,7 +26517,7 @@ async function _mreqFetchAll() {
 async function _ctkFetchForClient() {
   try {
     const token = await _mreqAuthToken();
-    const res = await fetch('/api/marketing?resource=content-tickets&scope=client&all=1', {
+    const res = await fetch('/api/marketing?resource=content-tickets&scope=client&all=1&client_id=' + encodeURIComponent(CLIENT_ID), {
       headers: { 'Authorization': 'Bearer ' + token },
     });
     const json = await _safeJson(res);
