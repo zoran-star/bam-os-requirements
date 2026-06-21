@@ -8838,6 +8838,7 @@ function hapticTap(style) {
 let _ASSETS = [];
 let _ASSET_FILTER = 'all';
 let _ASSET_TARGETS = { offers: [], staff: [], locations: [] };
+let _assetUploadNudge = '';   // one-shot message shown when over-limit files were skipped
 const _ASSET_CATS = ['logo','wordmark','hero','photo','video','crest','icon','og','favicon','other'];
 
 function _assetUrl(path) {
@@ -8933,12 +8934,26 @@ function _renderAssets() {
       </label>
       <span style="font-size:12.5px;color:var(--text-mute);max-width:420px">Add images or videos. Upload a folder to keep them grouped, then tag each to an offer, staff member, or location.</span>
     </div>
+    <div id="asset-link-nudge" style="display:${_assetUploadNudge ? 'block' : 'none'};margin-bottom:12px;padding:10px 14px;border-radius:8px;background:rgba(232,197,71,.08);border:1px solid var(--gold);color:var(--text);font-size:12.5px">${escapeHTML(_assetUploadNudge || '')}</div>
+    <div style="margin-bottom:18px">
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+        <input id="asset-link-input" type="url" placeholder="Paste a share link for large files (Google Drive, Dropbox, WeTransfer…)" onkeydown="if(event.key==='Enter'){event.preventDefault();_addAssetLink();}"
+          style="flex:1;min-width:280px;background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);padding:9px 12px;font:inherit;font-size:13px;outline:none">
+        <button onclick="_addAssetLink()" style="padding:9px 16px;background:transparent;color:var(--text);font-weight:600;font-size:13px;border:1px solid var(--border-med);border-radius:8px;cursor:pointer">Add link</button>
+      </div>
+      <div style="font-size:11.5px;color:var(--text-mute);margin-top:7px;max-width:560px;line-height:1.5">
+        Files over 50&nbsp;MB can't be uploaded here - add them as a link instead.
+        <b style="color:var(--text-sub)">Set the link's sharing to "Anyone with the link can view"</b> before adding it, otherwise your team won't be able to open it.
+      </div>
+    </div>
     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:20px">${pills}</div>
     ${cards}`;
+  _assetUploadNudge = '';   // one-shot: clear after it's been rendered
 }
 
 function _assetCard(a) {
-  const url = _assetUrl(a.storage_path);
+  const isLink = !!a.link_url;
+  const url = isLink ? a.link_url : _assetUrl(a.storage_path);
   const selStyle = "width:100%;background:var(--bg);border:1px solid var(--border);border-radius:5px;color:var(--text);padding:6px 8px;font:inherit;font-size:11.5px";
   const lbl = (t) => `<div style="font-size:9.5px;color:var(--text-mute);text-transform:uppercase;letter-spacing:.06em;margin:9px 0 3px">${t}</div>`;
   // Step 1 - Type
@@ -8957,7 +8972,12 @@ function _assetCard(a) {
   return `
     <div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;overflow:hidden;display:flex;flex-direction:column">
       <div style="aspect-ratio:16/10;background:#0a0a0a;display:flex;align-items:center;justify-content:center;overflow:hidden">
-        ${((a.mime_type || '').startsWith('video/') || a.category === 'video')
+        ${isLink
+          ? `<a href="${escapeHTML(url)}" target="_blank" rel="noopener" style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;width:100%;height:100%;text-decoration:none;color:var(--text-sub)">
+              <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+              <span style="font-size:11.5px;font-weight:600">Open link ↗</span>
+            </a>`
+          : ((a.mime_type || '').startsWith('video/') || a.category === 'video')
           ? `<video src="${escapeHTML(url)}#t=0.5" preload="metadata" muted playsinline controls style="max-width:100%;max-height:100%;background:#000"></video>`
           : `<img src="${escapeHTML(url)}" alt="${escapeHTML(a.alt || '')}" loading="lazy" style="max-width:100%;max-height:100%;object-fit:contain">`}
       </div>
@@ -8999,10 +9019,41 @@ async function _assetSetTag2(id, value) {
 
 function _assetSetFilter(k) { _ASSET_FILTER = k; _renderAssets(); }
 
+// Add a large file as a share link (Drive/Dropbox/etc.) instead of uploading it.
+// Reuses _isValidAssetLink from the content flow. Link assets have no storage_path.
+async function _addAssetLink() {
+  const inp = document.getElementById('asset-link-input');
+  const raw = (inp && inp.value || '').trim();
+  if (!raw) { if (inp) inp.focus(); return; }
+  if (!_isValidAssetLink(raw)) {
+    alert("That doesn't look like a valid link. Paste a full URL starting with https:// (Google Drive, Dropbox, WeTransfer, etc.).");
+    return;
+  }
+  if (!_sb || typeof CLIENT_ID === 'undefined') return;
+  try {
+    const host = raw.replace(/^https?:\/\//, '').split(/[\/?#]/)[0] || 'link';
+    const { error } = await _sb.from('client_assets').insert({
+      client_id: CLIENT_ID, label: 'Link - ' + host, category: 'other',
+      link_url: raw, storage_path: null, mime_type: 'text/uri-list',
+    });
+    if (error) throw error;
+    if (inp) inp.value = '';
+    await openAssetsView();
+  } catch (e) { alert("Couldn't add link - " + (e.message || e)); }
+}
+
 async function _uploadAssets(inputEl, fromFolder) {
-  const files = Array.from(inputEl.files || []);
+  const all = Array.from(inputEl.files || []);
   inputEl.value = '';
-  if (!files.length || !_sb || typeof CLIENT_ID === 'undefined') return;
+  if (!all.length || !_sb || typeof CLIENT_ID === 'undefined') return;
+  // Skip files over the 50MB project Storage limit and nudge them toward a link.
+  const MAX = 50 * 1024 * 1024;
+  const files = all.filter(f => f.size <= MAX);
+  const tooBig = all.filter(f => f.size > MAX);
+  if (tooBig.length) {
+    const names = tooBig.map(f => f.name).join(', ');
+    _assetUploadNudge = `${tooBig.length} file${tooBig.length === 1 ? ' was' : 's were'} over the 50 MB upload limit and skipped (${names}). Add ${tooBig.length === 1 ? 'it' : 'them'} as a link below instead.`;
+  }
   for (const file of files) {
     try {
       const clean = file.name.replace(/[^a-zA-Z0-9._-]+/g, '_');
@@ -9038,7 +9089,7 @@ async function _assetRemove(id) {
   if (!confirm('Remove this asset?')) return;
   const a = _ASSETS.find(x => x.id === id);
   try {
-    if (a) await _sb.storage.from('client-assets').remove([a.storage_path]).catch(() => {});
+    if (a && a.storage_path) await _sb.storage.from('client-assets').remove([a.storage_path]).catch(() => {});
     const { error } = await _sb.from('client_assets').delete().eq('id', id);
     if (error) throw error;
     await openAssetsView();
