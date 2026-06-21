@@ -18433,8 +18433,7 @@ function _organicFileTile(f) {
 // Request modal in organic mode (reuses the input-assets modal, tags channel=organic).
 let _inputAssetsChannel = 'ads';
 function openOrganicRequestModal() {
-  _inputAssetsChannel = 'organic';
-  openAddCreativeModal();
+  openAddCreativeModal('organic');
 }
 async function _organicApprove(id) {
   try {
@@ -18608,8 +18607,9 @@ async function confirmRemove() {
 }
 
 // ── Input assets modal (raw assets → goes to content team) ──
-function openAddCreativeModal() {
-  // Kept name for backward compat with the existing button onclick
+function openAddCreativeModal(channel) {
+  // Kept name for backward compat with the existing button onclick (ads path).
+  _inputAssetsChannel = (channel === 'organic') ? 'organic' : 'ads';
   _inputAssetsState = { type: 'graphic', files: [] };
   _selectInputAssetsType('graphic');
   _renderInputAssetsFilesList();
@@ -18617,6 +18617,14 @@ function openAddCreativeModal() {
   if (notes) notes.value = '';
   const fld = document.getElementById('inputAssetsFolder');
   if (fld) fld.value = '';
+  // Reset the creative-spec fields each open.
+  const fmt = document.getElementById('inputAssetsFormat'); if (fmt) fmt.value = '9:16 Vertical';
+  const cap = document.getElementById('inputAssetsCaptions'); if (cap) cap.checked = false;
+  // Channel-aware copy: organic goes back to the client to review, not into a campaign.
+  const sub = document.getElementById('inputAssetsSub');
+  if (sub) sub.textContent = _inputAssetsChannel === 'organic'
+    ? 'Submit raw assets here. Our content team will create your post, then send it back to you to review and approve.'
+    : 'Submit raw assets here. Our content team will turn them into a finished creative and add it to your campaign.';
   _refreshInputAssetsFolderList();
   document.getElementById('inputAssetsModal').style.display = 'flex';
 }
@@ -18801,6 +18809,8 @@ async function submitInputAssets() {
     return;
   }
   const notes = document.getElementById('inputAssetsNotes')?.value?.trim() || '';
+  const format = document.getElementById('inputAssetsFormat')?.value || '';
+  const captions = !!(document.getElementById('inputAssetsCaptions') || {}).checked;
   // Snapshot files + type BEFORE closing the modal - closeInputAssetsModal()
   // resets _inputAssetsState to { files: [] } which would otherwise wipe the
   // upload list and silently submit a ticket with no files attached.
@@ -18824,6 +18834,8 @@ async function submitInputAssets() {
       context: {
         source: channel === 'organic' ? 'organic-request' : 'add-creative',
         campaign_title: _detailCampaignTitle(),
+        format,
+        captions,
       },
     });
     hideLoading();
@@ -31447,7 +31459,7 @@ function toggleTheme() {
   <div class="modal-card" onclick="event.stopPropagation()" style="max-width:520px">
     <div class="modal-kicker">§ Request</div>
     <div class="modal-title">Input assets</div>
-    <div class="modal-sub">Submit raw assets here. Our content team will turn them into a finished creative and add it to your campaign.</div>
+    <div class="modal-sub" id="inputAssetsSub">Submit raw assets here. Our content team will turn them into a finished creative and add it to your campaign.</div>
 
     <label class="modal-label">Raw files</label>
     <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:8px">
@@ -31468,6 +31480,18 @@ function toggleTheme() {
     <label class="modal-label" for="inputAssetsDriveLink" style="margin-top:18px">Link to file <span style="color:var(--text-mute);font-weight:400">(use if your file is over 500MB - Drive, Dropbox, WeTransfer, OneDrive, etc.)</span></label>
     <input id="inputAssetsDriveLink" class="modal-input" type="url" placeholder="https://..." />
     <div style="font-size:12px;color:var(--text-mute);margin-top:4px">Set sharing to "Anyone with the link" so we can open it.</div>
+
+    <label class="modal-label" for="inputAssetsFormat" style="margin-top:18px">Format</label>
+    <select id="inputAssetsFormat" class="modal-input">
+      <option value="9:16 Vertical">9:16 - Vertical (Reels / Stories / TikTok)</option>
+      <option value="16:9 Landscape">16:9 - Landscape (YouTube)</option>
+      <option value="4:5 Feed">4:5 - Feed (Instagram / Facebook post)</option>
+    </select>
+
+    <label class="modal-label" style="margin-top:16px;display:flex;align-items:center;gap:10px;cursor:pointer;font-weight:400">
+      <input type="checkbox" id="inputAssetsCaptions" style="width:16px;height:16px;accent-color:var(--gold);cursor:pointer;flex:none">
+      <span>Add on-screen captions</span>
+    </label>
 
     <label class="modal-label" for="inputAssetsNotes" style="margin-top:18px">Notes for the content team</label>
     <textarea id="inputAssetsNotes" class="modal-textarea" placeholder="What's the vibe? Hook? Key copy? Brand colors? Anything special the team should know?"></textarea>
