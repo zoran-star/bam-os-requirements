@@ -6950,6 +6950,15 @@ Then the call to action."]</div>
         border-color:var(--accent); background:rgba(232,197,71,0.12);
         color:var(--accent); font-weight:700;
       }
+      #view-pipelines .pl-select {
+        font-size:13px; padding:8px 32px 8px 14px; border-radius:999px; cursor:pointer;
+        border:1px solid var(--accent); background:rgba(232,197,71,0.12); color:var(--accent);
+        font-weight:700; font-family:inherit; max-width:100%;
+        appearance:none; -webkit-appearance:none;
+        background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23E8C547' stroke-width='3'><path d='M6 9l6 6 6-6'/></svg>");
+        background-repeat:no-repeat; background-position:right 12px center;
+      }
+      #view-pipelines .pl-select option { background:var(--bg); color:var(--text); font-weight:500; }
       #view-pipelines .pl-board {
         display:flex; gap:12px; overflow-x:auto; padding-bottom:14px;
         scroll-snap-type:x proximity;
@@ -19943,11 +19952,11 @@ function _renderPipelineTabs() {
   if (!pls.some(p => p.id === _PL_PIPELINE)) _PL_PIPELINE = pls[0].id;
   // One pipeline = no need for a selector tab; drop the redundant header.
   if (pls.length <= 1) { _PL_PIPELINE = pls[0].id; host.innerHTML = ''; return; }
-  host.innerHTML = pls.map(p => {
-    const on = p.id === _PL_PIPELINE;
+  const opts = pls.map(p => {
     const visibleCount = (p.opportunities || []).filter(o => _isStageAllowed(o.stageId) && !['won', 'lost', 'abandoned'].includes(String(o.status || '').toLowerCase())).length;
-    return `<button class="pl-tab ${on ? 'on' : ''}" onclick="_plSelectPipeline('${escapeHTML(p.id)}')">${escapeHTML(p.name)} <span style="opacity:0.7">${visibleCount}</span></button>`;
+    return `<option value="${escapeHTML(p.id)}" ${p.id === _PL_PIPELINE ? 'selected' : ''}>${escapeHTML(p.name)} (${visibleCount})</option>`;
   }).join('');
+  host.innerHTML = `<select class="pl-select" onchange="_plSelectPipeline(this.value)">${opts}</select>`;
 }
 
 function _plSelectPipeline(pipelineId) {
