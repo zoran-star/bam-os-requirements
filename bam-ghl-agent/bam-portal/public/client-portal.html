@@ -21109,7 +21109,7 @@ async function _apxPost(endpoint, action, payload) {
     body: JSON.stringify({ action, client_id: CLIENT_ID, ...(payload || {}) }),
   });
   const json = await _safeJson(r);
-  if (!r.ok) throw new Error(json.error || ('HTTP ' + r.status));
+  if (!r.ok) { const e = new Error(json.error || ('HTTP ' + r.status)); e.status = r.status; throw e; }
   return json;
 }
 
@@ -21129,9 +21129,12 @@ async function _apxRefreshCount() {
     _apxPost('/api/agent-followups', 'list', {}),
     _apxPost('/api/agent-approvals', 'list-ready', {}),
   ]);
-  // Authorized if EITHER staff-gated call answered - one flaky mobile request
-  // shouldn't hide the button. Both failing = not staff (or offline) → hide.
-  if (fuR.status !== 'fulfilled' && rdR.status !== 'fulfilled') {
+  // ONLY hide on an explicit "not authorized" (401/403) - a non-staff user. A
+  // server/rate-limit error (429/500) or network blip is NOT a reason to hide
+  // the button; the button is visible by default and stays put. (This was the
+  // bug: during a GHL 429 storm both calls errored and the button vanished.)
+  const denied = (r) => r.status === 'rejected' && (r.reason?.status === 401 || r.reason?.status === 403);
+  if (denied(fuR) && denied(rdR)) {
     btns.forEach(({ btn }) => { btn.style.display = 'none'; });
     return;
   }
