@@ -124,6 +124,11 @@ member**, scoped to their client_id. Shared `api/agent/_auth.js` → `resolveAge
 client_id, mutations are `&client_id=eq.` scoped. The autonomy MODE switch
 (agent-config.js + 🎚 Autonomy tab, gated by `_IS_BAM_STAFF`) stays BAM-staff-only.
 Button reveal (`_apxRefreshCount`) is visible-by-default, hides ONLY on 401/403.
+Hawkeye edits TRAIN (2026-06-21): editing a ready reply or follow-up in the drawer
+prompts "teach the agent why?" and `_apxTeach()` calls `/api/agent-train` `teach`
+(same classify-and-promote pipeline as the Train Agent tab) with context
+{ai_drafted, you_sent} — born local, AI-classified, general craft → BAM promotion
+queue. So Hawkeye is now itself a training loop, not just a send gate.
 
 ## 5. Per-contact memory — agent remembers each person (PR #612, 2026-06-21)
 The agent personalizes per lead. `api/agent/contact-memory.js` → `loadContactMemory(sb, clientId, contactId)`
