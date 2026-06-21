@@ -42,3 +42,14 @@ Booking agent is being built for BAM GTA. Zoran is working with Danny on sourcin
 
 ## Key rule
 The master template is the source of truth for agent behaviour. Location instances should only differ in their placeholder values — not in logic, tone guidelines, or guardrails. If the logic needs to change, update the master template first.
+
+## Architecture — facts vs behavior (no duplicate sources)
+The live agent "brain" runs from **`bam-portal/api/agent/prompt-structure.js`** (read by `api/agent-sandbox.js` + the GHL responder), with per-academy overrides in the `agent_prompt_sections` Supabase table.
+
+Two kinds of section:
+- **BEHAVIOR** (layer `general`/`goal`: role, tone, core_behavior, qualification, objection_handling, conversation_flow, guardrails, boundaries, examples, follow-up). **Academy-agnostic. Contains NO literal facts** — no ages, prices, addresses, links, discounts. It references the config generically ("the program's age range", "the configured price range", "the booking link in business info"). Shared across every academy/offer.
+- **FACT** (layer `location`/`offer`: business_info, schedule, coaches, social_proof, selling_points, program, pricing, policies, qualification_config). **Per-academy. Holds every literal value EXACTLY ONCE** — age only in `program`, price + discounts only in `pricing`, address + booking link only in `business_info`, schedule only in `schedule`. Edit a fact in one place → it propagates everywhere.
+
+**Why:** previously the age ("9") was baked into 5 behavior sections, so editing it in one place didn't change the agent. Now facts live once. **Rule: never put a literal fact in a behavior section — reference the config instead.** A new academy = override the FACT sections only.
+
+> The `.txt` files here are the human-readable spec. The brain (`prompt-structure.js`) is what actually runs — keep them in sync, and apply the facts-vs-behavior rule to both.
