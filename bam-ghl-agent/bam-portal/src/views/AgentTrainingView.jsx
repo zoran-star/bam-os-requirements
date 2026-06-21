@@ -22,11 +22,18 @@ export default function AgentTrainingView({ tokens }) {
   const F = "Inter, sans-serif";
 
   const [lessons, setLessons] = useState(null);
+  const [pending, setPending] = useState([]);
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(null);
 
   useEffect(() => { load(); }, []);
-  async function load() { try { const d = await api("list"); setLessons(d.lessons || []); } catch (e) { setErr(e.message); } }
+  async function load() {
+    try {
+      const [d, p] = await Promise.all([api("list"), api("list-promotions").catch(() => ({ pending: [] }))]);
+      setLessons(d.lessons || []);
+      setPending(p.pending || []);
+    } catch (e) { setErr(e.message); }
+  }
   async function act(fn, id) { setBusy(id); try { await fn(); await load(); } catch (e) { alert(e.message); } finally { setBusy(null); } }
 
   const btn = (color, bord) => ({ background: "transparent", border: `1px solid ${bord}`, color, borderRadius: 7, padding: "5px 11px", fontSize: 12, cursor: "pointer", fontFamily: F });
@@ -44,6 +51,26 @@ export default function AgentTrainingView({ tokens }) {
       <div style={{ fontSize: 13, color: sub, marginBottom: 12, lineHeight: 1.6, maxWidth: 660 }}>
         Lessons the booking agent has learned, per academy. <b style={{ color: text }}>Academy</b> lessons stay local (their offer, pricing, local facts). Mark a general sales-craft lesson <b style={{ color: accent }}>general</b> to flag it for the shared brain. Archive ones that no longer apply.
       </div>
+      {pending.length > 0 && (
+        <div style={{ border: `1px solid ${accent}`, borderRadius: 12, padding: "14px 16px", marginBottom: 22, background: "rgba(232,197,71,.05)" }}>
+          <div style={{ fontSize: 14, fontWeight: 700, color: accent, marginBottom: 4 }}>🌐 Pending global approvals · {pending.length}</div>
+          <div style={{ fontSize: 12.5, color: sub, marginBottom: 12, lineHeight: 1.5 }}>
+            A client trainer taught these, and the AI judged them general sales-craft. Approve to promote to the shared brain (all academies). Reject to keep it local to their academy.
+          </div>
+          {pending.map(l => (
+            <div key={l.id} style={{ background: surface, border: `1px solid ${border}`, borderRadius: 10, padding: "12px 14px", marginBottom: 8 }}>
+              <div style={{ fontSize: 13.5, lineHeight: 1.5 }}>{l.lesson}</div>
+              {l.reason && <div style={{ fontSize: 11.5, color: mute, marginTop: 6, fontStyle: "italic" }}>AI: {l.reason}</div>}
+              <div style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 8, flexWrap: "wrap" }}>
+                <span style={{ fontSize: 10.5, fontFamily: "JetBrains Mono, monospace", color: mute }}>{l.business_name || "(academy)"} · {l.created_by || ""}</span>
+                <div style={{ flex: 1 }} />
+                <button disabled={busy === l.id} onClick={() => act(() => api("approve-promotion", { id: l.id }), l.id)} style={btn(accent, accent)}>✓ approve → global</button>
+                <button disabled={busy === l.id} onClick={() => act(() => api("reject-promotion", { id: l.id }), l.id)} style={btn(sub, border)}>✕ keep local</button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
       {!active.length && <div style={{ color: mute, fontSize: 14, padding: "20px 0" }}>No learnings yet across any academy.</div>}
       {Object.keys(byAcademy).sort().map(ac => (
         <div key={ac} style={{ marginBottom: 22 }}>

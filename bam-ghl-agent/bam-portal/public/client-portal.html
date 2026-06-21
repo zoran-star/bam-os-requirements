@@ -5656,6 +5656,18 @@
         Calendar
       </div>
 
+      <!-- Train Agent — opt-in, only shown to client users with can_train_agent=true (or BAM staff). -->
+      <div class="nav-item" id="nav-train-agent" style="display:none" onclick="switchView('train-agent', this)">
+        <span class="nav-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="4" y="6" width="16" height="12" rx="2"/>
+            <path d="M12 6V3M9 12h.01M15 12h.01M9 16h6"/>
+            <path d="M2 11v3M22 11v3"/>
+          </svg>
+        </span>
+        Train Agent
+      </div>
+
       <!-- Standalone Team nav removed 2026-05-26 — merged into BB > Staff. -->
     </nav>
 
@@ -8608,6 +8620,20 @@ Then the call to action."]</div>
       </button>
     </div>
 
+    <div class="view" id="view-train-agent">
+      <div class="topbar">
+        <div>
+          <span class="topbar-kicker">§ Train Agent</span>
+          <div class="topbar-title">Train Agent</div>
+        </div>
+      </div>
+      <div class="content">
+        <div id="train-agent-content">
+          <div class="req-empty" style="padding:20px 0"><span class="req-spin"></span>Loading…</div>
+        </div>
+      </div>
+    </div>
+
     <div class="view" id="view-blueprint">
       <div class="topbar">
         <div>
@@ -10750,6 +10776,8 @@ function switchView(name, el) {
   // Per-staff tab permissions: a restricted teammate can't open a hidden tab
   // even via hash/deep-link. Owner/unrestricted users pass through.
   if (typeof _isViewTabAllowed === 'function' && !_isViewTabAllowed(name)) { switchView(_landingView ? _landingView() : 'home'); return; }
+  // Train Agent is opt-in: block deep-links for users without the grant.
+  if (name === 'train-agent' && !((typeof _MY_CAN_TRAIN_AGENT !== 'undefined' && _MY_CAN_TRAIN_AGENT === true) || _IS_BAM_STAFF === true)) { switchView(_landingView ? _landingView() : 'home'); return; }
   hapticTap('Light'); // #12 — tactile feedback on tab change (native only)
 
   // Remember where we came from so the "Talk to BAM Business" view can go back.
@@ -10816,6 +10844,8 @@ function switchView(name, el) {
 
   // When entering Business Blueprint, render based on hash route
   if (name === 'blueprint') openBlueprintView();
+
+  if (name === 'train-agent') openTrainAgentView();
 
   // Keep the mobile bottom nav in sync with the active view
   syncMobileNav(name);
@@ -11363,6 +11393,7 @@ let _MY_ALLOWED_TABS = null;   // null = all tabs (default / owner / BAM staff)
 let _MY_ALLOWED_STAGES = null; // null = all pipeline stages
 let _MY_ALLOWED_KPIS = null;   // null = all KPI categories
 let _MY_TAB_ROLE = null;       // 'owner' | 'member' | null
+let _MY_CAN_TRAIN_AGENT = false; // opt-in grant: shows the Train Agent nav (default off)
 
 // Owner "Preview as <staff>" — when set, the owner temporarily adopts a
 // teammate's permissions to see exactly what that teammate sees.
@@ -11398,7 +11429,16 @@ function _plVisiblePipelines() {
 
 // Hide nav items the current user isn't permitted to see. Runs AFTER the tier
 // gates so it only ever subtracts. No-op for owners or when no perms are set.
+// Opt-IN nav: Train Agent shows only for granted client users (or BAM staff),
+// and hides during "Preview as" so an owner sees the teammate's real surface.
+function applyTrainAgentNavState() {
+  const show = !_PREVIEW_AS && ((_MY_CAN_TRAIN_AGENT === true) || (_IS_BAM_STAFF === true));
+  const el = document.getElementById('nav-train-agent');
+  if (el) el.style.display = show ? '' : 'none';
+}
+
 function applyTabPermissions() {
+  try { applyTrainAgentNavState(); } catch (_) {}   // runs on every re-apply (incl. preview)
   if (_effTabRole() === 'owner') return;
   const tabs = _effAllowedTabs();
   if (!Array.isArray(tabs)) return; // null = unrestricted
@@ -11494,6 +11534,7 @@ async function _ensureStaffFlag() {
   } catch (_) { _IS_BAM_STAFF = false; }
   // Now that we know staff status, re-apply Home visibility (staff keep Home).
   try { if (typeof applyHomeNavState === 'function') applyHomeNavState(); } catch (_) {}
+  try { if (typeof applyTrainAgentNavState === 'function') applyTrainAgentNavState(); } catch (_) {}
   return _IS_BAM_STAFF;
 }
 
@@ -11545,13 +11586,14 @@ async function loadMyPermissionsAndApply() {
     if (!_myAuthUserId) { const u = await _sb.auth.getUser(); _myAuthUserId = u?.data?.user?.id || null; }
     if (!_myAuthUserId) return;
     const { data } = await _sb.from('client_users')
-      .select('role, allowed_tabs, allowed_stages, allowed_kpis')
+      .select('role, allowed_tabs, allowed_stages, allowed_kpis, can_train_agent')
       .eq('user_id', _myAuthUserId).eq('client_id', CLIENT_ID).eq('status', 'active').limit(1);
     const row = (data || [])[0] || null;
     _MY_TAB_ROLE = row?.role || null;
     _MY_ALLOWED_TABS = Array.isArray(row?.allowed_tabs) ? row.allowed_tabs : null;
     _MY_ALLOWED_STAGES = Array.isArray(row?.allowed_stages) ? row.allowed_stages : null;
     _MY_ALLOWED_KPIS = Array.isArray(row?.allowed_kpis) ? row.allowed_kpis : null;
+    _MY_CAN_TRAIN_AGENT = row?.can_train_agent === true;
   } catch (_) { _MY_ALLOWED_TABS = null; _MY_ALLOWED_STAGES = null; _MY_ALLOWED_KPIS = null; }
   applyTabPermissions();
   if (typeof _renderPreviewAsMenu === 'function') _renderPreviewAsMenu(); // owner role now known
@@ -14112,6 +14154,207 @@ async function _bbRenderAgentLearnings(panel) {
   } catch (e) {
     const host = document.getElementById('bb-learn-list'); if (host) host.innerHTML = `<div class="bb-empty">Couldn't load — ${escapeHTML(e.message)}</div>`;
   }
+}
+
+// ════════════════════════════════════════════════════════════════════════
+// TRAIN AGENT — client-side trainer surface (granted users only).
+// Local knowledge only: lessons (AI auto-routes global craft to BAM approval)
+// + the academy's own brain facts (schedule/pricing/coaches/policies).
+// All writes go to /api/agent-train, which enforces local-only server-side.
+// ════════════════════════════════════════════════════════════════════════
+const _TA = { tab: 'test', chat: [], sending: false };
+
+async function _taApi(action, extra) {
+  const token = await _mreqAuthToken();
+  const r = await fetch('/api/agent-train', {
+    method: 'POST',
+    headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action, client_id: CLIENT_ID, ...(extra || {}) }),
+  });
+  const json = await _safeJson(r);
+  if (!r.ok) throw new Error(json.error || ('HTTP ' + r.status));
+  return json;
+}
+
+function openTrainAgentView() {
+  const host = document.getElementById('train-agent-content');
+  if (!host) return;
+  const tab = (k, label) => `<button onclick="_taTab('${k}')" style="background:${_TA.tab === k ? 'var(--gold)' : 'transparent'};color:${_TA.tab === k ? '#0B0B0D' : 'var(--text-sub)'};border:1px solid ${_TA.tab === k ? 'var(--gold)' : 'var(--border)'};border-radius:8px;padding:7px 14px;font-size:13px;font-weight:600;cursor:pointer">${label}</button>`;
+  host.innerHTML = `
+    <p style="color:var(--text-sub);font-size:13.5px;margin:0 0 14px;max-width:640px;line-height:1.55">Coach your academy's booking agent. Teach it lessons and keep its facts current — changes apply to <b>your academy</b> right away. Anything that looks like a broader sales strategy gets sent to BAM for approval before it spreads.</p>
+    <div style="display:flex;gap:8px;margin-bottom:18px;flex-wrap:wrap">
+      ${tab('test', '💬 Test')}
+      ${tab('lessons', '📚 Lessons')}
+      ${tab('knowledge', '📍 Knowledge')}
+    </div>
+    <div id="ta-panel"></div>`;
+  _taRenderPanel();
+}
+
+function _taTab(k) { _TA.tab = k; openTrainAgentView(); }
+
+function _taRenderPanel() {
+  if (_TA.tab === 'test') return _taRenderTest();
+  if (_TA.tab === 'lessons') return _taRenderLessons();
+  if (_TA.tab === 'knowledge') return _taRenderKnowledge();
+}
+
+// ── Test (role-play sandbox) ───────────────────────────────────────────────
+function _taRenderTest() {
+  const p = document.getElementById('ta-panel'); if (!p) return;
+  p.innerHTML = `
+    <p style="color:var(--text-mute);font-size:12.5px;margin:0 0 12px;line-height:1.5">Type as a lead — the agent shows the reply it <i>would</i> send. Nothing is actually texted.</p>
+    <div id="ta-chat" style="display:flex;flex-direction:column;gap:10px;margin-bottom:14px;min-height:40px"></div>
+    <div style="display:flex;gap:8px;align-items:flex-end">
+      <textarea id="ta-chat-input" rows="2" placeholder="Type as the lead…" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();_taSend();}" style="flex:1;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:10px 12px;color:var(--text);font-size:14px;resize:vertical;font-family:inherit"></textarea>
+      <button class="btn-primary-bb" id="ta-send-btn" onclick="_taSend()">Send</button>
+    </div>
+    <button onclick="_TA.chat=[];_taRenderTest()" style="margin-top:10px;background:none;border:none;color:var(--text-mute);font-size:12px;cursor:pointer">↺ reset conversation</button>`;
+  _taRenderChatLog();
+}
+
+function _taRenderChatLog() {
+  const log = document.getElementById('ta-chat'); if (!log) return;
+  if (!_TA.chat.length) { log.innerHTML = `<div style="color:var(--text-mute);font-size:13px;padding:8px 0">No messages yet — say something as the lead.</div>`; return; }
+  log.innerHTML = _TA.chat.map(m => {
+    if (m.role === 'parent') {
+      return `<div style="align-self:flex-end;max-width:80%;background:var(--gold);color:#0B0B0D;border-radius:14px 14px 4px 14px;padding:9px 13px;font-size:14px">${escapeHTML(m.text)}</div>`;
+    }
+    if (m.role === 'escalate') {
+      return `<div style="align-self:flex-start;max-width:85%;background:var(--surface);border:1px dashed var(--gold);border-radius:14px;padding:10px 13px;font-size:13px;color:var(--text-sub)">🚩 The agent would stop and flag this to a human.${m.reason ? `<div style="margin-top:4px;color:var(--text-mute);font-size:12px">${escapeHTML(m.reason)}</div>` : ''}</div>`;
+    }
+    return `<div style="align-self:flex-start;max-width:85%"><div style="background:var(--surface);border:1px solid var(--border);border-radius:14px 14px 14px 4px;padding:9px 13px;font-size:14px;color:var(--text)">${escapeHTML(m.text)}</div>${m.reasoning ? `<div style="margin-top:4px;color:var(--text-mute);font-size:11.5px;font-style:italic">${escapeHTML(m.reasoning)}</div>` : ''}</div>`;
+  }).join('');
+}
+
+async function _taSend() {
+  const inp = document.getElementById('ta-chat-input'); if (!inp) return;
+  const text = inp.value.trim(); if (!text || _TA.sending) return;
+  _TA.sending = true;
+  _TA.chat.push({ role: 'parent', text });
+  inp.value = '';
+  _taRenderChatLog();
+  const btn = document.getElementById('ta-send-btn'); if (btn) { btn.disabled = true; btn.textContent = '…'; }
+  try {
+    const res = await _taApi('chat', { messages: _TA.chat.map(m => ({ role: m.role === 'parent' ? 'parent' : 'agent', text: m.text })).filter(m => m.role === 'parent' || m.role === 'agent') });
+    if (res.escalate) _TA.chat.push({ role: 'escalate', reason: res.escalate_reason });
+    else _TA.chat.push({ role: 'agent', text: res.reply, reasoning: res.reasoning });
+  } catch (e) {
+    _TA.chat.push({ role: 'agent', text: '⚠️ ' + e.message });
+  } finally {
+    _TA.sending = false;
+    const b = document.getElementById('ta-send-btn'); if (b) { b.disabled = false; b.textContent = 'Send'; }
+    _taRenderChatLog();
+  }
+}
+
+// ── Lessons (teach + list) ─────────────────────────────────────────────────
+function _taRenderLessons() {
+  const p = document.getElementById('ta-panel'); if (!p) return;
+  p.innerHTML = `
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:18px">
+      <div style="font-weight:600;font-size:14px;margin-bottom:8px">Teach a lesson</div>
+      <textarea id="ta-teach-input" rows="3" placeholder="e.g. When a parent asks about parking, mention there's free lot parking out front." style="width:100%;box-sizing:border-box;background:var(--surface-el,#222);border:1px solid var(--border);border-radius:10px;padding:10px 12px;color:var(--text);font-size:14px;resize:vertical;font-family:inherit"></textarea>
+      <div style="display:flex;align-items:center;gap:12px;margin-top:10px">
+        <button class="btn-primary-bb" id="ta-teach-btn" onclick="_taTeach()">Teach lesson</button>
+        <div id="ta-teach-note" style="font-size:12.5px"></div>
+      </div>
+    </div>
+    <div style="font-weight:600;font-size:14px;margin-bottom:10px">What the agent has learned</div>
+    <div id="ta-lesson-list"><div class="req-empty"><span class="req-spin"></span>Loading…</div></div>`;
+  _taLoadLessons();
+}
+
+async function _taTeach() {
+  const ta = document.getElementById('ta-teach-input'); if (!ta) return;
+  const text = ta.value.trim(); if (!text) return;
+  const btn = document.getElementById('ta-teach-btn'); if (btn) { btn.disabled = true; btn.textContent = 'Saving…'; }
+  const note = document.getElementById('ta-teach-note');
+  try {
+    const res = await _taApi('teach', { lesson: text });
+    ta.value = '';
+    if (note) note.innerHTML = res.proposed_global
+      ? `<span style="color:var(--gold)">🌐 Looks like global strategy — sent to BAM for approval. It already applies to your academy.</span>`
+      : `<span style="color:#5BBF7B">📍 Saved to your academy.</span>`;
+    await _taLoadLessons();
+  } catch (e) { if (note) note.innerHTML = `<span style="color:#E5736A">${escapeHTML(e.message)}</span>`; }
+  finally { if (btn) { btn.disabled = false; btn.textContent = 'Teach lesson'; } }
+}
+
+async function _taLoadLessons() {
+  const host = document.getElementById('ta-lesson-list'); if (!host) return;
+  try {
+    const res = await _taApi('lessons', {});
+    const lessons = (res.lessons || []);
+    if (!lessons.length) { host.innerHTML = `<div class="bb-empty">No lessons yet. Teach the agent something above, or correct it in the Test tab.</div>`; return; }
+    host.innerHTML = lessons.map(l => {
+      let badge;
+      if (l.promotion_status === 'pending') badge = `<span style="color:var(--gold)">⏳ pending BAM approval (global)</span>`;
+      else if (l.scope === 'general') badge = `<span style="color:#7FB2F0">🌐 shared brain</span>`;
+      else badge = `<span style="color:var(--text-mute)">📍 your academy</span>`;
+      return `<div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px 16px;margin-bottom:10px">
+        <div style="color:var(--text);font-size:14px;line-height:1.5">${escapeHTML(l.lesson)}</div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px;font-size:11px;font-family:'JetBrains Mono',monospace">
+          <span>${badge}</span>
+          <button onclick="_taForget('${l.id}')" style="background:none;border:none;color:var(--text-mute);font-size:11px;cursor:pointer;font-family:inherit">remove</button>
+        </div>
+      </div>`;
+    }).join('');
+  } catch (e) { host.innerHTML = `<div class="bb-empty">Couldn't load — ${escapeHTML(e.message)}</div>`; }
+}
+
+async function _taForget(id) {
+  if (!confirm('Remove this lesson? The agent will stop using it.')) return;
+  try { await _taApi('forget', { id }); await _taLoadLessons(); } catch (e) { alert(e.message); }
+}
+
+// ── Knowledge (local brain: location + offer facts) ────────────────────────
+async function _taRenderKnowledge() {
+  const p = document.getElementById('ta-panel'); if (!p) return;
+  p.innerHTML = `
+    <p style="color:var(--text-mute);font-size:12.5px;margin:0 0 14px;line-height:1.5">These are your academy's own facts. Edit them and the agent uses the new version on its next reply. Global sales-style sections are managed by BAM and locked here.</p>
+    <div id="ta-section-list"><div class="req-empty"><span class="req-spin"></span>Loading…</div></div>`;
+  try {
+    const res = await _taApi('sections', {});
+    const sections = (res.sections || []);
+    const editable = sections.filter(s => s.editable);
+    const locked = sections.filter(s => !s.editable);
+    const host = document.getElementById('ta-section-list'); if (!host) return;
+    let html = editable.map(s => `
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px 16px;margin-bottom:12px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+          <div style="font-weight:600;font-size:14px">${escapeHTML(s.label)}${s.is_default ? '' : ' <span style="color:var(--gold);font-size:11px;font-family:monospace">✏️ edited</span>'}</div>
+        </div>
+        <textarea id="ta-sec-${s.key}" rows="5" style="width:100%;box-sizing:border-box;background:var(--surface-el,#222);border:1px solid var(--border);border-radius:10px;padding:10px 12px;color:var(--text);font-size:13.5px;resize:vertical;font-family:inherit;line-height:1.5">${escapeHTML(s.body)}</textarea>
+        <div style="display:flex;gap:10px;margin-top:8px;align-items:center">
+          <button class="btn-primary-bb" onclick="_taSaveSection('${s.key}')">Save</button>
+          ${s.is_default ? '' : `<button onclick="_taResetSection('${s.key}')" style="background:none;border:1px solid var(--border);color:var(--text-sub);border-radius:8px;padding:7px 12px;font-size:12px;cursor:pointer">Reset to default</button>`}
+          <span id="ta-sec-note-${s.key}" style="font-size:12px"></span>
+        </div>
+      </div>`).join('');
+    if (locked.length) {
+      html += `<div style="margin-top:20px"><div style="font-size:12px;color:var(--text-mute);font-family:'JetBrains Mono',monospace;text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px">🔒 Managed by BAM (global)</div>` +
+        locked.map(s => `<div style="opacity:.6;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:10px 14px;margin-bottom:6px;font-size:13px">${escapeHTML(s.label)}</div>`).join('') + `</div>`;
+    }
+    host.innerHTML = html || `<div class="bb-empty">No editable sections.</div>`;
+  } catch (e) {
+    const host = document.getElementById('ta-section-list'); if (host) host.innerHTML = `<div class="bb-empty">Couldn't load — ${escapeHTML(e.message)}</div>`;
+  }
+}
+
+async function _taSaveSection(key) {
+  const ta = document.getElementById('ta-sec-' + key); if (!ta) return;
+  const note = document.getElementById('ta-sec-note-' + key);
+  try {
+    await _taApi('update-section', { key, body: ta.value });
+    if (note) note.innerHTML = `<span style="color:#5BBF7B">Saved ✓</span>`;
+    setTimeout(() => _taRenderKnowledge(), 700);
+  } catch (e) { if (note) note.innerHTML = `<span style="color:#E5736A">${escapeHTML(e.message)}</span>`; }
+}
+
+async function _taResetSection(key) {
+  if (!confirm('Reset this section to the BAM default?')) return;
+  try { await _taApi('reset-section', { key }); _taRenderKnowledge(); } catch (e) { alert(e.message); }
 }
 
 async function _bbRenderMemberOnboarding(panel) {
