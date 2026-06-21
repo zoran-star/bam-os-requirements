@@ -14238,6 +14238,7 @@ function openTrainAgentView() {
       ${tab('test', '💬 Test')}
       ${tab('lessons', '📚 Lessons')}
       ${tab('knowledge', '📍 Knowledge')}
+      ${(typeof _IS_BAM_STAFF !== 'undefined' && _IS_BAM_STAFF === true) ? tab('mode', '🎚 Autonomy') : ''}
     </div>
     <div id="ta-panel"></div>`;
   _taRenderPanel();
@@ -14249,6 +14250,64 @@ function _taRenderPanel() {
   if (_TA.tab === 'test') return _taRenderTest();
   if (_TA.tab === 'lessons') return _taRenderLessons();
   if (_TA.tab === 'knowledge') return _taRenderKnowledge();
+  if (_TA.tab === 'mode') return _taRenderMode();
+}
+
+// ── Autonomy (BAM staff only): this academy's agent mode ────────────────────
+async function _taConfigApi(action, extra) {
+  const token = await _mreqAuthToken();
+  const r = await fetch('/api/agent-config', {
+    method: 'POST', headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action, ...(extra || {}) }),
+  });
+  const json = await _safeJson(r);
+  if (!r.ok) throw new Error(json.error || ('HTTP ' + r.status));
+  return json;
+}
+
+const _TA_MODES = [
+  { key: 'off',        label: 'Off',          hint: 'Agent is silent — nothing drafts or sends.' },
+  { key: 'hawkeye',    label: '👁 Hawkeye',    hint: 'Agent drafts every message; you approve each one in Inbox → 📨 Approve before it sends.' },
+  { key: 'self_drive', label: '🚀 Self-drive', hint: "Agent sends high-confidence messages itself. Anything it's unsure about still drops to the inbox." },
+];
+
+async function _taRenderMode() {
+  const p = document.getElementById('ta-panel'); if (!p) return;
+  p.innerHTML = `<div style="color:var(--text-mute);font-size:13px"><span class="req-spin"></span> Loading…</div>`;
+  let cur = 'off';
+  try {
+    const d = await _taConfigApi('list');
+    const row = (d.academies || []).find(a => a.client_id === CLIENT_ID);
+    cur = (row && row.mode) || 'off';
+  } catch (e) { p.innerHTML = `<div style="color:#e07070;font-size:13px">Couldn't load — ${escapeHTML(e.message)}</div>`; return; }
+  _TA.mode = cur;
+  const seg = (on, danger) => `background:${on ? (danger ? '#e05a42' : 'var(--gold)') : 'transparent'};color:${on ? '#0B0B0D' : 'var(--text-sub)'};border:1px solid ${on ? (danger ? '#e05a42' : 'var(--gold)') : 'var(--border)'};border-radius:9px;padding:9px 16px;font-size:13.5px;font-weight:700;cursor:pointer;font-family:inherit`;
+  const curMode = _TA_MODES.find(m => m.key === cur) || _TA_MODES[0];
+  p.innerHTML = `
+    <p style="color:var(--text-mute);font-size:12.5px;margin:0 0 14px;line-height:1.55;max-width:620px">One switch for this academy — it controls <b style="color:var(--text)">both</b> the Responded-stage reply bot and the follow-up nudges. <b style="color:var(--text)">BAM staff only.</b></p>
+    <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">
+      ${_TA_MODES.map(m => `<button onclick="_taSetMode('${m.key}')" style="${seg(cur === m.key, m.key === 'self_drive')}">${m.label}</button>`).join('')}
+    </div>
+    <div style="font-size:13px;color:${cur === 'self_drive' ? '#e05a42' : 'var(--text-sub)'};line-height:1.5">${escapeHTML(curMode.hint)}</div>`;
+}
+
+async function _taSetMode(mode) {
+  if (mode === _TA.mode) return;
+  if (mode === 'self_drive') {
+    _plConfirmModal({
+      icon: '⚠️',
+      title: 'Turn on Self-drive?',
+      body: 'The agent will <b>text real leads on its own</b> — no approval — whenever it\'s confident. Unsure messages still drop to the inbox. Make sure the brain is trained and any duplicate GHL workflow texts are off first.',
+      okLabel: 'Yes, let it drive',
+      onOk: () => _taSetModeGo(mode),
+    });
+    return;
+  }
+  _taSetModeGo(mode);
+}
+async function _taSetModeGo(mode) {
+  try { await _taConfigApi('set-mode', { client_id: CLIENT_ID, mode }); _TA.mode = mode; _taRenderMode(); _plToast('🎚 Mode set: ' + mode.replace('_', '-')); }
+  catch (e) { alert(e.message); }
 }
 
 // ── Test (role-play sandbox) ───────────────────────────────────────────────

@@ -93,9 +93,11 @@ two legacy bools in sync.
 - **off** = silent. **hawkeye** = draft everything, human approves. **self_drive** =
   auto-send when confidence≥0.8 & !escalate; UNSURE/escalate still queue to the inbox.
 
-**Set by BAM staff:** `api/agent-config.js` (staff-gated) `list`/`set-mode`. UI =
-`src/views/AgentModePanel.jsx`, new **🎚 Autonomy** tab in `AgentTrainingView.jsx`.
-Self-drive pick shows a red warning modal.
+**Set by BAM staff:** `api/agent-config.js` (staff-gated) `list`/`set-mode`. TWO UIs,
+both staff-only: (1) staff portal `src/views/AgentModePanel.jsx` → **🎚 Autonomy** tab in
+`AgentTrainingView.jsx` (all academies); (2) client portal Train Agent view 4th sub-tab
+**🎚 Autonomy** (`_taRenderMode`/`_taSetMode`/`_taConfigApi` in client-portal.html, shown
+only when `_IS_BAM_STAFF`, scoped to the current academy). Self-drive shows a warning modal.
 
 **Ready replies queue** (responded-bot equivalent of agent_followups): table
 `agent_ready_replies` (migration 20260621000000) — detector pre-drafts the next reply
