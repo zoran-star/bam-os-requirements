@@ -130,15 +130,98 @@ function CommitmentSelector(props) {
   );
 }
 
+var YOUTH_GRADES = ['5th Grade', '6th Grade', '7th Grade', '8th Grade'];
+var HS_GRADES    = ['9th Grade', '10th Grade', '11th Grade', '12th Grade', 'College'];
+
+function SchedulePreview(props) {
+  var grade = props.grade || '';
+  var isYouth = YOUTH_GRADES.indexOf(grade) !== -1;
+  var isHS    = HS_GRADES.indexOf(grade) !== -1;
+
+  var group = isYouth
+    ? { label: 'Youth Group', ages: 'Grades 5–8', times: ['Mon  6:00–7:00 PM', 'Fri  5:45–6:45 PM', 'Sun  5:00–6:00 PM'] }
+    : isHS
+    ? { label: 'HS / College Group', ages: 'Grades 9–12 & College', times: ['Mon & Wed  7:00–8:00 PM', 'Tue & Thu  6:30–7:30 PM'] }
+    : null;
+
+  var lift = { label: 'Strength & Conditioning', ages: 'All members · included', times: ['Mon & Wed  4:30–5:30 PM', 'Tue & Thu  5:00–6:00 PM'] };
+
+  return (
+    <div style={{
+      margin: '20px 0 4px', borderRadius: 10,
+      border: '1px solid var(--border)', overflow: 'hidden',
+    }}>
+      <div style={{
+        background: 'rgba(0,184,200,0.08)', borderBottom: '1px solid var(--border)',
+        padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 8,
+      }}>
+        <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--teal)', letterSpacing: '0.03em' }}>
+          TRAINING SCHEDULE
+        </span>
+        {group && (
+          <span style={{ fontSize: 12, color: 'var(--fg-subtle)', marginLeft: 4 }}>
+            · {grade}
+          </span>
+        )}
+      </div>
+
+      <div style={{ padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+        {group ? (
+          <ScheduleRow group={group} highlight />
+        ) : (
+          <div style={{ fontSize: 13, color: 'var(--fg-subtle)', fontStyle: 'italic' }}>
+            Schedule depends on your grade. Both groups train 2–4× per week.
+          </div>
+        )}
+        <ScheduleRow group={lift} />
+      </div>
+
+      <div style={{
+        borderTop: '1px solid var(--border)', padding: '8px 14px',
+        fontSize: 11, color: 'var(--fg-subtle)',
+      }}>
+        625 N Spring St · Middletown, PA 17057 · Groups capped at 9
+      </div>
+    </div>
+  );
+}
+
+function ScheduleRow(props) {
+  var g = props.group;
+  return (
+    <div style={{ display: 'flex', gap: 10 }}>
+      <div style={{ flexShrink: 0, width: 3, borderRadius: 2, background: props.highlight ? 'var(--teal)' : 'var(--border)', alignSelf: 'stretch' }} />
+      <div style={{ flex: 1 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 8 }}>
+          <span style={{ fontWeight: 700, fontSize: 13, color: 'var(--fg)' }}>{g.label}</span>
+          <span style={{ fontSize: 11, color: 'var(--fg-subtle)', whiteSpace: 'nowrap' }}>{g.ages}</span>
+        </div>
+        <div style={{ marginTop: 4, display: 'flex', flexDirection: 'column', gap: 2 }}>
+          {g.times.map(function (t, i) {
+            return (
+              <span key={i} style={{ fontSize: 12, color: props.highlight ? 'var(--fg)' : 'var(--fg-subtle)', fontVariantNumeric: 'tabular-nums' }}>
+                {t}
+              </span>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function Step2(props) {
   var CH3 = window.CH3;
+  var grade = props.form ? props.form.grade : '';
 
   return (
     <div className="fbody" key="s2">
       <h1 className="fstep-title">Choose your <em>plan.</em></h1>
       <p className="fstep-sub">Pick the level of commitment that fits your goals. All memberships include a free first session.</p>
 
-      <div className="fgroup-label">Membership</div>
+      <SchedulePreview grade={grade} />
+
+      <div className="fgroup-label" style={{ marginTop: 20 }}>Membership</div>
       <div className="plans">
         {CH3.PLANS.map(function (p) {
           return (
@@ -168,4 +251,4 @@ function Step2(props) {
   );
 }
 
-Object.assign(window, { Step2, PlanCard, CommitmentSelector });
+Object.assign(window, { Step2, PlanCard, CommitmentSelector, SchedulePreview, ScheduleRow });

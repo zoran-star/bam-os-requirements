@@ -165,6 +165,7 @@ function App() {
       {step === 1 && <Step1 form={form} setForm={setForm} showErrors={showErr1} />}
       {step === 2 && (
         <Step2
+          form={form}
           selectedPlan={selectedPlan}
           onSelectPlan={setSelectedPlan}
           selectedCommitment={selectedCommitment}
