@@ -21,6 +21,7 @@ import { buildAgentSystem } from "./agent/brain.js";
 import { loadContactMemory } from "./agent/contact-memory.js";
 import { respondedStage, contactInRespondedStage, computeQueue } from "./agent/_stage.js";
 import { agentMode, modeIsOn, shouldAutoSend } from "./agent/_mode.js";
+import { resolveAgentActor } from "./agent/_auth.js";
 
 const SUPABASE_URL         = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
@@ -317,12 +318,14 @@ async function handler(req, res) {
     return await runDigest(res);
   }
   if (req.method !== "POST") return res.status(405).json({ error: "POST only" });
-  const staffEmail = await requireStaff(req);
-  if (!staffEmail) return res.status(401).json({ error: "staff only" });
-  if (!ANTHROPIC_KEY) return res.status(500).json({ error: "ANTHROPIC_API_KEY not configured" });
+  // BAM staff OR the academy's own owner / can_train_agent member.
+  const actor = await resolveAgentActor(req);
+  if (!actor) return res.status(401).json({ error: "sign in required" });
 
   const b = req.body && typeof req.body === "object" ? req.body : {};
   const clientId = b.client_id || DEFAULT_CLIENT_ID;
+  if (!actor.canActOn(clientId)) return res.status(403).json({ error: "not your academy" });
+  const staffEmail = actor.email;
 
   // Supabase-only actions — handle BEFORE touching GHL so the inbox's frequent
   // count refresh (list-ready) never costs a GHL token fetch / rate-limit hit.
@@ -335,13 +338,17 @@ async function handler(req, res) {
     }
     if (b.action === "skip-ready") {
       if (!b.ready_id) return res.status(400).json({ error: "ready_id required" });
-      await sb(`agent_ready_replies?id=eq.${encodeURIComponent(b.ready_id)}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ status: "skipped", updated_at: new Date().toISOString() }) });
+      // Scope the patch to this academy so an actor can't skip another's row.
+      await sb(`agent_ready_replies?id=eq.${encodeURIComponent(b.ready_id)}&client_id=eq.${clientId}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ status: "skipped", updated_at: new Date().toISOString() }) });
       return res.status(200).json({ ok: true });
     }
   } catch (e) {
     console.error("[agent-approvals]", e);
     return res.status(500).json({ error: e.message || "internal error" });
   }
+
+  // The remaining actions hit GHL/Claude.
+  if (!ANTHROPIC_KEY && b.action === "draft") return res.status(500).json({ error: "ANTHROPIC_API_KEY not configured" });
 
   const client = await loadClient(clientId);
   if (!client) return res.status(404).json({ error: "academy not found" });

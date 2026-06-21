@@ -117,8 +117,13 @@ client-portal.html — right-side drawer, 2 sections: ⏰ Follow-ups (agent-foll
 list/approve via send-now/edit/skip) + 💬 Ready messages (agent-approvals list-ready/
 send w/ ready_id/skip-ready/local-edit). Count refreshed on inbox load. inbound-webhook
 now cancels pending/approved `agent_ready_replies` too (+ notify gate uses agentMode).
-⚠️ Inbox is staff-operated for now (endpoints staff-gated); opening it to academy
-owners (can_train_agent) is a later step.
+Hawkeye inbox access (2026-06-21): approval inbox (agent-approvals + agent-followups
+POST actions) is open to **BAM staff OR the academy's own owner / can_train_agent
+member**, scoped to their client_id. Shared `api/agent/_auth.js` → `resolveAgentActor(req)`
+= `{email,isStaff,academyClientIds,canActOn(clientId)}`; academy actors must pass
+client_id, mutations are `&client_id=eq.` scoped. The autonomy MODE switch
+(agent-config.js + 🎚 Autonomy tab, gated by `_IS_BAM_STAFF`) stays BAM-staff-only.
+Button reveal (`_apxRefreshCount`) is visible-by-default, hides ONLY on 401/403.
 
 ## 5. Per-contact memory — agent remembers each person (PR #612, 2026-06-21)
 The agent personalizes per lead. `api/agent/contact-memory.js` → `loadContactMemory(sb, clientId, contactId)`
