@@ -21319,7 +21319,7 @@ async function fetchAndRenderInbox() {
 // staff-gated). Self-drive sends most of these itself; only the
 // unsure ones land here.
 // ═══════════════════════════════════════════════════════════════
-let _APX_DATA = { followups: [], ready: [] };
+let _APX_DATA = { followups: [], ready: [], lost: [] };
 
 async function _apxPost(endpoint, action, payload) {
   const token = await _mreqAuthToken();
@@ -21358,9 +21358,11 @@ async function _apxRefreshCount() {
   const fu = fuR.status === 'fulfilled' ? fuR.value : {};
   const rd = rdR.status === 'fulfilled' ? rdR.value : {};
   const fups = (fu.followups || []).filter(f => f.status === 'pending');
-  const ready = (rd.ready || []).filter(r => r.status === 'pending');
-  _APX_DATA = { followups: fups, ready };
-  const n = fups.length + ready.length;
+  const all = (rd.ready || []).filter(r => r.status === 'pending');
+  const ready = all.filter(r => r.kind !== 'mark_lost');
+  const lost = all.filter(r => r.kind === 'mark_lost');
+  _APX_DATA = { followups: fups, ready, lost };
+  const n = fups.length + ready.length + lost.length;
   btns.forEach(({ btn, span }) => {
     btn.style.display = '';
     if (span) span.textContent = n ? `(${n})` : '';
@@ -21396,11 +21398,14 @@ async function _apxLoad() {
       _apxPost('/api/agent-approvals', 'list-ready', {}),
     ]);
     const fups = (fu.followups || []).filter(f => f.status === 'pending');
-    const ready = (rd.ready || []).filter(r => r.status === 'pending');
-    _APX_DATA = { followups: fups, ready };
+    const all = (rd.ready || []).filter(r => r.status === 'pending');
+    const ready = all.filter(r => r.kind !== 'mark_lost');
+    const lost = all.filter(r => r.kind === 'mark_lost');
+    _APX_DATA = { followups: fups, ready, lost };
     _apxRender();
     const span = document.getElementById('apx-count');
-    if (span) span.textContent = (fups.length + ready.length) ? `(${fups.length + ready.length})` : '';
+    const n = fups.length + ready.length + lost.length;
+    if (span) span.textContent = n ? `(${n})` : '';
   } catch (e) {
     body.innerHTML = `<div style="color:#e07070;font-size:13px">Couldn't load - ${escapeHTML(e.message)}</div>`;
   }
@@ -21437,18 +21442,61 @@ function _apxCard(kind, r) {
   </div>`;
 }
 
+// A red "suggested Lost" card - confirm marks the lead Lost in the pipeline.
+function _apxLostCard(r) {
+  const reason = escapeHTML(r.lost_reason || 'Other');
+  const closing = (r.draft_message || '').trim();
+  return `<div id="apx-${r.id}" style="background:rgba(224,90,66,0.05);border:1px solid rgba(224,90,66,0.4);border-radius:11px;padding:12px 14px;margin-bottom:9px">
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:5px;flex-wrap:wrap">
+      <span style="font-weight:700;font-size:13.5px">${escapeHTML(r.contact_name || 'Lead')}</span>
+      <span style="font-size:11px;font-weight:700;color:#e0654f;background:rgba(224,90,66,0.12);border-radius:999px;padding:2px 9px">🚫 ${reason}</span>
+      <div style="flex:1"></div>
+      ${typeof r.confidence === 'number' ? `<span style="font-size:11px;color:var(--text-mute)">${Math.round(r.confidence * 100)}% sure</span>` : ''}
+    </div>
+    ${r.reasoning ? `<div style="font-size:12px;color:var(--text-sub);margin-bottom:6px">${escapeHTML(r.reasoning)}</div>` : ''}
+    ${closing ? `<div style="font-size:12.5px;line-height:1.45;background:rgba(255,255,255,.03);border-radius:8px;padding:8px 10px"><span style="color:var(--text-mute);font-size:10.5px">closing text the agent will send:</span><br>${escapeHTML(closing)}</div>` : ''}
+    <div style="display:flex;gap:7px;margin-top:8px;justify-content:flex-end">
+      <button onclick="_apxLostDismiss('${r.id}')" style="background:transparent;border:1px solid var(--border);color:var(--text-sub);border-radius:7px;padding:5px 11px;font-size:12px;cursor:pointer">✕ Dismiss</button>
+      <button onclick="_apxLostConfirm('${r.id}')" style="background:#e0654f;border:1px solid #e0654f;color:#fff;border-radius:7px;padding:5px 13px;font-size:12px;font-weight:700;cursor:pointer">🚫 Confirm Lost</button>
+    </div>
+  </div>`;
+}
+
+async function _apxLostConfirm(id) {
+  const r = _APX_DATA.lost.find(x => x.id === id); if (!r) return;
+  _plConfirmModal({
+    icon: '🚫',
+    title: 'Mark ' + (r.contact_name || 'this lead') + ' as Lost?',
+    body: 'Reason: <b>' + escapeHTML(r.lost_reason || 'Other') + '</b>.' + ((r.draft_message || '').trim() ? ' The closing message is sent, then they\'re marked Lost in the pipeline.' : ' They\'re marked Lost in the pipeline.'),
+    okLabel: 'Mark Lost',
+    onOk: async () => {
+      try {
+        await _apxPost('/api/agent-approvals', 'confirm-lost', { ready_id: r.id, lost_reason: r.lost_reason || null, reply: r.draft_message || '' });
+        _apxRemove(id); _plToast('🚫 Marked Lost');
+      } catch (e) { alert(e.message); }
+    },
+  });
+}
+async function _apxLostDismiss(id) { try { await _apxPost('/api/agent-approvals', 'skip-ready', { ready_id: id }); _apxRemove(id); } catch (e) { alert(e.message); } }
+
 function _apxRender() {
   const body = document.getElementById('apx-body');
   if (!body) return;
-  const { followups, ready } = _APX_DATA;
+  const { followups, ready, lost } = _APX_DATA;
   const sec = (title, items, kind) => `
     <div style="font-size:13px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:var(--text-mute);margin:4px 0 10px">${title} ${items.length ? `· ${items.length}` : ''}</div>
     ${items.length ? items.map(r => _apxCard(kind, r)).join('') : `<div style="color:var(--text-mute);font-size:13px;padding:2px 0 14px">Nothing waiting.</div>`}`;
-  body.innerHTML =
+  let html =
     sec('⏰ Follow-ups', followups, 'followup') +
     `<div style="height:8px"></div>` +
     sec('💬 Ready messages', ready, 'ready');
-  if (!followups.length && !ready.length) {
+  if ((lost || []).length) {
+    html += `<div style="height:8px"></div>`
+      + `<div style="font-size:13px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:#e0654f;margin:4px 0 10px">🚫 Suggested Lost · ${lost.length}</div>`
+      + lost.map(_apxLostCard).join('');
+  }
+  body.innerHTML = html;
+  if (!followups.length && !ready.length && !(lost || []).length) {
     body.innerHTML = `<div style="text-align:center;color:var(--text-mute);font-size:14px;padding:40px 10px">✅ All clear - nothing waiting for approval.</div>`;
   }
 }
@@ -21456,9 +21504,10 @@ function _apxRender() {
 function _apxRemove(id) {
   _APX_DATA.followups = _APX_DATA.followups.filter(x => x.id !== id);
   _APX_DATA.ready = _APX_DATA.ready.filter(x => x.id !== id);
+  _APX_DATA.lost = (_APX_DATA.lost || []).filter(x => x.id !== id);
   _apxRender();
   const span = document.getElementById('apx-count');
-  const n = _APX_DATA.followups.length + _APX_DATA.ready.length;
+  const n = _APX_DATA.followups.length + _APX_DATA.ready.length + (_APX_DATA.lost || []).length;
   if (span) span.textContent = n ? `(${n})` : '';
 }
 

@@ -75,7 +75,8 @@ const LIVE_BOOKING_TRAILER =
   `<live_booking>\n` +
   `You are drafting the next SMS to a REAL lead who just replied and is in the "Responded" stage. Your single goal is to book them into a free trial. A human reviews your draft before it sends. ` +
   `Respond ONLY by calling propose_reply: 'reply' = the exact text to send; 'reasoning' = 1-2 sentence why; 'confidence' = 0..1; ` +
-  `'asked_to_book' = true if your reply invites them to book/come in; 'escalate' = true (with 'escalate_reason', reply empty) if your guardrails say to hand to a human instead of replying.\n</live_booking>`;
+  `'asked_to_book' = true if your reply invites them to book/come in; 'escalate' = true (with 'escalate_reason', reply empty) if your guardrails say to hand to a human instead of replying. ` +
+  `If your lost_criteria say this lead should be closed out, set 'recommend_lost' = true with a short 'lost_reason' from the taxonomy, and put your warm closing message in 'reply' (a human confirms the Lost before anything changes).\n</live_booking>`;
 function buildSystem({ lessons, overrides, examples }) {
   return buildAgentSystem({ lessons, overrides, examples, trailer: LIVE_BOOKING_TRAILER });
 }
@@ -92,6 +93,8 @@ const REPLY_TOOL = {
       asked_to_book:   { type: "boolean", description: "True if this reply invites the lead to book or come in." },
       escalate:        { type: "boolean", description: "True if guardrails say to hand to a human instead of replying." },
       escalate_reason: { type: "string", description: "If escalate: why." },
+      recommend_lost:  { type: "boolean", description: "True if your lost_criteria say this lead should be marked Lost (a human confirms it)." },
+      lost_reason:     { type: "string", description: "If recommend_lost: the closest taxonomy reason (Too expensive / Not enough time / Started other programs / Not locked in / Bad fit / Invalid lead / Opted out / Other)." },
     },
     required: ["reply", "reasoning", "confidence", "escalate"],
   },
@@ -164,6 +167,8 @@ async function draftForContact(token, locationId, clientId, contactId, cfg, opts
     escalate: !!out.escalate,
     escalate_reason: out.escalate_reason || null,
     asked_to_book: !!out.asked_to_book || BOOK_ASK.test(out.reply || ""),
+    recommend_lost: !!out.recommend_lost,
+    lost_reason: out.lost_reason || null,
     reply_count: agentMsgs.length,
     booking_asks: agentMsgs.filter(m => BOOK_ASK.test(m.text)).length,
   };
@@ -197,7 +202,7 @@ async function detectForClient(client) {
   if (!rs) return { client_id: client.id, skipped: "no Responded stage" };
 
   const cfg = await loadConfig(client.id);
-  let drafted = 0, autoSent = 0, skipped = 0, escalated = 0;
+  let drafted = 0, autoSent = 0, skipped = 0, escalated = 0, lostProposed = 0;
 
   // Cap how many contacts we draft per run so a big Responded queue can't burst
   // GHL's rate limit (each draft hits GHL for the thread + Claude).
@@ -217,6 +222,23 @@ async function detectForClient(client) {
     // so the detector makes ONE GHL call (the thread) per contact, not four.
     try { d = await draftForContact(token, locationId, client.id, contactId, cfg, { rs, conversationId: item.conversation_id, skipStageGuard: true }); }
     catch (_) { skipped++; continue; }
+
+    // Lost proposal: the agent thinks this lead is dead. ALWAYS queue it for a
+    // human in Hawkeye — never auto-mark, even in self-drive. The warm closing
+    // message (if any) rides along in draft_message and sends on confirm.
+    if (d.recommend_lost) {
+      try {
+        await sb(`agent_ready_replies`, { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify([{
+          client_id: client.id, ghl_contact_id: String(contactId), ghl_conversation_id: d.conversation_id || null,
+          contact_name: item.name || null, kind: "mark_lost", lost_reason: d.lost_reason || "Other",
+          draft_message: (d.reply && String(d.reply).trim()) ? d.reply : "", reasoning: d.reasoning || null,
+          confidence: d.confidence, last_lead_at: item.last_at || null, status: "pending", created_by: "detector",
+        }]) });
+        lostProposed++;
+      } catch (_) { skipped++; }
+      continue;
+    }
+
     if (d.error || !d.reply || !String(d.reply).trim()) {
       if (d.escalate) escalated++; else skipped++;
       // Still queue an escalation so a human sees it (no message to auto-send).
@@ -260,7 +282,7 @@ async function detectForClient(client) {
       } catch (_) { skipped++; }
     }
   }
-  return { client_id: client.id, business: client.business_name, mode, queued: queue.length, drafted, auto_sent: autoSent, escalated, skipped };
+  return { client_id: client.id, business: client.business_name, mode, queued: queue.length, drafted, auto_sent: autoSent, escalated, lost_proposed: lostProposed, skipped };
 }
 
 async function runDetect(res, onlyClientId) {
@@ -413,6 +435,34 @@ async function handler(req, res) {
         try { await sb(`agent_ready_replies?id=eq.${encodeURIComponent(b.ready_id)}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ status: "sent", approved_by: staffEmail, approved_at: new Date().toISOString(), sent_at: new Date().toISOString(), updated_at: new Date().toISOString() }) }); } catch (_) {}
       }
       return res.status(200).json({ ok: true, sent: true, lesson_id: lessonId });
+    }
+
+    // Confirm a Lost suggestion: optionally send the warm closing message, then
+    // mark the lead's opportunity Lost in GHL with the reason, and close the row.
+    if (b.action === "confirm-lost") {
+      if (!b.ready_id) return res.status(400).json({ error: "ready_id required" });
+      const [row] = await sb(`agent_ready_replies?id=eq.${encodeURIComponent(b.ready_id)}&client_id=eq.${clientId}&select=*`);
+      if (!row) return res.status(404).json({ error: "not found" });
+      const contactId = row.ghl_contact_id;
+      // Find this contact's opportunity so we can set its status.
+      let oppId = null;
+      try {
+        const d = await ghl("GET", `/opportunities/search?${new URLSearchParams({ location_id: locationId, contact_id: contactId, limit: "20" })}`, { token });
+        const opps = d.opportunities || d.data || [];
+        const pick = opps.find(o => String(o.status || "").toLowerCase() === "open") || opps[0];
+        oppId = pick && pick.id;
+      } catch (e) { return res.status(e.status || 502).json({ error: `GHL find opp: ${e.message}` }); }
+      if (!oppId) return res.status(200).json({ error: "No opportunity found for this contact — nothing to mark lost." });
+      // Send the warm closing message first, if the agent wrote one and staff kept it.
+      const closing = (typeof b.reply === "string" ? b.reply : row.draft_message) || "";
+      if (closing.trim()) { try { await sendReplyViaGhl(token, contactId, closing.trim()); } catch (_) {} }
+      try {
+        await ghl("PUT", `/opportunities/${encodeURIComponent(oppId)}`, { token, body: { status: "lost" } });
+      } catch (e) { return res.status(e.status || 502).json({ error: `GHL mark lost: ${e.message}` }); }
+      const reason = (b.lost_reason || row.lost_reason || "").toString().trim() || null;
+      try { await sb(`pipeline_outcomes`, { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify([{ client_id: clientId, opportunity_id: oppId, status: "lost", reason }]) }); } catch (_) {}
+      try { await sb(`agent_ready_replies?id=eq.${encodeURIComponent(b.ready_id)}&client_id=eq.${clientId}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ status: "sent", approved_by: staffEmail, approved_at: new Date().toISOString(), sent_at: new Date().toISOString(), updated_at: new Date().toISOString() }) }); } catch (_) {}
+      return res.status(200).json({ ok: true, marked_lost: true, opportunity_id: oppId, reason });
     }
 
     return res.status(400).json({ error: "unknown action" });
