@@ -124,6 +124,18 @@ member**, scoped to their client_id. Shared `api/agent/_auth.js` → `resolveAge
 client_id, mutations are `&client_id=eq.` scoped. The autonomy MODE switch
 (agent-config.js + 🎚 Autonomy tab, gated by `_IS_BAM_STAFF`) stays BAM-staff-only.
 Button reveal (`_apxRefreshCount`) is visible-by-default, hides ONLY on 401/403.
+Agent suggests LOST (2026-06-21): the reply agent can recommend marking a lead Lost
+(propose_reply tool fields `recommend_lost`+`lost_reason`; criteria in new
+`lost_criteria` brain section, goal layer). Detector stores it as
+`agent_ready_replies.kind='mark_lost'` (+lost_reason; migration 20260621120000) —
+ALWAYS queued for human confirm, NEVER auto-marked even in self-drive. Hawkeye
+shows a red "🚫 Suggested Lost" section; Confirm → `agent-approvals confirm-lost`
+finds the opp, optionally sends the warm closing msg, PUTs GHL status=lost, logs
+pipeline_outcomes. Cases: hard no / chose-elsewhere / price-final / location / kid-
+not-into-it / bad-fit / invalid-lead / opted-out / SOFT no's ("no time","maybe next
+season"). NOT lost: booked, "let me think/talk to spouse" (nurture), no-response
+(→ ghosted sequence, NOT lost), complaint/off-topic (→ escalate). ⚠️ ghosted routing
+still relies on the Ghosted GHL workflow being set on the offer.
 Hawkeye edits TRAIN (2026-06-21): editing a ready reply or follow-up in the drawer
 prompts "teach the agent why?" and `_apxTeach()` calls `/api/agent-train` `teach`
 (same classify-and-promote pipeline as the Train Agent tab) with context
