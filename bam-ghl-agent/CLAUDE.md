@@ -271,6 +271,7 @@ All frontend work follows the **Full Control design system** at [`front-end/full
 - Gold (`#E8C547`) is the only accent — one moment per screen
 - No shadows, no gradients, no rounded corners > 6px
 - UX principle: guiding info at the point of action; minimize eye travel
+- **NEVER use em dashes (—, U+2014) in portal UI** (client portal `bam-portal/public/client-portal.html` + staff portal `bam-portal/src/`). Use a hyphen `-`. For empty fields use `-`, not `—`. Don't use an em dash as a JS "empty" sentinel; detect the placeholder by shape (e.g. money `startsWith('$')`). Note: backend `api/*.js` still emits some `"—"` placeholders; the client should hide/replace them, not render them.
 
 ---
 
