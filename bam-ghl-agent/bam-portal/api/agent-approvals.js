@@ -27,6 +27,7 @@ const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.en
 const ANTHROPIC_KEY        = process.env.ANTHROPIC_API_KEY;
 const ANTHROPIC_MODEL      = "claude-sonnet-4-6";
 const DEFAULT_CLIENT_ID    = "39875f07-0a4b-4429-a201-2249bc1f24df"; // BAM GTA
+const DETECT_CAP           = 10;   // max ready replies drafted per academy per run
 
 const BOOK_ASK = /(would you like to|want to|wanna|do you want to|happy to have you|can you make it|are you free).*(come|book|try|drop by|stop by|swing by|check|visit|session)|come (by|in|on (in|by)|and (see|try|check)|check (it|us) out)|check (it|us) out|book(ing)? (a|the|your|in)?\s*(free\s*)?(trial|session|spot)|(grab|reserve|save) (a|the|your)?\s*spot|see if it'?s a (good )?fit|pop (by|in)|see you (there|then)/i;
 
@@ -134,21 +135,28 @@ async function threadMessages(token, conversationId) {
 
 // Draft the agent's next reply for one Responded-stage contact. Returns the
 // structured proposal (reply/reasoning/confidence/escalate/…) or { error }.
-// Shared by the on-demand `draft` action and the `detect` cron.
-async function draftForContact(token, locationId, clientId, contactId, cfg, rs) {
-  rs = rs || await respondedStage(token, locationId);
+// Shared by the on-demand `draft` action and the `detect` cron. opts lets the
+// detector skip GHL calls it already made via computeQueue (stage check +
+// conversation lookup) to stay well under GHL's rate limit:
+//   { rs, conversationId, skipStageGuard }
+async function draftForContact(token, locationId, clientId, contactId, cfg, opts = {}) {
+  const rs = opts.rs || await respondedStage(token, locationId);
   if (!rs) return { error: "No Responded stage found in the Training Pipeline." };
-  if (!(await contactInRespondedStage(token, locationId, contactId, rs))) {
+  if (!opts.skipStageGuard && !(await contactInRespondedStage(token, locationId, contactId, rs))) {
     return { error: "This lead isn't in the Responded stage — the bot only replies to Responded-stage leads." };
   }
-  const convo = await findConversation(token, locationId, contactId);
-  if (!convo) return { error: "no conversation for contact" };
-  const messages = await threadMessages(token, convo.id);
+  let conversationId = opts.conversationId;
+  if (!conversationId) {
+    const convo = await findConversation(token, locationId, contactId);
+    if (!convo) return { error: "no conversation for contact" };
+    conversationId = convo.id;
+  }
+  const messages = await threadMessages(token, conversationId);
   const system = buildSystem(cfg) + await loadContactMemory(sb, clientId, contactId);
   const out = await runAgent(system, messages);
   const agentMsgs = messages.filter(m => m.role === "agent");
   return {
-    conversation_id: convo.id,
+    conversation_id: conversationId,
     reply: out.reply || "",
     reasoning: out.reasoning || "",
     confidence: typeof out.confidence === "number" ? out.confidence : null,
@@ -190,7 +198,9 @@ async function detectForClient(client) {
   const cfg = await loadConfig(client.id);
   let drafted = 0, autoSent = 0, skipped = 0, escalated = 0;
 
-  for (const item of queue) {
+  // Cap how many contacts we draft per run so a big Responded queue can't burst
+  // GHL's rate limit (each draft hits GHL for the thread + Claude).
+  for (const item of queue.slice(0, DETECT_CAP)) {
     const contactId = item.contact_id;
     if (!contactId) { skipped++; continue; }
     // Dedupe: skip if an active draft exists, or we already answered THIS inbound.
@@ -202,7 +212,9 @@ async function detectForClient(client) {
     } catch (_) {}
 
     let d;
-    try { d = await draftForContact(token, locationId, client.id, contactId, cfg, rs); }
+    // The queue already proved the stage + found the conversation — reuse both
+    // so the detector makes ONE GHL call (the thread) per contact, not four.
+    try { d = await draftForContact(token, locationId, client.id, contactId, cfg, { rs, conversationId: item.conversation_id, skipStageGuard: true }); }
     catch (_) { skipped++; continue; }
     if (d.error || !d.reply || !String(d.reply).trim()) {
       if (d.escalate) escalated++; else skipped++;
@@ -281,7 +293,7 @@ async function runDigest(res) {
       if (!creds) continue;
       const { queue } = await computeQueue(creds.token, creds.locationId);
       if (queue.length > 0) {
-        const msg = `🤖 ${queue.length} chat${queue.length === 1 ? "" : "s"} waiting for your approval (${client.business_name || "academy"}). Open the portal → Inbox → 🤖 Bot.`;
+        const msg = `🤖 ${queue.length} chat${queue.length === 1 ? "" : "s"} waiting for your approval (${client.business_name || "academy"}). Open the portal → Inbox → 👁 Hawkeye.`;
         const r = await sendSms({ client, toPhone: cfg.agent_notify_phone, message: msg, contactName: "BAM Agent" });
         out.push({ client_id: client.id, count: queue.length, sent: !!r.ok });
       } else {
@@ -311,18 +323,10 @@ async function handler(req, res) {
 
   const b = req.body && typeof req.body === "object" ? req.body : {};
   const clientId = b.client_id || DEFAULT_CLIENT_ID;
-  const client = await loadClient(clientId);
-  if (!client) return res.status(404).json({ error: "academy not found" });
-  const creds = await pickGhlToken(client);
-  if (!creds) return res.status(400).json({ error: "academy not connected to GHL" });
-  const { token, locationId } = creds;
 
+  // Supabase-only actions — handle BEFORE touching GHL so the inbox's frequent
+  // count refresh (list-ready) never costs a GHL token fetch / rate-limit hit.
   try {
-    if (b.action === "list") {
-      const { queue } = await computeQueue(token, locationId);
-      return res.status(200).json({ queue, count: queue.length });
-    }
-
     // Ready-reply queue (the inbox's "💬 Ready messages" section): pending +
     // approved drafts for this academy, newest first.
     if (b.action === "list-ready") {
@@ -333,6 +337,22 @@ async function handler(req, res) {
       if (!b.ready_id) return res.status(400).json({ error: "ready_id required" });
       await sb(`agent_ready_replies?id=eq.${encodeURIComponent(b.ready_id)}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ status: "skipped", updated_at: new Date().toISOString() }) });
       return res.status(200).json({ ok: true });
+    }
+  } catch (e) {
+    console.error("[agent-approvals]", e);
+    return res.status(500).json({ error: e.message || "internal error" });
+  }
+
+  const client = await loadClient(clientId);
+  if (!client) return res.status(404).json({ error: "academy not found" });
+  const creds = await pickGhlToken(client);
+  if (!creds) return res.status(400).json({ error: "academy not connected to GHL" });
+  const { token, locationId } = creds;
+
+  try {
+    if (b.action === "list") {
+      const { queue } = await computeQueue(token, locationId);
+      return res.status(200).json({ queue, count: queue.length });
     }
 
     if (b.action === "draft") {

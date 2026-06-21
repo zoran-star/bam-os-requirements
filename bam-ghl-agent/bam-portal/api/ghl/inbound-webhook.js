@@ -175,7 +175,7 @@ async function handler(req, res) {
         const rs = await respondedStage(creds.token, creds.locationId);
         if (rs && await contactInRespondedStage(creds.token, creds.locationId, String(contactId), rs)) {
           const who = pick(p, ["full_name", "fullName", "contactName", "name", "first_name"]) || "a lead";
-          await sendSms({ client, toPhone: cfg.agent_notify_phone, message: `🤖 New chat to approve — ${who} just replied (${client.business_name || "academy"}). Portal → Inbox → 🤖 Bot.`, contactName: "BAM Agent" });
+          await sendSms({ client, toPhone: cfg.agent_notify_phone, message: `🤖 New chat to approve - ${who} just replied (${client.business_name || "academy"}). Portal → Inbox → 👁 Hawkeye.`, contactName: "BAM Agent" });
         }
       }
     }

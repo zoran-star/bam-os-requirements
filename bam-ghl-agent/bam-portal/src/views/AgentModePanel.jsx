@@ -15,7 +15,7 @@ async function api(action, payload = {}) {
 }
 
 const MODES = [
-  { key: "off",        label: "Off",        hint: "Agent is silent — nothing drafts or sends." },
+  { key: "off",        label: "Off",        hint: "Agent is silent - nothing drafts or sends." },
   { key: "hawkeye",    label: "👁 Hawkeye", hint: "Agent drafts every message; you approve each one before it sends." },
   { key: "self_drive", label: "🚀 Self-drive", hint: "Agent sends high-confidence messages itself. Anything it's unsure about still drops to the inbox." },
 ];
@@ -61,7 +61,7 @@ export default function AgentModePanel({ tokens }) {
       <div style={{ fontSize: 13, color: sub, lineHeight: 1.6, marginBottom: 16, maxWidth: 660 }}>
         One switch per academy. It controls <b style={{ color: text }}>both</b> the Responded-stage reply bot and the
         follow-up nudge engine. In <b style={{ color: text }}>Hawkeye</b>, every message waits for approval in that
-        academy's <b style={{ color: text }}>Inbox → 📨 Approve</b>. In <b style={{ color: red }}>Self-drive</b>, the agent
+        academy's <b style={{ color: text }}>Inbox → 👁 Hawkeye</b>. In <b style={{ color: red }}>Self-drive</b>, the agent
         texts leads on its own.
       </div>
 
@@ -85,7 +85,7 @@ export default function AgentModePanel({ tokens }) {
             </div>
             <div style={{ fontSize: 12, color: row.mode === "self_drive" ? red : sub }}>{cur.hint}</div>
             {!row.notify_phone && row.mode !== "off" && (
-              <div style={{ fontSize: 11.5, color: mute, marginTop: 6 }}>⚠ No notify phone set (ghl_kpi_config.agent_notify_phone) — no SMS alerts when chats are waiting.</div>
+              <div style={{ fontSize: 11.5, color: mute, marginTop: 6 }}>⚠ No notify phone set (ghl_kpi_config.agent_notify_phone) - no SMS alerts when chats are waiting.</div>
             )}
           </div>
         );
@@ -97,7 +97,7 @@ export default function AgentModePanel({ tokens }) {
             <div style={{ fontSize: 30, marginBottom: 10 }}>⚠️</div>
             <div style={{ fontSize: 18, fontWeight: 800, color: red, marginBottom: 8 }}>Turn on Self-drive for {warn.business_name}?</div>
             <div style={{ fontSize: 13.5, color: sub, lineHeight: 1.6, marginBottom: 20 }}>
-              The agent will <b style={{ color: text }}>text real leads on its own</b> — no approval — whenever it's confident.
+              The agent will <b style={{ color: text }}>text real leads on its own</b> - no approval - whenever it's confident.
               Unsure messages still drop to the inbox, but confident ones <b style={{ color: text }}>send themselves</b>.
               Make sure the brain is trained and any duplicate GHL workflow texts are turned off first.
             </div>
