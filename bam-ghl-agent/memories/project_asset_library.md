@@ -27,6 +27,16 @@ A client reported the Assets picker wouldn't let them select videos — the file
   upload fine; only the project-wide Storage upload limit applies (raise it if big videos 400).
 - The secondary per-offer/staff/location "asset bank" picker (`_assetBankUpload`) stays
   **image-only** on purpose (headshots/logos).
+
+**Large-file link fallback (50MB Storage limit).** The project-wide Storage upload limit is
+**50MB** (confirmed 2026-06-21), so a single phone video can't upload. Migration `20260621140000`
+also adds **`client_assets.link_url`** + drops the `storage_path` NOT NULL constraint:
+- `_uploadAssets` pre-checks `file.size`; files > 50MB are skipped + a one-shot `_assetUploadNudge`
+  points them to the link field.
+- Toolbar has a "Paste a share link" input + `_addAssetLink()` (reuses `_isValidAssetLink`),
+  with a note to set sharing to **"Anyone with the link can view."** Link assets have
+  `link_url` set, `storage_path` null; `_assetCard` renders an "Open link" tile; `_assetRemove`
+  skips the bucket delete. To raise the cap instead: Supabase Settings → Storage upload limit.
 - Bucket **`client-assets`** (public). Path: `<client_id>/<stamp>-<name>`.
 - RLS mirrors the `offers` table/bucket: table policies = `is_staff() or
   client_id in (select my_client_ids())`; storage policies = public read +
