@@ -14210,7 +14210,10 @@ async function _bbRenderAgentLearnings(panel) {
 // + the academy's own brain facts (schedule/pricing/coaches/policies).
 // All writes go to /api/agent-train, which enforces local-only server-side.
 // ════════════════════════════════════════════════════════════════════════
-const _TA = { tab: 'test', chat: [], sending: false };
+const _TA = { tab: 'test', chat: [], sending: false, openSections: {} };
+// Buttons here can't use .btn-primary-bb (that class is scoped to #view-blueprint).
+const _TA_BTN  = "background:var(--gold);color:#0B0B0D;border:none;border-radius:8px;padding:8px 16px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit";
+const _TA_BTN2 = "background:transparent;color:var(--text-sub);border:1px solid var(--border);border-radius:8px;padding:8px 14px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit";
 
 async function _taApi(action, extra) {
   const token = await _mreqAuthToken();
@@ -14255,7 +14258,7 @@ function _taRenderTest() {
     <div id="ta-chat" style="display:flex;flex-direction:column;gap:10px;margin-bottom:14px;min-height:40px"></div>
     <div style="display:flex;gap:8px;align-items:flex-end">
       <textarea id="ta-chat-input" rows="2" placeholder="Type as the lead…" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();_taSend();}" style="flex:1;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:10px 12px;color:var(--text);font-size:14px;resize:vertical;font-family:inherit"></textarea>
-      <button class="btn-primary-bb" id="ta-send-btn" onclick="_taSend()">Send</button>
+      <button id="ta-send-btn" style="${_TA_BTN}" onclick="_taSend()">Send</button>
     </div>
     <button onclick="_TA.chat=[];_taRenderTest()" style="margin-top:10px;background:none;border:none;color:var(--text-mute);font-size:12px;cursor:pointer">↺ reset conversation</button>`;
   _taRenderChatLog();
@@ -14264,15 +14267,63 @@ function _taRenderTest() {
 function _taRenderChatLog() {
   const log = document.getElementById('ta-chat'); if (!log) return;
   if (!_TA.chat.length) { log.innerHTML = `<div style="color:var(--text-mute);font-size:13px;padding:8px 0">No messages yet — say something as the lead.</div>`; return; }
-  log.innerHTML = _TA.chat.map(m => {
+  log.innerHTML = _TA.chat.map((m, i) => {
     if (m.role === 'parent') {
       return `<div style="align-self:flex-end;max-width:80%;background:var(--gold);color:#0B0B0D;border-radius:14px 14px 4px 14px;padding:9px 13px;font-size:14px">${escapeHTML(m.text)}</div>`;
     }
     if (m.role === 'escalate') {
       return `<div style="align-self:flex-start;max-width:85%;background:var(--surface);border:1px dashed var(--gold);border-radius:14px;padding:10px 13px;font-size:13px;color:var(--text-sub)">🚩 The agent would stop and flag this to a human.${m.reason ? `<div style="margin-top:4px;color:var(--text-mute);font-size:12px">${escapeHTML(m.reason)}</div>` : ''}</div>`;
     }
-    return `<div style="align-self:flex-start;max-width:85%"><div style="background:var(--surface);border:1px solid var(--border);border-radius:14px 14px 14px 4px;padding:9px 13px;font-size:14px;color:var(--text)">${escapeHTML(m.text)}</div>${m.reasoning ? `<div style="margin-top:4px;color:var(--text-mute);font-size:11.5px;font-style:italic">${escapeHTML(m.reasoning)}</div>` : ''}</div>`;
+    // Agent reply: bubble + confidence + reasoning + source pills + actions.
+    const pct = (typeof m.confidence === 'number') ? Math.round(m.confidence * 100) + '% sure' : '';
+    const conf = pct ? `<span style="font-size:10.5px;font-family:'JetBrains Mono',monospace;color:#5BBF7B;border:1px solid #5BBF7B55;border-radius:99px;padding:1px 8px">${pct}</span>` : '';
+    const pills = (Array.isArray(m.sources) && m.sources.length)
+      ? `<div style="margin-top:5px;font-size:11px;color:var(--text-mute);display:flex;align-items:center;gap:6px;flex-wrap:wrap">📍 <span>from:</span>${m.sources.map(s => `<span style="border:1px solid var(--border);border-radius:99px;padding:1px 8px;color:var(--text-sub)">${escapeHTML(s)}</span>`).join('')}</div>`
+      : '';
+    const reasoning = m.reasoning ? `<div style="margin-top:5px;color:var(--text-mute);font-size:11.5px;font-style:italic">🧠 ${escapeHTML(m.reasoning)}${pct ? ` · ${pct}` : ''}</div>` : '';
+    const actions = m.error ? '' : `<div style="margin-top:6px;display:flex;gap:14px">
+        <button onclick="_taChatTeach(${i})" style="background:none;border:none;color:var(--text-sub);font-size:12px;cursor:pointer;font-family:inherit">📝 teach</button>
+        <button onclick="_taSaveExample(${i})" style="background:none;border:none;color:var(--text-sub);font-size:12px;cursor:pointer;font-family:inherit">⭐ save as example</button>
+      </div>`;
+    return `<div style="align-self:flex-start;max-width:88%;width:100%">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:3px"><span style="font-size:12px;color:var(--text-sub)">🤖 agent</span>${conf}</div>
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:14px 14px 14px 4px;padding:10px 13px;font-size:14px;color:var(--text)">${escapeHTML(m.text)}</div>
+      ${reasoning}${pills}${actions}
+      <div id="ta-chat-teach-${i}"></div>
+    </div>`;
   }).join('');
+}
+
+// Inline "teach a correction" box under an agent reply.
+function _taChatTeach(i) {
+  const host = document.getElementById('ta-chat-teach-' + i); if (!host) return;
+  if (host.dataset.open === '1') { host.innerHTML = ''; host.dataset.open = '0'; return; }
+  host.dataset.open = '1';
+  host.innerHTML = `<div style="margin-top:8px;display:flex;gap:8px;align-items:flex-end">
+    <textarea id="ta-chat-teach-input-${i}" rows="2" placeholder="What should it have done instead?" style="flex:1;background:var(--surface-el,#222);border:1px solid var(--border);border-radius:8px;padding:8px 10px;color:var(--text);font-size:13px;resize:vertical;font-family:inherit"></textarea>
+    <button style="${_TA_BTN}" onclick="_taChatTeachSave(${i})">Save lesson</button>
+  </div><div id="ta-chat-teach-note-${i}" style="font-size:12px;margin-top:4px"></div>`;
+}
+async function _taChatTeachSave(i) {
+  const ta = document.getElementById('ta-chat-teach-input-' + i); if (!ta) return;
+  const text = ta.value.trim(); if (!text) return;
+  const note = document.getElementById('ta-chat-teach-note-' + i);
+  try {
+    const res = await _taApi('teach', { lesson: text });
+    if (note) note.innerHTML = res.proposed_global
+      ? `<span style="color:var(--gold)">🌐 Looks like global strategy — sent to BAM for approval.</span>`
+      : `<span style="color:#5BBF7B">📍 Saved to your academy.</span>`;
+    ta.value = '';
+  } catch (e) { if (note) note.innerHTML = `<span style="color:#E5736A">${escapeHTML(e.message)}</span>`; }
+}
+// Save the last lead message + this agent reply as an approved example.
+async function _taSaveExample(i) {
+  const agent = _TA.chat[i];
+  let parent = null;
+  for (let j = i - 1; j >= 0; j--) { if (_TA.chat[j].role === 'parent') { parent = _TA.chat[j]; break; } }
+  if (!agent || !parent) return alert('Need a lead message + an agent reply to save.');
+  try { await _taApi('save-example', { parent_text: parent.text, agent_text: agent.text }); alert('Saved as an example ⭐'); }
+  catch (e) { alert(e.message); }
 }
 
 async function _taSend() {
@@ -14286,9 +14337,9 @@ async function _taSend() {
   try {
     const res = await _taApi('chat', { messages: _TA.chat.map(m => ({ role: m.role === 'parent' ? 'parent' : 'agent', text: m.text })).filter(m => m.role === 'parent' || m.role === 'agent') });
     if (res.escalate) _TA.chat.push({ role: 'escalate', reason: res.escalate_reason });
-    else _TA.chat.push({ role: 'agent', text: res.reply, reasoning: res.reasoning });
+    else _TA.chat.push({ role: 'agent', text: res.reply, reasoning: res.reasoning, confidence: res.confidence, sources: res.sources });
   } catch (e) {
-    _TA.chat.push({ role: 'agent', text: '⚠️ ' + e.message });
+    _TA.chat.push({ role: 'agent', text: '⚠️ ' + e.message, error: true });
   } finally {
     _TA.sending = false;
     const b = document.getElementById('ta-send-btn'); if (b) { b.disabled = false; b.textContent = 'Send'; }
@@ -14304,7 +14355,7 @@ function _taRenderLessons() {
       <div style="font-weight:600;font-size:14px;margin-bottom:8px">Teach a lesson</div>
       <textarea id="ta-teach-input" rows="3" placeholder="e.g. When a parent asks about parking, mention there's free lot parking out front." style="width:100%;box-sizing:border-box;background:var(--surface-el,#222);border:1px solid var(--border);border-radius:10px;padding:10px 12px;color:var(--text);font-size:14px;resize:vertical;font-family:inherit"></textarea>
       <div style="display:flex;align-items:center;gap:12px;margin-top:10px">
-        <button class="btn-primary-bb" id="ta-teach-btn" onclick="_taTeach()">Teach lesson</button>
+        <button id="ta-teach-btn" style="${_TA_BTN}" onclick="_taTeach()">Teach lesson</button>
         <div id="ta-teach-note" style="font-size:12.5px"></div>
       </div>
     </div>
@@ -14368,18 +14419,24 @@ async function _taRenderKnowledge() {
     const editable = sections.filter(s => s.editable);
     const locked = sections.filter(s => !s.editable);
     const host = document.getElementById('ta-section-list'); if (!host) return;
-    let html = editable.map(s => `
-      <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px 16px;margin-bottom:12px">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
-          <div style="font-weight:600;font-size:14px">${escapeHTML(s.label)}${s.is_default ? '' : ' <span style="color:var(--gold);font-size:11px;font-family:monospace">✏️ edited</span>'}</div>
+    let html = editable.map(s => {
+      const open = !!_TA.openSections[s.key];
+      return `
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;margin-bottom:10px;overflow:hidden">
+        <button onclick="_taToggleSec('${s.key}')" style="width:100%;display:flex;align-items:center;justify-content:space-between;gap:10px;background:none;border:none;color:var(--text);padding:14px 16px;cursor:pointer;font-family:inherit;text-align:left">
+          <span style="font-weight:600;font-size:14px">${escapeHTML(s.label)}${s.is_default ? '' : ' <span style="color:var(--gold);font-size:11px;font-family:monospace">✏️ edited</span>'}</span>
+          <span id="ta-chev-${s.key}" style="color:var(--text-mute);font-size:11px;transition:transform .15s;transform:rotate(${open ? 90 : 0}deg)">▶</span>
+        </button>
+        <div id="ta-sec-body-${s.key}" style="display:${open ? 'block' : 'none'};padding:0 16px 14px">
+          <textarea id="ta-sec-${s.key}" rows="5" style="width:100%;box-sizing:border-box;background:var(--surface-el,#222);border:1px solid var(--border);border-radius:10px;padding:10px 12px;color:var(--text);font-size:13.5px;resize:vertical;font-family:inherit;line-height:1.5">${escapeHTML(s.body)}</textarea>
+          <div style="display:flex;gap:10px;margin-top:8px;align-items:center">
+            <button style="${_TA_BTN}" onclick="_taSaveSection('${s.key}')">Save</button>
+            ${s.is_default ? '' : `<button style="${_TA_BTN2}" onclick="_taResetSection('${s.key}')">Reset to default</button>`}
+            <span id="ta-sec-note-${s.key}" style="font-size:12px"></span>
+          </div>
         </div>
-        <textarea id="ta-sec-${s.key}" rows="5" style="width:100%;box-sizing:border-box;background:var(--surface-el,#222);border:1px solid var(--border);border-radius:10px;padding:10px 12px;color:var(--text);font-size:13.5px;resize:vertical;font-family:inherit;line-height:1.5">${escapeHTML(s.body)}</textarea>
-        <div style="display:flex;gap:10px;margin-top:8px;align-items:center">
-          <button class="btn-primary-bb" onclick="_taSaveSection('${s.key}')">Save</button>
-          ${s.is_default ? '' : `<button onclick="_taResetSection('${s.key}')" style="background:none;border:1px solid var(--border);color:var(--text-sub);border-radius:8px;padding:7px 12px;font-size:12px;cursor:pointer">Reset to default</button>`}
-          <span id="ta-sec-note-${s.key}" style="font-size:12px"></span>
-        </div>
-      </div>`).join('');
+      </div>`;
+    }).join('');
     if (locked.length) {
       html += `<div style="margin-top:20px"><div style="font-size:12px;color:var(--text-mute);font-family:'JetBrains Mono',monospace;text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px">🔒 Managed by BAM (global)</div>` +
         locked.map(s => `<div style="opacity:.6;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:10px 14px;margin-bottom:6px;font-size:13px">${escapeHTML(s.label)}</div>`).join('') + `</div>`;
@@ -14388,6 +14445,14 @@ async function _taRenderKnowledge() {
   } catch (e) {
     const host = document.getElementById('ta-section-list'); if (host) host.innerHTML = `<div class="bb-empty">Couldn't load — ${escapeHTML(e.message)}</div>`;
   }
+}
+
+function _taToggleSec(key) {
+  _TA.openSections[key] = !_TA.openSections[key];
+  const body = document.getElementById('ta-sec-body-' + key);
+  const chev = document.getElementById('ta-chev-' + key);
+  if (body) body.style.display = _TA.openSections[key] ? 'block' : 'none';
+  if (chev) chev.style.transform = 'rotate(' + (_TA.openSections[key] ? 90 : 0) + 'deg)';
 }
 
 async function _taSaveSection(key) {
