@@ -7222,6 +7222,7 @@ Then the call to action."]</div>
           <button class="ib-tab"    data-tab="leads"   onclick="_ibSetTab('leads')">Leads <span id="ib-count-leads"></span></button>
           <button class="ib-tab"    data-tab="bot"     onclick="_ibSetTab('bot')" title="Replies the bot drafted for leads in the Responded stage — you approve each one">🤖 Bot <span id="ib-count-bot"></span></button>
           <input id="ib-search" class="ib-search" type="text" placeholder="🔍  Search by name or content…" oninput="_ibSetSearch(this.value)">
+          <button id="ib-approve-btn" onclick="_apxOpen()" title="Approve the agent's drafted messages before they send" style="display:none;background:transparent;border:1px solid var(--accent);color:var(--accent);padding:7px 12px;border-radius:4px;cursor:pointer;font-size:12px;font-weight:700">📨 Approve <span id="apx-count" style="font-weight:800"></span></button>
           <button onclick="_ibComposeNew()" title="New message" style="background:var(--accent);border:1px solid var(--accent);color:#08080A;padding:7px 12px;border-radius:4px;cursor:pointer;font-size:12px;font-weight:600">✏️ New</button>
           <button onclick="fetchAndRenderInbox()" title="Refresh" style="background:transparent;border:1px solid var(--border);color:var(--text);padding:7px 12px;border-radius:4px;cursor:pointer;font-size:12px">↻</button>
         </div>
@@ -20881,9 +20882,180 @@ async function fetchAndRenderInbox() {
     if (!r.ok) throw new Error(json.error || ('HTTP ' + r.status));
     _INBOX_DATA = json;
     _renderInboxList();
+    _apxRefreshCount();
   } catch (e) {
     container.innerHTML = `<div class="req-empty" style="padding:20px 0">Couldn't load inbox — ${escapeHTML(e.message)}</div>`;
   }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// APPROVAL INBOX (📨) — unified Hawkeye queue: agent's drafted
+// follow-ups + ready replies, approve/edit/skip before they send.
+// Staff-operated (the agent-approvals / agent-followups APIs are
+// staff-gated). Self-drive sends most of these itself; only the
+// unsure ones land here.
+// ═══════════════════════════════════════════════════════════════
+let _APX_DATA = { followups: [], ready: [] };
+
+async function _apxPost(endpoint, action, payload) {
+  const token = await _mreqAuthToken();
+  const r = await fetch(endpoint, {
+    method: 'POST',
+    headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action, client_id: CLIENT_ID, ...(payload || {}) }),
+  });
+  const json = await _safeJson(r);
+  if (!r.ok) throw new Error(json.error || ('HTTP ' + r.status));
+  return json;
+}
+
+// Show the 📨 button + a live count, for staff only.
+async function _apxRefreshCount() {
+  const btn = document.getElementById('ib-approve-btn');
+  if (!btn) return;
+  const staff = (typeof _IS_BAM_STAFF !== 'undefined' && _IS_BAM_STAFF === true);
+  if (!staff) { btn.style.display = 'none'; return; }
+  btn.style.display = '';
+  try {
+    const [fu, rd] = await Promise.all([
+      _apxPost('/api/agent-followups', 'list', {}).catch(() => ({ followups: [] })),
+      _apxPost('/api/agent-approvals', 'list-ready', {}).catch(() => ({ ready: [] })),
+    ]);
+    const fups = (fu.followups || []).filter(f => f.status === 'pending');
+    const ready = (rd.ready || []).filter(r => r.status === 'pending');
+    _APX_DATA = { followups: fups, ready };
+    const n = fups.length + ready.length;
+    const span = document.getElementById('apx-count');
+    if (span) span.textContent = n ? `(${n})` : '';
+    btn.style.borderColor = n ? 'var(--accent)' : 'var(--border)';
+    btn.style.color = n ? 'var(--accent)' : 'var(--text-mute)';
+  } catch (_) {}
+}
+
+function _apxOpen() {
+  document.getElementById('apx-overlay')?.remove();
+  document.body.insertAdjacentHTML('beforeend', `
+    <div id="apx-overlay" onclick="if(event.target===this)_apxClose()" style="position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9400;display:flex;justify-content:flex-end">
+      <div style="width:480px;max-width:100vw;height:100%;background:var(--bg);border-left:1px solid var(--border);display:flex;flex-direction:column">
+        <div style="padding:16px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px">
+          <div style="font-size:17px;font-weight:800">📨 Approve</div>
+          <div style="font-size:12px;color:var(--text-mute)">agent drafts — approve before they send</div>
+          <div style="flex:1"></div>
+          <button onclick="_apxClose()" aria-label="Close" style="background:none;border:none;color:var(--text-mute);font-size:22px;cursor:pointer;padding:2px 8px">×</button>
+        </div>
+        <div id="apx-body" style="flex:1;overflow-y:auto;padding:16px 18px"><div style="color:var(--text-mute);font-size:13px"><span class="req-spin"></span> Loading…</div></div>
+      </div>
+    </div>`);
+  _apxLoad();
+}
+function _apxClose() { document.getElementById('apx-overlay')?.remove(); }
+
+async function _apxLoad() {
+  const body = document.getElementById('apx-body');
+  if (!body) return;
+  try {
+    const [fu, rd] = await Promise.all([
+      _apxPost('/api/agent-followups', 'list', {}),
+      _apxPost('/api/agent-approvals', 'list-ready', {}),
+    ]);
+    const fups = (fu.followups || []).filter(f => f.status === 'pending');
+    const ready = (rd.ready || []).filter(r => r.status === 'pending');
+    _APX_DATA = { followups: fups, ready };
+    _apxRender();
+    const span = document.getElementById('apx-count');
+    if (span) span.textContent = (fups.length + ready.length) ? `(${fups.length + ready.length})` : '';
+  } catch (e) {
+    body.innerHTML = `<div style="color:#e07070;font-size:13px">Couldn't load — ${escapeHTML(e.message)}</div>`;
+  }
+}
+
+function _apxWhen(ts) {
+  if (!ts) return '';
+  const ms = new Date(ts).getTime() - Date.now(); const past = ms < 0; const a = Math.abs(ms);
+  const h = a / 3600000, d = a / 86400000;
+  const s = d >= 1 ? `${Math.round(d)}d` : h >= 1 ? `${Math.round(h)}h` : `${Math.max(1, Math.round(a / 60000))}m`;
+  return past ? `${s} overdue` : `in ${s}`;
+}
+
+function _apxCard(kind, r) {
+  const esc = r.escalate ? `<div style="font-size:11.5px;color:#e0a020;margin-bottom:6px">⚠ agent escalated${r.escalate_reason ? ': ' + escapeHTML(r.escalate_reason) : ''}</div>` : '';
+  const meta = kind === 'followup'
+    ? `<span style="font-size:11px;font-family:var(--mono,monospace);color:var(--accent)">⏰ ${escapeHTML(_apxWhen(r.scheduled_at))}</span>`
+    : (typeof r.confidence === 'number' ? `<span style="font-size:11px;color:var(--text-mute)">${Math.round(r.confidence * 100)}% sure</span>` : '');
+  const goal = (kind === 'followup' && r.goal) ? `<div style="font-size:11.5px;color:var(--text-sub);margin-bottom:5px">🎯 ${escapeHTML(r.goal)}</div>` : '';
+  const sendFn = kind === 'followup' ? `_apxFollowupSend('${r.id}')` : `_apxReadySend('${r.id}')`;
+  const editFn = kind === 'followup' ? `_apxFollowupEdit('${r.id}')` : `_apxReadyEdit('${r.id}')`;
+  const skipFn = kind === 'followup' ? `_apxFollowupSkip('${r.id}')` : `_apxReadySkip('${r.id}')`;
+  return `<div id="apx-${r.id}" style="background:var(--surface);border:1px solid var(--accent-border,rgba(232,197,71,.3));border-radius:11px;padding:12px 14px;margin-bottom:9px">
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:5px;flex-wrap:wrap">
+      <span style="font-weight:700;font-size:13.5px">${escapeHTML(r.contact_name || 'Lead')}</span>
+      <div style="flex:1"></div>${meta}
+    </div>${goal}${esc}
+    <div style="font-size:13.5px;line-height:1.5;background:rgba(255,255,255,.03);border-radius:8px;padding:8px 10px;white-space:pre-wrap" id="apx-msg-${r.id}">${escapeHTML(r.draft_message || '')}</div>
+    <div style="display:flex;gap:7px;margin-top:8px;flex-wrap:wrap;justify-content:flex-end">
+      <button onclick="${editFn}" style="background:transparent;border:1px solid var(--border);color:var(--text-sub);border-radius:7px;padding:5px 11px;font-size:12px;cursor:pointer">✎ edit</button>
+      <button onclick="${skipFn}" style="background:transparent;border:1px solid var(--border);color:#e07070;border-radius:7px;padding:5px 11px;font-size:12px;cursor:pointer">✕ skip</button>
+      <button onclick="${sendFn}" style="background:var(--accent);border:1px solid var(--accent);color:#08080A;border-radius:7px;padding:5px 13px;font-size:12px;font-weight:700;cursor:pointer">✓ send</button>
+    </div>
+  </div>`;
+}
+
+function _apxRender() {
+  const body = document.getElementById('apx-body');
+  if (!body) return;
+  const { followups, ready } = _APX_DATA;
+  const sec = (title, items, kind) => `
+    <div style="font-size:13px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:var(--text-mute);margin:4px 0 10px">${title} ${items.length ? `· ${items.length}` : ''}</div>
+    ${items.length ? items.map(r => _apxCard(kind, r)).join('') : `<div style="color:var(--text-mute);font-size:13px;padding:2px 0 14px">Nothing waiting.</div>`}`;
+  body.innerHTML =
+    sec('⏰ Follow-ups', followups, 'followup') +
+    `<div style="height:8px"></div>` +
+    sec('💬 Ready messages', ready, 'ready');
+  if (!followups.length && !ready.length) {
+    body.innerHTML = `<div style="text-align:center;color:var(--text-mute);font-size:14px;padding:40px 10px">✅ All clear — nothing waiting for approval.</div>`;
+  }
+}
+
+function _apxRemove(id) {
+  _APX_DATA.followups = _APX_DATA.followups.filter(x => x.id !== id);
+  _APX_DATA.ready = _APX_DATA.ready.filter(x => x.id !== id);
+  _apxRender();
+  const span = document.getElementById('apx-count');
+  const n = _APX_DATA.followups.length + _APX_DATA.ready.length;
+  if (span) span.textContent = n ? `(${n})` : '';
+}
+
+// ── Follow-up actions ──
+async function _apxFollowupSend(id) { try { await _apxPost('/api/agent-followups', 'send-now', { id }); _apxRemove(id); _plToast('✓ Sent'); } catch (e) { alert(e.message); } }
+async function _apxFollowupSkip(id) { try { await _apxPost('/api/agent-followups', 'skip', { id }); _apxRemove(id); } catch (e) { alert(e.message); } }
+async function _apxFollowupEdit(id) {
+  const r = _APX_DATA.followups.find(x => x.id === id); if (!r) return;
+  const t = prompt('Edit the follow-up message:', r.draft_message || '');
+  if (t == null || !t.trim() || t.trim() === r.draft_message) return;
+  try { await _apxPost('/api/agent-followups', 'edit', { id, message: t.trim() }); r.draft_message = t.trim(); _apxRender(); } catch (e) { alert(e.message); }
+}
+
+// ── Ready-reply actions (send = approve + fire via agent-approvals) ──
+async function _apxReadySend(id) {
+  const r = _APX_DATA.ready.find(x => x.id === id); if (!r) return;
+  if (r.escalate && !confirm('The agent escalated this one (it wanted a human). Send the draft anyway?')) return;
+  try {
+    await _apxPost('/api/agent-approvals', 'send', {
+      contact_id: r.ghl_contact_id, reply: r.draft_message, conversation_id: r.ghl_conversation_id || null,
+      contact_name: r.contact_name || null, reasoning: r.reasoning || null, confidence: r.confidence,
+      reply_count: r.reply_count, booking_asks: r.booking_asks, ready_id: r.id,
+    });
+    _apxRemove(id); _plToast('✓ Sent');
+  } catch (e) { alert(e.message); }
+}
+async function _apxReadySkip(id) { try { await _apxPost('/api/agent-approvals', 'skip-ready', { ready_id: id }); _apxRemove(id); } catch (e) { alert(e.message); } }
+async function _apxReadyEdit(id) {
+  const r = _APX_DATA.ready.find(x => x.id === id); if (!r) return;
+  const t = prompt('Edit the reply before sending:', r.draft_message || '');
+  if (t == null || !t.trim()) return;
+  r.draft_message = t.trim();
+  const el = document.getElementById('apx-msg-' + id);
+  if (el) el.textContent = r.draft_message;
 }
 
 function _ibSetTab(tab) {

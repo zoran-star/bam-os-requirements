@@ -81,6 +81,43 @@ one-active-per-contact (status in pending/approved). RLS select staff/member.
 BAM GTA). ⚠️ Before approving live: turn OFF GHL's follow-up workflow steps for
 that academy or it double-texts. This engine is what retires those (roadmap step 4).
 
+## 4. Agent autonomy mode — one switch, unified approval inbox (2026-06-21)
+ONE per-academy switch governs BOTH engines (reply bot + follow-ups). Replaces the
+two loose booleans (`agent_approvals_enabled`/`followup_engine_enabled`).
+
+**Mode** = `clients.ghl_kpi_config.agent_mode` ∈ `off | hawkeye | self_drive`.
+Shared helper `api/agent/_mode.js`: `agentMode(client)` (legacy fallback: either old
+bool on → 'hawkeye'), `modeIsOn`, `modeSelfDrives`, `shouldAutoSend(mode,{confidence,
+escalate})`, `SELF_DRIVE_MIN_CONFIDENCE=0.8`. `agent-config.set-mode` also keeps the
+two legacy bools in sync.
+- **off** = silent. **hawkeye** = draft everything, human approves. **self_drive** =
+  auto-send when confidence≥0.8 & !escalate; UNSURE/escalate still queue to the inbox.
+
+**Set by BAM staff:** `api/agent-config.js` (staff-gated) `list`/`set-mode`. UI =
+`src/views/AgentModePanel.jsx`, new **🎚 Autonomy** tab in `AgentTrainingView.jsx`.
+Self-drive pick shows a red warning modal.
+
+**Ready replies queue** (responded-bot equivalent of agent_followups): table
+`agent_ready_replies` (migration 20260621000000) — detector pre-drafts the next reply
+for Responded-stage leads who just messaged. NEW cron `agent-approvals?action=detect`
+(*/5). agent-approvals actions added: `detect` (cron), `list-ready`, `skip-ready`; the
+`send` action takes optional `ready_id` to close the row. Self-drive auto-sends high-conf
+drafts in detect (auto_sent=true) + logs agent_approvals; escalations/low-conf queue.
+agent_approvals stays the audit log; agent_ready_replies is the live queue.
+
+**Follow-up self-drive:** `agent-followups.runWork` now also sends `pending` rows whose
+time is due when academy is self_drive & confidence≥0.8 (else they stay for approval).
+detect gate switched from `followup_engine_enabled` → `modeIsOn(agentMode())`.
+
+**Unified approval inbox (client portal):** `📨 Approve (N)` button in the Inbox-tab
+toolbar (`#ib-approve-btn`, staff-only via `_IS_BAM_STAFF`). `_apx*` fns in
+client-portal.html — right-side drawer, 2 sections: ⏰ Follow-ups (agent-followups
+list/approve via send-now/edit/skip) + 💬 Ready messages (agent-approvals list-ready/
+send w/ ready_id/skip-ready/local-edit). Count refreshed on inbox load. inbound-webhook
+now cancels pending/approved `agent_ready_replies` too (+ notify gate uses agentMode).
+⚠️ Inbox is staff-operated for now (endpoints staff-gated); opening it to academy
+owners (can_train_agent) is a later step.
+
 ## ⚠️ Known gap (same as roadmap): no global SINK yet
 `scope='general'` is still only a flag — `activeLessons()` queries by client_id,
 so an approved "global" lesson doesn't actually propagate to other academies. The

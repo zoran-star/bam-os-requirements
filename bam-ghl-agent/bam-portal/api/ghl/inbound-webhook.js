@@ -1,6 +1,7 @@
 import { withSentryApiRoute } from "../_sentry.js";
 import { pickGhlToken, sendSms } from "./_core.js";
 import { respondedStage, contactInRespondedStage } from "../agent/_stage.js";
+import { agentMode, modeIsOn } from "../agent/_mode.js";
 // Vercel Serverless Function — GHL inbound-message webhook  ("P1 Spine")
 //
 //   POST /api/ghl/inbound-webhook
@@ -152,23 +153,23 @@ async function handler(req, res) {
     return res.status(200).json({ error: e.message });
   }
 
-  // Nudge engine: the lead just replied → cancel any pending/approved scheduled
-  // follow-ups for them (don't text someone who's already talking to us).
+  // Lead just replied → cancel any pending/approved drafts for them (don't text
+  // someone who's already talking to us): scheduled follow-ups AND ready replies
+  // (the old ready draft was for their previous message; the detector re-drafts).
   try {
     if (contactId) {
-      await sb(`agent_followups?client_id=eq.${client.id}&ghl_contact_id=eq.${encodeURIComponent(String(contactId))}&status=in.(pending,approved)`, {
-        method: "PATCH",
-        headers: { Prefer: "return=minimal" },
-        body: JSON.stringify({ status: "canceled", send_error: "lead replied", updated_at: new Date().toISOString() }),
-      });
+      const cid = encodeURIComponent(String(contactId));
+      const patch = { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ status: "canceled", send_error: "lead replied", updated_at: new Date().toISOString() }) };
+      await sb(`agent_followups?client_id=eq.${client.id}&ghl_contact_id=eq.${cid}&status=in.(pending,approved)`, patch);
+      await sb(`agent_ready_replies?client_id=eq.${client.id}&ghl_contact_id=eq.${cid}&status=in.(pending,approved)`, patch);
     }
-  } catch (e) { console.error("ghl inbound-webhook followup-cancel error:", e.message); }
+  } catch (e) { console.error("ghl inbound-webhook draft-cancel error:", e.message); }
 
   // Instant notify: when a Responded-stage lead replies (a chat that needs
   // approval), text the academy's configured number. Best-effort — never blocks.
   try {
     const cfg = client.ghl_kpi_config || {};
-    if (cfg.agent_approvals_enabled && cfg.agent_notify_phone && contactId) {
+    if (modeIsOn(agentMode(client)) && cfg.agent_notify_phone && contactId) {
       const creds = await pickGhlToken(client);
       if (creds) {
         const rs = await respondedStage(creds.token, creds.locationId);
