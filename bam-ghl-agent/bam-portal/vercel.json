@@ -37,6 +37,10 @@
       "schedule": "0 */2 * * *"
     },
     {
+      "path": "/api/agent-approvals?action=detect",
+      "schedule": "*/5 * * * *"
+    },
+    {
       "path": "/api/agent-followups?action=detect",
       "schedule": "*/30 * * * *"
     },

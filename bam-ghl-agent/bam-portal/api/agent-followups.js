@@ -22,6 +22,7 @@ import { withSentryApiRoute } from "./_sentry.js";
 import { pickGhlToken, ghl } from "./ghl/_core.js";
 import { assemblePrompt } from "./agent/prompt-structure.js";
 import { buildAgentSystem } from "./agent/brain.js";
+import { agentMode, modeIsOn, modeSelfDrives, SELF_DRIVE_MIN_CONFIDENCE } from "./agent/_mode.js";
 
 const SUPABASE_URL         = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
@@ -141,8 +142,7 @@ const clamp = (n, lo, hi) => Math.max(lo, Math.min(hi, n));
 
 // ── Detector: find quiet leads, draft the next nudge, queue it ──
 async function detectForClient(client) {
-  const cfg = client.ghl_kpi_config || {};
-  if (!cfg.followup_engine_enabled) return { client_id: client.id, skipped: "engine off" };
+  if (!modeIsOn(agentMode(client))) return { client_id: client.id, skipped: "mode off" };
   const creds = await pickGhlToken(client);
   if (!creds) return { client_id: client.id, skipped: "no GHL token" };
   const { token, locationId } = creds;
@@ -253,13 +253,26 @@ async function markFailed(id, msg) {
 }
 
 async function runWork(res) {
+  // Approved rows always send (human said yes). In SELF-DRIVE, high-confidence
+  // pending rows send themselves too; low-confidence ones stay pending for the
+  // inbox ("unsure → a human"). Hawkeye pending rows never auto-send.
   let due = [];
   try {
-    due = await sb(`agent_followups?status=eq.approved&scheduled_at=lte.${new Date().toISOString()}&select=*&order=scheduled_at.asc&limit=50`);
+    due = await sb(`agent_followups?status=in.(pending,approved)&scheduled_at=lte.${new Date().toISOString()}&select=*&order=scheduled_at.asc&limit=80`);
   } catch (e) { return res.status(500).json({ error: e.message }); }
   const cache = {};
   const out = [];
-  for (const row of (Array.isArray(due) ? due : [])) out.push(await sendOne(row, cache));
+  for (const row of (Array.isArray(due) ? due : [])) {
+    if (row.status === "pending") {
+      let client = cache[row.client_id];
+      if (client === undefined) { client = await loadClient(row.client_id); cache[row.client_id] = client; }
+      const auto = client && modeSelfDrives(agentMode(client)) && typeof row.confidence === "number" && row.confidence >= SELF_DRIVE_MIN_CONFIDENCE;
+      if (!auto) continue;   // hawkeye, or self-drive-but-unsure → wait for approval
+      out.push({ ...(await sendOne(row, cache)), auto_sent: true });
+    } else {
+      out.push(await sendOne(row, cache));
+    }
+  }
   return res.status(200).json({ ok: true, processed: out.length, results: out });
 }
 
