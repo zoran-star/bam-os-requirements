@@ -48,7 +48,10 @@ function App() {
       .then(function (data) {
         setLoading(false);
         if (data.ok) {
-          setStep('success');
+          var group = data.group || CH3.getGroup(form.grade) || 'hs';
+          var params = 'group=' + encodeURIComponent(group)
+            + '&name=' + encodeURIComponent(form.firstName.trim());
+          window.location.href = '/ch3-funnel/calendar.html?' + params;
         } else {
           setApiErr(data.error || 'Something went wrong. Please try again.');
         }
@@ -109,8 +112,8 @@ function App() {
             disabled={loading}
             onClick={submitLead}>
             {loading
-              ? <React.Fragment><span className="spinner" /> Claiming your spot&hellip;</React.Fragment>
-              : 'Claim my free session'}
+              ? <React.Fragment><span className="spinner" /> Saving&hellip;</React.Fragment>
+              : 'Pick my session time →'}
           </button>
         )}
 
