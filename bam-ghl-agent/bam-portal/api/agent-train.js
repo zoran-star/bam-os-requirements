@@ -127,6 +127,7 @@ const REPLY_TOOL = {
       confidence:      { type: "number", description: "0..1 confidence this is the right reply." },
       escalate:        { type: "boolean", description: "True if instructions say to silently flag this to a human admin instead of replying." },
       escalate_reason: { type: "string", description: "If escalate is true, why." },
+      sources:         { type: "array", items: { type: "string" }, description: "The section tag(s) you drew this reply from — e.g. pricing, schedule, program, policies, tone, objection_handling, conversation_flow, qualification, guardrails. List the 1-3 most relevant. Use 'learned_lessons' if a trainer lesson drove it." },
     },
     required: ["reply", "reasoning", "confidence", "escalate"],
   },
@@ -146,7 +147,7 @@ function buildSystem(lessons, overrides, examples, leadContext) {
   if (leadContext && String(leadContext).trim()) {
     sys += `\n\n<lead_context>\nWhat you already know about this lead (do NOT re-ask):\n${String(leadContext).trim()}\n</lead_context>`;
   }
-  sys += `\n\n<sandbox_mode>\nYou are in a TRAINING TEST talking to a coach role-playing as a lead — NOT a real customer. Do not actually send anything. ALWAYS respond by calling propose_reply: 'reply' is the exact text you'd send, 'reasoning' is a short why. Set 'escalate'=true when your instructions say to silently flag to admin (leave 'reply' empty then).\n</sandbox_mode>`;
+  sys += `\n\n<sandbox_mode>\nYou are in a TRAINING TEST talking to a coach role-playing as a lead — NOT a real customer. Do not actually send anything. ALWAYS respond by calling propose_reply: 'reply' is the exact text you'd send, 'reasoning' is a short why. Set 'escalate'=true when your instructions say to silently flag to admin (leave 'reply' empty then). In 'sources', list the section tag(s) of your knowledge you actually used (e.g. pricing, schedule, program, tone, objection_handling, conversation_flow, qualification, guardrails) so the trainer can see where it came from.\n</sandbox_mode>`;
   return sys;
 }
 
@@ -168,6 +169,14 @@ async function handleChat(messages, clientId, leadContext, res) {
     confidence: typeof tool.input.confidence === "number" ? tool.input.confidence : null,
     escalate: !!tool.input.escalate,
     escalate_reason: tool.input.escalate_reason || null,
+    sources: (Array.isArray(tool.input.sources) ? tool.input.sources : [])
+      .map(t => {
+        const key = String(t).toLowerCase().trim();
+        if (key === "learned_lessons" || key === "lessons") return "Trainer lesson";
+        const s = SECTIONS.find(x => x.key === key || x.tag === key);
+        return s ? s.label : t;
+      })
+      .filter(Boolean).slice(0, 4),
     lessons_applied: lessons.filter(l => l.kind !== "good").length,
   });
 }
@@ -235,6 +244,15 @@ async function handler(req, res) {
         }]),
       });
       return res.status(200).json({ ok: true, lesson: row, proposed_global: cls.global, reason: cls.reason });
+    }
+
+    if (b.action === "save-example") {
+      if (!b.parent_text || !b.agent_text) return res.status(400).json({ error: "parent_text and agent_text required" });
+      const [row] = await sb(`agent_examples`, {
+        method: "POST", headers: { Prefer: "return=representation" },
+        body: JSON.stringify([{ client_id: clientId, parent_text: String(b.parent_text), agent_text: String(b.agent_text), created_by: ctx.user.email || "client-trainer" }]),
+      });
+      return res.status(200).json({ ok: true, example: row });
     }
 
     if (b.action === "lessons") {
