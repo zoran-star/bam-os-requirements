@@ -18052,6 +18052,7 @@ function _renderOrganicCredits() {
   const pill = (icon, label, d) => {
     if (!d) return '';
     if (d.allowance == null) return `<span style="display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;color:var(--text-sub);background:var(--surface-el);border:1px solid var(--line);padding:5px 11px;border-radius:999px">${icon} ${label}: <b style="color:var(--text)">Unlimited</b></span>`;
+    if (d.allowance === 0) return `<span style="display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;color:var(--text-mute);background:var(--surface-el);border:1px solid var(--line);padding:5px 11px;border-radius:999px;opacity:.7">${icon} ${label}: <b>Not included</b></span>`;
     const out = d.left <= 0;
     const col = out ? '#ED7969' : 'var(--text)';
     return `<span style="display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;color:var(--text-sub);background:var(--surface-el);border:1px solid ${out ? '#ED796955' : 'var(--line)'};padding:5px 11px;border-radius:999px">${icon} ${label}: <b style="color:${col}">${d.used} / ${d.allowance}</b>${out ? ' · used up' : ''}</span>`;
@@ -18534,7 +18535,7 @@ async function submitInputAssets() {
     // the meter so the client sees they're maxed.
     if (channel === 'organic') _fetchAndRenderOrganicCredits();
     const msg = e.message || String(e);
-    if (/this month|creative/i.test(msg)) alert(msg);
+    if (/month|creative|limit|plan|included|separate request/i.test(msg)) alert(msg);
     else alert('Submit failed: ' + msg);
   } finally {
     _inputAssetsChannel = 'ads'; // reset for the next opener

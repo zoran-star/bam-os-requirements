@@ -885,17 +885,34 @@ async function handleContentTickets(req, res) {
 
     // Per-type monthly organic credit cap (V1 hard limit, no overage). NULL allowance
     // = unlimited; 0 = none. Counts at request; cancelling a request frees the credit.
-    if (channel === "organic" && (type === "video" || type === "graphic")) {
-      const col = type === "video" ? "organic_video_credits_per_month" : "organic_graphic_credits_per_month";
-      const crows = await sb(`clients?id=eq.${ctx.client.id}&select=${col}`);
-      const allowance = crows?.[0]?.[col];
-      if (allowance != null) {
-        const used = await organicUsedThisMonth(ctx.client.id, type);
-        if (used >= Number(allowance)) {
-          return res.status(403).json({
-            error: `You've used all ${allowance} ${type} creative${allowance === 1 ? "" : "s"} for this month. Your allowance resets on the 1st.`,
-            code: "credit_limit", type, used, allowance: Number(allowance),
-          });
+    if (channel === "organic") {
+      // Organic requests are single-type so each counts toward the right limit —
+      // a graphic+video upload (mixed) would otherwise bypass the cap entirely.
+      if (type === "mixed") {
+        return res.status(400).json({
+          error: "For organic content, please submit videos and graphics as separate requests so each counts toward the right monthly limit.",
+          code: "organic_single_type",
+        });
+      }
+      if (type === "video" || type === "graphic") {
+        const col = type === "video" ? "organic_video_credits_per_month" : "organic_graphic_credits_per_month";
+        const crows = await sb(`clients?id=eq.${ctx.client.id}&select=${col}`);
+        const allowance = crows?.[0]?.[col];
+        if (allowance != null) {
+          const label = type === "video" ? "Video" : "Graphic";
+          if (Number(allowance) === 0) {
+            return res.status(403).json({
+              error: `${label} creatives aren't included in your current plan.`,
+              code: "credit_limit", type, used: 0, allowance: 0,
+            });
+          }
+          const used = await organicUsedThisMonth(ctx.client.id, type);
+          if (used >= Number(allowance)) {
+            return res.status(403).json({
+              error: `You've used all ${allowance} ${type} creative${allowance === 1 ? "" : "s"} for this month. Your allowance resets on the 1st.`,
+              code: "credit_limit", type, used, allowance: Number(allowance),
+            });
+          }
         }
       }
     }
