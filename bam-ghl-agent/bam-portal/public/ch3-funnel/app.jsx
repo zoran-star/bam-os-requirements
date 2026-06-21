@@ -8,7 +8,10 @@ var CHECKOUT_URL = "/api/website/ch3-checkout";
 
 var LIVE_CHECKOUT = false;
 
-var EMPTY = { cFirst: '', cLast: '', cEmail: '', cPhone: '' };
+var EMPTY = {
+  cFirst: '', cLast: '', cEmail: '', cPhone: '',
+  grade: '', experienceLevel: '', desiredStartDate: '', proximity: '',
+};
 
 function App() {
   var s = React.useState(1); var step = s[0], setStep = s[1];
@@ -20,6 +23,7 @@ function App() {
     return popular ? popular.id : (first ? first.id : null);
   })();
   var pp = React.useState(defaultPlan); var selectedPlan = pp[0], setSelectedPlan = pp[1];
+  var cm = React.useState('monthly'); var selectedCommitment = cm[0], setSelectedCommitment = cm[1];
 
   var py = React.useState({ method: null, name: '', cardFilled: false }); var pay = py[0], setPay = py[1];
   var ag = React.useState(false); var agreed = ag[0], setAgreed = ag[1];
@@ -51,8 +55,18 @@ function App() {
 
   function checkoutPayload() {
     return {
-      contact: { first: form.cFirst, last: form.cLast, email: form.cEmail, phone: form.cPhone },
-      plan:    { id: selectedPlan },
+      contact: {
+        first: form.cFirst,
+        last: form.cLast,
+        email: form.cEmail,
+        phone: form.cPhone,
+        grade: form.grade || null,
+        experienceLevel: form.experienceLevel || null,
+        desiredStartDate: form.desiredStartDate || null,
+        proximity: form.proximity || null,
+      },
+      plan: { id: selectedPlan },
+      commitment: selectedCommitment || 'monthly',
       agreement: { signature: sig || '', signed_at: new Date().toISOString() }
     };
   }
@@ -141,7 +155,7 @@ function App() {
   }
 
   if (step === 4) {
-    return <Success form={form} plan={plan} />;
+    return <Success form={form} plan={plan} commitment={selectedCommitment} />;
   }
 
   return (
@@ -149,10 +163,18 @@ function App() {
       <ProgressHeader step={step} />
 
       {step === 1 && <Step1 form={form} setForm={setForm} showErrors={showErr1} />}
-      {step === 2 && <Step2 selectedPlan={selectedPlan} onSelectPlan={setSelectedPlan} />}
+      {step === 2 && (
+        <Step2
+          selectedPlan={selectedPlan}
+          onSelectPlan={setSelectedPlan}
+          selectedCommitment={selectedCommitment}
+          onSelectCommitment={setSelectedCommitment}
+        />
+      )}
       {step === 3 && plan && (
         <Step3
           form={form} plan={plan}
+          commitment={selectedCommitment}
           pay={pay} setPay={setPay}
           agreed={agreed} onAgree={function (e) { setAgreed(e.target.checked); }}
           agreeError={false} sig={sig} onSig={setSig}

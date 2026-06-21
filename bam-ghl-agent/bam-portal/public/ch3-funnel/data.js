@@ -5,11 +5,11 @@
    ============================================================ */
 (function () {
 
-  // edit per client — flip sold_out to true once spots fill
+  // 3 active membership plans — 6-month commitment model
   var PLANS = [
     {
-      id: 'min',
-      name: 'Min Package',
+      id: 'train1x',
+      name: 'Train 1x/Week',
       price_usd: 165,
       billing: 'monthly',
       frequency: '1x / week',
@@ -17,11 +17,16 @@
       popular: false,
       sold_out: false,
       description: 'One focused session per week. Build the habit and the fundamentals.',
-      includes: ['4 group sessions / month', 'Skills & fundamentals', 'Coach feedback each session'],
+      includes: [
+        '1 skills session/week · groups of max 9',
+        'Strength & conditioning included',
+        'Direct coaching from Coach Haynes',
+        'Youth + HS/College groups available',
+      ],
     },
     {
-      id: 'competitive',
-      name: 'Competitive Edge',
+      id: 'train2x',
+      name: 'Train 2x/Week',
       price_usd: 225,
       billing: 'monthly',
       frequency: '2x / week',
@@ -29,11 +34,16 @@
       popular: true,
       sold_out: false,
       description: 'Double the reps, double the development. For athletes chasing a starting spot.',
-      includes: ['8 group sessions / month', 'Advanced skill progressions', 'Priority scheduling'],
+      includes: [
+        '2 skills sessions/week · groups of max 9',
+        'Strength & conditioning included',
+        'Double the reps, double the development',
+        'Direct coaching from Coach Haynes',
+      ],
     },
     {
-      id: 'allaccess',
-      name: 'All-Access',
+      id: 'unlimited',
+      name: 'Unlimited',
       price_usd: 349,
       billing: 'monthly',
       frequency: 'Unlimited',
@@ -41,33 +51,21 @@
       popular: false,
       sold_out: false,
       description: 'Maximum reps. For athletes serious about a college or pro pathway.',
-      includes: ['Unlimited sessions', 'All group programs', 'Video review sessions'],
-    },
-    {
-      id: '1on1',
-      name: '1-on-1 Pack',
-      price_usd: 320,
-      billing: 'one-time',
-      frequency: '4 private sessions',
-      sessions_per_month: null,
-      popular: false,
-      sold_out: false,
-      description: 'Four private sessions dedicated to your exact skill gaps.',
-      includes: ['4 private 1-on-1 sessions', 'Personalized game plan', 'Video breakdown'],
-    },
-    {
-      id: 'speedagility',
-      name: 'Speed & Agility',
-      price_usd: 35,
-      billing: 'one-time',
-      frequency: 'Drop-in class',
-      sessions_per_month: null,
-      popular: false,
-      sold_out: false,
-      description: 'One class dedicated to quickness, lateral speed, and explosiveness.',
-      includes: ['1 class', 'Athletic performance drills', 'Open to all levels'],
+      includes: [
+        'Unlimited sessions · max 9 per group',
+        'Strength & conditioning included',
+        'Maximum reps for serious college-track athletes',
+        'Direct coaching from Coach Haynes',
+      ],
     },
   ];
+
+  // Prepay amounts by plan ID and commitment length
+  var COMMITMENTS = {
+    'train1x':   { '3m': 450,  '6m': 795  },
+    'train2x':   { '3m': 605,  '6m': 1080 },
+    'unlimited': { '3m': 945,  '6m': 1675 },
+  };
 
   function getPlan(id) {
     return PLANS.filter(function (p) { return p.id === id; })[0];
@@ -83,9 +81,17 @@
   }
   function dollars(n) { return '$' + money(n); }
 
-  // Returns { base, total } — no tax for US
-  function charge(plan) {
-    var base = plan.price_usd;
+  // Returns { base, total } based on commitment
+  // commitment: null | 'monthly' | '3m' | '6m'
+  function charge(plan, commitment) {
+    var base;
+    if (commitment === '3m') {
+      base = COMMITMENTS[plan.id]['3m'];
+    } else if (commitment === '6m') {
+      base = COMMITMENTS[plan.id]['6m'];
+    } else {
+      base = plan.price_usd;
+    }
     return { base: base, total: base };
   }
 
@@ -102,6 +108,7 @@
 
   window.CH3 = {
     PLANS: PLANS,
+    COMMITMENTS: COMMITMENTS,
     getPlan: getPlan,
     money: money,
     dollars: dollars,

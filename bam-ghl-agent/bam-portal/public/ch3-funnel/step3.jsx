@@ -12,21 +12,34 @@ function paymentValid(pay) {
 function OrderSummary(props) {
   var CH3 = window.CH3;
   var plan = props.plan;
-  var c = CH3.charge(plan);
-  var isMonthly = plan.billing === 'monthly';
+  var commitment = props.commitment || 'monthly';
+  var c = CH3.charge(plan, commitment);
+
+  var commitmentLabel;
+  var billingNote;
+  if (commitment === '3m') {
+    commitmentLabel = '3-Month Prepay';
+    billingNote = 'Full 3-month commitment charged today. No recurring charges.';
+  } else if (commitment === '6m') {
+    commitmentLabel = '6-Month Prepay';
+    billingNote = 'Full 6-month commitment charged today. No recurring charges.';
+  } else {
+    commitmentLabel = 'Monthly';
+    billingNote = 'First month charged today. Same amount billed monthly (6-month commitment).';
+  }
 
   return (
     <div className="summary">
       <div className="summary__head">
         <div className="summary__plan">
           {plan.name}
-          <span>{plan.frequency}</span>
+          <span>{plan.frequency} · {commitmentLabel}</span>
         </div>
         <button className="summary__change" onClick={props.onChange}>Change</button>
       </div>
       <div className="summary__lines">
         <div className="sumline">
-          <span>{isMonthly ? 'First month' : plan.name}</span>
+          <span>{commitment === 'monthly' ? 'First month' : commitmentLabel}</span>
           <span>{CH3.dollars(c.base)}</span>
         </div>
         <div className="sumline is-total">
@@ -35,10 +48,7 @@ function OrderSummary(props) {
         </div>
       </div>
       <div className="summary__when">
-        {isMonthly
-          ? <span>Monthly membership. <b>Cancel anytime.</b> First payment today, then same day each month.</span>
-          : <span>One-time payment. <b>No recurring charges.</b> A receipt goes to your inbox immediately.</span>
-        }
+        <span>{billingNote}</span>
       </div>
     </div>
   );
@@ -107,9 +117,9 @@ function Agreement(props) {
       <div className="disclosure__panel">
         <div className="agreement__scroll">
           <h5>1 · Membership &amp; billing</h5>
-          <p>This agreement is between CH3 Training and the person named at signup. Monthly memberships are billed to your card on the same day each month. One-time payments are charged in full at time of purchase. All prices are in USD.</p>
-          <h5>2 · Cancellation</h5>
-          <p>Monthly memberships can be cancelled at any time with at least 7 days notice before your next billing date. Cancellations received within 7 days of billing will take effect the following month. One-time payments are non-refundable once the session has been scheduled.</p>
+          <p>This agreement is between CH3 Training and the person named at signup. Monthly memberships are billed to your card on the same day each month. Prepay commitments are charged in full at time of signup. All prices are in USD.</p>
+          <h5>2 · Commitment &amp; cancellation</h5>
+          <p>All memberships carry a 6-month minimum commitment. Monthly members are billed each month for the duration of the commitment. Prepay members pay in full upfront and are not subject to further billing for the prepaid period. After the commitment period, monthly memberships continue month-to-month until cancelled with at least 7 days notice before your next billing date.</p>
           <h5>3 · Conduct &amp; liability</h5>
           <p>Athletes agree to follow coach direction and facility rules at all times. CH3 Training is not liable for injury sustained during normal training activity. Pre-existing medical conditions should be disclosed before the first session.</p>
           <h5>4 · Photography &amp; media</h5>
@@ -119,7 +129,7 @@ function Agreement(props) {
       <label className={'agree' + (props.checked ? ' is-checked' : '') + (props.error ? ' is-error' : '')}>
         <input type="checkbox" checked={props.checked} onChange={props.onCheck} style={{ position: 'absolute', opacity: 0, width: 0, height: 0 }} />
         <span className="agree__box"><IcCheck size={14} /></span>
-        <span className="agree__text"><b>I agree</b> to the training agreement and understand the cancellation policy above.</span>
+        <span className="agree__text"><b>I agree</b> to the training agreement and understand the commitment and cancellation policy above.</span>
       </label>
       <div className="sig">
         <label className="sig__lab" htmlFor="sig">Signature <span style={{ textTransform: 'none', letterSpacing: 0 }}>(optional)</span></label>
@@ -151,7 +161,7 @@ function Step3(props) {
       <h1 className="fstep-title">Confirm &amp; <em>pay.</em></h1>
       <p className="fstep-sub">Review your plan, sign the agreement, and pay securely.</p>
 
-      <OrderSummary plan={plan} onChange={props.onChangePlan} />
+      <OrderSummary plan={plan} commitment={props.commitment} onChange={props.onChangePlan} />
 
       <Payment pay={props.pay} setPay={props.setPay} live={props.live} stripeReady={props.stripeReady} payErr={props.payErr} />
 
@@ -163,9 +173,9 @@ function Step3(props) {
         sig={props.sig} onSig={props.onSig} />
 
       <div className="fgroup-label" style={{ marginTop: 26 }}>Common questions</div>
-      <FaqRow q="Can I cancel my membership?" open={ui.faq === 0}
+      <FaqRow q="What is the 6-month commitment?" open={ui.faq === 0}
         onToggle={function () { setUi(Object.assign({}, ui, { faq: ui.faq === 0 ? null : 0 })); }}
-        a={<>Monthly memberships can be cancelled anytime with at least 7 days notice before your next billing date. There are no cancellation fees.</>} />
+        a={<>All CH3 Training memberships require a 6-month minimum commitment. Monthly members are billed each month. Prepay members pay upfront at a discount and have no recurring charges during the prepaid period.</>} />
       <FaqRow q="Can I upgrade or downgrade my plan?" open={ui.faq === 1}
         onToggle={function () { setUi(Object.assign({}, ui, { faq: ui.faq === 1 ? null : 1 })); }}
         a={<>Yes. Reach out to Coach Haynes at ch3training@gmail.com to change your plan. Changes take effect at the next billing cycle.</>} />

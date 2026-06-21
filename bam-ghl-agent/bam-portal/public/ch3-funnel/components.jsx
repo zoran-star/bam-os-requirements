@@ -109,7 +109,38 @@ function Field(props) {
   );
 }
 
+function SelectField(props) {
+  var hasError = !!props.error;
+  var cls = 'field__input' + (hasError ? ' is-error' : (props.valid ? ' is-valid' : ''));
+  return (
+    <div className="field" style={props.style}>
+      {props.label && <label className="field__lab" htmlFor={props.name}>{props.label}</label>}
+      <select
+        id={props.name}
+        name={props.name}
+        className={cls}
+        value={props.value || ''}
+        onChange={function (e) { props.onChange(e.target.value); }}
+        onBlur={props.onBlur}
+        style={{ appearance: 'auto' }}>
+        {props.placeholder && <option value="" disabled>{props.placeholder}</option>}
+        {(props.options || []).map(function (opt, i) {
+          var val = typeof opt === 'object' ? opt.value : opt;
+          var label = typeof opt === 'object' ? opt.label : opt;
+          return <option key={i} value={val}>{label}</option>;
+        })}
+      </select>
+      {(hasError || props.okMsg) && (
+        <div className={'field__msg ' + (hasError ? 'is-error' : 'is-ok')}>
+          {hasError ? <IcWarn /> : <IcCheck size={12} />}
+          <span>{hasError ? props.error : props.okMsg}</span>
+        </div>
+      )}
+    </div>
+  );
+}
+
 Object.assign(window, {
   IcCheck, IcLock, IcMail, IcWarn, IcApple, IcGoogleG,
-  ProgressHeader, Field,
+  ProgressHeader, Field, SelectField,
 });

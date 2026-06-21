@@ -2,16 +2,17 @@
 // First-payment checkout for a CH3 Training plan.
 //
 // body: {
-//   contact:   { first, last, email, phone },
-//   plan:      { id },
-//   agreement: { signature, signed_at }
+//   contact:    { first, last, email, phone, grade, experienceLevel, desiredStartDate, proximity },
+//   plan:       { id },
+//   commitment: 'monthly' | '3m' | '6m',
+//   agreement:  { signature, signed_at }
 // }
 // → { ok, client_secret, publishable_key, amount_cents, lead_id }
 //
 // Flow:
-//   1. Validate + resolve plan from server-side catalog
+//   1. Validate + resolve plan and commitment from server-side catalog
 //   2. Upsert GHL contact (CH3 sub-account)
-//   3. Create Stripe PaymentIntent (USD, first month for monthly plans)
+//   3. Create Stripe PaymentIntent (USD, resolved amount based on commitment)
 //   4. Insert website_leads record (form_type = 'ch3_signup')
 //   5. Return { ok, client_secret, publishable_key, amount_cents, lead_id }
 
@@ -37,11 +38,16 @@ const ALLOWED_ORIGINS = new Set([
 
 // Server-side plans catalog — the client sends only plan.id; price is resolved here.
 const PLANS = {
-  "min":          { name: "Min Package",       price_usd: 165, billing: "monthly",  frequency: "1x / week" },
-  "competitive":  { name: "Competitive Edge",  price_usd: 225, billing: "monthly",  frequency: "2x / week" },
-  "allaccess":    { name: "All-Access",        price_usd: 349, billing: "monthly",  frequency: "Unlimited" },
-  "1on1":         { name: "1-on-1 Pack",       price_usd: 320, billing: "one-time", frequency: "4 private sessions" },
-  "speedagility": { name: "Speed & Agility",   price_usd:  35, billing: "one-time", frequency: "Drop-in class" },
+  "train1x":   { name: "Train 1x/Week", price_usd: 165, billing: "monthly", frequency: "1x / week" },
+  "train2x":   { name: "Train 2x/Week", price_usd: 225, billing: "monthly", frequency: "2x / week" },
+  "unlimited": { name: "Unlimited",     price_usd: 349, billing: "monthly", frequency: "Unlimited"  },
+};
+
+// Prepay amounts — must match data.js COMMITMENTS
+const COMMITMENTS = {
+  "train1x":   { "3m": 450,  "6m": 795  },
+  "train2x":   { "3m": 605,  "6m": 1080 },
+  "unlimited": { "3m": 945,  "6m": 1675 },
 };
 
 function setCors(req, res) {
@@ -89,7 +95,24 @@ async function stripeFetch(path, { method = "GET", body } = {}) {
   return json;
 }
 
-async function ghlUpsertContact({ first, last, email, phone, planName, billing }) {
+function resolveBillingTag(commitment) {
+  if (commitment === "3m") return "Prepay 3-Month";
+  if (commitment === "6m") return "Prepay 6-Month";
+  return "Monthly Member";
+}
+
+function resolvePrice(planId, plan, commitment) {
+  if (commitment === "3m" && COMMITMENTS[planId]) return COMMITMENTS[planId]["3m"];
+  if (commitment === "6m" && COMMITMENTS[planId]) return COMMITMENTS[planId]["6m"];
+  return plan.price_usd;
+}
+
+function resolveDescription(plan, commitment, fullName) {
+  const commitLabel = commitment === "3m" ? "3-month prepay" : commitment === "6m" ? "6-month prepay" : "first month";
+  return `CH3 Training — ${plan.name} (${commitLabel}) — ${fullName}`;
+}
+
+async function ghlUpsertContact({ first, last, email, phone, planName, billingTag, contact }) {
   if (!GHL_TOKEN || !GHL_LOC_ID) return null;
   const body = {
     locationId: GHL_LOC_ID,
@@ -97,9 +120,9 @@ async function ghlUpsertContact({ first, last, email, phone, planName, billing }
     lastName: last,
     email,
     phone,
-    tags: ["CH3 Training", billing === "monthly" ? "Monthly Member" : "One-Time Purchase"],
+    tags: ["CH3 Training", billingTag],
     customFields: [
-      { key: "contact.inquiry", field_value: `CH3 Training — ${planName} (${billing})` }
+      { key: "contact.inquiry", field_value: `CH3 Training — ${planName} (${billingTag})` }
     ]
   };
   try {
@@ -122,7 +145,7 @@ async function handler(req, res) {
   if (req.method !== "POST") return res.status(405).json({ ok: false, error: "Method not allowed" });
 
   try {
-    const { contact, plan: planInput, agreement } = req.body || {};
+    const { contact, plan: planInput, commitment: rawCommitment, agreement } = req.body || {};
 
     if (!contact?.email?.trim()) return res.status(400).json({ ok: false, error: "Email is required" });
     if (!contact?.first?.trim()) return res.status(400).json({ ok: false, error: "First name is required" });
@@ -131,13 +154,20 @@ async function handler(req, res) {
     const plan = PLANS[planInput.id];
     if (!plan) return res.status(400).json({ ok: false, error: "Invalid plan" });
 
-    const amount_cents = Math.round(plan.price_usd * 100);
+    const commitment = ["3m", "6m"].includes(rawCommitment) ? rawCommitment : "monthly";
+    const price_usd = resolvePrice(planInput.id, plan, commitment);
+    const amount_cents = Math.round(price_usd * 100);
     const fullName = `${(contact.first || "").trim()} ${(contact.last || "").trim()}`.trim();
+    const billingTag = resolveBillingTag(commitment);
 
     const ghlContactId = await ghlUpsertContact({
-      first: contact.first?.trim(), last: contact.last?.trim() || "",
-      email: contact.email?.trim(), phone: contact.phone?.trim() || "",
-      planName: plan.name, billing: plan.billing,
+      first: contact.first?.trim(),
+      last: contact.last?.trim() || "",
+      email: contact.email?.trim(),
+      phone: contact.phone?.trim() || "",
+      planName: plan.name,
+      billingTag,
+      contact,
     });
 
     let clientSecret = null;
@@ -149,11 +179,12 @@ async function handler(req, res) {
           amount: amount_cents,
           currency: "usd",
           receipt_email: contact.email?.trim(),
-          description: `CH3 Training — ${plan.name} (${plan.billing === "monthly" ? "first month" : "one-time"}) — ${fullName}`,
+          description: resolveDescription(plan, commitment, fullName),
           metadata: {
-            plan_id:   planInput.id,
-            plan_name: plan.name,
-            billing:   plan.billing,
+            plan_id:       planInput.id,
+            plan_name:     plan.name,
+            commitment,
+            billing_tag:   billingTag,
             contact_email: contact.email?.trim(),
             contact_name:  fullName,
           },
@@ -175,12 +206,17 @@ async function handler(req, res) {
         email: contact.email?.trim(),
         phone: contact.phone?.trim() || null,
         fields: {
-          plan_id:   planInput.id,
-          plan_name: plan.name,
-          billing:   plan.billing,
-          frequency: plan.frequency,
-          amount_usd: plan.price_usd,
+          plan_id:      planInput.id,
+          plan_name:    plan.name,
+          commitment,
+          billing_tag:  billingTag,
+          frequency:    plan.frequency,
+          amount_usd:   price_usd,
           amount_cents,
+          grade:        contact.grade || null,
+          experience_level: contact.experienceLevel || null,
+          desired_start_date: contact.desiredStartDate || null,
+          proximity:    contact.proximity || null,
           stripe_pi_id:   piId,
           payment_status: piId ? "pending" : "no_stripe",
           agreement_signature: agreement?.signature || null,

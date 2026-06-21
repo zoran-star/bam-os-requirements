@@ -1,13 +1,12 @@
 /* ============================================================
    Step 2 — CHOOSE YOUR PLAN
-   Plan cards: 3 monthly + 2 one-time. Popular badge on Competitive Edge.
+   3 monthly membership plans + commitment selector.
    ============================================================ */
 
 function PlanCard(props) {
   var CH3 = window.CH3;
   var p = props.plan;
   var selected = props.selected;
-  var c = CH3.charge(p);
 
   return (
     <button
@@ -30,14 +29,9 @@ function PlanCard(props) {
       <div className="plan__price">
         <span className="plan__price-main">
           {CH3.dollars(p.price_usd)}
-          {p.billing === 'monthly' && <span style={{ fontFamily: 'var(--font-body)', fontSize: 13, color: 'var(--fg-subtle)', marginLeft: 4 }}>/mo</span>}
+          <span style={{ fontFamily: 'var(--font-body)', fontSize: 13, color: 'var(--fg-subtle)', marginLeft: 4 }}>/mo</span>
         </span>
       </div>
-      {p.billing === 'one-time' && (
-        <div className="plan__price" style={{ marginTop: 2 }}>
-          <span className="plan__price-unit">One-time &middot; no subscription</span>
-        </div>
-      )}
 
       <ul className="plan__includes">
         {p.includes.map(function (item, i) {
@@ -50,50 +44,128 @@ function PlanCard(props) {
   );
 }
 
-function Step2(props) {
+function CommitmentSelector(props) {
   var CH3 = window.CH3;
-  var monthly = CH3.PLANS.filter(function (p) { return p.billing === 'monthly'; });
-  var oneTime  = CH3.PLANS.filter(function (p) { return p.billing === 'one-time'; });
+  var planId = props.planId;
+  var selected = props.selected || 'monthly';
+  var onSelect = props.onSelect;
+  var plan = CH3.getPlan(planId);
+  if (!plan) return null;
+
+  var mo = plan.price_usd;
+  var c3 = CH3.COMMITMENTS[planId]['3m'];
+  var c6 = CH3.COMMITMENTS[planId]['6m'];
+  var mo3 = Math.round(c3 / 3);
+  var mo6 = Math.round(c6 / 6);
+  var save3 = (mo * 3) - c3;
+  var save6 = (mo * 6) - c6;
+
+  var options = [
+    {
+      key: 'monthly',
+      label: 'Monthly',
+      price: CH3.dollars(mo) + '/mo',
+      detail: 'Billed each month · 6-month minimum',
+      badge: null,
+    },
+    {
+      key: '3m',
+      label: '3 Months',
+      price: CH3.dollars(c3),
+      detail: CH3.dollars(mo3) + '/mo · save ' + CH3.dollars(save3),
+      badge: null,
+    },
+    {
+      key: '6m',
+      label: '6 Months',
+      price: CH3.dollars(c6),
+      detail: CH3.dollars(mo6) + '/mo · best value (save ' + CH3.dollars(save6) + ')',
+      badge: 'Best Value',
+    },
+  ];
 
   return (
-    <div className="fbody" key="s2">
-      <h1 className="fstep-title">Choose your <em>plan.</em></h1>
-      <p className="fstep-sub">Pick the level of commitment that fits your goals. Cancel monthly plans anytime.</p>
-
-      <div className="fgroup-label">Monthly membership</div>
-      <div className="plans">
-        {monthly.map(function (p) {
+    <div className="commitment-selector" style={{ marginTop: 20 }}>
+      <div className="fgroup-label">Commitment &amp; pricing</div>
+      <div className="commitment-options" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        {options.map(function (opt) {
+          var isActive = selected === opt.key;
           return (
-            <PlanCard
-              key={p.id}
-              plan={p}
-              selected={props.selectedPlan === p.id}
-              onSelect={props.onSelectPlan}
-            />
+            <button
+              key={opt.key}
+              className={'commit-opt' + (isActive ? ' is-selected' : '')}
+              onClick={function () { onSelect(opt.key); }}
+              style={{
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                padding: '12px 14px', border: isActive ? '2px solid var(--teal)' : '1px solid var(--border)',
+                borderRadius: 8, background: isActive ? 'rgba(0,184,200,0.06)' : 'var(--surface)',
+                cursor: 'pointer', textAlign: 'left', position: 'relative',
+              }}>
+              {opt.badge && (
+                <span style={{
+                  position: 'absolute', top: -1, right: 10, fontSize: 10, fontWeight: 700,
+                  background: 'var(--teal)', color: '#000', padding: '2px 7px', borderRadius: '0 0 5px 5px',
+                  letterSpacing: '0.04em', textTransform: 'uppercase',
+                }}>{opt.badge}</span>
+              )}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <span style={{
+                  width: 16, height: 16, borderRadius: '50%', flexShrink: 0,
+                  border: isActive ? '5px solid var(--teal)' : '2px solid var(--border)',
+                  background: 'transparent', display: 'inline-block',
+                }} aria-hidden="true" />
+                <div>
+                  <div style={{ fontWeight: 600, fontSize: 14, color: 'var(--fg)' }}>{opt.label}</div>
+                  <div style={{ fontSize: 12, color: 'var(--fg-subtle)', marginTop: 2 }}>{opt.detail}</div>
+                </div>
+              </div>
+              <div style={{ fontWeight: 700, fontSize: 15, color: isActive ? 'var(--teal)' : 'var(--fg)', whiteSpace: 'nowrap', marginLeft: 8 }}>
+                {opt.price}
+              </div>
+            </button>
           );
         })}
-      </div>
-
-      <div className="fgroup-label" style={{ marginTop: 24 }}>One-time &amp; drop-in</div>
-      <div className="plans">
-        {oneTime.map(function (p) {
-          return (
-            <PlanCard
-              key={p.id}
-              plan={p}
-              selected={props.selectedPlan === p.id}
-              onSelect={props.onSelectPlan}
-            />
-          );
-        })}
-      </div>
-
-      <div className="reassure" style={{ marginTop: 20, justifyContent: 'center' }}>
-        <IcLock size={15} />
-        <span><b>No commitment on one-time plans.</b> Monthly memberships can be cancelled at any time.</span>
       </div>
     </div>
   );
 }
 
-Object.assign(window, { Step2, PlanCard });
+function Step2(props) {
+  var CH3 = window.CH3;
+
+  return (
+    <div className="fbody" key="s2">
+      <h1 className="fstep-title">Choose your <em>plan.</em></h1>
+      <p className="fstep-sub">Pick the level of commitment that fits your goals. All memberships include a free first session.</p>
+
+      <div className="fgroup-label">Membership</div>
+      <div className="plans">
+        {CH3.PLANS.map(function (p) {
+          return (
+            <PlanCard
+              key={p.id}
+              plan={p}
+              selected={props.selectedPlan === p.id}
+              onSelect={props.onSelectPlan}
+            />
+          );
+        })}
+      </div>
+
+      {props.selectedPlan && (
+        <CommitmentSelector
+          planId={props.selectedPlan}
+          selected={props.selectedCommitment}
+          onSelect={props.onSelectCommitment}
+        />
+      )}
+
+      <div className="reassure" style={{ marginTop: 20, justifyContent: 'center' }}>
+        <IcLock size={15} />
+        <span><b>6-month commitment.</b> First session is free. Payment begins when you commit to a plan.</span>
+      </div>
+    </div>
+  );
+}
+
+Object.assign(window, { Step2, PlanCard, CommitmentSelector });
