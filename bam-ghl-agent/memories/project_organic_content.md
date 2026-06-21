@@ -51,5 +51,22 @@ New `content_executor` role — CONTENT-ONLY. In `_roles.js` it's in `ANY_STAFF_
 
 ⚠️ **GOTCHA — `staff.role` has a DB CHECK constraint `staff_role_check`** enumerating allowed role strings. Adding a new staff role needs BOTH the app-layer sets in `api/_roles.js`/`StaffModals` AND a migration that rebuilds `staff_role_check` to include it — otherwise invite-staff fails with `new row for relation "staff" violates check constraint "staff_role_check"`. Fixed for content_executor in `20260620120000_staff_role_add_content_executor.sql`. Keep the constraint's role list in sync with `ANY_STAFF_ROLES`.
 
+## Organic credits + content-only clients (V1, added 2026-06-20, branch `feat/organic-content-credits`)
+
+**Per-type monthly credits (hard cap, no billing).** Migration `20260620180000`:
+- `clients.organic_video_credits_per_month` + `organic_graphic_credits_per_month` (int; **NULL = unlimited, 0 = none**).
+- "Used" = COUNT of this-calendar-month organic content_tickets of that type with `status != cancelled` (counted **at request**; cancelling frees one; revisions reuse the same ticket so never double-count). No counter column.
+- **Enforced server-side** in `api/marketing.js` content-tickets POST: organic graphic/video request past allowance → `403 {code:'credit_limit'}` with a friendly message. This is the real "can't go past" guarantee.
+- `GET ?resource=content-tickets&summary=credits` (client scope, or staff w/ `client_id`) → `{ video:{used,allowance,left}, graphic:{...} }` for the meter.
+- Client portal organic view: `#organic-credit-meter` pills (`_fetchAndRenderOrganicCredits`/`_renderOrganicCredits`); request button disabled only when NO type has capacity; 403 surfaces cleanly + refreshes meter.
+- Staff: `ClientsCombinedView` MarketingTab → "Monthly organic credits" inputs (🎬 Videos/mo, 🖼 Graphics/mo) under the organic toggle. Saved via `update-fields` (validated in `clients.js`: int>=0 or null).
+- **V2 (deferred):** overage past cap + Stripe auto-charge (per-client rate). V1 is hard-cap only.
+
+**Content-only clients.** Organic is now **decoupled from ads** (`marketing_included`):
+- Surface shows when `marketing_included OR organic_content` (gates in `switchView`, `mobileSwitchView`, `applyMarketingNavState`).
+- Content-only (`organic_content` ON + `marketing_included` OFF) → `_marketingEnter`/`_backToChannelSplit` go **straight to organic** (no Ads|Organic split, back button hidden via `_showOrganicOnly`); nav relabels **"Marketing" → "Content"**.
+- Staff one-click **"Make content-only"** preset in MarketingTab → sets `marketing_included=false` + `organic_content=true`.
+
 ## To demo
 Flip the staff "Organic content" toggle on a client → their Marketing tab shows the Ads | Organic split.
+Set credits + "Make content-only" in the client's Marketing setup → client sees a Content-only portal with `🎬 x/N · 🖼 x/N` meters and gets blocked past the cap.
