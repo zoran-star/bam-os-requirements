@@ -21044,28 +21044,29 @@ async function _apxRefreshCount() {
     { btn: document.getElementById('v15ib-approve-btn'), span: document.getElementById('v15-apx-count') },
   ].filter(x => x.btn);
   if (!btns.length) return;
-  // Resolve staff status first - on mobile the flag may still be null at render.
-  if (typeof _IS_BAM_STAFF !== 'undefined' && _IS_BAM_STAFF === null && typeof _ensureStaffFlag === 'function') {
-    try { await _ensureStaffFlag(); } catch (_) {}
-  }
-  const staff = (typeof _IS_BAM_STAFF !== 'undefined' && _IS_BAM_STAFF === true);
-  if (!staff) { btns.forEach(({ btn }) => { btn.style.display = 'none'; }); return; }
-  btns.forEach(({ btn }) => { btn.style.display = ''; });
+  // Let the SERVER decide who sees this - the approval APIs are staff-gated, so
+  // if they answer, this user is authorized. This avoids the client-side staff
+  // flag racing on mobile (where it can resolve false before the session loads).
+  let fu, rd;
   try {
-    const [fu, rd] = await Promise.all([
-      _apxPost('/api/agent-followups', 'list', {}).catch(() => ({ followups: [] })),
-      _apxPost('/api/agent-approvals', 'list-ready', {}).catch(() => ({ ready: [] })),
+    [fu, rd] = await Promise.all([
+      _apxPost('/api/agent-followups', 'list', {}),
+      _apxPost('/api/agent-approvals', 'list-ready', {}),
     ]);
-    const fups = (fu.followups || []).filter(f => f.status === 'pending');
-    const ready = (rd.ready || []).filter(r => r.status === 'pending');
-    _APX_DATA = { followups: fups, ready };
-    const n = fups.length + ready.length;
-    btns.forEach(({ btn, span }) => {
-      if (span) span.textContent = n ? `(${n})` : '';
-      btn.style.borderColor = n ? 'var(--accent)' : 'var(--border)';
-      btn.style.color = n ? 'var(--accent)' : 'var(--text-mute)';
-    });
-  } catch (_) {}
+  } catch (_) {
+    btns.forEach(({ btn }) => { btn.style.display = 'none'; });  // not authorized / offline
+    return;
+  }
+  const fups = (fu.followups || []).filter(f => f.status === 'pending');
+  const ready = (rd.ready || []).filter(r => r.status === 'pending');
+  _APX_DATA = { followups: fups, ready };
+  const n = fups.length + ready.length;
+  btns.forEach(({ btn, span }) => {
+    btn.style.display = '';
+    if (span) span.textContent = n ? `(${n})` : '';
+    btn.style.borderColor = n ? 'var(--accent)' : 'var(--border)';
+    btn.style.color = n ? 'var(--accent)' : 'var(--text-mute)';
+  });
 }
 
 function _apxOpen() {
