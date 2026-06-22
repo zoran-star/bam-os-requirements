@@ -53,6 +53,7 @@ function App() {
           var params = 'group=' + encodeURIComponent(group)
             + '&name=' + encodeURIComponent(form.firstName.trim())
             + '&email=' + encodeURIComponent(form.email.trim());
+          if (data.contactId) params += '&cid=' + encodeURIComponent(data.contactId);
           window.location.href = '/ch3-funnel/calendar.html?' + params;
         } else {
           setApiErr(data.error || 'Something went wrong. Please try again.');

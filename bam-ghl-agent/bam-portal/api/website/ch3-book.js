@@ -55,7 +55,7 @@ async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  var { calendarId, start, firstName, lastName, email, phone } = req.body || {};
+  var { calendarId, start, firstName, lastName, email, phone, contactId: passedContactId } = req.body || {};
 
   if (!calendarId || !ALLOWED.has(calendarId)) {
     return res.status(400).json({ error: 'Invalid calendarId' });
@@ -69,32 +69,51 @@ async function handler(req, res) {
 
   var group = calendarId === 'sfnJdd2WAk2lHVTymTOh' ? 'Youth' : 'HS / College';
 
-  var contactBody = {
-    locationId: LOCATION_ID,
-    firstName,
-    lastName: lastName || '',
-    email,
-    source: 'CH3 Free Trial Booking',
-    tags: ['ch3-lead', 'ch3-free-trial-booked'],
-  };
-  if (phone) contactBody.phone = phone;
-
-  var contactRes = await fetch(`${GHL_BASE}/contacts/upsert`, {
-    method: 'POST',
-    headers: ghlHeaders(),
-    body: JSON.stringify(contactBody),
-  });
-
-  if (!contactRes.ok) {
-    var errText = await contactRes.text();
-    return res.status(contactRes.status).json({ error: 'Failed to upsert contact', detail: errText });
-  }
-
-  var contactData = await contactRes.json();
-  var contactId = contactData.contact?.id || contactData.id;
+  // Resolve contactId: use the one passed from step 1, else upsert, else search by email.
+  var contactId = passedContactId || null;
 
   if (!contactId) {
-    return res.status(500).json({ error: 'No contactId returned from GHL' });
+    var contactBody = {
+      locationId: LOCATION_ID,
+      firstName,
+      lastName: lastName || undefined,
+      email,
+      tags: ['ch3-lead', 'ch3-free-trial-booked'],
+    };
+    if (phone) contactBody.phone = phone;
+
+    var contactRes = await fetch(`${GHL_BASE}/contacts/upsert`, {
+      method: 'POST',
+      headers: ghlHeaders(),
+      body: JSON.stringify(contactBody),
+    });
+
+    if (contactRes.ok) {
+      var contactData = await contactRes.json();
+      contactId = (contactData.contact || contactData).id || null;
+    } else {
+      // Upsert failed — try searching for an existing contact by email.
+      var upsertErrText = await contactRes.text();
+      try {
+        var searchRes = await fetch(
+          `${GHL_BASE}/contacts/?locationId=${encodeURIComponent(LOCATION_ID)}&query=${encodeURIComponent(email)}&limit=1`,
+          { headers: ghlHeaders() }
+        );
+        if (searchRes.ok) {
+          var searchData = await searchRes.json();
+          var found = (searchData.contacts || [])[0];
+          if (found) contactId = found.id;
+        }
+      } catch (_) {}
+
+      if (!contactId) {
+        return res.status(502).json({ error: 'Could not create or find your contact in GHL. Please try again or contact Coach Haynes.', detail: upsertErrText.slice(0, 200) });
+      }
+    }
+  }
+
+  if (!contactId) {
+    return res.status(500).json({ error: 'No contactId resolved — please try again.' });
   }
 
   var apptBody = {

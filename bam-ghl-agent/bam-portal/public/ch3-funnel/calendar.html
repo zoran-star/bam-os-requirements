@@ -496,10 +496,13 @@
 
       setDrawerLoading(true);
 
+      var bookPayload = { calendarId: calendarId, start: start, firstName: firstName, lastName: lastName, email: email };
+      if (state.contactId) bookPayload.contactId = state.contactId;
+
       fetch('/api/website/ch3-book', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ calendarId: calendarId, start: start, firstName: firstName, lastName: lastName, email: email }),
+        body: JSON.stringify(bookPayload),
       })
         .then(function(r) { return r.json(); })
         .then(function(data) {
@@ -531,6 +534,7 @@
       state.group = group;
       state.prefillName = params.get('name') || '';
       state.prefillEmail = params.get('email') || '';
+      state.contactId = params.get('cid') || null;
 
       document.querySelectorAll('.toggle__btn').forEach(function(btn) {
         btn.classList.toggle('is-active', btn.dataset.group === group);

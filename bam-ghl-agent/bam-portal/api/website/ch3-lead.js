@@ -179,7 +179,7 @@ async function handler(req, res) {
     console.error("Supabase insert failed (non-fatal):", e.message);
   }
 
-  return res.status(200).json({ ok: true, group });
+  return res.status(200).json({ ok: true, group, contactId });
 }
 
 export default withSentryApiRoute(handler);
