@@ -42,22 +42,23 @@ const GHL_TOKEN_URL     = "https://services.leadconnectorhq.com/oauth/token";
 // app config, GHL ignores it on consent. Safe to request more than the
 // app has enabled.
 const SCOPES = [
-  // Core CRM
+  // Location + business
   "locations.readonly",
-  "users.readonly",
   "businesses.readonly",
+  "businesses.write",
+
+  // Users (write excluded — agency-level concern)
+  "users.readonly",
+
+  // Contacts
   "contacts.readonly",
   "contacts.write",
 
-  // Conversations + messaging (SMS / email / etc)
+  // Conversations + messaging
   "conversations.readonly",
   "conversations.write",
   "conversations/message.readonly",
   "conversations/message.write",
-
-  // Pipelines / opportunities
-  "opportunities.readonly",
-  "opportunities.write",
 
   // Calendars + appointments
   "calendars.readonly",
@@ -66,9 +67,26 @@ const SCOPES = [
   "calendars/events.write",
   "calendars/groups.readonly",
   "calendars/groups.write",
+  "calendars/resources.readonly",
+  "calendars/resources.write",
+
+  // Opportunities / pipeline
+  "opportunities.readonly",
+  "opportunities.write",
+
+  // CRM custom objects + associations
+  "objects/schema.readonly",
+  "objects/schema.write",
+  "objects/record.readonly",
+  "objects/record.write",
+  "associations.readonly",
+  "associations.write",
+  "associations/relation.readonly",
+  "associations/relation.write",
 
   // Forms, workflows, campaigns, surveys
   "forms.readonly",
+  "forms.write",
   "workflows.readonly",
   "campaigns.readonly",
   "surveys.readonly",
@@ -81,50 +99,88 @@ const SCOPES = [
   "locations/tags.readonly",
   "locations/tags.write",
   "locations/tasks.readonly",
-  "locations/tasks.write",
   "locations/templates.readonly",
 
-  // Products + invoices + payments (read-most, write where useful)
+  // Funnels + website pages (correct sub-resource scopes — funnels.readonly is invalid)
+  "funnels/funnel.readonly",
+  "funnels/page.readonly",
+  "funnels/pagecount.readonly",
+  "funnels/redirect.readonly",
+  "funnels/redirect.write",
+
+  // Tracking links
+  "links.readonly",
+  "links.write",
+
+  // Products
   "products.readonly",
   "products.write",
   "products/prices.readonly",
   "products/prices.write",
   "products/collection.readonly",
+  "products/collection.write",
+
+  // Invoices
   "invoices.readonly",
   "invoices.write",
+  "invoices/estimate.readonly",
+  "invoices/estimate.write",
   "invoices/schedule.readonly",
   "invoices/schedule.write",
   "invoices/template.readonly",
+  "invoices/template.write",
+
+  // Payments
   "payments/orders.readonly",
   "payments/orders.write",
   "payments/transactions.readonly",
   "payments/subscriptions.readonly",
   "payments/integration.readonly",
+  "payments/integration.write",
   "payments/coupons.readonly",
   "payments/coupons.write",
+  "payments/custom-provider.readonly",
+  "payments/custom-provider.write",
 
-  // Media library (GHL /medias/files API for syncing client assets)
+  // Media library
   "medias.readonly",
   "medias.write",
 
-  // Social planner (subset — medialibrary not available for sub-account apps)
+  // Social planner
   "socialplanner/post.readonly",
   "socialplanner/post.write",
   "socialplanner/account.readonly",
+  "socialplanner/account.write",
+  "socialplanner/category.readonly",
+  "socialplanner/csv.readonly",
+  "socialplanner/csv.write",
   "socialplanner/oauth.readonly",
+  "socialplanner/oauth.write",
+  "socialplanner/statistics.readonly",
+  "socialplanner/tag.readonly",
 
-  // Courses + email builder
+  // Courses / LMS
   "courses.readonly",
   "courses.write",
+
+  // Blogs + website content
+  "blogs/author.readonly",
+  "blogs/category.readonly",
+  "blogs/check-slug.readonly",
+  "blogs/post.write",
+  "blogs/post-update.write",
+
+  // Email builder
   "emails/builder.readonly",
   "emails/builder.write",
+  "emails/schedule.readonly",
 
-  // Notes on dropped scopes (2026-05-30):
-  //   snapshots.readonly                — not available for Sub-Account apps
-  //   socialplanner/medialibrary.readonly — same
-  //   blogs.readonly / blogs.write       — same
-  // If GHL later exposes these to Sub-Account apps, add back here AND tick
-  // the matching scope in the Marketplace app config.
+  // Voice AI
+  "voice-ai-agents.readonly",
+  "voice-ai-agents.write",
+  "voice-ai-agent-goals.readonly",
+  "voice-ai-agent-goals.write",
+  "voice-ai-dashboard.readonly",
 ].join(" ");
 
 function nowIso() { return new Date().toISOString(); }

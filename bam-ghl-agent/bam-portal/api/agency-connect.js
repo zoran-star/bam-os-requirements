@@ -44,6 +44,7 @@ const SCOPES = [
   "payments/integration.readonly", "payments/coupons.readonly", "payments/coupons.write",
   "socialplanner/post.readonly", "socialplanner/post.write", "socialplanner/account.readonly", "socialplanner/oauth.readonly",
   "courses.readonly", "courses.write", "emails/builder.readonly", "emails/builder.write",
+  "funnels/funnel.readonly", "funnels/page.readonly", "funnels/pagecount.readonly", "funnels/redirect.readonly",
 ].join(" ");
 
 function esc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])); }
@@ -202,9 +203,13 @@ async function handler(req, res) {
   }
 
   // 3) Re-mint later (e.g. after adding academies) — gated by CRON_SECRET.
+  // Accepts either ?key=<secret> (manual) or Authorization: Bearer <secret> (Vercel cron).
   if (action === "mint") {
     const expected = process.env.CRON_SECRET || "";
-    if (!expected || (req.query.key || "") !== expected) return res.status(401).json({ error: "unauthorized" });
+    const fromHeader = (req.headers.authorization || "").replace(/^Bearer\s+/i, "");
+    const fromQuery  = (req.query.key || "").toString();
+    const provided   = fromHeader || fromQuery;
+    if (!expected || provided !== expected) return res.status(401).json({ error: "unauthorized" });
     const t = await getAgencyToken();
     if (!t) return res.status(400).json({ error: "no agency token — authorize first via ?action=start" });
     const results = await mintAll(t.company_id, t.access_token);
