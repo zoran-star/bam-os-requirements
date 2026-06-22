@@ -10233,7 +10233,11 @@ async function openV15Inbox() {
   const host = document.getElementById('v15inbox-content');
   if (!host || typeof CLIENT_ID === 'undefined') return;
   _V15IB.active = null; _V15IB.pending = [];
-  host.innerHTML = `<div class="req-empty" style="padding:24px 0"><span class="req-spin"></span> Loading messages…</div>`;
+  // Instant render: if we already have this academy's inbox loaded, show it
+  // immediately and refresh in the background - no blank spinner on re-open.
+  const hadData = Array.isArray(_V15IB.convos) && _V15IB.convos.length;
+  if (hadData) { try { _v15ibRenderAll(); } catch (_) {} }
+  else host.innerHTML = `<div class="req-empty" style="padding:24px 0"><span class="req-spin"></span> Loading messages…</div>`;
   try {
     const token = await _mreqAuthToken();
     const [ir, pr] = await Promise.all([
@@ -10267,7 +10271,8 @@ async function openV15Inbox() {
     } catch (_) { /* pipelines optional */ }
     _v15ibRenderAll();
   } catch (e) {
-    host.innerHTML = `<div class="req-empty" style="padding:24px 0;color:#9a3b2f">Couldn't load inbox - ${escapeHTML(e.message || String(e))}</div>`;
+    // Keep showing the old data if we had it; only blank to an error otherwise.
+    if (!hadData) host.innerHTML = `<div class="req-empty" style="padding:24px 0;color:#9a3b2f">Couldn't load inbox - ${escapeHTML(e.message || String(e))}</div>`;
   }
 }
 function _v15ibPill(on) {
@@ -11988,7 +11993,7 @@ function applyV15NavState(v15) {
     mNav.classList.toggle('is-v2', onV2);
     mNav.classList.toggle('is-v15', !onV2 && V15_ACCESS === true);
   }
-  // Assets visible for all tiers including V1.5 — clients use it for brand/video files.
+  // Assets visible for all tiers including V1.5 - clients use it for brand/video files.
   const assetsNav = document.getElementById('nav-assets');
   if (assetsNav) assetsNav.style.display = '';
   // Contacts/Inbox/KPIs sharing + the Marketing "narrative" treatment now live in
@@ -20195,7 +20200,11 @@ let _PL_DRAG_OPP   = null;   // { oppId, fromStageId, pipelineId } during drag
 async function fetchAndRenderPipelines() {
   const container = document.getElementById('pl-board-container');
   if (!container) return;
-  container.innerHTML = '<div class="req-empty" style="padding:20px 0"><span class="req-spin"></span>Loading pipelines…</div>';
+  // Instant render: if the board is already loaded, show it now and refresh in
+  // the background instead of blanking to a spinner on every open.
+  const hadData = _PL_DATA && Array.isArray(_PL_DATA.pipelines) && _PL_DATA.pipelines.length;
+  if (hadData) { try { _renderPipelineTabs(); _renderPipelineBoard(); } catch (_) {} }
+  else container.innerHTML = '<div class="req-empty" style="padding:20px 0"><span class="req-spin"></span>Loading pipelines…</div>';
   try {
     if (typeof CLIENT_ID === 'undefined' || !CLIENT_ID) throw new Error('CLIENT_ID not in scope');
     const token = await _mreqAuthToken();
@@ -20211,7 +20220,7 @@ async function fetchAndRenderPipelines() {
     _renderPipelineTabs();
     _renderPipelineBoard();
   } catch (e) {
-    container.innerHTML = `<div class="req-empty" style="padding:20px 0">Couldn't load pipelines - ${escapeHTML(e.message)}</div>`;
+    if (!hadData) container.innerHTML = `<div class="req-empty" style="padding:20px 0">Couldn't load pipelines - ${escapeHTML(e.message)}</div>`;
   }
 }
 
