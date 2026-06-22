@@ -95,7 +95,7 @@ async function ghl(method, path, { token, body } = {}) {
 // The list payload is cached for a few seconds so rapid reloads + the approval
 // count refresh cost ZERO GHL calls, and so a GHL rate-limit (429) serves the
 // last good payload instead of failing the whole inbox.
-const INBOX_CACHE_TTL_MS = 25000;
+const INBOX_CACHE_TTL_MS = 12000;
 async function readInboxCache(clientId) {
   try {
     const rows = await sb(`ghl_inbox_cache?client_id=eq.${clientId}&select=payload,updated_at&limit=1`);

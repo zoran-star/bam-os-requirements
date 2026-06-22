@@ -10489,9 +10489,13 @@ function _v15ibRenderThread() {
   const _visibleMsgs = sorted.filter(m => !_ibIsActivity(m));
   const bubbles = _visibleMsgs.length ? _visibleMsgs.map(m => {
     const out = (m.direction || '').toLowerCase() === 'outbound';
-    return `<div style="max-width:78%;align-self:${out ? 'flex-end' : 'flex-start'};background:${out ? 'var(--gold)' : 'var(--surface)'};color:${out ? '#0B0B0D' : 'var(--text)'};border:1px solid ${out ? 'var(--gold)' : 'var(--border)'};padding:8px 12px;border-radius:12px;font-size:13px;line-height:1.45;word-break:break-word">
+    const tail = m._unconfirmed
+      ? '⚠ not confirmed in GHL'
+      : (m._optimistic ? 'sending…' : `${escapeHTML(_ghlChannelLabel(m.type))} · ${escapeHTML(_ibFormatDate(m.date))}`);
+    const tailColor = m._unconfirmed ? 'color:#9a3b2f;opacity:1;font-weight:700' : 'opacity:.6';
+    return `<div style="max-width:78%;align-self:${out ? 'flex-end' : 'flex-start'};background:${out ? 'var(--gold)' : 'var(--surface)'};color:${out ? '#0B0B0D' : 'var(--text)'};border:1px solid ${m._unconfirmed ? '#e0654f' : (out ? 'var(--gold)' : 'var(--border)')};padding:8px 12px;border-radius:12px;font-size:13px;line-height:1.45;word-break:break-word">
       ${escapeHTML(m.body || '(no body)')}
-      <div style="font-size:10px;opacity:.6;margin-top:3px">${escapeHTML(_ghlChannelLabel(m.type))} · ${escapeHTML(_ibFormatDate(m.date))}</div>
+      <div style="font-size:10px;margin-top:3px;${tailColor}">${tail}</div>
     </div>`;
   }).join('') : '<div style="color:var(--text-mute);font-size:13px;text-align:center;padding:20px">No messages yet.</div>';
   const isEmail = _V15IB.type === 'Email';
@@ -10548,6 +10552,9 @@ async function _v15ibSend() {
       method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
       body: JSON.stringify({
         client_id: CLIENT_ID, type: _V15IB.type,
+        // Target the EXACT contact we're viewing - never re-look-up by phone
+        // (which can resolve to a duplicate and send to the wrong conversation).
+        contact_id: a.contactId || undefined,
         contact_phone: a.phone || undefined, contact_email: a.email || undefined, contact_name: a.name || undefined,
         message: text, subject: _V15IB.type === 'Email' ? subject : undefined,
         attachments: _V15IB.pending,
@@ -10567,7 +10574,7 @@ async function _v15ibSend() {
     // Reconcile with GHL once it catches up - the real message replaces the
     // optimistic one (de-duped by text); if GHL is still behind, we keep showing it.
     setTimeout(() => _v15ibResync(a, text), 2000);
-    setTimeout(() => _v15ibResync(a, text), 6000);
+    setTimeout(() => _v15ibResync(a, text, true), 6000);
   } catch (e) {
     alert('Send failed: ' + (e.message || e));
     if (btn) { btn.disabled = false; btn.textContent = 'Send'; }
@@ -10576,7 +10583,7 @@ async function _v15ibSend() {
 
 // Re-pull the thread from GHL, keeping a just-sent message visible until GHL
 // surfaces it (so an outbound text never disappears after sending).
-async function _v15ibResync(a, sentText) {
+async function _v15ibResync(a, sentText, final) {
   if (!_V15IB.active || _V15IB.active.convId !== a.convId) return;   // user moved on
   try {
     const token = await _mreqAuthToken();
@@ -10585,8 +10592,11 @@ async function _v15ibResync(a, sentText) {
     if (!r.ok) return;
     let msgs = j.messages || [];
     const t = (sentText || '').trim();
-    if (t && !msgs.some(m => (m.direction || '').toLowerCase() === 'outbound' && (m.body || '').trim() === t)) {
-      msgs = [...msgs, { body: t, direction: 'outbound', type: 'SMS', date: new Date().toISOString(), _optimistic: true }];
+    const found = t && msgs.some(m => (m.direction || '').toLowerCase() === 'outbound' && (m.body || '').trim() === t);
+    if (t && !found) {
+      // GHL hasn't surfaced it yet - keep showing it. On the FINAL check, if GHL
+      // still doesn't have it, flag it so the user knows to retry.
+      msgs = [...msgs, { body: t, direction: 'outbound', type: 'SMS', date: new Date().toISOString(), _optimistic: !final, _unconfirmed: !!final }];
     }
     if (_V15IB.active && _V15IB.active.convId === a.convId) { _V15IB.messages = msgs; _v15ibRenderThread(); }
   } catch (_) {}
