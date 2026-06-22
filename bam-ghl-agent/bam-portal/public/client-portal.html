@@ -21617,10 +21617,17 @@ function _apxCard(kind, r) {
   </div>`;
 }
 
-// A red "suggested Lost" card - confirm marks the lead Lost in the pipeline.
+// A red "suggested Lost" card. Nothing is sent or changed until you confirm -
+// confirming sends the closing text (if any) AND marks the lead Lost together.
 function _apxLostCard(r) {
   const reason = escapeHTML(r.lost_reason || 'Other');
   const closing = (r.draft_message || '').trim();
+  const last = r.last_message
+    ? `<div style="font-size:11.5px;color:var(--text-mute);margin-bottom:6px">💬 Last from lead${r.last_lead_at ? ` · ${escapeHTML(_apxAgo(r.last_lead_at))}` : ''}: "${escapeHTML(_apxTrim(r.last_message, 110))}"</div>`
+    : '';
+  const closingBox = closing
+    ? `<div style="font-size:12.5px;line-height:1.45;background:rgba(255,255,255,.03);border-radius:8px;padding:8px 10px;white-space:pre-wrap"><span style="color:var(--text-mute);font-size:10.5px">texts this when you confirm, then marks Lost:</span><br>${escapeHTML(closing)}</div>`
+    : `<div style="font-size:11.5px;color:var(--text-mute);background:rgba(255,255,255,.02);border-radius:8px;padding:8px 10px">No closing text - will mark Lost without sending anything.</div>`;
   return `<div id="apx-${r.id}" style="background:rgba(224,90,66,0.05);border:1px solid rgba(224,90,66,0.4);border-radius:11px;padding:12px 14px;margin-bottom:9px">
     <div style="display:flex;align-items:center;gap:8px;margin-bottom:5px;flex-wrap:wrap">
       <span style="font-weight:700;font-size:13.5px">${escapeHTML(r.contact_name || 'Lead')}</span>
@@ -21628,22 +21635,37 @@ function _apxLostCard(r) {
       <div style="flex:1"></div>
       ${typeof r.confidence === 'number' ? `<span style="font-size:11px;color:var(--text-mute)">${Math.round(r.confidence * 100)}% sure</span>` : ''}
     </div>
+    ${last}
     ${r.reasoning ? `<div style="font-size:12px;color:var(--text-sub);margin-bottom:6px">${escapeHTML(r.reasoning)}</div>` : ''}
-    ${closing ? `<div style="font-size:12.5px;line-height:1.45;background:rgba(255,255,255,.03);border-radius:8px;padding:8px 10px"><span style="color:var(--text-mute);font-size:10.5px">closing text the agent will send:</span><br>${escapeHTML(closing)}</div>` : ''}
-    <div style="display:flex;gap:7px;margin-top:8px;justify-content:flex-end">
+    ${closingBox}
+    <div style="display:flex;align-items:center;gap:7px;margin-top:8px;flex-wrap:wrap">
+      <button onclick="_apxOpenCardThread('${r.id}')" style="background:transparent;border:1px solid var(--border);color:var(--text-mute);border-radius:7px;padding:5px 10px;font-size:12px;cursor:pointer">💬 chat</button>
+      <div style="flex:1"></div>
+      <button onclick="_apxLostEdit('${r.id}')" style="background:transparent;border:1px solid var(--border);color:var(--text-sub);border-radius:7px;padding:5px 11px;font-size:12px;cursor:pointer">✎ edit text</button>
       <button onclick="_apxLostDismiss('${r.id}')" style="background:transparent;border:1px solid var(--border);color:var(--text-sub);border-radius:7px;padding:5px 11px;font-size:12px;cursor:pointer">✕ Dismiss</button>
-      <button onclick="_apxLostConfirm('${r.id}')" style="background:#e0654f;border:1px solid #e0654f;color:#fff;border-radius:7px;padding:5px 13px;font-size:12px;font-weight:700;cursor:pointer">🚫 Confirm Lost</button>
+      <button onclick="_apxLostConfirm('${r.id}')" style="background:#e0654f;border:1px solid #e0654f;color:#fff;border-radius:7px;padding:5px 13px;font-size:12px;font-weight:700;cursor:pointer">🚫 ${closing ? 'Send &amp; mark Lost' : 'Mark Lost'}</button>
     </div>
   </div>`;
 }
 
+// Edit the closing text on a Lost suggestion (clearing it = mark Lost, no text).
+function _apxLostEdit(id) {
+  const r = _APX_DATA.lost.find(x => x.id === id); if (!r) return;
+  _apxEditModal({
+    title: 'Edit the closing message (clear it to mark Lost without texting)',
+    value: r.draft_message || '', teachable: false,
+    onSave: (text) => { r.draft_message = text; _apxRender(); },
+  });
+}
+
 async function _apxLostConfirm(id) {
   const r = _APX_DATA.lost.find(x => x.id === id); if (!r) return;
+  const hasClosing = (r.draft_message || '').trim();
   _plConfirmModal({
     icon: '🚫',
     title: 'Mark ' + (r.contact_name || 'this lead') + ' as Lost?',
-    body: 'Reason: <b>' + escapeHTML(r.lost_reason || 'Other') + '</b>.' + ((r.draft_message || '').trim() ? ' The closing message is sent, then they\'re marked Lost in the pipeline.' : ' They\'re marked Lost in the pipeline.'),
-    okLabel: 'Mark Lost',
+    body: 'Reason: <b>' + escapeHTML(r.lost_reason || 'Other') + '</b>.' + (hasClosing ? ' This sends the closing message AND marks them Lost in the pipeline - in one go.' : ' They\'re marked Lost in the pipeline (no message sent).'),
+    okLabel: hasClosing ? 'Send & mark Lost' : 'Mark Lost',
     onOk: async () => {
       try {
         await _apxPost('/api/agent-approvals', 'confirm-lost', { ready_id: r.id, lost_reason: r.lost_reason || null, reply: r.draft_message || '' });
