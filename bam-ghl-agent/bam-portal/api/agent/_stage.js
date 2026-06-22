@@ -22,6 +22,15 @@ export async function contactInRespondedStage(token, locationId, contactId, rs) 
   } catch (_) { return false; }
 }
 
+// GHL returns lastMessageDate as a Unix epoch in MILLISECONDS (e.g. 1782158616605),
+// which Postgres can't store in a timestamptz column. Normalize to ISO.
+export function toIso(v) {
+  if (v == null || v === "") return null;
+  const n = typeof v === "number" ? v : (/^\d{10,}$/.test(String(v).trim()) ? Number(v) : null);
+  const d = n != null ? new Date(n) : new Date(v);
+  return isNaN(d.getTime()) ? null : d.toISOString();
+}
+
 // The queue for one academy: Responded-stage contacts whose last message is inbound.
 export async function computeQueue(token, locationId) {
   const rs = await respondedStage(token, locationId);
@@ -34,7 +43,7 @@ export async function computeQueue(token, locationId) {
   const convos = cd.conversations || cd.data || [];
   const queue = convos
     .filter(c => respondedContactIds.has(c.contactId) && String(c.lastMessageDirection || "").toLowerCase() === "inbound")
-    .map(c => ({ contact_id: c.contactId, conversation_id: c.id, name: c.fullName || c.contactName || "Unknown", last_message: c.lastMessageBody || "", last_at: c.lastMessageDate || c.dateUpdated || null }))
+    .map(c => ({ contact_id: c.contactId, conversation_id: c.id, name: c.fullName || c.contactName || "Unknown", last_message: c.lastMessageBody || "", last_at: toIso(c.lastMessageDate || c.dateUpdated) }))
     .sort((a, b) => new Date(b.last_at || 0) - new Date(a.last_at || 0));
   return { rs, queue };
 }
