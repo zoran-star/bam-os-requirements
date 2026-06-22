@@ -8840,6 +8840,7 @@ function hapticTap(style) {
 // ══════════════════════════════════════════════════════════════
 let _ASSETS = [];
 let _ASSET_FILTER = 'all';
+let _ASSET_TYPE   = 'all'; // 'all' | 'images' | 'videos'
 let _ASSET_TARGETS = { offers: [], staff: [], locations: [] };
 let _assetUploadNudge = '';   // one-shot message shown when over-limit files were skipped
 const _ASSET_CATS = ['logo','wordmark','hero','photo','video','crest','icon','og','favicon','other'];
@@ -8875,6 +8876,8 @@ function _assetTargetName(a) {
 }
 
 function _assetMatchesFilter(a) {
+  if (_ASSET_TYPE === 'images' && a.category === 'video') return false;
+  if (_ASSET_TYPE === 'videos' && a.category !== 'video') return false;
   const tagged = a.offer_id || a.staff_id || a.location_id;
   switch (_ASSET_FILTER) {
     case 'brand':     return !tagged;
@@ -8949,6 +8952,13 @@ function _renderAssets() {
         <b style="color:var(--text-sub)">Set the link's sharing to "Anyone with the link can view"</b> before adding it, otherwise your team won't be able to open it.
       </div>
     </div>
+    <div style="display:flex;gap:6px;margin-bottom:14px;padding-bottom:14px;border-bottom:1px solid var(--border)">
+      ${[['all','All Files'],['images','Images'],['videos','Videos']].map(([t,l]) => {
+        const on = _ASSET_TYPE === t;
+        const icon = t === 'images' ? '🖼 ' : t === 'videos' ? '🎬 ' : '📁 ';
+        return `<button onclick="_setAssetType('${t}')" style="display:inline-flex;align-items:center;gap:5px;padding:8px 16px;border-radius:8px;font:inherit;font-size:13px;font-weight:600;cursor:pointer;border:1px solid ${on ? 'var(--gold)' : 'var(--border-med)'};background:${on ? 'var(--gold)' : 'transparent'};color:${on ? '#0B0B0D' : 'var(--text-sub)'};transition:all .15s">${icon}${l}</button>`;
+      }).join('')}
+    </div>
     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:20px">${pills}</div>
     ${cards}`;
   _assetUploadNudge = '';   // one-shot: clear after it's been rendered
@@ -9021,6 +9031,7 @@ async function _assetSetTag2(id, value) {
 }
 
 function _assetSetFilter(k) { _ASSET_FILTER = k; _renderAssets(); }
+function _setAssetType(t)   { _ASSET_TYPE   = t; _renderAssets(); }
 
 // Add a large file as a share link (Drive/Dropbox/etc.) instead of uploading it.
 // Reuses _isValidAssetLink from the content flow. Link assets have no storage_path.
@@ -11977,9 +11988,9 @@ function applyV15NavState(v15) {
     mNav.classList.toggle('is-v2', onV2);
     mNav.classList.toggle('is-v15', !onV2 && V15_ACCESS === true);
   }
-  // Assets is hidden for V1.5 (also drops it from the mobile More sheet).
+  // Assets visible for all tiers including V1.5 — clients use it for brand/video files.
   const assetsNav = document.getElementById('nav-assets');
-  if (assetsNav) assetsNav.style.display = v15 ? 'none' : '';
+  if (assetsNav) assetsNav.style.display = '';
   // Contacts/Inbox/KPIs sharing + the Marketing "narrative" treatment now live in
   // applyCrmSupersetNav so V2 gets them too - override the bulk v15 toggle above.
   applyCrmSupersetNav();
@@ -18028,6 +18039,7 @@ async function switchClient(newId) {
   applyMarketingNavState();
   applyV2NavState(row.v2_access === true);   // re-gate Members/Calendar for the new client
   applyV15NavState(row.v15_access === true); // re-gate the Contacts tab
+  applyV4NavState(row.v4_access === true);   // re-gate V4 calendar (was missing from switch path)
   loadMyPermissionsAndApply();               // per-staff tab perms for the new academy
   _PREVIEW_STAFF_LIST = []; _loadPreviewStaff(); // refresh "Preview as" for the new academy
   renderClientSwitcher();
