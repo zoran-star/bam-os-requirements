@@ -86,8 +86,55 @@ async function pickGhlToken(client) {
   return token ? { token, locationId: client.ghl_location_id } : null;
 }
 
+// Does a GHL custom-field name look like an athlete's name field?
+// athlete/player/child/etc + a name token (name / first / last / full).
+function looksLikeAthleteName(name) {
+  const n = String(name || "");
+  const who = /\b(athlete|player|child|kid|son|daughter|camper|participant|student)\b/i.test(n);
+  const nameTok = /\b(name|first|last|full)\b/i.test(n);
+  return who && nameTok;
+}
+
 async function handler(req, res) {
   if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY) return res.status(500).json({ error: "Supabase not configured" });
+
+  // ── Batch auto-map athlete-name fields across every connected academy ──
+  // GET /api/contacts?action=auto-map-athletes&key=<CRON_SECRET>[&dry=1][&overwrite=1]
+  // For each v15 academy with a GHL token, scan custom fields and set
+  // v15_config.athlete_name_field_ids to any field whose name looks like an
+  // athlete name. Skips academies already mapped (unless &overwrite=1). dry=1
+  // previews without writing.
+  if (req.query.action === "auto-map-athletes") {
+    const expected = (process.env.CRON_SECRET || "").trim();
+    if (!expected || (req.query.key || "") !== expected) return res.status(401).json({ error: "unauthorized" });
+    const dry = req.query.dry === "1";
+    const overwrite = req.query.overwrite === "1";
+    let clients;
+    try { clients = await sb(`clients?v15_access=eq.true&ghl_access_token=not.is.null&select=id,business_name,ghl_location_id,ghl_access_token,ghl_refresh_token,ghl_token_expires_at,v15_config&order=business_name.asc`); }
+    catch (e) { return res.status(500).json({ error: "DB: " + e.message }); }
+    const out = [];
+    for (const client of (Array.isArray(clients) ? clients : [])) {
+      const row = { academy: client.business_name, action: null, matched: [] };
+      const already = Array.isArray(client.v15_config?.athlete_name_field_ids) ? client.v15_config.athlete_name_field_ids.map(String) : [];
+      if (already.length && !overwrite) { row.action = "skipped (already mapped)"; out.push(row); continue; }
+      let creds; try { creds = await pickGhlToken(client); } catch (e) { row.action = "error: token " + e.message; out.push(row); continue; }
+      if (!creds) { row.action = "error: not connected"; out.push(row); continue; }
+      let defs;
+      try { defs = (await ghl("GET", `/locations/${encodeURIComponent(creds.locationId)}/customFields`, { token: creds.token })).customFields || []; }
+      catch (e) { row.action = "error: fields " + e.message; out.push(row); continue; }
+      const hits = defs.filter(d => looksLikeAthleteName(d.name || d.fieldKey));
+      row.matched = hits.map(d => d.name || d.fieldKey);
+      if (!hits.length) { row.action = "no athlete-name field found"; out.push(row); continue; }
+      if (dry) { row.action = "would set " + hits.length; out.push(row); continue; }
+      const cfg = client.v15_config || {};
+      cfg.athlete_name_field_ids = hits.map(d => String(d.id));
+      try { await sb(`clients?id=eq.${client.id}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ v15_config: cfg }) }); row.action = "✓ set " + hits.length; }
+      catch (e) { row.action = "error: save " + e.message; }
+      out.push(row);
+    }
+    return res.status(200).json({ ok: true, dry, overwrite, academies: out, set: out.filter(r => String(r.action).startsWith("✓")).length, total: out.length });
+  }
+
   let ctx;
   try { ctx = await resolveUser(req); }
   catch (e) { return res.status(e.status || 401).json({ error: e.message }); }
