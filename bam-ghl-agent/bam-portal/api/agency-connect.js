@@ -63,7 +63,11 @@ function getOrigin(req) {
   if (/localhost|127\.0\.0\.1/.test(origin)) return origin.replace(/\/+$/, "");
   return "https://portal.byanymeansbusiness.com";
 }
-function redirectUri(req) { return `${getOrigin(req)}/api/agency-connect`; }
+// The FC marketplace app only allows ONE redirect URL and it's already set to
+// /api/messaging/connect — so the agency OAuth round-trips through THAT (it
+// detects the agency-signed state and hands back here). Avoids needing to add a
+// second redirect URL on a published app.
+function redirectUri(req) { return `${getOrigin(req)}/api/messaging/connect`; }
 
 function stateSecret() { return process.env.GHL_OAUTH_STATE_SECRET || SUPABASE_SERVICE_KEY; }
 function signState(payload) {
@@ -169,6 +173,19 @@ function resultsPage(companyId, results) {
     `<p>Authorized agency <b>${esc(companyId)}</b>. Connected <b>${ok}/${results.length}</b> sub-accounts.</p>
      <table>${rows}</table>
      <p class="muted" style="margin-top:18px">Failures are usually sub-accounts not actually under this agency, or with no GHL location. You can close this tab.</p>`);
+}
+
+// Shared agency-callback logic, called from /api/messaging/connect when it sees
+// an agency-signed state. Exchanges the code as a Company, stores the agency
+// token, mints a location token for every academy, and returns the results HTML.
+export async function agencyConnectFromCode(code, redirect) {
+  const tok = await exchangeCode(code, redirect);
+  const companyId = tok.companyId || tok.company_id || null;
+  if (!companyId) throw new Error("No companyId in the OAuth response — make sure you authorized at the AGENCY level (Distribution = Agency & Sub-Account), not a single location.");
+  const expiresAt = tok.expires_in ? new Date(Date.now() + Number(tok.expires_in) * 1000).toISOString() : null;
+  await sb(`ghl_agency_tokens?on_conflict=company_id`, { method: "POST", headers: { Prefer: "resolution=merge-duplicates,return=minimal" }, body: JSON.stringify({ company_id: companyId, access_token: tok.access_token, refresh_token: tok.refresh_token || null, expires_at: expiresAt, updated_at: new Date().toISOString() }) });
+  const results = await mintAll(companyId, tok.access_token);
+  return { companyId, results, html: resultsPage(companyId, results) };
 }
 
 async function handler(req, res) {
