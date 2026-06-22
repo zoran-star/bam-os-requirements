@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Contact — DETAIL Miami</title>
+  <meta name="description" content="Get in touch with DETAIL Miami. Questions about programs, facility rental, or ADAPT Club — we're here." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Anton&family=Inter+Tight:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #080808; --surface: #101010; --surface2: #181818;
+      --border: rgba(255,255,255,0.08);
+      --brand: #e2dd9f; --brand-dim: rgba(226,221,159,0.10);
+      --fg: #ffffff; --fg-sub: rgba(255,255,255,0.62); --fg-muted: rgba(255,255,255,0.35);
+      --red: #ff4d4f;
+      --font-d: 'Anton', sans-serif; --font-b: 'Inter Tight', sans-serif;
+      --max: 1200px; --r: 10px;
+    }
+    html { scroll-behavior: smooth; }
+    body { background: var(--bg); color: var(--fg); font-family: var(--font-b); line-height: 1.6; overflow-x: hidden; }
+
+    nav {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+      background: rgba(8,8,8,0.92); backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border);
+      padding: 0 24px; height: 64px;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .nav-logo { font-family: var(--font-d); font-size: 20px; letter-spacing: .06em; text-transform: uppercase; color: var(--fg); text-decoration: none; }
+    .nav-logo span { color: var(--brand); }
+    .nav-links { display: flex; align-items: center; gap: 32px; list-style: none; }
+    .nav-links a { font-size: 13px; font-weight: 500; letter-spacing: .04em; text-transform: uppercase; color: var(--fg-sub); text-decoration: none; transition: color .2s; }
+    .nav-links a:hover { color: var(--fg); }
+    .nav-cta { background: var(--brand); color: #1a1a00; font-family: var(--font-d); font-size: 14px; letter-spacing: .06em; text-transform: uppercase; padding: 10px 22px; border-radius: 6px; text-decoration: none; transition: opacity .2s; }
+    .nav-cta:hover { opacity: .88; }
+    @media (max-width: 768px) { .nav-links { display: none; } }
+
+    .page-hero { padding: 140px 24px 80px; text-align: center; }
+    .page-hero .eyebrow { font-size: 11px; font-weight: 600; letter-spacing: .2em; text-transform: uppercase; color: var(--brand); margin-bottom: 16px; }
+    .page-hero h1 { font-family: var(--font-d); font-size: clamp(42px, 8vw, 80px); text-transform: uppercase; line-height: .95; }
+    .page-hero h1 span { color: var(--brand); }
+
+    .contact-section { padding: 40px 24px 100px; }
+    .contact-inner { max-width: 960px; margin: 0 auto; display: grid; grid-template-columns: 1fr 1fr; gap: 60px; }
+    @media (max-width: 700px) { .contact-inner { grid-template-columns: 1fr; gap: 48px; } }
+
+    .contact-info h3 { font-family: var(--font-d); font-size: 28px; text-transform: uppercase; letter-spacing: .02em; margin-bottom: 28px; }
+    .contact-info h3 span { color: var(--brand); }
+    .info-item { display: flex; gap: 14px; align-items: flex-start; padding: 16px 0; border-bottom: 1px solid var(--border); }
+    .info-item:last-of-type { border-bottom: none; }
+    .info-icon { width: 38px; height: 38px; border-radius: 8px; background: var(--brand-dim); display: flex; align-items: center; justify-content: center; font-size: 16px; flex-shrink: 0; }
+    .info-label { font-size: 11px; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; color: var(--fg-muted); margin-bottom: 2px; }
+    .info-val { font-size: 15px; color: var(--fg); font-weight: 500; }
+    .info-val a { color: var(--fg); text-decoration: none; }
+    .info-val a:hover { color: var(--brand); }
+
+    .contact-form { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 36px 32px; }
+    .contact-form h3 { font-family: var(--font-d); font-size: 24px; text-transform: uppercase; letter-spacing: .02em; margin-bottom: 28px; }
+    .field { margin-bottom: 16px; }
+    .field label { display: block; font-size: 12px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--fg-muted); margin-bottom: 6px; }
+    .field input, .field select, .field textarea {
+      width: 100%; background: var(--surface2); border: 1.5px solid var(--border);
+      border-radius: var(--r); color: var(--fg); font-family: var(--font-b);
+      font-size: 15px; padding: 12px 14px; outline: none; transition: border-color .2s;
+      appearance: none; -webkit-appearance: none;
+    }
+    .field input::placeholder, .field textarea::placeholder { color: var(--fg-muted); }
+    .field input:focus, .field select:focus, .field textarea:focus { border-color: var(--brand); }
+    .field textarea { min-height: 120px; resize: vertical; }
+    .field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .btn { width: 100%; padding: 16px; border: none; border-radius: var(--r); background: var(--brand); color: #1a1a00; font-family: var(--font-d); font-size: 18px; letter-spacing: .04em; text-transform: uppercase; cursor: pointer; transition: opacity .2s; margin-top: 4px; }
+    .btn:hover { opacity: .88; }
+    .btn:disabled { opacity: .45; cursor: not-allowed; }
+    .success-msg { background: rgba(226,221,159,0.1); border: 1px solid rgba(226,221,159,0.3); border-radius: var(--r); padding: 16px; text-align: center; color: var(--brand); font-weight: 600; display: none; }
+    .success-msg.show { display: block; }
+    .err-msg { background: rgba(255,77,79,.1); border: 1px solid rgba(255,77,79,.3); border-radius: var(--r); padding: 12px; font-size: 13px; color: var(--red); display: none; margin-bottom: 14px; }
+    .err-msg.show { display: block; }
+    @media (max-width: 480px) { .field-row { grid-template-columns: 1fr; } }
+
+    footer { background: var(--bg); border-top: 1px solid var(--border); padding: 40px 24px; }
+    .footer-bottom { max-width: var(--max); margin: 0 auto; display: flex; justify-content: space-between; align-items: center; font-size: 12px; color: var(--fg-muted); gap: 16px; flex-wrap: wrap; }
+    .footer-logo { font-family: var(--font-d); font-size: 16px; letter-spacing: .06em; text-transform: uppercase; }
+    .footer-logo span { color: var(--brand); }
+  </style>
+</head>
+<body>
+
+<nav>
+  <a class="nav-logo" href="/miami-website/">DETAIL <span>Miami</span></a>
+  <ul class="nav-links">
+    <li><a href="index.html#about">About</a></li>
+    <li><a href="index.html#programs">Programs</a></li>
+    <li><a href="index.html#location">Location</a></li>
+    <li><a href="contact.html">Contact</a></li>
+  </ul>
+  <a class="nav-cta" href="/miami-funnel/">Book Free Trial</a>
+</nav>
+
+<div class="page-hero">
+  <div class="eyebrow">DETAIL Miami</div>
+  <h1>Get In <span>Touch</span></h1>
+</div>
+
+<div class="contact-section">
+  <div class="contact-inner">
+    <div class="contact-info">
+      <h3>Reach <span>Us</span></h3>
+      <div class="info-item">
+        <div class="info-icon">📍</div>
+        <div>
+          <div class="info-label">Address</div>
+          <div class="info-val">16414 NW 54th Ave<br>Miami Lakes, FL 33014</div>
+        </div>
+      </div>
+      <div class="info-item">
+        <div class="info-icon">📞</div>
+        <div>
+          <div class="info-label">Phone</div>
+          <div class="info-val"><a href="tel:7862443336">(786) 244-3336</a></div>
+        </div>
+      </div>
+      <div class="info-item">
+        <div class="info-icon">✉️</div>
+        <div>
+          <div class="info-label">Email</div>
+          <div class="info-val"><a href="mailto:info@byanymeansbball.com">info@byanymeansbball.com</a></div>
+        </div>
+      </div>
+      <div class="info-item">
+        <div class="info-icon">📸</div>
+        <div>
+          <div class="info-label">Instagram</div>
+          <div class="info-val"><a href="https://instagram.com/detail.mia" target="_blank" rel="noopener" style="color:var(--brand);">@detail.mia</a></div>
+        </div>
+      </div>
+      <div style="margin-top:32px;">
+        <a href="/miami-funnel/" style="display:inline-block; background:var(--brand); color:#1a1a00; font-family:var(--font-d); font-size:15px; letter-spacing:.06em; text-transform:uppercase; padding:14px 32px; border-radius:6px; text-decoration:none;">Book Free Trial</a>
+      </div>
+    </div>
+
+    <div class="contact-form">
+      <h3>Send a Message</h3>
+      <div class="success-msg" id="successMsg">Message sent! We'll get back to you within 24 hours.</div>
+      <div class="err-msg" id="errMsg"></div>
+      <div class="field-row">
+        <div class="field">
+          <label>First Name</label>
+          <input id="firstName" type="text" placeholder="First" autocomplete="given-name" />
+        </div>
+        <div class="field">
+          <label>Last Name</label>
+          <input id="lastName" type="text" placeholder="Last" autocomplete="family-name" />
+        </div>
+      </div>
+      <div class="field">
+        <label>Email</label>
+        <input id="email" type="email" placeholder="your@email.com" autocomplete="email" />
+      </div>
+      <div class="field">
+        <label>Phone</label>
+        <input id="phone" type="tel" placeholder="(555) 000-0000" autocomplete="tel" />
+      </div>
+      <div class="field">
+        <label>Inquiry Type</label>
+        <select id="inquiry">
+          <option value="" disabled selected>Select topic</option>
+          <option value="free-trial">Book a Free Trial</option>
+          <option value="elementary">Elementary Academy</option>
+          <option value="academy">DETAIL Academy (6th&ndash;12th)</option>
+          <option value="adapt">ADAPT Club Program</option>
+          <option value="camps">Camps &amp; Clinics</option>
+          <option value="virtual">Virtual Academy</option>
+          <option value="rental">Gym Rental</option>
+          <option value="other">Other</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>Message</label>
+        <textarea id="message" placeholder="Tell us about your player, their age, grade, and what you're looking for..."></textarea>
+      </div>
+      <button class="btn" id="submitBtn" onclick="submitForm()">Send Message</button>
+    </div>
+  </div>
+</div>
+
+<footer>
+  <div class="footer-bottom">
+    <span class="footer-logo">DETAIL <span>Miami</span></span>
+    <span>&copy; 2026 By Any Means Basketball &middot; 16414 NW 54th Ave, Miami Lakes, FL 33014</span>
+  </div>
+</footer>
+
+<script>
+  async function submitForm() {
+    var btn  = document.getElementById('submitBtn');
+    var succ = document.getElementById('successMsg');
+    var err  = document.getElementById('errMsg');
+    var fn   = document.getElementById('firstName').value.trim();
+    var em   = document.getElementById('email').value.trim();
+
+    err.classList.remove('show');
+    if (!fn) { err.textContent = 'First name is required.'; err.classList.add('show'); return; }
+    if (!em || !em.includes('@')) { err.textContent = 'Valid email is required.'; err.classList.add('show'); return; }
+
+    btn.disabled = true; btn.textContent = 'Sending...';
+
+    try {
+      var res = await fetch('/api/website/miami-lead', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          firstName: fn,
+          lastName:  document.getElementById('lastName').value.trim() || undefined,
+          email:     em,
+          phone:     document.getElementById('phone').value.trim() || undefined,
+          grade:     'contact-form',
+          inquiry:   document.getElementById('inquiry').value || undefined,
+          message:   document.getElementById('message').value.trim() || undefined,
+          smsConsent: false,
+          consentTimestamp: new Date().toISOString(),
+        }),
+      });
+      succ.classList.add('show');
+      btn.style.display = 'none';
+    } catch (e) {
+      err.textContent = 'Something went wrong. Please email us directly at info@byanymeansbball.com';
+      err.classList.add('show');
+      btn.disabled = false; btn.textContent = 'Send Message';
+    }
+  }
+</script>
+</body>
+</html>
