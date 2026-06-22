@@ -43,6 +43,7 @@ const SCOPES = [
   "payments/integration.readonly", "payments/coupons.readonly", "payments/coupons.write",
   "socialplanner/post.readonly", "socialplanner/post.write", "socialplanner/account.readonly", "socialplanner/oauth.readonly",
   "courses.readonly", "courses.write", "emails/builder.readonly", "emails/builder.write",
+  "funnels.readonly", "funnels/page.readonly", "funnels/funnel.readonly",
 ].join(" ");
 
 function esc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])); }
