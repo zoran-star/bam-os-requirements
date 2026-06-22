@@ -19,8 +19,19 @@ const SB_URL  = (process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || ""
 const SB_KEY  = (process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY || "").trim();
 const GHL_V2  = "https://services.leadconnectorhq.com";
 const V2_VER  = "2021-07-28";
-const CH3_LOC = process.env.CH3_GHL_LOCATION_ID || "lUqgMMX0RRf1FSG7Odg9";
-const GHLKEY  = process.env.GHLKEY || "";
+const CH3_LOC = "lUqgMMX0RRf1FSG7Odg9";
+
+function getCh3Key() {
+  if (process.env.GHL_LOCATIONS_JSON) {
+    try {
+      const locs = JSON.parse(process.env.GHL_LOCATIONS_JSON);
+      const entry = locs.find(l => l.locationId === CH3_LOC || l.name === "CH3 Training");
+      if (entry && (entry.apiKeyV2 || entry.apiKey)) return entry.apiKeyV2 || entry.apiKey;
+    } catch (_) {}
+  }
+  return process.env.GHLKEY || "";
+}
+const GHLKEY = getCh3Key();
 
 // Allow any bam-portal preview URL + production + local dev
 const VERCEL_PREVIEW = /^https:\/\/bam-portal-[a-z0-9]+-zoran-stars-projects\.vercel\.app$/;

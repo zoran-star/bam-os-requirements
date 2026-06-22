@@ -1,6 +1,18 @@
 import { withSentryApiRoute } from '../_sentry.js';
 
 var ALLOWED = new Set(['sfnJdd2WAk2lHVTymTOh', 'f6d7oYjVJRiGr9JPqkow']);
+var CH3_LOCATION_ID = 'lUqgMMX0RRf1FSG7Odg9';
+
+function getCh3Key() {
+  if (process.env.GHL_LOCATIONS_JSON) {
+    try {
+      var locs = JSON.parse(process.env.GHL_LOCATIONS_JSON);
+      var entry = locs.find(function(l) { return l.locationId === CH3_LOCATION_ID || l.name === 'CH3 Training'; });
+      if (entry && (entry.apiKeyV2 || entry.apiKey)) return entry.apiKeyV2 || entry.apiKey;
+    } catch (_) {}
+  }
+  return process.env.GHLKEY || '';
+}
 
 async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -31,7 +43,7 @@ async function handler(req, res) {
   try {
     ghlRes = await fetch(url, {
       headers: {
-        Authorization: 'Bearer ' + (process.env.GHLKEY || ''),
+        Authorization: 'Bearer ' + getCh3Key(),
         Version: '2021-07-28',
         Accept: 'application/json',
       },
