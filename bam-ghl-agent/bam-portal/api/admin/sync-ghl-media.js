@@ -41,8 +41,12 @@ async function sbStorageUpload(bucket, path, data, contentType) {
 }
 
 async function ghlListMedia(token, locationId, type, offset = 0) {
-  const params = new URLSearchParams({ locationId, type, limit: '100', offset: String(offset) });
-  const r = await fetch(`${GHL}/medias/?${params}`, {
+  const params = new URLSearchParams({
+    altId: locationId, altType: 'location',
+    limit: '100', offset: String(offset),
+  });
+  if (type) params.set('type', type);
+  const r = await fetch(`${GHL}/medias/files?${params}`, {
     headers: { Authorization: `Bearer ${token}`, Version: VER, Accept: 'application/json' },
   });
   const json = await r.json().catch(() => ({}));
@@ -97,7 +101,7 @@ async function handler(req, res) {
       try { page = await ghlListMedia(token, locationId, mediaType, offset); }
       catch (e) { results.errors.push(`list ${mediaType}@${offset}: ${e.message}`); break; }
 
-      const items = page.medias || page.files || [];
+      const items = page.files || page.medias || [];
       if (!items.length) { hasMore = false; break; }
 
       for (const item of items) {
