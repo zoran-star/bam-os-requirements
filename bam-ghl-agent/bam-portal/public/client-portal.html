@@ -1865,6 +1865,13 @@
     animation: loading-spin 0.8s linear infinite;
   }
 
+  /* Skeleton loaders (first-load placeholders for inbox + pipeline board). */
+  @keyframes skelShimmer { 0% { background-position: -420px 0; } 100% { background-position: 420px 0; } }
+  .skel {
+    background: linear-gradient(90deg, rgba(255,255,255,0.04) 25%, rgba(255,255,255,0.10) 37%, rgba(255,255,255,0.04) 63%);
+    background-size: 840px 100%; animation: skelShimmer 1.4s infinite linear; border-radius: 6px;
+  }
+
   /* Confirmation success card */
   .confirmation-card {
     text-align: center;
@@ -10229,6 +10236,26 @@ async function _v15calCreateBooking() {
 let _V15IB = { convos: [], pipelines: [], contactPipe: {}, pipeOppCount: 0, ghlLoc: '', unreadOnly: false, failedOnly: false, fPipeline: '', fStage: '', active: null, messages: [], type: 'SMS', pending: [] };
 const _V15IB_FAILED = ['failed', 'undelivered', 'error', 'rejected'];
 
+// ── Skeleton loaders (shown on the very first load, before any data) ──
+function _skelInboxHTML() {
+  let rows = '';
+  for (let i = 0; i < 7; i++) rows += `<div style="display:flex;align-items:center;gap:12px;padding:13px 15px;border:1px solid var(--border);border-radius:12px;background:var(--surface);margin-bottom:10px">
+    <div class="skel" style="width:42px;height:42px;border-radius:50%;flex:0 0 auto"></div>
+    <div style="flex:1;min-width:0">
+      <div class="skel" style="height:11px;width:${30 + (i * 9) % 45}%;margin-bottom:8px"></div>
+      <div class="skel" style="height:10px;width:${58 + (i * 7) % 32}%"></div>
+    </div></div>`;
+  return `<div style="padding:2px 0">${rows}</div>`;
+}
+function _skelPipelinesHTML() {
+  const card = (w1, w2) => `<div style="border:1px solid var(--border);border-radius:6px;padding:10px;margin-bottom:8px;background:var(--surface)">
+    <div class="skel" style="height:11px;width:${w1}%;margin-bottom:8px"></div>
+    <div class="skel" style="height:9px;width:${w2}%"></div></div>`;
+  const col = () => `<div style="flex:0 0 280px;max-width:280px;background:rgba(255,255,255,0.02);border:1px solid var(--border);border-radius:8px;padding:10px">
+    <div class="skel" style="height:12px;width:50%;margin-bottom:12px"></div>${card(65, 40)}${card(55, 48)}${card(72, 35)}</div>`;
+  return `<div style="display:flex;gap:12px;overflow:hidden">${col()}${col()}${col()}${col()}</div>`;
+}
+
 async function openV15Inbox() {
   const host = document.getElementById('v15inbox-content');
   if (!host || typeof CLIENT_ID === 'undefined') return;
@@ -10237,7 +10264,7 @@ async function openV15Inbox() {
   // immediately and refresh in the background - no blank spinner on re-open.
   const hadData = Array.isArray(_V15IB.convos) && _V15IB.convos.length;
   if (hadData) { try { _v15ibRenderAll(); } catch (_) {} }
-  else host.innerHTML = `<div class="req-empty" style="padding:24px 0"><span class="req-spin"></span> Loading messages…</div>`;
+  else host.innerHTML = _skelInboxHTML();
   try {
     const token = await _mreqAuthToken();
     const [ir, pr] = await Promise.all([
@@ -20204,7 +20231,7 @@ async function fetchAndRenderPipelines() {
   // the background instead of blanking to a spinner on every open.
   const hadData = _PL_DATA && Array.isArray(_PL_DATA.pipelines) && _PL_DATA.pipelines.length;
   if (hadData) { try { _renderPipelineTabs(); _renderPipelineBoard(); } catch (_) {} }
-  else container.innerHTML = '<div class="req-empty" style="padding:20px 0"><span class="req-spin"></span>Loading pipelines…</div>';
+  else container.innerHTML = _skelPipelinesHTML();
   try {
     if (typeof CLIENT_ID === 'undefined' || !CLIENT_ID) throw new Error('CLIENT_ID not in scope');
     const token = await _mreqAuthToken();
@@ -21316,7 +21343,10 @@ let _INBOX_THREAD = null;  // { convo: {...}, messages: [...] }
 async function fetchAndRenderInbox() {
   const container = document.getElementById('inbox-list-container');
   if (!container) return;
-  container.innerHTML = '<div class="req-empty" style="padding:20px 0"><span class="req-spin"></span>Loading conversations…</div>';
+  // Show a skeleton only on the first load; keep existing data on refresh.
+  if (!(_INBOX_DATA && Array.isArray(_INBOX_DATA.conversations) && _INBOX_DATA.conversations.length)) {
+    container.innerHTML = _skelInboxHTML();
+  }
   try {
     if (typeof CLIENT_ID === 'undefined' || !CLIENT_ID) throw new Error('CLIENT_ID not in scope');
     const token = await _mreqAuthToken();
