@@ -21,7 +21,10 @@ import { withSentryApiRoute } from "./_sentry.js";
 
 import { pickGhlToken, ghl } from "./ghl/_core.js";
 import { assemblePrompt } from "./agent/prompt-structure.js";
+import { loadContactMemory } from "./agent/contact-memory.js";
 import { buildAgentSystem } from "./agent/brain.js";
+import { agentMode, modeIsOn, modeSelfDrives, SELF_DRIVE_MIN_CONFIDENCE } from "./agent/_mode.js";
+import { resolveAgentActor } from "./agent/_auth.js";
 
 const SUPABASE_URL         = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
@@ -141,8 +144,7 @@ const clamp = (n, lo, hi) => Math.max(lo, Math.min(hi, n));
 
 // ── Detector: find quiet leads, draft the next nudge, queue it ──
 async function detectForClient(client) {
-  const cfg = client.ghl_kpi_config || {};
-  if (!cfg.followup_engine_enabled) return { client_id: client.id, skipped: "engine off" };
+  if (!modeIsOn(agentMode(client))) return { client_id: client.id, skipped: "mode off" };
   const creds = await pickGhlToken(client);
   if (!creds) return { client_id: client.id, skipped: "no GHL token" };
   const { token, locationId } = creds;
@@ -179,8 +181,10 @@ async function detectForClient(client) {
     const quietHrs = Math.round(hoursSince(c.lastMessageDate || c.dateUpdated));
 
     let decision;
-    try { decision = await runScheduleAgent(buildFollowupSystem(cfgBrain, quietHrs), transcript); }
-    catch (_) { skipped++; continue; }
+    try {
+      const sys = buildFollowupSystem(cfgBrain, quietHrs) + await loadContactMemory(sb, client.id, contactId);
+      decision = await runScheduleAgent(sys, transcript);
+    } catch (_) { skipped++; continue; }
 
     if (!decision.should_followup || !decision.message || !String(decision.message).trim()) { stopped++; continue; }
     const sendInH = clamp(Number(decision.send_in_hours) || 24, 1, MAX_AGE_DAYS * 24);
@@ -210,7 +214,7 @@ async function runDetect(res, onlyClientId) {
   try {
     clients = onlyClientId
       ? [await loadClient(onlyClientId)].filter(Boolean)
-      : await sb(`clients?select=id,business_name,ghl_location_id,ghl_access_token,ghl_refresh_token,ghl_token_expires_at,ghl_kpi_config&or=(v15_access.eq.true,v2_access.eq.true)`);
+      : await sb(`clients?select=id,business_name,ghl_location_id,ghl_access_token,ghl_refresh_token,ghl_token_expires_at,ghl_kpi_config&v2_access=eq.true`);
   } catch (_) {}
   const out = [];
   for (const client of (Array.isArray(clients) ? clients : [])) {
@@ -253,13 +257,26 @@ async function markFailed(id, msg) {
 }
 
 async function runWork(res) {
+  // Approved rows always send (human said yes). In SELF-DRIVE, high-confidence
+  // pending rows send themselves too; low-confidence ones stay pending for the
+  // inbox ("unsure → a human"). Hawkeye pending rows never auto-send.
   let due = [];
   try {
-    due = await sb(`agent_followups?status=eq.approved&scheduled_at=lte.${new Date().toISOString()}&select=*&order=scheduled_at.asc&limit=50`);
+    due = await sb(`agent_followups?status=in.(pending,approved)&scheduled_at=lte.${new Date().toISOString()}&select=*&order=scheduled_at.asc&limit=80`);
   } catch (e) { return res.status(500).json({ error: e.message }); }
   const cache = {};
   const out = [];
-  for (const row of (Array.isArray(due) ? due : [])) out.push(await sendOne(row, cache));
+  for (const row of (Array.isArray(due) ? due : [])) {
+    if (row.status === "pending") {
+      let client = cache[row.client_id];
+      if (client === undefined) { client = await loadClient(row.client_id); cache[row.client_id] = client; }
+      const auto = client && modeSelfDrives(agentMode(client)) && typeof row.confidence === "number" && row.confidence >= SELF_DRIVE_MIN_CONFIDENCE;
+      if (!auto) continue;   // hawkeye, or self-drive-but-unsure → wait for approval
+      out.push({ ...(await sendOne(row, cache)), auto_sent: true });
+    } else {
+      out.push(await sendOne(row, cache));
+    }
+  }
   return res.status(200).json({ ok: true, processed: out.length, results: out });
 }
 
@@ -273,14 +290,23 @@ async function handler(req, res) {
   }
 
   if (req.method !== "POST") return res.status(405).json({ error: "POST only" });
-  const staffEmail = await requireStaff(req);
-  if (!staffEmail) return res.status(401).json({ error: "staff only" });
+  // BAM staff OR the academy's own owner / can_train_agent member.
+  const actor = await resolveAgentActor(req);
+  if (!actor) return res.status(401).json({ error: "sign in required" });
 
   const b = req.body && typeof req.body === "object" ? req.body : {};
+  const staffEmail = actor.email;
+  // Academy (non-staff) actors must scope every action to their own academy;
+  // staff may omit client_id to act across academies. `clientScope` is appended
+  // to each row mutation so an academy actor can never touch another's rows.
+  if (!actor.isStaff && (!b.client_id || !actor.canActOn(b.client_id))) {
+    return res.status(403).json({ error: "not your academy" });
+  }
+  const clientScope = b.client_id ? `&client_id=eq.${b.client_id}` : "";
 
   try {
     if (b.action === "list") {
-      const clientFilter = b.client_id ? `&client_id=eq.${b.client_id}` : "";
+      const clientFilter = clientScope;
       const weekAgo = new Date(Date.now() - 7 * 86400000).toISOString();
       // Upcoming (pending/approved) + recent terminal (sent/skipped/canceled/failed in last 7d).
       const rows = await sb(`agent_followups?select=*,clients(business_name)&or=(status.in.(pending,approved),and(status.in.(sent,skipped,canceled,failed),updated_at.gte.${weekAgo}))${clientFilter}&order=scheduled_at.asc&limit=300`);
@@ -289,12 +315,12 @@ async function handler(req, res) {
     }
     if (b.action === "approve") {
       if (!b.id) return res.status(400).json({ error: "id required" });
-      await sb(`agent_followups?id=eq.${encodeURIComponent(b.id)}&status=eq.pending`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ status: "approved", approved_by: staffEmail, approved_at: new Date().toISOString(), updated_at: new Date().toISOString() }) });
+      await sb(`agent_followups?id=eq.${encodeURIComponent(b.id)}&status=eq.pending${clientScope}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ status: "approved", approved_by: staffEmail, approved_at: new Date().toISOString(), updated_at: new Date().toISOString() }) });
       return res.status(200).json({ ok: true });
     }
     if (b.action === "skip") {
       if (!b.id) return res.status(400).json({ error: "id required" });
-      await sb(`agent_followups?id=eq.${encodeURIComponent(b.id)}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ status: "skipped", updated_at: new Date().toISOString() }) });
+      await sb(`agent_followups?id=eq.${encodeURIComponent(b.id)}${clientScope}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ status: "skipped", updated_at: new Date().toISOString() }) });
       return res.status(200).json({ ok: true });
     }
     if (b.action === "edit") {
@@ -303,20 +329,20 @@ async function handler(req, res) {
       if (typeof b.message === "string" && b.message.trim()) patch.draft_message = b.message.trim();
       if (typeof b.goal === "string") patch.goal = b.goal;
       if (b.scheduled_at) patch.scheduled_at = new Date(b.scheduled_at).toISOString();
-      await sb(`agent_followups?id=eq.${encodeURIComponent(b.id)}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify(patch) });
+      await sb(`agent_followups?id=eq.${encodeURIComponent(b.id)}${clientScope}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify(patch) });
       return res.status(200).json({ ok: true });
     }
     if (b.action === "snooze") {
       if (!b.id || !b.hours) return res.status(400).json({ error: "id + hours required" });
-      const [row] = await sb(`agent_followups?id=eq.${encodeURIComponent(b.id)}&select=scheduled_at`);
+      const [row] = await sb(`agent_followups?id=eq.${encodeURIComponent(b.id)}${clientScope}&select=scheduled_at`);
       if (!row) return res.status(404).json({ error: "not found" });
       const base = new Date(row.scheduled_at).getTime() || Date.now();
-      await sb(`agent_followups?id=eq.${encodeURIComponent(b.id)}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ scheduled_at: new Date(base + Number(b.hours) * 3600000).toISOString(), updated_at: new Date().toISOString() }) });
+      await sb(`agent_followups?id=eq.${encodeURIComponent(b.id)}${clientScope}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ scheduled_at: new Date(base + Number(b.hours) * 3600000).toISOString(), updated_at: new Date().toISOString() }) });
       return res.status(200).json({ ok: true });
     }
     if (b.action === "send-now") {
       if (!b.id) return res.status(400).json({ error: "id required" });
-      const [row] = await sb(`agent_followups?id=eq.${encodeURIComponent(b.id)}&select=*`);
+      const [row] = await sb(`agent_followups?id=eq.${encodeURIComponent(b.id)}${clientScope}&select=*`);
       if (!row) return res.status(404).json({ error: "not found" });
       if (!["pending", "approved"].includes(row.status)) return res.status(409).json({ error: `already ${row.status}` });
       const r = await sendOne(row, {});
@@ -325,7 +351,8 @@ async function handler(req, res) {
     }
     if (b.action === "detect-now") {
       if (!ANTHROPIC_KEY) return res.status(500).json({ error: "ANTHROPIC_API_KEY not configured" });
-      return await runDetect(res, b.client_id || DEFAULT_CLIENT_ID);
+      // Academy actors can only scan their own academy; staff may scan the default.
+      return await runDetect(res, b.client_id || (actor.isStaff ? DEFAULT_CLIENT_ID : actor.academyClientIds[0]));
     }
     return res.status(400).json({ error: "unknown action" });
   } catch (e) {

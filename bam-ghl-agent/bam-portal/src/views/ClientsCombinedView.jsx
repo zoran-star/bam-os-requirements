@@ -1134,23 +1134,54 @@ export function MarketingTab({ client, tokens, role, session, onChanged, forceCa
   // Organic content — when on, the client's Marketing tab gets an Ads | Organic split.
   const organicContent = client.organic_content === true;
   const [savingOrganic, setSavingOrganic] = useState(false);
+  async function saveClientFields(fields) {
+    const tok = session?.access_token;
+    const res = await fetch(`/api/clients?action=update-fields&id=${client.id}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${tok}` },
+      body: JSON.stringify({ client_id: client.id, ...fields }),
+    });
+    const j = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(j.error || res.statusText);
+    onChanged?.();
+    return j;
+  }
   async function toggleOrganicContent(nextValue) {
     setSavingOrganic(true);
+    try { await saveClientFields({ organic_content: nextValue }); }
+    catch (err) { alert("Couldn't save: " + (err?.message || err)); }
+    finally { setSavingOrganic(false); }
+  }
+
+  // Organic credits. total = combined pool (any mix); video/graphic = optional hard
+  // caps. "" = unlimited, 0 = none.
+  const [totCredits, setTotCredits] = useState(client.organic_total_credits_per_month ?? "");
+  const [vidCredits, setVidCredits] = useState(client.organic_video_credits_per_month ?? "");
+  const [gfxCredits, setGfxCredits] = useState(client.organic_graphic_credits_per_month ?? "");
+  const [savingCredits, setSavingCredits] = useState(false);
+  const creditsDirty = String(totCredits) !== String(client.organic_total_credits_per_month ?? "")
+    || String(vidCredits) !== String(client.organic_video_credits_per_month ?? "")
+    || String(gfxCredits) !== String(client.organic_graphic_credits_per_month ?? "");
+  async function saveCredits() {
+    setSavingCredits(true);
     try {
-      const tok = session?.access_token;
-      const res = await fetch(`/api/clients?action=update-fields&id=${client.id}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${tok}` },
-        body: JSON.stringify({ client_id: client.id, organic_content: nextValue }),
+      await saveClientFields({
+        organic_total_credits_per_month: totCredits === "" ? null : Number(totCredits),
+        organic_video_credits_per_month: vidCredits === "" ? null : Number(vidCredits),
+        organic_graphic_credits_per_month: gfxCredits === "" ? null : Number(gfxCredits),
       });
-      const j = await res.json().catch(() => ({}));
-      if (!res.ok) { alert("Couldn't save: " + (j.error || res.statusText)); }
-      else onChanged?.();
-    } catch (err) {
-      alert("Couldn't save: " + (err?.message || err));
-    } finally {
-      setSavingOrganic(false);
-    }
+    } catch (e) { alert("Couldn't save credits: " + (e.message || e)); }
+    finally { setSavingCredits(false); }
+  }
+
+  // "Content-only" preset: paid ads OFF, organic content ON. Other services untouched.
+  const [savingPreset, setSavingPreset] = useState(false);
+  async function applyContentOnlyPreset() {
+    if (!confirm("Set this client to CONTENT-ONLY?\n\nTurns OFF paid ads (marketing) and turns ON organic content. Other services are left as-is.")) return;
+    setSavingPreset(true);
+    try { await saveClientFields({ marketing_included: false, organic_content: true }); }
+    catch (e) { alert("Couldn't apply preset: " + (e.message || e)); }
+    finally { setSavingPreset(false); }
   }
 
   // Setup state
@@ -1390,6 +1421,72 @@ export function MarketingTab({ client, tokens, role, session, onChanged, forceCa
           </button>
         )}
       </div>
+
+      {/* Organic monthly credits (per type). Only relevant when organic is ON.
+          Blank = unlimited, 0 = none (e.g. graphics-only client = videos 0). */}
+      {organicContent && canEdit && (
+        <div style={{
+          padding: "14px 18px", marginBottom: 22, borderRadius: 8,
+          background: t.surfaceEl, border: `1px solid ${t.border}`,
+        }}>
+          <div style={{ fontSize: 13, fontWeight: 600, color: t.text }}>Monthly organic credits</div>
+          <div style={{ fontSize: 12, color: t.textMute, marginTop: 2, marginBottom: 12 }}>
+            Creatives this client can request per calendar month. <b>Blank = unlimited</b>, <b>0 = none</b>. Resets the 1st; no rollover.
+          </div>
+          <div style={{ display: "flex", gap: 16, flexWrap: "wrap", alignItems: "flex-end" }}>
+            <label style={{ fontSize: 12, color: t.textSub }}>
+              Total / mo (any type)
+              <input type="number" min="0" step="1" value={totCredits}
+                onChange={e => setTotCredits(e.target.value)} placeholder="∞"
+                style={{ display: "block", marginTop: 5, width: 130, padding: "9px 12px", fontSize: 13,
+                  background: t.surface, color: t.text, border: `1px solid ${t.border}`, borderRadius: 6 }} />
+            </label>
+            <label style={{ fontSize: 12, color: t.textSub }}>
+              Video cap
+              <input type="number" min="0" step="1" value={vidCredits}
+                onChange={e => setVidCredits(e.target.value)} placeholder="∞"
+                style={{ display: "block", marginTop: 5, width: 100, padding: "9px 12px", fontSize: 13,
+                  background: t.surface, color: t.text, border: `1px solid ${t.border}`, borderRadius: 6 }} />
+            </label>
+            <label style={{ fontSize: 12, color: t.textSub }}>
+              Graphic cap
+              <input type="number" min="0" step="1" value={gfxCredits}
+                onChange={e => setGfxCredits(e.target.value)} placeholder="∞"
+                style={{ display: "block", marginTop: 5, width: 100, padding: "9px 12px", fontSize: 13,
+                  background: t.surface, color: t.text, border: `1px solid ${t.border}`, borderRadius: 6 }} />
+            </label>
+            <button type="button" onClick={saveCredits} disabled={savingCredits || !creditsDirty}
+              style={{ padding: "9px 16px", fontSize: 13, fontWeight: 600, borderRadius: 6, border: "none",
+                background: creditsDirty ? t.accent : t.border, color: creditsDirty ? "#0A0A0B" : t.textMute,
+                cursor: creditsDirty && !savingCredits ? "pointer" : "default" }}>
+              {savingCredits ? "Saving…" : "Save credits"}
+            </button>
+          </div>
+          <div style={{ fontSize: 11, color: t.textMute, marginTop: 10, lineHeight: 1.5 }}>
+            <b>Total</b> = combined pool videos + graphics share (e.g. 12 / mo, any mix). <b>Caps</b> are optional hard sub-limits - set a cap to <b>0</b> to disallow that type. Leave caps blank for a pure shared pool.
+          </div>
+        </div>
+      )}
+
+      {/* Content-only preset — one click: paid ads OFF, organic ON. */}
+      {canEdit && (
+        <div style={{
+          padding: "12px 16px", marginBottom: 22, borderRadius: 8,
+          background: t.surfaceEl, border: `1px solid ${t.border}`,
+          display: "flex", alignItems: "center", gap: 14,
+        }}>
+          <div style={{ flex: 1, fontSize: 12, color: t.textMute }}>
+            <b style={{ color: t.text }}>Content-only client?</b> One click sets paid ads OFF + organic content ON
+            {!marketingIncluded && organicContent ? " — already set ✓" : "."}
+          </div>
+          <button type="button" onClick={applyContentOnlyPreset} disabled={savingPreset}
+            style={{ padding: "8px 14px", fontSize: 12, fontWeight: 600, borderRadius: 6,
+              border: `1px solid ${t.border}`, background: "transparent", color: t.text,
+              cursor: savingPreset ? "wait" : "pointer", whiteSpace: "nowrap" }}>
+            {savingPreset ? "Applying…" : "Make content-only"}
+          </button>
+        </div>
+      )}
 
       {/* Meta Ads onboarding-tracker check (moved here from OverviewTab
           2026-05-27 — staff owns the flip, lives next to the marketing
