@@ -2,52 +2,32 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <title>CH3 Training — Sign Up</title>
-  <meta name="description" content="Sign up for CH3 Training — elite basketball development in Harrisburg, PA." />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>CH3 Training — Free Trial Session</title>
   <meta name="robots" content="noindex" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Anton&family=Inter+Tight:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/intl-tel-input@25.3.1/build/css/intlTelInput.css" />
   <link rel="stylesheet" href="funnel.css" />
+  <style>
+    html, body { margin: 0; height: 100%; background: #0a0a0a; }
+    #root { min-height: 100vh; }
+  </style>
 </head>
 <body>
-  <div class="stage">
-    <div class="stage__bg"></div>
-    <div class="device-wrap" id="device-wrap">
-      <div id="root"></div>
-    </div>
-  </div>
+  <div id="root"></div>
 
-  <!-- data must load before any JSX -->
+  <script src="https://unpkg.com/react@18.3.1/umd/react.production.min.js" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.production.min.js" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" crossorigin="anonymous"></script>
+
+  <script src="https://cdn.jsdelivr.net/npm/intl-tel-input@25.3.1/build/js/intlTelInputWithUtils.js" crossorigin="anonymous"></script>
   <script src="data.js"></script>
-
-  <!-- React 18 + Babel (CDN, in-browser JSX) -->
-  <script crossorigin src="https://unpkg.com/react@18.3.1/umd/react.production.min.js"></script>
-  <script crossorigin src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.production.min.js"></script>
-  <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js"></script>
-
-  <!-- Stripe.js -->
-  <script src="https://js.stripe.com/v3/"></script>
-
-  <!-- Funnel components — order matters -->
   <script type="text/babel" src="components.jsx"></script>
   <script type="text/babel" src="step1.jsx"></script>
   <script type="text/babel" src="step2.jsx"></script>
-  <script type="text/babel" src="step3.jsx"></script>
   <script type="text/babel" src="success.jsx"></script>
   <script type="text/babel" src="app.jsx"></script>
-
-  <script>
-    // Device-frame scaler — keeps the funnel at a fixed 402px width, scaled to fit.
-    (function () {
-      var FRAME_W = 402, FRAME_H = 812;
-      var wrap = document.getElementById('device-wrap');
-      function resize() {
-        var vw = window.innerWidth, vh = window.innerHeight;
-        var scale = Math.min(vw / FRAME_W, vh / FRAME_H, 1);
-        wrap.style.cssText = 'width:' + FRAME_W + 'px;height:' + FRAME_H + 'px;transform:scale(' + scale + ');transform-origin:center center;overflow:hidden;';
-      }
-      resize();
-      window.addEventListener('resize', resize);
-    })();
-  </script>
 </body>
 </html>

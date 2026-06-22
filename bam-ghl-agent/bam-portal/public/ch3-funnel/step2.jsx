@@ -1,99 +1,66 @@
-/* ============================================================
-   Step 2 — CHOOSE YOUR PLAN
-   Plan cards: 3 monthly + 2 one-time. Popular badge on Competitive Edge.
-   ============================================================ */
-
-function PlanCard(props) {
-  var CH3 = window.CH3;
-  var p = props.plan;
-  var selected = props.selected;
-  var c = CH3.charge(p);
-
-  return (
-    <button
-      className={'plan' + (selected ? ' is-selected' : '') + (p.popular ? ' is-popular' : '') + (p.sold_out ? ' is-disabled' : '')}
-      aria-pressed={selected}
-      disabled={p.sold_out}
-      onClick={function () { if (!p.sold_out) props.onSelect(p.id); }}
-      style={{ textAlign: 'left', cursor: p.sold_out ? 'not-allowed' : 'pointer' }}>
-
-      {p.popular && !p.sold_out && <span className="plan__badge">Most Popular</span>}
-
-      <div className="plan__top">
-        <div>
-          <div className="plan__name">{p.name}</div>
-          <div className="plan__freq">{p.frequency}</div>
-        </div>
-        <span className="plan__radio" aria-hidden="true" />
-      </div>
-
-      <div className="plan__price">
-        <span className="plan__price-main">
-          {CH3.dollars(p.price_usd)}
-          {p.billing === 'monthly' && <span style={{ fontFamily: 'var(--font-body)', fontSize: 13, color: 'var(--fg-subtle)', marginLeft: 4 }}>/mo</span>}
-        </span>
-      </div>
-      {p.billing === 'one-time' && (
-        <div className="plan__price" style={{ marginTop: 2 }}>
-          <span className="plan__price-unit">One-time &middot; no subscription</span>
-        </div>
-      )}
-
-      <ul className="plan__includes">
-        {p.includes.map(function (item, i) {
-          return (
-            <li key={i}><IcCheck size={14} /><span>{item}</span></li>
-          );
-        })}
-      </ul>
-    </button>
-  );
-}
+/* Step 2 — Schedule preview + what to expect */
 
 function Step2(props) {
   var CH3 = window.CH3;
-  var monthly = CH3.PLANS.filter(function (p) { return p.billing === 'monthly'; });
-  var oneTime  = CH3.PLANS.filter(function (p) { return p.billing === 'one-time'; });
+  var grade = props.grade || '';
+  var groupKey = CH3.getGroup(grade);
+  var group = groupKey ? CH3.SCHEDULE[groupKey] : null;
+  var lift = CH3.SCHEDULE.lift;
 
   return (
-    <div className="fbody" key="s2">
-      <h1 className="fstep-title">Choose your <em>plan.</em></h1>
-      <p className="fstep-sub">Pick the level of commitment that fits your goals. Cancel monthly plans anytime.</p>
+    <div className="fbody">
+      <h1 className="fstep-title">Your <em>schedule.</em></h1>
+      <p className="fstep-sub">
+        {group
+          ? 'Here are the sessions available for your group. Pick the days that work for you once you book.'
+          : 'Here are all the available training sessions at CH3 Training.'}
+      </p>
 
-      <div className="fgroup-label">Monthly membership</div>
-      <div className="plans">
-        {monthly.map(function (p) {
-          return (
-            <PlanCard
-              key={p.id}
-              plan={p}
-              selected={props.selectedPlan === p.id}
-              onSelect={props.onSelectPlan}
-            />
-          );
-        })}
+      <div className="sched-block">
+        <div className="sched-block__header">
+          <span className="sched-block__title">Training Schedule</span>
+          {grade && <span className="sched-block__grade">&middot; {grade}</span>}
+        </div>
+        <div className="sched-block__body">
+          {group ? (
+            <SchedRow group={group} highlight={true} />
+          ) : (
+            <div>
+              <SchedRow group={CH3.SCHEDULE.youth} highlight={false} />
+              <div style={{ height: 14 }} />
+              <SchedRow group={CH3.SCHEDULE.hs} highlight={false} />
+            </div>
+          )}
+          <SchedRow group={lift} highlight={false} />
+        </div>
+        <div className="sched-block__footer">
+          625 N Spring St &middot; Middletown, PA 17057 &middot; Groups capped at 9
+        </div>
       </div>
 
-      <div className="fgroup-label" style={{ marginTop: 24 }}>One-time &amp; drop-in</div>
-      <div className="plans">
-        {oneTime.map(function (p) {
+      <div className="fgroup-label" style={{ marginTop: 24 }}>What to expect</div>
+      <ul className="expect-list">
+        {[
+          'Coach Haynes will text you within 24 hours to confirm your free session time.',
+          'Your first session is 100% free — no payment, no commitment.',
+          'Wear sneakers and athletic clothes. Just show up ready to work.',
+          'After the session, Coach will give you an honest assessment and show you the right plan.',
+        ].map(function (item, i) {
           return (
-            <PlanCard
-              key={p.id}
-              plan={p}
-              selected={props.selectedPlan === p.id}
-              onSelect={props.onSelectPlan}
-            />
+            <li key={i}>
+              <span className="expect-list__dot" />
+              <span>{item}</span>
+            </li>
           );
         })}
-      </div>
+      </ul>
 
-      <div className="reassure" style={{ marginTop: 20, justifyContent: 'center' }}>
-        <IcLock size={15} />
-        <span><b>No commitment on one-time plans.</b> Monthly memberships can be cancelled at any time.</span>
+      <div className="reassure" style={{ marginTop: 24 }}>
+        <IcLock size={13} />
+        <span>No payment info required. This is just to claim your free session.</span>
       </div>
     </div>
   );
 }
 
-Object.assign(window, { Step2, PlanCard });
+Object.assign(window, { Step2 });

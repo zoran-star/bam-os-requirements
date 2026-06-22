@@ -1,182 +1,112 @@
-/* ============================================================
-   CH3 Training — Signup Funnel
-   3-step: contact info → plan pick → confirm + pay.
-   Live mode: ?live=1 in URL or window.FUNNEL_LIVE = true.
-   ============================================================ */
+/* CH3 Training — Free Trial Onboarding Funnel
+   2 steps: contact info → schedule preview → success
+   Posts to /api/website/ch3-lead to create GHL contact + Supabase row.
+   GHL automation fires from "CH3 Lead" tag → SMS with calendar link. */
 
-var CHECKOUT_URL = "/api/website/ch3-checkout";
+var API_URL = '/api/website/ch3-lead';
 
-var LIVE_CHECKOUT = false;
-
-var EMPTY = { cFirst: '', cLast: '', cEmail: '', cPhone: '' };
+var EMPTY = {
+  firstName: '', lastName: '', email: '', phone: '',
+  grade: '', experienceLevel: '', proximity: '',
+  smsConsent: false, termsAgreed: false,
+};
 
 function App() {
-  var s = React.useState(1); var step = s[0], setStep = s[1];
+  var ss = React.useState(1); var step = ss[0], setStep = ss[1];
   var ff = React.useState(Object.assign({}, EMPTY)); var form = ff[0], setForm = ff[1];
-
-  var defaultPlan = (function () {
-    var popular = window.CH3.PLANS.filter(function (p) { return p.popular && !p.sold_out; })[0];
-    var first   = window.CH3.PLANS.filter(function (p) { return !p.sold_out; })[0];
-    return popular ? popular.id : (first ? first.id : null);
-  })();
-  var pp = React.useState(defaultPlan); var selectedPlan = pp[0], setSelectedPlan = pp[1];
-
-  var py = React.useState({ method: null, name: '', cardFilled: false }); var pay = py[0], setPay = py[1];
-  var ag = React.useState(false); var agreed = ag[0], setAgreed = ag[1];
-  var sg = React.useState(''); var sig = sg[0], setSig = sg[1];
-  var uiS = React.useState({ agreeOpen: false, faq: null }); var ui = uiS[0], setUi = uiS[1];
+  var ll = React.useState(false); var loading = ll[0], setLoading = ll[1];
+  var ee = React.useState(null); var apiErr = ee[0], setApiErr = ee[1];
   var se = React.useState(false); var showErr1 = se[0], setShowErr1 = se[1];
-  var tl = React.useState(false); var loading = tl[0], setLoading = tl[1];
-  var ll = React.useState('Processing…'); var loadLabel = ll[0], setLoadLabel = ll[1];
-  var pe = React.useState(null); var payErr = pe[0], setPayErr = pe[1];
-  var sr = React.useState(false); var stripeReady = sr[0], setStripeReady = sr[1];
-  var df = React.useState(false); var demoFallback = df[0], setDemoFallback = df[1];
-
-  var stripeRef = React.useRef(null);
-  var elementsRef = React.useRef(null);
-  var attemptedRef = React.useRef(false);
 
   React.useEffect(function () {
-    var el = document.querySelector('.fbody, .success');
-    if (el) el.scrollTop = 0;
+    window.scrollTo(0, 0);
   }, [step]);
 
-  var wantLive = LIVE_CHECKOUT || window.FUNNEL_LIVE ||
-    (typeof location !== 'undefined' && new URLSearchParams(location.search).has('live'));
-  var liveMode = wantLive && !demoFallback;
-
   var s1valid = window.validateStep1(form).valid;
-  var plan = selectedPlan ? window.CH3.getPlan(selectedPlan) : null;
-  var s3valid = agreed && (liveMode ? stripeReady : window.paymentValid(pay));
 
-  function checkoutPayload() {
-    return {
-      contact: { first: form.cFirst, last: form.cLast, email: form.cEmail, phone: form.cPhone },
-      plan:    { id: selectedPlan },
-      agreement: { signature: sig || '', signed_at: new Date().toISOString() }
+  function submitLead() {
+    setShowErr1(true);
+    if (!s1valid) return;
+    setLoading(true);
+    setApiErr(null);
+    var payload = {
+      firstName: form.firstName.trim(),
+      lastName:  form.lastName.trim(),
+      email:     form.email.trim(),
+      phone:     window.ch3Iti ? window.ch3Iti.getNumber() : form.phone.trim(),
+      grade:     form.grade,
+      experienceLevel: form.experienceLevel,
+      proximity: form.proximity || '',
+      smsConsent: !!form.smsConsent,
+      consentTimestamp: new Date().toISOString(),
     };
-  }
-
-  function advance(target, ms, label) {
-    setLoadLabel(label || 'Processing…');
-    setLoading(true);
-    window.setTimeout(function () { setLoading(false); setStep(target); }, ms || 400);
-  }
-
-  React.useEffect(function () {
-    if (!liveMode || step !== 3 || !plan) return;
-    if (attemptedRef.current) return;
-    attemptedRef.current = true;
-    setLoadLabel('Setting up payment…');
-    setLoading(true);
-
-    fetch(CHECKOUT_URL, {
+    fetch(API_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(checkoutPayload())
+      body: JSON.stringify(payload),
     })
       .then(function (r) { return r.json(); })
       .then(function (data) {
-        if (!data.ok) throw new Error(data.error || 'Checkout failed');
-        var stripe = window.Stripe(data.publishable_key);
-        stripeRef.current = stripe;
-        var elements = stripe.elements({ clientSecret: data.client_secret, appearance: { theme: 'night', variables: { colorPrimary: '#00B8C8' } } });
-        elementsRef.current = elements;
-        var pe = elements.create('payment');
-        pe.mount('#payment-element');
-        pe.on('ready', function () { setStripeReady(true); });
         setLoading(false);
+        if (data.ok) {
+          var group = data.group || window.CH3.getGroup(form.grade) || 'hs';
+          var params = 'group=' + encodeURIComponent(group)
+            + '&name=' + encodeURIComponent(form.firstName.trim())
+            + '&email=' + encodeURIComponent(form.email.trim());
+          if (data.contactId) params += '&cid=' + encodeURIComponent(data.contactId);
+          window.location.href = '/ch3-funnel/calendar.html?' + params;
+        } else {
+          setApiErr(data.error || 'Something went wrong. Please try again.');
+        }
       })
-      .catch(function (err) {
-        console.error('Checkout setup error', err);
-        setDemoFallback(true);
+      .catch(function () {
         setLoading(false);
+        setApiErr('Network error. Please check your connection and try again.');
       });
-  }, [step, liveMode]);
-
-  async function handlePay() {
-    if (liveMode && stripeRef.current && elementsRef.current) {
-      setLoadLabel('Confirming payment…');
-      setLoading(true);
-      setPayErr(null);
-      var result = await stripeRef.current.confirmPayment({
-        elements: elementsRef.current,
-        redirect: 'if_required'
-      });
-      if (result.error) {
-        setPayErr(result.error.message || 'Payment failed. Please try again.');
-        setLoading(false);
-      } else {
-        advance(4, 100, 'Confirming…');
-      }
-    } else {
-      advance(4, 800, 'Confirming your spot…');
-    }
   }
 
-  var ctaLabel, ctaAction, ctaDisabled;
-  if (step === 1) {
-    ctaLabel = 'Choose my plan →';
-    ctaAction = function () {
-      if (!s1valid) { setShowErr1(true); return; }
-      advance(2, 300);
-    };
-    ctaDisabled = false;
-  } else if (step === 2) {
-    ctaLabel = 'Review &amp; pay →';
-    ctaAction = function () {
-      if (!selectedPlan) return;
-      attemptedRef.current = false;
-      advance(3, 300);
-    };
-    ctaDisabled = !selectedPlan;
-  } else if (step === 3) {
-    ctaLabel = loading ? loadLabel : 'Confirm my spot →';
-    ctaAction = function () {
-      if (!agreed) { setUi(Object.assign({}, ui, { agreeOpen: true })); return; }
-      if (!s3valid) return;
-      handlePay();
-    };
-    ctaDisabled = loading || !agreed || (!liveMode && !window.paymentValid(pay));
-  }
-
-  if (step === 4) {
-    return <Success form={form} plan={plan} />;
+  if (step === 'success') {
+    return (
+      <div className="funnel">
+        <header className="fheader" style={{ position: 'relative' }}>
+          <div className="fheader__brand">CH3 <em>TRAINING</em></div>
+          <div className="fheader__step">Free Trial</div>
+          <div className="fprogress" style={{ position: 'absolute', bottom: 0, left: 0, right: 0 }}>
+            <div className="fprogress__fill" style={{ width: '100%' }} />
+          </div>
+        </header>
+        <Success grade={form.grade} />
+      </div>
+    );
   }
 
   return (
-    <div className="funnel">
-      <ProgressHeader step={step} />
+    <div className="funnel is-step1">
+      <header className="fheader" style={{ position: 'relative' }}>
+        <div className="fheader__brand">CH3 <em>TRAINING</em></div>
+        <div className="fheader__step">Free Trial</div>
+        <div className="fprogress" style={{ position: 'absolute', bottom: 0, left: 0, right: 0 }}>
+          <div className="fprogress__fill" style={{ width: '50%' }} />
+        </div>
+      </header>
 
-      {step === 1 && <Step1 form={form} setForm={setForm} showErrors={showErr1} />}
-      {step === 2 && <Step2 selectedPlan={selectedPlan} onSelectPlan={setSelectedPlan} />}
-      {step === 3 && plan && (
-        <Step3
-          form={form} plan={plan}
-          pay={pay} setPay={setPay}
-          agreed={agreed} onAgree={function (e) { setAgreed(e.target.checked); }}
-          agreeError={false} sig={sig} onSig={setSig}
-          ui={ui} setUi={setUi}
-          live={liveMode} stripeReady={stripeReady} payErr={payErr}
-          onChangePlan={function () { setStep(2); }}
-        />
-      )}
+      <Step1 form={form} setForm={setForm} showErrors={showErr1} onNext={submitLead} />
 
-      {step <= 3 && (
-        <footer className="fcta">
-          <button
-            className={'btn-primary' + (loading ? ' is-loading' : '')}
-            disabled={ctaDisabled}
-            onClick={ctaAction}
-            dangerouslySetInnerHTML={{ __html: loading ? '<span class="spinner"></span>' + loadLabel : ctaLabel }}
-          />
-          {step > 1 && (
-            <button className="fcta__back" onClick={function () { setStep(step - 1); }}>
-              &larr; Back
-            </button>
-          )}
-        </footer>
-      )}
+      <footer className="fcta">
+        {apiErr && (
+          <div style={{ fontSize: 13, color: 'var(--red)', textAlign: 'center', marginBottom: 4 }}>
+            {apiErr}
+          </div>
+        )}
+        <button
+          className={'btn-primary' + (loading ? ' is-loading' : '')}
+          disabled={loading}
+          onClick={submitLead}>
+          {loading
+            ? <React.Fragment><span className="spinner" /> Saving&hellip;</React.Fragment>
+            : 'Book my free trial →'}
+        </button>
+      </footer>
     </div>
   );
 }

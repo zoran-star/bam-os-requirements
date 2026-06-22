@@ -1,0 +1,724 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>DETAIL Miami — Miami's Premier Basketball Facility</title>
+  <meta name="description" content="Elite basketball training in Miami Lakes, FL. Programs for K-12, ADAPT Club, Camps & Clinics, and Virtual Academy. Book your free trial today." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Anton&family=Inter+Tight:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:        #080808;
+      --surface:   #101010;
+      --surface2:  #181818;
+      --border:    rgba(255,255,255,0.08);
+      --brand:     #e2dd9f;
+      --brand-dim: rgba(226,221,159,0.10);
+      --fg:        #ffffff;
+      --fg-sub:    rgba(255,255,255,0.62);
+      --fg-muted:  rgba(255,255,255,0.35);
+      --font-d:    'Anton', sans-serif;
+      --font-b:    'Inter Tight', sans-serif;
+      --max:       1200px;
+    }
+
+    html { scroll-behavior: smooth; }
+    body { background: var(--bg); color: var(--fg); font-family: var(--font-b); line-height: 1.6; overflow-x: hidden; }
+
+    /* ── NAV ── */
+    nav {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+      background: rgba(8,8,8,0.92); backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border);
+      padding: 0 24px; height: 64px;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .nav-logo {
+      font-family: var(--font-d); font-size: 20px; letter-spacing: .06em;
+      text-transform: uppercase; color: var(--fg); text-decoration: none;
+    }
+    .nav-logo span { color: var(--brand); }
+    .nav-links {
+      display: flex; align-items: center; gap: 32px; list-style: none;
+    }
+    .nav-links a {
+      font-size: 13px; font-weight: 500; letter-spacing: .04em;
+      text-transform: uppercase; color: var(--fg-sub); text-decoration: none;
+      transition: color .2s;
+    }
+    .nav-links a:hover { color: var(--fg); }
+    .nav-cta {
+      background: var(--brand); color: #1a1a00; font-family: var(--font-d);
+      font-size: 14px; letter-spacing: .06em; text-transform: uppercase;
+      padding: 10px 22px; border-radius: 6px; text-decoration: none;
+      transition: opacity .2s; white-space: nowrap;
+    }
+    .nav-cta:hover { opacity: .88; }
+    .nav-mobile-toggle {
+      display: none; flex-direction: column; gap: 5px; cursor: pointer;
+      background: none; border: none; padding: 4px;
+    }
+    .nav-mobile-toggle span {
+      display: block; width: 24px; height: 2px; background: var(--fg);
+      border-radius: 2px; transition: .3s;
+    }
+    .nav-drawer {
+      display: none; position: fixed; top: 64px; left: 0; right: 0; bottom: 0;
+      background: var(--bg); z-index: 99; padding: 32px 24px;
+      flex-direction: column; gap: 8px;
+    }
+    .nav-drawer.open { display: flex; }
+    .nav-drawer a {
+      font-family: var(--font-d); font-size: 26px; letter-spacing: .04em;
+      text-transform: uppercase; color: var(--fg-sub); text-decoration: none;
+      padding: 10px 0; border-bottom: 1px solid var(--border);
+    }
+    .nav-drawer a:hover { color: var(--brand); }
+    .nav-drawer .drawer-cta {
+      margin-top: 24px; background: var(--brand); color: #1a1a00;
+      text-align: center; border-radius: 8px; color: #1a1a00;
+    }
+    @media (max-width: 768px) {
+      .nav-links { display: none; }
+      .nav-cta { display: none; }
+      .nav-mobile-toggle { display: flex; }
+    }
+
+    /* ── HERO ── */
+    .hero {
+      min-height: 100vh; display: flex; align-items: flex-end;
+      position: relative; overflow: hidden; padding-top: 64px;
+    }
+    .hero-bg {
+      position: absolute; inset: 0;
+      background: radial-gradient(ellipse 80% 60% at 60% 40%, rgba(226,221,159,0.05) 0%, transparent 70%),
+                  linear-gradient(160deg, #0f0f0f 0%, #060606 100%);
+    }
+    .hero-grid {
+      position: absolute; inset: 0; opacity: .03;
+      background-image: linear-gradient(rgba(226,221,159,0.6) 1px, transparent 1px),
+                        linear-gradient(90deg, rgba(226,221,159,0.6) 1px, transparent 1px);
+      background-size: 60px 60px;
+    }
+    .hero-accent-line {
+      position: absolute; right: 0; top: 0; bottom: 0; width: 3px;
+      background: linear-gradient(to bottom, transparent, var(--brand), transparent);
+      opacity: .4;
+    }
+    .hero-content {
+      position: relative; z-index: 2;
+      width: 100%; max-width: var(--max);
+      margin: 0 auto; padding: 80px 24px 100px;
+    }
+    .hero-eyebrow {
+      display: inline-flex; align-items: center; gap: 10px;
+      font-size: 11px; font-weight: 600; letter-spacing: .2em;
+      text-transform: uppercase; color: var(--brand); margin-bottom: 28px;
+    }
+    .hero-eyebrow::before {
+      content: ''; display: block; width: 32px; height: 1.5px; background: var(--brand);
+    }
+    .hero h1 {
+      font-family: var(--font-d); font-size: clamp(52px, 9vw, 110px);
+      line-height: .95; letter-spacing: .01em; text-transform: uppercase;
+      margin-bottom: 32px; max-width: 900px;
+    }
+    .hero h1 .accent { color: var(--brand); }
+    .hero-sub {
+      font-size: clamp(16px, 2vw, 20px); color: var(--fg-sub);
+      max-width: 560px; line-height: 1.55; margin-bottom: 48px; font-weight: 300;
+    }
+    .hero-btns { display: flex; gap: 16px; flex-wrap: wrap; }
+    .btn-primary {
+      display: inline-block; background: var(--brand); color: #1a1a00;
+      font-family: var(--font-d); font-size: 16px; letter-spacing: .06em;
+      text-transform: uppercase; padding: 18px 40px; border-radius: 6px;
+      text-decoration: none; transition: opacity .2s;
+    }
+    .btn-primary:hover { opacity: .88; }
+    .btn-outline {
+      display: inline-block; border: 1.5px solid rgba(255,255,255,0.2);
+      color: var(--fg); font-family: var(--font-d); font-size: 16px;
+      letter-spacing: .06em; text-transform: uppercase; padding: 18px 40px;
+      border-radius: 6px; text-decoration: none; transition: border-color .2s, color .2s;
+    }
+    .btn-outline:hover { border-color: var(--brand); color: var(--brand); }
+    .hero-scroll {
+      position: absolute; bottom: 40px; left: 50%; transform: translateX(-50%);
+      display: flex; flex-direction: column; align-items: center; gap: 8px;
+      color: var(--fg-muted); font-size: 11px; letter-spacing: .14em;
+      text-transform: uppercase;
+    }
+    .hero-scroll::after {
+      content: ''; width: 1px; height: 40px;
+      background: linear-gradient(to bottom, var(--fg-muted), transparent);
+    }
+
+    /* ── STATS ── */
+    .stats-bar {
+      background: var(--surface); border-top: 1px solid var(--border);
+      border-bottom: 1px solid var(--border);
+    }
+    .stats-inner {
+      max-width: var(--max); margin: 0 auto;
+      display: grid; grid-template-columns: repeat(5, 1fr);
+      padding: 0 24px;
+    }
+    .stat-item {
+      padding: 36px 20px; text-align: center;
+      border-right: 1px solid var(--border);
+    }
+    .stat-item:last-child { border-right: none; }
+    .stat-num {
+      font-family: var(--font-d); font-size: clamp(28px, 4vw, 48px);
+      letter-spacing: .02em; color: var(--brand); line-height: 1;
+      margin-bottom: 6px;
+    }
+    .stat-label {
+      font-size: 11px; font-weight: 600; letter-spacing: .12em;
+      text-transform: uppercase; color: var(--fg-muted);
+    }
+    @media (max-width: 768px) {
+      .stats-inner { grid-template-columns: repeat(3, 1fr); }
+      .stat-item:nth-child(3) { border-right: none; }
+      .stat-item:nth-child(4) { border-top: 1px solid var(--border); }
+      .stat-item:nth-child(5) { border-top: 1px solid var(--border); border-right: none; }
+    }
+    @media (max-width: 480px) {
+      .stats-inner { grid-template-columns: repeat(2, 1fr); }
+      .stat-item:nth-child(2) { border-right: none; }
+      .stat-item:nth-child(3) { border-top: 1px solid var(--border); }
+      .stat-item:nth-child(4) { border-top: 1px solid var(--border); border-right: none; }
+      .stat-item:nth-child(5) { border-top: 1px solid var(--border); grid-column: 1 / -1; border-right: none; }
+    }
+
+    /* ── SECTIONS ── */
+    section { padding: 100px 24px; }
+    .section-inner { max-width: var(--max); margin: 0 auto; }
+    .section-eyebrow {
+      font-size: 11px; font-weight: 600; letter-spacing: .2em;
+      text-transform: uppercase; color: var(--brand); margin-bottom: 20px;
+      display: flex; align-items: center; gap: 10px;
+    }
+    .section-eyebrow::before { content: ''; display: block; width: 24px; height: 1.5px; background: var(--brand); }
+    .section-title {
+      font-family: var(--font-d); font-size: clamp(36px, 6vw, 72px);
+      line-height: .95; letter-spacing: .01em; text-transform: uppercase;
+      margin-bottom: 24px;
+    }
+    .section-title .accent { color: var(--brand); }
+    .section-body { font-size: 17px; color: var(--fg-sub); line-height: 1.7; max-width: 640px; font-weight: 300; }
+
+    /* ── MISSION ── */
+    .mission { background: var(--bg); }
+    .mission-grid {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 80px; align-items: center;
+    }
+    .mission-left { }
+    .mission-right { }
+    .mission-quote {
+      font-family: var(--font-d); font-size: clamp(22px, 3vw, 36px);
+      letter-spacing: .01em; text-transform: uppercase; line-height: 1.15;
+      color: var(--fg); margin-bottom: 32px;
+    }
+    .mission-quote .accent { color: var(--brand); }
+    .mission-pillars { display: flex; flex-direction: column; gap: 20px; margin-top: 40px; }
+    .pillar {
+      display: flex; gap: 16px; align-items: flex-start;
+      padding: 20px; background: var(--surface); border: 1px solid var(--border);
+      border-radius: 10px;
+    }
+    .pillar-icon {
+      width: 40px; height: 40px; border-radius: 8px;
+      background: var(--brand-dim); border: 1px solid rgba(226,221,159,0.2);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 18px; flex-shrink: 0;
+    }
+    .pillar-text h4 { font-weight: 600; font-size: 15px; margin-bottom: 4px; }
+    .pillar-text p { font-size: 13px; color: var(--fg-muted); line-height: 1.5; }
+    .mission-visual {
+      position: relative; background: var(--surface); border: 1px solid var(--border);
+      border-radius: 16px; overflow: hidden; aspect-ratio: 4/5;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .mission-visual-inner {
+      text-align: center; padding: 40px;
+    }
+    .mission-visual-inner .big-num {
+      font-family: var(--font-d); font-size: 100px; color: var(--brand);
+      opacity: .15; line-height: 1; letter-spacing: -.02em;
+    }
+    .mission-visual-inner .tag {
+      font-family: var(--font-d); font-size: 28px; text-transform: uppercase;
+      letter-spacing: .08em; color: var(--brand); margin-bottom: 12px;
+    }
+    .mission-visual-inner p { font-size: 14px; color: var(--fg-muted); }
+    @media (max-width: 900px) {
+      .mission-grid { grid-template-columns: 1fr; gap: 48px; }
+      .mission-visual { aspect-ratio: 16/9; }
+    }
+
+    /* ── PROGRAMS ── */
+    .programs { background: var(--surface); }
+    .programs-header {
+      display: flex; justify-content: space-between; align-items: flex-end;
+      margin-bottom: 60px; gap: 24px; flex-wrap: wrap;
+    }
+    .programs-grid {
+      display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px;
+    }
+    .program-card {
+      background: var(--bg); border: 1px solid var(--border);
+      border-radius: 14px; padding: 32px 28px; position: relative;
+      overflow: hidden; transition: border-color .25s, transform .25s;
+      text-decoration: none; color: var(--fg); display: block;
+    }
+    .program-card:hover { border-color: rgba(226,221,159,0.35); transform: translateY(-4px); }
+    .program-card::before {
+      content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px;
+      background: var(--brand); transform: scaleX(0); transform-origin: left;
+      transition: transform .3s;
+    }
+    .program-card:hover::before { transform: scaleX(1); }
+    .program-tag {
+      display: inline-block; font-size: 10px; font-weight: 700; letter-spacing: .14em;
+      text-transform: uppercase; color: var(--brand);
+      background: var(--brand-dim); border: 1px solid rgba(226,221,159,0.2);
+      border-radius: 20px; padding: 4px 12px; margin-bottom: 20px;
+    }
+    .program-card h3 {
+      font-family: var(--font-d); font-size: clamp(22px, 3vw, 28px);
+      text-transform: uppercase; letter-spacing: .02em; line-height: 1.1;
+      margin-bottom: 12px;
+    }
+    .program-card p { font-size: 14px; color: var(--fg-sub); line-height: 1.6; margin-bottom: 24px; }
+    .program-card .card-cta {
+      font-size: 13px; font-weight: 600; color: var(--brand);
+      letter-spacing: .04em; text-transform: uppercase;
+      display: flex; align-items: center; gap: 6px;
+    }
+    .program-card .card-cta::after { content: '→'; }
+    .program-card.featured {
+      background: var(--brand-dim); border-color: rgba(226,221,159,0.3);
+      grid-column: span 1;
+    }
+    @media (max-width: 900px) {
+      .programs-grid { grid-template-columns: repeat(2, 1fr); }
+    }
+    @media (max-width: 560px) {
+      .programs-grid { grid-template-columns: 1fr; }
+      .programs-header { flex-direction: column; align-items: flex-start; }
+    }
+
+    /* ── FREE TRIAL CTA ── */
+    .cta-section {
+      background: var(--bg); text-align: center;
+    }
+    .cta-box {
+      max-width: 760px; margin: 0 auto;
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 24px; padding: 80px 48px; position: relative; overflow: hidden;
+    }
+    .cta-box::before {
+      content: ''; position: absolute; top: -60px; left: 50%; transform: translateX(-50%);
+      width: 400px; height: 400px; border-radius: 50%;
+      background: radial-gradient(circle, rgba(226,221,159,0.07) 0%, transparent 70%);
+      pointer-events: none;
+    }
+    .cta-eyebrow { margin-bottom: 20px; justify-content: center; }
+    .cta-title {
+      font-family: var(--font-d); font-size: clamp(36px, 6vw, 64px);
+      line-height: .95; text-transform: uppercase; margin-bottom: 20px;
+    }
+    .cta-title .accent { color: var(--brand); }
+    .cta-body { font-size: 16px; color: var(--fg-sub); max-width: 460px; margin: 0 auto 40px; line-height: 1.6; }
+    .cta-meta { display: flex; gap: 24px; justify-content: center; flex-wrap: wrap; margin-top: 28px; }
+    .cta-meta-item { font-size: 12px; color: var(--fg-muted); display: flex; align-items: center; gap: 6px; }
+    .cta-meta-item::before { content: '✓'; color: var(--brand); }
+    @media (max-width: 600px) { .cta-box { padding: 48px 24px; } }
+
+    /* ── LOCATION ── */
+    .location-section { background: var(--surface); }
+    .location-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 60px; align-items: start; }
+    .location-info h3 {
+      font-family: var(--font-d); font-size: 36px; text-transform: uppercase;
+      letter-spacing: .02em; margin-bottom: 24px;
+    }
+    .location-info h3 span { color: var(--brand); }
+    .location-detail {
+      display: flex; gap: 14px; align-items: flex-start;
+      padding: 16px 0; border-bottom: 1px solid var(--border);
+    }
+    .location-detail:last-of-type { border-bottom: none; }
+    .location-detail .icon {
+      width: 36px; height: 36px; border-radius: 8px;
+      background: var(--brand-dim); display: flex; align-items: center;
+      justify-content: center; font-size: 16px; flex-shrink: 0; margin-top: 2px;
+    }
+    .location-detail .info-label { font-size: 11px; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; color: var(--fg-muted); margin-bottom: 2px; }
+    .location-detail .info-val { font-size: 15px; color: var(--fg); font-weight: 500; }
+    .location-map {
+      background: var(--bg); border: 1px solid var(--border); border-radius: 16px;
+      overflow: hidden; aspect-ratio: 4/3;
+    }
+    .location-map iframe { width: 100%; height: 100%; border: none; filter: invert(90%) hue-rotate(180deg); }
+    @media (max-width: 768px) {
+      .location-grid { grid-template-columns: 1fr; gap: 40px; }
+    }
+
+    /* ── FOOTER ── */
+    footer {
+      background: var(--bg); border-top: 1px solid var(--border);
+      padding: 60px 24px 40px;
+    }
+    .footer-inner {
+      max-width: var(--max); margin: 0 auto;
+      display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 48px;
+    }
+    .footer-brand { }
+    .footer-logo {
+      font-family: var(--font-d); font-size: 22px; letter-spacing: .06em;
+      text-transform: uppercase; color: var(--fg); margin-bottom: 12px;
+    }
+    .footer-logo span { color: var(--brand); }
+    .footer-tagline { font-size: 13px; color: var(--fg-muted); line-height: 1.6; max-width: 280px; }
+    .footer-col h5 {
+      font-size: 11px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase;
+      color: var(--fg-muted); margin-bottom: 16px;
+    }
+    .footer-col ul { list-style: none; display: flex; flex-direction: column; gap: 10px; }
+    .footer-col ul a { font-size: 14px; color: var(--fg-sub); text-decoration: none; transition: color .2s; }
+    .footer-col ul a:hover { color: var(--brand); }
+    .footer-bottom {
+      max-width: var(--max); margin: 48px auto 0; padding-top: 24px;
+      border-top: 1px solid var(--border);
+      display: flex; justify-content: space-between; align-items: center;
+      font-size: 12px; color: var(--fg-muted); gap: 16px; flex-wrap: wrap;
+    }
+    @media (max-width: 768px) {
+      .footer-inner { grid-template-columns: 1fr 1fr; }
+      .footer-brand { grid-column: 1 / -1; }
+    }
+    @media (max-width: 480px) {
+      .footer-inner { grid-template-columns: 1fr; }
+      .footer-bottom { flex-direction: column; text-align: center; }
+    }
+
+    /* ── UTILS ── */
+    @media (max-width: 768px) {
+      section { padding: 72px 20px; }
+      .hero-content { padding: 60px 20px 80px; }
+    }
+    @media (max-width: 480px) {
+      section { padding: 56px 16px; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- NAVIGATION -->
+<nav>
+  <a class="nav-logo" href="/miami-website/">DETAIL <span>Miami</span></a>
+  <ul class="nav-links">
+    <li><a href="#about">About</a></li>
+    <li><a href="#programs">Programs</a></li>
+    <li><a href="#location">Location</a></li>
+    <li><a href="contact.html">Contact</a></li>
+  </ul>
+  <a class="nav-cta" href="/miami-funnel/">Book Free Trial</a>
+  <button class="nav-mobile-toggle" id="menuBtn" aria-label="Open menu">
+    <span></span><span></span><span></span>
+  </button>
+</nav>
+
+<div class="nav-drawer" id="navDrawer">
+  <a href="#about" class="drawer-link">About</a>
+  <a href="#programs" class="drawer-link">Programs</a>
+  <a href="#location" class="drawer-link">Location</a>
+  <a href="contact.html" class="drawer-link">Contact</a>
+  <a href="/miami-funnel/" class="drawer-link drawer-cta">Book Free Trial</a>
+</div>
+
+<!-- HERO -->
+<section class="hero" id="home">
+  <div class="hero-bg"></div>
+  <div class="hero-grid"></div>
+  <div class="hero-accent-line"></div>
+  <div class="hero-content">
+    <div class="hero-eyebrow">Miami Lakes, FL &mdash; Since 2018</div>
+    <h1>
+      Miami's<br>
+      Premier<br>
+      <span class="accent">Basketball</span><br>
+      Facility
+    </h1>
+    <p class="hero-sub">
+      It's more than just basketball training&nbsp;&mdash; it's human development.
+      Elite coaching, proven systems, real results.
+    </p>
+    <div class="hero-btns">
+      <a href="/miami-funnel/" class="btn-primary">Book Free Trial</a>
+      <a href="#programs" class="btn-outline">View Programs</a>
+    </div>
+  </div>
+  <div class="hero-scroll">Scroll</div>
+</section>
+
+<!-- STATS -->
+<div class="stats-bar">
+  <div class="stats-inner">
+    <div class="stat-item"><div class="stat-num">60+</div><div class="stat-label">Locations</div></div>
+    <div class="stat-item"><div class="stat-num">150+</div><div class="stat-label">Coaches</div></div>
+    <div class="stat-item"><div class="stat-num">3,200+</div><div class="stat-label">Players Trained</div></div>
+    <div class="stat-item"><div class="stat-num">42+</div><div class="stat-label">Countries</div></div>
+    <div class="stat-item"><div class="stat-num">800k+</div><div class="stat-label">Online Community</div></div>
+  </div>
+</div>
+
+<!-- MISSION / ABOUT -->
+<section class="mission" id="about">
+  <div class="section-inner">
+    <div class="mission-grid">
+      <div class="mission-left">
+        <div class="section-eyebrow">Our Mission</div>
+        <div class="mission-quote">
+          More Than<br>Just <span class="accent">Basketball</span>
+        </div>
+        <p class="section-body">
+          At DETAIL Miami, we believe basketball is a vehicle for life. Our coaches don't just teach the game&nbsp;&mdash; they invest in the student-athlete as a whole person. Discipline, work ethic, and character development are woven into every session.
+        </p>
+        <p class="section-body" style="margin-top:16px;">
+          From our youngest Elementary Academy players to our elite ADAPT Club athletes, every player who walks through our doors gets access to world-class instruction and a community that pushes them to be their best.
+        </p>
+        <div class="mission-pillars">
+          <div class="pillar">
+            <div class="pillar-icon">🏀</div>
+            <div class="pillar-text">
+              <h4>Elite Skill Development</h4>
+              <p>Structured, progressive curriculum built on fundamentals that scale to the elite level.</p>
+            </div>
+          </div>
+          <div class="pillar">
+            <div class="pillar-icon">🧠</div>
+            <div class="pillar-text">
+              <h4>Mental Toughness</h4>
+              <p>IQ, decision-making, and composure training — the skills that separate good from great.</p>
+            </div>
+          </div>
+          <div class="pillar">
+            <div class="pillar-icon">🌎</div>
+            <div class="pillar-text">
+              <h4>Global Network</h4>
+              <p>Part of the By Any Means family — 60+ locations, 42+ countries, 150+ world-class coaches.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="mission-right">
+        <div class="mission-visual">
+          <div class="mission-visual-inner">
+            <div class="big-num">BAM</div>
+            <div class="tag">DETAIL Miami</div>
+            <p style="margin-top:8px;">16414 NW 54th Ave<br>Miami Lakes, FL 33014</p>
+            <p style="margin-top:20px; font-size:13px; color:var(--fg-sub);">Mon&ndash;Sat &middot; Open for Training</p>
+            <a href="/miami-funnel/" class="btn-primary" style="display:inline-block; margin-top:28px; font-size:14px; padding:14px 32px;">Claim Free Trial</a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- PROGRAMS -->
+<section class="programs" id="programs">
+  <div class="section-inner">
+    <div class="programs-header">
+      <div>
+        <div class="section-eyebrow">Training Programs</div>
+        <div class="section-title">Built For <span class="accent">Every Level</span></div>
+      </div>
+      <a href="/miami-funnel/" class="btn-primary" style="font-size:14px; padding:14px 32px; white-space:nowrap;">Start Free Trial</a>
+    </div>
+    <div class="programs-grid">
+      <a class="program-card" href="/miami-funnel/?group=elementary">
+        <div class="program-tag">Ages K&ndash;5th Grade</div>
+        <h3>Elementary<br>Academy</h3>
+        <p>A safe, fun, and structured environment for young players to fall in love with the game. Foundational skills, movement, and teamwork&nbsp;&mdash; built right from the start.</p>
+        <div class="card-cta">Book Free Trial</div>
+      </a>
+      <a class="program-card" href="/miami-funnel/?group=ms-hs">
+        <div class="program-tag">6th&ndash;12th Grade</div>
+        <h3>DETAIL<br>Academy</h3>
+        <p>High-intensity skill development for middle and high school athletes. Position-specific training, game film, and the habits that college and pro scouts look for.</p>
+        <div class="card-cta">Book Free Trial</div>
+      </a>
+      <a class="program-card featured" href="contact.html">
+        <div class="program-tag">Competitive Club</div>
+        <h3>ADAPT<br>Academy</h3>
+        <p>Our elite travel and AAU program. Built for the serious player who wants to compete at the highest level regionally and nationally.</p>
+        <div class="card-cta">Learn More</div>
+      </a>
+      <a class="program-card" href="contact.html">
+        <div class="program-tag">Seasonal Events</div>
+        <h3>Camps &amp;<br>Clinics</h3>
+        <p>Intensive multi-day programs during school breaks. Players of all levels get focused reps, guest coaches, and real competitive experience.</p>
+        <div class="card-cta">Learn More</div>
+      </a>
+      <a class="program-card" href="contact.html">
+        <div class="program-tag">Train Anywhere</div>
+        <h3>Virtual<br>Academy</h3>
+        <p>Access DETAIL coaching from anywhere in the world. Structured video-based curriculum, live Q&A sessions, and direct coach feedback.</p>
+        <div class="card-cta">Explore Online</div>
+      </a>
+      <a class="program-card" href="rent.html">
+        <div class="program-tag">Facility Rental</div>
+        <h3>Rent<br>The Gym</h3>
+        <p>Need court time? Our facility is available for team practices, open gyms, and private workouts. Contact us to check availability and rates.</p>
+        <div class="card-cta">Check Availability</div>
+      </a>
+    </div>
+  </div>
+</section>
+
+<!-- FREE TRIAL CTA -->
+<section class="cta-section">
+  <div class="section-inner">
+    <div class="cta-box">
+      <div class="section-eyebrow cta-eyebrow">No Cost, No Commitment</div>
+      <div class="cta-title">
+        Claim Your<br><span class="accent">Free Trial</span>
+      </div>
+      <p class="cta-body">
+        Experience elite player development firsthand. One session, on us. Bring your player and see why hundreds of Miami families trust DETAIL.
+      </p>
+      <a href="/miami-funnel/" class="btn-primary" style="font-size:18px; padding:20px 56px;">Book Free Trial</a>
+      <div class="cta-meta">
+        <div class="cta-meta-item">No payment required</div>
+        <div class="cta-meta-item">2-hour session</div>
+        <div class="cta-meta-item">All levels welcome</div>
+        <div class="cta-meta-item">Miami Lakes facility</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- LOCATION -->
+<section class="location-section" id="location">
+  <div class="section-inner">
+    <div class="section-eyebrow">Find Us</div>
+    <div class="section-title" style="margin-bottom:48px;">Our <span class="accent">Facility</span></div>
+    <div class="location-grid">
+      <div class="location-info">
+        <h3>Miami <span>Lakes</span></h3>
+        <div class="location-detail">
+          <div class="icon">📍</div>
+          <div>
+            <div class="info-label">Address</div>
+            <div class="info-val">16414 NW 54th Ave<br>Miami Lakes, FL 33014</div>
+          </div>
+        </div>
+        <div class="location-detail">
+          <div class="icon">📞</div>
+          <div>
+            <div class="info-label">Phone</div>
+            <div class="info-val"><a href="tel:7862443336" style="color:var(--fg); text-decoration:none;">(786) 244-3336</a></div>
+          </div>
+        </div>
+        <div class="location-detail">
+          <div class="icon">✉️</div>
+          <div>
+            <div class="info-label">Email</div>
+            <div class="info-val"><a href="mailto:info@byanymeansbball.com" style="color:var(--fg); text-decoration:none;">info@byanymeansbball.com</a></div>
+          </div>
+        </div>
+        <div class="location-detail">
+          <div class="icon">📸</div>
+          <div>
+            <div class="info-label">Instagram</div>
+            <div class="info-val"><a href="https://instagram.com/detail.mia" target="_blank" rel="noopener" style="color:var(--brand); text-decoration:none;">@detail.mia</a></div>
+          </div>
+        </div>
+        <a href="/miami-funnel/" class="btn-primary" style="display:inline-block; margin-top:32px;">Book Free Trial</a>
+      </div>
+      <div class="location-map">
+        <iframe
+          src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3591.6!2d-80.3397!3d25.9115!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x88d9b7e62f5c2e9b%3A0x1!2s16414+NW+54th+Ave%2C+Hialeah%2C+FL+33014!5e0!3m2!1sen!2sus!4v1680000000"
+          allowfullscreen loading="lazy" referrerpolicy="no-referrer-when-downgrade"
+          title="DETAIL Miami location">
+        </iframe>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer>
+  <div class="footer-inner">
+    <div class="footer-brand">
+      <div class="footer-logo">DETAIL <span>Miami</span></div>
+      <p class="footer-tagline">It's more than just basketball training&nbsp;&mdash; it's human development. Part of the By Any Means global network.</p>
+    </div>
+    <div class="footer-col">
+      <h5>Programs</h5>
+      <ul>
+        <li><a href="/miami-funnel/?group=elementary">Elementary Academy</a></li>
+        <li><a href="/miami-funnel/?group=ms-hs">DETAIL Academy</a></li>
+        <li><a href="contact.html">ADAPT Academy</a></li>
+        <li><a href="contact.html">Camps &amp; Clinics</a></li>
+        <li><a href="contact.html">Virtual Academy</a></li>
+        <li><a href="rent.html">Rent the Gym</a></li>
+      </ul>
+    </div>
+    <div class="footer-col">
+      <h5>Quick Links</h5>
+      <ul>
+        <li><a href="#about">About Us</a></li>
+        <li><a href="/miami-funnel/">Free Trial</a></li>
+        <li><a href="#location">Location</a></li>
+        <li><a href="contact.html">Contact</a></li>
+        <li><a href="https://instagram.com/detail.mia" target="_blank" rel="noopener">Instagram</a></li>
+      </ul>
+    </div>
+  </div>
+  <div class="footer-bottom">
+    <span>&copy; 2026 DETAIL Miami &mdash; By Any Means Basketball</span>
+    <span>16414 NW 54th Ave, Miami Lakes, FL 33014 &middot; (786) 244-3336</span>
+  </div>
+</footer>
+
+<script>
+  // Mobile nav toggle
+  var menuBtn  = document.getElementById('menuBtn');
+  var navDrawer = document.getElementById('navDrawer');
+  menuBtn.addEventListener('click', function () {
+    navDrawer.classList.toggle('open');
+  });
+  navDrawer.querySelectorAll('a').forEach(function (a) {
+    a.addEventListener('click', function () { navDrawer.classList.remove('open'); });
+  });
+
+  // Close nav on outside click
+  document.addEventListener('click', function (e) {
+    if (!navDrawer.contains(e.target) && !menuBtn.contains(e.target)) {
+      navDrawer.classList.remove('open');
+    }
+  });
+
+  // Smooth-scroll for anchor links on same page
+  document.querySelectorAll('a[href^="#"]').forEach(function (a) {
+    a.addEventListener('click', function (e) {
+      var id = this.getAttribute('href').slice(1);
+      var el = document.getElementById(id);
+      if (el) {
+        e.preventDefault();
+        el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    });
+  });
+</script>
+</body>
+</html>
