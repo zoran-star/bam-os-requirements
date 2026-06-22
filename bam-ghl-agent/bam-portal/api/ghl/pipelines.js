@@ -42,6 +42,26 @@ async function sb(path, init = {}) {
   return txt ? JSON.parse(txt) : null;
 }
 
+// ── Pipeline-board cache (per academy) ──────────────────────────────────────
+// The board takes several GHL calls (pipelines + an opportunity search per
+// pipeline + a calendar-events call per calendar). Cache the assembled payload
+// for a few seconds so quick re-opens are instant and a GHL 429 serves the last
+// good board instead of failing. ?fresh=1 bypasses.
+const PIPELINE_CACHE_TTL_MS = 30000;
+async function readPipelineCache(clientId) {
+  try {
+    const rows = await sb(`ghl_pipeline_cache?client_id=eq.${clientId}&select=payload,updated_at&limit=1`);
+    return Array.isArray(rows) && rows[0] ? rows[0] : null;
+  } catch (_) { return null; }
+}
+function writePipelineCache(clientId, payload) {
+  sb(`ghl_pipeline_cache?on_conflict=client_id`, {
+    method: "POST",
+    headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
+    body: JSON.stringify([{ client_id: clientId, payload, updated_at: new Date().toISOString() }]),
+  }).catch(() => {});
+}
+
 async function resolveUser(req) {
   const token = (req.headers.authorization || "").replace(/^Bearer\s+/i, "");
   if (!token) throw Object.assign(new Error("no token"), { status: 401 });
@@ -358,11 +378,20 @@ async function handler(req, res) {
   // ── GET: list pipelines + stages + opportunities ───────────
   if (req.method !== "GET") return res.status(405).json({ error: "method not allowed" });
 
+  // Serve a fresh-enough cached board without touching GHL.
+  const wantFresh = req.query.fresh === "1" || req.query.nocache === "1";
+  const cached = await readPipelineCache(clientId);
+  if (!wantFresh && cached && cached.updated_at &&
+      (Date.now() - new Date(cached.updated_at).getTime()) < PIPELINE_CACHE_TTL_MS) {
+    return res.status(200).json({ ...cached.payload, cached: true });
+  }
+
   // 1. Pull pipelines (lightweight call)
   let pipelinesResp;
   try {
     pipelinesResp = await ghl("GET", `/opportunities/pipelines?locationId=${encodeURIComponent(locationId)}`, { token });
   } catch (e) {
+    if (cached) return res.status(200).json({ ...cached.payload, stale: true });
     return res.status(e.status || 502).json({ error: `GHL pipelines: ${e.message}`, detail: e.body || null });
   }
   const pipelines = pipelinesResp.pipelines || pipelinesResp.data || [];
@@ -578,10 +607,12 @@ async function handler(req, res) {
     }
   } catch (_) { /* non-fatal — cards just show parent-only */ }
 
-  return res.status(200).json({ pipelines: enriched, trainers: trainerOptions, location_id: locationId, totals: {
+  const payload = { pipelines: enriched, trainers: trainerOptions, location_id: locationId, totals: {
     pipelines: enriched.length,
     opportunities: enriched.reduce((s, p) => s + p.opportunities.length, 0),
-  } });
+  } };
+  writePipelineCache(clientId, payload);   // warm the cache for the next open (fire-and-forget)
+  return res.status(200).json(payload);
 }
 
 export default withSentryApiRoute(handler);

@@ -27,6 +27,7 @@ import { withSentryApiRoute } from "../_sentry.js";
 //   https://portal.byanymeansbusiness.com/api/messaging/connect
 
 import crypto from "node:crypto";
+import { agencyConnectFromCode } from "../agency-connect.js";
 
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
@@ -380,6 +381,20 @@ async function handleCallback(req, res) {
     console.error("[connect/callback] state verify failed:", e.message, "state prefix:", state.slice(0, 40));
     return redirectBack(res, "error", `state: ${e.message}`);
   }
+  // Agency connect round-trips through this same registered redirect. When the
+  // state is agency-signed, exchange as a Company + mint a token for every
+  // academy, then render the agency results page (not the per-location flow).
+  if (payload.k === "agency") {
+    try {
+      const r = await agencyConnectFromCode(code, redirectUri(req));
+      res.setHeader("Content-Type", "text/html; charset=utf-8");
+      return res.status(200).send(r.html);
+    } catch (e) {
+      console.error("[connect/callback] agency connect failed:", e.message);
+      return redirectBack(res, "error", `agency: ${e.message}`);
+    }
+  }
+
   if (!payload.client_id) return redirectBack(res, "error", "state missing client_id");
 
   const clientId     = (process.env.GHL_OAUTH_CLIENT_ID || "").trim();

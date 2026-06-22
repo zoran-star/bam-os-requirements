@@ -1,6 +1,7 @@
 import { withSentryApiRoute } from "./_sentry.js";
 import crypto from "node:crypto";
 // ── Path B: GHL Agency (Company) connect + bulk sub-account token minting ──
+// Uses the live FC app (GHL_OAUTH_CLIENT_ID) + the registered /api/messaging/connect redirect.
 //
 // BAM is the agency that owns every academy sub-account. Instead of connecting
 // each one with its own OAuth, the agency owner authorizes ONCE at the company
@@ -64,7 +65,11 @@ function getOrigin(req) {
   if (/localhost|127\.0\.0\.1/.test(origin)) return origin.replace(/\/+$/, "");
   return "https://portal.byanymeansbusiness.com";
 }
-function redirectUri(req) { return `${getOrigin(req)}/api/agency-connect`; }
+// The FC marketplace app only allows ONE redirect URL and it's already set to
+// /api/messaging/connect — so the agency OAuth round-trips through THAT (it
+// detects the agency-signed state and hands back here). Avoids needing to add a
+// second redirect URL on a published app.
+function redirectUri(req) { return `${getOrigin(req)}/api/messaging/connect`; }
 
 function stateSecret() { return process.env.GHL_OAUTH_STATE_SECRET || SUPABASE_SERVICE_KEY; }
 function signState(payload) {
@@ -95,8 +100,8 @@ async function exchangeCode(code, redirect) {
   const r = await fetch(GHL_TOKEN_URL, {
     method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams({
-      client_id: (process.env.GHL_AGENCY_OAUTH_CLIENT_ID || process.env.GHL_OAUTH_CLIENT_ID || "").trim(),
-      client_secret: (process.env.GHL_AGENCY_OAUTH_CLIENT_SECRET || process.env.GHL_OAUTH_CLIENT_SECRET || "").trim(),
+      client_id: (process.env.GHL_OAUTH_CLIENT_ID || "").trim(),
+      client_secret: (process.env.GHL_OAUTH_CLIENT_SECRET || "").trim(),
       grant_type: "authorization_code", code, user_type: "Company", redirect_uri: redirect,
     }),
   });
@@ -115,8 +120,8 @@ async function getAgencyToken() {
       const r = await fetch(GHL_TOKEN_URL, {
         method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" },
         body: new URLSearchParams({
-          client_id: (process.env.GHL_AGENCY_OAUTH_CLIENT_ID || process.env.GHL_OAUTH_CLIENT_ID || "").trim(),
-          client_secret: (process.env.GHL_AGENCY_OAUTH_CLIENT_SECRET || process.env.GHL_OAUTH_CLIENT_SECRET || "").trim(),
+          client_id: (process.env.GHL_OAUTH_CLIENT_ID || "").trim(),
+          client_secret: (process.env.GHL_OAUTH_CLIENT_SECRET || "").trim(),
           grant_type: "refresh_token", refresh_token: t.refresh_token, user_type: "Company",
         }),
       });
@@ -172,6 +177,19 @@ function resultsPage(companyId, results) {
      <p class="muted" style="margin-top:18px">Failures are usually sub-accounts not actually under this agency, or with no GHL location. You can close this tab.</p>`);
 }
 
+// Shared agency-callback logic, called from /api/messaging/connect when it sees
+// an agency-signed state. Exchanges the code as a Company, stores the agency
+// token, mints a location token for every academy, and returns the results HTML.
+export async function agencyConnectFromCode(code, redirect) {
+  const tok = await exchangeCode(code, redirect);
+  const companyId = tok.companyId || tok.company_id || null;
+  if (!companyId) throw new Error("No companyId in the OAuth response — make sure you authorized at the AGENCY level (Distribution = Agency & Sub-Account), not a single location.");
+  const expiresAt = tok.expires_in ? new Date(Date.now() + Number(tok.expires_in) * 1000).toISOString() : null;
+  await sb(`ghl_agency_tokens?on_conflict=company_id`, { method: "POST", headers: { Prefer: "resolution=merge-duplicates,return=minimal" }, body: JSON.stringify({ company_id: companyId, access_token: tok.access_token, refresh_token: tok.refresh_token || null, expires_at: expiresAt, updated_at: new Date().toISOString() }) });
+  const results = await mintAll(companyId, tok.access_token);
+  return { companyId, results, html: resultsPage(companyId, results) };
+}
+
 async function handler(req, res) {
   if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY) return res.status(500).send("Supabase not configured");
   const action = (req.query.action || "").toString();
@@ -179,7 +197,7 @@ async function handler(req, res) {
   // 1) Kick off the agency consent.
   if (action === "start") {
     const state = signState({ k: "agency", exp: Date.now() + 15 * 60 * 1000 });
-    const params = new URLSearchParams({ response_type: "code", client_id: (process.env.GHL_AGENCY_OAUTH_CLIENT_ID || process.env.GHL_OAUTH_CLIENT_ID || "").trim(), redirect_uri: redirectUri(req), scope: SCOPES, state });
+    const params = new URLSearchParams({ response_type: "code", client_id: (process.env.GHL_OAUTH_CLIENT_ID || "").trim(), redirect_uri: redirectUri(req), scope: SCOPES, state });
     res.writeHead(302, { Location: `${GHL_AUTHORIZE_URL}?${params.toString()}` });
     return res.end();
   }
