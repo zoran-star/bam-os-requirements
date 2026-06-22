@@ -14,33 +14,31 @@
 // Returns: { ok: true, group: 'youth'|'hs' } or { ok: false, error }
 
 import { withSentryApiRoute } from "../_sentry.js";
+import { getClientGhlToken } from "./availability.js";
 
 const SB_URL  = (process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || "").trim();
 const SB_KEY  = (process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY || "").trim();
 const GHL_V2  = "https://services.leadconnectorhq.com";
-const GHL_V1  = "https://rest.gohighlevel.com";
 const V2_VER  = "2021-07-28";
 const CH3_LOC = "lUqgMMX0RRf1FSG7Odg9";
+const CH3_CLIENT_UUID = "df59d13e-fefc-4acc-b4cc-5ab8d5edd732";
 
-function getCh3Entry() {
-  if (process.env.GHL_LOCATIONS_JSON) {
-    try {
-      const locs = JSON.parse(process.env.GHL_LOCATIONS_JSON);
-      return locs.find(l => l.locationId === CH3_LOC || l.name === "CH3 Training") || null;
-    } catch (_) {}
-  }
-  return null;
+// Load the CH3 client row from Supabase so we can use getClientGhlToken,
+// which auto-selects OAuth token → Private Integration key in that order.
+async function getCh3Client() {
+  if (!SB_URL || !SB_KEY) return { ghl_location_id: CH3_LOC };
+  try {
+    const r = await fetch(
+      `${SB_URL}/rest/v1/clients?id=eq.${CH3_CLIENT_UUID}&select=id,ghl_location_id,ghl_kpi_config,ghl_access_token,ghl_refresh_token,ghl_token_expires_at&limit=1`,
+      { headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` } }
+    );
+    if (r.ok) {
+      const rows = await r.json();
+      return rows && rows[0] ? rows[0] : { ghl_location_id: CH3_LOC };
+    }
+  } catch (_) {}
+  return { ghl_location_id: CH3_LOC };
 }
-function getCh3Key() {
-  const entry = getCh3Entry();
-  if (entry && (entry.apiKeyV2 || entry.apiKey)) return entry.apiKeyV2 || entry.apiKey;
-  return process.env.GHLKEY || "";
-}
-function getCh3KeyV1() {
-  const entry = getCh3Entry();
-  return (entry && entry.apiKey) || null;
-}
-const GHLKEY = getCh3Key();
 
 // Allow any bam-portal preview URL + production + local dev
 const VERCEL_PREVIEW = /^https:\/\/bam-portal-[a-z0-9]+-zoran-stars-projects\.vercel\.app$/;
@@ -107,83 +105,46 @@ async function handler(req, res) {
 
   let contactId = null;
 
-  if (GHLKEY) {
+  // Use getClientGhlToken so we pick up the OAuth token when available
+  // (same pattern as BAM GTA), falling back to the Private Integration key.
+  let ghlToken = null;
+  try {
+    const ch3Client = await getCh3Client();
+    ghlToken = await getClientGhlToken(ch3Client);
+  } catch (e) {
+    console.error("GHL token resolve failed (non-fatal):", e.message);
+  }
+
+  if (ghlToken) {
     const ghlHeaders = {
-      Authorization: `Bearer ${GHLKEY}`,
+      Authorization: `Bearer ${ghlToken}`,
       Version: V2_VER,
       "Content-Type": "application/json",
       Accept: "application/json",
     };
 
-    const contactPayload = {
-      locationId: CH3_LOC,
-      firstName:  firstName.trim(),
-      lastName:   lastName?.trim() || undefined,
-      email:      email.toLowerCase().trim(),
-      phone:      phone?.trim() || undefined,
-      source:     "CH3 Free Trial Form",
-      tags:       ["ch3-lead", "ch3-free-trial", "sms-opted-in"],
-    };
-
-    // Try GHL V2 Private Integration upsert first.
     try {
       const upsertRes = await fetch(`${GHL_V2}/contacts/upsert`, {
         method: "POST",
         headers: ghlHeaders,
-        body: JSON.stringify(contactPayload),
+        body: JSON.stringify({
+          locationId: CH3_LOC,
+          firstName:  firstName.trim(),
+          lastName:   lastName?.trim() || undefined,
+          email:      email.toLowerCase().trim(),
+          phone:      phone?.trim() || undefined,
+          source:     "CH3 Free Trial Form",
+          tags:       ["ch3-lead", "ch3-free-trial", "sms-opted-in"],
+        }),
       });
       if (upsertRes.ok) {
         const data = await upsertRes.json();
         contactId = (data.contact || data).id || null;
       } else {
-        const errText = (await upsertRes.text()).slice(0, 200);
-        console.error("GHL V2 upsert failed:", upsertRes.status, errText);
+        console.error("GHL upsert failed:", upsertRes.status, (await upsertRes.text()).slice(0, 200));
       }
     } catch (e) {
-      console.error("GHL V2 upsert error (non-fatal):", e.message);
-    }
-
-    // V2 failed (likely missing contacts scope on key) — fall back to GHL V1 location API.
-    if (!contactId) {
-      const v1Key = getCh3KeyV1();
-      if (v1Key) {
-        try {
-          const v1Headers = { Authorization: `Bearer ${v1Key}`, "Content-Type": "application/json" };
-          const v1Body = {
-            locationId: CH3_LOC,
-            firstName:  firstName.trim(),
-            lastName:   lastName?.trim() || undefined,
-            email:      email.toLowerCase().trim(),
-            phone:      phone?.trim() || undefined,
-            source:     "CH3 Free Trial Form",
-            tags:       ["ch3-lead", "ch3-free-trial", "sms-opted-in"],
-          };
-          const v1Res = await fetch(`${GHL_V1}/v1/contacts/`, {
-            method: "POST",
-            headers: v1Headers,
-            body: JSON.stringify(v1Body),
-          });
-          if (v1Res.ok) {
-            const v1Data = await v1Res.json();
-            contactId = v1Data.contact?.id || v1Data.id || null;
-          } else {
-            // V1 create failed — try lookup by email.
-            try {
-              const v1LookupRes = await fetch(
-                `${GHL_V1}/v1/contacts/?locationId=${encodeURIComponent(CH3_LOC)}&query=${encodeURIComponent(email.toLowerCase().trim())}`,
-                { headers: { Authorization: `Bearer ${v1Key}` } }
-              );
-              if (v1LookupRes.ok) {
-                const v1Lookup = await v1LookupRes.json();
-                const match = (v1Lookup.contacts || []).find(c => c.email === email.toLowerCase().trim());
-                if (match) contactId = match.id;
-              }
-            } catch (_) {}
-          }
-        } catch (e) {
-          console.error("GHL V1 upsert error (non-fatal):", e.message);
-        }
-      }
+      console.error("GHL upsert error (non-fatal):", e.message);
     }
 
     if (contactId) {
