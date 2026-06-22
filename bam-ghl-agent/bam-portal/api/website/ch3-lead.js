@@ -18,18 +18,27 @@ import { withSentryApiRoute } from "../_sentry.js";
 const SB_URL  = (process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || "").trim();
 const SB_KEY  = (process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY || "").trim();
 const GHL_V2  = "https://services.leadconnectorhq.com";
+const GHL_V1  = "https://rest.gohighlevel.com";
 const V2_VER  = "2021-07-28";
 const CH3_LOC = "lUqgMMX0RRf1FSG7Odg9";
 
-function getCh3Key() {
+function getCh3Entry() {
   if (process.env.GHL_LOCATIONS_JSON) {
     try {
       const locs = JSON.parse(process.env.GHL_LOCATIONS_JSON);
-      const entry = locs.find(l => l.locationId === CH3_LOC || l.name === "CH3 Training");
-      if (entry && (entry.apiKeyV2 || entry.apiKey)) return entry.apiKeyV2 || entry.apiKey;
+      return locs.find(l => l.locationId === CH3_LOC || l.name === "CH3 Training") || null;
     } catch (_) {}
   }
+  return null;
+}
+function getCh3Key() {
+  const entry = getCh3Entry();
+  if (entry && (entry.apiKeyV2 || entry.apiKey)) return entry.apiKeyV2 || entry.apiKey;
   return process.env.GHLKEY || "";
+}
+function getCh3KeyV1() {
+  const entry = getCh3Entry();
+  return (entry && entry.apiKey) || null;
 }
 const GHLKEY = getCh3Key();
 
@@ -106,28 +115,75 @@ async function handler(req, res) {
       Accept: "application/json",
     };
 
+    const contactPayload = {
+      locationId: CH3_LOC,
+      firstName:  firstName.trim(),
+      lastName:   lastName?.trim() || undefined,
+      email:      email.toLowerCase().trim(),
+      phone:      phone?.trim() || undefined,
+      source:     "CH3 Free Trial Form",
+      tags:       ["ch3-lead", "ch3-free-trial", "sms-opted-in"],
+    };
+
+    // Try GHL V2 Private Integration upsert first.
     try {
       const upsertRes = await fetch(`${GHL_V2}/contacts/upsert`, {
         method: "POST",
         headers: ghlHeaders,
-        body: JSON.stringify({
-          locationId: CH3_LOC,
-          firstName:  firstName.trim(),
-          lastName:   lastName?.trim() || undefined,
-          email:      email.toLowerCase().trim(),
-          phone:      phone?.trim() || undefined,
-          source:     "CH3 Free Trial Form",
-          tags:       ["ch3-lead", "ch3-free-trial", "sms-opted-in"],
-        }),
+        body: JSON.stringify(contactPayload),
       });
       if (upsertRes.ok) {
         const data = await upsertRes.json();
         contactId = (data.contact || data).id || null;
       } else {
-        console.error("GHL upsert failed:", upsertRes.status, (await upsertRes.text()).slice(0, 200));
+        const errText = (await upsertRes.text()).slice(0, 200);
+        console.error("GHL V2 upsert failed:", upsertRes.status, errText);
       }
     } catch (e) {
-      console.error("GHL upsert error (non-fatal):", e.message);
+      console.error("GHL V2 upsert error (non-fatal):", e.message);
+    }
+
+    // V2 failed (likely missing contacts scope on key) — fall back to GHL V1 location API.
+    if (!contactId) {
+      const v1Key = getCh3KeyV1();
+      if (v1Key) {
+        try {
+          const v1Headers = { Authorization: `Bearer ${v1Key}`, "Content-Type": "application/json" };
+          const v1Body = {
+            locationId: CH3_LOC,
+            firstName:  firstName.trim(),
+            lastName:   lastName?.trim() || undefined,
+            email:      email.toLowerCase().trim(),
+            phone:      phone?.trim() || undefined,
+            source:     "CH3 Free Trial Form",
+            tags:       ["ch3-lead", "ch3-free-trial", "sms-opted-in"],
+          };
+          const v1Res = await fetch(`${GHL_V1}/v1/contacts/`, {
+            method: "POST",
+            headers: v1Headers,
+            body: JSON.stringify(v1Body),
+          });
+          if (v1Res.ok) {
+            const v1Data = await v1Res.json();
+            contactId = v1Data.contact?.id || v1Data.id || null;
+          } else {
+            // V1 create failed — try lookup by email.
+            try {
+              const v1LookupRes = await fetch(
+                `${GHL_V1}/v1/contacts/?locationId=${encodeURIComponent(CH3_LOC)}&query=${encodeURIComponent(email.toLowerCase().trim())}`,
+                { headers: { Authorization: `Bearer ${v1Key}` } }
+              );
+              if (v1LookupRes.ok) {
+                const v1Lookup = await v1LookupRes.json();
+                const match = (v1Lookup.contacts || []).find(c => c.email === email.toLowerCase().trim());
+                if (match) contactId = match.id;
+              }
+            } catch (_) {}
+          }
+        } catch (e) {
+          console.error("GHL V1 upsert error (non-fatal):", e.message);
+        }
+      }
     }
 
     if (contactId) {
