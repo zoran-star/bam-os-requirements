@@ -40,12 +40,12 @@ async function sbStorageUpload(bucket, path, data, contentType) {
   return await r.json();
 }
 
-async function ghlListMedia(token, locationId, type, offset = 0) {
+async function ghlListMedia(token, locationId, offset = 0) {
   const params = new URLSearchParams({
     altId: locationId, altType: 'location',
+    type: 'file',
     limit: '100', offset: String(offset),
   });
-  if (type) params.set('type', type);
   const r = await fetch(`${GHL}/medias/files?${params}`, {
     headers: { Authorization: `Bearer ${token}`, Version: VER, Accept: 'application/json' },
   });
@@ -53,6 +53,17 @@ async function ghlListMedia(token, locationId, type, offset = 0) {
   if (!r.ok) throw new Error(`GHL media ${r.status}: ${json.message || json.error || r.status}`);
   return json;
 }
+
+function ghlCategoryFromMime(mime) {
+  if (!mime) return 'file';
+  if (mime.startsWith('image/')) return 'photo';
+  if (mime.startsWith('video/')) return 'video';
+  return 'file';
+}
+
+// Files over this threshold are linked (GHL CDN URL) rather than copied into Supabase storage.
+// Vercel Pro function timeout is 300s — a 50 MB file at ~10 MB/s download + upload would be tight.
+const LINK_ONLY_THRESHOLD = 50 * 1024 * 1024; // 50 MB
 
 async function handler(req, res) {
   if (!SB_URL || !SB_KEY) return res.status(500).json({ error: 'Supabase not configured' });
@@ -90,43 +101,60 @@ async function handler(req, res) {
     existingUrls = new Set((existing || []).map(r => r.link_url));
   } catch (_) {}
 
-  const results = { synced: 0, skipped: 0, failed: 0, errors: [] };
+  const results = { synced: 0, linked: 0, skipped: 0, failed: 0, errors: [] };
 
-  for (const mediaType of ['image', 'video']) {
-    let offset = 0;
-    let hasMore = true;
+  let offset = 0;
+  let hasMore = true;
 
-    while (hasMore) {
-      let page;
-      try { page = await ghlListMedia(token, locationId, mediaType, offset); }
-      catch (e) { results.errors.push(`list ${mediaType}@${offset}: ${e.message}`); break; }
+  while (hasMore) {
+    let page;
+    try { page = await ghlListMedia(token, locationId, offset); }
+    catch (e) { results.errors.push(`list@${offset}: ${e.message}`); break; }
 
-      const items = page.files || page.medias || [];
-      if (!items.length) { hasMore = false; break; }
+    const items = page.files || page.medias || [];
+    if (!items.length) { hasMore = false; break; }
 
-      for (const item of items) {
-        const srcUrl = item.url || item.downloadUrl;
-        if (!srcUrl) { results.skipped++; continue; }
-        if (existingUrls.has(srcUrl)) { results.skipped++; continue; }
+    for (const item of items) {
+      const srcUrl = item.url || item.downloadUrl;
+      if (!srcUrl) { results.skipped++; continue; }
+      if (existingUrls.has(srcUrl)) { results.skipped++; continue; }
 
-        const name   = item.name || item.fileName || 'untitled';
-        const mime   = item.mimeType || (mediaType === 'image' ? 'image/jpeg' : 'video/mp4');
-        const cat    = mediaType === 'video' ? 'video' : 'photo';
-        const label  = name.replace(/\.[^.]+$/, '');
-        const clean  = name.replace(/[^a-zA-Z0-9._-]+/g, '_');
-        const stamp  = Date.now() + '-' + Math.random().toString(36).slice(2, 6);
-        const path   = `${client_id}/${stamp}-${clean}`;
+      const name     = item.name || item.fileName || 'untitled';
+      const mime     = item.contentType || item.mimeType || 'application/octet-stream';
+      const cat      = ghlCategoryFromMime(mime);
+      const label    = name.replace(/\.[^.]+$/, '');
+      const clean    = name.replace(/[^a-zA-Z0-9._-]+/g, '_');
+      const fileSize = item.size || 0;
 
-        try {
-          // Download the file from GHL CDN
+      try {
+        if (fileSize > LINK_ONLY_THRESHOLD) {
+          // Large file — store GHL CDN URL directly, skip Supabase copy
+          await sbReq(`client_assets`, {
+            method: 'POST',
+            headers: { Prefer: 'return=minimal' },
+            body: JSON.stringify({
+              client_id,
+              label,
+              category: cat,
+              storage_path: null,
+              link_url: srcUrl,
+              mime_type: mime,
+              size_bytes: fileSize,
+              folder: 'GHL Import',
+            }),
+          });
+          existingUrls.add(srcUrl);
+          results.linked++;
+        } else {
+          const stamp = Date.now() + '-' + Math.random().toString(36).slice(2, 6);
+          const path  = `${client_id}/${stamp}-${clean}`;
+
           const fileRes = await fetch(srcUrl);
           if (!fileRes.ok) throw new Error(`Download ${fileRes.status}`);
           const buffer = await fileRes.arrayBuffer();
 
-          // Upload to Supabase storage
           await sbStorageUpload('client-assets', path, buffer, mime);
 
-          // Insert record — store original GHL URL in link_url for dedup on re-runs
           await sbReq(`client_assets`, {
             method: 'POST',
             headers: { Prefer: 'return=minimal' },
@@ -136,23 +164,23 @@ async function handler(req, res) {
               category: cat,
               storage_path: path,
               mime_type: mime,
-              size_bytes: item.size || buffer.byteLength,
-              link_url: srcUrl, // used as dedup key; cleared by client if they want to re-upload
+              size_bytes: fileSize || buffer.byteLength,
+              link_url: srcUrl,
               folder: 'GHL Import',
             }),
           });
 
           existingUrls.add(srcUrl);
           results.synced++;
-        } catch (e) {
-          results.failed++;
-          results.errors.push(`${name}: ${e.message}`);
         }
+      } catch (e) {
+        results.failed++;
+        results.errors.push(`${name}: ${e.message}`);
       }
-
-      offset += items.length;
-      hasMore = items.length === 100;
     }
+
+    offset += items.length;
+    hasMore = items.length === 100;
   }
 
   return res.status(200).json({ ok: true, locationId, ...results });
