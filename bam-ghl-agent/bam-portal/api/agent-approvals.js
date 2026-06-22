@@ -204,6 +204,7 @@ async function detectForClient(client) {
 
   const cfg = await loadConfig(client.id);
   let drafted = 0, autoSent = 0, skipped = 0, escalated = 0, lostProposed = 0;
+  const reasons = [];   // diagnostic: why each contact was skipped
 
   // Cap how many contacts we draft per run so a big Responded queue can't burst
   // GHL's rate limit (each draft hits GHL for the thread + Claude).
@@ -222,7 +223,7 @@ async function detectForClient(client) {
     // The queue already proved the stage + found the conversation — reuse both
     // so the detector makes ONE GHL call (the thread) per contact, not four.
     try { d = await draftForContact(token, locationId, client.id, contactId, cfg, { rs, conversationId: item.conversation_id, skipStageGuard: true }); }
-    catch (_) { skipped++; continue; }
+    catch (e) { skipped++; reasons.push(`${item.name || contactId}: draft threw — ${e.message}`); continue; }
 
     // Lost proposal: the agent thinks this lead is dead. ALWAYS queue it for a
     // human in Hawkeye — never auto-mark, even in self-drive. The warm closing
@@ -242,7 +243,7 @@ async function detectForClient(client) {
     }
 
     if (d.error || !d.reply || !String(d.reply).trim()) {
-      if (d.escalate) escalated++; else skipped++;
+      if (d.escalate) escalated++; else { skipped++; reasons.push(`${item.name || contactId}: ${d.error || "agent returned empty reply"}`); }
       // Still queue an escalation so a human sees it (no message to auto-send).
       if (d.escalate) {
         try {
@@ -284,7 +285,7 @@ async function detectForClient(client) {
       } catch (_) { skipped++; }
     }
   }
-  return { client_id: client.id, business: client.business_name, mode, queued: queue.length, drafted, auto_sent: autoSent, escalated, lost_proposed: lostProposed, skipped };
+  return { client_id: client.id, business: client.business_name, mode, queued: queue.length, drafted, auto_sent: autoSent, escalated, lost_proposed: lostProposed, skipped, reasons };
 }
 
 async function runDetect(res, onlyClientId) {
@@ -369,6 +370,13 @@ async function handler(req, res) {
   } catch (e) {
     console.error("[agent-approvals]", e);
     return res.status(500).json({ error: e.message || "internal error" });
+  }
+
+  // Manually run the ready-reply detector for THIS academy (drafts replies for
+  // every Responded-stage lead now, instead of waiting for the */5 cron).
+  if (b.action === "detect-now") {
+    if (!ANTHROPIC_KEY) return res.status(500).json({ error: "ANTHROPIC_API_KEY not configured" });
+    return await runDetect(res, clientId);
   }
 
   // The remaining actions hit GHL/Claude.
