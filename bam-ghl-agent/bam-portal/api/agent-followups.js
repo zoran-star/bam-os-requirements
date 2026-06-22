@@ -23,6 +23,7 @@ import { pickGhlToken, ghl } from "./ghl/_core.js";
 import { assemblePrompt } from "./agent/prompt-structure.js";
 import { loadContactMemory } from "./agent/contact-memory.js";
 import { buildAgentSystem } from "./agent/brain.js";
+import { toIso } from "./agent/_stage.js";
 import { agentMode, modeIsOn, modeSelfDrives, SELF_DRIVE_MIN_CONFIDENCE } from "./agent/_mode.js";
 import { resolveAgentActor } from "./agent/_auth.js";
 
@@ -201,7 +202,7 @@ async function detectForClient(client) {
           last_message: lastLeadMsg ? String(lastLeadMsg.text).slice(0, 500) : null,
           scheduled_at: scheduledAt, status: "pending",
           trigger_reason: decision.reason || null,
-          last_lead_at: c.lastMessageDate || c.dateUpdated || null,
+          last_lead_at: toIso(c.lastMessageDate || c.dateUpdated),
           confidence: typeof decision.confidence === "number" ? decision.confidence : null,
           created_by: "detector",
         }]),
