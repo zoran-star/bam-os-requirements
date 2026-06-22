@@ -5719,7 +5719,8 @@
       </div>
 
       <button class="user-tour-link" onclick="openChangePassword()" style="margin-bottom:6px">Change password</button>
-      <button class="user-tour-link" onclick="startOnboardingTour()">↻ Take the tour</button>
+      <!-- Onboarding tour disabled for now (Zoran, 2026-06-22) -->
+      <button class="user-tour-link" onclick="startOnboardingTour()" style="display:none">↻ Take the tour</button>
 
       <!-- Owner / BAM-staff: preview a teammate's restricted view -->
       <div id="previewAsBlock" style="display:none"></div>
@@ -30551,6 +30552,11 @@ function getEffectiveTourSteps() {
 }
 
 function startOnboardingTour() {
+  // Onboarding walkthrough disabled for ALL clients (Zoran, 2026-06-22, "for now").
+  // Kills the first-login auto-fire, the ?preview=tour path, and the "Take the tour"
+  // link in one spot. To re-enable, delete this early return. TOUR_STEPS /
+  // TOUR_DEMO_CONTAINERS are left intact below.
+  return;
   _tourStep = 1;
   _tourSetupDemos();
   _renderTourStep();
