@@ -43,7 +43,6 @@ const GHL_TOKEN_URL     = "https://services.leadconnectorhq.com/oauth/token";
 const SCOPES = [
   // Location + business
   "locations.readonly",
-  "locations.write",
   "businesses.readonly",
   "businesses.write",
 
