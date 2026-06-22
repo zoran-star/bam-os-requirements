@@ -10,7 +10,7 @@ import { pickGhlToken, ghl } from "./_core.js";
 // PUBLIC (per Zoran) — open at staff.byanymeansbusiness.com/api/ghl/all-pipelines.
 // Tokens handled server-side (pickGhlToken auto-refreshes), so it's always live.
 
-export const maxDuration = 120;
+export const maxDuration = 120; // rows+notes layout
 
 const SUPABASE_URL         = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
