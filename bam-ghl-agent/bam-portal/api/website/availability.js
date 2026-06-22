@@ -125,12 +125,12 @@ export async function getClientGhlToken(client) {
     const locs = loadLocations();
     if (client.ghl_location_id) {
       const loc = locs.find(l => l.locationId === client.ghl_location_id);
-      if (loc?.apiKeyV2) return loc.apiKeyV2;
+      if (loc?.apiKeyV2 || loc?.apiKey) return loc.apiKeyV2 || loc.apiKey;
     }
     const locName = client.ghl_kpi_config?.ghl_location;
     if (locName) {
       const loc = locs.find(l => l.name === locName);
-      if (loc?.apiKeyV2) return loc.apiKeyV2;
+      if (loc?.apiKeyV2 || loc?.apiKey) return loc.apiKeyV2 || loc.apiKey;
     }
     throw new Error("academy not connected to GHL (no OAuth token or Private Integration key)");
   }
