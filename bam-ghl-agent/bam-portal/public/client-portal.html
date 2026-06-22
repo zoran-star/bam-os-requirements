@@ -10465,6 +10465,19 @@ async function _v15ibOpen(convId, contactId, phone, email, name) {
   }
 }
 
+// Robustly scroll a message thread to the newest message. A single synchronous
+// scrollTop=scrollHeight often lands mid-thread because the layout/images aren't
+// settled yet - so re-apply across a few frames + after images load.
+function _scrollToBottom(el) {
+  if (!el) return;
+  const go = () => { try { el.scrollTop = el.scrollHeight; } catch (_) {} };
+  go();
+  requestAnimationFrame(go);
+  setTimeout(go, 60);
+  setTimeout(go, 250);
+  try { el.querySelectorAll('img').forEach(img => { if (!img.complete) img.addEventListener('load', go, { once: true }); }); } catch (_) {}
+}
+
 function _v15ibRenderThread() {
   const body = document.getElementById('v15ib-body');
   if (!body || !_V15IB.active) return;
@@ -10491,7 +10504,7 @@ function _v15ibRenderThread() {
       <div style="font-size:15px;font-weight:700;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHTML(a.name || a.phone || a.email || 'Conversation')}</div>
       ${ghlUrl ? `<a href="${escapeHTML(ghlUrl)}" target="_blank" rel="noopener" title="Open this contact in GHL to call" style="flex:none;display:inline-flex;align-items:center;gap:6px;background:rgba(232,197,71,0.12);border:1px solid var(--gold);border-radius:8px;color:var(--gold);padding:6px 10px;font:inherit;font-size:12px;font-weight:700;text-decoration:none">📞 Call in GHL</a>` : ''}
     </div>
-    <div style="display:flex;flex-direction:column;gap:8px;max-height:min(62vh,560px);overflow-y:auto;-webkit-overflow-scrolling:touch;padding:8px;border:1px solid var(--border);border-radius:10px;background:var(--bg)">${bubbles}</div>
+    <div id="v15ib-thread-scroll" style="display:flex;flex-direction:column;gap:8px;max-height:min(62vh,560px);overflow-y:auto;-webkit-overflow-scrolling:touch;padding:8px;border:1px solid var(--border);border-radius:10px;background:var(--bg)">${bubbles}</div>
     <div style="margin-top:12px;border:1px solid var(--border);border-radius:10px;padding:10px">
       ${!a.phone ? `<div style="font-size:11px;color:#c47424;margin-bottom:8px">⚠ No phone on file - add one in GHL to text this contact.</div>` : ''}
       <textarea id="v15ib-text" placeholder="Type a message…" style="width:100%;min-height:70px;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:9px 11px;font:inherit;font-size:13px;resize:vertical;outline:none"></textarea>
@@ -10501,6 +10514,7 @@ function _v15ibRenderThread() {
         <button id="v15ib-send" onclick="_v15ibSend()" style="margin-left:auto;background:var(--gold);color:#0B0B0D;border:none;padding:9px 20px;border-radius:6px;font-weight:700;font-size:13px;cursor:pointer">Send</button>
       </div>
     </div>`;
+  _scrollToBottom(document.getElementById('v15ib-thread-scroll'));
 }
 
 function _v15ibSetType(t) { _V15IB.type = t; _v15ibRenderThread(); }
@@ -21236,7 +21250,7 @@ function _plRenderThread(messages) {
         </div>`;
       }).join('')
     : `<div style="color:var(--text-mute);font-size:13px">No messages yet - send the first one below.</div>`;
-  host.scrollTop = host.scrollHeight;
+  _scrollToBottom(host);
 }
 
 function _plMsgPickFiles(inputEl) {
@@ -21474,7 +21488,7 @@ async function _apxOpenThread(contactId, name) {
       const when = (typeof _ibFormatDate === 'function') ? _ibFormatDate(m.date) : '';
       return `<div style="max-width:82%;align-self:${out ? 'flex-end' : 'flex-start'};background:${out ? 'var(--accent)' : 'var(--surface)'};color:${out ? '#0B0B0D' : 'var(--text)'};border:1px solid ${out ? 'var(--accent)' : 'var(--border)'};padding:8px 11px;border-radius:12px;font-size:13.5px;line-height:1.45;word-break:break-word">${escapeHTML(m.body)}<div style="font-size:10px;opacity:.6;margin-top:3px">${escapeHTML(when)}</div></div>`;
     }).join('') : `<div style="color:var(--text-mute);font-size:13px;text-align:center;padding:24px">No messages yet.</div>`;
-    body.scrollTop = body.scrollHeight;
+    _scrollToBottom(body);
   } catch (e) {
     const body = document.getElementById('apx-thread-body');
     if (body) body.innerHTML = `<div style="color:#e0654f;font-size:13px;text-align:center;padding:24px">Couldn't load conversation - ${escapeHTML(_apxErr(e))}</div>`;
@@ -22078,8 +22092,7 @@ function _renderInboxDrawer() {
     </div>`;
 
   // Scroll to newest message
-  const scrollEl = document.getElementById('ib-thread-scroll');
-  if (scrollEl) scrollEl.scrollTop = scrollEl.scrollHeight;
+  _scrollToBottom(document.getElementById('ib-thread-scroll'));
 }
 
 // ── Inbox attachments ────────────────────────────────────────────────────────
@@ -31991,7 +32004,7 @@ function toggleTheme() {
         // viewport stayed full, so reserve room for the keyboard ourselves.
         cl.style.height = (h < preH - 20 ? h : (h - kbH)) + 'px';
         var thread = document.getElementById('messages-thread');
-        if (thread) thread.scrollTop = thread.scrollHeight;   // keep latest in view
+        if (thread) { if (typeof _scrollToBottom === 'function') _scrollToBottom(thread); else thread.scrollTop = thread.scrollHeight; }   // keep latest in view
       }
       function hide() {
         document.body.classList.remove('keyboard-open');
