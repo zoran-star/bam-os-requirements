@@ -1,6 +1,10 @@
 {
   "crons": [
     {
+      "path": "/api/agency-connect?action=mint",
+      "schedule": "0 4 * * *"
+    },
+    {
       "path": "/api/clients?action=cron-resend-invites",
       "schedule": "0 * * * *"
     },
