@@ -207,8 +207,41 @@ function redirectBack(res, status, msg) {
 async function handler(req, res) {
   if (req.method === "POST") return handlePrepare(req, res);
   if (req.method === "GET" && req.query.action === "list") return handleList(req, res);
+  if (req.method === "GET" && req.query.action === "admin-start") return handleAdminStart(req, res);
   if (req.method === "GET")  return handleCallback(req, res);
   return res.status(405).json({ error: "method not allowed" });
+}
+
+// ── Admin shortcut: start OAuth for any client without portal login ──
+// GET /api/messaging/connect?action=admin-start&client_id=<uuid>&key=<CRON_SECRET>
+// Redirects straight to GHL consent screen. Safe: gated by CRON_SECRET.
+async function handleAdminStart(req, res) {
+  const expected = (process.env.CRON_SECRET || "").trim();
+  if (!expected || (req.query.key || "") !== expected) {
+    return res.status(401).json({ error: "unauthorized" });
+  }
+  const clientId = (req.query.client_id || "").trim();
+  if (!clientId) return res.status(400).json({ error: "client_id required" });
+
+  const ghlClientId = (process.env.GHL_OAUTH_CLIENT_ID || "").trim();
+  if (!ghlClientId) return res.status(500).json({ error: "GHL_OAUTH_CLIENT_ID not configured" });
+
+  const state = signState({
+    client_id: clientId,
+    exp: Date.now() + 15 * 60 * 1000,
+    nonce: crypto.randomBytes(8).toString("hex"),
+  });
+
+  const params = new URLSearchParams({
+    response_type: "code",
+    client_id:     ghlClientId,
+    redirect_uri:  redirectUri(req),
+    scope:         SCOPES,
+    state,
+  });
+
+  res.writeHead(302, { Location: `${GHL_AUTHORIZE_URL}?${params.toString()}` });
+  return res.end();
 }
 
 // ── Staff connect console: list academies + their GHL-connected status ──
