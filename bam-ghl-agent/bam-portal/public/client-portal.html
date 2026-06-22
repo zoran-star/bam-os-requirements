@@ -10556,11 +10556,40 @@ async function _v15ibSend() {
     const j = await _safeJson(r);
     if (!r.ok || j.error) throw new Error(j.error || ('HTTP ' + r.status));
     _V15IB.pending = [];
-    await _v15ibOpen(a.convId, a.contactId, a.phone, a.email, a.name);
+    // Show the sent message immediately. GHL's messages API can lag a few seconds
+    // before it returns what we just sent, so don't rely on an instant re-fetch.
+    if (text) {
+      _V15IB.messages = [...(_V15IB.messages || []), { body: text, direction: 'outbound', type: _V15IB.type, date: new Date().toISOString(), _optimistic: true }];
+      _v15ibRenderThread();
+      const ta = document.getElementById('v15ib-text'); if (ta) ta.value = '';
+    }
+    if (btn) { btn.disabled = false; btn.textContent = 'Send'; }
+    // Reconcile with GHL once it catches up - the real message replaces the
+    // optimistic one (de-duped by text); if GHL is still behind, we keep showing it.
+    setTimeout(() => _v15ibResync(a, text), 2000);
+    setTimeout(() => _v15ibResync(a, text), 6000);
   } catch (e) {
     alert('Send failed: ' + (e.message || e));
     if (btn) { btn.disabled = false; btn.textContent = 'Send'; }
   }
+}
+
+// Re-pull the thread from GHL, keeping a just-sent message visible until GHL
+// surfaces it (so an outbound text never disappears after sending).
+async function _v15ibResync(a, sentText) {
+  if (!_V15IB.active || _V15IB.active.convId !== a.convId) return;   // user moved on
+  try {
+    const token = await _mreqAuthToken();
+    const r = await fetch(`/api/ghl/inbox?client_id=${encodeURIComponent(CLIENT_ID)}&conversation_id=${encodeURIComponent(a.convId)}`, { headers: { Authorization: 'Bearer ' + token } });
+    const j = await _safeJson(r);
+    if (!r.ok) return;
+    let msgs = j.messages || [];
+    const t = (sentText || '').trim();
+    if (t && !msgs.some(m => (m.direction || '').toLowerCase() === 'outbound' && (m.body || '').trim() === t)) {
+      msgs = [...msgs, { body: t, direction: 'outbound', type: 'SMS', date: new Date().toISOString(), _optimistic: true }];
+    }
+    if (_V15IB.active && _V15IB.active.convId === a.convId) { _V15IB.messages = msgs; _v15ibRenderThread(); }
+  } catch (_) {}
 }
 
 async function _v15ibSetup() {
