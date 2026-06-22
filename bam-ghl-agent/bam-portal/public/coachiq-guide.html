@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="robots" content="noindex">
-<title>FullControl × CoachIQ — How BAM GTA Is Connected</title>
+<title>FullControl × CoachIQ - How BAM GTA Is Connected</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -191,12 +191,12 @@
   <div class="wrap">
     <div class="eyebrow">Integration Guide · BAM GTA</div>
     <h1>FullControl <span class="x">×</span> CoachIQ</h1>
-    <p class="sub">How the FullControl portal and CoachIQ are wired together for BAM GTA — who owns what, how the webhooks talk both directions, the automations CoachIQ needs, how member import listens for matches, and how to run it day&nbsp;to&nbsp;day.</p>
+    <p class="sub">How the FullControl portal and CoachIQ are wired together for BAM GTA - who owns what, how the webhooks talk both directions, the automations CoachIQ needs, how member import listens for matches, and how to run it day&nbsp;to&nbsp;day.</p>
     <div class="meta-row">
       <span class="pill"><b>Model:</b> Portal owns billing · CoachIQ owns credits</span>
       <span class="pill"><b>Link:</b> the Stripe sub&nbsp;ID</span>
       <span class="pill"><b>Zapier:</b> not used</span>
-      <span class="pill">Conceptual overview — no keys or endpoints</span>
+      <span class="pill">Conceptual overview - no keys or endpoints</span>
     </div>
   </div>
 </header>
@@ -221,18 +221,18 @@
   <!-- 01 -->
   <section id="big-picture">
     <h2><span class="h2num">01</span>The big picture</h2>
-    <p class="lead">Most BAM GTA athletes already live in <strong>CoachIQ</strong> (the credits + scheduling engine). The goal was to put <strong>FullControl</strong> on top — running billing, CRM and marketing — <em>without</em> ripping out the tool the academy already runs every day.</p>
+    <p class="lead">Most BAM GTA athletes already live in <strong>CoachIQ</strong> (the credits + scheduling engine). The goal was to put <strong>FullControl</strong> on top - running billing, CRM and marketing - <em>without</em> ripping out the tool the academy already runs every day.</p>
 
     <div class="card">
       <p style="margin:0;">The whole connection comes down to one idea:</p>
       <p style="margin:14px 0 0; font-size:17px; color:var(--text);"><strong>FullControl owns the Stripe subscription. CoachIQ keeps owning credits &amp; scheduling. The two are linked by the Stripe <span style="color:var(--gold)">subscription&nbsp;ID</span>.</strong></p>
     </div>
 
-    <p>Because FullControl creates and owns the subscription, the portal's billing buttons — <strong>pause, cancel, change plan, refund</strong> — actually work. CoachIQ, meanwhile, watches that same subscription ID so it knows when to refresh an athlete's credits. Neither system has to be the other's database; they just share one reference.</p>
+    <p>Because FullControl creates and owns the subscription, the portal's billing buttons - <strong>pause, cancel, change plan, refund</strong> - actually work. CoachIQ, meanwhile, watches that same subscription ID so it knows when to refresh an athlete's credits. Neither system has to be the other's database; they just share one reference.</p>
 
     <div class="callout">
       <span class="tag">Why this matters</span>
-      BAM builds <strong>no custom credit bridge per academy</strong>. CoachIQ already knows how to watch an external subscription ID and grant credits off it. That means this same pattern can be sold to <em>any</em> academy already on CoachIQ — keep CoachIQ, add FullControl.
+      BAM builds <strong>no custom credit bridge per academy</strong>. CoachIQ already knows how to watch an external subscription ID and grant credits off it. That means this same pattern can be sold to <em>any</em> academy already on CoachIQ - keep CoachIQ, add FullControl.
     </div>
   </section>
 
@@ -257,8 +257,8 @@
         <div class="who">CoachIQ</div>
         <div class="role">owns the experience</div>
         <ul>
-          <li><b>Credits</b> — granting &amp; redeeming on booking</li>
-          <li><b>Scheduling</b> — classes, calendars, check-ins</li>
+          <li><b>Credits</b> - granting &amp; redeeming on booking</li>
+          <li><b>Scheduling</b> - classes, calendars, check-ins</li>
           <li>The <b>athlete app</b> the parent actually uses (white-labeled)</li>
           <li><b>Product / program access</b> per athlete</li>
           <li>Watches the subscription ID to refresh credits on renewal</li>
@@ -268,14 +268,14 @@
 
     <div class="callout sacred">
       <span class="tag">Sacred rule</span>
-      Payment <strong>only</strong> happens on the FullControl side. Never put a payment / Products connection on a CoachIQ form — if CoachIQ takes the payment, CoachIQ owns the subscription and the billing buttons stop working.
+      Payment <strong>only</strong> happens on the FullControl side. Never put a payment / Products connection on a CoachIQ form - if CoachIQ takes the payment, CoachIQ owns the subscription and the billing buttons stop working.
     </div>
   </section>
 
   <!-- 03 -->
   <section id="webhooks">
     <h2><span class="h2num">03</span>Webhooks, both ways</h2>
-    <p class="lead">The two systems talk over webhooks in <strong>both directions</strong>. CoachIQ tells FullControl when something happens to a user; FullControl tells CoachIQ when to grant a product or credits. Nothing is polled on a timer — each side just pokes the other when there's news.</p>
+    <p class="lead">The two systems talk over webhooks in <strong>both directions</strong>. CoachIQ tells FullControl when something happens to a user; FullControl tells CoachIQ when to grant a product or credits. Nothing is polled on a timer - each side just pokes the other when there's news.</p>
 
     <div class="dirs">
       <div class="dir out">
@@ -294,7 +294,7 @@
 
     <div class="callout warn">
       <span class="tag">The one gotcha</span>
-      CoachIQ can only act on a <strong>specific CoachIQ user ID</strong> — not an email, not a profile link. That's why FullControl has to <em>store each member's CoachIQ user ID</em> first. Capturing that ID is exactly what the inbound "new user" and "tag added" webhooks are for (see <a class="inline" href="#import">Member import</a>).
+      CoachIQ can only act on a <strong>specific CoachIQ user ID</strong> - not an email, not a profile link. That's why FullControl has to <em>store each member's CoachIQ user ID</em> first. Capturing that ID is exactly what the inbound "new user" and "tag added" webhooks are for (see <a class="inline" href="#import">Member import</a>).
     </div>
   </section>
 
@@ -306,7 +306,7 @@
     <div class="auto">
       <div class="ah"><span class="n">A</span><span class="name">New User → Send to External Webhook</span><span class="badge">outbound</span></div>
       <div class="ab">
-        <div class="line"><span class="lab">Trigger</span><span class="val"><b class="trig">New User</b> — a parent creates their account on the academy's group login page</span></div>
+        <div class="line"><span class="lab">Trigger</span><span class="val"><b class="trig">New User</b> - a parent creates their account on the academy's group login page</span></div>
         <div class="line"><span class="lab">Action</span><span class="val"><b class="act">Send to External Webhook</b> → tells FullControl the new user's ID + email</span></div>
         <div class="line"><span class="lab">Result</span><span class="val">FullControl matches that email to a paying member, then fires automation&nbsp;C to grant their product</span></div>
       </div>
@@ -315,7 +315,7 @@
     <div class="auto">
       <div class="ah"><span class="n">B</span><span class="name">User Tag Added → Send to External Webhook</span><span class="badge">outbound</span></div>
       <div class="ab">
-        <div class="line"><span class="lab">Trigger</span><span class="val"><b class="trig">Tag added to a user</b> — a staff member tags an existing athlete in CoachIQ</span></div>
+        <div class="line"><span class="lab">Trigger</span><span class="val"><b class="trig">Tag added to a user</b> - a staff member tags an existing athlete in CoachIQ</span></div>
         <div class="line"><span class="lab">Action</span><span class="val"><b class="act">Send to External Webhook</b> → tells FullControl that user's ID + email</span></div>
         <div class="line"><span class="lab">Result</span><span class="val">FullControl links that CoachIQ user ID onto the matching member row (the import "listening" step)</span></div>
       </div>
@@ -324,8 +324,8 @@
     <div class="auto">
       <div class="ah"><span class="n">C</span><span class="name">Add a Product Purchase</span><span class="badge">inbound · one per plan</span></div>
       <div class="ab">
-        <div class="line"><span class="lab">Trigger</span><span class="val"><b class="trig">Incoming Webhook</b> — fired by FullControl when a member pays</span></div>
-        <div class="line"><span class="lab">Action</span><span class="val"><b class="act">Add a Product Purchase</b> → grants the product, program access, and the cycle's starter credits — <b>without</b> taking payment (they already paid in the portal)</span></div>
+        <div class="line"><span class="lab">Trigger</span><span class="val"><b class="trig">Incoming Webhook</b> - fired by FullControl when a member pays</span></div>
+        <div class="line"><span class="lab">Action</span><span class="val"><b class="act">Add a Product Purchase</b> → grants the product, program access, and the cycle's starter credits - <b>without</b> taking payment (they already paid in the portal)</span></div>
         <div class="line"><span class="lab">Stores</span><span class="val">the FullControl <b>subscription ID</b> on the product, so CoachIQ can track renewals and refresh credits</span></div>
       </div>
     </div>
@@ -339,13 +339,13 @@
   <!-- 05 -->
   <section id="import">
     <h2><span class="h2num">05</span>Member import listening</h2>
-    <p class="lead">Onboarding an existing roster means matching each athlete in the portal to their existing CoachIQ user. The import wizard does this with a live <strong>"listening session"</strong> — it watches matches arrive in real time instead of making you copy IDs by hand.</p>
+    <p class="lead">Onboarding an existing roster means matching each athlete in the portal to their existing CoachIQ user. The import wizard does this with a live <strong>"listening session"</strong> - it watches matches arrive in real time instead of making you copy IDs by hand.</p>
 
     <h3>The 5-step import wizard</h3>
     <div class="flow">
       <div class="flow-title">Members tab → Import</div>
       <div class="steps">
-        <div class="step"><div class="dot">1</div><div class="body"><div class="st-h">Import</div><div class="st-d">Upload the roster (CSV) into a staging area — nothing is live yet.</div></div></div>
+        <div class="step"><div class="dot">1</div><div class="body"><div class="st-h">Import</div><div class="st-d">Upload the roster (CSV) into a staging area - nothing is live yet.</div></div></div>
         <div class="step"><div class="dot">2</div><div class="body"><div class="st-h">Stripe</div><div class="st-d">Match each member to their Stripe customer / subscription.</div></div></div>
         <div class="step"><div class="dot">3</div><div class="body"><div class="st-h">CoachIQ <span style="color:var(--ciq)">· the listening step</span></div><div class="st-d">Match each member to their CoachIQ user (detail below).</div></div></div>
         <div class="step"><div class="dot">4</div><div class="body"><div class="st-h">GHL</div><div class="st-d">Match each member to their GoHighLevel contact.</div></div></div>
@@ -359,7 +359,7 @@
     <table>
       <thead><tr><th>How a match arrives</th><th>What happens</th></tr></thead>
       <tbody>
-        <tr><td class="k">Auto, from Stripe</td><td>For subscriptions CoachIQ originally created, CoachIQ stamped the user ID into the subscription's metadata. The wizard reads it off automatically — no action needed.</td></tr>
+        <tr><td class="k">Auto, from Stripe</td><td>For subscriptions CoachIQ originally created, CoachIQ stamped the user ID into the subscription's metadata. The wizard reads it off automatically - no action needed.</td></tr>
         <tr><td class="k">Live, by tagging</td><td>For the rest, a staff member <b>adds a tag</b> to the athlete in CoachIQ. Automation&nbsp;B fires, FullControl captures that user's ID, and the member ticks off on screen <b>within seconds</b>.</td></tr>
         <tr><td class="k">Manual fallback</td><td>Paste a user ID by hand, or mark a member <b>"not on CoachIQ"</b> so they're skipped cleanly.</td></tr>
       </tbody>
@@ -367,7 +367,7 @@
 
     <div class="callout">
       <span class="tag">Never blocks</span>
-      A member with no CoachIQ match doesn't stop the import — you can still promote them. The listening screen just keeps watching, and any tag that doesn't match a known member is flagged so you can see it.
+      A member with no CoachIQ match doesn't stop the import - you can still promote them. The listening screen just keeps watching, and any tag that doesn't match a known member is flagged so you can see it.
     </div>
   </section>
 
@@ -389,14 +389,14 @@
 
     <div class="callout warn">
       <span class="tag">Plan changes need a re-link</span>
-      If a member <em>changes plan</em>, they may end up on a new product (and sometimes a new subscription ID). CoachIQ has to be pointed at the new product / ID — see the day-to-day guide below. This re-link is the academy's normal CoachIQ workflow, not a BAM engineering task.
+      If a member <em>changes plan</em>, they may end up on a new product (and sometimes a new subscription ID). CoachIQ has to be pointed at the new product / ID - see the day-to-day guide below. This re-link is the academy's normal CoachIQ workflow, not a BAM engineering task.
     </div>
   </section>
 
   <!-- 07 -->
   <section id="newmember">
     <h2><span class="h2num">07</span>New member, end to end</h2>
-    <p class="lead">Putting it all together — here's everything that happens when a brand-new athlete signs up. Note there's <strong>no Zapier</strong>: the parent makes their own CoachIQ account, and CoachIQ tells FullControl about it.</p>
+    <p class="lead">Putting it all together - here's everything that happens when a brand-new athlete signs up. Note there's <strong>no Zapier</strong>: the parent makes their own CoachIQ account, and CoachIQ tells FullControl about it.</p>
 
     <div class="flow">
       <div class="flow-title">New athlete signup</div>
@@ -420,21 +420,21 @@
     <table>
       <thead><tr><th>You want to…</th><th>Do it in</th><th>What CoachIQ needs after</th></tr></thead>
       <tbody>
-        <tr><td class="k">Sign up a new member</td><td>FullControl (payment) → parent makes CoachIQ account</td><td>Nothing manual — automations A + C handle the grant</td></tr>
+        <tr><td class="k">Sign up a new member</td><td>FullControl (payment) → parent makes CoachIQ account</td><td>Nothing manual - automations A + C handle the grant</td></tr>
         <tr><td class="k">Change a plan</td><td>FullControl (change plan)</td><td><b>Re-link:</b> remove the old product, add the new one, paste the updated sub ID, set credits</td></tr>
-        <tr><td class="k">Pause a membership</td><td>FullControl (pause)</td><td>Nothing — renewals stop, so the credit cycle stops</td></tr>
+        <tr><td class="k">Pause a membership</td><td>FullControl (pause)</td><td>Nothing - renewals stop, so the credit cycle stops</td></tr>
         <tr><td class="k">Cancel a membership</td><td>FullControl (cancel)</td><td>Remove / revoke the product if the academy wants access to end immediately</td></tr>
         <tr><td class="k">Refund</td><td>FullControl (refund)</td><td>Nothing billing-side; adjust credits only if the academy chooses to</td></tr>
       </tbody>
     </table>
 
     <h3>What "action items" are</h3>
-    <p>Most of the time the two systems sync themselves through the webhooks. An <strong>action item</strong> is the short list of things a human still has to do by hand — and they almost always live on the <em>CoachIQ side</em>, after a change in FullControl:</p>
+    <p>Most of the time the two systems sync themselves through the webhooks. An <strong>action item</strong> is the short list of things a human still has to do by hand - and they almost always live on the <em>CoachIQ side</em>, after a change in FullControl:</p>
     <ul class="check">
-      <li><b>Re-link after a plan change</b> — point CoachIQ at the member's new product + sub ID. This is the big one.</li>
-      <li><b>Confirm a tricky import match</b> — a member whose CoachIQ ID didn't auto-arrive (tag them, or mark "not on CoachIQ").</li>
-      <li><b>Revoke access on cancel</b> — only if the academy wants the athlete locked out the moment they cancel, rather than at period end.</li>
-      <li><b>Re-collect a card</b> — for the rare member migrated without a reusable card on file.</li>
+      <li><b>Re-link after a plan change</b> - point CoachIQ at the member's new product + sub ID. This is the big one.</li>
+      <li><b>Confirm a tricky import match</b> - a member whose CoachIQ ID didn't auto-arrive (tag them, or mark "not on CoachIQ").</li>
+      <li><b>Revoke access on cancel</b> - only if the academy wants the athlete locked out the moment they cancel, rather than at period end.</li>
+      <li><b>Re-collect a card</b> - for the rare member migrated without a reusable card on file.</li>
     </ul>
 
     <h3>How to change a membership (the careful version)</h3>
@@ -450,7 +450,7 @@
 
     <div class="callout sacred">
       <span class="tag">Two things to never do</span>
-      <strong>1.</strong> Never take payment on a CoachIQ form — billing ownership is lost.<br>
+      <strong>1.</strong> Never take payment on a CoachIQ form - billing ownership is lost.<br>
       <strong>2.</strong> Never change a member's money in CoachIQ. Money changes happen in FullControl; CoachIQ only mirrors the result.
     </div>
   </section>

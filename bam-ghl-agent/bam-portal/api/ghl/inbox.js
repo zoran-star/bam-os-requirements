@@ -91,6 +91,26 @@ async function ghl(method, path, { token, body } = {}) {
   return json;
 }
 
+// ── Inbox-list cache (per academy) ──────────────────────────────────────────
+// The list payload is cached for a few seconds so rapid reloads + the approval
+// count refresh cost ZERO GHL calls, and so a GHL rate-limit (429) serves the
+// last good payload instead of failing the whole inbox.
+const INBOX_CACHE_TTL_MS = 25000;
+async function readInboxCache(clientId) {
+  try {
+    const rows = await sb(`ghl_inbox_cache?client_id=eq.${clientId}&select=payload,updated_at&limit=1`);
+    return Array.isArray(rows) && rows[0] ? rows[0] : null;
+  } catch (_) { return null; }
+}
+function writeInboxCache(clientId, payload) {
+  // Fire-and-forget upsert — never block the response on the cache write.
+  sb(`ghl_inbox_cache?on_conflict=client_id`, {
+    method: "POST",
+    headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
+    body: JSON.stringify([{ client_id: clientId, payload, updated_at: new Date().toISOString() }]),
+  }).catch(() => {});
+}
+
 async function refreshGhlToken(client) {
   const clientId     = (process.env.GHL_OAUTH_CLIENT_ID || "").trim();
   const clientSecret = (process.env.GHL_OAUTH_CLIENT_SECRET || "").trim();
@@ -268,14 +288,24 @@ async function handler(req, res) {
   }
 
   // ────────────────────────────────────────────────────────
-  // Mode A: list conversations
+  // Mode A: list conversations  (cached — see readInboxCache)
   // ────────────────────────────────────────────────────────
+  const wantFresh = req.query.fresh === "1" || req.query.nocache === "1";
+  const cached = await readInboxCache(clientId);
+  if (!wantFresh && cached && cached.updated_at &&
+      (Date.now() - new Date(cached.updated_at).getTime()) < INBOX_CACHE_TTL_MS) {
+    return res.status(200).json({ ...cached.payload, cached: true });
+  }
+
   let convos = [];
   try {
     const params = new URLSearchParams({ locationId, limit: "100" });
     const data = await ghl("GET", `/conversations/search?${params}`, { token });
     convos = data.conversations || data.data || [];
   } catch (e) {
+    // GHL failed (usually 429). Serve the last good payload instead of breaking
+    // the inbox; only error out if we have nothing cached at all.
+    if (cached) return res.status(200).json({ ...cached.payload, stale: true });
     return res.status(e.status || 502).json({ error: `GHL: ${e.message}`, detail: e.body || null });
   }
 
@@ -400,7 +430,7 @@ async function handler(req, res) {
     return tb - ta;
   });
 
-  return res.status(200).json({
+  const payload = {
     conversations: annotated,
     location_id: locationId,   // for the "Open in GHL" deep link
     trainers,
@@ -411,7 +441,9 @@ async function handler(req, res) {
       leads:   annotated.filter(c => c.classification === "lead").length,
       unread:  annotated.reduce((sum, c) => sum + (c.unreadCount || 0), 0),
     },
-  });
+  };
+  writeInboxCache(clientId, payload);   // refresh the cache for the next load (fire-and-forget)
+  return res.status(200).json(payload);
 }
 
 export default withSentryApiRoute(handler);

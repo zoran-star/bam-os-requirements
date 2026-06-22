@@ -3,7 +3,7 @@
 **For agents:** before making schema changes (new tables, columns, RLS, functions, drops/renames),
 diff your plan against the lists below. If anything overlaps → **stop and tell Zoran to message Luka.**
 
-Owner: Luka (fc-mobile parent app backend). Last updated: 2026-06-13.
+Owner: Luka (fc-mobile parent app backend). Last updated: 2026-06-20.
 Full context: [`docs/core-handoff/platform-foundations.md`](../../docs/core-handoff/platform-foundations.md)
 
 ---
@@ -15,14 +15,16 @@ Full context: [`docs/core-handoff/platform-foundations.md`](../../docs/core-hand
 | Status | Tables |
 |---|---|
 | Applied (identity) | `customer_profiles` · `students` · `academy_memberships` · `member_links` |
-| Coming next (scheduling) | `slot_templates` · `schedule_slots` · `reservations` · `waitlist_entries` |
-| Planned (billing/credits) | `membership_plans` · `credit_ledger` · `subscriptions` |
+| Applied (schedule read model) | `slot_templates` · `schedule_slots` · `reservations` · `waitlist_entries` |
+| Planned (billing/credits/booking) | `membership_plans` · `credit_ledger` · booking/waitlist/cancel RPCs |
+| Not in v1 unless explicitly revived | `subscriptions` |
 | Planned (later) | `membership_change_requests` · parent messaging/notification tables (names TBD) |
 
 ⚠️ These names are **reserved even before the tables exist** — creating a table with one of
 these names is itself a conflict.
 
-All of them: deny-all RLS (no policies, service-role only). Don't add policies to them.
+All table names above: deny-all RLS (no policies, service-role only). Don't add policies to them.
+Booking/waitlist/cancel RPCs are also Luka-owned; coordinate before adding or changing them.
 
 ---
 
@@ -31,11 +33,11 @@ All of them: deny-all RLS (no policies, service-role only). Don't add policies t
 | Table | How the parent app uses it | Conflict if you… |
 |---|---|---|
 | `clients` | Every parent table FKs `tenant_id → clients(id)` | change PK, archive/merge rows, rename table |
-| `members` | Read-only; `member_links` FKs `members(id)`; matching uses `email_norm` + parent phone/email columns | rename/drop table or those columns, change `email_norm` semantics, re-import with new ids |
-| `members_staging` → promote | Registration matching waits on Sorter Steps 3–4 promote | change what promote writes into `members` |
+| `members` | Read-only; `member_links` FKs `members(id)`; matching uses `email_norm` + parent phone/email columns; future profile/billing reads may use `offer_id` / `stripe_price_id` lineage | rename/drop table or those columns, change `email_norm` semantics, re-import with new ids, omit lineage for checkout-created members |
+| `members_staging` → promote | Registration matching waits on Sorter Steps 3–4 promote; 56 rows staged and `members` empty as of 2026-06-20 | change what promote writes into `members` |
 | `offers` | `membership_plans` and schedule templates read Offer identity + `data.pricing.pricing_offerings` / schedule classes as source lineage | reshape `data.pricing.pricing_offerings`, change archive semantics, regenerate ids, remove pricing/schedule sections |
 | `offer_teams` | Future Team offers may link schedule/templates to specific team rows via soft lineage | reshape team row identity/data semantics, regenerate ids |
-| `pricing_catalog` | `membership_plans` will be seeded from confirmed Offer-price mappings | change `match_status` values/semantics, remove `offer_id` / `offer_price_key`, change canonical price tier semantics |
+| `pricing_catalog` | `membership_plans` will be seeded from confirmed Offer-price mappings; confirmed rows now carry `offer_id`, `offer_price_key`, and `stripe_price_id` | change `match_status` values/semantics, remove `offer_id` / `offer_price_key`, change canonical price tier semantics |
 | `locations` | Will be **additively extended** (new nullable columns) toward core `Location` | drop/rename existing columns |
 | `device_tokens` | Reused as-is for parent push | schema change |
 | **Auth (whole project)** | Parents will register as Supabase auth users; `app_metadata.role='parent'` stamped at registration | logic assuming every auth user is staff/client |
@@ -73,6 +75,10 @@ Examples:
 - Session pack → fixed number of credits, with optional expiry
 
 Marketing copy is not enough. The booking system needs exact values for credits, periods, unlimited access, and eligibility rules.
+
+As of 2026-06-20, the price-matching lineage exists, but these structured entitlement
+fields are still not present in Offer data. Booking credits stay blocked/manual
+until they exist.
 
 ---
 

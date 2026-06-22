@@ -74,7 +74,6 @@ type WaitlistEntry = {
 type ParentScheduleContext = {
   profile: CustomerProfile;
   memberships: Membership[];
-  membershipIds: string[];
   academyIds: string[];
 };
 
@@ -83,6 +82,15 @@ type SlotState = {
   waitlistCounts: Map<string, number>;
   reservationBySlotMembership: Map<string, Reservation>;
   waitlistBySlotMembership: Map<string, WaitlistEntry>;
+};
+
+export type CustomerSlotEnrollmentOut = {
+  membership_id: string;
+  student_id: string | null;
+  status: "CONFIRMED" | "WAITING";
+  reservation_id: string | null;
+  waitlist_id: string | null;
+  can_cancel: boolean;
 };
 
 export type CustomerSlotOut = {
@@ -100,6 +108,7 @@ export type CustomerSlotOut = {
   instructor_name: string | null;
   booked_count: number;
   waitlist_length: number;
+  enrollments: CustomerSlotEnrollmentOut[];
   my_status: "CONFIRMED" | "WAITING" | null;
   my_reservation_id: string | null;
   my_waitlist_id: string | null;
@@ -129,7 +138,6 @@ export async function getParentScheduleContext(
   return {
     profile,
     memberships,
-    membershipIds: memberships.map((membership) => membership.id),
     academyIds: [...new Set(memberships.map((membership) => membership.academy_id))],
   };
 }
@@ -145,7 +153,7 @@ export async function listScheduleSlots(
   },
 ): Promise<CustomerSlotOut[]> {
   ensureAcademyAccess(context, opts.academyId);
-  const membershipId = resolveMembershipForAcademy(context, opts.membershipId, opts.academyId);
+  const memberships = resolveMembershipsForAcademy(context, opts.membershipId, opts.academyId);
   const timeZones = await getAcademyTimeZones([opts.academyId]);
   const dateRange = futureDateRangeIso(
     opts.dateFrom,
@@ -161,7 +169,7 @@ export async function listScheduleSlots(
     includeCancelled: false,
   });
   const state = await getSlotState(slots.map((slot) => slot.id));
-  return slots.map((slot) => toCustomerSlot(slot, state, membershipId));
+  return slots.map((slot) => toCustomerSlot(slot, state, memberships));
 }
 
 export async function getScheduleSlot(
@@ -175,9 +183,9 @@ export async function getScheduleSlot(
   }
 
   ensureAcademyAccess(context, slot.tenant_id);
-  const resolvedMembershipId = resolveMembershipForAcademy(context, membershipId, slot.tenant_id);
+  const memberships = resolveMembershipsForAcademy(context, membershipId, slot.tenant_id);
   const state = await getSlotState([slot.id]);
-  return toCustomerSlot(slot, state, resolvedMembershipId);
+  return toCustomerSlot(slot, state, memberships);
 }
 
 export async function listUpcomingReservations(
@@ -189,7 +197,8 @@ export async function listUpcomingReservations(
     limit: number;
   },
 ): Promise<CustomerReservationOut[]> {
-  const membershipIds = resolveMembershipIds(context, opts.membershipId);
+  const memberships = resolveMemberships(context, opts.membershipId);
+  const membershipIds = memberships.map((membership) => membership.id);
   if (membershipIds.length === 0 || context.academyIds.length === 0) return [];
 
   const slotLimit = scanLimit(opts.limit);
@@ -212,7 +221,9 @@ export async function listUpcomingReservations(
 
   return reservations
     .filter((reservation) => slotById.has(reservation.slot_id))
-    .map((reservation) => toReservationOut(reservation, slotById.get(reservation.slot_id), state))
+    .map((reservation) =>
+      toReservationOut(reservation, slotById.get(reservation.slot_id), state, memberships),
+    )
     .sort((a, b) => compareSlotStart(a.slot, b.slot, "asc"))
     .slice(0, opts.limit);
 }
@@ -225,7 +236,8 @@ export async function listPastAppointments(
     limit: number;
   },
 ): Promise<CustomerReservationOut[]> {
-  const membershipIds = resolveMembershipIds(context, opts.membershipId);
+  const memberships = resolveMemberships(context, opts.membershipId);
+  const membershipIds = memberships.map((membership) => membership.id);
   if (membershipIds.length === 0 || context.academyIds.length === 0) return [];
 
   const now = new Date();
@@ -250,7 +262,9 @@ export async function listPastAppointments(
 
   return reservations
     .filter((reservation) => slotById.has(reservation.slot_id))
-    .map((reservation) => toReservationOut(reservation, slotById.get(reservation.slot_id), state))
+    .map((reservation) =>
+      toReservationOut(reservation, slotById.get(reservation.slot_id), state, memberships),
+    )
     .sort((a, b) => compareSlotStart(a.slot, b.slot, "desc"))
     .slice(0, opts.limit);
 }
@@ -375,22 +389,25 @@ function ensureAcademyAccess(context: ParentScheduleContext, academyId: string):
   }
 }
 
-function resolveMembershipForAcademy(
+function resolveMembershipsForAcademy(
   context: ParentScheduleContext,
   membershipId: string | undefined,
   academyId: string,
-): string | undefined {
-  if (!membershipId) return undefined;
+): Membership[] {
+  if (!membershipId) {
+    return context.memberships.filter((membership) => membership.academy_id === academyId);
+  }
+
   const membership = getOwnedMembership(context, membershipId);
   if (membership.academy_id !== academyId) {
     throw new HttpError(403, "Membership does not belong to this academy.");
   }
-  return membership.id;
+  return [membership];
 }
 
-function resolveMembershipIds(context: ParentScheduleContext, membershipId?: string): string[] {
-  if (!membershipId) return context.membershipIds;
-  return [getOwnedMembership(context, membershipId).id];
+function resolveMemberships(context: ParentScheduleContext, membershipId?: string): Membership[] {
+  if (!membershipId) return context.memberships;
+  return [getOwnedMembership(context, membershipId)];
 }
 
 function getOwnedMembership(context: ParentScheduleContext, membershipId: string): Membership {
@@ -543,18 +560,19 @@ async function getWaitlistEntries(slotIds: string[]): Promise<WaitlistEntry[]> {
 function toCustomerSlot(
   slot: ScheduleSlot,
   state: SlotState,
-  membershipId: string | undefined,
+  memberships: Membership[],
 ): CustomerSlotOut {
   const bookedCount = state.bookedCounts.get(slot.id) || 0;
   const waitlistLength = state.waitlistCounts.get(slot.id) || 0;
-  const reservation = membershipId
-    ? state.reservationBySlotMembership.get(slotMembershipKey({ slot_id: slot.id, membership_id: membershipId }))
-    : undefined;
-  const waitlist = membershipId
-    ? state.waitlistBySlotMembership.get(slotMembershipKey({ slot_id: slot.id, membership_id: membershipId }))
-    : undefined;
   const startsInFuture = isFuture(slot.start_time);
-  const hasEnrollment = Boolean(reservation || waitlist);
+  const enrollments = getSlotEnrollments(slot, state, memberships, startsInFuture);
+  const primaryEnrollment = getPrimarySlotEnrollment(enrollments);
+  const enrolledMembershipIds = new Set(
+    enrollments.map((enrollment) => enrollment.membership_id),
+  );
+  const hasAvailableMembership = memberships.some(
+    (membership) => !enrolledMembershipIds.has(membership.id),
+  );
   const isFull = bookedCount >= slot.capacity;
 
   return {
@@ -572,12 +590,13 @@ function toCustomerSlot(
     instructor_name: null,
     booked_count: bookedCount,
     waitlist_length: waitlistLength,
-    my_status: reservation ? "CONFIRMED" : waitlist ? "WAITING" : null,
-    my_reservation_id: reservation?.id ?? null,
-    my_waitlist_id: waitlist?.id ?? null,
-    can_book: startsInFuture && !slot.is_cancelled && !hasEnrollment && !isFull,
-    can_waitlist: startsInFuture && !slot.is_cancelled && !hasEnrollment,
-    can_cancel: Boolean(reservation && startsInFuture),
+    enrollments,
+    my_status: primaryEnrollment?.status ?? null,
+    my_reservation_id: primaryEnrollment?.reservation_id ?? null,
+    my_waitlist_id: primaryEnrollment?.waitlist_id ?? null,
+    can_book: startsInFuture && !slot.is_cancelled && hasAvailableMembership && !isFull,
+    can_waitlist: startsInFuture && !slot.is_cancelled && hasAvailableMembership,
+    can_cancel: enrollments.some((enrollment) => enrollment.can_cancel),
   };
 }
 
@@ -585,10 +604,15 @@ function toReservationOut(
   reservation: Reservation,
   slot: ScheduleSlot | undefined,
   state: SlotState,
+  memberships: Membership[],
 ): CustomerReservationOut {
   if (!slot) {
     throw new HttpError(500, "Reservation is missing its schedule slot.");
   }
+
+  const slotMemberships = memberships.filter(
+    (membership) => membership.academy_id === slot.tenant_id,
+  );
 
   return {
     id: reservation.id,
@@ -597,8 +621,56 @@ function toReservationOut(
     student_id: reservation.student_id,
     status: reservation.status,
     booked_at: reservation.booked_at,
-    slot: toCustomerSlot(slot, state, reservation.membership_id),
+    slot: toCustomerSlot(slot, state, slotMemberships),
   };
+}
+
+function getSlotEnrollments(
+  slot: ScheduleSlot,
+  state: SlotState,
+  memberships: Membership[],
+  startsInFuture: boolean,
+): CustomerSlotEnrollmentOut[] {
+  const enrollments: CustomerSlotEnrollmentOut[] = [];
+
+  for (const membership of memberships) {
+    const key = slotMembershipKey({ slot_id: slot.id, membership_id: membership.id });
+    const reservation = state.reservationBySlotMembership.get(key);
+    if (reservation) {
+      enrollments.push({
+        membership_id: membership.id,
+        student_id: reservation.student_id ?? membership.student_id,
+        status: "CONFIRMED",
+        reservation_id: reservation.id,
+        waitlist_id: null,
+        can_cancel: startsInFuture && !slot.is_cancelled,
+      });
+      continue;
+    }
+
+    const waitlist = state.waitlistBySlotMembership.get(key);
+    if (waitlist) {
+      enrollments.push({
+        membership_id: membership.id,
+        student_id: waitlist.student_id ?? membership.student_id,
+        status: "WAITING",
+        reservation_id: null,
+        waitlist_id: waitlist.id,
+        can_cancel: false,
+      });
+    }
+  }
+
+  return enrollments;
+}
+
+function getPrimarySlotEnrollment(
+  enrollments: CustomerSlotEnrollmentOut[],
+): CustomerSlotEnrollmentOut | undefined {
+  return (
+    enrollments.find((enrollment) => enrollment.status === "CONFIRMED") ??
+    enrollments.find((enrollment) => enrollment.status === "WAITING")
+  );
 }
 
 function emptySlotState(): SlotState {

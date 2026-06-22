@@ -1,6 +1,7 @@
 import { withSentryApiRoute } from "../_sentry.js";
 import { pickGhlToken, sendSms } from "./_core.js";
 import { respondedStage, contactInRespondedStage } from "../agent/_stage.js";
+import { agentMode, modeIsOn } from "../agent/_mode.js";
 // Vercel Serverless Function — GHL inbound-message webhook  ("P1 Spine")
 //
 //   POST /api/ghl/inbound-webhook
@@ -55,10 +56,14 @@ function pick(obj, keys) {
 async function handler(req, res) {
   if (req.method !== "POST") return res.status(405).json({ error: "POST only" });
 
-  // Shared-secret auth.
+  // Auth: two callers. (1) Per-academy GHL Workflow webhook passes our shared
+  // secret (header or ?key=). (2) The FC app-level "InboundMessage" webhook uses
+  // a PLAIN URL (no secret) — GHL controls the payload. So reject only an
+  // explicitly WRONG secret; allow no-secret (app webhook) and correct-secret.
+  // Every request still resolves a known academy by locationId + gates below.
   const expected = (process.env.GHL_WEBHOOK_SECRET || "").trim();
   const provided = (req.headers["x-webhook-secret"] || req.query.key || "").toString().trim();
-  if (!expected || provided !== expected) return res.status(401).json({ error: "unauthorized" });
+  if (expected && provided && provided !== expected) return res.status(401).json({ error: "unauthorized" });
 
   const p = req.body && typeof req.body === "object" ? req.body : {};
 
@@ -152,17 +157,29 @@ async function handler(req, res) {
     return res.status(200).json({ error: e.message });
   }
 
+  // Lead just replied → cancel any pending/approved drafts for them (don't text
+  // someone who's already talking to us): scheduled follow-ups AND ready replies
+  // (the old ready draft was for their previous message; the detector re-drafts).
+  try {
+    if (contactId) {
+      const cid = encodeURIComponent(String(contactId));
+      const patch = { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ status: "canceled", send_error: "lead replied", updated_at: new Date().toISOString() }) };
+      await sb(`agent_followups?client_id=eq.${client.id}&ghl_contact_id=eq.${cid}&status=in.(pending,approved)`, patch);
+      await sb(`agent_ready_replies?client_id=eq.${client.id}&ghl_contact_id=eq.${cid}&status=in.(pending,approved)`, patch);
+    }
+  } catch (e) { console.error("ghl inbound-webhook draft-cancel error:", e.message); }
+
   // Instant notify: when a Responded-stage lead replies (a chat that needs
   // approval), text the academy's configured number. Best-effort — never blocks.
   try {
     const cfg = client.ghl_kpi_config || {};
-    if (cfg.agent_approvals_enabled && cfg.agent_notify_phone && contactId) {
+    if (client.v2_access && modeIsOn(agentMode(client)) && cfg.agent_notify_phone && contactId) {
       const creds = await pickGhlToken(client);
       if (creds) {
         const rs = await respondedStage(creds.token, creds.locationId);
         if (rs && await contactInRespondedStage(creds.token, creds.locationId, String(contactId), rs)) {
           const who = pick(p, ["full_name", "fullName", "contactName", "name", "first_name"]) || "a lead";
-          await sendSms({ client, toPhone: cfg.agent_notify_phone, message: `🤖 New chat to approve — ${who} just replied (${client.business_name || "academy"}). Portal → Inbox → 🤖 Bot.`, contactName: "BAM Agent" });
+          await sendSms({ client, toPhone: cfg.agent_notify_phone, message: `🤖 New chat to approve - ${who} just replied (${client.business_name || "academy"}). Portal → Inbox → 👁 Hawkeye.`, contactName: "BAM Agent" });
         }
       }
     }

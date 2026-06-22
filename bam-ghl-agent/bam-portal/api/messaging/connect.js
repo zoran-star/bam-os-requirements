@@ -27,6 +27,7 @@ import { withSentryApiRoute } from "../_sentry.js";
 //   https://portal.byanymeansbusiness.com/api/messaging/connect
 
 import crypto from "node:crypto";
+import { agencyConnectFromCode } from "../agency-connect.js";
 
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
@@ -41,22 +42,23 @@ const GHL_TOKEN_URL     = "https://services.leadconnectorhq.com/oauth/token";
 // app config, GHL ignores it on consent. Safe to request more than the
 // app has enabled.
 const SCOPES = [
-  // Core CRM
+  // Location + business
   "locations.readonly",
-  "users.readonly",
   "businesses.readonly",
+  "businesses.write",
+
+  // Users (write excluded — agency-level concern)
+  "users.readonly",
+
+  // Contacts
   "contacts.readonly",
   "contacts.write",
 
-  // Conversations + messaging (SMS / email / etc)
+  // Conversations + messaging
   "conversations.readonly",
   "conversations.write",
   "conversations/message.readonly",
   "conversations/message.write",
-
-  // Pipelines / opportunities
-  "opportunities.readonly",
-  "opportunities.write",
 
   // Calendars + appointments
   "calendars.readonly",
@@ -65,9 +67,26 @@ const SCOPES = [
   "calendars/events.write",
   "calendars/groups.readonly",
   "calendars/groups.write",
+  "calendars/resources.readonly",
+  "calendars/resources.write",
+
+  // Opportunities / pipeline
+  "opportunities.readonly",
+  "opportunities.write",
+
+  // CRM custom objects + associations
+  "objects/schema.readonly",
+  "objects/schema.write",
+  "objects/record.readonly",
+  "objects/record.write",
+  "associations.readonly",
+  "associations.write",
+  "associations/relation.readonly",
+  "associations/relation.write",
 
   // Forms, workflows, campaigns, surveys
   "forms.readonly",
+  "forms.write",
   "workflows.readonly",
   "campaigns.readonly",
   "surveys.readonly",
@@ -80,46 +99,88 @@ const SCOPES = [
   "locations/tags.readonly",
   "locations/tags.write",
   "locations/tasks.readonly",
-  "locations/tasks.write",
   "locations/templates.readonly",
 
-  // Products + invoices + payments (read-most, write where useful)
+  // Funnels + website pages (correct sub-resource scopes — funnels.readonly is invalid)
+  "funnels/funnel.readonly",
+  "funnels/page.readonly",
+  "funnels/pagecount.readonly",
+  "funnels/redirect.readonly",
+  "funnels/redirect.write",
+
+  // Tracking links
+  "links.readonly",
+  "links.write",
+
+  // Products
   "products.readonly",
   "products.write",
   "products/prices.readonly",
   "products/prices.write",
   "products/collection.readonly",
+  "products/collection.write",
+
+  // Invoices
   "invoices.readonly",
   "invoices.write",
+  "invoices/estimate.readonly",
+  "invoices/estimate.write",
   "invoices/schedule.readonly",
   "invoices/schedule.write",
   "invoices/template.readonly",
+  "invoices/template.write",
+
+  // Payments
   "payments/orders.readonly",
   "payments/orders.write",
   "payments/transactions.readonly",
   "payments/subscriptions.readonly",
   "payments/integration.readonly",
+  "payments/integration.write",
   "payments/coupons.readonly",
   "payments/coupons.write",
+  "payments/custom-provider.readonly",
+  "payments/custom-provider.write",
 
-  // Social planner (subset — medialibrary not available for sub-account apps)
+  // Media library
+  "medias.readonly",
+  "medias.write",
+
+  // Social planner
   "socialplanner/post.readonly",
   "socialplanner/post.write",
   "socialplanner/account.readonly",
+  "socialplanner/account.write",
+  "socialplanner/category.readonly",
+  "socialplanner/csv.readonly",
+  "socialplanner/csv.write",
   "socialplanner/oauth.readonly",
+  "socialplanner/oauth.write",
+  "socialplanner/statistics.readonly",
+  "socialplanner/tag.readonly",
 
-  // Courses + email builder
+  // Courses / LMS
   "courses.readonly",
   "courses.write",
+
+  // Blogs + website content
+  "blogs/author.readonly",
+  "blogs/category.readonly",
+  "blogs/check-slug.readonly",
+  "blogs/post.write",
+  "blogs/post-update.write",
+
+  // Email builder
   "emails/builder.readonly",
   "emails/builder.write",
+  "emails/schedule.readonly",
 
-  // Notes on dropped scopes (2026-05-30):
-  //   snapshots.readonly                — not available for Sub-Account apps
-  //   socialplanner/medialibrary.readonly — same
-  //   blogs.readonly / blogs.write       — same
-  // If GHL later exposes these to Sub-Account apps, add back here AND tick
-  // the matching scope in the Marketplace app config.
+  // Voice AI
+  "voice-ai-agents.readonly",
+  "voice-ai-agents.write",
+  "voice-ai-agent-goals.readonly",
+  "voice-ai-agent-goals.write",
+  "voice-ai-dashboard.readonly",
 ].join(" ");
 
 function nowIso() { return new Date().toISOString(); }
@@ -207,8 +268,44 @@ function redirectBack(res, status, msg) {
 async function handler(req, res) {
   if (req.method === "POST") return handlePrepare(req, res);
   if (req.method === "GET" && req.query.action === "list") return handleList(req, res);
+  if (req.method === "GET" && req.query.action === "admin-start") return handleAdminStart(req, res);
   if (req.method === "GET")  return handleCallback(req, res);
   return res.status(405).json({ error: "method not allowed" });
+}
+
+// ── Admin shortcut: start OAuth for any client without portal login ──
+// GET /api/messaging/connect?action=admin-start&client_id=<uuid>&key=<CRON_SECRET>
+// Redirects straight to GHL consent screen. Safe: gated by CRON_SECRET.
+async function handleAdminStart(req, res) {
+  const expected = (process.env.CRON_SECRET || "").trim();
+  if (!expected || (req.query.key || "") !== expected) {
+    return res.status(401).json({ error: "unauthorized" });
+  }
+  const clientId = (req.query.client_id || "").trim();
+  if (!clientId) return res.status(400).json({ error: "client_id required" });
+
+  const ghlClientId = (process.env.GHL_OAUTH_CLIENT_ID || "").trim();
+  if (!ghlClientId) return res.status(500).json({ error: "GHL_OAUTH_CLIENT_ID not configured" });
+
+  const state = signState({
+    client_id: clientId,
+    exp: Date.now() + 15 * 60 * 1000,
+    nonce: crypto.randomBytes(8).toString("hex"),
+  });
+
+  const params = new URLSearchParams({
+    client_id:    ghlClientId,
+    redirect_uri: redirectUri(req),
+    scope:        SCOPES,
+    state,
+  });
+
+  // Pre-select the specific location so GHL skips the agency picker.
+  const locationId = (req.query.location_id || "").trim();
+  if (locationId) params.set("locationId", locationId);
+
+  res.writeHead(302, { Location: `${GHL_AUTHORIZE_URL}?${params.toString()}` });
+  return res.end();
 }
 
 // ── Staff connect console: list academies + their GHL-connected status ──
@@ -251,10 +348,9 @@ async function handlePrepare(req, res) {
   });
 
   const params = new URLSearchParams({
-    response_type: "code",
-    client_id:     ghlClientId,
-    redirect_uri:  redirectUri(req),
-    scope:         SCOPES,
+    client_id:    ghlClientId,
+    redirect_uri: redirectUri(req),
+    scope:        SCOPES,
     state,
   });
 
@@ -272,19 +368,46 @@ async function handlePrepare(req, res) {
 // ── Step 2: callback ──────────────────────────────────────
 async function handleCallback(req, res) {
   const { code, state, error: ghlError, error_description } = req.query;
-  if (ghlError) return redirectBack(res, "error", error_description || String(ghlError));
-  if (!code || !state) return redirectBack(res, "error", "missing code or state");
+  if (ghlError) {
+    console.error("[connect/callback] GHL error:", ghlError, error_description);
+    return redirectBack(res, "error", error_description || String(ghlError));
+  }
+  if (!code || !state) {
+    console.error("[connect/callback] missing code or state. query:", JSON.stringify(req.query));
+    return redirectBack(res, "error", "missing code or state");
+  }
 
   let payload;
   try { payload = verifyState(state); }
-  catch (e) { return redirectBack(res, "error", `state: ${e.message}`); }
+  catch (e) {
+    console.error("[connect/callback] state verify failed:", e.message, "state prefix:", state.slice(0, 40));
+    return redirectBack(res, "error", `state: ${e.message}`);
+  }
+  // Agency connect round-trips through this same registered redirect. When the
+  // state is agency-signed, exchange as a Company + mint a token for every
+  // academy, then render the agency results page (not the per-location flow).
+  if (payload.k === "agency") {
+    try {
+      const r = await agencyConnectFromCode(code, redirectUri(req));
+      res.setHeader("Content-Type", "text/html; charset=utf-8");
+      return res.status(200).send(r.html);
+    } catch (e) {
+      console.error("[connect/callback] agency connect failed:", e.message);
+      return redirectBack(res, "error", `agency: ${e.message}`);
+    }
+  }
+
   if (!payload.client_id) return redirectBack(res, "error", "state missing client_id");
 
   const clientId     = (process.env.GHL_OAUTH_CLIENT_ID || "").trim();
   const clientSecret = (process.env.GHL_OAUTH_CLIENT_SECRET || "").trim();
   if (!clientId || !clientSecret) {
+    console.error("[connect/callback] GHL OAuth env vars missing. clientId set:", !!clientId, "secret set:", !!clientSecret);
     return redirectBack(res, "error", "GHL OAuth env vars missing");
   }
+
+  const callbackRedirectUri = redirectUri(req);
+  console.log("[connect/callback] exchanging code. client_id:", payload.client_id, "redirect_uri:", callbackRedirectUri);
 
   // Exchange the authorization code for an access + refresh token pair.
   let tok;
@@ -297,15 +420,17 @@ async function handleCallback(req, res) {
         client_secret: clientSecret,
         grant_type:    "authorization_code",
         code,
-        redirect_uri:  redirectUri(req),
+        redirect_uri:  callbackRedirectUri,
         user_type:     "Location",
       }),
     });
     tok = await tokenRes.json();
+    console.log("[connect/callback] token exchange status:", tokenRes.status, "has_token:", !!tok?.access_token, "error:", tok?.error || tok?.message || null);
     if (!tokenRes.ok || !tok?.access_token) {
       return redirectBack(res, "error", tok?.error_description || tok?.error || tok?.message || "token exchange failed");
     }
   } catch (e) {
+    console.error("[connect/callback] token exchange threw:", e.message);
     return redirectBack(res, "error", `token exchange: ${e.message}`);
   }
 

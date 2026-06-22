@@ -75,15 +75,35 @@ async function resolveUser(req) {
   }
   const staffRow = Array.isArray(staffRows) && staffRows[0] ? staffRows[0] : null;
 
-  // Always also resolve client (a user can be both)
-  const clientRows = await sb(`clients?auth_user_id=eq.${user.id}&select=id,business_name`);
-  const clientRow = Array.isArray(clientRows) && clientRows[0] ? clientRows[0] : null;
+  // Resolve the EFFECTIVE client for this request. A user reaches a client two
+  // ways: as the academy's original owner (clients.auth_user_id) OR as an invited
+  // teammate via client_users (the multi-user model). The client portal passes
+  // ?client_id for the academy it's currently showing - honor it as long as the
+  // caller actually belongs to that client (owner row or active membership).
+  // Falls back to the owner row, then a sole membership. Single-owner clients keep
+  // working unchanged; teammates can now use the Marketing/Content tabs.
+  const ownerRows = await sb(`clients?auth_user_id=eq.${user.id}&select=id,business_name`);
+  const ownerRow = Array.isArray(ownerRows) && ownerRows[0] ? ownerRows[0] : null;
 
-  // Multi-academy members: a user linked to many academies via client_users
-  // (no single clients.auth_user_id) can still scope to any academy they belong
-  // to by passing ?client_id (honored below).
   const memberships = await sb(`client_users?user_id=eq.${user.id}&status=eq.active&select=client_id`);
   const clientIds = Array.isArray(memberships) ? memberships.map(m => String(m.client_id)) : [];
+
+  const ownerId = ownerRow ? String(ownerRow.id) : null;
+  const belongsTo = (id) => !!id && (id === ownerId || clientIds.includes(id));
+  const requested = req.query && req.query.client_id ? String(req.query.client_id) : null;
+
+  let targetId = null;
+  if (requested && belongsTo(requested)) targetId = requested;   // validated - no IDOR
+  else if (ownerId) targetId = ownerId;
+  else if (clientIds.length === 1) targetId = clientIds[0];
+
+  let clientRow = null;
+  if (targetId && targetId === ownerId) {
+    clientRow = ownerRow;
+  } else if (targetId) {
+    const rows = await sb(`clients?id=eq.${targetId}&select=id,business_name`);
+    clientRow = Array.isArray(rows) && rows[0] ? rows[0] : null;
+  }
 
   return { user, staff: staffRow, client: clientRow, clientIds };
 }
@@ -253,6 +273,39 @@ async function staffSlackIdById(staffId) {
   } catch (_) {
     return null;
   }
+}
+
+// ─── Organic content credits (per-type monthly hard cap, V1) ───
+// First day of the current calendar month, UTC midnight — the credit window start.
+function startOfMonthIso() {
+  const d = new Date();
+  return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), 1)).toISOString();
+}
+// Organic creatives of `type` this calendar month that still hold a credit:
+// anything not cancelled (delivered OR in-flight). Revisions reuse the same
+// ticket, so they never double-count.
+async function organicUsedThisMonth(clientId, type) {
+  const since = encodeURIComponent(startOfMonthIso());
+  const typeFilter = type ? `&type=eq.${type}` : "";   // omit type -> count ALL organic (the pool)
+  const rows = await sb(`content_tickets?client_id=eq.${clientId}&channel=eq.organic${typeFilter}&status=neq.cancelled&submitted_at=gte.${since}&select=id`);
+  return Array.isArray(rows) ? rows.length : 0;
+}
+// { total:{used,allowance,left}, video:{...}, graphic:{...} }. allowance null = no limit.
+// total = combined pool (any type draws from it); video/graphic = optional hard caps.
+async function organicCreditSummary(clientId) {
+  const crows = await sb(`clients?id=eq.${clientId}&select=organic_total_credits_per_month,organic_video_credits_per_month,organic_graphic_credits_per_month`);
+  const c = crows?.[0] || {};
+  const out = {};
+  const totalAllow = c.organic_total_credits_per_month == null ? null : Number(c.organic_total_credits_per_month);
+  const totalUsed = await organicUsedThisMonth(clientId, null);
+  out.total = { used: totalUsed, allowance: totalAllow, left: totalAllow == null ? null : Math.max(0, totalAllow - totalUsed) };
+  for (const type of ["video", "graphic"]) {
+    const col = type === "video" ? "organic_video_credits_per_month" : "organic_graphic_credits_per_month";
+    const allowance = c[col] == null ? null : Number(c[col]);
+    const used = await organicUsedThisMonth(clientId, type);
+    out[type] = { used, allowance, left: allowance == null ? null : Math.max(0, allowance - used) };
+  }
+  return out;
 }
 
 // Fire Cam a DM that a fresh marketing request landed. Safe to call unawaited.
@@ -808,6 +861,13 @@ async function handleContentTickets(req, res) {
       return res.status(200).json({ ticket: enriched });
     }
 
+    // Organic credit summary for the meter ({ video, graphic } used/allowance/left).
+    if (req.query.summary === "credits") {
+      const clientId = asStaff ? (req.query.client_id || null) : ctx.client?.id;
+      if (!clientId) return res.status(400).json({ error: "client_id required" });
+      return res.status(200).json({ credits: await organicCreditSummary(clientId) });
+    }
+
     // Pagination: default 50, cap 200. Same shape as marketing tickets above.
     const limit = Math.min(parseInt(req.query.limit, 10) || 50, 200);
     const offset = Math.max(parseInt(req.query.offset, 10) || 0, 0);
@@ -847,6 +907,54 @@ async function handleContentTickets(req, res) {
     }
 
     const channel = body.channel === "organic" ? "organic" : "ads";
+
+    // Per-type monthly organic credit cap (V1 hard limit, no overage). NULL allowance
+    // = unlimited; 0 = none. Counts at request; cancelling a request frees the credit.
+    if (channel === "organic") {
+      // Organic requests are single-type so each counts toward the right limit —
+      // a graphic+video upload (mixed) would otherwise bypass the caps entirely.
+      if (type === "mixed") {
+        return res.status(400).json({
+          error: "For organic content, please submit videos and graphics as separate requests so each counts toward the right monthly limit.",
+          code: "organic_single_type",
+        });
+      }
+      if (type === "video" || type === "graphic") {
+        const crows = await sb(`clients?id=eq.${ctx.client.id}&select=organic_total_credits_per_month,organic_video_credits_per_month,organic_graphic_credits_per_month`);
+        const c = crows?.[0] || {};
+        // 1. Per-type hard cap (optional; 0 = type not included).
+        const typeCol = type === "video" ? "organic_video_credits_per_month" : "organic_graphic_credits_per_month";
+        const typeAllow = c[typeCol];
+        if (typeAllow != null) {
+          const label = type === "video" ? "Video" : "Graphic";
+          if (Number(typeAllow) === 0) {
+            return res.status(403).json({
+              error: `${label} creatives aren't included in your current plan.`,
+              code: "credit_limit", type, used: 0, allowance: 0,
+            });
+          }
+          const typeUsed = await organicUsedThisMonth(ctx.client.id, type);
+          if (typeUsed >= Number(typeAllow)) {
+            return res.status(403).json({
+              error: `You've used all ${typeAllow} ${type} creative${typeAllow === 1 ? "" : "s"} for this month. Your allowance resets on the 1st.`,
+              code: "credit_limit", type, used: typeUsed, allowance: Number(typeAllow),
+            });
+          }
+        }
+        // 2. Combined monthly pool (videos + graphics share it).
+        const totalAllow = c.organic_total_credits_per_month;
+        if (totalAllow != null) {
+          const totalUsed = await organicUsedThisMonth(ctx.client.id, null);
+          if (totalUsed >= Number(totalAllow)) {
+            return res.status(403).json({
+              error: `You've used all ${totalAllow} creative${totalAllow === 1 ? "" : "s"} for this month. Your allowance resets on the 1st.`,
+              code: "credit_limit", type: "total", used: totalUsed, allowance: Number(totalAllow),
+            });
+          }
+        }
+      }
+    }
+
     // Channel-aware routing: organic -> content team (Eli), ads -> marketing (Cam),
     // unless the admin roster assigns this client's channel to someone specific.
     const assignedTo = await resolveContentAssignee(ctx.client.id, channel);

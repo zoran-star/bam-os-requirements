@@ -85,6 +85,36 @@ async function handler(req, res) {
       return res.status(200).json({ ok: true });
     }
 
+    // ── Global-promotion approval queue (lessons a client trainer taught that the
+    //    AI flagged as general sales-craft). Admin approves → promote to shared brain.
+    if (b.action === "list-promotions") {
+      const rows = await sb(
+        `agent_lessons?promotion_status=eq.pending&active=eq.true&select=id,client_id,lesson,kind,promotion_reason,created_by,created_at,clients(business_name)&order=created_at.desc`
+      );
+      const pending = (Array.isArray(rows) ? rows : []).map(r => ({
+        id: r.id, client_id: r.client_id, lesson: r.lesson, kind: r.kind,
+        reason: r.promotion_reason, created_by: r.created_by, created_at: r.created_at,
+        business_name: r.clients?.business_name || null,
+      }));
+      return res.status(200).json({ pending });
+    }
+    if (b.action === "approve-promotion") {
+      if (!b.id) return res.status(400).json({ error: "id required" });
+      await sb(`agent_lessons?id=eq.${encodeURIComponent(b.id)}`, {
+        method: "PATCH", headers: { Prefer: "return=minimal" },
+        body: JSON.stringify({ scope: "general", promotion_status: "approved", reviewed_by: ctx.user.email || "staff", reviewed_at: new Date().toISOString() }),
+      });
+      return res.status(200).json({ ok: true });
+    }
+    if (b.action === "reject-promotion") {
+      if (!b.id) return res.status(400).json({ error: "id required" });
+      await sb(`agent_lessons?id=eq.${encodeURIComponent(b.id)}`, {
+        method: "PATCH", headers: { Prefer: "return=minimal" },
+        body: JSON.stringify({ promotion_status: "rejected", reviewed_by: ctx.user.email || "staff", reviewed_at: new Date().toISOString() }),
+      });
+      return res.status(200).json({ ok: true });
+    }
+
     return res.status(400).json({ error: "unknown action" });
   } catch (e) {
     console.error("[agent-learnings]", e);

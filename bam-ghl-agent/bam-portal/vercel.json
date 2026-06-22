@@ -1,6 +1,10 @@
 {
   "crons": [
     {
+      "path": "/api/agency-connect?action=mint",
+      "schedule": "0 4 * * *"
+    },
+    {
       "path": "/api/clients?action=cron-resend-invites",
       "schedule": "0 * * * *"
     },
@@ -35,6 +39,18 @@
     {
       "path": "/api/agent-approvals?action=cron-digest",
       "schedule": "0 */2 * * *"
+    },
+    {
+      "path": "/api/agent-approvals?action=detect",
+      "schedule": "*/15 * * * *"
+    },
+    {
+      "path": "/api/agent-followups?action=detect",
+      "schedule": "*/30 * * * *"
+    },
+    {
+      "path": "/api/agent-followups?action=work",
+      "schedule": "* * * * *"
     }
   ],
   "headers": [

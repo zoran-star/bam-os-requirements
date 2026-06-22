@@ -8,10 +8,38 @@ images live here in Supabase, fed by the Business Blueprint).
 
 ## Schema (migration `20260615120000_client_assets_library.sql`)
 - Table **`client_assets`**: `client_id` → clients; `label`, `category`
-  (logo|wordmark|hero|photo|crest|icon|og|favicon|other), `alt`, `storage_path`,
-  `mime_type`, `size_bytes`, `width`, `height`; **tags** (all nullable):
+  (logo|wordmark|hero|photo|**video**|crest|icon|og|favicon|other), `alt`, `storage_path`,
+  `mime_type`, `size_bytes`, `width`, `height`; **`folder`** (text, nullable — single-level
+  group from a folder upload, migration `20260621140000`); **tags** (all nullable):
   `offer_id` → offers, `staff_id` → client_users, `location_id` → locations;
   `sort_order`, `uploaded_by`, timestamps.
+
+## Video + folder uploads (added 2026-06-21)
+A client reported the Assets picker wouldn't let them select videos — the file input was
+`accept="image/*"`. Now the main Assets tab accepts **images + videos** and supports
+**folder uploads**:
+- Inputs: `accept="image/*,video/*"`; a second `<input webkitdirectory>` "Upload a folder".
+- `_uploadAssets(inputEl, fromFolder)` derives `folder` from `webkitRelativePath`'s top dir,
+  and `category` from mime (`video/*` → 'video', else 'photo').
+- `_renderAssets` groups by `folder` (ungrouped first, then a collapsible `<details>` per folder).
+- `_assetCard` renders a `<video controls>` tile for video mime, else `<img>`.
+- The `client-assets` bucket has **no MIME/size restriction** (confirmed 2026-06-21), so videos
+  upload fine; only the project-wide Storage upload limit applies (raise it if big videos 400).
+- The secondary per-offer/staff/location "asset bank" picker (`_assetBankUpload`) stays
+  **image-only** on purpose (headshots/logos).
+
+**Large-file link fallback.** Project-wide Storage upload limit was 50MB, **raised to 500MB
+2026-06-21**. Migration `20260621140000` also adds **`client_assets.link_url`** + drops the
+`storage_path` NOT NULL constraint:
+- `_uploadAssets` pre-checks `file.size` against **`MAX_DIRECT_UPLOAD_BYTES`** (= 500MB, the
+  SAME constant the content/creative flow uses — single source of truth; the message follows it).
+  Over-limit files are skipped + a one-shot `_assetUploadNudge` points them to the link field.
+- ⚠️ If the Supabase project Storage limit changes again, update `MAX_DIRECT_UPLOAD_BYTES` in
+  `client-portal.html` to match (both Assets + the content flow read it).
+- Toolbar has a "Paste a share link" input + `_addAssetLink()` (reuses `_isValidAssetLink`),
+  with a note to set sharing to **"Anyone with the link can view."** Link assets have
+  `link_url` set, `storage_path` null; `_assetCard` renders an "Open link" tile; `_assetRemove`
+  skips the bucket delete. To raise the cap instead: Supabase Settings → Storage upload limit.
 - Bucket **`client-assets`** (public). Path: `<client_id>/<stamp>-<name>`.
 - RLS mirrors the `offers` table/bucket: table policies = `is_staff() or
   client_id in (select my_client_ids())`; storage policies = public read +

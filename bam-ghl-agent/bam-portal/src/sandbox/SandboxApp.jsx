@@ -3,6 +3,7 @@ import { Navigate } from "react-router-dom";
 import { supabase } from "../lib/supabase";
 import { authFetch } from "../lib/authFetch";
 import { T } from "../tokens/tokens";
+import FollowupsPanel from "../views/FollowupsPanel";
 
 // 🎮 Agent Sandbox — a private chat to TRAIN the BAM GTA sales agent.
 // You play the parent/lead; the agent proposes replies (never sent anywhere).
@@ -21,7 +22,7 @@ async function api(action, payload = {}) {
   return data;
 }
 
-export default function SandboxApp() {
+export default function SandboxApp({ embedded = false } = {}) {
   const [session, setSession] = useState(undefined);
   const [view, setView] = useState("chat");          // 'chat' | 'brain'
   const [messages, setMessages] = useState([]);     // {role:'parent'|'agent', text, meta?}
@@ -118,8 +119,8 @@ export default function SandboxApp() {
 
   return (
     <>
-      <style>{`html,body{margin:0;padding:0;background:${tk.bg};} *{box-sizing:border-box;}`}</style>
-      <div style={{ background: tk.bg, minHeight: "100vh", color: tk.text, fontFamily: F, display: "flex", flexDirection: "column" }}>
+      {!embedded && <style>{`html,body{margin:0;padding:0;background:${tk.bg};} *{box-sizing:border-box;}`}</style>}
+      <div style={{ background: tk.bg, minHeight: embedded ? 0 : "100vh", height: embedded ? "calc(100vh - 150px)" : undefined, border: embedded ? `1px solid ${tk.border}` : undefined, borderRadius: embedded ? 12 : undefined, overflow: embedded ? "hidden" : undefined, color: tk.text, fontFamily: F, display: "flex", flexDirection: "column" }}>
         {/* Header */}
         <div style={{ padding: "16px 24px", borderBottom: `1px solid ${tk.border}`, display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap" }}>
           <div style={{ fontSize: 18, fontWeight: 700 }}>🎮 Agent Sandbox</div>
@@ -131,6 +132,7 @@ export default function SandboxApp() {
             <Tab on={view === "chat"} onClick={() => setView("chat")}>💬 Chat</Tab>
             <Tab on={view === "brain"} onClick={() => setView("brain")}>📝 Brain</Tab>
             <Tab on={view === "tests"} onClick={() => setView("tests")}>🧪 Break it</Tab>
+            <Tab on={view === "followups"} onClick={() => setView("followups")}>⏰ Follow-ups</Tab>
           </div>
           <div style={{ flex: 1 }} />
           {view === "chat" && <BtnGhost onClick={() => setMessages([])}>↺ Reset chat</BtnGhost>}
@@ -138,6 +140,11 @@ export default function SandboxApp() {
 
         {view === "brain" ? <BrainEditor /> :
          view === "tests" ? <TestLab onTry={(msg) => { setMessages([]); setError(""); setInput(msg); setView("chat"); }} /> :
+         view === "followups" ? (
+          <div style={{ flex: 1, overflowY: "auto", padding: "20px 24px", minHeight: 0 }}>
+            <FollowupsPanel tokens={{ text: tk.text, textSub: tk.textSub, textMute: tk.textMute, surface: tk.surface, border: tk.border, accent: tk.amber, red: tk.red }} />
+          </div>
+         ) :
         <div style={{ flex: 1, display: "flex", minHeight: 0 }}>
           {/* Chat */}
           <div style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0 }}>

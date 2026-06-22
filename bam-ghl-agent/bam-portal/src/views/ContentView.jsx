@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from "react";
+import JSZip from "jszip";
 import { supabase } from "../lib/supabase";
 
 const STORAGE_BUCKET = "ticket-files";
@@ -56,6 +57,22 @@ function CtkPriorityChip({ priority, tk }) {
       padding: "2px 7px", borderRadius: 999, whiteSpace: "nowrap",
       color: meta.color, border: `1px solid ${meta.color}66`, background: `${meta.color}1A`,
     }}>{priority === "high" ? "⚡ " : ""}{meta.label}</span>
+  );
+}
+
+// Which pipeline a content ticket belongs to: ads (digital marketing) vs organic.
+const CT_CHANNEL_META = {
+  organic: { label: "Organic", color: "#7BC47F" },
+  ads:     { label: "Ads",     color: "#7E9CD9" },
+};
+function CtkChannelBadge({ channel }) {
+  const meta = CT_CHANNEL_META[channel] || CT_CHANNEL_META.ads;
+  return (
+    <span style={{
+      fontSize: 10, fontWeight: 700, letterSpacing: "0.04em",
+      padding: "2px 7px", borderRadius: 999, whiteSpace: "nowrap",
+      color: meta.color, border: `1px solid ${meta.color}66`, background: `${meta.color}1A`,
+    }}>{meta.label}</span>
   );
 }
 
@@ -654,6 +671,7 @@ function ContentTicketsTab({ tk, session, me }) {
   const [banner, setBanner] = useState(null);
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState("all"); // all | graphic | video | mixed
+  const [channelFilter, setChannelFilter] = useState("all"); // all | ads | organic
   const [sortOrder, setSortOrder] = useState("newest"); // newest | oldest
 
   const showBanner = (text) => { setBanner(text); setTimeout(() => setBanner(null), 3500); };
@@ -697,10 +715,16 @@ function ContentTicketsTab({ tk, session, me }) {
     ? tickets.filter(t => t.assigned_to === me.id)
     : tickets;
 
+  // Channel filter (All / Ads / Organic) - applied before the sub-tab split so the
+  // tab counts reflect it too.
+  const channelScoped = channelFilter === "all"
+    ? scoped
+    : scoped.filter(t => (t.channel || "ads") === channelFilter);
+
   // Filter rows by sub-tab; sort oldest first per spec
-  const active     = scoped.filter(t => t.status === "active");
-  const clientDep  = scoped.filter(t => t.status === "client-dependent");
-  const completed  = scoped.filter(t => t.status === "completed" || t.status === "cancelled");
+  const active     = channelScoped.filter(t => t.status === "active");
+  const clientDep  = channelScoped.filter(t => t.status === "client-dependent");
+  const completed  = channelScoped.filter(t => t.status === "completed" || t.status === "cancelled");
   const tabRows =
     subTab === "active"           ? active
     : subTab === "client-dependent" ? clientDep
@@ -776,6 +800,20 @@ function ContentTicketsTab({ tk, session, me }) {
             outline: "none", fontFamily: "inherit",
           }}
         />
+        <div style={{ display: "flex", gap: 4, background: tk.surfaceEl, border: `1px solid ${tk.border}`, borderRadius: 8, padding: 3 }}>
+          {[["all", "All"], ["ads", "Ads"], ["organic", "Organic"]].map(([k, label]) => {
+            const on = channelFilter === k;
+            const color = k === "organic" ? "#7BC47F" : k === "ads" ? "#7E9CD9" : tk.accent;
+            return (
+              <button key={k} type="button" onClick={() => setChannelFilter(k)} style={{
+                padding: "6px 12px", fontSize: 12.5, fontWeight: 600, borderRadius: 6, border: "none",
+                cursor: "pointer", fontFamily: "inherit",
+                background: on ? `${color}22` : "transparent",
+                color: on ? (k === "all" ? tk.text : color) : tk.textMute,
+              }}>{label}</button>
+            );
+          })}
+        </div>
         <select
           value={typeFilter}
           onChange={e => setTypeFilter(e.target.value)}
@@ -870,6 +908,7 @@ function ContentTicketsTab({ tk, session, me }) {
                   background: "rgba(255,255,255,0.04)", border: `1px solid ${tk.border}`,
                 }}>{ctkCode(t.id)}</span>
                 <span>{academyName}</span>
+                <CtkChannelBadge channel={t.channel} />
                 <CtkPriorityChip priority={pri} tk={tk} />
               </div>
               <div style={{ color: tk.textSub, fontSize: 13, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{previewNotes}</div>
@@ -1055,6 +1094,7 @@ function ContentTicketDetail({ tk, session, ticket, onBack, onRefetch, patchTick
           </div>
           {/* Priority + SLA deadline, content owner (channel-routed), and SM contact */}
           <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 8, alignItems: "center" }}>
+            <CtkChannelBadge channel={ticket.channel} />
             <CtkPriorityChip priority={ctkPriorityOf(ticket)} tk={tk} />
             {(() => {
               const inProg = ticket.status === "active" || ticket.status === "client-dependent";
@@ -1353,6 +1393,11 @@ function ClientInputs({ ticket, tk }) {
       {ctx.source === "add-creative" && row("Source", <span>Add-creative on <b>{ctx.campaign_title || "(unspecified)"}</b></span>)}
       {ctx.source === "marketing-revision" && row("Source", <span style={{ color: tk.red || "#ED7969" }}>↩ Revision requested by marketing</span>)}
 
+      {ctx.format && row("Format", <b style={{ color: tk.accent }}>{ctx.format}</b>)}
+      {ctx.captions !== undefined && row("On-screen captions", ctx.captions
+        ? <span style={{ color: tk.green || "#7BC47F", fontWeight: 600 }}>Yes</span>
+        : <span style={{ color: tk.textMute }}>No</span>)}
+
       {subCreatives ? (
         <div style={{ padding: "10px 0" }}>
           <div style={{ fontSize: 10, color: tk.textMute, letterSpacing: "0.2em", textTransform: "uppercase", marginBottom: 10 }}>
@@ -1451,36 +1496,139 @@ function BrandCard({ brand, tk }) {
 
 // Render a set of files grouped by their `folder` (the client's categories).
 // Falls back to a flat grid when nothing is foldered.
-function FilesByFolder({ files, tk, compact, minmax = 180 }) {
+// Fetch the given files and download them as a single .zip (one click instead of
+// N). Files that fail to fetch are skipped. Names are de-duped inside the zip.
+async function ctkDownloadZip(files, baseName) {
+  const zip = new JSZip();
+  const used = new Set();
+  await Promise.all(files.map(async (f) => {
+    try {
+      const res = await fetch(f.url);
+      if (!res.ok) return;
+      const blob = await res.blob();
+      const safe = (f.name || "file").replace(/[\\/]/g, "_");
+      let name = safe, n = 1;
+      while (used.has(name)) {
+        const dot = safe.lastIndexOf(".");
+        name = dot > 0 ? `${safe.slice(0, dot)}-${n}${safe.slice(dot)}` : `${safe}-${n}`;
+        n++;
+      }
+      used.add(name);
+      zip.file(name, blob);
+    } catch (_) { /* skip files that can't be fetched */ }
+  }));
+  const out = await zip.generateAsync({ type: "blob" });
+  const url = URL.createObjectURL(out);
+  const a = document.createElement("a");
+  a.href = url; a.download = `${baseName || "files"}.zip`;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 5000);
+}
+
+function FilesByFolder({ files, tk, compact, minmax = 180, zipName = "creatives" }) {
   const list = Array.isArray(files) ? files : [];
+  const keyOf = (f) => f.url || f.name || "";
+  const isDl = (f) => !!f.url && (f.mime || "") !== "text/uri-list";   // skip drive-link entries
+  const dlList = list.filter(isDl);
+  const [selected, setSelected] = useState(() => new Set());
+  const [zipping, setZipping] = useState(false);
   if (!list.length) return null;
+
+  const toggle = (f) => setSelected(s => {
+    const n = new Set(s); const k = keyOf(f); n.has(k) ? n.delete(k) : n.add(k); return n;
+  });
+  const selCount = dlList.filter(f => selected.has(keyOf(f))).length;
+  const allSelected = dlList.length > 0 && selCount === dlList.length;
+  const selectAll = () => setSelected(allSelected ? new Set() : new Set(dlList.map(keyOf)));
+  const download = async (which) => {
+    const picked = which === "all" ? dlList : dlList.filter(f => selected.has(keyOf(f)));
+    if (!picked.length) return;
+    setZipping(true);
+    try { await ctkDownloadZip(picked, zipName); }
+    catch (e) { alert("Download failed: " + (e.message || e)); }
+    finally { setZipping(false); }
+  };
+
+  const btn = (accent) => ({
+    padding: "6px 12px", fontSize: 12, fontWeight: 600, borderRadius: 6, fontFamily: "inherit",
+    cursor: zipping ? "wait" : "pointer",
+    border: `1px solid ${accent ? tk.accent : tk.border}`,
+    background: accent ? tk.accent : "transparent",
+    color: accent ? "#0A0A0B" : tk.textSub,
+  });
+
   const groups = {};
   list.forEach(f => { const k = (f.folder || "").trim(); (groups[k] = groups[k] || []).push(f); });
   const names = Object.keys(groups).sort((a, b) => (a === "" ? 1 : b === "" ? -1 : a.localeCompare(b)));
+
+  const tile = (f, i) => (
+    <div key={i} style={{ position: "relative" }}>
+      {isDl(f) && (
+        <label onClick={e => e.stopPropagation()} style={{
+          position: "absolute", top: 7, left: 7, zIndex: 3,
+          width: 22, height: 22, display: "flex", alignItems: "center", justifyContent: "center",
+          background: "rgba(0,0,0,0.55)", borderRadius: 5, cursor: "pointer",
+        }}>
+          <input type="checkbox" checked={selected.has(keyOf(f))} onChange={() => toggle(f)}
+            style={{ width: 15, height: 15, accentColor: tk.accent, cursor: "pointer", margin: 0 }} />
+        </label>
+      )}
+      <FilePreviewTile file={f} tk={tk} compact={compact} />
+    </div>
+  );
   const grid = (items) => (
     <div style={{ display: "grid", gridTemplateColumns: `repeat(auto-fill, minmax(${minmax}px, 1fr))`, gap: 10 }}>
-      {items.map((f, i) => <FilePreviewTile key={i} file={f} tk={tk} compact={compact} />)}
+      {items.map(tile)}
     </div>
   );
-  if (names.length === 1 && names[0] === "") return grid(groups[""]);
-  return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-      {names.map(name => (
-        <details key={name || "_uncat"} style={{
-          border: `1px solid ${tk.borderSoft || tk.border}`, borderRadius: 8, padding: "8px 10px",
-        }}>
-          <summary style={{
-            cursor: "pointer", userSelect: "none",
-            fontFamily: "monospace", fontSize: 11, letterSpacing: "0.1em", textTransform: "uppercase",
-            color: name ? tk.accent : tk.textMute,
+
+  const toolbar = dlList.length > 1 ? (
+    <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", marginBottom: 12 }}>
+      <button type="button" onClick={selectAll} style={btn(false)}>{allSelected ? "Clear" : "Select all"}</button>
+      {selCount > 0 && (
+        <button type="button" onClick={() => download("selected")} disabled={zipping} style={btn(true)}>
+          {zipping ? "Zipping…" : `↓ Download ${selCount} selected`}
+        </button>
+      )}
+      <button type="button" onClick={() => download("all")} disabled={zipping} style={btn(false)}>
+        {zipping ? "Zipping…" : `↓ Download all (${dlList.length})`}
+      </button>
+    </div>
+  ) : null;
+
+  const body = (names.length === 1 && names[0] === "")
+    ? grid(groups[""])
+    : (
+      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+        {names.map(name => (
+          <details key={name || "_uncat"} style={{
+            border: `1px solid ${tk.borderSoft || tk.border}`, borderRadius: 8, padding: "8px 10px",
           }}>
-            {name ? `📁 ${name}` : "Uncategorized"} <span style={{ color: tk.textMute }}>({groups[name].length})</span>
-          </summary>
-          <div style={{ marginTop: 10 }}>{grid(groups[name])}</div>
-        </details>
-      ))}
-    </div>
-  );
+            <summary style={{
+              cursor: "pointer", userSelect: "none",
+              fontFamily: "monospace", fontSize: 11, letterSpacing: "0.1em", textTransform: "uppercase",
+              color: name ? tk.accent : tk.textMute,
+            }}>
+              {name ? `📁 ${name}` : "Uncategorized"} <span style={{ color: tk.textMute }}>({groups[name].length})</span>
+            </summary>
+            <div style={{ marginTop: 10 }}>{grid(groups[name])}</div>
+          </details>
+        ))}
+      </div>
+    );
+
+  return <div>{toolbar}{body}</div>;
+}
+
+// Resize a Supabase public-storage image to a small thumbnail on the fly (Supabase
+// image transforms). Camera-original JPEGs are multi-MB each; the grid only needs
+// ~400px. Non-Supabase URLs (e.g. Google Drive links) pass through untouched, and
+// the <img> onError falls back to the full file if transforms aren't available.
+function ctkThumbUrl(url, width = 400) {
+  if (typeof url !== "string" || !url.includes("/storage/v1/object/public/")) return url;
+  const base = url.replace("/storage/v1/object/public/", "/storage/v1/render/image/public/");
+  const sep = base.includes("?") ? "&" : "?";
+  return `${base}${sep}width=${width}&quality=70&resize=contain`;
 }
 
 function FilePreviewTile({ file, tk, compact }) {
@@ -1499,10 +1647,21 @@ function FilePreviewTile({ file, tk, compact }) {
       onMouseLeave={e => e.currentTarget.style.borderColor = tk.border}
     >
       {isImage ? (
-        <img src={file.url} alt={file.name} style={{
-          width: "100%", aspectRatio: "1 / 1", objectFit: "cover",
-          borderRadius: 4, background: tk.surfaceHov,
-        }} />
+        <img
+          src={ctkThumbUrl(file.url)}
+          alt={file.name}
+          loading="lazy"
+          decoding="async"
+          onError={e => {
+            // Transform endpoint unavailable (or errored) → fall back to the original once.
+            const img = e.currentTarget;
+            if (!img.dataset.fellBack && file.url) { img.dataset.fellBack = "1"; img.src = file.url; }
+          }}
+          style={{
+            width: "100%", aspectRatio: "1 / 1", objectFit: "cover",
+            borderRadius: 4, background: tk.surfaceHov,
+          }}
+        />
       ) : isVideo ? (
         <div style={{ position: "relative", width: "100%", aspectRatio: "1 / 1" }}>
           {/* Poster frame: seek a fraction in so browsers paint a real frame, not black */}
@@ -1618,7 +1777,7 @@ function ContentRoutingTab({ tk, session }) {
 
   const selStyle = {
     width: "100%", padding: "7px 9px", fontSize: 13, borderRadius: 6,
-    background: tk.bg, color: tk.text, border: `1px solid ${tk.border}`, cursor: "pointer",
+    background: tk.surfaceEl, color: tk.text, border: `1px solid ${tk.border}`, cursor: "pointer",
   };
 
   const renderSelect = (client, channel) => {
@@ -1658,7 +1817,7 @@ function ContentRoutingTab({ tk, session }) {
         placeholder="Search clients…"
         style={{
           width: 260, maxWidth: "100%", padding: "8px 11px", fontSize: 13, marginBottom: 14,
-          background: tk.bg, color: tk.text, border: `1px solid ${tk.border}`, borderRadius: 6,
+          background: tk.surfaceEl, color: tk.text, border: `1px solid ${tk.border}`, borderRadius: 6,
         }}
       />
 

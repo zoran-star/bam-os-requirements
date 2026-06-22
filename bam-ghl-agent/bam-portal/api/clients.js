@@ -2276,6 +2276,23 @@ async function handler(req, res) {
           patch.organic_content = v;
         }
 
+        // Monthly organic credits: total = combined pool; video/graphic = optional
+        // hard caps. null/"" = unlimited; otherwise a non-negative integer (0 = none).
+        for (const f of ["organic_total_credits_per_month", "organic_video_credits_per_month", "organic_graphic_credits_per_month"]) {
+          if (wasSet(f)) {
+            const raw = body[f];
+            if (raw === null || raw === "") {
+              patch[f] = null;
+            } else {
+              const n = Number(raw);
+              if (!Number.isInteger(n) || n < 0) {
+                return res.status(400).json({ error: `${f} must be a non-negative integer or null` });
+              }
+              patch[f] = n;
+            }
+          }
+        }
+
         // Meta Ads onboarding-tracker flag. Staff flips this on/off — the
         // body sends a boolean, we store NOW() / NULL on the timestamp
         // column. The client-portal tracker reads it via get_onboarding_progress().
