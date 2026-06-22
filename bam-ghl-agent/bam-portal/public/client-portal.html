@@ -19307,7 +19307,12 @@ function _assetFolderOf(file) {
 // on a single multi-minute request. Smaller files keep the proven standard upload.
 // Any resumable failure falls back to standard, so this can't regress what works today.
 const _SUPABASE_STORAGE_URL = 'https://jnojmfmpnsfmtqmwhopz.supabase.co';
-const _RESUMABLE_THRESHOLD = 50 * 1024 * 1024;   // 50MB
+// Resumable (TUS) uploads are DISABLED (2026-06-22): shipped untested in #631 and a
+// large organic upload hung indefinitely (tus has no hard timeout on a stalled
+// request). Infinity => the resumable branch in _storageUpload never runs, so all
+// uploads use the proven standard path. Large files fall back to the link option.
+// Re-enable (lower this back to ~50MB) only after a verified real >50MB upload test.
+const _RESUMABLE_THRESHOLD = Infinity;
 
 function _resumableUpload(bucket, path, file) {
   return new Promise((resolve, reject) => {
