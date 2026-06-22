@@ -1,0 +1,427 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>FAQ — DETAIL Miami</title>
+  <meta name="description" content="Frequently asked questions about DETAIL Miami basketball academy programs, free trial, facility, and pricing." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Anton&family=Inter+Tight:wght@300;400;500;600&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #080808; --surface: #101010; --surface2: #181818;
+      --border: rgba(255,255,255,0.08);
+      --brand: #e2dd9f; --brand-dim: rgba(226,221,159,0.10);
+      --fg: #ffffff; --fg-sub: rgba(255,255,255,0.62); --fg-muted: rgba(255,255,255,0.35);
+      --font-d: 'Anton', sans-serif; --font-b: 'Inter Tight', sans-serif;
+      --max: 1200px; --r: 10px;
+    }
+    html { scroll-behavior: smooth; }
+    body { background: var(--bg); color: var(--fg); font-family: var(--font-b); line-height: 1.6; overflow-x: hidden; }
+
+    /* NAV */
+    nav {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+      background: rgba(8,8,8,0.92); backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border);
+      padding: 0 24px; height: 64px;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .nav-logo { font-family: var(--font-d); font-size: 20px; letter-spacing: .06em; text-transform: uppercase; color: var(--fg); text-decoration: none; }
+    .nav-logo span { color: var(--brand); }
+    .nav-links { display: flex; align-items: center; gap: 32px; list-style: none; }
+    .nav-links a { font-size: 13px; font-weight: 500; letter-spacing: .04em; text-transform: uppercase; color: var(--fg-sub); text-decoration: none; transition: color .2s; }
+    .nav-links a:hover, .nav-links a.active { color: var(--fg); }
+    .nav-cta { background: var(--brand); color: #1a1a00; font-family: var(--font-d); font-size: 14px; letter-spacing: .06em; text-transform: uppercase; padding: 10px 22px; border-radius: 6px; text-decoration: none; transition: opacity .2s; }
+    .nav-cta:hover { opacity: .88; }
+    @media (max-width: 768px) { .nav-links { display: none; } }
+
+    /* HERO */
+    .page-hero { padding: 148px 24px 72px; text-align: center; }
+    .page-hero .eyebrow { font-size: 11px; font-weight: 600; letter-spacing: .2em; text-transform: uppercase; color: var(--brand); margin-bottom: 16px; }
+    .page-hero h1 { font-family: var(--font-d); font-size: clamp(42px, 8vw, 80px); text-transform: uppercase; line-height: .95; margin-bottom: 20px; }
+    .page-hero p { font-size: 16px; color: var(--fg-sub); font-weight: 400; max-width: 480px; margin: 0 auto; }
+
+    /* FAQ SECTION */
+    .faq-section { padding: 20px 24px 100px; }
+    .faq-inner { max-width: 780px; margin: 0 auto; }
+
+    .faq-group { margin-bottom: 56px; }
+    .faq-group-title {
+      font-size: 11px; font-weight: 600; letter-spacing: .18em; text-transform: uppercase;
+      color: var(--brand); margin-bottom: 16px; padding-bottom: 12px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .faq-item { border-bottom: 1px solid var(--border); }
+    .faq-question {
+      width: 100%; background: none; border: none; color: var(--fg);
+      font-family: var(--font-b); font-size: 16px; font-weight: 500;
+      text-align: left; cursor: pointer;
+      padding: 20px 0; display: flex; justify-content: space-between; align-items: center;
+      gap: 16px; transition: color .2s;
+    }
+    .faq-question:hover { color: var(--brand); }
+    .faq-question.open { color: var(--brand); }
+    .faq-indicator {
+      flex-shrink: 0; width: 20px; height: 20px;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .faq-indicator svg {
+      transition: transform .3s ease;
+      display: block;
+    }
+    .faq-question.open .faq-indicator svg { transform: rotate(180deg); }
+
+    .faq-body {
+      overflow: hidden;
+      max-height: 0;
+      transition: max-height .35s ease, padding .35s ease;
+    }
+    .faq-body.open { max-height: 600px; }
+    .faq-body-inner {
+      padding-bottom: 20px;
+      font-size: 15px; color: var(--fg-sub); font-weight: 400; line-height: 1.7;
+    }
+
+    /* CTA STRIP */
+    .cta-strip {
+      background: var(--brand); padding: 72px 24px; text-align: center;
+    }
+    .cta-strip .cta-eyebrow {
+      font-size: 11px; font-weight: 600; letter-spacing: .2em; text-transform: uppercase;
+      color: rgba(26,26,0,0.55); margin-bottom: 12px;
+    }
+    .cta-strip h2 {
+      font-family: var(--font-d); font-size: clamp(28px, 5vw, 48px);
+      text-transform: uppercase; color: #1a1a00; line-height: 1;
+      margin-bottom: 12px;
+    }
+    .cta-strip p { font-size: 16px; color: rgba(26,26,0,0.65); font-weight: 400; margin-bottom: 32px; }
+    .cta-strip a {
+      display: inline-block; background: #1a1a00; color: var(--brand);
+      font-family: var(--font-d); font-size: 16px; letter-spacing: .06em; text-transform: uppercase;
+      padding: 14px 36px; border-radius: 6px; text-decoration: none;
+      transition: opacity .2s;
+    }
+    .cta-strip a:hover { opacity: .82; }
+
+    /* FOOTER */
+    footer { background: var(--bg); border-top: 1px solid var(--border); padding: 48px 24px 40px; }
+    .footer-inner { max-width: var(--max); margin: 0 auto; display: flex; flex-direction: column; gap: 28px; }
+    .footer-top { display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 24px; }
+    .footer-brand .footer-logo { font-family: var(--font-d); font-size: 18px; letter-spacing: .06em; text-transform: uppercase; color: var(--fg); }
+    .footer-brand .footer-logo span { color: var(--brand); }
+    .footer-brand p { font-size: 13px; color: var(--fg-muted); margin-top: 6px; max-width: 220px; }
+    .footer-contact { display: flex; flex-direction: column; gap: 6px; text-align: right; }
+    .footer-contact a { font-size: 13px; color: var(--fg-muted); text-decoration: none; transition: color .2s; }
+    .footer-contact a:hover { color: var(--fg); }
+    .footer-social { display: flex; gap: 12px; margin-top: 8px; justify-content: flex-end; }
+    .footer-social a { color: var(--fg-muted); transition: color .2s; }
+    .footer-social a:hover { color: var(--brand); }
+    .footer-bottom { border-top: 1px solid var(--border); padding-top: 20px; font-size: 12px; color: var(--fg-muted); display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px; }
+    @media (max-width: 600px) { .footer-contact { text-align: left; } .footer-social { justify-content: flex-start; } }
+  </style>
+</head>
+<body>
+
+<nav>
+  <a class="nav-logo" href="/miami-website/">DETAIL <span>Miami</span></a>
+  <ul class="nav-links">
+    <li><a href="about.html">About</a></li>
+    <li><a href="programs.html">Programs</a></li>
+    <li><a href="rentals.html">Rentals</a></li>
+    <li><a href="faq.html" class="active">FAQ</a></li>
+    <li><a href="contact.html">Contact</a></li>
+  </ul>
+  <a class="nav-cta" href="/miami-funnel/">Book Free Trial</a>
+</nav>
+
+<div class="page-hero">
+  <div class="eyebrow">FAQ</div>
+  <h1>Your Questions, Answered</h1>
+  <p>Everything you need to know before getting started.</p>
+</div>
+
+<div class="faq-section">
+  <div class="faq-inner">
+
+    <!-- Group: Getting Started -->
+    <div class="faq-group">
+      <div class="faq-group-title">Getting Started</div>
+
+      <div class="faq-item">
+        <button class="faq-question" onclick="toggle(this)" aria-expanded="false">
+          What is the free trial?
+          <span class="faq-indicator">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M3 6L8 11L13 6" stroke="#e2dd9f" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </span>
+        </button>
+        <div class="faq-body">
+          <div class="faq-body-inner">The free trial is a one-hour session where your athlete joins a real training group. It's a chance for them to experience our coaching style, meet the team, and see if the program is the right fit — completely free, no commitment required.</div>
+        </div>
+      </div>
+
+      <div class="faq-item">
+        <button class="faq-question" onclick="toggle(this)" aria-expanded="false">
+          How do I book a free trial?
+          <span class="faq-indicator">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M3 6L8 11L13 6" stroke="#e2dd9f" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </span>
+        </button>
+        <div class="faq-body">
+          <div class="faq-body-inner">Click "Book Free Trial" anywhere on our website, fill out a short form with your athlete's info and preferred time, and we'll confirm your spot.</div>
+        </div>
+      </div>
+
+      <div class="faq-item">
+        <button class="faq-question" onclick="toggle(this)" aria-expanded="false">
+          What age groups do you accept?
+          <span class="faq-indicator">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M3 6L8 11L13 6" stroke="#e2dd9f" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </span>
+        </button>
+        <div class="faq-body">
+          <div class="faq-body-inner">We have programs for all ages. Our Elementary Academy is for K&ndash;5th grade. DETAIL Academy serves 6th&ndash;12th grade players. ADAPT Club is open to select athletes. Contact us if you're unsure which program fits.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Group: Training & Programs -->
+    <div class="faq-group">
+      <div class="faq-group-title">Training &amp; Programs</div>
+
+      <div class="faq-item">
+        <button class="faq-question" onclick="toggle(this)" aria-expanded="false">
+          How often do sessions run?
+          <span class="faq-indicator">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M3 6L8 11L13 6" stroke="#e2dd9f" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </span>
+        </button>
+        <div class="faq-body">
+          <div class="faq-body-inner">Most programs run weekly. ADAPT Club has multiple training days per week including practices, skills sessions, and games.</div>
+        </div>
+      </div>
+
+      <div class="faq-item">
+        <button class="faq-question" onclick="toggle(this)" aria-expanded="false">
+          What should my athlete bring?
+          <span class="faq-indicator">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M3 6L8 11L13 6" stroke="#e2dd9f" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </span>
+        </button>
+        <div class="faq-body">
+          <div class="faq-body-inner">Basketball shoes, water bottle, and a positive attitude. We provide everything else.</div>
+        </div>
+      </div>
+
+      <div class="faq-item">
+        <button class="faq-question" onclick="toggle(this)" aria-expanded="false">
+          Are sessions indoors?
+          <span class="faq-indicator">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M3 6L8 11L13 6" stroke="#e2dd9f" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </span>
+        </button>
+        <div class="faq-body">
+          <div class="faq-body-inner">Yes. All training takes place at our indoor facility at 16414 NW 54th Ave, Miami Lakes, FL 33014.</div>
+        </div>
+      </div>
+
+      <div class="faq-item">
+        <button class="faq-question" onclick="toggle(this)" aria-expanded="false">
+          What is ADAPT Club?
+          <span class="faq-indicator">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M3 6L8 11L13 6" stroke="#e2dd9f" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </span>
+        </button>
+        <div class="faq-body">
+          <div class="faq-body-inner">ADAPT is our competitive club program inspired by European-style basketball development. It includes practices, skill training, organized games, and film sessions — a full athlete development experience.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Group: Facility & Location -->
+    <div class="faq-group">
+      <div class="faq-group-title">Facility &amp; Location</div>
+
+      <div class="faq-item">
+        <button class="faq-question" onclick="toggle(this)" aria-expanded="false">
+          Where are you located?
+          <span class="faq-indicator">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M3 6L8 11L13 6" stroke="#e2dd9f" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </span>
+        </button>
+        <div class="faq-body">
+          <div class="faq-body-inner">16414 NW 54th Ave, Miami Lakes, FL 33014. We're in the Miami Lakes area, easily accessible from Hialeah, Opa-locka, and northwest Miami.</div>
+        </div>
+      </div>
+
+      <div class="faq-item">
+        <button class="faq-question" onclick="toggle(this)" aria-expanded="false">
+          Do you offer court rentals?
+          <span class="faq-indicator">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M3 6L8 11L13 6" stroke="#e2dd9f" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </span>
+        </button>
+        <div class="faq-body">
+          <div class="faq-body-inner">Yes! We offer private court and weight room rentals for trainers, teams, and events — early morning to late night. See our <a href="rentals.html" style="color:var(--brand);">Rentals page</a> for details.</div>
+        </div>
+      </div>
+
+      <div class="faq-item">
+        <button class="faq-question" onclick="toggle(this)" aria-expanded="false">
+          Are birthday parties available?
+          <span class="faq-indicator">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M3 6L8 11L13 6" stroke="#e2dd9f" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </span>
+        </button>
+        <div class="faq-body">
+          <div class="faq-body-inner">Absolutely. We host basketball-themed birthday parties. Contact us to check availability and packages.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Group: Pricing & Enrollment -->
+    <div class="faq-group">
+      <div class="faq-group-title">Pricing &amp; Enrollment</div>
+
+      <div class="faq-item">
+        <button class="faq-question" onclick="toggle(this)" aria-expanded="false">
+          How much do programs cost?
+          <span class="faq-indicator">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M3 6L8 11L13 6" stroke="#e2dd9f" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </span>
+        </button>
+        <div class="faq-body">
+          <div class="faq-body-inner">Pricing varies by program and session frequency. After the free trial, we'll walk you through the options that fit your athlete's goals and your budget.</div>
+        </div>
+      </div>
+
+      <div class="faq-item">
+        <button class="faq-question" onclick="toggle(this)" aria-expanded="false">
+          Is there a contract or long-term commitment?
+          <span class="faq-indicator">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M3 6L8 11L13 6" stroke="#e2dd9f" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </span>
+        </button>
+        <div class="faq-body">
+          <div class="faq-body-inner">We work with families to find the right plan. Reach out after your free trial to discuss enrollment options.</div>
+        </div>
+      </div>
+
+      <div class="faq-item">
+        <button class="faq-question" onclick="toggle(this)" aria-expanded="false">
+          Can I enroll mid-season?
+          <span class="faq-indicator">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M3 6L8 11L13 6" stroke="#e2dd9f" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </span>
+        </button>
+        <div class="faq-body">
+          <div class="faq-body-inner">Yes, we accept new members on a rolling basis depending on program availability.</div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- CTA STRIP -->
+<div class="cta-strip">
+  <div class="cta-eyebrow">Need More Info?</div>
+  <h2>Still Have Questions?</h2>
+  <p>Reach out &mdash; we're happy to help.</p>
+  <a href="contact.html">Contact Us</a>
+</div>
+
+<footer>
+  <div class="footer-inner">
+    <div class="footer-top">
+      <div class="footer-brand">
+        <div class="footer-logo">DETAIL <span>Miami</span></div>
+        <p>European-style basketball development in Miami Lakes.</p>
+      </div>
+      <div class="footer-contact">
+        <a href="https://maps.google.com/?q=16414+NW+54th+Ave+Miami+Lakes+FL+33014" target="_blank" rel="noopener">16414 NW 54th Ave, Miami Lakes FL 33014</a>
+        <a href="tel:7862443336">(786) 244-3336</a>
+        <a href="mailto:info@byanymeansbball.com">info@byanymeansbball.com</a>
+        <div class="footer-social">
+          <!-- Instagram -->
+          <a href="https://instagram.com/detail.mia" target="_blank" rel="noopener" aria-label="Instagram">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="2" y="2" width="20" height="20" rx="5" ry="5"/>
+              <circle cx="12" cy="12" r="4"/>
+              <circle cx="17.5" cy="6.5" r=".8" fill="currentColor" stroke="none"/>
+            </svg>
+          </a>
+          <!-- Facebook -->
+          <a href="#" aria-label="Facebook">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z"/>
+            </svg>
+          </a>
+          <!-- TikTok -->
+          <a href="#" aria-label="TikTok">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M9 12a4 4 0 1 0 4 4V4a5 5 0 0 0 5 5"/>
+            </svg>
+          </a>
+        </div>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <span>&copy; 2026 By Any Means Basketball. All rights reserved.</span>
+      <span>Miami Lakes, FL</span>
+    </div>
+  </div>
+</footer>
+
+<script>
+  function toggle(btn) {
+    var body = btn.nextElementSibling;
+    var isOpen = btn.classList.contains('open');
+
+    // Close all open items
+    document.querySelectorAll('.faq-question.open').forEach(function(q) {
+      q.classList.remove('open');
+      q.setAttribute('aria-expanded', 'false');
+      q.nextElementSibling.classList.remove('open');
+    });
+
+    // Open clicked if it was closed
+    if (!isOpen) {
+      btn.classList.add('open');
+      btn.setAttribute('aria-expanded', 'true');
+      body.classList.add('open');
+    }
+  }
+</script>
+</body>
+</html>

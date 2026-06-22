@@ -1,0 +1,765 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Programs — DETAIL Miami Basketball Academy</title>
+  <meta name="description" content="Explore all DETAIL Miami training programs: Elementary Academy, DETAIL Academy, ADAPT Club, Camps &amp; Clinics, Virtual Academy, and Gym Rentals. Find your path." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Anton&family=Inter+Tight:ital,wght@0,300;0,400;0,500;0,600;1,300&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:        #080808;
+      --surface:   #101010;
+      --surface2:  #181818;
+      --border:    rgba(255,255,255,0.08);
+      --brand:     #e2dd9f;
+      --brand-dim: rgba(226,221,159,0.10);
+      --fg:        #ffffff;
+      --fg-sub:    rgba(255,255,255,0.62);
+      --fg-muted:  rgba(255,255,255,0.35);
+      --font-d:    'Anton', sans-serif;
+      --font-b:    'Inter Tight', sans-serif;
+      --max:       1200px;
+    }
+
+    html { scroll-behavior: smooth; }
+    body {
+      background: var(--bg);
+      color: var(--fg);
+      font-family: var(--font-b);
+      line-height: 1.6;
+      overflow-x: hidden;
+    }
+
+    /* ─── FOCUS ─── */
+    :focus-visible { outline: 2px solid var(--brand); outline-offset: 3px; }
+
+    /* ─── NAV ─── */
+    nav {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 200;
+      background: rgba(8,8,8,0.0);
+      backdrop-filter: blur(0px);
+      border-bottom: 1px solid transparent;
+      padding: 0 32px; height: 68px;
+      display: flex; align-items: center; justify-content: space-between;
+      transition: background .35s, backdrop-filter .35s, border-color .35s;
+    }
+    nav.scrolled {
+      background: rgba(8,8,8,0.92);
+      backdrop-filter: blur(16px);
+      border-bottom-color: var(--border);
+    }
+    .nav-logo {
+      font-family: var(--font-d);
+      font-size: 19px; letter-spacing: .08em;
+      text-transform: uppercase; color: var(--fg); text-decoration: none;
+      flex-shrink: 0;
+    }
+    .nav-logo span { color: var(--brand); }
+    .nav-links {
+      display: flex; align-items: center; gap: 28px; list-style: none;
+    }
+    .nav-links a {
+      font-size: 12px; font-weight: 500; letter-spacing: .08em;
+      text-transform: uppercase; color: var(--fg-sub); text-decoration: none;
+      transition: color .2s;
+    }
+    .nav-links a:hover { color: var(--fg); }
+    .nav-links a.active { color: var(--fg); }
+    .nav-cta {
+      background: var(--brand); color: #141400;
+      font-family: var(--font-b); font-size: 12px; font-weight: 600;
+      letter-spacing: .08em; text-transform: uppercase;
+      padding: 10px 22px; border-radius: 4px; text-decoration: none;
+      transition: opacity .2s; white-space: nowrap; flex-shrink: 0;
+    }
+    .nav-cta:hover { opacity: .85; }
+    .nav-hamburger {
+      display: none; flex-direction: column; gap: 5px; cursor: pointer;
+      background: none; border: none; padding: 6px; z-index: 201;
+    }
+    .nav-hamburger span {
+      display: block; width: 22px; height: 1.5px; background: var(--fg);
+      border-radius: 2px; transition: transform .3s, opacity .3s;
+    }
+    .nav-hamburger.active span:nth-child(1) { transform: translateY(6.5px) rotate(45deg); }
+    .nav-hamburger.active span:nth-child(2) { opacity: 0; }
+    .nav-hamburger.active span:nth-child(3) { transform: translateY(-6.5px) rotate(-45deg); }
+
+    .nav-drawer {
+      display: none;
+      position: fixed; top: 0; left: 0; right: 0; bottom: 0; z-index: 199;
+      background: var(--bg); padding: 100px 32px 48px;
+      flex-direction: column; gap: 4px;
+    }
+    .nav-drawer.open { display: flex; }
+    .nav-drawer a {
+      font-family: var(--font-d); font-size: 32px; letter-spacing: .04em;
+      text-transform: uppercase; color: var(--fg-sub); text-decoration: none;
+      padding: 12px 0; border-bottom: 1px solid var(--border);
+      transition: color .2s;
+    }
+    .nav-drawer a:hover { color: var(--brand); }
+    .nav-drawer a.active { color: var(--fg); }
+    .nav-drawer .drawer-cta {
+      margin-top: 24px; background: var(--brand); color: #141400;
+      text-align: center; border-radius: 6px; border: none;
+      font-size: 16px;
+    }
+    @media (max-width: 860px) {
+      .nav-links, .nav-cta { display: none; }
+      .nav-hamburger { display: flex; }
+    }
+
+    /* ─── PAGE HERO ─── */
+    .page-hero {
+      padding: 160px 32px 80px;
+      position: relative; overflow: hidden;
+      background: var(--bg);
+    }
+    .hero-bg-grad {
+      position: absolute; inset: 0; pointer-events: none;
+      background:
+        radial-gradient(ellipse 60% 50% at 60% 40%, rgba(226,221,159,0.03) 0%, transparent 65%),
+        linear-gradient(175deg, #0d0d0d 0%, #060606 100%);
+    }
+    /* Court-circle decoration */
+    .hero-court-deco {
+      position: absolute; inset: 0; pointer-events: none; overflow: hidden;
+    }
+    .hero-court-deco::before {
+      content: '';
+      position: absolute; bottom: -80px; right: 8%;
+      width: 440px; height: 440px;
+      border: 1.5px solid rgba(226,221,159,0.05);
+      border-radius: 50%;
+    }
+    .hero-court-deco::after {
+      content: '';
+      position: absolute; bottom: -80px; right: calc(8% + 110px);
+      width: 2px; height: 260px;
+      background: rgba(226,221,159,0.05);
+    }
+    .hero-lane-deco {
+      position: absolute; bottom: -80px; right: calc(8% + 10px);
+      width: 200px; height: 340px;
+      border: 1.5px solid rgba(226,221,159,0.04);
+      border-bottom: none;
+      pointer-events: none;
+    }
+    .page-hero-inner {
+      position: relative; z-index: 2;
+      max-width: var(--max); margin: 0 auto;
+    }
+    .hero-eyebrow {
+      display: inline-flex; align-items: center; gap: 10px;
+      font-size: 11px; font-weight: 500; letter-spacing: .22em;
+      text-transform: uppercase; color: var(--brand); margin-bottom: 32px;
+      opacity: 0; transform: translateY(12px);
+      animation: fadeUp .6s .1s ease-out forwards;
+    }
+    .hero-eyebrow::before {
+      content: ''; display: block; width: 28px; height: 1px; background: var(--brand);
+    }
+    .page-hero h1 {
+      font-family: var(--font-d);
+      font-size: clamp(52px, 9vw, 108px);
+      line-height: 0.92; letter-spacing: .01em; text-transform: uppercase;
+      margin-bottom: 28px; max-width: 700px;
+      opacity: 0; transform: translateY(28px);
+      animation: fadeUp .75s .22s ease-out forwards;
+    }
+    .page-hero-sub {
+      font-size: clamp(15px, 1.6vw, 18px); color: var(--fg-sub); font-weight: 300;
+      max-width: 500px; line-height: 1.65;
+      opacity: 0; transform: translateY(20px);
+      animation: fadeUp .7s .4s ease-out forwards;
+    }
+
+    @keyframes fadeUp {
+      to { opacity: 1; transform: none; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .hero-eyebrow, .page-hero h1, .page-hero-sub {
+        opacity: 1; transform: none; animation: none;
+      }
+    }
+
+    /* ─── SCROLL REVEAL ─── */
+    .reveal {
+      opacity: 0; transform: translateY(24px);
+      transition: opacity .65s ease-out, transform .65s ease-out;
+    }
+    .reveal.visible { opacity: 1; transform: none; }
+    .reveal-delay-1 { transition-delay: .1s; }
+    .reveal-delay-2 { transition-delay: .2s; }
+    .reveal-delay-3 { transition-delay: .3s; }
+    .reveal-delay-4 { transition-delay: .4s; }
+    .reveal-delay-5 { transition-delay: .5s; }
+    @media (prefers-reduced-motion: reduce) {
+      .reveal { opacity: 1; transform: none; transition: none; }
+    }
+
+    /* ─── SHARED ─── */
+    .eyebrow {
+      display: inline-flex; align-items: center; gap: 10px;
+      font-size: 10px; font-weight: 600; letter-spacing: .22em;
+      text-transform: uppercase; color: var(--brand); margin-bottom: 18px;
+    }
+    .eyebrow::before { content: ''; display: block; width: 24px; height: 1px; background: var(--brand); }
+
+    .btn-primary {
+      display: inline-block; background: var(--brand); color: #141400;
+      font-family: var(--font-b); font-size: 13px; font-weight: 600;
+      letter-spacing: .08em; text-transform: uppercase;
+      padding: 16px 36px; border-radius: 4px; text-decoration: none;
+      transition: opacity .2s; white-space: nowrap;
+    }
+    .btn-primary:hover { opacity: .85; }
+    .btn-ghost {
+      display: inline-block;
+      border: 1px solid rgba(255,255,255,0.18);
+      color: var(--fg); font-family: var(--font-b); font-size: 13px; font-weight: 500;
+      letter-spacing: .08em; text-transform: uppercase;
+      padding: 16px 36px; border-radius: 4px; text-decoration: none;
+      transition: border-color .2s, color .2s; white-space: nowrap;
+    }
+    .btn-ghost:hover { border-color: var(--brand); color: var(--brand); }
+
+    /* ─── PROGRAMS SECTION ─── */
+    .programs-section {
+      background: var(--surface);
+      padding: 96px 32px 120px;
+    }
+    .programs-section-inner {
+      max-width: var(--max); margin: 0 auto;
+    }
+    .programs-section-header {
+      margin-bottom: 64px;
+    }
+    .programs-section-header h2 {
+      font-family: var(--font-d);
+      font-size: clamp(32px, 5vw, 60px);
+      line-height: .93; letter-spacing: .01em; text-transform: uppercase;
+      margin-bottom: 0;
+    }
+    .programs-section-header h2 .accent { color: var(--brand); }
+
+    /* ─── PROGRAM CARDS (large horizontal stacked) ─── */
+    .program-list {
+      display: flex; flex-direction: column; gap: 2px;
+    }
+
+    .prog-card {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      position: relative; overflow: hidden;
+      display: grid;
+      grid-template-columns: 56px 1fr auto;
+      gap: 0;
+      transition: border-color .25s, transform .3s, background .25s;
+      text-decoration: none; color: var(--fg);
+    }
+    .prog-card:hover {
+      border-color: rgba(226,221,159,0.25);
+      transform: translateY(-2px);
+      background: #0c0c0c;
+    }
+
+    /* Left edge vertical bar */
+    .prog-card-bar {
+      width: 3px;
+      background: var(--brand);
+      position: absolute; left: 0; top: 0; bottom: 0;
+      transform: scaleY(0); transform-origin: top;
+      transition: transform .35s ease-out;
+      border-radius: 0 2px 2px 0;
+    }
+    .prog-card:hover .prog-card-bar { transform: scaleY(1); }
+
+    /* Left badge column */
+    .prog-card-badge {
+      display: flex; flex-direction: column; align-items: center;
+      justify-content: flex-start;
+      padding: 36px 0 36px 24px;
+      gap: 8px;
+    }
+    .prog-card-num {
+      font-family: var(--font-d); font-size: 12px; letter-spacing: .14em;
+      color: var(--brand); line-height: 1; white-space: nowrap;
+    }
+
+    /* Center body */
+    .prog-card-body {
+      padding: 36px 40px 36px 28px;
+    }
+    .prog-card-name {
+      font-family: var(--font-d);
+      font-size: clamp(24px, 2.6vw, 32px);
+      text-transform: uppercase; letter-spacing: .02em; line-height: 1.05;
+      margin-bottom: 10px; color: var(--fg);
+    }
+    .prog-card-tag {
+      font-size: 10px; font-weight: 600; letter-spacing: .18em;
+      text-transform: uppercase; color: var(--fg-muted);
+      margin-bottom: 16px; display: block;
+    }
+    .prog-card-desc {
+      font-size: 15px; color: var(--fg-sub); line-height: 1.7;
+      font-weight: 300; margin-bottom: 14px; max-width: 560px;
+    }
+    .prog-card-quote {
+      font-size: 13px; color: var(--fg-muted); line-height: 1.65;
+      font-style: italic; font-weight: 300;
+      padding-left: 14px;
+      border-left: 2px solid rgba(226,221,159,0.2);
+      max-width: 520px;
+    }
+
+    /* Right CTA column */
+    .prog-card-cta {
+      display: flex; align-items: center; justify-content: flex-end;
+      padding: 36px 36px 36px 24px;
+      flex-shrink: 0;
+    }
+
+    /* Ghost letter watermark */
+    .prog-card-ghost {
+      position: absolute; right: 160px; top: 50%;
+      transform: translateY(-50%);
+      font-family: var(--font-d); font-size: 140px; line-height: 1;
+      color: var(--brand); opacity: 0.04;
+      letter-spacing: -.02em; pointer-events: none;
+      user-select: none;
+    }
+
+    /* Mobile: stack vertically */
+    @media (max-width: 860px) {
+      .prog-card {
+        grid-template-columns: 48px 1fr;
+        grid-template-rows: auto auto;
+      }
+      .prog-card-badge {
+        padding: 28px 0 0 18px;
+      }
+      .prog-card-body {
+        padding: 28px 24px 16px 16px;
+      }
+      .prog-card-cta {
+        grid-column: 1 / -1;
+        padding: 0 24px 28px 24px;
+        justify-content: flex-start;
+      }
+      .prog-card-ghost {
+        right: 0; font-size: 100px; opacity: 0.03;
+      }
+    }
+    @media (max-width: 560px) {
+      .programs-section { padding: 64px 20px 80px; }
+      .page-hero { padding: 140px 20px 60px; }
+      nav { padding: 0 20px; }
+      .prog-card-body { padding: 24px 20px 12px 12px; }
+      .prog-card-badge { padding: 24px 0 0 14px; }
+      .prog-card-cta { padding: 0 20px 24px 20px; }
+    }
+
+    /* ─── CTA STRIP ─── */
+    .cta-strip {
+      background: var(--brand); padding: 80px 32px;
+      text-align: center; position: relative; overflow: hidden;
+    }
+    .cta-strip::before {
+      content: 'BAM'; position: absolute;
+      font-family: var(--font-d); font-size: 280px; letter-spacing: -.04em;
+      color: rgba(0,0,0,0.06); top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      pointer-events: none; line-height: 1; white-space: nowrap;
+    }
+    .cta-strip-inner { position: relative; z-index: 1; max-width: 640px; margin: 0 auto; }
+    .cta-strip h2 {
+      font-family: var(--font-d); font-size: clamp(42px, 7vw, 80px);
+      line-height: .93; letter-spacing: .02em; text-transform: uppercase;
+      color: #0d0d00; margin-bottom: 16px;
+    }
+    .cta-strip p {
+      font-size: 16px; color: rgba(20,18,0,0.65); font-weight: 300;
+      line-height: 1.6; margin-bottom: 36px;
+    }
+    .btn-dark {
+      display: inline-block; background: #0d0d00; color: var(--brand);
+      font-family: var(--font-b); font-size: 13px; font-weight: 600;
+      letter-spacing: .08em; text-transform: uppercase;
+      padding: 16px 40px; border-radius: 4px; text-decoration: none;
+      transition: opacity .2s;
+    }
+    .btn-dark:hover { opacity: .82; }
+
+    /* ─── FOOTER ─── */
+    footer {
+      background: var(--bg); border-top: 1px solid var(--border);
+      padding: 72px 32px 40px;
+    }
+    .footer-inner {
+      max-width: var(--max); margin: 0 auto;
+      display: grid; grid-template-columns: 2.2fr 1fr 1fr 1fr; gap: 48px;
+    }
+    .footer-logo {
+      font-family: var(--font-d); font-size: 21px; letter-spacing: .06em;
+      text-transform: uppercase; color: var(--fg); margin-bottom: 12px;
+      text-decoration: none; display: block;
+    }
+    .footer-logo span { color: var(--brand); }
+    .footer-tagline { font-size: 13px; color: var(--fg-muted); line-height: 1.65; max-width: 260px; font-weight: 300; }
+    .footer-address { font-size: 13px; color: var(--fg-muted); line-height: 1.7; margin-top: 16px; font-weight: 300; }
+    .footer-address a { color: var(--fg-sub); text-decoration: none; transition: color .2s; }
+    .footer-address a:hover { color: var(--brand); }
+    .footer-socials {
+      display: flex; gap: 14px; margin-top: 24px;
+    }
+    .social-icon {
+      width: 36px; height: 36px; border-radius: 8px;
+      border: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: center;
+      color: var(--fg-muted); text-decoration: none;
+      transition: border-color .2s, color .2s;
+    }
+    .social-icon:hover { border-color: var(--brand); color: var(--brand); }
+    .social-icon svg { width: 16px; height: 16px; fill: currentColor; }
+    .footer-col h5 {
+      font-size: 10px; font-weight: 600; letter-spacing: .18em; text-transform: uppercase;
+      color: var(--fg-muted); margin-bottom: 18px;
+    }
+    .footer-col ul { list-style: none; display: flex; flex-direction: column; gap: 10px; }
+    .footer-col ul a { font-size: 13px; color: var(--fg-sub); text-decoration: none; transition: color .2s; font-weight: 300; }
+    .footer-col ul a:hover { color: var(--brand); }
+    .footer-bottom {
+      max-width: var(--max); margin: 48px auto 0; padding-top: 24px;
+      border-top: 1px solid var(--border);
+      display: flex; justify-content: space-between; align-items: center;
+      font-size: 11px; color: var(--fg-muted); gap: 16px; flex-wrap: wrap;
+      font-weight: 300;
+    }
+    @media (max-width: 900px) {
+      .footer-inner { grid-template-columns: 1fr 1fr; }
+      .footer-brand { grid-column: 1 / -1; }
+    }
+    @media (max-width: 500px) {
+      .footer-inner { grid-template-columns: 1fr; }
+      .footer-bottom { flex-direction: column; text-align: center; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ─── NAV ─── -->
+<nav id="mainNav">
+  <a class="nav-logo" href="/miami-website/">DETAIL <span>Miami</span></a>
+  <ul class="nav-links">
+    <li><a href="/miami-website/">About</a></li>
+    <li><a href="/miami-website/programs.html" class="active" aria-current="page">Programs</a></li>
+    <li><a href="/miami-website/rentals.html">Rentals</a></li>
+    <li><a href="/miami-website/faq.html">FAQ</a></li>
+    <li><a href="/miami-website/contact.html">Contact</a></li>
+  </ul>
+  <a class="nav-cta" href="/miami-funnel/">Book Free Trial</a>
+  <button class="nav-hamburger" id="menuBtn" aria-label="Open menu" aria-expanded="false">
+    <span></span><span></span><span></span>
+  </button>
+</nav>
+
+<div class="nav-drawer" id="navDrawer" aria-hidden="true">
+  <a href="/miami-website/" class="drawer-link">About</a>
+  <a href="/miami-website/programs.html" class="drawer-link active" aria-current="page">Programs</a>
+  <a href="/miami-website/rentals.html" class="drawer-link">Rentals</a>
+  <a href="/miami-website/faq.html" class="drawer-link">FAQ</a>
+  <a href="/miami-website/contact.html" class="drawer-link">Contact</a>
+  <a href="/miami-funnel/" class="drawer-link drawer-cta">Book Free Trial</a>
+</div>
+
+<!-- ─── PAGE HERO ─── -->
+<header class="page-hero" aria-label="Programs hero">
+  <div class="hero-bg-grad" aria-hidden="true"></div>
+  <div class="hero-court-deco" aria-hidden="true">
+    <div class="hero-lane-deco" aria-hidden="true"></div>
+  </div>
+  <div class="page-hero-inner">
+    <div class="hero-eyebrow" aria-hidden="false">Our Programs</div>
+    <h1>Find Your<br>Path</h1>
+    <p class="page-hero-sub">Every player has a different starting point. Choose the program that fits your game.</p>
+  </div>
+</header>
+
+<!-- ─── PROGRAMS ─── -->
+<section class="programs-section" id="programs">
+  <div class="programs-section-inner">
+    <div class="programs-section-header reveal">
+      <div class="eyebrow">6 Programs</div>
+      <h2>Every Level.<br><span class="accent">Every Goal.</span></h2>
+    </div>
+
+    <div class="program-list">
+
+      <!-- 01 Elementary Academy -->
+      <div class="prog-card reveal">
+        <div class="prog-card-bar" aria-hidden="true"></div>
+        <div class="prog-card-badge">
+          <span class="prog-card-num">01</span>
+        </div>
+        <div class="prog-card-body">
+          <h2 class="prog-card-name">Elementary Academy</h2>
+          <span class="prog-card-tag">K&ndash;5th Grade</span>
+          <p class="prog-card-desc">Weekly sessions covering shooting mechanics, live play, and basketball IQ.</p>
+          <p class="prog-card-quote">Built for the foundational years. We develop the love of the game alongside the skills.</p>
+        </div>
+        <div class="prog-card-cta">
+          <a href="/miami-funnel/" class="btn-primary">Book Free Trial</a>
+        </div>
+        <span class="prog-card-ghost" aria-hidden="true">E</span>
+      </div>
+
+      <!-- 02 DETAIL Academy -->
+      <div class="prog-card reveal reveal-delay-1">
+        <div class="prog-card-bar" aria-hidden="true"></div>
+        <div class="prog-card-badge">
+          <span class="prog-card-num">02</span>
+        </div>
+        <div class="prog-card-body">
+          <h2 class="prog-card-name">DETAIL Academy</h2>
+          <span class="prog-card-tag">6th&ndash;12th Grade &middot; Flagship Program</span>
+          <p class="prog-card-desc">Weekly shooting, live play, and personalized development plans. Small groups. Individual attention.</p>
+          <p class="prog-card-quote">Our flagship program for serious players. Small groups. Individual attention. Real development.</p>
+        </div>
+        <div class="prog-card-cta">
+          <a href="/miami-funnel/" class="btn-primary">Book Free Trial</a>
+        </div>
+        <span class="prog-card-ghost" aria-hidden="true">D</span>
+      </div>
+
+      <!-- 03 ADAPT Club -->
+      <div class="prog-card reveal reveal-delay-2">
+        <div class="prog-card-bar" aria-hidden="true"></div>
+        <div class="prog-card-badge">
+          <span class="prog-card-num">03</span>
+        </div>
+        <div class="prog-card-body">
+          <h2 class="prog-card-name">ADAPT Club</h2>
+          <span class="prog-card-tag">Club Program &middot; All Ages</span>
+          <p class="prog-card-desc">Comprehensive club program: practices, skills training, games, and film sessions.</p>
+          <p class="prog-card-quote">Drawing inspiration from European-style hoops development. ADAPT Academy is a one-stop-shop for developing young players as athletes and as humans.</p>
+        </div>
+        <div class="prog-card-cta">
+          <a href="/miami-funnel/" class="btn-primary">Join ADAPT</a>
+        </div>
+        <span class="prog-card-ghost" aria-hidden="true">A</span>
+      </div>
+
+      <!-- 04 Camps & Clinics -->
+      <div class="prog-card reveal reveal-delay-3">
+        <div class="prog-card-bar" aria-hidden="true"></div>
+        <div class="prog-card-badge">
+          <span class="prog-card-num">04</span>
+        </div>
+        <div class="prog-card-body">
+          <h2 class="prog-card-name">Camps &amp; Clinics</h2>
+          <span class="prog-card-tag">Seasonal &middot; All Levels</span>
+          <p class="prog-card-desc">Intensive skill development and specialized training for all levels.</p>
+          <p class="prog-card-quote">Immersive short-format training events. Perfect for players who want to level up fast.</p>
+        </div>
+        <div class="prog-card-cta">
+          <a href="/miami-funnel/" class="btn-ghost">View Schedule</a>
+        </div>
+        <span class="prog-card-ghost" aria-hidden="true">C</span>
+      </div>
+
+      <!-- 05 Virtual Academy -->
+      <div class="prog-card reveal reveal-delay-4">
+        <div class="prog-card-bar" aria-hidden="true"></div>
+        <div class="prog-card-badge">
+          <span class="prog-card-num">05</span>
+        </div>
+        <div class="prog-card-body">
+          <h2 class="prog-card-name">Virtual Academy</h2>
+          <span class="prog-card-tag">Online &middot; 150+ Countries</span>
+          <p class="prog-card-desc">Comprehensive online training platform trusted by athletes across the globe.</p>
+          <p class="prog-card-quote">World-class coaching, anywhere in the world. Join athletes from 42+ countries training online with BAM.</p>
+        </div>
+        <div class="prog-card-cta">
+          <a href="/miami-funnel/" class="btn-primary">Get Access</a>
+        </div>
+        <span class="prog-card-ghost" aria-hidden="true">V</span>
+      </div>
+
+      <!-- 06 Rent the Gym -->
+      <div class="prog-card reveal reveal-delay-5">
+        <div class="prog-card-bar" aria-hidden="true"></div>
+        <div class="prog-card-badge">
+          <span class="prog-card-num">06</span>
+        </div>
+        <div class="prog-card-body">
+          <h2 class="prog-card-name">Rent the Gym</h2>
+          <span class="prog-card-tag">Facility Rental</span>
+          <p class="prog-card-desc">Court and weight room available early morning to late night. For trainers, teams, and groups.</p>
+          <p class="prog-card-quote">A professional environment to compete, practice, or host events. Book by the hour.</p>
+        </div>
+        <div class="prog-card-cta">
+          <a href="/miami-website/rentals.html" class="btn-ghost">View Availability</a>
+        </div>
+        <span class="prog-card-ghost" aria-hidden="true">R</span>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- ─── CTA STRIP ─── -->
+<div class="cta-strip" id="trial">
+  <div class="cta-strip-inner reveal">
+    <h2>Ready to<br>Start?</h2>
+    <p>No payment required. Your athlete trains, meets the coaches, sees the facility.</p>
+    <a href="/miami-funnel/" class="btn-dark">Book Free Trial &rarr;</a>
+  </div>
+</div>
+
+<!-- ─── FOOTER ─── -->
+<footer>
+  <div class="footer-inner">
+    <div class="footer-brand">
+      <a class="footer-logo" href="/miami-website/">DETAIL <span>Miami</span></a>
+      <p class="footer-tagline">It's more than just basketball training&thinsp;&mdash;&thinsp;it's human development. Part of the By Any Means global network.</p>
+      <address class="footer-address" style="font-style:normal;">
+        16414 NW 54th Ave<br>Miami Lakes, FL 33014<br>
+        <a href="tel:7862443336">(786) 244-3336</a><br>
+        <a href="mailto:info@byanymeansbball.com">info@byanymeansbball.com</a>
+      </address>
+      <div class="footer-socials">
+        <!-- Instagram -->
+        <a class="social-icon" href="https://instagram.com/detail.mia" target="_blank" rel="noopener" aria-label="Instagram">
+          <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+            <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"/>
+          </svg>
+        </a>
+        <!-- Facebook -->
+        <a class="social-icon" href="https://facebook.com/byanymeansbball" target="_blank" rel="noopener" aria-label="Facebook">
+          <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+            <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
+          </svg>
+        </a>
+        <!-- YouTube -->
+        <a class="social-icon" href="https://youtube.com/@byanymeansbball" target="_blank" rel="noopener" aria-label="YouTube">
+          <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+            <path d="M23.495 6.205a3.007 3.007 0 0 0-2.088-2.088c-1.87-.501-9.396-.501-9.396-.501s-7.507-.01-9.396.501A3.007 3.007 0 0 0 .527 6.205a31.247 31.247 0 0 0-.522 5.805 31.247 31.247 0 0 0 .522 5.783 3.007 3.007 0 0 0 2.088 2.088c1.868.502 9.396.502 9.396.502s7.506 0 9.396-.502a3.007 3.007 0 0 0 2.088-2.088 31.247 31.247 0 0 0 .5-5.783 31.247 31.247 0 0 0-.5-5.805zM9.609 15.601V8.408l6.264 3.602z"/>
+          </svg>
+        </a>
+      </div>
+    </div>
+
+    <div class="footer-col">
+      <h5>Programs</h5>
+      <ul>
+        <li><a href="/miami-funnel/">Elementary Academy</a></li>
+        <li><a href="/miami-funnel/">DETAIL Academy</a></li>
+        <li><a href="/miami-funnel/">ADAPT Club</a></li>
+        <li><a href="/miami-funnel/">Camps &amp; Clinics</a></li>
+        <li><a href="/miami-funnel/">Virtual Academy</a></li>
+      </ul>
+    </div>
+
+    <div class="footer-col">
+      <h5>Facility</h5>
+      <ul>
+        <li><a href="/miami-website/rentals.html">Rent the Gym</a></li>
+        <li><a href="/miami-website/">About Us</a></li>
+        <li><a href="/miami-website/faq.html">FAQ</a></li>
+        <li><a href="/miami-website/contact.html">Contact</a></li>
+      </ul>
+    </div>
+
+    <div class="footer-col">
+      <h5>Connect</h5>
+      <ul>
+        <li><a href="https://instagram.com/detail.mia" target="_blank" rel="noopener">Instagram</a></li>
+        <li><a href="https://facebook.com/byanymeansbball" target="_blank" rel="noopener">Facebook</a></li>
+        <li><a href="https://youtube.com/@byanymeansbball" target="_blank" rel="noopener">YouTube</a></li>
+        <li><a href="/miami-funnel/">Free Trial</a></li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="footer-bottom">
+    <span>&copy; 2026 DETAIL Miami &mdash; By Any Means Basketball</span>
+    <span>16414 NW 54th Ave, Miami Lakes, FL 33014 &middot; (786) 244-3336</span>
+  </div>
+</footer>
+
+<script>
+(function () {
+  'use strict';
+
+  /* ─── NAV: scroll behavior + hamburger ─── */
+  var nav     = document.getElementById('mainNav');
+  var menuBtn = document.getElementById('menuBtn');
+  var drawer  = document.getElementById('navDrawer');
+
+  window.addEventListener('scroll', function () {
+    if (window.scrollY > 40) {
+      nav.classList.add('scrolled');
+    } else {
+      nav.classList.remove('scrolled');
+    }
+  }, { passive: true });
+
+  menuBtn.addEventListener('click', function () {
+    var open = drawer.classList.toggle('open');
+    menuBtn.classList.toggle('active', open);
+    menuBtn.setAttribute('aria-expanded', String(open));
+    drawer.setAttribute('aria-hidden', String(!open));
+  });
+
+  drawer.querySelectorAll('a').forEach(function (a) {
+    a.addEventListener('click', function () {
+      drawer.classList.remove('open');
+      menuBtn.classList.remove('active');
+      menuBtn.setAttribute('aria-expanded', 'false');
+      drawer.setAttribute('aria-hidden', 'true');
+    });
+  });
+
+  document.addEventListener('click', function (e) {
+    if (!drawer.contains(e.target) && !menuBtn.contains(e.target)) {
+      drawer.classList.remove('open');
+      menuBtn.classList.remove('active');
+      menuBtn.setAttribute('aria-expanded', 'false');
+      drawer.setAttribute('aria-hidden', 'true');
+    }
+  });
+
+  /* ─── SCROLL REVEAL ─── */
+  var prefersReduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  if (!prefersReduced) {
+    var revealEls = document.querySelectorAll('.reveal');
+    var revealObserver = new IntersectionObserver(function (entries) {
+      entries.forEach(function (entry) {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('visible');
+          revealObserver.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1 });
+
+    revealEls.forEach(function (el) { revealObserver.observe(el); });
+  } else {
+    document.querySelectorAll('.reveal').forEach(function (el) {
+      el.classList.add('visible');
+    });
+  }
+
+}());
+</script>
+</body>
+</html>
