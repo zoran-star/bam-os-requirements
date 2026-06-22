@@ -83,4 +83,10 @@ session's **infra/tools + resume playbook**; the per-academy board lives in
   [[project_bam_portal_deploy]].
 - Per-academy connect: in the GHL chooselocation picker, **pick the matching academy** —
   wrong pick maps the wrong GHL account (the name cross-check on the pipelines page catches it).
+- **GHL connect `["response_type must be a valid enum value"]` error (FIXED 2026-06-22, PR #671):**
+  a refactor of `api/messaging/connect.js` dropped `response_type: "code"` from BOTH authorize
+  URL builders (`handleAdminStart` + `handlePrepare`). The chooselocation page loads but
+  errors on location-select; no new academy could connect. If it recurs, check both
+  `URLSearchParams` blocks still include `response_type: "code"` as the first param, then
+  force a prod deploy from repo root (`vercel deploy --prod`).
 - No local Vercel env creds — DB/token work goes through the Supabase MCP or server endpoints.
