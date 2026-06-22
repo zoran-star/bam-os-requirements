@@ -210,14 +210,14 @@ async function detectForClient(client) {
   // GHL's rate limit (each draft hits GHL for the thread + Claude).
   for (const item of queue.slice(0, DETECT_CAP)) {
     const contactId = item.contact_id;
-    if (!contactId) { skipped++; continue; }
+    if (!contactId) { skipped++; reasons.push(`${item.name || "?"}: no contactId in queue item`); continue; }
     // Dedupe: skip if an active draft exists, or we already answered THIS inbound.
     try {
       const existing = await sb(`agent_ready_replies?client_id=eq.${client.id}&ghl_contact_id=eq.${encodeURIComponent(contactId)}&order=created_at.desc&select=id,status,last_lead_at&limit=1`);
       const last = Array.isArray(existing) && existing[0];
-      if (last && ["pending", "approved"].includes(last.status)) { skipped++; continue; }
-      if (last && last.last_lead_at && item.last_at && new Date(last.last_lead_at).getTime() === new Date(item.last_at).getTime()) { skipped++; continue; }
-    } catch (_) {}
+      if (last && ["pending", "approved"].includes(last.status)) { skipped++; reasons.push(`${item.name || contactId}: already has a ${last.status} draft`); continue; }
+      if (last && last.last_lead_at && item.last_at && new Date(last.last_lead_at).getTime() === new Date(item.last_at).getTime()) { skipped++; reasons.push(`${item.name || contactId}: already answered this inbound (timestamp match)`); continue; }
+    } catch (e) { reasons.push(`${item.name || contactId}: dedup-check error — ${e.message}`); }
 
     let d;
     // The queue already proved the stage + found the conversation — reuse both
@@ -238,7 +238,7 @@ async function detectForClient(client) {
           confidence: d.confidence, last_lead_at: item.last_at || null, status: "pending", created_by: "detector",
         }]) });
         lostProposed++;
-      } catch (_) { skipped++; }
+      } catch (e) { skipped++; reasons.push(`${item.name || contactId}: lost-insert failed — ${e.message}`); }
       continue;
     }
 
@@ -272,7 +272,7 @@ async function detectForClient(client) {
           contact_name: item.name || null, final_reply: d.reply, reasoning: d.reasoning || null, confidence: d.confidence,
           reply_count: d.reply_count, booking_asks: d.booking_asks, adjusted: false, status: "sent", created_by: "self-drive" });
         autoSent++;
-      } catch (_) { skipped++; }
+      } catch (e) { skipped++; reasons.push(`${item.name || contactId}: auto-send failed — ${e.message}`); }
     } else {
       try {
         await sb(`agent_ready_replies`, { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify([{
@@ -282,7 +282,7 @@ async function detectForClient(client) {
           last_lead_at: item.last_at || null, status: "pending", created_by: "detector",
         }]) });
         drafted++;
-      } catch (_) { skipped++; }
+      } catch (e) { skipped++; reasons.push(`${item.name || contactId}: pending-insert failed — ${e.message}`); }
     }
   }
   return { client_id: client.id, business: client.business_name, mode, queued: queue.length, drafted, auto_sent: autoSent, escalated, lost_proposed: lostProposed, skipped, reasons };
