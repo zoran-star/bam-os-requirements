@@ -34,9 +34,27 @@ client site form
   (`G5y4QI0MsFq3159IhFU7`). Sends athlete_age (→ GHL "Athlete's Age"
   numeric field) + group label. Grade was dropped 2026-06-12 (GHL grade
   field only had options 5-9).
-- Opportunity names are PLAIN contact names (GHL-native convention) so the
-  workflows' create/update-opportunity card-search matches our card —
-  Zoran kept stage-move actions inside the GHL workflows on purpose.
+- **Pipeline ownership = the GHL workflow, NOT the portal (decided 2026-06-18).**
+  For GTA's website **free-trial** and **contact** forms, `entry_points.pipeline_name`
+  + `stage_name` were set to NULL, so the portal no longer creates/places an
+  opportunity for them. The form's GHL workflow ("trial form filled in" /
+  "contact form filled in") owns the pipeline entirely (create + stage moves).
+  Reason: V1.5 = integrate with GHL's existing automations, and having both the
+  portal AND the workflow add to the pipeline risked duplicate cards (the old
+  design relied on the workflow's create/update-opportunity matching the portal's
+  card by plain contact name — fragile). Portal still: saves the lead, upserts the
+  contact, adds tags, posts the note/inbox entry, and ENROLLS the contact into the
+  form's `ghl_workflow_id`. **Assumes those workflows create the pipeline card
+  themselves** — if a workflow only MOVES an existing card, leads won't appear in
+  the pipeline.
+- **Calendars also workflow-owned now (2026-06-18).** `entry_points` type=calendar
+  (both GTA booking calendars) had pipeline_name/stage_name set to NULL too, so the
+  portal no longer advances the pipeline on booking. Booking still (a) CREATES the
+  GHL appointment and (b) enrolls the "free trial booked" workflow — only the
+  portal's stage-advance was removed (leads.js ~line 390, gated on
+  pipeline_name+stage_name). The "free trial booked" workflow owns the stage move to
+  "scheduled trial". Net: the portal places ZERO opportunities for GTA — every
+  pipeline action (create + stage moves + WON) lives in the GHL workflows. V1.5.
 
 ## Booking Calendars panel (portal-managed availability, Jun 2026)
 - Client portal → Calendar tab → "Booking Calendars" section (above the

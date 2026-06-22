@@ -99,6 +99,7 @@ async function handler(req, res) {
   const showedUp = (b.showed_up === true || b.showed_up === false) ? b.showed_up : null;
   const trainer = (b.trainer || "").trim() || null;
   const notes = (b.notes || "").trim() || null;
+  const sendLink = !!b.send_onboarding_link;
 
   const rows = await sb(`clients?id=eq.${clientId}&select=id,ghl_location_id,ghl_access_token,ghl_refresh_token,ghl_token_expires_at&limit=1`);
   const client = rows?.[0];
@@ -123,7 +124,7 @@ async function handler(req, res) {
       body: JSON.stringify({
         client_id: clientId, opportunity_id: oppId, ghl_contact_id: contactId,
         good_fit: goodFit, showed_up: showedUp, trainer, notes,
-        signup_text_status: goodFit ? "queued" : "skipped",
+        signup_text_status: sendLink ? "queued" : "skipped",
         created_by: ctx.staff?.name || ctx.user?.email || null,
         updated_at: new Date().toISOString(),
       }),
@@ -153,6 +154,25 @@ async function handler(req, res) {
 
   const result = { ok: true, good_fit: goodFit, showed_up: showedUp, moved: false, trainer, signup_text: "none" };
 
+  // Missed-trial automation: when the trainer marks the athlete as NOT attended,
+  // fire the academy's chosen GHL workflow. Configured per-academy on the training
+  // offer (offers.data.missed_trial_workflow), same pattern as signup_url. Non-fatal.
+  if (showedUp === false && contactId) {
+    try {
+      const offers = await sb(`offers?client_id=eq.${encodeURIComponent(clientId)}&type=eq.training&select=data&order=sort_order.asc&limit=1`);
+      const wfId = ((offers && offers[0] && offers[0].data && offers[0].data.missed_trial_workflow) || "").trim();
+      if (!wfId) {
+        result.missed_trial = "no_workflow";   // not set up on the offer yet
+      } else {
+        await ghl("POST", `/contacts/${encodeURIComponent(contactId)}/workflow/${encodeURIComponent(wfId)}`, { token });
+        result.missed_trial = "fired";
+      }
+    } catch (e) {
+      console.error("missed-trial workflow failed (non-fatal):", e.message);
+      result.missed_trial = "failed";
+    }
+  }
+
   if (goodFit) {
     // Move to the Done Trial stage of the opp's pipeline.
     try {
@@ -176,8 +196,31 @@ async function handler(req, res) {
       } catch (e) { console.error("trainer write failed (non-fatal):", e.message); }
     }
 
-    // Signup-link text is QUEUED only — gated until the comms tab can send.
-    result.signup_text = "queued";
+  }
+
+  // Send the academy's onboarding / sign-up link if the reviewer asked for it.
+  // Link is configured per-academy on the training offer (offers.data.signup_url).
+  if (sendLink && contactId) {
+    try {
+      const offers = await sb(`offers?client_id=eq.${encodeURIComponent(clientId)}&type=eq.training&select=data&order=sort_order.asc&limit=1`);
+      const signupUrl = ((offers && offers[0] && offers[0].data && offers[0].data.signup_url) || "").trim();
+      if (!signupUrl) {
+        result.signup_text = "no_link";   // checkbox was on but no URL set in setup
+      } else {
+        const msg = `Thanks for coming in! Ready to get started? Sign up here: ${signupUrl}`;
+        await ghl("POST", `/conversations/messages`, { token, body: { type: "SMS", contactId, message: msg } });
+        result.signup_text = "sent";
+        try {
+          await sb(`post_trial_reviews?client_id=eq.${encodeURIComponent(clientId)}&opportunity_id=eq.${encodeURIComponent(oppId)}`, {
+            method: "PATCH", headers: { Prefer: "return=minimal" },
+            body: JSON.stringify({ signup_text_status: "sent", updated_at: new Date().toISOString() }),
+          });
+        } catch (_) {}
+      }
+    } catch (e) {
+      console.error("signup link send failed (non-fatal):", e.message);
+      result.signup_text = "failed";
+    }
   }
 
   return res.status(200).json(result);

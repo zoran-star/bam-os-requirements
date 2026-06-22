@@ -15,6 +15,66 @@ const STATUS_META = {
   "cancelled":   { label: "Cancelled",    color: "mute" },
 };
 
+// ─── Priority + turnaround SLA ───
+// Cam's rule from the team call: a client-flagged urgent ticket is High (3 business
+// days to turn around); everything else is Normal (5 business days). Priority is
+// stored on the ticket as fields.priority; absent → treated as normal.
+const PRIORITY_META = {
+  high:   { label: "High",   sla: 3, color: "#ED7969" },
+  normal: { label: "Normal", sla: 5, color: "#7E9CD9" },
+};
+function priorityOf(apiTicketFields) {
+  return (apiTicketFields?.priority === "high") ? "high" : "normal";
+}
+// Add N business days (skip Sat/Sun) to a date.
+function addBusinessDays(start, days) {
+  const d = new Date(start);
+  let added = 0;
+  while (added < days) {
+    d.setDate(d.getDate() + 1);
+    const dow = d.getDay();
+    if (dow !== 0 && dow !== 6) added++;
+  }
+  return d;
+}
+// Whole business days from today until `due` (negative if past).
+function bizDaysUntil(due) {
+  const now = new Date(); now.setHours(0, 0, 0, 0);
+  const d = new Date(due);  d.setHours(0, 0, 0, 0);
+  if (d.getTime() < now.getTime()) return -1;
+  let count = 0;
+  const cur = new Date(now);
+  while (cur.getTime() < d.getTime()) {
+    cur.setDate(cur.getDate() + 1);
+    const dow = cur.getDay();
+    if (dow !== 0 && dow !== 6) count++;
+  }
+  return count;
+}
+// { due, label, overdue } deadline info for a ticket, or null with no submit date.
+function deadlineInfo(submittedIso, priority) {
+  if (!submittedIso) return null;
+  const sla = (PRIORITY_META[priority] || PRIORITY_META.normal).sla;
+  const due = addBusinessDays(new Date(submittedIso), sla);
+  const rem = bizDaysUntil(due);
+  if (rem < 0) return { due, label: "Overdue", overdue: true };
+  if (rem === 0) return { due, label: "Due today", overdue: false };
+  return { due, label: `Due in ${rem} biz day${rem === 1 ? "" : "s"}`, overdue: false };
+}
+
+// Resolve the client's website from brand_data, wherever it was entered.
+// Different input paths have used different keys (website_url from Brand Basics,
+// domain from older imports), so check them all so Cam always sees a site if one
+// exists. Returns a clickable absolute URL (prepends https:// for bare domains).
+function clientWebsiteFrom(brand) {
+  if (!brand || typeof brand !== "object") return "";
+  const raw = [brand.website_url, brand.domain, brand.website, brand.url]
+    .map(v => (typeof v === "string" ? v.trim() : ""))
+    .find(Boolean);
+  if (!raw) return "";
+  return /^https?:\/\//i.test(raw) ? raw : `https://${raw}`;
+}
+
 // Ticket types that include uploaded files → need content review by Cam/Ximena
 const CONTENT_TYPES = new Set(["replace", "add", "campaign-create"]);
 
@@ -66,6 +126,9 @@ function normalizeTicket(apiTicket) {
   return {
     id: apiTicket.id,
     academyName: apiTicket.client?.business_name || "—",
+    clientWebsite: clientWebsiteFrom(apiTicket.client?.brand_data),
+    assignedSm: apiTicket.assigned_to_name || "",
+    priority: priorityOf(fields),
     campaignTitle: fields.campaign_title || "",
     type: apiTicket.type,
     creative: fields.creative_name,
@@ -215,7 +278,7 @@ export default function MarketingView({ tokens: tk, dark, me, session }) {
   const [banner, setBanner] = useState(null); // { type, text }
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState("all"); // all | replace | add | remove | budget | campaign-create
-  const [sortOrder, setSortOrder] = useState("newest"); // newest | oldest
+  const [sortOrder, setSortOrder] = useState("priority"); // priority | newest | oldest
 
   // ─── Fetch tickets on mount ───
   useEffect(() => {
@@ -273,6 +336,13 @@ export default function MarketingView({ tokens: tk, dark, me, session }) {
     list = [...list].sort((a, b) => {
       const aDate = new Date(a._raw?.submitted_at || 0).getTime();
       const bDate = new Date(b._raw?.submitted_at || 0).getTime();
+      if (sortOrder === "priority") {
+        // High priority first; within the same priority, newest first.
+        const rank = p => (p === "high" ? 0 : 1);
+        const diff = rank(a.priority) - rank(b.priority);
+        if (diff !== 0) return diff;
+        return bDate - aDate;
+      }
       return sortOrder === "newest" ? bDate - aDate : aDate - bDate;
     });
     return list;
@@ -428,8 +498,26 @@ export default function MarketingView({ tokens: tk, dark, me, session }) {
               {selected.lastActivityAt ? `  ·  Last activity ${formatRelative(selected.lastActivityAt)}` : ""}
             </div>
           </div>
-          <StatusPills t={selected} tk={tk} size="large" />
+          <div style={{ display: "flex", flexDirection: "column", gap: 6, alignItems: "flex-end" }}>
+            <PriorityChip priority={selected.priority} tk={tk} size="large" />
+            <DeadlineLabel t={selected} tk={tk} />
+            <StatusPills t={selected} tk={tk} size="large" />
+          </div>
         </div>
+
+        {/* Client — who this is for + where the offer lives (Cam's first stop) */}
+        <SectionLabel tk={tk}>Client</SectionLabel>
+        <Card tk={tk} style={{ marginBottom: 24 }}>
+          {renderClientInfo(selected, tk, () => {
+            const msg = `Hey — can you send the landing page link for ${selected.academyName}'s ${selected.offer || selected.campaignTitle || "campaign"}? Need it to build the ad.`;
+            try {
+              navigator.clipboard?.writeText(msg);
+              showBanner("success", "Message copied — paste it to the SM in Slack.");
+            } catch (_) {
+              showBanner("error", "Couldn't copy — message: " + msg);
+            }
+          })}
+        </Card>
 
         {/* What client submitted */}
         <SectionLabel tk={tk}>Client submitted</SectionLabel>
@@ -569,6 +657,7 @@ export default function MarketingView({ tokens: tk, dark, me, session }) {
             cursor: "pointer", fontFamily: "inherit",
           }}
         >
+          <option value="priority">Priority (urgent first)</option>
           <option value="newest">Newest first</option>
           <option value="oldest">Oldest first</option>
         </select>
@@ -584,7 +673,7 @@ export default function MarketingView({ tokens: tk, dark, me, session }) {
       {/* Column headers */}
       <div style={{
         display: "grid",
-        gridTemplateColumns: "1.2fr 1.4fr 1.3fr 0.9fr 1.2fr",
+        gridTemplateColumns: "1.1fr 1.3fr 1.1fr 1fr 0.8fr 1.1fr",
         gap: 16,
         padding: "8px 16px",
         fontSize: 10, color: tk.textMute, letterSpacing: "0.2em", textTransform: "uppercase",
@@ -592,6 +681,7 @@ export default function MarketingView({ tokens: tk, dark, me, session }) {
         <div>Academy</div>
         <div>Campaign</div>
         <div>Type</div>
+        <div>Priority</div>
         <div>Submitted</div>
         <div style={{ textAlign: "right" }}>Status</div>
       </div>
@@ -618,10 +708,12 @@ export default function MarketingView({ tokens: tk, dark, me, session }) {
               onClick={() => setSelectedId(t.id)}
               style={{
                 display: "grid",
-                gridTemplateColumns: "1.2fr 1.4fr 1.3fr 0.9fr 1.2fr",
+                gridTemplateColumns: "1.1fr 1.3fr 1.1fr 1fr 0.8fr 1.1fr",
                 gap: 16,
                 padding: "14px 16px",
                 borderBottom: `1px solid ${tk.borderSoft || tk.border}`,
+                borderLeft: t.priority === "high" && t.status === "in-progress"
+                  ? `3px solid ${PRIORITY_META.high.color}` : "3px solid transparent",
                 cursor: "pointer",
                 alignItems: "center",
                 transition: "background 0.12s ease",
@@ -641,6 +733,10 @@ export default function MarketingView({ tokens: tk, dark, me, session }) {
               <div style={{ color: tk.textSub, fontSize: 13 }}>
                 <span style={{ marginRight: 6 }}>{typeMeta.icon}</span>{typeMeta.label}
                 {t.creative ? <span style={{ color: tk.textMute, marginLeft: 6 }}>· {t.creative}</span> : ""}
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 4, alignItems: "flex-start" }}>
+                <PriorityChip priority={t.priority} tk={tk} />
+                <DeadlineLabel t={t} tk={tk} />
               </div>
               <div style={{ color: tk.textMute, fontSize: 12, fontFamily: "monospace", letterSpacing: "0.05em" }}>
                 {t.submittedDate}
@@ -674,6 +770,33 @@ function Tab({ label, active, onClick, tk, amber, red }) {
         transition: "color 0.15s ease",
       }}
     >{label}</div>
+  );
+}
+
+// Priority chip — High (urgent, client-flagged) vs Normal
+function PriorityChip({ priority, tk, size = "small" }) {
+  const meta = PRIORITY_META[priority] || PRIORITY_META.normal;
+  const fontSize = size === "large" ? 11 : 10;
+  const padding = size === "large" ? "5px 11px" : "3px 9px";
+  return (
+    <span style={{
+      color: meta.color, fontSize, fontWeight: 700, letterSpacing: "0.14em",
+      textTransform: "uppercase", padding, borderRadius: 999,
+      border: `1px solid ${meta.color}`, background: `${meta.color}15`, whiteSpace: "nowrap",
+    }}>{priority === "high" ? "⚡ " : ""}{meta.label}</span>
+  );
+}
+
+// Turnaround deadline derived from priority SLA (only meaningful while in progress)
+function DeadlineLabel({ t, tk }) {
+  if (t.status !== "in-progress") return null;
+  const info = deadlineInfo(t._raw?.submitted_at, t.priority);
+  if (!info) return null;
+  return (
+    <span style={{
+      fontSize: 11, fontWeight: 600,
+      color: info.overdue ? (tk.red || "#ED7969") : tk.textMute,
+    }}>{info.overdue ? "⚠ " : ""}{info.label}</span>
   );
 }
 
@@ -736,6 +859,53 @@ function Card({ children, tk, style }) {
   );
 }
 
+// Client header card: who the ticket is for + the links Cam needs to learn the
+// offer (client site, landing page, offer name). When no landing page is attached,
+// surface the V1 stopgap from the call — a one-tap "ask the SM for the link".
+function renderClientInfo(t, tk, onAskSm) {
+  const rows = [];
+  rows.push(["Client", <span style={{ fontWeight: 600 }}>{t.academyName}</span>]);
+
+  rows.push(["Assigned SM", t.assignedSm
+    ? <span>{t.assignedSm}</span>
+    : <span style={{ color: tk.textMute }}>Unassigned</span>]);
+
+  rows.push(["Client site", t.clientWebsite
+    ? <a href={t.clientWebsite} target="_blank" rel="noreferrer" style={{ color: tk.accent, textDecoration: "none" }}>{t.clientWebsite} ↗</a>
+    : <span style={{ color: tk.textMute }}>No website on file</span>]);
+
+  rows.push(["Landing page", t.landingPage
+    ? <a href={t.landingPage} target="_blank" rel="noreferrer" style={{ color: tk.accent, textDecoration: "none" }}>{t.landingPage} ↗</a>
+    : (
+      <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+        <span style={{ color: tk.textMute }}>Not attached</span>
+        <button onClick={onAskSm} style={{
+          background: "transparent", border: `1px solid ${tk.accent}`, color: tk.accent,
+          padding: "6px 14px", borderRadius: 6, cursor: "pointer",
+          fontFamily: "inherit", fontSize: 12, fontWeight: 600,
+        }}>🔗 Ask SM for landing page</button>
+      </div>
+    )]);
+
+  if (t.offer) {
+    rows.push(["Offer", <span>{t.offer}{t.isNewOffer ? <span style={{ marginLeft: 8, color: tk.accent, fontSize: 11, fontWeight: 600, letterSpacing: "0.12em", textTransform: "uppercase" }}>New offer</span> : null}</span>]);
+  }
+
+  return rows.map(([label, value], i) => (
+    <div key={label} style={{
+      display: "flex", alignItems: "flex-start", gap: 16,
+      padding: "10px 0",
+      borderBottom: i < rows.length - 1 ? `1px solid ${tk.borderSoft || tk.border}` : "none",
+    }}>
+      <div style={{
+        fontSize: 10, color: tk.textMute, letterSpacing: "0.2em", textTransform: "uppercase",
+        width: 140, flexShrink: 0, paddingTop: 4,
+      }}>{label}</div>
+      <div style={{ flex: 1, color: tk.text, fontSize: 14, lineHeight: 1.5 }}>{value}</div>
+    </div>
+  ));
+}
+
 function renderSubmittedInfo(t, tk) {
   const rows = [];
   rows.push(["Academy", t.academyName]);
@@ -746,6 +916,7 @@ function renderSubmittedInfo(t, tk) {
     <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
       {(t.files || []).map((f, i) => {
         const isImage = (f.mime || "").startsWith("image/");
+        const isVideo = (f.mime || "").startsWith("video/");
         return (
           <a key={i} href={f.url} target="_blank" rel="noreferrer" download={f.name} style={{
             display: "flex", flexDirection: "column", gap: 4, alignItems: "center",
@@ -756,7 +927,12 @@ function renderSubmittedInfo(t, tk) {
           }}>
             {isImage
               ? <img src={f.url} alt={f.name} style={{ width: 56, height: 56, objectFit: "cover", borderRadius: 4 }} />
-              : <div style={{ width: 56, height: 56, display: "flex", alignItems: "center", justifyContent: "center", borderRadius: 4, background: tk.surface, fontSize: 22, color: tk.textMute }}>{(f.mime || "").startsWith("video/") ? "🎬" : "📄"}</div>
+              : isVideo
+              ? <div style={{ position: "relative", width: 56, height: 56 }}>
+                  <video src={`${f.url}#t=0.5`} muted playsInline preload="metadata" style={{ width: 56, height: 56, objectFit: "cover", borderRadius: 4, background: tk.surface, display: "block" }} />
+                  <span style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 11, textShadow: "0 1px 3px rgba(0,0,0,0.7)", pointerEvents: "none" }}>▶</span>
+                </div>
+              : <div style={{ width: 56, height: 56, display: "flex", alignItems: "center", justifyContent: "center", borderRadius: 4, background: tk.surface, fontSize: 22, color: tk.textMute }}>📄</div>
             }
             <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 110 }}>{f.name}</span>
             <span style={{ color: tk.accent, fontSize: 10, letterSpacing: "0.05em" }}>Download ↓</span>

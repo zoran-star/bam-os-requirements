@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "description": "BAM OS asset library — one entry per client. Each entry links to its manifest file.",
+  "clients": [
+    {
+      "slug": "ch3-training",
+      "name": "CH3 Training",
+      "location": "Harrisburg, PA",
+      "status": "active",
+      "manifest": "/assets/ch3-training.json",
+      "primary_color": "#00B8C8",
+      "site_url": "https://www.chrishaynesbasketball.com",
+      "vercel_site": "bam-client-sites/clients/ch3-training",
+      "funnel_path": "bam-portal/public/ch3-funnel",
+      "api_path": "bam-portal/api/website/ch3-checkout.js",
+      "ghl_env_key": "CH3_GHL_LOCATION_ID",
+      "stripe_env_key": "CH3_STRIPE_SECRET_KEY"
+    }
+  ]
+}

@@ -1,5 +1,18 @@
 # BAM GHL Agent
 
+## ⛔ HARD RULE — never touch V1 unless explicitly told
+**V1 is the live production tier** (academies still using GoHighLevel; a client
+where `clients.v2_access = false AND clients.v15_access = false`). Do NOT let any
+edit change V1 behavior **unless Zoran explicitly says "we're editing V1"** for
+that task.
+
+- New features / changes default to **V1.5 and/or V2 only** — gate them so V1
+  academies are unaffected (e.g. `if (V2_ACCESS || V15_ACCESS)`, `data-feature`
+  gates, or the `_bbIsV1()` pattern that hides things for V1).
+- When a change *could* affect V1, call it out and confirm before shipping.
+- Bug fixes that clearly apply to all tiers are fine, but say so explicitly.
+- This rule is the default; only an explicit "edit V1" instruction lifts it.
+
 ## Project memory
 Project notes live in [`memories/`](memories/). Scan [`memories/MEMORY.md`](memories/MEMORY.md) first (index of one-liners), then open the specific note. See [`memories/README.md`](memories/README.md) for conventions.
 
@@ -258,6 +271,7 @@ All frontend work follows the **Full Control design system** at [`front-end/full
 - Gold (`#E8C547`) is the only accent — one moment per screen
 - No shadows, no gradients, no rounded corners > 6px
 - UX principle: guiding info at the point of action; minimize eye travel
+- **NEVER use em dashes (—, U+2014) in portal UI** (client portal `bam-portal/public/client-portal.html` + staff portal `bam-portal/src/`). Use a hyphen `-`. For empty fields use `-`, not `—`. Don't use an em dash as a JS "empty" sentinel; detect the placeholder by shape (e.g. money `startsWith('$')`). Note: backend `api/*.js` still emits some `"—"` placeholders; the client should hide/replace them, not render them.
 
 ---
 

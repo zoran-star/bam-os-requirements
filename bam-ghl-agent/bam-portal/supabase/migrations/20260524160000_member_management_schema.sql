@@ -3,10 +3,8 @@ ALTER TABLE public.clients ADD COLUMN IF NOT EXISTS stripe_connect_status text
   DEFAULT 'not_connected'
   CHECK (stripe_connect_status IN ('not_connected', 'onboarding', 'connected', 'disabled'));
 ALTER TABLE public.clients ADD COLUMN IF NOT EXISTS stripe_connect_connected_at timestamptz;
-
 COMMENT ON COLUMN public.clients.stripe_connect_account_id IS
   'Stripe Connect connected-account id (acct_...). The portal acts on this academy''s billing with the platform key + the Stripe-Account header.';
-
 DO $$
 BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'member_status') THEN
@@ -18,14 +16,12 @@ BEGIN
     );
   END IF;
 END $$;
-
 DO $$
 BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'cancellation_type') THEN
     CREATE TYPE public.cancellation_type AS ENUM ('cancel', 'pause');
   END IF;
 END $$;
-
 CREATE TABLE IF NOT EXISTS public.members (
   id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
   client_id uuid NOT NULL REFERENCES public.clients(id) ON DELETE CASCADE,
@@ -49,7 +45,6 @@ CREATE TABLE IF NOT EXISTS public.members (
   created_at timestamptz DEFAULT now(),
   updated_at timestamptz DEFAULT now()
 );
-
 CREATE TABLE IF NOT EXISTS public.cancellations (
   id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
   client_id uuid NOT NULL REFERENCES public.clients(id) ON DELETE CASCADE,
@@ -66,7 +61,6 @@ CREATE TABLE IF NOT EXISTS public.cancellations (
   stripe_customer_id text,
   created_at timestamptz DEFAULT now()
 );
-
 CREATE TABLE IF NOT EXISTS public.referrals (
   id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
   client_id uuid NOT NULL REFERENCES public.clients(id) ON DELETE CASCADE,
@@ -80,7 +74,6 @@ CREATE TABLE IF NOT EXISTS public.referrals (
   new_trial_end timestamptz NOT NULL,
   created_at timestamptz DEFAULT now()
 );
-
 CREATE TABLE IF NOT EXISTS public.refunds (
   id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
   client_id uuid NOT NULL REFERENCES public.clients(id) ON DELETE CASCADE,
@@ -97,7 +90,6 @@ CREATE TABLE IF NOT EXISTS public.refunds (
   stripe_subscription_id text,
   created_at timestamptz DEFAULT now()
 );
-
 CREATE TABLE IF NOT EXISTS public.member_audit_log (
   id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
   client_id uuid NOT NULL REFERENCES public.clients(id) ON DELETE CASCADE,
@@ -110,7 +102,6 @@ CREATE TABLE IF NOT EXISTS public.member_audit_log (
   db_changes jsonb,
   created_at timestamptz DEFAULT now()
 );
-
 CREATE INDEX IF NOT EXISTS idx_members_client ON public.members (client_id);
 CREATE INDEX IF NOT EXISTS idx_members_client_status ON public.members (client_id, status);
 CREATE INDEX IF NOT EXISTS idx_members_client_name ON public.members (client_id, athlete_name);
@@ -121,7 +112,6 @@ CREATE INDEX IF NOT EXISTS idx_referrals_referrer ON public.referrals (referrer_
 CREATE INDEX IF NOT EXISTS idx_refunds_client ON public.refunds (client_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_audit_client ON public.member_audit_log (client_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_audit_member ON public.member_audit_log (member_id);
-
 CREATE OR REPLACE FUNCTION public.update_members_updated_at()
 RETURNS trigger
 LANGUAGE plpgsql
@@ -131,45 +121,38 @@ BEGIN
   RETURN NEW;
 END;
 $$;
-
 CREATE OR REPLACE TRIGGER members_updated_at
   BEFORE UPDATE ON public.members
   FOR EACH ROW EXECUTE FUNCTION public.update_members_updated_at();
-
 ALTER TABLE public.members ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.cancellations ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.referrals ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.refunds ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.member_audit_log ENABLE ROW LEVEL SECURITY;
-
 DROP POLICY IF EXISTS members_select_own_or_staff ON public.members;
 CREATE POLICY members_select_own_or_staff ON public.members
   FOR SELECT USING (
     client_id IN (SELECT public.my_client_ids())
     OR EXISTS (SELECT 1 FROM public.staff WHERE staff.user_id = auth.uid())
   );
-
 DROP POLICY IF EXISTS cancellations_select_own_or_staff ON public.cancellations;
 CREATE POLICY cancellations_select_own_or_staff ON public.cancellations
   FOR SELECT USING (
     client_id IN (SELECT public.my_client_ids())
     OR EXISTS (SELECT 1 FROM public.staff WHERE staff.user_id = auth.uid())
   );
-
 DROP POLICY IF EXISTS referrals_select_own_or_staff ON public.referrals;
 CREATE POLICY referrals_select_own_or_staff ON public.referrals
   FOR SELECT USING (
     client_id IN (SELECT public.my_client_ids())
     OR EXISTS (SELECT 1 FROM public.staff WHERE staff.user_id = auth.uid())
   );
-
 DROP POLICY IF EXISTS refunds_select_own_or_staff ON public.refunds;
 CREATE POLICY refunds_select_own_or_staff ON public.refunds
   FOR SELECT USING (
     client_id IN (SELECT public.my_client_ids())
     OR EXISTS (SELECT 1 FROM public.staff WHERE staff.user_id = auth.uid())
   );
-
 DROP POLICY IF EXISTS audit_select_own_or_staff ON public.member_audit_log;
 CREATE POLICY audit_select_own_or_staff ON public.member_audit_log
   FOR SELECT USING (

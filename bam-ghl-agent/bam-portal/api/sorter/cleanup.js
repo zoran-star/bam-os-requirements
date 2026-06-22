@@ -37,6 +37,7 @@ function normName(s) { return (s || "").toString().trim().toLowerCase().replace(
 function toMemberStatus(raw) {
   const s = (raw || "").toString().trim().toLowerCase();
   if (s === "paused" || s === "pause" || s === "on hold" || s === "hold") return "paused";
+  if (s === "payment_method_required" || s === "collecting" || s === "collecting payment") return "payment_method_required";
   return "live";
 }
 
@@ -102,6 +103,51 @@ async function stripePost(path, body, stripeAccount) {
 
 const ACTIVEISH = new Set(["active", "trialing", "past_due", "paused", "unpaid"]);
 
+// Next-payment facts pulled off a raw Stripe subscription — WHEN the next charge
+// lands and any reason it won't (canceling, paused). Spread onto the link entries
+// so the cleanup list can flag "should bill but won't".
+function subBillingFacts(sub) {
+  const item = sub.items && sub.items.data && sub.items.data[0];
+  const price = item && item.price;
+  return {
+    // Stripe moved current_period_end off the Subscription and onto its items in
+    // recent API versions (2025-04+ "basil"); read the item first, fall back to
+    // the legacy sub-level field. Without this, ACTIVE subs showed "unknown".
+    current_period_end: (item && item.current_period_end) || sub.current_period_end || null,
+    trial_end: sub.trial_end || null,
+    cancel_at_period_end: !!sub.cancel_at_period_end,
+    cancel_at: sub.cancel_at || null,
+    paused: !!sub.pause_collection,
+    sub_interval: price && price.recurring
+      ? `${price.recurring.interval_count > 1 ? price.recurring.interval_count + " " : ""}${price.recurring.interval}`
+      : null,
+  };
+}
+
+// Per-member "Next payment" verdict for the cleanup list. Pure function of the
+// member's live link + their catalog offer — no extra Stripe calls. `fixable`
+// means the fix-payment modal can offer a one-click correction.
+// states: scheduled | none | missing | paused | ending | at_risk | unknown
+function computeNextPayment({ link, cat, offerKey, altPay }) {
+  const iso = (unix) => (unix ? new Date(unix * 1000).toISOString().slice(0, 10) : null);
+  if (altPay) return { state: "none", date: null, label: "— pays another way", fixable: false, reason: "alternate payment method" };
+  const recurringExpected = !!(cat && cat.interval) || /month|week|3_month|6_month|12_month|year/i.test(offerKey || "");
+  if (!link) {
+    if (recurringExpected) return { state: "missing", date: null, label: "⚠ none — set one up", fixable: true, reason: "no subscription, but this plan should bill on a schedule" };
+    return { state: "none", date: null, label: "—", fixable: false, reason: "no recurring plan" };
+  }
+  const st = link.status;
+  if (st === "canceled" || link.cancel_at_period_end || link.cancel_at) {
+    return { state: "ending", date: iso(link.cancel_at || link.current_period_end), label: "⚠ no next payment", fixable: true, reason: "subscription is set to cancel (or already canceled)" };
+  }
+  if (link.paused) return { state: "paused", date: null, label: "⚠ paused — no next", fixable: true, reason: "billing is paused (pause_collection)" };
+  if (st === "past_due" || st === "unpaid") return { state: "at_risk", date: iso(link.current_period_end), label: "⚠ payment failing", fixable: true, reason: "the last payment failed (past_due / unpaid)" };
+  if (st === "incomplete" || st === "incomplete_expired") return { state: "missing", date: null, label: "⚠ never started", fixable: true, reason: "the subscription never completed its first payment" };
+  if (st === "trialing") { const d = iso(link.trial_end); return d ? { state: "scheduled", date: d, label: d, fixable: false, reason: "first charge when the trial ends" } : { state: "unknown", date: null, label: "⚠ unknown", fixable: true, reason: "trialing but no trial_end set" }; }
+  if (st === "active") { const d = iso(link.current_period_end); return d ? { state: "scheduled", date: d, label: d, fixable: false, reason: "next billing date" } : { state: "unknown", date: null, label: "⚠ unknown", fixable: true, reason: "active but no period end" }; }
+  return { state: "unknown", date: null, label: "⚠ unknown", fixable: true, reason: `unexpected subscription status: ${st}` };
+}
+
 // Pull all subscriptions on the connected account (any status), expanded, and
 // build an email → { customer_id, sub_id, price_id, status } map for both-ways
 // linking. Mirrors fetchLiveSubs() in offers/match-prices.js.
@@ -138,12 +184,68 @@ function buildEmailMap(subs) {
       status: sub.status,
       amount_cents: price ? price.unit_amount : null,
       name: (cust && cust.name) || null,
+      ...subBillingFacts(sub),
     };
     const prev = map.get(email);
     // keep the first active-ish sub; otherwise keep whatever we already have.
     if (!prev || (!ACTIVEISH.has(prev.status) && ACTIVEISH.has(sub.status))) map.set(email, entry);
   }
   return map;
+}
+
+// Every Stripe customer that could plausibly be this staged member — matched by
+// email, name, or phone — each with its best (active-ish) sub. Powers the
+// "multiple possible customers" warning in the connect popup so staff don't
+// silently link the wrong person. `linkedId` (the customer currently tied to the
+// row) is always included and marked, even if the search misses it.
+async function gatherCandidates(acct, srow, linkedId) {
+  if (!acct || !srow) return [];
+  const clean = (v) => String(v || "").trim().replace(/["\\]/g, "");
+  const terms = [];
+  const addTerm = (v) => { v = clean(v); if (v && !terms.some(t => t.toLowerCase() === v.toLowerCase())) terms.push(v); };
+  addTerm(srow.parent_email); addTerm(srow.parent_name); addTerm(srow.athlete_name);
+  const phoneDigits = String(srow.parent_phone || "").replace(/\D/g, "");
+  const found = new Map();
+  // One combined Stripe search across email + name (+ phone).
+  try {
+    const clauses = [];
+    for (const t of terms) { clauses.push(`email~"${t}"`); clauses.push(`name~"${t}"`); }
+    if (phoneDigits) clauses.push(`phone~"${phoneDigits.slice(-10)}"`);
+    if (clauses.length) {
+      const r = await stripeGet(`/customers/search?query=${encodeURIComponent(clauses.join(" OR "))}&limit=20`, acct);
+      (r.data || []).forEach(c => found.set(c.id, c));
+    }
+  } catch (_) { /* search API may be disabled — exact email lookups still run */ }
+  // Exact email lookups as a belt-and-suspenders fallback.
+  for (const t of terms) {
+    if (!t.includes("@")) continue;
+    try { const r = await stripeGet(`/customers?email=${encodeURIComponent(t.toLowerCase())}&limit=5`, acct); (r.data || []).forEach(c => found.set(c.id, c)); } catch (_) {}
+  }
+  // Always include the currently-linked customer, even if search missed it.
+  if (linkedId && !found.has(linkedId)) {
+    try { const c = await stripeGet(`/customers/${encodeURIComponent(linkedId)}`, acct); if (c && c.id) found.set(c.id, c); } catch (_) {}
+  }
+  const customers = [...found.values()].map(cu => ({
+    id: cu.id, name: cu.name || null, email: cu.email || null, phone: cu.phone || null,
+    is_linked: !!linkedId && cu.id === linkedId,
+  }));
+  // Attach each customer's best sub (active-ish preferred) for context.
+  for (const cu of customers) {
+    try {
+      const sr = await stripeGet(`/subscriptions?customer=${encodeURIComponent(cu.id)}&status=all&limit=5&expand[]=data.items.data.price`, acct);
+      const subs2 = sr.data || [];
+      const best = subs2.find(s2 => ACTIVEISH.has(s2.status)) || subs2[0];
+      if (best) {
+        const price = best.items && best.items.data && best.items.data[0] && best.items.data[0].price;
+        cu.sub_id = best.id; cu.status = best.status;
+        cu.price_id = price ? price.id : null;
+        cu.amount_cents = price ? price.unit_amount : null;
+      }
+    } catch (_) {}
+  }
+  // Linked first, then customers that actually have a sub, then the rest.
+  customers.sort((a, b) => (Number(b.is_linked) - Number(a.is_linked)) || ((b.sub_id ? 1 : 0) - (a.sub_id ? 1 : 0)));
+  return customers;
 }
 
 // Small bounded Levenshtein for typo'd-email suggestions ("mguirges" vs
@@ -246,10 +348,74 @@ async function handler(req, res) {
     ) || [];
 
     // Client row (Stripe account + persisted dismissals) — used by most actions.
-    const clientRows = await sb(`clients?id=eq.${encodeURIComponent(clientId)}&select=id,business_name,stripe_connect_account_id,sorter_dismissals&limit=1`);
+    const clientRows = await sb(`clients?id=eq.${encodeURIComponent(clientId)}&select=id,business_name,stripe_connect_account_id,sorter_dismissals,coachiq_enabled,coachiq_signup_url&limit=1`);
     const client = Array.isArray(clientRows) && clientRows[0];
     if (!client) return res.status(404).json({ error: "academy not found" });
     const dismissed = new Set(Array.isArray(client.sorter_dismissals) ? client.sorter_dismissals : []);
+
+    // ── CoachIQ cleanup: read status (the "listening session") ──
+    if (action === "coachiq-status") {
+      let events = [];
+      try { events = await sb(`coachiq_link_events?select=email,coachiq_user_id,matched,created_at&order=created_at.desc&limit=60`) || []; }
+      catch (_) { events = []; }
+      const lastEventAt = events.length ? events[0].created_at : null;
+      return res.status(200).json({
+        ok: true,
+        coachiq_enabled: !!client.coachiq_enabled,
+        coachiq_signup_url: client.coachiq_signup_url || null,
+        last_event_at: lastEventAt,   // most recent webhook of ANY kind → "connected" signal
+        server_now: nowIso(),
+        members: staging.map(s => ({
+          id: s.id, athlete_name: s.athlete_name, parent_name: s.parent_name, parent_email: s.parent_email,
+          stripe_subscription_id: s.stripe_subscription_id || null,
+          coachiq_member_id: s.coachiq_member_id || null, coachiq_not_applicable: !!s.coachiq_not_applicable,
+          coachiq_collecting: !!s.coachiq_collecting,
+        })),
+        unmatched: events.filter(e => !e.matched).map(e => ({ email: e.email, coachiq_user_id: e.coachiq_user_id, at: e.created_at })),
+      });
+    }
+
+    // coachiq-sync: POST-billing list for the Finish step — each CoachIQ-linked
+    // member + their FINAL sub_id (from the live promoted member, which take-over
+    // updated), so staff paste the real portal sub_id into CoachIQ (not a stale one).
+    if (action === "coachiq-sync") {
+      const linked = staging.filter(s => s.coachiq_member_id);
+      const ids = linked.map(s => s.promoted_member_id).filter(Boolean);
+      const memberMap = {};
+      if (ids.length) {
+        try {
+          const rows = await sb(`members?id=in.(${ids.map(encodeURIComponent).join(",")})&select=id,stripe_subscription_id`);
+          (rows || []).forEach(m => { memberMap[m.id] = m.stripe_subscription_id; });
+        } catch (_) { /* fall back to staging sub below */ }
+      }
+      return res.status(200).json({
+        ok: true, coachiq_enabled: !!client.coachiq_enabled, coachiq_signup_url: client.coachiq_signup_url || null,
+        members: linked.map(s => ({
+          id: s.id, athlete_name: s.athlete_name, coachiq_member_id: s.coachiq_member_id,
+          sub_id: (s.promoted_member_id && memberMap[s.promoted_member_id]) || s.stripe_subscription_id || null,
+        })).filter(m => m.sub_id),
+      });
+    }
+
+    // ── CoachIQ cleanup: set a member's id manually / mark not-applicable ──
+    if (action === "coachiq-set") {
+      const s = staging.find(x => String(x.id) === String(body.staging_id));
+      if (!s) return res.status(404).json({ error: "staging row not found" });
+      const patch = { updated_at: nowIso() };
+      if (body.not_applicable === true)  { patch.coachiq_not_applicable = true; patch.coachiq_member_id = null; patch.coachiq_collecting = false; }
+      else if (body.not_applicable === false) { patch.coachiq_not_applicable = false; }
+      // "supposed to be on it" → collecting a CoachIQ (invite sent, awaiting signup).
+      // Not N/A and not yet linked — it's a tracked in-between state.
+      if (body.collecting === true)  { patch.coachiq_collecting = true; patch.coachiq_not_applicable = false; }
+      else if (body.collecting === false) { patch.coachiq_collecting = false; }
+      if (typeof body.coachiq_member_id === "string") {
+        const v = body.coachiq_member_id.trim();
+        patch.coachiq_member_id = v || null;
+        if (v) { patch.coachiq_not_applicable = false; patch.coachiq_collecting = false; } // linked → no longer collecting
+      }
+      await sb(`members_staging?id=eq.${s.id}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify(patch) });
+      return res.status(200).json({ ok: true, staging_id: s.id });
+    }
 
     // dismiss: "this finding is wrong / not relevant" — persists per client so
     // it never resurfaces on future checks.
@@ -292,6 +458,18 @@ async function handler(req, res) {
       if (!s) return res.status(404).json({ error: "staging row not found" });
       const acct = client.stripe_connect_account_id;
       if (!acct) return res.status(409).json({ error: "academy not connected to Stripe" });
+      // A card link puts them ON a plan — paying collects the card AND starts
+      // the subscription. So we need a price first; if none is attached, tell
+      // the UI to connect a plan before sending the link.
+      let priceId = body.price_id || s.stripe_price_id || null;
+      if (!priceId && s.offer_price_key) {
+        const rows = await sb(
+          `pricing_catalog?client_id=eq.${encodeURIComponent(clientId)}&offer_price_key=eq.${encodeURIComponent(s.offer_price_key)}` +
+          `&tier=eq.canonical&match_status=eq.confirmed&select=stripe_price_id&limit=1`
+        );
+        priceId = (Array.isArray(rows) && rows[0] && rows[0].stripe_price_id) || null;
+      }
+      if (!priceId) return res.status(200).json({ ok: true, needs_plan: true });
       const email = normEmail(s.parent_email);
       let customerId = s.stripe_customer_id;
       if (!customerId && email) {
@@ -309,12 +487,15 @@ async function handler(req, res) {
       if (customerId && customerId !== s.stripe_customer_id) {
         await sb(`members_staging?id=eq.${s.id}`, {
           method: "PATCH", headers: { Prefer: "return=minimal" },
-          body: JSON.stringify({ stripe_customer_id: customerId, billing_mode: "card", updated_at: nowIso() }),
+          body: JSON.stringify({ stripe_customer_id: customerId, stripe_price_id: priceId, billing_mode: "card", updated_at: nowIso() }),
         }).catch(() => {});
       }
       const origin = (req.headers.origin || "https://portal.byanymeansbusiness.com").replace(/\/+$/, "");
+      // mode=subscription → the checkout collects the card AND starts the sub on
+      // their price (currency comes from the price, so no missing-param error).
       const sess = await stripePost(`/checkout/sessions`, {
-        mode: "setup", customer: customerId,
+        mode: "subscription", customer: customerId,
+        "line_items[0][price]": priceId, "line_items[0][quantity]": 1,
         success_url: `${origin}/client-portal.html?card=saved`,
         cancel_url: `${origin}/client-portal.html?card=cancelled`,
       }, acct);
@@ -336,8 +517,15 @@ async function handler(req, res) {
         };
       } catch (e2) { return res.status(404).json({ error: `Stripe customer not found — ${e2.message}` }); }
       try {
-        const subsR = await stripeGet(`/subscriptions?customer=${encodeURIComponent(custId)}&status=all&limit=10&expand[]=data.items.data.price.product`, client.stripe_connect_account_id);
-        subsOut = (subsR.data || []).map(sub => {
+        // Fallback chain like member-detail: a deep price.product expand can throw on
+        // legacy plan_ prices → without this, the whole list silently shows "No subscriptions"
+        // even when the customer HAS a live (e.g. unpaid) sub.
+        const subBase = `/subscriptions?customer=${encodeURIComponent(custId)}&status=all&limit=10`;
+        let subsR = null;
+        for (const q of [`${subBase}&expand[]=data.items.data.price.product`, `${subBase}&expand[]=data.items.data.price`, subBase]) {
+          try { subsR = await stripeGet(q, client.stripe_connect_account_id); break; } catch (_) { subsR = null; }
+        }
+        subsOut = ((subsR && subsR.data) || []).map(sub => {
           const item = sub.items && sub.items.data && sub.items.data[0];
           const price = item && item.price;
           return {
@@ -371,28 +559,46 @@ async function handler(req, res) {
       let stripe = null;
       let charges = [];
       let subs = [];
+      let stripeError = null;
       const cust = s.stripe_customer_id || (s.__link && s.__link.customer_id) || null;
+      const mapSub = (sub) => {
+        const item = sub.items && sub.items.data && sub.items.data[0];
+        const price = item && item.price;
+        const product = price && price.product;
+        return {
+          sub_id: sub.id, status: sub.status,
+          price_id: price ? price.id : null,
+          product_name: (product && typeof product === "object" && product.name) || null,
+          amount_cents: price ? price.unit_amount : null,
+          interval: price && price.recurring ? `${price.recurring.interval_count > 1 ? price.recurring.interval_count + " " : ""}${price.recurring.interval}` : null,
+          started: sub.created ? new Date(sub.created * 1000).toISOString().slice(0, 10) : null,
+          canceled_at: sub.canceled_at ? new Date(sub.canceled_at * 1000).toISOString().slice(0, 10) : null,
+          // Raw billing fields (unix) so the popup can compute "Next payment".
+          current_period_end: (item && item.current_period_end) || sub.current_period_end || null,
+          trial_end: sub.trial_end || null,
+          cancel_at: sub.cancel_at || null,
+          cancel_at_period_end: !!sub.cancel_at_period_end,
+          paused: !!sub.pause_collection,
+        };
+      };
       if (client.stripe_connect_account_id && cust) {
         // ALL of this customer's subs (live + past), newest-status preferred.
-        try {
-          const r = await stripeGet(`/subscriptions?customer=${encodeURIComponent(cust)}&status=all&limit=20&expand[]=data.items.data.price.product`, client.stripe_connect_account_id);
-          subs = (r.data || []).map(sub => {
-            const item = sub.items && sub.items.data && sub.items.data[0];
-            const price = item && item.price;
-            return {
-              sub_id: sub.id, status: sub.status,
-              price_id: price ? price.id : null,
-              product_name: (price && price.product && price.product.name) || null,
-              amount_cents: price ? price.unit_amount : null,
-              interval: price && price.recurring ? `${price.recurring.interval_count > 1 ? price.recurring.interval_count + " " : ""}${price.recurring.interval}` : null,
-              started: sub.created ? new Date(sub.created * 1000).toISOString().slice(0, 10) : null,
-              canceled_at: sub.canceled_at ? new Date(sub.canceled_at * 1000).toISOString().slice(0, 10) : null,
-            };
-          });
-          // Primary sub (the one on the staging row, else the first active-ish).
-          stripe = subs.find(x => x.sub_id === s.stripe_subscription_id)
-            || subs.find(x => ACTIVEISH.has(x.status)) || subs[0] || null;
-        } catch (_) {}
+        // Try the rich product-expanded query first; if Stripe rejects the deep
+        // expand (legacy plan_ prices, expand-depth quirks), fall back to a
+        // lighter expand, then a bare query — a real subscription must NEVER
+        // silently render as "No subscription". Capture the error if all fail.
+        const subBase = `/subscriptions?customer=${encodeURIComponent(cust)}&status=all&limit=20`;
+        for (const q of [`${subBase}&expand[]=data.items.data.price.product`, `${subBase}&expand[]=data.items.data.price`, subBase]) {
+          try {
+            const r = await stripeGet(q, client.stripe_connect_account_id);
+            subs = (r.data || []).map(mapSub);
+            stripeError = null;
+            break;
+          } catch (e2) { stripeError = (e2 && e2.message) ? e2.message : String(e2); }
+        }
+        // Primary sub (the one on the staging row, else the first active-ish).
+        stripe = subs.find(x => x.sub_id === s.stripe_subscription_id)
+          || subs.find(x => ACTIVEISH.has(x.status)) || subs[0] || null;
         try {
           const ch = await stripeGet(`/charges?customer=${encodeURIComponent(cust)}&limit=15`, client.stripe_connect_account_id);
           charges = (ch.data || []).map(c2 => ({
@@ -414,6 +620,23 @@ async function handler(req, res) {
         }
         if (best) recommendation = { key: best.key, label: best.label, diff_cents: bestD };
       }
+      // Flag ambiguous matches: every Stripe customer that could be this member,
+      // so staff can confirm the right one before connecting (the sheet email
+      // and the Stripe email don't always agree → name/phone matches surface
+      // duplicate or alternate customers).
+      let candidates = [];
+      try { candidates = await gatherCandidates(client.stripe_connect_account_id, s, cust); } catch (_) {}
+      const ambiguous = candidates.length > 1;
+      // "Next payment" verdict for the primary sub — same logic as the cleanup
+      // table column, so the popup and the row always agree.
+      const next_payment = computeNextPayment({
+        link: stripe ? {
+          status: stripe.status, current_period_end: stripe.current_period_end,
+          trial_end: stripe.trial_end, cancel_at: stripe.cancel_at,
+          cancel_at_period_end: stripe.cancel_at_period_end, paused: stripe.paused,
+        } : null,
+        cat: stripe ? { interval: stripe.interval } : null, offerKey: s.plan || "", altPay: false,
+      });
       return res.status(200).json({
         ok: true,
         member: {
@@ -425,9 +648,56 @@ async function handler(req, res) {
           promoted: !!s.promoted, promoted_member_id: s.promoted_member_id || null,
           raw: s.raw && typeof s.raw === "object" ? s.raw : null, // extra CSV columns
         },
-        stripe, subs, charges, targets, recommendation,
+        stripe, subs, charges, targets, recommendation, next_payment,
+        stripe_error: stripeError, candidates, ambiguous,
         stripe_account_id: client.stripe_connect_account_id || null,
       });
+    }
+
+    // change-offer: reassign which OFFER-PRICE this member is on, WITHOUT touching
+    // their Stripe price/sub. Flags it as manually set. (For when Stripe + the CSV
+    // disagree on the offer — e.g. CSV says 2/wk but they actually pay for Summer.)
+    // body.map_price=true ALSO maps their Stripe price → this offer-price in the catalog.
+    if (action === "change-offer") {
+      const s = staging.find(x => String(x.id) === String(body.staging_id));
+      if (!s) return res.status(404).json({ error: "staging row not found" });
+      const key = (body.offer_price_key || "").toString();
+      if (!key) return res.status(400).json({ error: "offer_price_key required" });
+      const offerId = body.offer_id || null;
+      await sb(`members_staging?id=eq.${s.id}`, {
+        method: "PATCH", headers: { Prefer: "return=minimal" },
+        body: JSON.stringify({
+          offer_price_key: key,
+          ...(offerId ? { offer_id: offerId } : {}),
+          offer_overridden: true,
+          match_status: s.is_duplicate ? "duplicate" : "ok",
+          cleanup_notes: `offer set manually to ${key} (price unchanged)`,
+          updated_at: nowIso(),
+        }),
+      });
+      // Carry to the live member if already promoted.
+      if (s.promoted_member_id && offerId) {
+        await sb(`members?id=eq.${encodeURIComponent(s.promoted_member_id)}`, {
+          method: "PATCH", headers: { Prefer: "return=minimal" },
+          body: JSON.stringify({ offer_id: offerId, updated_at: nowIso() }),
+        }).catch(() => {});
+      }
+      // Optional: also map their Stripe price → this offer-price (fixes everyone on it).
+      let priceMapped = false;
+      if (body.map_price && s.stripe_price_id) {
+        try {
+          const slotCanon = await sb(
+            `pricing_catalog?client_id=eq.${encodeURIComponent(clientId)}&offer_price_key=eq.${encodeURIComponent(key)}&tier=eq.canonical&stripe_price_id=neq.${encodeURIComponent(s.stripe_price_id)}&select=stripe_price_id&limit=1`
+          );
+          const tier = (Array.isArray(slotCanon) && slotCanon[0]) ? "legacy_match" : "canonical";
+          await sb(`pricing_catalog?client_id=eq.${encodeURIComponent(clientId)}&stripe_price_id=eq.${encodeURIComponent(s.stripe_price_id)}`, {
+            method: "PATCH", headers: { Prefer: "return=minimal" },
+            body: JSON.stringify({ offer_id: offerId, offer_price_key: key, tier, is_routable: tier === "canonical", match_status: "confirmed", match_source: "cleanup-change-offer", matched_at: nowIso(), updated_at: nowIso() }),
+          });
+          priceMapped = true;
+        } catch (_) { /* non-fatal */ }
+      }
+      return res.status(200).json({ ok: true, offer_price_key: key, price_mapped: priceMapped });
     }
 
     // connect-offer: tie a staged member's price to an offer-price slot. With a
@@ -483,11 +753,24 @@ async function handler(req, res) {
         method: "PATCH", headers: { Prefer: "return=minimal" },
         body: JSON.stringify({
           offer_price_key: key,
+          ...(offerId ? { offer_id: offerId } : {}),
           match_status: s.is_duplicate ? "duplicate" : (s.stripe_linked || priceId ? "ok" : "needs_fix"),
           cleanup_notes: `connected to ${key}`,
           updated_at: nowIso(),
         }),
       });
+      // Backfill any already-promoted live members on this same price — connecting
+      // the price to an offer should scope them too, not just future imports.
+      if (priceId && offerId) {
+        try {
+          await sb(
+            `members?client_id=eq.${encodeURIComponent(clientId)}` +
+            `&stripe_price_id=eq.${encodeURIComponent(priceId)}&offer_id=is.null`,
+            { method: "PATCH", headers: { Prefer: "return=minimal" },
+              body: JSON.stringify({ offer_id: offerId, updated_at: nowIso() }) }
+          );
+        } catch (_) { /* non-fatal */ }
+      }
       return res.status(200).json({ ok: true, counts: await flagCounts(clientId, batchId) });
     }
 
@@ -499,6 +782,28 @@ async function handler(req, res) {
       const skipped = [];
       const memberIds = [];
 
+      // Offer scoping (V2): a member belongs to the offer its Stripe price maps
+      // to. Build a price_id → offer_id map once from this academy's catalog, plus
+      // an offer_price_key → offer_id fallback (member matched to a plan slot but
+      // not yet on a concrete Stripe price). Members whose price isn't mapped to
+      // an offer stay NULL and surface in the "no offer" cleanup flag.
+      const priceToOffer = new Map();
+      const keyToOffer = new Map();
+      try {
+        const catRows = await sb(
+          `pricing_catalog?client_id=eq.${encodeURIComponent(clientId)}` +
+          `&offer_id=not.is.null&select=stripe_price_id,offer_price_key,offer_id`
+        );
+        for (const c of (Array.isArray(catRows) ? catRows : [])) {
+          if (c.stripe_price_id && c.offer_id) priceToOffer.set(c.stripe_price_id, c.offer_id);
+          if (c.offer_price_key && c.offer_id && !keyToOffer.has(c.offer_price_key)) keyToOffer.set(c.offer_price_key, c.offer_id);
+        }
+      } catch (_) { /* non-fatal — promote without offer scoping */ }
+      const resolveOfferId = (s) =>
+        (s.stripe_price_id && priceToOffer.get(s.stripe_price_id)) ||
+        (s.offer_price_key && keyToOffer.get(s.offer_price_key)) ||
+        null;
+
       for (const s of staging) {
         if (onlyIds && !onlyIds.has(String(s.id))) continue;
         if (s.promoted) { skipped.push({ id: s.id, reason: "already promoted" }); continue; }
@@ -506,6 +811,8 @@ async function handler(req, res) {
         const athleteName = (s.athlete_name || "").toString().trim();
         const parentEmail = normEmail(s.parent_email);
         if (!athleteName || !parentEmail) { skipped.push({ id: s.id, reason: "missing athlete_name or parent_email" }); continue; }
+
+        const offerId = resolveOfferId(s);
 
         // 1:1 column copy matching the live `members` insert shape in checkout.js.
         const memberFields = {
@@ -521,8 +828,12 @@ async function handler(req, res) {
           stripe_price_id:        s.stripe_price_id || null,
           billing_mode:           s.billing_mode || null,
           joined_date:            s.joined_date || null,
+          coachiq_member_id:      s.coachiq_member_id || null,
           updated_at:             nowIso(),
         };
+        // Only set offer_id when resolved, so re-importing a member whose price
+        // isn't (yet) offer-mapped never clobbers an existing member's offer.
+        if (offerId) memberFields.offer_id = offerId;
 
         // Idempotency on (client_id, parent_email, athlete_name): PATCH if exists, else POST.
         const existingRows = await sb(
@@ -556,6 +867,7 @@ async function handler(req, res) {
             promoted: true,
             promoted_member_id: memberId,
             match_status: "ok",
+            ...(offerId ? { offer_id: offerId } : {}),
             updated_at: nowIso(),
           }),
         });
@@ -601,34 +913,74 @@ async function handler(req, res) {
     if (action === "search-customers") {
       const acct = client.stripe_connect_account_id;
       if (!acct) return res.status(409).json({ error: "academy not connected to Stripe" });
-      const q = (body.q || "").toString().trim().replace(/["\\]/g, "");
-      if (!q) return res.status(400).json({ error: "q required" });
-      let customers = [];
-      try {
-        const r = await stripeGet(`/customers/search?query=${encodeURIComponent(`name~"${q}" OR email~"${q}"`)}&limit=10`, acct);
-        customers = (r.data || []).map(cu => ({ id: cu.id, name: cu.name || null, email: cu.email || null }));
-      } catch (_) {
-        // search API not available / errored → fall back to exact email lookup
-        try {
-          const r = await stripeGet(`/customers?email=${encodeURIComponent(q.toLowerCase())}&limit=10`, acct);
-          customers = (r.data || []).map(cu => ({ id: cu.id, name: cu.name || null, email: cu.email || null }));
-        } catch (_2) {}
+      // Search by EVERYTHING we have on them — not just one field. Gather the
+      // member's email, parent name, athlete name, and phone (+ any manual q).
+      const clean = (v) => String(v || "").trim().replace(/["\\]/g, "");
+      const terms = [];
+      const addTerm = (v) => { v = clean(v); if (v && !terms.some(t => t.toLowerCase() === v.toLowerCase())) terms.push(v); };
+      addTerm(body.q);
+      const srow = body.staging_id ? staging.find(x => String(x.id) === String(body.staging_id)) : null;
+      let phoneDigits = "";
+      if (srow) {
+        addTerm(srow.parent_email); addTerm(srow.parent_name); addTerm(srow.athlete_name);
+        phoneDigits = String(srow.parent_phone || "").replace(/\D/g, "");
       }
-      // attach each customer's best sub (active-ish preferred) for context
+      if (!terms.length && !phoneDigits) return res.status(400).json({ error: "q or staging_id required" });
+      const searched = terms.slice();
+      const found = new Map();
+      // One combined Stripe search across email + name (+ phone).
+      try {
+        const clauses = [];
+        for (const t of terms) { clauses.push(`email~"${t}"`); clauses.push(`name~"${t}"`); }
+        if (phoneDigits) { clauses.push(`phone~"${phoneDigits.slice(-10)}"`); searched.push("phone"); }
+        if (clauses.length) {
+          const r = await stripeGet(`/customers/search?query=${encodeURIComponent(clauses.join(" OR "))}&limit=20`, acct);
+          (r.data || []).forEach(c => found.set(c.id, c));
+        }
+      } catch (_) { /* search API may 400 / be disabled — exact lookups below still run */ }
+      // Exact email lookups as a belt-and-suspenders fallback.
+      for (const t of terms) {
+        if (!t.includes("@")) continue;
+        try { const r = await stripeGet(`/customers?email=${encodeURIComponent(t.toLowerCase())}&limit=5`, acct); (r.data || []).forEach(c => found.set(c.id, c)); } catch (_) {}
+      }
+      const customers = [...found.values()].map(cu => ({ id: cu.id, name: cu.name || null, email: cu.email || null, phone: cu.phone || null }));
+      // attach the FULL Stripe picture per candidate (best sub + next payment +
+      // last charge) so staff see everything before connecting — not just a name.
       for (const cu of customers) {
         try {
-          const sr = await stripeGet(`/subscriptions?customer=${encodeURIComponent(cu.id)}&status=all&limit=5&expand[]=data.items.data.price`, acct);
+          const sr = await stripeGet(`/subscriptions?customer=${encodeURIComponent(cu.id)}&status=all&limit=5&expand[]=data.items.data.price.product`, acct);
           const subs = sr.data || [];
+          cu.sub_count = subs.length;
           const best = subs.find(s2 => ACTIVEISH.has(s2.status)) || subs[0];
           if (best) {
-            const price = best.items && best.items.data && best.items.data[0] && best.items.data[0].price;
+            const item = best.items && best.items.data && best.items.data[0];
+            const price = item && item.price;
+            const product = price && price.product;
             cu.sub_id = best.id; cu.status = best.status;
             cu.price_id = price ? price.id : null;
             cu.amount_cents = price ? price.unit_amount : null;
+            cu.product_name = (product && typeof product === "object" && product.name) || null;
+            cu.interval = price && price.recurring ? `${price.recurring.interval_count > 1 ? price.recurring.interval_count + " " : ""}${price.recurring.interval}` : null;
+            cu.cancel_at_period_end = !!best.cancel_at_period_end;
+            cu.paused = !!best.pause_collection;
+            cu.since = best.created ? new Date(best.created * 1000).toISOString().slice(0, 10) : null;
+            const cpe = (item && item.current_period_end) || best.current_period_end || null;
+            cu.next_payment = best.status === "trialing"
+              ? (best.trial_end ? new Date(best.trial_end * 1000).toISOString().slice(0, 10) : null)
+              : (best.cancel_at_period_end || best.cancel_at || best.pause_collection) ? null
+              : (cpe ? new Date(cpe * 1000).toISOString().slice(0, 10) : null);
           }
         } catch (_) {}
+        // Last payment — useful even with no sub (prepaid one-times).
+        try {
+          const ch = await stripeGet(`/charges?customer=${encodeURIComponent(cu.id)}&limit=3`, acct);
+          const list = ch.data || [];
+          cu.charge_count = list.length;
+          const paid = list.find(c => c.status === "succeeded" && !c.refunded) || list[0];
+          if (paid) cu.last_charge = { amount_cents: paid.amount, date: paid.created ? new Date(paid.created * 1000).toISOString().slice(0, 10) : null, one_time: !paid.invoice, refunded: !!paid.refunded };
+        } catch (_) {}
       }
-      return res.status(200).json({ ok: true, customers });
+      return res.status(200).json({ ok: true, customers, searched, stripe_account_id: acct });
     }
 
     // link-customer: tie an existing Stripe customer (+ their best sub/price) to
@@ -640,14 +992,18 @@ async function handler(req, res) {
       const acct = client.stripe_connect_account_id;
       const custId = body.customer_id;
       if (!acct || !custId) return res.status(400).json({ error: "customer_id required" });
-      let subId = body.sub_id || null, priceId = body.price_id || null;
+      let subId = body.sub_id || null, priceId = body.price_id || null, coachiqUserId = null;
       if (!subId) {
         try {
           const sr = await stripeGet(`/subscriptions?customer=${encodeURIComponent(custId)}&status=all&limit=5&expand[]=data.items.data.price`, acct);
           const subs = sr.data || [];
           const best = subs.find(s2 => ACTIVEISH.has(s2.status)) || subs[0];
-          if (best) { subId = best.id; const p = best.items && best.items.data && best.items.data[0] && best.items.data[0].price; priceId = priceId || (p && p.id) || null; }
+          if (best) { subId = best.id; const p = best.items && best.items.data && best.items.data[0] && best.items.data[0].price; priceId = priceId || (p && p.id) || null; coachiqUserId = (best.metadata && best.metadata.userId) || null; }
         } catch (_) {}
+      }
+      // CoachIQ stamps the member's USER id on subs it created → auto-link it.
+      if (subId && !coachiqUserId) {
+        try { const sub = await stripeGet(`/subscriptions/${encodeURIComponent(subId)}`, acct); coachiqUserId = (sub.metadata && sub.metadata.userId) || null; } catch (_) {}
       }
       const status = s.is_duplicate ? "duplicate" : await priceVerdict(priceId);
       await sb(`members_staging?id=eq.${s.id}`, {
@@ -655,6 +1011,7 @@ async function handler(req, res) {
         body: JSON.stringify({
           stripe_customer_id: custId, stripe_subscription_id: subId, stripe_price_id: priceId,
           stripe_linked: true, billing_mode: null, match_status: status,
+          ...(coachiqUserId ? { coachiq_member_id: coachiqUserId } : {}),
           cleanup_notes: "connected to an existing Stripe customer", updated_at: nowIso(),
         }),
       });
@@ -720,6 +1077,7 @@ async function handler(req, res) {
     if (action === "remove-staged") {
       const s = staging.find(x => String(x.id) === String(body.staging_id));
       if (!s) return res.status(404).json({ error: "staging row not found" });
+      const removedRow = { ...s }; delete removedRow.__link; // full snapshot for Undo
       await sb(`members_staging?id=eq.${s.id}&client_id=eq.${encodeURIComponent(clientId)}`, { method: "DELETE", headers: { Prefer: "return=minimal" } });
       // If the dup group is down to one row, clear its duplicate flag and
       // recompute its verdict from the notes it already carries.
@@ -736,7 +1094,40 @@ async function handler(req, res) {
           body: JSON.stringify({ is_duplicate: false, match_status: status, updated_at: nowIso() }),
         });
       }
+      return res.status(200).json({ ok: true, removed_row: removedRow, counts: await flagCounts(clientId, batchId) });
+    }
+
+    // ── Undo primitives ────────────────────────────────────────────────
+    // patch-staging: set whitelisted fields on a staging row (inverse of
+    // alt-pay / connect / link by clearing what they set).
+    if (action === "patch-staging") {
+      const s = staging.find(x => String(x.id) === String(body.staging_id));
+      if (!s) return res.status(404).json({ error: "staging row not found" });
+      const allowed = new Set(["billing_mode", "offer_price_key", "stripe_customer_id", "stripe_subscription_id", "stripe_price_id", "stripe_linked", "match_status", "is_duplicate", "cleanup_notes"]);
+      const fields = (body.fields && typeof body.fields === "object") ? body.fields : {};
+      const patch = { updated_at: nowIso() };
+      for (const k of Object.keys(fields)) if (allowed.has(k)) patch[k] = fields[k];
+      await sb(`members_staging?id=eq.${s.id}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify(patch) });
       return res.status(200).json({ ok: true, counts: await flagCounts(clientId, batchId) });
+    }
+    // restore-staged: re-insert a previously removed/added row (inverse of remove).
+    if (action === "restore-staged") {
+      const row = (body.row && typeof body.row === "object") ? body.row : null;
+      if (!row) return res.status(400).json({ error: "row required" });
+      const cols = ["id", "athlete_name", "parent_name", "parent_email", "parent_phone", "plan", "offer_price_key", "status", "joined_date", "stripe_customer_id", "stripe_subscription_id", "stripe_price_id", "raw", "email_norm", "match_status", "cleanup_notes", "stripe_linked", "is_duplicate", "billing_mode", "source_row"];
+      const rec = { client_id: clientId, import_batch_id: batchId };
+      for (const k of cols) if (row[k] !== undefined) rec[k] = row[k];
+      await sb(`members_staging`, { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify([rec]) });
+      return res.status(200).json({ ok: true, counts: await flagCounts(clientId, batchId) });
+    }
+    // undismiss: remove a dismissal key (inverse of the deny buttons).
+    if (action === "undismiss") {
+      const key = (body.key || "").toString();
+      if (dismissed.has(key)) {
+        dismissed.delete(key);
+        await sb(`clients?id=eq.${encodeURIComponent(clientId)}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ sorter_dismissals: [...dismissed] }) });
+      }
+      return res.status(200).json({ ok: true });
     }
 
     // ════════════════════════════ CHECK ════════════════════════════
@@ -762,6 +1153,7 @@ async function handler(req, res) {
             amount_cents: price ? price.unit_amount : null,
             name: (cust && cust.name) || null,
             email: normEmail(cust && cust.email) || null,
+            ...subBillingFacts(sub),
           };
           bySubId.set(sub.id, entry);
           if (entry.customer_id) {
@@ -1018,6 +1410,7 @@ async function handler(req, res) {
       const cat = priceId ? catalogByPrice[priceId] : null;
       const key = s.offer_price_key || (cat && cat.offer_price_key) || null;
       const amount = cat && cat.amount_cents != null ? cat.amount_cents : (link && link.amount_cents) || null;
+      const next_payment = computeNextPayment({ link, cat, offerKey: key, altPay });
       const issues = [];
       if (dupIds.has(s.id)) issues.push("duplicate");
       if (noOfferIds.has(s.id)) issues.push("no offer");
@@ -1042,6 +1435,7 @@ async function handler(req, res) {
         is_dup_copy: dupCopyIds.has(s.id),
         dup_key: dupKeyById[s.id] || null,
         suggestion: suggById[s.id] || null,
+        next_payment, // { state, date, label, fixable, reason }
       };
     }).sort((a, b) =>
       (b.needs_work - a.needs_work) ||
@@ -1052,6 +1446,7 @@ async function handler(req, res) {
       ok: true,
       academy: client.business_name,
       batch_id: batchId,
+      stripe_account_id: client.stripe_connect_account_id || null,
       counts: {
         staged: staging.length,
         staged_no_stripe: stagedNoStripe.length,

@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Our Story — DETAIL Miami</title>
+  <meta name="description" content="Learn about DETAIL Miami — elite basketball training in Miami Lakes, FL. Part of the By Any Means global network." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Anton&family=Inter+Tight:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #080808; --surface: #101010; --surface2: #181818;
+      --border: rgba(255,255,255,0.08);
+      --brand: #e2dd9f; --brand-dim: rgba(226,221,159,0.10);
+      --fg: #ffffff; --fg-sub: rgba(255,255,255,0.62); --fg-muted: rgba(255,255,255,0.35);
+      --font-d: 'Anton', sans-serif; --font-b: 'Inter Tight', sans-serif;
+      --max: 1200px;
+    }
+    html { scroll-behavior: smooth; }
+    body { background: var(--bg); color: var(--fg); font-family: var(--font-b); line-height: 1.6; overflow-x: hidden; }
+
+    /* NAV */
+    nav {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+      background: rgba(8,8,8,0.92); backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border);
+      padding: 0 24px; height: 64px;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .nav-logo {
+      font-family: var(--font-d); font-size: 20px; letter-spacing: .06em;
+      text-transform: uppercase; color: var(--fg); text-decoration: none;
+      display: flex; align-items: center;
+    }
+    .nav-logo span { color: var(--brand); }
+    .nav-links { display: flex; align-items: center; gap: 32px; list-style: none; }
+    .nav-links a { font-size: 13px; font-weight: 500; letter-spacing: .04em; text-transform: uppercase; color: var(--fg-sub); text-decoration: none; transition: color .2s; }
+    .nav-links a:hover { color: var(--fg); }
+    .nav-links a.active { color: var(--brand); }
+    .nav-cta { background: var(--brand); color: #1a1a00; font-family: var(--font-d); font-size: 14px; letter-spacing: .06em; text-transform: uppercase; padding: 10px 22px; border-radius: 6px; text-decoration: none; transition: opacity .2s; white-space: nowrap; }
+    .nav-cta:hover { opacity: .88; }
+    .nav-mobile-toggle { display: none; flex-direction: column; gap: 5px; cursor: pointer; background: none; border: none; padding: 4px; }
+    .nav-mobile-toggle span { display: block; width: 24px; height: 2px; background: var(--fg); border-radius: 2px; transition: .3s; }
+    .nav-drawer {
+      display: none; position: fixed; top: 64px; left: 0; right: 0; bottom: 0;
+      background: var(--bg); z-index: 99; padding: 32px 24px;
+      flex-direction: column; gap: 8px;
+    }
+    .nav-drawer.open { display: flex; }
+    .nav-drawer a { font-family: var(--font-d); font-size: 26px; letter-spacing: .04em; text-transform: uppercase; color: var(--fg-sub); text-decoration: none; padding: 10px 0; border-bottom: 1px solid var(--border); }
+    .nav-drawer a:hover { color: var(--brand); }
+    .nav-drawer .drawer-cta { margin-top: 24px; background: var(--brand); color: #1a1a00; text-align: center; border-radius: 8px; }
+    @media (max-width: 768px) {
+      .nav-links { display: none; }
+      .nav-cta { display: none; }
+      .nav-mobile-toggle { display: flex; }
+    }
+
+    /* PAGE HERO */
+    .page-hero {
+      padding: 140px 24px 0;
+      text-align: center;
+      position: relative;
+    }
+    .page-hero .eyebrow {
+      font-size: 11px; font-weight: 600; letter-spacing: .2em;
+      text-transform: uppercase; color: var(--brand); margin-bottom: 16px;
+      display: flex; align-items: center; justify-content: center; gap: 10px;
+    }
+    .page-hero .eyebrow::before { content: ''; display: block; width: 24px; height: 1.5px; background: var(--brand); }
+    .page-hero .eyebrow::after { content: ''; display: block; width: 24px; height: 1.5px; background: var(--brand); }
+    .page-hero h1 {
+      font-family: var(--font-d); font-size: clamp(52px, 9vw, 100px);
+      text-transform: uppercase; line-height: .95; letter-spacing: .01em;
+      margin-bottom: 24px;
+    }
+    .page-hero h1 span { color: var(--brand); }
+    .page-hero .hero-sub {
+      font-size: clamp(16px, 2vw, 19px); color: var(--fg-sub); max-width: 520px;
+      margin: 0 auto 48px; line-height: 1.55; font-weight: 300;
+    }
+    .hero-photo {
+      max-width: 960px; margin: 0 auto;
+      border-radius: 16px 16px 0 0; overflow: hidden;
+    }
+    .hero-photo img {
+      width: 100%; max-height: 500px; object-fit: cover; display: block;
+    }
+
+    /* OUR STORY */
+    .story-section { padding: 80px 24px 100px; background: var(--bg); }
+    .story-inner { max-width: var(--max); margin: 0 auto; }
+    .section-eyebrow {
+      font-size: 11px; font-weight: 600; letter-spacing: .2em;
+      text-transform: uppercase; color: var(--brand); margin-bottom: 20px;
+      display: flex; align-items: center; gap: 10px;
+    }
+    .section-eyebrow::before { content: ''; display: block; width: 24px; height: 1.5px; background: var(--brand); }
+    .story-grid {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 80px; align-items: start;
+      margin-top: 48px;
+    }
+    .story-left { }
+    .story-heading {
+      font-family: var(--font-d); font-size: clamp(36px, 5vw, 60px);
+      line-height: .95; letter-spacing: .01em; text-transform: uppercase;
+      margin-bottom: 28px;
+    }
+    .story-heading span { color: var(--brand); }
+    .story-body { font-size: 17px; color: var(--fg-sub); line-height: 1.7; font-weight: 300; }
+    .story-body + .story-body { margin-top: 18px; }
+    .story-right { position: relative; top: 0; }
+    @media (max-width: 900px) {
+      .story-grid { grid-template-columns: 1fr; gap: 48px; }
+    }
+
+    /* VALUES */
+    .values-section { padding: 80px 24px 100px; background: var(--surface); }
+    .values-inner { max-width: var(--max); margin: 0 auto; }
+    .values-header { margin-bottom: 56px; }
+    .section-title {
+      font-family: var(--font-d); font-size: clamp(36px, 6vw, 72px);
+      line-height: .95; letter-spacing: .01em; text-transform: uppercase;
+      margin-bottom: 16px;
+    }
+    .section-title span { color: var(--brand); }
+    .values-grid {
+      display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px;
+    }
+    .value-card {
+      background: var(--bg); border: 1px solid var(--border);
+      border-radius: 14px; padding: 32px 28px;
+    }
+    .value-icon {
+      width: 48px; height: 48px; border-radius: 10px;
+      background: var(--brand-dim); border: 1px solid rgba(226,221,159,0.2);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 22px; margin-bottom: 20px;
+    }
+    .value-card h3 {
+      font-family: var(--font-d); font-size: 22px; text-transform: uppercase;
+      letter-spacing: .02em; margin-bottom: 10px;
+    }
+    .value-card p { font-size: 14px; color: var(--fg-sub); line-height: 1.65; }
+    @media (max-width: 768px) { .values-grid { grid-template-columns: 1fr 1fr; } }
+    @media (max-width: 480px) { .values-grid { grid-template-columns: 1fr; } }
+
+    /* CTA */
+    .cta-section { background: var(--bg); padding: 80px 24px 100px; text-align: center; }
+    .cta-box {
+      max-width: 760px; margin: 0 auto;
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 24px; padding: 80px 48px; position: relative; overflow: hidden;
+    }
+    .cta-box::before {
+      content: ''; position: absolute; top: -60px; left: 50%; transform: translateX(-50%);
+      width: 400px; height: 400px; border-radius: 50%;
+      background: radial-gradient(circle, rgba(226,221,159,0.07) 0%, transparent 70%);
+      pointer-events: none;
+    }
+    .cta-eyebrow { margin-bottom: 20px; justify-content: center; }
+    .cta-title {
+      font-family: var(--font-d); font-size: clamp(36px, 6vw, 64px);
+      line-height: .95; text-transform: uppercase; margin-bottom: 20px;
+    }
+    .cta-title span { color: var(--brand); }
+    .cta-body { font-size: 16px; color: var(--fg-sub); max-width: 460px; margin: 0 auto 40px; line-height: 1.6; }
+    .btn-primary {
+      display: inline-block; background: var(--brand); color: #1a1a00;
+      font-family: var(--font-d); font-size: 16px; letter-spacing: .06em;
+      text-transform: uppercase; padding: 18px 40px; border-radius: 6px;
+      text-decoration: none; transition: opacity .2s;
+    }
+    .btn-primary:hover { opacity: .88; }
+    @media (max-width: 600px) { .cta-box { padding: 48px 24px; } }
+
+    /* FOOTER */
+    footer { background: var(--bg); border-top: 1px solid var(--border); padding: 40px 24px; }
+    .footer-bottom {
+      max-width: var(--max); margin: 0 auto;
+      display: flex; justify-content: space-between; align-items: center;
+      font-size: 12px; color: var(--fg-muted); gap: 16px; flex-wrap: wrap;
+    }
+    .footer-logo { font-family: var(--font-d); font-size: 16px; letter-spacing: .06em; text-transform: uppercase; }
+    .footer-logo span { color: var(--brand); }
+    @media (max-width: 480px) { .footer-bottom { flex-direction: column; text-align: center; } }
+  </style>
+</head>
+<body>
+
+<!-- NAVIGATION -->
+<nav>
+  <a class="nav-logo" href="/miami-website/">
+    <img src="https://assets.cdn.filesafe.space/RBnlVgmXNMbFpgFGPGcv/media/672031f1ca958b541fa3fc8f.png" alt="DETAIL Miami" style="height:36px;width:auto;object-fit:contain;vertical-align:middle;margin-right:8px">
+    DETAIL <span>Miami</span>
+  </a>
+  <ul class="nav-links">
+    <li><a href="about.html" class="active">About</a></li>
+    <li><a href="programs.html">Programs</a></li>
+    <li><a href="rentals.html">Rentals</a></li>
+    <li><a href="faq.html">FAQ</a></li>
+    <li><a href="contact.html">Contact</a></li>
+  </ul>
+  <a class="nav-cta" href="/miami-funnel/">Book Free Trial</a>
+  <button class="nav-mobile-toggle" id="menuBtn" aria-label="Open menu">
+    <span></span><span></span><span></span>
+  </button>
+</nav>
+
+<div class="nav-drawer" id="navDrawer">
+  <a href="about.html">About</a>
+  <a href="programs.html">Programs</a>
+  <a href="rentals.html">Rentals</a>
+  <a href="faq.html">FAQ</a>
+  <a href="contact.html">Contact</a>
+  <a href="/miami-funnel/" class="drawer-cta">Book Free Trial</a>
+</div>
+
+<!-- HERO -->
+<div class="page-hero">
+  <div class="eyebrow">Miami Lakes, FL</div>
+  <h1>Our <span>Story</span></h1>
+  <p class="hero-sub">
+    More than just basketball training. A community built to develop athletes and people.
+  </p>
+  <div class="hero-photo">
+    <img src="https://assets.cdn.filesafe.space/RBnlVgmXNMbFpgFGPGcv/media/09fdd1f6-f8a8-45a5-9346-1afa69f5e3ca.webp"
+         alt="DETAIL Miami facility">
+  </div>
+</div>
+
+<!-- OUR STORY -->
+<section class="story-section">
+  <div class="story-inner">
+    <div class="section-eyebrow">Who We Are</div>
+    <div class="story-grid">
+      <div class="story-left">
+        <div class="story-heading">
+          Built On<br><span>More Than</span><br>The Game
+        </div>
+        <p class="story-body">
+          DETAIL Miami was built on a simple belief: basketball is a vehicle for life. Our coaches don't just teach the game -- they invest in the student-athlete as a whole person. Discipline, work ethic, and character development are woven into every session.
+        </p>
+        <p class="story-body" style="margin-top:18px;">
+          From our youngest Elementary Academy players to our elite ADAPT Club athletes, every player who walks through our doors gets access to world-class instruction and a community that genuinely pushes them to be their best.
+        </p>
+        <p class="story-body" style="margin-top:18px;">
+          We are proud members of the By Any Means global network -- 60+ locations, 150+ coaches, and 42+ countries united by a single mission: develop the full athlete.
+        </p>
+        <div style="margin-top:40px;">
+          <a href="/miami-funnel/" class="btn-primary">Claim Free Trial</a>
+        </div>
+      </div>
+      <div class="story-right">
+        <img src="https://assets.cdn.filesafe.space/RBnlVgmXNMbFpgFGPGcv/media/44d3b813-8d2f-4619-bc4b-51909f0ec456.webp"
+             alt="BAM training session"
+             style="width:100%;border-radius:12px;object-fit:cover;max-height:480px;display:block;">
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- CORE VALUES -->
+<section class="values-section">
+  <div class="values-inner">
+    <div class="values-header">
+      <div class="section-eyebrow">What We Stand For</div>
+      <div class="section-title">Our Core <span>Values</span></div>
+    </div>
+    <div class="values-grid">
+      <div class="value-card">
+        <div class="value-icon">🏀</div>
+        <h3>Elite Skill Development</h3>
+        <p>Structured, progressive curriculum built on fundamentals that scale to the elite level. Every rep has a purpose.</p>
+      </div>
+      <div class="value-card">
+        <div class="value-icon">🧠</div>
+        <h3>Mental Toughness</h3>
+        <p>IQ, decision-making, and composure training. The mental skills that separate good players from great ones.</p>
+      </div>
+      <div class="value-card">
+        <div class="value-icon">🤝</div>
+        <h3>Character First</h3>
+        <p>We develop people, not just players. Accountability, respect, and work ethic are non-negotiable in every session.</p>
+      </div>
+      <div class="value-card">
+        <div class="value-icon">🌎</div>
+        <h3>Global Network</h3>
+        <p>Part of the By Any Means family -- 60+ locations, 42+ countries, and 800k+ strong online community.</p>
+      </div>
+      <div class="value-card">
+        <div class="value-icon">📈</div>
+        <h3>Proven Systems</h3>
+        <p>Our curriculum is field-tested across thousands of athletes worldwide. Not guesswork -- a proven development path.</p>
+      </div>
+      <div class="value-card">
+        <div class="value-icon">🏅</div>
+        <h3>Real Results</h3>
+        <p>3,200+ players trained. College placements. AAU success. Real outcomes for real families who trusted the process.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- CTA -->
+<section class="cta-section">
+  <div class="cta-box">
+    <div class="section-eyebrow cta-eyebrow">No Cost, No Commitment</div>
+    <div class="cta-title">
+      Come See It<br><span>For Yourself</span>
+    </div>
+    <p class="cta-body">
+      One session, on us. Bring your player and experience firsthand why hundreds of Miami families trust DETAIL.
+    </p>
+    <a href="/miami-funnel/" class="btn-primary" style="font-size:18px; padding:20px 56px;">Book Free Trial</a>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer>
+  <div class="footer-bottom">
+    <span class="footer-logo">DETAIL <span>Miami</span></span>
+    <span>&copy; 2026 By Any Means Basketball &middot; 16414 NW 54th Ave, Miami Lakes, FL 33014</span>
+  </div>
+</footer>
+
+<script>
+  var menuBtn   = document.getElementById('menuBtn');
+  var navDrawer = document.getElementById('navDrawer');
+  menuBtn.addEventListener('click', function () {
+    navDrawer.classList.toggle('open');
+  });
+  navDrawer.querySelectorAll('a').forEach(function (a) {
+    a.addEventListener('click', function () { navDrawer.classList.remove('open'); });
+  });
+  document.addEventListener('click', function (e) {
+    if (!navDrawer.contains(e.target) && !menuBtn.contains(e.target)) {
+      navDrawer.classList.remove('open');
+    }
+  });
+</script>
+</body>
+</html>

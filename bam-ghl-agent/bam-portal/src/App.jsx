@@ -28,6 +28,7 @@ const FeedbackView         = lazy(() => import('./views/FeedbackView'));
 const InboxView            = lazy(() => import('./views/InboxView'));
 const ResourcesView        = lazy(() => import('./views/ResourcesView'));
 const OurAdsView           = lazy(() => import('./views/OurAdsView'));
+const AgentTrainingView    = lazy(() => import('./views/AgentTrainingView'));
 import AlertsPanel from './components/overlays/AlertsPanel';
 import LoginView from './views/LoginView';
 import UniversalFeedbackWidget from './components/UniversalFeedbackWidget';
@@ -158,7 +159,7 @@ export default function BAMPortal() {
   const canSeeSystems = me && (me.role === "admin" || me.role === "scaling_manager" || me.role === "systems_manager" || me.role === "systems_executor");
   const canSeeMarketing = me && (me.role === "admin" || me.role === "scaling_manager" || me.role === "marketing_manager" || me.role === "marketing_executor");
   const canSeeTeam = me && (me.role === "admin" || me.role === "scaling_manager");
-  const canSeeContent = me && (me.role === "admin" || me.role === "scaling_manager" || me.role === "marketing_manager" || me.role === "marketing_executor");
+  const canSeeContent = me && (me.role === "admin" || me.role === "scaling_manager" || me.role === "marketing_manager" || me.role === "marketing_executor" || me.role === "content_executor");
   const canSeeFinancials = me && (me.role === "admin" || me.role === "scaling_manager");
   // Resources: admins + the content/marketing team (they upload + manage the
   // library). Writes are enforced server-side by RLS is_resource_editor().
@@ -206,7 +207,8 @@ export default function BAMPortal() {
       financials: canSeeFinancials, ourads: canSeeOurAds,
     };
     if (nav === "dashboard" || (Object.prototype.hasOwnProperty.call(gated, nav) && !gated[nav])) {
-      setNav("inbox");
+      // Content executors live in the Content tab — land them there, not Inbox.
+      setNav(me.role === "content_executor" ? "content" : "inbox");
     }
   }, [me, nav, canSeeSystems, canSeeMarketing, canSeeContent, canSeeTeam, canSeeResources, canSeeFeedback, canSeeFinancials, canSeeOurAds]);
 
@@ -489,6 +491,7 @@ export default function BAMPortal() {
         ...(canSeeResources ? [{ label: "Resources", key: "resources" }] : []),
         ...(canSeeOurAds ? [{ label: "Our Ads", key: "ourads" }] : []),
         ...(canSeeFeedback ? [{ label: "Feedback", key: "feedback" }] : []),
+        ...(canSeeFeedback ? [{ label: "Agent training", key: "training" }] : []),
       ];
 
   return (
@@ -829,6 +832,7 @@ export default function BAMPortal() {
               {nav === "team" && canSeeTeam && <TeamView tokens={tk} dark={dark} session={session} me={me} />}
               {nav === "content" && canSeeContent && <ContentView tokens={tk} dark={dark} me={me} session={session} />}
               {nav === "feedback" && canSeeFeedback && <FeedbackView tokens={tk} dark={dark} session={session} />}
+              {nav === "training" && canSeeFeedback && <AgentTrainingView tokens={tk} dark={dark} session={session} />}
               {nav === "resources" && canSeeResources && <ResourcesView tokens={tk} dark={dark} me={me} />}
               {nav === "ourads" && canSeeOurAds && <OurAdsView tokens={tk} session={session} me={me} />}
             </Suspense>

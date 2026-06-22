@@ -32,30 +32,36 @@ const DEV_ORIGINS = new Set([
 
 // Module-level cache so warm serverless instances don't hit the DB on
 // every preflight. 60s is fine — domain changes are rare.
-let originsCache = { set: null, at: 0 };
+let originsCache = { set: null, patterns: null, at: 0 };
 const ORIGINS_TTL_MS = 60_000;
 
 async function getAllowedOrigins() {
   if (originsCache.set && Date.now() - originsCache.at < ORIGINS_TTL_MS) {
-    return originsCache.set;
+    return originsCache;
   }
   const set = new Set(DEV_ORIGINS);
+  const patterns = [];
   const rows = await sbReq("clients?select=allowed_domains&allowed_domains=not.is.null");
   for (const row of rows || []) {
     for (const domain of row.allowed_domains || []) {
-      set.add(`https://${domain}`);
-      set.add(`https://www.${domain}`);
+      if (domain.includes("*")) {
+        patterns.push(new RegExp(`^https://${domain.replace(/\./g, "\\.").replace(/\*/g, "[a-z0-9-]+")}$`));
+      } else {
+        set.add(`https://${domain}`);
+        set.add(`https://www.${domain}`);
+      }
     }
   }
-  originsCache = { set, at: Date.now() };
-  return set;
+  originsCache = { set, patterns, at: Date.now() };
+  return originsCache;
 }
 
 async function setCors(req, res) {
   const origin = req.headers.origin || "";
   let allowed = false;
   try {
-    allowed = (await getAllowedOrigins()).has(origin);
+    const { set, patterns } = await getAllowedOrigins();
+    allowed = set.has(origin) || patterns.some(p => p.test(origin));
   } catch { /* DB hiccup — treat as not allowed; POST will 403 */ }
   if (allowed) {
     res.setHeader("Access-Control-Allow-Origin", origin);
@@ -431,10 +437,19 @@ async function handler(req, res) {
 // V1 automations: enroll the GHL contact into an existing GHL workflow
 // (the entry point's ghl_workflow_id). The portal is the trigger now —
 // the workflow's own steps (texts, emails, waits) keep running in GHL.
+// Falls back to the location API key when no OAuth token is present —
+// workflow enrollment doesn't require calendar scopes.
 async function enrollInWorkflow(client, contactId, workflowId) {
   if (!contactId || !workflowId) return;
   try {
-    const token = await getClientGhlToken(client);
+    let token;
+    try {
+      token = await getClientGhlToken(client);
+    } catch {
+      const loc = loadLocations().find(l => l.name === client.ghl_kpi_config?.ghl_location);
+      token = loc?.apiKeyV2 || loc?.apiKey || null;
+    }
+    if (!token) { console.error("GHL workflow enroll skipped: no token or API key available"); return; }
     const r = await fetch(`${GHL_V2}/contacts/${contactId}/workflow/${workflowId}`, {
       method: "POST",
       headers: { Authorization: `Bearer ${token}`, Version: V2_VERSION, "Content-Type": "application/json", Accept: "application/json" },

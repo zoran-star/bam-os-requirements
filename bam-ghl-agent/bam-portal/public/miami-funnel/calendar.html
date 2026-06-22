@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>Book Your Free Trial — DETAIL Miami</title>
+  <meta name="robots" content="noindex" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Anton&family=Inter+Tight:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:       #080808;
+      --surface:  #111111;
+      --surface2: #1a1a1a;
+      --border:   rgba(255,255,255,0.08);
+      --brand:     #e2dd9f;
+      --brand-dim: rgba(226,221,159,0.10);
+      --brand-dim2: rgba(226,221,159,0.05);
+      --fg:       #ffffff;
+      --fg-sub:   rgba(255,255,255,0.60);
+      --fg-muted: rgba(255,255,255,0.35);
+      --red:      #ff4d4f;
+      --green:    #52c41a;
+      --font-d:   'Anton', sans-serif;
+      --font-b:   'Inter Tight', sans-serif;
+      --r:        10px;
+    }
+
+    html, body { min-height: 100dvh; background: var(--bg); color: var(--fg); font-family: var(--font-b); }
+    body { display: flex; flex-direction: column; align-items: center; padding: 0 16px 80px; }
+
+    .header { width: 100%; max-width: 520px; padding: 40px 0 28px; text-align: center; }
+    .header-badge { display: inline-block; font-size: 11px; font-weight: 600; letter-spacing: .12em; text-transform: uppercase; color: var(--brand); background: var(--brand-dim); border: 1px solid rgba(226,221,159,0.25); border-radius: 20px; padding: 5px 14px; margin-bottom: 16px; }
+    .header h1 { font-family: var(--font-d); font-size: clamp(26px, 6vw, 38px); text-transform: uppercase; letter-spacing: .02em; margin-bottom: 8px; }
+    .header h1 span { color: var(--brand); }
+    .header p { font-size: 14px; color: var(--fg-sub); }
+
+    .card { width: 100%; max-width: 520px; background: var(--surface); border: 1px solid var(--border); border-radius: 16px; overflow: hidden; }
+
+    .group-banner { padding: 14px 20px; background: var(--brand-dim); border-bottom: 1px solid rgba(226,221,159,0.2); display: flex; align-items: center; gap: 10px; }
+    .group-banner .label { font-size: 11px; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; color: var(--brand); }
+    .group-banner .value { font-size: 14px; font-weight: 600; color: var(--fg); }
+
+    .cal-grid { padding: 20px; }
+    .month-nav { display: flex; align-items: center; justify-content: space-between; margin-bottom: 18px; }
+    .month-nav .month-label { font-family: var(--font-d); font-size: 20px; letter-spacing: .03em; text-transform: uppercase; }
+    .nav-btn { background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; width: 36px; height: 36px; color: var(--fg); font-size: 16px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: background .2s; }
+    .nav-btn:hover { background: var(--border); }
+    .nav-btn:disabled { opacity: .3; cursor: not-allowed; }
+
+    .dow-row { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; margin-bottom: 6px; }
+    .dow-row span { text-align: center; font-size: 11px; font-weight: 600; color: var(--fg-muted); letter-spacing: .06em; text-transform: uppercase; padding: 4px 0; }
+
+    .days-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+    .day-cell { aspect-ratio: 1; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 500; cursor: default; position: relative; }
+    .day-cell.empty { background: none; }
+    .day-cell.past { color: var(--fg-muted); }
+    .day-cell.available { background: var(--brand-dim2); border: 1px solid rgba(226,221,159,0.2); cursor: pointer; color: var(--fg); transition: background .2s; }
+    .day-cell.available:hover { background: var(--brand-dim); border-color: rgba(226,221,159,0.5); }
+    .day-cell.selected { background: var(--brand); border-color: var(--brand); color: #000; font-weight: 700; }
+    .day-cell.today { color: var(--brand); font-weight: 700; }
+    .day-cell.today.available { color: var(--fg); }
+
+    .slots-panel { padding: 0 20px 20px; }
+    .slots-header { font-size: 12px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--fg-muted); margin-bottom: 12px; padding-top: 4px; }
+    .slots-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+    .slot-btn { padding: 11px 6px; border-radius: 8px; border: 1px solid var(--border); background: var(--surface2); color: var(--fg); font-family: var(--font-b); font-size: 13px; font-weight: 500; cursor: pointer; text-align: center; transition: background .2s, border-color .2s; }
+    .slot-btn:hover { background: var(--brand-dim); border-color: rgba(226,221,159,0.4); }
+    .slot-btn.selected { background: var(--brand); border-color: var(--brand); color: #000; font-weight: 700; }
+
+    .slot-loading { text-align: center; padding: 24px; color: var(--fg-muted); font-size: 14px; }
+    .slot-empty   { text-align: center; padding: 24px; color: var(--fg-muted); font-size: 14px; }
+
+    .confirm-panel { padding: 16px 20px 20px; border-top: 1px solid var(--border); }
+    .confirm-details { background: var(--surface2); border: 1px solid var(--border); border-radius: var(--r); padding: 14px; margin-bottom: 16px; }
+    .confirm-details .confirm-row { display: flex; justify-content: space-between; font-size: 13px; padding: 4px 0; }
+    .confirm-details .confirm-label { color: var(--fg-muted); }
+    .confirm-details .confirm-value { color: var(--fg); font-weight: 500; }
+
+    .btn { width: 100%; padding: 16px; border: none; border-radius: var(--r); background: var(--brand); color: #000; font-family: var(--font-d); font-size: 18px; letter-spacing: .04em; text-transform: uppercase; cursor: pointer; transition: opacity .2s; }
+    .btn:disabled { opacity: .4; cursor: not-allowed; }
+    .btn:not(:disabled):hover { opacity: .88; }
+
+    .global-err { background: rgba(255,77,79,.1); border: 1px solid rgba(255,77,79,.3); border-radius: var(--r); padding: 12px 14px; font-size: 13px; color: var(--red); margin-bottom: 14px; display: none; }
+    .global-err.show { display: block; }
+
+    .spinner { width: 18px; height: 18px; border: 2.5px solid rgba(0,0,0,0.3); border-top-color: #000; border-radius: 50%; animation: spin .7s linear infinite; display: none; margin-right: 8px; vertical-align: middle; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* Success screen */
+    .success-screen { display: none; width: 100%; max-width: 480px; text-align: center; padding: 20px 0 40px; }
+    .success-icon { width: 72px; height: 72px; border-radius: 50%; background: var(--brand-dim); border: 2px solid rgba(226,221,159,0.4); display: flex; align-items: center; justify-content: center; margin: 0 auto 24px; font-size: 32px; }
+    .success-screen h2 { font-family: var(--font-d); font-size: 30px; text-transform: uppercase; letter-spacing: .03em; margin-bottom: 10px; }
+    .success-screen h2 span { color: var(--brand); }
+    .success-screen p { font-size: 14px; color: var(--fg-sub); line-height: 1.6; max-width: 360px; margin: 0 auto 28px; }
+    .booking-card { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 20px; text-align: left; max-width: 360px; margin: 0 auto; }
+    .booking-card .bk-row { display: flex; justify-content: space-between; padding: 5px 0; font-size: 14px; border-bottom: 1px solid var(--border); }
+    .booking-card .bk-row:last-child { border-bottom: none; }
+    .booking-card .bk-label { color: var(--fg-muted); }
+    .booking-card .bk-val   { font-weight: 600; color: var(--fg); }
+  </style>
+</head>
+<body>
+
+<div class="header" id="mainHeader">
+  <div class="header-badge">Step 2 of 2</div>
+  <h1>Pick Your <span>Session</span> Time</h1>
+  <p>Select a date and time for your free trial below.</p>
+</div>
+
+<div class="card" id="mainCard">
+  <div class="group-banner">
+    <span class="label">Group:</span>
+    <span class="value" id="groupLabel">Loading...</span>
+  </div>
+
+  <div class="cal-grid">
+    <div class="month-nav">
+      <button class="nav-btn" id="btnPrev" onclick="prevMonth()">&#8249;</button>
+      <div class="month-label" id="monthLabel"></div>
+      <button class="nav-btn" id="btnNext" onclick="nextMonth()">&#8250;</button>
+    </div>
+    <div class="dow-row">
+      <span>Su</span><span>Mo</span><span>Tu</span><span>We</span><span>Th</span><span>Fr</span><span>Sa</span>
+    </div>
+    <div class="days-grid" id="daysGrid"></div>
+  </div>
+
+  <div class="slots-panel" id="slotsPanel" style="display:none;">
+    <div class="slots-header" id="slotsHeader">Available Times</div>
+    <div id="slotsContainer"><div class="slot-loading">Loading slots...</div></div>
+  </div>
+
+  <div class="confirm-panel" id="confirmPanel" style="display:none;">
+    <div class="confirm-details">
+      <div class="confirm-row"><span class="confirm-label">Date</span><span class="confirm-value" id="confirmDate"></span></div>
+      <div class="confirm-row"><span class="confirm-label">Time</span><span class="confirm-value" id="confirmTime"></span></div>
+      <div class="confirm-row"><span class="confirm-label">Group</span><span class="confirm-value" id="confirmGroup"></span></div>
+      <div class="confirm-row"><span class="confirm-label">Location</span><span class="confirm-value">16414 NW 54th Ave, Hialeah</span></div>
+    </div>
+    <div class="global-err" id="bookErr"></div>
+    <button class="btn" id="btnBook" onclick="bookSlot()">
+      <span class="spinner" id="bookSpinner"></span>Confirm Booking
+    </button>
+  </div>
+</div>
+
+<div class="success-screen" id="successScreen">
+  <div class="success-icon">🏆</div>
+  <h2>You're <span>Booked!</span></h2>
+  <p>Your free trial session is confirmed. Check your email for details and we'll see you on the court.</p>
+  <div class="booking-card">
+    <div class="bk-row"><span class="bk-label">Date</span><span class="bk-val" id="sDate"></span></div>
+    <div class="bk-row"><span class="bk-label">Time</span><span class="bk-val" id="sTime"></span></div>
+    <div class="bk-row"><span class="bk-label">Group</span><span class="bk-val" id="sGroup"></span></div>
+    <div class="bk-row"><span class="bk-label">Location</span><span class="bk-val">16414 NW 54th Ave, Hialeah</span></div>
+  </div>
+</div>
+
+<script>
+  var CALENDARS = {
+    'elementary': '290AH08i2I7Ts3yzd4W0',
+    'ms-hs':      'HPQ2WsQ444DbtuatZPmM',
+  };
+  var GROUP_LABELS = {
+    'elementary': 'Elementary Academy (K–5th)',
+    'ms-hs':      'MS / HS Academy (6th–12th+)',
+  };
+  var AVAIL_API = '/api/website/availability';
+  var BOOK_API  = '/api/website/miami-book';
+
+  var params = new URLSearchParams(location.search);
+  var group  = params.get('group') || 'ms-hs';
+  var name   = params.get('name')  || '';
+  var email  = params.get('email') || '';
+  var cid    = params.get('cid')   || '';
+
+  var calendarId = CALENDARS[group] || CALENDARS['ms-hs'];
+  document.getElementById('groupLabel').textContent = GROUP_LABELS[group] || GROUP_LABELS['ms-hs'];
+
+  // Calendar state
+  var today     = new Date();
+  var curYear   = today.getFullYear();
+  var curMonth  = today.getMonth();
+  var viewYear  = curYear;
+  var viewMonth = curMonth;
+  var slotsMap  = {};
+  var selDate   = null;
+  var selSlot   = null;
+
+  var MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+
+  async function fetchSlots(year, month) {
+    var clientId = '4708a68d-5365-48bf-a404-72a69fadd34d';
+    var r = await fetch(AVAIL_API + '?client_id=' + clientId + '&calendar=' + calendarId + '&days=60');
+    if (!r.ok) return {};
+    var data = await r.json();
+    return data.days || {};
+  }
+
+  async function renderMonth(year, month) {
+    document.getElementById('monthLabel').textContent = MONTHS[month] + ' ' + year;
+    document.getElementById('btnPrev').disabled = (year === curYear && month === curMonth);
+
+    if (!Object.keys(slotsMap).length) {
+      slotsMap = await fetchSlots(year, month);
+    }
+
+    var firstDay = new Date(year, month, 1).getDay();
+    var daysInMonth = new Date(year, month + 1, 0).getDate();
+    var grid = document.getElementById('daysGrid');
+    grid.innerHTML = '';
+
+    for (var i = 0; i < firstDay; i++) {
+      var blank = document.createElement('div');
+      blank.className = 'day-cell empty';
+      grid.appendChild(blank);
+    }
+
+    var todayStr = today.getFullYear() + '-' + pad2(today.getMonth()+1) + '-' + pad2(today.getDate());
+
+    for (var d = 1; d <= daysInMonth; d++) {
+      var dateStr = year + '-' + pad2(month+1) + '-' + pad2(d);
+      var cell = document.createElement('div');
+      cell.textContent = d;
+      var isToday = (dateStr === todayStr);
+      var isPast  = (dateStr < todayStr);
+      var hasSlots = slotsMap[dateStr] && slotsMap[dateStr].length > 0;
+
+      if (isPast) {
+        cell.className = 'day-cell past';
+      } else if (hasSlots) {
+        cell.className = 'day-cell available' + (isToday ? ' today' : '') + (selDate === dateStr ? ' selected' : '');
+        cell.dataset.date = dateStr;
+        cell.onclick = function() { selectDate(this.dataset.date); };
+      } else {
+        cell.className = 'day-cell' + (isToday ? ' today' : '');
+      }
+      grid.appendChild(cell);
+    }
+  }
+
+  function selectDate(dateStr) {
+    selDate = dateStr;
+    selSlot = null;
+    document.getElementById('confirmPanel').style.display = 'none';
+    renderMonth(viewYear, viewMonth);
+    showSlots(dateStr);
+  }
+
+  function showSlots(dateStr) {
+    var panel = document.getElementById('slotsPanel');
+    var container = document.getElementById('slotsContainer');
+    var header = document.getElementById('slotsHeader');
+    panel.style.display = '';
+
+    var slots = slotsMap[dateStr] || [];
+    var d = new Date(dateStr + 'T12:00:00');
+    var months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    header.textContent = months[d.getMonth()] + ' ' + d.getDate() + ' — Available Times';
+
+    if (!slots.length) {
+      container.innerHTML = '<div class="slot-empty">No available times on this day.</div>';
+      return;
+    }
+
+    container.innerHTML = '';
+    var gridEl = document.createElement('div');
+    gridEl.className = 'slots-grid';
+    slots.forEach(function(iso) {
+      var t = new Date(iso);
+      var h = t.getHours(), m = t.getMinutes();
+      var ampm = h >= 12 ? 'PM' : 'AM';
+      var h12 = h % 12 || 12;
+      var label = h12 + (m ? ':' + pad2(m) : '') + ' ' + ampm;
+      var btn = document.createElement('button');
+      btn.className = 'slot-btn' + (selSlot === iso ? ' selected' : '');
+      btn.textContent = label;
+      btn.dataset.iso = iso;
+      btn.onclick = function() { selectSlot(this.dataset.iso, label); };
+      gridEl.appendChild(btn);
+    });
+    container.appendChild(gridEl);
+  }
+
+  function selectSlot(iso, label) {
+    selSlot = iso;
+    document.querySelectorAll('.slot-btn').forEach(function(b){ b.classList.remove('selected'); });
+    event.target.classList.add('selected');
+
+    var d = new Date(iso);
+    var months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    var days = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+    document.getElementById('confirmDate').textContent = days[d.getDay()] + ', ' + months[d.getMonth()] + ' ' + d.getDate();
+    document.getElementById('confirmTime').textContent = label;
+    document.getElementById('confirmGroup').textContent = GROUP_LABELS[group] || '';
+    document.getElementById('confirmPanel').style.display = '';
+    document.getElementById('bookErr').classList.remove('show');
+  }
+
+  async function bookSlot() {
+    if (!selSlot) return;
+    var btn = document.getElementById('btnBook');
+    var spinner = document.getElementById('bookSpinner');
+    var errEl = document.getElementById('bookErr');
+    errEl.classList.remove('show');
+    btn.disabled = true;
+    spinner.style.display = 'inline-block';
+
+    try {
+      var res = await fetch(BOOK_API, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          calendarId: calendarId,
+          start:      selSlot,
+          firstName:  name.split(' ')[0] || name,
+          lastName:   name.split(' ').slice(1).join(' ') || undefined,
+          email:      email,
+          contactId:  cid || undefined,
+        }),
+      });
+      var data = await res.json();
+      if (!res.ok) throw new Error(data.error || data.detail || 'Booking failed');
+
+      document.getElementById('sDate').textContent = data.shortDate || selDate;
+      document.getElementById('sTime').textContent = data.time || '';
+      document.getElementById('sGroup').textContent = GROUP_LABELS[group] || '';
+      document.getElementById('mainHeader').style.display = 'none';
+      document.getElementById('mainCard').style.display = 'none';
+      document.getElementById('successScreen').style.display = '';
+    } catch (e) {
+      errEl.textContent = e.message;
+      errEl.classList.add('show');
+      btn.disabled = false;
+      spinner.style.display = 'none';
+    }
+  }
+
+  function prevMonth() {
+    viewMonth--;
+    if (viewMonth < 0) { viewMonth = 11; viewYear--; }
+    renderMonth(viewYear, viewMonth);
+  }
+  function nextMonth() {
+    viewMonth++;
+    if (viewMonth > 11) { viewMonth = 0; viewYear++; }
+    renderMonth(viewYear, viewMonth);
+  }
+  function pad2(n) { return String(n).padStart(2, '0'); }
+
+  renderMonth(viewYear, viewMonth);
+</script>
+</body>
+</html>

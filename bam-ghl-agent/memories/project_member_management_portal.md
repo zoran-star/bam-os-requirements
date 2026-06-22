@@ -1050,6 +1050,43 @@ PARKED
 - `fc59b0a` — Pipelines view + Convert to member
 - `b84ec6e` — Mike's client switcher fix (max-height + filter)
 
+## Session 7 — 2026-06-18 — Members are offer-scoped (V2 offer-centric)
+
+The V1.5→V2 jump is member management, and members now join the offer-centric
+model (same as `entry_points.offer_id` ties pipelines to offers). A member
+belongs to the offer its **Stripe price** maps to — no up-front choice; derived
+from the price match you already built (`pricing_catalog.offer_id`).
+
+- **Schema** (migration `20260618000000_member_offer_scope.sql`, applied live via
+  MCP): `offer_id uuid REFERENCES offers(id)` on **`members`** + **`members_staging`**
+  (nullable) + `(client_id, offer_id)` indexes. Nullable = a member whose price
+  isn't offer-mapped yet stays NULL → surfaces in the existing cleanup "no offer"
+  flag.
+- **Resolution at promote** (`api/sorter/cleanup.js` promote action): builds a
+  `priceToOffer` (stripe_price_id→offer_id) + `keyToOffer` (offer_price_key→offer_id)
+  map once from `pricing_catalog` (offer_id not null), resolves per staging row,
+  sets `members.offer_id` on insert. Guarded: only set when resolved, so re-import
+  of an unmapped member never clobbers an existing offer.
+- **`connect-offer` cleanup action** now ALSO sets `offer_id` on the staging row
+  AND backfills any already-promoted live `members` on that same price
+  (`stripe_price_id=eq & offer_id=is.null` → PATCH). So tying a price to an offer
+  scopes existing members too, not just future imports.
+- **GET /api/members (list)** enriches each member with `m.offer = { id, title }`
+  (batched `offers?id=in.(…)&select=id,title`), alongside the existing `m.pricing`.
+- **Roster UI** (`client-portal.html`): `_memberOfferPill(m)` (gold pill, offer
+  title) on the card + an **Offer** section in the filter popover + `offer` in
+  `_MEMBERS_FILTER`/`_filterMembers`/`_membersClearFilters`. Both gated on
+  `_MEMBERS_MULTI_OFFER` (roster spans 2+ offers) so single-offer GTA stays clean
+  today and the pill/filter light up when offer #2 lands — mirrors the Sales page
+  ("offer switcher comes when offer #2 goes live").
+- **Branch:** `feat/member-import-offer-scope`. Tour verifier passes; api files
+  `node --check` clean. (Local `npm run build` fails ONLY on missing `@sentry/react`
+  in stale node_modules — pre-existing, unrelated.)
+- **Follow-up (not built):** offer row in the member-detail popup Billing section
+  (needs the single-member GET to enrich offer too); a real offer switcher header
+  on the Members tab (deferred with Sales' until offer #2). See
+  [[project_website_leads]] "Offer scoping" + [[project_pricing_sorter_wizard]].
+
 ## Related notes
 - [[project_client_auth]] — how client login + client_id scoping works
 - [[project_marketing_content_flow]] — the api/ + view pattern to model

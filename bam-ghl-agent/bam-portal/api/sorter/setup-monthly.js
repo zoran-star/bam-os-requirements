@@ -131,6 +131,15 @@ async function handler(req, res) {
       const d = new Date(body.charge_date);
       if (!isNaN(d.getTime())) { d.setMonth(d.getMonth() + months); trialEnd = Math.max(Math.floor(d.getTime() / 1000), trialEnd); }
     }
+    // Direct first-charge-date override (staff picked it in the modal). Wins over charge_date.
+    if (body.first_charge_date) {
+      const fd = new Date(body.first_charge_date);
+      if (!isNaN(fd.getTime())) trialEnd = Math.max(Math.floor(fd.getTime() / 1000), Math.floor(Date.now() / 1000) + 60);
+    }
+    // Stripe rejects trial_end more than 730 days out — clamp (a 12-month prepaid
+    // anchored from an old charge date can otherwise exceed it → 400).
+    const STRIPE_TRIAL_MAX_SECS = 729 * 86400;
+    trialEnd = Math.min(trialEnd, Math.floor(Date.now() / 1000) + STRIPE_TRIAL_MAX_SECS);
 
     // Reusable card? prefer the customer's default PM, else any attached card.
     const cust = await stripeFetch(`/customers/${encodeURIComponent(customerId)}?expand[]=invoice_settings.default_payment_method`, { stripeAccount: acct });
@@ -155,7 +164,7 @@ async function handler(req, res) {
           const sess = await stripeFetch(`/checkout/sessions`, {
             method: "POST", stripeAccount: acct,
             body: {
-              mode: "setup", customer: customerId,
+              mode: "setup", currency: "cad", customer: customerId,
               success_url: `${origin}/client-portal.html?card=saved`,
               cancel_url: `${origin}/client-portal.html?card=cancelled`,
             },
@@ -184,6 +193,11 @@ async function handler(req, res) {
         "items[0][price]": mp.stripe_price_id,
         trial_end: trialEnd,
         default_payment_method: defaultPm,
+        // origin=fullcontrol-portal is the STANDARD portal-owned marker the webhook +
+        // members.js both read — without it these subs never flip live or get can_manage.
+        // import_silent=1 → flip live without firing the new-signup welcome (existing members).
+        "metadata[origin]": "fullcontrol-portal",
+        "metadata[import_silent]": "1",
         "metadata[source]": "fullcontrol-prepaid-monthly",
         "metadata[offer_price_key]": mKey,
         "metadata[member_email]": body.member_email || undefined,

@@ -36,12 +36,10 @@ CREATE TABLE IF NOT EXISTS public.customer_profiles (
     created_at timestamptz NOT NULL DEFAULT now(),
     updated_at timestamptz NOT NULL DEFAULT now()
 );
-
 CREATE UNIQUE INDEX IF NOT EXISTS ix_customer_profiles_supabase_user_id
     ON public.customer_profiles USING btree (supabase_user_id);
 CREATE UNIQUE INDEX IF NOT EXISTS ix_customer_profiles_email
     ON public.customer_profiles USING btree (email);
-
 -- ── 2. students — the child ────────────────────────────────────────────────
 
 CREATE TABLE IF NOT EXISTS public.students (
@@ -54,10 +52,8 @@ CREATE TABLE IF NOT EXISTS public.students (
     created_at timestamptz NOT NULL DEFAULT now(),
     updated_at timestamptz NOT NULL DEFAULT now()
 );
-
 CREATE INDEX IF NOT EXISTS ix_students_parent_id
     ON public.students USING btree (parent_id);
-
 -- ── 3. academy_memberships — the booking principal ─────────────────────────
 
 CREATE TABLE IF NOT EXISTS public.academy_memberships (
@@ -78,7 +74,6 @@ CREATE TABLE IF NOT EXISTS public.academy_memberships (
     CONSTRAINT uq_membership_academy_customer UNIQUE (academy_id, customer_id),
     CONSTRAINT uq_membership_academy_student UNIQUE (academy_id, student_id)
 );
-
 CREATE INDEX IF NOT EXISTS ix_academy_memberships_customer_id
     ON public.academy_memberships USING btree (customer_id);
 CREATE INDEX IF NOT EXISTS ix_academy_memberships_student_id
@@ -91,7 +86,6 @@ CREATE INDEX IF NOT EXISTS ix_membership_academy_customer
     ON public.academy_memberships USING btree (academy_id, customer_id);
 CREATE INDEX IF NOT EXISTS ix_membership_academy_student
     ON public.academy_memberships USING btree (academy_id, student_id);
-
 -- ── 4. member_links — interim bridge to PM-owned members (dropped at cutover) ──
 
 CREATE TABLE IF NOT EXISTS public.member_links (
@@ -104,7 +98,6 @@ CREATE TABLE IF NOT EXISTS public.member_links (
     CONSTRAINT uq_member_links_student UNIQUE (student_id),
     CONSTRAINT uq_member_links_member UNIQUE (member_id)
 );
-
 -- ── RLS: deny-all on every parent-domain table ──────────────────────────────
 -- Zero policies on purpose. Service-role Vercel fns are the only access path.
 

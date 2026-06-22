@@ -235,22 +235,36 @@ const ONBOARDING_STEPS = [
   { key: "kpis",           title: "Fill out your KPIs",                  sort: 9, col: "kpi_marked_done_at",            writable: true },
   { key: "offers",         title: "Set up your Offers",                  sort: 10, col: "offers_marked_done_at",       writable: true },
   { key: "book_call",      title: "Book a call with your Scaling Manager", sort: 11, col: "call_booked_at",            writable: true },
-  { key: "book_call_cam",  title: "Book a call with Cam (marketing)",    sort: 12, col: "cam_call_booked_at",          writable: true },
-  { key: "submit_content", title: "Submit your raw content",             sort: 13, col: "content_submitted_at",        writable: true },
   // Staff-only: hidden from clients. Checking it CREATES the systems ticket.
-  { key: "trigger_buildout", title: "Trigger systems buildout",         sort: 14, col: "systems_buildout_triggered_at", writable: true, staff_only: true },
+  // Sits right AFTER the SM call — the build gets scoped on that call.
+  { key: "trigger_buildout", title: "Trigger systems buildout",         sort: 12, col: "systems_buildout_triggered_at", writable: true, staff_only: true },
+  { key: "book_call_cam",  title: "Book a call with Cam (marketing)",    sort: 13, col: "cam_call_booked_at",          writable: true },
+  // Self-serve marketing setup — replaces the old "Book a call with Ximena"
+  // and "Submit your raw content" steps. Client connects their ad account via
+  // the Leadsie share link, then launches campaigns in the Marketing tab
+  // (each campaign collects budget + assets via the new-campaign wizard).
+  { key: "connect_ads",    title: "Connect your ad account",             sort: 14, col: "ads_connected_at",            writable: true },
+  { key: "add_campaign",   title: "Add a new campaign",                  sort: 15, col: "content_submitted_at",        writable: true },
   // Staff-only gate. Flipping it UNLOCKS the client's "Book review call" step.
-  { key: "ready_for_review", title: "Ready for review call?",           sort: 15, col: "ready_for_review_at",         writable: true, staff_only: true },
+  { key: "ready_for_review", title: "Ready for review call?",           sort: 16, col: "ready_for_review_at",         writable: true, staff_only: true },
   // Client step — locked (greyed) until ready_for_review is done.
-  { key: "book_review_call", title: "Book review call with Scaling Manager", sort: 16, col: "review_call_booked_at", writable: true, locked_by: "ready_for_review" },
-  { key: "book_call_ximena", title: "Book a call with Ximena (ads)",        sort: 17, col: "ximena_call_booked_at",      writable: true },
+  { key: "book_review_call", title: "Book review call with Scaling Manager", sort: 17, col: "review_call_booked_at", writable: true, locked_by: "ready_for_review" },
+  // ── V1.5-only steps (tier:"v15") — only seeded for V1.5 academies; V2/V1
+  // never see them. They get tier-gated in syncOnboardingItems. ──
+  { key: "v15_athlete_map", title: "Map your athlete-name field", sort: 18, col: "athlete_map_done_at", writable: true, tier: "v15" },
+  { key: "v15_kpi_setup",   title: "Connect your KPIs",           sort: 19, col: "kpi_setup_done_at",   writable: true, tier: "v15" },
 ];
 const ONBOARDING_BY_KEY = Object.fromEntries(ONBOARDING_STEPS.map(s => [s.key, s]));
 const ONBOARDING_SIGNAL_COLS = [...new Set(ONBOARDING_STEPS.map(s => s.col))].join(",");
 const ONBOARDING_STAFF_ONLY = new Set(ONBOARDING_STEPS.filter(s => s.staff_only).map(s => s.key));
+const ONBOARDING_TIER_KEYS = new Set(ONBOARDING_STEPS.filter(s => s.tier).map(s => s.key));
+// Which steps apply to a client of a given tier (no `tier` = all tiers).
+function onboardingStepsForTier(isV15) {
+  return ONBOARDING_STEPS.filter(s => !s.tier || (s.tier === "v15" && isV15));
+}
 
 async function loadClientSignals(clientId) {
-  const rows = await sb(`clients?id=eq.${clientId}&select=${ONBOARDING_SIGNAL_COLS}`);
+  const rows = await sb(`clients?id=eq.${clientId}&select=${ONBOARDING_SIGNAL_COLS},v15_access`);
   return (Array.isArray(rows) && rows[0]) || {};
 }
 
@@ -258,13 +272,24 @@ async function loadClientSignals(clientId) {
 // reconcile each against its clients-row column. Safe to call on every GET.
 async function syncOnboardingItems(clientId) {
   const signals = await loadClientSignals(clientId);
+  const isV15 = signals.v15_access === true;
+  const steps = onboardingStepsForTier(isV15);
+  const applicableKeys = new Set(steps.map(s => s.key));
   const existing = await sb(
-    `action_items?client_id=eq.${clientId}&onboarding_key=not.is.null&select=id,onboarding_key,completed_at,onboarding_overridden`
+    `action_items?client_id=eq.${clientId}&onboarding_key=not.is.null&select=id,onboarding_key,completed_at,onboarding_overridden,sort_order`
   );
   const byKey = {};
   (existing || []).forEach(r => { byKey[r.onboarding_key] = r; });
 
-  for (const step of ONBOARDING_STEPS) {
+  // Remove tier-gated steps that no longer apply (e.g. V1.5 steps left over on an
+  // academy that's no longer V1.5). Only ever deletes tier-gated keys.
+  for (const r of (existing || [])) {
+    if (ONBOARDING_TIER_KEYS.has(r.onboarding_key) && !applicableKeys.has(r.onboarding_key)) {
+      await sb(`action_items?id=eq.${r.id}`, { method: "DELETE", headers: { Prefer: "return=minimal" } }).catch(() => {});
+    }
+  }
+
+  for (const step of steps) {
     const colVal = signals[step.col] || null; // timestamp or null
     const row = byKey[step.key];
 
@@ -281,6 +306,14 @@ async function syncOnboardingItems(clientId) {
         }),
       });
       continue;
+    }
+    // Keep the step ORDER in sync with the code (source of truth) — without
+    // this, reordering ONBOARDING_STEPS only affected brand-new clients.
+    if (row.sort_order !== step.sort) {
+      await sb(`action_items?id=eq.${row.id}`, {
+        method: "PATCH", headers: { Prefer: "return=minimal" },
+        body: JSON.stringify({ sort_order: step.sort }),
+      });
     }
     // Writable steps always mirror col (toggling writes col, so they're already
     // consistent; this picks up changes made via the BB "mark done" buttons).
@@ -503,6 +536,14 @@ async function handler(req, res) {
       if (obStep && obStep.key === "trigger_buildout" && b.completed === true) {
         try { await createSystemsOnboardingTicket(existing.client_id); }
         catch (e) { console.error("createSystemsOnboardingTicket failed:", e?.message || e); }
+      }
+      // Un-checking clears the saved ticket pointer so re-triggering builds a
+      // FRESH systems ticket (createSystemsOnboardingTicket is idempotent on it).
+      if (obStep && obStep.key === "trigger_buildout" && b.completed === false) {
+        await sb(`clients?id=eq.${existing.client_id}`, {
+          method: "PATCH", headers: { Prefer: "return=minimal" },
+          body: JSON.stringify({ systems_onboarding_ticket_id: null }),
+        }).catch((e) => console.error("clear systems_onboarding_ticket_id failed:", e?.message || e));
       }
 
       // Slack ping only on a genuine reassignment to a person.

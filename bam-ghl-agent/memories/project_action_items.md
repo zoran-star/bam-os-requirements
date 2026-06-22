@@ -11,14 +11,17 @@ staff-portal page. Any field on any row is editable by anyone who can see it.
 > ```
 > 1 slack · 2 connect_stripe* · 3 create_ghl · 4 connect_ghl*
 > 5 general_info · 6 staff · 7 locations · 8 brand · 9 kpis · 10 offers
-> 11 book_call(SM) · 12 book_call_cam · 13 submit_content
-> 14 trigger_buildout🔒 · 15 ready_for_review🔒 · 16 book_review_call · 17 book_call_ximena
+> 11 book_call(SM) · 12 trigger_buildout🔒 · 13 book_call_cam
+> 14 connect_ads · 15 add_campaign · 16 ready_for_review🔒 · 17 book_review_call
 >   (*auto from a connect signal · 🔒 = staff-only, hidden from clients)
+>   marketing-onboarding restructure 2026-06-17: REMOVED submit_content +
+>   book_call_ximena; ADDED connect_ads (Leadsie link, col ads_connected_at) +
+>   add_campaign (opens new-campaign wizard, col content_submitted_at). Still 17 steps.
 > ```
 >
 > **UX:** first login → 2-step welcome → ACTION ITEMS. Onboarding renders as a **subway map** (circle nodes + line) inside a **collapsible gold "🚀 Onboarding" card that DISAPPEARS once all steps done**; ad-hoc to-dos are a separate collapsible "Tasks" panel. `book_review_call` is **locked/greyed until staff flip `ready_for_review`**.
 >
-> **Booking steps (data-driven via `staff.booking_url`):** SM = per-client `scaling_manager` ✅ · Cam = `marketing_manager` ✅ link set · **Ximena = `marketing_executor` ⏳ link still pending** (Slack fallback). GET returns `sm`/`mktg`/`ads`/`review_ready`. Helper `_aiBookingCta`.
+> **Booking steps (data-driven via `staff.booking_url`):** SM = per-client `scaling_manager` ✅ · Cam = `marketing_manager` ✅ link set. (Ximena's `book_call_ximena` step was removed 2026-06-17 — replaced by the self-serve Leadsie `connect_ads` step.) GET still returns `sm`/`mktg`/`ads`/`review_ready`; Helper `_aiBookingCta`.
 >
 > **Systems ticket (staff side):** `trigger_buildout` → `createSystemsOnboardingTicket()` builds it (due +7d; old auto DB trigger dropped). Ticket modal has 📋 **Copy-for-Claude** + per-field **"mark incorrect"** + **Send-corrections** (via requestClientAction). Lobby=unassigned/Ongoing=assigned. Admins are in the delegation pool. Assigned executor can Mark complete.
 >
@@ -100,11 +103,11 @@ an external connection signal):
 | 10 | `offers` | Set up your Offers | `offers_marked_done_at` | ✅ → BB #bb=offers |
 | 11 | `book_call` | Book a call with your Scaling Manager | `call_booked_at` | ✅ → dynamic SM booking CTA |
 | 12 | `book_call_cam` | Book a call with Cam (marketing) | `cam_call_booked_at` | ✅ → dynamic CTA from marketing_manager `booking_url` (Cam) |
-| 13 | `submit_content` | Submit your raw content | `content_submitted_at` | ✅ → `_aiOpenNewCampaign()` opens the Marketing new-campaign wizard (bypasses the MARKETING_INCLUDED nav gate) |
-| 14 | `trigger_buildout` | Trigger systems buildout | `systems_buildout_triggered_at` | 🔒 **staff-only** → creates the systems ticket |
-| 15 | `ready_for_review` | Ready for review call? | `ready_for_review_at` | 🔒 **staff-only gate** → unlocks step 16. Staff note via `_AI_ONB_NOTES` |
-| 16 | `book_review_call` | Book review call with Scaling Manager | `review_call_booked_at` | client step — **LOCKED/greyed until step 15 done**; then dynamic SM booking CTA |
-| 17 | `book_call_ximena` | Book a call with Ximena (ads) | `ximena_call_booked_at` | ✅ → dynamic CTA from first `marketing_executor` (Ximena) `booking_url` |
+| 12 | `trigger_buildout` | Trigger systems buildout | `systems_buildout_triggered_at` | 🔒 **staff-only** → creates the systems ticket |
+| 14 | `connect_ads` | Connect your ad account | `ads_connected_at` | ✅ → opens Leadsie share link (`LEADSIE_CONNECT_URL`). Self-serve; replaced `book_call_ximena` 2026-06-17 |
+| 15 | `add_campaign` | Add a new campaign | `content_submitted_at` | ✅ → `_aiOpenNewCampaign()` opens the Marketing new-campaign wizard (budget + asset filedrop). Replaced `submit_content` 2026-06-17 |
+| 16 | `ready_for_review` | Ready for review call? | `ready_for_review_at` | 🔒 **staff-only gate** → unlocks book_review_call. Staff note via `_AI_ONB_NOTES` |
+| 17 | `book_review_call` | Book review call with Scaling Manager | `review_call_booked_at` | client step — **LOCKED/greyed until ready_for_review done**; then dynamic SM booking CTA |
 
 GET also returns `mktg` (first `marketing_manager` = **Cam**, link set 2026-06-05: content-acceleration), `ads` (first `marketing_executor` = **Ximena**, link not set yet → Slack fallback), and `review_ready` (bool). `_aiBookingCta(person, fallback)` is the shared booking-button helper (SM `_AI_SM` · Cam `_AI_MKTG` · Ximena `_AI_ADS`).
 
@@ -150,3 +153,9 @@ GET also returns `mktg` (first `marketing_manager` = **Cam**, link set 2026-06-0
 - Mobile bottom-nav got a 6th item ("Actions"). Watch for crowding on very small screens.
 - Staff assignees + notifications-to-staff are the obvious v2.
 - Onboarding **manual** flags now have TWO writers: the BB onboarding tracker AND the Action Items step — both write the same `clients.*_done_at` columns, so they stay consistent. Keep it that way.
+
+## Staff-side mirror + buildout re-trigger (2026-06-18)
+
+- **Staff now see the onboarding checklist too.** `ClientsCombinedView` OverviewTab renders `<ClientOnboardingItems>` — fetches `/api/action-items?client_id=<client.id>` (staff GET returns ALL steps, incl. staff-only), shows toggles, badges staff-only steps. The API already allowed staff (`canAccessClient` = `isStaff || ...`).
+- **Re-trigger a systems buildout** = uncheck → re-check `trigger_buildout`. Unchecking clears `clients.systems_onboarding_ticket_id`; re-checking calls `createSystemsOnboardingTicket` (idempotent — bails if the id is set) which inserts a `tickets` row (type=onboarding, due +7d, fields = full client snapshot, assigned to first `systems_manager`) and sets the id. Staff can now do this from the OverviewTab checklist.
+- Did this manually for **Pro Precision** on 2026-06-18 (new systems ticket created) via SQL replicating `createSystemsOnboardingTicket`.

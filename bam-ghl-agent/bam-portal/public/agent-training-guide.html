@@ -1,0 +1,180 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BAM Sales Agent — Training Guide</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#08080A; --surface:#0F0F12; --surface-el:#16161A; --border:rgba(255,255,255,.07);
+    --border-med:rgba(255,255,255,.12); --text:#EDEDEC; --sub:#9A9AA0; --mute:#5A5A60;
+    --gold:#E8C547; --gold-soft:rgba(232,197,71,.12); --gold-border:rgba(232,197,71,.3);
+    --green:#34D399; --amber:#FBBF24; --red:#FB7185; --blue:#60A5FA;
+    --mono:'JetBrains Mono',monospace; --disp:'Space Grotesk',sans-serif; --body:'Inter',sans-serif;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--ink);color:var(--text);font-family:var(--body);line-height:1.6;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:880px;margin:0 auto;padding:0 20px 80px}
+  header{padding:48px 0 8px;text-align:center}
+  .kicker{font-family:var(--mono);font-size:12px;letter-spacing:2px;color:var(--gold);text-transform:uppercase}
+  h1{font-family:var(--disp);font-size:34px;margin:10px 0 6px;font-weight:700}
+  .lede{color:var(--sub);font-size:15px;max-width:560px;margin:0 auto}
+  .tabs{display:flex;gap:6px;justify-content:center;margin:30px 0 8px;position:sticky;top:0;background:linear-gradient(var(--ink) 70%,transparent);padding:14px 0;z-index:10}
+  .tab{background:var(--surface-el);border:1px solid var(--border);color:var(--sub);font-family:var(--body);font-weight:600;font-size:14px;padding:9px 18px;border-radius:10px;cursor:pointer}
+  .tab.on{background:var(--gold);color:#000;border-color:var(--gold)}
+  section.pane{display:none;animation:fade .2s ease}
+  section.pane.on{display:block}
+  @keyframes fade{from{opacity:0;transform:translateY(4px)}to{opacity:1}}
+  h2{font-family:var(--disp);font-size:22px;margin:36px 0 14px;display:flex;align-items:center;gap:10px}
+  h3{font-family:var(--disp);font-size:16px;margin:22px 0 8px}
+  p{margin:0 0 12px}
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:20px 22px;margin:14px 0}
+  .card.gold{border-color:var(--gold-border);background:var(--gold-soft)}
+  .pill{display:inline-block;font-family:var(--mono);font-size:11px;font-weight:600;padding:2px 9px;border-radius:99px;border:1px solid var(--border-med);color:var(--sub)}
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:14px 0}
+  @media(max-width:640px){.grid{grid-template-columns:1fr}}
+  .tool{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:18px}
+  .tool .ic{font-size:26px}
+  .tool h4{font-family:var(--disp);font-size:15px;margin:8px 0 4px}
+  .tool p{font-size:13.5px;color:var(--sub);margin:0}
+  pre.flow{font-family:var(--mono);font-size:12.5px;line-height:1.7;background:var(--surface-el);border:1px solid var(--border);border-radius:12px;padding:18px;overflow-x:auto;color:var(--text);white-space:pre}
+  .flow .g{color:var(--gold)} .flow .gr{color:var(--green)} .flow .b{color:var(--blue)} .flow .m{color:var(--mute)} .flow .a{color:var(--amber)}
+  ol.steps{counter-reset:s;list-style:none;padding:0;margin:16px 0}
+  ol.steps li{position:relative;padding:14px 16px 14px 56px;background:var(--surface);border:1px solid var(--border);border-radius:12px;margin-bottom:10px}
+  ol.steps li::before{counter-increment:s;content:counter(s);position:absolute;left:16px;top:14px;width:26px;height:26px;border-radius:50%;background:var(--gold);color:#000;font-family:var(--disp);font-weight:700;font-size:14px;display:flex;align-items:center;justify-content:center}
+  ol.steps b{color:var(--text)}
+  .note{font-size:13px;color:var(--sub)}
+  .tag{font-family:var(--mono);font-size:12px;color:var(--gold)}
+  .layers div{padding:10px 14px;border-radius:10px;margin:6px 0;border:1px solid var(--border);background:var(--surface)}
+  .layers .lbl{font-family:var(--disp);font-weight:700}
+  .layers .who{font-size:12px;color:var(--mute);font-family:var(--mono)}
+  hr{border:none;border-top:1px solid var(--border);margin:34px 0}
+  footer{text-align:center;color:var(--mute);font-size:12px;margin-top:40px}
+  a{color:var(--gold)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="kicker">By Any Means Business</div>
+    <h1>🤖 Training Your Sales Agent</h1>
+    <p class="lede">How the booking agent works, and how to train it until you trust it — for leads in the <b>Responded</b> stage.</p>
+  </header>
+
+  <div class="tabs">
+    <button class="tab on" onclick="showTab(0)">📚 Train it</button>
+    <button class="tab" onclick="showTab(1)">⚙️ How it works</button>
+  </div>
+
+  <!-- ─────────── TAB 1: TRAIN IT ─────────── -->
+  <section class="pane on">
+
+    <div class="card gold">
+      <b>The one rule:</b> you train the agent in 4 places, but they all feed <b>one shared brain</b>.
+      Teach it anywhere → it's smarter everywhere. Nothing it sends goes out without your approval (for now).
+    </div>
+
+    <h2>🛠️ The 4 ways you train it</h2>
+    <div class="grid">
+      <div class="tool"><div class="ic">📝</div><h4>Brain editor</h4><p>Edit what it knows + how it acts, by section (tone, pricing, objections…). Saved → used on the next reply.</p></div>
+      <div class="tool"><div class="ic">💬</div><h4>Sandbox chat</h4><p>Text it like a parent. Watch it reply with its reasoning + confidence. Hit <span class="tag">📝 teach</span> to correct it, <span class="tag">⭐ save</span> a great reply as an example.</p></div>
+      <div class="tool"><div class="ic">🧪</div><h4>Break-it tests</h4><p>~38 tricky scenarios (discount traps, made-up facts, jailbreaks…). Run each, mark ✅ held up / ❌ broke, fix the brain, re-test.</p></div>
+      <div class="tool"><div class="ic">🤖</div><h4>Live approvals</h4><p>Real replies wait for you in the Inbox → Bot tab. Confirm, or adjust + save your change as a learning.</p></div>
+    </div>
+
+    <h2>🔁 The training loop</h2>
+    <ol class="steps">
+      <li><b>Edit the Brain</b> — set tone, pricing, objections, guardrails. <span class="note">(Sandbox → 📝 Brain tab)</span></li>
+      <li><b>Chat-test in the Sandbox</b> — play the parent. When it's off, hit 📝 teach. When it's perfect, ⭐ save as an example.</li>
+      <li><b>Run the Break-it lab</b> — try the tricky cases. Every ❌ tells you which brain section to fix (the 📍 chips show where it pulled from).</li>
+      <li><b>Go live with approvals</b> — real leads' replies show in Inbox → 🤖 Bot. Confirm good ones; adjust the rest and save the fix as a learning.</li>
+      <li><b>Keep teaching</b> — every correction (sandbox OR live) sticks to this academy's brain and improves all future replies.</li>
+    </ol>
+
+    <h2>✅ What "good" looks like</h2>
+    <div class="card">
+      <p>Before you lean on it, drive the <b>Break-it board to all ✅</b> and make sure live drafts feel right 9 times out of 10. Watch the <b>confidence %</b> and the <b>📍 source</b> chips — low confidence or a wrong source = a brain section to tighten.</p>
+      <p class="note">It will never <i>guarantee</i> zero mistakes — that's why every message is human-approved at this stage.</p>
+    </div>
+
+    <h2>📍 Where everything lives</h2>
+    <pre class="flow">Staff portal → <span class="g">/sandbox</span>      💬 Chat · 📝 Brain · 🧪 Break it
+Client portal → <span class="g">Inbox → 🤖 Bot</span>   approve / adjust real replies
+Client portal → <span class="g">Business Blueprint → Agent learnings</span>  (what it has learned)
+Staff portal → <span class="g">Agent training</span>   manage learnings · mark a general one</pre>
+
+    <div class="card gold">
+      🔒 <b>It only ever replies to leads in the "Responded" stage</b> — never members, never other stages. And it texts you a heads-up: a digest every 2 hours of how many chats are waiting, plus a ping each time a new one needs approval.
+    </div>
+  </section>
+
+  <!-- ─────────── TAB 2: HOW IT WORKS ─────────── -->
+  <section class="pane">
+
+    <h2>🗺️ The big picture</h2>
+    <pre class="flow">📨 You add a lead to the <span class="g">Summer Special</span> automation (pipeline button)
+        │
+   ⏳ GHL texts them over a few days
+        │  they reply?
+        ▼
+   🟢 moved to the <span class="b">"Responded"</span> stage
+        │
+   🔔 our <span class="g">spine</span> hears the reply (logs it)
+        │
+   🤖 the <span class="g">agent drafts</span> a reply (to book a free trial)
+        │
+   🧍 <span class="a">YOU approve / adjust</span> in Inbox → 🤖 Bot   ← human gate
+        │
+   📤 approved reply sends to the lead via GHL</pre>
+
+    <h2>🧠 The brain = layers + lessons + examples</h2>
+    <p>Every reply is built fresh from these, combined:</p>
+    <div class="layers">
+      <div><span class="lbl">🌐 General</span> <span class="who">— BAM owns · every academy inherits</span><br><span class="note">how it sells: tone, objections, flow, guardrails</span></div>
+      <div><span class="lbl">📍 Location</span> <span class="who">— this academy</span><br><span class="note">address, schedule, coaches, proof</span></div>
+      <div><span class="lbl">🎁 Offer</span> <span class="who">— the product</span><br><span class="note">program, pricing, policies, who qualifies</span></div>
+      <div><span class="lbl">🎯 Goal</span> <span class="who">— the objective</span><br><span class="note">follow-up cadence · book a free trial</span></div>
+      <div><span class="lbl">🧠 Lessons + ⭐ Examples</span> <span class="who">— your corrections</span><br><span class="note">stay with this academy unless BAM promotes a general one</span></div>
+    </div>
+
+    <h2>🔗 One brain, two surfaces</h2>
+    <pre class="flow">   📝 Brain edits ┐
+   💬 Sandbox teach ├─►  <span class="g">ONE shared brain</span>  (lessons · sections · examples)
+   🤖 Live adjust  ┘            │
+                                ▼
+        read by BOTH →  💬 sandbox drafts  &  🤖 live drafts
+   <span class="gr">teach it anywhere → smarter everywhere</span></pre>
+
+    <h2>🧩 The pieces under the hood</h2>
+    <div class="card">
+      <p><span class="pill">🔔 The Spine</span> &nbsp; GHL pings us the moment a lead replies, so the system knows. Foundation for everything.</p>
+      <p><span class="pill">📨 Pipeline button</span> &nbsp; "Summer Special" — hand-picks a lead into the nudge automation.</p>
+      <p><span class="pill">🤖 Approval queue</span> &nbsp; finds Responded-stage leads needing a reply, drafts one with the brain, waits for your OK.</p>
+      <p><span class="pill">🛡️ Guardrails</span> &nbsp; if it's unsure, off-topic, a complaint, or out of its knowledge → it flags to a human instead of guessing.</p>
+    </div>
+
+    <h2>🚦 What's live vs. coming</h2>
+    <pre class="flow"><span class="gr">✅ live</span>   spine · sandbox + brain editor · break-it lab · summer-special button
+<span class="gr">✅ live</span>   approval queue (human approves every send) · <span class="b">Responded-stage only</span>
+<span class="gr">✅ live</span>   agent learnings (client tab + staff manage) · reminder texts (2h digest + per-chat)
+<span class="m">⏳ later</span> the agent acting on its own (book / follow-up / escalate tools)</pre>
+
+    <div class="card gold">
+      <b>Why human-approved first?</b> A booking agent that talks to real leads has to be trusted. We train it in the sandbox, prove it on the break-it board, then let it draft live — but a person approves every message until it's earned full autonomy.
+    </div>
+  </section>
+
+  <footer>By Any Means Business · Sales Agent Training Guide</footer>
+</div>
+
+<script>
+  function showTab(i){
+    document.querySelectorAll('.tab').forEach((t,n)=>t.classList.toggle('on',n===i));
+    document.querySelectorAll('.pane').forEach((p,n)=>p.classList.toggle('on',n===i));
+    window.scrollTo({top:0,behavior:'smooth'});
+  }
+</script>
+</body>
+</html>

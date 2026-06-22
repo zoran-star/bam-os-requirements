@@ -1,9 +1,10 @@
 import { withSentryApiRoute } from "./_sentry.js";
+// redeploy marker 2026-06-15: force a fresh deploy to pick up GITHUB_TOKEN/GITHUB_REPO
 // Vercel Serverless Function — Clients (Supabase clients table + live Stripe revenue)
 // GET /api/clients               → list all clients
 // GET /api/clients?id=<uuid>     → single client
 
-import { ADMIN_LIKE_ROLES, ANY_STAFF_ROLES, ASSIGNABLE_STAFF_ROLES } from "./_roles.js";
+import { ADMIN_LIKE_ROLES, ANY_STAFF_ROLES, ASSIGNABLE_STAFF_ROLES, CONTENT_MANAGER_ROLES } from "./_roles.js";
 
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
@@ -291,6 +292,11 @@ async function specFeedbackToIssue(item) {
     "\n\n---",
     `_Auto-generated from portal feedback \`${item.id}\`${item.submitter_email ? ` · ${item.submitter_email}` : ""}${item.page ? ` · page ${item.page}` : ""}._`,
   ].join("");
+  // NOTE: no `auto-implement` label — the unattended Auto-build workflow needs
+  // repo-admin to enable (Claude GitHub App + Actions secret), which we don't
+  // have. The build is done by a human in Claude Code on this issue instead; the
+  // resulting PR (branch `feedback/…`) shows up in the portal Ship Queue.
+  // Re-add the label if/when the App is installed to turn on unattended builds.
   const labels = ["feedback", item.kind === "bug" ? "bug" : "enhancement"];
   const url = await createGithubIssue(title, body, labels);
   if (!url) return { error: "issue_not_created" };
@@ -369,6 +375,70 @@ async function cronFeedbackDigest(req, res) {
   } catch (e) {
     return res.status(500).json({ error: e.message });
   }
+}
+
+// ── Ship Queue: portal-native approval of auto-built PRs (no GitHub for Zoran) ──
+
+async function githubApi(path, { method = "GET", body } = {}) {
+  const token = process.env.GITHUB_TOKEN;
+  const repo = process.env.GITHUB_REPO;
+  if (!token || !repo) return { ok: false, status: 400, json: {} };
+  try {
+    const r = await fetch(`https://api.github.com/repos/${repo}${path}`, {
+      method,
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Accept: "application/vnd.github+json",
+        "Content-Type": "application/json",
+        "User-Agent": "bam-portal-shipqueue",
+      },
+      body: body ? JSON.stringify(body) : undefined,
+    });
+    const json = await r.json().catch(() => ({}));
+    return { ok: r.ok, status: r.status, json };
+  } catch (e) {
+    return { ok: false, status: 0, json: { message: e?.message || "github fetch failed" } };
+  }
+}
+
+// Roll up a head commit's CI check-runs into one word for the UI.
+async function shipChecksState(sha) {
+  const res = await githubApi(`/commits/${sha}/check-runs`);
+  if (!res.ok) return "unknown";
+  const runs = Array.isArray(res.json?.check_runs) ? res.json.check_runs : [];
+  if (!runs.length) return "unknown";
+  if (runs.some(r => r.status !== "completed")) return "pending";
+  if (runs.some(r => ["failure", "timed_out", "cancelled", "action_required"].includes(r.conclusion))) return "failure";
+  return "success";
+}
+
+// Open PRs from the auto-build flow (branch `feedback/…`), newest first, with a
+// plain-English summary + CI state for the portal Ship Queue.
+async function listShipQueue() {
+  const res = await githubApi(`/pulls?state=open&per_page=50&sort=created&direction=desc`);
+  if (!res.ok) return [];
+  const pulls = Array.isArray(res.json) ? res.json : [];
+  const feedbackPrs = pulls.filter(p => (p.head?.ref || "").startsWith("feedback/"));
+  const out = [];
+  for (const p of feedbackPrs) {
+    out.push({
+      number: p.number,
+      title: p.title,
+      summary: (p.body || "").replace(/\r/g, "").slice(0, 800),
+      url: p.html_url,
+      branch: p.head?.ref || null,
+      created_at: p.created_at,
+      author: p.user?.login || null,
+      checks: p.head?.sha ? await shipChecksState(p.head.sha) : "unknown",
+    });
+  }
+  return out;
+}
+
+async function mergeShipPr(prNum) {
+  const res = await githubApi(`/pulls/${prNum}/merge`, { method: "PUT", body: { merge_method: "squash" } });
+  if (res.ok) return { ok: true };
+  return { ok: false, status: res.status === 0 ? 502 : res.status, error: res.json?.message || `merge failed (${res.status})` };
 }
 
 function shapeClient(row, revenue) {
@@ -1445,7 +1515,7 @@ async function handler(req, res) {
       // OR by a client portal user (the academy owner or a teammate). Auth
       // is resolved per-action below, so these MUST sit before the staff-only
       // gate — that gate would 403 a legitimate client-portal caller.
-      if (publicSignupAction === "invite-team-member" || publicSignupAction === "revoke-team-member") {
+      if (publicSignupAction === "invite-team-member" || publicSignupAction === "revoke-team-member" || publicSignupAction === "set-staff-tabs" || publicSignupAction === "add-teammate" || publicSignupAction === "update-teammate") {
         const teamAuth = req.headers.authorization || "";
         const teamToken = teamAuth.startsWith("Bearer ") ? teamAuth.slice(7) : null;
         if (!teamToken) return res.status(401).json({ error: "auth required" });
@@ -1478,8 +1548,112 @@ async function handler(req, res) {
         if (!teamClientRows?.length) return res.status(404).json({ error: "client not found" });
         const teamClient = teamClientRows[0];
 
+        // ---- action=set-staff-tabs ----
+        // The academy OWNER (or BAM staff) sets a teammate's portal access:
+        //   allowed_tabs   = array of logical tab keys, or null = all tabs
+        //   allowed_stages = array of GHL stage ids, or null = all stages
+        // Either or both may be present; only the provided fields are patched.
+        if (publicSignupAction === "set-staff-tabs") {
+          if (!isStaffCaller && callerRole !== "owner") {
+            return res.status(403).json({ error: "only the account owner can set staff access" });
+          }
+          const memberId = typeof teamBody.member_id === "string" ? teamBody.member_id.trim() : "";
+          if (!memberId) return res.status(400).json({ error: "member_id required" });
+          const normArr = (v) => {
+            if (v === null) return null;
+            if (!Array.isArray(v)) return undefined; // signals invalid
+            return [...new Set(v.filter((x) => typeof x === "string").map((x) => x.trim()).filter(Boolean))].slice(0, 200);
+          };
+          const patch = { updated_at: new Date().toISOString() };
+          if ("allowed_tabs" in teamBody) {
+            const a = normArr(teamBody.allowed_tabs);
+            if (a === undefined) return res.status(400).json({ error: "allowed_tabs must be an array or null" });
+            patch.allowed_tabs = a;
+          }
+          if ("allowed_stages" in teamBody) {
+            const a = normArr(teamBody.allowed_stages);
+            if (a === undefined) return res.status(400).json({ error: "allowed_stages must be an array or null" });
+            patch.allowed_stages = a;
+          }
+          if ("allowed_kpis" in teamBody) {
+            const a = normArr(teamBody.allowed_kpis);
+            if (a === undefined) return res.status(400).json({ error: "allowed_kpis must be an array or null" });
+            patch.allowed_kpis = a;
+          }
+          if (!("allowed_tabs" in patch) && !("allowed_stages" in patch) && !("allowed_kpis" in patch)) {
+            return res.status(400).json({ error: "provide allowed_tabs, allowed_stages, and/or allowed_kpis" });
+          }
+          // Target must belong to THIS client and not be the owner.
+          const targetRows = await supabaseSelect(
+            `client_users?id=eq.${encodeURIComponent(memberId)}&client_id=eq.${client_id}&select=id,role`
+          ).catch(() => []);
+          if (!targetRows?.length) return res.status(404).json({ error: "teammate not found for this client" });
+          if (targetRows[0].role === "owner") return res.status(400).json({ error: "the owner always sees everything" });
+          const upd = await fetch(`${SUPABASE_URL}/rest/v1/client_users?id=eq.${encodeURIComponent(memberId)}`, {
+            method: "PATCH",
+            headers: {
+              apikey: SUPABASE_SERVICE_KEY,
+              Authorization: `Bearer ${SUPABASE_SERVICE_KEY}`,
+              "Content-Type": "application/json",
+              Prefer: "return=minimal",
+            },
+            body: JSON.stringify(patch),
+          });
+          if (!upd.ok) return res.status(502).json({ error: `couldn't save staff access — ${await upd.text()}` });
+          return res.status(200).json({ ok: true, member_id: memberId, ...patch });
+        }
+
+        // ---- action=add-teammate ----
+        // Create a placeholder teammate (no invite, email optional). The owner
+        // fills the email + clicks Invite later. user_id stays null = "not invited".
+        if (publicSignupAction === "add-teammate") {
+          if (!isStaffCaller && !callerRole) return res.status(403).json({ error: "not authorized for this client" });
+          const name = typeof teamBody.name === "string" ? teamBody.name.trim() : "";
+          if (!name) return res.status(400).json({ error: "name required" });
+          let email = typeof teamBody.email === "string" ? teamBody.email.trim().toLowerCase() : "";
+          if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return res.status(400).json({ error: "enter a valid email or leave it blank" });
+          try {
+            const rows = await supabaseInsert("client_users", {
+              client_id, name, email: email || null,
+              role: "member", status: "active", user_id: null, hide_from_team: false,
+            });
+            return res.status(200).json({ ok: true, member: Array.isArray(rows) ? rows[0] : rows });
+          } catch (e) { return res.status(500).json({ error: `add teammate failed: ${e.message}` }); }
+        }
+
+        // ---- action=update-teammate ----
+        // Edit a NOT-YET-INVITED teammate's email/name (owner only). Once they
+        // have a login, edits go through their own account.
+        if (publicSignupAction === "update-teammate") {
+          if (!isStaffCaller && callerRole !== "owner") return res.status(403).json({ error: "only the account owner can edit a teammate" });
+          const memberId = typeof teamBody.member_id === "string" ? teamBody.member_id.trim() : "";
+          if (!memberId) return res.status(400).json({ error: "member_id required" });
+          const targetRows = await supabaseSelect(
+            `client_users?id=eq.${encodeURIComponent(memberId)}&client_id=eq.${client_id}&select=id,user_id,role`
+          ).catch(() => []);
+          if (!targetRows?.length) return res.status(404).json({ error: "teammate not found for this client" });
+          if (targetRows[0].role === "owner") return res.status(400).json({ error: "can't edit the owner here" });
+          if (targetRows[0].user_id) return res.status(400).json({ error: "this teammate already has a login — edits go through their account" });
+          const patch = { updated_at: new Date().toISOString() };
+          if ("email" in teamBody) {
+            let email = typeof teamBody.email === "string" ? teamBody.email.trim().toLowerCase() : "";
+            if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return res.status(400).json({ error: "enter a valid email or leave it blank" });
+            patch.email = email || null;
+          }
+          if ("name" in teamBody) { const nm = (teamBody.name || "").trim(); if (nm) patch.name = nm; }
+          const upd = await fetch(`${SUPABASE_URL}/rest/v1/client_users?id=eq.${encodeURIComponent(memberId)}`, {
+            method: "PATCH",
+            headers: { apikey: SUPABASE_SERVICE_KEY, Authorization: `Bearer ${SUPABASE_SERVICE_KEY}`, "Content-Type": "application/json", Prefer: "return=minimal" },
+            body: JSON.stringify(patch),
+          });
+          if (!upd.ok) return res.status(502).json({ error: `couldn't save — ${await upd.text()}` });
+          return res.status(200).json({ ok: true, member_id: memberId, ...patch });
+        }
+
         // ---- action=invite-team-member ----
         // Any BAM staff OR any active portal user of this client can invite.
+        // Optional `member_id` invites an existing placeholder row (links it to
+        // the auth user) instead of creating a new membership.
         if (publicSignupAction === "invite-team-member") {
           if (!isStaffCaller && !callerRole) {
             return res.status(403).json({ error: "not authorized for this client" });
@@ -1539,13 +1713,38 @@ async function handler(req, res) {
           }
           if (!memberUserId) return res.status(500).json({ error: "could not resolve the invited user" });
 
+          let memberRow;
+
+          // Inviting an existing PLACEHOLDER row → link it to the auth user
+          // instead of creating a duplicate membership.
+          const draftId = typeof teamBody.member_id === "string" ? teamBody.member_id.trim() : "";
+          if (draftId) {
+            const draftRows = await supabaseSelect(
+              `client_users?id=eq.${encodeURIComponent(draftId)}&client_id=eq.${client_id}&select=id,user_id,role`
+            ).catch(() => []);
+            if (!draftRows?.length) return res.status(404).json({ error: "teammate not found for this client" });
+            // Guard: that email isn't already an active member on a different row.
+            const dupe = await supabaseSelect(
+              `client_users?user_id=eq.${memberUserId}&client_id=eq.${client_id}&status=eq.active&select=id`
+            ).catch(() => []);
+            if (dupe?.length && dupe[0].id !== draftId) return res.status(409).json({ error: "that email already has access to this portal" });
+            const updRes = await fetch(`${SUPABASE_URL}/rest/v1/client_users?id=eq.${encodeURIComponent(draftId)}`, {
+              method: "PATCH",
+              headers: { apikey: SUPABASE_SERVICE_KEY, Authorization: `Bearer ${SUPABASE_SERVICE_KEY}`, "Content-Type": "application/json", Prefer: "return=representation" },
+              body: JSON.stringify({ user_id: memberUserId, name, email, status: "active", last_invite_sent_at: new Date().toISOString() }),
+            });
+            if (!updRes.ok) return res.status(500).json({ error: `membership link failed: ${await updRes.text()}` });
+            memberRow = (await updRes.json())[0];
+          }
+
           // Upsert the membership. A previously-revoked row for this
           // user+client is reactivated; otherwise a fresh row is inserted.
-          const existingMembership = await supabaseSelect(
+          const existingMembership = memberRow ? [] : await supabaseSelect(
             `client_users?user_id=eq.${memberUserId}&client_id=eq.${client_id}&select=id,role,status`
           ).catch(() => []);
-          let memberRow;
-          if (existingMembership?.length) {
+          if (memberRow) {
+            // already linked the placeholder above — skip the upsert
+          } else if (existingMembership?.length) {
             const ex = existingMembership[0];
             if (ex.status === "active") {
               return res.status(409).json({ error: "that person already has access to this portal" });
@@ -1683,7 +1882,7 @@ async function handler(req, res) {
       // submit-feedback moved to the public path (no auth required).
       // list-feedback + resolve-feedback flow through staff auth, then are
       // additionally narrowed to the `admin` role inside their handlers.
-      const ADMIN_ONLY_ACTIONS = new Set(["invite-staff", "update-staff", "reset-staff-password", "create-client", "setup-account", "reset-password", "transfer-owner", "archive", "list-feedback", "resolve-feedback", "feedback-spec"]);
+      const ADMIN_ONLY_ACTIONS = new Set(["invite-staff", "update-staff", "reset-staff-password", "create-client", "setup-account", "reset-password", "transfer-owner", "archive", "list-feedback", "resolve-feedback", "feedback-spec", "ship-queue", "ship-merge"]);
       const ANY_STAFF_OK_ACTIONS = new Set(["update-fields"]);
 
       if (ADMIN_ONLY_ACTIONS.has(action)) {
@@ -1985,6 +2184,17 @@ async function handler(req, res) {
         if (wasSet("ghl_location_id"))    patch.ghl_location_id    = setText("ghl_location_id");
         if (wasSet("scaling_manager_id")) patch.scaling_manager_id = body.scaling_manager_id || null;
 
+        // Content roster: per-channel content owner. Manager/admin only — content
+        // executors pass the ANY_STAFF action gate, so guard these fields here so
+        // they can't reassign who owns a client's content.
+        if (wasSet("content_assignee_organic_id") || wasSet("content_assignee_ads_id")) {
+          if (!CONTENT_MANAGER_ROLES.has(role)) {
+            return res.status(403).json({ error: "manager or admin role required to assign content owners" });
+          }
+          if (wasSet("content_assignee_organic_id")) patch.content_assignee_organic_id = body.content_assignee_organic_id || null;
+          if (wasSet("content_assignee_ads_id"))     patch.content_assignee_ads_id     = body.content_assignee_ads_id || null;
+        }
+
         if (wasSet("status")) {
           const s = body.status;
           if (s !== null && !["onboarding","active","paused","churned"].includes(s)) {
@@ -2045,6 +2255,42 @@ async function handler(req, res) {
             return res.status(400).json({ error: "v2_access must be a boolean" });
           }
           patch.v2_access = v;
+        }
+
+        // v15_access — V1.5 portal tier (no GoHighLevel, lighter than V2).
+        // Mutually exclusive with v2_access in the staff "Portal tier" selector,
+        // which posts both flags together.
+        if (wasSet("v15_access")) {
+          const v = body.v15_access;
+          if (typeof v !== "boolean") {
+            return res.status(400).json({ error: "v15_access must be a boolean" });
+          }
+          patch.v15_access = v;
+        }
+
+        if (wasSet("organic_content")) {
+          const v = body.organic_content;
+          if (typeof v !== "boolean") {
+            return res.status(400).json({ error: "organic_content must be a boolean" });
+          }
+          patch.organic_content = v;
+        }
+
+        // Monthly organic credits: total = combined pool; video/graphic = optional
+        // hard caps. null/"" = unlimited; otherwise a non-negative integer (0 = none).
+        for (const f of ["organic_total_credits_per_month", "organic_video_credits_per_month", "organic_graphic_credits_per_month"]) {
+          if (wasSet(f)) {
+            const raw = body[f];
+            if (raw === null || raw === "") {
+              patch[f] = null;
+            } else {
+              const n = Number(raw);
+              if (!Number.isInteger(n) || n < 0) {
+                return res.status(400).json({ error: `${f} must be a non-negative integer or null` });
+              }
+              patch[f] = n;
+            }
+          }
         }
 
         // Meta Ads onboarding-tracker flag. Staff flips this on/off — the
@@ -2268,6 +2514,34 @@ async function handler(req, res) {
         const result = await specFeedbackToIssue(item);
         if (result.error) return res.status(502).json({ ok: false, error: result.error });
         return res.status(200).json({ ok: true, url: result.url, created: result.created });
+      }
+
+      // ── action=ship-queue ──
+      // ADMIN-ONLY. The portal-native "Ship Queue": lists open auto-built PRs
+      // (branch `feedback/…`) with a plain-English summary + checks status, so
+      // Zoran approves shipping IN the portal and never touches GitHub.
+      if (action === "ship-queue") {
+        if (role !== "admin") return res.status(403).json({ error: "ship queue is admin-only" });
+        if (!process.env.GITHUB_TOKEN || !process.env.GITHUB_REPO) {
+          return res.status(200).json({ ok: true, prs: [], reason: "github_not_configured" });
+        }
+        const prs = await listShipQueue();
+        return res.status(200).json({ ok: true, prs });
+      }
+
+      // ── action=ship-merge ──
+      // ADMIN-ONLY. Approve & ship: squash-merges a feedback PR behind the
+      // scenes (→ Vercel auto-deploys). Body/query: pr=<number>.
+      if (action === "ship-merge") {
+        if (role !== "admin") return res.status(403).json({ error: "ship is admin-only" });
+        if (!process.env.GITHUB_TOKEN || !process.env.GITHUB_REPO) {
+          return res.status(200).json({ ok: false, reason: "github_not_configured" });
+        }
+        const prNum = parseInt(req.query.pr || req.body?.pr, 10);
+        if (!prNum) return res.status(400).json({ error: "pr (number) required" });
+        const result = await mergeShipPr(prNum);
+        if (!result.ok) return res.status(result.status || 502).json({ ok: false, error: result.error });
+        return res.status(200).json({ ok: true, merged: true, pr: prNum });
       }
 
       // ── action=resolve-feedback ──

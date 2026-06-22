@@ -82,8 +82,10 @@ async function handler(req, res) {
     const data = { ...(offer.data || {}) };
     if ("lead_tag" in b) data.lead_tag = b.lead_tag || null;
     if ("client_tag" in b) data.client_tag = b.client_tag || null;
+    // The academy's onboarding / sign-up link, sent from the post-trial form.
+    if ("signup_url" in b) data.signup_url = (b.signup_url || "").trim() || null;
     await sb(`offers?id=eq.${offer.id}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ data, updated_at: new Date().toISOString() }) });
-    return res.status(200).json({ ok: true, lead_tag: data.lead_tag || null, client_tag: data.client_tag || null });
+    return res.status(200).json({ ok: true, lead_tag: data.lead_tag || null, client_tag: data.client_tag || null, signup_url: data.signup_url || null });
   }
 
   // GET — list location tags + current selections + recommendation.
@@ -103,6 +105,7 @@ async function handler(req, res) {
     tags,
     lead_tag: offer?.data?.lead_tag || null,
     client_tag: offer?.data?.client_tag || null,
+    signup_url: offer?.data?.signup_url || null,
     recommend: recommend(tags),
   });
 }

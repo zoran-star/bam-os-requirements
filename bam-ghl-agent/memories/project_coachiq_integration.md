@@ -7,6 +7,120 @@ metadata:
 
 # CoachIQ integration
 
+## ⭐ 2026-06-19 — MEMBER IMPORT + CoachIQ (5-step wizard, built + live)
+
+Member Import (Pricing Sorter `members` mode) restructured to: **Import → Stripe →
+CoachIQ → GHL → Finish(promote)**. Lives in client-portal.html, launched from the
+Members tab. Promote moved from the old step-3 to the final Finish step.
+
+- Schema: `clients.coachiq_enabled` (per-academy toggle; GTA=true), `members_staging`
+  `coachiq_member_id` + `coachiq_not_applicable`. Promote copies coachiq_member_id → members.
+- **Auto-link**: cleanup `link-customer` harvests the member's CoachIQ USER id from the
+  resolved Stripe sub's `metadata.userId` (CoachIQ stamps it on subs it created) → staging.
+- **CoachIQ "listening session" step** (step 4, only if coachiq_enabled): polls
+  `/api/sorter/cleanup?action=coachiq-status` every 4s, lists members, checks each off live
+  as ids arrive; per-member paste user-id or "not on CoachIQ"; flags unmatched tag webhooks.
+  Never blocks promote. Backed by `coachiq-status` + `coachiq-set` cleanup actions.
+- **Tag-listening webhook (VERIFIED 2026-06-19):** CoachIQ "User Tag Added" automation →
+  Send to External Webhook → `POST /api/coachiq/link-user?secret=…` with
+  `coachiq_user_id={{user.id}}` + `email={{user.email}}`. CONFIRMED the tag-added payload
+  carries the real **user id** (not profile id). link-user matches by email across
+  members_staging + members, stamps coachiq_member_id, NO product grant, logs to
+  `coachiq_link_events` (matched/unmatched) for the listening UI.
+- ⚠️ The CoachIQ admin URL `admin.coachiq.io/…?profile=<id>` = PROFILE id, which does NOT
+  grant. The user id only comes from Stripe metadata (auto) or the tag webhook. No CoachIQ
+  page exposes the user id directly.
+- ⚠️ **CoachIQ webhook JSON-body tokens (confirmed 2026-06-20):** the `@ Users` dropdown in
+  the automation's External-Webhook builder ONLY inserts `{{user.id:<specific-user-uuid>}}`
+  (pick a SPECIFIC user) — the dynamic triggering-user token is `{{user.id}}` + `{{user.email}}`.
+  There is **NO profile-id or profile-URL token** available. Other dropdowns: `# Fields`
+  (custom fields), `Forms`, `Media`, `Products`, `Scheduler`. So we CANNOT get a deep-link
+  profile id from the webhook — only the user id we already capture. A direct "open this member
+  in CoachIQ" link is only possible IF CoachIQ's member-page URL itself is built from the user
+  id (unverified — admin is WAF-locked; needs Zoran to check a real member-page URL).
+
+**REMAINING for import:** Zoran builds the real "tag added → link-user" automation (tested
+with tag "intro"); then upload GTA's CSV → run the 5 steps → promote. Then member-mgmt buttons.
+
+
+## ⭐ 2026-06-18 — TRACK A ONBOARDING = SELF-SIGNUP MODEL (NO ZAPIER), live + tested
+
+**Decision: NO Zapier.** Zapier gates webhooks + multi-step Zaps behind a paid plan
+(~$20/mo), needed ONLY to auto-create the CoachIQ user. Instead the **parent creates
+their own CoachIQ account** on the academy's group login page
+(`app.coachiq.io/bam-gta/athletes`) — group-scoped signup = ENROLLED user (Zoran
+confirmed). Then CoachIQ tells us and we grant the product. Flow:
+
+```
+pay → confirmation page: "make your account at the group login page (use paid email)"
+→ parent signs up (enrolled) → CoachIQ "New User → Send to External Webhook" automation
+→ POST /api/coachiq/user-created → match member by EMAIL → store id + grant product
+```
+
+Files (live on prod, PR #454 + #461):
+- `api/coachiq.js` — `addCoachiqProduct(id,{plan,term})` fires the **"Add a Product
+  Purchase"** automation (`18c05158-…`; product + access + starter credits, no payment).
+  `coachiqOnboardingEnabled()` = api key + group + product automation (no Zapier).
+  `createCoachiqUser()` (Zapier hook) kept but UNUSED in this model.
+- `api/coachiq/user-created.js` — matches member by **email** (or member_id), stores
+  `coachiq_member_id` on all members sharing that parent_email (siblings), grants the
+  product. Secret via body/query/header. Idempotent (retry → "already linked"); accepts
+  + skips signups with no matching paid member.
+- `api/coachiq/test-onboard.js` — secret-gated harness (`status|create|product|callback|full`).
+- `api/onboarding/activations.js` — on payment: returning member (has id) → grant inline;
+  new member → audit `coachiq-await-signup` (the New-User webhook grants later).
+
+**ENV SET IN PROD (2026-06-18):** `COACHIQ_API_KEY` (…53f2 — **ROTATE**, was in chat),
+`COACHIQ_GROUP_ID` `719bb0cf-5a17-4172-ac55-c28e19238824`, `COACHIQ_PRODUCT_AUTOMATION_ID`
+`18c05158-d981-4429-b568-495479428d26`, `COACHIQ_WEBHOOK_SECRET`, `COACHIQ_CREATE_USER_WEBHOOK_URL`
+(Zapier hook — now unused, can delete). Org ID `349b6d2d-…` (Zapier connection only).
+
+**PER-PRICE PRODUCT AUTOMATION (2026-06-18, PR #467):** the product granted is now
+chosen by what the member BOUGHT, not a global default. `pricing_catalog` gained
+**`coachiq_automation_url`** (the "Add a Product Purchase" webhook link pasted per
+Stripe price). The grant path resolves it from the member's `stripe_price_id` →
+`addCoachiqProduct(..., {automationUrl, sub_id})` POSTs to that URL; falls back to
+`COACHIQ_PRODUCT_AUTOMATION_ID`/map if a price has none. **GTA "Summer Unlimited"
+(monthly + 3mo routable prices) prefilled** with `…/18c05158`. The payload now also
+sends **`sub_id`** (member.stripe_subscription_id) so Zoran's automation can store it
+on the product → CoachIQ tracks the Stripe sub's renewal date to refresh credits.
+Tested live: callback resolved the price's URL + fired success ✅.
+
+**ZORAN'S CoachIQ AUTOMATION must map (in "Add a Product Purchase"):** `{{payload.user.id}}`
+as target, and `{{payload.sub_id}}` into the product's subscription/sub-id field (for
+renewal refresh). Per-product: create one automation per product, paste each link into
+that price's `coachiq_automation_url` (UI to fill this per-price NOT built yet — DB only).
+
+**TESTED LIVE 2026-06-18:** product automation fires ✅; email-match callback stores id +
+grants product ✅; idempotent retry ✅; per-price URL resolution ✅. Full chain (real
+self-signup → New-User webhook payload → email match → grant) proven with user
+`2d4452f5-…`. (Test users `2578c9b2`/`2d4452f5` + test members cleaned up.)
+
+**REMAINING:**
+1. Zoran's **"New User → Send to External Webhook"** automation is BUILT + fired in
+   testing (URL `…/api/coachiq/user-created?secret=…`, body `coachiq_user_id={{user.id}}`
+   + `email={{user.email}}`). Confirm it's published/on.
+2. **Per-price UI** — ✅ BUILT, final design after 2026-06-19 redesign (PRs #473/#476/#481):
+   - **Editing** = the "🔗 CoachIQ Links" card under **BB → Offers → Pricing → Price Match**
+     → modal listing **live + legacy** prices; each has a **"CoachIQ product" switch** →
+     ON reveals a link input (paste the "Add a Product Purchase" URL) → Save; OFF clears it.
+   - **Status** = a CoachIQ pill on each plan row in the Pricing step (`● CoachIQ` /
+     `○ No CoachIQ`), next to "● LIVE on Stripe", filled async from /api/pricing.
+   - Backed by **PATCH /api/pricing** ({client_id, stripe_price_id|stripe_price_ids[],
+     coachiq_automation_url}; staff or client's own users; https-or-blank).
+   - The earlier standalone "CoachIQ" offer-builder TAB was REMOVED (Zoran: links live only
+     in Price Match + the row pill). `coachiq_automation_url` is per pricing_catalog row;
+     one plan's terms share one product so set the same URL on each of its prices.
+3. **Confirmation-page UX** — ✅ BUILT (bam-client-sites PR #21, enroll.jsx v17). The
+   "You're in" screen after payment shows a "Set up your athlete app" card: create CoachIQ
+   account with the same email → set password → book first class → credits load
+   automatically, with a button to `app.coachiq.io/bam-gta/athletes`. This is the parent
+   trigger for the self-signup → New-User-webhook → product-grant flow. (No live credit
+   number shown — credits live in the app.) Brand: no emoji/dashes, gold accent.
+4. Per-product automations for the other plans + confirm Summer Unlimited credit count.
+5. **Rotate the API key.**
+
+
 ## Why this matters (the strategic goal)
 
 **The point of all this: figure out how to connect CoachIQ to the FullControl

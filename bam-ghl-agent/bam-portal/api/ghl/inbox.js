@@ -91,6 +91,26 @@ async function ghl(method, path, { token, body } = {}) {
   return json;
 }
 
+// ── Inbox-list cache (per academy) ──────────────────────────────────────────
+// The list payload is cached for a few seconds so rapid reloads + the approval
+// count refresh cost ZERO GHL calls, and so a GHL rate-limit (429) serves the
+// last good payload instead of failing the whole inbox.
+const INBOX_CACHE_TTL_MS = 25000;
+async function readInboxCache(clientId) {
+  try {
+    const rows = await sb(`ghl_inbox_cache?client_id=eq.${clientId}&select=payload,updated_at&limit=1`);
+    return Array.isArray(rows) && rows[0] ? rows[0] : null;
+  } catch (_) { return null; }
+}
+function writeInboxCache(clientId, payload) {
+  // Fire-and-forget upsert — never block the response on the cache write.
+  sb(`ghl_inbox_cache?on_conflict=client_id`, {
+    method: "POST",
+    headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
+    body: JSON.stringify([{ client_id: clientId, payload, updated_at: new Date().toISOString() }]),
+  }).catch(() => {});
+}
+
 async function refreshGhlToken(client) {
   const clientId     = (process.env.GHL_OAUTH_CLIENT_ID || "").trim();
   const clientSecret = (process.env.GHL_OAUTH_CLIENT_SECRET || "").trim();
@@ -128,7 +148,23 @@ async function pickGhlToken(client) {
   if (client.ghl_access_token) {
     const expiresAt = client.ghl_token_expires_at ? new Date(client.ghl_token_expires_at).getTime() : 0;
     if (expiresAt - Date.now() <= 60_000 && client.ghl_refresh_token) {
-      try { return await refreshGhlToken(client); } catch (_) {}
+      try { return await refreshGhlToken(client); }
+      catch (_) {
+        // Refresh failed — GHL refresh tokens are single-use, so a concurrent
+        // process (e.g. the contacts-sync cron) likely just consumed it and saved
+        // a fresh access token. Re-read the row and use that instead of falling
+        // back to the now-stale in-memory token (which caused "Invalid JWT").
+        try {
+          const rows = await sb(`clients?id=eq.${client.id}&select=ghl_access_token,ghl_location_id,ghl_token_expires_at,ghl_refresh_token`);
+          const fresh = rows && rows[0];
+          if (fresh && fresh.ghl_access_token && fresh.ghl_access_token !== client.ghl_access_token) {
+            const fexp = fresh.ghl_token_expires_at ? new Date(fresh.ghl_token_expires_at).getTime() : 0;
+            if (fexp - Date.now() > 60_000) return { token: fresh.ghl_access_token, locationId: fresh.ghl_location_id || client.ghl_location_id };
+            try { return await refreshGhlToken(fresh); } catch (_) {}
+            return { token: fresh.ghl_access_token, locationId: fresh.ghl_location_id || client.ghl_location_id };
+          }
+        } catch (_) {}
+      }
     }
     return { token: client.ghl_access_token, locationId: client.ghl_location_id };
   }
@@ -185,6 +221,25 @@ async function handler(req, res) {
   if (!creds) return res.status(500).json({ error: "GHL not configured for this academy." });
   const { token, locationId } = creds;
 
+  // Mode S: sender info — the email + phone number synced with GHL (V1.5 Inbox
+  // setup just lists these so staff know what they send from).
+  if (req.query.action === "sender-info") {
+    try {
+      const loc = (await ghl("GET", `/locations/${encodeURIComponent(locationId)}`, { token })).location || {};
+      let phone = loc.phone || null;
+      // Prefer a real SMS-capable number from the location's phone numbers, if exposed.
+      try {
+        const nums = await ghl("GET", `/phone-system/numbers/location/${encodeURIComponent(locationId)}`, { token });
+        const list = nums?.numbers || nums?.data || [];
+        const first = list.find(n => n.phoneNumber || n.number);
+        if (first) phone = first.phoneNumber || first.number || phone;
+      } catch (_) { /* numbers endpoint not available on this plan — fall back to location.phone */ }
+      return res.status(200).json({ email: loc.email || null, phone, location_name: loc.name || null });
+    } catch (e) {
+      return res.status(e.status || 500).json({ error: e.message });
+    }
+  }
+
   const conversationId = req.query.conversation_id;
   const contactId = req.query.contact_id;
 
@@ -206,7 +261,7 @@ async function handler(req, res) {
   // ────────────────────────────────────────────────────────
   if (conversationId) {
     try {
-      const data = await ghl("GET", `/conversations/${encodeURIComponent(conversationId)}/messages`, { token });
+      const data = await ghl("GET", `/conversations/${encodeURIComponent(conversationId)}/messages?limit=100`, { token });
       const messages = (data.messages?.messages || data.messages || data.data || []).map(mapMsg);
       return res.status(200).json({ conversation_id: conversationId, messages });
     } catch (e) {
@@ -233,14 +288,24 @@ async function handler(req, res) {
   }
 
   // ────────────────────────────────────────────────────────
-  // Mode A: list conversations
+  // Mode A: list conversations  (cached — see readInboxCache)
   // ────────────────────────────────────────────────────────
+  const wantFresh = req.query.fresh === "1" || req.query.nocache === "1";
+  const cached = await readInboxCache(clientId);
+  if (!wantFresh && cached && cached.updated_at &&
+      (Date.now() - new Date(cached.updated_at).getTime()) < INBOX_CACHE_TTL_MS) {
+    return res.status(200).json({ ...cached.payload, cached: true });
+  }
+
   let convos = [];
   try {
-    const params = new URLSearchParams({ locationId, limit: "50" });
+    const params = new URLSearchParams({ locationId, limit: "100" });
     const data = await ghl("GET", `/conversations/search?${params}`, { token });
     convos = data.conversations || data.data || [];
   } catch (e) {
+    // GHL failed (usually 429). Serve the last good payload instead of breaking
+    // the inbox; only error out if we have nothing cached at all.
+    if (cached) return res.status(200).json({ ...cached.payload, stale: true });
     return res.status(e.status || 502).json({ error: `GHL: ${e.message}`, detail: e.body || null });
   }
 
@@ -348,6 +413,7 @@ async function handler(req, res) {
       lastMessageDate:   c.lastMessageDate || c.dateUpdated || null,
       lastMessageType:   c.lastMessageType || "",
       lastMessageDirection: c.lastMessageDirection || "",
+      lastMessageStatus: String(c.lastMessageStatus || c.status || "").toLowerCase(),
       unreadCount:       c.unreadCount || 0,
       classification:    isMember ? "member" : (isLead ? "lead" : "other"),
       member: m ? { id: m.id, athlete_name: m.athlete_name, status: m.status } : null,
@@ -364,8 +430,9 @@ async function handler(req, res) {
     return tb - ta;
   });
 
-  return res.status(200).json({
+  const payload = {
     conversations: annotated,
+    location_id: locationId,   // for the "Open in GHL" deep link
     trainers,
     tagConfig,
     counts: {
@@ -374,7 +441,9 @@ async function handler(req, res) {
       leads:   annotated.filter(c => c.classification === "lead").length,
       unread:  annotated.reduce((sum, c) => sum + (c.unreadCount || 0), 0),
     },
-  });
+  };
+  writeInboxCache(clientId, payload);   // refresh the cache for the next load (fire-and-forget)
+  return res.status(200).json(payload);
 }
 
 export default withSentryApiRoute(handler);

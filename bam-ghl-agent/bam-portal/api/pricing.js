@@ -52,14 +52,32 @@ async function resolveUser(req) {
 }
 
 async function handler(req, res) {
-  if (req.method !== "GET") return res.status(405).json({ error: "GET only" });
+  if (req.method !== "GET" && req.method !== "PATCH") return res.status(405).json({ error: "GET or PATCH only" });
 
   try {
     const ctx = await resolveUser(req);
-    const targetClientId = (req.query && req.query.client_id) || ctx.clientIds[0] || null;
+    const targetClientId = (req.query && req.query.client_id) || (req.body && req.body.client_id) || ctx.clientIds[0] || null;
     if (!targetClientId) return res.status(400).json({ error: "client_id required" });
     if (!ctx.isStaff && !ctx.clientIds.includes(targetClientId)) {
       return res.status(403).json({ error: "not your academy" });
+    }
+
+    // ── PATCH: save a price's CoachIQ automation URL (one or many) ──
+    if (req.method === "PATCH") {
+      const ids = Array.isArray(req.body && req.body.stripe_price_ids)
+        ? req.body.stripe_price_ids.filter(Boolean)
+        : ((req.body && req.body.stripe_price_id) ? [req.body.stripe_price_id] : []);
+      if (!ids.length) return res.status(400).json({ error: "stripe_price_id or stripe_price_ids required" });
+      let url = req.body && req.body.coachiq_automation_url;
+      url = (url == null || String(url).trim() === "") ? null : String(url).trim();
+      if (url && !/^https:\/\//i.test(url)) return res.status(400).json({ error: "coachiq_automation_url must be an https URL (or blank to clear)" });
+      const inList = ids.map(id => `"${String(id).replace(/"/g, "")}"`).join(",");
+      const updated = await sb(
+        `pricing_catalog?client_id=eq.${encodeURIComponent(targetClientId)}&stripe_price_id=in.(${encodeURIComponent(inList)})`,
+        { method: "PATCH", headers: { Prefer: "return=representation" }, body: JSON.stringify({ coachiq_automation_url: url }) }
+      );
+      if (!Array.isArray(updated) || !updated.length) return res.status(404).json({ error: "price not found for this academy" });
+      return res.status(200).json({ ok: true, updated: updated.length, stripe_price_ids: ids, coachiq_automation_url: url });
     }
 
     const singlePriceId = (req.query && req.query.price_id) || null;

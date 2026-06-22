@@ -133,7 +133,7 @@ async function syncContactsForAcademy(client, deadline) {
     return { skipped: true, reason: "no GHL token / location" };
   }
 
-  let startAfterId = null;
+  let startAfterId = null, startAfter = null;
   let totalSeen = 0, totalUpdated = 0;
   const sampleChanges = [];
 
@@ -141,7 +141,10 @@ async function syncContactsForAcademy(client, deadline) {
     if (Date.now() > deadline) return { partial: true, reason: "deadline reached", totalSeen, totalUpdated };
 
     const params = new URLSearchParams({ locationId: tok.locationId, limit: "100" });
-    if (startAfterId) params.set("startAfterId", startAfterId);
+    // GHL contacts paging needs BOTH the timestamp (startAfter) and the id
+    // (startAfterId) — passing only the id stalls after the first page (~100).
+    if (startAfterId) params.set("startAfterId", String(startAfterId));
+    if (startAfter != null) params.set("startAfter", String(startAfter));
 
     let data;
     try { data = await ghlFetchWithBackoff(`/contacts/?${params}`, tok.token); }
@@ -150,6 +153,46 @@ async function syncContactsForAcademy(client, deadline) {
     const contacts = data?.contacts || data?.data || [];
     if (contacts.length === 0) break;
     totalSeen += contacts.length;
+
+    // ── V1.5 mirror: upsert every contact into ghl_contacts (powers the
+    // Contacts tab). Only for V1.5 academies — the Contacts tab is their CRM.
+    // athlete_name is resolved from the mapped custom field(s).
+    if (client.v15_access === true) {
+      const athleteFieldIds = Array.isArray(client.v15_config?.athlete_name_field_ids)
+        ? client.v15_config.athlete_name_field_ids.map(String) : [];
+      const mirrorRows = contacts.map(c => {
+        const cid = c.id || c.contactId;
+        if (!cid) return null;
+        const cfArr = c.customFields || c.customField || [];
+        const cfMap = {};
+        for (const f of (Array.isArray(cfArr) ? cfArr : [])) {
+          if (f && f.id != null) cfMap[String(f.id)] = (f.value ?? f.field_value ?? f.fieldValue ?? "");
+        }
+        let athleteName = null;
+        for (const fid of athleteFieldIds) {
+          const v = cfMap[fid];
+          if (v != null && String(v).trim()) { athleteName = String(v).trim(); break; }
+        }
+        const tags = Array.isArray(c.tags)
+          ? c.tags.map(t => (typeof t === "string" ? t : (t.name || t.tag || ""))).filter(Boolean) : [];
+        const name = [c.firstName, c.lastName].filter(Boolean).join(" ").trim() || c.contactName || c.name || null;
+        return {
+          client_id: client.id, ghl_contact_id: cid,
+          first_name: c.firstName || null, last_name: c.lastName || null, name,
+          email: (c.email || "").toLowerCase().trim() || null, phone: c.phone || null,
+          tags, athlete_name: athleteName, custom_fields: cfMap,
+          dnd: c.dnd === true || !!(c.dndSettings && Object.values(c.dndSettings).some(s => s && s.status === "active")),
+          date_added: c.dateAdded || c.createdAt || null, synced_at: nowIso(),
+        };
+      }).filter(Boolean);
+      if (mirrorRows.length) {
+        await sb(`ghl_contacts?on_conflict=client_id,ghl_contact_id`, {
+          method: "POST",
+          headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
+          body: JSON.stringify(mirrorRows),
+        }).catch(() => {});
+      }
+    }
 
     // Batch member lookup by contact_id
     const contactIds = contacts.map(c => c.id || c.contactId).filter(Boolean);
@@ -209,9 +252,12 @@ async function syncContactsForAcademy(client, deadline) {
       }
     }
 
-    // Pagination — pick a next-page anchor; bail when we get a partial page
+    // Pagination — advance with BOTH meta.startAfter (timestamp) + startAfterId;
+    // bail when we get a partial page.
     const last = contacts[contacts.length - 1];
-    startAfterId = data?.meta?.lastId || last?.id || last?.contactId || null;
+    const meta = data?.meta || {};
+    startAfterId = meta.startAfterId || meta.lastId || last?.id || last?.contactId || null;
+    startAfter = (meta.startAfter != null) ? meta.startAfter : (last?.dateAdded ? new Date(last.dateAdded).getTime() : null);
     if (!startAfterId || contacts.length < 100) break;
 
     await sleep(PER_REQUEST_SLEEP_MS);
@@ -241,7 +287,7 @@ async function handler(req, res) {
   // All academies with a usable GHL connection
   const clientsList = await sb(
     `clients?or=(ghl_access_token.not.is.null,ghl_location_id.not.is.null)` +
-    `&select=id,business_name,ghl_location_id,ghl_access_token,ghl_refresh_token,ghl_token_expires_at,ghl_contacts_last_synced_at`
+    `&select=id,business_name,ghl_location_id,ghl_access_token,ghl_refresh_token,ghl_token_expires_at,ghl_contacts_last_synced_at,v15_access,v15_config`
   ).catch(() => []);
 
   if (!Array.isArray(clientsList) || clientsList.length === 0) {

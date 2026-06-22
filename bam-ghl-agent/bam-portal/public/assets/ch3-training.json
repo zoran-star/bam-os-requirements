@@ -1,0 +1,44 @@
+{
+  "slug": "ch3-training",
+  "name": "CH3 Training",
+  "location": "Harrisburg, PA",
+  "primary_color": "#00B8C8",
+  "assets": {
+    "logo": {
+      "label": "Logo",
+      "url": "https://dgpv43ylujmyh.cloudfront.net/optimized-images/700x/media/c297018d-67fc-4fc6-bb6a-60e9d58bd503/1711052861720.jpg"
+    },
+    "founder_photo": {
+      "label": "Founder Photo — Christopher Haynes",
+      "url": "https://dgpv43ylujmyh.cloudfront.net/optimized-images/1200x/media/c297018d-67fc-4fc6-bb6a-60e9d58bd503/1711054528675.jpg"
+    },
+    "gallery": [
+      { "id": 1, "label": "Training session — court drill", "url": "https://dgpv43ylujmyh.cloudfront.net/optimized-images/1200x/media/d9ef5206-82a2-48c8-9390-ceb989724a7d/1710655730421.jpg" },
+      { "id": 2, "label": "Training session — ball handling", "url": "https://dgpv43ylujmyh.cloudfront.net/optimized-images/1200x/media/d9ef5206-82a2-48c8-9390-ceb989724a7d/1710655714983.jpg" },
+      { "id": 3, "label": "Training session — shooting", "url": "https://dgpv43ylujmyh.cloudfront.net/optimized-images/1200x/media/d9ef5206-82a2-48c8-9390-ceb989724a7d/1710655746223.jpg" },
+      { "id": 4, "label": "Training session — group drill", "url": "https://dgpv43ylujmyh.cloudfront.net/optimized-images/1200x/media/d9ef5206-82a2-48c8-9390-ceb989724a7d/1710655737918.jpg" },
+      { "id": 5, "label": "Training session — footwork", "url": "https://dgpv43ylujmyh.cloudfront.net/optimized-images/1200x/media/d9ef5206-82a2-48c8-9390-ceb989724a7d/1710655760781.jpg" },
+      { "id": 6, "label": "Training session — conditioning", "url": "https://dgpv43ylujmyh.cloudfront.net/optimized-images/1200x/media/d9ef5206-82a2-48c8-9390-ceb989724a7d/1710655823418.jpg" },
+      { "id": 7, "label": "Training session — 1-on-1 coaching", "url": "https://dgpv43ylujmyh.cloudfront.net/optimized-images/1200x/media/d9ef5206-82a2-48c8-9390-ceb989724a7d/1710655811864.jpg" },
+      { "id": 8, "label": "Training session — game speed reps", "url": "https://dgpv43ylujmyh.cloudfront.net/optimized-images/1200x/media/d9ef5206-82a2-48c8-9390-ceb989724a7d/1710655798573.jpg" }
+    ]
+  },
+  "testimonials": [
+    { "name": "Gavin Moyer",        "affiliation": "Northern HS",       "quote": "Group sessions contain challenging drills that improved my offensive mechanics and translated directly to in-game success." },
+    { "name": "Timmy Moore",        "affiliation": "Middletown HS",     "quote": "Chris challenged me, built immediate rapport, and improved my game and work ethic tremendously." },
+    { "name": "Jaiden Giovannetti", "affiliation": "Northern HS",       "quote": "Training includes ball handles and shot work. Coach is encouraging, wants the best, and pushes you to work hard." },
+    { "name": "Allison Jung",       "affiliation": "Parent",            "quote": "Impressed with the feedback level Coach Chris provides — small tweaks that create big improvements in my son's game." },
+    { "name": "Colton Rose",        "affiliation": "Red Land HS",       "quote": "Chris pushed me in every workout and helped mold me into the player I am today." },
+    { "name": "Aedan Walker",       "affiliation": "Chambersburg Area", "quote": "Coach recognizes your strengths and weaknesses, teaches skilled moves, and brings consistent high energy every session." },
+    { "name": "Arkel Batts",        "affiliation": "College Athlete",   "quote": "His expertise improved my shooting, dribbling, and game understanding. His motivational guidance helped push me past my limits." },
+    { "name": "Aleel Batts",        "affiliation": "Middletown HS",     "quote": "Individualized instruction significantly improved my shooting, dribbling, and overall offensive ability." }
+  ],
+  "contact": {
+    "phone": "267-216-8887",
+    "email": "ch3training@gmail.com",
+    "location": "Harrisburg, PA",
+    "instagram": "https://www.instagram.com/ch3training",
+    "tiktok": "https://www.tiktok.com/@CH3Training",
+    "member_login": "https://app.coachiq.io/ch3training/ch3training?login=true"
+  }
+}

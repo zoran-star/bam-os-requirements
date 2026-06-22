@@ -35,6 +35,12 @@ const STRIPE_API = "https://api.stripe.com/v1";
 // targets in v1. Everything else (one-time prepay, lil-sale, legacy) is
 // frozen to its current holder.
 
+// Subs the portal CREATED (so Stripe lets us pause/cancel/change them). Foreign
+// subs (CoachIQ/GHL/dashboard) reject every write — the popup greys those actions.
+// One standard portal-owned marker = metadata.origin in this set (matches webhook.js).
+// setup-monthly subs now also stamp origin=fullcontrol-portal (no more divergent 'source').
+const PORTAL_OWNED_ORIGINS = new Set(["fullcontrol-portal", "fullcontrol-website-enrollment"]);
+
 const PLAN_TO_PRICE = {
   "1/wk":   "plan_ToNwa96lQ5I1Bs",   // Steady       $226 / 4-wk all-in
   "2/wk":   "plan_ThYK86w2Zd8fp3",   // Accelerated  $316 / 4-wk all-in
@@ -274,6 +280,10 @@ async function handler(req, res) {
               { stripeAccount: client.stripe_connect_account_id }
             );
             const item = sub.items?.data?.[0];
+            // Can the portal manage this sub? Only subs IT created (Standard-account
+            // rule). Drives which billing buttons are enabled vs greyed in the popup.
+            const liveStatus = ["active", "trialing", "past_due", "unpaid", "paused"].includes(sub.status);
+            const portalOwned = PORTAL_OWNED_ORIGINS.has(sub.metadata?.origin);
             stripe = {
               status: sub.status,
               trial_end: sub.trial_end,
@@ -286,6 +296,10 @@ async function handler(req, res) {
               interval: item?.price?.recurring?.interval || null,
               interval_count: item?.price?.recurring?.interval_count || null,
               latest_invoice_url: sub.latest_invoice?.hosted_invoice_url || null,
+              application: sub.application || null,
+              origin: sub.metadata?.origin || null,
+              portal_owned: portalOwned,
+              can_manage: liveStatus && portalOwned, // gate for pause/cancel/change/refund
             };
 
             // Lazy backfill: if we just learned the sub's created date and
@@ -365,6 +379,20 @@ async function handler(req, res) {
             }
           }
         }
+
+        // Offer scoping (V2): attach each member's offer { id, title } so the
+        // roster can show + filter by offer. offer_id is derived at import from
+        // the member's Stripe price (pricing_catalog.offer_id).
+        const offerIds = [...new Set(memberList.map(m => m.offer_id).filter(Boolean))];
+        if (offerIds.length) {
+          const offerRows = await sb(
+            `offers?id=in.(${offerIds.join(",")})&select=id,title`
+          ).catch(() => []);
+          const offers = new Map((Array.isArray(offerRows) ? offerRows : []).map(o => [o.id, o.title]));
+          for (const m of memberList) {
+            if (m.offer_id) m.offer = { id: m.offer_id, title: offers.get(m.offer_id) || null };
+          }
+        }
       }
 
       const targetClient = targetClientId ? await loadClientRow(targetClientId) : null;
@@ -418,19 +446,56 @@ async function handler(req, res) {
             });
           } catch (_) { return false; }
         })();
-        const [matched, imported, promoted, unlinked] = await Promise.all([
+        // CoachIQ step is "done" when there's nothing left to triage: either the
+        // academy isn't on CoachIQ, or every imported member has been linked /
+        // marked not-applicable / flagged collecting (none left raw "waiting").
+        const coachiqDone = (async () => {
+          try {
+            const cr = await sb(`clients?id=eq.${targetClientId}&select=coachiq_enabled&limit=1`);
+            if (!(Array.isArray(cr) && cr[0] && cr[0].coachiq_enabled)) return true;
+            const waiting = await sb(
+              `members_staging?client_id=eq.${targetClientId}` +
+              `&coachiq_member_id=is.null&coachiq_not_applicable=is.false&coachiq_collecting=is.false&select=id&limit=1`
+            );
+            return !(Array.isArray(waiting) && waiting.length > 0);
+          } catch (_) { return false; }
+        })();
+        const [matched, imported, promoted, unlinked, coachiq_done] = await Promise.all([
           matchedAll,
           exists(`members_staging?client_id=eq.${targetClientId}&select=id&limit=1`),
           exists(`members_staging?client_id=eq.${targetClientId}&promoted=is.true&select=id&limit=1`),
           exists(`members?client_id=eq.${targetClientId}&ghl_contact_id=is.null&select=id&limit=1`),
+          coachiqDone,
         ]);
         // ghl_linked = the roster exists and every member has a GHL contact.
-        sorter = { matched, imported, promoted, ghl_linked: memberList.length > 0 && !unlinked };
+        sorter = { matched, imported, promoted, coachiq_done, ghl_linked: memberList.length > 0 && !unlinked };
+      }
+
+      // Open "cancel old Stripe sub" action items — the import leaves these when it
+      // replaces a foreign sub (portal can't cancel it). Surfaced as a banner so the
+      // owner doesn't walk away with old subs still billing. Count drops as they're done.
+      let subsToCancel = 0;
+      if (targetClientId) {
+        try {
+          const rows = await sb(`action_items?client_id=eq.${encodeURIComponent(targetClientId)}&completed_at=is.null&title=ilike.*Cancel%20old%20Stripe%20sub*&select=id`);
+          subsToCancel = Array.isArray(rows) ? rows.length : 0;
+        } catch (_) { /* non-fatal */ }
+      }
+
+      // CoachIQ config (for the "Set up CoachIQ" member-card invite).
+      let coachiq = { enabled: false, signup_url: null };
+      if (targetClientId) {
+        try {
+          const cr = await sb(`clients?id=eq.${encodeURIComponent(targetClientId)}&select=coachiq_enabled,coachiq_signup_url&limit=1`);
+          if (Array.isArray(cr) && cr[0]) coachiq = { enabled: !!cr[0].coachiq_enabled, signup_url: cr[0].coachiq_signup_url || null };
+        } catch (_) { /* non-fatal */ }
       }
 
       return res.status(200).json({
         members: memberList,
         sorter,
+        subs_to_cancel: subsToCancel,
+        coachiq,
         stripe: {
           client_id: targetClientId,
           status: targetClient?.stripe_connect_status || "not_connected",
@@ -492,11 +557,13 @@ async function handler(req, res) {
     try {
       switch (action) {
         case "pause":         return await actionPause(res, member, stripeAccount, ctx, body);
+        case "pause-date-fix": return await actionPauseDateFix(res, member, ctx, body);
         case "unpause":       return await actionUnpause(res, member, stripeAccount, ctx, body);
         case "cancel":        return await actionCancel(res, member, stripeAccount, ctx, body);
         case "refund":        return await actionRefund(res, member, stripeAccount, ctx, body);
         case "change":        return await actionChange(res, member, stripeAccount, ctx, body);
         case "payment-link":  return await actionPaymentLink(res, member, stripeAccount, ctx, body, req);
+        case "card-setup-link": return await actionCardSetupLink(res, member, stripeAccount, ctx, body, req);
         case "referred":      return await actionReferred(res, member, stripeAccount, ctx, body);
         default:              return res.status(400).json({ error: `unknown action: ${action}` });
       }
@@ -528,6 +595,40 @@ async function handler(req, res) {
 //
 // Capped at Stripe's 730-day trial max. Rejects past-due / payment_failed /
 // cancelling members. Rejects past end_date.
+// ── PAUSE DATE FIX ──
+// Record a pause (start/end dates) WITHOUT touching Stripe — for foreign/no-sub
+// members, or to correct pause dates. DB-only: inserts a cancellations pause row +
+// flips status to paused. No trial_end, no pause_collection.
+async function actionPauseDateFix(res, member, ctx, body) {
+  const { start_date, end_date } = body;
+  if (!start_date || !end_date) return res.status(400).json({ error: "start_date and end_date required (YYYY-MM-DD)" });
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(start_date) || !/^\d{4}-\d{2}-\d{2}$/.test(end_date)) return res.status(400).json({ error: "dates must be YYYY-MM-DD" });
+  if (isoToUnix(end_date) <= isoToUnix(start_date)) return res.status(400).json({ error: "end_date must be after start_date" });
+  const inserted = await sb(`cancellations?select=id`, {
+    method: "POST", headers: { Prefer: "return=representation" },
+    body: JSON.stringify([{
+      client_id: member.client_id, member_id: member.id, athlete_name: member.athlete_name,
+      archetype: member.archetype, parent_name: member.parent_name, type: "pause",
+      pause_start: start_date, pause_end: end_date,
+      reason: body.reason || "pause date fix (no Stripe change)",
+      stripe_subscription_id: member.stripe_subscription_id, stripe_customer_id: member.stripe_customer_id,
+      activated_at: nowIso(),
+    }]),
+  });
+  const newRowId = Array.isArray(inserted) && inserted[0]?.id;
+  if (!newRowId) return res.status(500).json({ error: "failed to insert pause row" });
+  await sb(`cancellations?member_id=eq.${member.id}&type=eq.pause&completed_at=is.null&id=neq.${newRowId}`, {
+    method: "PATCH", headers: { Prefer: "return=minimal" },
+    body: JSON.stringify({ activated_at: nowIso(), completed_at: nowIso(), reason: "superseded by pause date fix" }),
+  }).catch(() => {});
+  await sb(`members?id=eq.${member.id}`, {
+    method: "PATCH", headers: { Prefer: "return=minimal" },
+    body: JSON.stringify({ status: "paused", pause_scheduled_for: null, updated_at: nowIso() }),
+  });
+  await writeAudit({ client_id: member.client_id, member_id: member.id, action_type: "pause-date-fix", args: { pause_start: start_date, pause_end: end_date }, performed_by: ctx.user.id, performed_by_name: ctx.staff?.name || null, db_changes: { members: { status: { to: "paused" } }, cancellations: "inserted (date fix)" } });
+  return res.status(200).json({ ok: true, action: "pause-date-fix", pause_start: start_date, pause_end: end_date });
+}
+
 async function actionPause(res, member, stripeAccount, ctx, body) {
   if (!member.stripe_subscription_id) {
     return res.status(400).json({ error: "member has no Stripe subscription to pause" });
@@ -1082,6 +1183,59 @@ async function actionPaymentLink(res, member, stripeAccount, ctx, body, req) {
 }
 
 // ─────────────────────────────────────────────────────────
+// Action: CARD-SETUP-LINK
+// ─────────────────────────────────────────────────────────
+// Standalone "save your card" link (Stripe setup-mode Checkout) — collects a card
+// and saves it to the customer with NO subscription attached. For members who have
+// no card on file ("collecting payment"); the portal uses the saved card later.
+// body: { mark_collecting?: bool }  → optionally flips status to payment_method_required.
+async function actionCardSetupLink(res, member, stripeAccount, ctx, body, req) {
+  if (!member.stripe_customer_id) {
+    return res.status(400).json({ error: "member has no Stripe customer — can't collect a card" });
+  }
+  const origin = req.headers.origin || `https://${req.headers.host || ""}`;
+  const isLocal = /localhost|127\.0\.0\.1/.test(origin);
+  const base = isLocal ? origin : "https://portal.byanymeansbusiness.com";
+
+  const session = await stripeFetch(`/checkout/sessions`, {
+    method: "POST", stripeAccount,
+    body: {
+      mode: "setup", currency: "cad", customer: member.stripe_customer_id,
+      success_url: `${base}/client-portal.html?card=saved`,
+      cancel_url: `${base}/client-portal.html?card=cancelled`,
+    },
+  });
+
+  if (body.mark_collecting) {
+    await sb(`members?id=eq.${member.id}`, {
+      method: "PATCH", headers: { Prefer: "return=minimal" },
+      body: JSON.stringify({ status: "payment_method_required", updated_at: nowIso() }),
+    }).catch(() => {});
+  }
+
+  await writeAudit({
+    client_id: member.client_id, member_id: member.id,
+    action_type: "card-setup-link", args: body,
+    performed_by: ctx.user.id, performed_by_name: ctx.staff?.name || null,
+    stripe_response: { id: session.id, url: session.url },
+    db_changes: body.mark_collecting ? { members: { status: { to: "payment_method_required" } } } : null,
+  });
+
+  const academyName = ctx.client?.business_name || "your academy";
+  const suggestedSms = `Hi, please add your card on file with ${academyName}: ${session.url}`;
+  return res.status(200).json({
+    ok: true, url: session.url, expires_at: session.expires_at || null,
+    parent: { name: member.parent_name || null, phone: member.parent_phone || null, email: member.parent_email || null },
+    ghl: { ready: Boolean(ctx.client?.ghl_location_id), location_id: ctx.client?.ghl_location_id || null },
+    suggested: {
+      sms_text: suggestedSms,
+      email_subject: `Add your card on file — ${academyName}`,
+      email_html: `<p>Hi${member.parent_name ? ` ${member.parent_name.split(/\s+/)[0]}` : ""},</p><p>Please add your card on file with ${academyName}:</p><p><a href="${session.url}">${session.url}</a></p><p>Thanks!<br>${academyName}</p>`,
+    },
+  });
+}
+
+// ─────────────────────────────────────────────────────────
 // Action: REFERRED
 // ─────────────────────────────────────────────────────────
 // body: { count: 1-10, reason? }
@@ -1323,7 +1477,7 @@ async function cronProcessScheduledPauses(res) {
       });
       if (!Array.isArray(claimRows) || claimRows.length === 0) continue;
 
-      const memberRows = await sb(`members?id=eq.${row.member_id}&select=id,client_id,status`);
+      const memberRows = await sb(`members?id=eq.${row.member_id}&select=id,client_id,status,stripe_subscription_id`);
       const member = Array.isArray(memberRows) && memberRows[0];
 
       // Member row gone — pause already cleaned up implicitly.
@@ -1340,10 +1494,12 @@ async function cronProcessScheduledPauses(res) {
         continue;
       }
 
-      // Only flip to 'live' if still 'paused'. Other statuses (cancelling,
-      // payment_failed) shouldn't be overridden by the cron.
+      // Only flip to 'live' if still 'paused' AND there's a real subscription to
+      // resume. A no-sub paused member (e.g. pause-date-fix, no Stripe) has nothing
+      // to bill — flipping them 'live' would falsely show an active member paying $0.
+      // Leave them paused; the pause row is still completed so it stops re-triggering.
       let flipped = false;
-      if (member.status === "paused") {
+      if (member.status === "paused" && member.stripe_subscription_id) {
         await sb(`members?id=eq.${member.id}`, {
           method: "PATCH",
           headers: { Prefer: "return=minimal" },
