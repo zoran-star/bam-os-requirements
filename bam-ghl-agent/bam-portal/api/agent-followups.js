@@ -189,6 +189,8 @@ async function detectForClient(client) {
     if (!decision.should_followup || !decision.message || !String(decision.message).trim()) { stopped++; continue; }
     const sendInH = clamp(Number(decision.send_in_hours) || 24, 1, MAX_AGE_DAYS * 24);
     const scheduledAt = new Date(Date.now() + sendInH * 3600000).toISOString();
+    // The lead's last actual message (so the card can show "what they last said").
+    const lastLeadMsg = [...thread].reverse().find(m => m.role === "parent");
     try {
       await sb(`agent_followups`, {
         method: "POST", headers: { Prefer: "return=minimal" },
@@ -196,6 +198,7 @@ async function detectForClient(client) {
           client_id: client.id, ghl_contact_id: String(contactId), ghl_conversation_id: c.id,
           contact_name: c.fullName || c.contactName || "Lead",
           goal: decision.goal || null, draft_message: String(decision.message).trim(),
+          last_message: lastLeadMsg ? String(lastLeadMsg.text).slice(0, 500) : null,
           scheduled_at: scheduledAt, status: "pending",
           trigger_reason: decision.reason || null,
           last_lead_at: c.lastMessageDate || c.dateUpdated || null,

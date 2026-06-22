@@ -21385,8 +21385,100 @@ async function _apxPost(endpoint, action, payload) {
     body: JSON.stringify({ action, client_id: CLIENT_ID, ...(payload || {}) }),
   });
   const json = await _safeJson(r);
-  if (!r.ok) { const e = new Error(json.error || ('HTTP ' + r.status)); e.status = r.status; throw e; }
+  if (!r.ok) {
+    const msg = typeof json.error === 'string' ? json.error : (json.error ? JSON.stringify(json.error) : ('HTTP ' + r.status));
+    const e = new Error(msg); e.status = r.status; throw e;
+  }
   return json;
+}
+
+// Clean error → string (never "[object Object]").
+function _apxErr(e) {
+  if (!e) return 'Something went wrong';
+  if (typeof e === 'string') return e;
+  if (e.message && typeof e.message === 'string') return e.message;
+  try { return JSON.stringify(e); } catch (_) { return 'Something went wrong'; }
+}
+
+// Top-center toast for Hawkeye actions (success green / error red).
+function _apxToast(msg, ok) {
+  document.getElementById('apx-toast')?.remove();
+  const color = ok ? '#3eaf5c' : '#e0654f';
+  document.body.insertAdjacentHTML('beforeend', `<div id="apx-toast" style="position:fixed;top:calc(14px + env(safe-area-inset-top));left:50%;transform:translateX(-50%);z-index:9700;background:var(--surface);border:1px solid ${color};border-left:4px solid ${color};border-radius:10px;padding:11px 16px;font-size:13.5px;font-weight:600;color:var(--text);box-shadow:0 8px 30px rgba(0,0,0,.45);max-width:90vw">${escapeHTML(msg)}</div>`);
+  clearTimeout(window._apxToastT);
+  window._apxToastT = setTimeout(() => document.getElementById('apx-toast')?.remove(), 3200);
+}
+
+// Full-message editor modal (replaces the tiny native prompt). Optionally folds
+// in the "teach the agent why" field so it's one step instead of two popups.
+function _apxEditModal(opts) {
+  document.getElementById('apx-edit-overlay')?.remove();
+  const teach = opts.teachable ? `
+    <div style="margin-top:13px">
+      <label style="display:block;font-size:11px;color:var(--text-mute);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">Teach the agent why? (optional)</label>
+      <input id="apx-edit-lesson" type="text" placeholder="e.g. Don't quote price before booking" style="width:100%;background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);padding:10px 12px;font:inherit;font-size:13px;outline:none">
+    </div>` : '';
+  document.body.insertAdjacentHTML('beforeend', `
+    <div id="apx-edit-overlay" onclick="if(event.target===this)this.remove()" style="position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9650;display:flex;align-items:flex-start;justify-content:center;padding:7vh 14px 0">
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:16px;width:100%;max-width:560px;padding:18px;box-shadow:0 20px 60px rgba(0,0,0,.5)">
+        <div style="font-size:15px;font-weight:700;margin-bottom:12px">${escapeHTML(opts.title || 'Edit message')}</div>
+        <textarea id="apx-edit-text" style="width:100%;min-height:140px;background:var(--bg);border:1px solid var(--border);border-radius:10px;color:var(--text);padding:12px;font:inherit;font-size:14px;line-height:1.5;resize:vertical;outline:none">${escapeHTML(opts.value || '')}</textarea>
+        ${teach}
+        <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:14px">
+          <button onclick="document.getElementById('apx-edit-overlay').remove()" style="background:transparent;border:1px solid var(--border);color:var(--text-sub);border-radius:9px;padding:10px 18px;font:inherit;font-size:14px;cursor:pointer">Cancel</button>
+          <button id="apx-edit-save" style="background:var(--accent);border:none;color:#08080A;border-radius:9px;padding:10px 22px;font:inherit;font-size:14px;font-weight:700;cursor:pointer">Save</button>
+        </div>
+      </div>
+    </div>`);
+  const ta = document.getElementById('apx-edit-text');
+  setTimeout(() => { try { ta.focus(); ta.setSelectionRange(ta.value.length, ta.value.length); } catch (_) {} }, 60);
+  document.getElementById('apx-edit-save').onclick = () => {
+    const text = (ta.value || '').trim();
+    const lesson = (document.getElementById('apx-edit-lesson')?.value || '').trim();
+    document.getElementById('apx-edit-overlay')?.remove();
+    try { opts.onSave(text, lesson); } catch (_) {}
+  };
+}
+
+// Tap a Hawkeye card → see the whole conversation with the lead.
+function _apxOpenCardThread(id) {
+  const r = [..._APX_DATA.followups, ..._APX_DATA.ready, ...(_APX_DATA.lost || [])].find(x => x.id === id);
+  if (r) _apxOpenThread(r.ghl_contact_id, r.contact_name || 'Conversation');
+}
+async function _apxOpenThread(contactId, name) {
+  if (!contactId) { _apxToast('No conversation linked to this card', false); return; }
+  document.getElementById('apx-thread-overlay')?.remove();
+  document.body.insertAdjacentHTML('beforeend', `
+    <div id="apx-thread-overlay" onclick="if(event.target===this)this.remove()" style="position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9680;display:flex;align-items:flex-end;justify-content:center">
+      <div style="background:var(--bg);border:1px solid var(--border);border-radius:16px 16px 0 0;width:100%;max-width:560px;height:82vh;display:flex;flex-direction:column">
+        <div style="padding:14px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px">
+          <div style="font-weight:700;font-size:15px">${escapeHTML(name || 'Conversation')}</div>
+          <div style="flex:1"></div>
+          <button onclick="document.getElementById('apx-thread-overlay').remove()" aria-label="Close" style="background:none;border:none;color:var(--text-mute);font-size:24px;cursor:pointer;padding:0 6px">×</button>
+        </div>
+        <div id="apx-thread-body" style="flex:1;overflow-y:auto;padding:14px 16px;display:flex;flex-direction:column;gap:8px">
+          <div style="color:var(--text-mute);font-size:13px;text-align:center;padding:24px"><span class="req-spin"></span> Loading conversation…</div>
+        </div>
+      </div>
+    </div>`);
+  try {
+    const token = await _mreqAuthToken();
+    const r = await fetch(`/api/ghl/inbox?client_id=${encodeURIComponent(CLIENT_ID)}&contact_id=${encodeURIComponent(contactId)}`, { headers: { Authorization: 'Bearer ' + token } });
+    const j = await _safeJson(r);
+    if (!r.ok) throw new Error(j.error || ('HTTP ' + r.status));
+    const body = document.getElementById('apx-thread-body');
+    if (!body) return;
+    const msgs = (j.messages || []).filter(m => (m.body || '').trim()).sort((a, b) => new Date(a.date || 0) - new Date(b.date || 0));
+    body.innerHTML = msgs.length ? msgs.map(m => {
+      const out = (m.direction || '').toLowerCase() === 'outbound';
+      const when = (typeof _ibFormatDate === 'function') ? _ibFormatDate(m.date) : '';
+      return `<div style="max-width:82%;align-self:${out ? 'flex-end' : 'flex-start'};background:${out ? 'var(--accent)' : 'var(--surface)'};color:${out ? '#0B0B0D' : 'var(--text)'};border:1px solid ${out ? 'var(--accent)' : 'var(--border)'};padding:8px 11px;border-radius:12px;font-size:13.5px;line-height:1.45;word-break:break-word">${escapeHTML(m.body)}<div style="font-size:10px;opacity:.6;margin-top:3px">${escapeHTML(when)}</div></div>`;
+    }).join('') : `<div style="color:var(--text-mute);font-size:13px;text-align:center;padding:24px">No messages yet.</div>`;
+    body.scrollTop = body.scrollHeight;
+  } catch (e) {
+    const body = document.getElementById('apx-thread-body');
+    if (body) body.innerHTML = `<div style="color:#e0654f;font-size:13px;text-align:center;padding:24px">Couldn't load conversation - ${escapeHTML(_apxErr(e))}</div>`;
+  }
 }
 
 // Show the 📨 button + a live count, for staff only. Drives BOTH inboxes:
@@ -21413,12 +21505,8 @@ async function _apxRefreshCount() {
   }
   const fu = fuR.status === 'fulfilled' ? fuR.value : {};
   const rd = rdR.status === 'fulfilled' ? rdR.value : {};
-  const fups = (fu.followups || []).filter(f => f.status === 'pending');
-  const all = (rd.ready || []).filter(r => r.status === 'pending');
-  const ready = all.filter(r => r.kind !== 'mark_lost');
-  const lost = all.filter(r => r.kind === 'mark_lost');
-  _APX_DATA = { followups: fups, ready, lost };
-  const n = fups.length + ready.length + lost.length;
+  _APX_DATA = _apxSplit(fu, rd);
+  const n = _APX_DATA.followups.length + _APX_DATA.ready.length + _APX_DATA.lost.length;
   btns.forEach(({ btn, span }) => {
     btn.style.display = '';
     if (span) span.textContent = n ? `(${n})` : '';
@@ -21445,6 +21533,22 @@ function _apxOpen() {
 }
 function _apxClose() { document.getElementById('apx-overlay')?.remove(); }
 
+// Split the two API payloads into the three drawer sections. OVERDUE follow-ups
+// (their send time has passed) move out of the upcoming "Follow-ups" list and
+// into "Ready messages" - they're ready to send now.
+function _apxSplit(fu, rd) {
+  const now = Date.now();
+  const upcoming = [], overdue = [];
+  for (const f of (fu.followups || []).filter(x => x.status === 'pending')) {
+    if (f.scheduled_at && new Date(f.scheduled_at).getTime() <= now) overdue.push({ ...f, _isFollowup: true });
+    else upcoming.push(f);
+  }
+  const all = (rd.ready || []).filter(r => r.status === 'pending');
+  const ready = [...overdue, ...all.filter(r => r.kind !== 'mark_lost')];
+  const lost = all.filter(r => r.kind === 'mark_lost');
+  return { followups: upcoming, ready, lost };
+}
+
 async function _apxLoad() {
   const body = document.getElementById('apx-body');
   if (!body) return;
@@ -21453,17 +21557,13 @@ async function _apxLoad() {
       _apxPost('/api/agent-followups', 'list', {}),
       _apxPost('/api/agent-approvals', 'list-ready', {}),
     ]);
-    const fups = (fu.followups || []).filter(f => f.status === 'pending');
-    const all = (rd.ready || []).filter(r => r.status === 'pending');
-    const ready = all.filter(r => r.kind !== 'mark_lost');
-    const lost = all.filter(r => r.kind === 'mark_lost');
-    _APX_DATA = { followups: fups, ready, lost };
+    _APX_DATA = _apxSplit(fu, rd);
     _apxRender();
     const span = document.getElementById('apx-count');
-    const n = fups.length + ready.length + lost.length;
+    const n = _APX_DATA.followups.length + _APX_DATA.ready.length + _APX_DATA.lost.length;
     if (span) span.textContent = n ? `(${n})` : '';
   } catch (e) {
-    body.innerHTML = `<div style="color:#e07070;font-size:13px">Couldn't load - ${escapeHTML(e.message)}</div>`;
+    body.innerHTML = `<div style="color:#e07070;font-size:13px">Couldn't load - ${escapeHTML(_apxErr(e))}</div>`;
   }
 }
 
@@ -21474,26 +21574,45 @@ function _apxWhen(ts) {
   const s = d >= 1 ? `${Math.round(d)}d` : h >= 1 ? `${Math.round(h)}h` : `${Math.max(1, Math.round(a / 60000))}m`;
   return past ? `${s} overdue` : `in ${s}`;
 }
+function _apxAgo(ts) {
+  if (!ts) return '';
+  const a = Math.max(0, Date.now() - new Date(ts).getTime());
+  const h = a / 3600000, d = a / 86400000;
+  return d >= 1 ? `${Math.round(d)}d ago` : h >= 1 ? `${Math.round(h)}h ago` : `${Math.max(1, Math.round(a / 60000))}m ago`;
+}
+function _apxOverdue(r) { return r.scheduled_at && new Date(r.scheduled_at).getTime() <= Date.now(); }
+function _apxTrim(s, n) { s = String(s || ''); return s.length > n ? s.slice(0, n - 1) + '…' : s; }
 
 function _apxCard(kind, r) {
+  const isFu = kind === 'followup' || r._isFollowup;
+  const overdue = isFu && _apxOverdue(r);
   const esc = r.escalate ? `<div style="font-size:11.5px;color:#e0a020;margin-bottom:6px">⚠ agent escalated${r.escalate_reason ? ': ' + escapeHTML(r.escalate_reason) : ''}</div>` : '';
-  const meta = kind === 'followup'
-    ? `<span style="font-size:11px;font-family:var(--mono,monospace);color:var(--accent)">⏰ ${escapeHTML(_apxWhen(r.scheduled_at))}</span>`
+  // Top-right meta: follow-ups show when the next message sends; replies show confidence.
+  const meta = isFu
+    ? `<span style="font-size:11px;font-family:var(--mono,monospace);color:${overdue ? '#e0654f' : 'var(--accent)'}">⏰ ${escapeHTML(overdue ? 'send now' : 'sends ' + _apxWhen(r.scheduled_at))}</span>`
     : (typeof r.confidence === 'number' ? `<span style="font-size:11px;color:var(--text-mute)">${Math.round(r.confidence * 100)}% sure</span>` : '');
-  const goal = (kind === 'followup' && r.goal) ? `<div style="font-size:11.5px;color:var(--text-sub);margin-bottom:5px">🎯 ${escapeHTML(r.goal)}</div>` : '';
-  const sendFn = kind === 'followup' ? `_apxFollowupSend('${r.id}')` : `_apxReadySend('${r.id}')`;
-  const editFn = kind === 'followup' ? `_apxFollowupEdit('${r.id}')` : `_apxReadyEdit('${r.id}')`;
-  const skipFn = kind === 'followup' ? `_apxFollowupSkip('${r.id}')` : `_apxReadySkip('${r.id}')`;
+  const goal = (isFu && r.goal) ? `<div style="font-size:11.5px;color:var(--text-sub);margin-bottom:5px">🎯 ${escapeHTML(r.goal)}</div>` : '';
+  // Follow-ups: show what the lead last said + when.
+  const last = (isFu && (r.last_message || r.last_lead_at))
+    ? `<div style="font-size:11.5px;color:var(--text-mute);margin-bottom:6px">💬 Last from lead${r.last_lead_at ? ` · ${escapeHTML(_apxAgo(r.last_lead_at))}` : ''}${r.last_message ? `: "${escapeHTML(_apxTrim(r.last_message, 90))}"` : ''}</div>`
+    : '';
+  const overBadge = overdue ? `<span style="font-size:10px;font-weight:700;color:#e0654f;background:rgba(224,90,66,0.12);border-radius:999px;padding:1px 7px">overdue</span>` : '';
+  const sendFn = isFu ? `_apxFollowupSend('${r.id}')` : `_apxReadySend('${r.id}')`;
+  const editFn = isFu ? `_apxFollowupEdit('${r.id}')` : `_apxReadyEdit('${r.id}')`;
+  const skipFn = isFu ? `_apxFollowupSkip('${r.id}')` : `_apxReadySkip('${r.id}')`;
   return `<div id="apx-${r.id}" style="background:var(--surface);border:1px solid var(--accent-border,rgba(232,197,71,.3));border-radius:11px;padding:12px 14px;margin-bottom:9px">
     <div style="display:flex;align-items:center;gap:8px;margin-bottom:5px;flex-wrap:wrap">
       <span style="font-weight:700;font-size:13.5px">${escapeHTML(r.contact_name || 'Lead')}</span>
+      ${overBadge}
       <div style="flex:1"></div>${meta}
-    </div>${goal}${esc}
-    <div style="font-size:13.5px;line-height:1.5;background:rgba(255,255,255,.03);border-radius:8px;padding:8px 10px;white-space:pre-wrap" id="apx-msg-${r.id}">${escapeHTML(r.draft_message || '')}</div>
-    <div style="display:flex;gap:7px;margin-top:8px;flex-wrap:wrap;justify-content:flex-end">
+    </div>${goal}${last}${esc}
+    <div style="font-size:13.5px;line-height:1.5;background:rgba(255,255,255,.03);border-radius:8px;padding:8px 10px;white-space:pre-wrap;cursor:pointer" id="apx-msg-${r.id}" onclick="_apxOpenCardThread('${r.id}')" title="Tap to see the full conversation">${escapeHTML(r.draft_message || '')}</div>
+    <div style="display:flex;align-items:center;gap:7px;margin-top:8px;flex-wrap:wrap">
+      <button onclick="_apxOpenCardThread('${r.id}')" style="background:transparent;border:1px solid var(--border);color:var(--text-mute);border-radius:7px;padding:5px 10px;font-size:12px;cursor:pointer">💬 chat</button>
+      <div style="flex:1"></div>
       <button onclick="${editFn}" style="background:transparent;border:1px solid var(--border);color:var(--text-sub);border-radius:7px;padding:5px 11px;font-size:12px;cursor:pointer">✎ edit</button>
       <button onclick="${skipFn}" style="background:transparent;border:1px solid var(--border);color:#e07070;border-radius:7px;padding:5px 11px;font-size:12px;cursor:pointer">✕ skip</button>
-      <button onclick="${sendFn}" style="background:var(--accent);border:1px solid var(--accent);color:#08080A;border-radius:7px;padding:5px 13px;font-size:12px;font-weight:700;cursor:pointer">✓ send</button>
+      <button onclick="${sendFn}" style="background:var(--accent);border:1px solid var(--accent);color:#08080A;border-radius:7px;padding:5px 13px;font-size:12px;font-weight:700;cursor:pointer">${overdue ? '✓ send now' : '✓ send'}</button>
     </div>
   </div>`;
 }
@@ -21528,12 +21647,12 @@ async function _apxLostConfirm(id) {
     onOk: async () => {
       try {
         await _apxPost('/api/agent-approvals', 'confirm-lost', { ready_id: r.id, lost_reason: r.lost_reason || null, reply: r.draft_message || '' });
-        _apxRemove(id); _plToast('🚫 Marked Lost');
-      } catch (e) { alert(e.message); }
+        _apxRemove(id); _apxToast('🚫 Marked Lost', true);
+      } catch (e) { _apxToast(_apxErr(e), false); }
     },
   });
 }
-async function _apxLostDismiss(id) { try { await _apxPost('/api/agent-approvals', 'skip-ready', { ready_id: id }); _apxRemove(id); } catch (e) { alert(e.message); } }
+async function _apxLostDismiss(id) { try { await _apxPost('/api/agent-approvals', 'skip-ready', { ready_id: id }); _apxRemove(id); _apxToast('Dismissed', true); } catch (e) { _apxToast(_apxErr(e), false); } }
 
 function _apxRender() {
   const body = document.getElementById('apx-body');
@@ -21571,40 +21690,41 @@ function _apxRemove(id) {
 // classify-and-promote pipeline as the Train Agent tab: born local to this
 // academy, applied to the next draft immediately, and (if the AI judges it
 // general sales-craft) queued for BAM to promote into the shared brain.
-async function _apxTeach(before, after, context) {
-  const lesson = prompt(
-    "Teach the agent from this edit? One line - what should it learn?\n" +
-    "e.g. \"Don't quote price before the trial is booked.\"\n\n(Leave blank to skip.)",
-    ''
-  );
-  if (lesson == null || !lesson.trim()) return;
+// Teach a lesson (already captured from the edit modal - no prompt).
+async function _apxTeach(lesson, before, after, context) {
+  if (!lesson || !lesson.trim()) return;
   try {
     const j = await _apxPost('/api/agent-train', 'teach', {
       lesson: lesson.trim(), kind: 'fix',
       context: { ...(context || {}), ai_drafted: before, you_sent: after },
     });
-    _plToast(j && j.proposed_global ? '📚 Lesson saved - sent to BAM to review for all academies' : '📚 Lesson saved + applied');
-  } catch (e) { _plToast('Edit kept, but lesson not saved: ' + (e.message || 'error')); }
+    _apxToast(j && j.proposed_global ? '📚 Lesson saved - sent to BAM to review' : '📚 Lesson saved + applied', true);
+  } catch (e) { _apxToast('Edit kept, but lesson not saved: ' + _apxErr(e), false); }
 }
 
 // ── Follow-up actions ──
-async function _apxFollowupSend(id) { try { await _apxPost('/api/agent-followups', 'send-now', { id }); _apxRemove(id); _plToast('✓ Sent'); } catch (e) { alert(e.message); } }
-async function _apxFollowupSkip(id) { try { await _apxPost('/api/agent-followups', 'skip', { id }); _apxRemove(id); } catch (e) { alert(e.message); } }
+async function _apxFollowupSend(id) { try { await _apxPost('/api/agent-followups', 'send-now', { id }); _apxRemove(id); _apxToast('✓ Sent', true); } catch (e) { _apxToast(_apxErr(e), false); } }
+async function _apxFollowupSkip(id) { try { await _apxPost('/api/agent-followups', 'skip', { id }); _apxRemove(id); _apxToast('Skipped', true); } catch (e) { _apxToast(_apxErr(e), false); } }
 async function _apxFollowupEdit(id) {
-  const r = _APX_DATA.followups.find(x => x.id === id); if (!r) return;
+  const r = _APX_DATA.followups.find(x => x.id === id) || _APX_DATA.ready.find(x => x.id === id); if (!r) return;
   const before = r.draft_message || '';
-  const t = prompt('Edit the follow-up message:', before);
-  if (t == null || !t.trim() || t.trim() === before) return;
-  try {
-    await _apxPost('/api/agent-followups', 'edit', { id, message: t.trim() });
-    r.draft_message = t.trim(); _apxRender();
-    await _apxTeach(before, t.trim(), { source: 'hawkeye-followup', contact: r.contact_name || null });
-  } catch (e) { alert(e.message); }
+  _apxEditModal({
+    title: 'Edit the follow-up message', value: before, teachable: true,
+    onSave: async (text, lesson) => {
+      if (text && text !== before) {
+        try { await _apxPost('/api/agent-followups', 'edit', { id, message: text }); r.draft_message = text; _apxRender(); }
+        catch (e) { _apxToast(_apxErr(e), false); return; }
+      }
+      if (lesson) await _apxTeach(lesson, before, text || before, { source: 'hawkeye-followup', contact: r.contact_name || null });
+    },
+  });
 }
 
 // ── Ready-reply actions (send = approve + fire via agent-approvals) ──
 async function _apxReadySend(id) {
   const r = _APX_DATA.ready.find(x => x.id === id); if (!r) return;
+  // Overdue follow-ups also live in the ready list - send those via the followup path.
+  if (r._isFollowup) return _apxFollowupSend(id);
   if (r.escalate && !confirm('The agent escalated this one (it wanted a human). Send the draft anyway?')) return;
   try {
     await _apxPost('/api/agent-approvals', 'send', {
@@ -21612,21 +21732,28 @@ async function _apxReadySend(id) {
       contact_name: r.contact_name || null, reasoning: r.reasoning || null, confidence: r.confidence,
       reply_count: r.reply_count, booking_asks: r.booking_asks, ready_id: r.id,
     });
-    _apxRemove(id); _plToast('✓ Sent');
-  } catch (e) { alert(e.message); }
+    _apxRemove(id); _apxToast('✓ Sent', true);
+  } catch (e) { _apxToast(_apxErr(e), false); }
 }
-async function _apxReadySkip(id) { try { await _apxPost('/api/agent-approvals', 'skip-ready', { ready_id: id }); _apxRemove(id); } catch (e) { alert(e.message); } }
+async function _apxReadySkip(id) {
+  const r = _APX_DATA.ready.find(x => x.id === id);
+  if (r && r._isFollowup) return _apxFollowupSkip(id);
+  try { await _apxPost('/api/agent-approvals', 'skip-ready', { ready_id: id }); _apxRemove(id); _apxToast('Skipped', true); } catch (e) { _apxToast(_apxErr(e), false); }
+}
 async function _apxReadyEdit(id) {
   const r = _APX_DATA.ready.find(x => x.id === id); if (!r) return;
+  if (r._isFollowup) return _apxFollowupEdit(id);
   const before = r.draft_message || '';
-  const t = prompt('Edit the reply before sending:', before);
-  if (t == null || !t.trim()) return;
-  r.draft_message = t.trim();
-  const el = document.getElementById('apx-msg-' + id);
-  if (el) el.textContent = r.draft_message;
-  if (r.draft_message !== before) {
-    await _apxTeach(before, r.draft_message, { source: 'hawkeye-ready', contact: r.contact_name || null });
-  }
+  _apxEditModal({
+    title: 'Edit the reply before sending', value: before, teachable: true,
+    onSave: async (text, lesson) => {
+      if (text && text !== before) {
+        r.draft_message = text;
+        const el = document.getElementById('apx-msg-' + id); if (el) el.textContent = r.draft_message;
+      }
+      if (lesson) await _apxTeach(lesson, before, text || before, { source: 'hawkeye-ready', contact: r.contact_name || null });
+    },
+  });
 }
 
 function _ibSetTab(tab) {
