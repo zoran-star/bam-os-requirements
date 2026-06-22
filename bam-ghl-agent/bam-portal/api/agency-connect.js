@@ -1,6 +1,7 @@
 import { withSentryApiRoute } from "./_sentry.js";
 import crypto from "node:crypto";
 // ── Path B: GHL Agency (Company) connect + bulk sub-account token minting ──
+// Uses the live FC app (GHL_OAUTH_CLIENT_ID) + the registered /api/messaging/connect redirect.
 //
 // BAM is the agency that owns every academy sub-account. Instead of connecting
 // each one with its own OAuth, the agency owner authorizes ONCE at the company
