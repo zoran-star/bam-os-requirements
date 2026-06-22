@@ -201,7 +201,7 @@ function Step1(props) {
 
         <button className="btn-primary s1-desktop-cta" style={{ marginTop: 20 }}
           onClick={function() { props.onNext && props.onNext(); }}>
-          See my schedule &rarr;
+          Book my free trial &rarr;
         </button>
       </div>
 

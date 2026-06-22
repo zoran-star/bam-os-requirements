@@ -25,6 +25,8 @@ function App() {
   var s1valid = window.validateStep1(form).valid;
 
   function submitLead() {
+    setShowErr1(true);
+    if (!s1valid) return;
     setLoading(true);
     setApiErr(null);
     var payload = {
@@ -35,7 +37,7 @@ function App() {
       grade:     form.grade,
       experienceLevel: form.experienceLevel,
       proximity: form.proximity || '',
-      smsConsent: true,
+      smsConsent: !!form.smsConsent,
       consentTimestamp: new Date().toISOString(),
     };
     fetch(API_URL, {
@@ -47,7 +49,7 @@ function App() {
       .then(function (data) {
         setLoading(false);
         if (data.ok) {
-          var group = data.group || CH3.getGroup(form.grade) || 'hs';
+          var group = data.group || window.CH3.getGroup(form.grade) || 'hs';
           var params = 'group=' + encodeURIComponent(group)
             + '&name=' + encodeURIComponent(form.firstName.trim())
             + '&email=' + encodeURIComponent(form.email.trim());
@@ -78,17 +80,16 @@ function App() {
   }
 
   return (
-    <div className={'funnel' + (step === 1 ? ' is-step1' : '')}>
+    <div className="funnel is-step1">
       <header className="fheader" style={{ position: 'relative' }}>
         <div className="fheader__brand">CH3 <em>TRAINING</em></div>
-        <div className="fheader__step">Step {step} of 2 &middot; {step === 1 ? 'Your info' : 'Your schedule'}</div>
+        <div className="fheader__step">Free Trial</div>
         <div className="fprogress" style={{ position: 'absolute', bottom: 0, left: 0, right: 0 }}>
-          <div className="fprogress__fill" style={{ width: step === 1 ? '50%' : '100%' }} />
+          <div className="fprogress__fill" style={{ width: '50%' }} />
         </div>
       </header>
 
-      {step === 1 && <Step1 form={form} setForm={setForm} showErrors={showErr1} onNext={function() { setShowErr1(true); if (s1valid) setStep(2); }} />}
-      {step === 2 && <Step2 grade={form.grade} />}
+      <Step1 form={form} setForm={setForm} showErrors={showErr1} onNext={submitLead} />
 
       <footer className="fcta">
         {apiErr && (
@@ -96,32 +97,14 @@ function App() {
             {apiErr}
           </div>
         )}
-
-        {step === 1 && (
-          <button className="btn-primary" onClick={function () {
-            setShowErr1(true);
-            if (s1valid) setStep(2);
-          }}>
-            See my schedule &rarr;
-          </button>
-        )}
-
-        {step === 2 && (
-          <button
-            className={'btn-primary' + (loading ? ' is-loading' : '')}
-            disabled={loading}
-            onClick={submitLead}>
-            {loading
-              ? <React.Fragment><span className="spinner" /> Saving&hellip;</React.Fragment>
-              : 'Pick my session time →'}
-          </button>
-        )}
-
-        {step === 2 && (
-          <button className="fcta__back" onClick={function () { setStep(1); }}>
-            &larr; Back
-          </button>
-        )}
+        <button
+          className={'btn-primary' + (loading ? ' is-loading' : '')}
+          disabled={loading}
+          onClick={submitLead}>
+          {loading
+            ? <React.Fragment><span className="spinner" /> Saving&hellip;</React.Fragment>
+            : 'Book my free trial →'}
+        </button>
       </footer>
     </div>
   );

@@ -36,6 +36,15 @@ async function handler(req, res) {
     return res.status(400).json({ error: 'startDate and endDate are required' });
   }
 
+  // GHL free-slots requires ms timestamps. If a YYYY-MM-DD string was passed, convert.
+  function toMs(v) {
+    if (/^\d{10,}$/.test(v)) return v; // already ms or seconds-as-string
+    var d = new Date(v);
+    return isNaN(d) ? v : String(d.getTime());
+  }
+  startDate = toMs(startDate);
+  endDate   = toMs(endDate);
+
   var params = new URLSearchParams({ startDate, endDate, timezone });
   var url = `https://services.leadconnectorhq.com/calendars/${calendarId}/free-slots?${params}`;
 

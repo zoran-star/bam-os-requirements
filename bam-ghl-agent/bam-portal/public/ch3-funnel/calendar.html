@@ -345,11 +345,11 @@
 
     function loadSlots() {
       var cal = CALENDARS[state.group];
-      var start = todayYMD();
-      var end = addDays(start, 21);
+      var startMs = Date.now();
+      var endMs = startMs + 28 * 24 * 60 * 60 * 1000;
       var url = '/api/website/ch3-slots?calendarId=' + cal.id
-        + '&startDate=' + start
-        + '&endDate=' + end
+        + '&startDate=' + startMs
+        + '&endDate=' + endMs
         + '&timezone=America%2FNew_York';
 
       renderSkeleton();
