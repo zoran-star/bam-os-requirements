@@ -294,10 +294,9 @@ async function handleAdminStart(req, res) {
   });
 
   const params = new URLSearchParams({
-    response_type: "code",
-    client_id:     ghlClientId,
-    redirect_uri:  redirectUri(req),
-    scope:         SCOPES,
+    client_id:    ghlClientId,
+    redirect_uri: redirectUri(req),
+    scope:        SCOPES,
     state,
   });
 
@@ -345,10 +344,9 @@ async function handlePrepare(req, res) {
   });
 
   const params = new URLSearchParams({
-    response_type: "code",
-    client_id:     ghlClientId,
-    redirect_uri:  redirectUri(req),
-    scope:         SCOPES,
+    client_id:    ghlClientId,
+    redirect_uri: redirectUri(req),
+    scope:        SCOPES,
     state,
   });
 
