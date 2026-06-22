@@ -29,7 +29,7 @@
       padding: 0 24px; height: 64px;
       display: flex; align-items: center; justify-content: space-between;
     }
-    .nav-logo { font-family: var(--font-d); font-size: 20px; letter-spacing: .06em; text-transform: uppercase; color: var(--fg); text-decoration: none; }
+    .nav-logo { font-family: var(--font-d); font-size: 20px; letter-spacing: .06em; text-transform: uppercase; color: var(--fg); text-decoration: none; display: flex; align-items: center; }
     .nav-logo span { color: var(--brand); }
     .nav-links { display: flex; align-items: center; gap: 32px; list-style: none; }
     .nav-links a { font-size: 13px; font-weight: 500; letter-spacing: .04em; text-transform: uppercase; color: var(--fg-sub); text-decoration: none; transition: color .2s; }
@@ -89,7 +89,10 @@
 <body>
 
 <nav>
-  <a class="nav-logo" href="/miami-website/">DETAIL <span>Miami</span></a>
+  <a class="nav-logo" href="/miami-website/">
+    <img src="https://assets.cdn.filesafe.space/RBnlVgmXNMbFpgFGPGcv/media/672031f1ca958b541fa3fc8f.png" alt="DETAIL Miami" style="height:36px;width:auto;object-fit:contain;vertical-align:middle;margin-right:8px">
+    DETAIL <span>Miami</span>
+  </a>
   <ul class="nav-links">
     <li><a href="index.html#about">About</a></li>
     <li><a href="index.html#programs">Programs</a></li>
