@@ -169,6 +169,7 @@ async function draftForContact(token, locationId, clientId, contactId, cfg, opts
     asked_to_book: !!out.asked_to_book || BOOK_ASK.test(out.reply || ""),
     recommend_lost: !!out.recommend_lost,
     lost_reason: out.lost_reason || null,
+    last_message: (() => { const lead = [...messages].reverse().find(m => m.role === "parent"); return lead ? String(lead.text).slice(0, 500) : null; })(),
     reply_count: agentMsgs.length,
     booking_asks: agentMsgs.filter(m => BOOK_ASK.test(m.text)).length,
   };
@@ -232,6 +233,7 @@ async function detectForClient(client) {
           client_id: client.id, ghl_contact_id: String(contactId), ghl_conversation_id: d.conversation_id || null,
           contact_name: item.name || null, kind: "mark_lost", lost_reason: d.lost_reason || "Other",
           draft_message: (d.reply && String(d.reply).trim()) ? d.reply : "", reasoning: d.reasoning || null,
+          last_message: d.last_message || null,
           confidence: d.confidence, last_lead_at: item.last_at || null, status: "pending", created_by: "detector",
         }]) });
         lostProposed++;
@@ -262,7 +264,7 @@ async function detectForClient(client) {
         await sb(`agent_ready_replies`, { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify([{
           client_id: client.id, ghl_contact_id: String(contactId), ghl_conversation_id: d.conversation_id || null,
           contact_name: item.name || null, draft_message: d.reply, reasoning: d.reasoning || null, confidence: d.confidence,
-          asked_to_book: d.asked_to_book, reply_count: d.reply_count, booking_asks: d.booking_asks,
+          asked_to_book: d.asked_to_book, reply_count: d.reply_count, booking_asks: d.booking_asks, last_message: d.last_message || null,
           last_lead_at: item.last_at || null, status: "sent", auto_sent: true, sent_at: new Date().toISOString(), created_by: "self-drive",
         }]) });
         await logApproval({ client_id: client.id, ghl_contact_id: contactId, ghl_conversation_id: d.conversation_id || null,
@@ -275,7 +277,7 @@ async function detectForClient(client) {
         await sb(`agent_ready_replies`, { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify([{
           client_id: client.id, ghl_contact_id: String(contactId), ghl_conversation_id: d.conversation_id || null,
           contact_name: item.name || null, draft_message: d.reply, reasoning: d.reasoning || null, confidence: d.confidence,
-          asked_to_book: d.asked_to_book, reply_count: d.reply_count, booking_asks: d.booking_asks,
+          asked_to_book: d.asked_to_book, reply_count: d.reply_count, booking_asks: d.booking_asks, last_message: d.last_message || null,
           last_lead_at: item.last_at || null, status: "pending", created_by: "detector",
         }]) });
         drafted++;
