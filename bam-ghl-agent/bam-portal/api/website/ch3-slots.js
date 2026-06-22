@@ -87,7 +87,9 @@ async function handler(req, res) {
 
   slots.sort(function(a, b) { return new Date(a.start) - new Date(b.start); });
 
-  return res.status(200).json({ ok: true, slots: slots });
+  // Include raw GHL response keys when empty to help diagnose misconfigured calendars.
+  var extra = slots.length === 0 ? { _ghl_keys: Object.keys(data || {}), _date_keys: Object.keys(dateMap) } : {};
+  return res.status(200).json(Object.assign({ ok: true, slots: slots }, extra));
 }
 
 export default withSentryApiRoute(handler);

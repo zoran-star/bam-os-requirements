@@ -354,8 +354,9 @@
 
       renderSkeleton();
       fetch(url)
-        .then(function(r) { if (!r.ok) throw new Error(r.status); return r.json(); })
+        .then(function(r) { return r.json(); })
         .then(function(data) {
+          if (!data.ok) { renderError(data.error || data.detail); return; }
           state.slots = data.slots || [];
           state.expanded = false;
           renderSlots();
@@ -373,11 +374,13 @@
       document.getElementById('slot-list').innerHTML = html;
     }
 
-    function renderError() {
+    function renderError(msg) {
+      var detail = msg ? '<span style="font-size:11px;color:var(--fg-muted);display:block;margin-top:4px;">' + msg + '</span>' : '';
       document.getElementById('slot-list').innerHTML =
         '<div class="slots-empty">'
         + '<strong>Could not load times.</strong>'
-        + 'Try refreshing the page.'
+        + detail
+        + 'Try refreshing the page or text Coach Haynes at <a href="sms:2672168887" style="color:var(--teal)">267-216-8887</a>.'
         + '<br/><button class="retry-btn" onclick="loadSlots()">Retry</button>'
         + '</div>';
     }
@@ -389,8 +392,8 @@
       if (!slots || slots.length === 0) {
         listEl.innerHTML =
           '<div class="slots-empty">'
-          + '<strong>No slots available in the next 3 weeks.</strong>'
-          + 'Text Coach Haynes at <a href="sms:2672168887" style="color:var(--teal)">267-216-8887</a> to get scheduled.'
+          + '<strong>No open sessions in the next 4 weeks.</strong>'
+          + 'Text Coach Haynes at <a href="sms:2672168887" style="color:var(--teal)">267-216-8887</a> to get scheduled directly.'
           + '</div>';
         return;
       }

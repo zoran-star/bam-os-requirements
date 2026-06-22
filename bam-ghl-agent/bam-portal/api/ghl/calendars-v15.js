@@ -128,7 +128,8 @@ async function loadClient(clientId) {
 function apiKeyForLocation(locationId) {
   try {
     const locs = JSON.parse(process.env.GHL_LOCATIONS_JSON || "[]");
-    return locs.find(l => l.locationId === locationId)?.apiKeyV2 || null;
+    const loc = locs.find(l => l.locationId === locationId);
+    return (loc?.apiKeyV2 || loc?.apiKey) || null;
   } catch { return null; }
 }
 
