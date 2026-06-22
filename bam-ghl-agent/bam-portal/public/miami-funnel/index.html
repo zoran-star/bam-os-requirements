@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>Book Your Free Trial — DETAIL Miami</title>
+  <meta name="robots" content="noindex" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Anton&family=Inter+Tight:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:       #080808;
+      --surface:  #111111;
+      --surface2: #1a1a1a;
+      --border:   rgba(255,255,255,0.08);
+      --brand:     #e2dd9f;
+      --brand-dim: rgba(226,221,159,0.10);
+      --fg:       #ffffff;
+      --fg-sub:   rgba(255,255,255,0.60);
+      --fg-muted: rgba(255,255,255,0.35);
+      --red:      #ff4d4f;
+      --font-d:   'Anton', sans-serif;
+      --font-b:   'Inter Tight', sans-serif;
+      --r:        10px;
+    }
+
+    html, body { min-height: 100dvh; background: var(--bg); color: var(--fg); font-family: var(--font-b); }
+
+    body { display: flex; flex-direction: column; align-items: center; padding: 0 16px 60px; }
+
+    .hero {
+      width: 100%; max-width: 480px; text-align: center;
+      padding: 48px 0 32px;
+    }
+    .hero-badge {
+      display: inline-block; font-size: 11px; font-weight: 600; letter-spacing: .12em;
+      text-transform: uppercase; color: var(--brand); background: var(--brand-dim);
+      border: 1px solid rgba(226,221,159,0.25); border-radius: 20px;
+      padding: 5px 14px; margin-bottom: 20px;
+    }
+    .hero h1 {
+      font-family: var(--font-d); font-size: clamp(32px, 8vw, 48px);
+      line-height: 1.05; letter-spacing: .02em; text-transform: uppercase;
+      margin-bottom: 14px;
+    }
+    .hero h1 span { color: var(--brand); }
+    .hero p { font-size: 15px; color: var(--fg-sub); line-height: 1.6; max-width: 360px; margin: 0 auto; }
+
+    .card {
+      width: 100%; max-width: 480px;
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 16px; padding: 28px 24px;
+    }
+
+    .step-indicator {
+      display: flex; gap: 6px; margin-bottom: 24px;
+    }
+    .step-dot {
+      height: 3px; border-radius: 2px; flex: 1;
+      background: var(--border); transition: background .3s;
+    }
+    .step-dot.active { background: var(--brand); }
+
+    .field { margin-bottom: 16px; }
+    .field label { display: block; font-size: 12px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--fg-muted); margin-bottom: 6px; }
+    .field input, .field select {
+      width: 100%; background: var(--surface2); border: 1px solid var(--border);
+      border-radius: var(--r); color: var(--fg); font-family: var(--font-b);
+      font-size: 15px; padding: 13px 14px; outline: none;
+      transition: border-color .2s;
+      appearance: none; -webkit-appearance: none;
+    }
+    .field input::placeholder { color: var(--fg-muted); }
+    .field input:focus, .field select:focus { border-color: var(--brand); }
+    .field input.error, .field select.error { border-color: var(--red); }
+    .field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+
+    .select-wrap { position: relative; }
+    .select-wrap::after {
+      content: ''; position: absolute; right: 14px; top: 50%; transform: translateY(-50%);
+      border: 5px solid transparent; border-top-color: var(--fg-muted);
+      pointer-events: none; margin-top: 3px;
+    }
+    .select-wrap select { padding-right: 36px; cursor: pointer; }
+    .select-wrap select option { background: #1a1a1a; color: #fff; }
+
+    .consent-block {
+      display: flex; gap: 12px; align-items: flex-start;
+      background: var(--surface2); border: 1px solid var(--border);
+      border-radius: var(--r); padding: 14px; margin-bottom: 20px; cursor: pointer;
+    }
+    .consent-block input[type=checkbox] { display: none; }
+    .checkbox-custom {
+      flex-shrink: 0; width: 20px; height: 20px; border-radius: 5px;
+      border: 1.5px solid var(--border); background: var(--surface);
+      display: flex; align-items: center; justify-content: center; margin-top: 1px;
+      transition: background .2s, border-color .2s;
+    }
+    .checkbox-custom svg { display: none; }
+    .consent-block input:checked + .checkbox-custom {
+      background: var(--brand); border-color: var(--brand);
+    }
+    .consent-block input:checked + .checkbox-custom svg { display: block; }
+    .consent-text { font-size: 12px; color: var(--fg-sub); line-height: 1.55; }
+
+    .btn {
+      width: 100%; padding: 16px; border: none; border-radius: var(--r);
+      background: var(--brand); color: #000; font-family: var(--font-d);
+      font-size: 18px; letter-spacing: .04em; text-transform: uppercase;
+      cursor: pointer; transition: opacity .2s; margin-top: 4px;
+    }
+    .btn:disabled { opacity: .45; cursor: not-allowed; }
+    .btn:not(:disabled):hover { opacity: .88; }
+
+    .err-msg { font-size: 13px; color: var(--red); margin-top: 6px; }
+    .global-err {
+      background: rgba(255,77,79,.1); border: 1px solid rgba(255,77,79,.3);
+      border-radius: var(--r); padding: 12px 14px; font-size: 13px;
+      color: var(--red); margin-bottom: 16px; display: none;
+    }
+    .global-err.show { display: block; }
+
+    .spinner {
+      width: 18px; height: 18px; border: 2.5px solid rgba(0,0,0,0.3);
+      border-top-color: #000; border-radius: 50%; animation: spin .7s linear infinite;
+      display: inline-block; vertical-align: middle; margin-right: 8px; display: none;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .trust-row {
+      display: flex; gap: 20px; justify-content: center; flex-wrap: wrap;
+      margin-top: 24px;
+    }
+    .trust-item { font-size: 12px; color: var(--fg-muted); display: flex; align-items: center; gap: 6px; }
+    .trust-item::before { content: '✓'; color: var(--brand); font-size: 12px; }
+  </style>
+</head>
+<body>
+
+<div class="hero">
+  <div class="hero-badge">DETAIL Miami</div>
+  <h1>Get Your <span>Free Trial</span><br>Session</h1>
+  <p>Experience elite player development firsthand. Fill out the form below to claim your spot.</p>
+</div>
+
+<div class="card">
+  <div class="step-indicator">
+    <div class="step-dot active" id="dot1"></div>
+    <div class="step-dot" id="dot2"></div>
+  </div>
+
+  <div id="step1">
+    <div class="field-row">
+      <div class="field">
+        <label>First Name</label>
+        <input id="firstName" type="text" placeholder="First" autocomplete="given-name" />
+      </div>
+      <div class="field">
+        <label>Last Name</label>
+        <input id="lastName" type="text" placeholder="Last" autocomplete="family-name" />
+      </div>
+    </div>
+    <div class="field">
+      <label>Email</label>
+      <input id="email" type="email" placeholder="your@email.com" autocomplete="email" />
+    </div>
+    <div class="field">
+      <label>Phone</label>
+      <input id="phone" type="tel" placeholder="+1 (555) 000-0000" autocomplete="tel" />
+    </div>
+    <div class="field">
+      <label>Player Grade</label>
+      <div class="select-wrap">
+        <select id="grade">
+          <option value="" disabled selected>Select grade</option>
+          <optgroup label="Elementary Academy (K–5th)">
+            <option value="Kindergarten">Kindergarten</option>
+            <option value="1st grade">1st Grade</option>
+            <option value="2nd grade">2nd Grade</option>
+            <option value="3rd grade">3rd Grade</option>
+            <option value="4th grade">4th Grade</option>
+            <option value="5th grade">5th Grade</option>
+          </optgroup>
+          <optgroup label="MS / HS Academy (6th–12th+)">
+            <option value="6th grade">6th Grade</option>
+            <option value="7th grade">7th Grade</option>
+            <option value="8th grade">8th Grade</option>
+            <option value="9th grade">9th Grade</option>
+            <option value="10th grade">10th Grade</option>
+            <option value="11th grade">11th Grade</option>
+            <option value="12th grade">12th Grade</option>
+            <option value="College">College / Adult</option>
+          </optgroup>
+        </select>
+      </div>
+    </div>
+    <button class="btn" id="btnNext" onclick="goStep2()">
+      <span class="spinner" id="spinner1"></span>Next: Pick a Time
+    </button>
+    <div class="global-err" id="globalErr1"></div>
+  </div>
+
+  <div id="step2" style="display:none;">
+    <div style="text-align:center; padding: 12px 0 20px;">
+      <div style="font-family:var(--font-d); font-size:22px; letter-spacing:.02em; text-transform:uppercase; margin-bottom:6px;">
+        Almost there, <span id="previewName" style="color:var(--brand)"></span>
+      </div>
+      <div style="font-size:13px; color:var(--fg-sub);">Confirm your info before we submit.</div>
+    </div>
+    <div class="field">
+      <label>Group</label>
+      <input id="previewGroup" type="text" readonly style="color:var(--brand); cursor:default;" />
+    </div>
+    <div class="field">
+      <label>Email</label>
+      <input id="previewEmail" type="text" readonly style="cursor:default;" />
+    </div>
+    <div class="field">
+      <label>Phone</label>
+      <input id="previewPhone" type="text" readonly style="cursor:default;" />
+    </div>
+    <label class="consent-block" for="smsConsent">
+      <input type="checkbox" id="smsConsent" />
+      <div class="checkbox-custom">
+        <svg width="11" height="9" viewBox="0 0 11 9" fill="none">
+          <path d="M1 4L4 7L10 1" stroke="#000" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </div>
+      <span class="consent-text">
+        I agree to receive marketing and informational SMS messages from DETAIL Miami. Message &amp; data rates may apply. Reply STOP to unsubscribe.
+      </span>
+    </label>
+    <div class="global-err" id="globalErr2"></div>
+    <button class="btn" id="btnSubmit" onclick="submitLead()">
+      <span class="spinner" id="spinner2"></span>Book My Free Trial
+    </button>
+    <button onclick="goStep1()" style="width:100%; background:none; border:none; color:var(--fg-muted); font-size:13px; margin-top:14px; cursor:pointer;">← Go back</button>
+  </div>
+</div>
+
+<div class="trust-row">
+  <div class="trust-item">No payment required</div>
+  <div class="trust-item">60-min session</div>
+  <div class="trust-item">16414 NW 54th Ave, Hialeah</div>
+</div>
+
+<script>
+  var API = '/api/website/miami-lead';
+
+  function getGroup(grade) {
+    if (!grade) return 'ms-hs';
+    var g = grade.toLowerCase();
+    if (g.includes('k') || g.includes('kinder') ||
+        ['1st','2nd','3rd','4th','5th'].some(function(n){ return g.includes(n); }))
+      return 'elementary';
+    return 'ms-hs';
+  }
+
+  function goStep1() {
+    document.getElementById('step1').style.display = '';
+    document.getElementById('step2').style.display = 'none';
+    document.getElementById('dot1').classList.add('active');
+    document.getElementById('dot2').classList.remove('active');
+  }
+
+  function goStep2() {
+    var fn = document.getElementById('firstName').value.trim();
+    var em = document.getElementById('email').value.trim();
+    var gr = document.getElementById('grade').value;
+    var err = document.getElementById('globalErr1');
+    err.classList.remove('show');
+
+    if (!fn) { showErr(err, 'First name is required.'); return; }
+    if (!em || !em.includes('@')) { showErr(err, 'Valid email is required.'); return; }
+    if (!gr) { showErr(err, 'Please select a grade.'); return; }
+
+    var group = getGroup(gr);
+    document.getElementById('previewName').textContent = fn;
+    document.getElementById('previewGroup').value = group === 'elementary' ? 'Elementary Academy (K–5th)' : 'MS / HS Academy (6th–12th+)';
+    document.getElementById('previewEmail').value = em;
+    document.getElementById('previewPhone').value = document.getElementById('phone').value.trim() || '—';
+
+    document.getElementById('step1').style.display = 'none';
+    document.getElementById('step2').style.display = '';
+    document.getElementById('dot1').classList.remove('active');
+    document.getElementById('dot2').classList.add('active');
+  }
+
+  function showErr(el, msg) {
+    el.textContent = msg;
+    el.classList.add('show');
+  }
+
+  async function submitLead() {
+    var btn = document.getElementById('btnSubmit');
+    var spinner = document.getElementById('spinner2');
+    var err = document.getElementById('globalErr2');
+    err.classList.remove('show');
+
+    var consent = document.getElementById('smsConsent').checked;
+    if (!consent) { showErr(err, 'Please agree to SMS consent to continue.'); return; }
+
+    btn.disabled = true;
+    spinner.style.display = 'inline-block';
+
+    var grade = document.getElementById('grade').value;
+    var group = getGroup(grade);
+
+    try {
+      var res = await fetch(API, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          firstName:        document.getElementById('firstName').value.trim(),
+          lastName:         document.getElementById('lastName').value.trim() || undefined,
+          email:            document.getElementById('email').value.trim(),
+          phone:            document.getElementById('phone').value.trim() || undefined,
+          grade:            grade,
+          smsConsent:       true,
+          consentTimestamp: new Date().toISOString(),
+        }),
+      });
+      var data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Submission failed');
+
+      var params = new URLSearchParams({
+        group:       data.group || group,
+        name:        document.getElementById('firstName').value.trim(),
+        email:       document.getElementById('email').value.trim(),
+      });
+      if (data.contactId) params.set('cid', data.contactId);
+      window.location.href = '/miami-funnel/calendar.html?' + params.toString();
+    } catch (e) {
+      showErr(err, e.message || 'Something went wrong. Please try again.');
+      btn.disabled = false;
+      spinner.style.display = 'none';
+    }
+  }
+</script>
+</body>
+</html>

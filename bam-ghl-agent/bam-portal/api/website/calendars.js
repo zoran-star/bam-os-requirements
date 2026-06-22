@@ -99,7 +99,7 @@ function summarizeCalendar(c) {
 
 async function loadClient(clientId) {
   const rows = await sb(
-    `clients?id=eq.${clientId}&select=id,time_zone,ghl_location_id,ghl_access_token,ghl_refresh_token,ghl_token_expires_at&limit=1`
+    `clients?id=eq.${clientId}&select=id,time_zone,ghl_location_id,ghl_kpi_config,ghl_access_token,ghl_refresh_token,ghl_token_expires_at&limit=1`
   );
   return rows?.[0] || null;
 }
