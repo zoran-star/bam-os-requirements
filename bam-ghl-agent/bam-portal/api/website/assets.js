@@ -69,13 +69,13 @@ async function handler(req, res) {
   try {
     const rows = await sbReq(
       `client_assets?client_id=eq.${encodeURIComponent(client_id)}` +
-      `&select=id,label,category,alt,storage_path,width,height,offer_id,staff_id,location_id` +
+      `&select=id,label,category,alt,storage_path,link_url,width,height,offer_id,staff_id,location_id` +
       `&order=sort_order.asc,created_at.desc`
     );
 
     const assets = (rows || []).map((a) => ({
       id: a.id, label: a.label, category: a.category, alt: a.alt || "",
-      url: publicUrl(a.storage_path),
+      url: a.storage_path ? publicUrl(a.storage_path) : (a.link_url || ""),
       width: a.width, height: a.height,
       offer_id: a.offer_id, staff_id: a.staff_id, location_id: a.location_id,
     }));
