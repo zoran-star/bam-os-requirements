@@ -92,22 +92,26 @@ async function handler(req, res) {
       var contactData = await contactRes.json();
       contactId = (contactData.contact || contactData).id || null;
     } else {
-      // Upsert failed — try searching for an existing contact by email.
       var upsertErrText = await contactRes.text();
+      // Upsert failed — look up by email using GHL's dedicated lookup endpoint.
       try {
-        var searchRes = await fetch(
-          `${GHL_BASE}/contacts/?locationId=${encodeURIComponent(LOCATION_ID)}&query=${encodeURIComponent(email)}&limit=1`,
+        var lookupRes = await fetch(
+          `${GHL_BASE}/contacts/lookup?email=${encodeURIComponent(email)}&locationId=${encodeURIComponent(LOCATION_ID)}`,
           { headers: ghlHeaders() }
         );
-        if (searchRes.ok) {
-          var searchData = await searchRes.json();
-          var found = (searchData.contacts || [])[0];
+        if (lookupRes.ok) {
+          var lookupData = await lookupRes.json();
+          var found = (lookupData.contacts || [])[0] || lookupData.contact || null;
           if (found) contactId = found.id;
         }
       } catch (_) {}
 
       if (!contactId) {
-        return res.status(502).json({ error: 'Could not create or find your contact in GHL. Please try again or contact Coach Haynes.', detail: upsertErrText.slice(0, 200) });
+        console.error('ch3-book upsert+lookup failed:', upsertErrText.slice(0, 300));
+        return res.status(502).json({
+          error: 'Booking failed — please go back and resubmit the form, or text Coach Haynes at 267-216-8887.',
+          detail: upsertErrText.slice(0, 200),
+        });
       }
     }
   }

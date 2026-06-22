@@ -516,7 +516,9 @@
               + '&location=' + encodeURIComponent(data.location || '')
               + '&group=' + encodeURIComponent(data.group || '');
           } else {
-            errEl.textContent = data.error || 'Something went wrong. Please try again.';
+            var msg = data.error || 'Something went wrong. Please try again.';
+            if (data.detail) msg += ' (' + data.detail + ')';
+            errEl.textContent = msg;
             errEl.style.display = 'block';
           }
         })
