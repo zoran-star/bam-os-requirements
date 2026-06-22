@@ -4,10 +4,11 @@ import { pickGhlToken, ghl } from "./_core.js";
 // page. Tokens are handled server-side (pickGhlToken auto-refreshes), so this
 // always reflects live GHL and covers academies whose stored token expired.
 //
-//   GET /api/ghl/all-pipelines?key=<CRON_SECRET>   → rendered HTML page
-//   GET /api/ghl/all-pipelines?key=...&format=json → JSON
+//   GET /api/ghl/all-pipelines            → rendered HTML page
+//   GET /api/ghl/all-pipelines?format=json → JSON
 //
-// Gated by CRON_SECRET so the agency owner can open it in a browser directly.
+// PUBLIC (per Zoran) — open at staff.byanymeansbusiness.com/api/ghl/all-pipelines.
+// Exposes pipeline + stage NAMES only (no contacts/PII).
 
 export const maxDuration = 120;
 
