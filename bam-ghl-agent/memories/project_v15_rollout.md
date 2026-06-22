@@ -60,21 +60,44 @@ session's **infra/tools + resume playbook**; the per-academy board lives in
   ⚠️ GTA still has an old per-academy Workflow "agent trigger" that DUPLICATES (sends
   body "undefined") — **delete that GTA workflow.**
 
-## Current state (2026-06-22)
-- Connected GHL: ~28 academies (the all-pipelines report shows them).
-- **On V1.5 (`v15_access=true`): only 4** — By Any Means Basketball, CH3 Training,
-  D.A. Hoops Academy, DETAIL Miami. Athlete-name auto-mapped for these ✅.
-- The other ~24 connected academies are still **V1** (GHL connected, not flipped).
+## Current state (2026-06-22, end of session — BIG flip done)
+- **On V1.5 (`v15_access=true`): 28 academies** (4 prior + 24 flipped this session).
+  Flipped all connected V1 academies in one shot via SQL
+  (`update clients set v15_access=true where ghl_access_token is not null and not v15_access and not v2_access`).
+- **Athlete-name mapped: 25/28** ✅ (re-ran auto-map after the flip). The 3 unmapped
+  have **no athlete-name field in their GHL yet**: Elite Smart Athletes, Fitz N Fit
+  Fitness, GAME Winner Athletics (GAME Winner buildout still in progress). They map
+  automatically once a field exists — re-run auto-map then.
+- **Prime By Design** athlete map cleaned: auto-map had grabbed a junk survey-question
+  field (`YFsCCMb489A48P0YMANi`, 0 contacts) alongside the real one; reset to just the
+  good field (`KgrM7fyIm1bUWHiVccYj`, "Athlete's Full Name", 122 contacts).
+- **Owner logins:** all 28 already have ≥2 `client_users` accounts → no invites needed.
+- **all-pipelines spot-check:** 27/29 render pipelines; only Fitz N Fit (0) + GAME Winner
+  (0) empty (buildouts not done — expected).
+- Only **BAM GTA** is V2.
+
+## Still V1 — need GHL connect first (3 real academies, not yet connected)
+`ACTIV8 · Performance Space Hoops · Straight Buckets Performance` — have a GHL location
+but no OAuth token. Connect via the portal "Connect GHL" step (the response_type bug that
+blocked this is now FIXED — see gotchas), then flip + auto-map.
+
+## Roster cleanup (2026-06-22)
+- The old "EXCLUDED (not training)" list was WRONG — Zoran confirmed BTG, Defy The Odds,
+  Fitz N Fit Fitness, Out Work, Prime By Design are all **real academies** (now V1.5).
+- Real-but-no-GHL-account-yet: True Focus, Locked In Sports, Pro Precision.
+- Junk/test/shell (no GHL location): Test biz (x2), test business, Demo Academy,
+  MIKEEEEEE, Twin Hoops (dupe of Twin Hoops Academy), BAM Business: Internal Ads,
+  BAM Coaches, Quicksand Mindset (confirmed not a real client), Basketball+ → now connected.
 
 ## REMAINING — pick up here
-1. **Flip the real connected academies to `v15_access=true`** in the staff portal.
-   SKIP junk/test rows: Test biz (x2), test business, Demo Academy, MIKEEEEEE,
-   BAM Coaches, BAM Business: Internal Ads, Locked In Sports/Pro Precision (unless real).
-2. **Re-run** `staff.byanymeansbusiness.com/api/contacts?action=auto-map-athletes`
-   (dry=1 first to preview) so the newly-flipped academies get their athlete-name field.
-3. **Owner logins** — ensure each academy owner has a `client_users` account (invite) so
-   they can log in. See [[project_multi_user_portal.md]].
-4. Spot-check the all-pipelines page reflects everyone.
+1. **Connect the 3 unconnected academies** (ACTIV8, Performance Space Hoops, Straight
+   Buckets), then flip + re-run auto-map.
+2. **3 missing athlete fields** — Elite Smart Athletes, Fitz N Fit, GAME Winner: build the
+   GHL field, then re-run `auto-map-athletes`.
+3. **Elevate Hoops** — its systems buildout was cancelled; pipeline shows 1, verify it's
+   real before relying on it.
+4. **Delete GTA's old per-academy "agent trigger" Workflow** (duplicates inbound, sends
+   body "undefined") — app-level webhook already covers it.
 
 ## Gotchas
 - **Deploy race:** bam-portal production lags/flaps — other sessions' deploys clobber it
