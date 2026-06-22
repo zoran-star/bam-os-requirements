@@ -118,6 +118,10 @@ const SCOPES = [
   "emails/builder.readonly",
   "emails/builder.write",
 
+  // Funnels + website pages
+  "funnels.readonly",
+  "funnels/page.readonly",
+
   // Notes on dropped scopes (2026-05-30):
   //   snapshots.readonly                — not available for Sub-Account apps
   //   socialplanner/medialibrary.readonly — same
