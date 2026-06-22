@@ -28,6 +28,7 @@ const DEV_ORIGINS = new Set([
   "http://localhost:3000",
   "http://localhost:5173",
   "http://127.0.0.1:5500",
+  "https://portal.byanymeansbusiness.com",
 ]);
 
 let originsCache = { set: null, patterns: null, at: 0 };
@@ -71,6 +72,12 @@ async function getAllowedOrigins() {
 
 async function setCors(req, res) {
   const origin = req.headers.origin || "";
+  // Same-origin requests (no Origin header) are always allowed.
+  if (!origin) {
+    res.setHeader("Access-Control-Allow-Methods", "GET, OPTIONS");
+    res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+    return true;
+  }
   let allowed = false;
   try {
     const { set, patterns } = await getAllowedOrigins();
