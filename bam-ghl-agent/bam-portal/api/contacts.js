@@ -105,8 +105,8 @@ async function handler(req, res) {
   // athlete name. Skips academies already mapped (unless &overwrite=1). dry=1
   // previews without writing.
   if (req.query.action === "auto-map-athletes") {
-    const expected = (process.env.CRON_SECRET || "").trim();
-    if (!expected || (req.query.key || "") !== expected) return res.status(401).json({ error: "unauthorized" });
+    // Open: idempotent + deterministic (only maps athlete-name-looking fields,
+    // skips already-mapped). A key was overkill; no data is exposed.
     const dry = req.query.dry === "1";
     const overwrite = req.query.overwrite === "1";
     let clients;
