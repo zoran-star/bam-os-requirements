@@ -123,11 +123,17 @@ async function handler(req, res) {
       try { defs = (await ghl("GET", `/locations/${encodeURIComponent(creds.locationId)}/customFields`, { token: creds.token })).customFields || []; }
       catch (e) { row.action = "error: fields " + e.message; out.push(row); continue; }
       const hits = defs.filter(d => looksLikeAthleteName(d.name || d.fieldKey));
-      row.matched = hits.map(d => d.name || d.fieldKey);
-      if (!hits.length) { row.action = "no athlete-name field found"; out.push(row); continue; }
-      if (dry) { row.action = "would set " + hits.length; out.push(row); continue; }
+      // The sync uses the FIRST non-empty mapped field (no concatenation), so
+      // prefer FULL-name fields ("Athlete Full Name", or "Athlete Name" with no
+      // first/last) over first/last-only fields — else names show half.
+      const isFull = (d) => { const n = String(d.name || d.fieldKey || "").toLowerCase(); return /\bfull\b/.test(n) || !/\b(first|last)\b/.test(n); };
+      const fulls = hits.filter(isFull);
+      const chosen = fulls.length ? fulls : hits;
+      row.matched = chosen.map(d => d.name || d.fieldKey);
+      if (!chosen.length) { row.action = "no athlete-name field found"; out.push(row); continue; }
+      if (dry) { row.action = "would set " + chosen.length; out.push(row); continue; }
       const cfg = client.v15_config || {};
-      cfg.athlete_name_field_ids = hits.map(d => String(d.id));
+      cfg.athlete_name_field_ids = chosen.map(d => String(d.id));
       try { await sb(`clients?id=eq.${client.id}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ v15_config: cfg }) }); row.action = "✓ set " + hits.length; }
       catch (e) { row.action = "error: save " + e.message; }
       out.push(row);
