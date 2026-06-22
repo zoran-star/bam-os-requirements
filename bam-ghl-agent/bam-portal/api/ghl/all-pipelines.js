@@ -91,8 +91,8 @@ function renderPage(rows) {
 
 async function handler(req, res) {
   if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY) return res.status(500).send("Supabase not configured");
-  const expected = (process.env.CRON_SECRET || "").trim();
-  if (!expected || (req.query.key || "") !== expected) return res.status(401).json({ error: "unauthorized" });
+  // Public (per Zoran) — open at staff.byanymeansbusiness.com/api/ghl/all-pipelines.
+  // Exposes pipeline + stage NAMES only (no contacts/PII). Re-gate later if needed.
 
   let clients;
   try { clients = await sb(`clients?ghl_access_token=not.is.null&select=id,business_name,ghl_location_id,ghl_access_token,ghl_refresh_token,ghl_token_expires_at,v2_access,v15_access&order=business_name.asc`); }
