@@ -73,13 +73,15 @@ async function handler(req, res) {
     return res.status(502).json({ ok: false, error: 'Invalid JSON from GHL' });
   }
 
-  var dateMap = (data && (data._dates_ || data.date)) || {};
-
+  // GHL free-slots returns dates as top-level keys: { "2026-06-26": { slots:[...] }, traceId: "..." }
+  // Filter to only date-shaped keys (YYYY-MM-DD).
+  var DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
   var slots = [];
-  Object.keys(dateMap).forEach(function(date) {
-    var dayData = dateMap[date];
-    var rawSlots = Array.isArray(dayData) ? dayData : (dayData.slots || dayData.openSlots || []);
-    rawSlots.forEach(function(iso) {
+  Object.keys(data || {}).forEach(function(date) {
+    if (!DATE_RE.test(date)) return;
+    var dayData = data[date];
+    var rawSlots = Array.isArray(dayData) ? dayData : (dayData && (dayData.slots || dayData.openSlots || []));
+    (rawSlots || []).forEach(function(iso) {
       if (typeof iso === 'string' && iso) slots.push({ start: iso, date: date });
       else if (iso && iso.startTime) slots.push({ start: iso.startTime, date: date });
     });
