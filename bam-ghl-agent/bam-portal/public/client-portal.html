@@ -20242,10 +20242,26 @@ let _PRICING_FILTER = 'all';
 let _PL_DATA       = null;   // { pipelines:[{id,name,stages,opportunities}], totals:{...} }
 let _PL_PIPELINE   = null;   // currently-selected pipeline id
 let _PL_DRAG_OPP   = null;   // { oppId, fromStageId, pipelineId } during drag
+let _PL_AGENT_MODE = null;   // 'off' | 'hawkeye' | 'self_drive' | null(unknown) - drives the Responded glow
+
+// Load this academy's agent mode once, then re-render so the Responded stage
+// can glow + show its Hawkeye button. Best-effort (403 for non-authorized = no glow).
+async function _plLoadAgentMode() {
+  try {
+    const token = await _mreqAuthToken();
+    const r = await fetch('/api/agent-config', { method: 'POST', headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'list' }) });
+    const j = await _safeJson(r);
+    if (!r.ok) { _PL_AGENT_MODE = 'off'; return; }
+    const row = (j.academies || []).find(a => a.client_id === CLIENT_ID);
+    _PL_AGENT_MODE = (row && row.mode) || 'off';
+  } catch (_) { _PL_AGENT_MODE = 'off'; }
+  try { if (typeof _renderPipelineBoard === 'function') _renderPipelineBoard(); } catch (_) {}
+}
 
 async function fetchAndRenderPipelines() {
   const container = document.getElementById('pl-board-container');
   if (!container) return;
+  if (_PL_AGENT_MODE === null) _plLoadAgentMode();   // fetch once, re-renders on completion
   // Instant render: if the board is already loaded, show it now and refresh in
   // the background instead of blanking to a spinner on every open.
   const hadData = _PL_DATA && Array.isArray(_PL_DATA.pipelines) && _PL_DATA.pipelines.length;
@@ -21004,11 +21020,20 @@ function _renderPipelineBoard() {
       </div>`;
   };
 
+  // When the agent is ON for this academy, the Responded stage glows blue and
+  // gets a full-width Hawkeye button (opens the approval queue) - that's the
+  // stage the agent works.
+  const _agentOn = !!_PL_AGENT_MODE && _PL_AGENT_MODE !== 'off';
   const colHtml = visibleStages.map(s => {
     const opps = (byStage.get(s.id) || []).slice()
       .sort((a, b) => (_plIsTrialToday(b.trialDate) ? 1 : 0) - (_plIsTrialToday(a.trialDate) ? 1 : 0)); // today's trials first
+    const isResponded = /respond/i.test(s.name || '');
+    const glowCol = (isResponded && _agentOn) ? 'box-shadow:0 0 0 1px var(--blue,#5A8FB8),0 0 18px rgba(90,143,184,0.45);border-color:var(--blue,#5A8FB8);' : '';
+    const hawkBtn = (isResponded && _agentOn)
+      ? `<button onclick="_apxOpen()" title="Open the agent approval queue" style="width:100%;box-sizing:border-box;margin-bottom:8px;background:var(--blue-soft,rgba(90,143,184,0.12));color:var(--blue,#5A8FB8);border:1px solid var(--blue,#5A8FB8);border-radius:7px;padding:9px;font-size:12.5px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px">👁 Hawkeye</button>`
+      : '';
     return `
-      <div class="pl-col"
+      <div class="pl-col" style="${glowCol}"
            ondragover="_plDragOver(event,'${escapeHTML(s.id)}')"
            ondragleave="_plDragLeave(event)"
            ondrop="_plDrop(event,'${escapeHTML(s.id)}','${escapeHTML(p.id)}')">
@@ -21017,6 +21042,7 @@ function _renderPipelineBoard() {
           <span class="pl-col-count">${opps.length}</span>
         </div>
         <div class="pl-cards">
+          ${hawkBtn}
           ${opps.length ? opps.map(o => cardHtml(o, s)).join('') : '<div class="pl-empty">No cards here yet.</div>'}
         </div>
       </div>`;
