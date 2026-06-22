@@ -7,8 +7,8 @@ var API_URL = '/api/website/ch3-lead';
 
 var EMPTY = {
   firstName: '', lastName: '', email: '', phone: '',
-  grade: '', experienceLevel: '', desiredStartDate: '', proximity: '',
-  smsConsent: false,
+  grade: '', experienceLevel: '', proximity: '',
+  smsConsent: false, termsAgreed: false,
 };
 
 function App() {
@@ -31,10 +31,9 @@ function App() {
       firstName: form.firstName.trim(),
       lastName:  form.lastName.trim(),
       email:     form.email.trim(),
-      phone:     form.phone.trim(),
+      phone:     window.ch3Iti ? window.ch3Iti.getNumber() : form.phone.trim(),
       grade:     form.grade,
       experienceLevel: form.experienceLevel,
-      desiredStartDate: form.desiredStartDate || '',
       proximity: form.proximity || '',
       smsConsent: true,
       consentTimestamp: new Date().toISOString(),
@@ -50,7 +49,8 @@ function App() {
         if (data.ok) {
           var group = data.group || CH3.getGroup(form.grade) || 'hs';
           var params = 'group=' + encodeURIComponent(group)
-            + '&name=' + encodeURIComponent(form.firstName.trim());
+            + '&name=' + encodeURIComponent(form.firstName.trim())
+            + '&email=' + encodeURIComponent(form.email.trim());
           window.location.href = '/ch3-funnel/calendar.html?' + params;
         } else {
           setApiErr(data.error || 'Something went wrong. Please try again.');
@@ -78,7 +78,7 @@ function App() {
   }
 
   return (
-    <div className="funnel">
+    <div className={'funnel' + (step === 1 ? ' is-step1' : '')}>
       <header className="fheader" style={{ position: 'relative' }}>
         <div className="fheader__brand">CH3 <em>TRAINING</em></div>
         <div className="fheader__step">Step {step} of 2 &middot; {step === 1 ? 'Your info' : 'Your schedule'}</div>

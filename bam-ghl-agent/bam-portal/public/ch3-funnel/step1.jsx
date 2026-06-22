@@ -1,14 +1,27 @@
-/* Step 1 — Contact info + qualifying fields + SMS consent */
+function PhoneInput(props) {
+  var ref = React.useRef(null);
+  React.useEffect(function() {
+    var el = ref.current;
+    if (!el || !window.intlTelInput) return;
+    window.ch3Iti = window.intlTelInput(el, {
+      initialCountry: 'us',
+      separateDialCode: true,
+      preferredCountries: ['us', 'ca', 'gb', 'jm', 'ng', 'gh', 'tt'],
+      countrySearch: true,
+      nationalMode: false,
+    });
+    return function() {
+      if (window.ch3Iti) { window.ch3Iti.destroy(); window.ch3Iti = null; }
+    };
+  }, []);
+  return (
+    <input ref={ref} id="ch3-phone" type="tel"
+      className="field__input" placeholder="Phone number (optional)"
+      autoComplete="tel" />
+  );
+}
 
 var EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
-function digits(s) { return (s || '').replace(/\D/g, ''); }
-function fmtPhone(s) {
-  var d = digits(s).slice(0, 10);
-  if (d.length === 0) return '';
-  if (d.length < 4) return '(' + d;
-  if (d.length < 7) return '(' + d.slice(0, 3) + ') ' + d.slice(3);
-  return '(' + d.slice(0, 3) + ') ' + d.slice(3, 6) + '-' + d.slice(6);
-}
 
 function validateStep1(f) {
   var e = {};
@@ -16,25 +29,10 @@ function validateStep1(f) {
   if (!f.lastName  || !f.lastName.trim())  e.lastName  = 'Enter last name';
   if (!f.email     || !f.email.trim())     e.email     = 'Enter your email';
   else if (!EMAIL_RE.test(f.email.trim())) e.email     = 'Enter a valid email';
-  if (!f.phone     || !f.phone.trim())     e.phone     = 'Enter your phone number';
-  else if (digits(f.phone).length !== 10)  e.phone     = 'Must be 10 digits';
   if (!f.grade     || !f.grade.trim())     e.grade     = 'Select a grade';
   if (!f.experienceLevel || !f.experienceLevel.trim()) e.experienceLevel = 'Select experience level';
-  if (!f.smsConsent) e.smsConsent = 'SMS consent is required to receive your trial session info';
   return { errors: e, valid: Object.keys(e).length === 0 };
 }
-
-var GRADE_OPTIONS = [
-  '5th Grade','6th Grade','7th Grade','8th Grade',
-  '9th Grade','10th Grade','11th Grade','12th Grade','College',
-];
-var EXP_OPTIONS = ['Beginner','Intermediate','Advanced'];
-var PROX_OPTIONS = [
-  "I'm within 15 minutes",
-  'Yes, I can travel there',
-  "I'm farther but willing",
-  'Not sure yet',
-];
 
 function Step1(props) {
   var f = props.form;
@@ -43,88 +41,167 @@ function Step1(props) {
   var v = validateStep1(f);
   var errs = v.errors;
 
-  var touched = React.useState({})[0];
-  var setTouched = React.useState({})[1];
-
   var ref = React.useState({}); var tch = ref[0], setTch = ref[1];
-  function touch(k) { setTch(function (t) { var n = Object.assign({}, t); n[k] = true; return n; }); }
-  function set(k, val) { setF(function (prev) { var n = Object.assign({}, prev); n[k] = val; return n; }); }
+  function touch(k) { setTch(function(t) { var n = Object.assign({}, t); n[k] = true; return n; }); }
+  function set(k, val) { setF(function(prev) { var n = Object.assign({}, prev); n[k] = val; return n; }); }
   function err(k) { return (showErrors || tch[k]) ? errs[k] : null; }
   function ok(k)  { return !errs[k] && f[k] && String(f[k]).trim().length > 0; }
 
   return (
-    <div className="fbody">
-      <h1 className="fstep-title">Let&rsquo;s get <em>started.</em></h1>
-      <p className="fstep-sub">
-        Fill in your details and Coach Haynes will reach out within 24 hours to set up your free session.
-      </p>
+    <div className="fbody s1-split">
 
-      <div className="field__row">
-        <Field name="firstName" label="First name" placeholder="Jordan"
-          autoComplete="given-name" value={f.firstName}
-          onChange={function (x) { set('firstName', x); }} onBlur={function () { touch('firstName'); }}
-          error={err('firstName')} valid={ok('firstName')} />
-        <Field name="lastName" label="Last name" placeholder="Williams"
-          autoComplete="family-name" value={f.lastName}
-          onChange={function (x) { set('lastName', x); }} onBlur={function () { touch('lastName'); }}
-          error={err('lastName')} valid={ok('lastName')} />
-      </div>
-
-      <Field name="email" label="Email" type="email" inputMode="email"
-        placeholder="you@email.com" autoComplete="email" value={f.email}
-        onChange={function (x) { set('email', x); }} onBlur={function () { touch('email'); }}
-        error={err('email')} valid={ok('email')} />
-
-      <Field name="phone" label="Phone" type="tel" inputMode="tel"
-        placeholder="(267) 555-0140" autoComplete="tel" value={f.phone}
-        onChange={function (x) { set('phone', fmtPhone(x)); }} onBlur={function () { touch('phone'); }}
-        error={err('phone')} valid={ok('phone')} />
-
-      <div className="field__row">
-        <SelectField name="grade" label="Grade" placeholder="Select grade"
-          value={f.grade} options={GRADE_OPTIONS}
-          onChange={function (x) { set('grade', x); }} onBlur={function () { touch('grade'); }}
-          error={err('grade')} valid={ok('grade')} />
-        <SelectField name="experienceLevel" label="Experience" placeholder="Select level"
-          value={f.experienceLevel} options={EXP_OPTIONS}
-          onChange={function (x) { set('experienceLevel', x); }} onBlur={function () { touch('experienceLevel'); }}
-          error={err('experienceLevel')} valid={ok('experienceLevel')} />
-      </div>
-
-      <Field name="desiredStartDate" label="When do you want to start?" type="date"
-        value={f.desiredStartDate}
-        onChange={function (x) { set('desiredStartDate', x); }}
-        error={null} valid={ok('desiredStartDate')} />
-
-      <SelectField name="proximity" label="Can you get to 625 N Spring St, Middletown PA?"
-        placeholder="Select one" value={f.proximity} options={PROX_OPTIONS}
-        onChange={function (x) { set('proximity', x); }}
-        error={null} valid={ok('proximity')} />
-
-      <div className={'consent-box' + ((showErrors && errs.smsConsent) ? ' is-error' : '')} style={{ marginTop: 24 }}>
-        <label>
-          <input type="checkbox" checked={!!f.smsConsent}
-            onChange={function (e) { set('smsConsent', e.target.checked); }} />
-          <div className="consent-box__text">
-            I agree to receive SMS messages from CH3 Training LLC about my free trial session and training updates.
-            Reply <b>STOP</b> to opt out, <b>HELP</b> for help. Msg &amp; data rates may apply. Up to 8 messages/month.{' '}
-            <a href="/privacy.html" target="_blank" rel="noopener">Privacy Policy</a>
+      <div className="s1-hero">
+        <div className="s1-hero__content">
+          <div className="s1-hero__eyebrow">CH3 Training · Harrisburg, PA</div>
+          <h1 className="s1-hero__title">YOUR FREE SESSION.</h1>
+          <p className="s1-hero__sub">No commitment. No credit card. Just show up.</p>
+          <div className="s1-hero__stats">
+            <div className="s1-hero__stat">120+ Athletes</div>
+            <div className="s1-hero__stat">5 Yrs</div>
+            <div className="s1-hero__stat">Cap 9</div>
           </div>
-        </label>
-        <div className="consent-tcpa">
-          By checking this box you consent to receive automated text messages. Consent is not a condition of purchase.
+          <blockquote className="s1-hero__quote">
+            "Improved my offensive mechanics and translated directly to in-game success." — Gavin M., Northern HS
+          </blockquote>
         </div>
       </div>
-      {showErrors && errs.smsConsent && (
-        <div className="field__error" style={{ marginTop: 4 }}>{errs.smsConsent}</div>
-      )}
 
-      <div className="reassure">
-        <IcLock size={13} />
-        <span><b>We never share your info.</b> Used only to set up your free session.</span>
+      <div className="s1-form">
+        <div className="s1-form__label">Step 1 of 2</div>
+        <h2 className="s1-form__title">Tell us about <em>yourself.</em></h2>
+        <p className="s1-form__sub">Coach Haynes will reach out within 24 hours.</p>
+
+        <div className="field__row">
+          <div className="field">
+            <label className="field__label" htmlFor="s1-fname">First Name *</label>
+            <input
+              id="s1-fname"
+              className={'field__input' + (err('firstName') ? ' is-error' : ok('firstName') ? ' is-valid' : '')}
+              type="text" autoComplete="given-name" placeholder="First name"
+              value={f.firstName}
+              onChange={function(e) { set('firstName', e.target.value); }}
+              onBlur={function() { touch('firstName'); }} />
+            {err('firstName') && <div className="field__error">{err('firstName')}</div>}
+          </div>
+          <div className="field">
+            <label className="field__label" htmlFor="s1-lname">Last Name *</label>
+            <input
+              id="s1-lname"
+              className={'field__input' + (err('lastName') ? ' is-error' : ok('lastName') ? ' is-valid' : '')}
+              type="text" autoComplete="family-name" placeholder="Last name"
+              value={f.lastName}
+              onChange={function(e) { set('lastName', e.target.value); }}
+              onBlur={function() { touch('lastName'); }} />
+            {err('lastName') && <div className="field__error">{err('lastName')}</div>}
+          </div>
+        </div>
+
+        <div className="field">
+          <label className="field__label" htmlFor="s1-email">Email *</label>
+          <input
+            id="s1-email"
+            className={'field__input' + (err('email') ? ' is-error' : ok('email') ? ' is-valid' : '')}
+            type="email" autoComplete="email" placeholder="you@email.com"
+            value={f.email}
+            onChange={function(e) { set('email', e.target.value); }}
+            onBlur={function() { touch('email'); }} />
+          {err('email') && <div className="field__error">{err('email')}</div>}
+        </div>
+
+        <div className="field">
+          <label className="field__label" htmlFor="ch3-phone">Phone (optional)</label>
+          <PhoneInput />
+        </div>
+
+        <div className="field">
+          <label className="field__label" htmlFor="s1-grade">Grade *</label>
+          <select
+            id="s1-grade"
+            className={'field__input select__input' + (err('grade') ? ' is-error' : ok('grade') ? ' is-valid' : '')}
+            value={f.grade}
+            onChange={function(e) { set('grade', e.target.value); }}
+            onBlur={function() { touch('grade'); }}>
+            <option value="">Select grade…</option>
+            <option value="5">5th Grade</option>
+            <option value="6">6th Grade</option>
+            <option value="7">7th Grade</option>
+            <option value="8">8th Grade</option>
+            <option value="9">9th Grade (Freshman)</option>
+            <option value="10">10th Grade (Sophomore)</option>
+            <option value="11">11th Grade (Junior)</option>
+            <option value="12">12th Grade (Senior)</option>
+            <option value="college">College</option>
+          </select>
+          {err('grade') && <div className="field__error">{err('grade')}</div>}
+        </div>
+
+        <div className="field">
+          <label className="field__label" htmlFor="s1-exp">Experience Level *</label>
+          <select
+            id="s1-exp"
+            className={'field__input select__input' + (err('experienceLevel') ? ' is-error' : ok('experienceLevel') ? ' is-valid' : '')}
+            value={f.experienceLevel}
+            onChange={function(e) { set('experienceLevel', e.target.value); }}
+            onBlur={function() { touch('experienceLevel'); }}>
+            <option value="">Select level…</option>
+            <option value="beginner">Beginner — just starting out</option>
+            <option value="recreational">Recreational — play for fun</option>
+            <option value="school">School team / JV</option>
+            <option value="varsity">Varsity</option>
+            <option value="aau">AAU / Travel ball</option>
+            <option value="college">College athlete</option>
+          </select>
+          {err('experienceLevel') && <div className="field__error">{err('experienceLevel')}</div>}
+        </div>
+
+        <div className="field">
+          <label className="field__label" htmlFor="s1-proximity">How far from Middletown, PA? (optional)</label>
+          <select
+            id="s1-proximity"
+            className="field__input select__input"
+            value={f.proximity}
+            onChange={function(e) { set('proximity', e.target.value); }}>
+            <option value="">Select distance…</option>
+            <option value="under15">Under 15 min</option>
+            <option value="15to30">15–30 min</option>
+            <option value="30to60">30–60 min</option>
+            <option value="over60">Over 60 min</option>
+          </select>
+        </div>
+
+        <div className="consent-row">
+          <label className="consent-item">
+            <input
+              type="checkbox"
+              checked={!!f.smsConsent}
+              onChange={function(e) { set('smsConsent', e.target.checked); }} />
+            <span className="consent-item__text">
+              Text me about sessions &amp; updates. By checking this box, I consent to receive SMS messages from CH3 Training. Msg &amp; data rates may apply. Up to 8 msgs/month. Reply STOP to opt out, HELP for help. Consent is not a condition of purchase.
+            </span>
+          </label>
+
+          <label className="consent-item">
+            <input
+              type="checkbox"
+              checked={!!f.termsAgreed}
+              onChange={function(e) { set('termsAgreed', e.target.checked); }} />
+            <span className="consent-item__text">
+              I agree to CH3 Training's <a href="/privacy.html" target="_blank" rel="noopener">Terms of Service</a> and <a href="/privacy.html" target="_blank" rel="noopener">Privacy Policy</a>.
+            </span>
+          </label>
+        </div>
+
+        <div className="reassure" style={{ marginTop: 16 }}>
+          <svg width="13" height="13" viewBox="0 0 13 13" fill="none" style={{ flexShrink: 0, marginTop: 1 }}>
+            <rect x="2" y="5.5" width="9" height="6.5" rx="1.5" stroke="rgba(255,255,255,0.36)" strokeWidth="1.2" fill="none"/>
+            <path d="M4.5 5.5V3.5a2 2 0 014 0v2" stroke="rgba(255,255,255,0.36)" strokeWidth="1.2" strokeLinecap="round" fill="none"/>
+          </svg>
+          <span>We never share your info.</span>
+        </div>
       </div>
+
     </div>
   );
 }
 
-Object.assign(window, { Step1, validateStep1, fmtPhone, digits });
+Object.assign(window, { Step1, validateStep1, PhoneInput });

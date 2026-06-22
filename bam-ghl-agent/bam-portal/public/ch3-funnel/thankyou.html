@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>You're Booked — CH3 Training</title>
+  <meta name="robots" content="noindex" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Anton&family=Inter+Tight:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:        #0a0a0a;
+      --surface:   #141414;
+      --surface2:  #1c1c1c;
+      --border:    rgba(255,255,255,0.09);
+      --teal:      #00B8C8;
+      --teal-dim:  rgba(0,184,200,0.10);
+      --fg:        #ffffff;
+      --fg-sub:    rgba(255,255,255,0.62);
+      --fg-muted:  rgba(255,255,255,0.36);
+      --green:     #22c55e;
+      --font-d:    'Anton', sans-serif;
+      --font-b:    'Inter Tight', sans-serif;
+      --r:         10px;
+    }
+
+    html, body {
+      background: var(--bg);
+      color: var(--fg);
+      font-family: var(--font-b);
+      min-height: 100vh;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* ── TOPBAR ── */
+    .topbar {
+      position: sticky; top: 0; z-index: 50;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 13px 20px 11px;
+    }
+    .topbar__brand { font-family: var(--font-d); font-size: 17px; letter-spacing: 0.04em; }
+    .topbar__brand em { color: var(--teal); font-style: normal; }
+
+    /* ── BODY ── */
+    .page { max-width: 480px; margin: 0 auto; padding: 48px 20px 60px; text-align: center; }
+
+    /* ── CHECKMARK ── */
+    .check-wrap {
+      width: 72px; height: 72px; border-radius: 50%;
+      background: rgba(34,197,94,0.10);
+      border: 2px solid rgba(34,197,94,0.35);
+      display: flex; align-items: center; justify-content: center;
+      margin: 0 auto 28px;
+    }
+    .check-svg { display: block; }
+    .check-circle {
+      fill: none;
+      stroke: var(--green);
+      stroke-width: 2.5;
+      stroke-dasharray: 200;
+      stroke-dashoffset: 200;
+      animation: drawCircle 0.55s ease forwards;
+    }
+    .check-mark {
+      fill: none;
+      stroke: var(--green);
+      stroke-width: 3;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      stroke-dasharray: 40;
+      stroke-dashoffset: 40;
+      animation: drawMark 0.35s ease 0.5s forwards;
+    }
+    @keyframes drawCircle {
+      to { stroke-dashoffset: 0; }
+    }
+    @keyframes drawMark {
+      to { stroke-dashoffset: 0; }
+    }
+
+    /* ── HEADLINE ── */
+    .headline {
+      font-family: var(--font-d);
+      font-size: 34px;
+      letter-spacing: 0.02em;
+      text-transform: uppercase;
+      line-height: 1.1;
+      margin-bottom: 10px;
+    }
+    .headline em { color: var(--teal); font-style: normal; }
+
+    .sub-text {
+      font-size: 15px;
+      color: var(--fg-sub);
+      font-weight: 500;
+      line-height: 1.55;
+      margin-bottom: 30px;
+    }
+
+    /* ── DETAILS CARD ── */
+    .details-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-left: 3px solid var(--teal);
+      border-radius: var(--r);
+      padding: 18px 20px;
+      text-align: left;
+      margin-bottom: 28px;
+    }
+    .detail-row {
+      display: flex; align-items: flex-start; gap: 12px;
+      padding: 8px 0;
+      border-bottom: 1px solid var(--border);
+      font-size: 14px;
+    }
+    .detail-row:last-child { border-bottom: none; }
+    .detail-row__icon { font-size: 15px; flex-shrink: 0; margin-top: 1px; width: 20px; text-align: center; }
+    .detail-row__text { color: var(--fg); font-weight: 500; line-height: 1.4; }
+    .detail-row__text small { display: block; font-size: 12px; color: var(--fg-muted); font-weight: 500; margin-top: 1px; }
+
+    /* ── CONFIRM NOTE ── */
+    .confirm-note {
+      font-size: 13px; color: var(--fg-muted); font-weight: 500;
+      line-height: 1.55; margin-bottom: 24px;
+    }
+
+    /* ── ADD TO CAL BUTTON ── */
+    .cal-btn {
+      display: inline-flex; align-items: center; gap: 8px;
+      background: none;
+      border: 1.5px solid var(--border);
+      border-radius: var(--r);
+      padding: 12px 22px;
+      color: var(--fg-sub);
+      font-family: var(--font-b); font-size: 14px; font-weight: 600;
+      cursor: pointer; transition: border-color 0.15s, color 0.15s;
+      margin-bottom: 36px;
+    }
+    .cal-btn:hover { border-color: var(--teal); color: var(--teal); }
+
+    /* ── BRING LIST ── */
+    .bring-section { text-align: left; margin-bottom: 30px; }
+    .bring-section__title {
+      font-size: 10px; font-weight: 700; letter-spacing: 0.12em;
+      text-transform: uppercase; color: var(--fg-muted); margin-bottom: 14px;
+    }
+    .bring-list { list-style: none; display: flex; flex-direction: column; gap: 10px; }
+    .bring-list li { display: flex; align-items: center; gap: 10px; font-size: 14px; font-weight: 500; color: var(--fg-sub); }
+    .bring-list li::before {
+      content: '';
+      display: inline-block; width: 6px; height: 6px; border-radius: 50%;
+      background: var(--teal); flex-shrink: 0;
+    }
+
+    /* ── CONTACT LINE ── */
+    .contact-line {
+      font-size: 13px; color: var(--fg-muted); font-weight: 500; line-height: 1.5;
+    }
+    .contact-line a { color: var(--teal); text-decoration: none; }
+    .contact-line a:hover { text-decoration: underline; }
+  </style>
+</head>
+<body>
+
+  <header class="topbar">
+    <div class="topbar__brand">CH3 <em>TRAINING</em></div>
+  </header>
+
+  <div class="page">
+    <div class="check-wrap">
+      <svg class="check-svg" width="40" height="40" viewBox="0 0 40 40">
+        <circle class="check-circle" cx="20" cy="20" r="17" transform="rotate(-90 20 20)" />
+        <path class="check-mark" d="M12 20l6 6 10-12" />
+      </svg>
+    </div>
+
+    <h1 class="headline" id="headline">See you <em id="hl-day">soon</em>!</h1>
+    <p class="sub-text">Your free trial session is confirmed.</p>
+
+    <div class="details-card" id="details-card">
+      <div class="detail-row" id="row-date" style="display:none">
+        <div class="detail-row__icon">📅</div>
+        <div class="detail-row__text" id="detail-date"></div>
+      </div>
+      <div class="detail-row" id="row-time" style="display:none">
+        <div class="detail-row__icon">🕐</div>
+        <div class="detail-row__text" id="detail-time"></div>
+      </div>
+      <div class="detail-row" id="row-location" style="display:none">
+        <div class="detail-row__icon">📍</div>
+        <div class="detail-row__text" id="detail-location"></div>
+      </div>
+      <div class="detail-row" id="row-group" style="display:none">
+        <div class="detail-row__icon">🏀</div>
+        <div class="detail-row__text" id="detail-group"></div>
+      </div>
+    </div>
+
+    <p class="confirm-note">Coach Haynes will send you a text confirmation shortly.</p>
+
+    <button class="cal-btn" id="cal-btn" onclick="addToCalendar()">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <rect x="3" y="4" width="18" height="18" rx="2"/>
+        <path d="M16 2v4M8 2v4M3 10h18"/>
+      </svg>
+      Add to Calendar
+    </button>
+
+    <div class="bring-section">
+      <div class="bring-section__title">What to bring</div>
+      <ul class="bring-list">
+        <li>Basketball shoes</li>
+        <li>Athletic clothes</li>
+        <li>Water bottle</li>
+        <li>Ready to work</li>
+      </ul>
+    </div>
+
+    <p class="contact-line">Questions? Text Coach Haynes: <a href="sms:2672168887">267-216-8887</a></p>
+  </div>
+
+  <script>
+    (function() {
+      var params = new URLSearchParams(window.location.search);
+      var name     = params.get('name') || '';
+      var day      = params.get('day') || '';
+      var date     = params.get('date') || '';
+      var time     = params.get('time') || '';
+      var location = params.get('location') || '';
+      var group    = params.get('group') || '';
+
+      if (day) {
+        document.getElementById('hl-day').textContent = day;
+        document.getElementById('headline').innerHTML =
+          'See you <em style="color:var(--teal)">' + day + (name ? ', ' + name : '') + '</em>!';
+      } else if (name) {
+        document.getElementById('headline').innerHTML =
+          'See you <em style="color:var(--teal)">' + name + '</em>!';
+      }
+
+      function showRow(id, text) {
+        var row = document.getElementById('row-' + id);
+        var val = document.getElementById('detail-' + id);
+        if (text) { row.style.display = 'flex'; val.textContent = text; }
+      }
+
+      if (day && date) showRow('date', day + ', ' + date);
+      else if (date) showRow('date', date);
+
+      if (time) showRow('time', time);
+      if (location) showRow('location', location);
+      if (group) showRow('group', group);
+
+      window._eventData = { day: day, date: date, time: time, location: location, group: group, name: name };
+    })();
+
+    function parseEventTime() {
+      var p = window._eventData;
+      if (!p.date || !p.time) return null;
+
+      var now = new Date();
+      var year = now.getFullYear();
+      var months = { Jan:0, Feb:1, Mar:2, Apr:3, May:4, Jun:5, Jul:6, Aug:7, Sep:8, Oct:9, Nov:10, Dec:11 };
+
+      var dateParts = p.date.match(/([A-Za-z]+)\s+(\d+)/);
+      if (!dateParts) return null;
+      var month = months[dateParts[1]];
+      var dayNum = parseInt(dateParts[2]);
+      if (month === undefined) return null;
+
+      var timeParts = p.time.match(/(\d+):(\d+)\s*(AM|PM)/i);
+      if (!timeParts) return null;
+      var h = parseInt(timeParts[1]);
+      var m = parseInt(timeParts[2]);
+      var ampm = timeParts[3].toUpperCase();
+      if (ampm === 'PM' && h !== 12) h += 12;
+      if (ampm === 'AM' && h === 12) h = 0;
+
+      var start = new Date(year, month, dayNum, h, m, 0);
+      if (start < now) start.setFullYear(year + 1);
+      var end = new Date(start.getTime() + 60 * 60 * 1000);
+      return { start: start, end: end };
+    }
+
+    function toIcsDate(d) {
+      function p(n) { return String(n).padStart(2,'0'); }
+      return d.getFullYear() + p(d.getMonth()+1) + p(d.getDate())
+        + 'T' + p(d.getHours()) + p(d.getMinutes()) + '00';
+    }
+
+    function addToCalendar() {
+      var ev = parseEventTime();
+      var p = window._eventData;
+      var title = 'CH3 Training Free Trial' + (p.name ? ' — ' + p.name : '');
+      var desc = 'Free trial session with Coach Haynes.' + (p.group ? ' Group: ' + p.group + '.' : '');
+      var loc = p.location || '625 N Spring St, Middletown, PA 17057';
+
+      var dtStart, dtEnd;
+      if (ev) {
+        dtStart = toIcsDate(ev.start);
+        dtEnd   = toIcsDate(ev.end);
+      } else {
+        var now = new Date();
+        dtStart = toIcsDate(now);
+        dtEnd   = toIcsDate(new Date(now.getTime() + 3600000));
+      }
+
+      var ics = [
+        'BEGIN:VCALENDAR',
+        'VERSION:2.0',
+        'PRODID:-//CH3 Training//Free Trial//EN',
+        'BEGIN:VEVENT',
+        'DTSTART:' + dtStart,
+        'DTEND:' + dtEnd,
+        'SUMMARY:' + title,
+        'DESCRIPTION:' + desc,
+        'LOCATION:' + loc,
+        'STATUS:CONFIRMED',
+        'END:VEVENT',
+        'END:VCALENDAR',
+      ].join('\r\n');
+
+      var blob = new Blob([ics], { type: 'text/calendar;charset=utf-8' });
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement('a');
+      a.href = url;
+      a.download = 'ch3-free-trial.ics';
+      document.body.appendChild(a);
+      a.click();
+      setTimeout(function() { document.body.removeChild(a); URL.revokeObjectURL(url); }, 100);
+    }
+  </script>
+</body>
+</html>

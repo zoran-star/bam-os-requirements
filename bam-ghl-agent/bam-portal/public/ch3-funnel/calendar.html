@@ -2,8 +2,9 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <title>Book Your Free Trial — CH3 Training</title>
+  <meta name="robots" content="noindex" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Anton&family=Inter+Tight:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet" />
@@ -17,11 +18,10 @@
       --border:    rgba(255,255,255,0.09);
       --teal:      #00B8C8;
       --teal-dim:  rgba(0,184,200,0.10);
-      --teal-glow: rgba(0,184,200,0.18);
       --fg:        #ffffff;
       --fg-sub:    rgba(255,255,255,0.62);
       --fg-muted:  rgba(255,255,255,0.36);
-      --green:     #22c55e;
+      --red:       #ff4d4f;
       --font-d:    'Anton', sans-serif;
       --font-b:    'Inter Tight', sans-serif;
       --r:         10px;
@@ -37,379 +37,503 @@
 
     /* ── TOPBAR ── */
     .topbar {
-      position: sticky;
-      top: 0;
-      z-index: 50;
+      position: sticky; top: 0; z-index: 100;
       background: var(--surface);
       border-bottom: 1px solid var(--border);
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
+      display: flex; align-items: center; justify-content: space-between;
       padding: 13px 20px 11px;
     }
-    .topbar__brand {
-      font-family: var(--font-d);
-      font-size: 17px;
-      letter-spacing: 0.04em;
-    }
+    .topbar__brand { font-family: var(--font-d); font-size: 17px; letter-spacing: 0.04em; }
     .topbar__brand em { color: var(--teal); font-style: normal; }
     .topbar__pill {
-      display: flex;
-      align-items: center;
-      gap: 6px;
+      display: flex; align-items: center; gap: 6px;
       background: var(--teal-dim);
       border: 1px solid rgba(0,184,200,0.22);
-      border-radius: 999px;
-      padding: 4px 10px 4px 8px;
+      border-radius: 999px; padding: 4px 10px 4px 8px;
     }
-    .topbar__pill-dot {
-      width: 6px; height: 6px;
-      border-radius: 50%;
-      background: var(--green);
-      box-shadow: 0 0 6px var(--green);
-      animation: pulse 2s ease-in-out infinite;
-    }
-    .topbar__pill-text {
-      font-size: 11px;
-      font-weight: 600;
-      letter-spacing: 0.07em;
-      text-transform: uppercase;
-      color: var(--teal);
-    }
-    @keyframes pulse {
-      0%, 100% { opacity: 1; }
-      50%       { opacity: 0.4; }
-    }
+    .topbar__pill-text { font-size: 11px; font-weight: 600; letter-spacing: 0.07em; text-transform: uppercase; color: var(--teal); }
 
-    /* ── PROGRESS ── */
-    .progress { height: 2px; background: var(--surface2); }
-    .progress__fill { height: 100%; width: 100%; background: var(--teal); }
+    /* ── MAIN WRAP ── */
+    .wrap { max-width: 520px; margin: 0 auto; padding: 0 16px; }
 
-    /* ── CONFIRM BANNER ── */
-    .confirm-banner {
-      margin: 20px 16px 0;
-      background: rgba(34,197,94,0.08);
-      border: 1px solid rgba(34,197,94,0.22);
-      border-radius: var(--r);
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      padding: 12px 14px;
+    /* ── GROUP TOGGLE ── */
+    .toggle-section { padding: 24px 0 0; }
+    .toggle-label { font-size: 10px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: var(--fg-muted); margin-bottom: 10px; }
+    .toggle { display: flex; gap: 0; background: var(--surface2); border-radius: var(--r); border: 1px solid var(--border); overflow: hidden; }
+    .toggle__btn {
+      flex: 1; padding: 11px 12px; background: none; border: none;
+      font-family: var(--font-b); font-size: 13px; font-weight: 600; color: var(--fg-muted);
+      cursor: pointer; transition: all 0.18s; text-align: center; line-height: 1.3;
     }
-    .confirm-banner__icon {
-      width: 22px; height: 22px;
-      border-radius: 50%;
-      background: var(--green);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      flex-shrink: 0;
+    .toggle__btn small { display: block; font-size: 11px; font-weight: 500; color: var(--fg-muted); margin-top: 1px; }
+    .toggle__btn.is-active {
+      background: var(--teal); color: #000;
     }
-    .confirm-banner__icon svg { display: block; }
-    .confirm-banner__text {
-      font-size: 13px;
-      color: rgba(255,255,255,0.80);
-      line-height: 1.4;
-    }
-    .confirm-banner__text strong { color: var(--fg); }
+    .toggle__btn.is-active small { color: rgba(0,0,0,0.65); }
 
-    /* ── HERO ── */
-    .hero {
-      padding: 24px 16px 0;
+    /* ── SECTION HEADER ── */
+    .section-hd { padding: 22px 0 0; }
+    .section-hd__title { font-family: var(--font-d); font-size: 26px; letter-spacing: 0.02em; text-transform: uppercase; line-height: 1.1; margin-bottom: 4px; }
+    .section-hd__title em { color: var(--teal); font-style: normal; }
+    .section-hd__sub { font-size: 13px; color: var(--fg-muted); font-weight: 500; }
+
+    /* ── SLOT LIST ── */
+    .slot-list { padding: 20px 0 0; }
+    .slot-date-hd { font-size: 10px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: var(--fg-muted); margin: 16px 0 8px; }
+    .slot-date-hd:first-child { margin-top: 0; }
+    .slot-card {
+      width: 100%; background: var(--surface2); border: 1.5px solid var(--border);
+      border-radius: var(--r); padding: 13px 16px; margin-bottom: 8px;
+      display: flex; align-items: center; justify-content: space-between;
+      cursor: pointer; transition: border-color 0.15s, background 0.15s;
+      font-family: var(--font-b);
     }
-    .hero__eyebrow {
-      font-size: 11px;
-      font-weight: 700;
-      letter-spacing: 0.12em;
-      text-transform: uppercase;
-      color: var(--teal);
-      margin-bottom: 8px;
+    .slot-card:hover { border-color: rgba(0,184,200,0.35); background: #1f1f1f; }
+    .slot-card.is-selected { border-color: var(--teal); background: rgba(0,184,200,0.07); }
+    .slot-card__time { font-size: 15px; font-weight: 600; color: var(--fg); }
+    .slot-card__right { display: flex; align-items: center; gap: 6px; }
+    .slot-card__book { font-size: 12px; font-weight: 600; color: var(--teal); }
+    .slot-card__arrow { color: var(--teal); font-size: 14px; }
+
+    .show-more-btn {
+      width: 100%; background: none; border: 1.5px solid var(--border);
+      border-radius: var(--r); padding: 12px 16px; color: var(--fg-sub);
+      font-family: var(--font-b); font-size: 13px; font-weight: 600;
+      cursor: pointer; transition: border-color 0.15s, color 0.15s; margin-top: 4px;
     }
-    .hero__title {
-      font-family: var(--font-d);
-      font-size: 30px;
-      letter-spacing: 0.02em;
-      text-transform: uppercase;
-      line-height: 1.1;
-      margin-bottom: 10px;
-    }
-    .hero__title em { color: var(--teal); font-style: normal; }
-    .hero__sub {
+    .show-more-btn:hover { border-color: rgba(0,184,200,0.3); color: var(--teal); }
+
+    /* ── EMPTY / ERROR STATES ── */
+    .slots-empty {
+      padding: 32px 0;
+      text-align: center;
+      color: var(--fg-muted);
       font-size: 14px;
-      color: var(--fg-sub);
-      line-height: 1.55;
+      line-height: 1.6;
+    }
+    .slots-empty strong { color: var(--fg-sub); display: block; margin-bottom: 6px; font-size: 15px; }
+    .retry-btn {
+      margin-top: 14px; background: none; border: 1px solid var(--border);
+      border-radius: var(--r); padding: 9px 18px; color: var(--fg-sub);
+      font-family: var(--font-b); font-size: 13px; font-weight: 600; cursor: pointer;
+    }
+    .retry-btn:hover { border-color: var(--teal); color: var(--teal); }
+
+    /* ── SKELETON ── */
+    .skeleton { border-radius: var(--r); background: var(--surface2); animation: shimmer 1.4s infinite; }
+    @keyframes shimmer {
+      0%, 100% { opacity: 0.5; }
+      50% { opacity: 1; }
     }
 
-    /* ── GROUP CARD ── */
-    .group-card {
-      margin: 20px 16px 0;
+    /* ── BOOKING DRAWER ── */
+    .drawer-overlay {
+      position: fixed; inset: 0; background: rgba(0,0,0,0.55);
+      z-index: 200; opacity: 0; pointer-events: none;
+      transition: opacity 0.25s;
+    }
+    .drawer-overlay.is-open { opacity: 1; pointer-events: all; }
+    .drawer {
+      position: fixed; bottom: 0; left: 0; right: 0; z-index: 201;
       background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: var(--r);
-      overflow: hidden;
+      border-top: 1px solid var(--border);
+      border-radius: 16px 16px 0 0;
+      max-width: 480px; margin: 0 auto;
+      transform: translateY(100%);
+      transition: transform 0.3s cubic-bezier(0.32, 0.72, 0, 1);
+      padding-bottom: env(safe-area-inset-bottom, 0px);
     }
-    .group-card__header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 12px 14px 10px;
-      border-bottom: 1px solid var(--border);
+    .drawer.is-open { transform: translateY(0); }
+    .drawer__handle {
+      width: 36px; height: 4px; border-radius: 2px;
+      background: rgba(255,255,255,0.18);
+      margin: 12px auto 0;
     }
-    .group-card__name {
-      font-size: 13px;
-      font-weight: 700;
-      letter-spacing: 0.04em;
-      text-transform: uppercase;
+    .drawer__inner { padding: 20px 20px 24px; }
+    .drawer__label { font-size: 10px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: var(--fg-muted); margin-bottom: 14px; }
+    .drawer__slot-badge {
+      display: inline-flex; align-items: center; gap: 8px;
+      background: var(--surface2); border: 1px solid var(--border);
+      border-radius: 8px; padding: 9px 14px; margin-bottom: 6px;
+      font-size: 14px; font-weight: 600; color: var(--fg);
     }
-    .group-card__badge {
-      font-size: 11px;
-      font-weight: 600;
-      color: var(--teal);
-      background: var(--teal-dim);
-      border: 1px solid rgba(0,184,200,0.20);
-      border-radius: 999px;
-      padding: 2px 8px;
+    .drawer__group-badge {
+      display: inline-flex; align-items: center;
+      background: var(--teal-dim); border: 1px solid rgba(0,184,200,0.22);
+      border-radius: 999px; padding: 3px 10px; margin-bottom: 20px;
+      font-size: 11px; font-weight: 600; color: var(--teal); letter-spacing: 0.06em;
     }
-    .group-card__body { padding: 10px 14px 12px; }
-    .sched-row {
-      display: flex;
-      align-items: baseline;
-      gap: 10px;
-      padding: 5px 0;
-      border-bottom: 1px solid var(--border);
-      font-size: 13px;
+    .drawer__divider { height: 1px; background: var(--border); margin: 4px 0 18px; }
+    .d-field { margin-bottom: 14px; }
+    .d-field__label { display: block; font-size: 12px; font-weight: 600; color: var(--fg-sub); margin-bottom: 6px; }
+    .d-field__input {
+      width: 100%; background: var(--bg); border: 1.5px solid var(--border);
+      border-radius: var(--r); color: var(--fg); font-family: var(--font-b);
+      font-size: 15px; font-weight: 500; padding: 11px 14px; outline: none;
+      transition: border-color 0.15s; -webkit-appearance: none;
     }
-    .sched-row:last-child { border-bottom: none; }
-    .sched-row__label {
-      font-weight: 600;
-      color: var(--fg);
-      white-space: nowrap;
-      min-width: 52px;
+    .d-field__input:focus { border-color: var(--teal); }
+    .d-field__input::placeholder { color: var(--fg-muted); }
+    .d-field__row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .drawer__cta {
+      width: 100%; padding: 15px 20px; background: var(--teal); color: #000;
+      font-family: var(--font-d); font-size: 16px; letter-spacing: 0.06em; text-transform: uppercase;
+      border: none; border-radius: var(--r); cursor: pointer; transition: opacity 0.15s;
+      display: flex; align-items: center; justify-content: center; gap: 8px;
+      margin-top: 18px;
     }
-    .sched-row__times { color: var(--fg-sub); }
-    .sched-row--lift .sched-row__label { color: var(--fg-muted); }
-    .sched-row--lift .sched-row__times { color: var(--fg-muted); }
+    .drawer__cta:hover:not(:disabled) { opacity: 0.88; }
+    .drawer__cta:disabled { opacity: 0.4; cursor: not-allowed; }
+    .drawer__back {
+      display: block; width: 100%; background: none; border: none;
+      color: var(--fg-muted); font-family: var(--font-b); font-size: 13px; font-weight: 500;
+      cursor: pointer; padding: 10px 4px; text-align: center; transition: color 0.15s; margin-top: 2px;
+    }
+    .drawer__back:hover { color: var(--fg-sub); }
+    .drawer__error { font-size: 13px; color: var(--red); text-align: center; margin-top: 10px; line-height: 1.4; }
 
-    /* ── WHAT'S FREE banner ── */
-    .free-banner {
-      margin: 14px 16px 0;
-      padding: 11px 14px;
-      background: var(--teal-glow);
-      border: 1px solid rgba(0,184,200,0.20);
-      border-radius: var(--r);
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      font-size: 13px;
-      color: var(--fg-sub);
-    }
-    .free-banner strong { color: var(--teal); }
+    /* spinner */
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .spinner { width: 16px; height: 16px; border: 2px solid rgba(0,0,0,0.25); border-top-color: #000; border-radius: 50%; animation: spin 0.7s linear infinite; flex-shrink: 0; }
 
-    /* ── CALENDAR SECTION ── */
-    .cal-section {
-      margin: 24px 16px 0;
-    }
-    .cal-section__label {
-      font-size: 11px;
-      font-weight: 700;
-      letter-spacing: 0.10em;
-      text-transform: uppercase;
-      color: var(--fg-muted);
-      margin-bottom: 10px;
-    }
-    .cal-frame-wrap {
-      border-radius: var(--r);
-      overflow: hidden;
-      border: 1px solid var(--border);
-      background: var(--surface);
-      position: relative;
-    }
-    .cal-frame-wrap::before {
-      content: 'Loading calendar…';
-      position: absolute;
-      inset: 0;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 13px;
-      color: var(--fg-muted);
-      z-index: 0;
-    }
-    .cal-frame-wrap iframe {
-      position: relative;
-      z-index: 1;
-      width: 100%;
-      border: none;
-      min-height: 680px;
-      display: block;
-      background: transparent;
-    }
+    /* bottom padding */
+    .bottom-pad { height: 60px; }
 
-    /* ── FOOTER NOTE ── */
-    .footer-note {
-      margin: 16px 16px 40px;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      font-size: 12px;
-      color: var(--fg-muted);
-    }
-    .footer-note svg { flex-shrink: 0; }
-
-    /* ── DESKTOP ── */
-    @media (min-width: 680px) {
-      .confirm-banner,
-      .hero,
-      .group-card,
-      .free-banner,
-      .cal-section,
-      .footer-note {
-        max-width: 640px;
-        margin-left: auto;
-        margin-right: auto;
-      }
-      .confirm-banner { margin-top: 28px; }
-      .hero { padding: 28px 0 0; }
+    @media (min-width: 520px) {
+      .drawer { left: 50%; right: auto; transform: translateX(-50%) translateY(100%); width: 480px; }
+      .drawer.is-open { transform: translateX(-50%) translateY(0); }
     }
   </style>
 </head>
 <body>
 
-  <!-- Topbar -->
   <header class="topbar">
     <div class="topbar__brand">CH3 <em>TRAINING</em></div>
     <div class="topbar__pill">
-      <div class="topbar__pill-dot"></div>
       <span class="topbar__pill-text">Free Trial</span>
     </div>
   </header>
-  <div class="progress"><div class="progress__fill"></div></div>
 
-  <!-- Confirm banner -->
-  <div class="confirm-banner">
-    <div class="confirm-banner__icon">
-      <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-        <path d="M2 6l3 3 5-5" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
-      </svg>
+  <div class="wrap">
+    <div class="toggle-section">
+      <div class="toggle-label">Select your group</div>
+      <div class="toggle" id="group-toggle">
+        <button class="toggle__btn" data-group="youth" onclick="switchGroup('youth')">
+          Youth<small>Grades 5–8</small>
+        </button>
+        <button class="toggle__btn" data-group="hs" onclick="switchGroup('hs')">
+          HS / College<small>Grades 9–12+</small>
+        </button>
+      </div>
     </div>
-    <div class="confirm-banner__text">
-      <strong id="confirm-name">You're in.</strong>
-      <span id="confirm-sub"> Pick a time below — your spot is free until you book.</span>
+
+    <div class="section-hd">
+      <h1 class="section-hd__title">Pick your <em>free session.</em></h1>
+      <p class="section-hd__sub">All sessions are free.</p>
     </div>
+
+    <div class="slot-list" id="slot-list"></div>
+    <div class="bottom-pad"></div>
   </div>
 
-  <!-- Hero -->
-  <div class="hero">
-    <div class="hero__eyebrow" id="hero-eyebrow">Your group</div>
-    <h1 class="hero__title">Pick your <em>session.</em></h1>
-    <p class="hero__sub">Choose any open slot. Coach Haynes confirms by text before your first session.</p>
-  </div>
-
-  <!-- Group schedule card -->
-  <div class="group-card" id="group-card">
-    <div class="group-card__header">
-      <span class="group-card__name" id="card-group-name"></span>
-      <span class="group-card__badge" id="card-group-ages"></span>
+  <div class="drawer-overlay" id="drawer-overlay" onclick="closeDrawer()"></div>
+  <div class="drawer" id="drawer">
+    <div class="drawer__handle"></div>
+    <div class="drawer__inner">
+      <div class="drawer__label">Book this slot</div>
+      <div class="drawer__slot-badge" id="drawer-slot-badge">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+        <span id="drawer-slot-text">—</span>
+      </div><br/>
+      <div class="drawer__group-badge" id="drawer-group-badge"></div>
+      <div class="drawer__divider"></div>
+      <div class="d-field__row">
+        <div class="d-field">
+          <label class="d-field__label" for="d-fname">First Name *</label>
+          <input id="d-fname" class="d-field__input" type="text" placeholder="First" autocomplete="given-name" />
+        </div>
+        <div class="d-field">
+          <label class="d-field__label" for="d-lname">Last Name *</label>
+          <input id="d-lname" class="d-field__input" type="text" placeholder="Last" autocomplete="family-name" />
+        </div>
+      </div>
+      <div class="d-field">
+        <label class="d-field__label" for="d-email">Email *</label>
+        <input id="d-email" class="d-field__input" type="email" placeholder="you@email.com" autocomplete="email" />
+      </div>
+      <button class="drawer__cta" id="drawer-cta" onclick="confirmBooking()">
+        Confirm free trial &rarr;
+      </button>
+      <button class="drawer__back" onclick="closeDrawer()">&larr; Choose different time</button>
+      <div class="drawer__error" id="drawer-error" style="display:none"></div>
     </div>
-    <div class="group-card__body" id="card-sched"></div>
-  </div>
-
-  <!-- Free trial note -->
-  <div class="free-banner">
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-      <circle cx="12" cy="12" r="10"/>
-      <path d="M12 8v4M12 16h.01"/>
-    </svg>
-    <span><strong>First session is free.</strong> No payment, no contract. Just show up.</span>
-  </div>
-
-  <!-- Calendar -->
-  <div class="cal-section">
-    <div class="cal-section__label">Available times</div>
-    <div class="cal-frame-wrap">
-      <iframe
-        id="cal-frame"
-        src=""
-        title="Book your free trial session"
-        loading="lazy"
-        allow="payment"
-      ></iframe>
-    </div>
-  </div>
-
-  <!-- Footer -->
-  <div class="footer-note">
-    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-      <rect x="3" y="11" width="18" height="11" rx="2"/>
-      <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
-    </svg>
-    No payment info needed to book your free trial.
   </div>
 
   <script>
     var CALENDARS = {
-      youth: {
-        id:    'sfnJdd2WAk2lHVTymTOh',
-        url:   'https://api.leadconnectorhq.com/widget/booking/sfnJdd2WAk2lHVTymTOh',
-        name:  'Youth Group',
-        ages:  'Grades 5–8',
-        times: [
-          { day: 'Mon',      t: '6:00 – 7:00 PM' },
-          { day: 'Fri',      t: '5:45 – 6:45 PM' },
-          { day: 'Sun',      t: '5:00 – 6:00 PM' },
-        ],
-        lift: [
-          { day: 'Mon & Wed', t: '4:30 – 5:30 PM' },
-          { day: 'Tue & Thu', t: '5:00 – 6:00 PM' },
-        ],
-      },
-      hs: {
-        id:    'f6d7oYjVJRiGr9JPqkow',
-        url:   'https://api.leadconnectorhq.com/widget/booking/f6d7oYjVJRiGr9JPqkow',
-        name:  'HS / College Group',
-        ages:  'Grades 9–12 & College',
-        times: [
-          { day: 'Mon & Wed', t: '7:00 – 8:00 PM' },
-          { day: 'Tue & Thu', t: '6:30 – 7:30 PM' },
-        ],
-        lift: [
-          { day: 'Mon & Wed', t: '4:30 – 5:30 PM' },
-          { day: 'Tue & Thu', t: '5:00 – 6:00 PM' },
-        ],
-      },
+      youth: { id: 'sfnJdd2WAk2lHVTymTOh', label: 'Youth',       ages: 'Grades 5–8',    color: '#00B8C8' },
+      hs:    { id: 'f6d7oYjVJRiGr9JPqkow', label: 'HS / College', ages: 'Grades 9–12+',  color: '#00B8C8' },
     };
 
-    (function () {
-      var params = new URLSearchParams(window.location.search);
-      var group  = (params.get('group') || 'hs').toLowerCase();
-      var name   = params.get('name') || '';
-      var cal    = CALENDARS[group] || CALENDARS.hs;
+    var state = {
+      group: 'hs',
+      slots: [],
+      expanded: false,
+      selectedSlot: null,
+      loading: false,
+      prefillEmail: '',
+      prefillName: '',
+    };
 
-      // Confirm banner
-      if (name) {
-        document.getElementById('confirm-name').textContent = "You're in, " + name + ".";
+    var INITIAL_VISIBLE = 5;
+
+    function pad2(n) { return String(n).padStart(2, '0'); }
+
+    function formatDay(iso) {
+      var d = new Date(iso);
+      var days   = ['SUN','MON','TUE','WED','THU','FRI','SAT'];
+      var months = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
+      return days[d.getDay()] + ', ' + months[d.getMonth()] + ' ' + d.getDate();
+    }
+
+    function formatTime(iso) {
+      var d = new Date(iso);
+      var h = d.getHours(), m = d.getMinutes();
+      var ampm = h >= 12 ? 'PM' : 'AM';
+      var h12 = h % 12 || 12;
+      return h12 + ':' + pad2(m) + ' ' + ampm;
+    }
+
+    function formatShortDate(iso) {
+      var d = new Date(iso);
+      var months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+      return months[d.getMonth()] + ' ' + d.getDate();
+    }
+
+    function formatDayShort(iso) {
+      var d = new Date(iso);
+      var days = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+      return days[d.getDay()];
+    }
+
+    function dateKey(iso) {
+      var d = new Date(iso);
+      return d.getFullYear() + '-' + pad2(d.getMonth()+1) + '-' + pad2(d.getDate());
+    }
+
+    function isoToYMD(iso) { return iso.slice(0,10); }
+
+    function addDays(date, n) {
+      var d = new Date(date);
+      d.setDate(d.getDate() + n);
+      return d.toISOString().slice(0,10);
+    }
+
+    function todayYMD() {
+      return new Date().toISOString().slice(0,10);
+    }
+
+    function switchGroup(g) {
+      state.group = g;
+      state.expanded = false;
+      state.selectedSlot = null;
+      document.querySelectorAll('.toggle__btn').forEach(function(btn) {
+        btn.classList.toggle('is-active', btn.dataset.group === g);
+      });
+      loadSlots();
+    }
+
+    function loadSlots() {
+      var cal = CALENDARS[state.group];
+      var start = todayYMD();
+      var end = addDays(start, 21);
+      var url = '/api/website/ch3-slots?calendarId=' + cal.id
+        + '&startDate=' + start
+        + '&endDate=' + end
+        + '&timezone=America%2FNew_York';
+
+      renderSkeleton();
+      fetch(url)
+        .then(function(r) { if (!r.ok) throw new Error(r.status); return r.json(); })
+        .then(function(data) {
+          state.slots = data.slots || [];
+          state.expanded = false;
+          renderSlots();
+        })
+        .catch(function() {
+          renderError();
+        });
+    }
+
+    function renderSkeleton() {
+      var html = '';
+      for (var i = 0; i < 5; i++) {
+        html += '<div class="skeleton" style="height:48px;margin-bottom:8px;"></div>';
+      }
+      document.getElementById('slot-list').innerHTML = html;
+    }
+
+    function renderError() {
+      document.getElementById('slot-list').innerHTML =
+        '<div class="slots-empty">'
+        + '<strong>Could not load times.</strong>'
+        + 'Try refreshing the page.'
+        + '<br/><button class="retry-btn" onclick="loadSlots()">Retry</button>'
+        + '</div>';
+    }
+
+    function renderSlots() {
+      var slots = state.slots;
+      var listEl = document.getElementById('slot-list');
+
+      if (!slots || slots.length === 0) {
+        listEl.innerHTML =
+          '<div class="slots-empty">'
+          + '<strong>No slots available in the next 3 weeks.</strong>'
+          + 'Text Coach Haynes at <a href="sms:2672168887" style="color:var(--teal)">267-216-8887</a> to get scheduled.'
+          + '</div>';
+        return;
       }
 
-      // Hero eyebrow
-      document.getElementById('hero-eyebrow').textContent = cal.name;
+      var visible = state.expanded ? slots : slots.slice(0, INITIAL_VISIBLE);
 
-      // Group card
-      document.getElementById('card-group-name').textContent = cal.name;
-      document.getElementById('card-group-ages').textContent = cal.ages;
-
-      var schedHtml = '';
-      cal.times.forEach(function (row) {
-        schedHtml += '<div class="sched-row"><span class="sched-row__label">' + row.day + '</span><span class="sched-row__times">' + row.t + '</span></div>';
+      var byDate = {};
+      var dateOrder = [];
+      visible.forEach(function(slot) {
+        var dk = dateKey(slot.start);
+        if (!byDate[dk]) { byDate[dk] = []; dateOrder.push(dk); }
+        byDate[dk].push(slot);
       });
-      schedHtml += '<div style="height:6px"></div>';
-      schedHtml += '<div class="sched-row" style="margin-top:4px"><span class="sched-row__label" style="color:var(--fg-muted);font-size:11px;font-weight:600;letter-spacing:0.06em;text-transform:uppercase">Lift</span><span class="sched-row__times" style="font-size:12px;color:var(--fg-muted)">Included with all groups</span></div>';
-      cal.lift.forEach(function (row) {
-        schedHtml += '<div class="sched-row sched-row--lift"><span class="sched-row__label">' + row.day + '</span><span class="sched-row__times">' + row.t + '</span></div>';
-      });
-      document.getElementById('card-sched').innerHTML = schedHtml;
 
-      // Calendar embed
-      document.getElementById('cal-frame').src = cal.url;
+      var html = '';
+      dateOrder.forEach(function(dk) {
+        html += '<div class="slot-date-hd">' + formatDay(byDate[dk][0].start) + '</div>';
+        byDate[dk].forEach(function(slot) {
+          var sel = state.selectedSlot && state.selectedSlot.start === slot.start;
+          html += '<button class="slot-card' + (sel ? ' is-selected' : '') + '" onclick="selectSlot(\'' + slot.start + '\')">'
+            + '<span class="slot-card__time">' + formatTime(slot.start) + '</span>'
+            + '<span class="slot-card__right">'
+            + '<span class="slot-card__book">Book</span>'
+            + '<span class="slot-card__arrow">›</span>'
+            + '</span>'
+            + '</button>';
+        });
+      });
+
+      if (!state.expanded && slots.length > INITIAL_VISIBLE) {
+        var more = slots.length - INITIAL_VISIBLE;
+        html += '<button class="show-more-btn" onclick="expandSlots()">Show ' + more + ' more slot' + (more !== 1 ? 's' : '') + ' &rarr;</button>';
+      }
+
+      listEl.innerHTML = html;
+    }
+
+    function expandSlots() {
+      state.expanded = true;
+      renderSlots();
+    }
+
+    function selectSlot(isoStart) {
+      state.selectedSlot = { start: isoStart };
+      renderSlots();
+      openDrawer(isoStart);
+    }
+
+    function openDrawer(isoStart) {
+      var cal = CALENDARS[state.group];
+      var timeStr = formatDayShort(isoStart) + ', ' + formatShortDate(isoStart) + ' · ' + formatTime(isoStart);
+      document.getElementById('drawer-slot-text').textContent = timeStr;
+      document.getElementById('drawer-group-badge').textContent = cal.label + ' · ' + cal.ages;
+      document.getElementById('drawer-error').style.display = 'none';
+
+      if (state.prefillName) document.getElementById('d-fname').value = state.prefillName;
+      if (state.prefillEmail) document.getElementById('d-email').value = state.prefillEmail;
+
+      document.getElementById('drawer-overlay').classList.add('is-open');
+      document.getElementById('drawer').classList.add('is-open');
+      document.body.style.overflow = 'hidden';
+    }
+
+    function closeDrawer() {
+      document.getElementById('drawer-overlay').classList.remove('is-open');
+      document.getElementById('drawer').classList.remove('is-open');
+      document.body.style.overflow = '';
+      state.selectedSlot = null;
+      renderSlots();
+    }
+
+    function setDrawerLoading(on) {
+      var btn = document.getElementById('drawer-cta');
+      btn.disabled = on;
+      btn.innerHTML = on
+        ? '<div class="spinner"></div> Booking&hellip;'
+        : 'Confirm free trial &rarr;';
+    }
+
+    function confirmBooking() {
+      var firstName = document.getElementById('d-fname').value.trim();
+      var lastName  = document.getElementById('d-lname').value.trim();
+      var email     = document.getElementById('d-email').value.trim();
+      var errEl     = document.getElementById('drawer-error');
+
+      if (!firstName || !lastName || !email) {
+        errEl.textContent = 'Please fill in your first name, last name, and email.';
+        errEl.style.display = 'block';
+        return;
+      }
+      if (!/\S+@\S+\.\S+/.test(email)) {
+        errEl.textContent = 'Please enter a valid email address.';
+        errEl.style.display = 'block';
+        return;
+      }
+      errEl.style.display = 'none';
+
+      var calendarId = CALENDARS[state.group].id;
+      var start = state.selectedSlot.start;
+
+      setDrawerLoading(true);
+
+      fetch('/api/website/ch3-book', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ calendarId: calendarId, start: start, firstName: firstName, lastName: lastName, email: email }),
+      })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+          setDrawerLoading(false);
+          if (data.ok) {
+            window.location.href = '/ch3-funnel/thankyou.html'
+              + '?name=' + encodeURIComponent(firstName)
+              + '&day=' + encodeURIComponent(data.day || '')
+              + '&date=' + encodeURIComponent(data.shortDate || '')
+              + '&time=' + encodeURIComponent(data.time || '')
+              + '&location=' + encodeURIComponent(data.location || '')
+              + '&group=' + encodeURIComponent(data.group || '');
+          } else {
+            errEl.textContent = data.error || 'Something went wrong. Please try again.';
+            errEl.style.display = 'block';
+          }
+        })
+        .catch(function() {
+          setDrawerLoading(false);
+          errEl.textContent = 'Network error. Please check your connection and try again.';
+          errEl.style.display = 'block';
+        });
+    }
+
+    (function init() {
+      var params = new URLSearchParams(window.location.search);
+      var group = (params.get('group') || 'hs').toLowerCase();
+      if (!CALENDARS[group]) group = 'hs';
+      state.group = group;
+      state.prefillName = params.get('name') || '';
+      state.prefillEmail = params.get('email') || '';
+
+      document.querySelectorAll('.toggle__btn').forEach(function(btn) {
+        btn.classList.toggle('is-active', btn.dataset.group === group);
+      });
+
+      loadSlots();
     })();
   </script>
 </body>
