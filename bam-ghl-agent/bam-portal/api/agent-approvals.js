@@ -208,7 +208,10 @@ async function detectForClient(client) {
 
   // Cap how many contacts we draft per run so a big Responded queue can't burst
   // GHL's rate limit (each draft hits GHL for the thread + Claude).
+  let _first = true;
   for (const item of queue.slice(0, DETECT_CAP)) {
+    if (!_first) await new Promise(r => setTimeout(r, 300));  // smooth GHL bursts
+    _first = false;
     const contactId = item.contact_id;
     if (!contactId) { skipped++; reasons.push(`${item.name || "?"}: no contactId in queue item`); continue; }
     // Dedupe: skip if an active draft exists, or we already answered THIS inbound.
