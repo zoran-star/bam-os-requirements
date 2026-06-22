@@ -305,19 +305,32 @@ async function handlePrepare(req, res) {
 // ── Step 2: callback ──────────────────────────────────────
 async function handleCallback(req, res) {
   const { code, state, error: ghlError, error_description } = req.query;
-  if (ghlError) return redirectBack(res, "error", error_description || String(ghlError));
-  if (!code || !state) return redirectBack(res, "error", "missing code or state");
+  if (ghlError) {
+    console.error("[connect/callback] GHL error:", ghlError, error_description);
+    return redirectBack(res, "error", error_description || String(ghlError));
+  }
+  if (!code || !state) {
+    console.error("[connect/callback] missing code or state. query:", JSON.stringify(req.query));
+    return redirectBack(res, "error", "missing code or state");
+  }
 
   let payload;
   try { payload = verifyState(state); }
-  catch (e) { return redirectBack(res, "error", `state: ${e.message}`); }
+  catch (e) {
+    console.error("[connect/callback] state verify failed:", e.message, "state prefix:", state.slice(0, 40));
+    return redirectBack(res, "error", `state: ${e.message}`);
+  }
   if (!payload.client_id) return redirectBack(res, "error", "state missing client_id");
 
   const clientId     = (process.env.GHL_OAUTH_CLIENT_ID || "").trim();
   const clientSecret = (process.env.GHL_OAUTH_CLIENT_SECRET || "").trim();
   if (!clientId || !clientSecret) {
+    console.error("[connect/callback] GHL OAuth env vars missing. clientId set:", !!clientId, "secret set:", !!clientSecret);
     return redirectBack(res, "error", "GHL OAuth env vars missing");
   }
+
+  const callbackRedirectUri = redirectUri(req);
+  console.log("[connect/callback] exchanging code. client_id:", payload.client_id, "redirect_uri:", callbackRedirectUri);
 
   // Exchange the authorization code for an access + refresh token pair.
   let tok;
@@ -330,15 +343,17 @@ async function handleCallback(req, res) {
         client_secret: clientSecret,
         grant_type:    "authorization_code",
         code,
-        redirect_uri:  redirectUri(req),
+        redirect_uri:  callbackRedirectUri,
         user_type:     "Location",
       }),
     });
     tok = await tokenRes.json();
+    console.log("[connect/callback] token exchange status:", tokenRes.status, "has_token:", !!tok?.access_token, "error:", tok?.error || tok?.message || null);
     if (!tokenRes.ok || !tok?.access_token) {
       return redirectBack(res, "error", tok?.error_description || tok?.error || tok?.message || "token exchange failed");
     }
   } catch (e) {
+    console.error("[connect/callback] token exchange threw:", e.message);
     return redirectBack(res, "error", `token exchange: ${e.message}`);
   }
 
