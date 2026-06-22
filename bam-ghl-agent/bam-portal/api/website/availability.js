@@ -121,9 +121,15 @@ export async function getClientGhlToken(client) {
   if (!client.ghl_access_token) {
     // Fall back to Private Integration API key from GHL_LOCATIONS_JSON.
     // The entry must have apiKeyV2 set to a Private Integration token with calendar scopes.
+    // Match by locationId first (most reliable), then by ghl_kpi_config name.
+    const locs = loadLocations();
+    if (client.ghl_location_id) {
+      const loc = locs.find(l => l.locationId === client.ghl_location_id);
+      if (loc?.apiKeyV2) return loc.apiKeyV2;
+    }
     const locName = client.ghl_kpi_config?.ghl_location;
     if (locName) {
-      const loc = loadLocations().find(l => l.name === locName);
+      const loc = locs.find(l => l.name === locName);
       if (loc?.apiKeyV2) return loc.apiKeyV2;
     }
     throw new Error("academy not connected to GHL (no OAuth token or Private Integration key)");
