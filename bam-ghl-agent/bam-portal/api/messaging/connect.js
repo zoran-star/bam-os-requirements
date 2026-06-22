@@ -300,6 +300,10 @@ async function handleAdminStart(req, res) {
     state,
   });
 
+  // Pre-select the specific location so GHL skips the agency picker.
+  const locationId = (req.query.location_id || "").trim();
+  if (locationId) params.set("locationId", locationId);
+
   res.writeHead(302, { Location: `${GHL_AUTHORIZE_URL}?${params.toString()}` });
   return res.end();
 }
