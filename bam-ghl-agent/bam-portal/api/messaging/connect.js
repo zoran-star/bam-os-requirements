@@ -102,6 +102,10 @@ const SCOPES = [
   "payments/coupons.readonly",
   "payments/coupons.write",
 
+  // Media library (GHL /medias/files API for syncing client assets)
+  "medias.readonly",
+  "medias.write",
+
   // Social planner (subset — medialibrary not available for sub-account apps)
   "socialplanner/post.readonly",
   "socialplanner/post.write",
