@@ -275,6 +275,16 @@ async function handler(req, res) {
     });
   }
 
+  // Audit every send (success or failure) for hard proof + debugging.
+  const logSend = (extra) => sb(`inbox_message_log`, {
+    method: "POST", headers: { Prefer: "return=minimal" },
+    body: JSON.stringify([{
+      client_id: clientId, ghl_contact_id: contactId, channel: type,
+      message: String(message || subject || "(attachment)").slice(0, 1000),
+      sent_by: (ctx.user && ctx.user.email) || null, ...extra,
+    }]),
+  }).catch(() => {});
+
   // Send the message
   let sendResp;
   try {
@@ -284,11 +294,18 @@ async function handler(req, res) {
     if (attachments.length) sendBody.attachments = attachments;
     sendResp = await ghl("POST", `/conversations/messages`, { token, body: sendBody });
   } catch (e) {
+    await logSend({ status: "failed", error: String(e.message || e).slice(0, 500) });
     return res.status(e.status || 502).json({
       error: `GHL send failed: ${e.message}`,
       detail: e.body || null,
     });
   }
+
+  await logSend({
+    status: "sent",
+    ghl_conversation_id: sendResp.conversationId || null,
+    ghl_message_id:      sendResp.messageId      || null,
+  });
 
   return res.status(200).json({
     ok: true,
