@@ -200,7 +200,7 @@ async function handler(req, res) {
   // 1) Kick off the agency consent.
   if (action === "start") {
     const state = signState({ k: "agency", exp: Date.now() + 15 * 60 * 1000 });
-    const params = new URLSearchParams({ response_type: "code", client_id: (process.env.GHL_OAUTH_CLIENT_ID || "").trim(), redirect_uri: redirectUri(req), scope: SCOPES, state });
+    const params = new URLSearchParams({ client_id: (process.env.GHL_OAUTH_CLIENT_ID || "").trim(), redirect_uri: redirectUri(req), scope: SCOPES, state });
     res.writeHead(302, { Location: `${GHL_AUTHORIZE_URL}?${params.toString()}` });
     return res.end();
   }
