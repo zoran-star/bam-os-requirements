@@ -198,6 +198,11 @@ function Step1(props) {
           </svg>
           <span>We never share your info.</span>
         </div>
+
+        <button className="btn-primary s1-desktop-cta" style={{ marginTop: 20 }}
+          onClick={function() { props.onNext && props.onNext(); }}>
+          See my schedule &rarr;
+        </button>
       </div>
 
     </div>

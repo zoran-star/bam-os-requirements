@@ -357,3 +357,9 @@ html, body { background: var(--bg); color: var(--fg); font-family: var(--font-bo
     display: none;
   }
 }
+
+/* Desktop CTA only shows inside the form panel; hidden on mobile (footer handles it) */
+.s1-desktop-cta { display: none; }
+@media (min-width: 860px) {
+  .s1-desktop-cta { display: block; width: 100%; }
+}

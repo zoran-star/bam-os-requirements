@@ -87,7 +87,7 @@ function App() {
         </div>
       </header>
 
-      {step === 1 && <Step1 form={form} setForm={setForm} showErrors={showErr1} />}
+      {step === 1 && <Step1 form={form} setForm={setForm} showErrors={showErr1} onNext={function() { setShowErr1(true); if (s1valid) setStep(2); }} />}
       {step === 2 && <Step2 grade={form.grade} />}
 
       <footer className="fcta">

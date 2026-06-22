@@ -27,37 +27,46 @@ async function handler(req, res) {
   var params = new URLSearchParams({ startDate, endDate, timezone });
   var url = `https://services.leadconnectorhq.com/calendars/${calendarId}/free-slots?${params}`;
 
-  var ghlRes = await fetch(url, {
-    headers: {
-      Authorization: `Bearer ${process.env.GHLKEY}`,
-      Version: '2021-07-28',
-      'Content-Type': 'application/json',
-    },
-  });
+  var ghlRes;
+  try {
+    ghlRes = await fetch(url, {
+      headers: {
+        Authorization: 'Bearer ' + (process.env.GHLKEY || ''),
+        Version: '2021-07-28',
+        Accept: 'application/json',
+      },
+    });
+  } catch (e) {
+    console.error('ch3-slots fetch error:', e.message);
+    return res.status(502).json({ ok: false, error: 'Network error fetching slots' });
+  }
 
   if (!ghlRes.ok) {
     var errText = await ghlRes.text();
-    return res.status(ghlRes.status).json({ error: 'GHL error', detail: errText });
+    console.error('ch3-slots GHL error:', ghlRes.status, errText.slice(0, 200));
+    return res.status(502).json({ ok: false, error: 'GHL error ' + ghlRes.status, detail: errText.slice(0, 200) });
   }
 
-  var data = await ghlRes.json();
+  var data;
+  try { data = await ghlRes.json(); } catch (e) {
+    return res.status(502).json({ ok: false, error: 'Invalid JSON from GHL' });
+  }
 
-  var dateMap = data._dates_ || data.date || {};
+  var dateMap = (data && (data._dates_ || data.date)) || {};
 
   var slots = [];
-  for (var date of Object.keys(dateMap)) {
+  Object.keys(dateMap).forEach(function(date) {
     var dayData = dateMap[date];
-    var rawSlots = Array.isArray(dayData) ? dayData : (dayData.slots || []);
-    for (var iso of rawSlots) {
-      slots.push({ start: iso, date });
-    }
-  }
-
-  slots.sort(function (a, b) {
-    return new Date(a.start) - new Date(b.start);
+    var rawSlots = Array.isArray(dayData) ? dayData : (dayData.slots || dayData.openSlots || []);
+    rawSlots.forEach(function(iso) {
+      if (typeof iso === 'string' && iso) slots.push({ start: iso, date: date });
+      else if (iso && iso.startTime) slots.push({ start: iso.startTime, date: date });
+    });
   });
 
-  return res.status(200).json({ slots });
+  slots.sort(function(a, b) { return new Date(a.start) - new Date(b.start); });
+
+  return res.status(200).json({ ok: true, slots: slots });
 }
 
 export default withSentryApiRoute(handler);
