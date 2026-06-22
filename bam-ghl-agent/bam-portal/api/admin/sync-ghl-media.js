@@ -53,7 +53,7 @@ async function ghlListMedia(token, locationId, type, offset = 0) {
 async function handler(req, res) {
   if (!SB_URL || !SB_KEY) return res.status(500).json({ error: 'Supabase not configured' });
 
-  const secret = (process.env.CRON_SECRET || '').trim();
+  const secret = (process.env.GHL_MEDIA_SYNC_SECRET || process.env.CRON_SECRET || '').trim();
   if (!secret || req.query.key !== secret) return res.status(403).json({ error: 'Forbidden' });
   if (req.method !== 'POST') return res.status(405).json({ error: 'POST required' });
 
