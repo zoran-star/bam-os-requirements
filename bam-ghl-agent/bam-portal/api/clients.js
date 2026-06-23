@@ -1335,6 +1335,63 @@ async function handler(req, res) {
         }
       }
 
+      // ── Onboarding feedback form (staff-triggered, blocking client popup) ──
+      // The client submits with their Bearer token; on success we stamp
+      // clients.onboarding_feedback_submitted_at, which unblocks the portal.
+      if (publicSignupAction === "submit-onboarding-feedback") {
+        if (!hasAuth) return res.status(401).json({ error: "auth required" });
+        const fb = req.body || {};
+        const ofClientId = typeof fb.client_id === "string" ? fb.client_id.trim() : "";
+        if (!ofClientId) return res.status(400).json({ error: "client_id required" });
+
+        const ofTok = (req.headers.authorization || "").slice(7);
+        let ofUserId = null;
+        try {
+          const whoRes = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
+            headers: { apikey: SUPABASE_SERVICE_KEY, Authorization: `Bearer ${ofTok}` },
+          });
+          if (whoRes.ok) { const who = await whoRes.json(); ofUserId = who?.id || null; }
+        } catch (_) { /* fall through */ }
+        if (!ofUserId) return res.status(401).json({ error: "invalid session" });
+
+        // Caller must be an active member of this client (or BAM staff).
+        let ofAllowed = false;
+        try {
+          const mem = await supabaseSelect(`client_users?user_id=eq.${ofUserId}&client_id=eq.${ofClientId}&status=eq.active&select=id`);
+          ofAllowed = Array.isArray(mem) && mem.length > 0;
+        } catch (_) { /* check staff next */ }
+        if (!ofAllowed) {
+          try { const st = await supabaseSelect(`staff?user_id=eq.${ofUserId}&select=id`); ofAllowed = Array.isArray(st) && st.length > 0; } catch (_) {}
+        }
+        if (!ofAllowed) return res.status(403).json({ error: "not your academy" });
+
+        const ratingKeys = ["rating_clarity", "rating_comfort", "rating_strategy", "rating_communication", "rating_confidence"];
+        const textKeys = ["most_helpful", "confusing", "excited_about", "improve", "main_focus", "additional_guidance", "testimonial"];
+        const ofRow = { client_id: ofClientId, submitted_by: ofUserId };
+        const fullName = typeof fb.full_name === "string" ? fb.full_name.trim() : "";
+        if (!fullName) return res.status(400).json({ error: "full_name is required" });
+        ofRow.full_name = fullName;
+        for (const k of ratingKeys) {
+          const n = parseInt(fb[k], 10);
+          if (!Number.isInteger(n) || n < 1 || n > 5) return res.status(400).json({ error: `${k} must be 1-5` });
+          ofRow[k] = n;
+        }
+        for (const k of textKeys) {
+          const v = typeof fb[k] === "string" ? fb[k].trim() : "";
+          if (!v) return res.status(400).json({ error: `${k} is required` });
+          ofRow[k] = v;
+        }
+        try {
+          await supabaseInsert("onboarding_feedback", ofRow);
+          await fetch(`${SUPABASE_URL}/rest/v1/clients?id=eq.${encodeURIComponent(ofClientId)}`, {
+            method: "PATCH",
+            headers: { apikey: SUPABASE_SERVICE_KEY, Authorization: `Bearer ${SUPABASE_SERVICE_KEY}`, "Content-Type": "application/json", Prefer: "return=minimal" },
+            body: JSON.stringify({ onboarding_feedback_submitted_at: new Date().toISOString() }),
+          });
+          return res.status(200).json({ ok: true });
+        } catch (e) { return res.status(500).json({ error: `submit failed: ${e.message}` }); }
+      }
+
       // ── Public self-serve signup path ──
       // /onboarding.html posts {business_name, owner_name, email} with no auth header.
       // Treat as a public signup (creates client + auth user via Supabase invite).
@@ -2337,6 +2394,18 @@ async function handler(req, res) {
             return res.status(400).json({ error: "slack_join_done must be a boolean" });
           }
           patch.slack_join_done_at = v ? new Date().toISOString() : null;
+        }
+
+        // Onboarding feedback form — staff request it from the client Overview
+        // tab. true → stamp requested_at + clear submitted_at so the client
+        // portal hard-blocks until they submit. false → cancel the request.
+        if (wasSet("onboarding_feedback_requested")) {
+          const v = body.onboarding_feedback_requested;
+          if (typeof v !== "boolean") {
+            return res.status(400).json({ error: "onboarding_feedback_requested must be a boolean" });
+          }
+          patch.onboarding_feedback_requested_at = v ? new Date().toISOString() : null;
+          if (v) patch.onboarding_feedback_submitted_at = null;
         }
 
         // Staff override flags for sections normally driven by the
