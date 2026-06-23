@@ -45,5 +45,16 @@ export async function computeQueue(token, locationId) {
     .filter(c => respondedContactIds.has(c.contactId) && String(c.lastMessageDirection || "").toLowerCase() === "inbound")
     .map(c => ({ contact_id: c.contactId, conversation_id: c.id, name: c.fullName || c.contactName || "Unknown", last_message: c.lastMessageBody || "", last_at: toIso(c.lastMessageDate || c.dateUpdated) }))
     .sort((a, b) => new Date(b.last_at || 0) - new Date(a.last_at || 0));
-  return { rs, queue };
+  return { rs, queue, respondedIds: respondedContactIds };
+}
+
+// Just the set of contact ids currently in the Responded stage (any message
+// direction). Used to gate the follow-up engine + prune stale drafts.
+export async function respondedContactIds(token, locationId) {
+  const rs = await respondedStage(token, locationId);
+  if (!rs) return { rs: null, ids: new Set() };
+  const params = new URLSearchParams({ location_id: locationId, pipeline_id: rs.pipelineId, pipeline_stage_id: rs.stageId, limit: "100" });
+  let opps = [];
+  try { const od = await ghl("GET", `/opportunities/search?${params}`, { token }); opps = od.opportunities || od.data || []; } catch (_) {}
+  return { rs, ids: new Set(opps.map(o => o.contactId || o.contact?.id).filter(Boolean)) };
 }
