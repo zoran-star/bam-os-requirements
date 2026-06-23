@@ -37,6 +37,7 @@ import { withSentryApiRoute } from "../_sentry.js";
 import crypto from "node:crypto";
 import { fireOnboardingActivations } from "../onboarding/activations.js";
 import { sendSms } from "../ghl/_core.js";
+import { notifyOwners } from "../_notify-owners.js";
 
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
@@ -461,6 +462,10 @@ async function handleInvoiceFailed(event, connectedAccount, res) {
     db_changes:      { members: { status: { from: member.status, to: "payment_failed" } } },
   });
 
+  // Owner/staff SMS (V1.5/V2, per notification_prefs). Non-fatal.
+  notifyOwners(member.client_id, "payment_failure",
+    `⚠️ Payment failed: ${member.athlete_name || member.parent_name || "a member"}. They're flagged in your portal.`).catch(() => {});
+
   return res.status(200).json({ ok: true, action: "flagged-payment-failed", member_id: member.id });
 }
 
@@ -539,14 +544,24 @@ async function handleInvoiceSucceeded(event, connectedAccount, res) {
           const cRows = await sb(`clients?id=eq.${member.client_id}&select=id,business_name,ghl_location_id,ghl_access_token,ghl_refresh_token,ghl_token_expires_at,staff_notify_phone&limit=1`);
           const client = Array.isArray(cRows) && cRows[0];
           const toPhone = (client && client.staff_notify_phone) || process.env.STAFF_NOTIFY_PHONE || null;
-          if (client && toPhone) {
-            const amt = inv.amount_paid != null ? `$${(inv.amount_paid / 100).toFixed(2)}` : "—";
-            const msg = `🎉 New signup — ${client.business_name || "academy"}\n`
+          const amt = inv.amount_paid != null ? `$${(inv.amount_paid / 100).toFixed(2)}` : "—";
+          if (client) {
+            const signupMsg = `🎉 New signup — ${client.business_name || "academy"}\n`
               + `Athlete: ${member.athlete_name || "—"}\n`
               + `Parent: ${member.parent_name || "—"}${member.parent_email ? " · " + member.parent_email : ""}${member.parent_phone ? " · " + member.parent_phone : ""}\n`
               + `Plan: ${onbSub.metadata.plan || "—"} · ${onbSub.metadata.term || "—"}\n`
               + `Paid: ${amt} · status LIVE`;
-            staffNotify = await sendSms({ client, toPhone, message: msg, contactName: "BAM Staff" });
+            if (toPhone) {
+              staffNotify = await sendSms({ client, toPhone, message: signupMsg, contactName: "BAM Staff" });
+            } else {
+              staffNotify = { ok: false, error: "no staff_notify_phone configured" };
+            }
+            // New owner-notification system (per notification_prefs), separate from
+            // the legacy staff_notify_phone SMS above. new_signup = V2; the same
+            // first-payment moment also fires "new payment" (V1.5/V2).
+            notifyOwners(member.client_id, "new_signup", signupMsg).catch(() => {});
+            notifyOwners(member.client_id, "stripe_payment",
+              `💳 New payment: ${member.athlete_name || member.parent_name || "a member"} — ${amt}`).catch(() => {});
           } else {
             staffNotify = { ok: false, error: "no staff_notify_phone configured" };
           }

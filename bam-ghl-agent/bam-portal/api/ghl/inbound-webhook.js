@@ -1,5 +1,6 @@
 import { withSentryApiRoute } from "../_sentry.js";
 import { pickGhlToken, sendSms } from "./_core.js";
+import { notifyOwners } from "../_notify-owners.js";
 import { respondedStage, contactInRespondedStage } from "../agent/_stage.js";
 import { agentMode, modeIsOn } from "../agent/_mode.js";
 // Vercel Serverless Function — GHL inbound-message webhook  ("P1 Spine")
@@ -156,6 +157,14 @@ async function handler(req, res) {
     console.error("ghl inbound-webhook insert error:", e.message);
     return res.status(200).json({ error: e.message });
   }
+
+  // Owner/staff SMS (V1.5/V2, per notification_prefs). Non-fatal. A snippet of
+  // the reply so the owner knows someone messaged the academy.
+  try {
+    const snip = String(body || "").trim().slice(0, 120);
+    notifyOwners(client.id, "inbox_message",
+      `💬 New ${channel || "message"} in your inbox${snip ? `: "${snip}"` : "."}`).catch(() => {});
+  } catch (_) { /* non-fatal */ }
 
   // Lead just replied → cancel any pending/approved drafts for them (don't text
   // someone who's already talking to us): scheduled follow-ups AND ready replies

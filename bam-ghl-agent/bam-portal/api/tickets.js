@@ -5,6 +5,7 @@ import { withSentryApiRoute } from "./_sentry.js";
 
 import { SYSTEMS_ROLES, SYSTEMS_MANAGER_ROLES } from "./_roles.js";
 import { notifyClientPush } from "./push/_send.js";
+import { notifyOwners } from "./_notify-owners.js";
 
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
@@ -562,6 +563,7 @@ async function handler(req, res) {
         notifyClientPush(t.client_id, "ticket-action-needed", {
           ticketTitle, ticketId: t.id, view: "systems",
         }).catch(() => {});
+        notifyOwners(t.client_id, "ticket_update", `🔔 ${ticketTitle}: action needed in your portal`).catch(() => {});
       } else if (action === "cancel_client_request") {
         postClientSlackNotification(t.client_id,
           `↩️ Request withdrawn — Systems [${code}]`, req);
@@ -585,6 +587,7 @@ async function handler(req, res) {
         notifyClientPush(t.client_id, "ticket-complete", {
           ticketTitle, ticketId: t.id, view: "systems",
         }).catch(() => {});
+        notifyOwners(t.client_id, "ticket_update", `✅ ${ticketTitle}: completed`).catch(() => {});
       } else if (action === "send_for_final_review") {
         postClientSlackNotification(t.client_id,
           `🟢 Final review ready — Systems [${code}]\n_Open the portal to approve or send feedback._`, req);
@@ -592,6 +595,7 @@ async function handler(req, res) {
         notifyClientPush(t.client_id, "ticket-action-needed", {
           ticketTitle, ticketId: t.id, view: "systems",
         }).catch(() => {});
+        notifyOwners(t.client_id, "ticket_update", `🟢 ${ticketTitle}: ready for your final review`).catch(() => {});
       }
 
       return res.status(200).json({ data: enriched[0] });
