@@ -20436,11 +20436,10 @@ let _PL_AGENT_MODE = null;   // 'off' | 'hawkeye' | 'self_drive' | null(unknown)
 async function _plLoadAgentMode() {
   try {
     const token = await _mreqAuthToken();
-    const r = await fetch('/api/agent-config', { method: 'POST', headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'list' }) });
+    const r = await fetch('/api/agent-config', { method: 'POST', headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'get-mode', client_id: CLIENT_ID }) });
     const j = await _safeJson(r);
     if (!r.ok) { _PL_AGENT_MODE = 'off'; return; }
-    const row = (j.academies || []).find(a => a.client_id === CLIENT_ID);
-    _PL_AGENT_MODE = (row && row.mode) || 'off';
+    _PL_AGENT_MODE = j.mode || 'off';
   } catch (_) { _PL_AGENT_MODE = 'off'; }
   try { if (typeof _renderPipelineBoard === 'function') _renderPipelineBoard(); } catch (_) {}
 }
