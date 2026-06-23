@@ -156,7 +156,7 @@ async function draftForContact(token, locationId, clientId, contactId, cfg, opts
     conversationId = convo.id;
   }
   const messages = await threadMessages(token, conversationId);
-  const system = buildSystem(cfg) + await loadContactMemory(sb, clientId, contactId);
+  const system = buildSystem(cfg) + await loadContactMemory(sb, clientId, contactId, { ghl, token, locationId });
   const out = await runAgent(system, messages);
   const agentMsgs = messages.filter(m => m.role === "agent");
   return {

@@ -183,7 +183,7 @@ async function detectForClient(client) {
 
     let decision;
     try {
-      const sys = buildFollowupSystem(cfgBrain, quietHrs) + await loadContactMemory(sb, client.id, contactId);
+      const sys = buildFollowupSystem(cfgBrain, quietHrs) + await loadContactMemory(sb, client.id, contactId, { ghl, token, locationId });
       decision = await runScheduleAgent(sys, transcript);
     } catch (_) { skipped++; continue; }
 
