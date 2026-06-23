@@ -8009,7 +8009,9 @@ Then the call to action."]</div>
         border-radius: 10px;
         margin-bottom: 12px;
         overflow: hidden;
+        transition: border-color 0.12s ease;
       }
+      .guide-card:hover { border-color: var(--line-str); }
       .guide-card > summary {
         list-style: none;
         cursor: pointer;
@@ -8078,8 +8080,11 @@ Then the call to action."]</div>
         background: var(--gold);
         color: #1a1a1a;
         border: 1px solid var(--gold);
+        transition: background 0.15s ease, border-color 0.12s ease, color 0.12s ease;
       }
+      .guide-card-btn:hover { background: var(--gold-hi); border-color: var(--gold-hi); }
       .guide-card-btn.ghost { background: transparent; color: var(--text); border: 1px solid var(--border-med); }
+      .guide-card-btn.ghost:hover { background: transparent; border-color: var(--text-mute); color: var(--text); }
       @media (max-width: 560px) {
         .guide-card-body { padding-left: 16px; }
         .guide-card-sub { display: none; }
