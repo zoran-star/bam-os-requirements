@@ -44,6 +44,7 @@ export default function ResourcesView({ tokens, dark, me }) {
   const [editing, setEditing] = useState(null);       // resource being edited (or {} for new)
   const [showCats, setShowCats] = useState(false);
   const [converting, setConverting] = useState(null); // resource id being converted, or 'all'
+  const [copiedId, setCopiedId] = useState(null);     // resource id whose link was just copied
 
   // Admins + the content/marketing team manage the library. Writes are enforced
   // server-side by RLS is_resource_editor(); this is just the UI gate.
@@ -103,6 +104,33 @@ export default function ResourcesView({ tokens, dark, me }) {
       alert("Delete failed: " + (e.message || String(e)));
     }
   };
+
+  // ─── Share a public link (the `resources` bucket is public) ───
+  // Returns a no-login URL clients can open directly. Prefers a PDF file,
+  // else the first uploaded file. Null when the resource has no file.
+  const shareUrlFor = useCallback((r) => {
+    const files = (r.resource_files || []).filter(f => f.storage_path);
+    if (!files.length) return null;
+    const pick = files.find(f => (f.mime_type || "").includes("pdf")) || files[0];
+    const { data } = supabase.storage.from(STORAGE_BUCKET).getPublicUrl(pick.storage_path);
+    return data?.publicUrl || null;
+  }, []);
+
+  const handleCopyLink = useCallback(async (r) => {
+    const url = shareUrlFor(r);
+    if (!url) { alert("This resource has no shareable file to link to."); return; }
+    try {
+      await navigator.clipboard.writeText(url);
+    } catch {
+      const ta = document.createElement("textarea");
+      ta.value = url; ta.style.position = "fixed"; ta.style.opacity = "0";
+      document.body.appendChild(ta); ta.focus(); ta.select();
+      try { document.execCommand("copy"); } catch { /* ignore */ }
+      document.body.removeChild(ta);
+    }
+    setCopiedId(r.id);
+    setTimeout(() => setCopiedId(c => (c === r.id ? null : c)), 1600);
+  }, [shareUrlFor]);
 
   // ─── Convert legacy PDF(s) → content blocks (AI) ───
   const isLegacyPdf = (r) =>
@@ -241,7 +269,7 @@ export default function ResourcesView({ tokens, dark, me }) {
         }}>
           <div style={{
             display: "grid",
-            gridTemplateColumns: "1fr 120px 70px 110px 185px",
+            gridTemplateColumns: "1fr 120px 70px 110px 280px",
             gap: 0, padding: "12px 16px",
             borderBottom: `1px solid ${tk.borderMed}`,
             fontSize: 11, fontWeight: 600, color: tk.textMute, letterSpacing: "0.06em", textTransform: "uppercase",
@@ -259,7 +287,7 @@ export default function ResourcesView({ tokens, dark, me }) {
             return (
               <div key={r.id} style={{
                 display: "grid",
-                gridTemplateColumns: "1fr 120px 70px 110px 185px",
+                gridTemplateColumns: "1fr 120px 70px 110px 280px",
                 gap: 0, padding: "14px 16px",
                 borderBottom: `1px solid ${tk.border}`,
                 alignItems: "center",
@@ -287,6 +315,13 @@ export default function ResourcesView({ tokens, dark, me }) {
                 <div style={{ fontSize: 13, color: tk.textSub }}>{fileCount}</div>
                 <div style={{ fontSize: 12, color: tk.textSub }}>{formatRelative(r.created_at)}</div>
                 <div style={{ display: "flex", gap: 6, justifyContent: "flex-end" }}>
+                  {shareUrlFor(r) && (
+                    <button onClick={() => handleCopyLink(r)}
+                      style={copiedId === r.id ? btnIconCopied(tk) : btnIcon(tk)}
+                      title="Copy a public link to send to clients (opens the file, no login needed)">
+                      {copiedId === r.id ? "Copied!" : "Copy link"}
+                    </button>
+                  )}
                   {isLegacyPdf(r) && (
                     <button onClick={() => handleConvert(r)} disabled={!!converting} style={btnIcon(tk)}
                       title="Convert this PDF into an interactive page with AI">
@@ -740,6 +775,15 @@ function btnIcon(tk) {
     padding: "6px 10px", borderRadius: 6,
     background: "transparent", border: `1px solid ${tk.border}`,
     color: tk.textSub, fontSize: 12, cursor: "pointer", fontFamily: "inherit",
+  };
+}
+
+function btnIconCopied(tk) {
+  return {
+    ...btnIcon(tk),
+    background: (tk.accent || "#D4B65C") + "22",
+    border: `1px solid ${tk.accent || "#D4B65C"}`,
+    color: tk.accent || "#D4B65C",
   };
 }
 
