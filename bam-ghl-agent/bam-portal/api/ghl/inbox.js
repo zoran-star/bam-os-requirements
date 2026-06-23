@@ -423,8 +423,11 @@ async function handler(req, res) {
   });
   const trainers = [...new Set([...trainerByContact.values()])].sort((a, b) => a.localeCompare(b));
 
-  // Sort by lastMessageDate desc (newest first)
+  // Unread always on top, then by lastMessageDate desc (newest first) within each group.
   annotated.sort((a, b) => {
+    const ua = (a.unreadCount || 0) > 0 ? 1 : 0;
+    const ub = (b.unreadCount || 0) > 0 ? 1 : 0;
+    if (ua !== ub) return ub - ua;
     const ta = a.lastMessageDate ? new Date(a.lastMessageDate).getTime() : 0;
     const tb = b.lastMessageDate ? new Date(b.lastMessageDate).getTime() : 0;
     return tb - ta;
