@@ -152,6 +152,17 @@ Not done (deferred): stale-ticket nudge cron; urgency toggle on budget/remove fl
 - **🎨 Brand card on content tickets:** `ContentView` shows a collapsible Brand card (`BrandCard`) reading `ticket.client.brand_data` — colors (`color_primary/secondary/accent`), fonts (`font_display/body`), logos (`logo_dark/light_url`, `icon_url`), website, notes/stats.
 - **Organic content** is a whole separate pipeline now — see [[project_organic_content]].
 
+## Resource guide cards (PDF placeholders) — 2026-06-23
+
+- 3 client-facing PDF guides ship as static assets in **`bam-portal/public/resources/`**:
+  `bam-paid-ads-explained.pdf`, `bam-organic-content-explained.pdf`, `bam-first-campaign.pdf`.
+  Source/editable copies live outside the repo in `~/Documents/BAM Business/Resources/Content/Content Starter Pack/Portal Guides/`
+  (built via the `bam-business-design` brand from the 3 walkthrough scripts). PLACEHOLDERS until Cam edits the walkthrough videos.
+- Rendered as default-collapsed `<details class="guide-card">` cards in `client-portal.html`:
+  **Ads screen** (top of `#marketing-list .content`) = Paid Ads card then First Campaign card; **Organic screen** (top of `#marketing-organic`, after the back btn) = Organic card.
+  `.guide-card` CSS sits just above the `#marketing-channel-split` styles. Cards only show where the screen shows (ads need `MARKETING_INCLUDED`, organic needs `ORGANIC_CONTENT`).
+- Also to be added to the Resources tab (manual, by Cam).
+
 ## Slack DMs to staff — blocked on a scope (2026-06-18)
 
 - New marketing/content tickets DM **Cam**; on completion the assigned SM is DM'd. `postStaffSlackDM` posts to a Slack user id; Cam = `marketingManagerSlackId()` (env `MARKETING_DM_SLACK_ID` else staff row by email `cameron@byanymeansbusiness.com`).
