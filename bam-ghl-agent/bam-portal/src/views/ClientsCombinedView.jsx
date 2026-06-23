@@ -563,6 +563,16 @@ function StatusPill({ client, tokens }) {
 // Onboarding steps that only BAM staff complete (rendered with a STAFF pill).
 const ONBOARDING_STAFF_ONLY_KEYS = new Set(["trigger_buildout", "ready_for_review"]);
 
+// Systems-build-tracker steps — DERIVED from the systems onboarding ticket, so
+// they can't be hand-toggled in either portal (the checkbox is read-only here).
+const ONBOARDING_DERIVED_KEYS = new Set(["sys_build_draft", "sys_client_review", "sys_revisions"]);
+function sysStepStatusLabel(it) {
+  if (it.completed_at) return "✓ Done";
+  if (it.lit) return "👁 Awaiting client";
+  if (it.ticket_id) return "In progress";
+  return "Pending";
+}
+
 // ─── ONBOARDING tab ─────────────────────────────────────────────────────────
 // Exact mirror of the client's onboarding action items (/api/action-items) —
 // the SAME 19-step checklist shown to the client. A progress bar at the top is
@@ -643,15 +653,19 @@ function OnboardingTab({ client, tokens, session, onChanged }) {
         {items.map(it => {
           const isDone = !!it.completed_at;
           const staffOnly = ONBOARDING_STAFF_ONLY_KEYS.has(it.onboarding_key);
+          const derived = ONBOARDING_DERIVED_KEYS.has(it.onboarding_key);
           return (
             <div key={it.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "11px 2px", borderBottom: `1px solid ${t.borderSoft || t.border}` }}>
-              <button onClick={() => toggle(it)} disabled={busyId === it.id} style={{
+              <button onClick={() => { if (!derived) toggle(it); }} disabled={busyId === it.id || derived} title={derived ? "Auto — mirrors the systems ticket" : ""} style={{
                 width: 22, height: 22, borderRadius: 6, flexShrink: 0,
-                border: `1px solid ${isDone ? t.green : t.border}`, background: isDone ? t.green : "transparent",
-                color: "#0A0A0B", cursor: busyId === it.id ? "wait" : "pointer", fontSize: 13, fontWeight: 800,
+                border: `1px ${derived ? "dashed" : "solid"} ${isDone ? t.green : t.border}`, background: isDone ? t.green : "transparent",
+                color: "#0A0A0B", cursor: derived ? "default" : (busyId === it.id ? "wait" : "pointer"), fontSize: 13, fontWeight: 800,
                 display: "flex", alignItems: "center", justifyContent: "center",
               }}>{isDone ? "✓" : ""}</button>
               <span style={{ flex: 1, fontSize: 14, color: isDone ? t.textMute : t.text, textDecoration: isDone ? "line-through" : "none" }}>{it.title}</span>
+              {derived && (
+                <span style={{ fontSize: 11, color: it.lit ? t.accent : t.textMute, fontWeight: it.lit ? 700 : 500, whiteSpace: "nowrap" }}>{sysStepStatusLabel(it)}</span>
+              )}
               {staffOnly && (
                 <span style={{ fontSize: 9, color: t.amber, border: `1px solid ${t.amber}55`, borderRadius: 4, padding: "1px 5px", textTransform: "uppercase", letterSpacing: "0.08em" }}>staff</span>
               )}
@@ -2551,19 +2565,21 @@ function ActionItemsTab({ client, tokens, session }) {
   // someone overrides them by hand.
   function onbRow(it) {
     const auto = _AI_ONB_AUTO.has(it.onboarding_key);
+    const derived = ONBOARDING_DERIVED_KEYS.has(it.onboarding_key);
     const isDone = !!it.completed_at;
     const note = _AI_ONB_NOTES[it.onboarding_key];
     return (
-      <div key={it.id} style={{ display: "flex", alignItems: "flex-start", gap: 12, padding: "11px 14px", background: t.surfaceEl, border: `1px solid ${t.border}`, borderRadius: 8, marginBottom: 8, opacity: isDone ? 0.6 : 1 }}>
+      <div key={it.id} style={{ display: "flex", alignItems: "flex-start", gap: 12, padding: "11px 14px", background: t.surfaceEl, border: `1px solid ${it.lit ? t.accent : t.border}`, borderRadius: 8, marginBottom: 8, opacity: isDone ? 0.6 : 1 }}>
         <input type="checkbox" checked={isDone}
-          onChange={() => toggle(it)}
-          title={auto ? "Auto-completes when connected — or tick by hand" : ""}
-          style={{ width: 18, height: 18, marginTop: 2, cursor: "pointer", accentColor: t.accent }} />
+          onChange={() => { if (!derived) toggle(it); }}
+          disabled={derived}
+          title={derived ? "Auto — mirrors the systems ticket" : (auto ? "Auto-completes when connected — or tick by hand" : "")}
+          style={{ width: 18, height: 18, marginTop: 2, cursor: derived ? "default" : "pointer", accentColor: t.accent }} />
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontSize: 14, fontWeight: 600, color: t.text, textDecoration: isDone ? "line-through" : "none" }}>{it.title}</div>
           {note && <div style={{ fontSize: 12, color: t.textMute, marginTop: 3, lineHeight: 1.45 }}>{note}</div>}
         </div>
-        <span style={_aiChipStyle(t)}>{isDone ? "✓ Done" : (auto ? "Auto · waiting" : "To do")}</span>
+        <span style={{ ..._aiChipStyle(t), ...(it.lit ? { color: t.accent, borderColor: t.accent } : {}) }}>{derived ? sysStepStatusLabel(it) : (isDone ? "✓ Done" : (auto ? "Auto · waiting" : "To do"))}</span>
       </div>
     );
   }

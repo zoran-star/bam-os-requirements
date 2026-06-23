@@ -238,25 +238,38 @@ const ONBOARDING_STEPS = [
   // Staff-only: hidden from clients. Checking it CREATES the systems ticket.
   // Sits right AFTER the SM call — the build gets scoped on that call.
   { key: "trigger_buildout", title: "Trigger systems buildout",         sort: 12, col: "systems_buildout_triggered_at", writable: true, staff_only: true },
-  { key: "book_call_cam",  title: "Book a call with Cam (marketing)",    sort: 13, col: "cam_call_booked_at",          writable: true },
+  // ── Systems build tracker (3 steps) — DERIVED from the systems onboarding
+  // ticket (clients.systems_onboarding_ticket_id), never hand-toggled. Their
+  // state mirrors the ticket's status (see loadSystemsTrackerState):
+  //   build first draft → in_progress/in_review (done once first draft is sent)
+  //   for review by client → final_review (LIT, client approves in Systems tab)
+  //   systems team revisions → post-review work (done when ticket = done)
+  // "For review by client" is the actionable one: it lights up the moment the
+  // first draft is sent and deep-links into the ticket's approve/feedback block.
+  { key: "sys_build_draft",   title: "Systems team building first draft", sort: 13, ticket_derived: true },
+  { key: "sys_client_review", title: "For review by client",              sort: 14, ticket_derived: true },
+  { key: "sys_revisions",     title: "Systems team revisions",            sort: 15, ticket_derived: true },
+  { key: "book_call_cam",  title: "Book a call with Cam (marketing)",    sort: 16, col: "cam_call_booked_at",          writable: true },
   // Self-serve marketing setup — replaces the old "Book a call with Ximena"
   // and "Submit your raw content" steps. Client connects their ad account via
   // the Leadsie share link, then launches campaigns in the Marketing tab
   // (each campaign collects budget + assets via the new-campaign wizard).
-  { key: "connect_ads",    title: "Connect your ad account",             sort: 14, col: "ads_connected_at",            writable: true },
-  { key: "add_campaign",   title: "Add a new campaign",                  sort: 15, col: "content_submitted_at",        writable: true },
+  { key: "connect_ads",    title: "Connect your ad account",             sort: 17, col: "ads_connected_at",            writable: true },
+  { key: "add_campaign",   title: "Add a new campaign",                  sort: 18, col: "content_submitted_at",        writable: true },
   // Staff-only gate. Flipping it UNLOCKS the client's "Book review call" step.
-  { key: "ready_for_review", title: "Ready for review call?",           sort: 16, col: "ready_for_review_at",         writable: true, staff_only: true },
+  { key: "ready_for_review", title: "Ready for review call?",           sort: 19, col: "ready_for_review_at",         writable: true, staff_only: true },
   // Client step — locked (greyed) until ready_for_review is done.
-  { key: "book_review_call", title: "Book review call with Scaling Manager", sort: 17, col: "review_call_booked_at", writable: true, locked_by: "ready_for_review" },
+  { key: "book_review_call", title: "Book review call with Scaling Manager", sort: 20, col: "review_call_booked_at", writable: true, locked_by: "ready_for_review" },
   // ── V1.5-only steps (tier:"v15") — only seeded for V1.5 academies; V2/V1
   // never see them. They get tier-gated in syncOnboardingItems. ──
-  { key: "v15_athlete_map", title: "Map your athlete-name field", sort: 18, col: "athlete_map_done_at", writable: true, tier: "v15" },
-  { key: "v15_kpi_setup",   title: "Connect your KPIs",           sort: 19, col: "kpi_setup_done_at",   writable: true, tier: "v15" },
+  { key: "v15_athlete_map", title: "Map your athlete-name field", sort: 21, col: "athlete_map_done_at", writable: true, tier: "v15" },
+  { key: "v15_kpi_setup",   title: "Connect your KPIs",           sort: 22, col: "kpi_setup_done_at",   writable: true, tier: "v15" },
 ];
 const ONBOARDING_BY_KEY = Object.fromEntries(ONBOARDING_STEPS.map(s => [s.key, s]));
-const ONBOARDING_SIGNAL_COLS = [...new Set(ONBOARDING_STEPS.map(s => s.col))].join(",");
+// Only steps backed by a clients column — ticket-derived steps have no `col`.
+const ONBOARDING_SIGNAL_COLS = [...new Set(ONBOARDING_STEPS.filter(s => s.col).map(s => s.col))].join(",");
 const ONBOARDING_STAFF_ONLY = new Set(ONBOARDING_STEPS.filter(s => s.staff_only).map(s => s.key));
+const ONBOARDING_TICKET_DERIVED = new Set(ONBOARDING_STEPS.filter(s => s.ticket_derived).map(s => s.key));
 const ONBOARDING_TIER_KEYS = new Set(ONBOARDING_STEPS.filter(s => s.tier).map(s => s.key));
 // Which steps apply to a client of a given tier (no `tier` = all tiers).
 function onboardingStepsForTier(isV15) {
@@ -268,12 +281,50 @@ async function loadClientSignals(clientId) {
   return (Array.isArray(rows) && rows[0]) || {};
 }
 
+// Derive the 3 systems-build-tracker steps from the client's systems onboarding
+// ticket (clients.systems_onboarding_ticket_id). Returns:
+//   { ticketId, status, lit, done: { <key>: completedTimestamp | null } }
+//   • sys_build_draft  done once the first draft was sent to the client (the
+//     ticket reached final_review at least once)
+//   • sys_client_review done ONLY when the client approved (ticket = done);
+//     `lit` = true while the ticket sits in final_review (ball in client's court)
+//   • sys_revisions    done when the ticket is done/resolved
+// No ticket (or cancelled) → everything pending.
+async function loadSystemsTrackerState(clientId) {
+  const crows = await sb(`clients?id=eq.${clientId}&select=systems_onboarding_ticket_id`);
+  const ticketId = (crows && crows[0] && crows[0].systems_onboarding_ticket_id) || null;
+  const empty = { ticketId, status: null, lit: false, done: { sys_build_draft: null, sys_client_review: null, sys_revisions: null } };
+  if (!ticketId) return empty;
+  const trows = await sb(`tickets?id=eq.${ticketId}&select=id,status,resolved_at,updated_at,messages`);
+  const t = trows && trows[0];
+  if (!t || t.status === "cancelled") return { ...empty, status: t ? t.status : null };
+
+  const msgs = Array.isArray(t.messages) ? t.messages : [];
+  const sent = msgs.filter(m => m && m.body === "(sent to client for final review)");
+  const everSent = sent.length > 0 || t.status === "final_review" || t.status === "done";
+  const firstSentAt = sent.length ? sent[0].created_at : (t.updated_at || null);
+  const isDone = t.status === "done";
+  const resolvedAt = t.resolved_at || t.updated_at || null;
+  return {
+    ticketId: t.id,
+    status: t.status,
+    lit: t.status === "final_review",
+    done: {
+      sys_build_draft:   everSent ? firstSentAt : null,
+      sys_client_review: isDone ? resolvedAt : null,
+      sys_revisions:     isDone ? resolvedAt : null,
+    },
+  };
+}
+
 // Idempotently ensure all onboarding steps exist for this client, then
 // reconcile each against its clients-row column. Safe to call on every GET.
-async function syncOnboardingItems(clientId) {
+async function syncOnboardingItems(clientId, tracker) {
   const signals = await loadClientSignals(clientId);
   const isV15 = signals.v15_access === true;
   const steps = onboardingStepsForTier(isV15);
+  // Ticket-derived steps mirror the systems onboarding ticket (load once).
+  if (steps.some(s => s.ticket_derived) && !tracker) tracker = await loadSystemsTrackerState(clientId);
   const applicableKeys = new Set(steps.map(s => s.key));
   const existing = await sb(
     `action_items?client_id=eq.${clientId}&onboarding_key=not.is.null&select=id,onboarding_key,completed_at,onboarding_overridden,sort_order`
@@ -290,7 +341,11 @@ async function syncOnboardingItems(clientId) {
   }
 
   for (const step of steps) {
-    const colVal = signals[step.col] || null; // timestamp or null
+    // Done-timestamp source: a clients column for normal steps, the systems
+    // ticket for ticket-derived steps.
+    const colVal = step.ticket_derived
+      ? ((tracker && tracker.done[step.key]) || null)
+      : (signals[step.col] || null); // timestamp or null
     const row = byKey[step.key];
 
     if (!row) {
@@ -318,7 +373,7 @@ async function syncOnboardingItems(clientId) {
     // Writable steps always mirror col (toggling writes col, so they're already
     // consistent; this picks up changes made via the BB "mark done" buttons).
     // Signal steps mirror col UNLESS a human overrode the step by hand.
-    const respectOverride = !step.writable && row.onboarding_overridden;
+    const respectOverride = !step.ticket_derived && !step.writable && row.onboarding_overridden;
     if (!respectOverride) {
       const shouldBeDone = !!colVal;
       if (!!row.completed_at !== shouldBeDone) {
@@ -386,13 +441,23 @@ async function handler(req, res) {
       if (!canAccess(ctx, clientId)) return res.status(403).json({ error: "not your academy" });
 
       // Seed missing onboarding steps + reconcile auto ones before listing.
-      await syncOnboardingItems(clientId);
+      const tracker = await loadSystemsTrackerState(clientId);
+      await syncOnboardingItems(clientId, tracker);
 
       const items = await sb(
         `action_items?client_id=eq.${clientId}&select=*` +
         // open first (completed_at null), then soonest due, then newest
         `&order=completed_at.asc.nullsfirst,due_date.asc.nullslast,created_at.desc`
       );
+      // Decorate the systems-build-tracker steps so the UIs can glow the "For
+      // review by client" step and deep-link it to the ticket.
+      for (const it of (items || [])) {
+        if (it.onboarding_key && ONBOARDING_TICKET_DERIVED.has(it.onboarding_key)) {
+          it.ticket_id = tracker.ticketId;
+          it.ticket_status = tracker.status;
+          it.lit = it.onboarding_key === "sys_client_review" ? tracker.lit : false;
+        }
+      }
       // Staff-only onboarding steps (e.g. trigger_buildout) are hidden from clients.
       let visibleItems = items || [];
       if (!ctx.isStaff) {
@@ -469,6 +534,10 @@ async function handler(req, res) {
       // Staff-only steps (e.g. trigger_buildout) can't be toggled by clients.
       if (obStep && obStep.staff_only && !ctx.isStaff) {
         return res.status(403).json({ error: "staff only" });
+      }
+      // Ticket-derived steps mirror the systems ticket — they can't be hand-toggled.
+      if (obStep && obStep.ticket_derived && "completed" in b) {
+        return res.status(400).json({ error: "this step updates automatically from the systems ticket" });
       }
 
       const patch = {};
