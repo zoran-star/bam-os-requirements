@@ -11,12 +11,18 @@ staff-portal page. Any field on any row is editable by anyone who can see it.
 > ```
 > 1 slack · 2 connect_stripe* · 3 create_ghl · 4 connect_ghl*
 > 5 general_info · 6 staff · 7 locations · 8 brand · 9 kpis · 10 offers
-> 11 book_call(SM) · 12 trigger_buildout🔒 · 13 book_call_cam
-> 14 connect_ads · 15 add_campaign · 16 ready_for_review🔒 · 17 book_review_call
->   (*auto from a connect signal · 🔒 = staff-only, hidden from clients)
+> 11 book_call(SM) · 12 trigger_buildout🔒
+> 13 sys_build_draft⚙ · 14 sys_client_review⚙★ · 15 sys_revisions⚙   ← NEW 2026-06-23
+> 16 book_call_cam · 17 connect_ads · 18 add_campaign
+> 19 ready_for_review🔒 · 20 book_review_call   (+ v15: 21 athlete_map · 22 kpi_setup)
+>   (*auto from a connect signal · 🔒 = staff-only, hidden from clients ·
+>    ⚙ = ticket-derived, mirrors the systems onboarding ticket, not hand-toggleable ·
+>    ★ = lights up gold when it's the client's turn)
 >   marketing-onboarding restructure 2026-06-17: REMOVED submit_content +
 >   book_call_ximena; ADDED connect_ads (Leadsie link, col ads_connected_at) +
->   add_campaign (opens new-campaign wizard, col content_submitted_at). Still 17 steps.
+>   add_campaign (opens new-campaign wizard, col content_submitted_at).
+>   2026-06-23: ADDED the 3-step systems build tracker after trigger_buildout
+>   (see "Systems build tracker" section below). Now 20 base steps (+2 v15).
 > ```
 >
 > **UX:** first login → 2-step welcome → ACTION ITEMS. Onboarding renders as a **subway map** (circle nodes + line) inside a **collapsible gold "🚀 Onboarding" card that DISAPPEARS once all steps done**; ad-hoc to-dos are a separate collapsible "Tasks" panel. `book_review_call` is **locked/greyed until staff flip `ready_for_review`**.
@@ -146,6 +152,45 @@ GET also returns `mktg` (first `marketing_manager` = **Cam**, link set 2026-06-0
   staff auto-set = `_AI_ONB_AUTO` (ClientsCombinedView.jsx).
 - To add a step: extend `ONBOARDING_STEPS` in `api/action-items.js`, add to `ONB_UI` (client)
   + `_AI_ONB_AUTO` (staff) if auto, and backfill existing clients.
+
+## Systems build tracker — 3 ticket-derived steps (2026-06-23)
+
+After `trigger_buildout` (12) the subway now shows a **3-step tracker for the
+systems build**, sort 13-15: **`sys_build_draft`** ("Systems team building first
+draft") · **`sys_client_review`** ("For review by client") · **`sys_revisions`**
+("Systems team revisions"). All 3 are **client-visible** but **derived from the
+systems onboarding ticket** (`clients.systems_onboarding_ticket_id`) — they are
+NOT hand-toggleable (new `ticket_derived:true` flag; PATCH `completed` on them 400s,
+both staff portals render the checkbox read-only).
+
+**State derivation** (`loadSystemsTrackerState()` in `api/action-items.js`, from the
+ticket's `status` + `messages`):
+- `sys_build_draft` done once the **first draft was sent** (ticket reached
+  `final_review` at least once — detected via a `(sent to client for final review)`
+  message OR status final_review/done).
+- `sys_client_review` done **ONLY when the client approves** (ticket `status='done'`);
+  `lit:true` while ticket sits in **`final_review`** (ball in client's court). Re-glows
+  if it bounces back to final_review after revisions.
+- `sys_revisions` done when ticket `status='done'`.
+
+The GET decorates these 3 items with `ticket_id` + `ticket_status` + `lit`.
+`syncOnboardingItems(clientId, tracker)` takes the tracker (loaded once in GET) and
+sets `completed_at` from `tracker.done[key]` instead of a clients column.
+
+**Client UI** (`_aiSysStopHTML` in client-portal.html, keys in `_AI_SYS_TRACKER_KEYS`):
+the "For review by client" stop **glows gold** (CSS `.ai-stop-circle.lit` + `aiLitPulse`)
+with a **"Review the build →"** CTA → `_aiOpenTicket(ticket_id)` → opens the ticket's
+existing approve/feedback block in the **Systems tab** (which already pins+golds
+`final_review` tickets). So the review surfaces in TWO places: the onboarding tracker
+(lit step) and the Systems tab — same underlying ticket.
+
+**Staff UI** (`ClientsCombinedView.jsx`, `ONBOARDING_DERIVED_KEYS` + `sysStepStatusLabel`):
+both onboarding mirrors (OverviewTab `ClientOnboardingItems` + ActionItemsTab `onbRow`)
+render these read-only with a status chip (✓ Done / 👁 Awaiting client / In progress / Pending).
+
+**Note:** the gold "🚀 Onboarding" card now persists through the entire systems build
+(it only hides when ALL steps incl. these 3 are done = ticket approved). No migration —
+`syncOnboardingItems` seeds the keys + re-syncs `sort_order` lazily on every GET.
 
 ## Gotchas / future
 

@@ -668,6 +668,10 @@
   .ai-stop-line { width: 2px; flex: 1; min-height: 14px; background: var(--line); border-radius: 2px; margin: 3px 0; }
   .ai-stop.done .ai-stop-line { background: var(--accent); }
   .ai-stop:last-child .ai-stop-line { display: none; }
+  /* Systems-build tracker: "For review by client" lights gold when it's the client's turn. */
+  .ai-stop-circle.lit { background: rgba(232,191,96,0.18); border-color: var(--accent); color: var(--accent); font-size: 14px; cursor: default; animation: aiLitPulse 1.8s ease-in-out infinite; }
+  .ai-stop.lit .ai-stop-title { color: var(--accent); font-weight: 700; }
+  @keyframes aiLitPulse { 0%,100% { box-shadow: 0 0 0 2px rgba(232,191,96,0.16); } 50% { box-shadow: 0 0 0 6px rgba(232,191,96,0.30); } }
   .ai-stop-body { flex: 1; min-width: 0; padding: 3px 0 22px; }
   .ai-stop:last-child .ai-stop-body { padding-bottom: 4px; }
   .ai-stop-title { font-size: 14px; font-weight: 600; color: var(--text); word-break: break-word; }
@@ -20242,7 +20246,12 @@ function _renderActionItems() {
 
 const _AI_CHECK_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><path d="M20 6L9 17l-5-5"/></svg>';
 
+// The 3 systems-build-tracker stops are DERIVED from the systems onboarding
+// ticket (not hand-toggleable) - rendered by _aiSysStopHTML below.
+const _AI_SYS_TRACKER_KEYS = ['sys_build_draft', 'sys_client_review', 'sys_revisions'];
+
 function _aiOnbHTML(it) {
+  if (_AI_SYS_TRACKER_KEYS.includes(it.onboarding_key)) return _aiSysStopHTML(it);
   const cfg = ONB_UI[it.onboarding_key] || {};
   const isDone = !!it.completed_at;
   // book_review_call is locked (greyed, non-interactive) until staff flip the
@@ -20287,6 +20296,48 @@ function _aiOnbHTML(it) {
     <div class="ai-stop-body">
       <div class="ai-stop-title">${escapeHTML(it.title)}</div>
       <div class="ai-stop-meta">${status}${cta}</div>
+    </div>
+  </div>`;
+}
+
+// Render one of the 3 systems-build-tracker stops. State comes from the systems
+// onboarding ticket (decorated onto these items by the API): completed_at = done,
+// `lit` = the ticket is in final_review (client's turn), `ticket_id` for the CTA.
+// "For review by client" glows gold + deep-links into the ticket's approve block.
+function _aiSysStopHTML(it) {
+  const draft  = _AI_ITEMS.find(i => i.onboarding_key === 'sys_build_draft')   || {};
+  const review = _AI_ITEMS.find(i => i.onboarding_key === 'sys_client_review') || {};
+  const ticketId = it.ticket_id || review.ticket_id || draft.ticket_id || null;
+  const st = it.ticket_status || review.ticket_status || draft.ticket_status || null;
+  const draftDone = !!draft.completed_at;
+  const lit = !!review.lit;
+  const isDone = !!it.completed_at;
+  const k = it.onboarding_key;
+
+  let circleClass = '', circleInner = '', chip = '', cta = '', litStop = false;
+  if (k === 'sys_client_review' && lit && !isDone) {
+    litStop = true;
+    circleClass = ' lit'; circleInner = '👁';
+    chip = `<span class="ai-chip" style="color:#E8C547;border-color:rgba(232,191,96,0.5)">★ Ready for your review</span>`;
+    cta = ticketId ? `<button class="ai-onb-cta" onclick="_aiOpenTicket('${escapeHTML(ticketId)}')">Review the build →</button>` : '';
+  } else if (isDone) {
+    circleClass = ' on'; circleInner = _AI_CHECK_ICON;
+    chip = `<span class="ai-chip" style="color:#7BC47F">✓ Done</span>`;
+  } else {
+    let label;
+    if (!ticketId) label = 'Pending';
+    else if (k === 'sys_build_draft') label = '🛠 In progress';
+    else if (k === 'sys_client_review') label = draftDone ? 'Awaiting next review' : 'Waiting for first draft';
+    else label = (draftDone && st && st !== 'final_review') ? '🛠 In progress' : 'Pending';
+    chip = `<span class="ai-chip">${escapeHTML(label)}</span>`;
+  }
+
+  const circle = `<span class="ai-stop-circle${circleClass}" aria-hidden="true">${circleInner}</span>`;
+  return `<div class="ai-stop${isDone ? ' done' : ''}${litStop ? ' lit' : ''}">
+    <div class="ai-stop-rail">${circle}<div class="ai-stop-line"></div></div>
+    <div class="ai-stop-body">
+      <div class="ai-stop-title">${escapeHTML(it.title)}</div>
+      <div class="ai-stop-meta">${chip}${cta}</div>
     </div>
   </div>`;
 }
