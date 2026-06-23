@@ -20,8 +20,9 @@ import { assemblePrompt } from "./agent/prompt-structure.js";
 import { buildAgentSystem } from "./agent/brain.js";
 import { loadContactMemory } from "./agent/contact-memory.js";
 import { loadCalendars, calendarForGroup, freeSlots, summarizeSlots } from "./agent/booking.js";
-import { respondedStage, contactInRespondedStage, computeQueue } from "./agent/_stage.js";
+import { respondedStage, contactInRespondedStage, computeQueue, respondedContactIdSetCached, peekRespondedIdSet } from "./agent/_stage.js";
 import { agentMode, modeIsOn, shouldAutoSend } from "./agent/_mode.js";
+import { withinQuietHours, nextSendableTime } from "./agent/_quiet.js";
 import { resolveAgentActor } from "./agent/_auth.js";
 
 const SUPABASE_URL         = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
@@ -281,8 +282,29 @@ async function detectForClient(client) {
   } catch (_) {}
 
   const cfg = await loadConfig(client.id);
-  let drafted = 0, autoSent = 0, skipped = 0, escalated = 0, lostProposed = 0;
+  let drafted = 0, autoSent = 0, skipped = 0, escalated = 0, lostProposed = 0, deferred = 0, flushed = 0;
   const reasons = [];   // diagnostic: why each contact was skipped
+
+  // Flush held replies: drafts parked during quiet hours (8:00am-9:30pm) whose
+  // send time has now arrived. Only inside the window; only if the lead is STILL in
+  // Responded (else cancel — they booked/moved/lost while we waited).
+  if (withinQuietHours()) {
+    try {
+      const held = await sb(`agent_ready_replies?client_id=eq.${client.id}&status=eq.approved&send_after=lte.${new Date().toISOString()}&select=id,ghl_contact_id,draft_message&order=send_after.asc&limit=40`);
+      for (const row of (Array.isArray(held) ? held : [])) {
+        if (row.ghl_contact_id && !respondedIds.has(row.ghl_contact_id)) {
+          await sb(`agent_ready_replies?id=eq.${row.id}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ status: "canceled", send_error: "left Responded stage", updated_at: new Date().toISOString() }) });
+          continue;
+        }
+        if (!row.draft_message || !String(row.draft_message).trim()) continue;
+        try {
+          await sendReplyViaGhl(token, row.ghl_contact_id, row.draft_message);
+          await sb(`agent_ready_replies?id=eq.${row.id}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ status: "sent", auto_sent: true, sent_at: new Date().toISOString(), updated_at: new Date().toISOString() }) });
+          flushed++;
+        } catch (e) { reasons.push(`flush ${row.ghl_contact_id}: send failed — ${e.message}`); }
+      }
+    } catch (_) {}
+  }
 
   // Cap how many contacts we draft per run so a big Responded queue can't burst
   // GHL's rate limit (each draft hits GHL for the thread + Claude).
@@ -358,7 +380,19 @@ async function detectForClient(client) {
     }
 
     const auto = shouldAutoSend(mode, { confidence: d.confidence, escalate: d.escalate });
-    if (auto) {
+    if (auto && !withinQuietHours()) {
+      // Quiet hours: don't text a parent after 9:30pm / before 8am. Hold the
+      // approved draft and let the flush step send it in the morning.
+      try {
+        await sb(`agent_ready_replies`, { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify([{
+          client_id: client.id, ghl_contact_id: String(contactId), ghl_conversation_id: d.conversation_id || null,
+          contact_name: item.name || null, draft_message: d.reply, reasoning: d.reasoning || null, confidence: d.confidence,
+          asked_to_book: d.asked_to_book, reply_count: d.reply_count, booking_asks: d.booking_asks, last_message: d.last_message || null,
+          last_lead_at: item.last_at || null, status: "approved", send_after: nextSendableTime().toISOString(), created_by: "self-drive",
+        }]) });
+        deferred++;
+      } catch (e) { skipped++; reasons.push(`${item.name || contactId}: defer-insert failed — ${e.message}`); }
+    } else if (auto) {
       try {
         await sendReplyViaGhl(token, contactId, d.reply);
         await sb(`agent_ready_replies`, { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify([{
@@ -384,7 +418,7 @@ async function detectForClient(client) {
       } catch (e) { skipped++; reasons.push(`${item.name || contactId}: pending-insert failed — ${e.message}`); }
     }
   }
-  return { client_id: client.id, business: client.business_name, mode, queued: queue.length, drafted, auto_sent: autoSent, escalated, lost_proposed: lostProposed, skipped, pruned, reasons };
+  return { client_id: client.id, business: client.business_name, mode, queued: queue.length, drafted, auto_sent: autoSent, deferred, flushed, escalated, lost_proposed: lostProposed, skipped, pruned, reasons };
 }
 
 async function runDetect(res, onlyClientId) {
@@ -458,7 +492,25 @@ async function handler(req, res) {
     // approved drafts for this academy, newest first.
     if (b.action === "list-ready") {
       const rows = await sb(`agent_ready_replies?client_id=eq.${clientId}&status=in.(pending,approved)&select=*&order=created_at.desc&limit=100`);
-      return res.status(200).json({ ready: Array.isArray(rows) ? rows : [], count: Array.isArray(rows) ? rows.length : 0 });
+      let list = Array.isArray(rows) ? rows : [];
+      // Read-time Responded gate: the detector cron prunes drafts when a lead
+      // leaves Responded, but until it runs the stale card lingers. Hide any row
+      // whose contact is no longer in the Responded stage. Fail OPEN (show the
+      // unfiltered list) if GHL is unreachable or the academy has no Responded
+      // stage — a possibly-stale card beats an empty inbox.
+      try {
+        const client = await loadClient(clientId);
+        const loc = client && client.ghl_location_id;
+        // Hot path: a warm cache lets us skip the GHL token fetch entirely (the
+        // count refresh hits this often — keep it cheap, per the note above).
+        let ids = loc ? peekRespondedIdSet(loc) : undefined;
+        if (ids === undefined && loc) {
+          const creds = await pickGhlToken(client);
+          if (creds) ids = await respondedContactIdSetCached(creds.token, loc);
+        }
+        if (ids) list = list.filter(r => !r.ghl_contact_id || ids.has(r.ghl_contact_id));
+      } catch (_) { /* fail open */ }
+      return res.status(200).json({ ready: list, count: list.length });
     }
     if (b.action === "skip-ready") {
       if (!b.ready_id) return res.status(400).json({ error: "ready_id required" });
@@ -507,6 +559,23 @@ async function handler(req, res) {
       const rsSend = await respondedStage(token, locationId);
       if (!rsSend || !(await contactInRespondedStage(token, locationId, b.contact_id, rsSend))) {
         return res.status(409).json({ error: "This lead is no longer in the Responded stage — not sending." });
+      }
+      // QUIET HOURS: a human approved this after 9:30pm / before 8am. Don't text the
+      // parent now — hold the approved reply and let the detect cron flush it at 8am.
+      if (!withinQuietHours()) {
+        const sendAfter = nextSendableTime().toISOString();
+        const held = {
+          client_id: clientId, ghl_contact_id: b.contact_id, ghl_conversation_id: b.conversation_id || null,
+          contact_name: b.contact_name || null, draft_message: String(b.reply), reasoning: b.reasoning || null,
+          confidence: typeof b.confidence === "number" ? b.confidence : null, reply_count: typeof b.reply_count === "number" ? b.reply_count : null,
+          booking_asks: typeof b.booking_asks === "number" ? b.booking_asks : null,
+          status: "approved", send_after: sendAfter, approved_by: staffEmail, approved_at: new Date().toISOString(), updated_at: new Date().toISOString(),
+        };
+        try {
+          if (b.ready_id) await sb(`agent_ready_replies?id=eq.${encodeURIComponent(b.ready_id)}&client_id=eq.${clientId}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify(held) });
+          else await sb(`agent_ready_replies`, { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify([{ ...held, created_by: staffEmail }]) });
+        } catch (e) { return res.status(500).json({ error: `couldn't schedule: ${e.message}` }); }
+        return res.status(200).json({ ok: true, sent: false, deferred: true, send_after: sendAfter });
       }
       // Send via GHL (human-approved).
       try {
