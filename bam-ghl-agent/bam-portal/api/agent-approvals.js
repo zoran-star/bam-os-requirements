@@ -622,10 +622,15 @@ async function handler(req, res) {
     // Confirm a Lost suggestion: optionally send the warm closing message, then
     // mark the lead's opportunity Lost in GHL with the reason, and close the row.
     if (b.action === "confirm-lost") {
-      if (!b.ready_id) return res.status(400).json({ error: "ready_id required" });
-      const [row] = await sb(`agent_ready_replies?id=eq.${encodeURIComponent(b.ready_id)}&client_id=eq.${clientId}&select=*`);
-      if (!row) return res.status(404).json({ error: "not found" });
-      const contactId = row.ghl_contact_id;
+      // Works from a ready-row (ready_id) OR straight from a contact (contact_id),
+      // so you can mark Lost from a reply OR a follow-up card.
+      let row = null, contactId = b.contact_id || null;
+      if (b.ready_id) {
+        [row] = await sb(`agent_ready_replies?id=eq.${encodeURIComponent(b.ready_id)}&client_id=eq.${clientId}&select=*`);
+        if (!row) return res.status(404).json({ error: "not found" });
+        contactId = row.ghl_contact_id;
+      }
+      if (!contactId) return res.status(400).json({ error: "ready_id or contact_id required" });
       // Find this contact's opportunity so we can set its status.
       let oppId = null;
       try {
@@ -635,15 +640,17 @@ async function handler(req, res) {
         oppId = pick && pick.id;
       } catch (e) { return res.status(e.status || 502).json({ error: `GHL find opp: ${e.message}` }); }
       if (!oppId) return res.status(200).json({ error: "No opportunity found for this contact — nothing to mark lost." });
-      // Send the warm closing message first, if the agent wrote one and staff kept it.
-      const closing = (typeof b.reply === "string" ? b.reply : row.draft_message) || "";
+      // Send a closing message only if one was explicitly provided.
+      const closing = (typeof b.reply === "string" ? b.reply : (row ? row.draft_message : "")) || "";
       if (closing.trim()) { try { await sendReplyViaGhl(token, contactId, closing.trim()); } catch (_) {} }
       try {
         await ghl("PUT", `/opportunities/${encodeURIComponent(oppId)}`, { token, body: { status: "lost" } });
       } catch (e) { return res.status(e.status || 502).json({ error: `GHL mark lost: ${e.message}` }); }
-      const reason = (b.lost_reason || row.lost_reason || "").toString().trim() || null;
+      const reason = (b.lost_reason || (row && row.lost_reason) || "").toString().trim() || null;
       try { await sb(`pipeline_outcomes`, { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify([{ client_id: clientId, opportunity_id: oppId, status: "lost", reason }]) }); } catch (_) {}
-      try { await sb(`agent_ready_replies?id=eq.${encodeURIComponent(b.ready_id)}&client_id=eq.${clientId}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ status: "sent", approved_by: staffEmail, approved_at: new Date().toISOString(), sent_at: new Date().toISOString(), updated_at: new Date().toISOString() }) }); } catch (_) {}
+      // Clear ALL of this lead's queued cards (replies + follow-ups) — they're Lost now.
+      try { await sb(`agent_ready_replies?client_id=eq.${clientId}&ghl_contact_id=eq.${encodeURIComponent(contactId)}&status=in.(pending,approved)`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ status: "sent", approved_by: staffEmail, approved_at: new Date().toISOString(), sent_at: new Date().toISOString(), updated_at: new Date().toISOString() }) }); } catch (_) {}
+      try { await sb(`agent_followups?client_id=eq.${clientId}&ghl_contact_id=eq.${encodeURIComponent(contactId)}&status=in.(pending,approved)`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ status: "canceled", send_error: "marked lost", updated_at: new Date().toISOString() }) }); } catch (_) {}
       return res.status(200).json({ ok: true, marked_lost: true, opportunity_id: oppId, reason });
     }
 
