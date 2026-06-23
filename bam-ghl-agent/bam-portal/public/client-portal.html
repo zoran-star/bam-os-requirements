@@ -21824,13 +21824,20 @@ function _apxTrim(s, n) { s = String(s || ''); return s.length > n ? s.slice(0, 
 
 // Shared card context: a 2-3 sentence convo summary + the lead's last message
 // AND our last message, so you have the whole picture at a glance.
+// The recent conversation, inline on the card (lead left / us right). Tappable
+// to open the full thread. Falls back to last_message/last_outbound for old rows.
 function _apxContext(r) {
-  const sum = r.summary ? `<div style="font-size:12px;color:var(--text-sub);margin-bottom:6px;line-height:1.45">📋 ${escapeHTML(r.summary)}</div>` : '';
-  const lead = (r.last_message || r.last_lead_at)
-    ? `<div style="font-size:11.5px;color:var(--text-mute);margin-bottom:3px">💬 Lead${r.last_lead_at ? ` · ${escapeHTML(_apxAgo(r.last_lead_at))}` : ''}${r.last_message ? `: "${escapeHTML(_apxTrim(r.last_message, 90))}"` : ''}</div>`
-    : '';
-  const ours = r.last_outbound ? `<div style="font-size:11.5px;color:var(--text-mute);margin-bottom:6px">🤖 Us: "${escapeHTML(_apxTrim(r.last_outbound, 90))}"</div>` : '';
-  return sum + lead + ours;
+  let tail = Array.isArray(r.thread_tail) ? r.thread_tail.slice() : [];
+  if (!tail.length) {
+    if (r.last_outbound) tail.push({ role: 'agent', text: r.last_outbound });
+    if (r.last_message) tail.push({ role: 'lead', text: r.last_message });
+  }
+  if (!tail.length) return '';
+  const bubbles = tail.map(m => {
+    const out = m.role === 'agent';
+    return `<div style="max-width:84%;align-self:${out ? 'flex-end' : 'flex-start'};background:${out ? 'rgba(232,197,71,.13)' : 'rgba(255,255,255,.05)'};border:1px solid ${out ? 'var(--accent-border,rgba(232,197,71,.3))' : 'var(--border)'};color:var(--text);padding:6px 10px;border-radius:12px;font-size:12.5px;line-height:1.4;word-break:break-word">${escapeHTML(_apxTrim(m.text, 240))}</div>`;
+  }).join('');
+  return `<div onclick="_apxOpenCardThread('${r.id}')" title="Tap for the full conversation" style="display:flex;flex-direction:column;gap:5px;margin:4px 0 8px;max-height:230px;overflow-y:auto;cursor:pointer">${bubbles}</div>`;
 }
 
 function _apxCard(kind, r) {
@@ -21847,19 +21854,19 @@ function _apxCard(kind, r) {
   const sendFn = isFu ? `_apxFollowupSend('${r.id}')` : `_apxReadySend('${r.id}')`;
   const editFn = isFu ? `_apxFollowupEdit('${r.id}')` : `_apxReadyEdit('${r.id}')`;
   const skipFn = isFu ? `_apxFollowupSkip('${r.id}')` : `_apxReadySkip('${r.id}')`;
+  const approveFn = isFu ? `_apxFollowupSend('${r.id}')` : `_apxReadyApprove('${r.id}')`;
   return `<div id="apx-${r.id}" style="background:var(--surface);border:1px solid var(--accent-border,rgba(232,197,71,.3));border-radius:11px;padding:12px 14px;margin-bottom:9px">
     <div style="display:flex;align-items:center;gap:8px;margin-bottom:5px;flex-wrap:wrap">
       <span style="font-weight:700;font-size:13.5px">${escapeHTML(r.contact_name || 'Lead')}</span>
       ${overBadge}
       <div style="flex:1"></div>${meta}
-    </div>${goal}${last}${esc}
-    <div style="font-size:13.5px;line-height:1.5;background:rgba(255,255,255,.03);border-radius:8px;padding:8px 10px;white-space:pre-wrap;cursor:pointer" id="apx-msg-${r.id}" onclick="_apxOpenCardThread('${r.id}')" title="Tap to see the full conversation">${escapeHTML(r.draft_message || '')}</div>
-    <div style="display:flex;align-items:center;gap:7px;margin-top:8px;flex-wrap:wrap">
-      <button onclick="_apxOpenCardThread('${r.id}')" style="background:transparent;border:1px solid var(--border);color:var(--text-mute);border-radius:7px;padding:5px 10px;font-size:12px;cursor:pointer">💬 chat</button>
-      <div style="flex:1"></div>
-      <button onclick="${editFn}" style="background:transparent;border:1px solid var(--border);color:var(--text-sub);border-radius:7px;padding:5px 11px;font-size:12px;cursor:pointer">✎ edit</button>
-      <button onclick="${skipFn}" style="background:transparent;border:1px solid var(--border);color:#e07070;border-radius:7px;padding:5px 11px;font-size:12px;cursor:pointer">✕ skip</button>
-      <button onclick="${sendFn}" style="background:var(--accent);border:1px solid var(--accent);color:#08080A;border-radius:7px;padding:5px 13px;font-size:12px;font-weight:700;cursor:pointer">${overdue ? '✓ send now' : '✓ send'}</button>
+    </div>${goal}${esc}${last}
+    <div style="text-align:center;font-size:9.5px;color:var(--text-mute);text-transform:uppercase;letter-spacing:.09em;margin:2px 0 5px">proposed reply</div>
+    <div style="font-size:13.5px;line-height:1.5;background:var(--accent-glow,rgba(232,197,71,.10));border:1px solid var(--accent-border,rgba(232,197,71,.3));border-radius:10px;padding:9px 11px;white-space:pre-wrap" id="apx-msg-${r.id}">${escapeHTML(r.draft_message || '')}</div>
+    <div style="display:flex;align-items:stretch;gap:8px;margin-top:10px">
+      <button onclick="${skipFn}" title="Skip (and optionally teach why)" style="flex:1;background:transparent;border:1px solid var(--border);color:#e0654f;border-radius:9px;padding:9px;font-size:17px;cursor:pointer">✕</button>
+      <button onclick="${editFn}" title="Edit the message" style="flex:1;background:transparent;border:1px solid var(--border);color:#9a7bd6;border-radius:9px;padding:9px;font-size:15px;cursor:pointer">🔄</button>
+      <button onclick="${approveFn}" title="${overdue ? 'Approve & send now' : 'Approve & send'}" style="flex:1;background:var(--accent);border:1px solid var(--accent);color:#08080A;border-radius:9px;padding:9px;font-size:17px;font-weight:700;cursor:pointer">✓</button>
     </div>
   </div>`;
 }
@@ -22050,6 +22057,30 @@ async function _apxFollowupEdit(id) {
         catch (e) { _apxToast(_apxErr(e), false); return; }
       }
       if (lesson) await _apxTeach(lesson, before, text || before, { source: 'hawkeye-followup', contact: r.contact_name || null });
+    },
+  });
+}
+
+// ✓ Approve: confirm, optionally teach why it's good, then send.
+async function _apxReadyApprove(id) {
+  const r = _APX_DATA.ready.find(x => x.id === id); if (!r) return;
+  if (r._isFollowup) return _apxFollowupSend(id);
+  _apxEditModal({
+    title: 'Send this reply to ' + (r.contact_name || 'the lead') + '?',
+    hideText: true, teachable: true, saveLabel: 'Approve & send',
+    teachLabel: 'Why is this a good reply? (optional - teaches the agent)',
+    teachPlaceholder: 'e.g. good - leads with the free trial, no price talk',
+    onSave: async (_t, lesson) => {
+      if (r.escalate && !confirm('The agent escalated this one (it wanted a human). Send the draft anyway?')) return;
+      try {
+        await _apxPost('/api/agent-approvals', 'send', {
+          contact_id: r.ghl_contact_id, reply: r.draft_message, conversation_id: r.ghl_conversation_id || null,
+          contact_name: r.contact_name || null, reasoning: r.reasoning || null, confidence: r.confidence,
+          reply_count: r.reply_count, booking_asks: r.booking_asks, ready_id: r.id,
+        });
+        if (lesson) await _apxTeach(lesson, r.draft_message, r.draft_message, { source: 'hawkeye-approve', contact: r.contact_name || null });
+        _apxRemove(id); _apxToast(lesson ? '✓ Sent + taught' : '✓ Sent', true);
+      } catch (e) { _apxToast(_apxErr(e), false); }
     },
   });
 }
