@@ -10577,7 +10577,7 @@ async function _v15calCreateBooking() {
 // Reuses /api/ghl/inbox (list + thread) + /api/ghl/send-message. (P2 adds
 // pipeline/stage + failed filters; P3 adds mass send.)
 // ══════════════════════════════════════════════════════════════
-let _V15IB = { convos: [], pipelines: [], contactPipe: {}, pipeOppCount: 0, ghlLoc: '', unreadOnly: false, failedOnly: false, fPipeline: '', fStage: '', active: null, messages: [], type: 'SMS', pending: [] };
+let _V15IB = { convos: [], pipelines: [], contactPipe: {}, pipeOppCount: 0, ghlLoc: '', unreadOnly: false, failedOnly: false, fPipeline: '', fStage: '', fChannel: '', active: null, messages: [], type: 'SMS', pending: [] };
 const _V15IB_FAILED = ['failed', 'undelivered', 'error', 'rejected'];
 
 // ── Skeleton loaders (shown on the very first load, before any data) ──
@@ -10653,6 +10653,7 @@ function _v15ibSetUnread(v) { _V15IB.unreadOnly = v; if (v) _V15IB.failedOnly = 
 function _v15ibSetFailed(v) { _V15IB.failedOnly = v; if (v) _V15IB.unreadOnly = false; _v15ibRenderAll(); }
 function _v15ibSetPipeline(v) { _V15IB.fPipeline = v; _V15IB.fStage = ''; _v15ibRenderAll(); }
 function _v15ibSetStage(v) { _V15IB.fStage = v; _v15ibRenderAll(); }
+function _v15ibSetChannel(v) { _V15IB.fChannel = v; _v15ibRenderAll(); }
 
 // Strip a phone/email down to a stable match key (digits-only for phones).
 function _ibNormKey(v) {
@@ -10673,6 +10674,7 @@ function _v15ibFiltered() {
   return _V15IB.convos.filter(c => {
     if (_V15IB.unreadOnly && !((c.unreadCount || 0) > 0)) return false;
     if (_V15IB.failedOnly && !_V15IB_FAILED.includes(c.lastMessageStatus || '')) return false;
+    if (_V15IB.fChannel && _ibChannelKey(c) !== _V15IB.fChannel) return false;
     if (_V15IB.fPipeline) {
       const cp = _v15ibPipeOf(c);
       if (!cp || cp.pipelineId !== _V15IB.fPipeline) return false;
@@ -10702,6 +10704,11 @@ function _v15ibRenderAll() {
         <button onclick="_v15ibMassSend()" class="v15ib-icon v15ib-send" title="Mass send" aria-label="Mass send" style="width:auto;padding:0 12px;gap:6px">✉ Mass send</button>
       </div>
       <div class="v15ib-filters">
+        <select onchange="_v15ibSetChannel(this.value)" class="v15ib-sel" title="Filter by channel">
+          <option value="">All channels</option>
+          <option value="instagram" ${_V15IB.fChannel === 'instagram' ? 'selected' : ''}>📸 Instagram</option>
+          <option value="facebook" ${_V15IB.fChannel === 'facebook' ? 'selected' : ''}>💬 Facebook</option>
+        </select>
         <select onchange="_v15ibSetPipeline(this.value)" class="v15ib-sel">${pipeOpts}</select>
         ${curPipe ? `<select onchange="_v15ibSetStage(this.value)" class="v15ib-sel">${stageOpts}</select>` : ''}
         ${filterActive ? `<button onclick="_v15ibClearPipe()" class="v15ib-clear" title="Clear pipeline filter" aria-label="Clear filter">✕</button>` : ''}
@@ -10754,6 +10761,7 @@ function _v15ibRenderList() {
   if (!rows.length) {
     let msg = 'No conversations yet.';
     if (_V15IB.unreadOnly) msg = 'No unread conversations.';
+    else if (_V15IB.fChannel) msg = `No ${_V15IB.fChannel === 'instagram' ? 'Instagram' : 'Facebook'} conversations yet.`;
     else if (_V15IB.failedOnly) msg = 'No failed messages - all good.';
     else if (_V15IB.fPipeline) {
       msg = _V15IB.pipeOppCount === 0
@@ -10768,7 +10776,7 @@ function _v15ibRenderList() {
     const name = c.contactName || '(no name)';
     const cp = _v15ibPipeOf(c);
     const chip = cp ? `<div style="margin-top:6px"><span class="v15ib-chip">${escapeHTML(cp.pipelineName)}${cp.stageName ? ' · ' + escapeHTML(cp.stageName) : ''}</span></div>` : '';
-    return `<div class="v15ib-conv ${unread ? 'unread' : ''}" onclick='_v15ibOpen(${JSON.stringify(c.id)},${JSON.stringify(c.contactId || "")},${JSON.stringify(c.phone || "")},${JSON.stringify(c.email || "")},${JSON.stringify(c.contactName || "")})'>
+    return `<div class="v15ib-conv ${unread ? 'unread' : ''}" onclick='_v15ibOpen(${JSON.stringify(c.id)},${JSON.stringify(c.contactId || "")},${JSON.stringify(c.phone || "")},${JSON.stringify(c.email || "")},${JSON.stringify(c.contactName || "")},${JSON.stringify(c.lastMessageType || c.channel || "")})'>
       <div style="position:relative;flex:none">
         <div style="width:42px;height:42px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;flex:none;${_ibAvatarStyle(name)}">${escapeHTML(_ibInitials(name))}</div>
         ${unread ? '<span style="position:absolute;top:-1px;right:-1px;width:11px;height:11px;border-radius:50%;background:var(--gold);border:2px solid var(--surface)"></span>' : ''}
@@ -10791,10 +10799,13 @@ function _ibAvatarStyle(name) {
   return `background:${c};border-color:${c};color:#fff`;
 }
 
-async function _v15ibOpen(convId, contactId, phone, email, name) {
-  _V15IB.active = { convId, contactId, phone, email, name };
+async function _v15ibOpen(convId, contactId, phone, email, name, channel) {
+  _V15IB.active = { convId, contactId, phone, email, name, channel: channel || '' };
   _V15IB.pending = [];
-  _V15IB.type = 'SMS'; // email to clients disabled for now - text only
+  // Reply on the SAME channel the lead used (IG/FB/WhatsApp), else SMS. Email to
+  // clients stays disabled here - _ghlSendType never returns Email for inbound SMS.
+  const st = _ghlSendType(channel || '');
+  _V15IB.type = (st === 'Email') ? 'SMS' : st;
   const body = document.getElementById('v15ib-body');
   if (body) body.innerHTML = `<div class="req-empty" style="padding:24px 0"><span class="req-spin"></span> Loading thread…</div>`;
   try {
@@ -10854,8 +10865,9 @@ function _v15ibRenderThread() {
     </div>
     <div id="v15ib-thread-scroll" style="display:flex;flex-direction:column;gap:8px;max-height:min(62vh,560px);overflow-y:auto;-webkit-overflow-scrolling:touch;padding:8px;border:1px solid var(--border);border-radius:10px;background:var(--bg)">${bubbles}</div>
     <div style="margin-top:12px;border:1px solid var(--border);border-radius:10px;padding:10px">
-      ${!a.phone ? `<div style="font-size:11px;color:#c47424;margin-bottom:8px">⚠ No phone on file - add one in GHL to text this contact.</div>` : ''}
-      <textarea id="v15ib-text" placeholder="Type a message…" style="width:100%;min-height:70px;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:9px 11px;font:inherit;font-size:13px;resize:vertical;outline:none"></textarea>
+      ${_V15IB.type !== 'SMS' ? `<div style="font-size:11px;color:var(--text-mute);margin-bottom:8px">Replying on <b style="color:var(--text)">${escapeHTML(_ghlChannelLabel(a.channel))}</b>${(_V15IB.type === 'IG' || _V15IB.type === 'FB') ? ' · Meta only allows a reply within 24h of their last message.' : ''}</div>` : ''}
+      ${(_V15IB.type === 'SMS' && !a.phone) ? `<div style="font-size:11px;color:#c47424;margin-bottom:8px">⚠ No phone on file - add one in GHL to text this contact.</div>` : ''}
+      <textarea id="v15ib-text" placeholder="${_V15IB.type === 'SMS' ? 'Type a message…' : 'Reply on ' + escapeHTML(_ghlChannelLabel(a.channel)) + '…'}" style="width:100%;min-height:70px;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:9px 11px;font:inherit;font-size:13px;resize:vertical;outline:none"></textarea>
       <div id="v15ib-chips" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px">${chips}</div>
       <div style="display:flex;align-items:center;gap:8px;margin-top:8px">
         <label title="Attach" style="display:inline-flex;align-items:center;justify-content:center;width:34px;height:34px;border:1px solid var(--border);border-radius:6px;cursor:pointer;color:var(--text-sub)">📎<input type="file" multiple style="display:none" onchange="_v15ibPickFiles(this)"></label>
@@ -10940,7 +10952,7 @@ async function _v15ibResync(a, sentText, final) {
     if (t && !found) {
       // GHL hasn't surfaced it yet - keep showing it. On the FINAL check, if GHL
       // still doesn't have it, flag it so the user knows to retry.
-      msgs = [...msgs, { body: t, direction: 'outbound', type: 'SMS', date: new Date().toISOString(), _optimistic: !final, _unconfirmed: !!final }];
+      msgs = [...msgs, { body: t, direction: 'outbound', type: _V15IB.type || 'SMS', date: new Date().toISOString(), _optimistic: !final, _unconfirmed: !!final }];
     }
     if (_V15IB.active && _V15IB.active.convId === a.convId) { _V15IB.messages = msgs; _v15ibRenderThread(); }
   } catch (_) {}
@@ -21990,6 +22002,25 @@ function _ghlChannelLabel(type) {
   if (!clean) return 'Message';
   // Title-case a leftover string label
   return clean.charAt(0).toUpperCase() + clean.slice(1).toLowerCase();
+}
+
+// Normalized channel key for a conversation (lowercased label) - used by the
+// inbox channel filter. e.g. 'instagram' | 'facebook' | 'sms' | 'email' | ...
+function _ibChannelKey(c) {
+  return _ghlChannelLabel((c && (c.lastMessageType || c.channel)) || '').toLowerCase();
+}
+
+// Map a conversation's channel/type → the GHL conversations/messages send `type`,
+// so a reply goes out on the SAME channel the lead used (IG/FB/WhatsApp), not SMS.
+function _ghlSendType(typeOrChannel) {
+  const label = _ghlChannelLabel(typeOrChannel).toLowerCase();
+  if (label.includes('instagram')) return 'IG';
+  if (label.includes('facebook') || label.includes('messenger')) return 'FB';
+  if (label.includes('whatsapp')) return 'WhatsApp';
+  if (label.includes('email')) return 'Email';
+  if (label.includes('live')) return 'Live_Chat';
+  if (label.includes('google')) return 'GMB';
+  return 'SMS';
 }
 
 function _plRenderThread(messages) {

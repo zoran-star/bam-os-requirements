@@ -245,7 +245,17 @@ async function handler(req, res) {
   }
   const { token, locationId } = creds;
 
-  const type = (body.type || "SMS").toUpperCase() === "EMAIL" ? "Email" : "SMS";
+  // Normalize the requested channel → a GHL conversations/messages `type`.
+  // Social channels (IG/FB/WhatsApp/Live_Chat/GMB) let staff reply on the SAME
+  // channel a lead messaged on, instead of always falling back to SMS. GHL must
+  // have that channel connected, and Meta's 24h messaging window applies to IG/FB.
+  const TYPE_MAP = {
+    SMS: "SMS", EMAIL: "Email",
+    IG: "IG", INSTAGRAM: "IG",
+    FB: "FB", FACEBOOK: "FB", MESSENGER: "FB",
+    WHATSAPP: "WhatsApp", LIVE_CHAT: "Live_Chat", LIVECHAT: "Live_Chat", GMB: "GMB",
+  };
+  const type = TYPE_MAP[(body.type || "SMS").toUpperCase()] || "SMS";
   const message = (body.message || "").trim();
   const subject = (body.subject || "").trim();
   const html    = (body.html    || "").trim();
@@ -290,7 +300,7 @@ async function handler(req, res) {
   try {
     const sendBody = type === "Email"
       ? { type: "Email", contactId, subject, html: html || `<p>${message}</p>` }
-      : { type: "SMS",   contactId, message };
+      : { type,          contactId, message };   // SMS / IG / FB / WhatsApp / Live_Chat / GMB
     if (attachments.length) sendBody.attachments = attachments;
     sendResp = await ghl("POST", `/conversations/messages`, { token, body: sendBody });
   } catch (e) {

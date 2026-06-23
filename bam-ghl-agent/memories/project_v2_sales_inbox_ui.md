@@ -77,3 +77,26 @@ compose). SMS only. v15 inbox forces `_V15IB.type='SMS'`, Email pill dropped.
   links route to the app; new-tab forced the browser).
 
 See [[project_staff_permissions]] for the access-control work shipped alongside.
+
+## Instagram / Facebook DMs in the inbox (2026-06-23)
+The V1.5 inbox (shared by V2 — `#nav-v2inbox` is retired) reads GHL conversations
+generically, so **IG/FB/WhatsApp DMs already show** if the academy connected that
+channel in GHL (type map in `_ghlChannelLabel`: 18=Instagram, 11/12=Facebook, 19=WhatsApp).
+
+**Channel-aware reply (Route A — through GHL, no Meta app review).** Previously the
+inbox sent EVERY reply as SMS. Now:
+- `_v15ibOpen(...)` takes the conversation's channel; `_ghlSendType()` maps it →
+  GHL send `type` (IG/FB/WhatsApp/Live_Chat/GMB/SMS). Stored on `_V15IB.active.channel`
+  + `_V15IB.type`. The composer shows "Replying on <Channel>" + a 24h-window note for IG/FB,
+  and only shows the no-phone warning for SMS.
+- `api/ghl/send-message.js` — `TYPE_MAP` normalizes the requested channel; sendBody is
+  `{ type, contactId, message }` for any non-Email channel (was hardcoded SMS). Social
+  sends use `contact_id` (no phone lookup). Meta's 24h messaging window applies to IG/FB
+  (outside it GHL errors, surfaced to the UI).
+
+**Channel filter.** Inbox filter bar has a channel `<select>` (All / 📸 Instagram /
+💬 Facebook) → `_V15IB.fChannel` + `_v15ibSetChannel`; `_v15ibFiltered` matches via
+`_ibChannelKey(c)` (= `_ghlChannelLabel(...).toLowerCase()`).
+
+Requires: academy's IG = Professional acct linked to a FB Page, and Instagram connected
+in GHL (Settings → Integrations). No portal-side Meta integration / app review.
