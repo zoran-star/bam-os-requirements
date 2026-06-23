@@ -13550,10 +13550,10 @@ function _bbRenderGeneralCard(panel, meta) {
     </div>
 
     <div class="bb-field">
-      <div class="bb-field-label">EIN</div>
+      <div class="bb-field-label">EIN <span class="bb-field-req">*</span></div>
       <input id="bb-gen-ein" type="text" class="bb-input" value="${v('ein')}"
-        oninput="_bbGenChanged()" placeholder="XX-XXXXXXX" />
-      <div class="bb-field-hint">Federal tax ID. Required if you want us to set up Stripe Connect under your business.</div>
+        oninput="_bbGenChanged()" placeholder="XX-XXXXXXX" required />
+      <div class="bb-field-hint">Federal tax ID - required so we can set up Stripe Connect under your business.</div>
     </div>
 
     <div class="bb-field">
