@@ -14277,6 +14277,7 @@ async function _bbRenderStaffCard(panel, meta) {
       Everyone listed here can log in to this portal with full access. Anyone on the team can invite more people; only the account owner can revoke access.
     </p>
     <div id="bb-staff-list"><div class="bb-empty">Loading…</div></div>
+    <div id="bb-notif-panel"></div>
     ${_bbMarkDoneCta('staff', 'Staff')}
   `;
 
@@ -14286,6 +14287,82 @@ async function _bbRenderStaffCard(panel, meta) {
   }
 
   await _bbStaffRefreshList();
+}
+
+// ── Owner/staff SMS notification prefs (V1.5/V2) — which teammates get texted
+// (from the academy's GHL number) for each event. Stored on clients.notification_prefs. ──
+let _BB_NOTIF_PREFS = null;
+let _BB_NOTIF_LOADED = false;
+let _BB_NOTIF_STAFF = [];
+let _bbNotifSaveTimer = null;
+const _NOTIF_EVENTS = [
+  { key:'inbox_message',         label:'New inbox message',              hint:'A lead or parent texts/emails the academy', tier:'crm' },
+  { key:'calendar_booking',      label:'New calendar booking',           hint:'Someone books a slot (with their contact + booking details)', tier:'crm' },
+  { key:'stripe_payment',        label:'New payment',                    hint:'A successful Stripe charge', tier:'crm' },
+  { key:'new_signup',            label:'New parent signup',              hint:'A new member signs up (website builds)', tier:'v2' },
+  { key:'payment_failure',       label:'Payment failure',                hint:'A charge fails or a card declines', tier:'crm' },
+  { key:'ticket_update',         label:'Ticket: action / done / review', hint:'A systems, marketing, or content ticket needs you or is done', tier:'crm' },
+  { key:'action_item',           label:'New action item',                hint:'A new onboarding / action item is created', tier:'crm' },
+  { key:'post_trial_escalation', label:'Post-trial follow-up due',       hint:'A trial needs a follow-up decision', tier:'crm' },
+];
+async function _bbRenderNotifPanel(teammates, canManage) {
+  const host = document.getElementById('bb-notif-panel');
+  if (!host) return;
+  const crm = (typeof V15_ACCESS !== 'undefined' && V15_ACCESS) || (typeof V2_ACCESS !== 'undefined' && V2_ACCESS);
+  if (!crm || !canManage) { host.innerHTML = ''; return; }
+  _BB_NOTIF_STAFF = teammates || [];
+  if (!_BB_NOTIF_LOADED) {
+    try {
+      const { data } = await _sb.from('clients').select('notification_prefs').eq('id', CLIENT_ID).single();
+      _BB_NOTIF_PREFS = (data && data.notification_prefs) || {};
+    } catch (_) { _BB_NOTIF_PREFS = {}; }
+    _BB_NOTIF_LOADED = true;
+  }
+  const isV2 = (typeof V2_ACCESS !== 'undefined' && V2_ACCESS);
+  const events = _NOTIF_EVENTS.filter(e => e.tier === 'crm' || (e.tier === 'v2' && isV2));
+  const rows = events.map(ev => {
+    const sel = Array.isArray(_BB_NOTIF_PREFS[ev.key]) ? _BB_NOTIF_PREFS[ev.key] : [];
+    const chips = _BB_NOTIF_STAFF.map(s => {
+      const on = sel.includes(s.id);
+      const noPhone = !(s.phone && String(s.phone).trim());
+      return `<button onclick="_bbNotifToggle('${ev.key}','${s.id}')" title="${noPhone ? 'No phone on file - add one in their row above to text them' : ''}" style="display:inline-flex;align-items:center;gap:6px;padding:5px 11px;border-radius:999px;font:inherit;font-size:12px;font-weight:600;cursor:pointer;border:1px solid ${on ? 'var(--gold)' : 'var(--border-med)'};background:${on ? 'var(--gold)' : 'transparent'};color:${on ? '#0B0B0D' : 'var(--text-sub)'}">${escapeHTML(s.name || s.email || 'teammate')}${noPhone ? ' <span style="opacity:.7;font-size:10px">no #</span>' : ''}</button>`;
+    }).join('');
+    return `<div style="padding:12px 0;border-top:1px solid var(--border)">
+      <div style="font-size:13.5px;font-weight:700;color:var(--text)">${escapeHTML(ev.label)}</div>
+      <div style="font-size:11.5px;color:var(--text-mute);margin:2px 0 9px">${escapeHTML(ev.hint)}</div>
+      <div style="display:flex;flex-wrap:wrap;gap:7px">${chips || '<span style="font-size:12px;color:var(--text-mute)">Invite a teammate first.</span>'}</div>
+    </div>`;
+  }).join('');
+  host.innerHTML = `<div style="margin-top:22px;border:1px solid var(--border);border-radius:12px;padding:16px 18px;background:var(--surface)">
+    <div style="font-size:15px;font-weight:800;color:var(--text)">🔔 Notifications</div>
+    <div style="font-size:12px;color:var(--text-mute);margin:4px 0 6px">Pick who gets a text (from your academy's number) for each event. Teammates need a phone number on file (set it in their row above). <span id="bb-notif-status" style="color:var(--text-mute)"></span></div>
+    ${rows}
+  </div>`;
+}
+function _bbNotifToggle(eventKey, cuId) {
+  _BB_NOTIF_PREFS = _BB_NOTIF_PREFS || {};
+  const arr = Array.isArray(_BB_NOTIF_PREFS[eventKey]) ? _BB_NOTIF_PREFS[eventKey].slice() : [];
+  const i = arr.indexOf(cuId);
+  if (i >= 0) arr.splice(i, 1); else arr.push(cuId);
+  _BB_NOTIF_PREFS[eventKey] = arr;
+  _bbRenderNotifPanel(_BB_NOTIF_STAFF, true);
+  _bbNotifSave();
+}
+function _bbNotifSave() {
+  clearTimeout(_bbNotifSaveTimer);
+  const st = document.getElementById('bb-notif-status'); if (st) st.textContent = '· saving…';
+  _bbNotifSaveTimer = setTimeout(async () => {
+    try {
+      const token = await _mreqAuthToken();
+      const res = await fetch('/api/clients?action=set-notification-prefs', {
+        method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+        body: JSON.stringify({ client_id: CLIENT_ID, notification_prefs: _BB_NOTIF_PREFS }),
+      });
+      const s = document.getElementById('bb-notif-status');
+      if (!res.ok) { const j = await res.json().catch(() => ({})); if (s) s.textContent = '· ' + (j.error || 'save failed'); }
+      else if (s) { s.textContent = '· saved ✓'; setTimeout(() => { const s2 = document.getElementById('bb-notif-status'); if (s2) s2.textContent = ''; }, 1500); }
+    } catch (e) { const s = document.getElementById('bb-notif-status'); if (s) s.textContent = '· ' + e.message; }
+  }, 500);
 }
 
 // Re-queryable staff list render - called on card open and after an invite/edit
@@ -14310,6 +14387,8 @@ async function _bbStaffRefreshList() {
   const myId = session?.user?.id || null;
   const myRow = (data || []).find(r => r.user_id === myId);
   if (typeof TEAM_MY_ROLE !== 'undefined') TEAM_MY_ROLE = myRow?.role || null;
+
+  _bbRenderNotifPanel(data || [], (myRow?.role === 'owner' || _IS_BAM_STAFF === true));
 
   if (!data || data.length === 0) {
     list.innerHTML = '<div class="bb-empty">No teammates yet. Click "+ Invite teammate" to add the first one.</div>';
