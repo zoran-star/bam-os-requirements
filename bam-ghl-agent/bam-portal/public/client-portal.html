@@ -22578,19 +22578,19 @@ async function _apxFollowupSkip(id) {
   if (!r) { try { await _apxPost('/api/agent-followups', 'skip', { id }); _apxRemove(id); _apxToast('Skipped', true); } catch (e) { _apxToast(_apxErr(e), false); } return; }
   _apxSkipModal(r, {
     onSkip: async (lesson) => {
+      _apxRemove(id); _apxToast(lesson ? '📚 Skipped + taught' : 'Skipped', true);   // instant
       try {
         await _apxPost('/api/agent-followups', 'skip', { id });
         if (lesson) await _apxTeach(lesson, r.draft_message, '', { source: 'hawkeye-followup-skip', contact: r.contact_name || null });
-        _apxRemove(id); _apxToast(lesson ? '📚 Skipped + taught' : 'Skipped', true);
       } catch (e) { _apxToast(_apxErr(e), false); }
     },
     onLost: async (lesson) => {
       if (!r.ghl_contact_id) { _apxToast('No contact linked - can\'t mark Lost', false); return; }
+      _apxRemove(id); _apxToast(lesson ? '🚫 Marked Lost + taught' : '🚫 Marked Lost', true);   // instant
       try {
         await _apxPost('/api/agent-followups', 'skip', { id });   // drop the nudge
         await _apxPost('/api/agent-approvals', 'confirm-lost', { contact_id: r.ghl_contact_id, reply: '', lost_reason: 'Other' });
-        await _apxTeach(lesson, r.draft_message, '', { source: 'hawkeye-followup-skip-lost', contact: r.contact_name || null });
-        _apxRemove(id); _apxToast('🚫 Marked Lost + taught', true);
+        if (lesson) await _apxTeach(lesson, r.draft_message, '', { source: 'hawkeye-followup-skip-lost', contact: r.contact_name || null });
       } catch (e) { _apxToast(_apxErr(e), false); }
     },
   });
@@ -22657,7 +22657,7 @@ function _apxSkipModal(r, handlers) {
     <div id="apx-edit-overlay" onclick="if(event.target===this)this.remove()" style="position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9650;display:flex;align-items:flex-start;justify-content:center;padding:7vh 14px 0">
       <div style="background:var(--surface);border:1px solid var(--border);border-radius:16px;width:100%;max-width:520px;padding:18px;box-shadow:0 20px 60px rgba(0,0,0,.5)">
         <div style="font-size:15px;font-weight:700;margin-bottom:3px">Skip the draft for ${escapeHTML(r.contact_name || 'this lead')}?</div>
-        <div style="font-size:12px;color:var(--text-mute);margin-bottom:13px">Skip it (teaching is optional), or mark the lead Lost (teaching is required).</div>
+        <div style="font-size:12px;color:var(--text-mute);margin-bottom:13px">Skip it, or mark the lead Lost. Teaching the agent why is optional either way.</div>
         <label style="display:block;font-size:11px;color:var(--text-mute);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">why? (teach the agent)</label>
         <input id="apx-skip-lesson" type="text" placeholder="e.g. they already said no / wrong number / picked another program" style="width:100%;background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);padding:10px 12px;font:inherit;font-size:13px;outline:none">
         <div id="apx-skip-note" style="font-size:11.5px;color:#e0654f;margin-top:6px;min-height:14px"></div>
@@ -22675,7 +22675,6 @@ function _apxSkipModal(r, handlers) {
   document.getElementById('apx-skip-go').onclick = () => { const l = val(); document.getElementById('apx-edit-overlay')?.remove(); handlers.onSkip(l); };
   document.getElementById('apx-skip-lost').onclick = () => {
     const l = val();
-    if (!l) { const n = document.getElementById('apx-skip-note'); if (n) n.textContent = 'Tell the agent why first - teaching is required to mark Lost.'; return; }
     document.getElementById('apx-edit-overlay')?.remove(); handlers.onLost(l);
   };
 }
@@ -22686,17 +22685,17 @@ async function _apxReadySkip(id) {
   if (!r) return;
   _apxSkipModal(r, {
     onSkip: async (lesson) => {
+      _apxRemove(id); _apxToast(lesson ? '📚 Skipped + taught' : 'Skipped', true);   // instant
       try {
         await _apxPost('/api/agent-approvals', 'skip-ready', { ready_id: id });
         if (lesson) await _apxTeach(lesson, r.draft_message, '', { source: 'hawkeye-skip', contact: r.contact_name || null });
-        _apxRemove(id); _apxToast(lesson ? '📚 Skipped + taught' : 'Skipped', true);
       } catch (e) { _apxToast(_apxErr(e), false); }
     },
     onLost: async (lesson) => {
+      _apxRemove(id); _apxToast(lesson ? '🚫 Marked Lost + taught' : '🚫 Marked Lost', true);   // instant
       try {
         await _apxPost('/api/agent-approvals', 'confirm-lost', { ready_id: id, reply: '', lost_reason: 'Other' });
-        await _apxTeach(lesson, r.draft_message, '', { source: 'hawkeye-skip-lost', contact: r.contact_name || null });
-        _apxRemove(id); _apxToast('🚫 Marked Lost + taught', true);
+        if (lesson) await _apxTeach(lesson, r.draft_message, '', { source: 'hawkeye-skip-lost', contact: r.contact_name || null });
       } catch (e) { _apxToast(_apxErr(e), false); }
     },
   });
