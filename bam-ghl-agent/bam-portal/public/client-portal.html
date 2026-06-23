@@ -9726,6 +9726,9 @@ function _v15kShortMonth(p) {
   const mm = /^(\d{4})-(\d{2})$/.exec(p.key || '');
   return mm ? new Date(+mm[1], +mm[2] - 1, 1).toLocaleString('en-US', { month: 'short' }) : (p.key || '');
 }
+function _v15kChartSkel() {
+  return `<div class="skel" style="height:250px;border-radius:10px;margin-top:6px"></div>`;
+}
 function _v15kLineChart(months, defs, fmt) {
   const W = 720, H = 250, padL = 58, padR = 16, padT = 14, padB = 34;
   const on = defs.filter(d => _V15K.trends.on[d.key]);
@@ -9768,18 +9771,17 @@ function _v15kRenderTrends() {
       <select onchange="_v15kTrendsSetStart(this.value)" style="background:var(--surface);border:1px solid var(--border-med);border-radius:8px;color:var(--text);padding:7px 11px;font:inherit;font-size:13px;cursor:pointer">${opt(_V15K.trends.start)}</select>
       <label style="font-size:12px;color:var(--text-mute)">to</label>
       <select onchange="_v15kTrendsSetEnd(this.value)" style="background:var(--surface);border:1px solid var(--border-med);border-radius:8px;color:var(--text);padding:7px 11px;font:inherit;font-size:13px;cursor:pointer">${opt(_V15K.trends.end)}</select>
-      ${loading ? `<span style="font-size:12px;color:var(--text-mute)"><span class="req-spin"></span> loading…</span>` : ''}
       <span style="font-size:11.5px;color:var(--text-mute);margin-left:auto">Click a month on the chart to open its full KPIs.</span>
     </div>
     <div style="margin-top:16px">
       <div style="font-size:13px;font-weight:700;color:var(--text);text-transform:uppercase;letter-spacing:.04em">Revenue &amp; spend</div>
       ${_v15kTrendsLegend(_V15K_TREND_SERIES.money)}
-      ${months.length ? _v15kLineChart(months, _V15K_TREND_SERIES.money, _v15kMoney) : '<div style="color:var(--text-mute);font-size:13px;padding:14px 0">Pick a month range.</div>'}
+      ${!months.length ? '<div style="color:var(--text-mute);font-size:13px;padding:14px 0">Pick a month range.</div>' : loading ? _v15kChartSkel() : _v15kLineChart(months, _V15K_TREND_SERIES.money, _v15kMoney)}
     </div>
     <div style="margin-top:26px">
       <div style="font-size:13px;font-weight:700;color:var(--text);text-transform:uppercase;letter-spacing:.04em">Funnel</div>
       ${_v15kTrendsLegend(_V15K_TREND_SERIES.counts)}
-      ${months.length ? _v15kLineChart(months, _V15K_TREND_SERIES.counts, _v15kNum) : ''}
+      ${!months.length ? '' : loading ? _v15kChartSkel() : _v15kLineChart(months, _V15K_TREND_SERIES.counts, _v15kNum)}
     </div>
   </div>`;
 }
