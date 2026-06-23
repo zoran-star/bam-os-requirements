@@ -161,6 +161,39 @@ async function handler(req, res) {
     return res.status(200).json({ ok: true, athlete_name_field_ids: ids });
   }
 
+  // ── POST: add / remove a tag on a GHL contact, then refresh the mirror ──
+  if (req.method === "POST" && (action === "add-tag" || action === "remove-tag")) {
+    const body = (req.body && typeof req.body === "object") ? req.body : {};
+    const contactId = String(body.contact_id || "").trim();
+    const tags = (Array.isArray(body.tags) ? body.tags : (body.tag != null ? [body.tag] : []))
+      .map(t => String(t).trim()).filter(Boolean);
+    if (!contactId) return res.status(400).json({ error: "contact_id required" });
+    if (!tags.length) return res.status(400).json({ error: "tag(s) required" });
+    const rows = await sb(`clients?id=eq.${clientId}&select=id,ghl_location_id,ghl_access_token,ghl_refresh_token,ghl_token_expires_at&limit=1`);
+    const client = Array.isArray(rows) && rows[0];
+    if (!client) return res.status(404).json({ error: "academy not found" });
+    let creds; try { creds = await pickGhlToken(client); } catch (e) { return res.status(500).json({ error: `GHL token: ${e.message}` }); }
+    if (!creds) return res.status(400).json({ error: "Academy not connected to GHL." });
+    const { token } = creds;
+    try {
+      if (action === "add-tag") await ghl("POST", `/contacts/${encodeURIComponent(contactId)}/tags`, { token, body: { tags } });
+      else                       await ghl("DELETE", `/contacts/${encodeURIComponent(contactId)}/tags`, { token, body: { tags } });
+    } catch (e) { return res.status(e.status || 502).json({ error: `GHL: ${e.message}` }); }
+    // Re-read the contact so we return + mirror the authoritative tag list.
+    let newTags = [];
+    try {
+      const c = await ghl("GET", `/contacts/${encodeURIComponent(contactId)}`, { token });
+      const cc = (c && (c.contact || c)) || {};
+      newTags = Array.isArray(cc.tags) ? cc.tags.map(String) : [];
+    } catch (_) { /* best-effort; mirror just won't update this cycle */ }
+    try {
+      await sb(`ghl_contacts?client_id=eq.${encodeURIComponent(clientId)}&ghl_contact_id=eq.${encodeURIComponent(contactId)}`, {
+        method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ tags: newTags }),
+      });
+    } catch (_) { /* mirror refresh is best-effort */ }
+    return res.status(200).json({ ok: true, tags: newTags });
+  }
+
   if (req.method !== "GET") return res.status(405).json({ error: "GET/POST only" });
 
   // ── GET ?action=custom-fields: live GHL custom-field defs + has-data + suggestion ──

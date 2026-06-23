@@ -10863,6 +10863,7 @@ function _v15ibRenderThread() {
       <div style="font-size:15px;font-weight:700;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHTML(a.name || a.phone || a.email || 'Conversation')}</div>
       ${ghlUrl ? `<a href="${escapeHTML(ghlUrl)}" target="_blank" rel="noopener" title="Open this contact in GHL to call" style="flex:none;display:inline-flex;align-items:center;gap:6px;background:rgba(232,197,71,0.12);border:1px solid var(--gold);border-radius:8px;color:var(--gold);padding:6px 10px;font:inherit;font-size:12px;font-weight:700;text-decoration:none">📞 Call in GHL</a>` : ''}
     </div>
+    <div id="ib-tags" style="margin-bottom:10px"></div>
     <div id="v15ib-thread-scroll" style="display:flex;flex-direction:column;gap:8px;max-height:min(62vh,560px);overflow-y:auto;-webkit-overflow-scrolling:touch;padding:8px;border:1px solid var(--border);border-radius:10px;background:var(--bg)">${bubbles}</div>
     <div style="margin-top:12px;border:1px solid var(--border);border-radius:10px;padding:10px">
       ${_V15IB.type !== 'SMS' ? `<div style="font-size:11px;color:var(--text-mute);margin-bottom:8px">Replying on <b style="color:var(--text)">${escapeHTML(_ghlChannelLabel(a.channel))}</b>${(_V15IB.type === 'IG' || _V15IB.type === 'FB') ? ' · Meta only allows a reply within 24h of their last message.' : ''}</div>` : ''}
@@ -10875,6 +10876,13 @@ function _v15ibRenderThread() {
       </div>
     </div>`;
   _scrollToBottom(document.getElementById('v15ib-thread-scroll'));
+  if (a.contactId) {
+    const st = _TAGW['ib-tags'];
+    // Reuse cached tags across thread re-renders (type toggle, file ops, send);
+    // only fetch live when opening a different conversation.
+    if (st && st.contactId === a.contactId) _renderTagEditor('ib-tags', a.contactId, st.tags);
+    else _renderTagEditorFetch('ib-tags', a.contactId);
+  }
 }
 
 function _v15ibSetType(t) { _V15IB.type = t; _v15ibRenderThread(); }
@@ -11232,9 +11240,67 @@ async function _contactsOpenDrawer(idx) {
   }
   const body = document.getElementById('contacts-drawer-body');
   if (body) body.innerHTML = _cdBody();
+  _renderTagEditor('cd-tags', c.ghl_contact_id, (_CDRAWER.ghl && _CDRAWER.ghl.tags) || c.tags || []);
   _contactsLoadStripe(c);
   _cdLoadMemory(c);
 }
+// ── Reusable contact-tag editor (Contacts drawer + Inbox thread) ──
+// View current tags as chips (× to remove) + an "add tag" dropdown sourced from
+// the academy's GHL tags (_bbTagList). Writes via /api/contacts add-tag/remove-tag.
+let _TAGW = {};  // hostId -> { contactId, tags:[] }
+function _tagEditorHtml(hostId) {
+  const st = _TAGW[hostId] || { contactId: null, tags: [] };
+  const tags = st.tags || [];
+  const chips = tags.length
+    ? tags.map((t, i) => `<span style="display:inline-flex;align-items:center;gap:4px;background:var(--surface);border:1px solid var(--border-med);border-radius:999px;padding:3px 6px 3px 10px;font-size:11.5px;color:var(--text-sub);margin:0 5px 5px 0">${escapeHTML(t)}<button onclick="_tagRemove('${hostId}',${i})" title="Remove tag" style="background:none;border:none;color:var(--text-mute);cursor:pointer;font-size:14px;line-height:1;padding:0 2px">×</button></span>`).join('')
+    : `<span style="font-size:11.5px;color:var(--text-mute);margin:0 6px 5px 0">No tags yet.</span>`;
+  const all = (typeof _bbTagList !== 'undefined' && Array.isArray(_bbTagList)) ? _bbTagList : [];
+  const avail = all.filter(t => !tags.some(x => String(x).toLowerCase() === String(t).toLowerCase()));
+  const opts = avail.map(t => `<option value="${escapeHTML(t)}">${escapeHTML(t)}</option>`).join('');
+  const dropdown = `<select onchange="_tagAdd('${hostId}', this)" style="background:var(--surface);border:1px solid var(--border-med);border-radius:999px;color:var(--text-sub);font:inherit;font-size:11.5px;padding:3px 10px;cursor:pointer;margin-bottom:5px">${'<option value="">＋ add tag</option>'}${opts}</select>`;
+  return `<div style="display:flex;flex-wrap:wrap;align-items:center;gap:0">${chips}${dropdown}<span id="${hostId}-status" style="font-size:11px;color:var(--text-mute);margin:0 0 5px 6px"></span></div>`;
+}
+async function _renderTagEditor(hostId, contactId, tags) {
+  _TAGW[hostId] = { contactId, tags: Array.isArray(tags) ? tags.slice() : [] };
+  if (typeof _bbLoadTags === 'function' && (typeof _bbTagList === 'undefined' || !_bbTagList || !_bbTagList.length)) {
+    try { await _bbLoadTags(); } catch (_) {}
+  }
+  const host = document.getElementById(hostId);
+  if (host) host.innerHTML = _tagEditorHtml(hostId);
+}
+// Inbox doesn't carry the contact's tags → fetch them live, then render.
+async function _renderTagEditorFetch(hostId, contactId) {
+  const host = document.getElementById(hostId); if (!host) return;
+  if (!contactId) { host.innerHTML = ''; return; }
+  let tags = [];
+  try {
+    const token = await _mreqAuthToken();
+    const r = await fetch(`/api/ghl/calendars-v15?action=contact&client_id=${encodeURIComponent(CLIENT_ID)}&id=${encodeURIComponent(contactId)}`, { headers: { Authorization: 'Bearer ' + token } });
+    const j = await _safeJson(r);
+    if (r.ok && j.contact && Array.isArray(j.contact.tags)) tags = j.contact.tags;
+  } catch (_) { /* render empty + still allow adding */ }
+  await _renderTagEditor(hostId, contactId, tags);
+}
+async function _tagChange(hostId, action, tag) {
+  const st = _TAGW[hostId]; if (!st || !st.contactId || !tag) return;
+  const status = document.getElementById(hostId + '-status'); if (status) status.textContent = '…';
+  try {
+    const token = await _mreqAuthToken();
+    const res = await fetch(`/api/contacts?action=${action}&client_id=${encodeURIComponent(CLIENT_ID)}`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+      body: JSON.stringify({ contact_id: st.contactId, tags: [tag] }),
+    });
+    const j = await _safeJson(res);
+    if (!res.ok) throw new Error(j.error || ('HTTP ' + res.status));
+    if (Array.isArray(j.tags)) st.tags = j.tags;
+    const host = document.getElementById(hostId); if (host) host.innerHTML = _tagEditorHtml(hostId);
+  } catch (e) {
+    const s = document.getElementById(hostId + '-status'); if (s) s.textContent = e.message;
+  }
+}
+function _tagAdd(hostId, sel) { const t = sel.value; if (!t) return; sel.value = ''; _tagChange(hostId, 'add-tag', t); }
+function _tagRemove(hostId, i) { const st = _TAGW[hostId]; const t = st && st.tags && st.tags[i]; if (t) _tagChange(hostId, 'remove-tag', t); }
+
 function _cdBody() {
   const g = _CDRAWER.ghl || {};
   const row = (k, v) => v ? `<div style="display:flex;gap:8px;padding:3px 0;font-size:13px"><span style="color:var(--text-mute);min-width:64px">${k}</span><span style="color:var(--text);word-break:break-word">${escapeHTML(String(v))}</span></div>` : '';
@@ -11245,7 +11311,8 @@ function _cdBody() {
     ${row('Name', g.name)}${row('Email', g.email)}${row('Phone', g.phone)}
     ${g.dnd ? `<div style="margin-top:6px;font-size:12px;color:#c9742f">⚠ Do-not-contact is ON</div>` : ''}
     ${row('Source', g.source)}${row('Added', g.dateAdded ? _cdDate(Math.floor(new Date(g.dateAdded).getTime() / 1000)) : '')}
-    ${tags ? `<div style="margin-top:8px">${tags}</div>` : ''}
+    <div style="font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--text-mute);font-weight:700;margin:12px 0 6px">Tags</div>
+    <div id="cd-tags"></div>
     ${cf.length ? `<div style="margin-top:10px;border-top:1px solid var(--border);padding-top:8px">${cf.map(f => row(escapeHTML(f.name || 'Field'), f.value)).join('')}</div>` : ''}
     ${g._error ? `<div style="margin-top:6px;font-size:11px;color:var(--text-mute)">Full GHL detail unavailable (${escapeHTML(g._error)})</div>` : ''}`;
   const ghlUrl = _ghlContactUrl(_CDRAWER.ghlLoc, (_CDRAWER.contact && _CDRAWER.contact.ghl_contact_id) || g.id);
