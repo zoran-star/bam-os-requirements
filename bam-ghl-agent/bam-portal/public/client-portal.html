@@ -7141,6 +7141,12 @@ Then the call to action."]</div>
       #view-pipelines .pl-card-abandon:hover { background:rgba(90,150,224,0.22); }
       #view-pipelines .pl-card-lost { background:rgba(224,112,112,0.12); border-color:#e07070; color:#e07070; }
       #view-pipelines .pl-card-lost:hover { background:rgba(224,112,112,0.22); }
+      /* Responded-stage follow-up status badge (All good / Needs action). */
+      #view-pipelines .pl-card-fu { width:100%; box-sizing:border-box; margin-top:8px; border-radius:7px; padding:6px 8px; font-size:11px; font-weight:700; cursor:pointer; font-family:inherit; border:1px solid; display:flex; align-items:center; justify-content:center; gap:5px; }
+      #view-pipelines .pl-card-fu-good { background:rgba(76,199,106,0.12); border-color:var(--green); color:var(--green); }
+      #view-pipelines .pl-card-fu-good:hover { background:rgba(76,199,106,0.2); }
+      #view-pipelines .pl-card-fu-action { background:rgba(224,112,112,0.12); border-color:#e07070; color:#e07070; }
+      #view-pipelines .pl-card-fu-action:hover { background:rgba(224,112,112,0.22); }
       #view-pipelines .pl-card-ptf {
         margin-top:9px; width:100%; background:rgba(232,197,71,0.12);
         border:1px solid var(--accent); color:var(--accent); border-radius:7px;
@@ -21059,6 +21065,45 @@ let _PL_PIPELINE   = null;   // currently-selected pipeline id
 let _PL_DRAG_OPP   = null;   // { oppId, fromStageId, pipelineId } during drag
 let _PL_AGENT_MODE = null;   // 'off' | 'hawkeye' | 'self_drive' | null(unknown) - drives the Responded glow
 
+// Set of Responded-stage contact ids that already have a follow-up queued
+// (status pending/approved). Drives the per-card All good / Needs action badge.
+let _PL_FU_PENDING = null;
+async function _plLoadFollowups() {
+  try {
+    const j = await _apxPost('/api/agent-followups', 'list', {});
+    const set = new Set();
+    for (const f of (j.followups || [])) {
+      if ((f.status === 'pending' || f.status === 'approved') && f.ghl_contact_id) set.add(String(f.ghl_contact_id));
+    }
+    _PL_FU_PENDING = set;
+  } catch (e) {
+    // Permission denied → this viewer can't read follow-up status; hide the
+    // badges entirely (don't paint everything red). Transient error → keep prior.
+    if (e && (e.status === 401 || e.status === 403)) _PL_FU_PENDING = null;
+  }
+  try { if (typeof _renderPipelineBoard === 'function') _renderPipelineBoard(); } catch (_) {}
+}
+// Look up a lead's display name from the loaded board by GHL contact id.
+function _plNameForContact(contactId) {
+  if (!_PL_DATA || !contactId) return null;
+  for (const pl of (_PL_DATA.pipelines || [])) {
+    for (const o of (pl.opportunities || [])) {
+      if (String(o.contactId || '') === String(contactId)) return (o.contact && o.contact.name) || o.name || null;
+    }
+  }
+  return null;
+}
+// Flip a lead's local opp status so its card drops off the board immediately
+// after a Hawkeye Lost/Abandon (before the next full board refetch).
+function _plCloseByContact(contactId, status) {
+  if (!_PL_DATA || !contactId) return;
+  for (const pl of (_PL_DATA.pipelines || [])) {
+    for (const o of (pl.opportunities || [])) {
+      if (String(o.contactId || '') === String(contactId)) o.status = status;
+    }
+  }
+}
+
 // Load this academy's agent mode once, then re-render so the Responded stage
 // can glow + show its Hawkeye button. Best-effort (403 for non-authorized = no glow).
 async function _plLoadAgentMode() {
@@ -21069,6 +21114,7 @@ async function _plLoadAgentMode() {
     if (!r.ok) { _PL_AGENT_MODE = 'off'; return; }
     _PL_AGENT_MODE = j.mode || 'off';
   } catch (_) { _PL_AGENT_MODE = 'off'; }
+  if (_PL_AGENT_MODE && _PL_AGENT_MODE !== 'off') _plLoadFollowups();   // load the follow-up badges once the agent is known to be on
   try { if (typeof _renderPipelineBoard === 'function') _renderPipelineBoard(); } catch (_) {}
 }
 
@@ -21076,6 +21122,7 @@ async function fetchAndRenderPipelines() {
   const container = document.getElementById('pl-board-container');
   if (!container) return;
   if (_PL_AGENT_MODE === null) _plLoadAgentMode();   // fetch once, re-renders on completion
+  else if (_PL_AGENT_MODE !== 'off') _plLoadFollowups();   // refresh the follow-up badges on each board open
   // Instant render: if the board is already loaded, show it now and refresh in
   // the background instead of blanking to a spinner on every open.
   const hadData = _PL_DATA && Array.isArray(_PL_DATA.pipelines) && _PL_DATA.pipelines.length;
@@ -21805,6 +21852,14 @@ function _renderPipelineBoard() {
     const isDone = _plIsDoneTrialStage(stage);
     const todayTrial = _plIsTrialToday(o.trialDate);
     const glow = todayTrial ? 'box-shadow:0 0 0 1px var(--gold,#E8C547),0 0 18px rgba(232,197,71,0.5);border-color:var(--gold,#E8C547);' : '';
+    // Responded-stage follow-up status: 🟢 a follow-up is queued, 🔴 none yet.
+    // Tap either → open Hawkeye focused on this lead (schedule / review the f/u).
+    const _isResp = stage && /respond/i.test(stage.name || '');
+    const fuBadge = (_isResp && _agentOn && _PL_FU_PENDING)
+      ? (_PL_FU_PENDING.has(String(o.contactId || ''))
+          ? `<button class="pl-card-fu pl-card-fu-good" title="A follow-up is scheduled" onclick="event.stopPropagation(); _apxOpen('${escapeHTML(o.contactId || '')}')">🟢 All good</button>`
+          : `<button class="pl-card-fu pl-card-fu-action" title="No follow-up scheduled - tap to set one" onclick="event.stopPropagation(); _apxOpen('${escapeHTML(o.contactId || '')}')">🔴 Needs action</button>`)
+      : '';
     return `
       <div class="pl-card ${stale ? 'pl-card-stale' : ''} ${missingTrial ? 'pl-card-notrial' : ''} ${todayTrial ? 'pl-card-today' : ''}"
            style="position:relative;${glow}"
@@ -21831,6 +21886,7 @@ function _renderPipelineBoard() {
           : (trialStarted
               ? `<button class="pl-card-ptf" onclick="event.stopPropagation(); _plPostTrialForm('${escapeHTML(o.id)}')">Post trial form</button>`
               : '')}
+        ${fuBadge}
       </div>`;
   };
 
@@ -22394,7 +22450,12 @@ let _APX_TAB = 'followups';
 function _apxSetTab(t) { _APX_TAB = t; _apxRender(); document.getElementById('apx-body')?.scrollTo(0, 0); }
 function _apxEmpty(msg) { return `<div style="text-align:center;color:var(--text-mute);font-size:14px;padding:48px 10px">${escapeHTML(msg)}</div>`; }
 
-function _apxOpen() {
+// When set, the Hawkeye queue is FOCUSED on one lead (tapped from a Sales-board
+// badge). Cleared when opened with no argument or on close.
+let _APX_FILTER_CONTACT = null, _APX_FILTER_NAME = null;
+function _apxOpen(focusContact, focusName) {
+  _APX_FILTER_CONTACT = focusContact || null;
+  _APX_FILTER_NAME = focusName || (focusContact ? _plNameForContact(focusContact) : null) || null;
   document.getElementById('apx-overlay')?.remove();
   // Full-width takeover: a screen-wide bar at the top (title + tabs) with the
   // active tab's cards below, centered to a readable width on desktop.
@@ -22413,7 +22474,7 @@ function _apxOpen() {
     </div>`);
   _apxLoad();
 }
-function _apxClose() { document.getElementById('apx-overlay')?.remove(); }
+function _apxClose() { _APX_FILTER_CONTACT = null; _APX_FILTER_NAME = null; document.getElementById('apx-overlay')?.remove(); }
 
 // Split the two API payloads into the three drawer sections. OVERDUE follow-ups
 // (their send time has passed) move out of the upcoming "Follow-ups" list and
@@ -22441,6 +22502,14 @@ async function _apxLoad() {
       _apxPost('/api/agent-approvals', 'list-ready', {}),
     ]);
     _APX_DATA = _apxSplit(fu, rd);
+    // Focused on one lead (from a Sales-board badge tap)? Keep only their cards.
+    if (_APX_FILTER_CONTACT) {
+      const keep = (x) => String(x.ghl_contact_id || '') === String(_APX_FILTER_CONTACT);
+      _APX_DATA.followups = _APX_DATA.followups.filter(keep);
+      _APX_DATA.ready = _APX_DATA.ready.filter(keep);
+      _APX_DATA.lost = (_APX_DATA.lost || []).filter(keep);
+      _APX_DATA.book = (_APX_DATA.book || []).filter(keep);
+    }
     // Open on the first tab that actually has something.
     const readyN = _APX_DATA.ready.length + (_APX_DATA.book || []).length;
     if (!_APX_DATA.followups.length) _APX_TAB = readyN ? 'ready' : ((_APX_DATA.lost || []).length ? 'lost' : 'followups');
@@ -22542,7 +22611,8 @@ function _apxLostCard(r) {
       <div style="flex:1"></div>
       <button onclick="_apxLostEdit('${r.id}')" style="background:transparent;border:1px solid var(--border);color:var(--text-sub);border-radius:7px;padding:5px 11px;font-size:12px;cursor:pointer">✎ edit text</button>
       <button onclick="_apxLostDismiss('${r.id}')" style="background:transparent;border:1px solid var(--border);color:var(--text-sub);border-radius:7px;padding:5px 11px;font-size:12px;cursor:pointer">✕ Dismiss</button>
-      <button onclick="_apxLostConfirm('${r.id}')" style="background:#e0654f;border:1px solid #e0654f;color:#fff;border-radius:7px;padding:5px 13px;font-size:12px;font-weight:700;cursor:pointer">🚫 ${closing ? 'Send &amp; mark Lost' : 'Mark Lost'}</button>
+      <button onclick="_apxLostAbandon('${r.id}')" title="Remove from pipeline - no nurture" style="background:transparent;border:1px solid var(--text-mute);color:var(--text-sub);border-radius:7px;padding:5px 11px;font-size:12px;cursor:pointer">🗑 Abandon</button>
+      <button onclick="_apxLostConfirm('${r.id}')" title="Mark Lost - enters the nurture automation" style="background:#e0654f;border:1px solid #e0654f;color:#fff;border-radius:7px;padding:5px 13px;font-size:12px;font-weight:700;cursor:pointer">🚫 ${closing ? 'Send &amp; mark Lost' : 'Mark Lost'}</button>
     </div>
   </div>`;
 }
@@ -22574,6 +22644,21 @@ async function _apxLostConfirm(id) {
   });
 }
 async function _apxLostDismiss(id) { try { await _apxPost('/api/agent-approvals', 'skip-ready', { ready_id: id }); _apxRemove(id); _apxToast('Dismissed', true); } catch (e) { _apxToast(_apxErr(e), false); } }
+// Abandon a suggested-lost lead: remove from the pipeline with NO nurture and no
+// closing message (vs Mark Lost, which enrolls them in the nurture automation).
+async function _apxLostAbandon(id) {
+  const r = _APX_DATA.lost.find(x => x.id === id); if (!r) return;
+  _plConfirmModal({
+    icon: '🗑',
+    title: 'Abandon ' + (r.contact_name || 'this lead') + '?',
+    body: 'Removes them from the pipeline. No nurture automation, no message sent.',
+    okLabel: 'Abandon',
+    onOk: async () => {
+      try { await _apxPost('/api/agent-approvals', 'confirm-abandoned', { ready_id: r.id }); _apxRemove(id); _apxToast('🗑 Abandoned', true); }
+      catch (e) { _apxToast(_apxErr(e), false); }
+    },
+  });
+}
 
 // A blue "booking request" card. The lead confirmed a slot; confirming creates
 // the real GHL appointment (GHL's automation then sends the confirmation).
@@ -22654,8 +22739,23 @@ function _apxRender() {
   } else if (_APX_TAB === 'lost') {
     inner = lostN ? lost.map(_apxLostCard).join('') : _apxEmpty('No suggested-lost leads.');
   }
-  body.innerHTML = `<div style="max-width:860px;margin:0 auto">${inner}</div>`;
+  // Focused on one lead (from a Sales-board badge): show a banner + a "draft a
+  // follow-up now" CTA when they have nothing queued.
+  let focusBanner = '';
+  if (_APX_FILTER_CONTACT) {
+    const nm = escapeHTML(_APX_FILTER_NAME || 'this lead');
+    focusBanner = `<div style="display:flex;align-items:center;gap:8px;margin-bottom:13px;flex-wrap:wrap">
+      <span style="font-size:12.5px;font-weight:700;color:var(--blue,#5A8FB8);background:var(--blue-soft,rgba(90,143,184,0.14));border:1px solid var(--blue,#5A8FB8);border-radius:999px;padding:3px 11px">👤 ${nm}</span>
+      <button onclick="_apxOpen()" style="background:transparent;border:1px solid var(--border);color:var(--text-sub);border-radius:999px;padding:3px 11px;font-size:12px;cursor:pointer">Show all</button></div>`;
+    if (!(followups.length + readyN + lostN)) {
+      inner = `<div style="text-align:center;padding:18px 10px">
+        <div style="font-size:13.5px;color:var(--text-mute);margin-bottom:14px">Nothing queued for ${nm}. Schedule a follow-up so they don't go cold.</div>
+        <button onclick="_apxDraftForFocus()" style="background:var(--accent);border:none;color:#08080A;border-radius:9px;padding:10px 18px;font:inherit;font-size:13.5px;font-weight:700;cursor:pointer">⏰ Draft a follow-up now</button></div>`;
+    }
+  }
+  body.innerHTML = `<div style="max-width:860px;margin:0 auto">${focusBanner}${inner}</div>`;
 }
+function _apxDraftForFocus() { if (_APX_FILTER_CONTACT) _apxMandatoryFollowup(_APX_FILTER_CONTACT, _APX_FILTER_NAME); }
 
 function _apxRemove(id) {
   _APX_DATA.followups = _APX_DATA.followups.filter(x => x.id !== id);
@@ -22712,6 +22812,14 @@ async function _apxFollowupSkip(id) {
         if (lesson) await _apxTeach(lesson, r.draft_message, '', { source: 'hawkeye-followup-skip-lost', contact: r.contact_name || null });
       } catch (e) { _apxToast(_apxErr(e), false); }
     },
+    onAbandon: async () => {
+      if (!r.ghl_contact_id) { _apxToast('No contact linked - can\'t Abandon', false); return; }
+      _apxRemove(id); _apxToast('🗑 Abandoned', true);   // instant
+      try {
+        await _apxPost('/api/agent-followups', 'skip', { id });   // drop the nudge
+        await _apxPost('/api/agent-approvals', 'confirm-abandoned', { contact_id: r.ghl_contact_id });
+      } catch (e) { _apxToast(_apxErr(e), false); }
+    },
   });
 }
 async function _apxFollowupEdit(id) {
@@ -22748,9 +22856,130 @@ async function _apxReadyApprove(id) {
         });
         if (lesson) await _apxTeach(lesson, r.draft_message, r.draft_message, { source: 'hawkeye-approve', contact: r.contact_name || null });
         _apxRemove(id); _apxToast(lesson ? '✓ Sent + taught' : '✓ Sent', true);
+        // Forced 2-step: every Responded reply must be followed by a scheduled follow-up.
+        await _apxMandatoryFollowup(r.ghl_contact_id, r.contact_name, r.ghl_conversation_id);
       } catch (e) { _apxToast(_apxErr(e), false); }
     },
   });
+}
+
+// ════════════════════════════════════════════════════════════════════
+// FORCED FOLLOW-UP - the mandatory step after a Hawkeye reply is sent.
+// You approve the follow-up (queues the nudge → the lead is "All good"), or
+// take them off the board (Lost → nurture, or Abandon → gone). Every Responded
+// lead must leave with a follow-up queued. Also reached from a "Needs action"
+// badge on the Sales board. Layered at z-index 9620 (above the queue, below the
+// 9650 edit modal so editing sits on top).
+let _APX_MAND = null;   // { contactId, contactName, conversationId, followup }
+function _apxMandShell(inner) {
+  document.getElementById('apx-mand-overlay')?.remove();
+  document.body.insertAdjacentHTML('beforeend', `
+    <div id="apx-mand-overlay" style="position:fixed;inset:0;z-index:9620;background:rgba(0,0,0,.72);display:flex;align-items:flex-start;justify-content:center;padding:7vh 14px 0">
+      <div style="background:var(--surface);border:1px solid var(--blue,#5A8FB8);border-radius:16px;width:100%;max-width:520px;padding:18px;box-shadow:0 24px 70px rgba(0,0,0,.6)">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
+          <span style="font-size:16px;font-weight:800">⏰ Schedule the follow-up</span>
+          <span style="font-size:11px;font-weight:700;color:var(--blue,#5A8FB8);background:var(--blue-soft,rgba(90,143,184,0.14));border:1px solid var(--blue,#5A8FB8);border-radius:999px;padding:2px 9px">required</span>
+        </div>
+        <div id="apx-mand-inner">${inner}</div>
+      </div>
+    </div>`);
+}
+function _apxMandClose() { _APX_MAND = null; document.getElementById('apx-mand-overlay')?.remove(); }
+// Lost / Abandon buttons shared by every state of the mandatory card.
+function _apxMandLostAbandonBtns() {
+  return `<button onclick="_apxMandLost()" title="Mark Lost - enters the lead-nurture automation" style="background:rgba(224,90,66,0.08);border:1px solid #e0654f;color:#e0654f;border-radius:9px;padding:9px 13px;font:inherit;font-size:13px;font-weight:700;cursor:pointer">🚫 Lost</button>
+    <button onclick="_apxMandAbandon()" title="Abandon - removed from the pipeline, no nurture" style="background:transparent;border:1px solid var(--text-mute);color:var(--text-sub);border-radius:9px;padding:9px 13px;font:inherit;font-size:13px;cursor:pointer">🗑 Abandon</button>`;
+}
+async function _apxMandatoryFollowup(contactId, contactName, conversationId) {
+  if (!contactId) return;
+  _APX_MAND = { contactId, contactName: contactName || _plNameForContact(contactId) || 'this lead', conversationId: conversationId || null, followup: null };
+  _apxMandShell(`<div style="color:var(--text-mute);font-size:13px;padding:6px 0"><span class="req-spin"></span> Drafting the follow-up for ${escapeHTML(_APX_MAND.contactName)}…</div>`);
+  let resp;
+  try {
+    resp = await _apxPost('/api/agent-followups', 'draft-one', { contact_id: contactId, conversation_id: conversationId || null, contact_name: _APX_MAND.contactName });
+  } catch (e) {
+    if (!_APX_MAND) return;
+    _apxMandShell(`<div style="font-size:13px;color:#e07070;margin-bottom:14px">Couldn't draft the follow-up: ${escapeHTML(_apxErr(e))}</div>
+      <div style="display:flex;gap:9px;flex-wrap:wrap;justify-content:flex-end;align-items:center">
+        <button onclick="_apxMandClose()" style="background:transparent;border:none;color:var(--text-mute);font-size:12px;cursor:pointer;margin-right:auto">Later</button>
+        ${_apxMandLostAbandonBtns()}
+        <button onclick="_apxMandRetry()" style="background:var(--accent);border:none;color:#08080A;border-radius:9px;padding:9px 16px;font:inherit;font-size:13px;font-weight:700;cursor:pointer">Retry</button>
+      </div>`);
+    return;
+  }
+  if (!_APX_MAND) return;   // closed mid-flight
+  if (resp && resp.followup) { _APX_MAND.followup = resp.followup; return _apxMandApproveCard(); }
+  // Brain says no follow-up is warranted → take them off the board.
+  _apxMandShell(`<div style="font-size:13.5px;color:var(--text);margin-bottom:6px">The agent doesn't recommend another follow-up for ${escapeHTML(_APX_MAND.contactName)}.</div>
+    <div style="font-size:12.5px;color:var(--text-mute);margin-bottom:16px">${escapeHTML((resp && resp.reason) || 'They look done.')} Mark them Lost (keeps nurturing them) or Abandon (removes them).</div>
+    <div style="display:flex;gap:9px;flex-wrap:wrap;justify-content:flex-end;align-items:center">
+      <button onclick="_apxMandClose()" style="background:transparent;border:none;color:var(--text-mute);font-size:12px;cursor:pointer;margin-right:auto">Not now</button>
+      ${_apxMandLostAbandonBtns()}
+    </div>`);
+}
+function _apxMandRetry() { if (_APX_MAND) _apxMandatoryFollowup(_APX_MAND.contactId, _APX_MAND.contactName, _APX_MAND.conversationId); }
+function _apxMandApproveCard() {
+  const f = _APX_MAND && _APX_MAND.followup; if (!f) return;
+  const when = f.scheduled_at ? _apxWhen(f.scheduled_at) : 'soon';
+  _apxMandShell(`
+    <div style="font-size:12.5px;color:var(--text-mute);margin-bottom:8px">Message sent ✓ - now lock in the follow-up for <b style="color:var(--text)">${escapeHTML(_APX_MAND.contactName)}</b> so they never go cold.</div>
+    <div style="font-size:13.5px;line-height:1.5;color:var(--text);background:var(--bg);border:1px solid var(--border);border-radius:9px;padding:11px 13px;white-space:pre-wrap">${escapeHTML(f.draft_message || '')}</div>
+    <div style="font-size:12px;color:var(--blue,#5A8FB8);margin-top:8px">🕐 sends ${escapeHTML(when)}</div>
+    ${f.goal ? `<div style="font-size:11.5px;color:var(--text-mute);margin-top:4px">🎯 ${escapeHTML(f.goal)}</div>` : ''}
+    <div style="display:flex;align-items:center;gap:8px;margin-top:16px;flex-wrap:wrap">
+      <button onclick="_apxMandEdit()" style="background:transparent;border:1px solid var(--border);color:var(--text-sub);border-radius:9px;padding:9px 13px;font:inherit;font-size:13px;cursor:pointer">✎ Edit</button>
+      <div style="flex:1"></div>
+      ${_apxMandLostAbandonBtns()}
+      <button onclick="_apxMandApprove()" style="background:var(--accent);border:none;color:#08080A;border-radius:9px;padding:9px 18px;font:inherit;font-size:13.5px;font-weight:700;cursor:pointer">✓ Approve follow-up</button>
+    </div>`);
+}
+async function _apxMandApprove() {
+  const f = _APX_MAND && _APX_MAND.followup; if (!f) return;
+  const cid = _APX_MAND.contactId;
+  try {
+    await _apxPost('/api/agent-followups', 'approve', { id: f.id });
+    if (_PL_FU_PENDING && cid) _PL_FU_PENDING.add(String(cid));
+    _apxMandClose(); _apxToast('✓ Follow-up scheduled', true); _apxAfterMand();
+  } catch (e) { _apxToast(_apxErr(e), false); }
+}
+function _apxMandEdit() {
+  const f = _APX_MAND && _APX_MAND.followup; if (!f) return;
+  _apxEditModal({
+    title: 'Edit the follow-up message', value: f.draft_message || '', teachable: false,
+    onSave: async (text) => {
+      const t = (text || '').trim();
+      if (t && t !== f.draft_message) {
+        try { await _apxPost('/api/agent-followups', 'edit', { id: f.id, message: t }); f.draft_message = t; }
+        catch (e) { _apxToast(_apxErr(e), false); return; }
+      }
+      _apxMandApproveCard();
+    },
+  });
+}
+async function _apxMandLost() {
+  const c = _APX_MAND; if (!c) return;
+  try {
+    await _apxPost('/api/agent-approvals', 'confirm-lost', { contact_id: c.contactId, reply: '', lost_reason: 'Other' });
+    if (_PL_FU_PENDING && c.contactId) _PL_FU_PENDING.delete(String(c.contactId));
+    _plCloseByContact(c.contactId, 'lost');
+    _apxMandClose(); _apxToast('🚫 Marked Lost', true); _apxAfterMand();
+  } catch (e) { _apxToast(_apxErr(e), false); }
+}
+async function _apxMandAbandon() {
+  const c = _APX_MAND; if (!c) return;
+  try {
+    await _apxPost('/api/agent-approvals', 'confirm-abandoned', { contact_id: c.contactId });
+    if (_PL_FU_PENDING && c.contactId) _PL_FU_PENDING.delete(String(c.contactId));
+    _plCloseByContact(c.contactId, 'abandoned');
+    _apxMandClose(); _apxToast('🗑 Abandoned', true); _apxAfterMand();
+  } catch (e) { _apxToast(_apxErr(e), false); }
+}
+// After resolving the mandatory card: refresh the board badges, the Hawkeye
+// count, and (if the queue is open) the focused/full list.
+function _apxAfterMand() {
+  try { if (typeof _renderPipelineBoard === 'function') _renderPipelineBoard(); } catch (_) {}
+  try { _apxRefreshCount(); } catch (_) {}
+  try { if (document.getElementById('apx-overlay')) _apxLoad(); } catch (_) {}
 }
 
 // ── Ready-reply actions (send = approve + fire via agent-approvals) ──
@@ -22766,6 +22995,8 @@ async function _apxReadySend(id) {
       reply_count: r.reply_count, booking_asks: r.booking_asks, ready_id: r.id,
     });
     _apxRemove(id); _apxToast(resp && resp.deferred ? _apxQuietMsg(resp.send_after) : '✓ Sent', true);
+    // Forced 2-step: every Responded reply must be followed by a scheduled follow-up.
+    await _apxMandatoryFollowup(r.ghl_contact_id, r.contact_name, r.ghl_conversation_id);
   } catch (e) { _apxToast(_apxErr(e), false); }
 }
 // The ✕ flow (replies AND follow-ups): skip with an optional lesson, OR mark
@@ -22776,12 +23007,15 @@ function _apxSkipModal(r, handlers) {
     <div id="apx-edit-overlay" onclick="if(event.target===this)this.remove()" style="position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9650;display:flex;align-items:flex-start;justify-content:center;padding:7vh 14px 0">
       <div style="background:var(--surface);border:1px solid var(--border);border-radius:16px;width:100%;max-width:520px;padding:18px;box-shadow:0 20px 60px rgba(0,0,0,.5)">
         <div style="font-size:15px;font-weight:700;margin-bottom:3px">Skip the draft for ${escapeHTML(r.contact_name || 'this lead')}?</div>
-        <div style="font-size:12px;color:var(--text-mute);margin-bottom:13px">Skip it, or mark the lead Lost. Teaching the agent why is optional either way.</div>
+        <div style="font-size:12px;color:var(--text-mute);margin-bottom:13px">Skip it, mark the lead Lost (nurture), or Abandon (remove). Teaching the agent why is optional.</div>
         <label style="display:block;font-size:11px;color:var(--text-mute);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">why? (teach the agent)</label>
         <input id="apx-skip-lesson" type="text" placeholder="e.g. they already said no / wrong number / picked another program" style="width:100%;background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);padding:10px 12px;font:inherit;font-size:13px;outline:none">
         <div id="apx-skip-note" style="font-size:11.5px;color:#e0654f;margin-top:6px;min-height:14px"></div>
-        <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-top:8px">
-          <button id="apx-skip-lost" style="background:rgba(224,90,66,0.08);border:1px solid #e0654f;color:#e0654f;border-radius:9px;padding:10px 16px;font:inherit;font-size:13.5px;font-weight:700;cursor:pointer">🚫 Mark lost</button>
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-top:8px;flex-wrap:wrap">
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <button id="apx-skip-lost" title="Lost - enters the nurture automation" style="background:rgba(224,90,66,0.08);border:1px solid #e0654f;color:#e0654f;border-radius:9px;padding:10px 14px;font:inherit;font-size:13.5px;font-weight:700;cursor:pointer">🚫 Mark lost</button>
+            ${handlers.onAbandon ? `<button id="apx-skip-abandon" title="Abandon - removed from pipeline, no nurture" style="background:transparent;border:1px solid var(--text-mute);color:var(--text-sub);border-radius:9px;padding:10px 14px;font:inherit;font-size:13.5px;cursor:pointer">🗑 Abandon</button>` : ''}
+          </div>
           <div style="display:flex;gap:10px">
             <button onclick="document.getElementById('apx-edit-overlay').remove()" style="background:transparent;border:1px solid var(--border);color:var(--text-sub);border-radius:9px;padding:10px 16px;font:inherit;font-size:13.5px;cursor:pointer">Cancel</button>
             <button id="apx-skip-go" style="background:var(--accent);border:none;color:#08080A;border-radius:9px;padding:10px 20px;font:inherit;font-size:13.5px;font-weight:700;cursor:pointer">Skip</button>
@@ -22796,6 +23030,8 @@ function _apxSkipModal(r, handlers) {
     const l = val();
     document.getElementById('apx-edit-overlay')?.remove(); handlers.onLost(l);
   };
+  const abBtn = document.getElementById('apx-skip-abandon');
+  if (abBtn) abBtn.onclick = () => { document.getElementById('apx-edit-overlay')?.remove(); handlers.onAbandon && handlers.onAbandon(); };
 }
 
 async function _apxReadySkip(id) {
@@ -22816,6 +23052,11 @@ async function _apxReadySkip(id) {
         await _apxPost('/api/agent-approvals', 'confirm-lost', { ready_id: id, reply: '', lost_reason: 'Other' });
         if (lesson) await _apxTeach(lesson, r.draft_message, '', { source: 'hawkeye-skip-lost', contact: r.contact_name || null });
       } catch (e) { _apxToast(_apxErr(e), false); }
+    },
+    onAbandon: async () => {
+      _apxRemove(id); _apxToast('🗑 Abandoned', true);   // instant
+      try { await _apxPost('/api/agent-approvals', 'confirm-abandoned', { ready_id: id }); }
+      catch (e) { _apxToast(_apxErr(e), false); }
     },
   });
 }

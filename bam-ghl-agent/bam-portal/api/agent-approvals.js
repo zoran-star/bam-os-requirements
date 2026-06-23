@@ -648,10 +648,50 @@ async function handler(req, res) {
       } catch (e) { return res.status(e.status || 502).json({ error: `GHL mark lost: ${e.message}` }); }
       const reason = (b.lost_reason || (row && row.lost_reason) || "").toString().trim() || null;
       try { await sb(`pipeline_outcomes`, { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify([{ client_id: clientId, opportunity_id: oppId, status: "lost", reason }]) }); } catch (_) {}
+      // Lost → lead-nurture: enroll the contact into the academy's nurture workflow
+      // so they keep getting touched over time. Dormant until the academy sets
+      // ghl_kpi_config.lost_nurture_workflow_id — no-op (and zero V1 impact) until then.
+      const lostNurtureWf = (client && client.ghl_kpi_config && client.ghl_kpi_config.lost_nurture_workflow_id || "").toString().trim();
+      let nurtured = false;
+      if (lostNurtureWf) {
+        try {
+          await ghl("POST", `/contacts/${encodeURIComponent(contactId)}/workflow/${encodeURIComponent(lostNurtureWf)}`, { token, body: { eventStartTime: new Date().toISOString().replace(/\.\d{3}Z$/, "+00:00") } });
+          nurtured = true;
+        } catch (_) { /* nurture is best-effort — never block the Lost mark */ }
+      }
       // Clear ALL of this lead's queued cards (replies + follow-ups) — they're Lost now.
       try { await sb(`agent_ready_replies?client_id=eq.${clientId}&ghl_contact_id=eq.${encodeURIComponent(contactId)}&status=in.(pending,approved)`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ status: "sent", approved_by: staffEmail, approved_at: new Date().toISOString(), sent_at: new Date().toISOString(), updated_at: new Date().toISOString() }) }); } catch (_) {}
       try { await sb(`agent_followups?client_id=eq.${clientId}&ghl_contact_id=eq.${encodeURIComponent(contactId)}&status=in.(pending,approved)`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ status: "canceled", send_error: "marked lost", updated_at: new Date().toISOString() }) }); } catch (_) {}
-      return res.status(200).json({ ok: true, marked_lost: true, opportunity_id: oppId, reason });
+      return res.status(200).json({ ok: true, marked_lost: true, opportunity_id: oppId, reason, nurtured });
+    }
+
+    // Abandon: like confirm-lost, but the lead is just REMOVED from the pipeline
+    // (status 'abandoned') — NO nurture automation, NO closing message. "Get them
+    // out." Used by the Hawkeye ✕/Lost flow's Abandon button.
+    if (b.action === "confirm-abandoned") {
+      let row = null, contactId = b.contact_id || null;
+      if (b.ready_id) {
+        [row] = await sb(`agent_ready_replies?id=eq.${encodeURIComponent(b.ready_id)}&client_id=eq.${clientId}&select=*`);
+        if (!row) return res.status(404).json({ error: "not found" });
+        contactId = row.ghl_contact_id;
+      }
+      if (!contactId) return res.status(400).json({ error: "ready_id or contact_id required" });
+      let oppId = null;
+      try {
+        const d = await ghl("GET", `/opportunities/search?${new URLSearchParams({ location_id: locationId, contact_id: contactId, limit: "20" })}`, { token });
+        const opps = d.opportunities || d.data || [];
+        const pick = opps.find(o => String(o.status || "").toLowerCase() === "open") || opps[0];
+        oppId = pick && pick.id;
+      } catch (e) { return res.status(e.status || 502).json({ error: `GHL find opp: ${e.message}` }); }
+      if (!oppId) return res.status(200).json({ error: "No opportunity found for this contact — nothing to abandon." });
+      try {
+        await ghl("PUT", `/opportunities/${encodeURIComponent(oppId)}`, { token, body: { status: "abandoned" } });
+      } catch (e) { return res.status(e.status || 502).json({ error: `GHL abandon: ${e.message}` }); }
+      const reason = (b.reason || (row && row.lost_reason) || "").toString().trim() || null;
+      try { await sb(`pipeline_outcomes`, { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify([{ client_id: clientId, opportunity_id: oppId, status: "abandoned", reason }]) }); } catch (_) {}
+      try { await sb(`agent_ready_replies?client_id=eq.${clientId}&ghl_contact_id=eq.${encodeURIComponent(contactId)}&status=in.(pending,approved)`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ status: "sent", approved_by: staffEmail, approved_at: new Date().toISOString(), sent_at: new Date().toISOString(), updated_at: new Date().toISOString() }) }); } catch (_) {}
+      try { await sb(`agent_followups?client_id=eq.${clientId}&ghl_contact_id=eq.${encodeURIComponent(contactId)}&status=in.(pending,approved)`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ status: "canceled", send_error: "abandoned", updated_at: new Date().toISOString() }) }); } catch (_) {}
+      return res.status(200).json({ ok: true, marked_abandoned: true, opportunity_id: oppId, reason });
     }
 
     // Human ✓ on a booking proposal → create the real GHL appointment. GHL's
