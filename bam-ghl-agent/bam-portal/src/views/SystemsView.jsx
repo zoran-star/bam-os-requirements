@@ -1207,9 +1207,9 @@ export function TicketModal({ ticket: initial, me, isManager, pool, tokens: t, d
           {/* Manager: approve / good-to-finalize / deny / send-for-final-review on in_review */}
           {isManager && ticket.status === "in_review" && (
             <>
-              <button disabled={busy || connectBlocks} onMouseDown={e => e.preventDefault()} onClick={() => wrap(() => approveTicket(ticket.id))} style={btn(t, "primary")} title={connectBlocks ? "Connect at least one pipeline/product/calendar to an offer first" : ""}>Approve</button>
+              <button disabled={busy || connectBlocks} onMouseDown={e => e.preventDefault()} onClick={() => wrap(() => approveTicket(ticket.id))} style={{...btn(t, "primary"), opacity: (busy || connectBlocks) ? 0.4 : 1, cursor: connectBlocks ? "not-allowed" : "pointer"}} title={connectBlocks ? "Connect at least one pipeline/product/calendar to an offer first" : ""}>Approve</button>
               <button disabled={busy} onMouseDown={e => e.preventDefault()} onClick={() => wrap(() => goodToFinalize(ticket.id))} style={btn(t, "ghost")} title="Work looks good — back to the executor for final touches, then Mark complete">Good to finalize</button>
-              <button disabled={busy} onMouseDown={e => e.preventDefault()} onClick={() => wrap(() => sendForFinalReview(ticket.id))} style={btn(t, "primary")} title="Send to client for final sign-off">Mark complete for review</button>
+              <button disabled={busy} onMouseDown={e => e.preventDefault()} onClick={() => wrap(() => sendForFinalReview(ticket.id))} style={{...btn(t, "primary"), opacity: busy ? 0.4 : 1}} title="Send to client for final sign-off">Mark complete for review</button>
               {!showDeny && <button disabled={busy} onMouseDown={e => e.preventDefault()} onClick={() => setShowDeny(true)} style={btn(t, "danger-ghost")}>Deny</button>}
             </>
           )}
@@ -1222,12 +1222,12 @@ export function TicketModal({ ticket: initial, me, isManager, pool, tokens: t, d
               disabled={busy || connectBlocks}
               onMouseDown={e => e.preventDefault()}
               onClick={() => { if (confirm("Mark this ticket complete?")) wrap(() => approveTicket(ticket.id)); }}
-              style={btn(t, "primary")}
+              style={{...btn(t, "primary"), opacity: (busy || connectBlocks) ? 0.4 : 1, cursor: connectBlocks ? "not-allowed" : "pointer"}}
               title={connectBlocks ? "Connect at least one pipeline/product/calendar to an offer first" : ""}
             >✓ Mark complete</button>
           )}
           {connectBlocks && (
-            <div style={{ fontSize: 12, color: t.amber || t.red, alignSelf: "center" }}>⚠ Connect at least one pipeline / product / calendar to an offer before completing.</div>
+            <div style={{ fontSize: 12, color: t.amber || t.red, alignSelf: "center" }}>⚠ Offer not connected - Approve is locked. Client review is still available.</div>
           )}
 
           {/* Cancel ticket — any systems staff can cancel at any non-final
