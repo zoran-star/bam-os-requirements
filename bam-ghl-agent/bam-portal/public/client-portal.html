@@ -22025,7 +22025,13 @@ async function _apxTeach(lesson, before, after, context) {
 }
 
 // ── Follow-up actions ──
-async function _apxFollowupSend(id) { try { await _apxPost('/api/agent-followups', 'send-now', { id }); _apxRemove(id); _apxToast('✓ Sent', true); } catch (e) { _apxToast(_apxErr(e), false); } }
+// Outside 8:00am-9:30pm the agent holds the message; tell the user when it'll go.
+function _apxQuietMsg(iso) {
+  let t = '8 AM';
+  try { if (iso) t = new Date(iso).toLocaleString([], { weekday: 'short', hour: 'numeric', minute: '2-digit' }); } catch (e) {}
+  return '📅 Quiet hours - scheduled for ' + t;
+}
+async function _apxFollowupSend(id) { try { const resp = await _apxPost('/api/agent-followups', 'send-now', { id }); _apxRemove(id); _apxToast(resp && resp.deferred ? _apxQuietMsg(resp.send_after) : '✓ Sent', true); } catch (e) { _apxToast(_apxErr(e), false); } }
 async function _apxFollowupSkip(id) { try { await _apxPost('/api/agent-followups', 'skip', { id }); _apxRemove(id); _apxToast('Skipped', true); } catch (e) { _apxToast(_apxErr(e), false); } }
 async function _apxFollowupEdit(id) {
   const r = _APX_DATA.followups.find(x => x.id === id) || _APX_DATA.ready.find(x => x.id === id); if (!r) return;
@@ -22049,12 +22055,12 @@ async function _apxReadySend(id) {
   if (r._isFollowup) return _apxFollowupSend(id);
   if (r.escalate && !confirm('The agent escalated this one (it wanted a human). Send the draft anyway?')) return;
   try {
-    await _apxPost('/api/agent-approvals', 'send', {
+    const resp = await _apxPost('/api/agent-approvals', 'send', {
       contact_id: r.ghl_contact_id, reply: r.draft_message, conversation_id: r.ghl_conversation_id || null,
       contact_name: r.contact_name || null, reasoning: r.reasoning || null, confidence: r.confidence,
       reply_count: r.reply_count, booking_asks: r.booking_asks, ready_id: r.id,
     });
-    _apxRemove(id); _apxToast('✓ Sent', true);
+    _apxRemove(id); _apxToast(resp && resp.deferred ? _apxQuietMsg(resp.send_after) : '✓ Sent', true);
   } catch (e) { _apxToast(_apxErr(e), false); }
 }
 async function _apxReadySkip(id) {
@@ -22202,11 +22208,12 @@ async function _botSend() {
   const chk = document.getElementById('bot-learn-chk');
   const lesson = (chk && chk.checked) ? (document.getElementById('bot-learn-box')?.value || '').trim() : '';
   try {
-    await _botApi('send', {
+    const resp = await _botApi('send', {
       contact_id: q.contact_id, conversation_id: q.draft.conversation_id || q.conversation_id, contact_name: q.name,
       reply, suggested_reply: q.draft.reply, reasoning: q.draft.reasoning, confidence: q.draft.confidence,
       reply_count: q.draft.reply_count, booking_asks: q.draft.booking_asks, adjusted, lesson: lesson || undefined,
     });
+    if (resp && resp.deferred) { try { _apxToast(_apxQuietMsg(resp.send_after), true); } catch (e) {} }
     _botAdvance(q.idx);
   } catch (e) { alert('Could not send: ' + e.message); }
 }

@@ -23,7 +23,8 @@ import { pickGhlToken, ghl } from "./ghl/_core.js";
 import { assemblePrompt } from "./agent/prompt-structure.js";
 import { loadContactMemory } from "./agent/contact-memory.js";
 import { buildAgentSystem } from "./agent/brain.js";
-import { toIso, respondedContactIds } from "./agent/_stage.js";
+import { toIso, respondedContactIds, respondedContactIdSetCached, peekRespondedIdSet } from "./agent/_stage.js";
+import { withinQuietHours, nextSendableTime } from "./agent/_quiet.js";
 import { agentMode, modeIsOn, modeSelfDrives, SELF_DRIVE_MIN_CONFIDENCE } from "./agent/_mode.js";
 import { resolveAgentActor } from "./agent/_auth.js";
 
@@ -205,7 +206,8 @@ async function detectForClient(client) {
 
     if (!decision.should_followup || !decision.message || !String(decision.message).trim()) { stopped++; continue; }
     const sendInH = clamp(Number(decision.send_in_hours) || 24, 1, MAX_AGE_DAYS * 24);
-    const scheduledAt = new Date(Date.now() + sendInH * 3600000).toISOString();
+    // Never schedule a send outside quiet hours (8:00am-9:30pm) — push to the morning.
+    const scheduledAt = nextSendableTime(new Date(Date.now() + sendInH * 3600000)).toISOString();
     // The lead's last actual message (so the card can show "what they last said").
     const lastLeadMsg = [...thread].reverse().find(m => m.role === "parent");
     try {
@@ -292,6 +294,10 @@ async function runWork(res) {
   // Approved rows always send (human said yes). In SELF-DRIVE, high-confidence
   // pending rows send themselves too; low-confidence ones stay pending for the
   // inbox ("unsure → a human"). Hawkeye pending rows never auto-send.
+  // Quiet hours guard: even if a row came due, never send outside 8:00am-9:30pm.
+  // Cron lag (a row scheduled for 9:25pm picked up at 9:40pm) lands here — leave the
+  // rows pending; the next in-window run sends them.
+  if (!withinQuietHours()) return res.status(200).json({ ok: true, processed: 0, deferred: "quiet hours" });
   let due = [];
   try {
     due = await sb(`agent_followups?status=in.(pending,approved)&scheduled_at=lte.${new Date().toISOString()}&select=*&order=scheduled_at.asc&limit=80`);
@@ -342,7 +348,33 @@ async function handler(req, res) {
       const weekAgo = new Date(Date.now() - 7 * 86400000).toISOString();
       // Upcoming (pending/approved) + recent terminal (sent/skipped/canceled/failed in last 7d).
       const rows = await sb(`agent_followups?select=*,clients(business_name)&or=(status.in.(pending,approved),and(status.in.(sent,skipped,canceled,failed),updated_at.gte.${weekAgo}))${clientFilter}&order=scheduled_at.asc&limit=300`);
-      const list = (Array.isArray(rows) ? rows : []).map(r => ({ ...r, business_name: r.clients?.business_name || null, clients: undefined }));
+      let list = (Array.isArray(rows) ? rows : []).map(r => ({ ...r, business_name: r.clients?.business_name || null, clients: undefined }));
+      // Read-time Responded gate (same as agent-approvals list-ready): hide
+      // pending/approved nudges whose lead has left the Responded stage before the
+      // cron prunes them. Terminal rows (sent/skipped/...) are history — left as-is.
+      // Per academy, since a staff view can span clients. Fail OPEN on any GHL error.
+      try {
+        const clientIds = [...new Set(list.filter(r => r.status === "pending" || r.status === "approved").map(r => r.client_id).filter(Boolean))];
+        const idsByClient = {};
+        for (const cid of clientIds) {
+          try {
+            const client = await loadClient(cid);
+            const loc = client && client.ghl_location_id;
+            let ids = loc ? peekRespondedIdSet(loc) : undefined;   // hot path: skip token fetch
+            if (ids === undefined && loc) {
+              const creds = await pickGhlToken(client);
+              ids = creds ? await respondedContactIdSetCached(creds.token, loc) : null;
+            }
+            idsByClient[cid] = ids ?? null;
+          } catch (_) { idsByClient[cid] = null; }   // fail open for this academy
+        }
+        list = list.filter(r => {
+          if (r.status !== "pending" && r.status !== "approved") return true;   // keep history
+          const ids = idsByClient[r.client_id];
+          if (!ids) return true;                       // no gate available → keep
+          return !r.ghl_contact_id || ids.has(r.ghl_contact_id);
+        });
+      } catch (_) { /* fail open */ }
       return res.status(200).json({ followups: list });
     }
     if (b.action === "approve") {
@@ -377,6 +409,14 @@ async function handler(req, res) {
       const [row] = await sb(`agent_followups?id=eq.${encodeURIComponent(b.id)}${clientScope}&select=*`);
       if (!row) return res.status(404).json({ error: "not found" });
       if (!["pending", "approved"].includes(row.status)) return res.status(409).json({ error: `already ${row.status}` });
+      // QUIET HOURS: a human hit "send now" after 9:30pm / before 8am. Don't text
+      // the parent now — approve it and reschedule to the morning so the send cron
+      // picks it up in-window.
+      if (!withinQuietHours()) {
+        const sendAfter = nextSendableTime().toISOString();
+        await sb(`agent_followups?id=eq.${encodeURIComponent(b.id)}${clientScope}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ status: "approved", scheduled_at: sendAfter, approved_by: staffEmail, approved_at: new Date().toISOString(), updated_at: new Date().toISOString() }) });
+        return res.status(200).json({ ok: true, deferred: true, send_after: sendAfter });
+      }
       const r = await sendOne(row, {});
       if (r.error) return res.status(502).json({ error: r.error });
       return res.status(200).json({ ok: true, result: r });
