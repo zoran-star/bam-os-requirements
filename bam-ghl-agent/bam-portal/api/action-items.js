@@ -1,4 +1,5 @@
 import { withSentryApiRoute } from "./_sentry.js";
+import { notifyOwners } from "./_notify-owners.js";
 // Vercel Serverless Function — Action Items (v1)
 //
 // A shared per-client to-do list. Visible to the academy team (client portal)
@@ -516,6 +517,8 @@ async function handler(req, res) {
       notifyClientPush(clientId, "action-item-assigned", {
         label: title, itemId: item.id, view: "action-items",
       }).catch(() => {});
+      // Owner/staff SMS (V1.5/V2, per notification_prefs)
+      notifyOwners(clientId, "action_item", `📋 New action item: ${title}`).catch(() => {});
       return res.status(200).json({ item });
     }
 
