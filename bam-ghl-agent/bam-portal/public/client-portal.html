@@ -26806,7 +26806,7 @@ async function _memberUpdateField(memberId, field, value) {
     await openMemberPopup(memberId);
     fetchAndRenderMembers();  // also refresh the roster behind the drawer
   } catch (e) {
-    alert('Update failed: ' + e.message);
+    _plToast('Update failed: ' + e.message);
   }
 }
 
@@ -26841,6 +26841,93 @@ function _localTodayYMD() {
   return `${y}-${m}-${day}`;
 }
 
+// ── Member-management modal (replaces native confirm()/prompt()) ──
+// Promise-based styled form modal. Resolves to a values object keyed by
+// field.key on confirm, or null on cancel/close. With no fields it acts as a
+// styled confirm (resolves {} on OK).
+//   opts: { icon, title, body, okLabel, danger, fields:[...] }
+//   field: { key, label, type, value, placeholder, hint, required, options, min, max, rows, validate(v)->errStr }
+//     type: 'text' | 'number' | 'date' | 'textarea' | 'select' | 'radio'
+//     options (select/radio): [{ value, label, hint }]
+function _mmFieldHtml(f) {
+  const esc = (s) => escapeHTML(String(s == null ? '' : s));
+  const base = 'width:100%;background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);padding:10px 12px;font:inherit;font-size:13.5px;outline:none;box-sizing:border-box';
+  const lbl = f.label ? `<label style="display:block;font-size:11px;font-weight:700;color:var(--text-sub);margin-bottom:6px;text-transform:uppercase;letter-spacing:.05em">${esc(f.label)}</label>` : '';
+  const hint = f.hint ? `<div style="font-size:11.5px;color:var(--text-mute);margin-top:6px;line-height:1.45">${f.hint}</div>` : '';
+  let ctrl = '';
+  if (f.type === 'textarea') {
+    ctrl = `<textarea id="mm-f-${f.key}" rows="${f.rows || 3}" placeholder="${esc(f.placeholder)}" style="${base};resize:vertical">${esc(f.value)}</textarea>`;
+  } else if (f.type === 'select') {
+    ctrl = `<select id="mm-f-${f.key}" style="${base}">${(f.options || []).map(o => `<option value="${esc(o.value)}" ${o.value === f.value ? 'selected' : ''}>${esc(o.label)}</option>`).join('')}</select>`;
+  } else if (f.type === 'radio') {
+    ctrl = `<div style="display:flex;flex-direction:column;gap:8px">${(f.options || []).map((o, i) => `
+      <label style="display:flex;align-items:flex-start;gap:10px;padding:11px 13px;border:1px solid var(--border-med);border-radius:9px;cursor:pointer">
+        <input type="radio" name="mm-f-${f.key}" value="${esc(o.value)}" ${(f.value != null ? o.value === f.value : i === 0) ? 'checked' : ''} style="margin-top:2px;accent-color:var(--gold)">
+        <span><span style="font-size:13.5px;font-weight:600;color:var(--text)">${esc(o.label)}</span>${o.hint ? `<span style="display:block;font-size:11.5px;color:var(--text-mute);margin-top:2px">${esc(o.hint)}</span>` : ''}</span>
+      </label>`).join('')}</div>`;
+  } else {
+    ctrl = `<input id="mm-f-${f.key}" type="${f.type || 'text'}" value="${esc(f.value)}" placeholder="${esc(f.placeholder)}" ${f.min != null ? `min="${f.min}"` : ''} ${f.max != null ? `max="${f.max}"` : ''} style="${base}">`;
+  }
+  return `<div style="margin-bottom:16px;text-align:left">${lbl}${ctrl}${hint}</div>`;
+}
+function _mmModalErr(msg) {
+  const el = document.getElementById('mm-modal-err');
+  if (el) { el.textContent = msg; el.style.display = 'block'; }
+}
+function _mmModal(opts = {}) {
+  return new Promise(resolve => {
+    document.getElementById('mm-modal-overlay')?.remove();
+    const fields = opts.fields || [];
+    const okBg = opts.danger ? '#c0392b' : 'var(--gold,#E8C547)';
+    const okCol = opts.danger ? '#fff' : '#0B0B0D';
+    document.body.insertAdjacentHTML('beforeend', `<div id="mm-modal-overlay" style="position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9300;display:flex;align-items:center;justify-content:center;padding:18px" onclick="if(event.target===this){this.remove();window.__mmResolve&&window.__mmResolve(null)}">
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;width:100%;max-width:440px;padding:24px;box-shadow:0 20px 60px rgba(0,0,0,.5);max-height:88vh;overflow:auto">
+        ${opts.icon ? `<div style="font-size:30px;line-height:1;margin-bottom:12px">${opts.icon}</div>` : ''}
+        <div style="font-size:18px;font-weight:700;color:var(--text);margin-bottom:${opts.body ? '6px' : '16px'}">${opts.title || 'Are you sure?'}</div>
+        ${opts.body ? `<div style="font-size:13.5px;color:var(--text-sub);line-height:1.5;margin-bottom:18px">${opts.body}</div>` : ''}
+        <div id="mm-modal-fields">${fields.map(_mmFieldHtml).join('')}</div>
+        <div id="mm-modal-err" style="display:none;font-size:12.5px;color:#e07a6b;margin-bottom:12px"></div>
+        <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:4px">
+          <button id="mm-modal-cancel" style="background:none;border:1px solid var(--border);border-radius:9px;color:var(--text-sub);padding:9px 18px;font:inherit;font-size:13px;cursor:pointer">Cancel</button>
+          <button id="mm-modal-ok" style="background:${okBg};color:${okCol};border:none;border-radius:9px;padding:9px 20px;font:inherit;font-size:13px;font-weight:700;cursor:pointer">${opts.okLabel || 'Confirm'}</button>
+        </div>
+      </div></div>`);
+    const overlay = document.getElementById('mm-modal-overlay');
+    let done = false;
+    const onKey = (e) => { if (e.key === 'Escape') finish(null); };
+    function finish(val) {
+      if (done) return; done = true;
+      document.removeEventListener('keydown', onKey);
+      window.__mmResolve = null;
+      overlay.remove();
+      resolve(val);
+    }
+    window.__mmResolve = finish;  // let the inline click-outside handler resolve too
+    document.addEventListener('keydown', onKey);
+    document.getElementById('mm-modal-cancel').onclick = () => finish(null);
+    document.getElementById('mm-modal-ok').onclick = () => {
+      const values = {};
+      for (const f of fields) {
+        let v;
+        if (f.type === 'radio') {
+          const checked = overlay.querySelector(`input[name="mm-f-${f.key}"]:checked`);
+          v = checked ? checked.value : '';
+        } else {
+          const el = document.getElementById('mm-f-' + f.key);
+          v = el ? el.value : '';
+        }
+        if (typeof v === 'string') v = v.trim();
+        if (f.required && !v) { _mmModalErr((f.label || 'This field') + ' is required.'); return; }
+        if (v && typeof f.validate === 'function') { const msg = f.validate(v); if (msg) { _mmModalErr(msg); return; } }
+        values[f.key] = v;
+      }
+      finish(values);
+    };
+    const first = overlay.querySelector('#mm-modal-fields input, #mm-modal-fields select, #mm-modal-fields textarea');
+    if (first) setTimeout(() => { try { first.focus(); } catch (_) {} }, 30);
+  });
+}
+
 async function mPause(memberId) {
   // Re-pause detection. Pull the freshest known state - if we have a list
   // cache, use it; otherwise fall back to a fresh single-member fetch so a
@@ -26860,123 +26947,154 @@ async function mPause(memberId) {
   const hasQueuedPause = m && m.pause_scheduled_for && m.status !== 'paused';
   const labelHead = (isUpdatingExistingPause || hasQueuedPause) ? 'Update pause' : 'Pause';
 
-  if (isUpdatingExistingPause) {
-    if (!confirm('This member is already paused. Update the pause window?')) return;
-  } else if (hasQueuedPause) {
-    if (!confirm(`A pause is queued to start ${m.pause_scheduled_for}. Replace it?`)) return;
-  }
+  let note = '';
+  if (isUpdatingExistingPause) note = 'This member is already paused - this updates the pause window.';
+  else if (hasQueuedPause) note = `A pause is queued to start ${escapeHTML(m.pause_scheduled_for)} - this replaces it.`;
 
   const today = _localTodayYMD();
-  const start = prompt(`${labelHead} - START date (YYYY-MM-DD):`, today);
-  if (start === null) return;
-  const startTrim = start.trim();
-  if (!_isValidYMD(startTrim)) { alert(`Start date "${startTrim}" is not a valid YYYY-MM-DD.`); return; }
+  const vals = await _mmModal({
+    icon: '⏸', title: labelHead, body: note, okLabel: labelHead,
+    fields: [
+      { key: 'start', label: 'Start date', type: 'date', value: today, required: true,
+        validate: v => _isValidYMD(v) ? '' : 'Use a valid YYYY-MM-DD date.' },
+      { key: 'end', label: 'End date', type: 'date', value: '', required: true,
+        validate: v => _isValidYMD(v) ? '' : 'Use a valid YYYY-MM-DD date.' },
+      { key: 'reason', label: 'Reason (optional)', type: 'text', placeholder: 'e.g. Injury, travel' },
+    ],
+  });
+  if (!vals) return;
+  const startTrim = vals.start, endTrim = vals.end;
+  if (endTrim <= startTrim) { _plToast('End date must be after start date.'); return; }
+  if (endTrim < today) { _plToast('End date is in the past - pick a future date.'); return; }
 
-  const end = prompt(`${labelHead} - END date (YYYY-MM-DD):`, '');
-  if (end === null) return;
-  const endTrim = end.trim();
-  if (!_isValidYMD(endTrim)) { alert(`End date "${endTrim}" is not a valid YYYY-MM-DD.`); return; }
-  if (endTrim <= startTrim) { alert('End date must be after start date.'); return; }
-  if (endTrim < today) { alert('End date is in the past - pick a future date.'); return; }
-
-  const reason = prompt(`${labelHead} - reason (optional)`, '');
   const body = { start_date: startTrim, end_date: endTrim };
-  if (reason && reason.trim()) body.reason = reason.trim();
+  if (vals.reason) body.reason = vals.reason;
 
   try {
     const r = await _memberAction(memberId, 'pause', body);
     let msg = isUpdatingExistingPause ? 'Pause updated.' : 'Paused.';
-    if (r.sub?.scheduled) {
-      msg = `🕐 Pause queued for ${startTrim}. The system will auto-activate it that morning.`;
-    }
-    if (r.sub?.capped_to_stripe_max) {
-      msg += '\n\n⚠ End date was capped to Stripe\'s 730-day max - the next-charge date is sooner than what you entered.';
-    }
-    if (r.sub?.resume_date) msg += `\n\nNext charge: ${r.sub.resume_date}`;
-    alert(msg);
+    if (r.sub?.scheduled) msg = `🕐 Pause queued for ${startTrim} - auto-activates that morning.`;
+    if (r.sub?.capped_to_stripe_max) msg += ' · ⚠ End date capped to Stripe 730-day max.';
+    if (r.sub?.resume_date) msg += ` · Next charge: ${r.sub.resume_date}`;
+    _plToast(msg);
     closeMemberPopup();
     await fetchAndRenderMembers();
   } catch (e) {
     // Translate known backend errors into targeted CTAs.
     const em = (e && e.message) || '';
     if (/payment[_ ]failed|past[_ ]due|payment link/i.test(em)) {
-      if (confirm(`${em}\n\nSend the parent a payment link now?`)) {
-        try { await mPaymentLink(memberId); } catch (_) { /* user already got the alert */ }
-      }
+      const go = await _mmModal({ icon: '⚠️', title: 'Payment issue', body: `${escapeHTML(em)}<br><br>Send the parent a payment link now?`, okLabel: 'Send link' });
+      if (go) { try { await mPaymentLink(memberId); } catch (_) { /* user already got the toast */ } }
       return;
     }
     if (/cancelling/i.test(em)) {
-      alert(`Pause can't be set on a cancelling member.\nUn-cancel them first (no API for that yet - Stripe Dashboard).`);
+      _plToast("Can't pause a cancelling member - un-cancel them first (Stripe Dashboard).");
       return;
     }
-    alert(`${labelHead} failed: ${em}`);
+    _plToast(`${labelHead} failed: ${em}`);
   }
 }
 
 async function mUnpause(memberId) {
-  const newDate = prompt('Unpause:\n  • leave blank → resume NOW\n  • or new end date (YYYY-MM-DD) to SHIFT the pause', '');
-  if (newDate === null) return;
+  const vals = await _mmModal({
+    icon: '▶️', title: 'Unpause', okLabel: 'Apply',
+    fields: [
+      { key: 'mode', label: 'How', type: 'radio', value: 'now', options: [
+        { value: 'now', label: 'Resume now', hint: 'Ends the pause immediately.' },
+        { value: 'shift', label: 'Shift the pause end date', hint: 'Keep paused, move the resume date.' },
+      ] },
+      { key: 'new_until', label: 'New end date (only if shifting)', type: 'date', value: '' },
+    ],
+  });
+  if (!vals) return;
   const body = {};
-  if (newDate.trim()) {
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(newDate.trim())) { alert('Date must be YYYY-MM-DD.'); return; }
-    body.new_until = newDate.trim();
+  if (vals.mode === 'shift') {
+    if (!_isValidYMD(vals.new_until)) { _plToast('Enter a valid end date to shift the pause.'); return; }
+    body.new_until = vals.new_until;
   }
   try {
     await _memberAction(memberId, 'unpause', body);
-    alert(body.new_until ? 'Pause shifted.' : 'Unpaused.');
+    _plToast(body.new_until ? 'Pause shifted.' : 'Unpaused.');
     closeMemberPopup();
     fetchAndRenderMembers();
-  } catch (e) { alert('Unpause failed: ' + e.message); }
+  } catch (e) { _plToast('Unpause failed: ' + e.message); }
 }
 
 async function mCancel(memberId, athleteName) {
-  if (!confirm(`Cancel ${athleteName}? They'll be removed from the active roster (cancellation history preserved).`)) return;
-  const reason = prompt('Reason (optional)', '');
-  const immediate = confirm('Cancel IMMEDIATELY?\n  OK = cancel sub now\n  Cancel = cancel at period end');
+  const vals = await _mmModal({
+    icon: '🚫', danger: true,
+    title: `Cancel ${escapeHTML(athleteName || 'this member')}?`,
+    body: `They'll be removed from the active roster. Cancellation history is preserved.`,
+    okLabel: 'Cancel membership',
+    fields: [
+      { key: 'when', label: 'When', type: 'radio', value: 'period_end', options: [
+        { value: 'period_end', label: 'At period end', hint: 'Stays active until the current paid period ends.' },
+        { value: 'immediate', label: 'Immediately', hint: 'Cancels the Stripe subscription right now.' },
+      ] },
+      { key: 'reason', label: 'Reason (optional)', type: 'textarea', rows: 2, placeholder: 'e.g. Moving away' },
+    ],
+  });
+  if (!vals) return;
   try {
-    await _memberAction(memberId, 'cancel', { reason: reason || null, immediate });
-    alert('Cancelled.');
+    await _memberAction(memberId, 'cancel', { reason: vals.reason || null, immediate: vals.when === 'immediate' });
+    _plToast('Membership cancelled.');
     closeMemberPopup();
     fetchAndRenderMembers();
-  } catch (e) { alert('Cancel failed: ' + e.message); }
+  } catch (e) { _plToast('Cancel failed: ' + e.message); }
 }
 
 async function mRefund(memberId) {
-  const chargeId = prompt('Stripe charge ID to refund (ch_...)\nFind in Stripe → Customer → Payments', '');
-  if (!chargeId || !chargeId.trim()) return;
-  const amountStr = prompt('Refund amount in CENTS (e.g. 9039 = $90.39)\nLeave blank for FULL refund', '');
-  if (amountStr === null) return;
-  const reason = prompt('Reason / note (e.g. "Plan downgrade - May cycle difference")', '');
-  const body = { charge_id: chargeId.trim() };
-  if (amountStr.trim()) body.amount_cents = parseInt(amountStr.trim(), 10);
-  if (reason && reason.trim()) body.notes = reason.trim();
+  const vals = await _mmModal({
+    icon: '💸', title: 'Refund', body: 'Find the charge ID in Stripe → Customer → Payments.', okLabel: 'Issue refund',
+    fields: [
+      { key: 'charge_id', label: 'Stripe charge ID', type: 'text', placeholder: 'ch_...', required: true,
+        validate: v => /^ch_/.test(v) ? '' : 'Charge IDs start with "ch_".' },
+      { key: 'amount', label: 'Amount in cents (blank = full refund)', type: 'number', placeholder: '9039 = $90.39' },
+      { key: 'notes', label: 'Reason / note', type: 'text', placeholder: 'e.g. Plan downgrade - May difference' },
+    ],
+  });
+  if (!vals) return;
+  const body = { charge_id: vals.charge_id };
+  if (vals.amount) body.amount_cents = parseInt(vals.amount, 10);
+  if (vals.notes) body.notes = vals.notes;
   try {
     const r = await _memberAction(memberId, 'refund', body);
-    alert(`Refunded $${(r.refund.amount_cents/100).toFixed(2)}\nStripe id: ${r.refund.id}`);
+    _plToast(`Refunded $${(r.refund.amount_cents / 100).toFixed(2)} (${r.refund.id}).`);
     closeMemberPopup();
     fetchAndRenderMembers();
-  } catch (e) { alert('Refund failed: ' + e.message); }
+  } catch (e) { _plToast('Refund failed: ' + e.message); }
 }
 
 async function mChange(memberId, currentPlan) {
-  const newPlan = prompt(`Change plan from "${currentPlan}" to:\n  • 1/wk   (Steady $226)\n  • 2/wk   (Accelerated $316)\n  • 3/wk   (Elevate $378)\n  • unlmtd (Dominate $638)`, '');
-  if (!newPlan || !newPlan.trim()) return;
-  const valid = ['1/wk','2/wk','3/wk','unlmtd'];
-  if (!valid.includes(newPlan.trim())) { alert('Invalid plan. Use: ' + valid.join(' · ')); return; }
-  const prorate = confirm('Prorate the difference NOW?\n  OK = prorated charge now (upgrades only)\n  Cancel = no proration');
+  const vals = await _mmModal({
+    icon: '🔄', title: 'Change plan', body: `Current plan: <b>${escapeHTML(currentPlan || '-')}</b>`, okLabel: 'Change plan',
+    fields: [
+      { key: 'new_plan', label: 'New plan', type: 'select', value: '1/wk', options: [
+        { value: '1/wk',   label: '1/wk - Steady ($226)' },
+        { value: '2/wk',   label: '2/wk - Accelerated ($316)' },
+        { value: '3/wk',   label: '3/wk - Elevate ($378)' },
+        { value: 'unlmtd', label: 'Unlimited - Dominate ($638)' },
+      ] },
+      { key: 'prorate', label: 'Proration', type: 'radio', value: 'no', options: [
+        { value: 'no',  label: 'No proration', hint: 'Change applies on the next cycle.' },
+        { value: 'yes', label: 'Prorate now', hint: 'Charge the prorated difference now (upgrades only).' },
+      ] },
+    ],
+  });
+  if (!vals) return;
   try {
-    const r = await _memberAction(memberId, 'change', { new_plan: newPlan.trim(), prorate });
-    alert(`Changed to ${newPlan.trim()} (${r.direction}${r.prorated ? ' · prorated' : ''}).`);
+    const r = await _memberAction(memberId, 'change', { new_plan: vals.new_plan, prorate: vals.prorate === 'yes' });
+    _plToast(`Changed to ${vals.new_plan} (${r.direction}${r.prorated ? ' · prorated' : ''}).`);
     closeMemberPopup();
     fetchAndRenderMembers();
-  } catch (e) { alert('Change failed: ' + e.message); }
+  } catch (e) { _plToast('Change failed: ' + e.message); }
 }
 
 async function mPaymentLink(memberId) {
   try {
     const r = await _memberAction(memberId, 'payment-link', {});
     _openPaymentLinkModal(memberId, r);
-  } catch (e) { alert('Payment link failed: ' + e.message); }
+  } catch (e) { _plToast('Payment link failed: ' + e.message); }
 }
 
 // Standalone "save your card" link (no sub attached) - for members with no card on
@@ -26985,7 +27103,7 @@ async function mGetCardLink(memberId) {
   try {
     const r = await _memberAction(memberId, 'card-setup-link', {});
     _openPaymentLinkModal(memberId, r);
-  } catch (e) { alert('Card link failed: ' + (e.message || e)); }
+  } catch (e) { _plToast('Card link failed: ' + (e.message || e)); }
 }
 
 // "Set up CoachIQ" on the member card → build the signup invite (copy + show).
@@ -27241,18 +27359,24 @@ async function _plSend(type, memberId) {
 }
 
 async function mReferred(memberId) {
-  const countStr = prompt('How many people did they refer? (1-10)\nEach referral = +4 weeks added to their next charge.', '1');
-  if (!countStr) return;
-  const count = parseInt(countStr.trim(), 10);
-  if (!Number.isFinite(count) || count < 1 || count > 10) { alert('Enter a number 1-10.'); return; }
-  if (!confirm(`Credit ${count} referral${count>1?'s':''} = ${count*4} weeks added. OK?`)) return;
+  const vals = await _mmModal({
+    icon: '🎁', title: 'Credit referrals', body: 'Each referral adds <b>4 free weeks</b> to their next charge.', okLabel: 'Add credit',
+    fields: [
+      { key: 'count', label: 'How many referrals? (1-10)', type: 'number', value: '1', min: 1, max: 10, required: true,
+        validate: v => { const n = parseInt(v, 10); return (Number.isFinite(n) && n >= 1 && n <= 10) ? '' : 'Enter a number from 1 to 10.'; } },
+    ],
+  });
+  if (!vals) return;
+  const count = parseInt(vals.count, 10);
+  const ok = await _mmModal({ icon: '🎁', title: 'Confirm referral credit', body: `Credit <b>${count}</b> referral${count > 1 ? 's' : ''} = <b>${count * 4} weeks</b> added?`, okLabel: 'Confirm' });
+  if (!ok) return;
   try {
     const r = await _memberAction(memberId, 'referred', { count });
-    const newDate = new Date(r.new_trial_end*1000).toISOString().slice(0,10);
-    alert(`Credited ${r.weeks_added} weeks.\nNext charge: ${newDate}${r.capped_to_730d ? '\n(capped to Stripe 730-day max)' : ''}`);
+    const newDate = new Date(r.new_trial_end * 1000).toISOString().slice(0, 10);
+    _plToast(`Credited ${r.weeks_added} weeks · Next charge: ${newDate}${r.capped_to_730d ? ' (capped to Stripe 730-day max)' : ''}`);
     closeMemberPopup();
     fetchAndRenderMembers();
-  } catch (e) { alert('Referred failed: ' + e.message); }
+  } catch (e) { _plToast('Referred failed: ' + e.message); }
 }
 
 async function _mreqCreateTicket(payload) {
