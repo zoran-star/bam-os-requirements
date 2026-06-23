@@ -58,3 +58,39 @@ export async function respondedContactIds(token, locationId) {
   try { const od = await ghl("GET", `/opportunities/search?${params}`, { token }); opps = od.opportunities || od.data || []; } catch (_) {}
   return { rs, ids: new Set(opps.map(o => o.contactId || o.contact?.id).filter(Boolean)) };
 }
+
+// Read-time gate for Hawkeye's queues (Ready messages + Follow-ups). The detector
+// cron prunes stale drafts when a lead leaves Responded, but that lag lets a card
+// linger; this lets the LIST endpoints hide those rows immediately. Unlike
+// respondedContactIds() above, this THROWS on a GHL failure (and returns null when
+// there's no Responded stage) so callers can fail OPEN — showing a possibly-stale
+// card beats an empty inbox when GHL is down. Returns a Set of contact ids, or null
+// if the academy has no Responded stage (cannot gate).
+export async function respondedContactIdSet(token, locationId) {
+  const rs = await respondedStage(token, locationId);   // throws on GHL error
+  if (!rs) return null;                                  // no stage → cannot gate
+  const params = new URLSearchParams({ location_id: locationId, pipeline_id: rs.pipelineId, pipeline_stage_id: rs.stageId, limit: "100" });
+  const od = await ghl("GET", `/opportunities/search?${params}`, { token });  // throws on GHL error
+  return new Set((od.opportunities || od.data || []).map(o => o.contactId || o.contact?.id).filter(Boolean));
+}
+
+// Cached wrapper, keyed by location, so the inbox's frequent count refresh doesn't
+// hit GHL on every call. Warm serverless instances reuse the set for `ttlMs`; a cold
+// start just re-fetches. Throws propagate so callers fail open.
+const _ridCache = new Map();   // locationId -> { at, ids }
+
+// Peek the cache WITHOUT a GHL token — lets a hot read path (list-ready, the inbox's
+// frequent count refresh) skip the token fetch entirely on a cache hit. Returns the
+// cached Set, or undefined when there's no fresh entry (caller must then fill).
+export function peekRespondedIdSet(locationId, ttlMs = 60000) {
+  const hit = _ridCache.get(locationId);
+  return (hit && (Date.now() - hit.at) < ttlMs) ? hit.ids : undefined;
+}
+
+export async function respondedContactIdSetCached(token, locationId, ttlMs = 60000) {
+  const hit = peekRespondedIdSet(locationId, ttlMs);
+  if (hit !== undefined) return hit;
+  const ids = await respondedContactIdSet(token, locationId);
+  _ridCache.set(locationId, { at: Date.now(), ids });
+  return ids;
+}
