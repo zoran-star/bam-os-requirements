@@ -20307,7 +20307,7 @@ function _renderMembersView() {
     <style>
       .member-card {
         display:grid;
-        grid-template-columns:38px minmax(140px,1fr) 100px auto;
+        grid-template-columns:38px minmax(140px,1fr) 100px 300px;
         gap:14px;
         align-items:center;
         padding:12px 16px;
@@ -20320,8 +20320,10 @@ function _renderMembersView() {
       .member-card-name { font-weight:700; font-size:15px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
       .member-card-parent { font-size:12px; color:var(--text-mute); margin-top:2px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
       .member-card-trainer { font-size:13px; color:var(--text-mute); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-      .member-card-pills { display:flex; gap:6px; align-items:center; justify-content:flex-end; flex-wrap:wrap; }
-      .member-pills-extra { display:contents; }
+      /* Fixed internal columns so status / price / set-up line up vertically
+         down the whole roster (the badges no longer drift per row). */
+      .member-card-pills { display:grid; grid-template-columns:124px 92px auto; align-items:center; column-gap:8px; }
+      .mc-status, .mc-price, .mc-extra { display:flex; align-items:center; gap:6px; min-width:0; }
       .members-filter-backdrop { display:none; }
       @media (max-width: 640px) {
         .member-card {
@@ -20331,16 +20333,12 @@ function _renderMembersView() {
           align-items: center;
         }
         .member-card-trainer { display:none; }
-        /* Keep mobile cards clean: only status + price; hide the rest. */
-        .member-pills-extra { display:none; }
+        /* Keep mobile cards clean: just status + price, inline under the name. */
         .member-card-pills {
           grid-column: 2 / -1;          /* under the name, not the avatar */
-          justify-content: flex-start;
-          flex-direction: row;
-          flex-wrap: wrap;
-          gap: 6px;
-          margin-top: 4px;
+          display:flex; flex-wrap:wrap; gap:7px; margin-top:4px;
         }
+        .mc-extra { display:none; }
       }
     </style>
     <div style="display:flex;gap:10px;align-items:center;margin-bottom:14px;flex-wrap:wrap">
@@ -20393,7 +20391,11 @@ function _memberCardHtml(m) {
         <div class="member-card-parent">Parent: ${escapeHTML(m.parent_name || '-')}</div>
       </div>
       <div class="member-card-trainer">${escapeHTML(m.trainer || '-')}</div>
-      <div class="member-card-pills">${_memberStatusPill(m.status, m)}${_memberPriceLabel(m.pricing)}<span class="member-pills-extra">${_memberSetupBadge(m)}${_memberEngagementChip(m.engagement)}${_memberOfferPill(m)}${_memberPricingPill(m.pricing)}</span></div>
+      <div class="member-card-pills">
+        <span class="mc-status">${_memberStatusPill(m.status, m)}</span>
+        <span class="mc-price">${_memberPriceLabel(m.pricing)}</span>
+        <span class="mc-extra">${_memberSetupBadge(m)}${_memberOfferPill(m)}</span>
+      </div>
     </div>`;
 }
 
