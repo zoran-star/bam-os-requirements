@@ -1874,6 +1874,9 @@
     background: linear-gradient(90deg, rgba(255,255,255,0.04) 25%, rgba(255,255,255,0.10) 37%, rgba(255,255,255,0.04) 63%);
     background-size: 840px 100%; animation: skelShimmer 1.4s infinite linear; border-radius: 6px;
   }
+  /* Trends chart: clickable month labels glow on hover to invite the click. */
+  .v15k-month-x { cursor: pointer; transition: fill .15s ease, filter .15s ease; }
+  .v15k-month-x:hover { fill: var(--gold, #E8C547); font-weight: 700; filter: drop-shadow(0 0 6px rgba(232,197,71,0.85)); }
 
   /* Confirmation success card */
   .confirmation-card {
@@ -9740,7 +9743,7 @@ function _v15kLineChart(months, defs, fmt) {
   const y = (v) => padT + (H - padT - padB) * (1 - (v / max));
   let grid = '';
   for (let g = 0; g <= 4; g++) { const gv = max * g / 4; const yy = y(gv); grid += `<line x1="${padL}" y1="${yy}" x2="${W - padR}" y2="${yy}" stroke="var(--border)" stroke-width="1"/><text x="${padL - 8}" y="${yy + 3}" text-anchor="end" font-size="10" fill="var(--text-mute)">${escapeHTML(fmt(gv))}</text>`; }
-  const xlabels = months.map((p, i) => `<text x="${x(i)}" y="${H - padB + 20}" text-anchor="middle" font-size="11" fill="var(--text-sub)" style="cursor:pointer" onclick="_v15kTrendsGoMonth('${p.key}')">${escapeHTML(_v15kShortMonth(p))}</text>`).join('');
+  const xlabels = months.map((p, i) => `<text class="v15k-month-x" x="${x(i)}" y="${H - padB + 20}" text-anchor="middle" font-size="11" fill="var(--text-sub)" onclick="_v15kTrendsGoMonth('${p.key}')">${escapeHTML(_v15kShortMonth(p))}</text>`).join('');
   const lines = on.map(d => {
     const pts = months.map((p, i) => { const v = _v15kTrendsValue(d.key, p.key); return v == null ? null : [x(i), y(v)]; });
     const poly = pts.filter(Boolean).map(pt => pt.join(',')).join(' ');
