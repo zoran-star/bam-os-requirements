@@ -222,6 +222,7 @@ async function detectForClient(client) {
           summary: decision.summary ? String(decision.summary).slice(0, 600) : null,
           last_message: lastLeadMsg ? String(lastLeadMsg.text).slice(0, 500) : null,
           last_outbound: lastOurMsg ? String(lastOurMsg.text).slice(0, 500) : null,
+          thread_tail: thread.slice(-6).map(m => ({ role: m.role === "agent" ? "agent" : "lead", text: String(m.text).slice(0, 320) })),
           scheduled_at: scheduledAt, status: "pending",
           trigger_reason: decision.reason || null,
           last_lead_at: toIso(c.lastMessageDate || c.dateUpdated),
