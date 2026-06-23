@@ -9580,7 +9580,8 @@ function _v15kRender() {
     <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:6px">
       <label style="font-size:12px;color:var(--text-mute)">Month</label>
       <select onchange="_v15kSetMonth(this.value)" style="background:var(--surface);border:1px solid var(--border-med);border-radius:8px;color:var(--text);padding:8px 12px;font:inherit;font-size:13px;cursor:pointer">${monthOpts || '<option>-</option>'}</select>
-      <button onclick="_v15kOpenSetup()" style="margin-left:auto;background:var(--surface);border:1px solid var(--border-med);border-radius:8px;color:var(--text);padding:8px 14px;font:inherit;font-size:13px;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:7px">⚙ Setup</button>
+      <button onclick="_v15kOpenTrends()" style="margin-left:auto;background:var(--surface);border:1px solid var(--border-med);border-radius:8px;color:var(--text);padding:8px 14px;font:inherit;font-size:13px;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:7px">📈 Trends</button>
+      <button onclick="_v15kOpenSetup()" style="background:var(--surface);border:1px solid var(--border-med);border-radius:8px;color:var(--text);padding:8px 14px;font:inherit;font-size:13px;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:7px">⚙ Setup</button>
     </div>
     ${kpiOn('marketing') ? `${sectionHead('Marketing')}${marketing}` : ''}
     ${kpiOn('sales')    ? `${sectionHead('Sales')}<div id="v15k-sales">${_v15kSecHtml('sales')}</div>` : ''}
@@ -9647,6 +9648,140 @@ async function _v15kEnsureSection(name) {
     _V15K.sec[name][m] = j;
   } catch (e) { _V15K.sec[name][m] = { error: e.message || String(e) }; }
   _v15kPaintSection(name);
+}
+
+// ── Trends (V1.5): multi-month line charts. Ad spend + leads come from
+// _V15K.mkt (already loaded 12mo); the other 6 metrics loop the existing
+// /api/kpis-v15 revenue+sales per month (cached in _V15K.sec). Inline SVG, no lib. ──
+const _V15K_TREND_SERIES = {
+  money: [
+    { key: 'gross',   label: 'Gross revenue',    color: '#E8C547' },
+    { key: 'net',     label: 'Net revenue',      color: '#7BC47F' },
+    { key: 'payouts', label: 'Payouts',          color: '#6EA8FF' },
+    { key: 'spend',   label: 'Ad spend',         color: '#FF8B7A' },
+  ],
+  counts: [
+    { key: 'leads',     label: 'Leads',             color: '#E8C547' },
+    { key: 'pipelines', label: 'Entered pipelines', color: '#7BC47F' },
+    { key: 'bookings',  label: 'Bookings',          color: '#6EA8FF' },
+    { key: 'payments',  label: 'New payments',      color: '#C98BFF' },
+  ],
+};
+function _v15kTrendsMonths() {
+  const ps = (_V15K.periods || []).slice().reverse(); // chronological
+  const s = _V15K.trends.start, e = _V15K.trends.end;
+  return ps.filter(p => p.key >= s && p.key <= e);
+}
+function _v15kOpenTrends() {
+  if (!_V15K.trends) {
+    const ps = _V15K.periods || [];
+    _V15K.trends = { start: (ps[Math.min(5, ps.length - 1)] || {}).key || null, end: (ps[0] || {}).key || null, on: {} };
+    [..._V15K_TREND_SERIES.money, ..._V15K_TREND_SERIES.counts].forEach(s => { _V15K.trends.on[s.key] = true; });
+  }
+  let ov = document.getElementById('v15k-trends-ov');
+  if (!ov) {
+    ov = document.createElement('div'); ov.id = 'v15k-trends-ov';
+    ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9000;display:flex;align-items:flex-start;justify-content:center;padding:20px;overflow:auto';
+    ov.onclick = (e) => { if (e.target === ov) _v15kCloseTrends(); };
+    document.body.appendChild(ov);
+  }
+  _v15kRenderTrends();
+  _v15kTrendsLoad();
+}
+function _v15kCloseTrends() { const ov = document.getElementById('v15k-trends-ov'); if (ov) ov.remove(); }
+function _v15kTrendsGoMonth(key) { _v15kCloseTrends(); _v15kSetMonth(key); }
+function _v15kTrendsSetStart(v) { _V15K.trends.start = v; if (_V15K.trends.end < v) _V15K.trends.end = v; _v15kRenderTrends(); _v15kTrendsLoad(); }
+function _v15kTrendsSetEnd(v) { _V15K.trends.end = v; if (_V15K.trends.start > v) _V15K.trends.start = v; _v15kRenderTrends(); _v15kTrendsLoad(); }
+function _v15kTrendsToggle(key) { _V15K.trends.on[key] = !_V15K.trends.on[key]; _v15kRenderTrends(); }
+async function _v15kTrendsEnsure(name, m) {
+  _V15K.sec[name] = _V15K.sec[name] || {};
+  if (_V15K.sec[name][m]) return;
+  try {
+    const token = await _mreqAuthToken();
+    const r = await fetch(`/api/kpis-v15?section=${name}&month=${encodeURIComponent(m)}&client_id=${encodeURIComponent(CLIENT_ID)}`, { headers: { Authorization: 'Bearer ' + token } });
+    const j = await _safeJson(r); if (!r.ok) throw new Error(j.error || ('HTTP ' + r.status));
+    _V15K.sec[name][m] = j;
+  } catch (e) { _V15K.sec[name][m] = { error: e.message || String(e) }; }
+}
+async function _v15kTrendsLoad() {
+  const months = _v15kTrendsMonths();
+  await Promise.all(months.flatMap(p => ['revenue', 'sales'].map(sec => _v15kTrendsEnsure(sec, p.key))));
+  _v15kRenderTrends();
+}
+function _v15kTrendsValue(key, m) {
+  if (key === 'spend' || key === 'leads') {
+    const t = ((_V15K.mkt || {})[m] || {}).totals; return t ? Number(t[key] || 0) : null;
+  }
+  if (key === 'gross' || key === 'net' || key === 'payouts') {
+    const c = (_V15K.sec.revenue || {})[m]; if (!c || c.error) return null; return Number(c[key] || 0);
+  }
+  const c = (_V15K.sec.sales || {})[m]; if (!c || c.error) return null;
+  const offers = c.offers || [];
+  if (key === 'pipelines') return offers.reduce((n, o) => n + ((o.pipeline && o.pipeline.count) || 0), 0);
+  if (key === 'bookings')  return offers.reduce((n, o) => n + ((o.bookings && o.bookings.count) || 0), 0);
+  if (key === 'payments')  return offers.reduce((n, o) => n + ((o.payments && o.payments.count) || 0), 0);
+  return null;
+}
+function _v15kShortMonth(p) {
+  const mm = /^(\d{4})-(\d{2})$/.exec(p.key || '');
+  return mm ? new Date(+mm[1], +mm[2] - 1, 1).toLocaleString('en-US', { month: 'short' }) : (p.key || '');
+}
+function _v15kLineChart(months, defs, fmt) {
+  const W = 720, H = 250, padL = 58, padR = 16, padT = 14, padB = 34;
+  const on = defs.filter(d => _V15K.trends.on[d.key]);
+  const vals = [];
+  months.forEach(p => on.forEach(d => { const v = _v15kTrendsValue(d.key, p.key); if (v != null) vals.push(v); }));
+  const max = Math.max(1, ...vals);
+  const n = months.length;
+  const x = (i) => padL + (n <= 1 ? (W - padL - padR) / 2 : (i * (W - padL - padR) / (n - 1)));
+  const y = (v) => padT + (H - padT - padB) * (1 - (v / max));
+  let grid = '';
+  for (let g = 0; g <= 4; g++) { const gv = max * g / 4; const yy = y(gv); grid += `<line x1="${padL}" y1="${yy}" x2="${W - padR}" y2="${yy}" stroke="var(--border)" stroke-width="1"/><text x="${padL - 8}" y="${yy + 3}" text-anchor="end" font-size="10" fill="var(--text-mute)">${escapeHTML(fmt(gv))}</text>`; }
+  const xlabels = months.map((p, i) => `<text x="${x(i)}" y="${H - padB + 20}" text-anchor="middle" font-size="11" fill="var(--text-sub)" style="cursor:pointer" onclick="_v15kTrendsGoMonth('${p.key}')">${escapeHTML(_v15kShortMonth(p))}</text>`).join('');
+  const lines = on.map(d => {
+    const pts = months.map((p, i) => { const v = _v15kTrendsValue(d.key, p.key); return v == null ? null : [x(i), y(v)]; });
+    const poly = pts.filter(Boolean).map(pt => pt.join(',')).join(' ');
+    const circles = pts.map((pt, i) => pt ? `<circle cx="${pt[0]}" cy="${pt[1]}" r="3.5" fill="${d.color}"><title>${escapeHTML(_v15kMonthLabel(months[i]))} - ${escapeHTML(d.label)}: ${escapeHTML(fmt(_v15kTrendsValue(d.key, months[i].key)))}</title></circle>` : '').join('');
+    return `<polyline points="${poly}" fill="none" stroke="${d.color}" stroke-width="2.5"/>${circles}`;
+  }).join('');
+  return `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;display:block;margin-top:6px">${grid}${lines}${xlabels}</svg>`;
+}
+function _v15kTrendsLegend(defs) {
+  return `<div style="display:flex;flex-wrap:wrap;gap:8px;margin:10px 0 2px">` + defs.map(d => {
+    const on = _V15K.trends.on[d.key];
+    return `<button onclick="_v15kTrendsToggle('${d.key}')" style="display:inline-flex;align-items:center;gap:7px;padding:5px 11px;border-radius:999px;font:inherit;font-size:12px;font-weight:600;cursor:pointer;border:1px solid ${on ? d.color : 'var(--border-med)'};background:${on ? d.color + '22' : 'transparent'};color:${on ? 'var(--text)' : 'var(--text-mute)'}"><span style="width:10px;height:10px;border-radius:2px;background:${on ? d.color : 'var(--border-med)'}"></span>${d.label}</button>`;
+  }).join('') + `</div>`;
+}
+function _v15kRenderTrends() {
+  const ov = document.getElementById('v15k-trends-ov'); if (!ov || !_V15K.trends) return;
+  const ps = (_V15K.periods || []).slice().reverse();
+  const opt = (sel) => ps.map(p => `<option value="${escapeHTML(p.key)}" ${p.key === sel ? 'selected' : ''}>${escapeHTML(_v15kMonthLabel(p))}</option>`).join('');
+  const months = _v15kTrendsMonths();
+  const loading = months.some(p => !(_V15K.sec.revenue || {})[p.key] || !(_V15K.sec.sales || {})[p.key]);
+  ov.innerHTML = `<div style="background:var(--bg);border:1px solid var(--border);border-radius:14px;max-width:840px;width:100%;max-height:90vh;overflow:auto;padding:22px 24px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+      <div style="font-family:var(--font-display,inherit);font-size:18px;font-weight:700;color:var(--text)">📈 Trends</div>
+      <button onclick="_v15kCloseTrends()" style="background:none;border:none;color:var(--text-mute);font-size:24px;cursor:pointer;line-height:1">×</button>
+    </div>
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+      <label style="font-size:12px;color:var(--text-mute)">From</label>
+      <select onchange="_v15kTrendsSetStart(this.value)" style="background:var(--surface);border:1px solid var(--border-med);border-radius:8px;color:var(--text);padding:7px 11px;font:inherit;font-size:13px;cursor:pointer">${opt(_V15K.trends.start)}</select>
+      <label style="font-size:12px;color:var(--text-mute)">to</label>
+      <select onchange="_v15kTrendsSetEnd(this.value)" style="background:var(--surface);border:1px solid var(--border-med);border-radius:8px;color:var(--text);padding:7px 11px;font:inherit;font-size:13px;cursor:pointer">${opt(_V15K.trends.end)}</select>
+      ${loading ? `<span style="font-size:12px;color:var(--text-mute)"><span class="req-spin"></span> loading…</span>` : ''}
+      <span style="font-size:11.5px;color:var(--text-mute);margin-left:auto">Click a month on the chart to open its full KPIs.</span>
+    </div>
+    <div style="margin-top:16px">
+      <div style="font-size:13px;font-weight:700;color:var(--text);text-transform:uppercase;letter-spacing:.04em">Revenue &amp; spend</div>
+      ${_v15kTrendsLegend(_V15K_TREND_SERIES.money)}
+      ${months.length ? _v15kLineChart(months, _V15K_TREND_SERIES.money, _v15kMoney) : '<div style="color:var(--text-mute);font-size:13px;padding:14px 0">Pick a month range.</div>'}
+    </div>
+    <div style="margin-top:26px">
+      <div style="font-size:13px;font-weight:700;color:var(--text);text-transform:uppercase;letter-spacing:.04em">Funnel</div>
+      ${_v15kTrendsLegend(_V15K_TREND_SERIES.counts)}
+      ${months.length ? _v15kLineChart(months, _V15K_TREND_SERIES.counts, _v15kNum) : ''}
+    </div>
+  </div>`;
 }
 
 const _v15kBtn = 'background:none;border:1px solid var(--border-med);border-radius:6px;color:var(--text-mute);cursor:pointer;font-size:11px;padding:3px 8px';
