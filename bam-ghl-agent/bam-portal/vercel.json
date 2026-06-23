@@ -51,6 +51,10 @@
     {
       "path": "/api/agent-followups?action=work",
       "schedule": "* * * * *"
+    },
+    {
+      "path": "/api/ghl/cron-post-trial-escalate",
+      "schedule": "*/15 * * * *"
     }
   ],
   "headers": [
