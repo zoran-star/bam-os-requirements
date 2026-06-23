@@ -56,10 +56,14 @@ function pick(obj, keys) {
 async function handler(req, res) {
   if (req.method !== "POST") return res.status(405).json({ error: "POST only" });
 
-  // Shared-secret auth.
+  // Auth: two callers. (1) Per-academy GHL Workflow webhook passes our shared
+  // secret (header or ?key=). (2) The FC app-level "InboundMessage" webhook uses
+  // a PLAIN URL (no secret) — GHL controls the payload. So reject only an
+  // explicitly WRONG secret; allow no-secret (app webhook) and correct-secret.
+  // Every request still resolves a known academy by locationId + gates below.
   const expected = (process.env.GHL_WEBHOOK_SECRET || "").trim();
   const provided = (req.headers["x-webhook-secret"] || req.query.key || "").toString().trim();
-  if (!expected || provided !== expected) return res.status(401).json({ error: "unauthorized" });
+  if (expected && provided && provided !== expected) return res.status(401).json({ error: "unauthorized" });
 
   const p = req.body && typeof req.body === "object" ? req.body : {};
 

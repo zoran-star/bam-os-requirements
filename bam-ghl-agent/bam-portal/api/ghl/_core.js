@@ -96,23 +96,34 @@ export async function pickGhlToken(client) {
   return null;
 }
 
-export async function ghl(method, path, { token, body } = {}) {
+export async function ghl(method, path, { token, body, retries = 3 } = {}) {
   const headers = {
     Authorization: `Bearer ${token}`,
     Version:       V2_VERSION,
     Accept:        "application/json",
     "Content-Type": "application/json",
   };
-  const res = await fetch(`${GHL_V2}${path}`, { method, headers, body: body ? JSON.stringify(body) : undefined });
-  const text = await res.text();
-  let json = null;
-  try { json = text ? JSON.parse(text) : null; } catch (_) { json = { raw: text }; }
-  if (!res.ok) {
-    const err = new Error((json && (json.message || json.error)) || `GHL ${res.status}`);
-    err.status = res.status; err.body = json;
-    throw err;
+  for (let attempt = 0; ; attempt++) {
+    const res = await fetch(`${GHL_V2}${path}`, { method, headers, body: body ? JSON.stringify(body) : undefined });
+    const text = await res.text();
+    let json = null;
+    try { json = text ? JSON.parse(text) : null; } catch (_) { json = { raw: text }; }
+    // GHL throttles bursts (429). Back off and retry — honor Retry-After when sent,
+    // else exponential (0.6s, 1.2s, 2.4s…), capped. This is what makes the detector
+    // survive fetching several conversation threads in a row.
+    if (res.status === 429 && attempt < retries) {
+      const ra = parseInt(res.headers.get("retry-after") || "", 10);
+      const waitMs = Number.isFinite(ra) && ra > 0 ? Math.min(ra * 1000, 10000) : Math.min(600 * 2 ** attempt, 6000);
+      await new Promise(r => setTimeout(r, waitMs));
+      continue;
+    }
+    if (!res.ok) {
+      const err = new Error((json && (json.message || json.error)) || `GHL ${res.status}`);
+      err.status = res.status; err.body = json;
+      throw err;
+    }
+    return json;
   }
-  return json;
 }
 
 // Find a GHL contact by phone, then email. Returns contactId or null.

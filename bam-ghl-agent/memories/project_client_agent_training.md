@@ -154,6 +154,40 @@ re-pitch a first trial to someone who already attended, and honors trainer steer
   `_cdMemoryHtml`/`_cdAddNote`/`_cdRemoveNote`) — facts + notes + add box.
 - Post-trial form (post-trial.js → post_trial_reviews) is the auto source of trial context.
 
+## 6. Read-time Responded gate + Quiet hours (2026-06-22)
+Two send-safety fixes. `api/agent/_stage.js` + both queue APIs + `_quiet.js` (NEW). V2-only.
+
+**Read-time Responded gate.** Bug: a lead who LEFT the Responded stage (e.g. Sergio
+Luciano) still showed in Hawkeye. Cause: drafting & sending were stage-gated, but the
+LIST endpoints just returned every `pending`/`approved` row — a stale card only
+disappeared when the */5 detector cron pruned it. Fix: `list-ready` (agent-approvals)
+and `list` (agent-followups) now filter rows against the live Responded contact set.
+New in `_stage.js`: `respondedContactIdSet()` (throws on GHL err → callers FAIL OPEN:
+show possibly-stale rather than empty inbox), `respondedContactIdSetCached()` (60s
+module cache keyed by locationId) + `peekRespondedIdSet(locationId)` (cache peek with
+NO token fetch — the count-refresh hot path skips GHL/pickGhlToken on a cache hit;
+keyed by `client.ghl_location_id`). No-Responded-stage or GHL down → no filter (open).
+
+**Quiet hours = 8:00am–9:30pm America/Toronto** (`_quiet.js`: `withinQuietHours`,
+`nextSendableTime`, `QUIET_TZ/QUIET_START_MIN/QUIET_END_MIN`; DST-correct via Intl).
+The agent NEVER texts a parent outside the window — every send path enforces it:
+- **Scheduled follow-ups:** detector clamps `scheduled_at` into the window;
+  `runWork` cron early-returns when out of window (cron-lag tail → next morning).
+- **Self-drive auto-send (approvals detect):** out of window → HOLD as
+  `agent_ready_replies` row `status='approved'` + `send_after=` next morning
+  (`deferred` counter) instead of sending.
+- **Human "send now" (Hawkeye):** out of window → same hold (approvals `send`
+  action; followups `send-now` sets status approved + `scheduled_at`=morning).
+  API returns `{deferred:true, send_after}`; client toasts "📅 Quiet hours -
+  scheduled for …" (`_apxQuietMsg` in client-portal.html).
+- **Flush:** approvals `detectForClient` sends due held rows at the top of each run
+  (in-window + still Responded; else cancels). Reuses the existing */5 detect cron.
+
+**Schema (migration 20260622210000, APPLIED to prod):** `agent_ready_replies +=
+send_after timestamptz` + partial index `(status, send_after) where send_after is
+not null`. Held auto-sends are `status='approved'` so they don't render in Hawkeye's
+pending-only Ready tab until flushed.
+
 ## ⚠️ Known gap (same as roadmap): no global SINK yet
 `scope='general'` is still only a flag — `activeLessons()` queries by client_id,
 so an approved "global" lesson doesn't actually propagate to other academies. The

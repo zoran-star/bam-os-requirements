@@ -2,6 +2,14 @@
 
 Living board for getting every **training** academy onto V1.5 — texting leads + using pipelines in the portal. Update the status as each academy advances. Started 2026-06-19.
 
+> **⚡ 2026-06-22 — board below is SUPERSEDED. Current live state lives in
+> [[project_v15_rollout]].** In short: **28 academies now on V1.5** (all connected V1
+> academies flipped in one batch), **25 athlete-mapped**, 3 awaiting a GHL field
+> (Elite Smart Athletes, Fitz N Fit, GAME Winner). Only **3 real academies still need a
+> GHL connect**: ACTIV8, Performance Space Hoops, Straight Buckets. The old "EXCLUDED
+> (not training)" list was wrong — BTG, Defy The Odds, Out Work, Prime By Design, Fitz N
+> Fit are all real and now V1.5. Treat the ASCII board below as historical (2026-06-19).
+
 ## 🎯 Definition of "done" (recalibrated 2026-06-19)
 
 ```

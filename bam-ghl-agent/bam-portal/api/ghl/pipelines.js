@@ -396,19 +396,30 @@ async function handler(req, res) {
   }
   const pipelines = pipelinesResp.pipelines || pipelinesResp.data || [];
 
-  // 2. For each pipeline, pull opportunities (capped at 100 per pipeline for now)
-  //    GHL search endpoint:  GET /opportunities/search?location_id=XXX&pipeline_id=YYY&limit=100
+  // 2. For each pipeline, pull ALL OPEN opportunities. status=open so closed
+  //    leads can't crowd out open ones within the page limit, and cursor-
+  //    paginate so we never cap at 100 — this keeps the portal's counts in
+  //    lockstep with GHL's "Open opportunities" view.
+  async function fetchOpenOpps(pipelineId) {
+    const out = [];
+    let startAfter, startAfterId;
+    for (let page = 0; page < 8; page++) {            // hard cap ~800 open/pipeline
+      const params = new URLSearchParams({ location_id: locationId, pipeline_id: pipelineId, status: "open", limit: "100" });
+      if (startAfter)   params.set("startAfter", String(startAfter));
+      if (startAfterId) params.set("startAfterId", String(startAfterId));
+      let r;
+      try { r = await ghl("GET", `/opportunities/search?${params}`, { token }); }
+      catch (_) { break; }
+      const batch = r.opportunities || r.data || [];
+      out.push(...batch);
+      const meta = r.meta || {};
+      startAfter = meta.startAfter; startAfterId = meta.startAfterId;
+      if (batch.length < 100 || (!startAfter && !startAfterId)) break;
+    }
+    return out;
+  }
   const enriched = await Promise.all(pipelines.map(async (p) => {
-    let opps = [];
-    try {
-      const params = new URLSearchParams({
-        location_id: locationId,
-        pipeline_id: p.id,
-        limit:       "100",
-      });
-      const r = await ghl("GET", `/opportunities/search?${params}`, { token });
-      opps = r.opportunities || r.data || [];
-    } catch (_) { opps = []; }
+    const opps = await fetchOpenOpps(p.id);
 
     return {
       id:     p.id,

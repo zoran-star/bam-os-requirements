@@ -1865,6 +1865,13 @@
     animation: loading-spin 0.8s linear infinite;
   }
 
+  /* Skeleton loaders (first-load placeholders for inbox + pipeline board). */
+  @keyframes skelShimmer { 0% { background-position: -420px 0; } 100% { background-position: 420px 0; } }
+  .skel {
+    background: linear-gradient(90deg, rgba(255,255,255,0.04) 25%, rgba(255,255,255,0.10) 37%, rgba(255,255,255,0.04) 63%);
+    background-size: 840px 100%; animation: skelShimmer 1.4s infinite linear; border-radius: 6px;
+  }
+
   /* Confirmation success card */
   .confirmation-card {
     text-align: center;
@@ -5499,7 +5506,26 @@
         <span class="nav-badge" id="messages-unread-badge" style="display:none;background:var(--accent);color:#0B0B0D;font-size:10px;font-weight:700;padding:2px 7px;border-radius:999px;margin-left:auto"></span>
       </div>
 
-      <div class="nav-item active" onclick="switchView('systems', this)">
+      <!-- V1.5 "Support" accordion: groups Systems + Marketing under one expandable
+           header. Hidden for V1/V2 (they keep the flat Systems + Marketing items below).
+           Shown + flat items hidden by applyV15NavState when V1.5. -->
+      <div class="nav-item" id="nav-support-toggle" style="display:none" onclick="toggleSupportAccordion()">
+        <span class="nav-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="4"/>
+            <line x1="4.93" y1="4.93" x2="9.17" y2="9.17"/><line x1="14.83" y1="14.83" x2="19.07" y2="19.07"/>
+            <line x1="14.83" y1="9.17" x2="19.07" y2="4.93"/><line x1="4.93" y1="19.07" x2="9.17" y2="14.83"/>
+          </svg>
+        </span>
+        Support
+        <span id="support-caret" style="margin-left:auto;font-size:11px;transition:transform .15s">▾</span>
+      </div>
+      <div id="support-submenu" style="display:none">
+        <div class="nav-item" id="nav-systems-sub" onclick="switchView('systems', this)" style="padding-left:42px">Systems</div>
+        <div class="nav-item" id="nav-marketing-sub" onclick="switchView('marketing', this)" style="padding-left:42px">Marketing</div>
+      </div>
+
+      <div class="nav-item active" id="nav-systems-flat" onclick="switchView('systems', this)">
         <span class="nav-icon" aria-hidden="true">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/>
@@ -5509,7 +5535,7 @@
         Systems
       </div>
 
-      <div class="nav-item" onclick="switchView('marketing', this)">
+      <div class="nav-item" id="nav-marketing-flat" onclick="switchView('marketing', this)">
         <span class="nav-icon" aria-hidden="true">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="m3 11 18-5v12L3 14v-3z"/>
@@ -5712,7 +5738,8 @@
       </div>
 
       <button class="user-tour-link" onclick="openChangePassword()" style="margin-bottom:6px">Change password</button>
-      <button class="user-tour-link" onclick="startOnboardingTour()">↻ Take the tour</button>
+      <!-- Onboarding tour disabled for now (Zoran, 2026-06-22) -->
+      <button class="user-tour-link" onclick="startOnboardingTour()" style="display:none">↻ Take the tour</button>
 
       <!-- Owner / BAM-staff: preview a teammate's restricted view -->
       <div id="previewAsBlock" style="display:none"></div>
@@ -8624,7 +8651,10 @@ Then the call to action."]</div>
           <span class="topbar-kicker">§ Inbox</span>
           <div class="topbar-title">Inbox</div>
         </div>
-        <button class="inbox-talk-btn" onclick="switchView('messages')" style="background:var(--surface);border:1px solid var(--border-med);border-radius:8px;color:var(--text);padding:9px 16px;font-weight:700;font-size:13px;cursor:pointer;display:inline-flex;align-items:center;gap:7px">💬 Talk to BAM Business</button>
+        <div style="display:flex;gap:8px;align-items:center">
+          <button id="inbox-contacts-btn" onclick="switchView('contacts')" style="display:none;background:var(--surface);border:1px solid var(--border-med);border-radius:8px;color:var(--text);padding:9px 16px;font-weight:700;font-size:13px;cursor:pointer;align-items:center;gap:7px">👥 Contacts</button>
+          <button class="inbox-talk-btn" onclick="switchView('messages')" style="background:var(--surface);border:1px solid var(--border-med);border-radius:8px;color:var(--text);padding:9px 16px;font-weight:700;font-size:13px;cursor:pointer;display:inline-flex;align-items:center;gap:7px">💬 Talk to BAM Business</button>
+        </div>
       </div>
       <div class="content">
         <div id="v15inbox-content"></div>
@@ -8845,12 +8875,17 @@ let _ASSET_TARGETS = { offers: [], staff: [], locations: [] };
 let _assetUploadNudge = '';   // one-shot message shown when over-limit files were skipped
 const _ASSET_CATS = ['logo','wordmark','hero','photo','video','crest','icon','og','favicon','other'];
 
+// Where the asset library renders. Standalone view = 'assets-content';
+// when embedded in Business Blueprint (V1.5) = 'bb-assets-content'. Set by
+// whichever entry point opens it; all re-renders read this.
+let _ASSETS_HOST_ID = 'assets-content';
+
 function _assetUrl(path) {
   try { return _sb.storage.from('client-assets').getPublicUrl(path).data.publicUrl; } catch (e) { return ''; }
 }
 
 async function openAssetsView() {
-  const host = document.getElementById('assets-content');
+  const host = document.getElementById(_ASSETS_HOST_ID);
   if (!host || !_sb || typeof CLIENT_ID === 'undefined') return;
   host.innerHTML = '<div class="req-empty" style="padding:24px 0"><span class="req-spin"></span> Loading assets…</div>';
   try {
@@ -8897,7 +8932,7 @@ function _assetFilterCount(k) {
 }
 
 function _renderAssets() {
-  const host = document.getElementById('assets-content');
+  const host = document.getElementById(_ASSETS_HOST_ID);
   if (!host) return;
   const pill = (k, l) => {
     const on = _ASSET_FILTER === k;
@@ -10229,6 +10264,26 @@ async function _v15calCreateBooking() {
 let _V15IB = { convos: [], pipelines: [], contactPipe: {}, pipeOppCount: 0, ghlLoc: '', unreadOnly: false, failedOnly: false, fPipeline: '', fStage: '', active: null, messages: [], type: 'SMS', pending: [] };
 const _V15IB_FAILED = ['failed', 'undelivered', 'error', 'rejected'];
 
+// ── Skeleton loaders (shown on the very first load, before any data) ──
+function _skelInboxHTML() {
+  let rows = '';
+  for (let i = 0; i < 7; i++) rows += `<div style="display:flex;align-items:center;gap:12px;padding:13px 15px;border:1px solid var(--border);border-radius:12px;background:var(--surface);margin-bottom:10px">
+    <div class="skel" style="width:42px;height:42px;border-radius:50%;flex:0 0 auto"></div>
+    <div style="flex:1;min-width:0">
+      <div class="skel" style="height:11px;width:${30 + (i * 9) % 45}%;margin-bottom:8px"></div>
+      <div class="skel" style="height:10px;width:${58 + (i * 7) % 32}%"></div>
+    </div></div>`;
+  return `<div style="padding:2px 0">${rows}</div>`;
+}
+function _skelPipelinesHTML() {
+  const card = (w1, w2) => `<div style="border:1px solid var(--border);border-radius:6px;padding:10px;margin-bottom:8px;background:var(--surface)">
+    <div class="skel" style="height:11px;width:${w1}%;margin-bottom:8px"></div>
+    <div class="skel" style="height:9px;width:${w2}%"></div></div>`;
+  const col = () => `<div style="flex:0 0 280px;max-width:280px;background:rgba(255,255,255,0.02);border:1px solid var(--border);border-radius:8px;padding:10px">
+    <div class="skel" style="height:12px;width:50%;margin-bottom:12px"></div>${card(65, 40)}${card(55, 48)}${card(72, 35)}</div>`;
+  return `<div style="display:flex;gap:12px;overflow:hidden">${col()}${col()}${col()}${col()}</div>`;
+}
+
 async function openV15Inbox() {
   const host = document.getElementById('v15inbox-content');
   if (!host || typeof CLIENT_ID === 'undefined') return;
@@ -10237,7 +10292,7 @@ async function openV15Inbox() {
   // immediately and refresh in the background - no blank spinner on re-open.
   const hadData = Array.isArray(_V15IB.convos) && _V15IB.convos.length;
   if (hadData) { try { _v15ibRenderAll(); } catch (_) {} }
-  else host.innerHTML = `<div class="req-empty" style="padding:24px 0"><span class="req-spin"></span> Loading messages…</div>`;
+  else host.innerHTML = _skelInboxHTML();
   try {
     const token = await _mreqAuthToken();
     const [ir, pr] = await Promise.all([
@@ -10438,6 +10493,19 @@ async function _v15ibOpen(convId, contactId, phone, email, name) {
   }
 }
 
+// Robustly scroll a message thread to the newest message. A single synchronous
+// scrollTop=scrollHeight often lands mid-thread because the layout/images aren't
+// settled yet - so re-apply across a few frames + after images load.
+function _scrollToBottom(el) {
+  if (!el) return;
+  const go = () => { try { el.scrollTop = el.scrollHeight; } catch (_) {} };
+  go();
+  requestAnimationFrame(go);
+  setTimeout(go, 60);
+  setTimeout(go, 250);
+  try { el.querySelectorAll('img').forEach(img => { if (!img.complete) img.addEventListener('load', go, { once: true }); }); } catch (_) {}
+}
+
 function _v15ibRenderThread() {
   const body = document.getElementById('v15ib-body');
   if (!body || !_V15IB.active) return;
@@ -10449,9 +10517,13 @@ function _v15ibRenderThread() {
   const _visibleMsgs = sorted.filter(m => !_ibIsActivity(m));
   const bubbles = _visibleMsgs.length ? _visibleMsgs.map(m => {
     const out = (m.direction || '').toLowerCase() === 'outbound';
-    return `<div style="max-width:78%;align-self:${out ? 'flex-end' : 'flex-start'};background:${out ? 'var(--gold)' : 'var(--surface)'};color:${out ? '#0B0B0D' : 'var(--text)'};border:1px solid ${out ? 'var(--gold)' : 'var(--border)'};padding:8px 12px;border-radius:12px;font-size:13px;line-height:1.45;word-break:break-word">
+    const tail = m._unconfirmed
+      ? '⚠ not confirmed in GHL'
+      : (m._optimistic ? 'sending…' : `${escapeHTML(_ghlChannelLabel(m.type))} · ${escapeHTML(_ibFormatDate(m.date))}`);
+    const tailColor = m._unconfirmed ? 'color:#9a3b2f;opacity:1;font-weight:700' : 'opacity:.6';
+    return `<div style="max-width:78%;align-self:${out ? 'flex-end' : 'flex-start'};background:${out ? 'var(--gold)' : 'var(--surface)'};color:${out ? '#0B0B0D' : 'var(--text)'};border:1px solid ${m._unconfirmed ? '#e0654f' : (out ? 'var(--gold)' : 'var(--border)')};padding:8px 12px;border-radius:12px;font-size:13px;line-height:1.45;word-break:break-word">
       ${escapeHTML(m.body || '(no body)')}
-      <div style="font-size:10px;opacity:.6;margin-top:3px">${escapeHTML(_ghlChannelLabel(m.type))} · ${escapeHTML(_ibFormatDate(m.date))}</div>
+      <div style="font-size:10px;margin-top:3px;${tailColor}">${tail}</div>
     </div>`;
   }).join('') : '<div style="color:var(--text-mute);font-size:13px;text-align:center;padding:20px">No messages yet.</div>';
   const isEmail = _V15IB.type === 'Email';
@@ -10464,7 +10536,7 @@ function _v15ibRenderThread() {
       <div style="font-size:15px;font-weight:700;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHTML(a.name || a.phone || a.email || 'Conversation')}</div>
       ${ghlUrl ? `<a href="${escapeHTML(ghlUrl)}" target="_blank" rel="noopener" title="Open this contact in GHL to call" style="flex:none;display:inline-flex;align-items:center;gap:6px;background:rgba(232,197,71,0.12);border:1px solid var(--gold);border-radius:8px;color:var(--gold);padding:6px 10px;font:inherit;font-size:12px;font-weight:700;text-decoration:none">📞 Call in GHL</a>` : ''}
     </div>
-    <div style="display:flex;flex-direction:column;gap:8px;max-height:min(62vh,560px);overflow-y:auto;-webkit-overflow-scrolling:touch;padding:8px;border:1px solid var(--border);border-radius:10px;background:var(--bg)">${bubbles}</div>
+    <div id="v15ib-thread-scroll" style="display:flex;flex-direction:column;gap:8px;max-height:min(62vh,560px);overflow-y:auto;-webkit-overflow-scrolling:touch;padding:8px;border:1px solid var(--border);border-radius:10px;background:var(--bg)">${bubbles}</div>
     <div style="margin-top:12px;border:1px solid var(--border);border-radius:10px;padding:10px">
       ${!a.phone ? `<div style="font-size:11px;color:#c47424;margin-bottom:8px">⚠ No phone on file - add one in GHL to text this contact.</div>` : ''}
       <textarea id="v15ib-text" placeholder="Type a message…" style="width:100%;min-height:70px;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:9px 11px;font:inherit;font-size:13px;resize:vertical;outline:none"></textarea>
@@ -10474,6 +10546,7 @@ function _v15ibRenderThread() {
         <button id="v15ib-send" onclick="_v15ibSend()" style="margin-left:auto;background:var(--gold);color:#0B0B0D;border:none;padding:9px 20px;border-radius:6px;font-weight:700;font-size:13px;cursor:pointer">Send</button>
       </div>
     </div>`;
+  _scrollToBottom(document.getElementById('v15ib-thread-scroll'));
 }
 
 function _v15ibSetType(t) { _V15IB.type = t; _v15ibRenderThread(); }
@@ -10507,6 +10580,9 @@ async function _v15ibSend() {
       method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
       body: JSON.stringify({
         client_id: CLIENT_ID, type: _V15IB.type,
+        // Target the EXACT contact we're viewing - never re-look-up by phone
+        // (which can resolve to a duplicate and send to the wrong conversation).
+        contact_id: a.contactId || undefined,
         contact_phone: a.phone || undefined, contact_email: a.email || undefined, contact_name: a.name || undefined,
         message: text, subject: _V15IB.type === 'Email' ? subject : undefined,
         attachments: _V15IB.pending,
@@ -10515,11 +10591,43 @@ async function _v15ibSend() {
     const j = await _safeJson(r);
     if (!r.ok || j.error) throw new Error(j.error || ('HTTP ' + r.status));
     _V15IB.pending = [];
-    await _v15ibOpen(a.convId, a.contactId, a.phone, a.email, a.name);
+    // Show the sent message immediately. GHL's messages API can lag a few seconds
+    // before it returns what we just sent, so don't rely on an instant re-fetch.
+    if (text) {
+      _V15IB.messages = [...(_V15IB.messages || []), { body: text, direction: 'outbound', type: _V15IB.type, date: new Date().toISOString(), _optimistic: true }];
+      _v15ibRenderThread();
+      const ta = document.getElementById('v15ib-text'); if (ta) ta.value = '';
+    }
+    if (btn) { btn.disabled = false; btn.textContent = 'Send'; }
+    // Reconcile with GHL once it catches up - the real message replaces the
+    // optimistic one (de-duped by text); if GHL is still behind, we keep showing it.
+    setTimeout(() => _v15ibResync(a, text), 2000);
+    setTimeout(() => _v15ibResync(a, text, true), 6000);
   } catch (e) {
     alert('Send failed: ' + (e.message || e));
     if (btn) { btn.disabled = false; btn.textContent = 'Send'; }
   }
+}
+
+// Re-pull the thread from GHL, keeping a just-sent message visible until GHL
+// surfaces it (so an outbound text never disappears after sending).
+async function _v15ibResync(a, sentText, final) {
+  if (!_V15IB.active || _V15IB.active.convId !== a.convId) return;   // user moved on
+  try {
+    const token = await _mreqAuthToken();
+    const r = await fetch(`/api/ghl/inbox?client_id=${encodeURIComponent(CLIENT_ID)}&conversation_id=${encodeURIComponent(a.convId)}`, { headers: { Authorization: 'Bearer ' + token } });
+    const j = await _safeJson(r);
+    if (!r.ok) return;
+    let msgs = j.messages || [];
+    const t = (sentText || '').trim();
+    const found = t && msgs.some(m => (m.direction || '').toLowerCase() === 'outbound' && (m.body || '').trim() === t);
+    if (t && !found) {
+      // GHL hasn't surfaced it yet - keep showing it. On the FINAL check, if GHL
+      // still doesn't have it, flag it so the user knows to retry.
+      msgs = [...msgs, { body: t, direction: 'outbound', type: 'SMS', date: new Date().toISOString(), _optimistic: !final, _unconfirmed: !!final }];
+    }
+    if (_V15IB.active && _V15IB.active.convId === a.convId) { _V15IB.messages = msgs; _v15ibRenderThread(); }
+  } catch (_) {}
 }
 
 async function _v15ibSetup() {
@@ -11079,7 +11187,7 @@ function switchView(name, el) {
 
   if (name === 'resources') openResourcesView();
 
-  if (name === 'assets') openAssetsView();
+  if (name === 'assets') { _ASSETS_HOST_ID = 'assets-content'; openAssetsView(); }
 
   if (name === 'contacts') openContactsView();
 
@@ -11993,14 +12101,57 @@ function applyV15NavState(v15) {
     mNav.classList.toggle('is-v2', onV2);
     mNav.classList.toggle('is-v15', !onV2 && V15_ACCESS === true);
   }
-  // Assets visible for all tiers including V1.5 - clients use it for brand/video files.
+  // Assets: V1.5 moved the asset library INTO Business Blueprint, so hide the
+  // standalone left-nav item for V1.5 only. V1 + V2 keep the standalone item.
+  const _v15only = V15_ACCESS && !(typeof V2_ACCESS !== 'undefined' && V2_ACCESS);
   const assetsNav = document.getElementById('nav-assets');
-  if (assetsNav) assetsNav.style.display = '';
+  if (assetsNav) assetsNav.style.display = _v15only ? 'none' : '';
   // Contacts/Inbox/KPIs sharing + the Marketing "narrative" treatment now live in
   // applyCrmSupersetNav so V2 gets them too - override the bulk v15 toggle above.
   applyCrmSupersetNav();
+  applySupportAccordionNav();    // V1.5: group Systems + Marketing under "Support"
+  applyV15ContactsPlacement();   // V1.5: Contacts moves to a button in the Inbox
   applyTabPermissions(); // re-subtract per-staff tab perms after the tier re-gate
   applyTalkToBamNav();
+}
+
+// V1.5 groups Systems + Marketing under an expandable "Support" accordion.
+// V1 + V2 keep the flat standalone Systems + Marketing nav items (unchanged).
+function applySupportAccordionNav() {
+  const v15only = (typeof V15_ACCESS !== 'undefined' && V15_ACCESS) &&
+                  !(typeof V2_ACCESS !== 'undefined' && V2_ACCESS);
+  const toggle  = document.getElementById('nav-support-toggle');
+  const sub     = document.getElementById('support-submenu');
+  const caret   = document.getElementById('support-caret');
+  const flatSys = document.getElementById('nav-systems-flat');
+  const flatMkt = document.getElementById('nav-marketing-flat');
+  if (toggle)  toggle.style.display  = v15only ? '' : 'none';
+  if (sub)     sub.style.display     = v15only ? '' : 'none';  // expanded by default
+  if (caret)   caret.style.transform = '';
+  if (flatSys) flatSys.style.display = v15only ? 'none' : '';
+  if (flatMkt) flatMkt.style.display = v15only ? 'none' : '';
+}
+
+// Click handler for the "Support" accordion header (V1.5).
+function toggleSupportAccordion() {
+  const sub = document.getElementById('support-submenu');
+  const caret = document.getElementById('support-caret');
+  if (!sub) return;
+  const open = sub.style.display !== 'none';
+  sub.style.display = open ? 'none' : '';
+  if (caret) caret.style.transform = open ? 'rotate(-90deg)' : '';
+}
+
+// V1.5: Contacts moves from the left nav into a button in the Inbox header.
+// V2 keeps Contacts in the left nav (applyCrmSupersetNav shows it) and hides
+// the inbox button. V1 has neither.
+function applyV15ContactsPlacement() {
+  const v15only = (typeof V15_ACCESS !== 'undefined' && V15_ACCESS) &&
+                  !(typeof V2_ACCESS !== 'undefined' && V2_ACCESS);
+  const navContacts = document.getElementById('nav-contacts');
+  if (navContacts && v15only) navContacts.style.display = 'none';
+  const inboxBtn = document.getElementById('inbox-contacts-btn');
+  if (inboxBtn) inboxBtn.style.display = v15only ? 'inline-flex' : 'none';
 }
 
 // "Messages" (the academy↔BAM team chat) is only a left-nav/bottom-bar item on
@@ -12371,7 +12522,9 @@ function bkBuildEvents() {
     }
     for (const slot of Object.values(bySlot)) {
       BK_EVENTS.push({
+        id: BK_EVENTS.length,
         date: calDateKey(slot.d),
+        start: slot.d.toISOString(),
         startHour: slot.d.getHours() + slot.d.getMinutes() / 60,
         endHour: slot.d.getHours() + slot.d.getMinutes() / 60 + durH,
         label: c.ghl?.name || c.label,
@@ -12458,8 +12611,11 @@ function renderCalendar() {
   const start = calStartOfWeek(CAL_WEEK_OFFSET);
   document.getElementById('cal-range-label').textContent = calFormatRange(start);
 
-  // Legend - one chip per venue currently scheduled
-  const venuesInUse = Array.from(new Set(CAL_SESSIONS.map(s => s.venue).filter(Boolean)));
+  // Legend - only venues actually scheduled in the week being viewed (so the
+  // legend reflects active calendars, not every venue that ever existed).
+  const _weekKeys = new Set();
+  for (let i = 0; i < 7; i++) { const d = new Date(start); d.setDate(d.getDate() + i); _weekKeys.add(calDateKey(d)); }
+  const venuesInUse = Array.from(new Set(CAL_SESSIONS.filter(s => _weekKeys.has(s.date)).map(s => s.venue).filter(Boolean)));
   const bkLegend = (typeof _BK_DATA !== 'undefined' && _BK_DATA ? _BK_DATA : []).map((c, idx) => {
     const col = bkColor(idx);
     return `<div class="cal-legend-item">
@@ -12511,7 +12667,7 @@ function renderCalendar() {
       const top = (e.startHour - CAL_HOUR_START) * CAL_HOUR_HEIGHT;
       const height = Math.max(26, (e.endHour - e.startHour) * CAL_HOUR_HEIGHT - 2);
       const who = e.names.slice(0, 6).join(', ') + (e.names.length > 6 ? ` +${e.names.length - 6} more` : '');
-      return `<div class="cal-session" style="top:${top}px;height:${height}px;background:${e.color.bg};border:1px solid ${e.color.border}" title="${escapeHTML(e.label)}: ${escapeHTML(who)}">
+      return `<div class="cal-session" style="top:${top}px;height:${height}px;background:${e.color.bg};border:1px solid ${e.color.border};cursor:pointer" onclick="bkOpenEvent(${e.id})" title="${escapeHTML(e.label)}: ${escapeHTML(who)}">
         <div class="cal-session-name" style="color:${e.color.text}">${escapeHTML(e.label)}</div>
         <div class="cal-session-time">${escapeHTML(who)}</div>
         <span class="cal-capacity-badge" style="background:${e.color.border}">${e.names.length} booked</span>
@@ -12559,6 +12715,37 @@ function openCalDrawer(id) {
 }
 function closeCalDrawer() {
   document.getElementById('cal-drawer-overlay').classList.remove('open');
+}
+
+// Tap a booking slot → a popup with the full details (calendar, time, who's booked).
+// Works on mobile (the old version only had a desktop hover tooltip).
+function bkOpenEvent(id) {
+  const e = (typeof BK_EVENTS !== 'undefined' ? BK_EVENTS : [])[id];
+  if (!e) return;
+  let when = '';
+  try { const d = new Date(e.start); if (!isNaN(d.getTime())) when = d.toLocaleString('en-US', { weekday: 'long', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }); } catch (_) {}
+  if (!when) when = calFormatTime(e.startHour);
+  const names = e.names || [];
+  document.getElementById('bk-event-overlay')?.remove();
+  document.body.insertAdjacentHTML('beforeend', `
+    <div id="bk-event-overlay" onclick="if(event.target===this)this.remove()" style="position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9600;display:flex;align-items:flex-end;justify-content:center">
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:16px 16px 0 0;width:100%;max-width:520px;max-height:82vh;display:flex;flex-direction:column">
+        <div style="padding:16px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:11px">
+          <span style="width:11px;height:11px;border-radius:50%;background:${e.color.text};flex:0 0 auto"></span>
+          <div style="min-width:0">
+            <div style="font-weight:700;font-size:15px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHTML(e.label)}</div>
+            <div style="font-size:12px;color:var(--text-mute)">${escapeHTML(when)} · ${names.length} booked</div>
+          </div>
+          <div style="flex:1"></div>
+          <button onclick="document.getElementById('bk-event-overlay').remove()" aria-label="Close" style="background:none;border:none;color:var(--text-mute);font-size:24px;cursor:pointer;padding:0 6px">×</button>
+        </div>
+        <div style="flex:1;overflow-y:auto;padding:8px 18px 18px">
+          ${names.length
+            ? names.map(n => `<div style="padding:11px 0;border-bottom:1px solid var(--border);font-size:14px;display:flex;align-items:center;gap:10px"><span style="width:26px;height:26px;border-radius:50%;background:var(--bg);border:1px solid var(--border);display:inline-flex;align-items:center;justify-content:center;font-size:12px;flex:0 0 auto">👤</span>${escapeHTML(n)}</div>`).join('')
+            : '<div style="color:var(--text-mute);font-size:13px;padding:14px 0">No names on this booking.</div>'}
+        </div>
+      </div>
+    </div>`);
 }
 
 // Bottom-left account switcher. Only renders when this auth user belongs
@@ -13069,6 +13256,22 @@ const _bbCards = [
   { id:'agent-learnings', label:'Agent learnings', desc:'What your booking agent has learned from your coaching' }
 ];
 
+// The Assets card only appears inside the Blueprint for V1.5 (Zoran, 2026-06-22).
+const _bbAssetsCard = { id:'assets', label:'Assets', desc:'Your brand files, photos, and videos - logos, headshots, b-roll' };
+
+// Tier-aware card list. V1 + V2 keep the master list unchanged. V1.5 drops
+// Member Onboarding + Agent learnings (not part of the V1.5 experience) and
+// gains Assets (moved out of the left nav into the Blueprint).
+function _bbIsV15Only() {
+  return (typeof V15_ACCESS !== 'undefined' && V15_ACCESS) &&
+         !(typeof V2_ACCESS !== 'undefined' && V2_ACCESS);
+}
+function _bbEffectiveCards() {
+  if (!_bbIsV15Only()) return _bbCards;
+  const base = _bbCards.filter(c => c.id !== 'member_onboarding' && c.id !== 'agent-learnings');
+  return [...base, _bbAssetsCard];
+}
+
 let _bbState = {
   card: null, offerId: null, step: 1,
   offer: null, saveState: 'idle', _saveTimer: null
@@ -13118,7 +13321,7 @@ function _bbRenderFromHash() {
   if (titleEl) {
     if (!card) titleEl.textContent = 'Business Blueprint';
     else if (card === 'offers' && id) titleEl.textContent = 'Edit Offer';
-    else titleEl.textContent = (_bbCards.find(c => c.id === card)||{}).label || 'Business Blueprint';
+    else titleEl.textContent = (_bbEffectiveCards().find(c => c.id === card)||{}).label || 'Business Blueprint';
   }
 
   const panel = document.getElementById('bb-panel');
@@ -13128,6 +13331,7 @@ function _bbRenderFromHash() {
   if (card === 'offers' && id === 'new') return _bbStartNewOffer(query && query.type);
   if (card === 'offers' && id) return _bbRenderOfferWizard(panel, id);
   if (card === 'offers') return _bbRenderOffersList(panel);
+  if (card === 'assets') return _bbRenderAssets(panel);
   if (card === 'member_onboarding') return _bbRenderMemberOnboarding(panel);
   if (card === 'agent-learnings') return _bbRenderAgentLearnings(panel);
   return _bbRenderCardPlaceholder(panel, card);
@@ -13137,6 +13341,7 @@ function _bbRenderFromHash() {
 // landing + any future "you're inside section X" breadcrumb can reuse.
 const _bbCardIcons = {
   member_onboarding: '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="22" y1="11" x2="16" y2="11"/>',
+  assets:    '<rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/>',
   offers:    '<path d="M16 10a4 4 0 0 1-8 0"/><path d="M3.103 6.034h17.794L20 18a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2z"/>',
   general:   '<path d="M3 21V7l9-4 9 4v14"/><path d="M9 21V12h6v9"/><path d="M3 21h18"/>',
   staff:     '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>',
@@ -13149,9 +13354,30 @@ function _bbCardIconSvg(cardId) {
   return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${inner}</svg>`;
 }
 
+// Assets embedded inside the Blueprint (V1.5). Reuses the standalone asset
+// library by repointing its host id at a container we render here.
+function _bbRenderAssets(panel) {
+  panel.innerHTML = `
+    <button class="bb-back" onclick="_bbNavigate(null)">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+      Back to Business Blueprint
+    </button>
+    <div class="bb-page-head">
+      <div>
+        <div class="bb-page-title">Assets</div>
+        <div class="bb-page-sub">Your brand files, photos, and videos - logos, headshots, b-roll.</div>
+      </div>
+    </div>
+    <div id="bb-assets-content"></div>
+  `;
+  _ASSETS_HOST_ID = 'bb-assets-content';
+  openAssetsView();
+}
+
 function _bbRenderLanding(panel) {
-  const offers = _bbCards.find(c => c.id === 'offers');
-  const others = _bbCards.filter(c => c.id !== 'offers');
+  const cards = _bbEffectiveCards();
+  const offers = cards.find(c => c.id === 'offers');
+  const others = cards.filter(c => c.id !== 'offers');
   panel.innerHTML = `
     <p style="font-size:14px;color:var(--text-sub);margin:0 0 22px;line-height:1.55;max-width:680px">
       Your academy at a glance. These cards cover everything from your offers to business basics. Start with Offers - it's where most of the work lives.
@@ -13177,7 +13403,7 @@ function _bbRenderLanding(panel) {
 }
 
 function _bbRenderCardPlaceholder(panel, card) {
-  const meta = _bbCards.find(c => c.id === card);
+  const meta = _bbEffectiveCards().find(c => c.id === card);
   if (!meta) return _bbRenderLanding(panel);
 
   // Real cards dispatch to dedicated renderers
@@ -19280,7 +19506,12 @@ function _assetFolderOf(file) {
 // on a single multi-minute request. Smaller files keep the proven standard upload.
 // Any resumable failure falls back to standard, so this can't regress what works today.
 const _SUPABASE_STORAGE_URL = 'https://jnojmfmpnsfmtqmwhopz.supabase.co';
-const _RESUMABLE_THRESHOLD = 50 * 1024 * 1024;   // 50MB
+// Resumable (TUS) uploads are DISABLED (2026-06-22): shipped untested in #631 and a
+// large organic upload hung indefinitely (tus has no hard timeout on a stalled
+// request). Infinity => the resumable branch in _storageUpload never runs, so all
+// uploads use the proven standard path. Large files fall back to the link option.
+// Re-enable (lower this back to ~50MB) only after a verified real >50MB upload test.
+const _RESUMABLE_THRESHOLD = Infinity;
 
 function _resumableUpload(bucket, path, file) {
   return new Promise((resolve, reject) => {
@@ -20076,7 +20307,7 @@ function _renderMembersView() {
     <style>
       .member-card {
         display:grid;
-        grid-template-columns:38px minmax(140px,1fr) 100px auto;
+        grid-template-columns:38px minmax(140px,1fr) 100px 300px;
         gap:14px;
         align-items:center;
         padding:12px 16px;
@@ -20089,8 +20320,10 @@ function _renderMembersView() {
       .member-card-name { font-weight:700; font-size:15px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
       .member-card-parent { font-size:12px; color:var(--text-mute); margin-top:2px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
       .member-card-trainer { font-size:13px; color:var(--text-mute); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-      .member-card-pills { display:flex; gap:6px; align-items:center; justify-content:flex-end; flex-wrap:wrap; }
-      .member-pills-extra { display:contents; }
+      /* Fixed internal columns so status / price / set-up line up vertically
+         down the whole roster (the badges no longer drift per row). */
+      .member-card-pills { display:grid; grid-template-columns:124px 92px auto; align-items:center; column-gap:8px; }
+      .mc-status, .mc-price, .mc-extra { display:flex; align-items:center; gap:6px; min-width:0; }
       .members-filter-backdrop { display:none; }
       @media (max-width: 640px) {
         .member-card {
@@ -20100,16 +20333,12 @@ function _renderMembersView() {
           align-items: center;
         }
         .member-card-trainer { display:none; }
-        /* Keep mobile cards clean: only status + price; hide the rest. */
-        .member-pills-extra { display:none; }
+        /* Keep mobile cards clean: just status + price, inline under the name. */
         .member-card-pills {
           grid-column: 2 / -1;          /* under the name, not the avatar */
-          justify-content: flex-start;
-          flex-direction: row;
-          flex-wrap: wrap;
-          gap: 6px;
-          margin-top: 4px;
+          display:flex; flex-wrap:wrap; gap:7px; margin-top:4px;
         }
+        .mc-extra { display:none; }
       }
     </style>
     <div style="display:flex;gap:10px;align-items:center;margin-bottom:14px;flex-wrap:wrap">
@@ -20162,7 +20391,11 @@ function _memberCardHtml(m) {
         <div class="member-card-parent">Parent: ${escapeHTML(m.parent_name || '-')}</div>
       </div>
       <div class="member-card-trainer">${escapeHTML(m.trainer || '-')}</div>
-      <div class="member-card-pills">${_memberStatusPill(m.status, m)}${_memberPriceLabel(m.pricing)}<span class="member-pills-extra">${_memberSetupBadge(m)}${_memberEngagementChip(m.engagement)}${_memberOfferPill(m)}${_memberPricingPill(m.pricing)}</span></div>
+      <div class="member-card-pills">
+        <span class="mc-status">${_memberStatusPill(m.status, m)}</span>
+        <span class="mc-price">${_memberPriceLabel(m.pricing)}</span>
+        <span class="mc-extra">${_memberSetupBadge(m)}${_memberOfferPill(m)}</span>
+      </div>
     </div>`;
 }
 
@@ -20196,15 +20429,30 @@ let _PRICING_FILTER = 'all';
 let _PL_DATA       = null;   // { pipelines:[{id,name,stages,opportunities}], totals:{...} }
 let _PL_PIPELINE   = null;   // currently-selected pipeline id
 let _PL_DRAG_OPP   = null;   // { oppId, fromStageId, pipelineId } during drag
+let _PL_AGENT_MODE = null;   // 'off' | 'hawkeye' | 'self_drive' | null(unknown) - drives the Responded glow
+
+// Load this academy's agent mode once, then re-render so the Responded stage
+// can glow + show its Hawkeye button. Best-effort (403 for non-authorized = no glow).
+async function _plLoadAgentMode() {
+  try {
+    const token = await _mreqAuthToken();
+    const r = await fetch('/api/agent-config', { method: 'POST', headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'get-mode', client_id: CLIENT_ID }) });
+    const j = await _safeJson(r);
+    if (!r.ok) { _PL_AGENT_MODE = 'off'; return; }
+    _PL_AGENT_MODE = j.mode || 'off';
+  } catch (_) { _PL_AGENT_MODE = 'off'; }
+  try { if (typeof _renderPipelineBoard === 'function') _renderPipelineBoard(); } catch (_) {}
+}
 
 async function fetchAndRenderPipelines() {
   const container = document.getElementById('pl-board-container');
   if (!container) return;
+  if (_PL_AGENT_MODE === null) _plLoadAgentMode();   // fetch once, re-renders on completion
   // Instant render: if the board is already loaded, show it now and refresh in
   // the background instead of blanking to a spinner on every open.
   const hadData = _PL_DATA && Array.isArray(_PL_DATA.pipelines) && _PL_DATA.pipelines.length;
   if (hadData) { try { _renderPipelineTabs(); _renderPipelineBoard(); } catch (_) {} }
-  else container.innerHTML = '<div class="req-empty" style="padding:20px 0"><span class="req-spin"></span>Loading pipelines…</div>';
+  else container.innerHTML = _skelPipelinesHTML();
   try {
     if (typeof CLIENT_ID === 'undefined' || !CLIENT_ID) throw new Error('CLIENT_ID not in scope');
     const token = await _mreqAuthToken();
@@ -20958,11 +21206,20 @@ function _renderPipelineBoard() {
       </div>`;
   };
 
+  // When the agent is ON for this academy, the Responded stage glows blue and
+  // gets a full-width Hawkeye button (opens the approval queue) - that's the
+  // stage the agent works.
+  const _agentOn = !!_PL_AGENT_MODE && _PL_AGENT_MODE !== 'off';
   const colHtml = visibleStages.map(s => {
     const opps = (byStage.get(s.id) || []).slice()
       .sort((a, b) => (_plIsTrialToday(b.trialDate) ? 1 : 0) - (_plIsTrialToday(a.trialDate) ? 1 : 0)); // today's trials first
+    const isResponded = /respond/i.test(s.name || '');
+    const glowCol = (isResponded && _agentOn) ? 'box-shadow:0 0 0 1px var(--blue,#5A8FB8),0 0 18px rgba(90,143,184,0.45);border-color:var(--blue,#5A8FB8);' : '';
+    const hawkBtn = (isResponded && _agentOn)
+      ? `<button onclick="_apxOpen()" title="Open the agent approval queue" style="width:100%;box-sizing:border-box;margin-bottom:8px;background:var(--blue-soft,rgba(90,143,184,0.12));color:var(--blue,#5A8FB8);border:1px solid var(--blue,#5A8FB8);border-radius:7px;padding:9px;font-size:12.5px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px">👁 Hawkeye</button>`
+      : '';
     return `
-      <div class="pl-col"
+      <div class="pl-col" style="${glowCol}"
            ondragover="_plDragOver(event,'${escapeHTML(s.id)}')"
            ondragleave="_plDragLeave(event)"
            ondrop="_plDrop(event,'${escapeHTML(s.id)}','${escapeHTML(p.id)}')">
@@ -20971,6 +21228,7 @@ function _renderPipelineBoard() {
           <span class="pl-col-count">${opps.length}</span>
         </div>
         <div class="pl-cards">
+          ${hawkBtn}
           ${opps.length ? opps.map(o => cardHtml(o, s)).join('') : '<div class="pl-empty">No cards here yet.</div>'}
         </div>
       </div>`;
@@ -21204,7 +21462,7 @@ function _plRenderThread(messages) {
         </div>`;
       }).join('')
     : `<div style="color:var(--text-mute);font-size:13px">No messages yet - send the first one below.</div>`;
-  host.scrollTop = host.scrollHeight;
+  _scrollToBottom(host);
 }
 
 function _plMsgPickFiles(inputEl) {
@@ -21316,7 +21574,10 @@ let _INBOX_THREAD = null;  // { convo: {...}, messages: [...] }
 async function fetchAndRenderInbox() {
   const container = document.getElementById('inbox-list-container');
   if (!container) return;
-  container.innerHTML = '<div class="req-empty" style="padding:20px 0"><span class="req-spin"></span>Loading conversations…</div>';
+  // Show a skeleton only on the first load; keep existing data on refresh.
+  if (!(_INBOX_DATA && Array.isArray(_INBOX_DATA.conversations) && _INBOX_DATA.conversations.length)) {
+    container.innerHTML = _skelInboxHTML();
+  }
   try {
     if (typeof CLIENT_ID === 'undefined' || !CLIENT_ID) throw new Error('CLIENT_ID not in scope');
     const token = await _mreqAuthToken();
@@ -21350,8 +21611,102 @@ async function _apxPost(endpoint, action, payload) {
     body: JSON.stringify({ action, client_id: CLIENT_ID, ...(payload || {}) }),
   });
   const json = await _safeJson(r);
-  if (!r.ok) { const e = new Error(json.error || ('HTTP ' + r.status)); e.status = r.status; throw e; }
+  if (!r.ok) {
+    const msg = typeof json.error === 'string' ? json.error : (json.error ? JSON.stringify(json.error) : ('HTTP ' + r.status));
+    const e = new Error(msg); e.status = r.status; throw e;
+  }
   return json;
+}
+
+// Clean error → string (never "[object Object]").
+function _apxErr(e) {
+  if (!e) return 'Something went wrong';
+  if (typeof e === 'string') return e;
+  if (e.message && typeof e.message === 'string') return e.message;
+  try { return JSON.stringify(e); } catch (_) { return 'Something went wrong'; }
+}
+
+// Top-center toast for Hawkeye actions (success green / error red).
+function _apxToast(msg, ok) {
+  document.getElementById('apx-toast')?.remove();
+  const color = ok ? '#3eaf5c' : '#e0654f';
+  document.body.insertAdjacentHTML('beforeend', `<div id="apx-toast" style="position:fixed;top:calc(14px + env(safe-area-inset-top));left:50%;transform:translateX(-50%);z-index:9700;background:var(--surface);border:1px solid ${color};border-left:4px solid ${color};border-radius:10px;padding:11px 16px;font-size:13.5px;font-weight:600;color:var(--text);box-shadow:0 8px 30px rgba(0,0,0,.45);max-width:90vw">${escapeHTML(msg)}</div>`);
+  clearTimeout(window._apxToastT);
+  window._apxToastT = setTimeout(() => document.getElementById('apx-toast')?.remove(), 3200);
+}
+
+// Full-message editor modal (replaces the tiny native prompt). Optionally folds
+// in the "teach the agent why" field so it's one step instead of two popups.
+function _apxEditModal(opts) {
+  document.getElementById('apx-edit-overlay')?.remove();
+  const showText = !opts.hideText;   // skip-with-lesson mode hides the message box
+  const teach = opts.teachable ? `
+    <div style="margin-top:${showText ? '13' : '2'}px">
+      <label style="display:block;font-size:11px;color:var(--text-mute);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">${escapeHTML(opts.teachLabel || 'Teach the agent why? (optional)')}</label>
+      <input id="apx-edit-lesson" type="text" placeholder="${escapeHTML(opts.teachPlaceholder || "e.g. Don't quote price before booking")}" style="width:100%;background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);padding:10px 12px;font:inherit;font-size:13px;outline:none">
+    </div>` : '';
+  const textBox = showText ? `<textarea id="apx-edit-text" style="width:100%;min-height:140px;background:var(--bg);border:1px solid var(--border);border-radius:10px;color:var(--text);padding:12px;font:inherit;font-size:14px;line-height:1.5;resize:vertical;outline:none">${escapeHTML(opts.value || '')}</textarea>` : '';
+  document.body.insertAdjacentHTML('beforeend', `
+    <div id="apx-edit-overlay" onclick="if(event.target===this)this.remove()" style="position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9650;display:flex;align-items:flex-start;justify-content:center;padding:7vh 14px 0">
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:16px;width:100%;max-width:560px;padding:18px;box-shadow:0 20px 60px rgba(0,0,0,.5)">
+        <div style="font-size:15px;font-weight:700;margin-bottom:12px">${escapeHTML(opts.title || 'Edit message')}</div>
+        ${textBox}
+        ${teach}
+        <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:14px">
+          <button onclick="document.getElementById('apx-edit-overlay').remove()" style="background:transparent;border:1px solid var(--border);color:var(--text-sub);border-radius:9px;padding:10px 18px;font:inherit;font-size:14px;cursor:pointer">Cancel</button>
+          <button id="apx-edit-save" style="background:var(--accent);border:none;color:#08080A;border-radius:9px;padding:10px 22px;font:inherit;font-size:14px;font-weight:700;cursor:pointer">${escapeHTML(opts.saveLabel || 'Save')}</button>
+        </div>
+      </div>
+    </div>`);
+  const ta = document.getElementById('apx-edit-text');
+  setTimeout(() => { try { const f = ta || document.getElementById('apx-edit-lesson'); if (f) { f.focus(); if (ta) ta.setSelectionRange(ta.value.length, ta.value.length); } } catch (_) {} }, 60);
+  document.getElementById('apx-edit-save').onclick = () => {
+    const text = (ta ? ta.value : '').trim();
+    const lesson = (document.getElementById('apx-edit-lesson')?.value || '').trim();
+    document.getElementById('apx-edit-overlay')?.remove();
+    try { opts.onSave(text, lesson); } catch (_) {}
+  };
+}
+
+// Tap a Hawkeye card → see the whole conversation with the lead.
+function _apxOpenCardThread(id) {
+  const r = [..._APX_DATA.followups, ..._APX_DATA.ready, ...(_APX_DATA.lost || []), ...(_APX_DATA.book || [])].find(x => x.id === id);
+  if (r) _apxOpenThread(r.ghl_contact_id, r.contact_name || 'Conversation');
+}
+async function _apxOpenThread(contactId, name) {
+  if (!contactId) { _apxToast('No conversation linked to this card', false); return; }
+  document.getElementById('apx-thread-overlay')?.remove();
+  document.body.insertAdjacentHTML('beforeend', `
+    <div id="apx-thread-overlay" onclick="if(event.target===this)this.remove()" style="position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9680;display:flex;align-items:flex-end;justify-content:center">
+      <div style="background:var(--bg);border:1px solid var(--border);border-radius:16px 16px 0 0;width:100%;max-width:560px;height:82vh;display:flex;flex-direction:column">
+        <div style="padding:14px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px">
+          <div style="font-weight:700;font-size:15px">${escapeHTML(name || 'Conversation')}</div>
+          <div style="flex:1"></div>
+          <button onclick="document.getElementById('apx-thread-overlay').remove()" aria-label="Close" style="background:none;border:none;color:var(--text-mute);font-size:24px;cursor:pointer;padding:0 6px">×</button>
+        </div>
+        <div id="apx-thread-body" style="flex:1;overflow-y:auto;padding:14px 16px;display:flex;flex-direction:column;gap:8px">
+          <div style="color:var(--text-mute);font-size:13px;text-align:center;padding:24px"><span class="req-spin"></span> Loading conversation…</div>
+        </div>
+      </div>
+    </div>`);
+  try {
+    const token = await _mreqAuthToken();
+    const r = await fetch(`/api/ghl/inbox?client_id=${encodeURIComponent(CLIENT_ID)}&contact_id=${encodeURIComponent(contactId)}`, { headers: { Authorization: 'Bearer ' + token } });
+    const j = await _safeJson(r);
+    if (!r.ok) throw new Error(j.error || ('HTTP ' + r.status));
+    const body = document.getElementById('apx-thread-body');
+    if (!body) return;
+    const msgs = (j.messages || []).filter(m => (m.body || '').trim()).sort((a, b) => new Date(a.date || 0) - new Date(b.date || 0));
+    body.innerHTML = msgs.length ? msgs.map(m => {
+      const out = (m.direction || '').toLowerCase() === 'outbound';
+      const when = (typeof _ibFormatDate === 'function') ? _ibFormatDate(m.date) : '';
+      return `<div style="max-width:82%;align-self:${out ? 'flex-end' : 'flex-start'};background:${out ? 'var(--accent)' : 'var(--surface)'};color:${out ? '#0B0B0D' : 'var(--text)'};border:1px solid ${out ? 'var(--accent)' : 'var(--border)'};padding:8px 11px;border-radius:12px;font-size:13.5px;line-height:1.45;word-break:break-word">${escapeHTML(m.body)}<div style="font-size:10px;opacity:.6;margin-top:3px">${escapeHTML(when)}</div></div>`;
+    }).join('') : `<div style="color:var(--text-mute);font-size:13px;text-align:center;padding:24px">No messages yet.</div>`;
+    _scrollToBottom(body);
+  } catch (e) {
+    const body = document.getElementById('apx-thread-body');
+    if (body) body.innerHTML = `<div style="color:#e0654f;font-size:13px;text-align:center;padding:24px">Couldn't load conversation - ${escapeHTML(_apxErr(e))}</div>`;
+  }
 }
 
 // Show the 📨 button + a live count, for staff only. Drives BOTH inboxes:
@@ -21378,12 +21733,8 @@ async function _apxRefreshCount() {
   }
   const fu = fuR.status === 'fulfilled' ? fuR.value : {};
   const rd = rdR.status === 'fulfilled' ? rdR.value : {};
-  const fups = (fu.followups || []).filter(f => f.status === 'pending');
-  const all = (rd.ready || []).filter(r => r.status === 'pending');
-  const ready = all.filter(r => r.kind !== 'mark_lost');
-  const lost = all.filter(r => r.kind === 'mark_lost');
-  _APX_DATA = { followups: fups, ready, lost };
-  const n = fups.length + ready.length + lost.length;
+  _APX_DATA = _apxSplit(fu, rd);
+  const n = _APX_DATA.followups.length + _APX_DATA.ready.length + _APX_DATA.lost.length + (_APX_DATA.book || []).length;
   btns.forEach(({ btn, span }) => {
     btn.style.display = '';
     if (span) span.textContent = n ? `(${n})` : '';
@@ -21392,23 +21743,47 @@ async function _apxRefreshCount() {
   });
 }
 
+let _APX_TAB = 'followups';
+function _apxSetTab(t) { _APX_TAB = t; _apxRender(); document.getElementById('apx-body')?.scrollTo(0, 0); }
+function _apxEmpty(msg) { return `<div style="text-align:center;color:var(--text-mute);font-size:14px;padding:48px 10px">${escapeHTML(msg)}</div>`; }
+
 function _apxOpen() {
   document.getElementById('apx-overlay')?.remove();
+  // Full-width takeover: a screen-wide bar at the top (title + tabs) with the
+  // active tab's cards below, centered to a readable width on desktop.
   document.body.insertAdjacentHTML('beforeend', `
-    <div id="apx-overlay" onclick="if(event.target===this)_apxClose()" style="position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9400;display:flex;justify-content:flex-end">
-      <div style="width:480px;max-width:100vw;height:100%;background:var(--bg);border-left:1px solid var(--border);display:flex;flex-direction:column">
-        <div style="padding:16px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px">
-          <div style="font-size:17px;font-weight:800">👁 Hawkeye</div>
-          <div style="font-size:12px;color:var(--text-mute)">agent drafts - approve before they send</div>
-          <div style="flex:1"></div>
-          <button onclick="_apxClose()" aria-label="Close" style="background:none;border:none;color:var(--text-mute);font-size:22px;cursor:pointer;padding:2px 8px">×</button>
-        </div>
-        <div id="apx-body" style="flex:1;overflow-y:auto;padding:16px 18px"><div style="color:var(--text-mute);font-size:13px"><span class="req-spin"></span> Loading…</div></div>
+    <div id="apx-overlay" style="position:fixed;inset:0;z-index:9400;background:var(--bg);display:flex;flex-direction:column">
+      <div style="padding:calc(14px + env(safe-area-inset-top)) 18px 12px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px">
+        <div style="font-size:18px;font-weight:800">👁 Hawkeye</div>
+        <div style="font-size:12px;color:var(--text-mute)">approve before they send</div>
+        <div style="flex:1"></div>
+        <button onclick="_apxClose()" aria-label="Close" style="background:none;border:none;color:var(--text-mute);font-size:24px;cursor:pointer;padding:2px 10px">×</button>
+      </div>
+      <div id="apx-tabs" style="display:flex;gap:7px;padding:11px 16px;border-bottom:1px solid var(--border);overflow-x:auto;-webkit-overflow-scrolling:touch"></div>
+      <div id="apx-body" style="flex:1;overflow-y:auto;padding:16px 18px calc(24px + env(safe-area-inset-bottom))">
+        <div style="max-width:860px;margin:0 auto"><div style="color:var(--text-mute);font-size:13px"><span class="req-spin"></span> Loading…</div></div>
       </div>
     </div>`);
   _apxLoad();
 }
 function _apxClose() { document.getElementById('apx-overlay')?.remove(); }
+
+// Split the two API payloads into the three drawer sections. OVERDUE follow-ups
+// (their send time has passed) move out of the upcoming "Follow-ups" list and
+// into "Ready messages" - they're ready to send now.
+function _apxSplit(fu, rd) {
+  const now = Date.now();
+  const upcoming = [], overdue = [];
+  for (const f of (fu.followups || []).filter(x => x.status === 'pending')) {
+    if (f.scheduled_at && new Date(f.scheduled_at).getTime() <= now) overdue.push({ ...f, _isFollowup: true });
+    else upcoming.push(f);
+  }
+  const all = (rd.ready || []).filter(r => r.status === 'pending');
+  const ready = [...overdue, ...all.filter(r => r.kind !== 'mark_lost' && r.kind !== 'book')];
+  const lost = all.filter(r => r.kind === 'mark_lost');
+  const book = all.filter(r => r.kind === 'book');
+  return { followups: upcoming, ready, lost, book };
+}
 
 async function _apxLoad() {
   const body = document.getElementById('apx-body');
@@ -21418,17 +21793,16 @@ async function _apxLoad() {
       _apxPost('/api/agent-followups', 'list', {}),
       _apxPost('/api/agent-approvals', 'list-ready', {}),
     ]);
-    const fups = (fu.followups || []).filter(f => f.status === 'pending');
-    const all = (rd.ready || []).filter(r => r.status === 'pending');
-    const ready = all.filter(r => r.kind !== 'mark_lost');
-    const lost = all.filter(r => r.kind === 'mark_lost');
-    _APX_DATA = { followups: fups, ready, lost };
+    _APX_DATA = _apxSplit(fu, rd);
+    // Open on the first tab that actually has something.
+    const readyN = _APX_DATA.ready.length + (_APX_DATA.book || []).length;
+    if (!_APX_DATA.followups.length) _APX_TAB = readyN ? 'ready' : ((_APX_DATA.lost || []).length ? 'lost' : 'followups');
     _apxRender();
     const span = document.getElementById('apx-count');
-    const n = fups.length + ready.length + lost.length;
+    const n = _APX_DATA.followups.length + readyN + _APX_DATA.lost.length;
     if (span) span.textContent = n ? `(${n})` : '';
   } catch (e) {
-    body.innerHTML = `<div style="color:#e07070;font-size:13px">Couldn't load - ${escapeHTML(e.message)}</div>`;
+    body.innerHTML = `<div style="color:#e07070;font-size:13px">Couldn't load - ${escapeHTML(_apxErr(e))}</div>`;
   }
 }
 
@@ -21439,34 +21813,73 @@ function _apxWhen(ts) {
   const s = d >= 1 ? `${Math.round(d)}d` : h >= 1 ? `${Math.round(h)}h` : `${Math.max(1, Math.round(a / 60000))}m`;
   return past ? `${s} overdue` : `in ${s}`;
 }
+function _apxAgo(ts) {
+  if (!ts) return '';
+  const a = Math.max(0, Date.now() - new Date(ts).getTime());
+  const h = a / 3600000, d = a / 86400000;
+  return d >= 1 ? `${Math.round(d)}d ago` : h >= 1 ? `${Math.round(h)}h ago` : `${Math.max(1, Math.round(a / 60000))}m ago`;
+}
+function _apxOverdue(r) { return r.scheduled_at && new Date(r.scheduled_at).getTime() <= Date.now(); }
+function _apxTrim(s, n) { s = String(s || ''); return s.length > n ? s.slice(0, n - 1) + '…' : s; }
+
+// Shared card context: a 2-3 sentence convo summary + the lead's last message
+// AND our last message, so you have the whole picture at a glance.
+// The recent conversation, inline on the card (lead left / us right). Tappable
+// to open the full thread. Falls back to last_message/last_outbound for old rows.
+function _apxContext(r) {
+  let tail = Array.isArray(r.thread_tail) ? r.thread_tail.slice() : [];
+  if (!tail.length) {
+    if (r.last_outbound) tail.push({ role: 'agent', text: r.last_outbound });
+    if (r.last_message) tail.push({ role: 'lead', text: r.last_message });
+  }
+  if (!tail.length) return '';
+  const bubbles = tail.map(m => {
+    const out = m.role === 'agent';
+    return `<div style="max-width:84%;align-self:${out ? 'flex-end' : 'flex-start'};background:${out ? 'rgba(232,197,71,.13)' : 'rgba(255,255,255,.05)'};border:1px solid ${out ? 'var(--accent-border,rgba(232,197,71,.3))' : 'var(--border)'};color:var(--text);padding:6px 10px;border-radius:12px;font-size:12.5px;line-height:1.4;word-break:break-word">${escapeHTML(_apxTrim(m.text, 240))}</div>`;
+  }).join('');
+  return `<div onclick="_apxOpenCardThread('${r.id}')" title="Tap for the full conversation" style="display:flex;flex-direction:column;gap:5px;margin:4px 0 8px;max-height:230px;overflow-y:auto;cursor:pointer">${bubbles}</div>`;
+}
 
 function _apxCard(kind, r) {
+  const isFu = kind === 'followup' || r._isFollowup;
+  const overdue = isFu && _apxOverdue(r);
   const esc = r.escalate ? `<div style="font-size:11.5px;color:#e0a020;margin-bottom:6px">⚠ agent escalated${r.escalate_reason ? ': ' + escapeHTML(r.escalate_reason) : ''}</div>` : '';
-  const meta = kind === 'followup'
-    ? `<span style="font-size:11px;font-family:var(--mono,monospace);color:var(--accent)">⏰ ${escapeHTML(_apxWhen(r.scheduled_at))}</span>`
+  // Top-right meta: follow-ups show when the next message sends; replies show confidence.
+  const meta = isFu
+    ? `<span style="font-size:11px;font-family:var(--mono,monospace);color:${overdue ? '#e0654f' : 'var(--accent)'}">⏰ ${escapeHTML(overdue ? 'send now' : 'sends ' + _apxWhen(r.scheduled_at))}</span>`
     : (typeof r.confidence === 'number' ? `<span style="font-size:11px;color:var(--text-mute)">${Math.round(r.confidence * 100)}% sure</span>` : '');
-  const goal = (kind === 'followup' && r.goal) ? `<div style="font-size:11.5px;color:var(--text-sub);margin-bottom:5px">🎯 ${escapeHTML(r.goal)}</div>` : '';
-  const sendFn = kind === 'followup' ? `_apxFollowupSend('${r.id}')` : `_apxReadySend('${r.id}')`;
-  const editFn = kind === 'followup' ? `_apxFollowupEdit('${r.id}')` : `_apxReadyEdit('${r.id}')`;
-  const skipFn = kind === 'followup' ? `_apxFollowupSkip('${r.id}')` : `_apxReadySkip('${r.id}')`;
+  const goal = (isFu && r.goal) ? `<div style="font-size:11.5px;color:var(--text-sub);margin-bottom:5px">🎯 ${escapeHTML(r.goal)}</div>` : '';
+  const last = _apxContext(r);   // summary + lead's last + our last
+  const overBadge = overdue ? `<span style="font-size:10px;font-weight:700;color:#e0654f;background:rgba(224,90,66,0.12);border-radius:999px;padding:1px 7px">overdue</span>` : '';
+  const sendFn = isFu ? `_apxFollowupSend('${r.id}')` : `_apxReadySend('${r.id}')`;
+  const editFn = isFu ? `_apxFollowupEdit('${r.id}')` : `_apxReadyEdit('${r.id}')`;
+  const skipFn = isFu ? `_apxFollowupSkip('${r.id}')` : `_apxReadySkip('${r.id}')`;
+  const approveFn = isFu ? `_apxFollowupSend('${r.id}')` : `_apxReadyApprove('${r.id}')`;
   return `<div id="apx-${r.id}" style="background:var(--surface);border:1px solid var(--accent-border,rgba(232,197,71,.3));border-radius:11px;padding:12px 14px;margin-bottom:9px">
     <div style="display:flex;align-items:center;gap:8px;margin-bottom:5px;flex-wrap:wrap">
       <span style="font-weight:700;font-size:13.5px">${escapeHTML(r.contact_name || 'Lead')}</span>
+      ${overBadge}
       <div style="flex:1"></div>${meta}
-    </div>${goal}${esc}
-    <div style="font-size:13.5px;line-height:1.5;background:rgba(255,255,255,.03);border-radius:8px;padding:8px 10px;white-space:pre-wrap" id="apx-msg-${r.id}">${escapeHTML(r.draft_message || '')}</div>
-    <div style="display:flex;gap:7px;margin-top:8px;flex-wrap:wrap;justify-content:flex-end">
-      <button onclick="${editFn}" style="background:transparent;border:1px solid var(--border);color:var(--text-sub);border-radius:7px;padding:5px 11px;font-size:12px;cursor:pointer">✎ edit</button>
-      <button onclick="${skipFn}" style="background:transparent;border:1px solid var(--border);color:#e07070;border-radius:7px;padding:5px 11px;font-size:12px;cursor:pointer">✕ skip</button>
-      <button onclick="${sendFn}" style="background:var(--accent);border:1px solid var(--accent);color:#08080A;border-radius:7px;padding:5px 13px;font-size:12px;font-weight:700;cursor:pointer">✓ send</button>
+    </div>${goal}${esc}${last}
+    <div style="text-align:center;font-size:9.5px;color:var(--text-mute);text-transform:uppercase;letter-spacing:.09em;margin:2px 0 5px">proposed reply</div>
+    <div style="font-size:13.5px;line-height:1.5;background:var(--accent-glow,rgba(232,197,71,.10));border:1px solid var(--accent-border,rgba(232,197,71,.3));border-radius:10px;padding:9px 11px;white-space:pre-wrap" id="apx-msg-${r.id}">${escapeHTML(r.draft_message || '')}</div>
+    <div style="display:flex;align-items:stretch;gap:8px;margin-top:10px">
+      <button onclick="${skipFn}" title="Skip (and optionally teach why)" style="flex:1;background:transparent;border:1px solid var(--border);color:#e0654f;border-radius:9px;padding:9px;font-size:17px;cursor:pointer">✕</button>
+      <button onclick="${editFn}" title="Edit the message" style="flex:1;background:transparent;border:1px solid var(--border);color:#9a7bd6;border-radius:9px;padding:9px;font-size:15px;cursor:pointer">🔄</button>
+      <button onclick="${approveFn}" title="${overdue ? 'Approve & send now' : 'Approve & send'}" style="flex:1;background:var(--accent);border:1px solid var(--accent);color:#08080A;border-radius:9px;padding:9px;font-size:17px;font-weight:700;cursor:pointer">✓</button>
     </div>
   </div>`;
 }
 
-// A red "suggested Lost" card - confirm marks the lead Lost in the pipeline.
+// A red "suggested Lost" card. Nothing is sent or changed until you confirm -
+// confirming sends the closing text (if any) AND marks the lead Lost together.
 function _apxLostCard(r) {
   const reason = escapeHTML(r.lost_reason || 'Other');
   const closing = (r.draft_message || '').trim();
+  const last = _apxContext(r);
+  const closingBox = closing
+    ? `<div style="font-size:12.5px;line-height:1.45;background:rgba(255,255,255,.03);border-radius:8px;padding:8px 10px;white-space:pre-wrap"><span style="color:var(--text-mute);font-size:10.5px">texts this when you confirm, then marks Lost:</span><br>${escapeHTML(closing)}</div>`
+    : `<div style="font-size:11.5px;color:var(--text-mute);background:rgba(255,255,255,.02);border-radius:8px;padding:8px 10px">No closing text - will mark Lost without sending anything.</div>`;
   return `<div id="apx-${r.id}" style="background:rgba(224,90,66,0.05);border:1px solid rgba(224,90,66,0.4);border-radius:11px;padding:12px 14px;margin-bottom:9px">
     <div style="display:flex;align-items:center;gap:8px;margin-bottom:5px;flex-wrap:wrap">
       <span style="font-weight:700;font-size:13.5px">${escapeHTML(r.contact_name || 'Lead')}</span>
@@ -21474,61 +21887,137 @@ function _apxLostCard(r) {
       <div style="flex:1"></div>
       ${typeof r.confidence === 'number' ? `<span style="font-size:11px;color:var(--text-mute)">${Math.round(r.confidence * 100)}% sure</span>` : ''}
     </div>
+    ${last}
     ${r.reasoning ? `<div style="font-size:12px;color:var(--text-sub);margin-bottom:6px">${escapeHTML(r.reasoning)}</div>` : ''}
-    ${closing ? `<div style="font-size:12.5px;line-height:1.45;background:rgba(255,255,255,.03);border-radius:8px;padding:8px 10px"><span style="color:var(--text-mute);font-size:10.5px">closing text the agent will send:</span><br>${escapeHTML(closing)}</div>` : ''}
-    <div style="display:flex;gap:7px;margin-top:8px;justify-content:flex-end">
+    ${closingBox}
+    <div style="display:flex;align-items:center;gap:7px;margin-top:8px;flex-wrap:wrap">
+      <button onclick="_apxOpenCardThread('${r.id}')" style="background:transparent;border:1px solid var(--border);color:var(--text-mute);border-radius:7px;padding:5px 10px;font-size:12px;cursor:pointer">💬 chat</button>
+      <div style="flex:1"></div>
+      <button onclick="_apxLostEdit('${r.id}')" style="background:transparent;border:1px solid var(--border);color:var(--text-sub);border-radius:7px;padding:5px 11px;font-size:12px;cursor:pointer">✎ edit text</button>
       <button onclick="_apxLostDismiss('${r.id}')" style="background:transparent;border:1px solid var(--border);color:var(--text-sub);border-radius:7px;padding:5px 11px;font-size:12px;cursor:pointer">✕ Dismiss</button>
-      <button onclick="_apxLostConfirm('${r.id}')" style="background:#e0654f;border:1px solid #e0654f;color:#fff;border-radius:7px;padding:5px 13px;font-size:12px;font-weight:700;cursor:pointer">🚫 Confirm Lost</button>
+      <button onclick="_apxLostConfirm('${r.id}')" style="background:#e0654f;border:1px solid #e0654f;color:#fff;border-radius:7px;padding:5px 13px;font-size:12px;font-weight:700;cursor:pointer">🚫 ${closing ? 'Send &amp; mark Lost' : 'Mark Lost'}</button>
     </div>
   </div>`;
 }
 
+// Edit the closing text on a Lost suggestion (clearing it = mark Lost, no text).
+function _apxLostEdit(id) {
+  const r = _APX_DATA.lost.find(x => x.id === id); if (!r) return;
+  _apxEditModal({
+    title: 'Edit the closing message (clear it to mark Lost without texting)',
+    value: r.draft_message || '', teachable: false,
+    onSave: (text) => { r.draft_message = text; _apxRender(); },
+  });
+}
+
 async function _apxLostConfirm(id) {
   const r = _APX_DATA.lost.find(x => x.id === id); if (!r) return;
+  const hasClosing = (r.draft_message || '').trim();
   _plConfirmModal({
     icon: '🚫',
     title: 'Mark ' + (r.contact_name || 'this lead') + ' as Lost?',
-    body: 'Reason: <b>' + escapeHTML(r.lost_reason || 'Other') + '</b>.' + ((r.draft_message || '').trim() ? ' The closing message is sent, then they\'re marked Lost in the pipeline.' : ' They\'re marked Lost in the pipeline.'),
-    okLabel: 'Mark Lost',
+    body: 'Reason: <b>' + escapeHTML(r.lost_reason || 'Other') + '</b>.' + (hasClosing ? ' This sends the closing message AND marks them Lost in the pipeline - in one go.' : ' They\'re marked Lost in the pipeline (no message sent).'),
+    okLabel: hasClosing ? 'Send & mark Lost' : 'Mark Lost',
     onOk: async () => {
       try {
         await _apxPost('/api/agent-approvals', 'confirm-lost', { ready_id: r.id, lost_reason: r.lost_reason || null, reply: r.draft_message || '' });
-        _apxRemove(id); _plToast('🚫 Marked Lost');
-      } catch (e) { alert(e.message); }
+        _apxRemove(id); _apxToast('🚫 Marked Lost', true);
+      } catch (e) { _apxToast(_apxErr(e), false); }
     },
   });
 }
-async function _apxLostDismiss(id) { try { await _apxPost('/api/agent-approvals', 'skip-ready', { ready_id: id }); _apxRemove(id); } catch (e) { alert(e.message); } }
+async function _apxLostDismiss(id) { try { await _apxPost('/api/agent-approvals', 'skip-ready', { ready_id: id }); _apxRemove(id); _apxToast('Dismissed', true); } catch (e) { _apxToast(_apxErr(e), false); } }
+
+// A blue "booking request" card. The lead confirmed a slot; confirming creates
+// the real GHL appointment (GHL's automation then sends the confirmation).
+function _apxBookSlotStr(ts) {
+  if (!ts) return 'time TBD';
+  try { return new Date(ts).toLocaleString('en-US', { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }); } catch (_) { return String(ts); }
+}
+function _apxBookCard(r) {
+  const when = _apxBookSlotStr(r.book_slot_at);
+  const msg = (r.draft_message || '').trim();
+  const last = _apxContext(r);
+  return `<div id="apx-${r.id}" style="background:var(--blue-soft,rgba(90,143,184,0.08));border:1px solid var(--blue,#5A8FB8);border-radius:11px;padding:12px 14px;margin-bottom:9px">
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:5px;flex-wrap:wrap">
+      <span style="font-weight:700;font-size:13.5px">${escapeHTML(r.contact_name || 'Lead')}</span>
+      <span style="font-size:11px;font-weight:700;color:var(--blue,#5A8FB8);background:var(--blue-soft,rgba(90,143,184,0.14));border-radius:999px;padding:2px 9px">📅 ${escapeHTML(r.book_group || 'Trial')}</span>
+      <div style="flex:1"></div>
+      ${typeof r.confidence === 'number' ? `<span style="font-size:11px;color:var(--text-mute)">${Math.round(r.confidence * 100)}% sure</span>` : ''}
+    </div>
+    <div style="font-size:13.5px;color:var(--text);margin-bottom:6px">🕐 <b>${escapeHTML(when)}</b></div>
+    ${last}
+    ${msg ? `<div style="font-size:12.5px;line-height:1.45;background:rgba(255,255,255,.03);border-radius:8px;padding:8px 10px;white-space:pre-wrap"><span style="color:var(--text-mute);font-size:10.5px">books the appointment on confirm - GHL sends the confirmation:</span><br>${escapeHTML(msg)}</div>` : ''}
+    <div style="display:flex;align-items:center;gap:7px;margin-top:8px;flex-wrap:wrap">
+      <button onclick="_apxOpenCardThread('${r.id}')" style="background:transparent;border:1px solid var(--border);color:var(--text-mute);border-radius:7px;padding:5px 10px;font-size:12px;cursor:pointer">💬 chat</button>
+      <div style="flex:1"></div>
+      <button onclick="_apxBookSkip('${r.id}')" style="background:transparent;border:1px solid var(--border);color:#e07070;border-radius:7px;padding:5px 11px;font-size:12px;cursor:pointer">✕ skip</button>
+      <button onclick="_apxBookConfirm('${r.id}')" style="background:var(--blue,#5A8FB8);border:1px solid var(--blue,#5A8FB8);color:#fff;border-radius:7px;padding:5px 13px;font-size:12px;font-weight:700;cursor:pointer">📅 approve &amp; book</button>
+    </div>
+  </div>`;
+}
+async function _apxBookConfirm(id) {
+  const r = (_APX_DATA.book || []).find(x => x.id === id); if (!r) return;
+  const when = _apxBookSlotStr(r.book_slot_at);
+  _plConfirmModal({
+    icon: '📅',
+    title: 'Book ' + (r.contact_name || 'this lead') + '?',
+    body: 'This creates the real GHL appointment for <b>' + escapeHTML(r.book_group || 'the trial') + '</b> on <b>' + escapeHTML(when) + '</b>. GHL sends the confirmation automatically.',
+    okLabel: 'Book it',
+    onOk: async () => {
+      try { await _apxPost('/api/agent-approvals', 'confirm-book', { ready_id: r.id }); _apxRemove(id); _apxToast('📅 Booked!', true); }
+      catch (e) { _apxToast(_apxErr(e), false); }
+    },
+  });
+}
+async function _apxBookSkip(id) { try { await _apxPost('/api/agent-approvals', 'skip-ready', { ready_id: id }); _apxRemove(id); _apxToast('Skipped', true); } catch (e) { _apxToast(_apxErr(e), false); } }
 
 function _apxRender() {
+  const { followups, ready, lost, book } = _APX_DATA;
+  const bookN = (book || []).length, readyN = ready.length + bookN, lostN = (lost || []).length;
+
+  // Tabs bar.
+  const tabsEl = document.getElementById('apx-tabs');
+  if (tabsEl) {
+    const tab = (key, label, n, color) => {
+      const on = _APX_TAB === key, c = color || 'var(--accent)';
+      return `<button onclick="_apxSetTab('${key}')" style="flex:0 0 auto;background:${on ? c : 'transparent'};color:${on ? '#0B0B0D' : 'var(--text-sub)'};border:1px solid ${on ? c : 'var(--border)'};border-radius:999px;padding:8px 15px;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap">${label}${n ? ` (${n})` : ''}</button>`;
+    };
+    tabsEl.innerHTML = tab('followups', '⏰ Follow-ups', followups.length)
+      + tab('ready', '💬 Ready messages', readyN)
+      + tab('lost', '🚫 Lost', lostN, '#e0654f');
+  }
+
+  // Active tab content (centered to a readable width on wide screens).
   const body = document.getElementById('apx-body');
   if (!body) return;
-  const { followups, ready, lost } = _APX_DATA;
-  const sec = (title, items, kind) => `
-    <div style="font-size:13px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:var(--text-mute);margin:4px 0 10px">${title} ${items.length ? `· ${items.length}` : ''}</div>
-    ${items.length ? items.map(r => _apxCard(kind, r)).join('') : `<div style="color:var(--text-mute);font-size:13px;padding:2px 0 14px">Nothing waiting.</div>`}`;
-  let html =
-    sec('⏰ Follow-ups', followups, 'followup') +
-    `<div style="height:8px"></div>` +
-    sec('💬 Ready messages', ready, 'ready');
-  if ((lost || []).length) {
-    html += `<div style="height:8px"></div>`
-      + `<div style="font-size:13px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:#e0654f;margin:4px 0 10px">🚫 Suggested Lost · ${lost.length}</div>`
-      + lost.map(_apxLostCard).join('');
+  let inner = '';
+  if (_APX_TAB === 'followups') {
+    inner = followups.length ? followups.map(r => _apxCard('followup', r)).join('') : _apxEmpty('No follow-ups waiting.');
+  } else if (_APX_TAB === 'ready') {
+    if (bookN) {
+      inner += `<div style="font-size:13px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:var(--blue,#5A8FB8);margin:2px 0 10px">📅 Booking requests · ${bookN}</div>`
+        + book.map(_apxBookCard).join('');
+    }
+    if (ready.length) {
+      if (bookN) inner += `<div style="height:10px"></div><div style="font-size:13px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:var(--text-mute);margin:2px 0 10px">💬 Ready messages · ${ready.length}</div>`;
+      inner += ready.map(r => _apxCard('ready', r)).join('');
+    }
+    if (!readyN) inner = _apxEmpty('Nothing ready to send.');
+  } else if (_APX_TAB === 'lost') {
+    inner = lostN ? lost.map(_apxLostCard).join('') : _apxEmpty('No suggested-lost leads.');
   }
-  body.innerHTML = html;
-  if (!followups.length && !ready.length && !(lost || []).length) {
-    body.innerHTML = `<div style="text-align:center;color:var(--text-mute);font-size:14px;padding:40px 10px">✅ All clear - nothing waiting for approval.</div>`;
-  }
+  body.innerHTML = `<div style="max-width:860px;margin:0 auto">${inner}</div>`;
 }
 
 function _apxRemove(id) {
   _APX_DATA.followups = _APX_DATA.followups.filter(x => x.id !== id);
   _APX_DATA.ready = _APX_DATA.ready.filter(x => x.id !== id);
   _APX_DATA.lost = (_APX_DATA.lost || []).filter(x => x.id !== id);
+  _APX_DATA.book = (_APX_DATA.book || []).filter(x => x.id !== id);
   _apxRender();
   const span = document.getElementById('apx-count');
-  const n = _APX_DATA.followups.length + _APX_DATA.ready.length + (_APX_DATA.lost || []).length;
+  const n = _APX_DATA.followups.length + _APX_DATA.ready.length + (_APX_DATA.lost || []).length + (_APX_DATA.book || []).length;
   if (span) span.textContent = n ? `(${n})` : '';
 }
 
@@ -21536,62 +22025,112 @@ function _apxRemove(id) {
 // classify-and-promote pipeline as the Train Agent tab: born local to this
 // academy, applied to the next draft immediately, and (if the AI judges it
 // general sales-craft) queued for BAM to promote into the shared brain.
-async function _apxTeach(before, after, context) {
-  const lesson = prompt(
-    "Teach the agent from this edit? One line - what should it learn?\n" +
-    "e.g. \"Don't quote price before the trial is booked.\"\n\n(Leave blank to skip.)",
-    ''
-  );
-  if (lesson == null || !lesson.trim()) return;
+// Teach a lesson (already captured from the edit modal - no prompt).
+async function _apxTeach(lesson, before, after, context) {
+  if (!lesson || !lesson.trim()) return;
   try {
     const j = await _apxPost('/api/agent-train', 'teach', {
       lesson: lesson.trim(), kind: 'fix',
       context: { ...(context || {}), ai_drafted: before, you_sent: after },
     });
-    _plToast(j && j.proposed_global ? '📚 Lesson saved - sent to BAM to review for all academies' : '📚 Lesson saved + applied');
-  } catch (e) { _plToast('Edit kept, but lesson not saved: ' + (e.message || 'error')); }
+    _apxToast(j && j.proposed_global ? '📚 Lesson saved - sent to BAM to review' : '📚 Lesson saved + applied', true);
+  } catch (e) { _apxToast('Edit kept, but lesson not saved: ' + _apxErr(e), false); }
 }
 
 // ── Follow-up actions ──
-async function _apxFollowupSend(id) { try { await _apxPost('/api/agent-followups', 'send-now', { id }); _apxRemove(id); _plToast('✓ Sent'); } catch (e) { alert(e.message); } }
-async function _apxFollowupSkip(id) { try { await _apxPost('/api/agent-followups', 'skip', { id }); _apxRemove(id); } catch (e) { alert(e.message); } }
+// Outside 8:00am-9:30pm the agent holds the message; tell the user when it'll go.
+function _apxQuietMsg(iso) {
+  let t = '8 AM';
+  try { if (iso) t = new Date(iso).toLocaleString([], { weekday: 'short', hour: 'numeric', minute: '2-digit' }); } catch (e) {}
+  return '📅 Quiet hours - scheduled for ' + t;
+}
+async function _apxFollowupSend(id) { try { const resp = await _apxPost('/api/agent-followups', 'send-now', { id }); _apxRemove(id); _apxToast(resp && resp.deferred ? _apxQuietMsg(resp.send_after) : '✓ Sent', true); } catch (e) { _apxToast(_apxErr(e), false); } }
+async function _apxFollowupSkip(id) { try { await _apxPost('/api/agent-followups', 'skip', { id }); _apxRemove(id); _apxToast('Skipped', true); } catch (e) { _apxToast(_apxErr(e), false); } }
 async function _apxFollowupEdit(id) {
-  const r = _APX_DATA.followups.find(x => x.id === id); if (!r) return;
+  const r = _APX_DATA.followups.find(x => x.id === id) || _APX_DATA.ready.find(x => x.id === id); if (!r) return;
   const before = r.draft_message || '';
-  const t = prompt('Edit the follow-up message:', before);
-  if (t == null || !t.trim() || t.trim() === before) return;
-  try {
-    await _apxPost('/api/agent-followups', 'edit', { id, message: t.trim() });
-    r.draft_message = t.trim(); _apxRender();
-    await _apxTeach(before, t.trim(), { source: 'hawkeye-followup', contact: r.contact_name || null });
-  } catch (e) { alert(e.message); }
+  _apxEditModal({
+    title: 'Edit the follow-up message', value: before, teachable: true,
+    onSave: async (text, lesson) => {
+      if (text && text !== before) {
+        try { await _apxPost('/api/agent-followups', 'edit', { id, message: text }); r.draft_message = text; _apxRender(); }
+        catch (e) { _apxToast(_apxErr(e), false); return; }
+      }
+      if (lesson) await _apxTeach(lesson, before, text || before, { source: 'hawkeye-followup', contact: r.contact_name || null });
+    },
+  });
+}
+
+// ✓ Approve: confirm, optionally teach why it's good, then send.
+async function _apxReadyApprove(id) {
+  const r = _APX_DATA.ready.find(x => x.id === id); if (!r) return;
+  if (r._isFollowup) return _apxFollowupSend(id);
+  _apxEditModal({
+    title: 'Send this reply to ' + (r.contact_name || 'the lead') + '?',
+    hideText: true, teachable: true, saveLabel: 'Approve & send',
+    teachLabel: 'Why is this a good reply? (optional - teaches the agent)',
+    teachPlaceholder: 'e.g. good - leads with the free trial, no price talk',
+    onSave: async (_t, lesson) => {
+      if (r.escalate && !confirm('The agent escalated this one (it wanted a human). Send the draft anyway?')) return;
+      try {
+        await _apxPost('/api/agent-approvals', 'send', {
+          contact_id: r.ghl_contact_id, reply: r.draft_message, conversation_id: r.ghl_conversation_id || null,
+          contact_name: r.contact_name || null, reasoning: r.reasoning || null, confidence: r.confidence,
+          reply_count: r.reply_count, booking_asks: r.booking_asks, ready_id: r.id,
+        });
+        if (lesson) await _apxTeach(lesson, r.draft_message, r.draft_message, { source: 'hawkeye-approve', contact: r.contact_name || null });
+        _apxRemove(id); _apxToast(lesson ? '✓ Sent + taught' : '✓ Sent', true);
+      } catch (e) { _apxToast(_apxErr(e), false); }
+    },
+  });
 }
 
 // ── Ready-reply actions (send = approve + fire via agent-approvals) ──
 async function _apxReadySend(id) {
   const r = _APX_DATA.ready.find(x => x.id === id); if (!r) return;
+  // Overdue follow-ups also live in the ready list - send those via the followup path.
+  if (r._isFollowup) return _apxFollowupSend(id);
   if (r.escalate && !confirm('The agent escalated this one (it wanted a human). Send the draft anyway?')) return;
   try {
-    await _apxPost('/api/agent-approvals', 'send', {
+    const resp = await _apxPost('/api/agent-approvals', 'send', {
       contact_id: r.ghl_contact_id, reply: r.draft_message, conversation_id: r.ghl_conversation_id || null,
       contact_name: r.contact_name || null, reasoning: r.reasoning || null, confidence: r.confidence,
       reply_count: r.reply_count, booking_asks: r.booking_asks, ready_id: r.id,
     });
-    _apxRemove(id); _plToast('✓ Sent');
-  } catch (e) { alert(e.message); }
+    _apxRemove(id); _apxToast(resp && resp.deferred ? _apxQuietMsg(resp.send_after) : '✓ Sent', true);
+  } catch (e) { _apxToast(_apxErr(e), false); }
 }
-async function _apxReadySkip(id) { try { await _apxPost('/api/agent-approvals', 'skip-ready', { ready_id: id }); _apxRemove(id); } catch (e) { alert(e.message); } }
+async function _apxReadySkip(id) {
+  const r = _APX_DATA.ready.find(x => x.id === id);
+  if (r && r._isFollowup) return _apxFollowupSkip(id);
+  // Skip, and optionally teach the agent WHY (so it stops drafting ones like this).
+  _apxEditModal({
+    title: 'Skip this draft?', hideText: true, teachable: true, saveLabel: 'Skip',
+    teachLabel: 'Why are you skipping it? (optional - teaches the agent)',
+    teachPlaceholder: "e.g. don't message leads who already said no",
+    onSave: async (_t, lesson) => {
+      try {
+        await _apxPost('/api/agent-approvals', 'skip-ready', { ready_id: id });
+        if (lesson) await _apxTeach(lesson, r ? r.draft_message : '', '', { source: 'hawkeye-skip', contact: r ? r.contact_name : null });
+        _apxRemove(id); _apxToast(lesson ? '📚 Skipped + taught' : 'Skipped', true);
+      } catch (e) { _apxToast(_apxErr(e), false); }
+    },
+  });
+}
 async function _apxReadyEdit(id) {
   const r = _APX_DATA.ready.find(x => x.id === id); if (!r) return;
+  if (r._isFollowup) return _apxFollowupEdit(id);
   const before = r.draft_message || '';
-  const t = prompt('Edit the reply before sending:', before);
-  if (t == null || !t.trim()) return;
-  r.draft_message = t.trim();
-  const el = document.getElementById('apx-msg-' + id);
-  if (el) el.textContent = r.draft_message;
-  if (r.draft_message !== before) {
-    await _apxTeach(before, r.draft_message, { source: 'hawkeye-ready', contact: r.contact_name || null });
-  }
+  _apxEditModal({
+    title: 'Edit the reply before sending', value: before, teachable: true,
+    onSave: async (text, lesson) => {
+      if (text && text !== before) {
+        r.draft_message = text;
+        const el = document.getElementById('apx-msg-' + id); if (el) el.textContent = r.draft_message;
+      }
+      if (lesson) await _apxTeach(lesson, before, text || before, { source: 'hawkeye-ready', contact: r.contact_name || null });
+    },
+  });
 }
 
 function _ibSetTab(tab) {
@@ -21718,11 +22257,12 @@ async function _botSend() {
   const chk = document.getElementById('bot-learn-chk');
   const lesson = (chk && chk.checked) ? (document.getElementById('bot-learn-box')?.value || '').trim() : '';
   try {
-    await _botApi('send', {
+    const resp = await _botApi('send', {
       contact_id: q.contact_id, conversation_id: q.draft.conversation_id || q.conversation_id, contact_name: q.name,
       reply, suggested_reply: q.draft.reply, reasoning: q.draft.reasoning, confidence: q.draft.confidence,
       reply_count: q.draft.reply_count, booking_asks: q.draft.booking_asks, adjusted, lesson: lesson || undefined,
     });
+    if (resp && resp.deferred) { try { _apxToast(_apxQuietMsg(resp.send_after), true); } catch (e) {} }
     _botAdvance(q.idx);
   } catch (e) { alert('Could not send: ' + e.message); }
 }
@@ -21894,8 +22434,7 @@ function _renderInboxDrawer() {
     </div>`;
 
   // Scroll to newest message
-  const scrollEl = document.getElementById('ib-thread-scroll');
-  if (scrollEl) scrollEl.scrollTop = scrollEl.scrollHeight;
+  _scrollToBottom(document.getElementById('ib-thread-scroll'));
 }
 
 // ── Inbox attachments ────────────────────────────────────────────────────────
@@ -26343,7 +26882,7 @@ async function _memberUpdateField(memberId, field, value) {
     await openMemberPopup(memberId);
     fetchAndRenderMembers();  // also refresh the roster behind the drawer
   } catch (e) {
-    alert('Update failed: ' + e.message);
+    _plToast('Update failed: ' + e.message);
   }
 }
 
@@ -26378,6 +26917,93 @@ function _localTodayYMD() {
   return `${y}-${m}-${day}`;
 }
 
+// ── Member-management modal (replaces native confirm()/prompt()) ──
+// Promise-based styled form modal. Resolves to a values object keyed by
+// field.key on confirm, or null on cancel/close. With no fields it acts as a
+// styled confirm (resolves {} on OK).
+//   opts: { icon, title, body, okLabel, danger, fields:[...] }
+//   field: { key, label, type, value, placeholder, hint, required, options, min, max, rows, validate(v)->errStr }
+//     type: 'text' | 'number' | 'date' | 'textarea' | 'select' | 'radio'
+//     options (select/radio): [{ value, label, hint }]
+function _mmFieldHtml(f) {
+  const esc = (s) => escapeHTML(String(s == null ? '' : s));
+  const base = 'width:100%;background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);padding:10px 12px;font:inherit;font-size:13.5px;outline:none;box-sizing:border-box';
+  const lbl = f.label ? `<label style="display:block;font-size:11px;font-weight:700;color:var(--text-sub);margin-bottom:6px;text-transform:uppercase;letter-spacing:.05em">${esc(f.label)}</label>` : '';
+  const hint = f.hint ? `<div style="font-size:11.5px;color:var(--text-mute);margin-top:6px;line-height:1.45">${f.hint}</div>` : '';
+  let ctrl = '';
+  if (f.type === 'textarea') {
+    ctrl = `<textarea id="mm-f-${f.key}" rows="${f.rows || 3}" placeholder="${esc(f.placeholder)}" style="${base};resize:vertical">${esc(f.value)}</textarea>`;
+  } else if (f.type === 'select') {
+    ctrl = `<select id="mm-f-${f.key}" style="${base}">${(f.options || []).map(o => `<option value="${esc(o.value)}" ${o.value === f.value ? 'selected' : ''}>${esc(o.label)}</option>`).join('')}</select>`;
+  } else if (f.type === 'radio') {
+    ctrl = `<div style="display:flex;flex-direction:column;gap:8px">${(f.options || []).map((o, i) => `
+      <label style="display:flex;align-items:flex-start;gap:10px;padding:11px 13px;border:1px solid var(--border-med);border-radius:9px;cursor:pointer">
+        <input type="radio" name="mm-f-${f.key}" value="${esc(o.value)}" ${(f.value != null ? o.value === f.value : i === 0) ? 'checked' : ''} style="margin-top:2px;accent-color:var(--gold)">
+        <span><span style="font-size:13.5px;font-weight:600;color:var(--text)">${esc(o.label)}</span>${o.hint ? `<span style="display:block;font-size:11.5px;color:var(--text-mute);margin-top:2px">${esc(o.hint)}</span>` : ''}</span>
+      </label>`).join('')}</div>`;
+  } else {
+    ctrl = `<input id="mm-f-${f.key}" type="${f.type || 'text'}" value="${esc(f.value)}" placeholder="${esc(f.placeholder)}" ${f.min != null ? `min="${f.min}"` : ''} ${f.max != null ? `max="${f.max}"` : ''} style="${base}">`;
+  }
+  return `<div style="margin-bottom:16px;text-align:left">${lbl}${ctrl}${hint}</div>`;
+}
+function _mmModalErr(msg) {
+  const el = document.getElementById('mm-modal-err');
+  if (el) { el.textContent = msg; el.style.display = 'block'; }
+}
+function _mmModal(opts = {}) {
+  return new Promise(resolve => {
+    document.getElementById('mm-modal-overlay')?.remove();
+    const fields = opts.fields || [];
+    const okBg = opts.danger ? '#c0392b' : 'var(--gold,#E8C547)';
+    const okCol = opts.danger ? '#fff' : '#0B0B0D';
+    document.body.insertAdjacentHTML('beforeend', `<div id="mm-modal-overlay" style="position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9300;display:flex;align-items:center;justify-content:center;padding:18px" onclick="if(event.target===this){this.remove();window.__mmResolve&&window.__mmResolve(null)}">
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;width:100%;max-width:440px;padding:24px;box-shadow:0 20px 60px rgba(0,0,0,.5);max-height:88vh;overflow:auto">
+        ${opts.icon ? `<div style="font-size:30px;line-height:1;margin-bottom:12px">${opts.icon}</div>` : ''}
+        <div style="font-size:18px;font-weight:700;color:var(--text);margin-bottom:${opts.body ? '6px' : '16px'}">${opts.title || 'Are you sure?'}</div>
+        ${opts.body ? `<div style="font-size:13.5px;color:var(--text-sub);line-height:1.5;margin-bottom:18px">${opts.body}</div>` : ''}
+        <div id="mm-modal-fields">${fields.map(_mmFieldHtml).join('')}</div>
+        <div id="mm-modal-err" style="display:none;font-size:12.5px;color:#e07a6b;margin-bottom:12px"></div>
+        <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:4px">
+          <button id="mm-modal-cancel" style="background:none;border:1px solid var(--border);border-radius:9px;color:var(--text-sub);padding:9px 18px;font:inherit;font-size:13px;cursor:pointer">Cancel</button>
+          <button id="mm-modal-ok" style="background:${okBg};color:${okCol};border:none;border-radius:9px;padding:9px 20px;font:inherit;font-size:13px;font-weight:700;cursor:pointer">${opts.okLabel || 'Confirm'}</button>
+        </div>
+      </div></div>`);
+    const overlay = document.getElementById('mm-modal-overlay');
+    let done = false;
+    const onKey = (e) => { if (e.key === 'Escape') finish(null); };
+    function finish(val) {
+      if (done) return; done = true;
+      document.removeEventListener('keydown', onKey);
+      window.__mmResolve = null;
+      overlay.remove();
+      resolve(val);
+    }
+    window.__mmResolve = finish;  // let the inline click-outside handler resolve too
+    document.addEventListener('keydown', onKey);
+    document.getElementById('mm-modal-cancel').onclick = () => finish(null);
+    document.getElementById('mm-modal-ok').onclick = () => {
+      const values = {};
+      for (const f of fields) {
+        let v;
+        if (f.type === 'radio') {
+          const checked = overlay.querySelector(`input[name="mm-f-${f.key}"]:checked`);
+          v = checked ? checked.value : '';
+        } else {
+          const el = document.getElementById('mm-f-' + f.key);
+          v = el ? el.value : '';
+        }
+        if (typeof v === 'string') v = v.trim();
+        if (f.required && !v) { _mmModalErr((f.label || 'This field') + ' is required.'); return; }
+        if (v && typeof f.validate === 'function') { const msg = f.validate(v); if (msg) { _mmModalErr(msg); return; } }
+        values[f.key] = v;
+      }
+      finish(values);
+    };
+    const first = overlay.querySelector('#mm-modal-fields input, #mm-modal-fields select, #mm-modal-fields textarea');
+    if (first) setTimeout(() => { try { first.focus(); } catch (_) {} }, 30);
+  });
+}
+
 async function mPause(memberId) {
   // Re-pause detection. Pull the freshest known state - if we have a list
   // cache, use it; otherwise fall back to a fresh single-member fetch so a
@@ -26397,123 +27023,154 @@ async function mPause(memberId) {
   const hasQueuedPause = m && m.pause_scheduled_for && m.status !== 'paused';
   const labelHead = (isUpdatingExistingPause || hasQueuedPause) ? 'Update pause' : 'Pause';
 
-  if (isUpdatingExistingPause) {
-    if (!confirm('This member is already paused. Update the pause window?')) return;
-  } else if (hasQueuedPause) {
-    if (!confirm(`A pause is queued to start ${m.pause_scheduled_for}. Replace it?`)) return;
-  }
+  let note = '';
+  if (isUpdatingExistingPause) note = 'This member is already paused - this updates the pause window.';
+  else if (hasQueuedPause) note = `A pause is queued to start ${escapeHTML(m.pause_scheduled_for)} - this replaces it.`;
 
   const today = _localTodayYMD();
-  const start = prompt(`${labelHead} - START date (YYYY-MM-DD):`, today);
-  if (start === null) return;
-  const startTrim = start.trim();
-  if (!_isValidYMD(startTrim)) { alert(`Start date "${startTrim}" is not a valid YYYY-MM-DD.`); return; }
+  const vals = await _mmModal({
+    icon: '⏸', title: labelHead, body: note, okLabel: labelHead,
+    fields: [
+      { key: 'start', label: 'Start date', type: 'date', value: today, required: true,
+        validate: v => _isValidYMD(v) ? '' : 'Use a valid YYYY-MM-DD date.' },
+      { key: 'end', label: 'End date', type: 'date', value: '', required: true,
+        validate: v => _isValidYMD(v) ? '' : 'Use a valid YYYY-MM-DD date.' },
+      { key: 'reason', label: 'Reason (optional)', type: 'text', placeholder: 'e.g. Injury, travel' },
+    ],
+  });
+  if (!vals) return;
+  const startTrim = vals.start, endTrim = vals.end;
+  if (endTrim <= startTrim) { _plToast('End date must be after start date.'); return; }
+  if (endTrim < today) { _plToast('End date is in the past - pick a future date.'); return; }
 
-  const end = prompt(`${labelHead} - END date (YYYY-MM-DD):`, '');
-  if (end === null) return;
-  const endTrim = end.trim();
-  if (!_isValidYMD(endTrim)) { alert(`End date "${endTrim}" is not a valid YYYY-MM-DD.`); return; }
-  if (endTrim <= startTrim) { alert('End date must be after start date.'); return; }
-  if (endTrim < today) { alert('End date is in the past - pick a future date.'); return; }
-
-  const reason = prompt(`${labelHead} - reason (optional)`, '');
   const body = { start_date: startTrim, end_date: endTrim };
-  if (reason && reason.trim()) body.reason = reason.trim();
+  if (vals.reason) body.reason = vals.reason;
 
   try {
     const r = await _memberAction(memberId, 'pause', body);
     let msg = isUpdatingExistingPause ? 'Pause updated.' : 'Paused.';
-    if (r.sub?.scheduled) {
-      msg = `🕐 Pause queued for ${startTrim}. The system will auto-activate it that morning.`;
-    }
-    if (r.sub?.capped_to_stripe_max) {
-      msg += '\n\n⚠ End date was capped to Stripe\'s 730-day max - the next-charge date is sooner than what you entered.';
-    }
-    if (r.sub?.resume_date) msg += `\n\nNext charge: ${r.sub.resume_date}`;
-    alert(msg);
+    if (r.sub?.scheduled) msg = `🕐 Pause queued for ${startTrim} - auto-activates that morning.`;
+    if (r.sub?.capped_to_stripe_max) msg += ' · ⚠ End date capped to Stripe 730-day max.';
+    if (r.sub?.resume_date) msg += ` · Next charge: ${r.sub.resume_date}`;
+    _plToast(msg);
     closeMemberPopup();
     await fetchAndRenderMembers();
   } catch (e) {
     // Translate known backend errors into targeted CTAs.
     const em = (e && e.message) || '';
     if (/payment[_ ]failed|past[_ ]due|payment link/i.test(em)) {
-      if (confirm(`${em}\n\nSend the parent a payment link now?`)) {
-        try { await mPaymentLink(memberId); } catch (_) { /* user already got the alert */ }
-      }
+      const go = await _mmModal({ icon: '⚠️', title: 'Payment issue', body: `${escapeHTML(em)}<br><br>Send the parent a payment link now?`, okLabel: 'Send link' });
+      if (go) { try { await mPaymentLink(memberId); } catch (_) { /* user already got the toast */ } }
       return;
     }
     if (/cancelling/i.test(em)) {
-      alert(`Pause can't be set on a cancelling member.\nUn-cancel them first (no API for that yet - Stripe Dashboard).`);
+      _plToast("Can't pause a cancelling member - un-cancel them first (Stripe Dashboard).");
       return;
     }
-    alert(`${labelHead} failed: ${em}`);
+    _plToast(`${labelHead} failed: ${em}`);
   }
 }
 
 async function mUnpause(memberId) {
-  const newDate = prompt('Unpause:\n  • leave blank → resume NOW\n  • or new end date (YYYY-MM-DD) to SHIFT the pause', '');
-  if (newDate === null) return;
+  const vals = await _mmModal({
+    icon: '▶️', title: 'Unpause', okLabel: 'Apply',
+    fields: [
+      { key: 'mode', label: 'How', type: 'radio', value: 'now', options: [
+        { value: 'now', label: 'Resume now', hint: 'Ends the pause immediately.' },
+        { value: 'shift', label: 'Shift the pause end date', hint: 'Keep paused, move the resume date.' },
+      ] },
+      { key: 'new_until', label: 'New end date (only if shifting)', type: 'date', value: '' },
+    ],
+  });
+  if (!vals) return;
   const body = {};
-  if (newDate.trim()) {
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(newDate.trim())) { alert('Date must be YYYY-MM-DD.'); return; }
-    body.new_until = newDate.trim();
+  if (vals.mode === 'shift') {
+    if (!_isValidYMD(vals.new_until)) { _plToast('Enter a valid end date to shift the pause.'); return; }
+    body.new_until = vals.new_until;
   }
   try {
     await _memberAction(memberId, 'unpause', body);
-    alert(body.new_until ? 'Pause shifted.' : 'Unpaused.');
+    _plToast(body.new_until ? 'Pause shifted.' : 'Unpaused.');
     closeMemberPopup();
     fetchAndRenderMembers();
-  } catch (e) { alert('Unpause failed: ' + e.message); }
+  } catch (e) { _plToast('Unpause failed: ' + e.message); }
 }
 
 async function mCancel(memberId, athleteName) {
-  if (!confirm(`Cancel ${athleteName}? They'll be removed from the active roster (cancellation history preserved).`)) return;
-  const reason = prompt('Reason (optional)', '');
-  const immediate = confirm('Cancel IMMEDIATELY?\n  OK = cancel sub now\n  Cancel = cancel at period end');
+  const vals = await _mmModal({
+    icon: '🚫', danger: true,
+    title: `Cancel ${escapeHTML(athleteName || 'this member')}?`,
+    body: `They'll be removed from the active roster. Cancellation history is preserved.`,
+    okLabel: 'Cancel membership',
+    fields: [
+      { key: 'when', label: 'When', type: 'radio', value: 'period_end', options: [
+        { value: 'period_end', label: 'At period end', hint: 'Stays active until the current paid period ends.' },
+        { value: 'immediate', label: 'Immediately', hint: 'Cancels the Stripe subscription right now.' },
+      ] },
+      { key: 'reason', label: 'Reason (optional)', type: 'textarea', rows: 2, placeholder: 'e.g. Moving away' },
+    ],
+  });
+  if (!vals) return;
   try {
-    await _memberAction(memberId, 'cancel', { reason: reason || null, immediate });
-    alert('Cancelled.');
+    await _memberAction(memberId, 'cancel', { reason: vals.reason || null, immediate: vals.when === 'immediate' });
+    _plToast('Membership cancelled.');
     closeMemberPopup();
     fetchAndRenderMembers();
-  } catch (e) { alert('Cancel failed: ' + e.message); }
+  } catch (e) { _plToast('Cancel failed: ' + e.message); }
 }
 
 async function mRefund(memberId) {
-  const chargeId = prompt('Stripe charge ID to refund (ch_...)\nFind in Stripe → Customer → Payments', '');
-  if (!chargeId || !chargeId.trim()) return;
-  const amountStr = prompt('Refund amount in CENTS (e.g. 9039 = $90.39)\nLeave blank for FULL refund', '');
-  if (amountStr === null) return;
-  const reason = prompt('Reason / note (e.g. "Plan downgrade - May cycle difference")', '');
-  const body = { charge_id: chargeId.trim() };
-  if (amountStr.trim()) body.amount_cents = parseInt(amountStr.trim(), 10);
-  if (reason && reason.trim()) body.notes = reason.trim();
+  const vals = await _mmModal({
+    icon: '💸', title: 'Refund', body: 'Find the charge ID in Stripe → Customer → Payments.', okLabel: 'Issue refund',
+    fields: [
+      { key: 'charge_id', label: 'Stripe charge ID', type: 'text', placeholder: 'ch_...', required: true,
+        validate: v => /^ch_/.test(v) ? '' : 'Charge IDs start with "ch_".' },
+      { key: 'amount', label: 'Amount in cents (blank = full refund)', type: 'number', placeholder: '9039 = $90.39' },
+      { key: 'notes', label: 'Reason / note', type: 'text', placeholder: 'e.g. Plan downgrade - May difference' },
+    ],
+  });
+  if (!vals) return;
+  const body = { charge_id: vals.charge_id };
+  if (vals.amount) body.amount_cents = parseInt(vals.amount, 10);
+  if (vals.notes) body.notes = vals.notes;
   try {
     const r = await _memberAction(memberId, 'refund', body);
-    alert(`Refunded $${(r.refund.amount_cents/100).toFixed(2)}\nStripe id: ${r.refund.id}`);
+    _plToast(`Refunded $${(r.refund.amount_cents / 100).toFixed(2)} (${r.refund.id}).`);
     closeMemberPopup();
     fetchAndRenderMembers();
-  } catch (e) { alert('Refund failed: ' + e.message); }
+  } catch (e) { _plToast('Refund failed: ' + e.message); }
 }
 
 async function mChange(memberId, currentPlan) {
-  const newPlan = prompt(`Change plan from "${currentPlan}" to:\n  • 1/wk   (Steady $226)\n  • 2/wk   (Accelerated $316)\n  • 3/wk   (Elevate $378)\n  • unlmtd (Dominate $638)`, '');
-  if (!newPlan || !newPlan.trim()) return;
-  const valid = ['1/wk','2/wk','3/wk','unlmtd'];
-  if (!valid.includes(newPlan.trim())) { alert('Invalid plan. Use: ' + valid.join(' · ')); return; }
-  const prorate = confirm('Prorate the difference NOW?\n  OK = prorated charge now (upgrades only)\n  Cancel = no proration');
+  const vals = await _mmModal({
+    icon: '🔄', title: 'Change plan', body: `Current plan: <b>${escapeHTML(currentPlan || '-')}</b>`, okLabel: 'Change plan',
+    fields: [
+      { key: 'new_plan', label: 'New plan', type: 'select', value: '1/wk', options: [
+        { value: '1/wk',   label: '1/wk - Steady ($226)' },
+        { value: '2/wk',   label: '2/wk - Accelerated ($316)' },
+        { value: '3/wk',   label: '3/wk - Elevate ($378)' },
+        { value: 'unlmtd', label: 'Unlimited - Dominate ($638)' },
+      ] },
+      { key: 'prorate', label: 'Proration', type: 'radio', value: 'no', options: [
+        { value: 'no',  label: 'No proration', hint: 'Change applies on the next cycle.' },
+        { value: 'yes', label: 'Prorate now', hint: 'Charge the prorated difference now (upgrades only).' },
+      ] },
+    ],
+  });
+  if (!vals) return;
   try {
-    const r = await _memberAction(memberId, 'change', { new_plan: newPlan.trim(), prorate });
-    alert(`Changed to ${newPlan.trim()} (${r.direction}${r.prorated ? ' · prorated' : ''}).`);
+    const r = await _memberAction(memberId, 'change', { new_plan: vals.new_plan, prorate: vals.prorate === 'yes' });
+    _plToast(`Changed to ${vals.new_plan} (${r.direction}${r.prorated ? ' · prorated' : ''}).`);
     closeMemberPopup();
     fetchAndRenderMembers();
-  } catch (e) { alert('Change failed: ' + e.message); }
+  } catch (e) { _plToast('Change failed: ' + e.message); }
 }
 
 async function mPaymentLink(memberId) {
   try {
     const r = await _memberAction(memberId, 'payment-link', {});
     _openPaymentLinkModal(memberId, r);
-  } catch (e) { alert('Payment link failed: ' + e.message); }
+  } catch (e) { _plToast('Payment link failed: ' + e.message); }
 }
 
 // Standalone "save your card" link (no sub attached) - for members with no card on
@@ -26522,7 +27179,7 @@ async function mGetCardLink(memberId) {
   try {
     const r = await _memberAction(memberId, 'card-setup-link', {});
     _openPaymentLinkModal(memberId, r);
-  } catch (e) { alert('Card link failed: ' + (e.message || e)); }
+  } catch (e) { _plToast('Card link failed: ' + (e.message || e)); }
 }
 
 // "Set up CoachIQ" on the member card → build the signup invite (copy + show).
@@ -26778,18 +27435,24 @@ async function _plSend(type, memberId) {
 }
 
 async function mReferred(memberId) {
-  const countStr = prompt('How many people did they refer? (1-10)\nEach referral = +4 weeks added to their next charge.', '1');
-  if (!countStr) return;
-  const count = parseInt(countStr.trim(), 10);
-  if (!Number.isFinite(count) || count < 1 || count > 10) { alert('Enter a number 1-10.'); return; }
-  if (!confirm(`Credit ${count} referral${count>1?'s':''} = ${count*4} weeks added. OK?`)) return;
+  const vals = await _mmModal({
+    icon: '🎁', title: 'Credit referrals', body: 'Each referral adds <b>4 free weeks</b> to their next charge.', okLabel: 'Add credit',
+    fields: [
+      { key: 'count', label: 'How many referrals? (1-10)', type: 'number', value: '1', min: 1, max: 10, required: true,
+        validate: v => { const n = parseInt(v, 10); return (Number.isFinite(n) && n >= 1 && n <= 10) ? '' : 'Enter a number from 1 to 10.'; } },
+    ],
+  });
+  if (!vals) return;
+  const count = parseInt(vals.count, 10);
+  const ok = await _mmModal({ icon: '🎁', title: 'Confirm referral credit', body: `Credit <b>${count}</b> referral${count > 1 ? 's' : ''} = <b>${count * 4} weeks</b> added?`, okLabel: 'Confirm' });
+  if (!ok) return;
   try {
     const r = await _memberAction(memberId, 'referred', { count });
-    const newDate = new Date(r.new_trial_end*1000).toISOString().slice(0,10);
-    alert(`Credited ${r.weeks_added} weeks.\nNext charge: ${newDate}${r.capped_to_730d ? '\n(capped to Stripe 730-day max)' : ''}`);
+    const newDate = new Date(r.new_trial_end * 1000).toISOString().slice(0, 10);
+    _plToast(`Credited ${r.weeks_added} weeks · Next charge: ${newDate}${r.capped_to_730d ? ' (capped to Stripe 730-day max)' : ''}`);
     closeMemberPopup();
     fetchAndRenderMembers();
-  } catch (e) { alert('Referred failed: ' + e.message); }
+  } catch (e) { _plToast('Referred failed: ' + e.message); }
 }
 
 async function _mreqCreateTicket(payload) {
@@ -30354,6 +31017,11 @@ function getEffectiveTourSteps() {
 }
 
 function startOnboardingTour() {
+  // Onboarding walkthrough disabled for ALL clients (Zoran, 2026-06-22, "for now").
+  // Kills the first-login auto-fire, the ?preview=tour path, and the "Take the tour"
+  // link in one spot. To re-enable, delete this early return. TOUR_STEPS /
+  // TOUR_DEMO_CONTAINERS are left intact below.
+  return;
   _tourStep = 1;
   _tourSetupDemos();
   _renderTourStep();
@@ -31807,7 +32475,7 @@ function toggleTheme() {
         // viewport stayed full, so reserve room for the keyboard ourselves.
         cl.style.height = (h < preH - 20 ? h : (h - kbH)) + 'px';
         var thread = document.getElementById('messages-thread');
-        if (thread) thread.scrollTop = thread.scrollHeight;   // keep latest in view
+        if (thread) { if (typeof _scrollToBottom === 'function') _scrollToBottom(thread); else thread.scrollTop = thread.scrollHeight; }   // keep latest in view
       }
       function hide() {
         document.body.classList.remove('keyboard-open');

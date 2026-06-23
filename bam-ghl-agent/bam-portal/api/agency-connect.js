@@ -45,6 +45,9 @@ const SCOPES = [
   "socialplanner/post.readonly", "socialplanner/post.write", "socialplanner/account.readonly", "socialplanner/oauth.readonly",
   "courses.readonly", "courses.write", "emails/builder.readonly", "emails/builder.write",
   "funnels/funnel.readonly", "funnels/page.readonly", "funnels/pagecount.readonly", "funnels/redirect.readonly",
+  // REQUIRED for /oauth/locationToken — without oauth.write the agency token
+  // can't mint sub-account tokens ("token is not authorized for this scope").
+  "oauth.readonly", "oauth.write",
 ].join(" ");
 
 function esc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])); }
