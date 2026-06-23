@@ -238,6 +238,9 @@ async function handler(req, res) {
           has_unread: !!hasUnread,
         };
       });
+      // Unread always on top. The query already returns last_message_at desc, and
+      // Array.sort is stable, so this keeps newest-first order within each group.
+      enriched.sort((a, b) => (b.has_unread ? 1 : 0) - (a.has_unread ? 1 : 0));
       return res.status(200).json({ conversations: enriched });
     }
 
