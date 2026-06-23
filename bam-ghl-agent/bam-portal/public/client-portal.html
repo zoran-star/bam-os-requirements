@@ -6275,8 +6275,7 @@
             <div class="guide-card-body">
               <p>You bring the raw material, we make it sharp, we run it, and you watch the results. This quick guide walks the whole flow - where your ads live, controlling your own spend, and requesting a new creative.</p>
               <div class="guide-card-actions">
-                <a class="guide-card-btn" href="/resources/bam-paid-ads-explained.pdf" target="_blank" rel="noopener">Open guide</a>
-                <a class="guide-card-btn ghost" href="/resources/bam-paid-ads-explained.pdf" download>Download</a>
+                <button type="button" class="guide-card-btn" onclick="_openGuideResource('paid ad')">Open guide</button>
               </div>
             </div>
           </details>
@@ -6294,8 +6293,7 @@
             <div class="guide-card-body">
               <p>Everything you need to shoot your first campaign - the three core videos, the three core graphics, and exactly how to get it all into your portal.</p>
               <div class="guide-card-actions">
-                <a class="guide-card-btn" href="/resources/bam-first-campaign.pdf" target="_blank" rel="noopener">Open guide</a>
-                <a class="guide-card-btn ghost" href="/resources/bam-first-campaign.pdf" download>Download</a>
+                <button type="button" class="guide-card-btn" onclick="_openGuideResource('first campaign')">Open guide</button>
               </div>
             </div>
           </details>
@@ -6711,8 +6709,7 @@ Then the call to action."]</div>
           <div class="guide-card-body">
             <p>Organic is the content you post on your own socials, and it works differently from your paid ads. This quick guide covers the difference, your monthly credits, and how to request, review, and download a creative.</p>
             <div class="guide-card-actions">
-              <a class="guide-card-btn" href="/resources/bam-organic-content-explained.pdf" target="_blank" rel="noopener">Open guide</a>
-              <a class="guide-card-btn ghost" href="/resources/bam-organic-content-explained.pdf" download>Download</a>
+              <button type="button" class="guide-card-btn" onclick="_openGuideResource('organic')">Open guide</button>
             </div>
           </div>
         </details>
@@ -8083,6 +8080,7 @@ Then the call to action."]</div>
         background: var(--gold);
         color: #1a1a1a;
         border: 1px solid var(--gold);
+        cursor: pointer;
         transition: background 0.15s ease, border-color 0.12s ease, color 0.12s ease;
       }
       .guide-card-btn:hover { background: var(--gold-hi); border-color: var(--gold-hi); }
@@ -13177,16 +13175,43 @@ function _formatRelative(iso) {
   if (diff < 7*day)   return Math.round(diff/day) + ' days ago';
   return d.toLocaleDateString('en-US', { month:'short', day:'numeric', year:'numeric' });
 }
+// The resources bucket is PRIVATE (login-gated). We mint short-lived signed
+// URLs on demand and cache them per render. _resourceFileUrl() is a sync
+// lookup into that cache; _signResourceFiles() fills it before render.
+const _resourceSignedUrls = {};
+async function _signResourceFiles(paths) {
+  const need = [...new Set((paths || []).filter(p => p && !_resourceSignedUrls[p]))];
+  if (!need.length) return;
+  try {
+    const { data, error } = await _sb.storage.from(RESOURCES_BUCKET).createSignedUrls(need, 3600);
+    if (error) throw error;
+    (data || []).forEach(d => { if (d && d.path && d.signedUrl) _resourceSignedUrls[d.path] = d.signedUrl; });
+  } catch (e) {
+    console.error('[resources] sign failed', e);
+  }
+}
 function _resourceFileUrl(path) {
-  // Public bucket - direct URL
-  const { data } = _sb.storage.from(RESOURCES_BUCKET).getPublicUrl(path);
-  return data?.publicUrl || '';
+  return _resourceSignedUrls[path] || '';
 }
 function _resourceCanPreview(mime) {
   if (!mime) return false;
   return mime.startsWith('image/')
       || mime.startsWith('video/')
       || mime === 'application/pdf';
+}
+
+// Open a guide card's gated resource in-portal (the PDFs are no longer public
+// static files). Switches to Resources, waits for the library to load, then
+// opens the resource whose title matches the keyword.
+async function _openGuideResource(keyword) {
+  try {
+    switchView('resources');
+    if (!_resourcesData && !_resourcesLoading) await loadResources();
+    while (_resourcesLoading) await new Promise(r => setTimeout(r, 40));
+    const kw = (keyword || '').toLowerCase();
+    const r = (_resourcesData?.resources || []).find(x => (x.title || '').toLowerCase().includes(kw));
+    if (r) openResourceDetail(r.id);
+  } catch (e) { console.error('[guide] open failed', e); }
 }
 
 async function openResourcesView() {
@@ -13319,7 +13344,7 @@ function closeResourceDetail() {
   renderResourcesList();
 }
 
-function renderResourceDetail(id) {
+async function renderResourceDetail(id) {
   if (!_resourcesData) return;
   const r = _resourcesData.resources.find(x => x.id === id);
   const listPanel = document.getElementById('resources-list-panel');
@@ -13336,6 +13361,9 @@ function renderResourceDetail(id) {
 
   if (listPanel) listPanel.style.display = 'none';
   detailPanel.style.display = '';
+
+  // Private bucket: sign this resource's file URLs before rendering them.
+  await _signResourceFiles((r.resource_files || []).map(f => f.storage_path));
 
   const c = _resourcesData.categories.find(x => x.id === r.category_id);
   const cBg = c ? `${c.color}1a` : 'var(--accent-ghost)';
@@ -32494,6 +32522,10 @@ async function boot() {
   // flag became v2_access and lost its onboarding-state meaning.)
   if (!clientRow?.onboarding_completed_at) {
     setTimeout(() => startOnboardingTour(), 600);
+  } else if (location.hash && /resource=[a-f0-9-]+/i.test(location.hash)) {
+    // Gated resource share link (#resource=<id>) → open the Resources view,
+    // which reads the hash and renders that resource's detail.
+    switchView('resources');
   } else if (!location.hash) {
     // Returning user (tour already done) → land on Home, or their first tab when
     // Home is hidden (V2 users). Skip when a deep link already targets a view.
