@@ -27,7 +27,7 @@ async function sb(path, init = {}) {
 
 const esc = (s) => String(s == null ? "" : s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 
-async function gather(client) {
+async function gather(client, withCounts) {
   const out = { client_id: client.id, name: client.business_name || "(academy)", tier: client.v2_access ? "V2" : client.v15_access ? "V1.5" : "-", ghl_name: null, pipelines: [], error: null };
   let creds;
   try { creds = await pickGhlToken(client); }
@@ -36,7 +36,20 @@ async function gather(client) {
   try { const loc = await ghl("GET", `/locations/${creds.locationId}`, { token: creds.token }); out.ghl_name = (loc.location || loc || {}).name || null; } catch (_) {}
   try {
     const d = await ghl("GET", `/opportunities/pipelines?locationId=${creds.locationId}`, { token: creds.token });
-    for (const p of (d.pipelines || [])) out.pipelines.push({ id: p.id, name: p.name, stages: (p.stages || []).map(s => s.name) });
+    for (const p of (d.pipelines || [])) {
+      const entry = { id: p.id, name: p.name, stages: (p.stages || []).map(s => s.name) };
+      if (withCounts) {
+        // "Actually using" = open opportunities currently in the pipeline.
+        // limit=1 + meta.total is the cheapest count GHL gives us.
+        try {
+          const params = new URLSearchParams({ location_id: creds.locationId, pipeline_id: p.id, status: "open", limit: "1" });
+          const r = await ghl("GET", `/opportunities/search?${params}`, { token: creds.token });
+          entry.open_count = (r.meta && r.meta.total != null) ? r.meta.total
+            : (Array.isArray(r.opportunities) ? r.opportunities.length : null);
+        } catch (_) { entry.open_count = null; }
+      }
+      out.pipelines.push(entry);
+    }
   } catch (e) { out.error = "pipelines: " + (e.message || e); }
   return out;
 }
@@ -70,9 +83,12 @@ function renderPage(rows, notes) {
         ? p.stages.map(s => `<div class="stage">${esc(s)}</div>`).join('<div class="arrow">→</div>')
         : `<div class="muted">no stages</div>`;
       const noteVal = esc(notes[`${r.client_id}|${p.id}`] || "");
+      const countPill = (p.open_count != null)
+        ? ` <span style="font-size:13px;font-weight:700;padding:2px 9px;border-radius:999px;${p.open_count > 0 ? 'background:#1f9d57;color:#fff' : 'background:#e3e5ea;color:#9498a1'}">${p.open_count} open</span>`
+        : "";
       return `<div class="pipe-row">
         <div class="flow">
-          <div class="pipe-label">${esc(p.name)}</div>
+          <div class="pipe-label">${esc(p.name)}${countPill}</div>
           <div class="stages">${stageEls}</div>
         </div>
         <div class="notes">
@@ -153,7 +169,14 @@ async function handler(req, res) {
   const notes = {};
   for (const n of (Array.isArray(noteRows) ? noteRows : [])) notes[`${n.client_id}|${n.pipeline_id}`] = n.note;
 
-  const rows = await mapLimit(Array.isArray(clients) ? clients : [], 5, gather);
+  // ?client_id=<uuid> → just that academy (fast). ?counts=1 → include open-opp
+  // counts per pipeline (auto-on when targeting a single academy).
+  let list = Array.isArray(clients) ? clients : [];
+  const onlyId = String(req.query.client_id || "").trim();
+  if (onlyId) list = list.filter(c => c.id === onlyId);
+  const withCounts = req.query.counts === "1" || !!onlyId;
+
+  const rows = await mapLimit(list, 5, c => gather(c, withCounts));
 
   if (req.query.format === "json") return res.status(200).json({ ok: true, academies: rows });
   res.setHeader("Content-Type", "text/html; charset=utf-8");
