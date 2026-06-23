@@ -27592,32 +27592,44 @@ async function mPause(memberId) {
   // cache, use it; otherwise fall back to a fresh single-member fetch so a
   // stale list doesn't mis-classify the action.
   let m = (typeof _MEMBERS_ALL !== 'undefined' ? _MEMBERS_ALL : []).find(x => x.id === memberId);
-  if (!m) {
-    try {
-      const token = await _mreqAuthToken();
-      const r = await fetch(`/api/members?id=${encodeURIComponent(memberId)}`, {
-        headers: { 'Authorization': 'Bearer ' + token },
-      });
-      const j = await _safeJson(r);
-      if (r.ok && j && j.member) m = j.member;
-    } catch (_) { /* fall through - best-effort */ }
-  }
+  // Always fetch fresh so we have the live Stripe sub (current next-charge date)
+  // to show in the modal + an accurate re-pause classification.
+  let stripe = null;
+  try {
+    const token = await _mreqAuthToken();
+    const r = await fetch(`/api/members?id=${encodeURIComponent(memberId)}`, {
+      headers: { 'Authorization': 'Bearer ' + token },
+    });
+    const j = await _safeJson(r);
+    if (r.ok && j) { if (j.member) m = j.member; stripe = j.stripe || null; }
+  } catch (_) { /* fall through - best-effort */ }
   const isUpdatingExistingPause = m && m.status === 'paused';
   const hasQueuedPause = m && m.pause_scheduled_for && m.status !== 'paused';
   const labelHead = (isUpdatingExistingPause || hasQueuedPause) ? 'Update pause' : 'Pause';
 
+  // Current next-charge date from Stripe (trial_end = while paused, else period end).
+  const _fmtUnix = (u) => u ? new Date(u * 1000).toISOString().slice(0, 10) : null;
+  const curNextStr = stripe ? _fmtUnix(stripe.trial_end || stripe.current_period_end) : null;
+  const npLine = curNextStr
+    ? `<div style="display:flex;align-items:center;gap:7px;background:rgba(232,191,96,0.08);border:1px solid rgba(232,191,96,0.3);border-radius:9px;padding:9px 12px;margin-bottom:4px;font-size:13px;color:var(--text)">📅 Next payment: <b>${escapeHTML(curNextStr)}</b>${stripe && stripe.trial_end ? ' <span style="color:var(--text-mute)">(currently paused)</span>' : ''}</div>`
+    : `<div style="font-size:12.5px;color:var(--text-mute);margin-bottom:4px">No scheduled next payment on file.</div>`;
+
   let note = '';
   if (isUpdatingExistingPause) note = 'This member is already paused - this updates the pause window.';
   else if (hasQueuedPause) note = `A pause is queued to start ${escapeHTML(m.pause_scheduled_for)} - this replaces it.`;
+  const bodyHtml = npLine + (note ? `<div style="margin-top:8px">${escapeHTML(note)}</div>` : '');
 
   const today = _localTodayYMD();
   const vals = await _mmModal({
-    icon: '⏸', title: labelHead, body: note, okLabel: labelHead,
+    icon: '⏸', title: labelHead, body: bodyHtml, okLabel: labelHead,
     fields: [
       { key: 'start', label: 'Start date', type: 'date', value: today, required: true,
         validate: v => _isValidYMD(v) ? '' : 'Use a valid YYYY-MM-DD date.' },
       { key: 'end', label: 'End date', type: 'date', value: '', required: true,
         validate: v => _isValidYMD(v) ? '' : 'Use a valid YYYY-MM-DD date.' },
+      { key: 'next_payment', label: 'Set next payment date (optional)', type: 'date', value: '',
+        hint: 'Leave blank to push the next charge out by the pause length. Set it to choose exactly when Stripe charges next - the pause period above is still required.',
+        validate: v => (!v || _isValidYMD(v)) ? '' : 'Use a valid YYYY-MM-DD date.' },
       { key: 'reason', label: 'Reason (optional)', type: 'text', placeholder: 'e.g. Injury, travel' },
     ],
   });
@@ -27625,8 +27637,10 @@ async function mPause(memberId) {
   const startTrim = vals.start, endTrim = vals.end;
   if (endTrim <= startTrim) { _plToast('End date must be after start date.'); return; }
   if (endTrim < today) { _plToast('End date is in the past - pick a future date.'); return; }
+  if (vals.next_payment && vals.next_payment <= today) { _plToast('Next payment date must be in the future.'); return; }
 
   const body = { start_date: startTrim, end_date: endTrim };
+  if (vals.next_payment) body.next_payment_date = vals.next_payment;
   if (vals.reason) body.reason = vals.reason;
 
   try {

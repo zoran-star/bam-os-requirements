@@ -663,6 +663,21 @@ async function actionPause(res, member, stripeAccount, ctx, body) {
     return res.status(400).json({ error: "end_date is in the past — pick a future date" });
   }
 
+  // Optional: staff manually set the NEXT PAYMENT date (Stripe trial_end) instead
+  // of letting it be computed from the pause length. It still requires a pause
+  // period (start_date/end_date above), which is always mandatory here.
+  const manualNextPayment = body.next_payment_date || null;
+  let manualTrialEndUnix = null;
+  if (manualNextPayment) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(manualNextPayment)) {
+      return res.status(400).json({ error: "next_payment_date must be YYYY-MM-DD" });
+    }
+    manualTrialEndUnix = isoToUnix(manualNextPayment);
+    if (manualTrialEndUnix <= nowUnix()) {
+      return res.status(400).json({ error: "next_payment_date is in the past — pick a future date" });
+    }
+  }
+
   // Future-scheduled vs immediate. Future = the pause starts more than ~1 day
   // out; we defer the Stripe trial_end + status flip to the cron at that time.
   const isFutureScheduled = startUnix > nowUnix() + 86400;
@@ -692,7 +707,8 @@ async function actionPause(res, member, stripeAccount, ctx, body) {
     // Stripe sub and no corresponding DB record).
     const currentPeriodEnd = subCurrentPeriodEnd(currentSub) || 0;
     const anchor = Math.max(nowUnix(), currentPeriodEnd);
-    trialEndUnix = anchor + pauseLengthSeconds;
+    // Manual next-payment date wins over the computed (anchor + pause length).
+    trialEndUnix = manualTrialEndUnix != null ? manualTrialEndUnix : anchor + pauseLengthSeconds;
 
     const stripeCap = nowUnix() + STRIPE_TRIAL_MAX_SECS;
     if (trialEndUnix > stripeCap) {
@@ -718,6 +734,7 @@ async function actionPause(res, member, stripeAccount, ctx, body) {
       type: "pause",
       pause_start: start_date,
       pause_end: end_date,
+      manual_trial_end: manualNextPayment,   // staff-set next charge date (null = computed)
       reason: body.reason || null,
       stripe_subscription_id: member.stripe_subscription_id,
       stripe_customer_id: member.stripe_customer_id,
@@ -1383,7 +1400,7 @@ async function cronProcessScheduledPauses(res) {
   // so concurrent cron invocations are safe. DB writes use conditional PATCH
   // (PostgREST filter on activated_at=is.null) so only one run "wins" the row.
   const pendingPauses = await sb(
-    `cancellations?type=eq.pause&activated_at=is.null&completed_at=is.null&pause_start=lte.${today}&select=id,client_id,member_id,pause_start,pause_end,stripe_subscription_id&limit=100`
+    `cancellations?type=eq.pause&activated_at=is.null&completed_at=is.null&pause_start=lte.${today}&select=id,client_id,member_id,pause_start,pause_end,manual_trial_end,stripe_subscription_id&limit=100`
   );
   for (const row of (pendingPauses || [])) {
     try {
@@ -1411,9 +1428,10 @@ async function cronProcessScheduledPauses(res) {
 
       // Compute trial_end using the standard rule. Use nowUnix() (not todayUnix)
       // so we don't shrink the pause length by up to 24h when running mid-day.
+      // Manual next-payment date (staff-set) wins over the computed trial_end.
       const pauseLengthSeconds = isoToUnix(row.pause_end) - isoToUnix(row.pause_start);
       const anchor = Math.max(nowUnix(), subCurrentPeriodEnd(currentSub) || 0);
-      let trialEndUnix = anchor + pauseLengthSeconds;
+      let trialEndUnix = row.manual_trial_end ? isoToUnix(row.manual_trial_end) : anchor + pauseLengthSeconds;
       const stripeCap = nowUnix() + STRIPE_TRIAL_MAX_SECS;
       const capped = trialEndUnix > stripeCap;
       if (capped) trialEndUnix = stripeCap;
