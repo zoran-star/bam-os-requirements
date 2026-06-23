@@ -36,11 +36,12 @@ function getGroup(grade) {
   return "ms-hs";
 }
 
-const VERCEL_PREVIEW = /^https:\/\/bam-portal-[a-z0-9]+-zoran-stars-projects\.vercel\.app$/;
+const VERCEL_PREVIEW = /^https:\/\/(bam-portal|bam-client-sites)-[a-z0-9]+-zoran-stars-projects\.vercel\.app$/;
 const ALLOWED = new Set([
   "https://detail-mia.com",
   "https://www.detail-mia.com",
   "https://bam-portal.vercel.app",
+  "https://bam-client-sites.vercel.app",
   "http://localhost:3000",
   "http://localhost:5173",
   "http://127.0.0.1:5500",
