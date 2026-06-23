@@ -1612,9 +1612,10 @@ async function handler(req, res) {
           if (!name) return res.status(400).json({ error: "name required" });
           let email = typeof teamBody.email === "string" ? teamBody.email.trim().toLowerCase() : "";
           if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return res.status(400).json({ error: "enter a valid email or leave it blank" });
+          const phone = typeof teamBody.phone === "string" ? teamBody.phone.trim() : "";
           try {
             const rows = await supabaseInsert("client_users", {
-              client_id, name, email: email || null,
+              client_id, name, email: email || null, phone: phone || null,
               role: "member", status: "active", user_id: null, hide_from_team: false,
             });
             return res.status(200).json({ ok: true, member: Array.isArray(rows) ? rows[0] : rows });
@@ -1629,17 +1630,32 @@ async function handler(req, res) {
           const memberId = typeof teamBody.member_id === "string" ? teamBody.member_id.trim() : "";
           if (!memberId) return res.status(400).json({ error: "member_id required" });
           const targetRows = await supabaseSelect(
-            `client_users?id=eq.${encodeURIComponent(memberId)}&client_id=eq.${client_id}&select=id,user_id,role`
+            `client_users?id=eq.${encodeURIComponent(memberId)}&client_id=eq.${client_id}&select=id,user_id,role,email`
           ).catch(() => []);
           if (!targetRows?.length) return res.status(404).json({ error: "teammate not found for this client" });
-          if (targetRows[0].role === "owner") return res.status(400).json({ error: "can't edit the owner here" });
-          if (targetRows[0].user_id) return res.status(400).json({ error: "this teammate already has a login — edits go through their account" });
+          const target = targetRows[0];
+          if (target.role === "owner") return res.status(400).json({ error: "can't edit the owner here" });
           const patch = { updated_at: new Date().toISOString() };
+          // Email + phone are editable at any point - including after the teammate
+          // has a login. When they have a linked auth user, sync the login email
+          // first (mirrors update-staff) so the row never drifts from the auth email.
           if ("email" in teamBody) {
             let email = typeof teamBody.email === "string" ? teamBody.email.trim().toLowerCase() : "";
             if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return res.status(400).json({ error: "enter a valid email or leave it blank" });
-            patch.email = email || null;
+            const newEmail = email || null;
+            if (target.user_id && newEmail !== (target.email || null)) {
+              if (!newEmail) return res.status(400).json({ error: "an invited teammate must keep an email (it's their login)" });
+              const sync = await adminUpdateAuthEmail(target.user_id, newEmail);
+              if (!sync.ok) {
+                if (/already|duplicate|409|422/i.test(sync.error || "")) {
+                  return res.status(409).json({ error: "That email already belongs to another login account.", code: "email_belongs_to_other_user" });
+                }
+                return res.status(400).json({ error: `couldn't update login email: ${sync.error}` });
+              }
+            }
+            patch.email = newEmail;
           }
+          if ("phone" in teamBody) { const ph = (teamBody.phone || "").trim(); patch.phone = ph || null; }
           if ("name" in teamBody) { const nm = (teamBody.name || "").trim(); if (nm) patch.name = nm; }
           const upd = await fetch(`${SUPABASE_URL}/rest/v1/client_users?id=eq.${encodeURIComponent(memberId)}`, {
             method: "PATCH",
@@ -1660,6 +1676,7 @@ async function handler(req, res) {
           }
           const name = typeof teamBody.name === "string" ? teamBody.name.trim() : "";
           const email = typeof teamBody.email === "string" ? teamBody.email.trim().toLowerCase() : "";
+          const phone = typeof teamBody.phone === "string" ? teamBody.phone.trim() : "";
           if (!name) return res.status(400).json({ error: "name required" });
           if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
             return res.status(400).json({ error: "valid email required" });
@@ -1731,7 +1748,7 @@ async function handler(req, res) {
             const updRes = await fetch(`${SUPABASE_URL}/rest/v1/client_users?id=eq.${encodeURIComponent(draftId)}`, {
               method: "PATCH",
               headers: { apikey: SUPABASE_SERVICE_KEY, Authorization: `Bearer ${SUPABASE_SERVICE_KEY}`, "Content-Type": "application/json", Prefer: "return=representation" },
-              body: JSON.stringify({ user_id: memberUserId, name, email, status: "active", last_invite_sent_at: new Date().toISOString() }),
+              body: JSON.stringify({ user_id: memberUserId, name, email, status: "active", last_invite_sent_at: new Date().toISOString(), ...(phone ? { phone } : {}) }),
             });
             if (!updRes.ok) return res.status(500).json({ error: `membership link failed: ${await updRes.text()}` });
             memberRow = (await updRes.json())[0];
@@ -1757,14 +1774,14 @@ async function handler(req, res) {
                 "Content-Type": "application/json",
                 Prefer: "return=representation",
               },
-              body: JSON.stringify({ name, email, status: "active" }),
+              body: JSON.stringify({ name, email, status: "active", ...(phone ? { phone } : {}) }),
             });
             if (!updRes.ok) return res.status(500).json({ error: `membership update failed: ${await updRes.text()}` });
             memberRow = (await updRes.json())[0];
           } else {
             try {
               const rows = await supabaseInsert("client_users", {
-                user_id: memberUserId, client_id, name, email,
+                user_id: memberUserId, client_id, name, email, phone: phone || null,
                 role: "member", status: "active",
               });
               memberRow = Array.isArray(rows) ? rows[0] : rows;

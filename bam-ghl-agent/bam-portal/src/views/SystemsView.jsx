@@ -847,6 +847,14 @@ export function TicketModal({ ticket: initial, me, isManager, pool, tokens: t, d
           </h2>
           <div style={{ display: "flex", gap: 14, fontSize: 13, color: t.textMute, marginTop: 6, flexWrap: "wrap", alignItems: "center" }}>
             <span>{ticket.client?.business_name || "Unknown client"}</span>
+            {(ticket.client?.owner_name || ticket.fields?.owner_name) && (
+              <span>Owner: {ticket.client?.owner_name || ticket.fields?.owner_name}</span>
+            )}
+            {(ticket.client?.email || ticket.fields?.email) && (
+              <a href={`mailto:${ticket.client?.email || ticket.fields?.email}`} onMouseDown={e => e.stopPropagation()} style={{ color: t.accent || t.text }}>
+                {ticket.client?.email || ticket.fields?.email}
+              </a>
+            )}
             <span>Submitted {formatDate(ticket.submitted_at)}</span>
             {ticket.assignee && <span>Assigned to {ticket.assignee.name}</span>}
             {/* Due date — admin can edit, everyone else sees the value. */}
