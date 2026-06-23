@@ -23,7 +23,7 @@ import { pickGhlToken, ghl } from "./ghl/_core.js";
 import { assemblePrompt } from "./agent/prompt-structure.js";
 import { loadContactMemory } from "./agent/contact-memory.js";
 import { buildAgentSystem } from "./agent/brain.js";
-import { toIso } from "./agent/_stage.js";
+import { toIso, respondedContactIds } from "./agent/_stage.js";
 import { agentMode, modeIsOn, modeSelfDrives, SELF_DRIVE_MIN_CONFIDENCE } from "./agent/_mode.js";
 import { resolveAgentActor } from "./agent/_auth.js";
 
@@ -150,7 +150,22 @@ async function detectForClient(client) {
   if (!creds) return { client_id: client.id, skipped: "no GHL token" };
   const { token, locationId } = creds;
 
-  // Find leads where OUR last message is outbound and stale (they went quiet).
+  // The sales agent ONLY works leads in the Responded stage. Gate every nudge to
+  // contacts currently in that stage — never follow up someone in another stage.
+  const { rs, ids: respondedIds } = await respondedContactIds(token, locationId);
+  if (!rs) return { client_id: client.id, skipped: "no Responded stage" };
+
+  // Prune: cancel scheduled follow-ups whose lead has LEFT the Responded stage.
+  try {
+    const active = await sb(`agent_followups?client_id=eq.${client.id}&status=in.(pending,approved)&select=id,ghl_contact_id`);
+    for (const row of (Array.isArray(active) ? active : [])) {
+      if (row.ghl_contact_id && !respondedIds.has(row.ghl_contact_id)) {
+        await sb(`agent_followups?id=eq.${row.id}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ status: "canceled", send_error: "left Responded stage", updated_at: new Date().toISOString() }) });
+      }
+    }
+  } catch (_) {}
+
+  // Find Responded-stage leads where OUR last message is outbound and stale.
   let convos = [];
   try {
     const cd = await ghl("GET", `/conversations/search?${new URLSearchParams({ locationId, limit: "100" })}`, { token });
@@ -158,6 +173,7 @@ async function detectForClient(client) {
   } catch (e) { return { client_id: client.id, error: `conversations: ${e.message}` }; }
 
   const candidates = convos.filter(c => {
+    if (!respondedIds.has(c.contactId)) return false;   // ← Responded-stage only
     if (String(c.lastMessageDirection || "").toLowerCase() !== "outbound") return false;
     const h = hoursSince(c.lastMessageDate || c.dateUpdated);
     return h >= MIN_QUIET_HOURS && h <= MAX_AGE_DAYS * 24;
@@ -236,10 +252,22 @@ async function leadRepliedSince(clientId, contactId, sinceISO) {
   } catch (_) { return false; }
 }
 
-async function sendOne(row, clientCache) {
+async function sendOne(row, clientCache, respondedCache = {}) {
   let client = clientCache[row.client_id];
   if (!client) { client = await loadClient(row.client_id); clientCache[row.client_id] = client; }
   if (!client) return { id: row.id, error: "client gone" };
+
+  // Hard guard: the sales agent only messages Responded-stage leads. If they've
+  // left the stage since this was scheduled, cancel instead of sending.
+  const credsGuard = await pickGhlToken(client);
+  if (credsGuard) {
+    let rset = respondedCache[row.client_id];
+    if (rset === undefined) { try { rset = (await respondedContactIds(credsGuard.token, credsGuard.locationId)).ids; } catch (_) { rset = null; } respondedCache[row.client_id] = rset; }
+    if (rset && row.ghl_contact_id && !rset.has(row.ghl_contact_id)) {
+      await sb(`agent_followups?id=eq.${row.id}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ status: "canceled", send_error: "left Responded stage", updated_at: new Date().toISOString() }) });
+      return { id: row.id, canceled: "left Responded stage" };
+    }
+  }
 
   // Cancel if the lead replied after this was drafted (belt-and-suspenders with
   // the inbound webhook's cancel hook).
@@ -268,7 +296,7 @@ async function runWork(res) {
   try {
     due = await sb(`agent_followups?status=in.(pending,approved)&scheduled_at=lte.${new Date().toISOString()}&select=*&order=scheduled_at.asc&limit=80`);
   } catch (e) { return res.status(500).json({ error: e.message }); }
-  const cache = {};
+  const cache = {}, rcache = {};
   const out = [];
   for (const row of (Array.isArray(due) ? due : [])) {
     if (row.status === "pending") {
@@ -276,9 +304,9 @@ async function runWork(res) {
       if (client === undefined) { client = await loadClient(row.client_id); cache[row.client_id] = client; }
       const auto = client && modeSelfDrives(agentMode(client)) && typeof row.confidence === "number" && row.confidence >= SELF_DRIVE_MIN_CONFIDENCE;
       if (!auto) continue;   // hawkeye, or self-drive-but-unsure → wait for approval
-      out.push({ ...(await sendOne(row, cache)), auto_sent: true });
+      out.push({ ...(await sendOne(row, cache, rcache)), auto_sent: true });
     } else {
-      out.push(await sendOne(row, cache));
+      out.push(await sendOne(row, cache, rcache));
     }
   }
   return res.status(200).json({ ok: true, processed: out.length, results: out });
