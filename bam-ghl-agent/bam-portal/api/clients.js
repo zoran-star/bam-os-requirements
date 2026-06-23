@@ -1596,7 +1596,7 @@ async function handler(req, res) {
       // OR by a client portal user (the academy owner or a teammate). Auth
       // is resolved per-action below, so these MUST sit before the staff-only
       // gate — that gate would 403 a legitimate client-portal caller.
-      if (publicSignupAction === "invite-team-member" || publicSignupAction === "revoke-team-member" || publicSignupAction === "set-staff-tabs" || publicSignupAction === "add-teammate" || publicSignupAction === "update-teammate") {
+      if (publicSignupAction === "invite-team-member" || publicSignupAction === "revoke-team-member" || publicSignupAction === "set-staff-tabs" || publicSignupAction === "add-teammate" || publicSignupAction === "update-teammate" || publicSignupAction === "set-notification-prefs") {
         const teamAuth = req.headers.authorization || "";
         const teamToken = teamAuth.startsWith("Bearer ") ? teamAuth.slice(7) : null;
         if (!teamToken) return res.status(401).json({ error: "auth required" });
@@ -1745,6 +1745,26 @@ async function handler(req, res) {
           });
           if (!upd.ok) return res.status(502).json({ error: `couldn't save — ${await upd.text()}` });
           return res.status(200).json({ ok: true, member_id: memberId, ...patch });
+        }
+
+        // ---- action=set-notification-prefs ----
+        // Owner picks which teammates get the SMS for each event. Shape:
+        // { "<event_key>": ["<client_users.id>", ...] }. Stored on clients.
+        if (publicSignupAction === "set-notification-prefs") {
+          if (!isStaffCaller && callerRole !== "owner") return res.status(403).json({ error: "only the account owner can edit notifications" });
+          const raw = teamBody.notification_prefs;
+          if (!raw || typeof raw !== "object" || Array.isArray(raw)) return res.status(400).json({ error: "notification_prefs object required" });
+          const clean = {};
+          for (const k of Object.keys(raw)) {
+            if (Array.isArray(raw[k])) clean[k] = raw[k].filter(x => typeof x === "string").slice(0, 100);
+          }
+          const upd = await fetch(`${SUPABASE_URL}/rest/v1/clients?id=eq.${encodeURIComponent(client_id)}`, {
+            method: "PATCH",
+            headers: { apikey: SUPABASE_SERVICE_KEY, Authorization: `Bearer ${SUPABASE_SERVICE_KEY}`, "Content-Type": "application/json", Prefer: "return=minimal" },
+            body: JSON.stringify({ notification_prefs: clean, updated_at: new Date().toISOString() }),
+          });
+          if (!upd.ok) return res.status(502).json({ error: `couldn't save — ${await upd.text()}` });
+          return res.status(200).json({ ok: true, notification_prefs: clean });
         }
 
         // ---- action=invite-team-member ----
