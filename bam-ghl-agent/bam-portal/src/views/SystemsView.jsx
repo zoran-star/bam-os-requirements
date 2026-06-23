@@ -1182,9 +1182,9 @@ export function TicketModal({ ticket: initial, me, isManager, pool, tokens: t, d
           )}
 
           {/* Anyone on systems team: request client action (works on any
-              non-final status, including while already awaiting_client —
-              supports multiple pending requests) */}
-          {canClientComm && !["done","approved","in_review"].includes(ticket.status) && !showRequest && (
+              non-final status, including in_review — supports asking client
+              things even after work is submitted for manager review) */}
+          {canClientComm && !["done","approved","cancelled"].includes(ticket.status) && !showRequest && (
             <button disabled={busy} onClick={() => setShowRequest(true)} style={btn(t, "ghost")}>
               {ticket.status === "awaiting_client" ? "Add another request" : "Request client action"}
             </button>
@@ -1209,7 +1209,7 @@ export function TicketModal({ ticket: initial, me, isManager, pool, tokens: t, d
             <>
               <button disabled={busy || connectBlocks} onMouseDown={e => e.preventDefault()} onClick={() => wrap(() => approveTicket(ticket.id))} style={btn(t, "primary")} title={connectBlocks ? "Connect at least one pipeline/product/calendar to an offer first" : ""}>Approve</button>
               <button disabled={busy} onMouseDown={e => e.preventDefault()} onClick={() => wrap(() => goodToFinalize(ticket.id))} style={btn(t, "ghost")} title="Work looks good — back to the executor for final touches, then Mark complete">Good to finalize</button>
-              <button disabled={busy || connectBlocks} onMouseDown={e => e.preventDefault()} onClick={() => wrap(() => sendForFinalReview(ticket.id))} style={btn(t, "primary")} title={connectBlocks ? "Connect at least one pipeline/product/calendar to an offer first" : "Send to client for final sign-off"}>Mark complete for review</button>
+              <button disabled={busy} onMouseDown={e => e.preventDefault()} onClick={() => wrap(() => sendForFinalReview(ticket.id))} style={btn(t, "primary")} title="Send to client for final sign-off">Mark complete for review</button>
               {!showDeny && <button disabled={busy} onMouseDown={e => e.preventDefault()} onClick={() => setShowDeny(true)} style={btn(t, "danger-ghost")}>Deny</button>}
             </>
           )}
