@@ -171,10 +171,6 @@ async function enrollWorkflow(headers, ghlContactId, workflowId) {
 
 /* ─── HANDLER ────────────────────────────────────────────────── */
 async function handler(req, res) {
-  if (!SB_URL || !SB_KEY) {
-    return res.status(500).json({ ok: false, error: "Supabase not configured" });
-  }
-
   setCors(req, res);
   if (req.method === "OPTIONS") return res.status(204).end();
   if (req.method !== "POST")   return res.status(405).json({ ok: false, error: "POST required" });
@@ -203,31 +199,33 @@ async function handler(req, res) {
     return res.status(400).json({ ok: false, error: "invalid email" });
   }
 
-  /* Save to Supabase */
-  let leadId;
-  try {
-    const rows = await sbReq("website_leads", {
-      method:  "POST",
-      headers: { Prefer: "return=representation" },
-      body: JSON.stringify({
-        client_id,
-        form_type: "detail_onboarding",
-        name:      `${parentFirst} ${parentLast}`.trim(),
-        email:     email.toLowerCase(),
-        phone:     phone || null,
-        fields: {
-          contactId,
-          parentFirst, parentLast,
-          athleteFirst, athleteLast,
-          grade, dob, position, shirtSize, school,
-          ecName, ecPhone, ecRelationship,
-          goals, hearAbout,
-        },
-      }),
-    });
-    leadId = rows?.[0]?.id;
-  } catch (e) {
-    return res.status(500).json({ ok: false, error: `submission failed: ${e.message}` });
+  /* Save to Supabase (non-fatal if not configured) */
+  let leadId = null;
+  if (SB_URL && SB_KEY) {
+    try {
+      const rows = await sbReq("website_leads", {
+        method:  "POST",
+        headers: { Prefer: "return=representation" },
+        body: JSON.stringify({
+          client_id,
+          form_type: "detail_onboarding",
+          name:      `${parentFirst} ${parentLast}`.trim(),
+          email:     email.toLowerCase(),
+          phone:     phone || null,
+          fields: {
+            contactId,
+            parentFirst, parentLast,
+            athleteFirst, athleteLast,
+            grade, dob, position, shirtSize, school,
+            ecName, ecPhone, ecRelationship,
+            goals, hearAbout,
+          },
+        }),
+      });
+      leadId = rows?.[0]?.id;
+    } catch (e) {
+      console.error("Supabase save failed (non-fatal):", e.message);
+    }
   }
 
   /* GHL sync (non-fatal) */
@@ -239,25 +237,29 @@ async function handler(req, res) {
         await postNote(headers, resolvedId, b);
         await enrollWorkflow(headers, resolvedId, ONBOARDING_WORKFLOW_ID);
 
-        try {
-          await sbReq(`website_leads?id=eq.${leadId}`, {
-            method: "PATCH",
-            body: JSON.stringify({
-              ghl_contact_id: resolvedId,
-              ghl_synced_at:  new Date().toISOString(),
-              ghl_error:      null,
-            }),
-          });
-        } catch (_) {}
+        if (leadId && SB_URL && SB_KEY) {
+          try {
+            await sbReq(`website_leads?id=eq.${leadId}`, {
+              method: "PATCH",
+              body: JSON.stringify({
+                ghl_contact_id: resolvedId,
+                ghl_synced_at:  new Date().toISOString(),
+                ghl_error:      null,
+              }),
+            });
+          } catch (_) {}
+        }
       }
     } catch (e) {
       console.error("GHL sync failed (lead saved):", e.message);
-      try {
-        await sbReq(`website_leads?id=eq.${leadId}`, {
-          method: "PATCH",
-          body: JSON.stringify({ ghl_error: e.message.slice(0, 500) }),
-        });
-      } catch (_) {}
+      if (leadId && SB_URL && SB_KEY) {
+        try {
+          await sbReq(`website_leads?id=eq.${leadId}`, {
+            method: "PATCH",
+            body: JSON.stringify({ ghl_error: e.message.slice(0, 500) }),
+          });
+        } catch (_) {}
+      }
     }
   }
 
