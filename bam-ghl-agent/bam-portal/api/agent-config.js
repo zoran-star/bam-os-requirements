@@ -9,6 +9,7 @@ import { withSentryApiRoute } from "./_sentry.js";
 // BOTH the Responded reply bot and the follow-up nudge engine. See agent/_mode.js.
 
 import { agentMode, AGENT_MODES } from "./agent/_mode.js";
+import { resolveAgentActor } from "./agent/_auth.js";
 
 const SUPABASE_URL         = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
@@ -37,10 +38,24 @@ async function requireStaff(req) {
 
 async function handler(req, res) {
   if (req.method !== "POST") return res.status(405).json({ error: "POST only" });
+  const b = req.body && typeof req.body === "object" ? req.body : {};
+
+  // Read-only mode lookup — staff OR the academy's own owner / can_train_agent
+  // member (so the pipeline can glow the Responded stage). SETTING the mode
+  // stays BAM-staff-only below.
+  if (b.action === "get-mode") {
+    const actor = await resolveAgentActor(req);
+    if (!actor) return res.status(401).json({ error: "sign in required" });
+    if (!b.client_id) return res.status(400).json({ error: "client_id required" });
+    if (!actor.canActOn(b.client_id)) return res.status(403).json({ error: "not your academy" });
+    try {
+      const [row] = await sb(`clients?id=eq.${encodeURIComponent(b.client_id)}&select=ghl_kpi_config&limit=1`);
+      return res.status(200).json({ mode: row ? agentMode(row) : "off" });
+    } catch (e) { return res.status(500).json({ error: e.message }); }
+  }
+
   const staffEmail = await requireStaff(req);
   if (!staffEmail) return res.status(401).json({ error: "staff only" });
-
-  const b = req.body && typeof req.body === "object" ? req.body : {};
 
   try {
     if (b.action === "list") {
