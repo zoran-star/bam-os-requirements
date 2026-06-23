@@ -13446,7 +13446,94 @@ function _bbMarkDoneCta(section, label) {
   `;
 }
 
+// ── Offer required-field validation ──
+// Marking "Offers done" is the gate the systems buildout keys off, so it's
+// blocked until every active offer has its required fields filled. Walks
+// _bbOfferConfigs, respects dep visibility, and for block_builder fields
+// requires >=1 active block with its required sub-fields filled.
+function _bbValOfferEmpty(v) {
+  if (v == null) return true;
+  if (typeof v === 'string') return v.trim() === '';
+  if (Array.isArray(v)) return v.length === 0;
+  return false;
+}
+function _bbValOfferDepOk(scope, dep) {
+  if (!dep) return true;
+  const v = scope[dep.key];
+  if (v == null) return false;
+  const want = Array.isArray(dep.equals) ? dep.equals : [dep.equals];
+  return Array.isArray(v) ? v.some(x => want.includes(x)) : want.includes(v);
+}
+function _bbValidateOfferRequired(offer) {
+  const missing = [];
+  const config = _bbOfferConfigs[offer.type] || [];
+  for (const section of config) {
+    const sec = (offer.data || {})[section.id] || {};
+    for (const field of (section.fields || [])) {
+      if (!_bbValOfferDepOk(sec, field.dep)) continue;
+      const val = field.key === '__title__' ? (offer.title || '') : sec[field.key];
+      if (field.type === 'block_builder') {
+        const blocks = Array.isArray(val) ? val.filter(b => b && !b.archived) : [];
+        if (field.required && blocks.length === 0) {
+          missing.push(`${section.label}: add at least one ${field.addLabel || (field.label || 'item').toLowerCase()}`);
+          continue;
+        }
+        (Array.isArray(field.subFields) ? field.subFields : []).forEach(sf => {
+          if (!sf.required) return;
+          blocks.forEach((blk, bi) => {
+            if (!_bbValOfferDepOk(blk, sf.dep)) return;
+            if (_bbValOfferEmpty(blk[sf.key])) missing.push(`${section.label}: ${field.label} #${bi + 1} - ${sf.label}`);
+          });
+        });
+      } else if (field.required && _bbValOfferEmpty(val)) {
+        missing.push(`${section.label}: ${field.label}`);
+      }
+    }
+  }
+  return missing;
+}
+async function _bbValidateAllOffers() {
+  if (!CLIENT_ID || !_sb) return [];
+  const { data, error } = await _sb.from('offers')
+    .select('id, type, title, status, data')
+    .eq('client_id', CLIENT_ID)
+    .neq('status', 'archived');
+  if (error) return null;
+  if (!data || !data.length) return [{ title: '(no offers yet)', missing: ['Add at least one offer before finishing.'] }];
+  const out = [];
+  for (const o of data) {
+    const miss = _bbValidateOfferRequired(o);
+    if (miss.length) out.push({ title: o.title || '(untitled offer)', missing: miss });
+  }
+  return out;
+}
+function _bbShowOffersBlocker(problems) {
+  const host = document.getElementById('bb-offers-pricing') || document.getElementById('bb-panel');
+  if (!host) return;
+  const items = problems.map(p => `<div style="margin-top:8px"><b style="color:var(--text)">${_bbEscapeHtml(p.title)}</b><ul style="margin:4px 0 0;padding-left:18px">${p.missing.map(m => `<li style="font-size:12.5px;color:var(--text-sub);margin:2px 0">${_bbEscapeHtml(m)}</li>`).join('')}</ul></div>`).join('');
+  const html = `<div id="bb-offers-blocker" class="bb-error-banner" style="margin-top:14px;padding:14px 16px;border-radius:10px"><div style="font-weight:700">Finish these required fields before marking Offers done:</div>${items}</div>`;
+  const existing = document.getElementById('bb-offers-blocker');
+  if (existing) existing.outerHTML = html; else host.insertAdjacentHTML('afterbegin', html);
+  document.getElementById('bb-offers-blocker')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+
 async function _bbSectionMarkDone(section, btn, label) {
+  // Offers is the buildout gate - validate every active offer before allowing done.
+  if (section === 'offers') {
+    if (btn) { btn.disabled = true; btn.textContent = 'Checking…'; }
+    const problems = await _bbValidateAllOffers();
+    if (problems === null) {
+      if (typeof _plToast === 'function') _plToast("Couldn't check offers - try again.");
+      if (btn) { btn.disabled = false; btn.textContent = "I'm done with " + label; }
+      return;
+    }
+    if (problems.length) {
+      _bbShowOffersBlocker(problems);
+      if (btn) { btn.disabled = false; btn.textContent = "I'm done with " + label; }
+      return;
+    }
+    document.getElementById('bb-offers-blocker')?.remove();
+  }
   if (btn) { btn.disabled = true; btn.textContent = 'Saving…'; }
   const ok = await _obtMarkSectionDone(section, true);
   if (ok) _bbRenderFromHash();  // re-render so the un-mark button appears

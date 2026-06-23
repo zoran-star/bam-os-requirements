@@ -512,6 +512,26 @@ async function handler(req, res) {
         }
       }
 
+      // Gate: the systems buildout can't be triggered until the academy's
+      // required onboarding data is in - EIN, business address, and the Offers
+      // section marked done (which the client portal only allows once every
+      // active offer's required fields are filled).
+      if (obStep && obStep.key === "trigger_buildout" && b.completed === true) {
+        const crows = await sb(`clients?id=eq.${existing.client_id}&select=ein,address,offers_marked_done_at`);
+        const c = Array.isArray(crows) ? crows[0] : crows;
+        const miss = [];
+        if (!c || !String(c.ein || "").trim()) miss.push("EIN");
+        if (!c || !String(c.address || "").trim()) miss.push("business address");
+        if (!c || !c.offers_marked_done_at) miss.push("Offers (mark the Offers section done)");
+        if (miss.length) {
+          return res.status(400).json({
+            error: `Can't trigger the systems buildout yet - missing: ${miss.join(", ")}.`,
+            code: "buildout_prereqs_missing",
+            missing: miss,
+          });
+        }
+      }
+
       if (Object.keys(patch).length === 0) {
         return res.status(400).json({ error: "no fields to update" });
       }
