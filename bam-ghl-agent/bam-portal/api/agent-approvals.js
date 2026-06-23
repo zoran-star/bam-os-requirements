@@ -262,10 +262,23 @@ async function detectForClient(client) {
   if (!creds) return { client_id: client.id, skipped: "no GHL token" };
   const { token, locationId } = creds;
 
-  let rs, queue;
-  try { ({ rs, queue } = await computeQueue(token, locationId)); }
+  let rs, queue, respondedIds;
+  try { ({ rs, queue, respondedIds } = await computeQueue(token, locationId)); }
   catch (e) { return { client_id: client.id, error: `queue: ${e.message}` }; }
   if (!rs) return { client_id: client.id, skipped: "no Responded stage" };
+
+  // Prune stale cards: cancel pending drafts whose lead has LEFT the Responded
+  // stage (booked, moved, lost…) so Hawkeye only ever shows current Responded leads.
+  let pruned = 0;
+  try {
+    const pend = await sb(`agent_ready_replies?client_id=eq.${client.id}&status=eq.pending&select=id,ghl_contact_id`);
+    for (const row of (Array.isArray(pend) ? pend : [])) {
+      if (row.ghl_contact_id && !respondedIds.has(row.ghl_contact_id)) {
+        await sb(`agent_ready_replies?id=eq.${row.id}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ status: "canceled", send_error: "left Responded stage", updated_at: new Date().toISOString() }) });
+        pruned++;
+      }
+    }
+  } catch (_) {}
 
   const cfg = await loadConfig(client.id);
   let drafted = 0, autoSent = 0, skipped = 0, escalated = 0, lostProposed = 0;
@@ -371,7 +384,7 @@ async function detectForClient(client) {
       } catch (e) { skipped++; reasons.push(`${item.name || contactId}: pending-insert failed — ${e.message}`); }
     }
   }
-  return { client_id: client.id, business: client.business_name, mode, queued: queue.length, drafted, auto_sent: autoSent, escalated, lost_proposed: lostProposed, skipped, reasons };
+  return { client_id: client.id, business: client.business_name, mode, queued: queue.length, drafted, auto_sent: autoSent, escalated, lost_proposed: lostProposed, skipped, pruned, reasons };
 }
 
 async function runDetect(res, onlyClientId) {
