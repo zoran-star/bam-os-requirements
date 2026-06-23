@@ -13,9 +13,19 @@ The single source of truth for how Pause works on the Members tab.
 
 **Endpoint:** `POST /api/members?id=<member_id>&action=pause`
 
-**Body:** `{ start_date: "YYYY-MM-DD", end_date: "YYYY-MM-DD", reason? }`
+**Body:** `{ start_date: "YYYY-MM-DD", end_date: "YYYY-MM-DD", reason?, next_payment_date? }`
 
 **No other modes.** No `weeks`, no `until`, no `indefinite` — all collapsed into start_date + end_date.
+
+**Manual next-payment date (2026-06-23).** Optional `next_payment_date` (YYYY-MM-DD,
+must be future) lets staff set the Stripe `trial_end` (next charge) DIRECTLY instead
+of computing it from the pause length. **It still requires a pause period** (start/end
+are always mandatory in the modal) — the pause window drives `members.status`, the
+manual date only overrides billing. Stored on the pause row as
+`cancellations.manual_trial_end`; honored by BOTH actionPause (immediate) and cron
+Phase A (future-scheduled). When set: `trial_end = isoToUnix(next_payment_date)` (still
+capped at now+729d) instead of the formula below. The Pause modal also DISPLAYS the
+current next-charge date (`stripe.trial_end || stripe.current_period_end`).
 
 ### The formula
 
@@ -66,6 +76,11 @@ CREATE INDEX idx_cancellations_pending_pause
 CREATE INDEX idx_cancellations_active_pause
   ON public.cancellations (pause_end)
   WHERE type = 'pause' AND activated_at IS NOT NULL AND completed_at IS NULL;
+
+-- cancellations: staff-set next-charge date (overrides the computed trial_end).
+-- null = use the formula. Migration 20260623120000.
+ALTER TABLE public.cancellations
+  ADD COLUMN manual_trial_end date;
 
 -- members: denormalized "future pause queued" date for cheap pill render
 ALTER TABLE public.members
@@ -119,8 +134,8 @@ Finds rows where:
 - `pause_start <= today`
 
 For each: load member + connected account → fetch Stripe sub → compute
-trial_end using the standard formula → PATCH Stripe → flip
-`members.status = 'paused'` → set `activated_at = now`. Writes a
+trial_end (`row.manual_trial_end` if set, else the standard formula) → PATCH
+Stripe → flip `members.status = 'paused'` → set `activated_at = now`. Writes a
 `cron-pause-activated` audit row.
 
 If the member or sub is missing, the row is short-circuited
@@ -170,10 +185,13 @@ Billing resumes on **trial_end** (Stripe charges automatically).
 
 ## Frontend (client-portal.html)
 
-`mPause(memberId)` reads from `_MEMBERS_ALL` to detect re-pauses:
-- If member is already `paused`, shows `confirm('Update the pause window?')` and the prompts say "Update pause —" instead of "Pause —"
-- Three prompts: start_date (default = today), end_date, reason (optional)
-- Returns a toast that includes scheduled flag, cap warning, and resume_date if available
+`mPause(memberId)` (styled `_mmModal`, not prompts as of the 2026-06 redesign):
+- Fetches `/api/members?id=` for live `stripe` → **displays the current next-charge
+  date** (`📅 Next payment: <date>`) at the top of the modal.
+- Fields: start_date (default = today, required), end_date (required), **next_payment
+  date (optional override)**, reason (optional). All re-pause / queued-pause notes still apply.
+- Returns a toast that includes scheduled flag, cap warning, and resume_date if available.
+- Detects re-pause via `m.status === 'paused'` → label "Update pause".
 
 ## When to update this note
 
