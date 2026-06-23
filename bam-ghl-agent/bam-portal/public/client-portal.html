@@ -15924,13 +15924,13 @@ const _bbStdPricing = [
 
 // Onboarding section common to most non-team types
 const _bbStdOnboarding = (intakeFieldDefaults, intakeFieldAddons) => ([
-  { key:'agreement', type:'file', label:'Agreement / waiver', required:true,
+  { key:'agreement', type:'file', label:'Agreement / waiver',
     hint:'PDF + checkbox confirming what it covers (waiver, media release, refund, cancellation, etc.)' },
-  { key:'onboarding_messaging', type:'text_files', label:'Onboarding messaging', required:true,
-    hint:'Welcome message + prep info. Attach PDFs / videos / images.' },
+  { key:'onboarding_messaging', type:'text_files', label:'Onboarding messaging',
+    hint:'This is the first thing people get texted when they sign up. Write the welcome message + prep info, and attach any PDFs / videos / images.' },
   { key:'welcome_video', type:'file', label:'Welcome video', 
     hint:'Plays on the website confirmation page right after a trial is booked. MP4, under 50 MB.' },
-  { key:'intake_form_fields', type:'check_many_defaults', label:'Intake form fields', required:true,
+  { key:'intake_form_fields', type:'check_many_defaults', label:'Intake form fields',
     defaultOptions: intakeFieldDefaults,
     addonOptions: intakeFieldAddons },
   { key:'notify_on_signup', type:'staff_select', label:'Notify on new sign-up',
@@ -15956,6 +15956,8 @@ const _bbOfferConfigs = {
         options:['Boys','Girls'] },
       { key:'location', type:'location_picker', label:'Primary location', required:true,
         hint:'Pick from your saved locations or add a new one' },
+      { key:'assets', type:'asset_bank', label:'Assets',
+        hint:'Marketing / promo material - graphics, photos, posters, social cards' },
       _bbCommonExtraNotes
     ]},
     { id:'schedule', label:'Schedule', fields:[
@@ -15992,7 +15994,7 @@ const _bbOfferConfigs = {
         ] },
       { key:'year_round', type:'check_one', label:'Year-round or seasonal?',
         options:['Year-round','Seasonal'] },
-      { key:'season_dates', type:'text', label:'Season start / end dates',
+      { key:'season_dates', type:'text', label:'Season start / end dates', required:true,
         dep:{ key:'year_round', equals:'Seasonal' },
         hint:'When the season runs (e.g. "Sept 5 - May 30")' },
       { key:'closed_dates', type:'textarea', label:'Closed dates / breaks',
@@ -16019,10 +16021,10 @@ const _bbOfferConfigs = {
       { key:'sales_path', type:'check_one', label:'Sales path', required:true,
         options:['Free trial','Paid trial','Discovery call first','Direct signup','Other'],
         hint:'Gates the next set of questions' },
-      { key:'trial_duration_price', type:'text', label:'Trial duration + price',
+      { key:'trial_duration_price', type:'text', label:'Trial duration + price', required:true,
         dep:{ key:'sales_path', equals:'Free trial' },
         hint:'e.g. "1 session, free" or "2 weeks, $25"' },
-      { key:'paid_trial_duration', type:'text', label:'Trial duration',
+      { key:'paid_trial_duration', type:'text', label:'Trial duration', required:true,
         dep:{ key:'sales_path', equals:'Paid trial' },
         hint:'e.g. "1 session" or "2 weeks"' },
       { key:'paid_trial_price', type:'currency', label:'Trial price',
@@ -16061,7 +16063,7 @@ const _bbOfferConfigs = {
       { key:'describe_path', type:'textarea', label:'Describe the path',
         dep:{ key:'sales_path', equals:'Other' },
         hint:'How leads become customers in this offer' },
-      { key:'info_collect', type:'check_many_defaults', label:'Info to collect from leads', required:true,
+      { key:'info_collect', type:'check_many_defaults', label:'Info to collect from leads',
         defaultOptions:['Parent name','Email','Phone','Athlete name'],
         addonOptions:['Proximity to location','Experience level (Beg/Int/Adv)','Desired start date','Grade','Age','Position','Goals','Add custom'] },
       { key:'info_collect_custom', type:'block_builder', label:'Custom fields to collect', addLabel:'custom field',
@@ -16090,10 +16092,11 @@ const _bbOfferConfigs = {
         hint:'The GHL tag that marks a contact as a paying member. Defaults to "liveclient" - added automatically when GHL connects and by the website onboarding flow. Members always win over lead tags in the Inbox.' },
       // Welcome video lives in the Sales section for training (it plays on the
       // post-trial website confirmation page), so drop it from onboarding here.
+      // Assets moved to General Info for training (Zoran, 2026-06-23).
       ..._bbStdOnboarding(
         ['Parent name','Phone','Email','Emergency contact name','Emergency contact phone'],
         ['Medical / allergies','School','Grade','Goals','Experience level','Jersey size','Add custom']
-      ).filter(f => f.key !== 'welcome_video')
+      ).filter(f => f.key !== 'welcome_video' && f.key !== 'assets')
     ]}
   ],
 
@@ -16631,18 +16634,22 @@ function _bbRenderField(field, sectionId) {
     case 'file':
     case 'files':
     case 'text_files': {
-      // Real upload - saves to offer_files + the offers storage bucket.
-      // Section key = "<sectionId>:<fieldKey>" so multiple file fields
-      // in the same section stay separate.
+      // A big text box (the message itself) alongside the file drop. Text saves
+      // to offer.data[section][key]; files save to offer_files + the offers
+      // bucket (sectionKey "<sectionId>:<fieldKey>" keeps multiple file fields
+      // in the same section separate).
+      const _tfText = `<textarea class="bb-textarea" style="min-height:130px" placeholder="Type the message here…" oninput="${onInputHandler}" onblur="_bbAutoSave()">${_bbEscapeHtml(val)}</textarea>`;
+      let _tfFiles;
       if (!_bbState.offer || !_bbState.offer.id) {
-        body = `<div style="padding:14px;background:var(--surface-alt);border:1px dashed var(--border-med);border-radius:8px;color:var(--text-mute);font-size:13px">Save the offer first, then come back to upload files.</div>`;
+        _tfFiles = `<div style="margin-top:10px;padding:14px;background:var(--surface-alt);border:1px dashed var(--border-med);border-radius:8px;color:var(--text-mute);font-size:13px">Save the offer first, then come back to attach files.</div>`;
       } else {
-        body = _bbRenderFileWidget(field, {
+        _tfFiles = `<div style="margin-top:10px">${_bbRenderFileWidget(field, {
           offerId: _bbState.offer.id,
           teamId: null,
           sectionKey: sectionId + ':' + field.key,
-        });
+        })}</div>`;
       }
+      body = _tfText + _tfFiles;
       break;
     }
     case 'asset_bank': {
