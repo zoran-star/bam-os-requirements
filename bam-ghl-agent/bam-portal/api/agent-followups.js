@@ -99,6 +99,7 @@ const SCHEDULE_TOOL = {
       stop:            { type: "boolean", description: "True if we should STOP following up this lead entirely (firm no, booked, complaint, etc)." },
       send_in_hours:   { type: "number",  description: "Hours from now to send the follow-up, per your timing rules. Whole-ish numbers (e.g. 18, 24, 48)." },
       message:         { type: "string",  description: "The exact short follow-up text to send. Empty if should_followup is false." },
+      summary:         { type: "string",  description: "A 2-3 sentence plain-English summary of the conversation so far for a human reviewer — who the lead is, what they want, and where things stand." },
       goal:            { type: "string",  description: "One short line: the goal of this follow-up / where the conversation is (e.g. 'lock Mon 7pm trial')." },
       reason:          { type: "string",  description: "One short line: why now / which trigger applies." },
       confidence:      { type: "number",  description: "0..1 confidence this is the right move." },
@@ -208,8 +209,9 @@ async function detectForClient(client) {
     const sendInH = clamp(Number(decision.send_in_hours) || 24, 1, MAX_AGE_DAYS * 24);
     // Never schedule a send outside quiet hours (8:00am-9:30pm) — push to the morning.
     const scheduledAt = nextSendableTime(new Date(Date.now() + sendInH * 3600000)).toISOString();
-    // The lead's last actual message (so the card can show "what they last said").
+    // The lead's last message + OUR last message (so the card shows both sides).
     const lastLeadMsg = [...thread].reverse().find(m => m.role === "parent");
+    const lastOurMsg  = [...thread].reverse().find(m => m.role === "agent");
     try {
       await sb(`agent_followups`, {
         method: "POST", headers: { Prefer: "return=minimal" },
@@ -217,7 +219,9 @@ async function detectForClient(client) {
           client_id: client.id, ghl_contact_id: String(contactId), ghl_conversation_id: c.id,
           contact_name: c.fullName || c.contactName || "Lead",
           goal: decision.goal || null, draft_message: String(decision.message).trim(),
+          summary: decision.summary ? String(decision.summary).slice(0, 600) : null,
           last_message: lastLeadMsg ? String(lastLeadMsg.text).slice(0, 500) : null,
+          last_outbound: lastOurMsg ? String(lastOurMsg.text).slice(0, 500) : null,
           scheduled_at: scheduledAt, status: "pending",
           trigger_reason: decision.reason || null,
           last_lead_at: toIso(c.lastMessageDate || c.dateUpdated),
