@@ -19,6 +19,7 @@ import { pickGhlToken, ghl, sendSms } from "./ghl/_core.js";
 import { assemblePrompt } from "./agent/prompt-structure.js";
 import { buildAgentSystem } from "./agent/brain.js";
 import { loadContactMemory } from "./agent/contact-memory.js";
+import { loadCalendars, calendarForGroup, freeSlots, summarizeSlots } from "./agent/booking.js";
 import { respondedStage, contactInRespondedStage, computeQueue } from "./agent/_stage.js";
 import { agentMode, modeIsOn, shouldAutoSend } from "./agent/_mode.js";
 import { resolveAgentActor } from "./agent/_auth.js";
@@ -95,27 +96,83 @@ const REPLY_TOOL = {
       escalate_reason: { type: "string", description: "If escalate: why." },
       recommend_lost:  { type: "boolean", description: "True if your lost_criteria say this lead should be marked Lost (a human confirms it)." },
       lost_reason:     { type: "string", description: "If recommend_lost: the closest taxonomy reason (Too expensive / Not enough time / Started other programs / Not locked in / Bad fit / Invalid lead / Opted out / Other)." },
+      book:            { type: "boolean", description: "True if you are BOOKING the lead into a free trial — ONLY after they confirmed a specific day/time AND you verified that exact slot is open via check_availability. A human approves before it's created. Your 'reply' is the confirmation you'd send." },
+      book_group:      { type: "string", description: "If book: the group by athlete age — 'Group 1' (elementary, 9-13) or 'Group 2' (high school, 14+)." },
+      book_slot_at:    { type: "string", description: "If book: the EXACT ISO datetime of the open slot the lead confirmed (must be one of the open_slots from check_availability)." },
     },
     required: ["reply", "reasoning", "confidence", "escalate"],
   },
 };
 
-async function runAgent(system, messages) {
-  const anthropicMsgs = messages
-    .filter(m => m && typeof m.text === "string" && m.text.trim() !== "")
-    .map(m => ({ role: m.role === "agent" ? "assistant" : "user", content: m.text }));
-  while (anthropicMsgs.length && anthropicMsgs[anthropicMsgs.length - 1].role === "assistant") anthropicMsgs.pop();
-  if (!anthropicMsgs.length) throw new Error("no inbound message to reply to");
+// Read-only availability tool the agent can call mid-draft before proposing a booking.
+const CHECK_AVAILABILITY = {
+  name: "check_availability",
+  description: "Check open free-trial slots for a group's calendar before you book. Pick the group by the athlete's age. Returns upcoming open ISO datetimes.",
+  input_schema: {
+    type: "object",
+    properties: {
+      group:       { type: "string", description: "'Group 1' (elementary, ages 9-13) or 'Group 2' (high school, 14+)." },
+      within_days: { type: "number", description: "How many days ahead to look (default 14)." },
+    },
+    required: ["group"],
+  },
+};
+
+async function runCheckAvailability(input, bookingCtx) {
+  try {
+    const cal = calendarForGroup(bookingCtx.calendars, input.group);
+    if (!cal) return { error: `No calendar found for ${input.group}.` };
+    const { days } = await freeSlots(bookingCtx.token, cal.key, { days: input.within_days || 14, timezone: bookingCtx.timezone });
+    return { group: input.group, calendar_id: cal.key, open_slots: summarizeSlots(days) };
+  } catch (e) { return { error: `availability check failed: ${e.message}` }; }
+}
+
+async function anthropicCall(body) {
   const r = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
     headers: { "x-api-key": ANTHROPIC_KEY, "anthropic-version": "2023-06-01", "content-type": "application/json" },
-    body: JSON.stringify({ model: ANTHROPIC_MODEL, max_tokens: 1024, system, tools: [REPLY_TOOL], tool_choice: { type: "tool", name: "propose_reply" }, messages: anthropicMsgs }),
+    body: JSON.stringify(body),
   });
   if (!r.ok) throw new Error(`Claude ${r.status}: ${(await r.text()).slice(0, 400)}`);
-  const data = await r.json();
-  const tool = (data.content || []).find(b => b.type === "tool_use" && b.name === "propose_reply");
-  if (!tool?.input) throw new Error("no structured reply from Claude");
-  return tool.input;
+  return r.json();
+}
+
+// The agent's draft turn. When the academy has trial calendars (bookingCtx), the
+// agent can call check_availability (a live read) before proposing — a tool-use
+// loop. propose_reply is always terminal. With no calendars it behaves exactly
+// as before (single forced propose_reply call).
+async function runAgent(system, messages, bookingCtx = null) {
+  const convo = messages
+    .filter(m => m && typeof m.text === "string" && m.text.trim() !== "")
+    .map(m => ({ role: m.role === "agent" ? "assistant" : "user", content: m.text }));
+  while (convo.length && convo[convo.length - 1].role === "assistant") convo.pop();
+  if (!convo.length) throw new Error("no inbound message to reply to");
+
+  const canBook = !!(bookingCtx && Array.isArray(bookingCtx.calendars) && bookingCtx.calendars.length);
+  const tools = canBook ? [REPLY_TOOL, CHECK_AVAILABILITY] : [REPLY_TOOL];
+
+  for (let i = 0; i < 4; i++) {
+    const forceReply = !canBook || i === 3;
+    const data = await anthropicCall({
+      model: ANTHROPIC_MODEL, max_tokens: 1024, system, tools,
+      tool_choice: forceReply ? { type: "tool", name: "propose_reply" } : { type: "auto" },
+      messages: convo,
+    });
+    const content = data.content || [];
+    const reply = content.find(b => b.type === "tool_use" && b.name === "propose_reply");
+    if (reply?.input) return reply.input;
+    const avail = content.find(b => b.type === "tool_use" && b.name === "check_availability");
+    if (avail) {
+      convo.push({ role: "assistant", content });
+      const result = await runCheckAvailability(avail.input, bookingCtx);
+      convo.push({ role: "user", content: [{ type: "tool_result", tool_use_id: avail.id, content: JSON.stringify(result).slice(0, 3000) }] });
+      continue;
+    }
+    // Text-only (no tool) — nudge it to use propose_reply next round.
+    convo.push({ role: "assistant", content: content.length ? content : "…" });
+    convo.push({ role: "user", content: "Call propose_reply now with your message." });
+  }
+  throw new Error("no structured reply from Claude (tool loop)");
 }
 
 // ── GHL thread helpers ──
@@ -157,8 +214,12 @@ async function draftForContact(token, locationId, clientId, contactId, cfg, opts
   }
   const messages = await threadMessages(token, conversationId);
   const system = buildSystem(cfg) + await loadContactMemory(sb, clientId, contactId, { ghl, token, locationId });
-  const out = await runAgent(system, messages);
+  const calendars = await loadCalendars(sb, clientId);
+  const out = await runAgent(system, messages, { calendars, token, timezone: "America/Toronto" });
   const agentMsgs = messages.filter(m => m.role === "agent");
+  // A booking proposal: the agent set book=true with a concrete slot it verified.
+  const bookCal = (out.book && out.book_slot_at && out.book_group) ? calendarForGroup(calendars, out.book_group) : null;
+  const book = !!(out.book && out.book_slot_at && bookCal);
   return {
     conversation_id: conversationId,
     reply: out.reply || "",
@@ -169,6 +230,10 @@ async function draftForContact(token, locationId, clientId, contactId, cfg, opts
     asked_to_book: !!out.asked_to_book || BOOK_ASK.test(out.reply || ""),
     recommend_lost: !!out.recommend_lost,
     lost_reason: out.lost_reason || null,
+    book,
+    book_group: book ? out.book_group : null,
+    book_slot_at: book ? out.book_slot_at : null,
+    book_calendar_id: book ? bookCal.key : null,
     last_message: (() => { const lead = [...messages].reverse().find(m => m.role === "parent"); return lead ? String(lead.text).slice(0, 500) : null; })(),
     reply_count: agentMsgs.length,
     booking_asks: agentMsgs.filter(m => BOOK_ASK.test(m.text)).length,
@@ -242,6 +307,24 @@ async function detectForClient(client) {
         }]) });
         lostProposed++;
       } catch (e) { skipped++; reasons.push(`${item.name || contactId}: lost-insert failed — ${e.message}`); }
+      continue;
+    }
+
+    // Booking proposal: the lead confirmed a specific open slot. ALWAYS queue for
+    // a human in Hawkeye — never auto-create the appointment. The confirmation
+    // message rides in draft_message and sends after the booking on confirm.
+    if (d.book && d.book_slot_at && d.book_calendar_id) {
+      try {
+        await sb(`agent_ready_replies`, { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify([{
+          client_id: client.id, ghl_contact_id: String(contactId), ghl_conversation_id: d.conversation_id || null,
+          contact_name: item.name || null, kind: "book",
+          book_calendar_id: d.book_calendar_id, book_slot_at: d.book_slot_at, book_group: d.book_group || null,
+          draft_message: (d.reply && String(d.reply).trim()) ? d.reply : "", reasoning: d.reasoning || null,
+          last_message: d.last_message || null,
+          confidence: d.confidence, last_lead_at: item.last_at || null, status: "pending", created_by: "detector",
+        }]) });
+        drafted++;
+      } catch (e) { skipped++; reasons.push(`${item.name || contactId}: book-insert failed — ${e.message}`); }
       continue;
     }
 
@@ -476,6 +559,32 @@ async function handler(req, res) {
       try { await sb(`pipeline_outcomes`, { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify([{ client_id: clientId, opportunity_id: oppId, status: "lost", reason }]) }); } catch (_) {}
       try { await sb(`agent_ready_replies?id=eq.${encodeURIComponent(b.ready_id)}&client_id=eq.${clientId}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ status: "sent", approved_by: staffEmail, approved_at: new Date().toISOString(), sent_at: new Date().toISOString(), updated_at: new Date().toISOString() }) }); } catch (_) {}
       return res.status(200).json({ ok: true, marked_lost: true, opportunity_id: oppId, reason });
+    }
+
+    // Human ✓ on a booking proposal → create the real GHL appointment. GHL's
+    // booked-trial automation sends the confirmation + logistics, so we do NOT
+    // double-text the lead. Staff may override the calendar / slot.
+    if (b.action === "confirm-book") {
+      if (!b.ready_id) return res.status(400).json({ error: "ready_id required" });
+      const [row] = await sb(`agent_ready_replies?id=eq.${encodeURIComponent(b.ready_id)}&client_id=eq.${clientId}&select=*`);
+      if (!row) return res.status(404).json({ error: "not found" });
+      const calendarId = (b.calendar_id || row.book_calendar_id || "").toString().trim();
+      const slotAt     = (b.slot_at || row.book_slot_at || "").toString().trim();
+      const contactId  = row.ghl_contact_id;
+      if (!calendarId || !slotAt) return res.status(400).json({ error: "missing calendar or slot for this booking" });
+      let startIso;
+      try { startIso = new Date(slotAt).toISOString(); } catch (_) { return res.status(400).json({ error: "invalid slot time" }); }
+      let appt;
+      try {
+        appt = await ghl("POST", `/calendars/events/appointments`, { token, body: {
+          calendarId, locationId, contactId, startTime: startIso,
+          appointmentStatus: "confirmed", ignoreDateRange: true, toNotify: true,
+          title: `Free Trial${row.contact_name ? " - " + row.contact_name : ""}`,
+        } });
+      } catch (e) { return res.status(e.status || 502).json({ error: `GHL book: ${e.message}` }); }
+      try { await sb(`agent_ready_replies?id=eq.${encodeURIComponent(b.ready_id)}&client_id=eq.${clientId}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ status: "sent", approved_by: staffEmail, approved_at: new Date().toISOString(), sent_at: new Date().toISOString(), updated_at: new Date().toISOString() }) }); } catch (_) {}
+      try { await logApproval({ client_id: clientId, ghl_contact_id: contactId, contact_name: row.contact_name || null, final_reply: `[booked ${row.book_group || "trial"} @ ${startIso}]`, status: "sent", created_by: staffEmail }); } catch (_) {}
+      return res.status(200).json({ ok: true, booked: true, appointment_id: appt?.id || appt?.appointment?.id || null, slot_at: startIso });
     }
 
     return res.status(400).json({ error: "unknown action" });

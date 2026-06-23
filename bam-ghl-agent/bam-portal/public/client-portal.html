@@ -21669,7 +21669,7 @@ function _apxEditModal(opts) {
 
 // Tap a Hawkeye card → see the whole conversation with the lead.
 function _apxOpenCardThread(id) {
-  const r = [..._APX_DATA.followups, ..._APX_DATA.ready, ...(_APX_DATA.lost || [])].find(x => x.id === id);
+  const r = [..._APX_DATA.followups, ..._APX_DATA.ready, ...(_APX_DATA.lost || []), ...(_APX_DATA.book || [])].find(x => x.id === id);
   if (r) _apxOpenThread(r.ghl_contact_id, r.contact_name || 'Conversation');
 }
 async function _apxOpenThread(contactId, name) {
@@ -21733,7 +21733,7 @@ async function _apxRefreshCount() {
   const fu = fuR.status === 'fulfilled' ? fuR.value : {};
   const rd = rdR.status === 'fulfilled' ? rdR.value : {};
   _APX_DATA = _apxSplit(fu, rd);
-  const n = _APX_DATA.followups.length + _APX_DATA.ready.length + _APX_DATA.lost.length;
+  const n = _APX_DATA.followups.length + _APX_DATA.ready.length + _APX_DATA.lost.length + (_APX_DATA.book || []).length;
   btns.forEach(({ btn, span }) => {
     btn.style.display = '';
     if (span) span.textContent = n ? `(${n})` : '';
@@ -21771,9 +21771,10 @@ function _apxSplit(fu, rd) {
     else upcoming.push(f);
   }
   const all = (rd.ready || []).filter(r => r.status === 'pending');
-  const ready = [...overdue, ...all.filter(r => r.kind !== 'mark_lost')];
+  const ready = [...overdue, ...all.filter(r => r.kind !== 'mark_lost' && r.kind !== 'book')];
   const lost = all.filter(r => r.kind === 'mark_lost');
-  return { followups: upcoming, ready, lost };
+  const book = all.filter(r => r.kind === 'book');
+  return { followups: upcoming, ready, lost, book };
 }
 
 async function _apxLoad() {
@@ -21787,7 +21788,7 @@ async function _apxLoad() {
     _APX_DATA = _apxSplit(fu, rd);
     _apxRender();
     const span = document.getElementById('apx-count');
-    const n = _APX_DATA.followups.length + _APX_DATA.ready.length + _APX_DATA.lost.length;
+    const n = _APX_DATA.followups.length + _APX_DATA.ready.length + _APX_DATA.lost.length + (_APX_DATA.book || []).length;
     if (span) span.textContent = n ? `(${n})` : '';
   } catch (e) {
     body.innerHTML = `<div style="color:#e07070;font-size:13px">Couldn't load - ${escapeHTML(_apxErr(e))}</div>`;
@@ -21903,14 +21904,65 @@ async function _apxLostConfirm(id) {
 }
 async function _apxLostDismiss(id) { try { await _apxPost('/api/agent-approvals', 'skip-ready', { ready_id: id }); _apxRemove(id); _apxToast('Dismissed', true); } catch (e) { _apxToast(_apxErr(e), false); } }
 
+// A blue "booking request" card. The lead confirmed a slot; confirming creates
+// the real GHL appointment (GHL's automation then sends the confirmation).
+function _apxBookSlotStr(ts) {
+  if (!ts) return 'time TBD';
+  try { return new Date(ts).toLocaleString('en-US', { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }); } catch (_) { return String(ts); }
+}
+function _apxBookCard(r) {
+  const when = _apxBookSlotStr(r.book_slot_at);
+  const msg = (r.draft_message || '').trim();
+  const last = r.last_message
+    ? `<div style="font-size:11.5px;color:var(--text-mute);margin-bottom:6px">💬 Last from lead${r.last_lead_at ? ` · ${escapeHTML(_apxAgo(r.last_lead_at))}` : ''}: "${escapeHTML(_apxTrim(r.last_message, 100))}"</div>`
+    : '';
+  return `<div id="apx-${r.id}" style="background:var(--blue-soft,rgba(90,143,184,0.08));border:1px solid var(--blue,#5A8FB8);border-radius:11px;padding:12px 14px;margin-bottom:9px">
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:5px;flex-wrap:wrap">
+      <span style="font-weight:700;font-size:13.5px">${escapeHTML(r.contact_name || 'Lead')}</span>
+      <span style="font-size:11px;font-weight:700;color:var(--blue,#5A8FB8);background:var(--blue-soft,rgba(90,143,184,0.14));border-radius:999px;padding:2px 9px">📅 ${escapeHTML(r.book_group || 'Trial')}</span>
+      <div style="flex:1"></div>
+      ${typeof r.confidence === 'number' ? `<span style="font-size:11px;color:var(--text-mute)">${Math.round(r.confidence * 100)}% sure</span>` : ''}
+    </div>
+    <div style="font-size:13.5px;color:var(--text);margin-bottom:6px">🕐 <b>${escapeHTML(when)}</b></div>
+    ${last}
+    ${msg ? `<div style="font-size:12.5px;line-height:1.45;background:rgba(255,255,255,.03);border-radius:8px;padding:8px 10px;white-space:pre-wrap"><span style="color:var(--text-mute);font-size:10.5px">books the appointment on confirm - GHL sends the confirmation:</span><br>${escapeHTML(msg)}</div>` : ''}
+    <div style="display:flex;align-items:center;gap:7px;margin-top:8px;flex-wrap:wrap">
+      <button onclick="_apxOpenCardThread('${r.id}')" style="background:transparent;border:1px solid var(--border);color:var(--text-mute);border-radius:7px;padding:5px 10px;font-size:12px;cursor:pointer">💬 chat</button>
+      <div style="flex:1"></div>
+      <button onclick="_apxBookSkip('${r.id}')" style="background:transparent;border:1px solid var(--border);color:#e07070;border-radius:7px;padding:5px 11px;font-size:12px;cursor:pointer">✕ skip</button>
+      <button onclick="_apxBookConfirm('${r.id}')" style="background:var(--blue,#5A8FB8);border:1px solid var(--blue,#5A8FB8);color:#fff;border-radius:7px;padding:5px 13px;font-size:12px;font-weight:700;cursor:pointer">📅 approve &amp; book</button>
+    </div>
+  </div>`;
+}
+async function _apxBookConfirm(id) {
+  const r = (_APX_DATA.book || []).find(x => x.id === id); if (!r) return;
+  const when = _apxBookSlotStr(r.book_slot_at);
+  _plConfirmModal({
+    icon: '📅',
+    title: 'Book ' + (r.contact_name || 'this lead') + '?',
+    body: 'This creates the real GHL appointment for <b>' + escapeHTML(r.book_group || 'the trial') + '</b> on <b>' + escapeHTML(when) + '</b>. GHL sends the confirmation automatically.',
+    okLabel: 'Book it',
+    onOk: async () => {
+      try { await _apxPost('/api/agent-approvals', 'confirm-book', { ready_id: r.id }); _apxRemove(id); _apxToast('📅 Booked!', true); }
+      catch (e) { _apxToast(_apxErr(e), false); }
+    },
+  });
+}
+async function _apxBookSkip(id) { try { await _apxPost('/api/agent-approvals', 'skip-ready', { ready_id: id }); _apxRemove(id); _apxToast('Skipped', true); } catch (e) { _apxToast(_apxErr(e), false); } }
+
 function _apxRender() {
   const body = document.getElementById('apx-body');
   if (!body) return;
-  const { followups, ready, lost } = _APX_DATA;
+  const { followups, ready, lost, book } = _APX_DATA;
   const sec = (title, items, kind) => `
     <div style="font-size:13px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:var(--text-mute);margin:4px 0 10px">${title} ${items.length ? `· ${items.length}` : ''}</div>
     ${items.length ? items.map(r => _apxCard(kind, r)).join('') : `<div style="color:var(--text-mute);font-size:13px;padding:2px 0 14px">Nothing waiting.</div>`}`;
-  let html =
+  let html = '';
+  if ((book || []).length) {
+    html += `<div style="font-size:13px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:var(--blue,#5A8FB8);margin:4px 0 10px">📅 Booking requests · ${book.length}</div>`
+      + book.map(_apxBookCard).join('') + `<div style="height:8px"></div>`;
+  }
+  html +=
     sec('⏰ Follow-ups', followups, 'followup') +
     `<div style="height:8px"></div>` +
     sec('💬 Ready messages', ready, 'ready');
@@ -21920,7 +21972,7 @@ function _apxRender() {
       + lost.map(_apxLostCard).join('');
   }
   body.innerHTML = html;
-  if (!followups.length && !ready.length && !(lost || []).length) {
+  if (!followups.length && !ready.length && !(lost || []).length && !(book || []).length) {
     body.innerHTML = `<div style="text-align:center;color:var(--text-mute);font-size:14px;padding:40px 10px">✅ All clear - nothing waiting for approval.</div>`;
   }
 }
@@ -21929,9 +21981,10 @@ function _apxRemove(id) {
   _APX_DATA.followups = _APX_DATA.followups.filter(x => x.id !== id);
   _APX_DATA.ready = _APX_DATA.ready.filter(x => x.id !== id);
   _APX_DATA.lost = (_APX_DATA.lost || []).filter(x => x.id !== id);
+  _APX_DATA.book = (_APX_DATA.book || []).filter(x => x.id !== id);
   _apxRender();
   const span = document.getElementById('apx-count');
-  const n = _APX_DATA.followups.length + _APX_DATA.ready.length + (_APX_DATA.lost || []).length;
+  const n = _APX_DATA.followups.length + _APX_DATA.ready.length + (_APX_DATA.lost || []).length + (_APX_DATA.book || []).length;
   if (span) span.textContent = n ? `(${n})` : '';
 }
 
