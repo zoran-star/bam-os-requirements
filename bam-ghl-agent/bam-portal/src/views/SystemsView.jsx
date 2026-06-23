@@ -1185,7 +1185,7 @@ export function TicketModal({ ticket: initial, me, isManager, pool, tokens: t, d
               non-final status, including in_review — supports asking client
               things even after work is submitted for manager review) */}
           {canClientComm && !["done","approved","cancelled"].includes(ticket.status) && !showRequest && (
-            <button disabled={busy} onClick={() => setShowRequest(true)} style={btn(t, "ghost")}>
+            <button disabled={busy} onClick={() => setShowRequest(true)} style={{...btn(t, "ghost"), border: `1px solid ${t.borderStr}`, color: t.accent}}>
               {ticket.status === "awaiting_client" ? "Add another request" : "Request client action"}
             </button>
           )}
