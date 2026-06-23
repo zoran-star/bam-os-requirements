@@ -1388,6 +1388,30 @@ async function handler(req, res) {
             headers: { apikey: SUPABASE_SERVICE_KEY, Authorization: `Bearer ${SUPABASE_SERVICE_KEY}`, "Content-Type": "application/json", Prefer: "return=minimal" },
             body: JSON.stringify({ onboarding_feedback_submitted_at: new Date().toISOString() }),
           });
+          // Mirror the answers into the client's notes so staff see them in the
+          // client Overview → Notes (non-fatal - never block the submission).
+          try {
+            const noteBody = [
+              "Onboarding Feedback Form",
+              `Name: ${ofRow.full_name}`,
+              "",
+              "Ratings (1-5):",
+              `- Onboarding clarity: ${ofRow.rating_clarity}`,
+              `- Comfort with systems: ${ofRow.rating_comfort}`,
+              `- Strategy-call clarity: ${ofRow.rating_strategy}`,
+              `- Communication during setup: ${ofRow.rating_communication}`,
+              `- Confidence it'll help grow: ${ofRow.rating_confidence}`,
+              "",
+              `Most helpful/valuable: ${ofRow.most_helpful}`,
+              `Confusing / could be clearer: ${ofRow.confusing}`,
+              `Most excited to use: ${ofRow.excited_about}`,
+              `Could improve for future clients: ${ofRow.improve}`,
+              `Main focus next few weeks: ${ofRow.main_focus}`,
+              `Wants extra guidance on: ${ofRow.additional_guidance}`,
+              `Testimonial: ${ofRow.testimonial}`,
+            ].join("\n");
+            await supabaseInsert("client_notes", { client_id: ofClientId, staff_id: null, body: noteBody });
+          } catch (_) { /* notes are a nice-to-have; the submission already saved */ }
           return res.status(200).json({ ok: true });
         } catch (e) { return res.status(500).json({ error: `submit failed: ${e.message}` }); }
       }
