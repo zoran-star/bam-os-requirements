@@ -69,6 +69,9 @@
        Existing variable names preserved so legacy rules don't break;
        NEW radius/shadow tokens added alongside. */
 
+    /* Allow height/size keyword (auto) transitions for <details> expand-collapse */
+    interpolate-size: allow-keywords;
+
     /* Surfaces - warm dark, layered */
     --bg:           #16140F;
     --ink:          #16140F;
@@ -8035,6 +8038,13 @@ Then the call to action."]</div>
         transition: transform 0.18s ease;
       }
       .guide-card[open] .guide-card-chev { transform: rotate(90deg); }
+      /* Smooth expand/collapse (progressive enhancement - snaps on older browsers) */
+      .guide-card::details-content {
+        block-size: 0;
+        overflow: hidden;
+        transition: block-size 0.25s ease, content-visibility 0.25s allow-discrete;
+      }
+      .guide-card[open]::details-content { block-size: auto; }
       .guide-card-body { padding: 0 16px 15px 58px; }
       .guide-card-body p { margin: 0 0 12px; font-size: 12.5px; color: var(--text-mute); line-height: 1.5; }
       .guide-card-actions { display: flex; gap: 10px; flex-wrap: wrap; }
