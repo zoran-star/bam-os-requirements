@@ -140,7 +140,7 @@ async function enrichTickets(tickets) {
 
   const [clients, staff] = await Promise.all([
     clientIds.length
-      ? sb(`clients?id=in.(${clientIds.join(",")})&select=id,business_name`)
+      ? sb(`clients?id=in.(${clientIds.join(",")})&select=id,business_name,owner_name,email`)
       : Promise.resolve([]),
     staffIds.length
       ? sb(`staff?id=in.(${staffIds.join(",")})&select=id,name,role`)

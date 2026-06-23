@@ -13532,9 +13532,9 @@ function _bbRenderGeneralCard(panel, meta) {
     </div>
 
     <div class="bb-field">
-      <div class="bb-field-label">Address</div>
-      <textarea id="bb-gen-address" class="bb-textarea" oninput="_bbGenChanged()">${v('address')}</textarea>
-      <div class="bb-field-hint">Mailing address for the business. Locations you operate from live under BB &gt; Locations.</div>
+      <div class="bb-field-label">Address <span class="bb-field-req">*</span></div>
+      <textarea id="bb-gen-address" class="bb-textarea" oninput="_bbGenChanged()" required>${v('address')}</textarea>
+      <div class="bb-field-hint">Mailing address for the business (required). Locations you operate from live under BB &gt; Locations.</div>
     </div>
 
     <div class="bb-field">
@@ -13919,7 +13919,7 @@ async function _bbStaffRefreshList() {
   // existing Team tab. Mirror its TEAM_ROWS / TEAM_MY_ROLE side-effects
   // so the invite/revoke modals (which read those globals) keep working.
   const { data, error } = await _sb.from('client_users')
-    .select('id, name, email, role, user_id, allowed_tabs, allowed_stages')
+    .select('id, name, email, phone, role, user_id, allowed_tabs, allowed_stages')
     .eq('client_id', CLIENT_ID)
     .eq('status', 'active')
     .eq('hide_from_team', false);
@@ -14008,13 +14008,18 @@ async function _bbStaffRefreshList() {
         </div>
       </details>`;
     const notInvited = !r.user_id;
-    const canInvite = iAmOwner && !isOwner && notInvited;
-    const inviteHtml = !canInvite ? '' : `
+    // Contact edit (email + phone) for any owner-managed teammate - editable at
+    // any point, invited or not. Not-yet-invited rows also get the Invite button.
+    const canEditContact = iAmOwner && !isOwner;
+    const inviteHtml = !canEditContact ? '' : `
       <div style="margin-top:6px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:10px 12px;background:var(--surface);border:1px solid var(--border-med);border-radius:10px">
         <input id="staff-email-${r.id}" type="email" value="${_bbEscapeAttr(r.email || '')}" placeholder="email@example.com"
-          onchange="_bbStaffEmailSave('${r.id}', this.value)"
-          style="flex:1;min-width:180px;background:var(--bg);color:var(--text);border:1px solid var(--border-med);border-radius:8px;padding:8px 11px;font-size:13px;outline:none">
-        <button onclick="_bbStaffInvite('${r.id}')" style="background:var(--gold,#E8C547);color:#0B0B0D;border:none;border-radius:8px;padding:8px 16px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">✉ Invite</button>
+          onchange="_bbStaffContactSave('${r.id}', 'email', this.value)"
+          style="flex:1;min-width:170px;background:var(--bg);color:var(--text);border:1px solid var(--border-med);border-radius:8px;padding:8px 11px;font-size:13px;outline:none">
+        <input id="staff-phone-${r.id}" type="tel" inputmode="tel" value="${_bbEscapeAttr(r.phone || '')}" placeholder="phone (optional)"
+          onchange="_bbStaffContactSave('${r.id}', 'phone', this.value)"
+          style="flex:1;min-width:140px;background:var(--bg);color:var(--text);border:1px solid var(--border-med);border-radius:8px;padding:8px 11px;font-size:13px;outline:none">
+        ${notInvited ? `<button onclick="_bbStaffInvite('${r.id}')" style="background:var(--gold,#E8C547);color:#0B0B0D;border:none;border-radius:8px;padding:8px 16px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">✉ Invite</button>` : ''}
         <span id="staff-invite-status-${r.id}" style="flex-basis:100%;font-size:11px;color:var(--text-mute)"></span>
       </div>`;
     return `<div style="margin-bottom:10px">
@@ -14083,7 +14088,10 @@ function _bbStaffMetaSet(memberId, key, value) {
 
 // ── Owner: placeholder teammate email + invite ──
 // Save the email on a not-yet-invited teammate (no login yet).
-async function _bbStaffEmailSave(memberId, email) {
+// Save a single teammate contact field (email or phone) at any point - even
+// after they've been invited. The server (update-teammate) syncs the login
+// email when they have an account.
+async function _bbStaffContactSave(memberId, field, value) {
   const statusEl = document.getElementById('staff-invite-status-' + memberId);
   if (statusEl) statusEl.textContent = 'Saving…';
   try {
@@ -14091,7 +14099,7 @@ async function _bbStaffEmailSave(memberId, email) {
     const res = await fetch('/api/clients?action=update-teammate', {
       method: 'POST',
       headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ client_id: CLIENT_ID, member_id: memberId, email: (email || '').trim() }),
+      body: JSON.stringify({ client_id: CLIENT_ID, member_id: memberId, [field]: (value || '').trim() }),
     });
     const j = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(j.error || ('HTTP ' + res.status));
@@ -14100,6 +14108,8 @@ async function _bbStaffEmailSave(memberId, email) {
     if (statusEl) statusEl.textContent = '⚠ ' + e.message;
   }
 }
+// Back-compat alias (older callers passed just email).
+function _bbStaffEmailSave(memberId, email) { return _bbStaffContactSave(memberId, 'email', email); }
 
 // Send the invite to a placeholder teammate using the email in their field.
 async function _bbStaffInvite(memberId) {
@@ -18148,6 +18158,7 @@ function setTeamMsg(id, text, kind) {
 function openInviteTeamModal() {
   document.getElementById('inviteTeamName').value = '';
   document.getElementById('inviteTeamEmail').value = '';
+  const ph = document.getElementById('inviteTeamPhone'); if (ph) ph.value = '';
   setTeamMsg('inviteTeamMsg', '');
   const btn = document.getElementById('inviteTeamSubmitBtn');
   btn.disabled = false; btn.textContent = 'Send invite';
@@ -18160,6 +18171,7 @@ function closeInviteTeamModal() {
 async function submitInviteTeam() {
   const name = document.getElementById('inviteTeamName').value.trim();
   const email = document.getElementById('inviteTeamEmail').value.trim();
+  const phone = (document.getElementById('inviteTeamPhone')?.value || '').trim();
   if (!name) return setTeamMsg('inviteTeamMsg', 'Enter their name.', 'err');
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return setTeamMsg('inviteTeamMsg', 'Enter a valid email.', 'err');
   const btn = document.getElementById('inviteTeamSubmitBtn');
@@ -18171,7 +18183,7 @@ async function submitInviteTeam() {
     const res = await fetch('/api/clients?action=invite-team-member', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + session.access_token },
-      body: JSON.stringify({ client_id: CLIENT_ID, name, email }),
+      body: JSON.stringify({ client_id: CLIENT_ID, name, email, phone }),
     });
     const j = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(j.error || ('HTTP ' + res.status));
@@ -18191,6 +18203,7 @@ async function submitInviteTeam() {
 async function submitAddTeammate() {
   const name = document.getElementById('inviteTeamName').value.trim();
   const email = document.getElementById('inviteTeamEmail').value.trim();
+  const phone = (document.getElementById('inviteTeamPhone')?.value || '').trim();
   if (!name) return setTeamMsg('inviteTeamMsg', 'Enter their name.', 'err');
   if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return setTeamMsg('inviteTeamMsg', 'Enter a valid email or leave it blank.', 'err');
   setTeamMsg('inviteTeamMsg', '');
@@ -18200,7 +18213,7 @@ async function submitAddTeammate() {
     const res = await fetch('/api/clients?action=add-teammate', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + session.access_token },
-      body: JSON.stringify({ client_id: CLIENT_ID, name, email }),
+      body: JSON.stringify({ client_id: CLIENT_ID, name, email, phone }),
     });
     const j = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(j.error || ('HTTP ' + res.status));
@@ -32135,6 +32148,9 @@ function toggleTheme() {
 
     <label class="modal-label" for="inviteTeamEmail" style="margin-top:14px">Email <span style="color:var(--text-mute);font-weight:400">(optional - needed only to invite)</span></label>
     <input type="email" id="inviteTeamEmail" class="modal-input" placeholder="jordan@academy.com" inputmode="email" autocomplete="off" />
+
+    <label class="modal-label" for="inviteTeamPhone" style="margin-top:14px">Phone <span style="color:var(--text-mute);font-weight:400">(optional)</span></label>
+    <input type="tel" id="inviteTeamPhone" class="modal-input" placeholder="(555) 123-4567" inputmode="tel" autocomplete="off" />
 
     <div class="team-msg" id="inviteTeamMsg"></div>
 
