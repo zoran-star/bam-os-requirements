@@ -1,0 +1,487 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex">
+<title>FullControl × CoachIQ - How BAM GTA Is Connected</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#0B0B0D; --ink-2:#121216; --ink-3:#17171c;
+    --card:#141419; --card-2:#1b1b22;
+    --border:#26262e; --border-med:#33333d;
+    --text:#ECECEF; --text-sub:#A0A0AB; --text-dim:#6E6E78;
+    --gold:#E8C547; --gold-dim:#8a7526;
+    --green:#3a7d44; --red:#9a3b2f; --blue:#3a5f9a;
+    --fc:#E8C547; --ciq:#5BA3C9;
+    --r:6px;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{
+    margin:0; background:var(--ink); color:var(--text);
+    font-family:Inter,system-ui,sans-serif; font-size:15px; line-height:1.65;
+    -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:1180px; margin:0 auto; padding:0 24px;}
+  .layout{display:grid; grid-template-columns:230px 1fr; gap:48px; align-items:start;}
+
+  /* ── Hero ── */
+  header.hero{
+    border-bottom:1px solid var(--border);
+    background:linear-gradient(180deg,#101015 0%,var(--ink) 100%);
+    padding:54px 0 40px;
+  }
+  .eyebrow{
+    font-family:'JetBrains Mono',monospace; font-size:12px; letter-spacing:.16em;
+    text-transform:uppercase; color:var(--gold); margin-bottom:16px;
+  }
+  h1{
+    font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:40px;
+    line-height:1.1; margin:0 0 14px; letter-spacing:-.02em;
+  }
+  h1 .x{color:var(--gold); font-weight:500; padding:0 6px;}
+  .sub{font-size:17px; color:var(--text-sub); max-width:720px;}
+  .meta-row{display:flex; flex-wrap:wrap; gap:10px; margin-top:24px;}
+  .pill{
+    font-family:'JetBrains Mono',monospace; font-size:11.5px; letter-spacing:.04em;
+    border:1px solid var(--border-med); border-radius:999px; padding:6px 13px;
+    color:var(--text-sub); background:var(--ink-2);
+  }
+  .pill b{color:var(--text); font-weight:500;}
+
+  /* ── Sidebar nav ── */
+  nav.toc{position:sticky; top:24px; padding-top:48px;}
+  nav.toc .toc-label{
+    font-family:'JetBrains Mono',monospace; font-size:11px; letter-spacing:.14em;
+    text-transform:uppercase; color:var(--text-dim); margin-bottom:14px;
+  }
+  nav.toc a{
+    display:block; color:var(--text-sub); text-decoration:none; font-size:13.5px;
+    padding:7px 0 7px 14px; border-left:2px solid var(--border); line-height:1.4;
+  }
+  nav.toc a:hover{color:var(--text); border-left-color:var(--border-med);}
+  nav.toc a.active{color:var(--gold); border-left-color:var(--gold);}
+  nav.toc .num{font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--text-dim); margin-right:7px;}
+
+  main{padding:48px 0 100px; min-width:0;}
+  section{margin-bottom:64px; scroll-margin-top:24px;}
+  h2{
+    font-family:'Space Grotesk',sans-serif; font-weight:600; font-size:26px;
+    margin:0 0 6px; letter-spacing:-.01em; display:flex; align-items:baseline; gap:12px;
+  }
+  h2 .h2num{
+    font-family:'JetBrains Mono',monospace; font-size:14px; color:var(--gold);
+    font-weight:500;
+  }
+  h3{font-family:'Space Grotesk',sans-serif; font-weight:600; font-size:18px; margin:30px 0 10px;}
+  .lead{color:var(--text-sub); font-size:15.5px; margin:0 0 22px; max-width:760px;}
+  p{margin:0 0 14px;}
+  strong{color:var(--text); font-weight:600;}
+  a.inline{color:var(--gold); text-decoration:none; border-bottom:1px solid var(--gold-dim);}
+
+  /* ── Cards / callouts ── */
+  .card{background:var(--card); border:1px solid var(--border); border-radius:var(--r); padding:22px 24px; margin:18px 0;}
+  .callout{
+    border-left:3px solid var(--gold); background:var(--ink-2);
+    border-radius:0 var(--r) var(--r) 0; padding:16px 20px; margin:18px 0;
+    font-size:14.5px;
+  }
+  .callout.warn{border-left-color:#c98a2e; }
+  .callout.sacred{border-left-color:var(--red);}
+  .callout .tag{
+    font-family:'JetBrains Mono',monospace; font-size:11px; letter-spacing:.1em;
+    text-transform:uppercase; color:var(--gold); display:block; margin-bottom:6px;
+  }
+  .callout.warn .tag{color:#d99b3e;}
+  .callout.sacred .tag{color:#c75b4c;}
+
+  /* ── Ownership split ── */
+  .split{display:grid; grid-template-columns:1fr 1fr; gap:16px; margin:22px 0;}
+  .owner{border:1px solid var(--border); border-radius:var(--r); padding:20px; background:var(--card);}
+  .owner.fc{border-top:3px solid var(--fc);}
+  .owner.ciq{border-top:3px solid var(--ciq);}
+  .owner .who{font-family:'Space Grotesk',sans-serif; font-weight:600; font-size:16px; margin-bottom:3px;}
+  .owner .role{font-size:12.5px; color:var(--text-dim); font-family:'JetBrains Mono',monospace; margin-bottom:14px;}
+  .owner ul{margin:0; padding-left:18px;}
+  .owner li{margin-bottom:7px; font-size:14px; color:var(--text-sub);}
+  .owner li b{color:var(--text);}
+
+  /* ── Flow diagram ── */
+  .flow{
+    border:1px solid var(--border); border-radius:var(--r); background:var(--ink-2);
+    padding:24px; margin:22px 0; overflow-x:auto;
+  }
+  .flow-title{font-family:'JetBrains Mono',monospace; font-size:11px; letter-spacing:.12em; text-transform:uppercase; color:var(--text-dim); margin-bottom:18px;}
+  .steps{display:flex; flex-direction:column; gap:0;}
+  .step{display:grid; grid-template-columns:34px 1fr; gap:16px; align-items:start;}
+  .step .dot{
+    width:34px; height:34px; border-radius:50%; background:var(--card-2);
+    border:1px solid var(--border-med); display:flex; align-items:center; justify-content:center;
+    font-family:'JetBrains Mono',monospace; font-size:13px; color:var(--gold); font-weight:500;
+  }
+  .step .body{padding-bottom:18px;}
+  .step .body .st-h{font-weight:600; color:var(--text); font-size:14.5px; margin-bottom:2px;}
+  .step .body .st-d{font-size:13.5px; color:var(--text-sub);}
+  .step .body .st-d .sys{font-family:'JetBrains Mono',monospace; font-size:11.5px; padding:1px 7px; border-radius:4px; margin-right:6px; vertical-align:middle;}
+  .sys.fc{background:rgba(232,197,71,.13); color:var(--gold); border:1px solid var(--gold-dim);}
+  .sys.ciq{background:rgba(91,163,201,.13); color:var(--ciq); border:1px solid #2f5566;}
+  .step:not(:last-child) .dot::after{
+    content:""; position:absolute; margin-top:34px; margin-left:0;
+    width:1px; height:calc(100% - 34px);
+  }
+  .conn{margin-left:16px; width:2px; background:var(--border); height:14px;}
+
+  /* ── Webhook directions ── */
+  .dirs{display:grid; grid-template-columns:1fr 1fr; gap:16px; margin:22px 0;}
+  .dir{border:1px solid var(--border); border-radius:var(--r); padding:20px; background:var(--card);}
+  .dir .arrow{font-family:'JetBrains Mono',monospace; font-size:13px; font-weight:500; margin-bottom:4px;}
+  .dir.out .arrow{color:var(--ciq);}
+  .dir.in .arrow{color:var(--gold);}
+  .dir .desc{font-size:13.5px; color:var(--text-sub); margin-bottom:14px;}
+  .dir .ev{font-size:13px; padding:8px 0; border-top:1px solid var(--border);}
+  .dir .ev b{color:var(--text); font-weight:600; display:block; font-size:13.5px;}
+  .dir .ev span{color:var(--text-dim);}
+
+  /* ── Tables ── */
+  table{width:100%; border-collapse:collapse; margin:18px 0; font-size:14px;}
+  th,td{text-align:left; padding:11px 14px; border-bottom:1px solid var(--border); vertical-align:top;}
+  th{font-family:'JetBrains Mono',monospace; font-size:11px; letter-spacing:.08em; text-transform:uppercase; color:var(--text-dim); font-weight:500;}
+  td b{color:var(--text);}
+  td.k{color:var(--text); font-weight:600; white-space:nowrap;}
+  tr:last-child td{border-bottom:none;}
+
+  /* ── Automations ── */
+  .auto{border:1px solid var(--border); border-radius:var(--r); margin:14px 0; background:var(--card); overflow:hidden;}
+  .auto .ah{display:flex; align-items:center; gap:12px; padding:16px 20px; border-bottom:1px solid var(--border); background:var(--ink-2);}
+  .auto .ah .n{width:26px; height:26px; border-radius:50%; background:var(--card-2); border:1px solid var(--border-med); display:flex; align-items:center; justify-content:center; font-family:'JetBrains Mono',monospace; font-size:12px; color:var(--gold); flex-shrink:0;}
+  .auto .ah .name{font-family:'Space Grotesk',sans-serif; font-weight:600; font-size:15.5px;}
+  .auto .ah .badge{margin-left:auto; font-family:'JetBrains Mono',monospace; font-size:10.5px; letter-spacing:.05em; text-transform:uppercase; padding:4px 9px; border-radius:999px; border:1px solid var(--border-med); color:var(--text-sub);}
+  .auto .ab{padding:16px 20px;}
+  .auto .ab .line{display:grid; grid-template-columns:74px 1fr; gap:12px; padding:5px 0; font-size:13.5px;}
+  .auto .ab .line .lab{font-family:'JetBrains Mono',monospace; font-size:11px; text-transform:uppercase; color:var(--text-dim); padding-top:2px;}
+  .auto .ab .line .val{color:var(--text-sub);} .auto .ab .line .val b{color:var(--text);}
+  .trig{color:var(--ciq);} .act{color:var(--gold);}
+
+  /* ── Checklist ── */
+  ul.check{list-style:none; padding:0; margin:18px 0;}
+  ul.check li{position:relative; padding:9px 0 9px 30px; border-bottom:1px solid var(--border); font-size:14.5px; color:var(--text-sub);}
+  ul.check li:last-child{border-bottom:none;}
+  ul.check li::before{content:"›"; position:absolute; left:8px; color:var(--gold); font-weight:700;}
+  ul.check li b{color:var(--text);}
+
+  .divider{height:1px; background:var(--border); margin:8px 0 0;}
+  footer{border-top:1px solid var(--border); padding:30px 0 60px; color:var(--text-dim); font-size:13px; font-family:'JetBrains Mono',monospace;}
+
+  @media (max-width:860px){
+    .layout{grid-template-columns:1fr; gap:0;}
+    nav.toc{display:none;}
+    .split,.dirs{grid-template-columns:1fr;}
+    h1{font-size:30px;}
+    main{padding:32px 0 60px;}
+  }
+</style>
+</head>
+<body>
+
+<header class="hero">
+  <div class="wrap">
+    <div class="eyebrow">Integration Guide · BAM GTA</div>
+    <h1>FullControl <span class="x">×</span> CoachIQ</h1>
+    <p class="sub">How the FullControl portal and CoachIQ are wired together for BAM GTA - who owns what, how the webhooks talk both directions, the automations CoachIQ needs, how member import listens for matches, and how to run it day&nbsp;to&nbsp;day.</p>
+    <div class="meta-row">
+      <span class="pill"><b>Model:</b> Portal owns billing · CoachIQ owns credits</span>
+      <span class="pill"><b>Link:</b> the Stripe sub&nbsp;ID</span>
+      <span class="pill"><b>Zapier:</b> not used</span>
+      <span class="pill">Conceptual overview - no keys or endpoints</span>
+    </div>
+  </div>
+</header>
+
+<div class="wrap">
+<div class="layout">
+
+  <nav class="toc">
+    <div class="toc-label">On this page</div>
+    <a href="#big-picture"><span class="num">01</span>The big picture</a>
+    <a href="#ownership"><span class="num">02</span>Who owns what</a>
+    <a href="#webhooks"><span class="num">03</span>Webhooks, both ways</a>
+    <a href="#automations"><span class="num">04</span>Automations in CoachIQ</a>
+    <a href="#import"><span class="num">05</span>Member import listening</a>
+    <a href="#subid"><span class="num">06</span>The sub&nbsp;ID link</a>
+    <a href="#newmember"><span class="num">07</span>New member, end to end</a>
+    <a href="#guide"><span class="num">08</span>Running it: the guide</a>
+  </nav>
+
+  <main>
+
+  <!-- 01 -->
+  <section id="big-picture">
+    <h2><span class="h2num">01</span>The big picture</h2>
+    <p class="lead">Most BAM GTA athletes already live in <strong>CoachIQ</strong> (the credits + scheduling engine). The goal was to put <strong>FullControl</strong> on top - running billing, CRM and marketing - <em>without</em> ripping out the tool the academy already runs every day.</p>
+
+    <div class="card">
+      <p style="margin:0;">The whole connection comes down to one idea:</p>
+      <p style="margin:14px 0 0; font-size:17px; color:var(--text);"><strong>FullControl owns the Stripe subscription. CoachIQ keeps owning credits &amp; scheduling. The two are linked by the Stripe <span style="color:var(--gold)">subscription&nbsp;ID</span>.</strong></p>
+    </div>
+
+    <p>Because FullControl creates and owns the subscription, the portal's billing buttons - <strong>pause, cancel, change plan, refund</strong> - actually work. CoachIQ, meanwhile, watches that same subscription ID so it knows when to refresh an athlete's credits. Neither system has to be the other's database; they just share one reference.</p>
+
+    <div class="callout">
+      <span class="tag">Why this matters</span>
+      BAM builds <strong>no custom credit bridge per academy</strong>. CoachIQ already knows how to watch an external subscription ID and grant credits off it. That means this same pattern can be sold to <em>any</em> academy already on CoachIQ - keep CoachIQ, add FullControl.
+    </div>
+  </section>
+
+  <!-- 02 -->
+  <section id="ownership">
+    <h2><span class="h2num">02</span>Who owns what</h2>
+    <p class="lead">The cleanest way to hold the model in your head: draw a hard line down the middle. Money on one side, the athlete experience on the other.</p>
+
+    <div class="split">
+      <div class="owner fc">
+        <div class="who">FullControl portal</div>
+        <div class="role">owns the money</div>
+        <ul>
+          <li><b>Creates &amp; owns the Stripe subscription</b></li>
+          <li><b>Billing actions:</b> pause · cancel · change plan · refund</li>
+          <li>The CRM, marketing, ad spend, support tickets</li>
+          <li>Surfaces the <b>subscription ID</b> for CoachIQ to track</li>
+          <li>Tells CoachIQ when to grant a product / credits</li>
+        </ul>
+      </div>
+      <div class="owner ciq">
+        <div class="who">CoachIQ</div>
+        <div class="role">owns the experience</div>
+        <ul>
+          <li><b>Credits</b> - granting &amp; redeeming on booking</li>
+          <li><b>Scheduling</b> - classes, calendars, check-ins</li>
+          <li>The <b>athlete app</b> the parent actually uses (white-labeled)</li>
+          <li><b>Product / program access</b> per athlete</li>
+          <li>Watches the subscription ID to refresh credits on renewal</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="callout sacred">
+      <span class="tag">Sacred rule</span>
+      Payment <strong>only</strong> happens on the FullControl side. Never put a payment / Products connection on a CoachIQ form - if CoachIQ takes the payment, CoachIQ owns the subscription and the billing buttons stop working.
+    </div>
+  </section>
+
+  <!-- 03 -->
+  <section id="webhooks">
+    <h2><span class="h2num">03</span>Webhooks, both ways</h2>
+    <p class="lead">The two systems talk over webhooks in <strong>both directions</strong>. CoachIQ tells FullControl when something happens to a user; FullControl tells CoachIQ when to grant a product or credits. Nothing is polled on a timer - each side just pokes the other when there's news.</p>
+
+    <div class="dirs">
+      <div class="dir out">
+        <div class="arrow">CoachIQ ──▶ FullControl</div>
+        <div class="desc">CoachIQ automations with a <em>"Send to External Webhook"</em> action. CoachIQ is the trigger; FullControl listens.</div>
+        <div class="ev"><b>New user signed up</b><span>Parent made their CoachIQ account → FullControl matches them to a paying member and grants the product.</span></div>
+        <div class="ev"><b>Tag added to a user</b><span>Used during member import: tag a member in CoachIQ → FullControl captures their CoachIQ user ID and links it.</span></div>
+      </div>
+      <div class="dir in">
+        <div class="arrow">FullControl ──▶ CoachIQ</div>
+        <div class="desc">FullControl fires a CoachIQ automation by its <em>"Incoming Webhook"</em> trigger. FullControl is the trigger; CoachIQ acts.</div>
+        <div class="ev"><b>Grant the product</b><span>A member paid in the portal → tell CoachIQ to add the product + access + starting credits (no payment taken).</span></div>
+        <div class="ev"><b>Identify the athlete</b><span>Every message names the exact CoachIQ user to act on, so the right athlete gets the credits.</span></div>
+      </div>
+    </div>
+
+    <div class="callout warn">
+      <span class="tag">The one gotcha</span>
+      CoachIQ can only act on a <strong>specific CoachIQ user ID</strong> - not an email, not a profile link. That's why FullControl has to <em>store each member's CoachIQ user ID</em> first. Capturing that ID is exactly what the inbound "new user" and "tag added" webhooks are for (see <a class="inline" href="#import">Member import</a>).
+    </div>
+  </section>
+
+  <!-- 04 -->
+  <section id="automations">
+    <h2><span class="h2num">04</span>Automations to create in CoachIQ</h2>
+    <p class="lead">Three CoachIQ automations make the connection work. The academy (or BAM systems) builds these once inside CoachIQ. Two of them <em>talk out</em> to FullControl; one <em>listens in</em> from FullControl.</p>
+
+    <div class="auto">
+      <div class="ah"><span class="n">A</span><span class="name">New User → Send to External Webhook</span><span class="badge">outbound</span></div>
+      <div class="ab">
+        <div class="line"><span class="lab">Trigger</span><span class="val"><b class="trig">New User</b> - a parent creates their account on the academy's group login page</span></div>
+        <div class="line"><span class="lab">Action</span><span class="val"><b class="act">Send to External Webhook</b> → tells FullControl the new user's ID + email</span></div>
+        <div class="line"><span class="lab">Result</span><span class="val">FullControl matches that email to a paying member, then fires automation&nbsp;C to grant their product</span></div>
+      </div>
+    </div>
+
+    <div class="auto">
+      <div class="ah"><span class="n">B</span><span class="name">User Tag Added → Send to External Webhook</span><span class="badge">outbound</span></div>
+      <div class="ab">
+        <div class="line"><span class="lab">Trigger</span><span class="val"><b class="trig">Tag added to a user</b> - a staff member tags an existing athlete in CoachIQ</span></div>
+        <div class="line"><span class="lab">Action</span><span class="val"><b class="act">Send to External Webhook</b> → tells FullControl that user's ID + email</span></div>
+        <div class="line"><span class="lab">Result</span><span class="val">FullControl links that CoachIQ user ID onto the matching member row (the import "listening" step)</span></div>
+      </div>
+    </div>
+
+    <div class="auto">
+      <div class="ah"><span class="n">C</span><span class="name">Add a Product Purchase</span><span class="badge">inbound · one per plan</span></div>
+      <div class="ab">
+        <div class="line"><span class="lab">Trigger</span><span class="val"><b class="trig">Incoming Webhook</b> - fired by FullControl when a member pays</span></div>
+        <div class="line"><span class="lab">Action</span><span class="val"><b class="act">Add a Product Purchase</b> → grants the product, program access, and the cycle's starter credits - <b>without</b> taking payment (they already paid in the portal)</span></div>
+        <div class="line"><span class="lab">Stores</span><span class="val">the FullControl <b>subscription ID</b> on the product, so CoachIQ can track renewals and refresh credits</span></div>
+      </div>
+    </div>
+
+    <div class="callout">
+      <span class="tag">One per plan</span>
+      Automation&nbsp;C is built <strong>once per product / plan</strong> (e.g. 1×/wk, 2×/wk, 3×/wk, Unlimited). FullControl picks the right one based on what the member actually bought, so each plan grants its own product and credit amount.
+    </div>
+  </section>
+
+  <!-- 05 -->
+  <section id="import">
+    <h2><span class="h2num">05</span>Member import listening</h2>
+    <p class="lead">Onboarding an existing roster means matching each athlete in the portal to their existing CoachIQ user. The import wizard does this with a live <strong>"listening session"</strong> - it watches matches arrive in real time instead of making you copy IDs by hand.</p>
+
+    <h3>The 5-step import wizard</h3>
+    <div class="flow">
+      <div class="flow-title">Members tab → Import</div>
+      <div class="steps">
+        <div class="step"><div class="dot">1</div><div class="body"><div class="st-h">Import</div><div class="st-d">Upload the roster (CSV) into a staging area - nothing is live yet.</div></div></div>
+        <div class="step"><div class="dot">2</div><div class="body"><div class="st-h">Stripe</div><div class="st-d">Match each member to their Stripe customer / subscription.</div></div></div>
+        <div class="step"><div class="dot">3</div><div class="body"><div class="st-h">CoachIQ <span style="color:var(--ciq)">· the listening step</span></div><div class="st-d">Match each member to their CoachIQ user (detail below).</div></div></div>
+        <div class="step"><div class="dot">4</div><div class="body"><div class="st-h">GHL</div><div class="st-d">Match each member to their GoHighLevel contact.</div></div></div>
+        <div class="step"><div class="dot">5</div><div class="body"><div class="st-h">Finish → Promote</div><div class="st-d">Promote staging rows into live members, carrying every linked ID across.</div></div></div>
+      </div>
+    </div>
+
+    <h3>How the CoachIQ step listens</h3>
+    <p>The portal needs each member's CoachIQ <strong>user ID</strong>. There's no CoachIQ page that simply shows it, so the wizard gathers it three ways and ticks members off the list live as their ID lands:</p>
+
+    <table>
+      <thead><tr><th>How a match arrives</th><th>What happens</th></tr></thead>
+      <tbody>
+        <tr><td class="k">Auto, from Stripe</td><td>For subscriptions CoachIQ originally created, CoachIQ stamped the user ID into the subscription's metadata. The wizard reads it off automatically - no action needed.</td></tr>
+        <tr><td class="k">Live, by tagging</td><td>For the rest, a staff member <b>adds a tag</b> to the athlete in CoachIQ. Automation&nbsp;B fires, FullControl captures that user's ID, and the member ticks off on screen <b>within seconds</b>.</td></tr>
+        <tr><td class="k">Manual fallback</td><td>Paste a user ID by hand, or mark a member <b>"not on CoachIQ"</b> so they're skipped cleanly.</td></tr>
+      </tbody>
+    </table>
+
+    <div class="callout">
+      <span class="tag">Never blocks</span>
+      A member with no CoachIQ match doesn't stop the import - you can still promote them. The listening screen just keeps watching, and any tag that doesn't match a known member is flagged so you can see it.
+    </div>
+  </section>
+
+  <!-- 06 -->
+  <section id="subid">
+    <h2><span class="h2num">06</span>The sub ID link</h2>
+    <p class="lead">The subscription ID is the single thread tying the two systems together. Understanding it explains the whole model.</p>
+
+    <div class="flow">
+      <div class="flow-title">How the sub ID flows</div>
+      <div class="steps">
+        <div class="step"><div class="dot">1</div><div class="body"><div class="st-h"><span class="sys fc">FullControl</span> creates the subscription</div><div class="st-d">When a member pays, the portal creates a Stripe subscription it <b>owns</b> → it gets a subscription ID.</div></div></div>
+        <div class="step"><div class="dot">2</div><div class="body"><div class="st-h"><span class="sys fc">FullControl</span> hands the ID to CoachIQ</div><div class="st-d">The "grant product" webhook carries the subscription ID, and CoachIQ stores it on the athlete's product.</div></div></div>
+        <div class="step"><div class="dot">3</div><div class="body"><div class="st-h"><span class="sys ciq">CoachIQ</span> watches that subscription</div><div class="st-d">CoachIQ tracks the subscription's renewal date and refreshes the athlete's credits each cycle, off that ID.</div></div></div>
+      </div>
+    </div>
+
+    <p>Because credits are pinned to the <strong>subscription ID</strong> and not to who created the payment, FullControl can own the money while CoachIQ keeps doing what it's good at. Pause the subscription in the portal and renewals stop; the credit cycle naturally stops with it.</p>
+
+    <div class="callout warn">
+      <span class="tag">Plan changes need a re-link</span>
+      If a member <em>changes plan</em>, they may end up on a new product (and sometimes a new subscription ID). CoachIQ has to be pointed at the new product / ID - see the day-to-day guide below. This re-link is the academy's normal CoachIQ workflow, not a BAM engineering task.
+    </div>
+  </section>
+
+  <!-- 07 -->
+  <section id="newmember">
+    <h2><span class="h2num">07</span>New member, end to end</h2>
+    <p class="lead">Putting it all together - here's everything that happens when a brand-new athlete signs up. Note there's <strong>no Zapier</strong>: the parent makes their own CoachIQ account, and CoachIQ tells FullControl about it.</p>
+
+    <div class="flow">
+      <div class="flow-title">New athlete signup</div>
+      <div class="steps">
+        <div class="step"><div class="dot">1</div><div class="body"><div class="st-h">Parent pays</div><div class="st-d"><span class="sys fc">FullControl</span> On the FullControl-branded payment page → the portal creates the portal-owned Stripe subscription.</div></div></div>
+        <div class="step"><div class="dot">2</div><div class="body"><div class="st-h">"You're in" page</div><div class="st-d"><span class="sys fc">FullControl</span> The confirmation screen tells the parent to make their athlete-app account using the <b>same email</b>.</div></div></div>
+        <div class="step"><div class="dot">3</div><div class="body"><div class="st-h">Parent creates their account</div><div class="st-d"><span class="sys ciq">CoachIQ</span> On the academy's group login page → a real, enrolled CoachIQ user (white-labeled, never sees "CoachIQ").</div></div></div>
+        <div class="step"><div class="dot">4</div><div class="body"><div class="st-h">CoachIQ tells FullControl</div><div class="st-d"><span class="sys ciq">CoachIQ</span> Automation&nbsp;A fires → sends the new user's ID + email to FullControl.</div></div></div>
+        <div class="step"><div class="dot">5</div><div class="body"><div class="st-h">FullControl grants the product</div><div class="st-d"><span class="sys fc">FullControl</span> Matches the email to the paying member → fires automation&nbsp;C → CoachIQ adds product + access + credits + stores the sub ID.</div></div></div>
+        <div class="step"><div class="dot">6</div><div class="body"><div class="st-h">Athlete books</div><div class="st-d"><span class="sys ciq">CoachIQ</span> Parent opens the app and books classes with the credits that just landed.</div></div></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 08 -->
+  <section id="guide">
+    <h2><span class="h2num">08</span>Running it: the guide</h2>
+    <p class="lead">Day-to-day, almost everything starts in the FullControl portal. The rule of thumb: <strong>change the money in FullControl, then make CoachIQ match.</strong> Here's what each common action means across both systems.</p>
+
+    <h3>Where to do each action</h3>
+    <table>
+      <thead><tr><th>You want to…</th><th>Do it in</th><th>What CoachIQ needs after</th></tr></thead>
+      <tbody>
+        <tr><td class="k">Sign up a new member</td><td>FullControl (payment) → parent makes CoachIQ account</td><td>Nothing manual - automations A + C handle the grant</td></tr>
+        <tr><td class="k">Change a plan</td><td>FullControl (change plan)</td><td><b>Re-link:</b> remove the old product, add the new one, paste the updated sub ID, set credits</td></tr>
+        <tr><td class="k">Pause a membership</td><td>FullControl (pause)</td><td>Nothing - renewals stop, so the credit cycle stops</td></tr>
+        <tr><td class="k">Cancel a membership</td><td>FullControl (cancel)</td><td>Remove / revoke the product if the academy wants access to end immediately</td></tr>
+        <tr><td class="k">Refund</td><td>FullControl (refund)</td><td>Nothing billing-side; adjust credits only if the academy chooses to</td></tr>
+      </tbody>
+    </table>
+
+    <h3>What "action items" are</h3>
+    <p>Most of the time the two systems sync themselves through the webhooks. An <strong>action item</strong> is the short list of things a human still has to do by hand - and they almost always live on the <em>CoachIQ side</em>, after a change in FullControl:</p>
+    <ul class="check">
+      <li><b>Re-link after a plan change</b> - point CoachIQ at the member's new product + sub ID. This is the big one.</li>
+      <li><b>Confirm a tricky import match</b> - a member whose CoachIQ ID didn't auto-arrive (tag them, or mark "not on CoachIQ").</li>
+      <li><b>Revoke access on cancel</b> - only if the academy wants the athlete locked out the moment they cancel, rather than at period end.</li>
+      <li><b>Re-collect a card</b> - for the rare member migrated without a reusable card on file.</li>
+    </ul>
+
+    <h3>How to change a membership (the careful version)</h3>
+    <div class="flow">
+      <div class="flow-title">Plan change, step by step</div>
+      <div class="steps">
+        <div class="step"><div class="dot">1</div><div class="body"><div class="st-h">Change the plan in FullControl</div><div class="st-d"><span class="sys fc">FullControl</span> Use the portal's change-plan button. The subscription updates; you may get a new product / sub ID.</div></div></div>
+        <div class="step"><div class="dot">2</div><div class="body"><div class="st-h">Open the member in CoachIQ</div><div class="st-d"><span class="sys ciq">CoachIQ</span> Find the same athlete (matched by their CoachIQ user / email).</div></div></div>
+        <div class="step"><div class="dot">3</div><div class="body"><div class="st-h">Swap the product</div><div class="st-d"><span class="sys ciq">CoachIQ</span> Remove the old product, add the new plan's product.</div></div></div>
+        <div class="step"><div class="dot">4</div><div class="body"><div class="st-h">Paste the sub ID + set credits</div><div class="st-d"><span class="sys ciq">CoachIQ</span> Paste the FullControl subscription ID onto the new product and set the right credit amount so renewals track correctly.</div></div></div>
+      </div>
+    </div>
+
+    <div class="callout sacred">
+      <span class="tag">Two things to never do</span>
+      <strong>1.</strong> Never take payment on a CoachIQ form - billing ownership is lost.<br>
+      <strong>2.</strong> Never change a member's money in CoachIQ. Money changes happen in FullControl; CoachIQ only mirrors the result.
+    </div>
+  </section>
+
+  </main>
+</div>
+</div>
+
+<footer>
+  <div class="wrap">
+    FullControl × CoachIQ integration · BAM GTA · internal reference · conceptual overview (no keys, endpoints, or IDs)
+  </div>
+</footer>
+
+<script>
+  // Sidebar active-section highlight
+  (function(){
+    var links = Array.prototype.slice.call(document.querySelectorAll('nav.toc a'));
+    var map = {};
+    links.forEach(function(a){ map[a.getAttribute('href').slice(1)] = a; });
+    var obs = new IntersectionObserver(function(entries){
+      entries.forEach(function(e){
+        if(e.isIntersecting){
+          links.forEach(function(a){ a.classList.remove('active'); });
+          var a = map[e.target.id];
+          if(a) a.classList.add('active');
+        }
+      });
+    }, { rootMargin:'-10% 0px -75% 0px', threshold:0 });
+    document.querySelectorAll('main section').forEach(function(s){ obs.observe(s); });
+  })();
+</script>
+</body>
+</html>
