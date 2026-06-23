@@ -1,5 +1,5 @@
 import { withSentryApiRoute } from "../_sentry.js";
-import { pickGhlToken, sendSms } from "./_core.js";
+import { pickGhlToken, sendSms, ghl } from "./_core.js";
 import { notifyOwners } from "../_notify-owners.js";
 import { respondedStage, contactInRespondedStage } from "../agent/_stage.js";
 import { agentMode, modeIsOn } from "../agent/_mode.js";
@@ -129,6 +129,43 @@ async function handler(req, res) {
   if (!client) return res.status(200).json({ skipped: "no academy for location", locationId });
   if (!client.v15_access && !client.v2_access) {
     return res.status(200).json({ skipped: "V1 academy — spine disabled", client_id: client.id });
+  }
+
+  // ── Appointment events ──
+  // The FC app posts AppointmentCreate to this same webhook URL. Fire the
+  // "calendar_booking" owner text with the contact + booking details, then stop
+  // (appointments don't go through the message spine). Best-effort.
+  const _evtType = nested(["type", "event", "eventType"], "customData", "message") || p.type || "";
+  const _appt = p.appointment || (p.customData && p.customData.appointment) || null;
+  if (/appointment/i.test(String(_evtType)) || _appt) {
+    try {
+      const a = _appt || {};
+      const apptContactId = a.contactId || a.contact_id || contactId || null;
+      let cName = "", cPhone = "", cEmail = "";
+      if (apptContactId) {
+        try {
+          const creds = await pickGhlToken(client);
+          if (creds) {
+            const cr = await ghl("GET", `/contacts/${apptContactId}`, { token: creds.token });
+            const c2 = (cr && (cr.contact || cr)) || {};
+            cName = c2.name || [c2.firstName, c2.lastName].filter(Boolean).join(" ") || "";
+            cPhone = c2.phone || "";
+            cEmail = c2.email || "";
+          }
+        } catch (_) { /* best-effort - details are a bonus */ }
+      }
+      const startRaw = a.startTime || a.start_time || a.selectedSlot || a.appointmentStartTime || null;
+      let when = "";
+      if (startRaw) { const d = new Date(startRaw); if (!isNaN(d.getTime())) when = d.toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short" }); }
+      const what = a.title || a.calendarName || a.calendar || "appointment";
+      const lines = [
+        `📅 New booking — ${what}`,
+        cName ? `Who: ${cName}${cPhone ? " · " + cPhone : ""}${cEmail ? " · " + cEmail : ""}` : "",
+        when ? `When: ${when}` : "",
+      ].filter(Boolean);
+      notifyOwners(client.id, "calendar_booking", lines.join("\n")).catch(() => {});
+    } catch (e) { console.error("ghl inbound-webhook appointment error:", e.message); }
+    return res.status(200).json({ ok: true, type: "appointment", client_id: client.id });
   }
 
   // Record the reply event (idempotent on client_id + GHL message id).
