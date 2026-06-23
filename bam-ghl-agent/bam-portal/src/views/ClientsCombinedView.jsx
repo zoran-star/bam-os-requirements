@@ -675,6 +675,7 @@ function OverviewTab({ client, staffMap, tokens, role, session, onChanged }) {
   const [revenue, setRevenue] = useState(null);
   const [revenueLoading, setRevenueLoading] = useState(false);
   const [savingOnb, setSavingOnb] = useState(false);
+  const [savingFb, setSavingFb] = useState(false);
   const canViewFinancials = ROLES.canViewFinancials(role);
 
   // Portal tier — V1 / V1.5 / V2, mutually exclusive. Backed by two booleans:
@@ -682,6 +683,25 @@ function OverviewTab({ client, staffMap, tokens, role, session, onChanged }) {
   // than V2 (requirements still being built out). The selector posts BOTH flags
   // so the tiers can never overlap.
   const tier = client.v2_access ? "v2" : client.v15_access ? "v15" : "v1";
+
+  // Onboarding feedback form — staff request it here; the client portal hard-
+  // blocks until the client submits, then submitted_at stamps and unblocks.
+  const fbRequested = !!client.onboarding_feedback_requested_at;
+  const fbSubmitted = !!client.onboarding_feedback_submitted_at;
+  async function setOnbFeedback(requested) {
+    setSavingFb(true);
+    const tok = session?.access_token;
+    try {
+      const res = await fetch(`/api/clients?action=update-fields&id=${client.id}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${tok}` },
+        body: JSON.stringify({ client_id: client.id, onboarding_feedback_requested: requested }),
+      });
+      if (!res.ok) { const j = await res.json().catch(() => ({})); alert("Couldn't save: " + (j.error || res.statusText)); }
+      else if (onChanged) onChanged();
+    } catch (e) { alert("Couldn't save: " + e.message); }
+    finally { setSavingFb(false); }
+  }
 
   async function setTier(next) {
     if (next === tier) return;
@@ -767,6 +787,37 @@ function OverviewTab({ client, staffMap, tokens, role, session, onChanged }) {
         <Field k="Scaling Manager" v={staffMap[client.scaling_manager_id]?.name} tokens={t} />
         <Field k="Status" v={client.status} tokens={t} cap />
         <Field k="Created" v={client.created_at ? new Date(client.created_at).toLocaleDateString() : null} tokens={t} />
+
+        <div style={{
+          marginTop: 14, padding: "12px 14px",
+          background: fbRequested && !fbSubmitted ? `${t.accent}10` : t.surfaceEl,
+          border: `1px solid ${fbRequested && !fbSubmitted ? t.accentBorder : t.border}`,
+          borderRadius: 8,
+        }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, fontWeight: 600, color: t.text, marginBottom: 8 }}>
+            Onboarding feedback form
+            {savingFb && <span style={{ color: t.textMute, fontSize: 11, fontFamily: "monospace", fontWeight: 400 }}>saving…</span>}
+          </div>
+          <div style={{ fontSize: 12, color: t.textMute, marginBottom: 10 }}>
+            {fbSubmitted ? `✓ Submitted ${new Date(client.onboarding_feedback_submitted_at).toLocaleDateString()}`
+              : fbRequested ? "● Requested — the client portal is blocked until they submit it."
+              : "Not requested."}
+          </div>
+          <div style={{ display: "flex", gap: 8 }}>
+            {(!fbRequested || fbSubmitted) && (
+              <button onClick={() => setOnbFeedback(true)} disabled={savingFb}
+                style={{ background: t.accent, color: "#0B0B0D", border: "none", borderRadius: 8, padding: "8px 14px", fontSize: 13, fontWeight: 700, cursor: "pointer" }}>
+                {fbSubmitted ? "Request again" : "Request feedback"}
+              </button>
+            )}
+            {fbRequested && !fbSubmitted && (
+              <button onClick={() => setOnbFeedback(false)} disabled={savingFb}
+                style={{ background: "none", color: t.textMute, border: `1px solid ${t.border}`, borderRadius: 8, padding: "8px 14px", fontSize: 13, cursor: "pointer" }}>
+                Cancel request
+              </button>
+            )}
+          </div>
+        </div>
 
         <div style={{
           marginTop: 14, padding: "12px 14px",
