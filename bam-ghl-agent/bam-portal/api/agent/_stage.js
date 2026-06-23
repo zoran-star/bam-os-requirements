@@ -4,6 +4,12 @@
 // rule is defined in exactly one place.
 import { ghl } from "../ghl/_core.js";
 
+// The agent only works OPEN opportunities. A won/lost/abandoned deal that's still
+// parked in the Responded STAGE must be ignored — gate on status, not just stage.
+// Missing status defaults to open (don't drop a valid lead on a sparse payload).
+const isOpenOpp = (o) => String((o && o.status) || "open").toLowerCase() === "open";
+const openOppContactIds = (opps) => new Set((opps || []).filter(isOpenOpp).map(o => o.contactId || o.contact?.id).filter(Boolean));
+
 export async function respondedStage(token, locationId) {
   const data = await ghl("GET", `/opportunities/pipelines?locationId=${encodeURIComponent(locationId)}`, { token });
   const pipelines = data.pipelines || data.data || [];
@@ -18,7 +24,7 @@ export async function contactInRespondedStage(token, locationId, contactId, rs) 
     const params = new URLSearchParams({ location_id: locationId, contact_id: contactId, pipeline_id: rs.pipelineId, limit: "20" });
     const d = await ghl("GET", `/opportunities/search?${params}`, { token });
     const opps = d.opportunities || d.data || [];
-    return opps.some(o => (o.pipelineStageId || o.stageId) === rs.stageId);
+    return opps.some(o => (o.pipelineStageId || o.stageId) === rs.stageId && isOpenOpp(o));
   } catch (_) { return false; }
 }
 
@@ -38,7 +44,7 @@ export async function computeQueue(token, locationId) {
   const oppParams = new URLSearchParams({ location_id: locationId, pipeline_id: rs.pipelineId, pipeline_stage_id: rs.stageId, limit: "100" });
   let opps = [];
   try { const od = await ghl("GET", `/opportunities/search?${oppParams}`, { token }); opps = od.opportunities || od.data || []; } catch (_) {}
-  const respondedContactIds = new Set(opps.map(o => o.contactId || o.contact?.id).filter(Boolean));
+  const respondedContactIds = openOppContactIds(opps);
   const cd = await ghl("GET", `/conversations/search?${new URLSearchParams({ locationId, limit: "100" })}`, { token });
   const convos = cd.conversations || cd.data || [];
   const queue = convos
@@ -56,7 +62,7 @@ export async function respondedContactIds(token, locationId) {
   const params = new URLSearchParams({ location_id: locationId, pipeline_id: rs.pipelineId, pipeline_stage_id: rs.stageId, limit: "100" });
   let opps = [];
   try { const od = await ghl("GET", `/opportunities/search?${params}`, { token }); opps = od.opportunities || od.data || []; } catch (_) {}
-  return { rs, ids: new Set(opps.map(o => o.contactId || o.contact?.id).filter(Boolean)) };
+  return { rs, ids: openOppContactIds(opps) };
 }
 
 // Read-time gate for Hawkeye's queues (Ready messages + Follow-ups). The detector
@@ -71,7 +77,7 @@ export async function respondedContactIdSet(token, locationId) {
   if (!rs) return null;                                  // no stage → cannot gate
   const params = new URLSearchParams({ location_id: locationId, pipeline_id: rs.pipelineId, pipeline_stage_id: rs.stageId, limit: "100" });
   const od = await ghl("GET", `/opportunities/search?${params}`, { token });  // throws on GHL error
-  return new Set((od.opportunities || od.data || []).map(o => o.contactId || o.contact?.id).filter(Boolean));
+  return openOppContactIds(od.opportunities || od.data || []);
 }
 
 // Cached wrapper, keyed by location, so the inbox's frequent count refresh doesn't
