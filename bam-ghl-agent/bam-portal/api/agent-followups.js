@@ -103,17 +103,33 @@ async function detectForClient(client) {
   if (!rs) return { client_id: client.id, skipped: "no Responded stage" };
 
   // Find Responded-stage leads where OUR last message is outbound and stale.
-  let convos = [];
+  // We iterate the actual Responded roster (respondedIds) — NOT just the recent
+  // conversations list. The bulk top-100 fetch is only a fast cache; a COLD lead's
+  // conversation is old and falls outside that window, so for any Responded contact
+  // missing from it we fetch their conversation directly. Otherwise long-quiet
+  // leads (the prime ghost candidates, e.g. someone silent 30+ days) would never be
+  // seen and would silently read "All good".
+  const byContact = new Map();
   try {
     const cd = await ghl("GET", `/conversations/search?${new URLSearchParams({ locationId, limit: "100" })}`, { token });
-    convos = cd.conversations || cd.data || [];
+    for (const c of (cd.conversations || cd.data || [])) if (c.contactId) byContact.set(c.contactId, c);
   } catch (e) { return { client_id: client.id, error: `conversations: ${e.message}` }; }
 
-  const candidates = convos.filter(c => {
-    if (!respondedIds.has(c.contactId)) return false;   // ← Responded-stage only
-    if (String(c.lastMessageDirection || "").toLowerCase() !== "outbound") return false;
-    return hoursSince(c.lastMessageDate || c.dateUpdated) >= MIN_QUIET_HOURS;   // quiet ≥ a day, no upper cap
-  }).slice(0, DRAFT_CAP);
+  const candidates = [];
+  for (const cid of respondedIds) {
+    let c = byContact.get(cid);
+    if (!c) {
+      try {
+        const s = await ghl("GET", `/conversations/search?${new URLSearchParams({ locationId, contactId: cid })}`, { token });
+        c = (s.conversations || s.data || [])[0] || null;
+      } catch (_) {}
+    }
+    if (!c) continue;
+    if (String(c.lastMessageDirection || "").toLowerCase() !== "outbound") continue;   // they messaged last → the reply engine owns it
+    if (hoursSince(c.lastMessageDate || c.dateUpdated) < MIN_QUIET_HOURS) continue;     // quiet < a day → still 🟢
+    candidates.push(c);
+    if (candidates.length >= DRAFT_CAP) break;
+  }
 
   let queued = 0, skipped = 0;
 

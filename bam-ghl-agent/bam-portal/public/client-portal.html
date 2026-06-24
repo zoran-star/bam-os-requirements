@@ -22220,7 +22220,7 @@ function _plOpenCard(oppId) {
       ${o.trainer ? `<div class="pl-d-row"><div class="lbl2">Coach</div><div>${escapeHTML(o.trainer)}</div></div>` : ''}
     </div>
     ${(_isResp && o.contactId) ? `<div class="pl-d-section" id="pl-d-agent"><div class="lbl">🤖 Agent suggests</div><div id="pl-d-agent-body"><div style="color:var(--text-mute);font-size:13px"><span class="req-spin"></span> Checking…</div></div></div>` : ''}
-    <div class="pl-d-section" id="pl-d-msg">
+    <div class="pl-d-section" id="pl-d-msg"${(_isResp && o.contactId) ? ' style="display:none"' : ''}>
       <div class="lbl">Messages</div>
       ${o.contactId ? `
         <div id="pl-d-thread" style="max-height:260px;overflow-y:auto;display:flex;flex-direction:column;gap:8px;padding:4px 0">
@@ -22287,6 +22287,8 @@ async function _plLoadAgentCard() {
     _plRenderAgentSection();
   } catch (e) {
     host.innerHTML = `<div style="font-size:12.5px;color:var(--text-mute)">Couldn't load the agent's suggestion - ${escapeHTML(_apxErr(e))}</div>`;
+    const msgEl = document.getElementById('pl-d-msg');   // fall back to Messages so it's never stuck hidden
+    if (msgEl) msgEl.style.display = '';
   }
 }
 // Render (or re-render after an action) the drawer's agent section from _APX_DATA,
@@ -22303,6 +22305,11 @@ function _plRenderAgentSection() {
     ...(_APX_DATA.followups || []).filter(mine).map(r => _apxCard('followup', r)),
   ];
   host.innerHTML = cards.length ? cards.join('') : `<div style="font-size:12.5px;color:var(--text-mute)">Nothing waiting - the agent has no suggested action right now.</div>`;
+  // The agent card already shows the thread + the proposed reply, so the separate
+  // Messages section is redundant when a card is present - hide it. With no card,
+  // show Messages so you can still read the convo + reply manually.
+  const msgEl = document.getElementById('pl-d-msg');
+  if (msgEl) msgEl.style.display = cards.length ? 'none' : '';
 }
 
 // ── Pipeline card drawer: messaging ─────────────────────────────────────────
@@ -22789,24 +22796,64 @@ function _apxCard(kind, r) {
   const goal = (isFu && r.goal) ? `<div style="font-size:11.5px;color:var(--text-sub);margin-bottom:5px">🎯 ${escapeHTML(r.goal)}</div>` : '';
   const last = _apxContext(r);   // summary + lead's last + our last
   const overBadge = overdue ? `<span style="font-size:10px;font-weight:700;color:#e0654f;background:rgba(224,90,66,0.12);border-radius:999px;padding:1px 7px">overdue</span>` : '';
-  const sendFn = isFu ? `_apxFollowupSend('${r.id}')` : `_apxReadySend('${r.id}')`;
-  const editFn = isFu ? `_apxFollowupEdit('${r.id}')` : `_apxReadyEdit('${r.id}')`;
-  const skipFn = isFu ? `_apxFollowupSkip('${r.id}')` : `_apxReadySkip('${r.id}')`;
-  const approveFn = isFu ? `_apxFollowupSend('${r.id}')` : `_apxReadyApprove('${r.id}')`;
+
+  // Reply cards: the proposed reply is an EDITABLE textarea — type straight in.
+  // A "teach the agent why" field slides in the moment you edit it. Follow-ups
+  // keep the read-only box + their existing buttons.
+  const replyBox = isFu
+    ? `<div style="font-size:13.5px;line-height:1.5;background:var(--accent-glow,rgba(232,197,71,.10));border:1px solid var(--accent-border,rgba(232,197,71,.3));border-radius:10px;padding:9px 11px;white-space:pre-wrap" id="apx-msg-${r.id}">${escapeHTML(r.draft_message || '')}</div>`
+    : `<textarea id="apx-edit-${r.id}" oninput="_apxOnReplyEdit('${r.id}')" style="width:100%;box-sizing:border-box;font-family:inherit;font-size:13.5px;line-height:1.5;background:var(--accent-glow,rgba(232,197,71,.10));border:1px solid var(--accent-border,rgba(232,197,71,.3));border-radius:10px;padding:9px 11px;color:var(--text);resize:vertical;min-height:74px;outline:none">${escapeHTML(r.draft_message || '')}</textarea>
+      <div id="apx-teach-wrap-${r.id}" style="display:none;margin-top:8px">
+        <div style="font-size:10px;color:var(--text-mute);text-transform:uppercase;letter-spacing:.07em;margin-bottom:4px">📝 teach the agent why (optional)</div>
+        <input id="apx-teach-${r.id}" type="text" placeholder="e.g. tightened the ask / dropped price talk" style="width:100%;box-sizing:border-box;background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);padding:8px 10px;font:inherit;font-size:12.5px;outline:none">
+      </div>`;
+
+  const actions = isFu
+    ? `<button onclick="_apxFollowupSkip('${r.id}')" title="Skip (and optionally teach why)" style="flex:1;background:transparent;border:1px solid var(--border);color:#e0654f;border-radius:9px;padding:9px;font-size:17px;cursor:pointer">✕</button>
+       <button onclick="_apxFollowupEdit('${r.id}')" title="Edit the message" style="flex:1;background:transparent;border:1px solid var(--border);color:#9a7bd6;border-radius:9px;padding:9px;font-size:15px;cursor:pointer">🔄</button>
+       <button onclick="_apxFollowupSend('${r.id}')" title="${overdue ? 'Approve & send now' : 'Approve & send'}" style="flex:1;background:var(--accent);border:1px solid var(--accent);color:#08080A;border-radius:9px;padding:9px;font-size:17px;font-weight:700;cursor:pointer">✓</button>`
+    : `<button onclick="_apxReadySkip('${r.id}')" title="Skip (and optionally teach why)" style="flex:1;background:transparent;border:1px solid var(--border);color:#e0654f;border-radius:9px;padding:9px;font-size:17px;cursor:pointer">✕</button>
+       <button onclick="_apxInlineApprove('${r.id}')" title="Approve & send" style="flex:2;background:var(--accent);border:1px solid var(--accent);color:#08080A;border-radius:9px;padding:9px;font-size:14px;font-weight:700;cursor:pointer">✓ Approve &amp; send</button>`;
+
   return `<div id="apx-${r.id}" style="background:var(--surface);border:1px solid var(--accent-border,rgba(232,197,71,.3));border-radius:11px;padding:12px 14px;margin-bottom:9px">
     <div style="display:flex;align-items:center;gap:8px;margin-bottom:5px;flex-wrap:wrap">
       <span style="font-weight:700;font-size:13.5px">${escapeHTML(r.contact_name || 'Lead')}</span>
       ${overBadge}
       <div style="flex:1"></div>${meta}
     </div>${goal}${esc}${last}
-    <div style="text-align:center;font-size:9.5px;color:var(--text-mute);text-transform:uppercase;letter-spacing:.09em;margin:2px 0 5px">proposed reply</div>
-    <div style="font-size:13.5px;line-height:1.5;background:var(--accent-glow,rgba(232,197,71,.10));border:1px solid var(--accent-border,rgba(232,197,71,.3));border-radius:10px;padding:9px 11px;white-space:pre-wrap" id="apx-msg-${r.id}">${escapeHTML(r.draft_message || '')}</div>
-    <div style="display:flex;align-items:stretch;gap:8px;margin-top:10px">
-      <button onclick="${skipFn}" title="Skip (and optionally teach why)" style="flex:1;background:transparent;border:1px solid var(--border);color:#e0654f;border-radius:9px;padding:9px;font-size:17px;cursor:pointer">✕</button>
-      <button onclick="${editFn}" title="Edit the message" style="flex:1;background:transparent;border:1px solid var(--border);color:#9a7bd6;border-radius:9px;padding:9px;font-size:15px;cursor:pointer">🔄</button>
-      <button onclick="${approveFn}" title="${overdue ? 'Approve & send now' : 'Approve & send'}" style="flex:1;background:var(--accent);border:1px solid var(--accent);color:#08080A;border-radius:9px;padding:9px;font-size:17px;font-weight:700;cursor:pointer">✓</button>
-    </div>
+    <div style="text-align:center;font-size:9.5px;color:var(--text-mute);text-transform:uppercase;letter-spacing:.09em;margin:2px 0 5px">proposed reply${isFu ? '' : ' · edit it right here'}</div>
+    ${replyBox}
+    <div style="display:flex;align-items:stretch;gap:8px;margin-top:10px">${actions}</div>
   </div>`;
+}
+// Reveal the "teach why" field the moment the staff edits the proposed reply.
+function _apxOnReplyEdit(id) {
+  const w = document.getElementById('apx-teach-wrap-' + id);
+  if (w && w.style.display === 'none') w.style.display = '';
+}
+// Approve & send a reply card using the (possibly edited) inline text + optional
+// teach note — no modal. Routes overdue follow-ups through their own send path.
+async function _apxInlineApprove(id) {
+  const r = _APX_DATA.ready.find(x => x.id === id); if (!r) return;
+  if (r._isFollowup) return _apxFollowupSend(id);
+  const ta = document.getElementById('apx-edit-' + id);
+  const reply = (ta ? ta.value : (r.draft_message || '')).trim();
+  if (!reply) { _apxToast('Reply is empty', false); return; }
+  const adjusted = reply !== (r.draft_message || '');
+  const lessonEl = document.getElementById('apx-teach-' + id);
+  const lesson = ((lessonEl && lessonEl.value) || '').trim();
+  if (r.escalate && !confirm('The agent escalated this one (it wanted a human). Send anyway?')) return;
+  try {
+    const resp = await _apxPost('/api/agent-approvals', 'send', {
+      contact_id: r.ghl_contact_id, reply, conversation_id: r.ghl_conversation_id || null,
+      contact_name: r.contact_name || null, reasoning: r.reasoning || null, confidence: r.confidence,
+      reply_count: r.reply_count, booking_asks: r.booking_asks, ready_id: r.id, adjusted,
+      suggested_reply: r.draft_message || null,
+    });
+    if (lesson) await _apxTeach(lesson, r.draft_message, reply, { source: 'hawkeye-inline', contact: r.contact_name || null });
+    _apxRemove(id);
+    _apxToast(resp && resp.deferred ? _apxQuietMsg(resp.send_after) : (lesson ? '✓ Sent + taught' : '✓ Sent'), true);
+  } catch (e) { _apxToast(_apxErr(e), false); }
 }
 
 // A red "suggested Lost" card. Nothing is sent or changed until you confirm -
@@ -23052,6 +23099,8 @@ function _apxRender() {
 }
 
 function _apxRemove(id) {
+  // Remember whose card this was, so we can clear the board badge for them.
+  const gone = [..._APX_DATA.followups, ..._APX_DATA.ready, ...(_APX_DATA.lost || []), ...(_APX_DATA.book || []), ...(_APX_DATA.ghost || [])].find(x => x.id === id);
   _APX_DATA.followups = _APX_DATA.followups.filter(x => x.id !== id);
   _APX_DATA.ready = _APX_DATA.ready.filter(x => x.id !== id);
   _APX_DATA.lost = (_APX_DATA.lost || []).filter(x => x.id !== id);
@@ -23059,6 +23108,18 @@ function _apxRemove(id) {
   _APX_DATA.ghost = (_APX_DATA.ghost || []).filter(x => x.id !== id);
   _apxRender();
   try { _plRenderAgentSection(); } catch (_) {}   // keep the in-drawer agent section in sync
+  // Update the Sales-board badge immediately: if the lead has no other pending
+  // card left, drop them from _PL_NEEDS and repaint the board (so acting in the
+  // drawer/Hawkeye clears "💬 Reply" / "👻 …" on the card right away).
+  if (gone && gone.ghl_contact_id && _PL_NEEDS) {
+    const cid = String(gone.ghl_contact_id);
+    const stillNeeds = [..._APX_DATA.followups, ..._APX_DATA.ready, ...(_APX_DATA.lost || []), ...(_APX_DATA.book || []), ...(_APX_DATA.ghost || [])]
+      .some(x => String(x.ghl_contact_id || '') === cid);
+    if (!stillNeeds) {
+      _PL_NEEDS.delete(cid);
+      try { if (typeof _renderPipelineBoard === 'function') _renderPipelineBoard(); } catch (_) {}
+    }
+  }
   const span = document.getElementById('apx-count');
   const n = _APX_DATA.followups.length + _APX_DATA.ready.length + (_APX_DATA.lost || []).length + (_APX_DATA.book || []).length + (_APX_DATA.ghost || []).length;
   if (span) span.textContent = n ? `(${n})` : '';
