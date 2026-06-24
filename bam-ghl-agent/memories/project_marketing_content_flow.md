@@ -161,7 +161,25 @@ Not done (deferred): stale-ticket nudge cron; urgency toggle on budget/remove fl
 - Rendered as default-collapsed `<details class="guide-card">` cards in `client-portal.html`:
   **Ads screen** (top of `#marketing-list .content`) = Paid Ads card then First Campaign card; **Organic screen** (top of `#marketing-organic`, after the back btn) = Organic card.
   `.guide-card` CSS sits just above the `#marketing-channel-split` styles. Cards only show where the screen shows (ads need `MARKETING_INCLUDED`, organic needs `ORGANIC_CONTENT`).
-- Also to be added to the Resources tab (manual, by Cam).
+- Update (2026-06-23, gating): the 3 static PDFs were REMOVED from `public/resources/`.
+  Each guide card's "Open guide" button now calls `_openGuideResource('<keyword>')`
+  (paid ad / first campaign / organic) which opens the matching Resources-tab entry
+  in-portal (login-gated). Cam added the 3 guides to the Resources tab manually.
+
+## Resources gated behind login — 2026-06-23
+
+- The **`resources` bucket is now PRIVATE** (migration `20260623210000_resources_private_gate.sql`).
+  Storage + table SELECT are **authenticated-only**, so files no longer open for "just anyone."
+- Client portal serves resource files via **short-lived signed URLs** (`createSignedUrls`, 1h):
+  `_signResourceFiles(paths)` fills `_resourceSignedUrls` cache before `renderResourceDetail`
+  (now async); `_resourceFileUrl(path)` is a sync cache lookup. Deep link `#resource=<id>`
+  routes to the Resources view on boot (added to `boot()`), opening that resource.
+- **Share link** = login-gated deep link `https://portal.byanymeansbusiness.com/client-portal.html#resource=<id>`
+  (staff ResourcesView `shareUrlFor`). Opening it requires the client to be logged in.
+- **Decorative content-block images** moved to a separate PUBLIC bucket **`resource-block-images`**
+  (`BlockImageUpload`), since they need a stable public URL and aren't the gated deliverable.
+  ⚠️ Any PRE-existing image-block uploaded into the old private `resources/_blocks/` path will
+  404 - re-upload it (likely none exist; Convert makes text blocks only).
 
 ## Slack DMs to staff — blocked on a scope (2026-06-18)
 
