@@ -5901,6 +5901,9 @@
           <!-- V1.5 dashboard (trials today · missed calls · action items) -->
           <div id="home-v15" style="display:none"></div>
 
+          <!-- V2 dashboard (trials today · done-trial replies · Hawkeye · unread) -->
+          <div id="home-v2" style="display:none"></div>
+
           <div class="home-sec" id="home-tiles-sec"><span class="home-sec-label">Needs your attention</span></div>
           <div class="home-tiles" id="home-tiles"></div>
 
@@ -11820,8 +11823,19 @@ async function openHomeView() {
   // V1.5 academies get a dedicated dashboard (trials today · missed calls ·
   // action items) instead of the ticket-centric tiles.
   const isV15 = (typeof V15_ACCESS !== 'undefined' && V15_ACCESS);
+  const isV2  = (typeof V2_ACCESS !== 'undefined' && V2_ACCESS);
   const GENERIC_SECTIONS = ['home-tiles-sec', 'home-tiles', 'home-week-sec', 'home-week', 'home-activity-sec', 'home-activity'];
   const v15El = document.getElementById('home-v15');
+  const v2El  = document.getElementById('home-v2');
+  // V2 (e.g. BAM GTA) gets the sales command-center dashboard. Takes precedence.
+  if (isV2) {
+    if (v2El)  v2El.style.display = '';
+    if (v15El) v15El.style.display = 'none';
+    GENERIC_SECTIONS.forEach(id => { const e = document.getElementById(id); if (e) e.style.display = 'none'; });
+    renderHomeV2();
+    return;
+  }
+  if (v2El) v2El.style.display = 'none';
   if (isV15) {
     if (v15El) v15El.style.display = '';
     GENERIC_SECTIONS.forEach(id => { const e = document.getElementById(id); if (e) e.style.display = 'none'; });
@@ -11855,6 +11869,108 @@ async function openHomeView() {
       renderHomeStatus(counts);
     }
   } catch (e) { /* leave the action-items tile dashed */ }
+}
+
+// ── V2 Home dashboard (sales command center) ─────────────────────────────
+// Four live tiles: trials today · done-trial replies waiting · Hawkeye actions ·
+// unread inbox. Each is a big tappable number that routes to the right place,
+// with hover + count-up animations. Each loads independently (no blocking).
+function _hv2Style() {
+  if (document.getElementById('hv2-style')) return;
+  const st = document.createElement('style'); st.id = 'hv2-style';
+  st.textContent =
+    '#home-v2 .hv2-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin:4px 0 18px}' +
+    '#home-v2 .hv2-tile{position:relative;border:1px solid var(--border);border-radius:14px;padding:16px 16px 15px;background:var(--surface);cursor:pointer;text-align:left;font-family:inherit;color:var(--text);opacity:0;transform:translateY(10px);transition:transform .18s ease,border-color .18s,box-shadow .18s;animation:hv2In .42s ease forwards}' +
+    '#home-v2 .hv2-tile:hover{transform:translateY(-4px);border-color:var(--gold,#E8C547);box-shadow:0 12px 30px rgba(0,0,0,.42)}' +
+    '#home-v2 .hv2-tile.hot{animation:hv2In .42s ease forwards,hv2Pulse 2.6s ease-in-out .7s infinite}' +
+    '#home-v2 .hv2-ic{font-size:20px;line-height:1}' +
+    '#home-v2 .hv2-num{font-size:36px;font-weight:800;line-height:1;margin:11px 0 3px;font-family:"Space Grotesk",Inter,sans-serif;color:var(--text-mute);transition:color .2s}' +
+    '#home-v2 .hv2-tile.hot .hv2-num{color:var(--gold,#E8C547)}' +
+    '#home-v2 .hv2-label{font-size:12.5px;font-weight:700;color:var(--text-sub)}' +
+    '#home-v2 .hv2-sub{font-size:11px;color:var(--text-mute);margin-top:2px}' +
+    '#home-v2 .hv2-go{position:absolute;top:13px;right:14px;color:var(--text-mute);font-size:18px;opacity:0;transform:translateX(-3px);transition:opacity .18s,transform .18s}' +
+    '#home-v2 .hv2-tile:hover .hv2-go{opacity:1;transform:translateX(0)}' +
+    '@keyframes hv2In{to{opacity:1;transform:translateY(0)}}' +
+    '@keyframes hv2Pulse{0%,100%{box-shadow:0 0 0 1px rgba(232,197,71,.28)}50%{box-shadow:0 0 0 4px rgba(232,197,71,.12)}}';
+  document.head.appendChild(st);
+}
+function _hv2Tile(key, delay, ic, label, sub, onclick) {
+  return `<button class="hv2-tile" id="hv2-tile-${key}" style="animation-delay:${delay}s" onclick="${onclick}">
+    <span class="hv2-go">›</span>
+    <div class="hv2-ic">${ic}</div>
+    <div class="hv2-num" id="hv2-num-${key}">·</div>
+    <div class="hv2-label">${label}</div>
+    <div class="hv2-sub">${sub}</div>
+  </button>`;
+}
+// Animate a tile's number up to n + flag it "hot" (gold + pulse) when n > 0.
+function _hv2Set(key, n) {
+  const el = document.getElementById('hv2-num-' + key); if (!el) return;
+  const tile = document.getElementById('hv2-tile-' + key);
+  const target = Math.max(0, Number(n) || 0);
+  if (tile) tile.classList.toggle('hot', target > 0);
+  const t0 = Date.now(), dur = 550;
+  const tick = () => { const p = Math.min(1, (Date.now() - t0) / dur); el.textContent = String(Math.round(p * target)); if (p < 1) requestAnimationFrame(tick); };
+  requestAnimationFrame(tick);
+}
+// Hawkeye tile: open the Sales pipeline FIRST, then the Hawkeye popup on top - so
+// closing the popup (×) lands you on the pipeline.
+function _hv2OpenHawkeye() { try { switchView('pipelines'); } catch (_) {} setTimeout(() => { try { _apxOpen(); } catch (_) {} }, 70); }
+function renderHomeV2() {
+  const host = document.getElementById('home-v2'); if (!host) return;
+  _hv2Style();
+  host.innerHTML = `<div class="home-sec" style="margin-top:2px"><span class="home-sec-label">Today at a glance</span></div>
+    <div class="hv2-grid">
+      ${_hv2Tile('trials', 0,    '📅', 'Trials today',           'see them in the pipeline', "switchView('pipelines')")}
+      ${_hv2Tile('done',   0.06, '💬', 'Done-trial replies',     'leads who texted back',    "switchView('pipelines')")}
+      ${_hv2Tile('hawk',   0.12, '👁', 'Hawkeye actions',        'to approve',               '_hv2OpenHawkeye()')}
+      ${_hv2Tile('unread', 0.18, '✉️', 'Unread messages',        'in the inbox',             "switchView('inbox')")}
+    </div>`;
+  _hv2Load();
+}
+async function _hv2Load() {
+  // Trials today
+  (async () => {
+    try {
+      const token = await _mreqAuthToken();
+      const r = await fetch('/api/ghl/calendars-v15?action=trials-today&client_id=' + encodeURIComponent(CLIENT_ID), { headers: { Authorization: 'Bearer ' + token } });
+      const j = await _safeJson(r); _hv2Set('trials', (j && j.trials || []).length);
+    } catch (_) { _hv2Set('trials', 0); }
+  })();
+  // Hawkeye actions waiting (same split the inbox badge uses)
+  (async () => {
+    try {
+      const [fu, rd] = await Promise.all([ _apxPost('/api/agent-followups', 'list', {}).catch(() => ({})), _apxPost('/api/agent-approvals', 'list-ready', {}).catch(() => ({})) ]);
+      const d = _apxSplit(fu, rd);
+      _hv2Set('hawk', d.followups.length + d.ready.length + (d.lost || []).length + (d.book || []).length + (d.ghost || []).length);
+    } catch (_) { _hv2Set('hawk', 0); }
+  })();
+  // Inbox unread + done-trial replies waiting (one inbox + one pipelines fetch)
+  (async () => {
+    try {
+      const token = await _mreqAuthToken();
+      const [ib, pl] = await Promise.all([
+        fetch('/api/ghl/inbox?client_id=' + encodeURIComponent(CLIENT_ID), { headers: { Authorization: 'Bearer ' + token } }).then(_safeJson),
+        fetch('/api/ghl/pipelines?client_id=' + encodeURIComponent(CLIENT_ID), { headers: { Authorization: 'Bearer ' + token } }).then(_safeJson),
+      ]);
+      _hv2Set('unread', (ib && ib.counts && ib.counts.unread) || 0);
+      const byContact = new Map();
+      for (const c of ((ib && ib.conversations) || [])) if (c.contactId) byContact.set(String(c.contactId), c);
+      let doneReplies = 0;
+      const pls = (pl && pl.pipelines) || [];
+      const pipe = pls.find(p => /training/i.test(p.name || '')) || pls[0];
+      const doneStage = pipe && (pipe.stages || []).find(s => _plIsDoneTrialStage(s));
+      if (pipe && doneStage) {
+        for (const o of (pipe.opportunities || [])) {
+          if (o.stageId !== doneStage.id) continue;
+          if (['won', 'lost', 'abandoned'].includes(String(o.status || 'open').toLowerCase())) continue;
+          const c = byContact.get(String(o.contactId || ''));
+          if (c && String(c.lastMessageDirection || '').toLowerCase() === 'inbound') doneReplies++;
+        }
+      }
+      _hv2Set('done', doneReplies);
+    } catch (_) { _hv2Set('unread', 0); _hv2Set('done', 0); }
+  })();
 }
 
 // ── V1.5 Home dashboard ──────────────────────────────────────────────────
