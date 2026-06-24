@@ -399,6 +399,7 @@ async function detectForClient(client) {
             client_id: client.id, ghl_contact_id: String(contactId), ghl_conversation_id: d.conversation_id || null,
             contact_name: item.name || null, draft_message: "(agent escalated — needs a human)", reasoning: d.reasoning || null,
             confidence: d.confidence, escalate: true, escalate_reason: d.escalate_reason || null,
+            last_message: d.last_message || null, last_outbound: d.last_outbound || null, summary: d.summary || null, thread_tail: d.thread_tail || null,
             last_lead_at: item.last_at || null, status: "pending", created_by: "detector",
           }]) });
         } catch (_) {}

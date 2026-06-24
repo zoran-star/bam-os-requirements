@@ -22512,19 +22512,21 @@ function _plRenderAgentSection() {
   const host = document.getElementById('pl-d-agent-body');
   if (!host || !_PL_DRAWER_CONTACT || !_APX_DATA) return;
   const mine = (x) => String(x.ghl_contact_id || '') === String(_PL_DRAWER_CONTACT);
-  const cards = [
-    ...(_APX_DATA.ghost || []).filter(mine).map(_apxGhostCard),
-    ...(_APX_DATA.book  || []).filter(mine).map(_apxBookCard),
-    ...(_APX_DATA.lost  || []).filter(mine).map(_apxLostCard),
-    ...(_APX_DATA.ready || []).filter(mine).map(r => _apxCard('ready', r)),
-    ...(_APX_DATA.followups || []).filter(mine).map(r => _apxCard('followup', r)),
+  const rows = [
+    ...(_APX_DATA.ghost || []).filter(mine).map(r => ['ghost', r]),
+    ...(_APX_DATA.book  || []).filter(mine).map(r => ['book', r]),
+    ...(_APX_DATA.lost  || []).filter(mine).map(r => ['lost', r]),
+    ...(_APX_DATA.ready || []).filter(mine).map(r => ['ready', r]),
+    ...(_APX_DATA.followups || []).filter(mine).map(r => ['followup', r]),
   ];
-  host.innerHTML = cards.length ? cards.join('') : `<div style="font-size:12.5px;color:var(--text-mute)">Nothing waiting - the agent has no suggested action right now.</div>`;
-  // The agent card already shows the thread + the proposed reply, so the separate
-  // Messages section is redundant when a card is present - hide it. With no card,
-  // show Messages so you can still read the convo + reply manually.
+  const render = (kind, r) => kind === 'ghost' ? _apxGhostCard(r) : kind === 'book' ? _apxBookCard(r) : kind === 'lost' ? _apxLostCard(r) : _apxCard(kind, r);
+  host.innerHTML = rows.length ? rows.map(([k, r]) => render(k, r)).join('') : `<div style="font-size:12.5px;color:var(--text-mute)">Nothing waiting - the agent has no suggested action right now.</div>`;
+  // Hide the separate Messages section ONLY when a card actually shows the
+  // conversation (it has a thread snapshot). For escalation / context-less cards,
+  // keep Messages visible so you always see the conversation - "no matter what".
+  const anyCtx = rows.some(([, r]) => (Array.isArray(r.thread_tail) && r.thread_tail.length) || r.last_message || r.last_outbound);
   const msgEl = document.getElementById('pl-d-msg');
-  if (msgEl) msgEl.style.display = cards.length ? 'none' : '';
+  if (msgEl) msgEl.style.display = (rows.length && anyCtx) ? 'none' : '';
 }
 
 // ── Pipeline card drawer: messaging ─────────────────────────────────────────
