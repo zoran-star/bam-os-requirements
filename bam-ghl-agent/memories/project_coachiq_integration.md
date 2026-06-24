@@ -7,6 +7,28 @@ metadata:
 
 # CoachIQ integration
 
+## ⭐ 2026-06-24 — "Scheduling app" switch (CoachIQ gated per academy)
+
+CoachIQ is now behind a per-academy **Scheduling app** switch so we can turn it
+off (moving off CoachIQ) while keeping the plumbing for any future academy.
+- `clients.scheduling_app` text ('coachiq' | 'none', default 'none', backfilled
+  from `coachiq_enabled`). Switch = a segmented control on the staff client
+  **Overview tab** (`src/views/ClientsCombinedView.jsx`, mirrors Portal-tier) →
+  `update-fields {scheduling_app}`.
+- `update-fields` (api/clients.js) writes `scheduling_app` AND syncs
+  `coachiq_enabled = (scheduling_app==='coachiq')`. Because **every existing
+  CoachIQ gate reads `coachiq_enabled`** (member-drawer button via
+  `_MEMBERS_CIQ.enabled`, members API, offer-builder pill, sorter step, links
+  modal), the switch cascades automatically — no per-surface edits.
+- The one env-only spot (`api/onboarding/activations.js` CoachIQ grant) now also
+  checks the client's `scheduling_app`/`coachiq_enabled`.
+- **GTA = 'none'** (CoachIQ off everywhere; data-driven so it took effect at
+  once). Onboard a new CoachIQ academy = flip the switch (+ set their
+  `coachiq_signup_url`).
+- GTA enroll site (`bam-client-sites` `clients/bam-gta/gta/enroll.jsx`): the
+  CoachIQ "set up your athlete app" step was replaced with a **Join WhatsApp
+  group** button.
+
 ## ⭐ 2026-06-19 — MEMBER IMPORT + CoachIQ (5-step wizard, built + live)
 
 Member Import (Pricing Sorter `members` mode) restructured to: **Import → Stripe →
