@@ -10606,7 +10606,10 @@ async function _v15calCreateBooking() {
 // Reuses /api/ghl/inbox (list + thread) + /api/ghl/send-message. (P2 adds
 // pipeline/stage + failed filters; P3 adds mass send.)
 // ══════════════════════════════════════════════════════════════
-let _V15IB = { convos: [], pipelines: [], contactPipe: {}, pipeOppCount: 0, ghlLoc: '', unreadOnly: false, failedOnly: false, fPipeline: '', fStage: '', fChannels: [], active: null, messages: [], type: 'SMS', pending: [] };
+let _V15IB = { convos: [], pipelines: [], contactPipe: {}, pipeOppCount: 0, ghlLoc: '', unreadOnly: false, failedOnly: false, fPipeline: '', fStage: '', fChannels: [], active: null, messages: [], type: 'SMS', pending: [], readAt: {} };
+// readAt: convId → the lastMessageDate at the moment you OPENED it. A conversation
+// is "read" (no dot) once opened, and re-flags as unread only if a NEWER message
+// arrives after that. GHL has no public mark-read API, so we track it per session.
 // Channel toggle buttons (multi-select). Empty selection = show all channels.
 const _V15IB_CHANNELS = [
   { key: 'sms',       label: 'SMS',       icon: '💬' },
@@ -10726,7 +10729,7 @@ function _v15ibPipeOf(c) {
 }
 function _v15ibFiltered() {
   return _V15IB.convos.filter(c => {
-    if (_V15IB.unreadOnly && !((c.unreadCount || 0) > 0)) return false;
+    if (_V15IB.unreadOnly && !_v15ibIsUnread(c)) return false;
     if (_V15IB.failedOnly && !_V15IB_FAILED.includes(c.lastMessageStatus || '')) return false;
     if (_V15IB.fChannels.length && !_V15IB.fChannels.includes(_ibChannelBucket(c))) return false;
     if (_V15IB.fPipeline) {
@@ -10811,6 +10814,13 @@ function _ibIsActivity(m) {
   return false;
 }
 
+// A conversation is unread if GHL flags it AND we haven't opened it since its
+// newest message (see _V15IB.readAt). Used by the list dots + the unread filter.
+function _v15ibIsUnread(c) {
+  if (!((c.unreadCount || 0) > 0)) return false;
+  const seenAt = _V15IB.readAt[c.id];
+  return !seenAt || new Date(c.lastMessageDate || 0).getTime() > new Date(seenAt).getTime();
+}
 function _v15ibRenderList() {
   const body = document.getElementById('v15ib-body');
   if (!body) return;
@@ -10832,7 +10842,7 @@ function _v15ibRenderList() {
     return;
   }
   body.innerHTML = `<div class="v15ib-list">` + rows.map(c => {
-    const unread = (c.unreadCount || 0) > 0;
+    const unread = _v15ibIsUnread(c);
     const name = c.contactName || '(no name)';
     const cp = _v15ibPipeOf(c);
     const chip = cp ? `<div style="margin-top:6px"><span class="v15ib-chip">${escapeHTML(cp.pipelineName)}${cp.stageName ? ' · ' + escapeHTML(cp.stageName) : ''}</span></div>` : '';
@@ -10864,6 +10874,11 @@ function _ibAvatarStyle(name) {
 async function _v15ibOpen(convId, contactId, phone, email, name, channel) {
   _V15IB.active = { convId, contactId, phone, email, name, channel: channel || '' };
   _V15IB.pending = [];
+  // Mark read: remember the conversation's newest-message time as of now, then
+  // repaint the list so the unread dot clears immediately.
+  const _c = (_V15IB.convos || []).find(x => x.id === convId);
+  _V15IB.readAt[convId] = (_c && _c.lastMessageDate) || new Date().toISOString();
+  try { _v15ibRenderList(); } catch (_) {}
   // Reply on the SAME channel the lead used - SMS / Email / IG / FB / WhatsApp.
   _V15IB.type = _ghlSendType(channel || '');
   const body = document.getElementById('v15ib-body');
@@ -21238,6 +21253,24 @@ async function _plLoadNeedsAction() {
   }
   try { if (typeof _renderPipelineBoard === 'function') _renderPipelineBoard(); } catch (_) {}
 }
+// Last-message info per contact (from the GHL inbox list), for the Done Trial
+// cards: show when the last message was + glow if the LEAD messaged last.
+let _PL_LASTMSG = null;   // contactId → { direction, date }
+async function _plLoadLastMessages() {
+  try {
+    const token = await _mreqAuthToken();
+    const r = await fetch(`/api/ghl/inbox?client_id=${encodeURIComponent(CLIENT_ID)}`, { headers: { Authorization: 'Bearer ' + token } });
+    const j = await _safeJson(r);
+    if (!r.ok) return;
+    const map = new Map();
+    for (const c of (j.conversations || [])) {
+      if (c.contactId) map.set(String(c.contactId), { direction: (c.lastMessageDirection || '').toLowerCase(), date: c.lastMessageDate || null });
+    }
+    _PL_LASTMSG = map;
+    try { if (typeof _renderPipelineBoard === 'function') _renderPipelineBoard(); } catch (_) {}
+  } catch (_) {}
+}
+
 // Force a fresh agent scan of the Responded stage NOW (both engines: reply +
 // ghost) instead of waiting for the every-15/30-min cron, then refresh the
 // badges. Shared by the board "🔄 Scan" button and the Responded-health view.
@@ -21302,6 +21335,7 @@ async function _plLoadAgentMode() {
     _PL_AGENT_MODE = j.mode || 'off';
   } catch (_) { _PL_AGENT_MODE = 'off'; }
   if (_PL_AGENT_MODE && _PL_AGENT_MODE !== 'off') { _plLoadNeedsAction(); try { _plScanNow(null, true); } catch (_) {} }   // load badges + auto-scan once the agent is known to be on
+  _plLoadLastMessages();   // Done Trial cards: last-message time + lead-last glow
   try { if (typeof _renderPipelineBoard === 'function') _renderPipelineBoard(); } catch (_) {}
 }
 
@@ -21329,6 +21363,7 @@ async function fetchAndRenderPipelines() {
     }
     _renderPipelineTabs();
     _renderPipelineBoard();
+    _plLoadLastMessages();   // Done Trial cards: last-message time + lead-last glow
     // Auto-scan on load so recommendations are fresh without waiting for the cron
     // (debounced to 5 min; greys the Responded cards while it runs). If the agent
     // mode isn't known yet, _plLoadAgentMode kicks the scan once it resolves.
@@ -22114,9 +22149,13 @@ function _renderPipelineBoard() {
     const missingTrial = stage && stage.expectsTrial && !trialStr;
     const isDone = _plIsDoneTrialStage(stage);
     const todayTrial = _plIsTrialToday(o.trialDate);
-    // Trial-today gold glow, but NOT once the card is in the Done Trial stage -
-    // the trial already happened, so the "today" highlight is just noise there.
-    const glow = (todayTrial && !isDone) ? 'box-shadow:0 0 0 1px var(--gold,#E8C547),0 0 18px rgba(232,197,71,0.5);border-color:var(--gold,#E8C547);' : '';
+    // Done Trial: surface the last message + GLOW only when the LEAD messaged last
+    // (their ball — needs a reply). Last-message info comes from _PL_LASTMSG.
+    const _lastMsg = (isDone && _PL_LASTMSG && o.contactId) ? _PL_LASTMSG.get(String(o.contactId)) : null;
+    const _clientLast = !!(_lastMsg && _lastMsg.direction === 'inbound');
+    const _goldGlow = 'box-shadow:0 0 0 1px var(--gold,#E8C547),0 0 18px rgba(232,197,71,0.5);border-color:var(--gold,#E8C547);';
+    // Trial-today gold glow (non-done stages); Done Trial glows only on lead-last.
+    const glow = isDone ? (_clientLast ? _goldGlow : '') : (todayTrial ? _goldGlow : '');
     // Responded-stage status: 🔴 Needs action when a Hawkeye card is waiting,
     // labelled by what the action is (reply / ghost / confirm lost / book). 🟢 All
     // good = nothing waiting (we're waiting on the lead). Tap → Hawkeye focused.
@@ -22155,11 +22194,9 @@ function _renderPipelineBoard() {
             ? `<div class="pl-card-trial" style="color:var(--text-mute)">Trial: <span style="opacity:0.6">-</span></div>`
             : missingTrial ? `<div class="pl-card-flag">⚠ No trial date</div>` : ''}
         ${isDone
-          ? `<div class="pl-card-wl">
-               <button class="pl-card-won" onclick="event.stopPropagation(); _plMarkWon('${escapeHTML(o.id)}')">Won</button>
-               <button class="pl-card-abandon" onclick="event.stopPropagation(); _plMarkAbandoned('${escapeHTML(o.id)}')">Abandon</button>
-               <button class="pl-card-lost" onclick="event.stopPropagation(); _plMarkLost('${escapeHTML(o.id)}')">Lost</button>
-             </div>`
+          ? (_lastMsg && _lastMsg.date
+              ? `<div class="pl-card-trial" style="color:${_clientLast ? 'var(--gold,#E8C547)' : 'var(--text-mute)'};font-weight:${_clientLast ? '600' : '400'}">💬 ${escapeHTML(_apxMsgWhen(_lastMsg.date) || 'last message')}${_clientLast ? ' · from client' : ''}</div>`
+              : '')
           : (_plIsScheduledTrialStage(stage)
               ? `<button class="pl-card-ptf" onclick="event.stopPropagation(); _plPostTrialForm('${escapeHTML(o.id)}')">Post trial form</button>`
               : '')}
