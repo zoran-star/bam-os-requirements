@@ -358,70 +358,70 @@ async function handler(req, res) {
   try {
     const resource = req.query.resource;
     if (resource === "meta-health-cron") {
-      return handleMetaHealthCron(req, res);
+      return await handleMetaHealthCron(req, res);
     }
     if (resource === "tickets") {
-      return handleMarketingTickets(req, res);
+      return await handleMarketingTickets(req, res);
     }
     if (resource === "guide-cards") {
-      return handleGuideCards(req, res);
+      return await handleGuideCards(req, res);
     }
     if (resource === "content-tickets") {
-      return handleContentTickets(req, res);
+      return await handleContentTickets(req, res);
     }
     if (resource === "meta-adaccounts") {
-      return handleMetaAdAccounts(req, res);
+      return await handleMetaAdAccounts(req, res);
     }
     if (resource === "meta-campaigns") {
-      return handleMetaCampaigns(req, res);
+      return await handleMetaCampaigns(req, res);
     }
     if (resource === "meta-kpis") {
-      return handleMetaKpis(req, res);
+      return await handleMetaKpis(req, res);
     }
     if (resource === "meta-report") {
-      return handleMetaReport(req, res);
+      return await handleMetaReport(req, res);
     }
     if (resource === "meta-insight") {
-      return handleMetaInsight(req, res);
+      return await handleMetaInsight(req, res);
     }
     if (resource === "ghl-kpi-suggest") {
-      return handleGhlKpiSuggest(req, res);
+      return await handleGhlKpiSuggest(req, res);
     }
     if (resource === "ghl-kpis") {
-      return handleGhlKpis(req, res);
+      return await handleGhlKpis(req, res);
     }
     if (resource === "ghl-kpis-monthly") {
-      return handleGhlKpisMonthly(req, res);
+      return await handleGhlKpisMonthly(req, res);
     }
     if (resource === "ghl-kpi-detail") {
-      return handleGhlKpiDetail(req, res);
+      return await handleGhlKpiDetail(req, res);
     }
     if (resource === "ghl-kpi-delete") {
-      return handleGhlKpiDelete(req, res);
+      return await handleGhlKpiDelete(req, res);
     }
     if (resource === "ghl-kpi-restore") {
-      return handleGhlKpiRestore(req, res);
+      return await handleGhlKpiRestore(req, res);
     }
     if (resource === "ghl-kpi-stripe") {
-      return handleGhlKpiStripe(req, res);
+      return await handleGhlKpiStripe(req, res);
     }
     if (resource === "ghl-kpi-trash") {
-      return handleGhlKpiTrash(req, res);
+      return await handleGhlKpiTrash(req, res);
     }
     if (resource === "meta-overview") {
-      return handleMetaOverview(req, res);
+      return await handleMetaOverview(req, res);
     }
     if (resource === "meta-creatives") {
-      return handleMetaCreatives(req, res);
+      return await handleMetaCreatives(req, res);
     }
     if (resource === "meta-staff-auth") {
-      return handleStaffMetaAuth(req, res);
+      return await handleStaffMetaAuth(req, res);
     }
     if (resource === "meta-staff-status") {
-      return handleStaffMetaStatus(req, res);
+      return await handleStaffMetaStatus(req, res);
     }
     if (resource === "onboarding") {
-      return handleOnboarding(req, res);
+      return await handleOnboarding(req, res);
     }
     return res.status(400).json({ error: "missing or invalid ?resource= (expected 'tickets' | 'guide-cards' | 'content-tickets' | 'meta-adaccounts' | 'meta-campaigns' | 'meta-kpis' | 'meta-report' | 'meta-insight' | 'meta-overview' | 'ghl-kpi-suggest' | 'ghl-kpis' | 'ghl-kpi-detail' | 'meta-creatives' | 'meta-staff-auth' | 'meta-staff-status' | 'onboarding')" });
   } catch (err) {
