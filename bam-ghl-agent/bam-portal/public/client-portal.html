@@ -7119,6 +7119,16 @@ Then the call to action."]</div>
       #ptf-overlay .ptf-note { font-size:11px; color:var(--text-mute); padding:12px 20px 0; line-height:1.45; }
       #ptf-overlay .ptf-submit { margin:16px 20px 20px; width:calc(100% - 40px); background:var(--accent); color:#0B0B0D; border:none; border-radius:9px; padding:11px; font-size:14px; font-weight:700; cursor:pointer; font-family:inherit; }
       #ptf-overlay .ptf-submit:disabled { opacity:0.5; cursor:not-allowed; }
+      /* Mobile: the post-trial form has its own modal classes, so the generic
+         bottom-sheet rules don't reach it. Without this, the overlay (z-index 70)
+         sits UNDER the fixed bottom nav (z-index 900), which covers the Submit
+         button. Lift it above the nav, make it a scrollable bottom sheet, and
+         clear the safe-area so Submit is always reachable. */
+      @media (max-width: 768px) {
+        #ptf-overlay { z-index: 10050; align-items: flex-end; padding: 0; }
+        #ptf-overlay .ptf-modal { width: 100%; max-width: 100%; max-height: 92dvh; overflow-y: auto; border-radius: 14px 14px 0 0; }
+        #ptf-overlay .ptf-submit { margin-bottom: calc(20px + env(safe-area-inset-bottom)); }
+      }
 
       /* Drawer journey timeline */
       #pl-drawer .pl-tl-step { display:flex; align-items:center; gap:9px; font-size:13px; padding:4px 0; }
