@@ -22116,6 +22116,17 @@ function _plAgeShort(iso) {
   return d.toLocaleDateString('en-US', { month:'short', day:'numeric' });
 }
 
+// A wavy "〜 upcoming 〜" divider (Claude-Code-style squiggle) that splits the
+// passed/today trials from the upcoming ones in the Scheduled Trial column.
+function _plUpcomingDivider() {
+  const wave = `<svg viewBox="0 0 100 12" preserveAspectRatio="none" style="flex:1;height:12px;color:var(--text-mute)"><path d="M0,6 Q12.5,0 25,6 T50,6 T75,6 T100,6" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>`;
+  return `<div style="display:flex;align-items:center;gap:9px;margin:14px 2px 12px;color:var(--text-mute)">
+    ${wave}
+    <span style="font-size:11.5px;font-weight:700;letter-spacing:.05em;white-space:nowrap">upcoming</span>
+    ${wave}
+  </div>`;
+}
+
 function _renderPipelineBoard() {
   const container = document.getElementById('pl-board-container');
   if (!container || !_PL_DATA) return;
@@ -22194,9 +22205,9 @@ function _renderPipelineBoard() {
            ondragstart="_plDragStart(event,'${escapeHTML(o.id)}','${escapeHTML(o.stageId || '')}','${escapeHTML(p.id)}')"
            ondragend="_plDragEnd(event)"
            onclick="_plOpenCard('${escapeHTML(o.id)}')">
-        <button class="pl-card-special" title="Send Summer special" onclick="event.stopPropagation(); _plEnrollSpecial('${escapeHTML(o.id)}')"
-           style="position:absolute;top:6px;right:6px;background:var(--gold-ghost,rgba(212,207,138,0.12));color:var(--gold);border:1px solid var(--gold);border-radius:6px;padding:3px 8px;font-size:11px;font-weight:700;cursor:pointer;line-height:1.3;z-index:2">📨 Special</button>
-        <div class="pl-card-name" style="padding-right:78px"><span class="pl-card-tag">Parent</span> ${escapeHTML(parent)}</div>
+        ${(!isDone && !_isResp) ? `<button class="pl-card-special" title="Send Summer special" onclick="event.stopPropagation(); _plEnrollSpecial('${escapeHTML(o.id)}')"
+           style="position:absolute;top:6px;right:6px;background:var(--gold-ghost,rgba(212,207,138,0.12));color:var(--gold);border:1px solid var(--gold);border-radius:6px;padding:3px 8px;font-size:11px;font-weight:700;cursor:pointer;line-height:1.3;z-index:2">📨 Special</button>` : ''}
+        <div class="pl-card-name" style="padding-right:${(!isDone && !_isResp) ? '78px' : '8px'}"><span class="pl-card-tag">Parent</span> ${escapeHTML(parent)}</div>
         <div class="pl-card-contact"><span class="pl-card-tag">Athlete</span> ${o.athlete ? escapeHTML(o.athlete) : '<span style="opacity:0.5">-</span>'}</div>
         ${o.trainer ? `<div class="pl-card-coach"><span class="pl-card-tag">Coach</span> ${escapeHTML(o.trainer)}</div>` : ''}
         ${trialStr
@@ -22230,8 +22241,38 @@ function _renderPipelineBoard() {
       return ageMs > 7 * 86400 * 1000 ? 1 : 2;
     };
     const _trialFirst = (a, b) => (_plIsTrialToday(b.trialDate) ? 1 : 0) - (_plIsTrialToday(a.trialDate) ? 1 : 0);
+    // Scheduled Trial order: today (glowing) → passed (most-recent first, fill the
+    // post-trial form) → [upcoming squiggle] → upcoming (soonest first).
+    const isSchedTrial = _plIsScheduledTrialStage(s);
+    const _trialPhase = (o) => {
+      if (_plIsTrialToday(o.trialDate)) return 0;            // today
+      const ti = _plTrialInfo(o.trialDate);
+      if (ti.passed) return 1;                                // already happened
+      if (ti.str) return 2;                                   // upcoming (future date)
+      return 3;                                               // no date → bottom
+    };
+    const _schedSort = (a, b) => {
+      const pa = _trialPhase(a), pb = _trialPhase(b);
+      if (pa !== pb) return pa - pb;
+      const ta = new Date(a.trialDate || 0).getTime(), tb = new Date(b.trialDate || 0).getTime();
+      if (pa === 1) return tb - ta;   // passed: most recent at top
+      if (pa === 2) return ta - tb;   // upcoming: soonest at top
+      return 0;
+    };
     const opps = (byStage.get(s.id) || []).slice()
-      .sort((a, b) => isResponded ? ((_respRank(a) - _respRank(b)) || _trialFirst(a, b)) : _trialFirst(a, b));
+      .sort((a, b) => isResponded ? ((_respRank(a) - _respRank(b)) || _trialFirst(a, b))
+                    : isSchedTrial ? _schedSort(a, b)
+                    : _trialFirst(a, b));
+    // Cards HTML — for Scheduled Trial, drop the "upcoming" squiggle in before the
+    // first future trial (only when there are today/passed cards above it).
+    let cardsHtml = '';
+    if (opps.length) {
+      let _divDone = false;
+      for (const o of opps) {
+        if (isSchedTrial && !_divDone && _trialPhase(o) === 2 && cardsHtml) { cardsHtml += _plUpcomingDivider(); _divDone = true; }
+        cardsHtml += cardHtml(o, s);
+      }
+    } else { cardsHtml = '<div class="pl-empty">No cards here yet.</div>'; }
     const glowCol = (isResponded && _agentOn) ? 'box-shadow:0 0 0 1px var(--blue,#5A8FB8),0 0 18px rgba(90,143,184,0.45);border-color:var(--blue,#5A8FB8);' : '';
     const hawkBtn = (isResponded && _agentOn)
       ? `<div style="display:flex;gap:6px;margin-bottom:8px">
@@ -22250,7 +22291,7 @@ function _renderPipelineBoard() {
         </div>
         <div class="pl-cards">
           ${hawkBtn}
-          ${opps.length ? opps.map(o => cardHtml(o, s)).join('') : '<div class="pl-empty">No cards here yet.</div>'}
+          ${cardsHtml}
         </div>
       </div>`;
   }).join('');
