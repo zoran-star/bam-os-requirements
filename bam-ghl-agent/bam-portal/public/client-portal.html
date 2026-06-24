@@ -21265,9 +21265,11 @@ async function _plLoadNeedsAction() {
 // Last-message info per contact (from the GHL inbox list), for the Done Trial
 // cards: show when the last message was + glow if the LEAD messaged last.
 let _PL_LASTMSG = null;   // contactId → { direction, date }
-// ⚠️ TEMPORARY TEST — set to false (or delete) to turn off the Interested-stage
-// "no message in 5 days → red card" highlight. Not meant to be permanent.
-const _PL_TEST_INTERESTED_RED = true;
+// Interested-stage "no message in 5 days → red card" highlight: OFF for all
+// tiers (Zoran, 2026-06-24). Kept as const=false so gated code below no-ops.
+const _PL_TEST_INTERESTED_RED = false;
+// V2-only flow gate for the pipelines board. V1.5 = plain GHL mirror.
+function _plIsV2() { return typeof V2_ACCESS !== 'undefined' && V2_ACCESS; }
 async function _plLoadLastMessages() {
   try {
     const token = await _mreqAuthToken();
@@ -22127,11 +22129,11 @@ function _plAgeShort(iso) {
 
 // A wavy "〜 upcoming 〜" divider (Claude-Code-style squiggle) that splits the
 // passed/today trials from the upcoming ones in the Scheduled Trial column.
-function _plUpcomingDivider() {
+function _plUpcomingDivider(label = 'upcoming') {
   const wave = `<svg viewBox="0 0 100 12" preserveAspectRatio="none" style="flex:1;height:12px;color:var(--text-mute)"><path d="M0,6 Q12.5,0 25,6 T50,6 T75,6 T100,6" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>`;
   return `<div style="display:flex;align-items:center;gap:9px;margin:14px 2px 12px;color:var(--text-mute)">
     ${wave}
-    <span style="font-size:11.5px;font-weight:700;letter-spacing:.05em;white-space:nowrap">upcoming</span>
+    <span style="font-size:11.5px;font-weight:700;letter-spacing:.05em;white-space:nowrap">${label}</span>
     ${wave}
   </div>`;
 }
@@ -22150,6 +22152,9 @@ function _renderPipelineBoard() {
 
   // Per-staff stage permissions: a restricted teammate only sees allowed stages.
   const visibleStages = p.stages.filter(s => _isStageAllowed(s.id));
+  // V1.5 = plain GHL mirror (no funnel glows/flags/agent buttons/stage-name
+  // behavior). V2 = the full opinionated flow.
+  const _plV2 = _plIsV2();
 
   // Won / Lost / Abandoned are removed from the pipeline board (kept in GHL).
   const _PL_CLOSED = new Set(['won', 'lost', 'abandoned']);
@@ -22166,6 +22171,19 @@ function _renderPipelineBoard() {
     const ageMs = (o.lastStageChangeAt || o.updatedAt) ? Date.now() - new Date(o.lastStageChangeAt || o.updatedAt).getTime() : 0;
     const stale = ageMs > 7 * 86400 * 1000;
     const parent = o.contact.name || o.name || 'Unknown';
+    // ── V1.5: plain mirror card — name + athlete, draggable, opens the contact.
+    // No trial dates, glows, Special/post-trial buttons, or agent badges. ──
+    if (!_plV2) {
+      return `
+        <div class="pl-card ${stale ? 'pl-card-stale' : ''}" style="position:relative"
+             draggable="true"
+             ondragstart="_plDragStart(event,'${escapeHTML(o.id)}','${escapeHTML(o.stageId || '')}','${escapeHTML(p.id)}')"
+             ondragend="_plDragEnd(event)"
+             onclick="_plOpenCard('${escapeHTML(o.id)}')">
+          <div class="pl-card-name"><span class="pl-card-tag">Parent</span> ${escapeHTML(parent)}</div>
+          ${o.athlete ? `<div class="pl-card-contact"><span class="pl-card-tag">Athlete</span> ${escapeHTML(o.athlete)}</div>` : ''}
+        </div>`;
+    }
     const tr = _plTrialInfo(o.trialDate);
     const trialStr = tr.str, trialPassed = tr.passed, trialStarted = tr.started;
     // A card in a trial-booking stage with no resolvable date gets flagged.
@@ -22268,22 +22286,30 @@ function _renderPipelineBoard() {
       if (pa === 2) return ta - tb;   // upcoming: soonest at top
       return 0;
     };
-    const opps = (byStage.get(s.id) || []).slice()
-      .sort((a, b) => isResponded ? ((_respRank(a) - _respRank(b)) || _trialFirst(a, b))
-                    : isSchedTrial ? _schedSort(a, b)
-                    : _trialFirst(a, b));
+    // V1.5 mirrors GHL order; V2 applies funnel-aware sorting.
+    const opps = !_plV2 ? (byStage.get(s.id) || []).slice()
+      : (byStage.get(s.id) || []).slice()
+        .sort((a, b) => isResponded ? ((_respRank(a) - _respRank(b)) || _trialFirst(a, b))
+                      : isSchedTrial ? _schedSort(a, b)
+                      : _trialFirst(a, b));
     // Cards HTML — for Scheduled Trial, drop the "upcoming" squiggle in before the
     // first future trial (only when there are today/passed cards above it).
     let cardsHtml = '';
     if (opps.length) {
-      let _divDone = false;
+      let _divDone = false, _pastDivDone = false;
       for (const o of opps) {
-        if (isSchedTrial && !_divDone && _trialPhase(o) === 2 && cardsHtml) { cardsHtml += _plUpcomingDivider(); _divDone = true; }
+        if (_plV2 && isSchedTrial) {
+          const ph = _trialPhase(o);
+          // squiggle between TODAY (above) and PAST trials
+          if (!_pastDivDone && ph === 1 && cardsHtml) { cardsHtml += _plUpcomingDivider('past'); _pastDivDone = true; }
+          // squiggle before the first UPCOMING (future) trial
+          if (!_divDone && ph === 2 && cardsHtml) { cardsHtml += _plUpcomingDivider('upcoming'); _divDone = true; }
+        }
         cardsHtml += cardHtml(o, s);
       }
     } else { cardsHtml = '<div class="pl-empty">No cards here yet.</div>'; }
-    const glowCol = (isResponded && _agentOn) ? 'box-shadow:0 0 0 1px var(--blue,#5A8FB8),0 0 18px rgba(90,143,184,0.45);border-color:var(--blue,#5A8FB8);' : '';
-    const hawkBtn = (isResponded && _agentOn)
+    const glowCol = (_plV2 && isResponded && _agentOn) ? 'box-shadow:0 0 0 1px var(--blue,#5A8FB8),0 0 18px rgba(90,143,184,0.45);border-color:var(--blue,#5A8FB8);' : '';
+    const hawkBtn = (_plV2 && isResponded && _agentOn)
       ? `<div style="display:flex;gap:6px;margin-bottom:8px">
           <button onclick="_apxOpen()" title="Open the agent approval queue" style="flex:1;box-sizing:border-box;background:var(--blue-soft,rgba(90,143,184,0.12));color:var(--blue,#5A8FB8);border:1px solid var(--blue,#5A8FB8);border-radius:7px;padding:9px;font-size:12.5px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px">👁 Hawkeye</button>
           <button id="pl-scan-btn" onclick="_plScanNow('pl-scan-btn')" title="Re-scan this stage now for new actions (don't wait for the every-30-min check)" style="box-sizing:border-box;background:transparent;color:var(--text-sub);border:1px solid var(--border);border-radius:7px;padding:9px 11px;font-size:12.5px;font-weight:700;cursor:pointer;white-space:nowrap">🔄 Scan</button>
@@ -22380,6 +22406,7 @@ function _plOpenCard(oppId) {
     if (found) { p = pl; o = found; s = pl.stages.find(st => st.id === found.stageId); break; }
   }
   if (!o) return;
+  const _plV2 = _plIsV2();  // V1.5 drawer = mirror (contact + messages + GHL); V2 = full flow
 
   const memberBadge = o.member
     ? `<span class="pl-tag pl-tag-member">member · ${escapeHTML(o.member.athlete_name || '')}</span>`
@@ -22407,7 +22434,7 @@ function _plOpenCard(oppId) {
   }
   if (o.status === 'won') steps.push(['Won', null, true]);
   else if (o.status === 'lost') steps.push(['Lost', null, false]);
-  const timelineHtml = steps.length
+  const timelineHtml = (_plV2 && steps.length)
     ? `<div class="pl-d-section"><div class="lbl">Journey</div>${steps.map(([t, sub, ok]) =>
         `<div class="pl-tl-step"><span class="pl-tl-dot ${ok ? 'ok' : 'bad'}"></span><span class="pl-tl-label">${escapeHTML(t)}</span>${sub ? `<span class="pl-tl-sub">${escapeHTML(sub)}</span>` : ''}</div>`).join('')}</div>`
     : '';
@@ -22428,14 +22455,14 @@ function _plOpenCard(oppId) {
     <div class="pl-d-section">
       <div class="pl-d-row"><div class="lbl2">Parent</div><div>${escapeHTML(o.contact.name || '-')}</div></div>
       <div class="pl-d-row"><div class="lbl2">Athlete</div><div>${escapeHTML(o.athlete || '-')}</div></div>
-      <div class="pl-d-row"><div class="lbl2">Athlete age</div><div id="pl-d-age">-</div></div>
-      <div class="pl-d-row"><div class="lbl2">Last trial</div><div style="color:${trialStr ? (trialPassed ? '#c47424' : 'var(--accent)') : 'var(--text-mute)'};font-weight:${trialStr ? '600' : '400'}">${trialStr ? escapeHTML(trialStr) : '-'}</div></div>
+      ${_plV2 ? `<div class="pl-d-row"><div class="lbl2">Athlete age</div><div id="pl-d-age">-</div></div>
+      <div class="pl-d-row"><div class="lbl2">Last trial</div><div style="color:${trialStr ? (trialPassed ? '#c47424' : 'var(--accent)') : 'var(--text-mute)'};font-weight:${trialStr ? '600' : '400'}">${trialStr ? escapeHTML(trialStr) : '-'}</div></div>` : ''}
       <div class="pl-d-row"><div class="lbl2">Phone</div><div>${o.contact.phone ? `<a href="tel:${escapeHTML(o.contact.phone)}" style="color:var(--accent)">${escapeHTML(o.contact.phone)}</a>` : '-'}</div></div>
       <div class="pl-d-row"><div class="lbl2">Email</div><div>${o.contact.email ? `<a href="mailto:${escapeHTML(o.contact.email)}" style="color:var(--accent)">${escapeHTML(o.contact.email)}</a>` : '-'}</div></div>
-      ${o.trainer ? `<div class="pl-d-row"><div class="lbl2">Coach</div><div>${escapeHTML(o.trainer)}</div></div>` : ''}
+      ${(_plV2 && o.trainer) ? `<div class="pl-d-row"><div class="lbl2">Coach</div><div>${escapeHTML(o.trainer)}</div></div>` : ''}
     </div>
-    ${(_isResp && o.contactId) ? `<div class="pl-d-section" id="pl-d-agent"><div class="lbl">🤖 Agent suggests</div><div id="pl-d-agent-body"><div style="color:var(--text-mute);font-size:13px"><span class="req-spin"></span> Checking…</div></div></div>` : ''}
-    <div class="pl-d-section" id="pl-d-msg"${(_isResp && o.contactId) ? ' style="display:none"' : ''}>
+    ${(_plV2 && _isResp && o.contactId) ? `<div class="pl-d-section" id="pl-d-agent"><div class="lbl">🤖 Agent suggests</div><div id="pl-d-agent-body"><div style="color:var(--text-mute);font-size:13px"><span class="req-spin"></span> Checking…</div></div></div>` : ''}
+    <div class="pl-d-section" id="pl-d-msg"${(_plV2 && _isResp && o.contactId) ? ' style="display:none"' : ''}>
       <div class="lbl">Messages</div>
       ${o.contactId ? `
         <div id="pl-d-thread" style="max-height:260px;overflow-y:auto;display:flex;flex-direction:column;gap:8px;padding:4px 0">
