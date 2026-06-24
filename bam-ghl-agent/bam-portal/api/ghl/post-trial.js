@@ -173,6 +173,22 @@ async function handler(req, res) {
     }
   }
 
+  // No-show → move the opportunity back to the Interested stage so it re-enters
+  // the nurture flow (the missed-trial automation handles the outreach). We don't
+  // ask about "good fit" for a no-show, so this is the whole outcome for them.
+  if (showedUp === false) {
+    try {
+      const pls = (await ghl("GET", `/opportunities/pipelines?locationId=${encodeURIComponent(client.ghl_location_id)}`, { token })).pipelines || [];
+      const pl = pls.find(p => p.id === pipelineId) || pls[0];
+      const interested = (pl?.stages || []).find(s => /interested/i.test(s.name || ""));
+      if (interested) {
+        await ghl("PUT", `/opportunities/${encodeURIComponent(oppId)}`, { token, body: { pipelineId: pl.id, pipelineStageId: interested.id } });
+        result.moved = true;
+        result.moved_to = "interested";
+      }
+    } catch (e) { console.error("no-show interested move failed (non-fatal):", e.message); }
+  }
+
   if (goodFit) {
     // Move to the Done Trial stage of the opp's pipeline.
     try {
@@ -200,7 +216,8 @@ async function handler(req, res) {
 
   // Send the academy's onboarding / sign-up link if the reviewer asked for it.
   // Link is configured per-academy on the training offer (offers.data.signup_url).
-  if (sendLink && contactId) {
+  // Never send it for a no-show (they didn't attend - guard in case the flag leaks through).
+  if (sendLink && contactId && showedUp !== false) {
     try {
       const offers = await sb(`offers?client_id=eq.${encodeURIComponent(clientId)}&type=eq.training&select=data&order=sort_order.asc&limit=1`);
       const signupUrl = ((offers && offers[0] && offers[0].data && offers[0].data.signup_url) || "").trim();

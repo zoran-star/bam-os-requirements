@@ -21505,14 +21505,14 @@ function _plPostTrialForm(oppId) {
           <button type="button" id="ptf-show-no" class="ptf-segbtn" onclick="_ptfSetShow(false)">No show</button>
         </div>
       </div>
-      <div class="ptf-field">
+      <div class="ptf-field" id="ptf-fit-field">
         <label>Was the trial a good fit?</label>
         <div class="ptf-seg">
           <button type="button" id="ptf-fit-yes" class="ptf-segbtn" onclick="_ptfSetFit(true)">Good fit</button>
           <button type="button" id="ptf-fit-no" class="ptf-segbtn" onclick="_ptfSetFit(false)">Not a fit</button>
         </div>
       </div>
-      <div class="ptf-field">
+      <div class="ptf-field" id="ptf-link-field">
         <label>Send onboarding link?</label>
         <div class="ptf-seg">
           <button type="button" id="ptf-link-yes" class="ptf-segbtn on" onclick="_ptfSetSendLink(true)">Yes, text it</button>
@@ -21528,7 +21528,7 @@ function _plPostTrialForm(oppId) {
         <textarea id="ptf-notes" class="ptf-input" rows="3" placeholder="Anything worth noting about this trial…"></textarea>
       </div>
       <div class="ptf-err" id="ptf-err"></div>
-      <div class="ptf-note">On a good fit the card moves to Done Trial + the trainer is assigned. With "Send onboarding link" on, we text the academy's sign-up link to the parent - set the link in KPIs → Setup → Offers (or the Blueprint training Sales section).</div>
+      <div class="ptf-note">On a good fit the card moves to Done Trial + the trainer is assigned. A no-show moves to Interested and fires the missed-trial automation. With "Send onboarding link" on, we text the academy's sign-up link to the parent - set the link in KPIs → Setup → Offers (or the Blueprint training Sales section).</div>
       <button class="ptf-submit" id="ptf-submit" onclick="_ptfSubmit()">Submit review</button>
     </div>`;
   ov.classList.add('open');
@@ -21568,6 +21568,23 @@ function _ptfSetShow(v) {
   _PTF_SHOW = v;
   document.getElementById('ptf-show-yes')?.classList.toggle('on', v === true);
   document.getElementById('ptf-show-no')?.classList.toggle('on', v === false);
+  // No-show → "good fit" and "send onboarding link" are irrelevant. Hide them,
+  // clear the fit (so it isn't required or sent), and force the link off (a
+  // no-show should never get the signup text). The backend moves them to Interested.
+  const noShow = (v === false);
+  const fitField = document.getElementById('ptf-fit-field');
+  const linkField = document.getElementById('ptf-link-field');
+  if (fitField) fitField.style.display = noShow ? 'none' : '';
+  if (linkField) linkField.style.display = noShow ? 'none' : '';
+  if (noShow) {
+    _PTF_FIT = null;
+    document.getElementById('ptf-fit-yes')?.classList.remove('on');
+    document.getElementById('ptf-fit-no')?.classList.remove('on');
+    _ptfSetSendLink(false);
+  } else if (v === true) {
+    _ptfSetSendLink(true);   // restore the default when they switch back to Showed up
+  }
+  const btn = document.getElementById('ptf-submit'); if (btn) btn.textContent = noShow ? 'Mark no-show' : 'Submit review';
 }
 function _ptfSetFit(v) {
   _PTF_FIT = v;
@@ -21582,7 +21599,9 @@ function _ptfSetSendLink(v) {
 function _ptfClose() { document.getElementById('ptf-overlay')?.classList.remove('open'); _PTF_OPP = null; }
 async function _ptfSubmit() {
   const err = document.getElementById('ptf-err');
-  if (_PTF_FIT === null) { err.textContent = 'Pick whether it was a good fit.'; err.style.display = 'block'; return; }
+  if (_PTF_SHOW === null) { err.textContent = 'Did the athlete show up?'; err.style.display = 'block'; return; }
+  // Good fit is only asked (and required) when they actually showed up.
+  if (_PTF_SHOW === true && _PTF_FIT === null) { err.textContent = 'Pick whether it was a good fit.'; err.style.display = 'block'; return; }
   const trainer = document.getElementById('ptf-trainer')?.value || '';
   const notes = document.getElementById('ptf-notes')?.value || '';
   const btn = document.getElementById('ptf-submit');
