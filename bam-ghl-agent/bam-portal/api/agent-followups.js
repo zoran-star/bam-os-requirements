@@ -16,6 +16,11 @@ import { withSentryApiRoute } from "./_sentry.js";
 //     "snooze"   { id, hours }                  → push the send time out
 //     "send-now" { id }                         → send immediately
 //     "detect-now" { client_id? }              → manually run the detector once
+//     "draft-one" { client_id, contact_id, conversation_id?, contact_name? }
+//                                               → draft+queue ONE follow-up for a
+//                                                 single lead (the forced 2-step
+//                                                 after a Hawkeye reply). Idempotent.
+//                                                 {stop:true} = brain says no f/u.
 //
 // Engine is per-academy gated by clients.ghl_kpi_config.followup_engine_enabled.
 
@@ -430,6 +435,74 @@ async function handler(req, res) {
       if (!ANTHROPIC_KEY) return res.status(500).json({ error: "ANTHROPIC_API_KEY not configured" });
       // Academy actors can only scan their own academy; staff may scan the default.
       return await runDetect(res, b.client_id || (actor.isStaff ? DEFAULT_CLIENT_ID : actor.academyClientIds[0]));
+    }
+    // ── Forced 2-step: draft ONE follow-up for a single contact, on demand ──
+    // After a human approves+sends a reply in Hawkeye, the UI immediately calls
+    // this to draft the mandatory next follow-up for that same lead — so every
+    // Responded lead always has a follow-up queued. Idempotent: hands back the
+    // existing active follow-up if one is already queued. Returns {stop:true}
+    // when the brain says no follow-up is warranted (booked / firm no / etc) —
+    // the UI then offers Lost / Abandon instead of a follow-up.
+    if (b.action === "draft-one") {
+      if (!ANTHROPIC_KEY) return res.status(500).json({ error: "ANTHROPIC_API_KEY not configured" });
+      if (!b.contact_id) return res.status(400).json({ error: "contact_id required" });
+      const cid = b.client_id || (actor.isStaff ? DEFAULT_CLIENT_ID : actor.academyClientIds[0]);
+      const client = await loadClient(cid);
+      if (!client) return res.status(404).json({ error: "client not found" });
+      // Already have an active follow-up for this lead? Hand it back (idempotent).
+      const active = await sb(`agent_followups?client_id=eq.${cid}&ghl_contact_id=eq.${encodeURIComponent(b.contact_id)}&status=in.(pending,approved)&select=*&order=created_at.desc&limit=1`).catch(() => null);
+      if (Array.isArray(active) && active[0]) return res.status(200).json({ followup: active[0], existing: true });
+      const creds = await pickGhlToken(client);
+      if (!creds) return res.status(502).json({ error: "no GHL token" });
+      const { token, locationId } = creds;
+      let conv = null;
+      try { conv = b.conversation_id ? { id: b.conversation_id } : await findConversation(token, locationId, b.contact_id); } catch (_) {}
+      if (!conv || !conv.id) return res.status(404).json({ error: "no conversation for this contact" });
+      let thread = [];
+      try { thread = await threadMessages(token, conv.id); } catch (_) {}
+      if (!thread.length) return res.status(422).json({ error: "no messages to draft from" });
+      const transcript = thread.map(m => `${m.role === "agent" ? "You" : "Lead"}: ${m.text}`).join("\n");
+      const cfgBrain = await loadConfig(cid);
+      let decision;
+      try {
+        // quietHours=0: we JUST replied, so the brain picks the next send time from its timing rules.
+        const sys = buildFollowupSystem(cfgBrain, 0) + await loadContactMemory(sb, cid, b.contact_id, { ghl, token, locationId });
+        decision = await runScheduleAgent(sys, transcript);
+      } catch (e) { return res.status(502).json({ error: `draft failed: ${e.message}` }); }
+      const message = String(decision.message || "").trim();
+      if (!decision.should_followup || !message) {
+        return res.status(200).json({ followup: null, stop: true, reason: decision.reason || decision.goal || "the agent doesn't recommend another follow-up for this lead" });
+      }
+      const sendInH = clamp(Number(decision.send_in_hours) || 24, 1, MAX_AGE_DAYS * 24);
+      const scheduledAt = nextSendableTime(new Date(Date.now() + sendInH * 3600000)).toISOString();
+      const lastLeadMsg = [...thread].reverse().find(m => m.role === "parent");
+      const lastOurMsg  = [...thread].reverse().find(m => m.role === "agent");
+      let inserted;
+      try {
+        inserted = await sb(`agent_followups`, {
+          method: "POST", headers: { Prefer: "return=representation" },
+          body: JSON.stringify([{
+            client_id: cid, ghl_contact_id: String(b.contact_id), ghl_conversation_id: conv.id,
+            contact_name: b.contact_name || "Lead",
+            goal: decision.goal || null, draft_message: message,
+            summary: decision.summary ? String(decision.summary).slice(0, 600) : null,
+            last_message: lastLeadMsg ? String(lastLeadMsg.text).slice(0, 500) : null,
+            last_outbound: lastOurMsg ? String(lastOurMsg.text).slice(0, 500) : null,
+            thread_tail: thread.slice(-6).map(m => ({ role: m.role === "agent" ? "agent" : "lead", text: String(m.text).slice(0, 320) })),
+            scheduled_at: scheduledAt, status: "pending",
+            trigger_reason: decision.reason || null,
+            confidence: typeof decision.confidence === "number" ? decision.confidence : null,
+            created_by: "forced-2step",
+          }]),
+        });
+      } catch (e) {
+        // Unique-active race (cron queued one in parallel) → return whatever's active now.
+        const again = await sb(`agent_followups?client_id=eq.${cid}&ghl_contact_id=eq.${encodeURIComponent(b.contact_id)}&status=in.(pending,approved)&select=*&order=created_at.desc&limit=1`).catch(() => null);
+        if (Array.isArray(again) && again[0]) return res.status(200).json({ followup: again[0], existing: true });
+        return res.status(500).json({ error: `insert failed: ${e.message}` });
+      }
+      const row = Array.isArray(inserted) ? inserted[0] : inserted;
+      return res.status(200).json({ followup: row });
     }
     return res.status(400).json({ error: "unknown action" });
   } catch (e) {
