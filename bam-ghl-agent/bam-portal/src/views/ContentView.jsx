@@ -703,8 +703,12 @@ function ContentTicketsTab({ tk, session, me }) {
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
       body: JSON.stringify(body),
     });
-    const json = await res.json();
-    if (!res.ok) throw new Error(json.error || `HTTP ${res.status}`);
+    // Read as text first so a non-JSON error (gateway 500, timeout, 413) surfaces
+    // its real message instead of a cryptic "Unexpected token" JSON parse error.
+    const text = await res.text();
+    let json = {};
+    try { json = text ? JSON.parse(text) : {}; } catch { /* non-JSON error body */ }
+    if (!res.ok) throw new Error(json.error || (text ? text.slice(0, 160) : `HTTP ${res.status}`));
     return json.ticket;
   }
 
@@ -983,7 +987,7 @@ function ContentTicketDetail({ tk, session, ticket, onBack, onRefetch, patchTick
           contentType: file.type || "application/octet-stream",
           cacheControl: "3600",
         });
-        if (upErr) throw new Error(upErr.message);
+        if (upErr) throw new Error(`Storage upload failed (${file.name}): ${upErr.message}`);
         const { data: urlData } = supabase.storage.from(STORAGE_BUCKET).getPublicUrl(path);
         uploaded.push({ name: file.name, url: urlData.publicUrl, size: file.size || 0, mime: file.type || "" });
       }
@@ -992,7 +996,10 @@ function ContentTicketDetail({ tk, session, ticket, onBack, onRefetch, patchTick
       await onRefetch();
       showBanner(`Uploaded ${uploaded.length} final file${uploaded.length === 1 ? "" : "s"}.`);
     } catch (e) {
-      alert("Upload failed: " + e.message);
+      // The storage upload + DB write may have already succeeded even if the
+      // response errored, so refetch so any saved finals still show up.
+      try { await onRefetch(); } catch { /* ignore */ }
+      alert("Upload failed: " + e.message + "\n\nIf your files don't appear, refresh - they may have saved.");
     } finally {
       setUploading(false);
     }
