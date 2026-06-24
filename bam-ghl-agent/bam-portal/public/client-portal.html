@@ -702,7 +702,11 @@
 
   @keyframes fadeIn {
     from { opacity: 0; transform: translateY(8px); }
-    to   { opacity: 1; transform: translateY(0); }
+    /* End at `none`, NOT translateY(0): with fill-mode:both the active view keeps
+       this end state, and a lingering transform (even translateY(0)) makes the
+       view a containing block - which breaks position:fixed for the member drawer
+       (it anchored to the scrolled list instead of the viewport). */
+    to   { opacity: 1; transform: none; }
   }
 
   /* ── Section header ── */
@@ -28458,7 +28462,7 @@ function _renderMemberModalBody(m, stripe, history) {
       ${btn('⏸ Pause date fix', `mPauseDateFix('${m.id}')`)}
       ${gbtn('Change plan', `mChange('${m.id}','${escapeHTML(m.plan||'')}')`, canManage)}
       ${gbtn('Refund',      `mRefund('${m.id}')`, canManage)}
-      ${gbtn('Cancel',      `mCancel('${m.id}','${escapeHTML((m.athlete_name||'').replace(/'/g, ''))}')`, canManage)}
+      ${btn('Cancel',       `mCancel('${m.id}','${escapeHTML((m.athlete_name||'').replace(/'/g, ''))}')`)}
       ${btn('Payment link',`mPaymentLink('${m.id}')`)}
       ${btn('💳 Get card link',`mGetCardLink('${m.id}')`)}
       ${(_MEMBERS_CIQ && _MEMBERS_CIQ.enabled && !m.coachiq_member_id) ? btn('🟦 Set up CoachIQ', `mSetupCoachiq('${m.id}','${escapeHTML((m.parent_email||'').replace(/'/g,''))}','${escapeHTML((m.athlete_name||'').replace(/'/g,''))}')`) : ''}
