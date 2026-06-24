@@ -21491,6 +21491,12 @@ function _plIsDoneTrialStage(stage) {
   const n = (stage && stage.name || '').toLowerCase();
   return n.includes('trial') && (n.includes('done') || n.includes('complete') || n.includes('attended'));
 }
+// The "Scheduled Trial" stage — the only place the post-trial form belongs (the
+// trial is booked here; staff fill the form after it happens).
+function _plIsScheduledTrialStage(stage) {
+  const n = (stage && stage.name || '').toLowerCase();
+  return n.includes('trial') && (n.includes('schedul') || n.includes('booked') || n.includes('upcoming')) && !_plIsDoneTrialStage(stage);
+}
 
 // Post-trial form - coach fills it after the trial. Captures fit, the
 // trainer leading the sale, and notes. On "good fit" the opportunity moves
@@ -22067,6 +22073,10 @@ function _plOpenCard(oppId) {
 
   const tr = _plTrialInfo(o.trialDate);
   const trialStr = tr.str, trialPassed = tr.passed, trialStarted = tr.started;
+  _PL_DRAWER_CONTACT = o.contactId || null;
+  const _ghlLoc = (_PL_DATA && _PL_DATA.location_id) || (_GHL_CONNECT_STATE && _GHL_CONNECT_STATE.location_id) || '';
+  const _ghlContactUrl = (o.contactId && _ghlLoc) ? `https://app.gohighlevel.com/v2/location/${_ghlLoc}/contacts/detail/${o.contactId}` : '';
+  const _isResp = !!(s && /respond/i.test(s.name || ''));
 
   // Journey timeline from what we know - form fill, booking, post-trial review,
   // won/lost. Each step renders only if we have it.
@@ -22096,7 +22106,10 @@ function _plOpenCard(oppId) {
         <div class="pl-d-title">${escapeHTML(o.contact.name || o.name || 'Untitled')}</div>
         <div class="pl-d-sub">${escapeHTML(p.name)} · ${escapeHTML(s?.name || '-')} · ${memberBadge}</div>
       </div>
-      <button class="pc-d-close" onclick="closePipelineDrawer()" aria-label="Close" style="background:none;border:none;color:var(--text-mute);cursor:pointer;font-size:22px;padding:4px 10px">×</button>
+      <div style="display:flex;align-items:center;gap:4px">
+        ${_ghlContactUrl ? `<a href="${_ghlContactUrl}" target="_blank" rel="noopener noreferrer" title="Call in GHL" aria-label="Call in GHL" style="text-decoration:none;display:inline-flex;align-items:center;justify-content:center;width:36px;height:36px;border:1px solid var(--green,#4CC76A);border-radius:8px;color:var(--green,#4CC76A);font-size:17px">📞</a>` : ''}
+        <button class="pc-d-close" onclick="closePipelineDrawer()" aria-label="Close" style="background:none;border:none;color:var(--text-mute);cursor:pointer;font-size:22px;padding:4px 10px">×</button>
+      </div>
     </div>
     <div class="pl-d-section">
       <div class="pl-d-row"><div class="lbl2">Parent</div><div>${escapeHTML(o.contact.name || '-')}</div></div>
@@ -22107,6 +22120,7 @@ function _plOpenCard(oppId) {
       <div class="pl-d-row"><div class="lbl2">Email</div><div>${o.contact.email ? `<a href="mailto:${escapeHTML(o.contact.email)}" style="color:var(--accent)">${escapeHTML(o.contact.email)}</a>` : '-'}</div></div>
       ${o.trainer ? `<div class="pl-d-row"><div class="lbl2">Coach</div><div>${escapeHTML(o.trainer)}</div></div>` : ''}
     </div>
+    ${(_isResp && o.contactId) ? `<div class="pl-d-section" id="pl-d-agent"><div class="lbl">🤖 Agent suggests</div><div id="pl-d-agent-body"><div style="color:var(--text-mute);font-size:13px"><span class="req-spin"></span> Checking…</div></div></div>` : ''}
     <div class="pl-d-section" id="pl-d-msg">
       <div class="lbl">Messages</div>
       ${o.contactId ? `
@@ -22142,7 +22156,7 @@ function _plOpenCard(oppId) {
     <div class="pl-d-actions">
       ${_plIsDoneTrialStage(s)
         ? `<button class="pl-d-btn primary" onclick="_plMarkWon('${escapeHTML(o.id)}')">Mark won</button>`
-        : (trialStarted ? `<button class="pl-d-btn primary" onclick="_plPostTrialForm('${escapeHTML(o.id)}')">Post trial form</button>` : '')}
+        : (_plIsScheduledTrialStage(s) ? `<button class="pl-d-btn primary" onclick="_plPostTrialForm('${escapeHTML(o.id)}')">Post trial form</button>` : '')}
       <button class="pl-d-btn" style="border-color:var(--gold,#E8C547);color:var(--gold,#E8C547)" onclick="_plEnrollSpecial('${escapeHTML(o.id)}')">📨 Summer special</button>
       ${o.member
         ? `<button class="pl-d-btn" onclick="closePipelineDrawer(); openMemberPopup('${escapeHTML(o.member.id)}')">Open member popup</button>`
@@ -22155,10 +22169,46 @@ function _plOpenCard(oppId) {
   _PL_MSG = o.contactId ? { contactId: o.contactId, name: o.contact.name || o.name || '', phone: o.contact.phone || null, email: o.contact.email || null, conversationId: null } : null;
   _IB_PENDING_FILES = [];
   if (o.contactId) _plLoadMessages();
+  if (_isResp && o.contactId) _plLoadAgentCard();
+}
+
+// ── Pipeline card drawer: agent suggestion (inline Hawkeye) ──────────────────
+// Loads the agent's pending card(s) for the lead in the drawer and renders them
+// with the EXACT Hawkeye renderers + action handlers — so staff approve/edit/skip/
+// ghost/lost/book right here without opening the Hawkeye overlay.
+async function _plLoadAgentCard() {
+  const host = document.getElementById('pl-d-agent-body');
+  if (!host || !_PL_DRAWER_CONTACT) return;
+  try {
+    const [fu, rd] = await Promise.all([
+      _apxPost('/api/agent-followups', 'list', {}).catch(() => ({})),
+      _apxPost('/api/agent-approvals', 'list-ready', {}),
+    ]);
+    _APX_DATA = _apxSplit(fu, rd);
+    _plRenderAgentSection();
+  } catch (e) {
+    host.innerHTML = `<div style="font-size:12.5px;color:var(--text-mute)">Couldn't load the agent's suggestion - ${escapeHTML(_apxErr(e))}</div>`;
+  }
+}
+// Render (or re-render after an action) the drawer's agent section from _APX_DATA,
+// filtered to the lead currently shown. Called on load and from _apxRemove.
+function _plRenderAgentSection() {
+  const host = document.getElementById('pl-d-agent-body');
+  if (!host || !_PL_DRAWER_CONTACT || !_APX_DATA) return;
+  const mine = (x) => String(x.ghl_contact_id || '') === String(_PL_DRAWER_CONTACT);
+  const cards = [
+    ...(_APX_DATA.ghost || []).filter(mine).map(_apxGhostCard),
+    ...(_APX_DATA.book  || []).filter(mine).map(_apxBookCard),
+    ...(_APX_DATA.lost  || []).filter(mine).map(_apxLostCard),
+    ...(_APX_DATA.ready || []).filter(mine).map(r => _apxCard('ready', r)),
+    ...(_APX_DATA.followups || []).filter(mine).map(r => _apxCard('followup', r)),
+  ];
+  host.innerHTML = cards.length ? cards.join('') : `<div style="font-size:12.5px;color:var(--text-mute)">Nothing waiting - the agent has no suggested action right now.</div>`;
 }
 
 // ── Pipeline card drawer: messaging ─────────────────────────────────────────
 let _PL_MSG = null;   // { contactId, name, phone, email, conversationId }
+let _PL_DRAWER_CONTACT = null;   // GHL contact id currently shown in the drawer
 
 async function _plLoadMessages() {
   const host = document.getElementById('pl-d-thread');
@@ -22310,6 +22360,7 @@ async function _plLoadLeadDetail(o) {
 function closePipelineDrawer() {
   document.getElementById('pl-drawer-overlay')?.classList.remove('open');
   document.getElementById('pl-drawer')?.classList.remove('open');
+  _PL_DRAWER_CONTACT = null;
 }
 
 async function _plConvert(oppId) {
@@ -22908,6 +22959,7 @@ function _apxRemove(id) {
   _APX_DATA.book = (_APX_DATA.book || []).filter(x => x.id !== id);
   _APX_DATA.ghost = (_APX_DATA.ghost || []).filter(x => x.id !== id);
   _apxRender();
+  try { _plRenderAgentSection(); } catch (_) {}   // keep the in-drawer agent section in sync
   const span = document.getElementById('apx-count');
   const n = _APX_DATA.followups.length + _APX_DATA.ready.length + (_APX_DATA.lost || []).length + (_APX_DATA.book || []).length + (_APX_DATA.ghost || []).length;
   if (span) span.textContent = n ? `(${n})` : '';
