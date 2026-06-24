@@ -190,6 +190,21 @@ async function runDetect(res, onlyClientId) {
 }
 
 // ── Worker: send approved follow-ups whose time has come ──
+// Did the lead reply after `sinceISO`? The Supabase mirror (`ghl_inbound_messages`)
+// is only populated by the inbound webhook, which may not be firing — so it can't
+// be trusted alone. We check LIVE GHL first (the source of truth) and fall back to
+// the mirror. Either says "replied" → we cancel the queued send.
+async function leadRepliedLiveGHL(token, locationId, contactId, sinceISO) {
+  if (!token || !locationId || !contactId || !sinceISO) return false;
+  try {
+    const s = await ghl("GET", `/conversations/search?${new URLSearchParams({ locationId, contactId })}`, { token });
+    const conv = (s.conversations || s.data || [])[0];
+    if (!conv) return false;
+    const dir = String(conv.lastMessageDirection || "").toLowerCase();
+    const at = conv.lastMessageDate || conv.dateUpdated;
+    return dir === "inbound" && at != null && new Date(at).getTime() > new Date(sinceISO).getTime();
+  } catch (_) { return false; }
+}
 async function leadRepliedSince(clientId, contactId, sinceISO) {
   try {
     const rows = await sb(`ghl_inbound_messages?client_id=eq.${clientId}&ghl_contact_id=eq.${encodeURIComponent(contactId)}&occurred_at=gt.${sinceISO}&select=id&limit=1`);
@@ -214,14 +229,19 @@ async function sendOne(row, clientCache, respondedCache = {}) {
     }
   }
 
-  // Cancel if the lead replied after this was drafted (belt-and-suspenders with
-  // the inbound webhook's cancel hook).
+  // Cancel if the lead replied after this was drafted. Check LIVE GHL first (the
+  // source of truth — so we never text someone who already replied even if the
+  // inbound webhook/mirror is down), then the Supabase mirror as a cheap backup.
   const since = row.last_lead_at || row.created_at;
-  if (since && await leadRepliedSince(row.client_id, row.ghl_contact_id, since)) {
-    await sb(`agent_followups?id=eq.${row.id}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ status: "canceled", send_error: "lead replied", updated_at: new Date().toISOString() }) });
-    return { id: row.id, canceled: "lead replied" };
+  if (since) {
+    const repliedLive = credsGuard && await leadRepliedLiveGHL(credsGuard.token, credsGuard.locationId, row.ghl_contact_id, since);
+    const replied = repliedLive || await leadRepliedSince(row.client_id, row.ghl_contact_id, since);
+    if (replied) {
+      await sb(`agent_followups?id=eq.${row.id}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ status: "canceled", send_error: "lead replied", updated_at: new Date().toISOString() }) });
+      return { id: row.id, canceled: "lead replied" };
+    }
   }
-  const creds = await pickGhlToken(client);
+  const creds = credsGuard || await pickGhlToken(client);
   if (!creds) { await markFailed(row.id, "no GHL token"); return { id: row.id, error: "no token" }; }
   try {
     await ghl("POST", `/conversations/messages`, { token: creds.token, body: { type: "SMS", contactId: row.ghl_contact_id, message: row.draft_message } });
