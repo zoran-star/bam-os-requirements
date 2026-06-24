@@ -20,7 +20,7 @@ import { assemblePrompt } from "./agent/prompt-structure.js";
 import { buildAgentSystem } from "./agent/brain.js";
 import { loadContactMemory } from "./agent/contact-memory.js";
 import { loadCalendars, calendarForGroup, freeSlots, summarizeSlots } from "./agent/booking.js";
-import { respondedStage, contactInRespondedStage, computeQueue, respondedContactIdSetCached, peekRespondedIdSet, interestedStage } from "./agent/_stage.js";
+import { respondedStage, contactInRespondedStage, computeQueue, respondedContactIdSetCached, peekRespondedIdSet, interestedStage, toIso } from "./agent/_stage.js";
 import { agentMode, modeIsOn, shouldAutoSend } from "./agent/_mode.js";
 import { withinQuietHours, nextSendableTime } from "./agent/_quiet.js";
 import { resolveAgentActor } from "./agent/_auth.js";
@@ -193,7 +193,7 @@ async function threadMessages(token, conversationId) {
     date: m.dateAdded || m.createdAt || m.timestamp || null,
   })).filter(m => m.text);
   msgs.sort((a, b) => new Date(a.date || 0) - new Date(b.date || 0));
-  return msgs.map(m => ({ role: m.direction === "outbound" ? "agent" : "parent", text: m.text }));
+  return msgs.map(m => ({ role: m.direction === "outbound" ? "agent" : "parent", text: m.text, date: m.date }));
 }
 
 // Draft the agent's next reply for one Responded-stage contact. Returns the
@@ -239,7 +239,7 @@ async function draftForContact(token, locationId, clientId, contactId, cfg, opts
     summary: out.summary ? String(out.summary).slice(0, 600) : null,
     last_message: (() => { const lead = [...messages].reverse().find(m => m.role === "parent"); return lead ? String(lead.text).slice(0, 500) : null; })(),
     last_outbound: (() => { const ours = [...messages].reverse().find(m => m.role === "agent"); return ours ? String(ours.text).slice(0, 500) : null; })(),
-    thread_tail: messages.slice(-6).map(m => ({ role: m.role === "agent" ? "agent" : "lead", text: String(m.text).slice(0, 320) })),
+    thread_tail: messages.slice(-6).map(m => ({ role: m.role === "agent" ? "agent" : "lead", text: String(m.text).slice(0, 320), at: toIso(m.date) })),
     reply_count: agentMsgs.length,
     booking_asks: agentMsgs.filter(m => BOOK_ASK.test(m.text)).length,
   };
