@@ -1872,6 +1872,19 @@
     animation: loading-spin 0.8s linear infinite;
   }
 
+  /* Big confirm-action spinner + success checkmark (member billing flows). */
+  .mm-spin {
+    width:46px; height:46px; border-radius:50%;
+    border:4px solid rgba(232,197,71,0.18); border-top-color: var(--gold,#E8C547);
+    animation: loading-spin 0.7s linear infinite;
+  }
+  .mm-check svg { display:block; margin:0 auto; }
+  .mm-check-c { stroke: var(--green,#3eaf5c); stroke-width:3; fill:none; stroke-dasharray:151; stroke-dashoffset:151; animation: mmCircle .45s ease-out forwards; }
+  .mm-check-k { stroke: var(--green,#3eaf5c); stroke-width:4; fill:none; stroke-linecap:round; stroke-linejoin:round; stroke-dasharray:44; stroke-dashoffset:44; animation: mmCheck .32s .42s ease-out forwards; }
+  @keyframes mmCircle { to { stroke-dashoffset:0; } }
+  @keyframes mmCheck  { to { stroke-dashoffset:0; } }
+  @keyframes mmPop    { 0% { transform:scale(.8); opacity:0; } 60% { transform:scale(1.04); } 100% { transform:scale(1); opacity:1; } }
+
   /* Skeleton loaders (first-load placeholders for inbox + pipeline board). */
   @keyframes skelShimmer { 0% { background-position: -420px 0; } 100% { background-position: 420px 0; } }
   .skel {
@@ -28676,6 +28689,37 @@ function _mmModal(opts = {}) {
   });
 }
 
+// Run an async billing action behind a centered overlay: a circle spinner while
+// it works, then a check-mark "success" animation that auto-closes. Returns the
+// task's result on success; on failure it removes the overlay and rethrows so the
+// caller can handle the error. Reusable for pause / cancel / change / refund.
+async function _mmProgress(task, opts = {}) {
+  const label = opts.label || 'Working…';
+  const doneLabel = opts.doneLabel || 'Done';
+  document.getElementById('mm-progress-overlay')?.remove();
+  document.body.insertAdjacentHTML('beforeend', `<div id="mm-progress-overlay" style="position:fixed;inset:0;background:rgba(0,0,0,.62);z-index:9520;display:flex;align-items:center;justify-content:center;padding:18px">
+    <div id="mm-progress-card" style="background:var(--surface);border:1px solid var(--border);border-radius:16px;min-width:230px;max-width:330px;padding:30px 26px;box-shadow:0 24px 70px rgba(0,0,0,.55);text-align:center;animation:mmPop .2s ease-out">
+      <div class="mm-spin" style="margin:0 auto 16px"></div>
+      <div style="font-size:14px;font-weight:600;color:var(--text)">${escapeHTML(label)}</div>
+    </div></div>`);
+  try {
+    const result = await task();
+    const card = document.getElementById('mm-progress-card');
+    if (card) {
+      card.style.animation = 'mmPop .25s ease-out';
+      card.innerHTML = `<div class="mm-check" style="margin-bottom:6px"><svg viewBox="0 0 52 52" width="58" height="58"><circle class="mm-check-c" cx="26" cy="26" r="24"/><path class="mm-check-k" d="M15 27 l7.5 7.5 L38 18"/></svg></div>
+        <div style="font-size:15px;font-weight:700;color:var(--text)">${escapeHTML(doneLabel)}</div>`;
+    }
+    await new Promise(r => setTimeout(r, 1050));
+    const ov = document.getElementById('mm-progress-overlay');
+    if (ov) { ov.style.transition = 'opacity .25s'; ov.style.opacity = '0'; await new Promise(r => setTimeout(r, 240)); ov.remove(); }
+    return result;
+  } catch (e) {
+    document.getElementById('mm-progress-overlay')?.remove();
+    throw e;
+  }
+}
+
 async function mPause(memberId) {
   // Re-pause detection. Pull the freshest known state - if we have a list
   // cache, use it; otherwise fall back to a fresh single-member fetch so a
@@ -28733,12 +28777,17 @@ async function mPause(memberId) {
   if (vals.reason) body.reason = vals.reason;
 
   try {
-    const r = await _memberAction(memberId, 'pause', body);
-    let msg = isUpdatingExistingPause ? 'Pause updated.' : 'Paused.';
-    if (r.sub?.scheduled) msg = `🕐 Pause queued for ${startTrim} - auto-activates that morning.`;
-    if (r.sub?.capped_to_stripe_max) msg += ' · ⚠ End date capped to Stripe 730-day max.';
-    if (r.sub?.resume_date) msg += ` · Next charge: ${r.sub.resume_date}`;
-    _plToast(msg);
+    // Spinner in the modal while Stripe processes → check-mark animation → close.
+    const r = await _mmProgress(() => _memberAction(memberId, 'pause', body), {
+      label: isUpdatingExistingPause ? 'Updating pause…' : 'Pausing…',
+      doneLabel: isUpdatingExistingPause ? 'Pause updated' : 'Paused',
+    });
+    // Only surface a toast when there's extra detail beyond the success animation.
+    let extra = '';
+    if (r.sub?.scheduled) extra = `🕐 Pause queued for ${startTrim} - auto-activates that morning.`;
+    if (r.sub?.capped_to_stripe_max) extra += (extra ? ' · ' : '') + '⚠ End date capped to Stripe 730-day max.';
+    if (r.sub?.resume_date) extra += (extra ? ' · ' : '') + `Next charge: ${r.sub.resume_date}`;
+    if (extra) _plToast(extra);
     closeMemberPopup();
     await fetchAndRenderMembers();
   } catch (e) {
