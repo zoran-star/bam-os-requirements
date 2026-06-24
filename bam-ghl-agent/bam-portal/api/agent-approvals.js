@@ -20,7 +20,7 @@ import { assemblePrompt } from "./agent/prompt-structure.js";
 import { buildAgentSystem } from "./agent/brain.js";
 import { loadContactMemory } from "./agent/contact-memory.js";
 import { loadCalendars, calendarForGroup, freeSlots, summarizeSlots } from "./agent/booking.js";
-import { respondedStage, contactInRespondedStage, computeQueue, respondedContactIdSetCached, peekRespondedIdSet } from "./agent/_stage.js";
+import { respondedStage, contactInRespondedStage, computeQueue, respondedContactIdSetCached, peekRespondedIdSet, interestedStage } from "./agent/_stage.js";
 import { agentMode, modeIsOn, shouldAutoSend } from "./agent/_mode.js";
 import { withinQuietHours, nextSendableTime } from "./agent/_quiet.js";
 import { resolveAgentActor } from "./agent/_auth.js";
@@ -248,6 +248,22 @@ async function draftForContact(token, locationId, clientId, contactId, cfg, opts
 // Fire a reply via GHL SMS (used by manual approve + self-drive auto-send).
 async function sendReplyViaGhl(token, contactId, reply) {
   await ghl("POST", `/conversations/messages`, { token, body: { type: "SMS", contactId, message: String(reply) } });
+}
+
+// Enroll a contact in the academy's Ghosted automation (the multi-touch text/email
+// sequence configured on the training offer's Sales step → offers.data.ghosted_workflow,
+// same place the manual 👻 Ghosted button reads). Throws if none is configured.
+async function enrollGhosted(client, token, contactId) {
+  let workflowId = "";
+  try {
+    const offers = await sb(`offers?client_id=eq.${encodeURIComponent(client.id)}&type=eq.training&select=data&order=sort_order.asc&limit=1`);
+    workflowId = ((offers && offers[0] && offers[0].data && offers[0].data.ghosted_workflow) || "").trim();
+  } catch (_) {}
+  if (!workflowId) { const e = new Error("No Ghosted automation set up yet. Pick one on the training offer's Sales step."); e.status = 400; throw e; }
+  // GHL rejects a trailing 'Z' on eventStartTime — send an explicit +00:00 offset.
+  const eventStartTime = new Date().toISOString().replace(/\.\d{3}Z$/, "+00:00");
+  await ghl("POST", `/contacts/${encodeURIComponent(contactId)}/workflow/${encodeURIComponent(workflowId)}`, { token, body: { eventStartTime } });
+  return workflowId;
 }
 
 // Append to the audit log (agent_approvals). Non-fatal.
@@ -710,6 +726,44 @@ async function handler(req, res) {
       try { await sb(`agent_ready_replies?id=eq.${encodeURIComponent(b.ready_id)}&client_id=eq.${clientId}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ status: "sent", approved_by: staffEmail, approved_at: new Date().toISOString(), sent_at: new Date().toISOString(), updated_at: new Date().toISOString() }) }); } catch (_) {}
       try { await logApproval({ client_id: clientId, ghl_contact_id: contactId, contact_name: row.contact_name || null, final_reply: `[booked ${row.book_group || "trial"} @ ${startIso}]`, status: "sent", created_by: staffEmail }); } catch (_) {}
       return res.status(200).json({ ok: true, booked: true, appointment_id: appt?.id || appt?.appointment?.id || null, slot_at: startIso });
+    }
+
+    // Human ✓ on a Ghost card → enroll the lead in the academy's Ghosted automation
+    // and move them to Interested (out of Responded). The GHL workflow then does the
+    // multi-touch follow-up: reply → back to Responded, no reply → marked Lost.
+    // This REPLACES drafting one-off follow-up nudges. Works from a ghost ready-row
+    // (ready_id) OR straight from a contact_id (the board "Needs action" badge).
+    if (b.action === "confirm-ghost") {
+      let row = null, contactId = b.contact_id || null;
+      if (b.ready_id) {
+        [row] = await sb(`agent_ready_replies?id=eq.${encodeURIComponent(b.ready_id)}&client_id=eq.${clientId}&select=*`);
+        if (!row) return res.status(404).json({ error: "not found" });
+        contactId = row.ghl_contact_id;
+      }
+      if (!contactId) return res.status(400).json({ error: "ready_id or contact_id required" });
+      // Find this contact's open opportunity (for the stage move + outcome log).
+      let oppId = null;
+      try {
+        const d = await ghl("GET", `/opportunities/search?${new URLSearchParams({ location_id: locationId, contact_id: contactId, limit: "20" })}`, { token });
+        const opps = d.opportunities || d.data || [];
+        const pick = opps.find(o => String(o.status || "").toLowerCase() === "open") || opps[0];
+        oppId = pick && pick.id;
+      } catch (e) { return res.status(e.status || 502).json({ error: `GHL find opp: ${e.message}` }); }
+      // Enroll in the Ghosted automation (the only step that MUST succeed).
+      let workflowId;
+      try { workflowId = await enrollGhosted(client, token, contactId); }
+      catch (e) { return res.status(e.status || 502).json({ error: e.message }); }
+      // Move the opp to Interested so it leaves Responded (best-effort — the enroll
+      // already happened; the GHL workflow will move them too).
+      try {
+        const is = await interestedStage(token, locationId);
+        if (is && oppId) await ghl("PUT", `/opportunities/${encodeURIComponent(oppId)}`, { token, body: { pipelineId: is.pipelineId, pipelineStageId: is.stageId } });
+      } catch (_) {}
+      try { if (oppId) await sb(`pipeline_outcomes`, { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify([{ client_id: clientId, opportunity_id: oppId, status: "ghosted", reason: "sent to ghosted automation" }]) }); } catch (_) {}
+      // Clear ALL of this lead's queued cards (replies + follow-ups) — they've left Responded.
+      try { await sb(`agent_ready_replies?client_id=eq.${clientId}&ghl_contact_id=eq.${encodeURIComponent(contactId)}&status=in.(pending,approved)`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ status: "sent", approved_by: staffEmail, approved_at: new Date().toISOString(), sent_at: new Date().toISOString(), updated_at: new Date().toISOString() }) }); } catch (_) {}
+      try { await sb(`agent_followups?client_id=eq.${clientId}&ghl_contact_id=eq.${encodeURIComponent(contactId)}&status=in.(pending,approved)`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ status: "canceled", send_error: "sent to ghosted", updated_at: new Date().toISOString() }) }); } catch (_) {}
+      return res.status(200).json({ ok: true, ghosted: true, workflow_id: workflowId, opportunity_id: oppId });
     }
 
     return res.status(400).json({ error: "unknown action" });

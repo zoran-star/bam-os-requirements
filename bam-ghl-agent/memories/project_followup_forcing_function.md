@@ -1,72 +1,66 @@
 ---
-name: Follow-up Forcing Function (Responded stage)
-description: 2026-06-23 — "everybody in the Responded stage always has a follow-up scheduled." Per-card All good / Needs action badge on the Sales board, a forced 2-step in Hawkeye (reply → mandatory follow-up approval), and an Abandon option added to the ✕/Lost flow. BAM GTA / V2-agent only, V1 untouched.
+name: Quiet Lead → Send to Ghosted (Responded stage)
+description: 2026-06-24 — REPLACED the "always schedule a follow-up" forcing function. Responded leads quiet ≥24h (from our last msg) now get a "Send to Ghosted" card in Hawkeye instead of a drafted nudge. Staff click 👻 Send to Ghosted (enroll in academy ghosted_workflow + move to Interested) or Lost/Abandon/Skip. No more auto-drafted nudge messages, no mandatory 2-step modal. BAM GTA / V2-agent only.
 type: project
 ---
 
-# Follow-up forcing function
+# Quiet lead → Send to Ghosted
 
-Goal (Zoran): every lead in the **Responded** stage always has a follow-up
-queued. Built three coordinated pieces. **Hawkeye = the 👁 agent approval queue.**
+**Supersedes the old "follow-up forcing function" (2026-06-23).** Zoran realized BAM
+GTA already has an **SMS Ghosted** GHL automation (multi-touch texts+emails → moves
+back to Interested on reply → marks Lost if no reply → Lost triggers lead-nurture).
+So the agent should NOT draft one-off nudges and should NOT force a follow-up on
+every lead. Instead: if a lead's quiet ~a day, the action is **Send to Ghosted**.
 
-## 1. Sales-board badge (per Responded card)
-- 🟢 **All good** = the lead has an active follow-up (`agent_followups` row with
-  status `pending` or `approved`). 🔴 **Needs action** = none.
-- Tap either → `_apxOpen(contactId)` opens Hawkeye **focused on that lead**
-  (filters the queue to their cards); if nothing's queued, a "Draft a follow-up
-  now" CTA runs the mandatory flow.
-- Frontend only. `_PL_FU_PENDING` (Set of contactIds) loaded by
-  `_plLoadFollowups()` via `POST /api/agent-followups {action:'list'}` whenever
-  the board opens + agent is on. On 401/403 → `_PL_FU_PENDING=null` → badges hidden
-  (don't paint everyone red). CSS `.pl-card-fu-good` / `.pl-card-fu-action`.
-  Badge rendered in `cardHtml()` gated by `isResponded && _agentOn`.
+## The model now
+- **Detector** (`api/agent-followups.js` `detect` cron): finds Responded-stage leads
+  whose **last message is ours** and who've been **quiet ≥24h** (`MIN_QUIET_HOURS=24`,
+  was 12). For each, queues a **`kind:'ghost'`** card in `agent_ready_replies`
+  (status pending). **No Claude call** — the card shows the real thread tail. No more
+  nudge-message drafting; no writes to `agent_followups` from the detector.
+- **Hawkeye** (`client-portal.html`): new **👻 Went quiet** tab (first tab). Each ghost
+  card: **👻 Send to Ghosted** (primary) or **✕ other** → skip / Lost / Abandon, each
+  with an optional "why" note that trains the brain via the existing `_apxTeach`
+  pipeline (`/api/agent-train` teach). Train-the-brain = optional note field.
+- **Send to Ghosted** = `POST /api/agent-approvals {action:'confirm-ghost', ready_id|contact_id}`:
+  enrolls the contact in the academy's `offers.data.ghosted_workflow` (helper
+  `enrollGhosted`), moves the opp to **Interested** (`interestedStage` in `_stage.js`),
+  logs `pipeline_outcomes` status `ghosted`, cancels the lead's queued cards. The GHL
+  workflow then does the actual multi-touch follow-up.
+- **Sales-board badge** (per Responded card): 🔴 **Needs action** = has a pending ghost
+  card (quiet ~a day, not yet ghosted). 🟢 **All good** = none. Source = `_PL_GHOST`
+  (loaded by `_plLoadNeedsAction` via `agent-approvals list-ready`, kind='ghost').
+  Tap → `_apxOpen(contactId)` opens Hawkeye focused on that lead.
 
-## 2. Forced 2-step in Hawkeye (manual-approval mode only)
-- After a ready reply is **sent** (`_apxReadyApprove` / `_apxReadySend`), a
-  **blocking** modal pops: `_apxMandatoryFollowup(contactId,name,convId)`.
-- It calls **NEW backend action** `POST /api/agent-followups {action:'draft-one'}`
-  — drafts+queues ONE follow-up for that single contact (reuses the detector's
-  brain/schedule-tool; idempotent; returns `{stop:true}` when the brain says no
-  follow-up is warranted). Engine picks the send time (editable on the card).
-- Resolve the card by: **✓ Approve** (`action:'approve'` → status `approved`,
-  scheduled) · **✎ Edit** · **🚫 Lost** · **🗑 Abandon**. No plain close on the
-  approve card (hard block). Modal z-index **9620** (above the 9400 queue, below
-  the 9650 edit modal). `_APX_MAND` holds the in-flight context.
-- 2-step is **Hawkeye-only** (self-drive auto-sends, no manual approve).
+## Removed (was the forcing function)
+- The **mandatory 2-step modal** after every reply (`_apxMand*` family, `_apxAfterMand`,
+  `_apxDraftForFocus`) — deleted from `client-portal.html`.
+- The **`draft-one`** action + the LLM nudge drafter (`buildFollowupSystem`,
+  `SCHEDULE_TOOL`, `runScheduleAgent`, `loadConfig`) — deleted from `agent-followups.js`.
+- `_PL_FU_PENDING` / `_plLoadFollowups` (badge from `agent_followups`) → replaced by
+  `_PL_GHOST` / `_plLoadNeedsAction` (badge from ghost cards).
 
-## 3. Abandon added to the ✕ / Lost flow
-- **Lost** = mark opp `lost`. **Nurture is handled NATIVELY by GHL** — the
-  academy's "Opportunity → Lost" workflow trigger auto-fires off the status
-  change, so the portal does NOT enroll anyone (would double-enroll). True for
-  BOTH Lost paths (Hawkeye `confirm-lost` AND the board-card Lost button), since
-  both just flip the opp status to `lost`.
-- **Abandon** = NEW action `POST /api/agent-approvals {action:'confirm-abandoned'}`
-  — marks opp `abandoned`, records `pipeline_outcomes`, cancels queued
-  replies+follow-ups, **no nurture, no message**. "Get them out of the pipeline."
-- Abandon button added in: `_apxLostCard` (🚫 Lost tab), `_apxSkipModal` (the ✕
-  flow — `onAbandon` handler), and the mandatory follow-up card.
+## Lost vs Abandon vs Ghost (Zoran's definitions)
+- **Ghost** → enroll in ghosted automation + move to Interested. The default for a
+  quiet lead. GHL handles the sequence (reply → Responded, no reply → Lost).
+- **Lost** → mark opp `lost`. GHL's native "Opportunity → Lost" workflow auto-enrolls
+  lead-nurture (no portal enroll). For leads who clearly said no / bad fit.
+- **Abandon** → remove from pipeline, no nurture, no message.
 
-## Lost vs Abandon (Zoran's definition)
-- **Lost** → GHL's native "Opportunity → Lost" workflow auto-enrolls them in
-  lead-nurture (no portal action — marking lost is enough).
-- **Abandon** → just removed from the pipeline, no nurture.
+## Kept / still legacy
+- `agent_followups` table + its worker/`list`/`approve`/`send-now`/etc. stay (drain any
+  already-approved rows). The detector no longer creates new ones.
+- `kind` on `agent_ready_replies` is free text (no CHECK) → no migration for `ghost`.
+- **`FollowupsPanel.jsx`** (React, used in SandboxApp + AgentTrainingView) NOT updated —
+  it lists `agent_followups` (now empty for new leads) and still works; ghost cards live
+  in Hawkeye on the client portal, not in that panel. Low priority to mirror.
 
 ## Files
-- `api/agent-followups.js` — `draft-one` action (single-contact draft+queue).
-- `api/agent-approvals.js` — `confirm-abandoned` action + Lost→nurture enroll in
-  `confirm-lost`.
-- `bam-portal/public/client-portal.html` — board badge (`_PL_FU_PENDING`,
-  `_plLoadFollowups`, `_plNameForContact`, `_plCloseByContact`, badge in
-  `cardHtml`), focused queue (`_apxOpen(contactId)`, `_apxLoad` filter,
-  `_apxRender` focus banner), the `_apxMand*` mandatory-card family, Abandon
-  wiring in `_apxLostCard`/`_apxLostAbandon`/`_apxSkipModal`/`_apxReadySkip`/
-  `_apxFollowupSkip`.
-
-## Open / dependency
-- **None.** Lost-nurture is a GHL-side workflow (auto-fires on the Lost status
-  change) — no portal config, no workflow id to set.
-- No new tables/columns — reuses `agent_followups`, `agent_ready_replies`,
-  `pipeline_outcomes`. No migration.
+- `api/agent-followups.js` — detector now queues ghost cards (LLM-free); draft-one + nudge LLM removed.
+- `api/agent-approvals.js` — `confirm-ghost` action + `enrollGhosted` helper; imports `interestedStage`.
+- `api/agent/_stage.js` — new `interestedStage()` (regex /interest/i on Training pipeline).
+- `client-portal.html` — ghost tab + `_apxGhostCard`/`_apxGhostConfirm`/`_apxGhostSkip`,
+  badge flip (`_PL_GHOST`/`_plLoadNeedsAction`), mandatory-modal family removed.
 
 ## Related
-- [[project_client_agent_training]] — the follow-up engine + Hawkeye queue.
+- [[project_client_agent_training]] — the Hawkeye queue + brain training.
