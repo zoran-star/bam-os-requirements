@@ -918,18 +918,30 @@ async function actionUnpause(res, member, stripeAccount, ctx, body) {
 // athlete/parent info (denormalized).
 async function actionCancel(res, member, stripeAccount, ctx, body) {
   let sub = null;
+  let stripeManaged = false;
   if (member.stripe_subscription_id) {
-    if (body.immediate) {
-      sub = await stripeFetch(`/subscriptions/${member.stripe_subscription_id}`, {
-        method: "DELETE",
-        stripeAccount,
-      });
-    } else {
-      sub = await stripeFetch(`/subscriptions/${member.stripe_subscription_id}`, {
-        method: "POST",
-        stripeAccount,
-        body: { "cancel_at_period_end": "true" },
-      });
+    try {
+      if (body.immediate) {
+        sub = await stripeFetch(`/subscriptions/${member.stripe_subscription_id}`, {
+          method: "DELETE",
+          stripeAccount,
+        });
+      } else {
+        sub = await stripeFetch(`/subscriptions/${member.stripe_subscription_id}`, {
+          method: "POST",
+          stripeAccount,
+          body: { "cancel_at_period_end": "true" },
+        });
+      }
+      stripeManaged = true;
+    } catch (e) {
+      // The sub may be foreign (CoachIQ/GHL/dashboard-created → not app-created,
+      // so we can't manage it) or already gone. Still let the member come OFF the
+      // roster - portal-side cancel only; the academy handles the external sub.
+      // Re-throw anything that isn't one of those expected "can't manage" cases.
+      const em = (e && e.message) || "";
+      if (!/not created by your application|No such subscription|resource_missing/i.test(em)) throw e;
+      console.error("cancel: Stripe sub not manageable, portal-side cancel only:", em);
     }
   }
 
@@ -967,7 +979,10 @@ async function actionCancel(res, member, stripeAccount, ctx, body) {
   // leave the row in 'cancelling' so they remain on the roster and don't see
   // ghost charges. The members row will be DELETED later by handleSubDeleted
   // when Stripe fires customer.subscription.deleted at period end.
-  const willDeleteNow = body.immediate || !member.stripe_subscription_id;
+  // Delete the row now for: immediate cancels, members with no Stripe sub, OR a
+  // sub we couldn't manage here (foreign/gone) - there'll be no period-end webhook
+  // to clean them up, so don't leave them stuck in 'cancelling'.
+  const willDeleteNow = body.immediate || !member.stripe_subscription_id || !stripeManaged;
   if (willDeleteNow) {
     await sb(`members?id=eq.${member.id}`, {
       method: "DELETE",
