@@ -21256,6 +21256,9 @@ async function _plLoadNeedsAction() {
 // Last-message info per contact (from the GHL inbox list), for the Done Trial
 // cards: show when the last message was + glow if the LEAD messaged last.
 let _PL_LASTMSG = null;   // contactId → { direction, date }
+// ⚠️ TEMPORARY TEST — set to false (or delete) to turn off the Interested-stage
+// "no message in 5 days → red card" highlight. Not meant to be permanent.
+const _PL_TEST_INTERESTED_RED = true;
 async function _plLoadLastMessages() {
   try {
     const token = await _mreqAuthToken();
@@ -22151,11 +22154,19 @@ function _renderPipelineBoard() {
     const todayTrial = _plIsTrialToday(o.trialDate);
     // Done Trial: surface the last message + GLOW only when the LEAD messaged last
     // (their ball — needs a reply). Last-message info comes from _PL_LASTMSG.
-    const _lastMsg = (isDone && _PL_LASTMSG && o.contactId) ? _PL_LASTMSG.get(String(o.contactId)) : null;
-    const _clientLast = !!(_lastMsg && _lastMsg.direction === 'inbound');
+    const _lastMsg = (_PL_LASTMSG && o.contactId) ? _PL_LASTMSG.get(String(o.contactId)) : null;
+    const _clientLast = !!(isDone && _lastMsg && _lastMsg.direction === 'inbound');
     const _goldGlow = 'box-shadow:0 0 0 1px var(--gold,#E8C547),0 0 18px rgba(232,197,71,0.5);border-color:var(--gold,#E8C547);';
     // Trial-today gold glow (non-done stages); Done Trial glows only on lead-last.
-    const glow = isDone ? (_clientLast ? _goldGlow : '') : (todayTrial ? _goldGlow : '');
+    let glow = isDone ? (_clientLast ? _goldGlow : '') : (todayTrial ? _goldGlow : '');
+    // ⚠️ TEMP TEST (remove later — _PL_TEST_INTERESTED_RED): flag Interested-stage
+    // leads RED when there's been no text/email in the last 5 days — a proxy for
+    // "not in an active messaging automation". Over-flags leads whose last message
+    // is older than the inbox's recent window, but fine for a quick eyeball test.
+    if (_PL_TEST_INTERESTED_RED && _PL_LASTMSG && stage && /interest/i.test(stage.name || '')) {
+      const _ageMs = (_lastMsg && _lastMsg.date) ? (Date.now() - new Date(_lastMsg.date).getTime()) : Infinity;
+      if (_ageMs > 5 * 86400 * 1000) glow = 'box-shadow:0 0 0 1px #e0654f,0 0 20px rgba(224,90,66,0.6);border-color:#e0654f;';
+    }
     // Responded-stage status: 🔴 Needs action when a Hawkeye card is waiting,
     // labelled by what the action is (reply / ghost / confirm lost / book). 🟢 All
     // good = nothing waiting (we're waiting on the lead). Tap → Hawkeye focused.
