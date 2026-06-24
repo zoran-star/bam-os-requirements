@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+# wt — give this terminal/Claude session its OWN git worktree so multiple
+# terminals never share one working tree + HEAD (which silently clobbers each
+# other's uncommitted edits).
+#
+#   Usage:  scripts/wt <session-name>     e.g.  scripts/wt sales-agents
+#   Then:   cd into the path it prints and work there. Commit/push/PR as normal.
+#
+# Each worktree lives at ~/bam-os-worktrees/<name> on branch session/<name>,
+# branched off the latest origin/main. The canonical checkout (the repo's main
+# folder) stays on `main` and should NOT be edited directly when sessions run.
+set -euo pipefail
+name="${1:-}"
+if [ -z "$name" ]; then echo "usage: scripts/wt <session-name>  (e.g. scripts/wt sales-agents)"; exit 1; fi
+root="$(git rev-parse --show-toplevel)"
+dir="$HOME/bam-os-worktrees/$name"
+git -C "$root" fetch origin -q || true
+if git -C "$root" worktree list --porcelain | grep -q "^worktree $dir$"; then
+  echo "✔ worktree already exists:"
+else
+  git -C "$root" worktree add -B "session/$name" "$dir" origin/main >/dev/null
+  echo "✔ created worktree:"
+fi
+echo "  cd $dir"
