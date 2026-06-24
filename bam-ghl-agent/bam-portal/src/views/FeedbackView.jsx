@@ -335,6 +335,9 @@ function FeedbackRow({ f, staff, tokens, onToggleResolved, onSpec }) {
             {f.submitter_email && f.submitter_email !== author && (
               <span style={{ fontSize: 12, color: t.textMute }}>{f.submitter_email}</span>
             )}
+            {f.client_name && (
+              <span style={{ fontSize: 11, fontWeight: 700, color: t.accent || t.text, border: `1px solid ${t.border}`, borderRadius: 999, padding: "2px 8px" }}>🏠 {f.client_name}</span>
+            )}
             <span style={{ marginLeft: "auto", fontSize: 12, color: t.textMute, fontFamily: "JetBrains Mono, monospace" }}>{when}</span>
           </div>
 

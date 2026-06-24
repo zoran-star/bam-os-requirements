@@ -1,7 +1,10 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { supabase } from "../supabase";
 
-const STORAGE_BUCKET = "resources";
+const STORAGE_BUCKET = "resources";              // private - gated file attachments
+const BLOCK_IMAGE_BUCKET = "resource-block-images"; // public - decorative inline images
+// Login-gated client portal base for shareable resource deep links.
+const CLIENT_PORTAL_BASE = "https://portal.byanymeansbusiness.com/client-portal.html";
 
 function formatRelative(iso) {
   if (!iso) return "";
@@ -105,20 +108,15 @@ export default function ResourcesView({ tokens, dark, me }) {
     }
   };
 
-  // ─── Share a public link (the `resources` bucket is public) ───
-  // Returns a no-login URL clients can open directly. Prefers a PDF file,
-  // else the first uploaded file. Null when the resource has no file.
-  const shareUrlFor = useCallback((r) => {
-    const files = (r.resource_files || []).filter(f => f.storage_path);
-    if (!files.length) return null;
-    const pick = files.find(f => (f.mime_type || "").includes("pdf")) || files[0];
-    const { data } = supabase.storage.from(STORAGE_BUCKET).getPublicUrl(pick.storage_path);
-    return data?.publicUrl || null;
-  }, []);
+  // ─── Share a login-gated link ───
+  // The resources bucket is PRIVATE, so we never share a raw file URL. Instead
+  // we share a deep link into the client portal; opening it requires the client
+  // to be logged in (random public can't view). Works for every resource.
+  const shareUrlFor = useCallback((r) => `${CLIENT_PORTAL_BASE}#resource=${r.id}`, []);
 
   const handleCopyLink = useCallback(async (r) => {
     const url = shareUrlFor(r);
-    if (!url) { alert("This resource has no shareable file to link to."); return; }
+    if (!url) { alert("Could not build a link for this resource."); return; }
     try {
       await navigator.clipboard.writeText(url);
     } catch {
@@ -318,7 +316,7 @@ export default function ResourcesView({ tokens, dark, me }) {
                   {shareUrlFor(r) && (
                     <button onClick={() => handleCopyLink(r)}
                       style={copiedId === r.id ? btnIconCopied(tk) : btnIcon(tk)}
-                      title="Copy a public link to send to clients (opens the file, no login needed)">
+                      title="Copy a link to send to clients (opens in their portal, login required)">
                       {copiedId === r.id ? "Copied!" : "Copy link"}
                     </button>
                   )}
@@ -915,11 +913,13 @@ function BlockImageUpload({ tk, disabled, onUploaded }) {
     setBusy(true);
     try {
       const ext = file.name.includes(".") ? file.name.slice(file.name.lastIndexOf(".")) : "";
-      const path = `_blocks/${Date.now()}-${slugify(file.name.replace(ext, ""))}${ext}`;
-      const { error } = await supabase.storage.from(STORAGE_BUCKET)
+      const path = `${Date.now()}-${slugify(file.name.replace(ext, ""))}${ext}`;
+      // Decorative inline images live in a PUBLIC bucket (not the gated
+      // `resources` bucket) so they render via a stable URL for everyone.
+      const { error } = await supabase.storage.from(BLOCK_IMAGE_BUCKET)
         .upload(path, file, { cacheControl: "3600", upsert: false, contentType: file.type || undefined });
       if (error) throw error;
-      const { data } = supabase.storage.from(STORAGE_BUCKET).getPublicUrl(path);
+      const { data } = supabase.storage.from(BLOCK_IMAGE_BUCKET).getPublicUrl(path);
       onUploaded(data.publicUrl);
     } catch (err) {
       alert("Image upload failed: " + (err.message || err));

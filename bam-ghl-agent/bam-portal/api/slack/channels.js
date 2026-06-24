@@ -2,6 +2,7 @@ import { withSentryApiRoute } from "../_sentry.js";
 // Unified Slack API — channels, messages, DMs, OAuth, status, disconnect
 // Routes via ?action= query param for OAuth flows, otherwise standard channel ops
 import { createClient } from "@supabase/supabase-js";
+import { sendSms } from "../ghl/_core.js";
 
 const SLACK_API = "https://slack.com/api";
 const SCOPES = "channels:history,channels:read,groups:history,groups:read,im:history,im:read,mpim:history,mpim:read,users:read,chat:write";
@@ -192,9 +193,30 @@ async function handleDisconnect(req, res) {
 }
 
 // ─── Feedback: submit to Slack (folded in from /api/feedback) ───
+// Text Zoran whenever feedback comes in (covers the staff-widget path, which
+// inserts client-side then calls this endpoint). Sent from BAM GTA's GHL number.
+// Best-effort, fire-and-forget — never blocks/fails the feedback submit.
+const FEEDBACK_NOTIFY_PHONE = process.env.FEEDBACK_NOTIFY_PHONE || "4165733718";
+const FEEDBACK_NOTIFY_CLIENT_ID = process.env.FEEDBACK_NOTIFY_CLIENT_ID || "39875f07-0a4b-4429-a201-2249bc1f24df";
+async function notifyFeedbackBySms({ body, page, author }) {
+  try {
+    if (!FEEDBACK_NOTIFY_PHONE || !FEEDBACK_NOTIFY_CLIENT_ID) return;
+    const { data: sender } = await supabase
+      .from("clients")
+      .select("id,business_name,ghl_location_id,ghl_access_token,ghl_refresh_token,ghl_token_expires_at")
+      .eq("id", FEEDBACK_NOTIFY_CLIENT_ID).single();
+    if (!sender) return;
+    const pageStr = page ? ` · ${page}` : "";
+    const snippet = String(body || "").replace(/\s+/g, " ").slice(0, 240);
+    const msg = `📝 New portal feedback from ${author || "the team"}${pageStr}\n"${snippet}"`;
+    await sendSms({ client: sender, toPhone: FEEDBACK_NOTIFY_PHONE, message: msg, contactName: "BAM Feedback" });
+  } catch (_) { /* notify is best-effort */ }
+}
+
 async function handleFeedbackSubmit(req, res) {
   const { id, body, source, page, author } = req.body || {};
   if (!body) return res.status(400).json({ error: "Missing feedback body" });
+  notifyFeedbackBySms({ body, page, author }).catch(() => {});  // text Zoran (fire-and-forget)
   const token = process.env.SLACK_BOT_TOKEN || process.env.SLACK_USER_TOKEN;
   const channel = process.env.FEEDBACK_SLACK_CHANNEL;
   if (!token || !channel) return res.status(200).json({ ok: true, slack: false });

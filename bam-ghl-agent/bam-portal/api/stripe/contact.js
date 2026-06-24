@@ -87,27 +87,55 @@ async function handler(req, res) {
     const acct = client && client.stripe_connect_account_id;
     if (!acct) return res.status(200).json({ connected: false });
 
-    // 1) Resolve the Stripe customer id. Prefer the members roster (exact link).
+    // Resolve the Stripe customer id, cheapest-first:
+    //   0) cached link on the contact mirror   1) members roster (exact)
+    //   2) Stripe search by email              3) Stripe search by phone
+    // When 2/3 find a match, cache it on the mirror so it's instant next time
+    // and survives an email change.
+    const phone = (req.query.phone || "").trim();
     let customerId = null;
+    let cached = null;
     if (ghlContactId) {
+      const cr = await sb(`ghl_contacts?client_id=eq.${clientId}&ghl_contact_id=eq.${encodeURIComponent(ghlContactId)}&select=stripe_customer_id,phone&limit=1`);
+      cached = (Array.isArray(cr) && cr[0]) || null;
+      if (cached && cached.stripe_customer_id) customerId = cached.stripe_customer_id;
+    }
+    if (!customerId && ghlContactId) {
       const mem = await sb(`members?client_id=eq.${clientId}&ghl_contact_id=eq.${encodeURIComponent(ghlContactId)}&select=stripe_customer_id&limit=1`);
       customerId = (Array.isArray(mem) && mem[0] && mem[0].stripe_customer_id) || null;
     }
-    // 2) Fallback: search the connected account by email.
     if (!customerId && email) {
       try {
         const found = await stripeFetch(`/customers/search?query=${encodeURIComponent(`email:"${email.replace(/"/g, "")}"`)}&limit=1`, { stripeAccount: acct });
         customerId = found?.data?.[0]?.id || null;
-      } catch (_) { /* search unavailable / no match — leave null */ }
+      } catch (_) { /* search unavailable / no match */ }
+    }
+    if (!customerId) {
+      const phoneTry = (phone || (cached && cached.phone) || "").replace(/[^\d+]/g, "");
+      if (phoneTry.length >= 7) {
+        try {
+          const found = await stripeFetch(`/customers/search?query=${encodeURIComponent(`phone:"${phoneTry}"`)}&limit=1`, { stripeAccount: acct });
+          customerId = found?.data?.[0]?.id || null;
+        } catch (_) { /* search unavailable / no match */ }
+      }
     }
     if (!customerId) return res.status(200).json({ connected: true, customer: null });
+    // Cache the resolved link on the mirror (best-effort) for instant future loads.
+    if (ghlContactId && (!cached || cached.stripe_customer_id !== customerId)) {
+      sb(`ghl_contacts?client_id=eq.${clientId}&ghl_contact_id=eq.${encodeURIComponent(ghlContactId)}`, {
+        method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ stripe_customer_id: customerId }),
+      }).catch(() => {});
+    }
 
     const customer = await stripeFetch(`/customers/${encodeURIComponent(customerId)}`, { stripeAccount: acct });
     if (customer.deleted) return res.status(200).json({ connected: true, customer: null });
 
-    // Subscriptions (all statuses), with price + product expanded for names.
+    // Subscriptions (all statuses). Expand only to the price — Stripe caps expand
+    // at 4 levels and `data.items.data.price.product` is 5, which 400s the whole
+    // lookup. planName() falls back to the price nickname / "$X/interval" so we
+    // still show a readable plan without the product object.
     const subsRes = await stripeFetch(
-      `/subscriptions?customer=${encodeURIComponent(customerId)}&status=all&limit=10&expand[]=data.items.data.price.product`,
+      `/subscriptions?customer=${encodeURIComponent(customerId)}&status=all&limit=10&expand[]=data.items.data.price`,
       { stripeAccount: acct }
     );
     const subscriptions = (subsRes.data || []).map(s => {

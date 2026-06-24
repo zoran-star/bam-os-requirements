@@ -111,6 +111,42 @@ function writeInboxCache(clientId, payload) {
   }).catch(() => {});
 }
 
+// ── Per-user read state (GHL has no reliable mark-read API, so we track it) ──
+// Map of ghl_conversation_id → last_read_at (ms) for this user+academy.
+async function loadUserReads(clientId, userId) {
+  const map = new Map();
+  if (!userId) return map;
+  try {
+    const rows = await sb(`ghl_conversation_reads?client_id=eq.${clientId}&auth_user_id=eq.${userId}&select=ghl_conversation_id,last_read_at`);
+    for (const r of (rows || [])) {
+      if (r.ghl_conversation_id) map.set(r.ghl_conversation_id, r.last_read_at ? new Date(r.last_read_at).getTime() : 0);
+    }
+  } catch (_) { /* best-effort — falls back to GHL's unreadCount */ }
+  return map;
+}
+// A conversation is READ for this user when they've opened it AFTER its last
+// message. We only ever CLEAR unread (never invent it) — so outbound/already-read
+// threads stay at 0, and a new inbound (date > last_read_at) flips back to unread.
+function applyReads(convos, readsMap) {
+  if (!readsMap || !readsMap.size) return convos || [];
+  return (convos || []).map(c => {
+    const r = readsMap.get(c.id);
+    if (r == null) return c;
+    const lastMs = c.lastMessageDate ? new Date(c.lastMessageDate).getTime() : 0;
+    return r >= lastMs ? { ...c, unreadCount: 0 } : c;
+  });
+}
+function sortByUnreadThenDate(arr) {
+  return [...(arr || [])].sort((a, b) => {
+    const ua = (a.unreadCount || 0) > 0 ? 1 : 0;
+    const ub = (b.unreadCount || 0) > 0 ? 1 : 0;
+    if (ua !== ub) return ub - ua;
+    const ta = a.lastMessageDate ? new Date(a.lastMessageDate).getTime() : 0;
+    const tb = b.lastMessageDate ? new Date(b.lastMessageDate).getTime() : 0;
+    return tb - ta;
+  });
+}
+
 async function refreshGhlToken(client) {
   const clientId     = (process.env.GHL_OAUTH_CLIENT_ID || "").trim();
   const clientSecret = (process.env.GHL_OAUTH_CLIENT_SECRET || "").trim();
@@ -188,16 +224,37 @@ async function pickGhlToken(client) {
 // Handler
 // ─────────────────────────────────────────────────────────
 async function handler(req, res) {
-  if (req.method !== "GET") return res.status(405).json({ error: "GET only" });
+  if (req.method !== "GET" && req.method !== "POST") return res.status(405).json({ error: "GET or POST" });
 
   let ctx;
   try { ctx = await resolveUser(req); }
   catch (e) { return res.status(e.status || 401).json({ error: e.message }); }
 
-  const clientId = req.query.client_id;
+  const clientId = req.query.client_id || (req.body && req.body.client_id);
   if (!clientId) return res.status(400).json({ error: "client_id required" });
   if (!ctx.isStaff && !ctx.clientIds.includes(clientId)) {
     return res.status(403).json({ error: "not your academy" });
+  }
+
+  // ── POST ?action=mark-read ── Per-user read receipt for a GHL conversation.
+  // Called when the user opens a thread. Idempotent upsert. No GHL call.
+  if (req.method === "POST") {
+    if (req.query.action !== "mark-read") return res.status(400).json({ error: "unsupported POST action" });
+    const convId = (req.body && req.body.conversation_id) || req.query.conversation_id;
+    if (!convId) return res.status(400).json({ error: "conversation_id required" });
+    try {
+      await sb(`ghl_conversation_reads?on_conflict=auth_user_id,ghl_conversation_id`, {
+        method: "POST",
+        headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
+        body: JSON.stringify([{
+          client_id: clientId, ghl_conversation_id: String(convId),
+          auth_user_id: ctx.user.id, last_read_at: new Date().toISOString(),
+        }]),
+      });
+      return res.status(200).json({ ok: true });
+    } catch (e) {
+      return res.status(500).json({ error: e.message });
+    }
   }
 
   // Load the academy's row + GHL config
@@ -290,11 +347,20 @@ async function handler(req, res) {
   // ────────────────────────────────────────────────────────
   // Mode A: list conversations  (cached — see readInboxCache)
   // ────────────────────────────────────────────────────────
+  // Per-user read state — applied on top of the (user-agnostic) cache so each
+  // person sees their own unread, and a thread they've read drops off the top.
+  const readsMap = await loadUserReads(clientId, ctx.user.id);
+  const finishList = (payload, flags) => {
+    const conversations = sortByUnreadThenDate(applyReads(payload.conversations || [], readsMap));
+    const counts = { ...(payload.counts || {}), unread: conversations.reduce((s, c) => s + (c.unreadCount || 0), 0) };
+    return res.status(200).json({ ...payload, conversations, counts, ...(flags || {}) });
+  };
+
   const wantFresh = req.query.fresh === "1" || req.query.nocache === "1";
   const cached = await readInboxCache(clientId);
   if (!wantFresh && cached && cached.updated_at &&
       (Date.now() - new Date(cached.updated_at).getTime()) < INBOX_CACHE_TTL_MS) {
-    return res.status(200).json({ ...cached.payload, cached: true });
+    return finishList(cached.payload, { cached: true });
   }
 
   let convos = [];
@@ -305,7 +371,7 @@ async function handler(req, res) {
   } catch (e) {
     // GHL failed (usually 429). Serve the last good payload instead of breaking
     // the inbox; only error out if we have nothing cached at all.
-    if (cached) return res.status(200).json({ ...cached.payload, stale: true });
+    if (cached) return finishList(cached.payload, { stale: true });
     return res.status(e.status || 502).json({ error: `GHL: ${e.message}`, detail: e.body || null });
   }
 
@@ -423,16 +489,8 @@ async function handler(req, res) {
   });
   const trainers = [...new Set([...trainerByContact.values()])].sort((a, b) => a.localeCompare(b));
 
-  // Unread always on top, then by lastMessageDate desc (newest first) within each group.
-  annotated.sort((a, b) => {
-    const ua = (a.unreadCount || 0) > 0 ? 1 : 0;
-    const ub = (b.unreadCount || 0) > 0 ? 1 : 0;
-    if (ua !== ub) return ub - ua;
-    const ta = a.lastMessageDate ? new Date(a.lastMessageDate).getTime() : 0;
-    const tb = b.lastMessageDate ? new Date(b.lastMessageDate).getTime() : 0;
-    return tb - ta;
-  });
-
+  // Cache the RAW (user-agnostic) payload with GHL's unreadCount; finishList
+  // applies this user's read state + the unread-on-top sort for the response.
   const payload = {
     conversations: annotated,
     location_id: locationId,   // for the "Open in GHL" deep link
@@ -446,7 +504,7 @@ async function handler(req, res) {
     },
   };
   writeInboxCache(clientId, payload);   // refresh the cache for the next load (fire-and-forget)
-  return res.status(200).json(payload);
+  return finishList(payload, {});
 }
 
 export default withSentryApiRoute(handler);

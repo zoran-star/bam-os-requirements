@@ -100,3 +100,31 @@ inbox sent EVERY reply as SMS. Now:
 
 Requires: academy's IG = Professional acct linked to a FB Page, and Instagram connected
 in GHL (Settings → Integrations). No portal-side Meta integration / app review.
+
+## Channel toggle buttons + Email in the inbox (2026-06-24)
+- The "All channels" dropdown is now a row of **pressed-down toggle buttons** (`.v15ib-chan` /
+  `.v15ib-chan.on` = gold + inset shadow + translateY): 💬 SMS · ✉️ Email · 📸 Instagram · 📘 Facebook.
+  **Multi-select** (`_V15IB.fChannels` array; empty = all) via `_v15ibToggleChannel`. Matching uses
+  `_ibChannelBucket(c)` (instagram/facebook/email/sms/other). Unread still sorts to top (inbox.js).
+- Each conversation row shows a small channel icon (`_ibChannelIcon`, non-SMS only) so email/IG/FB
+  threads are tellable at a glance.
+- **Email is now a first-class reply channel.** `_v15ibOpen` no longer forces Email→SMS; an email
+  thread sets `_V15IB.type='Email'` → the composer shows a **Subject** input (`#v15ib-subject`) +
+  a no-email-on-file warning. `_v15ibSend` already sent subject for Email; `send-message.js` already
+  had the Email path. Email conversations already arrive via the generic `/conversations/search`
+  (no type filter) — so they show + filter + reply, IF the academy has GHL email configured.
+
+## Mark-as-read for the GHL inbox (2026-06-24)
+**Bug:** the GHL inbox (V1.5/V2) never marked anything read — `_v15ibOpen` just loaded
+the thread; nothing cleared GHL's `unreadCount` (GHL has no reliable mark-read API),
+so threads stayed bold + pinned to the unread-top forever, worse after the unread-sort.
+**Fix (per-user, mirrors the staff inbox's `conversation_reads`):**
+- New table `ghl_conversation_reads (client_id, ghl_conversation_id, auth_user_id,
+  last_read_at)` PK (auth_user_id, ghl_conversation_id). Migration 20260624140000.
+- `api/ghl/inbox.js` now accepts **POST `?action=mark-read`** (upserts the receipt) and,
+  on every list response, applies the user's reads: `loadUserReads` → `applyReads`
+  (zeroes `unreadCount` when `last_read_at >= lastMessageDate` — only ever CLEARS, never
+  invents unread) → `sortByUnreadThenDate`. Applied AFTER the shared `ghl_inbox_cache`
+  (cache stays user-agnostic with GHL's raw count). `counts.unread` recomputed per-user.
+- `_v15ibOpen` fires the mark-read POST (fire-and-forget) + optimistically sets the
+  cached convo's `unreadCount=0`. A new inbound (date > last_read_at) flips it back to unread.

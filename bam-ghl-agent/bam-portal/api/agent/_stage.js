@@ -19,6 +19,18 @@ export async function respondedStage(token, locationId) {
   return stage ? { pipelineId: pipe.id, stageId: stage.id, stageName: stage.name } : null;
 }
 
+// The Training Pipeline "Interested" stage — where a lead lands when we send them
+// to the Ghosted automation (the workflow then bounces them back to Responded on
+// reply, or marks them lost). Same shape as respondedStage.
+export async function interestedStage(token, locationId) {
+  const data = await ghl("GET", `/opportunities/pipelines?locationId=${encodeURIComponent(locationId)}`, { token });
+  const pipelines = data.pipelines || data.data || [];
+  const pipe = pipelines.find(p => /training/i.test(p.name || "")) || pipelines[0];
+  if (!pipe) return null;
+  const stage = (pipe.stages || []).find(s => /interest/i.test(s.name || ""));
+  return stage ? { pipelineId: pipe.id, stageId: stage.id, stageName: stage.name } : null;
+}
+
 export async function contactInRespondedStage(token, locationId, contactId, rs) {
   try {
     const params = new URLSearchParams({ location_id: locationId, contact_id: contactId, pipeline_id: rs.pipelineId, limit: "20" });

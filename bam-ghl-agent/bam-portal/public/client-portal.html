@@ -5901,6 +5901,9 @@
           <!-- V1.5 dashboard (trials today · missed calls · action items) -->
           <div id="home-v15" style="display:none"></div>
 
+          <!-- V2 dashboard (trials today · done-trial replies · Hawkeye · unread) -->
+          <div id="home-v2" style="display:none"></div>
+
           <div class="home-sec" id="home-tiles-sec"><span class="home-sec-label">Needs your attention</span></div>
           <div class="home-tiles" id="home-tiles"></div>
 
@@ -6279,8 +6282,7 @@
             <div class="guide-card-body">
               <p>You bring the raw material, we make it sharp, we run it, and you watch the results. This quick guide walks the whole flow - where your ads live, controlling your own spend, and requesting a new creative.</p>
               <div class="guide-card-actions">
-                <a class="guide-card-btn" href="/resources/bam-paid-ads-explained.pdf" target="_blank" rel="noopener">Open guide</a>
-                <a class="guide-card-btn ghost" href="/resources/bam-paid-ads-explained.pdf" download>Download</a>
+                <button type="button" class="guide-card-btn" onclick="_openGuideResource('paid ad')">Open guide</button>
               </div>
             </div>
           </details>
@@ -6298,8 +6300,7 @@
             <div class="guide-card-body">
               <p>Everything you need to shoot your first campaign - the three core videos, the three core graphics, and exactly how to get it all into your portal.</p>
               <div class="guide-card-actions">
-                <a class="guide-card-btn" href="/resources/bam-first-campaign.pdf" target="_blank" rel="noopener">Open guide</a>
-                <a class="guide-card-btn ghost" href="/resources/bam-first-campaign.pdf" download>Download</a>
+                <button type="button" class="guide-card-btn" onclick="_openGuideResource('first campaign')">Open guide</button>
               </div>
             </div>
           </details>
@@ -6715,8 +6716,7 @@ Then the call to action."]</div>
           <div class="guide-card-body">
             <p>Organic is the content you post on your own socials, and it works differently from your paid ads. This quick guide covers the difference, your monthly credits, and how to request, review, and download a creative.</p>
             <div class="guide-card-actions">
-              <a class="guide-card-btn" href="/resources/bam-organic-content-explained.pdf" target="_blank" rel="noopener">Open guide</a>
-              <a class="guide-card-btn ghost" href="/resources/bam-organic-content-explained.pdf" download>Download</a>
+              <button type="button" class="guide-card-btn" onclick="_openGuideResource('organic')">Open guide</button>
             </div>
           </div>
         </details>
@@ -6962,6 +6962,19 @@ Then the call to action."]</div>
       /* V1.5 inbox toolbar (status pills · filters · actions) */
       .v15ib-bar { margin-bottom:14px; }
       .v15ib-pills { display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-bottom:10px; }
+      /* Channel toggle buttons - a pressed one looks "down + activated". */
+      .v15ib-chans { display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-bottom:10px; }
+      .v15ib-chan {
+        display:inline-flex; align-items:center; gap:6px;
+        background:var(--surface); border:1px solid var(--border-med); border-radius:999px;
+        color:var(--text-sub); padding:7px 14px; font:inherit; font-size:12.5px; font-weight:600;
+        cursor:pointer; transition:background .12s ease, color .12s ease, box-shadow .12s ease, transform .06s ease;
+      }
+      .v15ib-chan:hover { border-color:var(--accent); color:var(--text); }
+      .v15ib-chan.on {
+        background:var(--gold,#E8C547); border-color:var(--gold,#E8C547); color:#0B0B0D; font-weight:800;
+        box-shadow:inset 0 2px 5px rgba(0,0,0,.45); transform:translateY(1px);
+      }
       .v15ib-filters { display:flex; gap:8px; align-items:center; }
       .v15ib-sel {
         background:var(--surface); border:1px solid var(--border-med); border-radius:10px;
@@ -7157,6 +7170,8 @@ Then the call to action."]</div>
       #view-pipelines .pl-card-fu-good:hover { background:rgba(76,199,106,0.2); }
       #view-pipelines .pl-card-fu-action { background:rgba(224,112,112,0.12); border-color:#e07070; color:#e07070; }
       #view-pipelines .pl-card-fu-action:hover { background:rgba(224,112,112,0.22); }
+      #view-pipelines .pl-card-fu-check { background:rgba(232,197,71,0.12); border-color:var(--gold,#E8C547); color:var(--gold,#E8C547); }
+      #view-pipelines .pl-card-fu-check:hover { background:rgba(232,197,71,0.22); }
       #view-pipelines .pl-card-ptf {
         margin-top:9px; width:100%; background:rgba(232,197,71,0.12);
         border:1px solid var(--accent); color:var(--accent); border-radius:7px;
@@ -8110,6 +8125,7 @@ Then the call to action."]</div>
         background: var(--gold);
         color: #1a1a1a;
         border: 1px solid var(--gold);
+        cursor: pointer;
         transition: background 0.15s ease, border-color 0.12s ease, color 0.12s ease;
       }
       .guide-card-btn:hover { background: var(--gold-hi); border-color: var(--gold-hi); }
@@ -10600,7 +10616,17 @@ async function _v15calCreateBooking() {
 // Reuses /api/ghl/inbox (list + thread) + /api/ghl/send-message. (P2 adds
 // pipeline/stage + failed filters; P3 adds mass send.)
 // ══════════════════════════════════════════════════════════════
-let _V15IB = { convos: [], pipelines: [], contactPipe: {}, pipeOppCount: 0, ghlLoc: '', unreadOnly: false, failedOnly: false, fPipeline: '', fStage: '', fChannel: '', active: null, messages: [], type: 'SMS', pending: [] };
+let _V15IB = { convos: [], pipelines: [], contactPipe: {}, pipeOppCount: 0, ghlLoc: '', unreadOnly: false, failedOnly: false, fPipeline: '', fStage: '', fChannels: [], active: null, messages: [], type: 'SMS', pending: [], readAt: {} };
+// readAt: convId → the lastMessageDate at the moment you OPENED it. A conversation
+// is "read" (no dot) once opened, and re-flags as unread only if a NEWER message
+// arrives after that. GHL has no public mark-read API, so we track it per session.
+// Channel toggle buttons (multi-select). Empty selection = show all channels.
+const _V15IB_CHANNELS = [
+  { key: 'sms',       label: 'SMS',       icon: '💬' },
+  { key: 'email',     label: 'Email',     icon: '✉️' },
+  { key: 'instagram', label: 'Instagram', icon: '📸' },
+  { key: 'facebook',  label: 'Facebook',  icon: '📘' },
+];
 const _V15IB_FAILED = ['failed', 'undelivered', 'error', 'rejected'];
 
 // ── Skeleton loaders (shown on the very first load, before any data) ──
@@ -10676,7 +10702,25 @@ function _v15ibSetUnread(v) { _V15IB.unreadOnly = v; if (v) _V15IB.failedOnly = 
 function _v15ibSetFailed(v) { _V15IB.failedOnly = v; if (v) _V15IB.unreadOnly = false; _v15ibRenderAll(); }
 function _v15ibSetPipeline(v) { _V15IB.fPipeline = v; _V15IB.fStage = ''; _v15ibRenderAll(); }
 function _v15ibSetStage(v) { _V15IB.fStage = v; _v15ibRenderAll(); }
-function _v15ibSetChannel(v) { _V15IB.fChannel = v; _v15ibRenderAll(); }
+// Bucket a conversation into one of the 4 toggle channels (or 'other').
+function _ibChannelBucket(c) {
+  const k = _ibChannelKey(c);
+  if (k.includes('instagram')) return 'instagram';
+  if (k.includes('facebook') || k.includes('messenger')) return 'facebook';
+  if (k.includes('email')) return 'email';
+  if (k.includes('sms') || k.includes('text')) return 'sms';
+  return 'other';
+}
+// Small per-row icon so email/IG/FB threads are tellable at a glance (SMS = default, no icon).
+function _ibChannelIcon(c) {
+  const ch = _V15IB_CHANNELS.find(x => x.key === _ibChannelBucket(c));
+  return (ch && ch.key !== 'sms') ? ch.icon : '';
+}
+function _v15ibToggleChannel(key) {
+  const i = _V15IB.fChannels.indexOf(key);
+  if (i >= 0) _V15IB.fChannels.splice(i, 1); else _V15IB.fChannels.push(key);
+  _v15ibRenderAll();
+}
 
 // Strip a phone/email down to a stable match key (digits-only for phones).
 function _ibNormKey(v) {
@@ -10695,9 +10739,9 @@ function _v15ibPipeOf(c) {
 }
 function _v15ibFiltered() {
   return _V15IB.convos.filter(c => {
-    if (_V15IB.unreadOnly && !((c.unreadCount || 0) > 0)) return false;
+    if (_V15IB.unreadOnly && !_v15ibIsUnread(c)) return false;
     if (_V15IB.failedOnly && !_V15IB_FAILED.includes(c.lastMessageStatus || '')) return false;
-    if (_V15IB.fChannel && _ibChannelKey(c) !== _V15IB.fChannel) return false;
+    if (_V15IB.fChannels.length && !_V15IB.fChannels.includes(_ibChannelBucket(c))) return false;
     if (_V15IB.fPipeline) {
       const cp = _v15ibPipeOf(c);
       if (!cp || cp.pipelineId !== _V15IB.fPipeline) return false;
@@ -10718,7 +10762,16 @@ function _v15ibRenderAll() {
   const stageOpts = `<option value="">All stages</option>` + (curPipe ? (curPipe.stages || []).map(s => `<option value="${escapeHTML(s.id)}" ${_V15IB.fStage === s.id ? 'selected' : ''}>${escapeHTML(s.name)}</option>`).join('') : '');
   const n = _v15ibFiltered().length;
   const filterActive = _V15IB.fPipeline || _V15IB.fStage;
-  const countLabel = `${n} conversation${n === 1 ? '' : 's'}${filterActive ? ' in filter' : ''}`;
+  const channelActive = _V15IB.fChannels.length > 0;
+  const countLabel = `${n} conversation${n === 1 ? '' : 's'}${(filterActive || channelActive || _V15IB.unreadOnly) ? ' in filter' : ''}`;
+  // Channel toggle buttons - press to show only that channel (multi-select).
+  // A pressed button is "down + activated"; none pressed = all channels.
+  const chanBtns = _V15IB_CHANNELS.map(ch => {
+    const on = _V15IB.fChannels.includes(ch.key);
+    return `<button onclick="_v15ibToggleChannel('${ch.key}')" aria-pressed="${on}" class="v15ib-chan${on ? ' on' : ''}">${ch.icon} ${ch.label}</button>`;
+  }).join('');
+  // Unread-only toggle - same pressed-down style as the channel buttons.
+  const unreadBtn = `<button onclick="_v15ibSetUnread(${!_V15IB.unreadOnly})" aria-pressed="${_V15IB.unreadOnly}" class="v15ib-chan${_V15IB.unreadOnly ? ' on' : ''}" title="Show only unread">🔴 Unread</button>`;
   host.innerHTML = `
     <div class="v15ib-bar">
       <div class="v15ib-pills">
@@ -10726,12 +10779,8 @@ function _v15ibRenderAll() {
         <button id="v15ib-approve-btn" onclick="_apxOpen()" title="Hawkeye - approve the agent's drafted messages before they send" aria-label="Hawkeye agent approvals" class="v15ib-icon" style="width:auto;padding:0 12px;gap:6px;border-color:var(--accent);color:var(--accent);font-weight:700">👁 Hawkeye <span id="v15-apx-count" style="font-weight:800"></span></button>
         <button onclick="_v15ibMassSend()" class="v15ib-icon v15ib-send" title="Mass send" aria-label="Mass send" style="width:auto;padding:0 12px;gap:6px">✉ Mass send</button>
       </div>
+      <div class="v15ib-chans">${unreadBtn}${chanBtns}</div>
       <div class="v15ib-filters">
-        <select onchange="_v15ibSetChannel(this.value)" class="v15ib-sel" title="Filter by channel">
-          <option value="">All channels</option>
-          <option value="instagram" ${_V15IB.fChannel === 'instagram' ? 'selected' : ''}>📸 Instagram</option>
-          <option value="facebook" ${_V15IB.fChannel === 'facebook' ? 'selected' : ''}>💬 Facebook</option>
-        </select>
         <select onchange="_v15ibSetPipeline(this.value)" class="v15ib-sel">${pipeOpts}</select>
         ${curPipe ? `<select onchange="_v15ibSetStage(this.value)" class="v15ib-sel">${stageOpts}</select>` : ''}
         ${filterActive ? `<button onclick="_v15ibClearPipe()" class="v15ib-clear" title="Clear pipeline filter" aria-label="Clear filter">✕</button>` : ''}
@@ -10777,6 +10826,13 @@ function _ibIsActivity(m) {
   return false;
 }
 
+// A conversation is unread if GHL flags it AND we haven't opened it since its
+// newest message (see _V15IB.readAt). Used by the list dots + the unread filter.
+function _v15ibIsUnread(c) {
+  if (!((c.unreadCount || 0) > 0)) return false;
+  const seenAt = _V15IB.readAt[c.id];
+  return !seenAt || new Date(c.lastMessageDate || 0).getTime() > new Date(seenAt).getTime();
+}
 function _v15ibRenderList() {
   const body = document.getElementById('v15ib-body');
   if (!body) return;
@@ -10784,7 +10840,10 @@ function _v15ibRenderList() {
   if (!rows.length) {
     let msg = 'No conversations yet.';
     if (_V15IB.unreadOnly) msg = 'No unread conversations.';
-    else if (_V15IB.fChannel) msg = `No ${_V15IB.fChannel === 'instagram' ? 'Instagram' : 'Facebook'} conversations yet.`;
+    else if (_V15IB.fChannels.length) {
+      const names = _V15IB_CHANNELS.filter(c => _V15IB.fChannels.includes(c.key)).map(c => c.label).join(' / ');
+      msg = `No ${names} conversations yet.`;
+    }
     else if (_V15IB.failedOnly) msg = 'No failed messages - all good.';
     else if (_V15IB.fPipeline) {
       msg = _V15IB.pipeOppCount === 0
@@ -10795,17 +10854,19 @@ function _v15ibRenderList() {
     return;
   }
   body.innerHTML = `<div class="v15ib-list">` + rows.map(c => {
-    const unread = (c.unreadCount || 0) > 0;
+    const unread = _v15ibIsUnread(c);
     const name = c.contactName || '(no name)';
     const cp = _v15ibPipeOf(c);
     const chip = cp ? `<div style="margin-top:6px"><span class="v15ib-chip">${escapeHTML(cp.pipelineName)}${cp.stageName ? ' · ' + escapeHTML(cp.stageName) : ''}</span></div>` : '';
+    const chIcon = _ibChannelIcon(c);
+    const chTag = chIcon ? `<span title="${escapeHTML(_ghlChannelLabel(c.lastMessageType || c.channel))}" style="margin-left:6px;font-size:11px;opacity:.85">${chIcon}</span>` : '';
     return `<div class="v15ib-conv ${unread ? 'unread' : ''}" onclick='_v15ibOpen(${JSON.stringify(c.id)},${JSON.stringify(c.contactId || "")},${JSON.stringify(c.phone || "")},${JSON.stringify(c.email || "")},${JSON.stringify(c.contactName || "")},${JSON.stringify(c.lastMessageType || c.channel || "")})'>
       <div style="position:relative;flex:none">
         <div style="width:42px;height:42px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;flex:none;${_ibAvatarStyle(name)}">${escapeHTML(_ibInitials(name))}</div>
         ${unread ? '<span style="position:absolute;top:-1px;right:-1px;width:11px;height:11px;border-radius:50%;background:var(--gold);border:2px solid var(--surface)"></span>' : ''}
       </div>
       <div style="flex:1;min-width:0">
-        <div class="v15ib-name">${escapeHTML(name)}</div>
+        <div class="v15ib-name">${escapeHTML(name)}${chTag}</div>
         <div class="v15ib-prev">${escapeHTML(_ibCleanPreview(c.lastMessageBody))}</div>
         ${chip}
       </div>
@@ -10825,14 +10886,25 @@ function _ibAvatarStyle(name) {
 async function _v15ibOpen(convId, contactId, phone, email, name, channel) {
   _V15IB.active = { convId, contactId, phone, email, name, channel: channel || '' };
   _V15IB.pending = [];
-  // Reply on the SAME channel the lead used (IG/FB/WhatsApp), else SMS. Email to
-  // clients stays disabled here - _ghlSendType never returns Email for inbound SMS.
-  const st = _ghlSendType(channel || '');
-  _V15IB.type = (st === 'Email') ? 'SMS' : st;
+  // Mark read: remember the conversation's newest-message time as of now, then
+  // repaint the list so the unread dot clears immediately.
+  const _c = (_V15IB.convos || []).find(x => x.id === convId);
+  _V15IB.readAt[convId] = (_c && _c.lastMessageDate) || new Date().toISOString();
+  try { _v15ibRenderList(); } catch (_) {}
+  // Reply on the SAME channel the lead used - SMS / Email / IG / FB / WhatsApp.
+  _V15IB.type = _ghlSendType(channel || '');
+  // Mark this conversation read (per-user). Optimistically clear it locally so it
+  // drops off the unread-top immediately; the server receipt makes it stick.
+  const _conv = (_V15IB.convos || []).find(c => c.id === convId);
+  if (_conv) _conv.unreadCount = 0;
   const body = document.getElementById('v15ib-body');
   if (body) body.innerHTML = `<div class="req-empty" style="padding:24px 0"><span class="req-spin"></span> Loading thread…</div>`;
   try {
     const token = await _mreqAuthToken();
+    fetch(`/api/ghl/inbox?action=mark-read&client_id=${encodeURIComponent(CLIENT_ID)}`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+      body: JSON.stringify({ conversation_id: convId }),
+    }).catch(() => {});
     const r = await fetch(`/api/ghl/inbox?client_id=${encodeURIComponent(CLIENT_ID)}&conversation_id=${encodeURIComponent(convId)}`, { headers: { Authorization: 'Bearer ' + token } });
     const j = await _safeJson(r);
     if (!r.ok) throw new Error(j.error || ('HTTP ' + r.status));
@@ -10891,6 +10963,8 @@ function _v15ibRenderThread() {
     <div style="margin-top:12px;border:1px solid var(--border);border-radius:10px;padding:10px">
       ${_V15IB.type !== 'SMS' ? `<div style="font-size:11px;color:var(--text-mute);margin-bottom:8px">Replying on <b style="color:var(--text)">${escapeHTML(_ghlChannelLabel(a.channel))}</b>${(_V15IB.type === 'IG' || _V15IB.type === 'FB') ? ' · Meta only allows a reply within 24h of their last message.' : ''}</div>` : ''}
       ${(_V15IB.type === 'SMS' && !a.phone) ? `<div style="font-size:11px;color:#c47424;margin-bottom:8px">⚠ No phone on file - add one in GHL to text this contact.</div>` : ''}
+      ${(_V15IB.type === 'Email' && !a.email) ? `<div style="font-size:11px;color:#c47424;margin-bottom:8px">⚠ No email on file - add one in GHL to email this contact.</div>` : ''}
+      ${isEmail ? `<input id="v15ib-subject" placeholder="Subject" style="width:100%;box-sizing:border-box;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:9px 11px;font:inherit;font-size:13px;margin-bottom:8px;outline:none">` : ''}
       <textarea id="v15ib-text" placeholder="${_V15IB.type === 'SMS' ? 'Type a message…' : 'Reply on ' + escapeHTML(_ghlChannelLabel(a.channel)) + '…'}" style="width:100%;min-height:70px;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:9px 11px;font:inherit;font-size:13px;resize:vertical;outline:none"></textarea>
       <div id="v15ib-chips" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px">${chips}</div>
       <div style="display:flex;align-items:center;gap:8px;margin-top:8px">
@@ -11419,6 +11493,7 @@ async function _contactsLoadStripe(c) {
     const p = new URLSearchParams({ client_id: CLIENT_ID });
     if (c.ghl_contact_id) p.set('ghl_contact_id', c.ghl_contact_id);
     if (c.email) p.set('email', c.email);
+    if (c.phone) p.set('phone', c.phone);
     const r = await fetch('/api/stripe/contact?' + p, { headers: { Authorization: 'Bearer ' + token } });
     const j = await _safeJson(r);
     if (!r.ok) throw new Error(j.error || ('HTTP ' + r.status));
@@ -11755,8 +11830,19 @@ async function openHomeView() {
   // V1.5 academies get a dedicated dashboard (trials today · missed calls ·
   // action items) instead of the ticket-centric tiles.
   const isV15 = (typeof V15_ACCESS !== 'undefined' && V15_ACCESS);
+  const isV2  = (typeof V2_ACCESS !== 'undefined' && V2_ACCESS);
   const GENERIC_SECTIONS = ['home-tiles-sec', 'home-tiles', 'home-week-sec', 'home-week', 'home-activity-sec', 'home-activity'];
   const v15El = document.getElementById('home-v15');
+  const v2El  = document.getElementById('home-v2');
+  // V2 (e.g. BAM GTA) gets the sales command-center dashboard. Takes precedence.
+  if (isV2) {
+    if (v2El)  v2El.style.display = '';
+    if (v15El) v15El.style.display = 'none';
+    GENERIC_SECTIONS.forEach(id => { const e = document.getElementById(id); if (e) e.style.display = 'none'; });
+    renderHomeV2();
+    return;
+  }
+  if (v2El) v2El.style.display = 'none';
   if (isV15) {
     if (v15El) v15El.style.display = '';
     GENERIC_SECTIONS.forEach(id => { const e = document.getElementById(id); if (e) e.style.display = 'none'; });
@@ -11790,6 +11876,108 @@ async function openHomeView() {
       renderHomeStatus(counts);
     }
   } catch (e) { /* leave the action-items tile dashed */ }
+}
+
+// ── V2 Home dashboard (sales command center) ─────────────────────────────
+// Four live tiles: trials today · done-trial replies waiting · Hawkeye actions ·
+// unread inbox. Each is a big tappable number that routes to the right place,
+// with hover + count-up animations. Each loads independently (no blocking).
+function _hv2Style() {
+  if (document.getElementById('hv2-style')) return;
+  const st = document.createElement('style'); st.id = 'hv2-style';
+  st.textContent =
+    '#home-v2 .hv2-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin:4px 0 18px}' +
+    '#home-v2 .hv2-tile{position:relative;border:1px solid var(--border);border-radius:14px;padding:16px 16px 15px;background:var(--surface);cursor:pointer;text-align:left;font-family:inherit;color:var(--text);opacity:0;transform:translateY(10px);transition:transform .18s ease,border-color .18s,box-shadow .18s;animation:hv2In .42s ease forwards}' +
+    '#home-v2 .hv2-tile:hover{transform:translateY(-4px);border-color:var(--gold,#E8C547);box-shadow:0 12px 30px rgba(0,0,0,.42)}' +
+    '#home-v2 .hv2-tile.hot{animation:hv2In .42s ease forwards,hv2Pulse 2.6s ease-in-out .7s infinite}' +
+    '#home-v2 .hv2-ic{font-size:20px;line-height:1}' +
+    '#home-v2 .hv2-num{font-size:36px;font-weight:800;line-height:1;margin:11px 0 3px;font-family:"Space Grotesk",Inter,sans-serif;color:var(--text-mute);transition:color .2s}' +
+    '#home-v2 .hv2-tile.hot .hv2-num{color:var(--gold,#E8C547)}' +
+    '#home-v2 .hv2-label{font-size:12.5px;font-weight:700;color:var(--text-sub)}' +
+    '#home-v2 .hv2-sub{font-size:11px;color:var(--text-mute);margin-top:2px}' +
+    '#home-v2 .hv2-go{position:absolute;top:13px;right:14px;color:var(--text-mute);font-size:18px;opacity:0;transform:translateX(-3px);transition:opacity .18s,transform .18s}' +
+    '#home-v2 .hv2-tile:hover .hv2-go{opacity:1;transform:translateX(0)}' +
+    '@keyframes hv2In{to{opacity:1;transform:translateY(0)}}' +
+    '@keyframes hv2Pulse{0%,100%{box-shadow:0 0 0 1px rgba(232,197,71,.28)}50%{box-shadow:0 0 0 4px rgba(232,197,71,.12)}}';
+  document.head.appendChild(st);
+}
+function _hv2Tile(key, delay, ic, label, sub, onclick) {
+  return `<button class="hv2-tile" id="hv2-tile-${key}" style="animation-delay:${delay}s" onclick="${onclick}">
+    <span class="hv2-go">›</span>
+    <div class="hv2-ic">${ic}</div>
+    <div class="hv2-num" id="hv2-num-${key}">·</div>
+    <div class="hv2-label">${label}</div>
+    <div class="hv2-sub">${sub}</div>
+  </button>`;
+}
+// Animate a tile's number up to n + flag it "hot" (gold + pulse) when n > 0.
+function _hv2Set(key, n) {
+  const el = document.getElementById('hv2-num-' + key); if (!el) return;
+  const tile = document.getElementById('hv2-tile-' + key);
+  const target = Math.max(0, Number(n) || 0);
+  if (tile) tile.classList.toggle('hot', target > 0);
+  const t0 = Date.now(), dur = 550;
+  const tick = () => { const p = Math.min(1, (Date.now() - t0) / dur); el.textContent = String(Math.round(p * target)); if (p < 1) requestAnimationFrame(tick); };
+  requestAnimationFrame(tick);
+}
+// Hawkeye tile: open the Sales pipeline FIRST, then the Hawkeye popup on top - so
+// closing the popup (×) lands you on the pipeline.
+function _hv2OpenHawkeye() { try { switchView('pipelines'); } catch (_) {} setTimeout(() => { try { _apxOpen(); } catch (_) {} }, 70); }
+function renderHomeV2() {
+  const host = document.getElementById('home-v2'); if (!host) return;
+  _hv2Style();
+  host.innerHTML = `<div class="home-sec" style="margin-top:2px"><span class="home-sec-label">Today at a glance</span></div>
+    <div class="hv2-grid">
+      ${_hv2Tile('trials', 0,    '📅', 'Trials today',           'see them in the pipeline', "switchView('pipelines')")}
+      ${_hv2Tile('done',   0.06, '💬', 'Done-trial replies',     'leads who texted back',    "switchView('pipelines')")}
+      ${_hv2Tile('hawk',   0.12, '👁', 'Hawkeye actions',        'to approve',               '_hv2OpenHawkeye()')}
+      ${_hv2Tile('unread', 0.18, '✉️', 'Unread messages',        'in the inbox',             "switchView('inbox')")}
+    </div>`;
+  _hv2Load();
+}
+async function _hv2Load() {
+  // Trials today
+  (async () => {
+    try {
+      const token = await _mreqAuthToken();
+      const r = await fetch('/api/ghl/calendars-v15?action=trials-today&client_id=' + encodeURIComponent(CLIENT_ID), { headers: { Authorization: 'Bearer ' + token } });
+      const j = await _safeJson(r); _hv2Set('trials', (j && j.trials || []).length);
+    } catch (_) { _hv2Set('trials', 0); }
+  })();
+  // Hawkeye actions waiting (same split the inbox badge uses)
+  (async () => {
+    try {
+      const [fu, rd] = await Promise.all([ _apxPost('/api/agent-followups', 'list', {}).catch(() => ({})), _apxPost('/api/agent-approvals', 'list-ready', {}).catch(() => ({})) ]);
+      const d = _apxSplit(fu, rd);
+      _hv2Set('hawk', d.followups.length + d.ready.length + (d.lost || []).length + (d.book || []).length + (d.ghost || []).length);
+    } catch (_) { _hv2Set('hawk', 0); }
+  })();
+  // Inbox unread + done-trial replies waiting (one inbox + one pipelines fetch)
+  (async () => {
+    try {
+      const token = await _mreqAuthToken();
+      const [ib, pl] = await Promise.all([
+        fetch('/api/ghl/inbox?client_id=' + encodeURIComponent(CLIENT_ID), { headers: { Authorization: 'Bearer ' + token } }).then(_safeJson),
+        fetch('/api/ghl/pipelines?client_id=' + encodeURIComponent(CLIENT_ID), { headers: { Authorization: 'Bearer ' + token } }).then(_safeJson),
+      ]);
+      _hv2Set('unread', (ib && ib.counts && ib.counts.unread) || 0);
+      const byContact = new Map();
+      for (const c of ((ib && ib.conversations) || [])) if (c.contactId) byContact.set(String(c.contactId), c);
+      let doneReplies = 0;
+      const pls = (pl && pl.pipelines) || [];
+      const pipe = pls.find(p => /training/i.test(p.name || '')) || pls[0];
+      const doneStage = pipe && (pipe.stages || []).find(s => _plIsDoneTrialStage(s));
+      if (pipe && doneStage) {
+        for (const o of (pipe.opportunities || [])) {
+          if (o.stageId !== doneStage.id) continue;
+          if (['won', 'lost', 'abandoned'].includes(String(o.status || 'open').toLowerCase())) continue;
+          const c = byContact.get(String(o.contactId || ''));
+          if (c && String(c.lastMessageDirection || '').toLowerCase() === 'inbound') doneReplies++;
+        }
+      }
+      _hv2Set('done', doneReplies);
+    } catch (_) { _hv2Set('unread', 0); _hv2Set('done', 0); }
+  })();
 }
 
 // ── V1.5 Home dashboard ──────────────────────────────────────────────────
@@ -12442,9 +12630,10 @@ function applyV2NavState(v2Access) {
   if (typeof applyTalkToBamNav === 'function') applyTalkToBamNav();
 }
 
-// Home is hidden for V2 academies for now - BAM staff admins keep it.
+// Home is now available to V2 academies too - it shows the V2 sales command-center
+// dashboard (renderHomeV2). (Previously hidden for V2 because there was no V2 home.)
 function _homeHiddenForMe() {
-  return (typeof V2_ACCESS !== 'undefined' && V2_ACCESS) && _IS_BAM_STAFF !== true;
+  return false;
 }
 function applyHomeNavState() {
   const hide = _homeHiddenForMe();
@@ -13304,16 +13493,43 @@ function _formatRelative(iso) {
   if (diff < 7*day)   return Math.round(diff/day) + ' days ago';
   return d.toLocaleDateString('en-US', { month:'short', day:'numeric', year:'numeric' });
 }
+// The resources bucket is PRIVATE (login-gated). We mint short-lived signed
+// URLs on demand and cache them per render. _resourceFileUrl() is a sync
+// lookup into that cache; _signResourceFiles() fills it before render.
+const _resourceSignedUrls = {};
+async function _signResourceFiles(paths) {
+  const need = [...new Set((paths || []).filter(p => p && !_resourceSignedUrls[p]))];
+  if (!need.length) return;
+  try {
+    const { data, error } = await _sb.storage.from(RESOURCES_BUCKET).createSignedUrls(need, 3600);
+    if (error) throw error;
+    (data || []).forEach(d => { if (d && d.path && d.signedUrl) _resourceSignedUrls[d.path] = d.signedUrl; });
+  } catch (e) {
+    console.error('[resources] sign failed', e);
+  }
+}
 function _resourceFileUrl(path) {
-  // Public bucket - direct URL
-  const { data } = _sb.storage.from(RESOURCES_BUCKET).getPublicUrl(path);
-  return data?.publicUrl || '';
+  return _resourceSignedUrls[path] || '';
 }
 function _resourceCanPreview(mime) {
   if (!mime) return false;
   return mime.startsWith('image/')
       || mime.startsWith('video/')
       || mime === 'application/pdf';
+}
+
+// Open a guide card's gated resource in-portal (the PDFs are no longer public
+// static files). Switches to Resources, waits for the library to load, then
+// opens the resource whose title matches the keyword.
+async function _openGuideResource(keyword) {
+  try {
+    switchView('resources');
+    if (!_resourcesData && !_resourcesLoading) await loadResources();
+    while (_resourcesLoading) await new Promise(r => setTimeout(r, 40));
+    const kw = (keyword || '').toLowerCase();
+    const r = (_resourcesData?.resources || []).find(x => (x.title || '').toLowerCase().includes(kw));
+    if (r) openResourceDetail(r.id);
+  } catch (e) { console.error('[guide] open failed', e); }
 }
 
 async function openResourcesView() {
@@ -13446,7 +13662,7 @@ function closeResourceDetail() {
   renderResourcesList();
 }
 
-function renderResourceDetail(id) {
+async function renderResourceDetail(id) {
   if (!_resourcesData) return;
   const r = _resourcesData.resources.find(x => x.id === id);
   const listPanel = document.getElementById('resources-list-panel');
@@ -13463,6 +13679,9 @@ function renderResourceDetail(id) {
 
   if (listPanel) listPanel.style.display = 'none';
   detailPanel.style.display = '';
+
+  // Private bucket: sign this resource's file URLs before rendering them.
+  await _signResourceFiles((r.resource_files || []).map(f => f.storage_path));
 
   const c = _resourcesData.categories.find(x => x.id === r.category_id);
   const cBg = c ? `${c.color}1a` : 'var(--accent-ghost)';
@@ -15396,6 +15615,7 @@ function _taRenderTest() {
   const p = document.getElementById('ta-panel'); if (!p) return;
   p.innerHTML = `
     <p style="color:var(--text-mute);font-size:12.5px;margin:0 0 12px;line-height:1.5">Type as a lead - the agent shows the reply it <i>would</i> send. Nothing is actually texted.</p>
+    <div style="margin:0 0 14px"><button onclick="_taHealthOpen()" title="See what the agent recommends for every lead in the Responded stage right now" style="background:transparent;border:1px solid var(--border);color:var(--text-sub);border-radius:8px;padding:7px 13px;font:inherit;font-size:12.5px;font-weight:700;cursor:pointer">🩺 Responded health</button></div>
     <div id="ta-chat" style="display:flex;flex-direction:column;gap:10px;margin-bottom:14px;min-height:40px"></div>
     <div style="display:flex;gap:8px;align-items:flex-end">
       <textarea id="ta-chat-input" rows="2" placeholder="Type as the lead…" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();_taSend();}" style="flex:1;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:10px 12px;color:var(--text);font-size:14px;resize:vertical;font-family:inherit"></textarea>
@@ -15403,6 +15623,69 @@ function _taRenderTest() {
     </div>
     <button onclick="_TA.chat=[];_taRenderTest()" style="margin-top:10px;background:none;border:none;color:var(--text-mute);font-size:12px;cursor:pointer">↺ reset conversation</button>`;
   _taRenderChatLog();
+}
+
+// ── Responded health (audit): what the agent recommends for every Responded lead ──
+function _taHealthOpen() {
+  document.getElementById('ta-health-overlay')?.remove();
+  document.body.insertAdjacentHTML('beforeend', `
+    <div id="ta-health-overlay" onclick="if(event.target===this)this.remove()" style="position:fixed;inset:0;z-index:9500;background:rgba(0,0,0,.6);display:flex;align-items:flex-start;justify-content:center;padding:6vh 14px 0;overflow-y:auto">
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:16px;width:100%;max-width:640px;padding:18px;box-shadow:0 24px 70px rgba(0,0,0,.6)">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+          <div style="font-size:16px;font-weight:800">🩺 Responded health</div>
+          <div style="flex:1"></div>
+          <button id="ta-health-scan" onclick="_taHealthScan()" title="Force a fresh agent scan now" style="background:transparent;border:1px solid var(--border);color:var(--text-sub);border-radius:8px;padding:6px 12px;font:inherit;font-size:12.5px;font-weight:700;cursor:pointer">🔄 Scan now</button>
+          <button onclick="document.getElementById('ta-health-overlay').remove()" aria-label="Close" style="background:none;border:none;color:var(--text-mute);font-size:22px;cursor:pointer;padding:0 6px">×</button>
+        </div>
+        <div style="font-size:12.5px;color:var(--text-mute);margin-bottom:12px;line-height:1.5">What the agent recommends for every lead in the Responded stage right now. 🟢 = waiting on the lead · 🟡 = sitting a while with no action (check it) · coloured = action waiting in Hawkeye.</div>
+        <div id="ta-health-body"><div style="color:var(--text-mute);font-size:13px"><span class="req-spin"></span> Loading…</div></div>
+      </div>
+    </div>`);
+  _taHealthLoad();
+}
+async function _taHealthLoad() {
+  const body = document.getElementById('ta-health-body'); if (!body) return;
+  try {
+    const token = await _mreqAuthToken();
+    const [pipeRes, rd] = await Promise.all([
+      fetch(`/api/ghl/pipelines?client_id=${encodeURIComponent(CLIENT_ID)}`, { headers: { Authorization: 'Bearer ' + token } }).then(_safeJson),
+      _apxPost('/api/agent-approvals', 'list-ready', {}).catch(() => ({ ready: [] })),
+    ]);
+    const pls = (pipeRes && pipeRes.pipelines) || [];
+    const pipe = pls.find(p => /training/i.test(p.name || '')) || pls[0];
+    const stage = pipe && (pipe.stages || []).find(s => /respond/i.test(s.name || ''));
+    const opps = (pipe && stage) ? (pipe.opportunities || []).filter(o => o.stageId === stage.id && String(o.status || 'open').toLowerCase() === 'open') : [];
+    const cardBy = new Map();
+    for (const r of (rd.ready || [])) {
+      if ((r.status === 'pending' || r.status === 'approved') && r.ghl_contact_id) {
+        const id = String(r.ghl_contact_id), k = r.kind || 'reply', cur = cardBy.get(id);
+        if (!cur || (_PL_NEED_PRIO[k] || 0) > (_PL_NEED_PRIO[cur] || 0)) cardBy.set(id, k);
+      }
+    }
+    if (!opps.length) { body.innerHTML = `<div style="font-size:13px;color:var(--text-mute)">No leads in the Responded stage.</div>`; return; }
+    const label = { reply: ['💬 Reply', '#5A8FB8'], ghost: ['👻 Send to Ghosted', 'var(--gold,#E8C547)'], mark_lost: ['🚫 Confirm lost', '#e0654f'], book: ['📅 Confirm booking', '#5A8FB8'] };
+    const rows = opps.map(o => {
+      const nm = escapeHTML((o.contact && o.contact.name) || o.name || 'Lead');
+      const k = cardBy.get(String(o.contactId || ''));
+      const ageMs = (o.lastStageChangeAt || o.updatedAt) ? Date.now() - new Date(o.lastStageChangeAt || o.updatedAt).getTime() : 0;
+      const stale = ageMs > 7 * 86400 * 1000;
+      let lab, col;
+      if (k && label[k]) { lab = label[k][0]; col = label[k][1]; }
+      else if (stale) { lab = '🟡 Check'; col = 'var(--gold,#E8C547)'; }
+      else { lab = '🟢 All good'; col = 'var(--green,#4CC76A)'; }
+      return `<div style="display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--border)">
+        <span style="font-size:13.5px;font-weight:600;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${nm}</span>
+        <span style="font-size:12px;font-weight:700;color:${col};white-space:nowrap">${lab}</span></div>`;
+    }).join('');
+    const needN = opps.filter(o => cardBy.get(String(o.contactId || ''))).length;
+    body.innerHTML = `<div style="font-size:12px;color:var(--text-mute);margin-bottom:8px">${opps.length} in Responded · ${needN} need action</div>${rows}`;
+  } catch (e) {
+    body.innerHTML = `<div style="color:#e07070;font-size:13px">Couldn't load - ${escapeHTML(e.message || String(e))}</div>`;
+  }
+}
+async function _taHealthScan() {
+  const ok = await _plScanNow('ta-health-scan');
+  if (ok) _taHealthLoad();
 }
 
 function _taRenderChatLog() {
@@ -21082,23 +21365,80 @@ let _PL_PIPELINE   = null;   // currently-selected pipeline id
 let _PL_DRAG_OPP   = null;   // { oppId, fromStageId, pipelineId } during drag
 let _PL_AGENT_MODE = null;   // 'off' | 'hawkeye' | 'self_drive' | null(unknown) - drives the Responded glow
 
-// Set of Responded-stage contact ids that already have a follow-up queued
-// (status pending/approved). Drives the per-card All good / Needs action badge.
-let _PL_FU_PENDING = null;
-async function _plLoadFollowups() {
+// Map of Responded-stage contact id → the pending Hawkeye action waiting on staff
+// ('reply' | 'ghost' | 'mark_lost' | 'book'). Drives the per-card badge: any
+// pending card → 🔴 Needs action (labelled by kind); none → 🟢 All good.
+let _PL_NEEDS = null;
+// If one lead somehow has more than one pending card, show the most decisive one.
+const _PL_NEED_PRIO = { book: 4, mark_lost: 3, reply: 2, ghost: 1 };
+async function _plLoadNeedsAction() {
   try {
-    const j = await _apxPost('/api/agent-followups', 'list', {});
-    const set = new Set();
-    for (const f of (j.followups || [])) {
-      if ((f.status === 'pending' || f.status === 'approved') && f.ghl_contact_id) set.add(String(f.ghl_contact_id));
+    const j = await _apxPost('/api/agent-approvals', 'list-ready', {});
+    const map = new Map();
+    for (const r of (j.ready || [])) {
+      if ((r.status !== 'pending' && r.status !== 'approved') || !r.ghl_contact_id) continue;
+      const id = String(r.ghl_contact_id), k = r.kind || 'reply', cur = map.get(id);
+      if (!cur || (_PL_NEED_PRIO[k] || 0) > (_PL_NEED_PRIO[cur] || 0)) map.set(id, k);
     }
-    _PL_FU_PENDING = set;
+    _PL_NEEDS = map;
   } catch (e) {
-    // Permission denied → this viewer can't read follow-up status; hide the
-    // badges entirely (don't paint everything red). Transient error → keep prior.
-    if (e && (e.status === 401 || e.status === 403)) _PL_FU_PENDING = null;
+    // Permission denied → this viewer can't read agent status; hide the badges
+    // entirely (don't paint everything green). Transient error → keep prior.
+    if (e && (e.status === 401 || e.status === 403)) _PL_NEEDS = null;
   }
   try { if (typeof _renderPipelineBoard === 'function') _renderPipelineBoard(); } catch (_) {}
+}
+// Last-message info per contact (from the GHL inbox list), for the Done Trial
+// cards: show when the last message was + glow if the LEAD messaged last.
+let _PL_LASTMSG = null;   // contactId → { direction, date }
+// V2-only flow gate for the pipelines board. V1.5 = plain GHL mirror.
+function _plIsV2() { return typeof V2_ACCESS !== 'undefined' && V2_ACCESS; }
+async function _plLoadLastMessages() {
+  try {
+    const token = await _mreqAuthToken();
+    const r = await fetch(`/api/ghl/inbox?client_id=${encodeURIComponent(CLIENT_ID)}`, { headers: { Authorization: 'Bearer ' + token } });
+    const j = await _safeJson(r);
+    if (!r.ok) return;
+    const map = new Map();
+    for (const c of (j.conversations || [])) {
+      if (c.contactId) map.set(String(c.contactId), { direction: (c.lastMessageDirection || '').toLowerCase(), date: c.lastMessageDate || null });
+    }
+    _PL_LASTMSG = map;
+    try { if (typeof _renderPipelineBoard === 'function') _renderPipelineBoard(); } catch (_) {}
+  } catch (_) {}
+}
+
+// Force a fresh agent scan of the Responded stage NOW (both engines: reply +
+// ghost) instead of waiting for the every-15/30-min cron, then refresh the
+// badges. Shared by the board "🔄 Scan" button and the Responded-health view.
+let _PL_SCANNING = false;
+let _PL_LAST_SCAN = 0;
+async function _plScanNow(btnId, auto) {
+  if (_PL_SCANNING) return;
+  // Auto-scan (on board open) is debounced — skip if we scanned in the last 5 min.
+  if (auto && _PL_LAST_SCAN && (Date.now() - _PL_LAST_SCAN) < 5 * 60000) return;
+  _PL_SCANNING = true;
+  const btn = btnId && document.getElementById(btnId);
+  const prev = btn ? btn.innerHTML : null;
+  if (btn) { btn.disabled = true; btn.innerHTML = '⏳…'; }
+  // Grey out the Responded cards + disable their buttons while the scan runs.
+  try { if (typeof _renderPipelineBoard === 'function') _renderPipelineBoard(); } catch (_) {}
+  try {
+    await Promise.all([
+      _apxPost('/api/agent-approvals', 'detect-now', {}).catch(() => null),
+      _apxPost('/api/agent-followups', 'detect-now', {}).catch(() => null),
+    ]);
+    _PL_LAST_SCAN = Date.now();
+    await _plLoadNeedsAction();   // repaint badges from the fresh cards (re-renders the board)
+    if (!auto && typeof _plToast === 'function') _plToast('🔄 Scan complete');
+  } catch (e) {
+    if (!auto && typeof _plToast === 'function') _plToast('Scan failed: ' + (e.message || e));
+  } finally {
+    _PL_SCANNING = false;
+    if (btn) { btn.disabled = false; btn.innerHTML = prev; }
+    try { if (typeof _renderPipelineBoard === 'function') _renderPipelineBoard(); } catch (_) {}   // ungrey
+  }
+  return true;
 }
 // Look up a lead's display name from the loaded board by GHL contact id.
 function _plNameForContact(contactId) {
@@ -21131,7 +21471,8 @@ async function _plLoadAgentMode() {
     if (!r.ok) { _PL_AGENT_MODE = 'off'; return; }
     _PL_AGENT_MODE = j.mode || 'off';
   } catch (_) { _PL_AGENT_MODE = 'off'; }
-  if (_PL_AGENT_MODE && _PL_AGENT_MODE !== 'off') _plLoadFollowups();   // load the follow-up badges once the agent is known to be on
+  if (_PL_AGENT_MODE && _PL_AGENT_MODE !== 'off') { _plLoadNeedsAction(); try { _plScanNow(null, true); } catch (_) {} }   // load badges + auto-scan once the agent is known to be on
+  _plLoadLastMessages();   // Done Trial cards: last-message time + lead-last glow
   try { if (typeof _renderPipelineBoard === 'function') _renderPipelineBoard(); } catch (_) {}
 }
 
@@ -21139,7 +21480,7 @@ async function fetchAndRenderPipelines() {
   const container = document.getElementById('pl-board-container');
   if (!container) return;
   if (_PL_AGENT_MODE === null) _plLoadAgentMode();   // fetch once, re-renders on completion
-  else if (_PL_AGENT_MODE !== 'off') _plLoadFollowups();   // refresh the follow-up badges on each board open
+  else if (_PL_AGENT_MODE !== 'off') _plLoadNeedsAction();   // refresh the needs-action badges on each board open
   // Instant render: if the board is already loaded, show it now and refresh in
   // the background instead of blanking to a spinner on every open.
   const hadData = _PL_DATA && Array.isArray(_PL_DATA.pipelines) && _PL_DATA.pipelines.length;
@@ -21159,6 +21500,11 @@ async function fetchAndRenderPipelines() {
     }
     _renderPipelineTabs();
     _renderPipelineBoard();
+    _plLoadLastMessages();   // Done Trial cards: last-message time + lead-last glow
+    // Auto-scan on load so recommendations are fresh without waiting for the cron
+    // (debounced to 5 min; greys the Responded cards while it runs). If the agent
+    // mode isn't known yet, _plLoadAgentMode kicks the scan once it resolves.
+    if (_PL_AGENT_MODE && _PL_AGENT_MODE !== 'off') { try { _plScanNow(null, true); } catch (_) {} }
   } catch (e) {
     if (!hadData) container.innerHTML = `<div class="req-empty" style="padding:20px 0">Couldn't load pipelines - ${escapeHTML(e.message)}</div>`;
   }
@@ -21465,6 +21811,12 @@ function _plIsDoneTrialStage(stage) {
   const n = (stage && stage.name || '').toLowerCase();
   return n.includes('trial') && (n.includes('done') || n.includes('complete') || n.includes('attended'));
 }
+// The "Scheduled Trial" stage — the only place the post-trial form belongs (the
+// trial is booked here; staff fill the form after it happens).
+function _plIsScheduledTrialStage(stage) {
+  const n = (stage && stage.name || '').toLowerCase();
+  return n.includes('trial') && (n.includes('schedul') || n.includes('booked') || n.includes('upcoming')) && !_plIsDoneTrialStage(stage);
+}
 
 // Post-trial form - coach fills it after the trial. Captures fit, the
 // trainer leading the sale, and notes. On "good fit" the opportunity moves
@@ -21661,6 +22013,54 @@ function _plRemoveOppLocal(oppId) {
   try { _renderPipelineTabs(); _renderPipelineBoard(); } catch (_) {}
 }
 
+// Full-drawer confirmation flash: covers the open card drawer with a big icon +
+// label for ~1.8s, then closes the drawer. If the drawer isn't open it just
+// closes (so callers can always use it). Shared by Lost / Abandon / Ghosted.
+function _plDrawerConfirm(icon, label, sub) {
+  const drawer = document.getElementById('pl-drawer');
+  if (!drawer || !drawer.classList.contains('open')) { closePipelineDrawer(); return; }
+  if (!document.getElementById('pl-dc-style')) {
+    const st = document.createElement('style'); st.id = 'pl-dc-style';
+    st.textContent =
+      '@keyframes plDcIn{from{opacity:0}to{opacity:1}}' +
+      '@keyframes plDcOut{from{opacity:1}to{opacity:0}}' +
+      '@keyframes plDcPop{0%{transform:scale(.2);opacity:0}50%{transform:scale(1.18)}70%{transform:scale(.92)}85%{transform:scale(1.04)}100%{transform:scale(1);opacity:1}}' +
+      '@keyframes plDcUp{0%{opacity:0;transform:translateY(10px)}100%{opacity:1;transform:translateY(0)}}' +
+      '@keyframes plDcGlow{0%{transform:scale(.4);opacity:0}45%{opacity:.45}100%{transform:scale(1.7);opacity:0}}';
+    document.head.appendChild(st);
+  }
+  document.getElementById('pl-drawer-confirm')?.remove();
+  const ov = document.createElement('div');
+  ov.id = 'pl-drawer-confirm';
+  // position:fixed inside the transformed drawer = contained by it → covers the
+  // whole visible drawer (no scroll bleed) AND slides out with it on close.
+  ov.style.cssText = 'position:fixed;inset:0;z-index:80;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;text-align:center;padding:24px;animation:plDcIn .2s ease both';
+  ov.innerHTML = `
+    <div style="position:relative;display:flex;align-items:center;justify-content:center;width:96px;height:96px">
+      <div style="position:absolute;width:96px;height:96px;border-radius:50%;background:radial-gradient(circle,var(--accent,#E8C547) 0%,transparent 68%);animation:plDcGlow .85s ease-out both"></div>
+      <div style="font-size:62px;line-height:1;position:relative;animation:plDcPop .56s cubic-bezier(.2,.8,.25,1) both">${icon}</div>
+    </div>
+    <div style="font-size:21px;font-weight:800;color:var(--text);animation:plDcUp .4s ease .14s both">${escapeHTML(label)}</div>
+    ${sub ? `<div style="font-size:13.5px;color:var(--text-mute);max-width:280px;line-height:1.5;animation:plDcUp .4s ease .22s both">${escapeHTML(sub)}</div>` : ''}`;
+  drawer.appendChild(ov);
+  // Brief fade-out, then close the drawer (the overlay slides out with it).
+  setTimeout(() => { try { ov.style.animation = 'plDcOut .25s ease both'; } catch (_) {} }, 1550);
+  setTimeout(() => { try { ov.remove(); } catch (_) {} closePipelineDrawer(); }, 1800);
+}
+
+// Move a lead's board card to its pipeline's Interested stage locally (optimistic),
+// keyed by GHL contact id. Used when sending to Ghosted (the automation also moves
+// them, but we reflect it on the board immediately).
+function _plMoveContactToInterested(contactId) {
+  if (!_PL_DATA || !contactId) return false;
+  for (const pl of (_PL_DATA.pipelines || [])) {
+    const opp = (pl.opportunities || []).find(o => String(o.contactId || '') === String(contactId));
+    const interested = (pl.stages || []).find(s => /interest/i.test(s.name || ''));
+    if (opp && interested) { opp.stageId = interested.id; opp.lastStageChangeAt = new Date().toISOString(); try { _renderPipelineBoard(); } catch (_) {} return true; }
+  }
+  return false;
+}
+
 function _plOutcome(oppId, status) {
   const label = _PL_STATUS_LABEL[status] || status;
   document.body.insertAdjacentHTML('beforeend', `<div id="pl-outcome-overlay" style="position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9100;display:flex;align-items:center;justify-content:center;padding:18px" onclick="if(event.target===this)this.remove()">
@@ -21682,8 +22082,8 @@ async function _plOutcomeConfirm(oppId, status) {
   try {
     await _plSetStatus(oppId, status, reason);
     document.getElementById('pl-outcome-overlay')?.remove();
-    closePipelineDrawer();
-    _plRemoveOppLocal(oppId); // remove from the pipeline board (Lost automation runs in GHL)
+    _plRemoveOppLocal(oppId); // remove from the pipeline board right away (Lost automation runs in GHL)
+    _plDrawerConfirm(status === 'lost' ? '🚫' : '🗑', `Marked ${_PL_STATUS_LABEL[status] || status}`, 'Removed from the pipeline'); // flashes, then closes the drawer
     _plShowUndo({ type: 'status', oppId }, `Marked ${_PL_STATUS_LABEL[status] || status} - removed from pipeline`);
   } catch (e) {
     alert('Couldn’t mark ' + status + ': ' + e.message);
@@ -21770,9 +22170,9 @@ async function _plEnrollSpecialGo(oppId) {
     });
     const json = await _safeJson(r);
     if (!r.ok) throw new Error(json.error || ('HTTP ' + r.status));
-    const moved = await _plMoveToInterested(oppId, token);
-    if (moved && typeof _renderPipelineBoard === 'function') _renderPipelineBoard();
-    _plToast(moved ? '📨 Sent + moved to Interested' : '📨 Sent to Summer Special');
+    // Do NOT move the card to Interested from the portal — the GHL Summer Special
+    // automation handles that move itself (set up in GoHighLevel).
+    _plToast('📨 Sent to Summer Special');
   } catch (e) {
     alert('Could not send: ' + (e.message || e));
   }
@@ -21802,8 +22202,7 @@ async function _plGhostGo(oppId) {
     if (!r.ok) throw new Error(json.error || ('HTTP ' + r.status));
     const moved = await _plMoveToInterested(oppId, token);
     if (moved && typeof _renderPipelineBoard === 'function') _renderPipelineBoard();
-    closePipelineDrawer();
-    _plToast(moved ? '👻 Ghosted - texting them + moved to Interested' : '👻 Sent to Ghosted automation');
+    _plDrawerConfirm('👻', 'Sent to Ghosted', moved ? 'Moved to Interested - the automation takes over' : 'The automation takes over');
   } catch (e) {
     alert('Could not send to Ghosted automation: ' + (e.message || e));
   }
@@ -21851,6 +22250,56 @@ function _plAgeShort(iso) {
   return d.toLocaleDateString('en-US', { month:'short', day:'numeric' });
 }
 
+// A wavy "〜 upcoming 〜" divider (Claude-Code-style squiggle) that splits the
+// passed/today trials from the upcoming ones in the Scheduled Trial column.
+function _plUpcomingDivider(label = 'upcoming') {
+  const wave = `<svg viewBox="0 0 100 12" preserveAspectRatio="none" style="flex:1;height:12px;color:var(--text-mute)"><path d="M0,6 Q12.5,0 25,6 T50,6 T75,6 T100,6" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>`;
+  return `<div style="display:flex;align-items:center;gap:9px;margin:14px 2px 12px;color:var(--text-mute)">
+    ${wave}
+    <span style="font-size:11.5px;font-weight:700;letter-spacing:.05em;white-space:nowrap">${label}</span>
+    ${wave}
+  </div>`;
+}
+
+let _PL_DUPS = null;   // oppId → [{id,name,stage,athlete,trial,phone}] of likely duplicates
+// Show the possible-duplicate group for an opp and let staff close the redundant
+// card(s). "Close" = mark that opportunity Abandoned (off the board). It does NOT
+// merge the GHL contacts - that's a manual GHL step if you want the records joined.
+function _plResolveDup(oppId) {
+  if (!_PL_DATA) return;
+  let me = null;
+  for (const pl of _PL_DATA.pipelines) { const f = (pl.opportunities || []).find(x => x.id === oppId); if (f) { me = f; break; } }
+  if (!me) return;
+  const stageNm = (sid) => { for (const pl of _PL_DATA.pipelines) { const st = (pl.stages || []).find(x => x.id === sid); if (st) return st.name; } return ''; };
+  const matches = (_PL_DUPS && _PL_DUPS.get(oppId)) || [];
+  const rows = [{ id: me.id, name: (me.contact && me.contact.name) || me.name || 'Lead', stage: stageNm(me.stageId), athlete: me.athlete || '', trial: me.trialDate || null, phone: (me.contact && me.contact.phone) || '', me: true }, ...matches];
+  const tStr = (t) => { if (!t) return ''; try { const d = new Date(t); return isNaN(d.getTime()) ? '' : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }); } catch (_) { return ''; } };
+  const rowHtml = (r) => `<div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--border)">
+      <div style="flex:1;min-width:0">
+        <div style="font-size:13.5px;font-weight:700">${escapeHTML(r.name)}${r.me ? ' <span style="font-size:10.5px;color:var(--text-mute);font-weight:600">(this card)</span>' : ''}</div>
+        <div style="font-size:11.5px;color:var(--text-mute);margin-top:2px">${escapeHTML(r.stage || '-')}${r.athlete ? ' · ' + escapeHTML(r.athlete) : ''}${tStr(r.trial) ? ' · trial ' + escapeHTML(tStr(r.trial)) : ''}${r.phone ? ' · ' + escapeHTML(r.phone) : ''}</div>
+      </div>
+      <button onclick="_plResolveDupClose('${escapeHTML(r.id)}')" style="background:transparent;border:1px solid var(--text-mute);color:var(--text-sub);border-radius:8px;padding:6px 11px;font:inherit;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap">🗑 close as dup</button>
+    </div>`;
+  document.getElementById('pl-dup-overlay')?.remove();
+  document.body.insertAdjacentHTML('beforeend', `
+    <div id="pl-dup-overlay" onclick="if(event.target===this)this.remove()" style="position:fixed;inset:0;z-index:9300;background:rgba(0,0,0,.6);display:flex;align-items:flex-start;justify-content:center;padding:8vh 14px 0">
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:16px;width:100%;max-width:480px;padding:18px;box-shadow:0 24px 70px rgba(0,0,0,.6)">
+        <div style="font-size:16px;font-weight:800;margin-bottom:4px">⚠ Possible duplicate</div>
+        <div style="font-size:12.5px;color:var(--text-mute);margin-bottom:12px;line-height:1.5">These cards share a phone or athlete name - likely the same person (e.g. they booked under a different email). Keep the right one and close the others. Closing marks that opportunity Abandoned (off the board); it does not merge the GHL contacts.</div>
+        ${rows.map(rowHtml).join('')}
+        <div style="display:flex;justify-content:flex-end;margin-top:14px"><button onclick="document.getElementById('pl-dup-overlay').remove()" style="background:transparent;border:1px solid var(--border);color:var(--text-sub);border-radius:9px;padding:8px 16px;font:inherit;font-size:13px;cursor:pointer">Done</button></div>
+      </div>
+    </div>`);
+}
+async function _plResolveDupClose(id) {
+  try {
+    await _plSetStatus(id, 'abandoned', 'duplicate');
+    _plRemoveOppLocal(id);
+    document.getElementById('pl-dup-overlay')?.remove();
+    _plToast('🗑 Closed duplicate');
+  } catch (e) { alert('Could not close duplicate: ' + (e.message || e)); }
+}
 function _renderPipelineBoard() {
   const container = document.getElementById('pl-board-container');
   if (!container || !_PL_DATA) return;
@@ -21865,6 +22314,9 @@ function _renderPipelineBoard() {
 
   // Per-staff stage permissions: a restricted teammate only sees allowed stages.
   const visibleStages = p.stages.filter(s => _isStageAllowed(s.id));
+  // V1.5 = plain GHL mirror (no funnel glows/flags/agent buttons/stage-name
+  // behavior). V2 = the full opinionated flow.
+  const _plV2 = _plIsV2();
 
   // Won / Lost / Abandoned are removed from the pipeline board (kept in GHL).
   const _PL_CLOSED = new Set(['won', 'lost', 'abandoned']);
@@ -21877,37 +22329,97 @@ function _renderPipelineBoard() {
     byStage.get(o.stageId).push(o);
   }
 
+  // Possible-duplicate detection (V2): two open opps sharing a phone (last 10
+  // digits) or athlete name are likely the same person - e.g. they booked a trial
+  // under a different email, so GHL made a second contact + card.
+  _PL_DUPS = new Map();
+  if (_plV2) {
+    const openOpps = []; for (const arr of byStage.values()) for (const o of arr) openOpps.push(o);
+    const stageNm = (sid) => { const st = visibleStages.find(x => x.id === sid); return st ? st.name : ''; };
+    const ph = (o) => String((o.contact && o.contact.phone) || '').replace(/\D/g, '').slice(-10);
+    const at = (o) => String(o.athlete || '').trim().toLowerCase().replace(/\s+/g, ' ');
+    const groups = new Map();
+    const add = (k, o) => { if (!k) return; if (!groups.has(k)) groups.set(k, []); groups.get(k).push(o); };
+    for (const o of openOpps) { const p10 = ph(o); if (p10.length === 10) add('p:' + p10, o); const a = at(o); if (a.length >= 3) add('a:' + a, o); }
+    for (const arr of groups.values()) {
+      if (arr.length < 2) continue;
+      for (const o of arr) {
+        const list = _PL_DUPS.get(o.id) || [];
+        for (const x of arr) if (x.id !== o.id && !list.some(e => e.id === x.id)) {
+          list.push({ id: x.id, name: (x.contact && x.contact.name) || x.name || 'Lead', stage: stageNm(x.stageId), athlete: x.athlete || '', trial: x.trialDate || null, phone: (x.contact && x.contact.phone) || '' });
+        }
+        if (list.length) _PL_DUPS.set(o.id, list);
+      }
+    }
+  }
+
   const cardHtml = (o, stage) => {
     const ageMs = (o.lastStageChangeAt || o.updatedAt) ? Date.now() - new Date(o.lastStageChangeAt || o.updatedAt).getTime() : 0;
     const stale = ageMs > 7 * 86400 * 1000;
     const parent = o.contact.name || o.name || 'Unknown';
+    // ── V1.5: plain mirror card — name + athlete, draggable, opens the contact.
+    // No trial dates, glows, Special/post-trial buttons, or agent badges. ──
+    if (!_plV2) {
+      return `
+        <div class="pl-card ${stale ? 'pl-card-stale' : ''}" style="position:relative"
+             draggable="true"
+             ondragstart="_plDragStart(event,'${escapeHTML(o.id)}','${escapeHTML(o.stageId || '')}','${escapeHTML(p.id)}')"
+             ondragend="_plDragEnd(event)"
+             onclick="_plOpenCard('${escapeHTML(o.id)}')">
+          <div class="pl-card-name"><span class="pl-card-tag">Parent</span> ${escapeHTML(parent)}</div>
+          ${o.athlete ? `<div class="pl-card-contact"><span class="pl-card-tag">Athlete</span> ${escapeHTML(o.athlete)}</div>` : ''}
+        </div>`;
+    }
     const tr = _plTrialInfo(o.trialDate);
     const trialStr = tr.str, trialPassed = tr.passed, trialStarted = tr.started;
     // A card in a trial-booking stage with no resolvable date gets flagged.
     const missingTrial = stage && stage.expectsTrial && !trialStr;
     const isDone = _plIsDoneTrialStage(stage);
     const todayTrial = _plIsTrialToday(o.trialDate);
-    // Trial-today gold glow, but NOT once the card is in the Done Trial stage -
-    // the trial already happened, so the "today" highlight is just noise there.
-    const glow = (todayTrial && !isDone) ? 'box-shadow:0 0 0 1px var(--gold,#E8C547),0 0 18px rgba(232,197,71,0.5);border-color:var(--gold,#E8C547);' : '';
-    // Responded-stage follow-up status: 🟢 a follow-up is queued, 🔴 none yet.
-    // Tap either → open Hawkeye focused on this lead (schedule / review the f/u).
+    // Done Trial: surface the last message + GLOW only when the LEAD messaged last
+    // (their ball — needs a reply). Last-message info comes from _PL_LASTMSG.
+    const _lastMsg = (_PL_LASTMSG && o.contactId) ? _PL_LASTMSG.get(String(o.contactId)) : null;
+    const _clientLast = !!(isDone && _lastMsg && _lastMsg.direction === 'inbound');
+    const _goldGlow = 'box-shadow:0 0 0 1px var(--gold,#E8C547),0 0 18px rgba(232,197,71,0.5);border-color:var(--gold,#E8C547);';
+    // Trial-today gold glow (non-done stages); Done Trial glows only on lead-last.
+    let glow = isDone ? (_clientLast ? _goldGlow : '') : (todayTrial ? _goldGlow : '');
+    // Interested stage: flag the card RED when there's been no text/email in the
+    // last 5 days - they've fallen out of (or were never in) an active messaging
+    // automation, i.e. nobody's contacted them. Uses _PL_LASTMSG (GHL inbox list);
+    // a lead not seen there at all counts as not-recently-contacted.
+    if (_PL_LASTMSG && stage && /interest/i.test(stage.name || '')) {
+      const _ageMs = (_lastMsg && _lastMsg.date) ? (Date.now() - new Date(_lastMsg.date).getTime()) : Infinity;
+      if (_ageMs > 5 * 86400 * 1000) glow = 'box-shadow:0 0 0 1px #e0654f,0 0 20px rgba(224,90,66,0.6);border-color:#e0654f;';
+    }
+    // Responded-stage status: 🔴 Needs action when a Hawkeye card is waiting,
+    // labelled by what the action is (reply / ghost / confirm lost / book). 🟢 All
+    // good = nothing waiting (we're waiting on the lead). Tap → Hawkeye focused.
     const _isResp = stage && /respond/i.test(stage.name || '');
-    const fuBadge = (_isResp && _agentOn && _PL_FU_PENDING)
-      ? (_PL_FU_PENDING.has(String(o.contactId || ''))
-          ? `<button class="pl-card-fu pl-card-fu-good" title="A follow-up is scheduled" onclick="event.stopPropagation(); _apxOpen('${escapeHTML(o.contactId || '')}')">🟢 All good</button>`
-          : `<button class="pl-card-fu pl-card-fu-action" title="No follow-up scheduled - tap to set one" onclick="event.stopPropagation(); _apxOpen('${escapeHTML(o.contactId || '')}')">🔴 Needs action</button>`)
-      : '';
+    // While an agent scan is running, grey the Responded cards + disable them
+    // (no buttons) so staff don't act on stale recommendations mid-scan.
+    const _scanning = _PL_SCANNING && _isResp;
+    const _need = _PL_NEEDS && _PL_NEEDS.get(String(o.contactId || ''));
+    const _needLabel = { reply: '💬 Reply', ghost: '👻 Send to Ghosted', mark_lost: '🚫 Confirm lost', book: '📅 Confirm booking' }[_need] || (_need ? '🔴 Needs action' : '');
+    // Safety net (#3): a Responded lead with NO agent card that's been sitting a
+    // while (stale = >7d in stage) shouldn't silently read "All good" - the
+    // detector may have missed it. Flag amber 🟡 Check so nothing hides.
+    // Only badge a card when there's an actual agent action to take. No action =
+    // no button (keep the card clean); those cards sort to the bottom of the
+    // column (see the sort in _renderPipelineBoard).
+    const fuBadge = _scanning
+      ? `<div class="pl-card-fu" style="border-color:var(--border);color:var(--text-mute);cursor:default"><span class="req-spin"></span> scanning…</div>`
+      : ((_isResp && _agentOn && _PL_NEEDS && _need)
+        ? `<button class="pl-card-fu pl-card-fu-action" title="Tap to handle in Hawkeye" onclick="event.stopPropagation(); _apxOpen('${escapeHTML(o.contactId || '')}')">${_needLabel}</button>`
+        : '');
     return `
       <div class="pl-card ${stale ? 'pl-card-stale' : ''} ${missingTrial ? 'pl-card-notrial' : ''} ${todayTrial ? 'pl-card-today' : ''}"
-           style="position:relative;${glow}"
-           draggable="true"
+           style="position:relative;${glow}${_scanning ? 'opacity:.45;pointer-events:none;' : ''}"
+           draggable="${_scanning ? 'false' : 'true'}"
            ondragstart="_plDragStart(event,'${escapeHTML(o.id)}','${escapeHTML(o.stageId || '')}','${escapeHTML(p.id)}')"
            ondragend="_plDragEnd(event)"
            onclick="_plOpenCard('${escapeHTML(o.id)}')">
-        <button class="pl-card-special" title="Send Summer special" onclick="event.stopPropagation(); _plEnrollSpecial('${escapeHTML(o.id)}')"
-           style="position:absolute;top:6px;right:6px;background:var(--gold-ghost,rgba(212,207,138,0.12));color:var(--gold);border:1px solid var(--gold);border-radius:6px;padding:3px 8px;font-size:11px;font-weight:700;cursor:pointer;line-height:1.3;z-index:2">📨 Special</button>
-        <div class="pl-card-name" style="padding-right:78px"><span class="pl-card-tag">Parent</span> ${escapeHTML(parent)}</div>
+        ${(_PL_DUPS && _PL_DUPS.has(o.id)) ? `<button onclick="event.stopPropagation(); _plResolveDup('${escapeHTML(o.id)}')" title="Possible duplicate - tap to resolve" style="width:100%;box-sizing:border-box;margin-bottom:7px;background:rgba(224,90,66,0.12);color:#e0654f;border:1px solid #e0654f;border-radius:6px;padding:4px 8px;font-size:11px;font-weight:700;cursor:pointer;text-align:center">⚠ Possible duplicate</button>` : ''}
+        <div class="pl-card-name" style="padding-right:8px"><span class="pl-card-tag">Parent</span> ${escapeHTML(parent)}</div>
         <div class="pl-card-contact"><span class="pl-card-tag">Athlete</span> ${o.athlete ? escapeHTML(o.athlete) : '<span style="opacity:0.5">-</span>'}</div>
         ${o.trainer ? `<div class="pl-card-coach"><span class="pl-card-tag">Coach</span> ${escapeHTML(o.trainer)}</div>` : ''}
         ${trialStr
@@ -21916,12 +22428,10 @@ function _renderPipelineBoard() {
             ? `<div class="pl-card-trial" style="color:var(--text-mute)">Trial: <span style="opacity:0.6">-</span></div>`
             : missingTrial ? `<div class="pl-card-flag">⚠ No trial date</div>` : ''}
         ${isDone
-          ? `<div class="pl-card-wl">
-               <button class="pl-card-won" onclick="event.stopPropagation(); _plMarkWon('${escapeHTML(o.id)}')">Won</button>
-               <button class="pl-card-abandon" onclick="event.stopPropagation(); _plMarkAbandoned('${escapeHTML(o.id)}')">Abandon</button>
-               <button class="pl-card-lost" onclick="event.stopPropagation(); _plMarkLost('${escapeHTML(o.id)}')">Lost</button>
-             </div>`
-          : (trialStarted
+          ? (_lastMsg && _lastMsg.date
+              ? `<div class="pl-card-trial" style="color:${_clientLast ? 'var(--gold,#E8C547)' : 'var(--text-mute)'};font-weight:${_clientLast ? '600' : '400'}">💬 ${escapeHTML(_apxMsgWhen(_lastMsg.date) || 'last message')}${_clientLast ? ' · from client' : ''}</div>`
+              : '')
+          : (_plIsScheduledTrialStage(stage) && trialStarted
               ? `<button class="pl-card-ptf" onclick="event.stopPropagation(); _plPostTrialForm('${escapeHTML(o.id)}')">Post trial form</button>`
               : '')}
         ${fuBadge}
@@ -21933,12 +22443,73 @@ function _renderPipelineBoard() {
   // stage the agent works.
   const _agentOn = !!_PL_AGENT_MODE && _PL_AGENT_MODE !== 'off';
   const colHtml = visibleStages.map(s => {
-    const opps = (byStage.get(s.id) || []).slice()
-      .sort((a, b) => (_plIsTrialToday(b.trialDate) ? 1 : 0) - (_plIsTrialToday(a.trialDate) ? 1 : 0)); // today's trials first
     const isResponded = /respond/i.test(s.name || '');
-    const glowCol = (isResponded && _agentOn) ? 'box-shadow:0 0 0 1px var(--blue,#5A8FB8),0 0 18px rgba(90,143,184,0.45);border-color:var(--blue,#5A8FB8);' : '';
-    const hawkBtn = (isResponded && _agentOn)
-      ? `<button onclick="_apxOpen()" title="Open the agent approval queue" style="width:100%;box-sizing:border-box;margin-bottom:8px;background:var(--blue-soft,rgba(90,143,184,0.12));color:var(--blue,#5A8FB8);border:1px solid var(--blue,#5A8FB8);border-radius:7px;padding:9px;font-size:12.5px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px">👁 Hawkeye</button>`
+    // In Responded, push cards with no agent action to the BOTTOM: queued action
+    // (🔴) first, stale (🟡 check) next, nothing-to-do (no badge) last.
+    const _respRank = (o) => {
+      if (!(_agentOn && _PL_NEEDS)) return 0;
+      if (_PL_NEEDS.get(String(o.contactId || ''))) return 0;
+      const ageMs = (o.lastStageChangeAt || o.updatedAt) ? Date.now() - new Date(o.lastStageChangeAt || o.updatedAt).getTime() : 0;
+      return ageMs > 7 * 86400 * 1000 ? 1 : 2;
+    };
+    const _trialFirst = (a, b) => (_plIsTrialToday(b.trialDate) ? 1 : 0) - (_plIsTrialToday(a.trialDate) ? 1 : 0);
+    // Scheduled Trial order: today (glowing) → passed (most-recent first, fill the
+    // post-trial form) → [upcoming squiggle] → upcoming (soonest first).
+    const isSchedTrial = _plIsScheduledTrialStage(s);
+    const _trialPhase = (o) => {
+      if (_plIsTrialToday(o.trialDate)) return 0;            // today
+      const ti = _plTrialInfo(o.trialDate);
+      if (ti.passed) return 1;                                // already happened
+      if (ti.str) return 2;                                   // upcoming (future date)
+      return 3;                                               // no date → bottom
+    };
+    const _schedSort = (a, b) => {
+      const pa = _trialPhase(a), pb = _trialPhase(b);
+      if (pa !== pb) return pa - pb;
+      const ta = new Date(a.trialDate || 0).getTime(), tb = new Date(b.trialDate || 0).getTime();
+      if (pa === 1) return tb - ta;   // passed: most recent at top
+      if (pa === 2) return ta - tb;   // upcoming: soonest at top
+      return 0;
+    };
+    // Done Trial: leads who messaged LAST (the glowing cards - their ball) float to
+    // the top, then by most-recent message.
+    const isDoneStage = _plIsDoneTrialStage(s);
+    const _lmOf = (o) => (_PL_LASTMSG && o.contactId) ? _PL_LASTMSG.get(String(o.contactId)) : null;
+    const _doneSort = (a, b) => {
+      const la = _lmOf(a), lb = _lmOf(b);
+      const ga = la && la.direction === 'inbound' ? 0 : 1, gb = lb && lb.direction === 'inbound' ? 0 : 1;
+      if (ga !== gb) return ga - gb;   // lead-last (glowing) to the top
+      return (lb && lb.date ? new Date(lb.date).getTime() : 0) - (la && la.date ? new Date(la.date).getTime() : 0);
+    };
+    // V1.5 mirrors GHL order; V2 applies funnel-aware sorting.
+    const opps = !_plV2 ? (byStage.get(s.id) || []).slice()
+      : (byStage.get(s.id) || []).slice()
+        .sort((a, b) => isResponded ? ((_respRank(a) - _respRank(b)) || _trialFirst(a, b))
+                      : isSchedTrial ? _schedSort(a, b)
+                      : isDoneStage ? _doneSort(a, b)
+                      : _trialFirst(a, b));
+    // Cards HTML — for Scheduled Trial, drop the "upcoming" squiggle in before the
+    // first future trial (only when there are today/passed cards above it).
+    let cardsHtml = '';
+    if (opps.length) {
+      let _divDone = false, _pastDivDone = false;
+      for (const o of opps) {
+        if (_plV2 && isSchedTrial) {
+          const ph = _trialPhase(o);
+          // squiggle between TODAY (above) and PAST trials
+          if (!_pastDivDone && ph === 1 && cardsHtml) { cardsHtml += _plUpcomingDivider('past'); _pastDivDone = true; }
+          // squiggle before the first UPCOMING (future) trial
+          if (!_divDone && ph === 2 && cardsHtml) { cardsHtml += _plUpcomingDivider('upcoming'); _divDone = true; }
+        }
+        cardsHtml += cardHtml(o, s);
+      }
+    } else { cardsHtml = '<div class="pl-empty">No cards here yet.</div>'; }
+    const glowCol = (_plV2 && isResponded && _agentOn) ? 'box-shadow:0 0 0 1px var(--blue,#5A8FB8),0 0 18px rgba(90,143,184,0.45);border-color:var(--blue,#5A8FB8);' : '';
+    const hawkBtn = (_plV2 && isResponded && _agentOn)
+      ? `<div style="display:flex;gap:6px;margin-bottom:8px">
+          <button onclick="_apxOpen()" title="Open the agent approval queue" style="flex:1;box-sizing:border-box;background:var(--blue-soft,rgba(90,143,184,0.12));color:var(--blue,#5A8FB8);border:1px solid var(--blue,#5A8FB8);border-radius:7px;padding:9px;font-size:12.5px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px">👁 Hawkeye</button>
+          <button id="pl-scan-btn" onclick="_plScanNow('pl-scan-btn')" title="Re-scan this stage now for new actions (don't wait for the every-30-min check)" style="box-sizing:border-box;background:transparent;color:var(--text-sub);border:1px solid var(--border);border-radius:7px;padding:9px 11px;font-size:12.5px;font-weight:700;cursor:pointer;white-space:nowrap">🔄 Scan</button>
+        </div>`
       : '';
     return `
       <div class="pl-col" style="${glowCol}"
@@ -21951,12 +22522,18 @@ function _renderPipelineBoard() {
         </div>
         <div class="pl-cards">
           ${hawkBtn}
-          ${opps.length ? opps.map(o => cardHtml(o, s)).join('') : '<div class="pl-empty">No cards here yet.</div>'}
+          ${cardsHtml}
         </div>
       </div>`;
   }).join('');
 
+  // Preserve the board's horizontal scroll across re-renders. Several async
+  // loaders (needs-action badges, last-messages, agent scan) re-render the board
+  // shortly after it opens; without this, each rebuild snapped scrollLeft back to
+  // 0 and the columns "jumped left and right" while you were swiping on mobile.
+  const _plPrevScroll = container.querySelector('.pl-board')?.scrollLeft || 0;
   container.innerHTML = `<div class="pl-board">${colHtml}</div>`;
+  if (_plPrevScroll) { const _nb = container.querySelector('.pl-board'); if (_nb) _nb.scrollLeft = _plPrevScroll; }
 }
 
 // ── Drag & drop ───────────────────────────────────────────
@@ -22031,6 +22608,7 @@ function _plOpenCard(oppId) {
     if (found) { p = pl; o = found; s = pl.stages.find(st => st.id === found.stageId); break; }
   }
   if (!o) return;
+  const _plV2 = _plIsV2();  // V1.5 drawer = mirror (contact + messages + GHL); V2 = full flow
 
   const memberBadge = o.member
     ? `<span class="pl-tag pl-tag-member">member · ${escapeHTML(o.member.athlete_name || '')}</span>`
@@ -22038,6 +22616,10 @@ function _plOpenCard(oppId) {
 
   const tr = _plTrialInfo(o.trialDate);
   const trialStr = tr.str, trialPassed = tr.passed, trialStarted = tr.started;
+  _PL_DRAWER_CONTACT = o.contactId || null;
+  const _ghlLoc = (_PL_DATA && _PL_DATA.location_id) || (_GHL_CONNECT_STATE && _GHL_CONNECT_STATE.location_id) || '';
+  const _ghlContactUrl = (o.contactId && _ghlLoc) ? `https://app.gohighlevel.com/v2/location/${_ghlLoc}/contacts/detail/${o.contactId}` : '';
+  const _isResp = !!(s && /respond/i.test(s.name || ''));
 
   // Journey timeline from what we know - form fill, booking, post-trial review,
   // won/lost. Each step renders only if we have it.
@@ -22054,7 +22636,7 @@ function _plOpenCard(oppId) {
   }
   if (o.status === 'won') steps.push(['Won', null, true]);
   else if (o.status === 'lost') steps.push(['Lost', null, false]);
-  const timelineHtml = steps.length
+  const timelineHtml = (_plV2 && steps.length)
     ? `<div class="pl-d-section"><div class="lbl">Journey</div>${steps.map(([t, sub, ok]) =>
         `<div class="pl-tl-step"><span class="pl-tl-dot ${ok ? 'ok' : 'bad'}"></span><span class="pl-tl-label">${escapeHTML(t)}</span>${sub ? `<span class="pl-tl-sub">${escapeHTML(sub)}</span>` : ''}</div>`).join('')}</div>`
     : '';
@@ -22067,22 +22649,28 @@ function _plOpenCard(oppId) {
         <div class="pl-d-title">${escapeHTML(o.contact.name || o.name || 'Untitled')}</div>
         <div class="pl-d-sub">${escapeHTML(p.name)} · ${escapeHTML(s?.name || '-')} · ${memberBadge}</div>
       </div>
-      <button class="pc-d-close" onclick="closePipelineDrawer()" aria-label="Close" style="background:none;border:none;color:var(--text-mute);cursor:pointer;font-size:22px;padding:4px 10px">×</button>
+      <div style="display:flex;align-items:center;gap:4px">
+        ${_ghlContactUrl ? `<a href="${_ghlContactUrl}" target="_blank" rel="noopener noreferrer" title="Call in GHL" aria-label="Call in GHL" style="text-decoration:none;display:inline-flex;align-items:center;justify-content:center;width:36px;height:36px;border:1px solid var(--green,#4CC76A);border-radius:8px;color:var(--green,#4CC76A);font-size:17px">📞</a>` : ''}
+        <button class="pc-d-close" onclick="closePipelineDrawer()" aria-label="Close" style="background:none;border:none;color:var(--text-mute);cursor:pointer;font-size:22px;padding:4px 10px">×</button>
+      </div>
     </div>
     <div class="pl-d-section">
       <div class="pl-d-row"><div class="lbl2">Parent</div><div>${escapeHTML(o.contact.name || '-')}</div></div>
       <div class="pl-d-row"><div class="lbl2">Athlete</div><div>${escapeHTML(o.athlete || '-')}</div></div>
-      <div class="pl-d-row"><div class="lbl2">Athlete age</div><div id="pl-d-age">-</div></div>
-      <div class="pl-d-row"><div class="lbl2">Last trial</div><div style="color:${trialStr ? (trialPassed ? '#c47424' : 'var(--accent)') : 'var(--text-mute)'};font-weight:${trialStr ? '600' : '400'}">${trialStr ? escapeHTML(trialStr) : '-'}</div></div>
+      ${_plV2 ? `<div class="pl-d-row"><div class="lbl2">Athlete age</div><div id="pl-d-age">-</div></div>
+      <div class="pl-d-row"><div class="lbl2">Last trial</div><div style="color:${trialStr ? (trialPassed ? '#c47424' : 'var(--accent)') : 'var(--text-mute)'};font-weight:${trialStr ? '600' : '400'}">${trialStr ? escapeHTML(trialStr) : '-'}</div></div>` : ''}
       <div class="pl-d-row"><div class="lbl2">Phone</div><div>${o.contact.phone ? `<a href="tel:${escapeHTML(o.contact.phone)}" style="color:var(--accent)">${escapeHTML(o.contact.phone)}</a>` : '-'}</div></div>
       <div class="pl-d-row"><div class="lbl2">Email</div><div>${o.contact.email ? `<a href="mailto:${escapeHTML(o.contact.email)}" style="color:var(--accent)">${escapeHTML(o.contact.email)}</a>` : '-'}</div></div>
-      ${o.trainer ? `<div class="pl-d-row"><div class="lbl2">Coach</div><div>${escapeHTML(o.trainer)}</div></div>` : ''}
+      ${(_plV2 && o.trainer) ? `<div class="pl-d-row"><div class="lbl2">Coach</div><div>${escapeHTML(o.trainer)}</div></div>` : ''}
     </div>
     <div class="pl-d-section" id="pl-d-msg">
       <div class="lbl">Messages</div>
       ${o.contactId ? `
-        <div id="pl-d-thread" style="max-height:260px;overflow-y:auto;display:flex;flex-direction:column;gap:8px;padding:4px 0">
-          <div style="color:var(--text-mute);font-size:13px"><span class="req-spin"></span> Loading…</div>
+        <div id="pl-d-thread" style="max-height:440px;overflow-y:auto;display:flex;flex-direction:column;gap:8px;padding:4px 0">
+          <div id="pl-d-thread-msgs" style="display:flex;flex-direction:column;gap:8px">
+            <div style="color:var(--text-mute);font-size:13px"><span class="req-spin"></span> Loading…</div>
+          </div>
+          ${(_plV2 && _isResp) ? `<div id="pl-d-agent-inline" style="margin-top:4px"><div class="lbl" style="margin:10px 0 6px">🤖 Agent suggests</div><div id="pl-d-agent-body"><div style="color:var(--text-mute);font-size:13px"><span class="req-spin"></span> Checking…</div></div></div>` : ''}
         </div>
         <div style="margin-top:10px">
           <textarea id="pl-msg-input" placeholder="Type a message…" style="width:100%;min-height:64px;padding:9px 11px;font-size:13px;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:8px;outline:none;font-family:inherit;resize:vertical"></textarea>
@@ -22101,7 +22689,7 @@ function _plOpenCard(oppId) {
       <div style="display:flex;gap:8px">
         <button class="pl-d-btn" style="flex:1;border-color:#e07070;color:#e07070" onclick="_plMarkLost('${escapeHTML(o.id)}')">Mark as lost</button>
         <button class="pl-d-btn" style="flex:1;border-color:#5a96e0;color:#5a96e0" onclick="_plMarkAbandoned('${escapeHTML(o.id)}')">Abandoned</button>
-        <button class="pl-d-btn" style="flex:1;border-color:var(--gold,#E8C547);color:var(--gold,#E8C547)" onclick="_plGhost('${escapeHTML(o.id)}')">👻 Ghosted</button>
+        ${_plV2 ? `<button class="pl-d-btn" style="flex:1;border-color:var(--gold,#E8C547);color:var(--gold,#E8C547)" onclick="_plGhost('${escapeHTML(o.id)}')">👻 Ghosted</button>` : ''}
       </div>
     </div>
     ${timelineHtml}
@@ -22109,12 +22697,12 @@ function _plOpenCard(oppId) {
       <div class="lbl">Lead details</div>
       <div class="pl-d-row" id="pl-d-lead-loading" style="color:var(--text-mute)"><div class="lbl2"><span class="req-spin"></span></div><div>Loading…</div></div>
     </div>
-    ${rv && rv.notes ? `<div class="pl-d-section"><div class="lbl">Post-trial notes</div><div style="font-size:13px;white-space:pre-wrap">${escapeHTML(rv.notes)}</div></div>` : ''}
+    ${(_plV2 && rv && rv.notes) ? `<div class="pl-d-section"><div class="lbl">Post-trial notes</div><div style="font-size:13px;white-space:pre-wrap">${escapeHTML(rv.notes)}</div></div>` : ''}
     <div class="pl-d-actions">
-      ${_plIsDoneTrialStage(s)
+      ${_plV2 ? `${_plIsDoneTrialStage(s)
         ? `<button class="pl-d-btn primary" onclick="_plMarkWon('${escapeHTML(o.id)}')">Mark won</button>`
-        : (trialStarted ? `<button class="pl-d-btn primary" onclick="_plPostTrialForm('${escapeHTML(o.id)}')">Post trial form</button>` : '')}
-      <button class="pl-d-btn" style="border-color:var(--gold,#E8C547);color:var(--gold,#E8C547)" onclick="_plEnrollSpecial('${escapeHTML(o.id)}')">📨 Summer special</button>
+        : (_plIsScheduledTrialStage(s) && trialStarted ? `<button class="pl-d-btn primary" onclick="_plPostTrialForm('${escapeHTML(o.id)}')">Post trial form</button>` : '')}
+      <button class="pl-d-btn" style="border-color:var(--gold,#E8C547);color:var(--gold,#E8C547)" onclick="_plEnrollSpecial('${escapeHTML(o.id)}')">📨 Summer special</button>` : ''}
       ${o.member
         ? `<button class="pl-d-btn" onclick="closePipelineDrawer(); openMemberPopup('${escapeHTML(o.member.id)}')">Open member popup</button>`
         : ''}
@@ -22126,13 +22714,53 @@ function _plOpenCard(oppId) {
   _PL_MSG = o.contactId ? { contactId: o.contactId, name: o.contact.name || o.name || '', phone: o.contact.phone || null, email: o.contact.email || null, conversationId: null } : null;
   _IB_PENDING_FILES = [];
   if (o.contactId) _plLoadMessages();
+  if (_plV2 && _isResp && o.contactId) _plLoadAgentCard();
+}
+
+// ── Pipeline card drawer: agent suggestion (inline Hawkeye) ──────────────────
+// Loads the agent's pending card(s) for the lead in the drawer and renders them
+// with the EXACT Hawkeye renderers + action handlers — so staff approve/edit/skip/
+// ghost/lost/book right here without opening the Hawkeye overlay.
+async function _plLoadAgentCard() {
+  const host = document.getElementById('pl-d-agent-body');
+  if (!host || !_PL_DRAWER_CONTACT) return;
+  try {
+    const [fu, rd] = await Promise.all([
+      _apxPost('/api/agent-followups', 'list', {}).catch(() => ({})),
+      _apxPost('/api/agent-approvals', 'list-ready', {}),
+    ]);
+    _APX_DATA = _apxSplit(fu, rd);
+    _plRenderAgentSection();
+  } catch (e) {
+    host.innerHTML = `<div style="font-size:12.5px;color:var(--text-mute)">Couldn't load the agent's suggestion - ${escapeHTML(_apxErr(e))}</div>`;
+  }
+}
+// Render (or re-render after an action) the drawer's agent section from _APX_DATA,
+// filtered to the lead currently shown. Called on load and from _apxRemove.
+function _plRenderAgentSection() {
+  const host = document.getElementById('pl-d-agent-body');
+  if (!host || !_PL_DRAWER_CONTACT || !_APX_DATA) return;
+  const mine = (x) => String(x.ghl_contact_id || '') === String(_PL_DRAWER_CONTACT);
+  const rows = [
+    ...(_APX_DATA.ghost || []).filter(mine).map(r => ['ghost', r]),
+    ...(_APX_DATA.book  || []).filter(mine).map(r => ['book', r]),
+    ...(_APX_DATA.lost  || []).filter(mine).map(r => ['lost', r]),
+    ...(_APX_DATA.ready || []).filter(mine).map(r => ['ready', r]),
+    ...(_APX_DATA.followups || []).filter(mine).map(r => ['followup', r]),
+  ];
+  const render = (kind, r) => kind === 'ghost' ? _apxGhostCard(r) : kind === 'book' ? _apxBookCard(r) : kind === 'lost' ? _apxLostCard(r) : _apxCard(kind, r);
+  host.innerHTML = rows.length ? rows.map(([k, r]) => render(k, r)).join('') : `<div style="font-size:12.5px;color:var(--text-mute)">Nothing waiting - the agent has no suggested action right now.</div>`;
+  // The agent suggestion now lives at the BOTTOM of the message thread, so it
+  // scrolls as part of the chat - scroll the thread down to reveal it.
+  try { _scrollToBottom(document.getElementById('pl-d-thread')); } catch (_) {}
 }
 
 // ── Pipeline card drawer: messaging ─────────────────────────────────────────
 let _PL_MSG = null;   // { contactId, name, phone, email, conversationId }
+let _PL_DRAWER_CONTACT = null;   // GHL contact id currently shown in the drawer
 
 async function _plLoadMessages() {
-  const host = document.getElementById('pl-d-thread');
+  const host = document.getElementById('pl-d-thread-msgs');
   if (!host || !_PL_MSG) return;
   try {
     const token = await _mreqAuthToken();
@@ -22185,7 +22813,7 @@ function _ghlSendType(typeOrChannel) {
 }
 
 function _plRenderThread(messages) {
-  const host = document.getElementById('pl-d-thread');
+  const host = document.getElementById('pl-d-thread-msgs');
   if (!host) return;
   const contactFirst = ((_PL_MSG && _PL_MSG.name) || '').trim().split(/\s+/)[0] || 'Them';
   const sorted = [...messages].filter(m => !_ibIsActivity(m)).sort((a, b) => (a.date ? new Date(a.date).getTime() : 0) - (b.date ? new Date(b.date).getTime() : 0));
@@ -22203,7 +22831,8 @@ function _plRenderThread(messages) {
         </div>`;
       }).join('')
     : `<div style="color:var(--text-mute);font-size:13px">No messages yet - send the first one below.</div>`;
-  _scrollToBottom(host);
+  // Scroll the whole thread (messages + the inline agent suggestion at the bottom).
+  _scrollToBottom(document.getElementById('pl-d-thread') || host);
 }
 
 function _plMsgPickFiles(inputEl) {
@@ -22246,6 +22875,9 @@ async function _plMsgSend() {
     _IB_PENDING_FILES = [];
     _plMsgRenderPendingFiles();
     _plLoadMessages();
+    // We just replied → our message is now the last one. Clear the Done Trial
+    // "lead messaged last" glow immediately by updating _PL_LASTMSG + repainting.
+    if (_PL_LASTMSG && t.contactId) { _PL_LASTMSG.set(String(t.contactId), { direction: 'outbound', date: new Date().toISOString() }); try { _renderPipelineBoard(); } catch (_) {} }
   } catch (e) {
     alert('Send failed: ' + e.message);
   } finally {
@@ -22281,6 +22913,7 @@ async function _plLoadLeadDetail(o) {
 function closePipelineDrawer() {
   document.getElementById('pl-drawer-overlay')?.classList.remove('open');
   document.getElementById('pl-drawer')?.classList.remove('open');
+  _PL_DRAWER_CONTACT = null;
 }
 
 async function _plConvert(oppId) {
@@ -22475,7 +23108,7 @@ async function _apxRefreshCount() {
   const fu = fuR.status === 'fulfilled' ? fuR.value : {};
   const rd = rdR.status === 'fulfilled' ? rdR.value : {};
   _APX_DATA = _apxSplit(fu, rd);
-  const n = _APX_DATA.followups.length + _APX_DATA.ready.length + _APX_DATA.lost.length + (_APX_DATA.book || []).length;
+  const n = _APX_DATA.followups.length + _APX_DATA.ready.length + _APX_DATA.lost.length + (_APX_DATA.book || []).length + (_APX_DATA.ghost || []).length;
   btns.forEach(({ btn, span }) => {
     btn.style.display = '';
     if (span) span.textContent = n ? `(${n})` : '';
@@ -22525,10 +23158,11 @@ function _apxSplit(fu, rd) {
     else upcoming.push(f);
   }
   const all = (rd.ready || []).filter(r => r.status === 'pending');
-  const ready = [...overdue, ...all.filter(r => r.kind !== 'mark_lost' && r.kind !== 'book')];
+  const ready = [...overdue, ...all.filter(r => r.kind !== 'mark_lost' && r.kind !== 'book' && r.kind !== 'ghost')];
   const lost = all.filter(r => r.kind === 'mark_lost');
   const book = all.filter(r => r.kind === 'book');
-  return { followups: upcoming, ready, lost, book };
+  const ghost = all.filter(r => r.kind === 'ghost');
+  return { followups: upcoming, ready, lost, book, ghost };
 }
 
 async function _apxLoad() {
@@ -22547,13 +23181,17 @@ async function _apxLoad() {
       _APX_DATA.ready = _APX_DATA.ready.filter(keep);
       _APX_DATA.lost = (_APX_DATA.lost || []).filter(keep);
       _APX_DATA.book = (_APX_DATA.book || []).filter(keep);
+      _APX_DATA.ghost = (_APX_DATA.ghost || []).filter(keep);
     }
-    // Open on the first tab that actually has something.
+    // Open on the first tab that actually has something (ghost leads the order -
+    // they're the most common "needs action").
     const readyN = _APX_DATA.ready.length + (_APX_DATA.book || []).length;
-    if (!_APX_DATA.followups.length) _APX_TAB = readyN ? 'ready' : ((_APX_DATA.lost || []).length ? 'lost' : 'followups');
+    const ghostN = (_APX_DATA.ghost || []).length;
+    if (ghostN) _APX_TAB = 'ghost';
+    else if (!_APX_DATA.followups.length) _APX_TAB = readyN ? 'ready' : ((_APX_DATA.lost || []).length ? 'lost' : 'followups');
     _apxRender();
     const span = document.getElementById('apx-count');
-    const n = _APX_DATA.followups.length + readyN + _APX_DATA.lost.length;
+    const n = _APX_DATA.followups.length + readyN + _APX_DATA.lost.length + ghostN;
     if (span) span.textContent = n ? `(${n})` : '';
   } catch (e) {
     body.innerHTML = `<div style="color:#e07070;font-size:13px">Couldn't load - ${escapeHTML(_apxErr(e))}</div>`;
@@ -22580,6 +23218,17 @@ function _apxTrim(s, n) { s = String(s || ''); return s.length > n ? s.slice(0, 
 // AND our last message, so you have the whole picture at a glance.
 // The recent conversation, inline on the card (lead left / us right). Tappable
 // to open the full thread. Falls back to last_message/last_outbound for old rows.
+// A message timestamp like "Sat, Jan 2 · 4pm" (drops ":00" so 4:00pm → 4pm).
+function _apxMsgWhen(ts) {
+  if (!ts) return '';
+  try {
+    const d = new Date(ts);
+    if (isNaN(d.getTime())) return '';
+    const date = d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+    const time = d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }).replace(':00', '').replace(/\s/g, '').toLowerCase();
+    return `${date} · ${time}`;
+  } catch (_) { return ''; }
+}
 function _apxContext(r) {
   let tail = Array.isArray(r.thread_tail) ? r.thread_tail.slice() : [];
   if (!tail.length) {
@@ -22589,9 +23238,13 @@ function _apxContext(r) {
   if (!tail.length) return '';
   const bubbles = tail.map(m => {
     const out = m.role === 'agent';
-    return `<div style="max-width:84%;align-self:${out ? 'flex-end' : 'flex-start'};background:${out ? 'rgba(232,197,71,.13)' : 'rgba(255,255,255,.05)'};border:1px solid ${out ? 'var(--accent-border,rgba(232,197,71,.3))' : 'var(--border)'};color:var(--text);padding:6px 10px;border-radius:12px;font-size:12.5px;line-height:1.4;word-break:break-word">${escapeHTML(_apxTrim(m.text, 240))}</div>`;
+    const when = _apxMsgWhen(m.at || m.date);
+    return `<div style="display:flex;flex-direction:column;align-items:${out ? 'flex-end' : 'flex-start'};gap:2px;max-width:84%;align-self:${out ? 'flex-end' : 'flex-start'}">
+      <div style="background:${out ? 'rgba(232,197,71,.13)' : 'rgba(255,255,255,.05)'};border:1px solid ${out ? 'var(--accent-border,rgba(232,197,71,.3))' : 'var(--border)'};color:var(--text);padding:6px 10px;border-radius:12px;font-size:12.5px;line-height:1.4;word-break:break-word">${escapeHTML(_apxTrim(m.text, 240))}</div>
+      ${when ? `<div style="font-size:10px;color:var(--text-mute);padding:0 4px">${escapeHTML(when)}</div>` : ''}
+    </div>`;
   }).join('');
-  return `<div onclick="_apxOpenCardThread('${r.id}')" title="Tap for the full conversation" style="display:flex;flex-direction:column;gap:5px;margin:4px 0 8px;max-height:230px;overflow-y:auto;cursor:pointer">${bubbles}</div>`;
+  return `<div onclick="_apxOpenCardThread('${r.id}')" title="Tap for the full conversation" style="display:flex;flex-direction:column;gap:6px;margin:4px 0 8px;max-height:260px;overflow-y:auto;cursor:pointer">${bubbles}</div>`;
 }
 
 function _apxCard(kind, r) {
@@ -22605,24 +23258,69 @@ function _apxCard(kind, r) {
   const goal = (isFu && r.goal) ? `<div style="font-size:11.5px;color:var(--text-sub);margin-bottom:5px">🎯 ${escapeHTML(r.goal)}</div>` : '';
   const last = _apxContext(r);   // summary + lead's last + our last
   const overBadge = overdue ? `<span style="font-size:10px;font-weight:700;color:#e0654f;background:rgba(224,90,66,0.12);border-radius:999px;padding:1px 7px">overdue</span>` : '';
-  const sendFn = isFu ? `_apxFollowupSend('${r.id}')` : `_apxReadySend('${r.id}')`;
-  const editFn = isFu ? `_apxFollowupEdit('${r.id}')` : `_apxReadyEdit('${r.id}')`;
+
+  // The proposed message is an EDITABLE textarea — type straight in. A "teach the
+  // agent why" field slides in the moment you edit it. Same for replies + follow-ups.
+  const replyBox = `<textarea id="apx-edit-${r.id}" oninput="_apxOnReplyEdit('${r.id}')" style="width:100%;box-sizing:border-box;font-family:inherit;font-size:13.5px;line-height:1.5;background:var(--accent-glow,rgba(232,197,71,.10));border:1px solid var(--accent-border,rgba(232,197,71,.3));border-radius:10px;padding:9px 11px;color:var(--text);resize:vertical;min-height:74px;outline:none">${escapeHTML(r.draft_message || '')}</textarea>
+      <div id="apx-teach-wrap-${r.id}" style="display:none;margin-top:8px">
+        <div style="font-size:10px;color:var(--text-mute);text-transform:uppercase;letter-spacing:.07em;margin-bottom:4px">📝 teach the agent why (optional)</div>
+        <input id="apx-teach-${r.id}" type="text" placeholder="e.g. tightened the ask / dropped price talk" style="width:100%;box-sizing:border-box;background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);padding:8px 10px;font:inherit;font-size:12.5px;outline:none">
+      </div>`;
+
   const skipFn = isFu ? `_apxFollowupSkip('${r.id}')` : `_apxReadySkip('${r.id}')`;
-  const approveFn = isFu ? `_apxFollowupSend('${r.id}')` : `_apxReadyApprove('${r.id}')`;
+  const actions = `<button onclick="${skipFn}" title="Skip (and optionally teach why)" style="flex:1;background:transparent;border:1px solid var(--border);color:#e0654f;border-radius:9px;padding:9px;font-size:17px;cursor:pointer">✕</button>
+       <button onclick="_apxInlineApprove('${r.id}')" title="${overdue ? 'Approve & send now' : 'Approve & send'}" style="flex:2;background:var(--accent);border:1px solid var(--accent);color:#08080A;border-radius:9px;padding:9px;font-size:14px;font-weight:700;cursor:pointer">✓ Approve &amp; send</button>`;
+
   return `<div id="apx-${r.id}" style="background:var(--surface);border:1px solid var(--accent-border,rgba(232,197,71,.3));border-radius:11px;padding:12px 14px;margin-bottom:9px">
     <div style="display:flex;align-items:center;gap:8px;margin-bottom:5px;flex-wrap:wrap">
       <span style="font-weight:700;font-size:13.5px">${escapeHTML(r.contact_name || 'Lead')}</span>
       ${overBadge}
       <div style="flex:1"></div>${meta}
     </div>${goal}${esc}${last}
-    <div style="text-align:center;font-size:9.5px;color:var(--text-mute);text-transform:uppercase;letter-spacing:.09em;margin:2px 0 5px">proposed reply</div>
-    <div style="font-size:13.5px;line-height:1.5;background:var(--accent-glow,rgba(232,197,71,.10));border:1px solid var(--accent-border,rgba(232,197,71,.3));border-radius:10px;padding:9px 11px;white-space:pre-wrap" id="apx-msg-${r.id}">${escapeHTML(r.draft_message || '')}</div>
-    <div style="display:flex;align-items:stretch;gap:8px;margin-top:10px">
-      <button onclick="${skipFn}" title="Skip (and optionally teach why)" style="flex:1;background:transparent;border:1px solid var(--border);color:#e0654f;border-radius:9px;padding:9px;font-size:17px;cursor:pointer">✕</button>
-      <button onclick="${editFn}" title="Edit the message" style="flex:1;background:transparent;border:1px solid var(--border);color:#9a7bd6;border-radius:9px;padding:9px;font-size:15px;cursor:pointer">🔄</button>
-      <button onclick="${approveFn}" title="${overdue ? 'Approve & send now' : 'Approve & send'}" style="flex:1;background:var(--accent);border:1px solid var(--accent);color:#08080A;border-radius:9px;padding:9px;font-size:17px;font-weight:700;cursor:pointer">✓</button>
-    </div>
+    <div style="text-align:center;font-size:9.5px;color:var(--text-mute);text-transform:uppercase;letter-spacing:.09em;margin:2px 0 5px">proposed message · edit it right here</div>
+    ${replyBox}
+    <div style="display:flex;align-items:stretch;gap:8px;margin-top:10px">${actions}</div>
   </div>`;
+}
+// Reveal the "teach why" field the moment the staff edits the proposed reply.
+function _apxOnReplyEdit(id) {
+  const w = document.getElementById('apx-teach-wrap-' + id);
+  if (w && w.style.display === 'none') w.style.display = '';
+}
+// Approve & send a reply OR follow-up card using the (possibly edited) inline text
+// + optional teach note — no modal.
+async function _apxInlineApprove(id) {
+  let r = _APX_DATA.ready.find(x => x.id === id); let isFu = false;
+  if (!r) { r = (_APX_DATA.followups || []).find(x => x.id === id); isFu = true; }
+  if (!r) return;
+  if (!isFu && r._isFollowup) isFu = true;   // overdue follow-up living in the ready list
+  const ta = document.getElementById('apx-edit-' + id);
+  const reply = (ta ? ta.value : (r.draft_message || '')).trim();
+  if (!reply) { _apxToast('Message is empty', false); return; }
+  const adjusted = reply !== (r.draft_message || '');
+  const lessonEl = document.getElementById('apx-teach-' + id);
+  const lesson = ((lessonEl && lessonEl.value) || '').trim();
+  try {
+    if (isFu) {
+      // Follow-up nudge: save any edit, then send via the follow-up path.
+      if (adjusted) await _apxPost('/api/agent-followups', 'edit', { id, message: reply });
+      const resp = await _apxPost('/api/agent-followups', 'send-now', { id });
+      if (lesson) await _apxTeach(lesson, r.draft_message, reply, { source: 'hawkeye-inline-fu', contact: r.contact_name || null });
+      _apxRemove(id);
+      _apxToast(resp && resp.deferred ? _apxQuietMsg(resp.send_after) : (lesson ? '✓ Sent + taught' : '✓ Sent'), true);
+      return;
+    }
+    if (r.escalate && !confirm('The agent escalated this one (it wanted a human). Send anyway?')) return;
+    const resp = await _apxPost('/api/agent-approvals', 'send', {
+      contact_id: r.ghl_contact_id, reply, conversation_id: r.ghl_conversation_id || null,
+      contact_name: r.contact_name || null, reasoning: r.reasoning || null, confidence: r.confidence,
+      reply_count: r.reply_count, booking_asks: r.booking_asks, ready_id: r.id, adjusted,
+      suggested_reply: r.draft_message || null,
+    });
+    if (lesson) await _apxTeach(lesson, r.draft_message, reply, { source: 'hawkeye-inline', contact: r.contact_name || null });
+    _apxRemove(id);
+    _apxToast(resp && resp.deferred ? _apxQuietMsg(resp.send_after) : (lesson ? '✓ Sent + taught' : '✓ Sent'), true);
+  } catch (e) { _apxToast(_apxErr(e), false); }
 }
 
 // A red "suggested Lost" card. Nothing is sent or changed until you confirm -
@@ -22742,9 +23440,89 @@ async function _apxBookConfirm(id) {
 }
 async function _apxBookSkip(id) { try { await _apxPost('/api/agent-approvals', 'skip-ready', { ready_id: id }); _apxRemove(id); _apxToast('Skipped', true); } catch (e) { _apxToast(_apxErr(e), false); } }
 
+// A gold "went quiet" card. The lead hasn't replied in ~a day. The recommended
+// action is Send to Ghosted (enroll in the academy's ghosted automation + move to
+// Interested); you can also Lost / Abandon / Skip. The GHL workflow handles the
+// actual multi-touch follow-up - we no longer draft one-off nudge messages.
+function _apxGhostCard(r) {
+  const last = _apxContext(r);
+  return `<div id="apx-${r.id}" style="background:var(--gold-ghost,rgba(212,207,138,0.06));border:1px solid var(--gold,#E8C547);border-radius:11px;padding:12px 14px;margin-bottom:9px">
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:5px;flex-wrap:wrap">
+      <span style="font-weight:700;font-size:13.5px">${escapeHTML(r.contact_name || 'Lead')}</span>
+      <span style="font-size:11px;font-weight:700;color:var(--gold,#E8C547);background:var(--gold-ghost,rgba(212,207,138,0.14));border-radius:999px;padding:2px 9px">👻 went quiet</span>
+      <div style="flex:1"></div>
+    </div>
+    ${r.reasoning ? `<div style="font-size:12px;color:var(--text-sub);margin-bottom:6px">${escapeHTML(r.reasoning)}</div>` : ''}
+    ${last}
+    <div style="font-size:11.5px;color:var(--text-mute);background:rgba(255,255,255,.02);border-radius:8px;padding:8px 10px">Sends them the <b>Ghosted</b> text sequence and moves the card to <b>Interested</b>. Reply → back to Responded; no reply → marked Lost automatically.</div>
+    <div style="display:flex;align-items:center;gap:7px;margin-top:8px;flex-wrap:wrap">
+      <button onclick="_apxOpenCardThread('${r.id}')" style="background:transparent;border:1px solid var(--border);color:var(--text-mute);border-radius:7px;padding:5px 10px;font-size:12px;cursor:pointer">💬 chat</button>
+      <div style="flex:1"></div>
+      <button onclick="_apxGhostSkip('${r.id}')" title="Skip, mark Lost, or Abandon (and optionally teach why)" style="background:transparent;border:1px solid var(--border);color:#e0654f;border-radius:7px;padding:5px 11px;font-size:12px;cursor:pointer">✕ other</button>
+      <button onclick="_apxGhostConfirm('${r.id}')" title="Send to the Ghosted automation" style="background:var(--gold,#E8C547);border:1px solid var(--gold,#E8C547);color:#0B0B0D;border-radius:7px;padding:5px 13px;font-size:12px;font-weight:700;cursor:pointer">👻 Send to Ghosted</button>
+    </div>
+  </div>`;
+}
+async function _apxGhostConfirm(id) {
+  const r = (_APX_DATA.ghost || []).find(x => x.id === id); if (!r) return;
+  _plConfirmModal({
+    icon: '👻',
+    title: 'Send ' + (r.contact_name || 'this lead') + ' to Ghosted?',
+    body: 'They\'ll get the Ghosted text sequence and move to <b>Interested</b>. If they reply they go back to <b>Responded</b>; if they don\'t, they get marked <b>Lost</b> automatically.',
+    okLabel: 'Send to Ghosted',
+    onOk: async () => {
+      try {
+        await _apxPost('/api/agent-approvals', 'confirm-ghost', { ready_id: r.id });
+        if (_PL_NEEDS && r.ghl_contact_id) _PL_NEEDS.delete(String(r.ghl_contact_id));
+        _apxRemove(id);
+        // Move the board card to Interested right away (the automation does it too).
+        _plMoveContactToInterested(r.ghl_contact_id);
+        // If acted on from inside the card drawer, flash the full-drawer confirmation;
+        // otherwise (Hawkeye overlay) just toast.
+        if (document.getElementById('pl-drawer')?.classList.contains('open')) {
+          _plDrawerConfirm('👻', 'Sent to Ghosted', 'Moved to Interested - the automation takes over');
+        } else {
+          _apxToast('👻 Sent to Ghosted', true);
+        }
+      } catch (e) { _apxToast(_apxErr(e), false); }
+    },
+  });
+}
+// The ✕ on a ghost card: skip it, mark Lost, or Abandon - each with an optional
+// "why" note that teaches the agent (e.g. "don't ghost - they asked us to wait").
+function _apxGhostSkip(id) {
+  const r = (_APX_DATA.ghost || []).find(x => x.id === id); if (!r) return;
+  _apxSkipModal(r, {
+    onSkip: async (lesson) => {
+      if (_PL_NEEDS && r.ghl_contact_id) _PL_NEEDS.delete(String(r.ghl_contact_id));
+      _apxRemove(id); _apxToast(lesson ? '📚 Skipped + taught' : 'Skipped', true);
+      try {
+        await _apxPost('/api/agent-approvals', 'skip-ready', { ready_id: id });
+        if (lesson) await _apxTeach(lesson, '', '', { source: 'hawkeye-ghost-skip', contact: r.contact_name || null });
+      } catch (e) { _apxToast(_apxErr(e), false); }
+    },
+    onLost: async (lesson) => {
+      if (_PL_NEEDS && r.ghl_contact_id) _PL_NEEDS.delete(String(r.ghl_contact_id));
+      _plCloseByContact(r.ghl_contact_id, 'lost');
+      _apxRemove(id); _apxToast(lesson ? '🚫 Marked Lost + taught' : '🚫 Marked Lost', true);
+      try {
+        await _apxPost('/api/agent-approvals', 'confirm-lost', { ready_id: id, reply: '', lost_reason: 'Other' });
+        if (lesson) await _apxTeach(lesson, '', '', { source: 'hawkeye-ghost-lost', contact: r.contact_name || null });
+      } catch (e) { _apxToast(_apxErr(e), false); }
+    },
+    onAbandon: async () => {
+      if (_PL_NEEDS && r.ghl_contact_id) _PL_NEEDS.delete(String(r.ghl_contact_id));
+      _plCloseByContact(r.ghl_contact_id, 'abandoned');
+      _apxRemove(id); _apxToast('🗑 Abandoned', true);
+      try { await _apxPost('/api/agent-approvals', 'confirm-abandoned', { ready_id: id }); }
+      catch (e) { _apxToast(_apxErr(e), false); }
+    },
+  });
+}
+
 function _apxRender() {
-  const { followups, ready, lost, book } = _APX_DATA;
-  const bookN = (book || []).length, readyN = ready.length + bookN, lostN = (lost || []).length;
+  const { followups, ready, lost, book, ghost } = _APX_DATA;
+  const bookN = (book || []).length, readyN = ready.length + bookN, lostN = (lost || []).length, ghostN = (ghost || []).length;
 
   // Tabs bar.
   const tabsEl = document.getElementById('apx-tabs');
@@ -22753,9 +23531,10 @@ function _apxRender() {
       const on = _APX_TAB === key, c = color || 'var(--accent)';
       return `<button onclick="_apxSetTab('${key}')" style="flex:0 0 auto;background:${on ? c : 'transparent'};color:${on ? '#0B0B0D' : 'var(--text-sub)'};border:1px solid ${on ? c : 'var(--border)'};border-radius:999px;padding:8px 15px;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap">${label}${n ? ` (${n})` : ''}</button>`;
     };
-    tabsEl.innerHTML = tab('followups', '⏰ Follow-ups', followups.length)
+    tabsEl.innerHTML = tab('ghost', '👻 Went quiet', ghostN, 'var(--gold,#E8C547)')
       + tab('ready', '💬 Ready messages', readyN)
-      + tab('lost', '🚫 Lost', lostN, '#e0654f');
+      + tab('lost', '🚫 Lost', lostN, '#e0654f')
+      + tab('followups', '⏰ Follow-ups', followups.length);
   }
 
   // Active tab content (centered to a readable width on wide screens).
@@ -22776,33 +23555,48 @@ function _apxRender() {
     if (!readyN) inner = _apxEmpty('Nothing ready to send.');
   } else if (_APX_TAB === 'lost') {
     inner = lostN ? lost.map(_apxLostCard).join('') : _apxEmpty('No suggested-lost leads.');
+  } else if (_APX_TAB === 'ghost') {
+    inner = ghostN ? ghost.map(_apxGhostCard).join('') : _apxEmpty('No quiet leads waiting.');
   }
-  // Focused on one lead (from a Sales-board badge): show a banner + a "draft a
-  // follow-up now" CTA when they have nothing queued.
+  // Focused on one lead (from a Sales-board badge): show a banner; if nothing's
+  // queued for them there's no action to take.
   let focusBanner = '';
   if (_APX_FILTER_CONTACT) {
     const nm = escapeHTML(_APX_FILTER_NAME || 'this lead');
     focusBanner = `<div style="display:flex;align-items:center;gap:8px;margin-bottom:13px;flex-wrap:wrap">
       <span style="font-size:12.5px;font-weight:700;color:var(--blue,#5A8FB8);background:var(--blue-soft,rgba(90,143,184,0.14));border:1px solid var(--blue,#5A8FB8);border-radius:999px;padding:3px 11px">👤 ${nm}</span>
       <button onclick="_apxOpen()" style="background:transparent;border:1px solid var(--border);color:var(--text-sub);border-radius:999px;padding:3px 11px;font-size:12px;cursor:pointer">Show all</button></div>`;
-    if (!(followups.length + readyN + lostN)) {
-      inner = `<div style="text-align:center;padding:18px 10px">
-        <div style="font-size:13.5px;color:var(--text-mute);margin-bottom:14px">Nothing queued for ${nm}. Schedule a follow-up so they don't go cold.</div>
-        <button onclick="_apxDraftForFocus()" style="background:var(--accent);border:none;color:#08080A;border-radius:9px;padding:10px 18px;font:inherit;font-size:13.5px;font-weight:700;cursor:pointer">⏰ Draft a follow-up now</button></div>`;
+    if (!(followups.length + readyN + lostN + ghostN)) {
+      inner = `<div style="text-align:center;padding:24px 10px;font-size:13.5px;color:var(--text-mute)">Nothing waiting for ${nm} right now.</div>`;
     }
   }
   body.innerHTML = `<div style="max-width:860px;margin:0 auto">${focusBanner}${inner}</div>`;
 }
-function _apxDraftForFocus() { if (_APX_FILTER_CONTACT) _apxMandatoryFollowup(_APX_FILTER_CONTACT, _APX_FILTER_NAME); }
 
 function _apxRemove(id) {
+  // Remember whose card this was, so we can clear the board badge for them.
+  const gone = [..._APX_DATA.followups, ..._APX_DATA.ready, ...(_APX_DATA.lost || []), ...(_APX_DATA.book || []), ...(_APX_DATA.ghost || [])].find(x => x.id === id);
   _APX_DATA.followups = _APX_DATA.followups.filter(x => x.id !== id);
   _APX_DATA.ready = _APX_DATA.ready.filter(x => x.id !== id);
   _APX_DATA.lost = (_APX_DATA.lost || []).filter(x => x.id !== id);
   _APX_DATA.book = (_APX_DATA.book || []).filter(x => x.id !== id);
+  _APX_DATA.ghost = (_APX_DATA.ghost || []).filter(x => x.id !== id);
   _apxRender();
+  try { _plRenderAgentSection(); } catch (_) {}   // keep the in-drawer agent section in sync
+  // Update the Sales-board badge immediately: if the lead has no other pending
+  // card left, drop them from _PL_NEEDS and repaint the board (so acting in the
+  // drawer/Hawkeye clears "💬 Reply" / "👻 …" on the card right away).
+  if (gone && gone.ghl_contact_id && _PL_NEEDS) {
+    const cid = String(gone.ghl_contact_id);
+    const stillNeeds = [..._APX_DATA.followups, ..._APX_DATA.ready, ...(_APX_DATA.lost || []), ...(_APX_DATA.book || []), ...(_APX_DATA.ghost || [])]
+      .some(x => String(x.ghl_contact_id || '') === cid);
+    if (!stillNeeds) {
+      _PL_NEEDS.delete(cid);
+      try { if (typeof _renderPipelineBoard === 'function') _renderPipelineBoard(); } catch (_) {}
+    }
+  }
   const span = document.getElementById('apx-count');
-  const n = _APX_DATA.followups.length + _APX_DATA.ready.length + (_APX_DATA.lost || []).length + (_APX_DATA.book || []).length;
+  const n = _APX_DATA.followups.length + _APX_DATA.ready.length + (_APX_DATA.lost || []).length + (_APX_DATA.book || []).length + (_APX_DATA.ghost || []).length;
   if (span) span.textContent = n ? `(${n})` : '';
 }
 
@@ -22894,131 +23688,11 @@ async function _apxReadyApprove(id) {
         });
         if (lesson) await _apxTeach(lesson, r.draft_message, r.draft_message, { source: 'hawkeye-approve', contact: r.contact_name || null });
         _apxRemove(id); _apxToast(lesson ? '✓ Sent + taught' : '✓ Sent', true);
-        // Forced 2-step: every Responded reply must be followed by a scheduled follow-up.
-        await _apxMandatoryFollowup(r.ghl_contact_id, r.contact_name, r.ghl_conversation_id);
       } catch (e) { _apxToast(_apxErr(e), false); }
     },
   });
 }
 
-// ════════════════════════════════════════════════════════════════════
-// FORCED FOLLOW-UP - the mandatory step after a Hawkeye reply is sent.
-// You approve the follow-up (queues the nudge → the lead is "All good"), or
-// take them off the board (Lost → nurture, or Abandon → gone). Every Responded
-// lead must leave with a follow-up queued. Also reached from a "Needs action"
-// badge on the Sales board. Layered at z-index 9620 (above the queue, below the
-// 9650 edit modal so editing sits on top).
-let _APX_MAND = null;   // { contactId, contactName, conversationId, followup }
-function _apxMandShell(inner) {
-  document.getElementById('apx-mand-overlay')?.remove();
-  document.body.insertAdjacentHTML('beforeend', `
-    <div id="apx-mand-overlay" style="position:fixed;inset:0;z-index:9620;background:rgba(0,0,0,.72);display:flex;align-items:flex-start;justify-content:center;padding:7vh 14px 0">
-      <div style="background:var(--surface);border:1px solid var(--blue,#5A8FB8);border-radius:16px;width:100%;max-width:520px;padding:18px;box-shadow:0 24px 70px rgba(0,0,0,.6)">
-        <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
-          <span style="font-size:16px;font-weight:800">⏰ Schedule the follow-up</span>
-          <span style="font-size:11px;font-weight:700;color:var(--blue,#5A8FB8);background:var(--blue-soft,rgba(90,143,184,0.14));border:1px solid var(--blue,#5A8FB8);border-radius:999px;padding:2px 9px">required</span>
-        </div>
-        <div id="apx-mand-inner">${inner}</div>
-      </div>
-    </div>`);
-}
-function _apxMandClose() { _APX_MAND = null; document.getElementById('apx-mand-overlay')?.remove(); }
-// Lost / Abandon buttons shared by every state of the mandatory card.
-function _apxMandLostAbandonBtns() {
-  return `<button onclick="_apxMandLost()" title="Mark Lost - enters the lead-nurture automation" style="background:rgba(224,90,66,0.08);border:1px solid #e0654f;color:#e0654f;border-radius:9px;padding:9px 13px;font:inherit;font-size:13px;font-weight:700;cursor:pointer">🚫 Lost</button>
-    <button onclick="_apxMandAbandon()" title="Abandon - removed from the pipeline, no nurture" style="background:transparent;border:1px solid var(--text-mute);color:var(--text-sub);border-radius:9px;padding:9px 13px;font:inherit;font-size:13px;cursor:pointer">🗑 Abandon</button>`;
-}
-async function _apxMandatoryFollowup(contactId, contactName, conversationId) {
-  if (!contactId) return;
-  _APX_MAND = { contactId, contactName: contactName || _plNameForContact(contactId) || 'this lead', conversationId: conversationId || null, followup: null };
-  _apxMandShell(`<div style="color:var(--text-mute);font-size:13px;padding:6px 0"><span class="req-spin"></span> Drafting the follow-up for ${escapeHTML(_APX_MAND.contactName)}…</div>`);
-  let resp;
-  try {
-    resp = await _apxPost('/api/agent-followups', 'draft-one', { contact_id: contactId, conversation_id: conversationId || null, contact_name: _APX_MAND.contactName });
-  } catch (e) {
-    if (!_APX_MAND) return;
-    _apxMandShell(`<div style="font-size:13px;color:#e07070;margin-bottom:14px">Couldn't draft the follow-up: ${escapeHTML(_apxErr(e))}</div>
-      <div style="display:flex;gap:9px;flex-wrap:wrap;justify-content:flex-end;align-items:center">
-        <button onclick="_apxMandClose()" style="background:transparent;border:none;color:var(--text-mute);font-size:12px;cursor:pointer;margin-right:auto">Later</button>
-        ${_apxMandLostAbandonBtns()}
-        <button onclick="_apxMandRetry()" style="background:var(--accent);border:none;color:#08080A;border-radius:9px;padding:9px 16px;font:inherit;font-size:13px;font-weight:700;cursor:pointer">Retry</button>
-      </div>`);
-    return;
-  }
-  if (!_APX_MAND) return;   // closed mid-flight
-  if (resp && resp.followup) { _APX_MAND.followup = resp.followup; return _apxMandApproveCard(); }
-  // Brain says no follow-up is warranted → take them off the board.
-  _apxMandShell(`<div style="font-size:13.5px;color:var(--text);margin-bottom:6px">The agent doesn't recommend another follow-up for ${escapeHTML(_APX_MAND.contactName)}.</div>
-    <div style="font-size:12.5px;color:var(--text-mute);margin-bottom:16px">${escapeHTML((resp && resp.reason) || 'They look done.')} Mark them Lost (keeps nurturing them) or Abandon (removes them).</div>
-    <div style="display:flex;gap:9px;flex-wrap:wrap;justify-content:flex-end;align-items:center">
-      <button onclick="_apxMandClose()" style="background:transparent;border:none;color:var(--text-mute);font-size:12px;cursor:pointer;margin-right:auto">Not now</button>
-      ${_apxMandLostAbandonBtns()}
-    </div>`);
-}
-function _apxMandRetry() { if (_APX_MAND) _apxMandatoryFollowup(_APX_MAND.contactId, _APX_MAND.contactName, _APX_MAND.conversationId); }
-function _apxMandApproveCard() {
-  const f = _APX_MAND && _APX_MAND.followup; if (!f) return;
-  const when = f.scheduled_at ? _apxWhen(f.scheduled_at) : 'soon';
-  _apxMandShell(`
-    <div style="font-size:12.5px;color:var(--text-mute);margin-bottom:8px">Message sent ✓ - now lock in the follow-up for <b style="color:var(--text)">${escapeHTML(_APX_MAND.contactName)}</b> so they never go cold.</div>
-    <div style="font-size:13.5px;line-height:1.5;color:var(--text);background:var(--bg);border:1px solid var(--border);border-radius:9px;padding:11px 13px;white-space:pre-wrap">${escapeHTML(f.draft_message || '')}</div>
-    <div style="font-size:12px;color:var(--blue,#5A8FB8);margin-top:8px">🕐 sends ${escapeHTML(when)}</div>
-    ${f.goal ? `<div style="font-size:11.5px;color:var(--text-mute);margin-top:4px">🎯 ${escapeHTML(f.goal)}</div>` : ''}
-    <div style="display:flex;align-items:center;gap:8px;margin-top:16px;flex-wrap:wrap">
-      <button onclick="_apxMandEdit()" style="background:transparent;border:1px solid var(--border);color:var(--text-sub);border-radius:9px;padding:9px 13px;font:inherit;font-size:13px;cursor:pointer">✎ Edit</button>
-      <div style="flex:1"></div>
-      ${_apxMandLostAbandonBtns()}
-      <button onclick="_apxMandApprove()" style="background:var(--accent);border:none;color:#08080A;border-radius:9px;padding:9px 18px;font:inherit;font-size:13.5px;font-weight:700;cursor:pointer">✓ Approve follow-up</button>
-    </div>`);
-}
-async function _apxMandApprove() {
-  const f = _APX_MAND && _APX_MAND.followup; if (!f) return;
-  const cid = _APX_MAND.contactId;
-  try {
-    await _apxPost('/api/agent-followups', 'approve', { id: f.id });
-    if (_PL_FU_PENDING && cid) _PL_FU_PENDING.add(String(cid));
-    _apxMandClose(); _apxToast('✓ Follow-up scheduled', true); _apxAfterMand();
-  } catch (e) { _apxToast(_apxErr(e), false); }
-}
-function _apxMandEdit() {
-  const f = _APX_MAND && _APX_MAND.followup; if (!f) return;
-  _apxEditModal({
-    title: 'Edit the follow-up message', value: f.draft_message || '', teachable: false,
-    onSave: async (text) => {
-      const t = (text || '').trim();
-      if (t && t !== f.draft_message) {
-        try { await _apxPost('/api/agent-followups', 'edit', { id: f.id, message: t }); f.draft_message = t; }
-        catch (e) { _apxToast(_apxErr(e), false); return; }
-      }
-      _apxMandApproveCard();
-    },
-  });
-}
-async function _apxMandLost() {
-  const c = _APX_MAND; if (!c) return;
-  try {
-    await _apxPost('/api/agent-approvals', 'confirm-lost', { contact_id: c.contactId, reply: '', lost_reason: 'Other' });
-    if (_PL_FU_PENDING && c.contactId) _PL_FU_PENDING.delete(String(c.contactId));
-    _plCloseByContact(c.contactId, 'lost');
-    _apxMandClose(); _apxToast('🚫 Marked Lost', true); _apxAfterMand();
-  } catch (e) { _apxToast(_apxErr(e), false); }
-}
-async function _apxMandAbandon() {
-  const c = _APX_MAND; if (!c) return;
-  try {
-    await _apxPost('/api/agent-approvals', 'confirm-abandoned', { contact_id: c.contactId });
-    if (_PL_FU_PENDING && c.contactId) _PL_FU_PENDING.delete(String(c.contactId));
-    _plCloseByContact(c.contactId, 'abandoned');
-    _apxMandClose(); _apxToast('🗑 Abandoned', true); _apxAfterMand();
-  } catch (e) { _apxToast(_apxErr(e), false); }
-}
-// After resolving the mandatory card: refresh the board badges, the Hawkeye
-// count, and (if the queue is open) the focused/full list.
-function _apxAfterMand() {
-  try { if (typeof _renderPipelineBoard === 'function') _renderPipelineBoard(); } catch (_) {}
-  try { _apxRefreshCount(); } catch (_) {}
-  try { if (document.getElementById('apx-overlay')) _apxLoad(); } catch (_) {}
-}
 
 // ── Ready-reply actions (send = approve + fire via agent-approvals) ──
 async function _apxReadySend(id) {
@@ -23033,8 +23707,6 @@ async function _apxReadySend(id) {
       reply_count: r.reply_count, booking_asks: r.booking_asks, ready_id: r.id,
     });
     _apxRemove(id); _apxToast(resp && resp.deferred ? _apxQuietMsg(resp.send_after) : '✓ Sent', true);
-    // Forced 2-step: every Responded reply must be followed by a scheduled follow-up.
-    await _apxMandatoryFollowup(r.ghl_contact_id, r.contact_name, r.ghl_conversation_id);
   } catch (e) { _apxToast(_apxErr(e), false); }
 }
 // The ✕ flow (replies AND follow-ups): skip with an optional lesson, OR mark
@@ -31879,6 +32551,7 @@ async function submitAdminFeedback() {
         file_name: fileName,
         page: window.location.pathname + window.location.search,
         portal: 'client',
+        client_id: (typeof CLIENT_ID !== 'undefined' ? CLIENT_ID : undefined),
       }),
     });
     const data = await res.json().catch(() => ({}));
@@ -33091,6 +33764,10 @@ async function boot() {
   // flag became v2_access and lost its onboarding-state meaning.)
   if (!clientRow?.onboarding_completed_at) {
     setTimeout(() => startOnboardingTour(), 600);
+  } else if (location.hash && /resource=[a-f0-9-]+/i.test(location.hash)) {
+    // Gated resource share link (#resource=<id>) → open the Resources view,
+    // which reads the hash and renders that resource's detail.
+    switchView('resources');
   } else if (!location.hash) {
     // Returning user (tour already done) → land on Home, or their first tab when
     // Home is hidden (V2 users). Skip when a deep link already targets a view.
