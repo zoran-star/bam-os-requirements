@@ -21861,7 +21861,9 @@ function _renderPipelineBoard() {
     const missingTrial = stage && stage.expectsTrial && !trialStr;
     const isDone = _plIsDoneTrialStage(stage);
     const todayTrial = _plIsTrialToday(o.trialDate);
-    const glow = todayTrial ? 'box-shadow:0 0 0 1px var(--gold,#E8C547),0 0 18px rgba(232,197,71,0.5);border-color:var(--gold,#E8C547);' : '';
+    // Trial-today gold glow, but NOT once the card is in the Done Trial stage -
+    // the trial already happened, so the "today" highlight is just noise there.
+    const glow = (todayTrial && !isDone) ? 'box-shadow:0 0 0 1px var(--gold,#E8C547),0 0 18px rgba(232,197,71,0.5);border-color:var(--gold,#E8C547);' : '';
     // Responded-stage follow-up status: 🟢 a follow-up is queued, 🔴 none yet.
     // Tap either → open Hawkeye focused on this lead (schedule / review the f/u).
     const _isResp = stage && /respond/i.test(stage.name || '');
