@@ -12623,9 +12623,10 @@ function applyV2NavState(v2Access) {
   if (typeof applyTalkToBamNav === 'function') applyTalkToBamNav();
 }
 
-// Home is hidden for V2 academies for now - BAM staff admins keep it.
+// Home is now available to V2 academies too - it shows the V2 sales command-center
+// dashboard (renderHomeV2). (Previously hidden for V2 because there was no V2 home.)
 function _homeHiddenForMe() {
-  return (typeof V2_ACCESS !== 'undefined' && V2_ACCESS) && _IS_BAM_STAFF !== true;
+  return false;
 }
 function applyHomeNavState() {
   const hide = _homeHiddenForMe();
