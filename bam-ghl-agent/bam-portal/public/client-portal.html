@@ -10944,10 +10944,7 @@ function _v15ibRenderThread() {
       ? '⚠ not confirmed in GHL'
       : (m._optimistic ? 'sending…' : `${escapeHTML(_ghlChannelLabel(m.type))} · ${escapeHTML(_ibFormatDate(m.date))}`);
     const tailColor = m._unconfirmed ? 'color:#9a3b2f;opacity:1;font-weight:700' : 'opacity:.6';
-    return `<div style="max-width:78%;align-self:${out ? 'flex-end' : 'flex-start'};background:${out ? 'var(--gold)' : 'var(--surface)'};color:${out ? '#0B0B0D' : 'var(--text)'};border:1px solid ${m._unconfirmed ? '#e0654f' : (out ? 'var(--gold)' : 'var(--border)')};padding:8px 12px;border-radius:12px;font-size:13px;line-height:1.45;white-space:pre-wrap;word-break:break-word">
-      ${escapeHTML(m.body || '(no body)')}
-      <div style="font-size:10px;margin-top:3px;${tailColor}">${tail}</div>
-    </div>`;
+    return `<div style="max-width:78%;align-self:${out ? 'flex-end' : 'flex-start'};background:${out ? 'var(--gold)' : 'var(--surface)'};color:${out ? '#0B0B0D' : 'var(--text)'};border:1px solid ${m._unconfirmed ? '#e0654f' : (out ? 'var(--gold)' : 'var(--border)')};padding:8px 12px;border-radius:12px;font-size:13px;line-height:1.45;white-space:pre-wrap;word-break:break-word">${escapeHTML((m.body || '(no body)').trim())}<div style="font-size:10px;margin-top:3px;${tailColor}">${tail}</div></div>`;
   }).join('') : '<div style="color:var(--text-mute);font-size:13px;text-align:center;padding:20px">No messages yet.</div>';
   const isEmail = _V15IB.type === 'Email';
   const ghlUrl = _ghlContactUrl(_V15IB.ghlLoc, a.contactId);
@@ -22854,10 +22851,7 @@ function _plRenderThread(messages) {
         const sender = out ? 'You' : escapeHTML(contactFirst);
         const channel = escapeHTML(_ghlChannelLabel(m.type));
         const when = escapeHTML(_ibFormatDate(m.date));
-        return `<div class="ib-msg ${out ? 'ib-msg-out' : 'ib-msg-in'}">
-          ${hasBody ? escapeHTML(m.body) : (atts ? '' : '(no body)')}${atts}
-          <div class="ib-msg-meta">${sender} · ${channel}${when ? ' · ' + when : ''}</div>
-        </div>`;
+        return `<div class="ib-msg ${out ? 'ib-msg-out' : 'ib-msg-in'}">${hasBody ? escapeHTML(m.body.trim()) : (atts ? '' : '(no body)')}${atts}<div class="ib-msg-meta">${sender} · ${channel}${when ? ' · ' + when : ''}</div></div>`;
       }).join('')
     : `<div style="color:var(--text-mute);font-size:13px">No messages yet - send the first one below.</div>`;
   // Scroll the whole thread (messages + the inline agent suggestion at the bottom).
@@ -23103,7 +23097,7 @@ async function _apxOpenThread(contactId, name) {
     body.innerHTML = msgs.length ? msgs.map(m => {
       const out = (m.direction || '').toLowerCase() === 'outbound';
       const when = (typeof _ibFormatDate === 'function') ? _ibFormatDate(m.date) : '';
-      return `<div style="max-width:82%;align-self:${out ? 'flex-end' : 'flex-start'};background:${out ? 'var(--accent)' : 'var(--surface)'};color:${out ? '#0B0B0D' : 'var(--text)'};border:1px solid ${out ? 'var(--accent)' : 'var(--border)'};padding:8px 11px;border-radius:12px;font-size:13.5px;line-height:1.45;white-space:pre-wrap;word-break:break-word">${escapeHTML(m.body)}<div style="font-size:10px;opacity:.6;margin-top:3px">${escapeHTML(when)}</div></div>`;
+      return `<div style="max-width:82%;align-self:${out ? 'flex-end' : 'flex-start'};background:${out ? 'var(--accent)' : 'var(--surface)'};color:${out ? '#0B0B0D' : 'var(--text)'};border:1px solid ${out ? 'var(--accent)' : 'var(--border)'};padding:8px 11px;border-radius:12px;font-size:13.5px;line-height:1.45;white-space:pre-wrap;word-break:break-word">${escapeHTML(String(m.body || '').trim())}<div style="font-size:10px;opacity:.6;margin-top:3px">${escapeHTML(when)}</div></div>`;
     }).join('') : `<div style="color:var(--text-mute);font-size:13px;text-align:center;padding:24px">No messages yet.</div>`;
     _scrollToBottom(body);
   } catch (e) {
@@ -23269,7 +23263,7 @@ function _apxContext(r) {
     const out = m.role === 'agent';
     const when = _apxMsgWhen(m.at || m.date);
     return `<div style="display:flex;flex-direction:column;align-items:${out ? 'flex-end' : 'flex-start'};gap:2px;max-width:84%;align-self:${out ? 'flex-end' : 'flex-start'}">
-      <div style="background:${out ? 'rgba(232,197,71,.13)' : 'rgba(255,255,255,.05)'};border:1px solid ${out ? 'var(--accent-border,rgba(232,197,71,.3))' : 'var(--border)'};color:var(--text);padding:6px 10px;border-radius:12px;font-size:12.5px;line-height:1.4;white-space:pre-wrap;word-break:break-word">${escapeHTML(_apxTrim(m.text, 240))}</div>
+      <div style="background:${out ? 'rgba(232,197,71,.13)' : 'rgba(255,255,255,.05)'};border:1px solid ${out ? 'var(--accent-border,rgba(232,197,71,.3))' : 'var(--border)'};color:var(--text);padding:6px 10px;border-radius:12px;font-size:12.5px;line-height:1.4;white-space:pre-wrap;word-break:break-word">${escapeHTML(_apxTrim(String(m.text || '').trim(), 240))}</div>
       ${when ? `<div style="font-size:10px;color:var(--text-mute);padding:0 4px">${escapeHTML(when)}</div>` : ''}
     </div>`;
   }).join('');
@@ -24084,11 +24078,7 @@ function _renderInboxDrawer() {
         const out = (m.direction || '').toLowerCase() === 'outbound';
         const atts = _ibRenderAttachments(m.attachments);
         const hasBody = (m.body || '').trim().length > 0;
-        return `<div class="ib-msg ${out ? 'ib-msg-out' : 'ib-msg-in'}">
-          ${hasBody ? escapeHTML(m.body) : (atts ? '' : '(no body)')}
-          ${atts}
-          <div class="ib-msg-meta">${escapeHTML(String(m.type || '').replace(/^TYPE_/, ''))} · ${escapeHTML(_ibFormatDate(m.date))}</div>
-        </div>`;
+        return `<div class="ib-msg ${out ? 'ib-msg-out' : 'ib-msg-in'}">${hasBody ? escapeHTML(m.body.trim()) : (atts ? '' : '(no body)')}${atts}<div class="ib-msg-meta">${escapeHTML(String(m.type || '').replace(/^TYPE_/, ''))} · ${escapeHTML(_ibFormatDate(m.date))}</div></div>`;
       }).join('')
     : '<div style="color:var(--text-mute);font-size:13px">No messages in this thread yet.</div>';
 
@@ -33165,7 +33155,7 @@ function renderMessageThread() {
     const canEdit = isMine && !m.deleted_at && !m._optimistic && ageMs < MSG_EDIT_WINDOW_MS;
     const body = m.deleted_at
       ? '<span style="color:var(--text-mute);font-style:italic">(deleted)</span>'
-      : escapeHTML(m.body || '');
+      : escapeHTML((m.body || '').trim());
     const files = Array.isArray(m.files) ? m.files : [];
     const filesHtml = files.length === 0 ? '' : '<div class="msg-files">' + files.map(f => {
       const isImg = (f.mime || '').startsWith('image/');
