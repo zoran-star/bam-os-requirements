@@ -7292,6 +7292,13 @@ Then the call to action."]</div>
         overflow-y:auto;
       }
       #pl-drawer.open { transform:translateX(0); }
+      /* Mobile: the full-height drawer ends at the screen bottom, behind the fixed
+         bottom nav (z-index 900 > the drawer's 61), so the bottom actions (Mark won,
+         etc.) get covered and can't be tapped. Pad the scroll area so the last
+         button clears the nav + safe-area. */
+      @media (max-width: 768px) {
+        #pl-drawer { padding-bottom: calc(var(--mobnav-h, 56px) + env(safe-area-inset-bottom) + 20px); }
+      }
       #pl-drawer .pl-d-header { padding:18px 20px; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:flex-start; gap:14px; }
       #pl-drawer .pl-d-title { font-size:18px; font-weight:700; }
       #pl-drawer .pl-d-sub { font-size:12px; color:var(--text-mute); margin-top:3px; }
