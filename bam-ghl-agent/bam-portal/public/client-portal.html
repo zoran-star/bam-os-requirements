@@ -11473,6 +11473,7 @@ async function _contactsLoadStripe(c) {
     const p = new URLSearchParams({ client_id: CLIENT_ID });
     if (c.ghl_contact_id) p.set('ghl_contact_id', c.ghl_contact_id);
     if (c.email) p.set('email', c.email);
+    if (c.phone) p.set('phone', c.phone);
     const r = await fetch('/api/stripe/contact?' + p, { headers: { Authorization: 'Bearer ' + token } });
     const j = await _safeJson(r);
     if (!r.ok) throw new Error(j.error || ('HTTP ' + r.status));
