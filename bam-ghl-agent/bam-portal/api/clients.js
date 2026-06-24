@@ -5,6 +5,7 @@ import { withSentryApiRoute } from "./_sentry.js";
 // GET /api/clients?id=<uuid>     → single client
 
 import { ADMIN_LIKE_ROLES, ANY_STAFF_ROLES, ASSIGNABLE_STAFF_ROLES, CONTENT_MANAGER_ROLES } from "./_roles.js";
+import { sendSms } from "./ghl/_core.js";
 
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
@@ -1270,6 +1271,8 @@ async function handler(req, res) {
         // Auth failures don't reject the submission, just leave fields blank.
         let submitterEmail = null;
         let authorId = null;
+        let fbClientId = null;
+        let fbPhone = null;
         if (hasAuth) {
           const fbToken = (req.headers.authorization || "").slice(7);
           try {
@@ -1286,6 +1289,20 @@ async function handler(req, res) {
                   );
                   authorId = sRows?.[0]?.id || null;
                 } catch (_) { /* not staff */ }
+              }
+              // Attribute the feedback to the submitter's academy + grab their
+              // phone (to text them when it's resolved). Prefer the client_id
+              // the portal sent; else the first active membership.
+              if (who?.id) {
+                try {
+                  const mems = await supabaseSelect(`client_users?user_id=eq.${who.id}&status=eq.active&select=client_id,phone`);
+                  if (Array.isArray(mems) && mems.length) {
+                    const want = (typeof fb.client_id === "string" && fb.client_id) ? mems.find(m => m.client_id === fb.client_id) : null;
+                    const m = want || mems[0];
+                    fbClientId = m.client_id || null;
+                    fbPhone = (m.phone || "").trim() || null;
+                  }
+                } catch (_) { /* membership lookup is best-effort */ }
               }
             }
           } catch (_) { /* unauth submission, fine */ }
@@ -1327,6 +1344,9 @@ async function handler(req, res) {
           // Only set author_id when we resolved one (otherwise the table's
           // gen_random_uuid() default fills in a placeholder).
           if (authorId) insertRow.author_id = authorId;
+          const cid = fbClientId || (typeof fb.client_id === "string" && fb.client_id ? fb.client_id : null);
+          if (cid) insertRow.client_id = cid;
+          if (fbPhone) insertRow.submitter_phone = fbPhone;
           const rows = await supabaseInsert("portal_feedback", insertRow);
           const row = Array.isArray(rows) ? rows[0] : rows;
           return res.status(200).json({ ok: true, id: row?.id });
@@ -2623,6 +2643,13 @@ async function handler(req, res) {
         const rows = await supabaseSelect(
           `portal_feedback?select=*${portalFilter}${kindFilter}&order=resolved_at.asc.nullsfirst,created_at.desc&limit=${limit}`
         );
+        // Attach the academy name so staff see which client account each came from.
+        const fbClientIds = [...new Set((rows || []).map(r => r.client_id).filter(Boolean))];
+        if (fbClientIds.length) {
+          const cs = await supabaseSelect(`clients?id=in.(${fbClientIds.join(",")})&select=id,business_name`).catch(() => []);
+          const nameById = Object.fromEntries((cs || []).map(c => [c.id, c.business_name]));
+          (rows || []).forEach(r => { r.client_name = r.client_id ? (nameById[r.client_id] || null) : null; });
+        }
         return res.status(200).json({ data: rows || [] });
       }
 
@@ -2715,7 +2742,17 @@ async function handler(req, res) {
         if (!Array.isArray(updated) || updated.length === 0) {
           return res.status(404).json({ error: "feedback id not found" });
         }
-        return res.status(200).json({ ok: true, resolved: !undo, item: updated[0] });
+        const fbItem = updated[0];
+        // Close the loop: when marked resolved, text the submitter from their
+        // academy's GHL number. Best-effort - never blocks the resolve.
+        if (!undo && fbItem && fbItem.client_id && fbItem.submitter_phone) {
+          try {
+            const cRows = await supabaseSelect(`clients?id=eq.${fbItem.client_id}&select=id,business_name,ghl_location_id,ghl_access_token,ghl_refresh_token,ghl_token_expires_at&limit=1`);
+            const fc = cRows?.[0];
+            if (fc) sendSms({ client: fc, toPhone: fbItem.submitter_phone, message: "✅ Your feedback has been resolved by the BAM team - thanks for flagging it!", contactName: "BAM" }).catch(() => {});
+          } catch (_) { /* texting is best-effort */ }
+        }
+        return res.status(200).json({ ok: true, resolved: !undo, item: fbItem });
       }
 
       // ── action=transfer-owner ──
