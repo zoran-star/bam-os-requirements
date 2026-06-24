@@ -81,7 +81,7 @@ async function threadMessages(token, conversationId) {
     date: m.dateAdded || m.createdAt || m.timestamp || null,
   })).filter(m => m.text);
   msgs.sort((a, b) => new Date(a.date || 0) - new Date(b.date || 0));
-  return msgs.map(m => ({ role: m.direction === "outbound" ? "agent" : "parent", text: m.text }));
+  return msgs.map(m => ({ role: m.direction === "outbound" ? "agent" : "parent", text: m.text, date: m.date }));
 }
 
 const hoursSince = (d) => d ? (Date.now() - new Date(d).getTime()) / 3600000 : Infinity;
@@ -160,7 +160,7 @@ async function detectForClient(client) {
           reasoning: `No reply for about ${quietStr}. Send them to the Ghosted automation?`,
           last_message: lastLeadMsg ? String(lastLeadMsg.text).slice(0, 500) : null,
           last_outbound: lastOurMsg ? String(lastOurMsg.text).slice(0, 500) : null,
-          thread_tail: thread.slice(-6).map(m => ({ role: m.role === "agent" ? "agent" : "lead", text: String(m.text).slice(0, 320) })),
+          thread_tail: thread.slice(-6).map(m => ({ role: m.role === "agent" ? "agent" : "lead", text: String(m.text).slice(0, 320), at: toIso(m.date) })),
           last_lead_at: toIso(c.lastMessageDate || c.dateUpdated),
           status: "pending", created_by: "detector",
         }]),
