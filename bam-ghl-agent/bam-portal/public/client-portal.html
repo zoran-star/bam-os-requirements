@@ -22288,11 +22288,22 @@ function _renderPipelineBoard() {
       if (pa === 2) return ta - tb;   // upcoming: soonest at top
       return 0;
     };
+    // Done Trial: leads who messaged LAST (the glowing cards - their ball) float to
+    // the top, then by most-recent message.
+    const isDoneStage = _plIsDoneTrialStage(s);
+    const _lmOf = (o) => (_PL_LASTMSG && o.contactId) ? _PL_LASTMSG.get(String(o.contactId)) : null;
+    const _doneSort = (a, b) => {
+      const la = _lmOf(a), lb = _lmOf(b);
+      const ga = la && la.direction === 'inbound' ? 0 : 1, gb = lb && lb.direction === 'inbound' ? 0 : 1;
+      if (ga !== gb) return ga - gb;   // lead-last (glowing) to the top
+      return (lb && lb.date ? new Date(lb.date).getTime() : 0) - (la && la.date ? new Date(la.date).getTime() : 0);
+    };
     // V1.5 mirrors GHL order; V2 applies funnel-aware sorting.
     const opps = !_plV2 ? (byStage.get(s.id) || []).slice()
       : (byStage.get(s.id) || []).slice()
         .sort((a, b) => isResponded ? ((_respRank(a) - _respRank(b)) || _trialFirst(a, b))
                       : isSchedTrial ? _schedSort(a, b)
+                      : isDoneStage ? _doneSort(a, b)
                       : _trialFirst(a, b));
     // Cards HTML — for Scheduled Trial, drop the "upcoming" squiggle in before the
     // first future trial (only when there are today/passed cards above it).

@@ -82,6 +82,29 @@ This repo is a collaborative project between **Zoran** and **Cole**. Both contri
 
 When working on requirements, be aware that the other collaborator may have made recent changes — always pull before editing.
 
+## ⚠️ Running multiple Claude sessions / terminals at once — USE GIT WORKTREES
+
+Zoran often runs **several terminals/Claude sessions on this repo at the same time.**
+Two sessions in the **same folder** share **one working tree and one git HEAD** — so
+when one runs `git checkout`/commit, it silently clobbers the other's uncommitted
+edits (this has bitten us). **Never run two concurrent sessions editing in the same
+checkout.**
+
+**Rule for every session:** if another session might be active, give yourself an
+isolated **git worktree** before editing:
+
+```bash
+scripts/wt <session-name>     # e.g. scripts/wt sales-agents
+cd ~/bam-os-worktrees/<session-name>   # work HERE, then commit/push/PR as normal
+```
+
+- Each worktree is its own folder on branch `session/<name>`, branched off the
+  latest `origin/main` — independent HEAD, zero collisions.
+- The canonical checkout (this main folder) stays on `main`; **don't edit files
+  directly in it** while sessions are running.
+- Per-PR branches still work inside a worktree: `git fetch && git checkout -b feat/x origin/main`.
+- Clean up a finished worktree with `git worktree remove ~/bam-os-worktrees/<name>`.
+
 ## Session startup — run `/start`
 
 At the very start of every conversation in this repo, run **`/start`** unless the user has already given you a specific task. The skill walks through:
