@@ -32311,6 +32311,7 @@ async function submitAdminFeedback() {
         file_name: fileName,
         page: window.location.pathname + window.location.search,
         portal: 'client',
+        client_id: (typeof CLIENT_ID !== 'undefined' ? CLIENT_ID : undefined),
       }),
     });
     const data = await res.json().catch(() => ({}));
