@@ -100,3 +100,16 @@ inbox sent EVERY reply as SMS. Now:
 
 Requires: academy's IG = Professional acct linked to a FB Page, and Instagram connected
 in GHL (Settings → Integrations). No portal-side Meta integration / app review.
+
+## Channel toggle buttons + Email in the inbox (2026-06-24)
+- The "All channels" dropdown is now a row of **pressed-down toggle buttons** (`.v15ib-chan` /
+  `.v15ib-chan.on` = gold + inset shadow + translateY): 💬 SMS · ✉️ Email · 📸 Instagram · 📘 Facebook.
+  **Multi-select** (`_V15IB.fChannels` array; empty = all) via `_v15ibToggleChannel`. Matching uses
+  `_ibChannelBucket(c)` (instagram/facebook/email/sms/other). Unread still sorts to top (inbox.js).
+- Each conversation row shows a small channel icon (`_ibChannelIcon`, non-SMS only) so email/IG/FB
+  threads are tellable at a glance.
+- **Email is now a first-class reply channel.** `_v15ibOpen` no longer forces Email→SMS; an email
+  thread sets `_V15IB.type='Email'` → the composer shows a **Subject** input (`#v15ib-subject`) +
+  a no-email-on-file warning. `_v15ibSend` already sent subject for Email; `send-message.js` already
+  had the Email path. Email conversations already arrive via the generic `/conversations/search`
+  (no type filter) — so they show + filter + reply, IF the academy has GHL email configured.
