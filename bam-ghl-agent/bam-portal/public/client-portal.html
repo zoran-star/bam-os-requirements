@@ -7154,6 +7154,8 @@ Then the call to action."]</div>
       #view-pipelines .pl-card-fu-good:hover { background:rgba(76,199,106,0.2); }
       #view-pipelines .pl-card-fu-action { background:rgba(224,112,112,0.12); border-color:#e07070; color:#e07070; }
       #view-pipelines .pl-card-fu-action:hover { background:rgba(224,112,112,0.22); }
+      #view-pipelines .pl-card-fu-check { background:rgba(232,197,71,0.12); border-color:var(--gold,#E8C547); color:var(--gold,#E8C547); }
+      #view-pipelines .pl-card-fu-check:hover { background:rgba(232,197,71,0.22); }
       #view-pipelines .pl-card-ptf {
         margin-top:9px; width:100%; background:rgba(232,197,71,0.12);
         border:1px solid var(--accent); color:var(--accent); border-radius:7px;
@@ -15417,6 +15419,7 @@ function _taRenderTest() {
   const p = document.getElementById('ta-panel'); if (!p) return;
   p.innerHTML = `
     <p style="color:var(--text-mute);font-size:12.5px;margin:0 0 12px;line-height:1.5">Type as a lead - the agent shows the reply it <i>would</i> send. Nothing is actually texted.</p>
+    <div style="margin:0 0 14px"><button onclick="_taHealthOpen()" title="See what the agent recommends for every lead in the Responded stage right now" style="background:transparent;border:1px solid var(--border);color:var(--text-sub);border-radius:8px;padding:7px 13px;font:inherit;font-size:12.5px;font-weight:700;cursor:pointer">🩺 Responded health</button></div>
     <div id="ta-chat" style="display:flex;flex-direction:column;gap:10px;margin-bottom:14px;min-height:40px"></div>
     <div style="display:flex;gap:8px;align-items:flex-end">
       <textarea id="ta-chat-input" rows="2" placeholder="Type as the lead…" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();_taSend();}" style="flex:1;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:10px 12px;color:var(--text);font-size:14px;resize:vertical;font-family:inherit"></textarea>
@@ -15424,6 +15427,69 @@ function _taRenderTest() {
     </div>
     <button onclick="_TA.chat=[];_taRenderTest()" style="margin-top:10px;background:none;border:none;color:var(--text-mute);font-size:12px;cursor:pointer">↺ reset conversation</button>`;
   _taRenderChatLog();
+}
+
+// ── Responded health (audit): what the agent recommends for every Responded lead ──
+function _taHealthOpen() {
+  document.getElementById('ta-health-overlay')?.remove();
+  document.body.insertAdjacentHTML('beforeend', `
+    <div id="ta-health-overlay" onclick="if(event.target===this)this.remove()" style="position:fixed;inset:0;z-index:9500;background:rgba(0,0,0,.6);display:flex;align-items:flex-start;justify-content:center;padding:6vh 14px 0;overflow-y:auto">
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:16px;width:100%;max-width:640px;padding:18px;box-shadow:0 24px 70px rgba(0,0,0,.6)">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+          <div style="font-size:16px;font-weight:800">🩺 Responded health</div>
+          <div style="flex:1"></div>
+          <button id="ta-health-scan" onclick="_taHealthScan()" title="Force a fresh agent scan now" style="background:transparent;border:1px solid var(--border);color:var(--text-sub);border-radius:8px;padding:6px 12px;font:inherit;font-size:12.5px;font-weight:700;cursor:pointer">🔄 Scan now</button>
+          <button onclick="document.getElementById('ta-health-overlay').remove()" aria-label="Close" style="background:none;border:none;color:var(--text-mute);font-size:22px;cursor:pointer;padding:0 6px">×</button>
+        </div>
+        <div style="font-size:12.5px;color:var(--text-mute);margin-bottom:12px;line-height:1.5">What the agent recommends for every lead in the Responded stage right now. 🟢 = waiting on the lead · 🟡 = sitting a while with no action (check it) · coloured = action waiting in Hawkeye.</div>
+        <div id="ta-health-body"><div style="color:var(--text-mute);font-size:13px"><span class="req-spin"></span> Loading…</div></div>
+      </div>
+    </div>`);
+  _taHealthLoad();
+}
+async function _taHealthLoad() {
+  const body = document.getElementById('ta-health-body'); if (!body) return;
+  try {
+    const token = await _mreqAuthToken();
+    const [pipeRes, rd] = await Promise.all([
+      fetch(`/api/ghl/pipelines?client_id=${encodeURIComponent(CLIENT_ID)}`, { headers: { Authorization: 'Bearer ' + token } }).then(_safeJson),
+      _apxPost('/api/agent-approvals', 'list-ready', {}).catch(() => ({ ready: [] })),
+    ]);
+    const pls = (pipeRes && pipeRes.pipelines) || [];
+    const pipe = pls.find(p => /training/i.test(p.name || '')) || pls[0];
+    const stage = pipe && (pipe.stages || []).find(s => /respond/i.test(s.name || ''));
+    const opps = (pipe && stage) ? (pipe.opportunities || []).filter(o => o.stageId === stage.id && String(o.status || 'open').toLowerCase() === 'open') : [];
+    const cardBy = new Map();
+    for (const r of (rd.ready || [])) {
+      if ((r.status === 'pending' || r.status === 'approved') && r.ghl_contact_id) {
+        const id = String(r.ghl_contact_id), k = r.kind || 'reply', cur = cardBy.get(id);
+        if (!cur || (_PL_NEED_PRIO[k] || 0) > (_PL_NEED_PRIO[cur] || 0)) cardBy.set(id, k);
+      }
+    }
+    if (!opps.length) { body.innerHTML = `<div style="font-size:13px;color:var(--text-mute)">No leads in the Responded stage.</div>`; return; }
+    const label = { reply: ['💬 Reply', '#5A8FB8'], ghost: ['👻 Send to Ghosted', 'var(--gold,#E8C547)'], mark_lost: ['🚫 Confirm lost', '#e0654f'], book: ['📅 Confirm booking', '#5A8FB8'] };
+    const rows = opps.map(o => {
+      const nm = escapeHTML((o.contact && o.contact.name) || o.name || 'Lead');
+      const k = cardBy.get(String(o.contactId || ''));
+      const ageMs = (o.lastStageChangeAt || o.updatedAt) ? Date.now() - new Date(o.lastStageChangeAt || o.updatedAt).getTime() : 0;
+      const stale = ageMs > 7 * 86400 * 1000;
+      let lab, col;
+      if (k && label[k]) { lab = label[k][0]; col = label[k][1]; }
+      else if (stale) { lab = '🟡 Check'; col = 'var(--gold,#E8C547)'; }
+      else { lab = '🟢 All good'; col = 'var(--green,#4CC76A)'; }
+      return `<div style="display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--border)">
+        <span style="font-size:13.5px;font-weight:600;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${nm}</span>
+        <span style="font-size:12px;font-weight:700;color:${col};white-space:nowrap">${lab}</span></div>`;
+    }).join('');
+    const needN = opps.filter(o => cardBy.get(String(o.contactId || ''))).length;
+    body.innerHTML = `<div style="font-size:12px;color:var(--text-mute);margin-bottom:8px">${opps.length} in Responded · ${needN} need action</div>${rows}`;
+  } catch (e) {
+    body.innerHTML = `<div style="color:#e07070;font-size:13px">Couldn't load - ${escapeHTML(e.message || String(e))}</div>`;
+  }
+}
+async function _taHealthScan() {
+  const ok = await _plScanNow('ta-health-scan');
+  if (ok) _taHealthLoad();
 }
 
 function _taRenderChatLog() {
@@ -21126,6 +21192,31 @@ async function _plLoadNeedsAction() {
   }
   try { if (typeof _renderPipelineBoard === 'function') _renderPipelineBoard(); } catch (_) {}
 }
+// Force a fresh agent scan of the Responded stage NOW (both engines: reply +
+// ghost) instead of waiting for the every-15/30-min cron, then refresh the
+// badges. Shared by the board "🔄 Scan" button and the Responded-health view.
+let _PL_SCANNING = false;
+async function _plScanNow(btnId) {
+  if (_PL_SCANNING) return;
+  _PL_SCANNING = true;
+  const btn = btnId && document.getElementById(btnId);
+  const prev = btn ? btn.innerHTML : null;
+  if (btn) { btn.disabled = true; btn.innerHTML = '⏳…'; }
+  try {
+    await Promise.all([
+      _apxPost('/api/agent-approvals', 'detect-now', {}).catch(() => null),
+      _apxPost('/api/agent-followups', 'detect-now', {}).catch(() => null),
+    ]);
+    await _plLoadNeedsAction();   // repaint badges from the fresh cards
+    if (typeof _plToast === 'function') _plToast('🔄 Scan complete');
+  } catch (e) {
+    if (typeof _plToast === 'function') _plToast('Scan failed: ' + (e.message || e));
+  } finally {
+    _PL_SCANNING = false;
+    if (btn) { btn.disabled = false; btn.innerHTML = prev; }
+  }
+  return true;
+}
 // Look up a lead's display name from the loaded board by GHL contact id.
 function _plNameForContact(contactId) {
   if (!_PL_DATA || !contactId) return null;
@@ -21928,10 +22019,15 @@ function _renderPipelineBoard() {
     const _isResp = stage && /respond/i.test(stage.name || '');
     const _need = _PL_NEEDS && _PL_NEEDS.get(String(o.contactId || ''));
     const _needLabel = { reply: '💬 Reply', ghost: '👻 Send to Ghosted', mark_lost: '🚫 Confirm lost', book: '📅 Confirm booking' }[_need] || (_need ? '🔴 Needs action' : '');
+    // Safety net (#3): a Responded lead with NO agent card that's been sitting a
+    // while (stale = >7d in stage) shouldn't silently read "All good" - the
+    // detector may have missed it. Flag amber 🟡 Check so nothing hides.
     const fuBadge = (_isResp && _agentOn && _PL_NEEDS)
       ? (_need
           ? `<button class="pl-card-fu pl-card-fu-action" title="Tap to handle in Hawkeye" onclick="event.stopPropagation(); _apxOpen('${escapeHTML(o.contactId || '')}')">${_needLabel}</button>`
-          : `<button class="pl-card-fu pl-card-fu-good" title="No action needed - waiting on the lead" onclick="event.stopPropagation(); _apxOpen('${escapeHTML(o.contactId || '')}')">🟢 All good</button>`)
+          : (stale
+              ? `<button class="pl-card-fu pl-card-fu-check" title="No agent action queued and sitting a while - tap to review, or hit Scan" onclick="event.stopPropagation(); _apxOpen('${escapeHTML(o.contactId || '')}')">🟡 Check</button>`
+              : `<button class="pl-card-fu pl-card-fu-good" title="No action needed - waiting on the lead" onclick="event.stopPropagation(); _apxOpen('${escapeHTML(o.contactId || '')}')">🟢 All good</button>`))
       : '';
     return `
       <div class="pl-card ${stale ? 'pl-card-stale' : ''} ${missingTrial ? 'pl-card-notrial' : ''} ${todayTrial ? 'pl-card-today' : ''}"
@@ -21956,7 +22052,7 @@ function _renderPipelineBoard() {
                <button class="pl-card-abandon" onclick="event.stopPropagation(); _plMarkAbandoned('${escapeHTML(o.id)}')">Abandon</button>
                <button class="pl-card-lost" onclick="event.stopPropagation(); _plMarkLost('${escapeHTML(o.id)}')">Lost</button>
              </div>`
-          : (trialStarted
+          : (_plIsScheduledTrialStage(stage)
               ? `<button class="pl-card-ptf" onclick="event.stopPropagation(); _plPostTrialForm('${escapeHTML(o.id)}')">Post trial form</button>`
               : '')}
         ${fuBadge}
@@ -21973,7 +22069,10 @@ function _renderPipelineBoard() {
     const isResponded = /respond/i.test(s.name || '');
     const glowCol = (isResponded && _agentOn) ? 'box-shadow:0 0 0 1px var(--blue,#5A8FB8),0 0 18px rgba(90,143,184,0.45);border-color:var(--blue,#5A8FB8);' : '';
     const hawkBtn = (isResponded && _agentOn)
-      ? `<button onclick="_apxOpen()" title="Open the agent approval queue" style="width:100%;box-sizing:border-box;margin-bottom:8px;background:var(--blue-soft,rgba(90,143,184,0.12));color:var(--blue,#5A8FB8);border:1px solid var(--blue,#5A8FB8);border-radius:7px;padding:9px;font-size:12.5px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px">👁 Hawkeye</button>`
+      ? `<div style="display:flex;gap:6px;margin-bottom:8px">
+          <button onclick="_apxOpen()" title="Open the agent approval queue" style="flex:1;box-sizing:border-box;background:var(--blue-soft,rgba(90,143,184,0.12));color:var(--blue,#5A8FB8);border:1px solid var(--blue,#5A8FB8);border-radius:7px;padding:9px;font-size:12.5px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px">👁 Hawkeye</button>
+          <button id="pl-scan-btn" onclick="_plScanNow('pl-scan-btn')" title="Re-scan this stage now for new actions (don't wait for the every-30-min check)" style="box-sizing:border-box;background:transparent;color:var(--text-sub);border:1px solid var(--border);border-radius:7px;padding:9px 11px;font-size:12.5px;font-weight:700;cursor:pointer;white-space:nowrap">🔄 Scan</button>
+        </div>`
       : '';
     return `
       <div class="pl-col" style="${glowCol}"
