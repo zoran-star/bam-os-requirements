@@ -22520,7 +22520,13 @@ function _renderPipelineBoard() {
       </div>`;
   }).join('');
 
+  // Preserve the board's horizontal scroll across re-renders. Several async
+  // loaders (needs-action badges, last-messages, agent scan) re-render the board
+  // shortly after it opens; without this, each rebuild snapped scrollLeft back to
+  // 0 and the columns "jumped left and right" while you were swiping on mobile.
+  const _plPrevScroll = container.querySelector('.pl-board')?.scrollLeft || 0;
   container.innerHTML = `<div class="pl-board">${colHtml}</div>`;
+  if (_plPrevScroll) { const _nb = container.querySelector('.pl-board'); if (_nb) _nb.scrollLeft = _plPrevScroll; }
 }
 
 // ── Drag & drop ───────────────────────────────────────────
