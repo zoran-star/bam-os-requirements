@@ -105,9 +105,12 @@ async function handler(req, res) {
     const customer = await stripeFetch(`/customers/${encodeURIComponent(customerId)}`, { stripeAccount: acct });
     if (customer.deleted) return res.status(200).json({ connected: true, customer: null });
 
-    // Subscriptions (all statuses), with price + product expanded for names.
+    // Subscriptions (all statuses). Expand only to the price — Stripe caps expand
+    // at 4 levels and `data.items.data.price.product` is 5, which 400s the whole
+    // lookup. planName() falls back to the price nickname / "$X/interval" so we
+    // still show a readable plan without the product object.
     const subsRes = await stripeFetch(
-      `/subscriptions?customer=${encodeURIComponent(customerId)}&status=all&limit=10&expand[]=data.items.data.price.product`,
+      `/subscriptions?customer=${encodeURIComponent(customerId)}&status=all&limit=10&expand[]=data.items.data.price`,
       { stripeAccount: acct }
     );
     const subscriptions = (subsRes.data || []).map(s => {
