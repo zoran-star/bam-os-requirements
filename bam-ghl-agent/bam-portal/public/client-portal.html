@@ -10881,10 +10881,18 @@ async function _v15ibOpen(convId, contactId, phone, email, name, channel) {
   try { _v15ibRenderList(); } catch (_) {}
   // Reply on the SAME channel the lead used - SMS / Email / IG / FB / WhatsApp.
   _V15IB.type = _ghlSendType(channel || '');
+  // Mark this conversation read (per-user). Optimistically clear it locally so it
+  // drops off the unread-top immediately; the server receipt makes it stick.
+  const _conv = (_V15IB.convos || []).find(c => c.id === convId);
+  if (_conv) _conv.unreadCount = 0;
   const body = document.getElementById('v15ib-body');
   if (body) body.innerHTML = `<div class="req-empty" style="padding:24px 0"><span class="req-spin"></span> Loading thread…</div>`;
   try {
     const token = await _mreqAuthToken();
+    fetch(`/api/ghl/inbox?action=mark-read&client_id=${encodeURIComponent(CLIENT_ID)}`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+      body: JSON.stringify({ conversation_id: convId }),
+    }).catch(() => {});
     const r = await fetch(`/api/ghl/inbox?client_id=${encodeURIComponent(CLIENT_ID)}&conversation_id=${encodeURIComponent(convId)}`, { headers: { Authorization: 'Bearer ' + token } });
     const j = await _safeJson(r);
     if (!r.ok) throw new Error(j.error || ('HTTP ' + r.status));
