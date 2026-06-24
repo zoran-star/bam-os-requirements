@@ -22083,17 +22083,13 @@ function _renderPipelineBoard() {
     // Safety net (#3): a Responded lead with NO agent card that's been sitting a
     // while (stale = >7d in stage) shouldn't silently read "All good" - the
     // detector may have missed it. Flag amber 🟡 Check so nothing hides.
-    // Only badge a card when there's something to DO: a queued agent action, or a
-    // stale lead worth a look. No action = no button (no prompt), and those cards
-    // sort to the bottom of the column (see the sort in _renderPipelineBoard).
+    // Only badge a card when there's an actual agent action to take. No action =
+    // no button (keep the card clean); those cards sort to the bottom of the
+    // column (see the sort in _renderPipelineBoard).
     const fuBadge = _scanning
       ? `<div class="pl-card-fu" style="border-color:var(--border);color:var(--text-mute);cursor:default"><span class="req-spin"></span> scanning…</div>`
-      : ((_isResp && _agentOn && _PL_NEEDS)
-        ? (_need
-            ? `<button class="pl-card-fu pl-card-fu-action" title="Tap to handle in Hawkeye" onclick="event.stopPropagation(); _apxOpen('${escapeHTML(o.contactId || '')}')">${_needLabel}</button>`
-            : (stale
-                ? `<button class="pl-card-fu pl-card-fu-check" title="No agent action queued and sitting a while - tap to review, or hit Scan" onclick="event.stopPropagation(); _apxOpen('${escapeHTML(o.contactId || '')}')">🟡 Check</button>`
-                : ''))
+      : ((_isResp && _agentOn && _PL_NEEDS && _need)
+        ? `<button class="pl-card-fu pl-card-fu-action" title="Tap to handle in Hawkeye" onclick="event.stopPropagation(); _apxOpen('${escapeHTML(o.contactId || '')}')">${_needLabel}</button>`
         : '');
     return `
       <div class="pl-card ${stale ? 'pl-card-stale' : ''} ${missingTrial ? 'pl-card-notrial' : ''} ${todayTrial ? 'pl-card-today' : ''}"
