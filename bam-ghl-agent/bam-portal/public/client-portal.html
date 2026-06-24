@@ -10753,13 +10753,15 @@ function _v15ibRenderAll() {
   const n = _v15ibFiltered().length;
   const filterActive = _V15IB.fPipeline || _V15IB.fStage;
   const channelActive = _V15IB.fChannels.length > 0;
-  const countLabel = `${n} conversation${n === 1 ? '' : 's'}${(filterActive || channelActive) ? ' in filter' : ''}`;
+  const countLabel = `${n} conversation${n === 1 ? '' : 's'}${(filterActive || channelActive || _V15IB.unreadOnly) ? ' in filter' : ''}`;
   // Channel toggle buttons - press to show only that channel (multi-select).
   // A pressed button is "down + activated"; none pressed = all channels.
   const chanBtns = _V15IB_CHANNELS.map(ch => {
     const on = _V15IB.fChannels.includes(ch.key);
     return `<button onclick="_v15ibToggleChannel('${ch.key}')" aria-pressed="${on}" class="v15ib-chan${on ? ' on' : ''}">${ch.icon} ${ch.label}</button>`;
   }).join('');
+  // Unread-only toggle - same pressed-down style as the channel buttons.
+  const unreadBtn = `<button onclick="_v15ibSetUnread(${!_V15IB.unreadOnly})" aria-pressed="${_V15IB.unreadOnly}" class="v15ib-chan${_V15IB.unreadOnly ? ' on' : ''}" title="Show only unread">🔴 Unread</button>`;
   host.innerHTML = `
     <div class="v15ib-bar">
       <div class="v15ib-pills">
@@ -10767,7 +10769,7 @@ function _v15ibRenderAll() {
         <button id="v15ib-approve-btn" onclick="_apxOpen()" title="Hawkeye - approve the agent's drafted messages before they send" aria-label="Hawkeye agent approvals" class="v15ib-icon" style="width:auto;padding:0 12px;gap:6px;border-color:var(--accent);color:var(--accent);font-weight:700">👁 Hawkeye <span id="v15-apx-count" style="font-weight:800"></span></button>
         <button onclick="_v15ibMassSend()" class="v15ib-icon v15ib-send" title="Mass send" aria-label="Mass send" style="width:auto;padding:0 12px;gap:6px">✉ Mass send</button>
       </div>
-      <div class="v15ib-chans">${chanBtns}</div>
+      <div class="v15ib-chans">${unreadBtn}${chanBtns}</div>
       <div class="v15ib-filters">
         <select onchange="_v15ibSetPipeline(this.value)" class="v15ib-sel">${pipeOpts}</select>
         ${curPipe ? `<select onchange="_v15ibSetStage(this.value)" class="v15ib-sel">${stageOpts}</select>` : ''}
