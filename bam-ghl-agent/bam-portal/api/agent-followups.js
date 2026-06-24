@@ -37,11 +37,11 @@ const SUPABASE_URL         = process.env.VITE_SUPABASE_URL || process.env.SUPABA
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
 const DEFAULT_CLIENT_ID    = "39875f07-0a4b-4429-a201-2249bc1f24df"; // BAM GTA
 
-// Candidate window: a lead is "quiet" if OUR last message is older than this (≈a
-// day with no reply)… we then queue a "Send to Ghosted" card for a human.
+// A lead is "quiet" if OUR last message is older than this (≈a day with no reply)
+// → we queue a "Send to Ghosted" card for a human. No upper age cap: a lead that's
+// been cold for weeks/months in Responded is the BEST candidate to ghost (the
+// Ghosted automation is built for cold leads), so we surface them all.
 const MIN_QUIET_HOURS = 24;
-// …and we stop chasing leads quiet longer than this.
-const MAX_AGE_DAYS    = 14;
 const DRAFT_CAP       = 12;   // max new ghost cards per academy per detector run
 
 async function sb(path, init = {}) {
@@ -112,8 +112,7 @@ async function detectForClient(client) {
   const candidates = convos.filter(c => {
     if (!respondedIds.has(c.contactId)) return false;   // ← Responded-stage only
     if (String(c.lastMessageDirection || "").toLowerCase() !== "outbound") return false;
-    const h = hoursSince(c.lastMessageDate || c.dateUpdated);
-    return h >= MIN_QUIET_HOURS && h <= MAX_AGE_DAYS * 24;
+    return hoursSince(c.lastMessageDate || c.dateUpdated) >= MIN_QUIET_HOURS;   // quiet ≥ a day, no upper cap
   }).slice(0, DRAFT_CAP);
 
   let queued = 0, skipped = 0;

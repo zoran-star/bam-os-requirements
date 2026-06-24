@@ -21103,22 +21103,26 @@ let _PL_PIPELINE   = null;   // currently-selected pipeline id
 let _PL_DRAG_OPP   = null;   // { oppId, fromStageId, pipelineId } during drag
 let _PL_AGENT_MODE = null;   // 'off' | 'hawkeye' | 'self_drive' | null(unknown) - drives the Responded glow
 
-// Set of Responded-stage contact ids that have a pending "Send to Ghosted" card
-// (the detector queues one when a lead's gone quiet ~a day). Drives the per-card
-// 🔴 Needs action / 🟢 All good badge — needs action == has a ghost card.
-let _PL_GHOST = null;
+// Map of Responded-stage contact id → the pending Hawkeye action waiting on staff
+// ('reply' | 'ghost' | 'mark_lost' | 'book'). Drives the per-card badge: any
+// pending card → 🔴 Needs action (labelled by kind); none → 🟢 All good.
+let _PL_NEEDS = null;
+// If one lead somehow has more than one pending card, show the most decisive one.
+const _PL_NEED_PRIO = { book: 4, mark_lost: 3, reply: 2, ghost: 1 };
 async function _plLoadNeedsAction() {
   try {
     const j = await _apxPost('/api/agent-approvals', 'list-ready', {});
-    const set = new Set();
+    const map = new Map();
     for (const r of (j.ready || [])) {
-      if (r.kind === 'ghost' && r.status === 'pending' && r.ghl_contact_id) set.add(String(r.ghl_contact_id));
+      if ((r.status !== 'pending' && r.status !== 'approved') || !r.ghl_contact_id) continue;
+      const id = String(r.ghl_contact_id), k = r.kind || 'reply', cur = map.get(id);
+      if (!cur || (_PL_NEED_PRIO[k] || 0) > (_PL_NEED_PRIO[cur] || 0)) map.set(id, k);
     }
-    _PL_GHOST = set;
+    _PL_NEEDS = map;
   } catch (e) {
     // Permission denied → this viewer can't read agent status; hide the badges
     // entirely (don't paint everything green). Transient error → keep prior.
-    if (e && (e.status === 401 || e.status === 403)) _PL_GHOST = null;
+    if (e && (e.status === 401 || e.status === 403)) _PL_NEEDS = null;
   }
   try { if (typeof _renderPipelineBoard === 'function') _renderPipelineBoard(); } catch (_) {}
 }
@@ -21912,14 +21916,16 @@ function _renderPipelineBoard() {
     // Trial-today gold glow, but NOT once the card is in the Done Trial stage -
     // the trial already happened, so the "today" highlight is just noise there.
     const glow = (todayTrial && !isDone) ? 'box-shadow:0 0 0 1px var(--gold,#E8C547),0 0 18px rgba(232,197,71,0.5);border-color:var(--gold,#E8C547);' : '';
-    // Responded-stage status: 🔴 Needs action = gone quiet ~a day, a "Send to
-    // Ghosted" card is waiting. 🟢 All good = nothing waiting. Tap either → open
-    // Hawkeye focused on this lead.
+    // Responded-stage status: 🔴 Needs action when a Hawkeye card is waiting,
+    // labelled by what the action is (reply / ghost / confirm lost / book). 🟢 All
+    // good = nothing waiting (we're waiting on the lead). Tap → Hawkeye focused.
     const _isResp = stage && /respond/i.test(stage.name || '');
-    const fuBadge = (_isResp && _agentOn && _PL_GHOST)
-      ? (_PL_GHOST.has(String(o.contactId || ''))
-          ? `<button class="pl-card-fu pl-card-fu-action" title="No reply in a day - tap to send to Ghosted" onclick="event.stopPropagation(); _apxOpen('${escapeHTML(o.contactId || '')}')">🔴 Needs action</button>`
-          : `<button class="pl-card-fu pl-card-fu-good" title="No action needed right now" onclick="event.stopPropagation(); _apxOpen('${escapeHTML(o.contactId || '')}')">🟢 All good</button>`)
+    const _need = _PL_NEEDS && _PL_NEEDS.get(String(o.contactId || ''));
+    const _needLabel = { reply: '💬 Reply', ghost: '👻 Send to Ghosted', mark_lost: '🚫 Confirm lost', book: '📅 Confirm booking' }[_need] || (_need ? '🔴 Needs action' : '');
+    const fuBadge = (_isResp && _agentOn && _PL_NEEDS)
+      ? (_need
+          ? `<button class="pl-card-fu pl-card-fu-action" title="Tap to handle in Hawkeye" onclick="event.stopPropagation(); _apxOpen('${escapeHTML(o.contactId || '')}')">${_needLabel}</button>`
+          : `<button class="pl-card-fu pl-card-fu-good" title="No action needed - waiting on the lead" onclick="event.stopPropagation(); _apxOpen('${escapeHTML(o.contactId || '')}')">🟢 All good</button>`)
       : '';
     return `
       <div class="pl-card ${stale ? 'pl-card-stale' : ''} ${missingTrial ? 'pl-card-notrial' : ''} ${todayTrial ? 'pl-card-today' : ''}"
@@ -22803,7 +22809,7 @@ async function _apxGhostConfirm(id) {
     onOk: async () => {
       try {
         await _apxPost('/api/agent-approvals', 'confirm-ghost', { ready_id: r.id });
-        if (_PL_GHOST && r.ghl_contact_id) _PL_GHOST.delete(String(r.ghl_contact_id));
+        if (_PL_NEEDS && r.ghl_contact_id) _PL_NEEDS.delete(String(r.ghl_contact_id));
         _apxRemove(id); _apxToast('👻 Sent to Ghosted', true);
         try { if (typeof _renderPipelineBoard === 'function') _renderPipelineBoard(); } catch (_) {}
       } catch (e) { _apxToast(_apxErr(e), false); }
@@ -22816,7 +22822,7 @@ function _apxGhostSkip(id) {
   const r = (_APX_DATA.ghost || []).find(x => x.id === id); if (!r) return;
   _apxSkipModal(r, {
     onSkip: async (lesson) => {
-      if (_PL_GHOST && r.ghl_contact_id) _PL_GHOST.delete(String(r.ghl_contact_id));
+      if (_PL_NEEDS && r.ghl_contact_id) _PL_NEEDS.delete(String(r.ghl_contact_id));
       _apxRemove(id); _apxToast(lesson ? '📚 Skipped + taught' : 'Skipped', true);
       try {
         await _apxPost('/api/agent-approvals', 'skip-ready', { ready_id: id });
@@ -22824,7 +22830,7 @@ function _apxGhostSkip(id) {
       } catch (e) { _apxToast(_apxErr(e), false); }
     },
     onLost: async (lesson) => {
-      if (_PL_GHOST && r.ghl_contact_id) _PL_GHOST.delete(String(r.ghl_contact_id));
+      if (_PL_NEEDS && r.ghl_contact_id) _PL_NEEDS.delete(String(r.ghl_contact_id));
       _plCloseByContact(r.ghl_contact_id, 'lost');
       _apxRemove(id); _apxToast(lesson ? '🚫 Marked Lost + taught' : '🚫 Marked Lost', true);
       try {
@@ -22833,7 +22839,7 @@ function _apxGhostSkip(id) {
       } catch (e) { _apxToast(_apxErr(e), false); }
     },
     onAbandon: async () => {
-      if (_PL_GHOST && r.ghl_contact_id) _PL_GHOST.delete(String(r.ghl_contact_id));
+      if (_PL_NEEDS && r.ghl_contact_id) _PL_NEEDS.delete(String(r.ghl_contact_id));
       _plCloseByContact(r.ghl_contact_id, 'abandoned');
       _apxRemove(id); _apxToast('🗑 Abandoned', true);
       try { await _apxPost('/api/agent-approvals', 'confirm-abandoned', { ready_id: id }); }
