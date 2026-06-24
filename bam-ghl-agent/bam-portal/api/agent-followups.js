@@ -102,13 +102,17 @@ async function detectForClient(client) {
   const { rs, ids: respondedIds } = await respondedContactIds(token, locationId);
   if (!rs) return { client_id: client.id, skipped: "no Responded stage" };
 
-  // Find Responded-stage leads where OUR last message is outbound and stale.
-  // We iterate the actual Responded roster (respondedIds) — NOT just the recent
-  // conversations list. The bulk top-100 fetch is only a fast cache; a COLD lead's
-  // conversation is old and falls outside that window, so for any Responded contact
-  // missing from it we fetch their conversation directly. Otherwise long-quiet
-  // leads (the prime ghost candidates, e.g. someone silent 30+ days) would never be
-  // seen and would silently read "All good".
+  // Find EVERY Responded-stage lead that's gone quiet ≥ a day and has no pending
+  // action — regardless of who messaged last. Iterate the actual Responded roster
+  // (respondedIds), NOT just the recent-conversations list: a cold lead's
+  // conversation is old and falls outside the bulk top-100 window, so for anyone
+  // missing from it we fetch their conversation directly.
+  //
+  // IMPORTANT: we deliberately do NOT require our-last-message-outbound. A lead who
+  // replied days ago and was never followed up (inbound-last) is ALSO a ghost
+  // candidate — the reply engine only sees the recent window, so otherwise these
+  // leads fall through both engines and silently read "All good". The fresh inbound
+  // leads (quiet < a day) still go to the reply engine; this is the ≥24h fallback.
   const byContact = new Map();
   try {
     const cd = await ghl("GET", `/conversations/search?${new URLSearchParams({ locationId, limit: "100" })}`, { token });
@@ -125,8 +129,7 @@ async function detectForClient(client) {
       } catch (_) {}
     }
     if (!c) continue;
-    if (String(c.lastMessageDirection || "").toLowerCase() !== "outbound") continue;   // they messaged last → the reply engine owns it
-    if (hoursSince(c.lastMessageDate || c.dateUpdated) < MIN_QUIET_HOURS) continue;     // quiet < a day → still 🟢
+    if (hoursSince(c.lastMessageDate || c.dateUpdated) < MIN_QUIET_HOURS) continue;     // quiet < a day → still fresh (reply engine / 🟢)
     candidates.push(c);
     if (candidates.length >= DRAFT_CAP) break;
   }
@@ -157,7 +160,7 @@ async function detectForClient(client) {
           client_id: client.id, ghl_contact_id: String(contactId), ghl_conversation_id: c.id,
           contact_name: c.fullName || c.contactName || "Lead",
           kind: "ghost", draft_message: "",
-          reasoning: `No reply for about ${quietStr}. Send them to the Ghosted automation?`,
+          reasoning: `Quiet for about ${quietStr}. Send them to the Ghosted automation?`,
           last_message: lastLeadMsg ? String(lastLeadMsg.text).slice(0, 500) : null,
           last_outbound: lastOurMsg ? String(lastOurMsg.text).slice(0, 500) : null,
           thread_tail: thread.slice(-6).map(m => ({ role: m.role === "agent" ? "agent" : "lead", text: String(m.text).slice(0, 320), at: toIso(m.date) })),

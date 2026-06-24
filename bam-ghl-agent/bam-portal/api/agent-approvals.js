@@ -334,6 +334,13 @@ async function detectForClient(client) {
     _first = false;
     const contactId = item.contact_id;
     if (!contactId) { skipped++; reasons.push(`${item.name || "?"}: no contactId in queue item`); continue; }
+    // Fresh inbound only: if the lead's last message is ≥24h old, we dropped the
+    // ball — hand them to the ghost engine (Send to Ghosted) instead of a late
+    // reply. Keeps the two engines from fighting and stops stale leads falling
+    // through the cracks. (last_at = the lead's last inbound time.)
+    if (item.last_at && (Date.now() - new Date(item.last_at).getTime()) >= 24 * 3600000) {
+      skipped++; reasons.push(`${item.name || contactId}: inbound ≥24h old → ghost engine`); continue;
+    }
     // Dedupe: skip if an active draft exists, or we already answered THIS inbound.
     try {
       const existing = await sb(`agent_ready_replies?client_id=eq.${client.id}&ghl_contact_id=eq.${encodeURIComponent(contactId)}&order=created_at.desc&select=id,status,last_lead_at&limit=1`);
