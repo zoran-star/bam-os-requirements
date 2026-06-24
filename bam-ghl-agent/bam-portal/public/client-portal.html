@@ -22307,7 +22307,7 @@ function _renderPipelineBoard() {
           ? (_lastMsg && _lastMsg.date
               ? `<div class="pl-card-trial" style="color:${_clientLast ? 'var(--gold,#E8C547)' : 'var(--text-mute)'};font-weight:${_clientLast ? '600' : '400'}">💬 ${escapeHTML(_apxMsgWhen(_lastMsg.date) || 'last message')}${_clientLast ? ' · from client' : ''}</div>`
               : '')
-          : (_plIsScheduledTrialStage(stage)
+          : (_plIsScheduledTrialStage(stage) && trialStarted
               ? `<button class="pl-card-ptf" onclick="event.stopPropagation(); _plPostTrialForm('${escapeHTML(o.id)}')">Post trial form</button>`
               : '')}
         ${fuBadge}
@@ -22571,7 +22571,7 @@ function _plOpenCard(oppId) {
     <div class="pl-d-actions">
       ${_plV2 ? `${_plIsDoneTrialStage(s)
         ? `<button class="pl-d-btn primary" onclick="_plMarkWon('${escapeHTML(o.id)}')">Mark won</button>`
-        : (_plIsScheduledTrialStage(s) ? `<button class="pl-d-btn primary" onclick="_plPostTrialForm('${escapeHTML(o.id)}')">Post trial form</button>` : '')}
+        : (_plIsScheduledTrialStage(s) && trialStarted ? `<button class="pl-d-btn primary" onclick="_plPostTrialForm('${escapeHTML(o.id)}')">Post trial form</button>` : '')}
       <button class="pl-d-btn" style="border-color:var(--gold,#E8C547);color:var(--gold,#E8C547)" onclick="_plEnrollSpecial('${escapeHTML(o.id)}')">📨 Summer special</button>` : ''}
       ${o.member
         ? `<button class="pl-d-btn" onclick="closePipelineDrawer(); openMemberPopup('${escapeHTML(o.member.id)}')">Open member popup</button>`
