@@ -2406,6 +2406,17 @@ async function handler(req, res) {
           patch.v15_access = v;
         }
 
+        // Scheduling app per academy ('coachiq' | 'none'). It drives
+        // coachiq_enabled so every existing CoachIQ gate follows automatically.
+        if (wasSet("scheduling_app")) {
+          const v = body.scheduling_app;
+          if (v !== "coachiq" && v !== "none") {
+            return res.status(400).json({ error: "scheduling_app must be 'coachiq' or 'none'" });
+          }
+          patch.scheduling_app = v;
+          patch.coachiq_enabled = (v === "coachiq");
+        }
+
         if (wasSet("organic_content")) {
           const v = body.organic_content;
           if (typeof v !== "boolean") {

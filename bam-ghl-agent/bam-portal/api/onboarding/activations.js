@@ -109,7 +109,17 @@ export async function fireOnboardingActivations(member, ctx = {}) {
   //     the academy's group login page (enrolled); CoachIQ's "New User" automation
   //     webhooks the id to /api/coachiq/user-created, which matches by email + grants
   //     the product then. The confirmation page tells them to sign up. Non-fatal.
-  if (coachiqOnboardingEnabled()) {
+  // Per-academy gate: only run CoachIQ when this academy's scheduling app IS
+  // CoachIQ (clients.scheduling_app / coachiq_enabled). GTA = 'none' → skipped.
+  let _schedCoachiq = false;
+  try {
+    if (sb && member.client_id) {
+      const cr = await sb(`clients?id=eq.${encodeURIComponent(member.client_id)}&select=scheduling_app,coachiq_enabled&limit=1`).catch(() => null);
+      const c = Array.isArray(cr) && cr[0];
+      _schedCoachiq = !!c && (c.scheduling_app === "coachiq" || c.coachiq_enabled === true);
+    }
+  } catch (_) { /* default off */ }
+  if (coachiqOnboardingEnabled() && _schedCoachiq) {
     try {
       const existingId = member.coachiq_member_id || null;
       if (existingId) {
@@ -132,7 +142,7 @@ export async function fireOnboardingActivations(member, ctx = {}) {
       await audit("onboarding-coachiq-error", { error: results.coachiq.error });
     }
   } else {
-    results.coachiq = { skipped: "CoachIQ onboarding not configured for this academy" };
+    results.coachiq = { skipped: _schedCoachiq ? "CoachIQ onboarding not configured (env)" : "scheduling app is not CoachIQ for this academy" };
   }
 
   return results;
