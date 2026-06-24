@@ -21267,9 +21267,6 @@ async function _plLoadNeedsAction() {
 // Last-message info per contact (from the GHL inbox list), for the Done Trial
 // cards: show when the last message was + glow if the LEAD messaged last.
 let _PL_LASTMSG = null;   // contactId → { direction, date }
-// Interested-stage "no message in 5 days → red card" highlight: OFF for all
-// tiers (Zoran, 2026-06-24). Kept as const=false so gated code below no-ops.
-const _PL_TEST_INTERESTED_RED = false;
 // V2-only flow gate for the pipelines board. V1.5 = plain GHL mirror.
 function _plIsV2() { return typeof V2_ACCESS !== 'undefined' && V2_ACCESS; }
 async function _plLoadLastMessages() {
@@ -22140,6 +22137,45 @@ function _plUpcomingDivider(label = 'upcoming') {
   </div>`;
 }
 
+let _PL_DUPS = null;   // oppId → [{id,name,stage,athlete,trial,phone}] of likely duplicates
+// Show the possible-duplicate group for an opp and let staff close the redundant
+// card(s). "Close" = mark that opportunity Abandoned (off the board). It does NOT
+// merge the GHL contacts - that's a manual GHL step if you want the records joined.
+function _plResolveDup(oppId) {
+  if (!_PL_DATA) return;
+  let me = null;
+  for (const pl of _PL_DATA.pipelines) { const f = (pl.opportunities || []).find(x => x.id === oppId); if (f) { me = f; break; } }
+  if (!me) return;
+  const stageNm = (sid) => { for (const pl of _PL_DATA.pipelines) { const st = (pl.stages || []).find(x => x.id === sid); if (st) return st.name; } return ''; };
+  const matches = (_PL_DUPS && _PL_DUPS.get(oppId)) || [];
+  const rows = [{ id: me.id, name: (me.contact && me.contact.name) || me.name || 'Lead', stage: stageNm(me.stageId), athlete: me.athlete || '', trial: me.trialDate || null, phone: (me.contact && me.contact.phone) || '', me: true }, ...matches];
+  const tStr = (t) => { if (!t) return ''; try { const d = new Date(t); return isNaN(d.getTime()) ? '' : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }); } catch (_) { return ''; } };
+  const rowHtml = (r) => `<div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--border)">
+      <div style="flex:1;min-width:0">
+        <div style="font-size:13.5px;font-weight:700">${escapeHTML(r.name)}${r.me ? ' <span style="font-size:10.5px;color:var(--text-mute);font-weight:600">(this card)</span>' : ''}</div>
+        <div style="font-size:11.5px;color:var(--text-mute);margin-top:2px">${escapeHTML(r.stage || '-')}${r.athlete ? ' · ' + escapeHTML(r.athlete) : ''}${tStr(r.trial) ? ' · trial ' + escapeHTML(tStr(r.trial)) : ''}${r.phone ? ' · ' + escapeHTML(r.phone) : ''}</div>
+      </div>
+      <button onclick="_plResolveDupClose('${escapeHTML(r.id)}')" style="background:transparent;border:1px solid var(--text-mute);color:var(--text-sub);border-radius:8px;padding:6px 11px;font:inherit;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap">🗑 close as dup</button>
+    </div>`;
+  document.getElementById('pl-dup-overlay')?.remove();
+  document.body.insertAdjacentHTML('beforeend', `
+    <div id="pl-dup-overlay" onclick="if(event.target===this)this.remove()" style="position:fixed;inset:0;z-index:9300;background:rgba(0,0,0,.6);display:flex;align-items:flex-start;justify-content:center;padding:8vh 14px 0">
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:16px;width:100%;max-width:480px;padding:18px;box-shadow:0 24px 70px rgba(0,0,0,.6)">
+        <div style="font-size:16px;font-weight:800;margin-bottom:4px">⚠ Possible duplicate</div>
+        <div style="font-size:12.5px;color:var(--text-mute);margin-bottom:12px;line-height:1.5">These cards share a phone or athlete name - likely the same person (e.g. they booked under a different email). Keep the right one and close the others. Closing marks that opportunity Abandoned (off the board); it does not merge the GHL contacts.</div>
+        ${rows.map(rowHtml).join('')}
+        <div style="display:flex;justify-content:flex-end;margin-top:14px"><button onclick="document.getElementById('pl-dup-overlay').remove()" style="background:transparent;border:1px solid var(--border);color:var(--text-sub);border-radius:9px;padding:8px 16px;font:inherit;font-size:13px;cursor:pointer">Done</button></div>
+      </div>
+    </div>`);
+}
+async function _plResolveDupClose(id) {
+  try {
+    await _plSetStatus(id, 'abandoned', 'duplicate');
+    _plRemoveOppLocal(id);
+    document.getElementById('pl-dup-overlay')?.remove();
+    _plToast('🗑 Closed duplicate');
+  } catch (e) { alert('Could not close duplicate: ' + (e.message || e)); }
+}
 function _renderPipelineBoard() {
   const container = document.getElementById('pl-board-container');
   if (!container || !_PL_DATA) return;
@@ -22167,6 +22203,30 @@ function _renderPipelineBoard() {
     if (_PL_CLOSED.has(String(o.status || '').toLowerCase())) continue; // closed → off the board
     if (!byStage.has(o.stageId)) continue; // opp sits in a stage this user can't see
     byStage.get(o.stageId).push(o);
+  }
+
+  // Possible-duplicate detection (V2): two open opps sharing a phone (last 10
+  // digits) or athlete name are likely the same person - e.g. they booked a trial
+  // under a different email, so GHL made a second contact + card.
+  _PL_DUPS = new Map();
+  if (_plV2) {
+    const openOpps = []; for (const arr of byStage.values()) for (const o of arr) openOpps.push(o);
+    const stageNm = (sid) => { const st = visibleStages.find(x => x.id === sid); return st ? st.name : ''; };
+    const ph = (o) => String((o.contact && o.contact.phone) || '').replace(/\D/g, '').slice(-10);
+    const at = (o) => String(o.athlete || '').trim().toLowerCase().replace(/\s+/g, ' ');
+    const groups = new Map();
+    const add = (k, o) => { if (!k) return; if (!groups.has(k)) groups.set(k, []); groups.get(k).push(o); };
+    for (const o of openOpps) { const p10 = ph(o); if (p10.length === 10) add('p:' + p10, o); const a = at(o); if (a.length >= 3) add('a:' + a, o); }
+    for (const arr of groups.values()) {
+      if (arr.length < 2) continue;
+      for (const o of arr) {
+        const list = _PL_DUPS.get(o.id) || [];
+        for (const x of arr) if (x.id !== o.id && !list.some(e => e.id === x.id)) {
+          list.push({ id: x.id, name: (x.contact && x.contact.name) || x.name || 'Lead', stage: stageNm(x.stageId), athlete: x.athlete || '', trial: x.trialDate || null, phone: (x.contact && x.contact.phone) || '' });
+        }
+        if (list.length) _PL_DUPS.set(o.id, list);
+      }
+    }
   }
 
   const cardHtml = (o, stage) => {
@@ -22199,11 +22259,11 @@ function _renderPipelineBoard() {
     const _goldGlow = 'box-shadow:0 0 0 1px var(--gold,#E8C547),0 0 18px rgba(232,197,71,0.5);border-color:var(--gold,#E8C547);';
     // Trial-today gold glow (non-done stages); Done Trial glows only on lead-last.
     let glow = isDone ? (_clientLast ? _goldGlow : '') : (todayTrial ? _goldGlow : '');
-    // ⚠️ TEMP TEST (remove later — _PL_TEST_INTERESTED_RED): flag Interested-stage
-    // leads RED when there's been no text/email in the last 5 days — a proxy for
-    // "not in an active messaging automation". Over-flags leads whose last message
-    // is older than the inbox's recent window, but fine for a quick eyeball test.
-    if (_PL_TEST_INTERESTED_RED && _PL_LASTMSG && stage && /interest/i.test(stage.name || '')) {
+    // Interested stage: flag the card RED when there's been no text/email in the
+    // last 5 days - they've fallen out of (or were never in) an active messaging
+    // automation, i.e. nobody's contacted them. Uses _PL_LASTMSG (GHL inbox list);
+    // a lead not seen there at all counts as not-recently-contacted.
+    if (_PL_LASTMSG && stage && /interest/i.test(stage.name || '')) {
       const _ageMs = (_lastMsg && _lastMsg.date) ? (Date.now() - new Date(_lastMsg.date).getTime()) : Infinity;
       if (_ageMs > 5 * 86400 * 1000) glow = 'box-shadow:0 0 0 1px #e0654f,0 0 20px rgba(224,90,66,0.6);border-color:#e0654f;';
     }
@@ -22234,9 +22294,8 @@ function _renderPipelineBoard() {
            ondragstart="_plDragStart(event,'${escapeHTML(o.id)}','${escapeHTML(o.stageId || '')}','${escapeHTML(p.id)}')"
            ondragend="_plDragEnd(event)"
            onclick="_plOpenCard('${escapeHTML(o.id)}')">
-        ${(!isDone && !_isResp) ? `<button class="pl-card-special" title="Send Summer special" onclick="event.stopPropagation(); _plEnrollSpecial('${escapeHTML(o.id)}')"
-           style="position:absolute;top:6px;right:6px;background:var(--gold-ghost,rgba(212,207,138,0.12));color:var(--gold);border:1px solid var(--gold);border-radius:6px;padding:3px 8px;font-size:11px;font-weight:700;cursor:pointer;line-height:1.3;z-index:2">📨 Special</button>` : ''}
-        <div class="pl-card-name" style="padding-right:${(!isDone && !_isResp) ? '78px' : '8px'}"><span class="pl-card-tag">Parent</span> ${escapeHTML(parent)}</div>
+        ${(_PL_DUPS && _PL_DUPS.has(o.id)) ? `<button onclick="event.stopPropagation(); _plResolveDup('${escapeHTML(o.id)}')" title="Possible duplicate - tap to resolve" style="width:100%;box-sizing:border-box;margin-bottom:7px;background:rgba(224,90,66,0.12);color:#e0654f;border:1px solid #e0654f;border-radius:6px;padding:4px 8px;font-size:11px;font-weight:700;cursor:pointer;text-align:center">⚠ Possible duplicate</button>` : ''}
+        <div class="pl-card-name" style="padding-right:8px"><span class="pl-card-tag">Parent</span> ${escapeHTML(parent)}</div>
         <div class="pl-card-contact"><span class="pl-card-tag">Athlete</span> ${o.athlete ? escapeHTML(o.athlete) : '<span style="opacity:0.5">-</span>'}</div>
         ${o.trainer ? `<div class="pl-card-coach"><span class="pl-card-tag">Coach</span> ${escapeHTML(o.trainer)}</div>` : ''}
         ${trialStr
@@ -22686,6 +22745,9 @@ async function _plMsgSend() {
     _IB_PENDING_FILES = [];
     _plMsgRenderPendingFiles();
     _plLoadMessages();
+    // We just replied → our message is now the last one. Clear the Done Trial
+    // "lead messaged last" glow immediately by updating _PL_LASTMSG + repainting.
+    if (_PL_LASTMSG && t.contactId) { _PL_LASTMSG.set(String(t.contactId), { direction: 'outbound', date: new Date().toISOString() }); try { _renderPipelineBoard(); } catch (_) {} }
   } catch (e) {
     alert('Send failed: ' + e.message);
   } finally {
