@@ -35,10 +35,11 @@ queued. Built three coordinated pieces. **Hawkeye = the 👁 agent approval queu
 - 2-step is **Hawkeye-only** (self-drive auto-sends, no manual approve).
 
 ## 3. Abandon added to the ✕ / Lost flow
-- **Lost** = mark opp `lost` + **enroll the contact in the lead-nurture workflow**
-  (NEW: `confirm-lost` now enrolls into `clients.ghl_kpi_config.lost_nurture_workflow_id`
-  — **dormant until that id is set**; best-effort; zero V1 impact since V1 has no
-  such config).
+- **Lost** = mark opp `lost`. **Nurture is handled NATIVELY by GHL** — the
+  academy's "Opportunity → Lost" workflow trigger auto-fires off the status
+  change, so the portal does NOT enroll anyone (would double-enroll). True for
+  BOTH Lost paths (Hawkeye `confirm-lost` AND the board-card Lost button), since
+  both just flip the opp status to `lost`.
 - **Abandon** = NEW action `POST /api/agent-approvals {action:'confirm-abandoned'}`
   — marks opp `abandoned`, records `pipeline_outcomes`, cancels queued
   replies+follow-ups, **no nurture, no message**. "Get them out of the pipeline."
@@ -46,7 +47,8 @@ queued. Built three coordinated pieces. **Hawkeye = the 👁 agent approval queu
   flow — `onAbandon` handler), and the mandatory follow-up card.
 
 ## Lost vs Abandon (Zoran's definition)
-- **Lost** → enters a lead-nurture automation (still being worked over time).
+- **Lost** → GHL's native "Opportunity → Lost" workflow auto-enrolls them in
+  lead-nurture (no portal action — marking lost is enough).
 - **Abandon** → just removed from the pipeline, no nurture.
 
 ## Files
@@ -61,11 +63,10 @@ queued. Built three coordinated pieces. **Hawkeye = the 👁 agent approval queu
   `_apxFollowupSkip`.
 
 ## Open / dependency
-- **Set the Lost-nurture workflow:** `clients.ghl_kpi_config.lost_nurture_workflow_id`
-  for BAM GTA (Zoran to provide the GHL workflow id). Until then Lost marks the opp
-  but doesn't nurture.
+- **None.** Lost-nurture is a GHL-side workflow (auto-fires on the Lost status
+  change) — no portal config, no workflow id to set.
 - No new tables/columns — reuses `agent_followups`, `agent_ready_replies`,
-  `pipeline_outcomes`, and a JSON config key. No migration.
+  `pipeline_outcomes`. No migration.
 
 ## Related
 - [[project_client_agent_training]] — the follow-up engine + Hawkeye queue.

@@ -648,21 +648,13 @@ async function handler(req, res) {
       } catch (e) { return res.status(e.status || 502).json({ error: `GHL mark lost: ${e.message}` }); }
       const reason = (b.lost_reason || (row && row.lost_reason) || "").toString().trim() || null;
       try { await sb(`pipeline_outcomes`, { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify([{ client_id: clientId, opportunity_id: oppId, status: "lost", reason }]) }); } catch (_) {}
-      // Lost → lead-nurture: enroll the contact into the academy's nurture workflow
-      // so they keep getting touched over time. Dormant until the academy sets
-      // ghl_kpi_config.lost_nurture_workflow_id — no-op (and zero V1 impact) until then.
-      const lostNurtureWf = (client && client.ghl_kpi_config && client.ghl_kpi_config.lost_nurture_workflow_id || "").toString().trim();
-      let nurtured = false;
-      if (lostNurtureWf) {
-        try {
-          await ghl("POST", `/contacts/${encodeURIComponent(contactId)}/workflow/${encodeURIComponent(lostNurtureWf)}`, { token, body: { eventStartTime: new Date().toISOString().replace(/\.\d{3}Z$/, "+00:00") } });
-          nurtured = true;
-        } catch (_) { /* nurture is best-effort — never block the Lost mark */ }
-      }
-      // Clear ALL of this lead's queued cards (replies + follow-ups) — they're Lost now.
+      // Lead-nurture is handled NATIVELY by GHL: the academy's "Opportunity →
+      // Lost" workflow trigger fires automatically off this status change, so the
+      // portal does NOT enroll anyone (that would double-enroll). Marking lost = done.
+      // Clear ALL of this lead's queued cards (replies + follow-ups) - they're Lost now.
       try { await sb(`agent_ready_replies?client_id=eq.${clientId}&ghl_contact_id=eq.${encodeURIComponent(contactId)}&status=in.(pending,approved)`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ status: "sent", approved_by: staffEmail, approved_at: new Date().toISOString(), sent_at: new Date().toISOString(), updated_at: new Date().toISOString() }) }); } catch (_) {}
       try { await sb(`agent_followups?client_id=eq.${clientId}&ghl_contact_id=eq.${encodeURIComponent(contactId)}&status=in.(pending,approved)`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ status: "canceled", send_error: "marked lost", updated_at: new Date().toISOString() }) }); } catch (_) {}
-      return res.status(200).json({ ok: true, marked_lost: true, opportunity_id: oppId, reason, nurtured });
+      return res.status(200).json({ ok: true, marked_lost: true, opportunity_id: oppId, reason });
     }
 
     // Abandon: like confirm-lost, but the lead is just REMOVED from the pipeline
