@@ -165,6 +165,29 @@ async function getStripeRevenue(customerId) {
   }
 }
 
+// ── Instant SMS to Zoran whenever feedback is submitted ─────────────────────
+// Sent from a designated GHL-connected academy (BAM GTA) so it always comes from
+// the same number. Best-effort: never blocks (or fails) the feedback submit.
+const FEEDBACK_NOTIFY_PHONE = process.env.FEEDBACK_NOTIFY_PHONE || "4165733718"; // Zoran
+const FEEDBACK_NOTIFY_CLIENT_ID = process.env.FEEDBACK_NOTIFY_CLIENT_ID || "39875f07-0a4b-4429-a201-2249bc1f24df"; // BAM GTA (sender)
+
+async function notifyFeedbackBySms(item, meta) {
+  try {
+    if (!FEEDBACK_NOTIFY_PHONE || !FEEDBACK_NOTIFY_CLIENT_ID) return;
+    const rows = await supabaseSelect(
+      `clients?id=eq.${FEEDBACK_NOTIFY_CLIENT_ID}&select=id,business_name,ghl_location_id,ghl_access_token,ghl_refresh_token,ghl_token_expires_at&limit=1`
+    );
+    const sender = Array.isArray(rows) && rows[0];
+    if (!sender) return;
+    const kind = item.kind === "feature" ? "💡 Feature request" : "🐞 Bug";
+    const who = (meta && meta.submitterEmail) || "anonymous";
+    const pageStr = meta && meta.page ? ` · ${meta.page}` : "";
+    const snippet = String(item.body || "").replace(/\s+/g, " ").slice(0, 240);
+    const msg = `${kind} via the ${(meta && meta.portalKind) || "client"} portal${pageStr}\n"${snippet}"\n- ${who}`;
+    await sendSms({ client: sender, toPhone: FEEDBACK_NOTIFY_PHONE, message: msg, contactName: "BAM Feedback" });
+  } catch (_) { /* notify is best-effort - never affects the submit */ }
+}
+
 // ── Feedback digest (Phase 1 of feedback → action) ──────────────────────────
 
 const FEEDBACK_KIND_LABEL = { bug: "BUG", feature: "FEATURE", idea: "IDEA", other: "FEEDBACK" };
@@ -1349,6 +1372,8 @@ async function handler(req, res) {
           if (fbPhone) insertRow.submitter_phone = fbPhone;
           const rows = await supabaseInsert("portal_feedback", insertRow);
           const row = Array.isArray(rows) ? rows[0] : rows;
+          // Text Zoran immediately (fire-and-forget — never blocks the submit).
+          notifyFeedbackBySms(row || insertRow, { page, portalKind, submitterEmail }).catch(() => {});
           return res.status(200).json({ ok: true, id: row?.id });
         } catch (insertErr) {
           return res.status(500).json({ error: `feedback insert failed: ${insertErr.message}` });

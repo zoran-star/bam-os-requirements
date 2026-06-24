@@ -117,3 +117,12 @@ later: install the App + secret (one-time admin task) and re-add the label in
 submitter_email, author_id, portal, status (pending…), resolved_at, resolved_by,
 created_at`. Open filter = `resolved_at is null`. Admin Feedback tab is the
 resolve UI (`/?nav=feedback`).
+
+## Instant SMS to Zoran on feedback submit (2026-06-24)
+Every portal feedback submission now texts Zoran (`FEEDBACK_NOTIFY_PHONE`, default
+4165733718) from BAM GTA's GHL number (`FEEDBACK_NOTIFY_CLIENT_ID`, default
+`39875f07-...`). Both env-overridable. Hooked at the TWO server entry points
+(disjoint — no double-text): `api/clients.js` `submit-feedback` (client portal +
+signup widget) and `api/slack/channels.js` `feedback-submit` (staff-app widget, which
+inserts client-side then pings this). Uses `sendSms` (ghl/_core.js) → upserts a contact
+by phone in BAM GTA + sends. Fire-and-forget; never blocks/fails the submit.
