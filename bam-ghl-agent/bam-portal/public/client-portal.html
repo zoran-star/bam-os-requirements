@@ -2416,6 +2416,7 @@
     background: var(--surface-el);
     border: none;
     word-break: break-word;
+    white-space: pre-wrap;
   }
 
   /* Outgoing = filled gold "you" bubble (iMessage-style), dark text. */
@@ -7039,7 +7040,7 @@ Then the call to action."]</div>
       #ib-drawer .ib-d-thread { flex:1; overflow-y:auto; padding:18px 20px; display:flex; flex-direction:column; gap:10px; }
       #ib-drawer .ib-msg, #pl-drawer .ib-msg {
         max-width:80%; padding:8px 12px; border-radius:14px; font-size:13px; line-height:1.45;
-        word-wrap:break-word;
+        word-wrap:break-word; white-space:pre-wrap;
       }
       #ib-drawer .ib-msg-in,  #pl-drawer .ib-msg-in  { background:rgba(255,255,255,0.04); border:1px solid var(--border); align-self:flex-start; border-bottom-left-radius:4px; }
       #ib-drawer .ib-msg-out, #pl-drawer .ib-msg-out { background:var(--accent); color:#0B0B0D; align-self:flex-end; border-bottom-right-radius:4px; }
@@ -10943,7 +10944,7 @@ function _v15ibRenderThread() {
       ? '⚠ not confirmed in GHL'
       : (m._optimistic ? 'sending…' : `${escapeHTML(_ghlChannelLabel(m.type))} · ${escapeHTML(_ibFormatDate(m.date))}`);
     const tailColor = m._unconfirmed ? 'color:#9a3b2f;opacity:1;font-weight:700' : 'opacity:.6';
-    return `<div style="max-width:78%;align-self:${out ? 'flex-end' : 'flex-start'};background:${out ? 'var(--gold)' : 'var(--surface)'};color:${out ? '#0B0B0D' : 'var(--text)'};border:1px solid ${m._unconfirmed ? '#e0654f' : (out ? 'var(--gold)' : 'var(--border)')};padding:8px 12px;border-radius:12px;font-size:13px;line-height:1.45;word-break:break-word">
+    return `<div style="max-width:78%;align-self:${out ? 'flex-end' : 'flex-start'};background:${out ? 'var(--gold)' : 'var(--surface)'};color:${out ? '#0B0B0D' : 'var(--text)'};border:1px solid ${m._unconfirmed ? '#e0654f' : (out ? 'var(--gold)' : 'var(--border)')};padding:8px 12px;border-radius:12px;font-size:13px;line-height:1.45;white-space:pre-wrap;word-break:break-word">
       ${escapeHTML(m.body || '(no body)')}
       <div style="font-size:10px;margin-top:3px;${tailColor}">${tail}</div>
     </div>`;
@@ -21401,11 +21402,33 @@ async function _plLoadLastMessages() {
     if (!r.ok) return;
     const map = new Map();
     for (const c of (j.conversations || [])) {
-      if (c.contactId) map.set(String(c.contactId), { direction: (c.lastMessageDirection || '').toLowerCase(), date: c.lastMessageDate || null });
+      if (c.contactId) map.set(String(c.contactId), { direction: (c.lastMessageDirection || '').toLowerCase(), date: c.lastMessageDate || null, unread: (c.unreadCount || 0) > 0, conversationId: c.id });
     }
     _PL_LASTMSG = map;
     try { if (typeof _renderPipelineBoard === 'function') _renderPipelineBoard(); } catch (_) {}
   } catch (_) {}
+}
+// True when the lead's last message is inbound AND still unread (drives the
+// Done-Trial glow + shows the drawer's "Mark read" button).
+function _plCardUnread(o) {
+  const lm = (_PL_LASTMSG && o && o.contactId) ? _PL_LASTMSG.get(String(o.contactId)) : null;
+  return !!(lm && lm.direction === 'inbound' && lm.unread);
+}
+// "Mark read" in the card drawer: record the read receipt (per-user) so the card's
+// new-message glow clears - here and on reload - without having to reply.
+async function _plMarkRead(contactId) {
+  const lm = (_PL_LASTMSG && contactId) ? _PL_LASTMSG.get(String(contactId)) : null;
+  if (!lm || !lm.conversationId) return;
+  try {
+    const token = await _mreqAuthToken();
+    await fetch('/api/ghl/inbox?action=mark-read&client_id=' + encodeURIComponent(CLIENT_ID), {
+      method: 'POST', headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ conversation_id: lm.conversationId }),
+    });
+  } catch (_) { /* best-effort; still clear locally */ }
+  lm.unread = false;                                   // optimistic: glow off now
+  try { _renderPipelineBoard(); } catch (_) {}
+  document.getElementById('pl-d-markread')?.remove();  // hide the button in the open drawer
 }
 
 // Force a fresh agent scan of the Responded stage NOW (both engines: reply +
@@ -22379,7 +22402,9 @@ function _renderPipelineBoard() {
     // Done Trial: surface the last message + GLOW only when the LEAD messaged last
     // (their ball — needs a reply). Last-message info comes from _PL_LASTMSG.
     const _lastMsg = (_PL_LASTMSG && o.contactId) ? _PL_LASTMSG.get(String(o.contactId)) : null;
-    const _clientLast = !!(isDone && _lastMsg && _lastMsg.direction === 'inbound');
+    // Glow only while the lead's last message is still UNREAD - "Mark read" in the
+    // drawer (or replying) clears it.
+    const _clientLast = !!(isDone && _lastMsg && _lastMsg.direction === 'inbound' && _lastMsg.unread);
     const _goldGlow = 'box-shadow:0 0 0 1px var(--gold,#E8C547),0 0 18px rgba(232,197,71,0.5);border-color:var(--gold,#E8C547);';
     // Trial-today gold glow (non-done stages); Done Trial glows only on lead-last.
     let glow = isDone ? (_clientLast ? _goldGlow : '') : (todayTrial ? _goldGlow : '');
@@ -22422,7 +22447,8 @@ function _renderPipelineBoard() {
         <div class="pl-card-name" style="padding-right:8px"><span class="pl-card-tag">Parent</span> ${escapeHTML(parent)}</div>
         <div class="pl-card-contact"><span class="pl-card-tag">Athlete</span> ${o.athlete ? escapeHTML(o.athlete) : '<span style="opacity:0.5">-</span>'}</div>
         ${o.trainer ? `<div class="pl-card-coach"><span class="pl-card-tag">Coach</span> ${escapeHTML(o.trainer)}</div>` : ''}
-        ${trialStr
+        ${_isResp ? '' /* Responded: no trial line on the card - it lives in the drawer's journey/details. */
+          : trialStr
           ? `<div class="pl-card-trial ${trialPassed ? 'is-past' : ''}">Trial: ${escapeHTML(trialStr)}</div>`
           : isDone
             ? `<div class="pl-card-trial" style="color:var(--text-mute)">Trial: <span style="opacity:0.6">-</span></div>`
@@ -22664,7 +22690,10 @@ function _plOpenCard(oppId) {
       ${(_plV2 && o.trainer) ? `<div class="pl-d-row"><div class="lbl2">Coach</div><div>${escapeHTML(o.trainer)}</div></div>` : ''}
     </div>
     <div class="pl-d-section" id="pl-d-msg">
-      <div class="lbl">Messages</div>
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
+        <div class="lbl">Messages</div>
+        ${_plCardUnread(o) ? `<button id="pl-d-markread" onclick="_plMarkRead('${escapeHTML(o.contactId)}')" title="Clear the new-message highlight" style="background:transparent;border:1px solid var(--gold,#E8C547);color:var(--gold,#E8C547);border-radius:6px;padding:4px 11px;font:inherit;font-size:11.5px;font-weight:700;cursor:pointer">✓ Mark read</button>` : ''}
+      </div>
       ${o.contactId ? `
         <div id="pl-d-thread" style="max-height:440px;overflow-y:auto;display:flex;flex-direction:column;gap:8px;padding:4px 0">
           <div id="pl-d-thread-msgs" style="display:flex;flex-direction:column;gap:8px">
@@ -23074,7 +23103,7 @@ async function _apxOpenThread(contactId, name) {
     body.innerHTML = msgs.length ? msgs.map(m => {
       const out = (m.direction || '').toLowerCase() === 'outbound';
       const when = (typeof _ibFormatDate === 'function') ? _ibFormatDate(m.date) : '';
-      return `<div style="max-width:82%;align-self:${out ? 'flex-end' : 'flex-start'};background:${out ? 'var(--accent)' : 'var(--surface)'};color:${out ? '#0B0B0D' : 'var(--text)'};border:1px solid ${out ? 'var(--accent)' : 'var(--border)'};padding:8px 11px;border-radius:12px;font-size:13.5px;line-height:1.45;word-break:break-word">${escapeHTML(m.body)}<div style="font-size:10px;opacity:.6;margin-top:3px">${escapeHTML(when)}</div></div>`;
+      return `<div style="max-width:82%;align-self:${out ? 'flex-end' : 'flex-start'};background:${out ? 'var(--accent)' : 'var(--surface)'};color:${out ? '#0B0B0D' : 'var(--text)'};border:1px solid ${out ? 'var(--accent)' : 'var(--border)'};padding:8px 11px;border-radius:12px;font-size:13.5px;line-height:1.45;white-space:pre-wrap;word-break:break-word">${escapeHTML(m.body)}<div style="font-size:10px;opacity:.6;margin-top:3px">${escapeHTML(when)}</div></div>`;
     }).join('') : `<div style="color:var(--text-mute);font-size:13px;text-align:center;padding:24px">No messages yet.</div>`;
     _scrollToBottom(body);
   } catch (e) {
@@ -23240,7 +23269,7 @@ function _apxContext(r) {
     const out = m.role === 'agent';
     const when = _apxMsgWhen(m.at || m.date);
     return `<div style="display:flex;flex-direction:column;align-items:${out ? 'flex-end' : 'flex-start'};gap:2px;max-width:84%;align-self:${out ? 'flex-end' : 'flex-start'}">
-      <div style="background:${out ? 'rgba(232,197,71,.13)' : 'rgba(255,255,255,.05)'};border:1px solid ${out ? 'var(--accent-border,rgba(232,197,71,.3))' : 'var(--border)'};color:var(--text);padding:6px 10px;border-radius:12px;font-size:12.5px;line-height:1.4;word-break:break-word">${escapeHTML(_apxTrim(m.text, 240))}</div>
+      <div style="background:${out ? 'rgba(232,197,71,.13)' : 'rgba(255,255,255,.05)'};border:1px solid ${out ? 'var(--accent-border,rgba(232,197,71,.3))' : 'var(--border)'};color:var(--text);padding:6px 10px;border-radius:12px;font-size:12.5px;line-height:1.4;white-space:pre-wrap;word-break:break-word">${escapeHTML(_apxTrim(m.text, 240))}</div>
       ${when ? `<div style="font-size:10px;color:var(--text-mute);padding:0 4px">${escapeHTML(when)}</div>` : ''}
     </div>`;
   }).join('');
