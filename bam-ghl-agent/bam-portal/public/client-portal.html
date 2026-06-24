@@ -21196,24 +21196,31 @@ async function _plLoadNeedsAction() {
 // ghost) instead of waiting for the every-15/30-min cron, then refresh the
 // badges. Shared by the board "🔄 Scan" button and the Responded-health view.
 let _PL_SCANNING = false;
-async function _plScanNow(btnId) {
+let _PL_LAST_SCAN = 0;
+async function _plScanNow(btnId, auto) {
   if (_PL_SCANNING) return;
+  // Auto-scan (on board open) is debounced — skip if we scanned in the last 5 min.
+  if (auto && _PL_LAST_SCAN && (Date.now() - _PL_LAST_SCAN) < 5 * 60000) return;
   _PL_SCANNING = true;
   const btn = btnId && document.getElementById(btnId);
   const prev = btn ? btn.innerHTML : null;
   if (btn) { btn.disabled = true; btn.innerHTML = '⏳…'; }
+  // Grey out the Responded cards + disable their buttons while the scan runs.
+  try { if (typeof _renderPipelineBoard === 'function') _renderPipelineBoard(); } catch (_) {}
   try {
     await Promise.all([
       _apxPost('/api/agent-approvals', 'detect-now', {}).catch(() => null),
       _apxPost('/api/agent-followups', 'detect-now', {}).catch(() => null),
     ]);
-    await _plLoadNeedsAction();   // repaint badges from the fresh cards
-    if (typeof _plToast === 'function') _plToast('🔄 Scan complete');
+    _PL_LAST_SCAN = Date.now();
+    await _plLoadNeedsAction();   // repaint badges from the fresh cards (re-renders the board)
+    if (!auto && typeof _plToast === 'function') _plToast('🔄 Scan complete');
   } catch (e) {
-    if (typeof _plToast === 'function') _plToast('Scan failed: ' + (e.message || e));
+    if (!auto && typeof _plToast === 'function') _plToast('Scan failed: ' + (e.message || e));
   } finally {
     _PL_SCANNING = false;
     if (btn) { btn.disabled = false; btn.innerHTML = prev; }
+    try { if (typeof _renderPipelineBoard === 'function') _renderPipelineBoard(); } catch (_) {}   // ungrey
   }
   return true;
 }
@@ -21248,7 +21255,7 @@ async function _plLoadAgentMode() {
     if (!r.ok) { _PL_AGENT_MODE = 'off'; return; }
     _PL_AGENT_MODE = j.mode || 'off';
   } catch (_) { _PL_AGENT_MODE = 'off'; }
-  if (_PL_AGENT_MODE && _PL_AGENT_MODE !== 'off') _plLoadNeedsAction();   // load the needs-action badges once the agent is known to be on
+  if (_PL_AGENT_MODE && _PL_AGENT_MODE !== 'off') { _plLoadNeedsAction(); try { _plScanNow(null, true); } catch (_) {} }   // load badges + auto-scan once the agent is known to be on
   try { if (typeof _renderPipelineBoard === 'function') _renderPipelineBoard(); } catch (_) {}
 }
 
@@ -21276,6 +21283,10 @@ async function fetchAndRenderPipelines() {
     }
     _renderPipelineTabs();
     _renderPipelineBoard();
+    // Auto-scan on load so recommendations are fresh without waiting for the cron
+    // (debounced to 5 min; greys the Responded cards while it runs). If the agent
+    // mode isn't known yet, _plLoadAgentMode kicks the scan once it resolves.
+    if (_PL_AGENT_MODE && _PL_AGENT_MODE !== 'off') { try { _plScanNow(null, true); } catch (_) {} }
   } catch (e) {
     if (!hadData) container.innerHTML = `<div class="req-empty" style="padding:20px 0">Couldn't load pipelines - ${escapeHTML(e.message)}</div>`;
   }
@@ -21784,6 +21795,41 @@ function _plRemoveOppLocal(oppId) {
   try { _renderPipelineTabs(); _renderPipelineBoard(); } catch (_) {}
 }
 
+// Full-drawer confirmation flash: covers the open card drawer with a big icon +
+// label for ~1.8s, then closes the drawer. If the drawer isn't open it just
+// closes (so callers can always use it). Shared by Lost / Abandon / Ghosted.
+function _plDrawerConfirm(icon, label, sub) {
+  const drawer = document.getElementById('pl-drawer');
+  if (!drawer || !drawer.classList.contains('open')) { closePipelineDrawer(); return; }
+  if (!document.getElementById('pl-dc-style')) {
+    const st = document.createElement('style'); st.id = 'pl-dc-style';
+    st.textContent = '@keyframes plDcIn{from{opacity:0}to{opacity:1}}@keyframes plDcPop{0%{transform:scale(.5);opacity:0}60%{transform:scale(1.12)}100%{transform:scale(1);opacity:1}}';
+    document.head.appendChild(st);
+  }
+  document.getElementById('pl-drawer-confirm')?.remove();
+  const ov = document.createElement('div');
+  ov.id = 'pl-drawer-confirm';
+  ov.style.cssText = 'position:absolute;inset:0;z-index:80;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;text-align:center;padding:24px;animation:plDcIn .22s ease both';
+  ov.innerHTML = `<div style="font-size:60px;animation:plDcPop .42s ease both">${icon}</div>
+    <div style="font-size:20px;font-weight:800;color:var(--text)">${escapeHTML(label)}</div>
+    ${sub ? `<div style="font-size:13.5px;color:var(--text-mute);max-width:280px">${escapeHTML(sub)}</div>` : ''}`;
+  drawer.appendChild(ov);
+  setTimeout(() => { try { ov.remove(); } catch (_) {} closePipelineDrawer(); }, 1800);
+}
+
+// Move a lead's board card to its pipeline's Interested stage locally (optimistic),
+// keyed by GHL contact id. Used when sending to Ghosted (the automation also moves
+// them, but we reflect it on the board immediately).
+function _plMoveContactToInterested(contactId) {
+  if (!_PL_DATA || !contactId) return false;
+  for (const pl of (_PL_DATA.pipelines || [])) {
+    const opp = (pl.opportunities || []).find(o => String(o.contactId || '') === String(contactId));
+    const interested = (pl.stages || []).find(s => /interest/i.test(s.name || ''));
+    if (opp && interested) { opp.stageId = interested.id; opp.lastStageChangeAt = new Date().toISOString(); try { _renderPipelineBoard(); } catch (_) {} return true; }
+  }
+  return false;
+}
+
 function _plOutcome(oppId, status) {
   const label = _PL_STATUS_LABEL[status] || status;
   document.body.insertAdjacentHTML('beforeend', `<div id="pl-outcome-overlay" style="position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9100;display:flex;align-items:center;justify-content:center;padding:18px" onclick="if(event.target===this)this.remove()">
@@ -21805,8 +21851,8 @@ async function _plOutcomeConfirm(oppId, status) {
   try {
     await _plSetStatus(oppId, status, reason);
     document.getElementById('pl-outcome-overlay')?.remove();
-    closePipelineDrawer();
-    _plRemoveOppLocal(oppId); // remove from the pipeline board (Lost automation runs in GHL)
+    _plRemoveOppLocal(oppId); // remove from the pipeline board right away (Lost automation runs in GHL)
+    _plDrawerConfirm(status === 'lost' ? '🚫' : '🗑', `Marked ${_PL_STATUS_LABEL[status] || status}`, 'Removed from the pipeline'); // flashes, then closes the drawer
     _plShowUndo({ type: 'status', oppId }, `Marked ${_PL_STATUS_LABEL[status] || status} - removed from pipeline`);
   } catch (e) {
     alert('Couldn’t mark ' + status + ': ' + e.message);
@@ -21925,8 +21971,7 @@ async function _plGhostGo(oppId) {
     if (!r.ok) throw new Error(json.error || ('HTTP ' + r.status));
     const moved = await _plMoveToInterested(oppId, token);
     if (moved && typeof _renderPipelineBoard === 'function') _renderPipelineBoard();
-    closePipelineDrawer();
-    _plToast(moved ? '👻 Ghosted - texting them + moved to Interested' : '👻 Sent to Ghosted automation');
+    _plDrawerConfirm('👻', 'Sent to Ghosted', moved ? 'Moved to Interested - the automation takes over' : 'The automation takes over');
   } catch (e) {
     alert('Could not send to Ghosted automation: ' + (e.message || e));
   }
@@ -22017,22 +22062,30 @@ function _renderPipelineBoard() {
     // labelled by what the action is (reply / ghost / confirm lost / book). 🟢 All
     // good = nothing waiting (we're waiting on the lead). Tap → Hawkeye focused.
     const _isResp = stage && /respond/i.test(stage.name || '');
+    // While an agent scan is running, grey the Responded cards + disable them
+    // (no buttons) so staff don't act on stale recommendations mid-scan.
+    const _scanning = _PL_SCANNING && _isResp;
     const _need = _PL_NEEDS && _PL_NEEDS.get(String(o.contactId || ''));
     const _needLabel = { reply: '💬 Reply', ghost: '👻 Send to Ghosted', mark_lost: '🚫 Confirm lost', book: '📅 Confirm booking' }[_need] || (_need ? '🔴 Needs action' : '');
     // Safety net (#3): a Responded lead with NO agent card that's been sitting a
     // while (stale = >7d in stage) shouldn't silently read "All good" - the
     // detector may have missed it. Flag amber 🟡 Check so nothing hides.
-    const fuBadge = (_isResp && _agentOn && _PL_NEEDS)
-      ? (_need
-          ? `<button class="pl-card-fu pl-card-fu-action" title="Tap to handle in Hawkeye" onclick="event.stopPropagation(); _apxOpen('${escapeHTML(o.contactId || '')}')">${_needLabel}</button>`
-          : (stale
-              ? `<button class="pl-card-fu pl-card-fu-check" title="No agent action queued and sitting a while - tap to review, or hit Scan" onclick="event.stopPropagation(); _apxOpen('${escapeHTML(o.contactId || '')}')">🟡 Check</button>`
-              : `<button class="pl-card-fu pl-card-fu-good" title="No action needed - waiting on the lead" onclick="event.stopPropagation(); _apxOpen('${escapeHTML(o.contactId || '')}')">🟢 All good</button>`))
-      : '';
+    // Only badge a card when there's something to DO: a queued agent action, or a
+    // stale lead worth a look. No action = no button (no prompt), and those cards
+    // sort to the bottom of the column (see the sort in _renderPipelineBoard).
+    const fuBadge = _scanning
+      ? `<div class="pl-card-fu" style="border-color:var(--border);color:var(--text-mute);cursor:default"><span class="req-spin"></span> scanning…</div>`
+      : ((_isResp && _agentOn && _PL_NEEDS)
+        ? (_need
+            ? `<button class="pl-card-fu pl-card-fu-action" title="Tap to handle in Hawkeye" onclick="event.stopPropagation(); _apxOpen('${escapeHTML(o.contactId || '')}')">${_needLabel}</button>`
+            : (stale
+                ? `<button class="pl-card-fu pl-card-fu-check" title="No agent action queued and sitting a while - tap to review, or hit Scan" onclick="event.stopPropagation(); _apxOpen('${escapeHTML(o.contactId || '')}')">🟡 Check</button>`
+                : ''))
+        : '');
     return `
       <div class="pl-card ${stale ? 'pl-card-stale' : ''} ${missingTrial ? 'pl-card-notrial' : ''} ${todayTrial ? 'pl-card-today' : ''}"
-           style="position:relative;${glow}"
-           draggable="true"
+           style="position:relative;${glow}${_scanning ? 'opacity:.45;pointer-events:none;' : ''}"
+           draggable="${_scanning ? 'false' : 'true'}"
            ondragstart="_plDragStart(event,'${escapeHTML(o.id)}','${escapeHTML(o.stageId || '')}','${escapeHTML(p.id)}')"
            ondragend="_plDragEnd(event)"
            onclick="_plOpenCard('${escapeHTML(o.id)}')">
@@ -22064,9 +22117,18 @@ function _renderPipelineBoard() {
   // stage the agent works.
   const _agentOn = !!_PL_AGENT_MODE && _PL_AGENT_MODE !== 'off';
   const colHtml = visibleStages.map(s => {
-    const opps = (byStage.get(s.id) || []).slice()
-      .sort((a, b) => (_plIsTrialToday(b.trialDate) ? 1 : 0) - (_plIsTrialToday(a.trialDate) ? 1 : 0)); // today's trials first
     const isResponded = /respond/i.test(s.name || '');
+    // In Responded, push cards with no agent action to the BOTTOM: queued action
+    // (🔴) first, stale (🟡 check) next, nothing-to-do (no badge) last.
+    const _respRank = (o) => {
+      if (!(_agentOn && _PL_NEEDS)) return 0;
+      if (_PL_NEEDS.get(String(o.contactId || ''))) return 0;
+      const ageMs = (o.lastStageChangeAt || o.updatedAt) ? Date.now() - new Date(o.lastStageChangeAt || o.updatedAt).getTime() : 0;
+      return ageMs > 7 * 86400 * 1000 ? 1 : 2;
+    };
+    const _trialFirst = (a, b) => (_plIsTrialToday(b.trialDate) ? 1 : 0) - (_plIsTrialToday(a.trialDate) ? 1 : 0);
+    const opps = (byStage.get(s.id) || []).slice()
+      .sort((a, b) => isResponded ? ((_respRank(a) - _respRank(b)) || _trialFirst(a, b)) : _trialFirst(a, b));
     const glowCol = (isResponded && _agentOn) ? 'box-shadow:0 0 0 1px var(--blue,#5A8FB8),0 0 18px rgba(90,143,184,0.45);border-color:var(--blue,#5A8FB8);' : '';
     const hawkBtn = (isResponded && _agentOn)
       ? `<div style="display:flex;gap:6px;margin-bottom:8px">
@@ -22797,23 +22859,17 @@ function _apxCard(kind, r) {
   const last = _apxContext(r);   // summary + lead's last + our last
   const overBadge = overdue ? `<span style="font-size:10px;font-weight:700;color:#e0654f;background:rgba(224,90,66,0.12);border-radius:999px;padding:1px 7px">overdue</span>` : '';
 
-  // Reply cards: the proposed reply is an EDITABLE textarea — type straight in.
-  // A "teach the agent why" field slides in the moment you edit it. Follow-ups
-  // keep the read-only box + their existing buttons.
-  const replyBox = isFu
-    ? `<div style="font-size:13.5px;line-height:1.5;background:var(--accent-glow,rgba(232,197,71,.10));border:1px solid var(--accent-border,rgba(232,197,71,.3));border-radius:10px;padding:9px 11px;white-space:pre-wrap" id="apx-msg-${r.id}">${escapeHTML(r.draft_message || '')}</div>`
-    : `<textarea id="apx-edit-${r.id}" oninput="_apxOnReplyEdit('${r.id}')" style="width:100%;box-sizing:border-box;font-family:inherit;font-size:13.5px;line-height:1.5;background:var(--accent-glow,rgba(232,197,71,.10));border:1px solid var(--accent-border,rgba(232,197,71,.3));border-radius:10px;padding:9px 11px;color:var(--text);resize:vertical;min-height:74px;outline:none">${escapeHTML(r.draft_message || '')}</textarea>
+  // The proposed message is an EDITABLE textarea — type straight in. A "teach the
+  // agent why" field slides in the moment you edit it. Same for replies + follow-ups.
+  const replyBox = `<textarea id="apx-edit-${r.id}" oninput="_apxOnReplyEdit('${r.id}')" style="width:100%;box-sizing:border-box;font-family:inherit;font-size:13.5px;line-height:1.5;background:var(--accent-glow,rgba(232,197,71,.10));border:1px solid var(--accent-border,rgba(232,197,71,.3));border-radius:10px;padding:9px 11px;color:var(--text);resize:vertical;min-height:74px;outline:none">${escapeHTML(r.draft_message || '')}</textarea>
       <div id="apx-teach-wrap-${r.id}" style="display:none;margin-top:8px">
         <div style="font-size:10px;color:var(--text-mute);text-transform:uppercase;letter-spacing:.07em;margin-bottom:4px">📝 teach the agent why (optional)</div>
         <input id="apx-teach-${r.id}" type="text" placeholder="e.g. tightened the ask / dropped price talk" style="width:100%;box-sizing:border-box;background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);padding:8px 10px;font:inherit;font-size:12.5px;outline:none">
       </div>`;
 
-  const actions = isFu
-    ? `<button onclick="_apxFollowupSkip('${r.id}')" title="Skip (and optionally teach why)" style="flex:1;background:transparent;border:1px solid var(--border);color:#e0654f;border-radius:9px;padding:9px;font-size:17px;cursor:pointer">✕</button>
-       <button onclick="_apxFollowupEdit('${r.id}')" title="Edit the message" style="flex:1;background:transparent;border:1px solid var(--border);color:#9a7bd6;border-radius:9px;padding:9px;font-size:15px;cursor:pointer">🔄</button>
-       <button onclick="_apxFollowupSend('${r.id}')" title="${overdue ? 'Approve & send now' : 'Approve & send'}" style="flex:1;background:var(--accent);border:1px solid var(--accent);color:#08080A;border-radius:9px;padding:9px;font-size:17px;font-weight:700;cursor:pointer">✓</button>`
-    : `<button onclick="_apxReadySkip('${r.id}')" title="Skip (and optionally teach why)" style="flex:1;background:transparent;border:1px solid var(--border);color:#e0654f;border-radius:9px;padding:9px;font-size:17px;cursor:pointer">✕</button>
-       <button onclick="_apxInlineApprove('${r.id}')" title="Approve & send" style="flex:2;background:var(--accent);border:1px solid var(--accent);color:#08080A;border-radius:9px;padding:9px;font-size:14px;font-weight:700;cursor:pointer">✓ Approve &amp; send</button>`;
+  const skipFn = isFu ? `_apxFollowupSkip('${r.id}')` : `_apxReadySkip('${r.id}')`;
+  const actions = `<button onclick="${skipFn}" title="Skip (and optionally teach why)" style="flex:1;background:transparent;border:1px solid var(--border);color:#e0654f;border-radius:9px;padding:9px;font-size:17px;cursor:pointer">✕</button>
+       <button onclick="_apxInlineApprove('${r.id}')" title="${overdue ? 'Approve & send now' : 'Approve & send'}" style="flex:2;background:var(--accent);border:1px solid var(--accent);color:#08080A;border-radius:9px;padding:9px;font-size:14px;font-weight:700;cursor:pointer">✓ Approve &amp; send</button>`;
 
   return `<div id="apx-${r.id}" style="background:var(--surface);border:1px solid var(--accent-border,rgba(232,197,71,.3));border-radius:11px;padding:12px 14px;margin-bottom:9px">
     <div style="display:flex;align-items:center;gap:8px;margin-bottom:5px;flex-wrap:wrap">
@@ -22821,7 +22877,7 @@ function _apxCard(kind, r) {
       ${overBadge}
       <div style="flex:1"></div>${meta}
     </div>${goal}${esc}${last}
-    <div style="text-align:center;font-size:9.5px;color:var(--text-mute);text-transform:uppercase;letter-spacing:.09em;margin:2px 0 5px">proposed reply${isFu ? '' : ' · edit it right here'}</div>
+    <div style="text-align:center;font-size:9.5px;color:var(--text-mute);text-transform:uppercase;letter-spacing:.09em;margin:2px 0 5px">proposed message · edit it right here</div>
     ${replyBox}
     <div style="display:flex;align-items:stretch;gap:8px;margin-top:10px">${actions}</div>
   </div>`;
@@ -22831,19 +22887,30 @@ function _apxOnReplyEdit(id) {
   const w = document.getElementById('apx-teach-wrap-' + id);
   if (w && w.style.display === 'none') w.style.display = '';
 }
-// Approve & send a reply card using the (possibly edited) inline text + optional
-// teach note — no modal. Routes overdue follow-ups through their own send path.
+// Approve & send a reply OR follow-up card using the (possibly edited) inline text
+// + optional teach note — no modal.
 async function _apxInlineApprove(id) {
-  const r = _APX_DATA.ready.find(x => x.id === id); if (!r) return;
-  if (r._isFollowup) return _apxFollowupSend(id);
+  let r = _APX_DATA.ready.find(x => x.id === id); let isFu = false;
+  if (!r) { r = (_APX_DATA.followups || []).find(x => x.id === id); isFu = true; }
+  if (!r) return;
+  if (!isFu && r._isFollowup) isFu = true;   // overdue follow-up living in the ready list
   const ta = document.getElementById('apx-edit-' + id);
   const reply = (ta ? ta.value : (r.draft_message || '')).trim();
-  if (!reply) { _apxToast('Reply is empty', false); return; }
+  if (!reply) { _apxToast('Message is empty', false); return; }
   const adjusted = reply !== (r.draft_message || '');
   const lessonEl = document.getElementById('apx-teach-' + id);
   const lesson = ((lessonEl && lessonEl.value) || '').trim();
-  if (r.escalate && !confirm('The agent escalated this one (it wanted a human). Send anyway?')) return;
   try {
+    if (isFu) {
+      // Follow-up nudge: save any edit, then send via the follow-up path.
+      if (adjusted) await _apxPost('/api/agent-followups', 'edit', { id, message: reply });
+      const resp = await _apxPost('/api/agent-followups', 'send-now', { id });
+      if (lesson) await _apxTeach(lesson, r.draft_message, reply, { source: 'hawkeye-inline-fu', contact: r.contact_name || null });
+      _apxRemove(id);
+      _apxToast(resp && resp.deferred ? _apxQuietMsg(resp.send_after) : (lesson ? '✓ Sent + taught' : '✓ Sent'), true);
+      return;
+    }
+    if (r.escalate && !confirm('The agent escalated this one (it wanted a human). Send anyway?')) return;
     const resp = await _apxPost('/api/agent-approvals', 'send', {
       contact_id: r.ghl_contact_id, reply, conversation_id: r.ghl_conversation_id || null,
       contact_name: r.contact_name || null, reasoning: r.reasoning || null, confidence: r.confidence,
@@ -23007,8 +23074,16 @@ async function _apxGhostConfirm(id) {
       try {
         await _apxPost('/api/agent-approvals', 'confirm-ghost', { ready_id: r.id });
         if (_PL_NEEDS && r.ghl_contact_id) _PL_NEEDS.delete(String(r.ghl_contact_id));
-        _apxRemove(id); _apxToast('👻 Sent to Ghosted', true);
-        try { if (typeof _renderPipelineBoard === 'function') _renderPipelineBoard(); } catch (_) {}
+        _apxRemove(id);
+        // Move the board card to Interested right away (the automation does it too).
+        _plMoveContactToInterested(r.ghl_contact_id);
+        // If acted on from inside the card drawer, flash the full-drawer confirmation;
+        // otherwise (Hawkeye overlay) just toast.
+        if (document.getElementById('pl-drawer')?.classList.contains('open')) {
+          _plDrawerConfirm('👻', 'Sent to Ghosted', 'Moved to Interested - the automation takes over');
+        } else {
+          _apxToast('👻 Sent to Ghosted', true);
+        }
       } catch (e) { _apxToast(_apxErr(e), false); }
     },
   });
