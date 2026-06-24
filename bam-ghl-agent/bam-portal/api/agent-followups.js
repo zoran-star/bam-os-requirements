@@ -1,9 +1,12 @@
 import { withSentryApiRoute } from "./_sentry.js";
-// Vercel Serverless Function — Scheduled Follow-Ups (the nudge engine)
+// Vercel Serverless Function — Quiet-Lead → Ghosted (the "went cold" detector)
 //
 //   GET  /api/agent-followups?action=detect   (Bearer CRON_SECRET)
-//        → scan each enabled academy for quiet leads, pre-draft the next nudge
-//          from the brain, and queue it (status='pending') with a send time.
+//        → scan each enabled academy for Responded leads who've gone quiet (no
+//          reply in ~a day) and queue a "Send to Ghosted" card in Hawkeye
+//          (agent_ready_replies, kind='ghost', status='pending'). We no longer
+//          draft one-off nudge SMS — the academy's Ghosted automation handles the
+//          multi-touch follow-up once a human approves the card.
 //   GET  /api/agent-followups?action=work     (Bearer CRON_SECRET)
 //        → send every APPROVED follow-up whose time has come (skips any whose
 //          lead replied since it was drafted). Approve-each: pending never sends.
@@ -25,9 +28,6 @@ import { withSentryApiRoute } from "./_sentry.js";
 // Engine is per-academy gated by clients.ghl_kpi_config.followup_engine_enabled.
 
 import { pickGhlToken, ghl } from "./ghl/_core.js";
-import { assemblePrompt } from "./agent/prompt-structure.js";
-import { loadContactMemory } from "./agent/contact-memory.js";
-import { buildAgentSystem } from "./agent/brain.js";
 import { toIso, respondedContactIds, respondedContactIdSetCached, peekRespondedIdSet } from "./agent/_stage.js";
 import { withinQuietHours, nextSendableTime } from "./agent/_quiet.js";
 import { agentMode, modeIsOn, modeSelfDrives, SELF_DRIVE_MIN_CONFIDENCE } from "./agent/_mode.js";
@@ -35,16 +35,14 @@ import { resolveAgentActor } from "./agent/_auth.js";
 
 const SUPABASE_URL         = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
-const ANTHROPIC_KEY        = process.env.ANTHROPIC_API_KEY;
-const ANTHROPIC_MODEL      = "claude-sonnet-4-6";
 const DEFAULT_CLIENT_ID    = "39875f07-0a4b-4429-a201-2249bc1f24df"; // BAM GTA
 
-// Candidate window: a lead is "quiet" if OUR last message is older than this…
-const MIN_QUIET_HOURS = 12;
+// Candidate window: a lead is "quiet" if OUR last message is older than this (≈a
+// day with no reply)… we then queue a "Send to Ghosted" card for a human.
+const MIN_QUIET_HOURS = 24;
 // …and we stop chasing leads quiet longer than this.
 const MAX_AGE_DAYS    = 14;
-const DRAFT_CAP       = 12;   // max new drafts per academy per detector run
-const RECENT_SENT_HRS = 20;   // don't re-draft a contact we nudged this recently
+const DRAFT_CAP       = 12;   // max new ghost cards per academy per detector run
 
 async function sb(path, init = {}) {
   const res = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
@@ -73,68 +71,7 @@ async function loadClient(clientId) {
   return Array.isArray(rows) && rows[0];
 }
 
-// ── brain (same source as the sandbox + approval queue) ──
-async function loadConfig(clientId) {
-  const [lessons, ovRows, exRows] = await Promise.all([
-    sb(`agent_lessons?client_id=eq.${clientId}&active=eq.true&select=lesson,kind&order=created_at.asc`).catch(() => []),
-    sb(`agent_prompt_sections?client_id=eq.${clientId}&select=section_key,body`).catch(() => []),
-    sb(`agent_examples?client_id=eq.${clientId}&select=parent_text,agent_text&order=created_at.asc`).catch(() => []),
-  ]);
-  const overrides = {};
-  for (const r of (Array.isArray(ovRows) ? ovRows : [])) overrides[r.section_key] = r.body;
-  return { lessons: Array.isArray(lessons) ? lessons : [], overrides, examples: Array.isArray(exRows) ? exRows : [] };
-}
-
-function buildFollowupSystem({ lessons, overrides, examples }, quietHours) {
-  const trailer = `<followup_scheduling>\n` +
-    `A lead went quiet — they have not replied to your last message for about ${quietHours} hour(s). Decide the next SCHEDULED follow-up using YOUR follow-up rules (triggers, timing, and especially "when NOT to").\n` +
-    `- If your "when NOT to" rules apply (they firmly said no / already booked / complaint / handed to a human / off-topic), set should_followup=false and stop=true.\n` +
-    `- Otherwise set should_followup=true and decide: how many HOURS from now to send it (interpret your timing rules relative to how long they've already been quiet), the EXACT short message to send, and a one-line goal for this nudge.\n` +
-    `A human approves your draft before it sends. Respond ONLY by calling schedule_followup.\n</followup_scheduling>`;
-  return buildAgentSystem({ lessons, overrides, examples, trailer });
-}
-
-const SCHEDULE_TOOL = {
-  name: "schedule_followup",
-  description: "Decide the next scheduled follow-up for a quiet lead (a human approves before it sends).",
-  input_schema: {
-    type: "object",
-    properties: {
-      should_followup: { type: "boolean", description: "True to schedule a follow-up. False if your 'when NOT to' rules say to stop." },
-      stop:            { type: "boolean", description: "True if we should STOP following up this lead entirely (firm no, booked, complaint, etc)." },
-      send_in_hours:   { type: "number",  description: "Hours from now to send the follow-up, per your timing rules. Whole-ish numbers (e.g. 18, 24, 48)." },
-      message:         { type: "string",  description: "The exact short follow-up text to send. Empty if should_followup is false." },
-      summary:         { type: "string",  description: "A 2-3 sentence plain-English summary of the conversation so far for a human reviewer — who the lead is, what they want, and where things stand." },
-      goal:            { type: "string",  description: "One short line: the goal of this follow-up / where the conversation is (e.g. 'lock Mon 7pm trial')." },
-      reason:          { type: "string",  description: "One short line: why now / which trigger applies." },
-      confidence:      { type: "number",  description: "0..1 confidence this is the right move." },
-    },
-    required: ["should_followup", "message"],
-  },
-};
-
-async function runScheduleAgent(system, transcript) {
-  const r = await fetch("https://api.anthropic.com/v1/messages", {
-    method: "POST",
-    headers: { "x-api-key": ANTHROPIC_KEY, "anthropic-version": "2023-06-01", "content-type": "application/json" },
-    body: JSON.stringify({
-      model: ANTHROPIC_MODEL, max_tokens: 600, system,
-      tools: [SCHEDULE_TOOL], tool_choice: { type: "tool", name: "schedule_followup" },
-      messages: [{ role: "user", content: `Here is the conversation so far (oldest first):\n\n${transcript}\n\nDecide the next scheduled follow-up.` }],
-    }),
-  });
-  if (!r.ok) throw new Error(`Claude ${r.status}: ${(await r.text()).slice(0, 300)}`);
-  const data = await r.json();
-  const tool = (data.content || []).find(b => b.type === "tool_use" && b.name === "schedule_followup");
-  if (!tool?.input) throw new Error("no schedule decision from Claude");
-  return tool.input;
-}
-
 // ── GHL thread helpers ──
-async function findConversation(token, locationId, contactId) {
-  const search = await ghl("GET", `/conversations/search?${new URLSearchParams({ locationId, contactId })}`, { token });
-  return (search.conversations || search.data || [])[0] || null;
-}
 async function threadMessages(token, conversationId) {
   const data = await ghl("GET", `/conversations/${encodeURIComponent(conversationId)}/messages`, { token });
   const raw = data.messages?.messages || data.messages || data.data || [];
@@ -148,29 +85,22 @@ async function threadMessages(token, conversationId) {
 }
 
 const hoursSince = (d) => d ? (Date.now() - new Date(d).getTime()) / 3600000 : Infinity;
-const clamp = (n, lo, hi) => Math.max(lo, Math.min(hi, n));
 
-// ── Detector: find quiet leads, draft the next nudge, queue it ──
+// ── Detector: find quiet leads (no reply in ~a day) and queue a Ghost card ──
+// We no longer draft nudge messages. For each Responded lead whose last message
+// is OURS and who's been quiet ≥MIN_QUIET_HOURS, we drop a "Send to Ghosted" card
+// in the Hawkeye queue (agent_ready_replies, kind='ghost'). A human approves it →
+// the lead is enrolled in the academy's Ghosted automation (which does the actual
+// multi-touch follow-up). No Claude call needed — the card shows the real thread.
 async function detectForClient(client) {
   if (!modeIsOn(agentMode(client))) return { client_id: client.id, skipped: "mode off" };
   const creds = await pickGhlToken(client);
   if (!creds) return { client_id: client.id, skipped: "no GHL token" };
   const { token, locationId } = creds;
 
-  // The sales agent ONLY works leads in the Responded stage. Gate every nudge to
-  // contacts currently in that stage — never follow up someone in another stage.
+  // The sales agent ONLY works leads in the Responded stage.
   const { rs, ids: respondedIds } = await respondedContactIds(token, locationId);
   if (!rs) return { client_id: client.id, skipped: "no Responded stage" };
-
-  // Prune: cancel scheduled follow-ups whose lead has LEFT the Responded stage.
-  try {
-    const active = await sb(`agent_followups?client_id=eq.${client.id}&status=in.(pending,approved)&select=id,ghl_contact_id`);
-    for (const row of (Array.isArray(active) ? active : [])) {
-      if (row.ghl_contact_id && !respondedIds.has(row.ghl_contact_id)) {
-        await sb(`agent_followups?id=eq.${row.id}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ status: "canceled", send_error: "left Responded stage", updated_at: new Date().toISOString() }) });
-      }
-    }
-  } catch (_) {}
 
   // Find Responded-stage leads where OUR last message is outbound and stale.
   let convos = [];
@@ -186,59 +116,44 @@ async function detectForClient(client) {
     return h >= MIN_QUIET_HOURS && h <= MAX_AGE_DAYS * 24;
   }).slice(0, DRAFT_CAP);
 
-  let drafted = 0, stopped = 0, skipped = 0;
-  const cfgBrain = await loadConfig(client.id);
+  let queued = 0, skipped = 0;
 
   for (const c of candidates) {
     const contactId = c.contactId;
     if (!contactId) { skipped++; continue; }
-    // Skip if an active follow-up already exists, or we nudged recently.
+    // Skip if this lead already has ANY active card (reply / ghost / lost / book).
     try {
-      const existing = await sb(`agent_followups?client_id=eq.${client.id}&ghl_contact_id=eq.${encodeURIComponent(contactId)}&or=(status.in.(pending,approved),and(status.eq.sent,sent_at.gte.${new Date(Date.now() - RECENT_SENT_HRS * 3600000).toISOString()}))&select=id&limit=1`);
+      const existing = await sb(`agent_ready_replies?client_id=eq.${client.id}&ghl_contact_id=eq.${encodeURIComponent(contactId)}&status=in.(pending,approved)&select=id&limit=1`);
       if (Array.isArray(existing) && existing.length) { skipped++; continue; }
     } catch (_) {}
 
     let thread;
     try { thread = await threadMessages(token, c.id); } catch (_) { skipped++; continue; }
     if (!thread.length) { skipped++; continue; }
-    const transcript = thread.map(m => `${m.role === "agent" ? "You" : "Lead"}: ${m.text}`).join("\n");
-    const quietHrs = Math.round(hoursSince(c.lastMessageDate || c.dateUpdated));
-
-    let decision;
-    try {
-      const sys = buildFollowupSystem(cfgBrain, quietHrs) + await loadContactMemory(sb, client.id, contactId, { ghl, token, locationId });
-      decision = await runScheduleAgent(sys, transcript);
-    } catch (_) { skipped++; continue; }
-
-    if (!decision.should_followup || !decision.message || !String(decision.message).trim()) { stopped++; continue; }
-    const sendInH = clamp(Number(decision.send_in_hours) || 24, 1, MAX_AGE_DAYS * 24);
-    // Never schedule a send outside quiet hours (8:00am-9:30pm) — push to the morning.
-    const scheduledAt = nextSendableTime(new Date(Date.now() + sendInH * 3600000)).toISOString();
     // The lead's last message + OUR last message (so the card shows both sides).
     const lastLeadMsg = [...thread].reverse().find(m => m.role === "parent");
     const lastOurMsg  = [...thread].reverse().find(m => m.role === "agent");
+    const quietH = Math.round(hoursSince(c.lastMessageDate || c.dateUpdated));
+    const quietStr = quietH >= 48 ? `${Math.round(quietH / 24)} days` : `${quietH}h`;
     try {
-      await sb(`agent_followups`, {
+      await sb(`agent_ready_replies`, {
         method: "POST", headers: { Prefer: "return=minimal" },
         body: JSON.stringify([{
           client_id: client.id, ghl_contact_id: String(contactId), ghl_conversation_id: c.id,
           contact_name: c.fullName || c.contactName || "Lead",
-          goal: decision.goal || null, draft_message: String(decision.message).trim(),
-          summary: decision.summary ? String(decision.summary).slice(0, 600) : null,
+          kind: "ghost", draft_message: "",
+          reasoning: `No reply for about ${quietStr}. Send them to the Ghosted automation?`,
           last_message: lastLeadMsg ? String(lastLeadMsg.text).slice(0, 500) : null,
           last_outbound: lastOurMsg ? String(lastOurMsg.text).slice(0, 500) : null,
           thread_tail: thread.slice(-6).map(m => ({ role: m.role === "agent" ? "agent" : "lead", text: String(m.text).slice(0, 320) })),
-          scheduled_at: scheduledAt, status: "pending",
-          trigger_reason: decision.reason || null,
           last_lead_at: toIso(c.lastMessageDate || c.dateUpdated),
-          confidence: typeof decision.confidence === "number" ? decision.confidence : null,
-          created_by: "detector",
+          status: "pending", created_by: "detector",
         }]),
       });
-      drafted++;
+      queued++;
     } catch (_) { skipped++; }  // unique-violation race etc.
   }
-  return { client_id: client.id, business: client.business_name, candidates: candidates.length, drafted, stopped, skipped };
+  return { client_id: client.id, business: client.business_name, candidates: candidates.length, queued, skipped };
 }
 
 async function runDetect(res, onlyClientId) {
@@ -333,7 +248,6 @@ async function handler(req, res) {
   if (req.method === "GET" && (req.query.action === "detect" || req.query.action === "work")) {
     const got = (req.headers.authorization || "").replace(/^Bearer\s+/i, "");
     if (!process.env.CRON_SECRET || got !== process.env.CRON_SECRET) return res.status(401).json({ error: "unauthorized" });
-    if (!ANTHROPIC_KEY && req.query.action === "detect") return res.status(500).json({ error: "ANTHROPIC_API_KEY not configured" });
     return req.query.action === "detect" ? await runDetect(res, null) : await runWork(res);
   }
 
@@ -432,77 +346,8 @@ async function handler(req, res) {
       return res.status(200).json({ ok: true, result: r });
     }
     if (b.action === "detect-now") {
-      if (!ANTHROPIC_KEY) return res.status(500).json({ error: "ANTHROPIC_API_KEY not configured" });
       // Academy actors can only scan their own academy; staff may scan the default.
       return await runDetect(res, b.client_id || (actor.isStaff ? DEFAULT_CLIENT_ID : actor.academyClientIds[0]));
-    }
-    // ── Forced 2-step: draft ONE follow-up for a single contact, on demand ──
-    // After a human approves+sends a reply in Hawkeye, the UI immediately calls
-    // this to draft the mandatory next follow-up for that same lead — so every
-    // Responded lead always has a follow-up queued. Idempotent: hands back the
-    // existing active follow-up if one is already queued. Returns {stop:true}
-    // when the brain says no follow-up is warranted (booked / firm no / etc) —
-    // the UI then offers Lost / Abandon instead of a follow-up.
-    if (b.action === "draft-one") {
-      if (!ANTHROPIC_KEY) return res.status(500).json({ error: "ANTHROPIC_API_KEY not configured" });
-      if (!b.contact_id) return res.status(400).json({ error: "contact_id required" });
-      const cid = b.client_id || (actor.isStaff ? DEFAULT_CLIENT_ID : actor.academyClientIds[0]);
-      const client = await loadClient(cid);
-      if (!client) return res.status(404).json({ error: "client not found" });
-      // Already have an active follow-up for this lead? Hand it back (idempotent).
-      const active = await sb(`agent_followups?client_id=eq.${cid}&ghl_contact_id=eq.${encodeURIComponent(b.contact_id)}&status=in.(pending,approved)&select=*&order=created_at.desc&limit=1`).catch(() => null);
-      if (Array.isArray(active) && active[0]) return res.status(200).json({ followup: active[0], existing: true });
-      const creds = await pickGhlToken(client);
-      if (!creds) return res.status(502).json({ error: "no GHL token" });
-      const { token, locationId } = creds;
-      let conv = null;
-      try { conv = b.conversation_id ? { id: b.conversation_id } : await findConversation(token, locationId, b.contact_id); } catch (_) {}
-      if (!conv || !conv.id) return res.status(404).json({ error: "no conversation for this contact" });
-      let thread = [];
-      try { thread = await threadMessages(token, conv.id); } catch (_) {}
-      if (!thread.length) return res.status(422).json({ error: "no messages to draft from" });
-      const transcript = thread.map(m => `${m.role === "agent" ? "You" : "Lead"}: ${m.text}`).join("\n");
-      const cfgBrain = await loadConfig(cid);
-      let decision;
-      try {
-        // quietHours=0: we JUST replied, so the brain picks the next send time from its timing rules.
-        const sys = buildFollowupSystem(cfgBrain, 0) + await loadContactMemory(sb, cid, b.contact_id, { ghl, token, locationId });
-        decision = await runScheduleAgent(sys, transcript);
-      } catch (e) { return res.status(502).json({ error: `draft failed: ${e.message}` }); }
-      const message = String(decision.message || "").trim();
-      if (!decision.should_followup || !message) {
-        return res.status(200).json({ followup: null, stop: true, reason: decision.reason || decision.goal || "the agent doesn't recommend another follow-up for this lead" });
-      }
-      const sendInH = clamp(Number(decision.send_in_hours) || 24, 1, MAX_AGE_DAYS * 24);
-      const scheduledAt = nextSendableTime(new Date(Date.now() + sendInH * 3600000)).toISOString();
-      const lastLeadMsg = [...thread].reverse().find(m => m.role === "parent");
-      const lastOurMsg  = [...thread].reverse().find(m => m.role === "agent");
-      let inserted;
-      try {
-        inserted = await sb(`agent_followups`, {
-          method: "POST", headers: { Prefer: "return=representation" },
-          body: JSON.stringify([{
-            client_id: cid, ghl_contact_id: String(b.contact_id), ghl_conversation_id: conv.id,
-            contact_name: b.contact_name || "Lead",
-            goal: decision.goal || null, draft_message: message,
-            summary: decision.summary ? String(decision.summary).slice(0, 600) : null,
-            last_message: lastLeadMsg ? String(lastLeadMsg.text).slice(0, 500) : null,
-            last_outbound: lastOurMsg ? String(lastOurMsg.text).slice(0, 500) : null,
-            thread_tail: thread.slice(-6).map(m => ({ role: m.role === "agent" ? "agent" : "lead", text: String(m.text).slice(0, 320) })),
-            scheduled_at: scheduledAt, status: "pending",
-            trigger_reason: decision.reason || null,
-            confidence: typeof decision.confidence === "number" ? decision.confidence : null,
-            created_by: "forced-2step",
-          }]),
-        });
-      } catch (e) {
-        // Unique-active race (cron queued one in parallel) → return whatever's active now.
-        const again = await sb(`agent_followups?client_id=eq.${cid}&ghl_contact_id=eq.${encodeURIComponent(b.contact_id)}&status=in.(pending,approved)&select=*&order=created_at.desc&limit=1`).catch(() => null);
-        if (Array.isArray(again) && again[0]) return res.status(200).json({ followup: again[0], existing: true });
-        return res.status(500).json({ error: `insert failed: ${e.message}` });
-      }
-      const row = Array.isArray(inserted) ? inserted[0] : inserted;
-      return res.status(200).json({ followup: row });
     }
     return res.status(400).json({ error: "unknown action" });
   } catch (e) {
