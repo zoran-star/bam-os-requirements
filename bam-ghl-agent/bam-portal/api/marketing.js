@@ -1001,7 +1001,7 @@ async function handleContentTickets(req, res) {
     if (!ticket) return res.status(404).json({ error: "not found" });
 
     const staffActions = new Set([
-      "upload-final", "send-to-marketing", "send-for-review",
+      "upload-final", "set-final", "send-to-marketing", "send-for-review",
       "request-client-action", "mark-completed",
       "assign", "edit-context",
     ]);
@@ -1059,6 +1059,18 @@ async function handleContentTickets(req, res) {
       patch.messages = appendMessage(ticket.messages, {
         author_type: "staff", author_id: ctx.staff.id, author_name: authorName,
         body: `Uploaded ${finals.length} final file${finals.length === 1 ? "" : "s"}.`,
+        is_action_request: false,
+        internal: true,
+      });
+
+    } else if (action === "set-final") {
+      // Replace the whole final_files array - used to remove files uploaded by
+      // mistake or to re-folder them. Staff-only.
+      const prev = (ticket.final_files || []).length;
+      patch.final_files = Array.isArray(body.final_files) ? body.final_files : [];
+      patch.messages = appendMessage(ticket.messages, {
+        author_type: "staff", author_id: ctx.staff.id, author_name: authorName,
+        body: `Updated final files (${prev} -> ${patch.final_files.length}).`,
         is_action_request: false,
         internal: true,
       });
