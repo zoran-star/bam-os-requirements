@@ -21803,17 +21803,30 @@ function _plDrawerConfirm(icon, label, sub) {
   if (!drawer || !drawer.classList.contains('open')) { closePipelineDrawer(); return; }
   if (!document.getElementById('pl-dc-style')) {
     const st = document.createElement('style'); st.id = 'pl-dc-style';
-    st.textContent = '@keyframes plDcIn{from{opacity:0}to{opacity:1}}@keyframes plDcPop{0%{transform:scale(.5);opacity:0}60%{transform:scale(1.12)}100%{transform:scale(1);opacity:1}}';
+    st.textContent =
+      '@keyframes plDcIn{from{opacity:0}to{opacity:1}}' +
+      '@keyframes plDcOut{from{opacity:1}to{opacity:0}}' +
+      '@keyframes plDcPop{0%{transform:scale(.2);opacity:0}50%{transform:scale(1.18)}70%{transform:scale(.92)}85%{transform:scale(1.04)}100%{transform:scale(1);opacity:1}}' +
+      '@keyframes plDcUp{0%{opacity:0;transform:translateY(10px)}100%{opacity:1;transform:translateY(0)}}' +
+      '@keyframes plDcGlow{0%{transform:scale(.4);opacity:0}45%{opacity:.45}100%{transform:scale(1.7);opacity:0}}';
     document.head.appendChild(st);
   }
   document.getElementById('pl-drawer-confirm')?.remove();
   const ov = document.createElement('div');
   ov.id = 'pl-drawer-confirm';
-  ov.style.cssText = 'position:absolute;inset:0;z-index:80;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;text-align:center;padding:24px;animation:plDcIn .22s ease both';
-  ov.innerHTML = `<div style="font-size:60px;animation:plDcPop .42s ease both">${icon}</div>
-    <div style="font-size:20px;font-weight:800;color:var(--text)">${escapeHTML(label)}</div>
-    ${sub ? `<div style="font-size:13.5px;color:var(--text-mute);max-width:280px">${escapeHTML(sub)}</div>` : ''}`;
+  // position:fixed inside the transformed drawer = contained by it → covers the
+  // whole visible drawer (no scroll bleed) AND slides out with it on close.
+  ov.style.cssText = 'position:fixed;inset:0;z-index:80;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;text-align:center;padding:24px;animation:plDcIn .2s ease both';
+  ov.innerHTML = `
+    <div style="position:relative;display:flex;align-items:center;justify-content:center;width:96px;height:96px">
+      <div style="position:absolute;width:96px;height:96px;border-radius:50%;background:radial-gradient(circle,var(--accent,#E8C547) 0%,transparent 68%);animation:plDcGlow .85s ease-out both"></div>
+      <div style="font-size:62px;line-height:1;position:relative;animation:plDcPop .56s cubic-bezier(.2,.8,.25,1) both">${icon}</div>
+    </div>
+    <div style="font-size:21px;font-weight:800;color:var(--text);animation:plDcUp .4s ease .14s both">${escapeHTML(label)}</div>
+    ${sub ? `<div style="font-size:13.5px;color:var(--text-mute);max-width:280px;line-height:1.5;animation:plDcUp .4s ease .22s both">${escapeHTML(sub)}</div>` : ''}`;
   drawer.appendChild(ov);
+  // Brief fade-out, then close the drawer (the overlay slides out with it).
+  setTimeout(() => { try { ov.style.animation = 'plDcOut .25s ease both'; } catch (_) {} }, 1550);
   setTimeout(() => { try { ov.remove(); } catch (_) {} closePipelineDrawer(); }, 1800);
 }
 
