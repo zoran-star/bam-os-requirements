@@ -22474,12 +22474,14 @@ function _plOpenCard(oppId) {
       <div class="pl-d-row"><div class="lbl2">Email</div><div>${o.contact.email ? `<a href="mailto:${escapeHTML(o.contact.email)}" style="color:var(--accent)">${escapeHTML(o.contact.email)}</a>` : '-'}</div></div>
       ${(_plV2 && o.trainer) ? `<div class="pl-d-row"><div class="lbl2">Coach</div><div>${escapeHTML(o.trainer)}</div></div>` : ''}
     </div>
-    ${(_plV2 && _isResp && o.contactId) ? `<div class="pl-d-section" id="pl-d-agent"><div class="lbl">🤖 Agent suggests</div><div id="pl-d-agent-body"><div style="color:var(--text-mute);font-size:13px"><span class="req-spin"></span> Checking…</div></div></div>` : ''}
-    <div class="pl-d-section" id="pl-d-msg"${(_plV2 && _isResp && o.contactId) ? ' style="display:none"' : ''}>
+    <div class="pl-d-section" id="pl-d-msg">
       <div class="lbl">Messages</div>
       ${o.contactId ? `
-        <div id="pl-d-thread" style="max-height:260px;overflow-y:auto;display:flex;flex-direction:column;gap:8px;padding:4px 0">
-          <div style="color:var(--text-mute);font-size:13px"><span class="req-spin"></span> Loading…</div>
+        <div id="pl-d-thread" style="max-height:440px;overflow-y:auto;display:flex;flex-direction:column;gap:8px;padding:4px 0">
+          <div id="pl-d-thread-msgs" style="display:flex;flex-direction:column;gap:8px">
+            <div style="color:var(--text-mute);font-size:13px"><span class="req-spin"></span> Loading…</div>
+          </div>
+          ${(_plV2 && _isResp) ? `<div id="pl-d-agent-inline" style="margin-top:4px"><div class="lbl" style="margin:10px 0 6px">🤖 Agent suggests</div><div id="pl-d-agent-body"><div style="color:var(--text-mute);font-size:13px"><span class="req-spin"></span> Checking…</div></div></div>` : ''}
         </div>
         <div style="margin-top:10px">
           <textarea id="pl-msg-input" placeholder="Type a message…" style="width:100%;min-height:64px;padding:9px 11px;font-size:13px;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:8px;outline:none;font-family:inherit;resize:vertical"></textarea>
@@ -22542,8 +22544,6 @@ async function _plLoadAgentCard() {
     _plRenderAgentSection();
   } catch (e) {
     host.innerHTML = `<div style="font-size:12.5px;color:var(--text-mute)">Couldn't load the agent's suggestion - ${escapeHTML(_apxErr(e))}</div>`;
-    const msgEl = document.getElementById('pl-d-msg');   // fall back to Messages so it's never stuck hidden
-    if (msgEl) msgEl.style.display = '';
   }
 }
 // Render (or re-render after an action) the drawer's agent section from _APX_DATA,
@@ -22561,12 +22561,9 @@ function _plRenderAgentSection() {
   ];
   const render = (kind, r) => kind === 'ghost' ? _apxGhostCard(r) : kind === 'book' ? _apxBookCard(r) : kind === 'lost' ? _apxLostCard(r) : _apxCard(kind, r);
   host.innerHTML = rows.length ? rows.map(([k, r]) => render(k, r)).join('') : `<div style="font-size:12.5px;color:var(--text-mute)">Nothing waiting - the agent has no suggested action right now.</div>`;
-  // Hide the separate Messages section ONLY when a card actually shows the
-  // conversation (it has a thread snapshot). For escalation / context-less cards,
-  // keep Messages visible so you always see the conversation - "no matter what".
-  const anyCtx = rows.some(([, r]) => (Array.isArray(r.thread_tail) && r.thread_tail.length) || r.last_message || r.last_outbound);
-  const msgEl = document.getElementById('pl-d-msg');
-  if (msgEl) msgEl.style.display = (rows.length && anyCtx) ? 'none' : '';
+  // The agent suggestion now lives at the BOTTOM of the message thread, so it
+  // scrolls as part of the chat - scroll the thread down to reveal it.
+  try { _scrollToBottom(document.getElementById('pl-d-thread')); } catch (_) {}
 }
 
 // ── Pipeline card drawer: messaging ─────────────────────────────────────────
@@ -22574,7 +22571,7 @@ let _PL_MSG = null;   // { contactId, name, phone, email, conversationId }
 let _PL_DRAWER_CONTACT = null;   // GHL contact id currently shown in the drawer
 
 async function _plLoadMessages() {
-  const host = document.getElementById('pl-d-thread');
+  const host = document.getElementById('pl-d-thread-msgs');
   if (!host || !_PL_MSG) return;
   try {
     const token = await _mreqAuthToken();
@@ -22627,7 +22624,7 @@ function _ghlSendType(typeOrChannel) {
 }
 
 function _plRenderThread(messages) {
-  const host = document.getElementById('pl-d-thread');
+  const host = document.getElementById('pl-d-thread-msgs');
   if (!host) return;
   const contactFirst = ((_PL_MSG && _PL_MSG.name) || '').trim().split(/\s+/)[0] || 'Them';
   const sorted = [...messages].filter(m => !_ibIsActivity(m)).sort((a, b) => (a.date ? new Date(a.date).getTime() : 0) - (b.date ? new Date(b.date).getTime() : 0));
@@ -22645,7 +22642,8 @@ function _plRenderThread(messages) {
         </div>`;
       }).join('')
     : `<div style="color:var(--text-mute);font-size:13px">No messages yet - send the first one below.</div>`;
-  _scrollToBottom(host);
+  // Scroll the whole thread (messages + the inline agent suggestion at the bottom).
+  _scrollToBottom(document.getElementById('pl-d-thread') || host);
 }
 
 function _plMsgPickFiles(inputEl) {
