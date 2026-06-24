@@ -689,6 +689,7 @@ function OverviewTab({ client, staffMap, tokens, role, session, onChanged }) {
   const [revenue, setRevenue] = useState(null);
   const [revenueLoading, setRevenueLoading] = useState(false);
   const [savingOnb, setSavingOnb] = useState(false);
+  const [savingSched, setSavingSched] = useState(false);
   const [savingFb, setSavingFb] = useState(false);
   const canViewFinancials = ROLES.canViewFinancials(role);
 
@@ -697,6 +698,23 @@ function OverviewTab({ client, staffMap, tokens, role, session, onChanged }) {
   // than V2 (requirements still being built out). The selector posts BOTH flags
   // so the tiers can never overlap.
   const tier = client.v2_access ? "v2" : client.v15_access ? "v15" : "v1";
+  // Scheduling app the academy uses. 'none' = off; 'coachiq' = CoachIQ on.
+  const sched = client.scheduling_app === "coachiq" ? "coachiq" : "none";
+  async function setSchedApp(next) {
+    if (next === sched) return;
+    setSavingSched(true);
+    const tok = session?.access_token;
+    try {
+      const res = await fetch(`/api/clients?action=update-fields&id=${client.id}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${tok}` },
+        body: JSON.stringify({ client_id: client.id, scheduling_app: next }),
+      });
+      if (!res.ok) { const j = await res.json().catch(() => ({})); alert("Couldn't save: " + (j.error || res.statusText)); }
+      else if (onChanged) onChanged();
+    } catch (e) { alert("Couldn't save: " + (e?.message || e)); }
+    finally { setSavingSched(false); }
+  }
 
   // Onboarding feedback form — staff request it here; the client portal hard-
   // blocks until the client submits, then submitted_at stamps and unblocks.
@@ -869,6 +887,43 @@ function OverviewTab({ client, staffMap, tokens, role, session, onChanged }) {
               : tier === "v15"
                 ? "V1.5: no GoHighLevel, lighter than V2. May need a little manual setup/cleanup to work right. (Requirements still being built out.)"
                 : "V1 portal — standard nav (uses GoHighLevel)."}
+          </div>
+        </div>
+
+        <div style={{
+          marginTop: 14, padding: "12px 14px",
+          background: sched !== "none" ? `${t.accent}10` : t.surfaceEl,
+          border: `1px solid ${sched !== "none" ? t.accentBorder : t.border}`,
+          borderRadius: 8,
+        }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, fontWeight: 600, color: t.text, marginBottom: 8 }}>
+            Scheduling app
+            {savingSched && <span style={{ color: t.textMute, fontSize: 11, fontFamily: "monospace", fontWeight: 400 }}>saving…</span>}
+          </div>
+          <div style={{ display: "inline-flex", border: `1px solid ${t.border}`, borderRadius: 8, overflow: "hidden" }}>
+            {[["none", "None"], ["coachiq", "CoachIQ"]].map(([k, label], i) => {
+              const on = sched === k;
+              return (
+                <button
+                  key={k}
+                  type="button"
+                  disabled={savingSched}
+                  onClick={() => setSchedApp(k)}
+                  style={{
+                    padding: "7px 18px", fontSize: 13, fontWeight: 600,
+                    cursor: savingSched ? "default" : "pointer",
+                    border: "none", borderLeft: i ? `1px solid ${t.border}` : "none",
+                    background: on ? t.accent : "transparent",
+                    color: on ? "#0B0B0D" : t.textMute,
+                  }}
+                >{label}</button>
+              );
+            })}
+          </div>
+          <div style={{ fontSize: 11, color: t.textMute, marginTop: 8, lineHeight: 1.5 }}>
+            {sched === "coachiq"
+              ? "CoachIQ is on: the Set up CoachIQ buttons, product links, and signup activation are active for this academy."
+              : "No scheduling app: all CoachIQ buttons and wiring are hidden for this academy."}
           </div>
         </div>
 
