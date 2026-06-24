@@ -21952,9 +21952,9 @@ async function _plEnrollSpecialGo(oppId) {
     });
     const json = await _safeJson(r);
     if (!r.ok) throw new Error(json.error || ('HTTP ' + r.status));
-    const moved = await _plMoveToInterested(oppId, token);
-    if (moved && typeof _renderPipelineBoard === 'function') _renderPipelineBoard();
-    _plToast(moved ? '📨 Sent + moved to Interested' : '📨 Sent to Summer Special');
+    // Do NOT move the card to Interested from the portal — the GHL Summer Special
+    // automation handles that move itself (set up in GoHighLevel).
+    _plToast('📨 Sent to Summer Special');
   } catch (e) {
     alert('Could not send: ' + (e.message || e));
   }
