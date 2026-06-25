@@ -57,6 +57,10 @@
       "schedule": "7,22,37,52 * * * *"
     },
     {
+      "path": "/api/agent-closing?action=detect",
+      "schedule": "3,18,33,48 * * * *"
+    },
+    {
       "path": "/api/ghl/cron-post-trial-escalate",
       "schedule": "*/15 * * * *"
     }
