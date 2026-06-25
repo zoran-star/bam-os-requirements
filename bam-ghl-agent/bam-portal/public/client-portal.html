@@ -23526,7 +23526,8 @@ async function _acxSkip(id) {
 // Done-Trial (good-fit attendee) leads. Sibling of _apx*/_acx*: same look,
 // own endpoint (/api/agent-closing), 3 card kinds:
 //   closing         → a drafted post-trial follow-up reply (Approve & send)
-//   closing_enroll  → lead is ready → send the sign-up link + mark won (the CLOSE)
+//   closing_enroll  → lead is ready → send the enroll link (the CLOSE; the opp is
+//                     marked won automatically when they pay, via the enroll flow)
 //   closing_lost    → good-fit attendee won't enroll → mark lost
 // Reuses _apxPost / _apxToast / _apxErr / _apxOpenThread / _apxMsgWhen / _apxTrim.
 // Kept a SEPARATE data set from _ACX_DATA / _APX_DATA (never merge them).
@@ -23637,13 +23638,13 @@ function _aclxEnrollCard(r) {
   const note = r.enroll_note ? `<div style="font-size:12px;color:var(--text-sub);background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:8px;padding:8px 10px;margin:4px 0 8px"><b style="color:var(--text)">Plan / context:</b> ${escapeHTML(r.enroll_note)}</div>` : '';
   return `<div id="aclx-${r.id}" style="background:var(--surface);border:1px solid #3DBE8B;border-radius:11px;padding:12px 14px;margin-bottom:9px">
     ${_aclxHeader(r, 'ready to enroll', '#3DBE8B')}
-    <div style="font-size:11.5px;color:#3DBE8B;margin-bottom:6px">🎉 The close: sends the academy's sign-up link, then marks the opportunity won.</div>
+    <div style="font-size:11.5px;color:#3DBE8B;margin-bottom:6px">🎉 The close: sends the academy's enroll link. The opportunity is marked won automatically when they pay.</div>
     ${_aclxContext(r)}${note}
     <div style="text-align:center;font-size:9.5px;color:var(--text-mute);text-transform:uppercase;letter-spacing:.09em;margin:2px 0 5px">warm message before the link (optional)</div>
     ${_aclxBox(r, 'optional warm message before the sign-up link')}
     <div style="display:flex;align-items:stretch;gap:8px;margin-top:10px">
       <button onclick="_aclxSkip('${r.id}')" title="Skip" style="flex:1;background:transparent;border:1px solid var(--border);color:#e0654f;border-radius:9px;padding:9px;font-size:17px;cursor:pointer">✕</button>
-      <button onclick="_aclxEnroll('${r.id}')" style="flex:2;background:#3DBE8B;border:1px solid #3DBE8B;color:#08080A;border-radius:9px;padding:9px;font-size:14px;font-weight:700;cursor:pointer">✓ Send sign-up link &amp; mark won</button>
+      <button onclick="_aclxEnroll('${r.id}')" style="flex:2;background:#3DBE8B;border:1px solid #3DBE8B;color:#08080A;border-radius:9px;padding:9px;font-size:14px;font-weight:700;cursor:pointer">✓ Send enroll link</button>
     </div>
   </div>`;
 }
@@ -23683,7 +23684,7 @@ async function _aclxEnroll(id) {
   const r = _ACLX_DATA.find(x => x.id === id); if (!r) return;
   const ta = document.getElementById('aclx-edit-' + id);
   const reply = (ta ? ta.value : (r.draft_message || '')).trim();
-  try { await _apxPost('/api/agent-closing', 'confirm-enroll', { ready_id: id, contact_id: r.ghl_contact_id, conversation_id: r.ghl_conversation_id, reply, contact_name: r.contact_name, enroll_note: r.enroll_note }); _aclxRemove(id); _apxToast('🎉 Sign-up link sent - marked won', true); }
+  try { await _apxPost('/api/agent-closing', 'confirm-enroll', { ready_id: id, contact_id: r.ghl_contact_id, conversation_id: r.ghl_conversation_id, reply, contact_name: r.contact_name, enroll_note: r.enroll_note }); _aclxRemove(id); _apxToast('🎉 Enroll link sent - won lands on payment', true); }
   catch (e) { _apxToast(_apxErr(e), false); }
 }
 async function _aclxLost(id) {

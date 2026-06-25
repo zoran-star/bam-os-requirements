@@ -504,13 +504,19 @@ async function handler(req, res) {
       return res.status(200).json({ ok: true, sent: true });
     }
 
-    // Confirm an ENROLL: the good-fit attendee is ready. Send the academy's sign-up
-    // link (from the training offer, offers.data.signup_url — same pattern as
-    // api/ghl/post-trial.js) preceded by any warm drafted reply, then mark the open
-    // opportunity won.
-    // TODO P2b: replace the "mark won" stub with the Stripe payment-link flow —
-    // approving here will send a Stripe checkout link and the Stripe webhook will
-    // auto-create the member record, retiring this manual Won path entirely.
+    // Confirm an ENROLL: the good-fit attendee is ready. Send the academy's enroll
+    // link (offers.data.signup_url) preceded by any warm drafted reply.
+    //
+    // P2b — connect to the EXISTING enroll flow (do NOT fake a win here): the enroll
+    // page already calls the portal checkout (api/website/checkout.js → member row),
+    // and on real payment the Stripe webhook (invoice.paid → fireOnboardingActivations)
+    // flips the member live AND marks the opportunity WON + welcomes them. So this
+    // action's job is ONLY to send the link and step back — marking the opp won here
+    // would inflate wins with people who never pay. We append client_id/contact_id/
+    // opp_id to the URL (forward-compat: when the enroll page + checkout read them,
+    // the member ↔ contact ↔ opportunity link at creation and the EXACT opp is the
+    // one the webhook marks won, instead of an email match). We drop a contact note
+    // so the agent + staff know the link went out and we're awaiting payment.
     if (b.action === "confirm-enroll") {
       let row = null, contactId = b.contact_id || null;
       if (b.ready_id) {
@@ -524,25 +530,45 @@ async function handler(req, res) {
         const offers = await sb(`offers?client_id=eq.${encodeURIComponent(clientId)}&type=eq.training&select=data&order=sort_order.asc&limit=1`);
         signupUrl = ((offers && offers[0] && offers[0].data && offers[0].data.signup_url) || "").trim();
       } catch (_) {}
+      // Resolve the opp (for the link param + the note) but DON'T change its status —
+      // the enroll flow's webhook owns the win on real payment.
+      let oppId = null;
+      try { oppId = await findOpenOpp(token, locationId, contactId); } catch (_) {}
+      // Append identifiers so payment ties back to THIS opportunity (harmless extra
+      // query params until the enroll page/checkout read them — P2b-plus, cross-repo).
+      let enrollUrl = signupUrl;
+      if (enrollUrl) {
+        try {
+          const u = new URL(enrollUrl);
+          u.searchParams.set("client_id", clientId);
+          if (contactId) u.searchParams.set("contact_id", String(contactId));
+          if (oppId) u.searchParams.set("opp_id", String(oppId));
+          enrollUrl = u.toString();
+        } catch (_) { /* not a valid absolute URL — send as-is */ }
+      }
       const draft = (typeof b.reply === "string" ? b.reply : (row ? row.draft_message : "")) || "";
       const parts = [];
       if (draft.trim()) parts.push(draft.trim());
-      if (signupUrl) parts.push(signupUrl);
+      if (enrollUrl) parts.push(enrollUrl);
       const msg = parts.join("\n\n");
       if (msg.trim()) { try { await sendReplyViaGhl(token, contactId, msg); } catch (e) { return res.status(e.status || 502).json({ error: `GHL send: ${e.message}` }); } }
-      let oppId = null, wonOk = false;
+      // Note for the team + the agent's own memory (so it won't re-pitch): the link
+      // went out; the win lands when they pay, via the enroll flow.
+      const note = (b.enroll_note || (row && row.enroll_note) || "").toString().slice(0, 300);
       try {
-        oppId = await findOpenOpp(token, locationId, contactId);
-        if (oppId) { await ghl("PUT", `/opportunities/${encodeURIComponent(oppId)}`, { token, body: { status: "won" } }); wonOk = true; }
-      } catch (e) { return res.status(e.status || 502).json({ error: `GHL mark won: ${e.message}` }); }
-      const note = (b.enroll_note || (row && row.enroll_note) || "enrolled via closing agent").toString().slice(0, 300);
-      try { if (oppId) await sb(`pipeline_outcomes`, { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify([{ client_id: clientId, opportunity_id: oppId, status: "won", reason: note }]) }); } catch (_) {}
+        await sb(`agent_contact_notes`, { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify([{
+          client_id: clientId, ghl_contact_id: String(contactId), active: true,
+          note: `Enrollment link sent (closing agent)${note ? ` — ${note}` : ""}. Awaiting payment: the enroll flow creates the member + marks this won when they pay.`,
+          created_by: staffEmail || "closing-agent",
+        }]) });
+      } catch (_) {}
+      try { if (oppId) await sb(`pipeline_outcomes`, { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify([{ client_id: clientId, opportunity_id: oppId, status: "enroll_link_sent", reason: note || null }]) }); } catch (_) {}
       try { await logApproval({ client_id: clientId, ghl_contact_id: contactId, ghl_conversation_id: b.conversation_id || (row && row.ghl_conversation_id) || null, contact_name: b.contact_name || (row && row.contact_name) || null, final_reply: msg || "[enroll link sent]", status: "sent", created_by: staffEmail }); } catch (_) {}
       if (b.ready_id) {
         try { await sb(`agent_closing_replies?id=eq.${encodeURIComponent(b.ready_id)}&client_id=eq.${clientId}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ status: "sent", approved_by: staffEmail, approved_at: new Date().toISOString(), sent_at: new Date().toISOString(), updated_at: new Date().toISOString() }) }); } catch (_) {}
       }
-      await clearClosingCards(clientId, contactId, "enrolled");
-      return res.status(200).json({ ok: true, enrolled: true, link_sent: !!signupUrl, opportunity_id: oppId, marked_won: wonOk });
+      await clearClosingCards(clientId, contactId, "enroll link sent");
+      return res.status(200).json({ ok: true, enrolled: true, link_sent: !!signupUrl, opportunity_id: oppId, won_on: "payment" });
     }
 
     // Confirm a Lost suggestion: optional warm closing, then mark the opp Lost.
