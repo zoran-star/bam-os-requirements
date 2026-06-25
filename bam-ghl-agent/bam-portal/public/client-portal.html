@@ -28461,7 +28461,7 @@ function _renderMemberModalBody(m, stripe, history) {
       ${toggleBtn}
       ${btn('⏸ Pause date fix', `mPauseDateFix('${m.id}')`)}
       ${gbtn('Change plan', `mChange('${m.id}','${escapeHTML(m.plan||'')}')`, canManage)}
-      ${gbtn('Refund',      `mRefund('${m.id}')`, canManage)}
+      ${gbtn('Refund',      `mRefund('${m.id}','${escapeHTML(m.stripe_customer_id||'')}')`, canManage)}
       ${btn('Cancel',       `mCancel('${m.id}','${escapeHTML((m.athlete_name||'').replace(/'/g, ''))}')`)}
       ${btn('Payment link',`mPaymentLink('${m.id}')`)}
       ${btn('💳 Get card link',`mGetCardLink('${m.id}')`)}
@@ -28858,16 +28858,54 @@ async function mCancel(memberId, athleteName) {
   } catch (e) { _plToast('Cancel failed: ' + e.message); }
 }
 
-async function mRefund(memberId) {
-  const vals = await _mmModal({
-    icon: '💸', title: 'Refund', body: 'Find the charge ID in Stripe → Customer → Payments.', okLabel: 'Issue refund',
-    fields: [
-      { key: 'charge_id', label: 'Stripe charge ID', type: 'text', placeholder: 'ch_...', required: true,
-        validate: v => /^ch_/.test(v) ? '' : 'Charge IDs start with "ch_".' },
-      { key: 'amount', label: 'Amount in cents (blank = full refund)', type: 'number', placeholder: '9039 = $90.39' },
-      { key: 'notes', label: 'Reason / note', type: 'text', placeholder: 'e.g. Plan downgrade - May difference' },
-    ],
-  });
+async function mRefund(memberId, customerId) {
+  // Pull the member's recent Stripe payments so the user picks one to refund
+  // (instead of hunting for a charge ID in Stripe). Falls back to manual entry
+  // if there's no customer link or the lookup fails.
+  let refundable = [];
+  if (customerId) {
+    try {
+      const token = await _mreqAuthToken();
+      const r = await fetch('/api/sorter/cleanup?action=stripe-detail', {
+        method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+        body: JSON.stringify({ client_id: _aiClientId(), customer_id: customerId }),
+      });
+      const j = await _safeJson(r);
+      if (r.ok) {
+        refundable = (j.charges || []).filter(c => c.id && c.status === 'succeeded'
+          && ((c.amount_cents || 0) - (c.amount_refunded || 0)) > 0);
+      }
+    } catch (_) {}
+  }
+
+  let vals;
+  if (refundable.length) {
+    const opts = refundable.map(c => {
+      const remain = (c.amount_cents || 0) - (c.amount_refunded || 0);
+      const part = c.amount_refunded ? ' · partially refunded' : '';
+      const desc = c.description ? ' · ' + c.description : (c.one_time ? ' · one-time' : '');
+      return { value: c.id, label: `${c.date || ''} · $${(remain / 100).toFixed(2)}${part}${desc}` };
+    });
+    vals = await _mmModal({
+      icon: '💸', title: 'Refund', body: 'Select the payment to refund.', okLabel: 'Issue refund',
+      fields: [
+        { key: 'charge_id', label: 'Payment', type: 'select', value: opts[0].value, options: opts },
+        { key: 'amount', label: 'Amount in cents (blank = full refund of that payment)', type: 'number', placeholder: '9039 = $90.39' },
+        { key: 'notes', label: 'Reason / note', type: 'text', placeholder: 'e.g. Plan downgrade - May difference' },
+      ],
+    });
+  } else {
+    // No payments found (or no customer link) — fall back to manual charge ID.
+    vals = await _mmModal({
+      icon: '💸', title: 'Refund', body: 'No payments found to list. Enter the charge ID from Stripe → Customer → Payments.', okLabel: 'Issue refund',
+      fields: [
+        { key: 'charge_id', label: 'Stripe charge ID', type: 'text', placeholder: 'ch_...', required: true,
+          validate: v => /^ch_/.test(v) ? '' : 'Charge IDs start with "ch_".' },
+        { key: 'amount', label: 'Amount in cents (blank = full refund)', type: 'number', placeholder: '9039 = $90.39' },
+        { key: 'notes', label: 'Reason / note', type: 'text', placeholder: 'e.g. Plan downgrade - May difference' },
+      ],
+    });
+  }
   if (!vals) return;
   const body = { charge_id: vals.charge_id };
   if (vals.amount) body.amount_cents = parseInt(vals.amount, 10);
