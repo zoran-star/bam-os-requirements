@@ -12286,19 +12286,95 @@ async function loadMyAvatar() {
   } catch (e) { /* column may not exist yet - initials are fine */ }
 }
 
+// Crop stage for the avatar: drag to reposition, slider to zoom, circular
+// preview. Resolves a square 512x512 JPEG Blob, null if cancelled, or the
+// original File if something goes wrong (so upload still works).
+function _avatarCropModal(file) {
+  return new Promise((resolve) => {
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onerror = () => { URL.revokeObjectURL(url); resolve(file); };
+    img.onload = () => {
+      const V = Math.min(300, Math.round(window.innerWidth * 0.78)); // viewport px
+      const baseScale = Math.max(V / img.naturalWidth, V / img.naturalHeight);
+      let z = 1, x = 0, y = 0;
+      const dims = () => ({ w: img.naturalWidth * baseScale * z, h: img.naturalHeight * baseScale * z });
+      const center = () => { const d = dims(); x = (V - d.w) / 2; y = (V - d.h) / 2; };
+      const clamp = () => { const d = dims(); x = Math.min(0, Math.max(V - d.w, x)); y = Math.min(0, Math.max(V - d.h, y)); };
+      center();
+      const overlay = document.createElement('div');
+      overlay.style.cssText = 'position:fixed;inset:0;z-index:3000;background:rgba(0,0,0,.62);display:flex;align-items:center;justify-content:center;padding:20px';
+      overlay.innerHTML = `
+        <div style="background:var(--surface,#16161a);border:1px solid var(--border,#2a2a31);border-radius:14px;padding:18px;width:min(360px,94vw)">
+          <div style="font-size:14px;font-weight:700;color:var(--text,#eee);margin-bottom:4px">Position your photo</div>
+          <div style="font-size:12px;color:var(--text-mute,#888);margin-bottom:12px">Drag to move, slide to zoom.</div>
+          <div id="_acv" style="position:relative;width:${V}px;height:${V}px;margin:0 auto;overflow:hidden;background:#000;border-radius:8px;cursor:grab;touch-action:none">
+            <img id="_acimg" src="${url}" draggable="false" style="position:absolute;left:0;top:0;user-select:none;pointer-events:none;max-width:none">
+            <div style="position:absolute;inset:0;border-radius:50%;box-shadow:0 0 0 9999px rgba(0,0,0,.5);border:2px solid rgba(255,255,255,.65);pointer-events:none"></div>
+          </div>
+          <input id="_aczoom" type="range" min="1" max="4" step="0.01" value="1" style="width:100%;margin:14px 0 2px;accent-color:var(--accent,#E8C547)">
+          <div style="display:flex;gap:8px;margin-top:12px">
+            <button id="_accancel" style="flex:1;padding:9px;border:1px solid var(--border,#2a2a31);background:transparent;color:var(--text,#eee);border-radius:8px;font-weight:600;cursor:pointer;font-family:inherit">Cancel</button>
+            <button id="_acsave" style="flex:1;padding:9px;border:none;background:var(--accent,#E8C547);color:#0B0B0D;border-radius:8px;font-weight:700;cursor:pointer;font-family:inherit">Save photo</button>
+          </div>
+        </div>`;
+      document.body.appendChild(overlay);
+      const view = overlay.querySelector('#_acv');
+      const imgEl = overlay.querySelector('#_acimg');
+      const zoom = overlay.querySelector('#_aczoom');
+      const apply = () => { const d = dims(); imgEl.style.width = d.w + 'px'; imgEl.style.height = d.h + 'px'; imgEl.style.transform = `translate(${x}px,${y}px)`; };
+      apply();
+      let dragging = false, px = 0, py = 0;
+      const pt = e => e.touches && e.touches[0] ? e.touches[0] : e;
+      const down = e => { dragging = true; const p = pt(e); px = p.clientX; py = p.clientY; view.style.cursor = 'grabbing'; };
+      const move = e => { if (!dragging) return; const p = pt(e); x += p.clientX - px; y += p.clientY - py; px = p.clientX; py = p.clientY; clamp(); apply(); if (e.cancelable) e.preventDefault(); };
+      const up = () => { dragging = false; view.style.cursor = 'grab'; };
+      view.addEventListener('mousedown', down); view.addEventListener('touchstart', down, { passive: false });
+      window.addEventListener('mousemove', move); window.addEventListener('touchmove', move, { passive: false });
+      window.addEventListener('mouseup', up); window.addEventListener('touchend', up);
+      zoom.addEventListener('input', () => {
+        const c = V / 2, oldz = z, nz = parseFloat(zoom.value);
+        x = c - (c - x) * (nz / oldz); y = c - (c - y) * (nz / oldz); z = nz; clamp(); apply();
+      });
+      const cleanup = () => {
+        window.removeEventListener('mousemove', move); window.removeEventListener('touchmove', move);
+        window.removeEventListener('mouseup', up); window.removeEventListener('touchend', up);
+        overlay.remove(); URL.revokeObjectURL(url);
+      };
+      overlay.querySelector('#_accancel').onclick = () => { cleanup(); resolve(null); };
+      overlay.querySelector('#_acsave').onclick = () => {
+        try {
+          const OUT = 512, cv = document.createElement('canvas'); cv.width = OUT; cv.height = OUT;
+          const ctx = cv.getContext('2d'); const sc = baseScale * z;
+          ctx.drawImage(img, (-x) / sc, (-y) / sc, V / sc, V / sc, 0, 0, OUT, OUT);
+          cv.toBlob(b => { cleanup(); resolve(b || file); }, 'image/jpeg', 0.9);
+        } catch (_) { cleanup(); resolve(file); }
+      };
+    };
+    img.src = url;
+  });
+}
+
 async function uploadMyAvatar(evt) {
   const file = evt.target.files && evt.target.files[0];
   evt.target.value = '';
   if (!file) return;
   if (!file.type.startsWith('image/')) { alert('Please pick an image file.'); return; }
   if (file.size > 5 * 1024 * 1024) { alert('Max image size is 5 MB.'); return; }
+  // Crop/position stage. null = user cancelled; a Blob = cropped JPEG; the
+  // original File = crop unavailable (fallback).
+  const cropped = await _avatarCropModal(file);
+  if (cropped === null) return;
+  const isCrop = cropped instanceof Blob && cropped.type === 'image/jpeg' && cropped !== file;
+  const upBody = cropped || file;
+  const contentType = isCrop ? 'image/jpeg' : file.type;
+  const ext = isCrop ? 'jpg' : ((file.name.split('.').pop() || 'jpg').toLowerCase().replace(/[^a-z0-9]/g, '') || 'jpg');
   const btn = document.getElementById('my-avatar-btn');
   if (btn) btn.style.opacity = '0.5';
   try {
     if (!_myAuthUserId) { const u = await _sb.auth.getUser(); _myAuthUserId = u?.data?.user?.id; }
-    const ext = (file.name.split('.').pop() || 'jpg').toLowerCase().replace(/[^a-z0-9]/g, '') || 'jpg';
     const path = `user/${_myAuthUserId || 'me'}/${Date.now()}.${ext}`;
-    const { error: upErr } = await _sb.storage.from('member-avatars').upload(path, file, { upsert: true, contentType: file.type, cacheControl: '3600' });
+    const { error: upErr } = await _sb.storage.from('member-avatars').upload(path, upBody, { upsert: true, contentType, cacheControl: '3600' });
     if (upErr) throw upErr;
     const { data: pub } = _sb.storage.from('member-avatars').getPublicUrl(path);
     await _msgApi('/api/profile?action=update-avatar', { method: 'POST', body: JSON.stringify({ avatar_url: pub.publicUrl }) });
