@@ -214,17 +214,25 @@ async function handler(req, res) {
 
   }
 
-  // Send the academy's onboarding / sign-up link if the reviewer asked for it.
-  // Link is configured per-academy on the training offer (offers.data.signup_url).
-  // Never send it for a no-show (they didn't attend - guard in case the flag leaks through).
-  if (sendLink && contactId && showedUp !== false) {
+  // Send the trainer's first follow-up message: their personal note (TOP) + the
+  // academy sign-up link on its own line at the BOTTOM (only when "add the sign-up
+  // link" is on). Link is configured per-academy on the training offer
+  // (offers.data.signup_url). Never send for a no-show (guard if the flag leaks).
+  const firstMessage = (b.first_message || "").toString().trim();
+  if (contactId && showedUp !== false && (firstMessage || sendLink)) {
     try {
-      const offers = await sb(`offers?client_id=eq.${encodeURIComponent(clientId)}&type=eq.training&select=data&order=sort_order.asc&limit=1`);
-      const signupUrl = ((offers && offers[0] && offers[0].data && offers[0].data.signup_url) || "").trim();
-      if (!signupUrl) {
-        result.signup_text = "no_link";   // checkbox was on but no URL set in setup
+      let signupUrl = "";
+      if (sendLink) {
+        const offers = await sb(`offers?client_id=eq.${encodeURIComponent(clientId)}&type=eq.training&select=data&order=sort_order.asc&limit=1`);
+        signupUrl = ((offers && offers[0] && offers[0].data && offers[0].data.signup_url) || "").trim();
+      }
+      const parts = [];
+      if (firstMessage) parts.push(firstMessage);
+      if (signupUrl)    parts.push(signupUrl);
+      const msg = parts.join("\n\n");
+      if (!msg) {
+        result.signup_text = sendLink ? "no_link" : "none";   // link asked for but none set, and no note typed
       } else {
-        const msg = `Thanks for coming in! Ready to get started? Sign up here: ${signupUrl}`;
         await ghl("POST", `/conversations/messages`, { token, body: { type: "SMS", contactId, message: msg } });
         result.signup_text = "sent";
         try {
@@ -235,7 +243,7 @@ async function handler(req, res) {
         } catch (_) {}
       }
     } catch (e) {
-      console.error("signup link send failed (non-fatal):", e.message);
+      console.error("first-message send failed (non-fatal):", e.message);
       result.signup_text = "failed";
     }
   }
