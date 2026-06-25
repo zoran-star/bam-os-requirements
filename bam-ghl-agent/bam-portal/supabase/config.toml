@@ -68,7 +68,8 @@ sql_paths = [
   "./seeds/20_bam_gta_entry_points.sql",
   "./pricing-catalog-gta-seed.sql",
   "./seeds/30_local_parent_app_fixture.sql",
-  "./seeds/40_local_parent_schedule_fixture.sql"
+  "./seeds/40_local_parent_schedule_fixture.sql",
+  "./seeds/50_local_parent_offer_runtime_fixture.sql"
 ]
 
 [db.network_restrictions]
