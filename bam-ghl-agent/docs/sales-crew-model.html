@@ -1,0 +1,748 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The Sales Crew — model, training & your notes</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#0d0f12; --ink2:#14171c; --ink3:#1b1f26; --line:#2a2f38;
+    --text:#e8eaed; --dim:#9aa3af; --faint:#6b7280;
+    --gold:#E8C547; --green:#34d399; --blue:#60a5fa; --red:#f87171; --purple:#c084fc; --orange:#fb923c;
+    --display:'Space Grotesk',sans-serif; --body:'Inter',sans-serif; --mono:'JetBrains Mono',monospace;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--ink);color:var(--text);font-family:var(--body);line-height:1.6;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:1040px;margin:0 auto;padding:32px 20px 170px}
+  h1{font-family:var(--display);font-weight:700;font-size:32px;letter-spacing:-.5px;line-height:1.15}
+  h2{font-family:var(--display);font-weight:700;font-size:21px;letter-spacing:-.3px}
+  .label{font-family:var(--mono);font-size:11px;letter-spacing:1.5px;text-transform:uppercase;color:var(--faint)}
+  .dim{color:var(--dim)} .gold{color:var(--gold)} .green{color:var(--green)} .blue{color:var(--blue)} .red{color:var(--red)} .purple{color:var(--purple)} .orange{color:var(--orange)}
+  b{color:#fff;font-weight:600}
+  .lede{font-size:16px;color:var(--dim);margin-top:12px;max-width:760px}
+
+  header{border-bottom:1px solid var(--line);padding-bottom:22px;margin-bottom:8px}
+  section{margin-top:42px;scroll-margin-top:14px}
+  .sec-head{display:flex;align-items:baseline;gap:12px;margin-bottom:14px;padding-bottom:11px;border-bottom:1px solid var(--line)}
+  .sec-num{font-family:var(--mono);font-size:13px;color:var(--gold);font-weight:700}
+  .sub{font-size:13.5px;color:var(--dim);margin-bottom:14px;max-width:780px}
+
+  nav{position:sticky;top:0;background:rgba(13,15,18,.92);backdrop-filter:blur(8px);z-index:10;display:flex;gap:6px;flex-wrap:wrap;padding:12px 0;border-bottom:1px solid var(--line);margin-bottom:6px}
+  nav a{font-family:var(--mono);font-size:11px;letter-spacing:.5px;text-transform:uppercase;color:var(--dim);text-decoration:none;padding:6px 10px;border-radius:6px;border:1px solid transparent;transition:.15s}
+  nav a:hover{color:var(--text);border-color:var(--line);background:var(--ink2)}
+
+  .chart{background:var(--ink2);border:1px solid var(--line);border-radius:12px;padding:18px;overflow-x:auto;text-align:center;position:relative}
+  .stage-pin{position:absolute;top:12px;left:12px;z-index:2;font-family:var(--mono);font-size:10px;letter-spacing:.5px;text-transform:uppercase;color:var(--faint);border:1px solid var(--line);background:var(--ink3);border-radius:7px;padding:5px 10px}
+  .chart:has(.stage-pin){padding-top:46px}
+  .chart.big{padding:24px 18px}
+  .mermaid{min-width:max-content;margin:0 auto}
+
+  /* ── hand-built vertical spine (full loop) ── */
+  .spine{position:relative;width:256px;margin:6px auto}
+  .abox{position:relative;border-radius:11px;padding:13px 14px;text-align:center;font-weight:700;font-size:14px;border:1.5px solid var(--c,var(--line));background:var(--bg,var(--ink3));color:var(--tx,var(--text))}
+  .abox.agent{border-width:2px;box-shadow:0 0 18px -3px var(--c)}   /* agents = thick + glowing solid */
+  .abox.auto{border-style:dashed;box-shadow:none}                  /* automations = dashed */
+  .abox.cold{--c:#3b6fd4;--bg:#0c1830;--tx:#aecbf5}
+  .abox.warm{--c:#E8C547;--bg:#2e2a12;--tx:#f5e9bf}
+  .abox.book{--c:#fb923c;--bg:#2a1b0e;--tx:#fed7aa}
+  .abox.hot{--c:#34d399;--bg:#0f2e1f;--tx:#bbf7d0}
+  .abox.clos{--c:#c084fc;--bg:#241433;--tx:#e9d5ff}
+  .abox.memb{--c:#ec4899;--bg:#2e1322;--tx:#fbcfe8}
+  .temp{font-family:var(--mono);font-size:8.5px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;border:1px solid var(--c);color:var(--c);border-radius:99px;padding:2px 9px}
+  .initauto{display:block;font-family:var(--mono);font-size:9.5px;letter-spacing:.2px;color:var(--dim);border:1px dashed var(--c);border-radius:6px;padding:3px 7px;margin-bottom:8px;font-weight:500;text-transform:none}
+  .auto-head{font-family:var(--mono);font-size:10px;letter-spacing:.6px;text-transform:uppercase;color:var(--faint);text-align:center;margin-bottom:8px}
+  .spinekey{position:absolute;top:16px;left:16px;background:var(--ink3);border:1px solid var(--line);border-radius:10px;padding:12px 13px;text-align:left;max-width:208px;z-index:3}
+  .spinekey .h{font-family:var(--mono);font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--faint);margin:0 0 6px}
+  .spinekey .row{display:flex;align-items:center;gap:8px;margin:4px 0;font-size:12px;color:var(--dim)}
+  .spinekey .sw{width:18px;height:14px;border-radius:4px;flex:none}
+  .spinekey .sw.dash{border:1.5px dashed #E8C547}
+  .spinekey .sw.glow{border:2px solid #34d399;box-shadow:0 0 9px -1px #34d399;background:#0f2e1f}
+  .spinekey hr{border:none;border-top:1px solid var(--line);margin:9px 0}
+  .spinekey .ck{display:flex;align-items:center;gap:7px;margin:3px 0;font-size:11.5px;color:var(--dim)}
+  .spinekey .ck .dot{width:10px;height:10px;border-radius:3px;flex:none}
+  @media(max-width:780px){.spinekey{position:static;max-width:none;margin:0 0 16px}}
+  .pinwrap{position:absolute;left:100%;top:50%;transform:translateY(-50%);margin-left:22px;display:flex;flex-direction:column;align-items:flex-start;gap:6px;white-space:nowrap}
+  .pin{font-family:var(--mono);font-size:10px;letter-spacing:.5px;text-transform:uppercase;color:var(--c,var(--faint));border:1px solid var(--c,var(--line));background:var(--ink3);border-radius:99px;padding:3px 10px}
+  .pin .pdot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--c,var(--faint));margin-right:7px;vertical-align:middle}
+  .enter{position:absolute;right:100%;top:50%;transform:translateY(-50%);margin-right:16px;white-space:nowrap;display:flex;align-items:center;gap:6px;font-family:var(--mono);font-size:11px;color:var(--faint)}
+  .enter{gap:9px}
+  .enter .nl{border:1px solid #4b5563;background:var(--ink3);border-radius:99px;padding:6px 13px;color:#fff;font-weight:700;letter-spacing:.3px}
+  .enter .bigarrow{font-size:26px;line-height:1;color:#fff;font-weight:700;text-shadow:0 0 9px rgba(255,255,255,.4)}
+  .conn{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;padding:9px 0 4px;min-height:50px;color:#7b8493}
+  .conn::before{content:"";position:absolute;left:50%;top:0;bottom:0;width:2px;background:var(--line);transform:translateX(-50%);z-index:0}
+  .conn .lbl{position:relative;z-index:1;background:var(--ink2);border:1px solid var(--line);border-radius:7px;padding:4px 11px;font-size:11px;color:var(--dim);font-family:var(--body);text-align:center;line-height:1.3}
+  .conn .ar{position:relative;z-index:1;font-size:15px;line-height:.7;color:#8b94a3;background:var(--ink2);padding:0 3px}
+  .conn2{position:relative;display:flex;justify-content:center;gap:44px;padding:9px 0 4px;min-height:54px}
+  .conn2 .lane{position:relative;display:flex;flex-direction:column;align-items:center;gap:4px;justify-content:center}
+  .conn2 .lane::before{content:"";position:absolute;left:50%;top:-9px;bottom:-8px;width:2px;background:var(--line);transform:translateX(-50%);z-index:0}
+  .conn2 .lbl{position:relative;z-index:1;background:var(--ink2);border:1px solid var(--line);border-radius:7px;padding:4px 10px;font-size:11px;color:var(--dim);font-family:var(--body);white-space:nowrap}
+  .conn2 .ar{position:relative;z-index:1;font-size:15px;line-height:.7;color:#8b94a3;background:var(--ink2);padding:0 3px}
+  @media(max-width:640px){.pinwrap{position:static;transform:none;flex-direction:row;align-items:center;margin:8px 0 0}.enter{position:static;transform:none;justify-content:center;margin:0 0 8px}}
+
+  .legend{display:flex;gap:8px 16px;flex-wrap:wrap;margin:14px 0 2px;font-size:12px;color:var(--dim)}
+  .legend span{display:inline-flex;align-items:center;gap:6px}
+  .dot{width:11px;height:11px;border-radius:3px;display:inline-block}
+
+  /* notes */
+  .note{margin-top:14px}
+  .note label{font-family:var(--mono);font-size:10.5px;letter-spacing:.8px;text-transform:uppercase;color:var(--gold);display:flex;align-items:center;gap:7px;margin-bottom:6px}
+  .note label .saved{color:var(--faint);font-weight:400;letter-spacing:0;opacity:0;transition:opacity .3s;text-transform:none}
+  .note label .saved.show{opacity:1}
+  textarea{width:100%;min-height:56px;resize:vertical;background:var(--ink);color:var(--text);border:1px dashed var(--line);border-radius:9px;padding:11px 13px;font-family:var(--body);font-size:14px;line-height:1.55;outline:none;transition:border-color .15s}
+  textarea:focus{border-color:var(--gold);border-style:solid;background:#0b0d10}
+  textarea::placeholder{color:#4b5563;font-style:italic}
+
+  /* ── training flow: mock screens + backend boxes ── */
+  .flow{max-width:880px;margin:0 auto}
+  .stage-label{font-family:var(--mono);font-size:12px;letter-spacing:.5px;color:var(--gold);text-transform:uppercase;font-weight:700;margin:0 0 10px;text-align:left}
+  .flow-arrow{text-align:center;color:var(--faint);font-size:24px;margin:12px 0;line-height:1}
+  .flow-arrow small{display:block;font-family:var(--body);font-size:12.5px;color:var(--dim);text-transform:none;letter-spacing:0;margin-top:1px}
+
+  .screen{background:#0f1115;border:1px solid var(--line);border-radius:12px;overflow:hidden;text-align:left;box-shadow:0 8px 26px rgba(0,0,0,.35)}
+  .scrn-head{background:var(--ink3);border-bottom:1px solid var(--line);padding:8px 12px;display:flex;align-items:center;gap:9px;font-size:12px;color:var(--dim);font-weight:600}
+  .scrn-head .dots{display:flex;gap:5px}
+  .scrn-head .dots i{width:9px;height:9px;border-radius:50%;display:inline-block;background:#3a3f48}
+  .scrn-body{padding:13px 14px}
+  .bub{padding:8px 11px;border-radius:12px;font-size:13px;line-height:1.45;margin-bottom:8px;max-width:90%;width:fit-content}
+  .bub.lead{background:rgba(96,165,250,.12);border:1px solid rgba(96,165,250,.3);margin-left:auto;border-bottom-right-radius:4px}
+  .bub.bot{background:var(--ink3);border:1px solid var(--line);border-bottom-left-radius:4px}
+  .minibtn{display:inline-block;font-size:11px;color:var(--dim);border:1px solid var(--line);border-radius:6px;padding:3px 9px;margin:6px 6px 0 0}
+  .minibtn.gold{background:var(--gold);color:#000;border-color:var(--gold);font-weight:700}
+  .seg{display:inline-flex;gap:3px;background:var(--ink3);border:1px solid var(--line);border-radius:7px;padding:2px;vertical-align:middle}
+  .seg b{font-size:11px;padding:3px 9px;border-radius:5px;color:var(--dim);font-weight:600}
+  .seg b.on{background:var(--gold);color:#000}
+  .field{background:#0a0c0f;border:1px solid var(--line);border-radius:7px;padding:8px 10px;font-size:12.5px;color:var(--text);line-height:1.45;margin-top:7px}
+  .field.edit{border-color:var(--gold);background:rgba(232,197,71,.06)}
+
+  .beapi{background:#0a1a14;border:1px solid #1f4d3a;border-left:3px solid var(--green);border-radius:9px;padding:11px 13px;text-align:left;margin-top:10px}
+  .beapi .tag{font-family:var(--mono);font-size:9.5px;letter-spacing:1.2px;text-transform:uppercase;color:var(--green);font-weight:700;display:block;margin-bottom:5px}
+  .beapi .k{font-family:var(--mono);font-size:11.5px;color:#8fe7b4;line-height:1.65;word-break:break-word}
+  .beapi .plain{font-size:12.5px;color:var(--dim);margin-top:6px}
+  .beapi .plain b{color:#cfe9d8}
+
+  .branch{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px}
+  @media(max-width:840px){.branch{grid-template-columns:1fr}}
+  .branch .col{display:flex;flex-direction:column}
+  .col-tag{font-family:var(--mono);font-size:11px;font-weight:700;color:var(--gold);text-align:center;margin-bottom:9px}
+
+  /* export bar */
+  .bar{position:fixed;bottom:0;left:0;right:0;background:rgba(13,15,18,.95);backdrop-filter:blur(10px);border-top:1px solid var(--line);padding:12px 20px;display:flex;align-items:center;gap:14px;z-index:50}
+  .bar .info{font-size:12.5px;color:var(--dim);flex:1}
+  .btn{font-family:var(--body);font-size:13.5px;font-weight:700;border-radius:9px;padding:10px 18px;cursor:pointer;border:1px solid var(--line);background:var(--ink2);color:var(--text)}
+  .btn.gold{background:var(--gold);color:#000;border-color:var(--gold)}
+  .btn.ghost{background:transparent;color:var(--dim)}
+  .toast{position:fixed;bottom:70px;left:50%;transform:translateX(-50%);background:var(--ink2);border:1px solid var(--green);border-left:4px solid var(--green);border-radius:10px;padding:11px 18px;font-size:13.5px;font-weight:600;opacity:0;transition:opacity .25s;z-index:60;pointer-events:none}
+  .toast.show{opacity:1}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <span class="label">BAM · sales automation</span>
+    <h1 style="margin-top:12px">The <span class="gold">Sales Crew</span> — model & training</h1>
+    <p class="lede">Conversational <b>agents</b> (each owns a pipeline stage) + adjustable <b>automations</b> (timed nudges). Everything is trainable/editable visually in one <b>Brain</b>. Drop notes anywhere — they auto-save; hit <b>Export</b> to send them back to me.</p>
+  </header>
+
+  <nav>
+    <a href="#loop">Full loop</a>
+    <a href="#booking">📞 Booking</a>
+    <a href="#confirm">✅ Confirm</a>
+    <a href="#trial">⟨Trial⟩</a>
+    <a href="#closing">🎯 Closing</a>
+    <a href="#qualifications">✓ Qualified</a>
+    <a href="#ghosted">👻 Ghosted</a>
+    <a href="#lostnurture">💔 Lead Nurture</a>
+    <a href="#train">🧠 How training works</a>
+    <a href="#guardrails">🛡️ Guardrails</a>
+    <a href="#notes">Big notes</a>
+  </nav>
+
+  <!-- FULL LOOP -->
+  <section id="loop">
+    <div class="sec-head"><span class="sec-num">01</span><h2>The full loop</h2></div>
+    <div class="chart big" style="position:relative">
+      <div class="spinekey">
+        <div class="h">how to read it</div>
+        <div class="row"><span class="sw dash"></span> ⌁ automation</div>
+        <div class="row"><span class="sw glow"></span> ▮ agent</div>
+      </div>
+      <div class="spine">
+        <div class="abox auto cold">💔 Lead Nurture <span style="font-weight:400;font-size:11px;opacity:.8">(sparse · long)</span><span class="pinwrap"><span class="pin"><i class="pdot"></i>Nurture</span></span></div>
+        <div class="conn"><span class="ar">↑</span><span class="lbl">no response after Ghosted</span></div>
+        <div class="abox auto warm">👻 Ghosted <span style="font-weight:400;font-size:11px;opacity:.8">(aggressive · short)</span><span class="pinwrap"><span class="pin"><i class="pdot"></i>Interested</span></span></div>
+        <div class="conn2"><div class="lane"><span class="ar">↑</span><span class="lbl">goes quiet</span></div><div class="lane"><span class="lbl">replies</span><span class="ar">↓</span></div></div>
+        <div class="abox agent book">📅 Booking agent<span class="enter"><span class="nl">🚪 New lead</span><span class="bigarrow">→</span></span><span class="pinwrap"><span class="pin"><i class="pdot"></i>Responded</span></span></div>
+        <div class="conn"><span class="lbl">booked</span><span class="ar">↓</span></div>
+        <div class="abox agent hot"><span class="initauto">⌁ initial automation: fixed confirmation texts/emails on booking</span>✅ Confirm agent<span class="pinwrap"><span class="pin"><i class="pdot"></i>Scheduled Trial</span></span></div>
+        <div class="conn"><span class="lbl">showed + good fit</span><span class="ar">↓</span></div>
+        <div class="abox agent clos"><span class="initauto">⌁ initial automation: fixed post-trial follow-up</span>🎯 Closing agent<span class="pinwrap"><span class="pin"><i class="pdot"></i>Attended / Done Trial</span></span></div>
+        <div class="conn"><span class="lbl">enrolls</span><span class="ar">↓</span></div>
+        <div class="abox memb">🎉 Member<span class="pinwrap"><span class="pin"><i class="pdot"></i>Member</span></span></div>
+      </div>
+    </div>
+
+
+    <div class="note"><label>📝 your note on the overall loop <span class="saved">saved ✓</span></label>
+      <textarea data-note="loop" placeholder="anything about the overall flow, naming, the handoff mechanic…"></textarea></div>
+  </section>
+
+  <!-- BOOKING -->
+  <section id="booking">
+    <div class="sec-head"><span class="sec-num">02</span><h2>📞 Booking agent</h2></div>
+    <p class="sub">The free-trial booker (a.k.a. the "scheduling" agent). Works <b>warm leads</b> — people who already responded — plus every re-entry (<b>can't-make-it · no-show · won-back lost lead</b>), told apart by context it reads from contact memory, so it never opens cold.</p>
+    <div class="chart"><span class="stage-pin">📍 Responded stage</span><pre class="mermaid">
+flowchart LR
+  IN["📥 ENTRY POINTS<br/>1. new lead — form / inbound<br/>2. can't-make-it · no-show<br/>3. won-back / nurture reply<br/>4. ghosted reply<br/>(all carry context)"]:::entry --> G[Goal: book a free trial<br/>specific day + time]:::booking
+  G --> D{lead does what?}:::dec
+  D -->|picks a day + time| BK([booked → ✅ Confirm agent]):::confirm
+  D -->|not interested| L([Lost → 💔 Lead Nurture automation]):::lost
+  D -->|marked unqualified| UQ([🚫 Unqualified]):::abandon
+  D -->|goes quiet| Q([👻 Ghosted automation]):::auto
+  D -->|complaint / off-topic| H([🙋 human]):::human
+  classDef entry fill:#102219,stroke:#34d399,color:#bbf7d0,stroke-width:1.5px
+  classDef booking fill:#2a1b0e,stroke:#fb923c,color:#fed7aa,stroke-width:1.5px
+  classDef confirm fill:#0f2e1f,stroke:#34d399,color:#bbf7d0,stroke-width:1.5px
+  classDef lost fill:#2e1416,stroke:#f87171,color:#fecaca,stroke-width:1.5px
+  classDef abandon fill:#1b232e,stroke:#94a3b8,color:#cbd5e1,stroke-width:1.5px
+  classDef auto fill:#2e2a12,stroke:#E8C547,color:#f5e9bf
+  classDef cold fill:#0c1830,stroke:#3b6fd4,color:#aecbf5,stroke-dasharray:4 3
+  classDef human fill:#1b1f26,stroke:#9aa3af,color:#e8eaed
+  classDef dec fill:#1b1f26,stroke:#9aa3af,color:#e8eaed,stroke-width:1.5px
+  classDef neutral fill:#1b1f26,stroke:#6b7280,color:#e8eaed
+  classDef reentry fill:#102219,stroke:#34d399,color:#bbf7d0,stroke-dasharray:4 3
+    </pre></div>
+    <div class="note"><label>📝 your note — Booking <span class="saved">saved ✓</span></label>
+      <textarea data-note="booking" placeholder="tweaks to goals, the no-show re-entry handling, cadence…"></textarea></div>
+  </section>
+
+  <!-- CONFIRM -->
+  <section id="confirm">
+    <div class="sec-head"><span class="sec-num">03</span><h2>✅ Confirm agent</h2></div>
+    <p class="sub">Works leads who've <b>booked a trial</b>. <b class="gold">Kicks off with a fixed initial automation</b> — the same confirmation text/email to everyone the moment they book. <b>The instant the lead replies to any of it, that automation switches off</b> and the agent takes over (replies, logistics, "can't make it"). The lead <b>stays in the Scheduled Trial stage until the post-trial form is filled</b> — that's when they leave and the agent turns off.</p>
+    <div class="chart"><span class="stage-pin">📍 Scheduled Trial stage</span><pre class="mermaid">
+flowchart LR
+  IN["📥 ENTRY POINTS<br/>• trial booked (from Booking)"]:::entry --> A["⌁ initial automation<br/>fixed confirmation text / email<br/>to everyone on booking"]:::autom
+  A -->|lead replies → automation OFF, agent live| G[Goals: confirm they're coming<br/>· help them get there]:::confirm
+  G --> D{what happens?}:::dec
+  D -->|post-trial form filled| T([⟨Trial⟩ outcomes]):::dec
+  D -->|cannot make it| B([📅 Booking agent — rebook]):::booking
+  D -->|no longer wants it| L([Lost → 💔 Lead Nurture automation]):::lost
+  D -->|marked unqualified| UQ([🚫 Unqualified]):::abandon
+  D -->|complaint / off-topic| H([🙋 human]):::human
+  classDef autom fill:#1f2630,stroke:#8b97ad,color:#cdd6e6,stroke-dasharray:5 3
+  classDef entry fill:#102219,stroke:#34d399,color:#bbf7d0,stroke-width:1.5px
+  classDef confirm fill:#0f2e1f,stroke:#34d399,color:#bbf7d0,stroke-width:1.5px
+  classDef booking fill:#2a1b0e,stroke:#fb923c,color:#fed7aa,stroke-width:1.5px
+  classDef lost fill:#2e1416,stroke:#f87171,color:#fecaca,stroke-width:1.5px
+  classDef abandon fill:#1b232e,stroke:#94a3b8,color:#cbd5e1,stroke-width:1.5px
+  classDef human fill:#1b1f26,stroke:#9aa3af,color:#e8eaed
+  classDef dec fill:#1b1f26,stroke:#9aa3af,color:#e8eaed,stroke-width:1.5px
+    </pre></div>
+    <div class="note"><label>📝 your note — Confirm <span class="saved">saved ✓</span></label>
+      <textarea data-note="confirm" placeholder="goals, the trial-start cutoff, reminder cadence…"></textarea></div>
+  </section>
+
+  <!-- TRIAL -->
+  <section id="trial">
+    <div class="sec-head"><span class="sec-num">04</span><h2>⟨Trial⟩ — the 3 outcomes</h2></div>
+    <p class="sub">After the session, the coach fills a quick <b>post-trial form</b> — that's what decides the branch and moves the lead's stage.</p>
+    <div class="screen" style="max-width:520px;margin:0 auto 16px">
+      <div class="scrn-head"><span class="dots"><i></i><i></i><i></i></span> 📋 Post-trial form <span style="flex:1"></span><span style="font-size:11px;color:var(--dim)">coach fills it after the trial</span></div>
+      <div class="scrn-body">
+        <div style="font-size:12px;color:var(--dim);margin-bottom:6px">Did they show up?</div>
+        <div class="field"><span class="seg"><b class="on">✅ yes</b><b>❌ no-show</b></span></div>
+        <div style="font-size:12px;color:var(--dim);margin:12px 0 6px">Good fit?</div>
+        <div class="field"><span class="seg"><b class="on">👍 good fit</b><b>👎 not a fit</b></span></div>
+        <div style="font-size:12px;color:var(--dim);margin:12px 0 6px">Trainer · notes</div>
+        <div class="field">who ran it + how it went…</div>
+        <div style="margin-top:12px"><span class="minibtn gold">Save → routes the lead</span></div>
+      </div>
+    </div>
+    <div class="chart"><pre class="mermaid">
+flowchart TD
+  T{📋 post-trial form}:::dec
+  T -->|showed + good fit| CL([🎯 Closing → convert to member]):::closing
+  T -->|showed, NOT a fit| AB([🚫 Unqualified<br/>true dead end · no nurture]):::abandon
+  T -->|no-show| B([📅 Booking agent<br/>re-enters with no-showed context]):::booking
+  classDef closing fill:#241433,stroke:#c084fc,color:#e9d5ff,stroke-width:1.5px
+  classDef abandon fill:#1b232e,stroke:#94a3b8,color:#cbd5e1,stroke-width:1.5px
+  classDef booking fill:#2a1b0e,stroke:#fb923c,color:#fed7aa,stroke-width:1.5px
+  classDef dec fill:#1b1f26,stroke:#9aa3af,color:#e8eaed,stroke-width:1.5px
+    </pre></div>
+    <p class="dim" style="font-size:12.5px;margin-top:8px;background:rgba(232,197,71,.05);border:1px solid #3a3f1a;border-radius:9px;padding:10px 12px">⚠️ <b class="gold">Redesign needed:</b> the agents currently mark leads "Lost" with a reason. New model = every agent decides one of two ends — <b>🚫 Unqualified</b> (dead) or <b>💔 Lead Nurture</b> (keep). Needs a new <code>unqualified</code> tag + a light tweak to each agent's "end the lead" logic. <b>For GTA: qualified = lives near Oakville + athlete 9+</b> → unqualified = fails that (or opt-out · invalid · spam).</p>
+    <div class="note"><label>📝 your note — trial outcomes <span class="saved">saved ✓</span></label>
+      <textarea data-note="trial" placeholder="who marks the outcome, timing, lost vs abandoned…"></textarea></div>
+  </section>
+
+  <!-- CLOSING -->
+  <section id="closing">
+    <div class="sec-head"><span class="sec-num">05</span><h2>🎯 Closing agent</h2></div>
+    <p class="sub">Works <b>good-fit attendees</b> after the trial. <b class="gold">Kicks off with a fixed initial automation</b> (a post-trial follow-up to everyone). <b>The instant the lead replies, that automation switches off</b> and the agent takes over to handle objections + convert a good-fit attendee to a paying member. (Designed later — SES-025.)</p>
+    <p class="dim" style="font-size:12.5px;margin-top:8px;background:rgba(232,197,71,.05);border:1px solid #3a3f1a;border-radius:9px;padding:10px 12px">⚠️ <b class="gold">To build:</b> the entire Closing agent (post-trial conversion + objection handling) + its fixed post-trial follow-up automation. Nothing exists yet — SES-025.</p>
+    <p class="dim" style="font-size:12.5px;margin-top:8px;background:rgba(232,197,71,.05);border:1px solid #3a3f1a;border-radius:9px;padding:10px 12px">⚠️ <b class="gold">To build — shared follow-up scheduler</b> (one tool, <b>every agent</b>, replaces the old per-agent nudge queue): set the <b>next</b> touch two ways — <b>(1)</b> staff sets it manually (pick day/time + write the text), or <b>(2)</b> the agent proposes it → lands in <b>Hawkeye</b> for staff to <b>approve or adjust</b> before it's scheduled.</p>
+    <div class="chart"><span class="stage-pin">📍 Attended / Done Trial stage</span><pre class="mermaid">
+flowchart LR
+  IN["📥 ENTRY POINTS<br/>• showed + good fit (from trial)"]:::entry --> A["⌁ initial automation<br/>fixed post-trial follow-up<br/>to everyone"]:::autom
+  A -->|lead replies → automation OFF, agent live| G[Goal: convert to member<br/>handle price / schedule objections]:::closing
+  G --> D{decision}:::dec
+  D -->|enrolls| M([🎉 Member]):::member
+  D -->|says no| L([Lost → 💔 Lead Nurture automation]):::lost
+  D -->|marked unqualified| UQ([🚫 Unqualified]):::abandon
+  D -->|complaint / off-topic| H([🙋 human]):::human
+  classDef autom fill:#1f2630,stroke:#8b97ad,color:#cdd6e6,stroke-dasharray:5 3
+  classDef entry fill:#102219,stroke:#34d399,color:#bbf7d0,stroke-width:1.5px
+  classDef closing fill:#241433,stroke:#c084fc,color:#e9d5ff,stroke-width:1.5px
+  classDef member fill:#2e1322,stroke:#ec4899,color:#fbcfe8,stroke-width:1.5px
+  classDef lost fill:#2e1416,stroke:#f87171,color:#fecaca,stroke-width:1.5px
+  classDef abandon fill:#1b232e,stroke:#94a3b8,color:#cbd5e1,stroke-width:1.5px
+  classDef human fill:#1b1f26,stroke:#9aa3af,color:#e8eaed
+  classDef dec fill:#1b1f26,stroke:#9aa3af,color:#e8eaed,stroke-width:1.5px
+    </pre></div>
+    <div class="note"><label>📝 your note — Closing <span class="saved">saved ✓</span></label>
+      <textarea data-note="closing" placeholder="how aggressive, cadence, what counts as 'closed'…"></textarea></div>
+  </section>
+
+  <!-- QUALIFICATIONS -->
+  <section id="qualifications">
+    <div class="sec-head"><span class="sec-num">🎯</span><h2>Qualifications — what counts as a qualified lead</h2></div>
+    <p class="sub">This is the rule every agent uses to decide <b>🚫 Unqualified</b> vs keep going. It's <b>not hard-coded</b> — it lives in the agent's <b>Brain</b> (the per-academy config) and the owner edits it visually, no code. <b>For GTA: qualified = lives near Oakville + athlete 9+.</b> Fail either → unqualified.</p>
+    <div class="screen" style="max-width:580px;margin:0 auto">
+      <div class="scrn-head"><span class="dots"><i></i><i></i><i></i></span> 🧠 Brain · Who qualifies <span style="flex:1"></span><span style="font-size:10px;color:var(--green)">client-editable</span></div>
+      <div class="scrn-body">
+        <div style="font-size:12px;color:var(--dim);margin-bottom:6px">📍 Service area</div>
+        <div class="field">within ~<b style="color:var(--text)">30 min</b> of <b style="color:var(--text)">Oakville, ON</b></div>
+        <div style="font-size:12px;color:var(--dim);margin:12px 0 6px">🎂 Athlete age</div>
+        <div class="field"><b style="color:var(--text)">9</b> and up</div>
+        <div style="font-size:12px;color:var(--dim);margin:12px 0 6px">🚫 Always disqualify</div>
+        <div class="field">opted out · invalid / wrong number · spam / vendor · wants a sport we don't offer</div>
+        <div style="margin-top:12px;font-size:11.5px;color:var(--text-mute,#6b7280)">▸ fails any → <b style="color:#94a3b8">🚫 Unqualified</b> = <b>removed from the pipeline</b> (no nurture, no further outreach) &nbsp;·&nbsp; passes → continue. Change the radius or age here and <b>every agent uses it instantly</b>.</div>
+      </div>
+    </div>
+    <div class="chart" style="text-align:left;margin-top:14px;background:rgba(52,211,153,.05);border-color:#1f4d3a">
+      <b class="green">✦ Editable in the Brain.</b> <span class="dim">These live in the brain's FACT sections — <code>business_info</code> (service area), <code>program</code> (age range), <code>qualification_config</code> (who qualifies). The academy owner edits them in the same <b>visual Brain editor</b> as everything else (📝 Brain tab) — or, for now, just tell me in a Claude Code chat and I update the config. No deploy; the agents read the new rule on the next message.</span>
+    </div>
+    <div class="note"><label>📝 your note — qualifications <span class="saved">saved ✓</span></label>
+      <textarea data-note="qualifications" placeholder="radius / age / disqualify rules · how strict · per-academy differences…"></textarea></div>
+  </section>
+
+  <!-- GHOSTED -->
+  <section id="ghosted">
+    <div class="sec-head"><span class="sec-num">06</span><h2>👻 Ghosted — an automation, not an agent</h2></div>
+    <p class="sub"><b>Aggressive + short.</b> A ghosted lead isn't replying, so there's nothing to "converse" with — it's just timed nudges into silence. An <b>adjustable automation</b>, not an agent. The second they reply → straight back to <b class="blue">Booking</b>. If they're <b>still</b> silent after the nudges → they roll down into the <b class="gold">💔 Lead Nurture</b> (the sparse long game) — they're not given up on, just touched less often.</p>
+    <p class="dim" style="font-size:12.5px;margin-top:8px;background:rgba(232,197,71,.05);border:1px solid #3a3f1a;border-radius:9px;padding:10px 12px">⚠️ <b class="gold">Redesign needed:</b> today this runs as a rigid <b>GHL workflow</b> — rebuild it as a portal automation so it's editable in the Brain + observable, then switch the GHL one off.</p>
+    <div class="chart"><span class="stage-pin">📍 Interested stage</span><pre class="mermaid">
+flowchart LR
+  Q([Lead went quiet]):::neutral --> N1[👻 nudge · day 1]:::auto
+  N1 --> N2[nudge · day 3]:::auto
+  N2 --> N3[nudge · day 7]:::auto
+  N3 --> LN([💔 Lead Nurture<br/>sparse · long-term]):::cold
+  N1 -.->|replies| B
+  N2 -.->|replies| B
+  N3 -.->|replies| B[📞 Booking — live convo]:::booking
+  classDef auto fill:#2e2a12,stroke:#E8C547,color:#f5e9bf
+  classDef cold fill:#0c1830,stroke:#3b6fd4,color:#aecbf5,stroke-width:1.5px
+  classDef booking fill:#2a1b0e,stroke:#fb923c,color:#fed7aa,stroke-width:1.5px
+  classDef neutral fill:#1b1f26,stroke:#6b7280,color:#e8eaed
+    </pre></div>
+    <p class="sub" style="margin-top:16px;margin-bottom:8px">The client edits it <b>visually in the Brain</b> — a step builder, not code:</p>
+    <div class="screen" style="max-width:560px;margin:0 auto">
+      <div class="scrn-head"><span class="dots"><i></i><i></i><i></i></span> 🧠 Brain · 👻 Ghosted sequence <span style="flex:1"></span><span class="seg"><b class="on">on</b><b>off</b></span></div>
+      <div class="scrn-body">
+        <div style="font-size:12px;color:var(--dim);margin-bottom:6px">① ⏱ wait <b style="color:var(--text)">1 day</b></div>
+        <div class="field">💬 "Hey {{name}}! Still keen to try a session this week?"</div>
+        <div style="font-size:12px;color:var(--dim);margin:12px 0 6px">② ⏱ wait <b style="color:var(--text)">2 days</b></div>
+        <div class="field">💬 "No rush — want me to hold a Saturday spot for {{athlete}}?"</div>
+        <div style="font-size:12px;color:var(--dim);margin:12px 0 6px">③ ⏱ wait <b style="color:var(--text)">3 days</b> → then 🛑 stop &amp; mark Lost</div>
+        <div class="field">💬 "All good if the timing's off — we're here whenever 👍"</div>
+        <div style="margin-top:12px"><span class="minibtn">+ add step</span><span class="minibtn gold">✦ AI-personalize: ON</span></div>
+      </div>
+    </div>
+    <div class="note"><label>📝 your note — Ghosted automation <span class="saved">saved ✓</span></label>
+      <textarea data-note="ghosted" placeholder="cadence, # of nudges, AI vs template, when to stop…"></textarea></div>
+  </section>
+
+  <!-- LOST-LEAD NURTURE -->
+  <section id="lostnurture">
+    <div class="sec-head"><span class="sec-num">07</span><h2>💔 Lead Nurture — the long game</h2></div>
+    <p class="sub">The <b>catch-all for everyone who didn't convert</b> — fed by two streams: leads who ran out of 👻 Ghosted (still silent) <b>and</b> anyone marked <b>Lost at any stage</b> (Booking / Confirm / Closing) who isn't <b>🚫 Unqualified</b>. Not given up on — just touched <b>sparingly</b> (odd email or text over weeks → months). One-way, so an <b>automation, not an agent</b>. Any reply → <b class="blue">Booking</b> with context. <span class="gold">Exact cadence = you'll define the first one.</span></p>
+    <p class="dim" style="font-size:12.5px;margin-top:8px;background:rgba(232,197,71,.05);border:1px solid #3a3f1a;border-radius:9px;padding:10px 12px">⚠️ <b class="gold">To build:</b> the whole Lead Nurture automation — the sparse cadence, email + text sends (via Resend), the <code>unqualified</code> gate, and routing every non-unqualified Lost lead in here. Nothing exists yet.</p>
+    <p class="dim" style="font-size:12.5px;margin-top:8px;background:rgba(232,197,71,.05);border:1px solid #3a3f1a;border-radius:9px;padding:10px 12px">⚠️ <b class="gold">To build — the whole Resend email system:</b> a <b>shared foundation</b> for every email send (Lead Nurture, Ghosted email, the Confirm/Closing initial automations). Needs: verify a sending domain + DNS (SPF/DKIM/DMARC), an <code>api/_email.js</code> send wrapper, templates, and a delivery/bounce webhook. (Resend's already wired for password-reset emails — extend that.)</p>
+    <div class="chart"><span class="stage-pin">📍 Nurture stage</span><pre class="mermaid">
+flowchart LR
+  G([👻 Ghosted ran out · silent]):::auto --> CK
+  LO([marked Lost · any stage<br/>Booking · Confirm · Closing]):::lost --> CK
+  CK{Unqualified?}:::dec
+  CK -->|yes| STOP([🚫 dead end · no nurture]):::abandon
+  CK -->|no| W1[💔 📧 email · sparse]:::cold
+  W1 --> W2[💬 text · sparser]:::cold
+  W2 --> W3([… keeps going<br/>cadence TBD]):::neutral
+  W1 -.->|replies| B
+  W2 -.->|replies| B[📞 Booking + context]:::booking
+  classDef auto fill:#2e2a12,stroke:#E8C547,color:#f5e9bf
+  classDef cold fill:#0c1830,stroke:#3b6fd4,color:#aecbf5,stroke-width:1.5px
+  classDef booking fill:#2a1b0e,stroke:#fb923c,color:#fed7aa,stroke-width:1.5px
+  classDef lost fill:#2e1416,stroke:#f87171,color:#fecaca,stroke-width:1.5px
+  classDef abandon fill:#1b232e,stroke:#94a3b8,color:#cbd5e1,stroke-width:1.5px
+  classDef dec fill:#1b1f26,stroke:#9aa3af,color:#e8eaed,stroke-width:1.5px
+  classDef neutral fill:#1b1f26,stroke:#6b7280,color:#e8eaed
+    </pre></div>
+    <div class="chart" style="text-align:left;margin-top:14px;background:rgba(96,165,250,.05);border-color:#1e3a5f">
+      <b class="blue">↩ On reply → Booking, with context.</b> <span class="dim">Just like no-show and ghosted-reply, the automation drops a note ("went quiet weeks ago, sitting in long-term nurture — re-engaged off a seasonal touch") and bounces them to Booking. The Booking agent reads it from contact memory, so it <b>opens warm, never cold</b> ("hey, good to hear from you again!") instead of pitching like a brand-new lead.</span></div>
+
+    <p class="sub" style="margin-top:14px;margin-bottom:0">Edited in the <b>same visual Brain step-builder</b> as 👻 Ghosted — just <b>way</b> sparser, and it mixes <b>email + text</b>. Two automations now, in sequence: <b class="gold">👻 Ghosted</b> (aggressive, short) → <b class="gold">💔 Lead Nurture</b> (sparse, long-term).</p>
+
+    <div class="screen" style="max-width:560px;margin:0 auto 16px">
+      <div class="scrn-head"><span class="dots"><i></i><i></i><i></i></span> 🧠 Brain · 💔 Lead Nurture <span style="flex:1"></span><span class="seg"><b class="on">on</b><b>off</b></span></div>
+      <div class="scrn-body">
+        <div style="font-size:11.5px;color:var(--dim);margin-bottom:10px;border:1px solid var(--line);border-radius:7px;padding:6px 9px">🎯 skips <b style="color:var(--text)">opted-out · invalid · already-member</b> leads. Each step picks a channel.</div>
+        <div style="font-size:12px;color:var(--dim);margin-bottom:6px">① ⏱ wait <b style="color:var(--text)">2 weeks</b> · <b class="blue">📧 email</b></div>
+        <div class="field">"Hey {{name}}! No pressure at all — we just opened new session times. Want to grab a free trial for {{athlete}}?"</div>
+        <div style="font-size:12px;color:var(--dim);margin:12px 0 6px">② ⏱ wait <b style="color:var(--text)">1 month</b> · <b class="gold">💬 text</b></div>
+        <div class="field">"Checking in 👋 happy to hold a spot whenever {{athlete}} wants to give it a shot."</div>
+        <div style="font-size:12px;color:var(--dim);margin:12px 0 6px">③ ⏱ wait <b style="color:var(--text)">3 months</b> · <b class="blue">📧 email</b> → then repeats sparsely</div>
+        <div class="field">"New season starting — would love to have {{athlete}} try a session if the timing works better now."</div>
+        <div style="margin-top:12px"><span class="minibtn">+ add step</span><span class="minibtn gold">✦ AI-personalize: ON</span></div>
+      </div>
+    </div>
+
+
+    <div class="note"><label>📝 your note — Lost-lead nurture <span class="saved">saved ✓</span></label>
+      <textarea data-note="lostnurture" placeholder="cadence (weeks/months), which Lost reasons get nurtured, promo angle, when to stop…"></textarea></div>
+  </section>
+
+  <!-- HOW TRAINING WORKS -->
+  <section id="train">
+    <div class="sec-head"><span class="sec-num">09</span><h2>🧠 How training works — end to end</h2></div>
+    <p class="sub"><b>Same for every agent</b> (Booking · Confirm · Closing — just pick it in the header). You teach in plain English; the <b>live agent changes within one message</b>. Below: the whole loop as screens, plus what happens in the backend at each step. <span class="dim">(Mock UI — shows the shape.)</span></p>
+
+    <div class="flow">
+
+      <!-- STAGE 1 -->
+      <div class="stage-label">① TEST IT — play the parent in the Sandbox</div>
+      <div class="screen">
+        <div class="scrn-head"><span class="dots"><i></i><i></i><i></i></span> 🎮 Agent Sandbox
+          <span class="seg" style="margin-left:6px"><b class="on">📞 Booking</b><b>✅ Confirm</b><b>🎯 Closing</b></span>
+          <span style="flex:1"></span><span style="color:var(--orange);font-size:11px">⚠ training only — nothing sent</span></div>
+        <div class="scrn-body">
+          <div class="bub lead">how much is it</div>
+          <div class="bub bot">We've got a few plans — we go over the details at the free trial. Want me to find you a time this week?</div>
+          <div><span class="minibtn">📝 teach</span><span class="minibtn">⭐ save as example</span></div>
+        </div>
+      </div>
+      <div class="beapi">
+        <span class="tag">backend · what just happened</span>
+        <div class="k">POST /api/agent-sandbox · buildAgentSystem(agent) → Claude</div>
+        <div class="plain">It answered using its <b>current brain</b> — pulled the live prompt + any lessons/examples, asked Claude, showed the reply. <b>Nothing saved yet.</b> Pure practice.</div>
+      </div>
+
+      <div class="flow-arrow">↓<small>see something off? fix it any of 3 ways</small></div>
+
+      <!-- STAGE 2 — branch -->
+      <div class="stage-label">② CORRECT IT — pick whichever fits</div>
+      <div class="branch">
+        <!-- A -->
+        <div class="col">
+          <div class="col-tag">A · quick rule</div>
+          <div class="screen">
+            <div class="scrn-head">📝 Teach the agent</div>
+            <div class="scrn-body">
+              <div style="font-size:11.5px;color:var(--dim);margin-bottom:6px">What should it do instead?</div>
+              <div class="field edit">Don't mention plans at all — just pivot to booking the trial.</div>
+              <div style="margin-top:9px"><span class="minibtn gold">Save lesson</span></div>
+            </div>
+          </div>
+          <div class="beapi">
+            <span class="tag">backend</span>
+            <div class="k">INSERT agent_lessons<br/>(client_id, kind:'fix', lesson)</div>
+            <div class="plain">A one-line rule that <b>overrides</b> everything else. Sticks forever — for this academy only.</div>
+          </div>
+        </div>
+        <!-- B -->
+        <div class="col">
+          <div class="col-tag">B · perfect example</div>
+          <div class="screen">
+            <div class="scrn-head">⭐ Save as example</div>
+            <div class="scrn-body">
+              <div class="bub lead" style="font-size:12px">can I just drop her off?</div>
+              <div class="bub bot" style="font-size:12px">Totally — drop-off's fine as long as you booked it. See you Monday at 7?</div>
+              <div style="margin-top:7px"><span class="minibtn gold">⭐ save</span></div>
+            </div>
+          </div>
+          <div class="beapi">
+            <span class="tag">backend</span>
+            <div class="k">INSERT agent_examples<br/>(client_id, parent_text, agent_text)</div>
+            <div class="plain">A gold-standard exchange. The agent <b>copies its tone & length</b> on future replies.</div>
+          </div>
+        </div>
+        <!-- C -->
+        <div class="col">
+          <div class="col-tag">C · edit the brain</div>
+          <div class="screen">
+            <div class="scrn-head">📝 Brain · Booking</div>
+            <div class="scrn-body">
+              <div style="font-size:12px;color:var(--text);font-weight:600">🌐 Objection handling <span style="font-size:10px;color:var(--gold);border:1px solid var(--gold);border-radius:99px;padding:0 6px">✏️ edited</span></div>
+              <div class="field edit" style="margin-top:7px">Acknowledge cost, share the range, then redirect to the free trial. Never quote an exact plan price first…</div>
+              <div style="margin-top:9px"><span class="minibtn gold">Save</span><span class="minibtn">Reset</span></div>
+            </div>
+          </div>
+          <div class="beapi">
+            <span class="tag">backend</span>
+            <div class="k">UPSERT agent_prompt_sections<br/>(client_id, section_key, body)</div>
+            <div class="plain">Rewrites a whole instruction block — the deepest change. Your version <b>replaces the default</b> for this academy.</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="flow-arrow">↓<small>all three land in the same place</small></div>
+
+      <!-- STAGE 3 -->
+      <div class="stage-label">③ STORED — per academy, per agent</div>
+      <div class="beapi" style="border-left-color:var(--blue);border-color:#1e3a5f;background:#0b1622">
+        <span class="tag" style="color:var(--blue)">backend · Supabase</span>
+        <div class="k" style="color:#bcd6f5">agent_lessons · agent_examples · agent_prompt_sections<br/>— all scoped by (client_id, agent)</div>
+        <div class="plain">Every academy has its <b>own</b> brain. BAM GTA's lessons never touch another academy's agent. Switching the Booking↔Confirm picker reads a different slice.</div>
+      </div>
+
+      <div class="flow-arrow">↓</div>
+
+      <!-- STAGE 4 -->
+      <div class="stage-label">④ ASSEMBLED — the moment it goes live</div>
+      <div class="beapi" style="border-left-color:var(--gold);border-color:#544a1d;background:#1a1708">
+        <span class="tag" style="color:var(--gold)">backend · buildAgentSystem()</span>
+        <div class="k" style="color:#f0dea0">brain sections + your overrides + lessons + examples → one system prompt</div>
+        <div class="plain">On the <b>very next message</b>, the prompt is rebuilt fresh from the latest data — sandbox AND live. <b>No deploy, no wait.</b> That's why a fix shows up instantly.</div>
+      </div>
+
+      <div class="flow-arrow">↓<small>now let it draft for real leads</small></div>
+
+      <!-- STAGE 5 -->
+      <div class="stage-label">⑤ GO LIVE — approve real drafts in Hawkeye</div>
+      <div class="screen">
+        <div class="scrn-head"><span class="dots"><i></i><i></i><i></i></span> 👁 Hawkeye — approve before it sends</div>
+        <div class="scrn-body">
+          <div style="font-size:12.5px;font-weight:700;margin-bottom:5px">Sarah <span style="font-size:11px;color:var(--dim);font-weight:400">· 82% sure</span></div>
+          <div class="bub lead" style="font-size:12.5px">do you have weekend spots?</div>
+          <div style="font-size:9.5px;color:var(--faint);text-transform:uppercase;letter-spacing:.08em;margin:3px 0 4px">proposed · edit right here</div>
+          <div class="field edit">Yep! Saturdays at 11:30. Want me to hold a spot for you?</div>
+          <div style="margin-top:9px"><span class="minibtn">✕ skip</span><span class="minibtn gold">✓ Approve &amp; send</span></div>
+        </div>
+      </div>
+      <div class="beapi">
+        <span class="tag">backend · the loop closes</span>
+        <div class="k">edit + Approve → /api/agent-approvals send · optional lesson saved</div>
+        <div class="plain">Real lead, real send — <b>you</b> still approve. And every time you <b>tweak</b> a draft before approving, that edit is another training signal. ↻ back to ①.</div>
+      </div>
+
+      <div class="flow-arrow">↻<small>the more you approve & correct, the better it gets — per academy</small></div>
+    </div>
+
+    <div class="chart" style="margin-top:18px;text-align:left">
+      <b>Automations train the same way</b>, just a different editor: the 👻 Ghosted step-builder writes to an <span class="mono" style="color:#8fe7b4;font-size:12.5px">automation_steps</span> table instead of prompt sections — same Brain, same "instant-live," same per-academy scoping. Agents = prose you teach; automations = steps you arrange.
+    </div>
+
+    <style>
+      details.tdrop{background:var(--ink2);border:1px solid var(--line);border-radius:10px;margin-bottom:9px;overflow:hidden}
+      details.tdrop > summary{padding:12px 14px;cursor:pointer;font-weight:600;font-size:14px;list-style:none;display:flex;align-items:center;gap:9px}
+      details.tdrop > summary::-webkit-details-marker{display:none}
+      details.tdrop > summary::after{content:"▸";margin-left:auto;color:var(--faint);transition:transform .15s}
+      details.tdrop[open] > summary::after{transform:rotate(90deg)}
+      details.tdrop .tbody{padding:11px 14px 13px;border-top:1px solid var(--line);font-size:13px;color:var(--dim);line-height:1.55}
+      .tbody .wl{font-family:var(--mono);font-size:9.5px;letter-spacing:1px;text-transform:uppercase;color:var(--gold);display:block;margin:9px 0 3px}
+      .tstep{background:var(--ink2);border:1px solid var(--line);border-radius:10px;padding:12px 14px;text-align:center;font-weight:700;font-size:14px;max-width:520px;margin:0 auto}
+      .tstep.go{border-color:#34d399;color:#bbf7d0;background:#0f2e1f}
+      .tar{text-align:center;color:var(--faint);font-size:18px;margin:7px 0}
+    </style>
+    <div style="margin-top:26px">
+      <div style="font-family:var(--display);font-size:17px;font-weight:700;margin-bottom:4px">🖱️ When you click "Train Agent" — the flow</div>
+      <p class="sub">Tap each tool to expand what it trains and how.</p>
+      <div class="tstep">🖱️ Click <b>"Train Agent"</b></div>
+      <div class="tar">↓</div>
+      <div class="tstep go">Pick the agent &nbsp;·&nbsp; 📅 Booking &nbsp;|&nbsp; ✅ Confirm &nbsp;|&nbsp; 🎯 Closing</div>
+      <div class="tar">↓ &nbsp;<span style="font-size:11px">then you get these tools</span></div>
+
+      <details class="tdrop"><summary>🎚️ Autonomy — turn it on / off</summary>
+        <div class="tbody"><span class="wl">what you set</span>off · 👁 <b style="color:var(--text)">Hawkeye</b> (you approve every message) · 🚀 <b style="color:var(--text)">Self-drive</b> (it auto-sends confident ones; unsure → inbox).
+        <span class="wl">how</span>tap the segmented control for that academy. Each agent has its own switch.</div>
+      </details>
+
+      <details class="tdrop"><summary>💬 Sandbox — test it like a real lead</summary>
+        <div class="tbody"><span class="wl">what you do</span>chat as a fake parent and watch the agent reply (nothing is sent).
+        <span class="wl">how you train</span>after a reply: hit <b style="color:var(--text)">📝 teach</b> (type a one-line correction) or <b style="color:var(--text)">⭐ save as example</b> (lock in a perfect reply). Both stick to this academy.</div>
+      </details>
+
+      <details class="tdrop"><summary>📝 Brain — edit its actual instructions</summary>
+        <div class="tbody"><span class="wl">what you can edit</span>every section: <b style="color:var(--text)">role · tone · qualification · objection handling · flow · guardrails</b>, the <b style="color:var(--text)">FACT config</b> (pricing · schedule · who-qualifies · service area · age), and the agent-specific bits (confirm / nurture steps).
+        <span class="wl">how</span>open a section card → edit the text → <b style="color:var(--text)">Save</b>. Reset-to-default anytime. Lands on the very next message — no deploy.
+        <span class="wl">examples organized by action ⚠️ to build</span>each agent's Brain holds a <b style="color:var(--text)">list of examples under every action it can take</b>. Teach an example in Hawkeye → it files under the right action, so training is <b style="color:var(--text)">organized by what the bot does</b>, not one flat pile. The action buckets per agent:
+        <div style="margin-top:8px;line-height:1.85;color:var(--text)">
+          <b class="orange">📅 Booking:</b> <span class="dim">book the trial · qualify the lead · handle pricing objection · re-engage (no-show / won-back / ghosted reply) · hand off "can't make it" · mark unqualified · escalate to human</span><br/>
+          <b class="green">✅ Confirm:</b> <span class="dim">confirm attendance · share logistics · hand off "can't make it" → Booking · mark unqualified · escalate to human</span><br/>
+          <b class="purple">🎯 Closing:</b> <span class="dim">close / enroll · handle objection · schedule a follow-up · mark Lost → Nurture · mark unqualified · escalate to human</span>
+        </div></div>
+      </details>
+
+      <details class="tdrop"><summary>🧪 Break-it — stress test it</summary>
+        <div class="tbody"><span class="wl">what it does</span>40+ tricky scenarios — jailbreaks, hallucination bait, pricing edges, off-topic.
+        <span class="wl">how</span>hit <b style="color:var(--text)">▶ try</b> → watch the reply → mark <b style="color:var(--text)">✅ held up</b> or <b style="color:var(--text)">❌ broke</b>. Marks save in your browser.</div>
+      </details>
+
+      <details class="tdrop"><summary>📅 Follow-up scheduler — set the next touch (any agent)</summary>
+        <div class="tbody"><span class="wl">what it does</span>schedule a specific next message for a lead — one shared tool every agent can use (e.g. "they said check back Sunday").
+        <span class="wl">how</span>two ways: <b style="color:var(--text)">staff sets it</b> (pick day/time + write the text), or the <b style="color:var(--text)">agent proposes it</b> → lands in <b style="color:var(--text)">Hawkeye</b> to approve or adjust before it's scheduled. Replaces the old per-agent nudge queue.</div>
+      </details>
+
+      <p class="dim" style="font-size:12.5px;margin-top:8px">Every change here saves to <b style="color:var(--text)">this academy's brain only</b> and goes live on the next message. Same screen trains every agent — just flip the agent picker at the top.</p>
+    </div>
+
+    <div class="note"><label>📝 your note — how training works <span class="saved">saved ✓</span></label>
+      <textarea data-note="train" placeholder="anything about the training loop, who can do it (staff vs client), what you'd change…"></textarea></div>
+  </section>
+
+  <!-- GUARDRAILS -->
+  <section id="guardrails">
+    <div class="sec-head"><span class="sec-num">10</span><h2>🛡️ Guardrails for the multi-bot system</h2></div>
+    <p class="sub">Non-negotiables so a human always has eyes + an off-switch on every bot. <span class="green">✅ have</span> · <span class="gold">🔶 partial</span> · <span class="blue">🆕 new build</span>.</p>
+    <div class="chart" style="text-align:left;padding:6px 8px">
+      <table style="width:100%;border-collapse:collapse;font-size:14px">
+        <tbody>
+          <tr style="border-bottom:1px solid var(--line)"><td style="padding:12px 12px;width:40px">🔔</td><td style="padding:12px 12px"><b>Notify on ALL inbound messages</b><div class="dim" style="font-size:12.5px">every parent text pings a human, not just first-touch</div></td><td style="padding:12px 12px;white-space:nowrap"><span class="gold mono" style="font-size:12px">🔶 partial</span><div class="dim" style="font-size:11.5px">today: only Responded replies</div></td></tr>
+          <tr style="border-bottom:1px solid var(--line)"><td style="padding:12px 12px">✨</td><td style="padding:12px 12px"><b>Pipeline glows → which bot is active</b><div class="dim" style="font-size:12.5px">each stage lights up by the bot running it, at a glance. <b>Stages run by an automation (not an agent) get a dashed coloured outline</b>; agent stages glow solid — matching <b>dashed = automation, glowing = agent</b>.</div></td><td style="padding:12px 12px;white-space:nowrap"><span class="gold mono" style="font-size:12px">🔶 partial</span><div class="dim" style="font-size:11.5px">Responded glow exists</div></td></tr>
+          <tr style="border-bottom:1px solid var(--line)"><td style="padding:12px 12px">👁</td><td style="padding:12px 12px"><b>Hawkeye approval queue for EVERY bot</b><div class="dim" style="font-size:12.5px">no bot can send without a human ✓ in its own inbox</div></td><td style="padding:12px 12px;white-space:nowrap"><span class="gold mono" style="font-size:12px">🔶 partial</span><div class="dim" style="font-size:11.5px">Booking + Confirm done</div></td></tr>
+          <tr style="border-bottom:1px solid var(--line)"><td style="padding:12px 12px">🎨</td><td style="padding:12px 12px"><b>Coloured / dashed outline on a conversation</b><div class="dim" style="font-size:12.5px">in the inbox, a convo tab is outlined when a bot is live in it (colour = which bot)</div></td><td style="padding:12px 12px;white-space:nowrap"><span class="blue mono" style="font-size:12px">🆕 new</span></td></tr>
+          <tr style="border-bottom:1px solid var(--line)"><td style="padding:12px 12px">⏻</td><td style="padding:12px 12px"><b>Turn a bot OFF (globally)</b><div class="dim" style="font-size:12.5px">per-bot kill switch (off / Hawkeye / Self-drive)</div></td><td style="padding:12px 12px;white-space:nowrap"><span class="green mono" style="font-size:12px">✅ have</span><div class="dim" style="font-size:11.5px">the mode toggle</div></td></tr>
+          <tr style="border-bottom:1px solid var(--line)"><td style="padding:12px 12px">⏸</td><td style="padding:12px 12px"><b>Turn a bot off for a SPECIFIC convo / card</b><div class="dim" style="font-size:12.5px">"hands off this one" — mute a bot on a single lead or a single drafted card</div></td><td style="padding:12px 12px;white-space:nowrap"><span class="blue mono" style="font-size:12px">🆕 new</span></td></tr>
+          <tr style="border-bottom:1px solid var(--line)"><td style="padding:12px 12px">🔒</td><td style="padding:12px 12px"><b>First-come-first-serve on Hawkeye cards</b><div class="dim" style="font-size:12.5px">two staff can't both action the same card/lead — first action wins (atomic claim), the second gets "already handled by [name]" instead of a double-send</div></td><td style="padding:12px 12px;white-space:nowrap"><span class="blue mono" style="font-size:12px">🆕 new</span></td></tr>
+          <tr><td style="padding:12px 12px">👁</td><td style="padding:12px 12px"><b>Client can see inside every automation</b><div class="dim" style="font-size:12.5px">a list of every automation + how many people are in it (total <b>and</b> per step). Click in → the list of people; click a person → their <b>contact drawer</b> opens.</div></td><td style="padding:12px 12px;white-space:nowrap"><span class="blue mono" style="font-size:12px">🆕 new</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="sub" style="margin-top:18px;margin-bottom:8px">What "see inside every automation" looks like for the client:</p>
+    <div class="screen" style="max-width:560px;margin:0 auto">
+      <div class="scrn-head"><span class="dots"><i></i><i></i><i></i></span> 📡 Automations</div>
+      <div class="scrn-body">
+        <div style="display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--line)"><span style="font-weight:700;font-size:13.5px">👻 Ghosted</span><span style="flex:1"></span><span class="seg"><b class="on">on</b></span><span style="font-family:var(--mono);font-size:12px;color:var(--gold)">142 people ›</span></div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;padding:8px 0 12px;font-family:var(--mono);font-size:11px;color:var(--dim)"><span style="border:1px solid var(--line);border-radius:6px;padding:3px 8px">① day 1 · <b style="color:var(--text)">88</b></span><span style="border:1px solid var(--line);border-radius:6px;padding:3px 8px">② day 3 · <b style="color:var(--text)">39</b></span><span style="border:1px solid var(--line);border-radius:6px;padding:3px 8px">③ day 7 · <b style="color:var(--text)">15</b></span></div>
+        <div style="display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--line)"><span style="font-weight:700;font-size:13.5px">💔 Lead Nurture</span><span style="flex:1"></span><span class="seg"><b class="on">on</b></span><span style="font-family:var(--mono);font-size:12px;color:var(--gold)">1,204 people ›</span></div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;padding:8px 0 4px;font-family:var(--mono);font-size:11px;color:var(--dim)"><span style="border:1px solid var(--line);border-radius:6px;padding:3px 8px">① 2wk · <b style="color:var(--text)">410</b></span><span style="border:1px solid var(--line);border-radius:6px;padding:3px 8px">② 1mo · <b style="color:var(--text)">560</b></span><span style="border:1px solid var(--line);border-radius:6px;padding:3px 8px">③ 3mo · <b style="color:var(--text)">234</b></span></div>
+        <div style="margin-top:12px;font-size:11.5px;color:var(--text-mute,#6b7280)">▸ tap a count → list of those people → tap a person → their <b style="color:var(--text)">contact drawer</b> opens</div>
+      </div>
+    </div>
+    <p class="dim" style="font-size:13px;margin-top:14px;background:rgba(232,197,71,.05);border:1px solid #3a3f1a;border-radius:9px;padding:12px 14px">
+      <b class="gold">Agents vs automations — the one rule that differs:</b> agents (Booking · Confirm · Closing) run a live conversation, so Hawkeye = <b>approve each message</b>. Automations (👻 Ghosted · 💔 Lost-nurture) are scheduled one-way nudges, so Hawkeye = <b>approve the sequence once</b>. Everything else (notify, glow, global + per-lead off-switches) is <b>identical</b>. And <b>every bot/automation owns a pipeline stage</b> — so it glows + is visible on the board.
+    </p>
+    <div class="note"><label>📝 your note — guardrails <span class="saved">saved ✓</span></label>
+      <textarea data-note="guardrails" placeholder="add / change guardrails, priority order, edge cases…"></textarea></div>
+  </section>
+
+  <!-- BIG NOTES -->
+  <section id="notes">
+    <div class="sec-head"><span class="sec-num">11</span><h2>Anything else</h2></div>
+    <div class="note"><label>🧠 open notes / questions / ideas <span class="saved">saved ✓</span></label>
+      <textarea data-note="big" style="min-height:150px" placeholder="dump anything — questions, edge cases, naming, things to change…"></textarea></div>
+  </section>
+
+</div>
+
+<div class="bar">
+  <div class="info">✍️ Notes auto-save in this browser. <span class="dim" id="count"></span></div>
+  <button class="btn ghost" onclick="clearNotes()">Clear all</button>
+  <button class="btn gold" onclick="exportNotes()">⬆ Export my notes</button>
+</div>
+<div class="toast" id="toast"></div>
+
+<script type="module">
+  import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
+  mermaid.initialize({
+    startOnLoad: true, theme: 'base', securityLevel: 'loose',
+    themeVariables: {
+      background: '#14171c', primaryColor: '#1b1f26', primaryTextColor: '#e8eaed', primaryBorderColor: '#2a2f38',
+      lineColor: '#7b8493', edgeLabelBackground: '#14171c', tertiaryColor: '#14171c',
+      fontFamily: 'Inter, sans-serif', fontSize: '14px',
+    },
+  });
+</script>
+<script>
+  const KEY = 'scm_notes_v3';
+  const LABELS = { loop:'Overall loop', booking:'Booking agent', confirm:'Confirm agent', trial:'Trial outcomes', closing:'Closing agent', qualifications:'Qualifications', ghosted:'Ghosted automation', lostnurture:'Lead Nurture', build:'What to build', train:'How training works', guardrails:'Guardrails', big:'Open notes' };
+  function load(){ try { return JSON.parse(localStorage.getItem(KEY) || '{}'); } catch(_){ return {}; } }
+  function save(d){ localStorage.setItem(KEY, JSON.stringify(d)); }
+  const store = load();
+  function refreshCount(){ const n = Object.values(store).filter(v => (v||'').trim()).length; document.getElementById('count').textContent = n ? `${n} section${n>1?'s':''} noted` : 'no notes yet'; }
+  document.querySelectorAll('textarea[data-note]').forEach(ta => {
+    const id = ta.getAttribute('data-note');
+    if (store[id]) ta.value = store[id];
+    let t;
+    ta.addEventListener('input', () => {
+      store[id] = ta.value; save(store); refreshCount();
+      const tag = ta.closest('.note').querySelector('.saved');
+      if (tag){ tag.classList.add('show'); clearTimeout(t); t = setTimeout(()=>tag.classList.remove('show'), 1200); }
+    });
+  });
+  refreshCount();
+  function toast(msg){ const el = document.getElementById('toast'); el.textContent = msg; el.classList.add('show'); setTimeout(()=>el.classList.remove('show'), 2400); }
+  window.exportNotes = function(){
+    const lines = ['# Sales Crew — Zoran\'s notes',''];
+    let any = false;
+    for (const [id,label] of Object.entries(LABELS)){ const v = (store[id]||'').trim(); if (v){ any = true; lines.push(`## ${label}`, v, ''); } }
+    if (!any){ toast('No notes to export yet ✍️'); return; }
+    const md = lines.join('\n');
+    navigator.clipboard.writeText(md).then(() => toast('Copied! Paste it back into the chat 📋'),
+      () => { const ta = document.createElement('textarea'); ta.value = md; document.body.appendChild(ta); ta.select(); try{document.execCommand('copy'); toast('Copied! Paste it back 📋');}catch(_){toast('Copy failed — select the text');} ta.remove(); });
+  };
+  window.clearNotes = function(){
+    if (!confirm('Clear all your notes on this page?')) return;
+    for (const k of Object.keys(store)) delete store[k];
+    save(store);
+    document.querySelectorAll('textarea[data-note]').forEach(t => t.value = '');
+    refreshCount(); toast('Cleared');
+  };
+</script>
+<style>
+  .sec-head{cursor:pointer;user-select:none;align-items:center}
+  .sec-chev{margin-left:auto;color:var(--faint);transition:transform .15s;font-size:13px;flex:none}
+  section.collapsed .sec-chev{transform:rotate(-90deg)}
+  section.collapsed .sec-head{border-bottom-color:transparent;margin-bottom:0;padding-bottom:6px}
+  .sec-body{overflow:hidden}
+  .note,.bar{display:none !important}
+  section.collapsed .sec-body{display:none}
+  #collapse-bar{display:flex;gap:8px;justify-content:flex-end;margin:0 0 -10px}
+  #collapse-bar button{font-family:var(--mono);font-size:11px;color:var(--dim);background:var(--ink2);border:1px solid var(--line);border-radius:7px;padding:5px 11px;cursor:pointer}
+</style>
+<script>
+  // Make every section a collapsible dropdown. Runs after mermaid renders so the
+  // SVGs size correctly, then just moves the rendered nodes into a .sec-body wrapper.
+  window.addEventListener('load', () => {
+    setTimeout(() => {
+      const secs = [...document.querySelectorAll('.wrap > section')];
+      secs.forEach(sec => {
+        const head = sec.querySelector('.sec-head');
+        if (!head || sec.querySelector('.sec-body')) return;
+        const body = document.createElement('div');
+        body.className = 'sec-body';
+        let n = head.nextSibling;
+        while (n) { const next = n.nextSibling; body.appendChild(n); n = next; }
+        sec.appendChild(body);
+        const chev = document.createElement('span');
+        chev.className = 'sec-chev'; chev.textContent = '▾';
+        head.appendChild(chev);
+        head.addEventListener('click', () => sec.classList.toggle('collapsed'));
+      });
+      // A little expand/collapse-all bar above the first section.
+      const nav = document.querySelector('nav');
+      if (nav && !document.getElementById('collapse-bar')) {
+        const bar = document.createElement('div');
+        bar.id = 'collapse-bar';
+        bar.innerHTML = '<button id="exp-all">▾ expand all</button><button id="col-all">▸ collapse all</button>';
+        nav.after(bar);
+        document.getElementById('exp-all').onclick = () => secs.forEach(s => s.classList.remove('collapsed'));
+        document.getElementById('col-all').onclick = () => secs.forEach(s => s.classList.add('collapsed'));
+      }
+    }, 400);
+  });
+</script>
+</body>
+</html>

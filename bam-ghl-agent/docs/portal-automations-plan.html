@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Plan — All automations in the portal (GHL as pipe, Resend email)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#0d0f12; --ink2:#14171c; --ink3:#1b1f26; --line:#2a2f38;
+    --text:#e8eaed; --dim:#9aa3af; --faint:#6b7280;
+    --gold:#E8C547; --green:#34d399; --blue:#60a5fa; --red:#f87171; --purple:#c084fc;
+    --display:'Space Grotesk',sans-serif; --body:'Inter',sans-serif; --mono:'JetBrains Mono',monospace;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--ink);color:var(--text);font-family:var(--body);line-height:1.6;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:1000px;margin:0 auto;padding:32px 20px 120px}
+  h1{font-family:var(--display);font-weight:700;font-size:32px;letter-spacing:-.5px;line-height:1.15}
+  h2{font-family:var(--display);font-weight:700;font-size:22px;margin:0;letter-spacing:-.3px}
+  h3{font-family:var(--display);font-weight:500;font-size:15px;letter-spacing:-.2px}
+  .mono{font-family:var(--mono)}
+  .label{font-family:var(--mono);font-size:11px;letter-spacing:1.5px;text-transform:uppercase;color:var(--faint)}
+  .dim{color:var(--dim)} .faint{color:var(--faint)}
+  .gold{color:var(--gold)} .green{color:var(--green)} .blue{color:var(--blue)} .red{color:var(--red)} .purple{color:var(--purple)}
+  code{font-family:var(--mono);font-size:.86em;background:var(--ink3);padding:1px 6px;border-radius:4px;color:#cbd5e1;border:1px solid var(--line)}
+  header{border-bottom:1px solid var(--line);padding-bottom:28px;margin-bottom:8px}
+  .eyebrow{display:inline-flex;align-items:center;gap:8px;margin-bottom:14px;flex-wrap:wrap}
+  .pill{font-family:var(--mono);font-size:10px;letter-spacing:1px;text-transform:uppercase;padding:4px 9px;border-radius:99px;border:1px solid var(--line)}
+  .pill.plan{color:var(--purple);border-color:#4a3a6b;background:rgba(192,132,252,.08)}
+  .pill.dec{color:var(--green);border-color:#1f4d3a;background:rgba(52,211,153,.08)}
+  .lede{font-size:18px;color:var(--dim);margin-top:14px;max-width:720px}
+  .lede b{color:var(--text);font-weight:600}
+  section{margin-top:54px;scroll-margin-top:20px}
+  .sec-head{display:flex;align-items:baseline;gap:14px;margin-bottom:22px;padding-bottom:14px;border-bottom:1px solid var(--line)}
+  .sec-num{font-family:var(--mono);font-size:13px;color:var(--gold);font-weight:700}
+  nav{position:sticky;top:0;background:rgba(13,15,18,.92);backdrop-filter:blur(8px);z-index:10;display:flex;gap:6px;flex-wrap:wrap;padding:12px 0;border-bottom:1px solid var(--line);margin-bottom:8px}
+  nav a{font-family:var(--mono);font-size:11px;letter-spacing:.5px;text-transform:uppercase;color:var(--dim);text-decoration:none;padding:6px 11px;border-radius:6px;border:1px solid transparent;transition:.15s}
+  nav a:hover{color:var(--text);border-color:var(--line);background:var(--ink2)}
+  .card{background:var(--ink2);border:1px solid var(--line);border-radius:10px;padding:20px}
+  .grid{display:grid;gap:14px}
+  .g2{grid-template-columns:1fr 1fr} .g3{grid-template-columns:1fr 1fr 1fr}
+  @media(max-width:720px){.g2,.g3{grid-template-columns:1fr}}
+  .hero{background:linear-gradient(180deg,var(--ink3),var(--ink2));border:1px solid var(--line);border-left:3px solid var(--gold);border-radius:10px;padding:24px 26px;margin-top:24px}
+  .hero p{font-size:17px}
+  .pipe{display:flex;align-items:stretch;gap:0;flex-wrap:wrap}
+  .stage{flex:1;min-width:140px;background:var(--ink2);border:1px solid var(--line);border-radius:10px;padding:15px;text-align:center}
+  .stage .who{font-family:var(--mono);font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--faint);margin-top:6px}
+  .stage.add{border-color:var(--gold);box-shadow:0 0 0 1px var(--gold) inset;background:linear-gradient(180deg,rgba(232,197,71,.06),var(--ink2))}
+  .arrow{display:flex;align-items:center;justify-content:center;color:var(--faint);font-size:20px;padding:0 4px;min-width:30px}
+  @media(max-width:720px){.arrow{transform:rotate(90deg);width:100%;height:28px}}
+  .row{display:flex;gap:14px;align-items:flex-start;padding:13px 0;border-bottom:1px solid var(--line)}
+  .row:last-child{border-bottom:none}
+  .ico{flex:none;width:34px;height:34px;border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:16px;background:var(--ink3);border:1px solid var(--line)}
+  .row h3{margin-bottom:2px} .row p{font-size:13.5px;color:var(--dim)}
+  .row .file{font-family:var(--mono);font-size:11px;color:var(--faint)}
+  table{width:100%;border-collapse:collapse;font-size:13.5px}
+  th,td{text-align:left;padding:10px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+  th{font-family:var(--mono);font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--faint);font-weight:500}
+  td.s{white-space:nowrap;font-family:var(--mono);font-size:11px;font-weight:700}
+  .flow{position:relative;padding-left:34px}
+  .flow::before{content:"";position:absolute;left:11px;top:8px;bottom:8px;width:2px;background:linear-gradient(180deg,var(--gold),var(--line))}
+  .step{position:relative;margin-bottom:16px}
+  .step .dot{position:absolute;left:-34px;top:2px;width:24px;height:24px;border-radius:50%;background:var(--ink);border:2px solid var(--gold);color:var(--gold);font-family:var(--mono);font-weight:700;font-size:12px;display:flex;align-items:center;justify-content:center}
+  .step .body{background:var(--ink2);border:1px solid var(--line);border-radius:9px;padding:13px 15px}
+  .step h3{margin-bottom:3px} .step p{font-size:13.5px;color:var(--dim)}
+  .step .where{font-family:var(--mono);font-size:11px;color:var(--faint);margin-top:6px}
+  .callout{border:1px solid #3a3f1a;background:rgba(232,197,71,.05);border-radius:10px;padding:18px 20px;display:flex;gap:14px;align-items:flex-start}
+  .callout .big{font-size:22px;flex:none}
+  .callout.warn{border-color:#5a2d2d;background:rgba(248,113,113,.06)}
+  ul.clean{list-style:none} ul.clean li{padding:6px 0;padding-left:22px;position:relative;font-size:14px;color:var(--dim)}
+  ul.clean li::before{content:"→";position:absolute;left:0;color:var(--gold)}
+  ul.clean li b{color:var(--text);font-weight:600}
+  .check li::before{content:"☐";color:var(--gold);font-weight:700}
+  .phase{border:1px solid var(--line);border-radius:10px;padding:16px 18px;background:var(--ink2);margin-bottom:12px;border-left:3px solid var(--line)}
+  .phase.p0{border-left-color:var(--purple)} .phase.p1{border-left-color:var(--gold)} .phase.p2{border-left-color:var(--blue)}
+  .phase .ph{font-family:var(--mono);font-size:11px;letter-spacing:1px;text-transform:uppercase;font-weight:700;display:flex;justify-content:space-between;align-items:center}
+  .phase .eff{font-family:var(--mono);font-size:10px;color:var(--faint);background:var(--ink3);padding:2px 8px;border-radius:99px;border:1px solid var(--line)}
+  .badge-live{color:var(--green)} .badge-ghl{color:var(--gold)} .badge-gap{color:var(--red)}
+  footer{margin-top:60px;padding-top:24px;border-top:1px solid var(--line);color:var(--faint);font-size:13px;font-family:var(--mono)}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div class="eyebrow">
+      <span class="label">BAM Portal · Architecture Plan</span>
+      <span class="pill plan">◆ Plan, not built</span>
+      <span class="pill dec">✓ GHL = pipe</span>
+      <span class="pill dec">✓ Email → Resend</span>
+    </div>
+    <h1>Move <span class="gold">all automations</span> into the portal</h1>
+    <p class="lede">Stop building automations inside GoHighLevel one sub-account at a time. The <b>portal owns the logic</b> — triggers, timing, decisions — and GHL drops to being a <b>pipe</b> (CRM mirror + a way to send a text). Email moves to <b>Resend</b> so we own the whole message.</p>
+  </header>
+
+  <nav>
+    <a href="#why">Why</a>
+    <a href="#proof">Already proven</a>
+    <a href="#inventory">Inventory</a>
+    <a href="#pattern">The pattern</a>
+    <a href="#missing">What's missing</a>
+    <a href="#resend">Resend</a>
+    <a href="#first">First target</a>
+    <a href="#roadmap">Roadmap</a>
+    <a href="#risks">Risks</a>
+  </nav>
+
+  <div class="hero">
+    <span class="label">The whole idea in one sentence</span>
+    <p style="margin-top:8px">We already built this <b class="gold">pattern</b> — the booking + confirm sales agents run entirely in the portal and only touch GHL to send. <b>"All automations in the portal" = pointing that same pattern at everything else</b>, and swapping GHL's weak email for Resend.</p>
+  </div>
+
+  <!-- WHY -->
+  <section id="why">
+    <div class="sec-head"><span class="sec-num">01</span><h2>Why bother</h2></div>
+    <div class="grid g2">
+      <div class="card">
+        <span class="label red">GHL workflows today</span>
+        <ul class="clean" style="margin-top:10px">
+          <li>Set up <b>per sub-account</b> by hand - 40+ academies = 40× the work</li>
+          <li>Change one thing → redo it everywhere</li>
+          <li>Can't branch on <b>portal data</b> (Stripe status, our DB, AI judgment)</li>
+          <li>Weak email - no real templates, no delivery visibility</li>
+          <li>Black box when something misfires</li>
+        </ul>
+      </div>
+      <div class="card" style="border-left:3px solid var(--green)">
+        <span class="label green">Portal-owned automations</span>
+        <ul class="clean" style="margin-top:10px">
+          <li>Write once → <b>every academy</b> gets it</li>
+          <li>Branch on anything we know (DB, Stripe, AI, history)</li>
+          <li>Version-controlled, observable, testable</li>
+          <li>Resend email: our domain, templates, open/bounce logs</li>
+          <li>Human-approval option on any step (like Hawkeye)</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- PROOF -->
+  <section id="proof">
+    <div class="sec-head"><span class="sec-num">02</span><h2>This isn't new — it's already proven</h2></div>
+    <p class="dim" style="margin-bottom:18px">Five automations already run fully in the portal. The plan just extends the same machinery.</p>
+    <div class="pipe">
+      <div class="stage"><h3>Trigger</h3><div class="who">cron / webhook</div></div>
+      <div class="arrow">→</div>
+      <div class="stage"><h3>Decide</h3><div class="who">code + AI + DB</div></div>
+      <div class="arrow">→</div>
+      <div class="stage"><h3>Schedule</h3><div class="who">queue + quiet hrs</div></div>
+      <div class="arrow">→</div>
+      <div class="stage"><h3>Send</h3><div class="who gold">GHL SMS / Resend</div></div>
+      <div class="arrow">→</div>
+      <div class="stage"><h3>Log</h3><div class="who">+ approve option</div></div>
+    </div>
+    <p class="dim" style="margin-top:14px;font-size:13.5px">Booking agent, confirm agent, ghost engine, owner notifications, post-trial escalation — all already run on this exact spine.</p>
+  </section>
+
+  <!-- INVENTORY -->
+  <section id="inventory">
+    <div class="sec-head"><span class="sec-num">03</span><h2>Where every automation lives today</h2></div>
+
+    <h3 class="green" style="margin-bottom:8px">✅ Already in the portal</h3>
+    <div class="card" style="margin-bottom:22px;padding:6px 8px">
+      <table>
+        <thead><tr><th>Automation</th><th>Lives in</th><th>Trigger</th></tr></thead>
+        <tbody>
+          <tr><td>Booking agent (Responded)</td><td class="mono faint">agent-approvals.js</td><td class="dim">cron */15</td></tr>
+          <tr><td>Confirm agent (Scheduled-Trial)</td><td class="mono faint">agent-confirm.js</td><td class="dim">cron 7,22,37,52</td></tr>
+          <tr><td>Quiet-lead → ghost detector</td><td class="mono faint">agent-followups.js</td><td class="dim">cron */30 + */1</td></tr>
+          <tr><td>Owner/staff SMS notifications (8 events)</td><td class="mono faint">_notify-owners.js</td><td class="dim">event-driven</td></tr>
+          <tr><td>Post-trial escalation (no review in 15m)</td><td class="mono faint">ghl/cron-post-trial-escalate.js</td><td class="dim">cron */15</td></tr>
+          <tr><td>Mass send (throttled bulk SMS/email)</td><td class="mono faint">mass-send.js</td><td class="dim">cron */1 worker</td></tr>
+          <tr><td>Scheduled pauses, invite resends, digests</td><td class="mono faint">members.js, clients.js</td><td class="dim">crons</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3 class="gold" style="margin-bottom:8px">🔶 Still trapped in GHL workflows</h3>
+    <div class="card" style="padding:6px 8px">
+      <table>
+        <thead><tr><th>Automation</th><th>How it fires today</th><th>Migrate by</th></tr></thead>
+        <tbody>
+          <tr><td>Ghosted / nurture sequence</td><td class="dim">portal enrolls <code>offers.data.ghosted_workflow</code></td><td class="dim">portal sends the touches itself</td></tr>
+          <tr><td>Booked-trial confirmation</td><td class="dim">GHL native on appointment</td><td class="dim">already half-done (confirm agent)</td></tr>
+          <tr><td>Missed-trial / post-trial</td><td class="dim">enrolls <code>offers.data.ghl_workflow</code></td><td class="dim">portal drip</td></tr>
+          <tr><td>Lost-lead nurture</td><td class="dim">GHL "Opportunity → Lost" trigger</td><td class="dim">portal drip</td></tr>
+          <tr><td>Failed-payment dunning</td><td class="dim">portal flags <code>status='payment_failed'</code>, outreach in GHL/manual</td><td class="dim">portal retry+reminder drip</td></tr>
+          <tr><td>Onboarding drips (academy + member)</td><td class="dim">website/onboarding + activations enroll GHL</td><td class="dim">portal + Resend email</td></tr>
+          <tr><td>Email blasts / newsletters</td><td class="dim">GHL email</td><td class="dim">Resend + mass-send</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="dim" style="margin-top:12px;font-size:13.5px">⚠️ Email today goes out through <b style="color:var(--text)">GHL</b> (<code>type:"Email"</code> in <code>ghl/send-message.js</code> + <code>mass-send.js</code>). Resend is already wired for <b style="color:var(--text)">password-reset</b> emails — so the account exists; we extend it.</p>
+  </section>
+
+  <!-- PATTERN -->
+  <section id="pattern">
+    <div class="sec-head"><span class="sec-num">04</span><h2>The reusable pattern (every migrated automation)</h2></div>
+    <div class="flow">
+      <div class="step"><div class="dot">1</div><div class="body"><h3>Trigger</h3><p>A cron tick, a GHL inbound webhook, or a portal event (Stripe failed, trial booked, lead went quiet).</p><div class="where">▸ vercel crons · inbound-webhook · stripe/webhook · an automation_events table</div></div></div>
+      <div class="step"><div class="dot">2</div><div class="body"><h3>Decide — in code</h3><p>Who qualifies, which step they're on, what to say. Branch on DB + Stripe + AI. This is the part GHL can't do well.</p><div class="where">▸ per-automation module (like the ghost detector)</div></div></div>
+      <div class="step"><div class="dot">3</div><div class="body"><h3>Schedule — one generic queue</h3><p>Drop a "send THIS to THEM at time T" row. Respect quiet hours. Carry a dedupe key so we never double-fire.</p><div class="where">▸ NEW automation_jobs table (generalizes agent_followups + mass_send_*)</div></div></div>
+      <div class="step"><div class="dot">4</div><div class="body"><h3>Send — through the pipe</h3><p>One unified sender: SMS via the academy's GHL number, email via Resend. Skip DND / unsubscribed.</p><div class="where">▸ NEW _send.js → ghl/_core sendSms + NEW _email.js (Resend)</div></div></div>
+      <div class="step"><div class="dot">5</div><div class="body"><h3>Log + (optional) approve</h3><p>Record every send + delivery result. Any step can route to a Hawkeye-style approval queue first.</p><div class="where">▸ message_log + email_events; reuse the approval-card pattern</div></div></div>
+    </div>
+  </section>
+
+  <!-- MISSING -->
+  <section id="missing">
+    <div class="sec-head"><span class="sec-num">05</span><h2>What's missing to generalize it</h2></div>
+    <p class="dim" style="margin-bottom:16px">Today each automation has its <i>own</i> table (agent_followups, agent_ready_replies, agent_confirm_replies, mass_send_*). To scale, we extract the shared spine.</p>
+    <div class="grid g2">
+      <div class="card"><span class="label gold">① Generic job queue</span><p style="margin-top:8px;font-size:14px" class="dim"><code>automation_jobs</code>: client_id, contact_id, automation, step, channel, template, payload, run_after, status, <b style="color:var(--text)">dedupe_key</b>, attempts. One worker cron drains it. Replaces N per-feature tables.</p></div>
+      <div class="card"><span class="label gold">② Events table</span><p style="margin-top:8px;font-size:14px" class="dim"><code>automation_events</code>: a normalized log of "X happened" (trial booked, payment failed, lead quiet) that automations subscribe to — instead of each one re-deriving state from GHL.</p></div>
+      <div class="card"><span class="label gold">③ Resend wrapper</span><p style="margin-top:8px;font-size:14px" class="dim"><code>api/_email.js</code> — a thin <code>sendEmail()</code> paralleling <code>sendSms()</code>. Plus a unified <code>_send.js</code> that picks SMS-or-email + checks quiet hours + suppression.</p></div>
+      <div class="card"><span class="label gold">④ Template store</span><p style="margin-top:8px;font-size:14px" class="dim"><code>automation_templates</code>: subject + body with <code>{{vars}}</code>, per channel, editable in the portal (like the agent Brain editor). Render with simple var substitution.</p></div>
+    </div>
+    <div class="callout" style="margin-top:16px"><span class="big">♻️</span><div><b>Mostly assembly, not invention.</b> The job queue generalizes <code>mass_send_jobs</code>; quiet hours (<code>_quiet.js</code>), the send pipe (<code>ghl/_core sendSms</code>), and the approval-card UI already exist. The genuinely new bits are <b>Resend email</b> + the <b>generic queue/events</b> tables.</div></div>
+  </section>
+
+  <!-- RESEND -->
+  <section id="resend">
+    <div class="sec-head"><span class="sec-num">06</span><h2>Resend — owning email</h2></div>
+    <div class="grid g2">
+      <div class="card">
+        <span class="label">What we build</span>
+        <ul class="clean" style="margin-top:10px">
+          <li><b>api/_email.js</b> → <code>sendEmail({to,from,subject,html,replyTo,tags})</code></li>
+          <li>Templates in <b>automation_templates</b> (or a templates/ dir)</li>
+          <li><b>api/resend/webhook.js</b> → write delivered / opened / bounced / complained to <b>email_events</b></li>
+          <li>A <b>suppression list</b> (hard bounces + unsubscribes) the sender checks</li>
+          <li>Swap GHL <code>type:"Email"</code> sends → <code>_email.js</code></li>
+        </ul>
+      </div>
+      <div class="card" style="border-left:3px solid var(--gold)">
+        <span class="label gold">☑ What YOU need to do (manual)</span>
+        <ul class="clean check" style="margin-top:10px">
+          <li>Confirm / open the <b>Resend account</b> (already used for password resets)</li>
+          <li>Add + <b>verify a sending domain</b> (e.g. <code>mail.byanymeansbusiness.com</code>)</li>
+          <li>Paste Resend's <b>DNS records</b> at the registrar: <b>SPF</b> (TXT), <b>DKIM</b> (Resend's CNAMEs), <b>DMARC</b> (TXT)</li>
+          <li>Add <code>RESEND_API_KEY</code> to <b>Vercel</b> env</li>
+          <li>Decide the <b>From</b> identity (one BAM domain now; per-academy domains later)</li>
+        </ul>
+      </div>
+    </div>
+    <div class="callout warn" style="margin-top:16px"><span class="big">📮</span><div><b>Deliverability is a warmup game.</b> A fresh domain can't blast day one. Start with low-volume transactional (confirmations, receipts), then ramp drips. DMARC + DKIM are non-negotiable or we land in spam.</div></div>
+  </section>
+
+  <!-- FIRST TARGET -->
+  <section id="first">
+    <div class="sec-head"><span class="sec-num">07</span><h2>First target — Ghosted / nurture sequence</h2></div>
+    <div class="callout" style="margin-bottom:18px"><span class="big">🎯</span><div><b>Why this one first:</b> the portal <b>already decides</b> who's gone quiet (the ghost detector, fully built). The only thing still in GHL is the actual <b>sending</b> of the nurture touches. Owning that = the shortest path to one <b>complete</b> end-to-end example that <b>retires a real GHL workflow</b> (<code>ghosted_workflow</code>) — and it exercises every new primitive at once (queue, SMS + Resend email, stop-on-reply, logging).</div></div>
+    <div class="flow">
+      <div class="step"><div class="dot">T</div><div class="body"><h3>Trigger</h3><p>Lead in Responded goes quiet ≥24h → staff clicks <b>Send to Nurture</b> (today: "Send to Ghosted"). Reuse the existing ghost card.</p><div class="where">▸ agent-followups detector + the Hawkeye ghost card</div></div></div>
+      <div class="step"><div class="dot">D</div><div class="body"><h3>Decide</h3><p>Enqueue a multi-touch sequence (e.g. Day 0 SMS · Day 2 email · Day 5 SMS · Day 9 warm close) from a template — instead of <code>enrollGhosted()</code> into GHL.</p><div class="where">▸ new nurture module writes automation_jobs rows</div></div></div>
+      <div class="step"><div class="dot">S</div><div class="body"><h3>Schedule</h3><p>Each touch = one <code>automation_jobs</code> row with <code>run_after</code> + a dedupe key. Quiet hours shift sends into the window.</p><div class="where">▸ automation_jobs + _quiet</div></div></div>
+      <div class="step"><div class="dot">P</div><div class="body"><h3>Send</h3><p>Worker cron drains due rows: SMS via GHL number, email via Resend. <b>Stop the whole sequence the instant they reply</b> (inbound-webhook already cancels pending rows — extend it to this table).</p><div class="where">▸ _send.js · inbound-webhook cancel</div></div></div>
+      <div class="step"><div class="dot">L</div><div class="body"><h3>Log + control</h3><p>Every touch logged; staff can pause/skip a contact's sequence. Optionally gate touch #1 behind Hawkeye while we trust it.</p><div class="where">▸ message_log · reuse approval card</div></div></div>
+    </div>
+    <p class="dim" style="margin-top:14px;font-size:13.5px">When it's proven: flip academies off <code>ghosted_workflow</code> in GHL → the portal owns nurture end-to-end. <b style="color:var(--text)">Watch the double-send risk</b> (see Risks).</p>
+  </section>
+
+  <!-- ROADMAP -->
+  <section id="roadmap">
+    <div class="sec-head"><span class="sec-num">08</span><h2>Phased roadmap</h2></div>
+    <div class="phase p0">
+      <div class="ph"><span class="purple">Phase 0 · Foundations</span><span class="eff">~1 build cycle</span></div>
+      <p class="dim" style="margin-top:8px;font-size:14px"><code>automation_jobs</code> + worker cron · <code>automation_events</code> · <code>api/_email.js</code> (Resend) + <code>_send.js</code> unified sender · <code>automation_templates</code> · Resend domain verified. <b style="color:var(--text)">Depends on:</b> your DNS/Resend checklist above.</p>
+    </div>
+    <div class="phase p1">
+      <div class="ph"><span class="gold">Phase 1 · Ghosted / nurture (the template)</span><span class="eff">~1 build cycle</span></div>
+      <p class="dim" style="margin-top:8px;font-size:14px">Build nurture on the new spine. Run in parallel with GHL (no double-send — see risks). Prove it, then <b style="color:var(--text)">turn off <code>ghosted_workflow</code></b> per academy. Output = the copy-paste template for everything after.</p>
+    </div>
+    <div class="phase p2">
+      <div class="ph"><span class="blue">Phase 2+ · Migrate the rest</span><span class="eff">1 per cycle</span></div>
+      <p class="dim" style="margin-top:8px;font-size:14px">In leverage order: <b style="color:var(--text)">failed-payment dunning</b> (money) → <b style="color:var(--text)">onboarding drips</b> (Resend-heavy) → <b style="color:var(--text)">lost-lead nurture</b> → <b style="color:var(--text)">booked-trial confirmation</b> (fold into confirm agent) → <b style="color:var(--text)">email blasts</b>. Each one retires its GHL workflow when it goes live.</p>
+    </div>
+    <div class="callout" style="margin-top:8px"><span class="big">🔌</span><div><b>SMS stays on GHL for now.</b> Keep sending texts through the academy's GHL number (good deliverability, already wired). Re-evaluate Twilio only if GHL sending becomes a limit — not part of this plan.</div></div>
+  </section>
+
+  <!-- RISKS -->
+  <section id="risks">
+    <div class="sec-head"><span class="sec-num">09</span><h2>Risks &amp; open questions</h2></div>
+    <div class="card" style="padding:6px 8px">
+      <div class="row"><div class="ico">⚠️</div><div><h3 class="red">Double-send vs GHL native triggers</h3><p>We've hit this before with ghosted. Each migration must turn OFF the matching GHL workflow (or gate it) the moment the portal version goes live. Track which workflow each automation replaces.</p></div></div>
+      <div class="row"><div class="ico">📮</div><div><h3>Email deliverability / warmup</h3><p>New domain → ramp slowly, transactional first. Needs SPF+DKIM+DMARC and a suppression list, or drips tank inbox placement.</p></div></div>
+      <div class="row"><div class="ico">🔁</div><div><h3>Idempotency</h3><p>Crons retry. Every job needs a <b>dedupe_key</b> and a "claim before send" status so a contact never gets the same touch twice.</p></div></div>
+      <div class="row"><div class="ico">🔭</div><div><h3>Observability</h3><p>One place to see "what got sent to whom, when, did it land." The <code>message_log</code> + <code>email_events</code> + a small staff view.</p></div></div>
+      <div class="row"><div class="ico">📱</div><div><h3>SMS provider — later call</h3><p>Staying on GHL for SMS now. If we ever want full independence, Twilio is the path (numbers, A2P 10DLC registration) — out of scope today.</p></div></div>
+      <div class="row"><div class="ico">🌐</div><div><h3>From-domain strategy</h3><p>One BAM domain for all academies now (simple) vs per-academy domains later (best branding + isolation). Start single, design the table to allow per-academy.</p></div></div>
+    </div>
+  </section>
+
+  <div class="hero" style="margin-top:48px">
+    <span class="label gold">🎯 Goal</span>
+    <p style="margin-top:8px">Every automation runs in the portal: <b>write once, every academy gets it</b>, branch on anything we know, own the email. GHL becomes the CRM mirror + the SMS pipe — nothing more. <b class="gold">First proof: portal-owned nurture, replacing the GHL ghosted workflow.</b></p>
+  </div>
+
+  <footer>
+    Plan · portal-owned automations · GHL as pipe · Resend email<br>
+    Foundations: <span class="dim">automation_jobs · automation_events · api/_email.js · _send.js · automation_templates</span><br>
+    First target: <span class="dim">Ghosted / nurture sequence (retires offers.data.ghosted_workflow)</span>
+  </footer>
+
+</div>
+</body>
+</html>

@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Confirm Agent — how it works & how you train it</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#0d0f12; --ink2:#14171c; --ink3:#1b1f26; --line:#2a2f38;
+    --text:#e8eaed; --dim:#9aa3af; --faint:#6b7280;
+    --gold:#E8C547; --green:#34d399; --blue:#60a5fa; --red:#f87171; --purple:#c084fc;
+    --display:'Space Grotesk',sans-serif; --body:'Inter',sans-serif; --mono:'JetBrains Mono',monospace;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--ink);color:var(--text);font-family:var(--body);line-height:1.6;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:1000px;margin:0 auto;padding:32px 20px 120px}
+  h1{font-family:var(--display);font-weight:700;font-size:34px;letter-spacing:-.5px;line-height:1.15}
+  h2{font-family:var(--display);font-weight:700;font-size:22px;margin:0;letter-spacing:-.3px}
+  h3{font-family:var(--display);font-weight:500;font-size:15px;letter-spacing:-.2px}
+  .mono{font-family:var(--mono)}
+  .label{font-family:var(--mono);font-size:11px;letter-spacing:1.5px;text-transform:uppercase;color:var(--faint)}
+  .dim{color:var(--dim)} .faint{color:var(--faint)}
+  .gold{color:var(--gold)} .green{color:var(--green)} .blue{color:var(--blue)} .red{color:var(--red)} .purple{color:var(--purple)}
+  code{font-family:var(--mono);font-size:.86em;background:var(--ink3);padding:1px 6px;border-radius:4px;color:#cbd5e1;border:1px solid var(--line)}
+
+  /* header */
+  header{border-bottom:1px solid var(--line);padding-bottom:28px;margin-bottom:8px}
+  .eyebrow{display:inline-flex;align-items:center;gap:8px;margin-bottom:14px}
+  .pill{font-family:var(--mono);font-size:10px;letter-spacing:1px;text-transform:uppercase;padding:4px 9px;border-radius:99px;border:1px solid var(--line)}
+  .pill.live{color:var(--green);border-color:#1f4d3a;background:rgba(52,211,153,.08)}
+  .pill.soon{color:var(--gold);border-color:#544a1d;background:rgba(232,197,71,.08)}
+  .lede{font-size:18px;color:var(--dim);margin-top:14px;max-width:680px}
+  .lede b{color:var(--text);font-weight:600}
+
+  /* section */
+  section{margin-top:56px;scroll-margin-top:20px}
+  .sec-head{display:flex;align-items:baseline;gap:14px;margin-bottom:22px;padding-bottom:14px;border-bottom:1px solid var(--line)}
+  .sec-num{font-family:var(--mono);font-size:13px;color:var(--gold);font-weight:700}
+
+  /* sticky nav */
+  nav{position:sticky;top:0;background:rgba(13,15,18,.9);backdrop-filter:blur(8px);z-index:10;display:flex;gap:6px;flex-wrap:wrap;padding:12px 0;border-bottom:1px solid var(--line);margin-bottom:8px}
+  nav a{font-family:var(--mono);font-size:11px;letter-spacing:.5px;text-transform:uppercase;color:var(--dim);text-decoration:none;padding:6px 11px;border-radius:6px;border:1px solid transparent;transition:.15s}
+  nav a:hover{color:var(--text);border-color:var(--line);background:var(--ink2)}
+
+  /* cards */
+  .card{background:var(--ink2);border:1px solid var(--line);border-radius:10px;padding:20px}
+  .grid{display:grid;gap:14px}
+  .g2{grid-template-columns:1fr 1fr} .g3{grid-template-columns:1fr 1fr 1fr}
+  @media(max-width:720px){.g2,.g3{grid-template-columns:1fr}}
+
+  /* one-liner hero box */
+  .hero{background:linear-gradient(180deg,var(--ink3),var(--ink2));border:1px solid var(--line);border-left:3px solid var(--gold);border-radius:10px;padding:24px 26px;margin-top:24px}
+  .hero p{font-size:17px}
+
+  /* pipeline diagram */
+  .pipe{display:flex;align-items:stretch;gap:0;flex-wrap:wrap}
+  .stage{flex:1;min-width:150px;background:var(--ink2);border:1px solid var(--line);border-radius:10px;padding:16px;position:relative;text-align:center}
+  .stage.me{border-color:var(--gold);box-shadow:0 0 0 1px var(--gold) inset;background:linear-gradient(180deg,rgba(232,197,71,.06),var(--ink2))}
+  .stage .who{font-family:var(--mono);font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--faint);margin-top:6px}
+  .arrow{display:flex;align-items:center;justify-content:center;color:var(--faint);font-size:22px;padding:0 4px;min-width:34px}
+  @media(max-width:720px){.arrow{transform:rotate(90deg);width:100%;height:30px}}
+  .loopback{margin-top:14px;border:1px dashed #544a1d;border-radius:8px;padding:12px 16px;background:rgba(232,197,71,.05);font-size:14px;display:flex;gap:10px;align-items:flex-start}
+
+  /* job / outcome rows */
+  .row{display:flex;gap:14px;align-items:flex-start;padding:14px 0;border-bottom:1px solid var(--line)}
+  .row:last-child{border-bottom:none}
+  .ico{flex:none;width:38px;height:38px;border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:18px;background:var(--ink3);border:1px solid var(--line)}
+  .row h3{margin-bottom:3px}
+  .row p{font-size:14px;color:var(--dim)}
+
+  /* mode cards */
+  .mode{padding:18px;border-radius:10px;border:1px solid var(--line);background:var(--ink2)}
+  .mode .tag{font-family:var(--mono);font-size:11px;letter-spacing:1px;text-transform:uppercase;font-weight:700;margin-bottom:8px;display:block}
+  .mode.off{opacity:.9} .mode.haw{border-color:#2d4a6b} .mode.self{border-color:#3a5a3a}
+  .mode .dflt{font-family:var(--mono);font-size:9px;letter-spacing:.5px;background:var(--gold);color:#000;padding:2px 6px;border-radius:4px;font-weight:700;margin-left:6px;vertical-align:middle}
+
+  /* lever cards */
+  .lever{background:var(--ink2);border:1px solid var(--line);border-radius:10px;padding:20px;position:relative}
+  .lever .n{position:absolute;top:-12px;left:18px;width:26px;height:26px;border-radius:7px;background:var(--gold);color:#000;font-family:var(--mono);font-weight:700;font-size:13px;display:flex;align-items:center;justify-content:center}
+  .lever h3{margin:6px 0 8px} .lever p{font-size:14px;color:var(--dim)}
+  .lever .ex{margin-top:12px;font-size:13px;font-family:var(--mono);color:var(--dim);background:var(--ink);border:1px solid var(--line);border-left:2px solid var(--green);border-radius:6px;padding:10px 12px}
+
+  /* training flow steps */
+  .flow{position:relative;padding-left:34px}
+  .flow::before{content:"";position:absolute;left:11px;top:8px;bottom:8px;width:2px;background:linear-gradient(180deg,var(--gold),var(--line))}
+  .step{position:relative;margin-bottom:18px}
+  .step .dot{position:absolute;left:-34px;top:2px;width:24px;height:24px;border-radius:50%;background:var(--ink);border:2px solid var(--gold);color:var(--gold);font-family:var(--mono);font-weight:700;font-size:12px;display:flex;align-items:center;justify-content:center}
+  .step .body{background:var(--ink2);border:1px solid var(--line);border-radius:9px;padding:14px 16px}
+  .step h3{margin-bottom:4px} .step p{font-size:14px;color:var(--dim)}
+  .step .where{font-family:var(--mono);font-size:11px;color:var(--faint);margin-top:7px}
+
+  /* callout */
+  .callout{border:1px solid #3a3f1a;background:rgba(232,197,71,.05);border-radius:10px;padding:20px 22px;display:flex;gap:14px;align-items:flex-start}
+  .callout .big{font-size:24px;flex:none}
+
+  /* status table */
+  table{width:100%;border-collapse:collapse;font-size:14px}
+  th,td{text-align:left;padding:11px 12px;border-bottom:1px solid var(--line)}
+  th{font-family:var(--mono);font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--faint);font-weight:500}
+  td.s{white-space:nowrap;font-family:var(--mono);font-size:11px;font-weight:700}
+  .badge-live{color:var(--green)} .badge-soon{color:var(--gold)}
+
+  footer{margin-top:64px;padding-top:24px;border-top:1px solid var(--line);color:var(--faint);font-size:13px;font-family:var(--mono)}
+  .timeline{display:flex;gap:0;flex-wrap:wrap;margin-top:10px}
+  .tl{flex:1;min-width:120px;padding:12px;border:1px solid var(--line);border-radius:8px;margin:4px;background:var(--ink2)}
+  .tl .t{font-family:var(--mono);font-size:11px;color:var(--gold);letter-spacing:.5px}
+  ul.clean{list-style:none} ul.clean li{padding:7px 0;padding-left:22px;position:relative;font-size:14px;color:var(--dim)}
+  ul.clean li::before{content:"→";position:absolute;left:0;color:var(--gold)}
+  ul.clean li b{color:var(--text);font-weight:600}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div class="eyebrow">
+      <span class="label">BAM Sales Agents</span>
+      <span class="pill live">● Backend live</span>
+      <span class="pill soon">◐ Training UI coming</span>
+    </div>
+    <h1>The <span class="gold">Confirm Agent</span></h1>
+    <p class="lede">The <b>second</b> sales texting agent. The booking agent gets a lead to <b>book</b> a free trial. The confirm agent makes sure they actually <b>show up</b> — and if they can't, it hands them back to the booking agent to rebook.</p>
+  </header>
+
+  <nav>
+    <a href="#what">What it is</a>
+    <a href="#when">When it fires</a>
+    <a href="#does">What it does</a>
+    <a href="#modes">Who's in control</a>
+    <a href="#train">How you train it</a>
+    <a href="#flow">Training flow</a>
+    <a href="#facts">Facts vs behavior</a>
+    <a href="#status">What's live</a>
+  </nav>
+
+  <div class="hero">
+    <span class="label">In one sentence</span>
+    <p style="margin-top:8px">When a lead is sitting in the <b class="gold">Scheduled Trial</b> stage of your pipeline, this agent texts them to <b>confirm they're coming</b>, <b>tells them how to get there</b>, and on <span class="red">"I can't make it"</span> it <b>hands them off</b> — never argues, never rebooks itself.</p>
+  </div>
+
+  <!-- 1. WHAT -->
+  <section id="what">
+    <div class="sec-head"><span class="sec-num">01</span><h2>Where it lives in the journey</h2></div>
+    <div class="pipe">
+      <div class="stage">
+        <h3>New lead</h3>
+        <div class="who">filled a form</div>
+      </div>
+      <div class="arrow">→</div>
+      <div class="stage">
+        <h3>Responded</h3>
+        <div class="who" style="color:var(--blue)">Booking agent</div>
+      </div>
+      <div class="arrow">→</div>
+      <div class="stage me">
+        <h3>Scheduled Trial</h3>
+        <div class="who gold">★ Confirm agent</div>
+      </div>
+      <div class="arrow">→</div>
+      <div class="stage">
+        <h3>Showed up</h3>
+        <div class="who" style="color:var(--green)">becomes a member</div>
+      </div>
+    </div>
+    <div class="loopback">
+      <span class="gold" style="font-size:18px">↩</span>
+      <div><b class="gold">The handoff loop:</b> if a Scheduled-Trial lead says they can't make it, the confirm agent drops a note and <b>bounces them back to "Responded"</b> — the booking agent picks them up <b>already knowing the whole story</b> and rebooks them.</div>
+    </div>
+    <p class="dim" style="margin-top:16px;font-size:14px">Each agent owns <b class="text" style="color:var(--text)">one stage</b>. A lead is only ever in one stage at a time, so the two agents never talk over each other.</p>
+  </section>
+
+  <!-- 2. WHEN -->
+  <section id="when">
+    <div class="sec-head"><span class="sec-num">02</span><h2>When it fires</h2></div>
+    <div class="grid g2">
+      <div class="card">
+        <span class="label">It reaches out FIRST (proactive)</span>
+        <p style="margin-top:10px" class="dim">Once a trial is booked and the date is <b class="text" style="color:var(--text)">within 3 days</b>, it sends one friendly "still good for Saturday?" text. (Reaching out the second they book — while the booking chat is still warm — would be annoying, so it waits.)</p>
+      </div>
+      <div class="card">
+        <span class="label">It replies when THEY text (reactive)</span>
+        <p style="margin-top:10px" class="dim">Any time a booked lead messages — a question, a "can we move it?", a "we'll be there" — it drafts the right response: logistics, a handoff, or a simple confirm.</p>
+      </div>
+    </div>
+    <h3 style="margin:24px 0 10px" class="dim">The rhythm</h3>
+    <div class="timeline">
+      <div class="tl"><div class="t">EVERY 15 MIN</div><div style="font-size:13px;margin-top:5px">A background check looks for booked leads who need a nudge or a reply.</div></div>
+      <div class="tl"><div class="t">8AM – 9:30PM</div><div style="font-size:13px;margin-top:5px">Quiet hours respected — it never texts a parent late at night. After-hours messages wait for morning.</div></div>
+      <div class="tl"><div class="t">THEY REPLY</div><div style="font-size:13px;margin-top:5px">Any pending nudge is dropped and it re-reads what they just said.</div></div>
+    </div>
+  </section>
+
+  <!-- 3. DOES -->
+  <section id="does">
+    <div class="sec-head"><span class="sec-num">03</span><h2>What it actually does</h2></div>
+    <h3 class="dim" style="margin-bottom:6px">Its three jobs</h3>
+    <div class="card" style="margin-bottom:24px">
+      <div class="row">
+        <div class="ico">✅</div>
+        <div><h3>Confirm they're coming</h3><p>References their <b>actual booked day & time</b> (pulled from the calendar, never made up) and gets a clear yes.</p></div>
+      </div>
+      <div class="row">
+        <div class="ico">🗺️</div>
+        <div><h3>Help them get there</h3><p>Address, directions, what to bring/wear, drop-off rules, which session — all pulled straight from <b>your academy's info</b>. It removes every reason a no-show happens.</p></div>
+      </div>
+      <div class="row">
+        <div class="ico">↩️</div>
+        <div><h3>Hand off if they can't make it</h3><p>It does <b>not</b> try to rebook or sell. It captures <b>why</b> they can't come and passes them back to the booking agent with full context.</p></div>
+      </div>
+    </div>
+
+    <h3 class="dim" style="margin-bottom:6px">So every reply becomes one of three cards for you</h3>
+    <div class="grid g3">
+      <div class="card" style="border-top:2px solid var(--blue)">
+        <span class="label blue">Confirm</span>
+        <p style="margin-top:8px;font-size:14px" class="dim">A normal confirmation or logistics text. <b class="text" style="color:var(--text)">You approve it</b> (or it auto-sends if you trust it — see modes).</p>
+      </div>
+      <div class="card" style="border-top:2px solid var(--gold)">
+        <span class="label gold">Handoff</span>
+        <p style="margin-top:8px;font-size:14px" class="dim">"Can't make it." On your ✓ it writes the note + sends them back to the booking agent. <b class="text" style="color:var(--text)">Always needs you.</b></p>
+      </div>
+      <div class="card" style="border-top:2px solid var(--red)">
+        <span class="label red">Lost</span>
+        <p style="margin-top:8px;font-size:14px" class="dim">They don't want the trial at all anymore. On your ✓ it closes them out. <b class="text" style="color:var(--text)">Always needs you.</b></p>
+      </div>
+    </div>
+  </section>
+
+  <!-- 4. MODES -->
+  <section id="modes">
+    <div class="sec-head"><span class="sec-num">04</span><h2>Who's in control (the dial)</h2></div>
+    <p class="dim" style="margin-bottom:18px">The confirm agent has its <b style="color:var(--text)">own</b> on/off dial, separate from the booking agent. Turning on booking does <b style="color:var(--text)">not</b> turn this on.</p>
+    <div class="grid g3">
+      <div class="mode off">
+        <span class="tag faint">Off <span class="dflt">DEFAULT</span></span>
+        <p style="font-size:14px" class="dim">Silent. Nothing drafts, nothing sends. This is where it starts for every academy.</p>
+      </div>
+      <div class="mode haw">
+        <span class="tag blue">Hawkeye</span>
+        <p style="font-size:14px" class="dim">It drafts <b style="color:var(--text)">every</b> message and waits. <b style="color:var(--text)">You approve, edit, or skip</b> each one before it sends. This is how you train it safely.</p>
+      </div>
+      <div class="mode self">
+        <span class="tag green">Self-drive</span>
+        <p style="font-size:14px" class="dim">Confident confirmations send themselves. Anything unsure — and <b style="color:var(--text)">always</b> handoffs & lost — still waits for you.</p>
+      </div>
+    </div>
+    <div class="callout" style="margin-top:18px">
+      <span class="big">🛡️</span>
+      <div><b>Safety by design.</b> Handoffs and "mark lost" <b>never</b> happen on their own — a human always confirms. And the booking agent was left completely untouched, so switching this on can't change how booking behaves.</div>
+    </div>
+  </section>
+
+  <!-- 5. TRAIN -->
+  <section id="train">
+    <div class="sec-head"><span class="sec-num">05</span><h2>How you train it — 3 levers</h2></div>
+    <p class="dim" style="margin-bottom:26px">You shape the agent in plain English. No code. Three ways to teach it, from lightest to deepest:</p>
+    <div class="grid g3">
+      <div class="lever">
+        <span class="n">1</span>
+        <h3 class="green">Teach a lesson</h3>
+        <p>A one-line correction. It <b style="color:var(--text)">overrides</b> everything else whenever it applies. Best for "stop doing X" / "always do Y."</p>
+        <div class="ex">"Don't say 'see you soon' — always name the actual day and time."</div>
+      </div>
+      <div class="lever">
+        <span class="n">2</span>
+        <h3 class="blue">Approve an example</h3>
+        <p>Show it a <b style="color:var(--text)">perfect reply</b>. It copies the tone, length and style of examples you bless.</p>
+        <div class="ex">Lead: "can I just drop her off?"<br>You: "Totally — drop-off's fine as long as you booked it. See you Monday at 7?"</div>
+      </div>
+      <div class="lever">
+        <span class="n">3</span>
+        <h3 class="purple">Edit the brain</h3>
+        <p>Open the actual sections (role, how it confirms, how it hands off…) and reword them. The deepest change — rewrites its standing instructions.</p>
+        <div class="ex">Brain → "Help them get there" → add: "Mention parking is free in the back lot."</div>
+      </div>
+    </div>
+    <div class="callout" style="margin-top:20px">
+      <span class="big">🧪</span>
+      <div><b>Always test first.</b> The <b>Sandbox</b> lets you chat <i>as a fake lead</i> and watch the agent reply — instantly, without texting anyone real. Tweak → test → tweak until it sounds like you, then let it loose in Hawkeye.</div>
+    </div>
+  </section>
+
+  <!-- 6. FLOW -->
+  <section id="flow">
+    <div class="sec-head"><span class="sec-num">06</span><h2>The end-to-end training loop</h2></div>
+    <p class="dim" style="margin-bottom:26px">This is the full circle — how a change in your head becomes the live agent's behavior, and how you keep tightening it.</p>
+    <div class="flow">
+      <div class="step"><div class="dot">1</div><div class="body">
+        <h3>Open the Sandbox & play the lead</h3>
+        <p>Type messages like a real parent would. Watch how the agent answers. Spot anything off — too pushy, wrong tone, missed a logistic.</p>
+        <div class="where">▸ Train Agent → Sandbox</div>
+      </div></div>
+      <div class="step"><div class="dot">2</div><div class="body">
+        <h3>Correct it — pick a lever</h3>
+        <p>Quick fix → <b class="green">teach a lesson</b>. Nail the voice → <b class="blue">approve an example</b>. Big rule change → <b class="purple">edit the brain</b>.</p>
+        <div class="where">▸ Train Agent → teach / save example / Brain editor</div>
+      </div></div>
+      <div class="step"><div class="dot">3</div><div class="body">
+        <h3>It saves to the agent's memory</h3>
+        <p>Your lesson / example / brain edit is stored against <b>your academy</b>. It instantly becomes part of the agent's instructions — for the sandbox <i>and</i> the live agent.</p>
+        <div class="where">▸ stored per-academy, no deploy needed</div>
+      </div></div>
+      <div class="step"><div class="dot">4</div><div class="body">
+        <h3>Re-test until it's right</h3>
+        <p>Back to the sandbox. Same scenario, see the improvement. Loop steps 1–3 until you'd be happy sending it yourself.</p>
+        <div class="where">▸ tweak → test → repeat</div>
+      </div></div>
+      <div class="step"><div class="dot">5</div><div class="body">
+        <h3>Flip it on in Hawkeye</h3>
+        <p>Now it drafts for <b>real</b> booked leads — but every message lands in your inbox first. You approve / edit / skip. Each edit is a free training signal.</p>
+        <div class="where">▸ mode = Hawkeye → Inbox approvals</div>
+      </div></div>
+      <div class="step"><div class="dot">6</div><div class="body">
+        <h3>Graduate to Self-drive (optional)</h3>
+        <p>Once it's consistently right, let confident confirmations send themselves. You still see — and approve — every handoff and lost.</p>
+        <div class="where">▸ mode = Self-drive</div>
+      </div></div>
+    </div>
+  </section>
+
+  <!-- 7. FACTS -->
+  <section id="facts">
+    <div class="sec-head"><span class="sec-num">07</span><h2>The golden rule: facts live once</h2></div>
+    <div class="grid g2">
+      <div class="card" style="border-left:3px solid var(--gold)">
+        <span class="label gold">Facts (your academy)</span>
+        <p style="margin-top:10px" class="dim">Address, schedule, prices, what-to-bring, policies. Set <b style="color:var(--text)">once</b> in your academy info.</p>
+        <ul class="clean" style="margin-top:8px">
+          <li>Edit your address in <b>one</b> place</li>
+          <li><b>Both</b> agents instantly use the new one</li>
+          <li>Never gets out of sync</li>
+        </ul>
+      </div>
+      <div class="card" style="border-left:3px solid var(--purple)">
+        <span class="label purple">Behavior (how it acts)</span>
+        <p style="margin-top:10px" class="dim">Tone, how it confirms, how it hands off. This is the part you <b style="color:var(--text)">train</b>.</p>
+        <ul class="clean" style="margin-top:8px">
+          <li>Shared style across academies</li>
+          <li>Contains <b>no</b> hard facts — it points at your info</li>
+          <li>Your lessons & examples live here</li>
+        </ul>
+      </div>
+    </div>
+    <p class="dim" style="margin-top:16px;font-size:14px">👉 Want to fix a wrong address or time? That's a <b style="color:var(--text)">fact</b> — change it in your academy info, not by training the agent. Want it to sound warmer or stop nagging? That's <b style="color:var(--text)">behavior</b> — train it.</p>
+  </section>
+
+  <!-- 8. STATUS -->
+  <section id="status">
+    <div class="sec-head"><span class="sec-num">08</span><h2>What's live right now</h2></div>
+    <p class="dim" style="margin-bottom:16px">Straight talk on what works today vs. what's still being built for the confirm agent specifically.</p>
+    <div class="card" style="padding:6px 8px">
+      <table>
+        <thead><tr><th>Piece</th><th>Status</th><th>Notes</th></tr></thead>
+        <tbody>
+          <tr><td>The agent's brain & logic</td><td class="s badge-live">● LIVE</td><td class="dim">Built, tested, byte-for-byte safe for the booking agent.</td></tr>
+          <tr><td>Runs on a schedule (every 15 min)</td><td class="s badge-live">● LIVE</td><td class="dim">Drafts confirms, handoffs, lost — gated behind the off switch.</td></tr>
+          <tr><td>Handoff back to booking agent</td><td class="s badge-live">● LIVE</td><td class="dim">Writes the note + bounces the stage. Booking agent reads it automatically.</td></tr>
+          <tr><td>Own on/off dial (default off)</td><td class="s badge-live">● LIVE</td><td class="dim">Won't text anyone until switched on.</td></tr>
+          <tr><td>Database table for the queue</td><td class="s badge-soon">◐ TO APPLY</td><td class="dim">Migration written; needs applying to production before turning on.</td></tr>
+          <tr><td>Inbox UI to approve its cards</td><td class="s badge-soon">◐ COMING</td><td class="dim">The Hawkeye screen for confirm cards isn't built yet.</td></tr>
+          <tr><td>Sandbox / Brain editor for confirm</td><td class="s badge-soon">◐ COMING</td><td class="dim">Training UI today points at the booking agent; an agent picker is the next step.</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="callout" style="margin-top:18px">
+      <span class="big">🎯</span>
+      <div><b>Bottom line:</b> the agent's <b>brain and behavior are done and live</b>. To actually start training and using it, the next build is the <b>screens</b> — the approval inbox and the sandbox/brain editor pointed at this agent — plus applying the database table. Then you flip the dial to Hawkeye and start teaching.</div>
+    </div>
+  </section>
+
+  <footer>
+    Confirm Agent · Scheduled-Trial stage · BAM sales agents<br>
+    Brain: <span class="dim">bam-portal/api/agent/prompt-structure.js</span> &nbsp;·&nbsp; Live: <span class="dim">api/agent-confirm.js</span> &nbsp;·&nbsp; Spec: <span class="dim">sales-conversation-agents/conversation-ai-confirm-agent-bam-gta.txt</span>
+  </footer>
+
+</div>
+</body>
+</html>
