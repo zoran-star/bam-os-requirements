@@ -21908,10 +21908,14 @@ function _plPostTrialForm(oppId) {
           <button type="button" id="ptf-fit-no" class="ptf-segbtn" onclick="_ptfSetFit(false)">Not a fit</button>
         </div>
       </div>
+      <div class="ptf-field" id="ptf-first-msg-field">
+        <label>First message to the parent</label>
+        <textarea id="ptf-first-msg" class="ptf-input" rows="3" placeholder="e.g. Hey Sarah! Loved having Leah today - awesome energy. Ready to lock in her spot?"></textarea>
+      </div>
       <div class="ptf-field" id="ptf-link-field">
-        <label>Send onboarding link?</label>
+        <label>Add the sign-up link at the bottom?</label>
         <div class="ptf-seg">
-          <button type="button" id="ptf-link-yes" class="ptf-segbtn on" onclick="_ptfSetSendLink(true)">Yes, text it</button>
+          <button type="button" id="ptf-link-yes" class="ptf-segbtn on" onclick="_ptfSetSendLink(true)">Yes</button>
           <button type="button" id="ptf-link-no" class="ptf-segbtn" onclick="_ptfSetSendLink(false)">No</button>
         </div>
       </div>
@@ -21924,7 +21928,7 @@ function _plPostTrialForm(oppId) {
         <textarea id="ptf-notes" class="ptf-input" rows="3" placeholder="Anything worth noting about this trial…"></textarea>
       </div>
       <div class="ptf-err" id="ptf-err"></div>
-      <div class="ptf-note">On a good fit the card moves to Done Trial + the trainer is assigned. A no-show moves to Interested and fires the missed-trial automation. With "Send onboarding link" on, we text the academy's sign-up link to the parent - set the link in KPIs → Setup → Offers (or the Blueprint training Sales section).</div>
+      <div class="ptf-note">On a good fit the card moves to Done Trial + the trainer is assigned. A no-show moves to Interested and fires the missed-trial automation. Your "first message" is texted to the parent; with the sign-up link on, the link is added at the bottom - set the link in KPIs → Setup → Offers (or the Blueprint training Sales section).</div>
       <button class="ptf-submit" id="ptf-submit" onclick="_ptfSubmit()">Submit review</button>
     </div>`;
   ov.classList.add('open');
@@ -21970,8 +21974,10 @@ function _ptfSetShow(v) {
   const noShow = (v === false);
   const fitField = document.getElementById('ptf-fit-field');
   const linkField = document.getElementById('ptf-link-field');
+  const firstMsgField = document.getElementById('ptf-first-msg-field');
   if (fitField) fitField.style.display = noShow ? 'none' : '';
   if (linkField) linkField.style.display = noShow ? 'none' : '';
+  if (firstMsgField) firstMsgField.style.display = noShow ? 'none' : '';
   if (noShow) {
     _PTF_FIT = null;
     document.getElementById('ptf-fit-yes')?.classList.remove('on');
@@ -22000,6 +22006,7 @@ async function _ptfSubmit() {
   if (_PTF_SHOW === true && _PTF_FIT === null) { err.textContent = 'Pick whether it was a good fit.'; err.style.display = 'block'; return; }
   const trainer = document.getElementById('ptf-trainer')?.value || '';
   const notes = document.getElementById('ptf-notes')?.value || '';
+  const firstMessage = document.getElementById('ptf-first-msg')?.value || '';
   const btn = document.getElementById('ptf-submit');
   err.style.display = 'none'; btn.disabled = true; btn.textContent = 'Saving…';
   try {
@@ -22007,7 +22014,7 @@ async function _ptfSubmit() {
     const r = await fetch(`/api/ghl/post-trial?client_id=${encodeURIComponent(CLIENT_ID)}`, {
       method: 'POST',
       headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ opportunity_id: _PTF_OPP, good_fit: _PTF_FIT, showed_up: _PTF_SHOW, trainer, notes, send_onboarding_link: _PTF_SENDLINK }),
+      body: JSON.stringify({ opportunity_id: _PTF_OPP, good_fit: _PTF_FIT, showed_up: _PTF_SHOW, trainer, notes, send_onboarding_link: _PTF_SENDLINK, first_message: firstMessage }),
     });
     const json = await _safeJson(r);
     if (!r.ok) throw new Error(json.error || ('HTTP ' + r.status));
