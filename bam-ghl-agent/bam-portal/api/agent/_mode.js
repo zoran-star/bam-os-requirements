@@ -34,6 +34,16 @@ export function confirmAgentMode(client) {
   return AGENT_MODES.includes(m) ? m : "off";
 }
 
+// The CLOSING agent (Done-Trial stage) — converts a good-fit trial attendee into a
+// paying member. Its OWN switch so turning on booking/confirm doesn't start pitching
+// memberships to everyone who finished a trial. Opt-in: defaults to "off" (no legacy
+// fallback). Same vocabulary. Stored at clients.ghl_kpi_config.closing_agent_mode.
+export function closingAgentMode(client) {
+  const cfg = (client && client.ghl_kpi_config) || {};
+  const m = cfg.closing_agent_mode;
+  return AGENT_MODES.includes(m) ? m : "off";
+}
+
 export const modeIsOn      = (mode) => mode === "hawkeye" || mode === "self_drive";
 export const modeSelfDrives = (mode) => mode === "self_drive";
 

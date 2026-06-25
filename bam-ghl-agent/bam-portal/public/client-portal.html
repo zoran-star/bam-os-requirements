@@ -7524,6 +7524,7 @@ Then the call to action."]</div>
           <input id="ib-search" class="ib-search" type="text" placeholder="🔍  Search by name or content…" oninput="_ibSetSearch(this.value)">
           <button id="ib-approve-btn" onclick="_apxOpen()" title="Hawkeye - approve the agent's drafted messages before they send" style="background:transparent;border:1px solid var(--accent);color:var(--accent);padding:7px 12px;border-radius:4px;cursor:pointer;font-size:12px;font-weight:700">👁 Hawkeye <span id="apx-count" style="font-weight:800"></span></button>
           <button id="acx-approve-btn" onclick="_acxOpen()" title="Confirm agent - approve trial-confirmation messages before they send" style="display:none;background:transparent;border:1px solid var(--border);color:var(--text-mute);padding:7px 12px;border-radius:4px;cursor:pointer;font-size:12px;font-weight:700">✅ Confirm <span id="acx-count" style="font-weight:800"></span></button>
+          <button id="aclx-approve-btn" onclick="_aclxOpen()" title="Closing agent - approve post-trial conversion messages before they send" style="display:none;background:transparent;border:1px solid var(--border);color:var(--text-mute);padding:7px 12px;border-radius:4px;cursor:pointer;font-size:12px;font-weight:700">🎯 Closing <span id="aclx-count" style="font-weight:800"></span></button>
           <button onclick="_ibComposeNew()" title="New message" style="background:var(--accent);border:1px solid var(--accent);color:#08080A;padding:7px 12px;border-radius:4px;cursor:pointer;font-size:12px;font-weight:600">✏️ New</button>
           <button onclick="fetchAndRenderInbox()" title="Refresh" style="background:transparent;border:1px solid var(--border);color:var(--text);padding:7px 12px;border-radius:4px;cursor:pointer;font-size:12px">↻</button>
         </div>
@@ -10964,6 +10965,7 @@ function _v15ibRenderAll() {
         <span style="flex:1"></span>
         <button id="v15ib-approve-btn" onclick="_apxOpen()" title="Hawkeye - approve the agent's drafted messages before they send" aria-label="Hawkeye agent approvals" class="v15ib-icon" style="width:auto;padding:0 12px;gap:6px;border-color:var(--accent);color:var(--accent);font-weight:700">👁 Hawkeye <span id="v15-apx-count" style="font-weight:800"></span></button>
         <button id="v15acx-approve-btn" onclick="_acxOpen()" title="Confirm agent - approve trial-confirmation messages before they send" aria-label="Confirm agent approvals" class="v15ib-icon" style="display:none;width:auto;padding:0 12px;gap:6px;font-weight:700">✅ Confirm <span id="v15-acx-count" style="font-weight:800"></span></button>
+        <button id="v15aclx-approve-btn" onclick="_aclxOpen()" title="Closing agent - approve post-trial conversion messages before they send" aria-label="Closing agent approvals" class="v15ib-icon" style="display:none;width:auto;padding:0 12px;gap:6px;font-weight:700">🎯 Closing <span id="v15-aclx-count" style="font-weight:800"></span></button>
         <button onclick="_v15ibMassSend()" class="v15ib-icon v15ib-send" title="Mass send" aria-label="Mass send" style="width:auto;padding:0 12px;gap:6px">✉ Mass send</button>
       </div>
       <div class="v15ib-chans">${unreadBtn}${chanBtns}</div>
@@ -10978,6 +10980,7 @@ function _v15ibRenderAll() {
   _v15ibRenderList();
   _apxRefreshCount();
   _acxRefreshCount();
+  _aclxRefreshCount();
 }
 
 // Initials for the row avatar - first letters of up to two name words; falls
@@ -15802,6 +15805,7 @@ function openTrainAgentView() {
       ${tab('test', '💬 Test')}
       ${tab('lessons', '📚 Lessons')}
       ${tab('knowledge', '📍 Knowledge')}
+      ${tab('automations', '👻 Automations')}
       ${(typeof _IS_BAM_STAFF !== 'undefined' && _IS_BAM_STAFF === true) ? tab('mode', '🎚 Autonomy') : ''}
     </div>
     <div id="ta-panel"></div>`;
@@ -15814,6 +15818,7 @@ function _taRenderPanel() {
   if (_TA.tab === 'test') return _taRenderTest();
   if (_TA.tab === 'lessons') return _taRenderLessons();
   if (_TA.tab === 'knowledge') return _taRenderKnowledge();
+  if (_TA.tab === 'automations') return _taRenderAutomations();
   if (_TA.tab === 'mode') return _taRenderMode();
 }
 
@@ -15871,6 +15876,206 @@ async function _taSetMode(mode) {
 }
 async function _taSetModeGo(mode) {
   try { await _taConfigApi('set-mode', { client_id: CLIENT_ID, mode }); _TA.mode = mode; _taRenderMode(); _plToast('🎚 Mode set: ' + mode.replace('_', '-')); }
+  catch (e) { alert(e.message); }
+}
+
+// ── Automations (step-builder): 👻 Ghosted + 💔 Lead Nurture sequences ──────
+// Visual editor backing the portal automation engine (api/automations.js). Each
+// step = a wait, then a text or email. Approve the sequence once + flip it on; the
+// engine sends each step on schedule (quiet hours respected). Renders EMPTY until
+// the import session fills the steps.
+let _AUTO = { list: [], overview: [] };
+const _AUTO_SEED = [
+  { automation_key: 'ghosted', name: '👻 Ghosted' },
+  { automation_key: 'nurture', name: '💔 Lead Nurture' },
+];
+const _AUTO_UNITS = ['minutes', 'hours', 'days', 'weeks', 'months'];
+
+async function _autoApi(action, extra) {
+  const token = await _mreqAuthToken();
+  const r = await fetch('/api/automations', {
+    method: 'POST', headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action, client_id: CLIENT_ID, ...(extra || {}) }),
+  });
+  const json = await _safeJson(r);
+  if (!r.ok) throw new Error(json.error || ('HTTP ' + r.status));
+  return json;
+}
+
+async function _taRenderAutomations() {
+  const p = document.getElementById('ta-panel'); if (!p) return;
+  p.innerHTML = `<div style="color:var(--text-mute);font-size:13px"><span class="req-spin"></span> Loading…</div>`;
+  let list = [];
+  try {
+    let d = await _autoApi('list');
+    list = d.automations || [];
+    // Seed Ghosted + Lead Nurture if this academy has none, so both always show.
+    const have = new Set(list.map(a => a.automation_key));
+    let seeded = false;
+    for (const s of _AUTO_SEED) {
+      if (!have.has(s.automation_key)) { await _autoApi('upsert-automation', { automation_key: s.automation_key, name: s.name, enabled: false, approved: false }); seeded = true; }
+    }
+    if (seeded) { d = await _autoApi('list'); list = d.automations || []; }
+  } catch (e) { p.innerHTML = `<div style="color:#e07070;font-size:13px">Couldn't load - ${escapeHTML(e.message)}</div>`; return; }
+  const order = { ghosted: 0, nurture: 1 };
+  list.sort((a, b) => ((order[a.automation_key] ?? 9) - (order[b.automation_key] ?? 9)));
+  _AUTO.list = list;
+  // Live counts (read-only observability) - best-effort; the editor still works if it fails.
+  try { const ov = await _autoApi('overview'); _AUTO.overview = ov.overview || []; } catch (_) { _AUTO.overview = []; }
+  p.innerHTML = `
+    <p style="color:var(--text-mute);font-size:12.5px;margin:0 0 14px;line-height:1.55;max-width:660px">Build your one-way nudge sequences - each step is a <b style="color:var(--text)">wait</b>, then a <b style="color:var(--text)">text or email</b>. Approve the sequence once and flip it on; the engine sends each step on schedule (quiet hours respected). Merge tags: <code>{{name}}</code> / <code>{{athlete}}</code>. Empty? Paste your texts + emails in the import session to auto-fill these.</p>
+    ${list.map(_autoCardHtml).join('') || '<div style="color:var(--text-mute)">No automations.</div>'}`;
+}
+
+// Read-only observability (guardrail #8): live counts strip per automation, click
+// a count -> the people in it -> a person -> their contact drawer (reused).
+function _autoCountsStrip(a) {
+  const ov = (_AUTO.overview || []).find(o => o.id === a.id);
+  if (!ov) return '';
+  const total = ov.total_active || 0;
+  const pills = (ov.by_step || []).map(s =>
+    `<button onclick="_autoOpenPeople('${a.id}',${s.position})" title="${escapeHTML(s.preview || '')}" style="background:var(--surface);border:1px solid var(--border);border-radius:7px;padding:3px 9px;font-size:11px;color:var(--text-sub);cursor:pointer;font-family:inherit">${escapeHTML(s.label)} ${s.channel === 'email' ? '📧' : '💬'} <b style="color:var(--text)">${s.count}</b></button>`
+  ).join('');
+  return `<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:12px">
+    <button onclick="_autoOpenPeople('${a.id}','')" style="background:transparent;border:1px solid var(--border);border-radius:7px;padding:3px 10px;font-size:11px;color:var(--text-sub);cursor:pointer;font-family:inherit">👥 <b style="color:var(--text)">${total}</b> in this sequence</button>
+    ${pills}</div>`;
+}
+async function _autoOpenPeople(autoId, position) {
+  const a = _AUTO.list.find(x => x.id === autoId);
+  const title = (a ? (a.name || a.automation_key) : 'Automation') + (position === '' ? '' : ' - step ' + (Number(position) + 1));
+  _autoPeopleModal(title, '<div style="color:var(--text-mute);font-size:13px;padding:18px 0;text-align:center"><span class="req-spin"></span> Loading…</div>');
+  try {
+    const d = await _autoApi('people', { automation_id: autoId, position });
+    const people = d.people || [];
+    const body = people.length
+      ? people.map(pp => `<button onclick="_autoOpenContact('${escapeHTML(pp.contact_id)}','${escapeHTML((pp.contact_name || '').replace(/'/g, ''))}')" style="display:flex;width:100%;align-items:center;gap:9px;text-align:left;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:9px 11px;margin-bottom:7px;cursor:pointer;font-family:inherit"><span style="font-size:13.5px;color:var(--text);font-weight:600">${escapeHTML(pp.contact_name || pp.contact_id)}</span><span style="flex:1"></span><span style="font-size:11px;color:var(--text-mute)">step ${Number(pp.current_position) + 1} ›</span></button>`).join('')
+      : '<div style="color:var(--text-mute);font-size:13px;padding:18px 0;text-align:center">Nobody here yet.</div>';
+    _autoPeopleModalBody(body);
+  } catch (e) { _autoPeopleModalBody(`<div style="color:#e07070;font-size:13px;padding:12px 0">Couldn't load - ${escapeHTML(e.message)}</div>`); }
+}
+function _autoPeopleModal(title, bodyHtml) {
+  _autoPeopleClose();
+  document.body.insertAdjacentHTML('beforeend', `<div id="auto-people-ov" onclick="if(event.target===this)_autoPeopleClose()" style="position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9300;display:flex;align-items:center;justify-content:center;padding:18px"><div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;width:100%;max-width:440px;max-height:80vh;display:flex;flex-direction:column;overflow:hidden"><div style="display:flex;align-items:center;gap:9px;padding:14px 16px;border-bottom:1px solid var(--border)"><div style="font-size:14px;font-weight:700;color:var(--text)">${escapeHTML(title)}</div><span style="flex:1"></span><button onclick="_autoPeopleClose()" aria-label="Close" style="background:none;border:none;color:var(--text-mute);font-size:20px;cursor:pointer;line-height:1">×</button></div><div id="auto-people-body" style="padding:14px 16px;overflow-y:auto">${bodyHtml}</div></div></div>`);
+}
+function _autoPeopleModalBody(html) { const b = document.getElementById('auto-people-body'); if (b) b.innerHTML = html; }
+function _autoPeopleClose() { const o = document.getElementById('auto-people-ov'); if (o) o.remove(); }
+// Reuse the existing contacts drawer: seed a minimal row, then open it by index
+// (the drawer fetches full detail by ghl_contact_id itself).
+function _autoOpenContact(contactId, name) {
+  if (!contactId) return;
+  _autoPeopleClose();
+  try {
+    let idx = _CONTACTS.findIndex(x => x && x.ghl_contact_id === contactId);
+    if (idx < 0) { _CONTACTS.push({ ghl_contact_id: contactId, name: name || 'Contact', email: null, phone: null, tags: [] }); idx = _CONTACTS.length - 1; }
+    _contactsOpenDrawer(idx);
+  } catch (_) { if (typeof _plToast === 'function') _plToast('Could not open contact'); }
+}
+
+function _autoCardHtml(a) {
+  const steps = (a.steps || []).slice().sort((x, y) => x.position - y.position);
+  const stepsHtml = steps.length
+    ? steps.map((s, i) => _autoStepHtml(a, s, i, steps.length)).join('')
+    : `<div style="color:var(--text-mute);font-size:12.5px;padding:11px 13px;border:1px dashed var(--border);border-radius:8px">No steps yet - add one, or paste your texts/emails in the import session to auto-fill this.</div>`;
+  const seg = (on) => `background:${on ? 'var(--gold)' : 'transparent'};color:${on ? '#0B0B0D' : 'var(--text-sub)'};border:1px solid ${on ? 'var(--gold)' : 'var(--border)'};border-radius:8px;padding:5px 12px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit`;
+  const statusLine = a.enabled && a.approved ? '🟢 Live - sending on schedule.' : (a.enabled && !a.approved ? '⚠ Approve the sequence too before it sends.' : 'Not sending yet.');
+  return `
+  <div style="border:1px solid var(--border);border-radius:12px;padding:14px 16px;margin-bottom:14px">
+    <div style="display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin-bottom:4px">
+      <div style="font-size:15px;font-weight:700;color:var(--text)">${escapeHTML(a.name || a.automation_key)}</div>
+      <span style="flex:1"></span>
+      <button onclick="_autoToggle('${a.id}','approved',${!a.approved})" style="${seg(!!a.approved)}">${a.approved ? '✓ Approved' : 'Approve sequence'}</button>
+      <button onclick="_autoToggle('${a.id}','enabled',${!a.enabled})" style="${seg(!!a.enabled)}">${a.enabled ? '🟢 On' : 'Off'}</button>
+    </div>
+    <div style="font-size:11.5px;color:var(--text-mute);margin-bottom:12px">${statusLine}</div>
+    ${_autoCountsStrip(a)}
+    ${stepsHtml}
+    <button onclick="_autoAddStep('${a.id}')" style="margin-top:10px;background:transparent;border:1px dashed var(--border);color:var(--text-sub);border-radius:8px;padding:8px 14px;font-size:12.5px;font-weight:600;cursor:pointer">+ add step</button>
+  </div>`;
+}
+
+function _autoStepHtml(a, s, i, total) {
+  const isEmail = s.channel === 'email';
+  const unitOpts = _AUTO_UNITS.map(u => `<option value="${u}"${s.wait_unit === u ? ' selected' : ''}>${u}</option>`).join('');
+  return `
+  <div id="astep-${s.id}" style="border:1px solid var(--border);border-radius:9px;padding:10px 12px;margin-bottom:8px;background:var(--surface)">
+    <div style="display:flex;align-items:center;gap:7px;flex-wrap:wrap;margin-bottom:8px">
+      <span style="font-size:11px;color:var(--text-mute);font-weight:700;min-width:14px">${i + 1}</span>
+      <span style="font-size:12px;color:var(--text-sub)">⏱ wait</span>
+      <input id="astep-${s.id}-amt" type="number" min="0" value="${Number(s.wait_amount) || 0}" style="width:60px;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:5px 7px;font-size:12.5px">
+      <select id="astep-${s.id}-unit" style="background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:5px 7px;font-size:12.5px">${unitOpts}</select>
+      <span style="font-size:12px;color:var(--text-mute)">·</span>
+      <select id="astep-${s.id}-chan" onchange="_autoChanChange('${s.id}')" style="background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:5px 7px;font-size:12.5px">
+        <option value="sms"${!isEmail ? ' selected' : ''}>💬 SMS</option>
+        <option value="email"${isEmail ? ' selected' : ''}>📧 Email</option>
+      </select>
+      <span style="flex:1"></span>
+      <button onclick="_autoMove('${a.id}','${s.id}',-1)" ${i === 0 ? 'disabled' : ''} title="Move up" style="background:transparent;border:1px solid var(--border);color:var(--text-sub);border-radius:6px;padding:4px 8px;font-size:11px;cursor:pointer;${i === 0 ? 'opacity:.4' : ''}">↑</button>
+      <button onclick="_autoMove('${a.id}','${s.id}',1)" ${i === total - 1 ? 'disabled' : ''} title="Move down" style="background:transparent;border:1px solid var(--border);color:var(--text-sub);border-radius:6px;padding:4px 8px;font-size:11px;cursor:pointer;${i === total - 1 ? 'opacity:.4' : ''}">↓</button>
+    </div>
+    <input id="astep-${s.id}-subj" placeholder="Subject (email)" value="${escapeHTML(s.subject || '')}" style="display:${isEmail ? 'block' : 'none'};width:100%;box-sizing:border-box;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:7px 9px;font-size:12.5px;margin-bottom:7px">
+    <textarea id="astep-${s.id}-body" placeholder="Message - use {{name}} / {{athlete}}" style="width:100%;box-sizing:border-box;min-height:54px;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:7px 9px;font-size:12.5px;resize:vertical;font-family:inherit">${escapeHTML(s.body || '')}</textarea>
+    <div style="display:flex;gap:8px;margin-top:7px">
+      <button onclick="_autoSaveStep('${a.id}','${s.id}')" style="background:var(--gold);color:#0B0B0D;border:none;border-radius:7px;padding:6px 14px;font-size:12px;font-weight:700;cursor:pointer">Save</button>
+      <button onclick="_autoDelStep('${s.id}')" style="background:transparent;border:1px solid var(--border);color:#e07070;border-radius:7px;padding:6px 12px;font-size:12px;cursor:pointer">Delete</button>
+    </div>
+  </div>`;
+}
+
+function _autoChanChange(sid) {
+  const chan = document.getElementById(`astep-${sid}-chan`), subj = document.getElementById(`astep-${sid}-subj`);
+  if (chan && subj) subj.style.display = chan.value === 'email' ? 'block' : 'none';
+}
+
+async function _autoToggle(autoId, field, value) {
+  try {
+    await _autoApi(field === 'approved' ? 'set-approved' : 'set-enabled', { automation_id: autoId, value });
+    _plToast(field === 'approved' ? (value ? '✓ Sequence approved' : 'Approval removed') : (value ? '🟢 Automation on' : 'Automation off'));
+    _taRenderAutomations();
+  } catch (e) { alert(e.message); }
+}
+
+async function _autoAddStep(autoId) {
+  const a = _AUTO.list.find(x => x.id === autoId);
+  const pos = a && a.steps && a.steps.length ? Math.max(...a.steps.map(s => Number(s.position) || 0)) + 1 : 0;
+  try { await _autoApi('upsert-step', { automation_id: autoId, position: pos, wait_amount: 1, wait_unit: 'days', channel: 'sms', body: 'New step - edit me' }); _taRenderAutomations(); }
+  catch (e) { alert(e.message); }
+}
+
+async function _autoSaveStep(autoId, sid) {
+  const g = (suf) => document.getElementById(`astep-${sid}-${suf}`);
+  const body = (g('body') && g('body').value || '').trim();
+  if (!body) { alert('Message body is required.'); return; }
+  const a = _AUTO.list.find(x => x.id === autoId);
+  const st = a && (a.steps || []).find(s => s.id === sid);
+  const chan = g('chan').value;
+  try {
+    await _autoApi('upsert-step', {
+      automation_id: autoId, id: sid,
+      position: st ? Number(st.position) || 0 : 0,
+      wait_amount: parseInt(g('amt').value, 10) || 0,
+      wait_unit: g('unit').value,
+      channel: chan,
+      subject: chan === 'email' && g('subj') ? (g('subj').value || '') : '',
+      body,
+    });
+    _plToast('Step saved');
+    _taRenderAutomations();
+  } catch (e) { alert(e.message); }
+}
+
+async function _autoDelStep(sid) {
+  if (!confirm('Delete this step?')) return;
+  try { await _autoApi('delete-step', { step_id: sid }); _taRenderAutomations(); }
+  catch (e) { alert(e.message); }
+}
+
+async function _autoMove(autoId, sid, dir) {
+  const a = _AUTO.list.find(x => x.id === autoId); if (!a) return;
+  const steps = (a.steps || []).slice().sort((x, y) => x.position - y.position);
+  const i = steps.findIndex(s => s.id === sid); if (i < 0) return;
+  const j = i + dir; if (j < 0 || j >= steps.length) return;
+  const ids = steps.map(s => s.id); [ids[i], ids[j]] = [ids[j], ids[i]];
+  try { await _autoApi('reorder', { automation_id: autoId, ordered_step_ids: ids }); _taRenderAutomations(); }
   catch (e) { alert(e.message); }
 }
 
@@ -22288,7 +22493,7 @@ async function _ptfSubmit() {
 // member work is done; stub for now (no GHL change yet).
 // Mark won / lost / abandoned - each captures a free-text reason, updates the
 // GHL opportunity status, and offers an Undo. (V1.5 pipelines.)
-const _PL_STATUS_LABEL = { won: 'Won', lost: 'Lost', abandoned: 'Abandoned' };
+const _PL_STATUS_LABEL = { won: 'Won', lost: 'Lost', abandoned: 'Abandoned', unqualified: 'Unqualified' };
 let _plUndoState = null, _plUndoTimer = null;
 
 // Won is instant (no reason): mark + remove from the pipeline board.
@@ -22302,6 +22507,55 @@ async function _plMarkWon(oppId) {
 }
 function _plMarkLost(oppId) { _plOutcome(oppId, 'lost'); }
 function _plMarkAbandoned(oppId) { _plOutcome(oppId, 'abandoned'); }
+// 🚫 Unqualified = the ONE true dead end: drop from the pipeline (GHL status
+// 'abandoned') AND stamp the GHL `unqualified` tag (mirrors the portal switch).
+// Distinct from a plain 'abandoned' (e.g. duplicate cleanup), which never tags.
+function _plMarkUnqualified(oppId, contactId) { _plOutcome(oppId, 'unqualified', contactId); }
+
+// Per-lead bot mute (guardrail #6): "hands off this lead" - stop the agents from
+// drafting on this specific contact, without turning the whole agent off. A global
+// (all-bots) mute also pulls them out of any running automation sequence.
+const _PL_MUTES = new Set();   // contactIds globally muted (best-effort cache)
+function _plMuteBtnLabel(muted) { return muted ? '🔊 Resume bots on this lead' : '🔇 Stop bots on this lead'; }
+async function _plMuteState(contactId) {
+  try {
+    const token = await _mreqAuthToken();
+    const r = await fetch('/api/agent-mutes', { method: 'POST', headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'list', client_id: CLIENT_ID, contact_id: contactId }) });
+    const j = await _safeJson(r);
+    const muted = Array.isArray(j.mutes) && j.mutes.some(m => !m.agent);   // a global (all-bots) mute exists
+    if (muted) _PL_MUTES.add(String(contactId)); else _PL_MUTES.delete(String(contactId));
+    return muted;
+  } catch (_) { return _PL_MUTES.has(String(contactId)); }
+}
+async function _plMuteInit(contactId) {
+  const muted = await _plMuteState(contactId);
+  const btn = document.getElementById('pl-mute-btn');
+  if (btn) { btn.textContent = _plMuteBtnLabel(muted); btn.style.color = muted ? 'var(--gold,#E8C547)' : 'var(--text-sub)'; }
+}
+async function _plToggleMute(contactId) {
+  const muted = _PL_MUTES.has(String(contactId));
+  const btn = document.getElementById('pl-mute-btn');
+  if (btn) btn.disabled = true;
+  try {
+    const token = await _mreqAuthToken();
+    const r = await fetch('/api/agent-mutes', { method: 'POST', headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' }, body: JSON.stringify({ action: muted ? 'clear' : 'set', client_id: CLIENT_ID, contact_id: contactId }) });
+    if (!r.ok) { const j = await _safeJson(r); throw new Error(j.error || ('HTTP ' + r.status)); }
+    if (muted) _PL_MUTES.delete(String(contactId)); else _PL_MUTES.add(String(contactId));
+    if (btn) { btn.textContent = _plMuteBtnLabel(!muted); btn.style.color = !muted ? 'var(--gold,#E8C547)' : 'var(--text-sub)'; }
+    _plToast(!muted ? '🔇 Bots muted on this lead' : '🔊 Bots resumed on this lead');
+  } catch (e) { _plToast('Could not update mute: ' + e.message); }
+  finally { if (btn) btn.disabled = false; }
+}
+
+// Stamp / clear the GHL `unqualified` tag on a contact (the portal ⟷ GHL mirror).
+async function _plStampUnqualified(contactId, unq) {
+  const token = await _mreqAuthToken();
+  const r = await fetch('/api/agent-approvals', {
+    method: 'POST', headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action: 'set-qualification', client_id: CLIENT_ID, contact_id: contactId, unqualified: !!unq }),
+  });
+  if (!r.ok) { const j = await _safeJson(r); throw new Error(j.error || ('HTTP ' + r.status)); }
+}
 
 // Drop an opportunity from the local board immediately (Won/Lost/Abandoned are
 // removed from the pipeline by the portal). Re-renders tabs + board.
@@ -22361,7 +22615,7 @@ function _plMoveContactToInterested(contactId) {
   return false;
 }
 
-function _plOutcome(oppId, status) {
+function _plOutcome(oppId, status, contactId) {
   const label = _PL_STATUS_LABEL[status] || status;
   document.body.insertAdjacentHTML('beforeend', `<div id="pl-outcome-overlay" style="position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9100;display:flex;align-items:center;justify-content:center;padding:18px" onclick="if(event.target===this)this.remove()">
     <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;width:100%;max-width:420px;padding:22px">
@@ -22370,20 +22624,25 @@ function _plOutcome(oppId, status) {
       <textarea id="pl-outcome-reason" placeholder="Reason…" style="width:100%;min-height:70px;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:9px 11px;font:inherit;font-size:13px;resize:vertical;margin-bottom:14px"></textarea>
       <div style="display:flex;justify-content:flex-end;gap:10px">
         <button onclick="document.getElementById('pl-outcome-overlay').remove()" style="background:none;border:1px solid var(--border);border-radius:8px;color:var(--text-sub);padding:9px 16px;font:inherit;font-size:13px;cursor:pointer">Cancel</button>
-        <button id="pl-outcome-go" onclick="_plOutcomeConfirm('${escapeHTML(oppId)}','${status}')" style="background:var(--gold);color:#0B0B0D;border:none;border-radius:8px;padding:9px 18px;font:inherit;font-size:13px;font-weight:700;cursor:pointer">Mark ${label}</button>
+        <button id="pl-outcome-go" onclick="_plOutcomeConfirm('${escapeHTML(oppId)}','${status}','${escapeHTML(contactId||'')}')" style="background:var(--gold);color:#0B0B0D;border:none;border-radius:8px;padding:9px 18px;font:inherit;font-size:13px;font-weight:700;cursor:pointer">Mark ${label}</button>
       </div>
     </div></div>`);
   setTimeout(() => document.getElementById('pl-outcome-reason')?.focus(), 30);
 }
 
-async function _plOutcomeConfirm(oppId, status) {
+async function _plOutcomeConfirm(oppId, status, contactId) {
   const reason = (document.getElementById('pl-outcome-reason')?.value || '').trim();
   const btn = document.getElementById('pl-outcome-go'); if (btn) { btn.disabled = true; btn.textContent = 'Saving…'; }
   try {
-    await _plSetStatus(oppId, status, reason);
+    // 'unqualified' is a portal concept: GHL has no such status, so it maps to
+    // 'abandoned' (off the pipeline) PLUS the `unqualified` tag.
+    const ghlStatus = status === 'unqualified' ? 'abandoned' : status;
+    await _plSetStatus(oppId, ghlStatus, reason);
+    if (status === 'unqualified' && contactId) { try { await _plStampUnqualified(contactId, true); } catch (_) {} }
     document.getElementById('pl-outcome-overlay')?.remove();
     _plRemoveOppLocal(oppId); // remove from the pipeline board right away (Lost automation runs in GHL)
-    _plDrawerConfirm(status === 'lost' ? '🚫' : '🗑', `Marked ${_PL_STATUS_LABEL[status] || status}`, 'Removed from the pipeline'); // flashes, then closes the drawer
+    const sub = status === 'unqualified' ? 'Tagged unqualified + removed' : 'Removed from the pipeline';
+    _plDrawerConfirm((status === 'lost' || status === 'unqualified') ? '🚫' : '🗑', `Marked ${_PL_STATUS_LABEL[status] || status}`, sub); // flashes, then closes the drawer
     _plShowUndo({ type: 'status', oppId }, `Marked ${_PL_STATUS_LABEL[status] || status} - removed from pipeline`);
   } catch (e) {
     alert('Couldn’t mark ' + status + ': ' + e.message);
@@ -23004,9 +23263,10 @@ function _plOpenCard(oppId) {
     <div class="pl-d-actions">
       <div style="display:flex;gap:8px">
         <button class="pl-d-btn" style="flex:1;border-color:#e07070;color:#e07070" onclick="_plMarkLost('${escapeHTML(o.id)}')">Mark as lost</button>
-        <button class="pl-d-btn" style="flex:1;border-color:#5a96e0;color:#5a96e0" onclick="_plMarkAbandoned('${escapeHTML(o.id)}')">Abandoned</button>
+        <button class="pl-d-btn" style="flex:1;border-color:#5a96e0;color:#5a96e0" onclick="_plMarkUnqualified('${escapeHTML(o.id)}','${escapeHTML(o.contactId||'')}')">🚫 Unqualified</button>
         ${_plV2 ? `<button class="pl-d-btn" style="flex:1;border-color:var(--gold,#E8C547);color:var(--gold,#E8C547)" onclick="_plGhost('${escapeHTML(o.id)}')">👻 Ghosted</button>` : ''}
       </div>
+      ${o.contactId ? `<button id="pl-mute-btn" class="pl-d-btn" style="margin-top:8px;width:100%;border-color:var(--border);color:var(--text-sub)" onclick="_plToggleMute('${escapeHTML(o.contactId)}')" title="Stop the sales bots from messaging this lead on their own (you can still send manually)">🔇 Stop bots on this lead</button>` : ''}
     </div>
     ${timelineHtml}
     <div class="pl-d-section" id="pl-d-lead">
@@ -23030,6 +23290,7 @@ function _plOpenCard(oppId) {
   _PL_MSG = o.contactId ? { contactId: o.contactId, name: o.contact.name || o.name || '', phone: o.contact.phone || null, email: o.contact.email || null, conversationId: null } : null;
   _IB_PENDING_FILES = [];
   if (o.contactId) _plLoadMessages();
+  if (o.contactId) _plMuteInit(o.contactId);
   if (_plV2 && _isResp && o.contactId) _plLoadAgentCard();
 }
 
@@ -23278,6 +23539,7 @@ async function fetchAndRenderInbox() {
     _renderInboxList();
     _apxRefreshCount();
     _acxRefreshCount();
+    _aclxRefreshCount();
   } catch (e) {
     container.innerHTML = `<div class="req-empty" style="padding:20px 0">Couldn't load inbox - ${escapeHTML(e.message)}</div>`;
   }
@@ -23605,6 +23867,184 @@ async function _acxLost(id) {
 }
 async function _acxSkip(id) {
   try { await _apxPost('/api/agent-confirm', 'skip-ready', { ready_id: id }); _acxRemove(id); _apxToast('Skipped', true); }
+  catch (e) { _apxToast(_apxErr(e), false); }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// CLOSING AGENT approval inbox (🎯) - the THIRD sales agent, working
+// Done-Trial (good-fit attendee) leads. Sibling of _apx*/_acx*: same look,
+// own endpoint (/api/agent-closing), 3 card kinds:
+//   closing         → a drafted post-trial follow-up reply (Approve & send)
+//   closing_enroll  → lead is ready → send the enroll link (the CLOSE; the opp is
+//                     marked won automatically when they pay, via the enroll flow)
+//   closing_lost    → good-fit attendee won't enroll → mark lost
+// Reuses _apxPost / _apxToast / _apxErr / _apxOpenThread / _apxMsgWhen / _apxTrim.
+// Kept a SEPARATE data set from _ACX_DATA / _APX_DATA (never merge them).
+// ═══════════════════════════════════════════════════════════════
+let _ACLX_DATA = [];
+
+async function _aclxRefreshCount() {
+  const btns = [
+    { btn: document.getElementById('aclx-approve-btn'), span: document.getElementById('aclx-count') },
+    { btn: document.getElementById('v15aclx-approve-btn'), span: document.getElementById('v15-aclx-count') },
+  ].filter(x => x.btn);
+  if (!btns.length) return;
+  let rd;
+  try { rd = await _apxPost('/api/agent-closing', 'list-ready', {}); }
+  catch (e) { if (e && (e.status === 401 || e.status === 403)) btns.forEach(({ btn }) => { btn.style.display = 'none'; }); return; }
+  const n = (rd.ready || []).length;
+  btns.forEach(({ btn, span }) => {
+    btn.style.display = '';
+    if (span) span.textContent = n ? `(${n})` : '';
+    btn.style.borderColor = n ? 'var(--accent)' : 'var(--border)';
+    btn.style.color = n ? 'var(--accent)' : 'var(--text-mute)';
+  });
+}
+function _aclxUpdateCount(n) {
+  [['aclx-approve-btn', 'aclx-count'], ['v15aclx-approve-btn', 'v15-aclx-count']].forEach(([b, s]) => {
+    const btn = document.getElementById(b), span = document.getElementById(s);
+    if (span) span.textContent = n ? `(${n})` : '';
+    if (btn) { btn.style.borderColor = n ? 'var(--accent)' : 'var(--border)'; btn.style.color = n ? 'var(--accent)' : 'var(--text-mute)'; }
+  });
+}
+
+function _aclxOpen() {
+  document.getElementById('aclx-overlay')?.remove();
+  document.body.insertAdjacentHTML('beforeend', `
+    <div id="aclx-overlay" style="position:fixed;inset:0;z-index:9400;background:var(--bg);display:flex;flex-direction:column">
+      <div style="padding:calc(14px + env(safe-area-inset-top)) 18px 12px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px">
+        <div style="font-size:18px;font-weight:800">🎯 Close trials</div>
+        <div style="font-size:12px;color:var(--text-mute)">convert good-fit attendees into members</div>
+        <div style="flex:1"></div>
+        <button onclick="_aclxClose()" aria-label="Close" style="background:none;border:none;color:var(--text-mute);font-size:24px;cursor:pointer;padding:2px 10px">×</button>
+      </div>
+      <div id="aclx-body" style="flex:1;overflow-y:auto;padding:16px 18px calc(24px + env(safe-area-inset-bottom))">
+        <div style="max-width:860px;margin:0 auto"><div style="color:var(--text-mute);font-size:13px"><span class="req-spin"></span> Loading…</div></div>
+      </div>
+    </div>`);
+  _aclxLoad();
+}
+function _aclxClose() { document.getElementById('aclx-overlay')?.remove(); }
+
+async function _aclxLoad() {
+  const body = document.getElementById('aclx-body');
+  if (!body) return;
+  try {
+    const rd = await _apxPost('/api/agent-closing', 'list-ready', {});
+    _ACLX_DATA = (rd.ready || []).filter(r => r.status === 'pending' || r.status === 'approved');
+    _aclxRender();
+    _aclxUpdateCount(_ACLX_DATA.length);
+  } catch (e) {
+    body.innerHTML = `<div style="color:#e07070;font-size:13px">Couldn't load - ${escapeHTML(_apxErr(e))}</div>`;
+  }
+}
+function _aclxRender() {
+  const body = document.getElementById('aclx-body');
+  if (!body) return;
+  if (!_ACLX_DATA.length) { body.innerHTML = '<div style="max-width:860px;margin:0 auto">' + _apxEmpty('All clear - no closings waiting.') + '</div>'; return; }
+  const cards = _ACLX_DATA.map(r => r.kind === 'closing_enroll' ? _aclxEnrollCard(r) : r.kind === 'closing_lost' ? _aclxLostCard(r) : _aclxReplyCard(r)).join('');
+  body.innerHTML = '<div style="max-width:860px;margin:0 auto">' + cards + '</div>';
+}
+
+function _aclxOpenThread(id) { const r = _ACLX_DATA.find(x => x.id === id); if (r) _apxOpenThread(r.ghl_contact_id, r.contact_name || 'Conversation'); }
+function _aclxContext(r) {
+  let tail = Array.isArray(r.thread_tail) ? r.thread_tail.slice() : [];
+  if (!tail.length) { if (r.last_outbound) tail.push({ role: 'agent', text: r.last_outbound }); if (r.last_message) tail.push({ role: 'lead', text: r.last_message }); }
+  if (!tail.length) return '';
+  const bubbles = tail.map(m => {
+    const out = m.role === 'agent';
+    const when = _apxMsgWhen(m.at || m.date);
+    return `<div style="display:flex;flex-direction:column;align-items:${out ? 'flex-end' : 'flex-start'};gap:2px;max-width:84%;align-self:${out ? 'flex-end' : 'flex-start'}">
+      <div style="background:${out ? 'rgba(232,197,71,.13)' : 'rgba(255,255,255,.05)'};border:1px solid ${out ? 'var(--accent-border,rgba(232,197,71,.3))' : 'var(--border)'};color:var(--text);padding:6px 10px;border-radius:12px;font-size:12.5px;line-height:1.4;white-space:pre-wrap;word-break:break-word">${escapeHTML(_apxTrim(String(m.text || '').trim(), 240))}</div>
+      ${when ? `<div style="font-size:10px;color:var(--text-mute);padding:0 4px">${escapeHTML(when)}</div>` : ''}
+    </div>`;
+  }).join('');
+  return `<div onclick="_aclxOpenThread('${r.id}')" title="Tap for the full conversation" style="display:flex;flex-direction:column;gap:6px;margin:4px 0 8px;max-height:260px;overflow-y:auto;cursor:pointer">${bubbles}</div>`;
+}
+function _aclxHeader(r, pill, color) {
+  return `<div style="display:flex;align-items:center;gap:8px;margin-bottom:5px;flex-wrap:wrap">
+    <span style="font-weight:700;font-size:13.5px">${escapeHTML(r.contact_name || 'Lead')}</span>
+    <span style="font-size:10px;font-weight:700;color:${color};background:${color}1a;border:1px solid ${color}44;border-radius:999px;padding:1px 8px">${pill}</span>
+    <div style="flex:1"></div>
+  </div>`;
+}
+function _aclxBox(r, ph) {
+  return `<textarea id="aclx-edit-${r.id}" placeholder="${escapeHTML(ph || '')}" style="width:100%;box-sizing:border-box;font-family:inherit;font-size:13.5px;line-height:1.5;background:var(--accent-glow,rgba(232,197,71,.10));border:1px solid var(--accent-border,rgba(232,197,71,.3));border-radius:10px;padding:9px 11px;color:var(--text);resize:vertical;min-height:64px;outline:none">${escapeHTML(r.draft_message || '')}</textarea>`;
+}
+function _aclxReplyCard(r) {
+  const esc = r.escalate ? `<div style="font-size:11.5px;color:#e0a020;margin-bottom:6px">⚠ agent escalated${r.escalate_reason ? ': ' + escapeHTML(r.escalate_reason) : ''}</div>` : '';
+  return `<div id="aclx-${r.id}" style="background:var(--surface);border:1px solid var(--accent-border,rgba(232,197,71,.3));border-radius:11px;padding:12px 14px;margin-bottom:9px">
+    ${_aclxHeader(r, 'follow-up', 'var(--accent)')}${esc}${_aclxContext(r)}
+    <div style="text-align:center;font-size:9.5px;color:var(--text-mute);text-transform:uppercase;letter-spacing:.09em;margin:2px 0 5px">proposed message · edit it right here</div>
+    ${_aclxBox(r)}
+    <div style="display:flex;align-items:stretch;gap:8px;margin-top:10px">
+      <button onclick="_aclxSkip('${r.id}')" title="Skip" style="flex:1;background:transparent;border:1px solid var(--border);color:#e0654f;border-radius:9px;padding:9px;font-size:17px;cursor:pointer">✕</button>
+      <button onclick="_aclxSend('${r.id}')" style="flex:2;background:var(--accent);border:1px solid var(--accent);color:#08080A;border-radius:9px;padding:9px;font-size:14px;font-weight:700;cursor:pointer">✓ Approve &amp; send</button>
+    </div>
+  </div>`;
+}
+function _aclxEnrollCard(r) {
+  const note = r.enroll_note ? `<div style="font-size:12px;color:var(--text-sub);background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:8px;padding:8px 10px;margin:4px 0 8px"><b style="color:var(--text)">Plan / context:</b> ${escapeHTML(r.enroll_note)}</div>` : '';
+  return `<div id="aclx-${r.id}" style="background:var(--surface);border:1px solid #3DBE8B;border-radius:11px;padding:12px 14px;margin-bottom:9px">
+    ${_aclxHeader(r, 'ready to enroll', '#3DBE8B')}
+    <div style="font-size:11.5px;color:#3DBE8B;margin-bottom:6px">🎉 The close: sends the academy's enroll link. The opportunity is marked won automatically when they pay.</div>
+    ${_aclxContext(r)}${note}
+    <div style="text-align:center;font-size:9.5px;color:var(--text-mute);text-transform:uppercase;letter-spacing:.09em;margin:2px 0 5px">warm message before the link (optional)</div>
+    ${_aclxBox(r, 'optional warm message before the sign-up link')}
+    <div style="display:flex;align-items:stretch;gap:8px;margin-top:10px">
+      <button onclick="_aclxSkip('${r.id}')" title="Skip" style="flex:1;background:transparent;border:1px solid var(--border);color:#e0654f;border-radius:9px;padding:9px;font-size:17px;cursor:pointer">✕</button>
+      <button onclick="_aclxEnroll('${r.id}')" style="flex:2;background:#3DBE8B;border:1px solid #3DBE8B;color:#08080A;border-radius:9px;padding:9px;font-size:14px;font-weight:700;cursor:pointer">✓ Send enroll link</button>
+    </div>
+  </div>`;
+}
+function _aclxLostCard(r) {
+  const reason = r.lost_reason ? `<span style="font-size:10px;font-weight:700;color:#e0654f;background:rgba(224,90,66,.12);border-radius:999px;padding:1px 8px">${escapeHTML(r.lost_reason)}</span>` : '';
+  return `<div id="aclx-${r.id}" style="background:var(--surface);border:1px solid rgba(224,90,66,.4);border-radius:11px;padding:12px 14px;margin-bottom:9px">
+    ${_aclxHeader(r, 'lost', '#e0654f')}
+    <div style="font-size:11.5px;color:#e0654f;margin-bottom:6px">Attendee won't enroll. ${reason}</div>
+    ${_aclxContext(r)}
+    <div style="text-align:center;font-size:9.5px;color:var(--text-mute);text-transform:uppercase;letter-spacing:.09em;margin:2px 0 5px">warm closing message (optional)</div>
+    ${_aclxBox(r, 'optional closing message')}
+    <div style="display:flex;align-items:stretch;gap:8px;margin-top:10px">
+      <button onclick="_aclxSkip('${r.id}')" title="Skip" style="flex:1;background:transparent;border:1px solid var(--border);color:var(--text-sub);border-radius:9px;padding:9px;font-size:17px;cursor:pointer">✕</button>
+      <button onclick="_aclxLost('${r.id}')" style="flex:2;background:#e0654f;border:1px solid #e0654f;color:#fff;border-radius:9px;padding:9px;font-size:14px;font-weight:700;cursor:pointer">Mark lost</button>
+    </div>
+  </div>`;
+}
+function _aclxRemove(id) {
+  _ACLX_DATA = _ACLX_DATA.filter(x => x.id !== id);
+  document.getElementById('aclx-' + id)?.remove();
+  if (!_ACLX_DATA.length) { const body = document.getElementById('aclx-body'); if (body) body.innerHTML = '<div style="max-width:860px;margin:0 auto">' + _apxEmpty('All clear - no closings waiting.') + '</div>'; }
+  _aclxUpdateCount(_ACLX_DATA.length);
+}
+async function _aclxSend(id) {
+  if (!_sendGuard('aclxSend-' + id)) return;
+  const r = _ACLX_DATA.find(x => x.id === id); if (!r) return;
+  const ta = document.getElementById('aclx-edit-' + id);
+  const reply = (ta ? ta.value : (r.draft_message || '')).trim();
+  if (!reply) { _apxToast('Message is empty', false); return; }
+  try {
+    const resp = await _apxPost('/api/agent-closing', 'send', { ready_id: id, contact_id: r.ghl_contact_id, conversation_id: r.ghl_conversation_id, reply, contact_name: r.contact_name, confidence: r.confidence, reasoning: r.reasoning });
+    _aclxRemove(id); _apxToast(resp && resp.deferred ? _apxQuietMsg(resp.send_after) : '✓ Sent', true);
+  } catch (e) { _apxToast(_apxErr(e), false); }
+}
+async function _aclxEnroll(id) {
+  if (!_sendGuard('aclxEnroll-' + id)) return;
+  const r = _ACLX_DATA.find(x => x.id === id); if (!r) return;
+  const ta = document.getElementById('aclx-edit-' + id);
+  const reply = (ta ? ta.value : (r.draft_message || '')).trim();
+  try { await _apxPost('/api/agent-closing', 'confirm-enroll', { ready_id: id, contact_id: r.ghl_contact_id, conversation_id: r.ghl_conversation_id, reply, contact_name: r.contact_name, enroll_note: r.enroll_note }); _aclxRemove(id); _apxToast('🎉 Enroll link sent - won lands on payment', true); }
+  catch (e) { _apxToast(_apxErr(e), false); }
+}
+async function _aclxLost(id) {
+  const r = _ACLX_DATA.find(x => x.id === id); if (!r) return;
+  const ta = document.getElementById('aclx-edit-' + id);
+  const reply = (ta ? ta.value : (r.draft_message || '')).trim();
+  try { await _apxPost('/api/agent-closing', 'confirm-lost', { ready_id: id, reply, lost_reason: r.lost_reason }); _aclxRemove(id); _apxToast('Marked lost', true); }
+  catch (e) { _apxToast(_apxErr(e), false); }
+}
+async function _aclxSkip(id) {
+  try { await _apxPost('/api/agent-closing', 'skip-ready', { ready_id: id }); _aclxRemove(id); _apxToast('Skipped', true); }
   catch (e) { _apxToast(_apxErr(e), false); }
 }
 

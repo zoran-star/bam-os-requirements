@@ -33,6 +33,11 @@ const HINTS = {
     hawkeye: "Drafts every confirm/reminder for booked leads; you approve each before it sends.",
     self_drive: "Sends confident confirmations itself. Handoffs & 'lost' ALWAYS wait for you.",
   },
+  closing: {
+    off: "Closing agent is silent - good-fit trial attendees get no follow-up.",
+    hawkeye: "Drafts every post-trial follow-up for attendees; you approve each before it sends.",
+    self_drive: "Sends confident follow-ups itself. Enroll & 'lost' ALWAYS wait for you.",
+  },
 };
 
 export default function AgentModePanel({ tokens }) {
@@ -52,11 +57,12 @@ export default function AgentModePanel({ tokens }) {
 
   async function setMode(client_id, mode, agent = "booking") {
     setBusy(client_id);
-    try { await api(agent === "confirm" ? "set-confirm-mode" : "set-mode", { client_id, mode }); await load(); }
+    const action = agent === "confirm" ? "set-confirm-mode" : agent === "closing" ? "set-closing-mode" : "set-mode";
+    try { await api(action, { client_id, mode }); await load(); }
     catch (e) { alert(e.message); } finally { setBusy(null); setWarn(null); }
   }
   function pick(row, mode, agent = "booking") {
-    const cur = agent === "confirm" ? (row.confirm_mode || "off") : row.mode;
+    const cur = agent === "confirm" ? (row.confirm_mode || "off") : agent === "closing" ? (row.closing_mode || "off") : row.mode;
     if (mode === cur) return;
     if (mode === "self_drive") { setWarn({ ...row, _next: mode, _agent: agent }); return; }
     setMode(row.client_id, mode, agent);
@@ -75,9 +81,10 @@ export default function AgentModePanel({ tokens }) {
   return (
     <div style={{ fontFamily: F, color: text }}>
       <div style={{ fontSize: 13, color: sub, lineHeight: 1.6, marginBottom: 16, maxWidth: 680 }}>
-        Two agents per academy, each with its own switch. <b style={{ color: text }}>Booking</b> works Responded-stage
+        Three agents per academy, each with its own switch. <b style={{ color: text }}>Booking</b> works Responded-stage
         leads (get them to book a trial). <b style={{ color: text }}>Confirm</b> works leads already booked (make sure
-        they show up, hand off to rebook if they can't). In <b style={{ color: text }}>Hawkeye</b>, every message waits
+        they show up, hand off to rebook if they can't). <b style={{ color: text }}>Closing</b> works good-fit trial
+        attendees (follow up and get them enrolled). In <b style={{ color: text }}>Hawkeye</b>, every message waits
         for approval in <b style={{ color: text }}>Inbox → 👁 Hawkeye</b>. In <b style={{ color: red }}>Self-drive</b>, the
         agent texts on its own.
       </div>
@@ -86,15 +93,17 @@ export default function AgentModePanel({ tokens }) {
 
       {rows.map(row => {
         const confirmMode = row.confirm_mode || "off";
-        const anyDrive = row.mode === "self_drive" || confirmMode === "self_drive";
+        const closingMode = row.closing_mode || "off";
+        const anyDrive = row.mode === "self_drive" || confirmMode === "self_drive" || closingMode === "self_drive";
+        const AGENT_LABEL = { booking: "Booking agent", confirm: "Confirm agent", closing: "Closing agent" };
         // One agent's labeled segmented control row.
         const control = (agent) => {
-          const mode = agent === "confirm" ? confirmMode : row.mode;
-          const isConfirm = agent === "confirm";
+          const mode = agent === "confirm" ? confirmMode : agent === "closing" ? closingMode : row.mode;
+          const isSub = agent !== "booking";
           return (
-            <div style={{ marginTop: isConfirm ? 12 : 0, paddingTop: isConfirm ? 12 : 0, borderTop: isConfirm ? `1px solid ${border}` : "none" }}>
+            <div style={{ marginTop: isSub ? 12 : 0, paddingTop: isSub ? 12 : 0, borderTop: isSub ? `1px solid ${border}` : "none" }}>
               <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-                <span style={{ fontSize: 12, fontWeight: 700, color: text }}>{isConfirm ? "Confirm agent" : "Booking agent"}</span>
+                <span style={{ fontSize: 12, fontWeight: 700, color: text }}>{AGENT_LABEL[agent]}</span>
                 {mode === "self_drive" && <span style={{ fontSize: 11, fontWeight: 700, color: red }}>🚀</span>}
                 {mode === "hawkeye" && <span style={{ fontSize: 11, fontWeight: 700, color: accent }}>👁</span>}
                 <div style={{ flex: 1 }} />
@@ -114,7 +123,8 @@ export default function AgentModePanel({ tokens }) {
             <div style={{ fontWeight: 700, fontSize: 14.5, marginBottom: 10 }}>{row.business_name}</div>
             {control("booking")}
             {control("confirm")}
-            {!row.notify_phone && (row.mode !== "off" || confirmMode !== "off") && (
+            {control("closing")}
+            {!row.notify_phone && (row.mode !== "off" || confirmMode !== "off" || closingMode !== "off") && (
               <div style={{ fontSize: 11.5, color: mute, marginTop: 8 }}>⚠ No notify phone set (ghl_kpi_config.agent_notify_phone) - no SMS alerts when chats are waiting.</div>
             )}
           </div>
@@ -125,11 +135,14 @@ export default function AgentModePanel({ tokens }) {
         <div onClick={() => setWarn(null)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.6)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", padding: 18 }}>
           <div onClick={e => e.stopPropagation()} style={{ background: surface, border: `1px solid ${red}`, borderRadius: 16, width: "100%", maxWidth: 460, padding: 24 }}>
             <div style={{ fontSize: 30, marginBottom: 10 }}>⚠️</div>
-            <div style={{ fontSize: 18, fontWeight: 800, color: red, marginBottom: 8 }}>Turn on Self-drive for the {warn._agent === "confirm" ? "Confirm" : "Booking"} agent ({warn.business_name})?</div>
+            <div style={{ fontSize: 18, fontWeight: 800, color: red, marginBottom: 8 }}>Turn on Self-drive for the {warn._agent === "confirm" ? "Confirm" : warn._agent === "closing" ? "Closing" : "Booking"} agent ({warn.business_name})?</div>
             <div style={{ fontSize: 13.5, color: sub, lineHeight: 1.6, marginBottom: 20 }}>
               {warn._agent === "confirm" ? (
                 <>It will <b style={{ color: text }}>text booked leads on its own</b> - no approval - to confirm and remind them.
                   Handoffs and "mark lost" <b style={{ color: text }}>always</b> still wait for you. Make sure the brain is trained first.</>
+              ) : warn._agent === "closing" ? (
+                <>It will <b style={{ color: text }}>text good-fit trial attendees on its own</b> - no approval - to follow up after their trial.
+                  Sending the sign-up link (enroll) and "mark lost" <b style={{ color: text }}>always</b> still wait for you. Make sure the brain is trained first.</>
               ) : (
                 <>The agent will <b style={{ color: text }}>text real leads on its own</b> - no approval - whenever it's confident.
                   Unsure messages still drop to the inbox, but confident ones <b style={{ color: text }}>send themselves</b>.

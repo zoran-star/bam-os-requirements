@@ -1,41 +1,39 @@
 import { withSentryApiRoute } from "./_sentry.js";
-// Vercel Serverless Function — Confirm Agent queue (Scheduled-Trial stage)
+// Vercel Serverless Function — Closing Agent queue (Done-Trial stage)
 //
-// The SECOND sales agent. It works leads the booking agent already booked — the
-// Training pipeline's "Scheduled Trial" / "Booked Trial" stage. Its job:
-//   1. confirm they're still coming to their booked trial,
-//   2. help them get there (address, directions, what to bring — from the academy
-//      config), and
-//   3. if they truly can't make it, HAND OFF to the booking agent to rebook (it
-//      does NOT rebook itself): write a context note + bounce the opportunity back
-//      to the Responded stage, where the booking agent picks it up with full context.
+// The THIRD sales agent. It works leads the post-trial form moved into the Training
+// pipeline's "Done Trial" / "Attended" stage — athletes who CAME IN for a free
+// trial and were marked a good fit. Its job:
+//   1. send a warm post-trial follow-up,
+//   2. answer last questions + handle price/schedule objections, and
+//   3. CONVERT them into a paying member — the close = sending the academy's
+//      enrollment (sign-up) link, then marking the opportunity won.
 //
-//   POST /api/agent-confirm  { action, ... }  (staff/owner bearer required)
-//     "list"            → Scheduled-Trial-stage contacts (the confirm queue)
-//     "draft"           { contact_id }         → the agent's proposed next message
-//     "send"            { contact_id, reply, ... } → send a human-approved confirm reply
-//     "list-ready"      → pending/approved confirm cards for the inbox
-//     "skip-ready"      { ready_id }
-//     "detect-now"      → run the detector for THIS academy now
-//     "confirm-handoff" { ready_id | contact_id, ... } → note + bounce to Responded
-//     "confirm-lost"    { ready_id | contact_id, ... } → mark the opportunity Lost
-//   GET  ?action=detect  (Bearer CRON_SECRET) → the confirm detector cron
+//   POST /api/agent-closing  { action, ... }  (staff/owner bearer required)
+//     "list"           → Done-Trial-stage contacts (the closing queue)
+//     "draft"          { contact_id }            → the agent's proposed next message
+//     "send"           { contact_id, reply, ... } → send a human-approved closing reply
+//     "list-ready"     → pending/approved closing cards for the inbox
+//     "skip-ready"     { ready_id }
+//     "detect-now"     → run the detector for THIS academy now
+//     "confirm-enroll" { ready_id | contact_id, ... } → send the sign-up link + mark won
+//     "confirm-lost"   { ready_id | contact_id, ... } → mark the opportunity Lost
+//   GET  ?action=detect  (Bearer CRON_SECRET) → the closing detector cron
 //
-// Gated behind clients.ghl_kpi_config.confirm_agent_mode (default 'off') so turning
-// on the booking agent never silently starts texting already-booked leads. Every
-// send is human-approved in Hawkeye; self-drive auto-sends only high-confidence
-// plain confirmations (handoff + lost ALWAYS wait for a human ✓).
+// Gated behind clients.ghl_kpi_config.closing_agent_mode (default 'off') so turning
+// on booking/confirm never silently starts pitching memberships. Every send is
+// human-approved in Hawkeye; self-drive auto-sends only high-confidence plain
+// follow-ups (enroll + lost ALWAYS wait for a human ✓).
 
 import { pickGhlToken, ghl, sendSms } from "./ghl/_core.js";
 import { buildAgentSystem } from "./agent/brain.js";
 import { loadContactMemory } from "./agent/contact-memory.js";
-import { nextAppointment } from "./agent/booking.js";
 import {
-  scheduledTrialStage, contactInRespondedStage, computeConfirmQueue,
-  scheduledTrialContactIdSetCached, peekScheduledTrialIdSet, respondedStage, nurtureStage, toIso,
+  doneTrialStage, contactInRespondedStage, computeClosingQueue,
+  doneTrialContactIdSetCached, peekDoneTrialIdSet, nurtureStage, toIso,
 } from "./agent/_stage.js";
 import { enrollContact, isAutomationLive } from "./automations.js";
-import { confirmAgentMode, modeIsOn, shouldAutoSend } from "./agent/_mode.js";
+import { closingAgentMode, modeIsOn, shouldAutoSend } from "./agent/_mode.js";
 import { mutedContactIdSet, isMuted } from "./agent/_mutes.js";
 import { withinQuietHours, nextSendableTime } from "./agent/_quiet.js";
 import { resolveAgentActor } from "./agent/_auth.js";
@@ -45,12 +43,7 @@ const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.en
 const ANTHROPIC_KEY        = process.env.ANTHROPIC_API_KEY;
 const ANTHROPIC_MODEL      = "claude-sonnet-4-6";
 const DEFAULT_CLIENT_ID    = "39875f07-0a4b-4429-a201-2249bc1f24df"; // BAM GTA
-const DETECT_CAP           = 10;   // max confirm cards drafted per academy per run
-const TZ                   = "America/Toronto";
-// Proactive opener window: only reach out first when the booked trial is within
-// this many days (and not already passed) — sooner than that is redundant with the
-// booking chat that just happened. Reactive replies (they message us) are unbounded.
-const PROACTIVE_WINDOW_DAYS = 3;
+const DETECT_CAP           = 10;   // max closing cards drafted per academy per run
 
 async function sb(path, init = {}) {
   const res = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
@@ -67,10 +60,10 @@ async function loadClient(clientId) {
   return Array.isArray(rows) && rows[0];
 }
 
-// The confirm agent uses the same per-academy SECTION overrides (agent_prompt_sections,
-// keyed by section_key — confirm_* keys apply, booking keys are ignored by the confirm
-// assembly) but NOT the booking agent's lessons/examples (those are booking-flavored
-// and would bleed the wrong behavior into a confirmation chat).
+// The closing agent uses the same per-academy SECTION overrides (agent_prompt_sections,
+// keyed by section_key — closing_* keys apply, other agents' keys are ignored by the
+// closing assembly) but NOT the booking agent's lessons/examples (those are booking-
+// flavored and would bleed the wrong behavior into a conversion chat).
 async function loadConfig(clientId) {
   const ovRows = await sb(`agent_prompt_sections?client_id=eq.${clientId}&select=section_key,body`).catch(() => []);
   const overrides = {};
@@ -78,33 +71,33 @@ async function loadConfig(clientId) {
   return { lessons: [], overrides, examples: [] };
 }
 
-const CONFIRM_TRAILER =
-  `<live_confirm>\n` +
-  `You are drafting the next SMS to a REAL lead who has ALREADY booked a free trial and is in the "Scheduled Trial" stage. Your goal is to make sure they SHOW UP — confirm they're still coming and help them get there. You do NOT sell and you do NOT rebook. A human reviews your draft before it sends. ` +
+const CLOSING_TRAILER =
+  `<live_closing>\n` +
+  `You are drafting the next SMS to a REAL lead whose athlete just ATTENDED a free trial and was marked a GOOD FIT (they're in the "Done Trial" stage). Your goal is to convert them into a PAYING MEMBER — a warm post-trial follow-up, handle price/schedule objections, and guide them to enroll. The close = sending the academy's sign-up link (from your config). You do NOT take payment yourself. A human reviews your draft before it sends. ` +
   `Respond ONLY by calling propose_reply: 'reply' = the exact text to send; 'reasoning' = 1-2 sentence why; 'confidence' = 0..1; ` +
   `'escalate' = true (with 'escalate_reason', reply empty) if your guardrails say to hand to a human. ` +
-  `If the lead CAN'T make their booked time / needs to reschedule, set 'recommend_handoff' = true with a clear 'handoff_note' capturing the dropped slot + any reason or constraint they gave (this note is what the booking assistant reads to rebook them) — do NOT propose new times yourself; put a warm acknowledgement in 'reply'. ` +
-  `If your confirm_lost criteria say the lead no longer wants the trial at all, set 'recommend_lost' = true with a short 'lost_reason' and put your warm closing message in 'reply'. A human confirms handoff/lost before anything changes.\n</live_confirm>`;
+  `If the lead is READY to enroll, set 'recommend_enroll' = true with a short 'enroll_note' (which plan/frequency they want, if known) and put a warm message in 'reply' — on approval a human sends the sign-up link. ` +
+  `If your closing_lost criteria say the good-fit attendee won't enroll, set 'recommend_lost' = true with a short 'lost_reason' and put your warm closing message in 'reply'. A human confirms enroll/lost before anything changes.\n</live_closing>`;
 function buildSystem({ lessons, overrides, examples }) {
-  return buildAgentSystem({ lessons, overrides, examples, trailer: CONFIRM_TRAILER, agent: "confirm" });
+  return buildAgentSystem({ lessons, overrides, examples, trailer: CLOSING_TRAILER, agent: "closing" });
 }
 
 const REPLY_TOOL = {
   name: "propose_reply",
-  description: "Propose the confirm agent's next text to the lead (a human approves before it sends).",
+  description: "Propose the closing agent's next text to the lead (a human approves before it sends).",
   input_schema: {
     type: "object",
     properties: {
-      reply:             { type: "string", description: "The exact text to send. Empty if escalating." },
-      summary:           { type: "string", description: "A 2-3 sentence plain-English summary for a human reviewer — who the lead is, their booked trial, and where things stand." },
-      reasoning:         { type: "string", description: "Short (1-2 sentences) why / current state." },
-      confidence:        { type: "number", description: "0..1 confidence this is the right message." },
-      escalate:          { type: "boolean", description: "True if guardrails say to hand to a human instead of replying." },
-      escalate_reason:   { type: "string", description: "If escalate: why." },
-      recommend_handoff: { type: "boolean", description: "True if the lead can't make their booked time and should be handed BACK to the booking assistant to rebook (do NOT rebook yourself)." },
-      handoff_note:      { type: "string", description: "If recommend_handoff: the context the booking assistant needs — which slot they're dropping (day/time) and any reason/constraint they gave. If they gave no reason, say so." },
-      recommend_lost:    { type: "boolean", description: "True only if the lead no longer wants the trial AT ALL (not just this time) — a human confirms before anything changes." },
-      lost_reason:       { type: "string", description: "If recommend_lost: closest taxonomy reason (Too expensive / Not enough time / Started other programs / Not locked in / Bad fit / Invalid lead / Opted out / Other)." },
+      reply:            { type: "string", description: "The exact text to send. Empty if escalating." },
+      summary:          { type: "string", description: "A 2-3 sentence plain-English summary for a human reviewer — who the lead is, their trial, and where the enrollment stands." },
+      reasoning:        { type: "string", description: "Short (1-2 sentences) why / current state." },
+      confidence:       { type: "number", description: "0..1 confidence this is the right message." },
+      escalate:         { type: "boolean", description: "True if guardrails say to hand to a human instead of replying." },
+      escalate_reason:  { type: "string", description: "If escalate: why." },
+      recommend_enroll: { type: "boolean", description: "True if the lead is ready to enroll and should be sent the sign-up link (a human confirms and sends it)." },
+      enroll_note:      { type: "string", description: "If recommend_enroll: which plan / frequency they want, if known, and any context for the human approving the enrollment." },
+      recommend_lost:   { type: "boolean", description: "True only if the good-fit attendee clearly won't enroll — a human confirms before anything changes." },
+      lost_reason:      { type: "string", description: "If recommend_lost: closest taxonomy reason (Too expensive / Not enough time / Started other programs / Not locked in / Bad fit / Invalid lead / Opted out / Other)." },
     },
     required: ["reply", "reasoning", "confidence", "escalate"],
   },
@@ -120,11 +113,11 @@ async function anthropicCall(body) {
   return r.json();
 }
 
-// The confirm agent's draft turn. No booking tools — a single forced propose_reply.
-// `seed` (for a PROACTIVE opener, when the lead hasn't messaged) is appended as the
-// final user turn so the model has the full booking thread for context plus a clear
-// instruction to open the confirmation.
-async function runConfirmAgent(system, messages, { seed = null } = {}) {
+// The closing agent's draft turn. No tools — a single forced propose_reply. `seed`
+// (for a PROACTIVE post-trial opener, when the lead hasn't messaged) is appended as
+// the final user turn so the model has the full thread for context plus a clear
+// instruction to open the follow-up.
+async function runClosingAgent(system, messages, { seed = null } = {}) {
   let convo = messages
     .filter(m => m && typeof m.text === "string" && m.text.trim() !== "")
     .map(m => ({ role: m.role === "agent" ? "assistant" : "user", content: m.text }));
@@ -146,7 +139,7 @@ async function runConfirmAgent(system, messages, { seed = null } = {}) {
   throw new Error("no structured reply from Claude");
 }
 
-// ── GHL thread helpers (same shape as the booking agent) ──
+// ── GHL thread helpers (same shape as the other agents) ──
 async function findConversation(token, locationId, contactId) {
   const params = new URLSearchParams({ locationId, contactId });
   const search = await ghl("GET", `/conversations/search?${params}`, { token });
@@ -164,22 +157,14 @@ async function threadMessages(token, conversationId) {
   return msgs.map(m => ({ role: m.direction === "outbound" ? "agent" : "parent", text: m.text, date: m.date }));
 }
 
-// "Sat, Jun 28 at 11:30 AM" in the academy timezone.
-function fmtTrial(iso) {
-  try {
-    return new Date(iso).toLocaleString("en-US", { timeZone: TZ, weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
-  } catch (_) { return iso; }
-}
-
-// Draft the confirm agent's next message for one Scheduled-Trial-stage contact.
-// Returns the structured proposal, or { error } / { skip } (skip = nothing to do
-// right now, e.g. a proactive opener whose trial isn't near yet). `opts`:
-//   { sts, conversationId, skipStageGuard, lastDirection, nowMs }
+// Draft the closing agent's next message for one Done-Trial-stage contact. Returns
+// the structured proposal, or { error } / { skip }. `opts`:
+//   { dts, conversationId, skipStageGuard, lastDirection, nowMs }
 async function draftForContact(token, locationId, clientId, contactId, cfg, opts = {}) {
-  const sts = opts.sts || await scheduledTrialStage(token, locationId);
-  if (!sts) return { error: "No Scheduled-Trial stage found in the Training Pipeline." };
-  if (!opts.skipStageGuard && !(await contactInRespondedStage(token, locationId, contactId, sts))) {
-    return { error: "This lead isn't in the Scheduled-Trial stage — the confirm agent only works booked leads." };
+  const dts = opts.dts || await doneTrialStage(token, locationId);
+  if (!dts) return { error: "No Done-Trial stage found in the Training Pipeline." };
+  if (!opts.skipStageGuard && !(await contactInRespondedStage(token, locationId, contactId, dts))) {
+    return { error: "This lead isn't in the Done-Trial stage — the closing agent only works good-fit attendees." };
   }
   let conversationId = opts.conversationId;
   if (!conversationId) {
@@ -188,31 +173,23 @@ async function draftForContact(token, locationId, clientId, contactId, cfg, opts
     conversationId = convo.id;
   }
   const messages = await threadMessages(token, conversationId);
-  const nowMs = opts.nowMs || Date.now();
-  const appt = await nextAppointment(token, contactId, { nowMs });
 
   const lastIsInbound = opts.lastDirection
     ? opts.lastDirection === "inbound"
     : (messages.length > 0 && messages[messages.length - 1].role === "parent");
 
-  // PROACTIVE opener gating: if the lead hasn't messaged, only open when the booked
-  // trial is real and within the window (else there's nothing useful to send yet).
+  // PROACTIVE post-trial opener: if the lead hasn't messaged since the trial, open
+  // with a warm follow-up. No appointment window to gate on — the trial already
+  // happened; the post-trial form is what moved them into this stage.
   let seed = null;
   if (!lastIsInbound) {
-    if (!appt) return { skip: "no upcoming appointment to confirm" };
-    const dMs = new Date(appt.startTime).getTime() - nowMs;
-    if (!(dMs > 0 && dMs <= PROACTIVE_WINDOW_DAYS * 86400000)) return { skip: "trial not in proactive window yet" };
-    seed = `[No new message from the lead. Their free trial is booked for ${fmtTrial(appt.startTime)}. Send a short, friendly opening text to confirm they're still planning to come.]`;
+    seed = `[No new message from the lead. Their athlete recently attended a free trial and was marked a good fit. Send a short, warm post-trial follow-up: check in on how the session went and gently open the door to enrolling. Do NOT lead with pricing.]`;
   }
 
-  const apptBlock = appt
-    ? `\n\n<booked_trial>\nThis lead's booked trial (confirm THIS slot — never invent one): ${fmtTrial(appt.startTime)}. If they ask to change it, that's a handoff, not a reschedule you make yourself.\n</booked_trial>`
-    : `\n\n<booked_trial>\nWe don't have the exact booked time on hand. Refer to "your booked trial" and, if you need the specifics, ask them to confirm the day and time.\n</booked_trial>`;
-
-  const system = buildSystem(cfg) + await loadContactMemory(sb, clientId, contactId, { ghl, token, locationId }) + apptBlock;
+  const system = buildSystem(cfg) + await loadContactMemory(sb, clientId, contactId, { ghl, token, locationId });
 
   let out;
-  try { out = await runConfirmAgent(system, messages, { seed }); }
+  try { out = await runClosingAgent(system, messages, { seed }); }
   catch (e) { return { error: e.message }; }
 
   const agentMsgs = messages.filter(m => m.role === "agent");
@@ -223,11 +200,11 @@ async function draftForContact(token, locationId, clientId, contactId, cfg, opts
     confidence: typeof out.confidence === "number" ? out.confidence : null,
     escalate: !!out.escalate,
     escalate_reason: out.escalate_reason || null,
-    recommend_handoff: !!out.recommend_handoff,
-    handoff_note: out.handoff_note || null,
+    recommend_enroll: !!out.recommend_enroll,
+    enroll_note: out.enroll_note || null,
     recommend_lost: !!out.recommend_lost,
     lost_reason: out.lost_reason || null,
-    trial_at: appt ? toIso(appt.startTime) : null,
+    trial_at: null,
     summary: out.summary ? String(out.summary).slice(0, 600) : null,
     last_message: (() => { const lead = [...messages].reverse().find(m => m.role === "parent"); return lead ? String(lead.text).slice(0, 500) : null; })(),
     last_outbound: (() => { const ours = [...messages].reverse().find(m => m.role === "agent"); return ours ? String(ours.text).slice(0, 500) : null; })(),
@@ -252,54 +229,54 @@ async function findOpenOpp(token, locationId, contactId) {
   return (opps.find(o => String(o.status || "").toLowerCase() === "open") || opps[0] || null)?.id || null;
 }
 
-// Cancel a contact's open confirm cards (after handoff / lost / leaving the stage).
-async function clearConfirmCards(clientId, contactId, reason) {
+// Cancel a contact's open closing cards (after enroll / lost / leaving the stage).
+async function clearClosingCards(clientId, contactId, reason) {
   try {
-    await sb(`agent_confirm_replies?client_id=eq.${clientId}&ghl_contact_id=eq.${encodeURIComponent(contactId)}&status=in.(pending,approved)`,
+    await sb(`agent_closing_replies?client_id=eq.${clientId}&ghl_contact_id=eq.${encodeURIComponent(contactId)}&status=in.(pending,approved)`,
       { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ status: "canceled", send_error: reason, updated_at: new Date().toISOString() }) });
   } catch (_) {}
 }
 
-// ── Detector: draft confirmations for Scheduled-Trial leads ──
+// ── Detector: draft post-trial conversions for Done-Trial leads ──
 async function detectForClient(client) {
-  const mode = confirmAgentMode(client);
-  if (!modeIsOn(mode)) return { client_id: client.id, skipped: "confirm mode off" };
+  const mode = closingAgentMode(client);
+  if (!modeIsOn(mode)) return { client_id: client.id, skipped: "closing mode off" };
   const creds = await pickGhlToken(client);
   if (!creds) return { client_id: client.id, skipped: "no GHL token" };
   const { token, locationId } = creds;
 
-  let sts, queue, scheduledIds;
-  try { ({ sts, queue, scheduledIds } = await computeConfirmQueue(token, locationId)); }
+  let dts, queue, doneIds;
+  try { ({ dts, queue, doneIds } = await computeClosingQueue(token, locationId)); }
   catch (e) { return { client_id: client.id, error: `queue: ${e.message}` }; }
-  if (!sts) return { client_id: client.id, skipped: "no Scheduled-Trial stage" };
+  if (!dts) return { client_id: client.id, skipped: "no Done-Trial stage" };
 
-  // Prune: cancel pending confirm cards whose lead has LEFT the Scheduled-Trial
-  // stage (showed up, handed off, lost…). Scoped to THIS agent's table only.
+  // Prune: cancel pending closing cards whose lead has LEFT the Done-Trial stage
+  // (enrolled, lost…). Scoped to THIS agent's table only.
   let pruned = 0;
   try {
-    const pend = await sb(`agent_confirm_replies?client_id=eq.${client.id}&status=eq.pending&select=id,ghl_contact_id`);
+    const pend = await sb(`agent_closing_replies?client_id=eq.${client.id}&status=eq.pending&select=id,ghl_contact_id`);
     for (const row of (Array.isArray(pend) ? pend : [])) {
-      if (row.ghl_contact_id && !scheduledIds.has(row.ghl_contact_id)) {
-        await sb(`agent_confirm_replies?id=eq.${row.id}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ status: "canceled", send_error: "left Scheduled-Trial stage", updated_at: new Date().toISOString() }) });
+      if (row.ghl_contact_id && !doneIds.has(row.ghl_contact_id)) {
+        await sb(`agent_closing_replies?id=eq.${row.id}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ status: "canceled", send_error: "left Done-Trial stage", updated_at: new Date().toISOString() }) });
         pruned++;
       }
     }
   } catch (_) {}
 
-  // Flush quiet-hours holds (approved confirm cards whose send time arrived).
+  // Flush quiet-hours holds (approved closing cards whose send time arrived).
   let flushed = 0;
   if (withinQuietHours()) {
     try {
-      const held = await sb(`agent_confirm_replies?client_id=eq.${client.id}&status=eq.approved&send_after=lte.${new Date().toISOString()}&select=id,ghl_contact_id,draft_message&order=send_after.asc&limit=40`);
+      const held = await sb(`agent_closing_replies?client_id=eq.${client.id}&status=eq.approved&send_after=lte.${new Date().toISOString()}&select=id,ghl_contact_id,draft_message&order=send_after.asc&limit=40`);
       for (const row of (Array.isArray(held) ? held : [])) {
-        if (row.ghl_contact_id && !scheduledIds.has(row.ghl_contact_id)) {
-          await sb(`agent_confirm_replies?id=eq.${row.id}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ status: "canceled", send_error: "left Scheduled-Trial stage", updated_at: new Date().toISOString() }) });
+        if (row.ghl_contact_id && !doneIds.has(row.ghl_contact_id)) {
+          await sb(`agent_closing_replies?id=eq.${row.id}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ status: "canceled", send_error: "left Done-Trial stage", updated_at: new Date().toISOString() }) });
           continue;
         }
         if (!row.draft_message || !String(row.draft_message).trim()) continue;
         try {
           await sendReplyViaGhl(token, row.ghl_contact_id, row.draft_message);
-          await sb(`agent_confirm_replies?id=eq.${row.id}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ status: "sent", auto_sent: true, sent_at: new Date().toISOString(), updated_at: new Date().toISOString() }) });
+          await sb(`agent_closing_replies?id=eq.${row.id}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ status: "sent", auto_sent: true, sent_at: new Date().toISOString(), updated_at: new Date().toISOString() }) });
           flushed++;
         } catch (_) {}
       }
@@ -307,8 +284,8 @@ async function detectForClient(client) {
   }
 
   const cfg = await loadConfig(client.id);
-  const mutedSet = await mutedContactIdSet(client.id, "confirm");
-  let drafted = 0, autoSent = 0, skipped = 0, escalated = 0, handoffs = 0, lostProposed = 0, deferred = 0;
+  const mutedSet = await mutedContactIdSet(client.id, "closing");
+  let drafted = 0, autoSent = 0, skipped = 0, escalated = 0, enrollsProposed = 0, lostProposed = 0, deferred = 0;
   const reasons = [];
   let _first = true;
   for (const item of queue.slice(0, DETECT_CAP)) {
@@ -321,16 +298,16 @@ async function detectForClient(client) {
     const reactive = item.last_direction === "inbound";
     try {
       // Dedupe. Reactive: skip if an active card exists or we already answered this
-      // inbound. Proactive: skip if ANY confirm card already exists (we've engaged).
-      const existing = await sb(`agent_confirm_replies?client_id=eq.${client.id}&ghl_contact_id=eq.${encodeURIComponent(contactId)}&order=created_at.desc&select=id,status,last_lead_at&limit=1`);
+      // inbound. Proactive: skip if ANY closing card already exists (we've engaged).
+      const existing = await sb(`agent_closing_replies?client_id=eq.${client.id}&ghl_contact_id=eq.${encodeURIComponent(contactId)}&order=created_at.desc&select=id,status,last_lead_at&limit=1`);
       const last = Array.isArray(existing) && existing[0];
       if (last && ["pending", "approved"].includes(last.status)) { skipped++; reasons.push(`${item.name || contactId}: already has a ${last.status} card`); continue; }
       if (reactive && last && last.last_lead_at && item.last_at && new Date(last.last_lead_at).getTime() === new Date(item.last_at).getTime()) { skipped++; reasons.push(`${item.name || contactId}: already answered this inbound`); continue; }
-      if (!reactive && last) { skipped++; reasons.push(`${item.name || contactId}: already opened a confirmation`); continue; }
+      if (!reactive && last) { skipped++; reasons.push(`${item.name || contactId}: already opened a follow-up`); continue; }
     } catch (e) { reasons.push(`${item.name || contactId}: dedup error — ${e.message}`); }
 
     let d;
-    try { d = await draftForContact(token, locationId, client.id, contactId, cfg, { sts, conversationId: item.conversation_id, skipStageGuard: true, lastDirection: item.last_direction }); }
+    try { d = await draftForContact(token, locationId, client.id, contactId, cfg, { dts, conversationId: item.conversation_id, skipStageGuard: true, lastDirection: item.last_direction }); }
     catch (e) { skipped++; reasons.push(`${item.name || contactId}: draft threw — ${e.message}`); continue; }
     if (d.skip) { skipped++; reasons.push(`${item.name || contactId}: ${d.skip}`); continue; }
 
@@ -342,23 +319,23 @@ async function detectForClient(client) {
       last_lead_at: item.last_at || null,
     };
 
-    // Handoff: lead can't make it → ALWAYS queue for a human (note + bounce on ✓).
-    if (d.recommend_handoff) {
+    // Enroll: lead is ready → ALWAYS queue for a human (send link + mark won on ✓).
+    if (d.recommend_enroll) {
       try {
-        await sb(`agent_confirm_replies`, { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify([{
-          ...baseRow, kind: "confirm_handoff", handoff_note: d.handoff_note || null,
+        await sb(`agent_closing_replies`, { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify([{
+          ...baseRow, kind: "closing_enroll", enroll_note: d.enroll_note || null,
           draft_message: (d.reply && String(d.reply).trim()) ? d.reply : "", status: "pending", created_by: "detector",
         }]) });
-        handoffs++;
-      } catch (e) { skipped++; reasons.push(`${item.name || contactId}: handoff-insert failed — ${e.message}`); }
+        enrollsProposed++;
+      } catch (e) { skipped++; reasons.push(`${item.name || contactId}: enroll-insert failed — ${e.message}`); }
       continue;
     }
 
-    // Lost: lead no longer wants the trial at all → ALWAYS queue for a human.
+    // Lost: good-fit attendee won't enroll → ALWAYS queue for a human.
     if (d.recommend_lost) {
       try {
-        await sb(`agent_confirm_replies`, { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify([{
-          ...baseRow, kind: "confirm_lost", lost_reason: d.lost_reason || "Other",
+        await sb(`agent_closing_replies`, { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify([{
+          ...baseRow, kind: "closing_lost", lost_reason: d.lost_reason || "Other",
           draft_message: (d.reply && String(d.reply).trim()) ? d.reply : "", status: "pending", created_by: "detector",
         }]) });
         lostProposed++;
@@ -371,8 +348,8 @@ async function detectForClient(client) {
       if (d.escalate) {
         escalated++;
         try {
-          await sb(`agent_confirm_replies`, { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify([{
-            ...baseRow, kind: "confirm", draft_message: "(agent escalated — needs a human)",
+          await sb(`agent_closing_replies`, { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify([{
+            ...baseRow, kind: "closing", draft_message: "(agent escalated — needs a human)",
             escalate: true, escalate_reason: d.escalate_reason || null, status: "pending", created_by: "detector",
           }]) });
         } catch (_) {}
@@ -380,35 +357,35 @@ async function detectForClient(client) {
       continue;
     }
 
-    // A plain confirmation reply. Self-drive may auto-send high-confidence ones;
+    // A plain closing/nurture reply. Self-drive may auto-send high-confidence ones;
     // quiet hours hold until morning. Everything else queues for approval.
     const auto = shouldAutoSend(mode, { confidence: d.confidence, escalate: d.escalate });
     if (auto && !withinQuietHours()) {
       try {
-        await sb(`agent_confirm_replies`, { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify([{
-          ...baseRow, kind: "confirm", draft_message: d.reply, status: "approved", send_after: nextSendableTime().toISOString(), created_by: "self-drive",
+        await sb(`agent_closing_replies`, { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify([{
+          ...baseRow, kind: "closing", draft_message: d.reply, status: "approved", send_after: nextSendableTime().toISOString(), created_by: "self-drive",
         }]) });
         deferred++;
       } catch (e) { skipped++; reasons.push(`${item.name || contactId}: defer-insert failed — ${e.message}`); }
     } else if (auto) {
       try {
         await sendReplyViaGhl(token, contactId, d.reply);
-        await sb(`agent_confirm_replies`, { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify([{
-          ...baseRow, kind: "confirm", draft_message: d.reply, status: "sent", auto_sent: true, sent_at: new Date().toISOString(), created_by: "self-drive",
+        await sb(`agent_closing_replies`, { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify([{
+          ...baseRow, kind: "closing", draft_message: d.reply, status: "sent", auto_sent: true, sent_at: new Date().toISOString(), created_by: "self-drive",
         }]) });
-        await logApproval({ client_id: client.id, ghl_contact_id: contactId, ghl_conversation_id: d.conversation_id || null, contact_name: item.name || null, final_reply: d.reply, reasoning: d.reasoning || null, confidence: d.confidence, adjusted: false, status: "sent", created_by: "confirm-self-drive" });
+        await logApproval({ client_id: client.id, ghl_contact_id: contactId, ghl_conversation_id: d.conversation_id || null, contact_name: item.name || null, final_reply: d.reply, reasoning: d.reasoning || null, confidence: d.confidence, adjusted: false, status: "sent", created_by: "closing-self-drive" });
         autoSent++;
       } catch (e) { skipped++; reasons.push(`${item.name || contactId}: auto-send failed — ${e.message}`); }
     } else {
       try {
-        await sb(`agent_confirm_replies`, { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify([{
-          ...baseRow, kind: "confirm", draft_message: d.reply, status: "pending", created_by: "detector",
+        await sb(`agent_closing_replies`, { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify([{
+          ...baseRow, kind: "closing", draft_message: d.reply, status: "pending", created_by: "detector",
         }]) });
         drafted++;
       } catch (e) { skipped++; reasons.push(`${item.name || contactId}: pending-insert failed — ${e.message}`); }
     }
   }
-  return { client_id: client.id, business: client.business_name, mode, queued: queue.length, drafted, handoffs, lost_proposed: lostProposed, auto_sent: autoSent, deferred, flushed, escalated, skipped, pruned, reasons };
+  return { client_id: client.id, business: client.business_name, mode, queued: queue.length, drafted, enrolls_proposed: enrollsProposed, lost_proposed: lostProposed, auto_sent: autoSent, deferred, flushed, escalated, skipped, pruned, reasons };
 }
 
 async function runDetect(res, onlyClientId) {
@@ -427,7 +404,7 @@ async function runDetect(res, onlyClientId) {
 }
 
 async function handler(req, res) {
-  // Cron: the confirm detector (drafts confirmations for Scheduled-Trial leads).
+  // Cron: the closing detector (drafts post-trial conversions for Done-Trial leads).
   if (req.method === "GET" && req.query.action === "detect") {
     const got = (req.headers.authorization || "").replace(/^Bearer\s+/i, "");
     if (!process.env.CRON_SECRET || got !== process.env.CRON_SECRET) return res.status(401).json({ error: "unauthorized" });
@@ -446,17 +423,17 @@ async function handler(req, res) {
   // Supabase-only reads first (cheap — no GHL token fetch).
   try {
     if (b.action === "list-ready") {
-      const rows = await sb(`agent_confirm_replies?client_id=eq.${clientId}&status=in.(pending,approved)&select=*&order=created_at.desc&limit=100`);
+      const rows = await sb(`agent_closing_replies?client_id=eq.${clientId}&status=in.(pending,approved)&select=*&order=created_at.desc&limit=100`);
       let list = Array.isArray(rows) ? rows : [];
-      // Read-time stage gate: hide cards whose contact left Scheduled-Trial. Fail
-      // OPEN if GHL is unreachable or there's no such stage.
+      // Read-time stage gate: hide cards whose contact left Done-Trial. Fail OPEN if
+      // GHL is unreachable or there's no such stage.
       try {
         const client = await loadClient(clientId);
         const loc = client && client.ghl_location_id;
-        let ids = loc ? peekScheduledTrialIdSet(loc) : undefined;
+        let ids = loc ? peekDoneTrialIdSet(loc) : undefined;
         if (ids === undefined && loc) {
           const creds = await pickGhlToken(client);
-          if (creds) ids = await scheduledTrialContactIdSetCached(creds.token, loc);
+          if (creds) ids = await doneTrialContactIdSetCached(creds.token, loc);
         }
         if (ids) list = list.filter(r => !r.ghl_contact_id || ids.has(r.ghl_contact_id));
       } catch (_) { /* fail open */ }
@@ -464,11 +441,11 @@ async function handler(req, res) {
     }
     if (b.action === "skip-ready") {
       if (!b.ready_id) return res.status(400).json({ error: "ready_id required" });
-      await sb(`agent_confirm_replies?id=eq.${encodeURIComponent(b.ready_id)}&client_id=eq.${clientId}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ status: "skipped", updated_at: new Date().toISOString() }) });
+      await sb(`agent_closing_replies?id=eq.${encodeURIComponent(b.ready_id)}&client_id=eq.${clientId}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ status: "skipped", updated_at: new Date().toISOString() }) });
       return res.status(200).json({ ok: true });
     }
   } catch (e) {
-    console.error("[agent-confirm]", e);
+    console.error("[agent-closing]", e);
     return res.status(500).json({ error: e.message || "internal error" });
   }
 
@@ -487,13 +464,13 @@ async function handler(req, res) {
 
   try {
     if (b.action === "list") {
-      const { queue } = await computeConfirmQueue(token, locationId);
+      const { queue } = await computeClosingQueue(token, locationId);
       return res.status(200).json({ queue, count: queue.length });
     }
 
     if (b.action === "draft") {
       if (!b.contact_id) return res.status(400).json({ error: "contact_id required" });
-      if (await isMuted(clientId, b.contact_id, "confirm")) return res.status(200).json({ error: "muted", muted: true });
+      if (await isMuted(clientId, b.contact_id, "closing")) return res.status(200).json({ error: "muted", muted: true });
       const cfg = await loadConfig(clientId);
       const d = await draftForContact(token, locationId, clientId, b.contact_id, cfg);
       if (d.error) return res.status(200).json({ error: d.error });
@@ -503,23 +480,23 @@ async function handler(req, res) {
 
     if (b.action === "send") {
       if (!b.contact_id || !b.reply || !String(b.reply).trim()) return res.status(400).json({ error: "contact_id and reply required" });
-      // HARD GUARD: only send to a lead still in the Scheduled-Trial stage.
-      const sts = await scheduledTrialStage(token, locationId);
-      if (!sts || !(await contactInRespondedStage(token, locationId, b.contact_id, sts))) {
-        return res.status(409).json({ error: "This lead is no longer in the Scheduled-Trial stage — not sending." });
+      // HARD GUARD: only send to a lead still in the Done-Trial stage.
+      const dts = await doneTrialStage(token, locationId);
+      if (!dts || !(await contactInRespondedStage(token, locationId, b.contact_id, dts))) {
+        return res.status(409).json({ error: "This lead is no longer in the Done-Trial stage — not sending." });
       }
       // Quiet hours: hold an after-hours approval until morning.
       if (!withinQuietHours()) {
         const sendAfter = nextSendableTime().toISOString();
         const held = {
           client_id: clientId, ghl_contact_id: b.contact_id, ghl_conversation_id: b.conversation_id || null,
-          contact_name: b.contact_name || null, kind: "confirm", draft_message: String(b.reply), reasoning: b.reasoning || null,
+          contact_name: b.contact_name || null, kind: "closing", draft_message: String(b.reply), reasoning: b.reasoning || null,
           confidence: typeof b.confidence === "number" ? b.confidence : null,
           status: "approved", send_after: sendAfter, approved_by: staffEmail, approved_at: new Date().toISOString(), updated_at: new Date().toISOString(),
         };
         try {
-          if (b.ready_id) await sb(`agent_confirm_replies?id=eq.${encodeURIComponent(b.ready_id)}&client_id=eq.${clientId}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify(held) });
-          else await sb(`agent_confirm_replies`, { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify([{ ...held, created_by: staffEmail }]) });
+          if (b.ready_id) await sb(`agent_closing_replies?id=eq.${encodeURIComponent(b.ready_id)}&client_id=eq.${clientId}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify(held) });
+          else await sb(`agent_closing_replies`, { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify([{ ...held, created_by: staffEmail }]) });
         } catch (e) { return res.status(500).json({ error: `couldn't schedule: ${e.message}` }); }
         return res.status(200).json({ ok: true, sent: false, deferred: true, send_after: sendAfter });
       }
@@ -527,55 +504,83 @@ async function handler(req, res) {
       catch (e) { return res.status(e.status || 502).json({ error: `GHL send: ${e.message}` }); }
       try { await logApproval({ client_id: clientId, ghl_contact_id: b.contact_id, ghl_conversation_id: b.conversation_id || null, contact_name: b.contact_name || null, final_reply: b.reply, reasoning: b.reasoning || null, confidence: typeof b.confidence === "number" ? b.confidence : null, adjusted: !!b.adjusted, status: "sent", created_by: staffEmail }); } catch (_) {}
       if (b.ready_id) {
-        try { await sb(`agent_confirm_replies?id=eq.${encodeURIComponent(b.ready_id)}&client_id=eq.${clientId}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ status: "sent", approved_by: staffEmail, approved_at: new Date().toISOString(), sent_at: new Date().toISOString(), updated_at: new Date().toISOString() }) }); } catch (_) {}
+        try { await sb(`agent_closing_replies?id=eq.${encodeURIComponent(b.ready_id)}&client_id=eq.${clientId}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ status: "sent", approved_by: staffEmail, approved_at: new Date().toISOString(), sent_at: new Date().toISOString(), updated_at: new Date().toISOString() }) }); } catch (_) {}
       }
       return res.status(200).json({ ok: true, sent: true });
     }
 
-    // Confirm a HANDOFF: the lead can't make it. Send the warm acknowledgement (if
-    // any), write the context note the booking agent will read, then bounce the
-    // opportunity Scheduled-Trial → Responded so the booking agent rebooks them.
-    if (b.action === "confirm-handoff") {
+    // Confirm an ENROLL: the good-fit attendee is ready. Send the academy's enroll
+    // link (offers.data.signup_url) preceded by any warm drafted reply.
+    //
+    // P2b — connect to the EXISTING enroll flow (do NOT fake a win here): the enroll
+    // page already calls the portal checkout (api/website/checkout.js → member row),
+    // and on real payment the Stripe webhook (invoice.paid → fireOnboardingActivations)
+    // flips the member live AND marks the opportunity WON + welcomes them. So this
+    // action's job is ONLY to send the link and step back — marking the opp won here
+    // would inflate wins with people who never pay. We append client_id/contact_id/
+    // opp_id to the URL (forward-compat: when the enroll page + checkout read them,
+    // the member ↔ contact ↔ opportunity link at creation and the EXACT opp is the
+    // one the webhook marks won, instead of an email match). We drop a contact note
+    // so the agent + staff know the link went out and we're awaiting payment.
+    if (b.action === "confirm-enroll") {
       let row = null, contactId = b.contact_id || null;
       if (b.ready_id) {
-        [row] = await sb(`agent_confirm_replies?id=eq.${encodeURIComponent(b.ready_id)}&client_id=eq.${clientId}&select=*`);
+        [row] = await sb(`agent_closing_replies?id=eq.${encodeURIComponent(b.ready_id)}&client_id=eq.${clientId}&select=*`);
         if (!row) return res.status(404).json({ error: "not found" });
         contactId = row.ghl_contact_id;
       }
       if (!contactId) return res.status(400).json({ error: "ready_id or contact_id required" });
-      // Send the warm acknowledgement only if one was provided / drafted.
-      const closing = (typeof b.reply === "string" ? b.reply : (row ? row.draft_message : "")) || "";
-      if (closing.trim()) { try { await sendReplyViaGhl(token, contactId, closing.trim()); } catch (_) {} }
-      // Write the context note (this is how the booking agent gets full context —
-      // contact-memory.js injects agent_contact_notes into the booking prompt).
-      const note = (b.handoff_note || (row && row.handoff_note) || "Couldn't make their booked trial — needs to rebook.").toString().trim();
+      let signupUrl = "";
+      try {
+        const offers = await sb(`offers?client_id=eq.${encodeURIComponent(clientId)}&type=eq.training&select=data&order=sort_order.asc&limit=1`);
+        signupUrl = ((offers && offers[0] && offers[0].data && offers[0].data.signup_url) || "").trim();
+      } catch (_) {}
+      // Resolve the opp (for the link param + the note) but DON'T change its status —
+      // the enroll flow's webhook owns the win on real payment.
+      let oppId = null;
+      try { oppId = await findOpenOpp(token, locationId, contactId); } catch (_) {}
+      // Append identifiers so payment ties back to THIS opportunity (harmless extra
+      // query params until the enroll page/checkout read them — P2b-plus, cross-repo).
+      let enrollUrl = signupUrl;
+      if (enrollUrl) {
+        try {
+          const u = new URL(enrollUrl);
+          u.searchParams.set("client_id", clientId);
+          if (contactId) u.searchParams.set("contact_id", String(contactId));
+          if (oppId) u.searchParams.set("opp_id", String(oppId));
+          enrollUrl = u.toString();
+        } catch (_) { /* not a valid absolute URL — send as-is */ }
+      }
+      const draft = (typeof b.reply === "string" ? b.reply : (row ? row.draft_message : "")) || "";
+      const parts = [];
+      if (draft.trim()) parts.push(draft.trim());
+      if (enrollUrl) parts.push(enrollUrl);
+      const msg = parts.join("\n\n");
+      if (msg.trim()) { try { await sendReplyViaGhl(token, contactId, msg); } catch (e) { return res.status(e.status || 502).json({ error: `GHL send: ${e.message}` }); } }
+      // Note for the team + the agent's own memory (so it won't re-pitch): the link
+      // went out; the win lands when they pay, via the enroll flow.
+      const note = (b.enroll_note || (row && row.enroll_note) || "").toString().slice(0, 300);
       try {
         await sb(`agent_contact_notes`, { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify([{
           client_id: clientId, ghl_contact_id: String(contactId), active: true,
-          note: `Rebook needed (from confirm agent): ${note}`, created_by: staffEmail || "confirm-agent",
+          note: `Enrollment link sent (closing agent)${note ? ` — ${note}` : ""}. Awaiting payment: the enroll flow creates the member + marks this won when they pay.`,
+          created_by: staffEmail || "closing-agent",
         }]) });
-      } catch (e) { return res.status(500).json({ error: `couldn't save handoff note: ${e.message}` }); }
-      // Bounce the opportunity back to Responded (best-effort — the note is the part
-      // that must land; the booking agent works the Responded stage).
-      let oppId = null, moved = false;
-      try {
-        oppId = await findOpenOpp(token, locationId, contactId);
-        const rs = await respondedStage(token, locationId);
-        if (rs && oppId) { await ghl("PUT", `/opportunities/${encodeURIComponent(oppId)}`, { token, body: { pipelineId: rs.pipelineId, pipelineStageId: rs.stageId } }); moved = true; }
       } catch (_) {}
-      try { if (oppId) await sb(`pipeline_outcomes`, { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify([{ client_id: clientId, opportunity_id: oppId, status: "rebook", reason: note.slice(0, 300) }]) }); } catch (_) {}
+      try { if (oppId) await sb(`pipeline_outcomes`, { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify([{ client_id: clientId, opportunity_id: oppId, status: "enroll_link_sent", reason: note || null }]) }); } catch (_) {}
+      try { await logApproval({ client_id: clientId, ghl_contact_id: contactId, ghl_conversation_id: b.conversation_id || (row && row.ghl_conversation_id) || null, contact_name: b.contact_name || (row && row.contact_name) || null, final_reply: msg || "[enroll link sent]", status: "sent", created_by: staffEmail }); } catch (_) {}
       if (b.ready_id) {
-        try { await sb(`agent_confirm_replies?id=eq.${encodeURIComponent(b.ready_id)}&client_id=eq.${clientId}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ status: "sent", approved_by: staffEmail, approved_at: new Date().toISOString(), sent_at: new Date().toISOString(), updated_at: new Date().toISOString() }) }); } catch (_) {}
+        try { await sb(`agent_closing_replies?id=eq.${encodeURIComponent(b.ready_id)}&client_id=eq.${clientId}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ status: "sent", approved_by: staffEmail, approved_at: new Date().toISOString(), sent_at: new Date().toISOString(), updated_at: new Date().toISOString() }) }); } catch (_) {}
       }
-      await clearConfirmCards(clientId, contactId, "handed off to booking");
-      return res.status(200).json({ ok: true, handed_off: true, moved_to_responded: moved, opportunity_id: oppId });
+      await clearClosingCards(clientId, contactId, "enroll link sent");
+      return res.status(200).json({ ok: true, enrolled: true, link_sent: !!signupUrl, opportunity_id: oppId, won_on: "payment" });
     }
 
     // Confirm a Lost suggestion: optional warm closing, then mark the opp Lost.
     if (b.action === "confirm-lost") {
       let row = null, contactId = b.contact_id || null;
       if (b.ready_id) {
-        [row] = await sb(`agent_confirm_replies?id=eq.${encodeURIComponent(b.ready_id)}&client_id=eq.${clientId}&select=*`);
+        [row] = await sb(`agent_closing_replies?id=eq.${encodeURIComponent(b.ready_id)}&client_id=eq.${clientId}&select=*`);
         if (!row) return res.status(404).json({ error: "not found" });
         contactId = row.ghl_contact_id;
       }
@@ -607,15 +612,15 @@ async function handler(req, res) {
       }
       try { await sb(`pipeline_outcomes`, { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify([{ client_id: clientId, opportunity_id: oppId, status: routedToNurture ? "nurture" : "lost", reason }]) }); } catch (_) {}
       if (b.ready_id) {
-        try { await sb(`agent_confirm_replies?id=eq.${encodeURIComponent(b.ready_id)}&client_id=eq.${clientId}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ status: "sent", approved_by: staffEmail, approved_at: new Date().toISOString(), sent_at: new Date().toISOString(), updated_at: new Date().toISOString() }) }); } catch (_) {}
+        try { await sb(`agent_closing_replies?id=eq.${encodeURIComponent(b.ready_id)}&client_id=eq.${clientId}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ status: "sent", approved_by: staffEmail, approved_at: new Date().toISOString(), sent_at: new Date().toISOString(), updated_at: new Date().toISOString() }) }); } catch (_) {}
       }
-      await clearConfirmCards(clientId, contactId, "marked lost");
+      await clearClosingCards(clientId, contactId, "marked lost");
       return res.status(200).json({ ok: true, marked_lost: !routedToNurture, routed_to_nurture: routedToNurture, opportunity_id: oppId, reason });
     }
 
     return res.status(400).json({ error: "unknown action" });
   } catch (e) {
-    console.error("[agent-confirm]", e);
+    console.error("[agent-closing]", e);
     return res.status(500).json({ error: e.message || "internal error" });
   }
 }

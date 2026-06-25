@@ -55,3 +55,127 @@ Only ONE true dead end now:
 ## Rule throughline
 agents = approve each message · automations = approve the sequence once · every bot/automation owns a
 pipeline stage. Conversational = agent; one-way nudges = automation. Reply to any automation → Booking.
+
+## BUILD PLAN — sequenced + decided 2026-06-25 (Zoran)
+Decisions: **whole crew, sequenced** · **email + text** (build Resend) · **GTA-first, product-shaped** ·
+**Zoran adds the Lead Nurture stage + `unqualified` tag in GHL**, portal maps by name. Goal = **run sales
+touching ONLY Hawkeye**. ALL agents = hawkeye mode (Zoran's rule).
+
+Phase order:
+- **P0** — ✅ DONE 2026-06-25: BAM GTA `confirm_agent_mode`='hawkeye' (booking already hawkeye). Confirm
+  detector cron now drafts into the `_acx` queue; nothing auto-sends.
+- **P1** — 🚫 Unqualified taxonomy. nurture stage named **`Lead Nurture`** in GHL (anchor `/nurtur/i`);
+  Unqualified = a GHL **`unqualified` tag** mirrored by a portal switch (bidirectional). ✅ SHIPPED
+  (branch `session/sales-crew`):
+  - `api/agent/_tags.js` (NEW) — `UNQUALIFIED_TAG`, add/remove contact tags (`POST`/`DELETE /contacts/{id}/tags`),
+    `markUnqualified`/`unmarkUnqualified`/`isUnqualified`.
+  - `api/agent/_stage.js` — `nurtureStage()` finder (`/nurtur/i`); null until Zoran makes the stage (dormant, no error).
+  - `api/agent-approvals.js` — `confirm-abandoned` now ALSO stamps the `unqualified` tag (best-effort);
+    NEW `set-qualification` action toggles the tag (portal ⟷ GHL).
+  - `client-portal.html` — drawer "Abandoned" button → **🚫 Unqualified** (`_plMarkUnqualified` → GHL
+    `abandoned` + stamps tag via `_plStampUnqualified`). Plain abandon / duplicate-cleanup does NOT tag.
+  - ⏸ DEFERRED to P6 (deliberate): do NOT reroute live "Lost" into the Nurture stage yet — nurture automation
+    doesn't exist; Lost keeps current behavior until P6.
+- **P2a** — ✅ SHIPPED (branch `session/sales-crew`): 🎯 Closing agent, mirror of Confirm, on the Done-Trial
+  stage. Backend: `api/agent-closing.js` (list/draft/send/list-ready/skip-ready/detect-now/**confirm-enroll**/
+  confirm-lost), `closingAgentMode` (`closing_agent_mode`, default off), `doneTrialStage`+`computeClosingQueue`
+  in `_stage.js`, 7 `closing_*` brain sections + `AGENT_SPECS.closing`, table `agent_closing_replies`
+  (migration 20260625210000, **APPLIED to prod**), cron `3,18,33,48`. Frontend: AgentModePanel 3rd control,
+  SandboxApp 🎯 Closing trainer tab, `_aclx*` Hawkeye queue in client-portal.html (kinds closing/closing_enroll/
+  closing_lost). `confirm-enroll` = send offer `signup_url` + mark opp won (the close). INERT until
+  `closing_agent_mode` set to hawkeye.
+- **P2b** — ✅ CORE SHIPPED (branch `session/sales-crew`). KEY FINDING: the enroll→pay→member→WON machinery
+  ALREADY EXISTS. GTA's `signup_url` = `byanymeanstoronto.ca/enroll`, whose page calls the portal checkout
+  (`api/website/checkout.js`) → creates the member (status `payment_method_required`) → on real payment the
+  Stripe webhook (`invoice.paid` → `fireOnboardingActivations`) flips member live + **marks the opp WON** +
+  CoachIQ + welcome. So `confirm-enroll` must NOT mark won itself (P2a did, prematurely — before payment).
+  Fixed: `confirm-enroll` now just sends the enroll link (with `client_id`/`contact_id`/`opp_id` query params
+  appended, forward-compat) + writes an `agent_contact_notes` "link sent, awaiting payment" + logs
+  `pipeline_outcomes status='enroll_link_sent'`; NO won PUT. Frontend relabeled "Send sign-up link & mark won"
+  → "Send enroll link" (won lands on payment). The win is owned by the webhook on real payment.
+  ⬜ **P2b-plus (deferred, CROSS-REPO + live checkout):** make the GTA enroll page (`bam-client-sites/clients/
+  bam-gta/gta/enroll.jsx`, which already calls `/api/website/checkout`) READ the `contact_id`/`opp_id` params
+  and pass them to checkout → store `ghl_contact_id` + `ghl_opportunity_id` on the member row + sub metadata →
+  `fireOnboardingActivations` marks THAT exact opp won + links member↔contact at creation (instead of the
+  current `parent_email` match in `api/onboarding/activations.js`). Today the email-match works for GTA's happy
+  path; P2b-plus hardens multi-opp / email-mismatch cases. See `[[project_stripe_app_created_subs]]` +
+  `[[project_offer_price_mapping]]`.
+- **P2.5** — ⏸ REORDERED to after P3/P4 (polish, blocks nothing). 📋 post-trial form → a card in the unified
+  approval inbox. GOTCHA found: `_plPostTrialForm(oppId)` is COUPLED to loaded board state (`_PL_DATA`, line
+  ~22014) — surfacing it in the inbox needs `switchView('pipelines')` first (like `_hv2OpenHawkeye`) or
+  decoupling the form to fetch the opp by id. Detection already exists in `api/ghl/cron-post-trial-escalate.js`
+  (trials ended 15min+ ago with no `post_trial_reviews` row).
+- **P3** — ✅ SHIPPED (branch `session/sales-crew`). ✉️ Resend foundation. Resend was ALREADY wired (raw fetch
+  in `api/clients.js` for invite/reset — LEFT UNTOUCHED). New:
+  - `api/_email.js` (NEW) — `sendEmail({to,subject,html,text,from,replyTo,tags,clientId})` + `isSuppressed()`.
+    Suppression gate before every send; best-effort `email_events` audit; throws on Resend error. Default
+    **FROM = `RESEND_FROM` || `"BAM Toronto <info@byanymeanstoronto.com>"`**.
+  - `api/resend/webhook.js` (NEW) — Svix-verified (`RESEND_WEBHOOK_SECRET`, `whsec_`); logs `email_events`,
+    upserts `email_suppressions` on hard bounce / complaint / unsubscribe. Unset secret → accept+warn; set+bad → 401.
+  - tables `email_events` + `email_suppressions` (migration 20260625220000, **APPLIED to prod**).
+  - ⚠️ INERT until Zoran (a) DNS-verifies **`byanymeanstoronto.com`** in Resend (the live key only authorizes
+    `byanymeansbball.com` today, so sends 403 until then) and (b) sets `RESEND_WEBHOOK_SECRET` + points a Resend
+    webhook at `/api/resend/webhook`. Suppression/audit/webhook all work regardless of the domain.
+  - **Email templates LIVE IN THE PORTAL**, designed by Zoran + Claude — NOT in bam-client-sites. Brand tokens
+    INLINED (gold `#E2DD9F`, black, Anton + Inter Tight). (Template authoring = part of P4/the import session.)
+- **P4** — ✅ SHIPPED (branch `session/sales-crew`). 🧱 Automation engine + step-builder, built EMPTY + inert.
+  - **P4a runtime:** 5 tables (`automations`, `automation_steps`, `automation_enrollments`, `automation_jobs`,
+    `automation_events`; migration 20260625230000, **APPLIED to prod**). `api/_send.js` (sms→GHL
+    `/conversations/messages` by contactId; email→`_email.js`). `api/automations.js` = exported
+    `enrollContact`/`exitEnrollment` (P6 triggers call these) + `GET ?action=work` worker cron (`* * * * *`,
+    in vercel.json) + staff CRUD (list/upsert-automation/upsert-step/delete-step/reorder/set-enabled/
+    set-approved). IDEMPOTENCY: `dedupe_key`=`enrollment_id:step_id` unique + atomic claim (conditional PATCH
+    pending→sending, 0 rows = lost race). Quiet-hours clamp on schedule + re-check at send. Worker re-checks
+    automation enabled+approved + enrollment active before sending. Approve-sequence-once = `automations.approved`.
+  - **P4b step-builder UI:** new **👻 Automations** sub-tab in the Train Agent view (`client-portal.html`,
+    `_taRenderAutomations`/`_autoApi`/`_autoCardHtml`/`_autoStepHtml`/`_autoSaveStep`/`_autoAddStep`/`_autoMove`/
+    `_autoToggle`). Seeds `ghosted`+`nurture` if missing → both always render EMPTY. Each step row = ⏱ wait
+    [amt][unit] · 💬SMS/📧Email · subject(email only) · body · Save/Delete · ↑↓ reorder. Per-card On/Off +
+    Approve-sequence toggles. Empty state nudges the import session. Visible to staff or `can_train_agent` members.
+  - NOTE: dropped `automation_templates` from the original plan — step bodies hold the message inline
+    (simpler; email templates/shells are a separate portal+Claude design task per P3).
+- **P5** — 📥 IMPORT SESSION. STRICT ORDER: P3+P4 built FIRST so the UI shows EMPTY automations, THEN Zoran
+  pastes GHL text/email screenshots → AI extracts {text, channel, timing} → POPULATES content/sequences.
+  Import populates; it does NOT design emails (that's a separate portal+Claude task). Screenshots = the cadence spec.
+- **P6** — ✅ TRIGGERS WIRED (branch `session/sales-crew`). Every trigger BRANCHES on `isAutomationLive(clientId,
+  key)` (enabled+approved+≥1 enabled step; **fails CLOSED** on DB error) so TODAY's behavior is byte-identical
+  until an academy approves a portal sequence — then it auto-switches (and they turn the GHL workflow off). No
+  double-send, no gap. Wiring:
+  - `api/automations.js`: + exported `isAutomationLive`. Worker "completed" branch: a finished `ghosted`
+    enrollment + nurture live → `enrollContact('nurture')` + move opp to nurture stage (ghosted ran out → nurture).
+  - `confirm-ghost` (agent-approvals): nurture... ghosted live → `enrollContact('ghosted')` (skip GHL workflow);
+    else existing GHL ghosted workflow. Interested move shared.
+  - `confirm-lost` (ALL 3 agents — approvals/confirm/closing): nurture live + `nurtureStage` exists → move opp to
+    Lead Nurture stage (kept OPEN) + `enrollContact('nurture')` + outcome 'nurture'; ELSE existing `status=lost`
+    (GHL-native). Falls back to status=lost if no nurture stage. 🚫 Unqualified (`confirm-abandoned`) unchanged.
+  - `inbound-webhook`: on reply → `exitEnrollment(reason:'replied')`; if it exited ≥1 enrollment, move opp to
+    Responded (booking picks them up warm). Best-effort.
+  - ⬜ STILL NEEDS (Zoran, per academy, when ready): populate + approve the portal Ghosted/Nurture sequences
+    (P5 import does the populate), create the Lead Nurture GHL stage, then turn OFF the matching GHL workflows.
+- **P5** — ⬜ NEXT (INTERACTIVE — needs Zoran + screenshots). The empty step-builder (P4b) is ready. Build the
+  AI screenshot→steps parser that fills `automation_steps` via `upsert-step`.
+- **P7** — 🛡️ guardrails. SHIPPED so far (branch `session/sales-crew`):
+  - ✅ **P7a per-lead bot mute** (#6): `agent_mutes` table (migration 20260625240000, APPLIED), `api/agent/
+    _mutes.js` (`isMuted`/`mutedContactIdSet`, fail-open), gated in the 3 agent detectors + draft actions,
+    `api/agent-mutes.js` (list/set/clear; global mute also exits automations), "Stop bot on this lead" drawer
+    toggle (`#pl-mute-btn`/`_plToggleMute`). Send paths NOT gated (human can always send).
+  - ✅ **P7b observability** (#8): `api/automations.js` `overview` + `people` actions; Automations sub-tab
+    shows per-step live counts → people list → reuses `_contactsOpenDrawer`.
+  - ✅ #1 notify-all-inbound already done (see below). ✅ #3 Hawkeye-per-bot done (each agent's queue). ✅ #5
+    global off-switch (modes).
+  - ⬜ DEFERRED: #7 atomic first-come claim on Hawkeye sends (the guardrails doc itself marks this "build
+    later"; low real-world risk - cards are usually actioned by one person). #4 coloured/dashed convo-tab
+    outline + #2 per-stage pipeline glow = minor UI polish.
+- **P2.5** — ⬜ post-trial form → unified inbox (polish; `_plPostTrialForm` coupled to board state — see note above).
+
+## Hawkeye-only verdict (end-to-end code trace 2026-06-25)
+Today TWO things force Zoran out of Hawkeye regularly: (1) **post-trial form** — a human must mark
+showed-up/good-fit after EVERY trial; NO auto attendance detection (only a 15-min reminder SMS via
+`cron-post-trial-escalate`). (2) **the close = payment** — the "Won" button is a STUB (status flip; no member
+link, no Stripe). P2 + P2.5 fold BOTH into Hawkeye. Edge cases left manual: merging duplicate GHL contacts;
+a social (IG/FB) lead past Meta's 24h window (agents are SMS-only — hard-coded `type:"SMS"`).
+
+## Notify-on-inbound (guardrail #1) — basically DONE
+`api/ghl/inbound-webhook.js`: (A) `notifyOwners(inbox_message)` fires on ALL inbound, any stage (V1.5/V2),
+gated only on a recipient subscribed to `inbox_message` in `clients.notification_prefs`. (B) the
+"🤖 new chat to approve" SMS is the EXTRA nudge, gated to Responded + agent on + `agent_notify_phone`.

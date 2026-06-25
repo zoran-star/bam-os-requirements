@@ -46,6 +46,23 @@ export async function scheduledTrialStage(token, locationId) {
   return stage ? { pipelineId: pipe.id, stageId: stage.id, stageName: stage.name } : null;
 }
 
+// The Training Pipeline "Lead Nurture" stage — the long-game home for every
+// non-Unqualified Lost lead (Booking / Confirm / Closing) plus leads who ran out
+// of the Ghosted sequence. The portal-owned nurture automation (sparse email +
+// text, built later) works the leads parked here; any reply bounces them back to
+// Booking with context. Same shape as the other stage finders. Anchored on
+// /nurtur/i so the academy can name it "Lead Nurture" / "Nurture" / "Lost - Nurture".
+// Returns null until the academy creates the stage in GHL — callers must handle
+// that (the routing stays dormant rather than erroring).
+export async function nurtureStage(token, locationId) {
+  const data = await ghl("GET", `/opportunities/pipelines?locationId=${encodeURIComponent(locationId)}`, { token });
+  const pipelines = data.pipelines || data.data || [];
+  const pipe = pipelines.find(p => /training/i.test(p.name || "")) || pipelines[0];
+  if (!pipe) return null;
+  const stage = (pipe.stages || []).find(s => /nurtur/i.test(s.name || ""));
+  return stage ? { pipelineId: pipe.id, stageId: stage.id, stageName: stage.name } : null;
+}
+
 export async function contactInRespondedStage(token, locationId, contactId, rs) {
   try {
     const params = new URLSearchParams({ location_id: locationId, contact_id: contactId, pipeline_id: rs.pipelineId, limit: "20" });
@@ -181,5 +198,79 @@ export async function scheduledTrialContactIdSetCached(token, locationId, ttlMs 
   if (hit !== undefined) return hit;
   const ids = await scheduledTrialContactIdSet(token, locationId);
   _stsCache.set(locationId, { at: Date.now(), ids });
+  return ids;
+}
+
+// ── CLOSING AGENT (Done-Trial stage) ─────────────────────────────────────────
+// Mirrors the Scheduled-Trial helpers above, for the closing agent's queue. The
+// closing agent works leads who ATTENDED a good-fit trial (the post-trial form
+// moved them here) and converts them into paying members.
+
+// The Training Pipeline "Done Trial" (a.k.a. "Attended" / "Trial Complete") stage —
+// where a lead lands AFTER the coach's post-trial form marks them showed-up + good
+// fit. Anchored on "trial" + (done|complete|attend) so it can't match the
+// Scheduled-Trial stage by accident. Same {pipelineId, stageId, stageName} shape.
+export async function doneTrialStage(token, locationId) {
+  const data = await ghl("GET", `/opportunities/pipelines?locationId=${encodeURIComponent(locationId)}`, { token });
+  const pipelines = data.pipelines || data.data || [];
+  const pipe = pipelines.find(p => /training/i.test(p.name || "")) || pipelines[0];
+  if (!pipe) return null;
+  const stage = (pipe.stages || []).find(s => {
+    const n = (s.name || "").toLowerCase();
+    return n.includes("trial") && (n.includes("done") || n.includes("complete") || n.includes("attend"));
+  });
+  return stage ? { pipelineId: pipe.id, stageId: stage.id, stageName: stage.name } : null;
+}
+
+// The closing queue for one academy: ALL open opps in the Done-Trial stage, each
+// tagged with its last message + direction so the detector can branch — inbound
+// last → draft a live reply; no agent message yet → draft a post-trial opener;
+// agent already waiting on a reply → skip. (Like the confirm queue, NOT inbound-only:
+// the post-trial follow-up is proactive.)
+export async function computeClosingQueue(token, locationId) {
+  const dts = await doneTrialStage(token, locationId);
+  if (!dts) return { dts: null, queue: [] };
+  const oppParams = new URLSearchParams({ location_id: locationId, pipeline_id: dts.pipelineId, pipeline_stage_id: dts.stageId, limit: "100" });
+  let opps = [];
+  try { const od = await ghl("GET", `/opportunities/search?${oppParams}`, { token }); opps = od.opportunities || od.data || []; } catch (_) {}
+  const ids = openOppContactIds(opps);
+  const cd = await ghl("GET", `/conversations/search?${new URLSearchParams({ locationId, limit: "100" })}`, { token });
+  const convos = cd.conversations || cd.data || [];
+  const queue = convos
+    .filter(c => ids.has(c.contactId))
+    .map(c => ({
+      contact_id: c.contactId,
+      conversation_id: c.id,
+      name: c.fullName || c.contactName || "Unknown",
+      last_message: c.lastMessageBody || "",
+      last_direction: String(c.lastMessageDirection || "").toLowerCase(),
+      last_at: toIso(c.lastMessageDate || c.dateUpdated),
+    }))
+    .sort((a, b) => new Date(b.last_at || 0) - new Date(a.last_at || 0));
+  return { dts, queue, doneIds: ids };
+}
+
+// Throws on GHL failure (callers fail open), null when there's no Done-Trial stage.
+// The read-time gate for the closing queue + send guard.
+export async function doneTrialContactIdSet(token, locationId) {
+  const dts = await doneTrialStage(token, locationId);   // throws on GHL error
+  if (!dts) return null;                                  // no stage → cannot gate
+  const params = new URLSearchParams({ location_id: locationId, pipeline_id: dts.pipelineId, pipeline_stage_id: dts.stageId, limit: "100" });
+  const od = await ghl("GET", `/opportunities/search?${params}`, { token });  // throws on GHL error
+  return openOppContactIds(od.opportunities || od.data || []);
+}
+
+const _dtsClosingCache = new Map();   // locationId -> { at, ids }
+
+export function peekDoneTrialIdSet(locationId, ttlMs = 60000) {
+  const hit = _dtsClosingCache.get(locationId);
+  return (hit && (Date.now() - hit.at) < ttlMs) ? hit.ids : undefined;
+}
+
+export async function doneTrialContactIdSetCached(token, locationId, ttlMs = 60000) {
+  const hit = peekDoneTrialIdSet(locationId, ttlMs);
+  if (hit !== undefined) return hit;
+  const ids = await doneTrialContactIdSet(token, locationId);
+  _dtsClosingCache.set(locationId, { at: Date.now(), ids });
   return ids;
 }

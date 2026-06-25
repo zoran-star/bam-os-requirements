@@ -27,9 +27,10 @@ export default function SandboxApp({ embedded = false } = {}) {
   const [agent, setAgent] = useState("booking");     // 'booking' | 'confirm' — which agent to train
   const [view, setView] = useState("chat");          // 'chat' | 'brain' | 'tests' | 'followups'
   const isConfirm = agent === "confirm";
+  const isBooking = agent === "booking";
   // Break-it + Follow-ups are booking-only surfaces; bounce to chat if we land on
   // them while training the confirm agent.
-  useEffect(() => { if (isConfirm && (view === "tests" || view === "followups")) setView("chat"); }, [isConfirm, view]);
+  useEffect(() => { if (!isBooking && (view === "tests" || view === "followups")) setView("chat"); }, [isBooking, view]);
   const [messages, setMessages] = useState([]);     // {role:'parent'|'agent', text, meta?}
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
@@ -133,16 +134,17 @@ export default function SandboxApp({ embedded = false } = {}) {
           <div style={{ display: "flex", gap: 4, background: tk.surfaceEl, borderRadius: 9, padding: 3, border: `1px solid ${tk.border}` }}>
             <Tab on={agent === "booking"} onClick={() => { setAgent("booking"); setMessages([]); }}>📞 Booking</Tab>
             <Tab on={agent === "confirm"} onClick={() => { setAgent("confirm"); setMessages([]); }}>✅ Confirm</Tab>
+            <Tab on={agent === "closing"} onClick={() => { setAgent("closing"); setMessages([]); }}>🎯 Closing</Tab>
           </div>
-          <div style={{ fontSize: 12, color: tk.textSub }}>BAM GTA · {isConfirm ? "confirms booked leads" : "books trials"}</div>
+          <div style={{ fontSize: 12, color: tk.textSub }}>BAM GTA · {agent === "confirm" ? "confirms booked leads" : agent === "closing" ? "follows up with attendees" : "books trials"}</div>
           <span style={{ fontSize: 11, padding: "3px 10px", borderRadius: 99, background: tk.amberSoft, color: tk.amber, border: `1px solid ${tk.amber}33`, fontWeight: 600 }}>
             ⚠ TRAINING ONLY — nothing is sent
           </span>
           <div style={{ display: "flex", gap: 4, marginLeft: 8, background: tk.surfaceEl, borderRadius: 9, padding: 3, border: `1px solid ${tk.border}` }}>
             <Tab on={view === "chat"} onClick={() => setView("chat")}>💬 Chat</Tab>
             <Tab on={view === "brain"} onClick={() => setView("brain")}>📝 Brain</Tab>
-            {!isConfirm && <Tab on={view === "tests"} onClick={() => setView("tests")}>🧪 Break it</Tab>}
-            {!isConfirm && <Tab on={view === "followups"} onClick={() => setView("followups")}>⏰ Follow-ups</Tab>}
+            {isBooking && <Tab on={view === "tests"} onClick={() => setView("tests")}>🧪 Break it</Tab>}
+            {isBooking && <Tab on={view === "followups"} onClick={() => setView("followups")}>⏰ Follow-ups</Tab>}
           </div>
           <div style={{ flex: 1 }} />
           {view === "chat" && <BtnGhost onClick={() => setMessages([])}>↺ Reset chat</BtnGhost>}
@@ -193,7 +195,7 @@ export default function SandboxApp({ embedded = false } = {}) {
               {messages.map((m, i) => m.role === "parent"
                 ? <ParentBubble key={i} text={m.text} />
                 : <AgentBubble key={i} m={m} parentText={messages[i - 1]?.role === "parent" ? messages[i - 1].text : ""}
-                    canTeach={!isConfirm}
+                    canTeach={isBooking}
                     onTeach={() => { setTeachFor(i); setTeachText(""); }}
                     teaching={teachFor === i} teachText={teachText} setTeachText={setTeachText}
                     onSave={() => saveLesson(i)} onCancel={() => setTeachFor(null)}
@@ -222,12 +224,14 @@ export default function SandboxApp({ embedded = false } = {}) {
             </div>
           </div>
 
-          {/* Lessons panel — booking only (confirm agent trains via the Brain tab) */}
-          {isConfirm ? (
+          {/* Lessons panel - booking only (confirm + closing agents train via the Brain tab) */}
+          {!isBooking ? (
           <div style={{ width: 300, borderLeft: `1px solid ${tk.border}`, padding: 18, overflowY: "auto", background: tk.surface }}>
-            <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 6 }}>✅ Confirm agent</div>
+            <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 6 }}>{isConfirm ? "✅ Confirm agent" : "🎯 Closing agent"}</div>
             <div style={{ fontSize: 12, color: tk.textSub, lineHeight: 1.6 }}>
-              Chat to it like a parent who <b style={{ color: tk.text }}>already booked a trial</b> — try "we'll be there", "can we move it?", "where is it?".
+              {isConfirm
+                ? <>Chat to it like a parent who <b style={{ color: tk.text }}>already booked a trial</b> - try "we'll be there", "can we move it?", "where is it?".</>
+                : <>Chat to it like a parent whose kid <b style={{ color: tk.text }}>just did the trial</b> - try "how much is it?", "we'll think about it", "how do we sign up?".</>}
               <br /><br />
               Train it in the <b style={{ color: tk.accent }}>📝 Brain</b> tab (lessons & saved examples are booking-only for now).
             </div>
