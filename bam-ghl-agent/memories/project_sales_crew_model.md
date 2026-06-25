@@ -55,3 +55,52 @@ Only ONE true dead end now:
 ## Rule throughline
 agents = approve each message · automations = approve the sequence once · every bot/automation owns a
 pipeline stage. Conversational = agent; one-way nudges = automation. Reply to any automation → Booking.
+
+## BUILD PLAN — sequenced + decided 2026-06-25 (Zoran)
+Decisions: **whole crew, sequenced** · **email + text** (build Resend) · **GTA-first, product-shaped** ·
+**Zoran adds the Lead Nurture stage + `unqualified` tag in GHL**, portal maps by name. Goal = **run sales
+touching ONLY Hawkeye**. ALL agents = hawkeye mode (Zoran's rule).
+
+Phase order:
+- **P0** — ✅ DONE 2026-06-25: BAM GTA `confirm_agent_mode`='hawkeye' (booking already hawkeye). Confirm
+  detector cron now drafts into the `_acx` queue; nothing auto-sends.
+- **P1** — 🚫 Unqualified taxonomy. nurture stage named **`Lead Nurture`** in GHL (anchor `/nurtur/i`);
+  Unqualified = a GHL **`unqualified` tag** mirrored by a portal switch (bidirectional). ✅ SHIPPED
+  (branch `session/sales-crew`):
+  - `api/agent/_tags.js` (NEW) — `UNQUALIFIED_TAG`, add/remove contact tags (`POST`/`DELETE /contacts/{id}/tags`),
+    `markUnqualified`/`unmarkUnqualified`/`isUnqualified`.
+  - `api/agent/_stage.js` — `nurtureStage()` finder (`/nurtur/i`); null until Zoran makes the stage (dormant, no error).
+  - `api/agent-approvals.js` — `confirm-abandoned` now ALSO stamps the `unqualified` tag (best-effort);
+    NEW `set-qualification` action toggles the tag (portal ⟷ GHL).
+  - `client-portal.html` — drawer "Abandoned" button → **🚫 Unqualified** (`_plMarkUnqualified` → GHL
+    `abandoned` + stamps tag via `_plStampUnqualified`). Plain abandon / duplicate-cleanup does NOT tag.
+  - ⏸ DEFERRED to P6 (deliberate): do NOT reroute live "Lost" into the Nurture stage yet — nurture automation
+    doesn't exist; Lost keeps current behavior until P6.
+- **P2** — 🎯 Closing agent (mirror Confirm) **+ the close runs through Hawkeye**: Closing sends a Stripe
+  payment link → human ✓ → parent self-pays → Stripe webhook auto-creates the member (kills the "Won" stub;
+  wire to `[[project_stripe_app_created_subs]]`). Own switch `closing_agent_mode`, `_aclx*` queue.
+- **P2.5** — 📋 post-trial form → a card in the unified approval inbox ("🏁 Trial done — log outcome").
+- **P3** — ✉️ Resend foundation (Resend ALREADY wired in `api/clients.js`; formalize `api/_email.js`).
+  **FROM = `info@byanymeanstoronto.com`** (verify DNS in Resend). **Email templates LIVE IN THE PORTAL,
+  designed by Zoran + Claude on the portal** — NOT in bam-client-sites, NOT the GTA marketing site
+  (Zoran corrected this). Brand tokens INLINED (gold `#E2DD9F`, black, Anton + Inter Tight).
+- **P4** — 🧱 Automation engine + step-builder, built EMPTY. Adopt the Phase-0 design in
+  `[[project_portal_automations_plan]]` (`automation_jobs` queue, `automation_events`, `automation_templates`,
+  `email_events`+suppression, `_send.js`). Approve-sequence-once.
+- **P5** — 📥 IMPORT SESSION. STRICT ORDER: P3+P4 built FIRST so the UI shows EMPTY automations, THEN Zoran
+  pastes GHL text/email screenshots → AI extracts {text, channel, timing} → POPULATES content/sequences.
+  Import populates; it does NOT design emails (that's a separate portal+Claude task). Screenshots = the cadence spec.
+- **P6** — 👻 Ghosted (retire GHL workflow) + 💔 Lead Nurture go live; flip "Lost" → Nurture stage here.
+- **P7** — 🛡️ guardrails + observability (see `[[project_sales_crew_guardrails]]`).
+
+## Hawkeye-only verdict (end-to-end code trace 2026-06-25)
+Today TWO things force Zoran out of Hawkeye regularly: (1) **post-trial form** — a human must mark
+showed-up/good-fit after EVERY trial; NO auto attendance detection (only a 15-min reminder SMS via
+`cron-post-trial-escalate`). (2) **the close = payment** — the "Won" button is a STUB (status flip; no member
+link, no Stripe). P2 + P2.5 fold BOTH into Hawkeye. Edge cases left manual: merging duplicate GHL contacts;
+a social (IG/FB) lead past Meta's 24h window (agents are SMS-only — hard-coded `type:"SMS"`).
+
+## Notify-on-inbound (guardrail #1) — basically DONE
+`api/ghl/inbound-webhook.js`: (A) `notifyOwners(inbox_message)` fires on ALL inbound, any stage (V1.5/V2),
+gated only on a recipient subscribed to `inbox_message` in `clients.notification_prefs`. (B) the
+"🤖 new chat to approve" SMS is the EXTRA nudge, gated to Responded + agent on + `agent_notify_phone`.

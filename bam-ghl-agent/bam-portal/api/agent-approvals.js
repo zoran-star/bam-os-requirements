@@ -21,6 +21,7 @@ import { buildAgentSystem } from "./agent/brain.js";
 import { loadContactMemory } from "./agent/contact-memory.js";
 import { loadCalendars, calendarForGroup, freeSlots, summarizeSlots } from "./agent/booking.js";
 import { respondedStage, contactInRespondedStage, computeQueue, respondedContactIdSetCached, peekRespondedIdSet, interestedStage, toIso } from "./agent/_stage.js";
+import { markUnqualified, unmarkUnqualified } from "./agent/_tags.js";
 import { agentMode, modeIsOn, shouldAutoSend } from "./agent/_mode.js";
 import { withinQuietHours, nextSendableTime } from "./agent/_quiet.js";
 import { resolveAgentActor } from "./agent/_auth.js";
@@ -681,9 +682,11 @@ async function handler(req, res) {
       return res.status(200).json({ ok: true, marked_lost: true, opportunity_id: oppId, reason });
     }
 
-    // Abandon: like confirm-lost, but the lead is just REMOVED from the pipeline
-    // (status 'abandoned') — NO nurture automation, NO closing message. "Get them
-    // out." Used by the Hawkeye ✕/Lost flow's Abandon button.
+    // 🚫 Unqualified (formerly "Abandon"): the ONE true dead end. The lead is
+    // REMOVED from the pipeline (status 'abandoned') — NO nurture, NO message —
+    // AND stamped with the GHL `unqualified` tag so the state mirrors the portal
+    // switch and stays segmentable in GHL. Everyone else who's "Lost" but still a
+    // fit flows into 💔 Lead Nurture instead (handled elsewhere). "Get them out."
     if (b.action === "confirm-abandoned") {
       let row = null, contactId = b.contact_id || null;
       if (b.ready_id) {
@@ -703,11 +706,29 @@ async function handler(req, res) {
       try {
         await ghl("PUT", `/opportunities/${encodeURIComponent(oppId)}`, { token, body: { status: "abandoned" } });
       } catch (e) { return res.status(e.status || 502).json({ error: `GHL abandon: ${e.message}` }); }
+      // Stamp the unqualified tag (best-effort — the abandon already succeeded, so
+      // a tag failure must not 500 the action).
+      try { await markUnqualified(token, contactId); } catch (_) {}
       const reason = (b.reason || (row && row.lost_reason) || "").toString().trim() || null;
       try { await sb(`pipeline_outcomes`, { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify([{ client_id: clientId, opportunity_id: oppId, status: "abandoned", reason }]) }); } catch (_) {}
       try { await sb(`agent_ready_replies?client_id=eq.${clientId}&ghl_contact_id=eq.${encodeURIComponent(contactId)}&status=in.(pending,approved)`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ status: "sent", approved_by: staffEmail, approved_at: new Date().toISOString(), sent_at: new Date().toISOString(), updated_at: new Date().toISOString() }) }); } catch (_) {}
       try { await sb(`agent_followups?client_id=eq.${clientId}&ghl_contact_id=eq.${encodeURIComponent(contactId)}&status=in.(pending,approved)`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ status: "canceled", send_error: "abandoned", updated_at: new Date().toISOString() }) }); } catch (_) {}
-      return res.status(200).json({ ok: true, marked_abandoned: true, opportunity_id: oppId, reason });
+      return res.status(200).json({ ok: true, marked_abandoned: true, unqualified: true, opportunity_id: oppId, reason });
+    }
+
+    // The Unqualified switch (portal ⟷ GHL `unqualified` tag), without changing the
+    // opportunity. On → stamp the tag; off → remove it. Bidirectional mirror so a
+    // staff toggle and a GHL-side tag stay in sync. (To ALSO drop the lead from the
+    // pipeline, the UI calls confirm-abandoned, which stamps the tag itself.)
+    if (b.action === "set-qualification") {
+      const contactId = b.contact_id;
+      if (!contactId) return res.status(400).json({ error: "contact_id required" });
+      const unq = !!b.unqualified;
+      try {
+        if (unq) await markUnqualified(token, contactId);
+        else await unmarkUnqualified(token, contactId);
+      } catch (e) { return res.status(e.status || 502).json({ error: `GHL tag: ${e.message}` }); }
+      return res.status(200).json({ ok: true, contact_id: contactId, unqualified: unq });
     }
 
     // Human ✓ on a booking proposal → create the real GHL appointment. GHL's

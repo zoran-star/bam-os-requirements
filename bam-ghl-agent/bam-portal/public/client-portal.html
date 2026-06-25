@@ -22178,7 +22178,7 @@ async function _ptfSubmit() {
 // member work is done; stub for now (no GHL change yet).
 // Mark won / lost / abandoned - each captures a free-text reason, updates the
 // GHL opportunity status, and offers an Undo. (V1.5 pipelines.)
-const _PL_STATUS_LABEL = { won: 'Won', lost: 'Lost', abandoned: 'Abandoned' };
+const _PL_STATUS_LABEL = { won: 'Won', lost: 'Lost', abandoned: 'Abandoned', unqualified: 'Unqualified' };
 let _plUndoState = null, _plUndoTimer = null;
 
 // Won is instant (no reason): mark + remove from the pipeline board.
@@ -22192,6 +22192,20 @@ async function _plMarkWon(oppId) {
 }
 function _plMarkLost(oppId) { _plOutcome(oppId, 'lost'); }
 function _plMarkAbandoned(oppId) { _plOutcome(oppId, 'abandoned'); }
+// 🚫 Unqualified = the ONE true dead end: drop from the pipeline (GHL status
+// 'abandoned') AND stamp the GHL `unqualified` tag (mirrors the portal switch).
+// Distinct from a plain 'abandoned' (e.g. duplicate cleanup), which never tags.
+function _plMarkUnqualified(oppId, contactId) { _plOutcome(oppId, 'unqualified', contactId); }
+
+// Stamp / clear the GHL `unqualified` tag on a contact (the portal ⟷ GHL mirror).
+async function _plStampUnqualified(contactId, unq) {
+  const token = await _mreqAuthToken();
+  const r = await fetch('/api/agent-approvals', {
+    method: 'POST', headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action: 'set-qualification', client_id: CLIENT_ID, contact_id: contactId, unqualified: !!unq }),
+  });
+  if (!r.ok) { const j = await _safeJson(r); throw new Error(j.error || ('HTTP ' + r.status)); }
+}
 
 // Drop an opportunity from the local board immediately (Won/Lost/Abandoned are
 // removed from the pipeline by the portal). Re-renders tabs + board.
@@ -22251,7 +22265,7 @@ function _plMoveContactToInterested(contactId) {
   return false;
 }
 
-function _plOutcome(oppId, status) {
+function _plOutcome(oppId, status, contactId) {
   const label = _PL_STATUS_LABEL[status] || status;
   document.body.insertAdjacentHTML('beforeend', `<div id="pl-outcome-overlay" style="position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9100;display:flex;align-items:center;justify-content:center;padding:18px" onclick="if(event.target===this)this.remove()">
     <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;width:100%;max-width:420px;padding:22px">
@@ -22260,20 +22274,25 @@ function _plOutcome(oppId, status) {
       <textarea id="pl-outcome-reason" placeholder="Reason…" style="width:100%;min-height:70px;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:9px 11px;font:inherit;font-size:13px;resize:vertical;margin-bottom:14px"></textarea>
       <div style="display:flex;justify-content:flex-end;gap:10px">
         <button onclick="document.getElementById('pl-outcome-overlay').remove()" style="background:none;border:1px solid var(--border);border-radius:8px;color:var(--text-sub);padding:9px 16px;font:inherit;font-size:13px;cursor:pointer">Cancel</button>
-        <button id="pl-outcome-go" onclick="_plOutcomeConfirm('${escapeHTML(oppId)}','${status}')" style="background:var(--gold);color:#0B0B0D;border:none;border-radius:8px;padding:9px 18px;font:inherit;font-size:13px;font-weight:700;cursor:pointer">Mark ${label}</button>
+        <button id="pl-outcome-go" onclick="_plOutcomeConfirm('${escapeHTML(oppId)}','${status}','${escapeHTML(contactId||'')}')" style="background:var(--gold);color:#0B0B0D;border:none;border-radius:8px;padding:9px 18px;font:inherit;font-size:13px;font-weight:700;cursor:pointer">Mark ${label}</button>
       </div>
     </div></div>`);
   setTimeout(() => document.getElementById('pl-outcome-reason')?.focus(), 30);
 }
 
-async function _plOutcomeConfirm(oppId, status) {
+async function _plOutcomeConfirm(oppId, status, contactId) {
   const reason = (document.getElementById('pl-outcome-reason')?.value || '').trim();
   const btn = document.getElementById('pl-outcome-go'); if (btn) { btn.disabled = true; btn.textContent = 'Saving…'; }
   try {
-    await _plSetStatus(oppId, status, reason);
+    // 'unqualified' is a portal concept: GHL has no such status, so it maps to
+    // 'abandoned' (off the pipeline) PLUS the `unqualified` tag.
+    const ghlStatus = status === 'unqualified' ? 'abandoned' : status;
+    await _plSetStatus(oppId, ghlStatus, reason);
+    if (status === 'unqualified' && contactId) { try { await _plStampUnqualified(contactId, true); } catch (_) {} }
     document.getElementById('pl-outcome-overlay')?.remove();
     _plRemoveOppLocal(oppId); // remove from the pipeline board right away (Lost automation runs in GHL)
-    _plDrawerConfirm(status === 'lost' ? '🚫' : '🗑', `Marked ${_PL_STATUS_LABEL[status] || status}`, 'Removed from the pipeline'); // flashes, then closes the drawer
+    const sub = status === 'unqualified' ? 'Tagged unqualified + removed' : 'Removed from the pipeline';
+    _plDrawerConfirm((status === 'lost' || status === 'unqualified') ? '🚫' : '🗑', `Marked ${_PL_STATUS_LABEL[status] || status}`, sub); // flashes, then closes the drawer
     _plShowUndo({ type: 'status', oppId }, `Marked ${_PL_STATUS_LABEL[status] || status} - removed from pipeline`);
   } catch (e) {
     alert('Couldn’t mark ' + status + ': ' + e.message);
@@ -22894,7 +22913,7 @@ function _plOpenCard(oppId) {
     <div class="pl-d-actions">
       <div style="display:flex;gap:8px">
         <button class="pl-d-btn" style="flex:1;border-color:#e07070;color:#e07070" onclick="_plMarkLost('${escapeHTML(o.id)}')">Mark as lost</button>
-        <button class="pl-d-btn" style="flex:1;border-color:#5a96e0;color:#5a96e0" onclick="_plMarkAbandoned('${escapeHTML(o.id)}')">Abandoned</button>
+        <button class="pl-d-btn" style="flex:1;border-color:#5a96e0;color:#5a96e0" onclick="_plMarkUnqualified('${escapeHTML(o.id)}','${escapeHTML(o.contactId||'')}')">🚫 Unqualified</button>
         ${_plV2 ? `<button class="pl-d-btn" style="flex:1;border-color:var(--gold,#E8C547);color:var(--gold,#E8C547)" onclick="_plGhost('${escapeHTML(o.id)}')">👻 Ghosted</button>` : ''}
       </div>
     </div>

@@ -46,6 +46,23 @@ export async function scheduledTrialStage(token, locationId) {
   return stage ? { pipelineId: pipe.id, stageId: stage.id, stageName: stage.name } : null;
 }
 
+// The Training Pipeline "Lead Nurture" stage — the long-game home for every
+// non-Unqualified Lost lead (Booking / Confirm / Closing) plus leads who ran out
+// of the Ghosted sequence. The portal-owned nurture automation (sparse email +
+// text, built later) works the leads parked here; any reply bounces them back to
+// Booking with context. Same shape as the other stage finders. Anchored on
+// /nurtur/i so the academy can name it "Lead Nurture" / "Nurture" / "Lost - Nurture".
+// Returns null until the academy creates the stage in GHL — callers must handle
+// that (the routing stays dormant rather than erroring).
+export async function nurtureStage(token, locationId) {
+  const data = await ghl("GET", `/opportunities/pipelines?locationId=${encodeURIComponent(locationId)}`, { token });
+  const pipelines = data.pipelines || data.data || [];
+  const pipe = pipelines.find(p => /training/i.test(p.name || "")) || pipelines[0];
+  if (!pipe) return null;
+  const stage = (pipe.stages || []).find(s => /nurtur/i.test(s.name || ""));
+  return stage ? { pipelineId: pipe.id, stageId: stage.id, stageName: stage.name } : null;
+}
+
 export async function contactInRespondedStage(token, locationId, contactId, rs) {
   try {
     const params = new URLSearchParams({ location_id: locationId, contact_id: contactId, pipeline_id: rs.pipelineId, limit: "20" });
