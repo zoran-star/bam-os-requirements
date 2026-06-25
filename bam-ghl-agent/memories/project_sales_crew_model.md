@@ -154,9 +154,18 @@ Phase order:
     (P5 import does the populate), create the Lead Nurture GHL stage, then turn OFF the matching GHL workflows.
 - **P5** — ⬜ NEXT (INTERACTIVE — needs Zoran + screenshots). The empty step-builder (P4b) is ready. Build the
   AI screenshot→steps parser that fills `automation_steps` via `upsert-step`.
-- **P7** — ⬜ 🛡️ guardrails + observability (see `[[project_sales_crew_guardrails]]`): notify-all-inbound,
-  per-convo/per-card bot mute, atomic first-come claim on Hawkeye cards, convo-tab outline, client
-  "see inside every automation" view.
+- **P7** — 🛡️ guardrails. SHIPPED so far (branch `session/sales-crew`):
+  - ✅ **P7a per-lead bot mute** (#6): `agent_mutes` table (migration 20260625240000, APPLIED), `api/agent/
+    _mutes.js` (`isMuted`/`mutedContactIdSet`, fail-open), gated in the 3 agent detectors + draft actions,
+    `api/agent-mutes.js` (list/set/clear; global mute also exits automations), "Stop bot on this lead" drawer
+    toggle (`#pl-mute-btn`/`_plToggleMute`). Send paths NOT gated (human can always send).
+  - ✅ **P7b observability** (#8): `api/automations.js` `overview` + `people` actions; Automations sub-tab
+    shows per-step live counts → people list → reuses `_contactsOpenDrawer`.
+  - ✅ #1 notify-all-inbound already done (see below). ✅ #3 Hawkeye-per-bot done (each agent's queue). ✅ #5
+    global off-switch (modes).
+  - ⬜ DEFERRED: #7 atomic first-come claim on Hawkeye sends (the guardrails doc itself marks this "build
+    later"; low real-world risk - cards are usually actioned by one person). #4 coloured/dashed convo-tab
+    outline + #2 per-stage pipeline glow = minor UI polish.
 - **P2.5** — ⬜ post-trial form → unified inbox (polish; `_plPostTrialForm` coupled to board state — see note above).
 
 ## Hawkeye-only verdict (end-to-end code trace 2026-06-25)
