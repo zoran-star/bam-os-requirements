@@ -960,6 +960,7 @@ function SubTab({ label, active, onClick, tk, red }) {
 // ─────────────────────────────────────────────────────────
 function ContentTicketDetail({ tk, session, ticket, onBack, onRefetch, patchTicket, showBanner }) {
   const [finalsToUpload, setFinalsToUpload] = useState([]); // local File objects
+  const [finalsFolder, setFinalsFolder] = useState("");     // optional folder for the next upload batch
   const [uploading, setUploading] = useState(false);
   const [actionModalOpen, setActionModalOpen] = useState(false);
   const [actionMsg, setActionMsg] = useState("");
@@ -989,10 +990,14 @@ function ContentTicketDetail({ tk, session, ticket, onBack, onRefetch, patchTick
         });
         if (upErr) throw new Error(`Storage upload failed (${file.name}): ${upErr.message}`);
         const { data: urlData } = supabase.storage.from(STORAGE_BUCKET).getPublicUrl(path);
-        uploaded.push({ name: file.name, url: urlData.publicUrl, size: file.size || 0, mime: file.type || "" });
+        const entry = { name: file.name, url: urlData.publicUrl, size: file.size || 0, mime: file.type || "" };
+        const folder = finalsFolder.trim();
+        if (folder) entry.folder = folder;
+        uploaded.push(entry);
       }
       await patchTicket(ticket.id, { action: "upload-final", final_files: uploaded });
       setFinalsToUpload([]);
+      setFinalsFolder("");
       await onRefetch();
       showBanner(`Uploaded ${uploaded.length} final file${uploaded.length === 1 ? "" : "s"}.`);
     } catch (e) {
@@ -1003,6 +1008,26 @@ function ContentTicketDetail({ tk, session, ticket, onBack, onRefetch, patchTick
     } finally {
       setUploading(false);
     }
+  }
+
+  // ── Remove finals uploaded by mistake (multi-select from FilesByFolder) ──
+  async function removeFinals(toRemove) {
+    if (!toRemove?.length) return;
+    if (!window.confirm(`Remove ${toRemove.length} file${toRemove.length === 1 ? "" : "s"} from finals? This can't be undone.`)) return;
+    const removeKeys = new Set(toRemove.map(f => f.url || f.name));
+    const kept = finalsExisting.filter(f => !removeKeys.has(f.url || f.name));
+    // Best-effort: also delete the objects from storage (DB removal is what matters).
+    try {
+      const marker = `/${STORAGE_BUCKET}/`;
+      const paths = toRemove
+        .map(f => (f.url || "").split(marker)[1])
+        .filter(Boolean)
+        .map(p => decodeURIComponent(p.split("?")[0]));
+      if (paths.length) await supabase.storage.from(STORAGE_BUCKET).remove(paths);
+    } catch { /* ignore storage errors */ }
+    await patchTicket(ticket.id, { action: "set-final", final_files: kept });
+    await onRefetch();
+    showBanner(`Removed ${toRemove.length} file${toRemove.length === 1 ? "" : "s"} from finals.`);
   }
 
   // Organic tickets go back to the CLIENT for review (not to marketing/Meta).
@@ -1155,8 +1180,8 @@ function ContentTicketDetail({ tk, session, ticket, onBack, onRefetch, patchTick
             No final creatives uploaded yet.
           </div>
         ) : (
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: 10, marginBottom: 14 }}>
-            {finalsExisting.map((f, i) => <FilePreviewTile key={i} file={f} tk={tk} />)}
+          <div style={{ marginBottom: 14 }}>
+            <FilesByFolder files={finalsExisting} tk={tk} zipName="finals" onRemove={removeFinals} />
           </div>
         )}
 
@@ -1179,7 +1204,18 @@ function ContentTicketDetail({ tk, session, ticket, onBack, onRefetch, patchTick
           </div>
         )}
 
-        <div style={{ display: "flex", gap: 10 }}>
+        <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+          <input
+            type="text"
+            value={finalsFolder}
+            onChange={e => setFinalsFolder(e.target.value)}
+            placeholder="Folder (optional)"
+            title="Group this upload batch under a folder name"
+            style={{
+              padding: "10px 12px", background: tk.surface, border: `1px solid ${tk.border}`,
+              borderRadius: 8, color: tk.text, fontSize: 13, fontFamily: "inherit", width: 170, outline: "none",
+            }}
+          />
           <label htmlFor="finals-input" style={{
             padding: "10px 18px", background: "transparent",
             border: `1.5px dashed ${tk.borderStr || tk.border}`, borderRadius: 8,
@@ -1532,13 +1568,14 @@ async function ctkDownloadZip(files, baseName) {
   setTimeout(() => URL.revokeObjectURL(url), 5000);
 }
 
-function FilesByFolder({ files, tk, compact, minmax = 180, zipName = "creatives" }) {
+function FilesByFolder({ files, tk, compact, minmax = 180, zipName = "creatives", onRemove }) {
   const list = Array.isArray(files) ? files : [];
   const keyOf = (f) => f.url || f.name || "";
   const isDl = (f) => !!f.url && (f.mime || "") !== "text/uri-list";   // skip drive-link entries
   const dlList = list.filter(isDl);
   const [selected, setSelected] = useState(() => new Set());
   const [zipping, setZipping] = useState(false);
+  const [removing, setRemoving] = useState(false);
   if (!list.length) return null;
 
   const toggle = (f) => setSelected(s => {
@@ -1554,6 +1591,14 @@ function FilesByFolder({ files, tk, compact, minmax = 180, zipName = "creatives"
     try { await ctkDownloadZip(picked, zipName); }
     catch (e) { alert("Download failed: " + (e.message || e)); }
     finally { setZipping(false); }
+  };
+  const removeSelected = async () => {
+    const picked = list.filter(f => selected.has(keyOf(f)));
+    if (!picked.length || !onRemove) return;
+    setRemoving(true);
+    try { await onRemove(picked); setSelected(new Set()); }
+    catch (e) { alert("Remove failed: " + (e.message || e)); }
+    finally { setRemoving(false); }
   };
 
   const btn = (accent) => ({
@@ -1589,7 +1634,13 @@ function FilesByFolder({ files, tk, compact, minmax = 180, zipName = "creatives"
     </div>
   );
 
-  const toolbar = dlList.length > 1 ? (
+  const removeBtn = {
+    padding: "6px 12px", fontSize: 12, fontWeight: 600, borderRadius: 6, fontFamily: "inherit",
+    cursor: removing ? "wait" : "pointer",
+    border: `1px solid ${tk.danger || "#E0524A"}`, background: "transparent", color: tk.danger || "#E0524A",
+  };
+  const showToolbar = dlList.length > 1 || (onRemove && dlList.length >= 1);
+  const toolbar = showToolbar ? (
     <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", marginBottom: 12 }}>
       <button type="button" onClick={selectAll} style={btn(false)}>{allSelected ? "Clear" : "Select all"}</button>
       {selCount > 0 && (
@@ -1597,9 +1648,16 @@ function FilesByFolder({ files, tk, compact, minmax = 180, zipName = "creatives"
           {zipping ? "Zipping…" : `↓ Download ${selCount} selected`}
         </button>
       )}
-      <button type="button" onClick={() => download("all")} disabled={zipping} style={btn(false)}>
-        {zipping ? "Zipping…" : `↓ Download all (${dlList.length})`}
-      </button>
+      {dlList.length > 1 && (
+        <button type="button" onClick={() => download("all")} disabled={zipping} style={btn(false)}>
+          {zipping ? "Zipping…" : `↓ Download all (${dlList.length})`}
+        </button>
+      )}
+      {onRemove && selCount > 0 && (
+        <button type="button" onClick={removeSelected} disabled={removing} style={removeBtn}>
+          {removing ? "Removing…" : `✕ Remove ${selCount} selected`}
+        </button>
+      )}
     </div>
   ) : null;
 
