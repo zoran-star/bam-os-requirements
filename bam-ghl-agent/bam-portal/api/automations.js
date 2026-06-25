@@ -367,6 +367,47 @@ async function handler(req, res) {
       return res.status(200).json({ ok: true });
     }
 
+    // Read-only observability (guardrail #8): how many leads are in each automation,
+    // total + per current step. Counts come from active enrollments grouped by
+    // current_position, aligned to the ordered steps.
+    if (b.action === "overview") {
+      const autos = await sb(`automations?client_id=eq.${clientId}&order=automation_key.asc&select=*`) || [];
+      const out = [];
+      for (const a of autos) {
+        const steps = await loadSteps(a.id);
+        const enr = await sb(`automation_enrollments?client_id=eq.${clientId}&automation_id=eq.${a.id}&status=eq.active&select=current_position&limit=5000`) || [];
+        const list = Array.isArray(enr) ? enr : [];
+        const byPos = new Map();
+        for (const e of list) byPos.set(e.current_position, (byPos.get(e.current_position) || 0) + 1);
+        const by_step = steps.map((s, i) => ({
+          position: s.position, step_id: s.id, channel: s.channel,
+          label: String(i + 1), preview: String(s.body || "").slice(0, 60),
+          count: byPos.get(s.position) || 0,
+        }));
+        out.push({ id: a.id, automation_key: a.automation_key, name: a.name, enabled: a.enabled, approved: a.approved, total_active: list.length, by_step });
+      }
+      return res.status(200).json({ overview: out });
+    }
+
+    // The people currently in one automation (optionally at one step position).
+    if (b.action === "people") {
+      if (!b.automation_id || !(await ownsAutomation(b.automation_id))) return res.status(403).json({ error: "unknown automation" });
+      let path = `automation_enrollments?client_id=eq.${clientId}&automation_id=eq.${b.automation_id}&status=eq.active&select=contact_id,current_position,entered_at&order=entered_at.desc&limit=200`;
+      if (b.position !== undefined && b.position !== null && b.position !== "") path += `&current_position=eq.${Number(b.position)}`;
+      const rows = (await sb(path)) || [];
+      const ids = [...new Set(rows.map(r => r.contact_id).filter(Boolean))];
+      const nameMap = {};
+      if (ids.length) {
+        try {
+          const inList = ids.map(id => `"${String(id).replace(/"/g, "")}"`).join(",");
+          const contacts = (await sb(`ghl_contacts?client_id=eq.${clientId}&ghl_contact_id=in.(${inList})&select=ghl_contact_id,name,athlete_name`)) || [];
+          for (const c of contacts) nameMap[c.ghl_contact_id] = c.name || c.athlete_name || null;
+        } catch (_) { /* names are best-effort */ }
+      }
+      const people = rows.map(r => ({ contact_id: r.contact_id, contact_name: nameMap[r.contact_id] || null, current_position: r.current_position, entered_at: r.entered_at }));
+      return res.status(200).json({ people });
+    }
+
     return res.status(400).json({ error: "unknown action" });
   } catch (e) {
     console.error("[automations]", e);
