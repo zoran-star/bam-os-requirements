@@ -770,6 +770,11 @@ async function handleGuideCards(req, res) {
     const dupes = await sb(`guide_cards?title=eq.${encodeURIComponent(title)}&select=id`);
     if (dupes?.length) return res.status(409).json({ error: "a guide card with that title already exists" });
 
+    // Only one card can be the First Campaign starter guide.
+    if (body.is_default === true) {
+      await sb(`guide_cards?is_default=eq.true`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ is_default: false }) });
+    }
+
     const inserted = await sb("guide_cards", {
       method: "POST",
       headers: { Prefer: "return=representation" },
@@ -780,6 +785,8 @@ async function handleGuideCards(req, res) {
         example_script: body.example_script || "",
         example_assets: Array.isArray(body.example_assets) ? body.example_assets : [],
         example_links:  Array.isArray(body.example_links)  ? body.example_links  : [],
+        angles:         Array.isArray(body.angles)         ? body.angles         : [],
+        is_default:     body.is_default === true,
         updated_by: ctx.staff.id,
       }]),
     });
@@ -801,7 +808,14 @@ async function handleGuideCards(req, res) {
     if (body.example_script !== undefined)  patch.example_script = body.example_script || "";
     if (body.example_assets !== undefined)  patch.example_assets = Array.isArray(body.example_assets) ? body.example_assets : [];
     if (body.example_links !== undefined)   patch.example_links  = Array.isArray(body.example_links)  ? body.example_links  : [];
+    if (body.angles !== undefined)          patch.angles         = Array.isArray(body.angles)         ? body.angles         : [];
+    if (body.is_default !== undefined)      patch.is_default     = body.is_default === true;
     patch.updated_by = ctx.staff.id;
+
+    // Only one card can be the First Campaign starter guide.
+    if (patch.is_default === true) {
+      await sb(`guide_cards?is_default=eq.true&id=neq.${id}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ is_default: false }) });
+    }
 
     const updated = await sb(`guide_cards?id=eq.${id}`, {
       method: "PATCH",
