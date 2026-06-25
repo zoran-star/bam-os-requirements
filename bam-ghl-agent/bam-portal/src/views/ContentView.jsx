@@ -1024,6 +1024,7 @@ function SubTab({ label, active, onClick, tk, red }) {
 function ContentTicketDetail({ tk, session, ticket, onBack, onRefetch, patchTicket, showBanner }) {
   const [finalsToUpload, setFinalsToUpload] = useState([]); // local File objects
   const [finalsFolder, setFinalsFolder] = useState("");     // optional folder for the next upload batch
+  const [finalsDragOver, setFinalsDragOver] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [actionModalOpen, setActionModalOpen] = useState(false);
   const [actionMsg, setActionMsg] = useState("");
@@ -1267,6 +1268,46 @@ function ContentTicketDetail({ tk, session, ticket, onBack, onRefetch, patchTick
           </div>
         )}
 
+        {/* Drop zone - drag final creatives here, or click to browse */}
+        <label
+          htmlFor="finals-input"
+          onDragOver={e => { e.preventDefault(); if (!finalsDragOver) setFinalsDragOver(true); }}
+          onDragEnter={e => { e.preventDefault(); setFinalsDragOver(true); }}
+          onDragLeave={e => { e.preventDefault(); setFinalsDragOver(false); }}
+          onDrop={e => {
+            e.preventDefault();
+            setFinalsDragOver(false);
+            const arr = Array.from(e.dataTransfer?.files || []);
+            if (arr.length) setFinalsToUpload(prev => [...prev, ...arr]);
+          }}
+          style={{
+            display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 5,
+            padding: "24px 16px", marginBottom: 10,
+            border: `1.5px dashed ${finalsDragOver ? tk.accent : (tk.borderStr || tk.border)}`,
+            background: finalsDragOver ? (tk.accentGhost || "transparent") : "transparent",
+            borderRadius: 10, cursor: uploading ? "wait" : "pointer",
+            color: finalsDragOver ? tk.accent : tk.textMute,
+            transition: "border-color 0.15s ease, background 0.15s ease, color 0.15s ease",
+          }}
+        >
+          <div style={{ fontSize: 22, lineHeight: 1, pointerEvents: "none" }}>↑</div>
+          <div style={{ fontSize: 13, fontWeight: 500, pointerEvents: "none" }}>Drag final creatives here, or <span style={{ color: tk.accent }}>browse</span></div>
+          <div style={{ fontSize: 11, color: tk.textMute, pointerEvents: "none" }}>Images &amp; videos · multiple at once</div>
+        </label>
+        <input
+          id="finals-input"
+          ref={fileInputRef}
+          type="file"
+          accept="image/*,video/*"
+          multiple
+          style={{ display: "none" }}
+          onChange={e => {
+            const arr = Array.from(e.target.files || []);
+            if (arr.length) setFinalsToUpload(prev => [...prev, ...arr]);
+            if (fileInputRef.current) fileInputRef.current.value = "";
+          }}
+        />
+
         <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
           <input
             type="text"
@@ -1277,24 +1318,6 @@ function ContentTicketDetail({ tk, session, ticket, onBack, onRefetch, patchTick
             style={{
               padding: "10px 12px", background: tk.surface, border: `1px solid ${tk.border}`,
               borderRadius: 8, color: tk.text, fontSize: 13, fontFamily: "inherit", width: 170, outline: "none",
-            }}
-          />
-          <label htmlFor="finals-input" style={{
-            padding: "10px 18px", background: "transparent",
-            border: `1.5px dashed ${tk.borderStr || tk.border}`, borderRadius: 8,
-            color: tk.textMute, cursor: "pointer", fontSize: 13, fontWeight: 500,
-          }}>+ Add final files</label>
-          <input
-            id="finals-input"
-            ref={fileInputRef}
-            type="file"
-            accept="image/*,video/*"
-            multiple
-            style={{ display: "none" }}
-            onChange={e => {
-              const arr = Array.from(e.target.files || []);
-              if (arr.length) setFinalsToUpload(prev => [...prev, ...arr]);
-              if (fileInputRef.current) fileInputRef.current.value = "";
             }}
           />
           {finalsToUpload.length > 0 && (
