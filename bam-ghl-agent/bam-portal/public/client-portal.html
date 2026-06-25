@@ -22751,6 +22751,22 @@ async function _plResolveDupClose(id) {
     _plToast('🗑 Closed duplicate');
   } catch (e) { alert('Could not close duplicate: ' + (e.message || e)); }
 }
+// Colour-code a pipeline stage header by the bot/automation that OWNS it (the
+// sales-crew model scheme). Agent stages glow solid; automation stages get a
+// dashed outline. Terminal stages (Member / Unqualified) get a solid accent, no
+// glow. Returns { color, kind, tag } or null for an unmapped stage. V2 only.
+function _plStageBot(name) {
+  const n = String(name || '').toLowerCase();
+  if (/respond/.test(n))                                     return { color: '#5A8FB8', kind: 'agent',      tag: '📞 Booking' };
+  if (/(schedul|book)/.test(n) && /trial/.test(n))           return { color: '#3DBE8B', kind: 'agent',      tag: '✅ Confirm' };
+  if (/trial/.test(n) && /(done|complete|attend)/.test(n))   return { color: '#B084E8', kind: 'agent',      tag: '🎯 Closing' };
+  if (/interest/.test(n))                                    return { color: '#E8C547', kind: 'automation', tag: '👻 Ghosted' };
+  if (/nurtur/.test(n))                                      return { color: '#3B6FD4', kind: 'automation', tag: '💔 Nurture' };
+  if (/member|liveclient|enrolled|\bwon\b/.test(n))          return { color: '#EC4899', kind: 'terminal',   tag: '🎉 Member' };
+  if (/unqualif/.test(n))                                    return { color: '#FB923C', kind: 'terminal',   tag: '🚫 Unqualified' };
+  return null;
+}
+
 function _renderPipelineBoard() {
   const container = document.getElementById('pl-board-container');
   if (!container || !_PL_DATA) return;
@@ -22973,13 +22989,27 @@ function _renderPipelineBoard() {
           <button id="pl-scan-btn" onclick="_plScanNow('pl-scan-btn')" title="Re-scan this stage now for new actions (don't wait for the every-30-min check)" style="box-sizing:border-box;background:transparent;color:var(--text-sub);border:1px solid var(--border);border-radius:7px;padding:9px 11px;font-size:12.5px;font-weight:700;cursor:pointer;white-space:nowrap">🔄 Scan</button>
         </div>`
       : '';
+    const _sb = _plV2 ? _plStageBot(s.name) : null;
+    let _hStyle = '', _hTag = '';
+    if (_sb) {
+      const c = _sb.color;
+      _hStyle = _sb.kind === 'agent'
+        ? `border-left:3px solid ${c};background:linear-gradient(90deg,${c}22,transparent);box-shadow:0 0 14px -6px ${c};border-radius:5px;`
+        : _sb.kind === 'automation'
+          ? `border-left:3px dashed ${c};background:linear-gradient(90deg,${c}14,transparent);border-radius:5px;`
+          : `border-left:3px solid ${c};background:linear-gradient(90deg,${c}1a,transparent);border-radius:5px;`;
+      _hTag = `<span style="font-family:var(--mono,monospace);font-size:9px;font-weight:700;letter-spacing:.4px;text-transform:uppercase;border:1px ${_sb.kind === 'automation' ? 'dashed' : 'solid'} ${c};color:${c};border-radius:99px;padding:1px 7px;white-space:nowrap">${_sb.tag}</span>`;
+    }
     return `
       <div class="pl-col" style="${glowCol}"
            ondragover="_plDragOver(event,'${escapeHTML(s.id)}')"
            ondragleave="_plDragLeave(event)"
            ondrop="_plDrop(event,'${escapeHTML(s.id)}','${escapeHTML(p.id)}')">
-        <div class="pl-col-header">
-          <span>${escapeHTML(s.name)}</span>
+        <div class="pl-col-header" style="${_hStyle}">
+          <span style="display:inline-flex;align-items:center;gap:6px;min-width:0;flex:1">
+            <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHTML(s.name)}</span>
+            ${_hTag}
+          </span>
           <span class="pl-col-count">${opps.length}</span>
         </div>
         <div class="pl-cards">
