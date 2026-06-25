@@ -24,6 +24,7 @@ import { respondedStage, contactInRespondedStage, computeQueue, respondedContact
 import { markUnqualified, unmarkUnqualified } from "./agent/_tags.js";
 import { enrollContact, isAutomationLive } from "./automations.js";
 import { agentMode, modeIsOn, shouldAutoSend } from "./agent/_mode.js";
+import { mutedContactIdSet, isMuted } from "./agent/_mutes.js";
 import { withinQuietHours, nextSendableTime } from "./agent/_quiet.js";
 import { resolveAgentActor } from "./agent/_auth.js";
 
@@ -330,12 +331,14 @@ async function detectForClient(client) {
 
   // Cap how many contacts we draft per run so a big Responded queue can't burst
   // GHL's rate limit (each draft hits GHL for the thread + Claude).
+  const mutedSet = await mutedContactIdSet(client.id, "booking");
   let _first = true;
   for (const item of queue.slice(0, DETECT_CAP)) {
     if (!_first) await new Promise(r => setTimeout(r, 300));  // smooth GHL bursts
     _first = false;
     const contactId = item.contact_id;
     if (!contactId) { skipped++; reasons.push(`${item.name || "?"}: no contactId in queue item`); continue; }
+    if (mutedSet.has(String(contactId))) { skipped++; reasons.push(`${item.name || contactId}: bot muted on this lead`); continue; }
     // Fresh inbound only: if the lead's last message is ≥24h old, we dropped the
     // ball — hand them to the ghost engine (Send to Ghosted) instead of a late
     // reply. Keeps the two engines from fighting and stops stale leads falling
@@ -577,6 +580,7 @@ async function handler(req, res) {
 
     if (b.action === "draft") {
       if (!b.contact_id) return res.status(400).json({ error: "contact_id required" });
+      if (await isMuted(clientId, b.contact_id, "booking")) return res.status(200).json({ error: "muted", muted: true });
       const cfg = await loadConfig(clientId);
       const d = await draftForContact(token, locationId, clientId, b.contact_id, cfg);
       if (d.error) return res.status(200).json({ error: d.error });

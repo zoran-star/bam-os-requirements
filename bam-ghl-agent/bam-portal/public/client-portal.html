@@ -22355,6 +22355,41 @@ function _plMarkAbandoned(oppId) { _plOutcome(oppId, 'abandoned'); }
 // Distinct from a plain 'abandoned' (e.g. duplicate cleanup), which never tags.
 function _plMarkUnqualified(oppId, contactId) { _plOutcome(oppId, 'unqualified', contactId); }
 
+// Per-lead bot mute (guardrail #6): "hands off this lead" - stop the agents from
+// drafting on this specific contact, without turning the whole agent off. A global
+// (all-bots) mute also pulls them out of any running automation sequence.
+const _PL_MUTES = new Set();   // contactIds globally muted (best-effort cache)
+function _plMuteBtnLabel(muted) { return muted ? '🔊 Resume bots on this lead' : '🔇 Stop bots on this lead'; }
+async function _plMuteState(contactId) {
+  try {
+    const token = await _mreqAuthToken();
+    const r = await fetch('/api/agent-mutes', { method: 'POST', headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'list', client_id: CLIENT_ID, contact_id: contactId }) });
+    const j = await _safeJson(r);
+    const muted = Array.isArray(j.mutes) && j.mutes.some(m => !m.agent);   // a global (all-bots) mute exists
+    if (muted) _PL_MUTES.add(String(contactId)); else _PL_MUTES.delete(String(contactId));
+    return muted;
+  } catch (_) { return _PL_MUTES.has(String(contactId)); }
+}
+async function _plMuteInit(contactId) {
+  const muted = await _plMuteState(contactId);
+  const btn = document.getElementById('pl-mute-btn');
+  if (btn) { btn.textContent = _plMuteBtnLabel(muted); btn.style.color = muted ? 'var(--gold,#E8C547)' : 'var(--text-sub)'; }
+}
+async function _plToggleMute(contactId) {
+  const muted = _PL_MUTES.has(String(contactId));
+  const btn = document.getElementById('pl-mute-btn');
+  if (btn) btn.disabled = true;
+  try {
+    const token = await _mreqAuthToken();
+    const r = await fetch('/api/agent-mutes', { method: 'POST', headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' }, body: JSON.stringify({ action: muted ? 'clear' : 'set', client_id: CLIENT_ID, contact_id: contactId }) });
+    if (!r.ok) { const j = await _safeJson(r); throw new Error(j.error || ('HTTP ' + r.status)); }
+    if (muted) _PL_MUTES.delete(String(contactId)); else _PL_MUTES.add(String(contactId));
+    if (btn) { btn.textContent = _plMuteBtnLabel(!muted); btn.style.color = !muted ? 'var(--gold,#E8C547)' : 'var(--text-sub)'; }
+    _plToast(!muted ? '🔇 Bots muted on this lead' : '🔊 Bots resumed on this lead');
+  } catch (e) { _plToast('Could not update mute: ' + e.message); }
+  finally { if (btn) btn.disabled = false; }
+}
+
 // Stamp / clear the GHL `unqualified` tag on a contact (the portal ⟷ GHL mirror).
 async function _plStampUnqualified(contactId, unq) {
   const token = await _mreqAuthToken();
@@ -23074,6 +23109,7 @@ function _plOpenCard(oppId) {
         <button class="pl-d-btn" style="flex:1;border-color:#5a96e0;color:#5a96e0" onclick="_plMarkUnqualified('${escapeHTML(o.id)}','${escapeHTML(o.contactId||'')}')">🚫 Unqualified</button>
         ${_plV2 ? `<button class="pl-d-btn" style="flex:1;border-color:var(--gold,#E8C547);color:var(--gold,#E8C547)" onclick="_plGhost('${escapeHTML(o.id)}')">👻 Ghosted</button>` : ''}
       </div>
+      ${o.contactId ? `<button id="pl-mute-btn" class="pl-d-btn" style="margin-top:8px;width:100%;border-color:var(--border);color:var(--text-sub)" onclick="_plToggleMute('${escapeHTML(o.contactId)}')" title="Stop the sales bots from messaging this lead on their own (you can still send manually)">🔇 Stop bots on this lead</button>` : ''}
     </div>
     ${timelineHtml}
     <div class="pl-d-section" id="pl-d-lead">
@@ -23097,6 +23133,7 @@ function _plOpenCard(oppId) {
   _PL_MSG = o.contactId ? { contactId: o.contactId, name: o.contact.name || o.name || '', phone: o.contact.phone || null, email: o.contact.email || null, conversationId: null } : null;
   _IB_PENDING_FILES = [];
   if (o.contactId) _plLoadMessages();
+  if (o.contactId) _plMuteInit(o.contactId);
   if (_plV2 && _isResp && o.contactId) _plLoadAgentCard();
 }
 

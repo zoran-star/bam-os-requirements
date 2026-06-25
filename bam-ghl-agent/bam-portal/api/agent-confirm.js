@@ -36,6 +36,7 @@ import {
 } from "./agent/_stage.js";
 import { enrollContact, isAutomationLive } from "./automations.js";
 import { confirmAgentMode, modeIsOn, shouldAutoSend } from "./agent/_mode.js";
+import { mutedContactIdSet, isMuted } from "./agent/_mutes.js";
 import { withinQuietHours, nextSendableTime } from "./agent/_quiet.js";
 import { resolveAgentActor } from "./agent/_auth.js";
 
@@ -306,6 +307,7 @@ async function detectForClient(client) {
   }
 
   const cfg = await loadConfig(client.id);
+  const mutedSet = await mutedContactIdSet(client.id, "confirm");
   let drafted = 0, autoSent = 0, skipped = 0, escalated = 0, handoffs = 0, lostProposed = 0, deferred = 0;
   const reasons = [];
   let _first = true;
@@ -314,6 +316,7 @@ async function detectForClient(client) {
     _first = false;
     const contactId = item.contact_id;
     if (!contactId) { skipped++; reasons.push(`${item.name || "?"}: no contactId`); continue; }
+    if (mutedSet.has(String(contactId))) { skipped++; reasons.push(`${item.name || contactId}: bot muted on this lead`); continue; }
 
     const reactive = item.last_direction === "inbound";
     try {
@@ -490,6 +493,7 @@ async function handler(req, res) {
 
     if (b.action === "draft") {
       if (!b.contact_id) return res.status(400).json({ error: "contact_id required" });
+      if (await isMuted(clientId, b.contact_id, "confirm")) return res.status(200).json({ error: "muted", muted: true });
       const cfg = await loadConfig(clientId);
       const d = await draftForContact(token, locationId, clientId, b.contact_id, cfg);
       if (d.error) return res.status(200).json({ error: d.error });
