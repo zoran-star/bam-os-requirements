@@ -22528,22 +22528,30 @@ function _renderPipelineBoard() {
                       : isSchedTrial ? _schedSort(a, b)
                       : isDoneStage ? _doneSort(a, b)
                       : _trialFirst(a, b));
-    // Cards HTML — for Scheduled Trial, drop the "upcoming" squiggle in before the
-    // first future trial (only when there are today/passed cards above it).
+    // Cards HTML. For Scheduled Trial we PARTITION cards by phase into groups and
+    // render each group whole, with its labelled squiggle divider in front. This
+    // makes it structurally impossible for a card to land on the wrong side of a
+    // divider (the old inline-insert approach stranded the first card of a section
+    // when that section started the column). Order: today (glowing, no divider) →
+    // 〜past〜 → 〜upcoming〜 → no-date. Sort within each group is already applied.
     let cardsHtml = '';
-    if (opps.length) {
-      let _divDone = false, _pastDivDone = false;
-      for (const o of opps) {
-        if (_plV2 && isSchedTrial) {
-          const ph = _trialPhase(o);
-          // squiggle between TODAY (above) and PAST trials
-          if (!_pastDivDone && ph === 1 && cardsHtml) { cardsHtml += _plUpcomingDivider('past'); _pastDivDone = true; }
-          // squiggle before the first UPCOMING (future) trial
-          if (!_divDone && ph === 2 && cardsHtml) { cardsHtml += _plUpcomingDivider('upcoming'); _divDone = true; }
-        }
-        cardsHtml += cardHtml(o, s);
-      }
-    } else { cardsHtml = '<div class="pl-empty">No cards here yet.</div>'; }
+    if (!opps.length) {
+      cardsHtml = '<div class="pl-empty">No cards here yet.</div>';
+    } else if (_plV2 && isSchedTrial) {
+      const g = { today: [], past: [], up: [], nodate: [] };
+      for (const o of opps) { const ph = _trialPhase(o); (ph === 0 ? g.today : ph === 1 ? g.past : ph === 2 ? g.up : g.nodate).push(o); }
+      const render = (arr) => arr.map(o => cardHtml(o, s)).join('');
+      const sections = [
+        { cards: g.today,  label: null },        // today: the default top, no divider
+        { cards: g.past,   label: 'past' },
+        { cards: g.up,     label: 'upcoming' },
+        { cards: g.nodate, label: null },
+      ].filter(sec => sec.cards.length);
+      cardsHtml = sections.map(sec => (sec.label ? _plUpcomingDivider(sec.label) : '') + render(sec.cards)).join('');
+    } else {
+      cardsHtml = opps.map(o => cardHtml(o, s)).join('');
+    }
+    if (!cardsHtml) cardsHtml = '<div class="pl-empty">No cards here yet.</div>';
     const glowCol = (_plV2 && isResponded && _agentOn) ? 'box-shadow:0 0 0 1px var(--blue,#5A8FB8),0 0 18px rgba(90,143,184,0.45);border-color:var(--blue,#5A8FB8);' : '';
     const hawkBtn = (_plV2 && isResponded && _agentOn)
       ? `<div style="display:flex;gap:6px;margin-bottom:8px">
