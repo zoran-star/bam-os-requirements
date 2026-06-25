@@ -1875,6 +1875,13 @@
     border:2px solid rgba(232,197,71,0.20); border-top-color: var(--gold);
     animation: loading-spin 0.8s linear infinite;
   }
+  /* Dark spinner for the gold Approve & send button while it's sending. */
+  .apx-btn-spin {
+    display:inline-block; width:14px; height:14px; vertical-align:middle;
+    border-radius:50%;
+    border:2px solid rgba(8,8,10,0.25); border-top-color:#08080A;
+    animation: loading-spin 0.7s linear infinite;
+  }
 
   /* Big confirm-action spinner + success checkmark (member billing flows). */
   .mm-spin {
@@ -23406,7 +23413,7 @@ function _apxCard(kind, r) {
 
   const skipFn = isFu ? `_apxFollowupSkip('${r.id}')` : `_apxReadySkip('${r.id}')`;
   const actions = `<button onclick="${skipFn}" title="Skip (and optionally teach why)" style="flex:1;background:transparent;border:1px solid var(--border);color:#e0654f;border-radius:9px;padding:9px;font-size:17px;cursor:pointer">✕</button>
-       <button onclick="_apxInlineApprove('${r.id}')" title="${overdue ? 'Approve & send now' : 'Approve & send'}" style="flex:2;background:var(--accent);border:1px solid var(--accent);color:#08080A;border-radius:9px;padding:9px;font-size:14px;font-weight:700;cursor:pointer">✓ Approve &amp; send</button>`;
+       <button id="apx-send-${r.id}" onclick="_apxInlineApprove('${r.id}')" title="${overdue ? 'Approve & send now' : 'Approve & send'}" style="flex:2;background:var(--accent);border:1px solid var(--accent);color:#08080A;border-radius:9px;padding:9px;font-size:14px;font-weight:700;cursor:pointer">✓ Approve &amp; send</button>`;
 
   return `<div id="apx-${r.id}" style="background:var(--surface);border:1px solid var(--accent-border,rgba(232,197,71,.3));border-radius:11px;padding:12px 14px;margin-bottom:9px">
     <div style="display:flex;align-items:center;gap:8px;margin-bottom:5px;flex-wrap:wrap">
@@ -23437,17 +23444,33 @@ async function _apxInlineApprove(id) {
   const adjusted = reply !== (r.draft_message || '');
   const lessonEl = document.getElementById('apx-teach-' + id);
   const lesson = ((lessonEl && lessonEl.value) || '').trim();
+  // Ask the escalate question BEFORE entering the loading state.
+  if (!isFu && r.escalate && !confirm('The agent escalated this one (it wanted a human). Send anyway?')) return;
+
+  // Loading state on the button: spinner while sending (also blocks the
+  // double-click that fired before there was any feedback), green checkmark
+  // when done, then the card slides out.
+  const sendBtn = document.getElementById('apx-send-' + id);
+  if (sendBtn) {
+    if (sendBtn.dataset.sending === '1') return;   // already in flight - ignore extra clicks
+    sendBtn.dataset.sending = '1';
+    sendBtn.disabled = true;
+    sendBtn.style.cursor = 'default';
+    sendBtn.innerHTML = '<span class="apx-btn-spin"></span>';
+  }
+  const showDone = (label) => { if (sendBtn) { sendBtn.style.background = '#1f7a3d'; sendBtn.style.borderColor = '#1f7a3d'; sendBtn.style.color = '#fff'; sendBtn.innerHTML = label; } };
+  const restore = () => { if (sendBtn) { sendBtn.dataset.sending = ''; sendBtn.disabled = false; sendBtn.style.cursor = 'pointer'; sendBtn.innerHTML = '✓ Approve &amp; send'; } };
   try {
     if (isFu) {
       // Follow-up nudge: save any edit, then send via the follow-up path.
       if (adjusted) await _apxPost('/api/agent-followups', 'edit', { id, message: reply });
       const resp = await _apxPost('/api/agent-followups', 'send-now', { id });
       if (lesson) await _apxTeach(lesson, r.draft_message, reply, { source: 'hawkeye-inline-fu', contact: r.contact_name || null });
-      _apxRemove(id);
+      showDone(resp && resp.deferred ? '✓ Queued' : '✓ Sent');
       _apxToast(resp && resp.deferred ? _apxQuietMsg(resp.send_after) : (lesson ? '✓ Sent + taught' : '✓ Sent'), true);
+      setTimeout(() => _apxRemove(id), 450);
       return;
     }
-    if (r.escalate && !confirm('The agent escalated this one (it wanted a human). Send anyway?')) return;
     const resp = await _apxPost('/api/agent-approvals', 'send', {
       contact_id: r.ghl_contact_id, reply, conversation_id: r.ghl_conversation_id || null,
       contact_name: r.contact_name || null, reasoning: r.reasoning || null, confidence: r.confidence,
@@ -23455,9 +23478,10 @@ async function _apxInlineApprove(id) {
       suggested_reply: r.draft_message || null,
     });
     if (lesson) await _apxTeach(lesson, r.draft_message, reply, { source: 'hawkeye-inline', contact: r.contact_name || null });
-    _apxRemove(id);
+    showDone(resp && resp.deferred ? '✓ Queued' : '✓ Sent');
     _apxToast(resp && resp.deferred ? _apxQuietMsg(resp.send_after) : (lesson ? '✓ Sent + taught' : '✓ Sent'), true);
-  } catch (e) { _apxToast(_apxErr(e), false); }
+    setTimeout(() => _apxRemove(id), 450);
+  } catch (e) { _apxToast(_apxErr(e), false); restore(); }
 }
 
 // A red "suggested Lost" card. Nothing is sent or changed until you confirm -
@@ -23466,9 +23490,11 @@ function _apxLostCard(r) {
   const reason = escapeHTML(r.lost_reason || 'Other');
   const closing = (r.draft_message || '').trim();
   const last = _apxContext(r);
-  const closingBox = closing
-    ? `<div style="font-size:12.5px;line-height:1.45;background:rgba(255,255,255,.03);border-radius:8px;padding:8px 10px;white-space:pre-wrap"><span style="color:var(--text-mute);font-size:10.5px">texts this when you confirm, then marks Lost:</span><br>${escapeHTML(closing)}</div>`
-    : `<div style="font-size:11.5px;color:var(--text-mute);background:rgba(255,255,255,.02);border-radius:8px;padding:8px 10px">No closing text - will mark Lost without sending anything.</div>`;
+  // Inline-editable closing text - just type in it (clear it to mark Lost with no text).
+  const closingBox = `<div style="background:rgba(255,255,255,.03);border-radius:8px;padding:8px 10px">
+      <div style="color:var(--text-mute);font-size:10.5px;margin-bottom:5px">texts this when you confirm, then marks Lost (edit below, clear to skip the text):</div>
+      <textarea id="apx-lost-msg-${r.id}" oninput="_apxLostInput('${r.id}', this.value)" placeholder="No closing text - will mark Lost without sending anything." style="width:100%;box-sizing:border-box;background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:7px;color:var(--text);padding:7px 9px;font:inherit;font-size:12.5px;line-height:1.45;resize:vertical;min-height:60px">${escapeHTML(closing)}</textarea>
+    </div>`;
   return `<div id="apx-${r.id}" style="background:rgba(224,90,66,0.05);border:1px solid rgba(224,90,66,0.4);border-radius:11px;padding:12px 14px;margin-bottom:9px">
     <div style="display:flex;align-items:center;gap:8px;margin-bottom:5px;flex-wrap:wrap">
       <span style="font-weight:700;font-size:13.5px">${escapeHTML(r.contact_name || 'Lead')}</span>
@@ -23482,10 +23508,9 @@ function _apxLostCard(r) {
     <div style="display:flex;align-items:center;gap:7px;margin-top:8px;flex-wrap:wrap">
       <button onclick="_apxOpenCardThread('${r.id}')" style="background:transparent;border:1px solid var(--border);color:var(--text-mute);border-radius:7px;padding:5px 10px;font-size:12px;cursor:pointer">💬 chat</button>
       <div style="flex:1"></div>
-      <button onclick="_apxLostEdit('${r.id}')" style="background:transparent;border:1px solid var(--border);color:var(--text-sub);border-radius:7px;padding:5px 11px;font-size:12px;cursor:pointer">✎ edit text</button>
       <button onclick="_apxLostDismiss('${r.id}')" style="background:transparent;border:1px solid var(--border);color:var(--text-sub);border-radius:7px;padding:5px 11px;font-size:12px;cursor:pointer">✕ Dismiss</button>
       <button onclick="_apxLostAbandon('${r.id}')" title="Remove from pipeline - no nurture" style="background:transparent;border:1px solid var(--text-mute);color:var(--text-sub);border-radius:7px;padding:5px 11px;font-size:12px;cursor:pointer">🗑 Abandon</button>
-      <button onclick="_apxLostConfirm('${r.id}')" title="Mark Lost - enters the nurture automation" style="background:#e0654f;border:1px solid #e0654f;color:#fff;border-radius:7px;padding:5px 13px;font-size:12px;font-weight:700;cursor:pointer">🚫 ${closing ? 'Send &amp; mark Lost' : 'Mark Lost'}</button>
+      <button id="apx-lost-confirm-${r.id}" onclick="_apxLostConfirm('${r.id}')" title="Mark Lost - enters the nurture automation" style="background:#e0654f;border:1px solid #e0654f;color:#fff;border-radius:7px;padding:5px 13px;font-size:12px;font-weight:700;cursor:pointer">🚫 ${closing ? 'Send &amp; mark Lost' : 'Mark Lost'}</button>
     </div>
   </div>`;
 }
@@ -23498,6 +23523,15 @@ function _apxLostEdit(id) {
     value: r.draft_message || '', teachable: false,
     onSave: (text) => { r.draft_message = text; _apxRender(); },
   });
+}
+
+// Inline edit: typing in the closing textarea updates the draft + the button
+// label (Send & mark Lost vs Mark Lost) without a re-render.
+function _apxLostInput(id, val) {
+  const r = _APX_DATA.lost.find(x => x.id === id); if (!r) return;
+  r.draft_message = val;
+  const btn = document.getElementById('apx-lost-confirm-' + id);
+  if (btn) btn.innerHTML = '🚫 ' + (val.trim() ? 'Send &amp; mark Lost' : 'Mark Lost');
 }
 
 async function _apxLostConfirm(id) {
