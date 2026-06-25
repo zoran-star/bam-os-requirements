@@ -212,6 +212,9 @@ async function handler(req, res) {
       const patch = { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ status: "canceled", send_error: "lead replied", updated_at: new Date().toISOString() }) };
       await sb(`agent_followups?client_id=eq.${client.id}&ghl_contact_id=eq.${cid}&status=in.(pending,approved)`, patch);
       await sb(`agent_ready_replies?client_id=eq.${client.id}&ghl_contact_id=eq.${cid}&status=in.(pending,approved)`, patch);
+      // Same for the confirm agent: a stale opener/confirm card is for their prior
+      // state; the confirm detector re-drafts against what they just said.
+      await sb(`agent_confirm_replies?client_id=eq.${client.id}&ghl_contact_id=eq.${cid}&status=in.(pending,approved)`, patch);
     }
   } catch (e) { console.error("ghl inbound-webhook draft-cancel error:", e.message); }
 

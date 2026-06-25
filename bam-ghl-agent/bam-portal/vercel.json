@@ -53,6 +53,10 @@
       "schedule": "* * * * *"
     },
     {
+      "path": "/api/agent-confirm?action=detect",
+      "schedule": "7,22,37,52 * * * *"
+    },
+    {
       "path": "/api/ghl/cron-post-trial-escalate",
       "schedule": "*/15 * * * *"
     }

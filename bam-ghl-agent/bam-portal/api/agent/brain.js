@@ -31,8 +31,8 @@ export async function loadBrainConfig(sb, clientId) {
 
 // Build the agent system prompt from the brain + lessons + examples (+ optional
 // lead context and a per-mode trailer). This is the ONLY assembly path.
-export function buildAgentSystem({ lessons = [], overrides = {}, examples = [], leadContext = "", trailer = "" } = {}) {
-  let sys = assemblePrompt(overrides || {});
+export function buildAgentSystem({ lessons = [], overrides = {}, examples = [], leadContext = "", trailer = "", agent = "booking" } = {}) {
+  let sys = assemblePrompt(overrides || {}, agent);
 
   const fixes = (Array.isArray(lessons) ? lessons : []).filter(l => l && l.kind !== "good").map(l => l.lesson).filter(Boolean);
   if (fixes.length) {

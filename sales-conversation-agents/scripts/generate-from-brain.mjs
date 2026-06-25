@@ -50,4 +50,15 @@ writeFileSync(
   header("Booking agent — BAM GTA INSTANCE (facts filled)") + assemblePrompt() + "\n"
 );
 
-console.log("✓ Regenerated both .txt prompt files from the brain.");
+// The CONFIRM agent (Scheduled-Trial stage). Shares the exact same FACT sections —
+// only its BEHAVIOR differs — so the same MASTER_FACTS placeholders apply.
+writeFileSync(
+  join(outDir, "conversation-ai-confirm-agent.txt"),
+  header("Confirm agent — MASTER TEMPLATE ({{PLACEHOLDER}} facts)") + assemblePrompt(MASTER_FACTS, "confirm") + "\n"
+);
+writeFileSync(
+  join(outDir, "conversation-ai-confirm-agent-bam-gta.txt"),
+  header("Confirm agent — BAM GTA INSTANCE (facts filled)") + assemblePrompt({}, "confirm") + "\n"
+);
+
+console.log("✓ Regenerated all 4 .txt prompt files (booking + confirm) from the brain.");

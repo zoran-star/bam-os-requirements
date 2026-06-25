@@ -2,6 +2,8 @@
 
 Project notes for the BAM GHL Agent / portal work. Read the relevant file when its topic comes up.
 
+- [Confirm agent (Scheduled-Trial stage)](project_confirm_agent.md) — 2026-06-25: 2nd sales agent. Brain is now agent-aware (`assemblePrompt(overrides, agent)`, `AGENT_SPECS={booking,confirm}`, shared facts). Confirms a booked lead is coming + helps them get there; "can't make it" → HANDS OFF to booking agent (note to `agent_contact_notes` + bounce stage Scheduled-Trial→Responded). Live: `api/agent-confirm.js` + `agent_confirm_replies` table (migration `20260625001106`, ⚠️maybe not applied) + own cron + `confirm_agent_mode` (default OFF). ⚠️ no frontend yet; booking agent untouched (byte-identical).
+
 - [V1.5 Onboarding Tracker](project_v15_onboarding_tracker.md) — **living board** for getting every training academy onto V1.5 (text leads + use pipelines). Definition of done (core vs polish), per-academy status, per-location connect process. DETAIL Miami = first one live.
 - [V1.5 Rollout — infra + resume](project_v15_rollout.md) — 2026-06-22: session infra for moving all academies to V1.5. Built `/api/ghl/all-pipelines` (public report — academy rows + stage→arrow→stage + saving notes via `pipeline_notes`; 28 academies/106 pipelines live), `/api/contacts?action=auto-map-athletes` (idempotent — maps full-name athlete field per v15 academy; re-run after flipping), FC **app-level `InboundMessage` webhook** → `/api/ghl/inbound-webhook` (no per-academy setup, confirmed; delete GTA's old "agent trigger" workflow). Agency one-click mint BLOCKED (FC=Sub-Account app) → per-account connect. Only 4 on v15; REMAINING = flip real academies (skip test rows), re-run auto-map, owner logins. `/v15continue` resumes.
 
