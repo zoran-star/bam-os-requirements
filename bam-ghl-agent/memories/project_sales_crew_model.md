@@ -84,9 +84,22 @@ Phase order:
   SandboxApp 🎯 Closing trainer tab, `_aclx*` Hawkeye queue in client-portal.html (kinds closing/closing_enroll/
   closing_lost). `confirm-enroll` = send offer `signup_url` + mark opp won (the close). INERT until
   `closing_agent_mode` set to hawkeye.
-- **P2b** — ⬜ TODO: replace the Won-stub in `confirm-enroll` with the real **Stripe payment-link → webhook
-  auto-member** flow (kills the manual Won path; wire to `[[project_stripe_app_created_subs]]`). There's a
-  `// TODO P2b:` marker in `api/agent-closing.js`.
+- **P2b** — ✅ CORE SHIPPED (branch `session/sales-crew`). KEY FINDING: the enroll→pay→member→WON machinery
+  ALREADY EXISTS. GTA's `signup_url` = `byanymeanstoronto.ca/enroll`, whose page calls the portal checkout
+  (`api/website/checkout.js`) → creates the member (status `payment_method_required`) → on real payment the
+  Stripe webhook (`invoice.paid` → `fireOnboardingActivations`) flips member live + **marks the opp WON** +
+  CoachIQ + welcome. So `confirm-enroll` must NOT mark won itself (P2a did, prematurely — before payment).
+  Fixed: `confirm-enroll` now just sends the enroll link (with `client_id`/`contact_id`/`opp_id` query params
+  appended, forward-compat) + writes an `agent_contact_notes` "link sent, awaiting payment" + logs
+  `pipeline_outcomes status='enroll_link_sent'`; NO won PUT. Frontend relabeled "Send sign-up link & mark won"
+  → "Send enroll link" (won lands on payment). The win is owned by the webhook on real payment.
+  ⬜ **P2b-plus (deferred, CROSS-REPO + live checkout):** make the GTA enroll page (`bam-client-sites/clients/
+  bam-gta/gta/enroll.jsx`, which already calls `/api/website/checkout`) READ the `contact_id`/`opp_id` params
+  and pass them to checkout → store `ghl_contact_id` + `ghl_opportunity_id` on the member row + sub metadata →
+  `fireOnboardingActivations` marks THAT exact opp won + links member↔contact at creation (instead of the
+  current `parent_email` match in `api/onboarding/activations.js`). Today the email-match works for GTA's happy
+  path; P2b-plus hardens multi-opp / email-mismatch cases. See `[[project_stripe_app_created_subs]]` +
+  `[[project_offer_price_mapping]]`.
 - **P2.5** — 📋 post-trial form → a card in the unified approval inbox ("🏁 Trial done — log outcome").
 - **P3** — ✉️ Resend foundation (Resend ALREADY wired in `api/clients.js`; formalize `api/_email.js`).
   **FROM = `info@byanymeanstoronto.com`** (verify DNS in Resend). **Email templates LIVE IN THE PORTAL,
