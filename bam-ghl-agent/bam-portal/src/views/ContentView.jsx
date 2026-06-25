@@ -1538,8 +1538,19 @@ function ClientInputs({ ticket, tk }) {
                 padding: 14, background: "rgba(255,255,255,0.02)",
                 border: `1px solid ${tk.borderSoft || tk.border}`, borderRadius: 8,
               }}>
-                <div style={{ fontWeight: 600, color: tk.text, marginBottom: 8 }}>
-                  Creative {i + 1} · {(TYPE_META_CT[c.type] || {}).label || c.type}
+                <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: 8, marginBottom: 8 }}>
+                  <span style={{ fontWeight: 600, color: tk.text }}>
+                    Creative {i + 1} · {(TYPE_META_CT[c.type] || {}).label || c.type}
+                  </span>
+                  {c.angle && (
+                    <span style={{
+                      fontSize: 10, color: tk.accent, letterSpacing: "0.08em", textTransform: "uppercase",
+                      padding: "2px 8px", borderRadius: 4,
+                      border: `1px solid ${tk.accent}`, background: "rgba(232,197,71,0.08)",
+                    }} title="Recommended angle from the offer's guide card">
+                      {c.angle}{c.type ? ` · ${c.type}` : ""}
+                    </span>
+                  )}
                 </div>
                 <div style={{ fontSize: 13, color: tk.text, marginBottom: 10, whiteSpace: "pre-wrap" }}>
                   {c.notes || <span style={{ color: tk.textMute, fontStyle: "italic" }}>(no notes)</span>}
