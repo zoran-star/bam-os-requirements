@@ -842,13 +842,19 @@ async function handleContentTickets(req, res) {
     return res.status(403).json({ error: "user is neither staff nor a linked client" });
   }
 
+  // Treat this request as staff (see internal messages, no strip) vs client
+  // (stripped). Hoisted to FUNCTION scope so the PATCH branch's response also
+  // uses it - it was previously declared only inside the GET branch, leaving
+  // `asStaff` undefined in PATCH (crashed final uploads after the DB write).
+  // `scope` disambiguates a dual-role user (staff who is also a client).
+  const scope = req.query.scope;
+  let asStaff;
+  if (scope === "staff")  asStaff = isStaff;
+  else if (scope === "client") asStaff = false;
+  else                    asStaff = isStaff && !isClient;
+
   // ─── GET ───────────────────────────────────────────────────
   if (req.method === "GET") {
-    const scope = req.query.scope;
-    let asStaff;
-    if (scope === "staff")  asStaff = isStaff;
-    else if (scope === "client") asStaff = false;
-    else                    asStaff = isStaff && !isClient;
 
     if (id) {
       const rows = await sb(`content_tickets?id=eq.${id}&select=*`);
