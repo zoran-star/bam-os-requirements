@@ -541,7 +541,8 @@ async function handler(req, res) {
       try {
         const ch = await stripeGet(`/charges?customer=${encodeURIComponent(custId)}&limit=15`, client.stripe_connect_account_id);
         chargesOut = (ch.data || []).map(c2 => ({
-          amount_cents: c2.amount, status: c2.status, refunded: !!c2.refunded, one_time: !c2.invoice,
+          id: c2.id, amount_cents: c2.amount, amount_refunded: c2.amount_refunded || 0,
+          status: c2.status, refunded: !!c2.refunded, one_time: !c2.invoice,
           date: c2.created ? new Date(c2.created * 1000).toISOString().slice(0, 10) : null,
           description: c2.description || null,
         }));
