@@ -276,6 +276,15 @@ export const AGENT_SPECS = {
   confirm: { role: "confirm_role", instructions: CONFIRM_INSTRUCTIONS_ORDER, examples: "confirm_examples" },
 };
 
+// The ordered section keys that make up one agent's prompt (role → academy facts →
+// behavior → guardrails/boundaries → examples). Used by the Brain editor to show
+// only the sections that actually shape the chosen agent. Facts + guardrails +
+// boundaries appear for every agent (shared); behavior keys differ per agent.
+export function sectionKeysForAgent(agent = "booking") {
+  const spec = AGENT_SPECS[agent] || AGENT_SPECS.booking;
+  return [spec.role, ...ACADEMY_ORDER, ...spec.instructions, "guardrails", "boundaries", spec.examples];
+}
+
 // Assemble one agent's system prompt. `agent` selects which behavior to build;
 // the academy_config (facts) and guardrails/boundaries are identical across all
 // agents. Default "booking" keeps the original prompt byte-for-byte unchanged.

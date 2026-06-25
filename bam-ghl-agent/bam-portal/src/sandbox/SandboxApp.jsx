@@ -24,7 +24,12 @@ async function api(action, payload = {}) {
 
 export default function SandboxApp({ embedded = false } = {}) {
   const [session, setSession] = useState(undefined);
-  const [view, setView] = useState("chat");          // 'chat' | 'brain'
+  const [agent, setAgent] = useState("booking");     // 'booking' | 'confirm' — which agent to train
+  const [view, setView] = useState("chat");          // 'chat' | 'brain' | 'tests' | 'followups'
+  const isConfirm = agent === "confirm";
+  // Break-it + Follow-ups are booking-only surfaces; bounce to chat if we land on
+  // them while training the confirm agent.
+  useEffect(() => { if (isConfirm && (view === "tests" || view === "followups")) setView("chat"); }, [isConfirm, view]);
   const [messages, setMessages] = useState([]);     // {role:'parent'|'agent', text, meta?}
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
@@ -82,7 +87,7 @@ export default function SandboxApp({ embedded = false } = {}) {
     setInput("");
     setBusy(true);
     try {
-      const d = await api("chat", { messages: next.map(m => ({ role: m.role, text: m.text })), lead_context: leadContext() });
+      const d = await api("chat", { messages: next.map(m => ({ role: m.role, text: m.text })), lead_context: leadContext(), agent });
       setMessages(m => [...m, {
         role: "agent",
         text: d.reply,
@@ -124,21 +129,26 @@ export default function SandboxApp({ embedded = false } = {}) {
         {/* Header */}
         <div style={{ padding: "16px 24px", borderBottom: `1px solid ${tk.border}`, display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap" }}>
           <div style={{ fontSize: 18, fontWeight: 700 }}>🎮 Agent Sandbox</div>
-          <div style={{ fontSize: 12, color: tk.textSub }}>BAM GTA brain</div>
+          {/* Which agent to train */}
+          <div style={{ display: "flex", gap: 4, background: tk.surfaceEl, borderRadius: 9, padding: 3, border: `1px solid ${tk.border}` }}>
+            <Tab on={agent === "booking"} onClick={() => { setAgent("booking"); setMessages([]); }}>📞 Booking</Tab>
+            <Tab on={agent === "confirm"} onClick={() => { setAgent("confirm"); setMessages([]); }}>✅ Confirm</Tab>
+          </div>
+          <div style={{ fontSize: 12, color: tk.textSub }}>BAM GTA · {isConfirm ? "confirms booked leads" : "books trials"}</div>
           <span style={{ fontSize: 11, padding: "3px 10px", borderRadius: 99, background: tk.amberSoft, color: tk.amber, border: `1px solid ${tk.amber}33`, fontWeight: 600 }}>
             ⚠ TRAINING ONLY — nothing is sent
           </span>
           <div style={{ display: "flex", gap: 4, marginLeft: 8, background: tk.surfaceEl, borderRadius: 9, padding: 3, border: `1px solid ${tk.border}` }}>
             <Tab on={view === "chat"} onClick={() => setView("chat")}>💬 Chat</Tab>
             <Tab on={view === "brain"} onClick={() => setView("brain")}>📝 Brain</Tab>
-            <Tab on={view === "tests"} onClick={() => setView("tests")}>🧪 Break it</Tab>
-            <Tab on={view === "followups"} onClick={() => setView("followups")}>⏰ Follow-ups</Tab>
+            {!isConfirm && <Tab on={view === "tests"} onClick={() => setView("tests")}>🧪 Break it</Tab>}
+            {!isConfirm && <Tab on={view === "followups"} onClick={() => setView("followups")}>⏰ Follow-ups</Tab>}
           </div>
           <div style={{ flex: 1 }} />
           {view === "chat" && <BtnGhost onClick={() => setMessages([])}>↺ Reset chat</BtnGhost>}
         </div>
 
-        {view === "brain" ? <BrainEditor /> :
+        {view === "brain" ? <BrainEditor agent={agent} /> :
          view === "tests" ? <TestLab onTry={(msg) => { setMessages([]); setError(""); setInput(msg); setView("chat"); }} /> :
          view === "followups" ? (
           <div style={{ flex: 1, overflowY: "auto", padding: "20px 24px", minHeight: 0 }}>
@@ -183,6 +193,7 @@ export default function SandboxApp({ embedded = false } = {}) {
               {messages.map((m, i) => m.role === "parent"
                 ? <ParentBubble key={i} text={m.text} />
                 : <AgentBubble key={i} m={m} parentText={messages[i - 1]?.role === "parent" ? messages[i - 1].text : ""}
+                    canTeach={!isConfirm}
                     onTeach={() => { setTeachFor(i); setTeachText(""); }}
                     teaching={teachFor === i} teachText={teachText} setTeachText={setTeachText}
                     onSave={() => saveLesson(i)} onCancel={() => setTeachFor(null)}
@@ -211,7 +222,17 @@ export default function SandboxApp({ embedded = false } = {}) {
             </div>
           </div>
 
-          {/* Lessons panel */}
+          {/* Lessons panel — booking only (confirm agent trains via the Brain tab) */}
+          {isConfirm ? (
+          <div style={{ width: 300, borderLeft: `1px solid ${tk.border}`, padding: 18, overflowY: "auto", background: tk.surface }}>
+            <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 6 }}>✅ Confirm agent</div>
+            <div style={{ fontSize: 12, color: tk.textSub, lineHeight: 1.6 }}>
+              Chat to it like a parent who <b style={{ color: tk.text }}>already booked a trial</b> — try "we'll be there", "can we move it?", "where is it?".
+              <br /><br />
+              Train it in the <b style={{ color: tk.accent }}>📝 Brain</b> tab (lessons & saved examples are booking-only for now).
+            </div>
+          </div>
+          ) : (
           <div style={{ width: 300, borderLeft: `1px solid ${tk.border}`, padding: 18, overflowY: "auto", background: tk.surface }}>
             <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 4 }}>🧠 What it's learned</div>
             <div style={{ fontSize: 11, color: tk.textMute, marginBottom: 14 }}>Applied to every new reply.</div>
@@ -236,6 +257,7 @@ export default function SandboxApp({ embedded = false } = {}) {
               </div>
             ))}
           </div>
+          )}
         </div>}
       </div>
     </>
@@ -251,7 +273,7 @@ function ParentBubble({ text }) {
   );
 }
 
-function AgentBubble({ m, parentText, onSaveExample, onTeach, teaching, teachText, setTeachText, onSave, onCancel }) {
+function AgentBubble({ m, parentText, onSaveExample, onTeach, teaching, teachText, setTeachText, onSave, onCancel, canTeach = true }) {
   const { reasoning, confidence, escalate, escalate_reason, followup, followup_when, followup_message, sources } = m.meta || {};
   const conf = typeof confidence === "number" ? Math.round(confidence * 100) : null;
   const confColor = conf == null ? tk.textMute : (conf >= 70 ? tk.green : conf >= 40 ? tk.amber : tk.red);
@@ -292,7 +314,7 @@ function AgentBubble({ m, parentText, onSaveExample, onTeach, teaching, teachTex
         </div>
       )}
 
-      {!teaching ? (
+      {!canTeach ? null : !teaching ? (
         <div style={{ marginTop: 6, display: "flex", gap: 14 }}>
           <Mini onClick={onTeach}>📝 teach</Mini>
           {!escalate && m.text && parentText && <Mini onClick={() => onSaveExample(parentText, m.text)}>⭐ save as example</Mini>}
@@ -321,11 +343,11 @@ const GROUPS = [
   { key: "goal",     label: "🎯 Goal — objective & cadence", hint: "Follow-up cadence and when to stop chasing." },
 ];
 
-function BrainEditor() {
+function BrainEditor({ agent = "booking" }) {
   const [sections, setSections] = useState(null);
   const [err, setErr] = useState("");
-  useEffect(() => { load(); }, []);
-  async function load() { try { const d = await api("sections"); setSections(d.sections || []); } catch (e) { setErr(e.message); } }
+  useEffect(() => { setSections(null); load(); }, [agent]);
+  async function load() { try { const d = await api("sections", { agent }); setSections(d.sections || []); } catch (e) { setErr(e.message); } }
   if (err) return <div style={{ flex: 1, padding: 24, color: tk.red }}>⚠ {err}</div>;
   if (!sections) return <div style={{ flex: 1, padding: 24, color: tk.textSub, fontSize: 14 }}>Loading the brain…</div>;
   const editedCount = sections.filter(s => !s.is_default).length;

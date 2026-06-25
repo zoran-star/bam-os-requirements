@@ -7397,6 +7397,7 @@ Then the call to action."]</div>
           <button class="ib-tab"    data-tab="bot"     onclick="_ibSetTab('bot')" title="Replies the bot drafted for leads in the Responded stage - you approve each one">🤖 Bot <span id="ib-count-bot"></span></button>
           <input id="ib-search" class="ib-search" type="text" placeholder="🔍  Search by name or content…" oninput="_ibSetSearch(this.value)">
           <button id="ib-approve-btn" onclick="_apxOpen()" title="Hawkeye - approve the agent's drafted messages before they send" style="background:transparent;border:1px solid var(--accent);color:var(--accent);padding:7px 12px;border-radius:4px;cursor:pointer;font-size:12px;font-weight:700">👁 Hawkeye <span id="apx-count" style="font-weight:800"></span></button>
+          <button id="acx-approve-btn" onclick="_acxOpen()" title="Confirm agent - approve trial-confirmation messages before they send" style="display:none;background:transparent;border:1px solid var(--border);color:var(--text-mute);padding:7px 12px;border-radius:4px;cursor:pointer;font-size:12px;font-weight:700">✅ Confirm <span id="acx-count" style="font-weight:800"></span></button>
           <button onclick="_ibComposeNew()" title="New message" style="background:var(--accent);border:1px solid var(--accent);color:#08080A;padding:7px 12px;border-radius:4px;cursor:pointer;font-size:12px;font-weight:600">✏️ New</button>
           <button onclick="fetchAndRenderInbox()" title="Refresh" style="background:transparent;border:1px solid var(--border);color:var(--text);padding:7px 12px;border-radius:4px;cursor:pointer;font-size:12px">↻</button>
         </div>
@@ -10824,6 +10825,7 @@ function _v15ibRenderAll() {
       <div class="v15ib-pills">
         <span style="flex:1"></span>
         <button id="v15ib-approve-btn" onclick="_apxOpen()" title="Hawkeye - approve the agent's drafted messages before they send" aria-label="Hawkeye agent approvals" class="v15ib-icon" style="width:auto;padding:0 12px;gap:6px;border-color:var(--accent);color:var(--accent);font-weight:700">👁 Hawkeye <span id="v15-apx-count" style="font-weight:800"></span></button>
+        <button id="v15acx-approve-btn" onclick="_acxOpen()" title="Confirm agent - approve trial-confirmation messages before they send" aria-label="Confirm agent approvals" class="v15ib-icon" style="display:none;width:auto;padding:0 12px;gap:6px;font-weight:700">✅ Confirm <span id="v15-acx-count" style="font-weight:800"></span></button>
         <button onclick="_v15ibMassSend()" class="v15ib-icon v15ib-send" title="Mass send" aria-label="Mass send" style="width:auto;padding:0 12px;gap:6px">✉ Mass send</button>
       </div>
       <div class="v15ib-chans">${unreadBtn}${chanBtns}</div>
@@ -10837,6 +10839,7 @@ function _v15ibRenderAll() {
     <div id="v15ib-body"></div>`;
   _v15ibRenderList();
   _apxRefreshCount();
+  _acxRefreshCount();
 }
 
 // Initials for the row avatar - first letters of up to two name words; falls
@@ -23129,6 +23132,7 @@ async function fetchAndRenderInbox() {
     _INBOX_DATA = json;
     _renderInboxList();
     _apxRefreshCount();
+    _acxRefreshCount();
   } catch (e) {
     container.innerHTML = `<div class="req-empty" style="padding:20px 0">Couldn't load inbox - ${escapeHTML(e.message)}</div>`;
   }
@@ -23281,6 +23285,181 @@ async function _apxRefreshCount() {
     btn.style.borderColor = n ? 'var(--accent)' : 'var(--border)';
     btn.style.color = n ? 'var(--accent)' : 'var(--text-mute)';
   });
+}
+
+// ═══════════════════════════════════════════════════════════════
+// CONFIRM AGENT approval inbox (✅) - the SECOND sales agent, working
+// Scheduled-Trial leads. Sibling of the _apx* Hawkeye queue: same look,
+// own endpoint (/api/agent-confirm), 3 card kinds:
+//   confirm          → a drafted confirm/logistics reply (Approve & send)
+//   confirm_handoff  → lead can't make it → hand back to booking (note + bounce)
+//   confirm_lost     → lead doesn't want the trial at all → mark lost
+// Reuses _apxPost / _apxToast / _apxErr / _apxOpenThread / _apxMsgWhen / _apxTrim.
+// ═══════════════════════════════════════════════════════════════
+let _ACX_DATA = [];
+
+async function _acxRefreshCount() {
+  const btns = [
+    { btn: document.getElementById('acx-approve-btn'), span: document.getElementById('acx-count') },
+    { btn: document.getElementById('v15acx-approve-btn'), span: document.getElementById('v15-acx-count') },
+  ].filter(x => x.btn);
+  if (!btns.length) return;
+  let rd;
+  try { rd = await _apxPost('/api/agent-confirm', 'list-ready', {}); }
+  catch (e) { if (e && (e.status === 401 || e.status === 403)) btns.forEach(({ btn }) => { btn.style.display = 'none'; }); return; }
+  const n = (rd.ready || []).length;
+  btns.forEach(({ btn, span }) => {
+    btn.style.display = '';
+    if (span) span.textContent = n ? `(${n})` : '';
+    btn.style.borderColor = n ? 'var(--accent)' : 'var(--border)';
+    btn.style.color = n ? 'var(--accent)' : 'var(--text-mute)';
+  });
+}
+function _acxUpdateCount(n) {
+  [['acx-approve-btn', 'acx-count'], ['v15acx-approve-btn', 'v15-acx-count']].forEach(([b, s]) => {
+    const btn = document.getElementById(b), span = document.getElementById(s);
+    if (span) span.textContent = n ? `(${n})` : '';
+    if (btn) { btn.style.borderColor = n ? 'var(--accent)' : 'var(--border)'; btn.style.color = n ? 'var(--accent)' : 'var(--text-mute)'; }
+  });
+}
+
+function _acxOpen() {
+  document.getElementById('acx-overlay')?.remove();
+  document.body.insertAdjacentHTML('beforeend', `
+    <div id="acx-overlay" style="position:fixed;inset:0;z-index:9400;background:var(--bg);display:flex;flex-direction:column">
+      <div style="padding:calc(14px + env(safe-area-inset-top)) 18px 12px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px">
+        <div style="font-size:18px;font-weight:800">✅ Confirm trials</div>
+        <div style="font-size:12px;color:var(--text-mute)">make sure booked leads show up</div>
+        <div style="flex:1"></div>
+        <button onclick="_acxClose()" aria-label="Close" style="background:none;border:none;color:var(--text-mute);font-size:24px;cursor:pointer;padding:2px 10px">×</button>
+      </div>
+      <div id="acx-body" style="flex:1;overflow-y:auto;padding:16px 18px calc(24px + env(safe-area-inset-bottom))">
+        <div style="max-width:860px;margin:0 auto"><div style="color:var(--text-mute);font-size:13px"><span class="req-spin"></span> Loading…</div></div>
+      </div>
+    </div>`);
+  _acxLoad();
+}
+function _acxClose() { document.getElementById('acx-overlay')?.remove(); }
+
+async function _acxLoad() {
+  const body = document.getElementById('acx-body');
+  if (!body) return;
+  try {
+    const rd = await _apxPost('/api/agent-confirm', 'list-ready', {});
+    _ACX_DATA = (rd.ready || []).filter(r => r.status === 'pending' || r.status === 'approved');
+    _acxRender();
+    _acxUpdateCount(_ACX_DATA.length);
+  } catch (e) {
+    body.innerHTML = `<div style="color:#e07070;font-size:13px">Couldn't load - ${escapeHTML(_apxErr(e))}</div>`;
+  }
+}
+function _acxRender() {
+  const body = document.getElementById('acx-body');
+  if (!body) return;
+  if (!_ACX_DATA.length) { body.innerHTML = '<div style="max-width:860px;margin:0 auto">' + _apxEmpty('All clear - no confirmations waiting.') + '</div>'; return; }
+  const cards = _ACX_DATA.map(r => r.kind === 'confirm_handoff' ? _acxHandoffCard(r) : r.kind === 'confirm_lost' ? _acxLostCard(r) : _acxReplyCard(r)).join('');
+  body.innerHTML = '<div style="max-width:860px;margin:0 auto">' + cards + '</div>';
+}
+
+function _acxOpenThread(id) { const r = _ACX_DATA.find(x => x.id === id); if (r) _apxOpenThread(r.ghl_contact_id, r.contact_name || 'Conversation'); }
+function _acxContext(r) {
+  let tail = Array.isArray(r.thread_tail) ? r.thread_tail.slice() : [];
+  if (!tail.length) { if (r.last_outbound) tail.push({ role: 'agent', text: r.last_outbound }); if (r.last_message) tail.push({ role: 'lead', text: r.last_message }); }
+  if (!tail.length) return '';
+  const bubbles = tail.map(m => {
+    const out = m.role === 'agent';
+    const when = _apxMsgWhen(m.at || m.date);
+    return `<div style="display:flex;flex-direction:column;align-items:${out ? 'flex-end' : 'flex-start'};gap:2px;max-width:84%;align-self:${out ? 'flex-end' : 'flex-start'}">
+      <div style="background:${out ? 'rgba(232,197,71,.13)' : 'rgba(255,255,255,.05)'};border:1px solid ${out ? 'var(--accent-border,rgba(232,197,71,.3))' : 'var(--border)'};color:var(--text);padding:6px 10px;border-radius:12px;font-size:12.5px;line-height:1.4;white-space:pre-wrap;word-break:break-word">${escapeHTML(_apxTrim(String(m.text || '').trim(), 240))}</div>
+      ${when ? `<div style="font-size:10px;color:var(--text-mute);padding:0 4px">${escapeHTML(when)}</div>` : ''}
+    </div>`;
+  }).join('');
+  return `<div onclick="_acxOpenThread('${r.id}')" title="Tap for the full conversation" style="display:flex;flex-direction:column;gap:6px;margin:4px 0 8px;max-height:260px;overflow-y:auto;cursor:pointer">${bubbles}</div>`;
+}
+function _acxHeader(r, pill, color) {
+  const trial = r.trial_at ? `<span style="font-size:11px;color:var(--text-mute)">🗓 ${escapeHTML(_apxMsgWhen(r.trial_at))}</span>` : '';
+  return `<div style="display:flex;align-items:center;gap:8px;margin-bottom:5px;flex-wrap:wrap">
+    <span style="font-weight:700;font-size:13.5px">${escapeHTML(r.contact_name || 'Lead')}</span>
+    <span style="font-size:10px;font-weight:700;color:${color};background:${color}1a;border:1px solid ${color}44;border-radius:999px;padding:1px 8px">${pill}</span>
+    <div style="flex:1"></div>${trial}
+  </div>`;
+}
+function _acxBox(r, ph) {
+  return `<textarea id="acx-edit-${r.id}" placeholder="${escapeHTML(ph || '')}" style="width:100%;box-sizing:border-box;font-family:inherit;font-size:13.5px;line-height:1.5;background:var(--accent-glow,rgba(232,197,71,.10));border:1px solid var(--accent-border,rgba(232,197,71,.3));border-radius:10px;padding:9px 11px;color:var(--text);resize:vertical;min-height:64px;outline:none">${escapeHTML(r.draft_message || '')}</textarea>`;
+}
+function _acxReplyCard(r) {
+  const esc = r.escalate ? `<div style="font-size:11.5px;color:#e0a020;margin-bottom:6px">⚠ agent escalated${r.escalate_reason ? ': ' + escapeHTML(r.escalate_reason) : ''}</div>` : '';
+  return `<div id="acx-${r.id}" style="background:var(--surface);border:1px solid var(--accent-border,rgba(232,197,71,.3));border-radius:11px;padding:12px 14px;margin-bottom:9px">
+    ${_acxHeader(r, 'confirm', 'var(--accent)')}${esc}${_acxContext(r)}
+    <div style="text-align:center;font-size:9.5px;color:var(--text-mute);text-transform:uppercase;letter-spacing:.09em;margin:2px 0 5px">proposed message · edit it right here</div>
+    ${_acxBox(r)}
+    <div style="display:flex;align-items:stretch;gap:8px;margin-top:10px">
+      <button onclick="_acxSkip('${r.id}')" title="Skip" style="flex:1;background:transparent;border:1px solid var(--border);color:#e0654f;border-radius:9px;padding:9px;font-size:17px;cursor:pointer">✕</button>
+      <button onclick="_acxSend('${r.id}')" style="flex:2;background:var(--accent);border:1px solid var(--accent);color:#08080A;border-radius:9px;padding:9px;font-size:14px;font-weight:700;cursor:pointer">✓ Approve &amp; send</button>
+    </div>
+  </div>`;
+}
+function _acxHandoffCard(r) {
+  const note = r.handoff_note ? `<div style="font-size:12px;color:var(--text-sub);background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:8px;padding:8px 10px;margin:4px 0 8px"><b style="color:var(--text)">Reason:</b> ${escapeHTML(r.handoff_note)}</div>` : '';
+  return `<div id="acx-${r.id}" style="background:var(--surface);border:1px solid #5A8FB8;border-radius:11px;padding:12px 14px;margin-bottom:9px">
+    ${_acxHeader(r, 'reschedule', '#5A8FB8')}
+    <div style="font-size:11.5px;color:#5A8FB8;margin-bottom:6px">↩ Hands back to the booking agent to rebook (writes a note + moves them to Responded).</div>
+    ${_acxContext(r)}${note}
+    <div style="text-align:center;font-size:9.5px;color:var(--text-mute);text-transform:uppercase;letter-spacing:.09em;margin:2px 0 5px">acknowledgement to send (optional)</div>
+    ${_acxBox(r, 'optional warm message before handing off')}
+    <div style="display:flex;align-items:stretch;gap:8px;margin-top:10px">
+      <button onclick="_acxSkip('${r.id}')" title="Skip" style="flex:1;background:transparent;border:1px solid var(--border);color:#e0654f;border-radius:9px;padding:9px;font-size:17px;cursor:pointer">✕</button>
+      <button onclick="_acxHandoff('${r.id}')" style="flex:2;background:#5A8FB8;border:1px solid #5A8FB8;color:#08080A;border-radius:9px;padding:9px;font-size:14px;font-weight:700;cursor:pointer">↩ Approve handoff</button>
+    </div>
+  </div>`;
+}
+function _acxLostCard(r) {
+  const reason = r.lost_reason ? `<span style="font-size:10px;font-weight:700;color:#e0654f;background:rgba(224,90,66,.12);border-radius:999px;padding:1px 8px">${escapeHTML(r.lost_reason)}</span>` : '';
+  return `<div id="acx-${r.id}" style="background:var(--surface);border:1px solid rgba(224,90,66,.4);border-radius:11px;padding:12px 14px;margin-bottom:9px">
+    ${_acxHeader(r, 'lost', '#e0654f')}
+    <div style="font-size:11.5px;color:#e0654f;margin-bottom:6px">Lead no longer wants the trial. ${reason}</div>
+    ${_acxContext(r)}
+    <div style="text-align:center;font-size:9.5px;color:var(--text-mute);text-transform:uppercase;letter-spacing:.09em;margin:2px 0 5px">warm closing message (optional)</div>
+    ${_acxBox(r, 'optional closing message')}
+    <div style="display:flex;align-items:stretch;gap:8px;margin-top:10px">
+      <button onclick="_acxSkip('${r.id}')" title="Skip" style="flex:1;background:transparent;border:1px solid var(--border);color:var(--text-sub);border-radius:9px;padding:9px;font-size:17px;cursor:pointer">✕</button>
+      <button onclick="_acxLost('${r.id}')" style="flex:2;background:#e0654f;border:1px solid #e0654f;color:#fff;border-radius:9px;padding:9px;font-size:14px;font-weight:700;cursor:pointer">Mark lost</button>
+    </div>
+  </div>`;
+}
+function _acxRemove(id) {
+  _ACX_DATA = _ACX_DATA.filter(x => x.id !== id);
+  document.getElementById('acx-' + id)?.remove();
+  if (!_ACX_DATA.length) { const body = document.getElementById('acx-body'); if (body) body.innerHTML = '<div style="max-width:860px;margin:0 auto">' + _apxEmpty('All clear - no confirmations waiting.') + '</div>'; }
+  _acxUpdateCount(_ACX_DATA.length);
+}
+async function _acxSend(id) {
+  const r = _ACX_DATA.find(x => x.id === id); if (!r) return;
+  const ta = document.getElementById('acx-edit-' + id);
+  const reply = (ta ? ta.value : (r.draft_message || '')).trim();
+  if (!reply) { _apxToast('Message is empty', false); return; }
+  try {
+    const resp = await _apxPost('/api/agent-confirm', 'send', { ready_id: id, contact_id: r.ghl_contact_id, conversation_id: r.ghl_conversation_id, reply, contact_name: r.contact_name, confidence: r.confidence, reasoning: r.reasoning });
+    _acxRemove(id); _apxToast(resp && resp.deferred ? _apxQuietMsg(resp.send_after) : '✓ Sent', true);
+  } catch (e) { _apxToast(_apxErr(e), false); }
+}
+async function _acxHandoff(id) {
+  const r = _ACX_DATA.find(x => x.id === id); if (!r) return;
+  const ta = document.getElementById('acx-edit-' + id);
+  const reply = (ta ? ta.value : (r.draft_message || '')).trim();
+  try { await _apxPost('/api/agent-confirm', 'confirm-handoff', { ready_id: id, reply, handoff_note: r.handoff_note }); _acxRemove(id); _apxToast('↩ Handed back to booking', true); }
+  catch (e) { _apxToast(_apxErr(e), false); }
+}
+async function _acxLost(id) {
+  const r = _ACX_DATA.find(x => x.id === id); if (!r) return;
+  const ta = document.getElementById('acx-edit-' + id);
+  const reply = (ta ? ta.value : (r.draft_message || '')).trim();
+  try { await _apxPost('/api/agent-confirm', 'confirm-lost', { ready_id: id, reply, lost_reason: r.lost_reason }); _acxRemove(id); _apxToast('Marked lost', true); }
+  catch (e) { _apxToast(_apxErr(e), false); }
+}
+async function _acxSkip(id) {
+  try { await _apxPost('/api/agent-confirm', 'skip-ready', { ready_id: id }); _acxRemove(id); _apxToast('Skipped', true); }
+  catch (e) { _apxToast(_apxErr(e), false); }
 }
 
 let _APX_TAB = 'followups';
