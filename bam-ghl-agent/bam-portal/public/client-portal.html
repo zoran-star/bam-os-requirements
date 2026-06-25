@@ -1635,6 +1635,24 @@
   }
   .angle-beat-text { font-size: 13.5px; line-height: 1.55; color: var(--text); }
   .angle-exec[hidden] { display: none; }
+  /* Phase 3: "Add to my campaign" action per execution */
+  .angle-make { margin-top: 14px; }
+  .angle-make-btn {
+    background: var(--gold-sheen);
+    border: 1px solid var(--gold);
+    border-radius: 7px;
+    padding: 8px 14px;
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--gold);
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .angle-make-btn:hover { background: var(--gold); color: var(--ink, #111); }
+  .angle-make-btn.is-added { background: var(--gold); color: var(--ink, #111); cursor: default; }
+  .angle-make-btn:disabled { opacity: 0.9; }
 
   /* Example-asset viewer modal */
   .asset-modal { position: fixed; inset: 0; z-index: 5000; display: none; }
@@ -31132,7 +31150,9 @@ function _angleAssetsHTML(assets) {
 }
 
 // Render one execution (segments / tips / assets) into the open angle.
-function _angleExecHTML(exec) {
+// Phase 3: angleName + medium are passed so the execution can offer an
+// "Add to my campaign" button that seeds a pre-tagged creative block.
+function _angleExecHTML(exec, angleName, medium) {
   if (!exec) return '';
   let html = '';
   if (Array.isArray(exec.segments) && exec.segments.length) {
@@ -31146,6 +31166,11 @@ function _angleExecHTML(exec) {
     html += `<div class="guide-label" style="margin-top:12px">Tips</div><div class="guide-value">${escapeHTML(exec.tips)}</div>`;
   }
   html += _angleAssetsHTML(exec.example_assets);
+  if (angleName && medium) {
+    const an = escapeHTML(String(angleName)).replace(/'/g, '&#39;');
+    const md = escapeHTML(String(medium));
+    html += `<div class="angle-make"><button type="button" class="angle-make-btn" data-angle="${an}" data-medium="${md}" onclick="_wizardSeedCreativeFromAngle(this.dataset.angle, this.dataset.medium, this)">+ Add to my campaign</button></div>`;
+  }
   return html;
 }
 
@@ -31166,7 +31191,7 @@ function _angleCardHTML(angle, idx) {
     ).join('') + '</div>';
   }
   const execBodies = media.map(m =>
-    `<div class="angle-exec" data-medium="${m}"${m === first ? '' : ' hidden'}>${_angleExecHTML(m === 'video' ? angle.video : angle.graphic)}</div>`
+    `<div class="angle-exec" data-medium="${m}"${m === first ? '' : ' hidden'}>${_angleExecHTML(m === 'video' ? angle.video : angle.graphic, angle.name, m)}</div>`
   ).join('');
   const purpose = angle.purpose
     ? `<div class="guide-label">Purpose</div><div class="guide-value">${escapeHTML(angle.purpose)}</div>`
@@ -31211,6 +31236,50 @@ function _renderAnglesAccordion(card) {
   const angles = _cardAngles(card);
   if (!angles.length) return '';
   return `<div class="angle-list">${angles.map((a, i) => _angleCardHTML(a, i)).join('')}</div>`;
+}
+
+// Phase 3: seed a creative block from a recommended angle + medium.
+// Pushes a normal creative-folder block pre-named after the angle and
+// pre-tagged with angle + guide_card_id so staff can see what was asked
+// for. The block is otherwise identical to a manually-added folder.
+function _wizardSeedCreativeFromAngle(angleName, medium, btn) {
+  if (!_wizard) return;
+  const name = (angleName || '').toString().trim() || 'Angle';
+  const type = (medium === 'video' || medium === 'graphic') ? medium : 'graphic';
+  // Optional nicety: don't double-add the same angle + medium.
+  const exists = (_wizard.creatives || []).some(c =>
+    (c.angle || '') === name && (c.type || '') === type);
+  if (!exists) {
+    _wizardCreativeSeq += 1;
+    _wizard.creatives.push({
+      id: 'c' + _wizardCreativeSeq,
+      name: name,
+      type: type,
+      files: [],
+      notes: '',
+      driveLink: '',
+      angle: name,
+      guide_card_id: (_wizard && _wizard.guideCardId) || null,
+    });
+    _renderWizardCreatives();
+  }
+  // Lightweight feedback on the button.
+  if (btn) {
+    const original = btn.textContent;
+    btn.textContent = 'Added ✓';
+    btn.classList.add('is-added');
+    btn.disabled = true;
+    setTimeout(() => {
+      btn.textContent = original;
+      btn.classList.remove('is-added');
+      btn.disabled = false;
+    }, 1600);
+  }
+  // Scroll the new block into view if the creatives list is on screen.
+  const list = document.getElementById('wizardCreativesList');
+  if (list && list.lastElementChild && typeof list.lastElementChild.scrollIntoView === 'function') {
+    try { list.lastElementChild.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); } catch (_) {}
+  }
 }
 
 // ── "Your First Campaign" top card - data-driven from is_default ──────
@@ -31303,6 +31372,10 @@ async function _populateGuideCard(offerName) {
   const linksSection = document.getElementById('wizardGuideLinksSection');
   if (linksSection) linksSection.style.display = 'none';
 
+  // Reset any previously captured guide-card identity for this offer. Phase 3
+  // re-populates these only when a matching card with angles is found.
+  if (_wizard) { _wizard.guideCardId = null; _wizard.guideCard = null; }
+
   try {
     const cards = await _fetchGuideCards();
     const match = (Array.isArray(cards) ? cards : []).find(c => {
@@ -31310,6 +31383,10 @@ async function _populateGuideCard(offerName) {
       return t === (offerName || '').toLowerCase().trim();
     });
     if (!match) { showGuidePlaceholders(); return; }
+
+    // Phase 3: remember the matched guide card so "Add to my campaign"
+    // can tag the creative block it seeds with this card's id + angle.
+    if (_wizard) { _wizard.guideCardId = match.id || null; _wizard.guideCard = match; }
 
     // Phase 2: if this card carries angles, render the accordion and stop.
     const anglesMarkup = _renderAnglesAccordion(match);
@@ -31488,7 +31565,7 @@ function wizardAddCreativeBlock() {
   if (!_wizard) return;
   _wizardCreativeSeq += 1;
   // Each block is now a named FOLDER (the content drop is folder-first).
-  _wizard.creatives.push({ id: 'c' + _wizardCreativeSeq, name: '', type: 'graphic', files: [], notes: '', driveLink: '' });
+  _wizard.creatives.push({ id: 'c' + _wizardCreativeSeq, name: '', type: 'graphic', files: [], notes: '', driveLink: '', angle: '', guide_card_id: null });
   _renderWizardCreatives();
 }
 
@@ -31670,6 +31747,8 @@ async function wizardSubmitFinal(skipped) {
         type: _deriveAssetType(c.files),
         notes: c.notes || '',
         raw_files: uploaded,
+        angle: c.angle || null,
+        guide_card_id: c.guide_card_id || null,
       });
       totalFiles += uploaded.length;
     }
