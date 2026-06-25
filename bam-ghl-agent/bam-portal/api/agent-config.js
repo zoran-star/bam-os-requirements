@@ -11,7 +11,7 @@ import { withSentryApiRoute } from "./_sentry.js";
 // bot + follow-up engine. The CONFIRM agent has its OWN switch at
 // clients.ghl_kpi_config.confirm_agent_mode (default off). See agent/_mode.js.
 
-import { agentMode, confirmAgentMode, AGENT_MODES } from "./agent/_mode.js";
+import { agentMode, confirmAgentMode, closingAgentMode, AGENT_MODES } from "./agent/_mode.js";
 import { resolveAgentActor } from "./agent/_auth.js";
 
 const SUPABASE_URL         = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
@@ -53,7 +53,7 @@ async function handler(req, res) {
     if (!actor.canActOn(b.client_id)) return res.status(403).json({ error: "not your academy" });
     try {
       const [row] = await sb(`clients?id=eq.${encodeURIComponent(b.client_id)}&select=ghl_kpi_config&limit=1`);
-      return res.status(200).json({ mode: row ? agentMode(row) : "off", confirm_mode: row ? confirmAgentMode(row) : "off" });
+      return res.status(200).json({ mode: row ? agentMode(row) : "off", confirm_mode: row ? confirmAgentMode(row) : "off", closing_mode: row ? closingAgentMode(row) : "off" });
     } catch (e) { return res.status(500).json({ error: e.message }); }
   }
 
@@ -69,6 +69,7 @@ async function handler(req, res) {
         business_name: c.business_name || "(academy)",
         mode: agentMode(c),
         confirm_mode: confirmAgentMode(c),
+        closing_mode: closingAgentMode(c),
         notify_phone: (c.ghl_kpi_config || {}).agent_notify_phone || null,
       }));
       return res.status(200).json({ academies });
@@ -97,6 +98,18 @@ async function handler(req, res) {
       const cfg = { ...(row.ghl_kpi_config || {}), confirm_agent_mode: b.mode };
       await sb(`clients?id=eq.${encodeURIComponent(b.client_id)}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ ghl_kpi_config: cfg }) });
       return res.status(200).json({ ok: true, confirm_mode: b.mode });
+    }
+
+    // The CLOSING agent's OWN switch (Done-Trial stage) — independent of booking +
+    // confirm. No legacy booleans to keep in sync.
+    if (b.action === "set-closing-mode") {
+      if (!b.client_id) return res.status(400).json({ error: "client_id required" });
+      if (!AGENT_MODES.includes(b.mode)) return res.status(400).json({ error: `mode must be one of ${AGENT_MODES.join(", ")}` });
+      const [row] = await sb(`clients?id=eq.${encodeURIComponent(b.client_id)}&select=ghl_kpi_config&limit=1`);
+      if (!row) return res.status(404).json({ error: "academy not found" });
+      const cfg = { ...(row.ghl_kpi_config || {}), closing_agent_mode: b.mode };
+      await sb(`clients?id=eq.${encodeURIComponent(b.client_id)}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ ghl_kpi_config: cfg }) });
+      return res.status(200).json({ ok: true, closing_mode: b.mode });
     }
 
     return res.status(400).json({ error: "unknown action" });

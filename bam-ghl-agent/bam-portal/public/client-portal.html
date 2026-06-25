@@ -7415,6 +7415,7 @@ Then the call to action."]</div>
           <input id="ib-search" class="ib-search" type="text" placeholder="🔍  Search by name or content…" oninput="_ibSetSearch(this.value)">
           <button id="ib-approve-btn" onclick="_apxOpen()" title="Hawkeye - approve the agent's drafted messages before they send" style="background:transparent;border:1px solid var(--accent);color:var(--accent);padding:7px 12px;border-radius:4px;cursor:pointer;font-size:12px;font-weight:700">👁 Hawkeye <span id="apx-count" style="font-weight:800"></span></button>
           <button id="acx-approve-btn" onclick="_acxOpen()" title="Confirm agent - approve trial-confirmation messages before they send" style="display:none;background:transparent;border:1px solid var(--border);color:var(--text-mute);padding:7px 12px;border-radius:4px;cursor:pointer;font-size:12px;font-weight:700">✅ Confirm <span id="acx-count" style="font-weight:800"></span></button>
+          <button id="aclx-approve-btn" onclick="_aclxOpen()" title="Closing agent - approve post-trial conversion messages before they send" style="display:none;background:transparent;border:1px solid var(--border);color:var(--text-mute);padding:7px 12px;border-radius:4px;cursor:pointer;font-size:12px;font-weight:700">🎯 Closing <span id="aclx-count" style="font-weight:800"></span></button>
           <button onclick="_ibComposeNew()" title="New message" style="background:var(--accent);border:1px solid var(--accent);color:#08080A;padding:7px 12px;border-radius:4px;cursor:pointer;font-size:12px;font-weight:600">✏️ New</button>
           <button onclick="fetchAndRenderInbox()" title="Refresh" style="background:transparent;border:1px solid var(--border);color:var(--text);padding:7px 12px;border-radius:4px;cursor:pointer;font-size:12px">↻</button>
         </div>
@@ -10855,6 +10856,7 @@ function _v15ibRenderAll() {
         <span style="flex:1"></span>
         <button id="v15ib-approve-btn" onclick="_apxOpen()" title="Hawkeye - approve the agent's drafted messages before they send" aria-label="Hawkeye agent approvals" class="v15ib-icon" style="width:auto;padding:0 12px;gap:6px;border-color:var(--accent);color:var(--accent);font-weight:700">👁 Hawkeye <span id="v15-apx-count" style="font-weight:800"></span></button>
         <button id="v15acx-approve-btn" onclick="_acxOpen()" title="Confirm agent - approve trial-confirmation messages before they send" aria-label="Confirm agent approvals" class="v15ib-icon" style="display:none;width:auto;padding:0 12px;gap:6px;font-weight:700">✅ Confirm <span id="v15-acx-count" style="font-weight:800"></span></button>
+        <button id="v15aclx-approve-btn" onclick="_aclxOpen()" title="Closing agent - approve post-trial conversion messages before they send" aria-label="Closing agent approvals" class="v15ib-icon" style="display:none;width:auto;padding:0 12px;gap:6px;font-weight:700">🎯 Closing <span id="v15-aclx-count" style="font-weight:800"></span></button>
         <button onclick="_v15ibMassSend()" class="v15ib-icon v15ib-send" title="Mass send" aria-label="Mass send" style="width:auto;padding:0 12px;gap:6px">✉ Mass send</button>
       </div>
       <div class="v15ib-chans">${unreadBtn}${chanBtns}</div>
@@ -10869,6 +10871,7 @@ function _v15ibRenderAll() {
   _v15ibRenderList();
   _apxRefreshCount();
   _acxRefreshCount();
+  _aclxRefreshCount();
 }
 
 // Initials for the row avatar - first letters of up to two name words; falls
@@ -23187,6 +23190,7 @@ async function fetchAndRenderInbox() {
     _renderInboxList();
     _apxRefreshCount();
     _acxRefreshCount();
+    _aclxRefreshCount();
   } catch (e) {
     container.innerHTML = `<div class="req-empty" style="padding:20px 0">Couldn't load inbox - ${escapeHTML(e.message)}</div>`;
   }
@@ -23514,6 +23518,183 @@ async function _acxLost(id) {
 }
 async function _acxSkip(id) {
   try { await _apxPost('/api/agent-confirm', 'skip-ready', { ready_id: id }); _acxRemove(id); _apxToast('Skipped', true); }
+  catch (e) { _apxToast(_apxErr(e), false); }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// CLOSING AGENT approval inbox (🎯) - the THIRD sales agent, working
+// Done-Trial (good-fit attendee) leads. Sibling of _apx*/_acx*: same look,
+// own endpoint (/api/agent-closing), 3 card kinds:
+//   closing         → a drafted post-trial follow-up reply (Approve & send)
+//   closing_enroll  → lead is ready → send the sign-up link + mark won (the CLOSE)
+//   closing_lost    → good-fit attendee won't enroll → mark lost
+// Reuses _apxPost / _apxToast / _apxErr / _apxOpenThread / _apxMsgWhen / _apxTrim.
+// Kept a SEPARATE data set from _ACX_DATA / _APX_DATA (never merge them).
+// ═══════════════════════════════════════════════════════════════
+let _ACLX_DATA = [];
+
+async function _aclxRefreshCount() {
+  const btns = [
+    { btn: document.getElementById('aclx-approve-btn'), span: document.getElementById('aclx-count') },
+    { btn: document.getElementById('v15aclx-approve-btn'), span: document.getElementById('v15-aclx-count') },
+  ].filter(x => x.btn);
+  if (!btns.length) return;
+  let rd;
+  try { rd = await _apxPost('/api/agent-closing', 'list-ready', {}); }
+  catch (e) { if (e && (e.status === 401 || e.status === 403)) btns.forEach(({ btn }) => { btn.style.display = 'none'; }); return; }
+  const n = (rd.ready || []).length;
+  btns.forEach(({ btn, span }) => {
+    btn.style.display = '';
+    if (span) span.textContent = n ? `(${n})` : '';
+    btn.style.borderColor = n ? 'var(--accent)' : 'var(--border)';
+    btn.style.color = n ? 'var(--accent)' : 'var(--text-mute)';
+  });
+}
+function _aclxUpdateCount(n) {
+  [['aclx-approve-btn', 'aclx-count'], ['v15aclx-approve-btn', 'v15-aclx-count']].forEach(([b, s]) => {
+    const btn = document.getElementById(b), span = document.getElementById(s);
+    if (span) span.textContent = n ? `(${n})` : '';
+    if (btn) { btn.style.borderColor = n ? 'var(--accent)' : 'var(--border)'; btn.style.color = n ? 'var(--accent)' : 'var(--text-mute)'; }
+  });
+}
+
+function _aclxOpen() {
+  document.getElementById('aclx-overlay')?.remove();
+  document.body.insertAdjacentHTML('beforeend', `
+    <div id="aclx-overlay" style="position:fixed;inset:0;z-index:9400;background:var(--bg);display:flex;flex-direction:column">
+      <div style="padding:calc(14px + env(safe-area-inset-top)) 18px 12px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px">
+        <div style="font-size:18px;font-weight:800">🎯 Close trials</div>
+        <div style="font-size:12px;color:var(--text-mute)">convert good-fit attendees into members</div>
+        <div style="flex:1"></div>
+        <button onclick="_aclxClose()" aria-label="Close" style="background:none;border:none;color:var(--text-mute);font-size:24px;cursor:pointer;padding:2px 10px">×</button>
+      </div>
+      <div id="aclx-body" style="flex:1;overflow-y:auto;padding:16px 18px calc(24px + env(safe-area-inset-bottom))">
+        <div style="max-width:860px;margin:0 auto"><div style="color:var(--text-mute);font-size:13px"><span class="req-spin"></span> Loading…</div></div>
+      </div>
+    </div>`);
+  _aclxLoad();
+}
+function _aclxClose() { document.getElementById('aclx-overlay')?.remove(); }
+
+async function _aclxLoad() {
+  const body = document.getElementById('aclx-body');
+  if (!body) return;
+  try {
+    const rd = await _apxPost('/api/agent-closing', 'list-ready', {});
+    _ACLX_DATA = (rd.ready || []).filter(r => r.status === 'pending' || r.status === 'approved');
+    _aclxRender();
+    _aclxUpdateCount(_ACLX_DATA.length);
+  } catch (e) {
+    body.innerHTML = `<div style="color:#e07070;font-size:13px">Couldn't load - ${escapeHTML(_apxErr(e))}</div>`;
+  }
+}
+function _aclxRender() {
+  const body = document.getElementById('aclx-body');
+  if (!body) return;
+  if (!_ACLX_DATA.length) { body.innerHTML = '<div style="max-width:860px;margin:0 auto">' + _apxEmpty('All clear - no closings waiting.') + '</div>'; return; }
+  const cards = _ACLX_DATA.map(r => r.kind === 'closing_enroll' ? _aclxEnrollCard(r) : r.kind === 'closing_lost' ? _aclxLostCard(r) : _aclxReplyCard(r)).join('');
+  body.innerHTML = '<div style="max-width:860px;margin:0 auto">' + cards + '</div>';
+}
+
+function _aclxOpenThread(id) { const r = _ACLX_DATA.find(x => x.id === id); if (r) _apxOpenThread(r.ghl_contact_id, r.contact_name || 'Conversation'); }
+function _aclxContext(r) {
+  let tail = Array.isArray(r.thread_tail) ? r.thread_tail.slice() : [];
+  if (!tail.length) { if (r.last_outbound) tail.push({ role: 'agent', text: r.last_outbound }); if (r.last_message) tail.push({ role: 'lead', text: r.last_message }); }
+  if (!tail.length) return '';
+  const bubbles = tail.map(m => {
+    const out = m.role === 'agent';
+    const when = _apxMsgWhen(m.at || m.date);
+    return `<div style="display:flex;flex-direction:column;align-items:${out ? 'flex-end' : 'flex-start'};gap:2px;max-width:84%;align-self:${out ? 'flex-end' : 'flex-start'}">
+      <div style="background:${out ? 'rgba(232,197,71,.13)' : 'rgba(255,255,255,.05)'};border:1px solid ${out ? 'var(--accent-border,rgba(232,197,71,.3))' : 'var(--border)'};color:var(--text);padding:6px 10px;border-radius:12px;font-size:12.5px;line-height:1.4;white-space:pre-wrap;word-break:break-word">${escapeHTML(_apxTrim(String(m.text || '').trim(), 240))}</div>
+      ${when ? `<div style="font-size:10px;color:var(--text-mute);padding:0 4px">${escapeHTML(when)}</div>` : ''}
+    </div>`;
+  }).join('');
+  return `<div onclick="_aclxOpenThread('${r.id}')" title="Tap for the full conversation" style="display:flex;flex-direction:column;gap:6px;margin:4px 0 8px;max-height:260px;overflow-y:auto;cursor:pointer">${bubbles}</div>`;
+}
+function _aclxHeader(r, pill, color) {
+  return `<div style="display:flex;align-items:center;gap:8px;margin-bottom:5px;flex-wrap:wrap">
+    <span style="font-weight:700;font-size:13.5px">${escapeHTML(r.contact_name || 'Lead')}</span>
+    <span style="font-size:10px;font-weight:700;color:${color};background:${color}1a;border:1px solid ${color}44;border-radius:999px;padding:1px 8px">${pill}</span>
+    <div style="flex:1"></div>
+  </div>`;
+}
+function _aclxBox(r, ph) {
+  return `<textarea id="aclx-edit-${r.id}" placeholder="${escapeHTML(ph || '')}" style="width:100%;box-sizing:border-box;font-family:inherit;font-size:13.5px;line-height:1.5;background:var(--accent-glow,rgba(232,197,71,.10));border:1px solid var(--accent-border,rgba(232,197,71,.3));border-radius:10px;padding:9px 11px;color:var(--text);resize:vertical;min-height:64px;outline:none">${escapeHTML(r.draft_message || '')}</textarea>`;
+}
+function _aclxReplyCard(r) {
+  const esc = r.escalate ? `<div style="font-size:11.5px;color:#e0a020;margin-bottom:6px">⚠ agent escalated${r.escalate_reason ? ': ' + escapeHTML(r.escalate_reason) : ''}</div>` : '';
+  return `<div id="aclx-${r.id}" style="background:var(--surface);border:1px solid var(--accent-border,rgba(232,197,71,.3));border-radius:11px;padding:12px 14px;margin-bottom:9px">
+    ${_aclxHeader(r, 'follow-up', 'var(--accent)')}${esc}${_aclxContext(r)}
+    <div style="text-align:center;font-size:9.5px;color:var(--text-mute);text-transform:uppercase;letter-spacing:.09em;margin:2px 0 5px">proposed message · edit it right here</div>
+    ${_aclxBox(r)}
+    <div style="display:flex;align-items:stretch;gap:8px;margin-top:10px">
+      <button onclick="_aclxSkip('${r.id}')" title="Skip" style="flex:1;background:transparent;border:1px solid var(--border);color:#e0654f;border-radius:9px;padding:9px;font-size:17px;cursor:pointer">✕</button>
+      <button onclick="_aclxSend('${r.id}')" style="flex:2;background:var(--accent);border:1px solid var(--accent);color:#08080A;border-radius:9px;padding:9px;font-size:14px;font-weight:700;cursor:pointer">✓ Approve &amp; send</button>
+    </div>
+  </div>`;
+}
+function _aclxEnrollCard(r) {
+  const note = r.enroll_note ? `<div style="font-size:12px;color:var(--text-sub);background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:8px;padding:8px 10px;margin:4px 0 8px"><b style="color:var(--text)">Plan / context:</b> ${escapeHTML(r.enroll_note)}</div>` : '';
+  return `<div id="aclx-${r.id}" style="background:var(--surface);border:1px solid #3DBE8B;border-radius:11px;padding:12px 14px;margin-bottom:9px">
+    ${_aclxHeader(r, 'ready to enroll', '#3DBE8B')}
+    <div style="font-size:11.5px;color:#3DBE8B;margin-bottom:6px">🎉 The close: sends the academy's sign-up link, then marks the opportunity won.</div>
+    ${_aclxContext(r)}${note}
+    <div style="text-align:center;font-size:9.5px;color:var(--text-mute);text-transform:uppercase;letter-spacing:.09em;margin:2px 0 5px">warm message before the link (optional)</div>
+    ${_aclxBox(r, 'optional warm message before the sign-up link')}
+    <div style="display:flex;align-items:stretch;gap:8px;margin-top:10px">
+      <button onclick="_aclxSkip('${r.id}')" title="Skip" style="flex:1;background:transparent;border:1px solid var(--border);color:#e0654f;border-radius:9px;padding:9px;font-size:17px;cursor:pointer">✕</button>
+      <button onclick="_aclxEnroll('${r.id}')" style="flex:2;background:#3DBE8B;border:1px solid #3DBE8B;color:#08080A;border-radius:9px;padding:9px;font-size:14px;font-weight:700;cursor:pointer">✓ Send sign-up link &amp; mark won</button>
+    </div>
+  </div>`;
+}
+function _aclxLostCard(r) {
+  const reason = r.lost_reason ? `<span style="font-size:10px;font-weight:700;color:#e0654f;background:rgba(224,90,66,.12);border-radius:999px;padding:1px 8px">${escapeHTML(r.lost_reason)}</span>` : '';
+  return `<div id="aclx-${r.id}" style="background:var(--surface);border:1px solid rgba(224,90,66,.4);border-radius:11px;padding:12px 14px;margin-bottom:9px">
+    ${_aclxHeader(r, 'lost', '#e0654f')}
+    <div style="font-size:11.5px;color:#e0654f;margin-bottom:6px">Attendee won't enroll. ${reason}</div>
+    ${_aclxContext(r)}
+    <div style="text-align:center;font-size:9.5px;color:var(--text-mute);text-transform:uppercase;letter-spacing:.09em;margin:2px 0 5px">warm closing message (optional)</div>
+    ${_aclxBox(r, 'optional closing message')}
+    <div style="display:flex;align-items:stretch;gap:8px;margin-top:10px">
+      <button onclick="_aclxSkip('${r.id}')" title="Skip" style="flex:1;background:transparent;border:1px solid var(--border);color:var(--text-sub);border-radius:9px;padding:9px;font-size:17px;cursor:pointer">✕</button>
+      <button onclick="_aclxLost('${r.id}')" style="flex:2;background:#e0654f;border:1px solid #e0654f;color:#fff;border-radius:9px;padding:9px;font-size:14px;font-weight:700;cursor:pointer">Mark lost</button>
+    </div>
+  </div>`;
+}
+function _aclxRemove(id) {
+  _ACLX_DATA = _ACLX_DATA.filter(x => x.id !== id);
+  document.getElementById('aclx-' + id)?.remove();
+  if (!_ACLX_DATA.length) { const body = document.getElementById('aclx-body'); if (body) body.innerHTML = '<div style="max-width:860px;margin:0 auto">' + _apxEmpty('All clear - no closings waiting.') + '</div>'; }
+  _aclxUpdateCount(_ACLX_DATA.length);
+}
+async function _aclxSend(id) {
+  if (!_sendGuard('aclxSend-' + id)) return;
+  const r = _ACLX_DATA.find(x => x.id === id); if (!r) return;
+  const ta = document.getElementById('aclx-edit-' + id);
+  const reply = (ta ? ta.value : (r.draft_message || '')).trim();
+  if (!reply) { _apxToast('Message is empty', false); return; }
+  try {
+    const resp = await _apxPost('/api/agent-closing', 'send', { ready_id: id, contact_id: r.ghl_contact_id, conversation_id: r.ghl_conversation_id, reply, contact_name: r.contact_name, confidence: r.confidence, reasoning: r.reasoning });
+    _aclxRemove(id); _apxToast(resp && resp.deferred ? _apxQuietMsg(resp.send_after) : '✓ Sent', true);
+  } catch (e) { _apxToast(_apxErr(e), false); }
+}
+async function _aclxEnroll(id) {
+  if (!_sendGuard('aclxEnroll-' + id)) return;
+  const r = _ACLX_DATA.find(x => x.id === id); if (!r) return;
+  const ta = document.getElementById('aclx-edit-' + id);
+  const reply = (ta ? ta.value : (r.draft_message || '')).trim();
+  try { await _apxPost('/api/agent-closing', 'confirm-enroll', { ready_id: id, contact_id: r.ghl_contact_id, conversation_id: r.ghl_conversation_id, reply, contact_name: r.contact_name, enroll_note: r.enroll_note }); _aclxRemove(id); _apxToast('🎉 Sign-up link sent - marked won', true); }
+  catch (e) { _apxToast(_apxErr(e), false); }
+}
+async function _aclxLost(id) {
+  const r = _ACLX_DATA.find(x => x.id === id); if (!r) return;
+  const ta = document.getElementById('aclx-edit-' + id);
+  const reply = (ta ? ta.value : (r.draft_message || '')).trim();
+  try { await _apxPost('/api/agent-closing', 'confirm-lost', { ready_id: id, reply, lost_reason: r.lost_reason }); _aclxRemove(id); _apxToast('Marked lost', true); }
+  catch (e) { _apxToast(_apxErr(e), false); }
+}
+async function _aclxSkip(id) {
+  try { await _apxPost('/api/agent-closing', 'skip-ready', { ready_id: id }); _aclxRemove(id); _apxToast('Skipped', true); }
   catch (e) { _apxToast(_apxErr(e), false); }
 }
 
