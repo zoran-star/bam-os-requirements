@@ -13,8 +13,11 @@ import { withSentryApiRoute } from "./_sentry.js";
 // It calls Claude and returns the proposed reply for a trainer to review. The
 // agent's behaviour = the vendored BAM GTA booking prompt + active lessons.
 
-import { assemblePrompt, SECTIONS } from "./agent/prompt-structure.js";
+import { assemblePrompt, SECTIONS, AGENT_SPECS, sectionKeysForAgent } from "./agent/prompt-structure.js";
 import { buildAgentSystem } from "./agent/brain.js";
+
+// Which agent is being trained/previewed. Defaults to the booking agent.
+const pickAgent = (a) => (a && AGENT_SPECS[a]) ? a : "booking";
 
 const SUPABASE_URL         = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
@@ -117,14 +120,18 @@ async function savedExamples(clientId) {
   } catch (_) { return []; }
 }
 
-async function handleChat(messages, clientId, leadContext, res) {
+async function handleChat(messages, clientId, leadContext, res, agent = "booking") {
   if (!ANTHROPIC_KEY) return res.status(500).json({ error: "ANTHROPIC_API_KEY not configured on server" });
   if (!Array.isArray(messages) || !messages.length) return res.status(400).json({ error: "messages required" });
 
+  // The confirm agent (Scheduled-Trial) is academy-agnostic in behavior and does NOT
+  // use the booking agent's lessons/examples — preview it from the clean brain +
+  // section overrides only, exactly like it runs live.
+  const isConfirm = agent === "confirm";
   const [lessons, overrides, examples] = await Promise.all([
-    activeLessons(clientId), sectionOverrides(clientId), savedExamples(clientId),
+    isConfirm ? [] : activeLessons(clientId), sectionOverrides(clientId), isConfirm ? [] : savedExamples(clientId),
   ]);
-  const system = buildAgentSystem({ lessons, overrides, examples, leadContext, trailer: SANDBOX_TRAILER });
+  const system = buildAgentSystem({ lessons, overrides, examples, leadContext, trailer: SANDBOX_TRAILER, agent });
 
   // Map sandbox turns → Anthropic roles. parent = user, agent = assistant.
   const anthropicMsgs = messages
@@ -194,7 +201,7 @@ async function handler(req, res) {
 
   try {
     if (action === "chat") {
-      return await handleChat(b.messages, clientId, b.lead_context || "", res);
+      return await handleChat(b.messages, clientId, b.lead_context || "", res, pickAgent(b.agent));
     }
 
     if (action === "save-example") {
@@ -254,18 +261,24 @@ async function handler(req, res) {
     }
 
     // ── Prompt "Brain" editor ──────────────────────────────
+    // Scoped to the chosen agent so the editor shows only the sections that shape
+    // it (shared facts + that agent's behavior), in prompt order.
     if (action === "sections") {
+      const agent = pickAgent(b.agent);
       const ov = await sectionOverrides(clientId);
-      return res.status(200).json({
-        sections: SECTIONS.map(s => ({
+      const bySection = new Map(SECTIONS.map(s => [s.key, s]));
+      const sections = sectionKeysForAgent(agent)
+        .map(k => bySection.get(k))
+        .filter(Boolean)
+        .map(s => ({
           key:          s.key,
           label:        s.label,
           group:        s.layer,
           body:         ov[s.key] != null ? ov[s.key] : s.body,  // current (override or default)
           default_body: s.body,
           is_default:   ov[s.key] == null,
-        })),
-      });
+        }));
+      return res.status(200).json({ agent, sections });
     }
 
     if (action === "update-section") {
