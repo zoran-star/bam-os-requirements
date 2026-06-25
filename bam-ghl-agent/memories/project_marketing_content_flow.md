@@ -165,6 +165,10 @@ Not done (deferred): stale-ticket nudge cron; urgency toggle on budget/remove fl
   Each guide card's "Open guide" button now calls `_openGuideResource('<keyword>')`
   (paid ad / first campaign / organic) which opens the matching Resources-tab entry
   in-portal (login-gated). Cam added the 3 guides to the Resources tab manually.
+- Update (2026-06-24, Zoran): cards now expand to the **full walkthrough INLINE**
+  (`.gc-step` numbered steps in the card body) so clients read how-to-get-started without
+  clicking away from the Marketing/Organic flow. Pill relabeled `GUIDE`; `_openGuideResource`
+  is now a small secondary "Open the printable PDF" link at the bottom of each card.
 
 ## Resources gated behind login — 2026-06-23
 
