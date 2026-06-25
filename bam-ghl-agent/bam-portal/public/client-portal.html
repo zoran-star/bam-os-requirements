@@ -28665,10 +28665,13 @@ async function _deleteMemberDoc(fileId, memberId, clientId) {
 async function _memberUpdateField(memberId, field, value) {
   try {
     await _memberAction(memberId, 'update-profile', { fields: { [field]: value } });
-    await openMemberPopup(memberId);
-    fetchAndRenderMembers();  // also refresh the roster behind the drawer
+    // The <select>/<input> already shows the new value - DON'T re-open the drawer
+    // (that full re-fetch + live Stripe call was the visible glitch). Just refresh
+    // the roster behind it so the list stays in sync.
+    fetchAndRenderMembers();
   } catch (e) {
     _plToast('Update failed: ' + e.message);
+    await openMemberPopup(memberId);  // revert the control to the saved value
   }
 }
 
