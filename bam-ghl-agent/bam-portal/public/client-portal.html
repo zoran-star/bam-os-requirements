@@ -21019,9 +21019,12 @@ function _memberStatusPill(status, opts) {
     payment_failed:          ['Payment failed', '#9a3b2f'],
   };
   const [label, color] = map[status] || [status || '-', '#555'];
-  const main = `<span style="display:inline-block;font-size:11px;font-weight:700;padding:2px 9px;border-radius:999px;background:${color};color:#fff">${escapeHTML(label)}</span>`;
+  const main = `<span style="display:inline-block;vertical-align:middle;white-space:nowrap;font-size:11px;font-weight:700;padding:2px 9px;border-radius:999px;background:${color};color:#fff">${escapeHTML(label)}</span>`;
   if (opts && opts.pause_scheduled_for && status !== 'paused' && status !== 'cancelling') {
-    const queued = `<span title="Pause queued - auto-activates ${escapeHTML(opts.pause_scheduled_for)}" style="display:inline-block;margin-left:5px;font-size:10px;font-weight:700;padding:2px 8px;border-radius:999px;background:transparent;border:1px solid #8a6d1f;color:#cfa647">🕐 Pause queued · ${escapeHTML(opts.pause_scheduled_for)}</span>`;
+    // Short date so the pill fits the fixed status column (full date in tooltip).
+    let _pd = opts.pause_scheduled_for;
+    try { _pd = new Date(opts.pause_scheduled_for + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' }); } catch (_) {}
+    const queued = `<span title="Pause queued - auto-activates ${escapeHTML(opts.pause_scheduled_for)}" style="display:inline-block;vertical-align:middle;white-space:nowrap;font-size:10px;font-weight:700;padding:2px 8px;border-radius:999px;background:transparent;border:1px solid #8a6d1f;color:#cfa647">🕐 Pause &middot; ${escapeHTML(_pd)}</span>`;
     return main + queued;
   }
   return main;
@@ -21273,6 +21276,9 @@ function _renderMembersView() {
          down the whole roster (the badges no longer drift per row). */
       .member-card-pills { display:grid; grid-template-columns:124px 92px auto; align-items:center; column-gap:8px; }
       .mc-status, .mc-price, .mc-extra { display:flex; align-items:center; gap:6px; min-width:0; }
+      /* If a member has a queued-pause pill too, stack it under the status pill
+         instead of overflowing the fixed column. */
+      .mc-status { flex-wrap:wrap; row-gap:4px; }
       .members-filter-backdrop { display:none; }
       @media (max-width: 640px) {
         .member-card {
