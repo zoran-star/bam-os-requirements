@@ -1550,6 +1550,92 @@
     line-height: 1;
   }
 
+  /* ── Multi-format angles accordion (wizard guide card) ── */
+  .angle-list { display: flex; flex-direction: column; gap: 10px; }
+  .angle-card {
+    border: 1px solid var(--border-med);
+    border-radius: 8px;
+    background: var(--surface);
+    overflow: hidden;
+  }
+  .angle-card.open { border-color: var(--accent-border); }
+  .angle-head {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 13px 14px;
+    background: none;
+    border: none;
+    cursor: pointer;
+    text-align: left;
+    color: var(--text);
+    -webkit-tap-highlight-color: transparent;
+  }
+  .angle-name {
+    flex: 1 1 auto;
+    min-width: 0;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text);
+  }
+  .angle-media-inds { display: flex; gap: 6px; flex: 0 0 auto; }
+  .angle-medium-ind {
+    font-family: var(--mono);
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--text-sub);
+    border: 1px solid var(--border-med);
+    border-radius: 4px;
+    padding: 2px 6px;
+    line-height: 1.4;
+  }
+  .angle-chev {
+    flex: 0 0 auto;
+    color: var(--text-mute);
+    font-size: 18px;
+    line-height: 1;
+    transition: transform 0.18s ease;
+  }
+  .angle-card.open .angle-chev { transform: rotate(90deg); color: var(--gold); }
+  .angle-body { padding: 2px 14px 14px; }
+  /* Medium toggle - segmented control */
+  .angle-toggle {
+    display: inline-flex;
+    gap: 0;
+    margin: 12px 0 4px;
+    border: 1px solid var(--border-med);
+    border-radius: 7px;
+    overflow: hidden;
+  }
+  .angle-toggle-btn {
+    background: none;
+    border: none;
+    padding: 7px 16px;
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-sub);
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .angle-toggle-btn + .angle-toggle-btn { border-left: 1px solid var(--border-med); }
+  .angle-toggle-btn.active { background: var(--gold-sheen); color: var(--gold); }
+  /* Flat labeled script beats */
+  .angle-beats { margin-top: 12px; display: flex; flex-direction: column; gap: 9px; }
+  .angle-beat { display: flex; flex-direction: column; gap: 2px; }
+  .angle-beat-label {
+    font-family: var(--mono);
+    font-size: 9px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--gold);
+  }
+  .angle-beat-text { font-size: 13.5px; line-height: 1.55; color: var(--text); }
+  .angle-exec[hidden] { display: none; }
+
   /* Example-asset viewer modal */
   .asset-modal { position: fixed; inset: 0; z-index: 5000; display: none; }
   .asset-modal.open { display: flex; align-items: center; justify-content: center; }
@@ -6332,7 +6418,7 @@
               <span class="guide-card-pill">GUIDE</span>
               <span class="guide-card-chev">&rsaquo;</span>
             </summary>
-            <div class="guide-card-body">
+            <div class="guide-card-body" id="firstCampaignGuideBody">
               <p class="gc-intro">Your first campaign is <b>three angles in two formats</b> - video and graphic. Here's what to send.</p>
               <div class="gc-group">The core videos - your phone is fine</div>
               <div class="gc-step"><span class="gc-num">1</span><span class="gc-tx"><span class="gc-h">Free trial</span><span class="gc-t">You to camera, <b>offer in the first three seconds</b>. Two hooks if you can - one specific, one general.</span></span></div>
@@ -6606,37 +6692,42 @@
               <div class="card-title" id="wizardGuideOfferTitle" style="margin-bottom:20px;text-transform:uppercase;letter-spacing:0.04em">Offer</div>
 
               <!-- Populated by _populateGuideCard() with the real card from
-                   /api/guide-cards matching the picked offer. Placeholder
-                   copy shows if no card exists yet. -->
-              <div class="guide-section">
-                <div class="guide-label">Purpose</div>
-                <div class="guide-value" id="wizardGuidePurpose">[Your account manager will fill this in. Why does this offer exist? Who's the audience? What action do we want them to take?]</div>
-              </div>
-              <div class="guide-section">
-                <div class="guide-label">Filming / creation tips</div>
-                <div class="guide-value" id="wizardGuideFilming">[Your account manager will fill this in. Camera angle, lighting, length, voiceover, hook in the first 3 seconds, etc.]</div>
-              </div>
-              <div class="guide-section">
-                <div class="guide-label">Example script</div>
-                <div class="guide-value" id="wizardGuideScript" style="white-space:pre-line">[Your account manager will fill this in.
+                   /api/guide-cards matching the picked offer. When the card
+                   carries angles[] (Phase 2) the accordion renders here;
+                   otherwise the legacy sections below are the fallback. -->
+              <div id="wizardGuideAngles" style="display:none"></div>
+
+              <div id="wizardGuideLegacy">
+                <div class="guide-section">
+                  <div class="guide-label">Purpose</div>
+                  <div class="guide-value" id="wizardGuidePurpose">[Your account manager will fill this in. Why does this offer exist? Who's the audience? What action do we want them to take?]</div>
+                </div>
+                <div class="guide-section">
+                  <div class="guide-label">Filming / creation tips</div>
+                  <div class="guide-value" id="wizardGuideFilming">[Your account manager will fill this in. Camera angle, lighting, length, voiceover, hook in the first 3 seconds, etc.]</div>
+                </div>
+                <div class="guide-section">
+                  <div class="guide-label">Example script</div>
+                  <div class="guide-value" id="wizardGuideScript" style="white-space:pre-line">[Your account manager will fill this in.
 "Hook line in the first 3 seconds.
 Then the offer pitch.
 Then the call to action."]</div>
-              </div>
-              <div class="guide-section" id="wizardGuideAssetsSection">
-                <div class="guide-label">Example assets</div>
-                <div class="guide-assets-grid" id="wizardGuideAssets">
-                  <!-- populated dynamically; falls back to placeholders -->
-                  <img src="https://picsum.photos/seed/eg1/200/200" alt="Example 1" />
-                  <img src="https://picsum.photos/seed/eg2/200/200" alt="Example 2" />
-                  <img src="https://picsum.photos/seed/eg3/200/200" alt="Example 3" />
-                  <img src="https://picsum.photos/seed/eg4/200/200" alt="Example 4" />
                 </div>
-              </div>
-              <div class="guide-section" id="wizardGuideLinksSection" style="display:none">
-                <div class="guide-label">Example links</div>
-                <div class="guide-value" id="wizardGuideLinks">
-                  <!-- populated dynamically; hidden when no links -->
+                <div class="guide-section" id="wizardGuideAssetsSection">
+                  <div class="guide-label">Example assets</div>
+                  <div class="guide-assets-grid" id="wizardGuideAssets">
+                    <!-- populated dynamically; falls back to placeholders -->
+                    <img src="https://picsum.photos/seed/eg1/200/200" alt="Example 1" />
+                    <img src="https://picsum.photos/seed/eg2/200/200" alt="Example 2" />
+                    <img src="https://picsum.photos/seed/eg3/200/200" alt="Example 3" />
+                    <img src="https://picsum.photos/seed/eg4/200/200" alt="Example 4" />
+                  </div>
+                </div>
+                <div class="guide-section" id="wizardGuideLinksSection" style="display:none">
+                  <div class="guide-label">Example links</div>
+                  <div class="guide-value" id="wizardGuideLinks">
+                    <!-- populated dynamically; hidden when no links -->
+                  </div>
                 </div>
               </div>
             </div>
@@ -19552,6 +19643,7 @@ function _showOrganicOnly() {
   _fetchAndRenderOrganic();
 }
 function _marketingEnter() {
+  _renderFirstCampaignGuide();   // data-drive the "Your First Campaign" card from the default guide card
   if (_hasOrganic() && !_hasAds()) {
     // Content-only client: straight to organic, no Ads | Organic split.
     _showOrganicOnly();
@@ -30967,9 +31059,204 @@ function wizardSelectOffer(offerName) {
   wizardGoToStep('guide-card');
 }
 
-// Fetch the guide card for this offer and populate the Purpose / Filming
-// tips / Example script / assets / links sections. Falls back to the
-// hardcoded placeholders if no matching card is found.
+// ── Guide-card data (Phase 2: multi-format angles) ───────────────────
+// A single guide card can carry an `angles[]` array. Each angle:
+//   { name, purpose, video:  { segments:[{label,text}], tips, example_assets:[{url,name,type}] } | null,
+//                     graphic:{ segments:[...], tips, example_assets:[...] } | null }
+// video / graphic are optional executions of the same angle. Legacy
+// columns (purpose / filming_tips / example_script / example_assets)
+// remain populated as a non-breaking fallback when `angles` is empty.
+
+// Shared, cached fetch so the wizard render and the First Campaign card
+// don't double-hit the API on the same screen.
+let _GUIDE_CARDS_CACHE = null;
+async function _fetchGuideCards() {
+  if (_GUIDE_CARDS_CACHE) return _GUIDE_CARDS_CACHE;
+  const token = await _mreqAuthToken();
+  const res = await fetch('/api/guide-cards', { headers: { Authorization: 'Bearer ' + token } });
+  if (!res.ok) throw new Error('guide-cards ' + res.status);
+  const json = await _safeJson(res);
+  const cards = json.guide_cards || json.cards || json || [];
+  _GUIDE_CARDS_CACHE = Array.isArray(cards) ? cards : [];
+  return _GUIDE_CARDS_CACHE;
+}
+
+// Normalize a card's angles into a clean array. Tolerates missing/odd
+// shapes so a half-filled staff record never throws in the client.
+function _cardAngles(card) {
+  const raw = card && Array.isArray(card.angles) ? card.angles : [];
+  return raw.map(a => {
+    const exec = (e) => {
+      if (!e || typeof e !== 'object') return null;
+      const segs = Array.isArray(e.segments)
+        ? e.segments.filter(s => s && (s.label || s.text)).map(s => ({ label: s.label || '', text: s.text || '' }))
+        : [];
+      const assets = Array.isArray(e.example_assets) ? e.example_assets : [];
+      const tips = (e.tips != null) ? String(e.tips) : '';
+      // an execution is "present" if it carries any content at all
+      if (!segs.length && !assets.length && !tips.trim()) return null;
+      return { segments: segs, tips, example_assets: assets };
+    };
+    return {
+      name: a && a.name ? String(a.name) : 'Angle',
+      purpose: a && a.purpose ? String(a.purpose) : '',
+      video: exec(a && a.video),
+      graphic: exec(a && a.graphic),
+    };
+  }).filter(a => a.video || a.graphic || a.purpose);
+}
+
+// Small inline medium label (clean text, no emoji) for headers/toggles.
+const _MEDIUM_LABEL = { video: 'Video', graphic: 'Graphic' };
+
+// Build the gallery markup for one execution's example_assets, reusing
+// the existing .guide-asset tile + openAssetModal viewer.
+function _angleAssetsHTML(assets) {
+  const list = Array.isArray(assets) ? assets : [];
+  if (!list.length) return '';
+  const tiles = list.map(a => {
+    const rawUrl = a.url || a;
+    const url = escapeHTML(rawUrl);
+    const name = escapeHTML(a.name || 'Example');
+    if (!url) return '';
+    const kind = _assetKind(rawUrl);
+    const thumb = kind === 'video'
+      ? `<video src="${url}" preload="metadata" muted playsinline onerror="this.closest('.guide-asset').classList.add('is-file')"></video><span class="guide-asset-play"></span>`
+      : `<img src="${url}" alt="${name}" onerror="this.closest('.guide-asset').classList.add('is-file')" />`;
+    return `<button type="button" class="guide-asset" onclick="openAssetModal(this.dataset.assetUrl,this.dataset.assetName,this.dataset.assetKind)" data-asset-url="${url}" data-asset-name="${name}" data-asset-kind="${kind}" title="View ${name}">`
+      + thumb
+      + `<span class="guide-asset-file"><span class="guide-asset-file-icon">&darr;</span><span>${name}</span></span>`
+      + `</button>`;
+  }).join('');
+  return `<div class="guide-label" style="margin-top:12px">Example assets</div><div class="guide-assets-grid">${tiles}</div>`;
+}
+
+// Render one execution (segments / tips / assets) into the open angle.
+function _angleExecHTML(exec) {
+  if (!exec) return '';
+  let html = '';
+  if (Array.isArray(exec.segments) && exec.segments.length) {
+    html += '<div class="angle-beats">' + exec.segments.map(s => {
+      const label = s.label ? `<span class="angle-beat-label">${escapeHTML(s.label)}</span>` : '';
+      const text = s.text ? `<span class="angle-beat-text">${escapeHTML(s.text)}</span>` : '';
+      return `<div class="angle-beat">${label}${text}</div>`;
+    }).join('') + '</div>';
+  }
+  if (exec.tips && exec.tips.trim()) {
+    html += `<div class="guide-label" style="margin-top:12px">Tips</div><div class="guide-value">${escapeHTML(exec.tips)}</div>`;
+  }
+  html += _angleAssetsHTML(exec.example_assets);
+  return html;
+}
+
+// Build one collapsed angle sub-card with a medium toggle.
+function _angleCardHTML(angle, idx) {
+  const media = [];
+  if (angle.video) media.push('video');
+  if (angle.graphic) media.push('graphic');
+  // Collapsed-header medium indicators (clean text pills, no emoji).
+  const indicators = media.map(m =>
+    `<span class="angle-medium-ind">${_MEDIUM_LABEL[m]}</span>`).join('');
+  const first = media[0] || '';
+  // Medium toggle - only when both executions exist.
+  let toggle = '';
+  if (media.length > 1) {
+    toggle = '<div class="angle-toggle" role="group">' + media.map((m, i) =>
+      `<button type="button" class="angle-toggle-btn${i === 0 ? ' active' : ''}" data-medium="${m}" onclick="_angleSelectMedium(this,${idx})">${_MEDIUM_LABEL[m]}</button>`
+    ).join('') + '</div>';
+  }
+  const execBodies = media.map(m =>
+    `<div class="angle-exec" data-medium="${m}"${m === first ? '' : ' hidden'}>${_angleExecHTML(m === 'video' ? angle.video : angle.graphic)}</div>`
+  ).join('');
+  const purpose = angle.purpose
+    ? `<div class="guide-label">Purpose</div><div class="guide-value">${escapeHTML(angle.purpose)}</div>`
+    : '';
+  return `<div class="angle-card" data-angle="${idx}">
+    <button type="button" class="angle-head" aria-expanded="false" onclick="_angleToggleOpen(this)">
+      <span class="angle-name">${escapeHTML(angle.name)}</span>
+      <span class="angle-media-inds">${indicators}</span>
+      <span class="angle-chev">&rsaquo;</span>
+    </button>
+    <div class="angle-body" hidden>
+      ${purpose}
+      ${toggle}
+      ${execBodies}
+    </div>
+  </div>`;
+}
+
+// Expand / collapse an angle sub-card (the single accordion level).
+function _angleToggleOpen(btn) {
+  const card = btn.closest('.angle-card');
+  if (!card) return;
+  const body = card.querySelector('.angle-body');
+  const open = card.classList.toggle('open');
+  btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+  if (body) body.hidden = !open;
+}
+
+// Switch the medium for one angle (the single toggle level).
+function _angleSelectMedium(btn, idx) {
+  const card = btn.closest('.angle-card');
+  if (!card) return;
+  const medium = btn.dataset.medium;
+  card.querySelectorAll('.angle-toggle-btn').forEach(b =>
+    b.classList.toggle('active', b === btn));
+  card.querySelectorAll('.angle-exec').forEach(ex =>
+    ex.hidden = (ex.dataset.medium !== medium));
+}
+
+// Render all angles of a card as the accordion. Returns '' if no angles.
+function _renderAnglesAccordion(card) {
+  const angles = _cardAngles(card);
+  if (!angles.length) return '';
+  return `<div class="angle-list">${angles.map((a, i) => _angleCardHTML(a, i)).join('')}</div>`;
+}
+
+// ── "Your First Campaign" top card - data-driven from is_default ──────
+// Renders the default guide card's angles inline using the existing
+// .gc-step walkthrough style. If no card is flagged is_default, leaves
+// the static hardcoded fallback content untouched.
+async function _renderFirstCampaignGuide() {
+  const body = document.getElementById('firstCampaignGuideBody');
+  if (!body || body._fcRendered) return;   // render once per session
+  try {
+    const cards = await _fetchGuideCards();
+    const def = cards.find(c => c && c.is_default === true);
+    if (!def) return;                       // keep static fallback
+    const angles = _cardAngles(def);
+    if (!angles.length) return;             // keep static fallback
+
+    const esc = escapeHTML;
+    let html = '';
+    if (def.purpose && String(def.purpose).trim()) {
+      html += `<p class="gc-intro">${esc(def.purpose)}</p>`;
+    } else {
+      html += `<p class="gc-intro">Your first campaign - here are the angles to send, in the formats that fit.</p>`;
+    }
+    angles.forEach((a, i) => {
+      const media = [];
+      if (a.video) media.push('Video');
+      if (a.graphic) media.push('Graphic');
+      const fmt = media.length ? ` <span style="color:var(--text-mute)">(${media.join(' + ')})</span>` : '';
+      html += `<div class="gc-step"><span class="gc-num">${i + 1}</span><span class="gc-tx">`
+        + `<span class="gc-h">${esc(a.name)}${fmt}</span>`
+        + (a.purpose ? `<span class="gc-t">${esc(a.purpose)}</span>` : '')
+        + `</span></div>`;
+    });
+    html += `<div class="gc-group">How to send it</div>`;
+    html += `<div class="gc-step"><span class="gc-num">&rsaquo;</span><span class="gc-tx"><span class="gc-t"><b>Marketing &rsaquo; Ads &rsaquo; Add new creative.</b> Drag your files in (or Upload a folder), pick the <b>format</b>, mark urgent if needed, submit, and watch it under <b>What's in flight</b>.</span></span></div>`;
+    html += `<div class="gc-step"><span class="gc-num">!</span><span class="gc-tx"><span class="gc-t"><b>One rule: send raw, don't edit.</b> The clips, the photos, the quotes. Cutting and designing is on us.</span></span></div>`;
+    html += `<div class="gc-pdf"><button type="button" onclick="_openGuideResource('first campaign')">Open the printable PDF</button></div>`;
+
+    body.innerHTML = html;
+    body._fcRendered = true;
+  } catch (_) { /* keep static fallback on any failure */ }
+}
+
+// Fetch the guide card for this offer and populate either the multi-format
+// angles accordion (Phase 2) or, as a non-breaking fallback, the legacy
+// Purpose / Filming tips / Example script / assets / links sections.
 async function _populateGuideCard(offerName) {
   const setText = (id, val, placeholder) => {
     const el = document.getElementById(id);
@@ -30988,8 +31275,23 @@ async function _populateGuideCard(offerName) {
     Object.keys(GUIDE_PLACEHOLDERS).forEach(id => setText(id, null, GUIDE_PLACEHOLDERS[id]));
   };
 
+  // Containers: the Phase 2 angles accordion + the legacy sections wrapper.
+  const anglesEl = document.getElementById('wizardGuideAngles');
+  const legacyEl = document.getElementById('wizardGuideLegacy');
+  // Helper to show legacy + hide the accordion (the fallback layout).
+  const showLegacyLayout = () => {
+    if (anglesEl) { anglesEl.style.display = 'none'; anglesEl.innerHTML = ''; }
+    if (legacyEl) legacyEl.style.display = '';
+  };
+  // Helper to show the accordion + hide legacy (the Phase 2 layout).
+  const showAnglesLayout = (markup) => {
+    if (legacyEl) legacyEl.style.display = 'none';
+    if (anglesEl) { anglesEl.innerHTML = markup; anglesEl.style.display = ''; }
+  };
+
   // Loading state up front - clears any stale content from a previously
   // viewed offer so nothing flashes before the real card arrives.
+  showLegacyLayout();
   ['wizardGuidePurpose', 'wizardGuideFilming', 'wizardGuideScript'].forEach(id => {
     const el = document.getElementById(id);
     if (el) { el.textContent = 'Loading…'; el.style.opacity = '0.4'; }
@@ -31002,17 +31304,18 @@ async function _populateGuideCard(offerName) {
   if (linksSection) linksSection.style.display = 'none';
 
   try {
-    const token = await _mreqAuthToken();
-    const res = await fetch('/api/guide-cards', { headers: { Authorization: 'Bearer ' + token } });
-    if (!res.ok) { showGuidePlaceholders(); return; }
-    const json = await _safeJson(res);
-    const cards = json.guide_cards || json.cards || json || [];
+    const cards = await _fetchGuideCards();
     const match = (Array.isArray(cards) ? cards : []).find(c => {
       const t = (c.title || '').toLowerCase().trim();
       return t === (offerName || '').toLowerCase().trim();
     });
     if (!match) { showGuidePlaceholders(); return; }
 
+    // Phase 2: if this card carries angles, render the accordion and stop.
+    const anglesMarkup = _renderAnglesAccordion(match);
+    if (anglesMarkup) { showAnglesLayout(anglesMarkup); return; }
+
+    // Fallback: legacy single purpose / tips / script / assets layout.
     setText('wizardGuidePurpose', match.purpose, GUIDE_PLACEHOLDERS.wizardGuidePurpose);
     setText('wizardGuideFilming', match.filming_tips, GUIDE_PLACEHOLDERS.wizardGuideFilming);
     setText('wizardGuideScript', match.example_script, GUIDE_PLACEHOLDERS.wizardGuideScript);
