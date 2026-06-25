@@ -76,9 +76,17 @@ Phase order:
     `abandoned` + stamps tag via `_plStampUnqualified`). Plain abandon / duplicate-cleanup does NOT tag.
   - ⏸ DEFERRED to P6 (deliberate): do NOT reroute live "Lost" into the Nurture stage yet — nurture automation
     doesn't exist; Lost keeps current behavior until P6.
-- **P2** — 🎯 Closing agent (mirror Confirm) **+ the close runs through Hawkeye**: Closing sends a Stripe
-  payment link → human ✓ → parent self-pays → Stripe webhook auto-creates the member (kills the "Won" stub;
-  wire to `[[project_stripe_app_created_subs]]`). Own switch `closing_agent_mode`, `_aclx*` queue.
+- **P2a** — ✅ SHIPPED (branch `session/sales-crew`): 🎯 Closing agent, mirror of Confirm, on the Done-Trial
+  stage. Backend: `api/agent-closing.js` (list/draft/send/list-ready/skip-ready/detect-now/**confirm-enroll**/
+  confirm-lost), `closingAgentMode` (`closing_agent_mode`, default off), `doneTrialStage`+`computeClosingQueue`
+  in `_stage.js`, 7 `closing_*` brain sections + `AGENT_SPECS.closing`, table `agent_closing_replies`
+  (migration 20260625210000, **APPLIED to prod**), cron `3,18,33,48`. Frontend: AgentModePanel 3rd control,
+  SandboxApp 🎯 Closing trainer tab, `_aclx*` Hawkeye queue in client-portal.html (kinds closing/closing_enroll/
+  closing_lost). `confirm-enroll` = send offer `signup_url` + mark opp won (the close). INERT until
+  `closing_agent_mode` set to hawkeye.
+- **P2b** — ⬜ TODO: replace the Won-stub in `confirm-enroll` with the real **Stripe payment-link → webhook
+  auto-member** flow (kills the manual Won path; wire to `[[project_stripe_app_created_subs]]`). There's a
+  `// TODO P2b:` marker in `api/agent-closing.js`.
 - **P2.5** — 📋 post-trial form → a card in the unified approval inbox ("🏁 Trial done — log outcome").
 - **P3** — ✉️ Resend foundation (Resend ALREADY wired in `api/clients.js`; formalize `api/_email.js`).
   **FROM = `info@byanymeanstoronto.com`** (verify DNS in Resend). **Email templates LIVE IN THE PORTAL,
