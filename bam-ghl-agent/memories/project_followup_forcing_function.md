@@ -6,6 +6,24 @@ type: project
 
 # Quiet lead → Send to Ghosted
 
+## ⭐ FINAL model (2026-06-24, later same day — important refinements)
+The ghost engine is now the **≥24h fallback for EVERY Responded lead**, not just
+outbound-last ones:
+- **Direction-agnostic.** Any Responded lead quiet ≥`MIN_QUIET_HOURS` (24h, either
+  direction) with no pending card → ghost card. We DROPPED the "our last message
+  outbound" requirement: an inbound-last lead (replied, never followed up) is also
+  a ghost candidate, else they fall through both engines and read "All good".
+- **Iterates the full Responded roster** (`respondedContactIds`), NOT just the
+  top-100 recent conversations — direct-fetches each cold lead's conversation when
+  it's outside that window. (This + dropping the 14-day `MAX_AGE_DAYS` cap is what
+  finally surfaced long-cold leads like Babatunde/Cissy.)
+- **Reply engine bounded to fresh inbound (<24h)** in `agent-approvals` detect: an
+  inbound lead quiet ≥24h is handed to ghost, not a late reply. Clean partition.
+- **Follow-up send guard checks LIVE GHL** (`leadRepliedLiveGHL` in
+  `agent-followups.js`), not the (empty for GTA) `ghl_inbound_messages` mirror — so
+  we never text someone who already replied even when the inbound webhook is down.
+- Detector is LLM-free; writes `kind:'ghost'` cards into `agent_ready_replies`.
+
 **Supersedes the old "follow-up forcing function" (2026-06-23).** Zoran realized BAM
 GTA already has an **SMS Ghosted** GHL automation (multi-touch texts+emails → moves
 back to Interested on reply → marks Lost if no reply → Lost triggers lead-nurture).
