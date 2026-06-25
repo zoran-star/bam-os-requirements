@@ -15696,6 +15696,7 @@ function openTrainAgentView() {
       ${tab('test', '💬 Test')}
       ${tab('lessons', '📚 Lessons')}
       ${tab('knowledge', '📍 Knowledge')}
+      ${tab('automations', '👻 Automations')}
       ${(typeof _IS_BAM_STAFF !== 'undefined' && _IS_BAM_STAFF === true) ? tab('mode', '🎚 Autonomy') : ''}
     </div>
     <div id="ta-panel"></div>`;
@@ -15708,6 +15709,7 @@ function _taRenderPanel() {
   if (_TA.tab === 'test') return _taRenderTest();
   if (_TA.tab === 'lessons') return _taRenderLessons();
   if (_TA.tab === 'knowledge') return _taRenderKnowledge();
+  if (_TA.tab === 'automations') return _taRenderAutomations();
   if (_TA.tab === 'mode') return _taRenderMode();
 }
 
@@ -15765,6 +15767,159 @@ async function _taSetMode(mode) {
 }
 async function _taSetModeGo(mode) {
   try { await _taConfigApi('set-mode', { client_id: CLIENT_ID, mode }); _TA.mode = mode; _taRenderMode(); _plToast('🎚 Mode set: ' + mode.replace('_', '-')); }
+  catch (e) { alert(e.message); }
+}
+
+// ── Automations (step-builder): 👻 Ghosted + 💔 Lead Nurture sequences ──────
+// Visual editor backing the portal automation engine (api/automations.js). Each
+// step = a wait, then a text or email. Approve the sequence once + flip it on; the
+// engine sends each step on schedule (quiet hours respected). Renders EMPTY until
+// the import session fills the steps.
+let _AUTO = { list: [] };
+const _AUTO_SEED = [
+  { automation_key: 'ghosted', name: '👻 Ghosted' },
+  { automation_key: 'nurture', name: '💔 Lead Nurture' },
+];
+const _AUTO_UNITS = ['minutes', 'hours', 'days', 'weeks', 'months'];
+
+async function _autoApi(action, extra) {
+  const token = await _mreqAuthToken();
+  const r = await fetch('/api/automations', {
+    method: 'POST', headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action, client_id: CLIENT_ID, ...(extra || {}) }),
+  });
+  const json = await _safeJson(r);
+  if (!r.ok) throw new Error(json.error || ('HTTP ' + r.status));
+  return json;
+}
+
+async function _taRenderAutomations() {
+  const p = document.getElementById('ta-panel'); if (!p) return;
+  p.innerHTML = `<div style="color:var(--text-mute);font-size:13px"><span class="req-spin"></span> Loading…</div>`;
+  let list = [];
+  try {
+    let d = await _autoApi('list');
+    list = d.automations || [];
+    // Seed Ghosted + Lead Nurture if this academy has none, so both always show.
+    const have = new Set(list.map(a => a.automation_key));
+    let seeded = false;
+    for (const s of _AUTO_SEED) {
+      if (!have.has(s.automation_key)) { await _autoApi('upsert-automation', { automation_key: s.automation_key, name: s.name, enabled: false, approved: false }); seeded = true; }
+    }
+    if (seeded) { d = await _autoApi('list'); list = d.automations || []; }
+  } catch (e) { p.innerHTML = `<div style="color:#e07070;font-size:13px">Couldn't load - ${escapeHTML(e.message)}</div>`; return; }
+  const order = { ghosted: 0, nurture: 1 };
+  list.sort((a, b) => ((order[a.automation_key] ?? 9) - (order[b.automation_key] ?? 9)));
+  _AUTO.list = list;
+  p.innerHTML = `
+    <p style="color:var(--text-mute);font-size:12.5px;margin:0 0 14px;line-height:1.55;max-width:660px">Build your one-way nudge sequences - each step is a <b style="color:var(--text)">wait</b>, then a <b style="color:var(--text)">text or email</b>. Approve the sequence once and flip it on; the engine sends each step on schedule (quiet hours respected). Merge tags: <code>{{name}}</code> / <code>{{athlete}}</code>. Empty? Paste your texts + emails in the import session to auto-fill these.</p>
+    ${list.map(_autoCardHtml).join('') || '<div style="color:var(--text-mute)">No automations.</div>'}`;
+}
+
+function _autoCardHtml(a) {
+  const steps = (a.steps || []).slice().sort((x, y) => x.position - y.position);
+  const stepsHtml = steps.length
+    ? steps.map((s, i) => _autoStepHtml(a, s, i, steps.length)).join('')
+    : `<div style="color:var(--text-mute);font-size:12.5px;padding:11px 13px;border:1px dashed var(--border);border-radius:8px">No steps yet - add one, or paste your texts/emails in the import session to auto-fill this.</div>`;
+  const seg = (on) => `background:${on ? 'var(--gold)' : 'transparent'};color:${on ? '#0B0B0D' : 'var(--text-sub)'};border:1px solid ${on ? 'var(--gold)' : 'var(--border)'};border-radius:8px;padding:5px 12px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit`;
+  const statusLine = a.enabled && a.approved ? '🟢 Live - sending on schedule.' : (a.enabled && !a.approved ? '⚠ Approve the sequence too before it sends.' : 'Not sending yet.');
+  return `
+  <div style="border:1px solid var(--border);border-radius:12px;padding:14px 16px;margin-bottom:14px">
+    <div style="display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin-bottom:4px">
+      <div style="font-size:15px;font-weight:700;color:var(--text)">${escapeHTML(a.name || a.automation_key)}</div>
+      <span style="flex:1"></span>
+      <button onclick="_autoToggle('${a.id}','approved',${!a.approved})" style="${seg(!!a.approved)}">${a.approved ? '✓ Approved' : 'Approve sequence'}</button>
+      <button onclick="_autoToggle('${a.id}','enabled',${!a.enabled})" style="${seg(!!a.enabled)}">${a.enabled ? '🟢 On' : 'Off'}</button>
+    </div>
+    <div style="font-size:11.5px;color:var(--text-mute);margin-bottom:12px">${statusLine}</div>
+    ${stepsHtml}
+    <button onclick="_autoAddStep('${a.id}')" style="margin-top:10px;background:transparent;border:1px dashed var(--border);color:var(--text-sub);border-radius:8px;padding:8px 14px;font-size:12.5px;font-weight:600;cursor:pointer">+ add step</button>
+  </div>`;
+}
+
+function _autoStepHtml(a, s, i, total) {
+  const isEmail = s.channel === 'email';
+  const unitOpts = _AUTO_UNITS.map(u => `<option value="${u}"${s.wait_unit === u ? ' selected' : ''}>${u}</option>`).join('');
+  return `
+  <div id="astep-${s.id}" style="border:1px solid var(--border);border-radius:9px;padding:10px 12px;margin-bottom:8px;background:var(--surface)">
+    <div style="display:flex;align-items:center;gap:7px;flex-wrap:wrap;margin-bottom:8px">
+      <span style="font-size:11px;color:var(--text-mute);font-weight:700;min-width:14px">${i + 1}</span>
+      <span style="font-size:12px;color:var(--text-sub)">⏱ wait</span>
+      <input id="astep-${s.id}-amt" type="number" min="0" value="${Number(s.wait_amount) || 0}" style="width:60px;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:5px 7px;font-size:12.5px">
+      <select id="astep-${s.id}-unit" style="background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:5px 7px;font-size:12.5px">${unitOpts}</select>
+      <span style="font-size:12px;color:var(--text-mute)">·</span>
+      <select id="astep-${s.id}-chan" onchange="_autoChanChange('${s.id}')" style="background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:5px 7px;font-size:12.5px">
+        <option value="sms"${!isEmail ? ' selected' : ''}>💬 SMS</option>
+        <option value="email"${isEmail ? ' selected' : ''}>📧 Email</option>
+      </select>
+      <span style="flex:1"></span>
+      <button onclick="_autoMove('${a.id}','${s.id}',-1)" ${i === 0 ? 'disabled' : ''} title="Move up" style="background:transparent;border:1px solid var(--border);color:var(--text-sub);border-radius:6px;padding:4px 8px;font-size:11px;cursor:pointer;${i === 0 ? 'opacity:.4' : ''}">↑</button>
+      <button onclick="_autoMove('${a.id}','${s.id}',1)" ${i === total - 1 ? 'disabled' : ''} title="Move down" style="background:transparent;border:1px solid var(--border);color:var(--text-sub);border-radius:6px;padding:4px 8px;font-size:11px;cursor:pointer;${i === total - 1 ? 'opacity:.4' : ''}">↓</button>
+    </div>
+    <input id="astep-${s.id}-subj" placeholder="Subject (email)" value="${escapeHTML(s.subject || '')}" style="display:${isEmail ? 'block' : 'none'};width:100%;box-sizing:border-box;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:7px 9px;font-size:12.5px;margin-bottom:7px">
+    <textarea id="astep-${s.id}-body" placeholder="Message - use {{name}} / {{athlete}}" style="width:100%;box-sizing:border-box;min-height:54px;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:7px 9px;font-size:12.5px;resize:vertical;font-family:inherit">${escapeHTML(s.body || '')}</textarea>
+    <div style="display:flex;gap:8px;margin-top:7px">
+      <button onclick="_autoSaveStep('${a.id}','${s.id}')" style="background:var(--gold);color:#0B0B0D;border:none;border-radius:7px;padding:6px 14px;font-size:12px;font-weight:700;cursor:pointer">Save</button>
+      <button onclick="_autoDelStep('${s.id}')" style="background:transparent;border:1px solid var(--border);color:#e07070;border-radius:7px;padding:6px 12px;font-size:12px;cursor:pointer">Delete</button>
+    </div>
+  </div>`;
+}
+
+function _autoChanChange(sid) {
+  const chan = document.getElementById(`astep-${sid}-chan`), subj = document.getElementById(`astep-${sid}-subj`);
+  if (chan && subj) subj.style.display = chan.value === 'email' ? 'block' : 'none';
+}
+
+async function _autoToggle(autoId, field, value) {
+  try {
+    await _autoApi(field === 'approved' ? 'set-approved' : 'set-enabled', { automation_id: autoId, value });
+    _plToast(field === 'approved' ? (value ? '✓ Sequence approved' : 'Approval removed') : (value ? '🟢 Automation on' : 'Automation off'));
+    _taRenderAutomations();
+  } catch (e) { alert(e.message); }
+}
+
+async function _autoAddStep(autoId) {
+  const a = _AUTO.list.find(x => x.id === autoId);
+  const pos = a && a.steps && a.steps.length ? Math.max(...a.steps.map(s => Number(s.position) || 0)) + 1 : 0;
+  try { await _autoApi('upsert-step', { automation_id: autoId, position: pos, wait_amount: 1, wait_unit: 'days', channel: 'sms', body: 'New step - edit me' }); _taRenderAutomations(); }
+  catch (e) { alert(e.message); }
+}
+
+async function _autoSaveStep(autoId, sid) {
+  const g = (suf) => document.getElementById(`astep-${sid}-${suf}`);
+  const body = (g('body') && g('body').value || '').trim();
+  if (!body) { alert('Message body is required.'); return; }
+  const a = _AUTO.list.find(x => x.id === autoId);
+  const st = a && (a.steps || []).find(s => s.id === sid);
+  const chan = g('chan').value;
+  try {
+    await _autoApi('upsert-step', {
+      automation_id: autoId, id: sid,
+      position: st ? Number(st.position) || 0 : 0,
+      wait_amount: parseInt(g('amt').value, 10) || 0,
+      wait_unit: g('unit').value,
+      channel: chan,
+      subject: chan === 'email' && g('subj') ? (g('subj').value || '') : '',
+      body,
+    });
+    _plToast('Step saved');
+    _taRenderAutomations();
+  } catch (e) { alert(e.message); }
+}
+
+async function _autoDelStep(sid) {
+  if (!confirm('Delete this step?')) return;
+  try { await _autoApi('delete-step', { step_id: sid }); _taRenderAutomations(); }
+  catch (e) { alert(e.message); }
+}
+
+async function _autoMove(autoId, sid, dir) {
+  const a = _AUTO.list.find(x => x.id === autoId); if (!a) return;
+  const steps = (a.steps || []).slice().sort((x, y) => x.position - y.position);
+  const i = steps.findIndex(s => s.id === sid); if (i < 0) return;
+  const j = i + dir; if (j < 0 || j >= steps.length) return;
+  const ids = steps.map(s => s.id); [ids[i], ids[j]] = [ids[j], ids[i]];
+  try { await _autoApi('reorder', { automation_id: autoId, ordered_step_ids: ids }); _taRenderAutomations(); }
   catch (e) { alert(e.message); }
 }
 

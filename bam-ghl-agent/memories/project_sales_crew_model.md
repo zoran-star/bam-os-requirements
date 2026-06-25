@@ -118,9 +118,22 @@ Phase order:
     webhook at `/api/resend/webhook`. Suppression/audit/webhook all work regardless of the domain.
   - **Email templates LIVE IN THE PORTAL**, designed by Zoran + Claude — NOT in bam-client-sites. Brand tokens
     INLINED (gold `#E2DD9F`, black, Anton + Inter Tight). (Template authoring = part of P4/the import session.)
-- **P4** — 🧱 Automation engine + step-builder, built EMPTY. Adopt the Phase-0 design in
-  `[[project_portal_automations_plan]]` (`automation_jobs` queue, `automation_events`, `automation_templates`,
-  `email_events`+suppression, `_send.js`). Approve-sequence-once.
+- **P4** — ✅ SHIPPED (branch `session/sales-crew`). 🧱 Automation engine + step-builder, built EMPTY + inert.
+  - **P4a runtime:** 5 tables (`automations`, `automation_steps`, `automation_enrollments`, `automation_jobs`,
+    `automation_events`; migration 20260625230000, **APPLIED to prod**). `api/_send.js` (sms→GHL
+    `/conversations/messages` by contactId; email→`_email.js`). `api/automations.js` = exported
+    `enrollContact`/`exitEnrollment` (P6 triggers call these) + `GET ?action=work` worker cron (`* * * * *`,
+    in vercel.json) + staff CRUD (list/upsert-automation/upsert-step/delete-step/reorder/set-enabled/
+    set-approved). IDEMPOTENCY: `dedupe_key`=`enrollment_id:step_id` unique + atomic claim (conditional PATCH
+    pending→sending, 0 rows = lost race). Quiet-hours clamp on schedule + re-check at send. Worker re-checks
+    automation enabled+approved + enrollment active before sending. Approve-sequence-once = `automations.approved`.
+  - **P4b step-builder UI:** new **👻 Automations** sub-tab in the Train Agent view (`client-portal.html`,
+    `_taRenderAutomations`/`_autoApi`/`_autoCardHtml`/`_autoStepHtml`/`_autoSaveStep`/`_autoAddStep`/`_autoMove`/
+    `_autoToggle`). Seeds `ghosted`+`nurture` if missing → both always render EMPTY. Each step row = ⏱ wait
+    [amt][unit] · 💬SMS/📧Email · subject(email only) · body · Save/Delete · ↑↓ reorder. Per-card On/Off +
+    Approve-sequence toggles. Empty state nudges the import session. Visible to staff or `can_train_agent` members.
+  - NOTE: dropped `automation_templates` from the original plan — step bodies hold the message inline
+    (simpler; email templates/shells are a separate portal+Claude design task per P3).
 - **P5** — 📥 IMPORT SESSION. STRICT ORDER: P3+P4 built FIRST so the UI shows EMPTY automations, THEN Zoran
   pastes GHL text/email screenshots → AI extracts {text, channel, timing} → POPULATES content/sequences.
   Import populates; it does NOT design emails (that's a separate portal+Claude task). Screenshots = the cadence spec.
