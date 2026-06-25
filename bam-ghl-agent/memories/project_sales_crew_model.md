@@ -100,11 +100,24 @@ Phase order:
   current `parent_email` match in `api/onboarding/activations.js`). Today the email-match works for GTA's happy
   path; P2b-plus hardens multi-opp / email-mismatch cases. See `[[project_stripe_app_created_subs]]` +
   `[[project_offer_price_mapping]]`.
-- **P2.5** — 📋 post-trial form → a card in the unified approval inbox ("🏁 Trial done — log outcome").
-- **P3** — ✉️ Resend foundation (Resend ALREADY wired in `api/clients.js`; formalize `api/_email.js`).
-  **FROM = `info@byanymeanstoronto.com`** (verify DNS in Resend). **Email templates LIVE IN THE PORTAL,
-  designed by Zoran + Claude on the portal** — NOT in bam-client-sites, NOT the GTA marketing site
-  (Zoran corrected this). Brand tokens INLINED (gold `#E2DD9F`, black, Anton + Inter Tight).
+- **P2.5** — ⏸ REORDERED to after P3/P4 (polish, blocks nothing). 📋 post-trial form → a card in the unified
+  approval inbox. GOTCHA found: `_plPostTrialForm(oppId)` is COUPLED to loaded board state (`_PL_DATA`, line
+  ~22014) — surfacing it in the inbox needs `switchView('pipelines')` first (like `_hv2OpenHawkeye`) or
+  decoupling the form to fetch the opp by id. Detection already exists in `api/ghl/cron-post-trial-escalate.js`
+  (trials ended 15min+ ago with no `post_trial_reviews` row).
+- **P3** — ✅ SHIPPED (branch `session/sales-crew`). ✉️ Resend foundation. Resend was ALREADY wired (raw fetch
+  in `api/clients.js` for invite/reset — LEFT UNTOUCHED). New:
+  - `api/_email.js` (NEW) — `sendEmail({to,subject,html,text,from,replyTo,tags,clientId})` + `isSuppressed()`.
+    Suppression gate before every send; best-effort `email_events` audit; throws on Resend error. Default
+    **FROM = `RESEND_FROM` || `"BAM Toronto <info@byanymeanstoronto.com>"`**.
+  - `api/resend/webhook.js` (NEW) — Svix-verified (`RESEND_WEBHOOK_SECRET`, `whsec_`); logs `email_events`,
+    upserts `email_suppressions` on hard bounce / complaint / unsubscribe. Unset secret → accept+warn; set+bad → 401.
+  - tables `email_events` + `email_suppressions` (migration 20260625220000, **APPLIED to prod**).
+  - ⚠️ INERT until Zoran (a) DNS-verifies **`byanymeanstoronto.com`** in Resend (the live key only authorizes
+    `byanymeansbball.com` today, so sends 403 until then) and (b) sets `RESEND_WEBHOOK_SECRET` + points a Resend
+    webhook at `/api/resend/webhook`. Suppression/audit/webhook all work regardless of the domain.
+  - **Email templates LIVE IN THE PORTAL**, designed by Zoran + Claude — NOT in bam-client-sites. Brand tokens
+    INLINED (gold `#E2DD9F`, black, Anton + Inter Tight). (Template authoring = part of P4/the import session.)
 - **P4** — 🧱 Automation engine + step-builder, built EMPTY. Adopt the Phase-0 design in
   `[[project_portal_automations_plan]]` (`automation_jobs` queue, `automation_events`, `automation_templates`,
   `email_events`+suppression, `_send.js`). Approve-sequence-once.
