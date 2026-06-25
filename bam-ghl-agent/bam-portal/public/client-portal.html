@@ -1882,6 +1882,13 @@
     border:2px solid rgba(8,8,10,0.25); border-top-color:#08080A;
     animation: loading-spin 0.7s linear infinite;
   }
+  /* Light spinner for the red Mark Lost button while it's working. */
+  .apx-btn-spin-light {
+    display:inline-block; width:14px; height:14px; vertical-align:middle;
+    border-radius:50%;
+    border:2px solid rgba(255,255,255,0.35); border-top-color:#fff;
+    animation: loading-spin 0.7s linear infinite;
+  }
 
   /* Big confirm-action spinner + success checkmark (member billing flows). */
   .mm-spin {
@@ -10465,7 +10472,19 @@ function _v15calMsgType(t) {
   for (const x of ['SMS','Email']) { const b = document.getElementById('v15cal-mt-' + x); if (b) { b.style.background = x === t ? 'var(--gold)' : 'var(--surface)'; b.style.color = x === t ? '#0B0B0D' : 'var(--text)'; } }
   const sub = document.getElementById('v15cal-msg-subject'); if (sub) sub.style.display = t === 'Email' ? 'block' : 'none';
 }
+// Double-send guard for anything that sends to a client. Ignores a repeat call
+// with the same key within ~1.2s, so an accidental double-click / double-tap
+// can't fire the same send twice. Keyed so distinct actions never cross-block.
+const _sendLastAt = {};
+function _sendGuard(key) {
+  const now = Date.now();
+  if (now - (_sendLastAt[key] || 0) < 1200) return false;
+  _sendLastAt[key] = now;
+  return true;
+}
+
 async function _v15calSendMsg() {
+  if (!_sendGuard('v15calSendMsg')) return;
   const c = _V15CAL.activeContact; if (!c) return;
   const text = (document.getElementById('v15cal-msg-text')?.value || '').trim();
   const subject = (document.getElementById('v15cal-msg-subject')?.value || '').trim();
@@ -11055,6 +11074,7 @@ async function _v15ibPickFiles(input) {
 }
 
 async function _v15ibSend() {
+  if (!_sendGuard('v15ibSend')) return;
   const a = _V15IB.active; if (!a) return;
   const text = (document.getElementById('v15ib-text')?.value || '').trim();
   const subject = (document.getElementById('v15ib-subject')?.value || '').trim();
@@ -11143,6 +11163,7 @@ async function _v15ibSetup() {
 // ── Mass send (V1.5 Inbox) - tag-filtered, queued, DND-safe blast ──
 let _V15MS = { tags: [], channel: 'SMS', selected: [], pollTimer: null };
 async function _v15ibMassSend() {
+  if (!_sendGuard('v15ibMassSend')) return;
   document.body.insertAdjacentHTML('beforeend', `<div id="v15ms-overlay" style="position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9000;display:flex;align-items:center;justify-content:center;padding:18px" onclick="if(event.target===this)_v15msClose()">
     <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;width:100%;max-width:520px;max-height:90vh;overflow-y:auto;padding:22px">
       <div id="v15ms-inner"><div class="req-empty" style="padding:20px"><span class="req-spin"></span> Loading tags…</div></div>
@@ -11607,6 +11628,7 @@ function _contactsMsgType(t) {
   const subj = document.getElementById('cd-msg-subject'); if (subj) subj.style.display = t === 'Email' ? 'block' : 'none';
 }
 async function _contactsSendMsg() {
+  if (!_sendGuard('contactsSendMsg')) return;
   const c = _CDRAWER.contact; if (!c) return;
   const text = (document.getElementById('cd-msg-text')?.value || '').trim();
   const subject = (document.getElementById('cd-msg-subject')?.value || '').trim();
@@ -22279,6 +22301,7 @@ function _plToast(msg) {
 // special) AND auto-move the card to the "Interested" stage (portal-side, no
 // GHL automation). Works from any card / any stage.
 function _plEnrollSpecial(oppId) {
+  if (!_sendGuard('plEnrollSpecial-' + oppId)) return;
   _plConfirmModal({
     icon: '📨',
     title: 'Send to Summer Special?',
@@ -22347,6 +22370,7 @@ async function _plEnrollSpecialGo(oppId) {
 // training offer's Sales step) and move the card to Interested. The GHL workflow
 // then texts them - reply → Responded stage, no reply → marked lost.
 function _plGhost(oppId) {
+  if (!_sendGuard('plGhost-' + oppId)) return;
   _plConfirmModal({
     icon: '👻',
     title: 'Send to Ghosted automation?',
@@ -23025,6 +23049,7 @@ function _plMsgRenderPendingFiles() {
 }
 
 async function _plMsgSend() {
+  if (!_sendGuard('plMsgSend')) return;
   const t = _PL_MSG;
   if (!t) return;
   const textEl = document.getElementById('pl-msg-input');
@@ -23441,6 +23466,7 @@ function _acxRemove(id) {
   _acxUpdateCount(_ACX_DATA.length);
 }
 async function _acxSend(id) {
+  if (!_sendGuard('acxSend-' + id)) return;
   const r = _ACX_DATA.find(x => x.id === id); if (!r) return;
   const ta = document.getElementById('acx-edit-' + id);
   const reply = (ta ? ta.value : (r.draft_message || '')).trim();
@@ -23751,10 +23777,21 @@ async function _apxLostConfirm(id) {
     body: 'Reason: <b>' + escapeHTML(r.lost_reason || 'Other') + '</b>.' + (hasClosing ? ' This sends the closing message AND marks them Lost in the pipeline - in one go.' : ' They\'re marked Lost in the pipeline (no message sent).'),
     okLabel: hasClosing ? 'Send & mark Lost' : 'Mark Lost',
     onOk: async () => {
+      const btn = document.getElementById('apx-lost-confirm-' + id);
+      if (btn) {
+        if (btn.dataset.sending === '1') return;   // already in flight - block double-send
+        btn.dataset.sending = '1'; btn.disabled = true; btn.style.cursor = 'default';
+        btn.innerHTML = '<span class="apx-btn-spin-light"></span>';
+      }
       try {
         await _apxPost('/api/agent-approvals', 'confirm-lost', { ready_id: r.id, lost_reason: r.lost_reason || null, reply: r.draft_message || '' });
-        _apxRemove(id); _apxToast('🚫 Marked Lost', true);
-      } catch (e) { _apxToast(_apxErr(e), false); }
+        if (btn) { btn.style.background = '#1f7a3d'; btn.style.borderColor = '#1f7a3d'; btn.innerHTML = '✓ Lost'; }
+        _apxToast('🚫 Marked Lost', true);
+        setTimeout(() => _apxRemove(id), 450);
+      } catch (e) {
+        _apxToast(_apxErr(e), false);
+        if (btn) { btn.dataset.sending = ''; btn.disabled = false; btn.style.cursor = 'pointer'; btn.innerHTML = '🚫 ' + (hasClosing ? 'Send &amp; mark Lost' : 'Mark Lost'); }
+      }
     },
   });
 }
@@ -24282,6 +24319,7 @@ function _botToggleAdjust() {
 }
 
 async function _botSend() {
+  if (!_sendGuard('botSend')) return;
   const q = _BOT_CUR; if (!q) return;
   const reply = (document.getElementById('bot-reply')?.value || '').trim();
   if (!reply) { alert('Reply is empty.'); return; }
@@ -24527,6 +24565,7 @@ async function _ibUploadPendingFiles() {
 }
 
 async function _ibSendReply() {
+  if (!_sendGuard('ibSendReply')) return;
   const t = _INBOX_THREAD;
   if (!t) return;
   const textEl = document.getElementById('ib-reply-input');
@@ -24677,6 +24716,7 @@ function _ibComposeClearContact() {
 }
 
 async function _ibComposeSend() {
+  if (!_sendGuard('ibComposeSend')) return;
   const c = _IB_COMPOSE && _IB_COMPOSE.contact;
   if (!c) return;
   const textEl = document.getElementById('ib-compose-input');
@@ -29513,6 +29553,7 @@ function _plStatus(msg, kind) {
 }
 
 async function _plSend(type, memberId) {
+  if (!_sendGuard('plSend-' + type + '-' + memberId)) return;
   if (typeof CLIENT_ID === 'undefined' || !CLIENT_ID) {
     _plStatus('No client_id in scope - refresh and try again.', 'err'); return;
   }
@@ -32858,6 +32899,7 @@ function _showFreshLinkRecovery(errEl) {
 }
 
 async function _sendFreshLink() {
+  if (!_sendGuard('sendFreshLink')) return;
   const emailEl = document.getElementById('rec-freshlink-email');
   const btn = document.getElementById('rec-freshlink-btn');
   const msgEl = document.getElementById('rec-freshlink-msg');
@@ -33837,6 +33879,7 @@ function removePendingFile(idx) {
 }
 
 async function sendCurrentMessage() {
+  if (!_sendGuard('sendCurrentMessage')) return;
   if (!_msgActiveConvoId) return;
   const input = document.getElementById('messages-input');
   const body = (input?.value || '').trim();
