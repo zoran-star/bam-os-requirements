@@ -349,13 +349,82 @@ export default function ContentView({ tokens: tk, dark, me, session }) {
 // ─────────────────────────────────────────────────────────
 // Edit/create form
 // ─────────────────────────────────────────────────────────
+// ── Multi-format guide cards: an offer's guide is a set of ANGLES, each with a
+// shared purpose + up to two executions (video / graphic). Each execution has
+// labeled script beats, tips, and its own example assets. ────────────────────
+const ANGLE_PRESETS = ["Free trial", "Transformation", "Testimonial", "Direct offer", "B-roll", "Reviews"];
+const DEFAULT_BEATS = {
+  video:   [{ label: "Hook", text: "" }, { label: "Value", text: "" }, { label: "CTA", text: "" }],
+  graphic: [{ label: "Headline", text: "" }, { label: "Offer", text: "" }, { label: "CTA", text: "" }],
+};
+const newExecution = (medium) => ({ segments: DEFAULT_BEATS[medium].map(b => ({ ...b })), tips: "", example_assets: [] });
+const newAngle = () => ({ name: "", purpose: "", video: newExecution("video"), graphic: null });
+function _normExec(e, medium) {
+  if (!e) return null;
+  return {
+    segments: Array.isArray(e.segments) && e.segments.length ? e.segments.map(s => ({ label: s.label || "", text: s.text || "" })) : DEFAULT_BEATS[medium].map(b => ({ ...b })),
+    tips: e.tips || "",
+    example_assets: Array.isArray(e.example_assets) ? e.example_assets : [],
+  };
+}
+function normalizeAngles(initial) {
+  if (Array.isArray(initial.angles) && initial.angles.length) {
+    return initial.angles.map(a => ({ name: a.name || "", purpose: a.purpose || "", video: _normExec(a.video, "video"), graphic: _normExec(a.graphic, "graphic") }));
+  }
+  // Fallback: wrap legacy single guidance into one angle (for un-backfilled cards).
+  const hasLegacy = initial.purpose || initial.example_script || initial.filming_tips || (Array.isArray(initial.example_assets) && initial.example_assets.length);
+  if (hasLegacy) {
+    return [{ name: "Recommended", purpose: initial.purpose || "", video: { segments: [{ label: "Script", text: initial.example_script || "" }], tips: initial.filming_tips || "", example_assets: Array.isArray(initial.example_assets) ? initial.example_assets : [] }, graphic: null }];
+  }
+  return [newAngle()];
+}
+// Flatten angles into the legacy columns so the current client wizard render
+// (which still reads purpose/script/tips/assets) keeps working until Phase 2.
+function flattenAnglesToLegacy(angles) {
+  const purpose = angles.map(a => a.purpose).filter(Boolean).join("\n");
+  const filming_tips = angles.flatMap(a => [a.video?.tips, a.graphic?.tips]).filter(Boolean).join("\n");
+  const example_assets = angles.flatMap(a => [...(a.video?.example_assets || []), ...(a.graphic?.example_assets || [])]);
+  const example_script = angles.map(a => {
+    const execs = [["Video", a.video], ["Graphic", a.graphic]].filter(([, e]) => e);
+    const body = execs.map(([m, e]) => `[${m}] ` + (e.segments || []).map(s => `${s.label}: ${s.text}`).join(" / ")).join("\n");
+    return `${a.name || "Angle"}\n${body}`;
+  }).join("\n\n");
+  return { purpose, filming_tips, example_script, example_assets };
+}
+
+// Example-asset grid for one execution. Mirrors the original guide asset grid
+// (1:1 thumbs + dashed add tile) and adds a video poster frame.
+function ExecAssetGrid({ tk, assets, uploading, inputId, onAdd, onRemove }) {
+  const ref = useRef(null);
+  return (
+    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(96px, 1fr))", gap: 8, marginBottom: 4 }}>
+      {assets.map((a, i) => {
+        const url = a.url || a;
+        const isVid = (a.type || "").startsWith("video/") || /\.(mp4|mov|webm|m4v)(\?|$)/i.test(url || "");
+        const common = { width: "100%", aspectRatio: "1 / 1", objectFit: "cover", borderRadius: 8, border: `1px solid ${tk.border}`, display: "block" };
+        return (
+          <div key={i} style={{ position: "relative" }}>
+            {isVid
+              ? <video src={`${url}#t=0.1`} preload="metadata" muted style={common} />
+              : <img src={url} alt={a.name || ""} style={common} />}
+            <button onClick={() => onRemove(i)} style={{ position: "absolute", top: 5, right: 5, width: 22, height: 22, borderRadius: "50%", background: "rgba(0,0,0,0.7)", color: "#fff", border: 0, cursor: "pointer", fontSize: 13, lineHeight: 1, display: "flex", alignItems: "center", justifyContent: "center" }} aria-label="Remove">×</button>
+          </div>
+        );
+      })}
+      <label htmlFor={inputId} style={{ aspectRatio: "1 / 1", border: `1.5px dashed ${tk.borderStr || tk.border}`, borderRadius: 8, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", cursor: uploading ? "wait" : "pointer", color: tk.textMute, fontSize: 13, gap: 4, opacity: uploading ? 0.5 : 1 }}>
+        <div style={{ fontSize: 20, lineHeight: 1 }}>+</div>
+        <div style={{ fontSize: 10, letterSpacing: "0.1em", textTransform: "uppercase" }}>Add</div>
+      </label>
+      <input id={inputId} ref={ref} type="file" accept="image/*,video/*" multiple disabled={uploading} style={{ display: "none" }} onChange={e => { onAdd(e.target.files); if (ref.current) ref.current.value = ""; }} />
+    </div>
+  );
+}
+
 function GuideEditor({ tk, initial, isNew, onCancel, onSave, onDelete }) {
   const [title, setTitle]       = useState(initial.title || "");
-  const [purpose, setPurpose]   = useState(initial.purpose || "");
-  const [tips, setTips]         = useState(initial.filming_tips || "");
-  const [script, setScript]     = useState(initial.example_script || "");
-  const [assets, setAssets]     = useState(Array.isArray(initial.example_assets) ? initial.example_assets : []);
   const [links, setLinks]       = useState(Array.isArray(initial.example_links)  ? initial.example_links  : []);
+  const [isDefault, setIsDefault] = useState(initial.is_default === true);
+  const [angles, setAngles]     = useState(() => normalizeAngles(initial));
   const [uploading, setUploading] = useState(false);
   const [error, setError]       = useState("");
   const fileInputRef = useRef(null);
@@ -368,15 +437,12 @@ function GuideEditor({ tk, initial, isNew, onCancel, onSave, onDelete }) {
   };
   const textareaStyle = { ...inputStyle, minHeight: 100, resize: "vertical", lineHeight: 1.5 };
 
-  // ─ Upload to Supabase Storage ─
+  // ─ Upload to Supabase Storage; returns the uploaded asset objects ─
   const uploadFiles = async (filesList) => {
     const incoming = Array.from(filesList || []);
-    if (!incoming.length) return;
+    if (!incoming.length) return [];
     setUploading(true);
     setError("");
-
-    // Concurrency-limited upload. Browser network gets messy if a user drops
-    // 20+ files at once. Cap at 3 in flight; sequential batches.
     const MAX_PARALLEL = 3;
     const uploadOne = async (file) => {
       const uid = (crypto?.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`);
@@ -390,43 +456,53 @@ function GuideEditor({ tk, initial, isNew, onCancel, onSave, onDelete }) {
       const { data: urlData } = supabase.storage.from(STORAGE_BUCKET).getPublicUrl(path);
       return { name: file.name, url: urlData.publicUrl, type: file.type || "" };
     };
-
     try {
       const uploads = [];
       for (let i = 0; i < incoming.length; i += MAX_PARALLEL) {
         const batch = incoming.slice(i, i + MAX_PARALLEL);
-        const results = await Promise.all(batch.map(uploadOne));
-        uploads.push(...results);
+        uploads.push(...await Promise.all(batch.map(uploadOne)));
       }
-      setAssets(prev => [...prev, ...uploads]);
+      return uploads;
     } catch (e) {
       setError("Upload failed: " + e.message);
+      return [];
     } finally {
       setUploading(false);
     }
   };
 
-  const removeAsset = (idx) => setAssets(prev => prev.filter((_, i) => i !== idx));
+  // ─ Angle / execution / beat / asset mutators (all functional updates) ─
+  const addAngle    = () => setAngles(p => [...p, newAngle()]);
+  const removeAngle = (i) => setAngles(p => p.filter((_, idx) => idx !== i));
+  const patchAngle  = (i, patch) => setAngles(p => p.map((a, idx) => idx === i ? { ...a, ...patch } : a));
+  const toggleExec  = (i, medium) => setAngles(p => p.map((a, idx) => idx === i ? { ...a, [medium]: a[medium] ? null : newExecution(medium) } : a));
+  const patchExec   = (i, medium, patch) => setAngles(p => p.map((a, idx) => idx === i ? { ...a, [medium]: { ...a[medium], ...patch } } : a));
+  const addBeat     = (i, medium) => setAngles(p => p.map((a, idx) => idx === i ? { ...a, [medium]: { ...a[medium], segments: [...a[medium].segments, { label: "", text: "" }] } } : a));
+  const patchBeat   = (i, medium, j, patch) => setAngles(p => p.map((a, idx) => idx === i ? { ...a, [medium]: { ...a[medium], segments: a[medium].segments.map((s, sj) => sj === j ? { ...s, ...patch } : s) } } : a));
+  const removeBeat  = (i, medium, j) => setAngles(p => p.map((a, idx) => idx === i ? { ...a, [medium]: { ...a[medium], segments: a[medium].segments.filter((_, sj) => sj !== j) } } : a));
+  const addExecAssets = async (i, medium, files) => {
+    const ups = await uploadFiles(files);
+    if (ups.length) setAngles(p => p.map((a, idx) => idx === i ? { ...a, [medium]: { ...a[medium], example_assets: [...a[medium].example_assets, ...ups] } } : a));
+  };
+  const removeExecAsset = (i, medium, j) => setAngles(p => p.map((a, idx) => idx === i ? { ...a, [medium]: { ...a[medium], example_assets: a[medium].example_assets.filter((_, aj) => aj !== j) } } : a));
+
   const addLinkRow  = () => setLinks(prev => [...prev, { url: "", label: "" }]);
   const updateLink  = (idx, key, value) => setLinks(prev => prev.map((l, i) => i === idx ? { ...l, [key]: value } : l));
   const removeLink  = (idx) => setLinks(prev => prev.filter((_, i) => i !== idx));
 
   const handleSave = () => {
     setError("");
-    if (!title.trim()) {
-      setError("Title is required.");
-      return;
-    }
-    // Filter out blank link rows
+    if (!title.trim()) { setError("Title is required."); return; }
     const cleanLinks = links.filter(l => (l.url || "").trim());
-    onSave({
-      title: title.trim(),
-      purpose: purpose.trim(),
-      filming_tips: tips.trim(),
-      example_script: script.trim(),
-      example_assets: assets,
-      example_links: cleanLinks,
-    });
+    const cleanAngles = angles.map(a => ({
+      name: (a.name || "").trim(),
+      purpose: (a.purpose || "").trim(),
+      video:   a.video   ? { segments: a.video.segments.filter(s => (s.label || "").trim() || (s.text || "").trim()),   tips: (a.video.tips || "").trim(),   example_assets: a.video.example_assets }   : null,
+      graphic: a.graphic ? { segments: a.graphic.segments.filter(s => (s.label || "").trim() || (s.text || "").trim()), tips: (a.graphic.tips || "").trim(), example_assets: a.graphic.example_assets } : null,
+    })).filter(a => a.name || a.purpose || a.video || a.graphic);
+    if (!cleanAngles.length) { setError("Add at least one angle."); return; }
+    const legacy = flattenAnglesToLegacy(cleanAngles);
+    onSave({ title: title.trim(), angles: cleanAngles, is_default: isDefault, example_links: cleanLinks, ...legacy });
   };
 
   return (
@@ -447,74 +523,61 @@ function GuideEditor({ tk, initial, isNew, onCancel, onSave, onDelete }) {
       <label style={labelStyle}>Offer title</label>
       <input style={inputStyle} value={title} onChange={e => setTitle(e.target.value)} placeholder="e.g. Camps" />
 
-      <label style={labelStyle}>Purpose</label>
-      <textarea style={textareaStyle} value={purpose} onChange={e => setPurpose(e.target.value)} placeholder="Why does this offer exist? Who is the audience? What action do we want them to take?" />
+      {/* Use this card as the generic "First Campaign" starter guide */}
+      <label style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 22, cursor: "pointer", fontSize: 13, color: tk.text }}>
+        <input type="checkbox" checked={isDefault} onChange={e => setIsDefault(e.target.checked)} style={{ width: 16, height: 16, accentColor: tk.accent, cursor: "pointer", flexShrink: 0 }} />
+        <span>Use as the <b>First Campaign</b> starter guide <span style={{ color: tk.textMute }}>· the generic example shown at the top of the Ads screen</span></span>
+      </label>
 
-      <label style={labelStyle}>Filming / creation tips</label>
-      <textarea style={textareaStyle} value={tips} onChange={e => setTips(e.target.value)} placeholder="Camera angle, lighting, length, voiceover, hook in the first 3 seconds, etc." />
+      <label style={labelStyle}>Recommended creatives <span style={{ color: tk.textMute, fontWeight: 400, textTransform: "none", letterSpacing: 0 }}>· one card per angle, each can be a video and/or a graphic</span></label>
+      <div style={{ display: "flex", flexDirection: "column", gap: 14, marginBottom: 14 }}>
+        {angles.map((a, i) => (
+          <div key={i} style={{ border: `1px solid ${tk.border}`, borderRadius: 10, padding: 14, background: tk.surface }}>
+            <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 10 }}>
+              <span style={{ fontFamily: "var(--mono)", fontSize: 11, color: tk.textMute, minWidth: 16 }}>{i + 1}</span>
+              <input style={{ ...inputStyle, marginBottom: 0, flex: 1 }} value={a.name} onChange={e => patchAngle(i, { name: e.target.value })} placeholder="Angle name (e.g. Testimonial)" />
+              {angles.length > 1 && (
+                <button onClick={() => removeAngle(i)} style={{ width: 32, height: 32, flexShrink: 0, background: "transparent", border: `1px solid ${tk.border}`, borderRadius: 6, color: tk.textMute, cursor: "pointer", fontSize: 16 }} aria-label="Remove angle">×</button>
+              )}
+            </div>
+            <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 12 }}>
+              {ANGLE_PRESETS.map(p => (
+                <button key={p} onClick={() => patchAngle(i, { name: p })} style={{ padding: "3px 10px", borderRadius: 999, fontSize: 11, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", background: a.name === p ? (tk.accentGhost || "transparent") : "transparent", border: `1px solid ${a.name === p ? tk.accent : tk.border}`, color: a.name === p ? tk.accent : tk.textMute }}>{p}</button>
+              ))}
+            </div>
+            <label style={{ ...labelStyle, marginBottom: 6 }}>Why this works <span style={{ fontWeight: 400, textTransform: "none", letterSpacing: 0 }}>· shared</span></label>
+            <textarea style={{ ...textareaStyle, minHeight: 58, marginBottom: 14 }} value={a.purpose} onChange={e => patchAngle(i, { purpose: e.target.value })} placeholder="Who it targets, why it converts - applies to both the video and the graphic." />
 
-      <label style={labelStyle}>Example script</label>
-      <textarea style={textareaStyle} value={script} onChange={e => setScript(e.target.value)} placeholder={"Hook line in the first 3 seconds.\nThen the offer pitch.\nThen the call to action."} />
+            <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
+              {["video", "graphic"].map(m => (
+                <button key={m} onClick={() => toggleExec(i, m)} style={{ padding: "6px 14px", borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", textTransform: "capitalize", background: a[m] ? tk.accent : "transparent", color: a[m] ? "#0A0A0B" : tk.textMute, border: `1px solid ${a[m] ? tk.accent : tk.border}` }}>{a[m] ? "✓ " : "+ "}{m}</button>
+              ))}
+            </div>
 
-      <label style={labelStyle}>Example assets {uploading && <span style={{ color: tk.accent, marginLeft: 8 }}>(uploading…)</span>}</label>
-      <div style={{
-        display: "grid",
-        gridTemplateColumns: "repeat(auto-fill, minmax(120px, 1fr))",
-        gap: 8, marginBottom: 6,
-      }}>
-        {assets.map((a, i) => (
-          <div key={i} style={{ position: "relative" }}>
-            <img src={a.url || a} alt={a.name || ""} style={{
-              width: "100%", aspectRatio: "1 / 1", objectFit: "cover",
-              borderRadius: 8, border: `1px solid ${tk.border}`, display: "block",
-            }} />
-            <button
-              onClick={() => removeAsset(i)}
-              style={{
-                position: "absolute", top: 6, right: 6,
-                width: 24, height: 24, borderRadius: "50%",
-                background: "rgba(0,0,0,0.7)", color: "#fff",
-                border: 0, cursor: "pointer", fontSize: 14, lineHeight: 1,
-                display: "flex", alignItems: "center", justifyContent: "center",
-                backdropFilter: "blur(4px)",
-              }}
-              aria-label="Remove"
-            >×</button>
+            {["video", "graphic"].map(m => a[m] && (
+              <div key={m} style={{ borderLeft: `2px solid ${tk.accent}`, paddingLeft: 14, marginBottom: 12 }}>
+                <div style={{ fontFamily: "var(--mono)", fontSize: 10, letterSpacing: "0.14em", textTransform: "uppercase", color: tk.accent, marginBottom: 10 }}>{m} execution</div>
+                <label style={{ ...labelStyle, marginBottom: 6 }}>Script beats</label>
+                <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 8 }}>
+                  {a[m].segments.map((s, j) => (
+                    <div key={j} style={{ display: "flex", gap: 6, alignItems: "flex-start" }}>
+                      <input style={{ ...inputStyle, marginBottom: 0, width: 108, flexShrink: 0, padding: "8px 10px" }} value={s.label} onChange={e => patchBeat(i, m, j, { label: e.target.value })} placeholder="Beat" />
+                      <textarea style={{ ...inputStyle, marginBottom: 0, flex: 1, minHeight: 38, padding: "8px 10px", resize: "vertical", lineHeight: 1.4 }} value={s.text} onChange={e => patchBeat(i, m, j, { text: e.target.value })} placeholder="What to say / show" />
+                      <button onClick={() => removeBeat(i, m, j)} style={{ width: 32, height: 32, flexShrink: 0, background: "transparent", border: `1px solid ${tk.border}`, borderRadius: 6, color: tk.textMute, cursor: "pointer", fontSize: 15 }} aria-label="Remove beat">×</button>
+                    </div>
+                  ))}
+                </div>
+                <button onClick={() => addBeat(i, m)} style={{ padding: "5px 12px", marginBottom: 12, background: "transparent", color: tk.accent, border: `1px dashed ${tk.accent}`, borderRadius: 8, fontSize: 11, fontWeight: 600, cursor: "pointer" }}>+ Add beat</button>
+                <label style={{ ...labelStyle, marginBottom: 6 }}>{m === "video" ? "Filming tips" : "Design tips"}</label>
+                <textarea style={{ ...textareaStyle, minHeight: 52, marginBottom: 12 }} value={a[m].tips} onChange={e => patchExec(i, m, { tips: e.target.value })} placeholder={m === "video" ? "Camera, lighting, length, hook in 3s…" : "Layout, headline weight, logo placement…"} />
+                <label style={{ ...labelStyle, marginBottom: 6 }}>Example {m}s {uploading && <span style={{ color: tk.accent, marginLeft: 6 }}>(uploading…)</span>}</label>
+                <ExecAssetGrid tk={tk} assets={a[m].example_assets} uploading={uploading} inputId={`guide-asset-${i}-${m}`} onAdd={(files) => addExecAssets(i, m, files)} onRemove={(j) => removeExecAsset(i, m, j)} />
+              </div>
+            ))}
           </div>
         ))}
-        <label
-          htmlFor="guide-asset-input"
-          style={{
-            aspectRatio: "1 / 1",
-            border: `1.5px dashed ${tk.borderStr || tk.border}`,
-            borderRadius: 8,
-            display: "flex", flexDirection: "column",
-            alignItems: "center", justifyContent: "center",
-            cursor: uploading ? "wait" : "pointer", color: tk.textMute,
-            fontSize: 13, gap: 4,
-            transition: "border-color 0.15s ease, color 0.15s ease",
-            opacity: uploading ? 0.5 : 1,
-          }}
-          onMouseEnter={e => { if (!uploading) { e.currentTarget.style.borderColor = tk.accent; e.currentTarget.style.color = tk.accent; } }}
-          onMouseLeave={e => { e.currentTarget.style.borderColor = tk.borderStr || tk.border; e.currentTarget.style.color = tk.textMute; }}
-        >
-          <div style={{ fontSize: 22, lineHeight: 1 }}>+</div>
-          <div style={{ fontSize: 11, letterSpacing: "0.1em", textTransform: "uppercase" }}>Add</div>
-        </label>
-        <input
-          id="guide-asset-input"
-          ref={fileInputRef}
-          type="file"
-          accept="image/*,video/*"
-          multiple
-          disabled={uploading}
-          style={{ display: "none" }}
-          onChange={e => { uploadFiles(e.target.files); if (fileInputRef.current) fileInputRef.current.value = ""; }}
-        />
       </div>
-      <div style={{ fontSize: 12, color: tk.textMute, marginBottom: 22 }}>
-        {assets.length} asset{assets.length === 1 ? "" : "s"} · Files persist in Supabase Storage.
-      </div>
+      <button onClick={addAngle} style={{ padding: "9px 16px", marginBottom: 24, background: "transparent", color: tk.accent, border: `1px dashed ${tk.accent}`, borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer", letterSpacing: "0.03em" }}>+ Add angle</button>
 
       <label style={labelStyle}>Example links</label>
       <div style={{ marginBottom: 6, display: "flex", flexDirection: "column", gap: 8 }}>

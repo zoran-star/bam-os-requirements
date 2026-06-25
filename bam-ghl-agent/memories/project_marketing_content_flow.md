@@ -185,6 +185,26 @@ Not done (deferred): stale-ticket nudge cron; urgency toggle on budget/remove fl
   ⚠️ Any PRE-existing image-block uploaded into the old private `resources/_blocks/` path will
   404 - re-upload it (likely none exist; Convert makes text blocks only).
 
+## Multi-format guide cards (angles) — Phase 1, 2026-06-25
+
+`guide_cards` (1 per offer; shown in the client new-campaign wizard) is going **multi-format**.
+- **Schema** (migration `20260625120000_guide_cards_angles.sql`): added `angles jsonb default '[]'`
+  + `is_default bool`. **Legacy columns kept** (purpose/filming_tips/example_script/example_assets).
+  Backfill wrapped each card's old content into `angles[0].video`.
+- **Model:** `angles[] = { name, purpose(shared), video|null, graphic|null }`; each execution =
+  `{ segments:[{label,text}], tips, example_assets[] }`. Leaf a client/ticket cares about = **angle × medium**.
+  Depth rule: 1 accordion (angle) + 1 toggle (medium); beats/examples flat-labeled. Never a 3rd collapse.
+- **`is_default`** flags the one card the "First Campaign" top card will render (Phase 2). API enforces
+  only-one-default (clears others on set). API GET/POST/PATCH accept `angles`+`is_default`.
+- **Phase 1 (done):** staff editor in `ContentView.jsx` `GuideEditor` rebuilt — angle repeater
+  (`+ Add angle`, preset chips, Video/Graphic toggle, per-execution segment beats + tips + `ExecAssetGrid`).
+  On save it ALSO writes flattened legacy fields (`flattenAnglesToLegacy`) so the current client wizard
+  render (reads legacy) keeps working untouched.
+- **Phase 2 (next):** client wizard renders the angle-accordion; "First Campaign" top card reads `is_default`.
+- **Phase 3:** "Recommended angles → creative blocks" — each angle×medium pre-seeds a creative block
+  tagged `guide_card_id`+`angle`+`medium` on the content ticket. **Decision: Ads-only for now** (organic
+  flow unchanged; model future-proofs extending it later).
+
 ## Slack DMs to staff — blocked on a scope (2026-06-18)
 
 - New marketing/content tickets DM **Cam**; on completion the assigned SM is DM'd. `postStaffSlackDM` posts to a Slack user id; Cam = `marketingManagerSlackId()` (env `MARKETING_DM_SLACK_ID` else staff row by email `cameron@byanymeansbusiness.com`).
