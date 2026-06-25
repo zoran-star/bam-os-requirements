@@ -44,14 +44,28 @@ self_drive, **default off** — `confirmAgentMode()` in `_mode.js`). Turning on 
 agent does NOT start the confirm agent. Self-drive auto-sends only plain confirmations;
 handoff + lost ALWAYS wait for a human ✓.
 
-## ⚠️ Still TODO (not built)
-- **Frontend**: no UI yet for the confirm queue (new table + endpoint). Needs a panel +
-  a `confirm_agent_mode` toggle in AgentModePanel + render of the 3 confirm card kinds.
-- **Apply the migration** to prod.
-- Day-of reminder cadence (detector creates ONE proactive opener; reminders are noted in
-  the prompt but not yet scheduled as separate cards).
+## Frontend (BUILT 2026-06-25)
+- **Mode toggle**: `AgentModePanel.jsx` renders a 2nd segmented control per academy
+  ("Confirm agent") reading `confirm_mode` / calling `set-confirm-mode`. `agent-config.js`
+  returns `confirm_mode` (list/get-mode) + has `set-confirm-mode`.
+- **Sandbox/Brain**: `SandboxApp.jsx` has a Booking|Confirm picker; threads `agent` into
+  `chat` + `sections`. `agent-sandbox.js` takes `agent`; Brain editor scopes to that
+  agent's sections via `sectionKeysForAgent()`. Confirm trains via Brain only (lessons/
+  examples stay booking-only).
+- **Approval inbox**: sibling `_acx*` module in `client-portal.html` (mirrors `_apx*`,
+  reuses `_apxPost`/`_apxToast`/`_apxOpenThread`). "✅ Confirm" button + count next to both
+  Hawkeye buttons (`#acx-approve-btn`, `#v15acx-approve-btn`). 3 kinds: confirm (→`send`),
+  confirm_handoff (→`confirm-handoff`), confirm_lost (→`confirm-lost`). Hidden until the
+  confirm API authorizes. ⚠️ `_acx*` is a SEPARATE set from `_apx*` (don't merge `_APX_DATA`).
+
+## ✅ Migration APPLIED to prod (jnojmfmpnsfmtqmwhopz) 2026-06-25.
+
+## ⚠️ Still TODO
+- Day-of reminder cadence (detector creates ONE proactive opener; reminders are in the
+  prompt but not yet scheduled as separate cards).
 - Optional: instant SMS notify when a Scheduled-Trial lead replies (booking has this for
   Responded; confirm relies on the 15-min cron).
+- **To turn on for an academy:** AgentModePanel → Confirm agent → Hawkeye.
 
 Spec mirrors: `sales-conversation-agents/conversation-ai-confirm-agent{,-bam-gta}.txt`
 (generated from the brain). See `[[project_client_agent_training]]` + `[[project_automation_agent_roadmap]]`.
