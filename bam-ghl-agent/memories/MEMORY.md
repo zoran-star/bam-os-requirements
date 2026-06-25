@@ -2,6 +2,8 @@
 
 Project notes for the BAM GHL Agent / portal work. Read the relevant file when its topic comes up.
 
+- [Plan: portal-owned automations](project_portal_automations_plan.md) — 2026-06-25 STRATEGIC PLAN (not built): move ALL automations off GHL workflows into the portal (cron+code+Supabase); GHL = pipe (CRM+SMS), email → Resend (already wired for password resets). Pattern: trigger→decide→schedule→send→log. Phase 0 = generic `automation_jobs` queue + `_email.js`/`_send.js` + templates + domain verify; Phase 1 = Ghosted/nurture (first target, retires a real GHL workflow). Visual: `docs/portal-automations-plan.html`. Needs Zoran's Resend/DNS checklist to start P0.
+
 - [Confirm agent (Scheduled-Trial stage)](project_confirm_agent.md) — 2026-06-25: 2nd sales agent. Brain is now agent-aware (`assemblePrompt(overrides, agent)`, `AGENT_SPECS={booking,confirm}`, shared facts). Confirms a booked lead is coming + helps them get there; "can't make it" → HANDS OFF to booking agent (note to `agent_contact_notes` + bounce stage Scheduled-Trial→Responded). Live: `api/agent-confirm.js` + `agent_confirm_replies` table (migration `20260625001106`, ⚠️maybe not applied) + own cron + `confirm_agent_mode` (default OFF). ⚠️ no frontend yet; booking agent untouched (byte-identical).
 
 - [V1.5 Onboarding Tracker](project_v15_onboarding_tracker.md) — **living board** for getting every training academy onto V1.5 (text leads + use pipelines). Definition of done (core vs polish), per-academy status, per-location connect process. DETAIL Miami = first one live.
