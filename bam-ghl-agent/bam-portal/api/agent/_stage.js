@@ -31,6 +31,21 @@ export async function interestedStage(token, locationId) {
   return stage ? { pipelineId: pipe.id, stageId: stage.id, stageName: stage.name } : null;
 }
 
+// The Training Pipeline "Scheduled Trial" (a.k.a. "Booked Trial") stage — where a
+// lead lands AFTER the booking agent books their trial. This is the CONFIRM agent's
+// queue: it confirms attendance, helps them get to the trial, and on "can't make it"
+// bounces them back to Responded for the booking agent to rebook. Same shape as
+// respondedStage. Anchored on "trial" so a generic "Booking"/"Bookings" stage can't
+// match by accident.
+export async function scheduledTrialStage(token, locationId) {
+  const data = await ghl("GET", `/opportunities/pipelines?locationId=${encodeURIComponent(locationId)}`, { token });
+  const pipelines = data.pipelines || data.data || [];
+  const pipe = pipelines.find(p => /training/i.test(p.name || "")) || pipelines[0];
+  if (!pipe) return null;
+  const stage = (pipe.stages || []).find(s => /(schedul|book).*trial/i.test(s.name || ""));
+  return stage ? { pipelineId: pipe.id, stageId: stage.id, stageName: stage.name } : null;
+}
+
 export async function contactInRespondedStage(token, locationId, contactId, rs) {
   try {
     const params = new URLSearchParams({ location_id: locationId, contact_id: contactId, pipeline_id: rs.pipelineId, limit: "20" });
@@ -110,5 +125,61 @@ export async function respondedContactIdSetCached(token, locationId, ttlMs = 600
   if (hit !== undefined) return hit;
   const ids = await respondedContactIdSet(token, locationId);
   _ridCache.set(locationId, { at: Date.now(), ids });
+  return ids;
+}
+
+// ── CONFIRM AGENT (Scheduled-Trial stage) ───────────────────────────────────
+// Mirrors the Responded helpers above, for the confirm agent's queue.
+
+// The confirm queue for one academy: ALL open opps in the Scheduled-Trial stage,
+// each tagged with its last message + direction so the detector can branch —
+// inbound last → draft a live reply; no agent message yet → draft an opening
+// confirmation; agent already waiting on a reply → skip. (Unlike the booking
+// computeQueue, this is NOT inbound-only: confirming attendance is proactive.)
+export async function computeConfirmQueue(token, locationId) {
+  const sts = await scheduledTrialStage(token, locationId);
+  if (!sts) return { sts: null, queue: [] };
+  const oppParams = new URLSearchParams({ location_id: locationId, pipeline_id: sts.pipelineId, pipeline_stage_id: sts.stageId, limit: "100" });
+  let opps = [];
+  try { const od = await ghl("GET", `/opportunities/search?${oppParams}`, { token }); opps = od.opportunities || od.data || []; } catch (_) {}
+  const ids = openOppContactIds(opps);
+  const cd = await ghl("GET", `/conversations/search?${new URLSearchParams({ locationId, limit: "100" })}`, { token });
+  const convos = cd.conversations || cd.data || [];
+  const queue = convos
+    .filter(c => ids.has(c.contactId))
+    .map(c => ({
+      contact_id: c.contactId,
+      conversation_id: c.id,
+      name: c.fullName || c.contactName || "Unknown",
+      last_message: c.lastMessageBody || "",
+      last_direction: String(c.lastMessageDirection || "").toLowerCase(),
+      last_at: toIso(c.lastMessageDate || c.dateUpdated),
+    }))
+    .sort((a, b) => new Date(b.last_at || 0) - new Date(a.last_at || 0));
+  return { sts, queue, scheduledIds: ids };
+}
+
+// Throws on GHL failure (callers fail open), null when there's no Scheduled-Trial
+// stage. The read-time gate for the confirm queue + send guard.
+export async function scheduledTrialContactIdSet(token, locationId) {
+  const sts = await scheduledTrialStage(token, locationId);   // throws on GHL error
+  if (!sts) return null;                                       // no stage → cannot gate
+  const params = new URLSearchParams({ location_id: locationId, pipeline_id: sts.pipelineId, pipeline_stage_id: sts.stageId, limit: "100" });
+  const od = await ghl("GET", `/opportunities/search?${params}`, { token });  // throws on GHL error
+  return openOppContactIds(od.opportunities || od.data || []);
+}
+
+const _stsCache = new Map();   // locationId -> { at, ids }
+
+export function peekScheduledTrialIdSet(locationId, ttlMs = 60000) {
+  const hit = _stsCache.get(locationId);
+  return (hit && (Date.now() - hit.at) < ttlMs) ? hit.ids : undefined;
+}
+
+export async function scheduledTrialContactIdSetCached(token, locationId, ttlMs = 60000) {
+  const hit = peekScheduledTrialIdSet(locationId, ttlMs);
+  if (hit !== undefined) return hit;
+  const ids = await scheduledTrialContactIdSet(token, locationId);
+  _stsCache.set(locationId, { at: Date.now(), ids });
   return ids;
 }

@@ -45,6 +45,26 @@ export async function freeSlots(token, calendarId, { days = 14, timezone = "Amer
   return { timezone, days: out };
 }
 
+// The contact's next upcoming booked appointment (the trial the confirm agent is
+// confirming). Returns { startTime, calendarId, title, status } or null. Best-effort:
+// GHL shapes vary, so we read defensively and never throw (callers fall back to a
+// generic "your booked trial"). `nowMs` lets callers pass a clock for determinism.
+export async function nextAppointment(token, contactId, { nowMs = Date.now() } = {}) {
+  try {
+    const r = await fetch(`${GHL}/contacts/${encodeURIComponent(contactId)}/appointments`, {
+      headers: { Authorization: `Bearer ${token}`, Version: "2021-07-28", Accept: "application/json" },
+    });
+    const json = await r.json().catch(() => ({}));
+    if (!r.ok) return null;
+    const events = json.events || json.appointments || json.data || [];
+    const upcoming = (Array.isArray(events) ? events : [])
+      .map(e => ({ startTime: e.startTime || e.startAt || e.start_time || null, calendarId: e.calendarId || e.calendar_id || null, title: e.title || null, status: (e.appointmentStatus || e.status || "").toLowerCase() }))
+      .filter(e => e.startTime && e.status !== "cancelled" && e.status !== "canceled" && new Date(e.startTime).getTime() > nowMs)
+      .sort((a, b) => new Date(a.startTime) - new Date(b.startTime));
+    return upcoming[0] || null;
+  } catch (_) { return null; }
+}
+
 // Flatten free-slots into a short, model-friendly list of upcoming open times.
 export function summarizeSlots(slotsByDay, max = 25) {
   const flat = [];

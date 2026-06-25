@@ -24,6 +24,16 @@ export function agentMode(client) {
   return (cfg.agent_approvals_enabled || cfg.followup_engine_enabled) ? "hawkeye" : "off";
 }
 
+// The CONFIRM agent (Scheduled-Trial stage) has its OWN switch so turning on the
+// booking agent doesn't silently start texting already-booked leads. New feature →
+// opt-in: defaults to "off" for every academy (no legacy fallback). Same vocabulary
+// (off / hawkeye / self_drive). Stored at clients.ghl_kpi_config.confirm_agent_mode.
+export function confirmAgentMode(client) {
+  const cfg = (client && client.ghl_kpi_config) || {};
+  const m = cfg.confirm_agent_mode;
+  return AGENT_MODES.includes(m) ? m : "off";
+}
+
 export const modeIsOn      = (mode) => mode === "hawkeye" || mode === "self_drive";
 export const modeSelfDrives = (mode) => mode === "self_drive";
 

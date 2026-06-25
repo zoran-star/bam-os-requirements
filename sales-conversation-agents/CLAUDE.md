@@ -26,8 +26,32 @@ Run `/memory-audit` periodically. Memory drift wastes context.
 Booking agent is being built for BAM GTA. Zoran is working with Danny on sourcing training data from the best sales academies in the BAM Business network to train the agent. Still early stage.
 
 ## Current agents
-- conversation-ai-booking-agent.txt — master template with {{PLACEHOLDER}} variables
-- conversation-ai-booking-agent-bam-gta.txt — BAM GTA instance (all placeholders filled in)
+
+Two live agents, one per pipeline stage. They SHARE the same FACT sections (one
+source of truth per academy) and differ only in BEHAVIOR. Pick the agent in
+`assemblePrompt(overrides, agent)` / `buildAgentSystem({ ..., agent })`.
+
+**1. Booking agent** — Training pipeline → **Responded** stage. Gets a lead to book a free trial.
+- conversation-ai-booking-agent.txt — master template ({{PLACEHOLDER}} facts)
+- conversation-ai-booking-agent-bam-gta.txt — BAM GTA instance (facts filled)
+- Live: `api/agent-approvals.js` (+ `agent_ready_replies` queue).
+
+**2. Confirm agent** — Training pipeline → **Scheduled Trial** stage. Confirms an
+already-booked lead is coming, helps them get there, and on "can't make it" HANDS
+OFF to the booking agent to rebook (writes a context note + bounces the opportunity
+back to Responded — the booking agent reads that note via contact_memory).
+- conversation-ai-confirm-agent.txt — master template ({{PLACEHOLDER}} facts)
+- conversation-ai-confirm-agent-bam-gta.txt — BAM GTA instance
+- Live: `api/agent-confirm.js` (+ `agent_confirm_replies` queue, own cron, gated
+  behind `clients.ghl_kpi_config.confirm_agent_mode` — default **off**).
+- Sections (keys `confirm_*`): role, core_behavior, flow, logistics, handoff,
+  followup, lost, examples. It does NOT rebook itself — handoff only.
+
+```
+Responded ──booking agent──► Scheduled Trial ──confirm agent──► (shows up / rebooks)
+     ▲                                              │ can't make it
+     └──────────── handoff (note + stage bounce) ◄──┘
+```
 
 ## Planned agents
 - Closing AI — post-trial conversion nudges (being designed in SES-025)
