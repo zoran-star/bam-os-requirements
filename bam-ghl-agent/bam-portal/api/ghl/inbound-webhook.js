@@ -3,6 +3,7 @@ import { pickGhlToken, sendSms, ghl } from "./_core.js";
 import { notifyOwners } from "../_notify-owners.js";
 import { respondedStage, contactInRespondedStage } from "../agent/_stage.js";
 import { agentMode, modeIsOn } from "../agent/_mode.js";
+import { exitEnrollment } from "../automations.js";
 // Vercel Serverless Function — GHL inbound-message webhook  ("P1 Spine")
 //
 //   POST /api/ghl/inbound-webhook
@@ -217,6 +218,25 @@ async function handler(req, res) {
       await sb(`agent_confirm_replies?client_id=eq.${client.id}&ghl_contact_id=eq.${cid}&status=in.(pending,approved)`, patch);
     }
   } catch (e) { console.error("ghl inbound-webhook draft-cancel error:", e.message); }
+
+  // Lead replied while in a portal automation (👻 Ghosted / 💔 Lead Nurture) → exit
+  // the sequence and bounce them to Booking (Responded) so the booking agent picks
+  // them up warm (mirrors the GHL ghosted "reply -> Responded" behavior). Best-effort.
+  try {
+    if (contactId) {
+      const { exited } = await exitEnrollment({ clientId: client.id, contactId, reason: "replied" });
+      if (exited > 0) {
+        const creds = await pickGhlToken(client);
+        if (creds) {
+          const rs = await respondedStage(creds.token, creds.locationId);
+          const d = await ghl("GET", `/opportunities/search?${new URLSearchParams({ location_id: creds.locationId, contact_id: String(contactId), limit: "20" })}`, { token: creds.token });
+          const opps = d.opportunities || d.data || [];
+          const oppId = (opps.find(o => String(o.status || "").toLowerCase() === "open") || opps[0] || null)?.id || null;
+          if (rs && oppId) await ghl("PUT", `/opportunities/${encodeURIComponent(oppId)}`, { token: creds.token, body: { pipelineId: rs.pipelineId, pipelineStageId: rs.stageId } });
+        }
+      }
+    }
+  } catch (e) { console.error("ghl inbound-webhook automation-exit error:", e.message); }
 
   // Instant notify: when a Responded-stage lead replies (a chat that needs
   // approval), text the academy's configured number. Best-effort — never blocks.

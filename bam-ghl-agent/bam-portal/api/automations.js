@@ -13,6 +13,7 @@ import { withSentryApiRoute } from "./_sentry.js";
 // CLAIMS a job with a conditional pending->sending update before sending.
 
 import { pickGhlToken, ghl } from "./ghl/_core.js";
+import { nurtureStage } from "./agent/_stage.js";
 import { sendOn } from "./_send.js";
 import { withinQuietHours, nextSendableTime } from "./agent/_quiet.js";
 import { resolveAgentActor } from "./agent/_auth.js";
@@ -130,6 +131,31 @@ export async function exitEnrollment({ clientId, automationKey = null, contactId
   return { ok: true, exited };
 }
 
+// ── EXPORTED: is this academy's automation actually LIVE? (enabled + approved +
+// at least one enabled step). The P6 triggers branch on this so live behavior is
+// unchanged until an academy turns a portal sequence on (then it auto-switches off
+// the GHL workflow / status=lost path). Fails CLOSED (false) on a DB error so a
+// transient blip never flips a lead onto an unproven portal path. ──
+export async function isAutomationLive(clientId, automationKey) {
+  if (!clientId || !automationKey) return false;
+  try {
+    const autos = await sb(`automations?client_id=eq.${clientId}&automation_key=eq.${encodeURIComponent(automationKey)}&enabled=eq.true&approved=eq.true&select=id&limit=1`);
+    const auto = Array.isArray(autos) && autos[0];
+    if (!auto) return false;
+    const steps = await sb(`automation_steps?automation_id=eq.${auto.id}&enabled=eq.true&select=id&limit=1`);
+    return Array.isArray(steps) && steps.length > 0;
+  } catch (_) { return false; }
+}
+
+// Find a contact's open opportunity id (for the ghosted->nurture stage move).
+async function findOpenOppId(token, locationId, contactId) {
+  try {
+    const d = await ghl("GET", `/opportunities/search?${new URLSearchParams({ location_id: locationId, contact_id: String(contactId), limit: "20" })}`, { token });
+    const opps = d.opportunities || d.data || [];
+    return (opps.find(o => String(o.status || "").toLowerCase() === "open") || opps[0] || null)?.id || null;
+  } catch (_) { return null; }
+}
+
 // ── the worker: send due jobs, then schedule the next step ──
 async function resolveContactInfo(token, contactId, cache) {
   const key = String(contactId);
@@ -180,6 +206,21 @@ async function runWork(res) {
         await sb(`automation_enrollments?id=eq.${job.enrollment_id}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ status: "completed", exited_at: new Date().toISOString(), exit_reason: "sequence complete" }) }).catch(() => {});
         await logEvent({ clientId: job.client_id, contactId: job.contact_id, automationId: job.automation_id, type: "completed", payload: null });
         completed++;
+        // Model: 👻 Ghosted ran out and they're STILL silent -> roll into 💔 Lead
+        // Nurture (the sparse long game). Only when nurture is live; best-effort.
+        try {
+          const a = autoCache.get(job.automation_id);
+          if (a && a.automation_key === "ghosted" && await isAutomationLive(job.client_id, "nurture")) {
+            await enrollContact({ clientId: job.client_id, automationKey: "nurture", contactId: job.contact_id });
+            const creds = tokenCache.get(job.client_id);
+            if (creds && creds.token) {
+              const ns = await nurtureStage(creds.token, creds.locationId);
+              const oppId = await findOpenOppId(creds.token, creds.locationId, job.contact_id);
+              if (ns && oppId) await ghl("PUT", `/opportunities/${encodeURIComponent(oppId)}`, { token: creds.token, body: { pipelineId: ns.pipelineId, pipelineStageId: ns.stageId } });
+            }
+            await logEvent({ clientId: job.client_id, contactId: job.contact_id, automationId: job.automation_id, type: "ghosted_to_nurture", payload: null });
+          }
+        } catch (_) { /* best-effort roll-forward */ }
       }
     };
 

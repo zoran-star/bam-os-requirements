@@ -137,8 +137,27 @@ Phase order:
 - **P5** — 📥 IMPORT SESSION. STRICT ORDER: P3+P4 built FIRST so the UI shows EMPTY automations, THEN Zoran
   pastes GHL text/email screenshots → AI extracts {text, channel, timing} → POPULATES content/sequences.
   Import populates; it does NOT design emails (that's a separate portal+Claude task). Screenshots = the cadence spec.
-- **P6** — 👻 Ghosted (retire GHL workflow) + 💔 Lead Nurture go live; flip "Lost" → Nurture stage here.
-- **P7** — 🛡️ guardrails + observability (see `[[project_sales_crew_guardrails]]`).
+- **P6** — ✅ TRIGGERS WIRED (branch `session/sales-crew`). Every trigger BRANCHES on `isAutomationLive(clientId,
+  key)` (enabled+approved+≥1 enabled step; **fails CLOSED** on DB error) so TODAY's behavior is byte-identical
+  until an academy approves a portal sequence — then it auto-switches (and they turn the GHL workflow off). No
+  double-send, no gap. Wiring:
+  - `api/automations.js`: + exported `isAutomationLive`. Worker "completed" branch: a finished `ghosted`
+    enrollment + nurture live → `enrollContact('nurture')` + move opp to nurture stage (ghosted ran out → nurture).
+  - `confirm-ghost` (agent-approvals): nurture... ghosted live → `enrollContact('ghosted')` (skip GHL workflow);
+    else existing GHL ghosted workflow. Interested move shared.
+  - `confirm-lost` (ALL 3 agents — approvals/confirm/closing): nurture live + `nurtureStage` exists → move opp to
+    Lead Nurture stage (kept OPEN) + `enrollContact('nurture')` + outcome 'nurture'; ELSE existing `status=lost`
+    (GHL-native). Falls back to status=lost if no nurture stage. 🚫 Unqualified (`confirm-abandoned`) unchanged.
+  - `inbound-webhook`: on reply → `exitEnrollment(reason:'replied')`; if it exited ≥1 enrollment, move opp to
+    Responded (booking picks them up warm). Best-effort.
+  - ⬜ STILL NEEDS (Zoran, per academy, when ready): populate + approve the portal Ghosted/Nurture sequences
+    (P5 import does the populate), create the Lead Nurture GHL stage, then turn OFF the matching GHL workflows.
+- **P5** — ⬜ NEXT (INTERACTIVE — needs Zoran + screenshots). The empty step-builder (P4b) is ready. Build the
+  AI screenshot→steps parser that fills `automation_steps` via `upsert-step`.
+- **P7** — ⬜ 🛡️ guardrails + observability (see `[[project_sales_crew_guardrails]]`): notify-all-inbound,
+  per-convo/per-card bot mute, atomic first-come claim on Hawkeye cards, convo-tab outline, client
+  "see inside every automation" view.
+- **P2.5** — ⬜ post-trial form → unified inbox (polish; `_plPostTrialForm` coupled to board state — see note above).
 
 ## Hawkeye-only verdict (end-to-end code trace 2026-06-25)
 Today TWO things force Zoran out of Hawkeye regularly: (1) **post-trial form** — a human must mark

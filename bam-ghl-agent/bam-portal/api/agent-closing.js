@@ -30,8 +30,9 @@ import { buildAgentSystem } from "./agent/brain.js";
 import { loadContactMemory } from "./agent/contact-memory.js";
 import {
   doneTrialStage, contactInRespondedStage, computeClosingQueue,
-  doneTrialContactIdSetCached, peekDoneTrialIdSet, toIso,
+  doneTrialContactIdSetCached, peekDoneTrialIdSet, nurtureStage, toIso,
 } from "./agent/_stage.js";
+import { enrollContact, isAutomationLive } from "./automations.js";
 import { closingAgentMode, modeIsOn, shouldAutoSend } from "./agent/_mode.js";
 import { withinQuietHours, nextSendableTime } from "./agent/_quiet.js";
 import { resolveAgentActor } from "./agent/_auth.js";
@@ -586,15 +587,31 @@ async function handler(req, res) {
       if (!oppId) return res.status(200).json({ error: "No opportunity found for this contact — nothing to mark lost." });
       const closing = (typeof b.reply === "string" ? b.reply : (row ? row.draft_message : "")) || "";
       if (closing.trim()) { try { await sendReplyViaGhl(token, contactId, closing.trim()); } catch (_) {} }
-      try { await ghl("PUT", `/opportunities/${encodeURIComponent(oppId)}`, { token, body: { status: "lost" } }); }
-      catch (e) { return res.status(e.status || 502).json({ error: `GHL mark lost: ${e.message}` }); }
       const reason = (b.lost_reason || (row && row.lost_reason) || "").toString().trim() || null;
-      try { await sb(`pipeline_outcomes`, { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify([{ client_id: clientId, opportunity_id: oppId, status: "lost", reason }]) }); } catch (_) {}
+      // Model: a non-Unqualified Lost lead flows into 💔 Lead Nurture. If the portal
+      // nurture sequence is LIVE + a Lead Nurture stage exists, route them there (opp
+      // stays OPEN); else keep the GHL-native status=lost behavior. Auto-switches per academy.
+      let routedToNurture = false;
+      try {
+        if (await isAutomationLive(clientId, "nurture")) {
+          const ns = await nurtureStage(token, locationId);
+          if (ns) {
+            await ghl("PUT", `/opportunities/${encodeURIComponent(oppId)}`, { token, body: { pipelineId: ns.pipelineId, pipelineStageId: ns.stageId } });
+            await enrollContact({ clientId, automationKey: "nurture", contactId });
+            routedToNurture = true;
+          }
+        }
+      } catch (_) { /* fall through to status=lost */ }
+      if (!routedToNurture) {
+        try { await ghl("PUT", `/opportunities/${encodeURIComponent(oppId)}`, { token, body: { status: "lost" } }); }
+        catch (e) { return res.status(e.status || 502).json({ error: `GHL mark lost: ${e.message}` }); }
+      }
+      try { await sb(`pipeline_outcomes`, { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify([{ client_id: clientId, opportunity_id: oppId, status: routedToNurture ? "nurture" : "lost", reason }]) }); } catch (_) {}
       if (b.ready_id) {
         try { await sb(`agent_closing_replies?id=eq.${encodeURIComponent(b.ready_id)}&client_id=eq.${clientId}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ status: "sent", approved_by: staffEmail, approved_at: new Date().toISOString(), sent_at: new Date().toISOString(), updated_at: new Date().toISOString() }) }); } catch (_) {}
       }
       await clearClosingCards(clientId, contactId, "marked lost");
-      return res.status(200).json({ ok: true, marked_lost: true, opportunity_id: oppId, reason });
+      return res.status(200).json({ ok: true, marked_lost: !routedToNurture, routed_to_nurture: routedToNurture, opportunity_id: oppId, reason });
     }
 
     return res.status(400).json({ error: "unknown action" });

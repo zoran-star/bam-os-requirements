@@ -20,8 +20,9 @@ import { assemblePrompt } from "./agent/prompt-structure.js";
 import { buildAgentSystem } from "./agent/brain.js";
 import { loadContactMemory } from "./agent/contact-memory.js";
 import { loadCalendars, calendarForGroup, freeSlots, summarizeSlots } from "./agent/booking.js";
-import { respondedStage, contactInRespondedStage, computeQueue, respondedContactIdSetCached, peekRespondedIdSet, interestedStage, toIso } from "./agent/_stage.js";
+import { respondedStage, contactInRespondedStage, computeQueue, respondedContactIdSetCached, peekRespondedIdSet, interestedStage, nurtureStage, toIso } from "./agent/_stage.js";
 import { markUnqualified, unmarkUnqualified } from "./agent/_tags.js";
+import { enrollContact, isAutomationLive } from "./automations.js";
 import { agentMode, modeIsOn, shouldAutoSend } from "./agent/_mode.js";
 import { withinQuietHours, nextSendableTime } from "./agent/_quiet.js";
 import { resolveAgentActor } from "./agent/_auth.js";
@@ -668,18 +669,33 @@ async function handler(req, res) {
       // Send a closing message only if one was explicitly provided.
       const closing = (typeof b.reply === "string" ? b.reply : (row ? row.draft_message : "")) || "";
       if (closing.trim()) { try { await sendReplyViaGhl(token, contactId, closing.trim()); } catch (_) {} }
-      try {
-        await ghl("PUT", `/opportunities/${encodeURIComponent(oppId)}`, { token, body: { status: "lost" } });
-      } catch (e) { return res.status(e.status || 502).json({ error: `GHL mark lost: ${e.message}` }); }
       const reason = (b.lost_reason || (row && row.lost_reason) || "").toString().trim() || null;
-      try { await sb(`pipeline_outcomes`, { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify([{ client_id: clientId, opportunity_id: oppId, status: "lost", reason }]) }); } catch (_) {}
-      // Lead-nurture is handled NATIVELY by GHL: the academy's "Opportunity →
-      // Lost" workflow trigger fires automatically off this status change, so the
-      // portal does NOT enroll anyone (that would double-enroll). Marking lost = done.
-      // Clear ALL of this lead's queued cards (replies + follow-ups) - they're Lost now.
+      // Model: "Lost" is no longer terminal - a non-Unqualified lost lead flows into
+      // 💔 Lead Nurture. If this academy has the portal nurture sequence LIVE and a
+      // Lead Nurture stage exists, route them there (the opp stays OPEN so the nurture
+      // sequence can work it). Otherwise keep the existing GHL-native Lost behavior:
+      // status=lost fires the academy's "Opportunity -> Lost" workflow. Auto-switches
+      // per academy the moment they approve the portal nurture sequence.
+      let routedToNurture = false;
+      try {
+        if (await isAutomationLive(clientId, "nurture")) {
+          const ns = await nurtureStage(token, locationId);
+          if (ns) {
+            await ghl("PUT", `/opportunities/${encodeURIComponent(oppId)}`, { token, body: { pipelineId: ns.pipelineId, pipelineStageId: ns.stageId } });
+            await enrollContact({ clientId, automationKey: "nurture", contactId });
+            routedToNurture = true;
+          }
+        }
+      } catch (_) { /* fall through to the GHL-native lost path below */ }
+      if (!routedToNurture) {
+        try { await ghl("PUT", `/opportunities/${encodeURIComponent(oppId)}`, { token, body: { status: "lost" } }); }
+        catch (e) { return res.status(e.status || 502).json({ error: `GHL mark lost: ${e.message}` }); }
+      }
+      try { await sb(`pipeline_outcomes`, { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify([{ client_id: clientId, opportunity_id: oppId, status: routedToNurture ? "nurture" : "lost", reason }]) }); } catch (_) {}
+      // Clear ALL of this lead's queued cards (replies + follow-ups) - they're done in Responded now.
       try { await sb(`agent_ready_replies?client_id=eq.${clientId}&ghl_contact_id=eq.${encodeURIComponent(contactId)}&status=in.(pending,approved)`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ status: "sent", approved_by: staffEmail, approved_at: new Date().toISOString(), sent_at: new Date().toISOString(), updated_at: new Date().toISOString() }) }); } catch (_) {}
       try { await sb(`agent_followups?client_id=eq.${clientId}&ghl_contact_id=eq.${encodeURIComponent(contactId)}&status=in.(pending,approved)`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ status: "canceled", send_error: "marked lost", updated_at: new Date().toISOString() }) }); } catch (_) {}
-      return res.status(200).json({ ok: true, marked_lost: true, opportunity_id: oppId, reason });
+      return res.status(200).json({ ok: true, marked_lost: !routedToNurture, routed_to_nurture: routedToNurture, opportunity_id: oppId, reason });
     }
 
     // 🚫 Unqualified (formerly "Abandon"): the ONE true dead end. The lead is
@@ -778,10 +794,19 @@ async function handler(req, res) {
         const pick = opps.find(o => String(o.status || "").toLowerCase() === "open") || opps[0];
         oppId = pick && pick.id;
       } catch (e) { return res.status(e.status || 502).json({ error: `GHL find opp: ${e.message}` }); }
-      // Enroll in the Ghosted automation (the only step that MUST succeed).
-      let workflowId;
-      try { workflowId = await enrollGhosted(client, token, contactId); }
-      catch (e) { return res.status(e.status || 502).json({ error: e.message }); }
+      // Enroll in the Ghosted sequence (the only step that MUST succeed). Use the
+      // portal-native automation if this academy has it LIVE (enabled+approved+steps);
+      // otherwise keep the GHL ghosted workflow exactly as before. Auto-switches the
+      // moment the academy approves the portal sequence (and turns the GHL one off).
+      let workflowId = null, portalGhosted = false;
+      try {
+        if (await isAutomationLive(clientId, "ghosted")) {
+          await enrollContact({ clientId, automationKey: "ghosted", contactId });
+          portalGhosted = true;
+        } else {
+          workflowId = await enrollGhosted(client, token, contactId);
+        }
+      } catch (e) { return res.status(e.status || 502).json({ error: e.message }); }
       // Move the opp to Interested so it leaves Responded (best-effort — the enroll
       // already happened; the GHL workflow will move them too).
       try {
@@ -792,7 +817,7 @@ async function handler(req, res) {
       // Clear ALL of this lead's queued cards (replies + follow-ups) — they've left Responded.
       try { await sb(`agent_ready_replies?client_id=eq.${clientId}&ghl_contact_id=eq.${encodeURIComponent(contactId)}&status=in.(pending,approved)`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ status: "sent", approved_by: staffEmail, approved_at: new Date().toISOString(), sent_at: new Date().toISOString(), updated_at: new Date().toISOString() }) }); } catch (_) {}
       try { await sb(`agent_followups?client_id=eq.${clientId}&ghl_contact_id=eq.${encodeURIComponent(contactId)}&status=in.(pending,approved)`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ status: "canceled", send_error: "sent to ghosted", updated_at: new Date().toISOString() }) }); } catch (_) {}
-      return res.status(200).json({ ok: true, ghosted: true, workflow_id: workflowId, opportunity_id: oppId });
+      return res.status(200).json({ ok: true, ghosted: true, portal: portalGhosted, workflow_id: workflowId, opportunity_id: oppId });
     }
 
     return res.status(400).json({ error: "unknown action" });
