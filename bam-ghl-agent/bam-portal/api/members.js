@@ -262,6 +262,17 @@ async function handler(req, res) {
   // ════════════════════════════════════════════════════════
   if (req.method === "GET") {
     try {
+      // ─── Member activity log: every audited action for this client ───
+      if (req.query.action === "audit-log") {
+        const cid = (req.query.client_id || "").toString();
+        if (!cid) return res.status(400).json({ error: "client_id required" });
+        if (!isStaff && !clients.some((c) => c.id === cid)) {
+          return res.status(403).json({ error: "not your client" });
+        }
+        const rows = await sb(`member_audit_log?client_id=eq.${cid}&select=id,member_id,action_type,performed_by_name,created_at,args&order=created_at.desc&limit=500`);
+        return res.status(200).json({ ok: true, log: Array.isArray(rows) ? rows : [] });
+      }
+
       // ─── Single member: returns DB row + Stripe detail (for popup) ─
       if (id) {
         const rows = await sb(`members?id=eq.${id}&select=*`);

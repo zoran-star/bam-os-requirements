@@ -6836,9 +6836,12 @@ Then the call to action."]</div>
           <span class="topbar-kicker">§ 03 · Members</span>
           <div class="topbar-title">Member Management</div>
         </div>
-        <div style="display:none">
-          <div id="stripe-connect-button-host"></div>
-          <div id="ghl-connect-button-host"></div>
+        <div style="display:flex;align-items:center;gap:10px">
+          <button onclick="_openMemberLog()" title="Activity log - every action performed on members" style="background:transparent;border:1px solid var(--border);color:var(--text-sub);border-radius:8px;padding:8px 14px;font:inherit;font-size:13px;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:7px;white-space:nowrap">📋 Activity log</button>
+          <div style="display:none">
+            <div id="stripe-connect-button-host"></div>
+            <div id="ghl-connect-button-host"></div>
+          </div>
         </div>
       </div>
       <div class="content">
@@ -28956,6 +28959,102 @@ async function _memberUpdateField(memberId, field, value) {
     await openMemberPopup(memberId);  // revert the control to the saved value
   }
 }
+
+// ── Member activity log modal ───────────────────────────────
+// Every audited member action (member_audit_log) in one filterable list:
+// filter by action type, search by member, click a row to open that member.
+let _MEMBER_LOG = { rows: [], action: '', search: '' };
+const _MLOG_LABELS = {
+  cancel: ['Cancelled', '#e0654f'],
+  pause: ['Paused', '#cfa647'],
+  unpause: ['Resumed', '#7BC47F'],
+  resume: ['Resumed', '#7BC47F'],
+  refund: ['Refund', '#e0654f'],
+  'change-plan': ['Plan change', '#5a8fb8'],
+  change_plan: ['Plan change', '#5a8fb8'],
+  change: ['Plan change', '#5a8fb8'],
+  'update-profile': ['Profile edit', '#9aa0a6'],
+  'pause-date-fix': ['Pause date fix', '#cfa647'],
+  referred: ['Referral', '#7BC47F'],
+};
+function _mlogLabel(a) { return (_MLOG_LABELS[a] || [null])[0] || (a || 'action').replace(/[-_]/g, ' '); }
+function _mlogColor(a) { return (_MLOG_LABELS[a] || [null, '#9aa0a6'])[1]; }
+function _mlogMemberMap() {
+  const m = {};
+  (typeof _MEMBERS_ALL !== 'undefined' ? _MEMBERS_ALL : []).forEach(x => { if (x && x.id) m[x.id] = x; });
+  return m;
+}
+function _mlogDate(iso) {
+  if (!iso) return '';
+  try { return new Date(iso).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }); } catch (_) { return iso.slice(0, 10); }
+}
+async function _openMemberLog() {
+  let host = document.getElementById('member-log-host');
+  if (!host) { host = document.createElement('div'); host.id = 'member-log-host'; document.body.appendChild(host); }
+  host.innerHTML = `
+    <div onclick="_closeMemberLog()" style="position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:200"></div>
+    <div style="position:fixed;z-index:201;top:50%;left:50%;transform:translate(-50%,-50%);width:min(640px,94vw);max-height:85vh;display:flex;flex-direction:column;background:var(--surface,#16161a);border:1px solid var(--border,#2a2a31);border-radius:14px;overflow:hidden">
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:16px 18px 12px">
+        <div style="font-size:16px;font-weight:700;color:var(--text)">Member activity</div>
+        <button onclick="_closeMemberLog()" aria-label="Close" style="background:none;border:none;color:var(--text-mute);font-size:24px;cursor:pointer;line-height:1;padding:0 4px">×</button>
+      </div>
+      <div style="padding:0 18px 12px">
+        <input id="mlog-search" oninput="_MEMBER_LOG.search=this.value;_renderMemberLog()" placeholder="Search by member name…" style="width:100%;box-sizing:border-box;background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);padding:9px 11px;font:inherit;font-size:13px;margin-bottom:10px">
+        <div id="mlog-filters" style="display:flex;flex-wrap:wrap;gap:6px"></div>
+      </div>
+      <div id="mlog-list" style="flex:1;overflow-y:auto;padding:4px 8px 14px"><div class="req-empty" style="padding:24px 0;text-align:center"><span class="req-spin"></span>Loading…</div></div>
+    </div>`;
+  try {
+    const token = await _mreqAuthToken();
+    const r = await fetch('/api/members?action=audit-log&client_id=' + encodeURIComponent(CLIENT_ID), { headers: { Authorization: 'Bearer ' + token } });
+    const j = await _safeJson(r);
+    if (!r.ok) throw new Error(j.error || ('HTTP ' + r.status));
+    _MEMBER_LOG = { rows: j.log || [], action: '', search: '' };
+    _renderMemberLog();
+  } catch (e) {
+    const el = document.getElementById('mlog-list');
+    if (el) el.innerHTML = `<div style="padding:24px 16px;color:#e0654f;font-size:13px">Couldn't load: ${escapeHTML(e.message || String(e))}</div>`;
+  }
+}
+function _closeMemberLog() { const h = document.getElementById('member-log-host'); if (h) h.innerHTML = ''; }
+function _renderMemberLog() {
+  const map = _mlogMemberMap();
+  const rows = _MEMBER_LOG.rows || [];
+  const actions = Array.from(new Set(rows.map(r => r.action_type))).sort();
+  const chips = document.getElementById('mlog-filters');
+  if (chips) {
+    const chip = (val, label) => {
+      const on = _MEMBER_LOG.action === val;
+      return `<button onclick="_MEMBER_LOG.action='${val}';_renderMemberLog()" style="background:${on ? 'var(--accent,#E8C547)' : 'transparent'};color:${on ? '#0B0B0D' : 'var(--text-sub)'};border:1px solid ${on ? 'var(--accent,#E8C547)' : 'var(--border)'};border-radius:999px;padding:4px 11px;font-size:12px;font-weight:600;cursor:pointer">${escapeHTML(label)}</button>`;
+    };
+    chips.innerHTML = chip('', 'All') + actions.map(a => chip(a, _mlogLabel(a))).join('');
+  }
+  const q = (_MEMBER_LOG.search || '').trim().toLowerCase();
+  const filtered = rows.filter(r => {
+    if (_MEMBER_LOG.action && r.action_type !== _MEMBER_LOG.action) return false;
+    if (q) { const m = map[r.member_id]; const nm = ((m && (m.athlete_name || m.parent_name)) || '').toLowerCase(); if (!nm.includes(q)) return false; }
+    return true;
+  });
+  const list = document.getElementById('mlog-list');
+  if (!list) return;
+  if (!filtered.length) { list.innerHTML = `<div style="padding:24px 16px;color:var(--text-mute);font-size:13px;text-align:center">No matching actions.</div>`; return; }
+  list.innerHTML = filtered.map(r => {
+    const m = map[r.member_id];
+    const name = m ? (m.athlete_name || m.parent_name || 'Member') : '(member removed)';
+    const clickable = !!m;
+    const by = r.performed_by_name ? ' · by ' + escapeHTML(r.performed_by_name) : '';
+    const col = _mlogColor(r.action_type);
+    return `<div ${clickable ? `onclick="_mlogOpen('${escapeHTML(r.member_id)}')" onmouseover="this.style.background='rgba(255,255,255,.04)'" onmouseout="this.style.background='transparent'"` : ''} style="display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:8px;${clickable ? 'cursor:pointer' : 'opacity:.6'}">
+        <span style="flex:0 0 auto;font-size:11px;font-weight:700;color:${col};background:${col}22;border-radius:999px;padding:3px 9px;white-space:nowrap">${escapeHTML(_mlogLabel(r.action_type))}</span>
+        <div style="flex:1;min-width:0">
+          <div style="font-size:13px;color:var(--text);font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHTML(name)}</div>
+          <div style="font-size:11px;color:var(--text-mute)">${_mlogDate(r.created_at)}${by}</div>
+        </div>
+        ${clickable ? '<span style="color:var(--text-mute);font-size:16px;flex:0 0 auto">&rsaquo;</span>' : ''}
+      </div>`;
+  }).join('');
+}
+function _mlogOpen(memberId) { _closeMemberLog(); openMemberPopup(memberId); }
 
 // ── Billing action calls ────────────────────────────────────
 async function _memberAction(memberId, action, body) {
