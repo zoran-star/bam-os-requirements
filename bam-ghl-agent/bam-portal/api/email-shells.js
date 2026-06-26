@@ -105,6 +105,36 @@ function resolveMergeVars(html, L, vars = {}) {
   return out;
 }
 
+// Dark-mode LOCK. Email clients (Gmail's mobile app especially) auto-"dark mode" a
+// message and can INVERT a dark design into a broken light one. This forces our
+// palette to hold: a color-scheme signal, [bgcolor] attribute selectors that pin our
+// dark surfaces + the gold button, and small classes (added by color) that restore the
+// text Gmail darkens (Gmail tags recolored nodes with data-ogsc / data-ogsb). Idempotent.
+const DARK_LOCK = `<style type="text/css">
+  :root { color-scheme: dark; supported-color-schemes: dark; }
+  u + .body, .body { background-color:#000000 !important; }
+  [bgcolor="#000000"], [data-ogsb] [bgcolor="#000000"] { background-color:#000000 !important; }
+  [bgcolor="#0A0A0A"], [data-ogsb] [bgcolor="#0A0A0A"] { background-color:#0A0A0A !important; }
+  [bgcolor="#141414"], [data-ogsb] [bgcolor="#141414"] { background-color:#141414 !important; }
+  [bgcolor="#E2DD9F"], [data-ogsb] [bgcolor="#E2DD9F"] { background-color:#E2DD9F !important; }
+  .dw, [data-ogsc] .dw { color:#ffffff !important; }
+  .db, [data-ogsc] .db { color:#C9C9C3 !important; }
+  .dm, [data-ogsc] .dm { color:#8C8C82 !important; }
+  .dg, [data-ogsc] .dg { color:#E2DD9F !important; }
+</style>`;
+function applyDarkLock(html) {
+  if (!html.includes(":root { color-scheme: dark") && html.includes("</head>")) {
+    html = html.replace("</head>", DARK_LOCK + "\n</head>");
+  }
+  const add = (hex, cls) => {
+    html = html.replace(new RegExp('(<(?:p|h1|span|a|div|td)\\b)((?:(?!class=)[^>])*?)(style="[^"]*color:' + hex.replace(/#/g, "\\$&") + '[^"]*")', "gi"), `$1 class="${cls}"$2$3`);
+  };
+  add("#ffffff", "dw"); add("#C9C9C3", "db"); add("#D6D6D0", "db");
+  add("#9A9A92", "dm"); add("#8C8C82", "dm"); add("#6E6E66", "dm");
+  add("#E2DD9F", "dg");
+  return html;
+}
+
 // Convert a step's plain-text body into inline-styled HTML on the dark shell. Staff
 // content is trusted (may carry a link or {{merge}} var), so we don't escape - blank
 // lines become paragraphs, single newlines become <br>, and a bare URL on its own
@@ -147,5 +177,5 @@ export function renderEmail({ clientId, subject, body, preheader, unsubscribeUrl
       .replace(/\{\{ACADEMY_FULL\}\}/g, L.full)
       .replace(/\{\{UNSUBSCRIBE\}\}/g, unsub);
   }
-  return resolveMergeVars(html, L, vars);
+  return applyDarkLock(resolveMergeVars(html, L, vars));
 }
