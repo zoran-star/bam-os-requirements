@@ -1,4 +1,9 @@
 import { withSentryApiRoute } from "../_sentry.js";
+import {
+  decorateMembershipsWithEntitlements,
+  type CustomerEntitlementOut,
+  type MembershipCreditSummaryOut,
+} from "./_entitlements.js";
 import { HttpError, sendError } from "./_errors.js";
 import { eq, inList, sb, verifySupabaseUser } from "./_supabase.js";
 import type { ParentApiRequest, ParentApiResponse } from "./_types.js";
@@ -71,6 +76,8 @@ type LinkedMember = {
 
 type ParentMembership = Membership & {
   academy_name: string;
+  credit_summary: MembershipCreditSummaryOut;
+  entitlements: CustomerEntitlementOut[];
   linked_member: {
     member_id: string;
     matched_by: MemberLink["matched_by"];
@@ -149,7 +156,7 @@ async function getMemberships(profileId: string, students: Student[]): Promise<P
   const academyNames = await getAcademyNames(memberships);
   const linkedMembers = await getLinkedMembers(studentIds);
 
-  return memberships.map((membership): ParentMembership => ({
+  const parentMemberships = memberships.map((membership) => ({
     id: membership.id,
     academy_id: membership.academy_id,
     academy_name: academyNames.get(membership.academy_id) || "Academy",
@@ -162,6 +169,8 @@ async function getMemberships(profileId: string, students: Student[]): Promise<P
     ghl_contact_id: membership.ghl_contact_id,
     linked_member: membership.student_id ? linkedMembers.get(membership.student_id) || null : null,
   }));
+
+  return decorateMembershipsWithEntitlements(parentMemberships);
 }
 
 async function getAcademyNames(memberships: Membership[]): Promise<Map<string, string>> {
