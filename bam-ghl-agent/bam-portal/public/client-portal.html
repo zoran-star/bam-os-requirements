@@ -9652,23 +9652,55 @@ function _swrKeep(host) {
   return true;
 }
 
+// ── Date-range helpers (KPIs view: from/to, default month-to-date) ──
+function _v15kYmd(d) { return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; }
+function _v15kMtd() { const n = new Date(); return { from: _v15kYmd(new Date(n.getFullYear(), n.getMonth(), 1)), to: _v15kYmd(n) }; }
+function _v15kRangeKey() { return `${_V15K.from}|${_V15K.to}`; }
+// Previous equal-length window immediately before [from, to].
+function _v15kPrevRange() {
+  const f = new Date(_V15K.from + 'T00:00:00'), t = new Date(_V15K.to + 'T00:00:00');
+  const days = Math.round((t - f) / 86400000) + 1;
+  const pt = new Date(f.getTime() - 86400000);
+  const pf = new Date(pt.getTime() - (days - 1) * 86400000);
+  return { from: _v15kYmd(pf), to: _v15kYmd(pt), key: `${_v15kYmd(pf)}|${_v15kYmd(pt)}` };
+}
+
 async function openV15Kpis() {
   const host = document.getElementById('v15kpis-content');
   if (!host || typeof CLIENT_ID === 'undefined') return;
   if (!_swrKeep(host)) host.innerHTML = `<div class="req-empty" style="padding:24px 0"><span class="req-spin"></span> Loading KPIs…</div>`;
-  // Always have a month list so Sales/Revenue/Members load even with no Meta.
+  // Month list still powers the Trends modal.
   _V15K.periods = _v15kBuildMonths(12);
   _V15K.monthKey = _V15K.periods[0].key;
-  _V15K.mkt = _V15K.mkt || {};   // keep last Meta numbers visible while refreshing
+  _V15K.mkt = _V15K.mkt || {};
+  if (!_V15K.from || !_V15K.to) { const d = _v15kMtd(); _V15K.from = d.from; _V15K.to = d.to; }
+  _V15K.mktRange = _V15K.mktRange || {};   // rangeKey -> meta-report period
   _v15kRender();
   _v15kLoadSetup();   // lazy, non-blocking (Stripe + GHL fetch is slow)
-  // Marketing data (Meta) is separate + optional - fold it in when it arrives.
+  _v15kLoadMarketing();
+  // 12-month Meta data for the Trends modal (separate from the range view).
+  (async () => {
+    try {
+      const token = await _mreqAuthToken();
+      const r = await fetch(`/api/marketing?resource=meta-report&months=12&client_id=${encodeURIComponent(CLIENT_ID)}`, { headers: { Authorization: 'Bearer ' + token } });
+      const j = await _safeJson(r);
+      if (r.ok) for (const p of (j.periods || [])) _V15K.mkt[p.key] = p;
+    } catch (_) { /* Trends ad-spend line stays empty; everything else works */ }
+  })();
+}
+
+// Marketing (Meta) for the current range, with optional compare. Folds into
+// _V15K.mktRange[rangeKey] = { totals, compareTotals? }.
+async function _v15kLoadMarketing() {
+  const key = _v15kRangeKey();
   try {
     const token = await _mreqAuthToken();
-    const r = await fetch(`/api/marketing?resource=meta-report&months=12&client_id=${encodeURIComponent(CLIENT_ID)}`, { headers: { Authorization: 'Bearer ' + token } });
+    const qs = `window=range&since=${encodeURIComponent(_V15K.from)}&until=${encodeURIComponent(_V15K.to)}${_V15K.compare ? '&compare=1' : ''}&client_id=${encodeURIComponent(CLIENT_ID)}`;
+    const r = await fetch(`/api/marketing?resource=meta-report&${qs}`, { headers: { Authorization: 'Bearer ' + token } });
     const j = await _safeJson(r);
-    if (r.ok) { for (const p of (j.periods || [])) _V15K.mkt[p.key] = p; _v15kRender(); }
-  } catch (_) { /* marketing stays "no data"; the rest still works */ }
+    _V15K.mktRange[key] = (r.ok && Array.isArray(j.periods) && j.periods[0]) ? j.periods[0] : null;
+  } catch (_) { _V15K.mktRange[key] = null; }
+  _v15kRender();
 }
 
 // ── SETUP section: tie Stripe products + GHL pipelines → offers (powers Sales/
@@ -9799,42 +9831,98 @@ function _v15kSetupHtml() {
 }
 function _v15kSetupTab(name) { _V15K.setupTab = name; _v15kRenderSetup(); }
 
-function _v15kSetMonth(k) { _V15K.monthKey = k; _v15kRender(); }
+function _v15kSetMonth(k) { // Trends "go to month" -> set the range to that whole month.
+  _V15K.monthKey = k;
+  const mm = /^(\d{4})-(\d{2})$/.exec(k || '');
+  if (mm) {
+    const y = +mm[1], mo = +mm[2];
+    _V15K.from = _v15kYmd(new Date(y, mo - 1, 1));
+    _V15K.to = _v15kYmd(new Date(y, mo, 0));
+    _v15kOnRangeChange();
+  } else { _v15kRender(); }
+}
+
+function _v15kSetFrom(v) { if (v) _V15K.from = v; if (_V15K.from > _V15K.to) _V15K.to = _V15K.from; _v15kOnRangeChange(); }
+function _v15kSetTo(v) { if (v) _V15K.to = v; if (_V15K.to < _V15K.from) _V15K.from = _V15K.to; _v15kOnRangeChange(); }
+function _v15kToggleCompare(on) { _V15K.compare = !!on; _v15kOnRangeChange(); }
+function _v15kOnRangeChange() {
+  const kpiOn = (cat) => (typeof _isKpiAllowed === 'function') ? _isKpiAllowed(cat) : true;
+  _v15kLoadMarketing();
+  ['sales', 'revenue', 'members'].forEach(s => { if (kpiOn(s)) _v15kEnsureSection(s); });
+  _v15kRender();
+}
+
+function _v15kNumOrNull(n) { return (n == null || isNaN(n)) ? null : Number(n); }
+// Compare delta pill. invert=true means lower is better (CPL, cancellations).
+function _v15kDeltaPill(cur, prev, opts) {
+  opts = opts || {};
+  cur = _v15kNumOrNull(cur); prev = _v15kNumOrNull(prev);
+  if (cur == null || prev == null) return '';
+  const diff = cur - prev;
+  if (diff === 0) return `<span style="font-size:11px;color:var(--text-mute)">no change</span>`;
+  const up = diff > 0;
+  const good = opts.invert ? !up : up;
+  const col = good ? '#3a7d44' : '#9a3b2f';
+  const pct = prev !== 0 ? Math.round((diff / Math.abs(prev)) * 100) : null;
+  const mag = opts.money ? _v15kMoney(Math.abs(diff)) : _v15kNum(Math.abs(diff));
+  return `<span style="font-size:11px;font-weight:700;color:${col}">${up ? '▲' : '▼'} ${mag}${pct != null ? ` (${up ? '+' : ''}${pct}%)` : ''}</span>`;
+}
+// Cross-section "vs previous period" strip (Marketing + Revenue + Members headlines).
+function _v15kCompareStrip() {
+  if (!_V15K.compare) return '';
+  const curKey = _v15kRangeKey(); const prev = _v15kPrevRange();
+  const mp = (_V15K.mktRange || {})[curKey]; const mt = (mp && mp.totals) || null; const mct = (mp && mp.compareTotals) || null;
+  const rev = (_V15K.sec.revenue || {})[curKey]; const revP = (_V15K.sec.revenue || {})[prev.key];
+  const mem = (_V15K.sec.members || {})[curKey]; const memP = (_V15K.sec.members || {})[prev.key];
+  const cell = (label, value, cur, pv, opts) => `<div style="background:var(--surface);border:1px solid var(--border);border-radius:9px;padding:11px 13px">
+      <div style="font-size:10px;color:var(--text-mute);text-transform:uppercase;letter-spacing:.06em">${label}</div>
+      <div style="font-size:18px;font-weight:700;color:var(--text);margin-top:3px">${value}</div>
+      <div style="margin-top:3px">${_v15kDeltaPill(cur, pv, opts)}</div></div>`;
+  const cells = [];
+  if (mt) { cells.push(cell('Ad spend', _v15kMoney(mt.spend), mt.spend, mct && mct.spend, { money: true })); cells.push(cell('Leads', _v15kNum(mt.leads), mt.leads, mct && mct.leads)); }
+  if (rev && rev.stripe_ok) { cells.push(cell('Gross rev', _v15kMoney(rev.gross), rev.gross, revP && revP.gross, { money: true })); cells.push(cell('Net rev', _v15kMoney(rev.net), rev.net, revP && revP.net, { money: true })); }
+  if (mem && mem.stripe_ok) {
+    cells.push(cell('New payments', _v15kNum((mem.payments || []).length), (mem.payments || []).length, memP && (memP.payments || []).length));
+    cells.push(cell('Cancellations', _v15kNum(mem.cancelled ? mem.cancelled.count : 0), mem.cancelled ? mem.cancelled.count : 0, memP && memP.cancelled ? memP.cancelled.count : null, { invert: true }));
+  }
+  if (!cells.length) return `<div style="font-size:12px;color:var(--text-mute);margin:10px 0"><span class="req-spin"></span> Loading comparison…</div>`;
+  return `<div style="margin:14px 0 2px">
+    <div style="font-size:11px;color:var(--text-mute);margin-bottom:7px">vs previous period (${prev.from} to ${prev.to})</div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(128px,1fr));gap:10px">${cells.join('')}</div></div>`;
+}
 
 function _v15kRender() {
   const host = document.getElementById('v15kpis-content');
   if (!host) return;
-  const monthOpts = _V15K.periods.map(p => `<option value="${escapeHTML(p.key)}" ${p.key === _V15K.monthKey ? 'selected' : ''}>${escapeHTML(_v15kMonthLabel(p))}</option>`).join('');
-  const period = _V15K.periods.find(p => p.key === _V15K.monthKey) || null;
-  // MARKETING - plain numbers, no verdicts / good-bad coloring.
+  const curKey = _v15kRangeKey();
+  // MARKETING (Meta) for the range.
+  const mp = (_V15K.mktRange || {})[curKey];
+  const t = mp && mp.totals ? mp.totals : null;
   let marketing;
-  if (!period) {
-    marketing = `<div class="req-empty" style="padding:18px 0;color:var(--text-mute)">No marketing data for this month.</div>`;
-  } else {
-    // Marketing (Meta) totals are keyed by month in _V15K.mkt - independent of
-    // the selector. period.totals carries spend/leads/cpl.
-    const mp = (_V15K.mkt || {})[_V15K.monthKey];
-    const t = mp && mp.totals ? mp.totals : null;
-    if (!t) {
-      marketing = `<div class="req-empty" style="padding:18px 0;color:var(--text-mute)">No marketing data for this month.</div>`;
-    } else {
-      marketing = `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-top:12px">
-        ${_v15kStat('Ad spend', _v15kMoney(t.spend))}
-        ${_v15kStat('Leads', _v15kNum(t.leads))}
-        ${_v15kStat('Cost per lead', t.cpl != null ? _v15kMoney(t.cpl) : '-')}
-      </div>`;
-    }
-  }
-  const sectionHead = (t) => `<div style="font-family:var(--font-display,inherit);font-size:24px;font-weight:800;letter-spacing:.02em;text-transform:uppercase;color:var(--text);margin-top:34px;padding-bottom:8px;border-bottom:1px solid var(--border)">${t}</div>`;
-  // Per-staff KPI category permissions - hide sections this teammate can't see.
+  if (mp === undefined) marketing = `<div class="req-empty" style="padding:18px 0;color:var(--text-mute)"><span class="req-spin"></span> Loading…</div>`;
+  else if (!t) marketing = `<div class="req-empty" style="padding:18px 0;color:var(--text-mute)">No marketing data for this range.</div>`;
+  else marketing = `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-top:12px">
+      ${_v15kStat('Ad spend', _v15kMoney(t.spend))}
+      ${_v15kStat('Leads', _v15kNum(t.leads))}
+      ${_v15kStat('Cost per lead', t.cpl != null ? _v15kMoney(t.cpl) : '-')}
+    </div>`;
+  const sectionHead = (x) => `<div style="font-family:var(--font-display,inherit);font-size:24px;font-weight:800;letter-spacing:.02em;text-transform:uppercase;color:var(--text);margin-top:34px;padding-bottom:8px;border-bottom:1px solid var(--border)">${x}</div>`;
   const kpiOn = (cat) => (typeof _isKpiAllowed === 'function') ? _isKpiAllowed(cat) : true;
+  const inSty = 'background:var(--surface);border:1px solid var(--border-med);border-radius:8px;color:var(--text);padding:7px 10px;font:inherit;font-size:13px;color-scheme:dark';
+  const btnSty = 'background:var(--surface);border:1px solid var(--border-med);border-radius:8px;color:var(--text);padding:8px 14px;font:inherit;font-size:13px;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:7px';
   host.innerHTML = `
-    <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:6px">
-      <label style="font-size:12px;color:var(--text-mute)">Month</label>
-      <select onchange="_v15kSetMonth(this.value)" style="background:var(--surface);border:1px solid var(--border-med);border-radius:8px;color:var(--text);padding:8px 12px;font:inherit;font-size:13px;cursor:pointer">${monthOpts || '<option>-</option>'}</select>
-      <button onclick="_v15kOpenTrends()" style="margin-left:auto;background:var(--surface);border:1px solid var(--border-med);border-radius:8px;color:var(--text);padding:8px 14px;font:inherit;font-size:13px;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:7px">📈 Trends</button>
-      <button onclick="_v15kOpenSetup()" style="background:var(--surface);border:1px solid var(--border-med);border-radius:8px;color:var(--text);padding:8px 14px;font:inherit;font-size:13px;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:7px">⚙ Setup</button>
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:2px">
+      <label style="font-size:12px;color:var(--text-mute)">From</label>
+      <input type="date" value="${_V15K.from}" onchange="_v15kSetFrom(this.value)" style="${inSty}">
+      <label style="font-size:12px;color:var(--text-mute)">to</label>
+      <input type="date" value="${_V15K.to}" onchange="_v15kSetTo(this.value)" style="${inSty}">
+      <label style="display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--text-sub);cursor:pointer;margin-left:4px">
+        <input type="checkbox" ${_V15K.compare ? 'checked' : ''} onchange="_v15kToggleCompare(this.checked)" style="accent-color:var(--gold);cursor:pointer"> Compare to previous period
+      </label>
+      <button onclick="_v15kOpenTrends()" style="margin-left:auto;${btnSty}">📈 Trends</button>
+      <button onclick="_v15kOpenSetup()" style="${btnSty}">⚙ Setup</button>
     </div>
+    ${_v15kCompareStrip()}
     ${kpiOn('marketing') ? `${sectionHead('Marketing')}${marketing}` : ''}
     ${kpiOn('sales')    ? `${sectionHead('Sales')}<div id="v15k-sales">${_v15kSecHtml('sales')}</div>` : ''}
     ${kpiOn('revenue')  ? `${sectionHead('Revenue')}<div id="v15k-revenue">${_v15kSecHtml('revenue')}</div>` : ''}
@@ -9881,7 +9969,7 @@ function _v15kToggle(id) {
 }
 function _v15kPaintSection(name) { const el = document.getElementById('v15k-' + name); if (el) el.innerHTML = _v15kSecHtml(name); }
 function _v15kSecHtml(name) {
-  const m = _V15K.monthKey; const cache = (_V15K.sec[name] || {})[m];
+  const k = _v15kRangeKey(); const cache = (_V15K.sec[name] || {})[k];
   if (!cache) return `<div class="req-empty" style="padding:14px 0"><span class="req-spin"></span> Loading…</div>`;
   if (cache.error) return `<div class="req-empty" style="padding:12px 0;color:#9a3b2f">${escapeHTML(cache.error)}</div>`;
   if (name === 'sales') return _v15kSalesHtml(cache);
@@ -9890,16 +9978,27 @@ function _v15kSecHtml(name) {
   return '';
 }
 async function _v15kEnsureSection(name) {
-  const m = _V15K.monthKey; if (!m) return;
+  const k = _v15kRangeKey();
   _V15K.sec[name] = _V15K.sec[name] || {};
-  if (_V15K.sec[name][m]) { _v15kPaintSection(name); return; }
-  try {
-    const token = await _mreqAuthToken();
-    const r = await fetch(`/api/kpis-v15?section=${name}&month=${encodeURIComponent(m)}&client_id=${encodeURIComponent(CLIENT_ID)}`, { headers: { Authorization: 'Bearer ' + token } });
-    const j = await _safeJson(r); if (!r.ok) throw new Error(j.error || ('HTTP ' + r.status));
-    _V15K.sec[name][m] = j;
-  } catch (e) { _V15K.sec[name][m] = { error: e.message || String(e) }; }
+  // Always need the current range; for compare, revenue+members also feed the
+  // previous-period strip, so load that window too.
+  const need = [];
+  if (!_V15K.sec[name][k]) need.push({ key: k, from: _V15K.from, to: _V15K.to });
+  if (_V15K.compare && (name === 'revenue' || name === 'members')) {
+    const pr = _v15kPrevRange();
+    if (!_V15K.sec[name][pr.key]) need.push({ key: pr.key, from: pr.from, to: pr.to });
+  }
+  if (!need.length) { _v15kPaintSection(name); return; }
+  const token = await _mreqAuthToken();
+  await Promise.all(need.map(async n => {
+    try {
+      const r = await fetch(`/api/kpis-v15?section=${name}&since=${encodeURIComponent(n.from)}&until=${encodeURIComponent(n.to)}&client_id=${encodeURIComponent(CLIENT_ID)}`, { headers: { Authorization: 'Bearer ' + token } });
+      const j = await _safeJson(r); if (!r.ok) throw new Error(j.error || ('HTTP ' + r.status));
+      _V15K.sec[name][n.key] = j;
+    } catch (e) { _V15K.sec[name][n.key] = { error: e.message || String(e) }; }
+  }));
   _v15kPaintSection(name);
+  _v15kRender();   // refresh the compare strip now that data (incl. prev) is in
 }
 
 // ── Trends (V1.5): multi-month line charts. Ad spend + leads come from
@@ -10250,7 +10349,7 @@ async function _v15kDelManualCancel(id) {
     const token = await _mreqAuthToken();
     const r = await fetch(`/api/kpis-v15?action=delete-manual-cancel&client_id=${encodeURIComponent(CLIENT_ID)}`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token }, body: JSON.stringify({ action: 'delete-manual-cancel', id }) });
     const j = await _safeJson(r); if (!r.ok) throw new Error(j.error || ('HTTP ' + r.status));
-    delete _V15K.sec.members[_V15K.monthKey]; _v15kEnsureSection('members');
+    delete _V15K.sec.members[_v15kRangeKey()]; _v15kEnsureSection("members");
   } catch (e) { alert("Couldn't delete: " + (e.message || e)); }
 }
 let _v15mcPicked = null, _v15mcSearchT = null;
@@ -10307,7 +10406,7 @@ async function _v15kSaveManualCancel() {
     const r = await fetch(`/api/kpis-v15?action=manual-cancel&client_id=${encodeURIComponent(CLIENT_ID)}`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token }, body: JSON.stringify({ action: 'manual-cancel', month: _V15K.monthKey, contact_name: name, ghl_contact_id: _v15mcPicked?._src === 'ghl' ? _v15mcPicked.id : null, stripe_customer_id: _v15mcPicked?._src === 'stripe' ? _v15mcPicked.id : null, reason, cancelled_on: date }) });
     const j = await _safeJson(r); if (!r.ok) throw new Error(j.error || ('HTTP ' + r.status));
     _v15calCloseDrawer();
-    delete _V15K.sec.members[_V15K.monthKey]; _v15kEnsureSection('members');
+    delete _V15K.sec.members[_v15kRangeKey()]; _v15kEnsureSection("members");
   } catch (e) { if (err) { err.textContent = e.message || String(e); err.style.display = 'block'; } if (btn) { btn.disabled = false; btn.textContent = 'Save'; } }
 }
 
