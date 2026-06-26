@@ -15807,11 +15807,11 @@ function openTrainAgentView() {
   if (!_TA.target) _TA.target = 'booking';
   const isAgent = _taIsAgent();
   const isStaff = (typeof _IS_BAM_STAFF !== 'undefined' && _IS_BAM_STAFF === true);
-  // keep the sub-tab valid for the chosen agent (Lessons works for every agent now;
-  // Autonomy is staff-only)
+  // keep the sub-tab valid for the chosen agent. Autonomy (🎚) is now open to the
+  // academy too - they can turn their own agents off / 👁 Hawkeye (self-drive stays
+  // blocked); the server enforces it's their own academy.
   if (isAgent) {
     if (!['test', 'lessons', 'knowledge', 'mode'].includes(_TA.tab)) _TA.tab = 'test';
-    if (_TA.tab === 'mode' && !isStaff) _TA.tab = 'test';
   }
   const pill = (k, label, active) => `<button onclick="_taPick('${k}')" style="background:${active ? 'var(--gold)' : 'transparent'};color:${active ? '#0B0B0D' : 'var(--text-sub)'};border:1px solid ${active ? 'var(--gold)' : 'var(--border)'};border-radius:8px;padding:7px 13px;font-size:13px;font-weight:700;cursor:pointer">${label}</button>`;
   const tab = (k, label) => `<button onclick="_taTab('${k}')" style="background:${_TA.tab === k ? 'var(--gold)' : 'transparent'};color:${_TA.tab === k ? '#0B0B0D' : 'var(--text-sub)'};border:1px solid ${_TA.tab === k ? 'var(--gold)' : 'var(--border)'};border-radius:8px;padding:7px 14px;font-size:13px;font-weight:600;cursor:pointer">${label}</button>`;
@@ -15831,7 +15831,7 @@ function openTrainAgentView() {
       ${tab('test', '💬 Test')}
       ${tab('lessons', '📚 Lessons')}
       ${tab('knowledge', '📍 Knowledge')}
-      ${isStaff ? tab('mode', '🎚 Autonomy') : ''}
+      ${tab('mode', '🎚 Autonomy')}
     </div>` : ''}
     <div id="ta-panel"></div>`;
   _taRenderPanel();
@@ -15847,7 +15847,7 @@ function _taRenderPanel() {
   return _taRenderTest();
 }
 
-// ── Autonomy (BAM staff only): this academy's agent mode ────────────────────
+// ── Autonomy: this academy's agent mode (academy owner OR BAM staff) ─────────
 async function _taConfigApi(action, extra) {
   const token = await _mreqAuthToken();
   const r = await fetch('/api/agent-config', {
@@ -15878,9 +15878,9 @@ async function _taRenderMode() {
   p.innerHTML = `<div style="color:var(--text-mute);font-size:13px"><span class="req-spin"></span> Loading…</div>`;
   let cur = 'off', selfDriveOn = false;
   try {
-    const d = await _taConfigApi('list');
-    const row = (d.academies || []).find(a => a.client_id === CLIENT_ID);
-    cur = (row && row[_TA_MODE_FIELD[agent]]) || 'off';
+    // get-mode (not list): readable by the academy's own owner, not just BAM staff.
+    const d = await _taConfigApi('get-mode', { client_id: CLIENT_ID });
+    cur = d[_TA_MODE_FIELD[agent]] || 'off';
     selfDriveOn = !!d.self_drive_enabled;   // 🔒 global kill-switch
   } catch (e) { p.innerHTML = `<div style="color:#e07070;font-size:13px">Couldn't load - ${escapeHTML(e.message)}</div>`; return; }
   _TA.mode = cur; _TA.selfDriveOn = selfDriveOn;
@@ -15889,7 +15889,7 @@ async function _taRenderMode() {
   const curMode = _TA_MODES.find(m => m.key === cur) || _TA_MODES[0];
   const agentLabel = (_TA_AGENTS[agent] || '📞 Booking');
   p.innerHTML = `
-    <p style="color:var(--text-mute);font-size:12.5px;margin:0 0 14px;line-height:1.55;max-width:620px">Autonomy for the <b style="color:var(--text)">${escapeHTML(agentLabel)}</b> agent. <b style="color:var(--text)">BAM staff only.</b></p>
+    <p style="color:var(--text-mute);font-size:12.5px;margin:0 0 14px;line-height:1.55;max-width:620px">Turn the <b style="color:var(--text)">${escapeHTML(agentLabel)}</b> agent <b style="color:var(--text)">Off</b>, or on in <b style="color:var(--text)">👁 Hawkeye</b> - it drafts every message for you to approve in <b style="color:var(--text)">Inbox → 👁 Hawkeye</b>, nothing sends on its own.</p>
     ${selfDriveOn ? '' : `<div style="font-size:12px;color:var(--gold);background:rgba(232,197,71,.08);border:1px solid rgba(232,197,71,.33);border-radius:9px;padding:9px 12px;margin-bottom:12px;line-height:1.5;max-width:620px">🔒 <b>Self-drive is disabled right now</b> for all academies - agents are capped at Off / 👁 Hawkeye, so nothing sends without approval.</div>`}
     <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">
       ${modes.map(m => `<button onclick="_taSetMode('${m.key}')" style="${seg(cur === m.key, m.key === 'self_drive')}">${m.label}</button>`).join('')}

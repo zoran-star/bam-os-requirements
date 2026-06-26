@@ -1,11 +1,15 @@
 import { withSentryApiRoute } from "./_sentry.js";
-// Vercel Serverless Function — Agent autonomy mode (BAM staff only)
+// Vercel Serverless Function — Agent autonomy mode
 //
-//   POST /api/agent-config { action }            (staff bearer required)
-//     "list"                 → every agent-capable academy + its booking + confirm mode
-//     "get-mode" { client_id }          → { mode, confirm_mode } (owner-readable)
-//     "set-mode" { client_id, mode }    → booking agent: off | hawkeye | self_drive
-//     "set-confirm-mode" { client_id, mode } → confirm agent (Scheduled-Trial), same vocab
+//   POST /api/agent-config { action }
+//     "list"                 → every agent-capable academy + its modes (STAFF only)
+//     "get-mode" { client_id }          → { mode, confirm_mode, closing_mode, self_drive_enabled }
+//                                         (staff OR the academy's own owner/can_train_agent)
+//     "set-mode" / "set-confirm-mode" / "set-closing-mode" { client_id, mode }
+//                                         → off | hawkeye | self_drive. Staff OR the academy's
+//                                           OWN owner/can_train_agent (so an academy can toggle
+//                                           its own agents from the client portal). self_drive is
+//                                           staff-only AND globally blocked, so academies get off/hawkeye.
 //
 // Booking switch at clients.ghl_kpi_config.agent_mode governs the Responded reply
 // bot + follow-up engine. The CONFIRM agent has its OWN switch at
@@ -57,6 +61,37 @@ async function handler(req, res) {
     } catch (e) { return res.status(500).json({ error: e.message }); }
   }
 
+  // Setting a mode — staff OR the academy's own owner / can_train_agent member, for
+  // their OWN academy (so an academy can turn its own agents on/off from the client
+  // portal). self_drive stays staff-only AND is globally blocked, so academies can
+  // only pick off / hawkeye (hawkeye = drafts for approval; nothing auto-sends).
+  const SET_ACTIONS = { "set-mode": "mode", "set-confirm-mode": "confirm_mode", "set-closing-mode": "closing_mode" };
+  if (SET_ACTIONS[b.action]) {
+    const actor = await resolveAgentActor(req);
+    if (!actor) return res.status(401).json({ error: "sign in required" });
+    if (!b.client_id) return res.status(400).json({ error: "client_id required" });
+    if (!actor.canActOn(b.client_id)) return res.status(403).json({ error: "not your academy" });
+    if (!AGENT_MODES.includes(b.mode)) return res.status(400).json({ error: `mode must be one of ${AGENT_MODES.join(", ")}` });
+    if (b.mode === "self_drive" && (SELF_DRIVE_GLOBALLY_DISABLED || !actor.isStaff)) return res.status(403).json({ error: "Self-drive is currently disabled - agents are capped at Hawkeye." });
+    try {
+      const [row] = await sb(`clients?id=eq.${encodeURIComponent(b.client_id)}&select=ghl_kpi_config&limit=1`);
+      if (!row) return res.status(404).json({ error: "academy not found" });
+      const cfg = { ...(row.ghl_kpi_config || {}) };
+      if (b.action === "set-mode") {
+        cfg.agent_mode = b.mode;
+        // Keep the legacy booleans in sync so any code still reading them agrees.
+        cfg.agent_approvals_enabled = b.mode !== "off";
+        cfg.followup_engine_enabled = b.mode !== "off";
+      } else if (b.action === "set-confirm-mode") {
+        cfg.confirm_agent_mode = b.mode;
+      } else {
+        cfg.closing_agent_mode = b.mode;
+      }
+      await sb(`clients?id=eq.${encodeURIComponent(b.client_id)}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ ghl_kpi_config: cfg }) });
+      return res.status(200).json({ ok: true, [SET_ACTIONS[b.action]]: b.mode });
+    } catch (e) { console.error("[agent-config set]", e); return res.status(500).json({ error: e.message || "internal error" }); }
+  }
+
   const staffEmail = await requireStaff(req);
   if (!staffEmail) return res.status(401).json({ error: "staff only" });
 
@@ -73,46 +108,6 @@ async function handler(req, res) {
         notify_phone: (c.ghl_kpi_config || {}).agent_notify_phone || null,
       }));
       return res.status(200).json({ academies, self_drive_enabled: !SELF_DRIVE_GLOBALLY_DISABLED });
-    }
-
-    if (b.action === "set-mode") {
-      if (!b.client_id) return res.status(400).json({ error: "client_id required" });
-      if (!AGENT_MODES.includes(b.mode)) return res.status(400).json({ error: `mode must be one of ${AGENT_MODES.join(", ")}` });
-      if (b.mode === "self_drive" && SELF_DRIVE_GLOBALLY_DISABLED) return res.status(403).json({ error: "Self-drive is currently disabled - agents are capped at Hawkeye." });
-      const [row] = await sb(`clients?id=eq.${encodeURIComponent(b.client_id)}&select=ghl_kpi_config&limit=1`);
-      if (!row) return res.status(404).json({ error: "academy not found" });
-      const cfg = { ...(row.ghl_kpi_config || {}), agent_mode: b.mode };
-      // Keep the legacy booleans in sync so any code still reading them agrees.
-      cfg.agent_approvals_enabled = b.mode !== "off";
-      cfg.followup_engine_enabled = b.mode !== "off";
-      await sb(`clients?id=eq.${encodeURIComponent(b.client_id)}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ ghl_kpi_config: cfg }) });
-      return res.status(200).json({ ok: true, mode: b.mode });
-    }
-
-    // The CONFIRM agent's OWN switch (Scheduled-Trial stage) — independent of the
-    // booking agent's agent_mode. No legacy booleans to keep in sync.
-    if (b.action === "set-confirm-mode") {
-      if (!b.client_id) return res.status(400).json({ error: "client_id required" });
-      if (!AGENT_MODES.includes(b.mode)) return res.status(400).json({ error: `mode must be one of ${AGENT_MODES.join(", ")}` });
-      if (b.mode === "self_drive" && SELF_DRIVE_GLOBALLY_DISABLED) return res.status(403).json({ error: "Self-drive is currently disabled - agents are capped at Hawkeye." });
-      const [row] = await sb(`clients?id=eq.${encodeURIComponent(b.client_id)}&select=ghl_kpi_config&limit=1`);
-      if (!row) return res.status(404).json({ error: "academy not found" });
-      const cfg = { ...(row.ghl_kpi_config || {}), confirm_agent_mode: b.mode };
-      await sb(`clients?id=eq.${encodeURIComponent(b.client_id)}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ ghl_kpi_config: cfg }) });
-      return res.status(200).json({ ok: true, confirm_mode: b.mode });
-    }
-
-    // The CLOSING agent's OWN switch (Done-Trial stage) — independent of booking +
-    // confirm. No legacy booleans to keep in sync.
-    if (b.action === "set-closing-mode") {
-      if (!b.client_id) return res.status(400).json({ error: "client_id required" });
-      if (!AGENT_MODES.includes(b.mode)) return res.status(400).json({ error: `mode must be one of ${AGENT_MODES.join(", ")}` });
-      if (b.mode === "self_drive" && SELF_DRIVE_GLOBALLY_DISABLED) return res.status(403).json({ error: "Self-drive is currently disabled - agents are capped at Hawkeye." });
-      const [row] = await sb(`clients?id=eq.${encodeURIComponent(b.client_id)}&select=ghl_kpi_config&limit=1`);
-      if (!row) return res.status(404).json({ error: "academy not found" });
-      const cfg = { ...(row.ghl_kpi_config || {}), closing_agent_mode: b.mode };
-      await sb(`clients?id=eq.${encodeURIComponent(b.client_id)}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ ghl_kpi_config: cfg }) });
-      return res.status(200).json({ ok: true, closing_mode: b.mode });
     }
 
     return res.status(400).json({ error: "unknown action" });
