@@ -161,11 +161,13 @@ async function findOpenOppId(token, locationId, contactId) {
 async function resolveContactInfo(token, contactId, cache) {
   const key = String(contactId);
   if (cache.has(key)) return cache.get(key);
-  let info = { email: null, phone: null };
+  let info = { email: null, phone: null, firstName: null, fullName: null };
   try {
     const d = await ghl("GET", `/contacts/${encodeURIComponent(key)}`, { token });
     const c = (d && (d.contact || d)) || {};
-    info = { email: c.email || null, phone: c.phone || null };
+    const first = c.firstName || c.first_name || (c.name ? String(c.name).trim().split(/\s+/)[0] : null) || null;
+    const full = c.name || [c.firstName, c.lastName].filter(Boolean).join(" ").trim() || first || null;
+    info = { email: c.email || null, phone: c.phone || null, firstName: first, fullName: full };
   } catch (_) {}
   cache.set(key, info);
   return info;
@@ -264,11 +266,12 @@ async function runWork(res) {
       if (!tokenCache.has(job.client_id)) tokenCache.set(job.client_id, client ? await pickGhlToken(client) : null);
       const creds = tokenCache.get(job.client_id);
       const token = creds && creds.token;
-      const info = token ? await resolveContactInfo(token, job.contact_id, contactCache) : { email: null, phone: null };
+      const info = token ? await resolveContactInfo(token, job.contact_id, contactCache) : { email: null, phone: null, firstName: null, fullName: null };
 
       const result = await sendOn({
         channel: step.channel, clientId: job.client_id, contactId: job.contact_id,
         toEmail: info.email, toPhone: info.phone, subject: step.subject, body: step.body, ghlToken: token,
+        vars: { first_name: info.firstName, full_name: info.fullName },
       });
 
       if (result && result.sent) { await finish({ status: "sent", sent_at: new Date().toISOString() }); sent++; await logEvent({ clientId: job.client_id, contactId: job.contact_id, automationId: job.automation_id, type: "step_sent", payload: { step_id: job.step_id, channel: step.channel } }); }
