@@ -249,11 +249,11 @@ P4a automation engine + P4b step-builder · P6 triggers · P7a per-lead mute · 
   route to the global store. Client-portal Knowledge tab badges them `🌐 GLOBAL · all academies` + confirms on save.
   **Empty store = byte-identical to old behavior;** other academies still see them locked. ⚠️ blast radius: a GTA
   edit changes EVERY academy's agent prompt.
-- ⬜ STILL OPEN: **📊 campaign-tracking redesign** (per-campaign card: name · monthly budget · change-date-range ·
-  spend/leads/CPL tiles defaulting to MTD). MAPPED not built. Backend gap: the Meta API is FIXED to
-  `date_preset(this_month)` / preset windows - a true per-campaign date-range picker needs `since`/`until` added to
-  `handleMetaReport` in `api/marketing.js`. Per-campaign leads+CPL exist in the report endpoint; "monthly budget" =
-  either Meta campaign budget (`budget_display`, null for ad-set budgets) or client-level `meta_monthly_budget`.
+- ✅ DONE **📊 campaign-tracking cards (#826).** Each ad-report campaign card now: 💰 Monthly budget pill (auto from
+  Meta `budget_display` via `/api/meta/campaigns`; blank for ad-set-level budgets) + 📅 per-campaign date range
+  (independent per card, default MTD, fetches via the EXISTING `window=range` endpoint - `handleMetaReport` already
+  supported `since`/`until`, the scout missed it) + Spend/Leads/CPL tiles. Frontend-only (`_reportCardHTML` +
+  `_reportCardApply`/`_reportCardReset`/`_reportCardToggleRange`, state `_reportBudgets`/`_reportCardRanges`).
 
 ### ✅ DONE 2026-06-26: self-drive globally blocked + per-agent Autonomy (PR #805, merged)
 - **🔒 Self-drive is OFF for everyone right now.** One flag `SELF_DRIVE_GLOBALLY_DISABLED=true` in
