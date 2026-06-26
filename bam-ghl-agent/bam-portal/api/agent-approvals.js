@@ -18,6 +18,7 @@ import { withSentryApiRoute } from "./_sentry.js";
 import { pickGhlToken, ghl, sendSms } from "./ghl/_core.js";
 import { assemblePrompt } from "./agent/prompt-structure.js";
 import { buildAgentSystem } from "./agent/brain.js";
+import { loadMergedOverrides } from "./agent/_sections.js";
 import { loadContactMemory } from "./agent/contact-memory.js";
 import { loadCalendars, calendarForGroup, freeSlots, summarizeSlots } from "./agent/booking.js";
 import { respondedStage, contactInRespondedStage, computeQueue, respondedContactIdSetCached, peekRespondedIdSet, interestedStage, nurtureStage, toIso } from "./agent/_stage.js";
@@ -66,13 +67,11 @@ async function loadClient(clientId) {
 
 // ── agent config (same brain as the sandbox) ──
 async function loadConfig(clientId) {
-  const [lessons, ovRows, exRows] = await Promise.all([
+  const [lessons, overrides, exRows] = await Promise.all([
     sb(`agent_lessons?client_id=eq.${clientId}&agent=eq.booking&active=eq.true&select=lesson,kind&order=created_at.asc`).catch(() => []),
-    sb(`agent_prompt_sections?client_id=eq.${clientId}&select=section_key,body`).catch(() => []),
+    loadMergedOverrides(clientId),   // global brain (general/goal) + this academy's own (location/offer)
     sb(`agent_examples?client_id=eq.${clientId}&select=parent_text,agent_text&order=created_at.asc`).catch(() => []),
   ]);
-  const overrides = {};
-  for (const r of (Array.isArray(ovRows) ? ovRows : [])) overrides[r.section_key] = r.body;
   return { lessons: Array.isArray(lessons) ? lessons : [], overrides, examples: Array.isArray(exRows) ? exRows : [] };
 }
 

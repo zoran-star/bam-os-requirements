@@ -16424,7 +16424,7 @@ async function _taForget(id) {
 async function _taRenderKnowledge() {
   const p = document.getElementById('ta-panel'); if (!p) return;
   p.innerHTML = `
-    <p style="color:var(--text-mute);font-size:12.5px;margin:0 0 14px;line-height:1.5">These are your academy's own facts. Edit them and the agent uses the new version on its next reply. Global sales-style sections are managed by BAM and locked here.</p>
+    <p style="color:var(--text-mute);font-size:12.5px;margin:0 0 14px;line-height:1.5">Your academy's facts power every reply - edit one and the agent uses it next time. Sections marked <b style="color:#E8C547">🌐 Global</b> are shared across <b>all</b> academies (edit carefully); <b>🔒</b> are managed by BAM.</p>
     <div id="ta-section-list"><div class="req-empty"><span class="req-spin"></span>Loading…</div></div>`;
   try {
     const res = await _taApi('sections', {});
@@ -16437,14 +16437,15 @@ async function _taRenderKnowledge() {
       return `
       <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;margin-bottom:10px;overflow:hidden">
         <button onclick="_taToggleSec('${s.key}')" style="width:100%;display:flex;align-items:center;justify-content:space-between;gap:10px;background:none;border:none;color:var(--text);padding:14px 16px;cursor:pointer;font-family:inherit;text-align:left">
-          <span style="font-weight:600;font-size:14px">${escapeHTML(s.label)}${s.is_default ? '' : ' <span style="color:var(--gold);font-size:11px;font-family:monospace">✏️ edited</span>'}</span>
+          <span style="font-weight:600;font-size:14px">${escapeHTML(s.label)}${s.scope === 'global' ? ' <span style="color:#E8C547;font-size:10.5px;font-family:monospace;border:1px solid #E8C547;border-radius:99px;padding:1px 7px">🌐 GLOBAL · all academies</span>' : (s.is_default ? '' : ' <span style="color:var(--gold);font-size:11px;font-family:monospace">✏️ edited</span>')}</span>
           <span id="ta-chev-${s.key}" style="color:var(--text-mute);font-size:11px;transition:transform .15s;transform:rotate(${open ? 90 : 0}deg)">▶</span>
         </button>
         <div id="ta-sec-body-${s.key}" style="display:${open ? 'block' : 'none'};padding:0 16px 14px">
+          ${s.scope === 'global' ? `<div style="font-size:11.5px;color:#E8C547;background:rgba(232,197,71,.08);border:1px solid rgba(232,197,71,.33);border-radius:8px;padding:7px 10px;margin-bottom:8px;line-height:1.45">🌐 This is a <b>global</b> section - saving changes it for <b>every academy's</b> agents, not just yours.</div>` : ''}
           <textarea id="ta-sec-${s.key}" rows="5" style="width:100%;box-sizing:border-box;background:var(--surface-el,#222);border:1px solid var(--border);border-radius:10px;padding:10px 12px;color:var(--text);font-size:13.5px;resize:vertical;font-family:inherit;line-height:1.5">${escapeHTML(s.body)}</textarea>
           <div style="display:flex;gap:10px;margin-top:8px;align-items:center">
-            <button style="${_TA_BTN}" onclick="_taSaveSection('${s.key}')">Save</button>
-            ${s.is_default ? '' : `<button style="${_TA_BTN2}" onclick="_taResetSection('${s.key}')">Reset to default</button>`}
+            <button style="${_TA_BTN}" onclick="_taSaveSection('${s.key}','${s.scope || 'local'}')">Save</button>
+            ${s.is_default ? '' : `<button style="${_TA_BTN2}" onclick="_taResetSection('${s.key}','${s.scope || 'local'}')">Reset to default</button>`}
             <span id="ta-sec-note-${s.key}" style="font-size:12px"></span>
           </div>
         </div>
@@ -16468,18 +16469,19 @@ function _taToggleSec(key) {
   if (chev) chev.style.transform = 'rotate(' + (_TA.openSections[key] ? 90 : 0) + 'deg)';
 }
 
-async function _taSaveSection(key) {
+async function _taSaveSection(key, scope) {
   const ta = document.getElementById('ta-sec-' + key); if (!ta) return;
   const note = document.getElementById('ta-sec-note-' + key);
+  if (scope === 'global' && !confirm('This is a GLOBAL section. Saving changes it for EVERY academy\'s agents, not just yours. Continue?')) return;
   try {
     await _taApi('update-section', { key, body: ta.value });
-    if (note) note.innerHTML = `<span style="color:#5BBF7B">Saved ✓</span>`;
+    if (note) note.innerHTML = `<span style="color:#5BBF7B">Saved ✓${scope === 'global' ? ' (global)' : ''}</span>`;
     setTimeout(() => _taRenderKnowledge(), 700);
   } catch (e) { if (note) note.innerHTML = `<span style="color:#E5736A">${escapeHTML(e.message)}</span>`; }
 }
 
-async function _taResetSection(key) {
-  if (!confirm('Reset this section to the BAM default?')) return;
+async function _taResetSection(key, scope) {
+  if (!confirm(scope === 'global' ? 'Reset this GLOBAL section to the BAM default for EVERY academy?' : 'Reset this section to the BAM default?')) return;
   try { await _taApi('reset-section', { key }); _taRenderKnowledge(); } catch (e) { alert(e.message); }
 }
 

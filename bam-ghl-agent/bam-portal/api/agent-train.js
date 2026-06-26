@@ -24,6 +24,7 @@ import { withSentryApiRoute } from "./_sentry.js";
 
 import { assemblePrompt, SECTIONS, AGENT_SPECS, sectionKeysForAgent } from "./agent/prompt-structure.js";
 import { buildAgentSystem } from "./agent/brain.js";
+import { loadMergedOverrides, loadGlobalSections, isGlobalSection, canEditGlobalBrain, setGlobalSection, deleteGlobalSection } from "./agent/_sections.js";
 
 // Which agent is being trained: booking | confirm | closing. Defaults to booking.
 const pickAgent = (a) => (a && AGENT_SPECS[a]) ? a : "booking";
@@ -37,12 +38,8 @@ const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.en
 const ANTHROPIC_KEY        = process.env.ANTHROPIC_API_KEY;
 const ANTHROPIC_MODEL      = "claude-sonnet-4-6";
 
-// Sections a client trainer is allowed to edit = their academy's own facts.
-const EDITABLE_LAYERS = ["location", "offer"];
-const isEditableSection = (key) => {
-  const s = SECTIONS.find(x => x.key === key);
-  return !!s && EDITABLE_LAYERS.includes(s.layer);
-};
+// Local (per-academy) vs global section gating now lives in agent/_sections.js
+// (isGlobalSection / canEditGlobalBrain) so every agent agrees on the split.
 
 async function sb(path, init = {}) {
   const res = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
@@ -99,12 +96,9 @@ async function activeLessons(clientId, agent = "booking") {
   } catch (_) { return []; }
 }
 async function sectionOverrides(clientId) {
-  try {
-    const rows = await sb(`agent_prompt_sections?client_id=eq.${clientId}&select=section_key,body`);
-    const map = {};
-    for (const r of (Array.isArray(rows) ? rows : [])) map[r.section_key] = r.body;
-    return map;
-  } catch (_) { return {}; }
+  // Merged: shared BAM global brain (general/goal) UNDER this academy's own (location/offer).
+  try { return await loadMergedOverrides(clientId); }
+  catch (_) { return {}; }
 }
 async function savedExamples(clientId) {
   try {
@@ -279,36 +273,58 @@ async function handler(req, res) {
 
     if (b.action === "sections") {
       const agent = pickAgent(b.agent);
-      const ov = await sectionOverrides(clientId);
+      // Two override sources: the GLOBAL brain (shared) and this academy's OWN.
+      const [globalMap, clientRows] = await Promise.all([
+        loadGlobalSections(),
+        sb(`agent_prompt_sections?client_id=eq.${clientId}&select=section_key,body`).catch(() => []),
+      ]);
+      const clientMap = {};
+      for (const r of (Array.isArray(clientRows) ? clientRows : [])) clientMap[r.section_key] = r.body;
+      const canGlobal = canEditGlobalBrain(ctx, clientId);   // BAM staff or a global-editor academy (GTA)
       const bySection = new Map(SECTIONS.map(s => [s.key, s]));
       const sections = sectionKeysForAgent(agent)
         .map(k => bySection.get(k)).filter(Boolean)
-        .map(s => ({
-          key: s.key, label: s.label, group: s.layer,
-          body: ov[s.key] != null ? ov[s.key] : s.body,
-          default_body: s.body,
-          is_default: ov[s.key] == null,
-          editable: EDITABLE_LAYERS.includes(s.layer),   // location/offer only
-        }));
-      return res.status(200).json({ agent, sections });
+        .map(s => {
+          const glob = isGlobalSection(s.key);
+          const ovVal = glob ? globalMap[s.key] : clientMap[s.key];   // global sections show the GLOBAL value
+          return {
+            key: s.key, label: s.label, group: s.layer,
+            body: ovVal != null ? ovVal : s.body,
+            default_body: s.body,
+            is_default: ovVal == null,
+            scope: glob ? "global" : "local",                          // UI badges global edits (affect all academies)
+            editable: glob ? canGlobal : true,                         // local = always editable; global = only a global editor
+          };
+        });
+      return res.status(200).json({ agent, sections, can_edit_global: canGlobal });
     }
 
     if (b.action === "update-section") {
       if (!b.key || !SECTIONS.some(s => s.key === b.key)) return res.status(400).json({ error: "unknown section key" });
-      if (!isEditableSection(b.key)) return res.status(403).json({ error: "that section is global — not editable here" });
       if (b.body == null || !String(b.body).trim()) return res.status(400).json({ error: "body required" });
+      if (isGlobalSection(b.key)) {
+        // GLOBAL section: editing it changes EVERY academy's agents. Gate on a global editor.
+        if (!canEditGlobalBrain(ctx, clientId)) return res.status(403).json({ error: "that section is managed by BAM (global) — not editable here" });
+        await setGlobalSection(b.key, b.body, ctx.user.email);
+        return res.status(200).json({ ok: true, scope: "global" });
+      }
+      // LOCAL section: this academy's own override (location/offer).
       await sb(`agent_prompt_sections?on_conflict=client_id,section_key`, {
         method: "POST", headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
         body: JSON.stringify([{ client_id: clientId, section_key: b.key, body: String(b.body), updated_by: ctx.user.email || "client-trainer", updated_at: new Date().toISOString() }]),
       });
-      return res.status(200).json({ ok: true });
+      return res.status(200).json({ ok: true, scope: "local" });
     }
 
     if (b.action === "reset-section") {
       if (!b.key) return res.status(400).json({ error: "key required" });
-      if (!isEditableSection(b.key)) return res.status(403).json({ error: "that section is global — not editable here" });
+      if (isGlobalSection(b.key)) {
+        if (!canEditGlobalBrain(ctx, clientId)) return res.status(403).json({ error: "that section is managed by BAM (global) — not editable here" });
+        await deleteGlobalSection(b.key);   // revert the GLOBAL section to its BAM default (for all academies)
+        return res.status(200).json({ ok: true, scope: "global" });
+      }
       await sb(`agent_prompt_sections?client_id=eq.${clientId}&section_key=eq.${encodeURIComponent(b.key)}`, { method: "DELETE", headers: { Prefer: "return=minimal" } });
-      return res.status(200).json({ ok: true });
+      return res.status(200).json({ ok: true, scope: "local" });
     }
 
     return res.status(400).json({ error: "unknown action" });

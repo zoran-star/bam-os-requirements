@@ -27,6 +27,7 @@ import { withSentryApiRoute } from "./_sentry.js";
 
 import { pickGhlToken, ghl, sendSms } from "./ghl/_core.js";
 import { buildAgentSystem } from "./agent/brain.js";
+import { loadMergedOverrides } from "./agent/_sections.js";
 import { loadContactMemory } from "./agent/contact-memory.js";
 import {
   doneTrialStage, contactInRespondedStage, computeClosingQueue,
@@ -66,12 +67,10 @@ async function loadClient(clientId) {
 // booking agent's lessons/examples (those would bleed the wrong behavior into a
 // conversion chat).
 async function loadConfig(clientId) {
-  const [ovRows, lessonRows] = await Promise.all([
-    sb(`agent_prompt_sections?client_id=eq.${clientId}&select=section_key,body`).catch(() => []),
+  const [overrides, lessonRows] = await Promise.all([
+    loadMergedOverrides(clientId),   // global brain (general/goal) + this academy's own (location/offer)
     sb(`agent_lessons?client_id=eq.${clientId}&agent=eq.closing&active=eq.true&select=lesson,kind&order=created_at.asc`).catch(() => []),
   ]);
-  const overrides = {};
-  for (const r of (Array.isArray(ovRows) ? ovRows : [])) overrides[r.section_key] = r.body;
   return { lessons: Array.isArray(lessonRows) ? lessonRows : [], overrides, examples: [] };
 }
 

@@ -15,6 +15,7 @@ import { withSentryApiRoute } from "./_sentry.js";
 
 import { assemblePrompt, SECTIONS, AGENT_SPECS, sectionKeysForAgent } from "./agent/prompt-structure.js";
 import { buildAgentSystem } from "./agent/brain.js";
+import { loadMergedOverrides } from "./agent/_sections.js";
 
 // Which agent is being trained/previewed. Defaults to the booking agent.
 const pickAgent = (a) => (a && AGENT_SPECS[a]) ? a : "booking";
@@ -68,14 +69,11 @@ async function activeLessons(clientId) {
   } catch (_) { return []; }
 }
 
-// Per-academy overrides for individual prompt sections → { section_key: body }.
+// Prompt-section overrides → { section_key: body }: the shared BAM global brain
+// (general/goal) merged UNDER this academy's own (location/offer) overrides.
 async function sectionOverrides(clientId) {
-  try {
-    const rows = await sb(`agent_prompt_sections?client_id=eq.${clientId}&select=section_key,body`);
-    const map = {};
-    for (const r of (Array.isArray(rows) ? rows : [])) map[r.section_key] = r.body;
-    return map;
-  } catch (_) { return {}; }
+  try { return await loadMergedOverrides(clientId); }
+  catch (_) { return {}; }
 }
 
 // Per-mode trailer only — the prompt body is built by the shared brain builder.
