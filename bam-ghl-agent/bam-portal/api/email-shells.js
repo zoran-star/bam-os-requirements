@@ -87,20 +87,24 @@ const LOCATIONS = {
   },
 };
 const GTA_ID = "39875f07-0a4b-4429-a201-2249bc1f24df";
-function locFor(clientId) { return LOCATIONS[clientId] || LOCATIONS[GTA_ID]; }
+export function locFor(clientId) { return LOCATIONS[clientId] || LOCATIONS[GTA_ID]; }
 
 // Resolve GHL-style merge tokens (the ones our imported emails carry) to real values:
 // location tokens from the academy config, contact tokens from `vars` (with friendly
 // fallbacks so a missing name never sends as a raw {{token}}). Tolerates spaces inside
 // the braces. Only touches these known tokens - the shell placeholders (UPPERCASE) are
 // left for the caller to fill.
-function resolveMergeVars(html, L, vars = {}) {
+export function resolveMergeVars(html, L, vars = {}) {
   const map = {
     "contact.first_name": vars.first_name || "there",
+    "contact.fullName": vars.full_name || vars.first_name || "there",
+    "contact.full_name": vars.full_name || vars.first_name || "there",
+    "contact.name": vars.full_name || vars.first_name || "there",
     "contact.athletes_full_name": vars.athlete || "your athlete",
     "contact.athlete_full_name": vars.athlete || "your athlete",
     "location.city": L.city || "",
     "location.name": L.full || "",
+    "location.website": L.siteUrl || "",
     "location_owner.first_name": L.ownerFirst || "",
   };
   let out = html;
