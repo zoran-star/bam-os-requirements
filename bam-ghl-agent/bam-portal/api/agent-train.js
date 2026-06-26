@@ -22,8 +22,15 @@ import { withSentryApiRoute } from "./_sentry.js";
 // ⚠️ LOCAL ONLY. This endpoint can never write a general-layer brain section or a
 // general-scope lesson. Global strategy changes go through the admin approval queue.
 
-import { assemblePrompt, SECTIONS } from "./agent/prompt-structure.js";
+import { assemblePrompt, SECTIONS, AGENT_SPECS, sectionKeysForAgent } from "./agent/prompt-structure.js";
 import { buildAgentSystem } from "./agent/brain.js";
+
+// Which agent is being trained: booking | confirm | closing. Defaults to booking.
+const pickAgent = (a) => (a && AGENT_SPECS[a]) ? a : "booking";
+// Lessons + examples are a BOOKING-only training surface; confirm/closing train
+// via their Brain (Knowledge) sections + the Test sandbox, not booking-flavored
+// lessons. Keep that boundary so a booking lesson never bleeds onto another agent.
+const lessonsAllowed = (agent) => agent === "booking";
 
 const SUPABASE_URL         = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
@@ -136,15 +143,21 @@ const REPLY_TOOL = {
 
 const TRAIN_TRAILER =
   `<sandbox_mode>\nYou are in a TRAINING TEST talking to a coach role-playing as a lead — NOT a real customer. Do not actually send anything. ALWAYS respond by calling propose_reply: 'reply' is the exact text you'd send, 'reasoning' is a short why. Set 'escalate'=true when your instructions say to silently flag to admin (leave 'reply' empty then). In 'sources', list the section tag(s) of your knowledge you actually used (e.g. pricing, schedule, program, tone, objection_handling, conversation_flow, qualification, guardrails) so the trainer can see where it came from.\n</sandbox_mode>`;
-function buildSystem(lessons, overrides, examples, leadContext) {
-  return buildAgentSystem({ lessons, overrides, examples, leadContext, trailer: TRAIN_TRAILER });
+function buildSystem(lessons, overrides, examples, leadContext, agent = "booking") {
+  return buildAgentSystem({ lessons, overrides, examples, leadContext, trailer: TRAIN_TRAILER, agent });
 }
 
-async function handleChat(messages, clientId, leadContext, res) {
+async function handleChat(messages, clientId, leadContext, res, agent = "booking") {
   if (!ANTHROPIC_KEY) return res.status(500).json({ error: "ANTHROPIC_API_KEY not configured" });
   if (!Array.isArray(messages) || !messages.length) return res.status(400).json({ error: "messages required" });
-  const [lessons, overrides, examples] = await Promise.all([activeLessons(clientId), sectionOverrides(clientId), savedExamples(clientId)]);
-  const system = buildSystem(lessons, overrides, examples, leadContext);
+  // confirm/closing preview from the clean brain - no booking lessons/examples.
+  const useLessons = lessonsAllowed(agent);
+  const [lessons, overrides, examples] = await Promise.all([
+    useLessons ? activeLessons(clientId) : Promise.resolve([]),
+    sectionOverrides(clientId),
+    useLessons ? savedExamples(clientId) : Promise.resolve([]),
+  ]);
+  const system = buildSystem(lessons, overrides, examples, leadContext, agent);
   const msgs = messages.filter(m => m && typeof m.text === "string" && m.text.trim() !== "")
     .map(m => ({ role: m.role === "agent" ? "assistant" : "user", content: m.text }));
   while (msgs.length && msgs[msgs.length - 1].role === "assistant") msgs.pop();
@@ -211,7 +224,12 @@ async function handler(req, res) {
 
   try {
     if (b.action === "chat") {
-      return await handleChat(b.messages, clientId, b.lead_context || "", res);
+      return await handleChat(b.messages, clientId, b.lead_context || "", res, pickAgent(b.agent));
+    }
+
+    // Lessons + examples are a booking-only surface; confirm/closing train via Knowledge + Test.
+    if (["teach", "save-example", "lessons", "forget"].includes(b.action) && !lessonsAllowed(pickAgent(b.agent))) {
+      return res.status(400).json({ error: "Lessons are for the booking agent. Train this agent in Knowledge + Test." });
     }
 
     if (b.action === "teach") {
@@ -259,16 +277,19 @@ async function handler(req, res) {
     }
 
     if (b.action === "sections") {
+      const agent = pickAgent(b.agent);
       const ov = await sectionOverrides(clientId);
-      return res.status(200).json({
-        sections: SECTIONS.map(s => ({
+      const bySection = new Map(SECTIONS.map(s => [s.key, s]));
+      const sections = sectionKeysForAgent(agent)
+        .map(k => bySection.get(k)).filter(Boolean)
+        .map(s => ({
           key: s.key, label: s.label, group: s.layer,
           body: ov[s.key] != null ? ov[s.key] : s.body,
           default_body: s.body,
           is_default: ov[s.key] == null,
           editable: EDITABLE_LAYERS.includes(s.layer),   // location/offer only
-        })),
-      });
+        }));
+      return res.status(200).json({ agent, sections });
     }
 
     if (b.action === "update-section") {

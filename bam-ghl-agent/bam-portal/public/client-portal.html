@@ -15669,7 +15669,13 @@ async function _bbRenderAgentLearnings(panel) {
 // + the academy's own brain facts (schedule/pricing/coaches/policies).
 // All writes go to /api/agent-train, which enforces local-only server-side.
 // ════════════════════════════════════════════════════════════════════════
-const _TA = { tab: 'test', chat: [], sending: false, openSections: {} };
+const _TA = { tab: 'test', target: 'booking', chat: [], sending: false, openSections: {} };
+// What you can train: the conversational AGENTS (Test / Lessons / Knowledge / Autonomy)
+// and the one-way AUTOMATIONS (the step-builder). The picker at the top selects one.
+const _TA_AGENTS = { booking: '📞 Booking', confirm: '✅ Confirm', closing: '🎯 Closing' };
+const _TA_AUTOS  = { ghosted: '👻 Ghosted', nurture: '💔 Lead Nurture' };
+const _taIsAgent = () => !!_TA_AGENTS[_TA.target];
+function _taPick(k) { _TA.target = k; _TA.tab = 'test'; _TA.chat = []; openTrainAgentView(); }
 // Buttons here can't use .btn-primary-bb (that class is scoped to #view-blueprint).
 const _TA_BTN  = "background:var(--gold);color:#0B0B0D;border:none;border-radius:8px;padding:8px 16px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit";
 const _TA_BTN2 = "background:transparent;color:var(--text-sub);border:1px solid var(--border);border-radius:8px;padding:8px 14px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit";
@@ -15679,7 +15685,7 @@ async function _taApi(action, extra) {
   const r = await fetch('/api/agent-train', {
     method: 'POST',
     headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ action, client_id: CLIENT_ID, ...(extra || {}) }),
+    body: JSON.stringify({ action, client_id: CLIENT_ID, agent: _TA.target, ...(extra || {}) }),
   });
   const json = await _safeJson(r);
   if (!r.ok) throw new Error(json.error || ('HTTP ' + r.status));
@@ -15689,16 +15695,35 @@ async function _taApi(action, extra) {
 function openTrainAgentView() {
   const host = document.getElementById('train-agent-content');
   if (!host) return;
+  if (!_TA.target) _TA.target = 'booking';
+  const isAgent = _taIsAgent();
+  const isStaff = (typeof _IS_BAM_STAFF !== 'undefined' && _IS_BAM_STAFF === true);
+  // keep the sub-tab valid for the chosen agent (Lessons is booking-only; Autonomy is staff-only)
+  if (isAgent) {
+    if (!['test', 'lessons', 'knowledge', 'mode'].includes(_TA.tab)) _TA.tab = 'test';
+    if (_TA.tab === 'lessons' && _TA.target !== 'booking') _TA.tab = 'test';
+    if (_TA.tab === 'mode' && !isStaff) _TA.tab = 'test';
+  }
+  const pill = (k, label, active) => `<button onclick="_taPick('${k}')" style="background:${active ? 'var(--gold)' : 'transparent'};color:${active ? '#0B0B0D' : 'var(--text-sub)'};border:1px solid ${active ? 'var(--gold)' : 'var(--border)'};border-radius:8px;padding:7px 13px;font-size:13px;font-weight:700;cursor:pointer">${label}</button>`;
   const tab = (k, label) => `<button onclick="_taTab('${k}')" style="background:${_TA.tab === k ? 'var(--gold)' : 'transparent'};color:${_TA.tab === k ? '#0B0B0D' : 'var(--text-sub)'};border:1px solid ${_TA.tab === k ? 'var(--gold)' : 'var(--border)'};border-radius:8px;padding:7px 14px;font-size:13px;font-weight:600;cursor:pointer">${label}</button>`;
+  const targetName = (isAgent ? _TA_AGENTS[_TA.target] : _TA_AUTOS[_TA.target]).replace(/^\S+\s/, '');
+  const blurb = isAgent
+    ? `Coach your academy's <b>${targetName} agent</b>. Test it and keep its facts current in Knowledge${_TA.target === 'booking' ? ', plus teach it Lessons' : ''} - changes apply to <b>your academy</b> right away.`
+    : `Edit your academy's <b>${targetName}</b> sequence - the timed text/email steps. Approve it once and flip it on.`;
   host.innerHTML = `
-    <p style="color:var(--text-sub);font-size:13.5px;margin:0 0 14px;max-width:640px;line-height:1.55">Coach your academy's booking agent. Teach it lessons and keep its facts current - changes apply to <b>your academy</b> right away. Anything that looks like a broader sales strategy gets sent to BAM for approval before it spreads.</p>
-    <div style="display:flex;gap:8px;margin-bottom:18px;flex-wrap:wrap">
-      ${tab('test', '💬 Test')}
-      ${tab('lessons', '📚 Lessons')}
-      ${tab('knowledge', '📍 Knowledge')}
-      ${tab('automations', '👻 Automations')}
-      ${(typeof _IS_BAM_STAFF !== 'undefined' && _IS_BAM_STAFF === true) ? tab('mode', '🎚 Autonomy') : ''}
+    <div style="display:flex;gap:7px;margin-bottom:14px;flex-wrap:wrap;align-items:center">
+      <span style="font-size:11px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:var(--text-mute);margin-right:2px">Train</span>
+      ${Object.entries(_TA_AGENTS).map(([k, l]) => pill(k, l, _TA.target === k)).join('')}
+      <span style="width:1px;height:22px;background:var(--border);margin:0 4px"></span>
+      ${Object.entries(_TA_AUTOS).map(([k, l]) => pill(k, l, _TA.target === k)).join('')}
     </div>
+    <p style="color:var(--text-sub);font-size:13.5px;margin:0 0 14px;max-width:640px;line-height:1.55">${blurb}</p>
+    ${isAgent ? `<div style="display:flex;gap:8px;margin-bottom:18px;flex-wrap:wrap">
+      ${tab('test', '💬 Test')}
+      ${_TA.target === 'booking' ? tab('lessons', '📚 Lessons') : ''}
+      ${tab('knowledge', '📍 Knowledge')}
+      ${isStaff ? tab('mode', '🎚 Autonomy') : ''}
+    </div>` : ''}
     <div id="ta-panel"></div>`;
   _taRenderPanel();
 }
@@ -15706,11 +15731,11 @@ function openTrainAgentView() {
 function _taTab(k) { _TA.tab = k; openTrainAgentView(); }
 
 function _taRenderPanel() {
-  if (_TA.tab === 'test') return _taRenderTest();
+  if (!_taIsAgent()) return _taRenderAutomations();   // an automation is selected -> its step-builder
   if (_TA.tab === 'lessons') return _taRenderLessons();
   if (_TA.tab === 'knowledge') return _taRenderKnowledge();
-  if (_TA.tab === 'automations') return _taRenderAutomations();
   if (_TA.tab === 'mode') return _taRenderMode();
+  return _taRenderTest();
 }
 
 // ── Autonomy (BAM staff only): this academy's agent mode ────────────────────
@@ -15811,11 +15836,13 @@ async function _taRenderAutomations() {
   const order = { ghosted: 0, nurture: 1 };
   list.sort((a, b) => ((order[a.automation_key] ?? 9) - (order[b.automation_key] ?? 9)));
   _AUTO.list = list;
+  // When an automation is picked in the Train header, show only that one; else both.
+  const shown = _TA_AUTOS[_TA.target] ? list.filter(a => a.automation_key === _TA.target) : list;
   // Live counts (read-only observability) - best-effort; the editor still works if it fails.
   try { const ov = await _autoApi('overview'); _AUTO.overview = ov.overview || []; } catch (_) { _AUTO.overview = []; }
   p.innerHTML = `
     <p style="color:var(--text-mute);font-size:12.5px;margin:0 0 14px;line-height:1.55;max-width:660px">Build your one-way nudge sequences - each step is a <b style="color:var(--text)">wait</b>, then a <b style="color:var(--text)">text or email</b>. Approve the sequence once and flip it on; the engine sends each step on schedule (quiet hours respected). Merge tags: <code>{{name}}</code> / <code>{{athlete}}</code>. Empty? Paste your texts + emails in the import session to auto-fill these.</p>
-    ${list.map(_autoCardHtml).join('') || '<div style="color:var(--text-mute)">No automations.</div>'}`;
+    ${shown.map(_autoCardHtml).join('') || '<div style="color:var(--text-mute)">No automations.</div>'}`;
 }
 
 // Read-only observability (guardrail #8): live counts strip per automation, click
