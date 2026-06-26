@@ -16203,8 +16203,8 @@ function _autoStepHtml(a, s, i, total) {
       <button onclick="_autoMove('${a.id}','${s.id}',-1)" ${i === 0 ? 'disabled' : ''} title="Move up" style="background:transparent;border:1px solid var(--border);color:var(--text-sub);border-radius:6px;padding:4px 8px;font-size:11px;cursor:pointer;${i === 0 ? 'opacity:.4' : ''}">↑</button>
       <button onclick="_autoMove('${a.id}','${s.id}',1)" ${i === total - 1 ? 'disabled' : ''} title="Move down" style="background:transparent;border:1px solid var(--border);color:var(--text-sub);border-radius:6px;padding:4px 8px;font-size:11px;cursor:pointer;${i === total - 1 ? 'opacity:.4' : ''}">↓</button>
     </div>
-    <input id="astep-${s.id}-subj" placeholder="Subject (email)" value="${escapeHTML(s.subject || '')}" style="display:${isEmail ? 'block' : 'none'};width:100%;box-sizing:border-box;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:7px 9px;font-size:12.5px;margin-bottom:7px">
-    <textarea id="astep-${s.id}-body" placeholder="Message - use {{name}} / {{athlete}}" style="width:100%;box-sizing:border-box;min-height:54px;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:7px 9px;font-size:12.5px;resize:vertical;font-family:inherit">${escapeHTML(s.body || '')}</textarea>
+    <input id="astep-${s.id}-subj" placeholder="Email subject line" value="${escapeHTML(s.subject || '')}" style="display:${isEmail ? 'block' : 'none'};width:100%;box-sizing:border-box;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:7px 9px;font-size:12.5px;margin-bottom:7px">
+    <textarea id="astep-${s.id}-body" placeholder="Message - use {{name}} / {{athlete}}" style="display:${isEmail ? 'none' : 'block'};width:100%;box-sizing:border-box;min-height:54px;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:7px 9px;font-size:12.5px;resize:vertical;font-family:inherit">${escapeHTML(s.body || '')}</textarea>
     <div style="display:flex;gap:8px;margin-top:7px">
       <button onclick="_autoSaveStep('${a.id}','${s.id}')" style="background:var(--gold);color:#0B0B0D;border:none;border-radius:7px;padding:6px 14px;font-size:12px;font-weight:700;cursor:pointer">Save</button>
       <button id="astep-${s.id}-prev" onclick="_autoPreviewEmail('${s.id}')" style="display:${isEmail ? 'inline-block' : 'none'};background:transparent;border:1px solid var(--gold);color:var(--gold);border-radius:7px;padding:6px 12px;font-size:12px;font-weight:700;cursor:pointer">👁 Preview</button>
@@ -16218,6 +16218,9 @@ function _autoChanChange(sid) {
   const chan = document.getElementById(`astep-${sid}-chan`), subj = document.getElementById(`astep-${sid}-subj`);
   const isEmail = chan && chan.value === 'email';
   if (chan && subj) subj.style.display = isEmail ? 'block' : 'none';
+  // Email steps are template-backed: hide the body editor, the subject is the only field.
+  const body = document.getElementById(`astep-${sid}-body`);
+  if (body) body.style.display = isEmail ? 'none' : 'block';
   const prev = document.getElementById(`astep-${sid}-prev`);
   if (prev) prev.style.display = isEmail ? 'inline-block' : 'none';
 }
