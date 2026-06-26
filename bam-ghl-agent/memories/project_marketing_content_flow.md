@@ -211,6 +211,22 @@ Not done (deferred): stale-ticket nudge cron; urgency toggle on budget/remove fl
 - **Cam's Slack id IS set:** `staff.slack_user_id = 'U09A66BCBNJ'` (Cam Wells).
 - ⚠️ **STILL DORMANT — the bam_portal Slack app is missing the `im:write` scope.** `chat.postMessage` to a user fails `missing_scope` (verified via conversations.open). Client-CHANNEL notifications work (chat:write present). **Fix: add `im:write` to the app's Bot Token Scopes at api.slack.com/apps → reinstall.** Until then NO person-to-person DM fires.
 
+## Content + Marketing team Slack channel + deadline digest (2026-06-25)
+
+Because per-person DMs are blocked (im:write missing, above), team notifications now go to a
+**shared channel** via `chat:write` (works) + **@mentions** (work in-channel, no im:write needed).
+- `postContentMarketingSlack(text)` posts to env **`CONTENT_MARKETING_SLACK_CHANNEL`** (channel id).
+  `slackMention(slackUserId, name)` → `<@id>` or `*name*`. Both in `api/marketing.js`.
+- **Wired triggers** (fire-and-forget, alongside the existing per-client-channel posts):
+  🆕 new content request (@assignee) · 🆕 new marketing request (@Cam) · ✅ content completed ·
+  ➡️ sent-to-marketing · 💬 client responded (@assignee). Revision = a new content ticket → covered.
+- **Daily deadline digest:** cron `?resource=content-deadlines-cron` (auth `Bearer CRON_SECRET`),
+  vercel.json `0 13 * * *`. Buckets outstanding content tickets (status active/client-dependent) into
+  🔴 overdue / 🟡 due-today / 🔵 due-tomorrow via the server-side SLA mirror (`_ctkDueDate`/`_dueBucket`:
+  high=3 biz days, normal=5). One message, @mentions assignees; skips if nothing due.
+- **SETUP NEEDED:** create the Slack channel, invite the bot, set `CONTENT_MARKETING_SLACK_CHANNEL` in
+  Vercel. Eli's `staff.slack_user_id` is null → set it for his @mentions to actually ping.
+
 ## Cam marketing guide (sendable HTML)
 
 - Live: `https://portal.byanymeansbusiness.com/cam-marketing-guide.html` (from `bam-portal/public/cam-marketing-guide.html`). Has a 6-screen fake-data walkthrough. Roles in it: **content team = Cam (uploads/sends) → Ximena = marketing (posts on Meta)**.
