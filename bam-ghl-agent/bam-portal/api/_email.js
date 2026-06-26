@@ -7,15 +7,15 @@
 // complained address) and an email_events audit trail. Dependency-free (raw fetch),
 // matching the rest of the codebase.
 //
-// FROM: defaults to GTA's branded sender info@byanymeanstoronto.com. NOTE: that
-// domain must be DNS-verified in Resend before sends succeed - until then Resend
-// returns 403 (same gotcha the auth emails hit with an unverified domain). The auth
-// emails send from the verified byanymeansbball.com and are intentionally left alone.
+// FROM: defaults to GTA's branded sender info@byanymeanstoronto.ca. That domain is
+// DNS-verified in Resend (the .com is NOT verified - sending from it 403s, which is
+// why this is .ca). The auth emails send from the verified byanymeansbball.com and
+// are intentionally left alone.
 
 const SUPABASE_URL         = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
 const RESEND_API_KEY       = process.env.RESEND_API_KEY;
-const DEFAULT_FROM         = process.env.RESEND_FROM || "BAM Toronto <info@byanymeanstoronto.com>";
+const DEFAULT_FROM         = process.env.RESEND_FROM || "BAM Toronto <info@byanymeanstoronto.ca>";
 
 // Service-role Supabase REST helper (same shape as api/agent-confirm.js).
 async function sb(path, init = {}) {

@@ -80,7 +80,7 @@ const LOCATIONS = {
     tagline: "Youth and high-school basketball training in Oakville and across the GTA.",
     siteUrl: "https://byanymeanstoronto.ca",
     siteLabel: "byanymeanstoronto.ca",
-    email: "info@byanymeanstoronto.com",
+    email: "info@byanymeanstoronto.ca",
     instagram: "https://instagram.com/byanymeanstoronto",
     city: "Oakville",
     ownerFirst: "Zoran",
