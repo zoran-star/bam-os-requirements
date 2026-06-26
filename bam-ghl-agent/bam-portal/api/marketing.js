@@ -314,6 +314,25 @@ async function marketingManagerSlackId() {
   }
 }
 
+// The marketing executor's (Ximena's) Slack id — the teammate who actually
+// posts the ads, so they get pinged when content lands in marketing. Env
+// override first, else the (first) marketing_executor on the team. Returns
+// null — ping silently no-ops — until one resolves with a slack_user_id.
+async function marketingExecutorSlackId() {
+  if (process.env.MARKETING_EXECUTOR_SLACK_ID) return process.env.MARKETING_EXECUTOR_SLACK_ID;
+  try {
+    const email = process.env.MARKETING_EXECUTOR_EMAIL;
+    if (email) {
+      const rows = await sb(`staff?email=eq.${encodeURIComponent(email)}&select=slack_user_id`);
+      if (rows?.[0]?.slack_user_id) return rows[0].slack_user_id;
+    }
+    const me = await sb(`staff?role=eq.marketing_executor&select=slack_user_id&order=created_at.asc&limit=1`);
+    return me?.[0]?.slack_user_id || null;
+  } catch (_) {
+    return null;
+  }
+}
+
 // The client's assigned manager (the "SM") — auto-owner of their marketing tickets.
 async function clientScalingManager(clientId) {
   try {
@@ -1520,7 +1539,8 @@ async function handleContentTickets(req, res) {
       }).catch(() => {});
       postContentMarketingSlack(`✅ *Completed* - Content [${code}]`);
     } else if (action === "send-to-marketing") {
-      postContentMarketingSlack(`➡️ *Sent to marketing* - Content [${code}] is ready to launch.`);
+      marketingExecutorSlackId().then(sid =>
+        postContentMarketingSlack(`➡️ *Sent to marketing* - Content [${code}] is ready to launch.${slackMention(sid) ? " " + slackMention(sid) : ""}`));
     } else if (action === "respond") {
       staffSlackIdById(ticket.assigned_to).then(sid =>
         postContentMarketingSlack(`💬 *Client responded* - Content [${code}]${slackMention(sid) ? " " + slackMention(sid) : ""}`));
