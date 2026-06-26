@@ -22288,11 +22288,18 @@ function _renderPipelineTabs() {
   const host = document.getElementById('pl-pipeline-tabs');
   if (!host || !_PL_DATA) return;
   const pls = _plVisiblePipelines();
-  if (!pls.length) { host.innerHTML = ''; return; }
+  if (!pls.length) { host.innerHTML = ''; host.style.display = 'none'; return; }
   // If the selected pipeline isn't visible to this user, snap to the first one.
   if (!pls.some(p => p.id === _PL_PIPELINE)) _PL_PIPELINE = pls[0].id;
-  // One pipeline = no need for a selector tab; drop the redundant header.
-  if (pls.length <= 1) { _PL_PIPELINE = pls[0].id; host.innerHTML = ''; return; }
+  // V2 = a single training-pipeline sales board: never show the selector (snap to
+  // the Training pipeline the agents work). One pipeline anywhere also needs none.
+  // Hide via display:none so the empty row leaves no gap above the board.
+  if (_plV2 || pls.length <= 1) {
+    if (_plV2) { const tp = pls.find(p => /training/i.test(p.name || '')); _PL_PIPELINE = (tp || pls[0]).id; }
+    else _PL_PIPELINE = pls[0].id;
+    host.innerHTML = ''; host.style.display = 'none'; return;
+  }
+  host.style.display = 'flex';
   const opts = pls.map(p => {
     const visibleCount = (p.opportunities || []).filter(o => _isStageAllowed(o.stageId) && !['won', 'lost', 'abandoned'].includes(String(o.status || '').toLowerCase())).length;
     return `<option value="${escapeHTML(p.id)}" ${p.id === _PL_PIPELINE ? 'selected' : ''}>${escapeHTML(p.name)} (${visibleCount})</option>`;
