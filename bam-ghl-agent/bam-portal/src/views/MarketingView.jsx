@@ -16,12 +16,13 @@ const STATUS_META = {
 };
 
 // ─── Priority + turnaround SLA ───
-// Cam's rule from the team call: a client-flagged urgent ticket is High (3 business
-// days to turn around); everything else is Normal (5 business days). Priority is
-// stored on the ticket as fields.priority; absent → treated as normal.
+// Internal turnaround for marketing tickets is 3 business days for every ticket
+// (Zoran, 2026-06-26). Priority still tags urgency (fields.priority) for the
+// pill colour + as a tiebreaker, but no longer changes the deadline.
+const MARKETING_SLA_DAYS = 3;
 const PRIORITY_META = {
-  high:   { label: "High",   sla: 3, color: "#ED7969" },
-  normal: { label: "Normal", sla: 5, color: "#7E9CD9" },
+  high:   { label: "High",   sla: MARKETING_SLA_DAYS, color: "#ED7969" },
+  normal: { label: "Normal", sla: MARKETING_SLA_DAYS, color: "#7E9CD9" },
 };
 function priorityOf(apiTicketFields) {
   return (apiTicketFields?.priority === "high") ? "high" : "normal";
@@ -278,7 +279,7 @@ export default function MarketingView({ tokens: tk, dark, me, session }) {
   const [banner, setBanner] = useState(null); // { type, text }
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState("all"); // all | replace | add | remove | budget | campaign-create
-  const [sortOrder, setSortOrder] = useState("priority"); // priority | newest | oldest
+  const [sortOrder, setSortOrder] = useState("due"); // due | priority | newest | oldest
 
   // ─── Fetch tickets on mount ───
   useEffect(() => {
@@ -336,6 +337,14 @@ export default function MarketingView({ tokens: tk, dark, me, session }) {
     list = [...list].sort((a, b) => {
       const aDate = new Date(a._raw?.submitted_at || 0).getTime();
       const bDate = new Date(b._raw?.submitted_at || 0).getTime();
+      if (sortOrder === "due") {
+        // Soonest due first → overdue (earliest due date) floats to the very top.
+        // Tickets with no submit date (no deadline) sink to the bottom.
+        const aDue = a._raw?.submitted_at ? deadlineInfo(a._raw.submitted_at, a.priority).due.getTime() : Infinity;
+        const bDue = b._raw?.submitted_at ? deadlineInfo(b._raw.submitted_at, b.priority).due.getTime() : Infinity;
+        if (aDue !== bDue) return aDue - bDue;
+        return aDate - bDate;
+      }
       if (sortOrder === "priority") {
         // High priority first; within the same priority, newest first.
         const rank = p => (p === "high" ? 0 : 1);
@@ -657,6 +666,7 @@ export default function MarketingView({ tokens: tk, dark, me, session }) {
             cursor: "pointer", fontFamily: "inherit",
           }}
         >
+          <option value="due">Soonest due (overdue first)</option>
           <option value="priority">Priority (urgent first)</option>
           <option value="newest">Newest first</option>
           <option value="oldest">Oldest first</option>
@@ -702,6 +712,12 @@ export default function MarketingView({ tokens: tk, dark, me, session }) {
           </div>
         ) : rows.map(t => {
           const typeMeta = TYPE_META[t.type] || { icon: "•", label: "Request" };
+          // Overdue (past the 3-day SLA) while still in progress → flag the whole
+          // row red so it stands out at the top of the soonest-due sort.
+          const dl = t.status === "in-progress" ? deadlineInfo(t._raw?.submitted_at, t.priority) : null;
+          const isOverdue = !!dl?.overdue;
+          const redLine = tk.red || "#ED7969";
+          const baseBg = isOverdue ? "rgba(237,121,105,0.08)" : "transparent";
           return (
             <div
               key={t.id}
@@ -712,14 +728,17 @@ export default function MarketingView({ tokens: tk, dark, me, session }) {
                 gap: 16,
                 padding: "14px 16px",
                 borderBottom: `1px solid ${tk.borderSoft || tk.border}`,
-                borderLeft: t.priority === "high" && t.status === "in-progress"
-                  ? `3px solid ${PRIORITY_META.high.color}` : "3px solid transparent",
+                borderLeft: isOverdue
+                  ? `3px solid ${redLine}`
+                  : (t.priority === "high" && t.status === "in-progress"
+                      ? `3px solid ${PRIORITY_META.high.color}` : "3px solid transparent"),
+                background: baseBg,
                 cursor: "pointer",
                 alignItems: "center",
                 transition: "background 0.12s ease",
               }}
               onMouseEnter={e => e.currentTarget.style.background = tk.surfaceHov}
-              onMouseLeave={e => e.currentTarget.style.background = "transparent"}
+              onMouseLeave={e => e.currentTarget.style.background = baseBg}
             >
               <div style={{ fontWeight: 500, color: tk.text, fontSize: 14, display: "flex", alignItems: "center", gap: 8 }}>
                 <span style={{
