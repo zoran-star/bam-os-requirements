@@ -161,6 +161,10 @@
       <div class="pills">
         <span class="pill">content_check: pending / approved</span><span class="pill r">awaiting_revision</span>
       </div>
+      <div class="lbl">Timeline (Ximena's SLA)</div>
+      <div class="pills">
+        <span class="pill r">urgent: 2 biz days</span><span class="pill b">standard: 4 biz days</span>
+      </div>
     </div>
   </div>
   <div class="callout">Both tables carry a <b>client_action_status</b> flag: <span class="pill">none</span> → <span class="pill r">requested</span> → <span class="pill gr">responded</span>. That's the engine behind "Request Client Action" (§6).</div>
@@ -232,7 +236,7 @@
   <div class="lbl" style="margin-top:26px"><span class="dot" style="background:var(--blue);width:8px;height:8px"></span>&nbsp; Marketing ticket (MarketingView)</div>
   <table>
     <tr><th>Button</th><th>Does</th><th>Result</th></tr>
-    <tr><td><span class="btn-txt">✓ Mark Completed</span></td><td>Ad is live on Meta - close it out.</td><td>→ <span class="pill gr">completed</span>. ✅ Slack to client + DM to the SM.</td></tr>
+    <tr><td><span class="btn-txt">✓ Mark Completed</span></td><td>Ad is live on Meta - close it out.</td><td>→ <span class="pill gr">completed</span>. ✅ Slack to client + <b>@SM</b> in #content-marketing.</td></tr>
     <tr><td><span class="btn-txt">↩ Request Content Revision</span> <span style="font-size:10px">(if it has files)</span></td><td>Kick the creative back to content for changes.</td><td><b>Spawns a content ticket</b> (linked); sets <span class="pill r">awaiting_revision</span> → leaves Active. Status stays in-progress.</td></tr>
     <tr><td><span class="btn-txt">Request Client Action</span></td><td>Ask the client a question before launching.</td><td>action requested (stays <span class="pill g">in-progress</span>); moves to Client-Dependent tab. 🔔 Slack to client.</td></tr>
     <tr><td><span class="btn-txt">✕ Cancel</span></td><td>Kill the ticket (confirm first).</td><td>→ <span class="pill">cancelled</span>. ❌ Slack to client.</td></tr>
@@ -297,8 +301,10 @@
         <span class="pill">type from source</span>
         <span class="pill">assigned to the SM</span>
         <span class="pill">pings Cam</span>
+        <span class="pill b">pings Ximena + due date</span>
       </div>
       <p style="margin-top:12px">The content ticket then closes → <span class="pill gr">completed</span>. Campaign-create tickets carry the offer, monthly spend + landing page across.</p>
+      <p style="margin-top:10px"><b style="color:var(--text)">Ximena's ping</b> lands in <span class="pill">#content-marketing</span>: <span style="font-family:var(--mono);font-size:11px;color:var(--text-mute)">➡️ Sent to marketing - Content [XXX] ready to launch. ⚡ URGENT Due Tue Jun 30. @Ximena</span> - so she sees the work <b>and her deadline</b> the moment it lands. Fires on revision round-trips too.</p>
     </div>
     <div class="syscard">
       <h3><span class="dot" style="background:var(--blue)"></span> Revision round-trip</h3>
@@ -339,14 +345,15 @@
     <tr><th>Event</th><th>Goes to</th><th>Message</th></tr>
     <tr><td>Client submits a <b>marketing</b> ticket</td><td>DM → Cam (marketing mgr)</td><td>new ticket ping</td></tr>
     <tr><td>Client submits a <b>content</b> ticket</td><td>DM → content owner (organic→content, ads→Cam)</td><td>new ticket ping</td></tr>
-    <tr><td>Content → marketing fresh spawn</td><td>DM → Cam</td><td>new marketing ticket</td></tr>
-    <tr><td><b>Request Client Action</b> (either)</td><td>Client's own Slack channel + push</td><td>🔔 Action requested - [CODE]</td></tr>
-    <tr><td><b>Mark Completed</b> (marketing)</td><td>Client channel + push, DM → SM</td><td>✅ Completed - [CODE]</td></tr>
+    <tr><td>Content → marketing <b>send-to-marketing</b></td><td><span class="pill">#content-marketing</span></td><td>🆕 New marketing request @Cam <b>+ @SM</b> · ➡️ Sent to marketing @Ximena <b>(Due &lt;date&gt;, ⚡ if urgent)</b></td></tr>
+    <tr><td><b>Request Client Action</b> (marketing)</td><td>Client channel + push · <span class="pill">#content-marketing</span></td><td>🔔 Action requested - [CODE] (client) · 🔔 Action needed from client @SM (team)</td></tr>
+    <tr><td><b>Client responds</b> (marketing)</td><td><span class="pill">#content-marketing</span></td><td>💬 Client responded - Marketing [CODE] @SM</td></tr>
+    <tr><td><b>Mark Completed</b> (marketing)</td><td>Client channel + push · <span class="pill">#content-marketing</span></td><td>✅ Completed - [CODE] @SM</td></tr>
     <tr><td><b>Mark Completed</b> (content)</td><td>Client channel + push</td><td>✅ Completed - [CODE]</td></tr>
-    <tr><td><b>Cancel</b> (either)</td><td>Client's own Slack channel</td><td>❌ Cancelled - [CODE]</td></tr>
-    <tr><td>New requests + checkpoints + daily digest</td><td><span class="pill">#content-marketing</span> (team channel)</td><td>@mentions + ~8-9am ET deadline digest</td></tr>
+    <tr><td><b>Cancel</b> (marketing)</td><td>Client channel · <span class="pill">#content-marketing</span></td><td>❌ Cancelled - [CODE] @SM</td></tr>
+    <tr><td><b>Daily deadline digest</b> (~8-9am ET)</td><td><span class="pill">#content-marketing</span></td><td>📋 Overdue / today / tomorrow - content lines @owner, <b>marketing lines @Ximena</b> (her 2/4-day SLA)</td></tr>
   </table>
-  <div class="callout"><b>Two Slack audiences:</b> client-facing pings (action / done / cancelled) always go to that <b>client's own channel</b>; the team's <b>#content-marketing</b> channel gets new-request alerts, checkpoints and the daily digest.</div>
+  <div class="callout"><b>Two Slack audiences:</b> client-facing pings (action / done / cancelled) always go to that <b>client's own channel</b>; the team's <b>#content-marketing</b> channel gets every new-request, status change, handoff and the daily digest.<br><br><b>Who gets @mentioned:</b> <b style="color:var(--pink)">content owner</b> on new content tickets · <b style="color:var(--gold)">Cam</b> (manager) + <b style="color:var(--blue)">SM</b> (client owner) on new marketing requests · <b style="color:var(--blue)">Ximena</b> (the doer) when work lands + in the digest · <b style="color:var(--blue)">SM</b> on every marketing status change (action needed / responded / completed / cancelled) for the full picture.</div>
 
   <!-- 10 -->
   <h2 id="big"><span class="h2-tag">10</span><br>The big picture</h2>
