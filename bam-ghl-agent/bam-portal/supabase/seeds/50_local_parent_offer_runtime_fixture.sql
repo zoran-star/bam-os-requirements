@@ -155,6 +155,7 @@ insert into public.entitlement_templates (
   id,
   tenant_id,
   offer_price_id,
+  bookable_program_id,
   entitlement_kind,
   scope_type,
   credits_per_period,
@@ -169,6 +170,7 @@ values
     '83000000-0000-4000-8000-000000000001',
     '39875f07-0a4b-4429-a201-2249bc1f24df',
     '82000000-0000-4000-8000-000000000001',
+    '80000000-0000-4000-8000-000000000001',
     'WEEKLY_CREDITS',
     'STUDENT',
     1,
@@ -182,6 +184,7 @@ values
     '83000000-0000-4000-8000-000000000002',
     '39875f07-0a4b-4429-a201-2249bc1f24df',
     '82000000-0000-4000-8000-000000000002',
+    '80000000-0000-4000-8000-000000000001',
     'WEEKLY_CREDITS',
     'STUDENT',
     2,
@@ -195,6 +198,7 @@ values
     '83000000-0000-4000-8000-000000000003',
     '39875f07-0a4b-4429-a201-2249bc1f24df',
     '82000000-0000-4000-8000-000000000003',
+    '80000000-0000-4000-8000-000000000001',
     'UNLIMITED_BOOKING',
     'STUDENT',
     null,
@@ -207,6 +211,7 @@ values
 on conflict (id) do update set
   tenant_id = excluded.tenant_id,
   offer_price_id = excluded.offer_price_id,
+  bookable_program_id = excluded.bookable_program_id,
   entitlement_kind = excluded.entitlement_kind,
   scope_type = excluded.scope_type,
   credits_per_period = excluded.credits_per_period,
@@ -232,6 +237,7 @@ insert into public.customer_entitlements (
   source,
   source_offer_price_id,
   source_entitlement_template_id,
+  bookable_program_id,
   source_ref,
   config
 )
@@ -251,6 +257,7 @@ values
     'seed',
     '82000000-0000-4000-8000-000000000001',
     '83000000-0000-4000-8000-000000000001',
+    '80000000-0000-4000-8000-000000000001',
     'local-seed:maya-steady',
     '{"credits_per_period":1,"credit_period":"WEEK"}'::jsonb
   ),
@@ -269,6 +276,7 @@ values
     'seed',
     '82000000-0000-4000-8000-000000000002',
     '83000000-0000-4000-8000-000000000002',
+    '80000000-0000-4000-8000-000000000001',
     'local-seed:leo-accelerate',
     '{"credits_per_period":2,"credit_period":"WEEK"}'::jsonb
   ),
@@ -287,6 +295,7 @@ values
     'seed',
     '82000000-0000-4000-8000-000000000003',
     '83000000-0000-4000-8000-000000000003',
+    '80000000-0000-4000-8000-000000000001',
     'local-seed:noah-summer-unlimited',
     '{"is_unlimited":true}'::jsonb
   )
@@ -304,6 +313,7 @@ on conflict (id) do update set
   source = excluded.source,
   source_offer_price_id = excluded.source_offer_price_id,
   source_entitlement_template_id = excluded.source_entitlement_template_id,
+  bookable_program_id = excluded.bookable_program_id,
   source_ref = excluded.source_ref,
   config = excluded.config,
   updated_at = now();
