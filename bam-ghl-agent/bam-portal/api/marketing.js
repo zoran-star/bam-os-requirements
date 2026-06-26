@@ -199,6 +199,107 @@ async function postStaffSlackDM(slackUserId, text, req) {
   }
 }
 
+// Shared content + marketing team channel: new requests, status checkpoints,
+// and the daily deadline digest. Fire-and-forget; no-ops if SLACK_BOT_TOKEN or
+// CONTENT_MARKETING_SLACK_CHANNEL is missing. Uses chat:write (no im:write
+// needed), so it works without per-person DM permissions.
+async function postContentMarketingSlack(text) {
+  try {
+    const token = process.env.SLACK_BOT_TOKEN;
+    const channel = process.env.CONTENT_MARKETING_SLACK_CHANNEL;
+    if (!token || !channel || !text) return;
+    await fetch("https://slack.com/api/chat.postMessage", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json; charset=utf-8" },
+      body: JSON.stringify({ channel, text, unfurl_links: false }),
+    });
+  } catch (err) {
+    console.error("Team Slack post failed:", err?.message || err);
+  }
+}
+// `<@U…>` ping if we have the user's Slack id (works inside a channel, no
+// im:write), else just the bolded name, else ''.
+function slackMention(slackUserId, fallbackName) {
+  if (slackUserId) return `<@${slackUserId}>`;
+  return fallbackName ? `*${fallbackName}*` : "";
+}
+
+// Server-side mirror of the content SLA (ContentView ctkDeadlineInfo):
+// high priority = 3 business days, normal = 5, from the submit date.
+function _addBusinessDays(start, days) {
+  const d = new Date(start);
+  let added = 0;
+  while (added < days) {
+    d.setDate(d.getDate() + 1);
+    const dow = d.getDay();
+    if (dow !== 0 && dow !== 6) added++;
+  }
+  return d;
+}
+function _ctkDueDate(submittedIso, priority) {
+  if (!submittedIso) return null;
+  const sla = priority === "high" ? 3 : 5;
+  return _addBusinessDays(new Date(submittedIso), sla);
+}
+// 'overdue' | 'today' | 'tomorrow' | 'later' (calendar-day comparison, local).
+function _dueBucket(due) {
+  if (!due) return "later";
+  const a = new Date(due); a.setHours(0, 0, 0, 0);
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const diff = Math.round((a.getTime() - today.getTime()) / 86400000);
+  if (diff < 0) return "overdue";
+  if (diff === 0) return "today";
+  if (diff === 1) return "tomorrow";
+  return "later";
+}
+
+// Daily deadline digest -> the content + marketing channel. Buckets outstanding
+// content tickets into overdue / due-today / due-tomorrow and posts one message
+// (@mentioning assignees). Cron auth: Vercel sends `Authorization: Bearer <CRON_SECRET>`.
+async function contentDeadlinesDigestCron(req, res) {
+  const expected = process.env.CRON_SECRET;
+  if (!expected) return res.status(500).json({ error: "CRON_SECRET not configured" });
+  if ((req.headers.authorization || "") !== `Bearer ${expected}`) return res.status(401).json({ error: "unauthorized" });
+  if (!process.env.SLACK_BOT_TOKEN || !process.env.CONTENT_MARKETING_SLACK_CHANNEL) {
+    return res.status(200).json({ sent: false, reason: "slack_not_configured" });
+  }
+  try {
+    const tickets = await sb(`content_tickets?status=in.(active,client-dependent)&select=id,channel,context,submitted_at,assigned_to,client_id`) || [];
+    const buckets = { overdue: [], today: [], tomorrow: [] };
+    for (const t of tickets) {
+      const pri = (t.context && t.context.priority === "high") ? "high" : "normal";
+      const b = _dueBucket(_ctkDueDate(t.submitted_at, pri));
+      if (buckets[b]) buckets[b].push(t);
+    }
+    const all = [...buckets.overdue, ...buckets.today, ...buckets.tomorrow];
+    if (!all.length) return res.status(200).json({ sent: false, reason: "nothing_due" });
+
+    const clientIds = [...new Set(all.map(t => t.client_id).filter(Boolean))];
+    const staffIds = [...new Set(all.map(t => t.assigned_to).filter(Boolean))];
+    const clients = clientIds.length ? (await sb(`clients?id=in.(${clientIds.join(",")})&select=id,business_name`) || []) : [];
+    const staff = staffIds.length ? (await sb(`staff?id=in.(${staffIds.join(",")})&select=id,slack_user_id`) || []) : [];
+    const cName = {}; clients.forEach(c => { cName[c.id] = c.business_name; });
+    const sSlack = {}; staff.forEach(s => { sSlack[s.id] = s.slack_user_id; });
+
+    const line = (t) => {
+      const code = String(t.id || "").slice(0, 3).toUpperCase();
+      const chan = t.channel === "organic" ? "Organic" : "Paid ads";
+      const who = slackMention(sSlack[t.assigned_to]);
+      return `• ${chan} · ${cName[t.client_id] || "client"} [${code}]${who ? " " + who : ""}`;
+    };
+    const section = (emoji, label, arr) => arr.length ? `\n\n${emoji} *${label} (${arr.length})*\n` + arr.map(line).join("\n") : "";
+    const msg = "📋 *Content / Marketing deadlines*"
+      + section("🔴", "Overdue", buckets.overdue)
+      + section("🟡", "Due today", buckets.today)
+      + section("🔵", "Due tomorrow", buckets.tomorrow);
+    await postContentMarketingSlack(msg);
+    return res.status(200).json({ sent: true, overdue: buckets.overdue.length, today: buckets.today.length, tomorrow: buckets.tomorrow.length });
+  } catch (e) {
+    console.error("content-deadlines-cron error:", e?.message || e);
+    return res.status(200).json({ sent: false, reason: e?.message || "error" });
+  }
+}
+
 // Resolve the marketing manager's (Cam's) Slack user ID for new-ticket pings.
 // Prefers an explicit env override; else looks up the staff row by email.
 // Returns null — ping silently no-ops — until a slack_user_id is on file.
@@ -314,6 +415,8 @@ function pingMarketingOnNewTicket({ ticketId, academy, priority }, req) {
   const pr = priority === "high" ? "⚡ HIGH priority " : "";
   marketingManagerSlackId().then(sid => {
     if (sid) postStaffSlackDM(sid, `🆕 New marketing request ${pr}— ${academy || "client"} [${code}]`, req);
+    const who = slackMention(sid);
+    postContentMarketingSlack(`🆕 *New marketing request* ${pr}- ${academy || "client"} [${code}]${who ? " " + who : ""}`);
   });
 }
 
@@ -357,6 +460,9 @@ async function enrichWithClient(tickets) {
 async function handler(req, res) {
   try {
     const resource = req.query.resource;
+    if (resource === "content-deadlines-cron") {
+      return await contentDeadlinesDigestCron(req, res);
+    }
     if (resource === "meta-health-cron") {
       return await handleMetaHealthCron(req, res);
     }
@@ -1004,6 +1110,8 @@ async function handleContentTickets(req, res) {
       const label = channel === "organic" ? "organic content" : "content";
       staffSlackIdById(assignedTo).then(sid => {
         if (sid) postStaffSlackDM(sid, `🆕 New ${label} request ${pr}— ${ctx.client.business_name || "client"} [${code}]`, req);
+        const who = slackMention(sid);
+        postContentMarketingSlack(`🆕 *New ${label} request* ${pr}- ${ctx.client.business_name || "client"} [${code}]${who ? " " + who : ""}`);
       });
     }
     return res.status(201).json({ ticket: newCt });
@@ -1331,6 +1439,12 @@ async function handleContentTickets(req, res) {
       notifyClientPush(ticket.client_id, "ticket-complete", {
         ticketTitle: "Your content request", ticketId: ticket.id, view: "marketing",
       }).catch(() => {});
+      postContentMarketingSlack(`✅ *Completed* - Content [${code}]`);
+    } else if (action === "send-to-marketing") {
+      postContentMarketingSlack(`➡️ *Sent to marketing* - Content [${code}] is ready to launch.`);
+    } else if (action === "respond") {
+      staffSlackIdById(ticket.assigned_to).then(sid =>
+        postContentMarketingSlack(`💬 *Client responded* - Content [${code}]${slackMention(sid) ? " " + slackMention(sid) : ""}`));
     } else if (action === "cancel") {
       postClientSlackNotification(ticket.client_id,
         `❌ Cancelled — Content [${code}]`, req);
