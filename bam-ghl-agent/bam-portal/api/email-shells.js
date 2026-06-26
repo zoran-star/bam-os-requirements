@@ -77,10 +77,33 @@ const LOCATIONS = {
     siteLabel: "byanymeanstoronto.ca",
     email: "info@byanymeanstoronto.com",
     instagram: "https://instagram.com/byanymeanstoronto",
+    city: "Oakville",
+    ownerFirst: "Zoran",
   },
 };
 const GTA_ID = "39875f07-0a4b-4429-a201-2249bc1f24df";
 function locFor(clientId) { return LOCATIONS[clientId] || LOCATIONS[GTA_ID]; }
+
+// Resolve GHL-style merge tokens (the ones our imported emails carry) to real values:
+// location tokens from the academy config, contact tokens from `vars` (with friendly
+// fallbacks so a missing name never sends as a raw {{token}}). Tolerates spaces inside
+// the braces. Only touches these known tokens - the shell placeholders (UPPERCASE) are
+// left for the caller to fill.
+function resolveMergeVars(html, L, vars = {}) {
+  const map = {
+    "contact.first_name": vars.first_name || "there",
+    "contact.athletes_full_name": vars.athlete || "your athlete",
+    "contact.athlete_full_name": vars.athlete || "your athlete",
+    "location.city": L.city || "",
+    "location.name": L.full || "",
+    "location_owner.first_name": L.ownerFirst || "",
+  };
+  let out = html;
+  for (const [k, val] of Object.entries(map)) {
+    out = out.replace(new RegExp("\\{\\{\\s*" + k.replace(/\./g, "\\.") + "\\s*\\}\\}", "g"), val);
+  }
+  return out;
+}
 
 // Convert a step's plain-text body into inline-styled HTML on the dark shell. Staff
 // content is trusted (may carry a link or {{merge}} var), so we don't escape - blank
@@ -97,22 +120,32 @@ function bodyToHtml(body) {
   }).join("");
 }
 
-// Render a full branded email: drop the step body into the academy's shell.
+// Render a full branded email: drop the step body into the academy's shell - OR,
+// if the body is already a FULL designed email (a complete HTML document, e.g.
+// exported from Claude Design), send it AS-IS and only fill its placeholders (it
+// has its own frame; wrapping it again would double the header/footer).
 //   renderEmail({ clientId, subject, body, preheader?, unsubscribeUrl? }) -> html
-export function renderEmail({ clientId, subject, body, preheader, unsubscribeUrl } = {}) {
+export function renderEmail({ clientId, subject, body, preheader, unsubscribeUrl, vars } = {}) {
   const L = locFor(clientId);
   const pre = String(preheader || subject || "").replace(/[<>]/g, "").slice(0, 140);
   const unsub = unsubscribeUrl || `mailto:${L.email}?subject=Unsubscribe`;
-  return FRAME
-    .replace(/\{\{CONTENT\}\}/g, bodyToHtml(body))
-    .replace(/\{\{PREHEADER\}\}/g, pre)
-    .replace(/\{\{WORDMARK_SUFFIX\}\}/g, L.suffix)
-    .replace(/\{\{LOCATION_TAG\}\}/g, L.locationTag)
-    .replace(/\{\{TAGLINE\}\}/g, L.tagline)
-    .replace(/\{\{SITE_URL\}\}/g, L.siteUrl)
-    .replace(/\{\{SITE_LABEL\}\}/g, L.siteLabel)
-    .replace(/\{\{SUPPORT_EMAIL\}\}/g, L.email)
-    .replace(/\{\{INSTAGRAM_URL\}\}/g, L.instagram)
-    .replace(/\{\{ACADEMY_FULL\}\}/g, L.full)
-    .replace(/\{\{UNSUBSCRIBE\}\}/g, unsub);
+  const raw = String(body || "");
+  let html;
+  if (/^\s*<(?:!doctype|html)/i.test(raw)) {
+    html = raw.replace(/\{\{UNSUBSCRIBE\}\}/g, unsub).replace(/\{\{PREHEADER\}\}/g, pre);
+  } else {
+    html = FRAME
+      .replace(/\{\{CONTENT\}\}/g, bodyToHtml(body))
+      .replace(/\{\{PREHEADER\}\}/g, pre)
+      .replace(/\{\{WORDMARK_SUFFIX\}\}/g, L.suffix)
+      .replace(/\{\{LOCATION_TAG\}\}/g, L.locationTag)
+      .replace(/\{\{TAGLINE\}\}/g, L.tagline)
+      .replace(/\{\{SITE_URL\}\}/g, L.siteUrl)
+      .replace(/\{\{SITE_LABEL\}\}/g, L.siteLabel)
+      .replace(/\{\{SUPPORT_EMAIL\}\}/g, L.email)
+      .replace(/\{\{INSTAGRAM_URL\}\}/g, L.instagram)
+      .replace(/\{\{ACADEMY_FULL\}\}/g, L.full)
+      .replace(/\{\{UNSUBSCRIBE\}\}/g, unsub);
+  }
+  return resolveMergeVars(html, L, vars);
 }
