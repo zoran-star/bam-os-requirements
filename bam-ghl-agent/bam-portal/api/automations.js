@@ -15,6 +15,7 @@ import { withSentryApiRoute } from "./_sentry.js";
 import { pickGhlToken, ghl } from "./ghl/_core.js";
 import { nurtureStage } from "./agent/_stage.js";
 import { sendOn } from "./_send.js";
+import { renderEmail } from "./email-shells.js";
 import { withinQuietHours, nextSendableTime } from "./agent/_quiet.js";
 import { resolveAgentActor } from "./agent/_auth.js";
 
@@ -307,6 +308,19 @@ async function handler(req, res) {
       const out = [];
       for (const a of autos) out.push({ ...a, steps: await loadSteps(a.id) });
       return res.status(200).json({ automations: out });
+    }
+
+    // Render an email step to full HTML for the in-portal preview modal. Uses the
+    // SAME renderEmail the sender uses (template:<key> refs resolved, brand frame,
+    // GHL merge tokens) so the preview matches the real send. Sample contact tokens.
+    if (b.action === "preview-email") {
+      const html = renderEmail({
+        clientId,
+        subject: b.subject || "",
+        body: b.body || "",
+        vars: { first_name: "Alex", athlete: "Jordan" },
+      });
+      return res.status(200).json({ html, subject: b.subject || "" });
     }
 
     if (b.action === "upsert-automation") {
