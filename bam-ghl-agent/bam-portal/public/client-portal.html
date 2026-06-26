@@ -15829,6 +15829,11 @@ const _TA = { tab: 'test', target: 'booking', chat: [], sending: false, openSect
 // and the one-way AUTOMATIONS (the step-builder). The picker at the top selects one.
 const _TA_AGENTS = { booking: '📞 Booking', confirm: '✅ Confirm', closing: '🎯 Closing' };
 const _TA_AUTOS  = { ghosted: '👻 Ghosted', nurture: '💔 Lead Nurture' };
+// What each automation is FOR and HOW a lead gets pulled into it (shown as the blurb).
+const _TA_AUTO_ABOUT = {
+  ghosted: `<b>👻 Ghosted</b> wins back leads who go quiet. When a lead stops replying, your agent drops them in here for a short burst of texts and emails to restart the conversation. Reply and they bounce straight back to the booking agent; silent all the way through and they roll into Lead Nurture.`,
+  nurture: `<b>💔 Lead Nurture</b> is the slow-burn long game. Any lead that's lost but still a fit - across booking, confirm and closing - plus anyone who finishes the Ghosted sequence lands here for the occasional text or email that keeps your academy top of mind. The moment they reply, they bounce back to the booking agent with context.`,
+};
 const _taIsAgent = () => !!_TA_AGENTS[_TA.target];
 function _taPick(k) { _TA.target = k; _TA.tab = 'test'; _TA.chat = []; openTrainAgentView(); }
 // Buttons here can't use .btn-primary-bb (that class is scoped to #view-blueprint).
@@ -15864,7 +15869,7 @@ function openTrainAgentView() {
   const targetName = (isAgent ? _TA_AGENTS[_TA.target] : _TA_AUTOS[_TA.target]).replace(/^\S+\s/, '');
   const blurb = isAgent
     ? `Coach your academy's <b>${targetName} agent</b>. Test it, teach it Lessons, and keep its facts current in Knowledge - changes apply to <b>your academy</b> right away.`
-    : `Edit your academy's <b>${targetName}</b> sequence - the timed text/email steps. Approve it once and flip it on.`;
+    : (_TA_AUTO_ABOUT[_TA.target] || `Edit your academy's <b>${targetName}</b> sequence.`);
   host.innerHTML = `
     <div style="display:flex;gap:7px;margin-bottom:14px;flex-wrap:wrap;align-items:center">
       <span style="font-size:11px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:var(--text-mute);margin-right:2px">Train</span>
@@ -16010,7 +16015,7 @@ async function _taRenderAutomations() {
   // Live counts (read-only observability) - best-effort; the editor still works if it fails.
   try { const ov = await _autoApi('overview'); _AUTO.overview = ov.overview || []; } catch (_) { _AUTO.overview = []; }
   p.innerHTML = `
-    <p style="color:var(--text-mute);font-size:12.5px;margin:0 0 14px;line-height:1.55;max-width:660px">Build your one-way nudge sequences - each step is a <b style="color:var(--text)">wait</b>, then a <b style="color:var(--text)">text or email</b>. Approve the sequence once and flip it on; the engine sends each step on schedule (quiet hours respected). Merge tags: <code>{{name}}</code> / <code>{{athlete}}</code>. Empty? Paste your texts + emails in the import session to auto-fill these.</p>
+    <p style="color:var(--text-mute);font-size:12.5px;margin:0 0 14px;line-height:1.55;max-width:660px">Each step is a <b style="color:var(--text)">wait</b>, then a <b style="color:var(--text)">text or email</b>. Build the sequence, approve it once and flip it on - the engine then sends each step on schedule (quiet hours respected). Merge tags: <code>{{name}}</code> / <code>{{athlete}}</code>. Empty? Paste your texts + emails in the import session to auto-fill these.</p>
     ${shown.map(_autoCardHtml).join('') || '<div style="color:var(--text-mute)">No automations.</div>'}`;
 }
 
