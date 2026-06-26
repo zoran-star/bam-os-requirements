@@ -129,7 +129,7 @@ From a team call with Cam. Goal: each marketing ticket is a complete brief + rea
 
 **Priority** — stored on `marketing_tickets.fields.priority` = `high` | `normal` (jsonb, no schema change; absent → normal).
 - Client sets it via an **"⚡ Mark as urgent"** checkbox on the new-campaign wizard's final step → rides in content-ticket `context.priority` → copied into `mktFields.priority` on send-to-marketing handoff.
-- SLA turnaround: **High = 3 business days, Normal = 5** (`PRIORITY_META`/`deadlineInfo`/`bizDaysUntil` in `MarketingView.jsx`). Staff view shows a priority chip + auto "Due in N biz days / Overdue", a red left-border on urgent rows, and a **"Priority (urgent first)"** sort (now the default).
+- SLA turnaround: **High = 3 business days, Normal = 5** (`PRIORITY_META`/`deadlineInfo`/`bizDaysUntil` in `MarketingView.jsx`). Staff view shows a priority chip + auto "Due in N biz days / Overdue", a red left-border on urgent rows, and a **"Priority (urgent first)"** sort (now the default). **(SUPERSEDED 2026-06-26 — see bottom section: SLA is now 3 biz days for ALL marketing tickets, default sort = soonest-due.)**
 
 **Assigned SM** — `marketing_tickets.assigned_to` (uuid → staff). Auto-set to the client's `scaling_manager_id` on every new marketing ticket (both direct create + content handoff). `enrichWithClient` resolves it → `assigned_to_name`; the staff detail's **Client card** shows "Assigned SM". Decision: SM = the client's assigned manager.
 
@@ -231,6 +231,29 @@ Because per-person DMs are blocked (im:write missing, above), team notifications
 
 - Live: `https://portal.byanymeansbusiness.com/cam-marketing-guide.html` (from `bam-portal/public/cam-marketing-guide.html`). Has a 6-screen fake-data walkthrough. Roles in it: **content team = Cam (uploads/sends) → Ximena = marketing (posts on Meta)**.
 - OPEN TODO: Zoran flagged the guide's "Start to finish" flow as "wrong" but didn't say what; unresolved. Best guess: drop the "build the ad" box.
+
+## Ads-content approval gate + budget confirmation + 3-day SLA (2026-06-26)
+
+Three shipped together (PRs #812, #813, #814).
+
+**Ads-content approval gate** (per academy, default OFF):
+- Schema: `clients.ads_content_approval_required boolean default false` (migration `20260626120000_ads_content_approval.sql`). Also added to the `update_client_basics` RPC whitelist so the **client** can self-toggle it.
+- Toggles: staff = the new **Content tab** (`ContentTab` in `ClientsCombinedView.jsx`, split out of MarketingTab same session); client = **Brand section of the business blueprint** (`_bbRenderBrandCard` → `_bbToggleAdsApproval`).
+- Behavior: when ON, a finished **ads** content ticket is **"Send for client review"** (like organic) instead of straight to marketing — `ContentView` flips the send button via `ticket.client.ads_content_approval_required` (exposed through `enrichWithClient` select). Client **Approve auto-spawns the marketing ticket** (`spawnOrUpdateMarketingFromContent` helper, factored out of `send-to-marketing`); **Request changes** reopens it.
+- New action state: `content_tickets.client_action_status = 'review-requested'` distinguishes a content review (approve/reject UI) from a plain question (`'requested'`, respond UI). Client GET filter widened to `in.(requested,review-requested)`. `send-for-review` sets it (both channels); organic unaffected since its render keys off `status==='client-dependent'`.
+- Client portal: ads review tickets show **Approve / Request changes** in `openContentTicketDetail` (`_adsContentApprove`/`_adsContentRequestChanges`); list pill = "Review content".
+
+**Confirm budgets** (one-off, staff-triggered):
+- New marketing type **`budget-review`**. Staff button **"Request budget confirmation"** on the client Marketing tab (`MarketingTab.requestBudgetConfirmation` → POST `/api/marketing-tickets` `{type:'budget-review', client_id}`, staff-only path in the POST handler). Creates the ticket already `client_action_status='requested'` + fires client Slack/push.
+- Client: `fetchAndRenderMarketingRequests` auto-pops `_openBudgetReviewModal` on next load (guarded by `_budgetReviewShownId`). Modal lists live Meta campaigns (`/api/meta/campaigns`) + monthly spend, editable, **min $600/mo**. Each changed campaign → its own `budget` ticket; **"These look good"** = no changes. Both resolve via marketing `respond`, which **auto-completes** a `budget-review` ticket so it doesn't linger. Plus a "Go to Marketing page" link (`switchView('marketing', …)`).
+
+**Marketing SLA = 3 biz days for ALL tickets** (`MARKETING_SLA_DAYS=3`; high+normal both 3). New default sort **"Soonest due (overdue first)"**; overdue in-progress rows flagged red (left border + tint).
+
+**Other portal polish same session:** upload overlay now counts "Uploading X of N files" (`_uploadProgress` in client-portal); removed stray "THIS MONTH" label on active campaign cards.
+
+## Marketing/content ticket flow reference (sendable)
+
+Live: `https://portal.byanymeansbusiness.com/marketing-content-ticket-flow.html` (`bam-portal/public/marketing-content-ticket-flow.html`, PR #810). Full visual map of both ticket tables, all entry points, every staff+client button, Request-Client-Action loop, content→marketing handoff, notifications. Built for Cam.
 
 ## Test data
 
