@@ -16169,6 +16169,14 @@ function _autoCardHtml(a) {
     : `<div style="color:var(--text-mute);font-size:12.5px;padding:11px 13px;border:1px dashed var(--border);border-radius:8px">No steps yet - add one, or paste your texts/emails in the import session to auto-fill this.</div>`;
   const seg = (on) => `background:${on ? 'var(--gold)' : 'transparent'};color:${on ? '#0B0B0D' : 'var(--text-sub)'};border:1px solid ${on ? 'var(--gold)' : 'var(--border)'};border-radius:8px;padding:5px 12px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit`;
   const statusLine = a.enabled && a.approved ? '🟢 Live - sending on schedule.' : (a.enabled && !a.approved ? '⚠ Approve the sequence too before it sends.' : 'Not sending yet.');
+  // Ghosted hands a still-silent lead off to Lead Nurture when the sequence ends.
+  // This is automatic (no step) - show it so the end of the sequence is clear.
+  const endNote = (a.automation_key === 'ghosted' && steps.length)
+    ? `<div style="display:flex;align-items:center;gap:9px;margin-top:8px;padding:11px 13px;border:1px dashed var(--border);border-radius:9px;background:var(--surface)">
+         <span style="font-size:15px">⤵</span>
+         <div style="font-size:12.5px;color:var(--text-sub);line-height:1.45">When the sequence ends and the lead still hasn't replied, they roll into <b style="color:var(--text)">💔 Lead Nurture</b> automatically.</div>
+       </div>`
+    : '';
   return `
   <div style="border:1px solid var(--border);border-radius:12px;padding:14px 16px;margin-bottom:14px">
     <div style="display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin-bottom:4px">
@@ -16180,6 +16188,7 @@ function _autoCardHtml(a) {
     <div style="font-size:11.5px;color:var(--text-mute);margin-bottom:12px">${statusLine}</div>
     ${_autoCountsStrip(a)}
     ${stepsHtml}
+    ${endNote}
     <button onclick="_autoAddStep('${a.id}')" style="margin-top:10px;background:transparent;border:1px dashed var(--border);color:var(--text-sub);border-radius:8px;padding:8px 14px;font-size:12.5px;font-weight:600;cursor:pointer">+ add step</button>
   </div>`;
 }
