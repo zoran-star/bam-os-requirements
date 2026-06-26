@@ -3,7 +3,7 @@
 **For agents:** before making schema changes (new tables, columns, RLS, functions, drops/renames),
 diff your plan against the lists below. If anything overlaps → **stop and tell Zoran to message Luka.**
 
-Owner: Luka (fc-mobile parent app backend). Last updated: 2026-06-25.
+Owner: Luka (fc-mobile parent app backend). Last updated: 2026-06-26.
 Full context: [`fc-mobile/docs/parent-app-architecture-plan.md`](../../../fc-mobile/docs/parent-app-architecture-plan.md)
 and [`fc-mobile/docs/parent-app-decisions-log.md`](../../../fc-mobile/docs/parent-app-decisions-log.md).
 
@@ -18,8 +18,8 @@ and [`fc-mobile/docs/parent-app-decisions-log.md`](../../../fc-mobile/docs/paren
 | Applied (identity) | `customer_profiles` · `students` · `academy_memberships` · `member_links` |
 | Applied (schedule read model) | `slot_templates` · `schedule_slots` · `reservations` · `waitlist_entries` |
 | Applied (commerce/credits runtime) | `offer_options` · `offer_prices` · `entitlement_templates` · `customer_entitlements` · `credit_ledger` |
-| Planned (access spine before booking) | `bookable_programs`; `bookable_program_id` columns on `offer_options`, `entitlement_templates`, `slot_templates`, and `schedule_slots` |
-| Planned (booking writes) | booking/waitlist/cancel RPCs |
+| Applied (access spine before booking) | `bookable_programs`; `bookable_program_id` columns on `entitlement_templates`, `customer_entitlements`, `slot_templates`, and `schedule_slots` via `20260626030258_parent_0004_bookable_programs_access_spine.sql` |
+| Implemented locally only (booking writes) | booking/waitlist/cancel/leave-waitlist RPCs via `20260626034238_parent_0005_booking_write_rpcs.sql`; Vercel/mobile wiring exists locally but is not approved for prod push |
 | Not in v1 unless explicitly revived | `subscriptions` |
 | Planned (later) | `membership_change_requests` · parent messaging/notification tables (names TBD) |
 
@@ -29,7 +29,10 @@ parent API/view/projection name, not as the phase-one source table. `membership_
 is a superseded reserved name; do not create it unless Luka explicitly revives it.
 
 All table names above: deny-all RLS (no policies, service-role only). Don't add policies to them.
-Booking/waitlist/cancel RPCs are also Luka-owned; coordinate before adding or changing them.
+Booking/waitlist/cancel/leave-waitlist RPCs are also Luka-owned; coordinate before
+adding or changing them. The current `0005` booking-write migration is a local
+implementation slice only. Do not apply, replace, or reshape it in production
+without Luka review.
 
 ---
 
@@ -97,11 +100,29 @@ Current implementation direction: do not change `offers`, `offer_teams`, or
 `pricing_catalog` to get parent V1 running. Actual access is stored in
 `customer_entitlements`; credit balances are derived from `credit_ledger`.
 
-Next agreed parent schema slice: add `bookable_programs` as the thin access target
-for things like BAM GTA Training, Summer Camp 2026, or a future tournament. Offers
-and entitlements will point to a program, and schedule templates/slots will point to
-the same program. This is the booking eligibility spine; do not build a competing
-program/event/access table without syncing with Luka.
+Applied parent schema slice: `20260626030258_parent_0004_bookable_programs_access_spine.sql`
+adds `bookable_programs` as the thin access target for things like BAM GTA Training,
+Summer Camp 2026, or a future tournament. Entitlement templates/customer entitlements
+and schedule templates/slots point to the same program. This is the booking
+eligibility spine; do not build a competing program/event/access table without
+syncing with Luka. `offer_options.bookable_program_id` is deliberately deferred; shop
+or listing views can derive the program through `offer_prices -> entitlement_templates`
+until there is a concrete need for a direct grouping FK.
+
+Current local-only booking slice: `20260626034238_parent_0005_booking_write_rpcs.sql`
+adds service-role-only booking, waitlist join/leave, and cancel/refund RPCs plus
+Vercel/mobile wiring. It has local reset/API/type/lint/simulator proof, including a
+dedicated full-slot seed for waitlist testing, but it is not approved for production
+push yet. Opus review follow-ups now implemented locally: visible mobile
+booking/waitlist/cancel errors, per-child partial-result handling, student-id
+ownership validation, slot-first cancel locking, and defensive capacity guarding.
+Waitlist promotion on cancellation is also implemented locally: it promotes the
+first currently eligible `WAITING` row by line order and leaves skipped ineligible
+rows in place so they keep priority after a later top-up. Final local polish on
+2026-06-26 added sanitized parent API error responses with raw backend detail logged
+server-side, fixed cancel-success copy for unlimited memberships, and passed a clean
+reset plus rollback-only waitlist-promotion smoke. Still do not push/apply `0005` to
+production until Luka explicitly approves it.
 
 MVP simplification rules:
 - No `entitlement_template_program_grants` or `customer_entitlement_program_grants`
@@ -109,7 +130,8 @@ MVP simplification rules:
 - No `training_programs`, `camp_programs`, or `tournament_programs` subtype tables
   until those verticals need real type-specific fields.
 - Classes remain `schedule_slots`-first; shop/offers pages can query
-  `offer_options` + `bookable_programs` + price summaries.
+  `offer_options` + `offer_prices` + `entitlement_templates` + `bookable_programs`
+  when they need program grouping.
 
 Long-term ideal: operational pricing should graduate from JSON into typed Offer runtime
 tables such as `offer_options`, `offer_prices`, and `entitlement_templates`, while flexible

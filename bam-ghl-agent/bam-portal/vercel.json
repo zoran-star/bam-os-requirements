@@ -166,8 +166,24 @@
       "destination": "/api/clients?action=invite-staff"
     },
     {
+      "source": "/api/parent/schedule/slots/([^/]+)/book",
+      "destination": "/api/parent/schedule/slot-action?slot_id=$1&action=book"
+    },
+    {
+      "source": "/api/parent/schedule/slots/([^/]+)/waitlist",
+      "destination": "/api/parent/schedule/slot-action?slot_id=$1&action=waitlist"
+    },
+    {
       "source": "/api/parent/schedule/slots/(.*)",
       "destination": "/api/parent/schedule/slot?slot_id=$1"
+    },
+    {
+      "source": "/api/parent/reservations/([^/]+)",
+      "destination": "/api/parent/reservation?reservation_id=$1"
+    },
+    {
+      "source": "/api/parent/waitlist-entries/([^/]+)",
+      "destination": "/api/parent/waitlist-entry?waitlist_id=$1"
     },
     {
       "source": "/api/parent/students/(.*)/entitlements",

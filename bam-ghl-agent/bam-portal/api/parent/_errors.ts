@@ -14,11 +14,25 @@ export class HttpError extends Error {
 
 export function sendError(res: ParentApiResponse, error: unknown) {
   if (error instanceof HttpError) {
-    const body: { error: string; detail?: unknown } = { error: error.message };
-    if (error.detail !== undefined) body.detail = error.detail;
-    return res.status(error.status).json(body);
+    if (error.status >= 500 || error.detail !== undefined) {
+      console.error("[parent-api]", {
+        detail: error.detail,
+        message: error.message,
+        status: error.status,
+      });
+    }
+
+    return res.status(error.status).json({ error: getPublicErrorMessage(error) });
   }
 
   console.error("[parent-api]", error);
-  return res.status(500).json({ error: "internal error" });
+  return res.status(500).json({ error: "Something went wrong. Please try again." });
+}
+
+function getPublicErrorMessage(error: HttpError): string {
+  if (error.status >= 500) {
+    return "Something went wrong. Please try again.";
+  }
+
+  return error.message;
 }
