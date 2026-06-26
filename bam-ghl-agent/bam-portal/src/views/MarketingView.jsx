@@ -7,6 +7,7 @@ const TYPE_META = {
   remove:            { icon: "🗑",  label: "Remove creative" },
   budget:            { icon: "💰", label: "Budget change" },
   "campaign-create": { icon: "🚀", label: "New campaign" },
+  "budget-review":   { icon: "📋", label: "Budget confirmation" },
 };
 
 const STATUS_META = {

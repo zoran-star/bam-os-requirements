@@ -20953,6 +20953,7 @@ const MARKETING_REQUEST_META = {
   remove:                     { icon: '🗑',  label: 'Remove creative'              },
   budget:                     { icon: '💰', label: 'Budget change'                },
   'campaign-create':          { icon: '🚀', label: 'New campaign'                 },
+  'budget-review':            { icon: '📋', label: 'Confirm your budgets'         },
   'content-action-needed':    { icon: '⏰', label: 'Content team needs your input' },
   'content-in-production':    { icon: '🎨', label: 'In production'                },
 };
@@ -30621,6 +30622,14 @@ async function fetchAndRenderMarketingRequests() {
       return new Date(b.submittedDate || 0) - new Date(a.submittedDate || 0);
     });
     renderMarketingRequests();
+    // Auto-pop the budget confirmation modal when staff have requested it.
+    // Re-pops on each fresh portal load until the client confirms.
+    const pendingBudgetReview = MARKETING_REQUESTS.find(r =>
+      r.type === 'budget-review' && r.clientActionStatus === 'requested');
+    if (pendingBudgetReview && _budgetReviewShownId !== pendingBudgetReview.id) {
+      _budgetReviewShownId = pendingBudgetReview.id;
+      _openBudgetReviewModal(pendingBudgetReview.id);
+    }
   } catch (e) {
     console.error('Failed to fetch tickets:', e.message);
   }
@@ -30628,6 +30637,130 @@ async function fetchAndRenderMarketingRequests() {
   _renderMarketingCampaigns();
   // Independently load the auto Ad Performance report (monthly KPIs).
   _loadAdReport();
+}
+
+// ── Budget confirmation modal ─────────────────────────────────────────────
+// Pops when staff send a "confirm your monthly budgets" request. Lists the
+// client's live campaigns + monthly spends; changing any submits a budget
+// ticket. Confirming resolves the budget-review request.
+let _budgetReviewShownId = null;
+
+async function _openBudgetReviewModal(reviewId) {
+  _closeBudgetReviewModal();
+  const host = document.createElement('div');
+  host.id = 'budgetReviewModal';
+  host.style.cssText = 'position:fixed;inset:0;z-index:10000;background:rgba(8,8,10,.72);backdrop-filter:blur(6px);display:flex;align-items:center;justify-content:center;padding:20px';
+  host.innerHTML = `<div style="width:100%;max-width:520px;max-height:88vh;overflow:auto;background:var(--surface,#141416);border:1px solid var(--line-str,#34343A);border-radius:14px;padding:26px">
+    <div style="font-family:var(--mono);font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:var(--text-mute);margin-bottom:8px">Monthly check-in</div>
+    <div style="font-size:20px;font-weight:700;color:var(--text);margin-bottom:6px">Confirm your monthly budgets</div>
+    <div style="font-size:13px;color:var(--text-sub);line-height:1.5;margin-bottom:18px">Review what each campaign spends per month. Change any you'd like and we'll send the update to your marketing team. Minimum $600/mo per campaign.</div>
+    <div id="budgetReviewBody"><div style="padding:24px 0;text-align:center;color:var(--text-mute);font-size:13px">Loading your campaigns…</div></div>
+  </div>`;
+  document.body.appendChild(host);
+  try {
+    const token = await _mreqAuthToken();
+    const res = await fetch('/api/meta/campaigns?client_id=' + encodeURIComponent(CLIENT_ID), { headers: { Authorization: 'Bearer ' + token } });
+    const json = await _safeJson(res);
+    const campaigns = (res.ok && Array.isArray(json.campaigns)) ? json.campaigns : [];
+    _renderBudgetReviewBody(reviewId, campaigns);
+  } catch (e) {
+    _renderBudgetReviewBody(reviewId, []);
+  }
+}
+
+function _budgetParse(disp) {
+  const n = parseFloat(String(disp || '').replace(/[^0-9.]/g, ''));
+  return Number.isFinite(n) ? n : null;
+}
+
+function _renderBudgetReviewBody(reviewId, campaigns) {
+  const body = document.getElementById('budgetReviewBody');
+  if (!body) return;
+  const MIN = 600;
+  const rows = campaigns.map((c, i) => {
+    const cur = _budgetParse(c.budget_display);
+    const def = cur != null ? Math.max(cur, MIN) : MIN;
+    return `<div style="border:1px solid var(--line);border-radius:9px;padding:12px 14px;margin-bottom:10px">
+      <div style="font-weight:600;font-size:13.5px;color:var(--text);margin-bottom:8px">${escapeHTML(c.name || 'Campaign')}</div>
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+        <span style="font-size:12px;color:var(--text-mute)">Monthly spend</span>
+        <span style="font-family:var(--mono);font-size:13px;color:var(--text-mute)">$</span>
+        <input id="br-input-${i}" type="number" min="${MIN}" step="50" value="${def}" data-name="${escapeHTML(c.name || '')}" data-cur="${cur != null ? cur : ''}"
+          style="width:120px;padding:8px 10px;font-size:13px;background:var(--surface-el);color:var(--text);border:1px solid var(--line);border-radius:6px" />
+        <span style="font-size:11px;color:var(--text-mute)">/ mo</span>
+      </div>
+    </div>`;
+  }).join('');
+  const noCampaigns = !campaigns.length
+    ? `<div style="padding:14px 0;color:var(--text-mute);font-size:13px">We couldn't load your live campaigns right now. You can still confirm, or head to the Marketing page.</div>`
+    : '';
+  body.innerHTML = `
+    ${noCampaigns}${rows}
+    <div id="br-error" style="color:var(--red,#F87171);font-size:12px;margin:4px 0 0;display:none"></div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:18px">
+      <button onclick="_budgetReviewSubmit('${reviewId}', true)" style="flex:1;min-width:130px;padding:11px 16px;background:transparent;border:1px solid var(--line-str);color:var(--text-sub);border-radius:8px;font-size:13px;font-weight:600;cursor:pointer">These look good</button>
+      <button onclick="_budgetReviewSubmit('${reviewId}', false)" style="flex:1;min-width:130px;padding:11px 16px;background:var(--gold,#E8C547);border:none;color:#0B0B0D;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer">Submit changes</button>
+    </div>
+    <button onclick="_budgetReviewGoToMarketing()" style="width:100%;margin-top:10px;padding:9px;background:transparent;border:none;color:var(--text-mute);font-size:12px;cursor:pointer;text-decoration:underline">Want to do more with your campaigns? Go to the Marketing page</button>
+  `;
+}
+
+async function _budgetReviewSubmit(reviewId, lookGood) {
+  const MIN = 600;
+  const inputs = Array.from(document.querySelectorAll('#budgetReviewBody input[id^="br-input-"]'));
+  const errEl = document.getElementById('br-error');
+  const changes = [];
+  for (const inp of inputs) {
+    const val = parseFloat(inp.value);
+    if (!Number.isFinite(val) || val < MIN) {
+      if (errEl) { errEl.textContent = `Each campaign needs a budget of at least $${MIN}/mo.`; errEl.style.display = 'block'; }
+      return;
+    }
+    const cur = inp.dataset.cur === '' ? null : parseFloat(inp.dataset.cur);
+    if (!lookGood && (cur == null || Math.round(val) !== Math.round(cur))) {
+      changes.push({ name: inp.dataset.name, cur, next: Math.round(val) });
+    }
+  }
+  try {
+    for (const ch of changes) {
+      await _mreqCreateTicket({
+        type: 'budget',
+        fields: {
+          campaign_title: ch.name,
+          current_spend: ch.cur != null ? '$' + ch.cur : '',
+          new_spend: '$' + ch.next,
+          note: 'Submitted from the monthly budget confirmation.',
+        },
+      });
+    }
+    await _mreqPatchTicket(reviewId, {
+      action: 'respond',
+      message: changes.length
+        ? `Confirmed monthly budgets - requested ${changes.length} change${changes.length === 1 ? '' : 's'}.`
+        : 'Confirmed monthly budgets - no changes.',
+    });
+    _closeBudgetReviewModal();
+    await fetchAndRenderMarketingRequests();
+    showConfirmation(
+      changes.length ? 'Budget changes submitted' : 'Budgets confirmed',
+      changes.length
+        ? `We sent ${changes.length} budget change${changes.length === 1 ? '' : 's'} to your marketing team.`
+        : 'Thanks for confirming - no changes made.'
+    );
+  } catch (e) {
+    if (errEl) { errEl.textContent = 'Something went wrong: ' + e.message; errEl.style.display = 'block'; }
+  }
+}
+
+function _budgetReviewGoToMarketing() {
+  _closeBudgetReviewModal();
+  const el = document.getElementById('nav-marketing-flat') || document.getElementById('nav-marketing-sub');
+  if (typeof switchView === 'function') switchView('marketing', el);
+}
+
+function _closeBudgetReviewModal() {
+  const host = document.getElementById('budgetReviewModal');
+  if (host) host.remove();
 }
 
 // Sample campaign data shown when the client has no real campaigns wired -
@@ -31379,7 +31512,9 @@ function _mreqRowHTML(r) {
 
   // All content-ticket rows open the unified content-ticket detail view.
   // Marketing-ticket rows open the existing marketing detail view.
-  const onClickAttr = (isContentAction || isContentProduction)
+  const onClickAttr = r.type === 'budget-review'
+    ? `_openBudgetReviewModal('${r.id}')`
+    : (isContentAction || isContentProduction)
     ? `openContentTicketDetail('${r.id}')`
     : `openMarketingRequest('${r.id}')`;
 
