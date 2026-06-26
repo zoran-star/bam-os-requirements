@@ -69,13 +69,17 @@ async function loadClient(clientId) {
 
 // The confirm agent uses the same per-academy SECTION overrides (agent_prompt_sections,
 // keyed by section_key — confirm_* keys apply, booking keys are ignored by the confirm
-// assembly) but NOT the booking agent's lessons/examples (those are booking-flavored
-// and would bleed the wrong behavior into a confirmation chat).
+// assembly) PLUS the confirm agent's OWN lessons (agent='confirm') - never the
+// booking agent's lessons/examples (those are booking-flavored and would bleed the
+// wrong behavior into a confirmation chat).
 async function loadConfig(clientId) {
-  const ovRows = await sb(`agent_prompt_sections?client_id=eq.${clientId}&select=section_key,body`).catch(() => []);
+  const [ovRows, lessonRows] = await Promise.all([
+    sb(`agent_prompt_sections?client_id=eq.${clientId}&select=section_key,body`).catch(() => []),
+    sb(`agent_lessons?client_id=eq.${clientId}&agent=eq.confirm&active=eq.true&select=lesson,kind&order=created_at.asc`).catch(() => []),
+  ]);
   const overrides = {};
   for (const r of (Array.isArray(ovRows) ? ovRows : [])) overrides[r.section_key] = r.body;
-  return { lessons: [], overrides, examples: [] };
+  return { lessons: Array.isArray(lessonRows) ? lessonRows : [], overrides, examples: [] };
 }
 
 const CONFIRM_TRAILER =

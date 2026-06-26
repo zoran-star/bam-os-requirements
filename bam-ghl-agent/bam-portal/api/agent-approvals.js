@@ -67,7 +67,7 @@ async function loadClient(clientId) {
 // ── agent config (same brain as the sandbox) ──
 async function loadConfig(clientId) {
   const [lessons, ovRows, exRows] = await Promise.all([
-    sb(`agent_lessons?client_id=eq.${clientId}&active=eq.true&select=lesson,kind&order=created_at.asc`).catch(() => []),
+    sb(`agent_lessons?client_id=eq.${clientId}&agent=eq.booking&active=eq.true&select=lesson,kind&order=created_at.asc`).catch(() => []),
     sb(`agent_prompt_sections?client_id=eq.${clientId}&select=section_key,body`).catch(() => []),
     sb(`agent_examples?client_id=eq.${clientId}&select=parent_text,agent_text&order=created_at.asc`).catch(() => []),
   ]);

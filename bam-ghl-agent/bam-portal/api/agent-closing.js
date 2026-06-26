@@ -62,13 +62,17 @@ async function loadClient(clientId) {
 
 // The closing agent uses the same per-academy SECTION overrides (agent_prompt_sections,
 // keyed by section_key — closing_* keys apply, other agents' keys are ignored by the
-// closing assembly) but NOT the booking agent's lessons/examples (those are booking-
-// flavored and would bleed the wrong behavior into a conversion chat).
+// closing assembly) PLUS the closing agent's OWN lessons (agent='closing') - never the
+// booking agent's lessons/examples (those would bleed the wrong behavior into a
+// conversion chat).
 async function loadConfig(clientId) {
-  const ovRows = await sb(`agent_prompt_sections?client_id=eq.${clientId}&select=section_key,body`).catch(() => []);
+  const [ovRows, lessonRows] = await Promise.all([
+    sb(`agent_prompt_sections?client_id=eq.${clientId}&select=section_key,body`).catch(() => []),
+    sb(`agent_lessons?client_id=eq.${clientId}&agent=eq.closing&active=eq.true&select=lesson,kind&order=created_at.asc`).catch(() => []),
+  ]);
   const overrides = {};
   for (const r of (Array.isArray(ovRows) ? ovRows : [])) overrides[r.section_key] = r.body;
-  return { lessons: [], overrides, examples: [] };
+  return { lessons: Array.isArray(lessonRows) ? lessonRows : [], overrides, examples: [] };
 }
 
 const CLOSING_TRAILER =

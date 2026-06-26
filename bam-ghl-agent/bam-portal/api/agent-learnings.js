@@ -44,7 +44,7 @@ async function handler(req, res) {
   try { ctx = await resolveUser(req); } catch (e) { return res.status(e.status || 401).json({ error: e.message }); }
 
   const b = req.body && typeof req.body === "object" ? req.body : {};
-  const SEL = "id,client_id,lesson,kind,scope,active,created_at,created_by,clients(business_name)";
+  const SEL = "id,client_id,agent,lesson,kind,scope,active,created_at,created_by,clients(business_name)";
 
   try {
     if (b.action === "list") {
