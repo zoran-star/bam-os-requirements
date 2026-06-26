@@ -241,6 +241,21 @@ function _ctkDueDate(submittedIso, priority) {
   const sla = priority === "high" ? 3 : 5;
   return _addBusinessDays(new Date(submittedIso), sla);
 }
+// Marketing SLA — Ximena's turnaround once content lands in marketing:
+// urgent (high) = 2 business days, standard = 4, from the marketing submit date.
+function _mktDueDate(submittedIso, priority) {
+  if (!submittedIso) return null;
+  const sla = priority === "high" ? 2 : 4;
+  return _addBusinessDays(new Date(submittedIso), sla);
+}
+// Short human date for Slack, e.g. "Tue Jun 30". No em dashes, no locale deps.
+const _DOW = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+const _MON = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+function _fmtDue(d) {
+  if (!d) return "";
+  const x = new Date(d);
+  return `${_DOW[x.getDay()]} ${_MON[x.getMonth()]} ${x.getDate()}`;
+}
 // 'overdue' | 'today' | 'tomorrow' | 'later' (calendar-day comparison, local).
 function _dueBucket(due) {
   if (!due) return "later";
@@ -264,12 +279,19 @@ async function contentDeadlinesDigestCron(req, res) {
     return res.status(200).json({ sent: false, reason: "slack_not_configured" });
   }
   try {
-    const tickets = await sb(`content_tickets?status=in.(active,client-dependent)&select=id,channel,context,submitted_at,assigned_to,client_id`) || [];
+    const mktExecSid = await marketingExecutorSlackId();
+    const contentTickets = await sb(`content_tickets?status=in.(active,client-dependent)&select=id,channel,context,submitted_at,assigned_to,client_id`) || [];
+    const mktTickets = await sb(`marketing_tickets?status=eq.in-progress&select=id,fields,submitted_at,assigned_to,client_id`) || [];
     const buckets = { overdue: [], today: [], tomorrow: [] };
-    for (const t of tickets) {
+    for (const t of contentTickets) {
       const pri = (t.context && t.context.priority === "high") ? "high" : "normal";
       const b = _dueBucket(_ctkDueDate(t.submitted_at, pri));
-      if (buckets[b]) buckets[b].push(t);
+      if (buckets[b]) buckets[b].push({ ...t, _kind: "content" });
+    }
+    for (const t of mktTickets) {
+      const pri = (t.fields && t.fields.priority === "high") ? "high" : "normal";
+      const b = _dueBucket(_mktDueDate(t.submitted_at, pri));
+      if (buckets[b]) buckets[b].push({ ...t, _kind: "marketing" });
     }
     const all = [...buckets.overdue, ...buckets.today, ...buckets.tomorrow];
     if (!all.length) return res.status(200).json({ sent: false, reason: "nothing_due" });
@@ -283,6 +305,11 @@ async function contentDeadlinesDigestCron(req, res) {
 
     const line = (t) => {
       const code = String(t.id || "").slice(0, 3).toUpperCase();
+      // Marketing lines ping Ximena (the doer); content lines ping the assignee.
+      if (t._kind === "marketing") {
+        const who = slackMention(mktExecSid);
+        return `• Marketing · ${cName[t.client_id] || "client"} [${code}]${who ? " " + who : ""}`;
+      }
       const chan = t.channel === "organic" ? "Organic" : "Paid ads";
       const who = slackMention(sSlack[t.assigned_to]);
       return `• ${chan} · ${cName[t.client_id] || "client"} [${code}]${who ? " " + who : ""}`;
@@ -1539,8 +1566,13 @@ async function handleContentTickets(req, res) {
       }).catch(() => {});
       postContentMarketingSlack(`✅ *Completed* - Content [${code}]`);
     } else if (action === "send-to-marketing") {
+      // Stamp Ximena's timeline on the ping: urgent = 2 biz days, standard = 4,
+      // from now (the moment it lands in marketing).
+      const mktPri = (ticket.context && ticket.context.priority === "high") ? "high" : "normal";
+      const dueStr = _fmtDue(_mktDueDate(nowIso(), mktPri));
+      const tag = mktPri === "high" ? " ⚡ URGENT" : "";
       marketingExecutorSlackId().then(sid =>
-        postContentMarketingSlack(`➡️ *Sent to marketing* - Content [${code}] is ready to launch.${slackMention(sid) ? " " + slackMention(sid) : ""}`));
+        postContentMarketingSlack(`➡️ *Sent to marketing* - Content [${code}] is ready to launch.${tag}${dueStr ? ` Due ${dueStr}.` : ""}${slackMention(sid) ? " " + slackMention(sid) : ""}`));
     } else if (action === "respond") {
       staffSlackIdById(ticket.assigned_to).then(sid =>
         postContentMarketingSlack(`💬 *Client responded* - Content [${code}]${slackMention(sid) ? " " + slackMention(sid) : ""}`));
