@@ -267,15 +267,28 @@ P4a automation engine + P4b step-builder · P6 triggers · P7a per-lead mute · 
   matching the staff portal. Mode-setting is still BAM-staff-only (server `requireStaff`).
 - DB at ship: only BAM GTA has modes, all three = hawkeye. No behavior change today; the cap is just enforced now.
 
+### ✅ DONE 2026-06-26 (PM): 👻 Ghosted built + name personalization fixed
+- **👻 Ghosted sequence POPULATED** (GTA `ghosted` id `7361fd83-5f60-44b7-b124-9454fd5b3315`, 3 steps, all 1 day
+  apart): #0 SMS check-in (`{{contact.first_name}}` + byanymeanstoronto.ca), #1 SMS "did my msg go through" +
+  free-trial link (`{{contact.fullName}}`), #2 email "Try a session free" (coach/location tokens + hardcoded
+  free-trial URL on its own line → renders as the gold CTA button via `bodyToHtml`). Imported from Zoran's GTA
+  GHL screenshots. **Still enabled=false, approved=false** — Zoran flips On + Approve in the portal himself.
+  Step 4 ("marked Lost → Lead Nurture") is NOT a step: handoff is automatic on ghosted completion (P6), but only
+  fires once **nurture is also enabled** (currently off) + a nurture GHL stage exists.
+- **✅ Name personalization FIXED (PR #833, merged).** GHL does NOT fill merge tokens on raw
+  `/conversations/messages` sends, so SMS tokens were going out literal. Now resolved at send time:
+  `email-shells.js` exports `resolveMergeVars`+`locFor`, token map gained `contact.fullName`/`.full_name`/`.name`
+  + `location.website`; `automations.js resolveContactInfo` returns firstName+fullName, worker passes
+  `vars:{first_name,full_name}` into `sendOn`; `_send.js sendOn` resolves SMS body + email subject + threads vars
+  into `renderEmail`. Benefits nurture too. ⚠️ `athlete` token still not threaded (no athlete on contact fetch).
+
 ### ⬜ TO FINALIZE GTA SALES (next chat)
-1. **👻 Ghosted sequence — NOT BUILT.** The short/aggressive automation (e.g. day 1/3/7). Zoran will paste his
-   GTA Ghosted GHL screenshots → import like nurture (steps into `ghosted` automation, then enable+approve).
-   `ghosted` automation row exists for GTA (enabled=false, approved=false, 0 steps). P6 already routes
-   confirm-ghost → portal ghosted when live.
+1. **👻 Ghosted — built, NOT live.** Zoran reviews the 3 steps in the portal (Train Agent → 👻 Automations) then
+   flips **On + Approve**. To get the auto-handoff into Nurture, also enable Nurture + create the Lead Nurture
+   GHL stage.
 2. **🔑 Resend key (ZORAN'S task):** create a Full-Access (or all-domains) key in Resend that covers
    `byanymeanstoronto.com`, put it in Vercel `RESEND_API_KEY`, redeploy. THEN re-test info@byanymeanstoronto.com.
-   Until then ALL nurture emails fail to send (1-week buffer before the first one).
-3. **Real-name personalization** in automation emails (thread contact first-name/athlete at send time).
+   Until then ALL nurture emails fail to send (1-week buffer before the first one). (Ghosted email = step #2, day 3.)
 4. Deferred polish: **P2.5** post-trial form → unified inbox · **P2b-plus** opp_id threading through checkout ·
    atomic first-come claim on Hawkeye · convo-tab coloured outline · per-stage pipeline glow tied to on/off.
 5. Per-agent **examples** (save-a-perfect-reply) for confirm/closing (currently booking-only).
