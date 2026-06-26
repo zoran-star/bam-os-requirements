@@ -17,6 +17,9 @@ If detail is genuinely needed, **collapse or link to it** instead of pasting inl
 
 When in doubt: **less text + more structure.**
 
+## ⛔ HARD RULE - never use an em dash in person-facing output
+NEVER use an em dash (Unicode U+2014, the long dash) in ANYTHING that reaches a person - emails, SMS, automation messages, UI copy, labels, placeholders, client websites, portals, and AI-agent / chat replies. EVERY repo, always, no exceptions. Use a hyphen ("-") instead, or restructure with a comma or colon. Em dashes read as AI-generated; Zoran does not want them anywhere output goes out.
+
 ## Project memory
 Team-shared project notes live in [`memories/`](memories/). Scan [`memories/MEMORY.md`](memories/MEMORY.md) first (index of one-liners), then open the specific note. See [`memories/README.md`](memories/README.md) for conventions.
 
