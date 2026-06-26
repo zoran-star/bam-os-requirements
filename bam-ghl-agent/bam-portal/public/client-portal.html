@@ -6458,12 +6458,17 @@
           <div class="report-head">
             <div class="readout" style="margin:0">Ad Performance</div>
             <div class="report-controls">
-              <div class="report-seg" role="group" aria-label="Time range">
-                <button type="button" class="report-seg-btn" data-rv="last7" onclick="setReportView('last7')">Last 7 days</button>
-                <button type="button" class="report-seg-btn active" data-rv="this_month" onclick="setReportView('this_month')">This month</button>
-                <button type="button" class="report-seg-btn" data-rv="history" onclick="setReportView('history')">History</button>
+              <div class="report-daterange" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+                <input type="date" id="report-from" onchange="_onReportRangeChange()" aria-label="From date"
+                  style="background:var(--surface-el);border:1px solid var(--line);border-radius:6px;color:var(--text);font-size:12px;padding:6px 8px;color-scheme:dark;font-family:inherit">
+                <span style="color:var(--text-mute);font-size:12px">to</span>
+                <input type="date" id="report-to" onchange="_onReportRangeChange()" aria-label="To date"
+                  style="background:var(--surface-el);border:1px solid var(--line);border-radius:6px;color:var(--text);font-size:12px;padding:6px 8px;color-scheme:dark;font-family:inherit">
+                <label style="display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--text-sub);cursor:pointer;margin-left:4px">
+                  <input type="checkbox" id="report-compare" onchange="_onReportCompareToggle()" style="accent-color:var(--gold);cursor:pointer">
+                  Compare to previous period
+                </label>
               </div>
-              <select id="report-month" class="report-month-select" style="display:none" onchange="_onReportMonthChange()" aria-label="Report month"></select>
             </div>
           </div>
           <div id="ad-report-container">
@@ -30664,8 +30669,8 @@ async function fetchAndRenderMarketingRequests() {
   }
   // Independently render real Meta campaigns (or connect/picker states).
   _renderMarketingCampaigns();
-  // Independently load the auto Ad Performance report (monthly KPIs).
-  _loadAdReport();
+  // Independently load the auto Ad Performance report (date range, default MTD).
+  _loadRangeReport();
 }
 
 // ── Budget confirmation modal ─────────────────────────────────────────────
@@ -31013,9 +31018,13 @@ const DEFAULT_BM = { cpl: 25, ctr_min: 1.5, ctr_max: 2.5, freq_min: 2, freq_max:
 
 let _reportMonthly = null;       // { view:'monthly', periods, goals, benchmarks, demo? }
 let _reportLast7 = null;         // { view:'last7', periods:[..], goals, benchmarks, demo? }
-let _reportView = 'this_month';  // 'last7' | 'this_month' | 'history'
+let _reportRange = null;         // { view:'range', periods:[period], goals, benchmarks }
+let _reportView = 'range';       // 'range' | 'last7' | 'this_month' | 'history'
 let _reportMode = 'simple';      // 'simple' | 'advanced'
 let _reportMonthKey = null;      // selected month key (history)
+let _reportRangeFrom = null;     // 'YYYY-MM-DD' (default = 1st of month)
+let _reportRangeTo = null;       // 'YYYY-MM-DD' (default = today)
+let _reportCompare = false;      // compare to previous equal-length period
 let _insightCache = {};          // cacheKey → insight object
 
 function _fmtNum(n) { return (Number(n) || 0).toLocaleString('en-US'); }
@@ -31160,7 +31169,7 @@ function _recordBadge(c) {
 }
 
 function _periodCompare(period) {
-  if (_reportView === 'last7') {
+  if (_reportView === 'range' || _reportView === 'last7') {
     const m = {}; (period.compareCampaigns || []).forEach(c => { m[c.id] = c; });
     return { totals: period.compareTotals || null, campaigns: m };
   }
@@ -31298,8 +31307,8 @@ function _paintReport(el, period, goals, bm, compare, insight, demo) {
     <div class="winfix-card fix"><div class="wf-l">What to look at</div><div class="wf-t">${escapeHTML(insight.fix || '')}</div></div>
   </div>`;
 
-  const deltaSuffix = _reportView === 'last7' ? 'vs prev 7d' : _reportView === 'this_month' ? 'vs last month' : 'vs prior month';
-  const ctx = { goals, bm, compare, deltaSuffix, showSpark: _reportView !== 'last7', insightNote: '' };
+  const deltaSuffix = _reportView === 'range' ? 'vs previous period' : _reportView === 'last7' ? 'vs prev 7d' : _reportView === 'this_month' ? 'vs last month' : 'vs prior month';
+  const ctx = { goals, bm, compare, deltaSuffix, showSpark: _reportView !== 'last7' && _reportView !== 'range', insightNote: '' };
   const notes = insight.campaigns || {};
   const cards = period.campaigns.length
     ? period.campaigns.map(c => _reportCardHTML(c, { ...ctx, insightNote: notes[c.id] || '' })).join('')
@@ -31310,8 +31319,12 @@ function _paintReport(el, period, goals, bm, compare, insight, demo) {
   el.innerHTML = demoNote + verdict + winfix + cards;
 }
 
-function _currentData() { return _reportView === 'last7' ? _reportLast7 : _reportMonthly; }
+function _currentData() {
+  if (_reportView === 'range') return _reportRange;
+  return _reportView === 'last7' ? _reportLast7 : _reportMonthly;
+}
 function _currentPeriod() {
+  if (_reportView === 'range') return _reportRange ? _reportRange.periods[0] : null;
   if (_reportView === 'last7') return _reportLast7 ? _reportLast7.periods[0] : null;
   if (!_reportMonthly || !_reportMonthly.periods.length) return null;
   if (_reportView === 'this_month') return _reportMonthly.periods[0];
@@ -31341,7 +31354,8 @@ async function _renderAdReport() {
   const goals = data.goals || {};
   const bm = data.benchmarks || DEFAULT_BM;
   const compare = _periodCompare(period);
-  const cacheKey = (data.demo ? 'demo:' : '') + _reportView + ':' + period.key;
+  const cacheKey = (data.demo ? 'demo:' : '') + _reportView + ':' + period.key
+    + (_reportView === 'range' ? `:${_reportRangeFrom}:${_reportRangeTo}:${_reportCompare}` : '');
 
   const instant = _insightCache[cacheKey] || _localInsight(period, goals, bm);
   _paintReport(el, period, goals, bm, compare, instant, data.demo);
@@ -31470,6 +31484,73 @@ async function _loadAdReport() {
   } catch (e) {
     el.innerHTML = `<div class="req-empty" style="padding:18px 0">Couldn't load report: ${escapeHTML(e.message)}</div>`;
   }
+}
+
+// ── Date-range report (default month-to-date) + previous-period compare ──
+function _ymd(d) { return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; }
+function _mtdDefaults() {
+  const now = new Date();
+  return { from: _ymd(new Date(now.getFullYear(), now.getMonth(), 1)), to: _ymd(now) };
+}
+async function _loadRangeReport() {
+  const el = document.getElementById('ad-report-container');
+  if (!el) return;
+  if (!_reportRangeFrom || !_reportRangeTo) { const d = _mtdDefaults(); _reportRangeFrom = d.from; _reportRangeTo = d.to; }
+  // Reflect state on the inputs (first render / programmatic changes).
+  const fromEl = document.getElementById('report-from');
+  const toEl = document.getElementById('report-to');
+  const cmpEl = document.getElementById('report-compare');
+  if (fromEl && !fromEl.value) fromEl.value = _reportRangeFrom;
+  if (toEl && !toEl.value) toEl.value = _reportRangeTo;
+  if (cmpEl) cmpEl.checked = _reportCompare;
+
+  el.innerHTML = `<div class="req-empty" style="padding:20px 0"><span class="req-spin"></span>Loading performance…</div>`;
+  try {
+    const token = await _mreqAuthToken();
+    const qs = `window=range&since=${encodeURIComponent(_reportRangeFrom)}&until=${encodeURIComponent(_reportRangeTo)}`
+      + (_reportCompare ? '&compare=1' : '') + `&client_id=${encodeURIComponent(CLIENT_ID)}`;
+    const res = await fetch('/api/marketing?resource=meta-report&' + qs, { headers: { Authorization: 'Bearer ' + token } });
+    const json = await _safeJson(res);
+    const controls = document.querySelector('.report-head .report-controls');
+    if (!res.ok) {
+      el.innerHTML = `<div class="req-empty" style="padding:18px 0">Couldn't load report: ${escapeHTML(json.error || ('HTTP ' + res.status))}</div>`;
+      return;
+    }
+    if (json.reason || !(Array.isArray(json.periods) && json.periods.length)) {
+      // No ad account / campaigns set up -> hide the controls. Otherwise (just no
+      // data in this range) keep them so the client can pick another range.
+      const setupIssue = json.reason === 'no_campaigns_selected' || json.reason === 'no_ad_account' || json.reason === 'no_staff_token' || json.reason === 'not_connected';
+      if (controls) controls.style.display = setupIssue ? 'none' : '';
+      const msg = json.reason === 'no_campaigns_selected'
+        ? 'Your ad performance will show here once your campaigns are set up.'
+        : setupIssue ? 'Your ad performance will show here once your ad account is connected.'
+        : 'No campaign data for this date range.';
+      el.innerHTML = `<div class="req-empty" style="padding:20px 0">${msg}</div>`;
+      _reportRange = null;
+      return;
+    }
+    if (controls) controls.style.display = '';
+    _reportView = 'range';
+    _reportRange = json;
+    _renderAdReport();
+  } catch (e) {
+    el.innerHTML = `<div class="req-empty" style="padding:18px 0">Couldn't load report: ${escapeHTML(e.message)}</div>`;
+  }
+}
+function _onReportRangeChange() {
+  const f = document.getElementById('report-from'); const t = document.getElementById('report-to');
+  if (f && f.value) _reportRangeFrom = f.value;
+  if (t && t.value) _reportRangeTo = t.value;
+  if (_reportRangeFrom && _reportRangeTo && _reportRangeFrom > _reportRangeTo) {
+    const tmp = _reportRangeFrom; _reportRangeFrom = _reportRangeTo; _reportRangeTo = tmp;
+    if (f) f.value = _reportRangeFrom; if (t) t.value = _reportRangeTo;
+  }
+  _loadRangeReport();
+}
+function _onReportCompareToggle() {
+  const c = document.getElementById('report-compare');
+  _reportCompare = !!(c && c.checked);
+  _loadRangeReport();
 }
 
 
