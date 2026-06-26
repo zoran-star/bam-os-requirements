@@ -9,41 +9,46 @@
 // so every BAM location reuses the same design with its own name / site / handle.
 // Brand: gold #E2DD9F, black #000000 / surface #0A0A0A, Anton (display) + Inter Tight.
 
+import { TEMPLATES } from "./email-templates/nurture-emails.js";
+
 const FRAME = `<!DOCTYPE html>
 <html lang="en"><head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
 <meta name="x-apple-disable-message-reformatting">
-<meta name="color-scheme" content="dark">
-<meta name="supported-color-schemes" content="dark">
+<meta name="color-scheme" content="light">
+<meta name="supported-color-schemes" content="light">
 <title>{{ACADEMY_FULL}}</title>
 <link href="https://fonts.googleapis.com/css2?family=Anton&family=Inter+Tight:wght@400;500;600;700&display=swap" rel="stylesheet">
 <!--[if mso]><style>* {font-family: Arial, sans-serif !important;}</style><![endif]-->
 </head>
-<body style="margin:0;padding:0;background:#000000;font-family:'Inter Tight',Arial,Helvetica,sans-serif;-webkit-font-smoothing:antialiased;">
+<body style="margin:0;padding:0;background:#EDEDEA;font-family:'Inter Tight',Arial,Helvetica,sans-serif;-webkit-font-smoothing:antialiased;">
 <span style="display:none!important;visibility:hidden;opacity:0;color:transparent;height:0;width:0;overflow:hidden;mso-hide:all;">{{PREHEADER}}</span>
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#000000" style="background:#000000;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#EDEDEA" style="background:#EDEDEA;">
   <tr><td align="center" style="padding:34px 12px;">
-    <table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" bgcolor="#0A0A0A" style="width:600px;max-width:600px;background:#0A0A0A;">
+    <table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" bgcolor="#FFFFFF" style="width:600px;max-width:600px;background:#FFFFFF;">
 
-      <!-- HEADER (fixed frame) -->
-      <tr><td style="padding:30px 36px 24px;border-bottom:1px solid #2B2A1F;">
+      <!-- thin gold top accent -->
+      <tr><td style="font-size:0;line-height:0;mso-line-height-rule:exactly;height:3px;background:#E2DD9F;">&nbsp;</td></tr>
+
+      <!-- HEADER (black bar) -->
+      <tr><td bgcolor="#0A0A0A" style="background:#0A0A0A;padding:30px 36px 24px;">
         <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr>
           <td align="left" valign="middle" style="font-family:'Anton','Arial Black',Arial,sans-serif;font-size:25px;line-height:1;letter-spacing:1px;color:#ffffff;text-transform:uppercase;">BY ANY MEANS&nbsp;<span style="color:#E2DD9F;">{{WORDMARK_SUFFIX}}</span></td>
           <td align="right" valign="middle" style="font-family:'Inter Tight',Arial,Helvetica,sans-serif;font-size:10px;font-weight:600;letter-spacing:3px;text-transform:uppercase;color:#8C8C82;">{{LOCATION_TAG}}</td>
         </tr></table>
       </td></tr>
 
-      <!-- CONTENT (the step's message drops in here) -->
-      <tr><td style="padding:46px 36px 8px;">
+      <!-- CONTENT (white) -->
+      <tr><td bgcolor="#FFFFFF" style="background:#FFFFFF;padding:46px 36px 8px;">
         {{CONTENT}}
       </td></tr>
 
       <!-- gold rule -->
-      <tr><td style="padding:36px 36px 0;"><div style="width:46px;height:2px;background:#E2DD9F;font-size:0;line-height:0;mso-line-height-rule:exactly;">&nbsp;</div></td></tr>
+      <tr><td bgcolor="#FFFFFF" style="background:#FFFFFF;padding:30px 36px 32px;"><div style="width:46px;height:2px;background:#E2DD9F;font-size:0;line-height:0;mso-line-height-rule:exactly;">&nbsp;</div></td></tr>
 
-      <!-- FOOTER (fixed frame) -->
-      <tr><td style="padding:26px 36px 32px;">
+      <!-- FOOTER (black bar) -->
+      <tr><td bgcolor="#0A0A0A" style="background:#0A0A0A;padding:26px 36px 32px;">
         <p style="margin:0 0 12px;font-family:'Anton','Arial Black',Arial,sans-serif;font-size:18px;line-height:1;letter-spacing:1px;text-transform:uppercase;color:#ffffff;">BY ANY MEANS&nbsp;<span style="color:#E2DD9F;">{{WORDMARK_SUFFIX}}</span></p>
         <p style="margin:0 0 16px;font-family:'Inter Tight',Arial,Helvetica,sans-serif;font-size:13px;line-height:1.6;color:#9A9A92;">{{TAGLINE}}</p>
         <p style="margin:0 0 16px;font-family:'Inter Tight',Arial,Helvetica,sans-serif;font-size:12px;line-height:1.7;color:#8C8C82;">
@@ -140,7 +145,7 @@ function applyDarkLock(html) {
 // lines become paragraphs, single newlines become <br>, and a bare URL on its own
 // line becomes the gold square CTA so the call-to-action stands out.
 function bodyToHtml(body) {
-  const P = "margin:0 0 18px;font-family:'Inter Tight',Arial,Helvetica,sans-serif;font-size:16px;line-height:1.62;color:#C9C9C3;";
+  const P = "margin:0 0 18px;font-family:'Inter Tight',Arial,Helvetica,sans-serif;font-size:16px;line-height:1.62;color:#333333;";
   return String(body || "").trim().split(/\n{2,}/).map((blk) => {
     const t = blk.trim();
     if (/^https?:\/\/\S+$/.test(t)) {
@@ -159,7 +164,11 @@ export function renderEmail({ clientId, subject, body, preheader, unsubscribeUrl
   const L = locFor(clientId);
   const pre = String(preheader || subject || "").replace(/[<>]/g, "").slice(0, 140);
   const unsub = unsubscribeUrl || `mailto:${L.email}?subject=Unsubscribe`;
-  const raw = String(body || "");
+  // A step body can be a short "template:<key>" reference to a vendored designed
+  // email (api/email-templates/) so the DB holds a tiny ref, not 12KB of HTML.
+  let raw = String(body || "");
+  const tref = raw.match(/^\s*template:([\w/-]+)\s*$/);
+  if (tref && TEMPLATES[tref[1]]) raw = TEMPLATES[tref[1]];
   let html;
   if (/^\s*<(?:!doctype|html)/i.test(raw)) {
     html = raw.replace(/\{\{UNSUBSCRIBE\}\}/g, unsub).replace(/\{\{PREHEADER\}\}/g, pre);
@@ -177,5 +186,8 @@ export function renderEmail({ clientId, subject, body, preheader, unsubscribeUrl
       .replace(/\{\{ACADEMY_FULL\}\}/g, L.full)
       .replace(/\{\{UNSUBSCRIBE\}\}/g, unsub);
   }
-  return applyDarkLock(resolveMergeVars(html, L, vars));
+  // Emails are LIGHT now (white body, black header/footer) so they render the same
+  // in light + dark mode everywhere - no dark-mode lock needed (and signaling dark
+  // on a light email would be wrong). applyDarkLock is kept for reference only.
+  return resolveMergeVars(html, L, vars);
 }
