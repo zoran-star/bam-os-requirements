@@ -425,7 +425,7 @@ async function enrichWithClient(tickets) {
   const clientIds = [...new Set(tickets.map(t => t.client_id).filter(Boolean))];
   const clientMap = {};
   if (clientIds.length) {
-    const clients = await sb(`clients?id=in.(${clientIds.join(",")})&select=id,business_name,brand_data,scaling_manager_id`);
+    const clients = await sb(`clients?id=in.(${clientIds.join(",")})&select=id,business_name,brand_data,scaling_manager_id,ads_content_approval_required`);
     Object.assign(clientMap, Object.fromEntries((clients || []).map(c => [c.id, c])));
   }
   // Resolve the assignee name: explicit assigned_to, else the client's manager.
@@ -451,6 +451,105 @@ async function enrichWithClient(tickets) {
       sm_name: smId ? (staffMap[smId] || null) : null,
     };
   });
+}
+
+// Spawn (or update, on a revision round-trip) the marketing ticket that a
+// finished content ticket hands off to. Shared by the staff "Send to Marketing"
+// action and the client auto-send on ads-content approval. `author` describes
+// who triggered the handoff (staff or client) for the internal message.
+// Returns the linked/spawned marketing ticket id.
+async function spawnOrUpdateMarketingFromContent(ticket, { authorType, authorId, authorName, marketingNotes = "", req }) {
+  const ctxObj = ticket.context || {};
+  const source = ctxObj.source || "add-creative";
+  const linkedMarketingId = ticket.marketing_ticket_id || null;
+
+  if (linkedMarketingId) {
+    // ── Revision round-trip — UPDATE the original marketing ticket ──
+    const cur = await sb(`marketing_tickets?id=eq.${linkedMarketingId}&select=*`);
+    const orig = cur?.[0];
+    if (orig) {
+      const newMessages = appendMessage(orig.messages, {
+        author_type: authorType, author_id: authorId, author_name: authorName,
+        body: marketingNotes
+          ? `Revision uploaded. Notes for marketing: "${marketingNotes}"`
+          : "Revision uploaded.",
+        is_action_request: false,
+        internal: true,
+      });
+      await sb(`marketing_tickets?id=eq.${linkedMarketingId}`, {
+        method: "PATCH",
+        headers: { Prefer: "return=representation" },
+        body: JSON.stringify({
+          files: ticket.final_files,
+          awaiting_revision: false,
+          messages: newMessages,
+        }),
+      });
+    }
+    return linkedMarketingId;
+  }
+
+  // ── Fresh spawn — INSERT a new marketing ticket ──
+  const mktType =
+    source === "new-campaign" ? "campaign-create" :
+    source === "change-campaign" || source === "add-creative" ? "add" :
+    "add";
+
+  const mktFields = {
+    campaign_title: ctxObj.campaign_title || "",
+    note: ctxObj.note || "",
+    priority: ctxObj.priority === "high" ? "high" : "normal",
+  };
+  if (mktType === "campaign-create") {
+    mktFields.offer = ctxObj.offer || "";
+    mktFields.is_new_offer = !!ctxObj.is_new_offer;
+    mktFields.new_offer_description = ctxObj.new_offer_description || "";
+    mktFields.monthly_spend = ctxObj.monthly_spend || "";
+    mktFields.landing_page = ctxObj.landing_page || "";
+  }
+  if (ctxObj.related_creative_name) {
+    mktFields.creative_name = ctxObj.related_creative_name;
+  }
+  const clientNotesRaw = (ticket.notes || "").trim();
+  if (clientNotesRaw) {
+    mktFields.client_notes = clientNotesRaw;
+  }
+
+  const initialMessage = {
+    author_type: authorType, author_id: authorId, author_name: authorName,
+    body: marketingNotes
+      ? `Sent from content ticket (${ticket.type}). Notes for marketing: "${marketingNotes}"`
+      : `Sent from content ticket (${ticket.type}).`,
+    is_action_request: false,
+    internal: true,
+    created_at: nowIso(),
+  };
+
+  const marketingInsert = await sb("marketing_tickets", {
+    method: "POST",
+    headers: { Prefer: "return=representation" },
+    body: JSON.stringify([{
+      client_id: ticket.client_id,
+      type: mktType,
+      status: "in-progress",
+      content_check_status: "not-required",
+      client_action_status: "none",
+      fields: mktFields,
+      files: ticket.final_files,
+      messages: [initialMessage],
+      originated_from_content_ticket_id: ticket.id,
+      assigned_to: await clientScalingManager(ticket.client_id),
+    }]),
+  });
+  const spawnedId = marketingInsert?.[0]?.id || null;
+  if (spawnedId) {
+    pingMarketingOnNewTicket({
+      ticketId: spawnedId,
+      academy: ctxObj.campaign_title || mktFields.campaign_title,
+      priority: mktFields.priority,
+    }, req);
+  }
+  return spawnedId;
 }
 
 // ─────────────────────────────────────────────────────────
@@ -1012,8 +1111,10 @@ async function handleContentTickets(req, res) {
     // Client view: only return tickets where action is requested OR explicitly all=1
     if (!isClient) return res.status(403).json({ error: "not authorized for this scope" });
     const onlyActionable = req.query.all !== "1";
+    // "requested" = a question to answer; "review-requested" = finished content
+    // awaiting the client's approve/request-changes. Both need the client.
     const filter = onlyActionable
-      ? `&client_action_status=eq.requested`
+      ? `&client_action_status=in.(requested,review-requested)`
       : "";
     const tickets = await sb(`content_tickets?select=*&client_id=eq.${ctx.client.id}${filter}${channelFilter}&order=submitted_at.desc${pageQS}`);
     return res.status(200).json({
@@ -1204,114 +1305,13 @@ async function handleContentTickets(req, res) {
       });
 
     } else if (action === "send-to-marketing") {
-      // 1. Validate
       if (!ticket.final_files || !ticket.final_files.length) {
         return res.status(409).json({ error: "upload at least one final creative before sending to marketing" });
       }
-
       const marketingNotes = (body.marketing_notes || "").trim();
-      const ctxObj = ticket.context || {};
-      const source = ctxObj.source || "add-creative";
-
-      // 2. Are we updating an existing marketing ticket (revision round-trip) or inserting?
-      const linkedMarketingId = ticket.marketing_ticket_id || null;
-
-      if (linkedMarketingId) {
-        // ── Revision round-trip — UPDATE the original marketing ticket ──
-        // Pull current to merge messages cleanly
-        const cur = await sb(`marketing_tickets?id=eq.${linkedMarketingId}&select=*`);
-        const orig = cur?.[0];
-        if (orig) {
-          const newMessages = appendMessage(orig.messages, {
-            author_type: "staff", author_id: ctx.staff.id, author_name: authorName,
-            body: marketingNotes
-              ? `Revision uploaded. Notes for marketing: "${marketingNotes}"`
-              : "Revision uploaded by content team.",
-            is_action_request: false,
-            internal: true,
-          });
-          await sb(`marketing_tickets?id=eq.${linkedMarketingId}`, {
-            method: "PATCH",
-            headers: { Prefer: "return=representation" },
-            body: JSON.stringify({
-              files: ticket.final_files,
-              awaiting_revision: false,
-              messages: newMessages,
-            }),
-          });
-        }
-        patch.marketing_ticket_id = linkedMarketingId;
-      } else {
-        // ── Fresh spawn — INSERT a new marketing ticket ──
-        const mktType =
-          source === "new-campaign" ? "campaign-create" :
-          source === "change-campaign" || source === "add-creative" ? "add" :
-          "add";
-
-        const mktFields = {
-          campaign_title: ctxObj.campaign_title || "",
-          note: ctxObj.note || "",
-          // Priority rides along from the client's submission (content ctx) so the
-          // marketing team sees urgency without re-asking. Defaults to normal.
-          priority: ctxObj.priority === "high" ? "high" : "normal",
-        };
-        if (mktType === "campaign-create") {
-          mktFields.offer = ctxObj.offer || "";
-          mktFields.is_new_offer = !!ctxObj.is_new_offer;
-          mktFields.new_offer_description = ctxObj.new_offer_description || "";
-          mktFields.monthly_spend = ctxObj.monthly_spend || "";
-          mktFields.landing_page = ctxObj.landing_page || "";
-        }
-        if (ctxObj.related_creative_name) {
-          mktFields.creative_name = ctxObj.related_creative_name;
-        }
-
-        // Pass client's original notes through so the marketing team
-        // sees what the client actually said (not just what content retyped).
-        const clientNotesRaw = (ticket.notes || "").trim();
-        if (clientNotesRaw) {
-          mktFields.client_notes = clientNotesRaw;
-        }
-
-        const initialMessage = {
-          author_type: "staff", author_id: ctx.staff.id, author_name: authorName,
-          body: marketingNotes
-            ? `Sent from content ticket (${ticket.type}). Notes for marketing: "${marketingNotes}"`
-            : `Sent from content ticket (${ticket.type}).`,
-          is_action_request: false,
-          internal: true,
-          created_at: nowIso(),
-        };
-
-        const marketingInsert = await sb("marketing_tickets", {
-          method: "POST",
-          headers: { Prefer: "return=representation" },
-          body: JSON.stringify([{
-            client_id: ticket.client_id,
-            type: mktType,
-            status: "in-progress",
-            content_check_status: "not-required",
-            client_action_status: "none",
-            fields: mktFields,
-            files: ticket.final_files,
-            messages: [initialMessage],
-            originated_from_content_ticket_id: ticket.id,
-            // Auto-assign to the client's manager (the "SM").
-            assigned_to: await clientScalingManager(ticket.client_id),
-          }]),
-        });
-        const spawnedId = marketingInsert?.[0]?.id || null;
-        patch.marketing_ticket_id = spawnedId;
-        // Ping Cam that a fresh marketing request just hit his board.
-        if (spawnedId) {
-          pingMarketingOnNewTicket({
-            ticketId: spawnedId,
-            academy: ctxObj.campaign_title || mktFields.campaign_title,
-            priority: mktFields.priority,
-          }, req);
-        }
-      }
-
+      patch.marketing_ticket_id = await spawnOrUpdateMarketingFromContent(ticket, {
+        authorType: "staff", authorId: ctx.staff.id, authorName, marketingNotes, req,
+      });
       patch.status = "completed";
       patch.sent_to_marketing_at = nowIso();
       patch.resolved_at = nowIso();
@@ -1383,12 +1383,17 @@ async function handleContentTickets(req, res) {
       });
 
     } else if (action === "send-for-review") {
-      // Organic: content team sends the finished creative to the client to review.
+      // Content team sends the finished creative to the client to review.
+      // Organic: review → approve adds it to the Creative Bank.
+      // Ads (when the academy's ads_content_approval_required gate is on):
+      //   review → approve auto-sends to marketing.
+      // "review-requested" distinguishes a content review from a plain question
+      // ("requested") so the client portal shows Approve/Request-changes here.
       if (!Array.isArray(ticket.final_files) || !ticket.final_files.length) {
         return res.status(400).json({ error: "upload at least one final creative before sending for review" });
       }
       patch.status = "client-dependent";
-      patch.client_action_status = "requested";
+      patch.client_action_status = "review-requested";
       const note = (body.message || "").trim();
       patch.messages = appendMessage(ticket.messages, {
         author_type: "staff", author_id: ctx.staff.id, author_name: authorName,
@@ -1397,17 +1402,39 @@ async function handleContentTickets(req, res) {
       });
 
     } else if (action === "approve") {
-      // Organic: client approves the creative → moves to their Creative Bank.
-      patch.status = "completed";
-      patch.client_action_status = "responded";
-      patch.resolved_at = nowIso();
-      patch.messages = appendMessage(ticket.messages, {
-        author_type: "client", author_name: authorName,
-        body: "Approved — added to the creative bank.", is_action_request: false,
-      });
+      // Client approves a content review. Only valid while a review is open.
+      if (ticket.client_action_status !== "review-requested") {
+        return res.status(409).json({ error: "no review is awaiting approval" });
+      }
+      if (ticket.channel === "ads") {
+        // Ads gate: approval auto-sends the finished creative to marketing.
+        patch.marketing_ticket_id = await spawnOrUpdateMarketingFromContent(ticket, {
+          authorType: "client", authorName, marketingNotes: "", req,
+        });
+        patch.status = "completed";
+        patch.client_action_status = "responded";
+        patch.sent_to_marketing_at = nowIso();
+        patch.resolved_at = nowIso();
+        patch.messages = appendMessage(ticket.messages, {
+          author_type: "client", author_name: authorName,
+          body: "Approved — sent to marketing.", is_action_request: false,
+        });
+      } else {
+        // Organic: client approves the creative → moves to their Creative Bank.
+        patch.status = "completed";
+        patch.client_action_status = "responded";
+        patch.resolved_at = nowIso();
+        patch.messages = appendMessage(ticket.messages, {
+          author_type: "client", author_name: authorName,
+          body: "Approved — added to the creative bank.", is_action_request: false,
+        });
+      }
 
     } else if (action === "request-changes") {
-      // Organic: client wants changes → back to the content team.
+      // Client wants changes on a content review → back to the content team.
+      if (ticket.client_action_status !== "review-requested") {
+        return res.status(409).json({ error: "no review is awaiting changes" });
+      }
       const message = (body.message || "").trim();
       if (!message) return res.status(400).json({ error: "tell us what to change" });
       patch.status = "active";
@@ -1432,6 +1459,12 @@ async function handleContentTickets(req, res) {
         `🔔 Action requested — Content [${code}]${ask ? `\n_${ask}_` : ""}`, req);
       notifyClientPush(ticket.client_id, "ticket-action-needed", {
         ticketTitle: "a content request", ticketId: ticket.id, view: "marketing",
+      }).catch(() => {});
+    } else if (action === "send-for-review") {
+      postClientSlackNotification(ticket.client_id,
+        `🔔 Content ready for your review — [${code}]`, req);
+      notifyClientPush(ticket.client_id, "ticket-action-needed", {
+        ticketTitle: "content to review", ticketId: ticket.id, view: "marketing",
       }).catch(() => {});
     } else if (action === "mark-completed") {
       postClientSlackNotification(ticket.client_id,

@@ -1038,6 +1038,13 @@ function ContentTicketDetail({ tk, session, ticket, onBack, onRefetch, patchTick
 
   const finalsExisting = Array.isArray(ticket.final_files) ? ticket.final_files : [];
 
+  // Review mode = the finished creative goes to the client to approve before it
+  // moves on. Always for organic; for ads only when the academy has the
+  // "approve ads content before marketing" gate on. Otherwise ads send straight
+  // to marketing.
+  const adsApprovalGate = ticket.channel === "ads" && !!ticket.client?.ads_content_approval_required;
+  const reviewMode = ticket.channel === "organic" || adsApprovalGate;
+
   // ── Upload selected finals to Supabase Storage and persist on ticket ──
   async function commitFinals() {
     if (!finalsToUpload.length) return;
@@ -1363,15 +1370,16 @@ function ContentTicketDetail({ tk, session, ticket, onBack, onRefetch, patchTick
             fontFamily: "inherit", fontSize: 13, fontWeight: 500,
           }}>Request Client Action</button>
           <button
-            onClick={() => ticket.channel === "organic" ? sendForReview() : setSendModalOpen(true)}
+            onClick={() => reviewMode ? sendForReview() : setSendModalOpen(true)}
             disabled={busy || !finalsExisting.length}
+            title={adsApprovalGate ? "This academy reviews ads content before it goes to marketing. On approval it auto-sends." : ""}
             style={{
               background: tk.accent, color: "#0A0A0B", border: 0,
               padding: "10px 22px", borderRadius: 8,
               cursor: (busy || !finalsExisting.length) ? "not-allowed" : "pointer",
               fontFamily: "inherit", fontSize: 13, fontWeight: 700,
               opacity: (busy || !finalsExisting.length) ? 0.5 : 1,
-            }}>{ticket.channel === "organic" ? "📤  Send for client review" : "📤  Send to Marketing"}</button>
+            }}>{reviewMode ? "📤  Send for client review" : "📤  Send to Marketing"}</button>
         </div>
       )}
 

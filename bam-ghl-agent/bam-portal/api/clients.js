@@ -2450,6 +2450,17 @@ async function handler(req, res) {
           patch.organic_content = v;
         }
 
+        // Ads content approval gate: when true, ads content tickets must be
+        // approved by the client before they reach marketing (client approval
+        // auto-sends). Default false = content sends straight to marketing.
+        if (wasSet("ads_content_approval_required")) {
+          const v = body.ads_content_approval_required;
+          if (typeof v !== "boolean") {
+            return res.status(400).json({ error: "ads_content_approval_required must be a boolean" });
+          }
+          patch.ads_content_approval_required = v;
+        }
+
         // Monthly organic credits: total = combined pool; video/graphic = optional
         // hard caps. null/"" = unlimited; otherwise a non-negative integer (0 = none).
         for (const f of ["organic_total_credits_per_month", "organic_video_credits_per_month", "organic_graphic_credits_per_month"]) {

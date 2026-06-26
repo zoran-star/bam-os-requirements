@@ -14614,6 +14614,7 @@ function _bbGenOtherChanged() {
 function _bbRenderBrandCard(panel, meta) {
   const c = (CLIENT_ROWS || []).find(r => r.id === CLIENT_ID) || {};
   const bd = c.brand_data || {};
+  const adsApproval = c.ads_content_approval_required === true;
   const v = (k) => _bbEscapeHtml(bd[k] || '');
   const websiteStatus = bd.website_status || '';
   const statusOpts = [
@@ -14724,8 +14725,35 @@ function _bbRenderBrandCard(panel, meta) {
 
     <div style="font-size:11px;color:var(--text-mute);margin-top:6px;text-align:right">Auto-saves as you type.</div>
 
+    <h3 style="font-family:'Space Grotesk',sans-serif;font-size:14px;font-weight:600;color:var(--text);margin:24px 0 10px;letter-spacing:0.02em">Content approvals</h3>
+
+    <div class="bb-field">
+      <div style="display:flex;align-items:center;gap:14px;background:var(--surface-el);border:1px solid ${adsApproval ? 'rgba(52,211,153,.35)' : 'var(--line)'};border-radius:8px;padding:14px 16px">
+        <div style="flex:1">
+          <div style="font-size:13.5px;font-weight:600;color:var(--text)">Review ad content before it goes live</div>
+          <div style="font-size:12px;color:var(--text-mute);margin-top:3px;line-height:1.5">
+            ${adsApproval
+              ? "On - your team's finished ad creatives come to you to approve. Approving sends them to the marketing team to launch."
+              : "Off - finished ad creatives go straight to your marketing team to launch."}
+          </div>
+        </div>
+        <button type="button" onclick="_bbToggleAdsApproval()" aria-label="Toggle ad content approval"
+          style="width:46px;height:26px;border-radius:999px;position:relative;flex-shrink:0;border:none;cursor:pointer;transition:background .2s ease;background:${adsApproval ? 'var(--green,#34D399)' : 'var(--line-str,#34343A)'}">
+          <span style="position:absolute;top:2px;left:${adsApproval ? '22px' : '2px'};width:22px;height:22px;border-radius:50%;background:#fff;transition:left .2s ease;box-shadow:0 1px 3px rgba(0,0,0,.25)"></span>
+        </button>
+      </div>
+    </div>
+
     ${_bbMarkDoneCta('brand', 'Brand')}
   `;
+}
+
+async function _bbToggleAdsApproval() {
+  const c = (CLIENT_ROWS || []).find(r => r.id === CLIENT_ID);
+  const next = !(c && c.ads_content_approval_required === true);
+  const ok = await _bbSaveClientBasics({ ads_content_approval_required: next });
+  if (!ok) { alert("Couldn't save that setting. Try again."); return; }
+  _bbRenderFromHash();
 }
 
 function _bbBrandChanged() {
@@ -20078,6 +20106,39 @@ let _inputAssetsChannel = 'ads';
 function openOrganicRequestModal() {
   openAddCreativeModal('organic');
 }
+// Ads content review (approve auto-sends to marketing; request-changes reopens for content).
+// Mirrors the organic approve/request-changes but refreshes the marketing requests list.
+async function _adsContentApprove(id) {
+  try {
+    const token = await _mreqAuthToken();
+    const res = await fetch('/api/marketing?resource=content-tickets&client_id=' + encodeURIComponent(CLIENT_ID) + '&id=' + encodeURIComponent(id), {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+      body: JSON.stringify({ action: 'approve' }),
+    });
+    if (!res.ok) { const j = await _safeJson(res); throw new Error(j.error || ('HTTP ' + res.status)); }
+    closeMarketingRequest();
+    await fetchAndRenderMarketingRequests();
+    showConfirmation('Content approved', 'Sent to your marketing team to launch. They\'ll take it from here.');
+  } catch (e) { alert('Approve failed: ' + e.message); }
+}
+async function _adsContentRequestChanges(id) {
+  const msg = prompt('What would you like changed?');
+  if (msg === null) return;
+  if (!msg.trim()) { alert('Add a quick note on what to change.'); return; }
+  try {
+    const token = await _mreqAuthToken();
+    const res = await fetch('/api/marketing?resource=content-tickets&client_id=' + encodeURIComponent(CLIENT_ID) + '&id=' + encodeURIComponent(id), {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+      body: JSON.stringify({ action: 'request-changes', message: msg.trim() }),
+    });
+    if (!res.ok) { const j = await _safeJson(res); throw new Error(j.error || ('HTTP ' + res.status)); }
+    closeMarketingRequest();
+    await fetchAndRenderMarketingRequests();
+    showConfirmation('Changes requested', 'Your content team will revise and send it back for review.');
+  } catch (e) { alert('Request failed: ' + e.message); }
+}
 async function _organicApprove(id) {
   try {
     const token = await _mreqAuthToken();
@@ -20471,7 +20532,7 @@ async function submitInputAssets() {
   );
   const channel = (typeof _inputAssetsChannel !== 'undefined') ? _inputAssetsChannel : 'ads';
   try {
-    const uploaded = await _mreqUploadFiles(filesToUpload);
+    const uploaded = await _mreqUploadFiles(filesToUpload, _uploadProgress(fileCount));
     if (hasDriveLink) uploaded.push(_buildAssetLinkEntry(driveLinkRaw));
     await _ctkCreateTicket({
       type: assetType,
@@ -20557,8 +20618,9 @@ function openContentTicketDetail(id) {
     `${_ticketCode(r.id)}  ·  ${r.campaign || '(no campaign)'}  ·  Submitted ${r.submittedDateDisplay}${lastBit}`;
   const pill = document.getElementById('reqDetailStatusPill');
   const actionNeeded = r.clientActionStatus === 'requested';
-  pill.className = 'status-pill ' + (actionNeeded ? 'needs-action' : 'in-progress');
-  pill.textContent = actionNeeded ? 'Action needed' : 'In production';
+  const reviewNeeded = r.clientActionStatus === 'review-requested';
+  pill.className = 'status-pill ' + ((actionNeeded || reviewNeeded) ? 'needs-action' : 'in-progress');
+  pill.textContent = reviewNeeded ? 'Review content' : actionNeeded ? 'Action needed' : 'In production';
 
   // "What you submitted" - show raw files + last action-request prompt
   const submitted = document.getElementById('reqDetailSubmittedCard');
@@ -20579,6 +20641,21 @@ function openContentTicketDetail(id) {
   if (actionReq) {
     html += `<div class="req-info-row"><div class="req-info-label">Action requested</div><div class="req-info-value" style="background:rgba(232,197,71,0.06);border-left:3px solid var(--gold);padding:10px 12px;border-radius:6px;font-style:italic">${escapeHTML(actionReq.message)}</div></div>`;
   }
+  // Content review: show the finished creatives + Approve / Request changes.
+  if (reviewNeeded) {
+    const finals = Array.isArray(r.finalFiles) ? r.finalFiles : [];
+    const tiles = finals.length
+      ? `<div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:6px">${finals.map(_organicFileTile).join('')}</div>`
+      : '<div style="font-size:12px;color:var(--text-mute)">No files attached.</div>';
+    html += `<div class="req-info-row"><div class="req-info-label">Ready to review</div><div class="req-info-value">
+      <div style="font-size:12.5px;color:var(--text-sub);margin-bottom:8px">Approve to send this to the marketing team to launch, or request changes.</div>
+      ${tiles}
+      <div style="display:flex;gap:8px;margin-top:14px;flex-wrap:wrap">
+        <button onclick="_adsContentRequestChanges('${r.id}')" style="background:transparent;border:1px solid var(--line);color:var(--text-sub);padding:9px 16px;border-radius:7px;font-size:12.5px;font-weight:600;cursor:pointer">Request changes</button>
+        <button onclick="_adsContentApprove('${r.id}')" style="background:var(--gold);border:none;color:#0B0B0D;padding:9px 18px;border-radius:7px;font-size:12.5px;font-weight:700;cursor:pointer">✓ Approve &amp; send to marketing</button>
+      </div>
+    </div></div>`;
+  }
   submitted.innerHTML = html;
 
   // Updates label is content-flavoured
@@ -20596,8 +20673,9 @@ function openContentTicketDetail(id) {
     _renderReqDetailRespondFilesList();
   }
 
-  // Always-on edit section - visible on active content tickets, supports raw file add/remove + note
-  const isActive = r.status === 'in-progress' || r.status === 'active';
+  // Always-on edit section - visible on active content tickets, supports raw file add/remove + note.
+  // Hidden during a content review so the client focuses on Approve / Request changes.
+  const isActive = (r.status === 'in-progress' || r.status === 'active') && !reviewNeeded;
   const editSection = document.getElementById('reqDetailEditSection');
   if (editSection) editSection.style.display = isActive ? 'block' : 'none';
   if (isActive) {
@@ -20775,7 +20853,8 @@ async function submitReqDetailEdit() {
     // Upload any new files first
     let uploaded = [];
     if (hasNewFiles) {
-      uploaded = await _mreqUploadFiles(_reqDetailEditFiles.slice());
+      const _editFiles = _reqDetailEditFiles.slice();
+      uploaded = await _mreqUploadFiles(_editFiles, _uploadProgress(_editFiles.length));
     }
 
     if (kind === 'content') {
@@ -20839,7 +20918,7 @@ async function submitReqDetailResponse() {
   showLoading('Sending your response…', filesToUpload.length ? "Uploading files - don't close this tab." : 'Just a moment.');
   try {
     // Upload any attached files first
-    const uploaded = filesToUpload.length ? await _mreqUploadFiles(filesToUpload) : [];
+    const uploaded = filesToUpload.length ? await _mreqUploadFiles(filesToUpload, _uploadProgress(filesToUpload.length)) : [];
     // Build message body that includes file references
     const fileNote = uploaded.length
       ? '\n\nAttached:\n' + uploaded.map(f => `• ${f.name} - ${f.url}`).join('\n')
@@ -20955,7 +21034,7 @@ async function _storageUpload(bucket, path, file) {
   if (error) throw new Error(error.message || String(error));
 }
 
-async function _mreqUploadFiles(files) {
+async function _mreqUploadFiles(files, onProgress) {
   if (!files || !files.length) return [];
   const out = [];
   for (const file of files) {
@@ -20967,8 +21046,21 @@ async function _mreqUploadFiles(files) {
     await _storageUpload('ticket-files', path, file);
     const { data: urlData } = _sb.storage.from('ticket-files').getPublicUrl(path);
     out.push({ name: file.name, url: urlData.publicUrl, size: file.size || 0, mime: file.type || '', folder });
+    if (typeof onProgress === 'function') onProgress(file);
   }
   return out;
+}
+
+// Returns an onProgress callback that live-updates the loading overlay title
+// with "Uploading X of N files…". Pass the same instance across multiple
+// _mreqUploadFiles() calls to count toward one grand total (e.g. multi-creative campaigns).
+function _uploadProgress(total) {
+  let done = 0;
+  return () => {
+    done++;
+    const t = document.getElementById('loadingTitle');
+    if (t) t.textContent = `Uploading ${done} of ${total} file${total === 1 ? '' : 's'}…`;
+  };
 }
 
 async function _safeJson(res) {
@@ -30412,12 +30504,15 @@ function _ctkNormalizeForTracker(apiTicket) {
   const lastActionReq = [...messages].reverse().find(m => m.is_action_request);
   const submittedAt = apiTicket.submitted_at;
   const actionNeeded = apiTicket.client_action_status === 'requested';
+  // "review-requested" = finished content awaiting the client's approve / request-changes.
+  const reviewNeeded = apiTicket.client_action_status === 'review-requested';
+  const needsClient = actionNeeded || reviewNeeded;
   // For the campaign-create mega-ticket, ctx.offer is the campaign name
   const campaignName = ctx.campaign_title || ctx.offer || '';
   return {
     id: apiTicket.id,
-    _kind: actionNeeded ? 'content-action-needed' : 'content-in-production',
-    type: actionNeeded ? 'content-action-needed' : 'content-in-production',
+    _kind: needsClient ? 'content-action-needed' : 'content-in-production',
+    type: needsClient ? 'content-action-needed' : 'content-in-production',
     campaign: campaignName,
     creative: ctx.related_creative_name || '',
     note: lastActionReq?.body || '',
@@ -30426,7 +30521,9 @@ function _ctkNormalizeForTracker(apiTicket) {
     contentTicketNotes: apiTicket.notes || '',
     status: 'in-progress',
     contentCheckStatus: 'not-required',
-    clientActionStatus: actionNeeded ? 'requested' : 'none',
+    clientActionStatus: apiTicket.client_action_status || 'none',
+    channel: apiTicket.channel || 'ads',
+    finalFiles: apiTicket.final_files || [],
     submittedDate: submittedAt ? submittedAt.split('T')[0] : '',
     submittedDateDisplay: submittedAt
       ? new Date(submittedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
@@ -30713,8 +30810,7 @@ async function _renderMarketingCampaigns() {
       return `
         <div class="campaign-card">
           <div class="campaign-card-main">
-            <div class="card-title" style="margin-bottom:6px">${escapeHTML(c.name || '(unnamed)')}</div>
-            <div style="font-family:var(--mono);font-size:10px;letter-spacing:0.16em;text-transform:uppercase;color:var(--text-mute);margin-bottom:14px">This month</div>
+            <div class="card-title" style="margin-bottom:14px">${escapeHTML(c.name || '(unnamed)')}</div>
             ${(typeof V15_ACCESS !== 'undefined' && V15_ACCESS) ? '' : `
             <div class="campaign-stats">
               <div class="campaign-stat">
@@ -31294,7 +31390,7 @@ function _mreqRowHTML(r) {
 
   const pillClass = needsAction ? 'needs-action' : r.status;
   const pillLabel = needsAction
-    ? 'Action needed'
+    ? (r.clientActionStatus === 'review-requested' ? 'Review content' : 'Action needed')
     : (MARKETING_STATUS_LABEL[r.status] || r.status);
 
   const activityBit = r.lastActivityAt
@@ -32250,6 +32346,7 @@ async function wizardSubmitFinal(skipped) {
     `Uploading ${_totalFiles} file${_totalFiles === 1 ? '' : 's'}…`,
     "This can take a minute for video. Don't close this tab."
   );
+  const _onUpload = _uploadProgress(_totalFiles);
 
   try {
     // Upload every file across every creative block, build serializable creatives array.
@@ -32264,7 +32361,7 @@ async function wizardSubmitFinal(skipped) {
       // Apply this block's folder name to every file (flattened - no nesting).
       const folderName = (c.name || '').trim();
       c.files.forEach(f => { f._folder = folderName; });
-      const uploaded = hasFiles ? await _mreqUploadFiles(c.files) : [];
+      const uploaded = hasFiles ? await _mreqUploadFiles(c.files, _onUpload) : [];
       if (validDrive) uploaded.push({ ..._buildAssetLinkEntry(c.driveLink), folder: folderName });
       creativesPayload.push({
         local_id: c.id,
@@ -35146,7 +35243,7 @@ async function boot() {
   // to exactly the caller's clients via my_client_ids(). One auth user can
   // belong to multiple clients - the bottom-left switcher lets them flip.
   const { data: clientRows } = await _sb.from('clients')
-    .select('id, business_name, owner_name, email, onboarding_completed_at, marketing_included, v2_access, v15_access, v4_access, organic_content, onboarding_feedback_requested_at, onboarding_feedback_submitted_at')
+    .select('id, business_name, owner_name, email, onboarding_completed_at, marketing_included, v2_access, v15_access, v4_access, organic_content, ads_content_approval_required, onboarding_feedback_requested_at, onboarding_feedback_submitted_at')
     .is('archived_at', null)
     .order('business_name');
   CLIENT_ROWS = clientRows || [];
