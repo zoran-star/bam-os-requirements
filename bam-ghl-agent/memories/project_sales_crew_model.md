@@ -224,6 +224,37 @@ P4a automation engine + P4b step-builder · P6 triggers · P7a per-lead mute · 
 - To send a test/preview email NOW, send from `gta@byanymeansbball.com` (works) to a real inbox.
 - Storing big HTML in the DB = pain (re-emit via MCP). The `template:<key>` ref pattern avoids it — keep using it.
 
+### ✅ DONE 2026-06-26 (PM session): finalize batch (PRs #807/#809/#819/#822/#823, all merged)
+- **✉️ Resend LIVE.** Sender fixed `.com`→`.ca` (only `byanymeanstoronto.ca` is DNS-verified; `.com` 403s). Code:
+  `_email.js` DEFAULT_FROM + `email-shells.js` footer + 4 template mailto links → `.ca` (#807); source in
+  `bam-client-sites/emails/*` too (PR #37 there). Real Resend key (`re_…8NW`, covers .ca/business/bball/coaches)
+  set in Vercel `RESEND_API_KEY` (prod) + redeployed. Live test send delivered. ⬜ optional: `RESEND_WEBHOOK_SECRET`
+  for bounce auto-suppression not set yet (sending works without it).
+- **🎚 Agent toggle in the CLIENT portal, per agent (#809).** Train Agent → 🎚 Autonomy now shows for the academy
+  owner (not just staff) and is per-agent (booking/confirm/closing via `_TA_MODE_FIELD`/`_TA_MODE_ACTION`).
+  `agent-config.js` set-*-mode authorize via `resolveAgentActor.canActOn` (own academy) not requireStaff; `list`
+  stays staff-only. self_drive still staff-only + globally blocked → academy only gets Off / 👁 Hawkeye.
+- **📧 Email step PREVIEW modal (#819).** Step-builder email steps have a 👁 Preview button → `automations.js`
+  `preview-email` action → `renderEmail` (template refs + brand frame + sample tokens Alex/Jordan) → iframe modal.
+- **👁 Hawkeye per agent + 🔄 Scan top-left (#822).** Sales board: each agent stage (Responded/Sched Trial/Done
+  Trial) has its own Hawkeye button (`_apxOpen`/`_acxOpen`/`_aclxOpen`, colour-matched); Scan moved out of the
+  Responded column to the board's top-left (one scan for the board).
+- **🌐 GLOBAL brain editing — GTA edits the shared sections for ALL academies (#823).** The locked "MANAGED BY
+  BAM (global)" sections (general+goal layers) now live in a shared store `agent_global_sections` (migration
+  20260626170000, APPLIED; separate table b/c agent_prompt_sections.client_id has a NOT-NULL FK). NEW
+  `api/agent/_sections.js` = the split's source of truth: `isGlobalSection` (general/goal=global, location/offer=
+  local), `canEditGlobalBrain` (staff OR `GLOBAL_BRAIN_EDITOR_CLIENT_IDS=[GTA]`), `loadMergedOverrides` (global
+  brain UNDER the academy's own), `set/deleteGlobalSection`. ALL agents (approvals/confirm/closing/sandbox/train)
+  build from the merge. `agent-train` returns global sections editable+`scope:'global'` for a global editor; writes
+  route to the global store. Client-portal Knowledge tab badges them `🌐 GLOBAL · all academies` + confirms on save.
+  **Empty store = byte-identical to old behavior;** other academies still see them locked. ⚠️ blast radius: a GTA
+  edit changes EVERY academy's agent prompt.
+- ⬜ STILL OPEN: **📊 campaign-tracking redesign** (per-campaign card: name · monthly budget · change-date-range ·
+  spend/leads/CPL tiles defaulting to MTD). MAPPED not built. Backend gap: the Meta API is FIXED to
+  `date_preset(this_month)` / preset windows - a true per-campaign date-range picker needs `since`/`until` added to
+  `handleMetaReport` in `api/marketing.js`. Per-campaign leads+CPL exist in the report endpoint; "monthly budget" =
+  either Meta campaign budget (`budget_display`, null for ad-set budgets) or client-level `meta_monthly_budget`.
+
 ### ✅ DONE 2026-06-26: self-drive globally blocked + per-agent Autonomy (PR #805, merged)
 - **🔒 Self-drive is OFF for everyone right now.** One flag `SELF_DRIVE_GLOBALLY_DISABLED=true` in
   `api/agent/_mode.js`. While true: `shouldAutoSend()` always returns false (deepest net - no agent auto-sends
