@@ -2192,6 +2192,59 @@ async function handleMetaReport(req, res) {
   const fmt = (d) => d.toISOString().slice(0, 10);
   const FIELDS = "campaign_id,campaign_name,spend,impressions,reach,frequency,inline_link_clicks,actions";
 
+  // ── window=range: arbitrary [since, until], optional previous-period compare ──
+  // since/until are YYYY-MM-DD (inclusive). compare=1 also fetches the equal-length
+  // window immediately before `since`. ONE Meta call (time_increment=1), bucketed.
+  if (req.query.window === "range") {
+    const reDate = /^\d{4}-\d{2}-\d{2}$/;
+    const since = String(req.query.since || "");
+    const until = String(req.query.until || "");
+    if (!reDate.test(since) || !reDate.test(until)) {
+      return res.status(400).json({ error: "since/until must be YYYY-MM-DD", ...base });
+    }
+    const sinceD = new Date(since + "T00:00:00Z");
+    const untilD = new Date(until + "T00:00:00Z");
+    if (untilD < sinceD) return res.status(400).json({ error: "until must be on/after since", ...base });
+    const compare = req.query.compare === "1";
+    const DAY = 86400000;
+    const lenDays = Math.round((untilD - sinceD) / DAY) + 1; // inclusive
+    const prevUntilD = new Date(sinceD.getTime() - DAY);
+    const prevSinceD = new Date(prevUntilD.getTime() - (lenDays - 1) * DAY);
+    const fetchSince = compare ? prevSinceD : sinceD;
+
+    const url = `${META_GRAPH}/${adAcct}/insights?` + new URLSearchParams({
+      level: "campaign", fields: FIELDS,
+      time_range: JSON.stringify({ since: fmt(fetchSince), until: fmt(untilD) }),
+      time_increment: "1", access_token: staffToken, limit: "500",
+    });
+    const r = await fetch(url);
+    const j = await r.json();
+    if (!r.ok) return res.status(r.status).json({ error: j?.error?.message || "Meta API error", ...base });
+
+    const splitDay = fmt(sinceD); // rows on/after `since` = current period
+    const cur = new Map(), prev = new Map();
+    for (const row of (j.data || [])) {
+      if (allow && !allow.has(row.campaign_id)) continue;
+      const bucket = (row.date_start >= splitDay) ? cur : prev;
+      if (!bucket.has(row.campaign_id)) bucket.set(row.campaign_id, { name: row.campaign_name || "(unnamed)", acc: newAcc() });
+      sumRowInto(bucket.get(row.campaign_id).acc, row);
+    }
+    const campaigns = [...cur.entries()].map(([id, v]) => ({ id, name: v.name, ...finalizeMetrics(v.acc) }));
+    const period = {
+      key: "range",
+      label: `${since} to ${until}`,
+      campaigns,
+      totals: totalsFromCampaigns(campaigns),
+    };
+    if (compare) {
+      const prevCampaigns = [...prev.entries()].map(([id, v]) => ({ id, ...finalizeMetrics(v.acc) }));
+      period.compareTotals = totalsFromCampaigns(prevCampaigns);
+      period.compareCampaigns = prevCampaigns;
+      period.compareLabel = `${fmt(prevSinceD)} to ${fmt(prevUntilD)}`;
+    }
+    return res.status(200).json({ ad_account: adAcct, view: "range", periods: [period], ...base });
+  }
+
   // ── window=last7: last 7 complete days vs previous 7 ──────────────────
   if (req.query.window === "last7") {
     const now = new Date();
