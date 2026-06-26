@@ -106,6 +106,9 @@ export function resolveMergeVars(html, L, vars = {}) {
     "location.name": L.full || "",
     "location.website": L.siteUrl || "",
     "location_owner.first_name": L.ownerFirst || "",
+    // Filled at send time by the worker (e.g. "Our next session is Tue 6pm. ").
+    // Empty string when no slot is known so the sentence just drops out.
+    "next_session": vars.next_session || "",
   };
   let out = html;
   for (const [k, val] of Object.entries(map)) {
