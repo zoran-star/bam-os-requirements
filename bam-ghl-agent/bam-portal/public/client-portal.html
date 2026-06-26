@@ -15698,17 +15698,17 @@ function openTrainAgentView() {
   if (!_TA.target) _TA.target = 'booking';
   const isAgent = _taIsAgent();
   const isStaff = (typeof _IS_BAM_STAFF !== 'undefined' && _IS_BAM_STAFF === true);
-  // keep the sub-tab valid for the chosen agent (Lessons is booking-only; Autonomy is staff-only)
+  // keep the sub-tab valid for the chosen agent (Lessons works for every agent now;
+  // Autonomy is staff-only)
   if (isAgent) {
     if (!['test', 'lessons', 'knowledge', 'mode'].includes(_TA.tab)) _TA.tab = 'test';
-    if (_TA.tab === 'lessons' && _TA.target !== 'booking') _TA.tab = 'test';
     if (_TA.tab === 'mode' && !isStaff) _TA.tab = 'test';
   }
   const pill = (k, label, active) => `<button onclick="_taPick('${k}')" style="background:${active ? 'var(--gold)' : 'transparent'};color:${active ? '#0B0B0D' : 'var(--text-sub)'};border:1px solid ${active ? 'var(--gold)' : 'var(--border)'};border-radius:8px;padding:7px 13px;font-size:13px;font-weight:700;cursor:pointer">${label}</button>`;
   const tab = (k, label) => `<button onclick="_taTab('${k}')" style="background:${_TA.tab === k ? 'var(--gold)' : 'transparent'};color:${_TA.tab === k ? '#0B0B0D' : 'var(--text-sub)'};border:1px solid ${_TA.tab === k ? 'var(--gold)' : 'var(--border)'};border-radius:8px;padding:7px 14px;font-size:13px;font-weight:600;cursor:pointer">${label}</button>`;
   const targetName = (isAgent ? _TA_AGENTS[_TA.target] : _TA_AUTOS[_TA.target]).replace(/^\S+\s/, '');
   const blurb = isAgent
-    ? `Coach your academy's <b>${targetName} agent</b>. Test it and keep its facts current in Knowledge${_TA.target === 'booking' ? ', plus teach it Lessons' : ''} - changes apply to <b>your academy</b> right away.`
+    ? `Coach your academy's <b>${targetName} agent</b>. Test it, teach it Lessons, and keep its facts current in Knowledge - changes apply to <b>your academy</b> right away.`
     : `Edit your academy's <b>${targetName}</b> sequence - the timed text/email steps. Approve it once and flip it on.`;
   host.innerHTML = `
     <div style="display:flex;gap:7px;margin-bottom:14px;flex-wrap:wrap;align-items:center">
@@ -15720,7 +15720,7 @@ function openTrainAgentView() {
     <p style="color:var(--text-sub);font-size:13.5px;margin:0 0 14px;max-width:640px;line-height:1.55">${blurb}</p>
     ${isAgent ? `<div style="display:flex;gap:8px;margin-bottom:18px;flex-wrap:wrap">
       ${tab('test', '💬 Test')}
-      ${_TA.target === 'booking' ? tab('lessons', '📚 Lessons') : ''}
+      ${tab('lessons', '📚 Lessons')}
       ${tab('knowledge', '📍 Knowledge')}
       ${isStaff ? tab('mode', '🎚 Autonomy') : ''}
     </div>` : ''}

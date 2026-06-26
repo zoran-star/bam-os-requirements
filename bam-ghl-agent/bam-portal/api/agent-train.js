@@ -92,9 +92,9 @@ function pickAcademy(ctx, bodyClientId) {
   return { clientId: grant.client_id, clientUserId: grant.id };
 }
 
-async function activeLessons(clientId) {
+async function activeLessons(clientId, agent = "booking") {
   try {
-    const rows = await sb(`agent_lessons?client_id=eq.${clientId}&active=eq.true&select=lesson,kind&order=created_at.asc`);
+    const rows = await sb(`agent_lessons?client_id=eq.${clientId}&agent=eq.${agent}&active=eq.true&select=lesson,kind&order=created_at.asc`);
     return Array.isArray(rows) ? rows : [];
   } catch (_) { return []; }
 }
@@ -150,12 +150,12 @@ function buildSystem(lessons, overrides, examples, leadContext, agent = "booking
 async function handleChat(messages, clientId, leadContext, res, agent = "booking") {
   if (!ANTHROPIC_KEY) return res.status(500).json({ error: "ANTHROPIC_API_KEY not configured" });
   if (!Array.isArray(messages) || !messages.length) return res.status(400).json({ error: "messages required" });
-  // confirm/closing preview from the clean brain - no booking lessons/examples.
-  const useLessons = lessonsAllowed(agent);
+  // Each agent previews from ITS OWN lessons (booking/confirm/closing, scoped). Saved
+  // examples stay a booking-only surface for now.
   const [lessons, overrides, examples] = await Promise.all([
-    useLessons ? activeLessons(clientId) : Promise.resolve([]),
+    activeLessons(clientId, agent),
     sectionOverrides(clientId),
-    useLessons ? savedExamples(clientId) : Promise.resolve([]),
+    agent === "booking" ? savedExamples(clientId) : Promise.resolve([]),
   ]);
   const system = buildSystem(lessons, overrides, examples, leadContext, agent);
   const msgs = messages.filter(m => m && typeof m.text === "string" && m.text.trim() !== "")
@@ -227,9 +227,9 @@ async function handler(req, res) {
       return await handleChat(b.messages, clientId, b.lead_context || "", res, pickAgent(b.agent));
     }
 
-    // Lessons + examples are a booking-only surface; confirm/closing train via Knowledge + Test.
-    if (["teach", "save-example", "lessons", "forget"].includes(b.action) && !lessonsAllowed(pickAgent(b.agent))) {
-      return res.status(400).json({ error: "Lessons are for the booking agent. Train this agent in Knowledge + Test." });
+    // Saved examples stay a booking-only surface; lessons are now per-agent (below).
+    if (b.action === "save-example" && pickAgent(b.agent) !== "booking") {
+      return res.status(400).json({ error: "Saved examples are for the booking agent. Train this agent in Lessons + Knowledge + Test." });
     }
 
     if (b.action === "teach") {
@@ -240,6 +240,7 @@ async function handler(req, res) {
         method: "POST", headers: { Prefer: "return=representation" },
         body: JSON.stringify([{
           client_id: clientId,
+          agent: pickAgent(b.agent),
           kind: b.kind || "lesson",
           lesson: text,
           context: b.context || {},
@@ -263,7 +264,7 @@ async function handler(req, res) {
     }
 
     if (b.action === "lessons") {
-      const rows = await sb(`agent_lessons?client_id=eq.${clientId}&active=eq.true&select=id,kind,lesson,scope,promotion_status,promotion_reason,created_by,created_at&order=created_at.desc`);
+      const rows = await sb(`agent_lessons?client_id=eq.${clientId}&agent=eq.${pickAgent(b.agent)}&active=eq.true&select=id,kind,lesson,scope,promotion_status,promotion_reason,created_by,created_at&order=created_at.desc`);
       return res.status(200).json({ lessons: Array.isArray(rows) ? rows : [] });
     }
 
