@@ -23272,11 +23272,16 @@ function _renderPipelineBoard() {
     }
     if (!cardsHtml) cardsHtml = '<div class="pl-empty">No cards here yet.</div>';
     const glowCol = (_plV2 && isResponded && _agentOn) ? 'box-shadow:0 0 0 1px var(--blue,#5A8FB8),0 0 18px rgba(90,143,184,0.45);border-color:var(--blue,#5A8FB8);' : '';
-    const hawkBtn = (_plV2 && isResponded && _agentOn)
-      ? `<div style="display:flex;gap:6px;margin-bottom:8px">
-          <button onclick="_apxOpen()" title="Open the agent approval queue" style="flex:1;box-sizing:border-box;background:var(--blue-soft,rgba(90,143,184,0.12));color:var(--blue,#5A8FB8);border:1px solid var(--blue,#5A8FB8);border-radius:7px;padding:9px;font-size:12.5px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px">👁 Hawkeye</button>
-          <button id="pl-scan-btn" onclick="_plScanNow('pl-scan-btn')" title="Re-scan this stage now for new actions (don't wait for the every-30-min check)" style="box-sizing:border-box;background:transparent;color:var(--text-sub);border:1px solid var(--border);border-radius:7px;padding:9px 11px;font-size:12.5px;font-weight:700;cursor:pointer;white-space:nowrap">🔄 Scan</button>
-        </div>`
+    // Every agent stage gets its own 👁 Hawkeye button that opens THAT agent's
+    // approval queue: Booking (Responded) → _apxOpen, Confirm (Scheduled Trial) →
+    // _acxOpen, Closing (Done Trial) → _aclxOpen. The Scan button moved to the
+    // board's top-left (one scan for the whole board) - see below.
+    const _hawk = isResponded ? { fn: '_apxOpen()', c: '#5A8FB8' }
+                : isSchedTrial ? { fn: '_acxOpen()', c: '#5FB87A' }
+                : isDoneStage  ? { fn: '_aclxOpen()', c: '#9D7BD8' }
+                : null;
+    const hawkBtn = (_plV2 && _hawk)
+      ? `<button onclick="${_hawk.fn}" title="Open this agent's Hawkeye approval queue" style="width:100%;box-sizing:border-box;margin-bottom:8px;background:transparent;color:${_hawk.c};border:1px solid ${_hawk.c};border-radius:7px;padding:9px;font-size:12.5px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px">👁 Hawkeye</button>`
       : '';
     const _sb = _plV2 ? _plStageBot(s.name) : null;
     let _colStyle = glowCol, _hTag = '';
@@ -23316,7 +23321,12 @@ function _renderPipelineBoard() {
   // shortly after it opens; without this, each rebuild snapped scrollLeft back to
   // 0 and the columns "jumped left and right" while you were swiping on mobile.
   const _plPrevScroll = container.querySelector('.pl-board')?.scrollLeft || 0;
-  container.innerHTML = `<div class="pl-board">${colHtml}</div>`;
+  // Scan button: top-left of the board (one re-scan for the whole board), moved out
+  // of the Responded column so each agent stage shows only its own Hawkeye button.
+  const scanBar = (_plV2 && _agentOn)
+    ? `<div style="display:flex;margin-bottom:10px"><button id="pl-scan-btn" onclick="_plScanNow('pl-scan-btn')" title="Re-scan now for new agent actions (don't wait for the every-30-min check)" style="background:transparent;color:var(--text-sub);border:1px solid var(--border);border-radius:7px;padding:7px 13px;font-size:12.5px;font-weight:700;cursor:pointer;white-space:nowrap">🔄 Scan</button></div>`
+    : '';
+  container.innerHTML = `${scanBar}<div class="pl-board">${colHtml}</div>`;
   if (_plPrevScroll) { const _nb = container.querySelector('.pl-board'); if (_nb) _nb.scrollLeft = _plPrevScroll; }
 }
 
