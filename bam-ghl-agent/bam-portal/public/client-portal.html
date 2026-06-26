@@ -6418,8 +6418,8 @@
             <div class="guide-card-body">
               <p class="gc-intro">You bring the raw material, <b>we make it sharp, we run it</b>, and you watch the results. Here's the whole flow.</p>
               <div class="gc-step"><span class="gc-num">1</span><span class="gc-tx"><span class="gc-h">Where your ads live</span><span class="gc-t">Everything paid sits under <b>Marketing &rsaquo; Ads</b> - your live campaigns, your spend, and your cost per lead.</span></span></div>
-              <div class="gc-step"><span class="gc-num">2</span><span class="gc-tx"><span class="gc-h">You control the spend</span><span class="gc-t">Adjust your own ad spend right on the campaign. You change it, it updates - no waiting on us.</span></span></div>
-              <div class="gc-step"><span class="gc-num">3</span><span class="gc-tx"><span class="gc-h">Request a new ad</span><span class="gc-t">Hit <b>Add new creative</b>. Drop in raw photos and clips with a note on the vibe, pick your <b>format</b> and <b>captions</b>, mark it urgent if it's time-sensitive, and submit.</span></span></div>
+              <div class="gc-step"><span class="gc-num">2</span><span class="gc-tx"><span class="gc-h">Request a new ad</span><span class="gc-t">Hit <b>+ Add New Campaign</b> (or <b>Add new creative</b> on a running one). Pick your offer, drop in your raw photos and clips with a note on the vibe, and pick your <b>format</b>.</span></span></div>
+              <div class="gc-step"><span class="gc-num">3</span><span class="gc-tx"><span class="gc-h">Set your spend</span><span class="gc-t">You set your monthly spend as the last step before you submit - and you can adjust it anytime right on the campaign. You change it, it updates - no waiting on us.</span></span></div>
               <div class="gc-step"><span class="gc-num">4</span><span class="gc-tx"><span class="gc-h">What happens next</span><span class="gc-t">Our content team turns your raw assets into a polished creative, then marketing launches it on Meta. Track it under <b>What's in flight</b>.</span></span></div>
               <div class="gc-step"><span class="gc-num">5</span><span class="gc-tx"><span class="gc-h">If we need you</span><span class="gc-t">You'll see an <b>Action needed</b> flag - reply right there and we keep moving.</span></span></div>
               <div class="gc-pdf"><button type="button" onclick="_openGuideResource('paid ad')">Open the printable PDF</button></div>
@@ -6447,7 +6447,7 @@
               <div class="gc-step"><span class="gc-num">5</span><span class="gc-tx"><span class="gc-h">Transformation</span><span class="gc-t">Before and after, side by side. One athlete, result obvious at a glance.</span></span></div>
               <div class="gc-step"><span class="gc-num">6</span><span class="gc-tx"><span class="gc-h">Testimonial</span><span class="gc-t">Real reviews, word for word, with a name and a face.</span></span></div>
               <div class="gc-group">How to send it</div>
-              <div class="gc-step"><span class="gc-num">&rsaquo;</span><span class="gc-tx"><span class="gc-t"><b>Marketing &rsaquo; Ads &rsaquo; Add new creative.</b> Drag your files in (or Upload a folder), pick the <b>format</b> - vertical for video, Feed for graphics - and captions yes or no. Over 500MB? Drop a share link. Mark urgent if needed, submit, and watch it under <b>What's in flight</b>.</span></span></div>
+              <div class="gc-step"><span class="gc-num">&rsaquo;</span><span class="gc-tx"><span class="gc-t"><b>Marketing &rsaquo; Ads &rsaquo; Add new creative.</b> Drag your files in (or Upload a folder), pick the <b>format</b> - vertical for video, Feed for graphics. Over 500MB? Drop a share link. Mark urgent if needed, submit, and watch it under <b>What's in flight</b>. Your spend is set as the last step.</span></span></div>
               <div class="gc-step"><span class="gc-num">!</span><span class="gc-tx"><span class="gc-t"><b>One rule: send raw, don't edit.</b> The clips, the photos, the quotes. Cutting and designing is on us.</span></span></div>
               <div class="gc-pdf"><button type="button" onclick="_openGuideResource('first campaign')">Open the printable PDF</button></div>
             </div>
@@ -20249,6 +20249,10 @@ function openAddCreativeModal(channel) {
   // Reset the creative-spec fields each open.
   const fmt = document.getElementById('inputAssetsFormat'); if (fmt) fmt.value = '9:16 Vertical';
   const cap = document.getElementById('inputAssetsCaptions'); if (cap) cap.checked = false;
+  // Captions are a client choice for ORGANIC posts only - on paid ads the
+  // content/marketing team handles captions, so hide the option there.
+  const capRow = document.getElementById('inputAssetsCaptionsRow');
+  if (capRow) capRow.style.display = (_inputAssetsChannel === 'organic') ? '' : 'none';
   // Channel-aware copy: organic goes back to the client to review, not into a campaign.
   const sub = document.getElementById('inputAssetsSub');
   if (sub) sub.textContent = _inputAssetsChannel === 'organic'
@@ -35512,7 +35516,7 @@ function toggleTheme() {
       <option value="4:5 Feed">4:5 - Feed (Instagram / Facebook post)</option>
     </select>
 
-    <label class="modal-label" style="margin-top:16px;display:flex;align-items:center;gap:10px;cursor:pointer;font-weight:400">
+    <label class="modal-label" id="inputAssetsCaptionsRow" style="margin-top:16px;display:flex;align-items:center;gap:10px;cursor:pointer;font-weight:400">
       <input type="checkbox" id="inputAssetsCaptions" style="width:16px;height:16px;accent-color:var(--gold);cursor:pointer;flex:none">
       <span>Add on-screen captions</span>
     </label>
