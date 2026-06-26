@@ -15865,22 +15865,34 @@ const _TA_MODES = [
   { key: 'self_drive', label: '🚀 Self-drive', hint: "Agent sends high-confidence messages itself. Anything it's unsure about still drops to the inbox." },
 ];
 
+// The Autonomy tab controls the CURRENTLY-PICKED agent (booking/confirm/closing),
+// not just booking - each has its own switch (matches the staff portal). The mode
+// for each lives on the list row as mode / confirm_mode / closing_mode and is set
+// via set-mode / set-confirm-mode / set-closing-mode.
+const _TA_MODE_FIELD  = { booking: 'mode',     confirm: 'confirm_mode',     closing: 'closing_mode' };
+const _TA_MODE_ACTION = { booking: 'set-mode', confirm: 'set-confirm-mode', closing: 'set-closing-mode' };
+
 async function _taRenderMode() {
   const p = document.getElementById('ta-panel'); if (!p) return;
+  const agent = _taIsAgent() ? _TA.target : 'booking';
   p.innerHTML = `<div style="color:var(--text-mute);font-size:13px"><span class="req-spin"></span> Loading…</div>`;
-  let cur = 'off';
+  let cur = 'off', selfDriveOn = false;
   try {
     const d = await _taConfigApi('list');
     const row = (d.academies || []).find(a => a.client_id === CLIENT_ID);
-    cur = (row && row.mode) || 'off';
+    cur = (row && row[_TA_MODE_FIELD[agent]]) || 'off';
+    selfDriveOn = !!d.self_drive_enabled;   // 🔒 global kill-switch
   } catch (e) { p.innerHTML = `<div style="color:#e07070;font-size:13px">Couldn't load - ${escapeHTML(e.message)}</div>`; return; }
-  _TA.mode = cur;
+  _TA.mode = cur; _TA.selfDriveOn = selfDriveOn;
+  const modes = _TA_MODES.filter(m => selfDriveOn || m.key !== 'self_drive');
   const seg = (on, danger) => `background:${on ? (danger ? '#e05a42' : 'var(--gold)') : 'transparent'};color:${on ? '#0B0B0D' : 'var(--text-sub)'};border:1px solid ${on ? (danger ? '#e05a42' : 'var(--gold)') : 'var(--border)'};border-radius:9px;padding:9px 16px;font-size:13.5px;font-weight:700;cursor:pointer;font-family:inherit`;
   const curMode = _TA_MODES.find(m => m.key === cur) || _TA_MODES[0];
+  const agentLabel = (_TA_AGENTS[agent] || '📞 Booking');
   p.innerHTML = `
-    <p style="color:var(--text-mute);font-size:12.5px;margin:0 0 14px;line-height:1.55;max-width:620px">One switch for this academy - it controls <b style="color:var(--text)">both</b> the Responded-stage reply bot and the follow-up nudges. <b style="color:var(--text)">BAM staff only.</b></p>
+    <p style="color:var(--text-mute);font-size:12.5px;margin:0 0 14px;line-height:1.55;max-width:620px">Autonomy for the <b style="color:var(--text)">${escapeHTML(agentLabel)}</b> agent. <b style="color:var(--text)">BAM staff only.</b></p>
+    ${selfDriveOn ? '' : `<div style="font-size:12px;color:var(--gold);background:rgba(232,197,71,.08);border:1px solid rgba(232,197,71,.33);border-radius:9px;padding:9px 12px;margin-bottom:12px;line-height:1.5;max-width:620px">🔒 <b>Self-drive is disabled right now</b> for all academies - agents are capped at Off / 👁 Hawkeye, so nothing sends without approval.</div>`}
     <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">
-      ${_TA_MODES.map(m => `<button onclick="_taSetMode('${m.key}')" style="${seg(cur === m.key, m.key === 'self_drive')}">${m.label}</button>`).join('')}
+      ${modes.map(m => `<button onclick="_taSetMode('${m.key}')" style="${seg(cur === m.key, m.key === 'self_drive')}">${m.label}</button>`).join('')}
     </div>
     <div style="font-size:13px;color:${cur === 'self_drive' ? '#e05a42' : 'var(--text-sub)'};line-height:1.5">${escapeHTML(curMode.hint)}</div>`;
 }
@@ -15888,6 +15900,7 @@ async function _taRenderMode() {
 async function _taSetMode(mode) {
   if (mode === _TA.mode) return;
   if (mode === 'self_drive') {
+    if (!_TA.selfDriveOn) { _plToast('🔒 Self-drive is disabled right now'); return; }   // belt + suspenders (server also blocks)
     _plConfirmModal({
       icon: '⚠️',
       title: 'Turn on Self-drive?',
@@ -15900,7 +15913,8 @@ async function _taSetMode(mode) {
   _taSetModeGo(mode);
 }
 async function _taSetModeGo(mode) {
-  try { await _taConfigApi('set-mode', { client_id: CLIENT_ID, mode }); _TA.mode = mode; _taRenderMode(); _plToast('🎚 Mode set: ' + mode.replace('_', '-')); }
+  const agent = _taIsAgent() ? _TA.target : 'booking';
+  try { await _taConfigApi(_TA_MODE_ACTION[agent], { client_id: CLIENT_ID, mode }); _TA.mode = mode; _taRenderMode(); _plToast('🎚 Mode set: ' + mode.replace('_', '-')); }
   catch (e) { alert(e.message); }
 }
 

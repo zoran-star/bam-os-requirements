@@ -16,6 +16,15 @@ export const AGENT_MODES = ["off", "hawkeye", "self_drive"];
 // (0..1) AND not escalating. Everything else drops to the inbox for a human.
 export const SELF_DRIVE_MIN_CONFIDENCE = 0.8;
 
+// 🔒 GLOBAL KILL-SWITCH (2026-06-26, Zoran): self-drive (autonomous send) is
+// disabled for EVERY academy right now. While true:
+//   • shouldAutoSend() ALWAYS returns false (deepest net - even a stray
+//     self_drive row can never auto-send; everything stays Hawkeye/approve),
+//   • the mode setters in agent-config.js reject self_drive (403),
+//   • the API reports self_drive_enabled:false so both UIs hide the 🚀 button.
+// Flip to false to re-enable self-drive (per-academy opt-in still applies). One flag.
+export const SELF_DRIVE_GLOBALLY_DISABLED = true;
+
 export function agentMode(client) {
   const cfg = (client && client.ghl_kpi_config) || {};
   const m = cfg.agent_mode;
@@ -49,6 +58,7 @@ export const modeSelfDrives = (mode) => mode === "self_drive";
 
 // Should this draft be auto-sent (self-drive) rather than queued for approval?
 export function shouldAutoSend(mode, { confidence, escalate } = {}) {
+  if (SELF_DRIVE_GLOBALLY_DISABLED) return false;   // 🔒 global kill-switch - nothing auto-sends
   if (!modeSelfDrives(mode)) return false;
   if (escalate) return false;
   return typeof confidence === "number" && confidence >= SELF_DRIVE_MIN_CONFIDENCE;
