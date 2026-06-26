@@ -97,7 +97,7 @@ function deriveClientStatus(client, t) {
   return null;
 }
 
-export default function ClientsCombinedView({ tokens, dark, me, session, initialClientId, onInitialClientHandled, onDetailChange }) {
+export default function ClientsCombinedView({ tokens, dark, me, session, initialClientId, onInitialClientHandled, onDetailChange, onNavigate }) {
   const t = tokens;
   const role = me?.role || "";
 
@@ -207,6 +207,7 @@ export default function ClientsCombinedView({ tokens, dark, me, session, initial
         session={session}
         onBack={() => setSelectedId(null)}
         onChanged={refresh}
+        onNavigate={onNavigate}
       />
     );
   }
@@ -413,7 +414,7 @@ function ClientRow({ client, staff, tokens, isOnline, onClick }) {
 }
 
 // ─── Detail view with tabs ──────────────────────────────────────────────────
-function ClientDetail({ client, staff, staffMap, tokens, dark, me, session, onBack, onChanged }) {
+function ClientDetail({ client, staff, staffMap, tokens, dark, me, session, onBack, onChanged, onNavigate }) {
   const t = tokens;
   const role = me?.role || "";
   const [tab, setTab] = useState("onboarding");
@@ -478,7 +479,7 @@ function ClientDetail({ client, staff, staffMap, tokens, dark, me, session, onBa
       {tab === "messages" && <MessagesTab client={client} tokens={t} session={session} me={me} />}
       {tab === "setup" && <SetupTab client={client} staff={staff} tokens={t} role={role} session={session} onChanged={onChanged} onBack={onBack} />}
       {tab === "team" && <TeamTab client={client} tokens={t} session={session} />}
-      {tab === "marketing" && <MarketingTab client={client} tokens={t} role={role} session={session} onChanged={onChanged} />}
+      {tab === "marketing" && <MarketingTab client={client} tokens={t} role={role} session={session} onChanged={onChanged} onNavigate={onNavigate} />}
       {tab === "content" && <ContentTab client={client} tokens={t} role={role} session={session} onChanged={onChanged} />}
       {tab === "sales" && <div style={{ marginTop: 8 }}><GhlKpiDiscovery client={client} tokens={t} session={session} salesMode /></div>}
       {tab === "systems" && <SystemsTab client={client} tokens={t} dark={dark} me={me} />}
@@ -1191,7 +1192,56 @@ function suggestAdAccount(clientName, adAccounts) {
   return bestScore >= 15 ? best : null;
 }
 
-export function MarketingTab({ client, tokens, role, session, onChanged, forceCanEdit = false }) {
+// Stacked-section header for the redesigned Marketing tab.
+function MktSectionHead({ t, title, desc, style }) {
+  return (
+    <div style={{ marginBottom: 16, ...style }}>
+      <div style={{ fontFamily: "'Space Grotesk', sans-serif", fontSize: 18, fontWeight: 700, color: t.text, letterSpacing: "-0.01em" }}>{title}</div>
+      {desc && <div style={{ fontSize: 12.5, color: t.textMute, marginTop: 3, lineHeight: 1.5 }}>{desc}</div>}
+      <div style={{ height: 1, background: t.border, marginTop: 12 }} />
+    </div>
+  );
+}
+
+const MKT_TYPE_LABEL = {
+  replace: "Replace creative", add: "Add creative", remove: "Remove creative",
+  budget: "Budget change", "campaign-create": "New campaign", "budget-review": "Budget confirmation",
+};
+
+// One row in the Marketing tab's Tickets section.
+function MktTicketRow({ tk, tokens: t, onOpen }) {
+  const label = MKT_TYPE_LABEL[tk.type] || "Request";
+  const code = String(tk.id || "").slice(0, 3).toUpperCase();
+  const awaiting = tk.client_action_status === "requested";
+  const pill = awaiting
+    ? { txt: "Awaiting client", c: t.red || "#ED7969" }
+    : tk.status === "completed" ? { txt: "Completed", c: t.green }
+    : tk.status === "cancelled" ? { txt: "Cancelled", c: t.textMute }
+    : { txt: "In progress", c: t.accent };
+  const when = tk.submitted_at ? new Date(tk.submitted_at).toLocaleDateString("en-US", { month: "short", day: "numeric" }) : "";
+  const campaign = tk.fields?.campaign_title || tk.fields?.offer || "";
+  return (
+    <div
+      onClick={() => onOpen(tk.id)}
+      style={{
+        display: "grid", gridTemplateColumns: "auto 1.6fr 1fr auto", gap: 12, alignItems: "center",
+        padding: "12px 14px", borderBottom: `1px solid ${t.border}`, cursor: "pointer",
+      }}
+      onMouseEnter={e => e.currentTarget.style.background = t.surfaceHov || "transparent"}
+      onMouseLeave={e => e.currentTarget.style.background = "transparent"}
+    >
+      <span style={{ fontFamily: "monospace", fontSize: 10, letterSpacing: "0.1em", color: t.textMute, padding: "2px 6px", borderRadius: 4, background: "rgba(255,255,255,0.04)", border: `1px solid ${t.border}` }}>{code}</span>
+      <div>
+        <div style={{ fontSize: 13, fontWeight: 600, color: t.text }}>{label}</div>
+        {campaign && <div style={{ fontSize: 11.5, color: t.textMute, marginTop: 2 }}>{campaign}</div>}
+      </div>
+      <span style={{ fontSize: 11, fontWeight: 700, color: pill.c }}>{pill.txt}</span>
+      <span style={{ fontSize: 11.5, color: t.textMute, whiteSpace: "nowrap" }}>{when} ↗</span>
+    </div>
+  );
+}
+
+export function MarketingTab({ client, tokens, role, session, onChanged, onNavigate, forceCanEdit = false }) {
   const t = tokens;
   // forceCanEdit lets a host surface (e.g. the email-gated "Our Ads" tab) allow
   // its trusted viewers to pick campaigns even if their global role isn't a
@@ -1228,6 +1278,49 @@ export function MarketingTab({ client, tokens, role, session, onChanged, forceCa
     } finally {
       setSavingMetaAds(false);
     }
+  }
+
+  // Setup: does the client run their own ad account? false = BAM-managed
+  // (Leadsie connect path); true = own account (extra onboarding steps, TBD).
+  const usesOwnAdAccount = client.uses_own_ad_account === true;
+  const [savingOwnAcct, setSavingOwnAcct] = useState(false);
+  async function toggleOwnAdAccount(next) {
+    setSavingOwnAcct(true);
+    try {
+      const tok = session?.access_token;
+      const res = await fetch(`/api/clients?action=update-fields&id=${client.id}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${tok}` },
+        body: JSON.stringify({ client_id: client.id, uses_own_ad_account: next }),
+      });
+      const j = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(j.error || `HTTP ${res.status}`);
+      onChanged?.();
+    } catch (e) { alert("Couldn't save: " + (e.message || e)); }
+    finally { setSavingOwnAcct(false); }
+  }
+
+  // Tickets section: this client's marketing tickets (live + past).
+  const [clientTickets, setClientTickets] = useState(null);
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const tok = session?.access_token;
+        const res = await fetch(`/api/marketing-tickets?scope=staff&client_id=${client.id}&limit=200`, {
+          headers: { Authorization: `Bearer ${tok}` },
+        });
+        const j = await res.json().catch(() => ({}));
+        if (!cancelled) setClientTickets(res.ok && Array.isArray(j.tickets) ? j.tickets : []);
+      } catch { if (!cancelled) setClientTickets([]); }
+    })();
+    return () => { cancelled = true; };
+  }, [client.id, session]);
+
+  // Click a ticket -> jump to the staff Marketing page with it pre-opened.
+  function openTicketOnMarketingPage(ticketId) {
+    try { sessionStorage.setItem("bam_marketing_focus_ticket", ticketId); } catch { /* ignore */ }
+    if (onNavigate) onNavigate("marketing");
   }
 
   // "Request budget confirmation" — sends the client a budget-review request.
@@ -1434,7 +1527,10 @@ export function MarketingTab({ client, tokens, role, session, onChanged, forceCa
 
   return (
     <div style={{ maxWidth: 880 }}>
-      {/* Marketing included toggle — always at top */}
+      {/* ═══ SETUP ═══ */}
+      <MktSectionHead t={t} title="Setup" desc="Is marketing included, and does the client run their own ad account?" />
+
+      {/* Marketing included toggle */}
       <div style={{
         padding: "14px 18px", marginBottom: 22, borderRadius: 8,
         background: t.surfaceEl, border: `1px solid ${marketingIncluded ? t.border : `${t.amber}55`}`,
@@ -1478,11 +1574,65 @@ export function MarketingTab({ client, tokens, role, session, onChanged, forceCa
         )}
       </div>
 
-      {/* Meta Ads onboarding-tracker check (moved here from OverviewTab
-          2026-05-27 — staff owns the flip, lives next to the marketing
-          data so it's reviewed in context). Shows regardless of
-          marketing_included so it's discoverable even for clients
-          without marketing on. */}
+      {/* Own ad account toggle (Setup) */}
+      {marketingIncluded && canEdit && (
+        <div style={{
+          padding: "14px 18px", marginBottom: 22, borderRadius: 8,
+          background: t.surfaceEl, border: `1px solid ${t.border}`,
+          display: "flex", alignItems: "center", gap: 14,
+        }}>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 13, fontWeight: 600, color: t.text }}>
+              {usesOwnAdAccount ? "Uses their own ad account" : "BAM-managed ad account"}
+            </div>
+            <div style={{ fontSize: 12, color: t.textMute, marginTop: 2 }}>
+              {usesOwnAdAccount
+                ? "Client runs their own ad account - onboarding shows the extra setup steps."
+                : "Default - onboarding shows the Leadsie connect-link step."}
+            </div>
+          </div>
+          <button type="button" onClick={() => toggleOwnAdAccount(!usesOwnAdAccount)} disabled={savingOwnAcct}
+            aria-label="Toggle own ad account"
+            style={{ width: 44, height: 24, borderRadius: 999, position: "relative",
+              background: usesOwnAdAccount ? t.green : t.borderStr || t.border, border: "none",
+              cursor: savingOwnAcct ? "wait" : "pointer", transition: "background 0.2s ease", opacity: savingOwnAcct ? 0.6 : 1, flexShrink: 0 }}>
+            <span style={{ position: "absolute", top: 2, left: usesOwnAdAccount ? 22 : 2, width: 20, height: 20, borderRadius: "50%", background: "#fff", transition: "left 0.2s ease", boxShadow: "0 1px 3px rgba(0,0,0,0.2)" }} />
+          </button>
+        </div>
+      )}
+
+      {!marketingIncluded ? (
+        <div style={{ color: t.textMute, fontSize: 13, fontStyle: "italic", padding: "8px 0 4px" }}>
+          Marketing is off for this client - the rest of this tab is hidden. Turn it on above to manage their campaigns.
+        </div>
+      ) : <>
+
+      {/* ═══ ONBOARDING ═══ */}
+      <MktSectionHead t={t} title="Onboarding" desc="What the client has completed to get marketing live." style={{ marginTop: 34 }} />
+
+      {/* Connection step: Leadsie (default) or own-account steps */}
+      <div style={{ padding: "14px 18px", marginBottom: 14, borderRadius: 8, background: t.surfaceEl, border: `1px solid ${t.border}` }}>
+        {usesOwnAdAccount ? (
+          <>
+            <div style={{ fontSize: 13, fontWeight: 600, color: t.text }}>Own-account setup steps</div>
+            <div style={{ fontSize: 12, color: t.textMute, marginTop: 4, lineHeight: 1.5 }}>These steps are coming soon - we'll define what shows in the client's action items.</div>
+          </>
+        ) : (
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <span style={{ fontSize: 15 }}>{client.ads_connected_at ? "✅" : "⏳"}</span>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: 13, fontWeight: 600, color: t.text }}>Connect ad account (Leadsie)</div>
+              <div style={{ fontSize: 12, color: t.textMute, marginTop: 2 }}>
+                {client.ads_connected_at
+                  ? `Connected ${new Date(client.ads_connected_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}.`
+                  : "Waiting on the client to open the Leadsie link from their action items."}
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Meta Ads onboarding-tracker check */}
       <div style={{
         marginBottom: 18, padding: "12px 14px",
         background: metaAdsDone ? `${t.accent}10` : t.surfaceEl,
@@ -1490,23 +1640,45 @@ export function MarketingTab({ client, tokens, role, session, onChanged, forceCa
         borderRadius: 8,
       }}>
         <label style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer", fontSize: 13, color: t.text }}>
-          <input
-            type="checkbox"
-            checked={metaAdsDone}
-            disabled={savingMetaAds}
-            onChange={(e) => toggleMetaAdsDone(e.target.checked)}
-            style={{ width: 16, height: 16, cursor: "pointer", accentColor: t.accent }}
-          />
+          <input type="checkbox" checked={metaAdsDone} disabled={savingMetaAds} onChange={(e) => toggleMetaAdsDone(e.target.checked)} style={{ width: 16, height: 16, cursor: "pointer", accentColor: t.accent }} />
           <span style={{ fontWeight: 600 }}>Meta Ads onboarding complete?</span>
           {savingMetaAds && <span style={{ color: t.textMute, fontSize: 11, fontFamily: "monospace" }}>saving…</span>}
         </label>
         <div style={{ fontSize: 11, color: t.textMute, marginTop: 6, marginLeft: 26, lineHeight: 1.5 }}>
-          Fills the "Meta Ads" circle on the client's onboarding tracker. Check when Meta is wired + the ad account is producing data on this tab.
+          Fills the "Meta Ads" circle on the client's onboarding tracker. Check when Meta is wired + the ad account is producing data.
         </div>
       </div>
 
-      {/* Everything below is hidden when marketing is not included */}
-      {!marketingIncluded ? null : <>
+      {/* ═══ TICKETS ═══ */}
+      <MktSectionHead t={t} title="Tickets" desc="Marketing tickets for this client. Click one to open it on the Marketing page." style={{ marginTop: 34 }} />
+      {clientTickets === null ? (
+        <div style={{ color: t.textMute, fontSize: 13, padding: "8px 0" }}>Loading tickets…</div>
+      ) : (() => {
+        const live = clientTickets.filter(tk => tk.status === "in-progress");
+        const past = clientTickets.filter(tk => tk.status === "completed" || tk.status === "cancelled");
+        return (
+          <>
+            {live.length === 0 ? (
+              <div style={{ color: t.textMute, fontSize: 13, fontStyle: "italic", padding: "8px 0" }}>No live tickets.</div>
+            ) : (
+              <div style={{ background: t.surfaceEl, border: `1px solid ${t.border}`, borderRadius: 8, overflow: "hidden", marginBottom: past.length ? 12 : 0 }}>
+                {live.map(tk => <MktTicketRow key={tk.id} tk={tk} tokens={t} onOpen={openTicketOnMarketingPage} />)}
+              </div>
+            )}
+            {past.length > 0 && (
+              <details style={{ marginTop: 4 }}>
+                <summary style={{ cursor: "pointer", fontSize: 12.5, color: t.textMute, fontWeight: 600, padding: "6px 0" }}>Past tickets ({past.length})</summary>
+                <div style={{ background: t.surfaceEl, border: `1px solid ${t.border}`, borderRadius: 8, overflow: "hidden", marginTop: 6 }}>
+                  {past.map(tk => <MktTicketRow key={tk.id} tk={tk} tokens={t} onOpen={openTicketOnMarketingPage} />)}
+                </div>
+              </details>
+            )}
+          </>
+        );
+      })()}
+
+      {/* ═══ CAMPAIGNS ═══ */}
+      <MktSectionHead t={t} title="Campaigns" desc="Wire the ad account, pick which campaigns the client sees, and review active campaigns." style={{ marginTop: 34 }} />
 
       {/* Request budget confirmation — sends the client a budget-review pop-up */}
       {canEdit && (
@@ -1526,39 +1698,6 @@ export function MarketingTab({ client, tokens, role, session, onChanged, forceCa
           </button>
         </div>
       )}
-
-      {/* Sub-tab bar: Campaigns | KPIs */}
-      <div style={{ display: "flex", gap: 4, marginBottom: 22, borderBottom: `1px solid ${t.border}` }}>
-        {[
-          { id: "performance", label: "Performance" },
-          { id: "campaigns", label: "Campaigns" },
-          { id: "kpis", label: "KPIs" },
-        ].map(st => (
-          <button
-            key={st.id}
-            type="button"
-            onClick={() => setMarketingSubTab(st.id)}
-            style={{
-              padding: "8px 16px", background: "transparent", border: "none",
-              borderBottom: `2px solid ${marketingSubTab === st.id ? t.accent : "transparent"}`,
-              color: marketingSubTab === st.id ? t.accent : t.textMute,
-              fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit",
-              marginBottom: -1,
-            }}
-          >{st.label}</button>
-        ))}
-      </div>
-
-      {marketingSubTab === "performance" && <>
-        {canEdit && <GoalEditor client={client} tokens={t} session={session} onChanged={onChanged} onSaved={onChanged} />}
-        <MarketingDashboard key={client.id} clientId={client.id} tokens={t} session={session} />
-      </>}
-
-      {marketingSubTab === "kpis" && (
-        <MarketingKpis client={client} tokens={t} session={session} />
-      )}
-
-      {marketingSubTab === "campaigns" && <>
 
       {/* Meta connection status */}
       <div style={{
@@ -1711,7 +1850,10 @@ export function MarketingTab({ client, tokens, role, session, onChanged, forceCa
         />
       )}
 
-      </>}{/* end campaigns sub-tab */}
+      {/* ═══ TRACKING ═══ */}
+      <MktSectionHead t={t} title="Tracking" desc="Live spend, leads and cost-per-lead per campaign (month-to-date by default)." style={{ marginTop: 34 }} />
+      {canEdit && <GoalEditor client={client} tokens={t} session={session} onChanged={onChanged} onSaved={onChanged} />}
+      <MarketingDashboard key={client.id} clientId={client.id} tokens={t} session={session} />
 
       </>}
     </div>

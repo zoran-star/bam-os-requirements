@@ -724,7 +724,10 @@ async function handleMarketingTickets(req, res) {
     const pageQS = `&limit=${limit}&offset=${offset}`;
 
     if (asStaff) {
-      const tickets = await sb(`marketing_tickets?select=*&order=submitted_at.desc${pageQS}`);
+      // Optional client filter - used by the staff client-detail Marketing tab's
+      // Tickets section to scope to one academy.
+      const clientFilter = req.query.client_id ? `&client_id=eq.${req.query.client_id}` : "";
+      const tickets = await sb(`marketing_tickets?select=*${clientFilter}&order=submitted_at.desc${pageQS}`);
       const out = await enrichWithClient(tickets || []);
       return res.status(200).json({ tickets: out, hasMore: (tickets || []).length === limit });
     }

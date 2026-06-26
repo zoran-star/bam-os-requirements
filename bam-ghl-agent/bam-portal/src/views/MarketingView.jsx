@@ -307,6 +307,22 @@ export default function MarketingView({ tokens: tk, dark, me, session }) {
     return () => { cancelled = true; };
   }, [session]);
 
+  // Deep-link: when the client-detail Marketing tab sends us here for a specific
+  // ticket, it stashes the id. Once tickets load, jump to it and clear the stash.
+  useEffect(() => {
+    let focusId = null;
+    try { focusId = sessionStorage.getItem("bam_marketing_focus_ticket"); } catch { focusId = null; }
+    if (!focusId) return;
+    const ft = tickets.find(t => t.id === focusId);
+    if (!ft) return;
+    setSection("tickets");
+    if (ft.status === "completed" || ft.status === "cancelled") setTab("completed");
+    else if (ft.clientActionStatus === "requested") setTab("client-action");
+    else setTab("active");
+    setSelectedId(focusId);
+    try { sessionStorage.removeItem("bam_marketing_focus_ticket"); } catch { /* ignore */ }
+  }, [tickets]);
+
   const selected = selectedId ? tickets.find(t => t.id === selectedId) : null;
 
   const inProgress = tickets.filter(t => t.status === "in-progress");
