@@ -1,8 +1,18 @@
 ---
 name: Next-session pickup — READ FIRST
-description: Current state + what to do next. Last updated 2026-06-08 after a big build session (parent payment funnel, CoachIQ model, offer⇄Stripe⇄CoachIQ price mapping + AI matcher, and The Pricing Sorter wizard — all merged to main/production).
+description: Current state + what to do next. 2026-06-26: actively FINALIZING THE GTA SALES SYSTEM — see [[project_sales_crew_model]] "CURRENT STATE + WHAT'S LEFT" section. Older 2026-06-08 build (payment funnel / pricing sorter) below.
 metadata:
   type: project
+---
+
+# 🎯 ACTIVE (2026-06-26): finalizing the GTA sales system
+The whole **Sales Crew** (3 agents + automation engine + nurture sequence) is built + live for GTA in
+Hawkeye. Next chat finalizes it. **Read the "⭐ CURRENT STATE + WHAT'S LEFT" section of
+[[project_sales_crew_model]]** — it has: what's live, the email architecture (light + template refs +
+gotchas), per-agent lessons, and the TO-FINALIZE list (👻 Ghosted sequence not built yet; Zoran's Resend
+key; real-name personalization; deferred polish). GTA `client_id=39875f07-0a4b-4429-a201-2249bc1f24df`.
+Pairs with [[project_sales_crew_guardrails]] · [[project_confirm_agent]] · [[project_automation_agent_roadmap]].
+
 ---
 
 # Next-session pickup (2026-06-08)

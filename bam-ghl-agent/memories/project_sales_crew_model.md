@@ -179,3 +179,65 @@ a social (IG/FB) lead past Meta's 24h window (agents are SMS-only — hard-coded
 `api/ghl/inbound-webhook.js`: (A) `notifyOwners(inbox_message)` fires on ALL inbound, any stage (V1.5/V2),
 gated only on a recipient subscribed to `inbox_message` in `clients.notification_prefs`. (B) the
 "🤖 new chat to approve" SMS is the EXTRA nudge, gated to Responded + agent on + `agent_notify_phone`.
+
+## ⭐ CURRENT STATE + WHAT'S LEFT (end of build session 2026-06-26) — READ THIS FIRST next time
+The next chat is **finalizing the GTA sales system.** GTA `client_id = 39875f07-0a4b-4429-a201-2249bc1f24df`.
+Everything below is MERGED to `main` + deployed (portal auto-deploys on merge). Work happened in worktree
+`~/bam-os-worktrees/sales-crew` (branch `session/sales-crew`) → PR → merge → main.
+
+### LIVE for GTA right now (all in Hawkeye = draft-only, nothing auto-sends)
+- 📞 Booking, ✅ Confirm, 🎯 Closing agents = all `hawkeye` (`agent_mode`/`confirm_agent_mode`/`closing_agent_mode`).
+- 💔 Lead Nurture automation = **enabled + approved**, 4 email steps live (cadence 1wk→1wk→3wk→3wk). Routes
+  non-Unqualified Lost leads in (P6 trigger). **BUT emails can't send until the Resend key is fixed (below).**
+- 🚫 Unqualified tag/switch, per-lead 🔇 mute, 👁 automation observability, stage-colour borders — all live.
+
+### Built this session (full list)
+P0 confirm-on · P1 unqualified · P2a closing agent · P2b close→enroll-flow · P3 Resend foundation ·
+P4a automation engine + P4b step-builder · P6 triggers · P7a per-lead mute · P7b observability. PLUS:
+- **Train Agent picker** (`client-portal.html`): pick Booking/Confirm/Closing/Ghosted/Nurture → Test/Lessons/
+  Knowledge/Autonomy scope to it; automations open their step-builder. `_TA.target`, `_taPick`, `_taIsAgent`.
+- **Per-agent Lessons**: `agent_lessons.agent` column (migration 20260625250000, APPLIED). Each detector
+  loads `agent=eq.<its agent>` lessons. `agent_examples` still booking-only.
+- **Sales board colour-coding**: `_plStageBot(name)` → per-bot colour on the WHOLE stage column border
+  (agents solid+glow, automations DASHED, terminal solid). Pipeline selector HIDDEN for V2 (snaps to Training).
+
+### 📧 EMAIL ARCHITECTURE (important — non-obvious)
+- Emails are **LIGHT** (white body, black header/footer bars, gold rules+buttons). We TRIED forced-dark; Gmail
+  mobile auto-dark-mode inverts it inconsistently and is unfightable → went light (renders the same everywhere).
+  The dark-mode lock was REMOVED from `renderEmail`; `color-scheme: light`.
+- Design source = `bam-client-sites/emails/nurture/{1-recognition,2-new-era,3-testimonials,4-dont-miss}.html`
+  (refined in Claude Design). Vendored into the portal as `api/email-templates/nurture-emails.js` (GENERATED
+  from those files — re-run the generator if they change). DB `automation_steps.body = "template:nurture-N"`
+  (a short ref, NOT the HTML); `renderEmail` resolves `template:<key>` → the vendored HTML.
+- `api/email-shells.js`: `renderEmail({clientId,subject,body,vars})` — resolves template refs, fills the light
+  FRAME (for plain-text bodies) OR passes a full HTML doc through, resolves GHL merge tokens
+  ({{contact.first_name}}→vars.first_name||'there', {{location.city}}→'Oakville', {{location_owner.first_name}}
+  →'Zoran', {{contact.athletes_full_name}}), FROM = `info@byanymeanstoronto.com`. `api/_send.js` calls it.
+- Email 1 has the real YouTube video (`2ftv0lHDofo`) + thumbnail. Coach handles in #1: @byanymeanszoran, @byanymeansadrian, @byanymeansgta.
+- ⚠️ Real first-name/athlete NOT yet threaded from the live contact at send time (falls back to "there"/"your
+  athlete"). The worker (`api/automations.js` resolveContactInfo) would need to also fetch + pass first name/athlete.
+
+### 🔧 GOTCHAS (will bite next session)
+- **`vercel env pull` returns an INVALID `SUPABASE_SERVICE_KEY`** (REST writes 401). The real service_role key
+  is a Vercel "sensitive" var not returned by pull. → Do DB writes via the **Supabase MCP** (works), not a node
+  REST script. The pulled `RESEND_API_KEY` DOES work but is scoped to **byanymeansbball.com only**.
+- To send a test/preview email NOW, send from `gta@byanymeansbball.com` (works) to a real inbox.
+- Storing big HTML in the DB = pain (re-emit via MCP). The `template:<key>` ref pattern avoids it — keep using it.
+
+### ⬜ TO FINALIZE GTA SALES (next chat)
+1. **👻 Ghosted sequence — NOT BUILT.** The short/aggressive automation (e.g. day 1/3/7). Zoran will paste his
+   GTA Ghosted GHL screenshots → import like nurture (steps into `ghosted` automation, then enable+approve).
+   `ghosted` automation row exists for GTA (enabled=false, approved=false, 0 steps). P6 already routes
+   confirm-ghost → portal ghosted when live.
+2. **🔑 Resend key (ZORAN'S task):** create a Full-Access (or all-domains) key in Resend that covers
+   `byanymeanstoronto.com`, put it in Vercel `RESEND_API_KEY`, redeploy. THEN re-test info@byanymeanstoronto.com.
+   Until then ALL nurture emails fail to send (1-week buffer before the first one).
+3. **Real-name personalization** in automation emails (thread contact first-name/athlete at send time).
+4. Deferred polish: **P2.5** post-trial form → unified inbox · **P2b-plus** opp_id threading through checkout ·
+   atomic first-come claim on Hawkeye · convo-tab coloured outline · per-stage pipeline glow tied to on/off.
+5. Per-agent **examples** (save-a-perfect-reply) for confirm/closing (currently booking-only).
+6. Email **fonts**: Anton/Inter Tight don't load in Gmail → Arial Black fallback (Zoran OK'd this; image
+   headlines only if he changes his mind).
+
+### HARD RULE reminder
+NO em dashes (U+2014) in ANYTHING person-facing, EVERY repo, always (now in all 3 CLAUDE.md + memory). Use hyphens.
