@@ -224,6 +224,18 @@ P4a automation engine + P4b step-builder · P6 triggers · P7a per-lead mute · 
 - To send a test/preview email NOW, send from `gta@byanymeansbball.com` (works) to a real inbox.
 - Storing big HTML in the DB = pain (re-emit via MCP). The `template:<key>` ref pattern avoids it — keep using it.
 
+### ✅ DONE 2026-06-26: self-drive globally blocked + per-agent Autonomy (PR #805, merged)
+- **🔒 Self-drive is OFF for everyone right now.** One flag `SELF_DRIVE_GLOBALLY_DISABLED=true` in
+  `api/agent/_mode.js`. While true: `shouldAutoSend()` always returns false (deepest net - no agent auto-sends
+  even if a row somehow = self_drive); `agent-config.js` rejects set-*-mode = self_drive (403) + returns
+  `self_drive_enabled:false` on list/get-mode; staff AgentModePanel + client-portal Autonomy hide the 🚀 button.
+  `agent-followups.js` was rolling its OWN self-drive check (bypassed the switch) - now routes through
+  shouldAutoSend too. **Re-enable = flip that one flag to false** (per-academy opt-in still applies).
+- **🎚 Client-portal Autonomy is now per-agent.** Train Agent → Autonomy used to set ONLY booking regardless of
+  the picked agent; now respects `_TA.target` (booking/confirm/closing) via `_TA_MODE_FIELD`/`_TA_MODE_ACTION`,
+  matching the staff portal. Mode-setting is still BAM-staff-only (server `requireStaff`).
+- DB at ship: only BAM GTA has modes, all three = hawkeye. No behavior change today; the cap is just enforced now.
+
 ### ⬜ TO FINALIZE GTA SALES (next chat)
 1. **👻 Ghosted sequence — NOT BUILT.** The short/aggressive automation (e.g. day 1/3/7). Zoran will paste his
    GTA Ghosted GHL screenshots → import like nurture (steps into `ghosted` automation, then enable+approve).
