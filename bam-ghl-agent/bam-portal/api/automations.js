@@ -13,7 +13,8 @@ import { withSentryApiRoute } from "./_sentry.js";
 // CLAIMS a job with a conditional pending->sending update before sending.
 
 import { pickGhlToken, ghl } from "./ghl/_core.js";
-import { nurtureStage } from "./agent/_stage.js";
+import { nurtureStage, scheduledTrialContactIdSetCached } from "./agent/_stage.js";
+import { nextSessionLabel } from "./_next_session.js";
 import { sendOn } from "./_send.js";
 import { renderEmail } from "./email-shells.js";
 import { withinQuietHours, nextSendableTime } from "./agent/_quiet.js";
@@ -36,7 +37,7 @@ async function sb(path, init = {}) {
 }
 
 async function loadClient(clientId) {
-  const rows = await sb(`clients?id=eq.${clientId}&select=id,business_name,ghl_location_id,ghl_access_token,ghl_refresh_token,ghl_token_expires_at,ghl_kpi_config&limit=1`);
+  const rows = await sb(`clients?id=eq.${clientId}&select=id,business_name,time_zone,ghl_location_id,ghl_access_token,ghl_refresh_token,ghl_token_expires_at,ghl_kpi_config&limit=1`);
   return Array.isArray(rows) && rows[0];
 }
 
@@ -185,7 +186,8 @@ async function runWork(res) {
   const tokenCache  = new Map();   // clientId -> {token,locationId} | null
   const autoCache   = new Map();   // automationId -> automation
   const stepsCache  = new Map();   // automationId -> steps[]
-  const contactCache = new Map();  // contactId -> {email,phone}
+  const contactCache = new Map();  // contactId -> {email,phone,firstName,fullName}
+  const calCache    = new Map();   // clientId -> first calendar entry-point key | null
   let sent = 0, deferred = 0, advanced = 0, completed = 0, failed = 0, canceled = 0, lost = 0;
 
   for (const job of jobs) {
@@ -268,10 +270,39 @@ async function runWork(res) {
       const token = creds && creds.token;
       const info = token ? await resolveContactInfo(token, job.contact_id, contactCache) : { email: null, phone: null, firstName: null, fullName: null };
 
+      // 🏀 trial_followup: if they've since BOOKED (now in the Scheduled Trial
+      // stage, via any path) the 20-min nudge is moot - exit + skip the send.
+      if (auto.automation_key === "trial_followup" && token && creds.locationId) {
+        try {
+          const booked = await scheduledTrialContactIdSetCached(token, creds.locationId);
+          if (booked && booked.has(String(job.contact_id))) {
+            await sb(`automation_enrollments?id=eq.${job.enrollment_id}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ status: "exited", exited_at: new Date().toISOString(), exit_reason: "booked" }) }).catch(() => {});
+            await finish({ status: "skipped", last_error: "booked - in scheduled trial" });
+            continue;
+          }
+        } catch (_) { /* fail open: send the nudge */ }
+      }
+
+      // {{next_session}} token: resolve the academy's next OPEN trial slot
+      // (best-effort, only when the copy actually uses it). Phrasing lives here
+      // so the sentence drops out cleanly when no slot is known.
+      let next_session = "";
+      if (token && /next_session/.test(`${step.body || ""}${step.subject || ""}`)) {
+        try {
+          if (!calCache.has(job.client_id)) {
+            const eps = await sb(`entry_points?client_id=eq.${job.client_id}&type=eq.calendar&enabled=eq.true&select=key&limit=1`);
+            calCache.set(job.client_id, (Array.isArray(eps) && eps[0] && eps[0].key) || null);
+          }
+          const calId = calCache.get(job.client_id);
+          const label = calId ? await nextSessionLabel({ calendarId: calId, token, timezone: (client && client.time_zone) || "America/Toronto" }) : "";
+          if (label) next_session = `Our next session is ${label}. `;
+        } catch (_) { /* leave it blank */ }
+      }
+
       const result = await sendOn({
         channel: step.channel, clientId: job.client_id, contactId: job.contact_id,
         toEmail: info.email, toPhone: info.phone, subject: step.subject, body: step.body, ghlToken: token,
-        vars: { first_name: info.firstName, full_name: info.fullName },
+        vars: { first_name: info.firstName, full_name: info.fullName, next_session },
       });
 
       if (result && result.sent) { await finish({ status: "sent", sent_at: new Date().toISOString() }); sent++; await logEvent({ clientId: job.client_id, contactId: job.contact_id, automationId: job.automation_id, type: "step_sent", payload: { step_id: job.step_id, channel: step.channel } }); }

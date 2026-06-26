@@ -17,6 +17,7 @@
 
 import { withSentryApiRoute } from "../_sentry.js";
 import { getClientGhlToken } from "./availability.js";
+import { enrollContact, exitEnrollment } from "../automations.js";
 
 const SB_URL = (process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || "").trim();
 const SB_KEY = (process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY || "").trim();
@@ -386,21 +387,36 @@ async function handler(req, res) {
         fields.booked_slot = booking.start;
         receipt.fields = fields;
 
-        if (calEp.ghl_workflow_id) {
-          await enrollInWorkflow(client, receipt.ghl_contact_id, calEp.ghl_workflow_id);
-        }
-
-        // Booking advances the pipeline card to the CALENDAR entry point's
-        // stage (e.g. form fill lands at "interested", a real booking moves
-        // the card to "scheduled trial"). Non-fatal.
-        if (calEp.pipeline_name && calEp.stage_name) {
-          try {
-            await placeOpportunity(
-              oauthHeaders, client.ghl_location_id, receipt.ghl_contact_id,
-              { pipeline: calEp.pipeline_name, stage: calEp.stage_name },
-              `${name || email}`, true
-            );
-          } catch (e) { console.error("Booking stage advance failed (non-fatal):", e.message); }
+        const routeCfg = client.ghl_kpi_config?.portal_entry_routing;
+        if (routeCfg?.enabled) {
+          // Portal routing ON: they booked, so cancel the 20-min trial_followup
+          // timer and move the card to the scheduled stage (Confirm bot owns it).
+          try { await exitEnrollment({ clientId: client.id, automationKey: "trial_followup", contactId: receipt.ghl_contact_id, reason: "booked" }); } catch (_) {}
+          if (routeCfg.pipeline && routeCfg.scheduled_stage) {
+            try {
+              await placeOpportunity(
+                oauthHeaders, client.ghl_location_id, receipt.ghl_contact_id,
+                { pipeline: routeCfg.pipeline, stage: routeCfg.scheduled_stage },
+                `${name || email}`, true
+              );
+            } catch (e) { console.error("Booking portal route failed (non-fatal):", e.message); }
+          }
+        } else {
+          if (calEp.ghl_workflow_id) {
+            await enrollInWorkflow(client, receipt.ghl_contact_id, calEp.ghl_workflow_id);
+          }
+          // Booking advances the pipeline card to the CALENDAR entry point's
+          // stage (e.g. form fill lands at "interested", a real booking moves
+          // the card to "scheduled trial"). Non-fatal.
+          if (calEp.pipeline_name && calEp.stage_name) {
+            try {
+              await placeOpportunity(
+                oauthHeaders, client.ghl_location_id, receipt.ghl_contact_id,
+                { pipeline: calEp.pipeline_name, stage: calEp.stage_name },
+                `${name || email}`, true
+              );
+            } catch (e) { console.error("Booking stage advance failed (non-fatal):", e.message); }
+          }
         }
       } catch (e) {
         console.error("GHL appointment failed (lead saved):", e.message);
@@ -424,9 +440,14 @@ async function handler(req, res) {
       return res.status(200).json({ ok: true, id: leadId, ghl: ghlStatus, appointment: appointmentStatus });
     }
 
-    // Form-step submission (no booking): enroll in the form's workflow.
-    if (kpiContactId && formWorkflowId && fields?.step !== "booking") {
-      await enrollInWorkflow(client, kpiContactId, formWorkflowId);
+    // Form-step submission (no booking): route the lead. Portal routing (when ON)
+    // places the card + enrols the portal automation; otherwise fall back to the
+    // legacy GHL workflow enrol.
+    if (kpiContactId && fields?.step !== "booking") {
+      const routed = await maybePortalRoute(client, kpiContactId, form_type, { name, email });
+      if (!routed && formWorkflowId) {
+        await enrollInWorkflow(client, kpiContactId, formWorkflowId);
+      }
     }
   }
 
@@ -458,6 +479,33 @@ async function enrollInWorkflow(client, contactId, workflowId) {
     });
     if (!r.ok) console.error("GHL workflow enroll failed:", r.status, (await r.text()).slice(0, 150));
   } catch (e) { console.error("GHL workflow enroll failed (non-fatal):", e.message); }
+}
+
+// ── Portal-native entry routing (DORMANT until ghl_kpi_config.portal_entry_routing
+// .enabled). When ON, the PORTAL owns the pipeline for new form fills instead of the
+// GHL workflow: place the card in the configured stage + enrol the lead in the portal
+// automation, and SKIP the legacy GHL workflow enrol (no double-touch). Flip ON per
+// academy the moment its matching GHL "form filled" workflows are turned off.
+//   contact form  -> contact_stage (e.g. Interested) + 👻 ghosted (immediately)
+//   trial no-book  -> trial_stage   (e.g. Responded)  + 🏀 trial_followup (20-min timer)
+// Returns true when it handled routing (caller then skips the GHL workflow enrol).
+async function maybePortalRoute(client, contactId, formType, { name, email }) {
+  const cfg = client.ghl_kpi_config?.portal_entry_routing;
+  if (!cfg || !cfg.enabled || !contactId) return false;
+  const isTrial = formType === "free-trial";
+  const stage = isTrial ? cfg.trial_stage : cfg.contact_stage;
+  const automationKey = isTrial ? "trial_followup" : "ghosted";
+  if (cfg.pipeline && stage) {
+    try {
+      const token = await getClientGhlToken(client);
+      const headers = { Authorization: `Bearer ${token}`, Version: V2_VERSION, "Content-Type": "application/json", Accept: "application/json" };
+      await placeOpportunity(headers, client.ghl_location_id, contactId, { pipeline: cfg.pipeline, stage }, `${name || email}`, true);
+    } catch (e) { console.error("portal route: place opp failed (non-fatal):", e.message); }
+  }
+  try {
+    await enrollContact({ clientId: client.id, automationKey, contactId });
+  } catch (e) { console.error("portal route: enroll failed (non-fatal):", e.message); }
+  return true;
 }
 
 // KPI continuity: website leads land in ghl_funnel_events (raw.websiteForm)
