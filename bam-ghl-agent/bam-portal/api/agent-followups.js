@@ -30,7 +30,7 @@ import { withSentryApiRoute } from "./_sentry.js";
 import { pickGhlToken, ghl } from "./ghl/_core.js";
 import { toIso, respondedContactIds, respondedContactIdSetCached, peekRespondedIdSet } from "./agent/_stage.js";
 import { withinQuietHours, nextSendableTime } from "./agent/_quiet.js";
-import { agentMode, modeIsOn, modeSelfDrives, SELF_DRIVE_MIN_CONFIDENCE } from "./agent/_mode.js";
+import { agentMode, modeIsOn, shouldAutoSend } from "./agent/_mode.js";
 import { resolveAgentActor } from "./agent/_auth.js";
 
 const SUPABASE_URL         = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
@@ -271,7 +271,8 @@ async function runWork(res) {
     if (row.status === "pending") {
       let client = cache[row.client_id];
       if (client === undefined) { client = await loadClient(row.client_id); cache[row.client_id] = client; }
-      const auto = client && modeSelfDrives(agentMode(client)) && typeof row.confidence === "number" && row.confidence >= SELF_DRIVE_MIN_CONFIDENCE;
+      // shouldAutoSend honors the global self-drive kill-switch (returns false while disabled).
+      const auto = client && shouldAutoSend(agentMode(client), { confidence: row.confidence });
       if (!auto) continue;   // hawkeye, or self-drive-but-unsure → wait for approval
       out.push({ ...(await sendOne(row, cache, rcache)), auto_sent: true });
     } else {

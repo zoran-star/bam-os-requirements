@@ -51,9 +51,10 @@ export default function AgentModePanel({ tokens }) {
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(null);
   const [warn, setWarn] = useState(null);   // { client_id, business_name } pending self-drive confirm
+  const [selfDriveOn, setSelfDriveOn] = useState(false);   // 🔒 global kill-switch (api self_drive_enabled)
 
   useEffect(() => { load(); }, []);
-  async function load() { try { const d = await api("list"); setRows(d.academies || []); } catch (e) { setErr(e.message); } }
+  async function load() { try { const d = await api("list"); setRows(d.academies || []); setSelfDriveOn(!!d.self_drive_enabled); } catch (e) { setErr(e.message); } }
 
   async function setMode(client_id, mode, agent = "booking") {
     setBusy(client_id);
@@ -89,6 +90,12 @@ export default function AgentModePanel({ tokens }) {
         agent texts on its own.
       </div>
 
+      {!selfDriveOn && (
+        <div style={{ fontSize: 12.5, color: accent, background: "rgba(232,197,71,.08)", border: `1px solid ${accent}55`, borderRadius: 10, padding: "10px 14px", marginBottom: 16, maxWidth: 680, lineHeight: 1.5 }}>
+          🔒 <b>Self-drive is disabled right now</b> for all academies - every agent is capped at Off / 👁 Hawkeye, so nothing sends without approval.
+        </div>
+      )}
+
       {!rows.length && <div style={{ color: mute, fontSize: 14, padding: "20px 0" }}>No agent-capable academies yet.</div>}
 
       {rows.map(row => {
@@ -108,7 +115,7 @@ export default function AgentModePanel({ tokens }) {
                 {mode === "hawkeye" && <span style={{ fontSize: 11, fontWeight: 700, color: accent }}>👁</span>}
                 <div style={{ flex: 1 }} />
                 <div style={{ display: "flex", gap: 6 }}>
-                  {MODES.map(m => (
+                  {MODES.filter(m => selfDriveOn || m.key !== "self_drive").map(m => (
                     <button key={m.key} disabled={busy === row.client_id} onClick={() => pick(row, m.key, agent)}
                       style={seg(mode === m.key, m.key === "self_drive")}>{m.label}</button>
                   ))}
