@@ -35,11 +35,13 @@ import {
   scheduledTrialStage, contactInRespondedStage, computeConfirmQueue,
   scheduledTrialContactIdSetCached, peekScheduledTrialIdSet, respondedStage, nurtureStage, toIso,
 } from "./agent/_stage.js";
-import { enrollContact, isAutomationLive } from "./automations.js";
+import { enrollContact, isAutomationLive, resolveContactInfo } from "./automations.js";
 import {
   DEFAULT_CONFIRM_AUTOMATIONS, getConfirmAutomations, automationsLive,
-  nextDueStep, renderTemplate, addressFromOverrides,
+  nextDueStep, resolveApptTokens, addressFromOverrides,
 } from "./agent/confirm-automations.js";
+import { sendOn } from "./_send.js";
+import { resolveMergeVars, locFor } from "./email-shells.js";
 import { confirmAgentMode, modeIsOn, shouldAutoSend } from "./agent/_mode.js";
 import { mutedContactIdSet, isMuted } from "./agent/_mutes.js";
 import { withinQuietHours, nextSendableTime } from "./agent/_quiet.js";
@@ -300,20 +302,43 @@ async function fireScriptedStep({ client, token, locationId, mode, autos, cfg, i
   const step = nextDueStep(autos, { nowMs, trialMs, sentKeys });
   if (!step) return "no scripted step due";
 
-  const message = renderTemplate(step.template, {
-    name: item.name, trialMs, address: addressFromOverrides(cfg && cfg.overrides),
-  });
-  if (!message) return "rendered template empty";
+  // Resolve EVERYTHING ourselves now (portal-native): appointment tokens here, then
+  // the contact/location tokens via the send engine's resolver — so the stored card
+  // is final text (clean in the approval inbox, and quiet-hours flush can send it raw).
+  const info = await resolveContactInfo(token, contactId).catch(() => ({ email: null, phone: null, firstName: null, fullName: null }));
+  const vars = { first_name: info.firstName, full_name: info.fullName };
+  const apptCtx = {
+    startMs: trialMs,
+    endMs: appt && appt.endTime ? new Date(appt.endTime).getTime() : null,
+    location: (appt && appt.address) || addressFromOverrides(cfg && cfg.overrides) || "",
+    title: (appt && appt.title) || "Free Trial",
+  };
+  const resolve = (tpl) => resolveMergeVars(resolveApptTokens(tpl, apptCtx), locFor(client.id), vars);
+  const message = resolve(step.template);
+  if (!message || !message.trim()) return "rendered template empty";
+
+  const wantsEmail = !!step.email && !!info.email;
+  const emailBody = wantsEmail ? message : null;
+  const emailSubject = wantsEmail ? resolveMergeVars(step.email_subject || "Your free trial is booked!", locFor(client.id), vars) : null;
+  // Fire the confirmation email (rides the same touch). Tokens already resolved, so
+  // vars is empty here. Non-fatal: a failed email never blocks the SMS.
+  const sendScriptedEmail = async () => {
+    if (!wantsEmail) return;
+    try { await sendOn({ channel: "email", clientId: client.id, toEmail: info.email, subject: emailSubject, body: emailBody, vars: {} }); } catch (_) {}
+  };
 
   const baseRow = {
     client_id: client.id, ghl_contact_id: String(contactId), contact_name: item.name || null,
     kind: "confirm_auto", step_key: step.key, draft_message: message, confidence: 1,
+    email_subject: emailSubject, email_body: emailBody,
     trial_at: trialMs ? toIso(appt.startTime) : null, last_lead_at: item.last_at || null,
     reasoning: `Scripted initial automation: ${step.label}`,
   };
 
   const auto = shouldAutoSend(mode, { confidence: 1, escalate: false });
   if (auto && !withinQuietHours()) {
+    // After-hours: hold the SMS until morning; the email isn't quiet-gated, send it now.
+    await sendScriptedEmail();
     await sb(`agent_confirm_replies`, { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify([{
       ...baseRow, status: "approved", send_after: nextSendableTime().toISOString(), created_by: "self-drive",
     }]) });
@@ -321,12 +346,14 @@ async function fireScriptedStep({ client, token, locationId, mode, autos, cfg, i
   }
   if (auto) {
     await sendReplyViaGhl(token, contactId, message);
+    await sendScriptedEmail();
     await sb(`agent_confirm_replies`, { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify([{
       ...baseRow, status: "sent", auto_sent: true, sent_at: new Date().toISOString(), created_by: "self-drive",
     }]) });
     await logApproval({ client_id: client.id, ghl_contact_id: contactId, contact_name: item.name || null, final_reply: message, reasoning: baseRow.reasoning, confidence: 1, adjusted: false, status: "sent", created_by: "confirm-auto" });
     return "sent";
   }
+  // Hawkeye: queue the SMS for a one-tap ✓; the email goes out WITH it on approval.
   await sb(`agent_confirm_replies`, { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify([{
     ...baseRow, status: "pending", created_by: "detector",
   }]) });
@@ -634,12 +661,24 @@ async function handler(req, res) {
       if (!sts || !(await contactInRespondedStage(token, locationId, b.contact_id, sts))) {
         return res.status(409).json({ error: "This lead is no longer in the Scheduled-Trial stage — not sending." });
       }
-      // Quiet hours: hold an after-hours approval until morning.
+      // For a scripted initial-automation card, the booking-confirmation step also
+      // emails (same copy). Pull that payload so approving the touch sends both.
+      let card = null;
+      if (b.ready_id) { try { [card] = await sb(`agent_confirm_replies?id=eq.${encodeURIComponent(b.ready_id)}&client_id=eq.${clientId}&select=*`); } catch (_) {} }
+      const fireCardEmail = async () => {
+        if (!card || !card.email_body) return;
+        try {
+          const info = await resolveContactInfo(token, b.contact_id);
+          if (info && info.email) await sendOn({ channel: "email", clientId, toEmail: info.email, subject: card.email_subject || "Your free trial is booked!", body: card.email_body, vars: {} });
+        } catch (_) {}
+      };
+      // Quiet hours: hold an after-hours approval until morning (email isn't quiet-gated, send it now).
       if (!withinQuietHours()) {
+        await fireCardEmail();
         const sendAfter = nextSendableTime().toISOString();
         const held = {
           client_id: clientId, ghl_contact_id: b.contact_id, ghl_conversation_id: b.conversation_id || null,
-          contact_name: b.contact_name || null, kind: "confirm", draft_message: String(b.reply), reasoning: b.reasoning || null,
+          contact_name: b.contact_name || null, kind: (card && card.kind) || "confirm", draft_message: String(b.reply), reasoning: b.reasoning || null,
           confidence: typeof b.confidence === "number" ? b.confidence : null,
           status: "approved", send_after: sendAfter, approved_by: staffEmail, approved_at: new Date().toISOString(), updated_at: new Date().toISOString(),
         };
@@ -651,6 +690,7 @@ async function handler(req, res) {
       }
       try { await sendReplyViaGhl(token, b.contact_id, String(b.reply)); }
       catch (e) { return res.status(e.status || 502).json({ error: `GHL send: ${e.message}` }); }
+      await fireCardEmail();
       try { await logApproval({ client_id: clientId, ghl_contact_id: b.contact_id, ghl_conversation_id: b.conversation_id || null, contact_name: b.contact_name || null, final_reply: b.reply, reasoning: b.reasoning || null, confidence: typeof b.confidence === "number" ? b.confidence : null, adjusted: !!b.adjusted, status: "sent", created_by: staffEmail }); } catch (_) {}
       if (b.ready_id) {
         try { await sb(`agent_confirm_replies?id=eq.${encodeURIComponent(b.ready_id)}&client_id=eq.${clientId}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ status: "sent", approved_by: staffEmail, approved_at: new Date().toISOString(), sent_at: new Date().toISOString(), updated_at: new Date().toISOString() }) }); } catch (_) {}

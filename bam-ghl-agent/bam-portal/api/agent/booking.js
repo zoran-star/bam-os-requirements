@@ -58,7 +58,7 @@ export async function nextAppointment(token, contactId, { nowMs = Date.now() } =
     if (!r.ok) return null;
     const events = json.events || json.appointments || json.data || [];
     const upcoming = (Array.isArray(events) ? events : [])
-      .map(e => ({ startTime: e.startTime || e.startAt || e.start_time || null, calendarId: e.calendarId || e.calendar_id || null, title: e.title || null, status: (e.appointmentStatus || e.status || "").toLowerCase() }))
+      .map(e => ({ startTime: e.startTime || e.startAt || e.start_time || null, endTime: e.endTime || e.endAt || e.end_time || null, address: e.address || e.location || e.meetingLocation || e.meeting_location || null, calendarId: e.calendarId || e.calendar_id || null, title: e.title || null, status: (e.appointmentStatus || e.status || "").toLowerCase() }))
       .filter(e => e.startTime && e.status !== "cancelled" && e.status !== "canceled" && new Date(e.startTime).getTime() > nowMs)
       .sort((a, b) => new Date(a.startTime) - new Date(b.startTime));
     return upcoming[0] || null;

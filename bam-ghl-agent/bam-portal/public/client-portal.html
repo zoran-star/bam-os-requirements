@@ -16649,16 +16649,17 @@ function _confirmAutosRender() {
         <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
           <span style="font-weight:600;font-size:13.5px">${escapeHTML(s.label)}</span>
           <span style="color:var(--text-mute);font-size:10.5px;font-family:monospace;border:1px solid var(--border);border-radius:99px;padding:1px 8px">${_CA_WHEN_LABEL[s.when] || s.when}</span>
+          <span style="color:var(--text-mute);font-size:10.5px;font-family:monospace;border:1px solid var(--border);border-radius:99px;padding:1px 8px">${s.email ? '📱 SMS + 📧 Email' : '📱 SMS'}</span>
         </div>
         <button style="${seg(s.enabled)}" onclick="_caToggle('enabled','${s.key}')">${s.enabled ? 'On' : 'Off'}</button>
       </div>
-      <textarea id="ca-tpl-${s.key}" rows="3" ${s.enabled ? '' : 'disabled'} style="width:100%;box-sizing:border-box;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:9px 11px;color:var(--text);font-size:13px;resize:vertical;font-family:inherit;line-height:1.5;opacity:${s.enabled ? 1 : .5}">${escapeHTML(s.template)}</textarea>
+      <textarea id="ca-tpl-${s.key}" rows="8" ${s.enabled ? '' : 'disabled'} style="width:100%;box-sizing:border-box;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:9px 11px;color:var(--text);font-size:13px;resize:vertical;font-family:inherit;line-height:1.5;opacity:${s.enabled ? 1 : .5}">${escapeHTML(s.template)}</textarea>
     </div>`).join('');
   host.innerHTML = `
     <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;margin-bottom:16px;overflow:hidden">
       <div style="padding:14px 16px;border-bottom:1px solid var(--border)">
         <div style="font-weight:700;font-size:14px;margin-bottom:3px">📨 Initial automations</div>
-        <div style="color:var(--text-mute);font-size:12px;line-height:1.5">Scripted texts that fire automatically when a lead books a trial. The moment they reply, the AI confirm agent takes over the conversation. In Hawkeye each text waits for your ✓; in Self-drive it sends on its own.</div>
+        <div style="color:var(--text-mute);font-size:12px;line-height:1.5">Scripted texts that fire when a lead books a trial (the confirmation also sends a matching email with calendar links). The moment they reply, the AI confirm agent takes over. In Hawkeye each touch waits for your ✓; in Self-drive it sends on its own.</div>
       </div>
       <div style="padding:14px 16px">
         <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap">
@@ -16667,7 +16668,7 @@ function _confirmAutosRender() {
         </div>
         <div style="font-size:12px;margin-bottom:12px">${status}</div>
         ${steps}
-        <div style="font-size:11px;color:var(--text-mute);margin:4px 0 12px;line-height:1.6">Tokens: <code>{first_name}</code> <code>{day}</code> <code>{time}</code> <code>{address}</code></div>
+        <div style="font-size:11px;color:var(--text-mute);margin:4px 0 12px;line-height:1.7">Tokens (filled in automatically): <code>{{contact.first_name}}</code> <code>{{appointment.start_time}}</code> <code>{{appointment.only_start_time}}</code> <code>{{appointment.only_start_date}}</code> <code>{{appointment.meeting_location}}</code> <code>{{appointment.add_to_google_calendar}}</code> <code>{{appointment.add_to_ical_outlook}}</code></div>
         <div style="display:flex;gap:10px;align-items:center">
           <button style="${_TA_BTN}" onclick="_confirmAutosSave()">Save</button>
           <span id="ca-note" style="font-size:12px"></span>

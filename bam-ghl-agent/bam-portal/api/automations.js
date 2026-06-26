@@ -159,7 +159,9 @@ async function findOpenOppId(token, locationId, contactId) {
 }
 
 // ── the worker: send due jobs, then schedule the next step ──
-async function resolveContactInfo(token, contactId, cache) {
+// Exported so the confirm agent's scripted automations can resolve a lead's
+// email/name the same way. `cache` is optional (the worker passes a shared Map).
+export async function resolveContactInfo(token, contactId, cache = new Map()) {
   const key = String(contactId);
   if (cache.has(key)) return cache.get(key);
   let info = { email: null, phone: null, firstName: null, fullName: null };

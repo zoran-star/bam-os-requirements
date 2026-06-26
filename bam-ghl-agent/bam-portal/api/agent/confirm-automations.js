@@ -3,26 +3,34 @@
 // When a lead lands in the "Scheduled Trial" stage (the booking agent just booked
 // them), a short SCRIPTED sequence goes out to make sure they show up:
 //
-//   1. immediate   → booking confirmation ("you're booked, reply YES")
-//   2. day_before  → "still good for tomorrow?"
-//   3. morning_of  → "today at {time}, bring shoes + water"
+//   1. immediate   → booking confirmation (SMS + a confirmation EMAIL, same text):
+//                    details, "bring a basketball", and add-to-calendar links.
+//   2. morning_of  → same-day check-in ("good to go for today?").
 //
-// These are TEMPLATES (no AI) — academy-agnostic defaults here, per-academy copy/
-// timing overrides in clients.ghl_kpi_config.confirm_initial_automations. The moment
-// the lead REPLIES, the AI confirm agent takes over the conversation (handled in
-// agent-confirm.js); the scripted touches only ever fire while the lead is silent.
+// PORTAL-NATIVE (no GHL tokens): we resolve the appointment date/time/location and
+// generate the calendar links OURSELVES, so this works without GHL doing any merge.
+// The lead's {{contact.first_name}} is resolved downstream by the send engine
+// (api/_send.js). The moment the lead REPLIES, the AI confirm agent takes over.
 //
-// Send mode reuses the confirm_agent_mode switch (via shouldAutoSend in _mode.js):
-//   hawkeye    → each scripted touch QUEUES for a one-tap ✓ approval.
+// Send mode reuses confirm_agent_mode (via shouldAutoSend in _mode.js):
+//   hawkeye    → each touch QUEUES for a one-tap ✓ approval (sends SMS + email).
 //   self_drive → it auto-fires (currently held by the global self-drive kill-switch).
 //
 // HARD RULE: never an em dash in any template (person-facing copy). Hyphens only.
 
 const TZ = "America/Toronto";
+const PORTAL_BASE = process.env.PORTAL_BASE_URL || "https://portal.byanymeansbusiness.com";
 
-// The shipped defaults — so a new academy's sequence is never blank. Tokens:
-//   {first_name} parent first name · {day} "Mon, Jun 30" · {time} "7:00 PM"
-//   {address} academy address (best-effort from business_info; blank if unknown)
+// The shipped defaults (BAM GTA copy). Per-academy overrides live in
+// clients.ghl_kpi_config.confirm_initial_automations (enabled + per-step copy only;
+// timing/channel/email are fixed here). Tokens it resolves itself:
+//   {{appointment.start_time}}            "Tue, Jun 30 at 7:00 PM"
+//   {{appointment.only_start_time}}       "7:00 PM"
+//   {{appointment.only_start_date}}       "Tuesday, June 30, 2026"
+//   {{appointment.meeting_location}}      academy address
+//   {{appointment.add_to_google_calendar}} Google Calendar URL we build
+//   {{appointment.add_to_ical_outlook}}   /api/ical link we host (.ics)
+// {{contact.first_name}} is left for the send engine to fill.
 export const DEFAULT_CONFIRM_AUTOMATIONS = {
   enabled: true,
   approved: false,   // must be approved once per academy before anything sends
@@ -32,34 +40,42 @@ export const DEFAULT_CONFIRM_AUTOMATIONS = {
       label: "Booking confirmation",
       when: "immediate",
       channel: "sms",
+      email: true,
+      email_subject: "Your free trial is booked! 🏀",
       enabled: true,
-      template: "Hi {first_name}! You're booked for the free trial on {day} at {time}. Reply YES to confirm you're coming and we'll send everything you need. 🏀",
+      template:
+"Your free trial is booked! Here are some important details:\n\n" +
+"Date & Time: {{appointment.start_time}}\n\n" +
+"Location: {{appointment.meeting_location}}\n\n" +
+"Please bring a basketball if you have one. Prepare to be challenged, so come ready to work! After the trial, we'll chat to see if the program feels like a fit and talk next steps 👍\n\n" +
+"You can add this to your calendar here:\n\n" +
+"Apple: {{appointment.add_to_ical_outlook}}\n\n" +
+"Google: {{appointment.add_to_google_calendar}}",
     },
     {
-      key: "day_before",
-      label: "Day-before reminder",
-      when: "day_before",
-      channel: "sms",
-      enabled: true,
-      template: "Hey {first_name}! Quick reminder the free trial is tomorrow ({day}) at {time}. Still good to come?",
-    },
-    {
-      key: "morning_of",
-      label: "Morning-of reminder",
+      key: "same_day",
+      label: "Same-day check-in",
       when: "morning_of",
       channel: "sms",
+      email: false,
       enabled: true,
-      template: "Reminder: the free trial is today at {time}! Bring court shoes and water. {address} See you there!",
+      template:
+"Hi {{contact.first_name}}, just wanted to check in to see if we're good to go for your trial today.\n\n" +
+"Looking forward to seeing you, after the session we will chat to see if the program is a good fit 👍\n\n" +
+"Here are the details:\n\n" +
+"Time: {{appointment.only_start_time}}\n\n" +
+"Date: {{appointment.only_start_date}}\n\n" +
+"Location: {{appointment.meeting_location}}\n\n" +
+"F.Y.I the gym entrance we use is at the front of the building, on the left side.",
     },
   ],
 };
 
 export const CONFIRM_AUTOMATION_WHENS = ["immediate", "day_before", "morning_of"];
 
-// Merge the per-academy override (clients.ghl_kpi_config.confirm_initial_automations)
-// over the shipped defaults. Override may set enabled/approved and per-step
-// enabled/template (matched by key); unknown keys are ignored, missing keys keep
-// their default. Returns a normalized { enabled, approved, steps }.
+// Merge the per-academy override over the shipped defaults. Override may set
+// enabled/approved and per-step enabled/template (by key); fixed fields (when,
+// channel, email, email_subject, label) always come from the defaults.
 export function getConfirmAutomations(client) {
   const cfg = (client && client.ghl_kpi_config) || {};
   const ov = cfg.confirm_initial_automations || {};
@@ -87,9 +103,6 @@ export function automationsLive(autos) {
 }
 
 // ── timing ──
-// Calendar-day difference (trialDate - now) in the academy timezone. 0 = trial is
-// today, 1 = tomorrow, negative = already past. Calendar-based (not 24h windows) so
-// "day before" / "morning of" copy is always date-correct.
 function tzDateStr(ms) {
   return new Date(ms).toLocaleDateString("en-CA", { timeZone: TZ }); // YYYY-MM-DD
 }
@@ -98,21 +111,15 @@ function dayDiffInTz(nowMs, trialMs) {
   const b = Date.parse(tzDateStr(trialMs) + "T00:00:00Z");
   return Math.round((b - a) / 86400000);
 }
-
-// Is this step due to fire right now, given the booked trial time?
 export function stepIsDue(when, nowMs, trialMs) {
-  if (!trialMs) return when === "immediate"; // no known trial: only the immediate confirm
+  if (!trialMs) return when === "immediate";
   const diff = dayDiffInTz(nowMs, trialMs);
-  if (diff < 0) return false;                // trial already passed - nothing fires
-  if (when === "immediate") return true;     // fire on the first run after they're booked
+  if (diff < 0) return false;
+  if (when === "immediate") return true;
   if (when === "day_before") return diff === 1;
   if (when === "morning_of") return diff === 0 && nowMs < trialMs;
   return false;
 }
-
-// Pick the next scripted step to act on: the first ENABLED step that is due now and
-// has not already been handled for this contact (sentKeys). One per detector run so
-// touches never bunch up; the rest fire on later runs as they come due.
 export function nextDueStep(autos, { nowMs, trialMs, sentKeys }) {
   const handled = sentKeys instanceof Set ? sentKeys : new Set(sentKeys || []);
   for (const step of (autos.steps || [])) {
@@ -123,41 +130,62 @@ export function nextDueStep(autos, { nowMs, trialMs, sentKeys }) {
   return null;
 }
 
-// ── rendering ──
-function fmtDay(ms) {
-  try { return new Date(ms).toLocaleDateString("en-US", { timeZone: TZ, weekday: "short", month: "short", day: "numeric" }); }
-  catch { return ""; }
+// ── appointment token rendering (portal-native) ──
+function fmtFull(ms) {
+  try {
+    const d = new Date(ms).toLocaleDateString("en-US", { timeZone: TZ, weekday: "short", month: "short", day: "numeric" });
+    const t = new Date(ms).toLocaleTimeString("en-US", { timeZone: TZ, hour: "numeric", minute: "2-digit" });
+    return `${d} at ${t}`;
+  } catch { return ""; }
 }
 function fmtTime(ms) {
   try { return new Date(ms).toLocaleTimeString("en-US", { timeZone: TZ, hour: "numeric", minute: "2-digit" }); }
   catch { return ""; }
 }
-function firstName(name) {
-  const n = String(name || "").trim();
-  if (!n) return "there";
-  return n.split(/\s+/)[0];
+function fmtDate(ms) {
+  try { return new Date(ms).toLocaleDateString("en-US", { timeZone: TZ, weekday: "long", month: "long", day: "numeric", year: "numeric" }); }
+  catch { return ""; }
 }
-// Best-effort academy address from the business_info FACT section (a free-text
-// "Location: ..." line). Blank if not found — templates are written to read fine
-// without it.
+function dtUtc(ms) {
+  return new Date(ms).toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, "");
+}
+export function buildGoogleCalUrl({ startMs, endMs, title, location }) {
+  const p = new URLSearchParams({
+    action: "TEMPLATE",
+    text: title || "Free Trial",
+    dates: `${dtUtc(startMs)}/${dtUtc(endMs || startMs + 3600000)}`,
+    details: "Your free trial session.",
+  });
+  if (location) p.set("location", location);
+  return `https://calendar.google.com/calendar/render?${p.toString()}`;
+}
+export function buildIcalUrl({ startMs, endMs, title, location }) {
+  const p = new URLSearchParams({ start: String(startMs), end: String(endMs || startMs + 3600000), title: title || "Free Trial" });
+  if (location) p.set("location", location);
+  return `${PORTAL_BASE}/api/ical?${p.toString()}`;
+}
+
+// Replace the {{appointment.*}} tokens with values WE resolve. Leaves
+// {{contact.*}} / {{location.*}} for the send engine. ctx: { startMs, endMs,
+// location, title }.
+export function resolveApptTokens(template, ctx = {}) {
+  const cal = { startMs: ctx.startMs, endMs: ctx.endMs, title: ctx.title || "Free Trial", location: ctx.location || "" };
+  const map = {
+    "appointment.start_time": ctx.startMs ? fmtFull(ctx.startMs) : "",
+    "appointment.only_start_time": ctx.startMs ? fmtTime(ctx.startMs) : "",
+    "appointment.only_start_date": ctx.startMs ? fmtDate(ctx.startMs) : "",
+    "appointment.meeting_location": ctx.location || "",
+    "appointment.add_to_google_calendar": ctx.startMs ? buildGoogleCalUrl(cal) : "",
+    "appointment.add_to_ical_outlook": ctx.startMs ? buildIcalUrl(cal) : "",
+  };
+  return String(template || "").replace(/\{\{\s*(appointment\.\w+)\s*\}\}/g, (_, k) => (k in map ? map[k] : ""));
+}
+
+// Best-effort academy address from the business_info FACT section ("Location:" line),
+// used when the GHL appointment has no address of its own.
 export function addressFromOverrides(overrides) {
   const bi = overrides && overrides.business_info;
   if (typeof bi !== "string") return "";
   const m = bi.match(/^\s*(?:location|address)\s*:\s*(.+)$/im);
   return m ? m[1].trim() : "";
-}
-
-// Fill a template's tokens and tidy whitespace. Unknown tokens render empty.
-export function renderTemplate(template, ctx = {}) {
-  const map = {
-    first_name: firstName(ctx.name),
-    day: ctx.trialMs ? fmtDay(ctx.trialMs) : "",
-    time: ctx.trialMs ? fmtTime(ctx.trialMs) : "",
-    address: ctx.address || "",
-    athlete: ctx.athlete || "your athlete",
-  };
-  return String(template || "")
-    .replace(/\{(\w+)\}/g, (_, k) => (k in map ? map[k] : ""))
-    .replace(/\s{2,}/g, " ")
-    .trim();
 }
