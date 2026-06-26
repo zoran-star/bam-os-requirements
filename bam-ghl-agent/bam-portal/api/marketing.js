@@ -455,14 +455,16 @@ async function organicCreditSummary(clientId) {
   return out;
 }
 
-// Fire Cam a DM that a fresh marketing request landed. Safe to call unawaited.
-function pingMarketingOnNewTicket({ ticketId, academy, priority }, req) {
+// Announce a fresh marketing request in #content-marketing, @mentioning both
+// Cam (manager) and the SM (ticket owner, for full-picture awareness). Pass
+// smId = the ticket's assigned_to. Safe to call unawaited.
+function pingMarketingOnNewTicket({ ticketId, academy, priority, smId }, req) {
   const code = String(ticketId || "").slice(0, 3).toUpperCase();
   const pr = priority === "high" ? "⚡ HIGH priority " : "";
-  marketingManagerSlackId().then(sid => {
-    if (sid) postStaffSlackDM(sid, `🆕 New marketing request ${pr}— ${academy || "client"} [${code}]`, req);
-    const who = slackMention(sid);
-    postContentMarketingSlack(`🆕 *New marketing request* ${pr}- ${academy || "client"} [${code}]${who ? " " + who : ""}`);
+  Promise.all([marketingManagerSlackId(), staffSlackIdById(smId)]).then(([mgrSid, smSid]) => {
+    if (mgrSid) postStaffSlackDM(mgrSid, `🆕 New marketing request ${pr}- ${academy || "client"} [${code}]`, req);
+    const mentions = [...new Set([slackMention(mgrSid), slackMention(smSid)].filter(Boolean))].join(" ");
+    postContentMarketingSlack(`🆕 *New marketing request* ${pr}- ${academy || "client"} [${code}]${mentions ? " " + mentions : ""}`);
   });
 }
 
@@ -593,6 +595,7 @@ async function spawnOrUpdateMarketingFromContent(ticket, { authorType, authorId,
       ticketId: spawnedId,
       academy: ctxObj.campaign_title || mktFields.campaign_title,
       priority: mktFields.priority,
+      smId: marketingInsert?.[0]?.assigned_to,
     }, req);
   }
   return spawnedId;
@@ -804,6 +807,7 @@ async function handleMarketingTickets(req, res) {
         ticketId: newTicket.id,
         academy: ctx.client.business_name,
         priority: fields?.priority,
+        smId: newTicket.assigned_to,
       }, req);
     }
     return res.status(201).json({ ticket: newTicket });
@@ -995,31 +999,41 @@ async function handleMarketingTickets(req, res) {
     // Slack notify (fire-and-forget) on action-request or completion.
     // We don't await — keeps the API snappy and Slack errors don't break us.
     const code = String(ticket.id || "").slice(0, 3).toUpperCase();
+    // SM (ticket owner) gets a full-picture @mention in #content-marketing on
+    // every status change. Resolved per-call; fire-and-forget.
+    const smChannelPing = (text) =>
+      staffSlackIdById(ticket.assigned_to).then(sid =>
+        postContentMarketingSlack(`${text}${slackMention(sid) ? " " + slackMention(sid) : ""}`));
     if (action === "request-client-action") {
       const ask = (body.message || "").trim();
       postClientSlackNotification(ticket.client_id,
-        `🔔 Action requested — Marketing [${code}]${ask ? `\n_${ask}_` : ""}`, req);
+        `🔔 Action requested - Marketing [${code}]${ask ? `\n_${ask}_` : ""}`, req);
       notifyClientPush(ticket.client_id, "ticket-action-needed", {
         ticketTitle: "a marketing request", ticketId: ticket.id, view: "marketing",
       }).catch(() => {});
+      smChannelPing(`🔔 *Action needed from client* - Marketing [${code}]`);
     } else if (action === "mark-completed") {
       // Client gets pinged in their channel...
       postClientSlackNotification(ticket.client_id,
-        `✅ Completed — Marketing [${code}]`, req);
+        `✅ Completed - Marketing [${code}]`, req);
       notifyClientPush(ticket.client_id, "ticket-complete", {
         ticketTitle: "Your marketing request", ticketId: ticket.id, view: "marketing",
       }).catch(() => {});
-      // ...and the assigned SM (else the client's manager) gets a DM.
+      // ...and the SM gets a full-picture channel @mention (+ a DM if im:write).
+      smChannelPing(`✅ *Completed* - Marketing [${code}]`);
       (async () => {
         const smId = ticket.assigned_to || await clientScalingManager(ticket.client_id);
         if (!smId) return;
         const rows = await sb(`staff?id=eq.${smId}&select=slack_user_id`);
         const sid = rows?.[0]?.slack_user_id;
-        if (sid) postStaffSlackDM(sid, `✅ Marketing request completed — [${code}]`, req);
+        if (sid) postStaffSlackDM(sid, `✅ Marketing request completed - [${code}]`, req);
       })();
     } else if (action === "cancel") {
       postClientSlackNotification(ticket.client_id,
-        `❌ Cancelled — Marketing [${code}]`, req);
+        `❌ Cancelled - Marketing [${code}]`, req);
+      smChannelPing(`❌ *Cancelled* - Marketing [${code}]`);
+    } else if (action === "respond") {
+      smChannelPing(`💬 *Client responded* - Marketing [${code}]`);
     }
 
     // SEC-5: strip internal messages from any response that reaches a client.
