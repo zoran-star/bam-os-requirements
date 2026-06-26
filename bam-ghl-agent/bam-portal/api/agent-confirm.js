@@ -36,6 +36,10 @@ import {
   scheduledTrialContactIdSetCached, peekScheduledTrialIdSet, respondedStage, nurtureStage, toIso,
 } from "./agent/_stage.js";
 import { enrollContact, isAutomationLive } from "./automations.js";
+import {
+  DEFAULT_CONFIRM_AUTOMATIONS, getConfirmAutomations, automationsLive,
+  nextDueStep, renderTemplate, addressFromOverrides,
+} from "./agent/confirm-automations.js";
 import { confirmAgentMode, modeIsOn, shouldAutoSend } from "./agent/_mode.js";
 import { mutedContactIdSet, isMuted } from "./agent/_mutes.js";
 import { withinQuietHours, nextSendableTime } from "./agent/_quiet.js";
@@ -248,6 +252,87 @@ async function logApproval(row) {
   try { await sb(`agent_approvals`, { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify([row]) }); } catch (_) {}
 }
 
+// Persist only the safe, editable slice of a confirm-automations override:
+// per-step enabled + template (known step keys only), sequence enabled, and the
+// approve flag. Timing ('when') is fixed to the shipped steps and never client-set.
+function sanitizeAutomations(incoming, cur = {}) {
+  const defByKey = new Map(DEFAULT_CONFIRM_AUTOMATIONS.steps.map(s => [s.key, s]));
+  const inSteps = Array.isArray(incoming.steps) ? incoming.steps : [];
+  const steps = [];
+  for (const s of inSteps) {
+    if (!s || !defByKey.has(s.key)) continue;
+    const def = defByKey.get(s.key);
+    steps.push({
+      key: s.key,
+      enabled: typeof s.enabled === "boolean" ? s.enabled : def.enabled,
+      template: typeof s.template === "string" ? s.template.slice(0, 800) : def.template,
+    });
+  }
+  return {
+    enabled: typeof incoming.enabled === "boolean" ? incoming.enabled
+      : (typeof cur.enabled === "boolean" ? cur.enabled : DEFAULT_CONFIRM_AUTOMATIONS.enabled),
+    approved: incoming.approved === true,
+    steps: steps.length ? steps : (Array.isArray(cur.steps) ? cur.steps : []),
+  };
+}
+
+// Fire (or queue) the next due SCRIPTED initial-automation step for one proactive
+// Scheduled-Trial lead. Returns a short status string for the run summary. The
+// moment a lead replies they become "reactive" and the AI confirm agent owns the
+// thread, so scripted touches stop. Mirrors the AI path's mode/quiet-hours handling.
+async function fireScriptedStep({ client, token, locationId, mode, autos, cfg, item, contactId }) {
+  const nowMs = Date.now();
+
+  // What's already happened with this contact?
+  let rows = [];
+  try {
+    rows = await sb(`agent_confirm_replies?client_id=eq.${client.id}&ghl_contact_id=eq.${encodeURIComponent(contactId)}&select=kind,status,step_key&order=created_at.desc&limit=50`);
+  } catch (_) { rows = []; }
+  rows = Array.isArray(rows) ? rows : [];
+  if (rows.some(r => ["pending", "approved"].includes(r.status))) return "already has an active card";
+  // Any AI confirm/handoff/lost card means they've been in a live exchange - let the
+  // AI agent own it; don't cold-script on top of a conversation.
+  if (rows.some(r => ["confirm", "confirm_handoff", "confirm_lost"].includes(r.kind))) return "lead already in conversation";
+  const sentKeys = new Set(rows.filter(r => r.kind === "confirm_auto" && ["pending", "approved", "sent", "skipped"].includes(r.status)).map(r => r.step_key));
+
+  const appt = await nextAppointment(token, contactId, { nowMs });
+  const trialMs = appt && appt.startTime ? new Date(appt.startTime).getTime() : null;
+  const step = nextDueStep(autos, { nowMs, trialMs, sentKeys });
+  if (!step) return "no scripted step due";
+
+  const message = renderTemplate(step.template, {
+    name: item.name, trialMs, address: addressFromOverrides(cfg && cfg.overrides),
+  });
+  if (!message) return "rendered template empty";
+
+  const baseRow = {
+    client_id: client.id, ghl_contact_id: String(contactId), contact_name: item.name || null,
+    kind: "confirm_auto", step_key: step.key, draft_message: message, confidence: 1,
+    trial_at: trialMs ? toIso(appt.startTime) : null, last_lead_at: item.last_at || null,
+    reasoning: `Scripted initial automation: ${step.label}`,
+  };
+
+  const auto = shouldAutoSend(mode, { confidence: 1, escalate: false });
+  if (auto && !withinQuietHours()) {
+    await sb(`agent_confirm_replies`, { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify([{
+      ...baseRow, status: "approved", send_after: nextSendableTime().toISOString(), created_by: "self-drive",
+    }]) });
+    return "deferred";
+  }
+  if (auto) {
+    await sendReplyViaGhl(token, contactId, message);
+    await sb(`agent_confirm_replies`, { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify([{
+      ...baseRow, status: "sent", auto_sent: true, sent_at: new Date().toISOString(), created_by: "self-drive",
+    }]) });
+    await logApproval({ client_id: client.id, ghl_contact_id: contactId, contact_name: item.name || null, final_reply: message, reasoning: baseRow.reasoning, confidence: 1, adjusted: false, status: "sent", created_by: "confirm-auto" });
+    return "sent";
+  }
+  await sb(`agent_confirm_replies`, { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify([{
+    ...baseRow, status: "pending", created_by: "detector",
+  }]) });
+  return "queued";
+}
+
 // Find a contact's open opportunity (for stage moves + outcome logging).
 async function findOpenOpp(token, locationId, contactId) {
   const d = await ghl("GET", `/opportunities/search?${new URLSearchParams({ location_id: locationId, contact_id: contactId, limit: "20" })}`, { token });
@@ -310,6 +395,8 @@ async function detectForClient(client) {
   }
 
   const cfg = await loadConfig(client.id);
+  const autos = getConfirmAutomations(client);
+  const scriptedLive = automationsLive(autos);
   const mutedSet = await mutedContactIdSet(client.id, "confirm");
   let drafted = 0, autoSent = 0, skipped = 0, escalated = 0, handoffs = 0, lostProposed = 0, deferred = 0;
   const reasons = [];
@@ -322,6 +409,22 @@ async function detectForClient(client) {
     if (mutedSet.has(String(contactId))) { skipped++; reasons.push(`${item.name || contactId}: bot muted on this lead`); continue; }
 
     const reactive = item.last_direction === "inbound";
+
+    // SCRIPTED INITIAL AUTOMATIONS (proactive only). When the academy's sequence is
+    // live + approved, the timed scripted touches OWN the proactive path (they
+    // replace the AI opener). The instant the lead replies (reactive) the AI confirm
+    // agent takes over below.
+    if (!reactive && scriptedLive) {
+      try {
+        const r = await fireScriptedStep({ client, token, locationId, mode, autos, cfg, item, contactId });
+        if (r === "sent") autoSent++;
+        else if (r === "deferred") deferred++;
+        else if (r === "queued") drafted++;
+        else { skipped++; reasons.push(`${item.name || contactId}: ${r}`); }
+      } catch (e) { skipped++; reasons.push(`${item.name || contactId}: scripted - ${e.message}`); }
+      continue;
+    }
+
     try {
       // Dedupe. Reactive: skip if an active card exists or we already answered this
       // inbound. Proactive: skip if ANY confirm card already exists (we've engaged).
@@ -469,6 +572,26 @@ async function handler(req, res) {
       if (!b.ready_id) return res.status(400).json({ error: "ready_id required" });
       await sb(`agent_confirm_replies?id=eq.${encodeURIComponent(b.ready_id)}&client_id=eq.${clientId}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ status: "skipped", updated_at: new Date().toISOString() }) });
       return res.status(200).json({ ok: true });
+    }
+
+    // Initial-automations editor (the scripted first-touch sequence) — read.
+    if (b.action === "automations-get") {
+      const client = await loadClient(clientId);
+      if (!client) return res.status(404).json({ error: "academy not found" });
+      return res.status(200).json({ automations: getConfirmAutomations(client), mode: confirmAgentMode(client) });
+    }
+    // Initial-automations editor — save (per-step enabled + copy, sequence enable,
+    // approve toggle). Timing is fixed; copy never contains an em dash.
+    if (b.action === "automations-set") {
+      const client = await loadClient(clientId);
+      if (!client) return res.status(404).json({ error: "academy not found" });
+      const cur = (client.ghl_kpi_config && client.ghl_kpi_config.confirm_initial_automations) || {};
+      const merged = sanitizeAutomations(b.automations && typeof b.automations === "object" ? b.automations : {}, cur);
+      const cfg = { ...(client.ghl_kpi_config || {}), confirm_initial_automations: merged };
+      try {
+        await sb(`clients?id=eq.${clientId}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ ghl_kpi_config: cfg }) });
+      } catch (e) { return res.status(500).json({ error: `couldn't save: ${e.message}` }); }
+      return res.status(200).json({ ok: true, automations: getConfirmAutomations({ ghl_kpi_config: cfg }) });
     }
   } catch (e) {
     console.error("[agent-confirm]", e);
