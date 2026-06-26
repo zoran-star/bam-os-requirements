@@ -40,8 +40,12 @@ on conflict (id) do update set
 with seed_context as (
   select
     c.id as academy_id,
+    bp.id as bookable_program_id,
     '52a6285c-7832-44e1-b531-ab7ef9d8fc21'::uuid as source_offer_id
   from public.clients c
+  join public.bookable_programs bp
+    on bp.tenant_id = c.id
+   and bp.source_program_key = 'bam-gta-training'
   where c.id = '39875f07-0a4b-4429-a201-2249bc1f24df'
 ),
 seed_templates (
@@ -242,6 +246,7 @@ insert into public.slot_templates (
   default_credit_cost,
   is_active,
   location_id,
+  bookable_program_id,
   source_offer_id,
   source_offer_class_key
 )
@@ -259,6 +264,7 @@ select
   t.default_credit_cost,
   true,
   t.location_id,
+  c.bookable_program_id,
   c.source_offer_id,
   t.source_offer_class_key
 from seed_templates t
@@ -276,6 +282,7 @@ on conflict (id) do update set
   default_credit_cost = excluded.default_credit_cost,
   is_active = excluded.is_active,
   location_id = excluded.location_id,
+  bookable_program_id = excluded.bookable_program_id,
   source_offer_id = excluded.source_offer_id,
   source_offer_class_key = excluded.source_offer_class_key,
   updated_at = now();
@@ -283,9 +290,13 @@ on conflict (id) do update set
 with seed_context as (
   select
     c.id as academy_id,
+    bp.id as bookable_program_id,
     coalesce(nullif(c.time_zone, ''), 'America/New_York') as time_zone,
     '52a6285c-7832-44e1-b531-ab7ef9d8fc21'::uuid as source_offer_id
   from public.clients c
+  join public.bookable_programs bp
+    on bp.tenant_id = c.id
+   and bp.source_program_key = 'bam-gta-training'
   where c.id = '39875f07-0a4b-4429-a201-2249bc1f24df'
 ),
 seed_dates as (
@@ -682,6 +693,7 @@ insert into public.schedule_slots (
   slot_template_id,
   is_cancelled,
   location_id,
+  bookable_program_id,
   source_offer_id,
   source_offer_class_key
 )
@@ -699,6 +711,7 @@ select
   s.slot_template_id,
   s.is_cancelled,
   s.location_id,
+  c.bookable_program_id,
   c.source_offer_id,
   s.source_offer_class_key
 from seed_slots s
@@ -717,6 +730,7 @@ on conflict (id) do update set
   slot_template_id = excluded.slot_template_id,
   is_cancelled = excluded.is_cancelled,
   location_id = excluded.location_id,
+  bookable_program_id = excluded.bookable_program_id,
   source_offer_id = excluded.source_offer_id,
   source_offer_class_key = excluded.source_offer_class_key,
   updated_at = now();
