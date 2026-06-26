@@ -24179,6 +24179,39 @@ function _acxUpdateCount(n) {
   });
 }
 
+// ── Agent switcher: one pill row at the top of every approval overlay so staff can
+// flip Booking · Confirm · Closing without backing out. Each pill opens the sibling
+// overlay (each *Open tears down the current one). A tab only shows if the user is
+// authorized for it (mirrors the per-agent button gating) and carries its pending count.
+function _agentTabVisible(which) {
+  if (which === 'booking') return true; // booking inbox is the default-visible one
+  const ids = which === 'confirm'
+    ? ['acx-approve-btn', 'v15acx-approve-btn']
+    : ['aclx-approve-btn', 'v15aclx-approve-btn'];
+  return ids.some(id => { const el = document.getElementById(id); return el && el.style.display !== 'none'; });
+}
+function _agentTabCount(which) {
+  if (which === 'confirm') return (typeof _ACX_DATA !== 'undefined' && _ACX_DATA) ? _ACX_DATA.length : 0;
+  if (which === 'closing') return (typeof _ACLX_DATA !== 'undefined' && _ACLX_DATA) ? _ACLX_DATA.length : 0;
+  const el = document.getElementById('apx-count') || document.getElementById('v15-apx-count');
+  const n = el ? parseInt(el.textContent, 10) : NaN;
+  if (Number.isFinite(n)) return n;
+  return (typeof _APX_DATA !== 'undefined' && _APX_DATA) ? _APX_DATA.length : 0;
+}
+function _agentTabsBar(active) {
+  const defs = [
+    ['booking', '👁 Booking', '_apxOpen()'],
+    ['confirm', '✅ Confirm', '_acxOpen()'],
+    ['closing', '🎯 Closing', '_aclxOpen()'],
+  ];
+  const c = 'var(--accent)';
+  const pills = defs.filter(([k]) => _agentTabVisible(k)).map(([k, label, fn]) => {
+    const on = k === active, n = _agentTabCount(k);
+    return `<button onclick="${on ? '' : fn}" style="flex:0 0 auto;background:${on ? c : 'transparent'};color:${on ? '#0B0B0D' : 'var(--text-sub)'};border:1px solid ${on ? c : 'var(--border)'};border-radius:999px;padding:7px 15px;font-size:13px;font-weight:700;cursor:${on ? 'default' : 'pointer'};white-space:nowrap">${label}${n ? ` (${n})` : ''}</button>`;
+  }).join('');
+  return `<div style="display:flex;gap:7px;padding:10px 16px;border-bottom:1px solid var(--border);overflow-x:auto;-webkit-overflow-scrolling:touch">${pills}</div>`;
+}
+
 function _acxOpen() {
   document.getElementById('acx-overlay')?.remove();
   document.body.insertAdjacentHTML('beforeend', `
@@ -24189,6 +24222,7 @@ function _acxOpen() {
         <div style="flex:1"></div>
         <button onclick="_acxClose()" aria-label="Close" style="background:none;border:none;color:var(--text-mute);font-size:24px;cursor:pointer;padding:2px 10px">×</button>
       </div>
+      ${_agentTabsBar('confirm')}
       <div id="acx-body" style="flex:1;overflow-y:auto;padding:16px 18px calc(24px + env(safe-area-inset-bottom))">
         <div style="max-width:860px;margin:0 auto"><div style="color:var(--text-mute);font-size:13px"><span class="req-spin"></span> Loading…</div></div>
       </div>
@@ -24367,6 +24401,7 @@ function _aclxOpen() {
         <div style="flex:1"></div>
         <button onclick="_aclxClose()" aria-label="Close" style="background:none;border:none;color:var(--text-mute);font-size:24px;cursor:pointer;padding:2px 10px">×</button>
       </div>
+      ${_agentTabsBar('closing')}
       <div id="aclx-body" style="flex:1;overflow-y:auto;padding:16px 18px calc(24px + env(safe-area-inset-bottom))">
         <div style="max-width:860px;margin:0 auto"><div style="color:var(--text-mute);font-size:13px"><span class="req-spin"></span> Loading…</div></div>
       </div>
@@ -24518,6 +24553,7 @@ function _apxOpen(focusContact, focusName) {
         <div style="flex:1"></div>
         <button onclick="_apxClose()" aria-label="Close" style="background:none;border:none;color:var(--text-mute);font-size:24px;cursor:pointer;padding:2px 10px">×</button>
       </div>
+      ${_agentTabsBar('booking')}
       <div id="apx-tabs" style="display:flex;gap:7px;padding:11px 16px;border-bottom:1px solid var(--border);overflow-x:auto;-webkit-overflow-scrolling:touch"></div>
       <div id="apx-body" style="flex:1;overflow-y:auto;padding:16px 18px calc(24px + env(safe-area-inset-bottom))">
         <div style="max-width:860px;margin:0 auto"><div style="color:var(--text-mute);font-size:13px"><span class="req-spin"></span> Loading…</div></div>
