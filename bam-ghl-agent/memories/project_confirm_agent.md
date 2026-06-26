@@ -64,14 +64,25 @@ handoff + lost ALWAYS wait for a human ✓.
 The proactive side is now a SCRIPTED, scheduled sequence (hybrid: scripted outbound +
 AI for any reply). When a Scheduled-Trial lead hasn't replied, the detector fires the
 next-due scripted step instead of the old single AI opener.
-- **3 steps**: `confirm` (immediate booking confirmation) → `day_before` → `morning_of`.
-  Calendar-based due logic in `api/agent/confirm-automations.js` (immediate always due;
-  day_before = trial is tomorrow in TZ; morning_of = trial today & now<trial).
-- Templates = academy-agnostic defaults (`DEFAULT_CONFIRM_AUTOMATIONS`) + per-academy
-  copy/enable overrides in `clients.ghl_kpi_config.confirm_initial_automations`
-  (`{enabled, approved, steps:[{key,enabled,template}]}`). Timing (`when`) is fixed, not
-  client-editable. Tokens: `{first_name} {day} {time} {address}` (address best-effort from
-  business_info "Location:" line).
+- **2 steps** (reworked PORTAL-NATIVE 2026-06-26, PR #839): `confirm` (immediate booking
+  confirmation, **SMS + matching EMAIL**) and `same_day` (morning-of check-in, SMS).
+  Day-before removed. Calendar-based due logic in `api/agent/confirm-automations.js`.
+- Copy is BAM GTA's real wording (in `DEFAULT_CONFIRM_AUTOMATIONS`). **PORTAL-NATIVE = no
+  GHL tokens**: we resolve `{{appointment.start_time / only_start_time / only_start_date /
+  meeting_location}}` ourselves from the appointment, and GENERATE the calendar links -
+  Google Calendar URL inline + a hosted `.ics` via **new `GET /api/ical`** (`api/ical.js`).
+  `{{contact.first_name}}` is resolved by the send engine (`sendOn` → `resolveMergeVars`
+  in `_send.js`/`email-shells.js`). `nextAppointment` (booking.js) now returns endTime +
+  address; `resolveContactInfo` exported from `automations.js`.
+- EMAIL rides the SAME approval card as the SMS (new cols `email_subject`/`email_body`,
+  migration `20260626140000`). Approving the touch sends both; email via `sendOn`→Resend
+  (suppression + email_events free). Email is NOT quiet-gated; SMS is. `fireScriptedStep`
+  resolves everything at card-creation so the stored draft is final text (clean inbox + the
+  quiet-hours flush can send it raw).
+- Per-academy overrides in `clients.ghl_kpi_config.confirm_initial_automations`
+  (`{enabled, approved, steps:[{key,enabled,template}]}`); fixed fields (when/channel/email/
+  email_subject) always from defaults. GTA's stale pre-portal override was cleared so the
+  new copy shows.
 - Detector (`agent-confirm.js` `fireScriptedStep`): one step per run; dedupes by `step_key`;
   STOPS scripting the moment any AI `confirm/handoff/lost` card exists or the lead replies
   (AI agent then owns it). Falls back to the old AI proactive opener when the sequence isn't
