@@ -199,9 +199,41 @@ async function handler(req, res) {
     }
 
     const section = req.query && req.query.section;
-    const month = (req.query && req.query.month) || "";
-    const { start, end } = monthRange(month);
-    const excl = await loadExclusions(clientId, month);
+    // Accept either ?month=YYYY-MM (legacy) or ?since=&until= (YYYY-MM-DD range,
+    // inclusive). Range end is the next-day midnight (exclusive) so a single-day
+    // range still captures that whole day.
+    const since = req.query && req.query.since;
+    const until = req.query && req.query.until;
+    let start, end, months;
+    if (since && until) {
+      const ymdSec = (ymd, next) => {
+        const mm = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(ymd || ""));
+        if (!mm) return null;
+        const t = Date.UTC(+mm[1], +mm[2] - 1, +mm[3]);
+        return Math.floor((next ? t + 86400000 : t) / 1000);
+      };
+      start = ymdSec(since, false);
+      end = ymdSec(until, true);
+      if (start == null || end == null || end <= start) {
+        return res.status(400).json({ error: "since/until must be YYYY-MM-DD and until >= since" });
+      }
+      months = [];
+      let d = new Date(start * 1000), last = new Date((end - 1) * 1000);
+      let yy = d.getUTCFullYear(), mo = d.getUTCMonth();
+      while (yy < last.getUTCFullYear() || (yy === last.getUTCFullYear() && mo <= last.getUTCMonth())) {
+        months.push(`${yy}-${String(mo + 1).padStart(2, "0")}`);
+        if (++mo > 11) { mo = 0; yy++; }
+      }
+    } else {
+      const month = (req.query && req.query.month) || "";
+      ({ start, end } = monthRange(month));
+      const now = new Date();
+      months = [/^\d{4}-\d{2}$/.test(month) ? month : `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, "0")}`];
+    }
+    // Exclusions + manual cancels are stored per YYYY-MM; union across the range's months.
+    const monthInList = months.map(m => encodeURIComponent(m)).join(",");
+    const exRows = await sb(`kpi_exclusions?client_id=eq.${encodeURIComponent(clientId)}&month=in.(${monthInList})&select=metric,offer_id,ref_id`) || [];
+    const excl = new Set(exRows.map(r => `${r.metric}|${r.offer_id || ZERO_UUID}|${r.ref_id}`));
 
     // ─────────── SALES ───────────
     if (section === "sales") {
@@ -344,7 +376,7 @@ async function handler(req, res) {
 
     // ─────────── MEMBERS ───────────
     if (section === "members") {
-      const manual = await sb(`kpi_manual_cancellations?client_id=eq.${encodeURIComponent(clientId)}&month=eq.${encodeURIComponent(month)}&select=id,contact_name,reason,cancelled_on,stripe_customer_id,ghl_contact_id&order=created_at.desc`) || [];
+      const manual = await sb(`kpi_manual_cancellations?client_id=eq.${encodeURIComponent(clientId)}&month=in.(${monthInList})&select=id,contact_name,reason,cancelled_on,stripe_customer_id,ghl_contact_id&order=created_at.desc`) || [];
       if (!acct) return res.status(200).json({ ok: true, stripe_ok: false, payments: [], cancelled: { count: 0, items: [] }, manual });
       // payments this month (succeeded charges)
       const charges = await stripeGetAll(`/charges?created[gte]=${start}&created[lt]=${end}&expand[]=data.customer`, acct);
