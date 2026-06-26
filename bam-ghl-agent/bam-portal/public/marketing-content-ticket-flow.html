@@ -114,8 +114,9 @@
     <a href="#action">⑥ Request Client Action</a>
     <a href="#handoff">⑦ Content → Marketing</a>
     <a href="#organic">⑧ Organic review</a>
-    <a href="#notify">⑨ Notifications</a>
-    <a href="#big">⑩ Big picture</a>
+    <a href="#gate">⑨ Approval gate + budgets</a>
+    <a href="#notify">⑩ Notifications</a>
+    <a href="#big">⑪ Big picture</a>
   </div>
 
   <div class="legend">
@@ -144,13 +145,17 @@
         <span class="pill r">client-dependent</span><span class="arrow" style="font-size:13px">→</span>
         <span class="pill gr">completed</span><span class="pill">cancelled</span>
       </div>
+      <div class="lbl">Approval gate (per academy)</div>
+      <div class="pills">
+        <span class="pill">ads_content_approval_required</span><span class="pill r">review-requested</span>
+      </div>
     </div>
     <div class="syscard blue">
       <h3><span class="dot" style="background:var(--blue)"></span> Marketing ticket</h3>
       <div class="tbl">marketing_tickets · MarketingView · Ximena / SM</div>
       <p><b style="color:var(--text)">Job:</b> launch &amp; run the paid ad on Meta. Created by the client directly, or spawned from a finished content ticket.</p>
       <div class="pills">
-        <span class="pill b">campaign-create</span><span class="pill b">add</span><span class="pill b">replace</span><span class="pill b">remove</span><span class="pill b">budget</span>
+        <span class="pill b">campaign-create</span><span class="pill b">add</span><span class="pill b">replace</span><span class="pill b">remove</span><span class="pill b">budget</span><span class="pill b">budget-review</span>
       </div>
       <div class="lbl">Status lifecycle</div>
       <div class="pills">
@@ -159,11 +164,11 @@
       </div>
       <div class="lbl">Extra flags</div>
       <div class="pills">
-        <span class="pill">content_check: pending / approved</span><span class="pill r">awaiting_revision</span>
+        <span class="pill r">awaiting_revision</span><span class="pill">assigned_to: client's SM</span>
       </div>
       <div class="lbl">Timeline (Ximena's SLA)</div>
       <div class="pills">
-        <span class="pill r">urgent: 2 biz days</span><span class="pill b">standard: 4 biz days</span>
+        <span class="pill b">3 biz days · every ticket</span><span class="pill">sort: soonest due (overdue first)</span>
       </div>
     </div>
   </div>
@@ -204,7 +209,7 @@
       <div class="out"><span class="pill b">→ marketing_ticket</span> <span class="pill">type: remove</span></div>
     </div>
   </div>
-  <div class="callout"><b>Priority:</b> any create flow can be flagged <b>⚡ urgent</b> → High priority (3-business-day SLA) vs Normal (5-day). Rides along into the staff board's sort.</div>
+  <div class="callout"><b>Priority:</b> any create flow can be flagged <b>⚡ urgent</b> → High vs Normal. On <b>content</b> tickets that drives the SLA (high = 3 biz days, normal = 5) and the deadline digest. Once it spawns a <b>marketing</b> ticket the SLA is a flat <b>3 business days for every ticket</b> - the urgent flag just floats it up the board's soonest-due sort.</div>
 
   <!-- 3 -->
   <h2 id="types"><span class="h2-tag">03</span><br>Ticket types in full</h2>
@@ -215,7 +220,8 @@
     <tr><td><span class="pill b">marketing</span></td><td><b>add</b></td><td>Add a new creative to a running campaign.</td><td>Spawned from an "add-creative" content ticket</td></tr>
     <tr><td><span class="pill b">marketing</span></td><td><b>replace</b></td><td>Swap one creative for another (legacy path).</td><td>Content handoff / legacy edit</td></tr>
     <tr><td><span class="pill b">marketing</span></td><td><b>remove</b></td><td>Take a creative down. No production step.</td><td>Client deletes a creative tile (direct)</td></tr>
-    <tr><td><span class="pill b">marketing</span></td><td><b>budget</b></td><td>Change monthly ad spend. No production step.</td><td>Client edits spend (direct)</td></tr>
+    <tr><td><span class="pill b">marketing</span></td><td><b>budget</b></td><td>Change monthly ad spend. No production step.</td><td>Client edits spend (direct), or a changed line in the budget-review pop-up (§9)</td></tr>
+    <tr><td><span class="pill b">marketing</span></td><td><b>budget-review</b></td><td>A "confirm your monthly budgets" check-in. Pops a modal for the client; auto-completes once they respond.</td><td>Staff press <b>Request budget confirmation</b> on the client's Marketing tab (§9)</td></tr>
   </table>
 
   <!-- 4 -->
@@ -227,7 +233,7 @@
     <tr><th>Button</th><th>Does</th><th>Result</th></tr>
     <tr><td><span class="btn-txt">+ Add final files</span> / <span class="btn-txt">Upload N files</span></td><td>Stage + upload finished creatives.</td><td>Appends to <b>final_files</b>. Status unchanged.</td></tr>
     <tr><td><span class="btn-txt">📤 Send to Marketing</span> <span style="font-size:10px">(ads)</span></td><td>Hand finals to marketing. Needs ≥1 final.</td><td>Content → <span class="pill gr">completed</span>; <b>spawns / updates a marketing ticket</b> (§7).</td></tr>
-    <tr><td><span class="btn-txt">📤 Send for client review</span> <span style="font-size:10px">(organic)</span></td><td>Show the client the finished organic post.</td><td>→ <span class="pill r">client-dependent</span>, awaiting approve. No Slack ping.</td></tr>
+    <tr><td><span class="btn-txt">📤 Send for client review</span> <span style="font-size:10px">(organic, + ads if gate ON)</span></td><td>Show the client the finished post / creative for sign-off.</td><td>→ <span class="pill r">client-dependent</span> + <span class="pill r">review-requested</span>, awaiting approve. For ads, the button auto-swaps to this when the academy's <b>approval gate</b> is ON (§9).</td></tr>
     <tr><td><span class="btn-txt">Request Client Action</span></td><td>Ask the client a question (free text).</td><td>→ <span class="pill r">client-dependent</span> + action requested. 🔔 Slack to client.</td></tr>
     <tr><td><span class="btn-txt">✕ Cancel</span></td><td>Kill the ticket (confirm first).</td><td>→ <span class="pill">cancelled</span>. ❌ Slack to client.</td></tr>
     <tr><td><span style="font-size:11px;color:var(--text-mute)">Routing roster (mgrs)</span></td><td>Assign the owner (organic→content, ads→Cam).</td><td>Sets <b>assigned_to</b>. Executors only see their own.</td></tr>
@@ -241,7 +247,14 @@
     <tr><td><span class="btn-txt">Request Client Action</span></td><td>Ask the client a question before launching.</td><td>action requested (stays <span class="pill g">in-progress</span>); moves to Client-Dependent tab. 🔔 Slack to client.</td></tr>
     <tr><td><span class="btn-txt">✕ Cancel</span></td><td>Kill the ticket (confirm first).</td><td>→ <span class="pill">cancelled</span>. ❌ Slack to client.</td></tr>
   </table>
-  <div class="callout">Staff boards both split into <b>Active</b> · <b>Client Dependent</b> (turns red when &gt;0) · <b>Completed</b>, with channel/type filters and a priority sort.</div>
+  <div class="callout">Staff boards both split into <b>Active</b> · <b>Client Dependent</b> (turns red when &gt;0) · <b>Completed</b>, with channel/type filters. Marketing defaults to the <b>soonest-due</b> sort (overdue rows go red and float to the top).</div>
+
+  <div class="lbl" style="margin-top:26px"><span class="dot" style="background:var(--gold);width:8px;height:8px"></span>&nbsp; On the client's Marketing tab (staff client view)</div>
+  <table>
+    <tr><th>Button</th><th>Does</th><th>Result</th></tr>
+    <tr><td><span class="btn-txt">Request budget confirmation</span></td><td>Ask a client to review their monthly ad spend.</td><td>Creates a <span class="pill b">budget-review</span> marketing ticket already flagged action-needed; 🔔 Slack + push to the client → pops the budget modal next time they open the portal (§9).</td></tr>
+    <tr><td><span style="font-size:11px;color:var(--text-mute)">Content tab · toggle</span></td><td>Turn the <b>ads approval gate</b> on/off for this academy.</td><td>Sets <b>ads_content_approval_required</b>. ON = finished ads route to the client for sign-off before marketing (§9).</td></tr>
+  </table>
 
   <!-- 5 -->
   <h2 id="client"><span class="h2-tag">05</span><br>Every client button on a ticket</h2>
@@ -250,8 +263,9 @@
     <tr><td><span class="btn-txt">Send response</span></td><td>Only when "Action needed"</td><td>Message + optional files → clears the action request (§6).</td></tr>
     <tr><td><span class="btn-txt">Save changes</span></td><td>Always (open ticket)</td><td>Add a note; content tickets can also add/remove files. Marketing = notes only.</td></tr>
     <tr><td><span class="btn-txt">Cancel Request</span></td><td>Open tickets only</td><td>Client kills their own request.</td></tr>
-    <tr><td><span class="btn-txt">✓ Approve</span> <span style="font-size:10px">(organic)</span></td><td>Organic post in review</td><td>Accepts the creative → <span class="pill gr">completed</span>, drops into the Organic content bank.</td></tr>
-    <tr><td><span class="btn-txt">Request changes</span> <span style="font-size:10px">(organic)</span></td><td>Organic post in review</td><td>Sends it back to content with a note → ticket re-opens <span class="pill g">active</span>.</td></tr>
+    <tr><td><span class="btn-txt">✓ Approve</span> <span style="font-size:10px">(review)</span></td><td>Creative in review (organic always; ads when gate ON)</td><td><b>Organic</b> → <span class="pill gr">completed</span>, lands in the Organic content bank. <b>Ads</b> → auto-spawns the marketing ticket (§9) and completes the content ticket.</td></tr>
+    <tr><td><span class="btn-txt">Request changes</span> <span style="font-size:10px">(review)</span></td><td>Creative in review (organic / gated ads)</td><td>Sends it back to content with a note → ticket re-opens <span class="pill g">active</span>.</td></tr>
+    <tr><td><span class="btn-txt">Confirm your budgets</span> <span style="font-size:10px">(pop-up)</span></td><td>Auto-pops after staff request a budget confirmation</td><td>Lists live campaigns + monthly spend (min $600/mo). Edit any → one <span class="pill b">budget</span> ticket each; <span class="btn-txt">These look good</span> = no change. Either way the budget-review ticket auto-completes (§9).</td></tr>
     <tr><td><span class="btn-txt">Change Campaign</span></td><td>On each active campaign card</td><td>Opens campaign detail → edit spend, delete creatives, add new creative.</td></tr>
   </table>
 
@@ -340,7 +354,43 @@
   </div>
 
   <!-- 9 -->
-  <h2 id="notify"><span class="h2-tag">09</span><br>Notifications - what fires, where</h2>
+  <h2 id="gate"><span class="h2-tag">09</span><br>Approval gate + budget confirmations</h2>
+  <div class="lead">Two newer controls that sit on top of the flow above: a per-academy <b>ads approval gate</b>, and a one-tap <b>budget check-in</b>.</div>
+
+  <div class="split">
+    <div class="syscard">
+      <h3><span class="dot" style="background:var(--gold)"></span> Ads approval gate <span class="pill" style="margin-left:6px">off by default</span></h3>
+      <p>A per-academy switch (<b>ads_content_approval_required</b>). Staff flip it on the client's <b>Content tab</b>; the client can flip it themselves in the <b>Brand</b> section of their business blueprint.</p>
+      <p style="margin-top:10px"><b style="color:var(--text)">OFF (default):</b> finished ads go <b>straight to marketing</b> - the normal §7 handoff.</p>
+      <p style="margin-top:10px"><b style="color:var(--text)">ON:</b> a finished <b>ads</b> creative behaves like organic - content presses <span class="btn-txt">Send for client review</span> instead of Send to Marketing. The client gets <span class="pill gr">Approve</span> / <span class="pill r">Request changes</span>:</p>
+      <div class="pills" style="margin-top:10px">
+        <span class="pill gr">Approve</span><span class="arrow" style="font-size:13px">→</span>
+        <span class="pill b">auto-spawns the marketing ticket</span>
+      </div>
+      <div class="pills" style="margin-top:8px">
+        <span class="pill r">Request changes</span><span class="arrow" style="font-size:13px">→</span>
+        <span class="pill g">content re-opens active</span>
+      </div>
+    </div>
+    <div class="syscard">
+      <h3><span class="dot" style="background:var(--blue)"></span> Confirm your budgets</h3>
+      <p>Staff press <span class="btn-txt">Request budget confirmation</span> on the client's Marketing tab → a <span class="pill b">budget-review</span> ticket fires (client Slack + push).</p>
+      <p style="margin-top:10px">Next time the client opens the portal a modal <b>auto-pops</b>: every live Meta campaign with its current monthly spend, editable, <b>min $600/mo</b> each.</p>
+      <div class="pills" style="margin-top:10px">
+        <span class="pill">edit a line</span><span class="arrow" style="font-size:13px">→</span>
+        <span class="pill b">one budget ticket per change</span>
+      </div>
+      <div class="pills" style="margin-top:8px">
+        <span class="btn-txt">These look good</span><span class="arrow" style="font-size:13px">→</span>
+        <span class="pill">no change</span>
+      </div>
+      <p style="margin-top:12px">Either path resolves the request and <b>auto-completes</b> the budget-review ticket so it never lingers on the board.</p>
+    </div>
+  </div>
+  <div class="callout">Both are opt-in nudges, not new lanes: the gate just inserts a client sign-off before the §7 handoff, and the budget check-in is a staff-initiated way to spin up ordinary <span class="pill b">budget</span> tickets.</div>
+
+  <!-- 10 -->
+  <h2 id="notify"><span class="h2-tag">10</span><br>Notifications - what fires, where</h2>
   <table>
     <tr><th>Event</th><th>Goes to</th><th>Message</th></tr>
     <tr><td>Client submits a <b>marketing</b> ticket</td><td>DM → Cam (marketing mgr)</td><td>new ticket ping</td></tr>
@@ -350,13 +400,15 @@
     <tr><td><b>Client responds</b> (marketing)</td><td><b>SM DM</b></td><td>📩 💬 Client responded - Marketing [CODE]</td></tr>
     <tr><td><b>Mark Completed</b> (marketing)</td><td>Client channel + push · <b>SM DM</b></td><td>✅ Completed - [CODE] (client) · 📩 completed (SM DM)</td></tr>
     <tr><td><b>Mark Completed</b> (content)</td><td>Client channel + push</td><td>✅ Completed - [CODE]</td></tr>
+    <tr><td><b>Request budget confirmation</b></td><td>Client channel + push</td><td>📋 Confirm your budgets - pops the budget modal on next portal open</td></tr>
+    <tr><td><b>Ads sent for client review</b> (gate ON)</td><td>Client channel + push</td><td>🔔 Action requested - review your creative (Approve / Request changes)</td></tr>
     <tr><td><b>Cancel</b> (marketing)</td><td>Client channel · <b>SM DM</b></td><td>❌ Cancelled - [CODE] (client + SM DM)</td></tr>
-    <tr><td><b>Daily deadline digest</b> (~8-9am ET)</td><td><span class="pill">#content-marketing</span></td><td>📋 Overdue / today / tomorrow - content lines @owner, <b>marketing lines @Ximena</b> (her 2/4-day SLA)</td></tr>
+    <tr><td><b>Daily deadline digest</b> (~8-9am ET)</td><td><span class="pill">#content-marketing</span></td><td>📋 Overdue / today / tomorrow - content lines @owner (content SLA: high 3 / normal 5 biz days), <b>marketing lines @Ximena</b> (flat 3-day SLA)</td></tr>
   </table>
   <div class="callout"><b>Two Slack audiences:</b> client-facing pings (action / done / cancelled) go to that <b>client's own channel</b>; the team's <b>#content-marketing</b> channel stays for <b>coordination</b> (Ximena's handoff + timeline, Cam on new requests, the daily digest).<br><br><b>The SM gets the full picture by DM</b> (not channel @mentions) - a clean per-SM feed of every marketing status change (new request / action needed / client responded / completed / cancelled). Keeps the shared channel quiet, which matters most for Mike (22 clients). Requires the bot's <code>im:write</code> scope (on).</div>
 
-  <!-- 10 -->
-  <h2 id="big"><span class="h2-tag">10</span><br>The big picture</h2>
+  <!-- 11 -->
+  <h2 id="big"><span class="h2-tag">11</span><br>The big picture</h2>
   <div class="lane">
     <div class="lane-label"><b>1 · Client</b></div>
     <div class="lane-row">
@@ -395,10 +447,11 @@
       <li><b style="color:var(--blue)">Marketing ticket</b> = launch &amp; run the ad (Ximena/SM).</li>
       <li>Paid work flows <b>content → marketing</b>; organic loops <b>content ↔ client</b>; budget &amp; remove go <b>straight to marketing</b>.</li>
       <li><b>Request Client Action</b> pauses either side until the client responds, all via their own Slack channel.</li>
+      <li>Optional <b>ads approval gate</b> adds a client sign-off before launch; <b>budget confirmations</b> let staff nudge a client to review spend. Every marketing ticket runs on a flat <b>3-business-day SLA</b>.</li>
     </ul>
   </div>
 
-  <div class="foot">BAM Business · client-portal.html + bam-portal/api/marketing.js · flow as of June 2026</div>
+  <div class="foot">BAM Business · client-portal.html + bam-portal/api/marketing.js · flow as of June 26 2026 (approval gate · budget confirmations · 3-day SLA)</div>
 
 </div>
 </body>

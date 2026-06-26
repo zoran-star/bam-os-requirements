@@ -1533,7 +1533,6 @@ export function MarketingTab({ client, tokens, role, session, onChanged, forceCa
           { id: "performance", label: "Performance" },
           { id: "campaigns", label: "Campaigns" },
           { id: "kpis", label: "KPIs" },
-          { id: "ghl", label: "GHL KPIs (beta)" },
         ].map(st => (
           <button
             key={st.id}
@@ -1557,10 +1556,6 @@ export function MarketingTab({ client, tokens, role, session, onChanged, forceCa
 
       {marketingSubTab === "kpis" && (
         <MarketingKpis client={client} tokens={t} session={session} />
-      )}
-
-      {marketingSubTab === "ghl" && (
-        <GhlKpiDiscovery client={client} tokens={t} session={session} />
       )}
 
       {marketingSubTab === "campaigns" && <>
