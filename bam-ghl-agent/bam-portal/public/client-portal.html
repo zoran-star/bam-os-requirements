@@ -1120,6 +1120,37 @@
     color: var(--gold);
   }
 
+  /* Branded custom dropdown (.bam-select) - fully styled popup, no native <select>.
+     Reusable: trigger button + absolutely-positioned styled option list. */
+  .bam-select { position: relative; }
+  .bam-select-trigger {
+    width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 8px;
+    background: var(--bg); border: 1px solid var(--line); border-radius: 8px;
+    padding: 11px 12px; color: var(--text); font: inherit; font-size: 13px; cursor: pointer;
+    text-align: left; transition: border-color 0.15s ease;
+  }
+  .bam-select-trigger:hover { border-color: var(--border-med); }
+  .bam-select.open .bam-select-trigger { border-color: var(--gold); }
+  .bam-select-chev { color: var(--text-mute); flex: none; transition: transform 0.15s ease; }
+  .bam-select.open .bam-select-chev { transform: rotate(180deg); }
+  .bam-select-menu {
+    position: absolute; left: 0; right: 0; top: calc(100% + 6px); z-index: 30;
+    background: var(--surface-el, #1c1a16); border: 1px solid var(--line); border-radius: 10px;
+    overflow: hidden; box-shadow: 0 14px 44px rgba(0,0,0,0.5); display: none;
+  }
+  .bam-select.open .bam-select-menu { display: block; }
+  .bam-select-opt {
+    display: flex; flex-direction: column; gap: 2px; align-items: flex-start; text-align: left;
+    width: 100%; padding: 10px 12px; cursor: pointer; color: var(--text-mute);
+    border: 0; background: transparent; font: inherit;
+    transition: background 0.12s ease, color 0.12s ease;
+  }
+  .bam-select-opt:not(:last-child) { border-bottom: 1px solid var(--line); }
+  .bam-select-opt:hover { background: rgba(255,255,255,0.04); color: var(--text); }
+  .bam-select-opt.selected { color: var(--gold); }
+  .bam-select-opt-main { font-size: 13px; font-weight: 600; }
+  .bam-select-opt-sub { font-size: 10.5px; color: var(--text-mute); }
+
   /* X-delete button on each creative tile (new workflow) */
   .creative-delete {
     position: absolute;
@@ -20219,9 +20250,8 @@ function openAddCreativeModal(channel) {
   if (notes) notes.value = '';
   const fld = document.getElementById('inputAssetsFolder');
   if (fld) fld.value = '';
-  // Reset the creative-spec fields each open.
-  const fmt = document.getElementById('inputAssetsFormat'); if (fmt) fmt.value = '9:16 Vertical';
-  const cap = document.getElementById('inputAssetsCaptions'); if (cap) cap.checked = false;
+  // Reset the creative-spec controls each open.
+  _resetCreativeSpec();
   // Channel-aware copy: organic goes back to the client to review, not into a campaign.
   const sub = document.getElementById('inputAssetsSub');
   if (sub) sub.textContent = _inputAssetsChannel === 'organic'
@@ -20245,6 +20275,59 @@ function _selectInputAssetsType(t) {
   document.querySelectorAll('#inputAssetsTypeToggle .binary-toggle-opt').forEach(el => {
     el.classList.toggle('active', el.dataset.value === t);
   });
+}
+
+// Creative-spec controls: branded custom dropdown (Format) + Yes/No toggle (captions).
+let _inputAssetsFormat = '9:16 Vertical';
+let _inputAssetsCaptions = false;
+
+// Reusable custom dropdown (.bam-select) - fully styled, no native <select>.
+function _bamSelectToggle(id) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  const willOpen = !el.classList.contains('open');
+  document.querySelectorAll('.bam-select.open').forEach(o => { if (o !== el) o.classList.remove('open'); });
+  el.classList.toggle('open', willOpen);
+}
+function _bamSelectApply(wrap, opt) {
+  if (!wrap || !opt) return;
+  wrap.querySelectorAll('.bam-select-opt').forEach(o => o.classList.toggle('selected', o === opt));
+  const lbl = wrap.querySelector('.bam-select-label');
+  if (lbl) {
+    const mEl = opt.querySelector('.bam-select-opt-main');
+    const sEl = opt.querySelector('.bam-select-opt-sub');
+    const m = mEl ? mEl.textContent : (opt.dataset.value || '');
+    const s = sEl ? sEl.textContent : '';
+    lbl.innerHTML = escapeHTML(m) + (s ? ' <span style="color:var(--text-mute);font-weight:400">· ' + escapeHTML(s) + '</span>' : '');
+  }
+}
+// Close open dropdowns on outside click / Escape. Capture phase so it still fires
+// inside the modal (whose card stops click bubbling).
+document.addEventListener('click', (e) => {
+  if (!e.target || !e.target.closest || !e.target.closest('.bam-select')) {
+    document.querySelectorAll('.bam-select.open').forEach(o => o.classList.remove('open'));
+  }
+}, true);
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') document.querySelectorAll('.bam-select.open').forEach(o => o.classList.remove('open'));
+});
+
+function _selectFormat(el) {
+  _inputAssetsFormat = el.dataset.value;
+  const wrap = el.closest('.bam-select');
+  _bamSelectApply(wrap, el);
+  if (wrap) wrap.classList.remove('open');
+}
+function _selectCaptions(el) {
+  _inputAssetsCaptions = el.dataset.value === 'yes';
+  document.querySelectorAll('#inputAssetsCaptionsToggle .binary-toggle-opt').forEach(o => o.classList.toggle('active', o === el));
+}
+function _resetCreativeSpec() {
+  _inputAssetsFormat = '9:16 Vertical';
+  _inputAssetsCaptions = false;
+  const fs = document.getElementById('inputAssetsFormatSelect');
+  if (fs) { fs.classList.remove('open'); _bamSelectApply(fs, fs.querySelector('.bam-select-opt[data-value="9:16 Vertical"]')); }
+  document.querySelectorAll('#inputAssetsCaptionsToggle .binary-toggle-opt').forEach(o => o.classList.toggle('active', o.dataset.value === 'no'));
 }
 
 // Files larger than this can't reliably upload directly to Supabase storage
@@ -20411,8 +20494,8 @@ async function submitInputAssets() {
     return;
   }
   const notes = document.getElementById('inputAssetsNotes')?.value?.trim() || '';
-  const format = document.getElementById('inputAssetsFormat')?.value || '';
-  const captions = !!(document.getElementById('inputAssetsCaptions') || {}).checked;
+  const format = _inputAssetsFormat;
+  const captions = _inputAssetsCaptions;
   // Snapshot files + type BEFORE closing the modal - closeInputAssetsModal()
   // resets _inputAssetsState to { files: [] } which would otherwise wipe the
   // upload list and silently submit a ticket with no files attached.
@@ -35468,17 +35551,30 @@ function toggleTheme() {
     <input id="inputAssetsDriveLink" class="modal-input" type="url" placeholder="https://..." />
     <div style="font-size:12px;color:var(--text-mute);margin-top:4px">Set sharing to "Anyone with the link" so we can open it.</div>
 
-    <label class="modal-label" for="inputAssetsFormat" style="margin-top:18px">Format</label>
-    <select id="inputAssetsFormat" class="modal-input">
-      <option value="9:16 Vertical">9:16 - Vertical (Reels / Stories / TikTok)</option>
-      <option value="16:9 Landscape">16:9 - Landscape (YouTube)</option>
-      <option value="4:5 Feed">4:5 - Feed (Instagram / Facebook post)</option>
-    </select>
+    <label class="modal-label" style="margin-top:18px">Format</label>
+    <div class="bam-select" id="inputAssetsFormatSelect">
+      <button type="button" class="bam-select-trigger" onclick="_bamSelectToggle('inputAssetsFormatSelect')" aria-haspopup="listbox">
+        <span class="bam-select-label">9:16 Vertical <span style="color:var(--text-mute);font-weight:400">· Reels / Stories / TikTok</span></span>
+        <svg class="bam-select-chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+      </button>
+      <div class="bam-select-menu" role="listbox">
+        <button type="button" class="bam-select-opt selected" data-value="9:16 Vertical" onclick="_selectFormat(this)">
+          <span class="bam-select-opt-main">9:16 Vertical</span><span class="bam-select-opt-sub">Reels / Stories / TikTok</span>
+        </button>
+        <button type="button" class="bam-select-opt" data-value="16:9 Landscape" onclick="_selectFormat(this)">
+          <span class="bam-select-opt-main">16:9 Landscape</span><span class="bam-select-opt-sub">Website / YouTube</span>
+        </button>
+        <button type="button" class="bam-select-opt" data-value="4:5 Feed" onclick="_selectFormat(this)">
+          <span class="bam-select-opt-main">4:5 Feed</span><span class="bam-select-opt-sub">Instagram / Facebook</span>
+        </button>
+      </div>
+    </div>
 
-    <label class="modal-label" style="margin-top:16px;display:flex;align-items:center;gap:10px;cursor:pointer;font-weight:400">
-      <input type="checkbox" id="inputAssetsCaptions" style="width:16px;height:16px;accent-color:var(--gold);cursor:pointer;flex:none">
-      <span>Add on-screen captions</span>
-    </label>
+    <label class="modal-label" style="margin-top:18px">On-screen captions</label>
+    <div class="binary-toggle" id="inputAssetsCaptionsToggle" style="max-width:220px">
+      <button type="button" class="binary-toggle-opt active" data-value="no" onclick="_selectCaptions(this)">No</button>
+      <button type="button" class="binary-toggle-opt" data-value="yes" onclick="_selectCaptions(this)">Yes</button>
+    </div>
 
     <label class="modal-label" for="inputAssetsNotes" style="margin-top:18px">Notes for the content team</label>
     <textarea id="inputAssetsNotes" class="modal-textarea" placeholder="What's the vibe? Hook? Key copy? Brand colors? Anything special the team should know?"></textarea>
