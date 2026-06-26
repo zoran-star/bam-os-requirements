@@ -8,6 +8,7 @@
 // notifications, not for messaging an existing lead).
 import { ghl } from "./ghl/_core.js";
 import { sendEmail } from "./_email.js";
+import { renderEmail } from "./email-shells.js";
 
 // Send one message on one channel.
 //   { channel:'sms',   contactId, body, ghlToken }
@@ -21,7 +22,10 @@ export async function sendOn({ channel, clientId, contactId, toEmail, toPhone, s
 
   if (channel === "email") {
     if (!toEmail) return { skipped: "no email on file" };
-    const r = await sendEmail({ to: toEmail, subject: subject || "", html: text, clientId });
+    // Wrap the step's text in the academy's branded shell so every automation
+    // email is on-brand (the step body carries only the message copy).
+    const html = renderEmail({ clientId, subject, body: text });
+    const r = await sendEmail({ to: toEmail, subject: subject || "", html, clientId });
     if (r && r.skipped) return { skipped: r.skipped };
     return { sent: true, id: (r && r.id) || null };
   }
