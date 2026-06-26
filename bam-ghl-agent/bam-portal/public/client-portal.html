@@ -16575,9 +16575,105 @@ async function _taRenderKnowledge() {
       html += `<div style="margin-top:20px"><div style="font-size:12px;color:var(--text-mute);font-family:'JetBrains Mono',monospace;text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px">🔒 Managed by BAM (global)</div>` +
         locked.map(s => `<div style="opacity:.6;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:10px 14px;margin-bottom:6px;font-size:13px">${escapeHTML(s.label)}</div>`).join('') + `</div>`;
     }
-    host.innerHTML = html || `<div class="bb-empty">No editable sections.</div>`;
+    // Confirm agent only: the scripted "Initial automations" sequence sits above the
+    // fact sections (it's a structured editor, not a prompt section).
+    const autosSlot = _TA.target === 'confirm'
+      ? `<div id="confirm-autos-card"><div class="req-empty"><span class="req-spin"></span>Loading automations…</div></div>`
+      : '';
+    host.innerHTML = autosSlot + (html || `<div class="bb-empty">No editable sections.</div>`);
+    if (_TA.target === 'confirm') _confirmAutosLoad();
   } catch (e) {
     const host = document.getElementById('ta-section-list'); if (host) host.innerHTML = `<div class="bb-empty">Couldn't load - ${escapeHTML(e.message)}</div>`;
+  }
+}
+
+// ── Confirm agent: Initial Automations editor (the scripted first-touch sequence) ──
+// Edits live in a working copy (_CA.data) and only persist on Save, so toggling a
+// step never loses unsaved copy. Posts to /api/agent-confirm automations-get/-set.
+const _CA = { data: null };
+const _CA_WHEN_LABEL = { immediate: 'Immediately', day_before: 'Day before', morning_of: 'Morning of' };
+
+async function _confirmAutosLoad() {
+  const host = document.getElementById('confirm-autos-card'); if (!host) return;
+  try {
+    const res = await _apxPost('/api/agent-confirm', 'automations-get', {});
+    _CA.data = res.automations || null;
+    _confirmAutosRender();
+  } catch (e) {
+    host.innerHTML = `<div class="bb-empty">Couldn't load automations - ${escapeHTML(e.message)}</div>`;
+  }
+}
+
+// Pull the current textarea values back into the working copy before any re-render.
+function _confirmAutosSync() {
+  if (!_CA.data) return;
+  (_CA.data.steps || []).forEach(s => {
+    const ta = document.getElementById('ca-tpl-' + s.key);
+    if (ta) s.template = ta.value;
+  });
+}
+
+function _caToggle(field, key) {
+  _confirmAutosSync();
+  if (!_CA.data) return;
+  if (key) { const s = (_CA.data.steps || []).find(x => x.key === key); if (s) s[field] = !s[field]; }
+  else { _CA.data[field] = !_CA.data[field]; }
+  _confirmAutosRender();
+}
+
+function _confirmAutosRender() {
+  const host = document.getElementById('confirm-autos-card'); if (!host || !_CA.data) return;
+  const d = _CA.data;
+  const seg = (on) => `background:${on ? 'var(--gold)' : 'transparent'};color:${on ? '#0B0B0D' : 'var(--text-sub)'};border:1px solid ${on ? 'var(--gold)' : 'var(--border)'};border-radius:8px;padding:5px 12px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit`;
+  const liveCount = (d.steps || []).filter(s => s.enabled).length;
+  const willSend = d.enabled && d.approved && liveCount > 0;
+  const status = willSend
+    ? `<span style="color:#5BBF7B">🟢 Live - ${liveCount} step${liveCount === 1 ? '' : 's'} fire when a trial is booked</span>`
+    : (!d.enabled ? `<span style="color:var(--text-mute)">Sequence off - nothing sends</span>`
+      : (!d.approved ? `<span style="color:#E8C547">⚠ Approve the sequence before anything sends</span>`
+        : `<span style="color:var(--text-mute)">No steps enabled</span>`));
+  const steps = (d.steps || []).map(s => `
+    <div style="background:var(--surface-el,#1a1a1d);border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:8px">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px">
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+          <span style="font-weight:600;font-size:13.5px">${escapeHTML(s.label)}</span>
+          <span style="color:var(--text-mute);font-size:10.5px;font-family:monospace;border:1px solid var(--border);border-radius:99px;padding:1px 8px">${_CA_WHEN_LABEL[s.when] || s.when}</span>
+        </div>
+        <button style="${seg(s.enabled)}" onclick="_caToggle('enabled','${s.key}')">${s.enabled ? 'On' : 'Off'}</button>
+      </div>
+      <textarea id="ca-tpl-${s.key}" rows="3" ${s.enabled ? '' : 'disabled'} style="width:100%;box-sizing:border-box;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:9px 11px;color:var(--text);font-size:13px;resize:vertical;font-family:inherit;line-height:1.5;opacity:${s.enabled ? 1 : .5}">${escapeHTML(s.template)}</textarea>
+    </div>`).join('');
+  host.innerHTML = `
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;margin-bottom:16px;overflow:hidden">
+      <div style="padding:14px 16px;border-bottom:1px solid var(--border)">
+        <div style="font-weight:700;font-size:14px;margin-bottom:3px">📨 Initial automations</div>
+        <div style="color:var(--text-mute);font-size:12px;line-height:1.5">Scripted texts that fire automatically when a lead books a trial. The moment they reply, the AI confirm agent takes over the conversation. In Hawkeye each text waits for your ✓; in Self-drive it sends on its own.</div>
+      </div>
+      <div style="padding:14px 16px">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap">
+          <button style="${seg(d.enabled)}" onclick="_caToggle('enabled')">${d.enabled ? 'Sequence on' : 'Sequence off'}</button>
+          <button style="${seg(d.approved)}" onclick="_caToggle('approved')">${d.approved ? 'Approved ✓' : 'Approve sequence'}</button>
+        </div>
+        <div style="font-size:12px;margin-bottom:12px">${status}</div>
+        ${steps}
+        <div style="font-size:11px;color:var(--text-mute);margin:4px 0 12px;line-height:1.6">Tokens: <code>{first_name}</code> <code>{day}</code> <code>{time}</code> <code>{address}</code></div>
+        <div style="display:flex;gap:10px;align-items:center">
+          <button style="${_TA_BTN}" onclick="_confirmAutosSave()">Save</button>
+          <span id="ca-note" style="font-size:12px"></span>
+        </div>
+      </div>
+    </div>`;
+}
+
+async function _confirmAutosSave() {
+  _confirmAutosSync();
+  try {
+    const res = await _apxPost('/api/agent-confirm', 'automations-set', { automations: _CA.data });
+    _CA.data = res.automations || _CA.data;
+    _confirmAutosRender();
+    const n = document.getElementById('ca-note'); if (n) n.innerHTML = `<span style="color:#5BBF7B">Saved ✓</span>`;
+  } catch (e) {
+    const n = document.getElementById('ca-note'); if (n) n.innerHTML = `<span style="color:#E5736A">${escapeHTML(e.message)}</span>`;
   }
 }
 
@@ -24141,7 +24237,7 @@ function _acxBox(r, ph) {
 function _acxReplyCard(r) {
   const esc = r.escalate ? `<div style="font-size:11.5px;color:#e0a020;margin-bottom:6px">⚠ agent escalated${r.escalate_reason ? ': ' + escapeHTML(r.escalate_reason) : ''}</div>` : '';
   return `<div id="acx-${r.id}" style="background:var(--surface);border:1px solid var(--accent-border,rgba(232,197,71,.3));border-radius:11px;padding:12px 14px;margin-bottom:9px">
-    ${_acxHeader(r, 'confirm', 'var(--accent)')}${esc}${_acxContext(r)}
+    ${_acxHeader(r, r.kind === 'confirm_auto' ? 'automated reminder' : 'confirm', 'var(--accent)')}${esc}${_acxContext(r)}
     <div style="text-align:center;font-size:9.5px;color:var(--text-mute);text-transform:uppercase;letter-spacing:.09em;margin:2px 0 5px">proposed message · edit it right here</div>
     ${_acxBox(r)}
     <div style="display:flex;align-items:stretch;gap:8px;margin-top:10px">
