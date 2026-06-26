@@ -1387,6 +1387,12 @@ export function MarketingTab({ client, tokens, role, session, onChanged, onNavig
   const [pickerLoading, setPickerLoading] = useState(false);
   const [pickerError, setPickerError] = useState("");
 
+  // Inline campaign list (shown right on the page, no modal). Loads the ad
+  // account's campaigns once it's saved; checkboxes toggle pickedCampaigns.
+  const [inlineCampaigns, setInlineCampaigns] = useState(null); // null=loading, []=none
+  const [inlineCampaignsErr, setInlineCampaignsErr] = useState("");
+  const savedAdAccount = client.meta_ad_account_id || "";
+
   // Display state — active campaigns shown below
   const [campaigns, setCampaigns] = useState(null);
   const [campaignsLoading, setCampaignsLoading] = useState(true);
@@ -1478,6 +1484,33 @@ export function MarketingTab({ client, tokens, role, session, onChanged, onNavig
   function applyPicker() {
     setPickedCampaigns(Array.from(pickerSelected));
     setPickerOpen(false);
+  }
+
+  // Load the saved ad account's campaigns for the inline checkbox list.
+  useEffect(() => {
+    if (!savedAdAccount) { setInlineCampaigns([]); return; }
+    let cancelled = false;
+    setInlineCampaigns(null); setInlineCampaignsErr("");
+    (async () => {
+      try {
+        const tok = session?.access_token;
+        const r = await fetch(`/api/meta/campaigns?staff_picker=1&client_id=${encodeURIComponent(client.id)}`, {
+          headers: { Authorization: `Bearer ${tok}` },
+        });
+        const j = await r.json().catch(() => ({}));
+        if (cancelled) return;
+        if (!r.ok) { setInlineCampaignsErr(j.error || `HTTP ${r.status}`); setInlineCampaigns([]); return; }
+        if (j.reason === "no_staff_token") { setInlineCampaignsErr("Meta not connected. Go to Settings > Connect Meta."); setInlineCampaigns([]); return; }
+        setInlineCampaigns(Array.isArray(j.campaigns) ? j.campaigns : []);
+      } catch (e) {
+        if (!cancelled) { setInlineCampaignsErr(e.message || "Failed to load campaigns"); setInlineCampaigns([]); }
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [client.id, savedAdAccount, session, refreshKey]);
+
+  function toggleInlineCampaign(id) {
+    setPickedCampaigns(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
   }
 
   async function saveSetup() {
@@ -1759,14 +1792,40 @@ export function MarketingTab({ client, tokens, role, session, onChanged, onNavig
             <label style={{ display: "block", fontSize: 11, color: t.textMute, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 4 }}>
               Campaigns to surface ({pickedCampaigns.length} selected)
             </label>
-            <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-              <button onClick={openPicker} style={btnStyle(t, "secondary")}>
-                {pickedCampaigns.length ? `Edit selection (${pickedCampaigns.length})` : "Pick campaigns"}
-              </button>
-              <span style={{ fontSize: 11, color: t.textMute }}>
-                {pickedCampaigns.length === 0 ? "Empty = show all active campaigns" : `${pickedCampaigns.length} campaign(s) will be shown to this client`}
-              </span>
+            <div style={{ fontSize: 11, color: t.textMute, marginBottom: 8 }}>
+              {pickedCampaigns.length === 0
+                ? "None ticked - all active campaigns will show to the client."
+                : `${pickedCampaigns.length} campaign(s) will be shown to this client.`}
             </div>
+            {(!savedAdAccount || pickedAdAccount !== savedAdAccount) ? (
+              <div style={{ fontSize: 12, color: t.textMute, fontStyle: "italic" }}>
+                Save the ad account first to choose campaigns.
+              </div>
+            ) : inlineCampaigns === null ? (
+              <div style={{ fontSize: 12, color: t.textMute }}>Loading campaigns…</div>
+            ) : inlineCampaignsErr ? (
+              <div style={{ fontSize: 12, color: t.red }}>{inlineCampaignsErr}</div>
+            ) : inlineCampaigns.length === 0 ? (
+              <div style={{ fontSize: 12, color: t.textMute, fontStyle: "italic" }}>No campaigns found in this ad account.</div>
+            ) : (
+              <div style={{ border: `1px solid ${t.border}`, borderRadius: 6, overflow: "hidden", maxHeight: 320, overflowY: "auto" }}>
+                {inlineCampaigns.map(c => {
+                  const on = pickedCampaigns.includes(c.id);
+                  return (
+                    <label key={c.id} style={{
+                      display: "flex", alignItems: "center", gap: 10, padding: "10px 12px",
+                      borderBottom: `1px solid ${t.border}`, cursor: "pointer",
+                      background: on ? `${t.accent}14` : "transparent",
+                    }}>
+                      <input type="checkbox" checked={on} onChange={() => toggleInlineCampaign(c.id)}
+                        style={{ width: 15, height: 15, accentColor: t.accent, cursor: "pointer", flexShrink: 0 }} />
+                      <span style={{ flex: 1, fontSize: 13, color: t.text }}>{c.name || "(unnamed)"}</span>
+                      {c.status && <span style={{ fontSize: 10, color: t.textMute, textTransform: "uppercase", letterSpacing: "0.06em" }}>{String(c.status).toLowerCase()}</span>}
+                    </label>
+                  );
+                })}
+              </div>
+            )}
           </div>
 
           {/* Save bar */}
