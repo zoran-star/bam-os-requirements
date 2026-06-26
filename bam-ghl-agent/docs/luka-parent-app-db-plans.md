@@ -3,8 +3,9 @@
 **For agents:** before making schema changes (new tables, columns, RLS, functions, drops/renames),
 diff your plan against the lists below. If anything overlaps → **stop and tell Zoran to message Luka.**
 
-Owner: Luka (fc-mobile parent app backend). Last updated: 2026-06-24.
-Full context: [`docs/core-handoff/platform-foundations.md`](../../docs/core-handoff/platform-foundations.md)
+Owner: Luka (fc-mobile parent app backend). Last updated: 2026-06-25.
+Full context: [`fc-mobile/docs/parent-app-architecture-plan.md`](../../../fc-mobile/docs/parent-app-architecture-plan.md)
+and [`fc-mobile/docs/parent-app-decisions-log.md`](../../../fc-mobile/docs/parent-app-decisions-log.md).
 
 ---
 
@@ -16,7 +17,9 @@ Full context: [`docs/core-handoff/platform-foundations.md`](../../docs/core-hand
 |---|---|
 | Applied (identity) | `customer_profiles` · `students` · `academy_memberships` · `member_links` |
 | Applied (schedule read model) | `slot_templates` · `schedule_slots` · `reservations` · `waitlist_entries` |
-| Planned (commerce/credits/booking) | `offer_options` · `offer_prices` · `entitlement_templates` · `customer_entitlements` · `credit_ledger` · booking/waitlist/cancel RPCs |
+| Applied (commerce/credits runtime) | `offer_options` · `offer_prices` · `entitlement_templates` · `customer_entitlements` · `credit_ledger` |
+| Planned (access spine before booking) | `bookable_programs`; `bookable_program_id` columns on `offer_options`, `entitlement_templates`, `slot_templates`, and `schedule_slots` |
+| Planned (booking writes) | booking/waitlist/cancel RPCs |
 | Not in v1 unless explicitly revived | `subscriptions` |
 | Planned (later) | `membership_change_requests` · parent messaging/notification tables (names TBD) |
 
@@ -84,12 +87,29 @@ Examples:
 
 Marketing copy is not enough. The booking system needs exact values for credits, periods, unlimited access, and eligibility rules.
 
-As of 2026-06-24, parent V1 should create these entitlement templates in parent-owned
-runtime rows first. Shared Offer lineage can stay null until the later reconciliation.
+As of 2026-06-25, migration `20260625011719_parent_0003_offer_runtime_entitlements.sql`
+has created these parent-owned runtime tables in prod. Prod verification confirmed
+RLS enabled, zero policies, and zero rows. Local development seeds include BAM GTA
+`offers`, `offer_teams`, and `pricing_catalog` mirrors plus synthetic parent runtime
+rows for API/mobile testing.
 
 Current implementation direction: do not change `offers`, `offer_teams`, or
 `pricing_catalog` to get parent V1 running. Actual access is stored in
 `customer_entitlements`; credit balances are derived from `credit_ledger`.
+
+Next agreed parent schema slice: add `bookable_programs` as the thin access target
+for things like BAM GTA Training, Summer Camp 2026, or a future tournament. Offers
+and entitlements will point to a program, and schedule templates/slots will point to
+the same program. This is the booking eligibility spine; do not build a competing
+program/event/access table without syncing with Luka.
+
+MVP simplification rules:
+- No `entitlement_template_program_grants` or `customer_entitlement_program_grants`
+  bridge tables until one entitlement must grant multiple programs.
+- No `training_programs`, `camp_programs`, or `tournament_programs` subtype tables
+  until those verticals need real type-specific fields.
+- Classes remain `schedule_slots`-first; shop/offers pages can query
+  `offer_options` + `bookable_programs` + price summaries.
 
 Long-term ideal: operational pricing should graduate from JSON into typed Offer runtime
 tables such as `offer_options`, `offer_prices`, and `entitlement_templates`, while flexible

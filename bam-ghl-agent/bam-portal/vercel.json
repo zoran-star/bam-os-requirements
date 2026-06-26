@@ -162,6 +162,14 @@
       "destination": "/api/clients?action=invite-staff"
     },
     {
+      "source": "/api/parent/schedule/slots/(.*)",
+      "destination": "/api/parent/schedule/slot?slot_id=$1"
+    },
+    {
+      "source": "/api/parent/students/(.*)/entitlements",
+      "destination": "/api/parent/student-entitlements?student_id=$1"
+    },
+    {
       "source": "/api/(.*)",
       "destination": "/api/$1"
     },
