@@ -687,10 +687,50 @@ async function handleMarketingTickets(req, res) {
   }
 
   if (req.method === "POST") {
-    if (!isClient) return res.status(403).json({ error: "only clients can submit marketing tickets" });
     const body = (req.body && typeof req.body === "object") ? req.body : {};
     const { type, fields, files } = body;
     if (!type) return res.status(400).json({ error: "type is required" });
+
+    // Staff-initiated: a "confirm your monthly budgets" request. Creates a
+    // budget-review ticket already flagged as awaiting client action, which the
+    // client portal turns into an auto-popup on their next visit.
+    if (type === "budget-review") {
+      if (!isStaff) return res.status(403).json({ error: "staff only" });
+      const clientId = body.client_id;
+      if (!clientId) return res.status(400).json({ error: "client_id is required" });
+      const inserted = await sb("marketing_tickets", {
+        method: "POST",
+        headers: { Prefer: "return=representation" },
+        body: JSON.stringify([{
+          client_id: clientId,
+          type: "budget-review",
+          status: "in-progress",
+          content_check_status: "not-required",
+          client_action_status: "requested",
+          fields: { note: "Please confirm your monthly campaign budgets." },
+          files: [],
+          messages: [{
+            author_type: "staff", author_id: ctx.staff.id,
+            author_name: ctx.staff.name || "Marketing",
+            body: "Requested the client to confirm their monthly budgets.",
+            is_action_request: true, internal: false, created_at: nowIso(),
+          }],
+          assigned_to: await clientScalingManager(clientId),
+        }]),
+      });
+      const t = inserted?.[0] || null;
+      if (t) {
+        const code = String(t.id || "").slice(0, 3).toUpperCase();
+        postClientSlackNotification(clientId,
+          `🔔 Action requested — please confirm your monthly budgets [${code}]`, req);
+        notifyClientPush(clientId, "ticket-action-needed", {
+          ticketTitle: "confirm your budgets", ticketId: t.id, view: "marketing",
+        }).catch(() => {});
+      }
+      return res.status(201).json({ ticket: t });
+    }
+
+    if (!isClient) return res.status(403).json({ error: "only clients can submit marketing tickets" });
     const allowedTypes = ["replace", "add", "remove", "budget", "campaign-create"];
     if (!allowedTypes.includes(type)) return res.status(400).json({ error: `invalid type: ${type}` });
 
@@ -820,6 +860,12 @@ async function handleMarketingTickets(req, res) {
         return res.status(409).json({ error: "no action was requested" });
       }
       patch.client_action_status = "responded";
+      // A budget-review request is one-and-done: confirming (with or without
+      // changes) closes it out so it doesn't linger on the staff board.
+      if (ticket.type === "budget-review") {
+        patch.status = "completed";
+        patch.resolved_at = nowIso();
+      }
       patch.messages = appendMessage(ticket.messages, {
         author_type: "client", author_name: authorName,
         body: message, is_action_request: false,

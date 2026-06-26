@@ -1230,6 +1230,31 @@ export function MarketingTab({ client, tokens, role, session, onChanged, forceCa
     }
   }
 
+  // "Request budget confirmation" — sends the client a budget-review request.
+  // They get a pop-up on their next portal visit listing their live campaigns +
+  // monthly spends and can change any (each change → a budget ticket).
+  const [savingBudgetReq, setSavingBudgetReq] = useState(false);
+  async function requestBudgetConfirmation() {
+    if (!confirm(`Send ${client.business_name} a request to confirm their monthly budgets?\n\nThey'll see a pop-up next time they open their portal.`)) return;
+    setSavingBudgetReq(true);
+    try {
+      const tok = session?.access_token;
+      const res = await fetch("/api/marketing-tickets?scope=staff", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${tok}` },
+        body: JSON.stringify({ type: "budget-review", client_id: client.id }),
+      });
+      const j = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(j.error || `HTTP ${res.status}`);
+      onChanged?.();
+      alert("Budget confirmation request sent. The client will see it on their next visit.");
+    } catch (e) {
+      alert("Couldn't send: " + (e.message || e));
+    } finally {
+      setSavingBudgetReq(false);
+    }
+  }
+
   // Sub-tab within the Marketing tab: "campaigns" (setup + active campaigns)
   // or "kpis" (yesterday + week-over-week lead KPIs).
   const [marketingSubTab, setMarketingSubTab] = useState("performance");
@@ -1482,6 +1507,25 @@ export function MarketingTab({ client, tokens, role, session, onChanged, forceCa
 
       {/* Everything below is hidden when marketing is not included */}
       {!marketingIncluded ? null : <>
+
+      {/* Request budget confirmation — sends the client a budget-review pop-up */}
+      {canEdit && (
+        <div style={{
+          padding: "12px 16px", marginBottom: 22, borderRadius: 8,
+          background: t.surfaceEl, border: `1px solid ${t.border}`,
+          display: "flex", alignItems: "center", gap: 14,
+        }}>
+          <div style={{ flex: 1, fontSize: 12, color: t.textMute }}>
+            <b style={{ color: t.text }}>Confirm monthly budgets?</b> Sends the client a pop-up of their live campaigns + spends to review and adjust.
+          </div>
+          <button type="button" onClick={requestBudgetConfirmation} disabled={savingBudgetReq}
+            style={{ padding: "8px 14px", fontSize: 12, fontWeight: 600, borderRadius: 6,
+              border: "none", background: t.accent, color: "#0A0A0B",
+              cursor: savingBudgetReq ? "wait" : "pointer", whiteSpace: "nowrap" }}>
+            {savingBudgetReq ? "Sending…" : "Request budget confirmation"}
+          </button>
+        </div>
+      )}
 
       {/* Sub-tab bar: Campaigns | KPIs */}
       <div style={{ display: "flex", gap: 4, marginBottom: 22, borderBottom: `1px solid ${t.border}` }}>
