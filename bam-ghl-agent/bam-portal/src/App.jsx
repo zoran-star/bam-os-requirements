@@ -802,6 +802,7 @@ export default function BAMPortal() {
                   initialClientId={clientsInitialId}
                   onInitialClientHandled={() => setClientsInitialId(null)}
                   onDetailChange={setClientsInDetail}
+                  onNavigate={setNav}
                 />
               )}
 

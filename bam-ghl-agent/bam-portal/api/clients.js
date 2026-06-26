@@ -2461,6 +2461,16 @@ async function handler(req, res) {
           patch.ads_content_approval_required = v;
         }
 
+        // Does the client run their own ad account? false = BAM-managed (Leadsie
+        // connect path); true = client's own account (extra onboarding steps).
+        if (wasSet("uses_own_ad_account")) {
+          const v = body.uses_own_ad_account;
+          if (typeof v !== "boolean") {
+            return res.status(400).json({ error: "uses_own_ad_account must be a boolean" });
+          }
+          patch.uses_own_ad_account = v;
+        }
+
         // Monthly organic credits: total = combined pool; video/graphic = optional
         // hard caps. null/"" = unlimited; otherwise a non-negative integer (0 = none).
         for (const f of ["organic_total_credits_per_month", "organic_video_credits_per_month", "organic_graphic_credits_per_month"]) {
