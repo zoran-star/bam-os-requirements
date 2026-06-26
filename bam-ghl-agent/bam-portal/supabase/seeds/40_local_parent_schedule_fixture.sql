@@ -391,6 +391,22 @@ seed_slots (
       false
     ),
     (
+      '73000000-0000-4000-8000-000000000023'::uuid,
+      '72000000-0000-4000-8000-000000000004'::uuid,
+      'tue-older',
+      1,
+      'Tuesday Waitlist Test',
+      'Synthetic full class for testing the parent waitlist flow.',
+      'GROUP_CLASS',
+      '1079 Linbrook Rd, Oakville, ON L6J 2L2',
+      1,
+      1,
+      '20:30'::time,
+      '21:30'::time,
+      '71000000-0000-4000-8000-000000000001'::uuid,
+      false
+    ),
+    (
       '73000000-0000-4000-8000-000000000005'::uuid,
       '72000000-0000-4000-8000-000000000005'::uuid,
       'wed-younger',
@@ -891,6 +907,15 @@ seed_reservations (
       'ATTENDED',
       '71000000-0000-4000-8000-000000000001'::uuid,
       'local-ghl-appt-leo-wed-younger-past'
+    ),
+    (
+      '74000000-0000-4000-8000-000000000017'::uuid,
+      '73000000-0000-4000-8000-000000000023'::uuid,
+      'a5ac9fd2-8d34-456a-8b56-1ae457f256f4'::uuid,
+      'ccfd4c6a-9e7a-41f4-8d7a-8f6e80e69825'::uuid,
+      'CONFIRMED',
+      '71000000-0000-4000-8000-000000000001'::uuid,
+      'local-ghl-appt-noah-tue-waitlist-test-full'
     )
 )
 insert into public.reservations (
