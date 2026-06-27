@@ -17,13 +17,14 @@ const STATUS_META = {
 };
 
 // ─── Priority + turnaround SLA ───
-// Internal turnaround for marketing tickets is 3 business days for every ticket
-// (Zoran, 2026-06-26). Priority still tags urgency (fields.priority) for the
-// pill colour + as a tiebreaker, but no longer changes the deadline.
-const MARKETING_SLA_DAYS = 3;
+// Marketing turnaround: urgent (high) = 2 business days, standard (normal) = 4,
+// from the marketing submit date. A 2/4 split deliberately sits inside the 3-day
+// external promise so we stay conservative (Zoran/Cam call, 2026-06-27). These
+// MUST match the digest cron's _mktDueDate in api/marketing.js, or the 9am Slack
+// digest and the portal will disagree on which marketing tickets are overdue.
 const PRIORITY_META = {
-  high:   { label: "High",   sla: MARKETING_SLA_DAYS, color: "#ED7969" },
-  normal: { label: "Normal", sla: MARKETING_SLA_DAYS, color: "#7E9CD9" },
+  high:   { label: "High",   sla: 2, color: "#ED7969" },
+  normal: { label: "Normal", sla: 4, color: "#7E9CD9" },
 };
 function priorityOf(apiTicketFields) {
   return (apiTicketFields?.priority === "high") ? "high" : "normal";

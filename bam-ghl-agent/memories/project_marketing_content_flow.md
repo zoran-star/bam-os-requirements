@@ -129,7 +129,7 @@ From a team call with Cam. Goal: each marketing ticket is a complete brief + rea
 
 **Priority** — stored on `marketing_tickets.fields.priority` = `high` | `normal` (jsonb, no schema change; absent → normal).
 - Client sets it via an **"⚡ Mark as urgent"** checkbox on the new-campaign wizard's final step → rides in content-ticket `context.priority` → copied into `mktFields.priority` on send-to-marketing handoff.
-- SLA turnaround: **High = 3 business days, Normal = 5** (`PRIORITY_META`/`deadlineInfo`/`bizDaysUntil` in `MarketingView.jsx`). Staff view shows a priority chip + auto "Due in N biz days / Overdue", a red left-border on urgent rows, and a **"Priority (urgent first)"** sort (now the default). **(SUPERSEDED 2026-06-26 — see bottom section: SLA is now 3 biz days for ALL marketing tickets, default sort = soonest-due.)**
+- SLA turnaround: **High = 2 business days, Normal = 4** (`PRIORITY_META`/`deadlineInfo`/`bizDaysUntil` in `MarketingView.jsx`). Staff view shows a priority chip + auto "Due in N biz days / Overdue", a red left-border on urgent rows, and a **soonest-due** sort (now the default). **(History: started high 3/normal 5; briefly 3-flat 2026-06-26; final 2/4 split 2026-06-27 — must match cron `_mktDueDate`. See bottom section.)**
 
 **Assigned SM** — `marketing_tickets.assigned_to` (uuid → staff). Auto-set to the client's `scaling_manager_id` on every new marketing ticket (both direct create + content handoff). `enrichWithClient` resolves it → `assigned_to_name`; the staff detail's **Client card** shows "Assigned SM". Decision: SM = the client's assigned manager.
 
@@ -247,7 +247,8 @@ Three shipped together (PRs #812, #813, #814).
 - New marketing type **`budget-review`**. Staff button **"Request budget confirmation"** on the client Marketing tab (`MarketingTab.requestBudgetConfirmation` → POST `/api/marketing-tickets` `{type:'budget-review', client_id}`, staff-only path in the POST handler). Creates the ticket already `client_action_status='requested'` + fires client Slack/push.
 - Client: `fetchAndRenderMarketingRequests` auto-pops `_openBudgetReviewModal` on next load (guarded by `_budgetReviewShownId`). Modal lists live Meta campaigns (`/api/meta/campaigns`) + monthly spend, editable, **min $600/mo**. Each changed campaign → its own `budget` ticket; **"These look good"** = no changes. Both resolve via marketing `respond`, which **auto-completes** a `budget-review` ticket so it doesn't linger. Plus a "Go to Marketing page" link (`switchView('marketing', …)`).
 
-**Marketing SLA = 3 biz days for ALL tickets** (`MARKETING_SLA_DAYS=3`; high+normal both 3). New default sort **"Soonest due (overdue first)"**; overdue in-progress rows flagged red (left border + tint).
+**Marketing SLA** (initially shipped 2026-06-26 as 3-flat) — **SUPERSEDED 2026-06-27: back to a 2/4 split** (high = 2 biz days, normal = 4) so we sit conservatively inside the 3-day external promise (Zoran/Cam call). `PRIORITY_META` in `MarketingView.jsx` is now `high.sla=2 / normal.sla=4`. New default sort **"Soonest due (overdue first)"**; overdue in-progress rows flagged red (left border + tint).
+- ⚠️ **These numbers MUST match the digest cron** `_mktDueDate` in `api/marketing.js` (also 2/4) — if they drift, the 9am Slack digest and the portal disagree on which marketing tickets are overdue. Content SLA is 3/5 in both (`ctkDeadlineInfo` / `_ctkDueDate`). This drift is exactly what bit us 2026-06-27 (UI was 3-flat, cron was 2/4).
 
 **Other portal polish same session:** upload overlay now counts "Uploading X of N files" (`_uploadProgress` in client-portal); removed stray "THIS MONTH" label on active campaign cards.
 
