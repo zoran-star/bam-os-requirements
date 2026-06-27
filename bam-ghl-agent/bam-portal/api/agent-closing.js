@@ -33,7 +33,12 @@ import {
   doneTrialStage, contactInRespondedStage, computeClosingQueue,
   doneTrialContactIdSetCached, peekDoneTrialIdSet, nurtureStage, toIso,
 } from "./agent/_stage.js";
-import { enrollContact, isAutomationLive } from "./automations.js";
+import { enrollContact, isAutomationLive, resolveContactInfo } from "./automations.js";
+import {
+  DEFAULT_CLOSING_AUTOMATIONS, getClosingAutomations,
+  automationsLive as closingAutomationsLive, nextDueStep as nextDueClosingStep,
+} from "./agent/closing-automations.js";
+import { resolveMergeVars, locFor } from "./email-shells.js";
 import { closingAgentMode, modeIsOn, shouldAutoSend } from "./agent/_mode.js";
 import { mutedContactIdSet, isMuted } from "./agent/_mutes.js";
 import { withinQuietHours, nextSendableTime } from "./agent/_quiet.js";
@@ -225,6 +230,80 @@ async function logApproval(row) {
   try { await sb(`agent_approvals`, { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify([row]) }); } catch (_) {}
 }
 
+// Persist only the safe, editable slice of a closing-automations override:
+// per-step enabled + template (known keys only), sequence enabled, approve flag.
+function sanitizeAutomations(incoming, cur = {}) {
+  const defByKey = new Map(DEFAULT_CLOSING_AUTOMATIONS.steps.map(s => [s.key, s]));
+  const inSteps = Array.isArray(incoming.steps) ? incoming.steps : [];
+  const steps = [];
+  for (const s of inSteps) {
+    if (!s || !defByKey.has(s.key)) continue;
+    const def = defByKey.get(s.key);
+    steps.push({
+      key: s.key,
+      enabled: typeof s.enabled === "boolean" ? s.enabled : def.enabled,
+      template: typeof s.template === "string" ? s.template.slice(0, 800) : def.template,
+    });
+  }
+  return {
+    enabled: typeof incoming.enabled === "boolean" ? incoming.enabled
+      : (typeof cur.enabled === "boolean" ? cur.enabled : DEFAULT_CLOSING_AUTOMATIONS.enabled),
+    approved: incoming.approved === true,
+    steps: steps.length ? steps : (Array.isArray(cur.steps) ? cur.steps : []),
+  };
+}
+
+// Fire (or queue) the next due SCRIPTED post-trial step for one proactive Done-Trial
+// lead. Timing is relative to the sequence start (first step's created_at). SMS-only;
+// the only token is {{contact.first_name}}, resolved here so the stored card is final
+// text. The instant the lead replies, the AI closing agent owns the thread.
+async function fireScriptedStep({ client, token, mode, autos, item, contactId }) {
+  const nowMs = Date.now();
+  let rows = [];
+  try {
+    rows = await sb(`agent_closing_replies?client_id=eq.${client.id}&ghl_contact_id=eq.${encodeURIComponent(contactId)}&select=kind,status,step_key,created_at&order=created_at.asc&limit=50`);
+  } catch (_) { rows = []; }
+  rows = Array.isArray(rows) ? rows : [];
+  if (rows.some(r => ["pending", "approved"].includes(r.status))) return "already has an active card";
+  if (rows.some(r => ["closing", "closing_enroll", "closing_lost"].includes(r.kind))) return "lead already in conversation";
+  const autoRows = rows.filter(r => r.kind === "closing_auto" && ["pending", "approved", "sent", "skipped"].includes(r.status));
+  const sentKeys = new Set(autoRows.map(r => r.step_key));
+  const startedMs = autoRows.length ? Math.min(...autoRows.map(r => new Date(r.created_at).getTime())) : null;
+
+  const step = nextDueClosingStep(autos, { nowMs, startedMs, sentKeys });
+  if (!step) return "no scripted step due";
+
+  const info = await resolveContactInfo(token, contactId).catch(() => ({ email: null, firstName: null, fullName: null }));
+  const message = resolveMergeVars(step.template, locFor(client.id), { first_name: info.firstName, full_name: info.fullName });
+  if (!message || !message.trim()) return "rendered template empty";
+
+  const baseRow = {
+    client_id: client.id, ghl_contact_id: String(contactId), contact_name: item.name || null,
+    kind: "closing_auto", step_key: step.key, draft_message: message, confidence: 1,
+    last_lead_at: item.last_at || null, reasoning: `Scripted initial automation: ${step.label}`,
+  };
+
+  const auto = shouldAutoSend(mode, { confidence: 1, escalate: false });
+  if (auto && !withinQuietHours()) {
+    await sb(`agent_closing_replies`, { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify([{
+      ...baseRow, status: "approved", send_after: nextSendableTime().toISOString(), created_by: "self-drive",
+    }]) });
+    return "deferred";
+  }
+  if (auto) {
+    await sendReplyViaGhl(token, contactId, message);
+    await sb(`agent_closing_replies`, { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify([{
+      ...baseRow, status: "sent", auto_sent: true, sent_at: new Date().toISOString(), created_by: "self-drive",
+    }]) });
+    await logApproval({ client_id: client.id, ghl_contact_id: contactId, contact_name: item.name || null, final_reply: message, reasoning: baseRow.reasoning, confidence: 1, adjusted: false, status: "sent", created_by: "closing-auto" });
+    return "sent";
+  }
+  await sb(`agent_closing_replies`, { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify([{
+    ...baseRow, status: "pending", created_by: "detector",
+  }]) });
+  return "queued";
+}
+
 // Find a contact's open opportunity (for stage moves + outcome logging).
 async function findOpenOpp(token, locationId, contactId) {
   const d = await ghl("GET", `/opportunities/search?${new URLSearchParams({ location_id: locationId, contact_id: contactId, limit: "20" })}`, { token });
@@ -287,6 +366,8 @@ async function detectForClient(client) {
   }
 
   const cfg = await loadConfig(client.id);
+  const autos = getClosingAutomations(client);
+  const scriptedLive = closingAutomationsLive(autos);
   const mutedSet = await mutedContactIdSet(client.id, "closing");
   let drafted = 0, autoSent = 0, skipped = 0, escalated = 0, enrollsProposed = 0, lostProposed = 0, deferred = 0;
   const reasons = [];
@@ -299,6 +380,21 @@ async function detectForClient(client) {
     if (mutedSet.has(String(contactId))) { skipped++; reasons.push(`${item.name || contactId}: bot muted on this lead`); continue; }
 
     const reactive = item.last_direction === "inbound";
+
+    // SCRIPTED INITIAL AUTOMATIONS (proactive only). When the academy's sequence is
+    // live + approved, the timed scripted touches OWN the proactive path (they replace
+    // the AI opener). The instant the lead replies, the AI closing agent takes over.
+    if (!reactive && scriptedLive) {
+      try {
+        const r = await fireScriptedStep({ client, token, mode, autos, item, contactId });
+        if (r === "sent") autoSent++;
+        else if (r === "deferred") deferred++;
+        else if (r === "queued") drafted++;
+        else { skipped++; reasons.push(`${item.name || contactId}: ${r}`); }
+      } catch (e) { skipped++; reasons.push(`${item.name || contactId}: scripted - ${e.message}`); }
+      continue;
+    }
+
     try {
       // Dedupe. Reactive: skip if an active card exists or we already answered this
       // inbound. Proactive: skip if ANY closing card already exists (we've engaged).
@@ -446,6 +542,26 @@ async function handler(req, res) {
       if (!b.ready_id) return res.status(400).json({ error: "ready_id required" });
       await sb(`agent_closing_replies?id=eq.${encodeURIComponent(b.ready_id)}&client_id=eq.${clientId}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ status: "skipped", updated_at: new Date().toISOString() }) });
       return res.status(200).json({ ok: true });
+    }
+
+    // Initial-automations editor (the scripted post-trial sequence) — read.
+    if (b.action === "automations-get") {
+      const client = await loadClient(clientId);
+      if (!client) return res.status(404).json({ error: "academy not found" });
+      return res.status(200).json({ automations: getClosingAutomations(client), mode: closingAgentMode(client) });
+    }
+    // Initial-automations editor — save (per-step enabled + copy, sequence enable,
+    // approve toggle). Timing is fixed; copy never contains an em dash.
+    if (b.action === "automations-set") {
+      const client = await loadClient(clientId);
+      if (!client) return res.status(404).json({ error: "academy not found" });
+      const cur = (client.ghl_kpi_config && client.ghl_kpi_config.closing_initial_automations) || {};
+      const merged = sanitizeAutomations(b.automations && typeof b.automations === "object" ? b.automations : {}, cur);
+      const cfg = { ...(client.ghl_kpi_config || {}), closing_initial_automations: merged };
+      try {
+        await sb(`clients?id=eq.${clientId}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ ghl_kpi_config: cfg }) });
+      } catch (e) { return res.status(500).json({ error: `couldn't save: ${e.message}` }); }
+      return res.status(200).json({ ok: true, automations: getClosingAutomations({ ghl_kpi_config: cfg }) });
     }
   } catch (e) {
     console.error("[agent-closing]", e);
