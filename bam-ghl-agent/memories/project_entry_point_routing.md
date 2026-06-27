@@ -59,9 +59,20 @@ sends until the ghosted / trial_followup automations are enabled+approved with s
   ANY path), exit + skip. Reply-exit already wired (inbound-webhook).
 - **UI**: `🏀 Trial Follow-up` added to the Train Agent automation picker (`_TA_AUTOS`,
   `_TA_AUTO_ABOUT`, `_AUTO_SEED`, order) so Zoran can review/approve it.
+- **Entry Points editor in the Train tab (2026-06-26):** two pills after a divider -
+  `📝 Contact Form` + `🏀 Trial Form` (`_TA_ENTRY`/`_TA_ENTRY_ABOUT`, `_taIsEntry`,
+  `_taRenderEntryPoints`/`_taEpForm`/`_taEpSave` in client-portal.html). Editable: master
+  Portal-routing ON/OFF toggle (the `enabled` flag), Pipeline, the stage each form lands
+  in, which automation works it, and (trial) the scheduled-trial stage. Reads/writes via
+  `api/agent-config.js` `get-entry-routing` / `set-entry-routing` (authorized by
+  `resolveAgentActor.canActOn`). Pipelines/stages from `/api/ghl/pipelines`. So
+  `portal_entry_routing` now also supports `contact_automation` / `trial_automation`
+  (leads.js reads them, defaults ghosted / trial_followup). **This editor IS the way to
+  flip routing on** - no more hand-editing the client row.
 
 ## Status
-BUILT DORMANT 2026-06-26. To go live for GTA: (1) set `portal_entry_routing` config on the
-GTA client row, (2) approve+enable ghosted + trial_followup automations, (3) turn OFF the
-matching GHL "form filled" workflows. V2/V1.5 only; V1 untouched. Quiet-hours clamp can
-push the 20-min nudge to the next morning if it lands outside 8am-9:30pm Toronto.
+BUILT DORMANT 2026-06-26. To go live for GTA: **Train Agent → 📝 Contact Form / 🏀 Trial Form**:
+set the pipeline + stages + automations and flip Portal-routing ON; then approve+enable the
+ghosted + trial_followup automations; then turn OFF the matching GHL "form filled" workflows.
+V2/V1.5 only; V1 untouched. Quiet-hours clamp can push the 20-min nudge to the next morning
+if it lands outside 8am-9:30pm Toronto.

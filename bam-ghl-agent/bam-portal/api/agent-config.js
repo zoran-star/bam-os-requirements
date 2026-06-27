@@ -92,6 +92,36 @@ async function handler(req, res) {
     } catch (e) { console.error("[agent-config set]", e); return res.status(500).json({ error: e.message || "internal error" }); }
   }
 
+  // Entry-point routing config (clients.ghl_kpi_config.portal_entry_routing) - the
+  // form-fill -> stage + bot wiring. Read + write, both scoped to the academy's own
+  // owner / can_train_agent member or BAM staff (same as get/set-mode).
+  if (b.action === "get-entry-routing") {
+    const actor = await resolveAgentActor(req);
+    if (!actor) return res.status(401).json({ error: "sign in required" });
+    if (!b.client_id) return res.status(400).json({ error: "client_id required" });
+    if (!actor.canActOn(b.client_id)) return res.status(403).json({ error: "not your academy" });
+    try {
+      const [row] = await sb(`clients?id=eq.${encodeURIComponent(b.client_id)}&select=ghl_kpi_config&limit=1`);
+      return res.status(200).json({ routing: (row && row.ghl_kpi_config && row.ghl_kpi_config.portal_entry_routing) || null });
+    } catch (e) { return res.status(500).json({ error: e.message }); }
+  }
+  if (b.action === "set-entry-routing") {
+    const actor = await resolveAgentActor(req);
+    if (!actor) return res.status(401).json({ error: "sign in required" });
+    if (!b.client_id) return res.status(400).json({ error: "client_id required" });
+    if (!actor.canActOn(b.client_id)) return res.status(403).json({ error: "not your academy" });
+    const routing = (b.routing && typeof b.routing === "object" && !Array.isArray(b.routing)) ? b.routing : null;
+    if (!routing) return res.status(400).json({ error: "routing object required" });
+    try {
+      const [row] = await sb(`clients?id=eq.${encodeURIComponent(b.client_id)}&select=ghl_kpi_config&limit=1`);
+      if (!row) return res.status(404).json({ error: "academy not found" });
+      const cfg = { ...(row.ghl_kpi_config || {}) };
+      cfg.portal_entry_routing = { ...(cfg.portal_entry_routing || {}), ...routing };
+      await sb(`clients?id=eq.${encodeURIComponent(b.client_id)}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ ghl_kpi_config: cfg }) });
+      return res.status(200).json({ ok: true, routing: cfg.portal_entry_routing });
+    } catch (e) { console.error("[agent-config set-entry-routing]", e); return res.status(500).json({ error: e.message || "internal error" }); }
+  }
+
   const staffEmail = await requireStaff(req);
   if (!staffEmail) return res.status(401).json({ error: "staff only" });
 

@@ -15934,7 +15934,14 @@ const _TA_AUTO_ABOUT = {
   ghosted: `<b>👻 Ghosted</b> wins back leads who go quiet. When a lead stops replying, your agent drops them in here for a short burst of texts and emails to restart the conversation. Reply and they bounce straight back to the booking agent; silent all the way through and they roll into Lead Nurture.`,
   nurture: `<b>💔 Lead Nurture</b> is the slow-burn long game. Any lead that's lost but still a fit - across booking, confirm and closing - plus anyone who finishes the Ghosted sequence lands here for the occasional text or email that keeps your academy top of mind. The moment they reply, they bounce back to the booking agent with context.`,
 };
+// Entry points - where a lead enters the pipeline + which stage/bot picks them up.
+const _TA_ENTRY = { ep_contact: '📝 Contact Form', ep_trial: '🏀 Trial Form' };
+const _TA_ENTRY_ABOUT = {
+  ep_contact: `<b>📝 Contact Form</b> is a general enquiry. Set the pipeline stage these leads land in and which automation starts working them right away. When portal routing is on, a contact-form lead drops straight into this stage and sequence; the moment they reply they move to your booking agent.`,
+  ep_trial: `<b>🏀 Trial Form</b> is someone asking for a free trial. Set where they land if they DON'T pick a time (plus the follow-up that chases them) and where they go once they DO book (handed to your Confirm agent). When portal routing is on, this owns the trial entry path instead of GoHighLevel.`,
+};
 const _taIsAgent = () => !!_TA_AGENTS[_TA.target];
+const _taIsEntry = () => !!_TA_ENTRY[_TA.target];
 function _taPick(k) { _TA.target = k; _TA.tab = 'test'; _TA.chat = []; openTrainAgentView(); }
 // Buttons here can't use .btn-primary-bb (that class is scoped to #view-blueprint).
 const _TA_BTN  = "background:var(--gold);color:#0B0B0D;border:none;border-radius:8px;padding:8px 16px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit";
@@ -15966,16 +15973,22 @@ function openTrainAgentView() {
   }
   const pill = (k, label, active) => `<button onclick="_taPick('${k}')" style="background:${active ? 'var(--gold)' : 'transparent'};color:${active ? '#0B0B0D' : 'var(--text-sub)'};border:1px solid ${active ? 'var(--gold)' : 'var(--border)'};border-radius:8px;padding:7px 13px;font-size:13px;font-weight:700;cursor:pointer">${label}</button>`;
   const tab = (k, label) => `<button onclick="_taTab('${k}')" style="background:${_TA.tab === k ? 'var(--gold)' : 'transparent'};color:${_TA.tab === k ? '#0B0B0D' : 'var(--text-sub)'};border:1px solid ${_TA.tab === k ? 'var(--gold)' : 'var(--border)'};border-radius:8px;padding:7px 14px;font-size:13px;font-weight:600;cursor:pointer">${label}</button>`;
-  const targetName = (isAgent ? _TA_AGENTS[_TA.target] : _TA_AUTOS[_TA.target]).replace(/^\S+\s/, '');
+  const isEntry = _taIsEntry();
+  const div = `<span style="width:1px;height:22px;background:var(--border);margin:0 4px"></span>`;
+  const targetName = (_TA_AGENTS[_TA.target] || _TA_AUTOS[_TA.target] || _TA_ENTRY[_TA.target] || '').replace(/^\S+\s/, '');
   const blurb = isAgent
     ? `Coach your academy's <b>${targetName} agent</b>. Test it, teach it Lessons, and keep its facts current in Knowledge - changes apply to <b>your academy</b> right away.`
+    : isEntry
+    ? (_TA_ENTRY_ABOUT[_TA.target] || `Configure where <b>${targetName}</b> leads land.`)
     : (_TA_AUTO_ABOUT[_TA.target] || `Edit your academy's <b>${targetName}</b> sequence.`);
   host.innerHTML = `
     <div style="display:flex;gap:7px;margin-bottom:14px;flex-wrap:wrap;align-items:center">
       <span style="font-size:11px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:var(--text-mute);margin-right:2px">Train</span>
       ${Object.entries(_TA_AGENTS).map(([k, l]) => pill(k, l, _TA.target === k)).join('')}
-      <span style="width:1px;height:22px;background:var(--border);margin:0 4px"></span>
+      ${div}
       ${Object.entries(_TA_AUTOS).map(([k, l]) => pill(k, l, _TA.target === k)).join('')}
+      ${div}
+      ${Object.entries(_TA_ENTRY).map(([k, l]) => pill(k, l, _TA.target === k)).join('')}
     </div>
     <p style="color:var(--text-sub);font-size:13.5px;margin:0 0 14px;max-width:640px;line-height:1.55">${blurb}</p>
     ${isAgent ? `<div style="display:flex;gap:8px;margin-bottom:18px;flex-wrap:wrap">
@@ -15991,6 +16004,7 @@ function openTrainAgentView() {
 function _taTab(k) { _TA.tab = k; openTrainAgentView(); }
 
 function _taRenderPanel() {
+  if (_taIsEntry()) return _taRenderEntryPoints();     // an entry point -> its routing config
   if (!_taIsAgent()) return _taRenderAutomations();   // an automation is selected -> its step-builder
   if (_TA.tab === 'lessons') return _taRenderLessons();
   if (_TA.tab === 'knowledge') return _taRenderKnowledge();
@@ -16091,6 +16105,107 @@ async function _autoApi(action, extra) {
   const json = await _safeJson(r);
   if (!r.ok) throw new Error(json.error || ('HTTP ' + r.status));
   return json;
+}
+
+// ── Entry Points config (Train tab) — edit where a form-fill lands + which bot
+// works it. Writes clients.ghl_kpi_config.portal_entry_routing via /api/agent-config.
+const _TAEP = { routing: null, pipelines: null };
+async function _taEpApi(action, extra) {
+  const token = await _mreqAuthToken();
+  const r = await fetch('/api/agent-config', {
+    method: 'POST', headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action, client_id: CLIENT_ID, ...(extra || {}) }),
+  });
+  const json = await _safeJson(r);
+  if (!r.ok) throw new Error(json.error || ('HTTP ' + r.status));
+  return json;
+}
+async function _taRenderEntryPoints() {
+  const p = document.getElementById('ta-panel');
+  if (!p) return;
+  p.innerHTML = `<div style="color:var(--text-mute);font-size:13px">Loading…</div>`;
+  try {
+    if (!_TAEP.pipelines) {
+      const token = await _mreqAuthToken();
+      const pr = await fetch('/api/ghl/pipelines?client_id=' + encodeURIComponent(CLIENT_ID), { headers: { Authorization: 'Bearer ' + token } });
+      const pj = await _safeJson(pr);
+      _TAEP.pipelines = (pr.ok && (pj.pipelines || [])) || [];
+    }
+    const d = await _taEpApi('get-entry-routing');
+    _TAEP.routing = d.routing || {};
+  } catch (e) { p.innerHTML = `<div style="color:#e07070;font-size:13px">Couldn't load - ${escapeHTML(e.message)}</div>`; return; }
+  _taEpForm();
+}
+function _taEpStageOpts(selected) {
+  const r = _TAEP.routing || {};
+  const pipe = (_TAEP.pipelines || []).find(x => x.name === r.pipeline);
+  if (!pipe) return '<option value="">Choose a pipeline first</option>';
+  return ['<option value="">Choose a stage…</option>']
+    .concat((pipe.stages || []).map(s => `<option value="${escapeHTML(s.name)}" ${s.name === selected ? 'selected' : ''}>${escapeHTML(s.name)}</option>`)).join('');
+}
+function _taEpAutoOpts(selected) {
+  return Object.entries(_TA_AUTOS).map(([k, l]) => `<option value="${k}" ${k === selected ? 'selected' : ''}>${escapeHTML(l)}</option>`).join('');
+}
+// Pull the on-screen field values back into _TAEP.routing (so a pipeline change
+// re-render keeps everything the user already picked).
+function _taEpCapture() {
+  const r = _TAEP.routing || (_TAEP.routing = {});
+  const v = (id) => { const el = document.getElementById(id); return el ? el.value : undefined; };
+  const en = document.getElementById('taep-enabled');
+  if (en) r.enabled = en.checked;
+  if (v('taep-pipeline') !== undefined) r.pipeline = v('taep-pipeline');
+  if (_TA.target === 'ep_contact') {
+    if (v('taep-stage') !== undefined) r.contact_stage = v('taep-stage');
+    if (v('taep-auto') !== undefined) r.contact_automation = v('taep-auto');
+  } else {
+    if (v('taep-stage') !== undefined) r.trial_stage = v('taep-stage');
+    if (v('taep-auto') !== undefined) r.trial_automation = v('taep-auto');
+    if (v('taep-sched') !== undefined) r.scheduled_stage = v('taep-sched');
+  }
+}
+function _taEpPipelineChange() { _taEpCapture(); _taEpForm(); }
+function _taEpForm() {
+  const p = document.getElementById('ta-panel');
+  if (!p) return;
+  const r = _TAEP.routing || {};
+  const isContact = _TA.target === 'ep_contact';
+  const isStaff = (typeof _IS_BAM_STAFF !== 'undefined' && _IS_BAM_STAFF === true);
+  const pipeOpts = ['<option value="">Choose a pipeline…</option>']
+    .concat((_TAEP.pipelines || []).map(pp => `<option value="${escapeHTML(pp.name)}" ${pp.name === (r.pipeline || '') ? 'selected' : ''}>${escapeHTML(pp.name)}</option>`)).join('');
+  const fieldWrap = (label, inner) => `<div style="margin-bottom:13px"><label style="display:block;font-size:12px;font-weight:600;color:var(--text-sub);margin-bottom:5px">${label}</label>${inner}</div>`;
+  const sel = (id, opts, onch) => `<select id="${id}" ${onch ? `onchange="${onch}"` : ''} style="width:100%;max-width:360px;background:var(--bg);border:1px solid var(--border);border-radius:7px;color:var(--text);padding:8px 10px;font-size:13px">${opts}</select>`;
+  const live = !!r.enabled;
+  p.innerHTML = `
+    <div style="border:1px solid var(--border);border-radius:12px;padding:16px;max-width:520px">
+      <label style="display:flex;align-items:center;gap:10px;cursor:pointer;margin-bottom:6px">
+        <input type="checkbox" id="taep-enabled" ${live ? 'checked' : ''} style="width:34px;height:20px;accent-color:var(--gold);cursor:pointer">
+        <span style="font-size:13.5px;font-weight:700;color:var(--text)">Portal routing ${live ? '🟢 ON' : 'OFF'}</span>
+      </label>
+      <p style="font-size:12px;color:var(--text-mute);margin:0 0 16px;line-height:1.5">Applies to all entry points. Turn ON only once you've turned OFF the matching GoHighLevel "form filled" workflows - otherwise leads get contacted twice. Nothing sends until the chosen automation is also approved + on.</p>
+      ${fieldWrap('Pipeline', sel('taep-pipeline', pipeOpts, '_taEpPipelineChange()'))}
+      ${isContact
+        ? fieldWrap('Leads land in this stage', sel('taep-stage', _taEpStageOpts(r.contact_stage))) +
+          fieldWrap('Automation that works them', sel('taep-auto', _taEpAutoOpts(r.contact_automation || 'ghosted')))
+        : fieldWrap('If they do not book, land in', sel('taep-stage', _taEpStageOpts(r.trial_stage))) +
+          fieldWrap('Follow-up automation (chases the booking)', sel('taep-auto', _taEpAutoOpts(r.trial_automation || 'trial_followup'))) +
+          fieldWrap('When they DO book, move to', sel('taep-sched', _taEpStageOpts(r.scheduled_stage)))}
+      <div id="taep-err" style="color:#e07070;font-size:12.5px;margin:4px 0 10px"></div>
+      <button onclick="_taEpSave()" style="${_TA_BTN}">Save</button>
+      ${!isStaff ? '' : '<span style="font-size:11.5px;color:var(--text-mute);margin-left:10px">Pipeline + stage names must match GHL exactly.</span>'}
+    </div>`;
+}
+async function _taEpSave() {
+  _taEpCapture();
+  const r = _TAEP.routing || {};
+  const err = document.getElementById('taep-err');
+  if (err) err.textContent = '';
+  if (r.enabled && !r.pipeline) { if (err) err.textContent = 'Pick a pipeline before turning routing on.'; return; }
+  try {
+    const d = await _taEpApi('set-entry-routing', { routing: r });
+    _TAEP.routing = d.routing || r;
+    _plToast('✓ Entry point saved');
+    _taEpForm();
+  } catch (e) { if (err) err.textContent = e.message; }
 }
 
 async function _taRenderAutomations() {

@@ -494,7 +494,7 @@ async function maybePortalRoute(client, contactId, formType, { name, email }) {
   if (!cfg || !cfg.enabled || !contactId) return false;
   const isTrial = formType === "free-trial";
   const stage = isTrial ? cfg.trial_stage : cfg.contact_stage;
-  const automationKey = isTrial ? "trial_followup" : "ghosted";
+  const automationKey = isTrial ? (cfg.trial_automation || "trial_followup") : (cfg.contact_automation || "ghosted");
   if (cfg.pipeline && stage) {
     try {
       const token = await getClientGhlToken(client);
