@@ -49,6 +49,25 @@ function ctkDeadlineInfo(submittedIso, priority) {
   if (rem === 0) return { due, label: "Due today", overdue: false };
   return { due, label: `Due in ${rem} biz day${rem === 1 ? "" : "s"}`, overdue: false };
 }
+// Quick-filter chip — cross-cuts the tabs (e.g. "all overdue regardless of bucket").
+function CtkStateChip({ label, active, onClick, tk, tone, count }) {
+  const accent = tone || tk.accent;
+  const empty = typeof count === "number" && count === 0;
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      style={{
+        padding: "6px 13px", fontSize: 12.5, fontWeight: 600, borderRadius: 999,
+        cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap",
+        background: active ? `${accent}22` : "transparent",
+        color: active ? accent : (empty ? tk.textMute : tk.textSub),
+        border: `1px solid ${active ? accent : tk.border}`,
+        transition: "all 0.12s ease",
+      }}
+    >{label}</button>
+  );
+}
 function CtkPriorityChip({ priority, tk }) {
   const meta = CT_PRIORITY_META[priority] || CT_PRIORITY_META.normal;
   return (
@@ -736,6 +755,7 @@ function ContentTicketsTab({ tk, session, me }) {
   const [typeFilter, setTypeFilter] = useState("all"); // all | graphic | video | mixed
   const [channelFilter, setChannelFilter] = useState("all"); // all | ads | organic
   const [sortOrder, setSortOrder] = useState("newest"); // newest | oldest
+  const [stateFilter, setStateFilter] = useState("all"); // all | overdue (cross-cuts tabs)
 
   const showBanner = (text) => { setBanner(text); setTimeout(() => setBanner(null), 3500); };
 
@@ -792,8 +812,15 @@ function ContentTicketsTab({ tk, session, me }) {
   const active     = channelScoped.filter(t => t.status === "active");
   const clientDep  = channelScoped.filter(t => t.status === "client-dependent");
   const completed  = channelScoped.filter(t => t.status === "completed" || t.status === "cancelled");
+  // Cross-cutting quick filter: every non-completed ticket that is overdue, regardless
+  // of which tab it sits in — so "show me all overdue" is one click.
+  const ctkIsOverdue = t =>
+    t.status !== "completed" && t.status !== "cancelled" &&
+    !!ctkDeadlineInfo(t.submitted_at, ctkPriorityOf(t))?.overdue;
+  const overdueAll = channelScoped.filter(ctkIsOverdue);
   const tabRows =
-    subTab === "active"           ? active
+    stateFilter === "overdue"       ? overdueAll
+    : subTab === "active"           ? active
     : subTab === "client-dependent" ? clientDep
                                     : completed;
 
@@ -916,6 +943,12 @@ function ContentTicketsTab({ tk, session, me }) {
         <SubTab label={`Active (${active.length})`}             active={subTab === "active"}            onClick={() => setSubTab("active")}            tk={tk} />
         <SubTab label={`Client Dependent (${clientDep.length})`} active={subTab === "client-dependent"} onClick={() => setSubTab("client-dependent")} tk={tk} red={clientDep.length > 0} />
         <SubTab label={`Completed (${completed.length})`}        active={subTab === "completed"}         onClick={() => setSubTab("completed")}         tk={tk} />
+      </div>
+
+      {/* Quick filters — cut across tabs so nothing overdue can hide */}
+      <div style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap", alignItems: "center" }}>
+        <CtkStateChip label="All" active={stateFilter === "all"} onClick={() => setStateFilter("all")} tk={tk} />
+        <CtkStateChip label={`⚠ Overdue (${overdueAll.length})`} active={stateFilter === "overdue"} onClick={() => setStateFilter("overdue")} tk={tk} tone={tk.red || "#ED7969"} count={overdueAll.length} />
       </div>
 
       <div style={{

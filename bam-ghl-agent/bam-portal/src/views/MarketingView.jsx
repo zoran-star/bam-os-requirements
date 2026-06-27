@@ -281,6 +281,7 @@ export default function MarketingView({ tokens: tk, dark, me, session }) {
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState("all"); // all | replace | add | remove | budget | campaign-create
   const [sortOrder, setSortOrder] = useState("due"); // due | priority | newest | oldest
+  const [stateFilter, setStateFilter] = useState("all"); // all | overdue | awaiting-revision (cross-cuts tabs)
 
   // ─── Fetch tickets on mount ───
   useEffect(() => {
@@ -326,18 +327,25 @@ export default function MarketingView({ tokens: tk, dark, me, session }) {
   const selected = selectedId ? tickets.find(t => t.id === selectedId) : null;
 
   const inProgress = tickets.filter(t => t.status === "in-progress");
-  // "Awaiting revision" tickets (returned by marketing to content team) are also
-  // hidden from Active since the ball is no longer in marketing's court.
+  const isOverdue   = t => !!deadlineInfo(t._raw?.submitted_at, t.priority)?.overdue;
+  // "Awaiting revision" = returned by marketing to the content team. It used to drop
+  // the ticket out of every tab (invisible). Now it's a state we badge, not a place we
+  // hide: the ticket stays in Active so overdue work can't fall through the cracks.
   const awaitingRev = inProgress.filter(t => t._raw?.awaiting_revision);
   const clientDep   = inProgress.filter(t => t.clientActionStatus === "requested");
-  // Active = in-progress, not awaiting client, not awaiting content revision
-  const active      = inProgress.filter(t => t.clientActionStatus !== "requested" && !t._raw?.awaiting_revision);
+  // Active = in-progress and not waiting on the client (awaiting-revision now lives here).
+  const active      = inProgress.filter(t => t.clientActionStatus !== "requested");
   const completed   = tickets.filter(t => t.status === "completed" || t.status === "cancelled");
+  // Cross-cutting quick filters: every non-completed ticket that is overdue / in revision,
+  // regardless of which tab it sits in — so "show me all overdue" is one click.
+  const overdueAll  = inProgress.filter(isOverdue);
 
   const tabRows =
-    tab === "active"         ? active
-    : tab === "client-action" ? clientDep
-                              : completed;
+    stateFilter === "overdue"            ? overdueAll
+    : stateFilter === "awaiting-revision" ? awaitingRev
+    : tab === "active"                    ? active
+    : tab === "client-action"             ? clientDep
+                                          : completed;
 
   // Apply toolbar filters: free-text search across academy + campaign,
   // type filter, then sort by submitted date.
@@ -697,6 +705,13 @@ export default function MarketingView({ tokens: tk, dark, me, session }) {
         <Tab label={`Completed (${completed.length})`}            active={tab === "completed"}     onClick={() => setTab("completed")}     tk={tk} />
       </div>
 
+      {/* Quick filters — cut across tabs so nothing overdue can hide */}
+      <div style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap", alignItems: "center" }}>
+        <StateChip label="All"               active={stateFilter === "all"}               onClick={() => setStateFilter("all")} tk={tk} />
+        <StateChip label={`⚠ Overdue (${overdueAll.length})`}            active={stateFilter === "overdue"}            onClick={() => setStateFilter("overdue")} tk={tk} tone={tk.red || "#ED7969"} count={overdueAll.length} />
+        <StateChip label={`↩ Awaiting revision (${awaitingRev.length})`} active={stateFilter === "awaiting-revision"} onClick={() => setStateFilter("awaiting-revision")} tk={tk} tone={tk.amber || "#E8A547"} count={awaitingRev.length} />
+      </div>
+
       {/* Column headers */}
       <div style={{
         display: "grid",
@@ -809,6 +824,27 @@ function Tab({ label, active, onClick, tk, amber, red }) {
   );
 }
 
+// Quick-filter chip — cross-cuts the tabs (e.g. "all overdue regardless of bucket").
+// A zero-count state chip is dimmed but still clickable (shows the empty view).
+function StateChip({ label, active, onClick, tk, tone, count }) {
+  const accent = tone || tk.accent;
+  const empty = typeof count === "number" && count === 0;
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      style={{
+        padding: "6px 13px", fontSize: 12.5, fontWeight: 600, borderRadius: 999,
+        cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap",
+        background: active ? `${accent}22` : "transparent",
+        color: active ? accent : (empty ? tk.textMute : tk.textSub),
+        border: `1px solid ${active ? accent : tk.border}`,
+        transition: "all 0.12s ease",
+      }}
+    >{label}</button>
+  );
+}
+
 // Priority chip — High (urgent, client-flagged) vs Normal
 function PriorityChip({ priority, tk, size = "small" }) {
   const meta = PRIORITY_META[priority] || PRIORITY_META.normal;
@@ -855,6 +891,12 @@ function StatusPills({ t, tk, size = "small" }) {
   // Client action signal — only while active
   if (t.status === "in-progress" && t.clientActionStatus === "requested") {
     pills.push({ label: "Awaiting client", color: tk.red || "#ED7969" });
+  }
+
+  // Awaiting-revision signal — ticket was sent back to the content team. Shown as a
+  // badge (not a hidden bucket) so the ticket stays visible in Active.
+  if (t.status === "in-progress" && t._raw?.awaiting_revision) {
+    pills.push({ label: "Awaiting revision", color: tk.amber || "#E8A547" });
   }
 
   return (
