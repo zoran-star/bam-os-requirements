@@ -16154,15 +16154,25 @@ function _taEpCapture() {
   const en = document.getElementById('taep-enabled');
   if (en) r.enabled = en.checked;
   if (v('taep-pipeline') !== undefined) r.pipeline = v('taep-pipeline');
+  // The automation that works a lead is whatever owns the chosen stage (no manual pick).
+  const botKey = (stage) => { const b = (typeof _plStageBot === 'function') ? _plStageBot(stage) : null; return (b && b.kind === 'automation') ? b.key : null; };
   if (_TA.target === 'ep_contact') {
     if (v('taep-stage') !== undefined) r.contact_stage = v('taep-stage');
-    if (v('taep-auto') !== undefined) r.contact_automation = v('taep-auto');
+    r.contact_automation = botKey(r.contact_stage);
   } else {
     if (v('taep-stage') !== undefined) r.trial_stage = v('taep-stage');
-    if (v('taep-auto') !== undefined) r.trial_automation = v('taep-auto');
     if (v('taep-sched') !== undefined) r.scheduled_stage = v('taep-sched');
+    r.trial_automation = botKey(r.trial_stage);
   }
 }
+// Read-only line under a stage dropdown: which bot owns that stage (or nothing).
+function _taEpActiveLine(stageName) {
+  const bot = (typeof _plStageBot === 'function') ? _plStageBot(stageName) : null;
+  const label = bot ? bot.tag : 'Nothing';
+  const kindWord = bot ? (bot.kind === 'automation' ? 'automation' : bot.kind === 'agent' ? 'agent' : bot.kind) : '';
+  return `<div style="margin:-6px 0 14px;font-size:12.5px;color:var(--text-sub)">▸ Works them here: <b style="color:var(--text)">${escapeHTML(label)}</b>${kindWord ? ` <span style="color:var(--text-mute)">(${kindWord})</span>` : ''}</div>`;
+}
+function _taEpStageChange() { _taEpCapture(); _taEpForm(); }
 function _taEpPipelineChange() { _taEpCapture(); _taEpForm(); }
 function _taEpForm() {
   const p = document.getElementById('ta-panel');
@@ -16184,11 +16194,12 @@ function _taEpForm() {
       <p style="font-size:12px;color:var(--text-mute);margin:0 0 16px;line-height:1.5">Applies to all entry points. Turn ON only once you've turned OFF the matching GoHighLevel "form filled" workflows - otherwise leads get contacted twice. Nothing sends until the chosen automation is also approved + on.</p>
       ${fieldWrap('Pipeline', sel('taep-pipeline', pipeOpts, '_taEpPipelineChange()'))}
       ${isContact
-        ? fieldWrap('Leads land in this stage', sel('taep-stage', _taEpStageOpts(r.contact_stage))) +
-          fieldWrap('Automation that works them', sel('taep-auto', _taEpAutoOpts(r.contact_automation || 'ghosted')))
-        : fieldWrap('If they do not book, land in', sel('taep-stage', _taEpStageOpts(r.trial_stage))) +
-          fieldWrap('Follow-up automation (chases the booking)', sel('taep-auto', _taEpAutoOpts(r.trial_automation || 'trial_followup'))) +
-          fieldWrap('When they DO book, move to', sel('taep-sched', _taEpStageOpts(r.scheduled_stage)))}
+        ? fieldWrap('Leads land in this stage', sel('taep-stage', _taEpStageOpts(r.contact_stage), '_taEpStageChange()')) +
+          _taEpActiveLine(r.contact_stage)
+        : fieldWrap('If they do not book, land in', sel('taep-stage', _taEpStageOpts(r.trial_stage), '_taEpStageChange()')) +
+          _taEpActiveLine(r.trial_stage) +
+          fieldWrap('When they DO book, move to', sel('taep-sched', _taEpStageOpts(r.scheduled_stage), '_taEpStageChange()')) +
+          _taEpActiveLine(r.scheduled_stage)}
       <div id="taep-err" style="color:#e07070;font-size:12.5px;margin:4px 0 10px"></div>
       <button onclick="_taEpSave()" style="${_TA_BTN}">Save</button>
       ${!isStaff ? '' : '<span style="font-size:11.5px;color:var(--text-mute);margin-left:10px">Pipeline + stage names must match GHL exactly.</span>'}
@@ -23407,13 +23418,13 @@ async function _plResolveDupClose(id) {
 // glow. Returns { color, kind, tag } or null for an unmapped stage. V2 only.
 function _plStageBot(name) {
   const n = String(name || '').toLowerCase();
-  if (/respond/.test(n))                                     return { color: '#5A8FB8', kind: 'agent',      tag: '📞 Booking' };
-  if (/(schedul|book)/.test(n) && /trial/.test(n))           return { color: '#3DBE8B', kind: 'agent',      tag: '✅ Confirm' };
-  if (/trial/.test(n) && /(done|complete|attend)/.test(n))   return { color: '#B084E8', kind: 'agent',      tag: '🎯 Closing' };
-  if (/interest/.test(n))                                    return { color: '#E8C547', kind: 'automation', tag: '👻 Ghosted' };
-  if (/nurtur/.test(n))                                      return { color: '#3B6FD4', kind: 'automation', tag: '💔 Nurture' };
-  if (/member|liveclient|enrolled|\bwon\b/.test(n))          return { color: '#EC4899', kind: 'terminal',   tag: '🎉 Member' };
-  if (/unqualif/.test(n))                                    return { color: '#FB923C', kind: 'terminal',   tag: '🚫 Unqualified' };
+  if (/respond/.test(n))                                     return { color: '#5A8FB8', kind: 'agent',      key: 'booking',     tag: '📞 Booking' };
+  if (/(schedul|book)/.test(n) && /trial/.test(n))           return { color: '#3DBE8B', kind: 'agent',      key: 'confirm',     tag: '✅ Confirm' };
+  if (/trial/.test(n) && /(done|complete|attend)/.test(n))   return { color: '#B084E8', kind: 'agent',      key: 'closing',     tag: '🎯 Closing' };
+  if (/interest/.test(n))                                    return { color: '#E8C547', kind: 'automation', key: 'ghosted',     tag: '👻 Ghosted' };
+  if (/nurtur/.test(n))                                      return { color: '#3B6FD4', kind: 'automation', key: 'nurture',     tag: '💔 Nurture' };
+  if (/member|liveclient|enrolled|\bwon\b/.test(n))          return { color: '#EC4899', kind: 'terminal',   key: 'member',      tag: '🎉 Member' };
+  if (/unqualif/.test(n))                                    return { color: '#FB923C', kind: 'terminal',   key: 'unqualified', tag: '🚫 Unqualified' };
   return null;
 }
 

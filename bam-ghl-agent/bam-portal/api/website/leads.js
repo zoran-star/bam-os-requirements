@@ -494,7 +494,9 @@ async function maybePortalRoute(client, contactId, formType, { name, email }) {
   if (!cfg || !cfg.enabled || !contactId) return false;
   const isTrial = formType === "free-trial";
   const stage = isTrial ? cfg.trial_stage : cfg.contact_stage;
-  const automationKey = isTrial ? (cfg.trial_automation || "trial_followup") : (cfg.contact_automation || "ghosted");
+  // Automation that works the lead = the one that owns the landing stage (derived in
+  // the UI from the stage). Trial still falls back to the trial_followup nudge.
+  const automationKey = isTrial ? (cfg.trial_automation || "trial_followup") : (cfg.contact_automation || null);
   if (cfg.pipeline && stage) {
     try {
       const token = await getClientGhlToken(client);
