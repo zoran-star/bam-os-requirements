@@ -426,6 +426,7 @@ function ClientDetail({ client, staff, staffMap, tokens, dark, me, session, onBa
     { id: "systems",      label: "Systems" },
     { id: "actionItems",  label: "Action Items" },
     { id: "notes",        label: "Notes" },
+    { id: "assets",       label: "Assets" },
   ].filter(t => !t.hide);
 
   return (
@@ -479,6 +480,7 @@ function ClientDetail({ client, staff, staffMap, tokens, dark, me, session, onBa
       {tab === "systems" && <SystemsTab client={client} tokens={t} dark={dark} me={me} />}
       {tab === "actionItems" && <ActionItemsTab client={client} tokens={t} session={session} />}
       {tab === "notes" && <NotesTab client={client} tokens={t} me={me} session={session} staffMap={staffMap} />}
+      {tab === "assets" && <AssetsTab client={client} tokens={t} />}
     </div>
   );
 }
@@ -2823,6 +2825,77 @@ function EditSelect({ label, value, onChange, options, tokens }) {
           return <option key={v} value={v}>{l}</option>;
         })}
       </select>
+    </div>
+  );
+}
+
+// ─── ASSETS tab ─────────────────────────────────────────────────────────────
+function AssetsTab({ client, tokens }) {
+  const t = tokens;
+  const [files, setFiles] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [copied, setCopied] = useState(null);
+  const BASE = `https://jnojmfmpnsfmtqmwhopz.supabase.co/storage/v1/object/public/client-assets/${client.id}/`;
+
+  useEffect(() => {
+    supabase.storage.from("client-assets").list(client.id, { limit: 200 })
+      .then(({ data, error }) => {
+        if (!error && data) setFiles(data.filter(f => f.name && f.name !== ".emptyFolderPlaceholder"));
+        setLoading(false);
+      });
+  }, [client.id]);
+
+  function copyUrl(name) {
+    navigator.clipboard.writeText(BASE + name);
+    setCopied(name);
+    setTimeout(() => setCopied(null), 2000);
+  }
+
+  const isImg = name => /\.(jpg|jpeg|png|gif|webp|svg)$/i.test(name);
+
+  if (loading) return <div style={{ color: t.textMute, padding: 24, fontSize: 13 }}>Loading assets...</div>;
+  if (!files.length) return (
+    <div style={{ color: t.textMute, padding: 24, fontSize: 13 }}>
+      No assets found. Upload files to Supabase storage under <code style={{ background: t.surface, padding: "2px 6px", borderRadius: 4 }}>client-assets/{client.id}/</code>
+    </div>
+  );
+
+  return (
+    <div style={{ marginTop: 8 }}>
+      <div style={{ marginBottom: 16, fontSize: 12, color: t.textMute }}>
+        {files.length} asset{files.length !== 1 ? "s" : ""} stored for this client
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 12 }}>
+        {files.map(file => (
+          <div key={file.name} style={{ background: t.surface, border: `1px solid ${t.border}`, borderRadius: 8, overflow: "hidden" }}>
+            {isImg(file.name) ? (
+              <div style={{ height: 140, overflow: "hidden", background: t.surfaceAlt || t.bg }}>
+                <img src={BASE + file.name} alt={file.name} style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: "center top" }} loading="lazy" />
+              </div>
+            ) : (
+              <div style={{ height: 80, display: "flex", alignItems: "center", justifyContent: "center", background: t.surfaceAlt || t.bg }}>
+                <span style={{ fontSize: 28 }}>📎</span>
+              </div>
+            )}
+            <div style={{ padding: "10px 12px" }}>
+              <div style={{ fontSize: 11, fontWeight: 600, color: t.text, marginBottom: 6, wordBreak: "break-all", lineHeight: 1.4 }}>
+                {file.name}
+              </div>
+              <div style={{ display: "flex", gap: 6 }}>
+                <button
+                  onClick={() => copyUrl(file.name)}
+                  style={{ flex: 1, padding: "6px 10px", background: copied === file.name ? "#16a34a" : t.accent, color: copied === file.name ? "#fff" : "#0B0B0D", border: "none", borderRadius: 4, fontSize: 11, fontWeight: 600, cursor: "pointer" }}
+                >
+                  {copied === file.name ? "Copied!" : "Copy URL"}
+                </button>
+                <a href={BASE + file.name} target="_blank" rel="noopener noreferrer" style={{ padding: "6px 10px", background: "transparent", color: t.textMute, border: `1px solid ${t.border}`, borderRadius: 4, fontSize: 11, fontWeight: 600, textDecoration: "none" }}>
+                  View
+                </a>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
