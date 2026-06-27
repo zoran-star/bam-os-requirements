@@ -70,6 +70,34 @@ sends until the ghosted / trial_followup automations are enabled+approved with s
   (leads.js reads them, defaults ghosted / trial_followup). **This editor IS the way to
   flip routing on** - no more hand-editing the client row.
 
+## ⬜ NEXT BUILD (DECIDED 2026-06-26) — Booking bot cold-opens with context; retire trial_followup
+Zoran's call: make the 📞 Booking bot the single conversational engine. Instead of a separate
+20-min trial_followup automation, a trial-form-no-book lead should enter at **Booking with context**
+("filled the trial form, didn't pick a time") and the booking bot opens the conversation. Generalizes
+to ALL context entries (no-show, etc.). **DO THIS IN A FRESH SESSION** (live-agent code). Interim:
+trial_followup still works (dormant), so no gap until this ships.
+
+Entry points to Booking today (all REPLY-triggered): new-lead reply · 👻 ghosted reply · 💔 nurture
+reply (won back) · ✅ confirm "can't make it" handoff · (planned) no-show. The bot only drafts when a
+lead SENT a message — it cannot cold-open yet. That's the gap to fill.
+
+Build (3 parts):
+1. **leads.js `maybePortalRoute`**: trial no-book → place in Responded + write an entry-context note
+   (use the same `agent_contact_notes` channel the confirm→booking handoff uses); STOP enrolling
+   trial_followup. (contact form unchanged — still → Interested → Ghosted.)
+2. **`api/agent-approvals.js`** (the live booking agent):
+   - `runAgent` THROWS "no inbound message to reply to" (line ~153) and `detectForClient` (~281) is
+     built on `computeQueue` which only surfaces leads with an INBOUND (`item.last_at`). So add a
+     NEW opener path: an opener system prompt (no thread) + an agent turn that drafts a FIRST touch
+     from the entry-context note, + a detector pass that finds Responded leads WITH an entry-context
+     note and NO conversation/outbound yet → queue an opener card in `agent_ready_replies` (Hawkeye).
+   - Verify how context notes get injected into the booking prompt (confirm→booking handoff already
+     does this via `agent_contact_notes`/contact_memory — reuse that).
+3. **Retire `trial_followup`**: disable the GTA row (id `2320e3b7-dbdd-4b34-8119-a751afed90ce`). UI
+   already derives the stage's bot, so the trial landing stage (Responded) shows 📞 Booking - no UI
+   change needed.
+All Hawkeye + dormant (portal_entry_routing off). V2 only.
+
 ## Status
 BUILT DORMANT 2026-06-26. To go live for GTA: **Train Agent → 📝 Contact Form / 🏀 Trial Form**:
 set the pipeline + stages + automations and flip Portal-routing ON; then approve+enable the
