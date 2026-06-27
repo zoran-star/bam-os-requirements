@@ -99,9 +99,25 @@ next-due scripted step instead of the old single AI opener.
 - **To turn ON for an academy:** edit/approve the sequence in Knowledge + set confirm_agent_mode.
   Gated to v2_access (detector) so V1 untouched.
 
+## Closing agent initial automations — BUILT 2026-06-26 (PR #842), mirrors confirm
+The CLOSING agent (Done-Trial stage) now has its own scripted post-trial sequence
+(`api/agent/closing-automations.js`, wired in `agent-closing.js` exactly like confirm):
+- **3 SMS steps**: `post_trial` (immediate) → `nudge` (+2 days) → `closeout` (+4 days).
+  Timing is relative to **sequence start** (first card's created_at), not an appointment.
+- SMS-only, only token `{{contact.first_name}}` (resolved by the send engine). No
+  appointment/calendar/email - trial already happened. Warm door-openers; the AI closing
+  agent sends the actual sign-up link once the lead engages.
+- Cards ride `agent_closing_replies` as kind **`closing_auto`** + `step_key` (migration
+  `20260626160000`, APPLIED). Inbox = editable reply card + "automated reminder" pill.
+- Override store: `clients.ghl_kpi_config.closing_initial_automations`. Actions
+  `automations-get`/`automations-set` on `/api/agent-closing`. Gated by `closing_agent_mode`.
+- **Knowledge editor is now AGENT-AWARE** (`_confirmAutos*`/`_CA` in client-portal.html):
+  same card serves confirm + closing, endpoint `/api/agent-<agent>`, per-agent copy/token
+  hints. Shown when `_TA.target` is confirm OR closing.
+- **To turn ON:** Closing → Knowledge → 📨 Initial automations (edit/approve) + set
+  closing_agent_mode. Default copy is generic post-trial; edit per academy.
+
 ## ⚠️ Still TODO
-- Closing agent has the SAME gap (one AI proactive opener; no scripted post-trial sequence) —
-  mirror this build for closing if wanted.
 - `{athlete}` token falls back to "your athlete" (name not yet pulled from contact memory in
   the scripted render).
 - Optional: instant SMS notify when a Scheduled-Trial lead replies (booking has this for
