@@ -1007,10 +1007,15 @@ async function handleMarketingTickets(req, res) {
     // SM (ticket owner) gets a full-picture DM on every status change. The team
     // channel stays for coordination (Ximena/Cam), not per-status SM noise.
     // Falls back to the client's SM if the ticket somehow has no assigned_to.
-    const smDM = (text) => (async () => {
+    // smDM takes a builder so the academy name is resolved lazily — only when a DM
+    // will actually fire (sid present) — and dropped right into the ping so the SM
+    // sees which academy the ticket belongs to (Mike's request, 2026-06-27).
+    const smDM = (build) => (async () => {
       const smId = ticket.assigned_to || await clientScalingManager(ticket.client_id);
       const sid = await staffSlackIdById(smId);
-      if (sid) postStaffSlackDM(sid, text, req);
+      if (!sid) return;
+      const academy = (await sb(`clients?id=eq.${ticket.client_id}&select=business_name`))?.[0]?.business_name || "client";
+      postStaffSlackDM(sid, build(academy), req);
     })();
     if (action === "request-client-action") {
       const ask = (body.message || "").trim();
@@ -1019,7 +1024,7 @@ async function handleMarketingTickets(req, res) {
       notifyClientPush(ticket.client_id, "ticket-action-needed", {
         ticketTitle: "a marketing request", ticketId: ticket.id, view: "marketing",
       }).catch(() => {});
-      smDM(`🔔 Action needed from client - Marketing [${code}]`);
+      smDM(a => `🔔 Action needed from client - ${a} · Marketing [${code}]`);
     } else if (action === "mark-completed") {
       // Client gets pinged in their channel...
       postClientSlackNotification(ticket.client_id,
@@ -1028,13 +1033,13 @@ async function handleMarketingTickets(req, res) {
         ticketTitle: "Your marketing request", ticketId: ticket.id, view: "marketing",
       }).catch(() => {});
       // ...and the SM gets a DM.
-      smDM(`✅ Marketing request completed - [${code}]`);
+      smDM(a => `✅ Completed - ${a} · Marketing [${code}]`);
     } else if (action === "cancel") {
       postClientSlackNotification(ticket.client_id,
         `❌ Cancelled - Marketing [${code}]`, req);
-      smDM(`❌ Cancelled - Marketing [${code}]`);
+      smDM(a => `❌ Cancelled - ${a} · Marketing [${code}]`);
     } else if (action === "respond") {
-      smDM(`💬 Client responded - Marketing [${code}]`);
+      smDM(a => `💬 Client responded - ${a} · Marketing [${code}]`);
     }
 
     // SEC-5: strip internal messages from any response that reaches a client.
