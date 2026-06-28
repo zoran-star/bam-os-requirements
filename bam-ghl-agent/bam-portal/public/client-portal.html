@@ -15927,10 +15927,11 @@ const _TA = { tab: 'test', target: 'booking', chat: [], sending: false, openSect
 // What you can train: the conversational AGENTS (Test / Lessons / Knowledge / Autonomy)
 // and the one-way AUTOMATIONS (the step-builder). The picker at the top selects one.
 const _TA_AGENTS = { booking: '📞 Booking', confirm: '✅ Confirm', closing: '🎯 Closing' };
-const _TA_AUTOS  = { trial_followup: '🏀 Trial Follow-up', ghosted: '👻 Ghosted', nurture: '💔 Lead Nurture' };
+// trial_followup retired 2026-06-28: trial-no-book leads now go to the Booking
+// agent with context (cold opener) instead of a separate automation.
+const _TA_AUTOS  = { ghosted: '👻 Ghosted', nurture: '💔 Lead Nurture' };
 // What each automation is FOR and HOW a lead gets pulled into it (shown as the blurb).
 const _TA_AUTO_ABOUT = {
-  trial_followup: `<b>🏀 Trial Follow-up</b> catches trial-form leads who didn't pick a time. When someone fills the free-trial form but doesn't book, they get a short timer; if they still haven't booked when it's up, this sends one friendly nudge with your next open session. Book in time and they skip straight to the Confirm agent; reply and they go to the booking agent.`,
   ghosted: `<b>👻 Ghosted</b> wins back leads who go quiet. When a lead stops replying, your agent drops them in here for a short burst of texts and emails to restart the conversation. Reply and they bounce straight back to the booking agent; silent all the way through and they roll into Lead Nurture.`,
   nurture: `<b>💔 Lead Nurture</b> is the slow-burn long game. Any lead that's lost but still a fit - across booking, confirm and closing - plus anyone who finishes the Ghosted sequence lands here for the occasional text or email that keeps your academy top of mind. The moment they reply, they bounce back to the booking agent with context.`,
 };
@@ -16090,7 +16091,6 @@ async function _taSetModeGo(mode) {
 // the import session fills the steps.
 let _AUTO = { list: [], overview: [] };
 const _AUTO_SEED = [
-  { automation_key: 'trial_followup', name: '🏀 Trial Follow-up' },
   { automation_key: 'ghosted', name: '👻 Ghosted' },
   { automation_key: 'nurture', name: '💔 Lead Nurture' },
 ];
@@ -16234,7 +16234,7 @@ async function _taRenderAutomations() {
     }
     if (seeded) { d = await _autoApi('list'); list = d.automations || []; }
   } catch (e) { p.innerHTML = `<div style="color:#e07070;font-size:13px">Couldn't load - ${escapeHTML(e.message)}</div>`; return; }
-  const order = { trial_followup: 0, ghosted: 1, nurture: 2 };
+  const order = { ghosted: 0, nurture: 1 };
   list.sort((a, b) => ((order[a.automation_key] ?? 9) - (order[b.automation_key] ?? 9)));
   _AUTO.list = list;
   // When an automation is picked in the Train header, show only that one; else both.
