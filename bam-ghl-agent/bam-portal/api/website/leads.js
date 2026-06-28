@@ -494,9 +494,10 @@ async function maybePortalRoute(client, contactId, formType, { name, email }) {
   if (!cfg || !cfg.enabled || !contactId) return false;
   const isTrial = formType === "free-trial";
   const stage = isTrial ? cfg.trial_stage : cfg.contact_stage;
-  // Automation that works the lead = the one that owns the landing stage (derived in
-  // the UI from the stage). Trial still falls back to the trial_followup nudge.
-  const automationKey = isTrial ? (cfg.trial_automation || "trial_followup") : (cfg.contact_automation || null);
+  // Automation that works the lead = whatever owns the landing stage (derived in the
+  // UI from the stage). null = an AGENT owns the stage (e.g. Responded -> Booking), so
+  // instead of an automation we leave a context note and the agent opens the convo.
+  const automationKey = isTrial ? cfg.trial_automation : cfg.contact_automation;
   if (cfg.pipeline && stage) {
     try {
       const token = await getClientGhlToken(client);
@@ -504,9 +505,27 @@ async function maybePortalRoute(client, contactId, formType, { name, email }) {
       await placeOpportunity(headers, client.ghl_location_id, contactId, { pipeline: cfg.pipeline, stage }, `${name || email}`, true);
     } catch (e) { console.error("portal route: place opp failed (non-fatal):", e.message); }
   }
-  try {
-    await enrollContact({ clientId: client.id, automationKey, contactId });
-  } catch (e) { console.error("portal route: enroll failed (non-fatal):", e.message); }
+  if (automationKey) {
+    // Automation-owned stage (e.g. Interested -> Ghosted): enrol the sequence.
+    try {
+      await enrollContact({ clientId: client.id, automationKey, contactId });
+    } catch (e) { console.error("portal route: enroll failed (non-fatal):", e.message); }
+  } else {
+    // Agent-owned stage: drop an "Entry:" context note so the stage's bot (the
+    // Booking agent) opens the conversation with context. contact-memory.js injects
+    // active agent_contact_notes into the agent prompt; the opener detector pass in
+    // agent-approvals.js picks these leads up.
+    const note = isTrial
+      ? "Filled out the free-trial form but did not pick a time. Help them book a free trial."
+      : "Filled out the contact form (general enquiry). Reach out and help them book a free trial.";
+    try {
+      await sbReq(`agent_contact_notes`, {
+        method: "POST",
+        headers: { Prefer: "return=minimal" },
+        body: JSON.stringify([{ client_id: client.id, ghl_contact_id: String(contactId), active: true, note: `Entry: ${note}`, created_by: "entry-routing" }]),
+      });
+    } catch (e) { console.error("portal route: entry note failed (non-fatal):", e.message); }
+  }
   return true;
 }
 

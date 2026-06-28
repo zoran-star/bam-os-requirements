@@ -81,26 +81,28 @@ Entry points to Booking today (all REPLY-triggered): new-lead reply · 👻 ghos
 reply (won back) · ✅ confirm "can't make it" handoff · (planned) no-show. The bot only drafts when a
 lead SENT a message — it cannot cold-open yet. That's the gap to fill.
 
-Build (3 parts):
-1. **leads.js `maybePortalRoute`**: trial no-book → place in Responded + write an entry-context note
-   (use the same `agent_contact_notes` channel the confirm→booking handoff uses); STOP enrolling
-   trial_followup. (contact form unchanged — still → Interested → Ghosted.)
-2. **`api/agent-approvals.js`** (the live booking agent):
-   - `runAgent` THROWS "no inbound message to reply to" (line ~153) and `detectForClient` (~281) is
-     built on `computeQueue` which only surfaces leads with an INBOUND (`item.last_at`). So add a
-     NEW opener path: an opener system prompt (no thread) + an agent turn that drafts a FIRST touch
-     from the entry-context note, + a detector pass that finds Responded leads WITH an entry-context
-     note and NO conversation/outbound yet → queue an opener card in `agent_ready_replies` (Hawkeye).
-   - Verify how context notes get injected into the booking prompt (confirm→booking handoff already
-     does this via `agent_contact_notes`/contact_memory — reuse that).
-3. **Retire `trial_followup`**: disable the GTA row (id `2320e3b7-dbdd-4b34-8119-a751afed90ce`). UI
-   already derives the stage's bot, so the trial landing stage (Responded) shows 📞 Booking - no UI
-   change needed.
+### ✅ BUILT 2026-06-28 — Booking cold-opener (PR pending)
+1. **leads.js `maybePortalRoute`**: dropped the trial_followup fallback. `automationKey` =
+   `trial_automation`/`contact_automation` (derived from the stage). If an automation owns the stage
+   (Interested→ghosted) → enrol it; ELSE (agent-owned stage, e.g. Responded→Booking) → write an
+   `agent_contact_notes` row prefixed **`Entry: ...`** ("Filled the free-trial form but did not pick a
+   time...") so the agent opens with context. contact_memory injects it into the prompt.
+2. **`api/agent-approvals.js`**: `OPENER_TRAILER` + `buildOpenerSystem`; `runOpener` (seeds one user
+   turn, no inbound, same check_availability loop + forced propose_reply); `draftOpener`
+   (buildOpenerSystem + loadContactMemory + calendars). NEW opener pass in `detectForClient`: finds
+   active `Entry:` notes ∩ respondedIds ∩ not muted; for each with NO prior `agent_ready_replies` row
+   AND no GHL conversation → `draftOpener` → queue `agent_ready_replies` pending (`created_by:'opener'`,
+   kind reply/book). Cap `OPENER_CAP=5`/run. Mode-gated (only when booking agent on), Hawkeye only.
+   Dedupe = never re-open (prior-row check) + never double-text (conversation check). No-reply leads
+   fall to the ≥24h ghost forcing-function naturally.
+3. **Retired `trial_followup`**: removed from the Train picker (`_TA_AUTOS`/`_TA_AUTO_ABOUT`/`_AUTO_SEED`/
+   order). GTA row (`2320e3b7-dbdd-4b34-8119-a751afed90ce`) left dormant (enabled/approved false), now
+   unused by leads.js. Trial landing stage (Responded) shows 📞 Booking via the stage-derived display.
 All Hawkeye + dormant (portal_entry_routing off). V2 only.
 
 ## Status
-BUILT DORMANT 2026-06-26. To go live for GTA: **Train Agent → 📝 Contact Form / 🏀 Trial Form**:
-set the pipeline + stages + automations and flip Portal-routing ON; then approve+enable the
-ghosted + trial_followup automations; then turn OFF the matching GHL "form filled" workflows.
-V2/V1.5 only; V1 untouched. Quiet-hours clamp can push the 20-min nudge to the next morning
-if it lands outside 8am-9:30pm Toronto.
+BUILT DORMANT (entry routing 2026-06-26 + Booking cold-opener 2026-06-28). To go live for GTA:
+**Train Agent → 📝 Contact Form / 🏀 Trial Form**: set the pipeline + stages and flip Portal-routing ON;
+approve+enable the 👻 Ghosted automation (contact path); make sure the Booking agent is on (Hawkeye) so
+it cold-opens trial-no-book leads; then turn OFF the matching GHL "form filled" workflows.
+V2/V1.5 only; V1 untouched.

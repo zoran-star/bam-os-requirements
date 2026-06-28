@@ -35,6 +35,7 @@ const ANTHROPIC_KEY        = process.env.ANTHROPIC_API_KEY;
 const ANTHROPIC_MODEL      = "claude-sonnet-4-6";
 const DEFAULT_CLIENT_ID    = "39875f07-0a4b-4429-a201-2249bc1f24df"; // BAM GTA
 const DETECT_CAP           = 10;   // max ready replies drafted per academy per run
+const OPENER_CAP           = 5;    // max cold openers drafted per academy per run
 
 const BOOK_ASK = /(would you like to|want to|wanna|do you want to|happy to have you|can you make it|are you free).*(come|book|try|drop by|stop by|swing by|check|visit|session)|come (by|in|on (in|by)|and (see|try|check)|check (it|us) out)|check (it|us) out|book(ing)? (a|the|your|in)?\s*(free\s*)?(trial|session|spot)|(grab|reserve|save) (a|the|your)?\s*spot|see if it'?s a (good )?fit|pop (by|in)|see you (there|then)/i;
 
@@ -83,6 +84,17 @@ const LIVE_BOOKING_TRAILER =
   `If your lost_criteria say this lead should be closed out, set 'recommend_lost' = true with a short 'lost_reason' from the taxonomy, and put your warm closing message in 'reply' (a human confirms the Lost before anything changes).\n</live_booking>`;
 function buildSystem({ lessons, overrides, examples }) {
   return buildAgentSystem({ lessons, overrides, examples, trailer: LIVE_BOOKING_TRAILER });
+}
+
+// Cold opener: the lead entered with context (see <contact_memory>) but has NOT
+// messaged yet (e.g. filled the free-trial form, never picked a time). The Booking
+// agent opens the conversation. Same propose_reply contract as a live reply.
+const OPENER_TRAILER =
+  `<live_booking>\n` +
+  `You are writing the FIRST outbound SMS to a REAL lead who entered with context (see <contact_memory>) but has NOT messaged yet - for example they filled out the free-trial form but never picked a time. Open the conversation warmly and like a real coach texting (short, human, no corporate tone), reference what they did so it doesn't feel automated, and your single goal is to get them booked into a free trial. A human reviews your draft before it sends. ` +
+  `Respond ONLY by calling propose_reply: 'reply' = the exact opening text to send; 'reasoning' = 1-2 sentence why; 'confidence' = 0..1; 'asked_to_book' = true if your message invites them to book or come in; 'escalate' = true (reply empty) only if you genuinely cannot draft an opener from the context.\n</live_booking>`;
+function buildOpenerSystem({ lessons, overrides, examples }) {
+  return buildAgentSystem({ lessons, overrides, examples, trailer: OPENER_TRAILER });
 }
 
 const REPLY_TOOL = {
@@ -179,6 +191,36 @@ async function runAgent(system, messages, bookingCtx = null) {
   throw new Error("no structured reply from Claude (tool loop)");
 }
 
+// The opener turn: no inbound thread - seed a single instruction so the agent
+// drafts a FIRST outbound from <contact_memory>. Same check_availability loop +
+// forced propose_reply as runAgent.
+async function runOpener(system, bookingCtx = null) {
+  const canBook = !!(bookingCtx && Array.isArray(bookingCtx.calendars) && bookingCtx.calendars.length);
+  const tools = canBook ? [REPLY_TOOL, CHECK_AVAILABILITY] : [REPLY_TOOL];
+  const convo = [{ role: "user", content: "Write your FIRST outbound text to this lead now, using what you know from the context above. They have not messaged yet, so open the conversation and move toward booking a free trial." }];
+  for (let i = 0; i < 4; i++) {
+    const forceReply = !canBook || i === 3;
+    const data = await anthropicCall({
+      model: ANTHROPIC_MODEL, max_tokens: 1024, system, tools,
+      tool_choice: forceReply ? { type: "tool", name: "propose_reply" } : { type: "auto" },
+      messages: convo,
+    });
+    const content = data.content || [];
+    const reply = content.find(b => b.type === "tool_use" && b.name === "propose_reply");
+    if (reply?.input) return reply.input;
+    const avail = content.find(b => b.type === "tool_use" && b.name === "check_availability");
+    if (avail) {
+      convo.push({ role: "assistant", content });
+      const result = await runCheckAvailability(avail.input, bookingCtx);
+      convo.push({ role: "user", content: [{ type: "tool_result", tool_use_id: avail.id, content: JSON.stringify(result).slice(0, 3000) }] });
+      continue;
+    }
+    convo.push({ role: "assistant", content: content.length ? content : "…" });
+    convo.push({ role: "user", content: "Call propose_reply now with your opening message." });
+  }
+  throw new Error("no structured opener from Claude (tool loop)");
+}
+
 // ── GHL thread helpers ──
 async function findConversation(token, locationId, contactId) {
   const params = new URLSearchParams({ locationId, contactId });
@@ -244,6 +286,25 @@ async function draftForContact(token, locationId, clientId, contactId, cfg, opts
     thread_tail: messages.slice(-6).map(m => ({ role: m.role === "agent" ? "agent" : "lead", text: String(m.text).slice(0, 320), at: toIso(m.date) })),
     reply_count: agentMsgs.length,
     booking_asks: agentMsgs.filter(m => BOOK_ASK.test(m.text)).length,
+  };
+}
+
+// Draft a cold OPENER for a Responded lead that entered with context but hasn't
+// messaged (no thread). Returns the structured proposal or throws.
+async function draftOpener(token, locationId, clientId, contactId, cfg, calendars) {
+  const system = buildOpenerSystem(cfg) + await loadContactMemory(sb, clientId, contactId, { ghl, token, locationId });
+  const out = await runOpener(system, { calendars: calendars || [], token, timezone: "America/Toronto" });
+  const bookCal = (out.book && out.book_slot_at && out.book_group) ? calendarForGroup(calendars || [], out.book_group) : null;
+  const book = !!(out.book && out.book_slot_at && bookCal);
+  return {
+    reply: out.reply || "",
+    reasoning: out.reasoning || "",
+    confidence: typeof out.confidence === "number" ? out.confidence : null,
+    escalate: !!out.escalate,
+    asked_to_book: !!out.asked_to_book || BOOK_ASK.test(out.reply || ""),
+    summary: out.summary ? String(out.summary).slice(0, 600) : null,
+    book, book_group: book ? out.book_group : null, book_slot_at: book ? out.book_slot_at : null,
+    book_calendar_id: book ? bookCal.key : null,
   };
 }
 
@@ -450,7 +511,53 @@ async function detectForClient(client) {
       } catch (e) { skipped++; reasons.push(`${item.name || contactId}: pending-insert failed — ${e.message}`); }
     }
   }
-  return { client_id: client.id, business: client.business_name, mode, queued: queue.length, drafted, auto_sent: autoSent, deferred, flushed, escalated, lost_proposed: lostProposed, skipped, pruned, reasons };
+
+  // ── Opener pass: cold-open Responded leads that ENTERED with context (an
+  // "Entry:" note from portal routing - e.g. trial form, no booking) but have not
+  // messaged yet. The Booking agent opens the conversation. Only for leads we have
+  // NEVER drafted for AND who have no GHL thread yet, so it never double-texts and
+  // never re-opens. Hawkeye-only (queued pending). Naturally dormant: no Entry notes
+  // exist until portal entry-routing is turned on for the academy.
+  let openers = 0;
+  try {
+    const entryNotes = await sb(`agent_contact_notes?client_id=eq.${client.id}&active=eq.true&note=ilike.Entry:*&select=ghl_contact_id&order=created_at.desc`);
+    const candidates = [...new Set((Array.isArray(entryNotes) ? entryNotes : []).map(n => String(n.ghl_contact_id)).filter(Boolean))]
+      .filter(id => respondedIds.has(id) && !mutedSet.has(id));
+    if (candidates.length) {
+      const calendars = await loadCalendars(sb, client.id);
+      for (const contactId of candidates) {
+        if (openers >= OPENER_CAP) break;
+        // Never cold-open someone we've already engaged (any prior queue row).
+        let prior;
+        try { prior = await sb(`agent_ready_replies?client_id=eq.${client.id}&ghl_contact_id=eq.${encodeURIComponent(contactId)}&select=id&limit=1`); }
+        catch (e) { reasons.push(`opener ${contactId}: dedup error — ${e.message}`); continue; }
+        if (Array.isArray(prior) && prior.length) continue;
+        // Skip if a GHL conversation already exists (they wrote, or were texted).
+        try { if (await findConversation(token, locationId, contactId)) continue; } catch (_) {}
+        let d;
+        try { d = await draftOpener(token, locationId, client.id, contactId, cfg, calendars); }
+        catch (e) { reasons.push(`opener ${contactId}: draft threw — ${e.message}`); continue; }
+        if (!d.reply || !String(d.reply).trim()) { if (d.escalate) escalated++; continue; }
+        let nm = null;
+        try { const c = await sb(`ghl_contacts?client_id=eq.${client.id}&ghl_contact_id=eq.${encodeURIComponent(contactId)}&select=name&limit=1`); nm = (Array.isArray(c) && c[0] && c[0].name) || null; } catch (_) {}
+        const isBook = !!(d.book && d.book_slot_at && d.book_calendar_id);
+        try {
+          await sb(`agent_ready_replies`, { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify([{
+            client_id: client.id, ghl_contact_id: String(contactId), ghl_conversation_id: null,
+            contact_name: nm, kind: isBook ? "book" : "reply",
+            book_calendar_id: isBook ? d.book_calendar_id : null, book_slot_at: isBook ? d.book_slot_at : null, book_group: isBook ? d.book_group : null,
+            draft_message: d.reply, reasoning: d.reasoning || "First touch (cold opener from entry context).",
+            confidence: d.confidence, asked_to_book: d.asked_to_book, summary: d.summary || null,
+            status: "pending", created_by: "opener",
+          }]) });
+          openers++;
+        } catch (e) { reasons.push(`opener ${contactId}: insert failed — ${e.message}`); }
+        await new Promise(r => setTimeout(r, 300));
+      }
+    }
+  } catch (e) { reasons.push(`opener pass: ${e.message}`); }
+
+  return { client_id: client.id, business: client.business_name, mode, queued: queue.length, drafted, openers, auto_sent: autoSent, deferred, flushed, escalated, lost_proposed: lostProposed, skipped, pruned, reasons };
 }
 
 async function runDetect(res, onlyClientId) {
