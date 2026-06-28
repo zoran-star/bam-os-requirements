@@ -38,6 +38,7 @@ import crypto from "node:crypto";
 import { fireOnboardingActivations } from "../onboarding/activations.js";
 import { sendSms } from "../ghl/_core.js";
 import { notifyOwners } from "../_notify-owners.js";
+import { enrollContact, isAutomationLive } from "../automations.js";
 
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
@@ -526,6 +527,24 @@ async function handleInvoiceSucceeded(event, connectedAccount, res) {
           activations = { error: String((e && e.message) || e) };
         }
       }
+      // Portal-native onboarding welcome sequence (the preferred path over the legacy
+      // GHL workflow). Enroll the new member's GHL contact into the academy's
+      // "onboarding" automation when it's live. fireOnboardingActivations upserts +
+      // links the GHL contact, so we read the id off the activations result / member.
+      // Non-fatal, and skipped for silent imports (existing members, not new signups).
+      let onboardingEnroll = silent ? { skipped: "import_silent" } : null;
+      if (!silent) {
+        try {
+          const cId = (activations && activations.ghl && activations.ghl.contact_id) || member.ghl_contact_id || null;
+          if (cId && await isAutomationLive(member.client_id, "onboarding")) {
+            onboardingEnroll = await enrollContact({ clientId: member.client_id, automationKey: "onboarding", contactId: cId });
+          } else {
+            onboardingEnroll = { skipped: cId ? "onboarding automation not live" : "no ghl contact id" };
+          }
+        } catch (e) {
+          onboardingEnroll = { ok: false, error: String((e && e.message) || e) };
+        }
+      }
       // Commitment terms that "go back to monthly": attach the revert schedule now
       // that the upfront commitment invoice is paid. Non-fatal.
       let commitmentSchedule = null;
@@ -572,10 +591,10 @@ async function handleInvoiceSucceeded(event, connectedAccount, res) {
       await writeAudit({
         client_id: member.client_id, member_id: member.id,
         action_type: silent ? "import-activated-silent" : "onboarding-activated",
-        args: { invoice_id: inv.id, sub_id: subId, plan: onbSub.metadata.plan, term: onbSub.metadata.term, silent, activations, staff_notify: staffNotify, commitment_schedule: commitmentSchedule },
+        args: { invoice_id: inv.id, sub_id: subId, plan: onbSub.metadata.plan, term: onbSub.metadata.term, silent, activations, onboarding_enroll: onboardingEnroll, staff_notify: staffNotify, commitment_schedule: commitmentSchedule },
         db_changes: { members: { status: { from: "payment_method_required", to: "live" } } },
       });
-      return res.status(200).json({ ok: true, action: silent ? "import-activated-silent" : "onboarding-activated", member_id: member.id, activations, staff_notify: staffNotify, commitment_schedule: commitmentSchedule });
+      return res.status(200).json({ ok: true, action: silent ? "import-activated-silent" : "onboarding-activated", member_id: member.id, activations, onboarding_enroll: onboardingEnroll, staff_notify: staffNotify, commitment_schedule: commitmentSchedule });
     }
   }
 
