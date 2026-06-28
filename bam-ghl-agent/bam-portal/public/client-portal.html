@@ -15929,9 +15929,10 @@ const _TA = { tab: 'test', target: 'booking', chat: [], sending: false, openSect
 const _TA_AGENTS = { booking: '📞 Booking', confirm: '✅ Confirm', closing: '🎯 Closing' };
 // trial_followup retired 2026-06-28: trial-no-book leads now go to the Booking
 // agent with context (cold opener) instead of a separate automation.
-const _TA_AUTOS  = { ghosted: '👻 Ghosted', nurture: '💔 Lead Nurture' };
+const _TA_AUTOS  = { onboarding: '👋 Onboarding', ghosted: '👻 Ghosted', nurture: '💔 Lead Nurture' };
 // What each automation is FOR and HOW a lead gets pulled into it (shown as the blurb).
 const _TA_AUTO_ABOUT = {
+  onboarding: `<b>👋 Onboarding</b> welcomes a brand-new paid member. The moment their first payment clears and they go live, they drop into this sequence - a welcome text + email, then a couple of getting-started nudges over the first week. Approve it once and flip it on; it runs itself (quiet hours respected). Edit every message below.`,
   ghosted: `<b>👻 Ghosted</b> wins back leads who go quiet. When a lead stops replying, your agent drops them in here for a short burst of texts and emails to restart the conversation. Reply and they bounce straight back to the booking agent; silent all the way through and they roll into Lead Nurture.`,
   nurture: `<b>💔 Lead Nurture</b> is the slow-burn long game. Any lead that's lost but still a fit - across booking, confirm and closing - plus anyone who finishes the Ghosted sequence lands here for the occasional text or email that keeps your academy top of mind. The moment they reply, they bounce back to the booking agent with context.`,
 };
@@ -16084,13 +16085,14 @@ async function _taSetModeGo(mode) {
   catch (e) { alert(e.message); }
 }
 
-// ── Automations (step-builder): 👻 Ghosted + 💔 Lead Nurture sequences ──────
+// ── Automations (step-builder): 👋 Onboarding + 👻 Ghosted + 💔 Lead Nurture ──
 // Visual editor backing the portal automation engine (api/automations.js). Each
 // step = a wait, then a text or email. Approve the sequence once + flip it on; the
 // engine sends each step on schedule (quiet hours respected). Renders EMPTY until
 // the import session fills the steps.
 let _AUTO = { list: [], overview: [] };
 const _AUTO_SEED = [
+  { automation_key: 'onboarding', name: '👋 Onboarding' },
   { automation_key: 'ghosted', name: '👻 Ghosted' },
   { automation_key: 'nurture', name: '💔 Lead Nurture' },
 ];
@@ -16226,7 +16228,7 @@ async function _taRenderAutomations() {
   try {
     let d = await _autoApi('list');
     list = d.automations || [];
-    // Seed Ghosted + Lead Nurture if this academy has none, so both always show.
+    // Seed Onboarding + Ghosted + Lead Nurture if this academy has none, so all show.
     const have = new Set(list.map(a => a.automation_key));
     let seeded = false;
     for (const s of _AUTO_SEED) {
@@ -16234,7 +16236,7 @@ async function _taRenderAutomations() {
     }
     if (seeded) { d = await _autoApi('list'); list = d.automations || []; }
   } catch (e) { p.innerHTML = `<div style="color:#e07070;font-size:13px">Couldn't load - ${escapeHTML(e.message)}</div>`; return; }
-  const order = { ghosted: 0, nurture: 1 };
+  const order = { onboarding: 0, ghosted: 1, nurture: 2 };
   list.sort((a, b) => ((order[a.automation_key] ?? 9) - (order[b.automation_key] ?? 9)));
   _AUTO.list = list;
   // When an automation is picked in the Train header, show only that one; else both.

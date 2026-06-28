@@ -32,6 +32,7 @@
 
 import { coachiqOnboardingEnabled, addCoachiqProduct } from "../coachiq.js";
 import { getClientGhlToken } from "../website/availability.js";
+import { isAutomationLive } from "../automations.js";
 
 const GHL_V2     = "https://services.leadconnectorhq.com";
 const V2_VERSION = "2021-07-28";
@@ -47,13 +48,19 @@ export async function fireOnboardingActivations(member, ctx = {}) {
     catch (_) { /* non-fatal */ }
   };
 
-  // ── 1. GHL — upsert contact + enroll directly into the onboarding workflow by ID ──
-  // No inbound webhook. We use the academy's GHL OAuth token (auto-refresh) to upsert
-  // the contact (match on email/phone), then POST it into GHL_ONBOARDING_WORKFLOW_ID.
-  // Manual API enrollment runs the workflow's steps (tag, mark WON, welcome emails) —
-  // the workflow itself needs no trigger.
+  // ── 1. GHL — ALWAYS upsert + link the contact; welcome via portal OR GHL workflow ──
+  // We use the academy's GHL OAuth token (auto-refresh) to upsert the contact (match on
+  // email/phone) UNCONDITIONALLY, so every paid member gets a linked GHL contact + the
+  // "website-enrollment" tag and members.ghl_contact_id is populated (the portal stops
+  // showing an empty contact, and the onboarding automation can enroll by this id).
+  //
+  // The WELCOME CADENCE runs via exactly one path, never both:
+  //   • portal-native "onboarding" automation (preferred) — enrolled in webhook.js, OR
+  //   • the legacy GHL workflow (GHL_ONBOARDING_WORKFLOW_ID) — enrolled here.
+  // If the portal sequence is live we skip the GHL workflow so the parent isn't
+  // welcomed twice.
   const workflowId = process.env.GHL_ONBOARDING_WORKFLOW_ID;
-  if (workflowId && member.parent_email && sb) {
+  if (member.parent_email && sb) {
     try {
       const rows = await sb(`clients?id=eq.${member.client_id}&select=id,ghl_location_id,ghl_access_token,ghl_refresh_token,ghl_token_expires_at&limit=1`);
       const client = Array.isArray(rows) && rows[0];
@@ -86,21 +93,42 @@ export async function fireOnboardingActivations(member, ctx = {}) {
       const contactId = (upserted.contact || upserted).id || null;
       if (!contactId) throw new Error("GHL upsert returned no contact id");
 
-      // Enroll the contact into the onboarding workflow.
-      const enrollRes = await fetch(`${GHL_V2}/contacts/${contactId}/workflow/${workflowId}`, {
-        method: "POST", headers,
-        body: JSON.stringify({ eventStartTime: new Date().toISOString().replace(/\.\d{3}Z$/, "+00:00") }),
-      });
-      if (!enrollRes.ok) throw new Error(`GHL workflow enroll ${enrollRes.status}: ${(await enrollRes.text()).slice(0, 120)}`);
+      // Link the GHL contact back onto the member row (best-effort). Mutates the in-memory
+      // member so the caller (webhook) can enroll the onboarding automation by this id.
+      if (contactId && !member.ghl_contact_id) {
+        try {
+          await sb(`members?id=eq.${member.id}`, {
+            method: "PATCH", headers: { Prefer: "return=minimal" },
+            body: JSON.stringify({ ghl_contact_id: contactId }),
+          });
+          member.ghl_contact_id = contactId;
+        } catch (_) { /* non-fatal */ }
+      }
 
-      results.ghl = { ok: true, contact_id: contactId, workflow_id: workflowId };
-      await audit("onboarding-ghl-fired", { contact_id: contactId, workflow_id: workflowId, plan, term });
+      // Legacy GHL onboarding workflow — only when configured AND the portal-native
+      // sequence is NOT live (otherwise the portal automation owns the welcome).
+      let portalLive = false;
+      try { portalLive = await isAutomationLive(member.client_id, "onboarding"); } catch (_) { portalLive = false; }
+      if (workflowId && !portalLive) {
+        const enrollRes = await fetch(`${GHL_V2}/contacts/${contactId}/workflow/${workflowId}`, {
+          method: "POST", headers,
+          body: JSON.stringify({ eventStartTime: new Date().toISOString().replace(/\.\d{3}Z$/, "+00:00") }),
+        });
+        if (!enrollRes.ok) throw new Error(`GHL workflow enroll ${enrollRes.status}: ${(await enrollRes.text()).slice(0, 120)}`);
+        results.ghl = { ok: true, contact_id: contactId, workflow_id: workflowId, welcomed_via: "ghl_workflow" };
+        await audit("onboarding-ghl-fired", { contact_id: contactId, workflow_id: workflowId, plan, term });
+      } else {
+        results.ghl = { ok: true, contact_id: contactId, workflow_id: null,
+          welcomed_via: portalLive ? "portal_onboarding_automation" : "none",
+          note: portalLive ? "portal onboarding sequence live; GHL workflow skipped" : "no GHL_ONBOARDING_WORKFLOW_ID set" };
+        await audit("onboarding-ghl-contact-linked", { contact_id: contactId, portal_live: portalLive, plan, term });
+      }
     } catch (e) {
       results.ghl = { ok: false, error: String(e && e.message || e) };
       await audit("onboarding-ghl-error", { workflow_id: workflowId, plan, term, error: results.ghl.error });
     }
   } else {
-    results.ghl = { skipped: "GHL not configured (need GHL_ONBOARDING_WORKFLOW_ID + parent_email)" };
+    results.ghl = { skipped: "GHL not configured (need parent_email + sb)" };
   }
 
   // ── 2. CoachIQ (self-signup model — only if the academy uses it) ──
