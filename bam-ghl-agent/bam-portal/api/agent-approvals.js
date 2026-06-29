@@ -22,7 +22,7 @@ import { buildAgentSystem } from "./agent/brain.js";
 import { loadMergedOverrides } from "./agent/_sections.js";
 import { loadContactMemory } from "./agent/contact-memory.js";
 import { loadCalendars, calendarForGroup, freeSlots, summarizeSlots } from "./agent/booking.js";
-import { respondedStage, contactInRespondedStage, computeQueue, respondedContactIdSetCached, peekRespondedIdSet, interestedStage, nurtureStage, toIso } from "./agent/_stage.js";
+import { respondedStage, contactInRespondedStage, computeQueue, respondedContactIdSetCached, peekRespondedIdSet, interestedStage, nurtureStage, scheduledTrialStage, toIso } from "./agent/_stage.js";
 import { markUnqualified, unmarkUnqualified } from "./agent/_tags.js";
 import { enrollContact, isAutomationLive } from "./automations.js";
 import { agentMode, modeIsOn, shouldAutoSend } from "./agent/_mode.js";
@@ -888,6 +888,27 @@ async function handler(req, res) {
           title: `Free Trial${row.contact_name ? " - " + row.contact_name : ""}`,
         } });
       } catch (e) { return res.status(e.status || 502).json({ error: `GHL book: ${e.message}` }); }
+      // Move the opp to Scheduled-Trial so it leaves Responded and lands in the
+      // Confirm agent's queue. Off-GHL this PUT is the ONLY thing that advances the
+      // card: historically a GHL "appointment booked" trigger owned this transition,
+      // so an agent-booked lead would otherwise sit in Responded forever (the
+      // website-calendar flow already advances portal-side in api/website/leads.js).
+      // Best-effort + idempotent (a PUT to a stage it's already in is a no-op, so a
+      // double-fire with the GHL trigger is harmless): a stage-move failure must
+      // NEVER break a successful booking. Mirrors confirm-ghost / confirm-lost.
+      // V2-only: this whole endpoint loads clients with v2_access=eq.true, so V1
+      // (GHL-owned) behavior is untouched.
+      // TODO(effort E — portal opportunity store): once the portal owns opportunities
+      // natively, replace this GHL find-opp + PUT with a local stage write, and unify
+      // with the website-calendar advance in api/website/leads.js behind one helper.
+      try {
+        const d = await ghl("GET", `/opportunities/search?${new URLSearchParams({ location_id: locationId, contact_id: contactId, limit: "20" })}`, { token });
+        const opps = d.opportunities || d.data || [];
+        const pick = opps.find(o => String(o.status || "").toLowerCase() === "open") || opps[0];
+        const oppId = pick && pick.id;
+        const sts = await scheduledTrialStage(token, locationId);
+        if (sts && oppId) await ghl("PUT", `/opportunities/${encodeURIComponent(oppId)}`, { token, body: { pipelineId: sts.pipelineId, pipelineStageId: sts.stageId } });
+      } catch (_) {}
       try { await sb(`agent_ready_replies?id=eq.${encodeURIComponent(b.ready_id)}&client_id=eq.${clientId}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ status: "sent", approved_by: staffEmail, approved_at: new Date().toISOString(), sent_at: new Date().toISOString(), updated_at: new Date().toISOString() }) }); } catch (_) {}
       try { await logApproval({ client_id: clientId, ghl_contact_id: contactId, contact_name: row.contact_name || null, final_reply: `[booked ${row.book_group || "trial"} @ ${startIso}]`, status: "sent", created_by: staffEmail }); } catch (_) {}
       return res.status(200).json({ ok: true, booked: true, appointment_id: appt?.id || appt?.appointment?.id || null, slot_at: startIso });
