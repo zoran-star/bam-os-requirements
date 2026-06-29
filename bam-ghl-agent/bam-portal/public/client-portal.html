@@ -15978,11 +15978,12 @@ function openTrainAgentView() {
   const isEntry = _taIsEntry();
   const div = `<span style="width:1px;height:22px;background:var(--border);margin:0 4px"></span>`;
   const targetName = (_TA_AGENTS[_TA.target] || _TA_AUTOS[_TA.target] || _TA_ENTRY[_TA.target] || '').replace(/^\S+\s/, '');
+  // Automations: no big descriptive blurb at the top - the steps speak for themselves.
   const blurb = isAgent
     ? `Coach your academy's <b>${targetName} agent</b>. Test it, teach it Lessons, and keep its facts current in Knowledge - changes apply to <b>your academy</b> right away.`
     : isEntry
     ? (_TA_ENTRY_ABOUT[_TA.target] || `Configure where <b>${targetName}</b> leads land.`)
-    : (_TA_AUTO_ABOUT[_TA.target] || `Edit your academy's <b>${targetName}</b> sequence.`);
+    : '';
   host.innerHTML = `
     <div style="display:flex;gap:7px;margin-bottom:14px;flex-wrap:wrap;align-items:center">
       <span style="font-size:11px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:var(--text-mute);margin-right:2px">Train</span>
@@ -15992,7 +15993,7 @@ function openTrainAgentView() {
       ${div}
       ${Object.entries(_TA_ENTRY).map(([k, l]) => pill(k, l, _TA.target === k)).join('')}
     </div>
-    <p style="color:var(--text-sub);font-size:13.5px;margin:0 0 14px;max-width:640px;line-height:1.55">${blurb}</p>
+    ${blurb ? `<p style="color:var(--text-sub);font-size:13.5px;margin:0 0 14px;max-width:640px;line-height:1.55">${blurb}</p>` : ''}
     ${isAgent ? `<div style="display:flex;gap:8px;margin-bottom:18px;flex-wrap:wrap">
       ${tab('test', '💬 Test')}
       ${tab('lessons', '📚 Lessons')}
@@ -16244,22 +16245,26 @@ async function _taRenderAutomations() {
   // Live counts (read-only observability) - best-effort; the editor still works if it fails.
   try { const ov = await _autoApi('overview'); _AUTO.overview = ov.overview || []; } catch (_) { _AUTO.overview = []; }
   p.innerHTML = `
-    <p style="color:var(--text-mute);font-size:12.5px;margin:0 0 14px;line-height:1.55;max-width:660px">Each step is a <b style="color:var(--text)">wait</b>, then a <b style="color:var(--text)">text or email</b>. Build the sequence, approve it once and flip it on - the engine then sends each step on schedule (quiet hours respected). Merge tags: <code>{{name}}</code> / <code>{{athlete}}</code>. Empty? Paste your texts + emails in the import session to auto-fill these.</p>
     ${shown.map(_autoCardHtml).join('') || '<div style="color:var(--text-mute)">No automations.</div>'}`;
 }
 
 // Read-only observability (guardrail #8): live counts strip per automation, click
 // a count -> the people in it -> a person -> their contact drawer (reused).
+// Top strip: just the total "in this sequence". Per-step counts live ON each step
+// row now (see _autoStepCount used in _autoStepHtml).
 function _autoCountsStrip(a) {
   const ov = (_AUTO.overview || []).find(o => o.id === a.id);
   if (!ov) return '';
   const total = ov.total_active || 0;
-  const pills = (ov.by_step || []).map(s =>
-    `<button onclick="_autoOpenPeople('${a.id}',${s.position})" title="${escapeHTML(s.preview || '')}" style="background:var(--surface);border:1px solid var(--border);border-radius:7px;padding:3px 9px;font-size:11px;color:var(--text-sub);cursor:pointer;font-family:inherit">${escapeHTML(s.label)} ${s.channel === 'email' ? '📧' : '💬'} <b style="color:var(--text)">${s.count}</b></button>`
-  ).join('');
   return `<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:12px">
     <button onclick="_autoOpenPeople('${a.id}','')" style="background:transparent;border:1px solid var(--border);border-radius:7px;padding:3px 10px;font-size:11px;color:var(--text-sub);cursor:pointer;font-family:inherit">👥 <b style="color:var(--text)">${total}</b> in this sequence</button>
-    ${pills}</div>`;
+  </div>`;
+}
+// People currently sitting at one step, for the count pill on the step row.
+function _autoStepCount(a, position) {
+  const ov = (_AUTO.overview || []).find(o => o.id === a.id);
+  if (!ov) return null;
+  return (ov.by_step || []).find(x => Number(x.position) === Number(position)) || { count: 0 };
 }
 async function _autoOpenPeople(autoId, position) {
   const a = _AUTO.list.find(x => x.id === autoId);
@@ -16326,10 +16331,16 @@ function _autoCardHtml(a) {
 function _autoStepHtml(a, s, i, total) {
   const isEmail = s.channel === 'email';
   const unitOpts = _AUTO_UNITS.map(u => `<option value="${u}"${s.wait_unit === u ? ' selected' : ''}>${u}</option>`).join('');
+  // Live count of people currently sitting at this step (null until overview loads).
+  const cnt = _autoStepCount(a, s.position);
+  const countPill = cnt
+    ? `<button onclick="_autoOpenPeople('${a.id}',${s.position})" title="People at this step" style="background:var(--bg);border:1px solid var(--border);border-radius:7px;padding:2px 8px;font-size:11px;color:var(--text-sub);cursor:pointer;font-family:inherit">👥 <b style="color:var(--text)">${cnt.count || 0}</b></button>`
+    : '';
   return `
   <div id="astep-${s.id}" style="border:1px solid var(--border);border-radius:9px;padding:10px 12px;margin-bottom:8px;background:var(--surface)">
     <div style="display:flex;align-items:center;gap:7px;flex-wrap:wrap;margin-bottom:8px">
       <span style="font-size:11px;color:var(--text-mute);font-weight:700;min-width:14px">${i + 1}</span>
+      ${countPill}
       <span style="font-size:12px;color:var(--text-sub)">⏱ wait</span>
       <input id="astep-${s.id}-amt" type="number" min="0" value="${Number(s.wait_amount) || 0}" style="width:60px;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:5px 7px;font-size:12.5px">
       <select id="astep-${s.id}-unit" style="background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:5px 7px;font-size:12.5px">${unitOpts}</select>
