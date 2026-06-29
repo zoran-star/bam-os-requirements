@@ -119,7 +119,7 @@ async function handler(req, res) {
     if (!amountCents || amountCents < 50) return res.status(400).json({ error: "amount_cents required (minimum 50)" });
     if (!parentEmail) return res.status(400).json({ error: "parent email required" });
     if (!athleteName) return res.status(400).json({ error: "athlete name required" });
-    if (!agreement.signature) return res.status(400).json({ error: "agreement signature required" });
+    // agreement.signature is optional — the waiver is signed client-side before calling stripe.confirmPayment
 
     const testMode = isTestMode();
 
