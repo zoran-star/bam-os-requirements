@@ -190,7 +190,7 @@ async function runWork(res) {
   const stepsCache  = new Map();   // automationId -> steps[]
   const contactCache = new Map();  // contactId -> {email,phone,firstName,fullName}
   const calCache    = new Map();   // clientId -> first calendar entry-point key | null
-  let sent = 0, deferred = 0, advanced = 0, completed = 0, failed = 0, canceled = 0, lost = 0;
+  let sent = 0, deferred = 0, advanced = 0, completed = 0, failed = 0, canceled = 0, lost = 0, nurtureLost = 0;
 
   for (const job of jobs) {
     // ATOMIC CLAIM: flip pending->sending ONLY if still pending. If 0 rows come
@@ -228,6 +228,32 @@ async function runWork(res) {
             await logEvent({ clientId: job.client_id, contactId: job.contact_id, automationId: job.automation_id, type: "ghosted_to_nurture", payload: null });
           }
         } catch (_) { /* best-effort roll-forward */ }
+        // Model: 💔 Lead Nurture is the LAST stop. If the nurture sequence itself runs
+        // out and they're STILL silent, the lead has been worked the full long game with
+        // no reply -> terminal LOST. Mark the opp lost (leaves the open board) + write a
+        // pipeline_outcomes row. Do NOT re-enroll anywhere (that would loop). Best-effort
+        // + idempotent: a nurture enrollment completes exactly once (status flips to
+        // 'completed' so this branch can't re-fire for the same enrollment).
+        // TODO: the GHL PUT becomes portal-native once effort E (opportunity store) lands.
+        try {
+          const a = autoCache.get(job.automation_id);
+          if (a && a.automation_key === "nurture") {
+            // creds may not be cached on the step-missing/disabled advance path — load them.
+            if (!clientCache.has(job.client_id)) clientCache.set(job.client_id, await loadClient(job.client_id));
+            const client = clientCache.get(job.client_id);
+            if (!tokenCache.has(job.client_id)) tokenCache.set(job.client_id, client ? await pickGhlToken(client) : null);
+            const creds = tokenCache.get(job.client_id);
+            if (creds && creds.token) {
+              const oppId = await findOpenOppId(creds.token, creds.locationId, job.contact_id);
+              if (oppId) {
+                try { await ghl("PUT", `/opportunities/${encodeURIComponent(oppId)}`, { token: creds.token, body: { status: "lost" } }); } catch (_) { /* GHL PUT best-effort */ }
+                try { await sb(`pipeline_outcomes`, { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify([{ client_id: job.client_id, opportunity_id: oppId, status: "lost", reason: "nurture sequence exhausted" }]) }); } catch (_) {}
+                await logEvent({ clientId: job.client_id, contactId: job.contact_id, automationId: job.automation_id, type: "nurture_exhausted_lost", payload: { opportunity_id: oppId } });
+                nurtureLost++;
+              }
+            }
+          }
+        } catch (_) { /* best-effort terminal disposition */ }
       }
     };
 
@@ -319,7 +345,7 @@ async function runWork(res) {
       else { await finish({ status: "pending", attempts, last_error: String(e.message || e).slice(0, 300), run_after: nextSendableTime(new Date(Date.now() + RETRY_BACKOFF_MS)).toISOString() }); }
     }
   }
-  return res.status(200).json({ ok: true, picked: jobs.length, sent, deferred, advanced, completed, failed, canceled, lost_race: lost });
+  return res.status(200).json({ ok: true, picked: jobs.length, sent, deferred, advanced, completed, failed, canceled, nurture_lost: nurtureLost, lost_race: lost });
 }
 
 // ── staff CRUD (backs the P4b step-builder) ──
