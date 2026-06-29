@@ -24478,10 +24478,10 @@ function _agentTabsBar(active) {
   const c = 'var(--accent)';
   const pills = defs.map(([k, label, fn]) => {  // always show all 3 agent tabs, however Hawkeye was opened
     const on = k === active, n = _agentTabCount(k);
-    return `<button onclick="${on ? '' : fn}" style="flex:0 0 auto;background:${on ? c : 'transparent'};color:${on ? '#0B0B0D' : 'var(--text-sub)'};border:1px solid ${on ? c : 'var(--border)'};border-radius:999px;padding:7px 15px;font-size:13px;font-weight:700;cursor:${on ? 'default' : 'pointer'};white-space:nowrap">${label}${n ? ` (${n})` : ''}</button>`;
+    return `<button onclick="${on ? '' : fn}" style="flex:1 1 0;min-width:0;text-align:center;background:${on ? c : 'transparent'};color:${on ? '#0B0B0D' : 'var(--text-sub)'};border:1px solid ${on ? c : 'var(--border)'};border-radius:8px;padding:9px 10px;font-size:13px;font-weight:700;cursor:${on ? 'default' : 'pointer'};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${label}${n ? ` (${n})` : ''}</button>`;
   }).join('');
   return `<div style="border-bottom:1px solid var(--border)">
-    <div style="display:flex;gap:7px;padding:10px 16px 8px;overflow-x:auto;-webkit-overflow-scrolling:touch">${pills}</div>
+    <div style="display:flex;gap:7px;padding:10px 16px 8px">${pills}</div>
     <div style="padding:0 16px 10px"><button onclick="_hawkEditBrain('${active}')" title="Edit this agent's brain (its knowledge + lessons) in the Train tab" style="background:transparent;color:var(--text-sub);border:1px solid var(--border);border-radius:7px;padding:6px 12px;font-size:12px;font-weight:700;cursor:pointer">✏️ Edit brain</button></div>
   </div>`;
 }
