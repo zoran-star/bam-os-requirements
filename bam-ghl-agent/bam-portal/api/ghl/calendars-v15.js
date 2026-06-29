@@ -174,6 +174,9 @@ async function handler(req, res) {
           try {
             const r = await ghl(token, "GET", `/calendars/events?locationId=${encodeURIComponent(locationId)}&calendarId=${encodeURIComponent(calId)}&startTime=${start}&endTime=${end}`);
             for (const ev of (r.events || [])) {
+              // GHL leaks events past endTime - keep only those starting in range.
+              const t = ev.startTime ? new Date(ev.startTime).getTime() : NaN;
+              if (!(t >= start && t < end)) continue;
               events.push({
                 id: ev.id || ev._id,
                 calendarId: calId,
@@ -204,6 +207,10 @@ async function handler(req, res) {
             const r = await ghl(token, "GET", `/calendars/events?locationId=${encodeURIComponent(locationId)}&calendarId=${encodeURIComponent(calId)}&startTime=${start}&endTime=${end}`);
             for (const ev of (r.events || [])) {
               if (ev.appointmentStatus === "cancelled") continue;
+              // GHL's /calendars/events leaks events past endTime (it returned
+              // tomorrow's trials too), so re-check the real start is within today.
+              const t = ev.startTime ? new Date(ev.startTime).getTime() : NaN;
+              if (!(t >= start && t < end)) continue;
               const cid = ev.contactId || (ev.contact && ev.contact.id) || null;
               trials.push({ id: ev.id || ev._id, start: ev.startTime, status: ev.appointmentStatus || null, contactId: cid, contactName: (ev.contact && ev.contact.name) || ev.contactName || null });
             }
