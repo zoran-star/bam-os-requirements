@@ -7,6 +7,7 @@
 // `sendSms`, which upserts a NEW contact by phone (that helper is for staff
 // notifications, not for messaging an existing lead).
 import { ghl } from "./ghl/_core.js";
+import { maybeSendSmsViaProvider } from "./messaging/provider.js";
 import { sendEmail } from "./_email.js";
 import { renderEmail, resolveMergeVars, locFor } from "./email-shells.js";
 
@@ -37,9 +38,13 @@ export async function sendOn({ channel, clientId, contactId, toEmail, toPhone, s
   }
 
   if (channel === "sms") {
+    if (!contactId && !toPhone) return { skipped: "no contact for sms" };
+    const message = resolveMergeVars(text, locFor(clientId), vars || {});
+    // Provider gate: Twilio academies send via Twilio + own-store; else GHL.
+    const g = await maybeSendSmsViaProvider(clientId, { ghlContactId: contactId, toPhone, body: message, sentBy: "automation" });
+    if (g.handled) { if (!g.ok) throw new Error(g.error); return { sent: true, via: "twilio", id: g.sid }; }
     if (!ghlToken) throw new Error("sendOn(sms): ghlToken required");
     if (!contactId) return { skipped: "no contact for sms" };
-    const message = resolveMergeVars(text, locFor(clientId), vars || {});
     const resp = await ghl("POST", `/conversations/messages`, { token: ghlToken, body: { type: "SMS", contactId, message } });
     return { sent: true, id: (resp && resp.messageId) || null };
   }

@@ -16,6 +16,7 @@ import { withSentryApiRoute } from "./_sentry.js";
 // scope 'academy' (stay with this academy).
 
 import { pickGhlToken, ghl, sendSms } from "./ghl/_core.js";
+import { maybeSendSmsViaProvider } from "./messaging/provider.js";
 import { assemblePrompt } from "./agent/prompt-structure.js";
 import { buildAgentSystem } from "./agent/brain.js";
 import { loadMergedOverrides } from "./agent/_sections.js";
@@ -309,8 +310,14 @@ async function draftOpener(token, locationId, clientId, contactId, cfg, calendar
   };
 }
 
-// Fire a reply via GHL SMS (used by manual approve + self-drive auto-send).
-async function sendReplyViaGhl(token, contactId, reply) {
+// Fire a reply (used by manual approve + self-drive auto-send). Pass clientId to
+// route Twilio academies through their own number + own-store; without it (or for
+// GHL academies) it sends via GHL exactly as before.
+async function sendReplyViaGhl(token, contactId, reply, clientId) {
+  if (clientId) {
+    const g = await maybeSendSmsViaProvider(clientId, { ghlContactId: contactId, body: String(reply), sentBy: "agent" });
+    if (g.handled) { if (!g.ok) throw new Error(g.error); return; }
+  }
   await ghl("POST", `/conversations/messages`, { token, body: { type: "SMS", contactId, message: String(reply) } });
 }
 
@@ -382,7 +389,7 @@ async function detectForClient(client) {
         }
         if (!row.draft_message || !String(row.draft_message).trim()) continue;
         try {
-          await sendReplyViaGhl(token, row.ghl_contact_id, row.draft_message);
+          await sendReplyViaGhl(token, row.ghl_contact_id, row.draft_message, client.id);
           await sb(`agent_ready_replies?id=eq.${row.id}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ status: "sent", auto_sent: true, sent_at: new Date().toISOString(), updated_at: new Date().toISOString() }) });
           flushed++;
         } catch (e) { reasons.push(`flush ${row.ghl_contact_id}: send failed — ${e.message}`); }
@@ -488,7 +495,7 @@ async function detectForClient(client) {
       } catch (e) { skipped++; reasons.push(`${item.name || contactId}: defer-insert failed — ${e.message}`); }
     } else if (auto) {
       try {
-        await sendReplyViaGhl(token, contactId, d.reply);
+        await sendReplyViaGhl(token, contactId, d.reply, client.id);
         await sb(`agent_ready_replies`, { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify([{
           client_id: client.id, ghl_contact_id: String(contactId), ghl_conversation_id: d.conversation_id || null,
           contact_name: item.name || null, draft_message: d.reply, reasoning: d.reasoning || null, confidence: d.confidence,
@@ -718,11 +725,13 @@ async function handler(req, res) {
         } catch (e) { return res.status(500).json({ error: `couldn't schedule: ${e.message}` }); }
         return res.status(200).json({ ok: true, sent: false, deferred: true, send_after: sendAfter });
       }
-      // Send via GHL (human-approved).
+      // Send (human-approved) - Twilio academy via own number, else GHL.
       try {
-        await ghl("POST", `/conversations/messages`, { token, body: { type: "SMS", contactId: b.contact_id, message: String(b.reply) } });
+        const g = await maybeSendSmsViaProvider(clientId, { ghlContactId: b.contact_id, body: String(b.reply), sentBy: staffEmail || "agent" });
+        if (g.handled) { if (!g.ok) throw new Error(g.error); }
+        else await ghl("POST", `/conversations/messages`, { token, body: { type: "SMS", contactId: b.contact_id, message: String(b.reply) } });
       } catch (e) {
-        return res.status(e.status || 502).json({ error: `GHL send: ${e.message}` });
+        return res.status(e.status || 502).json({ error: `send failed: ${e.message}` });
       }
       // Optional learning (stays with this academy by default).
       let lessonId = null;
@@ -779,7 +788,7 @@ async function handler(req, res) {
       if (!oppId) return res.status(200).json({ error: "No opportunity found for this contact — nothing to mark lost." });
       // Send a closing message only if one was explicitly provided.
       const closing = (typeof b.reply === "string" ? b.reply : (row ? row.draft_message : "")) || "";
-      if (closing.trim()) { try { await sendReplyViaGhl(token, contactId, closing.trim()); } catch (_) {} }
+      if (closing.trim()) { try { await sendReplyViaGhl(token, contactId, closing.trim(), clientId); } catch (_) {} }
       const reason = (b.lost_reason || (row && row.lost_reason) || "").toString().trim() || null;
       // Model: "Lost" is no longer terminal - a non-Unqualified lost lead flows into
       // 💔 Lead Nurture. If this academy has the portal nurture sequence LIVE and a

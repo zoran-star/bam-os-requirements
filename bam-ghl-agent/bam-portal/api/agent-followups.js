@@ -28,6 +28,7 @@ import { withSentryApiRoute } from "./_sentry.js";
 // Engine is per-academy gated by clients.ghl_kpi_config.followup_engine_enabled.
 
 import { pickGhlToken, ghl } from "./ghl/_core.js";
+import { maybeSendSmsViaProvider } from "./messaging/provider.js";
 import { toIso, respondedContactIds, respondedContactIdSetCached, peekRespondedIdSet } from "./agent/_stage.js";
 import { withinQuietHours, nextSendableTime } from "./agent/_quiet.js";
 import { agentMode, modeIsOn, shouldAutoSend } from "./agent/_mode.js";
@@ -240,6 +241,13 @@ async function sendOne(row, clientCache, respondedCache = {}) {
       await sb(`agent_followups?id=eq.${row.id}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ status: "canceled", send_error: "lead replied", updated_at: new Date().toISOString() }) });
       return { id: row.id, canceled: "lead replied" };
     }
+  }
+  // Provider gate: a Twilio academy sends via Twilio + own-store (no GHL token needed).
+  const tw = await maybeSendSmsViaProvider(row.client_id, { ghlContactId: row.ghl_contact_id, body: row.draft_message, sentBy: "ghosted" });
+  if (tw.handled) {
+    if (!tw.ok) { await markFailed(row.id, tw.error); return { id: row.id, error: tw.error }; }
+    await sb(`agent_followups?id=eq.${row.id}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ status: "sent", sent_at: new Date().toISOString(), updated_at: new Date().toISOString() }) });
+    return { id: row.id, sent: true };
   }
   const creds = credsGuard || await pickGhlToken(client);
   if (!creds) { await markFailed(row.id, "no GHL token"); return { id: row.id, error: "no token" }; }

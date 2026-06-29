@@ -1,5 +1,6 @@
 import { withSentryApiRoute } from "./_sentry.js";
 import { timingSafeEqual } from "node:crypto";
+import { maybeSendSmsViaProvider } from "./messaging/provider.js";
 // V1.5 mass send — queued, throttled, DND-respecting bulk SMS/email to a
 // tag-filtered audience (GHL bulk rules: skip DND, pace the sends).
 //
@@ -98,7 +99,13 @@ async function runWorker(res) {
         : { type: "SMS", contactId: rcp.contact_id, message: job.body || "" };
       const atts = Array.isArray(job.attachments) ? job.attachments : [];
       if (atts.length) sendBody.attachments = atts;
-      await ghl("POST", `/conversations/messages`, { token, body: sendBody });
+      // Provider gate (SMS only): Twilio academies send via Twilio + own-store.
+      let twHandled = false;
+      if (job.channel !== "Email") {
+        const g = await maybeSendSmsViaProvider(job.client_id, { ghlContactId: rcp.contact_id, body: job.body || "", sentBy: "mass-send" });
+        if (g.handled) { if (!g.ok) throw new Error(g.error); twHandled = true; }
+      }
+      if (!twHandled) await ghl("POST", `/conversations/messages`, { token, body: sendBody });
       await sb(`mass_send_recipients?id=eq.${rcp.id}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ status: "sent", sent_at: nowIso() }) });
       sent++;
     } catch (e) {

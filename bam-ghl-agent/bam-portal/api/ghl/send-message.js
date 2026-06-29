@@ -1,4 +1,5 @@
 import { withSentryApiRoute } from "../_sentry.js";
+import { maybeSendSmsViaProvider } from "../messaging/provider.js";
 // Vercel Serverless Function — GHL: send SMS or Email to an academy parent.
 //
 // POST /api/ghl/send-message
@@ -298,6 +299,15 @@ async function handler(req, res) {
   // Send the message
   let sendResp;
   try {
+    // Provider gate (SMS only): Twilio academies send via Twilio + own-store.
+    if (type === "SMS") {
+      const g = await maybeSendSmsViaProvider(clientId, { ghlContactId: contactId, toPhone: body.contact_phone, body: message, sentBy: (ctx.user && ctx.user.email) || "staff" });
+      if (g.handled) {
+        if (!g.ok) { await logSend({ status: "failed", error: g.error }); return res.status(502).json({ error: `Twilio send failed: ${g.error}` }); }
+        await logSend({ status: "sent", ghl_message_id: g.sid || null });
+        return res.status(200).json({ ok: true, sent_via: "twilio", message_id: g.sid || null });
+      }
+    }
     const sendBody = type === "Email"
       ? { type: "Email", contactId, subject, html: html || `<p>${message}</p>` }
       : { type,          contactId, message };   // SMS / IG / FB / WhatsApp / Live_Chat / GMB
