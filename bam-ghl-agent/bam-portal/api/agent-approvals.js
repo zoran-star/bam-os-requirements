@@ -72,7 +72,7 @@ async function loadConfig(clientId) {
   const [lessons, overrides, exRows] = await Promise.all([
     sb(`agent_lessons?client_id=eq.${clientId}&agent=eq.booking&active=eq.true&select=lesson,kind&order=created_at.asc`).catch(() => []),
     loadMergedOverrides(clientId),   // global brain (general/goal) + this academy's own (location/offer)
-    sb(`agent_examples?client_id=eq.${clientId}&select=parent_text,agent_text&order=created_at.asc`).catch(() => []),
+    sb(`agent_examples?client_id=eq.${clientId}&agent=eq.booking&select=parent_text,agent_text&order=created_at.asc`).catch(() => []),
   ]);
   return { lessons: Array.isArray(lessons) ? lessons : [], overrides, examples: Array.isArray(exRows) ? exRows : [] };
 }

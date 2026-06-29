@@ -16357,6 +16357,13 @@ function _autoCardHtml(a) {
 
 function _autoStepHtml(a, s, i, total) {
   const isEmail = s.channel === 'email';
+  // An email step body can be a short `template:<key>` reference to a pre-built
+  // designed email. We still let the academy edit it: the body box stays editable
+  // and a note flags that this step is template-backed - clearing the box and typing
+  // a plain message overrides the template with a custom email (renderEmail handles
+  // both a template ref and a plain body, dropping it into the branded frame).
+  const tplMatch = isEmail ? String(s.body || '').match(/^\s*template:([\w/-]+)\s*$/) : null;
+  const tplKey = tplMatch ? tplMatch[1] : '';
   const unitOpts = _AUTO_UNITS.map(u => `<option value="${u}"${s.wait_unit === u ? ' selected' : ''}>${u}</option>`).join('');
   // Live count of people currently sitting at this step (null until overview loads).
   const cnt = _autoStepCount(a, s.position);
@@ -16381,7 +16388,11 @@ function _autoStepHtml(a, s, i, total) {
       ${countPill}
     </div>
     <input id="astep-${s.id}-subj" placeholder="Email subject line" value="${escapeHTML(s.subject || '')}" style="display:${isEmail ? 'block' : 'none'};width:100%;box-sizing:border-box;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:7px 9px;font-size:12.5px;margin-bottom:7px">
-    <textarea id="astep-${s.id}-body" placeholder="Message - use {{name}} / {{athlete}}" style="display:${isEmail ? 'none' : 'block'};width:100%;box-sizing:border-box;min-height:54px;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:7px 9px;font-size:12.5px;resize:vertical;font-family:inherit">${escapeHTML(s.body || '')}</textarea>
+    <div id="astep-${s.id}-tpl" style="display:${tplKey ? 'flex' : 'none'};align-items:flex-start;gap:7px;margin-bottom:7px;padding:8px 10px;border:1px dashed var(--border);border-radius:7px;background:var(--bg)">
+      <span style="font-size:13px">📧</span>
+      <div style="font-size:11.5px;color:var(--text-sub);line-height:1.45">This step sends a pre-built BAM email${tplKey ? ` (<b style="color:var(--text)">${escapeHTML(tplKey)}</b>)` : ''}. To write your own instead, clear the box below and type a plain message - it sends in your academy's branded frame.</div>
+    </div>
+    <textarea id="astep-${s.id}-body" placeholder="${isEmail ? 'Email body - use {{name}} / {{athlete}}' : 'Message - use {{name}} / {{athlete}}'}" style="display:block;width:100%;box-sizing:border-box;min-height:54px;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:7px 9px;font-size:12.5px;resize:vertical;font-family:inherit">${escapeHTML(s.body || '')}</textarea>
     <div style="display:flex;gap:8px;margin-top:7px">
       <button onclick="_autoSaveStep('${a.id}','${s.id}')" style="background:var(--gold);color:#0B0B0D;border:none;border-radius:7px;padding:6px 14px;font-size:12px;font-weight:700;cursor:pointer">Save</button>
       <button id="astep-${s.id}-prev" onclick="_autoPreviewEmail('${s.id}')" style="display:${isEmail ? 'inline-block' : 'none'};background:transparent;border:1px solid var(--gold);color:var(--gold);border-radius:7px;padding:6px 12px;font-size:12px;font-weight:700;cursor:pointer">👁 Preview</button>
@@ -16395,11 +16406,16 @@ function _autoChanChange(sid) {
   const chan = document.getElementById(`astep-${sid}-chan`), subj = document.getElementById(`astep-${sid}-subj`);
   const isEmail = chan && chan.value === 'email';
   if (chan && subj) subj.style.display = isEmail ? 'block' : 'none';
-  // Email steps are template-backed: hide the body editor, the subject is the only field.
+  // Email steps now have an editable body too (it flows through renderEmail), so the
+  // body box stays visible for both channels - only its placeholder changes.
   const body = document.getElementById(`astep-${sid}-body`);
-  if (body) body.style.display = isEmail ? 'none' : 'block';
+  if (body) { body.style.display = 'block'; body.placeholder = isEmail ? 'Email body - use {{name}} / {{athlete}}' : 'Message - use {{name}} / {{athlete}}'; }
   const prev = document.getElementById(`astep-${sid}-prev`);
   if (prev) prev.style.display = isEmail ? 'inline-block' : 'none';
+  // The template-backed note only applies to an email step whose body is still a
+  // `template:<key>` reference - re-evaluate it on every channel switch.
+  const tpl = document.getElementById(`astep-${sid}-tpl`);
+  if (tpl) tpl.style.display = (isEmail && /^\s*template:[\w/-]+\s*$/.test((body && body.value) || '')) ? 'flex' : 'none';
 }
 
 // Render this email step the way it will actually send (brand frame, template refs,
@@ -16635,7 +16651,10 @@ async function _taSaveExample(i) {
   let parent = null;
   for (let j = i - 1; j >= 0; j--) { if (_TA.chat[j].role === 'parent') { parent = _TA.chat[j]; break; } }
   if (!agent || !parent) return alert('Need a lead message + an agent reply to save.');
-  try { await _taApi('save-example', { parent_text: parent.text, agent_text: agent.text }); alert('Saved as an example ⭐'); }
+  // _taApi injects agent: _TA.target, so the example is captured for whichever agent
+  // (Booking / Confirm / Closing) is currently being trained - each keeps its own.
+  const agentName = (_TA_AGENTS[_TA.target] || '📞 Booking').replace(/^\S+\s/, '');
+  try { await _taApi('save-example', { parent_text: parent.text, agent_text: agent.text }); alert(`Saved as a ${agentName} example ⭐`); }
   catch (e) { alert(e.message); }
 }
 
