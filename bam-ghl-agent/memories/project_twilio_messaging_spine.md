@@ -80,3 +80,27 @@ To build AFTER the GTA pilot:
 
 External prereqs (BAM/Twilio, gated by Twilio review): master account + payment, TrustHub
 Primary Business Profile / ISV approval. A2P 10DLC is per-academy and unavoidable (days).
+
+## Self-serve provisioning UX (planned, build after GTA pilot — 2026-06-29)
+Target: academies set up their own texting number with no manual ops. A "Set up your
+texting number" screen with TWO paths:
+  ① GET A NEW NUMBER — pick area code → confirm prefilled business info (legal name,
+     EIN, address from onboarding) + templated opt-in/sample messages → Submit →
+     auto: buy number (Twilio API) + create Messaging Service + register A2P
+     brand+campaign (TrustHub/ISV API) + wire webhooks + store creds.
+  ② BRING EXISTING TWILIO NUMBER — enter their number/account → account-to-account
+     transfer into BAM's master Twilio → attach to Messaging Service + A2P.
+Then a status badge: Provisioning → Pending (carrier review) → 🟢 Live, auto-flipping
+clients.messaging_provider='twilio' when A2P approves.
+
+HONEST CONSTRAINT: everything is one-click/automatic EXCEPT A2P 10DLC carrier approval
+(minutes to ~1-3 days). We automate the SUBMISSION + wiring + go-live; the approval
+wait is external and shown as a status. There is no way to make carrier approval instant.
+
+Build phases (after GTA proves the flow):
+  0. (prereq, external) BAM master Twilio + TrustHub Primary Business Profile approved.
+  1. provision-twilio endpoint (modes: new | import) + A2P brand/campaign via TrustHub
+     API + status poller → auto-flip to Live. Extend client_twilio_config with
+     brand_sid, campaign_sid, messaging_service_sid, a2p_status, provisioning_status.
+  2. Self-serve screen (the 2-path flow) with prefilled info + status badge.
+  3. New academies auto-run provisioning at onboarding → start on twilio day 1.
