@@ -16267,15 +16267,13 @@ async function _taRenderAutomations() {
 
 // Read-only observability (guardrail #8): live counts strip per automation, click
 // a count -> the people in it -> a person -> their contact drawer (reused).
-// Top strip: just the total "in this sequence". Per-step counts live ON each step
-// row now (see _autoStepCount used in _autoStepHtml).
+// The "in this sequence" pill - rendered inline on the card title row. Per-step
+// counts live at the top-right of each step row (see _autoStepCount in _autoStepHtml).
 function _autoCountsStrip(a) {
   const ov = (_AUTO.overview || []).find(o => o.id === a.id);
   if (!ov) return '';
   const total = ov.total_active || 0;
-  return `<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:12px">
-    <button onclick="_autoOpenPeople('${a.id}','')" style="background:transparent;border:1px solid var(--border);border-radius:7px;padding:3px 10px;font-size:11px;color:var(--text-sub);cursor:pointer;font-family:inherit">👥 <b style="color:var(--text)">${total}</b> in this sequence</button>
-  </div>`;
+  return `<button onclick="_autoOpenPeople('${a.id}','')" style="background:transparent;border:1px solid var(--border);border-radius:7px;padding:3px 10px;font-size:11px;color:var(--text-sub);cursor:pointer;font-family:inherit">👥 <b style="color:var(--text)">${total}</b> in this sequence</button>`;
 }
 // People currently sitting at one step, for the count pill on the step row.
 function _autoStepCount(a, position) {
@@ -16333,12 +16331,12 @@ function _autoCardHtml(a) {
   <div style="border:1px solid var(--border);border-radius:12px;padding:14px 16px;margin-bottom:14px">
     <div style="display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin-bottom:4px">
       <div style="font-size:15px;font-weight:700;color:var(--text)">${escapeHTML(a.name || a.automation_key)}</div>
+      ${_autoCountsStrip(a)}
       <span style="flex:1"></span>
       <button onclick="_autoToggle('${a.id}','approved',${!a.approved})" style="${seg(!!a.approved)}">${a.approved ? '✓ Approved' : 'Approve sequence'}</button>
       <button onclick="_autoToggle('${a.id}','enabled',${!a.enabled})" style="${seg(!!a.enabled)}">${a.enabled ? '🟢 On' : 'Off'}</button>
     </div>
     <div style="font-size:11.5px;color:var(--text-mute);margin-bottom:12px">${statusLine}</div>
-    ${_autoCountsStrip(a)}
     ${stepsHtml}
     ${endNote}
     <button onclick="_autoAddStep('${a.id}')" style="margin-top:10px;background:transparent;border:1px dashed var(--border);color:var(--text-sub);border-radius:8px;padding:8px 14px;font-size:12.5px;font-weight:600;cursor:pointer">+ add step</button>
@@ -16357,7 +16355,6 @@ function _autoStepHtml(a, s, i, total) {
   <div id="astep-${s.id}" style="border:1px solid var(--border);border-radius:9px;padding:10px 12px;margin-bottom:8px;background:var(--surface)">
     <div style="display:flex;align-items:center;gap:7px;flex-wrap:wrap;margin-bottom:8px">
       <span style="font-size:11px;color:var(--text-mute);font-weight:700;min-width:14px">${i + 1}</span>
-      ${countPill}
       <span style="font-size:12px;color:var(--text-sub)">⏱ wait</span>
       <input id="astep-${s.id}-amt" type="number" min="0" value="${Number(s.wait_amount) || 0}" style="width:60px;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:5px 7px;font-size:12.5px">
       <select id="astep-${s.id}-unit" style="background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:5px 7px;font-size:12.5px">${unitOpts}</select>
@@ -16369,6 +16366,7 @@ function _autoStepHtml(a, s, i, total) {
       <span style="flex:1"></span>
       <button onclick="_autoMove('${a.id}','${s.id}',-1)" ${i === 0 ? 'disabled' : ''} title="Move up" style="background:transparent;border:1px solid var(--border);color:var(--text-sub);border-radius:6px;padding:4px 8px;font-size:11px;cursor:pointer;${i === 0 ? 'opacity:.4' : ''}">↑</button>
       <button onclick="_autoMove('${a.id}','${s.id}',1)" ${i === total - 1 ? 'disabled' : ''} title="Move down" style="background:transparent;border:1px solid var(--border);color:var(--text-sub);border-radius:6px;padding:4px 8px;font-size:11px;cursor:pointer;${i === total - 1 ? 'opacity:.4' : ''}">↓</button>
+      ${countPill}
     </div>
     <input id="astep-${s.id}-subj" placeholder="Email subject line" value="${escapeHTML(s.subject || '')}" style="display:${isEmail ? 'block' : 'none'};width:100%;box-sizing:border-box;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:7px 9px;font-size:12.5px;margin-bottom:7px">
     <textarea id="astep-${s.id}-body" placeholder="Message - use {{name}} / {{athlete}}" style="display:${isEmail ? 'none' : 'block'};width:100%;box-sizing:border-box;min-height:54px;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:7px 9px;font-size:12.5px;resize:vertical;font-family:inherit">${escapeHTML(s.body || '')}</textarea>
