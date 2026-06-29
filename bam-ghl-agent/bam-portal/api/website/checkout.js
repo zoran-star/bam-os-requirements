@@ -180,6 +180,11 @@ async function handler(req, res) {
     const parentPhone = (parent.phone || body.parent_phone || "").toString().trim() || null;
     const athleteName = (athlete.name || `${athlete.first || ""} ${athlete.last || ""}`).trim() || null;
     const intake = (body.intake && typeof body.intake === "object") ? body.intake : {};
+    // P2b-plus: the enroll link carries ?opp_id=<GHL opportunity id> (set by the
+    // closing agent / enroll page). Thread it through Stripe so the webhook can mark
+    // the EXACT opportunity WON on payment, and persist it on the member row. Optional
+    // — when absent the webhook falls back to the member's open opp by contact.
+    const oppId = (body.opp_id || body.opportunity_id || "").toString().trim() || null;
 
     // ── Validate ──
     if (!clientId) return res.status(400).json({ error: "client_id required" });
@@ -289,6 +294,7 @@ async function handler(req, res) {
         "metadata[offer_id]": offerId, "metadata[offer_price_key]": priceKey,
         "metadata[plan]": planText, "metadata[term]": term,
         "metadata[client_id]": clientId, "metadata[parent_email]": parentEmail, "metadata[athlete_name]": athleteName,
+        ...(oppId ? { "metadata[ghl_opportunity_id]": oppId } : {}),
         ...(revert ? { "metadata[commitment_reverts]": "monthly", "metadata[revert_to_price]": revert.revertToPriceId } : {}),
       },
     });
@@ -301,6 +307,8 @@ async function handler(req, res) {
       status: "payment_method_required", stripe_customer_id: customerId,
       stripe_subscription_id: sub.id, stripe_price_id: price.stripe_price_id, updated_at: nowIso(),
     };
+    // Only stamp the opp link when we have one — never null out an existing link on a retry.
+    if (oppId) memberFields.ghl_opportunity_id = oppId;
     if (member) {
       await sb(`members?id=eq.${member.id}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify(memberFields) });
     } else {

@@ -39,10 +39,13 @@ import { fireOnboardingActivations } from "../onboarding/activations.js";
 import { sendSms } from "../ghl/_core.js";
 import { notifyOwners } from "../_notify-owners.js";
 import { enrollContact, isAutomationLive } from "../automations.js";
+import { getClientGhlToken } from "../website/availability.js";
 
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
 const STRIPE_API = "https://api.stripe.com/v1";
+const GHL_V2 = "https://services.leadconnectorhq.com";
+const GHL_V2_VERSION = "2021-07-28";
 
 // Stripe signature verification needs the RAW body — disable Vercel's
 // default JSON body parser for this route.
@@ -137,6 +140,109 @@ async function stripePost(path, body, stripeAccount) {
   const txt = await res.text();
   if (!res.ok) throw new Error(`Stripe ${res.status}: ${txt}`);
   return txt ? JSON.parse(txt) : {};
+}
+
+// GHL v2 call (same shape + 429 backoff as api/ghl/pipelines.js ghl()). Used only
+// by markOpportunityWon below.
+async function ghlFetch(method, path, { token, body } = {}) {
+  const headers = {
+    Authorization:  `Bearer ${token}`,
+    Version:        GHL_V2_VERSION,
+    Accept:         "application/json",
+    "Content-Type": "application/json",
+  };
+  let res;
+  for (let attempt = 0; attempt < 4; attempt++) {
+    res = await fetch(`${GHL_V2}${path}`, { method, headers, body: body ? JSON.stringify(body) : undefined });
+    if (res.status !== 429) break;
+    const ra = Number(res.headers.get("retry-after"));
+    const wait = ra > 0 ? Math.min(ra * 1000, 5000) : Math.min(400 * 2 ** attempt, 5000);
+    await new Promise(r => setTimeout(r, wait));
+  }
+  const text = await res.text();
+  let json = null;
+  try { json = text ? JSON.parse(text) : null; } catch (_) { json = { raw: text }; }
+  if (!res.ok) {
+    const err = new Error((json && (json.message || json.error)) || `GHL ${res.status}`);
+    err.status = res.status; err.body = json;
+    throw err;
+  }
+  return json;
+}
+
+// ─── Pipeline exit on payment: mark the member's GHL opportunity WON ───────────
+// When a member goes live via a portal payment, mark their GHL sales-board
+// opportunity WON and record a pipeline_outcomes row — so the card leaves the
+// board WITHOUT depending on any GHL onboarding workflow (the old marking-won
+// step lived inside a GHL workflow that is skipped the moment the academy turns
+// the portal "onboarding" automation on). Best-effort + idempotent: it never
+// blocks member activation, and it won't double-mark on webhook retries or after
+// the manual _plMarkWon button.
+//
+// Opportunity-id resolution order:
+//   1. explicit hint (Stripe sub metadata.ghl_opportunity_id, threaded from the
+//      website enroll funnel's ?opp_id), then
+//   2. members.ghl_opportunity_id (persisted at checkout), then
+//   3. (only when allowContactSearch) the member's open opp by ghl_contact_id.
+//
+// V1 SAFETY: the contact search is gated OFF for the external-sub path
+// (handleSubCreated) so V1 / GHL-managed members are never touched — it runs only
+// on the V2 portal-owned invoice path (handleInvoiceSucceeded).
+//
+// TODO: once the portal-native opportunity store (effort E) lands, this GHL PUT
+// becomes a no-op (or is replaced by a local status write). Until then, if an
+// academy turns GHL off the PUT simply fails silently — acceptable for now.
+async function markOpportunityWon({ member, oppIdHint, allowContactSearch }) {
+  try {
+    if (!member || !member.client_id) return { skipped: "no member/client" };
+    const cRows = await sb(`clients?id=eq.${encodeURIComponent(member.client_id)}&select=id,business_name,ghl_location_id,ghl_access_token,ghl_refresh_token,ghl_token_expires_at,ghl_kpi_config&limit=1`);
+    const client = Array.isArray(cRows) && cRows[0];
+    if (!client) return { skipped: "no client row" };
+    if (!client.ghl_access_token && !client.ghl_location_id) return { skipped: "academy not connected to GHL" };
+
+    let oppId = (oppIdHint && String(oppIdHint).trim()) || member.ghl_opportunity_id || null;
+
+    let token = null;
+    try { token = await getClientGhlToken(client); }
+    catch (e) { return { skipped: `no GHL token: ${String((e && e.message) || e)}` }; }
+
+    if (!oppId && allowContactSearch && member.ghl_contact_id && client.ghl_location_id) {
+      try {
+        const params = new URLSearchParams({ location_id: client.ghl_location_id, contact_id: member.ghl_contact_id, limit: "20" });
+        const d = await ghlFetch("GET", `/opportunities/search?${params}`, { token });
+        const opps = (d && (d.opportunities || d.data)) || [];
+        oppId = (opps.find(o => String(o.status || "").toLowerCase() === "open") || opps[0] || null)?.id || null;
+      } catch (_) { /* non-fatal — fall through to skip */ }
+    }
+    if (!oppId) return { skipped: "no opportunity to mark" };
+
+    // Backfill the resolved opp id onto the member so retries + later code reuse it.
+    if (!member.ghl_opportunity_id) {
+      try {
+        await sb(`members?id=eq.${member.id}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ ghl_opportunity_id: oppId, updated_at: nowIso() }) });
+        member.ghl_opportunity_id = oppId;
+      } catch (_) { /* non-fatal */ }
+    }
+
+    // Idempotency: if a WON outcome already exists for this opp (retry, or the
+    // manual mark-won button already fired), don't re-PUT or re-insert.
+    try {
+      const prior = await sb(`pipeline_outcomes?client_id=eq.${encodeURIComponent(member.client_id)}&opportunity_id=eq.${encodeURIComponent(oppId)}&status=eq.won&select=id&limit=1`);
+      if (Array.isArray(prior) && prior.length > 0) return { ok: true, opportunity_id: oppId, already_won: true };
+    } catch (_) { /* if the check fails, fall through — re-PUT to WON is itself idempotent in GHL */ }
+
+    // Mark the GHL opportunity WON (same call shape as api/ghl/pipelines.js).
+    await ghlFetch("PUT", `/opportunities/${encodeURIComponent(oppId)}`, { token, body: { status: "won" } });
+
+    // Record the outcome (mirrors the manual mark-won + agent flows).
+    try {
+      await sb(`pipeline_outcomes`, { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify([{ client_id: member.client_id, opportunity_id: oppId, status: "won", reason: "auto: paid via portal" }]) });
+    } catch (_) { /* non-fatal */ }
+
+    return { ok: true, opportunity_id: oppId, marked_won: true };
+  } catch (e) {
+    return { ok: false, error: String((e && e.message) || e) };
+  }
 }
 
 // Commitment → revert-to-monthly. The website funnel sub was created on a 3/6-month
@@ -252,7 +358,7 @@ async function handleSubCreated(event, connectedAccount, res) {
     `members?status=eq.payment_method_required` +
     `&parent_email=eq.${encodeURIComponent(email)}` +
     `&stripe_subscription_id=is.null` +
-    `&select=id,client_id,athlete_name,parent_email` +
+    `&select=id,client_id,athlete_name,parent_email,ghl_contact_id,ghl_opportunity_id` +
     `&order=created_at.asc&limit=1`
   );
   const target = Array.isArray(candidates) && candidates[0];
@@ -304,6 +410,20 @@ async function handleSubCreated(event, connectedAccount, res) {
     stripe_response: { id: sub.id, status: sub.status },
     db_changes:      { members: { status: "payment_method_required → live", linked: true, plan: planFromPrice || "(unchanged — non-canonical price)" } },
   });
+
+  // Pipeline exit (explicit-opp-only): if this member is already linked to a GHL
+  // opportunity, mark it WON now that they're live. Contact-search is intentionally
+  // OFF here so V1 / GHL-managed external subs are never touched (HARD RULE: don't
+  // change V1). The website enroll funnel that sets members.ghl_opportunity_id is
+  // portal-owned and returns earlier in this handler, so in practice this only fires
+  // for an explicitly-linked opp. Best-effort — never blocks the link.
+  try {
+    await markOpportunityWon({
+      member: target,
+      oppIdHint: sub.metadata && sub.metadata.ghl_opportunity_id,
+      allowContactSearch: false,
+    });
+  } catch (_) { /* non-fatal */ }
 
   // Funnel KPI: record the conversion (lead went live on Stripe), tied to the
   // lead by email. Best-effort — never blocks member linking. ref=sub.id keeps
@@ -515,6 +635,18 @@ async function handleInvoiceSucceeded(event, connectedAccount, res) {
         method: "PATCH", headers: { Prefer: "return=minimal" },
         body: JSON.stringify({ status: "live", updated_at: nowIso() }),
       });
+      // Pipeline exit: mark the member's GHL opportunity WON now that they're live —
+      // portal-owned, independent of any GHL onboarding workflow. Best-effort. This is
+      // the V2 portal-owned path, so the contact-search fallback is allowed. Skipped for
+      // silent imports (existing members, not new sales-board cards).
+      let pipelineWon = silent ? { skipped: "import_silent" } : null;
+      if (!silent) {
+        pipelineWon = await markOpportunityWon({
+          member,
+          oppIdHint: onbSub.metadata.ghl_opportunity_id,
+          allowContactSearch: true,
+        });
+      }
       let activations = null;
       if (silent) {
         activations = { skipped: "import_silent" };
@@ -591,10 +723,10 @@ async function handleInvoiceSucceeded(event, connectedAccount, res) {
       await writeAudit({
         client_id: member.client_id, member_id: member.id,
         action_type: silent ? "import-activated-silent" : "onboarding-activated",
-        args: { invoice_id: inv.id, sub_id: subId, plan: onbSub.metadata.plan, term: onbSub.metadata.term, silent, activations, onboarding_enroll: onboardingEnroll, staff_notify: staffNotify, commitment_schedule: commitmentSchedule },
+        args: { invoice_id: inv.id, sub_id: subId, plan: onbSub.metadata.plan, term: onbSub.metadata.term, silent, activations, onboarding_enroll: onboardingEnroll, staff_notify: staffNotify, commitment_schedule: commitmentSchedule, pipeline_won: pipelineWon },
         db_changes: { members: { status: { from: "payment_method_required", to: "live" } } },
       });
-      return res.status(200).json({ ok: true, action: silent ? "import-activated-silent" : "onboarding-activated", member_id: member.id, activations, onboarding_enroll: onboardingEnroll, staff_notify: staffNotify, commitment_schedule: commitmentSchedule });
+      return res.status(200).json({ ok: true, action: silent ? "import-activated-silent" : "onboarding-activated", member_id: member.id, activations, onboarding_enroll: onboardingEnroll, staff_notify: staffNotify, commitment_schedule: commitmentSchedule, pipeline_won: pipelineWon });
     }
   }
 
