@@ -1,4 +1,6 @@
 import { withSentryApiRoute } from "../_sentry.js";
+import { isAutomationLive, enrollContact } from "../automations.js";
+import { nurtureStage } from "../agent/_stage.js";
 // Vercel Serverless Function — Per-academy GHL Pipelines (kanban + moves)
 //
 //   GET   /api/ghl/pipelines?client_id=<uuid>
@@ -223,6 +225,36 @@ async function handler(req, res) {
     if (body.status && !body.stage_id) {
       const allowed = ["open", "won", "lost", "abandoned"];
       if (!allowed.includes(body.status)) return res.status(400).json({ error: "invalid status" });
+
+      // Model: a hand-marked "Lost" is no longer terminal. If this academy has the
+      // portal Lead-Nurture sequence LIVE and a Lead Nurture stage exists, route the
+      // lead there (the opp stays OPEN so the sequence can work it) AND enroll them -
+      // identical to the agent's confirm-lost path. Otherwise fall through to the
+      // GHL-native status=lost below (which fires the academy's "Opportunity -> Lost"
+      // workflow). Auto-switches per academy the moment they approve portal nurture;
+      // isAutomationLive fails CLOSED so V1 / not-yet-live academies are unaffected.
+      if (body.status === "lost") {
+        try {
+          if (await isAutomationLive(clientId, "nurture")) {
+            const ns = await nurtureStage(token, locationId);
+            if (ns) {
+              let contactId = null;
+              try {
+                const og = await ghl("GET", `/opportunities/${encodeURIComponent(oppId)}`, { token });
+                const oo = og.opportunity || og;
+                contactId = oo.contactId || oo.contact?.id || null;
+              } catch (_) {}
+              await ghl("PUT", `/opportunities/${encodeURIComponent(oppId)}`, { token, body: { pipelineId: ns.pipelineId, pipelineStageId: ns.stageId } });
+              if (contactId) { try { await enrollContact({ clientId, automationKey: "nurture", contactId }); } catch (_) {} }
+              await sb(`pipeline_outcomes`, {
+                method: "POST", headers: { Prefer: "return=minimal" },
+                body: JSON.stringify([{ client_id: clientId, opportunity_id: oppId, status: "nurture", reason: (body.reason || "").toString().trim() || null }]),
+              }).catch(() => {});
+              return res.status(200).json({ ok: true, opportunity_id: oppId, status: "lost", routed_to_nurture: true, nurture_stage: ns.stageName });
+            }
+          }
+        } catch (_) { /* fall through to GHL-native lost */ }
+      }
       try {
         const out = await ghl("PUT", `/opportunities/${encodeURIComponent(oppId)}`, {
           token, body: { status: body.status },
