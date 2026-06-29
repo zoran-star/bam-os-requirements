@@ -17733,13 +17733,17 @@ const _bbStdPricing = [
         hint:'What\'s included at this price - sessions per week, access to facilities, gear, perks, etc. Sales / landing page copy will pull from this.' },
       { key:'price', type:'currency', label:'Price (pre-tax)', required:true,
         hint:'Headline number before added fees - monthly fee, package total, or per-session cost' },
+      { key:'billing_cycle', type:'check_one', label:'Billing cycle', required:true,
+        dep:{ key:'type', equals:'Membership' },
+        options:['Weekly','Biweekly','Monthly','Every 4 weeks','Quarterly','Annually','Other'],
+        hint:'How often the member is charged at this price' },
+      { key:'billing_cycle_other', type:'text', label:'Billing cycle - specify', required:true,
+        dep:{ key:'billing_cycle', equals:'Other' },
+        hint:'e.g. "every 6 weeks", "per term"' },
       { key:'added_fees', type:'text', label:'Added fees',
         hint:'Percentage or dollar amount on top of the pre-tax price. e.g. "+13% HST" or "$25"' },
       { key:'added_fees_description', type:'text', label:'Added fees - description',
         hint:'What the added fees cover (e.g. "Ontario sales tax", "admin / processing")' },
-      { key:'billing_cycle', type:'text', label:'Billing cycle',
-        dep:{ key:'type', equals:'Membership' },
-        hint:'e.g. "monthly", "every 4 weeks", "biweekly"' },
       { key:'commitments', type:'block_builder', label:'Commitments',
         dep:{ key:'type', equals:'Membership' },
         hint:'Optional discounted longer-term commitments (e.g. 3-month, 6-month, annual) that the client can choose instead of the default billing cycle.',
@@ -23243,13 +23247,17 @@ async function _plOutcomeConfirm(oppId, status, contactId) {
     // 'unqualified' is a portal concept: GHL has no such status, so it maps to
     // 'abandoned' (off the pipeline) PLUS the `unqualified` tag.
     const ghlStatus = status === 'unqualified' ? 'abandoned' : status;
-    await _plSetStatus(oppId, ghlStatus, reason);
+    const out = await _plSetStatus(oppId, ghlStatus, reason);
     if (status === 'unqualified' && contactId) { try { await _plStampUnqualified(contactId, true); } catch (_) {} }
     document.getElementById('pl-outcome-overlay')?.remove();
-    _plRemoveOppLocal(oppId); // remove from the pipeline board right away (Lost automation runs in GHL)
-    const sub = status === 'unqualified' ? 'Tagged unqualified + removed' : 'Removed from the pipeline';
-    _plDrawerConfirm((status === 'lost' || status === 'unqualified') ? '🚫' : '🗑', `Marked ${_PL_STATUS_LABEL[status] || status}`, sub); // flashes, then closes the drawer
-    _plShowUndo({ type: 'status', oppId }, `Marked ${_PL_STATUS_LABEL[status] || status} - removed from pipeline`);
+    _plRemoveOppLocal(oppId); // remove from the current column right away (server moves Lost leads to Lead Nurture, or runs the GHL Lost automation)
+    // When the academy has portal Lead Nurture live, the server routes a "Lost"
+    // lead into the Lead Nurture stage + enrolls them instead of closing it out.
+    const toNurture = status === 'lost' && out && out.routed_to_nurture;
+    const sub = toNurture ? 'Moved to Lead Nurture + enrolled'
+      : status === 'unqualified' ? 'Tagged unqualified + removed' : 'Removed from the pipeline';
+    _plDrawerConfirm(toNurture ? '💔' : (status === 'lost' || status === 'unqualified') ? '🚫' : '🗑', toNurture ? 'Sent to Lead Nurture' : `Marked ${_PL_STATUS_LABEL[status] || status}`, sub); // flashes, then closes the drawer
+    _plShowUndo({ type: 'status', oppId }, toNurture ? 'Sent to Lead Nurture' : `Marked ${_PL_STATUS_LABEL[status] || status} - removed from pipeline`);
   } catch (e) {
     alert('Couldn’t mark ' + status + ': ' + e.message);
     if (btn) { btn.disabled = false; btn.textContent = 'Mark ' + (_PL_STATUS_LABEL[status] || status); }
