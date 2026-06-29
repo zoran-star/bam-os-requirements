@@ -27,6 +27,7 @@ import { withSentryApiRoute } from "./_sentry.js";
 // plain confirmations (handoff + lost ALWAYS wait for a human ✓).
 
 import { pickGhlToken, ghl, sendSms } from "./ghl/_core.js";
+import { maybeSendSmsViaProvider } from "./messaging/provider.js";
 import { buildAgentSystem } from "./agent/brain.js";
 import { loadMergedOverrides } from "./agent/_sections.js";
 import { loadContactMemory } from "./agent/contact-memory.js";
@@ -245,7 +246,11 @@ async function draftForContact(token, locationId, clientId, contactId, cfg, opts
   };
 }
 
-async function sendReplyViaGhl(token, contactId, reply) {
+async function sendReplyViaGhl(token, contactId, reply, clientId) {
+  if (clientId) {
+    const g = await maybeSendSmsViaProvider(clientId, { ghlContactId: contactId, body: String(reply), sentBy: "confirm-agent" });
+    if (g.handled) { if (!g.ok) throw new Error(g.error); return; }
+  }
   await ghl("POST", `/conversations/messages`, { token, body: { type: "SMS", contactId, message: String(reply) } });
 }
 
@@ -345,7 +350,7 @@ async function fireScriptedStep({ client, token, locationId, mode, autos, cfg, i
     return "deferred";
   }
   if (auto) {
-    await sendReplyViaGhl(token, contactId, message);
+    await sendReplyViaGhl(token, contactId, message, client.id);
     await sendScriptedEmail();
     await sb(`agent_confirm_replies`, { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify([{
       ...baseRow, status: "sent", auto_sent: true, sent_at: new Date().toISOString(), created_by: "self-drive",
@@ -413,7 +418,7 @@ async function detectForClient(client) {
         }
         if (!row.draft_message || !String(row.draft_message).trim()) continue;
         try {
-          await sendReplyViaGhl(token, row.ghl_contact_id, row.draft_message);
+          await sendReplyViaGhl(token, row.ghl_contact_id, row.draft_message, client.id);
           await sb(`agent_confirm_replies?id=eq.${row.id}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ status: "sent", auto_sent: true, sent_at: new Date().toISOString(), updated_at: new Date().toISOString() }) });
           flushed++;
         } catch (_) {}
@@ -688,7 +693,7 @@ async function handler(req, res) {
         } catch (e) { return res.status(500).json({ error: `couldn't schedule: ${e.message}` }); }
         return res.status(200).json({ ok: true, sent: false, deferred: true, send_after: sendAfter });
       }
-      try { await sendReplyViaGhl(token, b.contact_id, String(b.reply)); }
+      try { await sendReplyViaGhl(token, b.contact_id, String(b.reply), clientId); }
       catch (e) { return res.status(e.status || 502).json({ error: `GHL send: ${e.message}` }); }
       await fireCardEmail();
       try { await logApproval({ client_id: clientId, ghl_contact_id: b.contact_id, ghl_conversation_id: b.conversation_id || null, contact_name: b.contact_name || null, final_reply: b.reply, reasoning: b.reasoning || null, confidence: typeof b.confidence === "number" ? b.confidence : null, adjusted: !!b.adjusted, status: "sent", created_by: staffEmail }); } catch (_) {}
@@ -711,7 +716,7 @@ async function handler(req, res) {
       if (!contactId) return res.status(400).json({ error: "ready_id or contact_id required" });
       // Send the warm acknowledgement only if one was provided / drafted.
       const closing = (typeof b.reply === "string" ? b.reply : (row ? row.draft_message : "")) || "";
-      if (closing.trim()) { try { await sendReplyViaGhl(token, contactId, closing.trim()); } catch (_) {} }
+      if (closing.trim()) { try { await sendReplyViaGhl(token, contactId, closing.trim(), clientId); } catch (_) {} }
       // Write the context note (this is how the booking agent gets full context —
       // contact-memory.js injects agent_contact_notes into the booking prompt).
       const note = (b.handoff_note || (row && row.handoff_note) || "Couldn't make their booked trial — needs to rebook.").toString().trim();
@@ -751,7 +756,7 @@ async function handler(req, res) {
       catch (e) { return res.status(e.status || 502).json({ error: `GHL find opp: ${e.message}` }); }
       if (!oppId) return res.status(200).json({ error: "No opportunity found for this contact — nothing to mark lost." });
       const closing = (typeof b.reply === "string" ? b.reply : (row ? row.draft_message : "")) || "";
-      if (closing.trim()) { try { await sendReplyViaGhl(token, contactId, closing.trim()); } catch (_) {} }
+      if (closing.trim()) { try { await sendReplyViaGhl(token, contactId, closing.trim(), clientId); } catch (_) {} }
       const reason = (b.lost_reason || (row && row.lost_reason) || "").toString().trim() || null;
       // Model: a non-Unqualified Lost lead flows into 💔 Lead Nurture. If the portal
       // nurture sequence is LIVE + a Lead Nurture stage exists, route them there (opp
