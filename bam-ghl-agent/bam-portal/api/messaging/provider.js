@@ -36,12 +36,29 @@ async function loadTwilioConfig(clientId) {
   return cfg;
 }
 
-// 'twilio' only when the academy is flipped AND its creds are active; else 'ghl'.
-// Cheap short-circuit: no DB hit unless messaging_provider is explicitly 'twilio'.
-export async function smsProvider(client) {
-  if (!client || client.messaging_provider !== "twilio") return "ghl";
-  const cfg = await loadTwilioConfig(client.id);
-  return cfg && cfg.status === "active" ? "twilio" : "ghl";
+// cached per-client provider resolution by clientId, so a send site that loaded a
+// partial client row (without messaging_provider) still resolves correctly. 'twilio'
+// only when the academy is flipped AND its creds are active; else 'ghl'.
+const _provCache = new Map(); // clientId -> { at, provider }
+async function resolveProvider(clientId) {
+  if (!clientId) return "ghl";
+  const hit = _provCache.get(clientId);
+  if (hit && Date.now() - hit.at < CFG_TTL) return hit.provider;
+  let provider = "ghl";
+  try {
+    const rows = await sb(`clients?id=eq.${encodeURIComponent(clientId)}&select=messaging_provider&limit=1`);
+    if (rows && rows[0] && rows[0].messaging_provider === "twilio") {
+      const cfg = await loadTwilioConfig(clientId);
+      if (cfg && cfg.status === "active") provider = "twilio";
+    }
+  } catch (_) { provider = "ghl"; }
+  _provCache.set(clientId, { at: Date.now(), provider });
+  return provider;
+}
+// Accepts a client object or a bare clientId.
+export async function smsProvider(clientOrId) {
+  const id = typeof clientOrId === "string" ? clientOrId : (clientOrId && clientOrId.id);
+  return resolveProvider(id);
 }
 
 function twilioCreds(cfg) {
@@ -72,8 +89,8 @@ async function phoneForContact(clientId, ghlContactId) {
 }
 
 // Send one SMS via the academy's own Twilio + record it in the own-store.
-async function sendViaTwilio(client, { toPhone, body, ghlContactId, sentBy, contactName }) {
-  const cfg = await loadTwilioConfig(client.id);
+async function sendViaTwilio(clientId, { toPhone, body, ghlContactId, sentBy, contactName }) {
+  const cfg = await loadTwilioConfig(clientId);
   if (!cfg) throw new Error("no twilio config");
   const c = twilioCreds(cfg);
   if (!c.accountSid) throw new Error("twilio account_sid missing");
@@ -99,13 +116,13 @@ async function sendViaTwilio(client, { toPhone, body, ghlContactId, sentBy, cont
   const json = await resp.json().catch(() => ({}));
   if (!resp.ok) throw new Error(`Twilio ${resp.status}: ${json.message || json.code || "send failed"}`);
 
-  const thread = await upsertThread(client.id, toPhone, ghlContactId, contactName);
+  const thread = await upsertThread(clientId, toPhone, ghlContactId, contactName);
   if (thread) {
     const occurred = new Date().toISOString();
     await sb(`sms_messages`, {
       method: "POST", headers: { Prefer: "return=minimal" },
       body: JSON.stringify([{
-        thread_id: thread.id, client_id: client.id, provider: "twilio", direction: "outbound",
+        thread_id: thread.id, client_id: clientId, provider: "twilio", direction: "outbound",
         channel: "sms", body: body || "", status: json.status || "queued", twilio_sid: json.sid || null,
         sent_by: sentBy || null, occurred_at: occurred, raw: json,
       }]),
@@ -124,12 +141,14 @@ async function sendViaTwilio(client, { toPhone, body, ghlContactId, sentBy, cont
 //   { handled:true, ok:false, error }  -> academy is twilio but send failed
 //                                         (do NOT fall back to GHL - wrong number)
 // Never throws.
-export async function maybeSendSmsViaProvider(client, { toPhone, ghlContactId, body, sentBy, contactName } = {}) {
+export async function maybeSendSmsViaProvider(clientOrId, { toPhone, ghlContactId, body, sentBy, contactName } = {}) {
   try {
-    if ((await smsProvider(client)) !== "twilio") return { handled: false };
-    const phone = toPhone || (await phoneForContact(client.id, ghlContactId));
+    const clientId = typeof clientOrId === "string" ? clientOrId : (clientOrId && clientOrId.id);
+    if (!clientId) return { handled: false };
+    if ((await resolveProvider(clientId)) !== "twilio") return { handled: false };
+    const phone = toPhone || (await phoneForContact(clientId, ghlContactId));
     if (!phone) return { handled: true, ok: false, error: "no phone for twilio send" };
-    const r = await sendViaTwilio(client, { toPhone: phone, body, ghlContactId, sentBy, contactName });
+    const r = await sendViaTwilio(clientId, { toPhone: phone, body, ghlContactId, sentBy, contactName });
     return { handled: true, ...r };
   } catch (e) {
     return { handled: true, ok: false, error: e.message || String(e) };
