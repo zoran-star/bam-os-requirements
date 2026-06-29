@@ -3,6 +3,7 @@
 // reminder cron, and the inbound-webhook notify hook so the "responded-only"
 // rule is defined in exactly one place.
 import { ghl } from "../ghl/_core.js";
+import { resolveStage } from "./_store.js";
 
 // The agent only works OPEN opportunities. A won/lost/abandoned deal that's still
 // parked in the Responded STAGE must be ignored — gate on status, not just stage.
@@ -10,25 +11,20 @@ import { ghl } from "../ghl/_core.js";
 const isOpenOpp = (o) => String((o && o.status) || "open").toLowerCase() === "open";
 const openOppContactIds = (opps) => new Set((opps || []).filter(isOpenOpp).map(o => o.contactId || o.contact?.id).filter(Boolean));
 
-export async function respondedStage(token, locationId) {
-  const data = await ghl("GET", `/opportunities/pipelines?locationId=${encodeURIComponent(locationId)}`, { token });
-  const pipelines = data.pipelines || data.data || [];
-  const pipe = pipelines.find(p => /training/i.test(p.name || "")) || pipelines[0];
-  if (!pipe) return null;
-  const stage = (pipe.stages || []).find(s => /respond/i.test(s.name || ""));
-  return stage ? { pipelineId: pipe.id, stageId: stage.id, stageName: stage.name } : null;
+// Delegates through the pipeline-store seam (_store.js). Optional ctx carries
+// { sb, clientId } for the future portal-read path; no current caller passes it,
+// so the seam takes the live-GHL /respond/i regex fallback - byte-identical to
+// the pre-seam body. Same { pipelineId, stageId, stageName } | null shape, and
+// GHL errors still throw.
+export async function respondedStage(token, locationId, ctx = {}) {
+  return resolveStage(ctx.sb, ghl, { clientId: ctx.clientId, token, locationId, role: "responded" });
 }
 
 // The Training Pipeline "Interested" stage — where a lead lands when we send them
 // to the Ghosted automation (the workflow then bounces them back to Responded on
 // reply, or marks them lost). Same shape as respondedStage.
-export async function interestedStage(token, locationId) {
-  const data = await ghl("GET", `/opportunities/pipelines?locationId=${encodeURIComponent(locationId)}`, { token });
-  const pipelines = data.pipelines || data.data || [];
-  const pipe = pipelines.find(p => /training/i.test(p.name || "")) || pipelines[0];
-  if (!pipe) return null;
-  const stage = (pipe.stages || []).find(s => /interest/i.test(s.name || ""));
-  return stage ? { pipelineId: pipe.id, stageId: stage.id, stageName: stage.name } : null;
+export async function interestedStage(token, locationId, ctx = {}) {
+  return resolveStage(ctx.sb, ghl, { clientId: ctx.clientId, token, locationId, role: "interested" });
 }
 
 // The Training Pipeline "Scheduled Trial" (a.k.a. "Booked Trial") stage — where a
@@ -37,13 +33,8 @@ export async function interestedStage(token, locationId) {
 // bounces them back to Responded for the booking agent to rebook. Same shape as
 // respondedStage. Anchored on "trial" so a generic "Booking"/"Bookings" stage can't
 // match by accident.
-export async function scheduledTrialStage(token, locationId) {
-  const data = await ghl("GET", `/opportunities/pipelines?locationId=${encodeURIComponent(locationId)}`, { token });
-  const pipelines = data.pipelines || data.data || [];
-  const pipe = pipelines.find(p => /training/i.test(p.name || "")) || pipelines[0];
-  if (!pipe) return null;
-  const stage = (pipe.stages || []).find(s => /(schedul|book).*trial/i.test(s.name || ""));
-  return stage ? { pipelineId: pipe.id, stageId: stage.id, stageName: stage.name } : null;
+export async function scheduledTrialStage(token, locationId, ctx = {}) {
+  return resolveStage(ctx.sb, ghl, { clientId: ctx.clientId, token, locationId, role: "scheduled_trial" });
 }
 
 // The Training Pipeline "Lead Nurture" stage — the long-game home for every
@@ -54,13 +45,8 @@ export async function scheduledTrialStage(token, locationId) {
 // /nurtur/i so the academy can name it "Lead Nurture" / "Nurture" / "Lost - Nurture".
 // Returns null until the academy creates the stage in GHL — callers must handle
 // that (the routing stays dormant rather than erroring).
-export async function nurtureStage(token, locationId) {
-  const data = await ghl("GET", `/opportunities/pipelines?locationId=${encodeURIComponent(locationId)}`, { token });
-  const pipelines = data.pipelines || data.data || [];
-  const pipe = pipelines.find(p => /training/i.test(p.name || "")) || pipelines[0];
-  if (!pipe) return null;
-  const stage = (pipe.stages || []).find(s => /nurtur/i.test(s.name || ""));
-  return stage ? { pipelineId: pipe.id, stageId: stage.id, stageName: stage.name } : null;
+export async function nurtureStage(token, locationId, ctx = {}) {
+  return resolveStage(ctx.sb, ghl, { clientId: ctx.clientId, token, locationId, role: "nurture" });
 }
 
 export async function contactInRespondedStage(token, locationId, contactId, rs) {
@@ -210,16 +196,8 @@ export async function scheduledTrialContactIdSetCached(token, locationId, ttlMs 
 // where a lead lands AFTER the coach's post-trial form marks them showed-up + good
 // fit. Anchored on "trial" + (done|complete|attend) so it can't match the
 // Scheduled-Trial stage by accident. Same {pipelineId, stageId, stageName} shape.
-export async function doneTrialStage(token, locationId) {
-  const data = await ghl("GET", `/opportunities/pipelines?locationId=${encodeURIComponent(locationId)}`, { token });
-  const pipelines = data.pipelines || data.data || [];
-  const pipe = pipelines.find(p => /training/i.test(p.name || "")) || pipelines[0];
-  if (!pipe) return null;
-  const stage = (pipe.stages || []).find(s => {
-    const n = (s.name || "").toLowerCase();
-    return n.includes("trial") && (n.includes("done") || n.includes("complete") || n.includes("attend"));
-  });
-  return stage ? { pipelineId: pipe.id, stageId: stage.id, stageName: stage.name } : null;
+export async function doneTrialStage(token, locationId, ctx = {}) {
+  return resolveStage(ctx.sb, ghl, { clientId: ctx.clientId, token, locationId, role: "done_trial" });
 }
 
 // The closing queue for one academy: ALL open opps in the Done-Trial stage, each
