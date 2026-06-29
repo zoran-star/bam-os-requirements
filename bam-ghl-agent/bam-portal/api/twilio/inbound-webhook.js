@@ -1,0 +1,157 @@
+import { withSentryApiRoute } from "../_sentry.js";
+// Messaging spine (4/5): Twilio inbound-SMS webhook. The Twilio counterpart of
+// api/ghl/inbound-webhook.js - when an academy runs its own Twilio, replies land
+// here. Stores the message in the own-store and fires the SAME side-effects the
+// GHL webhook does (cancel stale drafts, exit automations -> Responded, notify
+// owner, wake the agent), keyed by the lead's GHL contact (still in GHL).
+//
+// Point each academy's Twilio number Messaging webhook at:
+//   https://portal.byanymeansbusiness.com/api/twilio/inbound-webhook
+//
+// Security: validates X-Twilio-Signature with the academy's auth token.
+// Compliance: STOP/UNSUBSCRIBE is recorded; Twilio's Advanced Opt-Out blocks
+// further sends at the carrier level (enable it on the Messaging Service).
+import crypto from "node:crypto";
+import { pickGhlToken, sendSms, ghl } from "../ghl/_core.js";
+import { notifyOwners } from "../_notify-owners.js";
+import { respondedStage, contactInRespondedStage } from "../agent/_stage.js";
+import { agentMode, modeIsOn } from "../agent/_mode.js";
+import { exitEnrollment } from "../automations.js";
+import { decryptSecret } from "../messaging/_crypto.js";
+
+const SB_URL = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
+const SB_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
+
+async function sb(path, init = {}) {
+  const r = await fetch(`${SB_URL}/rest/v1/${path}`, { ...init, headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}`, "Content-Type": "application/json", ...(init.headers || {}) } });
+  if (!r.ok) throw new Error(`Supabase ${r.status}: ${(await r.text()).slice(0, 200)}`);
+  const t = await r.text(); return t ? JSON.parse(t) : null;
+}
+
+const STOP_WORDS  = new Set(["stop", "stopall", "stop all", "unsubscribe", "cancel", "end", "quit", "revoke", "optout", "opt out", "opt-out"]);
+const START_WORDS = new Set(["start", "unstop", "unstop all", "yes", "resume"]);
+
+// Twilio request signature: base64(HMAC-SHA1(authToken, url + sorted(k+v)…)).
+function validSignature(authToken, url, params, signature) {
+  if (!authToken || !signature) return false;
+  const data = url + Object.keys(params).sort().map((k) => k + params[k]).join("");
+  const expected = crypto.createHmac("sha1", authToken).update(Buffer.from(data, "utf-8")).digest("base64");
+  try { return crypto.timingSafeEqual(Buffer.from(expected), Buffer.from(String(signature))); } catch { return false; }
+}
+
+function xmlOk(res) {
+  res.setHeader("Content-Type", "text/xml");
+  return res.status(200).send("<Response/>");
+}
+
+async function handler(req, res) {
+  if (req.method !== "POST") return res.status(405).json({ error: "POST only" });
+  const p = (req.body && typeof req.body === "object") ? req.body : {};
+  const from = String(p.From || "").trim();
+  const to   = String(p.To || "").trim();
+  const bodyText = String(p.Body || "");
+  const sid  = p.MessageSid || p.SmsSid || null;
+  if (!from || !to) return xmlOk(res);
+
+  // Resolve the academy by the receiving number (their own Twilio number).
+  let cfg = null;
+  try {
+    const rows = await sb(`client_twilio_config?from_number=eq.${encodeURIComponent(to)}&status=eq.active&select=client_id,auth_token_enc,api_key_secret_enc&limit=1`);
+    cfg = rows && rows[0];
+  } catch (_) { cfg = null; }
+  if (!cfg) return xmlOk(res); // unknown / inactive number — ack so Twilio doesn't retry
+
+  // Verify the signature with the academy's auth token.
+  const authToken = cfg.auth_token_enc ? decryptSecret(cfg.auth_token_enc)
+    : (cfg.api_key_secret_enc ? decryptSecret(cfg.api_key_secret_enc) : null);
+  const url = `https://${req.headers["x-forwarded-host"] || req.headers.host}${req.url}`;
+  if (authToken && !validSignature(authToken, url, p, req.headers["x-twilio-signature"])) {
+    return res.status(403).json({ error: "bad signature" });
+  }
+
+  const clientId = cfg.client_id;
+  let client = null;
+  try {
+    const rows = await sb(`clients?id=eq.${clientId}&select=id,business_name,v2_access,ghl_kpi_config,ghl_location_id,ghl_access_token,ghl_refresh_token,ghl_token_expires_at&limit=1`);
+    client = rows && rows[0];
+  } catch (_) {}
+
+  // Upsert the thread + record the inbound message.
+  let thread = null;
+  try {
+    const rows = await sb(`sms_threads?on_conflict=client_id,contact_phone`, {
+      method: "POST", headers: { Prefer: "resolution=merge-duplicates,return=representation" },
+      body: JSON.stringify([{ client_id: clientId, contact_phone: from }]),
+    });
+    thread = Array.isArray(rows) ? rows[0] : null;
+  } catch (e) { console.error("twilio inbound thread upsert:", e.message); }
+
+  const occurred = new Date().toISOString();
+  if (thread) {
+    try {
+      await sb(`sms_messages`, { method: "POST", headers: { Prefer: "return=minimal" },
+        body: JSON.stringify([{ thread_id: thread.id, client_id: clientId, provider: "twilio", direction: "inbound", channel: "sms", body: bodyText.slice(0, 8000), status: "received", twilio_sid: sid, occurred_at: occurred, raw: p }]) });
+      await sb(`sms_threads?id=eq.${thread.id}`, { method: "PATCH", headers: { Prefer: "return=minimal" },
+        body: JSON.stringify({ last_message_at: occurred, last_preview: bodyText.trim().slice(0, 160), last_direction: "inbound", unread: true, updated_at: occurred }) });
+    } catch (e) { console.error("twilio inbound store:", e.message); }
+  }
+
+  const ghlContactId = thread?.ghl_contact_id || null;
+
+  // Compliance: STOP/START. Twilio's Advanced Opt-Out blocks further sends at the
+  // carrier level; we just record and skip the "wake the agent" side-effects.
+  const norm = bodyText.trim().toLowerCase().replace(/\s+/g, " ");
+  if (STOP_WORDS.has(norm) || START_WORDS.has(norm)) return xmlOk(res);
+
+  if (!client) return xmlOk(res);
+
+  // ── Same side-effects as the GHL inbound webhook ───────────────────────────
+  try {
+    const snip = bodyText.trim().slice(0, 120);
+    notifyOwners(client.id, "inbox_message", `💬 New message in your inbox${snip ? `: "${snip}"` : "."}`).catch(() => {});
+  } catch (_) {}
+
+  if (ghlContactId) {
+    const cid = encodeURIComponent(String(ghlContactId));
+    // Lead replied → cancel pending/approved drafts (the detector re-drafts).
+    try {
+      const patch = { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ status: "canceled", send_error: "lead replied", updated_at: occurred }) };
+      await sb(`agent_followups?client_id=eq.${client.id}&ghl_contact_id=eq.${cid}&status=in.(pending,approved)`, patch);
+      await sb(`agent_ready_replies?client_id=eq.${client.id}&ghl_contact_id=eq.${cid}&status=in.(pending,approved)`, patch);
+      await sb(`agent_confirm_replies?client_id=eq.${client.id}&ghl_contact_id=eq.${cid}&status=in.(pending,approved)`, patch);
+    } catch (e) { console.error("twilio inbound draft-cancel:", e.message); }
+
+    // Replied while in a portal automation → exit + bounce to Responded.
+    try {
+      const { exited } = await exitEnrollment({ clientId: client.id, contactId: ghlContactId, reason: "replied" });
+      if (exited > 0) {
+        const creds = await pickGhlToken(client);
+        if (creds) {
+          const rs = await respondedStage(creds.token, creds.locationId);
+          const d = await ghl("GET", `/opportunities/search?${new URLSearchParams({ location_id: creds.locationId, contact_id: String(ghlContactId), limit: "20" })}`, { token: creds.token });
+          const opps = d.opportunities || d.data || [];
+          const oppId = (opps.find((o) => String(o.status || "").toLowerCase() === "open") || opps[0] || null)?.id || null;
+          if (rs && oppId) await ghl("PUT", `/opportunities/${encodeURIComponent(oppId)}`, { token: creds.token, body: { pipelineId: rs.pipelineId, pipelineStageId: rs.stageId } });
+        }
+      }
+    } catch (e) { console.error("twilio inbound automation-exit:", e.message); }
+
+    // Instant notify when a Responded-stage lead replies + the agent is on.
+    try {
+      const k = client.ghl_kpi_config || {};
+      if (client.v2_access && modeIsOn(agentMode(client)) && k.agent_notify_phone) {
+        const creds = await pickGhlToken(client);
+        if (creds) {
+          const rs = await respondedStage(creds.token, creds.locationId);
+          if (rs && await contactInRespondedStage(creds.token, creds.locationId, String(ghlContactId), rs)) {
+            await sendSms({ client, toPhone: k.agent_notify_phone, message: `🤖 New chat to approve - ${thread?.contact_name || "a lead"} just replied (${client.business_name || "academy"}). Portal → Inbox → 👁 Hawkeye.`, contactName: "BAM Agent" });
+          }
+        }
+      }
+    } catch (e) { console.error("twilio inbound notify:", e.message); }
+  }
+
+  return xmlOk(res);
+}
+
+export default withSentryApiRoute(handler);
