@@ -9,7 +9,12 @@
 // so every BAM location reuses the same design with its own name / site / handle.
 // Brand: gold #E2DD9F, black #000000 / surface #0A0A0A, Anton (display) + Inter Tight.
 
-import { TEMPLATES } from "./email-templates/nurture-emails.js";
+import { TEMPLATES as NURTURE_TEMPLATES } from "./email-templates/nurture-emails.js";
+import { ONBOARDING_TEMPLATES } from "./email-templates/onboarding-emails.js";
+
+// All vendored designed emails, addressable by `template:<key>` from an
+// automation_steps body: lead-nurture sequence + onboarding welcome sequence.
+const TEMPLATES = { ...NURTURE_TEMPLATES, ...ONBOARDING_TEMPLATES };
 
 const FRAME = `<!DOCTYPE html>
 <html lang="en"><head>
