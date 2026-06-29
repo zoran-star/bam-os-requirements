@@ -93,13 +93,22 @@ Phase order:
   appended, forward-compat) + writes an `agent_contact_notes` "link sent, awaiting payment" + logs
   `pipeline_outcomes status='enroll_link_sent'`; NO won PUT. Frontend relabeled "Send sign-up link & mark won"
   → "Send enroll link" (won lands on payment). The win is owned by the webhook on real payment.
-  ⬜ **P2b-plus (deferred, CROSS-REPO + live checkout):** make the GTA enroll page (`bam-client-sites/clients/
-  bam-gta/gta/enroll.jsx`, which already calls `/api/website/checkout`) READ the `contact_id`/`opp_id` params
-  and pass them to checkout → store `ghl_contact_id` + `ghl_opportunity_id` on the member row + sub metadata →
-  `fireOnboardingActivations` marks THAT exact opp won + links member↔contact at creation (instead of the
-  current `parent_email` match in `api/onboarding/activations.js`). Today the email-match works for GTA's happy
-  path; P2b-plus hardens multi-opp / email-mismatch cases. See `[[project_stripe_app_created_subs]]` +
-  `[[project_offer_price_mapping]]`.
+  ⚠️ CORRECTION (audit, branch `fix/ghl-a-pipeline-exit-on-payment`): the webhook did NOT actually mark the
+  opp won — marking-won lived INSIDE the GHL onboarding workflow, which `fireOnboardingActivations` SKIPS the
+  moment the academy turns the portal `onboarding` automation on (`activations.js:112`). So going portal-native
+  silently broke pipeline exit: a paid member stayed a live card on the board.
+  ✅ **P2b-plus PORTAL SIDE NOW SHIPPED** (`fix/ghl-a-pipeline-exit-on-payment`): `members` got a nullable
+  `ghl_opportunity_id` column (migration `20260629160000_add_members_ghl_opportunity_id.sql`). `checkout.js`
+  reads `opp_id` from the POST body → stamps `metadata[ghl_opportunity_id]` on the Stripe sub + persists it on
+  the member. `api/stripe/webhook.js` has a new portal-owned `markOpportunityWon()` (best-effort, idempotent on
+  a prior `pipeline_outcomes status='won'` row) called AFTER the member flips live in BOTH `handleInvoiceSucceeded`
+  (V2 portal-owned path; contact-search fallback allowed) and `handleSubCreated` (external subs; explicit-opp-only,
+  contact-search OFF to never touch V1). It PUTs the GHL opp to `won` + writes `pipeline_outcomes status='won'`.
+  Marking-won no longer depends on the GHL workflow.
+  ⬜ **Still deferred (CROSS-REPO):** make the GTA enroll page (`bam-client-sites/clients/bam-gta/gta/enroll.jsx`,
+  which already calls `/api/website/checkout`) actually READ the `contact_id`/`opp_id` query params and pass them
+  in the checkout POST body — until then the webhook resolves the opp via the contact-search fallback (happy path)
+  or stays a no-op. See `[[project_stripe_app_created_subs]]` + `[[project_offer_price_mapping]]`.
 - **P2.5** — ⏸ REORDERED to after P3/P4 (polish, blocks nothing). 📋 post-trial form → a card in the unified
   approval inbox. GOTCHA found: `_plPostTrialForm(oppId)` is COUPLED to loaded board state (`_PL_DATA`, line
   ~22014) — surfacing it in the inbox needs `switchView('pipelines')` first (like `_hv2OpenHawkeye`) or
