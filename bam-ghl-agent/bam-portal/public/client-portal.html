@@ -24465,7 +24465,7 @@ function _agentTabsBar(active) {
     ['closing', '🎯 Closing', '_aclxOpen()'],
   ];
   const c = 'var(--accent)';
-  const pills = defs.filter(([k]) => _agentTabVisible(k)).map(([k, label, fn]) => {
+  const pills = defs.map(([k, label, fn]) => {  // always show all 3 agent tabs, however Hawkeye was opened
     const on = k === active, n = _agentTabCount(k);
     return `<button onclick="${on ? '' : fn}" style="flex:0 0 auto;background:${on ? c : 'transparent'};color:${on ? '#0B0B0D' : 'var(--text-sub)'};border:1px solid ${on ? c : 'var(--border)'};border-radius:999px;padding:7px 15px;font-size:13px;font-weight:700;cursor:${on ? 'default' : 'pointer'};white-space:nowrap">${label}${n ? ` (${n})` : ''}</button>`;
   }).join('');
