@@ -58,3 +58,25 @@ if flipped AND `client_twilio_config.status='active'`; else falls back to 'ghl'
 `vercel env pull` for bam-portal returned STALE Supabase + GHL creds (all 401) while
 the live deploy works fine — so prod-cred SCRIPTS can't run locally; use MCP or the
 deployed endpoint (that's why the import is a portal button, not a local script).
+
+## Multi-academy plan (decided 2026-06-29)
+Model: **BAM master Twilio account** (agency/ISV). Per academy: A2P Brand (from their
+EIN/legal name/address — onboarding already collects these) + Campaign → Messaging
+Service → their number; webhooks → our endpoints; encrypted creds → client_twilio_config.
+**New academies default to messaging_provider='twilio' from day 1** (provision at
+onboarding, no GHL history to import, never touch GHL for SMS).
+
+**Sequence (decided): pilot GTA MANUALLY first**, then build auto-provisioning from the
+proven steps. Do NOT build the provisioning/A2P automation before GTA's cutover proves
+Twilio's exact A2P + number flow (and before the BAM master Twilio + TrustHub account
+even exists — can't test otherwise).
+
+To build AFTER the GTA pilot:
+1. Staff "Set up Twilio" provisioning panel + endpoint: buy/assign number, create
+   Messaging Service, register A2P brand+campaign via Twilio TrustHub/ISV API from the
+   academy's DB business info, wire webhooks, encrypt+store creds, flip the flag.
+2. Onboarding default → auto-provision new academies onto twilio.
+3. A2P status poller: client_twilio_config.status pending → active when approved.
+
+External prereqs (BAM/Twilio, gated by Twilio review): master account + payment, TrustHub
+Primary Business Profile / ISV approval. A2P 10DLC is per-academy and unavoidable (days).
