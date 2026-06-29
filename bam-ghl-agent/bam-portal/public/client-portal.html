@@ -24611,34 +24611,37 @@ function _acxRemove(id) {
   if (!_ACX_DATA.length) { const body = document.getElementById('acx-body'); if (body) body.innerHTML = '<div style="max-width:860px;margin:0 auto">' + _apxEmpty('All clear - no confirmations waiting.') + '</div>'; }
   _acxUpdateCount(_ACX_DATA.length);
 }
-async function _acxSend(id) {
+function _acxSend(id) {
   if (!_sendGuard('acxSend-' + id)) return;
   const r = _ACX_DATA.find(x => x.id === id); if (!r) return;
   const ta = document.getElementById('acx-edit-' + id);
   const reply = (ta ? ta.value : (r.draft_message || '')).trim();
   if (!reply) { _apxToast('Message is empty', false); return; }
-  try {
+  _hawkDefer({ cardId: 'acx-' + id, label: 'Sent', restore: _acxRender, run: async () => {
     const resp = await _apxPost('/api/agent-confirm', 'send', { ready_id: id, contact_id: r.ghl_contact_id, conversation_id: r.ghl_conversation_id, reply, contact_name: r.contact_name, confidence: r.confidence, reasoning: r.reasoning });
     _acxRemove(id); _apxToast(resp && resp.deferred ? _apxQuietMsg(resp.send_after) : '✓ Sent', true);
-  } catch (e) { _apxToast(_apxErr(e), false); }
+  } });
 }
-async function _acxHandoff(id) {
+function _acxHandoff(id) {
   const r = _ACX_DATA.find(x => x.id === id); if (!r) return;
   const ta = document.getElementById('acx-edit-' + id);
   const reply = (ta ? ta.value : (r.draft_message || '')).trim();
-  try { await _apxPost('/api/agent-confirm', 'confirm-handoff', { ready_id: id, reply, handoff_note: r.handoff_note }); _acxRemove(id); _apxToast('↩ Handed back to booking', true); }
-  catch (e) { _apxToast(_apxErr(e), false); }
+  _hawkDefer({ cardId: 'acx-' + id, label: 'Handed back', restore: _acxRender, run: async () => {
+    await _apxPost('/api/agent-confirm', 'confirm-handoff', { ready_id: id, reply, handoff_note: r.handoff_note }); _acxRemove(id); _apxToast('↩ Handed back to booking', true);
+  } });
 }
-async function _acxLost(id) {
+function _acxLost(id) {
   const r = _ACX_DATA.find(x => x.id === id); if (!r) return;
   const ta = document.getElementById('acx-edit-' + id);
   const reply = (ta ? ta.value : (r.draft_message || '')).trim();
-  try { await _apxPost('/api/agent-confirm', 'confirm-lost', { ready_id: id, reply, lost_reason: r.lost_reason }); _acxRemove(id); _apxToast('Marked lost', true); }
-  catch (e) { _apxToast(_apxErr(e), false); }
+  _hawkDefer({ cardId: 'acx-' + id, label: 'Marked lost', restore: _acxRender, run: async () => {
+    await _apxPost('/api/agent-confirm', 'confirm-lost', { ready_id: id, reply, lost_reason: r.lost_reason }); _acxRemove(id); _apxToast('Marked lost', true);
+  } });
 }
-async function _acxSkip(id) {
-  try { await _apxPost('/api/agent-confirm', 'skip-ready', { ready_id: id }); _acxRemove(id); _apxToast('Skipped', true); }
-  catch (e) { _apxToast(_apxErr(e), false); }
+function _acxSkip(id) {
+  _hawkDefer({ cardId: 'acx-' + id, label: 'Skipped', restore: _acxRender, run: async () => {
+    await _apxPost('/api/agent-confirm', 'skip-ready', { ready_id: id }); _acxRemove(id); _apxToast('Skipped', true);
+  } });
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -24789,35 +24792,38 @@ function _aclxRemove(id) {
   if (!_ACLX_DATA.length) { const body = document.getElementById('aclx-body'); if (body) body.innerHTML = '<div style="max-width:860px;margin:0 auto">' + _apxEmpty('All clear - no closings waiting.') + '</div>'; }
   _aclxUpdateCount(_ACLX_DATA.length);
 }
-async function _aclxSend(id) {
+function _aclxSend(id) {
   if (!_sendGuard('aclxSend-' + id)) return;
   const r = _ACLX_DATA.find(x => x.id === id); if (!r) return;
   const ta = document.getElementById('aclx-edit-' + id);
   const reply = (ta ? ta.value : (r.draft_message || '')).trim();
   if (!reply) { _apxToast('Message is empty', false); return; }
-  try {
+  _hawkDefer({ cardId: 'aclx-' + id, label: 'Sent', restore: _aclxRender, run: async () => {
     const resp = await _apxPost('/api/agent-closing', 'send', { ready_id: id, contact_id: r.ghl_contact_id, conversation_id: r.ghl_conversation_id, reply, contact_name: r.contact_name, confidence: r.confidence, reasoning: r.reasoning });
     _aclxRemove(id); _apxToast(resp && resp.deferred ? _apxQuietMsg(resp.send_after) : '✓ Sent', true);
-  } catch (e) { _apxToast(_apxErr(e), false); }
+  } });
 }
-async function _aclxEnroll(id) {
+function _aclxEnroll(id) {
   if (!_sendGuard('aclxEnroll-' + id)) return;
   const r = _ACLX_DATA.find(x => x.id === id); if (!r) return;
   const ta = document.getElementById('aclx-edit-' + id);
   const reply = (ta ? ta.value : (r.draft_message || '')).trim();
-  try { await _apxPost('/api/agent-closing', 'confirm-enroll', { ready_id: id, contact_id: r.ghl_contact_id, conversation_id: r.ghl_conversation_id, reply, contact_name: r.contact_name, enroll_note: r.enroll_note }); _aclxRemove(id); _apxToast('🎉 Enroll link sent - won lands on payment', true); }
-  catch (e) { _apxToast(_apxErr(e), false); }
+  _hawkDefer({ cardId: 'aclx-' + id, label: 'Enroll link sent', restore: _aclxRender, run: async () => {
+    await _apxPost('/api/agent-closing', 'confirm-enroll', { ready_id: id, contact_id: r.ghl_contact_id, conversation_id: r.ghl_conversation_id, reply, contact_name: r.contact_name, enroll_note: r.enroll_note }); _aclxRemove(id); _apxToast('🎉 Enroll link sent - won lands on payment', true);
+  } });
 }
-async function _aclxLost(id) {
+function _aclxLost(id) {
   const r = _ACLX_DATA.find(x => x.id === id); if (!r) return;
   const ta = document.getElementById('aclx-edit-' + id);
   const reply = (ta ? ta.value : (r.draft_message || '')).trim();
-  try { await _apxPost('/api/agent-closing', 'confirm-lost', { ready_id: id, reply, lost_reason: r.lost_reason }); _aclxRemove(id); _apxToast('Marked lost', true); }
-  catch (e) { _apxToast(_apxErr(e), false); }
+  _hawkDefer({ cardId: 'aclx-' + id, label: 'Marked lost', restore: _aclxRender, run: async () => {
+    await _apxPost('/api/agent-closing', 'confirm-lost', { ready_id: id, reply, lost_reason: r.lost_reason }); _aclxRemove(id); _apxToast('Marked lost', true);
+  } });
 }
-async function _aclxSkip(id) {
-  try { await _apxPost('/api/agent-closing', 'skip-ready', { ready_id: id }); _aclxRemove(id); _apxToast('Skipped', true); }
-  catch (e) { _apxToast(_apxErr(e), false); }
+function _aclxSkip(id) {
+  _hawkDefer({ cardId: 'aclx-' + id, label: 'Skipped', restore: _aclxRender, run: async () => {
+    await _apxPost('/api/agent-closing', 'skip-ready', { ready_id: id }); _aclxRemove(id); _apxToast('Skipped', true);
+  } });
 }
 
 let _APX_TAB = 'followups';
@@ -25007,28 +25013,14 @@ async function _apxInlineApprove(id) {
   // Ask the escalate question BEFORE entering the loading state.
   if (!isFu && r.escalate && !confirm('The agent escalated this one (it wanted a human). Send anyway?')) return;
 
-  // Loading state on the button: spinner while sending (also blocks the
-  // double-click that fired before there was any feedback), green checkmark
-  // when done, then the card slides out.
-  const sendBtn = document.getElementById('apx-send-' + id);
-  if (sendBtn) {
-    if (sendBtn.dataset.sending === '1') return;   // already in flight - ignore extra clicks
-    sendBtn.dataset.sending = '1';
-    sendBtn.disabled = true;
-    sendBtn.style.cursor = 'default';
-    sendBtn.innerHTML = '<span class="apx-btn-spin"></span>';
-  }
-  const showDone = (label) => { if (sendBtn) { sendBtn.style.background = '#1f7a3d'; sendBtn.style.borderColor = '#1f7a3d'; sendBtn.style.color = '#fff'; sendBtn.innerHTML = label; } };
-  const restore = () => { if (sendBtn) { sendBtn.dataset.sending = ''; sendBtn.disabled = false; sendBtn.style.cursor = 'pointer'; sendBtn.innerHTML = '✓ Approve &amp; send'; } };
-  try {
+  // Instant card animation; the real send is held 6s with Undo top-right.
+  _hawkDefer({ cardId: 'apx-' + id, label: 'Sent', restore: _apxRender, run: async () => {
     if (isFu) {
-      // Follow-up nudge: save any edit, then send via the follow-up path.
       if (adjusted) await _apxPost('/api/agent-followups', 'edit', { id, message: reply });
       const resp = await _apxPost('/api/agent-followups', 'send-now', { id });
       if (lesson) await _apxTeach(lesson, r.draft_message, reply, { source: 'hawkeye-inline-fu', contact: r.contact_name || null });
-      showDone(resp && resp.deferred ? '✓ Queued' : '✓ Sent');
+      _apxRemove(id);
       _apxToast(resp && resp.deferred ? _apxQuietMsg(resp.send_after) : (lesson ? '✓ Sent + taught' : '✓ Sent'), true);
-      setTimeout(() => _apxRemove(id), 450);
       return;
     }
     const resp = await _apxPost('/api/agent-approvals', 'send', {
@@ -25038,10 +25030,9 @@ async function _apxInlineApprove(id) {
       suggested_reply: r.draft_message || null,
     });
     if (lesson) await _apxTeach(lesson, r.draft_message, reply, { source: 'hawkeye-inline', contact: r.contact_name || null });
-    showDone(resp && resp.deferred ? '✓ Queued' : '✓ Sent');
+    _apxRemove(id);
     _apxToast(resp && resp.deferred ? _apxQuietMsg(resp.send_after) : (lesson ? '✓ Sent + taught' : '✓ Sent'), true);
-    setTimeout(() => _apxRemove(id), 450);
-  } catch (e) { _apxToast(_apxErr(e), false); restore(); }
+  } });
 }
 
 // A red "suggested Lost" card. Nothing is sent or changed until you confirm -
@@ -25094,48 +25085,23 @@ function _apxLostInput(id, val) {
   if (btn) btn.innerHTML = '🚫 ' + (val.trim() ? 'Send &amp; mark Lost' : 'Mark Lost');
 }
 
-async function _apxLostConfirm(id) {
+// No confirm popup (it rendered behind Hawkeye). Instant card animation; the
+// closing-send + Lost mark is held 6s with Undo top-right.
+function _apxLostConfirm(id) {
   const r = _APX_DATA.lost.find(x => x.id === id); if (!r) return;
-  const hasClosing = (r.draft_message || '').trim();
-  _plConfirmModal({
-    icon: '🚫',
-    title: 'Mark ' + (r.contact_name || 'this lead') + ' as Lost?',
-    body: 'Reason: <b>' + escapeHTML(r.lost_reason || 'Other') + '</b>.' + (hasClosing ? ' This sends the closing message AND marks them Lost in the pipeline - in one go.' : ' They\'re marked Lost in the pipeline (no message sent).'),
-    okLabel: hasClosing ? 'Send & mark Lost' : 'Mark Lost',
-    onOk: async () => {
-      const btn = document.getElementById('apx-lost-confirm-' + id);
-      if (btn) {
-        if (btn.dataset.sending === '1') return;   // already in flight - block double-send
-        btn.dataset.sending = '1'; btn.disabled = true; btn.style.cursor = 'default';
-        btn.innerHTML = '<span class="apx-btn-spin-light"></span>';
-      }
-      try {
-        await _apxPost('/api/agent-approvals', 'confirm-lost', { ready_id: r.id, lost_reason: r.lost_reason || null, reply: r.draft_message || '' });
-        if (btn) { btn.style.background = '#1f7a3d'; btn.style.borderColor = '#1f7a3d'; btn.innerHTML = '✓ Lost'; }
-        _apxToast('🚫 Marked Lost', true);
-        setTimeout(() => _apxRemove(id), 450);
-      } catch (e) {
-        _apxToast(_apxErr(e), false);
-        if (btn) { btn.dataset.sending = ''; btn.disabled = false; btn.style.cursor = 'pointer'; btn.innerHTML = '🚫 ' + (hasClosing ? 'Send &amp; mark Lost' : 'Mark Lost'); }
-      }
-    },
-  });
+  _hawkDefer({ cardId: 'apx-' + id, label: 'Marked Lost', restore: _apxRender, run: async () => {
+    await _apxPost('/api/agent-approvals', 'confirm-lost', { ready_id: r.id, lost_reason: r.lost_reason || null, reply: r.draft_message || '' });
+    _apxRemove(id); _apxToast('🚫 Marked Lost', true);
+  } });
 }
-async function _apxLostDismiss(id) { try { await _apxPost('/api/agent-approvals', 'skip-ready', { ready_id: id }); _apxRemove(id); _apxToast('Dismissed', true); } catch (e) { _apxToast(_apxErr(e), false); } }
+function _apxLostDismiss(id) { _hawkDefer({ cardId: 'apx-' + id, label: 'Dismissed', restore: _apxRender, run: async () => { await _apxPost('/api/agent-approvals', 'skip-ready', { ready_id: id }); _apxRemove(id); _apxToast('Dismissed', true); } }); }
 // Abandon a suggested-lost lead: remove from the pipeline with NO nurture and no
 // closing message (vs Mark Lost, which enrolls them in the nurture automation).
-async function _apxLostAbandon(id) {
+function _apxLostAbandon(id) {
   const r = _APX_DATA.lost.find(x => x.id === id); if (!r) return;
-  _plConfirmModal({
-    icon: '🗑',
-    title: 'Abandon ' + (r.contact_name || 'this lead') + '?',
-    body: 'Removes them from the pipeline. No nurture automation, no message sent.',
-    okLabel: 'Abandon',
-    onOk: async () => {
-      try { await _apxPost('/api/agent-approvals', 'confirm-abandoned', { ready_id: r.id }); _apxRemove(id); _apxToast('🗑 Abandoned', true); }
-      catch (e) { _apxToast(_apxErr(e), false); }
-    },
-  });
+  _hawkDefer({ cardId: 'apx-' + id, label: 'Abandoned', restore: _apxRender, run: async () => {
+    await _apxPost('/api/agent-approvals', 'confirm-abandoned', { ready_id: r.id }); _apxRemove(id); _apxToast('🗑 Abandoned', true);
+  } });
 }
 
 // A blue "booking request" card. The lead confirmed a slot; confirming creates
@@ -25166,21 +25132,13 @@ function _apxBookCard(r) {
     </div>
   </div>`;
 }
-async function _apxBookConfirm(id) {
+function _apxBookConfirm(id) {
   const r = (_APX_DATA.book || []).find(x => x.id === id); if (!r) return;
-  const when = _apxBookSlotStr(r.book_slot_at);
-  _plConfirmModal({
-    icon: '📅',
-    title: 'Book ' + (r.contact_name || 'this lead') + '?',
-    body: 'This creates the real GHL appointment for <b>' + escapeHTML(r.book_group || 'the trial') + '</b> on <b>' + escapeHTML(when) + '</b>. GHL sends the confirmation automatically.',
-    okLabel: 'Book it',
-    onOk: async () => {
-      try { await _apxPost('/api/agent-approvals', 'confirm-book', { ready_id: r.id }); _apxRemove(id); _apxToast('📅 Booked!', true); }
-      catch (e) { _apxToast(_apxErr(e), false); }
-    },
-  });
+  _hawkDefer({ cardId: 'apx-' + id, label: 'Booked', restore: _apxRender, run: async () => {
+    await _apxPost('/api/agent-approvals', 'confirm-book', { ready_id: r.id }); _apxRemove(id); _apxToast('📅 Booked!', true);
+  } });
 }
-async function _apxBookSkip(id) { try { await _apxPost('/api/agent-approvals', 'skip-ready', { ready_id: id }); _apxRemove(id); _apxToast('Skipped', true); } catch (e) { _apxToast(_apxErr(e), false); } }
+function _apxBookSkip(id) { _hawkDefer({ cardId: 'apx-' + id, label: 'Skipped', restore: _apxRender, run: async () => { await _apxPost('/api/agent-approvals', 'skip-ready', { ready_id: id }); _apxRemove(id); _apxToast('Skipped', true); } }); }
 
 // A gold "went quiet" card. The lead hasn't replied in ~a day. The recommended
 // action is Send to Ghosted (enroll in the academy's ghosted automation + move to
