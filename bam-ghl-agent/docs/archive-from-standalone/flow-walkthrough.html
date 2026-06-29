@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>End-to-End Flow — Walkthrough</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet" />
+<style>
+  :root{
+    --bg:#0F0E0C; --surface:#1A1813; --surface-2:#211E18; --chrome:#26221A;
+    --border:rgba(255,255,255,.10); --border-soft:rgba(255,255,255,.06);
+    --text:#F2EFE6; --sub:#B7B2A4; --mute:#827D70;
+    --gold:#E8C547; --red:#ED7969; --blue:#7E9CD9; --green:#7ED996;
+    --display:'Space Grotesk',system-ui,sans-serif; --body:'Inter',system-ui,sans-serif; --mono:'JetBrains Mono',monospace;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--text);font-family:var(--body);line-height:1.55;padding:0 18px 100px;background-image:radial-gradient(circle at 50% -8%,rgba(232,197,71,.06),transparent 55%)}
+  .wrap{max-width:780px;margin:0 auto}
+  header{padding:56px 0 28px}
+  .kicker{font-family:var(--mono);font-size:12px;letter-spacing:.26em;text-transform:uppercase;color:var(--gold);margin-bottom:14px}
+  h1{font-family:var(--display);font-weight:600;font-size:34px;letter-spacing:-.02em;margin-bottom:10px}
+  .lede{font-size:17px;color:var(--sub);max-width:600px}
+  .legend{display:flex;flex-wrap:wrap;gap:8px;margin-top:18px}
+  .legend .who{font-size:12px;font-weight:600;padding:4px 11px;border-radius:999px;border:1px solid var(--border)}
+  .w-client{color:#9FD0F0;border-color:rgba(159,208,240,.4)!important}
+  .w-content{color:#F6A6D2;border-color:rgba(246,166,210,.4)!important}
+  .w-mktg{color:var(--gold);border-color:rgba(232,197,71,.45)!important}
+
+  /* Stage */
+  .stage{margin-top:40px}
+  .stage-head{display:flex;align-items:baseline;gap:12px;margin-bottom:6px}
+  .stage-num{font-family:var(--display);font-size:13px;font-weight:700;color:#0B0B0D;background:var(--gold);width:26px;height:26px;border-radius:7px;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0}
+  .stage-title{font-family:var(--display);font-size:21px;font-weight:600}
+  .stage-cap{color:var(--sub);font-size:14px;margin:4px 0 14px 38px}
+  .stage-cap b{color:var(--text)}
+  .arrow-down{text-align:center;color:var(--gold);font-size:22px;margin:14px 0 0}
+
+  /* Fake app window */
+  .screen{background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden;box-shadow:0 12px 40px rgba(0,0,0,.35)}
+  .chrome{display:flex;align-items:center;gap:10px;background:var(--chrome);padding:9px 14px;border-bottom:1px solid var(--border)}
+  .dots{display:flex;gap:6px}
+  .dots i{width:10px;height:10px;border-radius:50%;display:block;background:#3a352b}
+  .chrome .role{font-size:12px;font-weight:700}
+  .chrome .page{font-family:var(--mono);font-size:11px;color:var(--mute);margin-left:auto;letter-spacing:.08em}
+  .body{padding:18px}
+
+  /* Bits */
+  .chip{display:inline-flex;align-items:center;gap:4px;font-family:var(--mono);font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;padding:3px 9px;border-radius:999px;white-space:nowrap}
+  .c-high{color:var(--red);border:1px solid var(--red);background:rgba(237,121,105,.12)}
+  .c-norm{color:var(--blue);border:1px solid var(--blue);background:rgba(126,156,217,.12)}
+  .c-active{color:var(--green);border:1px solid var(--green);background:rgba(126,217,150,.12)}
+  .c-gold{color:var(--gold);border:1px solid var(--gold);background:rgba(232,197,71,.12)}
+  .c-mute{color:var(--mute);border:1px solid var(--border)}
+  .due{font-size:12px;font-weight:600;color:var(--mute)}
+  .label{font-family:var(--mono);font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--mute);margin-bottom:10px}
+  .row{display:flex;align-items:center;gap:12px;padding:12px 14px;border:1px solid var(--border);border-radius:8px;background:var(--surface-2);margin-bottom:8px}
+  .row.urgent{border-left:3px solid var(--red)}
+  .code{font-family:var(--mono);font-size:10px;color:var(--mute);padding:2px 6px;border-radius:4px;background:rgba(255,255,255,.04);border:1px solid var(--border)}
+  .row .who2{font-weight:600;flex:1;min-width:0}
+  .row .who2 small{display:block;font-weight:400;color:var(--mute);font-size:12px;margin-top:1px}
+  .row .meta{display:flex;flex-direction:column;align-items:flex-end;gap:5px}
+
+  .kv{display:flex;gap:14px;padding:9px 0;border-bottom:1px solid var(--border-soft)}
+  .kv:last-child{border-bottom:0}
+  .kv .k{font-family:var(--mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--mute);width:120px;flex-shrink:0;padding-top:3px}
+  .kv .v{flex:1;min-width:0;font-size:14px}
+  .kv .v a{color:var(--gold);text-decoration:none}
+
+  .files{display:flex;flex-wrap:wrap;gap:10px;margin-top:4px}
+  .tile{width:96px;border:1px solid var(--border);border-radius:8px;background:var(--surface-2);padding:8px;text-align:center}
+  .tile .thumb{height:60px;border-radius:5px;display:flex;align-items:center;justify-content:center;font-size:26px;margin-bottom:6px}
+  .tile .nm{font-size:10px;color:var(--sub);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .tile.final{border-color:rgba(232,197,71,.4)}
+  .tile .tag{font-size:9px;color:var(--gold);font-weight:700;letter-spacing:.08em;text-transform:uppercase;margin-top:2px}
+
+  .btns{display:flex;flex-wrap:wrap;gap:8px;margin-top:16px;justify-content:flex-end}
+  .btn{font-family:var(--body);font-size:12px;font-weight:600;padding:9px 16px;border-radius:7px;border:1px solid var(--border);color:var(--sub);background:transparent}
+  .btn.primary{background:var(--gold);color:#0B0B0D;border:0;font-weight:700}
+  .btn.danger{color:var(--red);border-color:rgba(237,121,105,.5)}
+
+  .field{margin-bottom:14px}
+  .field .fl{font-family:var(--mono);font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--mute);margin-bottom:5px}
+  .field .fv{background:var(--surface-2);border:1px solid var(--border);border-radius:7px;padding:10px 12px;font-size:14px}
+  .check{display:flex;align-items:center;gap:9px;background:rgba(232,197,71,.06);border:1px solid rgba(232,197,71,.32);border-radius:8px;padding:10px 12px;font-size:13px}
+  .check .box{width:17px;height:17px;border-radius:4px;background:var(--gold);color:#0B0B0D;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;flex-shrink:0}
+
+  .callout{display:flex;gap:11px;background:var(--surface-2);border:1px solid var(--border);border-left:3px solid var(--blue);border-radius:8px;padding:12px 14px;font-size:13px;color:var(--sub);margin-top:14px}
+  .callout b{color:var(--text)}
+  .slackmsg{display:flex;gap:10px;align-items:flex-start;background:#1a1d21;border:1px solid var(--border);border-radius:8px;padding:12px 14px;margin-top:6px}
+  .slackmsg .av{width:30px;height:30px;border-radius:6px;background:var(--gold);color:#0B0B0D;font-weight:800;display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0}
+  .slackmsg .nm{font-weight:700;font-size:13px}
+  .slackmsg .bd{font-size:13px;color:var(--sub);margin-top:2px}
+  .meta-ad{border:1px solid var(--border);border-radius:10px;overflow:hidden;max-width:280px}
+  .meta-ad .top{display:flex;align-items:center;gap:8px;padding:9px 11px;font-size:12px}
+  .meta-ad .ph{height:150px;background:linear-gradient(135deg,#2a2620,#1c1916);display:flex;align-items:center;justify-content:center;font-size:34px}
+  .meta-ad .cta{padding:10px 11px;font-size:12px;color:var(--sub);border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:center}
+  footer{margin-top:48px;text-align:center;color:var(--mute);font-size:13px}
+  @media(max-width:560px){h1{font-size:27px}.kv{flex-direction:column;gap:3px}.kv .k{width:auto}.stage-cap{margin-left:0}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div class="kicker">FullControl · Marketing</div>
+    <h1>The flow, screen by screen</h1>
+    <p class="lede">One campaign — "Supreme Hoops · Summer Camp 2026" — from the client's first click to the ad going live on Meta. Fake data, real screens.</p>
+    <div class="legend">
+      <span class="who w-client">👤 Client (Supreme Hoops)</span>
+      <span class="who w-content">🎬 Content team (Ximena)</span>
+      <span class="who w-mktg">📣 Marketing (Cam)</span>
+    </div>
+  </header>
+
+  <!-- 1 -->
+  <div class="stage">
+    <div class="stage-head"><span class="stage-num">1</span><span class="stage-title">Client adds content</span></div>
+    <div class="stage-cap">On their <b>Marketing page</b>, the client starts a <b>new campaign</b> (or hits "Add creative" on an existing one). They set a budget and drop their raw assets.</div>
+    <div class="screen">
+      <div class="chrome"><span class="dots"><i></i><i></i><i></i></span><span class="role w-client">👤 Supreme Hoops</span><span class="page">MARKETING · NEW CAMPAIGN</span></div>
+      <div class="body">
+        <div class="field"><div class="fl">Offer</div><div class="fv">Summer Camp 2026</div></div>
+        <div class="field"><div class="fl">Monthly budget</div><div class="fv" style="color:var(--gold);font-weight:600">$1,500</div></div>
+        <div class="field"><div class="fl">Your assets</div>
+          <div class="files">
+            <div class="tile"><div class="thumb" style="background:#23201a">🎬</div><div class="nm">court-action.mp4</div></div>
+            <div class="tile"><div class="thumb" style="background:#23201a">🖼</div><div class="nm">team-logo.png</div></div>
+            <div class="tile"><div class="thumb" style="background:#23201a">📄</div><div class="nm">schedule.pdf</div></div>
+          </div>
+        </div>
+        <div class="check"><span class="box">✓</span><span><b style="color:var(--text)">⚡ Marked urgent</b> — camp starts in 2 weeks (3-day turnaround instead of 5)</span></div>
+        <div class="btns"><span class="btn">Back</span><span class="btn primary">Submit Request →</span></div>
+      </div>
+    </div>
+  </div>
+  <div class="arrow-down">↓</div>
+
+  <!-- 2 -->
+  <div class="stage">
+    <div class="stage-head"><span class="stage-num">2</span><span class="stage-title">It lands with the content team</span></div>
+    <div class="stage-cap">The submission becomes a <b>content ticket</b>. Owned by <b>Cam</b>, with the client's SM (<b>Alex Silva</b>) shown as the contact. The content team turns the raw assets into finished creative.</div>
+    <div class="screen">
+      <div class="chrome"><span class="dots"><i></i><i></i><i></i></span><span class="role w-content">🎬 Content team</span><span class="page">CONTENT · ACTIVE</span></div>
+      <div class="body">
+        <div class="label">Active content tickets</div>
+        <div class="row urgent">
+          <span class="code">SUP</span>
+          <div class="who2">Supreme Hoops<small>Summer Camp 2026 · 🎬 Video</small></div>
+          <div class="meta"><span class="chip c-high">⚡ High</span><span class="chip c-active">Active</span></div>
+        </div>
+        <div class="kv" style="margin-top:14px"><div class="k">Owner</div><div class="v"><span class="chip c-gold">👤 Cam</span></div></div>
+        <div class="kv"><div class="k">SM contact</div><div class="v">Alex Silva</div></div>
+        <div class="kv"><div class="k">Client said</div><div class="v" style="color:var(--sub);font-style:italic">"New summer camp push — want high energy, lots of game footage."</div></div>
+        <div class="kv"><div class="k">Raw files</div><div class="v"><div class="files">
+          <div class="tile"><div class="thumb" style="background:#23201a">🎬</div><div class="nm">court-action.mp4</div></div>
+          <div class="tile"><div class="thumb" style="background:#23201a">🖼</div><div class="nm">team-logo.png</div></div>
+          <div class="tile"><div class="thumb" style="background:#23201a">📄</div><div class="nm">schedule.pdf</div></div>
+        </div></div></div>
+      </div>
+    </div>
+  </div>
+  <div class="arrow-down">↓</div>
+
+  <!-- 3 -->
+  <div class="stage">
+    <div class="stage-head"><span class="stage-num">3</span><span class="stage-title">Content sends it to marketing</span></div>
+    <div class="stage-cap">Ximena uploads the <b>finished creatives</b> and hits <b>Send to Marketing</b>. <span style="color:var(--mute)">(If she needed something from the client first, she could hit "Request Client Action" — see stage 5.)</span></div>
+    <div class="screen">
+      <div class="chrome"><span class="dots"><i></i><i></i><i></i></span><span class="role w-content">🎬 Content team</span><span class="page">CONTENT · TICKET SUP</span></div>
+      <div class="body">
+        <div class="label">Finals</div>
+        <div class="files">
+          <div class="tile final"><div class="thumb" style="background:#262019">🎬</div><div class="nm">camp-16x9.mp4</div><div class="tag">Final</div></div>
+          <div class="tile final"><div class="thumb" style="background:#262019">🎬</div><div class="nm">camp-story.mp4</div><div class="tag">Final</div></div>
+        </div>
+        <div class="btns"><span class="btn">Request Client Action</span><span class="btn primary">📤 Send to Marketing</span></div>
+      </div>
+    </div>
+  </div>
+  <div class="arrow-down">↓</div>
+
+  <!-- 4 -->
+  <div class="stage">
+    <div class="stage-head"><span class="stage-num">4</span><span class="stage-title">It hits Cam's marketing board</span></div>
+    <div class="stage-cap">Auto-sorted <b>urgent-first</b> with a deadline. Supreme Hoops jumps to the top with a red edge.</div>
+    <div class="screen">
+      <div class="chrome"><span class="dots"><i></i><i></i><i></i></span><span class="role w-mktg">📣 Marketing · Cam</span><span class="page">MARKETING · SORT: PRIORITY</span></div>
+      <div class="body">
+        <div class="row urgent">
+          <span class="code">SUP</span>
+          <div class="who2">Supreme Hoops<small>🚀 New campaign · Summer Camp 2026</small></div>
+          <div class="meta"><span class="chip c-high">⚡ High</span><span class="due">Due in 3 biz days</span></div>
+        </div>
+        <div class="row">
+          <span class="code">NIC</span>
+          <div class="who2">Nico Brooks<small>➕ Add creative · Fall Clinic</small></div>
+          <div class="meta"><span class="chip c-norm">Normal</span><span class="due">Due in 5 biz days</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="arrow-down">↓</div>
+
+  <!-- 5 -->
+  <div class="stage">
+    <div class="stage-head"><span class="stage-num">5</span><span class="stage-title">Cam opens it → the full brief</span></div>
+    <div class="stage-cap">Everything in one place: the client, their site + landing page, the offer, and the final creatives. <b>Either team can Request Client Action</b> at any point — the ticket then waits on the client.</div>
+    <div class="screen">
+      <div class="chrome"><span class="dots"><i></i><i></i><i></i></span><span class="role w-mktg">📣 Marketing · Cam</span><span class="page">MARKETING · TICKET SUP</span></div>
+      <div class="body">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">
+          <div style="font-family:var(--display);font-size:18px;font-weight:600">🚀 New campaign</div>
+          <span class="chip c-high">⚡ High</span><span class="due">Due in 3 biz days</span>
+        </div>
+        <div class="label">Client</div>
+        <div class="kv"><div class="k">Client</div><div class="v"><b>Supreme Hoops</b></div></div>
+        <div class="kv"><div class="k">Assigned SM</div><div class="v">Alex Silva</div></div>
+        <div class="kv"><div class="k">Client site</div><div class="v"><a>supremehoops.com ↗</a></div></div>
+        <div class="kv"><div class="k">Landing page</div><div class="v"><a>supremehoops.com/summer-camp ↗</a></div></div>
+        <div class="kv"><div class="k">Offer</div><div class="v">Summer Camp 2026</div></div>
+        <div class="label" style="margin-top:16px">Final creatives</div>
+        <div class="files">
+          <div class="tile final"><div class="thumb" style="background:#262019">🎬</div><div class="nm">camp-16x9.mp4</div><div class="tag">Final</div></div>
+          <div class="tile final"><div class="thumb" style="background:#262019">🎬</div><div class="nm">camp-story.mp4</div><div class="tag">Final</div></div>
+        </div>
+        <div class="callout"><span>↔</span><div><b>Need something from the client?</b> Hit "Request Client Action" (e.g. <i>"Confirm the camp dates — Jul 8–12?"</i>). They get prompted in their portal and the ticket pauses until they reply.</div></div>
+        <div class="btns"><span class="btn danger">↩ Request Content Revision</span><span class="btn">Request Client Action</span><span class="btn primary">✓ Mark Completed</span></div>
+      </div>
+    </div>
+  </div>
+  <div class="arrow-down">↓</div>
+
+  <!-- 6 -->
+  <div class="stage">
+    <div class="stage-head"><span class="stage-num">6</span><span class="stage-title">Cam posts on Meta → marks it done</span></div>
+    <div class="stage-cap">Cam launches the ad in <b>Meta Ads Manager</b> (this part is manual), then hits <b>Mark Completed</b> in the portal. The client gets a ✅ in their Slack channel.</div>
+    <div class="screen">
+      <div class="chrome"><span class="dots"><i></i><i></i><i></i></span><span class="role w-mktg">📣 Marketing · Cam</span><span class="page">META ADS MANAGER</span></div>
+      <div class="body">
+        <div class="meta-ad">
+          <div class="top"><span style="width:22px;height:22px;border-radius:50%;background:var(--gold);color:#0B0B0D;display:inline-flex;align-items:center;justify-content:center;font-weight:800;font-size:11px">SH</span><div><div style="font-weight:600">Supreme Hoops</div><div style="font-size:10px;color:var(--mute)">Sponsored</div></div></div>
+          <div class="ph">🏀</div>
+          <div class="cta"><span>Summer Camp 2026 — limited spots</span><span class="chip c-active" style="font-size:9px">● Live</span></div>
+        </div>
+        <div style="font-size:13px;color:var(--sub);margin:14px 0 4px">Budget $1,500/mo · status <b style="color:var(--green)">Active</b></div>
+        <div class="btns"><span class="btn primary">✓ Mark Completed in portal</span></div>
+      </div>
+    </div>
+    <div style="margin-top:10px" class="screen">
+      <div class="chrome"><span class="dots"><i></i><i></i><i></i></span><span class="role w-client">👤 Supreme Hoops</span><span class="page">SLACK · #supreme-hoops</span></div>
+      <div class="body" style="padding:14px">
+        <div class="slackmsg"><span class="av">B</span><div><div class="nm">BAM Portal <span style="color:var(--mute);font-weight:400;font-size:11px">· now</span></div><div class="bd">✅ Completed — Marketing [SUP] · Your Summer Camp 2026 campaign is live.</div></div></div>
+      </div>
+    </div>
+  </div>
+
+  <footer>
+    That's the whole loop: <b style="color:var(--text)">client → content → marketing → Meta</b>.<br/>
+    Fake data for illustration · FullControl
+  </footer>
+
+</div>
+</body>
+</html>
