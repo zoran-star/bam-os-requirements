@@ -23625,9 +23625,10 @@ function _renderPipelineBoard() {
     // last 5 days - they've fallen out of (or were never in) an active messaging
     // automation, i.e. nobody's contacted them. Uses _PL_LASTMSG (GHL inbox list);
     // a lead not seen there at all counts as not-recently-contacted.
+    let _noContact = false;
     if (_PL_LASTMSG && stage && /interest/i.test(stage.name || '')) {
       const _ageMs = (_lastMsg && _lastMsg.date) ? (Date.now() - new Date(_lastMsg.date).getTime()) : Infinity;
-      if (_ageMs > 5 * 86400 * 1000) glow = 'box-shadow:0 0 0 1px #e0654f,0 0 20px rgba(224,90,66,0.6);border-color:#e0654f;';
+      if (_ageMs > 5 * 86400 * 1000) { glow = 'box-shadow:0 0 0 1px #e0654f,0 0 20px rgba(224,90,66,0.6);border-color:#e0654f;'; _noContact = true; }
     }
     // Responded-stage status: 🔴 Needs action when a Hawkeye card is waiting,
     // labelled by what the action is (reply / ghost / confirm lost / book). 🟢 All
@@ -23656,8 +23657,9 @@ function _renderPipelineBoard() {
            ondragstart="_plDragStart(event,'${escapeHTML(o.id)}','${escapeHTML(o.stageId || '')}','${escapeHTML(p.id)}')"
            ondragend="_plDragEnd(event)"
            onclick="_plOpenCard('${escapeHTML(o.id)}')">
+        ${_noContact ? `<span class="pl-card-alert" title="No contact in 5+ days - nobody's working this lead. Open the card to send them to the Ghosted automation." style="position:absolute;top:8px;right:8px;width:19px;height:19px;border-radius:50%;background:#e0654f;color:#fff;font-size:12px;font-weight:800;line-height:1;display:flex;align-items:center;justify-content:center;z-index:2;box-shadow:0 0 10px rgba(224,90,66,0.7)">!</span>` : ''}
         ${(_PL_DUPS && _PL_DUPS.has(o.id)) ? `<button onclick="event.stopPropagation(); _plResolveDup('${escapeHTML(o.id)}')" title="Possible duplicate - tap to resolve" style="width:100%;box-sizing:border-box;margin-bottom:7px;background:rgba(224,90,66,0.12);color:#e0654f;border:1px solid #e0654f;border-radius:6px;padding:4px 8px;font-size:11px;font-weight:700;cursor:pointer;text-align:center">⚠ Possible duplicate</button>` : ''}
-        <div class="pl-card-name" style="padding-right:8px"><span class="pl-card-tag">Parent</span> ${escapeHTML(parent)}</div>
+        <div class="pl-card-name" style="padding-right:${_noContact ? '26px' : '8px'}"><span class="pl-card-tag">Parent</span> ${escapeHTML(parent)}</div>
         <div class="pl-card-contact"><span class="pl-card-tag">Athlete</span> ${o.athlete ? escapeHTML(o.athlete) : '<span style="opacity:0.5">-</span>'}</div>
         ${o.trainer ? `<div class="pl-card-coach"><span class="pl-card-tag">Coach</span> ${escapeHTML(o.trainer)}</div>` : ''}
         ${_isResp ? '' /* Responded: no trial line on the card - it lives in the drawer's journey/details. */
