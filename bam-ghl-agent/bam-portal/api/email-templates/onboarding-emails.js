@@ -96,7 +96,7 @@ const welcome = HEAD("By Any Means - Welcome", "You're in. Everything you need t
       <tr><td style="padding:6px 36px 8px;">`
   + P("<b style=\"color:#0A0A0A;\">1. Join the WhatsApp group</b> for schedule updates and announcements: <a href=\"https://chat.whatsapp.com/J5tq7Sn5EF0DJ1rFsqBO9v?mode=gi_t\" style=\"color:#0A0A0A;font-weight:600;\">tap to join</a>.", 14)
   + P("<b style=\"color:#0A0A0A;\">2. Access the online programs</b> any time at <a href=\"https://byanymeanstoronto.ca/online-programs\" style=\"color:#0A0A0A;font-weight:600;\">byanymeanstoronto.ca/online-programs</a>.", 14)
-  + P("<b style=\"color:#0A0A0A;\">3. Follow along</b> - Coach Zoran on <a href=\"https://www.instagram.com/byanymeanszoran/\" style=\"color:#0A0A0A;font-weight:600;\">Instagram</a> and our <a href=\"https://www.instagram.com/byanymeanstoronto/\" style=\"color:#0A0A0A;font-weight:600;\">general page</a>.", 14)
+  + P("<b style=\"color:#0A0A0A;\">3. Follow along</b> - Coach Zoran on <a href=\"https://www.instagram.com/byanymeanszoran/\" style=\"color:#0A0A0A;font-weight:600;\">Instagram</a>, Coach Adrian on <a href=\"https://www.instagram.com/byanymeansadrian/\" style=\"color:#0A0A0A;font-weight:600;\">Instagram</a>, and our <a href=\"https://www.instagram.com/byanymeanstoronto/\" style=\"color:#0A0A0A;font-weight:600;\">general page</a>.", 14)
   + P("<b style=\"color:#0A0A0A;\">4. Bring a friend</b> to training and you both get a free month plus some merch (<a href=\"https://byanymeansgsc.com\" style=\"color:#0A0A0A;font-weight:600;\">check out the merch</a>).", 14)
   + P("<b style=\"color:#0A0A0A;\">5. Need anything?</b> Reach the coaches at <a href=\"tel:+12898166569\" style=\"color:#0A0A0A;font-weight:600;\">(289) 816-6569</a>.", 26)
   + CTA("https://chat.whatsapp.com/J5tq7Sn5EF0DJ1rFsqBO9v?mode=gi_t", "Join the WhatsApp group")
@@ -136,7 +136,7 @@ const training = HEAD("By Any Means - Make Training Count", "Three habits that s
   + `      </td></tr>
       <tr><td style="padding:18px 36px 8px;">`
   + P("Want to level up faster? Watch as many By Any Means videos as you can. Here is one of our most popular from the Attention to Detail series:", 16)
-  + `        <a href="https://www.youtube.com/watch?v=${VIDEO_ID}" style="text-decoration:none;"><img src="https://img.youtube.com/vi/${VIDEO_ID}/maxresdefault.jpg" width="528" alt="Attention to Detail - watch on YouTube" style="display:block;width:100%;max-width:528px;height:auto;border:0;margin:0 0 4px;"></a>
+  + `        <a href="https://www.youtube.com/watch?v=${VIDEO_ID}" style="text-decoration:none;"><img src="https://img.youtube.com/vi/${VIDEO_ID}/hqdefault.jpg" width="528" alt="Attention to Detail - watch on YouTube" style="display:block;width:100%;max-width:528px;height:auto;border:0;margin:0 0 4px;"></a>
       </td></tr>
       <tr><td style="padding:8px 36px 8px;">`
   + CTA(`https://www.youtube.com/watch?v=${VIDEO_ID}`, "Watch the video")
