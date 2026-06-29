@@ -28,10 +28,9 @@ import { loadMergedOverrides, loadGlobalSections, isGlobalSection, canEditGlobal
 
 // Which agent is being trained: booking | confirm | closing. Defaults to booking.
 const pickAgent = (a) => (a && AGENT_SPECS[a]) ? a : "booking";
-// Lessons + examples are a BOOKING-only training surface; confirm/closing train
-// via their Brain (Knowledge) sections + the Test sandbox, not booking-flavored
-// lessons. Keep that boundary so a booking lesson never bleeds onto another agent.
-const lessonsAllowed = (agent) => agent === "booking";
+// Lessons AND saved examples are now per-agent (booking/confirm/closing): each is
+// stored with its `agent` and only that agent ever loads it, so a booking lesson
+// or example never bleeds the wrong tone into a confirm/closing chat.
 
 const SUPABASE_URL         = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
@@ -100,9 +99,9 @@ async function sectionOverrides(clientId) {
   try { return await loadMergedOverrides(clientId); }
   catch (_) { return {}; }
 }
-async function savedExamples(clientId) {
+async function savedExamples(clientId, agent = "booking") {
   try {
-    const rows = await sb(`agent_examples?client_id=eq.${clientId}&select=parent_text,agent_text&order=created_at.asc`);
+    const rows = await sb(`agent_examples?client_id=eq.${clientId}&agent=eq.${agent}&select=parent_text,agent_text&order=created_at.asc`);
     return Array.isArray(rows) ? rows : [];
   } catch (_) { return []; }
 }
@@ -144,12 +143,13 @@ function buildSystem(lessons, overrides, examples, leadContext, agent = "booking
 async function handleChat(messages, clientId, leadContext, res, agent = "booking") {
   if (!ANTHROPIC_KEY) return res.status(500).json({ error: "ANTHROPIC_API_KEY not configured" });
   if (!Array.isArray(messages) || !messages.length) return res.status(400).json({ error: "messages required" });
-  // Each agent previews from ITS OWN lessons (booking/confirm/closing, scoped). Saved
-  // examples stay a booking-only surface for now.
+  // Each agent previews from ITS OWN lessons AND its OWN saved examples
+  // (booking/confirm/closing, scoped) so a booking example never bleeds into a
+  // confirm/closing preview and vice versa.
   const [lessons, overrides, examples] = await Promise.all([
     activeLessons(clientId, agent),
     sectionOverrides(clientId),
-    agent === "booking" ? savedExamples(clientId) : Promise.resolve([]),
+    savedExamples(clientId, agent),
   ]);
   const system = buildSystem(lessons, overrides, examples, leadContext, agent);
   const msgs = messages.filter(m => m && typeof m.text === "string" && m.text.trim() !== "")
@@ -221,11 +221,6 @@ async function handler(req, res) {
       return await handleChat(b.messages, clientId, b.lead_context || "", res, pickAgent(b.agent));
     }
 
-    // Saved examples stay a booking-only surface; lessons are now per-agent (below).
-    if (b.action === "save-example" && pickAgent(b.agent) !== "booking") {
-      return res.status(400).json({ error: "Saved examples are for the booking agent. Train this agent in Lessons + Knowledge + Test." });
-    }
-
     if (b.action === "teach") {
       if (!b.lesson || !String(b.lesson).trim()) return res.status(400).json({ error: "lesson text required" });
       const text = String(b.lesson).trim();
@@ -252,7 +247,7 @@ async function handler(req, res) {
       if (!b.parent_text || !b.agent_text) return res.status(400).json({ error: "parent_text and agent_text required" });
       const [row] = await sb(`agent_examples`, {
         method: "POST", headers: { Prefer: "return=representation" },
-        body: JSON.stringify([{ client_id: clientId, parent_text: String(b.parent_text), agent_text: String(b.agent_text), created_by: ctx.user.email || "client-trainer" }]),
+        body: JSON.stringify([{ client_id: clientId, agent: pickAgent(b.agent), parent_text: String(b.parent_text), agent_text: String(b.agent_text), created_by: ctx.user.email || "client-trainer" }]),
       });
       return res.status(200).json({ ok: true, example: row });
     }

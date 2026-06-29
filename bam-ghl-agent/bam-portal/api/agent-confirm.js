@@ -82,11 +82,12 @@ async function loadClient(clientId) {
 // booking agent's lessons/examples (those are booking-flavored and would bleed the
 // wrong behavior into a confirmation chat).
 async function loadConfig(clientId) {
-  const [overrides, lessonRows] = await Promise.all([
+  const [overrides, lessonRows, exRows] = await Promise.all([
     loadMergedOverrides(clientId),   // global brain (general/goal) + this academy's own (location/offer)
     sb(`agent_lessons?client_id=eq.${clientId}&agent=eq.confirm&active=eq.true&select=lesson,kind&order=created_at.asc`).catch(() => []),
+    sb(`agent_examples?client_id=eq.${clientId}&agent=eq.confirm&select=parent_text,agent_text&order=created_at.asc`).catch(() => []),
   ]);
-  return { lessons: Array.isArray(lessonRows) ? lessonRows : [], overrides, examples: [] };
+  return { lessons: Array.isArray(lessonRows) ? lessonRows : [], overrides, examples: Array.isArray(exRows) ? exRows : [] };
 }
 
 const CONFIRM_TRAILER =

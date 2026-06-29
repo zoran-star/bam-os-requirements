@@ -111,9 +111,9 @@ const REPLY_TOOL = {
   },
 };
 
-async function savedExamples(clientId) {
+async function savedExamples(clientId, agent = "booking") {
   try {
-    const rows = await sb(`agent_examples?client_id=eq.${clientId}&select=parent_text,agent_text&order=created_at.asc`);
+    const rows = await sb(`agent_examples?client_id=eq.${clientId}&agent=eq.${agent}&select=parent_text,agent_text&order=created_at.asc`);
     return Array.isArray(rows) ? rows : [];
   } catch (_) { return []; }
 }
@@ -122,12 +122,12 @@ async function handleChat(messages, clientId, leadContext, res, agent = "booking
   if (!ANTHROPIC_KEY) return res.status(500).json({ error: "ANTHROPIC_API_KEY not configured on server" });
   if (!Array.isArray(messages) || !messages.length) return res.status(400).json({ error: "messages required" });
 
-  // The confirm agent (Scheduled-Trial) is academy-agnostic in behavior and does NOT
-  // use the booking agent's lessons/examples — preview it from the clean brain +
-  // section overrides only, exactly like it runs live.
+  // The confirm agent (Scheduled-Trial) does NOT use the booking agent's lessons,
+  // but every agent now previews from ITS OWN saved examples (agent-scoped), exactly
+  // like it runs live - so a booking example never bleeds into a confirm/closing test.
   const isConfirm = agent === "confirm";
   const [lessons, overrides, examples] = await Promise.all([
-    isConfirm ? [] : activeLessons(clientId), sectionOverrides(clientId), isConfirm ? [] : savedExamples(clientId),
+    isConfirm ? [] : activeLessons(clientId), sectionOverrides(clientId), savedExamples(clientId, agent),
   ]);
   const system = buildAgentSystem({ lessons, overrides, examples, leadContext, trailer: SANDBOX_TRAILER, agent });
 
@@ -207,7 +207,7 @@ async function handler(req, res) {
       const [row] = await sb(`agent_examples`, {
         method: "POST", headers: { Prefer: "return=representation" },
         body: JSON.stringify([{
-          client_id: clientId, parent_text: String(b.parent_text), agent_text: String(b.agent_text),
+          client_id: clientId, agent: pickAgent(b.agent), parent_text: String(b.parent_text), agent_text: String(b.agent_text),
           note: b.note || null, created_by: staffEmail,
         }]),
       });
@@ -215,7 +215,7 @@ async function handler(req, res) {
     }
 
     if (action === "examples") {
-      const rows = await sb(`agent_examples?client_id=eq.${clientId}&select=id,parent_text,agent_text,created_at&order=created_at.desc`);
+      const rows = await sb(`agent_examples?client_id=eq.${clientId}&agent=eq.${pickAgent(b.agent)}&select=id,parent_text,agent_text,created_at&order=created_at.desc`);
       return res.status(200).json({ examples: Array.isArray(rows) ? rows : [] });
     }
 
