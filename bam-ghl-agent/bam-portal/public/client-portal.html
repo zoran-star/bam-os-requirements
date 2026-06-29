@@ -7545,6 +7545,31 @@ Then the call to action."]</div>
         </div>
       </div>
       <div class="content">
+        <!-- BAM-staff-only: pipeline cutover (off GHL). Hidden for academy users;
+             shown only to BAM staff via _pcoInit(). Additive + dormant - nothing
+             changes until a staff member uses it. See api/admin/pipeline-cutover.js -->
+        <div id="pco-panel" style="display:none;margin:0 0 16px;border:1px solid var(--border-med);border-radius:8px;background:var(--surface);padding:14px 16px">
+          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+            <span style="font-weight:800;font-size:14px;color:var(--text)">Pipeline cutover (off GHL)</span>
+            <span style="font-size:10px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:var(--accent);border:1px solid var(--accent);border-radius:3px;padding:2px 6px">BAM staff</span>
+            <button onclick="_pcoLoadStatus()" title="Refresh state" style="margin-left:auto;background:transparent;border:1px solid var(--border);color:var(--text-mute);padding:5px 10px;border-radius:4px;cursor:pointer;font-size:12px">↻ Refresh</button>
+          </div>
+          <p style="margin:8px 0 0;font-size:12px;line-height:1.5;color:var(--text-mute)">
+            Cuts this academy's sales board from GoHighLevel over to the portal's own store.
+            The order is: start shadow (dual-write), let it soak, run reconcile until it is clean,
+            then flip to portal. The flip is fully reversible: roll back to GHL is instant.
+          </p>
+          <div id="pco-state" style="margin-top:10px;font-size:12px;color:var(--text)">
+            <span class="req-spin"></span> Loading state…
+          </div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px">
+            <button id="pco-shadow-btn" onclick="_pcoToggleShadow()" disabled style="background:transparent;border:1px solid var(--border);color:var(--text);padding:7px 13px;border-radius:4px;cursor:pointer;font-size:12px;font-weight:700">Start shadow</button>
+            <button id="pco-reconcile-btn" onclick="_pcoReconcile()" disabled style="background:transparent;border:1px solid var(--border);color:var(--text);padding:7px 13px;border-radius:4px;cursor:pointer;font-size:12px;font-weight:700">Run reconcile</button>
+            <button id="pco-flip-btn" onclick="_pcoFlip('portal')" disabled style="background:var(--accent);border:1px solid var(--accent);color:#08080A;padding:7px 13px;border-radius:4px;cursor:not-allowed;font-size:12px;font-weight:700;opacity:.5">Flip to portal</button>
+            <button id="pco-rollback-btn" onclick="_pcoFlip('ghl')" disabled style="background:transparent;border:1px solid var(--border);color:var(--text-mute);padding:7px 13px;border-radius:4px;cursor:pointer;font-size:12px;font-weight:700">Roll back to GHL</button>
+          </div>
+          <div id="pco-report" style="margin-top:12px;font-size:12px;color:var(--text)"></div>
+        </div>
         <div id="pl-pipeline-tabs" class="pl-tabs"></div>
         <div id="pl-board-container">
           <div class="req-empty" style="padding:20px 0"><span class="req-spin"></span>Loading pipelines…</div>
@@ -12005,7 +12030,7 @@ function switchView(name, el) {
   if (name === 'members') fetchAndRenderMembers();
   // 'pricing' view retired 2026-06-10 - price matching lives in BB → Offers.
   if (name === 'inbox')   fetchAndRenderInbox();
-  if (name === 'pipelines') { fetchAndRenderPipelines(); }
+  if (name === 'pipelines') { fetchAndRenderPipelines(); _pcoInit(); }
 
   // When entering Calendar, render the weekly grid (mock data for now)
   if (name === 'calendar') { renderCalendar(); bkFetchAndRender(); }
@@ -22589,6 +22614,183 @@ async function _plLoadAgentMode() {
   if (_PL_AGENT_MODE && _PL_AGENT_MODE !== 'off') { _plLoadNeedsAction(); try { _plScanNow(null, true); } catch (_) {} }   // load badges + auto-scan once the agent is known to be on
   _plLoadLastMessages();   // Done Trial cards: last-message time + lead-last glow
   try { if (typeof _renderPipelineBoard === 'function') _renderPipelineBoard(); } catch (_) {}
+}
+
+// ─────────────────────────────────────────────────────────
+// Pipeline cutover (off GHL) - BAM-staff-only control panel.
+// Talks to /api/admin/pipeline-cutover. Additive + dormant: every academy stays
+// on GHL until a staff member explicitly flips. Flip to portal is gated on a
+// clean reconcile + shadow-on; roll back to GHL is always one click.
+// ─────────────────────────────────────────────────────────
+let _PCO_STATE = null;       // last status payload
+let _PCO_RECON = null;       // last reconcile payload (drift gate for the flip button)
+let _PCO_BUSY  = false;
+
+function _pcoEsc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])); }
+
+// Show the panel only for BAM staff, then load the current state once.
+async function _pcoInit() {
+  try {
+    if (typeof CLIENT_ID === 'undefined' || !CLIENT_ID) return;
+    const isStaff = (typeof _ensureStaffFlag === 'function') ? await _ensureStaffFlag() : (_IS_BAM_STAFF === true);
+    const panel = document.getElementById('pco-panel');
+    if (!panel) return;
+    if (!isStaff) { panel.style.display = 'none'; return; }
+    panel.style.display = '';
+    if (!_PCO_STATE) _pcoLoadStatus();   // first open only; ↻ Refresh re-pulls
+  } catch (_) { /* never block the board */ }
+}
+
+async function _pcoApi(method, action, body) {
+  const token = await _mreqAuthToken();
+  const opts = { method, headers: { Authorization: 'Bearer ' + token } };
+  if (body) { opts.headers['Content-Type'] = 'application/json'; opts.body = JSON.stringify(body); }
+  const r = await fetch(`/api/admin/pipeline-cutover?action=${action}&client_id=${encodeURIComponent(CLIENT_ID)}`, opts);
+  const j = await _safeJson(r);
+  return { ok: r.ok, status: r.status, j: j || {} };
+}
+
+async function _pcoLoadStatus() {
+  const el = document.getElementById('pco-state');
+  if (el) el.innerHTML = '<span class="req-spin"></span> Loading state…';
+  _PCO_RECON = null;   // a fresh status invalidates the previous reconcile gate
+  try {
+    const { ok, j } = await _pcoApi('GET', 'status');
+    if (!ok) { if (el) el.textContent = 'Could not load state: ' + (j.error || 'error'); return; }
+    _PCO_STATE = j;
+    _pcoRenderState();
+  } catch (e) { if (el) el.textContent = 'Could not load state: ' + e.message; }
+}
+
+function _pcoRenderState() {
+  const el = document.getElementById('pco-state');
+  const s = _PCO_STATE;
+  if (!el || !s) return;
+  const onPortal = s.pipeline_provider === 'portal';
+  const provPill = onPortal
+    ? '<span style="font-weight:800;color:var(--accent)">portal</span>'
+    : '<span style="font-weight:800;color:var(--text)">GHL</span>';
+  const shadowPill = s.shadow_column_present === false
+    ? '<span style="color:var(--text-mute)">column not deployed yet</span>'
+    : (s.pipeline_shadow ? '<span style="font-weight:700;color:#7BC47F">on</span>' : '<span style="color:var(--text-mute)">off</span>');
+  const seeded = (s.registry_coverage || []).filter(c => c.seeded).length;
+  el.innerHTML =
+    `System of record: ${provPill} &nbsp;·&nbsp; Shadow (dual-write): ${shadowPill}` +
+    ` &nbsp;·&nbsp; Portal open opps: <b>${s.portal_open_total || 0}</b>` +
+    ` &nbsp;·&nbsp; Registry: <b>${seeded}/7</b> roles seeded`;
+  _pcoRenderButtons();
+}
+
+function _pcoRenderButtons() {
+  const s = _PCO_STATE;
+  const shadowBtn = document.getElementById('pco-shadow-btn');
+  const reconBtn = document.getElementById('pco-reconcile-btn');
+  const flipBtn = document.getElementById('pco-flip-btn');
+  const rollBtn = document.getElementById('pco-rollback-btn');
+  if (!s || !shadowBtn) return;
+  const shadowAvail = s.shadow_column_present !== false;
+  const onPortal = s.pipeline_provider === 'portal';
+
+  // Shadow toggle.
+  shadowBtn.disabled = _PCO_BUSY || !shadowAvail;
+  shadowBtn.textContent = s.pipeline_shadow ? 'Stop shadow' : 'Start shadow';
+  shadowBtn.title = shadowAvail ? '' : 'The dual-write migration has not shipped the pipeline_shadow column yet.';
+
+  // Reconcile is always available to staff (read-only).
+  reconBtn.disabled = _PCO_BUSY;
+
+  // Flip to portal: enabled only when shadow is on AND the last reconcile is clean.
+  const reconClean = !!(_PCO_RECON && _PCO_RECON.clean);
+  const canFlip = !onPortal && s.pipeline_shadow && reconClean && !_PCO_BUSY;
+  flipBtn.disabled = !canFlip;
+  flipBtn.style.cursor = canFlip ? 'pointer' : 'not-allowed';
+  flipBtn.style.opacity = canFlip ? '1' : '.5';
+  flipBtn.title = onPortal ? 'Already on portal.'
+    : !s.pipeline_shadow ? 'Turn shadow on and let it soak first.'
+    : !reconClean ? 'Run reconcile and get a clean result first.'
+    : 'Ready to flip.';
+
+  // Roll back to GHL: enabled whenever on portal (the safety valve).
+  rollBtn.disabled = _PCO_BUSY || !onPortal;
+  rollBtn.style.opacity = onPortal ? '1' : '.5';
+}
+
+async function _pcoToggleShadow() {
+  if (!_PCO_STATE || _PCO_BUSY) return;
+  const turningOn = !_PCO_STATE.pipeline_shadow;
+  _PCO_BUSY = true; _pcoRenderButtons();
+  try {
+    const { ok, j } = await _pcoApi('POST', 'set-shadow', { on: turningOn });
+    if (!ok) { alert('Could not change shadow: ' + (j.error || 'error')); }
+  } catch (e) { alert('Could not change shadow: ' + e.message); }
+  _PCO_BUSY = false;
+  await _pcoLoadStatus();
+}
+
+async function _pcoReconcile() {
+  if (_PCO_BUSY) return;
+  const rep = document.getElementById('pco-report');
+  _PCO_BUSY = true; _pcoRenderButtons();
+  if (rep) rep.innerHTML = '<span class="req-spin"></span> Comparing GHL vs the portal store…';
+  try {
+    const { ok, j } = await _pcoApi('GET', 'reconcile');
+    if (!ok) { if (rep) rep.textContent = 'Reconcile failed: ' + (j.error || 'error'); _PCO_RECON = null; }
+    else { _PCO_RECON = j; _pcoRenderReport(j); }
+  } catch (e) { if (rep) rep.textContent = 'Reconcile failed: ' + e.message; _PCO_RECON = null; }
+  _PCO_BUSY = false;
+  _pcoRenderButtons();
+}
+
+function _pcoRenderReport(j) {
+  const rep = document.getElementById('pco-report');
+  if (!rep) return;
+  const d = j.drift && j.drift.counts ? j.drift.counts : { missing: 0, extra: 0, mismatched: 0, total: 0 };
+  const clean = j.clean;
+  const head = clean
+    ? '<span style="font-weight:800;color:#7BC47F">Clean - no drift.</span> Safe to flip.'
+    : `<span style="font-weight:800;color:#E5897B">${d.total} drift item(s) found.</span> Heal these before flipping (or use force).`;
+  const sample = (arr, label, fmt) => {
+    if (!arr || !arr.length) return '';
+    const rows = arr.slice(0, 8).map(fmt).join('');
+    const more = arr.length > 8 ? `<div style="color:var(--text-mute)">+ ${arr.length - 8} more</div>` : '';
+    return `<div style="margin-top:8px"><div style="font-weight:700;margin-bottom:3px">${label}</div>${rows}${more}</div>`;
+  };
+  const drift = j.drift || {};
+  rep.innerHTML =
+    `<div style="border:1px solid var(--border);border-radius:6px;padding:10px 12px;background:var(--bg)">` +
+    `<div>${head}</div>` +
+    `<div style="margin-top:6px;color:var(--text-mute)">GHL open (mapped): <b>${j.ghl ? j.ghl.open_mapped : 0}</b>` +
+    (j.ghl && j.ghl.open_unmapped ? ` (+${j.ghl.open_unmapped} in unmapped stages)` : '') +
+    ` &nbsp;·&nbsp; Portal open: <b>${j.portal ? j.portal.open_total : 0}</b></div>` +
+    `<div style="margin-top:6px">Missing in portal: <b>${d.missing}</b> &nbsp;·&nbsp; Extra in portal: <b>${d.extra}</b> &nbsp;·&nbsp; Stage mismatch: <b>${d.mismatched}</b></div>` +
+    sample(drift.missing, 'Missing in portal (open in GHL, not mirrored)', m => `<div style="color:var(--text-mute)">· ${_pcoEsc(m.name) || m.ghl_opportunity_id} <span style="opacity:.7">[${_pcoEsc(m.role)}]</span></div>`) +
+    sample(drift.mismatched, 'Stage mismatch (GHL vs portal)', m => `<div style="color:var(--text-mute)">· ${_pcoEsc(m.name) || m.ghl_opportunity_id} <span style="opacity:.7">GHL ${_pcoEsc(m.ghl_role)} / portal ${_pcoEsc(m.portal_role)}</span></div>`) +
+    sample(drift.extra, 'Extra in portal (not open in GHL)', m => `<div style="color:var(--text-mute)">· ${_pcoEsc(m.name) || m.ghl_opportunity_id} <span style="opacity:.7">[${_pcoEsc(m.role)}]</span></div>`) +
+    `</div>`;
+}
+
+async function _pcoFlip(provider) {
+  if (_PCO_BUSY) return;
+  if (provider === 'portal') {
+    if (!confirm('Flip this academy to the portal store?\n\nThe board and agents will read from the portal opportunities store instead of GHL. This is reversible: roll back to GHL is instant.')) return;
+  } else {
+    if (!confirm('Roll back this academy to GHL?\n\nThe board and agents read live from GHL again. Instant and safe.')) return;
+  }
+  _PCO_BUSY = true; _pcoRenderButtons();
+  try {
+    let { ok, status, j } = await _pcoApi('POST', 'flip', { provider });
+    // Guard refusal (412): offer the force override for a near-clean reconcile.
+    if (!ok && status === 412 && provider === 'portal' && j.reason === 'drift') {
+      _PCO_BUSY = false; _pcoRenderButtons();
+      if (confirm((j.message || 'Reconcile is not clean.') + '\n\nForce the flip anyway?')) {
+        _PCO_BUSY = true; _pcoRenderButtons();
+        ({ ok, status, j } = await _pcoApi('POST', 'flip', { provider, force: true }));
+      } else { return; }
+    }
+    if (!ok) { alert('Flip refused: ' + (j.message || j.error || ('status ' + status))); }
+  } catch (e) { alert('Flip failed: ' + e.message); }
+  _PCO_BUSY = false;
+  await _pcoLoadStatus();
 }
 
 async function fetchAndRenderPipelines() {
