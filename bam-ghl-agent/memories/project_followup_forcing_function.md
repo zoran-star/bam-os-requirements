@@ -61,8 +61,14 @@ every lead. Instead: if a lead's quiet ~a day, the action is **Send to Ghosted**
 ## Lost vs Abandon vs Ghost (Zoran's definitions)
 - **Ghost** → enroll in ghosted automation + move to Interested. The default for a
   quiet lead. GHL handles the sequence (reply → Responded, no reply → Lost).
-- **Lost** → mark opp `lost`. GHL's native "Opportunity → Lost" workflow auto-enrolls
-  lead-nurture (no portal enroll). For leads who clearly said no / bad fit.
+- **Lost** → routes to **💔 Lead Nurture when the academy has portal nurture LIVE**:
+  move the opp into the Lead Nurture stage (stays OPEN) + `enrollContact("nurture")`,
+  log a `nurture` outcome. Otherwise falls back to GHL-native status=`lost` (fires the
+  academy's "Opportunity → Lost" workflow). Auto-switches per academy via
+  `isAutomationLive(client,"nurture")` (fails CLOSED → V1 / not-yet-live unaffected).
+  **Both lost paths do this**: the agent's `confirm-lost` (agent-approvals.js) AND a
+  hand "Mark as lost" from the pipeline drawer (`api/ghl/pipelines.js` PATCH status,
+  added 2026-06-29 #879). For leads who clearly said no / bad fit.
 - **Abandon** → remove from pipeline, no nurture, no message.
 
 ## Kept / still legacy
