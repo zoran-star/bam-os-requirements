@@ -9,6 +9,12 @@ the app instantly — no App Store resubmission for content or UI changes.
 You only resubmit the native build for native changes (app icon, push
 notifications, plugins, OS version bumps).
 
+> **Do we need Capgo / OTA? No — not while we're remote-URL.** Capgo only
+> helps *bundled* apps push web updates without review; our remote-URL setup
+> already gets that for free. Full decision + the triggers for when to switch
+> to bundled+Capgo live in
+> [`../memories/project_app_remote_vs_bundled.md`](../memories/project_app_remote_vs_bundled.md).
+
 ---
 
 ## ⚠️ Confirm these two values before the first build
