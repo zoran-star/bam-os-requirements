@@ -16319,7 +16319,7 @@ function _autoCardHtml(a) {
     ? steps.map((s, i) => _autoStepHtml(a, s, i, steps.length)).join('')
     : `<div style="color:var(--text-mute);font-size:12.5px;padding:11px 13px;border:1px dashed var(--border);border-radius:8px">No steps yet - add one, or paste your texts/emails in the import session to auto-fill this.</div>`;
   const seg = (on) => `background:${on ? 'var(--gold)' : 'transparent'};color:${on ? '#0B0B0D' : 'var(--text-sub)'};border:1px solid ${on ? 'var(--gold)' : 'var(--border)'};border-radius:8px;padding:5px 12px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit`;
-  const statusLine = a.enabled && a.approved ? '🟢 Live - sending on schedule.' : (a.enabled && !a.approved ? '⚠ Approve the sequence too before it sends.' : 'Not sending yet.');
+  const statusLine = (a.enabled && a.approved) ? '🟢 Live - sending on schedule.' : 'Not sending yet.';
   // Ghosted hands a still-silent lead off to Lead Nurture when the sequence ends.
   // This is automatic (no step) - show it so the end of the sequence is clear.
   const endNote = (a.automation_key === 'ghosted' && steps.length)
@@ -16334,8 +16334,7 @@ function _autoCardHtml(a) {
       <div style="font-size:15px;font-weight:700;color:var(--text)">${escapeHTML(a.name || a.automation_key)}</div>
       ${_autoCountsStrip(a)}
       <span style="flex:1"></span>
-      <button onclick="_autoToggle('${a.id}','approved',${!a.approved})" style="${seg(!!a.approved)}">${a.approved ? '✓ Approved' : 'Approve sequence'}</button>
-      <button onclick="_autoToggle('${a.id}','enabled',${!a.enabled})" style="${seg(!!a.enabled)}">${a.enabled ? '🟢 On' : 'Off'}</button>
+      <button onclick="_autoSetLive('${a.id}',${!(a.enabled && a.approved)})" style="${seg(!!(a.enabled && a.approved))}">${(a.enabled && a.approved) ? '🟢 On' : 'Off'}</button>
     </div>
     <div style="font-size:11.5px;color:var(--text-mute);margin-bottom:12px">${statusLine}</div>
     ${stepsHtml}
@@ -16415,10 +16414,13 @@ function _autoPreviewModal(subject) {
   document.body.insertAdjacentHTML('beforeend', `<div id="auto-prev-ov" onclick="if(event.target===this)_autoPreviewClose()" style="position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:9400;display:flex;align-items:center;justify-content:center;padding:18px"><div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;width:100%;max-width:680px;height:86vh;display:flex;flex-direction:column;overflow:hidden"><div style="display:flex;align-items:flex-start;gap:9px;padding:13px 16px;border-bottom:1px solid var(--border)"><div><div style="font-size:14px;font-weight:700;color:var(--text)">📧 Email preview</div>${subjLine}</div><span style="flex:1"></span><button onclick="_autoPreviewClose()" aria-label="Close" style="background:none;border:none;color:var(--text-mute);font-size:22px;cursor:pointer;line-height:1">×</button></div><div id="auto-prev-body" style="flex:1;background:#fff;overflow:hidden"><iframe id="auto-prev-frame" title="Email preview" style="width:100%;height:100%;border:0;background:#fff" srcdoc="<div style=&quot;padding:40px;text-align:center;color:#888;font-family:sans-serif&quot;>Rendering…</div>"></iframe></div></div></div>`);
 }
 
-async function _autoToggle(autoId, field, value) {
+// One switch: On = approved + running, Off = both off. (Approve + On were two
+// gates that both had to be true to send; collapsed into a single toggle.)
+async function _autoSetLive(autoId, on) {
   try {
-    await _autoApi(field === 'approved' ? 'set-approved' : 'set-enabled', { automation_id: autoId, value });
-    _plToast(field === 'approved' ? (value ? '✓ Sequence approved' : 'Approval removed') : (value ? '🟢 Automation on' : 'Automation off'));
+    await _autoApi('set-approved', { automation_id: autoId, value: on });
+    await _autoApi('set-enabled', { automation_id: autoId, value: on });
+    _plToast(on ? '🟢 Automation on' : 'Automation off');
     _taRenderAutomations();
   } catch (e) { alert(e.message); }
 }
@@ -16794,6 +16796,14 @@ function _caToggle(field, key) {
   else { _CA.data[field] = !_CA.data[field]; }
   _confirmAutosRender();
 }
+// One switch: On = approved + running together (collapsed from two gates).
+function _caSetLive() {
+  _confirmAutosSync();
+  if (!_CA.data) return;
+  const on = !(_CA.data.enabled && _CA.data.approved);
+  _CA.data.enabled = on; _CA.data.approved = on;
+  _confirmAutosRender();
+}
 
 function _confirmAutosRender() {
   const host = document.getElementById('confirm-autos-card'); if (!host || !_CA.data) return;
@@ -16834,8 +16844,7 @@ function _confirmAutosRender() {
       </div>
       <div style="padding:14px 16px">
         <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap">
-          <button style="${seg(d.enabled)}" onclick="_caToggle('enabled')">${d.enabled ? 'Sequence on' : 'Sequence off'}</button>
-          <button style="${seg(d.approved)}" onclick="_caToggle('approved')">${d.approved ? 'Approved ✓' : 'Approve sequence'}</button>
+          <button style="${seg(d.enabled && d.approved)}" onclick="_caSetLive()">${(d.enabled && d.approved) ? '🟢 Sequence on' : 'Sequence off'}</button>
         </div>
         <div style="font-size:12px;margin-bottom:12px">${status}</div>
         ${steps}
