@@ -23811,7 +23811,7 @@ function _renderPipelineBoard() {
   const _plPrevScroll = container.querySelector('.pl-scroll')?.scrollLeft || 0;
   // Scan button: top-left of the board (one re-scan for the whole board).
   const scanBar = (_plV2 && _agentOn)
-    ? `<div style="display:flex;margin-bottom:10px"><button id="pl-scan-btn" onclick="_plScanNow('pl-scan-btn')" title="Re-scan now for new agent actions (don't wait for the every-30-min check)" style="background:transparent;color:var(--text-sub);border:1px solid var(--border);border-radius:7px;padding:7px 13px;font-size:12.5px;font-weight:700;cursor:pointer;white-space:nowrap">🔄 Scan</button></div>`
+    ? `<div style="display:flex;gap:8px;margin-bottom:10px"><button id="pl-scan-btn" onclick="_plScanNow('pl-scan-btn')" title="Re-scan now for new agent actions (don't wait for the every-30-min check)" style="background:transparent;color:var(--text-sub);border:1px solid var(--border);border-radius:7px;padding:7px 13px;font-size:12.5px;font-weight:700;cursor:pointer;white-space:nowrap">🔄 Scan</button><button onclick="_apxOpen()" title="Open Hawkeye - review and approve every agent's drafted messages (Booking / Confirm / Closing tabs)" style="background:transparent;color:var(--accent);border:1px solid var(--accent);border-radius:7px;padding:7px 13px;font-size:12.5px;font-weight:700;cursor:pointer;white-space:nowrap">👁 Hawkeye</button></div>`
     : '';
   container.innerHTML = `${scanBar}<div class="pl-scroll">${entryBand}${engineBand}<div class="pl-board">${colHtml}</div></div>`;
   if (_plPrevScroll) { const _nb = container.querySelector('.pl-scroll'); if (_nb) _nb.scrollLeft = _plPrevScroll; }
@@ -24469,7 +24469,18 @@ function _agentTabsBar(active) {
     const on = k === active, n = _agentTabCount(k);
     return `<button onclick="${on ? '' : fn}" style="flex:0 0 auto;background:${on ? c : 'transparent'};color:${on ? '#0B0B0D' : 'var(--text-sub)'};border:1px solid ${on ? c : 'var(--border)'};border-radius:999px;padding:7px 15px;font-size:13px;font-weight:700;cursor:${on ? 'default' : 'pointer'};white-space:nowrap">${label}${n ? ` (${n})` : ''}</button>`;
   }).join('');
-  return `<div style="display:flex;gap:7px;padding:10px 16px;border-bottom:1px solid var(--border);overflow-x:auto;-webkit-overflow-scrolling:touch">${pills}</div>`;
+  return `<div style="border-bottom:1px solid var(--border)">
+    <div style="display:flex;gap:7px;padding:10px 16px 8px;overflow-x:auto;-webkit-overflow-scrolling:touch">${pills}</div>
+    <div style="padding:0 16px 10px"><button onclick="_hawkEditBrain('${active}')" title="Edit this agent's brain (its knowledge + lessons) in the Train tab" style="background:transparent;color:var(--text-sub);border:1px solid var(--border);border-radius:7px;padding:6px 12px;font-size:12px;font-weight:700;cursor:pointer">✏️ Edit brain</button></div>
+  </div>`;
+}
+// From a Hawkeye queue, jump to the active agent's brain (Train tab). Close the
+// Hawkeye overlay first so the Train view isn't hidden behind it.
+function _hawkEditBrain(key) {
+  document.getElementById('apx-overlay')?.remove();
+  document.getElementById('acx-overlay')?.remove();
+  document.getElementById('aclx-overlay')?.remove();
+  _plEngineEdit(key);
 }
 
 function _acxOpen() {
