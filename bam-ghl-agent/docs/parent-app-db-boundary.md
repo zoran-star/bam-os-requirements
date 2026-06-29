@@ -1,11 +1,21 @@
-# Parent App DB Boundary — Conflict Check Doc
+# Parent App DB Boundary
+
+## Start Here
+
+If you are trying to understand the parent app / Offer runtime architecture,
+checkout cutover, or future free-trial scheduling shape, read
+[`parent-app-architecture-handoff.md`](parent-app-architecture-handoff.md).
+
+If you are about to change schema, migrations, RLS, functions, or shared table
+semantics, this is the guardrail doc to read first.
 
 **For agents:** before making schema changes (new tables, columns, RLS, functions, drops/renames),
 diff your plan against the lists below. If anything overlaps → **stop and tell Zoran to message Luka.**
 
-Owner: Luka (fc-mobile parent app backend). Last updated: 2026-06-26.
-Full context: [`fc-mobile/docs/parent-app-architecture-plan.md`](../../../fc-mobile/docs/parent-app-architecture-plan.md)
-and [`fc-mobile/docs/parent-app-decisions-log.md`](../../../fc-mobile/docs/parent-app-decisions-log.md).
+Owner: Luka (fc-mobile parent app backend). Last updated: 2026-06-29.
+Original planning context lives in `fc-mobile/docs/parent-app-architecture-plan.md`
+and `fc-mobile/docs/parent-app-decisions-log.md`, which may not be available to
+all BAM Portal agents.
 
 ---
 
