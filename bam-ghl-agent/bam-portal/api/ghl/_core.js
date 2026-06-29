@@ -6,6 +6,8 @@
 // Keep this provider-agnostic of auth: callers do their own authorization, then
 // pass a loaded `clients` row (with the ghl_* fields) to these functions.
 
+import { maybeSendSmsViaProvider } from "../messaging/provider.js";
+
 const GHL_V2 = "https://services.leadconnectorhq.com";
 const V2_VERSION = "2021-07-28";
 const GHL_TOKEN_URL = "https://services.leadconnectorhq.com/oauth/token";
@@ -165,6 +167,10 @@ export async function sendSms({ client, toPhone, message, contactName }) {
   try {
     if (!client) return { ok: false, error: "no client" };
     if (!toPhone) return { ok: false, error: "no destination phone" };
+    // Provider gate: if this academy runs its own Twilio, send there + store and
+    // skip GHL entirely. Inert until messaging_provider='twilio' + active creds.
+    const viaProvider = await maybeSendSmsViaProvider(client, { toPhone, body: message, contactName, sentBy: "system" });
+    if (viaProvider.handled) return viaProvider.ok ? { ok: true, via: "twilio", message_id: viaProvider.sid } : { ok: false, error: viaProvider.error };
     if (!client.ghl_location_id && !client.ghl_access_token) return { ok: false, error: "academy not connected to GHL" };
     const creds = await pickGhlToken(client);
     if (!creds) return { ok: false, error: "no GHL token for academy" };
