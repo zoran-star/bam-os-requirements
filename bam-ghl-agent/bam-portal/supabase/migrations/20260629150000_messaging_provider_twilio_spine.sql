@@ -96,14 +96,22 @@ alter table public.sms_threads enable row level security;
 alter table public.sms_messages enable row level security;
 -- Same pattern as ghl_inbound_messages: staff see all, client_users see their own,
 -- writes are service-role / staff only.
-create policy sms_threads_select on public.sms_threads
-  for select using (is_staff() or client_id in (select my_client_ids()));
-create policy sms_threads_write on public.sms_threads
-  for all using (is_staff()) with check (is_staff());
-create policy sms_messages_select on public.sms_messages
-  for select using (is_staff() or client_id in (select my_client_ids()));
-create policy sms_messages_write on public.sms_messages
-  for all using (is_staff()) with check (is_staff());
+do $$ begin
+  create policy sms_threads_select on public.sms_threads
+    for select using (is_staff() or client_id in (select my_client_ids()));
+exception when duplicate_object then null; end $$;
+do $$ begin
+  create policy sms_threads_write on public.sms_threads
+    for all using (is_staff()) with check (is_staff());
+exception when duplicate_object then null; end $$;
+do $$ begin
+  create policy sms_messages_select on public.sms_messages
+    for select using (is_staff() or client_id in (select my_client_ids()));
+exception when duplicate_object then null; end $$;
+do $$ begin
+  create policy sms_messages_write on public.sms_messages
+    for all using (is_staff()) with check (is_staff());
+exception when duplicate_object then null; end $$;
 
 comment on table public.sms_threads is
   'Provider-agnostic SMS conversation per (academy, contact phone). The own-store that replaces GHL conversations for academies on messaging_provider=''twilio''. ghl_contact_id maps back to GHL so pipeline+agents keep working.';
