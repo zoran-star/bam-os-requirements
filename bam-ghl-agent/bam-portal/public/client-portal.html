@@ -7252,10 +7252,11 @@ Then the call to action."]</div>
         background-repeat:no-repeat; background-position:right 12px center;
       }
       #view-pipelines .pl-select option { background:var(--bg); color:var(--text); font-weight:500; }
-      #view-pipelines .pl-board {
-        display:flex; gap:12px; overflow-x:auto; padding-bottom:14px;
-        scroll-snap-type:x proximity;
-      }
+      #view-pipelines .pl-scroll { overflow-x:auto; padding-bottom:14px; scroll-snap-type:x proximity; }
+      #view-pipelines .pl-board { display:flex; gap:12px; min-width:min-content; }
+      /* Header bands ABOVE the board: one cell per stage column, aligned to it */
+      #view-pipelines .pl-band { display:flex; gap:12px; min-width:min-content; align-items:flex-end; margin:0 0 8px; }
+      #view-pipelines .pl-band-cell { flex:0 0 280px; max-width:280px; }
       #view-pipelines .pl-col {
         flex:0 0 280px; max-width:280px; background:rgba(255,255,255,0.02);
         border:1px solid var(--border); border-radius:8px; padding:10px;
@@ -7273,14 +7274,14 @@ Then the call to action."]</div>
         background:rgba(232,197,71,0.12); color:var(--accent);
       }
       /* Stage-engine + entry-point header band (V2): what controls each stage column */
-      #view-pipelines .pl-entry-wrap { display:flex; flex-direction:column; gap:5px; margin:0 0 6px; }
+      #view-pipelines .pl-entry-wrap { display:flex; flex-direction:column; gap:5px; margin:0; width:100%; }
       #view-pipelines .pl-entry { display:flex; align-items:center; justify-content:space-between; gap:6px;
         background:rgba(255,255,255,0.03); border:1px dashed var(--border); border-radius:7px; padding:5px 8px; }
       #view-pipelines .pl-entry-lbl { font-size:11px; font-weight:600; color:var(--text-sub);
         overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
       #view-pipelines .pl-entry-arrow { text-align:center; color:var(--text-mute); font-size:13px; line-height:1; }
       #view-pipelines .pl-eng { display:flex; align-items:center; justify-content:space-between; gap:6px;
-        border:1.5px solid var(--border); border-radius:7px; padding:5px 8px; margin:0 0 8px; }
+        border:1.5px solid var(--border); border-radius:7px; padding:5px 8px; margin:0; width:100%; }
       #view-pipelines .pl-eng-automation { border-style:dashed; }
       #view-pipelines .pl-eng-tag { font-size:11px; font-weight:800; letter-spacing:0.3px;
         overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
@@ -23723,54 +23724,24 @@ function _renderPipelineBoard() {
       ? `<button onclick="${_hawk.fn}" title="Open this agent's Hawkeye approval queue" style="width:100%;box-sizing:border-box;margin-bottom:8px;background:transparent;color:${_hawk.c};border:1px solid ${_hawk.c};border-radius:7px;padding:9px;font-size:12.5px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px">👁 Hawkeye</button>`
       : '';
     const _sb = _plV2 ? _plStageBot(s.name) : null;
-    let _colStyle = glowCol, _engHdr = '', _entHdr = '';
+    let _colStyle = glowCol;
     if (_sb) {
       const c = _sb.color;
       // Per-bot treatment on the WHOLE stage column border: an AGENT stage gets a
       // solid coloured border + glow; an AUTOMATION stage gets a dashed coloured
       // border (the dotted look); a terminal stage gets a solid coloured border.
+      // (The engine + entry-point headers render in a band ABOVE the board.)
       _colStyle = _sb.kind === 'agent'
         ? `border:1.5px solid ${c};box-shadow:0 0 22px -6px ${c};`
         : _sb.kind === 'automation'
           ? `border:1.5px dashed ${c};`
           : `border:1.5px solid ${c};`;
-      // STAGE ENGINE header: what controls this stage. 🤖 = AI agent (solid border,
-      // gets a 👁 Hawkeye link), 🔁 = automation (dashed border), 🏁 = terminal.
-      // ✏️ opens the engine in the Train tab. Eye opens that agent's Hawkeye queue.
-      const typeIcon = _sb.kind === 'agent' ? '🤖' : _sb.kind === 'automation' ? '🔁' : '🏁';
-      const editBtn = _sb.kind !== 'terminal'
-        ? `<button class="pl-eng-btn" title="Edit ${escapeHTML(_sb.tag)} in the Train tab" onclick="_plEngineEdit('${_sb.key}')">✏️</button>`
-        : '';
-      const eyeBtn = (_sb.kind === 'agent' && _hawk)
-        ? `<button class="pl-eng-btn" title="Open the ${escapeHTML(_sb.tag)} Hawkeye queue" onclick="${_hawk.fn}">👁</button>`
-        : '';
-      _engHdr = `<div class="pl-eng pl-eng-${_sb.kind}" style="border-color:${c}">
-            <span class="pl-eng-tag" style="color:${c}">${typeIcon} ${escapeHTML(_sb.tag)}</span>
-            <span class="pl-eng-acts">${editBtn}${eyeBtn}</span>
-          </div>`;
-    }
-    // ENTRY POINTS feeding this stage: calendars (✏️ → Calendar page) + forms
-    // (✏️ greyed out, edited in GHL). Multiple (e.g. group 1 / group 2) stack.
-    if (_plV2) {
-      const eps = _plEntryPointsForStage(p, s.name);
-      if (eps.length) {
-        _entHdr = `<div class="pl-entry-wrap">` + eps.map(ep => {
-          const isCal = ep.type === 'calendar';
-          const icon = isCal ? '🏀' : '📝';
-          const pencil = isCal
-            ? `<button class="pl-eng-btn" title="Edit this calendar" onclick="_plGoCalendar('${escapeHTML(ep.key)}')">✏️</button>`
-            : `<button class="pl-eng-btn pl-eng-btn-off" title="Forms are edited in GHL" disabled>✏️</button>`;
-          return `<div class="pl-entry"><span class="pl-entry-lbl">${icon} ${escapeHTML(ep.label || ep.type || 'Entry')}</span>${pencil}</div>`;
-        }).join('') + `<div class="pl-entry-arrow">&darr;</div></div>`;
-      }
     }
     return `
       <div class="pl-col" style="${_colStyle}"
            ondragover="_plDragOver(event,'${escapeHTML(s.id)}')"
            ondragleave="_plDragLeave(event)"
            ondrop="_plDrop(event,'${escapeHTML(s.id)}','${escapeHTML(p.id)}')">
-        ${_entHdr}
-        ${_engHdr}
         <div class="pl-col-header">
           <span style="display:inline-flex;align-items:center;gap:6px;min-width:0;flex:1">
             <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHTML(s.name)}</span>
@@ -23783,18 +23754,53 @@ function _renderPipelineBoard() {
       </div>`;
   }).join('');
 
-  // Preserve the board's horizontal scroll across re-renders. Several async
-  // loaders (needs-action badges, last-messages, agent scan) re-render the board
-  // shortly after it opens; without this, each rebuild snapped scrollLeft back to
-  // 0 and the columns "jumped left and right" while you were swiping on mobile.
-  const _plPrevScroll = container.querySelector('.pl-board')?.scrollLeft || 0;
-  // Scan button: top-left of the board (one re-scan for the whole board), moved out
-  // of the Responded column so each agent stage shows only its own Hawkeye button.
+  // ── Header bands ABOVE the board (V2): one cell per stage column, aligned to
+  // the columns and scrolling with them. Engine band = what controls each stage;
+  // entry band = the forms/calendars that feed it. Bot/automation TYPE icons are
+  // intentionally omitted - the engine tag + the column border style convey it.
+  let entryBand = '', engineBand = '';
+  if (_plV2) {
+    let anyEntry = false;
+    const entryCells = visibleStages.map(s => {
+      const eps = _plEntryPointsForStage(p, s.name);
+      if (!eps.length) return `<div class="pl-band-cell"></div>`;
+      anyEntry = true;
+      const chips = eps.map(ep => {
+        const isCal = ep.type === 'calendar';
+        const icon = isCal ? '🏀' : '📝';
+        const pencil = isCal
+          ? `<button class="pl-eng-btn" title="Edit this calendar" onclick="_plGoCalendar('${escapeHTML(ep.key)}')">✏️</button>`
+          : `<button class="pl-eng-btn pl-eng-btn-off" title="Forms are edited in GHL" disabled>✏️</button>`;
+        return `<div class="pl-entry"><span class="pl-entry-lbl">${icon} ${escapeHTML(ep.label || ep.type || 'Entry')}</span>${pencil}</div>`;
+      }).join('');
+      return `<div class="pl-band-cell"><div class="pl-entry-wrap">${chips}<div class="pl-entry-arrow">&darr;</div></div></div>`;
+    }).join('');
+    const engineCells = visibleStages.map(s => {
+      const sb = _plStageBot(s.name);
+      if (!sb) return `<div class="pl-band-cell"></div>`;
+      const c = sb.color;
+      const editBtn = sb.kind !== 'terminal'
+        ? `<button class="pl-eng-btn" title="Edit ${escapeHTML(sb.tag)} in the Train tab" onclick="_plEngineEdit('${sb.key}')">✏️</button>` : '';
+      const eyeBtn = sb.kind === 'agent'
+        ? `<button class="pl-eng-btn" title="Open the ${escapeHTML(sb.tag)} Hawkeye queue" onclick="_plEngineHawk('${sb.key}')">👁</button>` : '';
+      return `<div class="pl-band-cell"><div class="pl-eng pl-eng-${sb.kind}" style="border-color:${c}">`
+        + `<span class="pl-eng-tag" style="color:${c}">${escapeHTML(sb.tag)}</span>`
+        + `<span class="pl-eng-acts">${editBtn}${eyeBtn}</span></div></div>`;
+    }).join('');
+    if (anyEntry) entryBand = `<div class="pl-band">${entryCells}</div>`;
+    engineBand = `<div class="pl-band">${engineCells}</div>`;
+  }
+
+  // Preserve the horizontal scroll across re-renders (now on the shared .pl-scroll
+  // wrapper so the bands + board scroll together). Several async loaders re-render
+  // shortly after open; without this, scrollLeft snapped back to 0.
+  const _plPrevScroll = container.querySelector('.pl-scroll')?.scrollLeft || 0;
+  // Scan button: top-left of the board (one re-scan for the whole board).
   const scanBar = (_plV2 && _agentOn)
     ? `<div style="display:flex;margin-bottom:10px"><button id="pl-scan-btn" onclick="_plScanNow('pl-scan-btn')" title="Re-scan now for new agent actions (don't wait for the every-30-min check)" style="background:transparent;color:var(--text-sub);border:1px solid var(--border);border-radius:7px;padding:7px 13px;font-size:12.5px;font-weight:700;cursor:pointer;white-space:nowrap">🔄 Scan</button></div>`
     : '';
-  container.innerHTML = `${scanBar}<div class="pl-board">${colHtml}</div>`;
-  if (_plPrevScroll) { const _nb = container.querySelector('.pl-board'); if (_nb) _nb.scrollLeft = _plPrevScroll; }
+  container.innerHTML = `${scanBar}<div class="pl-scroll">${entryBand}${engineBand}<div class="pl-board">${colHtml}</div></div>`;
+  if (_plPrevScroll) { const _nb = container.querySelector('.pl-scroll'); if (_nb) _nb.scrollLeft = _plPrevScroll; }
 }
 
 // ── Drag & drop ───────────────────────────────────────────
