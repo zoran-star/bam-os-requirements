@@ -7301,6 +7301,7 @@ Then the call to action."]</div>
         padding:2px 4px; border-radius:5px; line-height:1; opacity:0.85; }
       #view-pipelines .pl-eng-btn:hover { opacity:1; background:rgba(255,255,255,0.08); }
       #view-pipelines .pl-eng-btn-off { opacity:0.3; cursor:not-allowed; }
+      #view-pipelines .pl-bands.collapsed { display:none; }
       #view-pipelines .pl-cards { display:flex; flex-direction:column; gap:8px; overflow-y:auto; flex:1; }
       #view-pipelines .pl-card {
         background:var(--surface); border:1px solid var(--border); border-radius:6px;
@@ -23492,6 +23493,14 @@ function _plStageBot(name) {
 // Entry points (forms + calendars) that feed a given stage of the current
 // pipeline. Sourced from the already-loaded _EP_DATA (entry_points table).
 let _plEpLoading = false;
+// Collapse state for the entry-point + stage-engine header band (persisted).
+let _plBandCollapsed = (() => { try { return localStorage.getItem('plBandCollapsed') === '1'; } catch (_) { return false; } })();
+function _plToggleBand() {
+  _plBandCollapsed = !_plBandCollapsed;
+  try { localStorage.setItem('plBandCollapsed', _plBandCollapsed ? '1' : '0'); } catch (_) {}
+  const el = document.getElementById('pl-bands'); if (el) el.classList.toggle('collapsed', _plBandCollapsed);
+  const btn = document.getElementById('pl-band-toggle'); if (btn) btn.textContent = _plBandCollapsed ? '▸ Show engine' : '▾ Hide engine';
+}
 function _plEntryPointsForStage(p, stageName) {
   if (!Array.isArray(_EP_DATA)) return [];
   const pn = String((p && p.name) || '').toLowerCase();
@@ -23814,8 +23823,12 @@ function _renderPipelineBoard() {
         ? `<button class="pl-eng-btn" title="Edit ${escapeHTML(sb.tag)} in the Train tab" onclick="_plEngineEdit('${sb.key}')">✏️</button>` : '';
       const eyeBtn = sb.kind === 'agent'
         ? `<button class="pl-eng-btn" title="Open the ${escapeHTML(sb.tag)} Hawkeye queue" onclick="_plEngineHawk('${sb.key}')">👁</button>` : '';
+      // Spell out the kind before the name: "📞 Agent: Booking", "👻 Automation: Ghosted".
+      const _kindWord = sb.kind === 'agent' ? 'Agent' : sb.kind === 'automation' ? 'Automation' : '';
+      const _sp = sb.tag.indexOf(' ');
+      const _engLabel = (_kindWord && _sp > 0) ? `${sb.tag.slice(0, _sp)} ${_kindWord}: ${sb.tag.slice(_sp + 1)}` : sb.tag;
       return `<div class="pl-band-cell"><div class="pl-eng pl-eng-${sb.kind}" style="border-color:${c}">`
-        + `<span class="pl-eng-tag" style="color:${c}">${escapeHTML(sb.tag)}</span>`
+        + `<span class="pl-eng-tag" style="color:${c}">${escapeHTML(_engLabel)}</span>`
         + `<span class="pl-eng-acts">${editBtn}${eyeBtn}</span></div></div>`;
     }).join('');
     if (anyEntry) entryBand = `<div class="pl-band">${entryCells}</div>`;
@@ -23826,11 +23839,16 @@ function _renderPipelineBoard() {
   // wrapper so the bands + board scroll together). Several async loaders re-render
   // shortly after open; without this, scrollLeft snapped back to 0.
   const _plPrevScroll = container.querySelector('.pl-scroll')?.scrollLeft || 0;
-  // Scan button: top-left of the board (one re-scan for the whole board).
-  const scanBar = (_plV2 && _agentOn)
-    ? `<div style="display:flex;gap:8px;margin-bottom:10px"><button id="pl-scan-btn" onclick="_plScanNow('pl-scan-btn')" title="Re-scan now for new agent actions (don't wait for the every-30-min check)" style="background:transparent;color:var(--text-sub);border:1px solid var(--border);border-radius:7px;padding:7px 13px;font-size:12.5px;font-weight:700;cursor:pointer;white-space:nowrap">🔄 Scan</button><button onclick="_apxOpen()" title="Open Hawkeye - review and approve every agent's drafted messages (Booking / Confirm / Closing tabs)" style="background:transparent;color:var(--accent);border:1px solid var(--accent);border-radius:7px;padding:7px 13px;font-size:12.5px;font-weight:700;cursor:pointer;white-space:nowrap">👁 Hawkeye</button></div>`
+  // Top bar: Scan + Hawkeye (re-scan / review drafts) + Show/Hide engine (collapse the band).
+  const _btnStyle = "background:transparent;color:var(--text-sub);border:1px solid var(--border);border-radius:7px;padding:7px 13px;font-size:12.5px;font-weight:700;cursor:pointer;white-space:nowrap";
+  const scanBtn = (_plV2 && _agentOn)
+    ? `<button id="pl-scan-btn" onclick="_plScanNow('pl-scan-btn')" title="Re-scan now for new agent actions (don't wait for the every-30-min check)" style="${_btnStyle}">🔄 Scan</button><button onclick="_apxOpen()" title="Open Hawkeye - review and approve every agent's drafted messages (Booking / Confirm / Closing tabs)" style="background:transparent;color:var(--accent);border:1px solid var(--accent);border-radius:7px;padding:7px 13px;font-size:12.5px;font-weight:700;cursor:pointer;white-space:nowrap">👁 Hawkeye</button>`
     : '';
-  container.innerHTML = `${scanBar}<div class="pl-scroll">${entryBand}${engineBand}<div class="pl-board">${colHtml}</div></div>`;
+  const bandToggleBtn = (_plV2 && (entryBand || engineBand))
+    ? `<button id="pl-band-toggle" onclick="_plToggleBand()" title="Show or hide the entry points + stage engine band" style="${_btnStyle}">${_plBandCollapsed ? '▸ Show engine' : '▾ Hide engine'}</button>`
+    : '';
+  const topBar = (scanBtn || bandToggleBtn) ? `<div style="display:flex;gap:8px;margin-bottom:10px;align-items:center">${scanBtn}${bandToggleBtn}</div>` : '';
+  container.innerHTML = `${topBar}<div class="pl-scroll"><div id="pl-bands" class="pl-bands${_plBandCollapsed ? ' collapsed' : ''}">${entryBand}${engineBand}</div><div class="pl-board">${colHtml}</div></div>`;
   if (_plPrevScroll) { const _nb = container.querySelector('.pl-scroll'); if (_nb) _nb.scrollLeft = _plPrevScroll; }
 }
 
