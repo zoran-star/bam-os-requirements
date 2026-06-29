@@ -25146,10 +25146,12 @@ function _apxBookCard(r) {
       <button onclick="_apxOpenCardThread('${r.id}')" style="background:transparent;border:1px solid var(--border);color:var(--text-mute);border-radius:7px;padding:5px 10px;font-size:12px;cursor:pointer">💬 chat</button>
       <div style="flex:1"></div>
       <button onclick="_apxBookSkip('${r.id}')" style="background:transparent;border:1px solid var(--border);color:#e07070;border-radius:7px;padding:5px 11px;font-size:12px;cursor:pointer">✕ skip</button>
+      <button onclick="_apxBookAbandon('${r.id}')" title="Remove from the pipeline - no message, no nurture" style="background:transparent;border:1px solid var(--text-mute);color:var(--text-sub);border-radius:7px;padding:5px 11px;font-size:12px;cursor:pointer">🗑 Abandon</button>
       <button onclick="_apxBookConfirm('${r.id}')" style="background:var(--blue,#5A8FB8);border:1px solid var(--blue,#5A8FB8);color:#fff;border-radius:7px;padding:5px 13px;font-size:12px;font-weight:700;cursor:pointer">📅 approve &amp; book</button>
     </div>
   </div>`;
 }
+function _apxBookAbandon(id) { _hawkDefer({ cardId: 'apx-' + id, label: 'Abandoned', restore: _apxRender, run: async () => { await _apxPost('/api/agent-approvals', 'confirm-abandoned', { ready_id: id }); _apxRemove(id); _apxToast('🗑 Abandoned', true); } }); }
 function _apxBookConfirm(id) {
   const r = (_APX_DATA.book || []).find(x => x.id === id); if (!r) return;
   _hawkDefer({ cardId: 'apx-' + id, label: 'Booked', restore: _apxRender, run: async () => {

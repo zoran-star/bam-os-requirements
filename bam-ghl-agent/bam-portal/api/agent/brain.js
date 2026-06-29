@@ -58,5 +58,12 @@ export function buildAgentSystem({ lessons = [], overrides = {}, examples = [], 
 
   if (trailer && String(trailer).trim()) sys += `\n\n${String(trailer).trim()}`;
 
+  // Global house rules for EVERY agent message to a lead/parent. Appended last so
+  // no section, lesson, or example can override them.
+  sys += `\n\n<house_rules>\n` +
+    `- NEVER use emojis in your messages to leads or parents. No 🏀, no 👍, none. It reads as unprofessional. Write like a real coach texting: clean, warm, human, no emojis.\n` +
+    `- Never use an em dash (the long dash). Use a hyphen, comma, or colon instead.\n` +
+    `</house_rules>`;
+
   return sys;
 }
