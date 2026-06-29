@@ -7257,6 +7257,17 @@ Then the call to action."]</div>
       /* Header bands ABOVE the board: one cell per stage column, aligned to it */
       #view-pipelines .pl-band { display:flex; gap:12px; min-width:min-content; align-items:flex-end; margin:0 0 8px; }
       #view-pipelines .pl-band-cell { flex:0 0 280px; max-width:280px; }
+      /* ── Mobile: one near-full-width column per swipe, finger-friendly buttons ── */
+      @media (max-width: 640px) {
+        #view-pipelines .pl-col,
+        #view-pipelines .pl-band-cell { flex-basis:86vw; max-width:86vw; }
+        #view-pipelines .pl-col { max-height:calc(100dvh - 300px); }
+        #view-pipelines .pl-band { margin:0 0 6px; align-items:stretch; }
+        #view-pipelines .pl-eng, #view-pipelines .pl-entry { padding:8px 11px; }
+        #view-pipelines .pl-eng-tag, #view-pipelines .pl-entry-lbl { font-size:13px; }
+        #view-pipelines .pl-eng-btn { font-size:15px; padding:8px 10px; border-radius:7px; }
+        #view-pipelines .pl-eng-acts { gap:4px; }
+      }
       #view-pipelines .pl-col {
         flex:0 0 280px; max-width:280px; background:rgba(255,255,255,0.02);
         border:1px solid var(--border); border-radius:8px; padding:10px;
