@@ -36,6 +36,7 @@ import {
   doneTrialContactIdSetCached, peekDoneTrialIdSet, nurtureStage, toIso,
 } from "./agent/_stage.js";
 import { enrollContact, isAutomationLive, resolveContactInfo } from "./automations.js";
+import { shadowMirrorMove } from "./agent/_store.js";
 import {
   DEFAULT_CLOSING_AUTOMATIONS, getClosingAutomations,
   automationsLive as closingAutomationsLive, nextDueStep as nextDueClosingStep,
@@ -735,12 +736,14 @@ async function handler(req, res) {
             await ghl("PUT", `/opportunities/${encodeURIComponent(oppId)}`, { token, body: { pipelineId: ns.pipelineId, pipelineStageId: ns.stageId } });
             await enrollContact({ clientId, automationKey: "nurture", contactId });
             routedToNurture = true;
+            try { await shadowMirrorMove(clientId, { ghlOpportunityId: oppId, ghlContactId: contactId, role: "nurture", stageResolved: ns, status: "open", reason }); } catch (_) {}
           }
         }
       } catch (_) { /* fall through to status=lost */ }
       if (!routedToNurture) {
         try { await ghl("PUT", `/opportunities/${encodeURIComponent(oppId)}`, { token, body: { status: "lost" } }); }
         catch (e) { return res.status(e.status || 502).json({ error: `GHL mark lost: ${e.message}` }); }
+        try { await shadowMirrorMove(clientId, { ghlOpportunityId: oppId, ghlContactId: contactId, status: "lost", reason }); } catch (_) {}
       }
       try { await sb(`pipeline_outcomes`, { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify([{ client_id: clientId, opportunity_id: oppId, status: routedToNurture ? "nurture" : "lost", reason }]) }); } catch (_) {}
       if (b.ready_id) {

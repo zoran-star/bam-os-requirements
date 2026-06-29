@@ -11,6 +11,7 @@
 // Auth: Supabase JWT — staff, or client_users membership for client_id.
 
 import { withSentryApiRoute } from "../_sentry.js";
+import { shadowMirrorMove } from "../agent/_store.js";
 
 const SUPABASE_URL = (process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || "").trim();
 const SUPABASE_SERVICE_KEY = (process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY || "").trim();
@@ -185,6 +186,7 @@ async function handler(req, res) {
         await ghl("PUT", `/opportunities/${encodeURIComponent(oppId)}`, { token, body: { pipelineId: pl.id, pipelineStageId: interested.id } });
         result.moved = true;
         result.moved_to = "interested";
+        try { await shadowMirrorMove(clientId, { ghlOpportunityId: oppId, ghlContactId: contactId, role: "interested", stageResolved: { pipelineId: pl.id, stageId: interested.id, stageName: interested.name }, status: "open" }); } catch (_) {}
       }
     } catch (e) { console.error("no-show interested move failed (non-fatal):", e.message); }
   }
@@ -198,6 +200,7 @@ async function handler(req, res) {
       if (doneStage) {
         await ghl("PUT", `/opportunities/${encodeURIComponent(oppId)}`, { token, body: { pipelineId: pl.id, pipelineStageId: doneStage.id } });
         result.moved = true;
+        try { await shadowMirrorMove(clientId, { ghlOpportunityId: oppId, ghlContactId: contactId, role: "done_trial", stageResolved: { pipelineId: pl.id, stageId: doneStage.id, stageName: doneStage.name }, status: "open" }); } catch (_) {}
       }
     } catch (e) { console.error("done-trial move failed (non-fatal):", e.message); }
 

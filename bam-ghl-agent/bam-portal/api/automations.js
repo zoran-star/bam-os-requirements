@@ -14,6 +14,7 @@ import { withSentryApiRoute } from "./_sentry.js";
 
 import { pickGhlToken, ghl } from "./ghl/_core.js";
 import { nurtureStage, scheduledTrialContactIdSetCached } from "./agent/_stage.js";
+import { shadowMirrorMove } from "./agent/_store.js";
 import { nextSessionLabel } from "./_next_session.js";
 import { sendOn } from "./_send.js";
 import { renderEmail } from "./email-shells.js";
@@ -224,6 +225,7 @@ async function runWork(res) {
               const ns = await nurtureStage(creds.token, creds.locationId);
               const oppId = await findOpenOppId(creds.token, creds.locationId, job.contact_id);
               if (ns && oppId) await ghl("PUT", `/opportunities/${encodeURIComponent(oppId)}`, { token: creds.token, body: { pipelineId: ns.pipelineId, pipelineStageId: ns.stageId } });
+              if (ns && oppId) { try { await shadowMirrorMove(job.client_id, { ghlOpportunityId: oppId, ghlContactId: job.contact_id, role: "nurture", stageResolved: ns, status: "open", reason: "ghosted ran out - rolled into nurture" }); } catch (_) {} }
             }
             await logEvent({ clientId: job.client_id, contactId: job.contact_id, automationId: job.automation_id, type: "ghosted_to_nurture", payload: null });
           }
@@ -248,6 +250,7 @@ async function runWork(res) {
               if (oppId) {
                 try { await ghl("PUT", `/opportunities/${encodeURIComponent(oppId)}`, { token: creds.token, body: { status: "lost" } }); } catch (_) { /* GHL PUT best-effort */ }
                 try { await sb(`pipeline_outcomes`, { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify([{ client_id: job.client_id, opportunity_id: oppId, status: "lost", reason: "nurture sequence exhausted" }]) }); } catch (_) {}
+                try { await shadowMirrorMove(job.client_id, { ghlOpportunityId: oppId, ghlContactId: job.contact_id, status: "lost", reason: "nurture sequence exhausted" }); } catch (_) {}
                 await logEvent({ clientId: job.client_id, contactId: job.contact_id, automationId: job.automation_id, type: "nurture_exhausted_lost", payload: { opportunity_id: oppId } });
                 nurtureLost++;
               }
