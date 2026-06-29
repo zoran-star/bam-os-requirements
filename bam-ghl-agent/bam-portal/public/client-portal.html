@@ -23459,12 +23459,18 @@ function _plResolveDup(oppId) {
     </div>`);
 }
 async function _plResolveDupClose(id) {
+  // Optimistic: drop the card + close the overlay the moment you tap, so it
+  // disappears right away. The server PATCH runs after; if it fails we refetch
+  // the board so the card reappears (and surface the error).
+  _plRemoveOppLocal(id);
+  document.getElementById('pl-dup-overlay')?.remove();
+  _plToast('🗑 Closed duplicate');
   try {
     await _plSetStatus(id, 'abandoned', 'duplicate');
-    _plRemoveOppLocal(id);
-    document.getElementById('pl-dup-overlay')?.remove();
-    _plToast('🗑 Closed duplicate');
-  } catch (e) { alert('Could not close duplicate: ' + (e.message || e)); }
+  } catch (e) {
+    _plToast('⚠ Could not close duplicate - restoring');
+    try { await fetchAndRenderPipelines(); } catch (_) {}
+  }
 }
 // Colour-code a pipeline stage header by the bot/automation that OWNS it (the
 // sales-crew model scheme). Agent stages glow solid; automation stages get a
