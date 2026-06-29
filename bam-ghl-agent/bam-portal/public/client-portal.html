@@ -7272,6 +7272,23 @@ Then the call to action."]</div>
         font-size:11px; font-weight:700; padding:2px 8px; border-radius:999px;
         background:rgba(232,197,71,0.12); color:var(--accent);
       }
+      /* Stage-engine + entry-point header band (V2): what controls each stage column */
+      #view-pipelines .pl-entry-wrap { display:flex; flex-direction:column; gap:5px; margin:0 0 6px; }
+      #view-pipelines .pl-entry { display:flex; align-items:center; justify-content:space-between; gap:6px;
+        background:rgba(255,255,255,0.03); border:1px dashed var(--border); border-radius:7px; padding:5px 8px; }
+      #view-pipelines .pl-entry-lbl { font-size:11px; font-weight:600; color:var(--text-sub);
+        overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+      #view-pipelines .pl-entry-arrow { text-align:center; color:var(--text-mute); font-size:13px; line-height:1; }
+      #view-pipelines .pl-eng { display:flex; align-items:center; justify-content:space-between; gap:6px;
+        border:1.5px solid var(--border); border-radius:7px; padding:5px 8px; margin:0 0 8px; }
+      #view-pipelines .pl-eng-automation { border-style:dashed; }
+      #view-pipelines .pl-eng-tag { font-size:11px; font-weight:800; letter-spacing:0.3px;
+        overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+      #view-pipelines .pl-eng-acts { display:flex; align-items:center; gap:2px; flex-shrink:0; }
+      #view-pipelines .pl-eng-btn { background:transparent; border:none; cursor:pointer; font-size:12px;
+        padding:2px 4px; border-radius:5px; line-height:1; opacity:0.85; }
+      #view-pipelines .pl-eng-btn:hover { opacity:1; background:rgba(255,255,255,0.08); }
+      #view-pipelines .pl-eng-btn-off { opacity:0.3; cursor:not-allowed; }
       #view-pipelines .pl-cards { display:flex; flex-direction:column; gap:8px; overflow-y:auto; flex:1; }
       #view-pipelines .pl-card {
         background:var(--surface); border:1px solid var(--border); border-radius:6px;
@@ -23430,6 +23447,38 @@ function _plStageBot(name) {
   return null;
 }
 
+// ── Stage-engine header band helpers (V2) ──────────────────────────────────
+// Entry points (forms + calendars) that feed a given stage of the current
+// pipeline. Sourced from the already-loaded _EP_DATA (entry_points table).
+let _plEpLoading = false;
+function _plEntryPointsForStage(p, stageName) {
+  if (!Array.isArray(_EP_DATA)) return [];
+  const pn = String((p && p.name) || '').toLowerCase();
+  const sn = String(stageName || '').toLowerCase();
+  if (!sn) return [];
+  return _EP_DATA.filter(ep => ep && String(ep.stage_name || '').toLowerCase() === sn
+    && (!ep.pipeline_name || String(ep.pipeline_name).toLowerCase() === pn));
+}
+// Pencil on an engine → open that agent/automation in the Train tab.
+function _plEngineEdit(key) {
+  try { switchView('train-agent'); setTimeout(() => { try { _taPick(key); } catch (_) {} }, 60); }
+  catch (e) { alert(e && e.message || e); }
+}
+// Eye on an agent → open that agent's Hawkeye queue over the board.
+function _plEngineHawk(key) {
+  const fn = key === 'booking' ? _apxOpen : key === 'confirm' ? _acxOpen : key === 'closing' ? _aclxOpen : null;
+  if (fn) try { fn(); } catch (e) { alert(e && e.message || e); }
+}
+// Pencil on a calendar entry point → open the Calendar page + highlight it.
+function _plGoCalendar(key) {
+  const nav = document.querySelector('.nav-item[data-feature="calendar"]');
+  switchView('calendar', nav);
+  setTimeout(() => {
+    const card = document.getElementById(`bk-${key}-save`)?.closest('.bk-card');
+    if (card) { card.scrollIntoView({ behavior: 'smooth', block: 'start' }); card.style.borderColor = 'var(--accent)'; }
+  }, 1200);
+}
+
 function _renderPipelineBoard() {
   const container = document.getElementById('pl-board-container');
   if (!container || !_PL_DATA) return;
@@ -23447,6 +23496,13 @@ function _renderPipelineBoard() {
   // V1.5 = plain GHL mirror (no funnel glows/flags/agent buttons/stage-name
   // behavior). V2 = the full opinionated flow.
   const _plV2 = _plIsV2();
+
+  // V2 stage-engine header needs the entry points (forms + calendars). Load once,
+  // then re-render so each stage shows the entry points that feed it.
+  if (_plV2 && !Array.isArray(_EP_DATA) && !_plEpLoading) {
+    _plEpLoading = true;
+    _epEnsureLoaded().then(() => { _plEpLoading = false; _renderPipelineBoard(); }).catch(() => { _plEpLoading = false; });
+  }
 
   // Won / Lost / Abandoned are removed from the pipeline board (kept in GHL).
   const _PL_CLOSED = new Set(['won', 'lost', 'abandoned']);
@@ -23658,7 +23714,7 @@ function _renderPipelineBoard() {
       ? `<button onclick="${_hawk.fn}" title="Open this agent's Hawkeye approval queue" style="width:100%;box-sizing:border-box;margin-bottom:8px;background:transparent;color:${_hawk.c};border:1px solid ${_hawk.c};border-radius:7px;padding:9px;font-size:12.5px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px">👁 Hawkeye</button>`
       : '';
     const _sb = _plV2 ? _plStageBot(s.name) : null;
-    let _colStyle = glowCol, _hTag = '';
+    let _colStyle = glowCol, _engHdr = '', _entHdr = '';
     if (_sb) {
       const c = _sb.color;
       // Per-bot treatment on the WHOLE stage column border: an AGENT stage gets a
@@ -23669,22 +23725,50 @@ function _renderPipelineBoard() {
         : _sb.kind === 'automation'
           ? `border:1.5px dashed ${c};`
           : `border:1.5px solid ${c};`;
-      _hTag = `<span style="font-family:var(--mono,monospace);font-size:9px;font-weight:700;letter-spacing:.4px;text-transform:uppercase;border:1px ${_sb.kind === 'automation' ? 'dashed' : 'solid'} ${c};color:${c};border-radius:99px;padding:1px 7px;white-space:nowrap">${_sb.tag}</span>`;
+      // STAGE ENGINE header: what controls this stage. 🤖 = AI agent (solid border,
+      // gets a 👁 Hawkeye link), 🔁 = automation (dashed border), 🏁 = terminal.
+      // ✏️ opens the engine in the Train tab. Eye opens that agent's Hawkeye queue.
+      const typeIcon = _sb.kind === 'agent' ? '🤖' : _sb.kind === 'automation' ? '🔁' : '🏁';
+      const editBtn = _sb.kind !== 'terminal'
+        ? `<button class="pl-eng-btn" title="Edit ${escapeHTML(_sb.tag)} in the Train tab" onclick="_plEngineEdit('${_sb.key}')">✏️</button>`
+        : '';
+      const eyeBtn = (_sb.kind === 'agent' && _hawk)
+        ? `<button class="pl-eng-btn" title="Open the ${escapeHTML(_sb.tag)} Hawkeye queue" onclick="${_hawk.fn}">👁</button>`
+        : '';
+      _engHdr = `<div class="pl-eng pl-eng-${_sb.kind}" style="border-color:${c}">
+            <span class="pl-eng-tag" style="color:${c}">${typeIcon} ${escapeHTML(_sb.tag)}</span>
+            <span class="pl-eng-acts">${editBtn}${eyeBtn}</span>
+          </div>`;
+    }
+    // ENTRY POINTS feeding this stage: calendars (✏️ → Calendar page) + forms
+    // (✏️ greyed out, edited in GHL). Multiple (e.g. group 1 / group 2) stack.
+    if (_plV2) {
+      const eps = _plEntryPointsForStage(p, s.name);
+      if (eps.length) {
+        _entHdr = `<div class="pl-entry-wrap">` + eps.map(ep => {
+          const isCal = ep.type === 'calendar';
+          const icon = isCal ? '🏀' : '📝';
+          const pencil = isCal
+            ? `<button class="pl-eng-btn" title="Edit this calendar" onclick="_plGoCalendar('${escapeHTML(ep.key)}')">✏️</button>`
+            : `<button class="pl-eng-btn pl-eng-btn-off" title="Forms are edited in GHL" disabled>✏️</button>`;
+          return `<div class="pl-entry"><span class="pl-entry-lbl">${icon} ${escapeHTML(ep.label || ep.type || 'Entry')}</span>${pencil}</div>`;
+        }).join('') + `<div class="pl-entry-arrow">&darr;</div></div>`;
+      }
     }
     return `
       <div class="pl-col" style="${_colStyle}"
            ondragover="_plDragOver(event,'${escapeHTML(s.id)}')"
            ondragleave="_plDragLeave(event)"
            ondrop="_plDrop(event,'${escapeHTML(s.id)}','${escapeHTML(p.id)}')">
+        ${_entHdr}
+        ${_engHdr}
         <div class="pl-col-header">
           <span style="display:inline-flex;align-items:center;gap:6px;min-width:0;flex:1">
             <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHTML(s.name)}</span>
-            ${_hTag}
           </span>
           <span class="pl-col-count">${opps.length}</span>
         </div>
         <div class="pl-cards">
-          ${hawkBtn}
           ${cardsHtml}
         </div>
       </div>`;
