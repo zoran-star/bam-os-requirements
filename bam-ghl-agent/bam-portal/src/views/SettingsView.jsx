@@ -5,6 +5,7 @@ import { useIsMobile } from '../hooks/useMediaQuery';
 import { useStaffMe } from '../hooks/useStaffMe';
 import { supabase } from '../lib/supabase';
 import { NewStaffModal } from '../components/StaffModals';
+import MessagingMigrationPanel from '../components/MessagingMigrationPanel';
 
 // Google Calendar was removed from here — it is now connected per-staff
 // directly on the Calendar page (each person links their own).
@@ -327,6 +328,13 @@ export default function SettingsView({ tokens, dark, setDark, userName, session,
               style={{ padding: "8px 14px", background: tokens.accent, color: "#0A0A0B", border: 0, borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer" }}
             >+ Add staff member</button>
           </div>
+        </div>
+      )}
+
+      {/* ═══ Messaging migration (admin only) ═══ */}
+      {(me?.role === "admin" || me?.role === "scaling_manager") && (
+        <div style={{ ...sectionStyle, animationDelay: "75ms" }}>
+          <MessagingMigrationPanel session={session} tokens={tokens} />
         </div>
       )}
 
