@@ -16,7 +16,8 @@ import { withSentryApiRoute } from "./_sentry.js";
 // scope 'academy' (stay with this academy).
 
 import { pickGhlToken, ghl, sendSms } from "./ghl/_core.js";
-import { maybeSendSmsViaProvider } from "./messaging/provider.js";
+import { maybeSendSmsViaProvider, smsProvider } from "./messaging/provider.js";
+import { readStoreThreadAgent } from "./messaging/read-thread.js";
 import { assemblePrompt } from "./agent/prompt-structure.js";
 import { buildAgentSystem } from "./agent/brain.js";
 import { loadMergedOverrides } from "./agent/_sections.js";
@@ -254,13 +255,19 @@ async function draftForContact(token, locationId, clientId, contactId, cfg, opts
   if (!opts.skipStageGuard && !(await contactInRespondedStage(token, locationId, contactId, rs))) {
     return { error: "This lead isn't in the Responded stage — the bot only replies to Responded-stage leads." };
   }
-  let conversationId = opts.conversationId;
-  if (!conversationId) {
-    const convo = await findConversation(token, locationId, contactId);
-    if (!convo) return { error: "no conversation for contact" };
-    conversationId = convo.id;
+  // Twilio academies: read the thread from the own-store (no GHL conversation).
+  let messages;
+  if ((await smsProvider(clientId)) === "twilio") {
+    messages = await readStoreThreadAgent(clientId, contactId);
+  } else {
+    let conversationId = opts.conversationId;
+    if (!conversationId) {
+      const convo = await findConversation(token, locationId, contactId);
+      if (!convo) return { error: "no conversation for contact" };
+      conversationId = convo.id;
+    }
+    messages = await threadMessages(token, conversationId);
   }
-  const messages = await threadMessages(token, conversationId);
   const system = buildSystem(cfg) + await loadContactMemory(sb, clientId, contactId, { ghl, token, locationId });
   const calendars = await loadCalendars(sb, clientId);
   const out = await runAgent(system, messages, { calendars, token, timezone: "America/Toronto" });

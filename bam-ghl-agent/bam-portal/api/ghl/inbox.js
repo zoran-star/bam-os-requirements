@@ -1,4 +1,6 @@
 import { withSentryApiRoute } from "../_sentry.js";
+import { smsProvider } from "../messaging/provider.js";
+import { readStoreThreadInbox, readStoreThreadById, listStoreThreads } from "../messaging/read-thread.js";
 // Vercel Serverless Function — Per-academy GHL Inbox
 //
 //   GET /api/ghl/inbox?client_id=<uuid>
@@ -299,6 +301,17 @@ async function handler(req, res) {
 
   const conversationId = req.query.conversation_id;
   const contactId = req.query.contact_id;
+
+  // Twilio academies: serve the inbox from the own-store, not GHL conversations.
+  try {
+    if ((await smsProvider(clientId)) === "twilio") {
+      if (contactId) return res.status(200).json(await readStoreThreadInbox(clientId, contactId));
+      if (conversationId) return res.status(200).json(await readStoreThreadById(conversationId));
+      const conversations = await listStoreThreads(clientId);
+      const counts = { unread: conversations.reduce((s, c) => s + (c.unreadCount || 0), 0) };
+      return res.status(200).json({ conversations, counts });
+    }
+  } catch (e) { console.error("inbox store-read:", e.message); /* fall through to GHL */ }
 
   // GHL returns `type` as a number for some channels — always coerce to a
   // string so the client can safely call .replace() on it.
