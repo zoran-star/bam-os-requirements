@@ -25201,32 +25201,26 @@ function _apxGhostCard(r) {
       <button onclick="_apxOpenCardThread('${r.id}')" style="background:transparent;border:1px solid var(--border);color:var(--text-mute);border-radius:7px;padding:5px 10px;font-size:12px;cursor:pointer">💬 chat</button>
       <div style="flex:1"></div>
       <button onclick="_apxGhostSkip('${r.id}')" title="Skip, mark Lost, or Abandon (and optionally teach why)" style="background:transparent;border:1px solid var(--border);color:#e0654f;border-radius:7px;padding:5px 11px;font-size:12px;cursor:pointer">✕ other</button>
-      <button onclick="_apxGhostConfirm('${r.id}')" title="Send to the Ghosted automation" style="background:var(--gold,#E8C547);border:1px solid var(--gold,#E8C547);color:#0B0B0D;border-radius:7px;padding:5px 13px;font-size:12px;font-weight:700;cursor:pointer">👻 Send to Ghosted</button>
+      <button onclick="_apxGhostConfirm('${r.id}', this)" title="Send to the Ghosted automation" style="background:var(--gold,#E8C547);border:1px solid var(--gold,#E8C547);color:#0B0B0D;border-radius:7px;padding:5px 13px;font-size:12px;font-weight:700;cursor:pointer">👻 Send to Ghosted</button>
     </div>
   </div>`;
 }
-async function _apxGhostConfirm(id) {
+// No confirm popup (it rendered behind the Hawkeye overlay). Instant card animation
+// via the deferred-action engine; the actual enroll is held 6s with Undo top-right.
+function _apxGhostConfirm(id, btn) {
   const r = (_APX_DATA.ghost || []).find(x => x.id === id); if (!r) return;
-  _plConfirmModal({
-    icon: '👻',
-    title: 'Send ' + (r.contact_name || 'this lead') + ' to Ghosted?',
-    body: 'They\'ll get the Ghosted text sequence and move to <b>Interested</b>. If they reply they go back to <b>Responded</b>; if they don\'t, they get marked <b>Lost</b> automatically.',
-    okLabel: 'Send to Ghosted',
-    onOk: async () => {
-      try {
-        await _apxPost('/api/agent-approvals', 'confirm-ghost', { ready_id: r.id });
-        if (_PL_NEEDS && r.ghl_contact_id) _PL_NEEDS.delete(String(r.ghl_contact_id));
-        _apxRemove(id);
-        // Move the board card to Interested right away (the automation does it too).
-        _plMoveContactToInterested(r.ghl_contact_id);
-        // If acted on from inside the card drawer, flash the full-drawer confirmation;
-        // otherwise (Hawkeye overlay) just toast.
-        if (document.getElementById('pl-drawer')?.classList.contains('open')) {
-          _plDrawerConfirm('👻', 'Sent to Ghosted', 'Moved to Interested - the automation takes over');
-        } else {
-          _apxToast('👻 Sent to Ghosted', true);
-        }
-      } catch (e) { _apxToast(_apxErr(e), false); }
+  _hawkDefer({
+    btn, cardId: 'apx-' + id, label: 'Sent to Ghosted', restore: _apxRender,
+    run: async () => {
+      await _apxPost('/api/agent-approvals', 'confirm-ghost', { ready_id: r.id });
+      if (_PL_NEEDS && r.ghl_contact_id) _PL_NEEDS.delete(String(r.ghl_contact_id));
+      _apxRemove(id);
+      _plMoveContactToInterested(r.ghl_contact_id);
+      if (document.getElementById('pl-drawer')?.classList.contains('open')) {
+        _plDrawerConfirm('👻', 'Sent to Ghosted', 'Moved to Interested - the automation takes over');
+      } else {
+        _apxToast('👻 Sent to Ghosted', true);
+      }
     },
   });
 }
@@ -25313,6 +25307,56 @@ function _apxRender() {
     }
   }
   body.innerHTML = `<div style="max-width:860px;margin:0 auto">${focusBanner}${inner}</div>`;
+}
+
+// ── Hawkeye deferred-action engine ──────────────────────────────────────────
+// A card action confirms INSTANTLY (button spinner -> card animates out) but the
+// real work (API call + any SMS) is HELD for 6s so it can be undone from the pill
+// at the top-right of Hawkeye. Undo within the window = nothing happened, the card
+// comes back. One pending action at a time: starting a second commits the first.
+let _HAWK_PENDING = null; // { run, label, restore, timer, deadline }
+function _hawkDefer({ btn, cardId, label, run, restore }) {
+  if (_HAWK_PENDING) _hawkFlush();   // commit any prior pending first
+  if (btn) { btn.disabled = true; btn.style.cursor = 'default'; btn.innerHTML = '<span class="apx-btn-spin-light"></span>'; }
+  // brief spinner beat, then collapse the card out of the list
+  setTimeout(() => {
+    const el = document.getElementById(cardId);
+    if (el) {
+      el.style.overflow = 'hidden';
+      el.style.transition = 'opacity .3s ease, transform .3s ease, max-height .35s ease, margin .35s ease, padding .35s ease';
+      el.style.maxHeight = el.offsetHeight + 'px';
+      requestAnimationFrame(() => {
+        el.style.opacity = '0'; el.style.transform = 'translateX(36px)';
+        el.style.maxHeight = '0'; el.style.marginTop = '0'; el.style.marginBottom = '0';
+        el.style.paddingTop = '0'; el.style.paddingBottom = '0';
+      });
+    }
+  }, 200);
+  const entry = { run, label, restore: restore || (() => {}), deadline: Date.now() + 6000 };
+  entry.timer = setInterval(() => { if (Date.now() >= entry.deadline) _hawkFlush(); else _hawkUndoPill(); }, 250);
+  _HAWK_PENDING = entry;
+  _hawkUndoPill();
+}
+async function _hawkFlush() {
+  const e = _HAWK_PENDING; if (!e) return;
+  _HAWK_PENDING = null; clearInterval(e.timer); _hawkUndoPill();
+  try { await e.run(); } catch (err) { _apxToast(_apxErr(err), false); try { e.restore(); } catch (_) {} }
+}
+function _hawkUndo() {
+  const e = _HAWK_PENDING; if (!e) return;
+  _HAWK_PENDING = null; clearInterval(e.timer); _hawkUndoPill();
+  try { e.restore(); } catch (_) {}
+  _apxToast('↩ Undone', true);
+}
+function _hawkUndoPill() {
+  let pill = document.getElementById('hawk-undo-pill');
+  if (!_HAWK_PENDING) { if (pill) pill.remove(); return; }
+  const secs = Math.max(0, Math.ceil((_HAWK_PENDING.deadline - Date.now()) / 1000));
+  if (!pill) {
+    document.body.insertAdjacentHTML('beforeend', `<button id="hawk-undo-pill" onclick="_hawkUndo()" style="position:fixed;top:calc(12px + env(safe-area-inset-top));right:14px;z-index:9999;background:var(--surface);border:1px solid var(--accent);color:var(--accent);border-radius:999px;padding:9px 16px;font:inherit;font-size:13px;font-weight:800;cursor:pointer;box-shadow:0 8px 24px rgba(0,0,0,.45)"></button>`);
+    pill = document.getElementById('hawk-undo-pill');
+  }
+  pill.innerHTML = `&#8617; Undo<span style="opacity:.72;font-weight:600">&nbsp; ${escapeHTML(_HAWK_PENDING.label || '')} &middot; ${secs}s</span>`;
 }
 
 function _apxRemove(id) {
