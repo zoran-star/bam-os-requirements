@@ -27,6 +27,7 @@ const SB_KEY = (process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SE
 const STRIPE_API = "https://api.stripe.com/v1";
 
 const DEV_ORIGINS = new Set(["http://localhost:3000", "http://localhost:5173", "http://127.0.0.1:5500"]);
+const VERCEL_PREVIEW = /^https:\/\/bam-client-sites-[a-z0-9]+-zoran-stars-projects\.vercel\.app$/;
 let originsCache = { set: null, at: 0 };
 const ORIGINS_TTL_MS = 60_000;
 
@@ -87,7 +88,7 @@ async function handler(req, res) {
   // CORS — same gate as /api/website/checkout
   const origin = req.headers.origin || "";
   let allowed = false;
-  try { allowed = (await getAllowedOrigins()).has(origin); } catch { /* 403 below */ }
+  try { allowed = (await getAllowedOrigins()).has(origin) || VERCEL_PREVIEW.test(origin); } catch { /* 403 below */ }
   if (allowed) { res.setHeader("Access-Control-Allow-Origin", origin); res.setHeader("Vary", "Origin"); }
   res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type");
