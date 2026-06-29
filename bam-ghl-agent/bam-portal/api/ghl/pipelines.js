@@ -1,6 +1,7 @@
 import { withSentryApiRoute } from "../_sentry.js";
 import { isAutomationLive, enrollContact } from "../automations.js";
 import { nurtureStage } from "../agent/_stage.js";
+import { shadowMirrorMove, shadowBackfillFromBoard, buildPortalBoard } from "../agent/_store.js";
 // Vercel Serverless Function — Per-academy GHL Pipelines (kanban + moves)
 //
 //   GET   /api/ghl/pipelines?client_id=<uuid>
@@ -184,7 +185,7 @@ async function loadAcademyAndToken(clientId, ctx, res) {
   }
   const rows = await sb(
     `clients?id=eq.${clientId}` +
-    `&select=id,business_name,ghl_location_id,ghl_access_token,ghl_refresh_token,ghl_token_expires_at,ghl_kpi_config` +
+    `&select=id,business_name,ghl_location_id,ghl_access_token,ghl_refresh_token,ghl_token_expires_at,ghl_kpi_config,pipeline_shadow,pipeline_provider` +
     `&limit=1`
   );
   const client = Array.isArray(rows) && rows[0];
@@ -250,6 +251,8 @@ async function handler(req, res) {
                 method: "POST", headers: { Prefer: "return=minimal" },
                 body: JSON.stringify([{ client_id: clientId, opportunity_id: oppId, status: "nurture", reason: (body.reason || "").toString().trim() || null }]),
               }).catch(() => {});
+              // Shadow dual-write (dormant unless this academy has pipeline_shadow on).
+              try { await shadowMirrorMove(clientId, { shadow: client.pipeline_shadow, ghlOpportunityId: oppId, ghlContactId: contactId, role: "nurture", stageResolved: ns, status: "open", reason: (body.reason || "").toString().trim() || null }); } catch (_) {}
               return res.status(200).json({ ok: true, opportunity_id: oppId, status: "lost", routed_to_nurture: true, nurture_stage: ns.stageName });
             }
           }
@@ -267,6 +270,8 @@ async function handler(req, res) {
             body: JSON.stringify([{ client_id: cid, opportunity_id: oppId, status: body.status, reason: (body.reason || "").toString().trim() || null }]),
           }).catch(() => {});
         }
+        // Shadow dual-write of the close/reopen (dormant unless pipeline_shadow on).
+        try { await shadowMirrorMove(clientId, { shadow: client.pipeline_shadow, ghlOpportunityId: oppId, status: body.status, reason: (body.reason || "").toString().trim() || null }); } catch (_) {}
         return res.status(200).json({ ok: true, opportunity_id: oppId, status: body.status, raw: out });
       } catch (e) {
         return res.status(e.status || 502).json({ error: `GHL: ${e.message}`, detail: e.body || null });
@@ -280,6 +285,8 @@ async function handler(req, res) {
         token,
         body: { pipelineId: body.pipeline_id, pipelineStageId: body.stage_id },
       });
+      // Shadow dual-write of the stage move (dormant unless pipeline_shadow on).
+      try { await shadowMirrorMove(clientId, { shadow: client.pipeline_shadow, ghlOpportunityId: oppId, ghlStageId: body.stage_id, ghlPipelineId: body.pipeline_id }); } catch (_) {}
       return res.status(200).json({ ok: true, opportunity_id: oppId, new_stage_id: body.stage_id, raw: out });
     } catch (e) {
       return res.status(e.status || 502).json({ error: `GHL: ${e.message}`, detail: e.body || null });
@@ -418,6 +425,21 @@ async function handler(req, res) {
     return res.status(200).json({ ...cached.payload, cached: true });
   }
 
+  // Read-from-portal (DORMANT under provider='ghl'): when this academy is flipped to
+  // provider='portal', assemble the base board from the own-store instead of GHL.
+  // pipelines.js still runs the identical enrichment below, so it stays the single
+  // shaper that emits the GHL-shaped board JSON the client UI depends on.
+  const provider = client.pipeline_provider || "ghl";
+  let enriched;
+  if (provider === "portal") {
+    try {
+      const portalBoard = await buildPortalBoard(clientId);
+      enriched = portalBoard.pipelines;
+    } catch (e) {
+      if (cached) return res.status(200).json({ ...cached.payload, stale: true });
+      return res.status(500).json({ error: `portal board: ${e.message}`, detail: null });
+    }
+  } else {
   // 1. Pull pipelines (lightweight call)
   let pipelinesResp;
   try {
@@ -450,7 +472,7 @@ async function handler(req, res) {
     }
     return out;
   }
-  const enriched = await Promise.all(pipelines.map(async (p) => {
+  enriched = await Promise.all(pipelines.map(async (p) => {
     const opps = await fetchOpenOpps(p.id);
 
     return {
@@ -475,6 +497,7 @@ async function handler(req, res) {
       })),
     };
   }));
+  }   // end provider==='ghl' branch (GHL-sourced board)
 
   // 3. Cross-reference each opportunity's contact with members table.
   //    A 'member' badge appears when we can match by email or phone or
@@ -655,6 +678,12 @@ async function handler(req, res) {
     opportunities: enriched.reduce((s, p) => s + p.opportunities.length, 0),
   } };
   writePipelineCache(clientId, payload);   // warm the cache for the next open (fire-and-forget)
+  // Shadow backfill (DORMANT unless pipeline_shadow on): passively mirror every open
+  // opp + self-seed the registry from the board we just built, with no extra GHL
+  // calls. Only meaningful while still reading from GHL (provider==='ghl').
+  if (provider !== "portal") {
+    try { await shadowBackfillFromBoard(clientId, { shadow: client.pipeline_shadow, pipelines: enriched }); } catch (_) {}
+  }
   return res.status(200).json(payload);
 }
 
