@@ -16096,13 +16096,14 @@ const _TA = { tab: 'test', target: 'booking', chat: [], sending: false, openSect
 const _TA_AGENTS = { booking: '📞 Booking', confirm: '✅ Confirm', closing: '🎯 Closing' };
 // trial_followup retired 2026-06-28: trial-no-book leads now go to the Booking
 // agent with context (cold opener) instead of a separate automation.
-const _TA_AUTOS  = { onboarding: '👋 Onboarding', missed_trial: '📵 Missed Trial', ghosted: '👻 Ghosted', nurture: '💔 Lead Nurture' };
+const _TA_AUTOS  = { onboarding: '👋 Onboarding', missed_trial: '📵 Missed Trial', ghosted: '👻 Ghosted', nurture: '💔 Lead Nurture', summer_special: '☀️ Summer Special' };
 // What each automation is FOR and HOW a lead gets pulled into it (shown as the blurb).
 const _TA_AUTO_ABOUT = {
   onboarding: `<b>👋 Onboarding</b> welcomes a brand-new paid member. The moment their first payment clears and they go live, they drop into this sequence - a welcome text + email, then a couple of getting-started nudges over the first week. Approve it once and flip it on; it runs itself (quiet hours respected). Edit every message below.`,
   missed_trial: `<b>📵 Missed Trial</b> is the first text an athlete gets when they no-show their trial. Edit the wait + message, then flip it on and approve. The moment they reply, your booking agent takes over; if they stay silent, they roll into 👻 Ghosted automatically.`,
   ghosted: `<b>👻 Ghosted</b> wins back leads who go quiet. When a lead stops replying, your agent drops them in here for a short burst of texts and emails to restart the conversation. Reply and they bounce straight back to the booking agent; silent all the way through and they roll into Lead Nurture.`,
   nurture: `<b>💔 Lead Nurture</b> is the slow-burn long game. Any lead that's lost but still a fit - across booking, confirm and closing - plus anyone who finishes the Ghosted sequence lands here for the occasional text or email that keeps your academy top of mind. The moment they reply, they bounce back to the booking agent with context.`,
+  summer_special: `<b>☀️ Summer Special</b> is your seasonal discount push. Drop a lead in from the pipeline (the "Summer Special" button) and they get a short burst of texts about the offer - book a trial now, a reminder a day later, then a last-chance nudge. Reply and your booking agent takes over; silent all the way through and they roll into Lead Nurture. Edit every message below.`,
 };
 // Entry points - where a lead enters the pipeline + which stage/bot picks them up.
 const _TA_ENTRY = { ep_contact: '📝 Contact Form', ep_trial: '🏀 Trial Form' };
