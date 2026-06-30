@@ -30837,7 +30837,7 @@ function _renderMemberModalBody(m, stripe, history) {
         <div style="${labelCss};margin-bottom:8px">Payment history</div>
         <div style="display:grid;gap:5px">
           ${stripe.payments.map(p => {
-            const stColor = p.status === 'paid' ? '#7BC47F' : (p.status === 'open' || p.status === 'draft') ? '#c79a4a' : '#9a3b2f';
+            const stColor = (p.status === 'succeeded' || p.status === 'paid') ? '#7BC47F' : (p.status === 'pending' || p.status === 'processing' || p.status === 'refunded' || p.status === 'open' || p.status === 'draft') ? '#c79a4a' : '#9a3b2f';
             const row = `<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;font-size:12.5px;padding:7px 10px;background:var(--surface);border:1px solid var(--border);border-radius:8px">
               <span style="color:var(--text-mute)">${fmtDate(p.date)}</span>
               <span style="display:flex;align-items:center;gap:9px">
@@ -31636,7 +31636,7 @@ async function mChange(memberId, currentPlan) {
   // Recent payments - last few invoices on this sub (from /api/members stripe.payments).
   // Amounts are already all-in (tax-inclusive), so show the total paid, not the HST split.
   const _pays = (sj && Array.isArray(sj.payments)) ? sj.payments.slice(0, 4) : [];
-  const _payStColor = (s) => s === 'paid' ? '#7BC47F' : (s === 'open' || s === 'draft') ? '#c79a4a' : '#9a3b2f';
+  const _payStColor = (s) => (s === 'succeeded' || s === 'paid') ? '#7BC47F' : (s === 'pending' || s === 'processing' || s === 'refunded' || s === 'open' || s === 'draft') ? '#c79a4a' : '#9a3b2f';
   const paymentsHtml = _pays.length ? `<div style="margin-top:10px"><div style="font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:var(--text-mute,#888);margin-bottom:5px">Recent payments</div><div style="display:grid;gap:4px">${_pays.map(p => `<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;font-size:12px"><span style="color:var(--text-mute,#888)">${escapeHTML(_cdDate(p.date) || '')}</span><span style="display:flex;align-items:center;gap:8px"><b style="color:var(--text,#eee)">${_money(p.amount_cents)}</b><span style="color:${_payStColor(p.status)};font-size:10px;font-weight:800;text-transform:capitalize">${escapeHTML(p.status || '')}</span></span></div>`).join('')}</div></div>` : '';
   let vals;
   try {
