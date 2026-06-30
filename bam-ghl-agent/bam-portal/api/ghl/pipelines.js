@@ -1,7 +1,7 @@
 import { withSentryApiRoute } from "../_sentry.js";
 import { isAutomationLive, enrollContact } from "../automations.js";
 import { nurtureStage, interestedStage } from "../agent/_stage.js";
-import { shadowMirrorMove, shadowBackfillFromBoard, buildPortalBoard } from "../agent/_store.js";
+import { shadowMirrorMove, shadowBackfillFromBoard, buildPortalBoard, findOpenOpp, setStatus, moveStage } from "../agent/_store.js";
 // Vercel Serverless Function — Per-academy GHL Pipelines (kanban + moves)
 //
 //   GET   /api/ghl/pipelines?client_id=<uuid>
@@ -201,6 +201,36 @@ async function loadAcademyAndToken(clientId, ctx, res) {
   return { client, ...creds };
 }
 
+// Build the provider-aware opp handle the store layer should act on for a
+// hand-marked PATCH.
+//   • provider='ghl' (every client today): the clicked opportunity_id IS the GHL
+//     opportunity id, so act on it directly -> byte-identical with today's PUT.
+//     No extra lookups, no behavior change.
+//   • provider='portal': resolve the contact's open row from the store via
+//     findOpenOpp (so a portal-native row, which has no GHL id, is matched too).
+//     Falls back to treating the clicked id as the portal row id.
+async function storeOppRef({ clientId, provider, shadow, token, locationId, oppId, contactId }) {
+  if (provider !== "portal") return { ghlOpportunityId: oppId };
+  let cid = contactId;
+  if (!cid) {
+    try {
+      const rows = await sb(
+        `opportunities?client_id=eq.${encodeURIComponent(clientId)}` +
+        `&or=(id.eq.${encodeURIComponent(oppId)},ghl_opportunity_id.eq.${encodeURIComponent(oppId)})` +
+        `&select=ghl_contact_id&limit=1`
+      );
+      cid = Array.isArray(rows) && rows[0] ? rows[0].ghl_contact_id : null;
+    } catch (_) { /* fall through to the id-based fallback */ }
+  }
+  if (cid) {
+    try {
+      const ref = await findOpenOpp({ clientId, provider, shadow, ghl, token, locationId, contactId: cid });
+      if (ref) return ref;
+    } catch (_) { /* fall through to the id-based fallback */ }
+  }
+  return { id: oppId, ghlOpportunityId: oppId };
+}
+
 // ─────────────────────────────────────────────────────────
 // Handler
 // ─────────────────────────────────────────────────────────
@@ -221,6 +251,12 @@ async function handler(req, res) {
     const oppId = req.query.opportunity_id;
     const body = (req.body && typeof req.body === "object") ? req.body : {};
     if (!oppId) return res.status(400).json({ error: "opportunity_id required" });
+
+    // Provider + shadow are read off the already-loaded client row, so the store
+    // calls below take the right branch with no extra Supabase read. 'ghl' for
+    // every client today -> the store does today's GHL PUT (byte-identical).
+    const provider = client.pipeline_provider || "ghl";
+    const shadow = !!client.pipeline_shadow;
 
     // Status-only update (e.g. mark won/lost from the Done Trial stage).
     if (body.status && !body.stage_id) {
@@ -245,34 +281,43 @@ async function handler(req, res) {
                 const oo = og.opportunity || og;
                 contactId = oo.contactId || oo.contact?.id || null;
               } catch (_) {}
-              await ghl("PUT", `/opportunities/${encodeURIComponent(oppId)}`, { token, body: { pipelineId: ns.pipelineId, pipelineStageId: ns.stageId } });
+              const reason = (body.reason || "").toString().trim() || null;
+              // Move to the Lead Nurture stage through the provider-aware store. On
+              // provider='ghl' (every client today) moveStage does today's PUT +
+              // shadow mirror -> byte-identical; on provider='portal' it updates the
+              // opportunities row instead. The store call also does the shadow
+              // dual-write internally, so no separate shadowMirrorMove here.
+              const oppRef = await storeOppRef({ clientId, provider, shadow, token, locationId, oppId, contactId });
+              await moveStage({ clientId, provider, shadow, ghl, token, oppRef, stage: ns, role: "nurture", contactId, reason });
               if (contactId) { try { await enrollContact({ clientId, automationKey: "nurture", contactId }); } catch (_) {} }
               await sb(`pipeline_outcomes`, {
                 method: "POST", headers: { Prefer: "return=minimal" },
-                body: JSON.stringify([{ client_id: clientId, opportunity_id: oppId, status: "nurture", reason: (body.reason || "").toString().trim() || null }]),
+                body: JSON.stringify([{ client_id: clientId, opportunity_id: oppId, status: "nurture", reason }]),
               }).catch(() => {});
-              // Shadow dual-write (dormant unless this academy has pipeline_shadow on).
-              try { await shadowMirrorMove(clientId, { shadow: client.pipeline_shadow, ghlOpportunityId: oppId, ghlContactId: contactId, role: "nurture", stageResolved: ns, status: "open", reason: (body.reason || "").toString().trim() || null }); } catch (_) {}
               return res.status(200).json({ ok: true, opportunity_id: oppId, status: "lost", routed_to_nurture: true, nurture_stage: ns.stageName });
             }
           }
         } catch (_) { /* fall through to GHL-native lost */ }
       }
       try {
-        const out = await ghl("PUT", `/opportunities/${encodeURIComponent(oppId)}`, {
-          token, body: { status: body.status },
-        });
+        const reason = (body.reason || "").toString().trim() || null;
+        // Set the lifecycle status through the provider-aware store. On
+        // provider='ghl' (every client today) setStatus does today's status PUT +
+        // shadow mirror -> byte-identical; on provider='portal' it updates the
+        // opportunities row instead. The store call does the shadow dual-write
+        // internally, so no separate shadowMirrorMove here. (No contactId is passed,
+        // matching today's mirror, which never stamped one on a plain status close.)
+        const oppRef = await storeOppRef({ clientId, provider, shadow, token, locationId, oppId });
+        await setStatus({ clientId, provider, shadow, ghl, token, oppRef, status: body.status, reason });
         // V1.5: record the outcome + free-text reason (status 'open' = an undo).
         const cid = req.query.client_id;
         if (cid && body.status !== "open") {
           await sb(`pipeline_outcomes`, {
             method: "POST", headers: { Prefer: "return=minimal" },
-            body: JSON.stringify([{ client_id: cid, opportunity_id: oppId, status: body.status, reason: (body.reason || "").toString().trim() || null }]),
+            body: JSON.stringify([{ client_id: cid, opportunity_id: oppId, status: body.status, reason }]),
           }).catch(() => {});
         }
-        // Shadow dual-write of the close/reopen (dormant unless pipeline_shadow on).
-        try { await shadowMirrorMove(clientId, { shadow: client.pipeline_shadow, ghlOpportunityId: oppId, status: body.status, reason: (body.reason || "").toString().trim() || null }); } catch (_) {}
-        return res.status(200).json({ ok: true, opportunity_id: oppId, status: body.status, raw: out });
+        return res.status(200).json({ ok: true, opportunity_id: oppId, status: body.status });
       } catch (e) {
         return res.status(e.status || 502).json({ error: `GHL: ${e.message}`, detail: e.body || null });
       }
