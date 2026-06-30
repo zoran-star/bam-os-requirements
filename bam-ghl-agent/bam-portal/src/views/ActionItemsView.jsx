@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
+import { useUrlState } from "../hooks/useUrlState";
 import { fetchActionItems, createActionItem, updateActionItem } from "../services/notionService";
 
 const CATEGORIES = ["Digital Marketing", "Systems", "Content", "Operations", "General"];
@@ -222,7 +223,7 @@ function ItemRow({ item, tokens, showClient, expanded, onToggle }) {
 }
 
 export default function ActionItemsView({ tokens, dark }) {
-  const [subTab, setSubTab] = useState("by-client");
+  const [subTab, setSubTab] = useUrlState("atab", "by-client");
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(false);
   const [expandedItem, setExpandedItem] = useState(null);

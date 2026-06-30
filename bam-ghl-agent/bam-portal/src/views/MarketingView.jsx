@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useUrlState } from "../hooks/useUrlState";
 import MarketingOverview from "./MarketingOverview";
 
 const TYPE_META = {
@@ -267,8 +268,8 @@ const SAMPLE_TICKETS_UNUSED_ = [
 ];
 
 export default function MarketingView({ tokens: tk, dark, me, session }) {
-  const [section, setSection] = useState("performance"); // performance | tickets
-  const [tab, setTab] = useState("active"); // active | content-check | client-action | completed
+  const [section, setSection] = useUrlState("msec", "performance"); // performance | tickets
+  const [tab, setTab] = useUrlState("mtab", "active"); // active | client-action | completed
   const [tickets, setTickets] = useState([]);
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState("");
