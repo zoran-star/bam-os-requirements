@@ -30750,6 +30750,12 @@ function _renderMemberModalBody(m, stripe, history) {
 
     ${divider}
 
+    <!-- Messages (read-only GHL conversation thread) -->
+    ${m.ghl_contact_id ? `<div style="${labelCss};margin-bottom:12px;display:flex;align-items:center;justify-content:space-between"><span>Messages</span><a onclick="_autoOpenContact('${escapeHTML(m.ghl_contact_id)}','${escapeHTML((m.athlete_name||'').replace(/'/g,''))}')" style="font-size:11px;color:var(--accent);cursor:pointer;text-transform:none;letter-spacing:0;font-family:inherit">Open in Inbox ↗</a></div>
+    <div id="member-inbox-section" style="margin-bottom:12px"><div style="font-size:12px;color:var(--text-mute)">Loading messages…</div></div>
+
+    ${divider}` : ''}
+
     <!-- Documents (waivers, media releases, etc) - private per-member files -->
     <div style="${labelCss};margin-bottom:12px">Documents</div>
     <div id="member-docs-section"><div style="font-size:12px;color:var(--text-mute)">Loading documents…</div></div>
@@ -30776,12 +30782,48 @@ function _renderMemberModalBody(m, stripe, history) {
     </div>
   `;
   _loadMemberDocs(m.id, m.client_id || (typeof CLIENT_ID !== 'undefined' ? CLIENT_ID : null));
+  if (m.ghl_contact_id) _loadMemberInbox(m);
   if (m.stripe_price_id) _mFillPlanStatus(m.stripe_price_id);
 }
 
 // ─── Per-member documents (private member-files bucket + member_files table) ──
 let _memberDocsCache = [];
 const _MEMBER_DOC_KINDS = { waiver: 'Waiver', media: 'Media release', medical: 'Medical', intake: 'Intake', document: 'Other' };
+
+// Member drawer: read-only GHL conversation thread, fetched by ghl_contact_id.
+// Reuses the same /api/ghl/inbox endpoint + ib-msg styling as the Sales pipeline
+// drawer. Shows the last ~8 messages; "Open in Inbox" jumps to the full thread.
+async function _loadMemberInbox(m) {
+  const sec = document.getElementById('member-inbox-section');
+  if (!sec || !m || !m.ghl_contact_id) return;
+  try {
+    const token = await _mreqAuthToken();
+    const r = await fetch(`/api/ghl/inbox?client_id=${encodeURIComponent(m.client_id || CLIENT_ID)}&contact_id=${encodeURIComponent(m.ghl_contact_id)}`, { headers: { 'Authorization': 'Bearer ' + token } });
+    const j = await _safeJson(r);
+    if (!r.ok) throw new Error(j.error || ('HTTP ' + r.status));
+    _renderMemberInbox(sec, j.messages || [], (m.athlete_name || '').trim().split(/\s+/)[0] || 'Them');
+  } catch (e) {
+    sec.innerHTML = `<div style="font-size:12px;color:var(--text-mute)">Couldn't load messages - ${escapeHTML(e.message)}</div>`;
+  }
+}
+
+function _renderMemberInbox(sec, messages, contactFirst) {
+  const sorted = [...messages].filter(mm => !_ibIsActivity(mm))
+    .sort((a, b) => (a.date ? new Date(a.date).getTime() : 0) - (b.date ? new Date(b.date).getTime() : 0));
+  const recent = sorted.slice(-8);
+  if (!recent.length) { sec.innerHTML = `<div style="font-size:12px;color:var(--text-mute)">No messages yet.</div>`; return; }
+  const more = sorted.length - recent.length;
+  const thread = recent.map(mm => {
+    const out = (mm.direction || '').toLowerCase() === 'outbound';
+    const atts = _ibRenderAttachments(mm.attachments);
+    const hasBody = (mm.body || '').trim().length > 0;
+    const sender = out ? 'You' : escapeHTML(contactFirst);
+    const channel = escapeHTML(_ghlChannelLabel(mm.type));
+    const when = escapeHTML(_ibFormatDate(mm.date));
+    return `<div class="ib-msg ${out ? 'ib-msg-out' : 'ib-msg-in'}">${hasBody ? escapeHTML(mm.body.trim()) : (atts ? '' : '(no body)')}${atts}<div class="ib-msg-meta">${sender} · ${channel}${when ? ' · ' + when : ''}</div></div>`;
+  }).join('');
+  sec.innerHTML = `${more > 0 ? `<div style="font-size:11px;color:var(--text-mute);margin-bottom:8px">Showing last ${recent.length} of ${sorted.length} messages</div>` : ''}<div style="display:flex;flex-direction:column;gap:8px;max-height:340px;overflow-y:auto">${thread}</div>`;
+}
 
 async function _loadMemberDocs(memberId, clientId) {
   const sec = document.getElementById('member-docs-section');
