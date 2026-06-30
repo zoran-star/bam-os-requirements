@@ -31630,11 +31630,16 @@ async function mChange(memberId, currentPlan) {
   let nextYMD = '';
   try { if (nextUnix) nextYMD = new Date(nextUnix * 1000).toISOString().slice(0, 10); } catch (_) { nextYMD = ''; }
   const nextLabel = nextUnix ? (_cdDate(nextUnix) || 'unknown') : 'unknown';
+  // Recent payments - last few invoices on this sub (from /api/members stripe.payments).
+  // Amounts are already all-in (tax-inclusive), so show the total paid, not the HST split.
+  const _pays = (sj && Array.isArray(sj.payments)) ? sj.payments.slice(0, 4) : [];
+  const _payStColor = (s) => s === 'paid' ? '#7BC47F' : (s === 'open' || s === 'draft') ? '#c79a4a' : '#9a3b2f';
+  const paymentsHtml = _pays.length ? `<div style="margin-top:10px"><div style="font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:var(--text-mute,#888);margin-bottom:5px">Recent payments</div><div style="display:grid;gap:4px">${_pays.map(p => `<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;font-size:12px"><span style="color:var(--text-mute,#888)">${escapeHTML(_cdDate(p.date) || '')}</span><span style="display:flex;align-items:center;gap:8px"><b style="color:var(--text,#eee)">${_money(p.amount_cents)}</b><span style="color:${_payStColor(p.status)};font-size:10px;font-weight:800;text-transform:capitalize">${escapeHTML(p.status || '')}</span></span></div>`).join('')}</div></div>` : '';
   let vals;
   try {
     vals = await _mmModal({
       icon: '🔄', title: 'Change plan',
-      body: `Current plan: <b>${escapeHTML(currentPlan || '-')}</b>${(sj && sj.amount_cents != null) ? ' &middot; ' + _withHst(sj.amount_cents) : ''}<br>Next payment: <b>${escapeHTML(nextLabel)}</b>`,
+      body: `Current plan: <b>${escapeHTML(currentPlan || '-')}</b>${(sj && sj.amount_cents != null) ? ' &middot; ' + _withHst(sj.amount_cents) : ''}<br>Next payment: <b>${escapeHTML(nextLabel)}</b>${paymentsHtml}`,
       okLabel: 'Change plan',
       fields: [
         { key: 'new_price', label: 'New plan', type: 'select', value: flat[0].value, options: grouped },
