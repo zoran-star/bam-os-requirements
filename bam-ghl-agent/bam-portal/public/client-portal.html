@@ -31918,7 +31918,9 @@ async function _budgetReviewSubmit(reviewId, lookGood) {
   const MIN = 600;
   const inputs = Array.from(document.querySelectorAll('#budgetReviewBody input[id^="br-input-"]'));
   const errEl = document.getElementById('br-error');
-  const changes = [];
+  // Snapshot EVERY campaign (not just changed ones) so the confirmation always
+  // turns into one marketing ticket the team can action - even "These look good".
+  const budgets = [];
   for (const inp of inputs) {
     const val = parseFloat(inp.value);
     if (!Number.isFinite(val) || val < MIN) {
@@ -31926,27 +31928,20 @@ async function _budgetReviewSubmit(reviewId, lookGood) {
       return;
     }
     const cur = inp.dataset.cur === '' ? null : parseFloat(inp.dataset.cur);
-    if (!lookGood && (cur == null || Math.round(val) !== Math.round(cur))) {
-      changes.push({ name: inp.dataset.name, cur, next: Math.round(val) });
-    }
+    const next = Math.round(val);
+    const changed = !lookGood && (cur == null || next !== Math.round(cur));
+    budgets.push({ name: inp.dataset.name, current: cur, confirmed: next, changed });
   }
+  const changes = budgets.filter(b => b.changed);
   try {
-    for (const ch of changes) {
-      await _mreqCreateTicket({
-        type: 'budget',
-        fields: {
-          campaign_title: ch.name,
-          current_spend: ch.cur != null ? '$' + ch.cur : '',
-          new_spend: '$' + ch.next,
-          note: 'Submitted from the monthly budget confirmation.',
-        },
-      });
-    }
+    // One ticket: the budget-review request itself becomes the marketing work
+    // ticket (stays open, carries the confirmed budgets). No per-campaign tickets.
     await _mreqPatchTicket(reviewId, {
       action: 'respond',
       message: changes.length
         ? `Confirmed monthly budgets - requested ${changes.length} change${changes.length === 1 ? '' : 's'}.`
         : 'Confirmed monthly budgets - no changes.',
+      budgets,
     });
     _closeBudgetReviewModal();
     await fetchAndRenderMarketingRequests();
@@ -31954,7 +31949,7 @@ async function _budgetReviewSubmit(reviewId, lookGood) {
       changes.length ? 'Budget changes submitted' : 'Budgets confirmed',
       changes.length
         ? `We sent ${changes.length} budget change${changes.length === 1 ? '' : 's'} to your marketing team.`
-        : 'Thanks for confirming - no changes made.'
+        : 'Thanks for confirming - we let your marketing team know.'
     );
   } catch (e) {
     if (errEl) { errEl.textContent = 'Something went wrong: ' + e.message; errEl.style.display = 'block'; }
@@ -32869,7 +32864,10 @@ function _mreqRowHTML(r) {
 
   // All content-ticket rows open the unified content-ticket detail view.
   // Marketing-ticket rows open the existing marketing detail view.
-  const onClickAttr = r.type === 'budget-review'
+  // A budget-review only re-opens the budget modal while it's still awaiting the
+  // client. Once confirmed it lives on as a marketing work ticket, so clicking it
+  // opens the normal request detail (the thread + confirmed budgets) instead.
+  const onClickAttr = (r.type === 'budget-review' && r.clientActionStatus === 'requested')
     ? `_openBudgetReviewModal('${r.id}')`
     : (isContentAction || isContentProduction)
     ? `openContentTicketDetail('${r.id}')`
