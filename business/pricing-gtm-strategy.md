@@ -128,7 +128,11 @@ STEP 1            STEP 2                          STEP 3
 
 ## 6b. Global Brain — privacy requirements (build rules)
 
-Global Brain = a shared, curated pool of AI *lessons* that improves every academy's agents (the "more it learns" moat at fleet scale). Non-negotiable rules for whoever builds it:
+Global Brain = a shared, curated pool of AI *lessons* that improves every academy's agents (the "more it learns" moat at fleet scale).
+
+**Tier split (decided):** **Consume** (your AI benefits from the network) = **Core** — you can't gate a network effect without shrinking it. **Contribute** (brain editor + lesson library + training sandbox, the tooling that shapes + feeds the brain) = **Growth**, where it already lives. Universal brand claim across all tiers: *"every FullControl AI is trained by the whole network."*
+
+Non-negotiable rules for whoever builds it:
 
 - **Promote the technique, never the content.** Share *how* to handle a situation (objection-handling, tone, cadence) — never business-specific data, pricing, contacts, names, or any PII.
 - **BAM curates every promotion.** Nothing auto-shares from local → global; a human approves what enters the shared brain (already modeled via `agent_lessons.promotion_status`).
