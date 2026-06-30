@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Category Landscape — Full Control</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --ink:#0A0A0B;--ink-2:#131316;--ink-3:#1C1C21;
+  --line-dark:#2A2A31;--line-dark-2:#383842;
+  --paper:#F5F1E8;--gold:#E8C547;--gold-3:#8B6F2A;
+  --pace-go:#9FD88A;--pace-stop:#E87560;--pace-flow:#5A8FB8;
+  --display:"Space Grotesk","Inter",sans-serif;--sans:"Inter",system-ui,sans-serif;--mono:"JetBrains Mono",ui-monospace,monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--ink);color:var(--paper);font-family:var(--sans);font-size:14px;-webkit-font-smoothing:antialiased;padding:48px 40px}
+.wrap{max-width:1120px;margin:0 auto}
+.kicker{font-family:var(--mono);font-size:11px;letter-spacing:.18em;text-transform:uppercase;opacity:.45}
+.title{font-family:var(--display);font-size:42px;font-weight:500;letter-spacing:-.02em;line-height:1.02;margin-top:14px}
+.sub{font-size:15px;opacity:.6;margin-top:14px;max-width:680px;line-height:1.5}
+
+.lbl{font-family:var(--mono);font-size:10px;letter-spacing:.16em;text-transform:uppercase;opacity:.45;margin:44px 0 14px}
+
+/* the fragmented stack */
+.stack{display:grid;grid-template-columns:repeat(5,1fr);gap:1px;background:var(--line-dark);border:1px solid var(--line-dark)}
+.tool{background:var(--ink-2);padding:18px 16px;display:flex;flex-direction:column;gap:0}
+.tool .cat{font-family:var(--display);font-size:15px;font-weight:500;letter-spacing:-.01em}
+.tool .names{font-family:var(--mono);font-size:10px;letter-spacing:.06em;color:var(--gold-3);margin-top:8px;line-height:1.5}
+.tool .does{font-size:12px;opacity:.55;margin-top:10px;line-height:1.45;flex:1}
+.tool .tag{font-family:var(--mono);font-size:9px;letter-spacing:.14em;text-transform:uppercase;opacity:.4;margin-top:14px;display:flex;align-items:center;gap:6px}
+.tag .d{width:5px;height:5px;border-radius:50%;background:var(--line-dark-2)}
+
+/* the you-are-the-glue strip */
+.glue{border:1px dashed var(--line-dark-2);border-top:none;padding:13px 16px;text-align:center;font-family:var(--mono);font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--pace-stop);opacity:.85}
+
+/* arrow */
+.arrow{display:flex;justify-content:center;align-items:center;gap:12px;margin:30px 0;font-family:var(--mono);font-size:10px;letter-spacing:.16em;text-transform:uppercase;opacity:.5}
+.arrow .ln{height:1px;width:120px;background:var(--line-dark-2)}
+
+/* fullcontrol bar */
+.fc{border:1px solid var(--gold);border-radius:4px;background:linear-gradient(180deg,rgba(232,197,71,.06),rgba(232,197,71,.02));padding:26px 28px}
+.fc-top{display:flex;align-items:baseline;justify-content:space-between;flex-wrap:wrap;gap:12px}
+.fc .name{font-family:var(--display);font-size:26px;font-weight:600;letter-spacing:-.01em;color:var(--gold)}
+.fc .runs{font-family:var(--mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--gold)}
+.fc .desc{font-size:14px;opacity:.8;margin-top:12px;line-height:1.55;max-width:780px}
+.fc .row{display:flex;gap:10px;flex-wrap:wrap;margin-top:18px}
+.chip{font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;border:1px solid var(--line-dark-2);border-radius:3px;padding:6px 10px;opacity:.8}
+.foot{margin-top:34px;border-top:1px solid var(--line-dark);padding-top:22px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:16px}
+.foot .punch{font-family:var(--display);font-size:20px;font-weight:500;letter-spacing:-.01em}
+.foot .punch em{color:var(--gold);font-style:normal}
+.foot .meta{font-family:var(--mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;opacity:.4}
+@media(max-width:880px){.stack{grid-template-columns:repeat(2,1fr)}.title{font-size:32px}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="kicker">§ Category · The Stack vs The OS</div>
+  <h1 class="title">Academies don't have a software problem.<br>They have an integration problem.</h1>
+  <p class="sub">Every tool below does one slice of the job. Today, the owner is the glue holding them together. FullControl is the layer above them - and the AI that actually runs it.</p>
+
+  <div class="lbl">What academies run today — a stitched stack of point tools</div>
+  <div class="stack">
+    <div class="tool">
+      <div class="cat">Scheduling &amp; athletes</div>
+      <div class="names">CoachIQ · Upper Hand · TeamSnap</div>
+      <div class="does">Sessions, credits, rosters, check-in.</div>
+      <div class="tag"><span class="d"></span>Assists</div>
+    </div>
+    <div class="tool">
+      <div class="cat">Automation &amp; messaging</div>
+      <div class="names">GoHighLevel (GHL)</div>
+      <div class="does">Pipelines, SMS/email, funnels - the agency plumbing.</div>
+      <div class="tag"><span class="d"></span>Assists</div>
+    </div>
+    <div class="tool">
+      <div class="cat">CRM &amp; sales</div>
+      <div class="names">HubSpot · Spreadsheets</div>
+      <div class="does">Contacts, leads, deal tracking - you do the work.</div>
+      <div class="tag"><span class="d"></span>Assists</div>
+    </div>
+    <div class="tool">
+      <div class="cat">Marketing</div>
+      <div class="names">Meta Ads Mgr · Mailchimp</div>
+      <div class="does">Run ads, send campaigns - you run them.</div>
+      <div class="tag"><span class="d"></span>Assists</div>
+    </div>
+    <div class="tool">
+      <div class="cat">Payments</div>
+      <div class="names">Stripe · Square</div>
+      <div class="does">Charge cards, manage subscriptions.</div>
+      <div class="tag"><span class="d"></span>Assists</div>
+    </div>
+  </div>
+  <div class="glue">↑ and YOU are the integration — carrying context between all of them, by hand</div>
+
+  <div class="arrow"><span class="ln"></span>FullControl absorbs the stack — competitors become features<span class="ln"></span></div>
+
+  <div class="fc">
+    <div class="fc-top">
+      <div class="name">FullControl</div>
+      <div class="runs">● Runs the business</div>
+    </div>
+    <div class="desc">One AI operating system that <strong>sells, books, closes, markets, follows up, and operates</strong> - across everything above. It integrates the tools you have, becomes the home base you log into first, then replaces them one workflow at a time.</div>
+    <div class="row">
+      <span class="chip">AI sales crew</span>
+      <span class="chip">Marketing + KPIs</span>
+      <span class="chip">Members + billing</span>
+      <span class="chip">Inbox + follow-up</span>
+      <span class="chip">Scheduling (native)</span>
+      <span class="chip">Learns your business</span>
+    </div>
+  </div>
+
+  <div class="foot">
+    <div class="punch">They assist. <em>FullControl operates.</em></div>
+    <div class="meta">Competitors become features</div>
+  </div>
+</div>
+</body>
+</html>
