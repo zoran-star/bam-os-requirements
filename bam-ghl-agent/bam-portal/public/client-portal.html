@@ -23393,7 +23393,7 @@ function _plPostTrialForm(oppId) {
       </div>
       <div class="ptf-err" id="ptf-err"></div>
       <div class="ptf-note">On a good fit the card moves to Done Trial + the trainer is assigned. A no-show moves to Interested and fires the missed-trial automation. Your "first message" is texted to the parent; with the sign-up link on, the link is added at the bottom - set the link in KPIs → Setup → Offers (or the Blueprint training Sales section).</div>
-      <button class="ptf-submit" id="ptf-submit" onclick="_ptfSubmit()">Submit review</button>
+      <button class="ptf-submit" id="ptf-submit" onclick="_ptfSubmit()">Submit post trial form</button>
     </div>`;
   ov.classList.add('open');
   _ptfLoadDetail(o);
@@ -23450,7 +23450,7 @@ function _ptfSetShow(v) {
   } else if (v === true) {
     _ptfSetSendLink(true);   // restore the default when they switch back to Showed up
   }
-  const btn = document.getElementById('ptf-submit'); if (btn) btn.textContent = noShow ? 'Mark no-show' : 'Submit review';
+  const btn = document.getElementById('ptf-submit'); if (btn) btn.textContent = noShow ? 'Mark no-show' : 'Submit post trial form';
 }
 function _ptfSetFit(v) {
   _PTF_FIT = v;
@@ -23488,7 +23488,7 @@ async function _ptfSubmit() {
     fetchAndRenderPipelines();
   } catch (e) {
     err.textContent = e.message; err.style.display = 'block';
-    btn.disabled = false; btn.textContent = 'Submit review';
+    btn.disabled = false; btn.textContent = 'Submit post trial form';
   }
 }
 
