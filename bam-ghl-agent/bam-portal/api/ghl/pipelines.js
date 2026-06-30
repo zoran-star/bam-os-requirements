@@ -1,6 +1,6 @@
 import { withSentryApiRoute } from "../_sentry.js";
 import { isAutomationLive, enrollContact } from "../automations.js";
-import { nurtureStage } from "../agent/_stage.js";
+import { nurtureStage, interestedStage } from "../agent/_stage.js";
 import { shadowMirrorMove, shadowBackfillFromBoard, buildPortalBoard } from "../agent/_store.js";
 // Vercel Serverless Function — Per-academy GHL Pipelines (kanban + moves)
 //
@@ -401,6 +401,23 @@ async function handler(req, res) {
       contactId = oppObj.contactId || oppObj.contact?.id;
     }
     if (!contactId) return res.status(400).json({ error: "no contact for this opportunity" });
+
+    // Portal-native ☀️ Summer Special: when this academy runs the portal sequence
+    // (sends via Twilio through the automation engine), enroll into it + move the opp
+    // to the Training Pipeline "Interested" stage, INSTEAD of poking a GHL workflow.
+    // Gated on isAutomationLive so every academy without it stays on the GHL path
+    // below - same provider-aware pattern the P6 triggers use. (Not the ghosted path.)
+    if (!isGhosted && await isAutomationLive(clientId, "summer_special")) {
+      const enr = await enrollContact({ clientId, automationKey: "summer_special", contactId });
+      try {
+        const is = await interestedStage(token, locationId, { sb, clientId });
+        if (is && oppId) {
+          await ghl("PUT", `/opportunities/${encodeURIComponent(oppId)}`, { token, body: { pipelineId: is.pipelineId, pipelineStageId: is.stageId } });
+          try { await shadowMirrorMove(clientId, { ghlOpportunityId: oppId, ghlContactId: contactId, role: "interested", stageResolved: is, status: "open", reason: "summer special enroll" }); } catch (_) {}
+        }
+      } catch (_) { /* stage move is best-effort */ }
+      return res.status(200).json({ ok: true, contact_id: contactId, mode: "portal", automation: "summer_special", enrolled: enr });
+    }
 
     // GHL rejects a trailing 'Z' on eventStartTime — send an explicit +00:00 offset.
     const eventStartTime = new Date().toISOString().replace(/\.\d{3}Z$/, "+00:00");

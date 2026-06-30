@@ -215,20 +215,23 @@ async function runWork(res) {
         await sb(`automation_enrollments?id=eq.${job.enrollment_id}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ status: "completed", exited_at: new Date().toISOString(), exit_reason: "sequence complete" }) }).catch(() => {});
         await logEvent({ clientId: job.client_id, contactId: job.contact_id, automationId: job.automation_id, type: "completed", payload: null });
         completed++;
-        // Model: 👻 Ghosted ran out and they're STILL silent -> roll into 💔 Lead
-        // Nurture (the sparse long game). Only when nurture is live; best-effort.
+        // Model: a finished outreach sequence with the lead STILL silent -> roll into
+        // 💔 Lead Nurture (the sparse long game). 👻 Ghosted does this; ☀️ Summer
+        // Special hands off the same way (its last SMS is the final nudge before the
+        // long game). Only when nurture is live; best-effort.
         try {
           const a = autoCache.get(job.automation_id);
-          if (a && a.automation_key === "ghosted" && await isAutomationLive(job.client_id, "nurture")) {
+          const rollsToNurture = a && (a.automation_key === "ghosted" || a.automation_key === "summer_special");
+          if (rollsToNurture && await isAutomationLive(job.client_id, "nurture")) {
             await enrollContact({ clientId: job.client_id, automationKey: "nurture", contactId: job.contact_id });
             const creds = tokenCache.get(job.client_id);
             if (creds && creds.token) {
               const ns = await nurtureStage(creds.token, creds.locationId);
               const oppId = await findOpenOppId(creds.token, creds.locationId, job.contact_id);
               if (ns && oppId) await ghl("PUT", `/opportunities/${encodeURIComponent(oppId)}`, { token: creds.token, body: { pipelineId: ns.pipelineId, pipelineStageId: ns.stageId } });
-              if (ns && oppId) { try { await shadowMirrorMove(job.client_id, { ghlOpportunityId: oppId, ghlContactId: job.contact_id, role: "nurture", stageResolved: ns, status: "open", reason: "ghosted ran out - rolled into nurture" }); } catch (_) {} }
+              if (ns && oppId) { try { await shadowMirrorMove(job.client_id, { ghlOpportunityId: oppId, ghlContactId: job.contact_id, role: "nurture", stageResolved: ns, status: "open", reason: `${a.automation_key} ran out - rolled into nurture` }); } catch (_) {} }
             }
-            await logEvent({ clientId: job.client_id, contactId: job.contact_id, automationId: job.automation_id, type: "ghosted_to_nurture", payload: null });
+            await logEvent({ clientId: job.client_id, contactId: job.contact_id, automationId: job.automation_id, type: `${a.automation_key}_to_nurture`, payload: null });
           }
         } catch (_) { /* best-effort roll-forward */ }
         // Model: 💔 Lead Nurture is the LAST stop. If the nurture sequence itself runs
