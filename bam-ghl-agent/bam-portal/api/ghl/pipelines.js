@@ -483,8 +483,19 @@ async function handler(req, res) {
       try {
         const is = await interestedStage(token, locationId, { sb, clientId });
         if (is && oppId) {
-          await ghl("PUT", `/opportunities/${encodeURIComponent(oppId)}`, { token, body: { pipelineId: is.pipelineId, pipelineStageId: is.stageId } });
-          try { await shadowMirrorMove(clientId, { ghlOpportunityId: oppId, ghlContactId: contactId, role: "interested", stageResolved: is, status: "open", reason: "summer special enroll" }); } catch (_) {}
+          // Route the Interested-stage move through the provider-aware store so a
+          // provider='portal' academy persists it to its own opportunities row.
+          // On provider='ghl' (every client today) moveStage issues the EXACT same
+          // PUT /opportunities/{id} { pipelineId, pipelineStageId } as before, and
+          // mirrors the shadow write internally - byte-identical for live academies.
+          const provider = client.pipeline_provider || "ghl";
+          const shadow = !!client.pipeline_shadow;
+          const oppRef = await storeOppRef({ clientId, provider, shadow, token, locationId, oppId, contactId });
+          await moveStage({
+            clientId, provider, shadow, ghl, token, oppRef,
+            stage: { pipelineId: is.pipelineId, stageId: is.stageId, stageName: is.stageName || null },
+            role: "interested", contactId, reason: "summer special enroll",
+          });
         }
       } catch (_) { /* stage move is best-effort */ }
       return res.status(200).json({ ok: true, contact_id: contactId, mode: "portal", automation: "summer_special", enrolled: enr });
