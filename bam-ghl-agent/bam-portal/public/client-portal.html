@@ -31327,7 +31327,7 @@ async function _mmProgress(task, opts = {}) {
   const label = opts.label || 'Working…';
   const doneLabel = opts.doneLabel || 'Done';
   document.getElementById('mm-progress-overlay')?.remove();
-  document.body.insertAdjacentHTML('beforeend', `<div id="mm-progress-overlay" style="position:fixed;inset:0;background:rgba(0,0,0,.62);z-index:9520;display:flex;align-items:center;justify-content:center;padding:18px">
+  document.body.insertAdjacentHTML('beforeend', `<div id="mm-progress-overlay" style="position:fixed;inset:0;background:${opts.solid ? 'var(--bg,#0e0e11)' : 'rgba(0,0,0,.62)'};z-index:9520;display:flex;align-items:center;justify-content:center;padding:18px">
     <div id="mm-progress-card" style="background:var(--surface);border:1px solid var(--border);border-radius:16px;min-width:230px;max-width:330px;padding:30px 26px;box-shadow:0 24px 70px rgba(0,0,0,.55);text-align:center;animation:mmPop .2s ease-out">
       <div class="mm-spin" style="margin:0 auto 16px"></div>
       <div style="font-size:14px;font-weight:600;color:var(--text)">${escapeHTML(label)}</div>
@@ -31662,7 +31662,11 @@ async function mChange(memberId, currentPlan) {
   const payload = { new_price_id: vals.new_price, prorate: vals.prorate === 'yes' };
   if (vals.next_payment && vals.next_payment !== nextYMD) payload.next_payment_date = vals.next_payment;
   try {
-    const r = await _memberAction(memberId, 'change', payload);
+    // Solid-backdrop overlay with a circle spinner → check-mark animation, then
+    // the roster gold-flash refresh. (Same _mmProgress used by Pause.)
+    const r = await _mmProgress(() => _memberAction(memberId, 'change', payload), {
+      label: 'Changing plan…', doneLabel: 'Plan changed', solid: true,
+    });
     const label = (r.member && r.member.plan) ? r.member.plan : (picked ? picked.label : 'new plan');
     const npNote = (r.next_payment_set && r.next_payment) ? ` · next payment ${_cdDate(r.next_payment)}` : '';
     _plToast(`Changed to ${label} (${r.direction}${r.prorated ? ' · prorated' : ''})${npNote}.`);
