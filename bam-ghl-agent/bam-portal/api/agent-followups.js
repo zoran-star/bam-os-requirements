@@ -100,7 +100,7 @@ async function detectForClient(client) {
   const { token, locationId } = creds;
 
   // The sales agent ONLY works leads in the Responded stage.
-  const { rs, ids: respondedIds } = await respondedContactIds(token, locationId);
+  const { rs, ids: respondedIds } = await respondedContactIds(token, locationId, { clientId: client.id, sb });
   if (!rs) return { client_id: client.id, skipped: "no Responded stage" };
 
   // Find EVERY Responded-stage lead that's gone quiet ≥ a day and has no pending
@@ -246,7 +246,7 @@ async function sendOne(row, clientCache, respondedCache = {}) {
   const credsGuard = await pickGhlToken(client);
   if (credsGuard) {
     let rset = respondedCache[row.client_id];
-    if (rset === undefined) { try { rset = (await respondedContactIds(credsGuard.token, credsGuard.locationId)).ids; } catch (_) { rset = null; } respondedCache[row.client_id] = rset; }
+    if (rset === undefined) { try { rset = (await respondedContactIds(credsGuard.token, credsGuard.locationId, { clientId: row.client_id, sb })).ids; } catch (_) { rset = null; } respondedCache[row.client_id] = rset; }
     if (rset && row.ghl_contact_id && !rset.has(row.ghl_contact_id)) {
       await sb(`agent_followups?id=eq.${row.id}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ status: "canceled", send_error: "left Responded stage", updated_at: new Date().toISOString() }) });
       return { id: row.id, canceled: "left Responded stage" };
@@ -357,7 +357,7 @@ async function handler(req, res) {
             let ids = loc ? peekRespondedIdSet(loc) : undefined;   // hot path: skip token fetch
             if (ids === undefined && loc) {
               const creds = await pickGhlToken(client);
-              ids = creds ? await respondedContactIdSetCached(creds.token, loc) : null;
+              ids = creds ? await respondedContactIdSetCached(creds.token, loc, 60000, { clientId: cid, sb }) : null;
             }
             idsByClient[cid] = ids ?? null;
           } catch (_) { idsByClient[cid] = null; }   // fail open for this academy

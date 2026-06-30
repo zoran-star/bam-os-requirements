@@ -245,7 +245,7 @@ async function runWork(res) {
             await enrollContact({ clientId: job.client_id, automationKey: "ghosted", contactId: job.contact_id });
             const creds = await ensureCreds();
             if (creds && creds.token) {
-              const is = await interestedStage(creds.token, creds.locationId);
+              const is = await interestedStage(creds.token, creds.locationId, { clientId: job.client_id, sb });
               const oppId = await findOpenOppId(creds.token, creds.locationId, job.contact_id);
               if (is && oppId) await ghl("PUT", `/opportunities/${encodeURIComponent(oppId)}`, { token: creds.token, body: { pipelineId: is.pipelineId, pipelineStageId: is.stageId } });
               if (is && oppId) { try { await shadowMirrorMove(job.client_id, { ghlOpportunityId: oppId, ghlContactId: job.contact_id, role: "ghosted", stageResolved: is, status: "open", reason: "intro form sent, no reply - rolled into ghosted" }); } catch (_) {} }
@@ -267,7 +267,7 @@ async function runWork(res) {
               await enrollContact({ clientId: job.client_id, automationKey: "nurture", contactId: job.contact_id });
               const creds = await ensureCreds();
               if (creds && creds.token) {
-                const ns = await nurtureStage(creds.token, creds.locationId);
+                const ns = await nurtureStage(creds.token, creds.locationId, { clientId: job.client_id, sb });
                 const oppId = await findOpenOppId(creds.token, creds.locationId, job.contact_id);
                 if (ns && oppId) await ghl("PUT", `/opportunities/${encodeURIComponent(oppId)}`, { token: creds.token, body: { pipelineId: ns.pipelineId, pipelineStageId: ns.stageId } });
                 if (ns && oppId) { try { await shadowMirrorMove(job.client_id, { ghlOpportunityId: oppId, ghlContactId: job.contact_id, role: "nurture", stageResolved: ns, status: "open", reason: `${a.automation_key} ran out - rolled into nurture` }); } catch (_) {} }
@@ -363,7 +363,7 @@ async function runWork(res) {
       // stage, via any path) the 20-min nudge is moot - exit + skip the send.
       if (auto.automation_key === "trial_form" && token && creds.locationId) {
         try {
-          const booked = await scheduledTrialContactIdSetCached(token, creds.locationId);
+          const booked = await scheduledTrialContactIdSetCached(token, creds.locationId, 60000, { clientId: job.client_id, sb });
           if (booked && booked.has(String(job.contact_id))) {
             await sb(`automation_enrollments?id=eq.${job.enrollment_id}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ status: "exited", exited_at: new Date().toISOString(), exit_reason: "booked" }) }).catch(() => {});
             await finish({ status: "skipped", last_error: "booked - in scheduled trial" });
