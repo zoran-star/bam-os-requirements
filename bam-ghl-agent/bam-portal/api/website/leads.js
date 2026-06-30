@@ -389,9 +389,11 @@ async function handler(req, res) {
 
         const routeCfg = client.ghl_kpi_config?.portal_entry_routing;
         if (routeCfg?.enabled) {
-          // Portal routing ON: they booked, so cancel the 20-min trial_form intro
-          // timer and move the card to the scheduled stage (Confirm bot owns it).
-          try { await exitEnrollment({ clientId: client.id, automationKey: "trial_form", contactId: receipt.ghl_contact_id, reason: "booked" }); } catch (_) {}
+          // Portal routing ON: they booked, so cancel EVERY active sales sequence
+          // (nurture / ghosted / contact_form / trial_form) - a lead who books
+          // shouldn't keep getting drip nudges - and move the card to the scheduled
+          // stage (Confirm bot owns it). No-key exit clears all active enrollments.
+          try { await exitEnrollment({ clientId: client.id, contactId: receipt.ghl_contact_id, reason: "booked" }); } catch (_) {}
           if (routeCfg.pipeline && routeCfg.scheduled_stage) {
             try {
               await placeOpportunity(
