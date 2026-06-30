@@ -30768,7 +30768,7 @@ function _renderMemberModalBody(m, stripe, history) {
 
     ${divider}
 
-    <!-- Messages (read-only GHL conversation thread) -->
+    <!-- Messages (two-way GHL conversation thread, newest first) -->
     ${m.ghl_contact_id ? `<div style="${labelCss};margin-bottom:12px;display:flex;align-items:center;justify-content:space-between"><span>Messages</span><a onclick="_autoOpenContact('${escapeHTML(m.ghl_contact_id)}','${escapeHTML((m.athlete_name||'').replace(/'/g,''))}')" style="font-size:11px;color:var(--accent);cursor:pointer;text-transform:none;letter-spacing:0;font-family:inherit">Open in Inbox ↗</a></div>
     <div id="member-inbox-section" style="margin-bottom:12px"><div style="font-size:12px;color:var(--text-mute)">Loading messages…</div></div>
 
@@ -30808,30 +30808,60 @@ function _renderMemberModalBody(m, stripe, history) {
 let _memberDocsCache = [];
 const _MEMBER_DOC_KINDS = { waiver: 'Waiver', media: 'Media release', medical: 'Medical', intake: 'Intake', document: 'Other' };
 
-// Member drawer: read-only GHL conversation thread, fetched by ghl_contact_id.
-// Reuses the same /api/ghl/inbox endpoint + ib-msg styling as the Sales pipeline
-// drawer. Shows the last ~8 messages; "Open in Inbox" jumps to the full thread.
+// Member drawer inbox: live two-way GHL thread, fetched by ghl_contact_id.
+// Reuses /api/ghl/inbox + ib-msg styling + /api/ghl/send-message (same as the
+// Sales pipeline drawer). Newest messages on top; a composer lets staff reply
+// inline without leaving the drawer.
+let _MEMBER_INBOX = null;  // { contactId, clientId, name, phone, email }
 async function _loadMemberInbox(m) {
   const sec = document.getElementById('member-inbox-section');
   if (!sec || !m || !m.ghl_contact_id) return;
+  _MEMBER_INBOX = {
+    contactId: m.ghl_contact_id,
+    clientId: m.client_id || (typeof CLIENT_ID !== 'undefined' ? CLIENT_ID : null),
+    name: (m.athlete_name || '').trim(),
+    phone: m.parent_phone || null,
+    email: m.parent_email || null,
+  };
   try {
     const token = await _mreqAuthToken();
-    const r = await fetch(`/api/ghl/inbox?client_id=${encodeURIComponent(m.client_id || CLIENT_ID)}&contact_id=${encodeURIComponent(m.ghl_contact_id)}`, { headers: { 'Authorization': 'Bearer ' + token } });
+    const r = await fetch(`/api/ghl/inbox?client_id=${encodeURIComponent(_MEMBER_INBOX.clientId)}&contact_id=${encodeURIComponent(m.ghl_contact_id)}`, { headers: { 'Authorization': 'Bearer ' + token } });
     const j = await _safeJson(r);
     if (!r.ok) throw new Error(j.error || ('HTTP ' + r.status));
-    _renderMemberInbox(sec, j.messages || [], (m.athlete_name || '').trim().split(/\s+/)[0] || 'Them');
+    _renderMemberInbox(sec, j.messages || []);
   } catch (e) {
-    sec.innerHTML = `<div style="font-size:12px;color:var(--text-mute)">Couldn't load messages - ${escapeHTML(e.message)}</div>`;
+    sec.innerHTML = `${_memberInboxComposer()}<div style="font-size:12px;color:var(--text-mute);margin-top:8px">Couldn't load messages - ${escapeHTML(e.message)}</div>`;
   }
 }
 
-function _renderMemberInbox(sec, messages, contactFirst) {
+// Reply composer - channel picker (only the channels the contact can receive on)
+// + textarea + Send. Hidden entirely if there's no phone AND no email on file.
+function _memberInboxComposer() {
+  const i = _MEMBER_INBOX || {};
+  const canSms = !!i.phone, canEmail = !!i.email;
+  if (!canSms && !canEmail) {
+    return `<div style="font-size:11.5px;color:var(--text-mute);margin-bottom:10px">No phone or email on file - add one in GHL to reply here.</div>`;
+  }
+  const chanOpts = [canSms ? '<option value="SMS">SMS</option>' : '', canEmail ? '<option value="Email">Email</option>' : ''].join('');
+  return `<div style="margin-bottom:12px">
+      <div style="display:flex;gap:8px;align-items:center;margin-bottom:6px">
+        <select id="member-msg-type" style="background:var(--surface);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:6px 9px;font:inherit;font-size:12px;cursor:pointer">${chanOpts}</select>
+      </div>
+      <textarea id="member-msg-input" placeholder="Type a message…" onkeydown="if((event.metaKey||event.ctrlKey)&&event.key==='Enter')_memberInboxSend()" style="width:100%;min-height:60px;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:9px 11px;font:inherit;font-size:13px;resize:vertical;outline:none;box-sizing:border-box"></textarea>
+      <div style="display:flex;justify-content:flex-end;margin-top:6px">
+        <button id="member-msg-send" onclick="_memberInboxSend()" style="background:var(--gold,#E8C547);color:#0B0B0D;border:none;border-radius:8px;padding:8px 18px;font:inherit;font-size:13px;font-weight:700;cursor:pointer">Send</button>
+      </div>
+    </div>`;
+}
+
+function _renderMemberInbox(sec, messages) {
+  const contactFirst = ((_MEMBER_INBOX && _MEMBER_INBOX.name) || '').trim().split(/\s+/)[0] || 'Them';
+  // Newest first - most recent message on top.
   const sorted = [...messages].filter(mm => !_ibIsActivity(mm))
-    .sort((a, b) => (a.date ? new Date(a.date).getTime() : 0) - (b.date ? new Date(b.date).getTime() : 0));
-  const recent = sorted.slice(-8);
-  if (!recent.length) { sec.innerHTML = `<div style="font-size:12px;color:var(--text-mute)">No messages yet.</div>`; return; }
+    .sort((a, b) => (b.date ? new Date(b.date).getTime() : 0) - (a.date ? new Date(a.date).getTime() : 0));
+  const recent = sorted.slice(0, 8);
   const more = sorted.length - recent.length;
-  const thread = recent.map(mm => {
+  const thread = recent.length ? recent.map(mm => {
     const out = (mm.direction || '').toLowerCase() === 'outbound';
     const atts = _ibRenderAttachments(mm.attachments);
     const hasBody = (mm.body || '').trim().length > 0;
@@ -30839,8 +30869,42 @@ function _renderMemberInbox(sec, messages, contactFirst) {
     const channel = escapeHTML(_ghlChannelLabel(mm.type));
     const when = escapeHTML(_ibFormatDate(mm.date));
     return `<div class="ib-msg ${out ? 'ib-msg-out' : 'ib-msg-in'}">${hasBody ? escapeHTML(mm.body.trim()) : (atts ? '' : '(no body)')}${atts}<div class="ib-msg-meta">${sender} · ${channel}${when ? ' · ' + when : ''}</div></div>`;
-  }).join('');
-  sec.innerHTML = `${more > 0 ? `<div style="font-size:11px;color:var(--text-mute);margin-bottom:8px">Showing last ${recent.length} of ${sorted.length} messages</div>` : ''}<div style="display:flex;flex-direction:column;gap:8px;max-height:340px;overflow-y:auto">${thread}</div>`;
+  }).join('') : `<div style="font-size:12px;color:var(--text-mute)">No messages yet.</div>`;
+  sec.innerHTML = `${_memberInboxComposer()}${more > 0 ? `<div style="font-size:11px;color:var(--text-mute);margin-bottom:8px">Newest ${recent.length} of ${sorted.length} messages</div>` : ''}<div style="display:flex;flex-direction:column;gap:8px;max-height:340px;overflow-y:auto">${thread}</div>`;
+}
+
+// Send a reply on the member's GHL thread, then reload (newest lands on top).
+async function _memberInboxSend() {
+  if (!_sendGuard('memberInboxSend')) return;
+  const i = _MEMBER_INBOX;
+  if (!i || !i.contactId) return;
+  const textEl = document.getElementById('member-msg-input');
+  const typeEl = document.getElementById('member-msg-type');
+  const btn    = document.getElementById('member-msg-send');
+  const message = (textEl?.value || '').trim();
+  const type    = typeEl?.value || 'SMS';
+  if (!message) return;
+  if (type === 'Email' && !i.email) { alert('This contact has no email on file - pick SMS, or add an email in GHL.'); return; }
+  if (type === 'SMS' && !i.phone)   { alert('This contact has no phone on file - pick Email, or add a phone in GHL.'); return; }
+  if (btn) { btn.disabled = true; btn.textContent = 'Sending…'; }
+  try {
+    const token = await _mreqAuthToken();
+    const subject = type === 'Email' ? `Message from ${(_GHL_CONNECT_STATE && _GHL_CONNECT_STATE.business_name) || 'us'}` : undefined;
+    const r = await fetch('/api/ghl/send-message', {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ client_id: i.clientId || CLIENT_ID, contact_id: i.contactId, type, message, subject }),
+    });
+    const json = await _safeJson(r);
+    if (!r.ok) throw new Error(json.error || ('HTTP ' + r.status));
+    if (textEl) textEl.value = '';
+    const sec = document.getElementById('member-inbox-section');
+    if (sec) _loadMemberInbox({ ghl_contact_id: i.contactId, client_id: i.clientId, athlete_name: i.name, parent_phone: i.phone, parent_email: i.email });
+  } catch (e) {
+    alert('Send failed: ' + e.message);
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = 'Send'; }
+  }
 }
 
 async function _loadMemberDocs(memberId, clientId) {
