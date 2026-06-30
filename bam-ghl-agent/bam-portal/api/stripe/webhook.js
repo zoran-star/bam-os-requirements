@@ -38,7 +38,7 @@ import crypto from "node:crypto";
 import { fireOnboardingActivations } from "../onboarding/activations.js";
 import { sendSms } from "../ghl/_core.js";
 import { notifyOwners } from "../_notify-owners.js";
-import { enrollContact, isAutomationLive } from "../automations.js";
+import { enrollContact, exitEnrollment, isAutomationLive } from "../automations.js";
 import { getClientGhlToken } from "../website/availability.js";
 
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
@@ -425,6 +425,19 @@ async function handleSubCreated(event, connectedAccount, res) {
     });
   } catch (_) { /* non-fatal */ }
 
+  // C3 fix — exit active SALES sequences on conversion. The member just went live,
+  // so any active portal sales drip (nurture / ghosted) must be exited or they keep
+  // getting "we miss you" texts and can later be marked LOST. No automationKey =
+  // exit ALL active sales enrollments for this contact. Idempotent (no-op if not
+  // enrolled) and best-effort: never blocks the link. Only touches the portal's own
+  // automation_enrollments table — it never reads or writes GHL, so V1 is untouched.
+  try {
+    const exitContactId = target.ghl_contact_id || (sub.metadata && sub.metadata.ghl_contact_id) || null;
+    if (exitContactId) {
+      await exitEnrollment({ clientId: target.client_id, contactId: exitContactId, reason: "converted" });
+    }
+  } catch (_) { /* non-fatal */ }
+
   // Funnel KPI: record the conversion (lead went live on Stripe), tied to the
   // lead by email. Best-effort — never blocks member linking. ref=sub.id keeps
   // it idempotent on webhook retries.
@@ -677,6 +690,28 @@ async function handleInvoiceSucceeded(event, connectedAccount, res) {
           onboardingEnroll = { ok: false, error: String((e && e.message) || e) };
         }
       }
+      // C3 fix — exit active SALES sequences on conversion. This payment just made
+      // them a LIVE member, so they must NOT stay enrolled in any sales drip
+      // (nurture / ghosted): otherwise a paying customer keeps getting "we miss you"
+      // texts and the nurture-exhausted branch can later mark them LOST. No
+      // automationKey = exit ALL active sales enrollments for this contact. Idempotent
+      // (no-op if not enrolled / already exited) and best-effort: never blocks
+      // activation. Touches only the portal automation_enrollments table, never GHL.
+      let salesExit = null;
+      try {
+        const exitContactId =
+          (activations && activations.ghl && activations.ghl.contact_id) ||
+          member.ghl_contact_id ||
+          (onbSub.metadata && onbSub.metadata.ghl_contact_id) ||
+          null;
+        if (exitContactId) {
+          salesExit = await exitEnrollment({ clientId: member.client_id, contactId: exitContactId, reason: "converted" });
+        } else {
+          salesExit = { skipped: "no ghl contact id" };
+        }
+      } catch (e) {
+        salesExit = { ok: false, error: String((e && e.message) || e) };
+      }
       // Commitment terms that "go back to monthly": attach the revert schedule now
       // that the upfront commitment invoice is paid. Non-fatal.
       let commitmentSchedule = null;
@@ -723,10 +758,10 @@ async function handleInvoiceSucceeded(event, connectedAccount, res) {
       await writeAudit({
         client_id: member.client_id, member_id: member.id,
         action_type: silent ? "import-activated-silent" : "onboarding-activated",
-        args: { invoice_id: inv.id, sub_id: subId, plan: onbSub.metadata.plan, term: onbSub.metadata.term, silent, activations, onboarding_enroll: onboardingEnroll, staff_notify: staffNotify, commitment_schedule: commitmentSchedule, pipeline_won: pipelineWon },
+        args: { invoice_id: inv.id, sub_id: subId, plan: onbSub.metadata.plan, term: onbSub.metadata.term, silent, activations, onboarding_enroll: onboardingEnroll, sales_exit: salesExit, staff_notify: staffNotify, commitment_schedule: commitmentSchedule, pipeline_won: pipelineWon },
         db_changes: { members: { status: { from: "payment_method_required", to: "live" } } },
       });
-      return res.status(200).json({ ok: true, action: silent ? "import-activated-silent" : "onboarding-activated", member_id: member.id, activations, onboarding_enroll: onboardingEnroll, staff_notify: staffNotify, commitment_schedule: commitmentSchedule, pipeline_won: pipelineWon });
+      return res.status(200).json({ ok: true, action: silent ? "import-activated-silent" : "onboarding-activated", member_id: member.id, activations, onboarding_enroll: onboardingEnroll, sales_exit: salesExit, staff_notify: staffNotify, commitment_schedule: commitmentSchedule, pipeline_won: pipelineWon });
     }
   }
 
