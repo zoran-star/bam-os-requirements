@@ -219,9 +219,11 @@ async function handler(req, res) {
     }
   } catch (e) { console.error("ghl inbound-webhook draft-cancel error:", e.message); }
 
-  // Lead replied while in a portal automation (👻 Ghosted / 💔 Lead Nurture) → exit
-  // the sequence and bounce them to Booking (Responded) so the booking agent picks
-  // them up warm (mirrors the GHL ghosted "reply -> Responded" behavior). Best-effort.
+  // Lead replied while in a portal automation (any: the form-intro 📝 contact_form /
+  // 🏀 trial_form first touches, 👻 Ghosted, 💔 Lead Nurture) → exit the sequence
+  // (exitEnrollment with no automationKey exits ALL active enrollments) and bounce them
+  // to Booking (Responded) so the booking agent picks them up warm (mirrors the GHL
+  // ghosted "reply -> Responded" behavior). Best-effort.
   try {
     if (contactId) {
       const { exited } = await exitEnrollment({ clientId: client.id, contactId, reason: "replied" });
