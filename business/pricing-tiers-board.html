@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pricing Tiers — Full Control</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --ink:#0A0A0B; --ink-2:#131316; --ink-3:#1C1C21;
+  --line-dark:#2A2A31; --line-dark-2:#383842;
+  --paper:#F5F1E8;
+  --gold:#E8C547; --gold-3:#8B6F2A; --gold-hi:#F4D788;
+  --pace-go:#9FD88A; --pace-stop:#E87560; --pace-flow:#5A8FB8;
+  --display:"Space Grotesk","Inter",sans-serif;
+  --sans:"Inter",system-ui,sans-serif;
+  --mono:"JetBrains Mono",ui-monospace,monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{background:var(--ink);color:var(--paper);font-family:var(--sans);font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased}
+.wrap{max-width:1440px;margin:0 auto;padding:40px 32px 80px}
+
+/* header */
+.head{border-bottom:1px solid var(--line-dark);padding-bottom:24px;margin-bottom:28px}
+.kicker{font-family:var(--mono);font-size:11px;letter-spacing:.18em;text-transform:uppercase;opacity:.45}
+.title{font-family:var(--display);font-size:48px;font-weight:500;letter-spacing:-.02em;line-height:1;margin-top:14px}
+.readout{font-family:var(--mono);font-size:11px;letter-spacing:.12em;text-transform:uppercase;opacity:.5;margin-top:16px}
+
+/* legend + controls */
+.bar{display:flex;align-items:center;justify-content:space-between;gap:24px;flex-wrap:wrap;margin-bottom:24px}
+.legend{display:flex;gap:20px;flex-wrap:wrap}
+.lg{font-family:var(--mono);font-size:10px;letter-spacing:.12em;text-transform:uppercase;opacity:.7;display:inline-flex;align-items:center;gap:7px}
+.dot{width:7px;height:7px;border-radius:50%;display:inline-block}
+.d-live{background:var(--gold)} .d-prog{background:var(--pace-flow)} .d-future{background:var(--line-dark-2)} .d-service{background:var(--pace-go)}
+.controls{display:flex;gap:10px}
+.btn{font-family:var(--display);font-size:12px;font-weight:600;padding:9px 16px;border-radius:3px;cursor:pointer;border:1px solid var(--line-dark);background:transparent;color:var(--paper)}
+.btn:hover{border-color:var(--line-dark-2)}
+.btn-gold{background:var(--gold);color:var(--ink);border:none}
+.btn-gold:hover{filter:brightness(1.06)}
+
+/* board */
+.board{display:grid;grid-template-columns:repeat(5,1fr);gap:1px;background:var(--line-dark);border:1px solid var(--line-dark)}
+.col{background:var(--ink);min-height:520px;display:flex;flex-direction:column}
+.col-head{padding:18px 16px 14px;border-bottom:1px solid var(--line-dark)}
+.col-name{font-family:var(--display);font-size:18px;font-weight:500;letter-spacing:-.01em}
+.col-price{font-family:var(--mono);font-size:11px;letter-spacing:.08em;color:var(--gold);margin-top:6px}
+.col-sub{font-size:12px;opacity:.55;margin-top:8px;line-height:1.4}
+.col-count{font-family:var(--mono);font-size:10px;letter-spacing:.12em;text-transform:uppercase;opacity:.4;margin-top:10px}
+.col[data-tier="bam"] .col-price{color:var(--pace-go)}
+.col[data-tier="backlog"] .col-name{opacity:.7}
+
+.drop{padding:12px 12px 24px;flex:1;display:flex;flex-direction:column;gap:8px;transition:background .12s}
+.drop.over{background:rgba(232,197,71,.05)}
+
+/* cards */
+.card{background:var(--ink-3);border:1px solid var(--line-dark);border-left:2px solid var(--line-dark-2);border-radius:4px;padding:11px 12px;cursor:grab;user-select:none}
+.card:active{cursor:grabbing}
+.card.dragging{opacity:.4}
+.card[data-status="live"]{border-left-color:var(--gold)}
+.card[data-status="prog"]{border-left-color:var(--pace-flow)}
+.card[data-status="future"]{border-left-color:var(--line-dark-2)}
+.card[data-status="service"]{border-left-color:var(--pace-go)}
+.card .c-name{font-size:13px;font-weight:500;line-height:1.35}
+.card .c-meta{font-family:var(--mono);font-size:9px;letter-spacing:.12em;text-transform:uppercase;opacity:.45;margin-top:6px;display:flex;align-items:center;gap:6px}
+.note{font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;opacity:.35;margin-top:28px;text-align:center}
+@media(max-width:1100px){.board{grid-template-columns:repeat(2,1fr)}.title{font-size:36px}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="head">
+    <div class="kicker">§ Pricing · Tier Map</div>
+    <h1 class="title">FullControl — Pricing Tiers</h1>
+    <div class="readout">Drag features between tiers · arrangement saves automatically · last sync: this session</div>
+  </header>
+
+  <div class="bar">
+    <div class="legend">
+      <span class="lg"><span class="dot d-live"></span>Live</span>
+      <span class="lg"><span class="dot d-prog"></span>In progress</span>
+      <span class="lg"><span class="dot d-future"></span>Future</span>
+      <span class="lg"><span class="dot d-service"></span>Human / service</span>
+    </div>
+    <div class="controls">
+      <button class="btn" id="reset">Reset to default</button>
+      <button class="btn-gold btn" id="copy">Copy layout for AI</button>
+    </div>
+  </div>
+
+  <div class="board" id="board"></div>
+  <div class="note">Tip — drag a future card into a tier to "promise" it there. Backlog column = not yet placed.</div>
+</div>
+
+<script>
+const COLUMNS = [
+  {tier:"core",   name:"FC Core",     price:"~$499 founding → $699", sub:"Run it yourself. Command center + AI books your trials."},
+  {tier:"growth", name:"FC Growth",   price:"~$899-999 ($499 founding)", sub:"The flagship. The business runs itself."},
+  {tier:"scale",  name:"FC Scale",    price:"~$1,499+", sub:"Multi-location, power users, advanced intelligence."},
+  {tier:"bam",    name:"BAM Business",price:"Base + 10-15% growth", sub:"Partner door. Human scaling manager + growth share."},
+  {tier:"backlog",name:"Backlog",     price:"unplaced", sub:"Future features not yet assigned to a tier."},
+];
+
+// status: live | prog | future | service
+const DEFAULT = [
+  // CORE
+  {id:"portal",   name:"Command center portal (KPIs, sales, members, inbox, support)", status:"live", tier:"core"},
+  {id:"booking",  name:"Booking Agent (AI converts leads → trials)", status:"live", tier:"core"},
+  {id:"inbox",    name:"Inbox: SMS + Email", status:"live", tier:"core"},
+  {id:"pipeline", name:"Sales board + pipeline", status:"live", tier:"core"},
+  {id:"billing",  name:"Members + Stripe billing (pause/cancel/refund)", status:"live", tier:"core"},
+  {id:"contacts", name:"Contacts / CRM", status:"live", tier:"core"},
+  {id:"mktools",  name:"Marketing tools: Meta campaigns + KPIs", status:"live", tier:"core"},
+  {id:"onboard",  name:"Onboarding wizard + Action Items", status:"live", tier:"core"},
+  {id:"app",      name:"Mobile app", status:"live", tier:"core"},
+  {id:"notify",   name:"Owner notifications", status:"live", tier:"core"},
+  // GROWTH
+  {id:"confirm",  name:"Confirm Agent", status:"live", tier:"growth"},
+  {id:"closing",  name:"Closing Agent", status:"live", tier:"growth"},
+  {id:"followup", name:"Follow-up nudge engine", status:"live", tier:"growth"},
+  {id:"nurture",  name:"Ghosted → Lead Nurture automation", status:"live", tier:"growth"},
+  {id:"insights", name:"AI marketing insights", status:"live", tier:"growth"},
+  {id:"brain",    name:"Agent brain editor + lessons + training sandbox", status:"live", tier:"growth"},
+  {id:"organic",  name:"Organic content pipeline", status:"live", tier:"growth"},
+  {id:"masssend", name:"Mass send (bulk SMS/email)", status:"live", tier:"growth"},
+  {id:"funnel",   name:"Website enrollment funnel (self-serve join → pay)", status:"live", tier:"growth"},
+  // SCALE
+  {id:"multiloc", name:"Multi-location support", status:"live", tier:"scale"},
+  {id:"multiuser",name:"Multi-user team + permissions", status:"live", tier:"scale"},
+  {id:"analytics",name:"Advanced analytics: funnel + benchmarks", status:"live", tier:"scale"},
+  {id:"customkpi",name:"Custom KPIs", status:"future", tier:"scale"},
+  {id:"resources",name:"Resources library", status:"live", tier:"scale"},
+  {id:"dwy",      name:"Priority / done-with-you support", status:"service", tier:"scale"},
+  // BAM BUSINESS
+  {id:"manager",  name:"Dedicated scaling manager", status:"service", tier:"bam"},
+  {id:"growthshare",name:"Growth-share model (base + 10-15%)", status:"service", tier:"bam"},
+  {id:"managedmkt",name:"Managed marketing (% of ad spend)", status:"future", tier:"bam"},
+  {id:"strategy", name:"Quarterly strategy consult", status:"service", tier:"bam"},
+  // BACKLOG (future, unplaced — drag me)
+  {id:"voice",    name:'Voice "talk to your business"', status:"future", tier:"backlog"},
+  {id:"memberapp",name:"Member-facing athlete app (streaks, QR check-in, billing)", status:"future", tier:"backlog"},
+  {id:"sched",    name:"Native scheduling (own it, drop CoachIQ)", status:"future", tier:"backlog"},
+  {id:"overnight",name:'"Runs while you sleep" overnight agents', status:"prog", tier:"backlog"},
+  {id:"globalbrain",name:"Global brain / lesson promotion (network effect)", status:"prog", tier:"backlog"},
+  {id:"aipricing",name:"AI pricing assistant", status:"future", tier:"backlog"},
+  {id:"noshow",   name:"No-show detector", status:"future", tier:"backlog"},
+  {id:"audit",    name:"Audit trail", status:"future", tier:"backlog"},
+];
+
+const STATUS_LABEL = {live:"Live", prog:"In progress", future:"Future", service:"Service"};
+const KEY = "fc-pricing-tiers-v1";
+
+function load(){
+  try{ const s = JSON.parse(localStorage.getItem(KEY)); if(Array.isArray(s)&&s.length) return mergeSaved(s); }catch(e){}
+  return DEFAULT.map(c=>({...c}));
+}
+// merge: keep saved tier placement, but add any new default cards not in saved
+function mergeSaved(saved){
+  const byId = Object.fromEntries(saved.map(c=>[c.id,c]));
+  return DEFAULT.map(d=> byId[d.id] ? {...d, tier:byId[d.id].tier} : {...d});
+}
+function save(cards){ localStorage.setItem(KEY, JSON.stringify(cards.map(c=>({id:c.id,tier:c.tier})))); }
+
+let cards = load();
+
+function render(){
+  const board = document.getElementById("board");
+  board.innerHTML = "";
+  COLUMNS.forEach(col=>{
+    const items = cards.filter(c=>c.tier===col.tier);
+    const el = document.createElement("div");
+    el.className="col"; el.dataset.tier=col.tier;
+    el.innerHTML = `
+      <div class="col-head">
+        <div class="col-name">${col.name}</div>
+        <div class="col-price">${col.price}</div>
+        <div class="col-sub">${col.sub}</div>
+        <div class="col-count">${items.length} feature${items.length===1?"":"s"}</div>
+      </div>
+      <div class="drop" data-tier="${col.tier}"></div>`;
+    const drop = el.querySelector(".drop");
+    items.forEach(c=>{
+      const card = document.createElement("div");
+      card.className="card"; card.draggable=true; card.dataset.id=c.id; card.dataset.status=c.status;
+      card.innerHTML = `<div class="c-name">${c.name}</div>
+        <div class="c-meta"><span class="dot d-${c.status}"></span>${STATUS_LABEL[c.status]}</div>`;
+      drop.appendChild(card);
+    });
+    board.appendChild(el);
+  });
+  wireDnD();
+}
+
+function wireDnD(){
+  let dragId=null;
+  document.querySelectorAll(".card").forEach(card=>{
+    card.addEventListener("dragstart",e=>{dragId=card.dataset.id;card.classList.add("dragging");e.dataTransfer.effectAllowed="move";});
+    card.addEventListener("dragend",()=>card.classList.remove("dragging"));
+  });
+  document.querySelectorAll(".drop").forEach(drop=>{
+    drop.addEventListener("dragover",e=>{e.preventDefault();drop.classList.add("over");});
+    drop.addEventListener("dragleave",()=>drop.classList.remove("over"));
+    drop.addEventListener("drop",e=>{
+      e.preventDefault();drop.classList.remove("over");
+      const c = cards.find(x=>x.id===dragId);
+      if(c){ c.tier = drop.dataset.tier; save(cards); render(); }
+    });
+  });
+}
+
+document.getElementById("reset").addEventListener("click",()=>{
+  if(confirm("Reset all cards to the default tier layout?")){ cards = DEFAULT.map(c=>({...c})); save(cards); render(); }
+});
+document.getElementById("copy").addEventListener("click",()=>{
+  let out = "# FullControl pricing tiers (current layout)\n\n";
+  COLUMNS.forEach(col=>{
+    const items = cards.filter(c=>c.tier===col.tier);
+    out += `## ${col.name} (${col.price})\n`;
+    items.forEach(c=> out += `- ${c.name} [${STATUS_LABEL[c.status]}]\n`);
+    out += "\n";
+  });
+  navigator.clipboard.writeText(out).then(()=>{
+    const b=document.getElementById("copy");const t=b.textContent;b.textContent="Copied ✓";setTimeout(()=>b.textContent=t,1400);
+  });
+});
+
+render();
+</script>
+</body>
+</html>
