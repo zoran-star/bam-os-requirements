@@ -22415,7 +22415,12 @@ async function _loadMemberPriceStatusMap() {
     const offerings = await _offerOfferings(offerId);
     _MEMBERS_OFFERINGS = offerings || [];
     catalog.forEach(row => {
-      if (row && row.stripe_price_id) _MEMBERS_PRICE_STATUS[row.stripe_price_id] = _offerPriceStatus(row, offerings);
+      // Only a CANONICAL price on a non-archived offering counts as "live".
+      // legacy_match / deprecated tiers are old prices → always Archived, even
+      // though their offer_price_key prefix (e.g. "Steady") matches a live offering.
+      if (row && row.stripe_price_id) {
+        _MEMBERS_PRICE_STATUS[row.stripe_price_id] = (row.tier === 'canonical') ? _offerPriceStatus(row, offerings) : 'legacy';
+      }
     });
   } catch (_) { /* leave map empty - column just renders blank */ }
 }
@@ -22438,9 +22443,11 @@ function _memberPlanStatus(m) {
 
 // Roster column: is this member on a live offer price or an archived one.
 function _memberPriceStatusCell(m) {
-  // Prefer the plan-name match (handles shared legacy price ids); fall back to
-  // the price_id->status map when the plan name doesn't match an offering.
-  const st = _memberPlanStatus(m) || (m && m.stripe_price_id ? _MEMBERS_PRICE_STATUS[m.stripe_price_id] : null);
+  // The member's actual Stripe price is the source of truth (it's what they pay),
+  // so the price_id->status map wins. Plan-name match is only a fallback for
+  // prices not in the catalog. (Plan labels like "1/wk" collide with the archived
+  // "1/Wk" offering, so plan-name must NOT override a known canonical price.)
+  const st = (m && m.stripe_price_id ? _MEMBERS_PRICE_STATUS[m.stripe_price_id] : null) || _memberPlanStatus(m);
   if (!st) return '';   // unknown price (or no sub) - leave blank
   const live = st === 'live';
   const color  = live ? '#7BC47F' : '#c79a4a';
