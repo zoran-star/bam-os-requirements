@@ -52,6 +52,23 @@ The strongest way to make the distinction land is to show what "runs your busine
 
 A toolbox can't do this - it has no idea what the other tools are doing. Only an operator with a unified data layer can. This is why "talk to your business" + "it runs while you sleep" are not features, they're the proof of the category difference: **tools assist, FullControl operates the whole business.**
 
+## What only FullControl has (not in GHL, not in CoachIQ)
+
+| Feature | Why they can't match it |
+|---|---|
+| AI sales crew (Booking + Confirm + Closing) | GHL has dumb drip automations; CoachIQ has nothing. Ours hold real conversations and book + close. |
+| Talk to your business | One sentence fires actions across scheduling + billing + comms + marketing. No toolbox spans modules. |
+| An AI that learns your academy | Brain editor + lessons + sandbox; drafts in your voice over time. They learn nothing. |
+| Global Brain | Your AI learns from every academy on the network. Structurally impossible for a single-tool competitor. |
+| Runs while you sleep | Proactive overnight agents draft tomorrow's work. Theirs are reactive. |
+| AI marketing insights | Claude reads ad performance + benchmarks vs industry. GHL shows raw numbers. |
+| One unified data layer | Members + billing + sales + marketing + comms in one brain. GHL is comms/CRM only; CoachIQ scheduling only. |
+| Built for academies, pre-loaded | The playbook's already in it. GHL is empty/generic. |
+
+Honorable mentions: smart follow-up (ghosted detection + draft re-engagement), done-for-you operator model (BAM Business), no-show detection (coming).
+
+**The pattern:** every differentiator is AI-that-does-the-work, unified-data, or built-for-academies - the three things a generic toolbox or a scheduling app structurally cannot be.
+
 ## The doctrine: competitors become features
 
 ```

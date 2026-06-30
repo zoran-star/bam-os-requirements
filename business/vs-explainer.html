@@ -52,6 +52,13 @@ body{background:var(--ink);color:var(--paper);font-family:var(--sans);font-size:
 .say-a b{color:var(--paper);opacity:1;font-weight:600}
 .sleep{font-family:var(--mono);font-size:11px;letter-spacing:.06em;color:var(--gold);margin-top:18px;line-height:1.5}
 .contrast{font-size:13px;opacity:.6;margin-top:14px;line-height:1.5;font-style:italic}
+/* only-FullControl band */
+.only{margin-top:40px;border:1px solid var(--line-dark);border-radius:4px;padding:26px 26px 22px}
+.only-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:1px;background:var(--line-dark);border:1px solid var(--line-dark)}
+.feat{background:var(--ink-2);padding:16px 18px}
+.feat .ft{font-family:var(--display);font-size:15px;font-weight:500;letter-spacing:-.01em;color:var(--gold);display:flex;align-items:center;gap:9px}
+.feat .ft::before{content:"";width:6px;height:6px;border-radius:50%;background:var(--gold);flex-shrink:0}
+.feat .fd{font-size:12.5px;opacity:.62;margin-top:9px;line-height:1.5}
 @media(max-width:840px){.cols{grid-template-columns:1fr}.say-grid{grid-template-columns:1fr}.title{font-size:30px}.work,.what{min-height:0}}
 </style>
 </head>
@@ -111,6 +118,23 @@ body{background:var(--ink);color:var(--paper);font-family:var(--sans);font-size:
     </div>
     <div class="sleep">● While you sleep: tomorrow's trials confirmed, no-shows flagged, follow-ups drafted and waiting for your OK.</div>
     <div class="contrast">A toolbox can't do this. With GHL or CoachIQ you'd be clicking through five tabs. With FullControl you said one sentence.</div>
+  </div>
+
+  <div class="only">
+    <div class="band-head">
+      <div class="q" style="margin:0">What only FullControl has</div>
+      <div class="band-tag">Not in GoHighLevel. Not in CoachIQ.</div>
+    </div>
+    <div class="only-grid">
+      <div class="feat"><div class="ft">AI sales crew</div><div class="fd">Booking, Confirm &amp; Closing agents hold real conversations - book trials, confirm them, close members. Not dumb drip automations.</div></div>
+      <div class="feat"><div class="ft">Talk to your business</div><div class="fd">Say it in plain language; it executes across scheduling, billing, comms, marketing at once.</div></div>
+      <div class="feat"><div class="ft">An AI that learns your academy</div><div class="fd">Brain editor + lessons + training sandbox. After 90 days it drafts in your voice.</div></div>
+      <div class="feat"><div class="ft">Global Brain</div><div class="fd">Your AI also learns from every academy on the network - it gets smarter as we grow. Nobody can copy this.</div></div>
+      <div class="feat"><div class="ft">Runs while you sleep</div><div class="fd">Overnight agents draft tomorrow's work. You wake up to drafts, not a blank inbox.</div></div>
+      <div class="feat"><div class="ft">AI marketing insights</div><div class="fd">Claude reads your ad performance and tells you what to fix, benchmarked against the industry.</div></div>
+      <div class="feat"><div class="ft">One unified data layer</div><div class="fd">Members, billing, sales, marketing, comms in one brain - so the AI can act across all of it.</div></div>
+      <div class="feat"><div class="ft">Built for academies, pre-loaded</div><div class="fd">The playbook is already in it. Not an empty, generic toolbox you have to build.</div></div>
+    </div>
   </div>
 
   <div class="foot">
