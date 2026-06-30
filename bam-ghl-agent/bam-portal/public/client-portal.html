@@ -30976,20 +30976,28 @@ async function mRefund(memberId, customerId) {
 }
 
 async function mChange(memberId, currentPlan) {
-  // Live target plans come from the academy's pricing_catalog (is_routable),
-  // not a hardcoded list - so new live prices (e.g. Summer Unlimited) show up
-  // automatically. We offer the monthly (4-week) live canonical prices.
-  let opts = [];
+  // Live target plans come from the academy's pricing_catalog (is_routable) -
+  // not a hardcoded list - so new live prices (Summer Unlimited) and the
+  // multi-month commitments show up automatically. Archived/legacy are excluded.
+  let opts = [], nextUnix = null;
   try {
     const token = await _mreqAuthToken();
     const qs = (typeof CLIENT_ID !== 'undefined' && CLIENT_ID) ? '?client_id=' + encodeURIComponent(CLIENT_ID) : '';
-    const r = await fetch('/api/pricing' + qs, { headers: { Authorization: 'Bearer ' + token } });
-    const json = await _safeJson(r);
-    if (!r.ok) throw new Error(json.error || ('HTTP ' + r.status));
-    opts = (json.catalog || [])
-      .filter(row => row && row.stripe_price_id && row.is_routable === true
-        && row.tier === 'canonical' && row.interval === '4_weeks')
-      .sort((a, b) => (a.amount_cents || 0) - (b.amount_cents || 0))
+    const [pr, mr] = await Promise.all([
+      fetch('/api/pricing' + qs, { headers: { Authorization: 'Bearer ' + token } }),
+      fetch('/api/members?id=' + encodeURIComponent(memberId), { headers: { Authorization: 'Bearer ' + token } }),
+    ]);
+    const pj = await _safeJson(pr);
+    if (!pr.ok) throw new Error(pj.error || ('HTTP ' + pr.status));
+    const mj = await _safeJson(mr);
+    const sj = (mr.ok && mj && mj.stripe) ? mj.stripe : {};
+    // "When the next payment was supposed to be": trial_end if a future trial is
+    // active, else the current period end.
+    nextUnix = (sj.trial_end && sj.trial_end * 1000 > Date.now()) ? sj.trial_end : (sj.current_period_end || null);
+    const ir = (v) => (v === '3_months' ? 1 : v === '6_months' ? 2 : 0); // monthly first, then commitments
+    opts = (pj.catalog || [])
+      .filter(row => row && row.stripe_price_id && row.is_routable === true && row.tier === 'canonical')
+      .sort((a, b) => ir(a.interval) - ir(b.interval) || (a.amount_cents || 0) - (b.amount_cents || 0))
       .map(row => {
         const amt = (row.amount_cents / 100).toFixed(2).replace(/\.00$/, '');
         return { value: row.stripe_price_id, label: `${row.display_name || row.canonical_plan || 'Plan'} ($${amt})` };
@@ -30999,13 +31007,18 @@ async function mChange(memberId, currentPlan) {
     return;
   }
   if (!opts.length) {
-    _plToast('No live monthly prices found for this academy.');
+    _plToast('No live prices found for this academy.');
     return;
   }
+  const nextYMD = nextUnix ? new Date(nextUnix * 1000).toISOString().slice(0, 10) : '';
+  const nextLabel = nextUnix ? _cdDate(nextUnix) : 'unknown';
   const vals = await _mmModal({
-    icon: '🔄', title: 'Change plan', body: `Current plan: <b>${escapeHTML(currentPlan || '-')}</b>`, okLabel: 'Change plan',
+    icon: '🔄', title: 'Change plan',
+    body: `Current plan: <b>${escapeHTML(currentPlan || '-')}</b><br>Next payment: <b>${escapeHTML(nextLabel)}</b>`,
+    okLabel: 'Change plan',
     fields: [
       { key: 'new_price', label: 'New plan (live prices)', type: 'select', value: opts[0].value, options: opts },
+      { key: 'next_payment', label: 'Next payment date (leave as-is to keep)', type: 'date', value: nextYMD },
       { key: 'prorate', label: 'Proration', type: 'radio', value: 'no', options: [
         { value: 'no',  label: 'No proration', hint: 'Change applies on the next cycle.' },
         { value: 'yes', label: 'Prorate now', hint: 'Charge the prorated difference now (upgrades only).' },
@@ -31014,10 +31027,13 @@ async function mChange(memberId, currentPlan) {
   });
   if (!vals) return;
   const picked = opts.find(o => o.value === vals.new_price);
+  const payload = { new_price_id: vals.new_price, prorate: vals.prorate === 'yes' };
+  if (vals.next_payment && vals.next_payment !== nextYMD) payload.next_payment_date = vals.next_payment;
   try {
-    const r = await _memberAction(memberId, 'change', { new_price_id: vals.new_price, prorate: vals.prorate === 'yes' });
+    const r = await _memberAction(memberId, 'change', payload);
     const label = (r.member && r.member.plan) ? r.member.plan : (picked ? picked.label : 'new plan');
-    _plToast(`Changed to ${label} (${r.direction}${r.prorated ? ' · prorated' : ''}).`);
+    const npNote = (r.next_payment_set && r.next_payment) ? ` · next payment ${_cdDate(r.next_payment)}` : '';
+    _plToast(`Changed to ${label} (${r.direction}${r.prorated ? ' · prorated' : ''})${npNote}.`);
     closeMemberPopup();
     fetchAndRenderMembers();
   } catch (e) { _plToast('Change failed: ' + e.message); }
