@@ -30976,15 +30976,36 @@ async function mRefund(memberId, customerId) {
 }
 
 async function mChange(memberId, currentPlan) {
+  // Live target plans come from the academy's pricing_catalog (is_routable),
+  // not a hardcoded list - so new live prices (e.g. Summer Unlimited) show up
+  // automatically. We offer the monthly (4-week) live canonical prices.
+  let opts = [];
+  try {
+    const token = await _mreqAuthToken();
+    const qs = (typeof CLIENT_ID !== 'undefined' && CLIENT_ID) ? '?client_id=' + encodeURIComponent(CLIENT_ID) : '';
+    const r = await fetch('/api/pricing' + qs, { headers: { Authorization: 'Bearer ' + token } });
+    const json = await _safeJson(r);
+    if (!r.ok) throw new Error(json.error || ('HTTP ' + r.status));
+    opts = (json.catalog || [])
+      .filter(row => row && row.stripe_price_id && row.is_routable === true
+        && row.tier === 'canonical' && row.interval === '4_weeks')
+      .sort((a, b) => (a.amount_cents || 0) - (b.amount_cents || 0))
+      .map(row => {
+        const amt = (row.amount_cents / 100).toFixed(2).replace(/\.00$/, '');
+        return { value: row.stripe_price_id, label: `${row.display_name || row.canonical_plan || 'Plan'} ($${amt})` };
+      });
+  } catch (e) {
+    _plToast("Couldn't load live prices: " + e.message);
+    return;
+  }
+  if (!opts.length) {
+    _plToast('No live monthly prices found for this academy.');
+    return;
+  }
   const vals = await _mmModal({
     icon: '🔄', title: 'Change plan', body: `Current plan: <b>${escapeHTML(currentPlan || '-')}</b>`, okLabel: 'Change plan',
     fields: [
-      { key: 'new_plan', label: 'New plan', type: 'select', value: '1/wk', options: [
-        { value: '1/wk',   label: '1/wk - Steady ($226)' },
-        { value: '2/wk',   label: '2/wk - Accelerated ($316)' },
-        { value: '3/wk',   label: '3/wk - Elevate ($378)' },
-        { value: 'unlmtd', label: 'Unlimited - Dominate ($638)' },
-      ] },
+      { key: 'new_price', label: 'New plan (live prices)', type: 'select', value: opts[0].value, options: opts },
       { key: 'prorate', label: 'Proration', type: 'radio', value: 'no', options: [
         { value: 'no',  label: 'No proration', hint: 'Change applies on the next cycle.' },
         { value: 'yes', label: 'Prorate now', hint: 'Charge the prorated difference now (upgrades only).' },
@@ -30992,9 +31013,11 @@ async function mChange(memberId, currentPlan) {
     ],
   });
   if (!vals) return;
+  const picked = opts.find(o => o.value === vals.new_price);
   try {
-    const r = await _memberAction(memberId, 'change', { new_plan: vals.new_plan, prorate: vals.prorate === 'yes' });
-    _plToast(`Changed to ${vals.new_plan} (${r.direction}${r.prorated ? ' · prorated' : ''}).`);
+    const r = await _memberAction(memberId, 'change', { new_price_id: vals.new_price, prorate: vals.prorate === 'yes' });
+    const label = (r.member && r.member.plan) ? r.member.plan : (picked ? picked.label : 'new plan');
+    _plToast(`Changed to ${label} (${r.direction}${r.prorated ? ' · prorated' : ''}).`);
     closeMemberPopup();
     fetchAndRenderMembers();
   } catch (e) { _plToast('Change failed: ' + e.message); }
