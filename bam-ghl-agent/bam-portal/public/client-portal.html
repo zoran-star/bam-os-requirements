@@ -31606,10 +31606,13 @@ async function mChange(memberId, currentPlan) {
       return offerings.length ? 'legacy' : (row.is_routable === true ? 'live' : 'legacy');
     };
 
+    // Group by plan so each plan's monthly + its commitments sit together
+    // (Steady monthly/3mo/6mo, then Summer Unlimited monthly/3mo), term ascending within.
+    const planKey = (r) => (r.offer_price_key ? r.offer_price_key.split('|')[0] : (r.canonical_plan || r.display_name || '')).trim().toLowerCase();
     const live = [], legacy = [];
     (pj.catalog || [])
       .filter(row => row && row.stripe_price_id && row.is_routable === true && row.tier === 'canonical')
-      .sort((a, b) => ir(a.interval) - ir(b.interval) || (a.amount_cents || 0) - (b.amount_cents || 0))
+      .sort((a, b) => planKey(a).localeCompare(planKey(b)) || ir(a.interval) - ir(b.interval) || (a.amount_cents || 0) - (b.amount_cents || 0))
       .forEach(row => {
         const o = { value: row.stripe_price_id, label: `${row.display_name || row.canonical_plan || 'Plan'} - ${_withHst(row.amount_cents)}` };
         (statusOf(row) === 'live' ? live : legacy).push(o);
