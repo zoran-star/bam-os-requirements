@@ -31330,6 +31330,15 @@ async function mChange(memberId, currentPlan) {
   // not a hardcoded list - so new live prices (Summer Unlimited) and the
   // multi-month commitments show up automatically. Archived/legacy are excluded.
   let flat = [], grouped = [], nextUnix = null;
+  // BAM GTA / Ontario: Stripe prices are tax-inclusive (13% HST baked in), so
+  // split the all-in amount into the regular price + the HST fee for display.
+  const HST_RATE = 0.13;
+  const _money = (c) => '$' + (c / 100).toFixed(2).replace(/\.00$/, '');
+  const _withHst = (cents) => {
+    if (cents == null) return '';
+    const base = Math.round(cents / (1 + HST_RATE));
+    return `${_money(cents)} (${_money(base)} + ${_money(cents - base)} HST)`;
+  };
   try {
     const token = await _mreqAuthToken();
     const qs = (typeof CLIENT_ID !== 'undefined' && CLIENT_ID) ? '?client_id=' + encodeURIComponent(CLIENT_ID) : '';
@@ -31379,8 +31388,7 @@ async function mChange(memberId, currentPlan) {
       .filter(row => row && row.stripe_price_id && row.is_routable === true && row.tier === 'canonical')
       .sort((a, b) => ir(a.interval) - ir(b.interval) || (a.amount_cents || 0) - (b.amount_cents || 0))
       .forEach(row => {
-        const amt = (row.amount_cents / 100).toFixed(2).replace(/\.00$/, '');
-        const o = { value: row.stripe_price_id, label: `${row.display_name || row.canonical_plan || 'Plan'} ($${amt})` };
+        const o = { value: row.stripe_price_id, label: `${row.display_name || row.canonical_plan || 'Plan'} - ${_withHst(row.amount_cents)}` };
         (statusOf(row) === 'live' ? live : legacy).push(o);
       });
     flat = [...live, ...legacy];
@@ -31398,7 +31406,7 @@ async function mChange(memberId, currentPlan) {
   const nextLabel = nextUnix ? _cdDate(nextUnix) : 'unknown';
   const vals = await _mmModal({
     icon: '🔄', title: 'Change plan',
-    body: `Current plan: <b>${escapeHTML(currentPlan || '-')}</b><br>Next payment: <b>${escapeHTML(nextLabel)}</b>`,
+    body: `Current plan: <b>${escapeHTML(currentPlan || '-')}</b>${(sj && sj.amount_cents != null) ? ' &middot; ' + _withHst(sj.amount_cents) : ''}<br>Next payment: <b>${escapeHTML(nextLabel)}</b>`,
     okLabel: 'Change plan',
     fields: [
       { key: 'new_price', label: 'New plan', type: 'select', value: flat[0].value, options: grouped },
