@@ -31000,6 +31000,35 @@ async function mChange(memberId, currentPlan) {
     // active, else the current period end.
     nextUnix = (sj.trial_end && sj.trial_end * 1000 > Date.now()) ? sj.trial_end : (sj.current_period_end || null);
     const ir = (v) => (v === '3_months' ? 1 : v === '6_months' ? 2 : 0); // monthly first, then commitments
+
+    // Live vs Legacy = the OFFER's archived flag (what's actually active on the
+    // website), matched to each price by plan title - the same rule the Pricing
+    // view uses. An archived plan (Accelerate/Elevate/Dominate) is Legacy even if
+    // its catalog row is still flagged routable/canonical. Falls back to
+    // is_routable only if the offer can't be loaded.
+    let offerings = (typeof _bbState !== 'undefined' && _bbState && _bbState.offer && _bbState.offer.data
+      && _bbState.offer.data.pricing && _bbState.offer.data.pricing.pricing_offerings) || [];
+    if (!offerings.length) {
+      const offerId = (mj && mj.member && mj.member.offer_id)
+        || ((pj.catalog || []).find(r => r && r.offer_id) || {}).offer_id || null;
+      if (offerId && typeof _sb !== 'undefined' && _sb) {
+        try {
+          const { data: offRow } = await _sb.from('offers').select('data').eq('id', offerId).maybeSingle();
+          offerings = (offRow && offRow.data && offRow.data.pricing && offRow.data.pricing.pricing_offerings) || [];
+        } catch (_) { /* fall back below */ }
+      }
+    }
+    const statusOf = (row) => {
+      const hay = ((row.offer_price_key ? row.offer_price_key.split('|')[0] : '') + ' ' + (row.display_name || '')).toLowerCase();
+      let best = null;
+      offerings.forEach(o => {
+        const t = String(o.title || '').trim().toLowerCase();
+        if (t && hay.indexOf(t) >= 0 && (!best || t.length > best.len)) best = { archived: !!o.archived, len: t.length };
+      });
+      if (best) return best.archived ? 'legacy' : 'live';
+      return offerings.length ? 'legacy' : (row.is_routable === true ? 'live' : 'legacy');
+    };
+
     const live = [], legacy = [];
     (pj.catalog || [])
       .filter(row => row && row.stripe_price_id && row.is_routable === true && row.tier === 'canonical')
@@ -31007,9 +31036,7 @@ async function mChange(memberId, currentPlan) {
       .forEach(row => {
         const amt = (row.amount_cents / 100).toFixed(2).replace(/\.00$/, '');
         const o = { value: row.stripe_price_id, label: `${row.display_name || row.canonical_plan || 'Plan'} ($${amt})` };
-        // Live = confirmed mapping to the current offer; older unmapped canonical
-        // prices drop into a separate "Legacy" group.
-        (row.match_status === 'confirmed' ? live : legacy).push(o);
+        (statusOf(row) === 'live' ? live : legacy).push(o);
       });
     flat = [...live, ...legacy];
     if (live.length)   grouped.push({ group: 'Live prices', items: live });
