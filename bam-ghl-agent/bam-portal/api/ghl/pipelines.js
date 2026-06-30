@@ -326,13 +326,39 @@ async function handler(req, res) {
     if (!body.pipeline_id)    return res.status(400).json({ error: "pipeline_id required in body" });
     if (!body.stage_id)       return res.status(400).json({ error: "stage_id required in body" });
     try {
-      const out = await ghl("PUT", `/opportunities/${encodeURIComponent(oppId)}`, {
-        token,
-        body: { pipelineId: body.pipeline_id, pipelineStageId: body.stage_id },
+      // Raw board drag-drop. Route the move through the provider-aware store so a
+      // provider='portal' academy persists the move to its own opportunities row.
+      // On provider='ghl' (every client today) moveStage issues the EXACT same
+      // PUT /opportunities/{id} { pipelineId, pipelineStageId } as before, so this
+      // is byte-identical for every live academy.
+
+      // oppRef: the dragged card already carries the GHL opportunity id, so on
+      // provider='ghl' storeOppRef returns { ghlOpportunityId: oppId } with zero
+      // extra lookups; on 'portal' it resolves the contact's open store row.
+      const oppRef = await storeOppRef({ clientId, provider, shadow, token, locationId, oppId });
+
+      // Derive the destination stage's ROLE from its GHL stage id, using the SAME
+      // registry mapping the store uses (pipeline_stages.role - what buildPortalBoard
+      // and shadowMirrorMove's raw-move path read). A not-yet-seeded GHL academy maps
+      // to null, which is fine: moveStage's GHL branch only needs pipelineId+stageId;
+      // role (and the seeded stage name) only feed the portal/shadow write. Reading the
+      // seeded stage name alongside keeps the registry upsert idempotent (no name clobber).
+      let destRole = null, destStageName = null;
+      try {
+        const rows = await sb(
+          `pipeline_stages?client_id=eq.${encodeURIComponent(clientId)}` +
+          `&ghl_stage_id=eq.${encodeURIComponent(body.stage_id)}&select=role,ghl_stage_name&limit=1`
+        );
+        if (Array.isArray(rows) && rows[0]) { destRole = rows[0].role || null; destStageName = rows[0].ghl_stage_name || null; }
+      } catch (_) { /* leave null - the GHL PUT is unaffected */ }
+
+      // moveStage mirrors the shadow write internally, so no separate shadowMirrorMove here.
+      await moveStage({
+        clientId, provider, shadow, ghl, token, oppRef,
+        stage: { pipelineId: body.pipeline_id, stageId: body.stage_id, stageName: destStageName },
+        role: destRole,
       });
-      // Shadow dual-write of the stage move (dormant unless pipeline_shadow on).
-      try { await shadowMirrorMove(clientId, { shadow: client.pipeline_shadow, ghlOpportunityId: oppId, ghlStageId: body.stage_id, ghlPipelineId: body.pipeline_id }); } catch (_) {}
-      return res.status(200).json({ ok: true, opportunity_id: oppId, new_stage_id: body.stage_id, raw: out });
+      return res.status(200).json({ ok: true, opportunity_id: oppId, new_stage_id: body.stage_id });
     } catch (e) {
       return res.status(e.status || 502).json({ error: `GHL: ${e.message}`, detail: e.body || null });
     }
