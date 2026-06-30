@@ -28,6 +28,8 @@ export default function TeamView({ tokens: tk, dark, session, me }) {
   const [editingId, setEditingId] = useState(null);
   const [banner, setBanner] = useState(null);
   const [refreshCounter, setRefreshCounter] = useState(0);
+  const [pendingIds, setPendingIds] = useState(() => new Set());
+  const [resendingId, setResendingId] = useState(null);
 
   const isAdmin = me?.role === "admin";
 
@@ -47,9 +49,45 @@ export default function TeamView({ tokens: tk, dark, session, me }) {
         setStaff(data || []);
       }
       setLoading(false);
+
+      // Which invites are still outstanding (never accepted)? Admin-only —
+      // needs the service key to read auth state. Non-fatal if it fails.
+      if (isAdmin) {
+        try {
+          const res = await fetch("/api/clients?action=staff-pending", {
+            method: "POST",
+            headers: { Authorization: `Bearer ${session?.access_token}` },
+          });
+          const json = await res.json().catch(() => ({}));
+          if (!cancelled && res.ok && Array.isArray(json.pending)) {
+            setPendingIds(new Set(json.pending));
+          }
+        } catch { /* badge just won't show — not worth surfacing */ }
+      }
     })();
     return () => { cancelled = true; };
-  }, [refreshCounter]);
+  }, [refreshCounter, isAdmin, session]);
+
+  // Re-send a still-outstanding invite. The backend auto-picks an invite link
+  // (never-accepted) vs a recovery link (active), so this is safe to call.
+  const resendInvite = async (member) => {
+    if (resendingId) return;
+    setResendingId(member.id);
+    try {
+      const res = await fetch("/api/clients?action=reset-staff-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${session?.access_token}` },
+        body: JSON.stringify({ email: member.email }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) { showBanner(`Could not resend: ${json?.error || res.status}`); return; }
+      showBanner(`Invite re-sent to ${member.email}.`);
+    } catch (e) {
+      showBanner(`Could not resend: ${e?.message || "network error"}`);
+    } finally {
+      setResendingId(null);
+    }
+  };
 
   const refresh = () => setRefreshCounter(x => x + 1);
   const editing = editingId ? staff.find(s => s.id === editingId) : null;
@@ -139,6 +177,7 @@ export default function TeamView({ tokens: tk, dark, session, me }) {
               const pill = rolePillColor(member.role);
               const initials = (member.name || "?")
                 .split(" ").map(w => w[0]).filter(Boolean).slice(0, 2).join("").toUpperCase();
+              const pending = pendingIds.has(member.id);
               return (
                 <div
                   key={member.id}
@@ -179,15 +218,38 @@ export default function TeamView({ tokens: tk, dark, session, me }) {
                     <div style={{ fontSize: 12, color: tk.textSub, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                       {member.email || <span style={{ color: tk.textMute, fontStyle: "italic" }}>no email</span>}
                     </div>
-                    <div style={{
-                      display: "inline-block",
-                      marginTop: 8,
-                      color: pill.color, fontSize: 10, fontWeight: 600, letterSpacing: "0.15em",
-                      textTransform: "uppercase",
-                      padding: "3px 9px", borderRadius: 999,
-                      background: pill.bg, border: `1px solid ${pill.border}`,
-                    }}>{getRoleLabel(member.role)}</div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap", marginTop: 8 }}>
+                      <span style={{
+                        display: "inline-block",
+                        color: pill.color, fontSize: 10, fontWeight: 600, letterSpacing: "0.15em",
+                        textTransform: "uppercase",
+                        padding: "3px 9px", borderRadius: 999,
+                        background: pill.bg, border: `1px solid ${pill.border}`,
+                      }}>{getRoleLabel(member.role)}</span>
+                      {pending && (
+                        <span style={{
+                          color: tk.amber || "#E8A547", fontSize: 10, fontWeight: 700, letterSpacing: "0.12em",
+                          textTransform: "uppercase", padding: "3px 9px", borderRadius: 999,
+                          background: `${tk.amber || "#E8A547"}1A`, border: `1px solid ${tk.amber || "#E8A547"}66`,
+                        }}>⏳ Pending invite</span>
+                      )}
+                    </div>
                   </div>
+                  {isAdmin && pending && member.email && (
+                    <button
+                      onClick={(e) => { e.stopPropagation(); resendInvite(member); }}
+                      disabled={resendingId === member.id}
+                      style={{
+                        flexShrink: 0, alignSelf: "center",
+                        padding: "7px 12px", fontSize: 12, fontWeight: 700,
+                        borderRadius: 8, cursor: resendingId === member.id ? "default" : "pointer",
+                        fontFamily: "inherit", whiteSpace: "nowrap",
+                        background: "transparent", color: tk.amber || "#E8A547",
+                        border: `1px solid ${tk.amber || "#E8A547"}66`,
+                        opacity: resendingId === member.id ? 0.6 : 1,
+                      }}
+                    >{resendingId === member.id ? "Sending…" : "Resend invite"}</button>
+                  )}
                 </div>
               );
             })}

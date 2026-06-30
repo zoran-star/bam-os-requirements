@@ -2045,7 +2045,7 @@ async function handler(req, res) {
       // submit-feedback moved to the public path (no auth required).
       // list-feedback + resolve-feedback flow through staff auth, then are
       // additionally narrowed to the `admin` role inside their handlers.
-      const ADMIN_ONLY_ACTIONS = new Set(["invite-staff", "update-staff", "reset-staff-password", "create-client", "setup-account", "reset-password", "transfer-owner", "archive", "list-feedback", "resolve-feedback", "feedback-spec", "ship-queue", "ship-merge"]);
+      const ADMIN_ONLY_ACTIONS = new Set(["invite-staff", "update-staff", "reset-staff-password", "staff-pending", "create-client", "setup-account", "reset-password", "transfer-owner", "archive", "list-feedback", "resolve-feedback", "feedback-spec", "ship-queue", "ship-merge"]);
       const ANY_STAFF_OK_ACTIONS = new Set(["update-fields"]);
 
       if (ADMIN_ONLY_ACTIONS.has(action)) {
@@ -2291,6 +2291,30 @@ async function handler(req, res) {
           return res.status(500).json({ error: "failed to send email" });
         }
         return res.status(200).json({ ok: true, sent_to: targetEmail, kind: link.kind });
+      }
+
+      // ── action=staff-pending ──
+      // Admin-only. Returns the staff ids whose linked auth user has never
+      // confirmed their email AND never signed in — i.e. an invite that's
+      // still outstanding. Powers the Team tab's "Pending invite" badge +
+      // "Resend invite" button so admins can spot + re-send aging invites.
+      if (action === "staff-pending") {
+        const rows = await supabaseSelect(`staff?select=id,user_id`) || [];
+        const checks = await Promise.all(rows.map(async (s) => {
+          // No linked auth user yet → definitely pending.
+          if (!s.user_id) return { id: s.id, pending: true };
+          try {
+            const r = await fetch(`${SUPABASE_URL}/auth/v1/admin/users/${s.user_id}`, {
+              headers: { apikey: SUPABASE_SERVICE_KEY, Authorization: `Bearer ${SUPABASE_SERVICE_KEY}` },
+            });
+            if (!r.ok) return { id: s.id, pending: false };
+            const u = await r.json();
+            return { id: s.id, pending: !u.email_confirmed_at && !u.last_sign_in_at };
+          } catch {
+            return { id: s.id, pending: false };
+          }
+        }));
+        return res.status(200).json({ pending: checks.filter(c => c.pending).map(c => c.id) });
       }
 
       // ── action=create-client ──
