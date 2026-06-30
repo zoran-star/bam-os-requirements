@@ -343,6 +343,20 @@ async function handler(req, res) {
                 member.stripe_joined_at = iso;
               } catch (_) { /* non-fatal */ }
             }
+
+            // Lazy backfill the billing-ownership flag so the roster can badge
+            // "imported / needs Set up billing" members without a Stripe call
+            // per row. Same pattern as stripe_joined_at above. Non-fatal.
+            if (member.billing_portal_owned !== portalOwned) {
+              try {
+                await sb(`members?id=eq.${id}`, {
+                  method: "PATCH",
+                  headers: { Prefer: "return=minimal" },
+                  body: JSON.stringify({ billing_portal_owned: portalOwned }),
+                });
+                member.billing_portal_owned = portalOwned;
+              } catch (_) { /* non-fatal */ }
+            }
           } catch (e) {
             stripe = { error: e.message };
           }

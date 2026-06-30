@@ -201,6 +201,18 @@ async function draftForContact(token, locationId, clientId, contactId, cfg, opts
   // happened; the post-trial form is what moved them into this stage.
   let seed = null;
   if (!lastIsInbound) {
+    // A6: don't stack the closing opener on top of the coach's post-trial text. The
+    // post-trial form can send the trainer's first message + the academy's sign-up
+    // link itself (post_trial_reviews.signup_text_status = 'sent'). When it already
+    // did, the lead has been opened - a second proactive "hope you had a great time"
+    // would double-text them. Skip the proactive opener in that case; the lead still
+    // re-enters via the reactive path the instant they reply.
+    try {
+      const rev = await sb(`post_trial_reviews?client_id=eq.${encodeURIComponent(clientId)}&ghl_contact_id=eq.${encodeURIComponent(contactId)}&select=signup_text_status&order=created_at.desc&limit=1`);
+      if (Array.isArray(rev) && rev[0] && rev[0].signup_text_status === "sent") {
+        return { skip: "coach's post-trial form already sent the first message/link" };
+      }
+    } catch (_) { /* best-effort - never block a draft on a review lookup */ }
     seed = `[No new message from the lead. Their athlete recently attended a free trial and was marked a good fit. Send a short, warm post-trial follow-up: check in on how the session went and gently open the door to enrolling. Do NOT lead with pricing.]`;
   }
 
@@ -242,6 +254,28 @@ async function sendReplyViaGhl(token, contactId, reply, clientId) {
 // Append to the shared audit log (agent_approvals). Non-fatal.
 async function logApproval(row) {
   try { await sb(`agent_approvals`, { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify([row]) }); } catch (_) {}
+}
+
+// O6 - is this contact ALREADY a live (paying) member? If the won-mark was skipped,
+// a paid member's opp can linger in Done-Trial and the closing agent would keep
+// drafting "come enroll". Guard on the actual member record, independent of the GHL
+// won-mark: match by ghl_contact_id first (cheap), then fall back to parent_email
+// (covers a brand-new live member whose contact isn't linked yet). Fails OPEN (returns
+// false) so a lookup hiccup never silences the agent on a genuine lead.
+async function isLiveMember(clientId, contactId, token) {
+  try {
+    const byId = await sb(`members?client_id=eq.${encodeURIComponent(clientId)}&ghl_contact_id=eq.${encodeURIComponent(contactId)}&status=eq.live&select=id&limit=1`);
+    if (Array.isArray(byId) && byId.length) return true;
+    if (token) {
+      const info = await resolveContactInfo(token, contactId).catch(() => null);
+      const email = info && info.email;
+      if (email) {
+        const byEmail = await sb(`members?client_id=eq.${encodeURIComponent(clientId)}&parent_email=eq.${encodeURIComponent(email)}&status=eq.live&select=id&limit=1`);
+        if (Array.isArray(byEmail) && byEmail.length) return true;
+      }
+    }
+  } catch (_) { /* fail open - never block a real lead on a lookup error */ }
+  return false;
 }
 
 // Persist only the safe, editable slice of a closing-automations override:
@@ -392,6 +426,9 @@ async function detectForClient(client) {
     const contactId = item.contact_id;
     if (!contactId) { skipped++; reasons.push(`${item.name || "?"}: no contactId`); continue; }
     if (mutedSet.has(String(contactId))) { skipped++; reasons.push(`${item.name || contactId}: bot muted on this lead`); continue; }
+    // O6: never keep selling to a paid member. If the won-mark was skipped, a live
+    // member can sit open in Done-Trial - skip them outright (independent of GHL won).
+    if (await isLiveMember(client.id, contactId, token)) { skipped++; reasons.push(`${item.name || contactId}: already a live member`); continue; }
 
     const reactive = item.last_direction === "inbound";
 

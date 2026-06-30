@@ -12,6 +12,7 @@
 
 import { withSentryApiRoute } from "../_sentry.js";
 import { shadowMirrorMove } from "../agent/_store.js";
+import { enrollContact, isAutomationLive } from "../automations.js";
 
 const SUPABASE_URL = (process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || "").trim();
 const SUPABASE_SERVICE_KEY = (process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY || "").trim();
@@ -155,22 +156,39 @@ async function handler(req, res) {
 
   const result = { ok: true, good_fit: goodFit, showed_up: showedUp, moved: false, trainer, signup_text: "none" };
 
-  // Missed-trial automation: when the trainer marks the athlete as NOT attended,
-  // fire the academy's chosen GHL workflow. Configured per-academy on the training
-  // offer (offers.data.missed_trial_workflow), same pattern as signup_url. Non-fatal.
+  // Missed-trial first-touch: when the trainer marks the athlete as NOT attended,
+  // start a rebooking outreach. PREFER the portal-native "missed_trial" automation
+  // (configurable in Train Agent -> 📵 Missed Trial). Its completion rolls into 👻
+  // Ghosted automatically (api/automations.js roll-forward), so the chain is:
+  //   no-show -> missed_trial first-touch -> Ghosted -> Nurture.
+  // Only fall back to the academy's chosen GHL "missed trial" workflow
+  // (offers.data.missed_trial_workflow) when the portal automation is NOT live, so a
+  // contact never gets both. Non-fatal.
   if (showedUp === false && contactId) {
-    try {
-      const offers = await sb(`offers?client_id=eq.${encodeURIComponent(clientId)}&type=eq.training&select=data&order=sort_order.asc&limit=1`);
-      const wfId = ((offers && offers[0] && offers[0].data && offers[0].data.missed_trial_workflow) || "").trim();
-      if (!wfId) {
-        result.missed_trial = "no_workflow";   // not set up on the offer yet
-      } else {
-        await ghl("POST", `/contacts/${encodeURIComponent(contactId)}/workflow/${encodeURIComponent(wfId)}`, { token });
-        result.missed_trial = "fired";
+    let portalMissedLive = false;
+    try { portalMissedLive = await isAutomationLive(clientId, "missed_trial"); } catch (_) { portalMissedLive = false; }
+    if (portalMissedLive) {
+      try {
+        const en = await enrollContact({ clientId, automationKey: "missed_trial", contactId });
+        result.missed_trial = (en && en.ok) ? "portal_enrolled" : `portal_${(en && en.skipped) || "skipped"}`;
+      } catch (e) {
+        console.error("missed-trial portal enroll failed (non-fatal):", e.message);
+        result.missed_trial = "portal_failed";
       }
-    } catch (e) {
-      console.error("missed-trial workflow failed (non-fatal):", e.message);
-      result.missed_trial = "failed";
+    } else {
+      try {
+        const offers = await sb(`offers?client_id=eq.${encodeURIComponent(clientId)}&type=eq.training&select=data&order=sort_order.asc&limit=1`);
+        const wfId = ((offers && offers[0] && offers[0].data && offers[0].data.missed_trial_workflow) || "").trim();
+        if (!wfId) {
+          result.missed_trial = "no_workflow";   // portal automation off + no GHL workflow set
+        } else {
+          await ghl("POST", `/contacts/${encodeURIComponent(contactId)}/workflow/${encodeURIComponent(wfId)}`, { token });
+          result.missed_trial = "fired";
+        }
+      } catch (e) {
+        console.error("missed-trial workflow failed (non-fatal):", e.message);
+        result.missed_trial = "failed";
+      }
     }
   }
 
