@@ -137,9 +137,32 @@ async function detectForClient(client) {
 
   let queued = 0, skipped = 0;
 
+  // INTRO HANDOFF GUARD: when an academy runs the form INTRO automation
+  // (contact_form / trial_form), that timed first-touch owns the lead's first
+  // contact. The ghost engine must NOT also queue a "Send to Ghosted" card while
+  // the intro is still scheduling/sending, or the lead gets double-texted once an
+  // intro is edited to span past the 24h quiet threshold (audit finding C2). The
+  // intro owns the first touch; the agent/ghost take over only on reply (reply
+  // engine) or after the intro completes and the lead still stays quiet. Skip any
+  // contact with an intro enrollment that's active (scheduled, mid-delay) or
+  // completed (sent). Loaded ONCE per client. Best-effort: a query failure leaves
+  // introSet empty so detection still runs. Naturally dormant when no
+  // contact_form/trial_form automations exist (introSet empty -> no behavior change).
+  let introSet = new Set();
+  try {
+    const introAutos = await sb(`automations?client_id=eq.${client.id}&automation_key=in.(contact_form,trial_form)&select=id`);
+    const introIds = (Array.isArray(introAutos) ? introAutos : []).map(a => a.id);
+    if (introIds.length) {
+      const enr = await sb(`automation_enrollments?client_id=eq.${client.id}&automation_id=in.(${introIds.join(",")})&status=in.(active,completed)&select=contact_id`);
+      introSet = new Set((Array.isArray(enr) ? enr : []).map(e => String(e.contact_id)));
+    }
+  } catch (_) { introSet = new Set(); }
+
   for (const c of candidates) {
     const contactId = c.contactId;
     if (!contactId) { skipped++; continue; }
+    // Mid-intro lead: the form-intro automation owns the first touch. Don't ghost it.
+    if (introSet.has(String(contactId))) { skipped++; continue; }
     // Skip if this lead already has ANY active card (reply / ghost / lost / book).
     try {
       const existing = await sb(`agent_ready_replies?client_id=eq.${client.id}&ghl_contact_id=eq.${encodeURIComponent(contactId)}&status=in.(pending,approved)&select=id&limit=1`);
