@@ -37,26 +37,31 @@ Tier on the things that scale both value **and** cost-to-serve:
 
 ## 3. The tier ladder
 
-### 🟢 FC Core — entry (~$499 founding → ~$699 standard)
-*The command center. One place to run the academy + AI books your trials.*
+**The progression: "Run it" → "It runs itself" → "Run an empire."** Each tier earns its upcharge.
+
+### 🟢 FC Core — "Run it" + the magic (~$499 founding → ~$699 standard)
+*The command center. Everything you need to run the academy + the magic. Loaded on purpose so the founding deal is a no-brainer and FC beats cheap point tools (CoachIQ etc.).*
 - Client portal: Home/KPI dashboard, Sales board + pipeline, Members + Stripe billing (pause/cancel/refund), Contacts, Inbox (SMS + email), Support tickets
 - **Booking Agent** (AI converts leads to trials, Hawkeye-approved)
 - Marketing **tools**: Meta campaign management + ad performance dashboard (results) + CAC/KPIs
 - Onboarding wizard + Action Items, mobile app, owner notifications
+- _Future:_ **Voice "talk to your business"** (meter usage to protect margin), **Member-facing athlete app**, **Native scheduling** (replaces CoachIQ dependency), **Global brain** (network effect — included everywhere on purpose)
 
-### 🟢 FC Growth — the flagship (~$899-999, **$499 founding**)
+### 🟢 FC Growth — "It runs itself" (~$899-999, **$499 founding**)
 *Everything in Core + the full crew so the business runs itself. Where most live clients actually sit.*
 - **Full sales crew: Confirm + Closing agents**
 - **Follow-up nudge engine** + Ghosted→Nurture automation
 - **AI marketing insights**
 - **Agent brain editor + lesson library + training sandbox** ← the "more it learns" moat
 - Organic content pipeline, Mass send, Website enrollment funnel (self-serve join→pay)
+- _Future:_ **"Runs while you sleep" overnight agents**, **No-show detector**
 
-### 🟢 FC Scale — premium (~$1,499+)
+### 🟢 FC Scale — "Run an empire" (~$1,499+)
 *For bigger / multi-location academies and power users.*
 - Multi-location support + location switching, multi-user team + permissions
 - Advanced analytics: funnel view, industry benchmarks, activity ledger, custom KPIs (near-term)
 - Resources library, priority support, higher member/SMS/AI volume, light done-with-you
+- _Future:_ **AI pricing assistant**, **Audit trail**
 
 ### 🔵 BAM Business — partner door (Base + 10-15% of growth above baseline)
 *Not a software tier. A human scaling manager runs growth WITH them. FC is the cockpit.*
@@ -66,20 +71,25 @@ Tier on the things that scale both value **and** cost-to-serve:
 
 ---
 
-## 4. Future adds (expansion levers — see the board to move them between tiers)
+## 4. Future adds (placed 2026-06-30 — drag on the board to re-plan)
 
-| Future add | Why it's money | Suggested home |
+| Future add | Why it's money | Agreed home |
 |---|---|---|
-| Voice "talk to your business" | Claim of fame #1, not built. Demo magic. | Halo across tiers / Scale |
-| Member-facing athlete app (streaks, QR check-in, billing) | New surface, prototype-only today | Add-on / Scale |
-| Native scheduling (own it, drop CoachIQ dependency) | Removes a dependency + new revenue | Add-on |
+| Voice "talk to your business" | Claim of fame #1, demo magic, the wedge | **Core** (meter usage to protect margin) |
+| Member-facing athlete app (streaks, QR check-in, billing) | Replaces cheap point tools; necessary to win the switch | **Core** |
+| Native scheduling (own it, drop CoachIQ dependency) | Table-stakes to run an academy; kills CoachIQ dependency | **Core** |
+| Global brain / lesson promotion (network effect) | Compounding moat, better with scale | **Core (everywhere)** — market as the moat |
+| "Runs while you sleep" overnight agents | Claim of fame #2; IS the "runs itself" promise | **Growth** |
+| No-show detector | Part of the sales crew (feeds Confirm/Closing) | **Growth** |
+| AI pricing assistant | Power-user convenience, stickiness | **Scale** |
+| Audit trail | Governance; pairs with multi-user | **Scale** |
 | Managed marketing % (we run their Meta) | % of ad spend for done-for-you | Upsell / BAM Business |
-| "Runs while you sleep" overnight agents | Claim of fame #2, partial via crons | Growth+ |
-| Global brain / lesson promotion (network effect) | Compounding moat, better with scale | All tiers — market as the moat |
-| AI pricing assistant + custom KPIs | Stickiness | Scale |
-| No-show detector / audit trail | Reliability + trust | Scale |
 
-**Strategically biggest:** the global brain (network effect) — the "more it learns" claim at the fleet level.
+**Why so much in Core:** competitors (CoachIQ etc.) are ~a couple hundred dollars. Scheduling + member app are what *replace* them, so they must be in the base or FC looks overpriced vs the thing it's killing. Voice + global brain are in Core to drive demos and compound the network-effect moat.
+
+**Strategically biggest:** the global brain (network effect) — the "more it learns" claim at the fleet level. Gating it would starve the network, so it's included everywhere on purpose.
+
+**Consequence — watch cost-to-serve.** A loaded Core (voice, app, global brain) carries real infra cost. The falling AI-cost curve is what makes it viable; fair-use caps on the expensive bits (voice minutes, AI generations) protect Core margin.
 
 ---
 

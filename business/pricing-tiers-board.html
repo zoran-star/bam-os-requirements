@@ -137,15 +137,15 @@ const DEFAULT = [
   {id:"growthshare",name:"Growth-share model (base + 10-15%)", status:"service", tier:"bam"},
   {id:"managedmkt",name:"Managed marketing (% of ad spend)", status:"future", tier:"bam"},
   {id:"strategy", name:"Quarterly strategy consult", status:"service", tier:"bam"},
-  // BACKLOG (future, unplaced — drag me)
-  {id:"voice",    name:'Voice "talk to your business"', status:"future", tier:"backlog"},
-  {id:"memberapp",name:"Member-facing athlete app (streaks, QR check-in, billing)", status:"future", tier:"backlog"},
-  {id:"sched",    name:"Native scheduling (own it, drop CoachIQ)", status:"future", tier:"backlog"},
-  {id:"overnight",name:'"Runs while you sleep" overnight agents', status:"prog", tier:"backlog"},
-  {id:"globalbrain",name:"Global brain / lesson promotion (network effect)", status:"prog", tier:"backlog"},
-  {id:"aipricing",name:"AI pricing assistant", status:"future", tier:"backlog"},
-  {id:"noshow",   name:"No-show detector", status:"future", tier:"backlog"},
-  {id:"audit",    name:"Audit trail", status:"future", tier:"backlog"},
+  // FUTURE FEATURES — placed 2026-06-30 (drag to re-plan)
+  {id:"voice",    name:'Voice "talk to your business" (meter usage at Core)', status:"future", tier:"core"},
+  {id:"memberapp",name:"Member-facing athlete app (streaks, QR check-in, billing)", status:"future", tier:"core"},
+  {id:"sched",    name:"Native scheduling (own it, drop CoachIQ)", status:"future", tier:"core"},
+  {id:"globalbrain",name:"Global brain / lesson promotion (network effect)", status:"prog", tier:"core"},
+  {id:"overnight",name:'"Runs while you sleep" overnight agents', status:"prog", tier:"growth"},
+  {id:"noshow",   name:"No-show detector", status:"future", tier:"growth"},
+  {id:"aipricing",name:"AI pricing assistant", status:"future", tier:"scale"},
+  {id:"audit",    name:"Audit trail", status:"future", tier:"scale"},
 ];
 
 const STATUS_LABEL = {live:"Live", prog:"In progress", future:"Future", service:"Service"};
