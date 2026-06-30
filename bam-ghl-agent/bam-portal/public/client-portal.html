@@ -29895,6 +29895,59 @@ function _renderPricingDrawer({ price, members, member_count }) {
   `;
 }
 
+// ── Member drawer → price peek ───────────────────────────────
+// The standalone Pricing view is retired from nav (pricing now lives under
+// Business Blueprint), so we open a self-contained price modal appended to
+// <body> at a z-index above the member drawer (z-9999). Clicking the Plan
+// name in a member's Billing section opens this; close it to return to the
+// member, still underneath.
+async function mViewPrice(priceId) {
+  if (!priceId) return;
+  let host = document.getElementById('m-price-host');
+  if (!host) { host = document.createElement('div'); host.id = 'm-price-host'; document.body.appendChild(host); }
+  host.innerHTML = `
+    <div onclick="mClosePrice()" style="position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:10000;"></div>
+    <div role="dialog" aria-modal="true" style="position:fixed;z-index:10001;top:50%;left:50%;transform:translate(-50%,-50%);width:min(440px,94vw);max-height:82vh;overflow:auto;background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:18px 20px;color:var(--text)">
+      <div style="font-size:13px;color:var(--text-mute)">Loading price…</div>
+    </div>`;
+  try {
+    const token = await _mreqAuthToken();
+    const qs = '?price_id=' + encodeURIComponent(priceId) +
+               ((typeof CLIENT_ID !== 'undefined' && CLIENT_ID) ? '&client_id=' + encodeURIComponent(CLIENT_ID) : '');
+    const r = await fetch('/api/pricing' + qs, { headers: { Authorization: 'Bearer ' + token } });
+    const j = await _safeJson(r);
+    if (!r.ok) throw new Error(j.error || ('HTTP ' + r.status));
+    _mRenderPrice(j);
+  } catch (e) {
+    const box = document.querySelector('#m-price-host [role="dialog"]');
+    if (box) box.innerHTML = `<div style="font-size:13px;color:#9a3b2f">Couldn't load price - ${escapeHTML(e.message)}</div>`;
+  }
+}
+
+function mClosePrice() { const h = document.getElementById('m-price-host'); if (h) h.innerHTML = ''; }
+
+function _mRenderPrice({ price, members, member_count }) {
+  const box = document.querySelector('#m-price-host [role="dialog"]');
+  if (!box || !price) return;
+  const count = (member_count != null) ? member_count : ((members || []).length);
+  const tierLabel = (typeof _pricingTierLabel === 'function') ? _pricingTierLabel(price.tier) : (price.tier || '-');
+  box.innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin-bottom:14px">
+      <div style="min-width:0">
+        <div style="font-size:16px;font-weight:800;line-height:1.3">${escapeHTML(price.display_name || price.canonical_plan || price.stripe_price_id)}</div>
+        <div style="font-size:10.5px;color:var(--text-mute);font-family:monospace;margin-top:3px;word-break:break-all">${escapeHTML(price.stripe_price_id)}</div>
+      </div>
+      <button onclick="mClosePrice()" aria-label="Close" style="background:none;border:none;color:var(--text-mute);font-size:22px;line-height:1;cursor:pointer">×</button>
+    </div>
+    <div style="display:grid;grid-template-columns:108px 1fr;gap:9px 12px;font-size:13px;align-items:center">
+      <div style="color:var(--text-mute)">Amount</div><div style="font-weight:700">${_pricingAmount(price)}</div>
+      <div style="color:var(--text-mute)">Plan</div><div>${escapeHTML(price.canonical_plan || '-')}</div>
+      <div style="color:var(--text-mute)">Tier</div><div>${escapeHTML(tierLabel)}</div>
+      <div style="color:var(--text-mute)">Routable</div><div>${price.is_routable ? 'Yes - sellable via Change plan' : 'No - held by existing members'}</div>
+      <div style="color:var(--text-mute)">Members</div><div style="font-weight:700">${count}</div>
+    </div>`;
+}
+
 function _membersRestoreSearchFocus(cursorPos) {
   setTimeout(() => {
     const input = document.querySelector('#members-list-container input[data-members-search]');
@@ -30292,7 +30345,9 @@ function _renderMemberModalBody(m, stripe, history) {
   let billingRows;
   if (stripe && stripe.status) {
     billingRows = [
-      ['Plan',     `${escapeHTML(m.plan || '-')} <span style="color:var(--text-mute)">(${fmtMoney(stripe.amount_cents, stripe.currency)})</span>`],
+      ['Plan',     `${m.stripe_price_id
+        ? `<a onclick="mViewPrice('${escapeHTML(m.stripe_price_id)}')" title="View this price in the offer" style="color:var(--gold,#E8C547);cursor:pointer;text-decoration:none;border-bottom:1px dashed var(--gold,#E8C547)">${escapeHTML(m.plan || '-')}</a>`
+        : escapeHTML(m.plan || '-')} <span style="color:var(--text-mute)">(${fmtMoney(stripe.amount_cents, stripe.currency)})</span>`],
       ['Status',   `${escapeHTML(stripe.status)}${stripe.cancel_at_period_end ? ' · cancel at period end' : ''}`],
       ['Joined',   joinedLabel],
       [stripe.trial_end ? 'Paused until' : 'Next payment', fmtDate(stripe.trial_end || stripe.current_period_end)],
