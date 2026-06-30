@@ -985,7 +985,7 @@ async function actionCancel(res, member, stripeAccount, ctx, body) {
       // roster - portal-side cancel only; the academy handles the external sub.
       // Re-throw anything that isn't one of those expected "can't manage" cases.
       const em = (e && e.message) || "";
-      if (!/not created by your application|No such subscription|resource_missing/i.test(em)) throw e;
+      if (!/not created by your application|No such subscription|resource_missing|can only update its cancellation_details|already canceled|already cancelled/i.test(em)) throw e;
       console.error("cancel: Stripe sub not manageable, portal-side cancel only:", em);
     }
   }
