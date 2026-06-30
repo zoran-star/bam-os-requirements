@@ -31470,7 +31470,7 @@ async function mChange(memberId, currentPlan) {
   // Live target plans come from the academy's pricing_catalog (is_routable) -
   // not a hardcoded list - so new live prices (Summer Unlimited) and the
   // multi-month commitments show up automatically. Archived/legacy are excluded.
-  let flat = [], grouped = [], nextUnix = null;
+  let flat = [], grouped = [], nextUnix = null, sj = {};
   // BAM GTA / Ontario: Stripe prices are tax-inclusive (13% HST baked in), so
   // split the all-in amount into the regular price + the HST fee for display.
   const HST_RATE = 0.13;
@@ -31490,7 +31490,7 @@ async function mChange(memberId, currentPlan) {
     const pj = await _safeJson(pr);
     if (!pr.ok) throw new Error(pj.error || ('HTTP ' + pr.status));
     const mj = await _safeJson(mr);
-    const sj = (mr.ok && mj && mj.stripe) ? mj.stripe : {};
+    sj = (mr.ok && mj && mj.stripe) ? mj.stripe : {};
     // "When the next payment was supposed to be": trial_end if a future trial is
     // active, else the current period end.
     nextUnix = (sj.trial_end && sj.trial_end * 1000 > Date.now()) ? sj.trial_end : (sj.current_period_end || null);
