@@ -6975,7 +6975,8 @@ Then the call to action."]</div>
         <div id="members-list-container">
           <div class="req-empty" style="padding:20px 0"><span class="req-spin"></span>Loading members…</div>
         </div>
-        <div id="member-modal-host"></div>
+        <!-- member-modal-host moved to body level (near #stripe-modal-host) so the
+             member drawer shows when opened from the Inbox too, not just Members. -->
       </div>
     </div>
 
@@ -11049,6 +11050,9 @@ async function openV15Inbox() {
       }
     } catch (_) { /* pipelines optional */ }
     _v15ibRenderAll();
+    // Load the member roster in the background so the ★ Member pill appears even
+    // if the staff hasn't opened the Members tab yet; repaint the list once it lands.
+    _ibEnsureMembers().then(() => { _IB_MEMBER_IDX = null; try { _v15ibRenderList(); } catch (_) {} });
   } catch (e) {
     // Keep showing the old data if we had it; only blank to an error otherwise.
     if (!hadData) host.innerHTML = `<div class="req-empty" style="padding:24px 0;color:#9a3b2f">Couldn't load inbox - ${escapeHTML(e.message || String(e))}</div>`;
@@ -11223,13 +11227,14 @@ function _v15ibRenderList() {
     const chip = cp ? `<div style="margin-top:6px"><span class="v15ib-chip">${escapeHTML(cp.pipelineName)}${cp.stageName ? ' · ' + escapeHTML(cp.stageName) : ''}</span></div>` : '';
     const chIcon = _ibChannelIcon(c);
     const chTag = chIcon ? `<span title="${escapeHTML(_ghlChannelLabel(c.lastMessageType || c.channel))}" style="margin-left:6px;font-size:11px;opacity:.85">${chIcon}</span>` : '';
+    const memTag = _ibMemberOf(c) ? `<span style="margin-left:6px">${_ibMemberPill(true)}</span>` : '';
     return `<div class="v15ib-conv ${unread ? 'unread' : ''}" onclick='_v15ibOpen(${JSON.stringify(c.id)},${JSON.stringify(c.contactId || "")},${JSON.stringify(c.phone || "")},${JSON.stringify(c.email || "")},${JSON.stringify(c.contactName || "")},${JSON.stringify(c.lastMessageType || c.channel || "")})'>
       <div style="position:relative;flex:none">
         <div style="width:42px;height:42px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;flex:none;${_ibAvatarStyle(name)}">${escapeHTML(_ibInitials(name))}</div>
         ${unread ? '<span style="position:absolute;top:-1px;right:-1px;width:11px;height:11px;border-radius:50%;background:var(--gold);border:2px solid var(--surface)"></span>' : ''}
       </div>
       <div style="flex:1;min-width:0">
-        <div class="v15ib-name">${escapeHTML(name)}${chTag}</div>
+        <div class="v15ib-name">${escapeHTML(name)}${memTag}${chTag}</div>
         <div class="v15ib-prev">${escapeHTML(_ibCleanPreview(c.lastMessageBody))}</div>
         ${chip}
       </div>
@@ -11244,6 +11249,108 @@ function _ibAvatarStyle(name) {
   const s = String(name || '?');
   const c = palette[Math.abs((s.charCodeAt(0) || 0) + (s.charCodeAt(1) || 0)) % palette.length];
   return `background:${c};border-color:${c};color:#fff`;
+}
+
+// ── Inbox ↔ Member linking ───────────────────────────────────────────────
+// Match a conversation's contact to a member row so the inbox can flag members
+// and open their full profile. Keyed on ghl_contact_id (primary), then phone,
+// then email - the same three keys GHL/Stripe line up on across endpoints.
+let _IB_MEMBER_IDX = null;
+function _ibBuildMemberIdx() {
+  const idx = {};
+  for (const m of (Array.isArray(_MEMBERS_ALL) ? _MEMBERS_ALL : [])) {
+    for (const k of [m.ghl_contact_id, _ibNormKey(m.parent_phone), _ibNormKey((m.parent_email || '').toLowerCase())]) {
+      if (k && !idx[k]) idx[k] = m;
+    }
+  }
+  _IB_MEMBER_IDX = idx;
+  return idx;
+}
+// Return the member that owns this conversation/contact, or null for a lead.
+// `c` can be a conversation row (contactId/phone/email) or _V15IB.active.
+function _ibMemberOf(c) {
+  if (!c) return null;
+  const idx = _IB_MEMBER_IDX || _ibBuildMemberIdx();
+  const cid = c.contactId || c.contact_id;
+  return idx[cid]
+    || idx[_ibNormKey(c.phone)]
+    || idx[_ibNormKey((c.email || '').toLowerCase())]
+    || null;
+}
+// Make sure the member roster is loaded so the inbox can match members even when
+// the staff hasn't opened the Members tab yet. Fire-and-forget; re-renders on load.
+async function _ibEnsureMembers() {
+  if (Array.isArray(_MEMBERS_ALL) && _MEMBERS_ALL.length) return;
+  try {
+    const token = await _mreqAuthToken();
+    const qs = (typeof CLIENT_ID !== 'undefined' && CLIENT_ID)
+      ? '?scope=client&client_id=' + encodeURIComponent(CLIENT_ID)
+      : '?scope=client';
+    const r = await fetch('/api/members' + qs, { headers: { Authorization: 'Bearer ' + token } });
+    const j = await _safeJson(r);
+    if (r.ok && Array.isArray(j.members)) { _MEMBERS_ALL = j.members; _IB_MEMBER_IDX = null; }
+  } catch (_) { /* members optional - inbox still works without the pill */ }
+}
+// Small gold "Member" pill. `small` trims it for the dense conversation list.
+function _ibMemberPill(small) {
+  const fs = small ? '10px' : '11px';
+  const pad = small ? '1px 7px' : '2px 9px';
+  return `<span title="Active member - click the name for full member info" style="display:inline-flex;align-items:center;gap:3px;vertical-align:middle;font-size:${fs};font-weight:800;padding:${pad};border-radius:999px;background:var(--gold);color:#0B0B0D;white-space:nowrap">★ Member</span>`;
+}
+// Click the contact name in a thread → member? full member drawer; else a light
+// contact drawer (name, channel, phone, email, tags, GHL link).
+function _ibOpenContact() {
+  const a = _V15IB.active; if (!a) return;
+  const m = _ibMemberOf(a);
+  if (m && m.id) { openMemberPopup(m.id); return; }
+  _ibOpenContactDrawer(a);
+}
+// Lightweight contact drawer for non-members (leads). Body-level host so it shows
+// over any view; mirrors the member drawer's slide-in shell.
+function _ibOpenContactDrawer(a) {
+  let host = document.getElementById('ib-contact-drawer-host');
+  if (!host) { host = document.createElement('div'); host.id = 'ib-contact-drawer-host'; document.body.appendChild(host); }
+  const name = a.name || a.phone || a.email || 'Contact';
+  const ghlUrl = _ghlContactUrl(_V15IB.ghlLoc, a.contactId);
+  const row = (label, val) => val
+    ? `<div style="color:var(--text-mute)">${label}</div><div style="word-break:break-word">${escapeHTML(val)}</div>` : '';
+  host.innerHTML = `
+    <div id="ib-cd-backdrop" style="position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:9998;opacity:0;transition:opacity 0.2s ease" onclick="_ibCloseContactDrawer()"></div>
+    <div id="ib-cd-drawer" style="position:fixed;top:0;right:0;width:min(420px,92vw);height:100vh;background:var(--surface);border-left:1px solid var(--border);box-shadow:-12px 0 32px rgba(0,0,0,0.25);z-index:9999;overflow-y:auto;transform:translateX(100%);transition:transform 0.25s ease;color:var(--text)">
+      <div style="padding:26px 24px 32px">
+        <div style="display:flex;align-items:flex-start;gap:14px;margin-bottom:18px">
+          <div style="width:56px;height:56px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:700;flex:none;${_ibAvatarStyle(name)}">${escapeHTML(_ibInitials(name))}</div>
+          <div style="flex:1;min-width:0">
+            <div style="font-weight:700;font-size:19px;line-height:1.2">${escapeHTML(name)}</div>
+            <div style="margin-top:8px"><span style="display:inline-block;font-size:11px;font-weight:700;padding:2px 9px;border-radius:999px;background:transparent;border:1px solid var(--border-med);color:var(--text-sub)">Lead / contact</span></div>
+          </div>
+          <button onclick="_ibCloseContactDrawer()" aria-label="Close" style="background:none;border:none;color:var(--text-mute);font-size:26px;cursor:pointer;line-height:1;padding:0 4px;margin-top:-4px">×</button>
+        </div>
+        <div style="display:grid;grid-template-columns:96px 1fr;gap:10px 14px;font-size:13px;align-items:center">
+          ${row('Channel', _ghlChannelLabel(a.channel))}
+          ${row('Phone', a.phone)}
+          ${row('Email', a.email)}
+        </div>
+        <div style="height:1px;background:var(--border);margin:20px 0"></div>
+        <div style="font-size:11px;font-weight:700;color:var(--text-mute);letter-spacing:0.6px;text-transform:uppercase;margin-bottom:10px">Tags</div>
+        <div id="ib-cd-tags"></div>
+        <div style="font-size:12px;color:var(--text-mute);margin-top:18px;line-height:1.5">Not a member yet. When they sign up they'll show a ★ Member pill and link to their full profile here.</div>
+        ${ghlUrl ? `<a href="${escapeHTML(ghlUrl)}" target="_blank" rel="noopener" style="display:flex;align-items:center;justify-content:center;gap:8px;margin-top:18px;background:transparent;color:var(--text);border:1px solid var(--border);padding:10px 12px;font-weight:600;border-radius:6px;cursor:pointer;font-size:13px;text-decoration:none">Open in GHL ↗</a>` : ''}
+      </div>
+    </div>`;
+  requestAnimationFrame(() => {
+    const bd = document.getElementById('ib-cd-backdrop'); const dr = document.getElementById('ib-cd-drawer');
+    if (bd) bd.style.opacity = '1';
+    if (dr) dr.style.transform = 'translateX(0)';
+  });
+  if (a.contactId) _renderTagEditorFetch('ib-cd-tags', a.contactId);
+  else { const t = document.getElementById('ib-cd-tags'); if (t) t.innerHTML = '<span style="font-size:12px;color:var(--text-mute)">No GHL contact linked.</span>'; }
+}
+function _ibCloseContactDrawer() {
+  const bd = document.getElementById('ib-cd-backdrop'); const dr = document.getElementById('ib-cd-drawer');
+  if (dr) dr.style.transform = 'translateX(100%)';
+  if (bd) bd.style.opacity = '0';
+  setTimeout(() => { const h = document.getElementById('ib-contact-drawer-host'); if (h) h.innerHTML = ''; }, 260);
 }
 
 async function _v15ibOpen(convId, contactId, phone, email, name, channel) {
@@ -11310,12 +11417,17 @@ function _v15ibRenderThread() {
   }).join('') : '<div style="color:var(--text-mute);font-size:13px;text-align:center;padding:20px">No messages yet.</div>';
   const isEmail = _V15IB.type === 'Email';
   const ghlUrl = _ghlContactUrl(_V15IB.ghlLoc, a.contactId);
+  const mem = _ibMemberOf(a);
   const chips = _V15IB.pending.map((u, i) => `<span style="display:inline-flex;align-items:center;gap:5px;background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:3px 8px;font-size:11px;color:var(--text-sub)">📎 file ${i + 1}<button onclick="_v15ibRmFile(${i})" style="background:none;border:none;color:var(--text-mute);cursor:pointer;font-size:12px">×</button></span>`).join('');
   body.innerHTML = `
     <button onclick="openV15Inbox()" style="display:inline-flex;align-items:center;gap:7px;background:var(--surface);border:1px solid var(--border-med);border-radius:999px;color:var(--text);font:inherit;font-size:13px;font-weight:600;cursor:pointer;padding:8px 14px;margin-bottom:12px">
       <span style="font-size:15px;line-height:1">←</span> All conversations</button>
     <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px">
-      <div style="font-size:15px;font-weight:700;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHTML(a.name || a.phone || a.email || 'Conversation')}</div>
+      <div onclick="_ibOpenContact()" title="View ${mem ? 'member' : 'contact'} details" style="display:flex;align-items:center;gap:8px;min-width:0;cursor:pointer">
+        <span style="font-size:15px;font-weight:700;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-decoration:underline;text-decoration-style:dotted;text-decoration-color:var(--border-med);text-underline-offset:3px">${escapeHTML(a.name || a.phone || a.email || 'Conversation')}</span>
+        ${mem ? _ibMemberPill(false) : ''}
+        <span style="flex:none;font-size:13px;color:var(--text-mute)">›</span>
+      </div>
       ${ghlUrl ? `<a href="${escapeHTML(ghlUrl)}" target="_blank" rel="noopener" title="Open this contact in GHL to call" style="flex:none;display:inline-flex;align-items:center;gap:6px;background:rgba(232,197,71,0.12);border:1px solid var(--gold);border-radius:8px;color:var(--gold);padding:6px 10px;font:inherit;font-size:12px;font-weight:700;text-decoration:none">📞 Call in GHL</a>` : ''}
     </div>
     <div id="ib-tags" style="margin-bottom:10px"></div>
@@ -22125,6 +22237,7 @@ async function fetchAndRenderMembers() {
     renderStripeConnectButton(json.stripe || { status: 'not_connected' });
     renderGhlConnectButton(json.ghl || { status: 'not_connected' });
     _MEMBERS_ALL = Array.isArray(json.members) ? json.members : [];
+    _IB_MEMBER_IDX = null; // roster changed - rebuild the inbox member-match index lazily
     _MEMBERS_SORTER = json.sorter || null;
     _MEMBERS_SUBS_TO_CANCEL = json.subs_to_cancel || 0;
     _MEMBERS_CIQ = json.coachiq || { enabled: false, signup_url: null };
@@ -36900,6 +37013,8 @@ function toggleTheme() {
      Was previously inside #view-members, which hid the modal when opened from
      the onboarding/Action Items tab or for non-V2 clients. -->
 <div id="stripe-modal-host"></div>
+<!-- Member detail drawer host - body level so it shows from any view (Members or Inbox). -->
+<div id="member-modal-host"></div>
 
 <!-- ── Action item create / edit modal ── -->
 <div id="actionItemModal" class="modal-backdrop" style="display:none" onclick="if(event.target===this)closeActionItemModal()">
