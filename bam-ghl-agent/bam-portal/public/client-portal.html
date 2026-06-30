@@ -22307,6 +22307,16 @@ function _memberSetupBadge(m) {
   return `<span title="Live · linked to GHL${ciq}. Open the member to confirm billing is portal-managed." style="display:inline-block;font-size:10px;font-weight:800;padding:2px 8px;border-radius:999px;background:transparent;border:1px solid #1f7a3d;color:#7BC47F">✓ set up</span>`;
 }
 
+// Billing-ownership flag - surfaces members whose Stripe sub the portal did NOT
+// create (imported / foreign), so Change plan / Pause / Refund are locked until
+// staff "Set up billing" to take it over. Only the actionable (false) case shows
+// a badge; portal-owned (true) and not-yet-checked (null) stay clean. The flag is
+// persisted on the member row and lazily backfilled the first time the drawer opens.
+function _memberBillingFlag(m) {
+  if (!m || m.billing_portal_owned !== false) return '';
+  return `<span title="This subscription was imported (created outside the portal). Open the member and use Set up billing to manage it here." style="display:inline-block;font-size:10px;font-weight:800;padding:2px 8px;border-radius:999px;background:transparent;border:1px solid #7a5a2f;color:#c79a4a;white-space:nowrap">🔒 imported</span>`;
+}
+
 function _memberEngagementChip(eng) {
   if (!eng) return '';
   const map = {
@@ -22670,7 +22680,7 @@ function _memberCardHtml(m) {
         <span class="mc-status">${_memberStatusPill(m.status, m)}</span>
         <span class="mc-pricestatus">${_memberPriceStatusCell(m)}</span>
         <span class="mc-price">${_memberPriceLabel(m.pricing)}</span>
-        <span class="mc-extra">${_memberSetupBadge(m)}${_memberOfferPill(m)}</span>
+        <span class="mc-extra">${_memberBillingFlag(m)}${_memberSetupBadge(m)}${_memberOfferPill(m)}</span>
       </div>
       ${updating ? '<span class="member-card-spin" aria-label="Updating"></span>' : ''}
     </div>`;
@@ -31376,6 +31386,10 @@ async function mRefund(memberId, customerId) {
 }
 
 async function mChange(memberId, currentPlan) {
+  // Immediate feedback so a click is NEVER silent - if the pricing/member fetch
+  // below is slow or the button was somehow reached in a weird state, the user
+  // still sees the click registered. The modal opens over this toast.
+  _plToast('Loading plans…');
   // Live target plans come from the academy's pricing_catalog (is_routable) -
   // not a hardcoded list - so new live prices (Summer Unlimited) and the
   // multi-month commitments show up automatically. Archived/legacy are excluded.
