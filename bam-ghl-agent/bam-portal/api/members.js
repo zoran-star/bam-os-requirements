@@ -312,20 +312,25 @@ async function handler(req, res) {
               can_manage: liveStatus && portalOwned, // gate for pause/cancel/change/refund
             };
 
-            // Recent payment history - last few invoices on this subscription.
+            // Recent payment history - actual money movements (Stripe charges) for
+            // this customer, NOT invoices. Invoices on a recreated/trial sub are
+            // $0 placeholders; charges are the real payments ("$316.39 Succeeded").
+            // Listed by customer so charges across the old + new sub both show.
             // Non-fatal: if it fails, the Billing section just omits the list.
             try {
-              const inv = await stripeFetch(
-                `/invoices?subscription=${member.stripe_subscription_id}&limit=6`,
-                { stripeAccount: client.stripe_connect_account_id }
-              );
-              stripe.payments = (inv?.data || []).map((i) => ({
-                date: i.created,
-                amount_cents: (i.amount_paid != null ? i.amount_paid : i.amount_due),
-                currency: (i.currency || "cad").toLowerCase(),
-                status: i.status,              // paid | open | void | uncollectible | draft
-                url: i.hosted_invoice_url || null,
-              }));
+              if (member.stripe_customer_id) {
+                const ch = await stripeFetch(
+                  `/charges?customer=${member.stripe_customer_id}&limit=6`,
+                  { stripeAccount: client.stripe_connect_account_id }
+                );
+                stripe.payments = (ch?.data || []).map((c) => ({
+                  date: c.created,
+                  amount_cents: c.amount,
+                  currency: (c.currency || "cad").toLowerCase(),
+                  status: c.refunded ? "refunded" : c.status,   // succeeded | pending | failed | refunded
+                  url: c.receipt_url || null,
+                }));
+              } else { stripe.payments = []; }
             } catch (_) { stripe.payments = []; }
 
             // Lazy backfill: if we just learned the sub's created date and
@@ -1252,7 +1257,9 @@ async function actionChange(res, member, stripeAccount, ctx, body) {
     await sb(`members?id=eq.${member.id}`, {
       method: "PATCH",
       headers: { Prefer: "return=minimal" },
-      body: JSON.stringify({ plan: newPlan, updated_at: nowIso() }),
+      // Persist the new price too - without this the row keeps the old
+      // stripe_price_id, so the roster shows the stale amount/Archived tag.
+      body: JSON.stringify({ stripe_price_id: newPriceId, plan: newPlan, updated_at: nowIso() }),
     });
   }
 
