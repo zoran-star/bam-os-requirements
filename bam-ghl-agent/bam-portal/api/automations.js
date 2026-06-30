@@ -255,13 +255,14 @@ async function runWork(res) {
           }
         } catch (_) { /* best-effort roll-forward */ }
         // Model: 👻 Ghosted ran out and they're STILL silent -> roll into 💔 Lead
-        // Nurture (the sparse long game). Only when nurture is live; best-effort.
-        // L2(a): if nurture is NOT live, the lead would otherwise sit open + idle
-        // forever -> fall back to a GHL-native terminal LOST + a pipeline_outcomes
+        // Nurture (the sparse long game). ☀️ Summer Special hands off the same way (its
+        // last SMS is the final nudge before the long game). Only when nurture is live;
+        // best-effort. L2(a): if nurture is NOT live, the lead would otherwise sit open +
+        // idle forever -> fall back to a GHL-native terminal LOST + a pipeline_outcomes
         // row (mirrors confirm-lost), so the lead leaves the open board.
         try {
           const a = autoCache.get(job.automation_id);
-          if (a && a.automation_key === "ghosted") {
+          if (a && (a.automation_key === "ghosted" || a.automation_key === "summer_special")) {
             if (await isAutomationLive(job.client_id, "nurture")) {
               await enrollContact({ clientId: job.client_id, automationKey: "nurture", contactId: job.contact_id });
               const creds = await ensureCreds();
@@ -269,9 +270,9 @@ async function runWork(res) {
                 const ns = await nurtureStage(creds.token, creds.locationId);
                 const oppId = await findOpenOppId(creds.token, creds.locationId, job.contact_id);
                 if (ns && oppId) await ghl("PUT", `/opportunities/${encodeURIComponent(oppId)}`, { token: creds.token, body: { pipelineId: ns.pipelineId, pipelineStageId: ns.stageId } });
-                if (ns && oppId) { try { await shadowMirrorMove(job.client_id, { ghlOpportunityId: oppId, ghlContactId: job.contact_id, role: "nurture", stageResolved: ns, status: "open", reason: "ghosted ran out - rolled into nurture" }); } catch (_) {} }
+                if (ns && oppId) { try { await shadowMirrorMove(job.client_id, { ghlOpportunityId: oppId, ghlContactId: job.contact_id, role: "nurture", stageResolved: ns, status: "open", reason: `${a.automation_key} ran out - rolled into nurture` }); } catch (_) {} }
               }
-              await logEvent({ clientId: job.client_id, contactId: job.contact_id, automationId: job.automation_id, type: "ghosted_to_nurture", payload: null });
+              await logEvent({ clientId: job.client_id, contactId: job.contact_id, automationId: job.automation_id, type: `${a.automation_key}_to_nurture`, payload: null });
             } else {
               const creds = await ensureCreds();
               if (creds && creds.token) {

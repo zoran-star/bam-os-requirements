@@ -46,13 +46,51 @@ if flipped AND `client_twilio_config.status='active'`; else falls back to 'ghl'
 - Inbound side-effects are DUPLICATED from `ghl/inbound-webhook.js` (not extracted) —
   keep them in sync if either changes.
 
-## CUTOVER STEPS (when GTA's Twilio + A2P are ready)
-1. Twilio: port number in, A2P 10DLC approved, point number's messaging webhook at
-   `/api/twilio/inbound-webhook`, enable Advanced Opt-Out.
+## A2P for GTA — EMPIRICALLY NOT A GATE (proven 2026-06-30)
+GTA texts Canadian leads (CA→CA, 289/416 Toronto). Key findings:
+- **US A2P 10DLC (TCR brand+campaign) is destination-based = for US-bound texts.**
+  CA→CA is a separate, lighter, evolving Canadian-carrier regime, NOT TCR. So the
+  whole TrustHub/Brand/Campaign dance does NOT apply to GTA's actual traffic.
+- **Live empirical test (Twilio API):** sent +12898166569 → +14165733718 with ZERO
+  registration (no brand, no campaign, no messaging service in the account) →
+  `status=delivered, error_code=None`, landed on the real phone. So the 289 line can
+  text Canadian leads RIGHT NOW. A2P does NOT block going live.
+- **Caveat (not a blocker):** 1 delivered test ≠ guaranteed clean delivery at volume;
+  Canadian carriers filter on content/volume. Register a Brand+Campaign LATER for
+  durable deliverability (use the Canadian Business Number / BN-9, not an EIN —
+  GTA's `clients.ein` is null; that field needs a BN if/when we register).
+- **A2P registration does NOT survive a Twilio account transfer** (configs reset on
+  transfer per Twilio). So any A2P "flipped" before the +1 289 transfer is gone; this
+  account (AC…4773) had 0 brands / 0 campaigns / 0 messaging services as of 6/30.
+- GTA Twilio Account SID = `AC…4773` (full value lives in Twilio console / Vercel env,
+  NOT in this repo - GitHub push protection blocks raw AC SIDs). The +12898166569 number
+  was created in-account 6/30 (transfer day), still pointed at Twilio's demo sms_url with
+  no compliance bundle as of the check.
+
+## Twilio REST recipe (researched 2026-06-30, from official docs)
+Auth = Basic `AccountSid:AuthToken` (API Key SID+secret works in same slot).
+- **Wire an owned number to our webhooks (simplest, no Messaging Service needed):**
+  `POST /2010-04-01/Accounts/{AC}/IncomingPhoneNumbers/{PN}.json`
+  with `SmsUrl=https://portal.byanymeansbusiness.com/api/twilio/inbound-webhook`,
+  `SmsMethod=POST`, `StatusCallback=…/api/twilio/status`, `StatusCallbackMethod=POST`.
+- **Messaging Service path (needed only for sender pool / future US A2P):**
+  `POST messaging.twilio.com/v1/Services` (set `InboundRequestUrl`+`StatusCallback`),
+  then `POST /Services/{MG}/PhoneNumbers` with `PhoneNumberSid`. Precedence gotcha:
+  number-level `SmsUrl` wins only if service `UseInboundWebhookOnNumber=true`.
+- **US ISV A2P (LATER, for US academies):** Secondary CustomerProfile (BU) + A2P Trust
+  Bundle (BU) → `POST messaging/v1/a2p/BrandRegistrations` (BN) → `POST
+  /Services/{MG}/Compliance/Usa2p` (campaign). Poll Brand `status=APPROVED` (tcr_id set)
+  + campaign `campaign_status=VERIFIED`. Brand ~minutes; campaign carrier-reviewed
+  ~10-15 days. Sandbox "mock" registration exists to test without TCR fees.
+
+## CUTOVER STEPS (simplified — A2P is NOT a prerequisite for GTA)
+1. Wire +12898166569 webhooks → our endpoints (1 API POST to IncomingPhoneNumbers,
+   sets SmsUrl=/api/twilio/inbound-webhook + StatusCallback=/api/twilio/status).
 2. Turn OFF GTA's GHL "form-filled" + reply workflows.
-3. Load creds into `client_twilio_config` (encrypted) via MCP, status='active'.
+3. Load creds into `client_twilio_config` (encrypted) via MCP/endpoint, status='active'.
 4. Final history import (the button).
 5. Flip `clients.messaging_provider='twilio'` for GTA.
+(Register a Canadian Brand+Campaign later for durability — not required to flip.)
 
 ## Gotcha discovered 2026-06-29
 `vercel env pull` for bam-portal returned STALE Supabase + GHL creds (all 401) while

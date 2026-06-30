@@ -54,7 +54,12 @@ async function handler(req, res) {
 
   const b = req.body && typeof req.body === "object" ? req.body : {};
   if (!b.client_id) return res.status(400).json({ error: "client_id required" });
-  const maxPages = Math.min(Number(b.max_pages) || 100, 500);
+  // Chunked: each call processes at most a few pages AND stops at a wall-clock budget
+  // (well under the function timeout), returning a cursor the client re-submits. This
+  // turns one long request that times out (-> HTML error -> "not valid JSON") into many
+  // short ones the UI can show live progress for.
+  const maxPages = Math.min(Number(b.max_pages) || 20, 50);
+  const DEADLINE = Date.now() + 12000; // 12s budget; client loops until done
 
   const rows = await sb(`clients?id=eq.${encodeURIComponent(b.client_id)}&select=id,business_name,ghl_access_token,ghl_refresh_token,ghl_token_expires_at,ghl_location_id&limit=1`);
   const client = rows && rows[0];
@@ -66,7 +71,9 @@ async function handler(req, res) {
   if (!locationId) return res.status(400).json({ error: "no GHL location_id" });
 
   let convScanned = 0, threadsUpserted = 0, msgInserted = 0, msgSkipped = 0, pages = 0;
-  let startAfterDate = null, startAfter = null;
+  // Resume from the cursor the previous chunk returned (null on the first call).
+  let startAfterDate = b.start_after_date || null, startAfter = b.start_after || null;
+  let done = false;
   const seenConvIds = new Set();
 
   try {
@@ -77,7 +84,7 @@ async function handler(req, res) {
       if (startAfter) params.set("startAfter", String(startAfter));
       const data = await ghl("GET", `/conversations/search?${params}`, { token });
       const convos = data.conversations || data.data || [];
-      if (!convos.length) break;
+      if (!convos.length) { done = true; break; }
 
       for (const convo of convos) {
         if (!convo || seenConvIds.has(convo.id)) continue;
@@ -167,7 +174,8 @@ async function handler(req, res) {
       const last = convos[convos.length - 1];
       startAfterDate = last?.lastMessageDate || last?.dateUpdated || last?.dateAdded || null;
       startAfter = last?.id || null;
-      if (convos.length < 100 || !startAfterDate) break;
+      if (convos.length < 100 || !startAfterDate) { done = true; break; }
+      if (Date.now() > DEADLINE) break; // budget hit -> return cursor so the client resumes
     }
   } catch (e) {
     return res.status(e.status || 502).json({
@@ -177,7 +185,8 @@ async function handler(req, res) {
   }
 
   return res.status(200).json({
-    ok: true, client_id: client.id, business_name: client.business_name,
+    ok: true, done, client_id: client.id, business_name: client.business_name,
+    cursor: done ? null : { start_after_date: startAfterDate, start_after: startAfter },
     pages, conversations_scanned: convScanned, threads_upserted: threadsUpserted,
     messages_imported: msgInserted, messages_skipped: msgSkipped,
   });
