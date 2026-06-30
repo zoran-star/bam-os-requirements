@@ -41,6 +41,17 @@ _Last updated: 2026-06-30 · Owners: Coleman, Zoran_
 
 ---
 
+## Emphasize the gap: "talk to your business" (the magic a toolbox can't do)
+
+The strongest way to make the distinction land is to show what "runs your business" *actually looks like*. With a toolbox you click through five tabs. With FullControl you say one sentence and it executes across every module:
+
+- **"Book a makeup for everyone who missed Tuesday and text their parents."** → schedules the sessions, drafts the parent texts, adjusts billing. *Three modules, one sentence.*
+- **"Who's about to cancel?"** → surfaces every at-risk member with a save-play ready.
+- **"Run a summer camp promo to last year's families."** → spins up the ad, the email, and the landing page.
+- **While you sleep:** tomorrow's trials confirmed, no-shows flagged, follow-ups drafted and waiting for your OK.
+
+A toolbox can't do this - it has no idea what the other tools are doing. Only an operator with a unified data layer can. This is why "talk to your business" + "it runs while you sleep" are not features, they're the proof of the category difference: **tools assist, FullControl operates the whole business.**
+
 ## The doctrine: competitors become features
 
 ```

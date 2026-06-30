@@ -41,14 +41,25 @@ body{background:var(--ink);color:var(--paper);font-family:var(--sans);font-size:
 .foot .punch{font-family:var(--display);font-size:23px;font-weight:500;letter-spacing:-.01em;line-height:1.4}
 .foot .punch em{color:var(--gold);font-style:normal}
 .foot .meta{font-family:var(--mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;opacity:.4;margin-top:14px}
-@media(max-width:840px){.cols{grid-template-columns:1fr}.title{font-size:30px}.work,.what{min-height:0}}
+/* talk-to-your-business band */
+.band{margin-top:40px;border:1px solid var(--gold);border-radius:4px;background:linear-gradient(180deg,rgba(232,197,71,.06),rgba(232,197,71,.015));padding:26px 26px 22px}
+.band-head{display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:10px;margin-bottom:20px}
+.band-tag{font-family:var(--mono);font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--gold);opacity:.85}
+.say-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--line-dark);border:1px solid var(--line-dark)}
+.say{background:var(--ink-2);padding:18px 16px}
+.say-q{font-family:var(--display);font-size:15px;font-weight:500;letter-spacing:-.01em;line-height:1.35;color:var(--gold)}
+.say-a{font-size:13px;opacity:.72;margin-top:12px;line-height:1.5}
+.say-a b{color:var(--paper);opacity:1;font-weight:600}
+.sleep{font-family:var(--mono);font-size:11px;letter-spacing:.06em;color:var(--gold);margin-top:18px;line-height:1.5}
+.contrast{font-size:13px;opacity:.6;margin-top:14px;line-height:1.5;font-style:italic}
+@media(max-width:840px){.cols{grid-template-columns:1fr}.say-grid{grid-template-columns:1fr}.title{font-size:30px}.work,.what{min-height:0}}
 </style>
 </head>
 <body>
 <div class="wrap">
   <div class="kicker">§ How we're different</div>
   <h1 class="title">It's not about features. It's about who does the work.</h1>
-  <p class="sub">CoachIQ runs your practices. GoHighLevel hands you tools. <b>FullControl runs your business.</b></p>
+  <p class="sub">CoachIQ runs your practices. GoHighLevel hands you tools. <b>FullControl runs your entire business - you just talk to it.</b></p>
 
   <div class="cols">
     <div class="col">
@@ -74,9 +85,32 @@ body{background:var(--ink);color:var(--paper);font-family:var(--sans);font-size:
       <div class="what">An AI operating system built for academies. Pre-loaded with the playbook.</div>
       <div class="divider"></div>
       <div class="q">Who does the work?</div>
-      <div class="work"><span class="hl">The AI does it.</span> Books trials, closes members, runs ads, follows up - around the clock. You just approve.</div>
-      <div class="line">Runs the business for you.</div>
+      <div class="work"><span class="hl">The AI does it - you just talk to it.</span> It books trials, closes members, runs the ads, follows up. No tabs, no building. You say it; it happens across the whole business.</div>
+      <div class="line">Runs your entire business.</div>
     </div>
+  </div>
+
+  <div class="band">
+    <div class="band-head">
+      <div class="q" style="margin:0">What "runs your business" actually looks like</div>
+      <div class="band-tag">You talk. It executes - across every part of the business.</div>
+    </div>
+    <div class="say-grid">
+      <div class="say">
+        <div class="say-q">"Book a makeup for everyone who missed Tuesday and text their parents."</div>
+        <div class="say-a">→ Schedules the sessions, drafts the parent texts, adjusts billing. <b>Three modules, one sentence.</b></div>
+      </div>
+      <div class="say">
+        <div class="say-q">"Who's about to cancel?"</div>
+        <div class="say-a">→ Surfaces every at-risk member with a save-play ready to send.</div>
+      </div>
+      <div class="say">
+        <div class="say-q">"Run a summer camp promo to last year's families."</div>
+        <div class="say-a">→ Spins up the ad, the email, and the landing page.</div>
+      </div>
+    </div>
+    <div class="sleep">● While you sleep: tomorrow's trials confirmed, no-shows flagged, follow-ups drafted and waiting for your OK.</div>
+    <div class="contrast">A toolbox can't do this. With GHL or CoachIQ you'd be clicking through five tabs. With FullControl you said one sentence.</div>
   </div>
 
   <div class="foot">
