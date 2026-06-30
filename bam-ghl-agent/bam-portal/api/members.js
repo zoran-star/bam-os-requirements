@@ -1128,29 +1128,15 @@ async function actionChange(res, member, stripeAccount, ctx, body) {
     return res.status(400).json({ error: `already on ${newPlan}` });
   }
 
-  // Stripe can't swap a subscription item across billing intervals (e.g. a
-  // 3-month sub onto a 4-week price). Block it with a clear message instead of
-  // letting the raw Stripe error bubble up.
   const currentRow = member.stripe_price_id ? byPrice.get(member.stripe_price_id) : null;
-  if (currentRow && targetRow && currentRow.interval && targetRow.interval
-      && currentRow.interval !== targetRow.interval) {
-    return res.status(400).json({
-      error: `Can't swap across billing intervals (current ${currentRow.interval}, new ${targetRow.interval}). Cancel and recreate the subscription instead.`,
-    });
-  }
 
-  // Fetch current sub to get the item id
+  // Fetch current sub - need item id, period end, and the card to carry over.
   const currentSub = await stripeFetch(`/subscriptions/${member.stripe_subscription_id}`, {
     stripeAccount,
   });
-  const itemId = currentSub.items?.data?.[0]?.id;
-  if (!itemId) {
-    return res.status(400).json({ error: "Stripe sub has no items - manual fix needed" });
-  }
 
   // Optional: staff sets when the NEXT payment should land (Stripe trial_end).
-  // Pushes the next charge to that date; no charge happens until then. When set,
-  // proration is forced off (trial + prorations don't combine cleanly).
+  // Pushes the next charge to that date; no charge happens until then.
   let trialEndUnix = null;
   if (body.next_payment_date) {
     if (!/^\d{4}-\d{2}-\d{2}$/.test(body.next_payment_date)) {
@@ -1168,27 +1154,77 @@ async function actionChange(res, member, stripeAccount, ctx, body) {
   const curAmt = currentRow ? currentRow.amount_cents : null;
   const newAmt = targetRow ? targetRow.amount_cents : null;
   const isUpgrade = (curAmt != null && newAmt != null) ? (newAmt > curAmt) : false;
-  const proration = (trialEndUnix == null && isUpgrade && body.prorate) ? "create_prorations" : "none";
 
-  const updateBody = {
-    "items[0][id]": itemId,
-    "items[0][price]": newPriceId,
-    proration_behavior: proration,
-  };
-  if (trialEndUnix != null) updateBody.trial_end = String(trialEndUnix);
+  // Same interval -> swap the price on the existing item. Different interval ->
+  // Stripe can't swap, so cancel the old sub and create a fresh one on the new price.
+  const intervalMismatch = !!(currentRow && targetRow && currentRow.interval && targetRow.interval
+    && currentRow.interval !== targetRow.interval);
 
-  const sub = await stripeFetch(`/subscriptions/${member.stripe_subscription_id}`, {
-    method: "POST",
-    stripeAccount,
-    body: updateBody,
-  });
+  let sub, mode, prorated = false, nextUnix = null;
 
-  // Update members.plan
-  await sb(`members?id=eq.${member.id}`, {
-    method: "PATCH",
-    headers: { Prefer: "return=minimal" },
-    body: JSON.stringify({ plan: newPlan, updated_at: nowIso() }),
-  });
+  if (intervalMismatch) {
+    mode = "recreate";
+    if (!member.stripe_customer_id) {
+      return res.status(400).json({ error: "member has no Stripe customer - can't recreate the subscription" });
+    }
+    // New sub starts charging at next_payment_date, or the existing period end so
+    // the member keeps time they already paid for (no double charge). Card +
+    // portal origin carry over so the new sub stays portal-managed.
+    const startUnix = trialEndUnix || subCurrentPeriodEnd(currentSub) || (nowUnix() + 86400);
+    const createBody = {
+      customer: member.stripe_customer_id,
+      "items[0][price]": newPriceId,
+      proration_behavior: "none",
+      "metadata[origin]": "fullcontrol-portal",
+    };
+    if (startUnix > nowUnix()) createBody.trial_end = String(startUnix);
+    const pm = currentSub.default_payment_method;
+    if (pm) createBody.default_payment_method = (typeof pm === "string" ? pm : pm.id);
+    sub = await stripeFetch(`/subscriptions`, { method: "POST", stripeAccount, body: createBody });
+    // Cancel the old sub now. If that fails, roll back the new one so we never double-bill.
+    try {
+      await stripeFetch(`/subscriptions/${member.stripe_subscription_id}`, { method: "DELETE", stripeAccount });
+    } catch (e) {
+      try { await stripeFetch(`/subscriptions/${sub.id}`, { method: "DELETE", stripeAccount }); } catch (_) {}
+      return res.status(502).json({ error: "Couldn't cancel the old subscription - no change made. " + (e.message || "") });
+    }
+    nextUnix = startUnix > nowUnix() ? startUnix : subCurrentPeriodEnd(sub);
+    await sb(`members?id=eq.${member.id}`, {
+      method: "PATCH",
+      headers: { Prefer: "return=minimal" },
+      body: JSON.stringify({
+        stripe_subscription_id: sub.id,
+        stripe_price_id: newPriceId,
+        plan: newPlan,
+        updated_at: nowIso(),
+      }),
+    });
+  } else {
+    mode = "swap";
+    const itemId = currentSub.items?.data?.[0]?.id;
+    if (!itemId) {
+      return res.status(400).json({ error: "Stripe sub has no items - manual fix needed" });
+    }
+    const proration = (trialEndUnix == null && isUpgrade && body.prorate) ? "create_prorations" : "none";
+    prorated = proration === "create_prorations";
+    const updateBody = {
+      "items[0][id]": itemId,
+      "items[0][price]": newPriceId,
+      proration_behavior: proration,
+    };
+    if (trialEndUnix != null) updateBody.trial_end = String(trialEndUnix);
+    sub = await stripeFetch(`/subscriptions/${member.stripe_subscription_id}`, {
+      method: "POST",
+      stripeAccount,
+      body: updateBody,
+    });
+    nextUnix = trialEndUnix != null ? trialEndUnix : subCurrentPeriodEnd(sub);
+    await sb(`members?id=eq.${member.id}`, {
+      method: "PATCH",
+      headers: { Prefer: "return=minimal" },
+      body: JSON.stringify({ plan: newPlan, updated_at: nowIso() }),
+    });
+  }
 
   await writeAudit({
     client_id: member.client_id,
@@ -1197,18 +1233,19 @@ async function actionChange(res, member, stripeAccount, ctx, body) {
     args: body,
     performed_by: ctx.user.id,
     performed_by_name: ctx.staff?.name || null,
-    stripe_response: { id: sub.id, status: sub.status, price_id: newPriceId, trial_end: sub.trial_end || null },
-    db_changes: { members: { id: member.id, plan: { from: member.plan, to: newPlan } } },
+    stripe_response: { id: sub.id, status: sub.status, price_id: newPriceId, trial_end: sub.trial_end || null, mode },
+    db_changes: { members: { id: member.id, plan: { from: member.plan, to: newPlan }, mode } },
   });
 
   return res.status(200).json({
     ok: true,
+    mode,
     member: { id: member.id, plan: newPlan },
     sub: { id: sub.id, status: sub.status, new_price_id: newPriceId },
-    prorated: proration === "create_prorations",
+    prorated,
     direction: isUpgrade ? "upgrade" : "downgrade",
-    next_payment_set: trialEndUnix != null,
-    next_payment: trialEndUnix != null ? trialEndUnix : subCurrentPeriodEnd(sub),
+    next_payment_set: nextUnix != null,
+    next_payment: nextUnix,
   });
 }
 
