@@ -22128,6 +22128,7 @@ async function fetchAndRenderMembers() {
     _MEMBERS_SORTER = json.sorter || null;
     _MEMBERS_SUBS_TO_CANCEL = json.subs_to_cancel || 0;
     _MEMBERS_CIQ = json.coachiq || { enabled: false, signup_url: null };
+    await _loadMemberPriceStatusMap();   // priceId → live/archived (offer-aware), one fetch for the whole roster
     _renderMembersView();
   } catch (e) {
     container.innerHTML = `<div class="req-empty" style="padding:20px 0">Couldn't load members - ${escapeHTML(e.message)}</div>`;
@@ -22219,6 +22220,38 @@ function _memberPriceLabel(pricing) {
   const full = (name ? name + ' · ' : '') + amt + per;   // tooltip
   const short = amt + per;                                 // clean on-card label
   return `<span title="${escapeHTML(full)}" style="display:inline-block;font-size:11px;font-weight:600;color:var(--text-mute);white-space:nowrap">${escapeHTML(short)}</span>`;
+}
+
+// priceId → 'live' | 'legacy', by the OFFER's archived flag (same rule the
+// Change-plan dropdown + member drawer use). Built once per roster load so the
+// per-row column renders synchronously (no per-card fetch).
+let _MEMBERS_PRICE_STATUS = {};
+async function _loadMemberPriceStatusMap() {
+  _MEMBERS_PRICE_STATUS = {};
+  try {
+    const token = await _mreqAuthToken();
+    const qs = (typeof CLIENT_ID !== 'undefined' && CLIENT_ID) ? '?client_id=' + encodeURIComponent(CLIENT_ID) : '';
+    const r = await fetch('/api/pricing' + qs, { headers: { Authorization: 'Bearer ' + token } });
+    const j = await _safeJson(r);
+    if (!r.ok) return;
+    const catalog = j.catalog || [];
+    const offerId = (catalog.find(x => x && x.offer_id) || {}).offer_id || null;
+    const offerings = await _offerOfferings(offerId);
+    catalog.forEach(row => {
+      if (row && row.stripe_price_id) _MEMBERS_PRICE_STATUS[row.stripe_price_id] = _offerPriceStatus(row, offerings);
+    });
+  } catch (_) { /* leave map empty - column just renders blank */ }
+}
+
+// Roster column: is this member on a live offer price or an archived one.
+function _memberPriceStatusCell(m) {
+  const st = m && m.stripe_price_id ? _MEMBERS_PRICE_STATUS[m.stripe_price_id] : null;
+  if (!st) return '';   // unknown price (or no sub) - leave blank
+  const live = st === 'live';
+  const color  = live ? '#7BC47F' : '#c79a4a';
+  const border = live ? '#1f7a3d' : '#7a5a2f';
+  const label  = live ? 'Live price' : 'Archived';
+  return `<span title="${live ? 'On a current offer price' : 'On an archived offer price'}" style="display:inline-block;font-size:11px;font-weight:700;padding:2px 9px;border-radius:999px;background:transparent;border:1px solid ${border};color:${color};white-space:nowrap">${label}</span>`;
 }
 
 // Circular avatar - uses uploaded image if present, otherwise initials on
@@ -22386,7 +22419,7 @@ function _renderMembersView() {
     <style>
       .member-card {
         display:grid;
-        grid-template-columns:38px minmax(140px,1fr) 100px 300px;
+        grid-template-columns:38px minmax(140px,1fr) 100px 420px;
         gap:14px;
         align-items:center;
         padding:12px 16px;
@@ -22401,8 +22434,8 @@ function _renderMembersView() {
       .member-card-trainer { font-size:13px; color:var(--text-mute); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
       /* Fixed internal columns so status / price / set-up line up vertically
          down the whole roster (the badges no longer drift per row). */
-      .member-card-pills { display:grid; grid-template-columns:124px 92px auto; align-items:center; column-gap:8px; }
-      .mc-status, .mc-price, .mc-extra { display:flex; align-items:center; gap:6px; min-width:0; }
+      .member-card-pills { display:grid; grid-template-columns:124px 96px 92px auto; align-items:center; column-gap:8px; }
+      .mc-status, .mc-pricestatus, .mc-price, .mc-extra { display:flex; align-items:center; gap:6px; min-width:0; }
       /* If a member has a queued-pause pill too, stack it under the status pill
          instead of overflowing the fixed column. */
       .mc-status { flex-wrap:wrap; row-gap:4px; }
@@ -22475,6 +22508,7 @@ function _memberCardHtml(m) {
       <div class="member-card-trainer">${escapeHTML(m.trainer || '-')}</div>
       <div class="member-card-pills">
         <span class="mc-status">${_memberStatusPill(m.status, m)}</span>
+        <span class="mc-pricestatus">${_memberPriceStatusCell(m)}</span>
         <span class="mc-price">${_memberPriceLabel(m.pricing)}</span>
         <span class="mc-extra">${_memberSetupBadge(m)}${_memberOfferPill(m)}</span>
       </div>
