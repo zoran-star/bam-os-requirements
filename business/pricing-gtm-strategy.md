@@ -126,6 +126,16 @@ STEP 1            STEP 2                          STEP 3
 
 ---
 
+## 6b. Global Brain — privacy requirements (build rules)
+
+Global Brain = a shared, curated pool of AI *lessons* that improves every academy's agents (the "more it learns" moat at fleet scale). Non-negotiable rules for whoever builds it:
+
+- **Promote the technique, never the content.** Share *how* to handle a situation (objection-handling, tone, cadence) — never business-specific data, pricing, contacts, names, or any PII.
+- **BAM curates every promotion.** Nothing auto-shares from local → global; a human approves what enters the shared brain (already modeled via `agent_lessons.promotion_status`).
+- **Anonymize on promotion.** Strip the source academy + any identifying details before a lesson enters the global pool.
+- **Same-market guardrail (decide):** consider excluding same-city/competing academies from sharing, or only globalizing universal sales/coaching patterns.
+- **Local stays local by default.** An academy's own lessons remain private unless explicitly promoted.
+
 ## 7. Open questions / to nail down
 - Define exactly what "V2 done" means (the round-3 pending portal items).
 - Growth-share margin model: does base + 10-15% reliably clear the scaling-manager cost? (model it)
