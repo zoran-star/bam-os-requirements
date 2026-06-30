@@ -121,6 +121,15 @@ export async function exitEnrollment({ clientId, automationKey = null, contactId
     const ids = (Array.isArray(autos) ? autos : []).map(a => a.id);
     if (!ids.length) return { skipped: "no such automation" };
     autoFilter = `&automation_id=in.(${ids.join(",")})`;
+  } else {
+    // KEYLESS exit (payment "converted", reply "replied", booking "booked"): exit ALL
+    // active enrollments EXCEPT the 🎉 onboarding welcome. A brand-new member who just
+    // paid (or replies during onboarding) must keep getting their welcome sequence: a
+    // keyless sweep used to cancel it too. Exclude only the `onboarding` automation; a
+    // caller that genuinely needs to exit onboarding passes automationKey:"onboarding".
+    const obAutos = await sb(`automations?client_id=eq.${clientId}&automation_key=eq.onboarding&select=id`);
+    const obIds = (Array.isArray(obAutos) ? obAutos : []).map(a => a.id);
+    if (obIds.length) autoFilter = `&automation_id=not.in.(${obIds.join(",")})`;
   }
   const active = await sb(`automation_enrollments?client_id=eq.${clientId}&contact_id=eq.${encodeURIComponent(String(contactId))}&status=eq.active${autoFilter}&select=id,automation_id`);
   let exited = 0;
@@ -224,7 +233,7 @@ async function runWork(res) {
         await sb(`automation_enrollments?id=eq.${job.enrollment_id}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ status: "completed", exited_at: new Date().toISOString(), exit_reason: "sequence complete" }) }).catch(() => {});
         await logEvent({ clientId: job.client_id, contactId: job.contact_id, automationId: job.automation_id, type: "completed", payload: null });
         completed++;
-        // L1/L3: 📝 contact_form / 🏀 trial_form INTRO sent its one step and they
+        // L1/L3: 📝 contact_form / 🏀 trial_form / ⏰ missed_trial INTRO sent its step(s) and they
         // never replied -> the lead is stranded in Interested where nobody watches
         // (the ghost detector + agent only scan Responded). Roll them into 👻 Ghosted
         // so the long game picks up, mirroring the ghosted->nurture roll below
@@ -232,7 +241,7 @@ async function runWork(res) {
         // Best-effort + idempotent; only when ghosted is live, else leave them put.
         try {
           const a = autoCache.get(job.automation_id);
-          if (a && (a.automation_key === "contact_form" || a.automation_key === "trial_form") && await isAutomationLive(job.client_id, "ghosted")) {
+          if (a && (a.automation_key === "contact_form" || a.automation_key === "trial_form" || a.automation_key === "missed_trial") && await isAutomationLive(job.client_id, "ghosted")) {
             await enrollContact({ clientId: job.client_id, automationKey: "ghosted", contactId: job.contact_id });
             const creds = await ensureCreds();
             if (creds && creds.token) {

@@ -1,7 +1,7 @@
 import { withSentryApiRoute } from "../_sentry.js";
 import { pickGhlToken, sendSms, ghl } from "./_core.js";
 import { notifyOwners } from "../_notify-owners.js";
-import { respondedStage, contactInRespondedStage, scheduledTrialStage } from "../agent/_stage.js";
+import { respondedStage, contactInRespondedStage, scheduledTrialStage, interestedStage, nurtureStage } from "../agent/_stage.js";
 import { agentMode, modeIsOn } from "../agent/_mode.js";
 import { exitEnrollment } from "../automations.js";
 // Vercel Serverless Function — GHL inbound-message webhook  ("P1 Spine")
@@ -245,14 +245,21 @@ async function handler(req, res) {
       // Same for the confirm agent: a stale opener/confirm card is for their prior
       // state; the confirm detector re-drafts against what they just said.
       await sb(`agent_confirm_replies?client_id=eq.${client.id}&ghl_contact_id=eq.${cid}&status=in.(pending,approved)`, patch);
+      // And the closing agent: a stale closing card can't be sent at a now-talking
+      // lead; the closing detector re-drafts so the AI can answer what they just said.
+      await sb(`agent_closing_replies?client_id=eq.${client.id}&ghl_contact_id=eq.${cid}&status=in.(pending,approved)`, patch);
     }
   } catch (e) { console.error("ghl inbound-webhook draft-cancel error:", e.message); }
 
-  // Lead replied while in a portal automation (any: the form-intro 📝 contact_form /
-  // 🏀 trial_form first touches, 👻 Ghosted, 💔 Lead Nurture) → exit the sequence
-  // (exitEnrollment with no automationKey exits ALL active enrollments) and bounce them
-  // to Booking (Responded) so the booking agent picks them up warm (mirrors the GHL
-  // ghosted "reply -> Responded" behavior). Best-effort.
+  // Lead replied while in a portal automation (any EXCEPT 🎉 onboarding: the form-intro
+  // 📝 contact_form / 🏀 trial_form first touches, 👻 Ghosted, 💔 Lead Nurture) → exit the
+  // sequence (keyless exitEnrollment exits all active enrollments but spares onboarding)
+  // and bounce them to Booking (Responded) so the booking agent picks them up warm
+  // (mirrors the GHL ghosted "reply -> Responded" behavior). Best-effort.
+  // GUARD: ONLY move the card when its open opp is currently in a NUDGE/GHOST stage
+  // (Interested/ghosted or Lead Nurture). A reply from a paid member, a booked
+  // Scheduled-Trial lead, an attended Done-Trial lead, or any won/closed opp must NOT
+  // be yanked back to Booking - leave those put.
   try {
     if (contactId) {
       const { exited } = await exitEnrollment({ clientId: client.id, contactId, reason: "replied" });
@@ -262,8 +269,18 @@ async function handler(req, res) {
           const rs = await respondedStage(creds.token, creds.locationId);
           const d = await ghl("GET", `/opportunities/search?${new URLSearchParams({ location_id: creds.locationId, contact_id: String(contactId), limit: "20" })}`, { token: creds.token });
           const opps = d.opportunities || d.data || [];
-          const oppId = (opps.find(o => String(o.status || "").toLowerCase() === "open") || opps[0] || null)?.id || null;
-          if (rs && oppId) await ghl("PUT", `/opportunities/${encodeURIComponent(oppId)}`, { token: creds.token, body: { pipelineId: rs.pipelineId, pipelineStageId: rs.stageId } });
+          const opp = opps.find(o => String(o.status || "").toLowerCase() === "open") || null;
+          if (rs && opp) {
+            const curStageId = opp.pipelineStageId || opp.stageId || null;
+            const [is, ns] = await Promise.all([
+              interestedStage(creds.token, creds.locationId).catch(() => null),
+              nurtureStage(creds.token, creds.locationId).catch(() => null),
+            ]);
+            const ghostStageIds = new Set([is && is.stageId, ns && ns.stageId].filter(Boolean));
+            if (ghostStageIds.has(curStageId)) {
+              await ghl("PUT", `/opportunities/${encodeURIComponent(opp.id)}`, { token: creds.token, body: { pipelineId: rs.pipelineId, pipelineStageId: rs.stageId } });
+            }
+          }
         }
       }
     }
