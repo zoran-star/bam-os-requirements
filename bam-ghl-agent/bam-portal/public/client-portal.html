@@ -30923,11 +30923,13 @@ function _memberInboxComposer() {
 
 function _renderMemberInbox(sec, messages) {
   const contactFirst = ((_MEMBER_INBOX && _MEMBER_INBOX.name) || '').trim().split(/\s+/)[0] || 'Them';
-  // Newest first - most recent message on top.
-  const sorted = [...messages].filter(mm => !_ibIsActivity(mm))
-    .sort((a, b) => (b.date ? new Date(b.date).getTime() : 0) - (a.date ? new Date(a.date).getTime() : 0));
-  const recent = sorted.slice(0, 8);
-  const more = sorted.length - recent.length;
+  // Chronological (oldest -> newest). We keep the 8 most-recent, displayed in
+  // order so the NEWEST sits at the bottom, right above the composer - like a
+  // normal chat. The container then auto-scrolls to the bottom on load.
+  const asc = [...messages].filter(mm => !_ibIsActivity(mm))
+    .sort((a, b) => (a.date ? new Date(a.date).getTime() : 0) - (b.date ? new Date(b.date).getTime() : 0));
+  const recent = asc.slice(-8);
+  const more = asc.length - recent.length;
   const thread = recent.length ? recent.map(mm => {
     const out = (mm.direction || '').toLowerCase() === 'outbound';
     const atts = _ibRenderAttachments(mm.attachments);
@@ -30937,12 +30939,14 @@ function _renderMemberInbox(sec, messages) {
     const when = escapeHTML(_ibFormatDate(mm.date));
     return `<div class="ib-msg ${out ? 'ib-msg-out' : 'ib-msg-in'}">${hasBody ? escapeHTML(mm.body.trim()) : (atts ? '' : '(no body)')}${atts}<div class="ib-msg-meta">${sender} · ${channel}${when ? ' · ' + when : ''}</div></div>`;
   }).join('') : `<div style="font-size:12px;color:var(--text-mute)">No messages yet.</div>`;
-  // Thread loads at the top (newest first, scroll starts at the newest); the
-  // composer sits BELOW the conversation like a normal chat window.
-  sec.innerHTML = `${more > 0 ? `<div style="font-size:11px;color:var(--text-mute);margin-bottom:8px">Newest ${recent.length} of ${sorted.length} messages</div>` : ''}<div style="display:flex;flex-direction:column;gap:8px;max-height:300px;overflow-y:auto;margin-bottom:12px">${thread}</div>${_memberInboxComposer()}`;
+  sec.innerHTML = `${more > 0 ? `<div style="font-size:11px;color:var(--text-mute);margin-bottom:8px">Latest ${recent.length} of ${asc.length} messages</div>` : ''}<div id="member-inbox-thread" style="display:flex;flex-direction:column;gap:8px;max-height:300px;overflow-y:auto;margin-bottom:12px">${thread}</div>${_memberInboxComposer()}`;
+  // Load scrolled to the bottom so the newest message is in view.
+  const tc = document.getElementById('member-inbox-thread');
+  if (tc) tc.scrollTop = tc.scrollHeight;
 }
 
-// Send a reply on the member's GHL thread, then reload (newest lands on top).
+// Send a reply on the member's GHL thread, then reload (reply lands at the
+// bottom and the thread auto-scrolls down to it).
 async function _memberInboxSend() {
   if (!_sendGuard('memberInboxSend')) return;
   const i = _MEMBER_INBOX;
