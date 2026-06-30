@@ -30680,7 +30680,12 @@ function _mmFieldHtml(f) {
   if (f.type === 'textarea') {
     ctrl = `<textarea id="mm-f-${f.key}" rows="${f.rows || 3}" placeholder="${esc(f.placeholder)}" style="${base};resize:vertical">${esc(f.value)}</textarea>`;
   } else if (f.type === 'select') {
-    ctrl = `<select id="mm-f-${f.key}" style="${base}">${(f.options || []).map(o => `<option value="${esc(o.value)}" ${o.value === f.value ? 'selected' : ''}>${esc(o.label)}</option>`).join('')}</select>`;
+    // Options can be flat ({value,label}) or grouped ({group, items:[{value,label}]}).
+    const _opt = (o) => `<option value="${esc(o.value)}" ${o.value === f.value ? 'selected' : ''}>${esc(o.label)}</option>`;
+    const _inner = (f.options || []).map(o => (o && o.items)
+      ? `<optgroup label="${esc(o.group)}">${(o.items || []).map(_opt).join('')}</optgroup>`
+      : _opt(o)).join('');
+    ctrl = `<select id="mm-f-${f.key}" style="${base}">${_inner}</select>`;
   } else if (f.type === 'radio') {
     ctrl = `<div style="display:flex;flex-direction:column;gap:8px">${(f.options || []).map((o, i) => `
       <label style="display:flex;align-items:flex-start;gap:10px;padding:11px 13px;border:1px solid var(--border-med);border-radius:9px;cursor:pointer">
@@ -30979,7 +30984,7 @@ async function mChange(memberId, currentPlan) {
   // Live target plans come from the academy's pricing_catalog (is_routable) -
   // not a hardcoded list - so new live prices (Summer Unlimited) and the
   // multi-month commitments show up automatically. Archived/legacy are excluded.
-  let opts = [], nextUnix = null;
+  let flat = [], grouped = [], nextUnix = null;
   try {
     const token = await _mreqAuthToken();
     const qs = (typeof CLIENT_ID !== 'undefined' && CLIENT_ID) ? '?client_id=' + encodeURIComponent(CLIENT_ID) : '';
@@ -30995,18 +31000,25 @@ async function mChange(memberId, currentPlan) {
     // active, else the current period end.
     nextUnix = (sj.trial_end && sj.trial_end * 1000 > Date.now()) ? sj.trial_end : (sj.current_period_end || null);
     const ir = (v) => (v === '3_months' ? 1 : v === '6_months' ? 2 : 0); // monthly first, then commitments
-    opts = (pj.catalog || [])
+    const live = [], legacy = [];
+    (pj.catalog || [])
       .filter(row => row && row.stripe_price_id && row.is_routable === true && row.tier === 'canonical')
       .sort((a, b) => ir(a.interval) - ir(b.interval) || (a.amount_cents || 0) - (b.amount_cents || 0))
-      .map(row => {
+      .forEach(row => {
         const amt = (row.amount_cents / 100).toFixed(2).replace(/\.00$/, '');
-        return { value: row.stripe_price_id, label: `${row.display_name || row.canonical_plan || 'Plan'} ($${amt})` };
+        const o = { value: row.stripe_price_id, label: `${row.display_name || row.canonical_plan || 'Plan'} ($${amt})` };
+        // Live = confirmed mapping to the current offer; older unmapped canonical
+        // prices drop into a separate "Legacy" group.
+        (row.match_status === 'confirmed' ? live : legacy).push(o);
       });
+    flat = [...live, ...legacy];
+    if (live.length)   grouped.push({ group: 'Live prices', items: live });
+    if (legacy.length) grouped.push({ group: 'Legacy (older prices)', items: legacy });
   } catch (e) {
     _plToast("Couldn't load live prices: " + e.message);
     return;
   }
-  if (!opts.length) {
+  if (!flat.length) {
     _plToast('No live prices found for this academy.');
     return;
   }
@@ -31017,7 +31029,7 @@ async function mChange(memberId, currentPlan) {
     body: `Current plan: <b>${escapeHTML(currentPlan || '-')}</b><br>Next payment: <b>${escapeHTML(nextLabel)}</b>`,
     okLabel: 'Change plan',
     fields: [
-      { key: 'new_price', label: 'New plan (live prices)', type: 'select', value: opts[0].value, options: opts },
+      { key: 'new_price', label: 'New plan', type: 'select', value: flat[0].value, options: grouped },
       { key: 'next_payment', label: 'Next payment date (leave as-is to keep)', type: 'date', value: nextYMD },
       { key: 'prorate', label: 'Proration', type: 'radio', value: 'no', options: [
         { value: 'no',  label: 'No proration', hint: 'Change applies on the next cycle.' },
@@ -31026,7 +31038,7 @@ async function mChange(memberId, currentPlan) {
     ],
   });
   if (!vals) return;
-  const picked = opts.find(o => o.value === vals.new_price);
+  const picked = flat.find(o => o.value === vals.new_price);
   const payload = { new_price_id: vals.new_price, prorate: vals.prorate === 'yes' };
   if (vals.next_payment && vals.next_payment !== nextYMD) payload.next_payment_date = vals.next_payment;
   try {
