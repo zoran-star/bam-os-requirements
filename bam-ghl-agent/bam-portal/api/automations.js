@@ -20,6 +20,7 @@ import { sendOn } from "./_send.js";
 import { renderEmail } from "./email-shells.js";
 import { withinQuietHours, nextSendableTime } from "./agent/_quiet.js";
 import { resolveAgentActor } from "./agent/_auth.js";
+import { FORM_INTRO_DEFAULTS } from "./form-intro-automations.js";
 
 const SUPABASE_URL         = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
@@ -397,6 +398,34 @@ async function handler(req, res) {
       };
       const r = await sb(`automations?on_conflict=client_id,automation_key`, { method: "POST", headers: { Prefer: "resolution=merge-duplicates,return=representation" }, body: JSON.stringify([row]) });
       return res.status(200).json({ ok: true, automation: Array.isArray(r) && r[0] });
+    }
+
+    // Seed a per-form INTRO automation (contact_form / trial_form) from the shipped
+    // DEFAULTS the first time its Entry Point tab loads. Idempotent + edit-safe:
+    //   - creates the automation only if it doesn't exist (never resets an academy's
+    //     enabled/approved on an existing one),
+    //   - adds the default step ONLY when the automation has zero steps (never clobbers
+    //     an edited message).
+    // Dormant: seeds enabled:true + approved:false, so nothing sends until approved
+    // AND portal_entry_routing.enabled is on.
+    if (b.action === "seed-form-intro") {
+      const key = String(b.automation_key || "");
+      const def = FORM_INTRO_DEFAULTS[key];
+      if (!def) return res.status(400).json({ error: "unknown form-intro key" });
+      let autos = await sb(`automations?client_id=eq.${clientId}&automation_key=eq.${encodeURIComponent(key)}&select=*&limit=1`);
+      let auto = Array.isArray(autos) && autos[0];
+      if (!auto) {
+        const ins = await sb(`automations?on_conflict=client_id,automation_key`, { method: "POST", headers: { Prefer: "resolution=merge-duplicates,return=representation" },
+          body: JSON.stringify([{ client_id: clientId, automation_key: key, name: def.name, enabled: !!def.enabled, approved: !!def.approved, updated_at: new Date().toISOString() }]) });
+        auto = Array.isArray(ins) && ins[0];
+      }
+      if (!auto) return res.status(500).json({ error: "seed failed" });
+      const steps = await loadSteps(auto.id);
+      if (!steps.length) {
+        await sb(`automation_steps`, { method: "POST", headers: { Prefer: "return=minimal" },
+          body: JSON.stringify([{ automation_id: auto.id, position: def.step.position || 0, wait_amount: def.step.wait_amount, wait_unit: def.step.wait_unit, channel: def.step.channel, subject: def.step.subject ?? null, body: def.step.body, enabled: true, updated_at: new Date().toISOString() }]) });
+      }
+      return res.status(200).json({ ok: true, automation: { ...auto, steps: await loadSteps(auto.id) } });
     }
 
     // Verify an automation_id belongs to this academy before mutating its steps.

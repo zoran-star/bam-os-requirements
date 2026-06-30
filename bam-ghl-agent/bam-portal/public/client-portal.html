@@ -16191,6 +16191,15 @@ async function _taRenderEntryPoints() {
     }
     const d = await _taEpApi('get-entry-routing');
     _TAEP.routing = d.routing || {};
+    // Seed + load THIS form's INTRO automation (📝 contact_form / 🏀 trial_form) so
+    // its step editor shows below the routing config. Idempotent + edit-safe + dormant
+    // (seeds approved:false). _AUTO.list is populated so the shared step handlers work.
+    const introKey = _TA.target === 'ep_contact' ? 'contact_form' : 'trial_form';
+    _TAEP.introKey = introKey;
+    await _autoApi('seed-form-intro', { automation_key: introKey });
+    const al = await _autoApi('list');
+    _AUTO.list = al.automations || [];
+    try { const ov = await _autoApi('overview'); _AUTO.overview = ov.overview || []; } catch (_) { _AUTO.overview = []; }
   } catch (e) { p.innerHTML = `<div style="color:#e07070;font-size:13px">Couldn't load - ${escapeHTML(e.message)}</div>`; return; }
   _taEpForm();
 }
@@ -16261,6 +16270,27 @@ function _taEpForm() {
       <div id="taep-err" style="color:#e07070;font-size:12.5px;margin:4px 0 10px"></div>
       <button onclick="_taEpSave()" style="${_TA_BTN}">Save</button>
       ${!isStaff ? '' : '<span style="font-size:11.5px;color:var(--text-mute);margin-left:10px">Pipeline + stage names must match GHL exactly.</span>'}
+    </div>
+    ${_taEpIntroHtml()}`;
+}
+// The form's INTRO automation (the timed first-touch SMS), edited right here on the
+// Contact / Trial form tab. Reuses the shared step-builder card (_autoCardHtml): edit
+// the message + delay, flip it on, approve - all one card. Dormant until ON + approved
+// AND portal routing is on.
+function _taEpIntroHtml() {
+  const introKey = _TAEP.introKey || (_TA.target === 'ep_contact' ? 'contact_form' : 'trial_form');
+  const introAuto = (_AUTO.list || []).find(a => a.automation_key === introKey);
+  if (!introAuto) return '';
+  const isContact = _TA.target === 'ep_contact';
+  const title = 'First-touch intro automation';
+  const blurb = isContact
+    ? 'The first text a contact-form lead gets. Edit the wait + message, then flip it on and approve. The moment they reply, your booking agent takes over.'
+    : 'The first text a trial lead gets if they fill the form but do not pick a time. Edit the wait + message, then flip it on and approve. If they book, they exit this and move to your Confirm agent; the moment they reply, your booking agent takes over.';
+  return `
+    <div style="margin-top:22px;max-width:520px">
+      <div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:4px">${title}</div>
+      <p style="font-size:12px;color:var(--text-mute);margin:0 0 12px;line-height:1.5">${blurb}</p>
+      ${_autoCardHtml(introAuto)}
     </div>`;
 }
 async function _taEpSave() {
@@ -16474,14 +16504,14 @@ async function _autoSetLive(autoId, on) {
     await _autoApi('set-approved', { automation_id: autoId, value: on });
     await _autoApi('set-enabled', { automation_id: autoId, value: on });
     _plToast(on ? '🟢 Automation on' : 'Automation off');
-    _taRenderAutomations();
+    _taRenderPanel();
   } catch (e) { alert(e.message); }
 }
 
 async function _autoAddStep(autoId) {
   const a = _AUTO.list.find(x => x.id === autoId);
   const pos = a && a.steps && a.steps.length ? Math.max(...a.steps.map(s => Number(s.position) || 0)) + 1 : 0;
-  try { await _autoApi('upsert-step', { automation_id: autoId, position: pos, wait_amount: 1, wait_unit: 'days', channel: 'sms', body: 'New step - edit me' }); _taRenderAutomations(); }
+  try { await _autoApi('upsert-step', { automation_id: autoId, position: pos, wait_amount: 1, wait_unit: 'days', channel: 'sms', body: 'New step - edit me' }); _taRenderPanel(); }
   catch (e) { alert(e.message); }
 }
 
@@ -16503,13 +16533,13 @@ async function _autoSaveStep(autoId, sid) {
       body,
     });
     _plToast('Step saved');
-    _taRenderAutomations();
+    _taRenderPanel();
   } catch (e) { alert(e.message); }
 }
 
 async function _autoDelStep(sid) {
   if (!confirm('Delete this step?')) return;
-  try { await _autoApi('delete-step', { step_id: sid }); _taRenderAutomations(); }
+  try { await _autoApi('delete-step', { step_id: sid }); _taRenderPanel(); }
   catch (e) { alert(e.message); }
 }
 
@@ -16519,7 +16549,7 @@ async function _autoMove(autoId, sid, dir) {
   const i = steps.findIndex(s => s.id === sid); if (i < 0) return;
   const j = i + dir; if (j < 0 || j >= steps.length) return;
   const ids = steps.map(s => s.id); [ids[i], ids[j]] = [ids[j], ids[i]];
-  try { await _autoApi('reorder', { automation_id: autoId, ordered_step_ids: ids }); _taRenderAutomations(); }
+  try { await _autoApi('reorder', { automation_id: autoId, ordered_step_ids: ids }); _taRenderPanel(); }
   catch (e) { alert(e.message); }
 }
 
