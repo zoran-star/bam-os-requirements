@@ -45,7 +45,7 @@ import {
 } from "./agent/confirm-automations.js";
 import { sendOn } from "./_send.js";
 import { resolveMergeVars, locFor } from "./email-shells.js";
-import { confirmAgentMode, modeIsOn, shouldAutoSend } from "./agent/_mode.js";
+import { confirmAgentMode, modeIsOn, shouldAutoSend, shouldAutoSendScripted } from "./agent/_mode.js";
 import { mutedContactIdSet, isMuted } from "./agent/_mutes.js";
 import { withinQuietHours, nextSendableTime } from "./agent/_quiet.js";
 import { resolveAgentActor } from "./agent/_auth.js";
@@ -395,7 +395,10 @@ async function fireScriptedStep({ client, token, locationId, mode, autos, cfg, i
     reasoning: `Scripted initial automation: ${step.label}`,
   };
 
-  const auto = shouldAutoSend(mode, { confidence: 1, escalate: false });
+  // Scripted + already approved (automationsLive gated this run): auto-send whenever the
+  // agent is on, bypassing the global self-drive kill-switch (that net is for AI freeform
+  // replies, not fixed pre-approved copy). AI replies below still use shouldAutoSend.
+  const auto = shouldAutoSendScripted(mode);
   if (auto && !withinQuietHours()) {
     // After-hours: hold the SMS until morning; the email isn't quiet-gated, send it now.
     await sendScriptedEmail();

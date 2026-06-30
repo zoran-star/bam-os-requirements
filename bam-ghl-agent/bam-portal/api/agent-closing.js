@@ -42,7 +42,7 @@ import {
   automationsLive as closingAutomationsLive, nextDueStep as nextDueClosingStep,
 } from "./agent/closing-automations.js";
 import { resolveMergeVars, locFor } from "./email-shells.js";
-import { closingAgentMode, modeIsOn, shouldAutoSend } from "./agent/_mode.js";
+import { closingAgentMode, modeIsOn, shouldAutoSend, shouldAutoSendScripted } from "./agent/_mode.js";
 import { mutedContactIdSet, isMuted } from "./agent/_mutes.js";
 import { withinQuietHours, nextSendableTime } from "./agent/_quiet.js";
 import { resolveAgentActor } from "./agent/_auth.js";
@@ -331,7 +331,9 @@ async function fireScriptedStep({ client, token, mode, autos, item, contactId })
     last_lead_at: item.last_at || null, reasoning: `Scripted initial automation: ${step.label}`,
   };
 
-  const auto = shouldAutoSend(mode, { confidence: 1, escalate: false });
+  // Scripted + pre-approved (automationsLive gated this run): auto-send whenever the agent
+  // is on, bypassing the global self-drive kill-switch (that net is for AI freeform replies).
+  const auto = shouldAutoSendScripted(mode);
   if (auto && !withinQuietHours()) {
     await sb(`agent_closing_replies`, { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify([{
       ...baseRow, status: "approved", send_after: nextSendableTime().toISOString(), created_by: "self-drive",

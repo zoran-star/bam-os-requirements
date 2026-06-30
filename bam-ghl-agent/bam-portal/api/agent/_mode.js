@@ -63,3 +63,14 @@ export function shouldAutoSend(mode, { confidence, escalate } = {}) {
   if (escalate) return false;
   return typeof confidence === "number" && confidence >= SELF_DRIVE_MIN_CONFIDENCE;
 }
+
+// Should a SCRIPTED, pre-approved initial-automation touch auto-send? These are FIXED
+// templates the academy already approved (booking confirmation, same-day check-in,
+// post-trial), with tokens auto-filled - they can't go off-script. So they are NOT
+// subject to the global self-drive kill-switch (which exists to gate the AI writing
+// its OWN words). They auto-send whenever the agent is ON at all (hawkeye OR
+// self_drive); 'off' still sends nothing. The caller must still confirm the sequence
+// is enabled+approved (automationsLive) before relying on this.
+export function shouldAutoSendScripted(mode) {
+  return modeIsOn(mode);
+}
