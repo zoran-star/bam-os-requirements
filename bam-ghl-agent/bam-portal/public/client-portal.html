@@ -29901,6 +29901,56 @@ function _renderPricingDrawer({ price, members, member_count }) {
 // <body> at a z-index above the member drawer (z-9999). Clicking the Plan
 // name in a member's Billing section opens this; close it to return to the
 // member, still underneath.
+// Live vs Legacy for one price, by the OFFER's archived flag (the same rule
+// the Change-plan dropdown uses). An archived plan reads Legacy even if its
+// catalog row is still flagged routable/canonical. Returns 'live' | 'legacy'.
+function _offerPriceStatus(row, offerings) {
+  const hay = ((row.offer_price_key ? row.offer_price_key.split('|')[0] : '') + ' ' + (row.display_name || '')).toLowerCase();
+  let best = null;
+  (offerings || []).forEach(o => {
+    const t = String(o.title || '').trim().toLowerCase();
+    if (t && hay.indexOf(t) >= 0 && (!best || t.length > best.len)) best = { archived: !!o.archived, len: t.length };
+  });
+  if (best) return best.archived ? 'legacy' : 'live';
+  return (offerings && offerings.length) ? 'legacy' : (row.is_routable === true ? 'live' : 'legacy');
+}
+
+// Load the offer's pricing_offerings - from the loaded Business Blueprint if
+// present, else fetch the offer row via Supabase by id.
+async function _offerOfferings(offerId) {
+  let offerings = (typeof _bbState !== 'undefined' && _bbState && _bbState.offer && _bbState.offer.data
+    && _bbState.offer.data.pricing && _bbState.offer.data.pricing.pricing_offerings) || [];
+  if (!offerings.length && offerId && typeof _sb !== 'undefined' && _sb) {
+    try {
+      const { data } = await _sb.from('offers').select('data').eq('id', offerId).maybeSingle();
+      offerings = (data && data.data && data.data.pricing && data.data.pricing.pricing_offerings) || [];
+    } catch (_) { /* leave empty */ }
+  }
+  return offerings;
+}
+
+// Fill the "(live)"/"(legacy)" badge next to a member's plan, async after the
+// drawer renders so we don't block on the catalog + offer fetch.
+async function _mFillPlanStatus(priceId) {
+  const el = document.getElementById('m-plan-status');
+  if (!el || !priceId) return;
+  try {
+    const token = await _mreqAuthToken();
+    const qs = (typeof CLIENT_ID !== 'undefined' && CLIENT_ID) ? '?client_id=' + encodeURIComponent(CLIENT_ID) : '';
+    const r = await fetch('/api/pricing' + qs, { headers: { Authorization: 'Bearer ' + token } });
+    const j = await _safeJson(r);
+    if (!r.ok) return;
+    const row = (j.catalog || []).find(x => x.stripe_price_id === priceId);
+    if (!row) return;
+    const offerings = await _offerOfferings(row.offer_id);
+    const live = _offerPriceStatus(row, offerings) === 'live';
+    el.textContent = live ? ' (live)' : ' (legacy)';
+    el.style.color = live ? '#7BC47F' : 'var(--text-mute)';
+    el.style.fontSize = '11px';
+    el.style.fontWeight = '700';
+  } catch (_) { /* leave badge blank on failure */ }
+}
+
 async function mViewPrice(priceId) {
   if (!priceId) return;
   let host = document.getElementById('m-price-host');
@@ -30347,7 +30397,7 @@ function _renderMemberModalBody(m, stripe, history) {
     billingRows = [
       ['Plan',     `${m.stripe_price_id
         ? `<a onclick="mViewPrice('${escapeHTML(m.stripe_price_id)}')" title="View this price in the offer" style="color:var(--gold,#E8C547);cursor:pointer;text-decoration:none;border-bottom:1px dashed var(--gold,#E8C547)">${escapeHTML(m.plan || '-')}</a>`
-        : escapeHTML(m.plan || '-')} <span style="color:var(--text-mute)">(${fmtMoney(stripe.amount_cents, stripe.currency)})</span>`],
+        : escapeHTML(m.plan || '-')} <span style="color:var(--text-mute)">(${fmtMoney(stripe.amount_cents, stripe.currency)})</span><span id="m-plan-status"></span>`],
       ['Status',   `${escapeHTML(stripe.status)}${stripe.cancel_at_period_end ? ' · cancel at period end' : ''}`],
       ['Joined',   joinedLabel],
       [stripe.trial_end ? 'Paused until' : 'Next payment', fmtDate(stripe.trial_end || stripe.current_period_end)],
@@ -30487,6 +30537,7 @@ function _renderMemberModalBody(m, stripe, history) {
     </div>
   `;
   _loadMemberDocs(m.id, m.client_id || (typeof CLIENT_ID !== 'undefined' ? CLIENT_ID : null));
+  if (m.stripe_price_id) _mFillPlanStatus(m.stripe_price_id);
 }
 
 // ─── Per-member documents (private member-files bucket + member_files table) ──
