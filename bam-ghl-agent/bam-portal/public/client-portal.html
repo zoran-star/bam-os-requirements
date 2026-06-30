@@ -30659,9 +30659,12 @@ function _renderMemberModalBody(m, stripe, history) {
   const mgmtWhy = !m.stripe_subscription_id ? 'No active subscription - use “Set up billing”.'
     : (stripe && stripe.portal_owned === false) ? 'This subscription was created outside the portal - use “Set up billing” to manage it here.'
     : 'No active subscription to manage here.';
+  // Greyed billing actions stay clickable so a tap explains WHY they're off
+  // (use "Set up billing") instead of a dead, silent button. The reason rides in
+  // a data attr so we never have to escape it into an inline JS string.
   const gbtn = (label, onclick, enabled) => enabled
     ? btn(label, onclick)
-    : `<button disabled title="${escapeHTML(mgmtWhy)}" style="background:transparent;color:var(--text-mute,#888);border:1px solid var(--border);padding:10px 12px;font-weight:600;border-radius:4px;cursor:not-allowed;font-size:13px;font-family:inherit;opacity:0.45">${label}</button>`;
+    : `<button data-why="${escapeHTML(mgmtWhy)}" title="${escapeHTML(mgmtWhy)}" onclick="_plToast(this.getAttribute('data-why'))" style="background:transparent;color:var(--text-mute,#888);border:1px solid var(--border);padding:10px 12px;font-weight:600;border-radius:4px;cursor:not-allowed;font-size:13px;font-family:inherit;opacity:0.5">🔒 ${label}</button>`;
   // Pause/Unpause button - hidden on cancelling members (backend rejects).
   // Gated on manageability (a no-sub or foreign-sub member can't be paused here).
   let toggleBtn = '';
