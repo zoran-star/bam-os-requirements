@@ -16096,10 +16096,11 @@ const _TA = { tab: 'test', target: 'booking', chat: [], sending: false, openSect
 const _TA_AGENTS = { booking: '📞 Booking', confirm: '✅ Confirm', closing: '🎯 Closing' };
 // trial_followup retired 2026-06-28: trial-no-book leads now go to the Booking
 // agent with context (cold opener) instead of a separate automation.
-const _TA_AUTOS  = { onboarding: '👋 Onboarding', ghosted: '👻 Ghosted', nurture: '💔 Lead Nurture' };
+const _TA_AUTOS  = { onboarding: '👋 Onboarding', missed_trial: '📵 Missed Trial', ghosted: '👻 Ghosted', nurture: '💔 Lead Nurture' };
 // What each automation is FOR and HOW a lead gets pulled into it (shown as the blurb).
 const _TA_AUTO_ABOUT = {
   onboarding: `<b>👋 Onboarding</b> welcomes a brand-new paid member. The moment their first payment clears and they go live, they drop into this sequence - a welcome text + email, then a couple of getting-started nudges over the first week. Approve it once and flip it on; it runs itself (quiet hours respected). Edit every message below.`,
+  missed_trial: `<b>📵 Missed Trial</b> is the first text an athlete gets when they no-show their trial. Edit the wait + message, then flip it on and approve. The moment they reply, your booking agent takes over; if they stay silent, they roll into 👻 Ghosted automatically.`,
   ghosted: `<b>👻 Ghosted</b> wins back leads who go quiet. When a lead stops replying, your agent drops them in here for a short burst of texts and emails to restart the conversation. Reply and they bounce straight back to the booking agent; silent all the way through and they roll into Lead Nurture.`,
   nurture: `<b>💔 Lead Nurture</b> is the slow-burn long game. Any lead that's lost but still a fit - across booking, confirm and closing - plus anyone who finishes the Ghosted sequence lands here for the occasional text or email that keeps your academy top of mind. The moment they reply, they bounce back to the booking agent with context.`,
 };
@@ -16260,12 +16261,13 @@ async function _taSetModeGo(mode) {
 // the import session fills the steps.
 let _AUTO = { list: [], overview: [] };
 // `enabled`/`approved` are the SHIPPED defaults when an academy has no row yet.
-// 💔 Lead Nurture ships ON (enabled + approved) so the last-stop long game is wired
-// from day one - it still sends nothing until it has enabled steps (the engine's
-// isAutomationLive gate), so on-by-default is safe. Onboarding + Ghosted ship OFF
-// (the academy approves them once their copy is reviewed).
+// 👋 Onboarding + 💔 Lead Nurture ship ON (enabled + approved) so a paid member is
+// ALWAYS welcomed and the last-stop long game is wired from day one - both still send
+// nothing until they have enabled steps (the engine's isAutomationLive gate), so
+// on-by-default is safe. Ghosted ships OFF (the academy approves it once their copy is
+// reviewed).
 const _AUTO_SEED = [
-  { automation_key: 'onboarding', name: '👋 Onboarding', enabled: false, approved: false },
+  { automation_key: 'onboarding', name: '👋 Onboarding', enabled: true, approved: true },
   { automation_key: 'ghosted', name: '👻 Ghosted', enabled: false, approved: false },
   { automation_key: 'nurture', name: '💔 Lead Nurture', enabled: true, approved: true },
 ];
@@ -16437,9 +16439,13 @@ async function _taRenderAutomations() {
     for (const s of _AUTO_SEED) {
       if (!have.has(s.automation_key)) { await _autoApi('upsert-automation', { automation_key: s.automation_key, name: s.name, enabled: !!s.enabled, approved: !!s.approved }); seeded = true; }
     }
+    // 📵 Missed Trial first-touch: seed from the shipped defaults (with its default SMS
+    // step) the SAME idempotent + edit-safe way the Contact / Trial form intros seed.
+    // Dormant (approved:false) until the academy reviews + approves it.
+    if (!have.has('missed_trial')) { await _autoApi('seed-form-intro', { automation_key: 'missed_trial' }); seeded = true; }
     if (seeded) { d = await _autoApi('list'); list = d.automations || []; }
   } catch (e) { p.innerHTML = `<div style="color:#e07070;font-size:13px">Couldn't load - ${escapeHTML(e.message)}</div>`; return; }
-  const order = { onboarding: 0, ghosted: 1, nurture: 2 };
+  const order = { onboarding: 0, missed_trial: 1, ghosted: 2, nurture: 3 };
   list.sort((a, b) => ((order[a.automation_key] ?? 9) - (order[b.automation_key] ?? 9)));
   _AUTO.list = list;
   // When an automation is picked in the Train header, show only that one; else both.
@@ -16510,6 +16516,11 @@ function _autoCardHtml(a) {
     ? `<div style="display:flex;align-items:center;gap:9px;margin-top:8px;padding:11px 13px;border:1px dashed var(--border);border-radius:9px;background:var(--surface)">
          <span style="font-size:15px">⤵</span>
          <div style="font-size:12.5px;color:var(--text-sub);line-height:1.45">When the sequence ends and the lead still hasn't replied, they roll into <b style="color:var(--text)">💔 Lead Nurture</b> automatically.</div>
+       </div>`
+    : (a.automation_key === 'missed_trial' && steps.length)
+    ? `<div style="display:flex;align-items:center;gap:9px;margin-top:8px;padding:11px 13px;border:1px dashed var(--border);border-radius:9px;background:var(--surface)">
+         <span style="font-size:15px">⤵</span>
+         <div style="font-size:12.5px;color:var(--text-sub);line-height:1.45">When this first touch ends and the no-show still hasn't replied, they roll into <b style="color:var(--text)">👻 Ghosted</b> automatically.</div>
        </div>`
     : '';
   return `
