@@ -17148,7 +17148,11 @@ async function _bbRenderMemberOnboarding(panel) {
     const json = await _safeJson(r);
     if (r.ok) {
       ghl = json.ghl || ghl;
-      memberCount = Array.isArray(json.members) ? json.members.length : null;
+      // "live now" = real (paid) members only - exclude signup-in-progress rows
+      // (started checkout, not paid) so the go-live count is never inflated.
+      memberCount = Array.isArray(json.members)
+        ? json.members.filter(m => m && m.status !== 'payment_method_required').length
+        : null;
       if (typeof renderGhlConnectButton === 'function') renderGhlConnectButton(ghl);
       if (json.stripe && typeof renderStripeConnectButton === 'function') renderStripeConnectButton(json.stripe);
     }
@@ -22291,11 +22295,18 @@ function _memberStatusPill(status, opts) {
   // opts is the member object - if it carries pause_scheduled_for, render
   // a secondary "Pause queued" pill alongside the main status. Useful for
   // surfacing a future-dated pause to staff before the cron activates it.
+  //
+  // "Signup in progress" = started checkout but has NOT paid (status
+  // payment_method_required). Rendered as a muted amber OUTLINE tag - visually
+  // distinct from the solid member pills below - so it never reads as a paying
+  // member. These rows are excluded from every member count (see _renderMembersView).
+  if (status === 'payment_method_required') {
+    return `<span title="Started checkout but has not paid yet. Not counted as a member." style="display:inline-block;vertical-align:middle;white-space:nowrap;font-size:11px;font-weight:700;padding:2px 9px;border-radius:999px;background:rgba(199,154,74,0.12);border:1px solid #c79a4a;color:#c79a4a">⏳ Signup in progress</span>`;
+  }
   const map = {
     live:                    ['Live', '#1f7a3d'],
     paused:                  ['Paused', '#8a6d1f'],
     cancelling:              ['Cancelling', '#8a4d1f'],
-    payment_method_required: ['Needs card', '#9a3b2f'],
     payment_failed:          ['Payment failed', '#9a3b2f'],
   };
   const [label, color] = map[status] || [status || '-', '#555'];
@@ -22430,16 +22441,27 @@ function _memberAvatar(m, size) {
   return `<div style="width:${size}px;height:${size}px;border-radius:50%;background:${c};color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:${Math.max(10, Math.floor(size * 0.4))}px;flex:0 0 ${size}px">${escapeHTML(initials)}</div>`;
 }
 
-function _filterMembers(all) {
+// "Signup in progress" = started checkout, has NOT paid. Never a real member.
+function _isSignupInProgress(m) { return !!m && m.status === 'payment_method_required'; }
+
+function _filterMembers(all, statusOverride) {
   const f = _MEMBERS_FILTER;
-  const isIssue = (s) => s === 'payment_failed' || s === 'payment_method_required';
+  const status = statusOverride || f.status;
+  // payment_method_required is "started, not paid" - it is NOT an issue (a real
+  // lapsed-but-paid member). Issues = payment_failed only.
+  const isIssue = (s) => s === 'payment_failed';
   // 'cancelling' members are still billing through the end of their period -
   // surface them under "Live" so they don't disappear from the roster.
   const isLiveLike = (s) => s === 'live' || s === 'cancelling';
   return all.filter(m => {
-    if (f.status === 'live'   && !isLiveLike(m.status)) return false;
-    if (f.status === 'paused' && m.status !== 'paused') return false;
-    if (f.status === 'issues' && !isIssue(m.status))    return false;
+    // Default ("all") + every member bucket excludes signup-in-progress rows so
+    // they are never counted or shown as members. They surface only under their
+    // own "Signup in progress" group/filter.
+    if (status === 'all'     && _isSignupInProgress(m))  return false;
+    if (status === 'pending' && !_isSignupInProgress(m)) return false;
+    if (status === 'live'    && !isLiveLike(m.status))   return false;
+    if (status === 'paused'  && m.status !== 'paused')   return false;
+    if (status === 'issues'  && !isIssue(m.status))      return false;
     if (f.trainer    !== 'all' && (m.trainer    || '') !== f.trainer)    return false;
     if (f.engagement !== 'all' && (m.engagement || '') !== f.engagement) return false;
     if (f.offer      !== 'all' && ((m.offer && m.offer.id) || 'none') !== f.offer) return false;
@@ -22506,11 +22528,17 @@ function _renderMembersView() {
   const cursorPos = wasFocused ? oldInput.selectionStart : null;
 
   const all = _MEMBERS_ALL;
-  const liveCount   = all.filter(m => m.status === 'live' || m.status === 'cancelling').length;
-  const pausedCount = all.filter(m => m.status === 'paused').length;
-  const issuesCount = all.filter(m => m.status === 'payment_failed' || m.status === 'payment_method_required').length;
-  const filtered = _filterMembers(all);
+  const liveCount    = all.filter(m => m.status === 'live' || m.status === 'cancelling').length;
+  const pausedCount  = all.filter(m => m.status === 'paused').length;
+  const issuesCount  = all.filter(m => m.status === 'payment_failed').length;
+  // Signup-in-progress (started checkout, not paid) is NEVER counted as a member.
+  const pendingCount = all.filter(_isSignupInProgress).length;
+  const memberTotal  = all.length - pendingCount;   // "All" = real (paid) members only
   const f = _MEMBERS_FILTER;
+  const filtered = _filterMembers(all);
+  // In the default view, append signup-in-progress rows as their own labeled
+  // group below the members (aux filters - trainer/search/offer - still apply).
+  const pendingGroup = (f.status === 'all') ? _filterMembers(all, 'pending') : [];
 
   // Unique trainers in the data, GTA canonical order first then any extras.
   const trainerSet = new Set(all.map(m => m.trainer).filter(Boolean));
@@ -22546,10 +22574,11 @@ function _renderMembersView() {
       <div style="display:none;font-size:15px;font-weight:700;color:var(--text);margin-bottom:12px" class="members-filter-title">Filters</div>
       <div style="${popoverLabel};margin-bottom:8px">Status</div>
       <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:16px">
-        ${filterChip('status','all','All',     all.length)}
+        ${filterChip('status','all','All',     memberTotal)}
         ${filterChip('status','live','Live',   liveCount)}
         ${filterChip('status','paused','Paused', pausedCount)}
         ${filterChip('status','issues','Issues', issuesCount)}
+        ${pendingCount ? filterChip('status','pending','⏳ Signup in progress', pendingCount) : ''}
       </div>
       <div style="${popoverLabel};margin-bottom:8px">Trainer</div>
       <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:16px">
@@ -22661,17 +22690,41 @@ function _renderMembersView() {
     container.innerHTML = '<div class="req-empty" style="padding:20px 0">No members yet.</div>';
     return;
   }
-  if (!filtered.length) {
+  if (!filtered.length && !pendingGroup.length) {
     container.innerHTML = toolbar + '<div id="members-cards"><div class="req-empty" style="padding:20px 0">No members match this filter.</div></div>';
     if (wasFocused) _membersRestoreSearchFocus(cursorPos);
     return;
   }
 
-  // Grid layout - keeps every column aligned across all cards.
-  const cards = filtered.map(_memberCardHtml).join('');
+  // Grid layout - keeps every column aligned across all cards. Real members
+  // first; signup-in-progress rows follow under their own labeled group.
+  const cards = _membersCardsMarkup(filtered, pendingGroup, f.status);
 
   container.innerHTML = toolbar + `<div id="members-cards">${cards}</div>`;
   if (wasFocused) _membersRestoreSearchFocus(cursorPos);
+}
+
+// Divider that labels the signup-in-progress group and spells out that these
+// rows are NOT members (started checkout, never paid). Amber to match the pill.
+function _pendingGroupHeader(n) {
+  return `<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:16px 0 8px;padding:8px 12px;border:1px solid #7a5a2f;border-left:3px solid #c79a4a;border-radius:6px;background:rgba(199,154,74,0.08)">
+    <span style="font-size:12px;font-weight:800;color:#c79a4a;text-transform:uppercase;letter-spacing:0.5px">⏳ Signup in progress · ${n}</span>
+    <span style="font-size:11px;color:var(--text-mute)">Started checkout, not paid yet. Not counted as members.</span>
+  </div>`;
+}
+
+// Build the card list: members, then (when present) the labeled signup-in-progress
+// group. When the dedicated "pending" filter is active, `members` already holds
+// only those rows, so render them under the header with no separate group.
+function _membersCardsMarkup(members, pending, statusFilter) {
+  if (statusFilter === 'pending') {
+    return _pendingGroupHeader(members.length) + members.map(_memberCardHtml).join('');
+  }
+  let html = members.map(_memberCardHtml).join('');
+  if (pending && pending.length) {
+    html += _pendingGroupHeader(pending.length) + pending.map(_memberCardHtml).join('');
+  }
+  return html;
 }
 
 // One member card's markup (shared by the full render + the search-only render).
@@ -22702,9 +22755,12 @@ function _memberCardHtml(m) {
 function _membersRenderCardsOnly() {
   const host = document.getElementById('members-cards');
   if (!host) { _renderMembersView(); return; }
-  const filtered = _filterMembers(_MEMBERS_ALL || []);
-  host.innerHTML = filtered.length
-    ? filtered.map(_memberCardHtml).join('')
+  const all = _MEMBERS_ALL || [];
+  const f = _MEMBERS_FILTER;
+  const filtered = _filterMembers(all);
+  const pendingGroup = (f.status === 'all') ? _filterMembers(all, 'pending') : [];
+  host.innerHTML = (filtered.length || pendingGroup.length)
+    ? _membersCardsMarkup(filtered, pendingGroup, f.status)
     : '<div class="req-empty" style="padding:20px 0">No members match this filter.</div>';
 }
 
