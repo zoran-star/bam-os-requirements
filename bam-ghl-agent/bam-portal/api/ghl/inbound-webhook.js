@@ -1,7 +1,7 @@
 import { withSentryApiRoute } from "../_sentry.js";
 import { pickGhlToken, sendSms, ghl } from "./_core.js";
 import { notifyOwners } from "../_notify-owners.js";
-import { respondedStage, contactInRespondedStage } from "../agent/_stage.js";
+import { respondedStage, contactInRespondedStage, scheduledTrialStage } from "../agent/_stage.js";
 import { agentMode, modeIsOn } from "../agent/_mode.js";
 import { exitEnrollment } from "../automations.js";
 // Vercel Serverless Function — GHL inbound-message webhook  ("P1 Spine")
@@ -166,6 +166,35 @@ async function handler(req, res) {
       ].filter(Boolean);
       notifyOwners(client.id, "calendar_booking", lines.join("\n")).catch(() => {});
     } catch (e) { console.error("ghl inbound-webhook appointment error:", e.message); }
+
+    // A booking is a hard exit from the sales drip: a lead who books a trial
+    // shouldn't keep getting nudges (nurture / ghosted / contact_form / trial_form),
+    // and their card should land in Scheduled Trial so the Confirm agent owns it -
+    // even if they booked without ever texting first. No-key exit clears ALL active
+    // enrollments. Both halves are best-effort and never block the webhook 200.
+    try {
+      const apptContactId = (_appt && (_appt.contactId || _appt.contact_id)) || contactId || null;
+      if (apptContactId) {
+        try { await exitEnrollment({ clientId: client.id, contactId: String(apptContactId), reason: "booked" }); } catch (_) {}
+        try {
+          const creds = await pickGhlToken(client);
+          if (creds) {
+            const sts = await scheduledTrialStage(creds.token, creds.locationId);
+            if (sts) {
+              const d = await ghl("GET", `/opportunities/search?${new URLSearchParams({ location_id: creds.locationId, contact_id: String(apptContactId), limit: "20" })}`, { token: creds.token });
+              const opps = d.opportunities || d.data || [];
+              // ONLY move an OPEN opp. A member booking a training session also hits this
+              // webhook - they have no open sales opp (theirs is won), so we must NOT grab
+              // opps[0] and shove a won/closed card into Scheduled Trial. Open-only = no-op
+              // for members + already-closed leads.
+              const oppId = (opps.find(o => String(o.status || "").toLowerCase() === "open") || null)?.id || null;
+              if (oppId) await ghl("PUT", `/opportunities/${encodeURIComponent(oppId)}`, { token: creds.token, body: { pipelineId: sts.pipelineId, pipelineStageId: sts.stageId } });
+            }
+          }
+        } catch (e) { console.error("ghl inbound-webhook appointment stage-move error:", e.message); }
+      }
+    } catch (e) { console.error("ghl inbound-webhook appointment exit error:", e.message); }
+
     return res.status(200).json({ ok: true, type: "appointment", client_id: client.id });
   }
 
