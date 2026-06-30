@@ -61,6 +61,13 @@ const TZ                   = "America/Toronto";
 // this many days (and not already passed) — sooner than that is redundant with the
 // booking chat that just happened. Reactive replies (they message us) are unbounded.
 const PROACTIVE_WINDOW_DAYS = 3;
+// A3 overdue-trial card: once a booked trial time has PASSED by this grace and no
+// post-trial review exists, the lead is stranded in Scheduled-Trial (the proactive
+// opener only fires for UPCOMING trials, so the agent otherwise goes silent). We
+// queue ONE staff "did they show up?" action card so the lead is never just parked.
+const OVERDUE_GRACE_MS = 2 * 3600000;       // wait ~2h past the start before nagging
+const OVERDUE_MAX_MS   = 14 * 86400000;     // don't resurrect trials older than 14 days
+const OVERDUE_CAP      = 10;                 // max overdue cards queued per academy per run
 
 async function sb(path, init = {}) {
   const res = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
@@ -268,6 +275,45 @@ async function logApproval(row) {
   try { await sb(`agent_approvals`, { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify([row]) }); } catch (_) {}
 }
 
+// O6 - is this contact ALREADY a live (paying) member? If the won-mark was skipped,
+// a paid member's opp can linger in Scheduled-Trial and the confirm agent would keep
+// chasing them. Guard on the actual member record, independent of the GHL won-mark:
+// match by ghl_contact_id first (cheap), then fall back to parent_email (covers a
+// brand-new live member whose contact isn't linked yet). Fails OPEN so a lookup
+// hiccup never silences the agent on a genuine lead.
+async function isLiveMember(clientId, contactId, token) {
+  try {
+    const byId = await sb(`members?client_id=eq.${encodeURIComponent(clientId)}&ghl_contact_id=eq.${encodeURIComponent(contactId)}&status=eq.live&select=id&limit=1`);
+    if (Array.isArray(byId) && byId.length) return true;
+    if (token) {
+      const info = await resolveContactInfo(token, contactId).catch(() => null);
+      const email = info && info.email;
+      if (email) {
+        const byEmail = await sb(`members?client_id=eq.${encodeURIComponent(clientId)}&parent_email=eq.${encodeURIComponent(email)}&status=eq.live&select=id&limit=1`);
+        if (Array.isArray(byEmail) && byEmail.length) return true;
+      }
+    }
+  } catch (_) { /* fail open - never block a real lead on a lookup error */ }
+  return false;
+}
+
+// A3 - this contact's non-cancelled trial appointments (used to tell whether the
+// booked trial time has PASSED). nextAppointment() only returns UPCOMING slots, so
+// it can't see an overdue trial; this returns all of them with their start times.
+async function trialAppts(token, contactId) {
+  try {
+    const json = await ghl("GET", `/contacts/${encodeURIComponent(contactId)}/appointments`, { token });
+    const events = json.events || json.appointments || json.data || [];
+    return (Array.isArray(events) ? events : [])
+      .map(e => {
+        const startRaw = e.startTime || e.startAt || e.start_time || null;
+        const ms = startRaw ? new Date(startRaw).getTime() : NaN;
+        return { startMs: ms, startIso: startRaw, status: (e.appointmentStatus || e.status || "").toLowerCase() };
+      })
+      .filter(e => e.startMs && !isNaN(e.startMs) && e.status !== "cancelled" && e.status !== "canceled");
+  } catch (_) { return []; }
+}
+
 // Persist only the safe, editable slice of a confirm-automations override:
 // per-step enabled + template (known step keys only), sequence enabled, and the
 // approve flag. Timing ('when') is fixed to the shipped steps and never client-set.
@@ -448,6 +494,9 @@ async function detectForClient(client) {
     const contactId = item.contact_id;
     if (!contactId) { skipped++; reasons.push(`${item.name || "?"}: no contactId`); continue; }
     if (mutedSet.has(String(contactId))) { skipped++; reasons.push(`${item.name || contactId}: bot muted on this lead`); continue; }
+    // O6: never keep chasing a paid member. If the won-mark was skipped, a live
+    // member can sit open in Scheduled-Trial - skip them outright (independent of GHL won).
+    if (await isLiveMember(client.id, contactId, token)) { skipped++; reasons.push(`${item.name || contactId}: already a live member`); continue; }
 
     const reactive = item.last_direction === "inbound";
 
@@ -555,7 +604,68 @@ async function detectForClient(client) {
       } catch (e) { skipped++; reasons.push(`${item.name || contactId}: pending-insert failed — ${e.message}`); }
     }
   }
-  return { client_id: client.id, business: client.business_name, mode, queued: queue.length, drafted, handoffs, lost_proposed: lostProposed, auto_sent: autoSent, deferred, flushed, escalated, skipped, pruned, reasons };
+
+  // ── A3 OVERDUE-TRIAL pass: a Scheduled-Trial lead whose booked time has PASSED
+  // with no post-trial review is stranded. The proactive opener only fires for an
+  // UPCOMING trial (dMs > 0), so once the slot passes the agent goes silent and only
+  // the staff cron nags - the lead sits in Scheduled-Trial forever. Queue ONE staff
+  // "did they show up?" action card that carries the opportunity id + an explicit
+  // instruction to log the result via the post-trial form (showed up / no-show / good
+  // fit), so the lead is never just parked. Idempotent: one card per stranded lead
+  // (created_by 'overdue-detector'); it clears itself the moment the review lands (the
+  // lead leaves Scheduled-Trial and the prune at the top of this run cancels the card).
+  let overdue = 0;
+  try {
+    const nowMs = Date.now();
+    for (const item of queue.slice(0, OVERDUE_CAP)) {
+      const contactId = item.contact_id;
+      if (!contactId) continue;
+      if (mutedSet.has(String(contactId))) continue;
+      // Already carded? (a) any active confirm card -> leave it (the unique index
+      // allows only one). (b) we already raised an overdue card -> never nag twice.
+      let cards = [];
+      try { cards = await sb(`agent_confirm_replies?client_id=eq.${client.id}&ghl_contact_id=eq.${encodeURIComponent(contactId)}&select=status,created_by&order=created_at.desc&limit=10`); } catch (_) { cards = []; }
+      cards = Array.isArray(cards) ? cards : [];
+      if (cards.some(c => ["pending", "approved"].includes(c.status))) continue;
+      if (cards.some(c => c.created_by === "overdue-detector")) continue;
+      // Already reviewed? Then it is not stranded.
+      let rev = [];
+      try { rev = await sb(`post_trial_reviews?client_id=eq.${client.id}&ghl_contact_id=eq.${encodeURIComponent(contactId)}&select=id&limit=1`); } catch (_) { rev = []; }
+      if (Array.isArray(rev) && rev.length) continue;
+      // Is the booked trial actually PAST (+ grace) with nothing upcoming?
+      const appts = await trialAppts(token, contactId);
+      if (!appts.length) continue;
+      if (appts.some(a => a.startMs > nowMs)) continue;            // a future trial exists -> not stranded
+      const lastPast = appts.filter(a => a.startMs <= nowMs).sort((a, b) => b.startMs - a.startMs)[0];
+      if (!lastPast) continue;
+      const age = nowMs - lastPast.startMs;
+      if (age < OVERDUE_GRACE_MS || age > OVERDUE_MAX_MS) continue; // too soon, or too old to resurrect
+      // Do not card a paid member (O6 reuse).
+      if (await isLiveMember(client.id, contactId, token)) continue;
+      // Resolve the opportunity so the card can deep-link the post-trial form (which is
+      // keyed by opportunity_id). Best-effort: a missing opp still queues the nag.
+      let oppId = null;
+      try { oppId = await findOpenOpp(token, locationId, contactId); } catch (_) {}
+      const trialWhen = fmtTrial(lastPast.startIso);
+      const instruction = `Trial on ${trialWhen} has passed with no review logged. Did they show up? Log the result (showed up / no-show / good fit) using the post-trial form for this lead${oppId ? ` (opportunity ${oppId})` : ""}.`;
+      try {
+        await sb(`agent_confirm_replies`, { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify([{
+          client_id: client.id, ghl_contact_id: String(contactId), ghl_conversation_id: item.conversation_id || null,
+          contact_name: item.name || null, kind: "confirm",
+          draft_message: "(post-trial review needed - log via the post-trial form)",
+          escalate: true, escalate_reason: instruction, summary: instruction,
+          handoff_note: oppId ? `post_trial_form opportunity_id=${oppId}` : null,
+          trial_at: toIso(lastPast.startIso), last_lead_at: item.last_at || null,
+          reasoning: "Overdue trial, no post-trial review: staff action card.",
+          confidence: null, status: "pending", created_by: "overdue-detector",
+        }]) });
+        overdue++;
+      } catch (e) { reasons.push(`${item.name || contactId}: overdue-insert failed - ${e.message}`); }
+      await new Promise(r => setTimeout(r, 300));
+    }
+  } catch (e) { reasons.push(`overdue pass: ${e.message}`); }
+
+  return { client_id: client.id, business: client.business_name, mode, queued: queue.length, drafted, handoffs, lost_proposed: lostProposed, auto_sent: autoSent, deferred, flushed, escalated, overdue, skipped, pruned, reasons };
 }
 
 async function runDetect(res, onlyClientId) {
@@ -735,6 +845,18 @@ async function handler(req, res) {
           note: `Rebook needed (from confirm agent): ${note}`, created_by: staffEmail || "confirm-agent",
         }]) });
       } catch (e) { return res.status(500).json({ error: `couldn't save handoff note: ${e.message}` }); }
+      // A5: don't just park them in Responded waiting for the lead to text first - have
+      // the BOOKING agent proactively open a rebook conversation. Write a SECOND note
+      // prefixed "Entry:" so the booking detector's opener pass picks it up (it keys off
+      // an Entry note + the Responded stage) and drafts the first rebook text. The memory
+      // note above stays active so the opener has full rebook context; this trigger note
+      // is consumed (deactivated) by the opener once it drafts, so it fires exactly once.
+      try {
+        await sb(`agent_contact_notes`, { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify([{
+          client_id: clientId, ghl_contact_id: String(contactId), active: true,
+          note: `Entry: Rebook needed - ${note}`, created_by: "confirm-agent-rebook",
+        }]) });
+      } catch (_) { /* best-effort - the handoff + bounce already landed */ }
       // Bounce the opportunity back to Responded (best-effort — the note is the part
       // that must land; the booking agent works the Responded stage).
       let oppId = null, moved = false;
