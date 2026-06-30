@@ -22400,8 +22400,10 @@ function _memberPriceLabel(pricing) {
 // Change-plan dropdown + member drawer use). Built once per roster load so the
 // per-row column renders synchronously (no per-card fetch).
 let _MEMBERS_PRICE_STATUS = {};
+let _MEMBERS_OFFERINGS = [];
 async function _loadMemberPriceStatusMap() {
   _MEMBERS_PRICE_STATUS = {};
+  _MEMBERS_OFFERINGS = [];
   try {
     const token = await _mreqAuthToken();
     const qs = (typeof CLIENT_ID !== 'undefined' && CLIENT_ID) ? '?client_id=' + encodeURIComponent(CLIENT_ID) : '';
@@ -22411,15 +22413,34 @@ async function _loadMemberPriceStatusMap() {
     const catalog = j.catalog || [];
     const offerId = (catalog.find(x => x && x.offer_id) || {}).offer_id || null;
     const offerings = await _offerOfferings(offerId);
+    _MEMBERS_OFFERINGS = offerings || [];
     catalog.forEach(row => {
       if (row && row.stripe_price_id) _MEMBERS_PRICE_STATUS[row.stripe_price_id] = _offerPriceStatus(row, offerings);
     });
   } catch (_) { /* leave map empty - column just renders blank */ }
 }
 
+// Classify a member by their RESOLVED plan name against the offer's offerings.
+// This is authoritative when it matches because legacy Stripe `plan_*` ids are
+// shared across different plans (e.g. Summer Unlimited and a 2/wk member can
+// carry the same id), so the price_id->status map mislabels them. Only returns
+// a verdict on a positive title match; otherwise null -> caller falls back.
+function _memberPlanStatus(m) {
+  const plan = ((m && m.plan) || '').trim().toLowerCase();
+  if (!plan || !_MEMBERS_OFFERINGS.length) return null;
+  let best = null;
+  _MEMBERS_OFFERINGS.forEach(o => {
+    const t = String(o.title || '').trim().toLowerCase();
+    if (t && plan.indexOf(t) >= 0 && (!best || t.length > best.len)) best = { archived: !!o.archived, len: t.length };
+  });
+  return best ? (best.archived ? 'legacy' : 'live') : null;
+}
+
 // Roster column: is this member on a live offer price or an archived one.
 function _memberPriceStatusCell(m) {
-  const st = m && m.stripe_price_id ? _MEMBERS_PRICE_STATUS[m.stripe_price_id] : null;
+  // Prefer the plan-name match (handles shared legacy price ids); fall back to
+  // the price_id->status map when the plan name doesn't match an offering.
+  const st = _memberPlanStatus(m) || (m && m.stripe_price_id ? _MEMBERS_PRICE_STATUS[m.stripe_price_id] : null);
   if (!st) return '';   // unknown price (or no sub) - leave blank
   const live = st === 'live';
   const color  = live ? '#7BC47F' : '#c79a4a';
