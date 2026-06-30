@@ -5,6 +5,60 @@ Twilio instead of GoHighLevel, toggled per-academy. DORMANT by default. SMS
 transport only — contacts + pipeline + agents still live in GHL; the lead's phone
 maps back to its GHL contact so the board/agents keep working after cutover.
 
+## 2026-06-30 — GTA FULLY CUT OVER + lead automations moved off GHL (this session)
+GTA is now LIVE on Twilio end-to-end and its lead messaging runs on the portal, not GHL.
+
+**Cutover done:** number +12898166569 transferred into Twilio acct `AC…4773`; webhooks
+wired (SmsUrl=/api/twilio/inbound-webhook, StatusCallback=/api/twilio/status); creds
+encrypted into `client_twilio_config` (status=active) using prod `MESSAGING_ENC_KEY`
+(pulled via `vercel env pull` for project bam-portal — it DOES work for this key, the old
+stale-cred gotcha didn't bite); `clients.messaging_provider='twilio'`. Inbound + outbound
+both verified delivered. GHL history imported (~14k msgs, 631 threads, May 2024→now).
+**A2P is NOT a gate for GTA (CA→CA) — empirically delivered unregistered. See section below.**
+
+**Portal automations made LIVE for GTA (enabled+approved):** contact_form, trial_form,
+ghosted, nurture, onboarding, summer_special. `trial_followup` LEFT OFF on purpose (retired
+2026-06-28, dupes trial_form intro). Flipping enabled+approved is the intended switch that
+makes the portal OWN a journey (P6 triggers branch on isAutomationLive → auto-drop the GHL path).
+
+**CRITICAL GAP found + fixed:** `clients.ghl_kpi_config.portal_entry_routing.enabled` was
+FALSE. With GHL workflows turned off, a new contact/trial form-fill (api/website/leads.js
+`maybePortalRoute`) fell through to a now-dead GHL workflow → NEW LEADS GOT NO TEXT. Flipped
+it TRUE → form-fills now enroll the contact_form/trial_form intro via Twilio. Routing cfg:
+pipeline 'TRAINING PIPELINE', intro keys are FIXED by form type (contact→contact_form,
+free-trial→trial_form), NOT derived from the stage. **Lesson: messaging_provider=twilio is
+only HALF the cutover; portal_entry_routing.enabled must also be ON or new leads silently drop.**
+
+**Booking/post-trial:** Confirm + Closing INITIAL AUTOMATIONS approved via
+`ghl_kpi_config.confirm_initial_automations` / `closing_initial_automations` =
+{enabled:true,approved:true} (steps fall back to code defaults in agent/confirm-automations.js
++ closing-automations.js). Agent modes stay `hawkeye`.
+
+**NEW behavior — scripted sequences bypass Hawkeye (PR #951):** `_mode.js`
+`shouldAutoSendScripted(mode)=modeIsOn(mode)` — approved FIXED scripted touches (booking
+confirmation, same-day check-in, post-trial) auto-send whenever the agent is ON, bypassing
+the global self-drive kill-switch (`SELF_DRIVE_GLOBALLY_DISABLED=true`, still on). Wired at the
+two scripted send sites only (agent-confirm.js:~398, agent-closing.js:~334, both `confidence:1`);
+AI FREEFORM replies still use `shouldAutoSend` (kill-switch + confidence gated) — unchanged.
+
+**Import made resilient (PR #933):** api/messaging/import-ghl-history.js is now CHUNKED (12s
+wall-clock budget + resumable {start_after_date,start_after} cursor + `done` flag); the staff
+MessagingMigrationPanel loops the cursor and shows a LIVE status bar. Fixes the timeout that
+returned an HTML error → "Unexpected token 'A'... not valid JSON".
+
+**Summer Special (PRs #933/#936):** ported off the GHL workflow to a portal-native 3-SMS
+sequence (0d/1d/2d) + worker rolls summer_special→nurture on completion; pipelines.js
+`enroll-workflow` is provider-aware (portal enroll + move opp to Interested when
+isAutomationLive('summer_special'), else legacy GHL); surfaced as a pill in the client-portal
+Automations (Train) view. automation_id `cb05f2a2-…`.
+
+**Still on GHL (intentional):** ADAPT intake funnel (parked — set up its initial automation
+later, keep entry_points rows). **OPEN:** Zoran turned off "all" GHL workflows — confirm he did
+NOT disable NON-messaging ones (payments/membership, review requests, internal notifications);
+those are not portal-replaced. **OPEN TEST:** Summer Special end-to-end button never fired.
+**NEXT SESSION:** full analysis of everything GTA still relies on GHL for (contacts/pipeline
+data, calendars/booking, payments, tags, KPI events, etc.).
+
 ## The toggle
 `clients.messaging_provider` ('ghl' default | 'twilio'). Resolves to 'twilio' ONLY
 if flipped AND `client_twilio_config.status='active'`; else falls back to 'ghl'
