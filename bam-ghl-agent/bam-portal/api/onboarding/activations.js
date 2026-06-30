@@ -105,11 +105,20 @@ export async function fireOnboardingActivations(member, ctx = {}) {
         } catch (_) { /* non-fatal */ }
       }
 
-      // Legacy GHL onboarding workflow — only when configured AND the portal-native
-      // sequence is NOT live (otherwise the portal automation owns the welcome).
+      // A paid member must ALWAYS get a welcome. Preferred path is the portal-native
+      // "onboarding" automation (enrolled by api/stripe/webhook.js right after this
+      // returns). Only fall back to the legacy GHL workflow when the portal sequence
+      // is NOT live. If NEITHER can fire, never silently skip - log a loud warning so
+      // the academy fixes their config (add steps to the portal Onboarding automation
+      // or set GHL_ONBOARDING_WORKFLOW_ID).
       let portalLive = false;
       try { portalLive = await isAutomationLive(member.client_id, "onboarding"); } catch (_) { portalLive = false; }
-      if (workflowId && !portalLive) {
+      if (portalLive) {
+        results.ghl = { ok: true, contact_id: contactId, workflow_id: null,
+          welcomed_via: "portal_onboarding_automation",
+          note: "portal onboarding sequence live; GHL workflow skipped" };
+        await audit("onboarding-ghl-contact-linked", { contact_id: contactId, portal_live: true, plan, term });
+      } else if (workflowId) {
         const enrollRes = await fetch(`${GHL_V2}/contacts/${contactId}/workflow/${workflowId}`, {
           method: "POST", headers,
           body: JSON.stringify({ eventStartTime: new Date().toISOString().replace(/\.\d{3}Z$/, "+00:00") }),
@@ -118,10 +127,12 @@ export async function fireOnboardingActivations(member, ctx = {}) {
         results.ghl = { ok: true, contact_id: contactId, workflow_id: workflowId, welcomed_via: "ghl_workflow" };
         await audit("onboarding-ghl-fired", { contact_id: contactId, workflow_id: workflowId, plan, term });
       } else {
-        results.ghl = { ok: true, contact_id: contactId, workflow_id: null,
-          welcomed_via: portalLive ? "portal_onboarding_automation" : "none",
-          note: portalLive ? "portal onboarding sequence live; GHL workflow skipped" : "no GHL_ONBOARDING_WORKFLOW_ID set" };
-        await audit("onboarding-ghl-contact-linked", { contact_id: contactId, portal_live: portalLive, plan, term });
+        // No welcome path available: portal onboarding has no live steps AND no GHL
+        // workflow is configured. Don't fail silently - warn so it gets fixed.
+        console.warn(`[onboarding] NO WELCOME PATH for member ${member.id} (client ${member.client_id}): portal onboarding automation is not live (no enabled steps) and no GHL_ONBOARDING_WORKFLOW_ID is set - this paid member was NOT welcomed.`);
+        results.ghl = { ok: true, contact_id: contactId, workflow_id: null, welcomed_via: "none",
+          warning: "no welcome path: portal onboarding has no live steps and no GHL workflow configured" };
+        await audit("onboarding-welcome-missing", { contact_id: contactId, portal_live: false, plan, term });
       }
     } catch (e) {
       results.ghl = { ok: false, error: String(e && e.message || e) };
