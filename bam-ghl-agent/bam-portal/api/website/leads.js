@@ -389,9 +389,11 @@ async function handler(req, res) {
 
         const routeCfg = client.ghl_kpi_config?.portal_entry_routing;
         if (routeCfg?.enabled) {
-          // Portal routing ON: they booked, so cancel the 20-min trial_followup
-          // timer and move the card to the scheduled stage (Confirm bot owns it).
-          try { await exitEnrollment({ clientId: client.id, automationKey: "trial_followup", contactId: receipt.ghl_contact_id, reason: "booked" }); } catch (_) {}
+          // Portal routing ON: they booked, so cancel EVERY active sales sequence
+          // (nurture / ghosted / contact_form / trial_form) - a lead who books
+          // shouldn't keep getting drip nudges - and move the card to the scheduled
+          // stage (Confirm bot owns it). No-key exit clears all active enrollments.
+          try { await exitEnrollment({ clientId: client.id, contactId: receipt.ghl_contact_id, reason: "booked" }); } catch (_) {}
           if (routeCfg.pipeline && routeCfg.scheduled_stage) {
             try {
               await placeOpportunity(
@@ -494,10 +496,18 @@ async function maybePortalRoute(client, contactId, formType, { name, email }) {
   if (!cfg || !cfg.enabled || !contactId) return false;
   const isTrial = formType === "free-trial";
   const stage = isTrial ? cfg.trial_stage : cfg.contact_stage;
-  // Automation that works the lead = whatever owns the landing stage (derived in the
-  // UI from the stage). null = an AGENT owns the stage (e.g. Responded -> Booking), so
-  // instead of an automation we leave a context note and the agent opens the convo.
-  const automationKey = isTrial ? cfg.trial_automation : cfg.contact_automation;
+  // Each form gets its OWN dedicated first-touch INTRO automation, keyed by a FIXED
+  // key (NOT derived from the landing stage). Seeds in the portal as approved:false,
+  // so enrollContact is a no-op until the academy approves + turns it on (the engine
+  // requires enabled+approved+>=1 enabled step). Defaults live in
+  // api/form-intro-automations.js.
+  //   contact form  -> contact_form intro (2-min SMS)
+  //   trial no-book -> trial_form  intro (20-min SMS)
+  const introKey = isTrial ? "trial_form" : "contact_form";
+  // Whether the landing stage is owned by an AGENT (no stage automation). When it is,
+  // we still leave an "Entry:" context note so the stage's bot (the Booking agent)
+  // opens the conversation with context the moment the lead replies.
+  const stageAutomation = isTrial ? cfg.trial_automation : cfg.contact_automation;
   if (cfg.pipeline && stage) {
     try {
       const token = await getClientGhlToken(client);
@@ -505,16 +515,15 @@ async function maybePortalRoute(client, contactId, formType, { name, email }) {
       await placeOpportunity(headers, client.ghl_location_id, contactId, { pipeline: cfg.pipeline, stage }, `${name || email}`, true);
     } catch (e) { console.error("portal route: place opp failed (non-fatal):", e.message); }
   }
-  if (automationKey) {
-    // Automation-owned stage (e.g. Interested -> Ghosted): enrol the sequence.
-    try {
-      await enrollContact({ clientId: client.id, automationKey, contactId });
-    } catch (e) { console.error("portal route: enroll failed (non-fatal):", e.message); }
-  } else {
-    // Agent-owned stage: drop an "Entry:" context note so the stage's bot (the
-    // Booking agent) opens the conversation with context. contact-memory.js injects
-    // active agent_contact_notes into the agent prompt; the opener detector pass in
-    // agent-approvals.js picks these leads up.
+  // Enrol the form's INTRO automation (the timed first touch). No-op until it's
+  // enabled+approved with a step, so this stays DORMANT until the academy opts in.
+  try {
+    await enrollContact({ clientId: client.id, automationKey: introKey, contactId });
+  } catch (e) { console.error("portal route: form-intro enroll failed (non-fatal):", e.message); }
+  if (!stageAutomation) {
+    // Agent-owned landing stage: drop an "Entry:" context note so the Booking agent
+    // opens with context. contact-memory.js injects active agent_contact_notes into
+    // the agent prompt; the opener detector pass in agent-approvals.js picks these up.
     const note = isTrial
       ? "Filled out the free-trial form but did not pick a time. Help them book a free trial."
       : "Filled out the contact form (general enquiry). Reach out and help them book a free trial.";

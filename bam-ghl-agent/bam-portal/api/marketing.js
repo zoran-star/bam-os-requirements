@@ -841,6 +841,10 @@ async function handleMarketingTickets(req, res) {
     }
 
     let patch = {};
+    // Staff (not acting as a client) get the raw ticket back; clients get internal
+    // messages stripped. Declared here because PATCH never set it before, which
+    // crashed the respond/upload tail with "asStaff is not defined".
+    const asStaff = isStaff && !isClient;
     const authorName = isStaff ? ctx.staff.name : (ctx.client.business_name || "Client");
 
     if (action === "approve-content") {
@@ -915,15 +919,35 @@ async function handleMarketingTickets(req, res) {
         return res.status(409).json({ error: "no action was requested" });
       }
       patch.client_action_status = "responded";
-      // A budget-review request is one-and-done: confirming (with or without
-      // changes) closes it out so it doesn't linger on the staff board.
-      if (ticket.type === "budget-review") {
-        patch.status = "completed";
-        patch.resolved_at = nowIso();
+      // Budget-review: the client's confirmation BECOMES one marketing support
+      // ticket. We keep THIS ticket open (no auto-complete) and fold in the
+      // confirmed per-campaign budgets so marketing can apply them and then mark
+      // it completed. Always fires - even a "no changes" confirm leaves a ticket
+      // the team can verify. budgets = [{ name, current, confirmed, changed }].
+      let respBody = message;
+      if (ticket.type === "budget-review" && Array.isArray(body.budgets)) {
+        const budgets = body.budgets.map(b => ({
+          name: String(b.name || "Campaign"),
+          current: (b.current == null || b.current === "") ? null : Number(b.current),
+          confirmed: (b.confirmed == null || b.confirmed === "") ? null : Number(b.confirmed),
+          changed: !!b.changed,
+        }));
+        const changedCount = budgets.filter(b => b.changed).length;
+        patch.fields = { ...(ticket.fields || {}), confirmed_budgets: budgets, changes_count: changedCount };
+        // Stays in-progress as a marketing work ticket; make sure it has an owner.
+        if (!ticket.assigned_to) patch.assigned_to = await clientScalingManager(ticket.client_id);
+        // Build an itemized summary so the staff board reads at a glance.
+        const lines = budgets.map(b => {
+          const cur = b.current != null ? `$${b.current}` : "n/a";
+          return b.changed
+            ? `• ${b.name}: ${cur} → $${b.confirmed}  (change)`
+            : `• ${b.name}: ${cur}  (no change)`;
+        });
+        respBody = `${changedCount ? `Confirmed monthly budgets - ${changedCount} change${changedCount === 1 ? "" : "s"}` : "Confirmed monthly budgets - no changes"}:\n${lines.join("\n")}`;
       }
       patch.messages = appendMessage(ticket.messages, {
         author_type: "client", author_name: authorName,
-        body: message, is_action_request: false,
+        body: respBody, is_action_request: false,
       });
     } else if (action === "request-content-revision") {
       // Marketing wants the content team to redo the creative.

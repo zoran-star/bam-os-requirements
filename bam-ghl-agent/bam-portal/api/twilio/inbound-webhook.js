@@ -14,7 +14,7 @@ import { withSentryApiRoute } from "../_sentry.js";
 import crypto from "node:crypto";
 import { pickGhlToken, sendSms, ghl } from "../ghl/_core.js";
 import { notifyOwners } from "../_notify-owners.js";
-import { respondedStage, contactInRespondedStage } from "../agent/_stage.js";
+import { respondedStage, contactInRespondedStage, interestedStage, nurtureStage } from "../agent/_stage.js";
 import { agentMode, modeIsOn } from "../agent/_mode.js";
 import { exitEnrollment } from "../automations.js";
 import { decryptSecret } from "../messaging/_crypto.js";
@@ -119,9 +119,14 @@ async function handler(req, res) {
       await sb(`agent_followups?client_id=eq.${client.id}&ghl_contact_id=eq.${cid}&status=in.(pending,approved)`, patch);
       await sb(`agent_ready_replies?client_id=eq.${client.id}&ghl_contact_id=eq.${cid}&status=in.(pending,approved)`, patch);
       await sb(`agent_confirm_replies?client_id=eq.${client.id}&ghl_contact_id=eq.${cid}&status=in.(pending,approved)`, patch);
+      await sb(`agent_closing_replies?client_id=eq.${client.id}&ghl_contact_id=eq.${cid}&status=in.(pending,approved)`, patch);
     } catch (e) { console.error("twilio inbound draft-cancel:", e.message); }
 
-    // Replied while in a portal automation → exit + bounce to Responded.
+    // Replied while in a portal automation → exit (keyless exit spares 🎉 onboarding) +
+    // bounce to Responded. GUARD: only move when the open opp is currently in a NUDGE/
+    // GHOST stage (Interested/ghosted or Lead Nurture). Never yank a paid member, a
+    // booked Scheduled-Trial lead, an attended Done-Trial lead, or a won/closed opp back
+    // to Booking on a single reply.
     try {
       const { exited } = await exitEnrollment({ clientId: client.id, contactId: ghlContactId, reason: "replied" });
       if (exited > 0) {
@@ -130,8 +135,18 @@ async function handler(req, res) {
           const rs = await respondedStage(creds.token, creds.locationId);
           const d = await ghl("GET", `/opportunities/search?${new URLSearchParams({ location_id: creds.locationId, contact_id: String(ghlContactId), limit: "20" })}`, { token: creds.token });
           const opps = d.opportunities || d.data || [];
-          const oppId = (opps.find((o) => String(o.status || "").toLowerCase() === "open") || opps[0] || null)?.id || null;
-          if (rs && oppId) await ghl("PUT", `/opportunities/${encodeURIComponent(oppId)}`, { token: creds.token, body: { pipelineId: rs.pipelineId, pipelineStageId: rs.stageId } });
+          const opp = opps.find((o) => String(o.status || "").toLowerCase() === "open") || null;
+          if (rs && opp) {
+            const curStageId = opp.pipelineStageId || opp.stageId || null;
+            const [is, ns] = await Promise.all([
+              interestedStage(creds.token, creds.locationId).catch(() => null),
+              nurtureStage(creds.token, creds.locationId).catch(() => null),
+            ]);
+            const ghostStageIds = new Set([is && is.stageId, ns && ns.stageId].filter(Boolean));
+            if (ghostStageIds.has(curStageId)) {
+              await ghl("PUT", `/opportunities/${encodeURIComponent(opp.id)}`, { token: creds.token, body: { pipelineId: rs.pipelineId, pipelineStageId: rs.stageId } });
+            }
+          }
         }
       }
     } catch (e) { console.error("twilio inbound automation-exit:", e.message); }

@@ -534,11 +534,38 @@ async function detectForClient(client) {
   // NEVER drafted for AND who have no GHL thread yet, so it never double-texts and
   // never re-opens. Hawkeye-only (queued pending). Naturally dormant: no Entry notes
   // exist until portal entry-routing is turned on for the academy.
-  let openers = 0;
+  let openers = 0, rebookOpeners = 0;
+  let rebookIds = new Set();
   try {
-    const entryNotes = await sb(`agent_contact_notes?client_id=eq.${client.id}&active=eq.true&note=ilike.Entry:*&select=ghl_contact_id&order=created_at.desc`);
-    const candidates = [...new Set((Array.isArray(entryNotes) ? entryNotes : []).map(n => String(n.ghl_contact_id)).filter(Boolean))]
-      .filter(id => respondedIds.has(id) && !mutedSet.has(id));
+    const entryNotes = await sb(`agent_contact_notes?client_id=eq.${client.id}&active=eq.true&note=ilike.Entry:*&select=ghl_contact_id,note&order=created_at.desc`);
+    const entryRows = Array.isArray(entryNotes) ? entryNotes : [];
+    // A5: "Entry: Rebook ..." notes are confirm-agent handoffs (the lead couldn't make
+    // their booked trial). They get a dedicated re-open pass below; keep them OUT of the
+    // cold-opener candidates here (a rebook lead has prior history + a GHL conversation,
+    // so the cold-opener guards would skip them anyway).
+    rebookIds = new Set(entryRows.filter(n => /^Entry:\s*Rebook/i.test(String(n.note || ""))).map(n => String(n.ghl_contact_id)).filter(Boolean));
+    let candidates = [...new Set(entryRows.map(n => String(n.ghl_contact_id)).filter(Boolean))]
+      .filter(id => respondedIds.has(id) && !mutedSet.has(id) && !rebookIds.has(id));
+    if (candidates.length) {
+      // HANDOFF GUARD: when an academy has the form INTRO automation on
+      // (contact_form / trial_form), that timed first-touch IS the cold open - the
+      // agent must NOT also open, or the lead gets double-texted. The agent takes
+      // over only when the lead REPLIES (reply engine, above) or after the intro
+      // goes quiet (the ghost engine at >=24h). Skip anyone with an intro enrollment
+      // that's active (scheduled, mid-delay) or completed (sent). This closes the
+      // 2-20 min delay window before the intro send creates a GHL thread that the
+      // findConversation guard below would otherwise catch. 'exited' = they replied,
+      // already handled by the reply engine. Dormant when no intros exist.
+      try {
+        const introAutos = await sb(`automations?client_id=eq.${client.id}&automation_key=in.(contact_form,trial_form)&select=id`);
+        const introIds = (Array.isArray(introAutos) ? introAutos : []).map(a => a.id);
+        if (introIds.length) {
+          const enr = await sb(`automation_enrollments?client_id=eq.${client.id}&automation_id=in.(${introIds.join(",")})&status=in.(active,completed)&select=contact_id`);
+          const introSet = new Set((Array.isArray(enr) ? enr : []).map(e => String(e.contact_id)));
+          if (introSet.size) candidates = candidates.filter(id => !introSet.has(id));
+        }
+      } catch (e) { reasons.push(`opener intro-guard: ${e.message}`); }
+    }
     if (candidates.length) {
       const calendars = await loadCalendars(sb, client.id);
       for (const contactId of candidates) {
@@ -573,7 +600,56 @@ async function detectForClient(client) {
     }
   } catch (e) { reasons.push(`opener pass: ${e.message}`); }
 
-  return { client_id: client.id, business: client.business_name, mode, queued: queue.length, drafted, openers, auto_sent: autoSent, deferred, flushed, escalated, lost_proposed: lostProposed, skipped, pruned, reasons };
+  // ── A5 REBOOK pass: the confirm agent handed a "can't make it" lead back to the
+  // Responded stage with an "Entry: Rebook" trigger note. The booking agent must now
+  // PROACTIVELY text them to rebook rather than waiting for the lead to message first.
+  // A rebook lead has prior booking history + an existing GHL conversation, so the cold
+  // -opener guards above deliberately skip them - this pass re-opens them on purpose:
+  // draft a first rebook text via the booking opener brain (the persistent "Rebook
+  // needed" memory note gives it context), queue it for Hawkeye, then CONSUME the
+  // trigger note (active=false) so a lead is opened exactly once.
+  try {
+    const rebookCandidates = [...rebookIds].filter(id => respondedIds.has(id) && !mutedSet.has(id));
+    if (rebookCandidates.length) {
+      const calendars = await loadCalendars(sb, client.id);
+      for (const contactId of rebookCandidates) {
+        if (rebookOpeners >= OPENER_CAP) break;
+        // Dedupe: if a card is already waiting (pending/approved), leave it be.
+        let active;
+        try { active = await sb(`agent_ready_replies?client_id=eq.${client.id}&ghl_contact_id=eq.${encodeURIComponent(contactId)}&status=in.(pending,approved)&select=id&limit=1`); }
+        catch (e) { reasons.push(`rebook ${contactId}: dedup error - ${e.message}`); continue; }
+        if (Array.isArray(active) && active.length) continue;
+        let d;
+        try { d = await draftOpener(token, locationId, client.id, contactId, cfg, calendars); }
+        catch (e) { reasons.push(`rebook ${contactId}: draft threw - ${e.message}`); continue; }
+        if (!d.reply || !String(d.reply).trim()) { if (d.escalate) escalated++; continue; }
+        let nm = null;
+        try { const c = await sb(`ghl_contacts?client_id=eq.${client.id}&ghl_contact_id=eq.${encodeURIComponent(contactId)}&select=name&limit=1`); nm = (Array.isArray(c) && c[0] && c[0].name) || null; } catch (_) {}
+        const isBook = !!(d.book && d.book_slot_at && d.book_calendar_id);
+        let queued = false;
+        try {
+          await sb(`agent_ready_replies`, { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify([{
+            client_id: client.id, ghl_contact_id: String(contactId), ghl_conversation_id: null,
+            contact_name: nm, kind: isBook ? "book" : "reply",
+            book_calendar_id: isBook ? d.book_calendar_id : null, book_slot_at: isBook ? d.book_slot_at : null, book_group: isBook ? d.book_group : null,
+            draft_message: d.reply, reasoning: d.reasoning || "First rebook touch (confirm agent handed this lead back to rebook).",
+            confidence: d.confidence, asked_to_book: d.asked_to_book, summary: d.summary || null,
+            status: "pending", created_by: "rebook-opener",
+          }]) });
+          queued = true;
+          rebookOpeners++;
+        } catch (e) { reasons.push(`rebook ${contactId}: insert failed - ${e.message}`); }
+        // Consume the trigger note so we open exactly once. The persistent "Rebook needed"
+        // memory note (no "Entry:" prefix) stays active for ongoing conversation context.
+        if (queued) {
+          try { await sb(`agent_contact_notes?client_id=eq.${client.id}&ghl_contact_id=eq.${encodeURIComponent(contactId)}&active=eq.true&note=ilike.${encodeURIComponent("Entry: Rebook")}*`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ active: false }) }); } catch (_) {}
+        }
+        await new Promise(r => setTimeout(r, 300));
+      }
+    }
+  } catch (e) { reasons.push(`rebook pass: ${e.message}`); }
+
+  return { client_id: client.id, business: client.business_name, mode, queued: queue.length, drafted, openers, rebook_openers: rebookOpeners, auto_sent: autoSent, deferred, flushed, escalated, lost_proposed: lostProposed, skipped, pruned, reasons };
 }
 
 async function runDetect(res, onlyClientId) {

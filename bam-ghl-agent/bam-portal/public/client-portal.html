@@ -6975,7 +6975,8 @@ Then the call to action."]</div>
         <div id="members-list-container">
           <div class="req-empty" style="padding:20px 0"><span class="req-spin"></span>Loading members…</div>
         </div>
-        <div id="member-modal-host"></div>
+        <!-- member-modal-host moved to body level (near #stripe-modal-host) so the
+             member drawer shows when opened from the Inbox too, not just Members. -->
       </div>
     </div>
 
@@ -7214,14 +7215,14 @@ Then the call to action."]</div>
       #ib-drawer .ib-d-sub { font-size:12px; color:var(--text-mute); margin-top:3px; }
       #ib-drawer .ib-d-close { background:none; border:none; color:var(--text-mute); cursor:pointer; font-size:22px; padding:4px 10px; }
       #ib-drawer .ib-d-thread { flex:1; overflow-y:auto; padding:18px 20px; display:flex; flex-direction:column; gap:10px; }
-      #ib-drawer .ib-msg, #pl-drawer .ib-msg {
+      #ib-drawer .ib-msg, #pl-drawer .ib-msg, #member-inbox-section .ib-msg {
         max-width:80%; padding:8px 12px; border-radius:14px; font-size:13px; line-height:1.45;
         word-wrap:break-word; white-space:pre-wrap;
       }
-      #ib-drawer .ib-msg-in,  #pl-drawer .ib-msg-in  { background:rgba(255,255,255,0.04); border:1px solid var(--border); align-self:flex-start; border-bottom-left-radius:4px; }
-      #ib-drawer .ib-msg-out, #pl-drawer .ib-msg-out { background:var(--accent); color:#0B0B0D; align-self:flex-end; border-bottom-right-radius:4px; }
-      #ib-drawer .ib-msg-meta, #pl-drawer .ib-msg-meta { font-size:10px; color:var(--text-mute); margin-top:3px; }
-      #pl-drawer .ib-msg-out .ib-msg-meta { color:rgba(11,11,13,0.55); }
+      #ib-drawer .ib-msg-in,  #pl-drawer .ib-msg-in,  #member-inbox-section .ib-msg-in  { background:rgba(255,255,255,0.04); border:1px solid var(--border); align-self:flex-start; border-bottom-left-radius:4px; }
+      #ib-drawer .ib-msg-out, #pl-drawer .ib-msg-out, #member-inbox-section .ib-msg-out { background:var(--accent); color:#0B0B0D; align-self:flex-end; border-bottom-right-radius:4px; }
+      #ib-drawer .ib-msg-meta, #pl-drawer .ib-msg-meta, #member-inbox-section .ib-msg-meta { font-size:10px; color:var(--text-mute); margin-top:3px; }
+      #pl-drawer .ib-msg-out .ib-msg-meta, #member-inbox-section .ib-msg-out .ib-msg-meta { color:rgba(11,11,13,0.55); }
       #ib-drawer .ib-d-reply { border-top:1px solid var(--border); padding:14px 20px; flex-shrink:0; }
       #ib-drawer .ib-d-reply textarea { width:100%; background:var(--surface); border:1px solid var(--border); border-radius:6px; padding:10px; font:inherit; font-size:13px; color:var(--text); resize:vertical; min-height:60px; outline:none; }
       #ib-drawer .ib-d-reply-actions { display:flex; justify-content:space-between; align-items:center; gap:10px; margin-top:8px; }
@@ -11049,6 +11050,9 @@ async function openV15Inbox() {
       }
     } catch (_) { /* pipelines optional */ }
     _v15ibRenderAll();
+    // Load the member roster in the background so the ★ Member pill appears even
+    // if the staff hasn't opened the Members tab yet; repaint the list once it lands.
+    _ibEnsureMembers().then(() => { _IB_MEMBER_IDX = null; try { _v15ibRenderList(); } catch (_) {} });
   } catch (e) {
     // Keep showing the old data if we had it; only blank to an error otherwise.
     if (!hadData) host.innerHTML = `<div class="req-empty" style="padding:24px 0;color:#9a3b2f">Couldn't load inbox - ${escapeHTML(e.message || String(e))}</div>`;
@@ -11223,13 +11227,14 @@ function _v15ibRenderList() {
     const chip = cp ? `<div style="margin-top:6px"><span class="v15ib-chip">${escapeHTML(cp.pipelineName)}${cp.stageName ? ' · ' + escapeHTML(cp.stageName) : ''}</span></div>` : '';
     const chIcon = _ibChannelIcon(c);
     const chTag = chIcon ? `<span title="${escapeHTML(_ghlChannelLabel(c.lastMessageType || c.channel))}" style="margin-left:6px;font-size:11px;opacity:.85">${chIcon}</span>` : '';
+    const memTag = _ibMemberOf(c) ? `<span style="margin-left:6px">${_ibMemberPill(true)}</span>` : '';
     return `<div class="v15ib-conv ${unread ? 'unread' : ''}" onclick='_v15ibOpen(${JSON.stringify(c.id)},${JSON.stringify(c.contactId || "")},${JSON.stringify(c.phone || "")},${JSON.stringify(c.email || "")},${JSON.stringify(c.contactName || "")},${JSON.stringify(c.lastMessageType || c.channel || "")})'>
       <div style="position:relative;flex:none">
         <div style="width:42px;height:42px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;flex:none;${_ibAvatarStyle(name)}">${escapeHTML(_ibInitials(name))}</div>
         ${unread ? '<span style="position:absolute;top:-1px;right:-1px;width:11px;height:11px;border-radius:50%;background:var(--gold);border:2px solid var(--surface)"></span>' : ''}
       </div>
       <div style="flex:1;min-width:0">
-        <div class="v15ib-name">${escapeHTML(name)}${chTag}</div>
+        <div class="v15ib-name">${escapeHTML(name)}${memTag}${chTag}</div>
         <div class="v15ib-prev">${escapeHTML(_ibCleanPreview(c.lastMessageBody))}</div>
         ${chip}
       </div>
@@ -11244,6 +11249,108 @@ function _ibAvatarStyle(name) {
   const s = String(name || '?');
   const c = palette[Math.abs((s.charCodeAt(0) || 0) + (s.charCodeAt(1) || 0)) % palette.length];
   return `background:${c};border-color:${c};color:#fff`;
+}
+
+// ── Inbox ↔ Member linking ───────────────────────────────────────────────
+// Match a conversation's contact to a member row so the inbox can flag members
+// and open their full profile. Keyed on ghl_contact_id (primary), then phone,
+// then email - the same three keys GHL/Stripe line up on across endpoints.
+let _IB_MEMBER_IDX = null;
+function _ibBuildMemberIdx() {
+  const idx = {};
+  for (const m of (Array.isArray(_MEMBERS_ALL) ? _MEMBERS_ALL : [])) {
+    for (const k of [m.ghl_contact_id, _ibNormKey(m.parent_phone), _ibNormKey((m.parent_email || '').toLowerCase())]) {
+      if (k && !idx[k]) idx[k] = m;
+    }
+  }
+  _IB_MEMBER_IDX = idx;
+  return idx;
+}
+// Return the member that owns this conversation/contact, or null for a lead.
+// `c` can be a conversation row (contactId/phone/email) or _V15IB.active.
+function _ibMemberOf(c) {
+  if (!c) return null;
+  const idx = _IB_MEMBER_IDX || _ibBuildMemberIdx();
+  const cid = c.contactId || c.contact_id;
+  return idx[cid]
+    || idx[_ibNormKey(c.phone)]
+    || idx[_ibNormKey((c.email || '').toLowerCase())]
+    || null;
+}
+// Make sure the member roster is loaded so the inbox can match members even when
+// the staff hasn't opened the Members tab yet. Fire-and-forget; re-renders on load.
+async function _ibEnsureMembers() {
+  if (Array.isArray(_MEMBERS_ALL) && _MEMBERS_ALL.length) return;
+  try {
+    const token = await _mreqAuthToken();
+    const qs = (typeof CLIENT_ID !== 'undefined' && CLIENT_ID)
+      ? '?scope=client&client_id=' + encodeURIComponent(CLIENT_ID)
+      : '?scope=client';
+    const r = await fetch('/api/members' + qs, { headers: { Authorization: 'Bearer ' + token } });
+    const j = await _safeJson(r);
+    if (r.ok && Array.isArray(j.members)) { _MEMBERS_ALL = j.members; _IB_MEMBER_IDX = null; }
+  } catch (_) { /* members optional - inbox still works without the pill */ }
+}
+// Small gold "Member" pill. `small` trims it for the dense conversation list.
+function _ibMemberPill(small) {
+  const fs = small ? '10px' : '11px';
+  const pad = small ? '1px 7px' : '2px 9px';
+  return `<span title="Active member - click the name for full member info" style="display:inline-flex;align-items:center;gap:3px;vertical-align:middle;font-size:${fs};font-weight:800;padding:${pad};border-radius:999px;background:var(--gold);color:#0B0B0D;white-space:nowrap">★ Member</span>`;
+}
+// Click the contact name in a thread → member? full member drawer; else a light
+// contact drawer (name, channel, phone, email, tags, GHL link).
+function _ibOpenContact() {
+  const a = _V15IB.active; if (!a) return;
+  const m = _ibMemberOf(a);
+  if (m && m.id) { openMemberPopup(m.id); return; }
+  _ibOpenContactDrawer(a);
+}
+// Lightweight contact drawer for non-members (leads). Body-level host so it shows
+// over any view; mirrors the member drawer's slide-in shell.
+function _ibOpenContactDrawer(a) {
+  let host = document.getElementById('ib-contact-drawer-host');
+  if (!host) { host = document.createElement('div'); host.id = 'ib-contact-drawer-host'; document.body.appendChild(host); }
+  const name = a.name || a.phone || a.email || 'Contact';
+  const ghlUrl = _ghlContactUrl(_V15IB.ghlLoc, a.contactId);
+  const row = (label, val) => val
+    ? `<div style="color:var(--text-mute)">${label}</div><div style="word-break:break-word">${escapeHTML(val)}</div>` : '';
+  host.innerHTML = `
+    <div id="ib-cd-backdrop" style="position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:9998;opacity:0;transition:opacity 0.2s ease" onclick="_ibCloseContactDrawer()"></div>
+    <div id="ib-cd-drawer" style="position:fixed;top:0;right:0;width:min(420px,92vw);height:100vh;background:var(--surface);border-left:1px solid var(--border);box-shadow:-12px 0 32px rgba(0,0,0,0.25);z-index:9999;overflow-y:auto;transform:translateX(100%);transition:transform 0.25s ease;color:var(--text)">
+      <div style="padding:26px 24px 32px">
+        <div style="display:flex;align-items:flex-start;gap:14px;margin-bottom:18px">
+          <div style="width:56px;height:56px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:700;flex:none;${_ibAvatarStyle(name)}">${escapeHTML(_ibInitials(name))}</div>
+          <div style="flex:1;min-width:0">
+            <div style="font-weight:700;font-size:19px;line-height:1.2">${escapeHTML(name)}</div>
+            <div style="margin-top:8px"><span style="display:inline-block;font-size:11px;font-weight:700;padding:2px 9px;border-radius:999px;background:transparent;border:1px solid var(--border-med);color:var(--text-sub)">Lead / contact</span></div>
+          </div>
+          <button onclick="_ibCloseContactDrawer()" aria-label="Close" style="background:none;border:none;color:var(--text-mute);font-size:26px;cursor:pointer;line-height:1;padding:0 4px;margin-top:-4px">×</button>
+        </div>
+        <div style="display:grid;grid-template-columns:96px 1fr;gap:10px 14px;font-size:13px;align-items:center">
+          ${row('Channel', _ghlChannelLabel(a.channel))}
+          ${row('Phone', a.phone)}
+          ${row('Email', a.email)}
+        </div>
+        <div style="height:1px;background:var(--border);margin:20px 0"></div>
+        <div style="font-size:11px;font-weight:700;color:var(--text-mute);letter-spacing:0.6px;text-transform:uppercase;margin-bottom:10px">Tags</div>
+        <div id="ib-cd-tags"></div>
+        <div style="font-size:12px;color:var(--text-mute);margin-top:18px;line-height:1.5">Not a member yet. When they sign up they'll show a ★ Member pill and link to their full profile here.</div>
+        ${ghlUrl ? `<a href="${escapeHTML(ghlUrl)}" target="_blank" rel="noopener" style="display:flex;align-items:center;justify-content:center;gap:8px;margin-top:18px;background:transparent;color:var(--text);border:1px solid var(--border);padding:10px 12px;font-weight:600;border-radius:6px;cursor:pointer;font-size:13px;text-decoration:none">Open in GHL ↗</a>` : ''}
+      </div>
+    </div>`;
+  requestAnimationFrame(() => {
+    const bd = document.getElementById('ib-cd-backdrop'); const dr = document.getElementById('ib-cd-drawer');
+    if (bd) bd.style.opacity = '1';
+    if (dr) dr.style.transform = 'translateX(0)';
+  });
+  if (a.contactId) _renderTagEditorFetch('ib-cd-tags', a.contactId);
+  else { const t = document.getElementById('ib-cd-tags'); if (t) t.innerHTML = '<span style="font-size:12px;color:var(--text-mute)">No GHL contact linked.</span>'; }
+}
+function _ibCloseContactDrawer() {
+  const bd = document.getElementById('ib-cd-backdrop'); const dr = document.getElementById('ib-cd-drawer');
+  if (dr) dr.style.transform = 'translateX(100%)';
+  if (bd) bd.style.opacity = '0';
+  setTimeout(() => { const h = document.getElementById('ib-contact-drawer-host'); if (h) h.innerHTML = ''; }, 260);
 }
 
 async function _v15ibOpen(convId, contactId, phone, email, name, channel) {
@@ -11310,12 +11417,17 @@ function _v15ibRenderThread() {
   }).join('') : '<div style="color:var(--text-mute);font-size:13px;text-align:center;padding:20px">No messages yet.</div>';
   const isEmail = _V15IB.type === 'Email';
   const ghlUrl = _ghlContactUrl(_V15IB.ghlLoc, a.contactId);
+  const mem = _ibMemberOf(a);
   const chips = _V15IB.pending.map((u, i) => `<span style="display:inline-flex;align-items:center;gap:5px;background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:3px 8px;font-size:11px;color:var(--text-sub)">📎 file ${i + 1}<button onclick="_v15ibRmFile(${i})" style="background:none;border:none;color:var(--text-mute);cursor:pointer;font-size:12px">×</button></span>`).join('');
   body.innerHTML = `
     <button onclick="openV15Inbox()" style="display:inline-flex;align-items:center;gap:7px;background:var(--surface);border:1px solid var(--border-med);border-radius:999px;color:var(--text);font:inherit;font-size:13px;font-weight:600;cursor:pointer;padding:8px 14px;margin-bottom:12px">
       <span style="font-size:15px;line-height:1">←</span> All conversations</button>
     <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px">
-      <div style="font-size:15px;font-weight:700;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHTML(a.name || a.phone || a.email || 'Conversation')}</div>
+      <div onclick="_ibOpenContact()" title="View ${mem ? 'member' : 'contact'} details" style="display:flex;align-items:center;gap:8px;min-width:0;cursor:pointer">
+        <span style="font-size:15px;font-weight:700;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-decoration:underline;text-decoration-style:dotted;text-decoration-color:var(--border-med);text-underline-offset:3px">${escapeHTML(a.name || a.phone || a.email || 'Conversation')}</span>
+        ${mem ? _ibMemberPill(false) : ''}
+        <span style="flex:none;font-size:13px;color:var(--text-mute)">›</span>
+      </div>
       ${ghlUrl ? `<a href="${escapeHTML(ghlUrl)}" target="_blank" rel="noopener" title="Open this contact in GHL to call" style="flex:none;display:inline-flex;align-items:center;gap:6px;background:rgba(232,197,71,0.12);border:1px solid var(--gold);border-radius:8px;color:var(--gold);padding:6px 10px;font:inherit;font-size:12px;font-weight:700;text-decoration:none">📞 Call in GHL</a>` : ''}
     </div>
     <div id="ib-tags" style="margin-bottom:10px"></div>
@@ -15984,12 +16096,14 @@ const _TA = { tab: 'test', target: 'booking', chat: [], sending: false, openSect
 const _TA_AGENTS = { booking: '📞 Booking', confirm: '✅ Confirm', closing: '🎯 Closing' };
 // trial_followup retired 2026-06-28: trial-no-book leads now go to the Booking
 // agent with context (cold opener) instead of a separate automation.
-const _TA_AUTOS  = { onboarding: '👋 Onboarding', ghosted: '👻 Ghosted', nurture: '💔 Lead Nurture' };
+const _TA_AUTOS  = { onboarding: '👋 Onboarding', missed_trial: '📵 Missed Trial', ghosted: '👻 Ghosted', nurture: '💔 Lead Nurture', summer_special: '☀️ Summer Special' };
 // What each automation is FOR and HOW a lead gets pulled into it (shown as the blurb).
 const _TA_AUTO_ABOUT = {
   onboarding: `<b>👋 Onboarding</b> welcomes a brand-new paid member. The moment their first payment clears and they go live, they drop into this sequence - a welcome text + email, then a couple of getting-started nudges over the first week. Approve it once and flip it on; it runs itself (quiet hours respected). Edit every message below.`,
+  missed_trial: `<b>📵 Missed Trial</b> is the first text an athlete gets when they no-show their trial. Edit the wait + message, then flip it on and approve. The moment they reply, your booking agent takes over; if they stay silent, they roll into 👻 Ghosted automatically.`,
   ghosted: `<b>👻 Ghosted</b> wins back leads who go quiet. When a lead stops replying, your agent drops them in here for a short burst of texts and emails to restart the conversation. Reply and they bounce straight back to the booking agent; silent all the way through and they roll into Lead Nurture.`,
   nurture: `<b>💔 Lead Nurture</b> is the slow-burn long game. Any lead that's lost but still a fit - across booking, confirm and closing - plus anyone who finishes the Ghosted sequence lands here for the occasional text or email that keeps your academy top of mind. The moment they reply, they bounce back to the booking agent with context.`,
+  summer_special: `<b>☀️ Summer Special</b> is your seasonal discount push. Drop a lead in from the pipeline (the "Summer Special" button) and they get a short burst of texts about the offer - book a trial now, a reminder a day later, then a last-chance nudge. Reply and your booking agent takes over; silent all the way through and they roll into Lead Nurture. Edit every message below.`,
 };
 // Entry points - where a lead enters the pipeline + which stage/bot picks them up.
 const _TA_ENTRY = { ep_contact: '📝 Contact Form', ep_trial: '🏀 Trial Form' };
@@ -16147,10 +16261,16 @@ async function _taSetModeGo(mode) {
 // engine sends each step on schedule (quiet hours respected). Renders EMPTY until
 // the import session fills the steps.
 let _AUTO = { list: [], overview: [] };
+// `enabled`/`approved` are the SHIPPED defaults when an academy has no row yet.
+// 👋 Onboarding + 💔 Lead Nurture ship ON (enabled + approved) so a paid member is
+// ALWAYS welcomed and the last-stop long game is wired from day one - both still send
+// nothing until they have enabled steps (the engine's isAutomationLive gate), so
+// on-by-default is safe. Ghosted ships OFF (the academy approves it once their copy is
+// reviewed).
 const _AUTO_SEED = [
-  { automation_key: 'onboarding', name: '👋 Onboarding' },
-  { automation_key: 'ghosted', name: '👻 Ghosted' },
-  { automation_key: 'nurture', name: '💔 Lead Nurture' },
+  { automation_key: 'onboarding', name: '👋 Onboarding', enabled: true, approved: true },
+  { automation_key: 'ghosted', name: '👻 Ghosted', enabled: false, approved: false },
+  { automation_key: 'nurture', name: '💔 Lead Nurture', enabled: true, approved: true },
 ];
 const _AUTO_UNITS = ['minutes', 'hours', 'days', 'weeks', 'months'];
 
@@ -16191,6 +16311,15 @@ async function _taRenderEntryPoints() {
     }
     const d = await _taEpApi('get-entry-routing');
     _TAEP.routing = d.routing || {};
+    // Seed + load THIS form's INTRO automation (📝 contact_form / 🏀 trial_form) so
+    // its step editor shows below the routing config. Idempotent + edit-safe + dormant
+    // (seeds approved:false). _AUTO.list is populated so the shared step handlers work.
+    const introKey = _TA.target === 'ep_contact' ? 'contact_form' : 'trial_form';
+    _TAEP.introKey = introKey;
+    await _autoApi('seed-form-intro', { automation_key: introKey });
+    const al = await _autoApi('list');
+    _AUTO.list = al.automations || [];
+    try { const ov = await _autoApi('overview'); _AUTO.overview = ov.overview || []; } catch (_) { _AUTO.overview = []; }
   } catch (e) { p.innerHTML = `<div style="color:#e07070;font-size:13px">Couldn't load - ${escapeHTML(e.message)}</div>`; return; }
   _taEpForm();
 }
@@ -16261,6 +16390,27 @@ function _taEpForm() {
       <div id="taep-err" style="color:#e07070;font-size:12.5px;margin:4px 0 10px"></div>
       <button onclick="_taEpSave()" style="${_TA_BTN}">Save</button>
       ${!isStaff ? '' : '<span style="font-size:11.5px;color:var(--text-mute);margin-left:10px">Pipeline + stage names must match GHL exactly.</span>'}
+    </div>
+    ${_taEpIntroHtml()}`;
+}
+// The form's INTRO automation (the timed first-touch SMS), edited right here on the
+// Contact / Trial form tab. Reuses the shared step-builder card (_autoCardHtml): edit
+// the message + delay, flip it on, approve - all one card. Dormant until ON + approved
+// AND portal routing is on.
+function _taEpIntroHtml() {
+  const introKey = _TAEP.introKey || (_TA.target === 'ep_contact' ? 'contact_form' : 'trial_form');
+  const introAuto = (_AUTO.list || []).find(a => a.automation_key === introKey);
+  if (!introAuto) return '';
+  const isContact = _TA.target === 'ep_contact';
+  const title = 'First-touch intro automation';
+  const blurb = isContact
+    ? 'The first text a contact-form lead gets. Edit the wait + message, then flip it on and approve. The moment they reply, your booking agent takes over.'
+    : 'The first text a trial lead gets if they fill the form but do not pick a time. Edit the wait + message, then flip it on and approve. If they book, they exit this and move to your Confirm agent; the moment they reply, your booking agent takes over.';
+  return `
+    <div style="margin-top:22px;max-width:520px">
+      <div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:4px">${title}</div>
+      <p style="font-size:12px;color:var(--text-mute);margin:0 0 12px;line-height:1.5">${blurb}</p>
+      ${_autoCardHtml(introAuto)}
     </div>`;
 }
 async function _taEpSave() {
@@ -16288,11 +16438,15 @@ async function _taRenderAutomations() {
     const have = new Set(list.map(a => a.automation_key));
     let seeded = false;
     for (const s of _AUTO_SEED) {
-      if (!have.has(s.automation_key)) { await _autoApi('upsert-automation', { automation_key: s.automation_key, name: s.name, enabled: false, approved: false }); seeded = true; }
+      if (!have.has(s.automation_key)) { await _autoApi('upsert-automation', { automation_key: s.automation_key, name: s.name, enabled: !!s.enabled, approved: !!s.approved }); seeded = true; }
     }
+    // 📵 Missed Trial first-touch: seed from the shipped defaults (with its default SMS
+    // step) the SAME idempotent + edit-safe way the Contact / Trial form intros seed.
+    // Dormant (approved:false) until the academy reviews + approves it.
+    if (!have.has('missed_trial')) { await _autoApi('seed-form-intro', { automation_key: 'missed_trial' }); seeded = true; }
     if (seeded) { d = await _autoApi('list'); list = d.automations || []; }
   } catch (e) { p.innerHTML = `<div style="color:#e07070;font-size:13px">Couldn't load - ${escapeHTML(e.message)}</div>`; return; }
-  const order = { onboarding: 0, ghosted: 1, nurture: 2 };
+  const order = { onboarding: 0, missed_trial: 1, ghosted: 2, nurture: 3 };
   list.sort((a, b) => ((order[a.automation_key] ?? 9) - (order[b.automation_key] ?? 9)));
   _AUTO.list = list;
   // When an automation is picked in the Train header, show only that one; else both.
@@ -16363,6 +16517,11 @@ function _autoCardHtml(a) {
     ? `<div style="display:flex;align-items:center;gap:9px;margin-top:8px;padding:11px 13px;border:1px dashed var(--border);border-radius:9px;background:var(--surface)">
          <span style="font-size:15px">⤵</span>
          <div style="font-size:12.5px;color:var(--text-sub);line-height:1.45">When the sequence ends and the lead still hasn't replied, they roll into <b style="color:var(--text)">💔 Lead Nurture</b> automatically.</div>
+       </div>`
+    : (a.automation_key === 'missed_trial' && steps.length)
+    ? `<div style="display:flex;align-items:center;gap:9px;margin-top:8px;padding:11px 13px;border:1px dashed var(--border);border-radius:9px;background:var(--surface)">
+         <span style="font-size:15px">⤵</span>
+         <div style="font-size:12.5px;color:var(--text-sub);line-height:1.45">When this first touch ends and the no-show still hasn't replied, they roll into <b style="color:var(--text)">👻 Ghosted</b> automatically.</div>
        </div>`
     : '';
   return `
@@ -16474,14 +16633,14 @@ async function _autoSetLive(autoId, on) {
     await _autoApi('set-approved', { automation_id: autoId, value: on });
     await _autoApi('set-enabled', { automation_id: autoId, value: on });
     _plToast(on ? '🟢 Automation on' : 'Automation off');
-    _taRenderAutomations();
+    _taRenderPanel();
   } catch (e) { alert(e.message); }
 }
 
 async function _autoAddStep(autoId) {
   const a = _AUTO.list.find(x => x.id === autoId);
   const pos = a && a.steps && a.steps.length ? Math.max(...a.steps.map(s => Number(s.position) || 0)) + 1 : 0;
-  try { await _autoApi('upsert-step', { automation_id: autoId, position: pos, wait_amount: 1, wait_unit: 'days', channel: 'sms', body: 'New step - edit me' }); _taRenderAutomations(); }
+  try { await _autoApi('upsert-step', { automation_id: autoId, position: pos, wait_amount: 1, wait_unit: 'days', channel: 'sms', body: 'New step - edit me' }); _taRenderPanel(); }
   catch (e) { alert(e.message); }
 }
 
@@ -16503,13 +16662,13 @@ async function _autoSaveStep(autoId, sid) {
       body,
     });
     _plToast('Step saved');
-    _taRenderAutomations();
+    _taRenderPanel();
   } catch (e) { alert(e.message); }
 }
 
 async function _autoDelStep(sid) {
   if (!confirm('Delete this step?')) return;
-  try { await _autoApi('delete-step', { step_id: sid }); _taRenderAutomations(); }
+  try { await _autoApi('delete-step', { step_id: sid }); _taRenderPanel(); }
   catch (e) { alert(e.message); }
 }
 
@@ -16519,7 +16678,7 @@ async function _autoMove(autoId, sid, dir) {
   const i = steps.findIndex(s => s.id === sid); if (i < 0) return;
   const j = i + dir; if (j < 0 || j >= steps.length) return;
   const ids = steps.map(s => s.id); [ids[i], ids[j]] = [ids[j], ids[i]];
-  try { await _autoApi('reorder', { automation_id: autoId, ordered_step_ids: ids }); _taRenderAutomations(); }
+  try { await _autoApi('reorder', { automation_id: autoId, ordered_step_ids: ids }); _taRenderPanel(); }
   catch (e) { alert(e.message); }
 }
 
@@ -16990,7 +17149,11 @@ async function _bbRenderMemberOnboarding(panel) {
     const json = await _safeJson(r);
     if (r.ok) {
       ghl = json.ghl || ghl;
-      memberCount = Array.isArray(json.members) ? json.members.length : null;
+      // "live now" = real (paid) members only - exclude signup-in-progress rows
+      // (started checkout, not paid) so the go-live count is never inflated.
+      memberCount = Array.isArray(json.members)
+        ? json.members.filter(m => m && m.status !== 'payment_method_required').length
+        : null;
       if (typeof renderGhlConnectButton === 'function') renderGhlConnectButton(ghl);
       if (json.stripe && typeof renderStripeConnectButton === 'function') renderStripeConnectButton(json.stripe);
     }
@@ -22072,6 +22235,29 @@ function _updateActionItemsBadge() {
   else { badge.style.display = 'none'; }
 }
 
+// Roster cards mid-update: show a spinner while saving + refetching, then a
+// one-shot gold flash on the row that changed. Module-level so the flags
+// survive the full re-render fetchAndRenderMembers() triggers.
+let _MEMBERS_UPDATING = new Set();
+let _MEMBERS_FLASH = new Set();
+
+// Call after a member action that changes what the roster shows (plan change,
+// pause, etc.): closes the drawer, spins the card, refetches, then flashes it
+// gold. memberId must be on the current roster.
+async function _membersRefreshFlash(memberId) {
+  try { closeMemberPopup(); } catch (_) {}
+  _MEMBERS_UPDATING.add(memberId);
+  if (document.getElementById('members-cards')) _renderMembersView();   // show the spinner now
+  try { await fetchAndRenderMembers(); } catch (_) {}                    // refetch (re-renders with spinner still on)
+  _MEMBERS_UPDATING.delete(memberId);
+  _MEMBERS_FLASH.add(memberId);
+  if (document.getElementById('members-cards')) _renderMembersView();   // fresh data + gold flash
+  setTimeout(() => {
+    _MEMBERS_FLASH.delete(memberId);
+    if (document.getElementById('members-cards')) _renderMembersView();
+  }, 1900);
+}
+
 async function fetchAndRenderMembers() {
   // Handle return redirect from Stripe Connect OAuth (?stripe_connect=...)
   _stripeConnectReturnCheck();
@@ -22095,9 +22281,11 @@ async function fetchAndRenderMembers() {
     renderStripeConnectButton(json.stripe || { status: 'not_connected' });
     renderGhlConnectButton(json.ghl || { status: 'not_connected' });
     _MEMBERS_ALL = Array.isArray(json.members) ? json.members : [];
+    _IB_MEMBER_IDX = null; // roster changed - rebuild the inbox member-match index lazily
     _MEMBERS_SORTER = json.sorter || null;
     _MEMBERS_SUBS_TO_CANCEL = json.subs_to_cancel || 0;
     _MEMBERS_CIQ = json.coachiq || { enabled: false, signup_url: null };
+    await _loadMemberPriceStatusMap();   // priceId → live/archived (offer-aware), one fetch for the whole roster
     _renderMembersView();
   } catch (e) {
     container.innerHTML = `<div class="req-empty" style="padding:20px 0">Couldn't load members - ${escapeHTML(e.message)}</div>`;
@@ -22108,11 +22296,18 @@ function _memberStatusPill(status, opts) {
   // opts is the member object - if it carries pause_scheduled_for, render
   // a secondary "Pause queued" pill alongside the main status. Useful for
   // surfacing a future-dated pause to staff before the cron activates it.
+  //
+  // "Signup in progress" = started checkout but has NOT paid (status
+  // payment_method_required). Rendered as a muted amber OUTLINE tag - visually
+  // distinct from the solid member pills below - so it never reads as a paying
+  // member. These rows are excluded from every member count (see _renderMembersView).
+  if (status === 'payment_method_required') {
+    return `<span title="Started checkout but has not paid yet. Not counted as a member." style="display:inline-block;vertical-align:middle;white-space:nowrap;font-size:11px;font-weight:700;padding:2px 9px;border-radius:999px;background:rgba(199,154,74,0.12);border:1px solid #c79a4a;color:#c79a4a">⏳ Signup in progress</span>`;
+  }
   const map = {
     live:                    ['Live', '#1f7a3d'],
     paused:                  ['Paused', '#8a6d1f'],
     cancelling:              ['Cancelling', '#8a4d1f'],
-    payment_method_required: ['Needs card', '#9a3b2f'],
     payment_failed:          ['Payment failed', '#9a3b2f'],
   };
   const [label, color] = map[status] || [status || '-', '#555'];
@@ -22133,6 +22328,16 @@ function _memberSetupBadge(m) {
   if (!m || m.status !== 'live' || !m.ghl_contact_id) return '';
   const ciq = m.coachiq_member_id ? ' + CoachIQ' : '';
   return `<span title="Live · linked to GHL${ciq}. Open the member to confirm billing is portal-managed." style="display:inline-block;font-size:10px;font-weight:800;padding:2px 8px;border-radius:999px;background:transparent;border:1px solid #1f7a3d;color:#7BC47F">✓ set up</span>`;
+}
+
+// Billing-ownership flag - surfaces members whose Stripe sub the portal did NOT
+// create (imported / foreign), so Change plan / Pause / Refund are locked until
+// staff "Set up billing" to take it over. Only the actionable (false) case shows
+// a badge; portal-owned (true) and not-yet-checked (null) stay clean. The flag is
+// persisted on the member row and lazily backfilled the first time the drawer opens.
+function _memberBillingFlag(m) {
+  if (!m || m.billing_portal_owned !== false) return '';
+  return `<span title="This subscription was imported (created outside the portal). Open the member and use Set up billing to manage it here." style="display:inline-block;font-size:10px;font-weight:800;padding:2px 8px;border-radius:999px;background:transparent;border:1px solid #7a5a2f;color:#c79a4a;white-space:nowrap">🔒 imported</span>`;
 }
 
 function _memberEngagementChip(eng) {
@@ -22191,6 +22396,59 @@ function _memberPriceLabel(pricing) {
   return `<span title="${escapeHTML(full)}" style="display:inline-block;font-size:11px;font-weight:600;color:var(--text-mute);white-space:nowrap">${escapeHTML(short)}</span>`;
 }
 
+// priceId → 'live' | 'legacy', by the OFFER's archived flag (same rule the
+// Change-plan dropdown + member drawer use). Built once per roster load so the
+// per-row column renders synchronously (no per-card fetch).
+let _MEMBERS_PRICE_STATUS = {};
+let _MEMBERS_OFFERINGS = [];
+async function _loadMemberPriceStatusMap() {
+  _MEMBERS_PRICE_STATUS = {};
+  _MEMBERS_OFFERINGS = [];
+  try {
+    const token = await _mreqAuthToken();
+    const qs = (typeof CLIENT_ID !== 'undefined' && CLIENT_ID) ? '?client_id=' + encodeURIComponent(CLIENT_ID) : '';
+    const r = await fetch('/api/pricing' + qs, { headers: { Authorization: 'Bearer ' + token } });
+    const j = await _safeJson(r);
+    if (!r.ok) return;
+    const catalog = j.catalog || [];
+    const offerId = (catalog.find(x => x && x.offer_id) || {}).offer_id || null;
+    const offerings = await _offerOfferings(offerId);
+    _MEMBERS_OFFERINGS = offerings || [];
+    catalog.forEach(row => {
+      if (row && row.stripe_price_id) _MEMBERS_PRICE_STATUS[row.stripe_price_id] = _offerPriceStatus(row, offerings);
+    });
+  } catch (_) { /* leave map empty - column just renders blank */ }
+}
+
+// Classify a member by their RESOLVED plan name against the offer's offerings.
+// This is authoritative when it matches because legacy Stripe `plan_*` ids are
+// shared across different plans (e.g. Summer Unlimited and a 2/wk member can
+// carry the same id), so the price_id->status map mislabels them. Only returns
+// a verdict on a positive title match; otherwise null -> caller falls back.
+function _memberPlanStatus(m) {
+  const plan = ((m && m.plan) || '').trim().toLowerCase();
+  if (!plan || !_MEMBERS_OFFERINGS.length) return null;
+  let best = null;
+  _MEMBERS_OFFERINGS.forEach(o => {
+    const t = String(o.title || '').trim().toLowerCase();
+    if (t && plan.indexOf(t) >= 0 && (!best || t.length > best.len)) best = { archived: !!o.archived, len: t.length };
+  });
+  return best ? (best.archived ? 'legacy' : 'live') : null;
+}
+
+// Roster column: is this member on a live offer price or an archived one.
+function _memberPriceStatusCell(m) {
+  // Prefer the plan-name match (handles shared legacy price ids); fall back to
+  // the price_id->status map when the plan name doesn't match an offering.
+  const st = _memberPlanStatus(m) || (m && m.stripe_price_id ? _MEMBERS_PRICE_STATUS[m.stripe_price_id] : null);
+  if (!st) return '';   // unknown price (or no sub) - leave blank
+  const live = st === 'live';
+  const color  = live ? '#7BC47F' : '#c79a4a';
+  const border = live ? '#1f7a3d' : '#7a5a2f';
+  const label  = live ? 'Live price' : 'Archived';
+  return `<span title="${live ? 'On a current offer price' : 'On an archived offer price'}" style="display:inline-block;font-size:11px;font-weight:700;padding:2px 9px;border-radius:999px;background:transparent;border:1px solid ${border};color:${color};white-space:nowrap">${label}</span>`;
+}
+
 // Circular avatar - uses uploaded image if present, otherwise initials on
 // a deterministic colored circle.
 function _memberAvatar(m, size) {
@@ -22205,16 +22463,27 @@ function _memberAvatar(m, size) {
   return `<div style="width:${size}px;height:${size}px;border-radius:50%;background:${c};color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:${Math.max(10, Math.floor(size * 0.4))}px;flex:0 0 ${size}px">${escapeHTML(initials)}</div>`;
 }
 
-function _filterMembers(all) {
+// "Signup in progress" = started checkout, has NOT paid. Never a real member.
+function _isSignupInProgress(m) { return !!m && m.status === 'payment_method_required'; }
+
+function _filterMembers(all, statusOverride) {
   const f = _MEMBERS_FILTER;
-  const isIssue = (s) => s === 'payment_failed' || s === 'payment_method_required';
+  const status = statusOverride || f.status;
+  // payment_method_required is "started, not paid" - it is NOT an issue (a real
+  // lapsed-but-paid member). Issues = payment_failed only.
+  const isIssue = (s) => s === 'payment_failed';
   // 'cancelling' members are still billing through the end of their period -
   // surface them under "Live" so they don't disappear from the roster.
   const isLiveLike = (s) => s === 'live' || s === 'cancelling';
   return all.filter(m => {
-    if (f.status === 'live'   && !isLiveLike(m.status)) return false;
-    if (f.status === 'paused' && m.status !== 'paused') return false;
-    if (f.status === 'issues' && !isIssue(m.status))    return false;
+    // Default ("all") + every member bucket excludes signup-in-progress rows so
+    // they are never counted or shown as members. They surface only under their
+    // own "Signup in progress" group/filter.
+    if (status === 'all'     && _isSignupInProgress(m))  return false;
+    if (status === 'pending' && !_isSignupInProgress(m)) return false;
+    if (status === 'live'    && !isLiveLike(m.status))   return false;
+    if (status === 'paused'  && m.status !== 'paused')   return false;
+    if (status === 'issues'  && !isIssue(m.status))      return false;
     if (f.trainer    !== 'all' && (m.trainer    || '') !== f.trainer)    return false;
     if (f.engagement !== 'all' && (m.engagement || '') !== f.engagement) return false;
     if (f.offer      !== 'all' && ((m.offer && m.offer.id) || 'none') !== f.offer) return false;
@@ -22281,11 +22550,17 @@ function _renderMembersView() {
   const cursorPos = wasFocused ? oldInput.selectionStart : null;
 
   const all = _MEMBERS_ALL;
-  const liveCount   = all.filter(m => m.status === 'live' || m.status === 'cancelling').length;
-  const pausedCount = all.filter(m => m.status === 'paused').length;
-  const issuesCount = all.filter(m => m.status === 'payment_failed' || m.status === 'payment_method_required').length;
-  const filtered = _filterMembers(all);
+  const liveCount    = all.filter(m => m.status === 'live' || m.status === 'cancelling').length;
+  const pausedCount  = all.filter(m => m.status === 'paused').length;
+  const issuesCount  = all.filter(m => m.status === 'payment_failed').length;
+  // Signup-in-progress (started checkout, not paid) is NEVER counted as a member.
+  const pendingCount = all.filter(_isSignupInProgress).length;
+  const memberTotal  = all.length - pendingCount;   // "All" = real (paid) members only
   const f = _MEMBERS_FILTER;
+  const filtered = _filterMembers(all);
+  // In the default view, append signup-in-progress rows as their own labeled
+  // group below the members (aux filters - trainer/search/offer - still apply).
+  const pendingGroup = (f.status === 'all') ? _filterMembers(all, 'pending') : [];
 
   // Unique trainers in the data, GTA canonical order first then any extras.
   const trainerSet = new Set(all.map(m => m.trainer).filter(Boolean));
@@ -22321,10 +22596,11 @@ function _renderMembersView() {
       <div style="display:none;font-size:15px;font-weight:700;color:var(--text);margin-bottom:12px" class="members-filter-title">Filters</div>
       <div style="${popoverLabel};margin-bottom:8px">Status</div>
       <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:16px">
-        ${filterChip('status','all','All',     all.length)}
+        ${filterChip('status','all','All',     memberTotal)}
         ${filterChip('status','live','Live',   liveCount)}
         ${filterChip('status','paused','Paused', pausedCount)}
         ${filterChip('status','issues','Issues', issuesCount)}
+        ${pendingCount ? filterChip('status','pending','⏳ Signup in progress', pendingCount) : ''}
       </div>
       <div style="${popoverLabel};margin-bottom:8px">Trainer</div>
       <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:16px">
@@ -22356,7 +22632,7 @@ function _renderMembersView() {
     <style>
       .member-card {
         display:grid;
-        grid-template-columns:38px minmax(140px,1fr) 100px 300px;
+        grid-template-columns:38px minmax(140px,1fr) 100px 420px;
         gap:14px;
         align-items:center;
         padding:12px 16px;
@@ -22365,14 +22641,30 @@ function _renderMembersView() {
         transition: background 0.15s ease, border-color 0.15s ease;
       }
       .member-card:hover { background: rgba(232,197,71,0.06); border-color: rgba(232,197,71,0.45); }
+      /* Just-updated: gold flash so the eye lands on the row that changed. */
+      @keyframes mcGoldFlash {
+        0%   { background: rgba(232,197,71,0.32); border-color: var(--gold,#E8C547); box-shadow: 0 0 0 1px var(--gold,#E8C547) inset; }
+        100% { background: transparent; border-color: var(--border); box-shadow: none; }
+      }
+      .member-card-flash { animation: mcGoldFlash 1.8s ease-out; }
+      /* Updating: dim + spinner while the change saves and the roster refetches. */
+      .member-card-updating { position: relative; pointer-events: none; }
+      .member-card-updating > *:not(.member-card-spin) { opacity: 0.45; }
+      @keyframes mcSpin { to { transform: translateY(-50%) rotate(360deg); } }
+      .member-card-spin {
+        position: absolute; top: 50%; right: 18px; transform: translateY(-50%);
+        width: 16px; height: 16px; border: 2px solid rgba(232,197,71,0.25);
+        border-top-color: var(--gold,#E8C547); border-radius: 50%;
+        animation: mcSpin 0.7s linear infinite; opacity: 1 !important;
+      }
       .member-card-main { min-width:0; }
       .member-card-name { font-weight:700; font-size:15px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
       .member-card-parent { font-size:12px; color:var(--text-mute); margin-top:2px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
       .member-card-trainer { font-size:13px; color:var(--text-mute); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
       /* Fixed internal columns so status / price / set-up line up vertically
          down the whole roster (the badges no longer drift per row). */
-      .member-card-pills { display:grid; grid-template-columns:124px 92px auto; align-items:center; column-gap:8px; }
-      .mc-status, .mc-price, .mc-extra { display:flex; align-items:center; gap:6px; min-width:0; }
+      .member-card-pills { display:grid; grid-template-columns:124px 96px 92px auto; align-items:center; column-gap:8px; }
+      .mc-status, .mc-pricestatus, .mc-price, .mc-extra { display:flex; align-items:center; gap:6px; min-width:0; }
       /* If a member has a queued-pause pill too, stack it under the status pill
          instead of overflowing the fixed column. */
       .mc-status { flex-wrap:wrap; row-gap:4px; }
@@ -22420,23 +22712,50 @@ function _renderMembersView() {
     container.innerHTML = '<div class="req-empty" style="padding:20px 0">No members yet.</div>';
     return;
   }
-  if (!filtered.length) {
+  if (!filtered.length && !pendingGroup.length) {
     container.innerHTML = toolbar + '<div id="members-cards"><div class="req-empty" style="padding:20px 0">No members match this filter.</div></div>';
     if (wasFocused) _membersRestoreSearchFocus(cursorPos);
     return;
   }
 
-  // Grid layout - keeps every column aligned across all cards.
-  const cards = filtered.map(_memberCardHtml).join('');
+  // Grid layout - keeps every column aligned across all cards. Real members
+  // first; signup-in-progress rows follow under their own labeled group.
+  const cards = _membersCardsMarkup(filtered, pendingGroup, f.status);
 
   container.innerHTML = toolbar + `<div id="members-cards">${cards}</div>`;
   if (wasFocused) _membersRestoreSearchFocus(cursorPos);
 }
 
+// Divider that labels the signup-in-progress group and spells out that these
+// rows are NOT members (started checkout, never paid). Amber to match the pill.
+function _pendingGroupHeader(n) {
+  return `<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:16px 0 8px;padding:8px 12px;border:1px solid #7a5a2f;border-left:3px solid #c79a4a;border-radius:6px;background:rgba(199,154,74,0.08)">
+    <span style="font-size:12px;font-weight:800;color:#c79a4a;text-transform:uppercase;letter-spacing:0.5px">⏳ Signup in progress · ${n}</span>
+    <span style="font-size:11px;color:var(--text-mute)">Started checkout, not paid yet. Not counted as members.</span>
+  </div>`;
+}
+
+// Build the card list: members, then (when present) the labeled signup-in-progress
+// group. When the dedicated "pending" filter is active, `members` already holds
+// only those rows, so render them under the header with no separate group.
+function _membersCardsMarkup(members, pending, statusFilter) {
+  if (statusFilter === 'pending') {
+    return _pendingGroupHeader(members.length) + members.map(_memberCardHtml).join('');
+  }
+  let html = members.map(_memberCardHtml).join('');
+  if (pending && pending.length) {
+    html += _pendingGroupHeader(pending.length) + pending.map(_memberCardHtml).join('');
+  }
+  return html;
+}
+
 // One member card's markup (shared by the full render + the search-only render).
 function _memberCardHtml(m) {
+  const updating = _MEMBERS_UPDATING.has(m.id);
+  const flash    = _MEMBERS_FLASH.has(m.id);
+  const cls = 'card member-card' + (updating ? ' member-card-updating' : '') + (flash ? ' member-card-flash' : '');
   return `
-    <div class="card member-card" onclick="openMemberPopup('${escapeHTML(m.id)}')">
+    <div class="${cls}" onclick="openMemberPopup('${escapeHTML(m.id)}')">
       ${_memberAvatar(m, 38)}
       <div class="member-card-main">
         <div class="member-card-name">${escapeHTML(m.athlete_name || 'Unnamed')}</div>
@@ -22445,9 +22764,11 @@ function _memberCardHtml(m) {
       <div class="member-card-trainer">${escapeHTML(m.trainer || '-')}</div>
       <div class="member-card-pills">
         <span class="mc-status">${_memberStatusPill(m.status, m)}</span>
+        <span class="mc-pricestatus">${_memberPriceStatusCell(m)}</span>
         <span class="mc-price">${_memberPriceLabel(m.pricing)}</span>
-        <span class="mc-extra">${_memberSetupBadge(m)}${_memberOfferPill(m)}</span>
+        <span class="mc-extra">${_memberBillingFlag(m)}${_memberSetupBadge(m)}${_memberOfferPill(m)}</span>
       </div>
+      ${updating ? '<span class="member-card-spin" aria-label="Updating"></span>' : ''}
     </div>`;
 }
 
@@ -22456,9 +22777,12 @@ function _memberCardHtml(m) {
 function _membersRenderCardsOnly() {
   const host = document.getElementById('members-cards');
   if (!host) { _renderMembersView(); return; }
-  const filtered = _filterMembers(_MEMBERS_ALL || []);
-  host.innerHTML = filtered.length
-    ? filtered.map(_memberCardHtml).join('')
+  const all = _MEMBERS_ALL || [];
+  const f = _MEMBERS_FILTER;
+  const filtered = _filterMembers(all);
+  const pendingGroup = (f.status === 'all') ? _filterMembers(all, 'pending') : [];
+  host.innerHTML = (filtered.length || pendingGroup.length)
+    ? _membersCardsMarkup(filtered, pendingGroup, f.status)
     : '<div class="req-empty" style="padding:20px 0">No members match this filter.</div>';
 }
 
@@ -23216,7 +23540,7 @@ function _plPostTrialForm(oppId) {
       </div>
       <div class="ptf-err" id="ptf-err"></div>
       <div class="ptf-note">On a good fit the card moves to Done Trial + the trainer is assigned. A no-show moves to Interested and fires the missed-trial automation. Your "first message" is texted to the parent; with the sign-up link on, the link is added at the bottom - set the link in KPIs → Setup → Offers (or the Blueprint training Sales section).</div>
-      <button class="ptf-submit" id="ptf-submit" onclick="_ptfSubmit()">Submit review</button>
+      <button class="ptf-submit" id="ptf-submit" onclick="_ptfSubmit()">Submit post trial form</button>
     </div>`;
   ov.classList.add('open');
   _ptfLoadDetail(o);
@@ -23273,7 +23597,7 @@ function _ptfSetShow(v) {
   } else if (v === true) {
     _ptfSetSendLink(true);   // restore the default when they switch back to Showed up
   }
-  const btn = document.getElementById('ptf-submit'); if (btn) btn.textContent = noShow ? 'Mark no-show' : 'Submit review';
+  const btn = document.getElementById('ptf-submit'); if (btn) btn.textContent = noShow ? 'Mark no-show' : 'Submit post trial form';
 }
 function _ptfSetFit(v) {
   _PTF_FIT = v;
@@ -23311,7 +23635,7 @@ async function _ptfSubmit() {
     fetchAndRenderPipelines();
   } catch (e) {
     err.textContent = e.message; err.style.display = 'block';
-    btn.disabled = false; btn.textContent = 'Submit review';
+    btn.disabled = false; btn.textContent = 'Submit post trial form';
   }
 }
 
@@ -30316,8 +30640,8 @@ async function openMemberPopup(memberId) {
   const host = document.getElementById('member-modal-host');
   if (!host) return;
   host.innerHTML = `
-    <div id="member-drawer-backdrop" style="position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:9998;opacity:0;transition:opacity 0.2s ease" onclick="closeMemberPopup()"></div>
-    <div id="member-drawer" style="position:fixed;top:0;right:0;width:min(480px,92vw);height:100vh;background:var(--surface);border-left:1px solid var(--border);box-shadow:-12px 0 32px rgba(0,0,0,0.25);z-index:9999;overflow-y:auto;transform:translateX(100%);transition:transform 0.25s ease;color:var(--text)">
+    <div id="member-drawer-backdrop" style="position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:8900;opacity:0;transition:opacity 0.2s ease" onclick="closeMemberPopup()"></div>
+    <div id="member-drawer" style="position:fixed;top:0;right:0;width:min(480px,92vw);height:100vh;background:var(--surface);border-left:1px solid var(--border);box-shadow:-12px 0 32px rgba(0,0,0,0.25);z-index:8950;overflow-y:auto;transform:translateX(100%);transition:transform 0.25s ease;color:var(--text)">
       <div id="member-modal-body" style="padding:28px 28px 36px"><div class="req-empty" style="padding:24px 0"><span class="req-spin"></span>Loading…</div></div>
     </div>`;
   // Slide in on next frame so the transition fires.
@@ -30434,9 +30758,12 @@ function _renderMemberModalBody(m, stripe, history) {
   const mgmtWhy = !m.stripe_subscription_id ? 'No active subscription - use “Set up billing”.'
     : (stripe && stripe.portal_owned === false) ? 'This subscription was created outside the portal - use “Set up billing” to manage it here.'
     : 'No active subscription to manage here.';
+  // Greyed billing actions stay clickable so a tap explains WHY they're off
+  // (use "Set up billing") instead of a dead, silent button. The reason rides in
+  // a data attr so we never have to escape it into an inline JS string.
   const gbtn = (label, onclick, enabled) => enabled
     ? btn(label, onclick)
-    : `<button disabled title="${escapeHTML(mgmtWhy)}" style="background:transparent;color:var(--text-mute,#888);border:1px solid var(--border);padding:10px 12px;font-weight:600;border-radius:4px;cursor:not-allowed;font-size:13px;font-family:inherit;opacity:0.45">${label}</button>`;
+    : `<button data-why="${escapeHTML(mgmtWhy)}" title="${escapeHTML(mgmtWhy)}" onclick="_plToast(this.getAttribute('data-why'))" style="background:transparent;color:var(--text-mute,#888);border:1px solid var(--border);padding:10px 12px;font-weight:600;border-radius:4px;cursor:not-allowed;font-size:13px;font-family:inherit;opacity:0.5">🔒 ${label}</button>`;
   // Pause/Unpause button - hidden on cancelling members (backend rejects).
   // Gated on manageability (a no-sub or foreign-sub member can't be paused here).
   let toggleBtn = '';
@@ -30505,11 +30832,36 @@ function _renderMemberModalBody(m, stripe, history) {
     <div style="${labelCss};margin-bottom:12px">Billing</div>
     ${rowGrid(billingRows)}
 
+    ${(stripe && stripe.payments && stripe.payments.length) ? `
+      <div style="margin-top:16px">
+        <div style="${labelCss};margin-bottom:8px">Payment history</div>
+        <div style="display:grid;gap:5px">
+          ${stripe.payments.map(p => {
+            const stColor = p.status === 'paid' ? '#7BC47F' : (p.status === 'open' || p.status === 'draft') ? '#c79a4a' : '#9a3b2f';
+            const row = `<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;font-size:12.5px;padding:7px 10px;background:var(--surface);border:1px solid var(--border);border-radius:8px">
+              <span style="color:var(--text-mute)">${fmtDate(p.date)}</span>
+              <span style="display:flex;align-items:center;gap:9px">
+                <b style="color:var(--text)">${fmtMoney(p.amount_cents, p.currency)}</b>
+                <span style="color:${stColor};font-size:10.5px;font-weight:800;text-transform:capitalize">${escapeHTML(p.status || '')}</span>
+              </span>
+            </div>`;
+            return p.url ? `<a href="${escapeHTML(p.url)}" target="_blank" rel="noopener" style="text-decoration:none">${row}</a>` : row;
+          }).join('')}
+        </div>
+      </div>
+    ` : ''}
+
     ${m.skill_notes ? `${divider}<div style="${labelCss};margin-bottom:10px">Notes</div><div style="font-size:13px;color:var(--text);line-height:1.5">${escapeHTML(m.skill_notes)}</div>` : ''}
 
     ${(history && history.length) ? `${divider}<div style="${labelCss};margin-bottom:10px">History</div><div style="display:grid;gap:6px">${history.map(h => `<div style="font-size:12px;color:var(--text-mute)"><span style="color:var(--text)">${escapeHTML(h.action_type)}</span> · ${escapeHTML(h.performed_by_name || '-')} · ${h.created_at ? h.created_at.slice(0,10) : ''}</div>`).join('')}</div>` : ''}
 
     ${divider}
+
+    <!-- Messages (two-way GHL conversation thread, newest first) -->
+    ${m.ghl_contact_id ? `<div style="${labelCss};margin-bottom:12px;display:flex;align-items:center;justify-content:space-between"><span>Messages</span><a onclick="_autoOpenContact('${escapeHTML(m.ghl_contact_id)}','${escapeHTML((m.athlete_name||'').replace(/'/g,''))}')" style="font-size:11px;color:var(--accent);cursor:pointer;text-transform:none;letter-spacing:0;font-family:inherit">Open in Inbox ↗</a></div>
+    <div id="member-inbox-section" style="margin-bottom:12px"><div style="font-size:12px;color:var(--text-mute)">Loading messages…</div></div>
+
+    ${divider}` : ''}
 
     <!-- Documents (waivers, media releases, etc) - private per-member files -->
     <div style="${labelCss};margin-bottom:12px">Documents</div>
@@ -30537,12 +30889,118 @@ function _renderMemberModalBody(m, stripe, history) {
     </div>
   `;
   _loadMemberDocs(m.id, m.client_id || (typeof CLIENT_ID !== 'undefined' ? CLIENT_ID : null));
+  if (m.ghl_contact_id) _loadMemberInbox(m);
   if (m.stripe_price_id) _mFillPlanStatus(m.stripe_price_id);
 }
 
 // ─── Per-member documents (private member-files bucket + member_files table) ──
 let _memberDocsCache = [];
 const _MEMBER_DOC_KINDS = { waiver: 'Waiver', media: 'Media release', medical: 'Medical', intake: 'Intake', document: 'Other' };
+
+// Member drawer inbox: live two-way GHL thread, fetched by ghl_contact_id.
+// Reuses /api/ghl/inbox + ib-msg styling + /api/ghl/send-message (same as the
+// Sales pipeline drawer). Newest messages on top; a composer lets staff reply
+// inline without leaving the drawer.
+let _MEMBER_INBOX = null;  // { contactId, clientId, name, phone, email }
+async function _loadMemberInbox(m) {
+  const sec = document.getElementById('member-inbox-section');
+  if (!sec || !m || !m.ghl_contact_id) return;
+  _MEMBER_INBOX = {
+    contactId: m.ghl_contact_id,
+    clientId: m.client_id || (typeof CLIENT_ID !== 'undefined' ? CLIENT_ID : null),
+    name: (m.athlete_name || '').trim(),
+    phone: m.parent_phone || null,
+    email: m.parent_email || null,
+  };
+  try {
+    const token = await _mreqAuthToken();
+    const r = await fetch(`/api/ghl/inbox?client_id=${encodeURIComponent(_MEMBER_INBOX.clientId)}&contact_id=${encodeURIComponent(m.ghl_contact_id)}`, { headers: { 'Authorization': 'Bearer ' + token } });
+    const j = await _safeJson(r);
+    if (!r.ok) throw new Error(j.error || ('HTTP ' + r.status));
+    _renderMemberInbox(sec, j.messages || []);
+  } catch (e) {
+    sec.innerHTML = `<div style="font-size:12px;color:var(--text-mute);margin-bottom:8px">Couldn't load messages - ${escapeHTML(e.message)}</div>${_memberInboxComposer()}`;
+  }
+}
+
+// Reply composer - channel picker (only the channels the contact can receive on)
+// + textarea + Send. Hidden entirely if there's no phone AND no email on file.
+function _memberInboxComposer() {
+  const i = _MEMBER_INBOX || {};
+  const canSms = !!i.phone, canEmail = !!i.email;
+  if (!canSms && !canEmail) {
+    return `<div style="font-size:11.5px;color:var(--text-mute);margin-bottom:10px">No phone or email on file - add one in GHL to reply here.</div>`;
+  }
+  const chanOpts = [canSms ? '<option value="SMS">SMS</option>' : '', canEmail ? '<option value="Email">Email</option>' : ''].join('');
+  return `<div style="margin-bottom:12px">
+      <div style="display:flex;gap:8px;align-items:center;margin-bottom:6px">
+        <select id="member-msg-type" style="background:var(--surface);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:6px 9px;font:inherit;font-size:12px;cursor:pointer">${chanOpts}</select>
+      </div>
+      <textarea id="member-msg-input" placeholder="Type a message…" onkeydown="if((event.metaKey||event.ctrlKey)&&event.key==='Enter')_memberInboxSend()" style="width:100%;min-height:60px;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:9px 11px;font:inherit;font-size:13px;resize:vertical;outline:none;box-sizing:border-box"></textarea>
+      <div style="display:flex;justify-content:flex-end;margin-top:6px">
+        <button id="member-msg-send" onclick="_memberInboxSend()" style="background:var(--gold,#E8C547);color:#0B0B0D;border:none;border-radius:8px;padding:8px 18px;font:inherit;font-size:13px;font-weight:700;cursor:pointer">Send</button>
+      </div>
+    </div>`;
+}
+
+function _renderMemberInbox(sec, messages) {
+  const contactFirst = ((_MEMBER_INBOX && _MEMBER_INBOX.name) || '').trim().split(/\s+/)[0] || 'Them';
+  // Chronological (oldest -> newest). We keep the 8 most-recent, displayed in
+  // order so the NEWEST sits at the bottom, right above the composer - like a
+  // normal chat. The container then auto-scrolls to the bottom on load.
+  const asc = [...messages].filter(mm => !_ibIsActivity(mm))
+    .sort((a, b) => (a.date ? new Date(a.date).getTime() : 0) - (b.date ? new Date(b.date).getTime() : 0));
+  const recent = asc.slice(-8);
+  const more = asc.length - recent.length;
+  const thread = recent.length ? recent.map(mm => {
+    const out = (mm.direction || '').toLowerCase() === 'outbound';
+    const atts = _ibRenderAttachments(mm.attachments);
+    const hasBody = (mm.body || '').trim().length > 0;
+    const sender = out ? 'You' : escapeHTML(contactFirst);
+    const channel = escapeHTML(_ghlChannelLabel(mm.type));
+    const when = escapeHTML(_ibFormatDate(mm.date));
+    return `<div class="ib-msg ${out ? 'ib-msg-out' : 'ib-msg-in'}">${hasBody ? escapeHTML(mm.body.trim()) : (atts ? '' : '(no body)')}${atts}<div class="ib-msg-meta">${sender} · ${channel}${when ? ' · ' + when : ''}</div></div>`;
+  }).join('') : `<div style="font-size:12px;color:var(--text-mute)">No messages yet.</div>`;
+  sec.innerHTML = `${more > 0 ? `<div style="font-size:11px;color:var(--text-mute);margin-bottom:8px">Latest ${recent.length} of ${asc.length} messages</div>` : ''}<div id="member-inbox-thread" style="display:flex;flex-direction:column;gap:8px;max-height:300px;overflow-y:auto;margin-bottom:12px">${thread}</div>${_memberInboxComposer()}`;
+  // Load scrolled to the bottom so the newest message is in view.
+  const tc = document.getElementById('member-inbox-thread');
+  if (tc) tc.scrollTop = tc.scrollHeight;
+}
+
+// Send a reply on the member's GHL thread, then reload (reply lands at the
+// bottom and the thread auto-scrolls down to it).
+async function _memberInboxSend() {
+  if (!_sendGuard('memberInboxSend')) return;
+  const i = _MEMBER_INBOX;
+  if (!i || !i.contactId) return;
+  const textEl = document.getElementById('member-msg-input');
+  const typeEl = document.getElementById('member-msg-type');
+  const btn    = document.getElementById('member-msg-send');
+  const message = (textEl?.value || '').trim();
+  const type    = typeEl?.value || 'SMS';
+  if (!message) return;
+  if (type === 'Email' && !i.email) { alert('This contact has no email on file - pick SMS, or add an email in GHL.'); return; }
+  if (type === 'SMS' && !i.phone)   { alert('This contact has no phone on file - pick Email, or add a phone in GHL.'); return; }
+  if (btn) { btn.disabled = true; btn.textContent = 'Sending…'; }
+  try {
+    const token = await _mreqAuthToken();
+    const subject = type === 'Email' ? `Message from ${(_GHL_CONNECT_STATE && _GHL_CONNECT_STATE.business_name) || 'us'}` : undefined;
+    const r = await fetch('/api/ghl/send-message', {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ client_id: i.clientId || CLIENT_ID, contact_id: i.contactId, type, message, subject }),
+    });
+    const json = await _safeJson(r);
+    if (!r.ok) throw new Error(json.error || ('HTTP ' + r.status));
+    if (textEl) textEl.value = '';
+    const sec = document.getElementById('member-inbox-section');
+    if (sec) _loadMemberInbox({ ghl_contact_id: i.contactId, client_id: i.clientId, athlete_name: i.name, parent_phone: i.phone, parent_email: i.email });
+  } catch (e) {
+    alert('Send failed: ' + e.message);
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = 'Send'; }
+  }
+}
 
 async function _loadMemberDocs(memberId, clientId) {
   const sec = document.getElementById('member-docs-section');
@@ -30813,7 +31271,7 @@ function _mmModal(opts = {}) {
     const fields = opts.fields || [];
     const okBg = opts.danger ? '#c0392b' : 'var(--gold,#E8C547)';
     const okCol = opts.danger ? '#fff' : '#0B0B0D';
-    document.body.insertAdjacentHTML('beforeend', `<div id="mm-modal-overlay" style="position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9300;display:flex;align-items:center;justify-content:center;padding:18px" onclick="if(event.target===this){this.remove();window.__mmResolve&&window.__mmResolve(null)}">
+    document.body.insertAdjacentHTML('beforeend', `<div id="mm-modal-overlay" style="position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:10100;display:flex;align-items:center;justify-content:center;padding:18px" onclick="if(event.target===this){this.remove();window.__mmResolve&&window.__mmResolve(null)}">
       <div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;width:100%;max-width:440px;padding:24px;box-shadow:0 20px 60px rgba(0,0,0,.5);max-height:88vh;overflow:auto">
         ${opts.icon ? `<div style="font-size:30px;line-height:1;margin-bottom:12px">${opts.icon}</div>` : ''}
         <div style="font-size:18px;font-weight:700;color:var(--text);margin-bottom:${opts.body ? '6px' : '16px'}">${opts.title || 'Are you sure?'}</div>
@@ -31087,10 +31545,23 @@ async function mRefund(memberId, customerId) {
 }
 
 async function mChange(memberId, currentPlan) {
+  // Immediate feedback so a click is NEVER silent - if the pricing/member fetch
+  // below is slow or the button was somehow reached in a weird state, the user
+  // still sees the click registered. The modal opens over this toast.
+  _plToast('Loading plans…');
   // Live target plans come from the academy's pricing_catalog (is_routable) -
   // not a hardcoded list - so new live prices (Summer Unlimited) and the
   // multi-month commitments show up automatically. Archived/legacy are excluded.
-  let flat = [], grouped = [], nextUnix = null;
+  let flat = [], grouped = [], nextUnix = null, sj = {};
+  // BAM GTA / Ontario: Stripe prices are tax-inclusive (13% HST baked in), so
+  // split the all-in amount into the regular price + the HST fee for display.
+  const HST_RATE = 0.13;
+  const _money = (c) => '$' + (c / 100).toFixed(2).replace(/\.00$/, '');
+  const _withHst = (cents) => {
+    if (cents == null) return '';
+    const base = Math.round(cents / (1 + HST_RATE));
+    return `${_money(cents)} (${_money(base)} + ${_money(cents - base)} HST)`;
+  };
   try {
     const token = await _mreqAuthToken();
     const qs = (typeof CLIENT_ID !== 'undefined' && CLIENT_ID) ? '?client_id=' + encodeURIComponent(CLIENT_ID) : '';
@@ -31101,7 +31572,7 @@ async function mChange(memberId, currentPlan) {
     const pj = await _safeJson(pr);
     if (!pr.ok) throw new Error(pj.error || ('HTTP ' + pr.status));
     const mj = await _safeJson(mr);
-    const sj = (mr.ok && mj && mj.stripe) ? mj.stripe : {};
+    sj = (mr.ok && mj && mj.stripe) ? mj.stripe : {};
     // "When the next payment was supposed to be": trial_end if a future trial is
     // active, else the current period end.
     nextUnix = (sj.trial_end && sj.trial_end * 1000 > Date.now()) ? sj.trial_end : (sj.current_period_end || null);
@@ -31140,8 +31611,7 @@ async function mChange(memberId, currentPlan) {
       .filter(row => row && row.stripe_price_id && row.is_routable === true && row.tier === 'canonical')
       .sort((a, b) => ir(a.interval) - ir(b.interval) || (a.amount_cents || 0) - (b.amount_cents || 0))
       .forEach(row => {
-        const amt = (row.amount_cents / 100).toFixed(2).replace(/\.00$/, '');
-        const o = { value: row.stripe_price_id, label: `${row.display_name || row.canonical_plan || 'Plan'} ($${amt})` };
+        const o = { value: row.stripe_price_id, label: `${row.display_name || row.canonical_plan || 'Plan'} - ${_withHst(row.amount_cents)}` };
         (statusOf(row) === 'live' ? live : legacy).push(o);
       });
     flat = [...live, ...legacy];
@@ -31155,21 +31625,35 @@ async function mChange(memberId, currentPlan) {
     _plToast('No live prices found for this academy.');
     return;
   }
-  const nextYMD = nextUnix ? new Date(nextUnix * 1000).toISOString().slice(0, 10) : '';
-  const nextLabel = nextUnix ? _cdDate(nextUnix) : 'unknown';
-  const vals = await _mmModal({
-    icon: '🔄', title: 'Change plan',
-    body: `Current plan: <b>${escapeHTML(currentPlan || '-')}</b><br>Next payment: <b>${escapeHTML(nextLabel)}</b>`,
-    okLabel: 'Change plan',
-    fields: [
-      { key: 'new_price', label: 'New plan', type: 'select', value: flat[0].value, options: grouped },
-      { key: 'next_payment', label: 'Next payment date (leave as-is to keep)', type: 'date', value: nextYMD },
-      { key: 'prorate', label: 'Proration', type: 'radio', value: 'no', options: [
-        { value: 'no',  label: 'No proration', hint: 'Change applies on the next cycle.' },
-        { value: 'yes', label: 'Prorate now', hint: 'Charge the prorated difference now (upgrades only).' },
-      ] },
-    ],
-  });
+  // Guard the date math - a stray/huge period-end would make toISOString throw,
+  // and since this runs AFTER the try block, that would silently kill the modal.
+  let nextYMD = '';
+  try { if (nextUnix) nextYMD = new Date(nextUnix * 1000).toISOString().slice(0, 10); } catch (_) { nextYMD = ''; }
+  const nextLabel = nextUnix ? (_cdDate(nextUnix) || 'unknown') : 'unknown';
+  // Recent payments - last few invoices on this sub (from /api/members stripe.payments).
+  // Amounts are already all-in (tax-inclusive), so show the total paid, not the HST split.
+  const _pays = (sj && Array.isArray(sj.payments)) ? sj.payments.slice(0, 4) : [];
+  const _payStColor = (s) => s === 'paid' ? '#7BC47F' : (s === 'open' || s === 'draft') ? '#c79a4a' : '#9a3b2f';
+  const paymentsHtml = _pays.length ? `<div style="margin-top:10px"><div style="font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:var(--text-mute,#888);margin-bottom:5px">Recent payments</div><div style="display:grid;gap:4px">${_pays.map(p => `<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;font-size:12px"><span style="color:var(--text-mute,#888)">${escapeHTML(_cdDate(p.date) || '')}</span><span style="display:flex;align-items:center;gap:8px"><b style="color:var(--text,#eee)">${_money(p.amount_cents)}</b><span style="color:${_payStColor(p.status)};font-size:10px;font-weight:800;text-transform:capitalize">${escapeHTML(p.status || '')}</span></span></div>`).join('')}</div></div>` : '';
+  let vals;
+  try {
+    vals = await _mmModal({
+      icon: '🔄', title: 'Change plan',
+      body: `Current plan: <b>${escapeHTML(currentPlan || '-')}</b>${(sj && sj.amount_cents != null) ? ' &middot; ' + _withHst(sj.amount_cents) : ''}<br>Next payment: <b>${escapeHTML(nextLabel)}</b>${paymentsHtml}`,
+      okLabel: 'Change plan',
+      fields: [
+        { key: 'new_price', label: 'New plan', type: 'select', value: flat[0].value, options: grouped },
+        { key: 'next_payment', label: 'Next payment date (leave as-is to keep)', type: 'date', value: nextYMD },
+        { key: 'prorate', label: 'Proration', type: 'radio', value: 'no', options: [
+          { value: 'no',  label: 'No proration', hint: 'Change applies on the next cycle.' },
+          { value: 'yes', label: 'Prorate now', hint: 'Charge the prorated difference now (upgrades only).' },
+        ] },
+      ],
+    });
+  } catch (e) {
+    _plToast('Could not open Change plan: ' + (e && e.message ? e.message : e));
+    return;
+  }
   if (!vals) return;
   const picked = flat.find(o => o.value === vals.new_price);
   const payload = { new_price_id: vals.new_price, prorate: vals.prorate === 'yes' };
@@ -31179,8 +31663,7 @@ async function mChange(memberId, currentPlan) {
     const label = (r.member && r.member.plan) ? r.member.plan : (picked ? picked.label : 'new plan');
     const npNote = (r.next_payment_set && r.next_payment) ? ` · next payment ${_cdDate(r.next_payment)}` : '';
     _plToast(`Changed to ${label} (${r.direction}${r.prorated ? ' · prorated' : ''})${npNote}.`);
-    closeMemberPopup();
-    fetchAndRenderMembers();
+    _membersRefreshFlash(memberId);
   } catch (e) { _plToast('Change failed: ' + e.message); }
 }
 
@@ -31741,7 +32224,9 @@ async function _budgetReviewSubmit(reviewId, lookGood) {
   const MIN = 600;
   const inputs = Array.from(document.querySelectorAll('#budgetReviewBody input[id^="br-input-"]'));
   const errEl = document.getElementById('br-error');
-  const changes = [];
+  // Snapshot EVERY campaign (not just changed ones) so the confirmation always
+  // turns into one marketing ticket the team can action - even "These look good".
+  const budgets = [];
   for (const inp of inputs) {
     const val = parseFloat(inp.value);
     if (!Number.isFinite(val) || val < MIN) {
@@ -31749,27 +32234,20 @@ async function _budgetReviewSubmit(reviewId, lookGood) {
       return;
     }
     const cur = inp.dataset.cur === '' ? null : parseFloat(inp.dataset.cur);
-    if (!lookGood && (cur == null || Math.round(val) !== Math.round(cur))) {
-      changes.push({ name: inp.dataset.name, cur, next: Math.round(val) });
-    }
+    const next = Math.round(val);
+    const changed = !lookGood && (cur == null || next !== Math.round(cur));
+    budgets.push({ name: inp.dataset.name, current: cur, confirmed: next, changed });
   }
+  const changes = budgets.filter(b => b.changed);
   try {
-    for (const ch of changes) {
-      await _mreqCreateTicket({
-        type: 'budget',
-        fields: {
-          campaign_title: ch.name,
-          current_spend: ch.cur != null ? '$' + ch.cur : '',
-          new_spend: '$' + ch.next,
-          note: 'Submitted from the monthly budget confirmation.',
-        },
-      });
-    }
+    // One ticket: the budget-review request itself becomes the marketing work
+    // ticket (stays open, carries the confirmed budgets). No per-campaign tickets.
     await _mreqPatchTicket(reviewId, {
       action: 'respond',
       message: changes.length
         ? `Confirmed monthly budgets - requested ${changes.length} change${changes.length === 1 ? '' : 's'}.`
         : 'Confirmed monthly budgets - no changes.',
+      budgets,
     });
     _closeBudgetReviewModal();
     await fetchAndRenderMarketingRequests();
@@ -31777,7 +32255,7 @@ async function _budgetReviewSubmit(reviewId, lookGood) {
       changes.length ? 'Budget changes submitted' : 'Budgets confirmed',
       changes.length
         ? `We sent ${changes.length} budget change${changes.length === 1 ? '' : 's'} to your marketing team.`
-        : 'Thanks for confirming - no changes made.'
+        : 'Thanks for confirming - we let your marketing team know.'
     );
   } catch (e) {
     if (errEl) { errEl.textContent = 'Something went wrong: ' + e.message; errEl.style.display = 'block'; }
@@ -32692,7 +33170,10 @@ function _mreqRowHTML(r) {
 
   // All content-ticket rows open the unified content-ticket detail view.
   // Marketing-ticket rows open the existing marketing detail view.
-  const onClickAttr = r.type === 'budget-review'
+  // A budget-review only re-opens the budget modal while it's still awaiting the
+  // client. Once confirmed it lives on as a marketing work ticket, so clicking it
+  // opens the normal request detail (the thread + confirmed budgets) instead.
+  const onClickAttr = (r.type === 'budget-review' && r.clientActionStatus === 'requested')
     ? `_openBudgetReviewModal('${r.id}')`
     : (isContentAction || isContentProduction)
     ? `openContentTicketDetail('${r.id}')`
@@ -36836,6 +37317,8 @@ function toggleTheme() {
      Was previously inside #view-members, which hid the modal when opened from
      the onboarding/Action Items tab or for non-V2 clients. -->
 <div id="stripe-modal-host"></div>
+<!-- Member detail drawer host - body level so it shows from any view (Members or Inbox). -->
+<div id="member-modal-host"></div>
 
 <!-- ── Action item create / edit modal ── -->
 <div id="actionItemModal" class="modal-backdrop" style="display:none" onclick="if(event.target===this)closeActionItemModal()">

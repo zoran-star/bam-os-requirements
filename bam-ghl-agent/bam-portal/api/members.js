@@ -312,6 +312,22 @@ async function handler(req, res) {
               can_manage: liveStatus && portalOwned, // gate for pause/cancel/change/refund
             };
 
+            // Recent payment history - last few invoices on this subscription.
+            // Non-fatal: if it fails, the Billing section just omits the list.
+            try {
+              const inv = await stripeFetch(
+                `/invoices?subscription=${member.stripe_subscription_id}&limit=6`,
+                { stripeAccount: client.stripe_connect_account_id }
+              );
+              stripe.payments = (inv?.data || []).map((i) => ({
+                date: i.created,
+                amount_cents: (i.amount_paid != null ? i.amount_paid : i.amount_due),
+                currency: (i.currency || "cad").toLowerCase(),
+                status: i.status,              // paid | open | void | uncollectible | draft
+                url: i.hosted_invoice_url || null,
+              }));
+            } catch (_) { stripe.payments = []; }
+
             // Lazy backfill: if we just learned the sub's created date and
             // the column is empty, persist it. New signups via webhook get
             // populated up front; this fills in the legacy rows the first
@@ -325,6 +341,20 @@ async function handler(req, res) {
                   body: JSON.stringify({ stripe_joined_at: iso }),
                 });
                 member.stripe_joined_at = iso;
+              } catch (_) { /* non-fatal */ }
+            }
+
+            // Lazy backfill the billing-ownership flag so the roster can badge
+            // "imported / needs Set up billing" members without a Stripe call
+            // per row. Same pattern as stripe_joined_at above. Non-fatal.
+            if (member.billing_portal_owned !== portalOwned) {
+              try {
+                await sb(`members?id=eq.${id}`, {
+                  method: "PATCH",
+                  headers: { Prefer: "return=minimal" },
+                  body: JSON.stringify({ billing_portal_owned: portalOwned }),
+                });
+                member.billing_portal_owned = portalOwned;
               } catch (_) { /* non-fatal */ }
             }
           } catch (e) {
