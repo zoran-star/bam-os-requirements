@@ -183,7 +183,11 @@ async function handler(req, res) {
             if (sts) {
               const d = await ghl("GET", `/opportunities/search?${new URLSearchParams({ location_id: creds.locationId, contact_id: String(apptContactId), limit: "20" })}`, { token: creds.token });
               const opps = d.opportunities || d.data || [];
-              const oppId = (opps.find(o => String(o.status || "").toLowerCase() === "open") || opps[0] || null)?.id || null;
+              // ONLY move an OPEN opp. A member booking a training session also hits this
+              // webhook - they have no open sales opp (theirs is won), so we must NOT grab
+              // opps[0] and shove a won/closed card into Scheduled Trial. Open-only = no-op
+              // for members + already-closed leads.
+              const oppId = (opps.find(o => String(o.status || "").toLowerCase() === "open") || null)?.id || null;
               if (oppId) await ghl("PUT", `/opportunities/${encodeURIComponent(oppId)}`, { token: creds.token, body: { pipelineId: sts.pipelineId, pipelineStageId: sts.stageId } });
             }
           }
