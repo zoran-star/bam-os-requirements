@@ -22214,6 +22214,29 @@ function _updateActionItemsBadge() {
   else { badge.style.display = 'none'; }
 }
 
+// Roster cards mid-update: show a spinner while saving + refetching, then a
+// one-shot gold flash on the row that changed. Module-level so the flags
+// survive the full re-render fetchAndRenderMembers() triggers.
+let _MEMBERS_UPDATING = new Set();
+let _MEMBERS_FLASH = new Set();
+
+// Call after a member action that changes what the roster shows (plan change,
+// pause, etc.): closes the drawer, spins the card, refetches, then flashes it
+// gold. memberId must be on the current roster.
+async function _membersRefreshFlash(memberId) {
+  try { closeMemberPopup(); } catch (_) {}
+  _MEMBERS_UPDATING.add(memberId);
+  if (document.getElementById('members-cards')) _renderMembersView();   // show the spinner now
+  try { await fetchAndRenderMembers(); } catch (_) {}                    // refetch (re-renders with spinner still on)
+  _MEMBERS_UPDATING.delete(memberId);
+  _MEMBERS_FLASH.add(memberId);
+  if (document.getElementById('members-cards')) _renderMembersView();   // fresh data + gold flash
+  setTimeout(() => {
+    _MEMBERS_FLASH.delete(memberId);
+    if (document.getElementById('members-cards')) _renderMembersView();
+  }, 1900);
+}
+
 async function fetchAndRenderMembers() {
   // Handle return redirect from Stripe Connect OAuth (?stripe_connect=...)
   _stripeConnectReturnCheck();
@@ -22541,6 +22564,22 @@ function _renderMembersView() {
         transition: background 0.15s ease, border-color 0.15s ease;
       }
       .member-card:hover { background: rgba(232,197,71,0.06); border-color: rgba(232,197,71,0.45); }
+      /* Just-updated: gold flash so the eye lands on the row that changed. */
+      @keyframes mcGoldFlash {
+        0%   { background: rgba(232,197,71,0.32); border-color: var(--gold,#E8C547); box-shadow: 0 0 0 1px var(--gold,#E8C547) inset; }
+        100% { background: transparent; border-color: var(--border); box-shadow: none; }
+      }
+      .member-card-flash { animation: mcGoldFlash 1.8s ease-out; }
+      /* Updating: dim + spinner while the change saves and the roster refetches. */
+      .member-card-updating { position: relative; pointer-events: none; }
+      .member-card-updating > *:not(.member-card-spin) { opacity: 0.45; }
+      @keyframes mcSpin { to { transform: translateY(-50%) rotate(360deg); } }
+      .member-card-spin {
+        position: absolute; top: 50%; right: 18px; transform: translateY(-50%);
+        width: 16px; height: 16px; border: 2px solid rgba(232,197,71,0.25);
+        border-top-color: var(--gold,#E8C547); border-radius: 50%;
+        animation: mcSpin 0.7s linear infinite; opacity: 1 !important;
+      }
       .member-card-main { min-width:0; }
       .member-card-name { font-weight:700; font-size:15px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
       .member-card-parent { font-size:12px; color:var(--text-mute); margin-top:2px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
@@ -22611,8 +22650,11 @@ function _renderMembersView() {
 
 // One member card's markup (shared by the full render + the search-only render).
 function _memberCardHtml(m) {
+  const updating = _MEMBERS_UPDATING.has(m.id);
+  const flash    = _MEMBERS_FLASH.has(m.id);
+  const cls = 'card member-card' + (updating ? ' member-card-updating' : '') + (flash ? ' member-card-flash' : '');
   return `
-    <div class="card member-card" onclick="openMemberPopup('${escapeHTML(m.id)}')">
+    <div class="${cls}" onclick="openMemberPopup('${escapeHTML(m.id)}')">
       ${_memberAvatar(m, 38)}
       <div class="member-card-main">
         <div class="member-card-name">${escapeHTML(m.athlete_name || 'Unnamed')}</div>
@@ -22625,6 +22667,7 @@ function _memberCardHtml(m) {
         <span class="mc-price">${_memberPriceLabel(m.pricing)}</span>
         <span class="mc-extra">${_memberSetupBadge(m)}${_memberOfferPill(m)}</span>
       </div>
+      ${updating ? '<span class="member-card-spin" aria-label="Updating"></span>' : ''}
     </div>`;
 }
 
@@ -31356,8 +31399,7 @@ async function mChange(memberId, currentPlan) {
     const label = (r.member && r.member.plan) ? r.member.plan : (picked ? picked.label : 'new plan');
     const npNote = (r.next_payment_set && r.next_payment) ? ` · next payment ${_cdDate(r.next_payment)}` : '';
     _plToast(`Changed to ${label} (${r.direction}${r.prorated ? ' · prorated' : ''})${npNote}.`);
-    closeMemberPopup();
-    fetchAndRenderMembers();
+    _membersRefreshFlash(memberId);
   } catch (e) { _plToast('Change failed: ' + e.message); }
 }
 
