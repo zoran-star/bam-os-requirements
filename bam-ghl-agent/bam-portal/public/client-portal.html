@@ -16259,10 +16259,15 @@ async function _taSetModeGo(mode) {
 // engine sends each step on schedule (quiet hours respected). Renders EMPTY until
 // the import session fills the steps.
 let _AUTO = { list: [], overview: [] };
+// `enabled`/`approved` are the SHIPPED defaults when an academy has no row yet.
+// 💔 Lead Nurture ships ON (enabled + approved) so the last-stop long game is wired
+// from day one - it still sends nothing until it has enabled steps (the engine's
+// isAutomationLive gate), so on-by-default is safe. Onboarding + Ghosted ship OFF
+// (the academy approves them once their copy is reviewed).
 const _AUTO_SEED = [
-  { automation_key: 'onboarding', name: '👋 Onboarding' },
-  { automation_key: 'ghosted', name: '👻 Ghosted' },
-  { automation_key: 'nurture', name: '💔 Lead Nurture' },
+  { automation_key: 'onboarding', name: '👋 Onboarding', enabled: false, approved: false },
+  { automation_key: 'ghosted', name: '👻 Ghosted', enabled: false, approved: false },
+  { automation_key: 'nurture', name: '💔 Lead Nurture', enabled: true, approved: true },
 ];
 const _AUTO_UNITS = ['minutes', 'hours', 'days', 'weeks', 'months'];
 
@@ -16430,7 +16435,7 @@ async function _taRenderAutomations() {
     const have = new Set(list.map(a => a.automation_key));
     let seeded = false;
     for (const s of _AUTO_SEED) {
-      if (!have.has(s.automation_key)) { await _autoApi('upsert-automation', { automation_key: s.automation_key, name: s.name, enabled: false, approved: false }); seeded = true; }
+      if (!have.has(s.automation_key)) { await _autoApi('upsert-automation', { automation_key: s.automation_key, name: s.name, enabled: !!s.enabled, approved: !!s.approved }); seeded = true; }
     }
     if (seeded) { d = await _autoApi('list'); list = d.automations || []; }
   } catch (e) { p.innerHTML = `<div style="color:#e07070;font-size:13px">Couldn't load - ${escapeHTML(e.message)}</div>`; return; }

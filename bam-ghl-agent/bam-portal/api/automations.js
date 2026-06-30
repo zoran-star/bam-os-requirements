@@ -13,7 +13,7 @@ import { withSentryApiRoute } from "./_sentry.js";
 // CLAIMS a job with a conditional pending->sending update before sending.
 
 import { pickGhlToken, ghl } from "./ghl/_core.js";
-import { nurtureStage, scheduledTrialContactIdSetCached } from "./agent/_stage.js";
+import { nurtureStage, interestedStage, scheduledTrialContactIdSetCached } from "./agent/_stage.js";
 import { shadowMirrorMove } from "./agent/_store.js";
 import { nextSessionLabel } from "./_next_session.js";
 import { sendOn } from "./_send.js";
@@ -192,7 +192,7 @@ async function runWork(res) {
   const stepsCache  = new Map();   // automationId -> steps[]
   const contactCache = new Map();  // contactId -> {email,phone,firstName,fullName}
   const calCache    = new Map();   // clientId -> first calendar entry-point key | null
-  let sent = 0, deferred = 0, advanced = 0, completed = 0, failed = 0, canceled = 0, lost = 0, nurtureLost = 0;
+  let sent = 0, deferred = 0, advanced = 0, completed = 0, failed = 0, canceled = 0, lost = 0, nurtureLost = 0, ghostedLost = 0, formToGhosted = 0;
 
   for (const job of jobs) {
     // ATOMIC CLAIM: flip pending->sending ONLY if still pending. If 0 rows come
@@ -204,6 +204,15 @@ async function runWork(res) {
     if (!Array.isArray(claimed) || !claimed.length) { lost++; continue; }
 
     const finish = (patch) => sb(`automation_jobs?id=eq.${job.id}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify(patch) }).catch(() => {});
+    // Lazily load this client's GHL creds into the shared caches. The completion
+    // branch can fire on the step-missing/disabled advance path where creds were
+    // never loaded before the send, so roll-forward/terminal handlers call this.
+    const ensureCreds = async () => {
+      if (!clientCache.has(job.client_id)) clientCache.set(job.client_id, await loadClient(job.client_id));
+      const client = clientCache.get(job.client_id);
+      if (!tokenCache.has(job.client_id)) tokenCache.set(job.client_id, client ? await pickGhlToken(client) : null);
+      return tokenCache.get(job.client_id);
+    };
     // Schedule the next enabled step after `curPos`, or complete the enrollment.
     const advance = async (steps, curPos) => {
       const next = enabledSteps(steps).find(s => s.position > curPos);
@@ -215,20 +224,58 @@ async function runWork(res) {
         await sb(`automation_enrollments?id=eq.${job.enrollment_id}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ status: "completed", exited_at: new Date().toISOString(), exit_reason: "sequence complete" }) }).catch(() => {});
         await logEvent({ clientId: job.client_id, contactId: job.contact_id, automationId: job.automation_id, type: "completed", payload: null });
         completed++;
-        // Model: 👻 Ghosted ran out and they're STILL silent -> roll into 💔 Lead
-        // Nurture (the sparse long game). Only when nurture is live; best-effort.
+        // L1/L3: 📝 contact_form / 🏀 trial_form INTRO sent its one step and they
+        // never replied -> the lead is stranded in Interested where nobody watches
+        // (the ghost detector + agent only scan Responded). Roll them into 👻 Ghosted
+        // so the long game picks up, mirroring the ghosted->nurture roll below
+        // (enroll + move the opp to the Interested/ghosted stage via interestedStage).
+        // Best-effort + idempotent; only when ghosted is live, else leave them put.
         try {
           const a = autoCache.get(job.automation_id);
-          if (a && a.automation_key === "ghosted" && await isAutomationLive(job.client_id, "nurture")) {
-            await enrollContact({ clientId: job.client_id, automationKey: "nurture", contactId: job.contact_id });
-            const creds = tokenCache.get(job.client_id);
+          if (a && (a.automation_key === "contact_form" || a.automation_key === "trial_form") && await isAutomationLive(job.client_id, "ghosted")) {
+            await enrollContact({ clientId: job.client_id, automationKey: "ghosted", contactId: job.contact_id });
+            const creds = await ensureCreds();
             if (creds && creds.token) {
-              const ns = await nurtureStage(creds.token, creds.locationId);
+              const is = await interestedStage(creds.token, creds.locationId);
               const oppId = await findOpenOppId(creds.token, creds.locationId, job.contact_id);
-              if (ns && oppId) await ghl("PUT", `/opportunities/${encodeURIComponent(oppId)}`, { token: creds.token, body: { pipelineId: ns.pipelineId, pipelineStageId: ns.stageId } });
-              if (ns && oppId) { try { await shadowMirrorMove(job.client_id, { ghlOpportunityId: oppId, ghlContactId: job.contact_id, role: "nurture", stageResolved: ns, status: "open", reason: "ghosted ran out - rolled into nurture" }); } catch (_) {} }
+              if (is && oppId) await ghl("PUT", `/opportunities/${encodeURIComponent(oppId)}`, { token: creds.token, body: { pipelineId: is.pipelineId, pipelineStageId: is.stageId } });
+              if (is && oppId) { try { await shadowMirrorMove(job.client_id, { ghlOpportunityId: oppId, ghlContactId: job.contact_id, role: "ghosted", stageResolved: is, status: "open", reason: "intro form sent, no reply - rolled into ghosted" }); } catch (_) {} }
             }
-            await logEvent({ clientId: job.client_id, contactId: job.contact_id, automationId: job.automation_id, type: "ghosted_to_nurture", payload: null });
+            await logEvent({ clientId: job.client_id, contactId: job.contact_id, automationId: job.automation_id, type: "form_intro_to_ghosted", payload: { automation_key: a.automation_key } });
+            formToGhosted++;
+          }
+        } catch (_) { /* best-effort roll-forward */ }
+        // Model: 👻 Ghosted ran out and they're STILL silent -> roll into 💔 Lead
+        // Nurture (the sparse long game). Only when nurture is live; best-effort.
+        // L2(a): if nurture is NOT live, the lead would otherwise sit open + idle
+        // forever -> fall back to a GHL-native terminal LOST + a pipeline_outcomes
+        // row (mirrors confirm-lost), so the lead leaves the open board.
+        try {
+          const a = autoCache.get(job.automation_id);
+          if (a && a.automation_key === "ghosted") {
+            if (await isAutomationLive(job.client_id, "nurture")) {
+              await enrollContact({ clientId: job.client_id, automationKey: "nurture", contactId: job.contact_id });
+              const creds = await ensureCreds();
+              if (creds && creds.token) {
+                const ns = await nurtureStage(creds.token, creds.locationId);
+                const oppId = await findOpenOppId(creds.token, creds.locationId, job.contact_id);
+                if (ns && oppId) await ghl("PUT", `/opportunities/${encodeURIComponent(oppId)}`, { token: creds.token, body: { pipelineId: ns.pipelineId, pipelineStageId: ns.stageId } });
+                if (ns && oppId) { try { await shadowMirrorMove(job.client_id, { ghlOpportunityId: oppId, ghlContactId: job.contact_id, role: "nurture", stageResolved: ns, status: "open", reason: "ghosted ran out - rolled into nurture" }); } catch (_) {} }
+              }
+              await logEvent({ clientId: job.client_id, contactId: job.contact_id, automationId: job.automation_id, type: "ghosted_to_nurture", payload: null });
+            } else {
+              const creds = await ensureCreds();
+              if (creds && creds.token) {
+                const oppId = await findOpenOppId(creds.token, creds.locationId, job.contact_id);
+                if (oppId) {
+                  try { await ghl("PUT", `/opportunities/${encodeURIComponent(oppId)}`, { token: creds.token, body: { status: "lost" } }); } catch (_) { /* GHL PUT best-effort */ }
+                  try { await sb(`pipeline_outcomes`, { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify([{ client_id: job.client_id, opportunity_id: oppId, status: "lost", reason: "ghosted exhausted, nurture off" }]) }); } catch (_) {}
+                  try { await shadowMirrorMove(job.client_id, { ghlOpportunityId: oppId, ghlContactId: job.contact_id, status: "lost", reason: "ghosted exhausted, nurture off" }); } catch (_) {}
+                  await logEvent({ clientId: job.client_id, contactId: job.contact_id, automationId: job.automation_id, type: "ghosted_exhausted_lost", payload: { opportunity_id: oppId } });
+                  ghostedLost++;
+                }
+              }
+            }
           }
         } catch (_) { /* best-effort roll-forward */ }
         // Model: 💔 Lead Nurture is the LAST stop. If the nurture sequence itself runs
@@ -302,9 +349,9 @@ async function runWork(res) {
       const token = creds && creds.token;
       const info = token ? await resolveContactInfo(token, job.contact_id, contactCache) : { email: null, phone: null, firstName: null, fullName: null };
 
-      // 🏀 trial_followup: if they've since BOOKED (now in the Scheduled Trial
+      // 🏀 trial_form: if they've since BOOKED (now in the Scheduled Trial
       // stage, via any path) the 20-min nudge is moot - exit + skip the send.
-      if (auto.automation_key === "trial_followup" && token && creds.locationId) {
+      if (auto.automation_key === "trial_form" && token && creds.locationId) {
         try {
           const booked = await scheduledTrialContactIdSetCached(token, creds.locationId);
           if (booked && booked.has(String(job.contact_id))) {
@@ -349,7 +396,7 @@ async function runWork(res) {
       else { await finish({ status: "pending", attempts, last_error: String(e.message || e).slice(0, 300), run_after: nextSendableTime(new Date(Date.now() + RETRY_BACKOFF_MS)).toISOString() }); }
     }
   }
-  return res.status(200).json({ ok: true, picked: jobs.length, sent, deferred, advanced, completed, failed, canceled, nurture_lost: nurtureLost, lost_race: lost });
+  return res.status(200).json({ ok: true, picked: jobs.length, sent, deferred, advanced, completed, failed, canceled, nurture_lost: nurtureLost, ghosted_lost: ghostedLost, form_to_ghosted: formToGhosted, lost_race: lost });
 }
 
 // ── staff CRUD (backs the P4b step-builder) ──
