@@ -30830,7 +30830,7 @@ async function _loadMemberInbox(m) {
     if (!r.ok) throw new Error(j.error || ('HTTP ' + r.status));
     _renderMemberInbox(sec, j.messages || []);
   } catch (e) {
-    sec.innerHTML = `${_memberInboxComposer()}<div style="font-size:12px;color:var(--text-mute);margin-top:8px">Couldn't load messages - ${escapeHTML(e.message)}</div>`;
+    sec.innerHTML = `<div style="font-size:12px;color:var(--text-mute);margin-bottom:8px">Couldn't load messages - ${escapeHTML(e.message)}</div>${_memberInboxComposer()}`;
   }
 }
 
@@ -30870,7 +30870,9 @@ function _renderMemberInbox(sec, messages) {
     const when = escapeHTML(_ibFormatDate(mm.date));
     return `<div class="ib-msg ${out ? 'ib-msg-out' : 'ib-msg-in'}">${hasBody ? escapeHTML(mm.body.trim()) : (atts ? '' : '(no body)')}${atts}<div class="ib-msg-meta">${sender} · ${channel}${when ? ' · ' + when : ''}</div></div>`;
   }).join('') : `<div style="font-size:12px;color:var(--text-mute)">No messages yet.</div>`;
-  sec.innerHTML = `${_memberInboxComposer()}${more > 0 ? `<div style="font-size:11px;color:var(--text-mute);margin-bottom:8px">Newest ${recent.length} of ${sorted.length} messages</div>` : ''}<div style="display:flex;flex-direction:column;gap:8px;max-height:340px;overflow-y:auto">${thread}</div>`;
+  // Thread loads at the top (newest first, scroll starts at the newest); the
+  // composer sits BELOW the conversation like a normal chat window.
+  sec.innerHTML = `${more > 0 ? `<div style="font-size:11px;color:var(--text-mute);margin-bottom:8px">Newest ${recent.length} of ${sorted.length} messages</div>` : ''}<div style="display:flex;flex-direction:column;gap:8px;max-height:300px;overflow-y:auto;margin-bottom:12px">${thread}</div>${_memberInboxComposer()}`;
 }
 
 // Send a reply on the member's GHL thread, then reload (newest lands on top).
@@ -31530,21 +31532,30 @@ async function mChange(memberId, currentPlan) {
     _plToast('No live prices found for this academy.');
     return;
   }
-  const nextYMD = nextUnix ? new Date(nextUnix * 1000).toISOString().slice(0, 10) : '';
-  const nextLabel = nextUnix ? _cdDate(nextUnix) : 'unknown';
-  const vals = await _mmModal({
-    icon: '🔄', title: 'Change plan',
-    body: `Current plan: <b>${escapeHTML(currentPlan || '-')}</b>${(sj && sj.amount_cents != null) ? ' &middot; ' + _withHst(sj.amount_cents) : ''}<br>Next payment: <b>${escapeHTML(nextLabel)}</b>`,
-    okLabel: 'Change plan',
-    fields: [
-      { key: 'new_price', label: 'New plan', type: 'select', value: flat[0].value, options: grouped },
-      { key: 'next_payment', label: 'Next payment date (leave as-is to keep)', type: 'date', value: nextYMD },
-      { key: 'prorate', label: 'Proration', type: 'radio', value: 'no', options: [
-        { value: 'no',  label: 'No proration', hint: 'Change applies on the next cycle.' },
-        { value: 'yes', label: 'Prorate now', hint: 'Charge the prorated difference now (upgrades only).' },
-      ] },
-    ],
-  });
+  // Guard the date math - a stray/huge period-end would make toISOString throw,
+  // and since this runs AFTER the try block, that would silently kill the modal.
+  let nextYMD = '';
+  try { if (nextUnix) nextYMD = new Date(nextUnix * 1000).toISOString().slice(0, 10); } catch (_) { nextYMD = ''; }
+  const nextLabel = nextUnix ? (_cdDate(nextUnix) || 'unknown') : 'unknown';
+  let vals;
+  try {
+    vals = await _mmModal({
+      icon: '🔄', title: 'Change plan',
+      body: `Current plan: <b>${escapeHTML(currentPlan || '-')}</b>${(sj && sj.amount_cents != null) ? ' &middot; ' + _withHst(sj.amount_cents) : ''}<br>Next payment: <b>${escapeHTML(nextLabel)}</b>`,
+      okLabel: 'Change plan',
+      fields: [
+        { key: 'new_price', label: 'New plan', type: 'select', value: flat[0].value, options: grouped },
+        { key: 'next_payment', label: 'Next payment date (leave as-is to keep)', type: 'date', value: nextYMD },
+        { key: 'prorate', label: 'Proration', type: 'radio', value: 'no', options: [
+          { value: 'no',  label: 'No proration', hint: 'Change applies on the next cycle.' },
+          { value: 'yes', label: 'Prorate now', hint: 'Charge the prorated difference now (upgrades only).' },
+        ] },
+      ],
+    });
+  } catch (e) {
+    _plToast('Could not open Change plan: ' + (e && e.message ? e.message : e));
+    return;
+  }
   if (!vals) return;
   const picked = flat.find(o => o.value === vals.new_price);
   const payload = { new_price_id: vals.new_price, prorate: vals.prorate === 'yes' };
