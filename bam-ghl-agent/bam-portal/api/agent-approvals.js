@@ -537,8 +537,28 @@ async function detectForClient(client) {
   let openers = 0;
   try {
     const entryNotes = await sb(`agent_contact_notes?client_id=eq.${client.id}&active=eq.true&note=ilike.Entry:*&select=ghl_contact_id&order=created_at.desc`);
-    const candidates = [...new Set((Array.isArray(entryNotes) ? entryNotes : []).map(n => String(n.ghl_contact_id)).filter(Boolean))]
+    let candidates = [...new Set((Array.isArray(entryNotes) ? entryNotes : []).map(n => String(n.ghl_contact_id)).filter(Boolean))]
       .filter(id => respondedIds.has(id) && !mutedSet.has(id));
+    if (candidates.length) {
+      // HANDOFF GUARD: when an academy has the form INTRO automation on
+      // (contact_form / trial_form), that timed first-touch IS the cold open - the
+      // agent must NOT also open, or the lead gets double-texted. The agent takes
+      // over only when the lead REPLIES (reply engine, above) or after the intro
+      // goes quiet (the ghost engine at >=24h). Skip anyone with an intro enrollment
+      // that's active (scheduled, mid-delay) or completed (sent). This closes the
+      // 2-20 min delay window before the intro send creates a GHL thread that the
+      // findConversation guard below would otherwise catch. 'exited' = they replied,
+      // already handled by the reply engine. Dormant when no intros exist.
+      try {
+        const introAutos = await sb(`automations?client_id=eq.${client.id}&automation_key=in.(contact_form,trial_form)&select=id`);
+        const introIds = (Array.isArray(introAutos) ? introAutos : []).map(a => a.id);
+        if (introIds.length) {
+          const enr = await sb(`automation_enrollments?client_id=eq.${client.id}&automation_id=in.(${introIds.join(",")})&status=in.(active,completed)&select=contact_id`);
+          const introSet = new Set((Array.isArray(enr) ? enr : []).map(e => String(e.contact_id)));
+          if (introSet.size) candidates = candidates.filter(id => !introSet.has(id));
+        }
+      } catch (e) { reasons.push(`opener intro-guard: ${e.message}`); }
+    }
     if (candidates.length) {
       const calendars = await loadCalendars(sb, client.id);
       for (const contactId of candidates) {
