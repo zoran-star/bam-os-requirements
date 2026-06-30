@@ -1148,20 +1148,39 @@ async function actionChange(res, member, stripeAccount, ctx, body) {
     return res.status(400).json({ error: "Stripe sub has no items - manual fix needed" });
   }
 
+  // Optional: staff sets when the NEXT payment should land (Stripe trial_end).
+  // Pushes the next charge to that date; no charge happens until then. When set,
+  // proration is forced off (trial + prorations don't combine cleanly).
+  let trialEndUnix = null;
+  if (body.next_payment_date) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(body.next_payment_date)) {
+      return res.status(400).json({ error: "next_payment_date must be YYYY-MM-DD" });
+    }
+    trialEndUnix = isoToUnix(body.next_payment_date);
+    if (trialEndUnix <= nowUnix()) {
+      return res.status(400).json({ error: "next_payment_date is in the past - pick a future date" });
+    }
+    const cap = nowUnix() + STRIPE_TRIAL_MAX_SECS;
+    if (trialEndUnix > cap) trialEndUnix = cap;
+  }
+
   // Upgrade vs downgrade by price amount (proration only matters on upgrades).
   const curAmt = currentRow ? currentRow.amount_cents : null;
   const newAmt = targetRow ? targetRow.amount_cents : null;
   const isUpgrade = (curAmt != null && newAmt != null) ? (newAmt > curAmt) : false;
-  const proration = isUpgrade && body.prorate ? "create_prorations" : "none";
+  const proration = (trialEndUnix == null && isUpgrade && body.prorate) ? "create_prorations" : "none";
+
+  const updateBody = {
+    "items[0][id]": itemId,
+    "items[0][price]": newPriceId,
+    proration_behavior: proration,
+  };
+  if (trialEndUnix != null) updateBody.trial_end = String(trialEndUnix);
 
   const sub = await stripeFetch(`/subscriptions/${member.stripe_subscription_id}`, {
     method: "POST",
     stripeAccount,
-    body: {
-      "items[0][id]": itemId,
-      "items[0][price]": newPriceId,
-      proration_behavior: proration,
-    },
+    body: updateBody,
   });
 
   // Update members.plan
@@ -1178,7 +1197,7 @@ async function actionChange(res, member, stripeAccount, ctx, body) {
     args: body,
     performed_by: ctx.user.id,
     performed_by_name: ctx.staff?.name || null,
-    stripe_response: { id: sub.id, status: sub.status, price_id: newPriceId },
+    stripe_response: { id: sub.id, status: sub.status, price_id: newPriceId, trial_end: sub.trial_end || null },
     db_changes: { members: { id: member.id, plan: { from: member.plan, to: newPlan } } },
   });
 
@@ -1188,6 +1207,8 @@ async function actionChange(res, member, stripeAccount, ctx, body) {
     sub: { id: sub.id, status: sub.status, new_price_id: newPriceId },
     prorated: proration === "create_prorations",
     direction: isUpgrade ? "upgrade" : "downgrade",
+    next_payment_set: trialEndUnix != null,
+    next_payment: trialEndUnix != null ? trialEndUnix : subCurrentPeriodEnd(sub),
   });
 }
 
