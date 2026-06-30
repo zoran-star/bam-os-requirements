@@ -11,7 +11,7 @@
 // Auth: Supabase JWT — staff, or client_users membership for client_id.
 
 import { withSentryApiRoute } from "../_sentry.js";
-import { shadowMirrorMove } from "../agent/_store.js";
+import { moveStage } from "../agent/_store.js";
 import { enrollContact, isAutomationLive } from "../automations.js";
 
 const SUPABASE_URL = (process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || "").trim();
@@ -201,10 +201,11 @@ async function handler(req, res) {
       const pl = pls.find(p => p.id === pipelineId) || pls[0];
       const interested = (pl?.stages || []).find(s => /interested/i.test(s.name || ""));
       if (interested) {
-        await ghl("PUT", `/opportunities/${encodeURIComponent(oppId)}`, { token, body: { pipelineId: pl.id, pipelineStageId: interested.id } });
+        // Move through the provider-aware store; on ghl it is the identical PUT and the
+        // store does the shadow mirror internally (replacing the manual shadowMirrorMove).
+        await moveStage({ clientId, sb, ghl, token, oppRef: { ghlOpportunityId: oppId }, stage: { pipelineId: pl.id, stageId: interested.id, stageName: interested.name }, role: "interested", contactId });
         result.moved = true;
         result.moved_to = "interested";
-        try { await shadowMirrorMove(clientId, { ghlOpportunityId: oppId, ghlContactId: contactId, role: "interested", stageResolved: { pipelineId: pl.id, stageId: interested.id, stageName: interested.name }, status: "open" }); } catch (_) {}
       }
     } catch (e) { console.error("no-show interested move failed (non-fatal):", e.message); }
   }
@@ -216,9 +217,10 @@ async function handler(req, res) {
       const pl = pls.find(p => p.id === pipelineId) || pls[0];
       const doneStage = (pl?.stages || []).find(s => { const n = (s.name || "").toLowerCase(); return n.includes("trial") && (n.includes("done") || n.includes("complete") || n.includes("attended")); });
       if (doneStage) {
-        await ghl("PUT", `/opportunities/${encodeURIComponent(oppId)}`, { token, body: { pipelineId: pl.id, pipelineStageId: doneStage.id } });
+        // Move through the provider-aware store; on ghl it is the identical PUT and the
+        // store does the shadow mirror internally (replacing the manual shadowMirrorMove).
+        await moveStage({ clientId, sb, ghl, token, oppRef: { ghlOpportunityId: oppId }, stage: { pipelineId: pl.id, stageId: doneStage.id, stageName: doneStage.name }, role: "done_trial", contactId });
         result.moved = true;
-        try { await shadowMirrorMove(clientId, { ghlOpportunityId: oppId, ghlContactId: contactId, role: "done_trial", stageResolved: { pipelineId: pl.id, stageId: doneStage.id, stageName: doneStage.name }, status: "open" }); } catch (_) {}
       }
     } catch (e) { console.error("done-trial move failed (non-fatal):", e.message); }
 

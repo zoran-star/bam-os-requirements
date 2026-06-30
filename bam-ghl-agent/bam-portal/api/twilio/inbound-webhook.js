@@ -15,6 +15,7 @@ import crypto from "node:crypto";
 import { pickGhlToken, sendSms, ghl } from "../ghl/_core.js";
 import { notifyOwners } from "../_notify-owners.js";
 import { respondedStage, contactInRespondedStage, interestedStage, nurtureStage } from "../agent/_stage.js";
+import { moveStage } from "../agent/_store.js";
 import { agentMode, modeIsOn } from "../agent/_mode.js";
 import { exitEnrollment } from "../automations.js";
 import { decryptSecret } from "../messaging/_crypto.js";
@@ -144,7 +145,9 @@ async function handler(req, res) {
             ]);
             const ghostStageIds = new Set([is && is.stageId, ns && ns.stageId].filter(Boolean));
             if (ghostStageIds.has(curStageId)) {
-              await ghl("PUT", `/opportunities/${encodeURIComponent(opp.id)}`, { token: creds.token, body: { pipelineId: rs.pipelineId, pipelineStageId: rs.stageId } });
+              // Guard preserved exactly (open opp currently in Interested/Nurture). The
+              // move runs through the provider-aware store; on ghl it is the identical PUT.
+              await moveStage({ clientId: client.id, sb, ghl, token: creds.token, oppRef: { ghlOpportunityId: opp.id }, stage: rs, role: "responded", contactId: String(ghlContactId) });
             }
           }
         }
