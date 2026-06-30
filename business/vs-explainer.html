@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>What makes us different — Full Control</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --ink:#0A0A0B;--ink-2:#131316;--ink-3:#1C1C21;
+  --line-dark:#2A2A31;--line-dark-2:#383842;
+  --paper:#F5F1E8;--gold:#E8C547;--gold-3:#8B6F2A;
+  --pace-go:#9FD88A;--pace-stop:#E87560;--pace-flow:#5A8FB8;
+  --display:"Space Grotesk","Inter",sans-serif;--sans:"Inter",system-ui,sans-serif;--mono:"JetBrains Mono",ui-monospace,monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--ink);color:var(--paper);font-family:var(--sans);font-size:14px;-webkit-font-smoothing:antialiased;padding:48px 40px}
+.wrap{max-width:1080px;margin:0 auto}
+.kicker{font-family:var(--mono);font-size:11px;letter-spacing:.18em;text-transform:uppercase;opacity:.45}
+.title{font-family:var(--display);font-size:40px;font-weight:500;letter-spacing:-.02em;line-height:1.04;margin-top:14px}
+.sub{font-size:15px;opacity:.62;margin-top:14px;max-width:660px;line-height:1.5}
+.sub b{color:var(--gold);font-weight:600}
+
+.cols{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--line-dark);border:1px solid var(--line-dark);margin-top:40px}
+.col{background:var(--ink-2);padding:26px 22px;display:flex;flex-direction:column}
+.col.fc{background:linear-gradient(180deg,rgba(232,197,71,.07),rgba(232,197,71,.02));border-top:2px solid var(--gold)}
+.col .name{font-family:var(--display);font-size:22px;font-weight:600;letter-spacing:-.01em}
+.col.fc .name{color:var(--gold)}
+.col .what{font-size:13px;opacity:.6;margin-top:8px;line-height:1.45;min-height:52px}
+.divider{height:1px;background:var(--line-dark);margin:20px 0}
+.q{font-family:var(--mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;opacity:.4;margin-bottom:8px}
+.work{font-size:14px;line-height:1.5;font-weight:500;min-height:84px}
+.work .hl{color:var(--pace-stop)}
+.col.fc .work .hl{color:var(--gold)}
+.line{margin-top:auto;padding-top:20px;font-family:var(--display);font-size:16px;font-weight:500;letter-spacing:-.01em}
+.col.fc .line{color:var(--gold)}
+
+.foot{margin-top:36px;border-top:1px solid var(--line-dark);padding-top:24px}
+.foot .punch{font-family:var(--display);font-size:23px;font-weight:500;letter-spacing:-.01em;line-height:1.4}
+.foot .punch em{color:var(--gold);font-style:normal}
+.foot .meta{font-family:var(--mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;opacity:.4;margin-top:14px}
+@media(max-width:840px){.cols{grid-template-columns:1fr}.title{font-size:30px}.work,.what{min-height:0}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="kicker">§ How we're different</div>
+  <h1 class="title">It's not about features. It's about who does the work.</h1>
+  <p class="sub">CoachIQ runs your practices. GoHighLevel hands you tools. <b>FullControl runs your business.</b></p>
+
+  <div class="cols">
+    <div class="col">
+      <div class="name">CoachIQ</div>
+      <div class="what">A scheduling &amp; athlete app. Sessions, credits, rosters, check-in.</div>
+      <div class="divider"></div>
+      <div class="q">Who does the work?</div>
+      <div class="work"><span class="hl">You run the business.</span> It just handles practices and sign-ups.</div>
+      <div class="line">Manages your practices.</div>
+    </div>
+
+    <div class="col">
+      <div class="name">GoHighLevel</div>
+      <div class="what">An agency toolkit - CRM, automations, funnels. Powerful, but empty out of the box.</div>
+      <div class="divider"></div>
+      <div class="q">Who does the work?</div>
+      <div class="work"><span class="hl">You (or an agency) build and operate it.</span> The tools do nothing until someone wires them up and works the leads.</div>
+      <div class="line">Gives you tools. You still do the work.</div>
+    </div>
+
+    <div class="col fc">
+      <div class="name">FullControl</div>
+      <div class="what">An AI operating system built for academies. Pre-loaded with the playbook.</div>
+      <div class="divider"></div>
+      <div class="q">Who does the work?</div>
+      <div class="work"><span class="hl">The AI does it.</span> Books trials, closes members, runs ads, follows up - around the clock. You just approve.</div>
+      <div class="line">Runs the business for you.</div>
+    </div>
+  </div>
+
+  <div class="foot">
+    <div class="punch">A toolbox doesn't run your business. <em>An operator does.</em><br>GoHighLevel is the toolbox. FullControl is the operator.</div>
+    <div class="meta">And the toolbox is one of the tools we're replacing — our own CRM is going native.</div>
+  </div>
+</div>
+</body>
+</html>
