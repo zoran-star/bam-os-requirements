@@ -47,7 +47,6 @@ const PLAN_TO_PRICE = {
   "3/wk":   "plan_U3CUUJkzgyTjel",   // Elevate      $378 / 4-wk all-in
   "unlmtd": "plan_U3CFSoR1LdyGlb",   // Dominate     $638 / 4-wk all-in
 };
-const PLAN_TIER = { "1/wk": 1, "2/wk": 2, "3/wk": 3, "unlmtd": 4 };
 const VALID_PLANS = Object.keys(PLAN_TO_PRICE);
 
 // Stripe's hard trial_end cap is 730 days from now; we use 729 as a 1-day
@@ -1093,14 +1092,52 @@ async function actionChange(res, member, stripeAccount, ctx, body) {
   if (!member.stripe_subscription_id) {
     return res.status(400).json({ error: "member has no Stripe subscription" });
   }
-  const newPlan = body.new_plan;
-  if (!VALID_PLANS.includes(newPlan)) {
-    return res.status(400).json({ error: `new_plan must be one of: ${VALID_PLANS.join(", ")}` });
+
+  // Live target prices come from pricing_catalog (is_routable = true), not a
+  // hardcoded list. Preferred input: body.new_price_id (a stripe_price_id from
+  // the catalog). Legacy fallback: body.new_plan ("1/wk".."unlmtd").
+  const cleanLabel = (s) => (String(s || "").split(/\s+[·—-]\s+/)[0].trim() || String(s || ""));
+  const catalog = (await sb(
+    `pricing_catalog?client_id=eq.${member.client_id}` +
+    `&select=stripe_price_id,display_name,canonical_plan,tier,interval,amount_cents,is_routable`
+  )) || [];
+  const byPrice = new Map(catalog.map(r => [r.stripe_price_id, r]));
+
+  let newPriceId, newPlan, targetRow;
+  if (body.new_price_id) {
+    targetRow = byPrice.get(body.new_price_id);
+    if (!targetRow) {
+      return res.status(400).json({ error: "that price isn't in this academy's catalog" });
+    }
+    if (targetRow.is_routable !== true) {
+      return res.status(400).json({ error: "that price isn't a live (sellable) price" });
+    }
+    newPriceId = body.new_price_id;
+    newPlan = targetRow.canonical_plan || cleanLabel(targetRow.display_name);
+  } else {
+    newPlan = body.new_plan;
+    if (!VALID_PLANS.includes(newPlan)) {
+      return res.status(400).json({ error: `new_plan must be one of: ${VALID_PLANS.join(", ")}` });
+    }
+    newPriceId = PLAN_TO_PRICE[newPlan];
+    targetRow = byPrice.get(newPriceId) || null;
   }
-  if (newPlan === member.plan) {
+
+  // Already on this exact price?
+  if (member.stripe_price_id && member.stripe_price_id === newPriceId) {
     return res.status(400).json({ error: `already on ${newPlan}` });
   }
-  const newPriceId = PLAN_TO_PRICE[newPlan];
+
+  // Stripe can't swap a subscription item across billing intervals (e.g. a
+  // 3-month sub onto a 4-week price). Block it with a clear message instead of
+  // letting the raw Stripe error bubble up.
+  const currentRow = member.stripe_price_id ? byPrice.get(member.stripe_price_id) : null;
+  if (currentRow && targetRow && currentRow.interval && targetRow.interval
+      && currentRow.interval !== targetRow.interval) {
+    return res.status(400).json({
+      error: `Can't swap across billing intervals (current ${currentRow.interval}, new ${targetRow.interval}). Cancel and recreate the subscription instead.`,
+    });
+  }
 
   // Fetch current sub to get the item id
   const currentSub = await stripeFetch(`/subscriptions/${member.stripe_subscription_id}`, {
@@ -1108,10 +1145,13 @@ async function actionChange(res, member, stripeAccount, ctx, body) {
   });
   const itemId = currentSub.items?.data?.[0]?.id;
   if (!itemId) {
-    return res.status(400).json({ error: "Stripe sub has no items — manual fix needed" });
+    return res.status(400).json({ error: "Stripe sub has no items - manual fix needed" });
   }
 
-  const isUpgrade = (PLAN_TIER[newPlan] || 0) > (PLAN_TIER[member.plan] || 0);
+  // Upgrade vs downgrade by price amount (proration only matters on upgrades).
+  const curAmt = currentRow ? currentRow.amount_cents : null;
+  const newAmt = targetRow ? targetRow.amount_cents : null;
+  const isUpgrade = (curAmt != null && newAmt != null) ? (newAmt > curAmt) : false;
   const proration = isUpgrade && body.prorate ? "create_prorations" : "none";
 
   const sub = await stripeFetch(`/subscriptions/${member.stripe_subscription_id}`, {
