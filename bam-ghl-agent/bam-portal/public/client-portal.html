@@ -30990,7 +30990,7 @@ function _mmModal(opts = {}) {
     const fields = opts.fields || [];
     const okBg = opts.danger ? '#c0392b' : 'var(--gold,#E8C547)';
     const okCol = opts.danger ? '#fff' : '#0B0B0D';
-    document.body.insertAdjacentHTML('beforeend', `<div id="mm-modal-overlay" style="position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9300;display:flex;align-items:center;justify-content:center;padding:18px" onclick="if(event.target===this){this.remove();window.__mmResolve&&window.__mmResolve(null)}">
+    document.body.insertAdjacentHTML('beforeend', `<div id="mm-modal-overlay" style="position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:10100;display:flex;align-items:center;justify-content:center;padding:18px" onclick="if(event.target===this){this.remove();window.__mmResolve&&window.__mmResolve(null)}">
       <div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;width:100%;max-width:440px;padding:24px;box-shadow:0 20px 60px rgba(0,0,0,.5);max-height:88vh;overflow:auto">
         ${opts.icon ? `<div style="font-size:30px;line-height:1;margin-bottom:12px">${opts.icon}</div>` : ''}
         <div style="font-size:18px;font-weight:700;color:var(--text);margin-bottom:${opts.body ? '6px' : '16px'}">${opts.title || 'Are you sure?'}</div>
