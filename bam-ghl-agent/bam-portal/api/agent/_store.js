@@ -411,3 +411,324 @@ export async function buildPortalBoard(clientId) {
   }
   return { pipelines: Array.from(pipeMap.values()) };
 }
+
+// ───────────────────────────────────────────────────────────────────────────
+// Provider-aware OPPORTUNITY LAYER (Effort E, Task A). PURELY ADDITIVE, DORMANT.
+//
+// Six functions that wrap every opportunity operation the sales pipeline does
+// (create / move / set-status / find-open / list-a-stage / is-in-stage) behind a
+// single provider seam. Each reads pipelineFlags(clientId) ONCE, then branches:
+//
+//   • provider='ghl' (the default for every academy today)  -> do EXACTLY what the
+//        call sites do today: the same GHL HTTP calls with the same field shapes,
+//        plus shadowMirrorMove when the shadow flag is on. With no flag overrides
+//        this path is byte-identical to current production - the whole layer stays
+//        dormant until ops flips a client to provider='portal'.
+//   • provider='portal'  -> operate on the portal `opportunities` table directly
+//        (no GHL call). Only reachable for a client explicitly flipped.
+//
+// An `oppRef` is the opaque handle threaded between these functions:
+//   { ghlOpportunityId }  on GHL    |    { id, ghlOpportunityId? }  on portal.
+//
+// A `stage` here is the resolveStage() shape { pipelineId, stageId, stageName }
+// PLUS the role string (the code contract). GHL branches use pipelineId/stageId;
+// portal branches use role (resolving the registry row id via the existing
+// shadowUpsertStageRegistry helper, idempotent). Callers already hold both - they
+// call resolveStage() to get the stage and know the role they asked for.
+//
+// DEVIATION FROM THE LITERAL SPEC (documented on purpose): the spec sketched a bare
+// `stageId`; this codebase's contract is a resolved-stage object + a role (that is
+// what resolveStage returns and what shadowMirrorMove already consumes), so these
+// functions take `{ stage, role }` to stay faithful to the existing seam.
+//
+// GHL branches use the shared ghl() wrapper (throws on non-2xx, like the agent /
+// stripe / pipelines call sites - the dominant convention); callers wrap in
+// try/catch exactly as they do today. Portal branches let Supabase errors propagate
+// (the store is the system-of-record there, so a failed write must not be silently
+// swallowed) - callers wrap the same way.
+// ───────────────────────────────────────────────────────────────────────────
+
+// Resolve { provider, shadow } once, honoring caller-supplied overrides (e.g. a
+// client row already loaded). Only hits Supabase when an override is missing.
+async function oppFlags(clientId, opts = {}) {
+  let provider = opts.provider, shadow = opts.shadow;
+  if (provider == null || shadow == null) {
+    const f = await pipelineFlags(clientId);
+    if (provider == null) provider = f.provider;
+    if (shadow == null) shadow = f.shadow;
+  }
+  return { provider: provider || "ghl", shadow: !!shadow };
+}
+
+// PostgREST filter selecting one portal opportunity row from an oppRef. Prefers the
+// portal row id; falls back to the GHL id (a row dual-written while still on GHL).
+function oppRefFilter(clientId, oppRef = {}) {
+  const base = `opportunities?client_id=eq.${encodeURIComponent(clientId)}`;
+  if (oppRef.id) return `${base}&id=eq.${encodeURIComponent(oppRef.id)}`;
+  if (oppRef.ghlOpportunityId) return `${base}&ghl_opportunity_id=eq.${encodeURIComponent(oppRef.ghlOpportunityId)}`;
+  return null;
+}
+
+// The seeded/looked-up pipeline_stages row id for a (client, role). Reuses the
+// idempotent registry upsert so a portal move/create always has a stage_id.
+async function portalStageRowId(clientId, role, stage) {
+  if (!role) return null;
+  return shadowUpsertStageRegistry(clientId, role, stage ? {
+    pipelineId: stage.pipelineId, stageId: stage.stageId, stageName: stage.stageName,
+  } : {});
+}
+
+// 1. createOpp - create an opportunity for a contact in a stage. Returns an oppRef.
+//   ghl:    POST /opportunities/ (same body shape as api/website/leads.js create) +
+//           shadowMirrorMove when shadow on. Returns { ghlOpportunityId }.
+//   portal: INSERT one opportunities row (status=open). Returns { id }.
+export async function createOpp(opts = {}) {
+  const {
+    clientId, sb, ghl, token, locationId, contactId, stage, role,
+    name, monetaryValue, source, entryPoint, contactName, contactPhone, athleteName,
+  } = opts;
+  const { provider, shadow } = await oppFlags(clientId, opts);
+
+  if (provider === "portal") {
+    const stageId = await portalStageRowId(clientId, role, stage);
+    const now = new Date().toISOString();
+    const body = {
+      client_id: clientId,
+      ghl_contact_id: contactId || null,
+      contact_name: contactName != null ? contactName : (name || null),
+      athlete_name: athleteName != null ? athleteName : null,
+      contact_phone: contactPhone != null ? contactPhone : null,
+      stage_role: role || "responded",
+      stage_id: stageId || null,
+      status: "open",
+      source: source != null ? source : null,
+      entry_point: entryPoint != null ? entryPoint : null,
+      monetary_value: monetaryValue != null ? monetaryValue : 0,
+      ghl_pipeline_id: (stage && stage.pipelineId) || null,
+      last_stage_change_at: now,
+      updated_at: now,
+    };
+    const rows = await sbRest(`opportunities?select=id,ghl_opportunity_id`, {
+      method: "POST",
+      headers: { Prefer: "return=representation" },
+      body: JSON.stringify([body]),
+    });
+    const row = Array.isArray(rows) && rows[0];
+    return row ? { id: row.id, ghlOpportunityId: row.ghl_opportunity_id || null } : null;
+  }
+
+  // provider === 'ghl': today's create (mirrors api/website/leads.js placeOpportunity).
+  const ghlFn = ghl || ghlDefault;
+  const oppBody = {
+    locationId,
+    pipelineId: stage && stage.pipelineId,
+    pipelineStageId: stage && stage.stageId,
+    contactId,
+    name: name || contactName || "",
+    status: "open",
+  };
+  if (monetaryValue != null) oppBody.monetaryValue = monetaryValue;
+  const out = await ghlFn("POST", `/opportunities/`, { token, body: oppBody });
+  const ghlOpportunityId = (out && out.opportunity && out.opportunity.id) || (out && out.id) || null;
+  if (shadow && ghlOpportunityId) {
+    try {
+      await shadowMirrorMove(clientId, {
+        shadow, ghlOpportunityId, ghlContactId: contactId, role,
+        stageResolved: stage, status: "open",
+        contactName, contactPhone, monetaryValue, source, entryPoint,
+      });
+    } catch (_) { /* mirror is best-effort */ }
+  }
+  return { ghlOpportunityId };
+}
+
+// 2. moveStage - move an opp into a stage.
+//   ghl:    PUT /opportunities/{id} { pipelineId, pipelineStageId } + shadow mirror.
+//   portal: UPDATE the row's stage_role / stage_id / last_stage_change_at.
+export async function moveStage(opts = {}) {
+  const { clientId, sb, ghl, token, oppRef = {}, stage, role, contactId, reason } = opts;
+  const { provider, shadow } = await oppFlags(clientId, opts);
+
+  if (provider === "portal") {
+    const filter = oppRefFilter(clientId, oppRef);
+    if (!filter) return oppRef;
+    const stageId = await portalStageRowId(clientId, role, stage);
+    const now = new Date().toISOString();
+    const patch = {
+      stage_role: role || undefined,
+      stage_id: stageId || null,
+      ghl_pipeline_id: (stage && stage.pipelineId) || undefined,
+      last_stage_change_at: now,
+      updated_at: now,
+    };
+    if (reason != null) patch.reason = reason;
+    await sbRest(filter, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify(patch) });
+    return oppRef;
+  }
+
+  // provider === 'ghl': today's move PUT (same shape used across the agents + pipelines.js).
+  const ghlFn = ghl || ghlDefault;
+  const oppId = oppRef.ghlOpportunityId;
+  if (oppId) {
+    await ghlFn("PUT", `/opportunities/${encodeURIComponent(oppId)}`, {
+      token, body: { pipelineId: stage && stage.pipelineId, pipelineStageId: stage && stage.stageId },
+    });
+    if (shadow) {
+      try {
+        await shadowMirrorMove(clientId, {
+          shadow, ghlOpportunityId: oppId, ghlContactId: contactId, role,
+          stageResolved: stage, status: "open", reason: reason != null ? reason : undefined,
+        });
+      } catch (_) { /* mirror is best-effort */ }
+    }
+  }
+  return oppRef;
+}
+
+// 3. setStatus - set the open/won/lost/abandoned lifecycle status (no stage move).
+//   ghl:    PUT /opportunities/{id} { status } + shadow mirror.
+//   portal: UPDATE status (+ closed_at). Optional role stamps stage_role (e.g. an
+//           abandoned -> 'unqualified' close, mirroring api/agent-approvals.js).
+export async function setStatus(opts = {}) {
+  const { clientId, sb, ghl, token, oppRef = {}, status, role, contactId, reason } = opts;
+  const { provider, shadow } = await oppFlags(clientId, opts);
+
+  if (provider === "portal") {
+    const filter = oppRefFilter(clientId, oppRef);
+    if (!filter) return oppRef;
+    const now = new Date().toISOString();
+    const patch = { status, updated_at: now };
+    if (isClosedStatus(status)) patch.closed_at = now;
+    else if (status === "open") patch.closed_at = null;   // reopen
+    if (role != null) patch.stage_role = role;
+    if (reason != null) patch.reason = reason;
+    await sbRest(filter, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify(patch) });
+    return oppRef;
+  }
+
+  // provider === 'ghl': today's status PUT (api/stripe/webhook.js won, agents lost/abandoned).
+  const ghlFn = ghl || ghlDefault;
+  const oppId = oppRef.ghlOpportunityId;
+  if (oppId) {
+    await ghlFn("PUT", `/opportunities/${encodeURIComponent(oppId)}`, { token, body: { status } });
+    if (shadow) {
+      try {
+        await shadowMirrorMove(clientId, {
+          shadow, ghlOpportunityId: oppId, ghlContactId: contactId, status,
+          stageRole: role != null ? role : undefined, reason: reason != null ? reason : undefined,
+        });
+      } catch (_) { /* mirror is best-effort */ }
+    }
+  }
+  return oppRef;
+}
+
+// 4. findOpenOpp - the single OPEN opp for a contact, or null.
+//   ghl:    GET /opportunities/search?contact_id (mirrors api/stripe/webhook.js:
+//           prefer the open one, else the first). Returns { ghlOpportunityId }|null.
+//   portal: SELECT one open row for the contact. Returns { id, ghlOpportunityId }|null.
+export async function findOpenOpp(opts = {}) {
+  const { clientId, sb, ghl, token, locationId, contactId } = opts;
+  if (!contactId) return null;
+  const { provider } = await oppFlags(clientId, opts);
+
+  if (provider === "portal") {
+    const rows = await sbRest(
+      `opportunities?client_id=eq.${encodeURIComponent(clientId)}` +
+      `&ghl_contact_id=eq.${encodeURIComponent(contactId)}&status=eq.open` +
+      `&select=id,ghl_opportunity_id&order=created_at.desc&limit=1`
+    );
+    const row = Array.isArray(rows) && rows[0];
+    return row ? { id: row.id, ghlOpportunityId: row.ghl_opportunity_id || null } : null;
+  }
+
+  // provider === 'ghl': today's contact search + open pick (api/stripe/webhook.js).
+  const ghlFn = ghl || ghlDefault;
+  const params = new URLSearchParams({ location_id: locationId, contact_id: contactId, limit: "20" });
+  const d = await ghlFn("GET", `/opportunities/search?${params}`, { token });
+  const opps = (d && (d.opportunities || d.data)) || [];
+  const pick = opps.find(o => String(o.status || "").toLowerCase() === "open") || opps[0] || null;
+  return pick ? { ghlOpportunityId: pick.id } : null;
+}
+
+// 5. queueOpps - every opp in a stage (or set of stages). Used by the agent queues.
+//   ghl:    GET /opportunities/search?pipeline_id&pipeline_stage_id (open only,
+//           mirrors api/agent/_stage.js computeQueue's opp half).
+//   portal: SELECT open rows by stage_role.
+//   Accepts a single { stage, role } or arrays { stages, roles } (positionally
+//   paired). Returns [{ contactId, oppRef, status, name, monetaryValue }].
+export async function queueOpps(opts = {}) {
+  const { clientId, sb, ghl, token, locationId } = opts;
+  const stages = opts.stages || (opts.stage ? [opts.stage] : []);
+  const roles  = opts.roles  || (opts.role  ? [opts.role]  : []);
+  const { provider } = await oppFlags(clientId, opts);
+
+  if (provider === "portal") {
+    const roleList = roles.length ? roles : stages.map(s => s && s.role).filter(Boolean);
+    if (!roleList.length) return [];
+    const inList = roleList.map(r => `"${r}"`).join(",");
+    const rows = await sbRest(
+      `opportunities?client_id=eq.${encodeURIComponent(clientId)}` +
+      `&stage_role=in.(${encodeURIComponent(inList)})&status=eq.open` +
+      `&select=id,ghl_opportunity_id,ghl_contact_id,contact_name,athlete_name,monetary_value,status`
+    ) || [];
+    return rows.map(o => ({
+      contactId: o.ghl_contact_id || null,
+      oppRef: { id: o.id, ghlOpportunityId: o.ghl_opportunity_id || null },
+      status: o.status || "open",
+      name: o.contact_name || o.athlete_name || "",
+      monetaryValue: o.monetary_value || 0,
+    }));
+  }
+
+  // provider === 'ghl': today's per-stage open-opp search (api/agent/_stage.js).
+  const ghlFn = ghl || ghlDefault;
+  const out = [];
+  for (const stage of stages) {
+    if (!stage) continue;
+    const params = new URLSearchParams({ location_id: locationId, pipeline_id: stage.pipelineId, pipeline_stage_id: stage.stageId, limit: "100" });
+    let opps = [];
+    try { const od = await ghlFn("GET", `/opportunities/search?${params}`, { token }); opps = od.opportunities || od.data || []; } catch (_) {}
+    for (const o of opps) {
+      if (String((o && o.status) || "open").toLowerCase() !== "open") continue;
+      out.push({
+        contactId: o.contactId || (o.contact && o.contact.id) || null,
+        oppRef: { ghlOpportunityId: o.id },
+        status: o.status || "open",
+        name: o.name || o.contactName || "",
+        monetaryValue: o.monetaryValue || 0,
+      });
+    }
+  }
+  return out;
+}
+
+// 6. contactInRole - boolean: is this contact's open opp in the given stage?
+//   ghl:    GET /opportunities/search?contact_id&pipeline_id then match the stage id
+//           (mirrors api/agent/_stage.js contactInRespondedStage).
+//   portal: SELECT exists by stage_role.
+export async function contactInRole(opts = {}) {
+  const { clientId, sb, ghl, token, locationId, contactId, stage, role } = opts;
+  if (!contactId) return false;
+  const { provider } = await oppFlags(clientId, opts);
+
+  if (provider === "portal") {
+    const r = role || (stage && stage.role);
+    if (!r) return false;
+    const rows = await sbRest(
+      `opportunities?client_id=eq.${encodeURIComponent(clientId)}` +
+      `&ghl_contact_id=eq.${encodeURIComponent(contactId)}&status=eq.open` +
+      `&stage_role=eq.${encodeURIComponent(r)}&select=id&limit=1`
+    );
+    return Array.isArray(rows) && rows.length > 0;
+  }
+
+  // provider === 'ghl': today's contact+pipeline search, match the stage id.
+  const ghlFn = ghl || ghlDefault;
+  try {
+    const params = new URLSearchParams({ location_id: locationId, contact_id: contactId, pipeline_id: stage && stage.pipelineId, limit: "20" });
+    const d = await ghlFn("GET", `/opportunities/search?${params}`, { token });
+    const opps = d.opportunities || d.data || [];
+    return opps.some(o => (o.pipelineStageId || o.stageId) === (stage && stage.stageId) && String((o && o.status) || "open").toLowerCase() === "open");
+  } catch (_) { return false; }
+}
