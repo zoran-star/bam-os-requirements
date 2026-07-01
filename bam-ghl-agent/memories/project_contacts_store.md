@@ -30,7 +30,8 @@
 1. ~~Repoint joins~~ **DONE (P2).** 2. ~~Portal writes + dual-write~~ **DONE (P3).**
 3. **P4a DONE (2026-07-01, dormant, migration `20260701130000`):** `custom_field_defs` (per academy: key/label/type/options/position/required/archived + `ghl_field_id` bridge, unique client_id+key) + `contact_field_values` (typed value per contact+field, RLS joins to contacts). Empty, nothing reads them.
    **P4b management UI DONE (2026-07-01, PR #960):** staff-portal "Custom Fields" nav tab (admin/scaling_manager), `api/custom-fields.js` CRUD over `custom_field_defs` (mirrors `action-items.js`), `src/views/CustomFieldsView.jsx` (academy picker + list + add/edit modal, 9 types). Dormant: definitions only, nothing renders values yet.
-   **P4b STILL pending:** (a) import existing GHL custom fields (adopt `ghl_field_id` + real labels via GHL `/locations/{id}/customFields`) + migrate the opaque `contacts.custom_fields` blob into `contact_field_values`; (b) edit values per contact in the member drawer; (c) feed `api/email-shells.js resolveMergeVars` from defs/values.
+   **P4b import-from-GHL DONE (2026-07-01, PR #964):** `api/custom-fields.js` GET `?action=ghl-fields` (reads live GHL customFields, maps dataType->type, flags already-imported) + POST `{action:"import-ghl"}` (creates defs with `ghl_field_id` bridge); "Import from GHL" modal in the view. One-click adopt of an academy's existing GHL fields.
+   **P4b STILL pending:** (a) fold the opaque `contacts.custom_fields` blob VALUES into `contact_field_values` (now that defs carry `ghl_field_id`, join blob keys -> def -> value); (b) edit values per contact in the member drawer; (c) feed `api/email-shells.js resolveMergeVars` from defs/values.
 4. **Flip `contact_provider='portal'` + stop `cron-sync-contacts.js`.** BLOCKED until inbound email + social DMs leave GHL (GHL needs the contact to thread an incoming reply).
 
 ## PRs

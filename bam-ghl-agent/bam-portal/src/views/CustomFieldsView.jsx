@@ -28,6 +28,7 @@ export default function CustomFieldsView({ tokens, session }) {
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState("");
   const [editing, setEditing] = useState(null); // field obj, or {} for new, or null
+  const [importing, setImporting] = useState(false);
 
   const authHeaders = useCallback(() => ({
     "Content-Type": "application/json",
@@ -108,6 +109,10 @@ export default function CustomFieldsView({ tokens, session }) {
           </select>
         </div>
         <button
+          style={{ ...btn(false), alignSelf: "flex-end", opacity: clientId ? 1 : 0.4, pointerEvents: clientId ? "auto" : "none" }}
+          onClick={() => setImporting(true)}
+        >Import from GHL</button>
+        <button
           style={{ ...btn(true), alignSelf: "flex-end", opacity: clientId ? 1 : 0.4, pointerEvents: clientId ? "auto" : "none" }}
           onClick={() => setEditing({ label: "", type: "text", options: [], required: false })}
         >+ Add field</button>
@@ -150,6 +155,104 @@ export default function CustomFieldsView({ tokens, session }) {
       {editing && (
         <FieldEditor field={editing} tokens={t} onCancel={() => setEditing(null)} onSave={saveField} input={input} btn={btn} card={card} />
       )}
+
+      {importing && (
+        <ImportModal
+          tokens={t} btn={btn} authHeaders={authHeaders} clientId={clientId}
+          onClose={() => setImporting(false)}
+          onDone={() => { setImporting(false); loadFields(clientId); }}
+        />
+      )}
+    </div>
+  );
+}
+
+function ImportModal({ tokens, btn, authHeaders, clientId, onClose, onDone }) {
+  const t = tokens;
+  const [rows, setRows] = useState(null); // null = loading
+  const [sel, setSel] = useState({});     // ghl_field_id -> true
+  const [err, setErr] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await fetch(`/api/custom-fields?action=ghl-fields&client_id=${clientId}`, { headers: authHeaders() });
+        const json = await res.json();
+        if (!res.ok) throw new Error(json.error || "failed to load GHL fields");
+        setRows(json.fields || []);
+      } catch (e) { setErr(e.message); setRows([]); }
+    })();
+  }, [clientId, authHeaders]);
+
+  const available = (rows || []).filter(r => !r.imported);
+  const selectedCount = available.filter(r => sel[r.ghl_field_id]).length;
+  const allSelected = available.length > 0 && selectedCount === available.length;
+
+  const doImport = async () => {
+    const fields = available.filter(r => sel[r.ghl_field_id]);
+    if (!fields.length) return;
+    setBusy(true); setErr("");
+    try {
+      const res = await fetch("/api/custom-fields", {
+        method: "POST", headers: authHeaders(),
+        body: JSON.stringify({ action: "import-ghl", client_id: clientId, fields }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || "import failed");
+      onDone();
+    } catch (e) { setErr(e.message); setBusy(false); }
+  };
+
+  return (
+    <div onClick={() => !busy && onClose()} style={{
+      position: "fixed", inset: 0, zIndex: 1100, background: "rgba(0,0,0,0.6)", backdropFilter: "blur(6px)",
+      display: "flex", alignItems: "center", justifyContent: "center", padding: 24,
+    }}>
+      <div onClick={e => e.stopPropagation()} style={{
+        width: "100%", maxWidth: 520, maxHeight: "80vh", display: "flex", flexDirection: "column",
+        background: t.surface, border: `1px solid ${t.borderMed}`, borderRadius: 14, padding: 24,
+      }}>
+        <div style={{ fontSize: 16, fontWeight: 700, color: t.text, marginBottom: 4 }}>Import from GHL</div>
+        <div style={{ fontSize: 12, color: t.textSub, marginBottom: 16 }}>Adopt this academy's existing GoHighLevel custom fields.</div>
+
+        {err && <div style={{ color: t.red, fontSize: 13, marginBottom: 12 }}>{err}</div>}
+
+        {rows === null ? (
+          <div style={{ color: t.textSub, fontSize: 13 }}>Loading GHL fields…</div>
+        ) : rows.length === 0 ? (
+          <div style={{ color: t.textSub, fontSize: 13 }}>No custom fields found in GHL for this academy.</div>
+        ) : (
+          <>
+            <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, color: t.textSub, marginBottom: 8, cursor: available.length ? "pointer" : "default" }}>
+              <input type="checkbox" disabled={!available.length} checked={allSelected}
+                onChange={e => { const v = e.target.checked; const next = {}; if (v) available.forEach(r => { next[r.ghl_field_id] = true; }); setSel(next); }} />
+              Select all ({available.length} not yet imported)
+            </label>
+            <div style={{ overflowY: "auto", flex: 1, display: "flex", flexDirection: "column", gap: 4, marginBottom: 16 }}>
+              {rows.map(r => (
+                <label key={r.ghl_field_id} style={{
+                  display: "flex", alignItems: "center", gap: 10, padding: "8px 10px", borderRadius: 6,
+                  background: t.bg, opacity: r.imported ? 0.5 : 1, cursor: r.imported ? "default" : "pointer",
+                }}>
+                  <input type="checkbox" disabled={r.imported} checked={r.imported || !!sel[r.ghl_field_id]}
+                    onChange={e => setSel(s => ({ ...s, [r.ghl_field_id]: e.target.checked }))} />
+                  <span style={{ flex: 1, fontSize: 13, color: t.text }}>{r.name}</span>
+                  <span style={{ fontSize: 11, color: t.textSub }}>{r.type}{r.options?.length ? ` · ${r.options.length} opts` : ""}</span>
+                  {r.imported && <span style={{ fontSize: 11, color: t.green }}>imported</span>}
+                </label>
+              ))}
+            </div>
+          </>
+        )}
+
+        <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
+          <button style={btn(false)} onClick={onClose} disabled={busy}>Cancel</button>
+          <button style={{ ...btn(true), opacity: selectedCount && !busy ? 1 : 0.5 }} onClick={doImport} disabled={!selectedCount || busy}>
+            {busy ? "Importing…" : `Import ${selectedCount || ""}`.trim()}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
