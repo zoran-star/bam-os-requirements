@@ -197,7 +197,8 @@ insert into public.customer_profiles (
   last_name,
   email,
   phone,
-  profile_type
+  profile_type,
+  claimed_at
 )
 values
   (
@@ -207,7 +208,8 @@ values
     'Rivera',
     'parent.alex.rivera@example.test',
     '+14165550101',
-    'PARENT'
+    'PARENT',
+    now()
   ),
   (
     '43608c82-9957-4a42-b206-e2af3d7a3f37',
@@ -216,7 +218,8 @@ values
     'Chen',
     'parent.jamie.chen@example.test',
     '+14165550102',
-    'PARENT'
+    'PARENT',
+    now()
   )
 on conflict (id) do update set
   supabase_user_id = excluded.supabase_user_id,
@@ -225,6 +228,7 @@ on conflict (id) do update set
   email = excluded.email,
   phone = excluded.phone,
   profile_type = excluded.profile_type,
+  claimed_at = excluded.claimed_at,
   updated_at = now();
 
 insert into public.students (
