@@ -55,12 +55,17 @@ portal id. So joins never change - only the id's origin does.
    - Stripe cache: `stripe/contact.js` mirror PATCH now targets `contactsReadTable(...)`.
    NOT YET (Stage 3): the `/contacts/upsert` lead/onboarding creation sites + notes +
    workflow enrollment. All dormant (every academy 'ghl').
-3. **Portal-native creation** - new leads created in the store with a portal-minted id
-   (no GHL POST); mint flows into the join key. Verify GTA no longer needs GHL workflows
-   (it runs portal automations) or gate them.
-4. **Flip GTA** - set contact_provider='portal', STOP the cron overwriting portal data
-   for portal academies (else it reverts portal edits), verify inbox/drawer/Contacts
-   tab/post-trial.
+3. **Flip GTA** (REORDERED ahead of creation - lower risk) - gate the sync cron so it
+   does NOT `bulkUpsertPortalContacts` for contact_provider='portal' (else it clobbers
+   portal-only edits), then set GTA contact_provider='portal'. Store verified flip-ready
+   2026-07-01: `contacts` is a superset of `ghl_contacts` (1725 vs 1701, 0 missing,
+   names match, tags match). No frontend reads `ghl_contacts` directly. leads.js already
+   dual-writes the store + portal-routes automations, so new leads land in the store even
+   with the cron gated.
+4. **Portal-native creation** (LAST - the last GHL touch) - new leads created in the store
+   with a portal-minted id (no GHL /contacts/upsert); mint flows into the join key. The
+   GHL note + conversation calls in leads.js also drop for portal. GHL workflow enrollment
+   is already gated per-academy (maybePortalRoute skips it when portal automations are ON).
 
 ## Status
 - contact_provider = 'ghl' for ALL 44 clients (GTA included). Seam is live but dormant.
