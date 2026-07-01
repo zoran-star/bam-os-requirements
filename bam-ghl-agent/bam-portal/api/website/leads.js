@@ -20,6 +20,7 @@ import { getClientGhlToken } from "./availability.js";
 import { enrollContact, exitEnrollment } from "../automations.js";
 import { createOpp, moveStage, findOpenOpp, pipelineFlags, ROLE_MATCHERS } from "../agent/_store.js";
 import { upsertPortalContact, writePortalFieldValues, contactProvider, resolveOrMintPortalContact } from "../_contacts.js";
+import { recordKpiEvent } from "../_kpi.js";
 
 const SB_URL = (process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || "").trim();
 const SB_KEY = (process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY || "").trim();
@@ -672,6 +673,14 @@ async function maybePortalRoute(client, contactId, formType, { name, email }) {
 // the form-step row already counted that person.
 async function recordKpiLeadEvent(clientId, leadId, formType, fields, { name, email, phone, contactId }) {
   if (fields?.step === "booking") return;
+  // KPI event log (Track A): the same lead lands in kpi_events - the table the
+  // dashboard reads for portal academies and the sandbox imports into.
+  await recordKpiEvent({
+    clientId, step: "lead",
+    ghlContactId: contactId || null, contactName: name || null,
+    ref: `weblead:${leadId}`,
+    meta: { form_type: formType, email: email ? email.toLowerCase() : null, phone: phone || null },
+  });
   try {
     await sbReq("ghl_funnel_events?on_conflict=event_type,ref", {
       method: "POST",

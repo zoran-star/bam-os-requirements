@@ -13,6 +13,7 @@
 import { withSentryApiRoute } from "../_sentry.js";
 import { moveStage, pipelineFlags, oppMatchClause, resolveStage } from "../agent/_store.js";
 import { contactProvider } from "../_contacts.js";
+import { recordKpiEvent } from "../_kpi.js";
 import { enrollContact, isAutomationLive } from "../automations.js";
 
 const SUPABASE_URL = (process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || "").trim();
@@ -146,6 +147,17 @@ async function handler(req, res) {
       }),
     });
   } catch (e) { return res.status(500).json({ error: `save review: ${e.message}` }); }
+
+  // KPI event log (Track A): the trial outcome is a funnel moment - attended or
+  // no-show. One outcome per opportunity (idempotent ref). Best-effort.
+  if (showedUp !== null) {
+    await recordKpiEvent({
+      clientId, step: showedUp ? "trial_attended" : "trial_no_show",
+      ghlContactId: contactId || null,
+      ref: `trialoutcome:${oppId}`,
+      meta: { opportunity_id: oppId, good_fit: goodFit, trainer: trainer || null },
+    });
+  }
 
   // Contact provider gate: a 'portal' academy owns attendance + trainer in its own
   // tables (post_trial_reviews above, contact_trainers below), so the redundant GHL

@@ -17,6 +17,7 @@
 // sb() helper in api/ghl/_core.js. No new packages.
 
 import { ghl as ghlDefault } from "../ghl/_core.js";
+import { recordKpiEvent } from "../_kpi.js";
 
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
@@ -558,6 +559,23 @@ export async function createOpp(opts = {}) {
   return { ghlOpportunityId };
 }
 
+// KPI event log hook (Track A of KPIs-off-GHL): every move into Scheduled Trial
+// = a "trial booked" funnel moment. ALL paths funnel through moveStage (agent
+// confirm-book, manual board drag, website booking advance), so this one hook
+// covers them. Idempotent per card per month (a same-month re-book is not
+// double-counted; a next-month re-book counts again). Best-effort, never blocks.
+function kpiTrialBooked(clientId, oppRef, contactId) {
+  const oppKey = (oppRef && (oppRef.id || oppRef.ghlOpportunityId)) || null;
+  if (!clientId || !oppKey) return Promise.resolve();
+  const month = new Date().toISOString().slice(0, 7);
+  return recordKpiEvent({
+    clientId, step: "trial_booked",
+    ghlContactId: contactId || null,
+    ref: `trialbook:${oppKey}:${month}`,
+    meta: { opp: oppKey },
+  });
+}
+
 // 2. moveStage - move an opp into a stage.
 //   ghl:    PUT /opportunities/{id} { pipelineId, pipelineStageId } + shadow mirror.
 //   portal: UPDATE the row's stage_role / stage_id / last_stage_change_at.
@@ -579,6 +597,7 @@ export async function moveStage(opts = {}) {
     };
     if (reason != null) patch.reason = reason;
     await sbRest(filter, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify(patch) });
+    if (role === "scheduled_trial") await kpiTrialBooked(clientId, oppRef, contactId);
     return oppRef;
   }
 
@@ -597,6 +616,7 @@ export async function moveStage(opts = {}) {
         });
       } catch (_) { /* mirror is best-effort */ }
     }
+    if (role === "scheduled_trial") await kpiTrialBooked(clientId, oppRef, contactId);
   }
   return oppRef;
 }
