@@ -8,6 +8,12 @@
     <link rel="apple-touch-icon" href="/favicon.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>bam-portal</title>
+    <!-- Reset the browser's default 8px body margin + white canvas so there's no
+         white border / white flash around the (black) app before React paints. -->
+    <style>
+      html, body { margin: 0; padding: 0; background: #000; }
+      #root { min-height: 100vh; }
+    </style>
   </head>
   <body>
     <div id="root"></div>
