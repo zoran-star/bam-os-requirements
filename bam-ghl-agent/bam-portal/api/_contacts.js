@@ -63,6 +63,60 @@ export async function upsertPortalContact(clientId, ghlContactId, fields = {}) {
   }
 }
 
+async function get(path) {
+  const res = await fetch(`${SB_URL}/rest/v1/${path}`, {
+    headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}`, Accept: "application/json" },
+  });
+  if (!res.ok) throw new Error(`${res.status}: ${(await res.text()).slice(0, 200)}`);
+  return res.json();
+}
+
+// Coerce a raw form value to the shape the def's type stores as jsonb.
+function coerceValue(type, v) {
+  if (v === undefined || v === null) return null;
+  const s = String(v).trim();
+  if (s === "") return null;
+  if (type === "number") { const n = Number(s); return Number.isFinite(n) ? n : s; }
+  if (type === "boolean") return /^(true|yes|1|on)$/i.test(s);
+  if (type === "multiselect") return s.split(",").map((x) => x.trim()).filter(Boolean);
+  return s;
+}
+
+// Close the write loop: on a form submit, write the collected custom-field
+// values straight into portal contact_field_values, keyed by custom_field_defs
+// (matched via each def's ghl_field_id bridge). Portal-native + real-time, so
+// the portal no longer depends on the GHL sync+fold to hold a lead's field
+// values. Archived defs are skipped. Best-effort; never throws.
+export async function writePortalFieldValues(clientId, portalContactId, fieldMap, fields) {
+  try {
+    if (!SB_URL || !SB_KEY || !clientId || !portalContactId || !fieldMap || !fields) return;
+    const ghlIds = [...new Set(Object.values(fieldMap).filter(Boolean))];
+    if (!ghlIds.length) return;
+    const defs = await get(
+      `custom_field_defs?client_id=eq.${clientId}&archived=eq.false&ghl_field_id=in.(${ghlIds.join(",")})&select=id,type,ghl_field_id`,
+    );
+    if (!Array.isArray(defs) || !defs.length) return;
+    const byGhl = new Map(defs.map((d) => [d.ghl_field_id, d]));
+    const now = new Date().toISOString();
+    const rows = [];
+    for (const [key, ghlFieldId] of Object.entries(fieldMap)) {
+      const def = byGhl.get(ghlFieldId);
+      if (!def) continue;
+      const val = coerceValue(def.type, fields[key]);
+      if (val === null || (Array.isArray(val) && !val.length)) continue;
+      rows.push({ contact_id: portalContactId, field_id: def.id, value: val, updated_at: now });
+    }
+    if (!rows.length) return;
+    await post(
+      "contact_field_values?on_conflict=contact_id,field_id",
+      rows,
+      "resolution=merge-duplicates,return=minimal",
+    );
+  } catch (e) {
+    console.error("[writePortalFieldValues] non-fatal:", e?.message || e);
+  }
+}
+
 // Bulk mirror (sync cron). rows must already be contacts-shaped (snake_case
 // columns). Best-effort, returns nothing.
 export async function bulkUpsertPortalContacts(rows) {
