@@ -1,8 +1,15 @@
--- Local development seed: BAM GTA lead-routing entry points.
+-- Local development seed: BAM GTA lead-routing entry points mirrored from prod
+-- on 2026-06-29.
+--
 -- These duplicate the production data shape after the historical entry-point
 -- migrations, because those migrations no-op locally when the production
 -- client row is absent during migration replay.
+
+delete from public.entry_points
+where client_id = '39875f07-0a4b-4429-a201-2249bc1f24df';
+
 insert into public.entry_points (
+  id,
   client_id,
   type,
   key,
@@ -14,17 +21,45 @@ insert into public.entry_points (
   field_map,
   offer_id,
   ghl_workflow_id,
-  ghl_workflow_name
+  ghl_workflow_name,
+  created_at,
+  updated_at
 )
 values
   (
+    '6229a5ae-09fb-42d3-b7b6-688b88ffa871',
+    '39875f07-0a4b-4429-a201-2249bc1f24df',
+    'website-form',
+    'free-trial',
+    'Website Free Trial',
+    array['website-inquiry','free trial form filled']::text[],
+    'TRAINING PIPELINE',
+    'scheduled trial',
+    true,
+    '{
+      "athlete": "RqNojS2YaVGQNjMAo4HB",
+      "athlete_age": "YV4VHWIN0yQM2RxCZG2K",
+      "athlete_first": "LkEMioBqJxuuBAI1C6JM",
+      "athlete_last": "shug52YPjEznPlWNRXRB",
+      "booked_date": "jtSUdhaCGn3d3oMXO8KW",
+      "near_oakville": "8npLyk6pibYGhOjuFhJQ",
+      "start_when_ghl": "9LyXPRWb3XN7ASy4amoB"
+    }'::jsonb,
+    '52a6285c-7832-44e1-b531-ab7ef9d8fc21',
+    'b3f5337d-186a-487b-b1e2-86aa4c979908',
+    'trial form filled in',
+    '2026-06-11 21:11:26.180602+00'::timestamptz,
+    '2026-06-12 16:27:35.107256+00'::timestamptz
+  ),
+  (
+    '64cec7fe-626e-4f69-a093-7d3bd0197179',
     '39875f07-0a4b-4429-a201-2249bc1f24df',
     'website-form',
     'contact',
     'Website Contact Form',
     array['website-inquiry','contact form filled']::text[],
-    null,
-    null,
+    'TRAINING PIPELINE',
+    'interested',
     true,
     '{
       "message": "q5d8vr3C9Vy5Xd9eQoDL",
@@ -32,41 +67,12 @@ values
     }'::jsonb,
     '52a6285c-7832-44e1-b531-ab7ef9d8fc21',
     'b3feffee-69a8-4c99-be20-7652a3206de6',
-    'contact form filled in'
+    'contact form filled in',
+    '2026-06-11 21:11:26.180602+00'::timestamptz,
+    '2026-06-11 22:25:28.781+00'::timestamptz
   ),
   (
-    '39875f07-0a4b-4429-a201-2249bc1f24df',
-    'website-form',
-    'free-trial',
-    'Website Free Trial',
-    array['website-inquiry','free trial form filled']::text[],
-    null,
-    null,
-    true,
-    '{
-      "athlete_first": "LkEMioBqJxuuBAI1C6JM",
-      "athlete_last": "shug52YPjEznPlWNRXRB",
-      "booked_date": "jtSUdhaCGn3d3oMXO8KW"
-    }'::jsonb,
-    '52a6285c-7832-44e1-b531-ab7ef9d8fc21',
-    'b3f5337d-186a-487b-b1e2-86aa4c979908',
-    'trial form filled in'
-  ),
-  (
-    '39875f07-0a4b-4429-a201-2249bc1f24df',
-    'ghl-form',
-    'GLI35e0zHS4cFrft92le',
-    'GHL Contact Form',
-    array[]::text[],
-    null,
-    null,
-    true,
-    '{}'::jsonb,
-    '52a6285c-7832-44e1-b531-ab7ef9d8fc21',
-    null,
-    null
-  ),
-  (
+    '6925c94d-31ec-4344-9c56-e5e0c018eee7',
     '39875f07-0a4b-4429-a201-2249bc1f24df',
     'ghl-form',
     '00MuBSi1GxsRcSqklOkF',
@@ -74,39 +80,81 @@ values
     array[]::text[],
     null,
     null,
-    true,
+    false,
     '{}'::jsonb,
     '52a6285c-7832-44e1-b531-ab7ef9d8fc21',
     null,
-    null
+    null,
+    '2026-06-11 21:11:26.180602+00'::timestamptz,
+    '2026-06-11 21:11:26.180602+00'::timestamptz
   ),
   (
-    '39875f07-0a4b-4429-a201-2249bc1f24df',
-    'calendar',
-    'Cmw4bCVBhexgi0Oi0Dkf',
-    'Booking Calendar: Group 1 (Elementary)',
-    array[]::text[],
-    null,
-    null,
-    true,
-    '{}'::jsonb,
-    '52a6285c-7832-44e1-b531-ab7ef9d8fc21',
-    '188cb898-0159-464d-8e3c-3df5024d4929',
-    'free trial booked'
-  ),
-  (
+    '87ae3fdd-e5bf-46dd-9871-c46bd169ee9b',
     '39875f07-0a4b-4429-a201-2249bc1f24df',
     'calendar',
     'G5y4QI0MsFq3159IhFU7',
     'Booking Calendar: Group 2 (High School)',
     array[]::text[],
-    null,
-    null,
+    'TRAINING PIPELINE',
+    'scheduled trial',
     true,
     '{}'::jsonb,
     '52a6285c-7832-44e1-b531-ab7ef9d8fc21',
     '188cb898-0159-464d-8e3c-3df5024d4929',
-    'free trial booked'
+    'free trial booked',
+    '2026-06-11 21:11:26.180602+00'::timestamptz,
+    '2026-06-11 23:34:22.502+00'::timestamptz
+  ),
+  (
+    '8c2fbade-7ff8-498a-86cf-38c172513ae8',
+    '39875f07-0a4b-4429-a201-2249bc1f24df',
+    'calendar',
+    'Cmw4bCVBhexgi0Oi0Dkf',
+    'Booking Calendar: Group 1 (Elementary)',
+    array[]::text[],
+    'TRAINING PIPELINE',
+    'scheduled trial',
+    true,
+    '{}'::jsonb,
+    '52a6285c-7832-44e1-b531-ab7ef9d8fc21',
+    '188cb898-0159-464d-8e3c-3df5024d4929',
+    'free trial booked',
+    '2026-06-11 21:11:26.180602+00'::timestamptz,
+    '2026-06-11 23:34:16.266+00'::timestamptz
+  ),
+  (
+    'adfc764a-b8e7-41fb-8a2c-5821a5a30509',
+    '39875f07-0a4b-4429-a201-2249bc1f24df',
+    'ghl-form',
+    'GLI35e0zHS4cFrft92le',
+    'GHL Contact Form',
+    array[]::text[],
+    null,
+    null,
+    false,
+    '{}'::jsonb,
+    '52a6285c-7832-44e1-b531-ab7ef9d8fc21',
+    null,
+    null,
+    '2026-06-11 21:11:26.180602+00'::timestamptz,
+    '2026-06-11 21:11:26.180602+00'::timestamptz
+  ),
+  (
+    'e9e91d47-fcb9-4656-ab3b-872bd099b789',
+    '39875f07-0a4b-4429-a201-2249bc1f24df',
+    'website-form',
+    'adapt',
+    'ADAPT intake form',
+    array['adaptformfilled']::text[],
+    null,
+    null,
+    true,
+    '{}'::jsonb,
+    null,
+    null,
+    null,
+    '2026-06-17 14:06:17.557594+00'::timestamptz,
+    '2026-06-17 14:06:17.557594+00'::timestamptz
   )
 on conflict (client_id, type, key) do update set
   label = excluded.label,
@@ -118,4 +166,4 @@ on conflict (client_id, type, key) do update set
   offer_id = excluded.offer_id,
   ghl_workflow_id = excluded.ghl_workflow_id,
   ghl_workflow_name = excluded.ghl_workflow_name,
-  updated_at = now();
+  updated_at = excluded.updated_at;
