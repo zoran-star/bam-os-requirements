@@ -22,6 +22,7 @@ import { withSentryApiRoute } from "./_sentry.js";
 
 import crypto from "node:crypto";
 import { timingSafeEqual } from "node:crypto";
+import { applyDiscountToCents, normCode } from "./_coupon-guardrails.js";
 
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
@@ -285,11 +286,33 @@ async function handler(req, res) {
         let stripe = null;
         if (client?.stripe_connect_account_id && member.stripe_subscription_id) {
           try {
-            const sub = await stripeFetch(
-              `/subscriptions/${member.stripe_subscription_id}?expand[]=items.data.price.product&expand[]=latest_invoice`,
-              { stripeAccount: client.stripe_connect_account_id }
-            );
+            let sub;
+            try {
+              sub = await stripeFetch(
+                `/subscriptions/${member.stripe_subscription_id}?expand[]=items.data.price.product&expand[]=latest_invoice&expand[]=discounts.promotion_code`,
+                { stripeAccount: client.stripe_connect_account_id }
+              );
+            } catch (_expandErr) {
+              // Older API version that can't expand discounts → drop the coupon
+              // expand so billing info never breaks (coupon chip just won't show).
+              sub = await stripeFetch(
+                `/subscriptions/${member.stripe_subscription_id}?expand[]=items.data.price.product&expand[]=latest_invoice`,
+                { stripeAccount: client.stripe_connect_account_id }
+              );
+            }
             const item = sub.items?.data?.[0];
+            // Active discount (coupon) on this sub, if any → drives the drawer's
+            // "current coupon" chip + whether the Remove-coupon button shows.
+            const disc = (Array.isArray(sub.discounts) ? sub.discounts[0] : null) || sub.discount || null;
+            const discCp = disc && (typeof disc.coupon === "object" ? disc.coupon : null);
+            const discCoupon = discCp ? {
+              code: (disc.promotion_code && typeof disc.promotion_code === "object" ? disc.promotion_code.code : null)
+                || discCp.name || discCp.id,
+              label: discCp.percent_off != null ? `${discCp.percent_off}% off`
+                : (discCp.amount_off != null ? `$${(discCp.amount_off / 100).toFixed(2)} off` : "discount"),
+              duration: discCp.duration || null,
+              duration_months: discCp.duration_in_months || null,
+            } : null;
             // Can the portal manage this sub? Only subs IT created (Standard-account
             // rule). Drives which billing buttons are enabled vs greyed in the popup.
             const liveStatus = ["active", "trialing", "past_due", "unpaid", "paused"].includes(sub.status);
@@ -310,6 +333,7 @@ async function handler(req, res) {
               origin: sub.metadata?.origin || null,
               portal_owned: portalOwned,
               can_manage: liveStatus && portalOwned, // gate for pause/cancel/change/refund
+              coupon: discCoupon, // active discount on the sub, or null
             };
 
             // Recent payment history - actual money movements (Stripe charges) for
@@ -607,6 +631,8 @@ async function handler(req, res) {
         case "cancel":        return await actionCancel(res, member, stripeAccount, ctx, body);
         case "refund":        return await actionRefund(res, member, stripeAccount, ctx, body);
         case "change":        return await actionChange(res, member, stripeAccount, ctx, body);
+        case "apply-coupon":  return await actionApplyCoupon(res, member, stripeAccount, ctx, body);
+        case "remove-coupon": return await actionRemoveCoupon(res, member, stripeAccount, ctx, body);
         case "payment-link":  return await actionPaymentLink(res, member, stripeAccount, ctx, body, req);
         case "card-setup-link": return await actionCardSetupLink(res, member, stripeAccount, ctx, body, req);
         case "referred":      return await actionReferred(res, member, stripeAccount, ctx, body);
@@ -1117,6 +1143,22 @@ async function actionRefund(res, member, stripeAccount, ctx, body) {
   });
 }
 
+// Resolve a customer-facing promo code string to its live promotion code on the
+// connected account (active only), or null.
+async function resolvePromo(code, stripeAccount) {
+  const c = normCode(code);
+  if (!c) return null;
+  const list = await stripeFetch(`/promotion_codes?code=${encodeURIComponent(c)}&limit=1`, { stripeAccount });
+  const pc = (list.data || [])[0];
+  return pc && pc.active !== false ? pc : null;
+}
+// Coupon def ({kind,value}) from a Stripe coupon object, for the guardrails.
+function couponDefFromStripe(cp = {}) {
+  return cp.percent_off != null
+    ? { kind: "Percent off", value: cp.percent_off }
+    : { kind: "Dollar off", value: (cp.amount_off || 0) / 100 };
+}
+
 // ─────────────────────────────────────────────────────────
 // Action: CHANGE (plan)
 // ─────────────────────────────────────────────────────────
@@ -1165,10 +1207,23 @@ async function actionChange(res, member, stripeAccount, ctx, body) {
 
   const currentRow = member.stripe_price_id ? byPrice.get(member.stripe_price_id) : null;
 
-  // Fetch current sub - need item id, period end, and the card to carry over.
-  const currentSub = await stripeFetch(`/subscriptions/${member.stripe_subscription_id}`, {
-    stripeAccount,
-  });
+  // Fetch current sub - need item id, period end, the card to carry over, and
+  // any active discount (so the recreate path doesn't silently drop it). Falls
+  // back to a plain fetch if the API version can't expand discounts.
+  let currentSub;
+  try {
+    currentSub = await stripeFetch(
+      `/subscriptions/${member.stripe_subscription_id}?expand[]=discounts.promotion_code`,
+      { stripeAccount }
+    );
+  } catch (_expandErr) {
+    currentSub = await stripeFetch(`/subscriptions/${member.stripe_subscription_id}`, { stripeAccount });
+  }
+  // Existing discount on the current sub, if any (for carry-over on recreate).
+  const curDisc = (Array.isArray(currentSub.discounts) ? currentSub.discounts[0] : null) || currentSub.discount || null;
+  const curDiscPromoId = curDisc && curDisc.promotion_code
+    && (typeof curDisc.promotion_code === "object" ? curDisc.promotion_code.id : curDisc.promotion_code) || null;
+  const curDiscCoupon = curDisc && (typeof curDisc.coupon === "object" ? curDisc.coupon : null);
 
   // Optional: staff sets when the NEXT payment should land (Stripe trial_end).
   // Pushes the next charge to that date; no charge happens until then.
@@ -1263,6 +1318,42 @@ async function actionChange(res, member, stripeAccount, ctx, body) {
     });
   }
 
+  // ── Coupon handling on the resulting subscription ──
+  // Swap keeps the existing discount automatically. Recreate starts clean, so we
+  // carry the old coupon over (this is the silent-discount-loss bug we're closing).
+  // Staff can also apply a new coupon or remove it during a change. Everything runs
+  // through the $1-floor guardrail against the NEW plan price.
+  let coupon = null;
+  const targetCents = sub.items?.data?.[0]?.price?.unit_amount || newAmt || null;
+  try {
+    if (body.remove_coupon) {
+      if (mode === "swap") await stripeFetch(`/subscriptions/${sub.id}/discount`, { method: "DELETE", stripeAccount });
+      coupon = { removed: true };
+    } else if (body.coupon_code) {
+      const pc = await resolvePromo(body.coupon_code, stripeAccount);
+      if (!pc) coupon = { error: "coupon not found or inactive" };
+      else {
+        const chk = targetCents ? applyDiscountToCents(couponDefFromStripe(pc.coupon || {}), targetCents) : { ok: true };
+        if (!chk.ok) coupon = { error: chk.error };
+        else {
+          await stripeFetch(`/subscriptions/${sub.id}`, { method: "POST", stripeAccount, body: { "discounts[0][promotion_code]": pc.id } });
+          coupon = { applied: true, code: normCode(body.coupon_code) };
+        }
+      }
+    } else if (mode === "recreate" && (curDiscPromoId || curDiscCoupon)) {
+      // Carry the old coupon onto the new sub - but only if it still clears the
+      // guardrail on the new plan (a $ coupon can break a cheaper plan).
+      const chk = (targetCents && curDiscCoupon) ? applyDiscountToCents(couponDefFromStripe(curDiscCoupon), targetCents) : { ok: true };
+      if (chk.ok) {
+        const cbody = curDiscPromoId ? { "discounts[0][promotion_code]": curDiscPromoId } : { "discounts[0][coupon]": curDiscCoupon.id };
+        await stripeFetch(`/subscriptions/${sub.id}`, { method: "POST", stripeAccount, body: cbody });
+        coupon = { carried_over: true };
+      } else {
+        coupon = { dropped: true, reason: chk.error };
+      }
+    }
+  } catch (e) { coupon = { error: e.message }; }
+
   await writeAudit({
     client_id: member.client_id,
     member_id: member.id,
@@ -1270,13 +1361,14 @@ async function actionChange(res, member, stripeAccount, ctx, body) {
     args: body,
     performed_by: ctx.user.id,
     performed_by_name: ctx.staff?.name || null,
-    stripe_response: { id: sub.id, status: sub.status, price_id: newPriceId, trial_end: sub.trial_end || null, mode },
+    stripe_response: { id: sub.id, status: sub.status, price_id: newPriceId, trial_end: sub.trial_end || null, mode, coupon },
     db_changes: { members: { id: member.id, plan: { from: member.plan, to: newPlan }, mode } },
   });
 
   return res.status(200).json({
     ok: true,
     mode,
+    coupon,
     member: { id: member.id, plan: newPlan },
     sub: { id: sub.id, status: sub.status, new_price_id: newPriceId },
     prorated,
@@ -1284,6 +1376,105 @@ async function actionChange(res, member, stripeAccount, ctx, body) {
     next_payment_set: nextUnix != null,
     next_payment: nextUnix,
   });
+}
+
+// ─────────────────────────────────────────────────────────
+// Action: APPLY-COUPON
+// ─────────────────────────────────────────────────────────
+// body: { code: "SIBLING10" }  (the customer-facing promotion code string)
+// Applies a live coupon to the member's subscription. Replaces any existing
+// discount (Stripe allows one). Guardrails run against the sub's CURRENT price
+// so a $ coupon can never drop this member below $1.
+async function actionApplyCoupon(res, member, stripeAccount, ctx, body) {
+  if (!member.stripe_subscription_id) {
+    return res.status(400).json({ error: "member has no Stripe subscription" });
+  }
+  const code = normCode(body.code || body.promotion_code);
+  if (!code) return res.status(400).json({ error: "code required" });
+
+  // Current sub → the price cents the coupon will discount.
+  const sub = await stripeFetch(`/subscriptions/${member.stripe_subscription_id}`, { stripeAccount });
+  const item = sub.items?.data?.[0];
+  const planCents = item?.price?.unit_amount;
+  if (!Number.isFinite(planCents) || planCents <= 0) {
+    return res.status(400).json({ error: "couldn't read this member's plan price from Stripe" });
+  }
+
+  // Live promotion code on the connected account.
+  const list = await stripeFetch(`/promotion_codes?code=${encodeURIComponent(code)}&limit=1`, { stripeAccount });
+  const pc = (list.data || [])[0];
+  if (!pc) return res.status(400).json({ error: `no coupon named ${code} exists in Stripe - create it in the offer's Pricing section first` });
+  if (pc.active === false) return res.status(400).json({ error: `${code} is deactivated` });
+  if (pc.expires_at && nowUnix() > pc.expires_at) return res.status(400).json({ error: `${code} has expired` });
+  if (pc.max_redemptions && (pc.times_redeemed || 0) >= pc.max_redemptions) {
+    return res.status(400).json({ error: `${code} is fully redeemed` });
+  }
+
+  // Guardrail: never let this coupon zero-out or go negative on THIS plan.
+  const cp = pc.coupon || {};
+  const def = cp.percent_off != null
+    ? { kind: "Percent off", value: cp.percent_off }
+    : { kind: "Dollar off", value: (cp.amount_off || 0) / 100 };
+  const applied = applyDiscountToCents(def, planCents);
+  if (!applied.ok) return res.status(400).json({ error: applied.error });
+
+  // Apply to the subscription (replaces any existing discount).
+  const updated = await stripeFetch(`/subscriptions/${member.stripe_subscription_id}`, {
+    method: "POST",
+    stripeAccount,
+    body: { "discounts[0][promotion_code]": pc.id },
+  });
+
+  await writeAudit({
+    client_id: member.client_id,
+    member_id: member.id,
+    action_type: "apply-coupon",
+    args: body,
+    performed_by: ctx.user.id,
+    performed_by_name: ctx.staff?.name || null,
+    stripe_response: { subscription: updated.id, promotion_code: pc.id, coupon: cp.id, discount_cents: applied.discountCents },
+    db_changes: null,
+  });
+
+  return res.status(200).json({
+    ok: true,
+    coupon: {
+      code,
+      label: applied.label,
+      discount_cents: applied.discountCents,
+      discounted_cents: applied.discountedCents,
+      plan_cents: planCents,
+    },
+  });
+}
+
+// ─────────────────────────────────────────────────────────
+// Action: REMOVE-COUPON
+// ─────────────────────────────────────────────────────────
+// Pulls any active discount off the member's subscription. Back to full price
+// on the next invoice.
+async function actionRemoveCoupon(res, member, stripeAccount, ctx, body) {
+  if (!member.stripe_subscription_id) {
+    return res.status(400).json({ error: "member has no Stripe subscription" });
+  }
+  // Legacy single-discount delete endpoint - clears the subscription's coupon.
+  await stripeFetch(`/subscriptions/${member.stripe_subscription_id}/discount`, {
+    method: "DELETE",
+    stripeAccount,
+  });
+
+  await writeAudit({
+    client_id: member.client_id,
+    member_id: member.id,
+    action_type: "remove-coupon",
+    args: body || null,
+    performed_by: ctx.user.id,
+    performed_by_name: ctx.staff?.name || null,
+    stripe_response: { subscription: member.stripe_subscription_id, discount: "removed" },
+    db_changes: null,
+  });
+
+  return res.status(200).json({ ok: true, removed: true });
 }
 
 // ─────────────────────────────────────────────────────────

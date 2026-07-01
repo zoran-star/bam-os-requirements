@@ -25,6 +25,7 @@
 
 import { withSentryApiRoute } from "../_sentry.js";
 import { renderAgreementPdf, uploadAgreementPdf } from "../_lib/agreement-pdf.js";
+import { applyDiscountToCents, normCode } from "../_coupon-guardrails.js";
 
 const SB_URL = (process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || "").trim();
 const SB_KEY = (process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY || "").trim();
@@ -219,6 +220,32 @@ async function handler(req, res) {
     const term = price.interval || "4_weeks";
     const planText = price.canonical_plan || priceKey.split("|")[0];
 
+    // ── Optional coupon: validate the promo code + run the $1-floor / percent
+    //    guardrail against the SERVER-SIDE plan price. Never trusts a client
+    //    amount. Skipped in test mode (inline price; coupons live on the
+    //    connected account). Stripe is the final gate at payment. ──
+    const couponCode = normCode(body.coupon_code || body.coupon);
+    let promo = null, discountInfo = null, couponError = null;
+    if (couponCode && !testMode) {
+      try {
+        const list = await stripeFetch(`/promotion_codes?code=${encodeURIComponent(couponCode)}&limit=1`, { stripeAccount });
+        const pc = (list.data || [])[0];
+        const nowSec = Math.floor(Date.now() / 1000);
+        if (!pc || pc.active === false) couponError = "Code not found";
+        else if (pc.expires_at && nowSec > pc.expires_at) couponError = "This code has expired";
+        else if (pc.max_redemptions && (pc.times_redeemed || 0) >= pc.max_redemptions) couponError = "This code is fully redeemed";
+        else {
+          const cp = pc.coupon || {};
+          const def = cp.percent_off != null
+            ? { kind: "Percent off", value: cp.percent_off }
+            : { kind: "Dollar off", value: (cp.amount_off || 0) / 100 };
+          const chk = price.amount_cents != null ? applyDiscountToCents(def, price.amount_cents) : { ok: false, error: "no price" };
+          if (!chk.ok) couponError = chk.error;
+          else { promo = pc; discountInfo = { code: couponCode, label: chk.label, discount_cents: chk.discountCents, discounted_cents: chk.discountedCents }; }
+        }
+      } catch { couponError = "Could not check that code"; }
+    }
+
     // ── Idempotency: reuse an existing member + in-flight sub ──
     const existingRows = await sb(
       `members?client_id=eq.${encodeURIComponent(clientId)}&parent_email=eq.${encodeURIComponent(parentEmail)}` +
@@ -231,6 +258,11 @@ async function handler(req, res) {
       try { sub = await stripeFetch(`/subscriptions/${member.stripe_subscription_id}?expand[]=latest_invoice.payment_intent&expand[]=latest_invoice.confirmation_secret`, { stripeAccount }); } catch { sub = null; }
       if (sub) {
         if (sub.status === "incomplete") {
+          // If a coupon was entered on a retry and this in-flight sub has no
+          // discount yet, apply it now so the first invoice reflects it.
+          if (promo && !(Array.isArray(sub.discounts) && sub.discounts.length) && !sub.discount) {
+            try { await stripeFetch(`/subscriptions/${sub.id}`, { method: "POST", stripeAccount, body: { "discounts[0][promotion_code]": promo.id } }); } catch { /* non-fatal */ }
+          }
           const secret = piSecretFromSub(sub);
           if (secret) {
             await maybeAttachAgreement({ member, client, parentName, athleteName, planText, price, term, agreement, clientId });
@@ -238,6 +270,7 @@ async function handler(req, res) {
               ok: true, reused: true, member_id: member.id, subscription_id: sub.id, customer_id: sub.customer,
               client_secret: secret, stripe_account: stripeAccount, publishable_key: process.env.STRIPE_PUBLISHABLE_KEY || null,
               amount_cents: price.amount_cents, currency: price.currency || "cad", agreement_saved: !!member.agreement_pdf_path,
+              discount: discountInfo, coupon_error: couponError,
             });
           }
         } else if (sub.status === "active" || sub.status === "trialing") {
@@ -296,6 +329,7 @@ async function handler(req, res) {
         "metadata[client_id]": clientId, "metadata[parent_email]": parentEmail, "metadata[athlete_name]": athleteName,
         ...(oppId ? { "metadata[ghl_opportunity_id]": oppId } : {}),
         ...(revert ? { "metadata[commitment_reverts]": "monthly", "metadata[revert_to_price]": revert.revertToPriceId } : {}),
+        ...(promo ? { "discounts[0][promotion_code]": promo.id, "metadata[coupon_code]": couponCode } : {}),
       },
     });
     const clientSecret = piSecretFromSub(sub);
@@ -328,7 +362,7 @@ async function handler(req, res) {
         body: JSON.stringify([{
           client_id: clientId, member_id: member && member.id,
           action_type: "website-enrollment-checkout-created",
-          args: { offer_id: offerId, offer_price_key: priceKey, plan: planText, term, sub_id: sub.id, customer_id: customerId, intake, agreement_saved: agreementSaved },
+          args: { offer_id: offerId, offer_price_key: priceKey, plan: planText, term, sub_id: sub.id, customer_id: customerId, intake, agreement_saved: agreementSaved, coupon: discountInfo || (couponError ? { error: couponError } : null) },
           performed_by_name: "Website enrollment funnel (public)",
         }]),
       });
@@ -338,6 +372,7 @@ async function handler(req, res) {
       ok: true, member_id: member && member.id, subscription_id: sub.id, customer_id: customerId,
       client_secret: clientSecret, stripe_account: stripeAccount, publishable_key: process.env.STRIPE_PUBLISHABLE_KEY || null,
       amount_cents: price.amount_cents, currency: price.currency || "cad", agreement_saved: agreementSaved,
+      discount: discountInfo, coupon_error: couponError,
     });
   } catch (e) {
     return res.status(e.stripeStatus || e.status || 500).json({ error: e.message || String(e) });
