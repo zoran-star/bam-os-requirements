@@ -38,6 +38,22 @@ const ORIGINS_TTL_MS = 60_000;
 function nowIso() { return new Date().toISOString(); }
 function norm(s) { return (s || "").toString().trim().toLowerCase(); }
 
+// Membership start date the parent optionally chose at enrollment. Display/access
+// label ONLY - it never changes Stripe billing (they pay + go live now). Accept a
+// YYYY-MM-DD within [tomorrow, ~6 months]; today / past / invalid / out-of-range all
+// return null, meaning "starts immediately" (the member card falls back to joined_date).
+function clampStartDate(raw) {
+  const s = String(raw || "").slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return null;
+  const picked = Date.parse(s + "T00:00:00Z");
+  if (!Number.isFinite(picked)) return null;
+  const todayUTC = Date.parse(new Date().toISOString().slice(0, 10) + "T00:00:00Z");
+  const maxAhead = todayUTC + 186 * 86400000; // ~6 months out
+  if (picked <= todayUTC) return null;  // today or earlier → starts immediately
+  if (picked > maxAhead) return null;   // beyond the 6-month window → ignore
+  return s;
+}
+
 async function sb(path, init = {}) {
   const res = await fetch(`${SB_URL}/rest/v1/${path}`, {
     ...init,
@@ -186,6 +202,8 @@ async function handler(req, res) {
     // the EXACT opportunity WON on payment, and persist it on the member row. Optional
     // — when absent the webhook falls back to the member's open opp by contact.
     const oppId = (body.opp_id || body.opportunity_id || "").toString().trim() || null;
+    // Optional future membership start date (display/access label only, never billing).
+    const startDate = clampStartDate(body.start_date);
 
     // ── Validate ──
     if (!clientId) return res.status(400).json({ error: "client_id required" });
@@ -263,6 +281,11 @@ async function handler(req, res) {
           if (promo && !(Array.isArray(sub.discounts) && sub.discounts.length) && !sub.discount) {
             try { await stripeFetch(`/subscriptions/${sub.id}`, { method: "POST", stripeAccount, body: { "discounts[0][promotion_code]": promo.id } }); } catch { /* non-fatal */ }
           }
+          // Persist a start date entered on a retry (member row + Stripe metadata). Non-fatal.
+          if (startDate) {
+            try { await sb(`members?id=eq.${member.id}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ start_date: startDate, updated_at: nowIso() }) }); } catch { /* non-fatal */ }
+            try { await stripeFetch(`/subscriptions/${sub.id}`, { method: "POST", stripeAccount, body: { "metadata[start_date]": startDate } }); } catch { /* non-fatal */ }
+          }
           const secret = piSecretFromSub(sub);
           if (secret) {
             await maybeAttachAgreement({ member, client, parentName, athleteName, planText, price, term, agreement, clientId });
@@ -270,7 +293,7 @@ async function handler(req, res) {
               ok: true, reused: true, member_id: member.id, subscription_id: sub.id, customer_id: sub.customer,
               client_secret: secret, stripe_account: stripeAccount, publishable_key: process.env.STRIPE_PUBLISHABLE_KEY || null,
               amount_cents: price.amount_cents, currency: price.currency || "cad", agreement_saved: !!member.agreement_pdf_path,
-              discount: discountInfo, coupon_error: couponError,
+              discount: discountInfo, coupon_error: couponError, start_date: startDate || member.start_date || null,
             });
           }
         } else if (sub.status === "active" || sub.status === "trialing") {
@@ -330,6 +353,7 @@ async function handler(req, res) {
         ...(oppId ? { "metadata[ghl_opportunity_id]": oppId } : {}),
         ...(revert ? { "metadata[commitment_reverts]": "monthly", "metadata[revert_to_price]": revert.revertToPriceId } : {}),
         ...(promo ? { "discounts[0][promotion_code]": promo.id, "metadata[coupon_code]": couponCode } : {}),
+        ...(startDate ? { "metadata[start_date]": startDate } : {}),
       },
     });
     const clientSecret = piSecretFromSub(sub);
@@ -343,6 +367,9 @@ async function handler(req, res) {
     };
     // Only stamp the opp link when we have one — never null out an existing link on a retry.
     if (oppId) memberFields.ghl_opportunity_id = oppId;
+    // Chosen future start date (display/access label). Only set when present so a retry
+    // without it doesn't wipe a previously-chosen date.
+    if (startDate) memberFields.start_date = startDate;
     if (member) {
       await sb(`members?id=eq.${member.id}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify(memberFields) });
     } else {
@@ -362,7 +389,7 @@ async function handler(req, res) {
         body: JSON.stringify([{
           client_id: clientId, member_id: member && member.id,
           action_type: "website-enrollment-checkout-created",
-          args: { offer_id: offerId, offer_price_key: priceKey, plan: planText, term, sub_id: sub.id, customer_id: customerId, intake, agreement_saved: agreementSaved, coupon: discountInfo || (couponError ? { error: couponError } : null) },
+          args: { offer_id: offerId, offer_price_key: priceKey, plan: planText, term, sub_id: sub.id, customer_id: customerId, intake, agreement_saved: agreementSaved, coupon: discountInfo || (couponError ? { error: couponError } : null), start_date: startDate },
           performed_by_name: "Website enrollment funnel (public)",
         }]),
       });
@@ -372,7 +399,7 @@ async function handler(req, res) {
       ok: true, member_id: member && member.id, subscription_id: sub.id, customer_id: customerId,
       client_secret: clientSecret, stripe_account: stripeAccount, publishable_key: process.env.STRIPE_PUBLISHABLE_KEY || null,
       amount_cents: price.amount_cents, currency: price.currency || "cad", agreement_saved: agreementSaved,
-      discount: discountInfo, coupon_error: couponError,
+      discount: discountInfo, coupon_error: couponError, start_date: startDate,
     });
   } catch (e) {
     return res.status(e.stripeStatus || e.status || 500).json({ error: e.message || String(e) });

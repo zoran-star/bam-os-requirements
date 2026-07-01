@@ -1690,6 +1690,9 @@ const PROFILE_EDITABLE_FIELDS = new Set([
   // 'alternate' = pays outside Stripe (cash/e-transfer) — set from the member
   // popup or the Sorter cleanup step; null/'stripe' = normal Stripe billing.
   "billing_mode",
+  // Membership start date (display/access label; NOT a billing change). Also mirrored
+  // to the Stripe subscription metadata[start_date] after the DB write (best-effort).
+  "start_date",
 ]);
 
 async function actionUpdateProfile(res, member, ctx, body) {
@@ -1697,6 +1700,14 @@ async function actionUpdateProfile(res, member, ctx, body) {
   const updates = {};
   for (const [k, v] of Object.entries(fields)) {
     if (!PROFILE_EDITABLE_FIELDS.has(k)) continue;
+    if (k === "start_date") {
+      // Blank clears it (starts immediately); otherwise must be YYYY-MM-DD.
+      if (v === "" || v === null || v === undefined) { updates.start_date = null; continue; }
+      const s = String(v).slice(0, 10);
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return res.status(400).json({ error: "start_date must be YYYY-MM-DD" });
+      updates.start_date = s;
+      continue;
+    }
     // Empty string → null (so "pick — " clears the field).
     updates[k] = (v === "" || v === undefined) ? null : v;
   }
@@ -1711,6 +1722,22 @@ async function actionUpdateProfile(res, member, ctx, body) {
     body: JSON.stringify(updates),
   });
   const updated = Array.isArray(rows) && rows[0] ? rows[0] : null;
+
+  // Mirror a start-date edit onto the Stripe subscription metadata so Stripe stays in
+  // sync with the member card. Best-effort + non-fatal: the members row is the source
+  // of truth for this display label. Empty string removes the Stripe metadata key.
+  if (Object.prototype.hasOwnProperty.call(updates, "start_date") && updated && updated.stripe_subscription_id) {
+    try {
+      const crows = await sb(`clients?id=eq.${encodeURIComponent(member.client_id)}&select=stripe_connect_account_id&limit=1`);
+      const acct = Array.isArray(crows) && crows[0] && crows[0].stripe_connect_account_id;
+      if (acct) {
+        await stripeFetch(`/subscriptions/${encodeURIComponent(updated.stripe_subscription_id)}`, {
+          method: "POST", stripeAccount: acct,
+          body: { "metadata[start_date]": updates.start_date || "" },
+        });
+      }
+    } catch (_) { /* non-fatal — DB write already succeeded */ }
+  }
 
   await writeAudit({
     client_id: member.client_id,
