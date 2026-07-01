@@ -61,18 +61,21 @@ Migrated the find-opp locators from `ghl /opportunities/search` to the provider-
   provider branch - for portal reads the open opp + `stage_role` from the store (the true stage
   lives there; the GHL stage is stale) and bounces only from interested/nurture.
 
-## The ONLY GHL touches left in the pipeline (non-breaking, not GTA writes)
-- `api/ghl/post-trial.js` still READS GHL pipeline NAMES (to resolve the interested/done_trial
-  stage) for BOTH providers - a read, not a write; the move goes to the store. Kept because
-  passing a partial stage to `portalStageRowId` would wipe the registry's ghl_stage_id (merge with
-  nulls). To fully remove: resolve the stage from the `pipeline_stages` registry by role instead.
+## Stage-NAME reads - DONE 2026-07-01 (registry-first, 4th PR)
+- `api/ghl/post-trial.js`: both stage lookups (interested + done_trial) branch on provider -
+  portal resolves via `resolveStage` (the `pipeline_stages` registry, no GHL read); ghl keeps
+  the exact pipelines fetch + name regex. GTA's registry has all 5 roles seeded with real ids.
+- `api/website/leads.js` `resolvePipelineStage`: registry-first for pipeline_provider='portal'
+  (configured stage name -> role via roleForStageName -> registry row). Unmapped custom stage
+  names / unseeded rows fall through to the GHL lookup unchanged.
+
+## The ONLY GHL touch left in the pipeline (non-breaking, never fires for GTA)
 - `api/ghl/inbound-webhook.js` (195,287): the GHL-MESSAGING inbound webhook - only fires for
   academies on GHL SMS. GTA is Twilio+Resend, so it NEVER runs for GTA. Left as-is (those
   academies are pipeline_provider='ghl' anyway).
 
-## Net for GTA: pipeline opp WRITES are 100% off GHL (create/move/close/won across board,
-## agents, automations, lead intake, post-trial, payment, inbound). Reads too, except the one
-## post-trial stage-name lookup above.
+## Net for GTA: pipeline opp READS and WRITES are 100% off GHL (create/move/close/won across
+## board, agents, automations, lead intake, post-trial, payment, inbound + stage lookups).
 
 ## Also still on GHL for the pipeline layer (deferred, Zoran's call)
 - **KPIs** (api/kpis-v15.js) and **calendars/booking** (api/ghl/calendars-v15.js) still read GHL
