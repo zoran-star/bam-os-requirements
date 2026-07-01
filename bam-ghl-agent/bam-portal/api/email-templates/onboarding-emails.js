@@ -8,6 +8,22 @@
 // {{contact.athletes_full_name}}, {{location.city}}, {{location_owner.first_name}}).
 // Referenced from an automation_steps row via body = "template:<key>".
 
+import { TEMPLATES as NURTURE } from "./nurture-emails.js";
+
+// The onboarding sequence reuses the designed nurture emails, but its recipients
+// are PAYING members - so any "Book a free trial" call-to-action (right for a lead,
+// wrong for a member who already trains) is stripped for the onboarding-only copies.
+// The shared nurture templates are left untouched so the lead-nurture sequence keeps
+// its trial CTA. Two strips: the gold CTA button table, and any paragraph whose text
+// mentions "free trial".
+function stripFreeTrial(html) {
+  return String(html)
+    // gold CTA button table that links to /free-trial (one per template, no nesting)
+    .replace(/\s*<table[^>]*>(?:(?!<\/table>)[\s\S])*?\/free-trial[\s\S]*?<\/table>/gi, "")
+    // any text-only paragraph that mentions a free trial (e.g. "Come in for a free trial session.")
+    .replace(/\s*<p[^>]*>[^<]*free trial[^<]*<\/p>/gi, "");
+}
+
 const HEAD = (title, preheader) => `<!DOCTYPE html>
 <html lang="en"><head>
 <meta charset="utf-8">
@@ -163,4 +179,10 @@ export const ONBOARDING_TEMPLATES = {
   "onboarding-welcome": welcome,
   "onboarding-training": training,
   "onboarding-review": review,
+  // Onboarding-only copies of the nurture designs, with the free-trial CTA removed
+  // (paying members, not leads). The onboarding automation points its brand-story /
+  // "new era" / testimonials steps at these keys instead of nurture-1/2/3.
+  "onboarding-story":        stripFreeTrial(NURTURE["nurture-1"]),
+  "onboarding-era":          stripFreeTrial(NURTURE["nurture-2"]),
+  "onboarding-testimonials": stripFreeTrial(NURTURE["nurture-3"]),
 };
