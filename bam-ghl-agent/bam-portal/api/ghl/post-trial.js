@@ -11,7 +11,7 @@
 // Auth: Supabase JWT — staff, or client_users membership for client_id.
 
 import { withSentryApiRoute } from "../_sentry.js";
-import { moveStage, pipelineFlags } from "../agent/_store.js";
+import { moveStage, pipelineFlags, oppMatchClause } from "../agent/_store.js";
 import { contactProvider } from "../_contacts.js";
 import { enrollContact, isAutomationLive } from "../automations.js";
 
@@ -119,7 +119,7 @@ async function handler(req, res) {
   const { provider } = await pipelineFlags(clientId).catch(() => ({ provider: "ghl" }));
   if (provider === "portal") {
     try {
-      const rows = await sb(`opportunities?client_id=eq.${encodeURIComponent(clientId)}&or=(id.eq.${encodeURIComponent(oppId)},ghl_opportunity_id.eq.${encodeURIComponent(oppId)})&select=id,ghl_opportunity_id,ghl_contact_id,ghl_pipeline_id&limit=1`);
+      const rows = await sb(`opportunities?client_id=eq.${encodeURIComponent(clientId)}&${oppMatchClause(oppId)}&select=id,ghl_opportunity_id,ghl_contact_id,ghl_pipeline_id&limit=1`);
       const row = Array.isArray(rows) && rows[0];
       if (row) { contactId = row.ghl_contact_id || null; pipelineId = row.ghl_pipeline_id || null; oppRef = { id: row.id, ghlOpportunityId: row.ghl_opportunity_id || null }; }
     } catch (e) { return res.status(500).json({ error: `store opp: ${e.message}` }); }
