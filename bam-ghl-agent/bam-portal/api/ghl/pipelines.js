@@ -1,7 +1,7 @@
 import { withSentryApiRoute } from "../_sentry.js";
 import { isAutomationLive, enrollContact } from "../automations.js";
 import { nurtureStage, interestedStage } from "../agent/_stage.js";
-import { shadowMirrorMove, shadowBackfillFromBoard, buildPortalBoard, findOpenOpp, setStatus, moveStage } from "../agent/_store.js";
+import { shadowMirrorMove, shadowBackfillFromBoard, buildPortalBoard, findOpenOpp, setStatus, moveStage, oppMatchClause } from "../agent/_store.js";
 // Vercel Serverless Function — Per-academy GHL Pipelines (kanban + moves)
 //
 //   GET   /api/ghl/pipelines?client_id=<uuid>
@@ -216,7 +216,7 @@ async function storeOppRef({ clientId, provider, shadow, token, locationId, oppI
     try {
       const rows = await sb(
         `opportunities?client_id=eq.${encodeURIComponent(clientId)}` +
-        `&or=(id.eq.${encodeURIComponent(oppId)},ghl_opportunity_id.eq.${encodeURIComponent(oppId)})` +
+        `&${oppMatchClause(oppId)}` +
         `&select=ghl_contact_id&limit=1`
       );
       cid = Array.isArray(rows) && rows[0] ? rows[0].ghl_contact_id : null;

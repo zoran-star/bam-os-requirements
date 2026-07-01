@@ -21,6 +21,22 @@ import { ghl as ghlDefault } from "../ghl/_core.js";
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
 
+// A portal opportunity id is a Postgres uuid; a GHL opportunity id is a 20-char
+// alphanumeric string. The board still hands out GHL ids even for a
+// provider='portal' academy, so lookups must accept either. Guard any `id=eq.`
+// filter with this: passing a non-uuid into a uuid column throws Postgres 22P02
+// and rejects the WHOLE query, instead of simply not matching that clause.
+export const isUuid = (v) =>
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(v || ""));
+
+// Build the PostgREST opportunity-match clause for a handle that may be a portal
+// uuid OR a GHL opportunity id. Matches both id and ghl_opportunity_id when the
+// handle is a uuid; only ghl_opportunity_id when it is a GHL id (avoids 22P02).
+export const oppMatchClause = (oppId) =>
+  isUuid(oppId)
+    ? `or=(id.eq.${encodeURIComponent(oppId)},ghl_opportunity_id.eq.${encodeURIComponent(oppId)})`
+    : `ghl_opportunity_id=eq.${encodeURIComponent(oppId)}`;
+
 // Default Supabase REST reader (service role). Used only when a caller threads in
 // a clientId but no custom sb reader. Mirrors api/ghl/_core.js sb().
 async function defaultSbGet(path) {
