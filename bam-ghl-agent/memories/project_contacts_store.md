@@ -16,9 +16,15 @@
 - RLS mirrors sibling stores: select = `is_staff() or client_id in (select my_client_ids())`; write = `is_staff()`.
 - Indexes: client_id, (client_id, ghl_contact_id), (client_id, lower(email)), (client_id, phone), gin(tags), stripe_customer_id.
 
+## P2 done (2026-06-30, dormant) - contact_id FK added + backfilled
+- `contact_id uuid references contacts(id) on delete set null` on **members, website_leads, opportunities** (+ index each). Migration `20260630211000`. Nothing reads it yet; code still joins on `ghl_contact_id` (byte-identical).
+- GTA backfill coverage: members 34/39 (5 have no ghl_contact_id = portal-native), website_leads 36/81, opportunities 13/30.
+- **FINDING: the `ghl_contacts` mirror is INCOMPLETE.** 45 leads + 17 opps reference GHL contact IDs that are NOT in `ghl_contacts` (so not in `contacts` either). The mirror/cron doesn't cover every contact. Fix = create contact rows from lead/opp data in P3 (portal owns creation), OR do a fuller GHL pull. Until then those rows dual-read via `ghl_contact_id`.
+- Inbox tables (`ghl_inbound_messages`, `inbox_message_log`, `ghl_conversation_reads`) NOT repointed yet - deferred to the inbox effort.
+
 ## NOT built yet (next PRs, in order)
-1. **Repoint joins** - add `contact_id` uuid to members/website_leads/opportunities/(inbox); dual-read (prefer contact_id, fall back to ghl_contact_id).
-2. **Portal writes + dual-write to GHL** - contact create/edit + website leads + Stripe signups write `contacts`; still push to GHL (shadow) so inbox/email/social resolve the person.
+1. ~~Repoint joins~~ **DONE (P2).**
+2. **Portal writes + dual-write to GHL** - contact create/edit + website leads + Stripe signups write `contacts`; still push to GHL (shadow) so inbox/email/social resolve the person. Also close the mirror gap (create contacts for unmatched leads/opps).
 3. **Owner-managed custom-field definitions** - new `custom_field_defs` + values tables + Settings UI; migrate the opaque GHL blob into real defs. Feeds the portal merge-var resolver (`api/email-shells.js resolveMergeVars`).
 4. **Flip `contact_provider='portal'` + stop the inbound `cron-sync-contacts.js`.** BLOCKED until inbound email + social DMs also leave GHL (GHL needs the contact to exist to thread an incoming IG DM / email reply).
 
