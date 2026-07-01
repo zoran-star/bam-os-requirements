@@ -7258,11 +7258,16 @@ Then the call to action."]</div>
       /* Header bands ABOVE the board: one cell per stage column, aligned to it */
       #view-pipelines .pl-band { display:flex; gap:12px; min-width:min-content; align-items:flex-end; margin:0 0 8px; }
       #view-pipelines .pl-band-cell { flex:0 0 280px; max-width:280px; }
-      /* ── Mobile: one near-full-width column per swipe, finger-friendly buttons ── */
+      /* ── Mobile: one near-full-width column per swipe, finger-friendly buttons ──
+         The engine/entry band moves INSIDE each stage column (.pl-colband) so it
+         can never drift out of alignment with the horizontally-scrolling board;
+         the desktop above-the-board bands are hidden here. */
       @media (max-width: 640px) {
         #view-pipelines .pl-col,
         #view-pipelines .pl-band-cell { flex-basis:86vw; max-width:86vw; }
         #view-pipelines .pl-col { max-height:calc(100dvh - 300px); }
+        #view-pipelines .pl-bands { display:none; }
+        #view-pipelines .pl-colband { display:flex; }
         #view-pipelines .pl-band { margin:0 0 6px; align-items:stretch; }
         #view-pipelines .pl-eng, #view-pipelines .pl-entry { padding:8px 11px; }
         #view-pipelines .pl-eng-tag, #view-pipelines .pl-entry-lbl { font-size:13px; }
@@ -7303,6 +7308,10 @@ Then the call to action."]</div>
       #view-pipelines .pl-eng-btn:hover { opacity:1; background:rgba(255,255,255,0.08); }
       #view-pipelines .pl-eng-btn-off { opacity:0.3; cursor:not-allowed; }
       #view-pipelines .pl-bands.collapsed { display:none; }
+      /* In-column engine/entry band (mobile only - see the 640px media query).
+         Respects the same Show/Hide engine toggle via .plband-collapsed. */
+      #view-pipelines .pl-colband { display:none; flex-direction:column; gap:6px; margin:2px 0 10px; }
+      #view-pipelines .pl-scroll.plband-collapsed .pl-colband { display:none !important; }
       #view-pipelines .pl-cards { display:flex; flex-direction:column; gap:8px; overflow-y:auto; flex:1; }
       #view-pipelines .pl-card {
         background:var(--surface); border:1px solid var(--border); border-radius:6px;
@@ -7320,6 +7329,14 @@ Then the call to action."]</div>
       #view-pipelines .pl-card-coach { font-size:12px; color:var(--text-sub, var(--text-mute)); margin-top:4px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
       #view-pipelines .pl-card-trial { font-size:11px; color:var(--accent); font-weight:600; margin-top:5px; }
 
+      /* Post-trial submit: full-screen one-colour takeover + loading popup */
+      #ptf-loading { position:fixed; inset:0; background:rgba(11,11,13,0.94); z-index:9500; display:flex; align-items:center; justify-content:center; opacity:0; pointer-events:none; transition:opacity 250ms; }
+      #ptf-loading.open { opacity:1; pointer-events:auto; }
+      #ptf-loading .ptfl-box { display:flex; flex-direction:column; align-items:center; gap:14px; padding:28px 36px; background:var(--surface); border:1px solid var(--border); border-radius:14px; }
+      #ptf-loading .req-spin { width:26px; height:26px; border-width:3px; margin:0; }
+      /* Gold landing flash on the card after it visibly moves stages */
+      @keyframes plCardLand { 0% { box-shadow:0 0 0 1px var(--gold,#E8C547), 0 0 28px rgba(232,197,71,0.8); } 100% { box-shadow:0 0 0 0 rgba(232,197,71,0); } }
+      #view-pipelines .pl-card-landed { animation: plCardLand 1.6s ease-out; border-color:var(--gold,#E8C547); }
       /* Post-trial form modal */
       #ptf-overlay { position:fixed; inset:0; background:rgba(0,0,0,0.55); opacity:0; pointer-events:none; transition:opacity 200ms; z-index:70; display:flex; align-items:center; justify-content:center; padding:20px; }
       #ptf-overlay.open { opacity:1; pointer-events:auto; }
@@ -7580,6 +7597,13 @@ Then the call to action."]</div>
     <div id="pl-drawer-overlay" onclick="closePipelineDrawer()"></div>
     <div id="pl-drawer" role="dialog" aria-modal="true"></div>
     <div id="ptf-overlay" onclick="_ptfClose()"></div>
+    <!-- Full-screen submit takeover: one colour + loading popup (post-trial form) -->
+    <div id="ptf-loading" aria-live="polite">
+      <div class="ptfl-box">
+        <span class="req-spin"></span>
+        <div id="ptf-loading-msg" style="font-size:14px;font-weight:600;color:var(--text)">Submitting trial result…</div>
+      </div>
+    </div>
 
     <div class="view" id="view-inbox">
       <div class="topbar">
@@ -24036,6 +24060,42 @@ function _ptfSetSendLink(v) {
   document.getElementById('ptf-link-no')?.classList.toggle('on', v === false);
 }
 function _ptfClose() { document.getElementById('ptf-overlay')?.classList.remove('open'); _PTF_OPP = null; }
+
+// ── Post-trial submit takeover: one-colour screen + loading popup ──
+function _ptfLoadShow(msg) {
+  const m = document.getElementById('ptf-loading-msg'); if (m && msg) m.textContent = msg;
+  document.getElementById('ptf-loading')?.classList.add('open');
+}
+function _ptfLoadText(msg) { const m = document.getElementById('ptf-loading-msg'); if (m) m.textContent = msg; }
+function _ptfLoadHide() { document.getElementById('ptf-loading')?.classList.remove('open'); }
+
+// After the board re-renders, show the moved card actually travelling from
+// where it sat to where it landed (fixed-position ghost), then flash it gold.
+// Falls back to a plain scroll-into-view + gold flash when the old position
+// isn't measurable. Hides the submit takeover itself, right before the move
+// plays, so the user watches the card change stages.
+async function _plAnimateCardMove(oppId, fromRect) {
+  const esc = (window.CSS && CSS.escape) ? CSS.escape(String(oppId || '')) : String(oppId || '');
+  const card = document.querySelector(`.pl-card[data-opp="${esc}"]`);
+  if (!card) { _ptfLoadHide(); return; }
+  try { card.scrollIntoView({ behavior: 'auto', block: 'nearest', inline: 'center' }); } catch (_) {}
+  await new Promise(res => requestAnimationFrame(() => requestAnimationFrame(res)));
+  const toRect = card.getBoundingClientRect();
+  _ptfLoadHide();
+  const flash = () => { card.classList.add('pl-card-landed'); setTimeout(() => card.classList.remove('pl-card-landed'), 1700); };
+  if (!fromRect || (Math.abs(fromRect.left - toRect.left) + Math.abs(fromRect.top - toRect.top)) < 8) { flash(); return; }
+  const ghost = card.cloneNode(true);
+  ghost.style.cssText += `;position:fixed;left:${fromRect.left}px;top:${fromRect.top}px;width:${fromRect.width}px;margin:0;z-index:9600;pointer-events:none;transform-origin:top left;transition:transform 700ms cubic-bezier(.22,.9,.26,1);box-shadow:0 14px 44px rgba(0,0,0,.55);`;
+  document.body.appendChild(ghost);
+  card.style.visibility = 'hidden';
+  requestAnimationFrame(() => {
+    const sc = (toRect.width && fromRect.width) ? (toRect.width / fromRect.width) : 1;
+    ghost.style.transform = `translate(${toRect.left - fromRect.left}px, ${toRect.top - fromRect.top}px) scale(${sc})`;
+  });
+  await new Promise(res => setTimeout(res, 720));
+  ghost.remove(); card.style.visibility = '';
+  flash();
+}
 async function _ptfSubmit() {
   const err = document.getElementById('ptf-err');
   if (_PTF_SHOW === null) { err.textContent = 'Did the athlete show up?'; err.style.display = 'block'; return; }
@@ -24046,6 +24106,15 @@ async function _ptfSubmit() {
   const firstMessage = document.getElementById('ptf-first-msg')?.value || '';
   const btn = document.getElementById('ptf-submit');
   err.style.display = 'none'; btn.disabled = true; btn.textContent = 'Saving…';
+  // Measure the card NOW (pre-move) so the stage move can be animated from its
+  // current spot, then take over the screen with the loading popup.
+  const oppId = _PTF_OPP;
+  let fromRect = null;
+  try {
+    const esc = (window.CSS && CSS.escape) ? CSS.escape(String(oppId || '')) : String(oppId || '');
+    fromRect = document.querySelector(`.pl-card[data-opp="${esc}"]`)?.getBoundingClientRect() || null;
+  } catch (_) {}
+  _ptfLoadShow('Submitting trial result…');
   try {
     const token = await _mreqAuthToken();
     const r = await fetch(`/api/ghl/post-trial?client_id=${encodeURIComponent(CLIENT_ID)}`, {
@@ -24058,8 +24127,11 @@ async function _ptfSubmit() {
     if (_PTF_SENDLINK && json.signup_text === 'no_link') { alert('Saved - but no sign-up link is set yet, so nothing was texted. Add it in KPIs → Setup → Offers (or the Blueprint training Sales section).'); }
     _ptfClose();
     closePipelineDrawer();
-    fetchAndRenderPipelines();
+    _ptfLoadText('Moving the card…');
+    try { await fetchAndRenderPipelines(); } catch (_) {}
+    await _plAnimateCardMove(oppId, fromRect);   // hides the takeover, plays the move + gold flash
   } catch (e) {
+    _ptfLoadHide();
     err.textContent = e.message; err.style.display = 'block';
     btn.disabled = false; btn.textContent = 'Submit post trial form';
   }
@@ -24478,6 +24550,8 @@ function _plToggleBand() {
   _plBandCollapsed = !_plBandCollapsed;
   try { localStorage.setItem('plBandCollapsed', _plBandCollapsed ? '1' : '0'); } catch (_) {}
   const el = document.getElementById('pl-bands'); if (el) el.classList.toggle('collapsed', _plBandCollapsed);
+  // Mobile renders the band inside each column (.pl-colband) - same toggle.
+  const sc = document.querySelector('#view-pipelines .pl-scroll'); if (sc) sc.classList.toggle('plband-collapsed', _plBandCollapsed);
   const btn = document.getElementById('pl-band-toggle'); if (btn) btn.textContent = _plBandCollapsed ? '▸ Show engine' : '▾ Hide engine';
 }
 function _plEntryPointsForStage(p, stageName) {
@@ -24576,7 +24650,7 @@ function _renderPipelineBoard() {
     // No trial dates, glows, Special/post-trial buttons, or agent badges. ──
     if (!_plV2) {
       return `
-        <div class="pl-card ${stale ? 'pl-card-stale' : ''}" style="position:relative"
+        <div class="pl-card ${stale ? 'pl-card-stale' : ''}" data-opp="${escapeHTML(o.id)}" style="position:relative"
              draggable="true"
              ondragstart="_plDragStart(event,'${escapeHTML(o.id)}','${escapeHTML(o.stageId || '')}','${escapeHTML(p.id)}')"
              ondragend="_plDragEnd(event)"
@@ -24631,6 +24705,7 @@ function _renderPipelineBoard() {
         : '');
     return `
       <div class="pl-card ${stale ? 'pl-card-stale' : ''} ${missingTrial ? 'pl-card-notrial' : ''} ${todayTrial ? 'pl-card-today' : ''}"
+           data-opp="${escapeHTML(o.id)}"
            style="position:relative;${glow}${_scanning ? 'opacity:.45;pointer-events:none;' : ''}"
            draggable="${_scanning ? 'false' : 'true'}"
            ondragstart="_plDragStart(event,'${escapeHTML(o.id)}','${escapeHTML(o.stageId || '')}','${escapeHTML(p.id)}')"
@@ -24658,6 +24733,38 @@ function _renderPipelineBoard() {
       </div>`;
   };
 
+  // Per-stage band-cell content, shared by the desktop bands ABOVE the board
+  // and the in-column band on mobile (.pl-colband - structurally impossible to
+  // drift out of alignment with its column).
+  const _plEntryCellInner = (s) => {
+    const eps = _plEntryPointsForStage(p, s.name);
+    if (!eps.length) return '';
+    const chips = eps.map(ep => {
+      const isCal = ep.type === 'calendar';
+      const icon = isCal ? '🏀' : '📝';
+      const pencil = isCal
+        ? `<button class="pl-eng-btn" title="Edit this calendar" onclick="_plGoCalendar('${escapeHTML(ep.key)}')">✏️</button>`
+        : `<button class="pl-eng-btn pl-eng-btn-off" title="Forms are edited in GHL" disabled>✏️</button>`;
+      return `<div class="pl-entry"><span class="pl-entry-lbl">${icon} ${escapeHTML(ep.label || ep.type || 'Entry')}</span>${pencil}</div>`;
+    }).join('');
+    return `<div class="pl-entry-wrap">${chips}<div class="pl-entry-arrow">&darr;</div></div>`;
+  };
+  const _plEngineCellInner = (s) => {
+    const sb = _plStageBot(s.name);
+    if (!sb) return '';
+    const c = sb.color;
+    const editBtn = sb.kind !== 'terminal'
+      ? `<button class="pl-eng-btn" title="Edit ${escapeHTML(sb.tag)} in the Train tab" onclick="_plEngineEdit('${sb.key}')">✏️</button>` : '';
+    const eyeBtn = sb.kind === 'agent'
+      ? `<button class="pl-eng-btn" title="Open the ${escapeHTML(sb.tag)} Hawkeye queue" onclick="_plEngineHawk('${sb.key}')">👁</button>` : '';
+    // Spell out the kind before the name: "📞 Agent: Booking", "👻 Automation: Ghosted".
+    const _kindWord = sb.kind === 'agent' ? 'Agent' : sb.kind === 'automation' ? 'Automation' : '';
+    const _sp = sb.tag.indexOf(' ');
+    const _engLabel = (_kindWord && _sp > 0) ? `${sb.tag.slice(0, _sp)} ${_kindWord}: ${sb.tag.slice(_sp + 1)}` : sb.tag;
+    return `<div class="pl-eng pl-eng-${sb.kind}" style="border-color:${c}">`
+      + `<span class="pl-eng-tag" style="color:${c}">${escapeHTML(_engLabel)}</span>`
+      + `<span class="pl-eng-acts">${editBtn}${eyeBtn}</span></div>`;
+  };
   // When the agent is ON for this academy, the Responded stage glows blue and
   // gets a full-width Hawkeye button (opens the approval queue) - that's the
   // stage the agent works.
@@ -24769,6 +24876,7 @@ function _renderPipelineBoard() {
           </span>
           <span class="pl-col-count">${opps.length}</span>
         </div>
+        ${_plV2 ? (() => { const _e = _plEntryCellInner(s), _g = _plEngineCellInner(s); return (_e || _g) ? `<div class="pl-colband">${_e}${_g}</div>` : ''; })() : ''}
         <div class="pl-cards">
           ${cardsHtml}
         </div>
@@ -24783,35 +24891,11 @@ function _renderPipelineBoard() {
   if (_plV2) {
     let anyEntry = false;
     const entryCells = visibleStages.map(s => {
-      const eps = _plEntryPointsForStage(p, s.name);
-      if (!eps.length) return `<div class="pl-band-cell"></div>`;
-      anyEntry = true;
-      const chips = eps.map(ep => {
-        const isCal = ep.type === 'calendar';
-        const icon = isCal ? '🏀' : '📝';
-        const pencil = isCal
-          ? `<button class="pl-eng-btn" title="Edit this calendar" onclick="_plGoCalendar('${escapeHTML(ep.key)}')">✏️</button>`
-          : `<button class="pl-eng-btn pl-eng-btn-off" title="Forms are edited in GHL" disabled>✏️</button>`;
-        return `<div class="pl-entry"><span class="pl-entry-lbl">${icon} ${escapeHTML(ep.label || ep.type || 'Entry')}</span>${pencil}</div>`;
-      }).join('');
-      return `<div class="pl-band-cell"><div class="pl-entry-wrap">${chips}<div class="pl-entry-arrow">&darr;</div></div></div>`;
+      const inner = _plEntryCellInner(s);
+      if (inner) anyEntry = true;
+      return `<div class="pl-band-cell">${inner}</div>`;
     }).join('');
-    const engineCells = visibleStages.map(s => {
-      const sb = _plStageBot(s.name);
-      if (!sb) return `<div class="pl-band-cell"></div>`;
-      const c = sb.color;
-      const editBtn = sb.kind !== 'terminal'
-        ? `<button class="pl-eng-btn" title="Edit ${escapeHTML(sb.tag)} in the Train tab" onclick="_plEngineEdit('${sb.key}')">✏️</button>` : '';
-      const eyeBtn = sb.kind === 'agent'
-        ? `<button class="pl-eng-btn" title="Open the ${escapeHTML(sb.tag)} Hawkeye queue" onclick="_plEngineHawk('${sb.key}')">👁</button>` : '';
-      // Spell out the kind before the name: "📞 Agent: Booking", "👻 Automation: Ghosted".
-      const _kindWord = sb.kind === 'agent' ? 'Agent' : sb.kind === 'automation' ? 'Automation' : '';
-      const _sp = sb.tag.indexOf(' ');
-      const _engLabel = (_kindWord && _sp > 0) ? `${sb.tag.slice(0, _sp)} ${_kindWord}: ${sb.tag.slice(_sp + 1)}` : sb.tag;
-      return `<div class="pl-band-cell"><div class="pl-eng pl-eng-${sb.kind}" style="border-color:${c}">`
-        + `<span class="pl-eng-tag" style="color:${c}">${escapeHTML(_engLabel)}</span>`
-        + `<span class="pl-eng-acts">${editBtn}${eyeBtn}</span></div></div>`;
-    }).join('');
+    const engineCells = visibleStages.map(s => `<div class="pl-band-cell">${_plEngineCellInner(s)}</div>`).join('');
     if (anyEntry) entryBand = `<div class="pl-band">${entryCells}</div>`;
     engineBand = `<div class="pl-band">${engineCells}</div>`;
   }
@@ -24829,7 +24913,7 @@ function _renderPipelineBoard() {
     ? `<button id="pl-band-toggle" onclick="_plToggleBand()" title="Show or hide the entry points + stage engine band" style="${_btnStyle}">${_plBandCollapsed ? '▸ Show engine' : '▾ Hide engine'}</button>`
     : '';
   const topBar = (scanBtn || bandToggleBtn) ? `<div style="display:flex;gap:8px;margin-bottom:10px;align-items:center">${scanBtn}${bandToggleBtn}</div>` : '';
-  container.innerHTML = `${topBar}<div class="pl-scroll"><div id="pl-bands" class="pl-bands${_plBandCollapsed ? ' collapsed' : ''}">${entryBand}${engineBand}</div><div class="pl-board">${colHtml}</div></div>`;
+  container.innerHTML = `${topBar}<div class="pl-scroll${_plBandCollapsed ? ' plband-collapsed' : ''}"><div id="pl-bands" class="pl-bands${_plBandCollapsed ? ' collapsed' : ''}">${entryBand}${engineBand}</div><div class="pl-board">${colHtml}</div></div>`;
   if (_plPrevScroll) { const _nb = container.querySelector('.pl-scroll'); if (_nb) _nb.scrollLeft = _plPrevScroll; }
 }
 
