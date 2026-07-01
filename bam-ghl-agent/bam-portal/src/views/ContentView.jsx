@@ -109,6 +109,19 @@ export default function ContentView({ tokens: tk, dark, me, session }) {
   // organic vs ads content). Executors don't see this tab. Mirrors CONTENT_MANAGER_ROLES.
   const canManageRouting = ["admin", "scaling_manager", "marketing_manager"].includes(me?.role);
 
+  // Assignable owners for per-ticket reassignment (same roster the Routing tab uses).
+  // Loaded once so a manager can re-route an individual creative (e.g. cover for
+  // someone on vacation) instead of re-pointing the whole client.
+  const [owners, setOwners] = useState([]);
+  useEffect(() => {
+    if (!canManageRouting) return;
+    let cancelled = false;
+    supabase.from("staff").select("id,name,role").order("name").then(({ data }) => {
+      if (!cancelled) setOwners((data || []).filter(s => ROUTING_OWNER_ROLES.includes(s.role)));
+    });
+    return () => { cancelled = true; };
+  }, [canManageRouting]);
+
   // ─── fetchGuides must be defined BEFORE the useEffect that calls it
   //     (it's an arrow-function const, not a hoisted function declaration).
   //     And both must live ABOVE any conditional return so the hook order
@@ -861,6 +874,9 @@ function ContentTicketsTab({ tk, session, me }) {
         tk={tk}
         session={session}
         ticket={selected}
+        me={me}
+        owners={owners}
+        canReassign={canManageRouting}
         onBack={() => setSelectedId(null)}
         onRefetch={refetch}
         patchTicket={patchTicket}
@@ -1055,7 +1071,25 @@ function SubTab({ label, active, onClick, tk, red }) {
 // ─────────────────────────────────────────────────────────
 // Detail view — review raw assets, upload finals, ship
 // ─────────────────────────────────────────────────────────
-function ContentTicketDetail({ tk, session, ticket, onBack, onRefetch, patchTicket, showBanner }) {
+function ContentTicketDetail({ tk, session, ticket, me, owners = [], canReassign = false, onBack, onRefetch, patchTicket, showBanner }) {
+  const [assignBusy, setAssignBusy] = useState(false);
+  // Re-route this single creative to a specific owner (or "me"). Manager/admin only;
+  // the backend re-checks the role. Lets a manager cover an individual task without
+  // re-pointing the client's whole routing roster.
+  async function reassign(staffId) {
+    if (assignBusy) return;
+    setAssignBusy(true);
+    try {
+      await patchTicket(ticket.id, { action: "assign", assigned_to: staffId || null });
+      await onRefetch();
+      const name = staffId === me?.id ? "you" : (owners.find(o => o.id === staffId)?.name || "Unassigned");
+      showBanner(`Owner set to ${name}.`);
+    } catch (e) {
+      showBanner("Reassign failed: " + (e?.message || "error"));
+    } finally {
+      setAssignBusy(false);
+    }
+  }
   const [finalsToUpload, setFinalsToUpload] = useState([]); // local File objects
   const [finalsFolder, setFinalsFolder] = useState("");     // optional folder for the next upload batch
   const [finalsDragOver, setFinalsDragOver] = useState(false);
@@ -1245,11 +1279,49 @@ function ContentTicketDetail({ tk, session, ticket, onBack, onRefetch, patchTick
                 }}>{dl.overdue ? "⚠ " : "⏱ "}{dl.label}</span>
               ) : null;
             })()}
-            <span style={{
-              fontSize: 11, fontWeight: 600, color: tk.accent, letterSpacing: "0.04em",
-              padding: "3px 10px", borderRadius: 999,
-              border: `1px solid ${tk.accent}`, background: `${tk.accent}14`,
-            }}>👤 Owner · {ticket.assigned_to_name || "Unassigned"}</span>
+            {canReassign ? (
+              <span style={{
+                display: "inline-flex", alignItems: "center", gap: 6,
+                fontSize: 11, fontWeight: 600, color: tk.accent, letterSpacing: "0.04em",
+                padding: "2px 6px 2px 10px", borderRadius: 999,
+                border: `1px solid ${tk.accent}`, background: `${tk.accent}14`,
+                opacity: assignBusy ? 0.6 : 1,
+              }}>
+                👤 Owner ·
+                <select
+                  value={ticket.assigned_to || ""}
+                  disabled={assignBusy}
+                  onChange={e => reassign(e.target.value || null)}
+                  title="Reassign this creative"
+                  style={{
+                    background: "transparent", color: tk.accent, border: "none",
+                    fontFamily: "inherit", fontSize: 11, fontWeight: 600, cursor: "pointer", outline: "none",
+                  }}
+                >
+                  <option value="" style={{ color: "#000" }}>Unassigned</option>
+                  {owners.map(o => (
+                    <option key={o.id} value={o.id} style={{ color: "#000" }}>{o.name}</option>
+                  ))}
+                </select>
+                {me?.id && ticket.assigned_to !== me.id && (
+                  <button
+                    onClick={() => reassign(me.id)}
+                    disabled={assignBusy}
+                    style={{
+                      background: tk.accent, color: "#0A0A0B", border: "none",
+                      borderRadius: 999, padding: "2px 9px", fontSize: 10, fontWeight: 700,
+                      cursor: assignBusy ? "default" : "pointer", fontFamily: "inherit", whiteSpace: "nowrap",
+                    }}
+                  >Assign to me</button>
+                )}
+              </span>
+            ) : (
+              <span style={{
+                fontSize: 11, fontWeight: 600, color: tk.accent, letterSpacing: "0.04em",
+                padding: "3px 10px", borderRadius: 999,
+                border: `1px solid ${tk.accent}`, background: `${tk.accent}14`,
+              }}>👤 Owner · {ticket.assigned_to_name || "Unassigned"}</span>
+            )}
             <span style={{
               fontSize: 11, fontWeight: 500, color: tk.textSub, letterSpacing: "0.04em",
               padding: "3px 10px", borderRadius: 999,
