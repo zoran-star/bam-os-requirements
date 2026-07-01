@@ -109,19 +109,6 @@ export default function ContentView({ tokens: tk, dark, me, session }) {
   // organic vs ads content). Executors don't see this tab. Mirrors CONTENT_MANAGER_ROLES.
   const canManageRouting = ["admin", "scaling_manager", "marketing_manager"].includes(me?.role);
 
-  // Assignable owners for per-ticket reassignment (same roster the Routing tab uses).
-  // Loaded once so a manager can re-route an individual creative (e.g. cover for
-  // someone on vacation) instead of re-pointing the whole client.
-  const [owners, setOwners] = useState([]);
-  useEffect(() => {
-    if (!canManageRouting) return;
-    let cancelled = false;
-    supabase.from("staff").select("id,name,role").order("name").then(({ data }) => {
-      if (!cancelled) setOwners((data || []).filter(s => ROUTING_OWNER_ROLES.includes(s.role)));
-    });
-    return () => { cancelled = true; };
-  }, [canManageRouting]);
-
   // ─── fetchGuides must be defined BEFORE the useEffect that calls it
   //     (it's an arrow-function const, not a hoisted function declaration).
   //     And both must live ABOVE any conditional return so the hook order
@@ -771,7 +758,50 @@ function ContentTicketsTab({ tk, session, me }) {
   const [sortOrder, setSortOrder] = useState("newest"); // newest | oldest
   const [stateFilter, setStateFilter] = useState("all"); // all | overdue (cross-cuts tabs)
 
+  // Reassignment: managers/admin can re-route a creative to a different owner,
+  // one at a time (detail) or in bulk (list multi-select) — e.g. covering for
+  // someone on vacation without re-pointing the client's whole routing roster.
+  const canReassign = ["admin", "scaling_manager", "marketing_manager"].includes(me?.role);
+  const [owners, setOwners] = useState([]);
+  const [selectedIds, setSelectedIds] = useState(() => new Set());
+  const [bulkBusy, setBulkBusy] = useState(false);
+  useEffect(() => {
+    if (!canReassign) return;
+    let cancelled = false;
+    supabase.from("staff").select("id,name,role").order("name").then(({ data }) => {
+      if (!cancelled) setOwners((data || []).filter(s => ROUTING_OWNER_ROLES.includes(s.role)));
+    });
+    return () => { cancelled = true; };
+  }, [canReassign]);
+  const toggleSelect = (id) => setSelectedIds(prev => {
+    const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n;
+  });
+  const clearSelection = () => setSelectedIds(new Set());
+  // Reset the selection when the visible slice changes, so we never bulk-act on
+  // rows that scrolled out of the current tab/filter.
+  useEffect(() => { setSelectedIds(new Set()); }, [subTab, stateFilter, channelFilter, typeFilter]);
+
   const showBanner = (text) => { setBanner(text); setTimeout(() => setBanner(null), 3500); };
+
+  // Reassign every selected ticket to one owner (loops the per-ticket assign action).
+  async function bulkReassign(staffId) {
+    if (bulkBusy || selectedIds.size === 0) return;
+    setBulkBusy(true);
+    const ids = [...selectedIds];
+    try {
+      for (const id of ids) {
+        await patchTicket(id, { action: "assign", assigned_to: staffId || null });
+      }
+      await refetch();
+      const who = staffId === me?.id ? "you" : (owners.find(o => o.id === staffId)?.name || "Unassigned");
+      showBanner(`${ids.length} ticket${ids.length === 1 ? "" : "s"} reassigned to ${who}.`);
+      clearSelection();
+    } catch (e) {
+      showBanner("Bulk reassign failed: " + (e?.message || "error"));
+    } finally {
+      setBulkBusy(false);
+    }
+  }
 
   useEffect(() => { refetch(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, []);
 
@@ -876,7 +906,7 @@ function ContentTicketsTab({ tk, session, me }) {
         ticket={selected}
         me={me}
         owners={owners}
-        canReassign={canManageRouting}
+        canReassign={canReassign}
         onBack={() => setSelectedId(null)}
         onRefetch={refetch}
         patchTicket={patchTicket}
@@ -968,13 +998,61 @@ function ContentTicketsTab({ tk, session, me }) {
         <CtkStateChip label={`⚠ Overdue (${overdueAll.length})`} active={stateFilter === "overdue"} onClick={() => setStateFilter("overdue")} tk={tk} tone={tk.red || "#ED7969"} count={overdueAll.length} />
       </div>
 
+      {/* Bulk reassign bar — appears once rows are selected (managers/admin only).
+          Route a batch of creatives to one owner in a single action. */}
+      {canReassign && selectedIds.size > 0 && (
+        <div style={{
+          display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap",
+          padding: "10px 14px", marginBottom: 12, borderRadius: 10,
+          background: `${tk.accent}12`, border: `1px solid ${tk.accent}55`,
+        }}>
+          <span style={{ fontSize: 13, fontWeight: 700, color: tk.accent }}>{selectedIds.size} selected</span>
+          <span style={{ fontSize: 12, color: tk.textSub }}>Reassign to</span>
+          <select
+            value=""
+            disabled={bulkBusy}
+            onChange={e => { if (e.target.value) bulkReassign(e.target.value); }}
+            style={{
+              padding: "6px 10px", fontSize: 12.5, borderRadius: 8,
+              background: tk.surfaceEl, color: tk.text, border: `1px solid ${tk.border}`,
+              cursor: bulkBusy ? "default" : "pointer", fontFamily: "inherit",
+            }}
+          >
+            <option value="">Choose owner…</option>
+            {owners.map(o => <option key={o.id} value={o.id}>{o.name}</option>)}
+          </select>
+          {me?.id && (
+            <button onClick={() => bulkReassign(me.id)} disabled={bulkBusy} style={{
+              padding: "6px 12px", fontSize: 12.5, fontWeight: 700, borderRadius: 8,
+              background: tk.accent, color: "#0A0A0B", border: "none",
+              cursor: bulkBusy ? "default" : "pointer", fontFamily: "inherit", whiteSpace: "nowrap",
+            }}>{bulkBusy ? "Working…" : "→ Assign to me"}</button>
+          )}
+          <button onClick={clearSelection} disabled={bulkBusy} style={{
+            padding: "6px 10px", fontSize: 12.5, fontWeight: 600, borderRadius: 8,
+            background: "transparent", color: tk.textSub, border: `1px solid ${tk.border}`,
+            cursor: "pointer", fontFamily: "inherit", marginLeft: "auto",
+          }}>Clear</button>
+        </div>
+      )}
+
       <div style={{
         display: "grid",
-        gridTemplateColumns: "1.2fr 1.5fr 0.8fr 1fr",
+        gridTemplateColumns: canReassign ? "28px 1.2fr 1.5fr 0.8fr 1fr" : "1.2fr 1.5fr 0.8fr 1fr",
         gap: 16,
         padding: "8px 16px",
         fontSize: 10, color: tk.textMute, letterSpacing: "0.2em", textTransform: "uppercase",
+        alignItems: "center",
       }}>
+        {canReassign && (
+          <input
+            type="checkbox"
+            checked={visible.length > 0 && visible.every(t => selectedIds.has(t.id))}
+            onChange={e => setSelectedIds(e.target.checked ? new Set(visible.map(t => t.id)) : new Set())}
+            title="Select all in view"
+            style={{ cursor: "pointer", accentColor: tk.accent }}
+          />
+        )}
         <div>Academy</div>
         <div>Notes / context</div>
         <div>Type</div>
@@ -1005,7 +1083,7 @@ function ContentTicketsTab({ tk, session, me }) {
               onClick={() => setSelectedId(t.id)}
               style={{
                 display: "grid",
-                gridTemplateColumns: "1.2fr 1.5fr 0.8fr 1fr",
+                gridTemplateColumns: canReassign ? "28px 1.2fr 1.5fr 0.8fr 1fr" : "1.2fr 1.5fr 0.8fr 1fr",
                 gap: 16,
                 padding: "14px 16px",
                 borderBottom: `1px solid ${tk.borderSoft || tk.border}`,
@@ -1013,11 +1091,22 @@ function ContentTicketsTab({ tk, session, me }) {
                   ? `3px solid ${CT_PRIORITY_META.high.color}` : "3px solid transparent",
                 cursor: "pointer",
                 alignItems: "center",
+                background: selectedIds.has(t.id) ? `${tk.accent}0F` : "transparent",
                 transition: "background 0.12s ease",
               }}
-              onMouseEnter={e => e.currentTarget.style.background = tk.surfaceHov}
-              onMouseLeave={e => e.currentTarget.style.background = "transparent"}
+              onMouseEnter={e => { if (!selectedIds.has(t.id)) e.currentTarget.style.background = tk.surfaceHov; }}
+              onMouseLeave={e => { e.currentTarget.style.background = selectedIds.has(t.id) ? `${tk.accent}0F` : "transparent"; }}
             >
+              {canReassign && (
+                <input
+                  type="checkbox"
+                  checked={selectedIds.has(t.id)}
+                  onClick={e => e.stopPropagation()}
+                  onChange={() => toggleSelect(t.id)}
+                  title="Select"
+                  style={{ cursor: "pointer", accentColor: tk.accent }}
+                />
+              )}
               <div style={{ fontWeight: 500, color: tk.text, fontSize: 14, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
                 <span style={{
                   fontFamily: "monospace", fontSize: 10, letterSpacing: "0.12em",
