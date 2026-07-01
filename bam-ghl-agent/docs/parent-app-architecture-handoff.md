@@ -148,6 +148,8 @@ Recommended sequence:
 
 1. Build a read-only backfill report.
 
+   Current report: [`offer-runtime-backfill-report.md`](offer-runtime-backfill-report.md).
+
    The report should list every candidate operational price:
 
    - `client_id`
