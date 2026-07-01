@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
+import { useUrlState } from "../hooks/useUrlState";
 import { fetchFinancialSummary, fetchCustomers, fetchInvoices, fetchAlerts, fetchMetrics } from "../services/stripeService";
 import { useIsMobile } from '../hooks/useMediaQuery';
 
@@ -334,7 +335,7 @@ export default function FinancialsView({ tokens, dark }) {
   const [isLive, setIsLive] = useState(false);
   const [loading, setLoading] = useState(true);
   const [lastUpdated, setLastUpdated] = useState(null);
-  const [activeTab, setActiveTab] = useState("overview");
+  const [activeTab, setActiveTab] = useUrlState("ftab", "overview");
   const [clientSearch, setClientSearch] = useState("");
   const [clientSort, setClientSort] = useState({ key: "monthlyAmount", dir: "desc" });
   const [barsAnimated, setBarsAnimated] = useState(false);

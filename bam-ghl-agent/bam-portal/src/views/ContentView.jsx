@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from "react";
+import { useUrlState } from "../hooks/useUrlState";
 import JSZip from "jszip";
 import { supabase } from "../lib/supabase";
 
@@ -96,7 +97,7 @@ function CtkChannelBadge({ channel }) {
 }
 
 export default function ContentView({ tokens: tk, dark, me, session }) {
-  const [mainTab, setMainTab]     = useState("tickets"); // tickets | guides
+  const [mainTab, setMainTab]     = useUrlState("csec", "tickets"); // tickets | guides | routing
   const [guides, setGuides]       = useState([]);
   const [loading, setLoading]     = useState(true);
   const [editingId, setEditingId] = useState(null);
@@ -745,7 +746,7 @@ const TYPE_META_CT = {
 };
 
 function ContentTicketsTab({ tk, session, me }) {
-  const [subTab, setSubTab] = useState("active"); // active | client-dependent | completed
+  const [subTab, setSubTab] = useUrlState("csub", "active"); // active | client-dependent | completed
   const [tickets, setTickets] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
