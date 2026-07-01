@@ -38,6 +38,7 @@ import crypto from "node:crypto";
 import { fireOnboardingActivations } from "../onboarding/activations.js";
 import { sendSms, ghl } from "../ghl/_core.js";
 import { findOpenOpp, setStatus } from "../agent/_store.js";
+import { recordKpiEvent } from "../_kpi.js";
 import { notifyOwners } from "../_notify-owners.js";
 import { enrollContact, exitEnrollment, isAutomationLive } from "../automations.js";
 import { getClientGhlToken } from "../website/availability.js";
@@ -416,6 +417,17 @@ async function handleSubCreated(event, connectedAccount, res) {
     db_changes:      { members: { status: "payment_method_required → live", linked: true, plan: planFromPrice || "(unchanged — non-canonical price)" } },
   });
 
+  // KPI event log (Track A): a paying member going live = the "joined" funnel
+  // moment. Idempotent per member. Best-effort, never blocks the webhook.
+  await recordKpiEvent({
+    clientId: target.client_id, step: "joined",
+    ghlContactId: target.ghl_contact_id || null,
+    contactName: target.parent_name || target.athlete_name || null,
+    occurredAt: sub.created ? new Date(sub.created * 1000).toISOString() : undefined,
+    ref: `joined:${target.id}`,
+    meta: { member_id: target.id, sub_id: sub.id, plan: planFromPrice || null },
+  });
+
   // Pipeline exit (explicit-opp-only): if this member is already linked to a GHL
   // opportunity, mark it WON now that they're live. Contact-search is intentionally
   // OFF here so V1 / GHL-managed external subs are never touched (HARD RULE: don't
@@ -508,6 +520,17 @@ async function handleSubDeleted(event, connectedAccount, res) {
       }]),
     });
   }
+
+  // KPI event log (Track A): the "cancelled" funnel moment. Idempotent per
+  // member row (a re-join later creates a fresh member id, so a future cancel
+  // still counts). Best-effort.
+  await recordKpiEvent({
+    clientId: member.client_id, step: "cancelled",
+    ghlContactId: member.ghl_contact_id || null,
+    contactName: member.parent_name || member.athlete_name || null,
+    ref: `cancelled:${member.id}`,
+    meta: { member_id: member.id, sub_id: sub.id, reason: cancellationAlreadyLogged ? "portal cancel finalized" : "cancelled in Stripe" },
+  });
 
   await sb(`members?id=eq.${member.id}`, {
     method: "DELETE",

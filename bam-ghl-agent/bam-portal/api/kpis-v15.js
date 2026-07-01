@@ -1,6 +1,7 @@
 import { withSentryApiRoute } from "./_sentry.js";
 import { getClientGhlToken } from "./website/availability.js";
 import { contactsReadTable } from "./_contacts.js";
+import { recordKpiEvent } from "./_kpi.js";
 // Scans Stripe (charges/subs/payouts) + GHL opportunities per month — well past
 // the default ~10s budget.
 export const maxDuration = 60;
@@ -166,7 +167,18 @@ async function handler(req, res) {
       if (action === "manual-cancel") {
         if (!b.month) return res.status(400).json({ error: "month required" });
         const rows = await sb(`kpi_manual_cancellations`, { method: "POST", headers: { Prefer: "return=representation" }, body: JSON.stringify({ client_id: clientId, month: b.month, contact_name: b.contact_name || null, ghl_contact_id: b.ghl_contact_id || null, stripe_customer_id: b.stripe_customer_id || null, reason: b.reason || null, cancelled_on: b.cancelled_on || null }) });
-        return res.status(200).json({ ok: true, row: Array.isArray(rows) ? rows[0] : rows });
+        const row = Array.isArray(rows) ? rows[0] : rows;
+        // KPI event log (Track A): a staff-entered cancellation is a funnel moment too.
+        if (row && row.id) {
+          await recordKpiEvent({
+            clientId, step: "cancelled", source: "manual",
+            ghlContactId: b.ghl_contact_id || null, contactName: b.contact_name || null,
+            occurredAt: b.cancelled_on ? `${b.cancelled_on}T12:00:00Z` : undefined,
+            ref: `manualcancel:${row.id}`,
+            meta: { reason: b.reason || null, month: b.month },
+          });
+        }
+        return res.status(200).json({ ok: true, row });
       }
       if (action === "delete-manual-cancel") {
         if (!b.id) return res.status(400).json({ error: "id required" });
@@ -289,7 +301,33 @@ async function handler(req, res) {
       const uniqPipes = [...new Map(offers.flatMap(o => o.pipelines).map(p => [p.id, p])).values()];
       const uniqCals = [...new Map(offers.flatMap(o => o.calendars || []).map(c => [c.id, c])).values()];
       const pipeById = {}, bookById = {};
-      if (ghlToken) {
+      // Pipeline provider: 'portal' academies count from THEIR OWN data (the
+      // portal opportunities store + the kpi_events log) - GHL is not consulted.
+      let pipelineProv = "ghl";
+      try {
+        const pr = await sb(`clients?id=eq.${encodeURIComponent(clientId)}&select=pipeline_provider&limit=1`);
+        if (pr?.[0]?.pipeline_provider === "portal") pipelineProv = "portal";
+      } catch (_) {}
+      let portalBookItems = null;
+      if (pipelineProv === "portal") {
+        const isoStart = new Date(start * 1000).toISOString();
+        const isoEnd = new Date(end * 1000).toISOString();
+        // sales_pipeline ← portal opportunities created in range, per tied pipeline id.
+        await Promise.all(uniqPipes.map(async (p) => {
+          try {
+            const rows = await sb(`opportunities?client_id=eq.${encodeURIComponent(clientId)}&ghl_pipeline_id=eq.${encodeURIComponent(p.id)}&created_at=gte.${encodeURIComponent(isoStart)}&created_at=lt.${encodeURIComponent(isoEnd)}&select=id,ghl_opportunity_id,contact_name,ghl_contact_id&limit=1000`);
+            pipeById[p.id] = (rows || []).map((r) => ({ ref_id: r.ghl_opportunity_id || r.id, label: r.contact_name || nameById[r.ghl_contact_id] || "Lead", contactId: r.ghl_contact_id || null }));
+          } catch (_) { pipeById[p.id] = []; }
+        }));
+        // sales_bookings ← the KPI event log (trial_booked, written at the moment
+        // any card moves to Scheduled Trial). Only accumulates from Track A launch;
+        // history arrives later via the KPI sandbox import.
+        try {
+          const evs = await sb(`kpi_events?client_id=eq.${encodeURIComponent(clientId)}&step=eq.trial_booked&occurred_at=gte.${encodeURIComponent(isoStart)}&occurred_at=lt.${encodeURIComponent(isoEnd)}&select=id,ref,ghl_contact_id,contact_name&order=occurred_at.asc&limit=1000`);
+          portalBookItems = (evs || []).map((ev) => ({ ref_id: ev.ref || ev.id, label: ev.contact_name || nameById[ev.ghl_contact_id] || "Trial booking", contactId: ev.ghl_contact_id || null }));
+        } catch (_) { portalBookItems = []; }
+      }
+      if (ghlToken && pipelineProv !== "portal") {
         await Promise.all([
           ...uniqPipes.map(async (p) => {
             try {
@@ -325,13 +363,18 @@ async function handler(req, res) {
           }),
         ]);
       }
+      // Portal bookings aren't calendar-keyed; attach them to the offer that has
+      // calendars tied (else the first with pipelines - GTA's Training offer).
+      const bookOffer = offers.find((o) => (o.calendars || []).length) || offers.find((o) => o.pipelines.length) || offers[0];
       const out = [];
       for (const o of offers) {
         const pipeItems = o.pipelines.flatMap((p) => pipeById[p.id] || []);
         // new payments: subs/one-time created in month for tied products
         const payItems = [];
         for (const pid of o.products) for (const it of (subsByProduct[pid] || [])) payItems.push(it);
-        const bookItems = (o.calendars || []).flatMap((c) => bookById[c.id] || []);
+        const bookItems = pipelineProv === "portal"
+          ? (o === bookOffer ? (portalBookItems || []) : [])
+          : (o.calendars || []).flatMap((c) => bookById[c.id] || []);
 
         const decorate = (items, metric) => items.map(it => ({ ...it, excluded: isExcluded(excl, metric, o.offer_id, it.ref_id) }));
         const pipe = decorate(pipeItems, "sales_pipeline");
@@ -345,7 +388,7 @@ async function handler(req, res) {
           has_pipelines: o.pipelines.length > 0, has_products: o.products.length > 0, has_calendars: (o.calendars || []).length > 0,
         });
       }
-      return res.status(200).json({ ok: true, offers: out, ghl_ok: !!ghlToken, ghl_error: ghlError || !ghlToken, stripe_ok: !!acct });
+      return res.status(200).json({ ok: true, offers: out, ghl_ok: pipelineProv === "portal" ? true : !!ghlToken, ghl_error: pipelineProv === "portal" ? false : (ghlError || !ghlToken), stripe_ok: !!acct });
     }
 
     // ─────────── REVENUE ───────────
