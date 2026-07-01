@@ -30896,6 +30896,7 @@ function _renderMemberModalBody(m, stripe, history) {
     <!-- Billing -->
     <div style="${labelCss};margin-bottom:12px">Billing</div>
     ${rowGrid(billingRows)}
+    ${(stripe && stripe.coupon) ? `<div style="margin-top:10px"><span style="display:inline-flex;align-items:center;gap:6px;font-size:11.5px;font-weight:700;padding:4px 10px;border-radius:999px;border:1px solid var(--gold,#E8C547);color:var(--gold,#E8C547)">🎟 ${escapeHTML(stripe.coupon.code || 'Coupon')} · ${escapeHTML(stripe.coupon.label || '')}${stripe.coupon.duration === 'repeating' && stripe.coupon.duration_months ? ' · ' + stripe.coupon.duration_months + ' mo' : (stripe.coupon.duration === 'once' ? ' · first payment' : '')}</span></div>` : ''}
 
     ${(stripe && stripe.payments && stripe.payments.length) ? `
       <div style="margin-top:16px">
@@ -30942,6 +30943,8 @@ function _renderMemberModalBody(m, stripe, history) {
       ${btn('⏸ Pause date fix', `mPauseDateFix('${m.id}')`)}
       ${gbtn('Change plan', `mChange('${m.id}','${escapeHTML(m.plan||'')}')`, canManage)}
       ${gbtn('Refund',      `mRefund('${m.id}','${escapeHTML(m.stripe_customer_id||'')}')`, canManage)}
+      ${gbtn('🎟 ' + (stripe && stripe.coupon ? 'Change coupon' : 'Apply coupon'), `mApplyCoupon('${m.id}')`, canManage)}
+      ${(stripe && stripe.coupon) ? gbtn('Remove coupon', `mRemoveCoupon('${m.id}','${escapeHTML(stripe.coupon.code||'')}')`, canManage) : ''}
       ${btn('Cancel',       `mCancel('${m.id}','${escapeHTML((m.athlete_name||'').replace(/'/g, ''))}')`)}
       ${btn('Payment link',`mPaymentLink('${m.id}')`)}
       ${btn('💳 Get card link',`mGetCardLink('${m.id}')`)}
@@ -31607,6 +31610,61 @@ async function mRefund(memberId, customerId) {
     closeMemberPopup();
     fetchAndRenderMembers();
   } catch (e) { _plToast('Refund failed: ' + e.message); }
+}
+
+async function mApplyCoupon(memberId) {
+  _plToast('Loading coupons…');
+  // Live coupons come from the academy's Stripe promotion codes (created from the
+  // offer's Pricing section). Only active ones can be applied.
+  let codes = [];
+  try {
+    const token = await _mreqAuthToken();
+    const r = await fetch('/api/offers/create-discount?client_id=' + encodeURIComponent(_aiClientId()), {
+      headers: { Authorization: 'Bearer ' + token },
+    });
+    const j = await _safeJson(r);
+    if (r.ok) codes = (j.codes || []).filter(c => c.active !== false);
+  } catch (_) {}
+
+  const _goCreate = () => { closeMemberPopup(); switchView('blueprint'); _plToast('Open your offer → Pricing → Discount codes to add one, then push it live in Price Match.'); };
+
+  if (!codes.length) {
+    const go = await _mmModal({ icon: '🎟', title: 'No coupons yet',
+      body: 'Create a coupon in the offer’s Pricing section, then push it live in Price Match. Go there now?', okLabel: 'Go to Pricing' });
+    if (go) _goCreate();
+    return;
+  }
+
+  const fmt = (c) => /percent/i.test(String(c.kind)) ? `${c.value}% off` : `$${c.value} off`;
+  const opts = codes.map(c => ({ value: c.code, label: `${c.code} · ${fmt(c)}` }));
+  opts.push({ value: '__create__', label: '＋ Create a new coupon…' });
+  const vals = await _mmModal({
+    icon: '🎟', title: 'Apply coupon',
+    body: 'Applies to this member’s next invoice and replaces any existing coupon. Blocked if it would drop the charge below $1.',
+    okLabel: 'Apply',
+    fields: [{ key: 'code', label: 'Coupon', type: 'select', value: opts[0].value, options: opts }],
+  });
+  if (!vals) return;
+  if (vals.code === '__create__') { _goCreate(); return; }
+  try {
+    const r = await _memberAction(memberId, 'apply-coupon', { code: vals.code });
+    _plToast(`Applied ${r.coupon.code} (${r.coupon.label}). Next charge: $${(r.coupon.discounted_cents / 100).toFixed(2)}.`);
+    closeMemberPopup();
+    fetchAndRenderMembers();
+  } catch (e) { _plToast('Apply failed: ' + e.message); }
+}
+
+async function mRemoveCoupon(memberId, code) {
+  const ok = await _mmModal({ icon: '🎟', danger: true, title: 'Remove coupon',
+    body: `Remove ${code ? '“' + escapeHTML(code) + '”' : 'the coupon'} from this member? They go back to full price on the next invoice.`,
+    okLabel: 'Remove' });
+  if (!ok) return;
+  try {
+    await _memberAction(memberId, 'remove-coupon', {});
+    _plToast('Coupon removed.');
+    closeMemberPopup();
+    fetchAndRenderMembers();
+  } catch (e) { _plToast('Remove failed: ' + e.message); }
 }
 
 async function mChange(memberId, currentPlan) {
