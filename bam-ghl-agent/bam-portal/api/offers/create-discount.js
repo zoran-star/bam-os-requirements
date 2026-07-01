@@ -1,4 +1,5 @@
 import { withSentryApiRoute } from "../_sentry.js";
+import { validateCouponDef, stripeCouponBody, stripePromoBody } from "../_coupon-guardrails.js";
 export const maxDuration = 60; // Stripe coupon + promo-code creation per row
 // Vercel Serverless Function — Price Match → create discount codes in Stripe.
 //
@@ -117,9 +118,24 @@ async function handler(req, res) {
       if (!ctx.isStaff && !ctx.clientIds.includes(clientId)) return res.status(403).json({ error: "forbidden" });
       const acct = await clientAccount(clientId);
       const live = await liveCodes(acct);
-      const codes = [...live.values()].map(pc => ({
-        code: pc.code, exists: true, promotion_code_id: pc.id, coupon_id: pc.coupon && pc.coupon.id,
-      }));
+      const codes = [...live.values()].map(pc => {
+        const cp = pc.coupon || {};
+        return {
+          code: pc.code,
+          exists: true,
+          active: pc.active !== false && cp.valid !== false,
+          promotion_code_id: pc.id,
+          coupon_id: cp.id || null,
+          kind: cp.percent_off != null ? "Percent off" : "Dollar off",
+          value: cp.percent_off != null ? cp.percent_off : (cp.amount_off != null ? cp.amount_off / 100 : null),
+          duration: cp.duration || null,
+          duration_months: cp.duration_in_months || null,
+          max_redemptions: pc.max_redemptions || null,
+          times_redeemed: pc.times_redeemed || 0,
+          expires_at: pc.expires_at || null,
+          once_per_customer: !!(pc.restrictions && pc.restrictions.first_time_transaction),
+        };
+      });
       return res.status(200).json({ ok: true, codes });
     }
 
@@ -128,6 +144,16 @@ async function handler(req, res) {
     const clientId = body.client_id || ctx.clientIds[0];
     if (!clientId) return res.status(400).json({ error: "client_id required" });
     if (!ctx.isStaff && !ctx.clientIds.includes(clientId)) return res.status(403).json({ error: "forbidden" });
+
+    // Deactivate a live promotion code (manager kill switch). Existing members
+    // who already redeemed it keep their discount - this only stops NEW uses.
+    if (body.deactivate) {
+      const acctD = await clientAccount(clientId);
+      const pc = await stripeFetch(`/promotion_codes/${String(body.deactivate)}`, {
+        method: "POST", stripeAccount: acctD, body: { active: "false" },
+      });
+      return res.status(200).json({ ok: true, deactivated: pc.id, active: pc.active });
+    }
 
     const codes = Array.isArray(body.codes) ? body.codes : [];
     if (!codes.length) return res.status(400).json({ error: "codes[] required" });
@@ -143,24 +169,23 @@ async function handler(req, res) {
         results.push({ code, created: false, exists: true, promotion_code_id: pc.id });
         continue;
       }
-      const value = Number(c.value);
-      if (!Number.isFinite(value) || value <= 0) { results.push({ code, error: "invalid amount" }); continue; }
+      // Guardrails: rejects 0/100% and bad shapes before anything hits Stripe.
+      const check = validateCouponDef(c);
+      if (!check.ok) { results.push({ code, error: check.error }); continue; }
+      const def = check.coupon;
       try {
-        // Coupon = the discount math (forever — falls off only when removed/expired).
-        const couponBody = isPercent(c.kind)
-          ? { percent_off: Math.min(100, value), duration: "forever", name: `${code} (${value}% off)` }
-          : { amount_off: Math.round(value * 100), currency: "cad", duration: "forever", name: `${code} ($${value} off)` };
-        couponBody["metadata[source]"] = "fullcontrol-sorter";
+        // Coupon = the discount math (percent/dollar + how long it lasts).
         const coupon = await stripeFetch(`/coupons`, {
           method: "POST", stripeAccount: acct,
-          idempotencyKey: `sorter-coupon-${clientId}-${code}-${isPercent(c.kind) ? "p" : "d"}-${value}`.slice(0, 200),
-          body: couponBody,
+          idempotencyKey: `sorter-coupon-${clientId}-${code}-${def.duration}-${def.duration_months || 0}-${isPercent(c.kind) ? "p" : "d"}-${def.value}`.slice(0, 200),
+          body: stripeCouponBody(def),
         });
-        // Promotion Code = the customer-facing string pointing at the coupon.
+        // Promotion Code = the customer-facing string + limits (expiry, max uses,
+        // once-per-customer) pointing at the coupon.
         const pc = await stripeFetch(`/promotion_codes`, {
           method: "POST", stripeAccount: acct,
           idempotencyKey: `sorter-promo-${clientId}-${code}`.slice(0, 200),
-          body: { coupon: coupon.id, code, "metadata[source]": "fullcontrol-sorter" },
+          body: stripePromoBody(def, coupon.id),
         });
         results.push({ code, created: true, promotion_code_id: pc.id, coupon_id: coupon.id });
       } catch (e) {
