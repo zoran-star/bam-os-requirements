@@ -16051,6 +16051,39 @@ async function _bbCouponPillClick(el) {
   }
 }
 
+// Auto-create newly-completed discount codes in Stripe right after the offer
+// saves - so adding a code makes it live in one step (no separate pill click).
+// Debounced + idempotent (create-discount skips codes that already exist live).
+let _bbCouponAutoTimer = null;
+function _bbScheduleCouponAutoCreate() {
+  clearTimeout(_bbCouponAutoTimer);
+  _bbCouponAutoTimer = setTimeout(_bbAutoCreateCoupons, 1200);
+}
+async function _bbAutoCreateCoupons() {
+  if (typeof _bbIsV1 === 'function' && _bbIsV1()) return;
+  const list = (_bbState && _bbState.offer && _bbState.offer.data && _bbState.offer.data.pricing && _bbState.offer.data.pricing.discount_codes) || [];
+  // Only push rows that are fully filled in (code + type + a positive amount).
+  const complete = list.filter(d => d && !d.archived && String(d.code || '').trim().length >= 2 && d.kind && Number(d.value) > 0);
+  if (!complete.length) return;
+  if (!_BB_COUPON_LIVE) { await _bbLoadCouponHealth(true); }
+  if (!_BB_COUPON_LIVE) return;
+  const missing = complete.filter(d => !_BB_COUPON_LIVE.has(String(d.code).trim().toUpperCase()));
+  if (!missing.length) return;
+  try {
+    const token = await _mreqAuthToken();
+    const r = await fetch('/api/offers/create-discount', {
+      method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+      body: JSON.stringify({ client_id: _aiClientId(), codes: missing }),
+    });
+    if (r.ok) {
+      const json = await _safeJson(r);
+      const made = (json.results || []).filter(x => x.created).map(x => x.code);
+      await _bbLoadCouponHealth(true);
+      if (made.length) _plToast((made.length === 1 ? made[0] + ' is' : made.length + ' codes are') + ' now live in Stripe.');
+    }
+  } catch (_) { /* non-fatal - the pill still offers manual create */ }
+}
+
 function _bbApplyLivePills() {
   if (!_BB_MATCH_HEALTH) { _bbLoadMatchHealth(); return; }
   document.querySelectorAll('[data-bb-live-pill]').forEach(el => {
@@ -20378,6 +20411,9 @@ async function _bbAutoSave() {
   _bbState.saveState = error ? 'error' : 'saved';
   _bbUpdateSaveStateLabel();
   if (!error) {
+    // A saved offer may have new discount codes → push them live in Stripe now
+    // (no-op unless there's a complete, not-yet-created code).
+    _bbScheduleCouponAutoCreate();
     setTimeout(() => {
       if (_bbState.saveState === 'saved') { _bbState.saveState = 'idle'; _bbUpdateSaveStateLabel(); }
     }, 1600);
