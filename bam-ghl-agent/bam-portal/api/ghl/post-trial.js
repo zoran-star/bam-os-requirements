@@ -11,7 +11,7 @@
 // Auth: Supabase JWT — staff, or client_users membership for client_id.
 
 import { withSentryApiRoute } from "../_sentry.js";
-import { moveStage } from "../agent/_store.js";
+import { moveStage, pipelineFlags } from "../agent/_store.js";
 import { enrollContact, isAutomationLive } from "../automations.js";
 
 const SUPABASE_URL = (process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || "").trim();
@@ -111,12 +111,25 @@ async function handler(req, res) {
   try { token = await getToken(client); }
   catch (e) { return res.status(502).json({ error: `GHL token: ${e.message}` }); }
 
-  // Look up the opportunity for contact + pipeline.
-  let opp;
-  try { opp = (await ghl("GET", `/opportunities/${encodeURIComponent(oppId)}`, { token })).opportunity; }
-  catch (e) { return res.status(e.status || 502).json({ error: `GHL opp: ${e.message}` }); }
-  const contactId = opp?.contactId || opp?.contact?.id || null;
-  const pipelineId = opp?.pipelineId || opp?.pipeline_id || null;
+  // Look up the opportunity for contact + pipeline (provider-aware). A provider='portal'
+  // academy's opp lives in the store and its id is a portal uuid, so a GHL fetch would
+  // 404 - read the store row instead. `oppRef` is the handle passed to the stage moves.
+  let contactId = null, pipelineId = null, oppRef = null;
+  const { provider } = await pipelineFlags(clientId).catch(() => ({ provider: "ghl" }));
+  if (provider === "portal") {
+    try {
+      const rows = await sb(`opportunities?client_id=eq.${encodeURIComponent(clientId)}&or=(id.eq.${encodeURIComponent(oppId)},ghl_opportunity_id.eq.${encodeURIComponent(oppId)})&select=id,ghl_opportunity_id,ghl_contact_id,ghl_pipeline_id&limit=1`);
+      const row = Array.isArray(rows) && rows[0];
+      if (row) { contactId = row.ghl_contact_id || null; pipelineId = row.ghl_pipeline_id || null; oppRef = { id: row.id, ghlOpportunityId: row.ghl_opportunity_id || null }; }
+    } catch (e) { return res.status(500).json({ error: `store opp: ${e.message}` }); }
+  } else {
+    let opp;
+    try { opp = (await ghl("GET", `/opportunities/${encodeURIComponent(oppId)}`, { token })).opportunity; }
+    catch (e) { return res.status(e.status || 502).json({ error: `GHL opp: ${e.message}` }); }
+    contactId = opp?.contactId || opp?.contact?.id || null;
+    pipelineId = opp?.pipelineId || opp?.pipeline_id || null;
+    oppRef = { ghlOpportunityId: oppId };
+  }
 
   // Record the review (one per opportunity).
   try {
@@ -203,7 +216,7 @@ async function handler(req, res) {
       if (interested) {
         // Move through the provider-aware store; on ghl it is the identical PUT and the
         // store does the shadow mirror internally (replacing the manual shadowMirrorMove).
-        await moveStage({ clientId, sb, ghl, token, oppRef: { ghlOpportunityId: oppId }, stage: { pipelineId: pl.id, stageId: interested.id, stageName: interested.name }, role: "interested", contactId });
+        await moveStage({ clientId, sb, ghl, token, oppRef, stage: { pipelineId: pl.id, stageId: interested.id, stageName: interested.name }, role: "interested", contactId });
         result.moved = true;
         result.moved_to = "interested";
       }
@@ -219,7 +232,7 @@ async function handler(req, res) {
       if (doneStage) {
         // Move through the provider-aware store; on ghl it is the identical PUT and the
         // store does the shadow mirror internally (replacing the manual shadowMirrorMove).
-        await moveStage({ clientId, sb, ghl, token, oppRef: { ghlOpportunityId: oppId }, stage: { pipelineId: pl.id, stageId: doneStage.id, stageName: doneStage.name }, role: "done_trial", contactId });
+        await moveStage({ clientId, sb, ghl, token, oppRef, stage: { pipelineId: pl.id, stageId: doneStage.id, stageName: doneStage.name }, role: "done_trial", contactId });
         result.moved = true;
       }
     } catch (e) { console.error("done-trial move failed (non-fatal):", e.message); }

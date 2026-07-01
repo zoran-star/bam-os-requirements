@@ -51,16 +51,28 @@ Migrated the find-opp locators from `ghl /opportunities/search` to the provider-
   existing opp is found + moved instead of duplicated. Cleaned up the 5 dup rows via SQL
   (kept each person's scheduled_trial). Every other academy keeps the exact GHL search.
 
-## STILL ON GHL — deeper opp-find sites (final smaller batch)
-These locate/read the opp from GHL and would miss portal-native opps; more involved than a
-plain find (they read opp FIELDS or have their own flow), so left for a focused pass:
-- `api/ghl/post-trial.js` (206,222): receives an `oppId` input, then `ghl GET /opportunities/{id}`
-  to read contactId+pipelineId. Portal-native id → 404. Needs a store read of those fields.
-- `api/stripe/webhook.js` (214): marks WON on payment — find logic to check.
-- `api/twilio/inbound-webhook.js` (150) + `api/resend/inbound-webhook.js` (185): responded-bounce
-  on reply — GHL `/opportunities/search` + reads `opp.pipelineStageId` for the ghost-stage guard.
-  Guarded by `if (opp)`, so portal-native just doesn't bounce (not breaking). Lower priority.
-- `api/ghl/inbound-webhook.js` (195,287): GHL-messaging academies only — NOT GTA. Leave.
+## Deeper opp-find sites - DONE 2026-07-01 (3rd PR)
+- `api/stripe/webhook.js` (WON on payment): kept the oppRef from findOpenOpp (was dropping
+  `ref.id`), and if none resolved, looks it up by contact - portal-native members now mark won.
+- `api/ghl/post-trial.js` (trial outcome -> stage): opp lookup is now provider-aware - reads the
+  store `opportunities` row (by id OR ghl_opportunity_id) for portal instead of `ghl GET
+  /opportunities/{id}` (which 404'd on a portal uuid); threads the oppRef into both moves.
+- `api/twilio/inbound-webhook.js` + `api/resend/inbound-webhook.js` (reply -> bounce to Responded):
+  provider branch - for portal reads the open opp + `stage_role` from the store (the true stage
+  lives there; the GHL stage is stale) and bounces only from interested/nurture.
+
+## The ONLY GHL touches left in the pipeline (non-breaking, not GTA writes)
+- `api/ghl/post-trial.js` still READS GHL pipeline NAMES (to resolve the interested/done_trial
+  stage) for BOTH providers - a read, not a write; the move goes to the store. Kept because
+  passing a partial stage to `portalStageRowId` would wipe the registry's ghl_stage_id (merge with
+  nulls). To fully remove: resolve the stage from the `pipeline_stages` registry by role instead.
+- `api/ghl/inbound-webhook.js` (195,287): the GHL-MESSAGING inbound webhook - only fires for
+  academies on GHL SMS. GTA is Twilio+Resend, so it NEVER runs for GTA. Left as-is (those
+  academies are pipeline_provider='ghl' anyway).
+
+## Net for GTA: pipeline opp WRITES are 100% off GHL (create/move/close/won across board,
+## agents, automations, lead intake, post-trial, payment, inbound). Reads too, except the one
+## post-trial stage-name lookup above.
 
 ## Also still on GHL for the pipeline layer (deferred, Zoran's call)
 - **KPIs** (api/kpis-v15.js) and **calendars/booking** (api/ghl/calendars-v15.js) still read GHL

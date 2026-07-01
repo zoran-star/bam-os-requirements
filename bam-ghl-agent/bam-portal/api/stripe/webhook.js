@@ -172,6 +172,7 @@ async function markOpportunityWon({ member, oppIdHint, allowContactSearch }) {
     if (!client.ghl_access_token && !client.ghl_location_id) return { skipped: "academy not connected to GHL" };
 
     let oppId = (oppIdHint && String(oppIdHint).trim()) || member.ghl_opportunity_id || null;
+    let oppRef = null;   // provider-aware handle for the WON write (portal-native safe)
 
     let token = null;
     try { token = await getClientGhlToken(client); }
@@ -186,7 +187,7 @@ async function markOpportunityWon({ member, oppIdHint, allowContactSearch }) {
           clientId: member.client_id, sb, ghl, token,
           locationId: client.ghl_location_id, contactId: member.ghl_contact_id,
         });
-        oppId = (ref && ref.ghlOpportunityId) || null;
+        if (ref) { oppRef = ref; oppId = ref.ghlOpportunityId || ref.id || null; }
       } catch (_) { /* non-fatal — fall through to skip */ }
     }
     if (!oppId) return { skipped: "no opportunity to mark" };
@@ -207,11 +208,16 @@ async function markOpportunityWon({ member, oppIdHint, allowContactSearch }) {
     } catch (_) { /* if the check fails, fall through — re-PUT to WON is itself idempotent in GHL */ }
 
     // Mark the opportunity WON through the provider-aware store. On provider='ghl'
-    // (every academy today) this is the identical PUT { status: 'won' }; the store
-    // also handles the shadow mirror internally when that flag is on.
+    // this is the identical PUT { status: 'won' }; on 'portal' it updates the store
+    // row. Resolve a proper oppRef (a portal-native row matches on `id`, not a GHL id):
+    // if we didn't already get one from findOpenOpp, look it up by contact.
+    if (!oppRef && member.ghl_contact_id && client.ghl_location_id) {
+      try { oppRef = await findOpenOpp({ clientId: member.client_id, sb, ghl, token, locationId: client.ghl_location_id, contactId: member.ghl_contact_id }); } catch (_) {}
+    }
+    if (!oppRef) oppRef = { ghlOpportunityId: oppId };
     await setStatus({
       clientId: member.client_id, sb, ghl, token,
-      oppRef: { ghlOpportunityId: oppId }, status: "won",
+      oppRef, status: "won",
       contactId: member.ghl_contact_id || null,
     });
 
