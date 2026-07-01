@@ -7330,10 +7330,10 @@ Then the call to action."]</div>
       #view-pipelines .pl-card-trial { font-size:11px; color:var(--accent); font-weight:600; margin-top:5px; }
 
       /* Post-trial submit: full-screen one-colour takeover + loading popup */
-      #ptf-loading { position:fixed; inset:0; background:rgba(11,11,13,0.94); z-index:9500; display:flex; align-items:center; justify-content:center; opacity:0; pointer-events:none; transition:opacity 250ms; }
-      #ptf-loading.open { opacity:1; pointer-events:auto; }
-      #ptf-loading .ptfl-box { display:flex; flex-direction:column; align-items:center; gap:14px; padding:28px 36px; background:var(--surface); border:1px solid var(--border); border-radius:14px; }
-      #ptf-loading .req-spin { width:26px; height:26px; border-width:3px; margin:0; }
+      #ptf-takeover { position:fixed; inset:0; background:rgba(11,11,13,0.94); z-index:9500; display:flex; align-items:center; justify-content:center; opacity:0; pointer-events:none; transition:opacity 250ms; }
+      #ptf-takeover.open { opacity:1; pointer-events:auto; }
+      #ptf-takeover .ptfl-box { display:flex; flex-direction:column; align-items:center; gap:14px; padding:28px 36px; background:var(--surface); border:1px solid var(--border); border-radius:14px; }
+      #ptf-takeover .req-spin { width:26px; height:26px; border-width:3px; margin:0; }
       /* Gold landing flash on the card after it visibly moves stages */
       @keyframes plCardLand { 0% { box-shadow:0 0 0 1px var(--gold,#E8C547), 0 0 28px rgba(232,197,71,0.8); } 100% { box-shadow:0 0 0 0 rgba(232,197,71,0); } }
       #view-pipelines .pl-card-landed { animation: plCardLand 1.6s ease-out; border-color:var(--gold,#E8C547); }
@@ -7598,10 +7598,10 @@ Then the call to action."]</div>
     <div id="pl-drawer" role="dialog" aria-modal="true"></div>
     <div id="ptf-overlay" onclick="_ptfClose()"></div>
     <!-- Full-screen submit takeover: one colour + loading popup (post-trial form) -->
-    <div id="ptf-loading" aria-live="polite">
+    <div id="ptf-takeover" aria-live="polite">
       <div class="ptfl-box">
         <span class="req-spin"></span>
-        <div id="ptf-loading-msg" style="font-size:14px;font-weight:600;color:var(--text)">Submitting trial result…</div>
+        <div id="ptf-takeover-msg" style="font-size:14px;font-weight:600;color:var(--text)">Submitting trial result…</div>
       </div>
     </div>
 
@@ -23927,20 +23927,8 @@ function _plPostTrialForm(oppId) {
   if (!o) return;
   _PTF_OPP = oppId; _PTF_FIT = null; _PTF_SHOW = null; _PTF_SENDLINK = true;
   const tr = _plTrialInfo(o.trialDate);
-  // Merge the GHL "Lead Sales Person" picklist with the academy's teammates
-  // (client_users), so staff added in BB → Staff show up as trainer options.
-  const _teamNames = (typeof _PREVIEW_STAFF_LIST !== 'undefined' ? _PREVIEW_STAFF_LIST : []).map(r => r.name).filter(Boolean);
-  const trainers = (() => {
-    const seen = new Set(), out = [];
-    for (const t of [...(_PL_DATA?.trainers || []), ..._teamNames]) {
-      const k = String(t).trim().toLowerCase();
-      if (k && !seen.has(k)) { seen.add(k); out.push(t); }
-    }
-    return out;
-  })();
-  const trainerControl = trainers.length
-    ? `<select id="ptf-trainer" class="ptf-input"><option value="">Select trainer…</option>${trainers.map(t => `<option>${escapeHTML(t)}</option>`).join('')}</select>`
-    : `<input id="ptf-trainer" class="ptf-input" type="text" placeholder="Trainer name">`;
+  // (The "Trainer leading the sale" picker was dropped 2026-07-01 - the form
+  // doesn't need a trainer; assign one from the card drawer / Communications.)
   const ov = document.getElementById('ptf-overlay');
   ov.innerHTML = `
     <div class="ptf-modal" onclick="event.stopPropagation()">
@@ -23981,15 +23969,11 @@ function _plPostTrialForm(oppId) {
         </div>
       </div>
       <div class="ptf-field">
-        <label>Trainer leading the sale</label>
-        ${trainerControl}
-      </div>
-      <div class="ptf-field">
         <label>Special notes</label>
         <textarea id="ptf-notes" class="ptf-input" rows="3" placeholder="Anything worth noting about this trial…"></textarea>
       </div>
       <div class="ptf-err" id="ptf-err"></div>
-      <div class="ptf-note">On a good fit the card moves to Done Trial + the trainer is assigned. A no-show moves to Interested and fires the missed-trial automation. Your "first message" is texted to the parent; with the sign-up link on, the link is added at the bottom - set the link in KPIs → Setup → Offers (or the Blueprint training Sales section).</div>
+      <div class="ptf-note">On a good fit the card moves to Done Trial. A no-show moves to Interested and fires the missed-trial automation. Your "first message" is texted to the parent; with the sign-up link on, the link is added at the bottom - set the link in KPIs → Setup → Offers (or the Blueprint training Sales section).</div>
       <button class="ptf-submit" id="ptf-submit" onclick="_ptfSubmit()">Submit post trial form</button>
     </div>`;
   ov.classList.add('open');
@@ -24062,12 +24046,14 @@ function _ptfSetSendLink(v) {
 function _ptfClose() { document.getElementById('ptf-overlay')?.classList.remove('open'); _PTF_OPP = null; }
 
 // ── Post-trial submit takeover: one-colour screen + loading popup ──
+// NOTE: the takeover is #ptf-takeover, NOT #ptf-loading - that id belongs to
+// the form's "Loading details…" row, which _ptfLoadDetail removes from the DOM.
 function _ptfLoadShow(msg) {
-  const m = document.getElementById('ptf-loading-msg'); if (m && msg) m.textContent = msg;
-  document.getElementById('ptf-loading')?.classList.add('open');
+  const m = document.getElementById('ptf-takeover-msg'); if (m && msg) m.textContent = msg;
+  document.getElementById('ptf-takeover')?.classList.add('open');
 }
-function _ptfLoadText(msg) { const m = document.getElementById('ptf-loading-msg'); if (m) m.textContent = msg; }
-function _ptfLoadHide() { document.getElementById('ptf-loading')?.classList.remove('open'); }
+function _ptfLoadText(msg) { const m = document.getElementById('ptf-takeover-msg'); if (m) m.textContent = msg; }
+function _ptfLoadHide() { document.getElementById('ptf-takeover')?.classList.remove('open'); }
 
 // After the board re-renders, show the moved card actually travelling from
 // where it sat to where it landed (fixed-position ghost), then flash it gold.
@@ -24101,7 +24087,7 @@ async function _ptfSubmit() {
   if (_PTF_SHOW === null) { err.textContent = 'Did the athlete show up?'; err.style.display = 'block'; return; }
   // Good fit is only asked (and required) when they actually showed up.
   if (_PTF_SHOW === true && _PTF_FIT === null) { err.textContent = 'Pick whether it was a good fit.'; err.style.display = 'block'; return; }
-  const trainer = document.getElementById('ptf-trainer')?.value || '';
+  const trainer = '';   // trainer picker removed from the form (2026-07-01)
   const notes = document.getElementById('ptf-notes')?.value || '';
   const firstMessage = document.getElementById('ptf-first-msg')?.value || '';
   const btn = document.getElementById('ptf-submit');
