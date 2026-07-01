@@ -22,11 +22,26 @@ const COUPON_CURRENCY = "cad";
 const isPercent = (kind) => /percent|%/i.test(String(kind || ""));
 const normCode = (s) => String(s || "").trim().toUpperCase();
 
+// Map a duration value that may be a machine token ("once"/"repeating"/"forever")
+// OR a friendly offer-builder label ("First payment only" / "A set number of
+// months" / "Every payment") to the machine token.
+function parseDuration(raw) {
+  const s = String(raw || "forever").toLowerCase();
+  if (/once|first payment|first invoice|one payment/.test(s)) return "once";
+  if (/repeat|month/.test(s)) return "repeating";
+  return "forever";
+}
+
+// A boolean field that may arrive as true, "Yes", "One per customer", etc.
+// Anything not explicitly affirmative is false (so a stray "No" isn't truthy).
+function parseBool(raw) {
+  return /^(yes|true|1|one|on)\b/i.test(String(raw || "").trim());
+}
+
 // Normalize a raw coupon row (from the offer builder) into a clean, typed shape.
 function normalizeCoupon(raw = {}) {
   const kind = isPercent(raw.kind) ? "Percent off" : "Dollar off";
-  let duration = String(raw.duration || "forever").toLowerCase();
-  if (!["once", "repeating", "forever"].includes(duration)) duration = "forever";
+  const duration = parseDuration(raw.duration);
   const months = Number(raw.duration_months);
   return {
     code: normCode(raw.code),
@@ -37,7 +52,7 @@ function normalizeCoupon(raw = {}) {
     expires_at: raw.expires_at ? String(raw.expires_at).slice(0, 10) : null,
     max_redemptions: Number.isFinite(Number(raw.max_redemptions)) && Number(raw.max_redemptions) > 0
       ? Math.round(Number(raw.max_redemptions)) : null,
-    once_per_customer: !!raw.once_per_customer,
+    once_per_customer: typeof raw.once_per_customer === "boolean" ? raw.once_per_customer : parseBool(raw.once_per_customer),
     archived: !!raw.archived,
   };
 }

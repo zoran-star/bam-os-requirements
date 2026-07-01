@@ -17913,11 +17913,24 @@ const _bbDiscountCodesField = {
   addLabel:'discount code',
   collapsible:true,
   summaryKeys:['code','kind','value'],
-  hint:'Codes customers enter at checkout - each is a percent or dollar discount. Create them in Stripe from Price Match.',
+  hint:'Codes customers enter at checkout - each is a percent or dollar discount. After adding them here, push them live in the Price Match panel. Guardrails: percent is capped 1-99%, and a dollar code that would drop a plan below $1 is blocked.',
   subFields:[
     { key:'code', type:'text', label:'Code', required:true, hint:'What customers type, e.g. SIBLING10 (letters/numbers)' },
     { key:'kind', type:'check_one', label:'Type', required:true, options:['Percent off','Dollar off'] },
-    { key:'value', type:'number', label:'Amount', required:true, hint:'e.g. 10 = 10% off (Percent) or $10 off (Dollar)' },
+    { key:'value', type:'number', label:'Amount', required:true, hint:'e.g. 10 = 10% off (Percent, 1-99) or $10 off (Dollar)' },
+    { key:'duration', type:'check_one', label:'How long does it apply?', required:true,
+      options:['First payment only','A set number of months','Every payment'],
+      hint:'On a recurring membership: just the first invoice, a fixed number of months, or forever.' },
+    { key:'duration_months', type:'number', label:'How many months?', required:true,
+      dep:{ key:'duration', equals:'A set number of months' },
+      hint:'The discount applies for this many billing months, then full price.' },
+    { key:'expires_at', type:'date', label:'Expires on (optional)',
+      hint:'Leave blank for no expiry. After this date the code stops working.' },
+    { key:'max_redemptions', type:'number', label:'Max total uses (optional)',
+      hint:'e.g. 50 = first 50 customers only. Leave blank for unlimited.' },
+    { key:'once_per_customer', type:'check_one', label:'One use per customer?',
+      options:['Yes','No'],
+      hint:'Yes = a customer can only redeem this code once (new-customer signups).' },
   ],
 };
 
@@ -19009,8 +19022,9 @@ function _bbRenderSubField(sectionId, parentKey, rowIdx, sf, subVal, row) {
     `;
   }
 
-  // Scalar inputs (text / time / number / currency)
+  // Scalar inputs (text / time / date / number / currency)
   const inputType = sf.type === 'time' ? 'time'
+    : sf.type === 'date' ? 'date'
     : (sf.type === 'currency' || sf.type === 'number') ? 'number'
     : 'text';
   return `
@@ -19083,6 +19097,7 @@ function _bbRenderNestedSubField(sectionId, parentKey, parentIdx, nestedKey, nes
   }
 
   const inputType = nsf.type === 'time' ? 'time'
+    : nsf.type === 'date' ? 'date'
     : (nsf.type === 'currency' || nsf.type === 'number') ? 'number'
     : 'text';
   return `
@@ -27702,14 +27717,15 @@ async function _sorterApplyMissing(slotId) {
 // ── Discount codes panel (Price Match) - mirror the offer's codes into Stripe ──
 // Reads discount_codes from the academy's offers, checks which already exist as
 // Stripe promotion codes, and creates the missing ones (Coupon + Promo Code).
-let _SORTER_DISCOUNTS = null; // { codes:[{code,kind,value}], live:Set<UPPER> }
+let _SORTER_DISCOUNTS = null; // { codes:[{code,kind,value,duration,...}], live:Map<UPPER, liveObj> }
 
 async function _sorterLoadDiscounts() {
   const host = document.getElementById('pc-sorter-discounts');
   if (!host) return;
   host.innerHTML = '';
   try {
-    // Collect discount codes from every non-archived offer's pricing section.
+    // Collect discount codes from every non-archived offer's pricing section,
+    // carrying the full config (duration + limits) through to Stripe.
     const { data: offers } = await _sb.from('offers').select('data,status').eq('client_id', _aiClientId());
     const seen = new Map();
     (offers || []).forEach(o => {
@@ -27717,21 +27733,26 @@ async function _sorterLoadDiscounts() {
       ((o.data && o.data.pricing && o.data.pricing.discount_codes) || []).forEach(d => {
         if (d && d.code && !d.archived) {
           const k = String(d.code).trim().toUpperCase();
-          if (k && !seen.has(k)) seen.set(k, { code: String(d.code).trim(), kind: d.kind, value: d.value });
+          if (k && !seen.has(k)) seen.set(k, {
+            code: String(d.code).trim(), kind: d.kind, value: d.value,
+            duration: d.duration, duration_months: d.duration_months,
+            expires_at: d.expires_at, max_redemptions: d.max_redemptions,
+            once_per_customer: d.once_per_customer,
+          });
         }
       });
     });
     const codes = [...seen.values()];
     if (!codes.length) return; // nothing to show
-    // Which already live in Stripe?
-    let live = new Set();
+    // Pull live promotion codes (with redemption/expiry/active state).
+    let live = new Map();
     try {
       const token = await _mreqAuthToken();
       const r = await fetch('/api/offers/create-discount?client_id=' + encodeURIComponent(_aiClientId()), {
         headers: { Authorization: 'Bearer ' + token },
       });
       const json = await _safeJson(r);
-      if (r.ok) live = new Set((json.codes || []).map(c => String(c.code).toUpperCase()));
+      if (r.ok) (json.codes || []).forEach(c => live.set(String(c.code).toUpperCase(), c));
     } catch (_) {}
     _SORTER_DISCOUNTS = { codes, live };
     _sorterRenderDiscounts();
@@ -27744,12 +27765,30 @@ function _sorterRenderDiscounts() {
   const { codes, live } = _SORTER_DISCOUNTS;
   const missing = codes.filter(c => !live.has(c.code.toUpperCase()));
   const fmt = (c) => /percent|%/i.test(String(c.kind || '')) ? `${c.value}% off` : `$${c.value} off`;
+  const durLabel = (d) => /once|first/i.test(String(d)) ? 'first payment' : /repeat|month/i.test(String(d)) ? 'set months' : 'every payment';
   const rows = codes.map(c => {
-    const inStripe = live.has(c.code.toUpperCase());
-    return `<div style="display:flex;align-items:center;gap:8px;border:1px solid var(--border,#2a2a31);border-radius:9px;padding:8px 11px;margin-bottom:7px;">
+    const lc = live.get(c.code.toUpperCase());
+    const inStripe = !!lc;
+    const active = inStripe && lc.active !== false;
+    const meta = [];
+    meta.push(durLabel(c.duration));
+    if (c.expires_at) meta.push('exp ' + String(c.expires_at).slice(0, 10));
+    if (lc && lc.max_redemptions) meta.push(`${lc.times_redeemed || 0}/${lc.max_redemptions} used`);
+    else if (c.max_redemptions) meta.push(`max ${c.max_redemptions}`);
+    if (c.once_per_customer && /^(yes|true|1|one|on)/i.test(String(c.once_per_customer))) meta.push('1/customer');
+    const pill = !inStripe
+      ? `<span style="font-size:9.5px;font-weight:800;letter-spacing:.3px;padding:2px 8px;border-radius:999px;border:1px solid #c9871f;color:#e0a93f;">NOT CREATED</span>`
+      : active
+        ? `<span style="font-size:9.5px;font-weight:800;letter-spacing:.3px;padding:2px 8px;border-radius:999px;border:1px solid #1f7a3d;color:#7BC47F;">✓ LIVE</span>`
+        : `<span style="font-size:9.5px;font-weight:800;letter-spacing:.3px;padding:2px 8px;border-radius:999px;border:1px solid #7a1f1f;color:#d98a8a;">OFF</span>`;
+    const deact = active
+      ? `<button onclick="_sorterDeactivateDiscount('${escapeHTML(lc.promotion_code_id)}','${escapeHTML(c.code)}')" title="Stop new uses (existing members keep their discount)" style="font-size:10px;font-weight:700;padding:3px 9px;border-radius:7px;border:1px solid var(--border,#2a2a31);background:transparent;color:var(--text-mute,#888);cursor:pointer;">Deactivate</button>`
+      : '';
+    return `<div style="display:flex;align-items:center;gap:8px;border:1px solid var(--border,#2a2a31);border-radius:9px;padding:8px 11px;margin-bottom:7px;flex-wrap:wrap;">
       <span style="font-size:12.5px;font-weight:700;font-family:'JetBrains Mono',monospace;">${escapeHTML(c.code)}</span>
       <span style="font-size:11px;color:var(--text-mute,#888);">${escapeHTML(fmt(c))}</span>
-      <span style="margin-left:auto;font-size:9.5px;font-weight:800;letter-spacing:.3px;padding:2px 8px;border-radius:999px;border:1px solid ${inStripe ? '#1f7a3d' : '#c9871f'};color:${inStripe ? '#7BC47F' : '#e0a93f'};">${inStripe ? '✓ IN STRIPE' : 'NOT CREATED'}</span>
+      <span style="font-size:10px;color:var(--text-mute,#888);opacity:.85;">${escapeHTML(meta.join(' · '))}</span>
+      <span style="margin-left:auto;display:flex;align-items:center;gap:8px;">${deact}${pill}</span>
     </div>`;
   }).join('');
   host.innerHTML = `
@@ -27761,7 +27800,7 @@ function _sorterRenderDiscounts() {
           : `<span style="font-size:10px;font-weight:800;color:#7BC47F;">✓ all in Stripe</span>`}
       </div>
       ${rows}
-      <div style="font-size:10px;color:var(--text-mute,#888);margin-top:4px;">Add or edit codes in the offer's Pricing section; create them here so checkout can apply them.</div>
+      <div style="font-size:10px;color:var(--text-mute,#888);margin-top:4px;">Add or edit codes in the offer's Pricing section; create them here so checkout can apply them. Percent is capped 1-99%; a dollar code that would drop a plan below $1 is rejected.</div>
     </div>`;
 }
 
@@ -27780,15 +27819,34 @@ async function _sorterCreateDiscounts() {
     });
     const json = await _safeJson(r);
     if (!r.ok) throw new Error(_sorterErr(json.error) || ('HTTP ' + r.status));
-    (json.results || []).forEach(res => {
-      if ((res.created || res.exists) && res.code) _SORTER_DISCOUNTS.live.add(String(res.code).toUpperCase());
-    });
     const failed = (json.results || []).filter(x => x.error);
-    _sorterRenderDiscounts();
+    // Reload so the panel reflects real live state (redemptions, limits, active).
+    await _sorterLoadDiscounts();
     if (failed.length) alert('Some codes failed:\n' + failed.map(f => `${f.code}: ${f.error}`).join('\n'));
   } catch (e) {
     _sorterRenderDiscounts();
     alert('Create discount codes failed: ' + _sorterErr(e));
+  }
+}
+
+async function _sorterDeactivateDiscount(promotionCodeId, code) {
+  if (!promotionCodeId) return;
+  if (!confirm(`Deactivate ${code}?\n\nNew customers can no longer use it. Members who already redeemed it keep their discount.`)) return;
+  const host = document.getElementById('pc-sorter-discounts');
+  if (host) host.innerHTML = _sorterLoading('Deactivating…');
+  try {
+    const token = await _mreqAuthToken();
+    const r = await fetch('/api/offers/create-discount', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+      body: JSON.stringify({ client_id: _aiClientId(), deactivate: promotionCodeId }),
+    });
+    const json = await _safeJson(r);
+    if (!r.ok) throw new Error(_sorterErr(json.error) || ('HTTP ' + r.status));
+    await _sorterLoadDiscounts();
+  } catch (e) {
+    _sorterRenderDiscounts();
+    alert('Deactivate failed: ' + _sorterErr(e));
   }
 }
 
