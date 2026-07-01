@@ -3031,14 +3031,19 @@ async function handleMetaOverview(req, res) {
 
   // Budget-confirmation status per client, from the "budget-review" ticket the
   // marketing team sends ("confirm your monthly budgets"). Newest ticket per
-  // client wins: responded = client filled it out (green), requested = sent but
-  // not filled (orange), no ticket = never sent (grey).
+  // client wins:
+  //   complete   = ticket marked completed (client confirmed + team actioned) → green check
+  //   confirmed  = client filled it out but ticket not done yet → red flag "needs action"
+  //   requested  = sent but client hasn't filled it → orange dot
+  //   (no ticket) = never sent → grey dot (falls back to "none")
   const budgetStatusById = {};
   try {
-    const bt = await sb(`marketing_tickets?type=eq.budget-review&select=client_id,client_action_status,submitted_at&order=submitted_at.desc`);
+    const bt = await sb(`marketing_tickets?type=eq.budget-review&select=client_id,client_action_status,status,submitted_at&order=submitted_at.desc`);
     for (const t of (bt || [])) {
       if (budgetStatusById[t.client_id]) continue; // first = newest
-      budgetStatusById[t.client_id] = t.client_action_status === "responded" ? "confirmed" : "requested";
+      budgetStatusById[t.client_id] = t.status === "completed" ? "complete"
+        : t.client_action_status === "responded" ? "confirmed"
+        : "requested";
     }
   } catch { /* leave map empty — every client falls back to "none" */ }
 
