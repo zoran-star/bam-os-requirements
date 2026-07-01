@@ -14,7 +14,7 @@ import { withSentryApiRoute } from "./_sentry.js";
 
 import { pickGhlToken, ghl } from "./ghl/_core.js";
 import { nurtureStage, interestedStage, scheduledTrialContactIdSetCached } from "./agent/_stage.js";
-import { moveStage, setStatus } from "./agent/_store.js";
+import { moveStage, setStatus, findOpenOpp as findOpenOppStore } from "./agent/_store.js";
 import { nextSessionLabel } from "./_next_session.js";
 import { sendOn } from "./_send.js";
 import { renderEmail } from "./email-shells.js";
@@ -160,13 +160,12 @@ export async function isAutomationLive(clientId, automationKey) {
   } catch (_) { return false; }
 }
 
-// Find a contact's open opportunity id (for the ghosted->nurture stage move).
-async function findOpenOppId(token, locationId, contactId) {
-  try {
-    const d = await ghl("GET", `/opportunities/search?${new URLSearchParams({ location_id: locationId, contact_id: String(contactId), limit: "20" })}`, { token });
-    const opps = d.opportunities || d.data || [];
-    return (opps.find(o => String(o.status || "").toLowerCase() === "open") || opps[0] || null)?.id || null;
-  } catch (_) { return null; }
+// Find a contact's open opportunity (provider-aware). Returns an oppRef
+// { id?, ghlOpportunityId? } | null — store on provider='portal' (so portal-native
+// opps are found), GHL search otherwise. Best-effort: null on any failure.
+async function findOpenOppRef(clientId, token, locationId, contactId) {
+  try { return await findOpenOppStore({ clientId, ghl, token, locationId, contactId }); }
+  catch (_) { return null; }
 }
 
 // ── the worker: send due jobs, then schedule the next step ──
@@ -246,8 +245,8 @@ async function runWork(res) {
             const creds = await ensureCreds();
             if (creds && creds.token) {
               const is = await interestedStage(creds.token, creds.locationId, { clientId: job.client_id, sb });
-              const oppId = await findOpenOppId(creds.token, creds.locationId, job.contact_id);
-              if (is && oppId) await moveStage({ clientId: job.client_id, ghl, token: creds.token, oppRef: { ghlOpportunityId: oppId }, stage: is, role: "ghosted", contactId: job.contact_id, reason: "intro form sent, no reply - rolled into ghosted" });
+              const oppRef = await findOpenOppRef(job.client_id, creds.token, creds.locationId, job.contact_id);
+              if (is && oppRef) await moveStage({ clientId: job.client_id, ghl, token: creds.token, oppRef, stage: is, role: "ghosted", contactId: job.contact_id, reason: "intro form sent, no reply - rolled into ghosted" });
             }
             await logEvent({ clientId: job.client_id, contactId: job.contact_id, automationId: job.automation_id, type: "form_intro_to_ghosted", payload: { automation_key: a.automation_key } });
             formToGhosted++;
@@ -267,16 +266,17 @@ async function runWork(res) {
               const creds = await ensureCreds();
               if (creds && creds.token) {
                 const ns = await nurtureStage(creds.token, creds.locationId, { clientId: job.client_id, sb });
-                const oppId = await findOpenOppId(creds.token, creds.locationId, job.contact_id);
-                if (ns && oppId) await moveStage({ clientId: job.client_id, ghl, token: creds.token, oppRef: { ghlOpportunityId: oppId }, stage: ns, role: "nurture", contactId: job.contact_id, reason: `${a.automation_key} ran out - rolled into nurture` });
+                const oppRef = await findOpenOppRef(job.client_id, creds.token, creds.locationId, job.contact_id);
+                if (ns && oppRef) await moveStage({ clientId: job.client_id, ghl, token: creds.token, oppRef, stage: ns, role: "nurture", contactId: job.contact_id, reason: `${a.automation_key} ran out - rolled into nurture` });
               }
               await logEvent({ clientId: job.client_id, contactId: job.contact_id, automationId: job.automation_id, type: `${a.automation_key}_to_nurture`, payload: null });
             } else {
               const creds = await ensureCreds();
               if (creds && creds.token) {
-                const oppId = await findOpenOppId(creds.token, creds.locationId, job.contact_id);
-                if (oppId) {
-                  try { await setStatus({ clientId: job.client_id, ghl, token: creds.token, oppRef: { ghlOpportunityId: oppId }, status: "lost", contactId: job.contact_id, reason: "ghosted exhausted, nurture off" }); } catch (_) { /* best-effort */ }
+                const oppRef = await findOpenOppRef(job.client_id, creds.token, creds.locationId, job.contact_id);
+                const oppId = oppRef && (oppRef.ghlOpportunityId || oppRef.id) || null;
+                if (oppRef) {
+                  try { await setStatus({ clientId: job.client_id, ghl, token: creds.token, oppRef, status: "lost", contactId: job.contact_id, reason: "ghosted exhausted, nurture off" }); } catch (_) { /* best-effort */ }
                   try { await sb(`pipeline_outcomes`, { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify([{ client_id: job.client_id, opportunity_id: oppId, status: "lost", reason: "ghosted exhausted, nurture off" }]) }); } catch (_) {}
                   await logEvent({ clientId: job.client_id, contactId: job.contact_id, automationId: job.automation_id, type: "ghosted_exhausted_lost", payload: { opportunity_id: oppId } });
                   ghostedLost++;
@@ -301,9 +301,10 @@ async function runWork(res) {
             if (!tokenCache.has(job.client_id)) tokenCache.set(job.client_id, client ? await pickGhlToken(client) : null);
             const creds = tokenCache.get(job.client_id);
             if (creds && creds.token) {
-              const oppId = await findOpenOppId(creds.token, creds.locationId, job.contact_id);
-              if (oppId) {
-                try { await setStatus({ clientId: job.client_id, ghl, token: creds.token, oppRef: { ghlOpportunityId: oppId }, status: "lost", contactId: job.contact_id, reason: "nurture sequence exhausted" }); } catch (_) { /* best-effort */ }
+              const oppRef = await findOpenOppRef(job.client_id, creds.token, creds.locationId, job.contact_id);
+              const oppId = oppRef && (oppRef.ghlOpportunityId || oppRef.id) || null;
+              if (oppRef) {
+                try { await setStatus({ clientId: job.client_id, ghl, token: creds.token, oppRef, status: "lost", contactId: job.contact_id, reason: "nurture sequence exhausted" }); } catch (_) { /* best-effort */ }
                 try { await sb(`pipeline_outcomes`, { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify([{ client_id: job.client_id, opportunity_id: oppId, status: "lost", reason: "nurture sequence exhausted" }]) }); } catch (_) {}
                 await logEvent({ clientId: job.client_id, contactId: job.contact_id, automationId: job.automation_id, type: "nurture_exhausted_lost", payload: { opportunity_id: oppId } });
                 nurtureLost++;

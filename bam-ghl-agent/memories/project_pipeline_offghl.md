@@ -35,19 +35,32 @@ Removed the now-redundant separate `shadowMirrorMove` calls (moveStage/setStatus
 internally on the ghl branch). V1-safe: provider='ghl' + shadow=false → identical PUT, no mirror.
 Opp CREATION already goes through provider-aware `createOpp` (website/leads.js:264).
 
-## STILL ON GHL — the find-opp READS (next step)
-The agent/automation/leads paths still LOCATE the opp via `ghl GET /opportunities/search`
-(by contact_id) before the (now portal) write. Two consequences:
-1. GTA still calls GHL once per pipeline action (a read).
-2. **Portal-native opps (no `ghl_opportunity_id`) are INVISIBLE to these paths** — the GHL
-   search can't find them, so agents/automations skip them. Found 8 such open opps for GTA
-   on 2026-07-01 (test dupes: Michael ×4, Yvette ×2, Monica ×2). New provider='portal' opps
-   are all portal-native, so this must be fixed for the cutover to be complete.
-Fix: replace the find-opp searches with the provider-aware `findOpenOpp` (returns an oppRef),
-and thread the oppRef OBJECT into moveStage/setStatus (NOT `{ghlOpportunityId: oppId}` — for a
-portal-native row oppRefFilter must match on `id`). Variants to reconcile: agent-confirm.js /
-agent-closing.js have a LOCAL `findOpenOpp(token,locationId,contactId)→id string`; automations.js
-has a local `findOpenOppId(...)→id`; agent-approvals.js has 4 inline GHL searches.
+## Find-opp READS cutover — DONE 2026-07-01 (2nd PR) + duplicate-bug fix
+Migrated the find-opp locators from `ghl /opportunities/search` to the provider-aware
+`findOpenOpp` (returns an oppRef), threading the oppRef OBJECT into moveStage/setStatus (NOT
+`{ghlOpportunityId: oppId}` — for a portal-native row oppRefFilter must match on `id`). Sites:
+- `agent-confirm.js` / `agent-closing.js`: local `findOpenOpp` helper made provider-aware
+  (now `(clientId, token, locationId, contactId)` → oppRef; delegates to `findOpenOpp as
+  findOpenOppStore`); all callers thread oppRef.
+- `automations.js`: local `findOpenOppId` → `findOpenOppRef` (provider-aware, returns oppRef).
+- `agent-approvals.js`: 4 inline GHL searches → `findOpenOpp({clientId,ghl,token,locationId,contactId})`.
+- `website/leads.js` `placeOpportunity`: the **EXISTENCE check** (create-vs-move) was the
+  DUPLICATE-BUG ROOT CAUSE — it searched GHL, never found the portal-native opp, and created a
+  NEW one every intake (Michael had 4 cards, Monica/Yvette 2 each — all REAL 2026-07-01 leads,
+  not test data). Now provider-aware: portal academies look in the store (findOpenOpp), so an
+  existing opp is found + moved instead of duplicated. Cleaned up the 5 dup rows via SQL
+  (kept each person's scheduled_trial). Every other academy keeps the exact GHL search.
+
+## STILL ON GHL — deeper opp-find sites (final smaller batch)
+These locate/read the opp from GHL and would miss portal-native opps; more involved than a
+plain find (they read opp FIELDS or have their own flow), so left for a focused pass:
+- `api/ghl/post-trial.js` (206,222): receives an `oppId` input, then `ghl GET /opportunities/{id}`
+  to read contactId+pipelineId. Portal-native id → 404. Needs a store read of those fields.
+- `api/stripe/webhook.js` (214): marks WON on payment — find logic to check.
+- `api/twilio/inbound-webhook.js` (150) + `api/resend/inbound-webhook.js` (185): responded-bounce
+  on reply — GHL `/opportunities/search` + reads `opp.pipelineStageId` for the ghost-stage guard.
+  Guarded by `if (opp)`, so portal-native just doesn't bounce (not breaking). Lower priority.
+- `api/ghl/inbound-webhook.js` (195,287): GHL-messaging academies only — NOT GTA. Leave.
 
 ## Also still on GHL for the pipeline layer (deferred, Zoran's call)
 - **KPIs** (api/kpis-v15.js) and **calendars/booking** (api/ghl/calendars-v15.js) still read GHL

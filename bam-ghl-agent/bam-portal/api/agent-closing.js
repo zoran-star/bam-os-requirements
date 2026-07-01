@@ -36,7 +36,7 @@ import {
   doneTrialContactIdSetCached, peekDoneTrialIdSet, nurtureStage, toIso,
 } from "./agent/_stage.js";
 import { enrollContact, isAutomationLive, resolveContactInfo } from "./automations.js";
-import { moveStage, setStatus } from "./agent/_store.js";
+import { moveStage, setStatus, findOpenOpp as findOpenOppStore } from "./agent/_store.js";
 import {
   DEFAULT_CLOSING_AUTOMATIONS, getClosingAutomations,
   automationsLive as closingAutomationsLive, nextDueStep as nextDueClosingStep,
@@ -354,11 +354,11 @@ async function fireScriptedStep({ client, token, mode, autos, item, contactId })
   return "queued";
 }
 
-// Find a contact's open opportunity (for stage moves + outcome logging).
-async function findOpenOpp(token, locationId, contactId) {
-  const d = await ghl("GET", `/opportunities/search?${new URLSearchParams({ location_id: locationId, contact_id: contactId, limit: "20" })}`, { token });
-  const opps = d.opportunities || d.data || [];
-  return (opps.find(o => String(o.status || "").toLowerCase() === "open") || opps[0] || null)?.id || null;
+// Find a contact's open opportunity (provider-aware). Returns an oppRef
+// { id?, ghlOpportunityId? } | null. On provider='portal' it reads the store (so
+// portal-native opps with no GHL id are found); on 'ghl' it searches GHL as before.
+async function findOpenOpp(clientId, token, locationId, contactId) {
+  return await findOpenOppStore({ clientId, ghl, token, locationId, contactId });
 }
 
 // Cancel a contact's open closing cards (after enroll / lost / leaving the stage).
@@ -710,7 +710,7 @@ async function handler(req, res) {
       // Resolve the opp (for the link param + the note) but DON'T change its status —
       // the enroll flow's webhook owns the win on real payment.
       let oppId = null;
-      try { oppId = await findOpenOpp(token, locationId, contactId); } catch (_) {}
+      try { const _r = await findOpenOpp(clientId, token, locationId, contactId); oppId = _r && (_r.ghlOpportunityId || _r.id) || null; } catch (_) {}
       // Append identifiers so payment ties back to THIS opportunity (harmless extra
       // query params until the enroll page/checkout read them — P2b-plus, cross-repo).
       let enrollUrl = signupUrl;
@@ -757,10 +757,10 @@ async function handler(req, res) {
         contactId = row.ghl_contact_id;
       }
       if (!contactId) return res.status(400).json({ error: "ready_id or contact_id required" });
-      let oppId = null;
-      try { oppId = await findOpenOpp(token, locationId, contactId); }
-      catch (e) { return res.status(e.status || 502).json({ error: `GHL find opp: ${e.message}` }); }
-      if (!oppId) return res.status(200).json({ error: "No opportunity found for this contact — nothing to mark lost." });
+      let oppId = null, oppRef = null;
+      try { oppRef = await findOpenOpp(clientId, token, locationId, contactId); oppId = oppRef && (oppRef.ghlOpportunityId || oppRef.id) || null; }
+      catch (e) { return res.status(e.status || 502).json({ error: `find opp: ${e.message}` }); }
+      if (!oppRef) return res.status(200).json({ error: "No opportunity found for this contact — nothing to mark lost." });
       const closing = (typeof b.reply === "string" ? b.reply : (row ? row.draft_message : "")) || "";
       if (closing.trim()) { try { await sendReplyViaGhl(token, contactId, closing.trim(), clientId); } catch (_) {} }
       const reason = (b.lost_reason || (row && row.lost_reason) || "").toString().trim() || null;
@@ -772,14 +772,14 @@ async function handler(req, res) {
         if (await isAutomationLive(clientId, "nurture")) {
           const ns = await nurtureStage(token, locationId, { clientId, sb });
           if (ns) {
-            await moveStage({ clientId, ghl, token, oppRef: { ghlOpportunityId: oppId }, stage: ns, role: "nurture", contactId, reason });
+            await moveStage({ clientId, ghl, token, oppRef, stage: ns, role: "nurture", contactId, reason });
             await enrollContact({ clientId, automationKey: "nurture", contactId });
             routedToNurture = true;
           }
         }
       } catch (_) { /* fall through to status=lost */ }
       if (!routedToNurture) {
-        try { await setStatus({ clientId, ghl, token, oppRef: { ghlOpportunityId: oppId }, status: "lost", contactId, reason }); }
+        try { await setStatus({ clientId, ghl, token, oppRef, status: "lost", contactId, reason }); }
         catch (e) { return res.status(e.status || 502).json({ error: `mark lost: ${e.message}` }); }
       }
       try { await sb(`pipeline_outcomes`, { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify([{ client_id: clientId, opportunity_id: oppId, status: routedToNurture ? "nurture" : "lost", reason }]) }); } catch (_) {}
