@@ -51,14 +51,24 @@ export default function MarketingOverview({ tokens, session }) {
 
   const bm = data.benchmarks || { cpl: 25 };
   const verdictColor = (v) => v === "strong" ? t.green : v === "attention" ? t.amber : v === "steady" ? t.accent : t.textMute;
-  // Budget-confirmation status. confirmed = client filled out the "confirm your
-  // monthly budgets" request (green check), requested = sent but not filled yet
-  // (orange dot), none = never sent (grey dot).
+  // Budget-confirmation status per client, from the "confirm your monthly
+  // budgets" request:
+  //   complete  = ticket done (green check "Confirmed")
+  //   confirmed = client filled it out but ticket not actioned yet
+  //               (red exclamation "Confirmed, needs action")
+  //   requested = sent but not filled yet (orange dot "Sent, awaiting")
+  //   none      = never sent (grey dot "Not sent")
   const budgetStatusCell = (s) => {
-    if (s === "confirmed") return (
+    if (s === "complete") return (
       <span style={{ display: "inline-flex", alignItems: "center", gap: 7 }}>
         <span style={{ color: t.green, fontSize: 13, lineHeight: 1 }}>✓</span>
         <span style={{ fontSize: 12, color: t.textSub }}>Confirmed</span>
+      </span>
+    );
+    if (s === "confirmed") return (
+      <span style={{ display: "inline-flex", alignItems: "center", gap: 7 }}>
+        <span style={{ color: t.red, fontSize: 13, lineHeight: 1, fontWeight: 700 }}>!</span>
+        <span style={{ fontSize: 12, color: t.red }}>Confirmed, needs action</span>
       </span>
     );
     const requested = s === "requested";
@@ -82,7 +92,7 @@ export default function MarketingOverview({ tokens, session }) {
   const attention = rows.filter(r => r.attention).map(r => ({ name: r.business_name, reason: reasonFor(r, bm) }));
 
   function exportCSV() {
-    const budgetStatusLabel = (s) => s === "confirmed" ? "Confirmed" : s === "requested" ? "Sent, awaiting" : "Not sent";
+    const budgetStatusLabel = (s) => s === "complete" ? "Confirmed" : s === "confirmed" ? "Confirmed, needs action" : s === "requested" ? "Sent, awaiting" : "Not sent";
     const head = ["Client", "Verdict", "Spend", "Leads", "CPL", "Goal CPL", "Budget", "Leads vs last %", "CPL vs last %", "Spent % of budget", "Budget status"];
     const lines = rows.map(r => [
       r.business_name, r.needs_campaigns ? "Needs campaigns" : r.connected ? (r.verdict_label || "") : "Not connected",
