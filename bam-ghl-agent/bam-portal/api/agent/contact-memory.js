@@ -1,3 +1,5 @@
+import { contactsReadTable } from "../_contacts.js";
+
 // Per-contact memory → a <contact_memory> block injected into the agent's
 // system prompt so it personalizes per person. Assembled from:
 //   • ghl_contacts mirror  (athlete name, tags, FORM custom fields)
@@ -29,7 +31,7 @@ export async function loadContactMemory(sb, clientId, contactId, opts = {}) {
   let contact = null, ptr = null, notes = [];
   try {
     [contact, ptr, notes] = await Promise.all([
-      sb(`ghl_contacts?client_id=eq.${clientId}&ghl_contact_id=eq.${cid}&select=name,athlete_name,tags,custom_fields&limit=1`).then(r => (Array.isArray(r) ? r[0] : null)).catch(() => null),
+      sb(`${await contactsReadTable(clientId)}?client_id=eq.${clientId}&ghl_contact_id=eq.${cid}&select=name,athlete_name,tags,custom_fields&limit=1`).then(r => (Array.isArray(r) ? r[0] : null)).catch(() => null),
       sb(`post_trial_reviews?client_id=eq.${clientId}&ghl_contact_id=eq.${cid}&select=showed_up,good_fit,trainer,notes,created_at&order=created_at.desc&limit=1`).then(r => (Array.isArray(r) ? r[0] : null)).catch(() => null),
       sb(`agent_contact_notes?client_id=eq.${clientId}&ghl_contact_id=eq.${cid}&active=eq.true&select=note,created_by,created_at&order=created_at.desc&limit=20`).then(r => (Array.isArray(r) ? r : [])).catch(() => []),
     ]);
