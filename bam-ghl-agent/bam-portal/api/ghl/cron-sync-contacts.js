@@ -16,6 +16,7 @@ import { withSentryApiRoute } from "../_sentry.js";
 //   - Global function timeout: 270s (Vercel Pro = 5min, we leave headroom)
 
 import { timingSafeEqual } from "node:crypto";
+import { bulkUpsertPortalContacts } from "../_contacts.js";
 
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
@@ -191,6 +192,11 @@ async function syncContactsForAcademy(client, deadline) {
           headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
           body: JSON.stringify(mirrorRows),
         }).catch(() => {});
+        // Dual-write the same contacts into the portal-native store (dormant).
+        // synced_at is a ghl_contacts-only column; drop it and tag provenance.
+        await bulkUpsertPortalContacts(
+          mirrorRows.map(({ synced_at, ...r }) => ({ ...r, source: "sync" })),
+        );
       }
     }
 

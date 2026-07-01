@@ -1,0 +1,38 @@
+# Portal-native contacts store (off-GHL contacts)
+
+**2026-06-30: PR 1 landed (dormant foundation).** Sibling of [[project_pipeline_store_cutover]] and [[project_twilio_messaging_spine]] - same own-store pattern (provider toggle + `ghl_*` bridge + backfill). This note = the contacts/people system-of-record only. Inbound email/social DMs are a separate effort (still on GHL).
+
+## Current state (2026-06-30)
+- **Dormant.** Nothing reads `public.contacts` yet. Every academy `contact_provider='ghl'`. Zero behavior change. V1/V1.5 untouched.
+- Migration `20260630210000_contacts_store_foundation.sql` applied to prod directly (like the pipeline/messaging foundations, it is NOT in the remote `list_migrations` history - git file is the record; applied via MCP execute_sql).
+- Backfill from `ghl_contacts` ran on prod: **GTA = 1,701 contacts** (exact match to source), 53,156 all-academy total.
+
+## The toggle
+- `clients.contact_provider` ('ghl' | 'portal'), checked constraint. Default 'ghl'. Flip to 'portal' only after portal writes dual-write to GHL + reconcile.
+
+## The store - `public.contacts`
+- Portal UUID `id` = the intended new join key. `ghl_contact_id` = reconciliation bridge (unique per client_id), lines up with `members.ghl_contact_id`, `opportunities.ghl_contact_id`, `website_leads.ghl_contact_id`, inbox.
+- Columns mirror `ghl_contacts`: first/last/name, email, phone, athlete_name, tags[], dnd, stripe_customer_id, date_added + `source` ('ghl-import' for backfill) + `custom_fields` jsonb (opaque GHL blob carried forward until the field-defs PR).
+- RLS mirrors sibling stores: select = `is_staff() or client_id in (select my_client_ids())`; write = `is_staff()`.
+- Indexes: client_id, (client_id, ghl_contact_id), (client_id, lower(email)), (client_id, phone), gin(tags), stripe_customer_id.
+
+## P2 done (2026-06-30, dormant) - contact_id FK added + backfilled
+- `contact_id uuid references contacts(id) on delete set null` on **members, website_leads, opportunities** (+ index each). Migration `20260630211000`. Nothing reads it yet; code still joins on `ghl_contact_id` (byte-identical).
+- GTA backfill coverage: members 34/39 (5 have no ghl_contact_id = portal-native), website_leads 36/81, opportunities 13/30.
+- **FINDING: the `ghl_contacts` mirror is INCOMPLETE.** 45 leads + 17 opps reference GHL contact IDs that are NOT in `ghl_contacts` (so not in `contacts` either). The mirror/cron doesn't cover every contact. Fix = create contact rows from lead/opp data in P3 (portal owns creation), OR do a fuller GHL pull. Until then those rows dual-read via `ghl_contact_id`.
+- Inbox tables (`ghl_inbound_messages`, `inbox_message_log`, `ghl_conversation_reads`) NOT repointed yet - deferred to the inbox effort.
+
+## P3 done (2026-07-01, dormant) - gap closed + dual-write live paths
+- **P3a (data, migration `20260701120000`):** materialized contacts from website_leads + opportunities own fields for rows whose GHL id was never mirrored, then re-linked. GTA now website_leads 81/81 + opportunities 30/30 linked.
+- **P3b (code):** new `api/_contacts.js` = `upsertPortalContact(clientId, ghlContactId, fields)` (returns portal id) + `bulkUpsertPortalContacts(rows)`. Best-effort, only writes `public.contacts`, NEVER calls GHL (dormant-safe). `clean()` drops empty values so sparse callers don't null good data under merge-duplicates. Wired at 4 paths: `onboarding/activations.js` (member enroll + links members.contact_id), `website/leads.js` (receipt stamp + links website_leads.contact_id), `website/ch3-lead.js` (CH3 upsert), `ghl/cron-sync-contacts.js` (V1.5 bulk mirror). **Goes live on merge+deploy** - smoke-test a website lead + a signup after deploy to confirm a contacts row lands.
+
+## NOT built yet (next PRs, in order)
+1. ~~Repoint joins~~ **DONE (P2).** 2. ~~Portal writes + dual-write~~ **DONE (P3).**
+3. **P4a DONE (2026-07-01, dormant, migration `20260701130000`):** `custom_field_defs` (per academy: key/label/type/options/position/required/archived + `ghl_field_id` bridge, unique client_id+key) + `contact_field_values` (typed value per contact+field, RLS joins to contacts). Empty, nothing reads them.
+   **P4b NOT built (needs design pass):** Settings UI to manage defs; migrate the opaque `contacts.custom_fields` GHL blob into typed values (needs a per-academy GHL custom-field-id -> label map, read from GHL `/locations/{id}/customFields`); feed `api/email-shells.js resolveMergeVars` from defs/values.
+4. **Flip `contact_provider='portal'` + stop `cron-sync-contacts.js`.** BLOCKED until inbound email + social DMs leave GHL (GHL needs the contact to thread an incoming reply).
+3. **Owner-managed custom-field definitions** - new `custom_field_defs` + values tables + Settings UI; migrate the opaque GHL blob into real defs. Feeds the portal merge-var resolver (`api/email-shells.js resolveMergeVars`).
+4. **Flip `contact_provider='portal'` + stop the inbound `cron-sync-contacts.js`.** BLOCKED until inbound email + social DMs also leave GHL (GHL needs the contact to exist to thread an incoming IG DM / email reply).
+
+## PRs
+- **#959:** PR 1 - foundation (`contact_provider` toggle, `contacts` table + RLS + indexes, backfill from `ghl_contacts`).

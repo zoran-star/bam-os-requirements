@@ -33,6 +33,7 @@
 import { coachiqOnboardingEnabled, addCoachiqProduct } from "../coachiq.js";
 import { getClientGhlToken } from "../website/availability.js";
 import { isAutomationLive } from "../automations.js";
+import { upsertPortalContact } from "../_contacts.js";
 
 const GHL_V2     = "https://services.leadconnectorhq.com";
 const V2_VERSION = "2021-07-28";
@@ -93,15 +94,37 @@ export async function fireOnboardingActivations(member, ctx = {}) {
       const contactId = (upserted.contact || upserted).id || null;
       if (!contactId) throw new Error("GHL upsert returned no contact id");
 
-      // Link the GHL contact back onto the member row (best-effort). Mutates the in-memory
-      // member so the caller (webhook) can enroll the onboarding automation by this id.
+      // Dual-write the portal-native contact (dormant store) so the member is in
+      // our own contacts table too, then link it onto the member row. Best-effort.
+      const portalContactId = await upsertPortalContact(member.client_id, contactId, {
+        first_name:         nameParts[0] || null,
+        last_name:          nameParts.slice(1).join(" ") || null,
+        name:               (member.parent_name || "").trim() || null,
+        email:              member.parent_email.toLowerCase(),
+        phone:              member.parent_phone || null,
+        athlete_name:       member.athlete_name || null,
+        stripe_customer_id: member.stripe_customer_id || null,
+        tags:               ["website-enrollment"],
+        source:             "website-enrollment",
+      });
+
+      // Link the GHL contact (and the portal contact) back onto the member row
+      // (best-effort). Mutates the in-memory member so the caller (webhook) can
+      // enroll the onboarding automation by the GHL id.
       if (contactId && !member.ghl_contact_id) {
         try {
           await sb(`members?id=eq.${member.id}`, {
             method: "PATCH", headers: { Prefer: "return=minimal" },
-            body: JSON.stringify({ ghl_contact_id: contactId }),
+            body: JSON.stringify({ ghl_contact_id: contactId, ...(portalContactId ? { contact_id: portalContactId } : {}) }),
           });
           member.ghl_contact_id = contactId;
+        } catch (_) { /* non-fatal */ }
+      } else if (portalContactId) {
+        try {
+          await sb(`members?id=eq.${member.id}`, {
+            method: "PATCH", headers: { Prefer: "return=minimal" },
+            body: JSON.stringify({ contact_id: portalContactId }),
+          });
         } catch (_) { /* non-fatal */ }
       }
 
