@@ -62,11 +62,28 @@ portal id. So joins never change - only the id's origin does.
    names match, tags match). No frontend reads `ghl_contacts` directly. leads.js already
    dual-writes the store + portal-routes automations, so new leads land in the store even
    with the cron gated.
-4. **Portal-native creation** (LAST - the last GHL touch) - new leads created in the store
-   with a portal-minted id (no GHL /contacts/upsert); mint flows into the join key. The
-   GHL note + conversation calls in leads.js also drop for portal. GHL workflow enrollment
-   is already gated per-academy (maybePortalRoute skips it when portal automations are ON).
+4. **Portal-native creation** - DONE 2026-07-01 (4th PR). New contacts are found-or-minted
+   in the store via `resolveOrMintPortalContact(clientId, fields)` (in `_contacts.js`):
+   match by email (preferred) or phone -> merge-update + reuse the existing join id (a
+   legacy person keeps their real GHL id, history stays joined); else MINT one uuid used
+   as BOTH `contacts.id` and `contacts.ghl_contact_id` - the minted id flows through the
+   system-wide join key with no schema change. Gated sites (provider='portal' branch):
+   - `website/leads.js` pushToGhl: mints in the store; GHL note + conversation skipped
+     (message lives on website_leads + mapped custom_fields); GHL workflow fallback gated.
+   - `onboarding/activations.js` (member signup): resolve-or-mint instead of GHL upsert;
+     tags omitted from the follow-up upsertPortalContact (it REPLACES arrays - the mint
+     already union-merged); legacy GHL workflow fallback gated.
+   - `website/onboarding.js` (ADAPT waiver): mint + stamp lead; GHL note/convo/workflow skipped.
+   - Inbound webhooks create no contacts (read-only resolution) - nothing to gate.
+   **THE ONE RESIDUAL (requireGhl)**: a lead submission WITH a calendar booking still does
+   the GHL /contacts/upsert, because `POST /calendars/events/appointments` needs a real GHL
+   contact id and CALENDARS ARE STILL ON GHL (Zoran deferred them). Remove when calendars
+   move off GHL. The GHL id still dual-writes to the store, so data stays home either way.
 
-## Status
-- contact_provider = 'ghl' for ALL 44 clients (GTA included). Seam is live but dormant.
-- messaging=twilio, email=resend, pipeline=portal already. Contacts is the last core one.
+## Status - GTA FLIPPED LIVE 2026-07-01
+- GTA contact_provider='portal' (flipped after the cron gate deployed; store verified:
+  1,725 contacts, tags/emails intact, superset of the mirror). All other 43 academies 'ghl'.
+- GTA now: messaging=twilio, email=resend, pipeline=portal, contacts=portal.
+- GHL touches left for GTA contacts: (1) the booking-flow GHL upsert (calendar residual,
+  above), (2) pipeline stage-NAME reads (documented in project_pipeline_offghl). Plus the
+  deferred KPIs + calendars.

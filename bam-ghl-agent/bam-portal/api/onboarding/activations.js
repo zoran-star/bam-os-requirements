@@ -33,7 +33,7 @@
 import { coachiqOnboardingEnabled, addCoachiqProduct } from "../coachiq.js";
 import { getClientGhlToken } from "../website/availability.js";
 import { isAutomationLive } from "../automations.js";
-import { upsertPortalContact } from "../_contacts.js";
+import { upsertPortalContact, contactProvider, resolveOrMintPortalContact } from "../_contacts.js";
 
 const GHL_V2     = "https://services.leadconnectorhq.com";
 const V2_VERSION = "2021-07-28";
@@ -67,35 +67,59 @@ export async function fireOnboardingActivations(member, ctx = {}) {
       const client = Array.isArray(rows) && rows[0];
       if (!client || !client.ghl_location_id) throw new Error("academy has no GHL location");
 
-      const token = await getClientGhlToken(client);
-      const headers = {
-        Authorization:  `Bearer ${token}`,
-        Version:        V2_VERSION,
-        "Content-Type": "application/json",
-        Accept:         "application/json",
-      };
-
-      // Upsert the contact (GHL matches on email/phone → creates or updates in one call).
       const nameParts = (member.parent_name || "").trim().split(/\s+/);
-      const contactPayload = {
-        locationId: client.ghl_location_id,
-        firstName:  nameParts[0] || undefined,
-        lastName:   nameParts.slice(1).join(" ") || undefined,
-        email:      member.parent_email.toLowerCase(),
-        phone:      member.parent_phone || undefined,
-        source:     "Website enrollment",
-        tags:       ["website-enrollment"],
-      };
-      const upsertRes = await fetch(`${GHL_V2}/contacts/upsert`, {
-        method: "POST", headers, body: JSON.stringify(contactPayload),
-      });
-      if (!upsertRes.ok) throw new Error(`GHL upsert ${upsertRes.status}: ${(await upsertRes.text()).slice(0, 120)}`);
-      const upserted  = await upsertRes.json();
-      const contactId = (upserted.contact || upserted).id || null;
-      if (!contactId) throw new Error("GHL upsert returned no contact id");
+      // Contact provider gate: a 'portal' academy finds-or-mints the member's
+      // contact in the portal store (a trial lead already exists there - possibly
+      // under a real GHL id - and is reused, keeping history joined). No GHL
+      // contact is created. Every 'ghl' academy keeps the exact upsert below.
+      const contactProv = await contactProvider(member.client_id);
+      let headers = null, contactId = null;
+      if (contactProv === "portal") {
+        contactId = await resolveOrMintPortalContact(member.client_id, {
+          first_name:         nameParts[0] || null,
+          last_name:          nameParts.slice(1).join(" ") || null,
+          name:               (member.parent_name || "").trim() || null,
+          email:              member.parent_email.toLowerCase(),
+          phone:              member.parent_phone || null,
+          athlete_name:       member.athlete_name || null,
+          stripe_customer_id: member.stripe_customer_id || null,
+          tags:               ["website-enrollment"],
+          source:             "website-enrollment",
+        });
+        if (!contactId) throw new Error("portal contact mint failed");
+      } else {
+        const token = await getClientGhlToken(client);
+        headers = {
+          Authorization:  `Bearer ${token}`,
+          Version:        V2_VERSION,
+          "Content-Type": "application/json",
+          Accept:         "application/json",
+        };
 
-      // Dual-write the portal-native contact (dormant store) so the member is in
-      // our own contacts table too, then link it onto the member row. Best-effort.
+        // Upsert the contact (GHL matches on email/phone → creates or updates in one call).
+        const contactPayload = {
+          locationId: client.ghl_location_id,
+          firstName:  nameParts[0] || undefined,
+          lastName:   nameParts.slice(1).join(" ") || undefined,
+          email:      member.parent_email.toLowerCase(),
+          phone:      member.parent_phone || undefined,
+          source:     "Website enrollment",
+          tags:       ["website-enrollment"],
+        };
+        const upsertRes = await fetch(`${GHL_V2}/contacts/upsert`, {
+          method: "POST", headers, body: JSON.stringify(contactPayload),
+        });
+        if (!upsertRes.ok) throw new Error(`GHL upsert ${upsertRes.status}: ${(await upsertRes.text()).slice(0, 120)}`);
+        const upserted  = await upsertRes.json();
+        contactId = (upserted.contact || upserted).id || null;
+        if (!contactId) throw new Error("GHL upsert returned no contact id");
+      }
+
+      // Write the member fields onto the portal contact row (merge-duplicates; for
+      // 'ghl' academies this is the dual-write, for 'portal' it ensures member
+      // extras like stripe_customer_id land) and get contacts.id for the link.
+      // NOTE: tags are omitted on the portal branch - upsertPortalContact REPLACES
+      // the array, and resolveOrMintPortalContact already union-merged them.
       const portalContactId = await upsertPortalContact(member.client_id, contactId, {
         first_name:         nameParts[0] || null,
         last_name:          nameParts.slice(1).join(" ") || null,
@@ -104,7 +128,7 @@ export async function fireOnboardingActivations(member, ctx = {}) {
         phone:              member.parent_phone || null,
         athlete_name:       member.athlete_name || null,
         stripe_customer_id: member.stripe_customer_id || null,
-        tags:               ["website-enrollment"],
+        ...(contactProv === "portal" ? {} : { tags: ["website-enrollment"] }),
         source:             "website-enrollment",
       });
 
@@ -141,7 +165,10 @@ export async function fireOnboardingActivations(member, ctx = {}) {
           welcomed_via: "portal_onboarding_automation",
           note: "portal onboarding sequence live; GHL workflow skipped" };
         await audit("onboarding-ghl-contact-linked", { contact_id: contactId, portal_live: true, plan, term });
-      } else if (workflowId) {
+      } else if (workflowId && contactProv !== "portal") {
+        // (portal academies can't take this fallback: their contact id may be a
+        // portal-minted uuid GHL doesn't know, and their welcome runs on the
+        // portal onboarding automation - the warning below flags a dead config.)
         const enrollRes = await fetch(`${GHL_V2}/contacts/${contactId}/workflow/${workflowId}`, {
           method: "POST", headers,
           body: JSON.stringify({ eventStartTime: new Date().toISOString().replace(/\.\d{3}Z$/, "+00:00") }),

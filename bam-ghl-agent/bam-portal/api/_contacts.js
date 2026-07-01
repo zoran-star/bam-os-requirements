@@ -41,6 +41,63 @@ async function post(path, body, prefer) {
   return txt ? JSON.parse(txt) : null;
 }
 
+// PORTAL-NATIVE contact creation (Stage 4 of contacts-off-GHL). Finds the person
+// in the portal store by email (preferred) or phone; if found, merge-updates the
+// row (never clobbering good data) and returns its ghl_contact_id - which for a
+// legacy contact is the real GHL id, keeping every historical join intact. If not
+// found, MINTS a new contact: a fresh uuid used as BOTH contacts.id and
+// contacts.ghl_contact_id, so the minted id flows through the system-wide join key
+// (members/opportunities/threads all key on ghl_contact_id) without any schema
+// change. No GHL call is ever made. Returns the join-key id, or null on failure
+// (callers treat null exactly like a GHL upsert failure).
+export async function resolveOrMintPortalContact(clientId, fields = {}) {
+  try {
+    if (!SB_URL || !SB_KEY || !clientId) return null;
+    const email = (fields.email || "").trim().toLowerCase() || null;
+    const phone = (fields.phone || "").trim() || null;
+    if (!email && !phone) return null;
+
+    // 1. Find an existing person (email beats phone - phones get shared).
+    let row = null;
+    if (email) {
+      const r = await get(`contacts?client_id=eq.${encodeURIComponent(clientId)}&email=eq.${encodeURIComponent(email)}&select=id,ghl_contact_id,tags&limit=1`);
+      row = (Array.isArray(r) && r[0]) || null;
+    }
+    if (!row && phone) {
+      const r = await get(`contacts?client_id=eq.${encodeURIComponent(clientId)}&phone=eq.${encodeURIComponent(phone)}&select=id,ghl_contact_id,tags&limit=1`);
+      row = (Array.isArray(r) && r[0]) || null;
+    }
+
+    const { tags, ...rest } = fields;
+    if (row) {
+      // Merge-update: clean() drops empties so sparse forms never null a name;
+      // tags union case-insensitively with what the contact already has.
+      const patchBody = { ...clean({ ...rest, email }), updated_at: new Date().toISOString() };
+      const have = Array.isArray(row.tags) ? row.tags.map(String) : [];
+      const hset = new Set(have.map((t) => t.toLowerCase()));
+      const add = (Array.isArray(tags) ? tags : []).map((t) => String(t || "").trim()).filter((t) => t && !hset.has(t.toLowerCase()));
+      if (add.length) patchBody.tags = [...have, ...add];
+      await patch(`contacts?id=eq.${row.id}`, patchBody);
+      return row.ghl_contact_id || row.id;
+    }
+
+    // 2. Mint: one uuid = contacts.id = ghl_contact_id (the join key everywhere).
+    const minted = crypto.randomUUID();
+    await post("contacts?select=id", [{
+      id: minted,
+      client_id: clientId,
+      ghl_contact_id: minted,
+      ...clean({ ...rest, email, tags }),
+      date_added: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    }], "return=minimal");
+    return minted;
+  } catch (e) {
+    console.error("[resolveOrMintPortalContact] non-fatal:", e?.message || e);
+    return null;
+  }
+}
+
 // Upsert ONE contact; returns the portal contacts.id (for linking) or null.
 export async function upsertPortalContact(clientId, ghlContactId, fields = {}) {
   try {
