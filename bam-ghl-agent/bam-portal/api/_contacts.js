@@ -71,6 +71,45 @@ async function get(path) {
   return res.json();
 }
 
+async function patch(path, body) {
+  const res = await fetch(`${SB_URL}/rest/v1/${path}`, {
+    method: "PATCH",
+    headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}`, "Content-Type": "application/json", Prefer: "return=minimal" },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) throw new Error(`${res.status}: ${(await res.text()).slice(0, 200)}`);
+}
+
+// Add or remove tags on a portal contact's tags[] (source of truth once flipped).
+// Best-effort + store-only (never calls GHL). Reads the current array, merges
+// case-insensitively, writes it back. No-op if the portal contact row doesn't
+// exist yet (a lead flow / backfill will create it). This is the 'portal' branch
+// of the tag write seam; the 'ghl' branch keeps hitting GHL in _tags.js.
+export async function mergePortalContactTags(clientId, ghlContactId, tags, { remove = false } = {}) {
+  try {
+    if (!SB_URL || !SB_KEY || !clientId || !ghlContactId) return;
+    const list = (Array.isArray(tags) ? tags : [tags]).map((t) => String(t || "").trim()).filter(Boolean);
+    if (!list.length) return;
+    const rows = await get(`contacts?client_id=eq.${encodeURIComponent(clientId)}&ghl_contact_id=eq.${encodeURIComponent(ghlContactId)}&select=id,tags&limit=1`);
+    const row = Array.isArray(rows) && rows[0];
+    if (!row) return;
+    const cur = Array.isArray(row.tags) ? row.tags.map(String) : [];
+    let next;
+    if (remove) {
+      const drop = new Set(list.map((t) => t.toLowerCase()));
+      next = cur.filter((t) => !drop.has(t.toLowerCase()));
+    } else {
+      const have = new Set(cur.map((t) => t.toLowerCase()));
+      next = [...cur];
+      for (const t of list) if (!have.has(t.toLowerCase())) next.push(t);
+    }
+    await patch(`contacts?id=eq.${row.id}`, { tags: next, updated_at: new Date().toISOString() });
+    return next;
+  } catch (e) {
+    console.error("[mergePortalContactTags] non-fatal:", e?.message || e);
+  }
+}
+
 // Read the academy's contact system-of-record: 'ghl' (default) or 'portal' (own
 // contacts store). Best-effort - any hiccup returns 'ghl', so a lookup failure can
 // never silently flip an academy off GHL. This is the READ-side seam: callers pick

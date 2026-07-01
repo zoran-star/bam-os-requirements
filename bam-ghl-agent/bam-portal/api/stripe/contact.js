@@ -123,7 +123,7 @@ async function handler(req, res) {
     if (!customerId) return res.status(200).json({ connected: true, customer: null });
     // Cache the resolved link on the mirror (best-effort) for instant future loads.
     if (ghlContactId && (!cached || cached.stripe_customer_id !== customerId)) {
-      sb(`ghl_contacts?client_id=eq.${clientId}&ghl_contact_id=eq.${encodeURIComponent(ghlContactId)}`, {
+      sb(`${await contactsReadTable(clientId)}?client_id=eq.${clientId}&ghl_contact_id=eq.${encodeURIComponent(ghlContactId)}`, {
         method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ stripe_customer_id: customerId }),
       }).catch(() => {});
     }

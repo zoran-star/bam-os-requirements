@@ -1,5 +1,5 @@
 import { withSentryApiRoute } from "./_sentry.js";
-import { contactsReadTable } from "./_contacts.js";
+import { contactsReadTable, contactProvider, mergePortalContactTags } from "./_contacts.js";
 // V1.5 Contacts tab API.
 //
 //   GET  /api/contacts?client_id=&q=&tag=          search the synced mirror (fast)
@@ -170,6 +170,13 @@ async function handler(req, res) {
       .map(t => String(t).trim()).filter(Boolean);
     if (!contactId) return res.status(400).json({ error: "contact_id required" });
     if (!tags.length) return res.status(400).json({ error: "tag(s) required" });
+    // Provider-aware: a 'portal' academy owns its tags in the contacts store, so
+    // write there and skip GHL entirely. Every other academy keeps the GHL tag
+    // write + mirror refresh below (byte-identical).
+    if ((await contactProvider(clientId)) === "portal") {
+      const next = await mergePortalContactTags(clientId, contactId, tags, { remove: action === "remove-tag" });
+      return res.status(200).json({ ok: true, tags: Array.isArray(next) ? next : [] });
+    }
     const rows = await sb(`clients?id=eq.${clientId}&select=id,ghl_location_id,ghl_access_token,ghl_refresh_token,ghl_token_expires_at&limit=1`);
     const client = Array.isArray(rows) && rows[0];
     if (!client) return res.status(404).json({ error: "academy not found" });

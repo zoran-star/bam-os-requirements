@@ -12,6 +12,7 @@
 
 import { withSentryApiRoute } from "../_sentry.js";
 import { moveStage, pipelineFlags } from "../agent/_store.js";
+import { contactProvider } from "../_contacts.js";
 import { enrollContact, isAutomationLive } from "../automations.js";
 
 const SUPABASE_URL = (process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || "").trim();
@@ -146,8 +147,13 @@ async function handler(req, res) {
     });
   } catch (e) { return res.status(500).json({ error: `save review: ${e.message}` }); }
 
+  // Contact provider gate: a 'portal' academy owns attendance + trainer in its own
+  // tables (post_trial_reviews above, contact_trainers below), so the redundant GHL
+  // custom-field writes are skipped for it. Every other academy keeps writing GHL.
+  const contactProv = await contactProvider(clientId);
+
   // Write attendance to the "Did the Athlete show up?" field (non-fatal).
-  if (contactId && showedUp !== null) {
+  if (contactId && showedUp !== null && contactProv !== "portal") {
     try {
       const cf = (await ghl("GET", `/locations/${encodeURIComponent(client.ghl_location_id)}/customFields`, { token })).customFields || [];
       const f = cf.find(x => /did the athlete show up|showed up|attended/i.test(x.name || ""));
@@ -238,7 +244,7 @@ async function handler(req, res) {
     } catch (e) { console.error("done-trial move failed (non-fatal):", e.message); }
 
     // Write the trainer to the contact's "Lead Sales Person" field (GTA convention).
-    if (contactId && trainer) {
+    if (contactId && trainer && contactProv !== "portal") {
       try {
         const cf = (await ghl("GET", `/locations/${encodeURIComponent(client.ghl_location_id)}/customFields`, { token })).customFields || [];
         const lsp = cf.find(f => /lead sales person/i.test(f.name || "")) || cf.find(f => /sales person|trainer/i.test(f.name || ""));
