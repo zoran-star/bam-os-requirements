@@ -22756,6 +22756,14 @@ function _renderMembersView() {
         100% { background: transparent; border-color: var(--border); box-shadow: none; }
       }
       .member-card-flash { animation: mcGoldFlash 1.8s ease-out; }
+      /* Cancel: slide the card away to the right, fade, then collapse its height so
+         the roster closes the gap smoothly before the refetch removes it for good. */
+      @keyframes mcSlideAway {
+        0%   { transform: translateX(0);    opacity: 1; }
+        45%  { transform: translateX(52px); opacity: 0; max-height: 260px; margin-top: 0; }
+        100% { transform: translateX(52px); opacity: 0; max-height: 0; margin: 0; padding-top: 0; padding-bottom: 0; border-width: 0; }
+      }
+      .member-card-removing { animation: mcSlideAway 0.5s cubic-bezier(.4,0,.2,1) forwards; overflow: hidden; pointer-events: none; }
       /* Updating: dim + spinner while the change saves and the roster refetches. */
       .member-card-updating { position: relative; pointer-events: none; }
       .member-card-updating > *:not(.member-card-spin) { opacity: 0.45; }
@@ -22892,7 +22900,7 @@ function _memberCardHtml(m) {
   const flash    = _MEMBERS_FLASH.has(m.id);
   const cls = 'card member-card' + (updating ? ' member-card-updating' : '') + (flash ? ' member-card-flash' : '');
   return `
-    <div class="${cls}" onclick="openMemberPopup('${escapeHTML(m.id)}')">
+    <div class="${cls}" data-member-id="${escapeHTML(m.id)}" onclick="openMemberPopup('${escapeHTML(m.id)}')">
       ${_memberAvatar(m, 38)}
       <div class="member-card-main">
         <div class="member-card-name">${escapeHTML(m.athlete_name || 'Unnamed')}</div>
@@ -31617,6 +31625,10 @@ async function mCancel(memberId, athleteName) {
     await _memberAction(memberId, 'cancel', { reason: vals.reason || null, immediate: vals.when === 'immediate' });
     _plToast('Membership cancelled.');
     closeMemberPopup();
+    // Slide the member's card away before the roster refetches, so the removal reads
+    // as an intentional exit instead of a sudden pop-out.
+    const _card = document.querySelector('.member-card[data-member-id="' + (window.CSS && CSS.escape ? CSS.escape(memberId) : memberId) + '"]');
+    if (_card) { _card.classList.add('member-card-removing'); await new Promise(r => setTimeout(r, 470)); }
     fetchAndRenderMembers();
   } catch (e) { _plToast('Cancel failed: ' + e.message); }
 }
