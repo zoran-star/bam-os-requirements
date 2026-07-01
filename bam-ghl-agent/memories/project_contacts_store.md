@@ -22,9 +22,15 @@
 - **FINDING: the `ghl_contacts` mirror is INCOMPLETE.** 45 leads + 17 opps reference GHL contact IDs that are NOT in `ghl_contacts` (so not in `contacts` either). The mirror/cron doesn't cover every contact. Fix = create contact rows from lead/opp data in P3 (portal owns creation), OR do a fuller GHL pull. Until then those rows dual-read via `ghl_contact_id`.
 - Inbox tables (`ghl_inbound_messages`, `inbox_message_log`, `ghl_conversation_reads`) NOT repointed yet - deferred to the inbox effort.
 
+## P3 done (2026-07-01, dormant) - gap closed + dual-write live paths
+- **P3a (data, migration `20260701120000`):** materialized contacts from website_leads + opportunities own fields for rows whose GHL id was never mirrored, then re-linked. GTA now website_leads 81/81 + opportunities 30/30 linked.
+- **P3b (code):** new `api/_contacts.js` = `upsertPortalContact(clientId, ghlContactId, fields)` (returns portal id) + `bulkUpsertPortalContacts(rows)`. Best-effort, only writes `public.contacts`, NEVER calls GHL (dormant-safe). `clean()` drops empty values so sparse callers don't null good data under merge-duplicates. Wired at 4 paths: `onboarding/activations.js` (member enroll + links members.contact_id), `website/leads.js` (receipt stamp + links website_leads.contact_id), `website/ch3-lead.js` (CH3 upsert), `ghl/cron-sync-contacts.js` (V1.5 bulk mirror). **Goes live on merge+deploy** - smoke-test a website lead + a signup after deploy to confirm a contacts row lands.
+
 ## NOT built yet (next PRs, in order)
-1. ~~Repoint joins~~ **DONE (P2).**
-2. **Portal writes + dual-write to GHL** - contact create/edit + website leads + Stripe signups write `contacts`; still push to GHL (shadow) so inbox/email/social resolve the person. Also close the mirror gap (create contacts for unmatched leads/opps).
+1. ~~Repoint joins~~ **DONE (P2).** 2. ~~Portal writes + dual-write~~ **DONE (P3).**
+3. **P4a DONE (2026-07-01, dormant, migration `20260701130000`):** `custom_field_defs` (per academy: key/label/type/options/position/required/archived + `ghl_field_id` bridge, unique client_id+key) + `contact_field_values` (typed value per contact+field, RLS joins to contacts). Empty, nothing reads them.
+   **P4b NOT built (needs design pass):** Settings UI to manage defs; migrate the opaque `contacts.custom_fields` GHL blob into typed values (needs a per-academy GHL custom-field-id -> label map, read from GHL `/locations/{id}/customFields`); feed `api/email-shells.js resolveMergeVars` from defs/values.
+4. **Flip `contact_provider='portal'` + stop `cron-sync-contacts.js`.** BLOCKED until inbound email + social DMs leave GHL (GHL needs the contact to thread an incoming reply).
 3. **Owner-managed custom-field definitions** - new `custom_field_defs` + values tables + Settings UI; migrate the opaque GHL blob into real defs. Feeds the portal merge-var resolver (`api/email-shells.js resolveMergeVars`).
 4. **Flip `contact_provider='portal'` + stop the inbound `cron-sync-contacts.js`.** BLOCKED until inbound email + social DMs also leave GHL (GHL needs the contact to exist to thread an incoming IG DM / email reply).
 
