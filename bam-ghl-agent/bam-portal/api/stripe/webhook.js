@@ -68,7 +68,7 @@ function nowIso() { return new Date().toISOString(); }
 // enrollment). Both are created `incomplete` and activated on first paid
 // invoice. Keep external subs (CoachIQ/GHL/manual) out of the onboarding path.
 const PORTAL_OWNED_ORIGINS = new Set(["fullcontrol-portal", "fullcontrol-website-enrollment"]);
-function isPortalOwnedOrigin(origin) { return PORTAL_OWNED_ORIGINS.has(origin); }
+export function isPortalOwnedOrigin(origin) { return PORTAL_OWNED_ORIGINS.has(origin); }
 
 async function readRawBody(req) {
   const chunks = [];
@@ -613,6 +613,122 @@ async function handleInvoiceFailed(event, connectedAccount, res) {
 //                                  Stripe auto-resumed billing)
 //   - anything else    → no-op   (every successful invoice fires this
 //                                  event — only act on a real recovery)
+// Activate a portal-owned onboarding member whose first invoice just paid.
+// Extracted from handleInvoiceSucceeded so the reconcile safety-net cron
+// (api/stripe/reconcile-activations.js) can run the EXACT same activation path
+// for members whose invoice.paid webhook never arrived or failed inline. The
+// caller guards on member.status === 'payment_method_required', so this is
+// idempotent (a second run for an already-live member simply won't be invoked).
+// Returns the same result object the webhook responds with.
+export async function activatePortalOnboardingMember({ member, onbSub, inv, connectedAccount }) {
+  const subId  = onbSub.id;
+  const silent = onbSub.metadata.import_silent === "1";
+  inv = inv || {};
+
+  await sb(`members?id=eq.${member.id}`, {
+    method: "PATCH", headers: { Prefer: "return=minimal" },
+    body: JSON.stringify({ status: "live", updated_at: nowIso() }),
+  });
+
+  let pipelineWon = silent ? { skipped: "import_silent" } : null;
+  if (!silent) {
+    pipelineWon = await markOpportunityWon({
+      member, oppIdHint: onbSub.metadata.ghl_opportunity_id, allowContactSearch: true,
+    });
+  }
+
+  let activations = null;
+  if (silent) {
+    activations = { skipped: "import_silent" };
+  } else {
+    try {
+      activations = await fireOnboardingActivations(member, {
+        plan: onbSub.metadata.plan, term: onbSub.metadata.term, sb, writeAudit,
+      });
+    } catch (e) {
+      activations = { error: String((e && e.message) || e) };
+    }
+  }
+
+  let onboardingEnroll = silent ? { skipped: "import_silent" } : null;
+  if (!silent) {
+    try {
+      const cId = (activations && activations.ghl && activations.ghl.contact_id) || member.ghl_contact_id || null;
+      if (cId && await isAutomationLive(member.client_id, "onboarding")) {
+        onboardingEnroll = await enrollContact({ clientId: member.client_id, automationKey: "onboarding", contactId: cId });
+      } else {
+        onboardingEnroll = { skipped: cId ? "onboarding automation not live" : "no ghl contact id" };
+      }
+    } catch (e) {
+      onboardingEnroll = { ok: false, error: String((e && e.message) || e) };
+    }
+  }
+
+  let salesExit = null;
+  try {
+    const exitContactId =
+      (activations && activations.ghl && activations.ghl.contact_id) ||
+      member.ghl_contact_id ||
+      (onbSub.metadata && onbSub.metadata.ghl_contact_id) ||
+      null;
+    if (exitContactId) {
+      salesExit = await exitEnrollment({ clientId: member.client_id, contactId: exitContactId, reason: "converted" });
+    } else {
+      salesExit = { skipped: "no ghl contact id" };
+    }
+  } catch (e) {
+    salesExit = { ok: false, error: String((e && e.message) || e) };
+  }
+
+  let commitmentSchedule = null;
+  try {
+    commitmentSchedule = await maybeAttachCommitmentSchedule({ subId, onbSub, connectedAccount });
+  } catch (e) {
+    commitmentSchedule = { error: String((e && e.message) || e) };
+  }
+
+  let staffNotify = silent ? { skipped: "import_silent" } : null;
+  if (!silent) {
+    try {
+      const cRows = await sb(`clients?id=eq.${member.client_id}&select=id,business_name,ghl_location_id,ghl_access_token,ghl_refresh_token,ghl_token_expires_at,staff_notify_phone&limit=1`);
+      const client = Array.isArray(cRows) && cRows[0];
+      const toPhone = (client && client.staff_notify_phone) || process.env.STAFF_NOTIFY_PHONE || null;
+      const amt = inv.amount_paid != null ? `$${(inv.amount_paid / 100).toFixed(2)}` : "-";
+      if (client) {
+        const signupMsg = `🎉 New signup - ${client.business_name || "academy"}\n`
+          + `Athlete: ${member.athlete_name || "-"}\n`
+          + `Parent: ${member.parent_name || "-"}${member.parent_email ? " · " + member.parent_email : ""}${member.parent_phone ? " · " + member.parent_phone : ""}\n`
+          + `Plan: ${onbSub.metadata.plan || "-"} · ${onbSub.metadata.term || "-"}\n`
+          + `Paid: ${amt} · status LIVE`;
+        if (toPhone) {
+          staffNotify = await sendSms({ client, toPhone, message: signupMsg, contactName: "BAM Staff" });
+        } else {
+          staffNotify = { ok: false, error: "no staff_notify_phone configured" };
+        }
+        // New owner-notification system (per notification_prefs), separate from
+        // the legacy staff_notify_phone SMS above. new_signup = V2; the same
+        // first-payment moment also fires "new payment" (V1.5/V2).
+        notifyOwners(member.client_id, "new_signup", signupMsg).catch(() => {});
+        notifyOwners(member.client_id, "stripe_payment",
+          `💳 New payment: ${member.athlete_name || member.parent_name || "a member"} - ${amt}`).catch(() => {});
+      } else {
+        staffNotify = { ok: false, error: "no staff_notify_phone configured" };
+      }
+    } catch (e) {
+      staffNotify = { ok: false, error: String((e && e.message) || e) };
+    }
+  }
+
+  await writeAudit({
+    client_id: member.client_id, member_id: member.id,
+    action_type: silent ? "import-activated-silent" : "onboarding-activated",
+    args: { invoice_id: inv.id, sub_id: subId, plan: onbSub.metadata.plan, term: onbSub.metadata.term, silent, activations, onboarding_enroll: onboardingEnroll, sales_exit: salesExit, staff_notify: staffNotify, commitment_schedule: commitmentSchedule, pipeline_won: pipelineWon },
+    db_changes: { members: { status: { from: "payment_method_required", to: "live" } } },
+  });
+
+  return { ok: true, action: silent ? "import-activated-silent" : "onboarding-activated", member_id: member.id, activations, onboarding_enroll: onboardingEnroll, sales_exit: salesExit, staff_notify: staffNotify, commitment_schedule: commitmentSchedule, pipeline_won: pipelineWon };
+}
+
 async function handleInvoiceSucceeded(event, connectedAccount, res) {
   const inv = event.data && event.data.object;
   if (!inv) return res.status(200).json({ skipped: "no invoice" });
@@ -636,132 +752,27 @@ async function handleInvoiceSucceeded(event, connectedAccount, res) {
   // it never touches CoachIQ/GHL/manual subs. Non-fatal: an activation failure
   // must never break Stripe webhook handling.
   if (member.status === "payment_method_required" && subId) {
-    let onbSub = null;
-    try { onbSub = await stripeFetch(`/subscriptions/${subId}`, connectedAccount); } catch (_) { onbSub = null; }
+    let onbSub = null, subFetchErr = null;
+    try { onbSub = await stripeFetch(`/subscriptions/${subId}`, connectedAccount); }
+    catch (e) { onbSub = null; subFetchErr = String((e && e.message) || e); }
     if (onbSub && onbSub.metadata && isPortalOwnedOrigin(onbSub.metadata.origin)) {
-      // Silent import: this sub was created by the member-import "take over billing"
-      // step for an EXISTING member, not a new signup. Flip to live, but suppress the
-      // whole welcome side — no GHL workflow enrollment / welcome emails, no CoachIQ
-      // re-grant (they already have access + credits), no "new signup" staff SMS.
-      const silent = onbSub.metadata.import_silent === "1";
-      await sb(`members?id=eq.${member.id}`, {
-        method: "PATCH", headers: { Prefer: "return=minimal" },
-        body: JSON.stringify({ status: "live", updated_at: nowIso() }),
-      });
-      // Pipeline exit: mark the member's GHL opportunity WON now that they're live —
-      // portal-owned, independent of any GHL onboarding workflow. Best-effort. This is
-      // the V2 portal-owned path, so the contact-search fallback is allowed. Skipped for
-      // silent imports (existing members, not new sales-board cards).
-      let pipelineWon = silent ? { skipped: "import_silent" } : null;
-      if (!silent) {
-        pipelineWon = await markOpportunityWon({
-          member,
-          oppIdHint: onbSub.metadata.ghl_opportunity_id,
-          allowContactSearch: true,
-        });
-      }
-      let activations = null;
-      if (silent) {
-        activations = { skipped: "import_silent" };
-      } else {
-        try {
-          activations = await fireOnboardingActivations(member, {
-            plan: onbSub.metadata.plan, term: onbSub.metadata.term, sb, writeAudit,
-          });
-        } catch (e) {
-          activations = { error: String((e && e.message) || e) };
-        }
-      }
-      // Portal-native onboarding welcome sequence (the preferred path over the legacy
-      // GHL workflow). Enroll the new member's GHL contact into the academy's
-      // "onboarding" automation when it's live. fireOnboardingActivations upserts +
-      // links the GHL contact, so we read the id off the activations result / member.
-      // Non-fatal, and skipped for silent imports (existing members, not new signups).
-      let onboardingEnroll = silent ? { skipped: "import_silent" } : null;
-      if (!silent) {
-        try {
-          const cId = (activations && activations.ghl && activations.ghl.contact_id) || member.ghl_contact_id || null;
-          if (cId && await isAutomationLive(member.client_id, "onboarding")) {
-            onboardingEnroll = await enrollContact({ clientId: member.client_id, automationKey: "onboarding", contactId: cId });
-          } else {
-            onboardingEnroll = { skipped: cId ? "onboarding automation not live" : "no ghl contact id" };
-          }
-        } catch (e) {
-          onboardingEnroll = { ok: false, error: String((e && e.message) || e) };
-        }
-      }
-      // C3 fix — exit active SALES sequences on conversion. This payment just made
-      // them a LIVE member, so they must NOT stay enrolled in any sales drip
-      // (nurture / ghosted): otherwise a paying customer keeps getting "we miss you"
-      // texts and the nurture-exhausted branch can later mark them LOST. No
-      // automationKey = exit ALL active sales enrollments for this contact. Idempotent
-      // (no-op if not enrolled / already exited) and best-effort: never blocks
-      // activation. Touches only the portal automation_enrollments table, never GHL.
-      let salesExit = null;
-      try {
-        const exitContactId =
-          (activations && activations.ghl && activations.ghl.contact_id) ||
-          member.ghl_contact_id ||
-          (onbSub.metadata && onbSub.metadata.ghl_contact_id) ||
-          null;
-        if (exitContactId) {
-          salesExit = await exitEnrollment({ clientId: member.client_id, contactId: exitContactId, reason: "converted" });
-        } else {
-          salesExit = { skipped: "no ghl contact id" };
-        }
-      } catch (e) {
-        salesExit = { ok: false, error: String((e && e.message) || e) };
-      }
-      // Commitment terms that "go back to monthly": attach the revert schedule now
-      // that the upfront commitment invoice is paid. Non-fatal.
-      let commitmentSchedule = null;
-      try {
-        commitmentSchedule = await maybeAttachCommitmentSchedule({ subId, onbSub, connectedAccount });
-      } catch (e) {
-        commitmentSchedule = { error: String((e && e.message) || e) };
-      }
-      // Text staff that a new parent just signed up + paid. Non-fatal: an SMS
-      // failure must never break webhook handling. Destination = the academy's
-      // configured staff phone (clients.staff_notify_phone), else env fallback.
-      // Skipped for silent imports (existing members, not new signups).
-      let staffNotify = silent ? { skipped: "import_silent" } : null;
-      if (!silent) {
-        try {
-          const cRows = await sb(`clients?id=eq.${member.client_id}&select=id,business_name,ghl_location_id,ghl_access_token,ghl_refresh_token,ghl_token_expires_at,staff_notify_phone&limit=1`);
-          const client = Array.isArray(cRows) && cRows[0];
-          const toPhone = (client && client.staff_notify_phone) || process.env.STAFF_NOTIFY_PHONE || null;
-          const amt = inv.amount_paid != null ? `$${(inv.amount_paid / 100).toFixed(2)}` : "—";
-          if (client) {
-            const signupMsg = `🎉 New signup — ${client.business_name || "academy"}\n`
-              + `Athlete: ${member.athlete_name || "—"}\n`
-              + `Parent: ${member.parent_name || "—"}${member.parent_email ? " · " + member.parent_email : ""}${member.parent_phone ? " · " + member.parent_phone : ""}\n`
-              + `Plan: ${onbSub.metadata.plan || "—"} · ${onbSub.metadata.term || "—"}\n`
-              + `Paid: ${amt} · status LIVE`;
-            if (toPhone) {
-              staffNotify = await sendSms({ client, toPhone, message: signupMsg, contactName: "BAM Staff" });
-            } else {
-              staffNotify = { ok: false, error: "no staff_notify_phone configured" };
-            }
-            // New owner-notification system (per notification_prefs), separate from
-            // the legacy staff_notify_phone SMS above. new_signup = V2; the same
-            // first-payment moment also fires "new payment" (V1.5/V2).
-            notifyOwners(member.client_id, "new_signup", signupMsg).catch(() => {});
-            notifyOwners(member.client_id, "stripe_payment",
-              `💳 New payment: ${member.athlete_name || member.parent_name || "a member"} — ${amt}`).catch(() => {});
-          } else {
-            staffNotify = { ok: false, error: "no staff_notify_phone configured" };
-          }
-        } catch (e) {
-          staffNotify = { ok: false, error: String((e && e.message) || e) };
-        }
-      }
+      // The parent just paid on the funnel → flip to live + fire all downstream
+      // activations. Shared with the reconcile cron so both paths are identical.
+      const out = await activatePortalOnboardingMember({ member, onbSub, inv, connectedAccount });
+      return res.status(200).json(out);
+    }
+    // A paid member we could NOT activate inline (the subscription fetch failed, e.g.
+    // a Stripe key-scope regression). Record it LOUDLY instead of silently returning —
+    // this is exactly how signups fell into a black hole before. The reconcile cron
+    // (api/stripe/reconcile-activations.js) picks these up and completes activation.
+    if (subFetchErr) {
       await writeAudit({
         client_id: member.client_id, member_id: member.id,
-        action_type: silent ? "import-activated-silent" : "onboarding-activated",
-        args: { invoice_id: inv.id, sub_id: subId, plan: onbSub.metadata.plan, term: onbSub.metadata.term, silent, activations, onboarding_enroll: onboardingEnroll, sales_exit: salesExit, staff_notify: staffNotify, commitment_schedule: commitmentSchedule, pipeline_won: pipelineWon },
-        db_changes: { members: { status: { from: "payment_method_required", to: "live" } } },
-      });
-      return res.status(200).json({ ok: true, action: silent ? "import-activated-silent" : "onboarding-activated", member_id: member.id, activations, onboarding_enroll: onboardingEnroll, sales_exit: salesExit, staff_notify: staffNotify, commitment_schedule: commitmentSchedule, pipeline_won: pipelineWon });
+        action_type: "onboarding-activation-deferred",
+        args: { sub_id: subId, invoice_id: inv.id, error: subFetchErr,
+                note: "invoice.paid received but subscription fetch failed; reconcile cron will retry" },
+      }).catch(() => {});
+      console.warn(`[webhook] onboarding activation DEFERRED for member ${member.id}: sub fetch failed (${subFetchErr}). Reconcile cron will retry.`);
     }
   }
 
