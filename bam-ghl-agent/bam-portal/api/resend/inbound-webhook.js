@@ -18,7 +18,7 @@ import crypto from "node:crypto";
 import { pickGhlToken } from "../ghl/_core.js";
 import { notifyOwners } from "../_notify-owners.js";
 import { respondedStage, interestedStage, nurtureStage } from "../agent/_stage.js";
-import { moveStage } from "../agent/_store.js";
+import { moveStage, pipelineFlags } from "../agent/_store.js";
 import { ghl } from "../ghl/_core.js";
 import { exitEnrollment } from "../automations.js";
 
@@ -171,18 +171,29 @@ async function handler(req, res) {
         const creds = await pickGhlToken(client);
         if (creds) {
           const rs = await respondedStage(creds.token, creds.locationId);
-          const d = await ghl("GET", `/opportunities/search?${new URLSearchParams({ location_id: creds.locationId, contact_id: String(ghlContactId), limit: "20" })}`, { token: creds.token });
-          const opps = d.opportunities || d.data || [];
-          const opp = opps.find((o) => String(o.status || "").toLowerCase() === "open") || null;
-          if (rs && opp) {
-            const curStageId = opp.pipelineStageId || opp.stageId || null;
-            const [is, ns] = await Promise.all([
-              interestedStage(creds.token, creds.locationId).catch(() => null),
-              nurtureStage(creds.token, creds.locationId).catch(() => null),
-            ]);
-            const ghostStageIds = new Set([is && is.stageId, ns && ns.stageId].filter(Boolean));
-            if (ghostStageIds.has(curStageId)) {
-              await moveStage({ clientId, sb, ghl, token: creds.token, oppRef: { ghlOpportunityId: opp.id }, stage: rs, role: "responded", contactId: String(ghlContactId) });
+          const { provider } = await pipelineFlags(clientId).catch(() => ({ provider: "ghl" }));
+          if (rs && provider === "portal") {
+            // Store: read the open opp + its role; bounce to Responded ONLY from a ghost/
+            // nurture stage (same guard, read from the store where the true stage lives).
+            const rows = await sb(`opportunities?client_id=eq.${encodeURIComponent(clientId)}&ghl_contact_id=eq.${encodeURIComponent(String(ghlContactId))}&status=eq.open&select=id,ghl_opportunity_id,stage_role&limit=1`);
+            const opp = Array.isArray(rows) && rows[0];
+            if (opp && (opp.stage_role === "interested" || opp.stage_role === "nurture")) {
+              await moveStage({ clientId, sb, ghl, token: creds.token, oppRef: { id: opp.id, ghlOpportunityId: opp.ghl_opportunity_id }, stage: rs, role: "responded", contactId: String(ghlContactId) });
+            }
+          } else if (rs) {
+            const d = await ghl("GET", `/opportunities/search?${new URLSearchParams({ location_id: creds.locationId, contact_id: String(ghlContactId), limit: "20" })}`, { token: creds.token });
+            const opps = d.opportunities || d.data || [];
+            const opp = opps.find((o) => String(o.status || "").toLowerCase() === "open") || null;
+            if (opp) {
+              const curStageId = opp.pipelineStageId || opp.stageId || null;
+              const [is, ns] = await Promise.all([
+                interestedStage(creds.token, creds.locationId).catch(() => null),
+                nurtureStage(creds.token, creds.locationId).catch(() => null),
+              ]);
+              const ghostStageIds = new Set([is && is.stageId, ns && ns.stageId].filter(Boolean));
+              if (ghostStageIds.has(curStageId)) {
+                await moveStage({ clientId, sb, ghl, token: creds.token, oppRef: { ghlOpportunityId: opp.id }, stage: rs, role: "responded", contactId: String(ghlContactId) });
+              }
             }
           }
         }
