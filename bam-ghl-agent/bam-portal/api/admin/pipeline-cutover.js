@@ -406,6 +406,21 @@ async function actionFlip(clientId, flags, provider, force) {
   //    'clean' flag). force=true lets staff override a non-zero (near-zero) drift.
   const recon = await actionReconcile(clientId, flags);
   if (recon.error) return { error: recon.error };
+
+  // 2b. The store must actually be POPULATED. With shadow freshly turned on but no
+  //     board read yet, the stage registry is empty, so reconcile maps zero opps and
+  //     reports clean (0 mapped = 0 drift) - a false green that would flip to an EMPTY
+  //     portal board. Refuse when GHL holds open opps the store doesn't. force overrides.
+  const ghlOpen = (recon.ghl.open_mapped || 0) + (recon.ghl.open_unmapped || 0);
+  if (ghlOpen > 0 && (recon.portal.open_total || 0) === 0 && !force) {
+    return { error: {
+      status: 412,
+      message: `Refusing to flip to portal: GHL has ${ghlOpen} open opportunit${ghlOpen === 1 ? "y" : "ies"} but the portal store is empty - the shadow backfill has not run. Open this academy's Pipelines board once (with shadow on) to seed the stage registry and mirror the opps, then reconcile and flip.`,
+      reason: "store_unpopulated",
+      ghl_open: ghlOpen,
+    } };
+  }
+
   if (!recon.clean && !force) {
     return { error: {
       status: 412,

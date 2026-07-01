@@ -1,5 +1,5 @@
 -- Local development seed: BAM GTA Business Blueprint offers mirrored from prod
--- on 2026-06-24. This keeps local Offer/pricing lineage close to the linked
+-- on 2026-06-29. This keeps local Offer/pricing lineage close to the linked
 -- project while parent V1 runtime tables remain independently seeded.
 
 insert into public.offers (
@@ -115,6 +115,14 @@ values
             "type": "Membership",
             "whats_included": "Unlimited credits to train"
           },
+          {
+            "added_fees": "13%",
+            "added_fees_description": "HST",
+            "price": "200",
+            "title": "1/Wk",
+            "type": "Membership",
+            "whats_included": "Once per week training - renews every 4 weeks."
+          },
           {}
         ],
         "pricing_tiers": [
@@ -190,7 +198,7 @@ values
     $json$::jsonb,
     0,
     '2026-05-25 18:14:29.614321+00'::timestamptz,
-    '2026-06-23 13:50:12.905358+00'::timestamptz
+    '2026-06-29 20:10:32.380127+00'::timestamptz
   ),
   (
     'a7dff382-4a4d-45fb-b781-5f6ca2de5cce',

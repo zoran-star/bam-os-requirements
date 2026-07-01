@@ -42,7 +42,7 @@ import {
   automationsLive as closingAutomationsLive, nextDueStep as nextDueClosingStep,
 } from "./agent/closing-automations.js";
 import { resolveMergeVars, locFor } from "./email-shells.js";
-import { closingAgentMode, modeIsOn, shouldAutoSend } from "./agent/_mode.js";
+import { closingAgentMode, modeIsOn, shouldAutoSend, shouldAutoSendScripted } from "./agent/_mode.js";
 import { mutedContactIdSet, isMuted } from "./agent/_mutes.js";
 import { withinQuietHours, nextSendableTime } from "./agent/_quiet.js";
 import { resolveAgentActor } from "./agent/_auth.js";
@@ -173,9 +173,9 @@ async function threadMessages(token, conversationId) {
 // the structured proposal, or { error } / { skip }. `opts`:
 //   { dts, conversationId, skipStageGuard, lastDirection, nowMs }
 async function draftForContact(token, locationId, clientId, contactId, cfg, opts = {}) {
-  const dts = opts.dts || await doneTrialStage(token, locationId);
+  const dts = opts.dts || await doneTrialStage(token, locationId, { clientId, sb });
   if (!dts) return { error: "No Done-Trial stage found in the Training Pipeline." };
-  if (!opts.skipStageGuard && !(await contactInRespondedStage(token, locationId, contactId, dts))) {
+  if (!opts.skipStageGuard && !(await contactInRespondedStage(token, locationId, contactId, dts, { clientId, sb }))) {
     return { error: "This lead isn't in the Done-Trial stage — the closing agent only works good-fit attendees." };
   }
   // Twilio academies: read the thread from the own-store (no GHL conversation).
@@ -331,7 +331,9 @@ async function fireScriptedStep({ client, token, mode, autos, item, contactId })
     last_lead_at: item.last_at || null, reasoning: `Scripted initial automation: ${step.label}`,
   };
 
-  const auto = shouldAutoSend(mode, { confidence: 1, escalate: false });
+  // Scripted + pre-approved (automationsLive gated this run): auto-send whenever the agent
+  // is on, bypassing the global self-drive kill-switch (that net is for AI freeform replies).
+  const auto = shouldAutoSendScripted(mode);
   if (auto && !withinQuietHours()) {
     await sb(`agent_closing_replies`, { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify([{
       ...baseRow, status: "approved", send_after: nextSendableTime().toISOString(), created_by: "self-drive",
@@ -376,7 +378,7 @@ async function detectForClient(client) {
   const { token, locationId } = creds;
 
   let dts, queue, doneIds;
-  try { ({ dts, queue, doneIds } = await computeClosingQueue(token, locationId)); }
+  try { ({ dts, queue, doneIds } = await computeClosingQueue(token, locationId, { clientId: client.id, sb })); }
   catch (e) { return { client_id: client.id, error: `queue: ${e.message}` }; }
   if (!dts) return { client_id: client.id, skipped: "no Done-Trial stage" };
 
@@ -583,7 +585,7 @@ async function handler(req, res) {
         let ids = loc ? peekDoneTrialIdSet(loc) : undefined;
         if (ids === undefined && loc) {
           const creds = await pickGhlToken(client);
-          if (creds) ids = await doneTrialContactIdSetCached(creds.token, loc);
+          if (creds) ids = await doneTrialContactIdSetCached(creds.token, loc, 60000, { clientId, sb });
         }
         if (ids) list = list.filter(r => !r.ghl_contact_id || ids.has(r.ghl_contact_id));
       } catch (_) { /* fail open */ }
@@ -634,7 +636,7 @@ async function handler(req, res) {
 
   try {
     if (b.action === "list") {
-      const { queue } = await computeClosingQueue(token, locationId);
+      const { queue } = await computeClosingQueue(token, locationId, { clientId, sb });
       return res.status(200).json({ queue, count: queue.length });
     }
 
@@ -651,8 +653,8 @@ async function handler(req, res) {
     if (b.action === "send") {
       if (!b.contact_id || !b.reply || !String(b.reply).trim()) return res.status(400).json({ error: "contact_id and reply required" });
       // HARD GUARD: only send to a lead still in the Done-Trial stage.
-      const dts = await doneTrialStage(token, locationId);
-      if (!dts || !(await contactInRespondedStage(token, locationId, b.contact_id, dts))) {
+      const dts = await doneTrialStage(token, locationId, { clientId, sb });
+      if (!dts || !(await contactInRespondedStage(token, locationId, b.contact_id, dts, { clientId, sb }))) {
         return res.status(409).json({ error: "This lead is no longer in the Done-Trial stage — not sending." });
       }
       // Quiet hours: hold an after-hours approval until morning.
@@ -768,7 +770,7 @@ async function handler(req, res) {
       let routedToNurture = false;
       try {
         if (await isAutomationLive(clientId, "nurture")) {
-          const ns = await nurtureStage(token, locationId);
+          const ns = await nurtureStage(token, locationId, { clientId, sb });
           if (ns) {
             await ghl("PUT", `/opportunities/${encodeURIComponent(oppId)}`, { token, body: { pipelineId: ns.pipelineId, pipelineStageId: ns.stageId } });
             await enrollContact({ clientId, automationKey: "nurture", contactId });

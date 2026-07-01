@@ -245,7 +245,7 @@ async function runWork(res) {
             await enrollContact({ clientId: job.client_id, automationKey: "ghosted", contactId: job.contact_id });
             const creds = await ensureCreds();
             if (creds && creds.token) {
-              const is = await interestedStage(creds.token, creds.locationId);
+              const is = await interestedStage(creds.token, creds.locationId, { clientId: job.client_id, sb });
               const oppId = await findOpenOppId(creds.token, creds.locationId, job.contact_id);
               if (is && oppId) await ghl("PUT", `/opportunities/${encodeURIComponent(oppId)}`, { token: creds.token, body: { pipelineId: is.pipelineId, pipelineStageId: is.stageId } });
               if (is && oppId) { try { await shadowMirrorMove(job.client_id, { ghlOpportunityId: oppId, ghlContactId: job.contact_id, role: "ghosted", stageResolved: is, status: "open", reason: "intro form sent, no reply - rolled into ghosted" }); } catch (_) {} }
@@ -267,7 +267,7 @@ async function runWork(res) {
               await enrollContact({ clientId: job.client_id, automationKey: "nurture", contactId: job.contact_id });
               const creds = await ensureCreds();
               if (creds && creds.token) {
-                const ns = await nurtureStage(creds.token, creds.locationId);
+                const ns = await nurtureStage(creds.token, creds.locationId, { clientId: job.client_id, sb });
                 const oppId = await findOpenOppId(creds.token, creds.locationId, job.contact_id);
                 if (ns && oppId) await ghl("PUT", `/opportunities/${encodeURIComponent(oppId)}`, { token: creds.token, body: { pipelineId: ns.pipelineId, pipelineStageId: ns.stageId } });
                 if (ns && oppId) { try { await shadowMirrorMove(job.client_id, { ghlOpportunityId: oppId, ghlContactId: job.contact_id, role: "nurture", stageResolved: ns, status: "open", reason: `${a.automation_key} ran out - rolled into nurture` }); } catch (_) {} }
@@ -363,7 +363,7 @@ async function runWork(res) {
       // stage, via any path) the 20-min nudge is moot - exit + skip the send.
       if (auto.automation_key === "trial_form" && token && creds.locationId) {
         try {
-          const booked = await scheduledTrialContactIdSetCached(token, creds.locationId);
+          const booked = await scheduledTrialContactIdSetCached(token, creds.locationId, 60000, { clientId: job.client_id, sb });
           if (booked && booked.has(String(job.contact_id))) {
             await sb(`automation_enrollments?id=eq.${job.enrollment_id}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ status: "exited", exited_at: new Date().toISOString(), exit_reason: "booked" }) }).catch(() => {});
             await finish({ status: "skipped", last_error: "booked - in scheduled trial" });
@@ -388,10 +388,21 @@ async function runWork(res) {
         } catch (_) { /* leave it blank */ }
       }
 
+      // {{athletes_full_name}} token: the athlete (child) name, resolved by the
+      // contact sync into ghl_contacts.athlete_name (the "resolver"). Only looked
+      // up when the copy uses it; blank falls back to "your athlete" in the shell.
+      let athlete = "";
+      if (/athlet/i.test(`${step.body || ""}${step.subject || ""}`)) {
+        try {
+          const rows = await sb(`ghl_contacts?client_id=eq.${job.client_id}&ghl_contact_id=eq.${encodeURIComponent(job.contact_id)}&select=athlete_name&limit=1`);
+          athlete = (Array.isArray(rows) && rows[0] && rows[0].athlete_name) || "";
+        } catch (_) { /* leave blank */ }
+      }
+
       const result = await sendOn({
         channel: step.channel, clientId: job.client_id, contactId: job.contact_id,
         toEmail: info.email, toPhone: info.phone, subject: step.subject, body: step.body, ghlToken: token,
-        vars: { first_name: info.firstName, full_name: info.fullName, next_session },
+        vars: { first_name: info.firstName, full_name: info.fullName, athlete, next_session },
       });
 
       if (result && result.sent) { await finish({ status: "sent", sent_at: new Date().toISOString() }); sent++; await logEvent({ clientId: job.client_id, contactId: job.contact_id, automationId: job.automation_id, type: "step_sent", payload: { step_id: job.step_id, channel: step.channel } }); }

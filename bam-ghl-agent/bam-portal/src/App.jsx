@@ -29,6 +29,7 @@ const InboxView            = lazy(() => import('./views/InboxView'));
 const ResourcesView        = lazy(() => import('./views/ResourcesView'));
 const OurAdsView           = lazy(() => import('./views/OurAdsView'));
 const AgentTrainingView    = lazy(() => import('./views/AgentTrainingView'));
+const CustomFieldsView     = lazy(() => import('./views/CustomFieldsView'));
 import AlertsPanel from './components/overlays/AlertsPanel';
 import LoginView from './views/LoginView';
 import UniversalFeedbackWidget from './components/UniversalFeedbackWidget';
@@ -48,17 +49,29 @@ export default function BAMPortal() {
   // Dashboard is hidden for all staff right now — land on Inbox instead.
   // Restore the last-viewed tab so a reload (mobile tab-discard, PWA update,
   // auth re-boot) doesn't drop staff back on Inbox and lose their place.
+  // Active page lives in the URL (?p=) so a reload restores it and Back/Forward
+  // move between pages. Falls back to the legacy ?nav= deep-link, then the last
+  // tab in localStorage, then Inbox.
   const [nav, setNav] = useState(() => {
+    try {
+      const sp = new URLSearchParams(window.location.search);
+      const fromUrl = sp.get("p") || sp.get("nav");
+      if (fromUrl) return fromUrl;
+    } catch { /* fall through to storage */ }
     try { return localStorage.getItem("bam_nav") || "inbox"; } catch { return "inbox"; }
   });
   // Dashboard click-to-detail: parent stashes the client id, ClientsCombinedView
   // consumes it once via initialClientId then clears it so reopening the tab
-  // fresh doesn't keep re-jumping.
-  const [clientsInitialId, setClientsInitialId] = useState(null);
-  // When the Clients view drills into a specific client, suppress the
-  // page-level "Clients · 27 total" banner — the in-view header carries
-  // the breadcrumb back out.
-  const [clientsInDetail, setClientsInDetail] = useState(false);
+  // fresh doesn't keep re-jumping. Seeded from ?client= so a reload (or Back)
+  // re-opens the client you were viewing.
+  const [clientsInitialId, setClientsInitialId] = useState(() => {
+    try { return new URLSearchParams(window.location.search).get("client") || null; } catch { return null; }
+  });
+  // The currently open client id (reported up by ClientsCombinedView). Drives
+  // both the page-banner suppression and the ?client= URL param. null = list view.
+  const [clientsOpenId, setClientsOpenId] = useState(() => {
+    try { return new URLSearchParams(window.location.search).get("client") || null; } catch { return null; }
+  });
   const [showCmd, setShowCmd] = useState(false);
   const [showAlerts, setShowAlerts] = useState(false);
   const [onboardingClients, setOnboardingClients] = useState([]);
@@ -159,6 +172,7 @@ export default function BAMPortal() {
   const canSeeSystems = me && (me.role === "admin" || me.role === "scaling_manager" || me.role === "systems_manager" || me.role === "systems_executor");
   const canSeeMarketing = me && (me.role === "admin" || me.role === "scaling_manager" || me.role === "marketing_manager" || me.role === "marketing_executor");
   const canSeeTeam = me && (me.role === "admin" || me.role === "scaling_manager");
+  const canSeeCustomFields = me && (me.role === "admin" || me.role === "scaling_manager");
   const canSeeContent = me && (me.role === "admin" || me.role === "scaling_manager" || me.role === "marketing_manager" || me.role === "marketing_executor" || me.role === "content_executor");
   const canSeeFinancials = me && (me.role === "admin" || me.role === "scaling_manager");
   // Resources: admins + the content/marketing team (they upload + manage the
@@ -196,6 +210,51 @@ export default function BAMPortal() {
     try { localStorage.setItem("bam_nav", nav); } catch { /* storage blocked — non-fatal */ }
   }, [nav]);
 
+  // Keep the URL in sync with the active page + open client (replaceState, no
+  // new history entry — so the URL reflects the current spot for reloads but
+  // page-to-page Back is driven by goNav's pushState below). Preserves any
+  // sub-tab params (?mtab=, ?ctab=, …) that the views manage via useUrlState.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const sp = new URLSearchParams(window.location.search);
+    sp.set("p", nav);
+    sp.delete("nav"); // fold the legacy deep-link param into ?p=
+    if (nav === "clients" && clientsOpenId) sp.set("client", clientsOpenId);
+    else sp.delete("client");
+    const url = window.location.pathname + "?" + sp.toString() + window.location.hash;
+    window.history.replaceState(null, "", url);
+  }, [nav, clientsOpenId]);
+
+  // Browser Back/Forward → restore the page (and open client) from the URL.
+  useEffect(() => {
+    const onPop = () => {
+      const sp = new URLSearchParams(window.location.search);
+      const page = sp.get("p") || sp.get("nav") || "inbox";
+      const client = sp.get("client") || null;
+      setNav(page);
+      setClientsInitialId(client);
+      setClientsOpenId(client);
+    };
+    window.addEventListener("popstate", onPop);
+    return () => window.removeEventListener("popstate", onPop);
+  }, []);
+
+  // User-initiated navigation: pushes a history entry so Back returns here, and
+  // starts the new page with a clean query (drops the old page's sub-tabs).
+  // Pass clientId to land directly inside a client's detail (Dashboard cards).
+  const goNav = (next, clientId = null) => {
+    if (typeof window !== "undefined") {
+      const sp = new URLSearchParams();
+      sp.set("p", next);
+      if (clientId) sp.set("client", clientId);
+      window.history.pushState(null, "", window.location.pathname + "?" + sp.toString());
+    }
+    setClientsInitialId(clientId || null);
+    setClientsOpenId(clientId || null);
+    setNav(next);
+    if (isMobile) setSidebarOpen(false);
+  };
+
   // A restored tab might be one this role can't see, or the hidden dashboard —
   // fall back to Inbox so we never land on a blank, gated tab. (Systems team is
   // handled by the redirect above.)
@@ -204,32 +263,16 @@ export default function BAMPortal() {
     const gated = {
       systems: canSeeSystems, marketing: canSeeMarketing, content: canSeeContent,
       team: canSeeTeam, resources: canSeeResources, feedback: canSeeFeedback,
-      financials: canSeeFinancials, ourads: canSeeOurAds,
+      financials: canSeeFinancials, ourads: canSeeOurAds, customfields: canSeeCustomFields,
     };
     if (nav === "dashboard" || (Object.prototype.hasOwnProperty.call(gated, nav) && !gated[nav])) {
       // Content executors live in the Content tab — land them there, not Inbox.
       setNav(me.role === "content_executor" ? "content" : "inbox");
     }
-  }, [me, nav, canSeeSystems, canSeeMarketing, canSeeContent, canSeeTeam, canSeeResources, canSeeFeedback, canSeeFinancials, canSeeOurAds]);
+  }, [me, nav, canSeeSystems, canSeeMarketing, canSeeContent, canSeeTeam, canSeeResources, canSeeFeedback, canSeeFinancials, canSeeOurAds, canSeeCustomFields]);
 
-  // Deep-link support: ?nav=inbox jumps the user straight to that nav
-  // tab on page load. Used by mention notifications (Slack DM / future
-  // push) so receivers land on the Inbox when they click the link.
-  // Runs once on mount; param is stripped after consumption so a
-  // refresh doesn't keep re-asserting the nav.
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const params = new URLSearchParams(window.location.search);
-    const target = params.get("nav");
-    if (target && ["dashboard", "inbox", "clients", "tasks", "calendar", "knowledge", "financials", "systems", "marketing", "content", "team", "feedback", "ourads", "settings"].includes(target)) {
-      setNav(target);
-      params.delete("nav");
-      const newQs = params.toString();
-      const newUrl = window.location.pathname + (newQs ? "?" + newQs : "") + window.location.hash;
-      window.history.replaceState(null, "", newUrl);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  // (Legacy ?nav= deep-links are honored by the nav initializer above and
+  // folded into ?p= by the URL-sync effect — no separate consumer needed.)
 
   const tk = dark ? T.dark : T.light;
 
@@ -445,6 +488,7 @@ export default function BAMPortal() {
     marketing: ["Marketing", "Client ad-campaign tickets"],
     content: ["Content", "Guide cards & ad creative content"],
     team: ["Team", "Staff members & roles"],
+    customfields: ["Custom Fields", "Portal-native contact fields per academy"],
     feedback: ["Feedback", "Bug reports + portal feedback (admin only)"],
     ourads: ["Our Ads", "Our own ad campaigns"],
     resources: ["Resources", "Library shown to all clients"],
@@ -488,6 +532,7 @@ export default function BAMPortal() {
         ...(canSeeMarketing ? [{ label: "Marketing", key: "marketing" }] : []),
         ...(canSeeContent ? [{ label: "Content", key: "content" }] : []),
         ...(canSeeTeam ? [{ label: "Team", key: "team" }] : []),
+        ...(canSeeCustomFields ? [{ label: "Custom Fields", key: "customfields" }] : []),
         ...(canSeeResources ? [{ label: "Resources", key: "resources" }] : []),
         ...(canSeeOurAds ? [{ label: "Our Ads", key: "ourads" }] : []),
         ...(canSeeFeedback ? [{ label: "Feedback", key: "feedback" }] : []),
@@ -595,7 +640,7 @@ export default function BAMPortal() {
               const active = nav === item.key;
               const Icon = NAV_ICONS[item.key];
               return (
-                <div key={item.key} onClick={() => { if (item.href) { window.location.href = item.href; return; } setNav(item.key); if (isMobile) setSidebarOpen(false); }} title={item.label} style={{
+                <div key={item.key} onClick={() => { if (item.href) { window.location.href = item.href; return; } goNav(item.key); }} title={item.label} style={{
                   display: "flex", alignItems: "center", gap: 10,
                   padding: "11px 14px", borderRadius: 10, cursor: "pointer",
                   background: active ? tk.accentGhost : "transparent",
@@ -636,7 +681,7 @@ export default function BAMPortal() {
               {(() => {
                 const active = nav === "settings";
                 return (
-                  <div onClick={() => { setNav("settings"); if (isMobile) setSidebarOpen(false); }} title="Settings" style={{
+                  <div onClick={() => { goNav("settings"); }} title="Settings" style={{
                     display: "flex", alignItems: "center", gap: 10,
                     padding: "11px 14px", borderRadius: 10, cursor: "pointer",
                     background: active ? tk.accentGhost : "transparent",
@@ -760,7 +805,7 @@ export default function BAMPortal() {
               overflow:hidden instead of scrolling. */}
           <div style={{ flex: 1, minHeight: 0, padding: isMobile ? "24px 16px 64px" : "40px 44px 80px", ...(["communication", "clients"].includes(nav) ? { overflow: "hidden", display: "flex", flexDirection: "column" } : { overflowY: "auto" }) }}>
 
-            {!(nav === "clients" && clientsInDetail) && (
+            {!(nav === "clients" && clientsOpenId) && (
               <div key={nav} style={{ flexShrink: 0, marginBottom: 40, animation: "slideUp 0.35s cubic-bezier(0.22, 1, 0.36, 1) both" }}>
                 <h1 style={{ fontSize: isMobile ? 24 : 32, fontWeight: 700, color: tk.text, letterSpacing: "-0.03em", lineHeight: 1.1, margin: 0 }}>{pageTitle}</h1>
                 <p style={{ fontSize: 15, color: tk.textMute, marginTop: 8 }}>{pageDesc}</p>
@@ -779,9 +824,9 @@ export default function BAMPortal() {
                 tokens={tk} dark={dark}
                 onboardingClients={onboardingClients} activeClients={activeClients}
                 allReminders={allReminders} tasks={tasks} calendarEvents={calendarEvents}
-                financialAlerts={financialAlerts} onNavigate={setNav}
+                financialAlerts={financialAlerts} onNavigate={goNav}
                 loading={dashboardLoading} onUpdateTask={handleUpdateTask}
-                onSelectClient={(client) => { setClientsInitialId(client?.id); setNav("clients"); }}
+                onSelectClient={(client) => goNav("clients", client?.id)}
                 userName={userName}
               />
             )}
@@ -801,8 +846,8 @@ export default function BAMPortal() {
                   session={session}
                   initialClientId={clientsInitialId}
                   onInitialClientHandled={() => setClientsInitialId(null)}
-                  onDetailChange={setClientsInDetail}
-                  onNavigate={setNav}
+                  onDetailChange={setClientsOpenId}
+                  onNavigate={goNav}
                 />
               )}
 
@@ -831,6 +876,7 @@ export default function BAMPortal() {
               {nav === "systems" && canSeeSystems && <SystemsView tokens={tk} dark={dark} me={me} session={session} />}
               {nav === "marketing" && canSeeMarketing && <MarketingView tokens={tk} dark={dark} me={me} session={session} />}
               {nav === "team" && canSeeTeam && <TeamView tokens={tk} dark={dark} session={session} me={me} />}
+              {nav === "customfields" && canSeeCustomFields && <CustomFieldsView tokens={tk} dark={dark} me={me} session={session} />}
               {nav === "content" && canSeeContent && <ContentView tokens={tk} dark={dark} me={me} session={session} />}
               {nav === "feedback" && canSeeFeedback && <FeedbackView tokens={tk} dark={dark} session={session} />}
               {nav === "training" && canSeeFeedback && <AgentTrainingView tokens={tk} dark={dark} session={session} />}
@@ -842,7 +888,7 @@ export default function BAMPortal() {
         </div>
       </div>
 
-      {showCmd && <SearchOverlay tokens={tk} dark={dark} onClose={() => setShowCmd(false)} allClients={[...onboardingClients, ...activeClients]} onNavigate={(key) => { setNav(key); setShowCmd(false); }} />}
+      {showCmd && <SearchOverlay tokens={tk} dark={dark} onClose={() => setShowCmd(false)} allClients={[...onboardingClients, ...activeClients]} onNavigate={(key) => { goNav(key); setShowCmd(false); }} />}
 
       {/* Universal feedback widget — always visible to staff. Submissions go to portal_feedback. Only Zoran sees the inbox. */}
       <UniversalFeedbackWidget tokens={tk} session={session} />

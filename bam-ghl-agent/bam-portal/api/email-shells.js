@@ -100,6 +100,9 @@ export function locFor(clientId) { return LOCATIONS[clientId] || LOCATIONS[GTA_I
 // the braces. Only touches these known tokens - the shell placeholders (UPPERCASE) are
 // left for the caller to fill.
 export function resolveMergeVars(html, L, vars = {}) {
+  // Athlete first name for casual copy ("Hey Jordan!"). Prefer an explicit
+  // athlete_first; else take the first token of the resolved athlete full name.
+  const _athFirst = vars.athlete_first || (vars.athlete ? String(vars.athlete).trim().split(/\s+/)[0] : "");
   const map = {
     "contact.first_name": vars.first_name || "there",
     "contact.fullName": vars.full_name || vars.first_name || "there",
@@ -107,6 +110,8 @@ export function resolveMergeVars(html, L, vars = {}) {
     "contact.name": vars.full_name || vars.first_name || "there",
     "contact.athletes_full_name": vars.athlete || "your athlete",
     "contact.athlete_full_name": vars.athlete || "your athlete",
+    "contact.athlete_first_name": _athFirst || "your athlete",
+    "contact.athletes_first_name": _athFirst || "your athlete",
     "location.city": L.city || "",
     "location.name": L.full || "",
     "location.website": L.siteUrl || "",

@@ -36,7 +36,8 @@ import { withSentryApiRoute } from "../_sentry.js";
 
 import crypto from "node:crypto";
 import { fireOnboardingActivations } from "../onboarding/activations.js";
-import { sendSms } from "../ghl/_core.js";
+import { sendSms, ghl } from "../ghl/_core.js";
+import { findOpenOpp, setStatus } from "../agent/_store.js";
 import { notifyOwners } from "../_notify-owners.js";
 import { enrollContact, exitEnrollment, isAutomationLive } from "../automations.js";
 import { getClientGhlToken } from "../website/availability.js";
@@ -44,8 +45,6 @@ import { getClientGhlToken } from "../website/availability.js";
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
 const STRIPE_API = "https://api.stripe.com/v1";
-const GHL_V2 = "https://services.leadconnectorhq.com";
-const GHL_V2_VERSION = "2021-07-28";
 
 // Stripe signature verification needs the RAW body — disable Vercel's
 // default JSON body parser for this route.
@@ -142,34 +141,6 @@ async function stripePost(path, body, stripeAccount) {
   return txt ? JSON.parse(txt) : {};
 }
 
-// GHL v2 call (same shape + 429 backoff as api/ghl/pipelines.js ghl()). Used only
-// by markOpportunityWon below.
-async function ghlFetch(method, path, { token, body } = {}) {
-  const headers = {
-    Authorization:  `Bearer ${token}`,
-    Version:        GHL_V2_VERSION,
-    Accept:         "application/json",
-    "Content-Type": "application/json",
-  };
-  let res;
-  for (let attempt = 0; attempt < 4; attempt++) {
-    res = await fetch(`${GHL_V2}${path}`, { method, headers, body: body ? JSON.stringify(body) : undefined });
-    if (res.status !== 429) break;
-    const ra = Number(res.headers.get("retry-after"));
-    const wait = ra > 0 ? Math.min(ra * 1000, 5000) : Math.min(400 * 2 ** attempt, 5000);
-    await new Promise(r => setTimeout(r, wait));
-  }
-  const text = await res.text();
-  let json = null;
-  try { json = text ? JSON.parse(text) : null; } catch (_) { json = { raw: text }; }
-  if (!res.ok) {
-    const err = new Error((json && (json.message || json.error)) || `GHL ${res.status}`);
-    err.status = res.status; err.body = json;
-    throw err;
-  }
-  return json;
-}
-
 // ─── Pipeline exit on payment: mark the member's GHL opportunity WON ───────────
 // When a member goes live via a portal payment, mark their GHL sales-board
 // opportunity WON and record a pipeline_outcomes row — so the card leaves the
@@ -208,10 +179,14 @@ async function markOpportunityWon({ member, oppIdHint, allowContactSearch }) {
 
     if (!oppId && allowContactSearch && member.ghl_contact_id && client.ghl_location_id) {
       try {
-        const params = new URLSearchParams({ location_id: client.ghl_location_id, contact_id: member.ghl_contact_id, limit: "20" });
-        const d = await ghlFetch("GET", `/opportunities/search?${params}`, { token });
-        const opps = (d && (d.opportunities || d.data)) || [];
-        oppId = (opps.find(o => String(o.status || "").toLowerCase() === "open") || opps[0] || null)?.id || null;
+        // Off-GHL store: findOpenOpp's GHL branch is byte-identical to the old
+        // search here (prefer the open opp, else the first). Wrapped so a search
+        // error falls through to skip exactly as the inline try/catch did before.
+        const ref = await findOpenOpp({
+          clientId: member.client_id, sb, ghl, token,
+          locationId: client.ghl_location_id, contactId: member.ghl_contact_id,
+        });
+        oppId = (ref && ref.ghlOpportunityId) || null;
       } catch (_) { /* non-fatal — fall through to skip */ }
     }
     if (!oppId) return { skipped: "no opportunity to mark" };
@@ -231,8 +206,14 @@ async function markOpportunityWon({ member, oppIdHint, allowContactSearch }) {
       if (Array.isArray(prior) && prior.length > 0) return { ok: true, opportunity_id: oppId, already_won: true };
     } catch (_) { /* if the check fails, fall through — re-PUT to WON is itself idempotent in GHL */ }
 
-    // Mark the GHL opportunity WON (same call shape as api/ghl/pipelines.js).
-    await ghlFetch("PUT", `/opportunities/${encodeURIComponent(oppId)}`, { token, body: { status: "won" } });
+    // Mark the opportunity WON through the provider-aware store. On provider='ghl'
+    // (every academy today) this is the identical PUT { status: 'won' }; the store
+    // also handles the shadow mirror internally when that flag is on.
+    await setStatus({
+      clientId: member.client_id, sb, ghl, token,
+      oppRef: { ghlOpportunityId: oppId }, status: "won",
+      contactId: member.ghl_contact_id || null,
+    });
 
     // Record the outcome (mirrors the manual mark-won + agent flows).
     try {
@@ -256,6 +237,20 @@ async function maybeAttachCommitmentSchedule({ subId, onbSub, connectedAccount }
   const meta = onbSub.metadata || {};
   if (meta.commitment_reverts !== "monthly" || !meta.revert_to_price) return null;
   if (onbSub.schedule) return { skipped: "already scheduled" };
+  // Carry any active coupon on the paid sub into BOTH schedule phases. Rebuilding
+  // the phases below is declarative - a field not restated on a phase is dropped -
+  // so without this a "forever"/repeating coupon would be lost the moment the plan
+  // reverts to monthly. phase0's invoice is already paid, so restating it there is
+  // a no-op; phase1 (monthly) is the one that actually needs it. Non-fatal: if we
+  // can't read the coupon, we just proceed without carrying it (today's behavior).
+  let couponId = null;
+  try {
+    const full = await stripeFetch(`/subscriptions/${subId}?expand[]=discounts.coupon`, connectedAccount);
+    const d = (Array.isArray(full.discounts) ? full.discounts[0] : null) || full.discount || null;
+    const cp = d && (typeof d.coupon === "object" ? d.coupon : null);
+    couponId = cp && cp.id ? cp.id : null;
+  } catch (_) { couponId = null; }
+
   const sched = await stripePost("/subscription_schedules", { from_subscription: subId }, connectedAccount);
   const p0 = sched.phases && sched.phases[0];
   const item0 = p0 && p0.items && p0.items[0];
@@ -269,8 +264,12 @@ async function maybeAttachCommitmentSchedule({ subId, onbSub, connectedAccount }
     "phases[0][iterations]": 1,
     "phases[1][items][0][price]": meta.revert_to_price,
     "phases[1][iterations]": 1,
+    ...(couponId ? {
+      "phases[0][discounts][0][coupon]": couponId,
+      "phases[1][discounts][0][coupon]": couponId,
+    } : {}),
   }, connectedAccount);
-  return { schedule_id: updated.id, committed_price: committedPrice, revert_to_price: meta.revert_to_price };
+  return { schedule_id: updated.id, committed_price: committedPrice, revert_to_price: meta.revert_to_price, coupon_carried: couponId || null };
 }
 
 async function writeAudit({ client_id, member_id, action_type, args, stripe_response, db_changes }) {

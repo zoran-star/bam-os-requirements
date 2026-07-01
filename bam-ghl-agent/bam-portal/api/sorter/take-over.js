@@ -99,6 +99,7 @@ async function buildTargets(clientId) {
     const offerings = (o.data && o.data.pricing && o.data.pricing.pricing_offerings) || [];
     for (const off of offerings) {
       if (String(off.type || "").toLowerCase() !== "membership") continue;
+      if (off.archived === true) continue; // only LIVE plans - skip archived offerings (Accelerate/Elevate/etc)
       const title = String(off.title || "").trim(); if (!title) continue;
       const base = parseFloat(off.price);
       if (!isNaN(base)) out.push({ key: `${title}|monthly`, label: `${title} · Monthly`, amount_cents: Math.round(base * 1.13 * 100) });
@@ -240,12 +241,20 @@ async function handler(req, res) {
     // "Set up billing" from the member card passes an offer_price_key → resolve it to
     // the offer's canonical Stripe price (so no-sub members can be put on a real plan).
     let resolvedPriceId = body.price_id || null;
+    let resolvedPlan = null;
     if (!resolvedPriceId && body.offer_price_key) {
       const pr = await sb(
         `pricing_catalog?client_id=eq.${encodeURIComponent(clientId)}&offer_price_key=eq.${encodeURIComponent(body.offer_price_key)}` +
-        `&tier=eq.canonical&select=stripe_price_id&limit=1`
+        `&tier=eq.canonical&select=stripe_price_id,canonical_plan,display_name&limit=1`
       ).catch(() => null);
-      resolvedPriceId = (Array.isArray(pr) && pr[0] && pr[0].stripe_price_id) || null;
+      const row = (Array.isArray(pr) && pr[0]) || null;
+      resolvedPriceId = (row && row.stripe_price_id) || null;
+      // Plan label for the members row - same derivation the Change-plan action uses
+      // (canonical_plan, else the display name with any " · 3 months" term suffix stripped).
+      if (row) {
+        const clean = (s) => (String(s || "").split(/\s+[·—-]\s+/)[0].trim() || String(s || ""));
+        resolvedPlan = row.canonical_plan || clean(row.display_name) || null;
+      }
       if (!resolvedPriceId) return res.status(409).json({ error: `No canonical Stripe price for "${body.offer_price_key}" — match it in Price Match first.` });
     }
     if (curAmount == null && !resolvedPriceId) {
@@ -261,7 +270,7 @@ async function handler(req, res) {
       "payment_settings[save_default_payment_method]": "on_subscription",
       "metadata[origin]": "fullcontrol-portal",
       "metadata[import_silent]": "1",
-      "metadata[plan]": member.plan || undefined,
+      "metadata[plan]": resolvedPlan || member.plan || undefined,
       "metadata[client_id]": clientId,
       "metadata[member_id]": member.id,
       "metadata[prior_sub_id]": oldSubId || undefined,
@@ -302,6 +311,7 @@ async function handler(req, res) {
     // Point the member at the new portal sub (the old one gets cancelled by hand).
     const patch = { stripe_subscription_id: sub.id, updated_at: new Date().toISOString() };
     if (billedPriceId) patch.stripe_price_id = billedPriceId;
+    if (resolvedPlan) patch.plan = resolvedPlan; // keep the member's plan label in sync with the new price
     await sb(`members?id=eq.${encodeURIComponent(member.id)}`, {
       method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify(patch),
     }).catch(() => {});

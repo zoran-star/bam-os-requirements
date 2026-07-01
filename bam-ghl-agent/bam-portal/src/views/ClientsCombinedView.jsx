@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
+import { useUrlState } from "../hooks/useUrlState";
 import { supabase } from "../lib/supabase";
 import MessageThread from "../components/MessageThread";
 import { TicketModal } from "./SystemsView";
@@ -191,7 +192,7 @@ export default function ClientsCombinedView({ tokens, dark, me, session, initial
   // Notify parent (App.jsx) when we enter/leave a detail view so it can hide
   // the page-level "Clients · 27 total" banner that's otherwise redundant.
   useEffect(() => {
-    onDetailChange?.(Boolean(selectedId));
+    onDetailChange?.(selectedId || null);
   }, [selectedId, onDetailChange]);
 
   // ─── DETAIL VIEW ─────────────────────────────────────────────────────────
@@ -417,7 +418,7 @@ function ClientRow({ client, staff, tokens, isOnline, onClick }) {
 function ClientDetail({ client, staff, staffMap, tokens, dark, me, session, onBack, onChanged, onNavigate }) {
   const t = tokens;
   const role = me?.role || "";
-  const [tab, setTab] = useState("onboarding");
+  const [tab, setTab] = useUrlState("ctab", "onboarding"); // survives reload + Back
 
   const tabs = [
     { id: "onboarding",   label: "Onboarding" },

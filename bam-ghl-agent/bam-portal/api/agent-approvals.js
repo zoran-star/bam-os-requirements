@@ -251,9 +251,9 @@ async function threadMessages(token, conversationId) {
 // conversation lookup) to stay well under GHL's rate limit:
 //   { rs, conversationId, skipStageGuard }
 async function draftForContact(token, locationId, clientId, contactId, cfg, opts = {}) {
-  const rs = opts.rs || await respondedStage(token, locationId);
+  const rs = opts.rs || await respondedStage(token, locationId, { clientId, sb });
   if (!rs) return { error: "No Responded stage found in the Training Pipeline." };
-  if (!opts.skipStageGuard && !(await contactInRespondedStage(token, locationId, contactId, rs))) {
+  if (!opts.skipStageGuard && !(await contactInRespondedStage(token, locationId, contactId, rs, { clientId, sb }))) {
     return { error: "This lead isn't in the Responded stage — the bot only replies to Responded-stage leads." };
   }
   // Twilio academies: read the thread from the own-store (no GHL conversation).
@@ -363,7 +363,7 @@ async function detectForClient(client) {
   const { token, locationId } = creds;
 
   let rs, queue, respondedIds;
-  try { ({ rs, queue, respondedIds } = await computeQueue(token, locationId)); }
+  try { ({ rs, queue, respondedIds } = await computeQueue(token, locationId, { clientId: client.id, sb })); }
   catch (e) { return { client_id: client.id, error: `queue: ${e.message}` }; }
   if (!rs) return { client_id: client.id, skipped: "no Responded stage" };
 
@@ -681,7 +681,7 @@ async function runDigest(res) {
     try {
       const creds = await pickGhlToken(client);
       if (!creds) continue;
-      const { queue } = await computeQueue(creds.token, creds.locationId);
+      const { queue } = await computeQueue(creds.token, creds.locationId, { clientId: client.id, sb });
       if (queue.length > 0) {
         const msg = `🤖 ${queue.length} chat${queue.length === 1 ? "" : "s"} waiting for your approval (${client.business_name || "academy"}). Open the portal → Inbox → 👁 Hawkeye.`;
         const r = await sendSms({ client, toPhone: cfg.agent_notify_phone, message: msg, contactName: "BAM Agent" });
@@ -737,7 +737,7 @@ async function handler(req, res) {
         let ids = loc ? peekRespondedIdSet(loc) : undefined;
         if (ids === undefined && loc) {
           const creds = await pickGhlToken(client);
-          if (creds) ids = await respondedContactIdSetCached(creds.token, loc);
+          if (creds) ids = await respondedContactIdSetCached(creds.token, loc, 60000, { clientId, sb });
         }
         if (ids) list = list.filter(r => !r.ghl_contact_id || ids.has(r.ghl_contact_id));
       } catch (_) { /* fail open */ }
@@ -772,7 +772,7 @@ async function handler(req, res) {
 
   try {
     if (b.action === "list") {
-      const { queue } = await computeQueue(token, locationId);
+      const { queue } = await computeQueue(token, locationId, { clientId, sb });
       return res.status(200).json({ queue, count: queue.length });
     }
 
@@ -788,8 +788,8 @@ async function handler(req, res) {
     if (b.action === "send") {
       if (!b.contact_id || !b.reply || !String(b.reply).trim()) return res.status(400).json({ error: "contact_id and reply required" });
       // HARD GUARD: refuse to send unless the lead is still in the Responded stage.
-      const rsSend = await respondedStage(token, locationId);
-      if (!rsSend || !(await contactInRespondedStage(token, locationId, b.contact_id, rsSend))) {
+      const rsSend = await respondedStage(token, locationId, { clientId, sb });
+      if (!rsSend || !(await contactInRespondedStage(token, locationId, b.contact_id, rsSend, { clientId, sb }))) {
         return res.status(409).json({ error: "This lead is no longer in the Responded stage — not sending." });
       }
       // QUIET HOURS: a human approved this after 9:30pm / before 8am. Don't text the
@@ -883,7 +883,7 @@ async function handler(req, res) {
       let routedToNurture = false;
       try {
         if (await isAutomationLive(clientId, "nurture")) {
-          const ns = await nurtureStage(token, locationId);
+          const ns = await nurtureStage(token, locationId, { clientId, sb });
           if (ns) {
             await ghl("PUT", `/opportunities/${encodeURIComponent(oppId)}`, { token, body: { pipelineId: ns.pipelineId, pipelineStageId: ns.stageId } });
             await enrollContact({ clientId, automationKey: "nurture", contactId });
@@ -993,7 +993,7 @@ async function handler(req, res) {
         const opps = d.opportunities || d.data || [];
         const pick = opps.find(o => String(o.status || "").toLowerCase() === "open") || opps[0];
         const oppId = pick && pick.id;
-        const sts = await scheduledTrialStage(token, locationId);
+        const sts = await scheduledTrialStage(token, locationId, { clientId, sb });
         if (sts && oppId) await ghl("PUT", `/opportunities/${encodeURIComponent(oppId)}`, { token, body: { pipelineId: sts.pipelineId, pipelineStageId: sts.stageId } });
         if (sts && oppId) { try { await shadowMirrorMove(clientId, { ghlOpportunityId: oppId, ghlContactId: contactId, role: "scheduled_trial", stageResolved: sts, status: "open" }); } catch (_) {} }
       } catch (_) {}
@@ -1039,7 +1039,7 @@ async function handler(req, res) {
       // Move the opp to Interested so it leaves Responded (best-effort — the enroll
       // already happened; the GHL workflow will move them too).
       try {
-        const is = await interestedStage(token, locationId);
+        const is = await interestedStage(token, locationId, { clientId, sb });
         if (is && oppId) await ghl("PUT", `/opportunities/${encodeURIComponent(oppId)}`, { token, body: { pipelineId: is.pipelineId, pipelineStageId: is.stageId } });
         if (is && oppId) { try { await shadowMirrorMove(clientId, { ghlOpportunityId: oppId, ghlContactId: contactId, role: "interested", stageResolved: is, status: "open" }); } catch (_) {} }
       } catch (_) {}

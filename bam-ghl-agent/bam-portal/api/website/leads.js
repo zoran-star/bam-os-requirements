@@ -18,6 +18,8 @@
 import { withSentryApiRoute } from "../_sentry.js";
 import { getClientGhlToken } from "./availability.js";
 import { enrollContact, exitEnrollment } from "../automations.js";
+import { createOpp, ROLE_MATCHERS } from "../agent/_store.js";
+import { upsertPortalContact, writePortalFieldValues } from "../_contacts.js";
 
 const SB_URL = (process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || "").trim();
 const SB_KEY = (process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY || "").trim();
@@ -116,7 +118,18 @@ async function resolvePipelineStage(headers, ghlLocationId, pipelineName, stageN
   return { pipelineId: pipeline.id, stageId: stage.id };
 }
 
-async function pushToGhl(locName, ghlLocationId, { name, email, phone, message, messageFieldId, formType, pipelineConfig, extraTags, fields, fieldMap }) {
+// Best-effort role for a stage NAME, using the same regex registry resolveStage
+// uses. The role only feeds the portal/shadow side of createOpp (stage_role +
+// registry seeding); on provider='ghl' it does not touch the GHL POST body.
+function roleForStageName(stageName) {
+  const s = { name: stageName || "" };
+  for (const [role, match] of Object.entries(ROLE_MATCHERS)) {
+    try { if (match(s)) return role; } catch (_) {}
+  }
+  return null;
+}
+
+async function pushToGhl(locName, ghlLocationId, { clientId, name, email, phone, message, messageFieldId, formType, pipelineConfig, extraTags, fields, fieldMap }) {
   const loc = loadLocations().find(l => l.name === locName);
   if (!loc) return null;
 
@@ -205,7 +218,7 @@ async function pushToGhl(locName, ghlLocationId, { name, email, phone, message, 
   // (used when a booking upgrades a form-stage lead).
   if (contactId && pipelineConfig?.pipeline && pipelineConfig?.stage) {
     try {
-      await placeOpportunity(headers, ghlLocationId, contactId, pipelineConfig, `${name || email}`, false);
+      await placeOpportunity(headers, ghlLocationId, contactId, pipelineConfig, `${name || email}`, false, clientId);
     } catch (e) { console.error("GHL pipeline step failed (non-fatal):", e.message); }
   }
 
@@ -215,7 +228,7 @@ async function pushToGhl(locName, ghlLocationId, { name, email, phone, message, 
 // Move-or-create the contact's open opportunity in the named pipeline/stage.
 // advance=false: create only if the contact has no open card in the pipeline.
 // advance=true:  also MOVE an existing open card to the target stage.
-async function placeOpportunity(headers, ghlLocationId, contactId, { pipeline, stage }, oppName, advance) {
+async function placeOpportunity(headers, ghlLocationId, contactId, { pipeline, stage }, oppName, advance, clientId) {
   const { pipelineId, stageId } = await resolvePipelineStage(headers, ghlLocationId, pipeline, stage);
 
   let existing = null;
@@ -238,6 +251,31 @@ async function placeOpportunity(headers, ghlLocationId, contactId, { pipeline, s
     return existing.id;
   }
   if (!existing) {
+    // CREATE through the provider-aware store: on provider='portal' it INSERTs an
+    // opportunities row instead of POSTing to GHL; on provider='ghl' (every client
+    // today) createOpp issues the exact same POST below, so this is byte-identical.
+    // The store needs a client_id; if it can't be resolved (unknown academy) we
+    // fall back to the raw GHL POST so nothing regresses. The auth token rides in
+    // `headers.Authorization` (location API key here, OAuth token on the booking
+    // flows) - extract it so createOpp's GHL branch uses the same credential.
+    if (clientId) {
+      const token = (headers.Authorization || headers.authorization || "").replace(/^Bearer\s+/i, "");
+      try {
+        const ref = await createOpp({
+          clientId,
+          token,
+          locationId: ghlLocationId,
+          contactId,
+          stage: { pipelineId, stageId, stageName: stage },
+          role: roleForStageName(stage),
+          name: oppName,
+        });
+        return (ref && (ref.ghlOpportunityId || ref.id)) || null;
+      } catch (e) {
+        console.error("GHL opportunity create failed:", e.message);
+        return existing?.id || null;
+      }
+    }
     const oppRes = await fetch(`${GHL_V2}/opportunities/`, {
       method: "POST",
       headers,
@@ -334,7 +372,7 @@ async function handler(req, res) {
   if (ghlLocName && client.ghl_location_id) {
     let receipt;
     try {
-      const ghlContactId = await pushToGhl(ghlLocName, client.ghl_location_id, { name, email, phone, message, messageFieldId, formType: form_type, pipelineConfig, extraTags, fields, fieldMap });
+      const ghlContactId = await pushToGhl(ghlLocName, client.ghl_location_id, { clientId: client.id, name, email, phone, message, messageFieldId, formType: form_type, pipelineConfig, extraTags, fields, fieldMap });
       if (ghlContactId) {
         ghlStatus = "synced";
         kpiContactId = ghlContactId;
@@ -399,7 +437,7 @@ async function handler(req, res) {
               await placeOpportunity(
                 oauthHeaders, client.ghl_location_id, receipt.ghl_contact_id,
                 { pipeline: routeCfg.pipeline, stage: routeCfg.scheduled_stage },
-                `${name || email}`, true
+                `${name || email}`, true, client.id
               );
             } catch (e) { console.error("Booking portal route failed (non-fatal):", e.message); }
           }
@@ -415,7 +453,7 @@ async function handler(req, res) {
               await placeOpportunity(
                 oauthHeaders, client.ghl_location_id, receipt.ghl_contact_id,
                 { pipeline: calEp.pipeline_name, stage: calEp.stage_name },
-                `${name || email}`, true
+                `${name || email}`, true, client.id
               );
             } catch (e) { console.error("Booking stage advance failed (non-fatal):", e.message); }
           }
@@ -428,6 +466,22 @@ async function handler(req, res) {
     }
 
     // 3. Receipt — stamp the lead row; never fail the request over it.
+    // Also dual-write the portal-native contact (dormant store) and link it back
+    // onto the lead via contact_id, so lead history is home even off GHL.
+    if (receipt?.ghl_contact_id) {
+      const portalContactId = await upsertPortalContact(client.id, receipt.ghl_contact_id, {
+        name:   name || null,
+        email:  email?.toLowerCase() || null,
+        phone:  phone || null,
+        source: "website-form",
+      });
+      if (portalContactId) {
+        receipt.contact_id = portalContactId;
+        // Close the write loop: land this form's custom-field values in the
+        // portal (contact_field_values) in real time, keyed by custom_field_defs.
+        await writePortalFieldValues(client.id, portalContactId, fieldMap, fields);
+      }
+    }
     try {
       await sbReq(`website_leads?id=eq.${leadId}`, {
         method: "PATCH",
@@ -512,7 +566,7 @@ async function maybePortalRoute(client, contactId, formType, { name, email }) {
     try {
       const token = await getClientGhlToken(client);
       const headers = { Authorization: `Bearer ${token}`, Version: V2_VERSION, "Content-Type": "application/json", Accept: "application/json" };
-      await placeOpportunity(headers, client.ghl_location_id, contactId, { pipeline: cfg.pipeline, stage }, `${name || email}`, true);
+      await placeOpportunity(headers, client.ghl_location_id, contactId, { pipeline: cfg.pipeline, stage }, `${name || email}`, true, client.id);
     } catch (e) { console.error("portal route: place opp failed (non-fatal):", e.message); }
   }
   // Enrol the form's INTRO automation (the timed first touch). No-op until it's

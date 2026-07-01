@@ -1,5 +1,6 @@
 import { withSentryApiRoute } from "../_sentry.js";
 import { maybeSendSmsViaProvider } from "../messaging/provider.js";
+import { emailProvider, maybeSendEmailViaResend } from "../messaging/email-provider.js";
 // Vercel Serverless Function — GHL: send SMS or Email to an academy parent.
 //
 // POST /api/ghl/send-message
@@ -306,6 +307,19 @@ async function handler(req, res) {
         if (!g.ok) { await logSend({ status: "failed", error: g.error }); return res.status(502).json({ error: `Twilio send failed: ${g.error}` }); }
         await logSend({ status: "sent", ghl_message_id: g.sid || null });
         return res.status(200).json({ ok: true, sent_via: "twilio", message_id: g.sid || null });
+      }
+    }
+    // Provider gate (Email): Resend academies send via Resend + own-store.
+    if (type === "Email" && (await emailProvider(clientId)) === "resend") {
+      let toEmail = body.contact_email || null;
+      if (!toEmail) {
+        try { const r = await sb(`contacts?client_id=eq.${clientId}&ghl_contact_id=eq.${encodeURIComponent(contactId)}&select=email&limit=1`); toEmail = r && r[0] && r[0].email; } catch (_) {}
+      }
+      const g = await maybeSendEmailViaResend(clientId, { toEmail, subject, html: html || `<p>${message}</p>`, text: message, ghlContactId: contactId, sentBy: (ctx.user && ctx.user.email) || "staff" });
+      if (g.handled) {
+        if (!g.ok) { await logSend({ status: "failed", error: g.error }); return res.status(502).json({ error: `Resend send failed: ${g.error}` }); }
+        await logSend({ status: "sent", ghl_message_id: g.id || null });
+        return res.status(200).json({ ok: true, sent_via: "resend", message_id: g.id || null });
       }
     }
     const sendBody = type === "Email"

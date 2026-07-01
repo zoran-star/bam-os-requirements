@@ -2,6 +2,7 @@ import { withSentryApiRoute } from "../_sentry.js";
 import { pickGhlToken, sendSms, ghl } from "./_core.js";
 import { notifyOwners } from "../_notify-owners.js";
 import { respondedStage, contactInRespondedStage, scheduledTrialStage, interestedStage, nurtureStage } from "../agent/_stage.js";
+import { moveStage } from "../agent/_store.js";
 import { agentMode, modeIsOn } from "../agent/_mode.js";
 import { exitEnrollment } from "../automations.js";
 // Vercel Serverless Function — GHL inbound-message webhook  ("P1 Spine")
@@ -186,9 +187,12 @@ async function handler(req, res) {
               // ONLY move an OPEN opp. A member booking a training session also hits this
               // webhook - they have no open sales opp (theirs is won), so we must NOT grab
               // opps[0] and shove a won/closed card into Scheduled Trial. Open-only = no-op
-              // for members + already-closed leads.
+              // for members + already-closed leads. (We keep this raw open-only find rather
+              // than findOpenOpp, whose ghl branch falls back to opps[0] - that fallback
+              // would reintroduce the exact won-member bug this guard prevents.) The MOVE
+              // itself goes through the provider-aware store; on ghl it is the identical PUT.
               const oppId = (opps.find(o => String(o.status || "").toLowerCase() === "open") || null)?.id || null;
-              if (oppId) await ghl("PUT", `/opportunities/${encodeURIComponent(oppId)}`, { token: creds.token, body: { pipelineId: sts.pipelineId, pipelineStageId: sts.stageId } });
+              if (oppId) await moveStage({ clientId: client.id, sb, ghl, token: creds.token, oppRef: { ghlOpportunityId: oppId }, stage: sts, role: "scheduled_trial", contactId: String(apptContactId) });
             }
           }
         } catch (e) { console.error("ghl inbound-webhook appointment stage-move error:", e.message); }
@@ -278,7 +282,9 @@ async function handler(req, res) {
             ]);
             const ghostStageIds = new Set([is && is.stageId, ns && ns.stageId].filter(Boolean));
             if (ghostStageIds.has(curStageId)) {
-              await ghl("PUT", `/opportunities/${encodeURIComponent(opp.id)}`, { token: creds.token, body: { pipelineId: rs.pipelineId, pipelineStageId: rs.stageId } });
+              // Guard preserved exactly (open opp currently in Interested/Nurture). The
+              // move runs through the provider-aware store; on ghl it is the identical PUT.
+              await moveStage({ clientId: client.id, sb, ghl, token: creds.token, oppRef: { ghlOpportunityId: opp.id }, stage: rs, role: "responded", contactId: String(contactId) });
             }
           }
         }

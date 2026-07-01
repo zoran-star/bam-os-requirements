@@ -148,6 +148,8 @@ Recommended sequence:
 
 1. Build a read-only backfill report.
 
+   Current report: [`offer-runtime-backfill-report.md`](offer-runtime-backfill-report.md).
+
    The report should list every candidate operational price:
 
    - `client_id`
@@ -291,6 +293,52 @@ The staff calendar should eventually show both:
 - member bookings: `schedule_slots + reservations`
 - trial bookings: `schedule_slots + trial_bookings`
 
+## Scheduling Ownership Split (Luka / Zoran)
+
+The dividing line is read vs write on `schedule_slots`. Zoran owns the sales,
+marketing, onboarding, and coach-facing surfaces. Luka owns every write path that
+consumes a slot's capacity, because paid reservations and free-trial bookings share
+one capacity pool (see `trial-calendars-confirmed-decisions.md`, decisions 4 and 5:
+`spots_left = capacity - (confirmed reservations + active trial_bookings)`).
+
+Rule for Zoran's surfaces: read availability and call Luka-owned RPCs. Never
+`INSERT`/`UPDATE` `schedule_slots`, `reservations`, or `trial_bookings` directly.
+If two code paths write occupancy independently, they overbook. One capacity gate,
+one owner.
+
+On Luka's plate first, before Zoran builds on top:
+
+1. Slot generation RPC (`slot_templates` -> `schedule_slots`). The coach template UI
+   calls it; it does not insert slots.
+2. Shared capacity accounting in ONE place. The existing member booking RPC
+   (`0005`) counts only `reservations` today; its capacity check must also count
+   active `trial_bookings` once trials go live, or members will overbook past
+   trials.
+3. `trial_bookings` table + conversion lineage (`converted_member_id`,
+   `converted_membership_id`, `converted_at`). Not in prod yet. Luka defines the
+   slot-consuming shape; Zoran's sales columns (`website_lead_id`, `status`,
+   `source`, etc.) ride along.
+4. Transaction-safe trial booking RPC that locks the slot row, counts
+   `reservations` + `trial_bookings`, and inserts only if capacity remains. Zoran's
+   trial funnel calls it.
+5. Availability read endpoint returning `spots_left` computed from both tables, so
+   the parent app and Zoran's website/staff calendar report the same number.
+
+Zoran can build in parallel without waiting (does not touch slot capacity):
+
+- Trial lead funnel + website form, post-trial `SHOWED`/`NO_SHOW` status form,
+  reminders.
+- Coach template authoring UI (calls the generation RPC).
+- Trial-to-paid conversion orchestration: run checkout, create/find `members` +
+  `academy_membership` + `customer_entitlement`, then set
+  `trial_bookings.status = CONVERTED` and fill conversion lineage.
+
+Handoff point: hand Zoran the coach-write and trial-funnel work once (a) identity +
+entitlements are backfilled, (b) a real BAM GTA schedule is readable in
+`schedule_slots`, (c) member booking/waitlist/cancel RPCs are in prod and proven,
+and (d) the trial booking RPC + shared capacity accounting exist. Then his UIs plug
+into stable, capacity-safe RPCs instead of a moving target.
+
 ## Why This Architecture Holds
 
 The key object is `bookable_programs`.
@@ -339,12 +387,15 @@ from member/credit booking state.
   calendar route into multiple programs?
 - Should age/group routing live on `entry_points`, `bookable_programs.config`, or
   a dedicated routing table?
-- Do trial slots share capacity with member slots, or are they separate slots on
-  the same staff calendar?
 - Which reminders replace GHL workflow reminders first: SMS only, email too, or
   owner notification only?
-- Does conversion from trial to paid member need to preserve `trial_booking_id`
-  on `members` or only in analytics?
+
+Resolved (see `trial-calendars-confirmed-decisions.md`):
+
+- Trial and member bookings share the same slot and the same capacity pool; no
+  separate trial slots, no `booking_kind`, no separate trial cap.
+- Conversion lineage lives on `trial_bookings` (`converted_member_id` /
+  `converted_membership_id` / `converted_at`), not `trial_booking_id` on `members`.
 
 ## Related Docs
 

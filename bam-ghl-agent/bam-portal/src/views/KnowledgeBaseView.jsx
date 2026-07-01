@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
+import { useUrlState } from "../hooks/useUrlState";
 import { authFetch } from "../lib/authFetch";
 import { fetchSOPTree, fetchSOPContent, fetchSolutionWarehouses } from "../services/notionService";
 import { useIsMobile } from '../hooks/useMediaQuery';
@@ -224,7 +225,7 @@ const gradientKeyframes = `
 
 export default function KnowledgeBaseView({ tokens }) {
   const isMobile = useIsMobile();
-  const [subTab, setSubTab] = useState("sops");
+  const [subTab, setSubTab] = useUrlState("ktab", "sops");
 
   /* ── SOP state ── */
   const [tree, setTree] = useState([]);

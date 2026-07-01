@@ -45,7 +45,7 @@ import {
 } from "./agent/confirm-automations.js";
 import { sendOn } from "./_send.js";
 import { resolveMergeVars, locFor } from "./email-shells.js";
-import { confirmAgentMode, modeIsOn, shouldAutoSend } from "./agent/_mode.js";
+import { confirmAgentMode, modeIsOn, shouldAutoSend, shouldAutoSendScripted } from "./agent/_mode.js";
 import { mutedContactIdSet, isMuted } from "./agent/_mutes.js";
 import { withinQuietHours, nextSendableTime } from "./agent/_quiet.js";
 import { resolveAgentActor } from "./agent/_auth.js";
@@ -196,9 +196,9 @@ function fmtTrial(iso) {
 // right now, e.g. a proactive opener whose trial isn't near yet). `opts`:
 //   { sts, conversationId, skipStageGuard, lastDirection, nowMs }
 async function draftForContact(token, locationId, clientId, contactId, cfg, opts = {}) {
-  const sts = opts.sts || await scheduledTrialStage(token, locationId);
+  const sts = opts.sts || await scheduledTrialStage(token, locationId, { clientId, sb });
   if (!sts) return { error: "No Scheduled-Trial stage found in the Training Pipeline." };
-  if (!opts.skipStageGuard && !(await contactInRespondedStage(token, locationId, contactId, sts))) {
+  if (!opts.skipStageGuard && !(await contactInRespondedStage(token, locationId, contactId, sts, { clientId, sb }))) {
     return { error: "This lead isn't in the Scheduled-Trial stage — the confirm agent only works booked leads." };
   }
   // Twilio academies: read the thread from the own-store (no GHL conversation).
@@ -395,7 +395,10 @@ async function fireScriptedStep({ client, token, locationId, mode, autos, cfg, i
     reasoning: `Scripted initial automation: ${step.label}`,
   };
 
-  const auto = shouldAutoSend(mode, { confidence: 1, escalate: false });
+  // Scripted + already approved (automationsLive gated this run): auto-send whenever the
+  // agent is on, bypassing the global self-drive kill-switch (that net is for AI freeform
+  // replies, not fixed pre-approved copy). AI replies below still use shouldAutoSend.
+  const auto = shouldAutoSendScripted(mode);
   if (auto && !withinQuietHours()) {
     // After-hours: hold the SMS until morning; the email isn't quiet-gated, send it now.
     await sendScriptedEmail();
@@ -444,7 +447,7 @@ async function detectForClient(client) {
   const { token, locationId } = creds;
 
   let sts, queue, scheduledIds;
-  try { ({ sts, queue, scheduledIds } = await computeConfirmQueue(token, locationId)); }
+  try { ({ sts, queue, scheduledIds } = await computeConfirmQueue(token, locationId, { clientId: client.id, sb })); }
   catch (e) { return { client_id: client.id, error: `queue: ${e.message}` }; }
   if (!sts) return { client_id: client.id, skipped: "no Scheduled-Trial stage" };
 
@@ -713,7 +716,7 @@ async function handler(req, res) {
         let ids = loc ? peekScheduledTrialIdSet(loc) : undefined;
         if (ids === undefined && loc) {
           const creds = await pickGhlToken(client);
-          if (creds) ids = await scheduledTrialContactIdSetCached(creds.token, loc);
+          if (creds) ids = await scheduledTrialContactIdSetCached(creds.token, loc, 60000, { clientId, sb });
         }
         if (ids) list = list.filter(r => !r.ghl_contact_id || ids.has(r.ghl_contact_id));
       } catch (_) { /* fail open */ }
@@ -764,7 +767,7 @@ async function handler(req, res) {
 
   try {
     if (b.action === "list") {
-      const { queue } = await computeConfirmQueue(token, locationId);
+      const { queue } = await computeConfirmQueue(token, locationId, { clientId, sb });
       return res.status(200).json({ queue, count: queue.length });
     }
 
@@ -781,8 +784,8 @@ async function handler(req, res) {
     if (b.action === "send") {
       if (!b.contact_id || !b.reply || !String(b.reply).trim()) return res.status(400).json({ error: "contact_id and reply required" });
       // HARD GUARD: only send to a lead still in the Scheduled-Trial stage.
-      const sts = await scheduledTrialStage(token, locationId);
-      if (!sts || !(await contactInRespondedStage(token, locationId, b.contact_id, sts))) {
+      const sts = await scheduledTrialStage(token, locationId, { clientId, sb });
+      if (!sts || !(await contactInRespondedStage(token, locationId, b.contact_id, sts, { clientId, sb }))) {
         return res.status(409).json({ error: "This lead is no longer in the Scheduled-Trial stage — not sending." });
       }
       // For a scripted initial-automation card, the booking-confirmation step also
@@ -862,7 +865,7 @@ async function handler(req, res) {
       let oppId = null, moved = false;
       try {
         oppId = await findOpenOpp(token, locationId, contactId);
-        const rs = await respondedStage(token, locationId);
+        const rs = await respondedStage(token, locationId, { clientId, sb });
         if (rs && oppId) { await ghl("PUT", `/opportunities/${encodeURIComponent(oppId)}`, { token, body: { pipelineId: rs.pipelineId, pipelineStageId: rs.stageId } }); moved = true; }
         if (rs && oppId) { try { await shadowMirrorMove(clientId, { ghlOpportunityId: oppId, ghlContactId: contactId, role: "responded", stageResolved: rs, status: "open", reason: note.slice(0, 300) }); } catch (_) {} }
       } catch (_) {}
@@ -896,7 +899,7 @@ async function handler(req, res) {
       let routedToNurture = false;
       try {
         if (await isAutomationLive(clientId, "nurture")) {
-          const ns = await nurtureStage(token, locationId);
+          const ns = await nurtureStage(token, locationId, { clientId, sb });
           if (ns) {
             await ghl("PUT", `/opportunities/${encodeURIComponent(oppId)}`, { token, body: { pipelineId: ns.pipelineId, pipelineStageId: ns.stageId } });
             await enrollContact({ clientId, automationKey: "nurture", contactId });

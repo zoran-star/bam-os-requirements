@@ -15,6 +15,7 @@
 
 import { withSentryApiRoute } from "../_sentry.js";
 import { getClientGhlToken } from "./availability.js";
+import { upsertPortalContact } from "../_contacts.js";
 
 const SB_URL  = (process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || "").trim();
 const SB_KEY  = (process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY || "").trim();
@@ -140,6 +141,18 @@ async function handler(req, res) {
       if (upsertRes.ok) {
         const data = await upsertRes.json();
         contactId = (data.contact || data).id || null;
+        // Dual-write the portal-native contact (dormant store). Best-effort.
+        if (contactId) {
+          await upsertPortalContact(CH3_CLIENT_UUID, contactId, {
+            first_name: firstName.trim(),
+            last_name:  lastName?.trim() || null,
+            name:       `${firstName.trim()} ${lastName?.trim() || ""}`.trim(),
+            email:      email.toLowerCase().trim(),
+            phone:      phone?.trim() || null,
+            tags:       ["ch3-lead", "ch3-free-trial", "sms-opted-in"],
+            source:     "ch3-free-trial",
+          });
+        }
       } else {
         console.error("GHL upsert failed:", upsertRes.status, (await upsertRes.text()).slice(0, 200));
       }
