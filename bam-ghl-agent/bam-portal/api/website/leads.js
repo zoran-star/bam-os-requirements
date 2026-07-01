@@ -101,7 +101,24 @@ function loadLocations() {
 let pipelinesCache = {};
 const PIPELINES_TTL_MS = 5 * 60_000;
 
-async function resolvePipelineStage(headers, ghlLocationId, pipelineName, stageName) {
+async function resolvePipelineStage(headers, ghlLocationId, pipelineName, stageName, clientId) {
+  // Registry-first for pipeline_provider='portal' academies: resolve from the
+  // portal's own pipeline_stages registry (by the role the configured stage name
+  // maps to) - no GHL read. Any miss (no clientId, provider 'ghl', unmapped
+  // custom stage name, unseeded row) falls through to the GHL lookup below.
+  if (clientId) {
+    try {
+      const role = roleForStageName(stageName);
+      if (role) {
+        const prow = await sbReq(`clients?id=eq.${clientId}&select=pipeline_provider&limit=1`);
+        if (prow?.[0]?.pipeline_provider === "portal") {
+          const rows = await sbReq(`pipeline_stages?client_id=eq.${clientId}&role=eq.${encodeURIComponent(role)}&select=ghl_pipeline_id,ghl_stage_id&limit=1`);
+          const row = rows?.[0];
+          if (row?.ghl_pipeline_id && row?.ghl_stage_id) return { pipelineId: row.ghl_pipeline_id, stageId: row.ghl_stage_id };
+        }
+      }
+    } catch (_) { /* fall through to GHL */ }
+  }
   const cached = pipelinesCache[ghlLocationId];
   let pipelines = cached && Date.now() - cached.at < PIPELINES_TTL_MS ? cached.list : null;
   if (!pipelines) {
@@ -252,7 +269,7 @@ async function pushToGhl(locName, ghlLocationId, { clientId, contactProv, requir
 // advance=false: create only if the contact has no open card in the pipeline.
 // advance=true:  also MOVE an existing open card to the target stage.
 async function placeOpportunity(headers, ghlLocationId, contactId, { pipeline, stage }, oppName, advance, clientId) {
-  const { pipelineId, stageId } = await resolvePipelineStage(headers, ghlLocationId, pipeline, stage);
+  const { pipelineId, stageId } = await resolvePipelineStage(headers, ghlLocationId, pipeline, stage, clientId);
 
   // Existence check (provider-aware). A provider='portal' academy's opp lives in the
   // portal STORE, not GHL - searching GHL would MISS it and create a DUPLICATE opp on
