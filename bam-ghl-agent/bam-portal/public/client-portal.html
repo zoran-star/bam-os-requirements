@@ -19927,8 +19927,8 @@ function _bbCqOpenAdd(offerId, sectionId, clientId) {
       <textarea id="bb-cq-opts" rows="3" placeholder="Small&#10;Medium&#10;Large" style="${inp};resize:vertical"></textarea>
     </div>
     <div style="display:flex;gap:10px;justify-content:flex-end">
-      <button class="btn-secondary-bb" onclick="document.getElementById('bb-cq-modal').remove()">Cancel</button>
-      <button class="btn-primary-bb" id="bb-cq-save" onclick="_bbCqSave('${offerId}','${sectionId}','${clientId}')">Add</button>
+      <button onclick="document.getElementById('bb-cq-modal').remove()" style="padding:9px 16px;background:transparent;border:1px solid var(--border);border-radius:6px;color:var(--text-sub);font-size:13px;font-weight:600;cursor:pointer">Cancel</button>
+      <button id="bb-cq-save" onclick="_bbCqSave('${offerId}','${sectionId}','${clientId}')" style="padding:9px 18px;background:var(--gold);border:1px solid var(--gold);border-radius:6px;color:#1a1a1a;font-size:13px;font-weight:700;cursor:pointer">Add</button>
     </div>
   </div>`;
   wrap.onclick = (e) => { if (e.target === wrap) wrap.remove(); };
@@ -19943,7 +19943,7 @@ async function _bbCqSave(offerId, sectionId, clientId) {
   const optsRaw = document.getElementById('bb-cq-opts')?.value || '';
   const options = (type === 'select' || type === 'multiselect') ? optsRaw.split('\n').map(s => s.trim()).filter(Boolean) : [];
   const btn = document.getElementById('bb-cq-save');
-  if (btn) { btn.disabled = true; btn.textContent = 'Adding…'; }
+  if (btn) { btn.disabled = true; btn.style.opacity = '0.6'; btn.style.cursor = 'not-allowed'; btn.textContent = 'Adding…'; }
   try {
     const token = await _mreqAuthToken();
     const r = await fetch('/api/custom-fields', {
@@ -19953,7 +19953,7 @@ async function _bbCqSave(offerId, sectionId, clientId) {
     });
     if (!r.ok) { const j = await r.json().catch(() => ({})); throw new Error(j.error || 'Save failed'); }
   } catch (e) {
-    if (btn) { btn.disabled = false; btn.textContent = 'Add'; }
+    if (btn) { btn.disabled = false; btn.style.opacity = '1'; btn.style.cursor = 'pointer'; btn.textContent = 'Add'; }
     alert(e.message || 'Could not add the question.');
     return;
   }
