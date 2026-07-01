@@ -19,6 +19,7 @@ import { withSentryApiRoute } from "../_sentry.js";
 import { getClientGhlToken } from "./availability.js";
 import { enrollContact, exitEnrollment } from "../automations.js";
 import { createOpp, ROLE_MATCHERS } from "../agent/_store.js";
+import { upsertPortalContact } from "../_contacts.js";
 
 const SB_URL = (process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || "").trim();
 const SB_KEY = (process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY || "").trim();
@@ -465,6 +466,17 @@ async function handler(req, res) {
     }
 
     // 3. Receipt — stamp the lead row; never fail the request over it.
+    // Also dual-write the portal-native contact (dormant store) and link it back
+    // onto the lead via contact_id, so lead history is home even off GHL.
+    if (receipt?.ghl_contact_id) {
+      const portalContactId = await upsertPortalContact(client.id, receipt.ghl_contact_id, {
+        name:   name || null,
+        email:  email?.toLowerCase() || null,
+        phone:  phone || null,
+        source: "website-form",
+      });
+      if (portalContactId) receipt.contact_id = portalContactId;
+    }
     try {
       await sbReq(`website_leads?id=eq.${leadId}`, {
         method: "PATCH",
