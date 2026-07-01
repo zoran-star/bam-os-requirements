@@ -3035,7 +3035,7 @@ async function handleMetaOverview(req, res) {
   // not filled (orange), no ticket = never sent (grey).
   const budgetStatusById = {};
   try {
-    const bt = await sb(`marketing_tickets?type=eq.budget-review&select=client_id,client_action_status,created_at&order=created_at.desc`);
+    const bt = await sb(`marketing_tickets?type=eq.budget-review&select=client_id,client_action_status,submitted_at&order=submitted_at.desc`);
     for (const t of (bt || [])) {
       if (budgetStatusById[t.client_id]) continue; // first = newest
       budgetStatusById[t.client_id] = t.client_action_status === "responded" ? "confirmed" : "requested";
