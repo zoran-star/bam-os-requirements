@@ -25,7 +25,7 @@
 
 import { withSentryApiRoute } from "../_sentry.js";
 import { renderAgreementPdf, uploadAgreementPdf } from "../_lib/agreement-pdf.js";
-import { applyDiscountToCents, normCode } from "../_coupon-guardrails.js";
+import { applyDiscountToCents, normCode, couponFromPromo } from "../_coupon-guardrails.js";
 
 const SB_URL = (process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || "").trim();
 const SB_KEY = (process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY || "").trim();
@@ -228,14 +228,14 @@ async function handler(req, res) {
     let promo = null, discountInfo = null, couponError = null;
     if (couponCode && !testMode) {
       try {
-        const list = await stripeFetch(`/promotion_codes?code=${encodeURIComponent(couponCode)}&limit=1`, { stripeAccount });
+        const list = await stripeFetch(`/promotion_codes?code=${encodeURIComponent(couponCode)}&limit=1&expand[]=data.promotion.coupon`, { stripeAccount });
         const pc = (list.data || [])[0];
         const nowSec = Math.floor(Date.now() / 1000);
         if (!pc || pc.active === false) couponError = "Code not found";
         else if (pc.expires_at && nowSec > pc.expires_at) couponError = "This code has expired";
         else if (pc.max_redemptions && (pc.times_redeemed || 0) >= pc.max_redemptions) couponError = "This code is fully redeemed";
         else {
-          const cp = pc.coupon || {};
+          const cp = couponFromPromo(pc);
           const def = cp.percent_off != null
             ? { kind: "Percent off", value: cp.percent_off }
             : { kind: "Dollar off", value: (cp.amount_off || 0) / 100 };

@@ -22,7 +22,7 @@ import { withSentryApiRoute } from "./_sentry.js";
 
 import crypto from "node:crypto";
 import { timingSafeEqual } from "node:crypto";
-import { applyDiscountToCents, normCode } from "./_coupon-guardrails.js";
+import { applyDiscountToCents, normCode, couponFromPromo } from "./_coupon-guardrails.js";
 
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
@@ -289,7 +289,7 @@ async function handler(req, res) {
             let sub;
             try {
               sub = await stripeFetch(
-                `/subscriptions/${member.stripe_subscription_id}?expand[]=items.data.price.product&expand[]=latest_invoice&expand[]=discounts.promotion_code`,
+                `/subscriptions/${member.stripe_subscription_id}?expand[]=items.data.price.product&expand[]=latest_invoice&expand[]=discounts.promotion_code&expand[]=discounts.coupon`,
                 { stripeAccount: client.stripe_connect_account_id }
               );
             } catch (_expandErr) {
@@ -1148,7 +1148,7 @@ async function actionRefund(res, member, stripeAccount, ctx, body) {
 async function resolvePromo(code, stripeAccount) {
   const c = normCode(code);
   if (!c) return null;
-  const list = await stripeFetch(`/promotion_codes?code=${encodeURIComponent(c)}&limit=1`, { stripeAccount });
+  const list = await stripeFetch(`/promotion_codes?code=${encodeURIComponent(c)}&limit=1&expand[]=data.promotion.coupon`, { stripeAccount });
   const pc = (list.data || [])[0];
   return pc && pc.active !== false ? pc : null;
 }
@@ -1213,7 +1213,7 @@ async function actionChange(res, member, stripeAccount, ctx, body) {
   let currentSub;
   try {
     currentSub = await stripeFetch(
-      `/subscriptions/${member.stripe_subscription_id}?expand[]=discounts.promotion_code`,
+      `/subscriptions/${member.stripe_subscription_id}?expand[]=discounts.promotion_code&expand[]=discounts.coupon`,
       { stripeAccount }
     );
   } catch (_expandErr) {
@@ -1333,7 +1333,7 @@ async function actionChange(res, member, stripeAccount, ctx, body) {
       const pc = await resolvePromo(body.coupon_code, stripeAccount);
       if (!pc) coupon = { error: "coupon not found or inactive" };
       else {
-        const chk = targetCents ? applyDiscountToCents(couponDefFromStripe(pc.coupon || {}), targetCents) : { ok: true };
+        const chk = targetCents ? applyDiscountToCents(couponDefFromStripe(couponFromPromo(pc)), targetCents) : { ok: true };
         if (!chk.ok) coupon = { error: chk.error };
         else {
           await stripeFetch(`/subscriptions/${sub.id}`, { method: "POST", stripeAccount, body: { "discounts[0][promotion_code]": pc.id } });
@@ -1401,7 +1401,7 @@ async function actionApplyCoupon(res, member, stripeAccount, ctx, body) {
   }
 
   // Live promotion code on the connected account.
-  const list = await stripeFetch(`/promotion_codes?code=${encodeURIComponent(code)}&limit=1`, { stripeAccount });
+  const list = await stripeFetch(`/promotion_codes?code=${encodeURIComponent(code)}&limit=1&expand[]=data.promotion.coupon`, { stripeAccount });
   const pc = (list.data || [])[0];
   if (!pc) return res.status(400).json({ error: `no coupon named ${code} exists in Stripe - create it in the offer's Pricing section first` });
   if (pc.active === false) return res.status(400).json({ error: `${code} is deactivated` });
@@ -1411,7 +1411,7 @@ async function actionApplyCoupon(res, member, stripeAccount, ctx, body) {
   }
 
   // Guardrail: never let this coupon zero-out or go negative on THIS plan.
-  const cp = pc.coupon || {};
+  const cp = couponFromPromo(pc);
   const def = cp.percent_off != null
     ? { kind: "Percent off", value: cp.percent_off }
     : { kind: "Dollar off", value: (cp.amount_off || 0) / 100 };

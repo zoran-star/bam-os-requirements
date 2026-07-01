@@ -41,5 +41,15 @@ Imported by every surface. Never bypass it.
 - Editing a live coupon's math isn't supported (Stripe coupons are immutable): deactivate + create a new code. `create-discount` skips codes that already exist live.
 - GTA checkout coupon is **skipped in test mode** (inline test price; coupons live on the connected account).
 
+## ⚠️ Stripe API-version gotcha (learned 2026-07-01)
+
+The platform's Stripe account is on a recent API version where **promotion codes changed shape**:
+- **Create:** `/v1/promotion_codes` needs `promotion[type]=coupon` + `promotion[coupon]=<id>` (NOT the old top-level `coupon` param → "Received unknown parameter: coupon").
+- **Read:** the coupon math is nested under `promotion.coupon` (expand `data.promotion.coupon`), not `pc.coupon`.
+- Coupon **create** (`/v1/coupons`) is unchanged (percent_off/amount_off/duration).
+- Subscriptions use the `discounts[]` array (we apply via `discounts[0][promotion_code]`).
+
+`stripePromoBody` emits the new shape; `couponFromPromo(pc)` reads coupon math across both shapes; all promo-code reads expand `...promotion.coupon`. If a future account is on an OLDER version this could flip - `couponFromPromo` already falls back to `pc.coupon`, but `stripePromoBody`/expands would need a version guard.
+
 ## Related
 [[project_change_plan_flow]] · [[project_website_enrollment_funnel]] · [[project_offer_architecture]]

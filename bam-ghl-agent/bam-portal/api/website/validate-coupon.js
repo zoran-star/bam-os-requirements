@@ -14,7 +14,7 @@
 // a negative or $0 charge. Stripe remains the final gate at payment time.
 
 import { withSentryApiRoute } from "../_sentry.js";
-import { applyDiscountToCents, normCode } from "../_coupon-guardrails.js";
+import { applyDiscountToCents, normCode, couponFromPromo } from "../_coupon-guardrails.js";
 
 const SB_URL = (process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || "").trim();
 const SB_KEY = (process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY || "").trim();
@@ -108,7 +108,7 @@ async function handler(req, res) {
     // Live promotion code (active only). Stripe matches code case-sensitively but
     // we always create UPPERCASE, so uppercasing the input lines them up.
     const list = await stripeFetch(
-      `/promotion_codes?code=${encodeURIComponent(code)}&limit=1`, acct
+      `/promotion_codes?code=${encodeURIComponent(code)}&limit=1&expand[]=data.promotion.coupon`, acct
     );
     const pc = (list.data || [])[0];
     if (!pc || pc.active === false) return res.status(200).json({ valid: false, reason: "Code not found" });
@@ -122,7 +122,7 @@ async function handler(req, res) {
     }
 
     // Coupon math from the live coupon + shared $1-floor / percent guardrails.
-    const cp = pc.coupon || {};
+    const cp = couponFromPromo(pc);
     const def = cp.percent_off != null
       ? { kind: "Percent off", value: cp.percent_off }
       : { kind: "Dollar off", value: (cp.amount_off || 0) / 100 };

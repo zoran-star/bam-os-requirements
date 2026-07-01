@@ -139,10 +139,17 @@ function stripeCouponBody(raw) {
 }
 
 // Build the Stripe Promotion Code create body (holds the customer-facing limits:
-// expiry, max redemptions, new-customer-only).
+// expiry, max redemptions, new-customer-only). Recent Stripe API versions moved
+// the coupon reference under a `promotion` hash (promotion[type]=coupon,
+// promotion[coupon]=<id>) instead of the old top-level `coupon` param.
 function stripePromoBody(raw, couponId) {
   const c = normalizeCoupon(raw);
-  const body = { coupon: couponId, code: c.code, "metadata[source]": "fullcontrol-sorter" };
+  const body = {
+    "promotion[type]": "coupon",
+    "promotion[coupon]": couponId,
+    code: c.code,
+    "metadata[source]": "fullcontrol-sorter",
+  };
   if (c.max_redemptions) body.max_redemptions = c.max_redemptions;
   if (c.expires_at) {
     const unix = Math.floor(Date.parse(c.expires_at + "T23:59:59") / 1000);
@@ -150,6 +157,16 @@ function stripePromoBody(raw, couponId) {
   }
   if (c.once_per_customer) body["restrictions[first_time_transaction]"] = "true";
   return body;
+}
+
+// Extract the coupon object from a promotion code across Stripe API versions:
+// newer versions nest it under `promotion.coupon`; older ones expose `pc.coupon`.
+// Requires the coupon to be expanded (expand[]=...promotion.coupon or ...coupon).
+function couponFromPromo(pc) {
+  if (!pc) return {};
+  if (pc.promotion && typeof pc.promotion.coupon === "object" && pc.promotion.coupon) return pc.promotion.coupon;
+  if (typeof pc.coupon === "object" && pc.coupon) return pc.coupon;
+  return {};
 }
 
 export {
@@ -163,4 +180,5 @@ export {
   isExpired,
   stripeCouponBody,
   stripePromoBody,
+  couponFromPromo,
 };

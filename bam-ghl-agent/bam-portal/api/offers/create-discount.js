@@ -1,5 +1,5 @@
 import { withSentryApiRoute } from "../_sentry.js";
-import { validateCouponDef, stripeCouponBody, stripePromoBody } from "../_coupon-guardrails.js";
+import { validateCouponDef, stripeCouponBody, stripePromoBody, couponFromPromo } from "../_coupon-guardrails.js";
 export const maxDuration = 60; // Stripe coupon + promo-code creation per row
 // Vercel Serverless Function — Price Match → create discount codes in Stripe.
 //
@@ -90,6 +90,9 @@ async function liveCodes(stripeAccount) {
   let startingAfter = null;
   for (let page = 0; page < 10; page++) {
     const qs = new URLSearchParams({ limit: "100", active: "true" });
+    // Expand the coupon (nested under promotion.coupon on this API version) so we
+    // can read its %/$ + duration for the manager pills.
+    qs.append("expand[]", "data.promotion.coupon");
     if (startingAfter) qs.set("starting_after", startingAfter);
     const r = await stripeFetch(`/promotion_codes?${qs.toString()}`, { stripeAccount });
     for (const pc of (r.data || [])) map.set(normCode(pc.code), pc);
@@ -119,7 +122,7 @@ async function handler(req, res) {
       const acct = await clientAccount(clientId);
       const live = await liveCodes(acct);
       const codes = [...live.values()].map(pc => {
-        const cp = pc.coupon || {};
+        const cp = couponFromPromo(pc);
         return {
           code: pc.code,
           exists: true,
