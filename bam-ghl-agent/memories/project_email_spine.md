@@ -28,6 +28,10 @@ verified domain — no per-academy config table.
   {toEmail, subject, html, text, ghlContactId, sentBy})` gate → `{handled:false}` for GHL
   academies (caller runs its GHL email send). Sends via `sendEmail` + records the own-store.
 - `messaging/email-read-thread.js` — store reads (list / by-contact / by-id / agent), type:"Email".
+- `messaging/email-import-ghl-history.js` — STAFF-only chunked import of GHL email history into the
+  store (pages /conversations/search, keeps EMAIL msgs, pulls subject/direction from `meta.email`,
+  fetches each body via `GET /conversations/messages/email/{id}`, upserts email_threads on
+  contact_email + email_messages idempotent on ghl_message_id). Read-only vs GHL.
 - `resend/inbound-webhook.js` — INBOUND: Svix-verified `email.received`. **Resend inbound is
   METADATA-ONLY** → fetches the body via `GET /emails/receiving/{email_id}`. Resolves the
   academy by the To-domain (`clients.email_domain`), the lead's ghl_contact_id from `contacts`
@@ -52,14 +56,24 @@ verified domain — no per-academy config table.
    `https://portal.byanymeansbusiness.com/api/resend/inbound-webhook`, copy the signing secret →
    set `RESEND_INBOUND_SECRET` on bam-portal Vercel (Prod+Dev).
 3. Set GTA `clients.email_domain='byanymeanstoronto.ca'`.
-4. (optional) import GHL email history into the store (email-import — not built yet).
+4. History import: DONE for GTA — 457 threads / 2,318 messages already in the email store (see below).
 5. Flip GTA `clients.email_provider='resend'`.
 
+## GTA email history — IMPORTED (2026-07-01)
+The SMS importer had already pulled ALL GHL channels into `sms_messages` (email tagged
+`channel='email'`: 2,882 msgs / 538 threads). Migrated those into the email store via SQL
+(resolving contact_email from `contacts` by ghl_contact_id): **457 email_threads, 2,318
+email_messages**, subjects backfilled from `raw->meta->email->subject` (2,310/2,318). Direction:
+15 inbound / 2,303 outbound (mostly automated receipts + training emails). **Bodies are NOT
+populated for these historical rows** (GHL's conversation list omits email bodies; they need the
+per-message fetch). Subjects + thread structure are there. To fill bodies, run
+`email-import-ghl-history.js` for GTA (it fetches each body from GHL) — heavy (~2.3k fetches),
+low value since most are outbound receipts. Post-cutover, all NEW email has full bodies via Resend.
+
 ## Known TODO / gaps
-- **History import not built** (email-import-ghl-history.js) — the SMS spine has one; add if we
-  want GTA's past GHL email threads in the store. Not required to flip (new mail flows in live).
 - **Body-fetch endpoint** `/emails/receiving/{id}` is best-effort; verify the exact path at cutover
   (metadata-only webhook confirmed via Resend docs). Store falls back to subject-only if it 404s.
+- **Historical email bodies** empty for GTA's imported threads (see above) — optional backfill.
 - **Inbox merge caveat:** an academy on `email_provider='resend'` but `messaging_provider='ghl'`
   would serve the email store only (SMS/IG/FB not merged from GHL). Doesn't affect GTA (already
   twilio → both stores merge). IG/FB DMs are still GHL-only regardless.
