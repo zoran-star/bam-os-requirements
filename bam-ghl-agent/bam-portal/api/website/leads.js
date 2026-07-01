@@ -18,7 +18,7 @@
 import { withSentryApiRoute } from "../_sentry.js";
 import { getClientGhlToken } from "./availability.js";
 import { enrollContact, exitEnrollment } from "../automations.js";
-import { createOpp, ROLE_MATCHERS } from "../agent/_store.js";
+import { createOpp, moveStage, ROLE_MATCHERS } from "../agent/_store.js";
 import { upsertPortalContact, writePortalFieldValues } from "../_contacts.js";
 
 const SB_URL = (process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || "").trim();
@@ -242,6 +242,17 @@ async function placeOpportunity(headers, ghlLocationId, contactId, { pipeline, s
   }
 
   if (existing && advance) {
+    // Move through the provider-aware store: on provider='portal' this updates the
+    // opportunities row (NO GHL write); on 'ghl' (every client today) it's the exact
+    // same PUT. Falls back to the raw PUT when the academy can't be resolved so
+    // nothing regresses. Best-effort - a move failure must not break lead intake.
+    if (clientId) {
+      const token = (headers.Authorization || headers.authorization || "").replace(/^Bearer\s+/i, "");
+      try {
+        await moveStage({ clientId, token, oppRef: { ghlOpportunityId: existing.id }, stage: { pipelineId, stageId, stageName: stage }, role: roleForStageName(stage), contactId });
+      } catch (e) { console.error("opportunity move failed:", e.message); }
+      return existing.id;
+    }
     const moveRes = await fetch(`${GHL_V2}/opportunities/${existing.id}`, {
       method: "PUT",
       headers,

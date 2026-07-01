@@ -14,7 +14,7 @@ import { withSentryApiRoute } from "./_sentry.js";
 
 import { pickGhlToken, ghl } from "./ghl/_core.js";
 import { nurtureStage, interestedStage, scheduledTrialContactIdSetCached } from "./agent/_stage.js";
-import { shadowMirrorMove } from "./agent/_store.js";
+import { moveStage, setStatus } from "./agent/_store.js";
 import { nextSessionLabel } from "./_next_session.js";
 import { sendOn } from "./_send.js";
 import { renderEmail } from "./email-shells.js";
@@ -247,8 +247,7 @@ async function runWork(res) {
             if (creds && creds.token) {
               const is = await interestedStage(creds.token, creds.locationId, { clientId: job.client_id, sb });
               const oppId = await findOpenOppId(creds.token, creds.locationId, job.contact_id);
-              if (is && oppId) await ghl("PUT", `/opportunities/${encodeURIComponent(oppId)}`, { token: creds.token, body: { pipelineId: is.pipelineId, pipelineStageId: is.stageId } });
-              if (is && oppId) { try { await shadowMirrorMove(job.client_id, { ghlOpportunityId: oppId, ghlContactId: job.contact_id, role: "ghosted", stageResolved: is, status: "open", reason: "intro form sent, no reply - rolled into ghosted" }); } catch (_) {} }
+              if (is && oppId) await moveStage({ clientId: job.client_id, ghl, token: creds.token, oppRef: { ghlOpportunityId: oppId }, stage: is, role: "ghosted", contactId: job.contact_id, reason: "intro form sent, no reply - rolled into ghosted" });
             }
             await logEvent({ clientId: job.client_id, contactId: job.contact_id, automationId: job.automation_id, type: "form_intro_to_ghosted", payload: { automation_key: a.automation_key } });
             formToGhosted++;
@@ -269,8 +268,7 @@ async function runWork(res) {
               if (creds && creds.token) {
                 const ns = await nurtureStage(creds.token, creds.locationId, { clientId: job.client_id, sb });
                 const oppId = await findOpenOppId(creds.token, creds.locationId, job.contact_id);
-                if (ns && oppId) await ghl("PUT", `/opportunities/${encodeURIComponent(oppId)}`, { token: creds.token, body: { pipelineId: ns.pipelineId, pipelineStageId: ns.stageId } });
-                if (ns && oppId) { try { await shadowMirrorMove(job.client_id, { ghlOpportunityId: oppId, ghlContactId: job.contact_id, role: "nurture", stageResolved: ns, status: "open", reason: `${a.automation_key} ran out - rolled into nurture` }); } catch (_) {} }
+                if (ns && oppId) await moveStage({ clientId: job.client_id, ghl, token: creds.token, oppRef: { ghlOpportunityId: oppId }, stage: ns, role: "nurture", contactId: job.contact_id, reason: `${a.automation_key} ran out - rolled into nurture` });
               }
               await logEvent({ clientId: job.client_id, contactId: job.contact_id, automationId: job.automation_id, type: `${a.automation_key}_to_nurture`, payload: null });
             } else {
@@ -278,9 +276,8 @@ async function runWork(res) {
               if (creds && creds.token) {
                 const oppId = await findOpenOppId(creds.token, creds.locationId, job.contact_id);
                 if (oppId) {
-                  try { await ghl("PUT", `/opportunities/${encodeURIComponent(oppId)}`, { token: creds.token, body: { status: "lost" } }); } catch (_) { /* GHL PUT best-effort */ }
+                  try { await setStatus({ clientId: job.client_id, ghl, token: creds.token, oppRef: { ghlOpportunityId: oppId }, status: "lost", contactId: job.contact_id, reason: "ghosted exhausted, nurture off" }); } catch (_) { /* best-effort */ }
                   try { await sb(`pipeline_outcomes`, { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify([{ client_id: job.client_id, opportunity_id: oppId, status: "lost", reason: "ghosted exhausted, nurture off" }]) }); } catch (_) {}
-                  try { await shadowMirrorMove(job.client_id, { ghlOpportunityId: oppId, ghlContactId: job.contact_id, status: "lost", reason: "ghosted exhausted, nurture off" }); } catch (_) {}
                   await logEvent({ clientId: job.client_id, contactId: job.contact_id, automationId: job.automation_id, type: "ghosted_exhausted_lost", payload: { opportunity_id: oppId } });
                   ghostedLost++;
                 }
@@ -306,9 +303,8 @@ async function runWork(res) {
             if (creds && creds.token) {
               const oppId = await findOpenOppId(creds.token, creds.locationId, job.contact_id);
               if (oppId) {
-                try { await ghl("PUT", `/opportunities/${encodeURIComponent(oppId)}`, { token: creds.token, body: { status: "lost" } }); } catch (_) { /* GHL PUT best-effort */ }
+                try { await setStatus({ clientId: job.client_id, ghl, token: creds.token, oppRef: { ghlOpportunityId: oppId }, status: "lost", contactId: job.contact_id, reason: "nurture sequence exhausted" }); } catch (_) { /* best-effort */ }
                 try { await sb(`pipeline_outcomes`, { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify([{ client_id: job.client_id, opportunity_id: oppId, status: "lost", reason: "nurture sequence exhausted" }]) }); } catch (_) {}
-                try { await shadowMirrorMove(job.client_id, { ghlOpportunityId: oppId, ghlContactId: job.contact_id, status: "lost", reason: "nurture sequence exhausted" }); } catch (_) {}
                 await logEvent({ clientId: job.client_id, contactId: job.contact_id, automationId: job.automation_id, type: "nurture_exhausted_lost", payload: { opportunity_id: oppId } });
                 nurtureLost++;
               }

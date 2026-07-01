@@ -36,7 +36,7 @@ import {
   doneTrialContactIdSetCached, peekDoneTrialIdSet, nurtureStage, toIso,
 } from "./agent/_stage.js";
 import { enrollContact, isAutomationLive, resolveContactInfo } from "./automations.js";
-import { shadowMirrorMove } from "./agent/_store.js";
+import { moveStage, setStatus } from "./agent/_store.js";
 import {
   DEFAULT_CLOSING_AUTOMATIONS, getClosingAutomations,
   automationsLive as closingAutomationsLive, nextDueStep as nextDueClosingStep,
@@ -772,17 +772,15 @@ async function handler(req, res) {
         if (await isAutomationLive(clientId, "nurture")) {
           const ns = await nurtureStage(token, locationId, { clientId, sb });
           if (ns) {
-            await ghl("PUT", `/opportunities/${encodeURIComponent(oppId)}`, { token, body: { pipelineId: ns.pipelineId, pipelineStageId: ns.stageId } });
+            await moveStage({ clientId, ghl, token, oppRef: { ghlOpportunityId: oppId }, stage: ns, role: "nurture", contactId, reason });
             await enrollContact({ clientId, automationKey: "nurture", contactId });
             routedToNurture = true;
-            try { await shadowMirrorMove(clientId, { ghlOpportunityId: oppId, ghlContactId: contactId, role: "nurture", stageResolved: ns, status: "open", reason }); } catch (_) {}
           }
         }
       } catch (_) { /* fall through to status=lost */ }
       if (!routedToNurture) {
-        try { await ghl("PUT", `/opportunities/${encodeURIComponent(oppId)}`, { token, body: { status: "lost" } }); }
-        catch (e) { return res.status(e.status || 502).json({ error: `GHL mark lost: ${e.message}` }); }
-        try { await shadowMirrorMove(clientId, { ghlOpportunityId: oppId, ghlContactId: contactId, status: "lost", reason }); } catch (_) {}
+        try { await setStatus({ clientId, ghl, token, oppRef: { ghlOpportunityId: oppId }, status: "lost", contactId, reason }); }
+        catch (e) { return res.status(e.status || 502).json({ error: `mark lost: ${e.message}` }); }
       }
       try { await sb(`pipeline_outcomes`, { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify([{ client_id: clientId, opportunity_id: oppId, status: routedToNurture ? "nurture" : "lost", reason }]) }); } catch (_) {}
       if (b.ready_id) {

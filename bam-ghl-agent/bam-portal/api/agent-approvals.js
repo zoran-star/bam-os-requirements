@@ -26,7 +26,7 @@ import { loadCalendars, calendarForGroup, freeSlots, summarizeSlots } from "./ag
 import { respondedStage, contactInRespondedStage, computeQueue, respondedContactIdSetCached, peekRespondedIdSet, interestedStage, nurtureStage, scheduledTrialStage, toIso } from "./agent/_stage.js";
 import { markUnqualified, unmarkUnqualified } from "./agent/_tags.js";
 import { enrollContact, isAutomationLive } from "./automations.js";
-import { shadowMirrorMove } from "./agent/_store.js";
+import { moveStage, setStatus } from "./agent/_store.js";
 import { agentMode, modeIsOn, shouldAutoSend } from "./agent/_mode.js";
 import { mutedContactIdSet, isMuted } from "./agent/_mutes.js";
 import { withinQuietHours, nextSendableTime } from "./agent/_quiet.js";
@@ -885,17 +885,17 @@ async function handler(req, res) {
         if (await isAutomationLive(clientId, "nurture")) {
           const ns = await nurtureStage(token, locationId, { clientId, sb });
           if (ns) {
-            await ghl("PUT", `/opportunities/${encodeURIComponent(oppId)}`, { token, body: { pipelineId: ns.pipelineId, pipelineStageId: ns.stageId } });
+            // Provider-aware: on provider='ghl' this is the identical PUT (+ shadow
+            // mirror); on 'portal' it updates the store row and writes NO GHL.
+            await moveStage({ clientId, ghl, token, oppRef: { ghlOpportunityId: oppId }, stage: ns, role: "nurture", contactId, reason });
             await enrollContact({ clientId, automationKey: "nurture", contactId });
             routedToNurture = true;
-            try { await shadowMirrorMove(clientId, { ghlOpportunityId: oppId, ghlContactId: contactId, role: "nurture", stageResolved: ns, status: "open", reason }); } catch (_) {}
           }
         }
       } catch (_) { /* fall through to the GHL-native lost path below */ }
       if (!routedToNurture) {
-        try { await ghl("PUT", `/opportunities/${encodeURIComponent(oppId)}`, { token, body: { status: "lost" } }); }
-        catch (e) { return res.status(e.status || 502).json({ error: `GHL mark lost: ${e.message}` }); }
-        try { await shadowMirrorMove(clientId, { ghlOpportunityId: oppId, ghlContactId: contactId, status: "lost", reason }); } catch (_) {}
+        try { await setStatus({ clientId, ghl, token, oppRef: { ghlOpportunityId: oppId }, status: "lost", contactId, reason }); }
+        catch (e) { return res.status(e.status || 502).json({ error: `mark lost: ${e.message}` }); }
       }
       try { await sb(`pipeline_outcomes`, { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify([{ client_id: clientId, opportunity_id: oppId, status: routedToNurture ? "nurture" : "lost", reason }]) }); } catch (_) {}
       // Clear ALL of this lead's queued cards (replies + follow-ups) - they're done in Responded now.
@@ -925,14 +925,13 @@ async function handler(req, res) {
         oppId = pick && pick.id;
       } catch (e) { return res.status(e.status || 502).json({ error: `GHL find opp: ${e.message}` }); }
       if (!oppId) return res.status(200).json({ error: "No opportunity found for this contact — nothing to abandon." });
+      const reason = (b.reason || (row && row.lost_reason) || "").toString().trim() || null;
       try {
-        await ghl("PUT", `/opportunities/${encodeURIComponent(oppId)}`, { token, body: { status: "abandoned" } });
-      } catch (e) { return res.status(e.status || 502).json({ error: `GHL abandon: ${e.message}` }); }
+        await setStatus({ clientId, ghl, token, oppRef: { ghlOpportunityId: oppId }, status: "abandoned", role: "unqualified", contactId, reason });
+      } catch (e) { return res.status(e.status || 502).json({ error: `abandon: ${e.message}` }); }
       // Stamp the unqualified tag (best-effort — the abandon already succeeded, so
       // a tag failure must not 500 the action).
       try { await markUnqualified(token, contactId); } catch (_) {}
-      const reason = (b.reason || (row && row.lost_reason) || "").toString().trim() || null;
-      try { await shadowMirrorMove(clientId, { ghlOpportunityId: oppId, ghlContactId: contactId, stageRole: "unqualified", status: "abandoned", reason }); } catch (_) {}
       try { await sb(`pipeline_outcomes`, { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify([{ client_id: clientId, opportunity_id: oppId, status: "abandoned", reason }]) }); } catch (_) {}
       try { await sb(`agent_ready_replies?client_id=eq.${clientId}&ghl_contact_id=eq.${encodeURIComponent(contactId)}&status=in.(pending,approved)`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ status: "sent", approved_by: staffEmail, approved_at: new Date().toISOString(), sent_at: new Date().toISOString(), updated_at: new Date().toISOString() }) }); } catch (_) {}
       try { await sb(`agent_followups?client_id=eq.${clientId}&ghl_contact_id=eq.${encodeURIComponent(contactId)}&status=in.(pending,approved)`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ status: "canceled", send_error: "abandoned", updated_at: new Date().toISOString() }) }); } catch (_) {}
@@ -994,8 +993,7 @@ async function handler(req, res) {
         const pick = opps.find(o => String(o.status || "").toLowerCase() === "open") || opps[0];
         const oppId = pick && pick.id;
         const sts = await scheduledTrialStage(token, locationId, { clientId, sb });
-        if (sts && oppId) await ghl("PUT", `/opportunities/${encodeURIComponent(oppId)}`, { token, body: { pipelineId: sts.pipelineId, pipelineStageId: sts.stageId } });
-        if (sts && oppId) { try { await shadowMirrorMove(clientId, { ghlOpportunityId: oppId, ghlContactId: contactId, role: "scheduled_trial", stageResolved: sts, status: "open" }); } catch (_) {} }
+        if (sts && oppId) await moveStage({ clientId, ghl, token, oppRef: { ghlOpportunityId: oppId }, stage: sts, role: "scheduled_trial", contactId });
       } catch (_) {}
       try { await sb(`agent_ready_replies?id=eq.${encodeURIComponent(b.ready_id)}&client_id=eq.${clientId}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ status: "sent", approved_by: staffEmail, approved_at: new Date().toISOString(), sent_at: new Date().toISOString(), updated_at: new Date().toISOString() }) }); } catch (_) {}
       try { await logApproval({ client_id: clientId, ghl_contact_id: contactId, contact_name: row.contact_name || null, final_reply: `[booked ${row.book_group || "trial"} @ ${startIso}]`, status: "sent", created_by: staffEmail }); } catch (_) {}
@@ -1040,8 +1038,7 @@ async function handler(req, res) {
       // already happened; the GHL workflow will move them too).
       try {
         const is = await interestedStage(token, locationId, { clientId, sb });
-        if (is && oppId) await ghl("PUT", `/opportunities/${encodeURIComponent(oppId)}`, { token, body: { pipelineId: is.pipelineId, pipelineStageId: is.stageId } });
-        if (is && oppId) { try { await shadowMirrorMove(clientId, { ghlOpportunityId: oppId, ghlContactId: contactId, role: "interested", stageResolved: is, status: "open" }); } catch (_) {} }
+        if (is && oppId) await moveStage({ clientId, ghl, token, oppRef: { ghlOpportunityId: oppId }, stage: is, role: "interested", contactId });
       } catch (_) {}
       try { if (oppId) await sb(`pipeline_outcomes`, { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify([{ client_id: clientId, opportunity_id: oppId, status: "ghosted", reason: "sent to ghosted automation" }]) }); } catch (_) {}
       // Clear ALL of this lead's queued cards (replies + follow-ups) — they've left Responded.
