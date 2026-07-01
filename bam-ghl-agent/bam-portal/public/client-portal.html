@@ -37717,8 +37717,13 @@ async function boot() {
     .order('business_name');
   CLIENT_ROWS = clientRows || [];
   // Pick the active academy: (1) the one you last selected on this device, else
-  // (2) an academy you OWN (members of many academies land on their own one),
-  // else (3) the first alphabetically.
+  // (2) an academy you OWN, else (3) the first alphabetically.
+  // For (2): when you own several academies, prefer the HIGHEST tier (V2 >
+  // V1.5/V4 > V1) so multi-academy owners land on their most advanced portal
+  // instead of the alphabetically-first one. This matters on fresh devices
+  // (mobile Chrome / a newly-installed PWA) where there's no stored choice
+  // yet - without it, an owner of both a V1 and a V2 academy would boot into
+  // the V1 one just because its name sorts earlier.
   let clientRow = null;
   if (clientRows && clientRows.length) {
     let stored = null;
@@ -37729,7 +37734,15 @@ async function boot() {
         const { data: ownRows } = await _sb.from('client_users')
           .select('client_id').eq('user_id', session.user.id).eq('role', 'owner').eq('status', 'active');
         const ownedIds = new Set((ownRows || []).map(r => r.client_id));
-        if (ownedIds.size) clientRow = clientRows.find(c => ownedIds.has(c.id)) || null;
+        if (ownedIds.size) {
+          // clientRows is already alpha-sorted; a stable sort by tier (desc)
+          // keeps alphabetical order as the tiebreak within the same tier.
+          const tierRank = (c) => c.v2_access === true ? 3
+            : (c.v15_access === true || c.v4_access === true ? 2 : 1);
+          const owned = clientRows.filter(c => ownedIds.has(c.id));
+          owned.sort((a, b) => tierRank(b) - tierRank(a));
+          clientRow = owned[0] || null;
+        }
       } catch (_) {}
     }
     if (!clientRow) clientRow = clientRows[0];
