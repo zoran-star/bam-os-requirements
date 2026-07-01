@@ -21763,6 +21763,10 @@ let _MEMBERS_FILTER = { q: '', status: 'all', trainer: 'all', engagement: 'all',
 // filter only appear once a second offer exists (mirrors the Sales page).
 let _MEMBERS_MULTI_OFFER = false;
 let _MEMBERS_FILTER_OPEN = false;
+// Client-side column-header sort (Google-Drive style). key = which column,
+// dir = 'asc' | 'desc'. When key is set it overrides the server-side dropdown
+// sort and is applied to the filtered list right before the cards render.
+let _MEMBERS_COLSORT = { key: null, dir: 'asc' };
 
 // ───────── Action Items (v1) ─────────
 // Shared per-client to-do list. List + create/edit modal + done checkbox.
@@ -22510,7 +22514,104 @@ function _membersSetSearch(q) {
 
 function _membersSetSort(value) {
   _MEMBERS_FILTER.sort = value;
+  // Picking the dropdown clears any active column-header sort so the two never
+  // fight - the dropdown's server-side sort wins and the header arrows clear.
+  _MEMBERS_COLSORT = { key: null, dir: 'asc' };
   fetchAndRenderMembers(); // sort happens server-side
+}
+
+// ── Column-header sort (client-side) ─────────────────────────────────────────
+// Amount / Price-status / Set-up are computed on the client and aren't
+// server-sortable, so we sort the already-filtered array here just before it
+// renders. Empty values always sink to the bottom regardless of direction.
+function _memberSortValue(m, key) {
+  switch (key) {
+    case 'athlete_name': {
+      const s = String(m.athlete_name || '').trim();
+      return { v: s.toLowerCase(), empty: !s };
+    }
+    case 'trainer': {
+      const t = String(m.trainer || '').trim();
+      return { v: t.toLowerCase(), empty: !t || t === '-' };
+    }
+    case 'status': {
+      const order = { live: 0, cancelling: 1, paused: 2, payment_failed: 3, payment_method_required: 4 };
+      const r = order[m.status];
+      return { v: (r === undefined ? 99 : r), empty: false };
+    }
+    case 'pricestatus': {
+      // Same resolution the roster cell uses: price_id map wins, plan-name is a
+      // fallback. 'live' first, 'legacy' (archived) next, unknown sinks last.
+      const st = (m && m.stripe_price_id ? _MEMBERS_PRICE_STATUS[m.stripe_price_id] : null) || _memberPlanStatus(m);
+      const r = st === 'live' ? 0 : (st === 'legacy' ? 1 : 2);
+      return { v: r, empty: r === 2 };
+    }
+    case 'amount': {
+      const c = (m.pricing && m.pricing.amount_cents) ? Number(m.pricing.amount_cents) : null;
+      return { v: (c == null ? 0 : c), empty: c == null };
+    }
+    case 'setup': {
+      // Fully wired (live + linked to GHL) first, imported/locked billing next,
+      // everything else last.
+      let r;
+      if (m.status === 'live' && m.ghl_contact_id) r = 0;
+      else if (m.billing_portal_owned === false) r = 1;
+      else r = 2;
+      return { v: r, empty: r === 2 };
+    }
+    default:
+      return { v: 0, empty: true };
+  }
+}
+
+function _membersApplyColSort(arr) {
+  const cs = _MEMBERS_COLSORT;
+  if (!cs || !cs.key || !Array.isArray(arr)) return arr;
+  const dir = cs.dir === 'desc' ? -1 : 1;
+  const key = cs.key;
+  return arr.slice().sort((a, b) => {
+    const va = _memberSortValue(a, key);
+    const vb = _memberSortValue(b, key);
+    if (va.empty && vb.empty) return 0;
+    if (va.empty) return 1;   // empties always last, either direction
+    if (vb.empty) return -1;
+    let cmp;
+    if (typeof va.v === 'number' && typeof vb.v === 'number') cmp = va.v - vb.v;
+    else cmp = String(va.v).localeCompare(String(vb.v));
+    return cmp * dir;
+  });
+}
+
+// Click a header: same column flips direction, a new column starts ascending.
+function _membersSortByColumn(key) {
+  const cs = _MEMBERS_COLSORT;
+  if (cs.key === key) cs.dir = (cs.dir === 'asc') ? 'desc' : 'asc';
+  else { cs.key = key; cs.dir = 'asc'; }
+  _renderMembersView();
+}
+
+// One header cell - shows the direction arrow + gold highlight when it's active.
+function _memberColHeader(key, label) {
+  const cs = _MEMBERS_COLSORT;
+  const active = cs.key === key;
+  const arrow = active ? (cs.dir === 'asc' ? '▲' : '▼') : '';
+  return `<button type="button" class="mch${active ? ' active' : ''}" onclick="_membersSortByColumn('${key}')" title="Sort by ${escapeHTML(label)}">${escapeHTML(label)}${arrow ? ` <span class="mch-arrow">${arrow}</span>` : ''}</button>`;
+}
+
+// The clickable column-header strip above the roster cards. Its grid mirrors the
+// .member-card grid exactly so the labels sit over their columns.
+function _membersColHeaderMarkup() {
+  return `<div class="members-col-header">
+    <span aria-hidden="true"></span>
+    ${_memberColHeader('athlete_name', 'Athlete / Parent')}
+    ${_memberColHeader('trainer', 'Trainer')}
+    <div class="members-col-header-pills">
+      ${_memberColHeader('status', 'Status')}
+      ${_memberColHeader('pricestatus', 'Price')}
+      ${_memberColHeader('amount', 'Amount')}
+      ${_memberColHeader('setup', 'Set up')}
+    </div>
+  </div>`;
 }
 
 
@@ -22564,10 +22665,11 @@ function _renderMembersView() {
   const pendingCount = all.filter(_isSignupInProgress).length;
   const memberTotal  = all.length - pendingCount;   // "All" = real (paid) members only
   const f = _MEMBERS_FILTER;
-  const filtered = _filterMembers(all);
+  // Apply the client-side column-header sort (no-op when no header is active).
+  const filtered = _membersApplyColSort(_filterMembers(all));
   // In the default view, append signup-in-progress rows as their own labeled
   // group below the members (aux filters - trainer/search/offer - still apply).
-  const pendingGroup = (f.status === 'all') ? _filterMembers(all, 'pending') : [];
+  const pendingGroup = (f.status === 'all') ? _membersApplyColSort(_filterMembers(all, 'pending')) : [];
 
   // Unique trainers in the data, GTA canonical order first then any extras.
   const trainerSet = new Set(all.map(m => m.trainer).filter(Boolean));
@@ -22676,6 +22778,31 @@ function _renderMembersView() {
          instead of overflowing the fixed column. */
       .mc-status { flex-wrap:wrap; row-gap:4px; }
       .members-filter-backdrop { display:none; }
+      /* Clickable column-header strip - NOT a card (thin, no fill/radius). Its
+         grid matches .member-card exactly (incl. a transparent 1px border to
+         offset the card border) so the labels line up over their columns. */
+      .members-col-header {
+        display:grid;
+        grid-template-columns:38px minmax(140px,1fr) 100px 420px;
+        gap:14px;
+        align-items:center;
+        padding:2px 16px 8px;
+        margin-bottom:4px;
+        border:1px solid transparent;
+        border-bottom:1px solid var(--border);
+      }
+      .members-col-header-pills { display:grid; grid-template-columns:124px 96px 92px auto; align-items:center; column-gap:8px; }
+      .mch {
+        background:transparent; border:none; padding:0; margin:0;
+        font-family:inherit; font-size:11px; font-weight:700; letter-spacing:0.5px;
+        text-transform:uppercase; color:var(--text-mute); cursor:pointer;
+        display:inline-flex; align-items:center; gap:4px; text-align:left;
+        white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:100%;
+        transition:color 0.12s ease;
+      }
+      .mch:hover { color:var(--text); }
+      .mch.active { color:var(--gold,#E8C547); }
+      .mch .mch-arrow { font-size:9px; flex:0 0 auto; }
       @media (max-width: 640px) {
         .member-card {
           grid-template-columns: 42px 1fr;
@@ -22690,6 +22817,9 @@ function _renderMembersView() {
           display:flex; flex-wrap:wrap; gap:7px; margin-top:4px;
         }
         .mc-extra { display:none; }
+        /* Cards reflow to 2 columns on mobile, so the aligned header can't line
+           up - hide the whole strip (matches hiding trainer + extra columns). */
+        .members-col-header { display:none; }
       }
     </style>
     <div style="display:flex;gap:10px;align-items:center;margin-bottom:14px;flex-wrap:wrap">
@@ -22729,7 +22859,7 @@ function _renderMembersView() {
   // first; signup-in-progress rows follow under their own labeled group.
   const cards = _membersCardsMarkup(filtered, pendingGroup, f.status);
 
-  container.innerHTML = toolbar + `<div id="members-cards">${cards}</div>`;
+  container.innerHTML = toolbar + _membersColHeaderMarkup() + `<div id="members-cards">${cards}</div>`;
   if (wasFocused) _membersRestoreSearchFocus(cursorPos);
 }
 
@@ -22786,8 +22916,8 @@ function _membersRenderCardsOnly() {
   if (!host) { _renderMembersView(); return; }
   const all = _MEMBERS_ALL || [];
   const f = _MEMBERS_FILTER;
-  const filtered = _filterMembers(all);
-  const pendingGroup = (f.status === 'all') ? _filterMembers(all, 'pending') : [];
+  const filtered = _membersApplyColSort(_filterMembers(all));
+  const pendingGroup = (f.status === 'all') ? _membersApplyColSort(_filterMembers(all, 'pending')) : [];
   host.innerHTML = (filtered.length || pendingGroup.length)
     ? _membersCardsMarkup(filtered, pendingGroup, f.status)
     : '<div class="req-empty" style="padding:20px 0">No members match this filter.</div>';
