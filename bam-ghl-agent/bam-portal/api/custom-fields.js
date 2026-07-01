@@ -232,9 +232,12 @@ async function handler(req, res) {
 
       // Optional filters: offer_id (wizard scopes to one offer) + section.
       let filter = `custom_field_defs?client_id=eq.${clientId}`;
+      const wizardRead = !!req.query.offer_id || req.query.scope === "academy";
       if (req.query.offer_id) filter += `&offer_id=eq.${encodeURIComponent(req.query.offer_id)}`;
       else if (req.query.scope === "academy") filter += `&offer_id=is.null`;
       if (req.query.section) filter += `&section=eq.${encodeURIComponent(req.query.section)}`;
+      // Wizard reads never want archived fields; the staff tab (no scope) shows them dimmed.
+      if (wizardRead) filter += `&archived=eq.false`;
       const fields = await sb(`${filter}&select=*&order=position.asc,created_at.asc`);
       // Attach how many contacts have a value per field (one grouped read).
       const counts = {};

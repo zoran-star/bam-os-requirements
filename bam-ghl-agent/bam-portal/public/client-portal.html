@@ -19855,6 +19855,7 @@ const _BB_CQ_TYPES = [
 ];
 const _BB_CQ_TYPE_LABEL = Object.fromEntries(_BB_CQ_TYPES);
 let _bbCqCache = {}; // `${offerId}:${section}` -> array | undefined (not loaded)
+let _bbCqCoreCache = {}; // clientId -> academy-level (always-collected) fields | undefined
 
 function _bbRenderCustomQuestions(offer, sectionId) {
   const ck = offer.id + ':' + sectionId;
@@ -19880,12 +19881,40 @@ function _bbRenderCustomQuestions(offer, sectionId) {
       </div>`;
     }).join('');
   }
+
+  // Read-only "always collected" strip: the academy-level (core) fields that
+  // are captured on every offer. Informational only - not editable here.
+  const core = _bbCqCoreCache[offer.client_id];
+  if (core === undefined) _bbLoadCoreFields(offer.client_id);
+  let coreBlock = '';
+  if (Array.isArray(core) && core.length) {
+    const rows = core.map(f => `<div style="display:flex;align-items:center;gap:8px;padding:7px 10px;background:transparent;border:1px dashed var(--border);border-radius:6px;margin-bottom:6px;opacity:0.85">
+        <span style="font-size:13px;color:var(--text-sub)">${escapeHTML(f.label)}</span>
+        <span style="font-size:11px;color:var(--text-mute);margin-left:auto">${escapeHTML(_BB_CQ_TYPE_LABEL[f.type] || f.type)}</span>
+      </div>`).join('');
+    coreBlock = `<div style="font-size:11px;font-weight:700;color:var(--text-mute);letter-spacing:0.6px;text-transform:uppercase;margin-bottom:4px">Always collected</div>
+      <div style="font-size:12px;color:var(--text-sub);margin-bottom:12px">Core info captured on every offer for this academy.</div>
+      ${rows}
+      <div style="height:20px"></div>`;
+  }
+
   return `<div style="margin-top:18px;padding-top:16px;border-top:1px solid var(--border)">
+    ${coreBlock}
     <div style="font-size:11px;font-weight:700;color:var(--text-mute);letter-spacing:0.6px;text-transform:uppercase;margin-bottom:4px">Custom questions</div>
     <div style="font-size:12px;color:var(--text-sub);margin-bottom:12px">${blurb}</div>
     ${inner}
     <button class="btn-secondary-bb" onclick="_bbCqOpenAdd('${offer.id}','${sectionId}','${offer.client_id}')" style="margin-top:8px">+ Add question</button>
   </div>`;
+}
+
+async function _bbLoadCoreFields(clientId) {
+  try {
+    const token = await _mreqAuthToken();
+    const r = await fetch('/api/custom-fields?client_id=' + encodeURIComponent(clientId) + '&scope=academy', { headers: { Authorization: 'Bearer ' + token } });
+    const j = await r.json().catch(() => ({}));
+    _bbCqCoreCache[clientId] = (r.ok && Array.isArray(j.fields)) ? j.fields : [];
+  } catch (e) { _bbCqCoreCache[clientId] = []; }
+  _bbRenderWizardBody();
 }
 
 async function _bbLoadCustomQuestions(offerId, sectionId, clientId) {
