@@ -1,4 +1,5 @@
 import { withSentryApiRoute } from "./_sentry.js";
+import { contactsReadTable } from "./_contacts.js";
 // Automation engine (P4a) — the portal-native scheduler for the 👻 Ghosted +
 // 💔 Lead Nurture sequences. Three jobs:
 //   1. enrollContact / exitEnrollment — helpers the P6 triggers call (exported).
@@ -391,7 +392,7 @@ async function runWork(res) {
       let athlete = "";
       if (/athlet/i.test(`${step.body || ""}${step.subject || ""}`)) {
         try {
-          const rows = await sb(`ghl_contacts?client_id=eq.${job.client_id}&ghl_contact_id=eq.${encodeURIComponent(job.contact_id)}&select=athlete_name&limit=1`);
+          const rows = await sb(`${await contactsReadTable(job.client_id)}?client_id=eq.${job.client_id}&ghl_contact_id=eq.${encodeURIComponent(job.contact_id)}&select=athlete_name&limit=1`);
           athlete = (Array.isArray(rows) && rows[0] && rows[0].athlete_name) || "";
         } catch (_) { /* leave blank */ }
       }
@@ -573,7 +574,7 @@ async function handler(req, res) {
       if (ids.length) {
         try {
           const inList = ids.map(id => `"${String(id).replace(/"/g, "")}"`).join(",");
-          const contacts = (await sb(`ghl_contacts?client_id=eq.${clientId}&ghl_contact_id=in.(${inList})&select=ghl_contact_id,name,athlete_name`)) || [];
+          const contacts = (await sb(`${await contactsReadTable(clientId)}?client_id=eq.${clientId}&ghl_contact_id=in.(${inList})&select=ghl_contact_id,name,athlete_name`)) || [];
           for (const c of contacts) nameMap[c.ghl_contact_id] = c.name || c.athlete_name || null;
         } catch (_) { /* names are best-effort */ }
       }

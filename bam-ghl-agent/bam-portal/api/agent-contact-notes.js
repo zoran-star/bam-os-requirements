@@ -1,4 +1,5 @@
 import { withSentryApiRoute } from "./_sentry.js";
+import { contactsReadTable } from "./_contacts.js";
 // Per-contact notes for the sales agent's memory.
 //
 //   POST /api/agent-contact-notes { action, ... }   (Supabase bearer)
@@ -53,7 +54,7 @@ async function handler(req, res) {
       const [notes, ptrRows, contactRows] = await Promise.all([
         sb(`agent_contact_notes?client_id=eq.${b.client_id}&ghl_contact_id=eq.${cid}&active=eq.true&select=id,note,created_by,created_at&order=created_at.desc`).catch(() => []),
         sb(`post_trial_reviews?client_id=eq.${b.client_id}&ghl_contact_id=eq.${cid}&select=showed_up,good_fit,trainer,notes,created_at&order=created_at.desc&limit=1`).catch(() => []),
-        sb(`ghl_contacts?client_id=eq.${b.client_id}&ghl_contact_id=eq.${cid}&select=name,athlete_name,tags&limit=1`).catch(() => []),
+        sb(`${await contactsReadTable(b.client_id)}?client_id=eq.${b.client_id}&ghl_contact_id=eq.${cid}&select=name,athlete_name,tags&limit=1`).catch(() => []),
       ]);
       return res.status(200).json({
         notes: Array.isArray(notes) ? notes : [],

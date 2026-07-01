@@ -1,4 +1,5 @@
 import { withSentryApiRoute } from "./_sentry.js";
+import { contactsReadTable } from "./_contacts.js";
 // Vercel Serverless Function — Bot Approval Queue (responded-stage booking agent)
 //
 //   POST /api/agent-approvals  { action, ... }   (staff bearer required)
@@ -582,7 +583,7 @@ async function detectForClient(client) {
         catch (e) { reasons.push(`opener ${contactId}: draft threw — ${e.message}`); continue; }
         if (!d.reply || !String(d.reply).trim()) { if (d.escalate) escalated++; continue; }
         let nm = null;
-        try { const c = await sb(`ghl_contacts?client_id=eq.${client.id}&ghl_contact_id=eq.${encodeURIComponent(contactId)}&select=name&limit=1`); nm = (Array.isArray(c) && c[0] && c[0].name) || null; } catch (_) {}
+        try { const c = await sb(`${await contactsReadTable(client.id)}?client_id=eq.${client.id}&ghl_contact_id=eq.${encodeURIComponent(contactId)}&select=name&limit=1`); nm = (Array.isArray(c) && c[0] && c[0].name) || null; } catch (_) {}
         const isBook = !!(d.book && d.book_slot_at && d.book_calendar_id);
         try {
           await sb(`agent_ready_replies`, { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify([{
@@ -624,7 +625,7 @@ async function detectForClient(client) {
         catch (e) { reasons.push(`rebook ${contactId}: draft threw - ${e.message}`); continue; }
         if (!d.reply || !String(d.reply).trim()) { if (d.escalate) escalated++; continue; }
         let nm = null;
-        try { const c = await sb(`ghl_contacts?client_id=eq.${client.id}&ghl_contact_id=eq.${encodeURIComponent(contactId)}&select=name&limit=1`); nm = (Array.isArray(c) && c[0] && c[0].name) || null; } catch (_) {}
+        try { const c = await sb(`${await contactsReadTable(client.id)}?client_id=eq.${client.id}&ghl_contact_id=eq.${encodeURIComponent(contactId)}&select=name&limit=1`); nm = (Array.isArray(c) && c[0] && c[0].name) || null; } catch (_) {}
         const isBook = !!(d.book && d.book_slot_at && d.book_calendar_id);
         let queued = false;
         try {

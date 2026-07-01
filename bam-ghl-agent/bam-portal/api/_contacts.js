@@ -71,6 +71,31 @@ async function get(path) {
   return res.json();
 }
 
+// Read the academy's contact system-of-record: 'ghl' (default) or 'portal' (own
+// contacts store). Best-effort - any hiccup returns 'ghl', so a lookup failure can
+// never silently flip an academy off GHL. This is the READ-side seam: callers pick
+// the table to query from it.
+export async function contactProvider(clientId) {
+  try {
+    if (!SB_URL || !SB_KEY || !clientId) return "ghl";
+    const rows = await get(`clients?id=eq.${encodeURIComponent(clientId)}&select=contact_provider&limit=1`);
+    const p = Array.isArray(rows) && rows[0] && rows[0].contact_provider;
+    return p === "portal" ? "portal" : "ghl";
+  } catch (e) {
+    console.error("[contactProvider] non-fatal:", e?.message || e);
+    return "ghl";
+  }
+}
+
+// The table a contact-card READ should come from for this academy:
+//   'portal' -> the portal-owned `contacts` store (source of truth once flipped)
+//   'ghl'    -> the `ghl_contacts` mirror (kept fresh by the sync cron)
+// Both carry the same search columns (id, ghl_contact_id, name, athlete_name,
+// email, phone, tags), so a caller swaps ONLY the table name and keeps its query.
+export async function contactsReadTable(clientId) {
+  return (await contactProvider(clientId)) === "portal" ? "contacts" : "ghl_contacts";
+}
+
 // Coerce a raw form value to the shape the def's type stores as jsonb.
 function coerceValue(type, v) {
   if (v === undefined || v === null) return null;

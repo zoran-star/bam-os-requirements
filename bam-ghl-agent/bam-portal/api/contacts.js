@@ -1,4 +1,5 @@
 import { withSentryApiRoute } from "./_sentry.js";
+import { contactsReadTable } from "./_contacts.js";
 // V1.5 Contacts tab API.
 //
 //   GET  /api/contacts?client_id=&q=&tag=          search the synced mirror (fast)
@@ -240,10 +241,13 @@ async function handler(req, res) {
     }
   }
 
-  // ── GET (default): search the synced mirror ──
+  // ── GET (default): search the contact store ──
+  // Provider-aware: provider='portal' reads the portal-owned `contacts` store;
+  // every other academy keeps the `ghl_contacts` mirror. Same columns either way.
   const q = (req.query.q || "").replace(/[(),*%]/g, " ").trim();
   const tag = (req.query.tag || "").trim();
-  let path = `ghl_contacts?client_id=eq.${encodeURIComponent(clientId)}` +
+  const table = await contactsReadTable(clientId);
+  let path = `${table}?client_id=eq.${encodeURIComponent(clientId)}` +
     `&select=id,ghl_contact_id,name,athlete_name,email,phone,tags` +
     `&order=name.asc.nullslast&limit=1000`;
   if (q) {

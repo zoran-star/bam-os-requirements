@@ -1,4 +1,5 @@
 import { withSentryApiRoute } from "../_sentry.js";
+import { contactsReadTable } from "../_contacts.js";
 // Vercel Serverless Function — Stripe info for a SINGLE contact, scoped to one
 // academy's CONNECTED Stripe account. Powers the Stripe section of the V1.5
 // Contacts-tab right drawer.
@@ -96,7 +97,7 @@ async function handler(req, res) {
     let customerId = null;
     let cached = null;
     if (ghlContactId) {
-      const cr = await sb(`ghl_contacts?client_id=eq.${clientId}&ghl_contact_id=eq.${encodeURIComponent(ghlContactId)}&select=stripe_customer_id,phone&limit=1`);
+      const cr = await sb(`${await contactsReadTable(clientId)}?client_id=eq.${clientId}&ghl_contact_id=eq.${encodeURIComponent(ghlContactId)}&select=stripe_customer_id,phone&limit=1`);
       cached = (Array.isArray(cr) && cr[0]) || null;
       if (cached && cached.stripe_customer_id) customerId = cached.stripe_customer_id;
     }

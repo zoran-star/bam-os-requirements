@@ -1,5 +1,6 @@
 import { withSentryApiRoute } from "./_sentry.js";
 import { timingSafeEqual } from "node:crypto";
+import { contactsReadTable } from "./_contacts.js";
 import { maybeSendSmsViaProvider } from "./messaging/provider.js";
 // V1.5 mass send — queued, throttled, DND-respecting bulk SMS/email to a
 // tag-filtered audience (GHL bulk rules: skip DND, pace the sends).
@@ -154,7 +155,7 @@ async function handler(req, res) {
     const clientId = req.query.client_id;
     if (!clientId) return res.status(400).json({ error: "client_id required" });
     if (!ctx.isStaff && !ctx.clientIds.includes(clientId)) return res.status(403).json({ error: "not your academy" });
-    const rows = await sb(`ghl_contacts?client_id=eq.${encodeURIComponent(clientId)}&dnd=eq.false&select=tags&limit=5000`);
+    const rows = await sb(`${await contactsReadTable(clientId)}?client_id=eq.${encodeURIComponent(clientId)}&dnd=eq.false&select=tags&limit=5000`);
     const counts = {};
     for (const r of (rows || [])) for (const t of (r.tags || [])) counts[t] = (counts[t] || 0) + 1;
     const tags = Object.entries(counts).map(([tag, count]) => ({ tag, count })).sort((a, b) => a.tag.localeCompare(b.tag));
@@ -185,7 +186,7 @@ async function handler(req, res) {
     const channelFilter = channel === "Email" ? "&email=not.is.null" : "&phone=not.is.null";
     const tagsArrLiteral = `{${tags.map(t => `"${t.replace(/"/g, "")}"`).join(",")}}`;
     const audience = await sb(
-      `ghl_contacts?client_id=eq.${encodeURIComponent(clientId)}&dnd=eq.false` +
+      `${await contactsReadTable(clientId)}?client_id=eq.${encodeURIComponent(clientId)}&dnd=eq.false` +
       `&tags=ov.${encodeURIComponent(tagsArrLiteral)}${channelFilter}` +
       `&select=ghl_contact_id,name,phone,email&limit=5000`
     );

@@ -1,5 +1,6 @@
 import { withSentryApiRoute } from "./_sentry.js";
 import { getClientGhlToken } from "./website/availability.js";
+import { contactsReadTable } from "./_contacts.js";
 // Scans Stripe (charges/subs/payouts) + GHL opportunities per month — well past
 // the default ~10s budget.
 export const maxDuration = 60;
@@ -187,7 +188,7 @@ async function handler(req, res) {
     if (action === "customer-search") {
       const q = String(req.query.q || "").trim();
       if (q.length < 2) return res.status(200).json({ ghl: [], stripe: [] });
-      const ghlMirror = await sb(`ghl_contacts?client_id=eq.${encodeURIComponent(clientId)}&select=ghl_contact_id,name,email,phone&or=(name.ilike.*${encodeURIComponent(q)}*,email.ilike.*${encodeURIComponent(q)}*,phone.ilike.*${encodeURIComponent(q)}*)&limit=8`).catch(() => []);
+      const ghlMirror = await sb(`${await contactsReadTable(clientId)}?client_id=eq.${encodeURIComponent(clientId)}&select=ghl_contact_id,name,email,phone&or=(name.ilike.*${encodeURIComponent(q)}*,email.ilike.*${encodeURIComponent(q)}*,phone.ilike.*${encodeURIComponent(q)}*)&limit=8`).catch(() => []);
       let stripeCusts = [];
       if (acct) {
         try {
@@ -278,7 +279,7 @@ async function handler(req, res) {
       // person's name instead of "By Any Means Free Trial".
       const nameById = {};
       try {
-        const rows = await sb(`ghl_contacts?client_id=eq.${encodeURIComponent(clientId)}&select=ghl_contact_id,name,athlete_name&limit=5000`);
+        const rows = await sb(`${await contactsReadTable(clientId)}?client_id=eq.${encodeURIComponent(clientId)}&select=ghl_contact_id,name,athlete_name&limit=5000`);
         for (const r of (rows || [])) if (r.ghl_contact_id) nameById[r.ghl_contact_id] = r.name || r.athlete_name || null;
       } catch (_) {}
       let ghlError = false;   // a GHL call failed (rate-limit/token) → counts may be understated
