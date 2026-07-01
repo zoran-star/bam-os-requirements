@@ -19,7 +19,7 @@ import { withSentryApiRoute } from "../_sentry.js";
 import { getClientGhlToken } from "./availability.js";
 import { enrollContact, exitEnrollment } from "../automations.js";
 import { createOpp, moveStage, findOpenOpp, pipelineFlags, ROLE_MATCHERS } from "../agent/_store.js";
-import { upsertPortalContact, writePortalFieldValues } from "../_contacts.js";
+import { upsertPortalContact, writePortalFieldValues, contactProvider, resolveOrMintPortalContact } from "../_contacts.js";
 
 const SB_URL = (process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || "").trim();
 const SB_KEY = (process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY || "").trim();
@@ -129,7 +129,7 @@ function roleForStageName(stageName) {
   return null;
 }
 
-async function pushToGhl(locName, ghlLocationId, { clientId, name, email, phone, message, messageFieldId, formType, pipelineConfig, extraTags, fields, fieldMap }) {
+async function pushToGhl(locName, ghlLocationId, { clientId, contactProv, requireGhl, name, email, phone, message, messageFieldId, formType, pipelineConfig, extraTags, fields, fieldMap }) {
   const loc = loadLocations().find(l => l.name === locName);
   if (!loc) return null;
 
@@ -177,15 +177,36 @@ async function pushToGhl(locName, ghlLocationId, { clientId, name, email, phone,
     Accept: "application/json",
   };
 
-  // Upsert: GHL matches on email/phone and creates or updates in one call.
+  // Create the contact. PORTAL-NATIVE for contact_provider='portal' academies:
+  // the person is found-or-minted in the portal contacts store and NO GHL contact
+  // is created - the minted uuid flows through the ghl_contact_id join key
+  // everywhere. EXCEPTION (requireGhl): a booking submission still needs a real
+  // GHL contact because the calendar appointment POST below requires one
+  // (calendars are still on GHL - deferred); the GHL id is dual-written to the
+  // store by the handler as before. Every 'ghl' academy keeps the exact upsert:
+  // GHL matches on email/phone and creates or updates in one call.
   // (Search-then-create raced with GHL's duplicate prevention and failed on
   // repeat submissions from the same email.)
-  const upsertRes = await fetch(`${GHL_V2}/contacts/upsert`, {
-    method: "POST", headers, body: JSON.stringify(payload),
-  });
-  if (!upsertRes.ok) throw new Error(`GHL ${upsertRes.status}: ${(await upsertRes.text()).slice(0, 120)}`);
-  const upserted = await upsertRes.json();
-  const contactId = (upserted.contact || upserted).id || null;
+  let contactId = null;
+  if (clientId && contactProv === "portal" && !requireGhl) {
+    const cfMap = {};
+    for (const f of customFields) cfMap[String(f.id)] = String(f.field_value);
+    contactId = await resolveOrMintPortalContact(clientId, {
+      first_name: firstName || null,
+      last_name:  lastName || null,
+      name:       (name || "").trim() || null,
+      email, phone, tags,
+      custom_fields: Object.keys(cfMap).length ? cfMap : null,
+      source: "website-form",
+    });
+  } else {
+    const upsertRes = await fetch(`${GHL_V2}/contacts/upsert`, {
+      method: "POST", headers, body: JSON.stringify(payload),
+    });
+    if (!upsertRes.ok) throw new Error(`GHL ${upsertRes.status}: ${(await upsertRes.text()).slice(0, 120)}`);
+    const upserted = await upsertRes.json();
+    contactId = (upserted.contact || upserted).id || null;
+  }
 
   // Make the message readable in GHL. The inbox thread can't carry it without
   // a registered conversation provider (/conversations/messages/inbound
@@ -193,7 +214,9 @@ async function pushToGhl(locName, ghlLocationId, { clientId, name, email, phone,
   //   1. NOTE on the contact — always works, holds the full message text
   //   2. conversation entry — puts the contact in the team inbox unread,
   //      which fires the normal GHL notification
-  if (contactId && message) {
+  // Skipped entirely for 'portal' academies - nobody reads GHL there, and the
+  // message already lives on the website_leads row (+ mapped custom fields).
+  if (contactId && message && contactProv !== "portal") {
     try {
       const noteRes = await fetch(`${GHL_V2}/contacts/${contactId}/notes`, {
         method: "POST",
@@ -392,12 +415,18 @@ async function handler(req, res) {
     }
   } catch (e) { console.error("entry_points lookup failed (non-fatal):", e.message); }
 
+  // Contact provider: 'portal' academies mint leads in the portal store (no GHL
+  // contact) - EXCEPT booking submissions, which still need a real GHL contact
+  // for the calendar appointment (calendars are still on GHL).
+  const contactProv = await contactProvider(client.id);
+  const requireGhl = !!(booking?.calendar_id && booking?.start);
+
   let ghlStatus = "not-configured";
   let kpiContactId = null;
   if (ghlLocName && client.ghl_location_id) {
     let receipt;
     try {
-      const ghlContactId = await pushToGhl(ghlLocName, client.ghl_location_id, { clientId: client.id, name, email, phone, message, messageFieldId, formType: form_type, pipelineConfig, extraTags, fields, fieldMap });
+      const ghlContactId = await pushToGhl(ghlLocName, client.ghl_location_id, { clientId: client.id, contactProv, requireGhl, name, email, phone, message, messageFieldId, formType: form_type, pipelineConfig, extraTags, fields, fieldMap });
       if (ghlContactId) {
         ghlStatus = "synced";
         kpiContactId = ghlContactId;
@@ -526,7 +555,10 @@ async function handler(req, res) {
     // legacy GHL workflow enrol.
     if (kpiContactId && fields?.step !== "booking") {
       const routed = await maybePortalRoute(client, kpiContactId, form_type, { name, email });
-      if (!routed && formWorkflowId) {
+      // GHL workflow fallback is meaningless for a 'portal' academy: its new
+      // contacts are portal-minted uuids GHL has never heard of (enroll would
+      // 404), and its outreach runs on portal automations.
+      if (!routed && formWorkflowId && contactProv !== "portal") {
         await enrollInWorkflow(client, kpiContactId, formWorkflowId);
       }
     }

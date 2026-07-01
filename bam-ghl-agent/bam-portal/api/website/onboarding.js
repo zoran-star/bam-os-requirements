@@ -18,6 +18,7 @@
 
 import { withSentryApiRoute } from "../_sentry.js";
 import { renderAgreementPdf } from "../_lib/agreement-pdf.js";
+import { contactProvider, resolveOrMintPortalContact } from "../_contacts.js";
 
 // Vercel body size override — base64 images are large
 export const config = {
@@ -518,6 +519,37 @@ async function handler(req, res) {
   let ghlContactId = null;
   let ghlStatus    = "not-configured";
 
+  // Contact provider gate: a 'portal' academy mints the contact in the portal
+  // store (no GHL contact / note / conversation / workflow - the full submission
+  // already lives on the website_leads row, files included). Every 'ghl' academy
+  // keeps the exact GHL push below.
+  const contactProv = await contactProvider(client_id);
+  if (contactProv === "portal") {
+    try {
+      ghlContactId = await resolveOrMintPortalContact(client_id, {
+        first_name: athlete_first || null,
+        last_name:  athlete_last || null,
+        name:       `${athlete_first || ""} ${athlete_last || ""}`.trim() || null,
+        email:      parent_email ? parent_email.toLowerCase() : null,
+        phone:      parent_phone || null,
+        athlete_name: `${athlete_first || ""} ${athlete_last || ""}`.trim() || null,
+        tags:       ["adapt-onboarding", "aau-experience"],
+        source:     "adapt-onboarding",
+      });
+      ghlStatus = ghlContactId ? "synced" : "failed";
+      if (ghlContactId) {
+        try {
+          await sbReq(`website_leads?id=eq.${leadId}`, {
+            method: "PATCH",
+            body: JSON.stringify({ ghl_contact_id: ghlContactId, ghl_synced_at: new Date().toISOString(), ghl_error: null }),
+          });
+        } catch (e) { console.error("Failed to stamp portal receipt on lead", leadId, e.message); }
+      }
+    } catch (e) {
+      console.error("portal contact mint failed - lead is saved:", e.message);
+      ghlStatus = "failed";
+    }
+  } else {
   const loc = loadGhlLocation(GHL_LOC_NAME);
   if (loc) {
     try {
@@ -563,6 +595,7 @@ async function handler(req, res) {
         console.error("Failed to stamp GHL error on lead", leadId, stampErr.message);
       }
     }
+  }
   }
 
   /* ------------------------------------------
