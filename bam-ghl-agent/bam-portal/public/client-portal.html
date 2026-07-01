@@ -10987,6 +10987,14 @@ const _V15IB_CHANNELS = [
   { key: 'instagram', label: 'Instagram', icon: '📸' },
   { key: 'facebook',  label: 'Facebook',  icon: '📘' },
 ];
+// V2 academies run their inbox off the own-store (SMS via Twilio + Email via
+// Resend) - Instagram/Facebook DMs are GHL-only and never surface here, so the
+// Meta toggles are dead buttons. Hide them for V2. (Icon lookups still use the
+// full list, so a stray Meta thread would still render its icon correctly.)
+function _v15ibVisibleChannels() {
+  const isV2 = (typeof V2_ACCESS !== 'undefined' && V2_ACCESS);
+  return isV2 ? _V15IB_CHANNELS.filter(c => c.key !== 'instagram' && c.key !== 'facebook') : _V15IB_CHANNELS;
+}
 const _V15IB_FAILED = ['failed', 'undelivered', 'error', 'rejected'];
 
 // ── Skeleton loaders (shown on the very first load, before any data) ──
@@ -11129,7 +11137,7 @@ function _v15ibRenderAll() {
   const countLabel = `${n} conversation${n === 1 ? '' : 's'}${(filterActive || channelActive || _V15IB.unreadOnly) ? ' in filter' : ''}`;
   // Channel toggle buttons - press to show only that channel (multi-select).
   // A pressed button is "down + activated"; none pressed = all channels.
-  const chanBtns = _V15IB_CHANNELS.map(ch => {
+  const chanBtns = _v15ibVisibleChannels().map(ch => {
     const on = _V15IB.fChannels.includes(ch.key);
     return `<button onclick="_v15ibToggleChannel('${ch.key}')" aria-pressed="${on}" class="v15ib-chan${on ? ' on' : ''}">${ch.icon} ${ch.label}</button>`;
   }).join('');
