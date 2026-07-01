@@ -1,6 +1,8 @@
 import { withSentryApiRoute } from "../_sentry.js";
 import { smsProvider } from "../messaging/provider.js";
 import { readStoreThreadInbox, readStoreThreadById, listStoreThreads } from "../messaging/read-thread.js";
+import { emailProvider } from "../messaging/email-provider.js";
+import { readEmailStoreThreadInbox, readEmailStoreThreadById, listEmailStoreThreads } from "../messaging/email-read-thread.js";
 // Vercel Serverless Function — Per-academy GHL Inbox
 //
 //   GET /api/ghl/inbox?client_id=<uuid>
@@ -302,12 +304,38 @@ async function handler(req, res) {
   const conversationId = req.query.conversation_id;
   const contactId = req.query.contact_id;
 
-  // Twilio academies: serve the inbox from the own-store, not GHL conversations.
+  // Own-store academies: serve the inbox from the portal store, not GHL. SMS
+  // (messaging_provider='twilio') and Email (email_provider='resend') each have
+  // their own store; when both are on we MERGE them into one inbox. Dormant for
+  // an academy on neither → falls through to the GHL read below unchanged.
   try {
-    if ((await smsProvider(clientId)) === "twilio") {
-      if (contactId) return res.status(200).json(await readStoreThreadInbox(clientId, contactId));
-      if (conversationId) return res.status(200).json(await readStoreThreadById(conversationId));
-      const conversations = await listStoreThreads(clientId);
+    const [smsOn, emailOn] = await Promise.all([
+      smsProvider(clientId).then((p) => p === "twilio").catch(() => false),
+      emailProvider(clientId).then((p) => p === "resend").catch(() => false),
+    ]);
+    if (smsOn || emailOn) {
+      // Single thread by contact: merge this contact's SMS + Email messages.
+      if (contactId) {
+        const parts = await Promise.all([
+          smsOn ? readStoreThreadInbox(clientId, contactId).catch(() => ({ messages: [] })) : { messages: [] },
+          emailOn ? readEmailStoreThreadInbox(clientId, contactId).catch(() => ({ messages: [] })) : { messages: [] },
+        ]);
+        const messages = [...(parts[0].messages || []), ...(parts[1].messages || [])].sort((a, b) => new Date(a.date || 0) - new Date(b.date || 0));
+        const conversation_id = parts[0].conversation_id || parts[1].conversation_id || null;
+        return res.status(200).json({ conversation_id, messages });
+      }
+      // Thread by id: try whichever store owns it (both are uuids).
+      if (conversationId) {
+        if (smsOn) { const t = await readStoreThreadById(conversationId).catch(() => null); if (t && t.messages && t.messages.length) return res.status(200).json(t); }
+        if (emailOn) { const t = await readEmailStoreThreadById(conversationId).catch(() => null); if (t) return res.status(200).json(t); }
+        return res.status(200).json({ conversation_id: conversationId, messages: [] });
+      }
+      // List: merge both stores' conversations, newest activity first.
+      const lists = await Promise.all([
+        smsOn ? listStoreThreads(clientId).catch(() => []) : [],
+        emailOn ? listEmailStoreThreads(clientId).catch(() => []) : [],
+      ]);
+      const conversations = [...lists[0], ...lists[1]].sort((a, b) => new Date(b.lastMessageDate || 0) - new Date(a.lastMessageDate || 0));
       const counts = { unread: conversations.reduce((s, c) => s + (c.unreadCount || 0), 0) };
       return res.status(200).json({ conversations, counts });
     }
