@@ -19,7 +19,7 @@ import { withSentryApiRoute } from "../_sentry.js";
 import { getClientGhlToken } from "./availability.js";
 import { enrollContact, exitEnrollment } from "../automations.js";
 import { createOpp, ROLE_MATCHERS } from "../agent/_store.js";
-import { upsertPortalContact } from "../_contacts.js";
+import { upsertPortalContact, writePortalFieldValues } from "../_contacts.js";
 
 const SB_URL = (process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || "").trim();
 const SB_KEY = (process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY || "").trim();
@@ -475,7 +475,12 @@ async function handler(req, res) {
         phone:  phone || null,
         source: "website-form",
       });
-      if (portalContactId) receipt.contact_id = portalContactId;
+      if (portalContactId) {
+        receipt.contact_id = portalContactId;
+        // Close the write loop: land this form's custom-field values in the
+        // portal (contact_field_values) in real time, keyed by custom_field_defs.
+        await writePortalFieldValues(client.id, portalContactId, fieldMap, fields);
+      }
     }
     try {
       await sbReq(`website_leads?id=eq.${leadId}`, {
