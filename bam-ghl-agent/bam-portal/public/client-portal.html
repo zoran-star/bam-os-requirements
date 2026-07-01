@@ -31214,6 +31214,18 @@ function _renderMemberModalBody(m, stripe, history) {
     billingRows = [['Status', 'No Stripe subscription on file.']];
   }
 
+  // Membership start date — editable inline. Display/access label only (does NOT change
+  // billing); blank = starts immediately. Saving mirrors it to the Stripe subscription
+  // metadata (see api/members.js actionUpdateProfile). Shown on every member.
+  const _startVal = (m.start_date && String(m.start_date).slice(0, 10)) || '';
+  const _startFuture = _startVal && _startVal > new Date().toISOString().slice(0, 10);
+  const startDateInput =
+    `<input type="date" value="${escapeHTML(_startVal)}" onchange="_memberUpdateField('${m.id}','start_date',this.value)" `
+    + `title="Membership start date (display only, does not change billing). Blank = starts immediately." `
+    + `style="background:var(--surface);border:1px solid var(--border);border-radius:4px;color:var(--text);padding:4px 8px;font:inherit;font-size:13px">`
+    + (_startFuture ? ` <span style="margin-left:8px;font-size:11px;font-weight:700;color:var(--gold,#E8C547)">Starts ${escapeHTML(fmtDate(Math.floor(new Date(_startVal + 'T00:00:00').getTime() / 1000)))}</span>` : '');
+  billingRows.push(['Start date', startDateInput]);
+
   const labelCss   = 'font-size:11px;font-weight:700;color:var(--text-mute);letter-spacing:0.6px;text-transform:uppercase';
   const divider    = '<div style="height:1px;background:var(--border);margin:22px 0"></div>';
   const rowGrid    = (rows) => `<div style="display:grid;grid-template-columns:120px 1fr;gap:10px 14px;font-size:13px;align-items:center">${rows.map(([l, v]) => `<div style="color:var(--text-mute)">${l}</div><div>${v}</div>`).join('')}</div>`;
