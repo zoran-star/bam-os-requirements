@@ -191,6 +191,24 @@ values
     true,
     true,
     60
+  ),
+  (
+    '82000000-0000-4000-8000-000000000007',
+    '39875f07-0a4b-4429-a201-2249bc1f24df',
+    '81000000-0000-4000-8000-000000000001',
+    '1/Wk - 3 months (legacy)',
+    54000,
+    'cad',
+    '3_months',
+    'price_1Rr8OjRxInSEtAh8GESeALQG',
+    'prod_Sl1zyYgBHXh1Bv',
+    '52a6285c-7832-44e1-b531-ab7ef9d8fc21',
+    'Steady|3_months',
+    '8b5790fb-6e0a-42e9-85d8-914f49fca2b7',
+    false,
+    false,
+    false,
+    70
   )
 on conflict (id) do update set
   tenant_id = excluded.tenant_id,
@@ -307,6 +325,20 @@ values
     true,
     'FREE',
     '{"display_label":"Unlimited bookings"}'::jsonb,
+    'ACTIVE'
+  ),
+  (
+    '83000000-0000-4000-8000-000000000007',
+    '39875f07-0a4b-4429-a201-2249bc1f24df',
+    '82000000-0000-4000-8000-000000000007',
+    '80000000-0000-4000-8000-000000000001',
+    'WEEKLY_CREDITS',
+    'STUDENT',
+    1,
+    'WEEK',
+    false,
+    'PER_SLOT_CREDIT_COST',
+    '{"display_label":"1 credit / week"}'::jsonb,
     'ACTIVE'
   )
 on conflict (id) do update set
