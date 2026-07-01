@@ -18015,9 +18015,8 @@ const _bbStdOnboarding = (intakeFieldDefaults, intakeFieldAddons) => ([
     hint:'This is the first thing people get texted when they sign up. Write the welcome message + prep info, and attach any PDFs / videos / images.' },
   { key:'welcome_video', type:'file', label:'Welcome video', 
     hint:'Plays on the website confirmation page right after a trial is booked. MP4, under 50 MB.' },
-  { key:'intake_form_fields', type:'check_many_defaults', label:'Intake form fields',
-    defaultOptions: intakeFieldDefaults,
-    addonOptions: intakeFieldAddons },
+  // Intake fields now come from the consolidated "info to collect" panel
+  // (custom_field_defs) appended to the Onboarding step by _bbRenderStepFields.
   { key:'notify_on_signup', type:'staff_select', label:'Notify on new sign-up',
     hint:'Who gets pinged when someone signs up' },
   { key:'assets', type:'asset_bank', label:'Assets',
@@ -18233,9 +18232,7 @@ const _bbOfferConfigs = {
         hint:'Calendar link or "create new"' },
       { key:'describe_path', type:'textarea', label:'Describe the path',
         dep:{ key:'sales_path', equals:'Other' } },
-      { key:'reg_form_fields', type:'check_many_defaults', label:'Registration form fields', required:true,
-        defaultOptions:['Athlete name','Parent name','Parent phone','Parent email','Emergency contact name','Emergency contact phone'],
-        addonOptions:['Age','Skill level','Dietary restrictions','T-shirt size','Photo / video release','Medical / allergies','Add custom'] },
+      // Registration fields now come from the consolidated "info to collect" panel.
       { key:'lead_notify', type:'staff_select', label:'Notify on new lead' },
       { key:'upsells', type:'block_builder', label:'Upsells',
         hint:'Target offer + description ("After this clinic, pitch the academy")',
@@ -18301,12 +18298,8 @@ const _bbOfferConfigs = {
       _bbCommonExtraNotes
     ]},
     { id:'sales', label:'Sales', fields:[
-      { key:'team_reg_form', type:'check_many_defaults', label:'Team registration form fields',
-        defaultOptions:['Team name','Captain name','Captain phone','Captain email','Roster (player names)'],
-        addonOptions:['Age division','Jersey colors','Preferred game time','Coach name + phone','Add custom'] },
-      { key:'individual_reg_form', type:'check_many_defaults', label:'Individual registration form fields',
-        defaultOptions:['Player name','Parent name','Parent phone','Parent email','Emergency contact name','Emergency contact phone'],
-        addonOptions:['Position','Height','Skill level','Add custom'] },
+      // Team + individual registration fields now come from the consolidated
+      // "info to collect" panel (custom_field_defs), authored per offer.
       { key:'roster_min_max', type:'text', label:'Roster min / max' },
       { key:'free_agent_matching', type:'check_one', label:'Free-agent matching?',
         dep:{ key:'registration_unit', equals:['Individual','Both'] },
@@ -18399,9 +18392,7 @@ const _bbOfferConfigs = {
       _bbCommonExtraNotes
     ]},
     { id:'sales', label:'Sales', fields:[
-      { key:'reg_form_fields', type:'check_many_defaults', label:'Registration form fields', required:true,
-        defaultOptions:['Team name','Captain name','Captain phone','Captain email','Age division','Roster (player names)'],
-        addonOptions:['Coach name + phone','Jersey colors','Out-of-state Y/N','Add custom'] },
+      // Registration fields now come from the consolidated "info to collect" panel.
       { key:'bracket_cap', type:'number', label:'Bracket cap',
         dep:{ key:'brackets', equals:'Yes' },
         hint:'Max teams per division' },
@@ -18499,9 +18490,7 @@ const _bbOfferConfigs = {
       _bbCommonExtraNotes
     ]},
     { id:'sales', label:'Sales', fields:[
-      { key:'inquiry_form_fields', type:'check_many_defaults', label:'Inquiry form fields',
-        defaultOptions:['Org name','Event type','Expected attendees','Dates','Contact name','Contact phone','Contact email'],
-        addonOptions:['Prior renter Y/N','Insurance status','Special requests','Add custom'] },
+      // Inquiry fields now come from the consolidated "info to collect" panel.
       { key:'rate_sheet', type:'file', label:'Quote / rate sheet',
         hint:'Auto-sent on inquiry' },
       { key:'negotiation_policy', type:'check_one', label:'Rate negotiation policy',
@@ -19827,9 +19816,11 @@ function _bbRenderStepFields(offer, sectionId) {
   let fields = config.fields;
   if (_bbIsV1()) fields = fields.filter(f => !_V1_HIDE_TYPES.has(f.type) && !_V1_HIDE_KEYS.has(f.key));
   let html = fields.map(f => _bbRenderField(f, sectionId)).join('');
-  // Owner-authored "info to collect" (always-asked + custom questions) lives in
-  // the Sales step - consolidated single surface, backed by custom_field_defs.
-  if (sectionId === 'sales' && !_bbIsV1()) {
+  // Owner-authored "info to collect" (always-asked + custom questions) - the
+  // consolidated single surface (backed by custom_field_defs) for the Sales and
+  // Onboarding steps of every standard offer type. Team routes its per-team
+  // sales/onboarding through a different renderer, so it isn't affected here.
+  if ((sectionId === 'sales' || sectionId === 'onboarding') && !_bbIsV1()) {
     html += _bbRenderCustomQuestions(offer, sectionId);
   }
   return html;
@@ -19860,7 +19851,7 @@ function _bbRenderCustomQuestions(offer, sectionId) {
 
   // Always-asked = base contact fields + academy core custom fields. Locked
   // (gold, no remove) - captured on every offer for this academy.
-  const alwaysChips = ['Parent name', 'Email', 'Phone']
+  const alwaysChips = ['Name', 'Email', 'Phone']
     .concat(Array.isArray(core) ? core.map(f => f.label) : [])
     .map(l => `<span class="bb-choice selected" style="cursor:default" title="Always collected - can't remove">${escapeHTML(l)}</span>`)
     .join('');
@@ -19877,9 +19868,12 @@ function _bbRenderCustomQuestions(offer, sectionId) {
   }
   optChips += `<button type="button" class="bb-choice" onclick="_bbCqOpenAdd('${offer.id}','${sectionId}','${offer.client_id}')">+ Add custom</button>`;
 
+  const heading = sectionId === 'sales' ? 'Info to collect from leads' : 'Info to collect at onboarding';
+  const sub = sectionId === 'sales' ? "What this offer's lead form asks." : 'What a member fills in when they join this offer.';
+
   return `<div style="margin-top:18px;padding-top:16px;border-top:1px solid var(--border)">
-    <div style="font-size:11px;font-weight:700;color:var(--text-mute);letter-spacing:0.6px;text-transform:uppercase;margin-bottom:4px">Info to collect from leads</div>
-    <div style="font-size:12px;color:var(--text-sub);margin-bottom:12px">What this offer's lead form asks.</div>
+    <div style="font-size:11px;font-weight:700;color:var(--text-mute);letter-spacing:0.6px;text-transform:uppercase;margin-bottom:4px">${heading}</div>
+    <div style="font-size:12px;color:var(--text-sub);margin-bottom:12px">${sub}</div>
     <div class="bb-defaults-info"><b style="color:var(--accent)">Always asked:</b></div>
     <div class="bb-choice-row" style="margin-bottom:14px">${alwaysChips}</div>
     <div class="bb-defaults-info" style="margin-top:0">Optional (your custom questions):</div>
