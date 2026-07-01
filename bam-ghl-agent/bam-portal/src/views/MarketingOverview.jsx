@@ -51,6 +51,24 @@ export default function MarketingOverview({ tokens, session }) {
 
   const bm = data.benchmarks || { cpl: 25 };
   const verdictColor = (v) => v === "strong" ? t.green : v === "attention" ? t.amber : v === "steady" ? t.accent : t.textMute;
+  // Budget-confirmation status. confirmed = client filled out the "confirm your
+  // monthly budgets" request (green check), requested = sent but not filled yet
+  // (orange dot), none = never sent (grey dot).
+  const budgetStatusCell = (s) => {
+    if (s === "confirmed") return (
+      <span style={{ display: "inline-flex", alignItems: "center", gap: 7 }}>
+        <span style={{ color: t.green, fontSize: 13, lineHeight: 1 }}>✓</span>
+        <span style={{ fontSize: 12, color: t.textSub }}>Confirmed</span>
+      </span>
+    );
+    const requested = s === "requested";
+    return (
+      <span style={{ display: "inline-flex", alignItems: "center", gap: 7 }}>
+        <span style={{ width: 9, height: 9, borderRadius: "50%", background: requested ? t.amber : t.textMute }} />
+        <span style={{ fontSize: 12, color: t.textSub }}>{requested ? "Sent, awaiting" : "Not sent"}</span>
+      </span>
+    );
+  };
   const rows = [...data.clients];
   rows.sort((a, b) => {
     if (sort === "attention") {
@@ -64,11 +82,12 @@ export default function MarketingOverview({ tokens, session }) {
   const attention = rows.filter(r => r.attention).map(r => ({ name: r.business_name, reason: reasonFor(r, bm) }));
 
   function exportCSV() {
-    const head = ["Client", "Verdict", "Spend", "Leads", "CPL", "Goal CPL", "Budget", "Leads vs last %", "CPL vs last %", "Spent % of budget"];
+    const budgetStatusLabel = (s) => s === "confirmed" ? "Confirmed" : s === "requested" ? "Sent, awaiting" : "Not sent";
+    const head = ["Client", "Verdict", "Spend", "Leads", "CPL", "Goal CPL", "Budget", "Leads vs last %", "CPL vs last %", "Spent % of budget", "Budget status"];
     const lines = rows.map(r => [
       r.business_name, r.needs_campaigns ? "Needs campaigns" : r.connected ? (r.verdict_label || "") : "Not connected",
       r.needs_campaigns ? "" : (r.spend ?? ""), r.needs_campaigns ? "" : (r.leads ?? ""), r.needs_campaigns ? "" : (r.cpl ?? ""), r.goal_cpl ?? "", r.monthly_budget ?? "",
-      r.trend?.leads_pct ?? "", r.trend?.cpl_pct ?? "", r.pacing?.spent_pct ?? "",
+      r.trend?.leads_pct ?? "", r.trend?.cpl_pct ?? "", r.pacing?.spent_pct ?? "", budgetStatusLabel(r.budget_status),
     ].map(v => `"${String(v).replace(/"/g, '""')}"`).join(","));
     const csv = [head.join(","), ...lines].join("\n");
     const blob = new Blob([csv], { type: "text/csv" });
@@ -143,7 +162,7 @@ export default function MarketingOverview({ tokens, session }) {
           <thead><tr>
             <th style={th}>Client</th><th style={th}>Verdict</th><th style={{ ...th, textAlign: "right" }}>Spend</th>
             <th style={{ ...th, textAlign: "right" }}>Leads</th><th style={{ ...th, textAlign: "right" }}>CPL</th>
-            <th style={th}>Trend</th><th style={th}>Pacing</th>
+            <th style={th}>Trend</th><th style={th}>Pacing</th><th style={th}>Budget status</th>
           </tr></thead>
           <tbody>
             {rows.map(r => {
@@ -167,10 +186,11 @@ export default function MarketingOverview({ tokens, session }) {
                   <td style={{ ...td, textAlign: "right", color: r.cpl == null ? t.textMute : (r.cpl <= target ? t.green : t.amber) }}>{r.cpl != null ? fmtMoney(r.cpl) : "—"}</td>
                   <td style={td}>{r.trend?.leads_pct == null ? <span style={{ color: t.textMute }}>—</span> : <span style={{ fontSize: 12, color: r.trend.leads_pct >= 0 ? t.green : t.amber }}>{r.trend.leads_pct > 0 ? "▲" : r.trend.leads_pct < 0 ? "▼" : "■"} {Math.abs(r.trend.leads_pct)}% leads</span>}</td>
                   <td style={td}>{r.pacing?.spent_pct == null ? <span style={{ color: t.textMute }}>—</span> : <span style={{ fontSize: 12, color: r.pacing.spent_pct > r.pacing.month_pct + 15 ? t.amber : t.textSub }}>{r.pacing.spent_pct}% of budget</span>}</td>
+                  <td style={td}>{budgetStatusCell(r.budget_status)}</td>
                 </tr>
               );
             })}
-            {!rows.length && <tr><td style={{ ...td, color: t.textSub }} colSpan={7}>No marketing clients yet.</td></tr>}
+            {!rows.length && <tr><td style={{ ...td, color: t.textSub }} colSpan={8}>No marketing clients yet.</td></tr>}
           </tbody>
         </table>
       </div>

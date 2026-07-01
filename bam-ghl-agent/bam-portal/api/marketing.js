@@ -3029,6 +3029,19 @@ async function handleMetaOverview(req, res) {
   catch { clients = await sb(`clients?select=id,business_name,meta_ad_account_id,meta_campaign_ids,marketing_included,status&order=business_name.asc`); }
   clients = (clients || []).filter(c => c.marketing_included !== false);
 
+  // Budget-confirmation status per client, from the "budget-review" ticket the
+  // marketing team sends ("confirm your monthly budgets"). Newest ticket per
+  // client wins: responded = client filled it out (green), requested = sent but
+  // not filled (orange), no ticket = never sent (grey).
+  const budgetStatusById = {};
+  try {
+    const bt = await sb(`marketing_tickets?type=eq.budget-review&select=client_id,client_action_status,created_at&order=created_at.desc`);
+    for (const t of (bt || [])) {
+      if (budgetStatusById[t.client_id]) continue; // first = newest
+      budgetStatusById[t.client_id] = t.client_action_status === "responded" ? "confirmed" : "requested";
+    }
+  } catch { /* leave map empty — every client falls back to "none" */ }
+
   const staffToken = await getAnyStaffMetaToken();
   const now = new Date();
   const curKey = now.toISOString().slice(0, 7);
@@ -3044,7 +3057,7 @@ async function handleMetaOverview(req, res) {
   const rows = await Promise.all(clients.map(async (c) => {
     const goal_cpl = c.meta_cpl_goal != null ? Number(c.meta_cpl_goal) : null;
     const monthly_budget = c.meta_monthly_budget != null ? Number(c.meta_monthly_budget) : null;
-    const baseRow = { id: c.id, business_name: c.business_name, goal_cpl, monthly_budget };
+    const baseRow = { id: c.id, business_name: c.business_name, goal_cpl, monthly_budget, budget_status: budgetStatusById[c.id] || "none" };
     if (!c.meta_ad_account_id || !staffToken) return { ...baseRow, connected: false };
     try {
       const adAcct = c.meta_ad_account_id.startsWith("act_") ? c.meta_ad_account_id : `act_${c.meta_ad_account_id}`;
