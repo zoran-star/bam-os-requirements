@@ -286,10 +286,20 @@ async function handler(req, res) {
         let stripe = null;
         if (client?.stripe_connect_account_id && member.stripe_subscription_id) {
           try {
-            const sub = await stripeFetch(
-              `/subscriptions/${member.stripe_subscription_id}?expand[]=items.data.price.product&expand[]=latest_invoice&expand[]=discounts.promotion_code`,
-              { stripeAccount: client.stripe_connect_account_id }
-            );
+            let sub;
+            try {
+              sub = await stripeFetch(
+                `/subscriptions/${member.stripe_subscription_id}?expand[]=items.data.price.product&expand[]=latest_invoice&expand[]=discounts.promotion_code`,
+                { stripeAccount: client.stripe_connect_account_id }
+              );
+            } catch (_expandErr) {
+              // Older API version that can't expand discounts → drop the coupon
+              // expand so billing info never breaks (coupon chip just won't show).
+              sub = await stripeFetch(
+                `/subscriptions/${member.stripe_subscription_id}?expand[]=items.data.price.product&expand[]=latest_invoice`,
+                { stripeAccount: client.stripe_connect_account_id }
+              );
+            }
             const item = sub.items?.data?.[0];
             // Active discount (coupon) on this sub, if any → drives the drawer's
             // "current coupon" chip + whether the Remove-coupon button shows.
@@ -1198,11 +1208,17 @@ async function actionChange(res, member, stripeAccount, ctx, body) {
   const currentRow = member.stripe_price_id ? byPrice.get(member.stripe_price_id) : null;
 
   // Fetch current sub - need item id, period end, the card to carry over, and
-  // any active discount (so the recreate path doesn't silently drop it).
-  const currentSub = await stripeFetch(
-    `/subscriptions/${member.stripe_subscription_id}?expand[]=discounts.promotion_code`,
-    { stripeAccount }
-  );
+  // any active discount (so the recreate path doesn't silently drop it). Falls
+  // back to a plain fetch if the API version can't expand discounts.
+  let currentSub;
+  try {
+    currentSub = await stripeFetch(
+      `/subscriptions/${member.stripe_subscription_id}?expand[]=discounts.promotion_code`,
+      { stripeAccount }
+    );
+  } catch (_expandErr) {
+    currentSub = await stripeFetch(`/subscriptions/${member.stripe_subscription_id}`, { stripeAccount });
+  }
   // Existing discount on the current sub, if any (for carry-over on recreate).
   const curDisc = (Array.isArray(currentSub.discounts) ? currentSub.discounts[0] : null) || currentSub.discount || null;
   const curDiscPromoId = curDisc && curDisc.promotion_code
