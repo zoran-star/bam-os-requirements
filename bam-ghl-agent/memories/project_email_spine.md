@@ -43,21 +43,30 @@ verified domain — no per-academy config table.
 - `ghl/send-message.js` — Email reply gate: `emailProvider==='resend'` → `maybeSendEmailViaResend`
   (resolves toEmail from body.contact_email or `contacts`), else the existing GHL email send.
 
-## Build status (2026-07-01)
-- Phase 1 (foundation: schema + toggle + provider gate) — PR #989. DORMANT.
-- Phases 2-3 (inbound webhook + email store reads + inbox merge + outbound gate) — PR pending. DORMANT.
-- Every academy stays `email_provider='ghl'` → zero behavior change until cutover.
+## Build status
+- Phase 1 (schema + toggle + provider gate) — PR #989. Phases 2-3 (inbound webhook + store reads +
+  inbox merge + outbound gate) — PR #992. History importer — PR #994.
+- **GTA CUT OVER LIVE 2026-07-01**: `email_provider='resend'`. Other academies stay `ghl` (dormant).
 
-## CUTOVER STEPS (GTA) — not done yet
-1. **DNS (Squarespace):** add Resend's MX records for `byanymeanstoronto.ca` (send-only domain;
-   Zoran's Gmail is on byanymeansbball.com, so this doesn't touch his inbox). Verify no inbox
-   currently reads `@byanymeanstoronto.ca`.
-2. In Resend: enable inbound for the domain, set the inbound webhook to
-   `https://portal.byanymeansbusiness.com/api/resend/inbound-webhook`, copy the signing secret →
-   set `RESEND_INBOUND_SECRET` on bam-portal Vercel (Prod+Dev).
-3. Set GTA `clients.email_domain='byanymeanstoronto.ca'`.
-4. History import: DONE for GTA — 457 threads / 2,318 messages already in the email store (see below).
-5. Flip GTA `clients.email_provider='resend'`.
+## GTA CUTOVER — DONE (2026-07-01, LIVE)
+1. ✅ DNS (Squarespace): Resend inbound MX on the root — `dig MX byanymeanstoronto.ca` →
+   `0 inbound-smtp.us-east-1.amazonaws.com` (priority 0 beats the old Mailgun MX at 10, so inbound
+   is pulled off GHL to Resend). `send` subdomain MX (feedback-smtp) = the SENDING record, was
+   already there. Zoran's personal Gmail is byanymeansbball.com, so this domain is safe to redirect.
+2. ✅ Resend: inbound enabled + webhook `→ /api/resend/inbound-webhook`, event `email.received`.
+   Signing secret set as `RESEND_INBOUND_SECRET` in Vercel (Production + Development).
+3. ✅ `clients.email_domain='byanymeanstoronto.ca'`.
+4. ✅ History imported (457 threads / 2,318 msgs — see below).
+5. ✅ `clients.email_provider='resend'`.
+- **Verified end-to-end**: test email in → stored (provider=resend, inbound, subject+body fetched via
+  `/emails/receiving/{id}`, sender resolved to its ghl_contact_id).
+
+## Gotcha: automations already send email via Resend (NOT changed by the flip)
+`api/_send.js` `sendOn({channel:'email'})` calls `_email.js sendEmail` (Resend) directly — so
+automation/agent emails were ALWAYS on Resend, independent of `email_provider`. The flip only changes
+(a) the inbox read (merges the email store) and (b) manual inbox replies (→ Resend via
+send-message.js). NOTE: `sendOn` email does NOT record into `email_messages`, so automation-sent
+emails don't yet show in the inbox thread (inbound + manual replies do) — see TODO.
 
 ## GTA email history — IMPORTED (2026-07-01)
 The SMS importer had already pulled ALL GHL channels into `sms_messages` (email tagged
@@ -71,8 +80,10 @@ per-message fetch). Subjects + thread structure are there. To fill bodies, run
 low value since most are outbound receipts. Post-cutover, all NEW email has full bodies via Resend.
 
 ## Known TODO / gaps
-- **Body-fetch endpoint** `/emails/receiving/{id}` is best-effort; verify the exact path at cutover
-  (metadata-only webhook confirmed via Resend docs). Store falls back to subject-only if it 404s.
+- **Automation emails not threaded**: `_send.js sendOn(email)` sends via Resend but does NOT write
+  `email_messages`, so automation/agent emails don't show in the inbox email thread. Fix = record to
+  the store there (mirror maybeSendEmailViaResend's store write). Inbound + manual replies DO thread.
+- **Body-fetch endpoint** `/emails/receiving/{id}` — CONFIRMED working at cutover (test body fetched).
 - **Historical email bodies** empty for GTA's imported threads (see above) — optional backfill.
 - **Inbox merge caveat:** an academy on `email_provider='resend'` but `messaging_provider='ghl'`
   would serve the email store only (SMS/IG/FB not merged from GHL). Doesn't affect GTA (already
