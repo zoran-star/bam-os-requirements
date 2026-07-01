@@ -18,7 +18,7 @@
 import { withSentryApiRoute } from "../_sentry.js";
 import { getClientGhlToken } from "./availability.js";
 import { enrollContact, exitEnrollment } from "../automations.js";
-import { createOpp, moveStage, ROLE_MATCHERS } from "../agent/_store.js";
+import { createOpp, moveStage, findOpenOpp, pipelineFlags, ROLE_MATCHERS } from "../agent/_store.js";
 import { upsertPortalContact, writePortalFieldValues } from "../_contacts.js";
 
 const SB_URL = (process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || "").trim();
@@ -231,14 +231,28 @@ async function pushToGhl(locName, ghlLocationId, { clientId, name, email, phone,
 async function placeOpportunity(headers, ghlLocationId, contactId, { pipeline, stage }, oppName, advance, clientId) {
   const { pipelineId, stageId } = await resolvePipelineStage(headers, ghlLocationId, pipeline, stage);
 
+  // Existence check (provider-aware). A provider='portal' academy's opp lives in the
+  // portal STORE, not GHL - searching GHL would MISS it and create a DUPLICATE opp on
+  // every intake (this caused the dup cards for GTA's new leads). Look in the store for
+  // those; every other academy keeps the exact GHL search. `existing` carries an oppRef
+  // so the move below targets the right row regardless of provider.
   let existing = null;
-  const searchRes = await fetch(
-    `${GHL_V2}/opportunities/search?${new URLSearchParams({ location_id: ghlLocationId, contact_id: contactId, status: "open" })}`,
-    { headers }
-  );
-  if (searchRes.ok) {
-    const found = (await searchRes.json()).opportunities || [];
-    existing = found.find(o => (o.pipelineId || o.pipeline_id) === pipelineId) || null;
+  let provider = "ghl";
+  if (clientId) { try { provider = (await pipelineFlags(clientId)).provider; } catch (_) {} }
+  if (provider === "portal" && clientId) {
+    const tok = (headers.Authorization || headers.authorization || "").replace(/^Bearer\s+/i, "");
+    const ref = await findOpenOpp({ clientId, token: tok, locationId: ghlLocationId, contactId }).catch(() => null);
+    if (ref) existing = { id: ref.ghlOpportunityId || ref.id, ref };
+  } else {
+    const searchRes = await fetch(
+      `${GHL_V2}/opportunities/search?${new URLSearchParams({ location_id: ghlLocationId, contact_id: contactId, status: "open" })}`,
+      { headers }
+    );
+    if (searchRes.ok) {
+      const found = (await searchRes.json()).opportunities || [];
+      const match = found.find(o => (o.pipelineId || o.pipeline_id) === pipelineId) || null;
+      if (match) existing = { id: match.id, ref: { ghlOpportunityId: match.id } };
+    }
   }
 
   if (existing && advance) {
@@ -249,7 +263,7 @@ async function placeOpportunity(headers, ghlLocationId, contactId, { pipeline, s
     if (clientId) {
       const token = (headers.Authorization || headers.authorization || "").replace(/^Bearer\s+/i, "");
       try {
-        await moveStage({ clientId, token, oppRef: { ghlOpportunityId: existing.id }, stage: { pipelineId, stageId, stageName: stage }, role: roleForStageName(stage), contactId });
+        await moveStage({ clientId, token, oppRef: existing.ref, stage: { pipelineId, stageId, stageName: stage }, role: roleForStageName(stage), contactId });
       } catch (e) { console.error("opportunity move failed:", e.message); }
       return existing.id;
     }

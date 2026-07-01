@@ -38,7 +38,7 @@ import {
   scheduledTrialContactIdSetCached, peekScheduledTrialIdSet, respondedStage, nurtureStage, toIso,
 } from "./agent/_stage.js";
 import { enrollContact, isAutomationLive, resolveContactInfo } from "./automations.js";
-import { moveStage, setStatus } from "./agent/_store.js";
+import { moveStage, setStatus, findOpenOpp as findOpenOppStore } from "./agent/_store.js";
 import {
   DEFAULT_CONFIRM_AUTOMATIONS, getConfirmAutomations, automationsLive,
   nextDueStep, resolveApptTokens, addressFromOverrides,
@@ -423,11 +423,11 @@ async function fireScriptedStep({ client, token, locationId, mode, autos, cfg, i
   return "queued";
 }
 
-// Find a contact's open opportunity (for stage moves + outcome logging).
-async function findOpenOpp(token, locationId, contactId) {
-  const d = await ghl("GET", `/opportunities/search?${new URLSearchParams({ location_id: locationId, contact_id: contactId, limit: "20" })}`, { token });
-  const opps = d.opportunities || d.data || [];
-  return (opps.find(o => String(o.status || "").toLowerCase() === "open") || opps[0] || null)?.id || null;
+// Find a contact's open opportunity (provider-aware). Returns an oppRef
+// { id?, ghlOpportunityId? } | null. On provider='portal' it reads the store (so
+// portal-native opps with no GHL id are found); on 'ghl' it searches GHL as before.
+async function findOpenOpp(clientId, token, locationId, contactId) {
+  return await findOpenOppStore({ clientId, ghl, token, locationId, contactId });
 }
 
 // Cancel a contact's open confirm cards (after handoff / lost / leaving the stage).
@@ -648,7 +648,7 @@ async function detectForClient(client) {
       // Resolve the opportunity so the card can deep-link the post-trial form (which is
       // keyed by opportunity_id). Best-effort: a missing opp still queues the nag.
       let oppId = null;
-      try { oppId = await findOpenOpp(token, locationId, contactId); } catch (_) {}
+      try { const _r = await findOpenOpp(client.id, token, locationId, contactId); oppId = _r && (_r.ghlOpportunityId || _r.id) || null; } catch (_) {}
       const trialWhen = fmtTrial(lastPast.startIso);
       const instruction = `Trial on ${trialWhen} has passed with no review logged. Did they show up? Log the result (showed up / no-show / good fit) using the post-trial form for this lead${oppId ? ` (opportunity ${oppId})` : ""}.`;
       try {
@@ -864,9 +864,10 @@ async function handler(req, res) {
       // that must land; the booking agent works the Responded stage).
       let oppId = null, moved = false;
       try {
-        oppId = await findOpenOpp(token, locationId, contactId);
+        const oppRef = await findOpenOpp(clientId, token, locationId, contactId);
+        oppId = oppRef && (oppRef.ghlOpportunityId || oppRef.id) || null;
         const rs = await respondedStage(token, locationId, { clientId, sb });
-        if (rs && oppId) { await moveStage({ clientId, ghl, token, oppRef: { ghlOpportunityId: oppId }, stage: rs, role: "responded", contactId, reason: note.slice(0, 300) }); moved = true; }
+        if (rs && oppRef) { await moveStage({ clientId, ghl, token, oppRef, stage: rs, role: "responded", contactId, reason: note.slice(0, 300) }); moved = true; }
       } catch (_) {}
       try { if (oppId) await sb(`pipeline_outcomes`, { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify([{ client_id: clientId, opportunity_id: oppId, status: "rebook", reason: note.slice(0, 300) }]) }); } catch (_) {}
       if (b.ready_id) {
@@ -885,10 +886,10 @@ async function handler(req, res) {
         contactId = row.ghl_contact_id;
       }
       if (!contactId) return res.status(400).json({ error: "ready_id or contact_id required" });
-      let oppId = null;
-      try { oppId = await findOpenOpp(token, locationId, contactId); }
-      catch (e) { return res.status(e.status || 502).json({ error: `GHL find opp: ${e.message}` }); }
-      if (!oppId) return res.status(200).json({ error: "No opportunity found for this contact — nothing to mark lost." });
+      let oppId = null, oppRef = null;
+      try { oppRef = await findOpenOpp(clientId, token, locationId, contactId); oppId = oppRef && (oppRef.ghlOpportunityId || oppRef.id) || null; }
+      catch (e) { return res.status(e.status || 502).json({ error: `find opp: ${e.message}` }); }
+      if (!oppRef) return res.status(200).json({ error: "No opportunity found for this contact — nothing to mark lost." });
       const closing = (typeof b.reply === "string" ? b.reply : (row ? row.draft_message : "")) || "";
       if (closing.trim()) { try { await sendReplyViaGhl(token, contactId, closing.trim(), clientId); } catch (_) {} }
       const reason = (b.lost_reason || (row && row.lost_reason) || "").toString().trim() || null;
@@ -900,14 +901,14 @@ async function handler(req, res) {
         if (await isAutomationLive(clientId, "nurture")) {
           const ns = await nurtureStage(token, locationId, { clientId, sb });
           if (ns) {
-            await moveStage({ clientId, ghl, token, oppRef: { ghlOpportunityId: oppId }, stage: ns, role: "nurture", contactId, reason });
+            await moveStage({ clientId, ghl, token, oppRef, stage: ns, role: "nurture", contactId, reason });
             await enrollContact({ clientId, automationKey: "nurture", contactId });
             routedToNurture = true;
           }
         }
       } catch (_) { /* fall through to status=lost */ }
       if (!routedToNurture) {
-        try { await setStatus({ clientId, ghl, token, oppRef: { ghlOpportunityId: oppId }, status: "lost", contactId, reason }); }
+        try { await setStatus({ clientId, ghl, token, oppRef, status: "lost", contactId, reason }); }
         catch (e) { return res.status(e.status || 502).json({ error: `mark lost: ${e.message}` }); }
       }
       try { await sb(`pipeline_outcomes`, { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify([{ client_id: clientId, opportunity_id: oppId, status: routedToNurture ? "nurture" : "lost", reason }]) }); } catch (_) {}
