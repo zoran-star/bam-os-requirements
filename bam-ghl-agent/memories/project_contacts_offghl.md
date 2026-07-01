@@ -34,6 +34,9 @@ portal id. So joins never change - only the id's origin does.
 - READS (added Stage 1): `contactProvider(clientId)` -> 'ghl'|'portal' (defaults to
   'ghl' on any error), and `contactsReadTable(clientId)` -> 'contacts' | 'ghl_contacts'.
   Callers swap ONLY the table name (both tables share the search columns).
+- WRITES (added Stage 2): `mergePortalContactTags(clientId, ghlContactId, tags, {remove})`
+  - store-only tag add/remove (reads tags[], merges case-insensitively, PATCHes back;
+  no-op if the portal row doesn't exist yet). Plus a `patch` REST helper.
 
 ## Roadmap (4 stages, each its own PR)
 1. **READ seam** - DONE 2026-07-01. Every contact-card read routes through
@@ -41,11 +44,17 @@ portal id. So joins never change - only the id's origin does.
    `agent-approvals` (x2), `automations` (x2), `kpis-v15` (x2), `agent/contact-memory`,
    `stripe/contact` (read only), `mass-send` (x2). Dormant (all academies 'ghl' =
    byte-identical). `inbox.js` does NOT read ghl_contacts directly (enriches via members).
-2. **WRITE seam** - route contact writes through a provider-aware writer. Known write
-   sites still on ghl_contacts/GHL: tags (`contacts.js` add/remove-tag PATCH ~L179-191,
-   `agent/_tags.js` add/removeContactTags -> GHL), custom fields (`ghl/post-trial.js`
-   L154+246 PUT), the mirror PATCH in `stripe/contact.js` ~L126, and all the
-   `/contacts/upsert` lead/onboarding sites.
+2. **WRITE seam** - DONE 2026-07-01. Contact-field writes are provider-aware:
+   - Tags: `agent/_tags.js` add/removeContactTags + markUnqualified/unmarkUnqualified now
+     take a `clientId`; provider='portal' -> `mergePortalContactTags` (store), else GHL.
+     Callers updated: `agent-approvals.js` (3 unqualified sites). `contacts.js` staff
+     add/remove-tag branches to the store for portal (skips GHL + mirror refresh).
+   - Custom fields: `ghl/post-trial.js` gates BOTH GHL custom-field PUTs (attendance +
+     trainer) behind `contactProv !== 'portal'` - portal already stores attendance in
+     `post_trial_reviews` and trainer in `contact_trainers`, so GHL writes are skipped.
+   - Stripe cache: `stripe/contact.js` mirror PATCH now targets `contactsReadTable(...)`.
+   NOT YET (Stage 3): the `/contacts/upsert` lead/onboarding creation sites + notes +
+   workflow enrollment. All dormant (every academy 'ghl').
 3. **Portal-native creation** - new leads created in the store with a portal-minted id
    (no GHL POST); mint flows into the join key. Verify GTA no longer needs GHL workflows
    (it runs portal automations) or gate them.

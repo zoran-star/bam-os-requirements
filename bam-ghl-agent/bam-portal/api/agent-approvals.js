@@ -924,7 +924,7 @@ async function handler(req, res) {
       } catch (e) { return res.status(e.status || 502).json({ error: `abandon: ${e.message}` }); }
       // Stamp the unqualified tag (best-effort — the abandon already succeeded, so
       // a tag failure must not 500 the action).
-      try { await markUnqualified(token, contactId); } catch (_) {}
+      try { await markUnqualified(token, contactId, clientId); } catch (_) {}
       try { await sb(`pipeline_outcomes`, { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify([{ client_id: clientId, opportunity_id: oppId, status: "abandoned", reason }]) }); } catch (_) {}
       try { await sb(`agent_ready_replies?client_id=eq.${clientId}&ghl_contact_id=eq.${encodeURIComponent(contactId)}&status=in.(pending,approved)`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ status: "sent", approved_by: staffEmail, approved_at: new Date().toISOString(), sent_at: new Date().toISOString(), updated_at: new Date().toISOString() }) }); } catch (_) {}
       try { await sb(`agent_followups?client_id=eq.${clientId}&ghl_contact_id=eq.${encodeURIComponent(contactId)}&status=in.(pending,approved)`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ status: "canceled", send_error: "abandoned", updated_at: new Date().toISOString() }) }); } catch (_) {}
@@ -940,8 +940,8 @@ async function handler(req, res) {
       if (!contactId) return res.status(400).json({ error: "contact_id required" });
       const unq = !!b.unqualified;
       try {
-        if (unq) await markUnqualified(token, contactId);
-        else await unmarkUnqualified(token, contactId);
+        if (unq) await markUnqualified(token, contactId, clientId);
+        else await unmarkUnqualified(token, contactId, clientId);
       } catch (e) { return res.status(e.status || 502).json({ error: `GHL tag: ${e.message}` }); }
       return res.status(200).json({ ok: true, contact_id: contactId, unqualified: unq });
     }
