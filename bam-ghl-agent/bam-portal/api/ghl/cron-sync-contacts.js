@@ -192,11 +192,17 @@ async function syncContactsForAcademy(client, deadline) {
           headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
           body: JSON.stringify(mirrorRows),
         }).catch(() => {});
-        // Dual-write the same contacts into the portal-native store (dormant).
-        // synced_at is a ghl_contacts-only column; drop it and tag provenance.
-        await bulkUpsertPortalContacts(
-          mirrorRows.map(({ synced_at, ...r }) => ({ ...r, source: "sync" })),
-        );
+        // Dual-write the same contacts into the portal-native store - EXCEPT for
+        // provider='portal' academies. Their store is the SOURCE OF TRUTH, so pulling
+        // GHL back over it would clobber portal-only edits (e.g. tags written straight
+        // to the store). Those academies keep the store fresh via the lead-flow
+        // dual-writes (upsertPortalContact) instead. synced_at is a ghl_contacts-only
+        // column; drop it and tag provenance.
+        if (client.contact_provider !== "portal") {
+          await bulkUpsertPortalContacts(
+            mirrorRows.map(({ synced_at, ...r }) => ({ ...r, source: "sync" })),
+          );
+        }
       }
     }
 
@@ -293,7 +299,7 @@ async function handler(req, res) {
   // All academies with a usable GHL connection
   const clientsList = await sb(
     `clients?or=(ghl_access_token.not.is.null,ghl_location_id.not.is.null)` +
-    `&select=id,business_name,ghl_location_id,ghl_access_token,ghl_refresh_token,ghl_token_expires_at,ghl_contacts_last_synced_at,v15_access,v15_config`
+    `&select=id,business_name,ghl_location_id,ghl_access_token,ghl_refresh_token,ghl_token_expires_at,ghl_contacts_last_synced_at,v15_access,v15_config,contact_provider`
   ).catch(() => []);
 
   if (!Array.isArray(clientsList) || clientsList.length === 0) {
