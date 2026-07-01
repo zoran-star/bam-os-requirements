@@ -24195,10 +24195,36 @@ async function _plStampUnqualified(contactId, unq) {
 // removed from the pipeline by the portal). Re-renders tabs + board.
 function _plRemoveOppLocal(oppId) {
   if (!_PL_DATA) return;
-  for (const pl of (_PL_DATA.pipelines || [])) {
-    pl.opportunities = (pl.opportunities || []).filter(o => o.id !== oppId);
-  }
-  try { _renderPipelineTabs(); _renderPipelineBoard(); } catch (_) {}
+  const drop = () => {
+    for (const pl of (_PL_DATA.pipelines || [])) {
+      pl.opportunities = (pl.opportunities || []).filter(o => o.id !== oppId);
+    }
+    try { _renderPipelineTabs(); _renderPipelineBoard(); } catch (_) {}
+  };
+  let card = null;
+  try {
+    const esc = (window.CSS && CSS.escape) ? CSS.escape(String(oppId || '')) : String(oppId || '');
+    card = document.querySelector(`.pl-card[data-opp="${esc}"]`);
+  } catch (_) {}
+  if (!card) { drop(); return; }
+  // Visible exit: the card shrinks + fades and the cards below slide up into
+  // the gap, THEN the data drops + board re-renders. When the drawer's
+  // confirmation flash is covering the board (Mark Won/Lost/Unqualified from
+  // the drawer), hold the exit until the drawer has closed so it's seen.
+  const drawerOpen = document.getElementById('pl-drawer')?.classList.contains('open');
+  const start = () => {
+    if (!card.isConnected) { drop(); return; }   // a re-render replaced the DOM mid-wait
+    card.style.cssText += `;overflow:hidden;height:${card.offsetHeight}px;pointer-events:none;transition:opacity 300ms ease,transform 300ms ease,height 380ms ease 140ms,margin 380ms ease 140ms,padding 380ms ease 140ms;`;
+    requestAnimationFrame(() => {
+      card.style.opacity = '0';
+      card.style.transform = 'scale(0.88)';
+      card.style.height = '0px';
+      card.style.marginTop = '0px'; card.style.marginBottom = '0px';
+      card.style.paddingTop = '0px'; card.style.paddingBottom = '0px';
+    });
+    setTimeout(drop, 560);
+  };
+  setTimeout(start, drawerOpen ? 2000 : 0);   // 1.8s flash + drawer close anim
 }
 
 // Full-drawer confirmation flash: covers the open card drawer with a big icon +
