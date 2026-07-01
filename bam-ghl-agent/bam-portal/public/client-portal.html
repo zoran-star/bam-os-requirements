@@ -18148,16 +18148,9 @@ const _bbOfferConfigs = {
       { key:'describe_path', type:'textarea', label:'Describe the path',
         dep:{ key:'sales_path', equals:'Other' },
         hint:'How leads become customers in this offer' },
-      { key:'info_collect', type:'check_many_defaults', label:'Info to collect from leads',
-        defaultOptions:['Parent name','Email','Phone','Athlete name'],
-        addonOptions:['Proximity to location','Experience level (Beg/Int/Adv)','Desired start date','Grade','Age','Position','Goals','Add custom'] },
-      { key:'info_collect_custom', type:'block_builder', label:'Custom fields to collect', addLabel:'custom field',
-        dep:{ key:'info_collect', equals:'Add custom' },
-        hint:'Add as many custom fields as you want. Each row = one extra question to ask the lead.',
-        subFields:[
-          { key:'name', type:'text', label:'Field name', required:true,
-            hint:'e.g. "Where did you hear about us?", "Sibling discount eligible?", "Current team"' }
-        ] },
+      // Info-to-collect (always-asked + custom questions) is rendered by the
+      // consolidated custom_field_defs panel appended in _bbRenderStepFields -
+      // replaces the old info_collect / info_collect_custom offer.data fields.
       { key:'lead_notify', type:'staff_select', label:'Staff in charge',
         hint:'Who gets pinged on new lead' },
       { key:'upsells', type:'block_builder', label:'Upsells',
@@ -19834,8 +19827,9 @@ function _bbRenderStepFields(offer, sectionId) {
   let fields = config.fields;
   if (_bbIsV1()) fields = fields.filter(f => !_V1_HIDE_TYPES.has(f.type) && !_V1_HIDE_KEYS.has(f.key));
   let html = fields.map(f => _bbRenderField(f, sectionId)).join('');
-  // Owner-authored custom questions live in the Sales + Onboarding steps.
-  if ((sectionId === 'sales' || sectionId === 'onboarding') && !_bbIsV1()) {
+  // Owner-authored "info to collect" (always-asked + custom questions) lives in
+  // the Sales step - consolidated single surface, backed by custom_field_defs.
+  if (sectionId === 'sales' && !_bbIsV1()) {
     html += _bbRenderCustomQuestions(offer, sectionId);
   }
   return html;
@@ -19860,50 +19854,36 @@ let _bbCqCoreCache = {}; // clientId -> academy-level (always-collected) fields 
 function _bbRenderCustomQuestions(offer, sectionId) {
   const ck = offer.id + ':' + sectionId;
   const list = _bbCqCache[ck];
-  const blurb = sectionId === 'sales'
-    ? 'Extra questions asked on this offer\'s lead form.'
-    : 'Extra info collected when a member onboards to this offer.';
-  let inner;
+  const core = _bbCqCoreCache[offer.client_id];
+  if (list === undefined) _bbLoadCustomQuestions(offer.id, sectionId, offer.client_id);
+  if (core === undefined) _bbLoadCoreFields(offer.client_id);
+
+  // Always-asked = base contact fields + academy core custom fields. Locked
+  // (gold, no remove) - captured on every offer for this academy.
+  const alwaysChips = ['Parent name', 'Email', 'Phone']
+    .concat(Array.isArray(core) ? core.map(f => f.label) : [])
+    .map(l => `<span class="bb-choice selected" style="cursor:default" title="Always collected - can't remove">${escapeHTML(l)}</span>`)
+    .join('');
+
+  // Optional = this offer's own custom questions (removable) + Add custom.
+  let optChips;
   if (list === undefined) {
-    _bbLoadCustomQuestions(offer.id, sectionId, offer.client_id);
-    inner = `<div style="font-size:12px;color:var(--text-mute)">Loading…</div>`;
-  } else if (!list.length) {
-    inner = `<div style="font-size:12px;color:var(--text-mute)">No custom questions yet.</div>`;
+    optChips = `<span style="font-size:12px;color:var(--text-mute)">Loading…</span>`;
   } else {
-    inner = list.map(f => {
-      const nOpts = (f.type === 'select' || f.type === 'multiselect') && Array.isArray(f.options) && f.options.length ? ` · ${f.options.length} options` : '';
-      return `<div style="display:flex;align-items:center;gap:10px;padding:8px 10px;background:var(--surface);border:1px solid var(--border);border-radius:6px;margin-bottom:6px">
-        <div style="flex:1;min-width:0">
-          <div style="font-size:13px;color:var(--text)">${escapeHTML(f.label)}</div>
-          <div style="font-size:11px;color:var(--text-mute)">${escapeHTML(_BB_CQ_TYPE_LABEL[f.type] || f.type)}${nOpts}</div>
-        </div>
-        <button onclick="_bbCqDelete('${offer.id}','${sectionId}','${f.id}')" style="background:none;border:0;color:var(--text-mute);cursor:pointer;font-size:18px;line-height:1;padding:0 4px" title="Remove">×</button>
-      </div>`;
+    optChips = list.map(f => {
+      const nOpts = (f.type === 'select' || f.type === 'multiselect') && Array.isArray(f.options) && f.options.length ? ` (${f.options.length})` : '';
+      return `<span class="bb-choice selected" style="cursor:default" title="${escapeHTML(_BB_CQ_TYPE_LABEL[f.type] || f.type)}">${escapeHTML(f.label)}${nOpts}<span onclick="_bbCqDelete('${offer.id}','${sectionId}','${f.id}')" style="cursor:pointer;margin-left:7px;opacity:0.65;font-weight:700" title="Remove">×</span></span>`;
     }).join('');
   }
-
-  // Read-only "always collected" strip: the academy-level (core) fields that
-  // are captured on every offer. Informational only - not editable here.
-  const core = _bbCqCoreCache[offer.client_id];
-  if (core === undefined) _bbLoadCoreFields(offer.client_id);
-  let coreBlock = '';
-  if (Array.isArray(core) && core.length) {
-    const rows = core.map(f => `<div style="display:flex;align-items:center;gap:8px;padding:7px 10px;background:transparent;border:1px dashed var(--border);border-radius:6px;margin-bottom:6px;opacity:0.85">
-        <span style="font-size:13px;color:var(--text-sub)">${escapeHTML(f.label)}</span>
-        <span style="font-size:11px;color:var(--text-mute);margin-left:auto">${escapeHTML(_BB_CQ_TYPE_LABEL[f.type] || f.type)}</span>
-      </div>`).join('');
-    coreBlock = `<div style="font-size:11px;font-weight:700;color:var(--text-mute);letter-spacing:0.6px;text-transform:uppercase;margin-bottom:4px">Always collected</div>
-      <div style="font-size:12px;color:var(--text-sub);margin-bottom:12px">Core info captured on every offer for this academy.</div>
-      ${rows}
-      <div style="height:20px"></div>`;
-  }
+  optChips += `<button type="button" class="bb-choice" onclick="_bbCqOpenAdd('${offer.id}','${sectionId}','${offer.client_id}')">+ Add custom</button>`;
 
   return `<div style="margin-top:18px;padding-top:16px;border-top:1px solid var(--border)">
-    ${coreBlock}
-    <div style="font-size:11px;font-weight:700;color:var(--text-mute);letter-spacing:0.6px;text-transform:uppercase;margin-bottom:4px">Custom questions</div>
-    <div style="font-size:12px;color:var(--text-sub);margin-bottom:12px">${blurb}</div>
-    ${inner}
-    <button class="btn-secondary-bb" onclick="_bbCqOpenAdd('${offer.id}','${sectionId}','${offer.client_id}')" style="margin-top:8px">+ Add question</button>
+    <div style="font-size:11px;font-weight:700;color:var(--text-mute);letter-spacing:0.6px;text-transform:uppercase;margin-bottom:4px">Info to collect from leads</div>
+    <div style="font-size:12px;color:var(--text-sub);margin-bottom:12px">What this offer's lead form asks.</div>
+    <div class="bb-defaults-info"><b style="color:var(--accent)">Always asked:</b></div>
+    <div class="bb-choice-row" style="margin-bottom:14px">${alwaysChips}</div>
+    <div class="bb-defaults-info" style="margin-top:0">Optional (your custom questions):</div>
+    <div class="bb-choice-row">${optChips}</div>
   </div>`;
 }
 
