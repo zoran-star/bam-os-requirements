@@ -237,6 +237,20 @@ async function maybeAttachCommitmentSchedule({ subId, onbSub, connectedAccount }
   const meta = onbSub.metadata || {};
   if (meta.commitment_reverts !== "monthly" || !meta.revert_to_price) return null;
   if (onbSub.schedule) return { skipped: "already scheduled" };
+  // Carry any active coupon on the paid sub into BOTH schedule phases. Rebuilding
+  // the phases below is declarative - a field not restated on a phase is dropped -
+  // so without this a "forever"/repeating coupon would be lost the moment the plan
+  // reverts to monthly. phase0's invoice is already paid, so restating it there is
+  // a no-op; phase1 (monthly) is the one that actually needs it. Non-fatal: if we
+  // can't read the coupon, we just proceed without carrying it (today's behavior).
+  let couponId = null;
+  try {
+    const full = await stripeFetch(`/subscriptions/${subId}?expand[]=discounts.coupon`, connectedAccount);
+    const d = (Array.isArray(full.discounts) ? full.discounts[0] : null) || full.discount || null;
+    const cp = d && (typeof d.coupon === "object" ? d.coupon : null);
+    couponId = cp && cp.id ? cp.id : null;
+  } catch (_) { couponId = null; }
+
   const sched = await stripePost("/subscription_schedules", { from_subscription: subId }, connectedAccount);
   const p0 = sched.phases && sched.phases[0];
   const item0 = p0 && p0.items && p0.items[0];
@@ -250,8 +264,12 @@ async function maybeAttachCommitmentSchedule({ subId, onbSub, connectedAccount }
     "phases[0][iterations]": 1,
     "phases[1][items][0][price]": meta.revert_to_price,
     "phases[1][iterations]": 1,
+    ...(couponId ? {
+      "phases[0][discounts][0][coupon]": couponId,
+      "phases[1][discounts][0][coupon]": couponId,
+    } : {}),
   }, connectedAccount);
-  return { schedule_id: updated.id, committed_price: committedPrice, revert_to_price: meta.revert_to_price };
+  return { schedule_id: updated.id, committed_price: committedPrice, revert_to_price: meta.revert_to_price, coupon_carried: couponId || null };
 }
 
 async function writeAudit({ client_id, member_id, action_type, args, stripe_response, db_changes }) {
