@@ -1133,6 +1133,22 @@ async function actionRefund(res, member, stripeAccount, ctx, body) {
   });
 }
 
+// Resolve a customer-facing promo code string to its live promotion code on the
+// connected account (active only), or null.
+async function resolvePromo(code, stripeAccount) {
+  const c = normCode(code);
+  if (!c) return null;
+  const list = await stripeFetch(`/promotion_codes?code=${encodeURIComponent(c)}&limit=1`, { stripeAccount });
+  const pc = (list.data || [])[0];
+  return pc && pc.active !== false ? pc : null;
+}
+// Coupon def ({kind,value}) from a Stripe coupon object, for the guardrails.
+function couponDefFromStripe(cp = {}) {
+  return cp.percent_off != null
+    ? { kind: "Percent off", value: cp.percent_off }
+    : { kind: "Dollar off", value: (cp.amount_off || 0) / 100 };
+}
+
 // ─────────────────────────────────────────────────────────
 // Action: CHANGE (plan)
 // ─────────────────────────────────────────────────────────
@@ -1181,10 +1197,17 @@ async function actionChange(res, member, stripeAccount, ctx, body) {
 
   const currentRow = member.stripe_price_id ? byPrice.get(member.stripe_price_id) : null;
 
-  // Fetch current sub - need item id, period end, and the card to carry over.
-  const currentSub = await stripeFetch(`/subscriptions/${member.stripe_subscription_id}`, {
-    stripeAccount,
-  });
+  // Fetch current sub - need item id, period end, the card to carry over, and
+  // any active discount (so the recreate path doesn't silently drop it).
+  const currentSub = await stripeFetch(
+    `/subscriptions/${member.stripe_subscription_id}?expand[]=discounts.promotion_code`,
+    { stripeAccount }
+  );
+  // Existing discount on the current sub, if any (for carry-over on recreate).
+  const curDisc = (Array.isArray(currentSub.discounts) ? currentSub.discounts[0] : null) || currentSub.discount || null;
+  const curDiscPromoId = curDisc && curDisc.promotion_code
+    && (typeof curDisc.promotion_code === "object" ? curDisc.promotion_code.id : curDisc.promotion_code) || null;
+  const curDiscCoupon = curDisc && (typeof curDisc.coupon === "object" ? curDisc.coupon : null);
 
   // Optional: staff sets when the NEXT payment should land (Stripe trial_end).
   // Pushes the next charge to that date; no charge happens until then.
@@ -1279,6 +1302,42 @@ async function actionChange(res, member, stripeAccount, ctx, body) {
     });
   }
 
+  // ── Coupon handling on the resulting subscription ──
+  // Swap keeps the existing discount automatically. Recreate starts clean, so we
+  // carry the old coupon over (this is the silent-discount-loss bug we're closing).
+  // Staff can also apply a new coupon or remove it during a change. Everything runs
+  // through the $1-floor guardrail against the NEW plan price.
+  let coupon = null;
+  const targetCents = sub.items?.data?.[0]?.price?.unit_amount || newAmt || null;
+  try {
+    if (body.remove_coupon) {
+      if (mode === "swap") await stripeFetch(`/subscriptions/${sub.id}/discount`, { method: "DELETE", stripeAccount });
+      coupon = { removed: true };
+    } else if (body.coupon_code) {
+      const pc = await resolvePromo(body.coupon_code, stripeAccount);
+      if (!pc) coupon = { error: "coupon not found or inactive" };
+      else {
+        const chk = targetCents ? applyDiscountToCents(couponDefFromStripe(pc.coupon || {}), targetCents) : { ok: true };
+        if (!chk.ok) coupon = { error: chk.error };
+        else {
+          await stripeFetch(`/subscriptions/${sub.id}`, { method: "POST", stripeAccount, body: { "discounts[0][promotion_code]": pc.id } });
+          coupon = { applied: true, code: normCode(body.coupon_code) };
+        }
+      }
+    } else if (mode === "recreate" && (curDiscPromoId || curDiscCoupon)) {
+      // Carry the old coupon onto the new sub - but only if it still clears the
+      // guardrail on the new plan (a $ coupon can break a cheaper plan).
+      const chk = (targetCents && curDiscCoupon) ? applyDiscountToCents(couponDefFromStripe(curDiscCoupon), targetCents) : { ok: true };
+      if (chk.ok) {
+        const cbody = curDiscPromoId ? { "discounts[0][promotion_code]": curDiscPromoId } : { "discounts[0][coupon]": curDiscCoupon.id };
+        await stripeFetch(`/subscriptions/${sub.id}`, { method: "POST", stripeAccount, body: cbody });
+        coupon = { carried_over: true };
+      } else {
+        coupon = { dropped: true, reason: chk.error };
+      }
+    }
+  } catch (e) { coupon = { error: e.message }; }
+
   await writeAudit({
     client_id: member.client_id,
     member_id: member.id,
@@ -1286,13 +1345,14 @@ async function actionChange(res, member, stripeAccount, ctx, body) {
     args: body,
     performed_by: ctx.user.id,
     performed_by_name: ctx.staff?.name || null,
-    stripe_response: { id: sub.id, status: sub.status, price_id: newPriceId, trial_end: sub.trial_end || null, mode },
+    stripe_response: { id: sub.id, status: sub.status, price_id: newPriceId, trial_end: sub.trial_end || null, mode, coupon },
     db_changes: { members: { id: member.id, plan: { from: member.plan, to: newPlan }, mode } },
   });
 
   return res.status(200).json({
     ok: true,
     mode,
+    coupon,
     member: { id: member.id, plan: newPlan },
     sub: { id: sub.id, status: sub.status, new_price_id: newPriceId },
     prorated,

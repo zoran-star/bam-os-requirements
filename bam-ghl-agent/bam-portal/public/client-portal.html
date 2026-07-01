@@ -31761,15 +31761,39 @@ async function mChange(memberId, currentPlan) {
   const _pays = (sj && Array.isArray(sj.payments)) ? sj.payments.slice(0, 4) : [];
   const _payStColor = (s) => (s === 'succeeded' || s === 'paid') ? '#7BC47F' : (s === 'pending' || s === 'processing' || s === 'refunded' || s === 'open' || s === 'draft') ? '#c79a4a' : '#9a3b2f';
   const paymentsHtml = _pays.length ? `<div style="margin-top:10px"><div style="font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:var(--text-mute,#888);margin-bottom:5px">Recent payments</div><div style="display:grid;gap:4px">${_pays.map(p => `<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;font-size:12px"><span style="color:var(--text-mute,#888)">${escapeHTML(_cdDate(p.date) || '')}</span><span style="display:flex;align-items:center;gap:8px"><b style="color:var(--text,#eee)">${_money(p.amount_cents)}</b><span style="color:${_payStColor(p.status)};font-size:10px;font-weight:800;text-transform:capitalize">${escapeHTML(p.status || '')}</span></span></div>`).join('')}</div></div>` : '';
+  // Available coupons for this academy (active promotion codes) + the current one
+  // on the sub. Optional field - a $ coupon that would break the new plan is
+  // rejected server-side by the shared guardrail.
+  let couponOpts = [];
+  try {
+    const token2 = await _mreqAuthToken();
+    const cr = await fetch('/api/offers/create-discount?client_id=' + encodeURIComponent(_aiClientId()), { headers: { Authorization: 'Bearer ' + token2 } });
+    const cj = await _safeJson(cr);
+    if (cr.ok) couponOpts = (cj.codes || []).filter(c => c.active !== false).map(c => ({
+      value: 'code:' + c.code,
+      label: c.code + ' · ' + (/percent/i.test(String(c.kind)) ? `${c.value}% off` : `$${c.value} off`),
+    }));
+  } catch (_) {}
+  const curCoupon = (sj && sj.coupon) ? sj.coupon : null;
+  const couponField = (couponOpts.length || curCoupon) ? {
+    key: 'coupon', label: 'Coupon (optional)', type: 'select', value: '',
+    options: [
+      { value: '', label: curCoupon ? `Keep current (${curCoupon.code})` : 'No coupon' },
+      ...(curCoupon ? [{ value: '__remove__', label: 'Remove coupon' }] : []),
+      ...couponOpts,
+    ],
+  } : null;
+
   let vals;
   try {
     vals = await _mmModal({
       icon: '🔄', title: 'Change plan',
-      body: `Current plan: <b>${escapeHTML(currentPlan || '-')}</b>${(sj && sj.amount_cents != null) ? ' &middot; ' + _withHst(sj.amount_cents) : ''}<br>Next payment: <b>${escapeHTML(nextLabel)}</b>${paymentsHtml}`,
+      body: `Current plan: <b>${escapeHTML(currentPlan || '-')}</b>${(sj && sj.amount_cents != null) ? ' &middot; ' + _withHst(sj.amount_cents) : ''}<br>Next payment: <b>${escapeHTML(nextLabel)}</b>${curCoupon ? '<br>Coupon: <b>' + escapeHTML(curCoupon.code) + '</b>' : ''}${paymentsHtml}`,
       okLabel: 'Change plan',
       fields: [
         { key: 'new_price', label: 'New plan', type: 'select', value: flat[0].value, options: grouped },
         { key: 'next_payment', label: 'Next payment date (leave as-is to keep)', type: 'date', value: nextYMD },
+        ...(couponField ? [couponField] : []),
         { key: 'prorate', label: 'Proration', type: 'radio', value: 'no', options: [
           { value: 'no',  label: 'No proration', hint: 'Change applies on the next cycle.' },
           { value: 'yes', label: 'Prorate now', hint: 'Charge the prorated difference now (upgrades only).' },
@@ -31784,6 +31808,8 @@ async function mChange(memberId, currentPlan) {
   const picked = flat.find(o => o.value === vals.new_price);
   const payload = { new_price_id: vals.new_price, prorate: vals.prorate === 'yes' };
   if (vals.next_payment && vals.next_payment !== nextYMD) payload.next_payment_date = vals.next_payment;
+  if (vals.coupon === '__remove__') payload.remove_coupon = true;
+  else if (vals.coupon && vals.coupon.indexOf('code:') === 0) payload.coupon_code = vals.coupon.slice(5);
   try {
     // Solid-backdrop overlay with a circle spinner → check-mark animation, then
     // the roster gold-flash refresh. (Same _mmProgress used by Pause.)
@@ -31792,7 +31818,15 @@ async function mChange(memberId, currentPlan) {
     });
     const label = (r.member && r.member.plan) ? r.member.plan : (picked ? picked.label : 'new plan');
     const npNote = (r.next_payment_set && r.next_payment) ? ` · next payment ${_cdDate(r.next_payment)}` : '';
-    _plToast(`Changed to ${label} (${r.direction}${r.prorated ? ' · prorated' : ''})${npNote}.`);
+    let cpNote = '';
+    if (r.coupon) {
+      if (r.coupon.error) cpNote = ` · coupon NOT applied: ${r.coupon.error}`;
+      else if (r.coupon.applied) cpNote = ` · coupon ${r.coupon.code || ''} applied`;
+      else if (r.coupon.removed) cpNote = ' · coupon removed';
+      else if (r.coupon.carried_over) cpNote = ' · coupon kept';
+      else if (r.coupon.dropped) cpNote = ` · coupon dropped (${r.coupon.reason || ''})`;
+    }
+    _plToast(`Changed to ${label} (${r.direction}${r.prorated ? ' · prorated' : ''})${npNote}${cpNote}.`);
     _membersRefreshFlash(memberId);
   } catch (e) { _plToast('Change failed: ' + e.message); }
 }
