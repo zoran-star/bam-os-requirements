@@ -31277,6 +31277,12 @@ function _renderMemberModalBody(m, stripe, history) {
       </div>
     ` : ''}
 
+    ${divider}
+
+    <!-- Custom Fields (portal-native contact_field_values) -->
+    ${m.ghl_contact_id ? `<div style="${labelCss};margin-bottom:12px">Custom Fields</div>
+    <div id="member-cf-section"><div style="font-size:12px;color:var(--text-mute)">Loading…</div></div>` : ''}
+
     ${m.skill_notes ? `${divider}<div style="${labelCss};margin-bottom:10px">Notes</div><div style="font-size:13px;color:var(--text);line-height:1.5">${escapeHTML(m.skill_notes)}</div>` : ''}
 
     ${(history && history.length) ? `${divider}<div style="${labelCss};margin-bottom:10px">History</div><div style="display:grid;gap:6px">${history.map(h => `<div style="font-size:12px;color:var(--text-mute)"><span style="color:var(--text)">${escapeHTML(h.action_type)}</span> · ${escapeHTML(h.performed_by_name || '-')} · ${h.created_at ? h.created_at.slice(0,10) : ''}</div>`).join('')}</div>` : ''}
@@ -31318,7 +31324,90 @@ function _renderMemberModalBody(m, stripe, history) {
   `;
   _loadMemberDocs(m.id, m.client_id || (typeof CLIENT_ID !== 'undefined' ? CLIENT_ID : null));
   if (m.ghl_contact_id) _loadMemberInbox(m);
+  if (m.ghl_contact_id) _loadMemberCustomFields(m);
   if (m.stripe_price_id) _mFillPlanStatus(m.stripe_price_id);
+}
+
+// ─── Per-member custom fields (portal contact_field_values, editable inline) ──
+// Reads/writes /api/custom-fields (?action=values + {action:'set-value'}).
+let _MEMBER_CF = null; // { contactId, byId: {fieldId: field} }
+
+async function _loadMemberCustomFields(m) {
+  const sec = document.getElementById('member-cf-section');
+  if (!sec || !m || !m.ghl_contact_id) return;
+  try {
+    const token = await _mreqAuthToken();
+    const r = await fetch('/api/custom-fields?action=values&client_id=' + encodeURIComponent(m.client_id) + '&ghl_contact_id=' + encodeURIComponent(m.ghl_contact_id), { headers: { 'Authorization': 'Bearer ' + token } });
+    const j = await _safeJson(r);
+    if (!r.ok) throw new Error(j.error || ('HTTP ' + r.status));
+    _renderMemberCF(sec, j.contact_id, j.fields || []);
+  } catch (e) {
+    sec.innerHTML = `<div style="font-size:12px;color:var(--text-mute)">Couldn't load custom fields - ${escapeHTML(e.message)}</div>`;
+  }
+}
+
+function _renderMemberCF(sec, contactId, fields) {
+  if (!contactId) { sec.innerHTML = `<div style="font-size:12px;color:var(--text-mute)">No portal contact linked yet.</div>`; return; }
+  if (!fields.length) { sec.innerHTML = `<div style="font-size:12px;color:var(--text-mute)">No custom fields set up for this academy.</div>`; return; }
+  _MEMBER_CF = { contactId, byId: {} };
+  fields.forEach(f => { _MEMBER_CF.byId[f.id] = f; });
+  const rows = fields.map(f => `<div style="display:grid;grid-template-columns:130px 1fr;gap:10px 12px;align-items:center;margin-bottom:9px">
+      <div style="font-size:12px;color:var(--text-mute)">${escapeHTML(f.label)}</div>
+      <div>${_memberCFInput(f)}</div>
+    </div>`).join('');
+  sec.innerHTML = `${rows}<div id="member-cf-flash" style="font-size:11px;height:14px;margin-top:2px"></div>`;
+}
+
+function _memberCFInput(f) {
+  const v = f.value;
+  const css = 'background:var(--surface);border:1px solid var(--border);border-radius:4px;color:var(--text);padding:5px 8px;font:inherit;font-size:13px';
+  if (f.type === 'select') {
+    const opts = ['<option value="">- pick -</option>'].concat((f.options || []).map(o => `<option value="${escapeHTML(o)}"${v === o ? ' selected' : ''}>${escapeHTML(o)}</option>`)).join('');
+    return `<select onchange="_memberCFSave('${f.id}',this.value)" style="${css};cursor:pointer;min-width:150px">${opts}</select>`;
+  }
+  if (f.type === 'boolean') {
+    const cur = v === true ? 'Yes' : v === false ? 'No' : '';
+    const opts = ['<option value="">- pick -</option>', `<option value="Yes"${cur === 'Yes' ? ' selected' : ''}>Yes</option>`, `<option value="No"${cur === 'No' ? ' selected' : ''}>No</option>`].join('');
+    return `<select onchange="_memberCFSave('${f.id}', this.value===''?'':this.value==='Yes')" style="${css};cursor:pointer">${opts}</select>`;
+  }
+  if (f.type === 'multiselect') {
+    const arr = Array.isArray(v) ? v : (v ? [v] : []);
+    return (f.options || []).map((o, oi) => `<label style="display:inline-flex;align-items:center;gap:5px;margin-right:12px;font-size:13px;color:var(--text);cursor:pointer"><input type="checkbox" ${arr.includes(o) ? 'checked' : ''} onchange="_memberCFToggleMulti('${f.id}',${oi},this.checked)">${escapeHTML(o)}</label>`).join('') || `<span style="font-size:12px;color:var(--text-mute)">-</span>`;
+  }
+  if (f.type === 'number') {
+    return `<input type="number" value="${v == null ? '' : escapeHTML(String(v))}" onchange="_memberCFSave('${f.id}', this.value===''?'':Number(this.value))" style="${css};width:110px">`;
+  }
+  if (f.type === 'date') {
+    const dv = v ? String(v).slice(0, 10) : '';
+    return `<input type="date" value="${escapeHTML(dv)}" onchange="_memberCFSave('${f.id}',this.value)" style="${css}">`;
+  }
+  const t = f.type === 'email' ? 'email' : f.type === 'phone' ? 'tel' : f.type === 'url' ? 'url' : 'text';
+  return `<input type="${t}" value="${v == null ? '' : escapeHTML(String(v))}" onchange="_memberCFSave('${f.id}',this.value)" style="${css};width:100%;max-width:260px;box-sizing:border-box">`;
+}
+
+async function _memberCFToggleMulti(fieldId, optIndex, checked) {
+  const f = _MEMBER_CF && _MEMBER_CF.byId[fieldId];
+  if (!f) return;
+  const option = (f.options || [])[optIndex];
+  if (option === undefined) return;
+  let arr = Array.isArray(f.value) ? f.value.slice() : (f.value ? [f.value] : []);
+  if (checked) { if (!arr.includes(option)) arr.push(option); }
+  else { arr = arr.filter(x => x !== option); }
+  await _memberCFSave(fieldId, arr);
+}
+
+async function _memberCFSave(fieldId, value) {
+  if (!_MEMBER_CF || !_MEMBER_CF.contactId) return;
+  const flash = document.getElementById('member-cf-flash');
+  try {
+    const token = await _mreqAuthToken();
+    const r = await fetch('/api/custom-fields', { method: 'POST', headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'set-value', contact_id: _MEMBER_CF.contactId, field_id: fieldId, value }) });
+    if (!r.ok) { const j = await _safeJson(r); throw new Error(j.error || ('HTTP ' + r.status)); }
+    if (_MEMBER_CF.byId[fieldId]) _MEMBER_CF.byId[fieldId].value = value;
+    if (flash) { flash.textContent = 'Saved'; flash.style.color = '#7BC47F'; setTimeout(() => { if (flash) flash.textContent = ''; }, 1500); }
+  } catch (e) {
+    if (flash) { flash.textContent = 'Save failed: ' + e.message; flash.style.color = '#c79a4a'; }
+  }
 }
 
 // ─── Per-member documents (private member-files bucket + member_files table) ──
