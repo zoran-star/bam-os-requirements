@@ -227,7 +227,21 @@ async function handler(req, res) {
         body: JSON.stringify(toInsert),
       });
       const created = (Array.isArray(rows) ? rows : [rows]).map(f => ({ ...f, value_count: 0 }));
-      return res.status(200).json({ imported: created.length, fields: created });
+
+      // Fold each contact's existing GHL blob values onto the newly-bridged
+      // fields (contacts.custom_fields -> contact_field_values). Best-effort:
+      // the fields are imported even if the value fold hiccups.
+      let folded = 0;
+      try {
+        const r = await sb(`rpc/fold_custom_field_values`, {
+          method: "POST",
+          headers: { Prefer: "return=representation" },
+          body: JSON.stringify({ p_client_id: clientId }),
+        });
+        folded = typeof r === "number" ? r : (Array.isArray(r) ? r[0] : 0) || 0;
+      } catch (e) { console.error("fold_custom_field_values non-fatal:", e?.message || e); }
+
+      return res.status(200).json({ imported: created.length, folded, fields: created });
     }
 
     // ── POST: create a field def ───────────────────────────────────────────
