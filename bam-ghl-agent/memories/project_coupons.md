@@ -37,6 +37,7 @@ Imported by every surface. Never bypass it.
 - The member GET + `actionChange` fetch the sub with `expand[]=discounts.promotion_code` and **fall back to a plain fetch** if the API version rejects that expand (so billing display + plan changes never break). Account is on a modern API version (uses `confirmation_secret`), so the expand path is the real one.
 - **once_per_customer** ≈ Stripe `first_time_transaction` (new-customer signups). Not a true per-customer counter; fine for the checkout case, weaker for staff manual apply.
 - Coupon discounts the **all-in (HST-inclusive)** amount - Stripe prices here are tax-inclusive, so "$20 off $180" charges $160.
+- Each coupon row in the offer's Discount-codes block shows a **Stripe pill** (`_bbCouponPill`/`_bbApplyCouponPills`/`_bbCouponPillClick`, mirrors `_bbLivePill`): LIVE / not created / deactivated. Click a "not created" pill → confirm modal → creates just that code in Stripe (POST create-discount with the full def) → pill flips to LIVE. This is the inline path; the Price Match panel bulk-create still exists. Adding a code under Pricing does NOT auto-push to Stripe - the pill (or panel) is the push step.
 - Editing a live coupon's math isn't supported (Stripe coupons are immutable): deactivate + create a new code. `create-discount` skips codes that already exist live.
 - GTA checkout coupon is **skipped in test mode** (inline test price; coupons live on the connected account).
 

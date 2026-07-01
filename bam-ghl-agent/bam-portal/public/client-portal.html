@@ -15957,6 +15957,100 @@ function _bbShowLivePrice(el) {
 }
 function _bbCloseLivePrice() { const h = document.getElementById('bb-live-price-host'); if (h) h.innerHTML = ''; }
 
+// ── Discount-code Stripe pills (mirrors _bbLivePill, for the discount_codes block) ──
+// Each coupon row gets a pill: LIVE on Stripe / not created / deactivated. Click a
+// "not created" pill to create it in Stripe right here (a small confirm modal),
+// instead of the separate Price Match panel. State is fetched once + cached.
+let _BB_COUPON_LIVE = null;      // Map<UPPER code, liveObj> or null (unloaded)
+let _BB_COUPON_LOADING = false;
+
+function _bbCouponPill(row) {
+  if (typeof _bbIsV1 === 'function' && _bbIsV1()) return '';
+  const code = String((row && row.code) || '').trim();
+  if (!code) return '';
+  setTimeout(_bbApplyCouponPills, 0);
+  return `<span class="bb-coupon-pill" data-bb-coupon-pill="${_bbEscapeAttr(code.toUpperCase())}" onclick="event.stopPropagation();_bbCouponPillClick(this)" title="Click to check / create this code in Stripe" style="display:inline-block;font-size:9.5px;font-weight:700;letter-spacing:.3px;padding:2px 8px;border-radius:999px;border:1px solid var(--border,#2a2a31);color:var(--text-mute,#888);white-space:nowrap;cursor:pointer;">Stripe…</span>`;
+}
+
+async function _bbLoadCouponHealth(force) {
+  if (_BB_COUPON_LIVE && !force) { _bbApplyCouponPills(); return; }
+  if (_BB_COUPON_LOADING) return;
+  _BB_COUPON_LOADING = true;
+  try {
+    const token = await _mreqAuthToken();
+    const r = await fetch('/api/offers/create-discount?client_id=' + encodeURIComponent(_aiClientId()), { headers: { Authorization: 'Bearer ' + token } });
+    const json = await _safeJson(r);
+    if (r.ok) { _BB_COUPON_LIVE = new Map((json.codes || []).map(c => [String(c.code).toUpperCase(), c])); _bbApplyCouponPills(); }
+  } catch (_) { /* leave pills in loading state; a later render retries */ }
+  finally { _BB_COUPON_LOADING = false; }
+}
+
+function _bbApplyCouponPills() {
+  if (!_BB_COUPON_LIVE) { _bbLoadCouponHealth(); return; }
+  document.querySelectorAll('[data-bb-coupon-pill]').forEach(el => {
+    const code = el.getAttribute('data-bb-coupon-pill') || '';
+    const lc = _BB_COUPON_LIVE.get(code);
+    let label, color, title;
+    if (lc && lc.active !== false) {
+      label = '● LIVE on Stripe'; color = '#7BC47F';
+      title = 'This code is live in Stripe' + (lc.times_redeemed ? ` · used ${lc.times_redeemed}×` : '') + '. Click for details.';
+    } else if (lc && lc.active === false) {
+      label = '● deactivated'; color = '#e0654f'; title = 'This code exists in Stripe but is turned off.';
+    } else {
+      label = '● not created · create →'; color = '#e0a93f'; title = 'Not in Stripe yet - click to create it so checkout can apply it.';
+    }
+    el.textContent = label; el.style.color = color; el.style.borderColor = color; el.title = title;
+  });
+}
+
+// Full coupon definition (with duration + limits) for a code, from the offer's
+// current edited state - so "Create in Stripe" carries everything the owner set.
+function _bbFindCouponDef(code) {
+  const U = String(code || '').trim().toUpperCase();
+  const list = (_bbState && _bbState.offer && _bbState.offer.data && _bbState.offer.data.pricing && _bbState.offer.data.pricing.discount_codes) || [];
+  return list.find(d => d && String(d.code || '').trim().toUpperCase() === U) || null;
+}
+
+async function _bbCouponPillClick(el) {
+  const code = el.getAttribute('data-bb-coupon-pill') || '';
+  if (!code) return;
+  const lc = _BB_COUPON_LIVE && _BB_COUPON_LIVE.get(code);
+  const fmt = (c) => /percent/i.test(String(c && c.kind)) ? `${c.value}% off` : `$${c.value} off`;
+  if (lc && lc.active !== false) {
+    _mmModal({ icon: '🎟', title: code + ' is live', okLabel: 'OK',
+      body: `Active in Stripe: <b>${escapeHTML(fmt(lc))}</b>${lc.times_redeemed ? ` &middot; used ${lc.times_redeemed}×` : ''}${lc.max_redemptions ? ` of ${lc.max_redemptions}` : ''}. Checkout, change-plan, and the member drawer can all apply it.` });
+    return;
+  }
+  const def = _bbFindCouponDef(code);
+  if (!def || !def.code) { _plToast('Save the offer first, then create the code.'); return; }
+  const reactivate = lc && lc.active === false;
+  const ok = await _mmModal({
+    icon: '🎟', title: reactivate ? 'Reactivate needed' : 'Create in Stripe',
+    body: reactivate
+      ? `<b>${escapeHTML(code)}</b> exists in Stripe but is turned off. Reactivate it from the Price Match panel (this button only creates new codes).`
+      : `Create <b>${escapeHTML(code)}</b> (${escapeHTML(fmt(def))}) in Stripe so checkout can apply it?`,
+    okLabel: reactivate ? 'OK' : 'Create in Stripe',
+  });
+  if (!ok || reactivate) return;
+  el.textContent = '● creating…'; el.style.color = 'var(--text-mute,#888)'; el.style.borderColor = 'var(--border,#2a2a31)';
+  try {
+    const token = await _mreqAuthToken();
+    const r = await fetch('/api/offers/create-discount', {
+      method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+      body: JSON.stringify({ client_id: _aiClientId(), codes: [def] }),
+    });
+    const json = await _safeJson(r);
+    if (!r.ok) throw new Error(json.error || ('HTTP ' + r.status));
+    const failed = (json.results || []).find(x => x.error);
+    if (failed) throw new Error(failed.error);
+    await _bbLoadCouponHealth(true);
+    _plToast(code + ' is now live in Stripe.');
+  } catch (e) {
+    _bbApplyCouponPills();
+    _plToast('Create failed: ' + (e && e.message ? e.message : e));
+  }
+}
+
 function _bbApplyLivePills() {
   if (!_BB_MATCH_HEALTH) { _bbLoadMatchHealth(); return; }
   document.querySelectorAll('[data-bb-live-pill]').forEach(el => {
@@ -17913,7 +18007,7 @@ const _bbDiscountCodesField = {
   addLabel:'discount code',
   collapsible:true,
   summaryKeys:['code','kind','value'],
-  hint:'Codes customers enter at checkout - each is a percent or dollar discount. After adding them here, push them live in the Price Match panel. Guardrails: percent is capped 1-99%, and a dollar code that would drop a plan below $1 is blocked.',
+  hint:'Codes customers enter at checkout - each is a percent or dollar discount. After adding a code, click its Stripe pill to create it live (that is what makes checkout accept it). Guardrails: percent is capped 1-99%, and a dollar code that would drop a plan below $1 is blocked.',
   subFields:[
     { key:'code', type:'text', label:'Code', required:true, hint:'What customers type, e.g. SIBLING10 (letters/numbers)' },
     { key:'kind', type:'check_one', label:'Type', required:true, options:['Percent off','Dollar off'] },
@@ -18651,12 +18745,13 @@ function _bbRenderField(field, sectionId) {
           const summary = _bbBlockSummaryHtml(row, field.subFields, field.summaryKeys);
           const livePill = (field.key === 'pricing_offerings' && !isArchived) ? _bbLivePill(_bbPlanKeys(row)) : '';
           const ciqPill = (field.key === 'pricing_offerings' && !isArchived) ? _ciqPill(_bbPlanKeys(row)) : '';
+          const couponPill = (field.key === 'discount_codes' && !isArchived) ? _bbCouponPill(row) : '';
           return `
             <div class="bb-block-row" ${isArchived ? 'style="opacity:0.6;"' : ''}>
               <div class="bb-block-row-head">
                 <button class="bb-block-toggle" onclick="_bbBlockToggleExpand('${sectionId}','${field.key}',${i})" title="${expanded ? 'Collapse' : 'Expand'}">${expanded ? '▾' : '▸'}</button>
                 <div class="bb-block-row-info">
-                  <div class="bb-block-row-title" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">${summary.title || '(' + _bbEscapeHtml(rowLabel.toLowerCase()) + ' ' + (i+1) + ')'}${isArchived ? '<span style="font-size:9.5px;font-weight:700;letter-spacing:.3px;padding:2px 7px;border-radius:999px;border:1px solid var(--border,#2a2a31);color:var(--text-mute,#888);">ARCHIVED</span>' : livePill + ciqPill}</div>
+                  <div class="bb-block-row-title" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">${summary.title || '(' + _bbEscapeHtml(rowLabel.toLowerCase()) + ' ' + (i+1) + ')'}${isArchived ? '<span style="font-size:9.5px;font-weight:700;letter-spacing:.3px;padding:2px 7px;border-radius:999px;border:1px solid var(--border,#2a2a31);color:var(--text-mute,#888);">ARCHIVED</span>' : livePill + ciqPill + couponPill}</div>
                   <div class="bb-block-row-meta">${summary.meta || '<span class="empty">Click ▸ to fill in details</span>'}</div>
                 </div>
                 ${actionBtn}
