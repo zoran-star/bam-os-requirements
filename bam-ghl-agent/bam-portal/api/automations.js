@@ -388,10 +388,21 @@ async function runWork(res) {
         } catch (_) { /* leave it blank */ }
       }
 
+      // {{athletes_full_name}} token: the athlete (child) name, resolved by the
+      // contact sync into ghl_contacts.athlete_name (the "resolver"). Only looked
+      // up when the copy uses it; blank falls back to "your athlete" in the shell.
+      let athlete = "";
+      if (/athlet/i.test(`${step.body || ""}${step.subject || ""}`)) {
+        try {
+          const rows = await sb(`ghl_contacts?client_id=eq.${job.client_id}&ghl_contact_id=eq.${encodeURIComponent(job.contact_id)}&select=athlete_name&limit=1`);
+          athlete = (Array.isArray(rows) && rows[0] && rows[0].athlete_name) || "";
+        } catch (_) { /* leave blank */ }
+      }
+
       const result = await sendOn({
         channel: step.channel, clientId: job.client_id, contactId: job.contact_id,
         toEmail: info.email, toPhone: info.phone, subject: step.subject, body: step.body, ghlToken: token,
-        vars: { first_name: info.firstName, full_name: info.fullName, next_session },
+        vars: { first_name: info.firstName, full_name: info.fullName, athlete, next_session },
       });
 
       if (result && result.sent) { await finish({ status: "sent", sent_at: new Date().toISOString() }); sent++; await logEvent({ clientId: job.client_id, contactId: job.contact_id, automationId: job.automation_id, type: "step_sent", payload: { step_id: job.step_id, channel: step.channel } }); }
