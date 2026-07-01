@@ -84,6 +84,19 @@ function canAccess(ctx, clientId) {
   return ctx.isStaff || ctx.clientIds.includes(clientId);
 }
 
+// Resolve a contacts row by portal uuid, or by (client_id, ghl_contact_id).
+async function resolveContact(contactId, clientId, ghlContactId) {
+  if (contactId) {
+    const r = await sb(`contacts?id=eq.${encodeURIComponent(contactId)}&select=id,client_id&limit=1`);
+    return (r && r[0]) || null;
+  }
+  if (clientId && ghlContactId) {
+    const r = await sb(`contacts?client_id=eq.${clientId}&ghl_contact_id=eq.${encodeURIComponent(ghlContactId)}&select=id,client_id&limit=1`);
+    return (r && r[0]) || null;
+  }
+  return null;
+}
+
 // ── GHL (read the academy's live custom-field definitions) ─────────────────
 async function ghlGet(path, token) {
   const r = await fetch(`${GHL_V2}${path}`, { headers: { Authorization: `Bearer ${token}`, Version: V2_VERSION, Accept: "application/json" } });
@@ -163,6 +176,45 @@ async function handler(req, res) {
   try {
     const ctx = await resolveUser(req);
 
+    // ── GET ?action=values: a contact's field defs + current values ────────
+    // Accepts contact_id (portal uuid) OR client_id + ghl_contact_id.
+    if (req.method === "GET" && req.query && req.query.action === "values") {
+      const contact = await resolveContact(req.query.contact_id, req.query.client_id, req.query.ghl_contact_id);
+      if (!contact) return res.status(200).json({ contact_id: null, fields: [] });
+      if (!canAccess(ctx, contact.client_id)) return res.status(403).json({ error: "not your academy" });
+      const defs = await sb(`custom_field_defs?client_id=eq.${contact.client_id}&archived=eq.false&select=*&order=position.asc,created_at.asc`);
+      const vals = await sb(`contact_field_values?contact_id=eq.${contact.id}&select=field_id,value`);
+      const vmap = new Map((vals || []).map(v => [v.field_id, v.value]));
+      return res.status(200).json({
+        contact_id: contact.id,
+        fields: (defs || []).map(d => ({ ...d, value: vmap.has(d.id) ? vmap.get(d.id) : null })),
+      });
+    }
+
+    // ── POST ?action=set-value: upsert (or clear) one value for a contact ──
+    if (req.method === "POST" && (req.body || {}).action === "set-value") {
+      const b = req.body || {};
+      if (!b.contact_id || !b.field_id) return res.status(400).json({ error: "contact_id and field_id required" });
+      const contact = await resolveContact(b.contact_id);
+      if (!contact) return res.status(404).json({ error: "contact not found" });
+      if (!canAccess(ctx, contact.client_id)) return res.status(403).json({ error: "not your academy" });
+      const def = await sb(`custom_field_defs?id=eq.${b.field_id}&client_id=eq.${contact.client_id}&select=id&limit=1`);
+      if (!def || !def[0]) return res.status(400).json({ error: "field not on this academy" });
+
+      const v = b.value;
+      const isEmpty = v === null || v === undefined || v === "" || (Array.isArray(v) && v.length === 0);
+      if (isEmpty) {
+        await sb(`contact_field_values?contact_id=eq.${contact.id}&field_id=eq.${b.field_id}`, { method: "DELETE", headers: { Prefer: "return=minimal" } });
+        return res.status(200).json({ ok: true, cleared: true });
+      }
+      await sb(`contact_field_values?on_conflict=contact_id,field_id`, {
+        method: "POST",
+        headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
+        body: JSON.stringify([{ contact_id: contact.id, field_id: b.field_id, value: v, updated_at: new Date().toISOString() }]),
+      });
+      return res.status(200).json({ ok: true });
+    }
+
     // ── GET ?action=ghl-fields: the academy's live GHL custom fields ───────
     if (req.method === "GET" && req.query && req.query.action === "ghl-fields") {
       const clientId = req.query.client_id;
@@ -178,9 +230,12 @@ async function handler(req, res) {
       if (!clientId) return res.status(400).json({ error: "client_id required" });
       if (!canAccess(ctx, clientId)) return res.status(403).json({ error: "not your academy" });
 
-      const fields = await sb(
-        `custom_field_defs?client_id=eq.${clientId}&select=*&order=position.asc,created_at.asc`
-      );
+      // Optional filters: offer_id (wizard scopes to one offer) + section.
+      let filter = `custom_field_defs?client_id=eq.${clientId}`;
+      if (req.query.offer_id) filter += `&offer_id=eq.${encodeURIComponent(req.query.offer_id)}`;
+      else if (req.query.scope === "academy") filter += `&offer_id=is.null`;
+      if (req.query.section) filter += `&section=eq.${encodeURIComponent(req.query.section)}`;
+      const fields = await sb(`${filter}&select=*&order=position.asc,created_at.asc`);
       // Attach how many contacts have a value per field (one grouped read).
       const counts = {};
       const ids = (fields || []).map(f => f.id);
@@ -254,8 +309,15 @@ async function handler(req, res) {
       if (!label) return res.status(400).json({ error: "label required" });
       const type = FIELD_TYPES.includes(b.type) ? b.type : "text";
 
-      // Position at the end of the current list.
-      const existing = await sb(`custom_field_defs?client_id=eq.${clientId}&select=position&order=position.desc&limit=1`);
+      // Optional offer + section scope (authored in the offer wizard).
+      const offerId = b.offer_id || null;
+      const section = (b.section === "sales" || b.section === "onboarding") ? b.section : null;
+
+      // Position at the end of the current scope's list.
+      let posFilter = `custom_field_defs?client_id=eq.${clientId}`;
+      posFilter += offerId ? `&offer_id=eq.${encodeURIComponent(offerId)}` : `&offer_id=is.null`;
+      if (section) posFilter += `&section=eq.${section}`;
+      const existing = await sb(`${posFilter}&select=position&order=position.desc&limit=1`);
       const nextPos = existing && existing[0] ? (existing[0].position || 0) + 1 : 0;
       const key = await uniqueKey(clientId, label);
 
@@ -267,6 +329,7 @@ async function handler(req, res) {
           options: cleanOptions(type, b.options),
           required: b.required === true,
           position: nextPos,
+          offer_id: offerId, section,
         }),
       });
       const field = Array.isArray(rows) ? rows[0] : rows;
