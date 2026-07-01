@@ -29,10 +29,10 @@
 ## NOT built yet (next PRs, in order)
 1. ~~Repoint joins~~ **DONE (P2).** 2. ~~Portal writes + dual-write~~ **DONE (P3).**
 3. **P4a DONE (2026-07-01, dormant, migration `20260701130000`):** `custom_field_defs` (per academy: key/label/type/options/position/required/archived + `ghl_field_id` bridge, unique client_id+key) + `contact_field_values` (typed value per contact+field, RLS joins to contacts). Empty, nothing reads them.
-   **P4b NOT built (needs design pass):** Settings UI to manage defs; migrate the opaque `contacts.custom_fields` GHL blob into typed values (needs a per-academy GHL custom-field-id -> label map, read from GHL `/locations/{id}/customFields`); feed `api/email-shells.js resolveMergeVars` from defs/values.
+   **P4b management UI DONE (2026-07-01, PR #960):** staff-portal "Custom Fields" nav tab (admin/scaling_manager), `api/custom-fields.js` CRUD over `custom_field_defs` (mirrors `action-items.js`), `src/views/CustomFieldsView.jsx` (academy picker + list + add/edit modal, 9 types). Dormant: definitions only, nothing renders values yet.
+   **P4b STILL pending:** (a) import existing GHL custom fields (adopt `ghl_field_id` + real labels via GHL `/locations/{id}/customFields`) + migrate the opaque `contacts.custom_fields` blob into `contact_field_values`; (b) edit values per contact in the member drawer; (c) feed `api/email-shells.js resolveMergeVars` from defs/values.
 4. **Flip `contact_provider='portal'` + stop `cron-sync-contacts.js`.** BLOCKED until inbound email + social DMs leave GHL (GHL needs the contact to thread an incoming reply).
-3. **Owner-managed custom-field definitions** - new `custom_field_defs` + values tables + Settings UI; migrate the opaque GHL blob into real defs. Feeds the portal merge-var resolver (`api/email-shells.js resolveMergeVars`).
-4. **Flip `contact_provider='portal'` + stop the inbound `cron-sync-contacts.js`.** BLOCKED until inbound email + social DMs also leave GHL (GHL needs the contact to exist to thread an incoming IG DM / email reply).
 
 ## PRs
-- **#959:** PR 1 - foundation (`contact_provider` toggle, `contacts` table + RLS + indexes, backfill from `ghl_contacts`).
+- **#959:** P1-P4a - foundation (`contact_provider` toggle, `contacts` table, backfill), repoint joins, gap backfill, dual-write code, custom-field schema.
+- **#960:** P4b - custom fields management UI (`api/custom-fields.js` + `CustomFieldsView.jsx` + nav tab).
