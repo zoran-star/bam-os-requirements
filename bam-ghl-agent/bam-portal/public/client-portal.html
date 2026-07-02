@@ -23436,6 +23436,10 @@ async function _plScanNow(btnId, auto) {
     await Promise.all([
       _apxPost('/api/agent-approvals', 'detect-now', {}).catch(() => null),
       _apxPost('/api/agent-followups', 'detect-now', {}).catch(() => null),
+      // One Scan = the WHOLE board: the confirm agent (Scheduled Trial) and the
+      // closing agent (Done Trial follow-up plans) run too, not just booking.
+      _apxPost('/api/agent-confirm', 'detect-now', {}).catch(() => null),
+      _apxPost('/api/agent-closing', 'detect-now', {}).catch(() => null),
     ]);
     _PL_LAST_SCAN = Date.now();
     await _plLoadNeedsAction();   // repaint badges from the fresh cards (re-renders the board)
