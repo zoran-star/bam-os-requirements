@@ -98,6 +98,11 @@ MCP-recorded version.
       `clients.credit_engine_enabled`; daily expiry sweep cron
       `/api/runtime/credits/cron-sweep`; opening balances backfilled via
       `scripts/credit-backfill-run.mjs`.
-- [ ] E: checkout cutover
+- [x] E: checkout cutover (2026-07-02). /api/website/checkout resolves through
+      TYPED offer_prices (offer_price_id preferred, offer_price_key kept for the
+      deployed funnel); commitment-revert monthly lookup typed too; archived
+      plans no longer purchasable by hand-crafted keys. Parity-verified: all 5
+      sellable keys resolve to identical stripe_price_id + amount. offer.js
+      response gains additive `purchasable` (typed) block.
 - [ ] F: members/sorter spine
 - [ ] G: entry_points.bookable_program_id + drift check

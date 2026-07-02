@@ -134,9 +134,26 @@ retries - the ONLY paths that can 5xx are access-sync ON failures).
 - Opening balances: `scripts/credit-backfill-run.mjs` replays each member's
   latest PAID invoice through the engine (idempotent).
 
-## Next (Part 2, money->access; order E->F->G)
+## E: checkout typed cutover - SHIPPED (2026-07-02)
 
-E checkout sells typed offer_price_id (weekly-credit plans hidden until D) ->
+- `api/website/checkout.js` resolves through TYPED `offer_prices`: accepts
+  `offer_price_id` (preferred, new) or legacy `offer_price_key`; requires
+  is_active AND is_routable (= confirmed entitlement rule exists) - checkout
+  can never sell what the engines can't fulfill. pricing_catalog no longer
+  consulted at checkout. Sub metadata now also stamps offer_price_id.
+- Commitment-revert monthly lookup (3/6-month "goes back to monthly") reads
+  typed rows too; conservative null -> plain sub unchanged.
+- Deliberate tightening: archived-plan keys (Accelerate/Elevate/Dominate) were
+  technically purchasable via hand-crafted POSTs before; typed routable now
+  refuses them. Parity on the 5 REAL sellable keys verified exact
+  (stripe_price_id + amount match old resolution).
+- `api/website/offer.js` response gains additive `purchasable[]` (typed
+  id/key/amount/interval) so frontends can migrate to ids without a portal PR.
+- Frontend (bam-client-sites enroll page) unchanged - keys still work.
+- Weekly-credit gating: moot, D activated before E.
+
+## Next (Part 2, money->access; order F->G)
+
 F members.js/sorter full identity spine ->
 G `entry_points.bookable_program_id` + drift check (Luka OK'd all of this 2026-07-02).
 

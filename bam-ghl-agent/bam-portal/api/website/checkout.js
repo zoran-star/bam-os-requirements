@@ -15,9 +15,12 @@
 // academy's connected account, returns a PaymentIntent client_secret for the
 // Stripe.js Payment Element) with three differences for the website funnel:
 //   1. CORS-gated by clients.allowed_domains (it runs cross-origin).
-//   2. The price is resolved by the offer's Price-Matched offer_price_key, not a
-//      canonical plan alias — so we charge exactly what the offer builder shows
-//      (still server-side; the client never sends an amount).
+//   2. The price is resolved through the TYPED runtime rows (offer_prices) —
+//      selected by the stable offer_price_id (preferred) or the legacy
+//      offer_price_key. Only active AND routable typed rows are sellable, and
+//      routable requires a confirmed entitlement rule, so checkout can never
+//      sell access the entitlement/credit engines can't fulfill. Still fully
+//      server-side; the client never sends an amount.
 //   3. It renders + stores the signed agreement PDF and links it to the member.
 //
 // Payment completion (member -> "live", GHL convert/tag) is handled later by
@@ -113,11 +116,6 @@ function piSecretFromSub(sub) {
   return pi && typeof pi === "object" ? pi.client_secret : null;
 }
 
-function pickRoutable(rows) {
-  const routable = (rows || []).filter((r) => r.is_routable);
-  if (!routable.length) return null;
-  return routable.find((r) => r.tier === "canonical") || routable[0];
-}
 function money(cents, currency) {
   if (cents == null) return "";
   return `$${(cents / 100).toFixed(2)} ${String(currency || "cad").toUpperCase()}`;
@@ -152,18 +150,20 @@ async function resolveCommitmentRevert({ clientId, offerId, planText, term }) {
   const commitment = offering && Array.isArray(offering.commitments)
     ? offering.commitments.find((c) => lengthMatchesTerm(c.length, term)) : null;
   if (!commitment || norm(commitment.after) !== norm("Goes back to monthly")) return null;
-  // 2) Find the plan's canonical monthly price to revert to (prefer the 4_weeks row).
+  // 2) Find the plan's monthly TYPED price to revert to (the routable typed
+  //    row is the canonical seller; prefer the 4_weeks interval). Conservative:
+  //    no routable typed monthly -> null -> plain sub (today's behavior).
   let monthlyRows = null;
   try {
     monthlyRows = await sb(
-      `pricing_catalog?client_id=eq.${encodeURIComponent(clientId)}&offer_id=eq.${encodeURIComponent(offerId)}` +
-      `&offer_price_key=eq.${encodeURIComponent(planText + "|monthly")}&tier=eq.canonical` +
-      `&select=stripe_price_id,interval`
+      `offer_prices?tenant_id=eq.${encodeURIComponent(clientId)}&source_offer_id=eq.${encodeURIComponent(offerId)}` +
+      `&source_offer_price_key=eq.${encodeURIComponent(planText + "|monthly")}&is_routable=eq.true&is_active=eq.true` +
+      `&select=stripe_price_id,billing_interval`
     );
   } catch { return null; }
   const monthly = (Array.isArray(monthlyRows) ? monthlyRows : [])
     .filter((r) => r.stripe_price_id)
-    .sort((a, b) => (b.interval === "4_weeks" ? 1 : 0) - (a.interval === "4_weeks" ? 1 : 0))[0];
+    .sort((a, b) => (b.billing_interval === "4_weeks" ? 1 : 0) - (a.billing_interval === "4_weeks" ? 1 : 0))[0];
   if (!monthly || !monthly.stripe_price_id) return null;
   return { revertToPriceId: monthly.stripe_price_id };
 }
@@ -205,10 +205,15 @@ async function handler(req, res) {
     // Optional future membership start date (display/access label only, never billing).
     const startDate = clampStartDate(body.start_date);
 
+    // Typed-runtime cutover (offer tie-in step E): the stable offer_price_id
+    // is the preferred selector; offer_price_key stays supported for the
+    // deployed funnel pages. Either way the server resolves TYPED rows below.
+    const offerPriceId = (body.offer_price_id || "").toString().trim();
+
     // ── Validate ──
     if (!clientId) return res.status(400).json({ error: "client_id required" });
     if (!offerId) return res.status(400).json({ error: "offer_id required" });
-    if (!priceKey) return res.status(400).json({ error: "offer_price_key required" });
+    if (!priceKey && !offerPriceId) return res.status(400).json({ error: "offer_price_id or offer_price_key required" });
     if (!parentEmail) return res.status(400).json({ error: "parent email required" });
     if (!athleteName) return res.status(400).json({ error: "athlete name required" });
     if (!agreement.signature) return res.status(400).json({ error: "agreement signature required" });
@@ -222,21 +227,34 @@ async function handler(req, res) {
     const stripeAccount = testMode ? null : client.stripe_connect_account_id;
     if (!testMode && !stripeAccount) return res.status(409).json({ error: "academy is not connected to Stripe" });
 
-    // ── Price: resolve the offer's Price-Matched, routable catalog row ──
-    const priceRows = await sb(
-      `pricing_catalog?client_id=eq.${encodeURIComponent(clientId)}&offer_id=eq.${encodeURIComponent(offerId)}` +
-      `&offer_price_key=eq.${encodeURIComponent(priceKey)}` +
-      `&select=stripe_price_id,amount_cents,currency,canonical_plan,interval,tier,is_routable`
-    );
-    const price = pickRoutable(priceRows);
+    // ── Price: resolve through the TYPED runtime rows (offer_prices).
+    // Checkout no longer reads pricing_catalog/Blueprint JSON to decide what
+    // is sellable: a typed row must be active AND routable, and routable
+    // requires a confirmed entitlement rule (offers-sync invariant) - so
+    // nothing can be sold that the access/credit engines can't fulfill.
+    const typedSelect = "id,title,amount_cents,currency,billing_interval,stripe_price_id,source_offer_id,source_offer_price_key,is_active,is_routable,sort_order";
+    let typedRows;
+    if (offerPriceId) {
+      typedRows = await sb(
+        `offer_prices?tenant_id=eq.${encodeURIComponent(clientId)}&id=eq.${encodeURIComponent(offerPriceId)}` +
+        `&source_offer_id=eq.${encodeURIComponent(offerId)}&select=${typedSelect}`
+      );
+    } else {
+      typedRows = await sb(
+        `offer_prices?tenant_id=eq.${encodeURIComponent(clientId)}&source_offer_id=eq.${encodeURIComponent(offerId)}` +
+        `&source_offer_price_key=eq.${encodeURIComponent(priceKey)}&order=sort_order.asc&select=${typedSelect}`
+      );
+    }
+    const price = (Array.isArray(typedRows) ? typedRows : []).find((row) => row.is_active && row.is_routable) || null;
     if (!price || (!testMode && !price.stripe_price_id)) {
-      return res.status(409).json({ error: "no routable price for that selection", offer_price_key: priceKey });
+      return res.status(409).json({ error: "no routable price for that selection", offer_price_key: priceKey || offerPriceId });
     }
     if (testMode && price.amount_cents == null) {
-      return res.status(409).json({ error: "no catalog amount for that selection (needed for inline test price)", offer_price_key: priceKey });
+      return res.status(409).json({ error: "no price amount for that selection (needed for inline test price)", offer_price_key: priceKey || offerPriceId });
     }
-    const term = price.interval || "4_weeks";
-    const planText = price.canonical_plan || priceKey.split("|")[0];
+    const resolvedPriceKey = priceKey || price.source_offer_price_key || "";
+    const term = price.billing_interval || "4_weeks";
+    const planText = resolvedPriceKey.split("|")[0] || price.title;
 
     // ── Optional coupon: validate the promo code + run the $1-floor / percent
     //    guardrail against the SERVER-SIDE plan price. Never trusts a client
@@ -323,10 +341,10 @@ async function handler(req, res) {
       const iv = intervalFor(term);
       const testPrice = await stripeFetch(`/prices`, {
         method: "POST", stripeAccount,
-        idempotencyKey: `web-price-${priceKey}-${price.amount_cents}`.slice(0, 200),
+        idempotencyKey: `web-price-${resolvedPriceKey}-${price.amount_cents}`.slice(0, 200),
         body: { currency: price.currency || "cad", unit_amount: price.amount_cents,
           "recurring[interval]": iv.interval, "recurring[interval_count]": iv.interval_count,
-          "product_data[name]": `${priceKey} (FC website enrollment test)` },
+          "product_data[name]": `${resolvedPriceKey} (FC website enrollment test)` },
       });
       priceIdToUse = testPrice.id;
     }
@@ -339,7 +357,7 @@ async function handler(req, res) {
     // ── Portal-owned subscription (default_incomplete → client_secret) ──
     const sub = await stripeFetch(`/subscriptions`, {
       method: "POST", stripeAccount,
-      idempotencyKey: `web-sub-${testMode ? "test-" : ""}${clientId}-${parentEmail}-${athleteName}-${priceKey}`.slice(0, 200),
+      idempotencyKey: `web-sub-${testMode ? "test-" : ""}${clientId}-${parentEmail}-${athleteName}-${resolvedPriceKey}`.slice(0, 200),
       body: {
         customer: customerId, "items[0][price]": priceIdToUse,
         payment_behavior: "default_incomplete",
@@ -347,7 +365,7 @@ async function handler(req, res) {
         "expand[0]": "latest_invoice.payment_intent",
         "expand[1]": "latest_invoice.confirmation_secret",
         "metadata[origin]": "fullcontrol-website-enrollment",
-        "metadata[offer_id]": offerId, "metadata[offer_price_key]": priceKey,
+        "metadata[offer_id]": offerId, "metadata[offer_price_key]": resolvedPriceKey, "metadata[offer_price_id]": price.id,
         "metadata[plan]": planText, "metadata[term]": term,
         "metadata[client_id]": clientId, "metadata[parent_email]": parentEmail, "metadata[athlete_name]": athleteName,
         ...(oppId ? { "metadata[ghl_opportunity_id]": oppId } : {}),
@@ -389,7 +407,7 @@ async function handler(req, res) {
         body: JSON.stringify([{
           client_id: clientId, member_id: member && member.id,
           action_type: "website-enrollment-checkout-created",
-          args: { offer_id: offerId, offer_price_key: priceKey, plan: planText, term, sub_id: sub.id, customer_id: customerId, intake, agreement_saved: agreementSaved, coupon: discountInfo || (couponError ? { error: couponError } : null), start_date: startDate },
+          args: { offer_id: offerId, offer_price_key: resolvedPriceKey, offer_price_id: price.id, plan: planText, term, sub_id: sub.id, customer_id: customerId, intake, agreement_saved: agreementSaved, coupon: discountInfo || (couponError ? { error: couponError } : null), start_date: startDate },
           performed_by_name: "Website enrollment funnel (public)",
         }]),
       });
