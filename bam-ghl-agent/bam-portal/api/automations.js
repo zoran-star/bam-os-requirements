@@ -462,6 +462,10 @@ async function handler(req, res) {
         name: b.name ?? null, enabled: !!b.enabled, approved: !!b.approved,
         ghl_stage_name: b.ghl_stage_name ?? null, updated_at: new Date().toISOString(),
       };
+      // Offer tie-in: scope the automation to an offer when the caller says so.
+      // Only include the key when provided, so older callers never clobber an
+      // existing offer_id back to null via the merge-duplicates upsert.
+      if (b.offer_id !== undefined) row.offer_id = b.offer_id || null;
       const r = await sb(`automations?on_conflict=client_id,automation_key`, { method: "POST", headers: { Prefer: "resolution=merge-duplicates,return=representation" }, body: JSON.stringify([row]) });
       return res.status(200).json({ ok: true, automation: Array.isArray(r) && r[0] });
     }
@@ -482,7 +486,7 @@ async function handler(req, res) {
       let auto = Array.isArray(autos) && autos[0];
       if (!auto) {
         const ins = await sb(`automations?on_conflict=client_id,automation_key`, { method: "POST", headers: { Prefer: "resolution=merge-duplicates,return=representation" },
-          body: JSON.stringify([{ client_id: clientId, automation_key: key, name: def.name, enabled: !!def.enabled, approved: !!def.approved, updated_at: new Date().toISOString() }]) });
+          body: JSON.stringify([{ client_id: clientId, automation_key: key, name: def.name, enabled: !!def.enabled, approved: !!def.approved, offer_id: b.offer_id || null, updated_at: new Date().toISOString() }]) });
         auto = Array.isArray(ins) && ins[0];
       }
       if (!auto) return res.status(500).json({ error: "seed failed" });
