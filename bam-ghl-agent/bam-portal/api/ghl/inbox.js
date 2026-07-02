@@ -228,11 +228,17 @@ async function pickGhlToken(client) {
 // A conversation is a MEMBER if its contact matches a row in the portal
 // `members` table (by portal contact id, phone, or email); everyone else who
 // reaches out — funnel leads AND random inbound — is a LEAD, so nothing hides
-// in "All" only. Uses portal data exclusively; makes zero GHL calls.
+// in "All" only. Also resolves a display NAME for threads whose store row only
+// has a phone/email: contacts store first, members table second. Uses portal
+// data exclusively; makes zero GHL calls.
+const _nameless = (s) => {
+  const v = String(s || "").trim();
+  return !v || /^[\s()+\-.\d]+$/.test(v) || (v.includes("@") && !v.includes(" "));
+};
 async function classifyStoreConversations(clientId, conversations) {
   const rows = await sb(
     `members?client_id=eq.${clientId}` +
-    `&select=id,athlete_name,parent_email,parent_phone,ghl_contact_id,status`
+    `&select=id,athlete_name,parent_name,parent_email,parent_phone,ghl_contact_id,status`
   ).catch(() => []);
   const members = Array.isArray(rows) ? rows : [];
   const normPhone = (p) => (p ? String(p).replace(/\D+/g, "") : "");
@@ -247,14 +253,40 @@ async function classifyStoreConversations(clientId, conversations) {
     if (m.parent_email) byEmail.set(m.parent_email.toLowerCase(), m);
   }
 
+  // Resolve real names from the portal contacts store for threads that only
+  // carry a phone/email (sms_threads.contact_name is often empty).
+  const needIds = [...new Set(conversations
+    .filter((c) => _nameless(c.contactName) && c.contactId)
+    .map((c) => c.contactId))];
+  const nameByContactId = new Map();
+  for (let i = 0; i < needIds.length; i += 100) {
+    const chunk = needIds.slice(i, i + 100);
+    const crows = await sb(
+      `contacts?client_id=eq.${clientId}` +
+      `&ghl_contact_id=in.(${chunk.map(encodeURIComponent).join(",")})` +
+      `&select=ghl_contact_id,name,first_name,last_name`
+    ).catch(() => []);
+    for (const r of (Array.isArray(crows) ? crows : [])) {
+      const nm = String(r.name || `${r.first_name || ""} ${r.last_name || ""}`).trim();
+      if (r.ghl_contact_id && nm && !_nameless(nm)) nameByContactId.set(r.ghl_contact_id, nm);
+    }
+  }
+
   return conversations.map((c) => {
     const m =
       (c.contactId && byContactId.get(c.contactId)) ||
       (c.phone     && byPhone.get(normPhone(c.phone))) ||
       (c.email     && byEmail.get(String(c.email).toLowerCase())) ||
       null;
+    let contactName = c.contactName;
+    if (_nameless(contactName)) {
+      contactName = (c.contactId && nameByContactId.get(c.contactId))
+        || (m && (m.parent_name || m.athlete_name))
+        || contactName;
+    }
     return {
       ...c,
+      contactName,
       classification: m ? "member" : "lead",
       member: m ? { id: m.id, athlete_name: m.athlete_name, status: m.status } : null,
     };

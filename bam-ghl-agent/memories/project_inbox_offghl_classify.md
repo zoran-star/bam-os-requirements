@@ -52,6 +52,16 @@ dropdown; it's what V1.5 AND V2 academies see). Zoran's PWA screenshot proved
 it. The `#view-inbox` styling is live but dead code for GTA. Both views read the
 same `/api/ghl/inbox` list, so the classification/counts work feeds both.
 
+## Names, not numbers (Zoran, same day)
+
+`sms_threads.contact_name` is often empty, so store threads showed bare phone
+numbers. `classifyStoreConversations` now also resolves a display name at read
+time for any thread whose name is phone-only or email-only (`_nameless` test):
+**contacts store first** (`contacts` by `ghl_contact_id`, batched `in.()` x100),
+**members table second** (`parent_name || athlete_name`). Zero GHL calls, fixes
+list rows + thread header (which reads the convo's contactName). Thread header
+also shows the phone as a small muted sub-line under a real name.
+
 ## One Hawkeye button (Zoran, same day)
 
 The inbox toolbars (both `#view-v15inbox` and `#view-inbox`) now show ONE
