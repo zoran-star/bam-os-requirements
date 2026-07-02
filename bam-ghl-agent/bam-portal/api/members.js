@@ -408,7 +408,7 @@ async function handler(req, res) {
         if (callOrs.length) {
           calls = await sb(
             `calls?client_id=eq.${member.client_id}&or=(${callOrs.join(",")})` +
-            `&select=direction,status,duration_seconds,recording_url,voicemail_transcript,occurred_at,answered_by` +
+            `&select=id,direction,status,duration_seconds,recording_url,voicemail_transcript,occurred_at,answered_by` +
             `&order=occurred_at.desc&limit=15`
           ).catch(() => []);
         }

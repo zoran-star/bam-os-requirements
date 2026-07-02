@@ -11174,6 +11174,7 @@ function _v15ibRenderAll() {
         <button id="v15ib-approve-btn" onclick="_apxOpen()" title="Hawkeye - approve the agent's drafted messages before they send" aria-label="Hawkeye agent approvals" class="v15ib-icon" style="width:auto;padding:0 12px;gap:6px;border-color:var(--accent);color:var(--accent);font-weight:700">👁 Hawkeye <span id="v15-apx-count" style="font-weight:800"></span></button>
         <button id="v15acx-approve-btn" onclick="_acxOpen()" title="Confirm agent - approve trial-confirmation messages before they send" aria-label="Confirm agent approvals" class="v15ib-icon" style="display:none;width:auto;padding:0 12px;gap:6px;font-weight:700">✅ Confirm <span id="v15-acx-count" style="font-weight:800"></span></button>
         <button id="v15aclx-approve-btn" onclick="_aclxOpen()" title="Closing agent - approve post-trial conversion messages before they send" aria-label="Closing agent approvals" class="v15ib-icon" style="display:none;width:auto;padding:0 12px;gap:6px;font-weight:700">🎯 Closing <span id="v15-aclx-count" style="font-weight:800"></span></button>
+        <button id="v15ib-vmx-btn" onclick="_vmxOpen()" title="Voicemails - listen and read transcripts here" aria-label="Voicemail inbox" class="v15ib-icon" style="display:none;width:auto;padding:0 12px;gap:6px;font-weight:700">📼 Voicemail <span id="v15-vmx-count" style="font-weight:800"></span></button>
         <button onclick="_v15ibMassSend()" class="v15ib-icon v15ib-send" title="Mass send" aria-label="Mass send" style="width:auto;padding:0 12px;gap:6px">✉ Mass send</button>
       </div>
       <div class="v15ib-chans">${unreadBtn}${chanBtns}</div>
@@ -11189,6 +11190,7 @@ function _v15ibRenderAll() {
   _apxRefreshCount();
   _acxRefreshCount();
   _aclxRefreshCount();
+  _vmxRefreshCount();
 }
 
 // Initials for the row avatar - first letters of up to two name words; falls
@@ -25952,6 +25954,185 @@ function _apxOpen(focusContact, focusName) {
 }
 function _apxClose() { _APX_FILTER_CONTACT = null; _APX_FILTER_NAME = null; document.getElementById('apx-overlay')?.remove(); }
 
+// ── Voicemail inbox (Twilio voice spine) ────────────────────────────────────
+// 📼 button in the inbox bar - hidden unless the academy has voice enabled
+// (the API returns enabled:false otherwise). Badge = unheard count. Opens a
+// takeover list: play the recording in-app, read the transcript; playing (or
+// the ✓ button) marks it heard. Backend: /api/twilio/voicemails.
+let _VMX = { rows: [] };
+
+async function _vmxFetch() {
+  const token = await _mreqAuthToken();
+  const r = await fetch('/api/twilio/voicemails?client_id=' + encodeURIComponent(CLIENT_ID), { headers: { Authorization: 'Bearer ' + token } });
+  const j = await _safeJson(r);
+  if (!r.ok) throw new Error(j.error || ('HTTP ' + r.status));
+  return j;
+}
+
+async function _vmxRefreshCount() {
+  const btn = document.getElementById('v15ib-vmx-btn');
+  if (!btn || typeof CLIENT_ID === 'undefined') return;
+  try {
+    const j = await _vmxFetch();
+    if (!j.enabled) { btn.style.display = 'none'; return; }
+    _VMX.rows = j.voicemails || [];
+    btn.style.display = '';
+    _vmxBadge();
+  } catch (_) { /* keep hidden on error - refreshed on next inbox render */ }
+}
+
+function _vmxBadge() {
+  const unheard = _VMX.rows.filter(v => !v.heard_at).length;
+  const btn = document.getElementById('v15ib-vmx-btn');
+  const span = document.getElementById('v15-vmx-count');
+  if (span) span.textContent = unheard ? `(${unheard})` : '';
+  if (btn) {
+    btn.style.borderColor = unheard ? 'var(--accent)' : '';
+    btn.style.color = unheard ? 'var(--accent)' : '';
+  }
+}
+
+function _vmxOpen() {
+  document.getElementById('vmx-overlay')?.remove();
+  document.body.insertAdjacentHTML('beforeend', `
+    <div id="vmx-overlay" style="position:fixed;inset:0;z-index:9400;background:var(--bg);display:flex;flex-direction:column">
+      <div style="padding:calc(14px + env(safe-area-inset-top)) 18px 12px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px">
+        <div style="font-size:18px;font-weight:800">📼 Voicemail</div>
+        <div id="vmx-sub" style="font-size:12px;color:var(--text-mute)"></div>
+        <div style="flex:1"></div>
+        <button id="vmx-markall" onclick="_vmxMarkAll()" style="display:none;background:transparent;border:1px solid var(--border);color:var(--text-sub);border-radius:6px;padding:7px 12px;font:inherit;font-size:12px;font-weight:700;cursor:pointer">✓ Mark all heard</button>
+        <button onclick="_vmxClose()" aria-label="Close" style="background:none;border:none;color:var(--text-mute);font-size:24px;cursor:pointer;padding:2px 10px">×</button>
+      </div>
+      <div id="vmx-body" style="flex:1;overflow-y:auto;padding:16px 18px calc(24px + env(safe-area-inset-bottom))">
+        <div style="max-width:720px;margin:0 auto;color:var(--text-mute);font-size:13px"><span class="req-spin"></span> Loading…</div>
+      </div>
+    </div>`);
+  _vmxLoad();
+}
+function _vmxClose() { document.getElementById('vmx-overlay')?.remove(); _vmxBadge(); }
+
+async function _vmxLoad() {
+  const body = document.getElementById('vmx-body');
+  if (!body) return;
+  try {
+    const j = await _vmxFetch();
+    _VMX.rows = j.voicemails || [];
+    _vmxRender();
+  } catch (e) {
+    body.innerHTML = `<div style="max-width:720px;margin:0 auto;color:#9a3b2f;font-size:13px">Couldn't load voicemails - ${escapeHTML(e.message)}</div>`;
+  }
+}
+
+function _vmxWhen(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + ', ' + d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+}
+
+function _vmxRender() {
+  const body = document.getElementById('vmx-body');
+  if (!body) return;
+  const rows = _VMX.rows;
+  const unheard = rows.filter(v => !v.heard_at).length;
+  const sub = document.getElementById('vmx-sub');
+  if (sub) sub.textContent = rows.length ? `${rows.length} voicemail${rows.length === 1 ? '' : 's'}${unheard ? ' · ' + unheard + ' new' : ''}` : '';
+  const markAll = document.getElementById('vmx-markall');
+  if (markAll) markAll.style.display = unheard ? '' : 'none';
+  if (!rows.length) {
+    body.innerHTML = `<div style="max-width:720px;margin:0 auto;text-align:center;color:var(--text-mute);font-size:13px;padding:48px 0;line-height:1.6">No voicemails yet.<br>When a caller rings out and leaves a message, it lands here with the recording and transcript.</div>`;
+    return;
+  }
+  const ghost = 'background:transparent;border:1px solid var(--border);color:var(--text-sub);border-radius:6px;padding:6px 12px;font:inherit;font-size:12px;font-weight:700;cursor:pointer';
+  body.innerHTML = `<div style="max-width:720px;margin:0 auto;display:grid;gap:10px">` + rows.map(v => {
+    const isNew = !v.heard_at;
+    const who = v.contact_name || v.contact_phone || 'Unknown caller';
+    const dur = (v.duration_seconds > 0) ? `${Math.floor(v.duration_seconds / 60)}:${String(v.duration_seconds % 60).padStart(2, '0')}` : '';
+    const vm = (v.voicemail_transcript || '').trim();
+    return `<div id="vmx-row-${v.id}" style="padding:13px 15px;background:var(--surface);border:1px solid ${isNew ? 'var(--gold,#E8C547)' : 'var(--border)'};border-radius:10px">
+      <div style="display:flex;align-items:center;gap:9px;flex-wrap:wrap">
+        <span id="vmx-dot-${v.id}" style="width:8px;height:8px;border-radius:50%;background:var(--gold,#E8C547);flex:0 0 8px;${isNew ? '' : 'display:none'}"></span>
+        <b style="font-size:14px">${escapeHTML(who)}</b>
+        ${(v.contact_name && v.contact_phone) ? `<span style="font-size:12px;color:var(--text-mute)">${escapeHTML(v.contact_phone)}</span>` : ''}
+        <span style="flex:1"></span>
+        <span style="font-size:12px;color:var(--text-mute)">${escapeHTML(_vmxWhen(v.occurred_at))}${dur ? ' · ' + dur : ''}</span>
+      </div>
+      <div id="vmx-au-${v.id}" style="margin-top:10px">
+        <button onclick="_vmxPlay('${v.id}')" style="${ghost};color:var(--gold,#E8C547);border-color:var(--gold,#E8C547)">▶ Play voicemail${dur ? ' (' + dur + ')' : ''}</button>
+      </div>
+      ${vm ? `<div style="margin-top:8px;font-size:13px;color:var(--text-sub);font-style:italic;line-height:1.5">"${escapeHTML(vm)}"</div>` : `<div style="margin-top:8px;font-size:11.5px;color:var(--text-mute)">No transcript${isNew ? ' yet' : ''}.</div>`}
+      <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
+        ${v.ghl_contact_id ? `<button onclick="_vmxClose();_autoOpenContact('${escapeHTML(v.ghl_contact_id)}','${escapeHTML((v.contact_name || '').replace(/'/g, ''))}')" style="${ghost}">💬 Open thread</button>` : ''}
+        <button id="vmx-mkh-${v.id}" onclick="_vmxHeard('${v.id}')" style="${ghost};${isNew ? '' : 'display:none'}">✓ Mark heard</button>
+      </div>
+    </div>`;
+  }).join('') + `</div>`;
+}
+
+// Twilio enforces HTTP basic auth on recording media, so the browser can't
+// play the raw URL. Fetch through the authenticated portal proxy instead and
+// play from a blob object-URL (cached per call so replays don't refetch).
+const _TWREC_CACHE = {};
+async function _twRecObjectUrl(callId, clientId) {
+  if (_TWREC_CACHE[callId]) return _TWREC_CACHE[callId];
+  const token = await _mreqAuthToken();
+  const r = await fetch('/api/twilio/voicemails?client_id=' + encodeURIComponent(clientId) + '&recording=' + encodeURIComponent(callId), { headers: { Authorization: 'Bearer ' + token } });
+  if (!r.ok) { const j = await _safeJson(r); throw new Error(j.error || ('HTTP ' + r.status)); }
+  const blob = await r.blob();
+  _TWREC_CACHE[callId] = URL.createObjectURL(blob);
+  return _TWREC_CACHE[callId];
+}
+
+// Swap the ▶ button for an in-place <audio> player + mark the voicemail heard.
+async function _vmxPlay(id) {
+  const holder = document.getElementById('vmx-au-' + id);
+  if (!holder) return;
+  holder.innerHTML = `<span style="font-size:12px;color:var(--text-mute)"><span class="req-spin"></span> Loading audio…</span>`;
+  try {
+    const src = await _twRecObjectUrl(id, CLIENT_ID);
+    holder.innerHTML = `<audio controls autoplay src="${src}" style="width:100%;height:36px"></audio>`;
+    _vmxHeard(id);
+  } catch (e) {
+    holder.innerHTML = `<span style="font-size:12px;color:#9a3b2f">Couldn't load the recording - ${escapeHTML(e.message)}</span>`;
+  }
+}
+
+// Mark one voicemail heard. Updates the row in place (NO re-render - that
+// would destroy the <audio> element mid-playback) + the badge + header line.
+async function _vmxHeard(id) {
+  const row = _VMX.rows.find(v => String(v.id) === String(id));
+  if (!row || row.heard_at) return;
+  row.heard_at = new Date().toISOString();
+  const dot = document.getElementById('vmx-dot-' + id);
+  const mkh = document.getElementById('vmx-mkh-' + id);
+  const card = document.getElementById('vmx-row-' + id);
+  if (dot) dot.style.display = 'none';
+  if (mkh) mkh.style.display = 'none';
+  if (card) card.style.borderColor = 'var(--border)';
+  const unheard = _VMX.rows.filter(v => !v.heard_at).length;
+  const sub = document.getElementById('vmx-sub');
+  if (sub) sub.textContent = `${_VMX.rows.length} voicemail${_VMX.rows.length === 1 ? '' : 's'}${unheard ? ' · ' + unheard + ' new' : ''}`;
+  const markAll = document.getElementById('vmx-markall');
+  if (markAll) markAll.style.display = unheard ? '' : 'none';
+  _vmxBadge();
+  try {
+    const token = await _mreqAuthToken();
+    await fetch('/api/twilio/voicemails', { method: 'POST', headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'mark-heard', client_id: CLIENT_ID, id }) });
+  } catch (_) { /* best-effort - reconciles on next load */ }
+}
+
+async function _vmxMarkAll() {
+  const fresh = _VMX.rows.filter(v => !v.heard_at);
+  if (!fresh.length) return;
+  try {
+    const token = await _mreqAuthToken();
+    await fetch('/api/twilio/voicemails', { method: 'POST', headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'mark-all-heard', client_id: CLIENT_ID }) });
+  } catch (_) {}
+  const now = new Date().toISOString();
+  fresh.forEach(v => { v.heard_at = now; });
+  _vmxRender();
+  _vmxBadge();
+}
+
 // Split the two API payloads into the three drawer sections. OVERDUE follow-ups
 // (their send time has passed) move out of the upcoming "Follow-ups" list and
 // into "Ready messages" - they're ready to send now.
@@ -31391,7 +31572,7 @@ function _renderMemberModalBody(m, stripe, history, calls) {
         const badge = callBadge(c);
         const dur = (c.duration_seconds > 0) ? `${Math.floor(c.duration_seconds/60)}:${String(c.duration_seconds%60).padStart(2,'0')}` : '';
         const vm = (c.voicemail_transcript || '').trim();
-        return `<div style="padding:7px 10px;background:var(--surface);border:1px solid var(--border);border-radius:8px">
+        return `<div data-call-card style="padding:7px 10px;background:var(--surface);border:1px solid var(--border);border-radius:8px">
           <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;font-size:12.5px">
             <span style="display:flex;align-items:center;gap:7px">
               <span title="${out ? 'Outgoing' : 'Incoming'}" style="color:${out ? '#7BC47F' : 'var(--gold,#E8C547)'};font-weight:800">${out ? '↗' : '↙'}</span>
@@ -31399,7 +31580,7 @@ function _renderMemberModalBody(m, stripe, history, calls) {
             </span>
             <span style="display:flex;align-items:center;gap:9px">
               ${dur ? `<span style="color:var(--text);font-weight:600">${dur}</span>` : ''}
-              ${c.recording_url ? `<a href="${escapeHTML(c.recording_url)}" target="_blank" rel="noopener" style="color:var(--gold,#E8C547);text-decoration:none;font-weight:700;font-size:11.5px">▶ Listen</a>` : ''}
+              ${(c.recording_url && c.id) ? `<button onclick="_drawerCallPlay(this,'${c.id}','${m.client_id || ''}')" style="background:none;border:none;color:var(--gold,#E8C547);cursor:pointer;font-weight:700;font-size:11.5px;padding:0;font-family:inherit">▶ Listen</button>` : ''}
               <span style="color:${badge[1]};font-size:10.5px;font-weight:800">${escapeHTML(badge[0])}</span>
             </span>
           </div>
@@ -31799,6 +31980,25 @@ async function _deleteMemberDoc(fileId, memberId, clientId) {
   const { error } = await _sb.from('member_files').delete().eq('id', fileId);
   if (error) { alert("Couldn't remove: " + error.message); return; }
   await _loadMemberDocs(memberId, clientId);
+}
+
+// Play a call recording inside the member drawer's Calls card. Same
+// authenticated proxy + blob approach as the voicemail inbox (_twRecObjectUrl).
+async function _drawerCallPlay(btn, callId, clientId) {
+  const cid = clientId || (typeof CLIENT_ID !== 'undefined' ? CLIENT_ID : '');
+  const old = btn.textContent;
+  btn.disabled = true; btn.textContent = '…';
+  try {
+    const src = await _twRecObjectUrl(callId, cid);
+    const card = btn.closest('[data-call-card]');
+    btn.style.display = 'none';
+    const holder = document.createElement('div');
+    holder.innerHTML = `<audio controls autoplay src="${src}" style="width:100%;margin-top:6px;height:34px"></audio>`;
+    (card || btn.parentElement).appendChild(holder);
+  } catch (e) {
+    btn.disabled = false; btn.textContent = old;
+    _plToast("Couldn't load the recording - " + (e && e.message ? e.message : 'try again'));
+  }
 }
 
 // Inline-edit handler - saves a single field, then re-renders the drawer
