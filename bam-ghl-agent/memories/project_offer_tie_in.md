@@ -41,10 +41,33 @@ A LEAD's offer comes from its ENTRY POINT; an OPPORTUNITY's offer comes from its
 STAGE/board. They can differ (an adapt lead pushed onto the Training board keeps
 lead.offer=NULL/adapt while opp.offer=Training). That's deliberate.
 
-## Next (Part 2, money->access; order B->C->D->E->F->G)
+## B: offers sync - BUILT (endpoint `api/runtime/offers-sync.ts`)
 
-B `POST /api/runtime/offers/sync` (typed rows from Blueprint JSON + pricing_catalog;
-  entitlement rules are CONFIRMED input, never inferred) ->
+`POST /api/runtime/offers/sync` (staff Bearer). Body: `{client_id, offer_id,
+mode: preview|apply, bookable_program_id, entitlement_rules: {<planKey>:
+{kind:WEEKLY_CREDITS,credits_per_period}|{kind:UNLIMITED_BOOKING}}}`.
+- Derives options/prices/templates from CONFIRMED `pricing_catalog` rows
+  (`offer_price_key` = "Plan|term"); Blueprint JSON only supplies plan order +
+  archived flags. ALL confirmed rows get typed (incl. legacy - that's how the
+  Phase 5 webhook will resolve old subs).
+- `is_active` = catalog.is_routable; typed `is_routable` = catalog routable AND
+  plan not archived in Blueprint AND rule confirmed (no rule = never sellable).
+- Converges on the uniqueness guards (source_pricing_catalog_id, stripe_price,
+  one-ACTIVE-template-per-price); staff-curated titles never overwritten;
+  vanished sources deactivated, never deleted. Rerun-safe (23505 refetch).
+- Unlimited templates: credit_cost_policy FREE; weekly: PER_SLOT_CREDIT_COST
+  (mirrors Luka's backfill).
+- Tests: `api/runtime/offers-sync.test.ts` (9 pure planning tests, run under
+  `npm run test:runtime`). Smoke vs prod snapshot: Luka's 6 rows all
+  "unchanged"; would create 3 options + 25 prices + 25 templates; routable set
+  unchanged (Steady + Summer Unlimited).
+- GTA rules (confirmed, handoff doc): Steady 1/wk, Accelerate 2/wk, Elevate
+  3/wk, Dominate unlimited, Summer Unlimited unlimited. GTA program id
+  `80000000-0000-4000-8000-000000000001`.
+- ⬜ APPLY not yet run against prod (preview first, then apply).
+
+## Next (Part 2, money->access; order C->D->E->F->G)
+
 C Phase 5 webhook access sync (paid invoice -> entitlement; 5xx on failure;
   source_ref convention DECIDED: `subscription:<sub_id>:<price_id>`, one-time
   `invoice:<invoice_id>:<price_id>`) ->
