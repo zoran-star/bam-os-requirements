@@ -49,7 +49,26 @@ nurture, onboarding, summer_special - all live). Cutover = zero comms gap.
    details enriched from the contacts store). agent-approvals: check_availability
    tool + confirm-book action branch; bookingCtx carries clientId (runAgent +
    draftOpener). agent-confirm: both nextAppointment sites pass clientId.
-③ Portal calendar + trials-today (calendars-v15.js) -> read schedule_slots +
-   trial_bookings (NOT DONE)
-④ Post-trial form -> set_trial_outcome RPC (NOT DONE; feeds trial_bookings.status)
+③ Portal calendar + trials-today - ✅ BUILT 2026-07-02 (4th PR). calendars-v15.js
+   branches to portalHandler() before any GHL token fetch: list (entry_points ->
+   calendar chips, capacity from slot_templates), events (trial_bookings joined to
+   slots, GHL-event shape), trials-today (today bounds, cancelled excluded),
+   appointment drawer (booking + contact from the contacts store, custom-field
+   labels via custom_field_defs), contact (store), settings GET (templates ->
+   openHours shape, read_only:true), set-status (showed/noshow ->
+   set_trial_outcome, cancelled/invalid -> cancel_trial_booking + KPI
+   trial_attended/no_show w/ ref trialoutcome-tb:{id}), create-appointment ->
+   bookPortalTrial. Settings WRITE returns a friendly error for portal (edit via
+   schedule templates - follow-up if Zoran wants an editor; would proxy the staff
+   JWT to Luka's template endpoints).
+④ Post-trial form - ✅ BUILT 2026-07-02 (same PR). post-trial.js stamps the
+   coach's outcome onto the contact's most recent STARTED trial_bookings row via
+   set_trial_outcome (SHOWED/NO_SHOW, 1h grace, best-effort).
 ⑤ GHL contact bridge - ✅ dead with the ① flip
+
+## GHL calendar deps remaining after ①-⑤
+- kpis-v15 sales_bookings GHL branch (only for booking_provider='ghl' academies;
+  GTA reads kpi_events).
+- agent-confirm's contactInRespondedStage/GHL-conversation reads etc are pipeline/
+  messaging concerns, already provider-aware elsewhere.
+- Slot generation has NO cron: re-run generate-slots before ~2026-08-31.
