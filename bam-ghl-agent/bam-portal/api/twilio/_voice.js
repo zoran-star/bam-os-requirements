@@ -180,11 +180,16 @@ export async function sendSmsVia(cfg, toPhone, body) {
   } catch (_) { /* non-fatal */ }
 }
 
-// Patch a call row by Twilio Call SID.
-export async function updateCallBySid(sid, patch) {
+// Patch a call row by Twilio Call SID. `unlessStatusIn` skips the patch when the
+// row already carries one of those (more specific) statuses - e.g. the parent
+// call of a ring-out-to-voicemail still ends "completed", which must not
+// overwrite the "voicemail" / "no-answer" set by the inbound stages.
+export async function updateCallBySid(sid, patch, unlessStatusIn) {
   if (!sid) return;
+  const guard = (Array.isArray(unlessStatusIn) && unlessStatusIn.length)
+    ? `&status=not.in.(${unlessStatusIn.map(encodeURIComponent).join(",")})` : "";
   try {
-    await sb(`calls?twilio_call_sid=eq.${encodeURIComponent(sid)}`, {
+    await sb(`calls?twilio_call_sid=eq.${encodeURIComponent(sid)}${guard}`, {
       method: "PATCH", headers: { Prefer: "return=minimal" },
       body: JSON.stringify({ ...patch, updated_at: new Date().toISOString() }),
     });
