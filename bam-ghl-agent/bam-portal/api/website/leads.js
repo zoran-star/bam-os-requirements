@@ -446,7 +446,7 @@ async function handler(req, res) {
   let formWorkflowId = null;
   try {
     const eps = await sbReq(
-      `entry_points?client_id=eq.${client.id}&type=eq.website-form&key=eq.${encodeURIComponent(form_type)}&enabled=eq.true&select=tags,pipeline_name,stage_name,field_map,ghl_workflow_id&limit=1`
+      `entry_points?client_id=eq.${client.id}&type=eq.website-form&key=eq.${encodeURIComponent(form_type)}&enabled=eq.true&select=id,offer_id,tags,pipeline_name,stage_name,field_map,ghl_workflow_id&limit=1`
     );
     const ep = eps?.[0];
     if (ep) {
@@ -456,6 +456,14 @@ async function handler(req, res) {
       if (ep.pipeline_name && ep.stage_name) {
         pipelineConfig = { pipeline: ep.pipeline_name, stage: ep.stage_name };
       }
+      // Offer tie-in: the lead inherits lineage from its entry point (which
+      // offer's funnel it came through). Best-effort; the lead is already saved.
+      try {
+        await sbReq(`website_leads?id=eq.${leadId}`, {
+          method: "PATCH",
+          body: JSON.stringify({ entry_point_id: ep.id, offer_id: ep.offer_id || null }),
+        });
+      } catch (e) { console.error("lead offer lineage stamp failed (non-fatal):", e.message); }
     }
   } catch (e) { console.error("entry_points lookup failed (non-fatal):", e.message); }
 

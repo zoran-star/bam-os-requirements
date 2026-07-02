@@ -508,6 +508,17 @@ export async function createOpp(opts = {}) {
 
   if (provider === "portal") {
     const stageId = await portalStageRowId(clientId, role, stage);
+    // Offer tie-in: a card belongs to the offer whose board it lands on
+    // (one pipeline per offer). Callers may pass offerId explicitly;
+    // otherwise inherit from the stage row. Lineage is best-effort and
+    // never blocks the create.
+    let offerId = opts.offerId != null ? opts.offerId : null;
+    if (!offerId && stageId) {
+      try {
+        const srows = await sbRest(`pipeline_stages?id=eq.${stageId}&select=offer_id&limit=1`);
+        offerId = (Array.isArray(srows) && srows[0] && srows[0].offer_id) || null;
+      } catch (_) { /* best-effort */ }
+    }
     const now = new Date().toISOString();
     const body = {
       client_id: clientId,
@@ -517,6 +528,7 @@ export async function createOpp(opts = {}) {
       contact_phone: contactPhone != null ? contactPhone : null,
       stage_role: role || "responded",
       stage_id: stageId || null,
+      offer_id: offerId,
       status: "open",
       source: source != null ? source : null,
       entry_point: entryPoint != null ? entryPoint : null,

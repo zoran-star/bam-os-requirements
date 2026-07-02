@@ -116,13 +116,13 @@ async function handler(req, res) {
   // Look up the opportunity for contact + pipeline (provider-aware). A provider='portal'
   // academy's opp lives in the store and its id is a portal uuid, so a GHL fetch would
   // 404 - read the store row instead. `oppRef` is the handle passed to the stage moves.
-  let contactId = null, pipelineId = null, oppRef = null;
+  let contactId = null, pipelineId = null, oppRef = null, oppOfferId = null;
   const { provider } = await pipelineFlags(clientId).catch(() => ({ provider: "ghl" }));
   if (provider === "portal") {
     try {
-      const rows = await sb(`opportunities?client_id=eq.${encodeURIComponent(clientId)}&${oppMatchClause(oppId)}&select=id,ghl_opportunity_id,ghl_contact_id,ghl_pipeline_id&limit=1`);
+      const rows = await sb(`opportunities?client_id=eq.${encodeURIComponent(clientId)}&${oppMatchClause(oppId)}&select=id,ghl_opportunity_id,ghl_contact_id,ghl_pipeline_id,offer_id&limit=1`);
       const row = Array.isArray(rows) && rows[0];
-      if (row) { contactId = row.ghl_contact_id || null; pipelineId = row.ghl_pipeline_id || null; oppRef = { id: row.id, ghlOpportunityId: row.ghl_opportunity_id || null }; }
+      if (row) { contactId = row.ghl_contact_id || null; pipelineId = row.ghl_pipeline_id || null; oppOfferId = row.offer_id || null; oppRef = { id: row.id, ghlOpportunityId: row.ghl_opportunity_id || null }; }
     } catch (e) { return res.status(500).json({ error: `store opp: ${e.message}` }); }
   } else {
     let opp;
@@ -140,6 +140,7 @@ async function handler(req, res) {
       headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
       body: JSON.stringify({
         client_id: clientId, opportunity_id: oppId, ghl_contact_id: contactId,
+        offer_id: oppOfferId,
         good_fit: goodFit, showed_up: showedUp, trainer, notes,
         signup_text_status: sendLink ? "queued" : "skipped",
         created_by: ctx.staff?.name || ctx.user?.email || null,
