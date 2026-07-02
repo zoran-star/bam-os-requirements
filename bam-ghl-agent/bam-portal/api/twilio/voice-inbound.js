@@ -15,7 +15,7 @@ import { withSentryApiRoute } from "../_sentry.js";
 
 import {
   loadVoiceConfigByNumber, validSignature, requestUrl, absUrl, sendTwiml,
-  xmlEscape, contactForPhone, logCall, updateCallBySid, sendSmsVia,
+  xmlEscape, contactForPhone, logCall, updateCallBySid, sendSmsVia, sendMissedCallText,
 } from "./_voice.js";
 
 const DIAL_TIMEOUT = 20;   // seconds to ring the cell before voicemail
@@ -56,6 +56,9 @@ async function handler(req, res) {
       await updateCallBySid(callSid, { status: "completed", answered_by: p.DialCallSid ? undefined : undefined });
       return sendTwiml(res, `<Response><Hangup/></Response>`);
     }
+    // Missed call → auto-text the caller once, via the portal SMS spine (off-GHL, so
+    // it threads in the portal inbox and their reply lands there). Best-effort.
+    await sendMissedCallText(cfg, String(p.From || "").trim()).catch(() => {});
     // Not answered → voicemail (if enabled).
     if (cfg.voicemailEnabled) {
       await updateCallBySid(callSid, { status: "no-answer" });
