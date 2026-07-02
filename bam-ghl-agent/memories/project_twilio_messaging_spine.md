@@ -158,9 +158,14 @@ the member; academy number = caller ID).
 - Endpoints: `api/twilio/_voice.js` (helpers), `voice-inbound.js` (staged
   ?stage=dial|vm|txn), `voice-status.js`, `voice-outbound.js`, `wire-voice.js`
   (one-time VoiceUrl wiring, Bearer CRON_SECRET).
-- UI: member drawer "Calls" section (history + voicemail listen/transcript) and
-  the phone-row Call button. Member GET returns `calls` matched by ghl_contact_id
-  or last-10-digits of parent_phone.
+- UI: member drawer "Calls" section (history + in-place playback) and the
+  phone-row Call button (member GET returns `calls` matched by ghl_contact_id or
+  last-10-digits of parent_phone); voicemail inbox = 📼 button in the v15 inbox
+  bar (unheard badge, transcripts, heard-on-play; `api/twilio/voicemails.js`,
+  `calls.heard_at/heard_by`).
+- GOTCHA: Twilio returns 401 on recording media without basic auth - never link
+  the raw recording_url. All playback goes through the authenticated portal
+  proxy (`/api/twilio/voicemails?recording=<call_id>` -> blob object-URL).
 - GOTCHA: Twilio's final status callback reports "completed" on the parent call
   even when the caller rang out to voicemail - `updateCallBySid(sid, patch,
   unlessStatusIn)` guards so stage-set `voicemail`/`no-answer` survive.
