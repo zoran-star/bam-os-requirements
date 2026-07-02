@@ -674,7 +674,17 @@ async function handleInvoiceFailed(event, connectedAccount, res) {
     if (Array.isArray(r) && r[0]) member = r[0];
   }
   if (!member) return res.status(200).json({ skipped: "no member match for invoice" });
-  if (member.status === "payment_failed") return res.status(200).json({ skipped: "already flagged" });
+  if (member.status === "payment_failed") {
+    // Already flagged - but this can be a Stripe RETRY after an ON-mode
+    // access-sync failure (we 5xx'd, the member flip had already landed).
+    // The access sync still needs its second chance here or it never runs.
+    const accessRetryFail = await accessSync(res, {
+      clientId: member.client_id, memberId: member.id,
+      reason: "payment-failed", subscriptionId: subId, invoiceId: inv.id,
+    });
+    if (accessRetryFail) return accessRetryFail;
+    return res.status(200).json({ skipped: "already flagged" });
+  }
 
   await sb(`members?id=eq.${member.id}`, {
     method: "PATCH",
