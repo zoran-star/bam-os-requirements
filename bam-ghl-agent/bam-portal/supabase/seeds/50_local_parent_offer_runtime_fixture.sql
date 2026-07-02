@@ -254,7 +254,7 @@ values
     'WEEK',
     false,
     'PER_SLOT_CREDIT_COST',
-    '{"display_label":"1 credit / week"}'::jsonb,
+    '{"display_label":"1 credit / week"}'::jsonb || '{"invoice_grant_credits":4,"credit_rollover":"EXPIRE"}'::jsonb,
     'ACTIVE'
   ),
   (

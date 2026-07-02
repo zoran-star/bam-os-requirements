@@ -190,6 +190,30 @@
       "destination": "/api/parent/student-entitlements?student_id=$1"
     },
     {
+      "source": "/api/runtime/offers/([^/]+)/options",
+      "destination": "/api/runtime/offers?offer_id=$1"
+    },
+    {
+      "source": "/api/runtime/schedule/templates/([^/]+)",
+      "destination": "/api/runtime/schedule/template?template_id=$1"
+    },
+    {
+      "source": "/api/runtime/schedule/slots/([^/]+)/cancel",
+      "destination": "/api/runtime/schedule/slot-cancel?slot_id=$1"
+    },
+    {
+      "source": "/api/runtime/trial-bookings/([^/]+)/outcome",
+      "destination": "/api/runtime/trial-bookings?trial_booking_id=$1&action=outcome"
+    },
+    {
+      "source": "/api/website/trial-booking/([^/]+)/cancel",
+      "destination": "/api/website/trial-booking?trial_booking_id=$1&action=cancel"
+    },
+    {
+      "source": "/api/website/trial-booking/([^/]+)/reschedule",
+      "destination": "/api/website/trial-booking?trial_booking_id=$1&action=reschedule"
+    },
+    {
       "source": "/api/(.*)",
       "destination": "/api/$1"
     },

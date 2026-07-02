@@ -9,7 +9,8 @@
     "check-types": "tsc --noEmit",
     "lint": "eslint .",
     "lint:parent-api": "eslint api/parent",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test:runtime": "bash -lc 'supabase status -o env | grep -E \"^(API_URL|ANON_KEY|SERVICE_ROLE_KEY)=\" > /tmp/bam-runtime.env; source /tmp/bam-runtime.env; VITE_SUPABASE_URL=\"$API_URL\" SUPABASE_URL=\"$API_URL\" RUNTIME_TEST_SUPABASE_URL=\"$API_URL\" RUNTIME_TEST_SUPABASE_ANON_KEY=\"$ANON_KEY\" SUPABASE_SERVICE_ROLE_KEY=\"$SERVICE_ROLE_KEY\" RUNTIME_TEST_SUPABASE_SERVICE_ROLE_KEY=\"$SERVICE_ROLE_KEY\" vitest run api/_runtime api/runtime'"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.88.0",
@@ -35,6 +36,7 @@
     "globals": "^17.4.0",
     "typescript": "^6.0.3",
     "typescript-eslint": "^8.61.0",
-    "vite": "^8.0.0"
+    "vite": "^8.0.0",
+    "vitest": "^4.1.9"
   }
 }
