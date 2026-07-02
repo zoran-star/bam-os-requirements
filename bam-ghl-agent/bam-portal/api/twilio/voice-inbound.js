@@ -79,8 +79,10 @@ async function handler(req, res) {
     const recUrl = p.RecordingUrl ? `${p.RecordingUrl}.mp3` : null;
     await updateCallBySid(callSid, { status: "voicemail", recording_url: recUrl, duration_seconds: p.RecordingDuration ? Number(p.RecordingDuration) : undefined });
     // Text staff that a voicemail landed (transcript follows separately).
+    // No raw recording link - Twilio 401s media without creds; the portal's
+    // voicemail inbox (Inbox → 📼 Voicemail) plays it through the auth proxy.
     const ring = cfg.ringNumbers[0];
-    if (ring) await sendSmsVia(cfg, ring, `New voicemail from ${p.From || "a caller"}${recUrl ? `\nListen: ${recUrl}` : ""}`);
+    if (ring) await sendSmsVia(cfg, ring, `New voicemail from ${p.From || "a caller"} - listen in the portal inbox: https://portal.byanymeansbusiness.com`);
     return sendTwiml(res, `<Response><Hangup/></Response>`);
   }
 
