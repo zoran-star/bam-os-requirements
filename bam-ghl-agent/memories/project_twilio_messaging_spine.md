@@ -148,8 +148,12 @@ Build phases (after GTA proves the flow):
 2026-07-01/02, PRs #1019/#1022/#1027. Cell-forwarding model (no softphone): inbound
 rings staff cells via `<Dial>`; ring-out -> recorded voicemail (transcribed) -> staff
 SMS alert + missed-call auto-text to the caller (threads in the portal inbox).
-Click-to-call = `PATCH /api/members?id=&action=call` (rings staff cell, bridges to
-the member; academy number = caller ID).
+Click-to-call = `PATCH /api/members?id=&action=call` (members) and
+`POST /api/twilio/call` {client_id, phone, contact_name?, ghl_contact_id?} (ANY
+contact - the Inbox thread header + Pipeline drawer header 📞 use it; both render
+a "Call in GHL" fallback, upgraded in place via `_callSlotUpgrade` once the
+once-per-session `_voicePrime()` check says voice_enabled). Rings staff cell,
+bridges to the contact; academy number = caller ID.
 
 - Config: `client_twilio_config` + `voice_enabled`, `voice_ring_numbers text[]`,
   `voice_record`, `voicemail_enabled`, `missed_call_text_enabled`, `missed_call_text`.
