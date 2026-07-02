@@ -155,6 +155,12 @@ Build phases (after GTA proves the flow):
      in parallel (approval doesn't need the number) -> attach on arrival ->
      ~zero US texting gap. Canadian academies: no A2P regime, port is the whole
      story. Voice cutover on port day is atomic.
+     DECIDED 2026-07-02: the GHL/port path is INTERNAL (staff-run, part of the
+     V1.5->V2 flip playbook; client only e-signs the LOA). The client-facing
+     "Set up your phone" card has exactly TWO doors: (1) new number, (2) connect
+     existing Twilio. During any port the client keeps texting from the portal
+     via GHL transport (V1.5 model); their GHL sub-account must stay alive until
+     port completion.
   3. New academies auto-run provisioning at onboarding → start on twilio day 1.
 
 ## Voice spine (calling) - built on top of this SMS spine
