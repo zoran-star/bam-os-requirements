@@ -131,8 +131,14 @@ retries - the ONLY paths that can 5xx are access-sync ON failures).
   invoice_line source_ref guard). Audited `credit-grant` / `credit-grant-error`.
 - Daily expiry sweep: `GET /api/runtime/credits/cron-sweep` (CRON_SECRET, 9:00
   UTC, vercel.json) -> `expire_lapsed_credit_entitlements` per enabled academy.
-- Opening balances: `scripts/credit-backfill-run.mjs` replays each member's
-  latest PAID invoice through the engine (idempotent).
+- Opening balances BACKFILLED (2026-07-02): 9 weekly-credit members granted
+  (8x4 + 1x12); unlimited members correctly not_credit_plan.
+- Real-world gotchas found + fixed (PR #1063): Stripe 2025+ invoice line shape
+  (`line.pricing.price_details.price`, not `line.price.id`) and GHL-era
+  DYNAMIC per-invoice prices (never typed) - single-line invoices fall back to
+  the member's stable sub price; multi-line prorations keep real prices.
+- `clients.credit_engine_enabled` = true for GTA (flipped 2026-07-02 after the
+  #1063 deploy went Ready).
 
 ## Next (Part 2, money->access; order E->F->G)
 
