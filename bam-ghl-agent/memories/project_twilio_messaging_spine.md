@@ -142,3 +142,28 @@ Build phases (after GTA proves the flow):
      brand_sid, campaign_sid, messaging_service_sid, a2p_status, provisioning_status.
   2. Self-serve screen (the 2-path flow) with prefilled info + status badge.
   3. New academies auto-run provisioning at onboarding → start on twilio day 1.
+
+## Voice spine (calling) - built on top of this SMS spine
+
+2026-07-01/02, PRs #1019/#1022/#1027. Cell-forwarding model (no softphone): inbound
+rings staff cells via `<Dial>`; ring-out -> recorded voicemail (transcribed) -> staff
+SMS alert + missed-call auto-text to the caller (threads in the portal inbox).
+Click-to-call = `PATCH /api/members?id=&action=call` (rings staff cell, bridges to
+the member; academy number = caller ID).
+
+- Config: `client_twilio_config` + `voice_enabled`, `voice_ring_numbers text[]`,
+  `voice_record`, `voicemail_enabled`, `missed_call_text_enabled`, `missed_call_text`.
+- Log table: `calls` (direction/status/twilio_call_sid unique/contact_phone/
+  ghl_contact_id/duration/recording_url/voicemail_transcript).
+- Endpoints: `api/twilio/_voice.js` (helpers), `voice-inbound.js` (staged
+  ?stage=dial|vm|txn), `voice-status.js`, `voice-outbound.js`, `wire-voice.js`
+  (one-time VoiceUrl wiring, Bearer CRON_SECRET).
+- UI: member drawer "Calls" section (history + voicemail listen/transcript) and
+  the phone-row Call button. Member GET returns `calls` matched by ghl_contact_id
+  or last-10-digits of parent_phone.
+- GOTCHA: Twilio's final status callback reports "completed" on the parent call
+  even when the caller rang out to voicemail - `updateCallBySid(sid, patch,
+  unlessStatusIn)` guards so stage-set `voicemail`/`no-answer` survive.
+- GTA live: +12898166569 rings +14165733718, voicemail + missed-call text on
+  (verified live 2026-07-02). Roadmap + billing/subaccount plan: Zoran's personal
+  memory note `bam-twilio-voice`.
