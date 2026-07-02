@@ -21,6 +21,46 @@ async function portalStageContactIds(stage, role, ctx) {
   return new Set(rows.map(r => r.contactId).filter(Boolean));
 }
 
+// ── Portal SMS recency overlay ───────────────────────────────────────────────
+// On a Twilio academy, GHL's /conversations/search FREEZES at the SMS cutover:
+// last_at / last_direction lie (a lead we answered via Twilio still looks
+// inbound-last forever, and a fresh Twilio thread may have no GHL conversation
+// at all). Overlay each queue item with the portal's own sms_threads when it
+// has something newer, and append stage contacts whose ONLY thread is portal-
+// side. Harmless for pure-GHL academies (their sms_threads rows only win when
+// genuinely newer). Mutates + re-sorts `queue` in place.
+async function overlayPortalSmsRecency(queue, ids, ctx) {
+  if (!ctx || !ctx.clientId || typeof ctx.sb !== "function") return queue;
+  let rows = [];
+  try {
+    rows = await ctx.sb(`sms_threads?client_id=eq.${ctx.clientId}&select=ghl_contact_id,contact_name,last_message_at,last_direction,last_preview&order=last_message_at.desc&limit=500`);
+  } catch (_) { return queue; }
+  const byContact = new Map((Array.isArray(rows) ? rows : []).filter(t => t.ghl_contact_id).map(t => [t.ghl_contact_id, t]));
+  for (const q of queue) {
+    const t = byContact.get(q.contact_id);
+    if (!t || !t.last_message_at) continue;
+    if (!q.last_at || new Date(t.last_message_at).getTime() > new Date(q.last_at).getTime()) {
+      q.last_at = t.last_message_at;
+      q.last_direction = String(t.last_direction || "").toLowerCase();
+      if (t.last_preview) q.last_message = t.last_preview;
+    }
+  }
+  const seen = new Set(queue.map(q => q.contact_id));
+  for (const id of ids) {
+    if (seen.has(id)) continue;
+    const t = byContact.get(id);
+    if (!t) continue;   // truly thread-less contacts stay for the bare-append path
+    queue.push({
+      contact_id: id, conversation_id: null, name: t.contact_name || null,
+      last_message: t.last_preview || "", last_direction: String(t.last_direction || "").toLowerCase(),
+      last_at: t.last_message_at || null,
+    });
+    seen.add(id);
+  }
+  queue.sort((a, b) => new Date(b.last_at || 0) - new Date(a.last_at || 0));
+  return queue;
+}
+
 // The agent only works OPEN opportunities. A won/lost/abandoned deal that's still
 // parked in the Responded STAGE must be ignored — gate on status, not just stage.
 // Missing status defaults to open (don't drop a valid lead on a sparse payload).
@@ -199,6 +239,9 @@ export async function computeConfirmQueue(token, locationId, ctx = {}) {
       last_at: toIso(c.lastMessageDate || c.dateUpdated),
     }))
     .sort((a, b) => new Date(b.last_at || 0) - new Date(a.last_at || 0));
+  // Twilio academies: fold in the portal's own SMS recency (GHL's conversation
+  // data freezes at the cutover and would lie about last_at / last_direction).
+  await overlayPortalSmsRecency(queue, ids, ctx);
   // Stage contacts with NO conversation yet (booked a trial straight off the
   // calendar; nobody has texted them) were previously INVISIBLE here - the
   // queue was conversation-seeded, so they never got the scripted booking
@@ -281,6 +324,17 @@ export async function computeClosingQueue(token, locationId, ctx = {}) {
       last_at: toIso(c.lastMessageDate || c.dateUpdated),
     }))
     .sort((a, b) => new Date(b.last_at || 0) - new Date(a.last_at || 0));
+  // Twilio academies: fold in the portal's own SMS recency (GHL's conversation
+  // data freezes at the cutover - a lead we answered via Twilio would look
+  // inbound-last forever, dead-ending the closing follow-up loop).
+  await overlayPortalSmsRecency(queue, ids, ctx);
+  // Closing version of the confirm bare-append (#1017): a Done-Trial lead with
+  // no conversation anywhere was invisible here - append them bare so the
+  // scripted post_trial step can open the thread.
+  const _inQ = new Set(queue.map(q => q.contact_id));
+  for (const id of ids) {
+    if (!_inQ.has(id)) queue.push({ contact_id: id, conversation_id: null, name: null, last_message: "", last_direction: "", last_at: null });
+  }
   return { dts, queue, doneIds: ids };
 }
 
