@@ -7687,9 +7687,7 @@ Then the call to action."]</div>
           </div>
           <input id="ib-search" class="ib-search" type="text" placeholder="🔍  Search by name or content…" oninput="_ibSetSearch(this.value)">
           <div class="ib-actions">
-            <button id="ib-approve-btn" class="ib-act ib-act-hawk" onclick="_apxOpen()" title="Hawkeye - approve the agent's drafted messages before they send">👁 Hawkeye <span id="apx-count" style="font-weight:800"></span></button>
-            <button id="acx-approve-btn" class="ib-act" onclick="_acxOpen()" title="Confirm agent - approve trial-confirmation messages before they send" style="display:none;color:var(--text-mute)">✅ Confirm <span id="acx-count" style="font-weight:800"></span></button>
-            <button id="aclx-approve-btn" class="ib-act" onclick="_aclxOpen()" title="Closing agent - approve post-trial conversion messages before they send" style="display:none;color:var(--text-mute)">🎯 Closing <span id="aclx-count" style="font-weight:800"></span></button>
+            <button id="ib-approve-btn" class="ib-act ib-act-hawk" onclick="_apxOpen()" title="Hawkeye - approve every agent's drafted messages (Booking / Confirm / Closing tabs inside)">👁 Hawkeye <span id="apx-count" style="font-weight:800"></span></button>
             <button class="ib-act ib-act-new" onclick="_ibComposeNew()" title="New message"><span class="ib-act-label">✏️ New</span><span class="ib-act-icon">✏️</span></button>
             <button class="ib-act ib-act-refresh" onclick="fetchAndRenderInbox()" title="Refresh">↻</button>
           </div>
@@ -11263,9 +11261,7 @@ function _v15ibRenderAll() {
     <div class="v15ib-bar">
       <div class="v15ib-pills">
         <span style="flex:1"></span>
-        <button id="v15ib-approve-btn" onclick="_apxOpen()" title="Hawkeye - approve the agent's drafted messages before they send" aria-label="Hawkeye agent approvals" class="v15ib-icon" style="width:auto;padding:0 12px;gap:6px;border-color:var(--accent);color:var(--accent);font-weight:700">👁 Hawkeye <span id="v15-apx-count" style="font-weight:800"></span></button>
-        <button id="v15acx-approve-btn" onclick="_acxOpen()" title="Confirm agent - approve trial-confirmation messages before they send" aria-label="Confirm agent approvals" class="v15ib-icon" style="display:none;width:auto;padding:0 12px;gap:6px;font-weight:700">✅ Confirm <span id="v15-acx-count" style="font-weight:800"></span></button>
-        <button id="v15aclx-approve-btn" onclick="_aclxOpen()" title="Closing agent - approve post-trial conversion messages before they send" aria-label="Closing agent approvals" class="v15ib-icon" style="display:none;width:auto;padding:0 12px;gap:6px;font-weight:700">🎯 Closing <span id="v15-aclx-count" style="font-weight:800"></span></button>
+        <button id="v15ib-approve-btn" onclick="_apxOpen()" title="Hawkeye - approve every agent's drafted messages (Booking / Confirm / Closing tabs inside)" aria-label="Hawkeye agent approvals" class="v15ib-icon" style="width:auto;padding:0 12px;gap:6px;border-color:var(--accent);color:var(--accent);font-weight:700">👁 Hawkeye <span id="v15-apx-count" style="font-weight:800"></span></button>
         <button id="v15ib-vmx-btn" onclick="_vmxOpen()" title="Voicemails - listen and read transcripts here" aria-label="Voicemail inbox" class="v15ib-icon" style="display:none;width:auto;padding:0 12px;gap:6px;font-weight:700">📼 Voicemail <span id="v15-vmx-count" style="font-weight:800"></span></button>
         <button onclick="_v15ibMassSend()" class="v15ib-icon v15ib-send" title="Mass send" aria-label="Mass send" style="width:auto;padding:0 12px;gap:6px">✉ Mass send</button>
       </div>
@@ -25650,15 +25646,8 @@ function _acxUpdateCount(n) {
 
 // ── Agent switcher: one pill row at the top of every approval overlay so staff can
 // flip Booking · Confirm · Closing without backing out. Each pill opens the sibling
-// overlay (each *Open tears down the current one). A tab only shows if the user is
-// authorized for it (mirrors the per-agent button gating) and carries its pending count.
-function _agentTabVisible(which) {
-  if (which === 'booking') return true; // booking inbox is the default-visible one
-  const ids = which === 'confirm'
-    ? ['acx-approve-btn', 'v15acx-approve-btn']
-    : ['aclx-approve-btn', 'v15aclx-approve-btn'];
-  return ids.some(id => { const el = document.getElementById(id); return el && el.style.display !== 'none'; });
-}
+// overlay (each *Open tears down the current one). All 3 tabs always show, each
+// carrying its pending count - the toolbars only surface the single Hawkeye button.
 function _agentTabCount(which) {
   if (which === 'confirm') return (typeof _ACX_DATA !== 'undefined' && _ACX_DATA) ? _ACX_DATA.length : 0;
   if (which === 'closing') return (typeof _ACLX_DATA !== 'undefined' && _ACLX_DATA) ? _ACLX_DATA.length : 0;

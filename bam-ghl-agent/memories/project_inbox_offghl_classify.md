@@ -52,6 +52,15 @@ dropdown; it's what V1.5 AND V2 academies see). Zoran's PWA screenshot proved
 it. The `#view-inbox` styling is live but dead code for GTA. Both views read the
 same `/api/ghl/inbox` list, so the classification/counts work feeds both.
 
+## One Hawkeye button (Zoran, same day)
+
+The inbox toolbars (both `#view-v15inbox` and `#view-inbox`) now show ONE
+approval button: **👁 Hawkeye**. The ✅ Confirm and 🎯 Closing toolbar buttons
+were removed - those queues live as tabs INSIDE the Hawkeye overlay
+(`_agentTabsBar` always renders all 3 pills with counts). `_acxRefreshCount` /
+`_aclxRefreshCount` no-op safely without their buttons; dead `_agentTabVisible`
+deleted. 📼 Voicemail + ✉ Mass send untouched.
+
 ## V15 inbox follow-up (same day)
 
 `_v15ibRenderAll()` got a **segmented All / ★ Members / Leads filter row**
