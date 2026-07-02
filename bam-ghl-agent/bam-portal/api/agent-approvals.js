@@ -23,7 +23,7 @@ import { assemblePrompt } from "./agent/prompt-structure.js";
 import { buildAgentSystem } from "./agent/brain.js";
 import { loadMergedOverrides } from "./agent/_sections.js";
 import { loadContactMemory } from "./agent/contact-memory.js";
-import { loadCalendars, calendarForGroup, freeSlots, summarizeSlots } from "./agent/booking.js";
+import { loadCalendars, calendarForGroup, freeSlots, summarizeSlots, bookingProviderOf, bookPortalTrial } from "./agent/booking.js";
 import { respondedStage, contactInRespondedStage, computeQueue, respondedContactIdSetCached, peekRespondedIdSet, interestedStage, nurtureStage, scheduledTrialStage, toIso } from "./agent/_stage.js";
 import { markUnqualified, unmarkUnqualified } from "./agent/_tags.js";
 import { enrollContact, isAutomationLive } from "./automations.js";
@@ -143,7 +143,7 @@ async function runCheckAvailability(input, bookingCtx) {
   try {
     const cal = calendarForGroup(bookingCtx.calendars, input.group);
     if (!cal) return { error: `No calendar found for ${input.group}.` };
-    const { days } = await freeSlots(bookingCtx.token, cal.key, { days: input.within_days || 14, timezone: bookingCtx.timezone });
+    const { days } = await freeSlots(bookingCtx.token, cal.key, { days: input.within_days || 14, timezone: bookingCtx.timezone, clientId: bookingCtx.clientId, calLabel: cal.label });
     return { group: input.group, calendar_id: cal.key, open_slots: summarizeSlots(days) };
   } catch (e) { return { error: `availability check failed: ${e.message}` }; }
 }
@@ -272,7 +272,7 @@ async function draftForContact(token, locationId, clientId, contactId, cfg, opts
   }
   const system = buildSystem(cfg) + await loadContactMemory(sb, clientId, contactId, { ghl, token, locationId });
   const calendars = await loadCalendars(sb, clientId);
-  const out = await runAgent(system, messages, { calendars, token, timezone: "America/Toronto" });
+  const out = await runAgent(system, messages, { calendars, token, timezone: "America/Toronto", clientId });
   const agentMsgs = messages.filter(m => m.role === "agent");
   // A booking proposal: the agent set book=true with a concrete slot it verified.
   const bookCal = (out.book && out.book_slot_at && out.book_group) ? calendarForGroup(calendars, out.book_group) : null;
@@ -304,7 +304,7 @@ async function draftForContact(token, locationId, clientId, contactId, cfg, opts
 // messaged (no thread). Returns the structured proposal or throws.
 async function draftOpener(token, locationId, clientId, contactId, cfg, calendars) {
   const system = buildOpenerSystem(cfg) + await loadContactMemory(sb, clientId, contactId, { ghl, token, locationId });
-  const out = await runOpener(system, { calendars: calendars || [], token, timezone: "America/Toronto" });
+  const out = await runOpener(system, { calendars: calendars || [], token, timezone: "America/Toronto", clientId });
   const bookCal = (out.book && out.book_slot_at && out.book_group) ? calendarForGroup(calendars || [], out.book_group) : null;
   const book = !!(out.book && out.book_slot_at && bookCal);
   return {
@@ -959,14 +959,23 @@ async function handler(req, res) {
       if (!calendarId || !slotAt) return res.status(400).json({ error: "missing calendar or slot for this booking" });
       let startIso;
       try { startIso = new Date(slotAt).toISOString(); } catch (_) { return res.status(400).json({ error: "invalid slot time" }); }
-      let appt;
-      try {
-        appt = await ghl("POST", `/calendars/events/appointments`, { token, body: {
-          calendarId, locationId, contactId, startTime: startIso,
-          appointmentStatus: "confirmed", ignoreDateRange: true, toNotify: true,
-          title: `Free Trial${row.contact_name ? " - " + row.contact_name : ""}`,
-        } });
-      } catch (e) { return res.status(e.status || 502).json({ error: `GHL book: ${e.message}` }); }
+      // Provider branch: booking_provider='portal' books onto OUR slot via the
+      // capacity-safe book_trial_slot RPC (no GHL appointment at all); every
+      // other academy keeps the exact GHL appointment POST.
+      let appt = null, trialBookingId = null;
+      if ((await bookingProviderOf(clientId)) === "portal") {
+        try {
+          trialBookingId = await bookPortalTrial(clientId, { slotAtIso: startIso, group: row.book_group, contactId, contactName: row.contact_name });
+        } catch (e) { return res.status(502).json({ error: `book: ${e.message}` }); }
+      } else {
+        try {
+          appt = await ghl("POST", `/calendars/events/appointments`, { token, body: {
+            calendarId, locationId, contactId, startTime: startIso,
+            appointmentStatus: "confirmed", ignoreDateRange: true, toNotify: true,
+            title: `Free Trial${row.contact_name ? " - " + row.contact_name : ""}`,
+          } });
+        } catch (e) { return res.status(e.status || 502).json({ error: `GHL book: ${e.message}` }); }
+      }
       // Move the opp to Scheduled-Trial so it leaves Responded and lands in the
       // Confirm agent's queue. Off-GHL this PUT is the ONLY thing that advances the
       // card: historically a GHL "appointment booked" trigger owned this transition,
@@ -987,7 +996,7 @@ async function handler(req, res) {
       } catch (_) {}
       try { await sb(`agent_ready_replies?id=eq.${encodeURIComponent(b.ready_id)}&client_id=eq.${clientId}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ status: "sent", approved_by: staffEmail, approved_at: new Date().toISOString(), sent_at: new Date().toISOString(), updated_at: new Date().toISOString() }) }); } catch (_) {}
       try { await logApproval({ client_id: clientId, ghl_contact_id: contactId, contact_name: row.contact_name || null, final_reply: `[booked ${row.book_group || "trial"} @ ${startIso}]`, status: "sent", created_by: staffEmail }); } catch (_) {}
-      return res.status(200).json({ ok: true, booked: true, appointment_id: appt?.id || appt?.appointment?.id || null, slot_at: startIso });
+      return res.status(200).json({ ok: true, booked: true, appointment_id: appt?.id || appt?.appointment?.id || trialBookingId || null, slot_at: startIso });
     }
 
     // Human ✓ on a Ghost card → enroll the lead in the academy's Ghosted automation

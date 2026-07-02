@@ -29,26 +29,27 @@ ALL 79 GTA GHL workflows are in DRAFT (incl. both "free trial booked" flows).
 Parent comms run 100% on portal automations (contact_form, trial_form, ghosted,
 nurture, onboarding, summer_special - all live). Cutover = zero comms gap.
 
-## Rewiring plan (① greenlit 2026-07-02)
-① Website booking (BUILT, pending flip): `clients.booking_provider` flag
-   (migration 20260702150000). availability.js portal branch serves OUR slots
-   (same {timezone, days} shape - site untouched; "Group N" from the entry_point
-   label picks the template family; spots = capacity - CONFIRMED - BOOKED).
-   leads.js booking branch portal path resolves booking.start -> schedule_slots
-   row -> book_trial_slot RPC (p_ghl_contact_id = the contact join key,
-   p_metadata.website_lead_id). requireGhl (the Stage-4 contact bridge) is now
-   `booking && bookingProv !== 'portal'` -> flipping GTA kills the LAST GHL
-   contact creation.
-② Booking/Confirm agents -> book_trial_slot / trial_bookings reads (NOT DONE;
-   agent/booking.js + agent-confirm.js still GHL appointments)
+## Rewiring status
+① Website booking - ✅ LIVE 2026-07-02, GTA FLIPPED (booking_provider='portal',
+   migration 20260702150000). availability.js portal branch serves OUR slots (same
+   {timezone, days} shape - site untouched; "Group N" from the entry_point label
+   picks the template family). leads.js portal path: booking.start ->
+   schedule_slots row -> book_trial_slot RPC. VERIFIED live twice (test bookings,
+   both cancelled + wiped): contact minted portal-native, slot claimed 12->11,
+   card -> scheduled_trial, kpi_event trial_booked fired, cancel freed the spot.
+   GOTCHA FIXED (PR #1025): pushToGhl's GHL_LOCATIONS_JSON gates ran BEFORE the
+   portal-native branch, and prod's GHL_LOCATIONS_JSON is EMPTY -> contact
+   creation silently null. portalNativeContact() now runs FIRST (zero GHL config;
+   also repaired GTA form-lead contact creation which that empty var had broken).
+   requireGhl bridge = dead for GTA (⑤ ✅).
+② Agents - ✅ BUILT 2026-07-02 (3rd PR). api/agent/booking.js is the provider
+   seam: freeSlots + nextAppointment take {clientId} and branch (portal reads
+   schedule_slots/trial_bookings); new bookPortalTrial(clientId, {slotAtIso,
+   group, contactId, contactName}) books via the RPC (p_source='staff', contact
+   details enriched from the contacts store). agent-approvals: check_availability
+   tool + confirm-book action branch; bookingCtx carries clientId (runAgent +
+   draftOpener). agent-confirm: both nextAppointment sites pass clientId.
 ③ Portal calendar + trials-today (calendars-v15.js) -> read schedule_slots +
    trial_bookings (NOT DONE)
 ④ Post-trial form -> set_trial_outcome RPC (NOT DONE; feeds trial_bookings.status)
-⑤ GHL contact bridge - dies with the ① flip ✅
-
-## Flip checklist (GTA booking_provider='portal')
-- [ ] ① deployed to prod
-- [ ] availability returns portal slots (curl with site Origin)
-- [ ] test booking end-to-end (book_trial_slot row + card -> scheduled trial +
-      kpi_event trial_booked) then cancel via cancel_trial_booking RPC
-- [ ] flip: update clients set booking_provider='portal' where id='39875f07-...'
+⑤ GHL contact bridge - ✅ dead with the ① flip

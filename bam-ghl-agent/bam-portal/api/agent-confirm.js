@@ -215,7 +215,7 @@ async function draftForContact(token, locationId, clientId, contactId, cfg, opts
     messages = await threadMessages(token, conversationId);
   }
   const nowMs = opts.nowMs || Date.now();
-  const appt = await nextAppointment(token, contactId, { nowMs });
+  const appt = await nextAppointment(token, contactId, { nowMs, clientId });
 
   const lastIsInbound = opts.lastDirection
     ? opts.lastDirection === "inbound"
@@ -357,7 +357,7 @@ async function fireScriptedStep({ client, token, locationId, mode, autos, cfg, i
   if (rows.some(r => ["confirm", "confirm_handoff", "confirm_lost"].includes(r.kind))) return "lead already in conversation";
   const sentKeys = new Set(rows.filter(r => r.kind === "confirm_auto" && ["pending", "approved", "sent", "skipped"].includes(r.status)).map(r => r.step_key));
 
-  const appt = await nextAppointment(token, contactId, { nowMs });
+  const appt = await nextAppointment(token, contactId, { nowMs, clientId: client.id });
   const trialMs = appt && appt.startTime ? new Date(appt.startTime).getTime() : null;
   const step = nextDueStep(autos, { nowMs, trialMs, sentKeys });
   if (!step) return "no scripted step due";
