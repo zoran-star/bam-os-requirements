@@ -43,6 +43,7 @@ import { notifyOwners } from "../_notify-owners.js";
 import { enrollContact, exitEnrollment, isAutomationLive } from "../automations.js";
 import { getClientGhlToken } from "../website/availability.js";
 import { getAccessSyncMode, syncAccessForMember } from "../_runtime/access-sync.js";
+import { applyInvoiceCreditGrants } from "../_runtime/credit-engine.js";
 import { createRuntimeSupabaseClient } from "../_runtime/supabase.js";
 
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
@@ -315,6 +316,53 @@ async function writeAudit({ client_id, member_id, action_type, args, stripe_resp
 function invoiceLinePriceId(inv) {
   const line = inv && inv.lines && inv.lines.data && inv.lines.data[0];
   return (line && line.price && line.price.id) || null;
+}
+
+// ─────────────────────────────────────────────────────────
+// Credit engine (offer tie-in step D) — grant weekly credits from the paid
+// invoice's real lines. Gated per academy by clients.credit_engine_enabled.
+// Runs AFTER accessSync (the entitlement must exist before it can be topped
+// up). Idempotent: grants key on source_ref invoice_line:<id> in the DB.
+// A failure while enabled returns 5xx so Stripe retries (same rationale as
+// the access sync). Returns null to continue, or the 500 response.
+// ─────────────────────────────────────────────────────────
+async function creditSync(res, { clientId, memberId, inv, subId }) {
+  let enabled = false;
+  try {
+    const rows = await sb(`clients?id=eq.${encodeURIComponent(clientId)}&select=credit_engine_enabled&limit=1`);
+    enabled = !!(Array.isArray(rows) && rows[0] && rows[0].credit_engine_enabled);
+    if (!enabled || !subId) return null;
+    const lines = ((inv && inv.lines && inv.lines.data) || [])
+      .filter((line) => line && line.id && line.price && line.price.id)
+      .map((line) => ({
+        lineId: line.id,
+        stripePriceId: line.price.id,
+        periodStart: new Date(((line.period && line.period.start) || 0) * 1000).toISOString(),
+        periodEnd: new Date(((line.period && line.period.end) || 0) * 1000).toISOString(),
+      }));
+    if (!lines.length) return null;
+    const supabase = createRuntimeSupabaseClient();
+    const result = await applyInvoiceCreditGrants(supabase, {
+      tenantId: clientId, subscriptionId: subId, invoiceId: inv.id, lines,
+    });
+    await writeAudit({
+      client_id: clientId, member_id: memberId,
+      action_type: "credit-grant",
+      args: { invoice_id: inv.id, sub_id: subId, granted: result.granted, skipped: result.skipped },
+    }).catch(() => {});
+    return null;
+  } catch (e) {
+    console.error(`[webhook] credit grant failed for member ${memberId}:`, e.message);
+    await writeAudit({
+      client_id: clientId, member_id: memberId,
+      action_type: "credit-grant-error",
+      args: { invoice_id: inv && inv.id, sub_id: subId, error: String((e && e.message) || e) },
+    }).catch(() => {});
+    if (enabled) {
+      return res.status(500).json({ error: "credit grant failed" });
+    }
+    return null;
+  }
 }
 
 async function accessSync(res, args) {
@@ -882,6 +930,8 @@ async function handleInvoiceSucceeded(event, connectedAccount, res) {
           invoiceLinePriceId(inv),
       });
       if (accessFail) return accessFail;
+      const creditFail = await creditSync(res, { clientId: member.client_id, memberId: member.id, inv, subId });
+      if (creditFail) return creditFail;
       return res.status(200).json(out);
     }
     // A paid member we could NOT activate inline (the subscription fetch failed, e.g.
@@ -911,6 +961,8 @@ async function handleInvoiceSucceeded(event, connectedAccount, res) {
         stripePriceId: invoiceLinePriceId(inv),
       });
       if (accessFail) return accessFail;
+      const creditFail = await creditSync(res, { clientId: member.client_id, memberId: member.id, inv, subId });
+      if (creditFail) return creditFail;
     }
     return res.status(200).json({ skipped: "member not in recoverable state", current_status: member.status });
   }
@@ -952,6 +1004,8 @@ async function handleInvoiceSucceeded(event, connectedAccount, res) {
     stripePriceId: invoiceLinePriceId(inv),
   });
   if (accessFail) return accessFail;
+  const creditFail = await creditSync(res, { clientId: member.client_id, memberId: member.id, inv, subId });
+  if (creditFail) return creditFail;
 
   return res.status(200).json({ ok: true, action: "recovered-to-live", from: prevStatus, member_id: member.id });
 }
