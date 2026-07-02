@@ -25903,6 +25903,43 @@ function _aclxRender() {
   if (!_ACLX_DATA.length) { body.innerHTML = '<div style="max-width:860px;margin:0 auto">' + _apxEmpty('All clear - no closings waiting.') + '</div>'; return; }
   const cards = _ACLX_DATA.map(r => r.kind === 'closing_enroll' ? _aclxEnrollCard(r) : r.kind === 'closing_lost' ? _aclxLostCard(r) : _aclxReplyCard(r)).join('');
   body.innerHTML = '<div style="max-width:860px;margin:0 auto">' + cards + '</div>';
+  _ACLX_DATA.forEach(r => _aclxLoadNotes(r));   // lazy-fill each card's team notes
+}
+
+// ── Team notes on a Done-Trial lead ──────────────────────────────────────────
+// Stored in agent_contact_notes, which feeds straight into the agent's
+// contact_memory - anything typed here shapes the agent's NEXT drafts.
+function _aclxNotesBlock(r) {
+  return `<div id="aclx-notes-${r.id}"></div>
+    <div style="display:flex;gap:6px;margin-top:8px">
+      <input id="aclx-note-in-${r.id}" placeholder="Add a note about this lead - the agent uses it in its next drafts" style="flex:1;background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:8px;padding:7px 10px;font-size:12px;color:var(--text);font-family:inherit;outline:none">
+      <button onclick="_aclxAddNote('${r.id}')" style="background:transparent;border:1px solid var(--border);color:var(--text-sub);border-radius:8px;padding:7px 12px;font-size:12px;cursor:pointer;white-space:nowrap">+ Note</button>
+    </div>`;
+}
+async function _aclxLoadNotes(r) {
+  const host = document.getElementById('aclx-notes-' + r.id);
+  if (!host) return;
+  try {
+    const token = await _mreqAuthToken();
+    const res = await fetch('/api/agent-contact-notes', { method: 'POST', headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'get', client_id: CLIENT_ID, contact_id: r.ghl_contact_id }) });
+    const j = await _safeJson(res);
+    const notes = Array.isArray(j.notes) ? j.notes : [];
+    host.innerHTML = notes.length
+      ? `<div style="margin-top:8px">${notes.slice(0, 4).map(n => `<div style="font-size:11.5px;color:var(--text-sub);padding:3px 0">📝 ${escapeHTML(n.note)}</div>`).join('')}</div>`
+      : '';
+  } catch (_) { /* notes are a nicety - never block the card */ }
+}
+async function _aclxAddNote(id) {
+  const r = _ACLX_DATA.find(x => x.id === id); if (!r) return;
+  const input = document.getElementById('aclx-note-in-' + id);
+  const note = (input && input.value || '').trim(); if (!note) return;
+  try {
+    const token = await _mreqAuthToken();
+    const res = await fetch('/api/agent-contact-notes', { method: 'POST', headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'add', client_id: CLIENT_ID, contact_id: r.ghl_contact_id, note }) });
+    if (!res.ok) { const j = await _safeJson(res); throw new Error(j.error || ('HTTP ' + res.status)); }
+    if (input) input.value = '';
+    _aclxLoadNotes(r);
+  } catch (e) { alert('Could not save the note: ' + (e.message || e)); }
 }
 
 function _aclxOpenThread(id) { const r = _ACLX_DATA.find(x => x.id === id); if (r) _apxOpenThread(r.ghl_contact_id, r.contact_name || 'Conversation'); }
@@ -25932,10 +25969,15 @@ function _aclxBox(r, ph) {
 }
 function _aclxReplyCard(r) {
   const esc = r.escalate ? `<div style="font-size:11.5px;color:#e0a020;margin-bottom:6px">⚠ agent escalated${r.escalate_reason ? ': ' + escapeHTML(r.escalate_reason) : ''}</div>` : '';
+  // Proactive follow-up loop cards carry step_key 'followup_N' - badge shows
+  // where the lead is in the 3-strike cadence.
+  const _fu = /^followup_(\d+)$/.exec(r.step_key || '');
+  const _pill = r.kind === 'closing_auto' ? 'automated reminder' : _fu ? `follow-up ${_fu[1]} of 3` : 'follow-up';
   return `<div id="aclx-${r.id}" style="background:var(--surface);border:1px solid var(--accent-border,rgba(232,197,71,.3));border-radius:11px;padding:12px 14px;margin-bottom:9px">
-    ${_aclxHeader(r, r.kind === 'closing_auto' ? 'automated reminder' : 'follow-up', 'var(--accent)')}${esc}${_aclxContext(r)}
+    ${_aclxHeader(r, _pill, 'var(--accent)')}${esc}${_aclxContext(r)}
     <div style="text-align:center;font-size:9.5px;color:var(--text-mute);text-transform:uppercase;letter-spacing:.09em;margin:2px 0 5px">proposed message · edit it right here</div>
     ${_aclxBox(r)}
+    ${_aclxNotesBlock(r)}
     <div style="display:flex;align-items:stretch;gap:8px;margin-top:10px">
       <button onclick="_aclxSkip('${r.id}')" title="Skip" style="flex:1;background:transparent;border:1px solid var(--border);color:#e0654f;border-radius:9px;padding:9px;font-size:17px;cursor:pointer">✕</button>
       <button onclick="_aclxSend('${r.id}')" style="flex:2;background:var(--accent);border:1px solid var(--accent);color:#08080A;border-radius:9px;padding:9px;font-size:14px;font-weight:700;cursor:pointer">✓ Approve &amp; send</button>
@@ -25950,6 +25992,7 @@ function _aclxEnrollCard(r) {
     ${_aclxContext(r)}${note}
     <div style="text-align:center;font-size:9.5px;color:var(--text-mute);text-transform:uppercase;letter-spacing:.09em;margin:2px 0 5px">warm message before the link (optional)</div>
     ${_aclxBox(r, 'optional warm message before the sign-up link')}
+    ${_aclxNotesBlock(r)}
     <div style="display:flex;align-items:stretch;gap:8px;margin-top:10px">
       <button onclick="_aclxSkip('${r.id}')" title="Skip" style="flex:1;background:transparent;border:1px solid var(--border);color:#e0654f;border-radius:9px;padding:9px;font-size:17px;cursor:pointer">✕</button>
       <button onclick="_aclxEnroll('${r.id}')" style="flex:2;background:#3DBE8B;border:1px solid #3DBE8B;color:#08080A;border-radius:9px;padding:9px;font-size:14px;font-weight:700;cursor:pointer">✓ Send enroll link</button>
@@ -25964,6 +26007,7 @@ function _aclxLostCard(r) {
     ${_aclxContext(r)}
     <div style="text-align:center;font-size:9.5px;color:var(--text-mute);text-transform:uppercase;letter-spacing:.09em;margin:2px 0 5px">warm closing message (optional)</div>
     ${_aclxBox(r, 'optional closing message')}
+    ${_aclxNotesBlock(r)}
     <div style="display:flex;align-items:stretch;gap:8px;margin-top:10px">
       <button onclick="_aclxSkip('${r.id}')" title="Skip" style="flex:1;background:transparent;border:1px solid var(--border);color:var(--text-sub);border-radius:9px;padding:9px;font-size:17px;cursor:pointer">✕</button>
       <button onclick="_aclxLost('${r.id}')" style="flex:2;background:#e0654f;border:1px solid #e0654f;color:#fff;border-radius:9px;padding:9px;font-size:14px;font-weight:700;cursor:pointer">Mark lost</button>

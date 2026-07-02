@@ -89,7 +89,8 @@ const CLOSING_TRAILER =
   `Respond ONLY by calling propose_reply: 'reply' = the exact text to send; 'reasoning' = 1-2 sentence why; 'confidence' = 0..1; ` +
   `'escalate' = true (with 'escalate_reason', reply empty) if your guardrails say to hand to a human. ` +
   `If the lead is READY to enroll, set 'recommend_enroll' = true with a short 'enroll_note' (which plan/frequency they want, if known) and put a warm message in 'reply' — on approval a human sends the sign-up link. ` +
-  `If your closing_lost criteria say the good-fit attendee won't enroll, set 'recommend_lost' = true with a short 'lost_reason' and put your warm closing message in 'reply'. A human confirms enroll/lost before anything changes.\n</live_closing>`;
+  `If your closing_lost criteria say the good-fit attendee won't enroll, set 'recommend_lost' = true with a short 'lost_reason' and put your warm closing message in 'reply'. A human confirms enroll/lost before anything changes. ` +
+  `Follow-up timing: proactive follow-ups default to the NEXT DAY. But if the lead names a specific date or timeframe for their decision ("we'll decide after the weekend", "after the 15th", "once report cards are out"), set 'followup_on' (YYYY-MM-DD) to the day right after it so we don't nag them before they said they'd know.\n</live_closing>`;
 function buildSystem({ lessons, overrides, examples }) {
   return buildAgentSystem({ lessons, overrides, examples, trailer: CLOSING_TRAILER, agent: "closing" });
 }
@@ -110,6 +111,7 @@ const REPLY_TOOL = {
       enroll_note:      { type: "string", description: "If recommend_enroll: which plan / frequency they want, if known, and any context for the human approving the enrollment." },
       recommend_lost:   { type: "boolean", description: "True only if the good-fit attendee clearly won't enroll — a human confirms before anything changes." },
       lost_reason:      { type: "string", description: "If recommend_lost: closest taxonomy reason (Too expensive / Not enough time / Started other programs / Not locked in / Bad fit / Invalid lead / Opted out / Other)." },
+      followup_on:      { type: "string", description: "YYYY-MM-DD. ONLY when the lead named a specific date/timeframe for their decision: the day right after it (the earliest day we should proactively follow up). Omit otherwise - the default cadence is next-day." },
     },
     required: ["reply", "reasoning", "confidence", "escalate"],
   },
@@ -237,6 +239,8 @@ async function draftForContact(token, locationId, clientId, contactId, cfg, opts
     enroll_note: out.enroll_note || null,
     recommend_lost: !!out.recommend_lost,
     lost_reason: out.lost_reason || null,
+    // Lead named a decision date ("after the 15th") → earliest day to follow up.
+    followup_on: (typeof out.followup_on === "string" && /^\d{4}-\d{2}-\d{2}$/.test(out.followup_on)) ? out.followup_on : null,
     trial_at: null,
     summary: out.summary ? String(out.summary).slice(0, 600) : null,
     last_message: (() => { const lead = [...messages].reverse().find(m => m.role === "parent"); return lead ? String(lead.text).slice(0, 500) : null; })(),
@@ -366,21 +370,26 @@ async function fireScriptedStep({ client, token, mode, autos, item, contactId })
 // to the Nurture stage + the Lead Nurture automation (the long game) - the same
 // routing "Mark as lost" uses. A reply at any point resets the strike count
 // (strikes are counted from the lead's most recent known reply).
-const FOLLOWUP_GAP_DAYS = 2;  // days of silence after OUR last message before the next nudge
-const FOLLOWUP_MAX = 3;       // unanswered follow-ups before the move to Nurture
+const FOLLOWUP_GAP_DAYS = 1;  // follow-ups happen the NEXT DAY by default (Zoran's rule)
+const FOLLOWUP_MAX = 3;       // unanswered follow-ups before recommending Lost → Nurture
 
 async function maybeFollowUpOrNurture({ client, token, locationId, dts, cfg, item, contactId }) {
   const clientId = client.id;
   if (!item.last_at) return "no thread to follow up on";
   const silenceDays = (Date.now() - new Date(item.last_at).getTime()) / 86400000;
-  if (silenceDays < FOLLOWUP_GAP_DAYS) return "waiting on the lead (follow-up gap not reached)";
+  if (silenceDays < FOLLOWUP_GAP_DAYS) return "waiting on the lead (next-day gap not reached)";
 
   let rows = [];
   try {
-    rows = await sb(`agent_closing_replies?client_id=eq.${clientId}&ghl_contact_id=eq.${encodeURIComponent(contactId)}&select=id,kind,step_key,status,sent_at,created_at,last_lead_at&order=created_at.desc&limit=50`);
+    rows = await sb(`agent_closing_replies?client_id=eq.${clientId}&ghl_contact_id=eq.${encodeURIComponent(contactId)}&select=id,kind,step_key,status,sent_at,created_at,last_lead_at,followup_not_before,created_by&order=created_at.desc&limit=50`);
   } catch (_) { rows = []; }
   rows = Array.isArray(rows) ? rows : [];
   if (rows.some(r => ["pending", "approved"].includes(r.status))) return "already has an active card";
+
+  // Exception to next-day cadence: the lead named a decision date ("we'll know
+  // after the 15th") - hold every proactive nudge until then.
+  const holdUntil = rows.reduce((m, r) => Math.max(m, r.followup_not_before ? new Date(r.followup_not_before).getTime() : 0), 0);
+  if (holdUntil && Date.now() < holdUntil) return `holding until the lead's decision date (${new Date(holdUntil).toISOString().slice(0, 10)})`;
 
   // Strikes = follow-ups SENT since the lead's last known reply (rows stamp
   // last_lead_at at draft time, so a reply in between restarts the count).
@@ -389,14 +398,21 @@ async function maybeFollowUpOrNurture({ client, token, locationId, dts, cfg, ite
     && new Date(r.sent_at || r.created_at).getTime() > lastInboundMs);
 
   if (fuSent.length >= FOLLOWUP_MAX) {
-    // Three strikes: hand them to the long game.
-    const oppRef = await findOpenOpp(clientId, token, locationId, contactId);
-    if (!oppRef) return `${FOLLOWUP_MAX} follow-ups unanswered but no open opportunity found`;
-    const stage = await resolveStage(sb, ghl, { clientId, token, locationId, role: "nurture" });
-    if (!stage) return `${FOLLOWUP_MAX} follow-ups unanswered but no Nurture stage resolved`;
-    await moveStage({ clientId, sb, ghl, token, oppRef, stage, role: "nurture", contactId });
-    try { await enrollContact({ clientId, automationKey: "nurture", contactId }); } catch (_) {}
-    return "nurtured";
+    // Three strikes: RECOMMEND Lost in Hawkeye (never move anyone silently).
+    // Approving the Lost card marks the opp lost and auto-routes them to the
+    // Nurture stage + Lead Nurture automation (existing confirm-lost path).
+    // One skip from a human = permanent snooze for this lead (they own it now).
+    if (rows.some(r => r.kind === "closing_lost" && r.created_by === "followup-loop" && r.status === "skipped")) {
+      return "lost recommendation was skipped by a human - leaving this lead alone";
+    }
+    await sb(`agent_closing_replies`, { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify([{
+      client_id: clientId, ghl_contact_id: String(contactId), contact_name: item.name || null,
+      kind: "closing_lost", lost_reason: "Not locked in", draft_message: "",
+      reasoning: `${FOLLOWUP_MAX} follow-ups sent with no reply. Recommend marking Lost - on approve they auto-route to the Nurture stage + Lead Nurture texts (the long game).`,
+      summary: `No response to ${FOLLOWUP_MAX} personalized follow-ups after their trial.`,
+      confidence: 1, last_lead_at: null, status: "pending", created_by: "followup-loop",
+    }]) });
+    return "lost-recommended";
   }
 
   const k = fuSent.length + 1;
@@ -413,7 +429,8 @@ async function maybeFollowUpOrNurture({ client, token, locationId, dts, cfg, ite
     draft_message: d.reply, reasoning: d.reasoning || `Proactive follow-up ${k} of ${FOLLOWUP_MAX}`,
     confidence: d.confidence, trial_at: d.trial_at || null, last_message: d.last_message || null,
     last_outbound: d.last_outbound || null, summary: d.summary || null, thread_tail: d.thread_tail || null,
-    reply_count: d.reply_count, status: "pending", created_by: "followup-loop",
+    reply_count: d.reply_count, followup_not_before: d.followup_on ? `${d.followup_on}T14:00:00Z` : null,
+    status: "pending", created_by: "followup-loop",
   }]) });
   return "drafted";
 }
@@ -517,7 +534,7 @@ async function detectForClient(client) {
       try {
         const fu = await maybeFollowUpOrNurture({ client, token, locationId, dts, cfg, item, contactId });
         if (fu === "drafted") drafted++;
-        else if (fu === "nurtured") { skipped++; reasons.push(`${item.name || contactId}: ${FOLLOWUP_MAX} follow-ups unanswered - moved to Nurture + enrolled`); }
+        else if (fu === "lost-recommended") { lostProposed++; reasons.push(`${item.name || contactId}: ${FOLLOWUP_MAX} follow-ups unanswered - Lost recommended in Hawkeye`); }
         else { skipped++; reasons.push(`${item.name || contactId}: ${fu}`); }
       } catch (e) { skipped++; reasons.push(`${item.name || contactId}: follow-up - ${e.message}`); }
       continue;
@@ -544,6 +561,9 @@ async function detectForClient(client) {
       trial_at: d.trial_at || null, last_message: d.last_message || null, last_outbound: d.last_outbound || null,
       summary: d.summary || null, thread_tail: d.thread_tail || null, reply_count: d.reply_count,
       last_lead_at: item.last_at || null,
+      // Lead named a decision date → the follow-up loop won't nudge before ~10am
+      // Toronto on that day (14:00 UTC). Null = default next-day cadence.
+      followup_not_before: d.followup_on ? `${d.followup_on}T14:00:00Z` : null,
     };
 
     // Enroll: lead is ready → ALWAYS queue for a human (send link + mark won on ✓).
