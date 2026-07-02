@@ -71,4 +71,8 @@ nurture, onboarding, summer_special - all live). Cutover = zero comms gap.
   GTA reads kpi_events).
 - agent-confirm's contactInRespondedStage/GHL-conversation reads etc are pipeline/
   messaging concerns, already provider-aware elsewhere.
-- Slot generation has NO cron: re-run generate-slots before ~2026-08-31.
+- Slot coverage: monthly Routine "GTA slot coverage - monthly extend"
+  (trig_01GSyNh5EXMNJtDbgjG7jwQi, 1st of month 13:00 UTC, push-notifies Zoran)
+  runs `bam-portal/scripts/extend-gta-slots.mjs` -> idempotent generate-slots to
+  +60d + coverage check (loud fail under 30d). Delete the Routine when Luka
+  ships a native auto-extend cron (ask pending).
