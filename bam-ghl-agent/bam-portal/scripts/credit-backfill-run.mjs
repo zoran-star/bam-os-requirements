@@ -19,6 +19,16 @@ function arg(name) {
   const idx = process.argv.indexOf(`--${name}`);
   return idx === -1 ? null : process.argv[idx + 1] || null;
 }
+
+// Legacy `line.price.id` or 2025+ `line.pricing.price_details.price`.
+function linePriceId(line) {
+  if (!line) return null;
+  if (line.price && line.price.id) return line.price.id;
+  if (line.pricing && line.pricing.price_details && line.pricing.price_details.price) {
+    return line.pricing.price_details.price;
+  }
+  return null;
+}
 const clientId = arg("client");
 const account = arg("account");
 const apply = process.argv.includes("--apply");
@@ -31,11 +41,18 @@ if (!clientId || !account || !stripeKey) {
 const supabase = createRuntimeSupabaseClient();
 const { data: members, error } = await supabase
   .from("members")
-  .select("id, athlete_name, status, plan, stripe_subscription_id")
+  .select("id, athlete_name, status, plan, stripe_subscription_id, stripe_price_id")
   .eq("client_id", clientId)
   .not("stripe_subscription_id", "is", null)
   .order("athlete_name");
 if (error) { console.error(error.message); process.exit(1); }
+
+const { data: typedRows } = await supabase
+  .from("offer_prices")
+  .select("stripe_price_id")
+  .eq("tenant_id", clientId)
+  .not("stripe_price_id", "is", null);
+const typedPriceIds = new Set((typedRows || []).map((r) => r.stripe_price_id));
 
 let applied = 0, skippedMembers = 0;
 for (const m of members) {
@@ -47,14 +64,20 @@ for (const m of members) {
   const inv = body && body.data && body.data[0];
   const label = `${(m.athlete_name || m.id).slice(0, 26).padEnd(28)} ${String(m.plan || "-").padEnd(18)}`;
   if (!inv) { console.log(`  - ${label} no paid invoice`); skippedMembers += 1; continue; }
-  const lines = ((inv.lines && inv.lines.data) || [])
-    .filter((line) => line && line.id && line.price && line.price.id)
+  let lines = ((inv.lines && inv.lines.data) || [])
+    .filter((line) => line && line.id && linePriceId(line))
     .map((line) => ({
       lineId: line.id,
-      stripePriceId: line.price.id,
+      stripePriceId: linePriceId(line),
       periodStart: new Date(((line.period && line.period.start) || 0) * 1000).toISOString(),
       periodEnd: new Date(((line.period && line.period.end) || 0) * 1000).toISOString(),
     }));
+  // GHL-era dynamic per-invoice prices are never typed; for single-line
+  // invoices fall back to the member's stable subscription price (mirrors the
+  // webhook creditSync fallback; multi-line prorations keep real prices).
+  if (lines.length === 1 && m.stripe_price_id && !typedPriceIds.has(lines[0].stripePriceId)) {
+    lines = [{ ...lines[0], stripePriceId: m.stripe_price_id }];
+  }
   if (!lines.length) { console.log(`  - ${label} invoice ${inv.id}: no price lines`); skippedMembers += 1; continue; }
   if (!apply) {
     console.log(`  · ${label} would replay ${inv.id} (${lines.map((l) => l.stripePriceId).join(",")})`);

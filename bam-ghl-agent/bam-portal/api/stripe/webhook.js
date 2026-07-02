@@ -313,9 +313,22 @@ async function writeAudit({ client_id, member_id, action_type, args, stripe_resp
 // Returns null to continue the normal 200 path, or a response the caller
 // must return (the ON-mode 500).
 // ─────────────────────────────────────────────────────────
+// Stripe moved the invoice-line price field across API versions:
+// legacy shape `line.price.id`, 2025+ shape `line.pricing.price_details.price`.
+// Events arrive in whichever version the webhook endpoint is pinned to, so
+// support both.
+function linePriceId(line) {
+  if (!line) return null;
+  if (line.price && line.price.id) return line.price.id;
+  if (line.pricing && line.pricing.price_details && line.pricing.price_details.price) {
+    return line.pricing.price_details.price;
+  }
+  return null;
+}
+
 function invoiceLinePriceId(inv) {
   const line = inv && inv.lines && inv.lines.data && inv.lines.data[0];
-  return (line && line.price && line.price.id) || null;
+  return linePriceId(line);
 }
 
 // ─────────────────────────────────────────────────────────
@@ -326,21 +339,32 @@ function invoiceLinePriceId(inv) {
 // A failure while enabled returns 5xx so Stripe retries (same rationale as
 // the access sync). Returns null to continue, or the 500 response.
 // ─────────────────────────────────────────────────────────
-async function creditSync(res, { clientId, memberId, inv, subId }) {
+async function creditSync(res, { clientId, memberId, inv, subId, memberPriceId }) {
   let enabled = false;
   try {
     const rows = await sb(`clients?id=eq.${encodeURIComponent(clientId)}&select=credit_engine_enabled&limit=1`);
     enabled = !!(Array.isArray(rows) && rows[0] && rows[0].credit_engine_enabled);
     if (!enabled || !subId) return null;
-    const lines = ((inv && inv.lines && inv.lines.data) || [])
-      .filter((line) => line && line.id && line.price && line.price.id)
+    let lines = ((inv && inv.lines && inv.lines.data) || [])
+      .filter((line) => line && line.id && linePriceId(line))
       .map((line) => ({
         lineId: line.id,
-        stripePriceId: line.price.id,
+        stripePriceId: linePriceId(line),
         periodStart: new Date(((line.period && line.period.start) || 0) * 1000).toISOString(),
         periodEnd: new Date(((line.period && line.period.end) || 0) * 1000).toISOString(),
       }));
     if (!lines.length) return null;
+    // GHL-era subs bill with DYNAMIC per-invoice prices that are never in the
+    // typed catalog. For single-line invoices, fall back to the member's
+    // stable subscription price (the same price the entitlement resolves
+    // through). Multi-line invoices (prorations) keep their real prices so an
+    // adjustment line can never double-grant.
+    if (lines.length === 1 && memberPriceId && lines[0].stripePriceId !== memberPriceId) {
+      const typed = await sb(
+        `offer_prices?tenant_id=eq.${encodeURIComponent(clientId)}&stripe_price_id=eq.${encodeURIComponent(lines[0].stripePriceId)}&select=id&limit=1`
+      );
+      if (!(Array.isArray(typed) && typed[0])) lines = [{ ...lines[0], stripePriceId: memberPriceId }];
+    }
     const supabase = createRuntimeSupabaseClient();
     const result = await applyInvoiceCreditGrants(supabase, {
       tenantId: clientId, subscriptionId: subId, invoiceId: inv.id, lines,
@@ -930,7 +954,7 @@ async function handleInvoiceSucceeded(event, connectedAccount, res) {
           invoiceLinePriceId(inv),
       });
       if (accessFail) return accessFail;
-      const creditFail = await creditSync(res, { clientId: member.client_id, memberId: member.id, inv, subId });
+      const creditFail = await creditSync(res, { clientId: member.client_id, memberId: member.id, inv, subId, memberPriceId: member.stripe_price_id || null });
       if (creditFail) return creditFail;
       return res.status(200).json(out);
     }
@@ -961,7 +985,7 @@ async function handleInvoiceSucceeded(event, connectedAccount, res) {
         stripePriceId: invoiceLinePriceId(inv),
       });
       if (accessFail) return accessFail;
-      const creditFail = await creditSync(res, { clientId: member.client_id, memberId: member.id, inv, subId });
+      const creditFail = await creditSync(res, { clientId: member.client_id, memberId: member.id, inv, subId, memberPriceId: member.stripe_price_id || null });
       if (creditFail) return creditFail;
     }
     return res.status(200).json({ skipped: "member not in recoverable state", current_status: member.status });
@@ -1004,7 +1028,7 @@ async function handleInvoiceSucceeded(event, connectedAccount, res) {
     stripePriceId: invoiceLinePriceId(inv),
   });
   if (accessFail) return accessFail;
-  const creditFail = await creditSync(res, { clientId: member.client_id, memberId: member.id, inv, subId });
+  const creditFail = await creditSync(res, { clientId: member.client_id, memberId: member.id, inv, subId, memberPriceId: member.stripe_price_id || null });
   if (creditFail) return creditFail;
 
   return res.status(200).json({ ok: true, action: "recovered-to-live", from: prevStatus, member_id: member.id });
