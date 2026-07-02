@@ -173,6 +173,11 @@ bridges to the contact; academy number = caller ID.
 - GOTCHA: Twilio's final status callback reports "completed" on the parent call
   even when the caller rang out to voicemail - `updateCallBySid(sid, patch,
   unlessStatusIn)` guards so stage-set `voicemail`/`no-answer` survive.
+- Branded caller ID: CNAM is impossible for CA numbers (Twilio forbids); Twilio
+  Branded Calling Canada = private beta (Rogers/Bell only, account-rep enable).
+  Portal fallback: public `GET /api/vcard?c=<client_id>` contact card (.vcf,
+  business_name + number), linked automatically from the missed-call text -
+  saved contact = name on every carrier.
 - GTA live: +12898166569 rings +14165733718, voicemail + missed-call text on
   (verified live 2026-07-02). Roadmap + billing/subaccount plan: Zoran's personal
   memory note `bam-twilio-voice`.
