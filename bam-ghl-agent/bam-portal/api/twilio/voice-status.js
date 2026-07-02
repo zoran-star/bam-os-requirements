@@ -12,7 +12,9 @@ async function handler(req, res) {
   if (sid && status) {
     const patch = { status };
     if (p.CallDuration) patch.duration_seconds = Number(p.CallDuration);
-    await updateCallBySid(sid, patch);
+    // Don't clobber the more specific statuses the inbound stages already set:
+    // a caller who rang out to voicemail still ends the PARENT call "completed".
+    await updateCallBySid(sid, patch, ["voicemail", "no-answer", "busy", "failed"]);
   }
   return res.status(200).send("ok");
 }

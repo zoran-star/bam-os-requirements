@@ -397,7 +397,23 @@ async function handler(req, res) {
           `member_audit_log?member_id=eq.${id}&select=action_type,args,performed_by_name,created_at&order=created_at.desc&limit=10`
         ).catch(() => []);
 
-        return res.status(200).json({ member, stripe, history });
+        // Calls — voice history (Twilio spine `calls` table), matched by portal
+        // contact id or the parent's phone. Inbound rows store E.164 so we match
+        // on the last 10 digits to survive formatting differences.
+        let calls = [];
+        const callOrs = [];
+        if (member.ghl_contact_id) callOrs.push(`ghl_contact_id.eq.${encodeURIComponent(member.ghl_contact_id)}`);
+        const phoneDigits = String(member.parent_phone || "").replace(/\D/g, "").slice(-10);
+        if (phoneDigits.length === 10) callOrs.push(`contact_phone.like.*${phoneDigits}`);
+        if (callOrs.length) {
+          calls = await sb(
+            `calls?client_id=eq.${member.client_id}&or=(${callOrs.join(",")})` +
+            `&select=direction,status,duration_seconds,recording_url,voicemail_transcript,occurred_at,answered_by` +
+            `&order=occurred_at.desc&limit=15`
+          ).catch(() => []);
+        }
+
+        return res.status(200).json({ member, stripe, history, calls });
       }
 
       // ─── List ────────────────────────────────────────────────────
