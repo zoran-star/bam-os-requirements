@@ -1,6 +1,18 @@
 # Creative Refresh Calendar (campaign asset update windows)
 
-**Status: SCOPED 2026-07-02, not built.** Origin: BAM Digital Marketing call Jul 01 (Ximena: clients must keep updating ad creatives; Cam: calendar view, color-coded, staggered across weeks, click-to-nudge).
+**Status: PHASE 1 BUILT 2026-07-02 (PR #1039). Migration APPLIED to prod same day via Supabase MCP as version `20260702181432` (local file renamed to match, so `migration list --linked` stays in sync). Table + refresh_week + both RLS policies verified live.** Origin: BAM Digital Marketing call Jul 01 (Ximena: clients must keep updating ad creatives; Cam: calendar view, color-coded, staggered across weeks, click-to-nudge).
+
+## Phase 1 file map (built)
+- `bam-portal/supabase/migrations/20260702181432_creative_refresh_windows.sql` - `clients.refresh_week` + `creative_refresh_windows` table + RLS (read = is_staff() or my_client_ids(); writes = service-role API only). Applied to prod 2026-07-02.
+- `bam-portal/api/marketing.js` → `handleRefreshWindows` (`?resource=refresh-windows`): GET materializes the month's rows on read for enrolled clients (idempotent via unique client_id+month), derives statuses (submitted/skipped sticky, rest pure date math), auto-detects submissions from marketing/content tickets landing inside the window (120-day lookback also powers last_submission). PATCH actions: set-week / move-week / nudge / mark-received / skip. View = CONTENT_ROLES, edit = CONTENT_MANAGER_ROLES.
+- `bam-portal/src/views/RefreshCalendarSection.jsx` - week-lane UI (chips, needs-attention filter, month nav, detail panel, unassigned-clients strip with enroll dropdown)
+- `bam-portal/src/views/MarketingView.jsx` - third section pill "Creative Refresh" (`?msec=refresh`)
+
+## Gotchas discovered during build
+- Week lanes are Monday-anchored: week 1 = first Monday of the month; days before it / after week 4's Sunday belong to no lane (by design, keeps lanes clean).
+- `content_executor` cannot open the Marketing tab (canSeeMarketing excludes them) - so despite the API allowing CONTENT_ROLES they can't SEE phase 1 yet. Open decision: add the same section to ContentView (the component drops in as-is).
+- tokens.js has NO `blueSoft` - "window open" uses AMBER (amber/amberSoft), which reads as "action needed" anyway. Scope originally said blue.
+- `marketing_tickets`/`content_tickets` have no created_at - submission detection uses `submitted_at` (same gotcha as [[project_marketing_budget_status]]).
 
 ## The problem
 Clients go stale on ad creatives. Ximena needs fresh assets monthly per client; today there is no system - she chases ad hoc. Fallback when a client has nothing new: they share existing organic posts for her to test as ads.
