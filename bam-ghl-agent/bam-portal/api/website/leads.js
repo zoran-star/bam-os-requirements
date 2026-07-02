@@ -147,7 +147,51 @@ function roleForStageName(stageName) {
   return null;
 }
 
+// PORTAL-NATIVE contact creation for contact_provider='portal' academies: the
+// person is found-or-minted in the portal contacts store (no GHL contact, no
+// GHL location config needed) and the pipeline card is placed through the
+// provider-aware store. The minted uuid flows through the ghl_contact_id join
+// key everywhere. Returns the contact join-key id (what pushToGhl returns).
+async function portalNativeContact({ clientId, ghlLocationId, name, email, phone, message, messageFieldId, formType, pipelineConfig, extraTags, fields, fieldMap }) {
+  const [firstName, ...rest] = (name || "").trim().split(" ");
+  const cfMap = {};
+  for (const [key, ghlFieldId] of Object.entries(fieldMap || {})) {
+    const val = fields?.[key];
+    if (ghlFieldId && val !== undefined && val !== null && String(val).trim() !== "") cfMap[String(ghlFieldId)] = String(val);
+  }
+  if (messageFieldId && message && !cfMap[String(messageFieldId)]) cfMap[String(messageFieldId)] = message;
+  const formTag = `${(formType || "contact").replace(/-/g, " ")} form filled`;
+  const tags = [...new Set(["website-inquiry", formTag, ...(extraTags || [])])];
+  const contactId = await resolveOrMintPortalContact(clientId, {
+    first_name: firstName || null,
+    last_name:  rest.join(" ") || null,
+    name:       (name || "").trim() || null,
+    email, phone, tags,
+    custom_fields: Object.keys(cfMap).length ? cfMap : null,
+    source: "website-form",
+  });
+  // Card placement (form-step lands at the entry point's configured stage).
+  // Stage resolution is registry-first for portal-pipeline academies, so the
+  // GHL-less headers are only a fallback shell. Best-effort - a placement
+  // failure must not lose the contact.
+  if (contactId && pipelineConfig?.pipeline && pipelineConfig?.stage) {
+    try {
+      const bareHeaders = { Version: V2_VERSION, "Content-Type": "application/json", Accept: "application/json" };
+      await placeOpportunity(bareHeaders, ghlLocationId, contactId, pipelineConfig, `${name || email}`, false, clientId);
+    } catch (e) { console.error("portal-native card placement failed (non-fatal):", e.message); }
+  }
+  return contactId;
+}
+
 async function pushToGhl(locName, ghlLocationId, { clientId, contactProv, requireGhl, name, email, phone, message, messageFieldId, formType, pipelineConfig, extraTags, fields, fieldMap }) {
+  // PORTAL-NATIVE creation runs FIRST: it needs no GHL location entry or API
+  // key, so the GHL_LOCATIONS_JSON gates below must not be able to block it
+  // (they did - prod's GHL_LOCATIONS_JSON is empty, which silently killed
+  // contact creation for portal academies).
+  if (clientId && contactProv === "portal" && !requireGhl) {
+    return await portalNativeContact({ clientId, ghlLocationId, name, email, phone, message, messageFieldId, formType, pipelineConfig, extraTags, fields, fieldMap });
+  }
+
   const loc = loadLocations().find(l => l.name === locName);
   if (!loc) return null;
 
@@ -195,36 +239,18 @@ async function pushToGhl(locName, ghlLocationId, { clientId, contactProv, requir
     Accept: "application/json",
   };
 
-  // Create the contact. PORTAL-NATIVE for contact_provider='portal' academies:
-  // the person is found-or-minted in the portal contacts store and NO GHL contact
-  // is created - the minted uuid flows through the ghl_contact_id join key
-  // everywhere. EXCEPTION (requireGhl): a booking submission still needs a real
-  // GHL contact because the calendar appointment POST below requires one
-  // (calendars are still on GHL - deferred); the GHL id is dual-written to the
-  // store by the handler as before. Every 'ghl' academy keeps the exact upsert:
-  // GHL matches on email/phone and creates or updates in one call.
-  // (Search-then-create raced with GHL's duplicate prevention and failed on
-  // repeat submissions from the same email.)
-  let contactId = null;
-  if (clientId && contactProv === "portal" && !requireGhl) {
-    const cfMap = {};
-    for (const f of customFields) cfMap[String(f.id)] = String(f.field_value);
-    contactId = await resolveOrMintPortalContact(clientId, {
-      first_name: firstName || null,
-      last_name:  lastName || null,
-      name:       (name || "").trim() || null,
-      email, phone, tags,
-      custom_fields: Object.keys(cfMap).length ? cfMap : null,
-      source: "website-form",
-    });
-  } else {
-    const upsertRes = await fetch(`${GHL_V2}/contacts/upsert`, {
-      method: "POST", headers, body: JSON.stringify(payload),
-    });
-    if (!upsertRes.ok) throw new Error(`GHL ${upsertRes.status}: ${(await upsertRes.text()).slice(0, 120)}`);
-    const upserted = await upsertRes.json();
-    contactId = (upserted.contact || upserted).id || null;
-  }
+  // Create the GHL contact (portal-native academies returned early above; the
+  // only portal case reaching here is requireGhl - a booking on a
+  // booking_provider='ghl' academy, which needs a real GHL contact for the GHL
+  // calendar appointment). GHL matches on email/phone and creates or updates in
+  // one call. (Search-then-create raced with GHL's duplicate prevention and
+  // failed on repeat submissions from the same email.)
+  const upsertRes = await fetch(`${GHL_V2}/contacts/upsert`, {
+    method: "POST", headers, body: JSON.stringify(payload),
+  });
+  if (!upsertRes.ok) throw new Error(`GHL ${upsertRes.status}: ${(await upsertRes.text()).slice(0, 120)}`);
+  const upserted = await upsertRes.json();
+  const contactId = (upserted.contact || upserted).id || null;
 
   // Make the message readable in GHL. The inbox thread can't carry it without
   // a registered conversation provider (/conversations/messages/inbound
