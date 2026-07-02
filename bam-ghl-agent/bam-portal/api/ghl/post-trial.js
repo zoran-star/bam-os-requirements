@@ -105,7 +105,7 @@ async function handler(req, res) {
   const notes = (b.notes || "").trim() || null;
   const sendLink = !!b.send_onboarding_link;
 
-  const rows = await sb(`clients?id=eq.${clientId}&select=id,ghl_location_id,ghl_access_token,ghl_refresh_token,ghl_token_expires_at&limit=1`);
+  const rows = await sb(`clients?id=eq.${clientId}&select=id,ghl_location_id,ghl_access_token,ghl_refresh_token,ghl_token_expires_at,booking_provider&limit=1`);
   const client = rows?.[0];
   if (!client) return res.status(404).json({ error: "academy not found" });
 
@@ -157,6 +157,32 @@ async function handler(req, res) {
       ref: `trialoutcome:${oppId}`,
       meta: { opportunity_id: oppId, good_fit: goodFit, trainer: trainer || null },
     });
+  }
+
+  // Calendars-off-GHL ④: on a portal-booking academy, stamp the outcome onto the
+  // contact's trial_bookings row too (SHOWED / NO_SHOW via Luka's set_trial_outcome
+  // RPC - never a direct update), so the portal calendar + conversion lineage agree
+  // with the coach's form. Targets the most recent BOOKED trial whose session has
+  // started. Best-effort: a miss must never fail the review submit.
+  if (showedUp !== null && contactId && client.booking_provider === "portal") {
+    try {
+      const tbs = await sb(
+        `trial_bookings?tenant_id=eq.${encodeURIComponent(clientId)}&ghl_contact_id=eq.${encodeURIComponent(contactId)}&status=eq.BOOKED&select=id,slot_id&limit=25`
+      );
+      if (Array.isArray(tbs) && tbs.length) {
+        const slotIds = tbs.map(t => t.slot_id).filter(Boolean);
+        const slots = slotIds.length ? await sb(`schedule_slots?id=in.(${slotIds.map(encodeURIComponent).join(",")})&select=id,start_time`) : [];
+        const startById = new Map((slots || []).map(s => [s.id, new Date(s.start_time).getTime()]));
+        const started = tbs
+          .map(t => ({ ...t, startMs: startById.get(t.slot_id) || 0 }))
+          .filter(t => t.startMs && t.startMs <= Date.now() + 60 * 60_000)   // session started (1h grace for early submits)
+          .sort((a, b) => b.startMs - a.startMs);
+        const target = started[0] || null;
+        if (target) {
+          await sb(`rpc/set_trial_outcome`, { method: "POST", body: JSON.stringify({ p_tenant_id: clientId, p_trial_booking_id: target.id, p_status: showedUp ? "SHOWED" : "NO_SHOW" }) });
+        }
+      }
+    } catch (e) { console.error("trial_bookings outcome stamp failed (non-fatal):", e.message); }
   }
 
   // Contact provider gate: a 'portal' academy owns attendance + trainer in its own

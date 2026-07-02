@@ -1,5 +1,7 @@
 import { withSentryApiRoute } from "../_sentry.js";
 import { getClientGhlToken } from "../website/availability.js";
+import { bookPortalTrial } from "../agent/booking.js";
+import { recordKpiEvent } from "../_kpi.js";
 // Multiple live GHL calls per request (calendars + events + appointment +
 // contact) — give it headroom past the default ~10s budget.
 export const maxDuration = 60;
@@ -120,8 +122,236 @@ function summarize(c) {
 }
 
 async function loadClient(clientId) {
-  const rows = await sb(`clients?id=eq.${clientId}&select=id,business_name,time_zone,ghl_location_id,ghl_access_token,ghl_refresh_token,ghl_token_expires_at,ghl_kpi_config&limit=1`);
+  const rows = await sb(`clients?id=eq.${clientId}&select=id,business_name,time_zone,ghl_location_id,ghl_access_token,ghl_refresh_token,ghl_token_expires_at,ghl_kpi_config,booking_provider&limit=1`);
   return rows?.[0] || null;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// booking_provider='portal': the whole Calendars surface reads + writes the
+// portal runtime spine (schedule_slots + trial_bookings) instead of GHL.
+// Response shapes mirror the GHL branch exactly, so client-portal.html is
+// untouched. Writes go through Luka's RPCs only (set_trial_outcome /
+// cancel_trial_booking / book_trial_slot) - never direct inserts/updates.
+// "Calendars" here = the academy's calendar entry_points; each maps to a
+// template family by the "Group N" in its label.
+// ─────────────────────────────────────────────────────────────────────────────
+
+const TB_TO_GHL_STATUS = { BOOKED: "confirmed", SHOWED: "showed", NO_SHOW: "noshow", CANCELLED: "cancelled" };
+
+function groupPrefixOf(label) {
+  const m = /group\s*\d+/i.exec(String(label || ""));
+  return m ? m[0].toLowerCase().replace(/\s+/g, " ") : null;
+}
+const slotMatchesGroup = (slotName, prefix) =>
+  !prefix || String(slotName || "").toLowerCase().replace(/\s+/g, " ").includes(prefix);
+
+async function portalCalendarEntries(clientId) {
+  const rows = await sb(`entry_points?client_id=eq.${clientId}&type=eq.calendar&enabled=eq.true&select=key,label`);
+  return (Array.isArray(rows) ? rows : []).map(r => ({ key: r.key, label: r.label || r.key, prefix: groupPrefixOf(r.label) }));
+}
+
+// One drawer-shaped contact from the portal contacts store (custom-field ids
+// resolved to labels via custom_field_defs).
+async function portalContactShape(clientId, ghlContactId) {
+  if (!ghlContactId) return null;
+  try {
+    const rows = await sb(`contacts?client_id=eq.${clientId}&ghl_contact_id=eq.${encodeURIComponent(ghlContactId)}&select=ghl_contact_id,first_name,last_name,name,email,phone,tags,dnd,source,date_added,custom_fields&limit=1`);
+    const c = rows?.[0];
+    if (!c) return { id: ghlContactId };
+    let cfNames = {};
+    try {
+      const defs = await sb(`custom_field_defs?client_id=eq.${clientId}&select=ghl_field_id,label`);
+      for (const d of (defs || [])) if (d.ghl_field_id) cfNames[d.ghl_field_id] = d.label || null;
+    } catch (_) {}
+    const cf = c.custom_fields && typeof c.custom_fields === "object" ? c.custom_fields : {};
+    return {
+      id: c.ghl_contact_id,
+      name: c.name || [c.first_name, c.last_name].filter(Boolean).join(" ") || null,
+      firstName: c.first_name || null, lastName: c.last_name || null,
+      email: c.email || null, phone: c.phone || null,
+      tags: c.tags || [], dnd: !!c.dnd,
+      source: c.source || null, type: null,
+      dateAdded: c.date_added || null,
+      customFields: Object.entries(cf).map(([id, value]) => ({ id, name: cfNames[id] || null, value })),
+    };
+  } catch (_) { return { id: ghlContactId }; }
+}
+
+// Bookings (trial_bookings joined to their slots) for a set of calendar entries
+// within [startMs, endMs). Emits GHL-events-shaped rows.
+async function portalBookingsInRange(clientId, entries, startMs, endMs, { includeCancelled = true } = {}) {
+  const slots = (await sb(
+    `schedule_slots?tenant_id=eq.${clientId}&start_time=gte.${encodeURIComponent(new Date(startMs).toISOString())}&start_time=lt.${encodeURIComponent(new Date(endMs).toISOString())}&select=id,name,start_time,end_time&limit=1000`
+  )) || [];
+  if (!slots.length) return [];
+  const slotById = new Map(slots.map(s => [s.id, s]));
+  const inList = slots.map(s => encodeURIComponent(s.id)).join(",");
+  const tbs = (await sb(
+    `trial_bookings?tenant_id=eq.${clientId}&slot_id=in.(${inList})&select=id,slot_id,status,ghl_contact_id,parent_name,athlete_name&limit=2000`
+  )) || [];
+  const events = [];
+  for (const tb of tbs) {
+    if (!includeCancelled && tb.status === "CANCELLED") continue;
+    const s = slotById.get(tb.slot_id);
+    if (!s) continue;
+    const entry = entries.find(e => slotMatchesGroup(s.name, e.prefix)) || entries[0];
+    events.push({
+      id: tb.id,
+      calendarId: entry ? entry.key : null,
+      start: s.start_time,
+      end: s.end_time,
+      title: tb.athlete_name || tb.parent_name || s.name || null,
+      status: TB_TO_GHL_STATUS[tb.status] || null,
+      contactId: tb.ghl_contact_id || null,
+      contactName: tb.parent_name || tb.athlete_name || null,
+    });
+  }
+  return events;
+}
+
+async function portalHandler(req, res, { client, clientId, action }) {
+  const timezone = client.time_zone || "America/Toronto";
+
+  if (req.method === "GET") {
+    if (action === "list") {
+      const entries = await portalCalendarEntries(clientId);
+      // capacity from the matching slot templates (falls back to null).
+      let tpls = [];
+      try { tpls = (await sb(`slot_templates?tenant_id=eq.${clientId}&is_active=eq.true&select=name,default_capacity`)) || []; } catch (_) {}
+      const calendars = entries.map(e => {
+        const t = tpls.find(t => slotMatchesGroup(t.name, e.prefix));
+        return { id: e.key, name: e.label, isActive: true, slotDuration: 60, slotDurationUnit: "mins", capacity: t ? t.default_capacity : null };
+      }).sort((a, b) => String(a.name || "").localeCompare(String(b.name || "")));
+      return res.status(200).json({ calendars, timezone });
+    }
+
+    if (action === "events") {
+      const ids = String((req.query && req.query.calendar_ids) || "").split(",").map(s => s.trim()).filter(Boolean);
+      const start = Number(req.query.start), end = Number(req.query.end);
+      if (!ids.length || !start || !end) return res.status(400).json({ error: "calendar_ids + start + end required" });
+      const entries = (await portalCalendarEntries(clientId)).filter(e => ids.includes(e.key));
+      const all = await portalBookingsInRange(clientId, entries.length ? entries : await portalCalendarEntries(clientId), start, end);
+      return res.status(200).json({ events: all.filter(ev => !ev.calendarId || ids.includes(ev.calendarId)) });
+    }
+
+    if (action === "trials-today") {
+      const cfg = client.ghl_kpi_config || {};
+      const calIds = Array.isArray(cfg.booking_calendar_ids) ? cfg.booking_calendar_ids.filter(Boolean) : [];
+      const entries = (await portalCalendarEntries(clientId)).filter(e => !calIds.length || calIds.includes(e.key));
+      const { start, end } = todayBoundsMs(timezone);
+      const evs = await portalBookingsInRange(clientId, entries, start, end, { includeCancelled: false });
+      const trials = evs
+        .map(ev => ({ id: ev.id, start: ev.start, status: ev.status, contactId: ev.contactId, contactName: ev.contactName || "Trial booking" }))
+        .sort((a, b) => new Date(a.start || 0) - new Date(b.start || 0));
+      return res.status(200).json({ trials, timezone });
+    }
+
+    if (action === "appointment") {
+      const id = req.query.id;
+      if (!id) return res.status(400).json({ error: "id required" });
+      const rows = await sb(`trial_bookings?tenant_id=eq.${clientId}&id=eq.${encodeURIComponent(id)}&select=id,slot_id,status,ghl_contact_id,parent_name,athlete_name,metadata&limit=1`);
+      const tb = rows?.[0];
+      if (!tb) return res.status(404).json({ error: "booking not found" });
+      let slot = null;
+      try { slot = ((await sb(`schedule_slots?id=eq.${tb.slot_id}&select=name,start_time,end_time,location_label&limit=1`)) || [])[0]; } catch (_) {}
+      const contact = await portalContactShape(clientId, tb.ghl_contact_id);
+      return res.status(200).json({
+        appointment: {
+          id: tb.id,
+          calendarId: null,
+          title: slot?.name || "Free Trial",
+          status: TB_TO_GHL_STATUS[tb.status] || null,
+          start: slot?.start_time || null,
+          end: slot?.end_time || null,
+          notes: null,
+          address: slot?.location_label || null,
+        },
+        contact,
+        statuses: APPT_STATUSES,
+      });
+    }
+
+    if (action === "contact") {
+      const cid = req.query.id;
+      if (!cid) return res.status(400).json({ error: "id required" });
+      const contact = await portalContactShape(clientId, cid);
+      return res.status(200).json({ contact, location_id: client.ghl_location_id || null });
+    }
+
+    if (action === "settings") {
+      const calId = req.query.calendar;
+      if (!calId) return res.status(400).json({ error: "calendar required" });
+      const entries = await portalCalendarEntries(clientId);
+      const entry = entries.find(e => e.key === calId);
+      let tpls = [];
+      try { tpls = (await sb(`slot_templates?tenant_id=eq.${clientId}&is_active=eq.true&select=name,default_capacity,default_start_time,default_end_time,recurrence_rule`)) || []; } catch (_) {}
+      const mine = tpls.filter(t => slotMatchesGroup(t.name, entry ? entry.prefix : null));
+      const DOW = { SU: 0, MO: 1, TU: 2, WE: 3, TH: 4, FR: 5, SA: 6 };
+      const openHours = mine.map(t => {
+        const daysTok = String(t.recurrence_rule || "").replace(/^WEEKLY:/i, "").split(",").map(s => s.trim()).filter(Boolean);
+        const [oh, om] = String(t.default_start_time || "00:00").split(":").map(Number);
+        const [ch, cm] = String(t.default_end_time || "00:00").split(":").map(Number);
+        return { daysOfTheWeek: daysTok.map(d => DOW[d]).filter(d => d != null), hours: [{ openHour: oh || 0, openMinute: om || 0, closeHour: ch || 0, closeMinute: cm || 0 }] };
+      });
+      return res.status(200).json({ calendar: {
+        id: calId, name: entry ? entry.label : calId, isActive: true,
+        slotDuration: 60, slotDurationUnit: "mins",
+        capacity: mine[0] ? mine[0].default_capacity : null,
+        openHours, special: [],
+        read_only: true,   // schedule edits go through the schedule templates, not here
+      } });
+    }
+
+    return res.status(400).json({ error: "unknown action" });
+  }
+
+  if (req.method === "POST") {
+    const b = (req.body && typeof req.body === "object") ? req.body : {};
+
+    if (action === "set-status") {
+      const id = b.id, status = b.status;
+      if (!id || !APPT_STATUSES.includes(status)) return res.status(400).json({ error: "id + valid status required" });
+      try {
+        if (status === "cancelled" || status === "invalid") {
+          await sb(`rpc/cancel_trial_booking`, { method: "POST", body: JSON.stringify({ p_tenant_id: clientId, p_trial_booking_id: id }) });
+        } else {
+          const map = { confirmed: "BOOKED", showed: "SHOWED", noshow: "NO_SHOW" };
+          await sb(`rpc/set_trial_outcome`, { method: "POST", body: JSON.stringify({ p_tenant_id: clientId, p_trial_booking_id: id, p_status: map[status] }) });
+        }
+      } catch (e) { return res.status(502).json({ error: `status update failed: ${e.message}` }); }
+      // KPI event log: attended / no-show from the calendar drawer (idempotent).
+      if (status === "showed" || status === "noshow") {
+        try {
+          const tb = ((await sb(`trial_bookings?tenant_id=eq.${clientId}&id=eq.${encodeURIComponent(id)}&select=ghl_contact_id,parent_name&limit=1`)) || [])[0];
+          await recordKpiEvent({
+            clientId, step: status === "showed" ? "trial_attended" : "trial_no_show",
+            ghlContactId: tb?.ghl_contact_id || null, contactName: tb?.parent_name || null,
+            ref: `trialoutcome-tb:${id}`, meta: { trial_booking_id: id, via: "calendar-drawer" },
+          });
+        } catch (_) {}
+      }
+      return res.status(200).json({ ok: true, id, status });
+    }
+
+    if (action === "create-appointment") {
+      const calId = b.calendar, contactId = b.contactId, start = b.start;
+      if (!calId || !contactId || !start) return res.status(400).json({ error: "calendar + contactId + start required" });
+      const entries = await portalCalendarEntries(clientId);
+      const entry = entries.find(e => e.key === calId);
+      try {
+        const tbId = await bookPortalTrial(clientId, { slotAtIso: new Date(start).toISOString(), calLabel: entry ? entry.label : null, contactId, contactName: b.title || null });
+        return res.status(200).json({ ok: true, appointment: { id: tbId, calendarId: calId, startTime: new Date(start).toISOString() } });
+      } catch (e) { return res.status(502).json({ error: `book: ${e.message}` }); }
+    }
+
+    if (action === "settings") {
+      return res.status(400).json({ error: "This academy's schedule is managed on the portal calendar system - session hours and capacity are edited through the schedule templates, not here." });
+    }
+
+    return res.status(400).json({ error: "unknown action" });
+  }
+
+  return res.status(405).json({ error: "GET or POST" });
 }
 
 // Fallback for locations that have a GHL_LOCATIONS_JSON API key but no OAuth yet.
@@ -144,6 +374,14 @@ async function handler(req, res) {
     const client = await loadClient(clientId);
     if (!client) return res.status(404).json({ error: "academy not found" });
     const locationId = client.ghl_location_id;
+    const action = (req.query && req.query.action) || (req.body && req.body.action) || "";
+
+    // booking_provider='portal': the entire surface runs on the portal spine -
+    // no GHL token needed at all. Every other academy continues below unchanged.
+    if (client.booking_provider === "portal") {
+      return await portalHandler(req, res, { client, clientId, action });
+    }
+
     let token;
     try { token = await getClientGhlToken(client); }
     catch (e) {
@@ -151,7 +389,6 @@ async function handler(req, res) {
       if (!apiKey) return res.status(502).json({ error: `GHL access: ${e.message}` });
       token = apiKey;
     }
-    const action = (req.query && req.query.action) || (req.body && req.body.action) || "";
 
     // ─────────────── GET ───────────────
     if (req.method === "GET") {
