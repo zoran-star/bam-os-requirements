@@ -60,8 +60,15 @@ async function resolveStaff(req) {
   return { role: rows?.[0]?.role || null };
 }
 
-function publicUrl(storagePath) {
-  return `${SUPABASE_URL}/storage/v1/object/public/${STORAGE_BUCKET}/${storagePath}`;
+// Read a storage object with the service key. The `resources` bucket is
+// PRIVATE, so the old public-URL fetch (/object/public/...) 400s on every
+// convert. The authenticated endpoint works regardless of bucket visibility.
+// Path segments are encoded individually (file names can carry spaces etc.).
+function fetchStorageObject(storagePath) {
+  const path = String(storagePath).split("/").map(encodeURIComponent).join("/");
+  return fetch(`${SUPABASE_URL}/storage/v1/object/${STORAGE_BUCKET}/${path}`, {
+    headers: { apikey: SUPABASE_SERVICE_KEY, Authorization: `Bearer ${SUPABASE_SERVICE_KEY}` },
+  });
 }
 
 // ── Claude: PDF → content blocks (forced tool use for clean JSON) ──────────
@@ -162,7 +169,7 @@ async function convertResource(resource) {
   const files = resource.resource_files || [];
   const pdf = files.find((f) => (f.mime_type || "").includes("pdf"));
   if (!pdf) throw new Error("no PDF attachment");
-  const res = await fetch(publicUrl(pdf.storage_path));
+  const res = await fetchStorageObject(pdf.storage_path);
   if (!res.ok) throw new Error(`fetch PDF ${res.status}`);
   const buf = Buffer.from(await res.arrayBuffer());
   if (buf.length > MAX_PDF_BYTES) throw new Error("PDF too large to convert");
