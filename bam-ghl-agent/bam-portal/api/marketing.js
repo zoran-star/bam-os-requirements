@@ -828,7 +828,7 @@ async function handleMarketingTickets(req, res) {
     const ticket = existing?.[0];
     if (!ticket) return res.status(404).json({ error: "not found" });
 
-    const staffActions = new Set(["approve-content", "request-client-action", "mark-completed", "request-content-revision"]);
+    const staffActions = new Set(["approve-content", "request-client-action", "mark-completed", "request-content-revision", "hold", "resume"]);
     const clientActions = new Set(["cancel", "edit", "respond"]);
 
     if (staffActions.has(action)) {
@@ -871,6 +871,28 @@ async function handleMarketingTickets(req, res) {
       patch.messages = appendMessage(ticket.messages, {
         author_type: "staff", author_id: ctx.staff.id, author_name: authorName,
         body: "Marked completed.", is_action_request: false,
+      });
+    } else if (action === "hold") {
+      // Staff-only internal pause. NOT a status change - the client keeps seeing
+      // the ticket exactly as before (hold is invisible to them; the activity
+      // message is internal so it's stripped from the client view). No Slack/push.
+      if (ticket.status !== "in-progress") {
+        return res.status(409).json({ error: "ticket is not active" });
+      }
+      if (ticket.on_hold === true) return res.status(409).json({ error: "already on hold" });
+      patch.on_hold = true;
+      patch.messages = appendMessage(ticket.messages, {
+        author_type: "staff", author_id: ctx.staff.id, author_name: authorName,
+        body: `Put on hold by ${authorName}.`, is_action_request: false,
+        internal: true,
+      });
+    } else if (action === "resume") {
+      if (ticket.on_hold !== true) return res.status(409).json({ error: "not on hold" });
+      patch.on_hold = false;
+      patch.messages = appendMessage(ticket.messages, {
+        author_type: "staff", author_id: ctx.staff.id, author_name: authorName,
+        body: `Resumed by ${authorName}.`, is_action_request: false,
+        internal: true,
       });
     } else if (action === "cancel") {
       if (ticket.status !== "in-progress") {

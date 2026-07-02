@@ -330,23 +330,29 @@ export default function MarketingView({ tokens: tk, dark, me, session }) {
 
   const inProgress = tickets.filter(t => t.status === "in-progress");
   const isOverdue   = t => !!deadlineInfo(t._raw?.submitted_at, t.priority)?.overdue;
+  // "On hold" = staff-side pause (on_hold flag, invisible to the client). Held
+  // tickets live in their OWN tab and leave Active / Client Dependent / Overdue -
+  // a paused ticket shouldn't nag anyone until it's resumed.
+  const onHold      = inProgress.filter(t => t._raw?.on_hold);
+  const live        = inProgress.filter(t => !t._raw?.on_hold);
   // "Awaiting revision" = returned by marketing to the content team. It used to drop
   // the ticket out of every tab (invisible). Now it's a state we badge, not a place we
   // hide: the ticket stays in Active so overdue work can't fall through the cracks.
-  const awaitingRev = inProgress.filter(t => t._raw?.awaiting_revision);
-  const clientDep   = inProgress.filter(t => t.clientActionStatus === "requested");
+  const awaitingRev = live.filter(t => t._raw?.awaiting_revision);
+  const clientDep   = live.filter(t => t.clientActionStatus === "requested");
   // Active = in-progress and not waiting on the client (awaiting-revision now lives here).
-  const active      = inProgress.filter(t => t.clientActionStatus !== "requested");
+  const active      = live.filter(t => t.clientActionStatus !== "requested");
   const completed   = tickets.filter(t => t.status === "completed" || t.status === "cancelled");
   // Cross-cutting quick filters: every non-completed ticket that is overdue / in revision,
   // regardless of which tab it sits in — so "show me all overdue" is one click.
-  const overdueAll  = inProgress.filter(isOverdue);
+  const overdueAll  = live.filter(isOverdue);
 
   const tabRows =
     stateFilter === "overdue"            ? overdueAll
     : stateFilter === "awaiting-revision" ? awaitingRev
     : tab === "active"                    ? active
     : tab === "client-action"             ? clientDep
+    : tab === "on-hold"                   ? onHold
                                           : completed;
 
   // Apply toolbar filters: free-text search across academy + campaign,
@@ -411,6 +417,23 @@ export default function MarketingView({ tokens: tk, dark, me, session }) {
       showBanner("success", `Ticket for ${selected.academyName} marked completed.`);
     } catch (e) {
       showBanner("error", "Mark completed failed: " + e.message);
+    } finally {
+      setActionBusy(false);
+    }
+  };
+
+  // Staff-side pause. Toggles on_hold via the hold/resume actions - the ticket
+  // stays open in the drawer so the new state is visible; the client sees nothing.
+  const toggleHold = async () => {
+    if (!selected || actionBusy) return;
+    const holding = !selected._raw?.on_hold;
+    setActionBusy(true);
+    try {
+      const updated = await _patchTicket(selected.id, { action: holding ? "hold" : "resume" });
+      setTickets(prev => prev.map(t => t.id === selected.id ? updated : t));
+      showBanner("success", `Ticket for ${selected.academyName} ${holding ? "put on hold" : "resumed"}.`);
+    } catch (e) {
+      showBanner("error", (holding ? "Hold" : "Resume") + " failed: " + e.message);
     } finally {
       setActionBusy(false);
     }
@@ -596,6 +619,15 @@ export default function MarketingView({ tokens: tk, dark, me, session }) {
               >↩  Request Content Revision</button>
             )}
             <button
+              onClick={toggleHold}
+              disabled={actionBusy}
+              style={{
+                background: "transparent", border: "1px solid #8FA8C8", color: "#8FA8C8",
+                padding: "10px 20px", borderRadius: 8, cursor: "pointer",
+                fontFamily: "inherit", fontSize: 13, fontWeight: 600,
+              }}
+            >{selected._raw?.on_hold ? "▶  Resume" : "⏸  On Hold"}</button>
+            <button
               onClick={cancelTicket}
               disabled={actionBusy}
               style={{
@@ -704,6 +736,7 @@ export default function MarketingView({ tokens: tk, dark, me, session }) {
       <div style={{ display: "flex", gap: 4, borderBottom: `1px solid ${tk.border}`, marginBottom: 20, overflowX: "auto" }}>
         <Tab label={`Active (${active.length})`}                  active={tab === "active"}         onClick={() => setTab("active")}         tk={tk} />
         <Tab label={`Client Dependent (${clientDep.length})`}     active={tab === "client-action"} onClick={() => setTab("client-action")} tk={tk} red={clientDep.length > 0} />
+        <Tab label={`On Hold (${onHold.length})`}                 active={tab === "on-hold"}       onClick={() => setTab("on-hold")}       tk={tk} />
         <Tab label={`Completed (${completed.length})`}            active={tab === "completed"}     onClick={() => setTab("completed")}     tk={tk} />
       </div>
 
@@ -747,8 +780,9 @@ export default function MarketingView({ tokens: tk, dark, me, session }) {
         ) : rows.map(t => {
           const typeMeta = TYPE_META[t.type] || { icon: "•", label: "Request" };
           // Overdue (past the 3-day SLA) while still in progress → flag the whole
-          // row red so it stands out at the top of the soonest-due sort.
-          const dl = t.status === "in-progress" ? deadlineInfo(t._raw?.submitted_at, t.priority) : null;
+          // row red so it stands out at the top of the soonest-due sort. A held
+          // ticket is paused on purpose, so it never screams overdue.
+          const dl = (t.status === "in-progress" && !t._raw?.on_hold) ? deadlineInfo(t._raw?.submitted_at, t.priority) : null;
           const isOverdue = !!dl?.overdue;
           const redLine = tk.red || "#ED7969";
           const baseBg = isOverdue ? "rgba(237,121,105,0.08)" : "transparent";
@@ -899,6 +933,11 @@ function StatusPills({ t, tk, size = "small" }) {
   // badge (not a hidden bucket) so the ticket stays visible in Active.
   if (t.status === "in-progress" && t._raw?.awaiting_revision) {
     pills.push({ label: "Awaiting revision", color: tk.amber || "#E8A547" });
+  }
+
+  // On-hold signal — staff-side pause (invisible to the client).
+  if (t.status === "in-progress" && t._raw?.on_hold) {
+    pills.push({ label: "⏸ On hold", color: "#8FA8C8" });
   }
 
   return (
