@@ -36,7 +36,7 @@ import {
   doneTrialContactIdSetCached, peekDoneTrialIdSet, nurtureStage, toIso,
 } from "./agent/_stage.js";
 import { enrollContact, isAutomationLive, resolveContactInfo } from "./automations.js";
-import { moveStage, setStatus, findOpenOpp as findOpenOppStore } from "./agent/_store.js";
+import { moveStage, setStatus, findOpenOpp as findOpenOppStore, resolveStage } from "./agent/_store.js";
 import {
   DEFAULT_CLOSING_AUTOMATIONS, getClosingAutomations,
   automationsLive as closingAutomationsLive, nextDueStep as nextDueClosingStep,
@@ -199,8 +199,11 @@ async function draftForContact(token, locationId, clientId, contactId, cfg, opts
   // PROACTIVE post-trial opener: if the lead hasn't messaged since the trial, open
   // with a warm follow-up. No appointment window to gate on — the trial already
   // happened; the post-trial form is what moved them into this stage.
-  let seed = null;
-  if (!lastIsInbound) {
+  // Callers can hand in their own seed (the proactive follow-up loop does - its
+  // instruction carries the follow-up number + freshness rules). The default
+  // opener seed + its double-text guard only apply when none was provided.
+  let seed = opts.seed || null;
+  if (!seed && !lastIsInbound) {
     // A6: don't stack the closing opener on top of the coach's post-trial text. The
     // post-trial form can send the trainer's first message + the academy's sign-up
     // link itself (post_trial_reviews.signup_text_status = 'sent'). When it already
@@ -354,6 +357,67 @@ async function fireScriptedStep({ client, token, mode, autos, item, contactId })
   return "queued";
 }
 
+// ── Proactive follow-up loop (Zoran, 2026-07-02) ────────────────────────────
+// When the scripted sequence has nothing (more) due and a Done-Trial lead has
+// gone quiet, the agent writes the NEXT follow-up fresh - ONE at a time, each
+// re-reading the thread + the coach's post-trial notes (contact_memory). Every
+// follow-up is AI-written, so it ALWAYS queues in Hawkeye for a human ✓ (never
+// auto-sends). After FOLLOWUP_MAX follow-ups sit unanswered, the lead graduates
+// to the Nurture stage + the Lead Nurture automation (the long game) - the same
+// routing "Mark as lost" uses. A reply at any point resets the strike count
+// (strikes are counted from the lead's most recent known reply).
+const FOLLOWUP_GAP_DAYS = 2;  // days of silence after OUR last message before the next nudge
+const FOLLOWUP_MAX = 3;       // unanswered follow-ups before the move to Nurture
+
+async function maybeFollowUpOrNurture({ client, token, locationId, dts, cfg, item, contactId }) {
+  const clientId = client.id;
+  if (!item.last_at) return "no thread to follow up on";
+  const silenceDays = (Date.now() - new Date(item.last_at).getTime()) / 86400000;
+  if (silenceDays < FOLLOWUP_GAP_DAYS) return "waiting on the lead (follow-up gap not reached)";
+
+  let rows = [];
+  try {
+    rows = await sb(`agent_closing_replies?client_id=eq.${clientId}&ghl_contact_id=eq.${encodeURIComponent(contactId)}&select=id,kind,step_key,status,sent_at,created_at,last_lead_at&order=created_at.desc&limit=50`);
+  } catch (_) { rows = []; }
+  rows = Array.isArray(rows) ? rows : [];
+  if (rows.some(r => ["pending", "approved"].includes(r.status))) return "already has an active card";
+
+  // Strikes = follow-ups SENT since the lead's last known reply (rows stamp
+  // last_lead_at at draft time, so a reply in between restarts the count).
+  const lastInboundMs = rows.reduce((m, r) => Math.max(m, r.last_lead_at ? new Date(r.last_lead_at).getTime() : 0), 0);
+  const fuSent = rows.filter(r => (r.step_key || "").startsWith("followup_") && r.status === "sent"
+    && new Date(r.sent_at || r.created_at).getTime() > lastInboundMs);
+
+  if (fuSent.length >= FOLLOWUP_MAX) {
+    // Three strikes: hand them to the long game.
+    const oppRef = await findOpenOpp(clientId, token, locationId, contactId);
+    if (!oppRef) return `${FOLLOWUP_MAX} follow-ups unanswered but no open opportunity found`;
+    const stage = await resolveStage(sb, ghl, { clientId, token, locationId, role: "nurture" });
+    if (!stage) return `${FOLLOWUP_MAX} follow-ups unanswered but no Nurture stage resolved`;
+    await moveStage({ clientId, sb, ghl, token, oppRef, stage, role: "nurture", contactId });
+    try { await enrollContact({ clientId, automationKey: "nurture", contactId }); } catch (_) {}
+    return "nurtured";
+  }
+
+  const k = fuSent.length + 1;
+  const seed = `[No reply from the lead since our last message ~${Math.max(1, Math.floor(silenceDays))} day(s) ago. This is proactive follow-up #${k} of ${FOLLOWUP_MAX}. Re-read the conversation and the coach's post-trial notes in contact_memory, then write ONE short, warm, fresh nudge toward getting the athlete signed up - do NOT repeat or rephrase earlier messages.${k >= FOLLOWUP_MAX ? " This is the FINAL follow-up: a friendly, no-pressure close-out that leaves the door open." : ""}]`;
+  const d = await draftForContact(token, locationId, clientId, contactId, cfg, {
+    dts, conversationId: item.conversation_id, skipStageGuard: true, lastDirection: item.last_direction, seed,
+  });
+  if (d.skip) return d.skip;
+  if (d.error) return d.error;
+  if (!d.reply || !String(d.reply).trim()) return "agent returned an empty follow-up";
+  await sb(`agent_closing_replies`, { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify([{
+    client_id: clientId, ghl_contact_id: String(contactId), ghl_conversation_id: d.conversation_id || null,
+    contact_name: item.name || null, kind: "closing", step_key: `followup_${k}`,
+    draft_message: d.reply, reasoning: d.reasoning || `Proactive follow-up ${k} of ${FOLLOWUP_MAX}`,
+    confidence: d.confidence, trial_at: d.trial_at || null, last_message: d.last_message || null,
+    last_outbound: d.last_outbound || null, summary: d.summary || null, thread_tail: d.thread_tail || null,
+    reply_count: d.reply_count, status: "pending", created_by: "followup-loop",
+  }]) });
+  return "drafted";
+}
+
 // Find a contact's open opportunity (provider-aware). Returns an oppRef
 // { id?, ghlOpportunityId? } | null. On provider='portal' it reads the store (so
 // portal-native opps with no GHL id are found); on 'ghl' it searches GHL as before.
@@ -438,13 +502,24 @@ async function detectForClient(client) {
     // live + approved, the timed scripted touches OWN the proactive path (they replace
     // the AI opener). The instant the lead replies, the AI closing agent takes over.
     if (!reactive && scriptedLive) {
+      let r = null;
+      try { r = await fireScriptedStep({ client, token, mode, autos, item, contactId }); }
+      catch (e) { skipped++; reasons.push(`${item.name || contactId}: scripted - ${e.message}`); continue; }
+      if (r === "sent") { autoSent++; continue; }
+      if (r === "deferred") { deferred++; continue; }
+      if (r === "queued") { drafted++; continue; }
+      if (r !== "no scripted step due" && r !== "lead already in conversation") {
+        skipped++; reasons.push(`${item.name || contactId}: ${r}`); continue;
+      }
+      // Scripted has nothing (more) to send OR the AI already owns this thread and
+      // the lead went quiet - the proactive follow-up loop takes over: ONE fresh,
+      // Hawkeye-approved nudge at a time; after FOLLOWUP_MAX unanswered → Nurture.
       try {
-        const r = await fireScriptedStep({ client, token, mode, autos, item, contactId });
-        if (r === "sent") autoSent++;
-        else if (r === "deferred") deferred++;
-        else if (r === "queued") drafted++;
-        else { skipped++; reasons.push(`${item.name || contactId}: ${r}`); }
-      } catch (e) { skipped++; reasons.push(`${item.name || contactId}: scripted - ${e.message}`); }
+        const fu = await maybeFollowUpOrNurture({ client, token, locationId, dts, cfg, item, contactId });
+        if (fu === "drafted") drafted++;
+        else if (fu === "nurtured") { skipped++; reasons.push(`${item.name || contactId}: ${FOLLOWUP_MAX} follow-ups unanswered - moved to Nurture + enrolled`); }
+        else { skipped++; reasons.push(`${item.name || contactId}: ${fu}`); }
+      } catch (e) { skipped++; reasons.push(`${item.name || contactId}: follow-up - ${e.message}`); }
       continue;
     }
 
