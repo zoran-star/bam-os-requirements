@@ -531,7 +531,9 @@ async function detectForClient(client) {
     let d;
     try { d = await draftForContact(token, locationId, client.id, contactId, cfg, { sts, conversationId: item.conversation_id, skipStageGuard: true, lastDirection: item.last_direction }); }
     catch (e) { skipped++; reasons.push(`${item.name || contactId}: draft threw — ${e.message}`); continue; }
-    if (d.skip) { skipped++; reasons.push(`${item.name || contactId}: ${d.skip}`); continue; }
+    // d.error (e.g. "no conversation for contact" on a bare queue item) must skip
+    // like d.skip - otherwise a half-empty card row gets built from undefineds.
+    if (d.skip || d.error) { skipped++; reasons.push(`${item.name || contactId}: ${d.skip || d.error}`); continue; }
 
     const baseRow = {
       client_id: client.id, ghl_contact_id: String(contactId), ghl_conversation_id: d.conversation_id || null,

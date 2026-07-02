@@ -199,6 +199,17 @@ export async function computeConfirmQueue(token, locationId, ctx = {}) {
       last_at: toIso(c.lastMessageDate || c.dateUpdated),
     }))
     .sort((a, b) => new Date(b.last_at || 0) - new Date(a.last_at || 0));
+  // Stage contacts with NO conversation yet (booked a trial straight off the
+  // calendar; nobody has texted them) were previously INVISIBLE here - the
+  // queue was conversation-seeded, so they never got the scripted booking
+  // confirmation (or any touch at all). Append them as bare proactive items:
+  // the scripted step opens the thread, and the send itself creates the GHL
+  // conversation. They sit at the back so recently-active threads keep
+  // priority under the detector's per-run cap.
+  const _inQueue = new Set(queue.map(q => q.contact_id));
+  for (const id of ids) {
+    if (!_inQueue.has(id)) queue.push({ contact_id: id, conversation_id: null, name: null, last_message: "", last_direction: "", last_at: null });
+  }
   return { sts, queue, scheduledIds: ids };
 }
 
