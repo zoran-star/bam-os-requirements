@@ -44,9 +44,29 @@ shows `.ib-tab-short` 🤖-only to fit 4 across), search full-width @16px, actio
 on their own row (Hawkeye flex-prominent, New/Refresh icon-only). Verified via
 Playwright at 390px + 1100px; tour verifier still passes.
 
+## ⚠️ Which inbox GTA actually shows (learned the hard way)
+
+The first mobile pass styled `#view-inbox` (`.ib-toolbar`) — but **GTA renders
+`#view-v15inbox`** (the `_v15ibRenderAll()` inbox with Mass send + the pipeline
+dropdown; it's what V1.5 AND V2 academies see). Zoran's PWA screenshot proved
+it. The `#view-inbox` styling is live but dead code for GTA. Both views read the
+same `/api/ghl/inbox` list, so the classification/counts work feeds both.
+
+## V15 inbox follow-up (same day)
+
+`_v15ibRenderAll()` got a **segmented All / ★ Members / Leads filter row**
+(`.v15ib-cls-row`, state `_V15IB.fClass`, setter `_v15ibSetClass`, clause in
+`_v15ibFiltered`) driven by the conversation `classification` — hidden if the
+payload has no classified convos (stale cache). Mobile (`≤640px` media block):
+`.v15ib-bar` goes column-flex with `order` so FILTERS come first (segmented →
+channel chips → pipeline dropdown), ACTIONS (Hawkeye/Mass send, full-width
+44px) sit on their own row below, count last. Desktop keeps its original
+layout + gains the compact (max-width 420px) segmented row.
+
 ## Gotchas
 
-- The V1.5 inbox is a separate view (`#view-v15inbox`, `.v15ib-*`) — untouched.
+- The V1.5 inbox is a separate view (`#view-v15inbox`, `.v15ib-*`) — and it is
+  THE inbox GTA sees (see above).
 - `tagConfig` is returned but not consumed client-side (vestigial).
 - Store threads key on `ghl_contact_id`, which for portal-contacts academies is
   the minted portal uuid (see [[project_contacts_offghl]]) — the members-table

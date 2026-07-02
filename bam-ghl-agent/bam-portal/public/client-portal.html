@@ -7229,11 +7229,34 @@ Then the call to action."]</div>
       .v15ib-conv.unread .v15ib-prev { color:var(--text-sub); }
       .v15ib-chip { font-size:10px; color:var(--text-mute); background:var(--bg); border:1px solid var(--border); border-radius:999px; padding:2px 9px; display:inline-flex; align-items:center; gap:5px; max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
       .v15ib-chip::before { content:""; width:5px; height:5px; border-radius:50%; background:var(--gold); flex:0 0 auto; }
+      /* Member/Lead segmented filter (classification from the inbox API). */
+      .v15ib-cls-row {
+        display:flex; gap:2px; background:var(--surface); border:1px solid var(--border-med);
+        border-radius:12px; padding:4px; margin-bottom:10px; max-width:420px;
+      }
+      .v15ib-cls {
+        flex:1; border:none; background:transparent; border-radius:9px; padding:8px 4px;
+        font:inherit; font-size:13px; font-weight:600; color:var(--text-sub); cursor:pointer;
+        display:flex; align-items:center; justify-content:center; gap:5px; min-width:0; white-space:nowrap;
+      }
+      .v15ib-cls:hover { color:var(--text); }
+      .v15ib-cls.on { background:var(--gold); color:#0B0B0D; font-weight:800; }
+      .v15ib-cls-n { font-size:11px; opacity:0.75; font-weight:700; }
       @media (max-width:640px) {
         .v15ib-setup { display:none; }            /* Setup not needed on mobile */
         .v15ib-filters { flex-direction:column; align-items:stretch; }
         .v15ib-sel { width:100%; flex:none; }
         .v15ib-filters .v15ib-clear { width:100%; }
+        /* Phone: FILTERS first (segmented -> channels -> pipeline), ACTIONS on
+           their own row below, count last - so filters read as filters. */
+        .v15ib-bar { display:flex; flex-direction:column; }
+        .v15ib-cls-row { order:1; max-width:none; }
+        .v15ib-chans { order:2; }
+        .v15ib-filters { order:3; }
+        .v15ib-pills { order:4; margin-bottom:0; margin-top:2px; }
+        .v15ib-count { order:5; }
+        .v15ib-pills > span[style] { display:none; }   /* the desktop right-align spacer */
+        .v15ib-pills .v15ib-icon { flex:1; height:44px; }
       }
 
       /* Team-chat back button - mobile-only. On desktop the left nav handles
@@ -11059,7 +11082,7 @@ async function _v15calCreateBooking() {
 // Reuses /api/ghl/inbox (list + thread) + /api/ghl/send-message. (P2 adds
 // pipeline/stage + failed filters; P3 adds mass send.)
 // ══════════════════════════════════════════════════════════════
-let _V15IB = { convos: [], pipelines: [], contactPipe: {}, pipeOppCount: 0, ghlLoc: '', unreadOnly: false, failedOnly: false, fPipeline: '', fStage: '', fChannels: [], active: null, messages: [], type: 'SMS', pending: [], readAt: {} };
+let _V15IB = { convos: [], pipelines: [], contactPipe: {}, pipeOppCount: 0, ghlLoc: '', unreadOnly: false, failedOnly: false, fClass: '', fPipeline: '', fStage: '', fChannels: [], active: null, messages: [], type: 'SMS', pending: [], readAt: {} };
 // readAt: convId → the lastMessageDate at the moment you OPENED it. A conversation
 // is "read" (no dot) once opened, and re-flags as unread only if a NEWER message
 // arrives after that. GHL has no public mark-read API, so we track it per session.
@@ -11152,6 +11175,7 @@ async function openV15Inbox() {
 function _v15ibPill(on) {
   return `padding:7px 16px;border-radius:999px;font:inherit;font-size:12.5px;font-weight:600;cursor:pointer;border:1px solid ${on ? 'var(--gold)' : 'var(--border-med)'};background:${on ? 'var(--gold)' : 'transparent'};color:${on ? '#0B0B0D' : 'var(--text-sub)'}`;
 }
+function _v15ibSetClass(v) { _V15IB.fClass = v; _v15ibRenderAll(); }
 function _v15ibSetUnread(v) { _V15IB.unreadOnly = v; if (v) _V15IB.failedOnly = false; _v15ibRenderAll(); }
 function _v15ibSetFailed(v) { _V15IB.failedOnly = v; if (v) _V15IB.unreadOnly = false; _v15ibRenderAll(); }
 function _v15ibSetPipeline(v) { _V15IB.fPipeline = v; _V15IB.fStage = ''; _v15ibRenderAll(); }
@@ -11193,6 +11217,7 @@ function _v15ibPipeOf(c) {
 }
 function _v15ibFiltered() {
   return _V15IB.convos.filter(c => {
+    if (_V15IB.fClass && c.classification !== _V15IB.fClass) return false;
     if (_V15IB.unreadOnly && !_v15ibIsUnread(c)) return false;
     if (_V15IB.failedOnly && !_V15IB_FAILED.includes(c.lastMessageStatus || '')) return false;
     if (_V15IB.fChannels.length && !_V15IB.fChannels.includes(_ibChannelBucket(c))) return false;
@@ -11217,7 +11242,15 @@ function _v15ibRenderAll() {
   const n = _v15ibFiltered().length;
   const filterActive = _V15IB.fPipeline || _V15IB.fStage;
   const channelActive = _V15IB.fChannels.length > 0;
-  const countLabel = `${n} conversation${n === 1 ? '' : 's'}${(filterActive || channelActive || _V15IB.unreadOnly) ? ' in filter' : ''}`;
+  const countLabel = `${n} conversation${n === 1 ? '' : 's'}${(filterActive || channelActive || _V15IB.unreadOnly || _V15IB.fClass) ? ' in filter' : ''}`;
+  // Member/Lead segmented filter - classification comes from the inbox API
+  // (portal members-table match, off-GHL). Hidden if the payload predates it.
+  const clsCounts = { member: 0, lead: 0 };
+  for (const c of _V15IB.convos) { if (c.classification === 'member') clsCounts.member++; else if (c.classification === 'lead') clsCounts.lead++; }
+  const clsBtn = (val, label, cnt) => `<button onclick="_v15ibSetClass('${val}')" aria-pressed="${_V15IB.fClass === val}" class="v15ib-cls${_V15IB.fClass === val ? ' on' : ''}">${label} <span class="v15ib-cls-n">${cnt}</span></button>`;
+  const clsRow = (clsCounts.member + clsCounts.lead) > 0
+    ? `<div class="v15ib-cls-row">${clsBtn('', 'All', _V15IB.convos.length)}${clsBtn('member', '★ Members', clsCounts.member)}${clsBtn('lead', 'Leads', clsCounts.lead)}</div>`
+    : '';
   // Channel toggle buttons - press to show only that channel (multi-select).
   // A pressed button is "down + activated"; none pressed = all channels.
   const chanBtns = _v15ibVisibleChannels().map(ch => {
@@ -11236,6 +11269,7 @@ function _v15ibRenderAll() {
         <button id="v15ib-vmx-btn" onclick="_vmxOpen()" title="Voicemails - listen and read transcripts here" aria-label="Voicemail inbox" class="v15ib-icon" style="display:none;width:auto;padding:0 12px;gap:6px;font-weight:700">📼 Voicemail <span id="v15-vmx-count" style="font-weight:800"></span></button>
         <button onclick="_v15ibMassSend()" class="v15ib-icon v15ib-send" title="Mass send" aria-label="Mass send" style="width:auto;padding:0 12px;gap:6px">✉ Mass send</button>
       </div>
+      ${clsRow}
       <div class="v15ib-chans">${unreadBtn}${chanBtns}</div>
       <div class="v15ib-filters">
         <select onchange="_v15ibSetPipeline(this.value)" class="v15ib-sel">${pipeOpts}</select>
