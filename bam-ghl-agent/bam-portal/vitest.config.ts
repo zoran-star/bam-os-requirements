@@ -3,7 +3,7 @@ import { defineConfig } from "vitest/config";
 export default defineConfig({
   test: {
     environment: "node",
-    include: ["api/_runtime/**/*.test.ts", "api/runtime/**/*.test.ts"],
+    include: ["api/_runtime/**/*.test.ts", "api/runtime/**/*.test.ts", "api/parent/**/*.test.ts"],
     pool: "forks",
     fileParallelism: false,
   },
