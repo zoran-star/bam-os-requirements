@@ -125,3 +125,29 @@ The CLOSING agent (Done-Trial stage) now has its own scripted post-trial sequenc
 
 Spec mirrors: `sales-conversation-agents/conversation-ai-confirm-agent{,-bam-gta}.txt`
 (generated from the brain). See `[[project_client_agent_training]]` + `[[project_automation_agent_roadmap]]`.
+
+## Gotchas found in the 2026-07-01 live audit (all fixed)
+- **Conversation-seeded queue blind spot (FIXED #1017):** `computeConfirmQueue` only
+  queued Scheduled-Trial contacts that had a GHL conversation - a lead who booked
+  straight off the calendar (never texted) was INVISIBLE and got zero touches.
+  Now bare no-conversation contacts are appended to the queue; the scripted send
+  opens the thread. `computeClosingQueue` still has the old pattern (follow-up).
+- **Stuck pending cards block re-fire:** any pending/approved card makes
+  `fireScriptedStep` return "already has an active card". Pre-Jun-30 (pre-autosend)
+  confirm_auto cards sat pending forever AND blocked the new auto-send. Cure: cancel
+  the stale card; the next 30-min scan re-drafts + auto-sends.
+- **No-phone contacts loop silently:** the quiet-hours flusher swallows send errors
+  (`catch (_)`) without writing send_error or changing status - a held card for a
+  phone-less contact retries forever. Also: the scripted "Your free trial is
+  booked!" can fire for leads who never actually booked (no appointment = tokens
+  render empty). Detect: `opportunities.contact_phone IS NULL` + no trial date on card.
+- **Policy (Zoran, 2026-07-01): scripted/templated automations are NEVER Hawkeye-gated**
+  - they auto-send whenever the agent is on (shouldAutoSendScripted). Only AI-written
+  drafts queue for approval. AI drafts CAN still rot in the queue (2 trials were burned
+  by unapproved confirm drafts) - no alerting exists yet.
+- **Suspected calendar bug:** multiple leads (Tunde, Monica, Yvette) completed the
+  trial form but never got past the calendar's "Confirm your Spot" step - they land in
+  Scheduled Trial with no appointment, no phone-based follow-up possible. Untested.
+- Post-trial good-fit submit fires the closing `post_trial` scripted step IMMEDIATELY -
+  if the form is filled courtside mid-trial, the parent gets "hope you had a great
+  time" while the athlete is still playing. No delay option yet.
