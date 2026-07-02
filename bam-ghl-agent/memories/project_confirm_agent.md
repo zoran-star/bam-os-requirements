@@ -167,3 +167,16 @@ line fallback was also blank. Fixes (PR same day):
   a missing value never ships as a bare label again.
 ⬜ Nice-to-have: set `location_label` when generating GTA slots (Luka's spine,
 RPC-only rule applies).
+
+## Closing follow-up loop (2026-07-02, Zoran's design)
+- After the scripted closing sequence has nothing due (or the AI already owns the
+  thread) and a Done-Trial lead is quiet 2+ days, `maybeFollowUpOrNurture` in
+  `api/agent-closing.js` drafts ONE fresh follow-up at a time (re-reads thread +
+  coach's post-trial notes via contact_memory). Rows: kind `closing`, step_key
+  `followup_1..3`, always status `pending` (AI-written → Hawkeye, never auto).
+- After 3 follow-ups sit unanswered (strikes count from the lead's last known
+  reply via rows' last_lead_at), the lead auto-moves to the NURTURE stage +
+  enrolls in the Lead Nurture automation (same routing as Mark-as-lost).
+- BAM GTA's scripted nudge/closeout steps are DISABLED via
+  clients.ghl_kpi_config.closing_initial_automations.steps so the AI loop owns
+  everything after the immediate post_trial text.
