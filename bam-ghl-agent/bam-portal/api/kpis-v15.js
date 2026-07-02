@@ -248,6 +248,26 @@ async function handler(req, res) {
     const exRows = await sb(`kpi_exclusions?client_id=eq.${encodeURIComponent(clientId)}&month=in.(${monthInList})&select=metric,offer_id,ref_id`) || [];
     const excl = new Set(exRows.map(r => `${r.metric}|${r.offer_id || ZERO_UUID}|${r.ref_id}`));
 
+    // ─────────── MARKETING ───────────
+    // Funnel counts for the range from the kpi_events log (Track A). The UI
+    // pairs these with Meta ad spend (meta-report) to compute cost per lead /
+    // trial / member (true CAC = spend ÷ new members, not Meta's self-reported
+    // "results"). History fills in via the KPI sandbox import.
+    if (section === "marketing") {
+      const isoStart = new Date(start * 1000).toISOString();
+      const isoEnd = new Date(end * 1000).toISOString();
+      const countStep = async (step) => {
+        try {
+          const rows = await sb(`kpi_events?client_id=eq.${encodeURIComponent(clientId)}&step=eq.${step}&occurred_at=gte.${encodeURIComponent(isoStart)}&occurred_at=lt.${encodeURIComponent(isoEnd)}&select=id&limit=5000`);
+          return Array.isArray(rows) ? rows.length : 0;
+        } catch (_) { return null; }
+      };
+      const [leads, trialsBooked, joined, cancelled] = await Promise.all([
+        countStep("lead"), countStep("trial_booked"), countStep("joined"), countStep("cancelled"),
+      ]);
+      return res.status(200).json({ ok: true, leads, trials_booked: trialsBooked, joined, cancelled });
+    }
+
     // ─────────── SALES ───────────
     if (section === "sales") {
       const offers = await loadLinks(clientId);
