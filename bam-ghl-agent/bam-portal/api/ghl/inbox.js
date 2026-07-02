@@ -224,6 +224,43 @@ async function pickGhlToken(client) {
   return token ? { token, locationId: client.ghl_location_id } : null;
 }
 
+// Off-GHL classifier for the own-store inbox (twilio/resend academies).
+// A conversation is a MEMBER if its contact matches a row in the portal
+// `members` table (by portal contact id, phone, or email); everyone else who
+// reaches out — funnel leads AND random inbound — is a LEAD, so nothing hides
+// in "All" only. Uses portal data exclusively; makes zero GHL calls.
+async function classifyStoreConversations(clientId, conversations) {
+  const rows = await sb(
+    `members?client_id=eq.${clientId}` +
+    `&select=id,athlete_name,parent_email,parent_phone,ghl_contact_id,status`
+  ).catch(() => []);
+  const members = Array.isArray(rows) ? rows : [];
+  const normPhone = (p) => (p ? String(p).replace(/\D+/g, "") : "");
+
+  const byContactId = new Map();
+  const byPhone     = new Map();
+  const byEmail     = new Map();
+  for (const m of members) {
+    if (m.ghl_contact_id) byContactId.set(m.ghl_contact_id, m);
+    const p = normPhone(m.parent_phone);
+    if (p) byPhone.set(p, m);
+    if (m.parent_email) byEmail.set(m.parent_email.toLowerCase(), m);
+  }
+
+  return conversations.map((c) => {
+    const m =
+      (c.contactId && byContactId.get(c.contactId)) ||
+      (c.phone     && byPhone.get(normPhone(c.phone))) ||
+      (c.email     && byEmail.get(String(c.email).toLowerCase())) ||
+      null;
+    return {
+      ...c,
+      classification: m ? "member" : "lead",
+      member: m ? { id: m.id, athlete_name: m.athlete_name, status: m.status } : null,
+    };
+  });
+}
+
 // ─────────────────────────────────────────────────────────
 // Handler
 // ─────────────────────────────────────────────────────────
@@ -330,13 +367,20 @@ async function handler(req, res) {
         if (emailOn) { const t = await readEmailStoreThreadById(conversationId).catch(() => null); if (t) return res.status(200).json(t); }
         return res.status(200).json({ conversation_id: conversationId, messages: [] });
       }
-      // List: merge both stores' conversations, newest activity first.
+      // List: merge both stores' conversations, newest activity first, then
+      // classify member/lead off-GHL so the Members/Leads filters + counts work.
       const lists = await Promise.all([
         smsOn ? listStoreThreads(clientId).catch(() => []) : [],
         emailOn ? listEmailStoreThreads(clientId).catch(() => []) : [],
       ]);
-      const conversations = [...lists[0], ...lists[1]].sort((a, b) => new Date(b.lastMessageDate || 0) - new Date(a.lastMessageDate || 0));
-      const counts = { unread: conversations.reduce((s, c) => s + (c.unreadCount || 0), 0) };
+      const merged = [...lists[0], ...lists[1]].sort((a, b) => new Date(b.lastMessageDate || 0) - new Date(a.lastMessageDate || 0));
+      const conversations = await classifyStoreConversations(clientId, merged);
+      const counts = {
+        all:     conversations.length,
+        members: conversations.filter((c) => c.classification === "member").length,
+        leads:   conversations.filter((c) => c.classification === "lead").length,
+        unread:  conversations.reduce((s, c) => s + (c.unreadCount || 0), 0),
+      };
       return res.status(200).json({ conversations, counts });
     }
   } catch (e) { console.error("inbox store-read:", e.message); /* fall through to GHL */ }
@@ -446,10 +490,10 @@ async function handler(req, res) {
     for (const r of (Array.isArray(ct) ? ct : [])) if (r.ghl_contact_id && r.trainer) trainerByContact.set(r.ghl_contact_id, r.trainer);
   } catch (_) {}
 
-  // Lead/Client tag config from the training offer.
-  //   client_tag (default "liveclient") → member.  lead_tags[] → lead.
-  //   A member ALWAYS wins over lead tags (someone tagged liveclient is a
-  //   member even if they still carry an old lead tag).
+  // Client (member) tag config from the training offer.
+  //   client_tag (default "liveclient") → member. Everyone who isn't a member
+  //   is a lead, so lead_tags[] no longer drives classification — it's kept in
+  //   tagConfig for reference only.
   let leadTags = [];
   let clientTag = "liveclient";
   try {
@@ -482,14 +526,9 @@ async function handler(req, res) {
     } catch (_) { /* search unsupported / failed — fall back to convo tags + members table */ }
     return ids;
   }
-  // Run searches sequentially (not Promise.all) so we never burst GHL's
-  // per-window rate limit — one member-tag search + one per lead tag.
+  // Only the member tag needs a GHL search — everyone who isn't a member is a
+  // lead (see classification below), so the old per-lead-tag searches are gone.
   const memberTagSet = await contactIdsWithTag(clientTag);
-  const leadTagSet = new Set();
-  for (const t of leadTags) {
-    const s = await contactIdsWithTag(t);
-    for (const id of s) leadTagSet.add(id);
-  }
 
   const annotated = convos.map(c => {
     const m =
@@ -503,13 +542,11 @@ async function handler(req, res) {
       : [];
     const cid = c.contactId;
     // Member wins: members-table match OR the member tag (set or inline).
+    // Everyone else who reaches out is a lead (funnel leads AND random inbound)
+    // so nothing ever hides in "All" only.
     const isMember = !!m
       || (cid && memberTagSet.has(cid))
       || convoTags.includes(lc(clientTag));
-    const isLead = !isMember && (
-      (cid && leadTagSet.has(cid))
-      || leadTags.some(t => convoTags.includes(lc(t)))
-    );
     return {
       id:                c.id,
       contactId:         c.contactId,
@@ -522,7 +559,7 @@ async function handler(req, res) {
       lastMessageDirection: c.lastMessageDirection || "",
       lastMessageStatus: String(c.lastMessageStatus || c.status || "").toLowerCase(),
       unreadCount:       c.unreadCount || 0,
-      classification:    isMember ? "member" : (isLead ? "lead" : "other"),
+      classification:    isMember ? "member" : "lead",
       member: m ? { id: m.id, athlete_name: m.athlete_name, status: m.status } : null,
       trainer: (c.contactId && trainerByContact.get(c.contactId)) || null,
       channel: String(c.lastMessageType || c.type || "").replace(/^TYPE_/, "").toLowerCase() || null,
