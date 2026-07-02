@@ -174,9 +174,24 @@ RPC-only rule applies).
   `api/agent-closing.js` drafts ONE fresh follow-up at a time (re-reads thread +
   coach's post-trial notes via contact_memory). Rows: kind `closing`, step_key
   `followup_1..3`, always status `pending` (AI-written → Hawkeye, never auto).
-- After 3 follow-ups sit unanswered (strikes count from the lead's last known
   reply via rows' last_lead_at), the lead auto-moves to the NURTURE stage +
   enrolls in the Lead Nurture automation (same routing as Mark-as-lost).
 - BAM GTA's scripted nudge/closeout steps are DISABLED via
   clients.ghl_kpi_config.closing_initial_automations.steps so the AI loop owns
   everything after the immediate post_trial text.
+
+## Follow-up loop v2 (2026-07-02 evening, Zoran's refinements)
+- Cadence: NEXT DAY (FOLLOWUP_GAP_DAYS=1), EXCEPT when the lead names a decision
+  date - the agent extracts it (REPLY_TOOL followup_on, YYYY-MM-DD) and every row
+  stamps agent_closing_replies.followup_not_before; the loop holds until then.
+- 3 strikes now RECOMMENDS instead of silently moving: a closing_lost card
+  (created_by 'followup-loop', reason 'Not locked in') queues in Hawkeye; the
+  human's ✓ marks Lost + auto-routes to Nurture stage + Lead Nurture automation.
+  One human SKIP of that card = permanent snooze for the lead.
+- Lost is still a thing post-GHL: portal-native (opportunities.status +
+  pipeline_outcomes), and Lost auto-routes to Nurture when the automation is live.
+- Hawkeye closing cards (client-portal.html _aclx*) now show team notes + an
+  'Add note' input per card -> /api/agent-contact-notes -> feeds contact_memory,
+  so notes shape the agent's NEXT drafts. Follow-up cards badge 'follow-up N of 3'.
+- Staff edits to a draft need no special handling: each next follow-up is drafted
+  fresh from the REAL thread, so the edited text is what the agent re-reads.
