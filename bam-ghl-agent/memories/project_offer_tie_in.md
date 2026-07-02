@@ -1,6 +1,6 @@
 # Offer tie-in (BAM GTA v2) - offer_id spine + money->access roadmap
 
-**Status 2026-07-02: Wave 1 SHIPPED (schema + stamping). Parts B-G not started.**
+**Status 2026-07-02: Wave 1 SHIPPED + B (offers sync) LIVE IN PROD. Next: C (webhook access sync).**
 Full plan: [`docs/offer-tie-in-plan.md`](../docs/offer-tie-in-plan.md). Approved by Zoran + Luka.
 
 ## The model
@@ -64,7 +64,17 @@ mode: preview|apply, bookable_program_id, entitlement_rules: {<planKey>:
 - GTA rules (confirmed, handoff doc): Steady 1/wk, Accelerate 2/wk, Elevate
   3/wk, Dominate unlimited, Summer Unlimited unlimited. GTA program id
   `80000000-0000-4000-8000-000000000001`.
-- ⬜ APPLY not yet run against prod (preview first, then apply).
+- ✅ APPLIED TO PROD 2026-07-02 via `scripts/offers-sync-run.mjs` (service role,
+  Vercel env): created 3 options + 25 prices + 25 templates. Prod now: 5
+  options, 31 prices (all 31 confirmed catalog rows typed, 0 missing lineage),
+  31 ACTIVE templates, routable set unchanged (5). Idempotency verified: rerun
+  preview = 31/31 unchanged.
+- ⚠️ Gotcha: Vercel prod env values (VITE_SUPABASE_URL etc) contain a literal
+  trailing "\n" two-char sequence; `requireEnv` does not trim. Strip when using
+  pulled env locally (`sed 's/\\n//g'`).
+- Endpoint refactor: handler = auth shell around exported `runOffersSync`
+  (PR #1055); operator script `scripts/offers-sync-run.mjs` (preview default,
+  `--apply` to write, GTA rules preset).
 
 ## Next (Part 2, money->access; order C->D->E->F->G)
 
