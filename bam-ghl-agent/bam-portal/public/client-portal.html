@@ -11462,7 +11462,7 @@ function _v15ibRenderThread() {
         ${mem ? _ibMemberPill(false) : ''}
         <span style="flex:none;font-size:13px;color:var(--text-mute)">›</span>
       </div>
-      ${ghlUrl ? `<a href="${escapeHTML(ghlUrl)}" target="_blank" rel="noopener" title="Open this contact in GHL to call" style="flex:none;display:inline-flex;align-items:center;gap:6px;background:rgba(232,197,71,0.12);border:1px solid var(--gold);border-radius:8px;color:var(--gold);padding:6px 10px;font:inherit;font-size:12px;font-weight:700;text-decoration:none">📞 Call in GHL</a>` : ''}
+      <span id="ib-call-slot" style="flex:none">${ghlUrl ? `<a href="${escapeHTML(ghlUrl)}" target="_blank" rel="noopener" title="Open this contact in GHL to call" style="display:inline-flex;align-items:center;gap:6px;background:rgba(232,197,71,0.12);border:1px solid var(--gold);border-radius:8px;color:var(--gold);padding:6px 10px;font:inherit;font-size:12px;font-weight:700;text-decoration:none">📞 Call in GHL</a>` : ''}</span>
     </div>
     <div id="ib-tags" style="margin-bottom:10px"></div>
     <div id="v15ib-thread-scroll" style="display:flex;flex-direction:column;gap:8px;max-height:min(62vh,560px);overflow-y:auto;-webkit-overflow-scrolling:touch;padding:8px;border:1px solid var(--border);border-radius:10px;background:var(--bg)">${bubbles}</div>
@@ -11479,6 +11479,7 @@ function _v15ibRenderThread() {
       </div>
     </div>`;
   _scrollToBottom(document.getElementById('v15ib-thread-scroll'));
+  _callSlotUpgrade('ib-call-slot', 'pill', a.phone, a.name || '', a.contactId || '');
   if (a.contactId) {
     const st = _TAGW['ib-tags'];
     // Reuse cached tags across thread re-renders (type toggle, file ops, send);
@@ -25045,7 +25046,7 @@ function _plOpenCard(oppId) {
         <div class="pl-d-sub">${escapeHTML(p.name)} · ${escapeHTML(s?.name || '-')} · ${memberBadge}</div>
       </div>
       <div style="display:flex;align-items:center;gap:4px">
-        ${_ghlContactUrl ? `<a href="${_ghlContactUrl}" target="_blank" rel="noopener noreferrer" title="Call in GHL" aria-label="Call in GHL" style="text-decoration:none;display:inline-flex;align-items:center;justify-content:center;width:36px;height:36px;border:1px solid var(--green,#4CC76A);border-radius:8px;color:var(--green,#4CC76A);font-size:17px">📞</a>` : ''}
+        <span id="pl-call-slot">${_ghlContactUrl ? `<a href="${_ghlContactUrl}" target="_blank" rel="noopener noreferrer" title="Call in GHL" aria-label="Call in GHL" style="text-decoration:none;display:inline-flex;align-items:center;justify-content:center;width:36px;height:36px;border:1px solid var(--green,#4CC76A);border-radius:8px;color:var(--green,#4CC76A);font-size:17px">📞</a>` : ''}</span>
         <button class="pc-d-close" onclick="closePipelineDrawer()" aria-label="Close" style="background:none;border:none;color:var(--text-mute);cursor:pointer;font-size:22px;padding:4px 10px">×</button>
       </div>
     </div>
@@ -25110,6 +25111,7 @@ function _plOpenCard(oppId) {
         : ''}
     </div>`;
   _plLoadLeadDetail(o);
+  _callSlotUpgrade('pl-call-slot', 'icon', o.contact.phone || '', o.contact.name || o.name || '', o.contactId || '');
   _PL_MSG = o.contactId ? { contactId: o.contactId, name: o.contact.name || o.name || '', phone: o.contact.phone || null, email: o.contact.email || null, conversationId: null } : null;
   _IB_PENDING_FILES = [];
   if (o.contactId) _plLoadMessages();
@@ -25974,6 +25976,7 @@ async function _vmxRefreshCount() {
   if (!btn || typeof CLIENT_ID === 'undefined') return;
   try {
     const j = await _vmxFetch();
+    _VOICE_ON = !!j.enabled;
     if (!j.enabled) { btn.style.display = 'none'; return; }
     _VMX.rows = j.voicemails || [];
     btn.style.display = '';
@@ -26131,6 +26134,53 @@ async function _vmxMarkAll() {
   fresh.forEach(v => { v.heard_at = now; });
   _vmxRender();
   _vmxBadge();
+}
+
+// ── Portal click-to-call from any contact surface (Inbox thread, Pipeline) ──
+// Rings the staff cell, then bridges to the contact - same spine as the member
+// drawer's Call button, but keyed on a raw phone (member or not). Backend:
+// /api/twilio/call. Voice availability is checked once per session; surfaces
+// render their "Call in GHL" fallback synchronously, then _callSlotUpgrade
+// swaps in the portal 📞 button once the check says voice is on.
+let _VOICE_ON = null;            // null = not checked yet
+let _VOICE_ON_PROMISE = null;
+function _voicePrime() {
+  if (_VOICE_ON !== null) return Promise.resolve(_VOICE_ON);
+  if (!_VOICE_ON_PROMISE) {
+    _VOICE_ON_PROMISE = _vmxFetch()
+      .then(j => { _VOICE_ON = !!j.enabled; return _VOICE_ON; })
+      .catch(() => { _VOICE_ON_PROMISE = null; return false; }); // retry next surface
+  }
+  return _VOICE_ON_PROMISE;
+}
+
+async function _callSlotUpgrade(slotId, variant, phone, name, ghlContactId) {
+  if (!phone) return;
+  const on = await _voicePrime();
+  if (!on) return;
+  const slot = document.getElementById(slotId);
+  if (!slot) return; // the view moved on while we checked
+  const args = `'${escapeHTML(phone)}','${escapeHTML((name || '').replace(/'/g, ''))}','${escapeHTML(ghlContactId || '')}'`;
+  const title = `Rings your phone first, then connects you to ${escapeHTML(name || 'this contact')}`;
+  slot.innerHTML = variant === 'icon'
+    ? `<button onclick="_ctcCall(${args})" title="${title}" aria-label="Call" style="background:none;display:inline-flex;align-items:center;justify-content:center;width:36px;height:36px;border:1px solid var(--green,#4CC76A);border-radius:8px;color:var(--green,#4CC76A);font-size:17px;cursor:pointer">📞</button>`
+    : `<button onclick="_ctcCall(${args})" title="${title}" style="display:inline-flex;align-items:center;gap:6px;background:rgba(232,197,71,0.12);border:1px solid var(--gold);border-radius:8px;color:var(--gold);padding:6px 10px;font:inherit;font-size:12px;font-weight:700;cursor:pointer">📞 Call</button>`;
+}
+
+async function _ctcCall(phone, name, ghlContactId) {
+  if (!_sendGuard('ctcCall')) return;
+  try {
+    const token = await _mreqAuthToken();
+    const r = await fetch('/api/twilio/call', {
+      method: 'POST',
+      headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ client_id: CLIENT_ID, phone, contact_name: name || undefined, ghl_contact_id: ghlContactId || undefined }),
+    });
+    if (!r.ok) { const j = await _safeJson(r); throw new Error(j.error || ('HTTP ' + r.status)); }
+    _plToast('📞 Calling - your phone will ring first, then it connects.');
+  } catch (e) {
+    _plToast('Call failed: ' + (e && e.message ? e.message : 'try again'));
+  }
 }
 
 // Split the two API payloads into the three drawer sections. OVERDUE follow-ups
