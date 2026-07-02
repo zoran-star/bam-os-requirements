@@ -1,9 +1,9 @@
 # Creative Refresh Calendar (campaign asset update windows)
 
-**Status: PHASE 1 BUILT 2026-07-02 (branch session/refresh-calendar). ⚠️ Migration `20260702180000_creative_refresh_windows.sql` NOT applied to prod yet - Zoran must apply it (Cam's Supabase MCP has no access to jnojmfmpnsfmtqmwhopz). Until applied, the new section shows a soft error banner; nothing else is affected.** Origin: BAM Digital Marketing call Jul 01 (Ximena: clients must keep updating ad creatives; Cam: calendar view, color-coded, staggered across weeks, click-to-nudge).
+**Status: PHASE 1 BUILT 2026-07-02 (PR #1039). Migration APPLIED to prod same day via Supabase MCP as version `20260702181432` (local file renamed to match, so `migration list --linked` stays in sync). Table + refresh_week + both RLS policies verified live.** Origin: BAM Digital Marketing call Jul 01 (Ximena: clients must keep updating ad creatives; Cam: calendar view, color-coded, staggered across weeks, click-to-nudge).
 
 ## Phase 1 file map (built)
-- `bam-portal/supabase/migrations/20260702180000_creative_refresh_windows.sql` - `clients.refresh_week` + `creative_refresh_windows` table + RLS (read = is_staff() or my_client_ids(); writes = service-role API only)
+- `bam-portal/supabase/migrations/20260702181432_creative_refresh_windows.sql` - `clients.refresh_week` + `creative_refresh_windows` table + RLS (read = is_staff() or my_client_ids(); writes = service-role API only). Applied to prod 2026-07-02.
 - `bam-portal/api/marketing.js` → `handleRefreshWindows` (`?resource=refresh-windows`): GET materializes the month's rows on read for enrolled clients (idempotent via unique client_id+month), derives statuses (submitted/skipped sticky, rest pure date math), auto-detects submissions from marketing/content tickets landing inside the window (120-day lookback also powers last_submission). PATCH actions: set-week / move-week / nudge / mark-received / skip. View = CONTENT_ROLES, edit = CONTENT_MANAGER_ROLES.
 - `bam-portal/src/views/RefreshCalendarSection.jsx` - week-lane UI (chips, needs-attention filter, month nav, detail panel, unassigned-clients strip with enroll dropdown)
 - `bam-portal/src/views/MarketingView.jsx` - third section pill "Creative Refresh" (`?msec=refresh`)
