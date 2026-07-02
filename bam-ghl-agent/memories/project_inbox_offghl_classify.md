@@ -52,6 +52,30 @@ dropdown; it's what V1.5 AND V2 academies see). Zoran's PWA screenshot proved
 it. The `#view-inbox` styling is live but dead code for GTA. Both views read the
 same `/api/ghl/inbox` list, so the classification/counts work feeds both.
 
+## Read/unread sync (Zoran, same day) - the model
+
+Zoran reported read state not sticking. Root causes found by tracing the whole
+flow:
+
+1. **Store list ignored read receipts.** `mark-read` saves a per-user receipt
+   in `ghl_conversation_reads` (keyed by the store thread uuid), and the GHL
+   list path applies them via `applyReads` - but the store list branch returned
+   raw `sms_threads.unread`/`email_threads.unread`. Reads only "stuck" in the
+   session-local `_V15IB.readAt` map, so a reload/other device showed
+   everything unread again. FIX: store list now runs
+   `sortByUnreadThenDate(applyReads(classified, loadUserReads(...)))` - same as
+   the GHL path (also gives unread-first ordering).
+2. **Nothing ever cleared `unread` in the DB.** Inbound webhooks set
+   `unread:true`; no writer set it false, so once a thread got an inbound it
+   stayed flagged forever at the DB level. FIX: the outbound send touch in
+   `messaging/provider.js` (SMS) + `messaging/email-provider.js` (email) now
+   sets `unread:false` - a reply means handled.
+
+THE MODEL now: inbound → `unread=true` (global, per-thread) · open the thread →
+per-user receipt (read for YOU, teammates still see unread) · reply (human or
+approved agent send) → `unread=false` for everyone. Imports default to read
+(`unread` column default false). `_voice.js` only reads sms_threads.
+
 ## Names, not numbers (Zoran, same day)
 
 `sms_threads.contact_name` is often empty, so store threads showed bare phone

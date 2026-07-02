@@ -86,7 +86,9 @@ export async function maybeSendEmailViaResend(clientOrId, { toEmail, subject, ht
         }).catch(() => {});
         await sb(`email_threads?id=eq.${thread.id}`, {
           method: "PATCH", headers: { Prefer: "return=minimal" },
-          body: JSON.stringify({ last_message_at: occurred, last_preview: preview, last_subject: subject || null, last_direction: "outbound", updated_at: occurred }),
+          // unread:false - replying means the inbound was handled (nothing else
+          // ever clears the flag; per-user receipts cover read-without-reply).
+          body: JSON.stringify({ last_message_at: occurred, last_preview: preview, last_subject: subject || null, last_direction: "outbound", unread: false, updated_at: occurred }),
         }).catch(() => {});
       }
     } catch (_) { /* store best-effort */ }
