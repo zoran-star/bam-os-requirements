@@ -2,7 +2,8 @@
 
 Owner: Luka
 Audience: Zoran's agent and BAM Portal agents
-Last updated: 2026-06-29
+Last updated: 2026-07-02 (major status change: scheduling/trial/credit DB layer
+is live in production; API layer awaiting deploy - see "What Is Already Done")
 
 This doc is the BAM Portal-side handoff for the parent app, typed Offer runtime,
 checkout cutover, and future internal free-trial scheduling work. It exists here
@@ -84,32 +85,55 @@ The schema for the typed operational runtime exists in production:
   `entitlement_templates`, `customer_entitlements`, `slot_templates`, and
   `schedule_slots`.
 
-Read-only production checks on 2026-06-29 showed:
+2026-07-02 update - the production DB layer is now much further along.
+Applied to production (`20260702115744`-`20260702115748` plus earlier July
+backfill migrations):
 
-- `bookable_programs`: 1 row
-- `offer_options`: 0 rows
-- `offer_prices`: 0 rows
-- `entitlement_templates`: 0 rows
-- `customer_entitlements`: 0 rows
-- `credit_ledger`: 0 rows
-- `slot_templates` / `schedule_slots` / `reservations` / `waitlist_entries`: 0 rows
-- `offers`: 46 rows
-- `pricing_catalog`: 41 rows
+- Identity/runtime backfill is LIVE: 29 `customer_profiles`, 30 `students`,
+  30 `academy_memberships`, 30 `member_links`, 6 `offer_prices`,
+  6 `entitlement_templates`, 30 `customer_entitlements`, 9 `credit_ledger`
+  rows (checked 2026-07-02).
+- Booking writes: `parent_book_slot` / `parent_join_waitlist` /
+  `parent_cancel_reservation` / `parent_leave_waitlist` RPCs, all capacity
+  checks routed through `slot_spots_taken` - the single capacity source of
+  truth (counts CONFIRMED reservations + BOOKED trial bookings).
+- Trials: `trial_bookings` table (conversion lineage, double-submit guard,
+  deny-all RLS) + `book_trial_slot`, `cancel_trial_booking`,
+  `reschedule_trial_booking`, `set_trial_outcome` RPCs.
+- Staff ops: `staff_cancel_slot` RPC (cancels reservations, refunds credits,
+  clears waitlist, cancels trials; idempotent).
+- Credit engine RPCs exist but are DORMANT (no cron, webhook untouched);
+  do not call them outside the Phase 6 cutover.
+- Uniqueness guards (runtime + identity spine) are applied.
 
-For BAM GTA Training specifically:
+Built and verified locally, on branch `parent/refactor`, awaiting deploy to
+Vercel (35 vitest tests + iOS simulator E2E):
+
+- Staff scheduling APIs: template CRUD, idempotent `generate-slots`
+  (recurrence `WEEKLY:MO,...`, client time_zone aware), `calendar` read with
+  shared spots-left, slot-cancel endpoint.
+- Public trial APIs: `GET /api/website/trial-slots`,
+  `POST /api/website/trial-booking` (+ email-verified cancel/reschedule),
+  staff `trial-bookings` list/outcome endpoint.
+- Read-only runtime APIs: typed offers read + staff diagnostics.
+- Parent availability updated so the app counts trials in `booked_count`.
+
+Production scheduling DATA is still empty: 0 `slot_templates`,
+0 `schedule_slots`, 0 `reservations`, 0 `trial_bookings`. Creating the real
+BAM GTA schedule is the remaining gate before anything user-facing can book.
+Slot creation is a Luka-owned write path; the generation endpoint ships with
+the `parent/refactor` deploy.
+
+For BAM GTA Training specifically (2026-06-29 numbers, pre-backfill context):
 
 - `pricing_catalog` has 30 confirmed rows with both `offer_id` and
   `offer_price_key`.
 - Those 30 confirmed rows all point to the published Training offer
   `52a6285c-7832-44e1-b531-ab7ef9d8fc21`.
 - There are 14 distinct confirmed `offer_price_key` values.
-- `members` has 42 promoted rows.
-- 41 of 42 promoted members can be mapped through
-  `members.stripe_price_id -> pricing_catalog`.
-- 34 of 35 live members can be mapped that way.
-
-That means BAM GTA Training is close to a reviewed backfill, but production is
-not currently using the typed runtime tables yet.
+- `members` has 42 promoted rows; 41 map through
+  `members.stripe_price_id -> pricing_catalog`, 34 of 35 live members map
+  that way.
 
 ## What Still Uses Offer JSON Today
 
@@ -210,18 +234,19 @@ Recommended sequence:
 The parent-app backend/mobile work is separate from the portal checkout cutover,
 but it uses the same runtime tables.
 
-Still outstanding before production parent booking:
+Still outstanding before production parent booking (updated 2026-07-02):
 
 - registration endpoint and parent JWT canary
-- production identity/member linking
-- production schedule import or staff-published schedule rows
-- production entitlement/customer entitlement import
-- production credit opening balances where needed
-- review/push of booking-write RPC slice
-- mobile polish for leave-waitlist and no-credit booking states
-
-Local-only parent booking work exists, but do not apply or reshape it in
-production without Luka review.
+- ~~production identity/member linking~~ ✅ backfilled (30 member_links)
+- production schedule import or staff-published schedule rows ← the remaining
+  data gate (0 slots in prod)
+- ~~production entitlement import~~ ✅ backfilled (30 entitlements)
+- production credit opening balances where needed (credit engine RPCs exist,
+  dormant; real `invoice_grant_credits` values pend the Stripe interval check)
+- ~~review/push of booking-write RPC slice~~ ✅ applied to prod 2026-07-02
+- deploy of the `parent/refactor` API layer (Vercel)
+- mobile polish for leave-waitlist and no-credit booking states; All Classes
+  screen also lacks pull-to-refresh
 
 ## Free Trials After GHL
 
@@ -243,13 +268,14 @@ Free trials are not member reservations. A free-trial lead does not have an
 `academy_membership_id`, does not consume credits, and does not need an active
 entitlement. Therefore free trials should not be forced into `reservations`.
 
-Recommended additions:
+Recommended additions (status 2026-07-02):
 
-- Add `entry_points.bookable_program_id`.
-- Add a clear way to identify trial availability on slots. Prefer a new
-  `schedule_slots.booking_kind` / `slot_templates.booking_kind` value such as
-  `FREE_TRIAL`, or standardize an existing `slot_type` value if that is enough.
-- Add `trial_bookings`.
+- Add `entry_points.bookable_program_id`. ← still pending; `entry_points` is a
+  shared table, so this needs a Luka/Zoran sync. Until then the trial APIs
+  accept `client_id`/`bookable_program_id` directly.
+- `booking_kind` was REJECTED for shared sessions (see
+  `trial-calendars-confirmed-decisions.md`); trials book into normal slots.
+- `trial_bookings`: ✅ in production.
 
 Suggested `trial_bookings` shape:
 
@@ -306,38 +332,40 @@ Rule for Zoran's surfaces: read availability and call Luka-owned RPCs. Never
 If two code paths write occupancy independently, they overbook. One capacity gate,
 one owner.
 
-On Luka's plate first, before Zoran builds on top:
+Luka's prerequisite list - STATUS 2026-07-02, all five DONE:
 
-1. Slot generation RPC (`slot_templates` -> `schedule_slots`). The coach template UI
-   calls it; it does not insert slots.
-2. Shared capacity accounting in ONE place. The existing member booking RPC
-   (`0005`) counts only `reservations` today; its capacity check must also count
-   active `trial_bookings` once trials go live, or members will overbook past
-   trials.
-3. `trial_bookings` table + conversion lineage (`converted_member_id`,
-   `converted_membership_id`, `converted_at`). Not in prod yet. Luka defines the
-   slot-consuming shape; Zoran's sales columns (`website_lead_id`, `status`,
-   `source`, etc.) ride along.
-4. Transaction-safe trial booking RPC that locks the slot row, counts
-   `reservations` + `trial_bookings`, and inserts only if capacity remains. Zoran's
-   trial funnel calls it.
-5. Availability read endpoint returning `spots_left` computed from both tables, so
-   the parent app and Zoran's website/staff calendar report the same number.
+1. ✅ Slot generation (`slot_templates` -> `schedule_slots`): idempotent
+   `POST /api/runtime/schedule/generate-slots` (DB-guarded by a unique index;
+   never overwrites manual edits). On `parent/refactor`, awaiting deploy.
+2. ✅ Shared capacity accounting in ONE place: `slot_spots_taken()` in prod;
+   member booking RPCs and trial RPC both use it, so members cannot overbook
+   past trials or vice versa.
+3. ✅ `trial_bookings` + conversion lineage: in prod
+   (`20260702115748`).
+4. ✅ Transaction-safe trial booking RPC: `book_trial_slot` in prod (locks the
+   slot, counts both tables, inserts only if capacity remains; double-submit
+   returns the existing booking).
+5. ✅ Availability reads: staff calendar + public trial-slots + parent app all
+   compute spots-left from the same accounting (endpoints on `parent/refactor`).
 
-Zoran can build in parallel without waiting (does not touch slot capacity):
+Zoran can now build directly (still without touching slot capacity):
 
-- Trial lead funnel + website form, post-trial `SHOWED`/`NO_SHOW` status form,
-  reminders.
-- Coach template authoring UI (calls the generation RPC).
+- Trial lead funnel + website form -> call `book_trial_slot` (via
+  `POST /api/website/trial-booking` once deployed, or service-role RPC until
+  then). Post-trial `SHOWED`/`NO_SHOW` form -> `set_trial_outcome`. Reminders.
+- Coach template authoring UI -> template CRUD + generate-slots endpoints
+  (needs the `parent/refactor` deploy).
 - Trial-to-paid conversion orchestration: run checkout, create/find `members` +
   `academy_membership` + `customer_entitlement`, then set
   `trial_bookings.status = CONVERTED` and fill conversion lineage.
 
-Handoff point: hand Zoran the coach-write and trial-funnel work once (a) identity +
-entitlements are backfilled, (b) a real BAM GTA schedule is readable in
-`schedule_slots`, (c) member booking/waitlist/cancel RPCs are in prod and proven,
-and (d) the trial booking RPC + shared capacity accounting exist. Then his UIs plug
-into stable, capacity-safe RPCs instead of a moving target.
+Handoff point status: (a) identity + entitlements backfilled ✅, (b) real BAM
+GTA schedule readable in `schedule_slots` ❌ NOT YET - prod has 0 slots; this
+is the one remaining gate, (c) booking RPCs in prod ✅ (proven locally +
+simulator; not yet exercised by production traffic), (d) trial RPC + shared
+capacity ✅. Practical consequence: the first concrete step of any scheduling
+work shipped today is creating the real schedule through the Luka-owned
+generation path - not inserting slots directly.
 
 ## Why This Architecture Holds
 
@@ -377,6 +405,11 @@ from member/credit booking state.
 - Do not stuff free-trial leads into `reservations`.
 - Do not make free trials require `academy_memberships` or entitlements.
 - Do not add RLS policies to Luka-owned parent/runtime tables.
+- Do not `INSERT`/`UPDATE` `trial_bookings` or `schedule_slots` directly - go
+  through the RPCs/endpoints (see "What Zoran's surfaces may do" in
+  `parent-app-db-boundary.md`).
+- Do not call the dormant credit engine RPCs (`apply_stripe_credit_grant`,
+  `expire_lapsed_credit_entitlements`) before the Phase 6 cutover.
 - Do not modify shared tables (`offers`, `offer_teams`, `pricing_catalog`,
   `entry_points`, `members`) in a way that breaks the lineage described here
   without syncing with Luka.
