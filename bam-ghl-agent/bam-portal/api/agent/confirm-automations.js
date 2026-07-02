@@ -178,7 +178,11 @@ export function resolveApptTokens(template, ctx = {}) {
     "appointment.add_to_google_calendar": ctx.startMs ? buildGoogleCalUrl(cal) : "",
     "appointment.add_to_ical_outlook": ctx.startMs ? buildIcalUrl(cal) : "",
   };
-  return String(template || "").replace(/\{\{\s*(appointment\.\w+)\s*\}\}/g, (_, k) => (k in map ? map[k] : ""));
+  let out = String(template || "").replace(/\{\{\s*(appointment\.\w+)\s*\}\}/g, (_, k) => (k in map ? map[k] : ""));
+  // Never send a dangling label: if a token above resolved empty, its line is
+  // now just "Location:" (etc) - drop that whole line and collapse the gap.
+  out = out.replace(/^[ \t]*(?:Location|Date & Time|Date|Time|Apple|Google)[ \t]*:[ \t]*$\n?/gim, "");
+  return out.replace(/\n{3,}/g, "\n\n").trim();
 }
 
 // Best-effort academy address from the business_info FACT section ("Location:" line),

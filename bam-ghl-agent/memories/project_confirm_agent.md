@@ -151,3 +151,19 @@ Spec mirrors: `sales-conversation-agents/conversation-ai-confirm-agent{,-bam-gta
 - Post-trial good-fit submit fires the closing `post_trial` scripted step IMMEDIATELY -
   if the form is filled courtside mid-trial, the parent gets "hope you had a great
   time" while the athlete is still playing. No delay option yet.
+
+## Trial-confirmation "Location:" fix (2026-07-02)
+
+Zoran caught the booking-confirmation automation sending "Location:" with an
+empty value. Cause: GTA's calendar moved to the portal spine that day and
+`schedule_slots.location_label` is NOT set by the slot-creation flow, so
+`nextAppointment()` returns `address:null`; the Brain business_info "Location:"
+line fallback was also blank. Fixes (PR same day):
+- `agent-confirm.js` address chain is now slot `location_label` -> Brain
+  business_info "Location:" line -> **`clients.address`** (the required BB
+  General field, added to both client selects).
+- `resolveApptTokens` (confirm-automations.js) strips any dangling label line
+  (Location/Date & Time/Date/Time/Apple/Google) whose token resolved empty, so
+  a missing value never ships as a bare label again.
+⬜ Nice-to-have: set `location_label` when generating GTA slots (Luka's spine,
+RPC-only rule applies).
