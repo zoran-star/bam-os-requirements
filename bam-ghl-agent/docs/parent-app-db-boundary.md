@@ -12,7 +12,7 @@ semantics, this is the guardrail doc to read first.
 **For agents:** before making schema changes (new tables, columns, RLS, functions, drops/renames),
 diff your plan against the lists below. If anything overlaps → **stop and tell Zoran to message Luka.**
 
-Owner: Luka (fc-mobile parent app backend). Last updated: 2026-06-29.
+Owner: Luka (fc-mobile parent app backend). Last updated: 2026-07-02.
 Original planning context lives in `fc-mobile/docs/parent-app-architecture-plan.md`
 and `fc-mobile/docs/parent-app-decisions-log.md`, which may not be available to
 all BAM Portal agents.
@@ -29,7 +29,12 @@ all BAM Portal agents.
 | Applied (schedule read model) | `slot_templates` · `schedule_slots` · `reservations` · `waitlist_entries` |
 | Applied (commerce/credits runtime) | `offer_options` · `offer_prices` · `entitlement_templates` · `customer_entitlements` · `credit_ledger` |
 | Applied (access spine before booking) | `bookable_programs`; `bookable_program_id` columns on `entitlement_templates`, `customer_entitlements`, `slot_templates`, and `schedule_slots` via `20260626030258_parent_0004_bookable_programs_access_spine.sql` |
-| Implemented locally only (booking writes) | booking/waitlist/cancel/leave-waitlist RPCs via `20260626034238_parent_0005_booking_write_rpcs.sql`; Vercel/mobile wiring exists locally but is not approved for prod push |
+| Applied 2026-07-02 (booking writes + shared capacity) | booking/waitlist/cancel/leave-waitlist RPCs (`0005`), rewired through `slot_spots_taken` (`20260702115745`) - the single capacity source of truth |
+| Applied 2026-07-02 (trials) | `trial_bookings` table + `book_trial_slot` / `cancel_trial_booking` / `reschedule_trial_booking` / `set_trial_outcome` RPCs (`20260702115748`) |
+| Applied 2026-07-02 (staff ops) | `staff_cancel_slot` RPC (`20260702115746`, extended by `115748` to cancel trials) |
+| Applied 2026-07-02 (credit engine, DORMANT) | `apply_stripe_credit_grant` / `expire_lapsed_credit_entitlements` (`20260702115747`); no cron registered, webhook untouched - do not call these in production flows yet |
+| Applied 2026-07-02 (guards) | identity-spine uniqueness guards (`20260702115744`) on top of the runtime guards (`20260701161000`) |
+| Built, awaiting deploy (API layer) | `/api/runtime/*` (staff schedule CRUD, generate-slots, calendar, diagnostics, offers read), `/api/website/trial-slots` + `/api/website/trial-booking`, parent availability alignment - on branch `parent/refactor`, not yet on Vercel |
 | Not in v1 unless explicitly revived | `subscriptions` |
 | Planned (later) | `membership_change_requests` · parent messaging/notification tables (names TBD) |
 
@@ -39,10 +44,35 @@ parent API/view/projection name, not as the phase-one source table. `membership_
 is a superseded reserved name; do not create it unless Luka explicitly revives it.
 
 All table names above: deny-all RLS (no policies, service-role only). Don't add policies to them.
-Booking/waitlist/cancel/leave-waitlist RPCs are also Luka-owned; coordinate before
-adding or changing them. The current `0005` booking-write migration is a local
-implementation slice only. Do not apply, replace, or reshape it in production
-without Luka review.
+All RPCs above are Luka-owned; coordinate before adding or changing them. As of
+2026-07-02 the booking/trial/capacity/credit RPCs ARE applied to production
+(migrations `20260702115744`-`20260702115748`).
+
+### What Zoran's surfaces may do, starting now
+
+- ✅ CALL the RPCs via service role: `book_trial_slot`, `cancel_trial_booking`,
+  `reschedule_trial_booking`, `set_trial_outcome`, `staff_cancel_slot`,
+  `parent_book_slot` family. They are transaction-safe and enforce capacity.
+- ✅ READ availability - but the number must come from `slot_spots_taken` (or a
+  Luka API that uses it). Never compute spots from your own counts.
+- ⛔ Never `INSERT`/`UPDATE`/`DELETE` `schedule_slots`, `reservations`,
+  `waitlist_entries`, or `trial_bookings` directly. One capacity gate, one owner.
+- ⛔ Do not call the credit engine RPCs (`apply_stripe_credit_grant`,
+  `expire_lapsed_credit_entitlements`) - dormant until the Phase 6 cutover.
+- ⚠️ Creating slots (templates + generation) is a Luka-owned write path. The
+  generation endpoint ships with the `parent/refactor` deploy; until then, ask
+  Luka to generate the schedule rather than inserting slots.
+
+### If you ship a stopgap implementation instead
+
+If timing forces a parallel implementation, keep the later migration cheap:
+
+- use non-reserved table names (prefix them, e.g. `zs_`),
+- no RLS policies that grant plain `authenticated` (parents hold real JWTs),
+- if your stopgap represents the same real-world sessions, still read capacity
+  through `slot_spots_taken` where slots exist, and
+- keep GHL (or your stopgap store) the clear source of truth for its own data,
+  so migrating to the runtime tables later is a one-way backfill, not a merge.
 
 ---
 
@@ -119,20 +149,15 @@ syncing with Luka. `offer_options.bookable_program_id` is deliberately deferred;
 or listing views can derive the program through `offer_prices -> entitlement_templates`
 until there is a concrete need for a direct grouping FK.
 
-Current local-only booking slice: `20260626034238_parent_0005_booking_write_rpcs.sql`
-adds service-role-only booking, waitlist join/leave, and cancel/refund RPCs plus
-Vercel/mobile wiring. It has local reset/API/type/lint/simulator proof, including a
-dedicated full-slot seed for waitlist testing, but it is not approved for production
-push yet. Opus review follow-ups now implemented locally: visible mobile
-booking/waitlist/cancel errors, per-child partial-result handling, student-id
-ownership validation, slot-first cancel locking, and defensive capacity guarding.
-Waitlist promotion on cancellation is also implemented locally: it promotes the
-first currently eligible `WAITING` row by line order and leaves skipped ineligible
-rows in place so they keep priority after a later top-up. Final local polish on
-2026-06-26 added sanitized parent API error responses with raw backend detail logged
-server-side, fixed cancel-success copy for unlimited memberships, and passed a clean
-reset plus rollback-only waitlist-promotion smoke. Still do not push/apply `0005` to
-production until Luka explicitly approves it.
+Booking-write status update (2026-07-02): the `0005` booking slice IS now applied
+to production, rewired so every capacity check goes through `slot_spots_taken`
+(which counts CONFIRMED reservations + BOOKED trial bookings). Waitlist promotion,
+slot-first locking, sanitized errors, and the review follow-ups described in the
+git history all shipped with it. The Vercel/mobile API wiring is on branch
+`parent/refactor` awaiting deploy. Production scheduling data is still empty
+(0 slot_templates / 0 schedule_slots / 0 reservations / 0 trial_bookings as of
+2026-07-02); the identity/runtime backfill is live (29 profiles, 30 students,
+30 memberships, 30 member_links, 6 offer_prices, 30 entitlements).
 
 MVP simplification rules:
 - No `entitlement_template_program_grants` or `customer_entitlement_program_grants`

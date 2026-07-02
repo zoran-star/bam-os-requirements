@@ -7,6 +7,7 @@ const MISSING_CUSTOMER_PROFILE_MESSAGE =
 
 const SLOT_SCAN_LIMIT = 1_000;
 const RESERVATION_SCAN_LIMIT = 1_000;
+const TRIAL_BOOKING_SCAN_LIMIT = 1_000;
 const UTC_TIME_ZONE = "UTC";
 const DATE_ONLY_PATTERN = /^(\d{4})-(\d{2})-(\d{2})$/;
 
@@ -70,6 +71,12 @@ type WaitlistEntry = {
   student_id: string | null;
   status: "WAITING" | "PROMOTED" | "EXPIRED" | "REMOVED";
   created_at: string;
+};
+
+type TrialBooking = {
+  id: string;
+  slot_id: string;
+  status: "BOOKED" | "CANCELLED" | "SHOWED" | "NO_SHOW" | "CONVERTED";
 };
 
 type ParentScheduleContext = {
@@ -718,7 +725,10 @@ async function getSlotState(slotIds: string[]): Promise<SlotState> {
     statuses: ["CONFIRMED"],
     limit: RESERVATION_SCAN_LIMIT,
   });
-  const waitlists = await getWaitlistEntries(slotIds);
+  const [trialBookings, waitlists] = await Promise.all([
+    getTrialBookings(slotIds),
+    getWaitlistEntries(slotIds),
+  ]);
 
   for (const reservation of reservations) {
     empty.bookedCounts.set(
@@ -726,6 +736,13 @@ async function getSlotState(slotIds: string[]): Promise<SlotState> {
       (empty.bookedCounts.get(reservation.slot_id) || 0) + 1,
     );
     empty.reservationBySlotMembership.set(slotMembershipKey(reservation), reservation);
+  }
+
+  for (const trialBooking of trialBookings) {
+    empty.bookedCounts.set(
+      trialBooking.slot_id,
+      (empty.bookedCounts.get(trialBooking.slot_id) || 0) + 1,
+    );
   }
 
   for (const waitlist of waitlists) {
@@ -760,6 +777,19 @@ async function getReservations(opts: {
     `reservations?${filters.join("&")}` +
       "&select=id,slot_id,membership_id,student_id,status,booked_at,cancelled_at" +
       `&limit=${opts.limit}`,
+  );
+
+  return Array.isArray(rows) ? rows : [];
+}
+
+async function getTrialBookings(slotIds: string[]): Promise<TrialBooking[]> {
+  if (slotIds.length === 0) return [];
+
+  const rows = await sb<TrialBooking[]>(
+    `trial_bookings?slot_id=in.(${inList(slotIds)})` +
+      "&status=eq.BOOKED" +
+      "&select=id,slot_id,status" +
+      `&limit=${TRIAL_BOOKING_SCAN_LIMIT}`,
   );
 
   return Array.isArray(rows) ? rows : [];
