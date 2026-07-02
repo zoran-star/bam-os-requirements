@@ -11547,7 +11547,10 @@ function _v15ibRenderThread() {
       <span style="font-size:15px;line-height:1">←</span> All conversations</button>
     <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px">
       <div onclick="_ibOpenContact()" title="View ${mem ? 'member' : 'contact'} details" style="display:flex;align-items:center;gap:8px;min-width:0;cursor:pointer">
-        <span style="font-size:15px;font-weight:700;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-decoration:underline;text-decoration-style:dotted;text-decoration-color:var(--border-med);text-underline-offset:3px">${escapeHTML(a.name || a.phone || a.email || 'Conversation')}</span>
+        <div style="min-width:0">
+          <div style="font-size:15px;font-weight:700;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-decoration:underline;text-decoration-style:dotted;text-decoration-color:var(--border-med);text-underline-offset:3px">${escapeHTML(a.name || a.phone || a.email || 'Conversation')}</div>
+          ${(a.name && a.phone && a.name !== a.phone) ? `<div style="font-size:11px;color:var(--text-mute);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHTML(a.phone)}</div>` : ''}
+        </div>
         ${mem ? _ibMemberPill(false) : ''}
         <span style="flex:none;font-size:13px;color:var(--text-mute)">›</span>
       </div>
