@@ -7116,6 +7116,47 @@ Then the call to action."]</div>
         border:1px solid var(--border); border-radius:4px; color:var(--text);
         font:inherit; font-size:13px; outline:none;
       }
+      /* Desktop: groups are transparent so tabs + actions sit as direct flex
+         children of the toolbar exactly as before. Mobile query below re-groups. */
+      #view-inbox .ib-filters, #view-inbox .ib-actions { display:contents; }
+      #view-inbox .ib-tab-short { display:none; }   /* Bot: full label on desktop */
+      #view-inbox .ib-act {
+        background:transparent; border:1px solid var(--border); color:var(--text);
+        padding:7px 12px; border-radius:4px; cursor:pointer; font-size:12px;
+        font-family:inherit; font-weight:500;
+      }
+      #view-inbox .ib-act-hawk { border-color:var(--accent); color:var(--accent); font-weight:700; }
+      #view-inbox .ib-act-new  { background:var(--accent); border-color:var(--accent); color:#08080A; font-weight:600; }
+      #view-inbox .ib-act-new .ib-act-icon { display:none; }   /* icon-only is mobile */
+
+      /* ── Mobile: filters become a segmented control, actions get their own
+         row, so it's obvious what filters vs what acts. Desktop untouched. ── */
+      @media (max-width: 768px) {
+        #view-inbox .ib-toolbar { display:block; margin-bottom:12px; }
+        #view-inbox .ib-filters {
+          display:flex; gap:2px; background:var(--surface);
+          border:1px solid var(--border-med); border-radius:12px; padding:4px; margin-bottom:10px;
+        }
+        #view-inbox .ib-filters .ib-tab {
+          flex:1; border:none; border-radius:9px; padding:9px 4px; font-size:13px;
+          font-weight:600; color:var(--text-sub); display:flex; align-items:center;
+          justify-content:center; gap:5px; min-width:0;
+        }
+        #view-inbox .ib-filters .ib-tab.on { background:var(--accent); color:#0B0B0D; font-weight:800; }
+        #view-inbox .ib-tab-full  { display:none; }   /* Bot: icon-only to fit 4 across */
+        #view-inbox .ib-tab-short { display:inline; }
+        #view-inbox .ib-tab-count { font-size:11px; opacity:0.75; font-weight:700; }
+        #view-inbox .ib-search {
+          width:100%; flex:none; min-width:0; box-sizing:border-box;
+          font-size:16px; padding:11px 12px; border-radius:10px; margin-bottom:10px;
+        }
+        #view-inbox .ib-actions { display:flex; gap:8px; align-items:stretch; }
+        #view-inbox .ib-act { padding:11px 12px; border-radius:10px; font-size:14px; }
+        #view-inbox .ib-act-hawk { flex:1; font-weight:800; background:var(--gold-glow); }
+        #view-inbox .ib-act-new .ib-act-label { display:none; }
+        #view-inbox .ib-act-new .ib-act-icon  { display:inline; }
+        #view-inbox .ib-act-new, #view-inbox .ib-act-refresh { flex:0 0 auto; min-width:46px; }
+      }
       #view-inbox .ib-row {
         display:grid; grid-template-columns: 1fr 80px 100px; gap:12px; align-items:center;
         padding:12px 14px; border:1px solid var(--border); border-radius:8px;
@@ -7615,16 +7656,20 @@ Then the call to action."]</div>
       </div>
       <div class="content">
         <div class="ib-toolbar">
-          <button class="ib-tab on" data-tab="all"     onclick="_ibSetTab('all')">All <span id="ib-count-all"></span></button>
-          <button class="ib-tab"    data-tab="members" onclick="_ibSetTab('members')">Members <span id="ib-count-members"></span></button>
-          <button class="ib-tab"    data-tab="leads"   onclick="_ibSetTab('leads')">Leads <span id="ib-count-leads"></span></button>
-          <button class="ib-tab"    data-tab="bot"     onclick="_ibSetTab('bot')" title="Replies the bot drafted for leads in the Responded stage - you approve each one">🤖 Bot <span id="ib-count-bot"></span></button>
+          <div class="ib-filters">
+            <button class="ib-tab on" data-tab="all"     onclick="_ibSetTab('all')">All <span id="ib-count-all" class="ib-tab-count"></span></button>
+            <button class="ib-tab"    data-tab="members" onclick="_ibSetTab('members')">Members <span id="ib-count-members" class="ib-tab-count"></span></button>
+            <button class="ib-tab"    data-tab="leads"   onclick="_ibSetTab('leads')">Leads <span id="ib-count-leads" class="ib-tab-count"></span></button>
+            <button class="ib-tab"    data-tab="bot"     onclick="_ibSetTab('bot')" title="Replies the bot drafted for leads in the Responded stage - you approve each one"><span class="ib-tab-full">🤖 Bot</span><span class="ib-tab-short">🤖</span> <span id="ib-count-bot" class="ib-tab-count"></span></button>
+          </div>
           <input id="ib-search" class="ib-search" type="text" placeholder="🔍  Search by name or content…" oninput="_ibSetSearch(this.value)">
-          <button id="ib-approve-btn" onclick="_apxOpen()" title="Hawkeye - approve the agent's drafted messages before they send" style="background:transparent;border:1px solid var(--accent);color:var(--accent);padding:7px 12px;border-radius:4px;cursor:pointer;font-size:12px;font-weight:700">👁 Hawkeye <span id="apx-count" style="font-weight:800"></span></button>
-          <button id="acx-approve-btn" onclick="_acxOpen()" title="Confirm agent - approve trial-confirmation messages before they send" style="display:none;background:transparent;border:1px solid var(--border);color:var(--text-mute);padding:7px 12px;border-radius:4px;cursor:pointer;font-size:12px;font-weight:700">✅ Confirm <span id="acx-count" style="font-weight:800"></span></button>
-          <button id="aclx-approve-btn" onclick="_aclxOpen()" title="Closing agent - approve post-trial conversion messages before they send" style="display:none;background:transparent;border:1px solid var(--border);color:var(--text-mute);padding:7px 12px;border-radius:4px;cursor:pointer;font-size:12px;font-weight:700">🎯 Closing <span id="aclx-count" style="font-weight:800"></span></button>
-          <button onclick="_ibComposeNew()" title="New message" style="background:var(--accent);border:1px solid var(--accent);color:#08080A;padding:7px 12px;border-radius:4px;cursor:pointer;font-size:12px;font-weight:600">✏️ New</button>
-          <button onclick="fetchAndRenderInbox()" title="Refresh" style="background:transparent;border:1px solid var(--border);color:var(--text);padding:7px 12px;border-radius:4px;cursor:pointer;font-size:12px">↻</button>
+          <div class="ib-actions">
+            <button id="ib-approve-btn" class="ib-act ib-act-hawk" onclick="_apxOpen()" title="Hawkeye - approve the agent's drafted messages before they send">👁 Hawkeye <span id="apx-count" style="font-weight:800"></span></button>
+            <button id="acx-approve-btn" class="ib-act" onclick="_acxOpen()" title="Confirm agent - approve trial-confirmation messages before they send" style="display:none;color:var(--text-mute)">✅ Confirm <span id="acx-count" style="font-weight:800"></span></button>
+            <button id="aclx-approve-btn" class="ib-act" onclick="_aclxOpen()" title="Closing agent - approve post-trial conversion messages before they send" style="display:none;color:var(--text-mute)">🎯 Closing <span id="aclx-count" style="font-weight:800"></span></button>
+            <button class="ib-act ib-act-new" onclick="_ibComposeNew()" title="New message"><span class="ib-act-label">✏️ New</span><span class="ib-act-icon">✏️</span></button>
+            <button class="ib-act ib-act-refresh" onclick="fetchAndRenderInbox()" title="Refresh">↻</button>
+          </div>
         </div>
         <div id="inbox-list-container">
           <div class="req-empty" style="padding:20px 0"><span class="req-spin"></span>Loading conversations…</div>
