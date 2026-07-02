@@ -1,6 +1,6 @@
 # Offer tie-in (BAM GTA v2) - offer_id spine + money->access roadmap
 
-**Status 2026-07-02: Wave 1 SHIPPED + B (offers sync) LIVE IN PROD. Next: C (webhook access sync).**
+**Status 2026-07-02: Wave 1 + B LIVE. C (webhook access sync) LIVE and ON for GTA. Next: D (Stripe interval check + credit engine).**
 Full plan: [`docs/offer-tie-in-plan.md`](../docs/offer-tie-in-plan.md). Approved by Zoran + Luka.
 
 ## The model
@@ -76,7 +76,7 @@ mode: preview|apply, bookable_program_id, entitlement_rules: {<planKey>:
   (PR #1055); operator script `scripts/offers-sync-run.mjs` (preview default,
   `--apply` to write, GTA rules preset).
 
-## C: webhook access sync - BUILT, SHIPPED DORMANT
+## C: webhook access sync - LIVE, GTA = ON (2026-07-02)
 
 `api/_runtime/access-sync.ts` (module) wired into `api/stripe/webhook.js` at 6
 lifecycle points: onboarding activation, live-member renewal invoice, payment
@@ -101,8 +101,15 @@ retries - the ONLY paths that can 5xx are access-sync ON failures).
 - Known gaps (documented, accepted): out-of-order failure/recovery at the
   MEMBER layer is legacy webhook behavior (fix belongs to Phase 6.2);
   non-canonical price changes skip subUpdated and converge on next invoice.
-- NEXT: flip GTA to `shadow`, watch `access-sync-shadow` audits vs real
-  events, then `on` (that flip is the Phase 6 cutover moment).
+- ON without shadow (Zoran call): justified by (1) nothing consumes
+  entitlements yet (parent booking unlaunched, credits dormant), (2) roster
+  rehearsal sweep replaced event-watching - `scripts/access-sync-sweep.mjs`
+  dry-ran all 41 GTA members: 40 grant, 1 correct skip (manual member, no
+  Stripe, covered by manual entitlement), (3) idempotent + instant rollback
+  (set access_sync_mode='off'). Retry hole fixed (PR #1059): already-flagged
+  payment-failed retries now re-run the sync.
+- VERIFY as real events land: `member_audit_log` action_type
+  `access-sync-on` / `access-sync-error`.
 
 ## Next (Part 2, money->access; order D->E->F->G)
 
