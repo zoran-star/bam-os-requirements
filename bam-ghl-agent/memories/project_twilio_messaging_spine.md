@@ -146,6 +146,15 @@ Build phases (after GTA proves the flow):
      staff involvement. Client picks area code + ring cell + missed-call copy
      (prefilled); staff only get a Slack note + a stuck-A2P alert. One number per
      academy (idempotent). Port-in path = phase 2.
+     Path ②a (connect existing Twilio account) is NOT blocked on the master
+     account - client pastes SID+token, live-validate, pick number, rewire
+     webhooks (Messaging-Service-aware); A2P untouched, they keep paying Twilio.
+     Path ②b (number lives in GHL / LC Phone): LC Phone = GHL's own Twilio, so
+     it's a PORT-OUT via GHL support + LOA (~1-3 wks). A2P never travels between
+     Twilio accounts, BUT brand+campaign can be PRE-REGISTERED on the BAM side
+     in parallel (approval doesn't need the number) -> attach on arrival ->
+     ~zero US texting gap. Canadian academies: no A2P regime, port is the whole
+     story. Voice cutover on port day is atomic.
   3. New academies auto-run provisioning at onboarding → start on twilio day 1.
 
 ## Voice spine (calling) - built on top of this SMS spine
