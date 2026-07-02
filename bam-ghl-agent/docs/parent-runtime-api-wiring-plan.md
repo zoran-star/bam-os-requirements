@@ -3,7 +3,8 @@
 Owner: Luka
 Audience: BAM Portal agents, Zoran's agents
 Last updated: 2026-07-02
-Status: Phases 1-4 + 7 implemented locally (uncommitted, not in production);
+Status: Phases 1-4 + 7 implemented, merged to main (PR #1020, 2026-07-02);
+migrations applied to production; API layer deployed via Vercel.
 Phase 5 and Phase 6 cutovers not started
 
 ## Implementation Status (2026-07-02)
@@ -19,10 +20,13 @@ Phase 5 and Phase 6 cutovers not started
 | 6 Production cutovers | NOT STARTED | Whole phase (blocked on 5 + open decisions) |
 | 7 Trial bookings | DONE locally | `entry_points.bookable_program_id` linkage (needs Zoran sync); trial conversion flow (CONVERTED + lineage) is deliberately not wired - it belongs with checkout cutover |
 
-Everything "DONE locally" is verified by full local `db reset` replay, 35 vitest
-tests, tsc/lint, and live iOS-simulator E2Es, and sits UNCOMMITTED on
-`parent/refactor` awaiting Luka's diff review. NO overnight migration has been
-applied to production (verified via `supabase migration list` 2026-07-02).
+Everything above is verified by full local `db reset` replay, 35 vitest tests,
+tsc/lint, and live iOS-simulator E2Es. As of 2026-07-02: merged to main
+(PR #1020) and the five parent migrations (`20260702115744`-`115748`) are
+APPLIED TO PRODUCTION after a clean read-only preflight (zero duplicate
+profile emails / EXPIRE refs). Production scheduling DATA is still empty
+(0 templates/slots/reservations/trials); generating the real BAM GTA schedule
+through the staff APIs is the next concrete step.
 
 Migration drift RESOLVED (2026-07-02): the four remote-only migrations that
 shipped concurrently overnight (`20260701210626` members start_date,
