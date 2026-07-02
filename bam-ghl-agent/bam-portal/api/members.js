@@ -1,4 +1,5 @@
 import { withSentryApiRoute } from "./_sentry.js";
+import { loadVoiceConfig, startClickToCall, logCall } from "./twilio/_voice.js";
 // Vercel Serverless Function — Members (academy roster + billing)
 //
 // Powers the client-portal "Members" tab. Ported from the BAM GTA
@@ -604,6 +605,16 @@ async function handler(req, res) {
     if (action === "update-profile") {
       try {
         return await actionUpdateProfile(res, member, ctx, body);
+      } catch (e) {
+        return res.status(500).json({ error: e.message });
+      }
+    }
+
+    // Click-to-call: ring staff cell → bridge to this member. Uses Twilio voice
+    // (not Stripe), so handle it before the Stripe-connection gate.
+    if (action === "call") {
+      try {
+        return await actionCall(res, member, ctx);
       } catch (e) {
         return res.status(500).json({ error: e.message });
       }
@@ -1694,6 +1705,31 @@ const PROFILE_EDITABLE_FIELDS = new Set([
   // to the Stripe subscription metadata[start_date] after the DB write (best-effort).
   "start_date",
 ]);
+
+// Click-to-call a member: rings the academy's staff cell, then bridges to the
+// member's phone (lead sees the academy number as caller ID). Logs to `calls`.
+async function actionCall(res, member, ctx) {
+  const lead = (member.parent_phone || "").trim();
+  if (!lead) return res.status(400).json({ error: "This member has no phone number on file." });
+  const cfg = await loadVoiceConfig(member.client_id);
+  if (!cfg || !cfg.voiceEnabled) return res.status(400).json({ error: "Calling isn't set up for this academy yet." });
+  if (!cfg.ringNumbers.length) return res.status(400).json({ error: "No staff phone is configured to ring." });
+
+  const call = await startClickToCall(cfg, { leadPhone: lead });
+  await logCall({
+    client_id: member.client_id, direction: "outbound", status: call.status || "queued",
+    twilio_call_sid: call.sid, from_number: cfg.from, to_number: lead, contact_phone: lead,
+    ghl_contact_id: member.ghl_contact_id || null, contact_name: member.parent_name || null,
+    answered_by: call.staff || null, occurred_at: new Date().toISOString(),
+    raw: { sid: call.sid, initiated_by: ctx.user?.id || null },
+  });
+  await writeAudit({
+    client_id: member.client_id, member_id: member.id, action_type: "call",
+    args: { to: lead, via: cfg.from, ring: call.staff, call_sid: call.sid },
+    performed_by: ctx.user?.id, performed_by_name: ctx.staff?.name || null,
+  }).catch(() => {});
+  return res.status(200).json({ ok: true, call_sid: call.sid, status: call.status, ringing: call.staff });
+}
 
 async function actionUpdateProfile(res, member, ctx, body) {
   const fields = (body.fields && typeof body.fields === "object") ? body.fields : {};
