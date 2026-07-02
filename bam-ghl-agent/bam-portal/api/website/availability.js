@@ -49,6 +49,20 @@ async function sbReq(path, init = {}) {
   return txt ? JSON.parse(txt) : null;
 }
 
+async function slotSpotsTakenBulk(tenantId, slotIds) {
+  if (!slotIds.length) return new Map();
+  const rows = await sbReq("rpc/slot_spots_taken_bulk", {
+    method: "POST",
+    body: JSON.stringify({
+      p_tenant_id: tenantId,
+      p_slot_ids: slotIds,
+    }),
+  });
+  const counts = new Map();
+  for (const row of rows || []) counts.set(row.slot_id, Number(row.spots_taken || 0));
+  return counts;
+}
+
 async function getAllowedOrigins() {
   if (originsCache.set && Date.now() - originsCache.at < ORIGINS_TTL_MS) {
     return originsCache;
@@ -184,9 +198,9 @@ async function handler(req, res) {
   // ── booking_provider='portal': serve OUR slots (schedule_slots), GHL never
   // consulted. Same response shape as the GHL branch, so client sites keep
   // working unchanged. The entry point's "Group N" label picks which template
-  // family this calendar maps to; spots math mirrors Luka's trial-slots
-  // endpoint (capacity - CONFIRMED reservations - BOOKED trials); the booking
-  // RPC re-checks capacity transactionally, so a stale read can't overbook.
+  // family this calendar maps to; occupancy comes from the shared
+  // slot_spots_taken function via the bulk RPC. The booking RPC re-checks
+  // capacity transactionally, so a stale read can't overbook.
   if (client.booking_provider === "portal") {
     try {
       const groupMatch = /group\s*\d+/i.exec(calEp.label || "");
@@ -197,15 +211,7 @@ async function handler(req, res) {
         `schedule_slots?tenant_id=eq.${client_id}&is_cancelled=eq.false&start_time=gte.${encodeURIComponent(nowIso)}&start_time=lte.${encodeURIComponent(endIso)}&select=id,name,start_time,capacity&order=start_time.asc&limit=500`
       )) || [];
       const list = slots.filter(s => !groupPrefix || (s.name || "").toLowerCase().replace(/\s+/g, " ").includes(groupPrefix));
-      const taken = new Map();
-      if (list.length) {
-        const inList = list.map(s => encodeURIComponent(s.id)).join(",");
-        const [resv, trials] = await Promise.all([
-          sbReq(`reservations?slot_id=in.(${inList})&status=eq.CONFIRMED&select=slot_id`).catch(() => []),
-          sbReq(`trial_bookings?slot_id=in.(${inList})&status=eq.BOOKED&select=slot_id`).catch(() => []),
-        ]);
-        for (const r of [...(resv || []), ...(trials || [])]) taken.set(r.slot_id, (taken.get(r.slot_id) || 0) + 1);
-      }
+      const taken = await slotSpotsTakenBulk(client_id, list.map(s => s.id));
       // Emit local-offset ISO strings + local day keys (what GHL emitted), so
       // the site's picker + booking.start round-trip identically.
       const fmt = new Intl.DateTimeFormat("en-CA", { timeZone: timezone, year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false, timeZoneName: "longOffset" });

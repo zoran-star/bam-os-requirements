@@ -7,7 +7,6 @@ const MISSING_CUSTOMER_PROFILE_MESSAGE =
 
 const SLOT_SCAN_LIMIT = 1_000;
 const RESERVATION_SCAN_LIMIT = 1_000;
-const TRIAL_BOOKING_SCAN_LIMIT = 1_000;
 const UTC_TIME_ZONE = "UTC";
 const DATE_ONLY_PATTERN = /^(\d{4})-(\d{2})-(\d{2})$/;
 
@@ -73,12 +72,6 @@ type WaitlistEntry = {
   created_at: string;
 };
 
-type TrialBooking = {
-  id: string;
-  slot_id: string;
-  status: "BOOKED" | "CANCELLED" | "SHOWED" | "NO_SHOW" | "CONVERTED";
-};
-
 type ParentScheduleContext = {
   profile: CustomerProfile;
   memberships: Membership[];
@@ -91,6 +84,11 @@ type SlotState = {
   waitlistCounts: Map<string, number>;
   reservationBySlotMembership: Map<string, Reservation>;
   waitlistBySlotMembership: Map<string, WaitlistEntry>;
+};
+
+type SlotSpotsTakenRow = {
+  slot_id: string;
+  spots_taken: number | string | null;
 };
 
 export type CustomerSlotEnrollmentOut = {
@@ -193,7 +191,7 @@ export async function listScheduleSlots(
     order: "asc",
     includeCancelled: false,
   });
-  const state = await getSlotState(slots.map((slot) => slot.id));
+  const state = await getSlotState(slots);
   return slots.map((slot) => toCustomerSlot(slot, state, memberships));
 }
 
@@ -209,7 +207,7 @@ export async function getScheduleSlot(
 
   ensureAcademyAccess(context, slot.tenant_id);
   const memberships = resolveMembershipsForAcademy(context, membershipId, slot.tenant_id);
-  const state = await getSlotState([slot.id]);
+  const state = await getSlotState([slot]);
   return toCustomerSlot(slot, state, memberships);
 }
 
@@ -314,7 +312,7 @@ export async function listUpcomingReservations(
     statuses: ["CONFIRMED"],
     limit: RESERVATION_SCAN_LIMIT,
   });
-  const state = await getSlotState(slots.map((slot) => slot.id));
+  const state = await getSlotState(slots);
 
   return reservations
     .filter((reservation) => slotById.has(reservation.slot_id))
@@ -355,7 +353,7 @@ export async function listPastAppointments(
     statuses: ["CONFIRMED", "ATTENDED", "NO_SHOW"],
     limit: RESERVATION_SCAN_LIMIT,
   });
-  const state = await getSlotState(slots.map((slot) => slot.id));
+  const state = await getSlotState(slots);
 
   return reservations
     .filter((reservation) => slotById.has(reservation.slot_id))
@@ -604,7 +602,7 @@ async function getReservationOutForContext(
 
   ensureAcademyAccess(context, slot.tenant_id);
   const memberships = resolveMembershipsForAcademy(context, undefined, slot.tenant_id);
-  const state = await getSlotState([slot.id]);
+  const state = await getSlotState([slot]);
   return toReservationOut(reservation, slot, state, memberships);
 }
 
@@ -624,7 +622,7 @@ async function getWaitlistOutForContext(
 
   ensureAcademyAccess(context, slot.tenant_id);
   const memberships = resolveMembershipsForAcademy(context, undefined, slot.tenant_id);
-  const state = await getSlotState([slot.id]);
+  const state = await getSlotState([slot]);
   return toWaitlistOut(waitlist, slot, state, memberships);
 }
 
@@ -716,33 +714,27 @@ async function getFutureSlotsAcrossAcademies(
     .slice(0, opts.limit);
 }
 
-async function getSlotState(slotIds: string[]): Promise<SlotState> {
+async function getSlotState(slots: Array<Pick<ScheduleSlot, "id" | "tenant_id">>): Promise<SlotState> {
   const empty = emptySlotState();
+  const slotIds = uniqueValues(slots.map((slot) => slot.id));
   if (slotIds.length === 0) return empty;
 
-  const reservations = await getReservations({
-    slotIds,
-    statuses: ["CONFIRMED"],
-    limit: RESERVATION_SCAN_LIMIT,
-  });
-  const [trialBookings, waitlists] = await Promise.all([
-    getTrialBookings(slotIds),
+  const [reservations, waitlists, bookedCounts] = await Promise.all([
+    getReservations({
+      slotIds,
+      statuses: ["CONFIRMED"],
+      limit: RESERVATION_SCAN_LIMIT,
+    }),
     getWaitlistEntries(slotIds),
+    getBulkBookedCounts(slots),
   ]);
 
-  for (const reservation of reservations) {
-    empty.bookedCounts.set(
-      reservation.slot_id,
-      (empty.bookedCounts.get(reservation.slot_id) || 0) + 1,
-    );
-    empty.reservationBySlotMembership.set(slotMembershipKey(reservation), reservation);
+  for (const [slotId, count] of bookedCounts) {
+    empty.bookedCounts.set(slotId, count);
   }
 
-  for (const trialBooking of trialBookings) {
-    empty.bookedCounts.set(
-      trialBooking.slot_id,
-      (empty.bookedCounts.get(trialBooking.slot_id) || 0) + 1,
-    );
+  for (const reservation of reservations) {
+    empty.reservationBySlotMembership.set(slotMembershipKey(reservation), reservation);
   }
 
   for (const waitlist of waitlists) {
@@ -754,6 +746,31 @@ async function getSlotState(slotIds: string[]): Promise<SlotState> {
   }
 
   return empty;
+}
+
+async function getBulkBookedCounts(
+  slots: Array<Pick<ScheduleSlot, "id" | "tenant_id">>,
+): Promise<Map<string, number>> {
+  const counts = new Map<string, number>();
+  const slotIdsByTenant = new Map<string, string[]>();
+
+  for (const slot of slots) {
+    const slotIds = slotIdsByTenant.get(slot.tenant_id) ?? [];
+    slotIds.push(slot.id);
+    slotIdsByTenant.set(slot.tenant_id, slotIds);
+  }
+
+  await Promise.all([...slotIdsByTenant.entries()].map(async ([tenantId, slotIds]) => {
+    const rows = await rpc<SlotSpotsTakenRow[]>("slot_spots_taken_bulk", {
+      p_tenant_id: tenantId,
+      p_slot_ids: uniqueValues(slotIds),
+    });
+    for (const row of rows || []) {
+      counts.set(row.slot_id, Number(row.spots_taken ?? 0));
+    }
+  }));
+
+  return counts;
 }
 
 async function getReservations(opts: {
@@ -777,19 +794,6 @@ async function getReservations(opts: {
     `reservations?${filters.join("&")}` +
       "&select=id,slot_id,membership_id,student_id,status,booked_at,cancelled_at" +
       `&limit=${opts.limit}`,
-  );
-
-  return Array.isArray(rows) ? rows : [];
-}
-
-async function getTrialBookings(slotIds: string[]): Promise<TrialBooking[]> {
-  if (slotIds.length === 0) return [];
-
-  const rows = await sb<TrialBooking[]>(
-    `trial_bookings?slot_id=in.(${inList(slotIds)})` +
-      "&status=eq.BOOKED" +
-      "&select=id,slot_id,status" +
-      `&limit=${TRIAL_BOOKING_SCAN_LIMIT}`,
   );
 
   return Array.isArray(rows) ? rows : [];
@@ -1190,4 +1194,8 @@ function compareSlotStart(a: CustomerSlotOut, b: CustomerSlotOut, order: "asc" |
 
 function scanLimit(limit: number): number {
   return Math.min(Math.max(limit * 10, 100), SLOT_SCAN_LIMIT);
+}
+
+function uniqueValues(values: string[]): string[] {
+  return [...new Set(values)];
 }

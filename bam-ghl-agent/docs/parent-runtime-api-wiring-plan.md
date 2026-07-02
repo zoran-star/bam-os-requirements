@@ -23,10 +23,20 @@ Phase 5 and Phase 6 cutovers not started
 Everything above is verified by full local `db reset` replay, 35 vitest tests,
 tsc/lint, and live iOS-simulator E2Es. As of 2026-07-02: merged to main
 (PR #1020) and the five parent migrations (`20260702115744`-`115748`) are
-APPLIED TO PRODUCTION after a clean read-only preflight (zero duplicate
-profile emails / EXPIRE refs). Production scheduling DATA is still empty
-(0 templates/slots/reservations/trials); generating the real BAM GTA schedule
-through the staff APIs is the next concrete step.
+APPLIED TO PRODUCTION after a clean read-only preflight. Later the same day
+Zoran created the real BAM GTA schedule via the staff endpoints (4 templates,
+86 slots, capacity 12), flipped GTA to `booking_provider='portal'`, and website
+trial bookings went LIVE on the runtime spine (see
+`memories/project_calendars_offghl.md`). Phase 5/6 cutover work is handed to
+Zoran under `docs/parent-runtime-cutover-guardrails.md`.
+
+Luka action items:
+- Native slot auto-extend cron (replaces the monthly Routine running
+  `scripts/extend-gta-slots.mjs`; slots currently generated through ~Aug 31).
+- Decide entitlement `source_ref` granularity (blocks Phase 6.0; see Open
+  Decisions).
+- Verify real Stripe billing intervals and set `invoice_grant_credits` values
+  (Phase 0 item 6).
 
 Migration drift RESOLVED (2026-07-02): the four remote-only migrations that
 shipped concurrently overnight (`20260701210626` members start_date,
@@ -43,6 +53,8 @@ member access, credits, and scheduling onto the typed runtime tables.
 
 Related docs:
 
+- `parent-runtime-cutover-guardrails.md` - REQUIRED reading for agents doing
+  Phase 5/6 cutover work; the short invariant list distilled from this plan.
 - `parent-app-architecture-handoff.md` - architecture overview and handoff.
 - `parent-app-db-boundary.md` - ownership and "do not touch without syncing"
   table boundaries.

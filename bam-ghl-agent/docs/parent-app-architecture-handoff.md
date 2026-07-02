@@ -118,11 +118,15 @@ verified by 35 vitest tests + iOS simulator E2E):
 - Read-only runtime APIs: typed offers read + staff diagnostics.
 - Parent availability updated so the app counts trials in `booked_count`.
 
-Production scheduling DATA is still empty: 0 `slot_templates`,
-0 `schedule_slots`, 0 `reservations`, 0 `trial_bookings`. Creating the real
-BAM GTA schedule is the remaining gate before anything user-facing can book.
-Slot creation is a Luka-owned write path; use the deployed staff endpoints
-(template CRUD + generate-slots), never direct inserts.
+Production scheduling DATA is LIVE (2026-07-02): Zoran created the real BAM GTA
+schedule through the staff endpoints - 4 `slot_templates` (Group 1/Group 2 x
+weeknights/Saturday), 86 `schedule_slots` through ~Aug 31, capacity 12 - and
+flipped GTA to `booking_provider='portal'`. Website trial bookings are live on
+this spine and real `trial_bookings` rows exist. `reservations` remains empty
+until the parent app launches member booking. Slot creation stays a Luka-owned
+write path (staff endpoints only, never direct inserts); a monthly Routine runs
+`bam-portal/scripts/extend-gta-slots.mjs` to extend coverage until a native
+cron ships (Luka action item).
 
 For BAM GTA Training specifically (2026-06-29 numbers, pre-backfill context):
 
@@ -360,13 +364,15 @@ Zoran can now build directly (still without touching slot capacity):
   `academy_membership` + `customer_entitlement`, then set
   `trial_bookings.status = CONVERTED` and fill conversion lineage.
 
-Handoff point status: (a) identity + entitlements backfilled ✅, (b) real BAM
-GTA schedule readable in `schedule_slots` ❌ NOT YET - prod has 0 slots; this
-is the one remaining gate, (c) booking RPCs in prod ✅ (proven locally +
-simulator; not yet exercised by production traffic), (d) trial RPC + shared
-capacity ✅. Practical consequence: the first concrete step of any scheduling
-work shipped today is creating the real schedule through the Luka-owned
-generation path - not inserting slots directly.
+Handoff point status - ALL FOUR GATES PASSED (2026-07-02): (a) identity +
+entitlements backfilled ✅, (b) real BAM GTA schedule readable in
+`schedule_slots` ✅ (86 slots via the staff endpoints), (c) booking RPCs in
+prod ✅ (now exercised by real website trial traffic), (d) trial RPC + shared
+capacity ✅. The handoff has happened: Zoran's surfaces (website trials, agent
+booking, staff Calendars tab, post-trial outcomes) are live on this spine for
+GTA - see `memories/project_calendars_offghl.md` for what was built and
+`docs/parent-runtime-cutover-guardrails.md` for the rules his agents follow
+next (Phase 5/6 cutover work).
 
 ## Why This Architecture Holds
 

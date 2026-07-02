@@ -86,6 +86,11 @@ type SlotCancelResponse = {
   already_cancelled: boolean;
 };
 
+type SlotSpotsTakenBulkRow = {
+  slot_id: string;
+  spots_taken: number | string | null;
+};
+
 type BookingActor = {
   profileId: string;
   studentId: string;
@@ -128,6 +133,8 @@ let rescheduledTrialBookingId = "";
 
 const createdUserIds: string[] = [];
 const createdStaffIds: string[] = [];
+const createdClientIds: string[] = [];
+const createdBookableProgramIds: string[] = [];
 const createdTemplateIds: string[] = [];
 const createdSlotIds: string[] = [];
 const createdReservationIds: string[] = [];
@@ -332,6 +339,52 @@ describe("trial booking runtime APIs", () => {
       already_cancelled: false,
     });
   });
+
+  it("returns bulk slot occupancy matching the scalar RPC for mixed slot states", async () => {
+    const reservationOnlySlotId = await createSlot(futureDateAtUtcHour(14, 21), "Bulk Reservation Only");
+    const trialOnlySlotId = await createSlot(futureDateAtUtcHour(15, 21), "Bulk Trial Only");
+    const mixedSlotId = await createSlot(futureDateAtUtcHour(16, 21), "Bulk Mixed");
+    const emptySlotId = await createSlot(futureDateAtUtcHour(17, 21), "Bulk Empty");
+    const otherTenantSlotId = await createOtherTenantSlot(futureDateAtUtcHour(18, 21));
+
+    const reservationOnlyActor = await createBookingActor("bulk-reservation-only");
+    const mixedActor = await createBookingActor("bulk-mixed");
+
+    createdReservationIds.push(await bookMemberSlot(reservationOnlyActor, reservationOnlySlotId));
+    createdReservationIds.push(await bookMemberSlot(mixedActor, mixedSlotId));
+
+    const trialOnly = await bookTrial(trialOnlySlotId, "bulk-trial-only@example.test");
+    const mixedTrial = await bookTrial(mixedSlotId, "bulk-mixed@example.test");
+    createdTrialBookingIds.push(trialOnly.trial_booking_id, mixedTrial.trial_booking_id);
+
+    const bulkCounts = await slotSpotsTakenBulk([
+      reservationOnlySlotId,
+      trialOnlySlotId,
+      mixedSlotId,
+      emptySlotId,
+      otherTenantSlotId,
+      reservationOnlySlotId,
+    ]);
+
+    const expectedTenantCounts = new Map<string, number>([
+      [reservationOnlySlotId, 1],
+      [trialOnlySlotId, 1],
+      [mixedSlotId, 2],
+      [emptySlotId, 0],
+    ]);
+    const scalarCounts = await Promise.all(
+      [...expectedTenantCounts.keys()].map((slotId) => slotSpotsTaken(slotId)),
+    );
+
+    [...expectedTenantCounts.entries()].forEach(([slotId, expectedCount], index) => {
+      const scalarCount = scalarCounts[index];
+      expect(scalarCount).toBe(expectedCount);
+      expect(bulkCounts.get(slotId)).toBe(scalarCount);
+    });
+
+    await expect(slotSpotsTaken(otherTenantSlotId)).resolves.toBe(0);
+    expect(bulkCounts.has(otherTenantSlotId)).toBe(false);
+  });
 });
 
 async function createStaffToken(): Promise<string> {
@@ -417,6 +470,66 @@ async function createSlot(start: Date, label: string): Promise<string> {
   return slotId;
 }
 
+async function createOtherTenantSlot(start: Date): Promise<string> {
+  const tenantId = randomUUID();
+  const bookableProgramId = randomUUID();
+  const templateId = randomUUID();
+  const slotId = randomUUID();
+
+  createdClientIds.push(tenantId);
+  createdBookableProgramIds.push(bookableProgramId);
+  createdTemplateIds.push(templateId);
+  createdSlotIds.push(slotId);
+
+  await insertRow("clients", {
+    id: tenantId,
+    business_name: `Runtime Trials Other ${TEST_RUN_ID}`,
+    status: "active",
+    time_zone: "America/New_York",
+  });
+
+  await insertRow("bookable_programs", {
+    id: bookableProgramId,
+    tenant_id: tenantId,
+    source_program_key: `runtime-trials-other-${TEST_RUN_ID}`,
+    title: "Runtime Trials Other Training",
+    program_type: "TRAINING",
+    status: "ACTIVE",
+  });
+
+  await insertRow("slot_templates", {
+    id: templateId,
+    tenant_id: tenantId,
+    name: `Runtime Trials Other ${TEST_RUN_ID}`,
+    slot_type: "TRAINING",
+    default_location: "Runtime Other Court",
+    default_capacity: 2,
+    default_credit_cost: 1,
+    default_start_time: "21:00:00",
+    default_end_time: "22:00:00",
+    recurrence_rule: "WEEKLY:MO",
+    is_active: true,
+    bookable_program_id: bookableProgramId,
+  });
+
+  await insertRow("schedule_slots", {
+    id: slotId,
+    tenant_id: tenantId,
+    name: `Runtime Trial Other Tenant ${TEST_RUN_ID}`,
+    slot_type: "TRAINING",
+    location_label: "Runtime Other Court",
+    capacity: 2,
+    credit_cost: 1,
+    start_time: start.toISOString(),
+    end_time: new Date(start.getTime() + 60 * 60 * 1000).toISOString(),
+    slot_template_id: templateId,
+    is_cancelled: false,
+    bookable_program_id: bookableProgramId,
+  });
+
+  return slotId;
+}
+
 async function createBookingActor(label: string, supabaseUserId?: string): Promise<BookingActor> {
   const profileId = randomUUID();
   const studentId = randomUUID();
@@ -495,6 +608,29 @@ async function bookTrial(slotId: string, email: string): Promise<TrialBookingRes
   expect(body.status).toBe("BOOKED");
   expect(body.trial_booking_id).toMatch(/[0-9a-f-]{36}/);
   return body;
+}
+
+async function slotSpotsTaken(slotId: string): Promise<number> {
+  const { data, error } = await serviceSupabase.rpc("slot_spots_taken", {
+    p_tenant_id: TENANT_ID,
+    p_slot_id: slotId,
+  });
+  if (error) throw new Error(error.message);
+  return Number(data ?? 0);
+}
+
+async function slotSpotsTakenBulk(slotIds: string[]): Promise<Map<string, number>> {
+  const { data, error } = await serviceSupabase.rpc("slot_spots_taken_bulk", {
+    p_tenant_id: TENANT_ID,
+    p_slot_ids: slotIds,
+  });
+  if (error) throw new Error(error.message);
+
+  const counts = new Map<string, number>();
+  for (const row of rows<SlotSpotsTakenBulkRow>(data)) {
+    counts.set(row.slot_id, Number(row.spots_taken ?? 0));
+  }
+  return counts;
 }
 
 function trialBookingBody(slotId: string, email: string) {
@@ -592,6 +728,9 @@ async function cleanupCreatedRows(): Promise<void> {
   if (createdTemplateIds.length > 0) {
     await serviceSupabase.from("slot_templates").delete().in("id", uniqueValues(createdTemplateIds));
   }
+  if (createdBookableProgramIds.length > 0) {
+    await serviceSupabase.from("bookable_programs").delete().in("id", uniqueValues(createdBookableProgramIds));
+  }
   if (createdEntitlementIds.length > 0) {
     await serviceSupabase.from("customer_entitlements").delete().in("id", uniqueValues(createdEntitlementIds));
   }
@@ -609,6 +748,9 @@ async function cleanupCreatedRows(): Promise<void> {
   }
   for (const userId of createdUserIds) {
     await serviceSupabase.auth.admin.deleteUser(userId);
+  }
+  if (createdClientIds.length > 0) {
+    await serviceSupabase.from("clients").delete().in("id", uniqueValues(createdClientIds));
   }
 }
 
@@ -679,6 +821,10 @@ function futureDateAtUtcHour(daysFromNow: number, utcHour: number): Date {
 
 function uniqueValues(values: string[]): string[] {
   return [...new Set(values)];
+}
+
+function rows<T>(data: unknown): T[] {
+  return Array.isArray(data) ? (data as T[]) : [];
 }
 
 function assertLocalSupabase(): void {

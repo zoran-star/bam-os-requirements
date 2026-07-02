@@ -22,6 +22,20 @@ async function sbFetch(path, init = {}) {
   return t ? JSON.parse(t) : null;
 }
 
+async function slotSpotsTakenBulk(tenantId, slotIds) {
+  if (!slotIds.length) return new Map();
+  const rows = await sbFetch("rpc/slot_spots_taken_bulk", {
+    method: "POST",
+    body: JSON.stringify({
+      p_tenant_id: tenantId,
+      p_slot_ids: slotIds,
+    }),
+  });
+  const counts = new Map();
+  for (const row of rows || []) counts.set(row.slot_id, Number(row.spots_taken || 0));
+  return counts;
+}
+
 // The academy's trial-booking system of record. Best-effort: any hiccup means
 // 'ghl', so a lookup failure can never silently flip an academy off GHL.
 export async function bookingProviderOf(clientId) {
@@ -66,9 +80,9 @@ function localIsoParts(dateUtc, timeZone) {
   return { day, iso: `${day}T${parts.hour === "24" ? "00" : parts.hour}:${parts.minute}:${parts.second}${off}` };
 }
 
-// Portal slots for a group over the window, with spots-left math mirroring
-// Luka's endpoints (capacity - CONFIRMED reservations - BOOKED trials). The
-// booking RPC re-checks capacity transactionally, so a stale read can't overbook.
+// Portal slots for a group over the window. Occupancy comes from the shared
+// slot_spots_taken function via the bulk RPC; the booking RPC re-checks capacity
+// transactionally, so a stale read can't overbook.
 async function portalFreeSlots(clientId, groupLabel, { days = 14, timezone = "America/Toronto", startMs } = {}) {
   const start = startMs || Date.now();
   const nowIso = new Date(start).toISOString();
@@ -78,15 +92,7 @@ async function portalFreeSlots(clientId, groupLabel, { days = 14, timezone = "Am
   )) || [];
   const g = String(groupOf(groupLabel) || groupLabel || "").toLowerCase();
   const list = slots.filter(s => !g || (s.name || "").toLowerCase().includes(g));
-  const taken = new Map();
-  if (list.length) {
-    const inList = list.map(s => encodeURIComponent(s.id)).join(",");
-    const [resv, trials] = await Promise.all([
-      sbFetch(`reservations?slot_id=in.(${inList})&status=eq.CONFIRMED&select=slot_id`).catch(() => []),
-      sbFetch(`trial_bookings?slot_id=in.(${inList})&status=eq.BOOKED&select=slot_id`).catch(() => []),
-    ]);
-    for (const r of [...(resv || []), ...(trials || [])]) taken.set(r.slot_id, (taken.get(r.slot_id) || 0) + 1);
-  }
+  const taken = await slotSpotsTakenBulk(clientId, list.map(s => s.id));
   const out = {};
   for (const s of list) {
     if ((s.capacity - (taken.get(s.id) || 0)) <= 0) continue;

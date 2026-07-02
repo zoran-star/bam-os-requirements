@@ -7,7 +7,9 @@ checkout cutover, or future free-trial scheduling shape, read
 [`parent-app-architecture-handoff.md`](parent-app-architecture-handoff.md).
 
 If you are about to change schema, migrations, RLS, functions, or shared table
-semantics, this is the guardrail doc to read first.
+semantics, this is the guardrail doc to read first. If you are doing Phase 5/6
+cutover work (checkout/webhook/members/sorter -> typed runtime), also read
+[`parent-runtime-cutover-guardrails.md`](parent-runtime-cutover-guardrails.md).
 
 **For agents:** before making schema changes (new tables, columns, RLS, functions, drops/renames),
 diff your plan against the lists below. If anything overlaps → **stop and tell Zoran to message Luka.**
@@ -47,6 +49,13 @@ All table names above: deny-all RLS (no policies, service-role only). Don't add 
 All RPCs above are Luka-owned; coordinate before adding or changing them. As of
 2026-07-02 the booking/trial/capacity/credit RPCs ARE applied to production
 (migrations `20260702115744`-`20260702115748`).
+
+Offers tie-in exception (2026-07-02): Zoran owns the Phase 6.8 offers sync
+write path for `offer_options` / `offer_prices` / `entitlement_templates`,
+under the pattern conditions in
+[`parent-runtime-cutover-guardrails.md`](parent-runtime-cutover-guardrails.md)
+("Offers tie-in" section) and with Luka review of the RPC/migration. All other
+Luka-owned tables keep the default rule.
 
 ### What Zoran's surfaces may do, starting now
 
@@ -155,10 +164,18 @@ to production, rewired so every capacity check goes through `slot_spots_taken`
 (which counts CONFIRMED reservations + BOOKED trial bookings). Waitlist promotion,
 slot-first locking, sanitized errors, and the review follow-ups described in the
 git history all shipped with it. The Vercel/mobile API wiring merged to main and
-deployed 2026-07-02 (PR #1020). Production scheduling data is still empty
-(0 slot_templates / 0 schedule_slots / 0 reservations / 0 trial_bookings as of
-2026-07-02); the identity/runtime backfill is live (29 profiles, 30 students,
-30 memberships, 30 member_links, 6 offer_prices, 30 entitlements).
+deployed 2026-07-02 (PR #1020).
+
+SCHEDULING IS LIVE (2026-07-02, later the same day): Zoran created the real BAM
+GTA schedule through the staff endpoints (4 slot_templates, 86 schedule_slots
+through ~Aug 31, capacity 12) and flipped GTA to `clients.booking_provider =
+'portal'`. Website trial bookings, agent booking, the staff Calendars tab, and
+post-trial outcomes all run on this spine via the RPCs (see
+`memories/project_calendars_offghl.md`). Real trial bookings exist - treat
+`trial_bookings` and `schedule_slots` as live production data. The
+identity/runtime backfill is also live (29 profiles, 30 students, 30
+memberships, 30 member_links, 6 offer_prices, 30 entitlements). Parent-app
+member booking (`reservations`) is not launched yet.
 
 MVP simplification rules:
 - No `entitlement_template_program_grants` or `customer_entitlement_program_grants`
