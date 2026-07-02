@@ -216,6 +216,18 @@ async function handler(req, res) {
       `&select=offer_price_key,canonical_plan,interval,tier,is_routable,amount_cents,currency,stripe_price_id`
     );
 
+    // Typed runtime rows: the authoritative "what can checkout sell" list
+    // (offer tie-in step E). Frontends can send purchasable[].offer_price_id
+    // to /api/website/checkout instead of the legacy offer_price_key.
+    let purchasable = [];
+    try {
+      purchasable = (await sbReq(
+        `offer_prices?tenant_id=eq.${encodeURIComponent(client_id)}&source_offer_id=eq.${offer.id}` +
+        `&is_routable=eq.true&is_active=eq.true&order=sort_order.asc` +
+        `&select=id,title,amount_cents,currency,billing_interval,source_offer_price_key`
+      )) || [];
+    } catch { /* additive block - never breaks the offer page */ }
+
     const [agreementUrl, welcomeVideo] = await Promise.all([
       fileUrl(offer.id, ["onboarding:agreement", "agreement"]),
       fileUrl(offer.id, ["sales:welcome_video", "onboarding:welcome_video", "welcome_video"]),
@@ -231,6 +243,7 @@ async function handler(req, res) {
       },
       intake_fields: buildIntakeFields(offer),
       pricing: buildPricing(offer, catalogRows),
+      purchasable,
       agreement_url: agreementUrl,
       welcome_video: welcomeVideo,
     });
