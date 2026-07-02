@@ -111,9 +111,31 @@ retries - the ONLY paths that can 5xx are access-sync ON failures).
 - VERIFY as real events land: `member_audit_log` action_type
   `access-sync-on` / `access-sync-error`.
 
-## Next (Part 2, money->access; order D->E->F->G)
+## D: credit engine - ACTIVATED for GTA (2026-07-02)
 
-D Stripe interval check then credit engine activation ->
+- Interval check (Stripe truth, all 24 weekly-credit prices): every *|monthly
+  price is a literal `week x4` interval -> per-invoice grant keeps the weekly
+  promise exactly (13 invoices/yr). 3/6-month canonical prices bill by
+  calendar months (one Steady|3m canonical is a ONE-TIME price); grants use
+  the SOLD promise block: monthly Nx4, 3mo Nx12, 6mo Nx24 (Steady 4/12/24,
+  Accelerate 8/24/48, Elevate 12/36/72). DECISION: promise-based (12/24), not
+  calendar-based (13/26) - flip = one config value per template.
+- Grant amounts live in entitlement_templates.config.invoice_grant_credits
+  (migration `20260702231435`; offers-sync UPDATE merges config so they
+  survive resyncs, but a template CREATE writes only display_label - re-set
+  grants after creating new weekly templates).
+- Webhook wiring: `creditSync` in api/stripe/webhook.js runs AFTER accessSync
+  at the 3 invoice-paid sites, builds lines from the real (signature-verified)
+  invoice, calls `applyInvoiceCreditGrants`. Gate `clients.credit_engine_enabled`
+  (default false). Failure while enabled -> 5xx (Stripe retries; idempotent by
+  invoice_line source_ref guard). Audited `credit-grant` / `credit-grant-error`.
+- Daily expiry sweep: `GET /api/runtime/credits/cron-sweep` (CRON_SECRET, 9:00
+  UTC, vercel.json) -> `expire_lapsed_credit_entitlements` per enabled academy.
+- Opening balances: `scripts/credit-backfill-run.mjs` replays each member's
+  latest PAID invoice through the engine (idempotent).
+
+## Next (Part 2, money->access; order E->F->G)
+
 E checkout sells typed offer_price_id (weekly-credit plans hidden until D) ->
 F members.js/sorter full identity spine ->
 G `entry_points.bookable_program_id` + drift check (Luka OK'd all of this 2026-07-02).

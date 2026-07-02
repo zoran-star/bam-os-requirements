@@ -91,7 +91,13 @@ MCP-recorded version.
 - [x] C: webhook access sync - built + shipped DORMANT (`clients.access_sync_mode`
       off/shadow/on; migration `20260702224203`). Activation = Phase 6 cutover:
       shadow-watch GTA, then flip to on.
-- [ ] D: Stripe interval check + credit engine activation
+- [x] D: credit engine ACTIVATED (2026-07-02). Interval check: all monthlies are
+      true week x4 (no 48/52 gap); grants = sold promise (monthly N x4, 3mo N x12,
+      6mo N x24) in template config invoice_grant_credits (migration
+      `20260702231435`). Webhook grants on paid invoices behind
+      `clients.credit_engine_enabled`; daily expiry sweep cron
+      `/api/runtime/credits/cron-sweep`; opening balances backfilled via
+      `scripts/credit-backfill-run.mjs`.
 - [ ] E: checkout cutover
 - [ ] F: members/sorter spine
 - [ ] G: entry_points.bookable_program_id + drift check
