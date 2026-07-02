@@ -29,6 +29,11 @@ type EmbeddedCountRow = {
   waitlist_entries?: Array<{ count: number | string | null }>;
 };
 
+type SlotSpotsTakenRow = {
+  slot_id: string;
+  spots_taken: number | string | null;
+};
+
 type CalendarSlotRow = ScheduleSlotRow & {
   reservation_count: number;
   trial_count: number;
@@ -70,17 +75,20 @@ async function listCalendarSlots(req: RuntimeApiRequest): Promise<CalendarSlotRo
   if (slots.length === 0) return [];
 
   const slotIds = slots.map((slot) => slot.id);
-  const [reservationCounts, trialCounts, waitlistCounts] = await Promise.all([
+  const [reservationCounts, trialCounts, waitlistCounts, spotsTakenCounts] = await Promise.all([
     groupedCounts("reservations", slotIds, "CONFIRMED"),
     groupedCounts("trial_bookings", slotIds, "BOOKED"),
     groupedCounts("waitlist_entries", slotIds, "WAITING"),
+    slotSpotsTakenBulk(request.clientId, slotIds),
   ]);
 
   return slots.map((slot) => {
     const reservationCount = reservationCounts.get(slot.id) ?? 0;
     const trialCount = trialCounts.get(slot.id) ?? 0;
     const waitlistCount = waitlistCounts.get(slot.id) ?? 0;
-    const spotsTaken = reservationCount + trialCount;
+    // spots_taken is deliberately sourced from slot_spots_taken_bulk, not the
+    // display-only reservation_count + trial_count fields above.
+    const spotsTaken = spotsTakenCounts.get(slot.id) ?? 0;
     return {
       ...slot,
       reservation_count: reservationCount,
@@ -128,6 +136,22 @@ async function getSlotsForRange(request: CalendarRequest, timeZone: string): Pro
 
   if (error) throw supabaseHttpError("schedule_slots", error.message);
   return rows<ScheduleSlotRow>(data);
+}
+
+async function slotSpotsTakenBulk(tenantId: string, slotIds: string[]): Promise<Map<string, number>> {
+  const supabase = createRuntimeSupabaseClient();
+  const { data, error } = await supabase.rpc("slot_spots_taken_bulk", {
+    p_tenant_id: tenantId,
+    p_slot_ids: slotIds,
+  });
+
+  if (error) throw supabaseHttpError("slot_spots_taken_bulk", error.message);
+
+  const counts = new Map<string, number>();
+  for (const row of rows<SlotSpotsTakenRow>(data)) {
+    counts.set(row.slot_id, Number(row.spots_taken ?? 0));
+  }
+  return counts;
 }
 
 async function groupedCounts(

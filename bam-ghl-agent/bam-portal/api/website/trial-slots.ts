@@ -62,6 +62,11 @@ type EmbeddedCountRow = {
   trial_bookings?: Array<{ count: number | string | null }>;
 };
 
+type SlotSpotsTakenRow = {
+  slot_id: string;
+  spots_taken: number | string | null;
+};
+
 type TrialSlotRequest = {
   clientId: string;
   bookableProgramId: string | null;
@@ -188,15 +193,16 @@ async function listTrialSlots(request: TrialSlotRequest) {
   if (slots.length === 0) return [];
 
   const slotIds = slots.map((slot) => slot.id);
-  const [reservationCounts, trialCounts] = await Promise.all([
+  const [reservationCounts, trialCounts, spotsTakenCounts] = await Promise.all([
     groupedCounts("reservations", slotIds, "CONFIRMED"),
     groupedCounts("trial_bookings", slotIds, "BOOKED"),
+    slotSpotsTakenBulk(request.clientId, slotIds),
   ]);
 
   return slots.map((slot) => {
     const reservationCount = reservationCounts.get(slot.id) ?? 0;
     const trialCount = trialCounts.get(slot.id) ?? 0;
-    const spotsTaken = reservationCount + trialCount;
+    const spotsTaken = spotsTakenCounts.get(slot.id) ?? 0;
     return {
       id: slot.id,
       client_id: slot.tenant_id,
@@ -253,6 +259,22 @@ async function getSlots(request: TrialSlotRequest): Promise<ScheduleSlotRow[]> {
   const { data, error } = await query;
   if (error) throw new Error(error.message);
   return rows<ScheduleSlotRow>(data);
+}
+
+async function slotSpotsTakenBulk(tenantId: string, slotIds: string[]): Promise<Map<string, number>> {
+  const supabase = createRuntimeSupabaseClient();
+  const { data, error } = await supabase.rpc("slot_spots_taken_bulk", {
+    p_tenant_id: tenantId,
+    p_slot_ids: slotIds,
+  });
+
+  if (error) throw new Error(error.message);
+
+  const counts = new Map<string, number>();
+  for (const row of rows<SlotSpotsTakenRow>(data)) {
+    counts.set(row.slot_id, Number(row.spots_taken ?? 0));
+  }
+  return counts;
 }
 
 async function groupedCounts(
