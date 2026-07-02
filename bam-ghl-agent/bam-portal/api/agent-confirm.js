@@ -80,7 +80,7 @@ async function sb(path, init = {}) {
 }
 
 async function loadClient(clientId) {
-  const rows = await sb(`clients?id=eq.${clientId}&select=id,business_name,ghl_location_id,ghl_access_token,ghl_refresh_token,ghl_token_expires_at,ghl_kpi_config&limit=1`);
+  const rows = await sb(`clients?id=eq.${clientId}&select=id,business_name,address,ghl_location_id,ghl_access_token,ghl_refresh_token,ghl_token_expires_at,ghl_kpi_config&limit=1`);
   return Array.isArray(rows) && rows[0];
 }
 
@@ -370,7 +370,10 @@ async function fireScriptedStep({ client, token, locationId, mode, autos, cfg, i
   const apptCtx = {
     startMs: trialMs,
     endMs: appt && appt.endTime ? new Date(appt.endTime).getTime() : null,
-    location: (appt && appt.address) || addressFromOverrides(cfg && cfg.overrides) || "",
+    // Address chain: the booked slot's own address (portal slots often have no
+    // location_label) -> the Brain's business_info "Location:" line -> the
+    // academy's required BB General address (clients.address).
+    location: (appt && appt.address) || addressFromOverrides(cfg && cfg.overrides) || String(client.address || "").trim(),
     title: (appt && appt.title) || "Free Trial",
   };
   const resolve = (tpl) => resolveMergeVars(resolveApptTokens(tpl, apptCtx), locFor(client.id), vars);
@@ -678,7 +681,7 @@ async function runDetect(res, onlyClientId) {
   try {
     clients = onlyClientId
       ? [await loadClient(onlyClientId)].filter(Boolean)
-      : await sb(`clients?select=id,business_name,ghl_location_id,ghl_access_token,ghl_refresh_token,ghl_token_expires_at,ghl_kpi_config&v2_access=eq.true`);
+      : await sb(`clients?select=id,business_name,address,ghl_location_id,ghl_access_token,ghl_refresh_token,ghl_token_expires_at,ghl_kpi_config&v2_access=eq.true`);
   } catch (_) {}
   const out = [];
   for (const client of (Array.isArray(clients) ? clients : [])) {
