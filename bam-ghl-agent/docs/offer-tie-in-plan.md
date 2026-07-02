@@ -85,10 +85,12 @@ MCP-recorded version.
 ## Progress
 
 - [x] Plan approved (Zoran + Luka)
-- [ ] Wave 1 migration (columns + backfill + offer_ad_campaigns)
-- [ ] Write-path stamping (opportunities, leads, post-trial, automations)
-- [ ] B: offers sync
-- [ ] C: webhook access sync
+- [x] Wave 1 migration (columns + backfill + offer_ad_campaigns) - PR #1052
+- [x] Write-path stamping (opportunities, leads, post-trial, automations) - PR #1052
+- [x] B: offers sync - PRs #1054/#1055, APPLIED to prod (31 typed prices live)
+- [x] C: webhook access sync - built + shipped DORMANT (`clients.access_sync_mode`
+      off/shadow/on; migration `20260702224203`). Activation = Phase 6 cutover:
+      shadow-watch GTA, then flip to on.
 - [ ] D: Stripe interval check + credit engine activation
 - [ ] E: checkout cutover
 - [ ] F: members/sorter spine
