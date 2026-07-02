@@ -1,6 +1,6 @@
 import { withSentryApiRoute, captureApiMessage } from "./_sentry.js";
 import crypto from "node:crypto";
-import { MARKETING_OPS_ROLES, CONTENT_MANAGER_ROLES } from "./_roles.js";
+import { MARKETING_OPS_ROLES, CONTENT_MANAGER_ROLES, CONTENT_ROLES, hasRole } from "./_roles.js";
 import { CANONICAL_FUNNEL, mapStageName, buildKpis } from "./_ghl_funnel.js";
 import { notifyClientPush } from "./push/_send.js";
 
@@ -678,6 +678,9 @@ async function handler(req, res) {
     }
     if (resource === "onboarding") {
       return await handleOnboarding(req, res);
+    }
+    if (resource === "refresh-windows") {
+      return await handleRefreshWindows(req, res);
     }
     return res.status(400).json({ error: "missing or invalid ?resource= (expected 'tickets' | 'guide-cards' | 'content-tickets' | 'meta-adaccounts' | 'meta-campaigns' | 'meta-kpis' | 'meta-report' | 'meta-insight' | 'meta-overview' | 'ghl-kpi-suggest' | 'ghl-kpis' | 'ghl-kpi-detail' | 'meta-creatives' | 'meta-staff-auth' | 'meta-staff-status' | 'onboarding')" });
   } catch (err) {
@@ -3598,6 +3601,285 @@ async function handleStaffMetaStatus(req, res) {
     team_fb_user_name: team?.fb_user_name || null,
     team_expires_at: team?.expires_at || null,
   });
+}
+
+// ─────────────────────────────────────────────────────────
+// CREATIVE REFRESH WINDOWS (phase 1)
+// ─────────────────────────────────────────────────────────
+// Monthly creative-update windows per client, week-anchored: clients.refresh_week
+// (1-4) = Monday-Sunday of that week each month. The staff Marketing tab renders
+// a week-lane calendar from creative_refresh_windows; managers nudge / move /
+// mark received. Statuses derive on read; submissions auto-detect from tickets
+// submitted inside the window. See memories/project_creative_refresh_calendar.md.
+//
+//   GET   ?resource=refresh-windows&month=YYYY-MM
+//         → { month, weeks, windows, unassigned, canEdit } (generates missing
+//           rows for enrolled clients, derives statuses, auto-detects submits)
+//   PATCH ?resource=refresh-windows   body { action, ... } (managers only):
+//         set-week      { client_id, week|null, month? }  enroll / re-anchor / unenroll
+//         move-week     { id, week }                      one-off move, this month only
+//         nudge         { id }                            Slack to the client channel
+//         mark-received { id }                            manual submitted flip
+//         skip          { id }                            skip this month
+//
+// View = CONTENT_ROLES (marketing + content team see load); edit = managers.
+// Only V1.5/V2 clients are eligible - V1 academies never appear (hard rule).
+
+function refreshIsoDate(d) { return d.toISOString().slice(0, 10); }
+
+// month 'YYYY-MM' → { 1: {start,end}, ... } Monday-anchored lanes. Week 1 starts
+// on the first Monday of the month; each lane is Monday-Sunday inclusive.
+function refreshMonthWeeks(month) {
+  const [y, m] = month.split("-").map(Number);
+  const first = new Date(Date.UTC(y, m - 1, 1));
+  const offset = (8 - first.getUTCDay()) % 7; // days from the 1st to the first Monday
+  const weeks = {};
+  for (let w = 1; w <= 4; w++) {
+    const start = new Date(Date.UTC(y, m - 1, 1 + offset + (w - 1) * 7));
+    const end = new Date(start.getTime() + 6 * 86400000);
+    weeks[w] = { start: refreshIsoDate(start), end: refreshIsoDate(end) };
+  }
+  return weeks;
+}
+
+// Derived status: submitted/skipped are sticky; the rest is pure date math so
+// rows never go stale between crons.
+function refreshDeriveStatus(row, todayIso) {
+  if (row.status === "submitted" || row.status === "skipped") return row.status;
+  if (todayIso < row.window_start) return "upcoming";
+  if (todayIso <= row.window_end) return "open";
+  return "overdue";
+}
+
+async function handleRefreshWindows(req, res) {
+  const ctx = await resolveUser(req);
+  if (ctx.error) return res.status(ctx.error.status).json({ error: ctx.error.message });
+  const role = ctx.staff?.role;
+  if (!hasRole(role, CONTENT_ROLES)) {
+    return res.status(403).json({ error: "marketing/content staff only" });
+  }
+  const canEdit = hasRole(role, CONTENT_MANAGER_ROLES);
+  const todayIso = nowIso().slice(0, 10);
+
+  if (req.method === "GET") {
+    const month = /^\d{4}-\d{2}$/.test(req.query.month || "")
+      ? req.query.month
+      : nowIso().slice(0, 7);
+    const weeks = refreshMonthWeeks(month);
+
+    // Eligible = V1.5/V2 and not churned. V1 academies are never enrolled.
+    const allClients = await sb(
+      `clients?or=(v2_access.is.true,v15_access.is.true)&select=id,business_name,status,refresh_week`
+    );
+    const eligible = (allClients || []).filter(c => c.status !== "churned");
+    const enrolled = eligible.filter(c => c.refresh_week >= 1 && c.refresh_week <= 4);
+    const unassigned = eligible
+      .filter(c => !c.refresh_week)
+      .map(c => ({ id: c.id, business_name: c.business_name }));
+    const nameById = Object.fromEntries(eligible.map(c => [String(c.id), c.business_name]));
+
+    // Materialize this month's rows for enrolled clients (idempotent - the
+    // unique (client_id, month) index absorbs re-runs).
+    if (enrolled.length) {
+      const inserts = enrolled.map(c => ({
+        client_id: c.id,
+        month,
+        window_start: weeks[c.refresh_week].start,
+        window_end: weeks[c.refresh_week].end,
+      }));
+      await sb(`creative_refresh_windows?on_conflict=client_id,month`, {
+        method: "POST",
+        headers: { Prefer: "resolution=ignore-duplicates" },
+        body: JSON.stringify(inserts),
+      });
+    }
+
+    let rows = (await sb(`creative_refresh_windows?month=eq.${month}&select=*`)) || [];
+
+    // Auto-detect submissions + last-submission dates in two ticket queries
+    // (last 120 days covers any month view the calendar realistically shows).
+    const clientIds = [...new Set([...rows.map(r => String(r.client_id)), ...enrolled.map(c => String(c.id))])];
+    const lastSubmission = {};
+    if (clientIds.length) {
+      const since = new Date(Date.now() - 120 * 86400000).toISOString();
+      const idList = clientIds.join(",");
+      const [mk, ct] = await Promise.all([
+        sb(`marketing_tickets?client_id=in.(${idList})&submitted_at=gte.${since}&select=id,client_id,submitted_at`),
+        sb(`content_tickets?client_id=in.(${idList})&submitted_at=gte.${since}&select=id,client_id,submitted_at`),
+      ]);
+      const all = [
+        ...(ct || []).map(t => ({ ...t, _type: "content" })),
+        ...(mk || []).map(t => ({ ...t, _type: "marketing" })),
+      ];
+      for (const t of all) {
+        const key = String(t.client_id);
+        if (!lastSubmission[key] || t.submitted_at > lastSubmission[key]) {
+          lastSubmission[key] = t.submitted_at;
+        }
+      }
+      // A ticket submitted inside an unfinished window satisfies it.
+      for (const r of rows) {
+        if (r.status === "submitted" || r.status === "skipped") continue;
+        const hit = all.find(t =>
+          String(t.client_id) === String(r.client_id) &&
+          t.submitted_at >= r.window_start &&
+          t.submitted_at <= `${r.window_end}T23:59:59Z`
+        );
+        if (hit) {
+          const patch = {
+            status: "submitted",
+            submitted_ticket_id: hit.id,
+            submitted_ticket_type: hit._type,
+            updated_at: nowIso(),
+          };
+          await sb(`creative_refresh_windows?id=eq.${r.id}`, {
+            method: "PATCH",
+            body: JSON.stringify(patch),
+          });
+          Object.assign(r, patch);
+        }
+      }
+    }
+
+    const windows = rows.map(r => {
+      const week = Math.min(4, Math.max(1,
+        Math.round((Date.parse(r.window_start) - Date.parse(weeks[1].start)) / (7 * 86400000)) + 1
+      ));
+      return {
+        id: r.id,
+        client_id: r.client_id,
+        business_name: nameById[String(r.client_id)] || "Unknown academy",
+        week,
+        window_start: r.window_start,
+        window_end: r.window_end,
+        status: refreshDeriveStatus(r, todayIso),
+        nudges: Array.isArray(r.nudges) ? r.nudges : [],
+        submitted_ticket_id: r.submitted_ticket_id,
+        submitted_ticket_type: r.submitted_ticket_type,
+        last_submission: lastSubmission[String(r.client_id)] || null,
+      };
+    });
+
+    return res.status(200).json({ month, weeks, windows, unassigned, canEdit });
+  }
+
+  if (req.method === "PATCH") {
+    if (!canEdit) return res.status(403).json({ error: "managers only" });
+    const body = req.body || {};
+    const action = body.action;
+
+    if (action === "set-week") {
+      const clientId = body.client_id;
+      const week = body.week === null ? null : Number(body.week);
+      if (!clientId) return res.status(400).json({ error: "client_id required" });
+      if (week !== null && !(week >= 1 && week <= 4)) {
+        return res.status(400).json({ error: "week must be 1-4 or null" });
+      }
+      await sb(`clients?id=eq.${clientId}`, {
+        method: "PATCH",
+        body: JSON.stringify({ refresh_week: week }),
+      });
+      const month = /^\d{4}-\d{2}$/.test(body.month || "") ? body.month : nowIso().slice(0, 7);
+      if (week === null) {
+        // Unenroll: drop this month's untouched window; history stays.
+        await sb(
+          `creative_refresh_windows?client_id=eq.${clientId}&month=eq.${month}&status=in.(upcoming,open,overdue)`,
+          { method: "DELETE" }
+        );
+      } else {
+        const weeks = refreshMonthWeeks(month);
+        await sb(
+          `creative_refresh_windows?client_id=eq.${clientId}&month=eq.${month}&status=in.(upcoming,open,overdue)`,
+          {
+            method: "PATCH",
+            body: JSON.stringify({
+              window_start: weeks[week].start,
+              window_end: weeks[week].end,
+              updated_at: nowIso(),
+            }),
+          }
+        );
+      }
+      return res.status(200).json({ ok: true });
+    }
+
+    // Everything below operates on one window row.
+    const id = body.id;
+    if (!id) return res.status(400).json({ error: "id required" });
+    const rows = await sb(`creative_refresh_windows?id=eq.${id}&select=*`);
+    const row = rows?.[0];
+    if (!row) return res.status(404).json({ error: "window not found" });
+
+    if (action === "move-week") {
+      const week = Number(body.week);
+      if (!(week >= 1 && week <= 4)) return res.status(400).json({ error: "week must be 1-4" });
+      if (row.status === "submitted" || row.status === "skipped") {
+        return res.status(400).json({ error: "window already resolved" });
+      }
+      const weeks = refreshMonthWeeks(row.month);
+      const updated = await sb(`creative_refresh_windows?id=eq.${id}`, {
+        method: "PATCH",
+        headers: { Prefer: "return=representation" },
+        body: JSON.stringify({
+          window_start: weeks[week].start,
+          window_end: weeks[week].end,
+          updated_at: nowIso(),
+        }),
+      });
+      return res.status(200).json({ window: updated?.[0] || null });
+    }
+
+    if (action === "nudge") {
+      const clientRows = await sb(`clients?id=eq.${row.client_id}&select=business_name`);
+      const businessName = clientRows?.[0]?.business_name || "your academy";
+      const until = new Date(`${row.window_end}T12:00:00Z`).toLocaleDateString("en-US", {
+        month: "short", day: "numeric",
+      });
+      // Fire-and-forget, same as ticket notifications - Slack being down
+      // must never block the staff action.
+      postClientSlackNotification(
+        row.client_id,
+        `🎨 Creative refresh time for ${businessName}! Your update window is open until ${until}. Send us fresh ad creatives - or share recent posts from your page and we'll test those.`,
+        req
+      );
+      const nudges = [
+        ...(Array.isArray(row.nudges) ? row.nudges : []),
+        { at: nowIso(), by: ctx.staff.name || ctx.staff.email, kind: "manual" },
+      ];
+      const updated = await sb(`creative_refresh_windows?id=eq.${id}`, {
+        method: "PATCH",
+        headers: { Prefer: "return=representation" },
+        body: JSON.stringify({ nudges, updated_at: nowIso() }),
+      });
+      return res.status(200).json({ window: updated?.[0] || null });
+    }
+
+    if (action === "mark-received") {
+      const updated = await sb(`creative_refresh_windows?id=eq.${id}`, {
+        method: "PATCH",
+        headers: { Prefer: "return=representation" },
+        body: JSON.stringify({
+          status: "submitted",
+          submitted_ticket_type: "manual",
+          updated_at: nowIso(),
+        }),
+      });
+      return res.status(200).json({ window: updated?.[0] || null });
+    }
+
+    if (action === "skip") {
+      const updated = await sb(`creative_refresh_windows?id=eq.${id}`, {
+        method: "PATCH",
+        headers: { Prefer: "return=representation" },
+        body: JSON.stringify({ status: "skipped", updated_at: nowIso() }),
+      });
+      return res.status(200).json({ window: updated?.[0] || null });
+    }
+
+    return res.status(400).json({ error: "unknown action" });
+  }
+
+  return res.status(405).json({ error: "method not allowed" });
 }
 
 export default withSentryApiRoute(handler);

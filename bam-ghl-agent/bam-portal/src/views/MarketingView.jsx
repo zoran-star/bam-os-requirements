@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useUrlState } from "../hooks/useUrlState";
 import MarketingOverview from "./MarketingOverview";
+import RefreshCalendarSection from "./RefreshCalendarSection";
 
 const TYPE_META = {
   replace:           { icon: "🔄", label: "Replace creative" },
@@ -268,7 +269,7 @@ const SAMPLE_TICKETS_UNUSED_ = [
 ];
 
 export default function MarketingView({ tokens: tk, dark, me, session }) {
-  const [section, setSection] = useUrlState("msec", "performance"); // performance | tickets
+  const [section, setSection] = useUrlState("msec", "performance"); // performance | tickets | refresh
   const [tab, setTab] = useUrlState("mtab", "active"); // active | client-action | completed
   const [tickets, setTickets] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -505,7 +506,7 @@ export default function MarketingView({ tokens: tk, dark, me, session }) {
   // Switcher between the cross-client Performance portal and the ticket queue.
   const sectionTabs = () => (
     <div style={{ display: "inline-flex", background: tk.surfaceEl, border: `1px solid ${tk.borderMed}`, borderRadius: 999, padding: 3, marginBottom: 20 }}>
-      {[["performance", "Performance"], ["tickets", "Tickets"]].map(([id, label]) => (
+      {[["performance", "Performance"], ["tickets", "Tickets"], ["refresh", "Creative Refresh"]].map(([id, label]) => (
         <button key={id} onClick={() => setSection(id)} style={{
           border: 0, background: section === id ? tk.accent : "transparent",
           color: section === id ? "#0A0A0B" : tk.textMute, fontSize: 11, fontWeight: 700,
@@ -522,6 +523,17 @@ export default function MarketingView({ tokens: tk, dark, me, session }) {
         {banner && <Banner banner={banner} tk={tk} />}
         {sectionTabs()}
         <MarketingOverview tokens={tk} session={session} />
+      </div>
+    );
+  }
+
+  // ─────────────────────── Creative Refresh calendar ───────────────────────
+  if (section === "refresh") {
+    return (
+      <div style={{ padding: "24px 28px", color: tk.text }}>
+        {banner && <Banner banner={banner} tk={tk} />}
+        {sectionTabs()}
+        <RefreshCalendarSection tokens={tk} session={session} />
       </div>
     );
   }
