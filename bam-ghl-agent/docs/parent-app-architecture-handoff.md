@@ -106,8 +106,8 @@ backfill migrations):
   do not call them outside the Phase 6 cutover.
 - Uniqueness guards (runtime + identity spine) are applied.
 
-Built and verified locally, on branch `parent/refactor`, awaiting deploy to
-Vercel (35 vitest tests + iOS simulator E2E):
+API layer, merged to main and deployed to Vercel 2026-07-02 (PR #1020;
+verified by 35 vitest tests + iOS simulator E2E):
 
 - Staff scheduling APIs: template CRUD, idempotent `generate-slots`
   (recurrence `WEEKLY:MO,...`, client time_zone aware), `calendar` read with
@@ -121,8 +121,8 @@ Vercel (35 vitest tests + iOS simulator E2E):
 Production scheduling DATA is still empty: 0 `slot_templates`,
 0 `schedule_slots`, 0 `reservations`, 0 `trial_bookings`. Creating the real
 BAM GTA schedule is the remaining gate before anything user-facing can book.
-Slot creation is a Luka-owned write path; the generation endpoint ships with
-the `parent/refactor` deploy.
+Slot creation is a Luka-owned write path; use the deployed staff endpoints
+(template CRUD + generate-slots), never direct inserts.
 
 For BAM GTA Training specifically (2026-06-29 numbers, pre-backfill context):
 
@@ -244,7 +244,7 @@ Still outstanding before production parent booking (updated 2026-07-02):
 - production credit opening balances where needed (credit engine RPCs exist,
   dormant; real `invoice_grant_credits` values pend the Stripe interval check)
 - ~~review/push of booking-write RPC slice~~ ✅ applied to prod 2026-07-02
-- deploy of the `parent/refactor` API layer (Vercel)
+- ~~deploy of the `parent/refactor` API layer~~ ✅ merged + deployed 2026-07-02
 - mobile polish for leave-waitlist and no-credit booking states; All Classes
   screen also lacks pull-to-refresh
 
@@ -336,7 +336,7 @@ Luka's prerequisite list - STATUS 2026-07-02, all five DONE:
 
 1. ✅ Slot generation (`slot_templates` -> `schedule_slots`): idempotent
    `POST /api/runtime/schedule/generate-slots` (DB-guarded by a unique index;
-   never overwrites manual edits). On `parent/refactor`, awaiting deploy.
+   never overwrites manual edits). Deployed.
 2. ✅ Shared capacity accounting in ONE place: `slot_spots_taken()` in prod;
    member booking RPCs and trial RPC both use it, so members cannot overbook
    past trials or vice versa.
@@ -346,15 +346,16 @@ Luka's prerequisite list - STATUS 2026-07-02, all five DONE:
    slot, counts both tables, inserts only if capacity remains; double-submit
    returns the existing booking).
 5. ✅ Availability reads: staff calendar + public trial-slots + parent app all
-   compute spots-left from the same accounting (endpoints on `parent/refactor`).
+   compute spots-left from the same accounting. Deployed.
 
 Zoran can now build directly (still without touching slot capacity):
 
-- Trial lead funnel + website form -> call `book_trial_slot` (via
-  `POST /api/website/trial-booking` once deployed, or service-role RPC until
-  then). Post-trial `SHOWED`/`NO_SHOW` form -> `set_trial_outcome`. Reminders.
+- Trial lead funnel + website form -> `POST /api/website/trial-booking`
+  (origin-gated; backed by the `book_trial_slot` RPC). Post-trial
+  `SHOWED`/`NO_SHOW` form -> the staff trial-bookings outcome endpoint.
+  Reminders.
 - Coach template authoring UI -> template CRUD + generate-slots endpoints
-  (needs the `parent/refactor` deploy).
+  (staff Bearer auth, deployed).
 - Trial-to-paid conversion orchestration: run checkout, create/find `members` +
   `academy_membership` + `customer_entitlement`, then set
   `trial_bookings.status = CONVERTED` and fill conversion lineage.

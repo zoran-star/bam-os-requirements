@@ -34,7 +34,7 @@ all BAM Portal agents.
 | Applied 2026-07-02 (staff ops) | `staff_cancel_slot` RPC (`20260702115746`, extended by `115748` to cancel trials) |
 | Applied 2026-07-02 (credit engine, DORMANT) | `apply_stripe_credit_grant` / `expire_lapsed_credit_entitlements` (`20260702115747`); no cron registered, webhook untouched - do not call these in production flows yet |
 | Applied 2026-07-02 (guards) | identity-spine uniqueness guards (`20260702115744`) on top of the runtime guards (`20260701161000`) |
-| Built, awaiting deploy (API layer) | `/api/runtime/*` (staff schedule CRUD, generate-slots, calendar, diagnostics, offers read), `/api/website/trial-slots` + `/api/website/trial-booking`, parent availability alignment - on branch `parent/refactor`, not yet on Vercel |
+| Deployed 2026-07-02 (API layer) | `/api/runtime/*` (staff schedule CRUD, generate-slots, calendar, diagnostics, offers read), `/api/website/trial-slots` + `/api/website/trial-booking`, parent availability alignment - merged via PR #1020, live on Vercel |
 | Not in v1 unless explicitly revived | `subscriptions` |
 | Planned (later) | `membership_change_requests` · parent messaging/notification tables (names TBD) |
 
@@ -59,9 +59,10 @@ All RPCs above are Luka-owned; coordinate before adding or changing them. As of
   `waitlist_entries`, or `trial_bookings` directly. One capacity gate, one owner.
 - ⛔ Do not call the credit engine RPCs (`apply_stripe_credit_grant`,
   `expire_lapsed_credit_entitlements`) - dormant until the Phase 6 cutover.
-- ⚠️ Creating slots (templates + generation) is a Luka-owned write path. The
-  generation endpoint ships with the `parent/refactor` deploy; until then, ask
-  Luka to generate the schedule rather than inserting slots.
+- ⚠️ Creating slots (templates + generation) is a Luka-owned write path. Use
+  the staff endpoints (`POST /api/runtime/schedule/templates` +
+  `POST /api/runtime/schedule/generate-slots`, staff Bearer auth) - never
+  insert `schedule_slots` rows directly.
 
 ### If you ship a stopgap implementation instead
 
@@ -153,8 +154,8 @@ Booking-write status update (2026-07-02): the `0005` booking slice IS now applie
 to production, rewired so every capacity check goes through `slot_spots_taken`
 (which counts CONFIRMED reservations + BOOKED trial bookings). Waitlist promotion,
 slot-first locking, sanitized errors, and the review follow-ups described in the
-git history all shipped with it. The Vercel/mobile API wiring is on branch
-`parent/refactor` awaiting deploy. Production scheduling data is still empty
+git history all shipped with it. The Vercel/mobile API wiring merged to main and
+deployed 2026-07-02 (PR #1020). Production scheduling data is still empty
 (0 slot_templates / 0 schedule_slots / 0 reservations / 0 trial_bookings as of
 2026-07-02); the identity/runtime backfill is live (29 profiles, 30 students,
 30 memberships, 30 member_links, 6 offer_prices, 30 entitlements).
