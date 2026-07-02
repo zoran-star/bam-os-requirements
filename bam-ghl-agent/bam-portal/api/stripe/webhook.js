@@ -42,6 +42,8 @@ import { recordKpiEvent } from "../_kpi.js";
 import { notifyOwners } from "../_notify-owners.js";
 import { enrollContact, exitEnrollment, isAutomationLive } from "../automations.js";
 import { getClientGhlToken } from "../website/availability.js";
+import { getAccessSyncMode, syncAccessForMember } from "../_runtime/access-sync.js";
+import { createRuntimeSupabaseClient } from "../_runtime/supabase.js";
 
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
@@ -298,6 +300,51 @@ async function writeAudit({ client_id, member_id, action_type, args, stripe_resp
 }
 
 // ─────────────────────────────────────────────────────────
+// Phase 5 access sync (typed entitlements) — see
+// api/_runtime/access-sync.ts + docs/parent-runtime-cutover-guardrails.md.
+// Gated per academy by clients.access_sync_mode:
+//   off (default) → no-op, webhook behavior byte-identical to before.
+//   shadow        → full read path, writes nothing, audits what it WOULD do.
+//   on            → writes typed access; a failure returns 5xx so Stripe
+//                   RETRIES (the sync is a multi-write sequence — a partial
+//                   failure swallowed as 200 loses the entitlement forever;
+//                   DB uniqueness guards make the retry converge, not dup).
+// Returns null to continue the normal 200 path, or a response the caller
+// must return (the ON-mode 500).
+// ─────────────────────────────────────────────────────────
+function invoiceLinePriceId(inv) {
+  const line = inv && inv.lines && inv.lines.data && inv.lines.data[0];
+  return (line && line.price && line.price.id) || null;
+}
+
+async function accessSync(res, args) {
+  let mode = "off";
+  try {
+    const supabase = createRuntimeSupabaseClient();
+    mode = await getAccessSyncMode(supabase, args.clientId);
+    if (mode === "off") return null;
+    const outcome = await syncAccessForMember(supabase, args, { dryRun: mode === "shadow" });
+    await writeAudit({
+      client_id: args.clientId, member_id: args.memberId,
+      action_type: `access-sync-${mode}`,
+      args: outcome,
+    }).catch(() => {});
+    return null;
+  } catch (e) {
+    console.error(`[webhook] access sync (${mode}) failed for member ${args.memberId}:`, e.message);
+    await writeAudit({
+      client_id: args.clientId, member_id: args.memberId,
+      action_type: "access-sync-error",
+      args: { reason: args.reason, mode, error: String((e && e.message) || e) },
+    }).catch(() => {});
+    if (mode === "on") {
+      return res.status(500).json({ error: "access sync failed", reason: args.reason });
+    }
+    return null; // off/shadow can never change webhook behavior
+  }
+}
+
+// ─────────────────────────────────────────────────────────
 // Handler
 // ─────────────────────────────────────────────────────────
 
@@ -532,6 +579,15 @@ async function handleSubDeleted(event, connectedAccount, res) {
     meta: { member_id: member.id, sub_id: sub.id, reason: cancellationAlreadyLogged ? "portal cancel finalized" : "cancelled in Stripe" },
   });
 
+  // Phase 5 access sync: cancel typed access BEFORE the member row disappears
+  // (entitlement cancel must run first per the wiring plan).
+  const accessFail = await accessSync(res, {
+    clientId: member.client_id, memberId: member.id,
+    reason: "subscription-deleted", subscriptionId: sub.id,
+    overrideMemberStatus: "cancelled",
+  });
+  if (accessFail) return accessFail;
+
   await sb(`members?id=eq.${member.id}`, {
     method: "DELETE",
     headers: { Prefer: "return=minimal" },
@@ -584,6 +640,16 @@ async function handleSubUpdated(event, connectedAccount, res) {
     db_changes:  { members: { plan: { from: member.plan, to: newPlan } } },
   });
 
+  // Phase 5 access sync: the plan changed → move the entitlement to the new
+  // price's template (source_ref carries the new price id; the old grant gets
+  // superseded/expired). Non-canonical price changes skip above and converge
+  // on the next paid invoice instead.
+  const accessFail = await accessSync(res, {
+    clientId: member.client_id, memberId: member.id,
+    reason: "subscription-updated", subscriptionId: sub.id, stripePriceId: newPriceId,
+  });
+  if (accessFail) return accessFail;
+
   return res.status(200).json({ ok: true, action: "plan-synced", from: member.plan, to: newPlan });
 }
 
@@ -627,6 +693,15 @@ async function handleInvoiceFailed(event, connectedAccount, res) {
   // Owner/staff SMS (V1.5/V2, per notification_prefs). Non-fatal.
   notifyOwners(member.client_id, "payment_failure",
     `⚠️ Payment failed: ${member.athlete_name || member.parent_name || "a member"}. They're flagged in your portal.`).catch(() => {});
+
+  // Phase 5 access sync: mirror the failed state onto membership +
+  // entitlements (suspend, never delete). Mirrors the member ROW so member
+  // status and booking eligibility always agree.
+  const accessFail = await accessSync(res, {
+    clientId: member.client_id, memberId: member.id,
+    reason: "payment-failed", subscriptionId: subId, invoiceId: inv.id,
+  });
+  if (accessFail) return accessFail;
 
   return res.status(200).json({ ok: true, action: "flagged-payment-failed", member_id: member.id });
 }
@@ -787,6 +862,16 @@ async function handleInvoiceSucceeded(event, connectedAccount, res) {
       // The parent just paid on the funnel → flip to live + fire all downstream
       // activations. Shared with the reconcile cron so both paths are identical.
       const out = await activatePortalOnboardingMember({ member, onbSub, inv, connectedAccount });
+      // Phase 5 access sync: first paid invoice → identity spine + entitlement.
+      const accessFail = await accessSync(res, {
+        clientId: member.client_id, memberId: member.id,
+        reason: "invoice-paid", subscriptionId: subId, invoiceId: inv.id,
+        stripePriceId:
+          (onbSub.items && onbSub.items.data && onbSub.items.data[0] &&
+           onbSub.items.data[0].price && onbSub.items.data[0].price.id) ||
+          invoiceLinePriceId(inv),
+      });
+      if (accessFail) return accessFail;
       return res.status(200).json(out);
     }
     // A paid member we could NOT activate inline (the subscription fetch failed, e.g.
@@ -806,6 +891,17 @@ async function handleInvoiceSucceeded(event, connectedAccount, res) {
 
   const RECOVERABLE = new Set(["payment_failed", "paused"]);
   if (!RECOVERABLE.has(member.status)) {
+    // Renewal invoice for an already-live member: nothing to recover, but the
+    // typed-access layer (re)converges on EVERY paid invoice — access is
+    // granted only after money moves, and renewals keep it current.
+    if (member.status === "live") {
+      const accessFail = await accessSync(res, {
+        clientId: member.client_id, memberId: member.id,
+        reason: "invoice-paid", subscriptionId: subId, invoiceId: inv.id,
+        stripePriceId: invoiceLinePriceId(inv),
+      });
+      if (accessFail) return accessFail;
+    }
     return res.status(200).json({ skipped: "member not in recoverable state", current_status: member.status });
   }
   const prevStatus = member.status;
@@ -837,6 +933,15 @@ async function handleInvoiceSucceeded(event, connectedAccount, res) {
     args:            { event_id: event.id, event_type: event.type, invoice_id: inv.id, sub_id: subId, customer_id: custId, amount_paid: inv.amount_paid },
     db_changes:      { members: { status: { from: prevStatus, to: "live" } } },
   });
+
+  // Phase 5 access sync: payment recovered → reactivate membership +
+  // entitlement (the member row is live again; the sync mirrors it).
+  const accessFail = await accessSync(res, {
+    clientId: member.client_id, memberId: member.id,
+    reason: "invoice-paid", subscriptionId: subId, invoiceId: inv.id,
+    stripePriceId: invoiceLinePriceId(inv),
+  });
+  if (accessFail) return accessFail;
 
   return res.status(200).json({ ok: true, action: "recovered-to-live", from: prevStatus, member_id: member.id });
 }

@@ -76,11 +76,36 @@ mode: preview|apply, bookable_program_id, entitlement_rules: {<planKey>:
   (PR #1055); operator script `scripts/offers-sync-run.mjs` (preview default,
   `--apply` to write, GTA rules preset).
 
-## Next (Part 2, money->access; order C->D->E->F->G)
+## C: webhook access sync - BUILT, SHIPPED DORMANT
 
-C Phase 5 webhook access sync (paid invoice -> entitlement; 5xx on failure;
-  source_ref convention DECIDED: `subscription:<sub_id>:<price_id>`, one-time
-  `invoice:<invoice_id>:<price_id>`) ->
+`api/_runtime/access-sync.ts` (module) wired into `api/stripe/webhook.js` at 6
+lifecycle points: onboarding activation, live-member renewal invoice, payment
+recovered, payment failed, subscription price change, subscription deleted
+(cancel runs BEFORE the member DELETE). Gate = `clients.access_sync_mode`
+(migration `20260702224203`): off (default) / shadow (read path + audit, no
+writes) / on (writes; webhook returns **5xx** on sync failure so Stripe
+retries - the ONLY paths that can 5xx are access-sync ON failures).
+- Grant path: re-fetch member row (DB row = truth, not the event) -> typed
+  price by `offer_prices.stripe_price_id` (unique guard; legacy prices resolve
+  too) -> ACTIVE template required (no rule = skip, never mint) ->
+  `ensureIdentitySpineFromMember` -> `grantOrSyncEntitlementFromOfferPrice`
+  (source='stripe', source_ref `subscription:<sub>:<price>` /
+  `invoice:<inv>:<price>`) -> SUPERSEDE other ACTIVE entitlements for the same
+  membership+program (import backfill / old plan) to EXPIRED, never delete.
+- Status path (failed/deleted): `syncAccessStatusFromMemberStatus` mirror.
+  Member status and booking eligibility always agree by construction.
+- Audited as `access-sync-<mode>` / `access-sync-error` in member_audit_log.
+- Tests: `api/_runtime/access-sync.test.ts` (11, stubbed supabase, decision
+  surface). Write path = Luka's DB-backed lane. JS->TS import verified via
+  esbuild bundle (no .js twin needed).
+- Known gaps (documented, accepted): out-of-order failure/recovery at the
+  MEMBER layer is legacy webhook behavior (fix belongs to Phase 6.2);
+  non-canonical price changes skip subUpdated and converge on next invoice.
+- NEXT: flip GTA to `shadow`, watch `access-sync-shadow` audits vs real
+  events, then `on` (that flip is the Phase 6 cutover moment).
+
+## Next (Part 2, money->access; order D->E->F->G)
+
 D Stripe interval check then credit engine activation ->
 E checkout sells typed offer_price_id (weekly-credit plans hidden until D) ->
 F members.js/sorter full identity spine ->
