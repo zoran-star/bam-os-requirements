@@ -380,7 +380,7 @@ async function handler(req, res) {
   let client;
   try {
     const rows = await sbReq(
-      `clients?id=eq.${client_id}&select=id,ghl_location_id,ghl_kpi_config,ghl_access_token,ghl_refresh_token,ghl_token_expires_at&limit=1`
+      `clients?id=eq.${client_id}&select=id,ghl_location_id,ghl_kpi_config,booking_provider,ghl_access_token,ghl_refresh_token,ghl_token_expires_at&limit=1`
     );
     client = rows?.[0];
   } catch (e) { return res.status(500).json({ error: e.message }); }
@@ -434,10 +434,13 @@ async function handler(req, res) {
   } catch (e) { console.error("entry_points lookup failed (non-fatal):", e.message); }
 
   // Contact provider: 'portal' academies mint leads in the portal store (no GHL
-  // contact) - EXCEPT booking submissions, which still need a real GHL contact
-  // for the calendar appointment (calendars are still on GHL).
+  // contact) - EXCEPT booking submissions on a booking_provider='ghl' academy,
+  // which still need a real GHL contact for the GHL calendar appointment. Once
+  // an academy's bookings run on the portal spine (booking_provider='portal'),
+  // even booking submissions stay fully portal-native.
   const contactProv = await contactProvider(client.id);
-  const requireGhl = !!(booking?.calendar_id && booking?.start);
+  const bookingProv = client.booking_provider === "portal" ? "portal" : "ghl";
+  const requireGhl = !!(booking?.calendar_id && booking?.start) && bookingProv !== "portal";
 
   let ghlStatus = "not-configured";
   let kpiContactId = null;
@@ -469,33 +472,74 @@ async function handler(req, res) {
       appointmentStatus = "failed";
       try {
         const eps = await sbReq(
-          `entry_points?client_id=eq.${client.id}&type=eq.calendar&key=eq.${encodeURIComponent(booking.calendar_id)}&enabled=eq.true&select=id,pipeline_name,stage_name,ghl_workflow_id&limit=1`
+          `entry_points?client_id=eq.${client.id}&type=eq.calendar&key=eq.${encodeURIComponent(booking.calendar_id)}&enabled=eq.true&select=id,label,pipeline_name,stage_name,ghl_workflow_id&limit=1`
         );
         if (!eps?.[0]) throw new Error("calendar not available");
         const calEp = eps[0];
-        const oauthToken = await getClientGhlToken(client);
-        const oauthHeaders = {
-          Authorization: `Bearer ${oauthToken}`,
-          Version: V2_VERSION,
-          "Content-Type": "application/json",
-          Accept: "application/json",
-        };
-        const apptRes = await fetch(`${GHL_V2}/calendars/events/appointments`, {
-          method: "POST",
-          headers: oauthHeaders,
-          body: JSON.stringify({
-            calendarId: booking.calendar_id,
-            locationId: client.ghl_location_id,
-            contactId: receipt.ghl_contact_id,
-            startTime: booking.start,
-          }),
-        });
-        const apptJson = await apptRes.json().catch(() => ({}));
-        if (!apptRes.ok) throw new Error(apptJson.message || apptJson.error || `GHL ${apptRes.status}`);
-        appointmentStatus = "booked";
-        fields.appointment_id = (apptJson.appointment || apptJson).id || null;
-        fields.booked_slot = booking.start;
-        receipt.fields = fields;
+        // OAuth headers power the GHL branch + downstream stage placement. On a
+        // portal-booking academy they're best-effort: the registry-first stage
+        // resolution and the portal opp store don't need GHL at all.
+        let oauthHeaders = { Version: V2_VERSION, "Content-Type": "application/json", Accept: "application/json" };
+        try {
+          const oauthToken = await getClientGhlToken(client);
+          oauthHeaders = { Authorization: `Bearer ${oauthToken}`, ...oauthHeaders };
+        } catch (e) {
+          if (bookingProv !== "portal") throw e;   // GHL booking can't proceed without a token
+        }
+        if (bookingProv === "portal") {
+          // Book onto OUR slot via Luka's capacity-safe RPC (never a direct
+          // insert). Resolve the chosen time to a schedule_slots row, scoped to
+          // this calendar's "Group N" template family.
+          const t = new Date(booking.start);
+          if (isNaN(t.getTime())) throw new Error("invalid slot time");
+          const slotRows = (await sbReq(
+            `schedule_slots?tenant_id=eq.${client.id}&is_cancelled=eq.false&start_time=eq.${encodeURIComponent(t.toISOString())}&select=id,name&limit=10`
+          )) || [];
+          const groupMatch = /group\s*\d+/i.exec(calEp.label || "");
+          const groupPrefix = groupMatch ? groupMatch[0].toLowerCase().replace(/\s+/g, " ") : null;
+          const slot = slotRows.find(s => !groupPrefix || (s.name || "").toLowerCase().replace(/\s+/g, " ").includes(groupPrefix)) || slotRows[0];
+          if (!slot) throw new Error("slot not found for chosen time");
+          const rpcRes = await sbReq(`rpc/book_trial_slot`, {
+            method: "POST",
+            body: JSON.stringify({
+              p_tenant_id: client.id,
+              p_slot_id: slot.id,
+              p_parent_name: name || null,
+              p_parent_email: email ? email.toLowerCase() : null,
+              p_athlete_name: (fields?.athlete_name || fields?.athlete || "").trim() || null,
+              p_parent_phone: phone || null,
+              p_athlete_dob: null,
+              p_entry_point_id: calEp.id,
+              p_offer_id: null,
+              p_ghl_contact_id: receipt.ghl_contact_id,
+              p_source: "website",
+              p_metadata: { website_lead_id: leadId, calendar_key: booking.calendar_id, slot_name: slot.name },
+            }),
+          });
+          const trialBookingId = typeof rpcRes === "string" ? rpcRes : (rpcRes && rpcRes.trial_booking_id) || null;
+          if (!trialBookingId) throw new Error("trial booking failed");
+          appointmentStatus = "booked";
+          fields.trial_booking_id = trialBookingId;
+          fields.booked_slot = booking.start;
+          receipt.fields = fields;
+        } else {
+          const apptRes = await fetch(`${GHL_V2}/calendars/events/appointments`, {
+            method: "POST",
+            headers: oauthHeaders,
+            body: JSON.stringify({
+              calendarId: booking.calendar_id,
+              locationId: client.ghl_location_id,
+              contactId: receipt.ghl_contact_id,
+              startTime: booking.start,
+            }),
+          });
+          const apptJson = await apptRes.json().catch(() => ({}));
+          if (!apptRes.ok) throw new Error(apptJson.message || apptJson.error || `GHL ${apptRes.status}`);
+          appointmentStatus = "booked";
+          fields.appointment_id = (apptJson.appointment || apptJson).id || null;
+          fields.booked_slot = booking.start;
+          receipt.fields = fields;
+        }
 
         const routeCfg = client.ghl_kpi_config?.portal_entry_routing;
         if (routeCfg?.enabled) {
@@ -514,7 +558,7 @@ async function handler(req, res) {
             } catch (e) { console.error("Booking portal route failed (non-fatal):", e.message); }
           }
         } else {
-          if (calEp.ghl_workflow_id) {
+          if (calEp.ghl_workflow_id && contactProv !== "portal") {
             await enrollInWorkflow(client, receipt.ghl_contact_id, calEp.ghl_workflow_id);
           }
           // Booking advances the pipeline card to the CALENDAR entry point's
