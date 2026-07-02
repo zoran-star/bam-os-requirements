@@ -11,6 +11,7 @@
 
 import crypto from "node:crypto";
 import { decryptSecret } from "../messaging/_crypto.js";
+import { maybeSendSmsViaProvider } from "../messaging/provider.js";
 
 const SB_URL = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
 const SB_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
@@ -41,10 +42,12 @@ function shapeCfg(row) {
     ringNumbers:       Array.isArray(row.voice_ring_numbers) ? row.voice_ring_numbers.filter(Boolean) : [],
     voiceRecord:       row.voice_record === true,
     voicemailEnabled:  row.voicemail_enabled !== false,
+    missedTextEnabled: row.missed_call_text_enabled !== false,
+    missedText:        row.missed_call_text || null,
   };
 }
 
-const CFG_COLS = "client_id,account_sid,auth_token_enc,api_key_sid,api_key_secret_enc,from_number,status,voice_enabled,voice_ring_numbers,voice_record,voicemail_enabled";
+const CFG_COLS = "client_id,account_sid,auth_token_enc,api_key_sid,api_key_secret_enc,from_number,status,voice_enabled,voice_ring_numbers,voice_record,voicemail_enabled,missed_call_text_enabled,missed_call_text";
 
 // Look up an academy's voice config by the number that received/owns the call.
 export async function loadVoiceConfigByNumber(e164) {
@@ -144,6 +147,22 @@ export async function startClickToCall(cfg, { leadPhone }) {
   const j = await r.json().catch(() => ({}));
   if (!r.ok) throw new Error(`Twilio ${r.status}: ${j.message || j.code || "call failed"}`);
   return { sid: j.sid || null, status: j.status || "queued", staff };
+}
+
+const DEFAULT_MISSED_TEXT = "Sorry we missed your call! Reply to this text and we'll help you out.";
+
+// Auto-text a caller after a missed inbound call. Routes through the portal SMS
+// spine first so it threads in the portal inbox (fully off-GHL) and the lead's
+// reply lands there; falls back to a direct Twilio send. Best-effort.
+export async function sendMissedCallText(cfg, callerPhone) {
+  if (!cfg || !cfg.missedTextEnabled || !callerPhone) return { skipped: true };
+  const body = (cfg.missedText && cfg.missedText.trim()) || DEFAULT_MISSED_TEXT;
+  try {
+    const r = await maybeSendSmsViaProvider(cfg.clientId, { toPhone: callerPhone, body, sentBy: "missed-call-auto" });
+    if (r && r.handled) return { ok: true, via: "provider" };
+  } catch (_) { /* fall through to direct */ }
+  await sendSmsVia(cfg, callerPhone, body);
+  return { ok: true, via: "direct" };
 }
 
 // Fire a plain SMS via the academy's Twilio (used for voicemail alerts to staff).
