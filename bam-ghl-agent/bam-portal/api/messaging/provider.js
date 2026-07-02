@@ -129,7 +129,9 @@ async function sendViaTwilio(clientId, { toPhone, body, ghlContactId, sentBy, co
     }).catch(() => {});
     await sb(`sms_threads?id=eq.${thread.id}`, {
       method: "PATCH", headers: { Prefer: "return=minimal" },
-      body: JSON.stringify({ last_message_at: occurred, last_preview: (body || "").slice(0, 160), last_direction: "outbound", updated_at: occurred }),
+      // unread:false - replying means the inbound was handled (nothing else
+      // ever clears the flag; per-user receipts cover read-without-reply).
+      body: JSON.stringify({ last_message_at: occurred, last_preview: (body || "").slice(0, 160), last_direction: "outbound", unread: false, updated_at: occurred }),
     }).catch(() => {});
   }
   return { ok: true, sid: json.sid || null, status: json.status || "queued" };

@@ -399,14 +399,22 @@ async function handler(req, res) {
         if (emailOn) { const t = await readEmailStoreThreadById(conversationId).catch(() => null); if (t) return res.status(200).json(t); }
         return res.status(200).json({ conversation_id: conversationId, messages: [] });
       }
-      // List: merge both stores' conversations, newest activity first, then
-      // classify member/lead off-GHL so the Members/Leads filters + counts work.
-      const lists = await Promise.all([
-        smsOn ? listStoreThreads(clientId).catch(() => []) : [],
-        emailOn ? listEmailStoreThreads(clientId).catch(() => []) : [],
+      // List: merge both stores' conversations, then classify member/lead
+      // off-GHL so the Members/Leads filters + counts work. Per-user read
+      // receipts (the same ghl_conversation_reads the mark-read action writes,
+      // keyed here by the store thread uuid) are applied so a thread you opened
+      // STAYS read across reloads and devices; sort matches the GHL path
+      // (unread first, then newest).
+      const [lists, readsMap] = await Promise.all([
+        Promise.all([
+          smsOn ? listStoreThreads(clientId).catch(() => []) : [],
+          emailOn ? listEmailStoreThreads(clientId).catch(() => []) : [],
+        ]),
+        loadUserReads(clientId, ctx.user.id),
       ]);
-      const merged = [...lists[0], ...lists[1]].sort((a, b) => new Date(b.lastMessageDate || 0) - new Date(a.lastMessageDate || 0));
-      const conversations = await classifyStoreConversations(clientId, merged);
+      const merged = [...lists[0], ...lists[1]];
+      const classified = await classifyStoreConversations(clientId, merged);
+      const conversations = sortByUnreadThenDate(applyReads(classified, readsMap));
       const counts = {
         all:     conversations.length,
         members: conversations.filter((c) => c.classification === "member").length,
