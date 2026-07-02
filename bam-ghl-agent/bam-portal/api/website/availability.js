@@ -163,21 +163,68 @@ async function handler(req, res) {
   let client;
   try {
     const rows = await sbReq(
-      `clients?id=eq.${client_id}&select=id,time_zone,ghl_location_id,ghl_kpi_config,ghl_access_token,ghl_refresh_token,ghl_token_expires_at&limit=1`
+      `clients?id=eq.${client_id}&select=id,time_zone,booking_provider,ghl_location_id,ghl_kpi_config,ghl_access_token,ghl_refresh_token,ghl_token_expires_at&limit=1`
     );
     client = rows?.[0];
   } catch (e) { return res.status(500).json({ error: e.message }); }
   if (!client) return res.status(404).json({ error: "client not found" });
 
   // Only calendars the academy exposed as entry points are readable.
+  let calEp;
   try {
     const eps = await sbReq(
-      `entry_points?client_id=eq.${client_id}&type=eq.calendar&key=eq.${encodeURIComponent(calendar)}&enabled=eq.true&select=id&limit=1`
+      `entry_points?client_id=eq.${client_id}&type=eq.calendar&key=eq.${encodeURIComponent(calendar)}&enabled=eq.true&select=id,label&limit=1`
     );
-    if (!eps?.[0]) return res.status(404).json({ error: "calendar not available" });
+    calEp = eps?.[0];
+    if (!calEp) return res.status(404).json({ error: "calendar not available" });
   } catch (e) { return res.status(500).json({ error: e.message }); }
 
   const timezone = client.time_zone || "America/Toronto";
+
+  // ── booking_provider='portal': serve OUR slots (schedule_slots), GHL never
+  // consulted. Same response shape as the GHL branch, so client sites keep
+  // working unchanged. The entry point's "Group N" label picks which template
+  // family this calendar maps to; spots math mirrors Luka's trial-slots
+  // endpoint (capacity - CONFIRMED reservations - BOOKED trials); the booking
+  // RPC re-checks capacity transactionally, so a stale read can't overbook.
+  if (client.booking_provider === "portal") {
+    try {
+      const groupMatch = /group\s*\d+/i.exec(calEp.label || "");
+      const groupPrefix = groupMatch ? groupMatch[0].toLowerCase().replace(/\s+/g, " ") : null;
+      const nowIso = new Date().toISOString();
+      const endIso = new Date(Date.now() + days * 24 * 3600 * 1000).toISOString();
+      const slots = (await sbReq(
+        `schedule_slots?tenant_id=eq.${client_id}&is_cancelled=eq.false&start_time=gte.${encodeURIComponent(nowIso)}&start_time=lte.${encodeURIComponent(endIso)}&select=id,name,start_time,capacity&order=start_time.asc&limit=500`
+      )) || [];
+      const list = slots.filter(s => !groupPrefix || (s.name || "").toLowerCase().replace(/\s+/g, " ").includes(groupPrefix));
+      const taken = new Map();
+      if (list.length) {
+        const inList = list.map(s => encodeURIComponent(s.id)).join(",");
+        const [resv, trials] = await Promise.all([
+          sbReq(`reservations?slot_id=in.(${inList})&status=eq.CONFIRMED&select=slot_id`).catch(() => []),
+          sbReq(`trial_bookings?slot_id=in.(${inList})&status=eq.BOOKED&select=slot_id`).catch(() => []),
+        ]);
+        for (const r of [...(resv || []), ...(trials || [])]) taken.set(r.slot_id, (taken.get(r.slot_id) || 0) + 1);
+      }
+      // Emit local-offset ISO strings + local day keys (what GHL emitted), so
+      // the site's picker + booking.start round-trip identically.
+      const fmt = new Intl.DateTimeFormat("en-CA", { timeZone: timezone, year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false, timeZoneName: "longOffset" });
+      const out = {};
+      for (const s of list) {
+        if ((s.capacity - (taken.get(s.id) || 0)) <= 0) continue;
+        const parts = Object.fromEntries(fmt.formatToParts(new Date(s.start_time)).map(p => [p.type, p.value]));
+        const off = (parts.timeZoneName || "GMT-04:00").replace("GMT", "") || "+00:00";
+        const day = `${parts.year}-${parts.month}-${parts.day}`;
+        const iso = `${day}T${parts.hour === "24" ? "00" : parts.hour}:${parts.minute}:${parts.second}${off}`;
+        (out[day] = out[day] || []).push(iso);
+      }
+      res.setHeader("Cache-Control", "s-maxage=60, stale-while-revalidate=120");
+      return res.status(200).json({ timezone, days: out });
+    } catch (e) {
+      return res.status(502).json({ error: `availability failed: ${e.message}` });
+    }
+  }
+
   try {
     const token = await getClientGhlToken(client);
     const start = Date.now();
