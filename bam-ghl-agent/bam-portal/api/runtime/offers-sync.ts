@@ -543,109 +543,114 @@ function summarize(plan: ReturnType<typeof buildSyncPlan>) {
   };
 }
 
+// The full load -> plan -> (optionally) apply pipeline, minus auth. Exported so
+// staff tooling/scripts (service role) and DB-backed tests can drive the exact
+// code path the endpoint runs.
+export async function runOffersSync(supabase: RuntimeSupabaseClient, body: SyncBody) {
+  const clientId = (body.client_id || "").trim();
+  const offerId = (body.offer_id || "").trim();
+  const mode = body.mode === "apply" ? "apply" : "preview";
+  if (!clientId || !offerId) throw new HttpError(400, "client_id and offer_id required");
+  const rules = validateRules(body.entitlement_rules);
+  const offerType = (body.offer_type || "TRAINING").trim().toUpperCase();
+  const purchaseKind = (body.purchase_kind || "MEMBERSHIP").trim().toUpperCase();
+  const bookableProgramId = body.bookable_program_id ? String(body.bookable_program_id) : null;
+
+  const { data: offerRows, error: offerError } = await supabase
+    .from("offers")
+    .select("id, client_id, title, data")
+    .eq("id", offerId)
+    .eq("client_id", clientId)
+    .limit(1);
+  const offer = assertRows<OfferRow>(offerRows, offerError)[0];
+  if (!offer) throw new HttpError(404, "offer not found for this client");
+
+  if (bookableProgramId) {
+    const { data: programRows, error: programError } = await supabase
+      .from("bookable_programs")
+      .select("id")
+      .eq("id", bookableProgramId)
+      .eq("tenant_id", clientId)
+      .limit(1);
+    if (!assertRows<{ id: string }>(programRows, programError)[0]) {
+      throw new HttpError(400, "bookable_program_id not found for this client");
+    }
+  }
+
+  const { data: catalogData, error: catalogError } = await supabase
+    .from("pricing_catalog")
+    .select(
+      "id, offer_id, offer_price_key, display_name, tier, match_status, is_routable, amount_cents, currency, interval, stripe_price_id, stripe_product_id",
+    )
+    .eq("client_id", clientId)
+    .eq("offer_id", offerId)
+    .eq("match_status", "confirmed")
+    .not("offer_price_key", "is", null)
+    .order("offer_price_key");
+  const catalogRows = assertRows<CatalogRow>(catalogData, catalogError);
+  if (!catalogRows.length) {
+    throw new HttpError(400, "no confirmed pricing_catalog rows for this offer - run the Stripe Matcher first");
+  }
+
+  const { data: optionData, error: optionError } = await supabase
+    .from("offer_options")
+    .select("id, title, status, source_offer_option_key, sort_order")
+    .eq("tenant_id", clientId)
+    .eq("source_offer_id", offerId);
+  const existingOptions = assertRows<OptionRow>(optionData, optionError);
+
+  const { data: priceData, error: priceError } = await supabase
+    .from("offer_prices")
+    .select(
+      "id, offer_option_id, title, amount_cents, currency, billing_interval, stripe_price_id, stripe_product_id, source_offer_id, source_offer_price_key, source_pricing_catalog_id, is_active, is_routable, sort_order",
+    )
+    .eq("tenant_id", clientId);
+  const existingPrices = assertRows<PriceRow>(priceData, priceError);
+
+  const priceIds = existingPrices.map((p) => p.id);
+  let existingTemplates: TemplateRow[] = [];
+  if (priceIds.length) {
+    const { data: tplData, error: tplError } = await supabase
+      .from("entitlement_templates")
+      .select(
+        "id, offer_price_id, entitlement_kind, scope_type, credits_per_period, credit_period, is_unlimited, credit_cost_policy, config, status, bookable_program_id",
+      )
+      .eq("tenant_id", clientId)
+      .in("offer_price_id", priceIds);
+    existingTemplates = assertRows<TemplateRow>(tplData, tplError);
+  }
+
+  const plan = buildSyncPlan({
+    offer,
+    catalogRows,
+    existingOptions,
+    existingPrices,
+    existingTemplates,
+    rules,
+    bookableProgramId,
+  });
+
+  if (mode === "apply") {
+    await applyPlan(supabase, clientId, offerId, offerType, purchaseKind, bookableProgramId, plan);
+  }
+
+  return {
+    ok: true,
+    mode,
+    offer: { id: offer.id, title: offer.title },
+    plan: summarize(plan),
+  };
+}
+
 async function handler(req: RuntimeApiRequest, res: RuntimeApiResponse) {
   try {
     if (req.method !== "POST") {
       throw new HttpError(405, "POST required");
     }
     await getStaffContext(req);
-
-    const body = (req.body || {}) as SyncBody;
-    const clientId = (body.client_id || "").trim();
-    const offerId = (body.offer_id || "").trim();
-    const mode = body.mode === "apply" ? "apply" : "preview";
-    if (!clientId || !offerId) throw new HttpError(400, "client_id and offer_id required");
-    const rules = validateRules(body.entitlement_rules);
-    const offerType = (body.offer_type || "TRAINING").trim().toUpperCase();
-    const purchaseKind = (body.purchase_kind || "MEMBERSHIP").trim().toUpperCase();
-    const bookableProgramId = body.bookable_program_id ? String(body.bookable_program_id) : null;
-
     const supabase = createRuntimeSupabaseClient();
-
-    const { data: offerRows, error: offerError } = await supabase
-      .from("offers")
-      .select("id, client_id, title, data")
-      .eq("id", offerId)
-      .eq("client_id", clientId)
-      .limit(1);
-    const offer = assertRows<OfferRow>(offerRows, offerError)[0];
-    if (!offer) throw new HttpError(404, "offer not found for this client");
-
-    if (bookableProgramId) {
-      const { data: programRows, error: programError } = await supabase
-        .from("bookable_programs")
-        .select("id")
-        .eq("id", bookableProgramId)
-        .eq("tenant_id", clientId)
-        .limit(1);
-      if (!assertRows<{ id: string }>(programRows, programError)[0]) {
-        throw new HttpError(400, "bookable_program_id not found for this client");
-      }
-    }
-
-    const { data: catalogData, error: catalogError } = await supabase
-      .from("pricing_catalog")
-      .select(
-        "id, offer_id, offer_price_key, display_name, tier, match_status, is_routable, amount_cents, currency, interval, stripe_price_id, stripe_product_id",
-      )
-      .eq("client_id", clientId)
-      .eq("offer_id", offerId)
-      .eq("match_status", "confirmed")
-      .not("offer_price_key", "is", null)
-      .order("offer_price_key");
-    const catalogRows = assertRows<CatalogRow>(catalogData, catalogError);
-    if (!catalogRows.length) {
-      throw new HttpError(400, "no confirmed pricing_catalog rows for this offer - run the Stripe Matcher first");
-    }
-
-    const { data: optionData, error: optionError } = await supabase
-      .from("offer_options")
-      .select("id, title, status, source_offer_option_key, sort_order")
-      .eq("tenant_id", clientId)
-      .eq("source_offer_id", offerId);
-    const existingOptions = assertRows<OptionRow>(optionData, optionError);
-
-    const { data: priceData, error: priceError } = await supabase
-      .from("offer_prices")
-      .select(
-        "id, offer_option_id, title, amount_cents, currency, billing_interval, stripe_price_id, stripe_product_id, source_offer_id, source_offer_price_key, source_pricing_catalog_id, is_active, is_routable, sort_order",
-      )
-      .eq("tenant_id", clientId);
-    const existingPrices = assertRows<PriceRow>(priceData, priceError);
-
-    const priceIds = existingPrices.map((p) => p.id);
-    let existingTemplates: TemplateRow[] = [];
-    if (priceIds.length) {
-      const { data: tplData, error: tplError } = await supabase
-        .from("entitlement_templates")
-        .select(
-          "id, offer_price_id, entitlement_kind, scope_type, credits_per_period, credit_period, is_unlimited, credit_cost_policy, config, status, bookable_program_id",
-        )
-        .eq("tenant_id", clientId)
-        .in("offer_price_id", priceIds);
-      existingTemplates = assertRows<TemplateRow>(tplData, tplError);
-    }
-
-    const plan = buildSyncPlan({
-      offer,
-      catalogRows,
-      existingOptions,
-      existingPrices,
-      existingTemplates,
-      rules,
-      bookableProgramId,
-    });
-
-    if (mode === "apply") {
-      await applyPlan(supabase, clientId, offerId, offerType, purchaseKind, bookableProgramId, plan);
-    }
-
-    return res.status(200).json({
-      ok: true,
-      mode,
-      offer: { id: offer.id, title: offer.title },
-      plan: summarize(plan),
-    });
+    const result = await runOffersSync(supabase, (req.body || {}) as SyncBody);
+    return res.status(200).json(result);
   } catch (error) {
     return sendError(res, error);
   }
