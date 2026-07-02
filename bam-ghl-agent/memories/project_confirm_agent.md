@@ -195,3 +195,17 @@ RPC-only rule applies).
   so notes shape the agent's NEXT drafts. Follow-up cards badge 'follow-up N of 3'.
 - Staff edits to a draft need no special handling: each next follow-up is drafted
   fresh from the REAL thread, so the edited text is what the agent re-reads.
+
+## Follow-up loop v3: PLAN mode (2026-07-02 late)
+- The loop now drafts the WHOLE remaining plan in one pass (PLAN_TOOL ->
+  followup_1..3) instead of one message per day-with-approval. All plan rows
+  insert as pending (created_by 'followup-plan'); Hawkeye groups a contact's
+  pending followup_N rows into ONE plan card (each message editable, empty box
+  = drop that step) with a single '✓ Approve plan' -> action 'approve-plan'
+  staggers send_after 1 DAY APART; the detector's flush delivers each when due.
+- A reply cancels remaining plan rows in TWO places: the flush (never send on
+  top of a fresh inbound) and the reactive branch (cancels then answers).
+- Paying member found in Done Trial -> auto-marked WON + cards cleared (they
+  should never sit in the stage).
+- Edit the templated 'thanks for coming out' copy: Train tab -> Closing ->
+  📨 Initial automations.

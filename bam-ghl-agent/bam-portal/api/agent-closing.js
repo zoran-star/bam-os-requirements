@@ -117,6 +117,42 @@ const REPLY_TOOL = {
   },
 };
 
+// The follow-up PLAN for a quiet Done-Trial lead: up to 3 messages drafted in one
+// pass, approved as a batch in Hawkeye, then sent 1 day apart - each only if the
+// previous got no reply. A reply at any point cancels the rest.
+const PLAN_TOOL = {
+  name: "propose_followup_plan",
+  description: "Propose the follow-up plan for a quiet Done-Trial lead. A human approves the whole plan; messages then send ONE DAY APART, each only if the previous got no reply.",
+  input_schema: {
+    type: "object",
+    properties: {
+      followup_1: { type: "string", description: "Day 1: short, warm, fresh nudge toward signing up. Never repeats or rephrases earlier messages." },
+      followup_2: { type: "string", description: "Day 2 (sends only if #1 got no reply): a DIFFERENT angle - value, schedule fit, or a light question. Must read naturally after silence." },
+      followup_3: { type: "string", description: "Day 3 (sends only if #2 got no reply): friendly, no-pressure close-out that leaves the door open." },
+      summary:    { type: "string", description: "2-3 sentence reviewer summary: who the lead is, their trial, where enrollment stands." },
+      reasoning:  { type: "string", description: "1-2 sentences on the plan's angle." },
+      confidence: { type: "number", description: "0..1" },
+      followup_on:{ type: "string", description: "YYYY-MM-DD. ONLY if the lead named a decision date/timeframe: the day after it - the plan starts sending then." },
+    },
+    required: ["followup_1", "followup_2", "followup_3", "reasoning", "confidence"],
+  },
+};
+
+async function runClosingPlan(system, messages, { seed }) {
+  let convo = messages
+    .filter(m => m && typeof m.text === "string" && m.text.trim() !== "")
+    .map(m => ({ role: m.role === "agent" ? "assistant" : "user", content: m.text }));
+  convo.push({ role: "user", content: seed });
+  while (convo.length && convo[0].role === "assistant") convo.shift();
+  const data = await anthropicCall({
+    model: ANTHROPIC_MODEL, max_tokens: 1024, system, tools: [PLAN_TOOL],
+    tool_choice: { type: "tool", name: "propose_followup_plan" }, messages: convo,
+  });
+  const out = (data.content || []).find(b => b.type === "tool_use" && b.name === "propose_followup_plan");
+  if (out?.input) return out.input;
+  throw new Error("no structured plan from Claude");
+}
+
 async function anthropicCall(body) {
   const r = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
@@ -222,6 +258,28 @@ async function draftForContact(token, locationId, clientId, contactId, cfg, opts
   }
 
   const system = buildSystem(cfg) + await loadContactMemory(sb, clientId, contactId, { ghl, token, locationId });
+
+  // PLAN MODE (the follow-up loop): draft the whole up-to-3-message plan in one
+  // pass instead of a single reply. Same system prompt + contact memory + thread.
+  if (opts.planMode) {
+    let planOut;
+    try { planOut = await runClosingPlan(system, messages, { seed }); }
+    catch (e) { return { error: e.message }; }
+    const agentMsgs = messages.filter(m => m.role === "agent");
+    return {
+      conversation_id: conversationId,
+      plan: [planOut.followup_1, planOut.followup_2, planOut.followup_3].map(s => String(s || "").trim()),
+      reasoning: planOut.reasoning || "",
+      summary: planOut.summary ? String(planOut.summary).slice(0, 600) : null,
+      confidence: typeof planOut.confidence === "number" ? planOut.confidence : null,
+      followup_on: (typeof planOut.followup_on === "string" && /^\d{4}-\d{2}-\d{2}$/.test(planOut.followup_on)) ? planOut.followup_on : null,
+      trial_at: null,
+      last_message: (() => { const lead = [...messages].reverse().find(m => m.role === "parent"); return lead ? String(lead.text).slice(0, 500) : null; })(),
+      last_outbound: (() => { const ours = [...messages].reverse().find(m => m.role === "agent"); return ours ? String(ours.text).slice(0, 500) : null; })(),
+      thread_tail: messages.slice(-6).map(m => ({ role: m.role === "agent" ? "agent" : "lead", text: String(m.text).slice(0, 320), at: toIso(m.date) })),
+      reply_count: agentMsgs.length,
+    };
+  }
 
   let out;
   try { out = await runClosingAgent(system, messages, { seed }); }
@@ -415,24 +473,33 @@ async function maybeFollowUpOrNurture({ client, token, locationId, dts, cfg, ite
     return "lost-recommended";
   }
 
-  const k = fuSent.length + 1;
-  const seed = `[No reply from the lead since our last message ~${Math.max(1, Math.floor(silenceDays))} day(s) ago. This is proactive follow-up #${k} of ${FOLLOWUP_MAX}. Re-read the conversation and the coach's post-trial notes in contact_memory, then write ONE short, warm, fresh nudge toward getting the athlete signed up - do NOT repeat or rephrase earlier messages.${k >= FOLLOWUP_MAX ? " This is the FINAL follow-up: a friendly, no-pressure close-out that leaves the door open." : ""}]`;
+  // Draft the WHOLE remaining plan in one pass (Zoran: approve all follow-ups at
+  // once; they send 1 day apart). Strikes already sent this silence-streak shrink
+  // the plan: e.g. 1 sent -> a 2-message plan (followup_2, followup_3).
+  const remaining = FOLLOWUP_MAX - fuSent.length;
+  const startK = fuSent.length + 1;
+  const seed = `[No reply from the lead since our last message ~${Math.max(1, Math.floor(silenceDays))} day(s) ago. Draft the follow-up PLAN: ${remaining} short, warm message(s) that will send ONE DAY APART, each only if the previous one got no reply. Re-read the conversation and the coach's post-trial notes in contact_memory. Every message must feel fresh (no repeats, different angles); the final one is a friendly, no-pressure close-out that leaves the door open. A human approves the whole plan before anything sends.${remaining < 3 ? ` Provide the plan in followup_1..followup_${remaining} and leave the rest as empty strings.` : ""}]`;
   const d = await draftForContact(token, locationId, clientId, contactId, cfg, {
-    dts, conversationId: item.conversation_id, skipStageGuard: true, lastDirection: item.last_direction, seed,
+    dts, conversationId: item.conversation_id, skipStageGuard: true, lastDirection: item.last_direction, seed, planMode: true,
   });
   if (d.skip) return d.skip;
   if (d.error) return d.error;
-  if (!d.reply || !String(d.reply).trim()) return "agent returned an empty follow-up";
-  await sb(`agent_closing_replies`, { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify([{
+  const texts = (d.plan || []).filter(t => t && t.trim()).slice(0, remaining);
+  if (!texts.length) return "agent returned an empty plan";
+  const nb = d.followup_on ? `${d.followup_on}T14:00:00Z` : null;
+  const planRows = texts.map((t, i) => ({
     client_id: clientId, ghl_contact_id: String(contactId), ghl_conversation_id: d.conversation_id || null,
-    contact_name: item.name || null, kind: "closing", step_key: `followup_${k}`,
-    draft_message: d.reply, reasoning: d.reasoning || `Proactive follow-up ${k} of ${FOLLOWUP_MAX}`,
-    confidence: d.confidence, trial_at: d.trial_at || null, last_message: d.last_message || null,
-    last_outbound: d.last_outbound || null, summary: d.summary || null, thread_tail: d.thread_tail || null,
-    reply_count: d.reply_count, followup_not_before: d.followup_on ? `${d.followup_on}T14:00:00Z` : null,
-    status: "pending", created_by: "followup-loop",
-  }]) });
-  return "drafted";
+    contact_name: item.name || null, kind: "closing", step_key: `followup_${startK + i}`,
+    draft_message: t,
+    reasoning: i === 0 ? (d.reasoning || `Follow-up plan: ${texts.length} message(s), 1 day apart.`) : `Plan message ${startK + i} of ${FOLLOWUP_MAX} - sends 1 day after the previous one if no reply.`,
+    summary: i === 0 ? d.summary : null,
+    confidence: d.confidence, trial_at: null,
+    last_message: d.last_message || null, last_outbound: d.last_outbound || null,
+    thread_tail: i === 0 ? d.thread_tail : null, reply_count: d.reply_count,
+    followup_not_before: nb, status: "pending", created_by: "followup-plan",
+  }));
+  await sb(`agent_closing_replies`, { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify(planRows) });
+  return "plan-drafted";
 }
 
 // Find a contact's open opportunity (provider-aware). Returns an oppRef
@@ -477,13 +544,22 @@ async function detectForClient(client) {
   } catch (_) {}
 
   // Flush quiet-hours holds (approved closing cards whose send time arrived).
+  // Approved follow-up PLAN steps ride this too: they sit 'approved' with
+  // send_after staggered 1 day apart, and the flush delivers each when due.
   let flushed = 0;
+  const _inboundLast = new Set(queue.filter(q => (q.last_direction || "") === "inbound").map(q => q.contact_id));
   if (withinQuietHours()) {
     try {
-      const held = await sb(`agent_closing_replies?client_id=eq.${client.id}&status=eq.approved&send_after=lte.${new Date().toISOString()}&select=id,ghl_contact_id,draft_message&order=send_after.asc&limit=40`);
+      const held = await sb(`agent_closing_replies?client_id=eq.${client.id}&status=eq.approved&send_after=lte.${new Date().toISOString()}&select=id,ghl_contact_id,draft_message,step_key&order=send_after.asc&limit=40`);
       for (const row of (Array.isArray(held) ? held : [])) {
         if (row.ghl_contact_id && !doneIds.has(row.ghl_contact_id)) {
           await sb(`agent_closing_replies?id=eq.${row.id}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ status: "canceled", send_error: "left Done-Trial stage", updated_at: new Date().toISOString() }) });
+          continue;
+        }
+        // A reply kills the rest of the plan - never send a scheduled follow-up on
+        // top of a fresh inbound. The reactive path answers, then re-plans later.
+        if ((row.step_key || "").startsWith("followup_") && _inboundLast.has(row.ghl_contact_id)) {
+          await sb(`agent_closing_replies?id=eq.${row.id}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ status: "canceled", send_error: "lead replied - plan canceled", updated_at: new Date().toISOString() }) });
           continue;
         }
         if (!row.draft_message || !String(row.draft_message).trim()) continue;
@@ -511,9 +587,28 @@ async function detectForClient(client) {
     if (mutedSet.has(String(contactId))) { skipped++; reasons.push(`${item.name || contactId}: bot muted on this lead`); continue; }
     // O6: never keep selling to a paid member. If the won-mark was skipped, a live
     // member can sit open in Done-Trial - skip them outright (independent of GHL won).
-    if (await isLiveMember(client.id, contactId, token)) { skipped++; reasons.push(`${item.name || contactId}: already a live member`); continue; }
+    if (await isLiveMember(client.id, contactId, token)) {
+      // A paying member has no business sitting in Done Trial (Zoran, 2026-07-02):
+      // close the loop - mark the opp WON (takes the card off the board) and
+      // cancel any open closing cards for them.
+      try {
+        const oppRef = await findOpenOpp(client.id, token, locationId, contactId);
+        if (oppRef) await setStatus({ clientId: client.id, ghl, token, oppRef, status: "won", contactId, reason: "auto: already a paying member" });
+        await clearClosingCards(client.id, contactId, "auto-won: already a paying member");
+        skipped++; reasons.push(`${item.name || contactId}: paying member - auto-marked won`);
+      } catch (e) { skipped++; reasons.push(`${item.name || contactId}: member auto-won failed - ${e.message}`); }
+      continue;
+    }
 
     const reactive = item.last_direction === "inbound";
+    if (reactive) {
+      // A reply cancels whatever plan was scheduled - the agent answers the
+      // conversation as it actually is, then re-plans once it goes quiet again.
+      try {
+        await sb(`agent_closing_replies?client_id=eq.${client.id}&ghl_contact_id=eq.${encodeURIComponent(contactId)}&status=in.(pending,approved)&step_key=like.followup*`,
+          { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ status: "canceled", send_error: "lead replied - plan canceled", updated_at: new Date().toISOString() }) });
+      } catch (_) {}
+    }
 
     // SCRIPTED INITIAL AUTOMATIONS (proactive only). When the academy's sequence is
     // live + approved, the timed scripted touches OWN the proactive path (they replace
@@ -533,7 +628,7 @@ async function detectForClient(client) {
       // Hawkeye-approved nudge at a time; after FOLLOWUP_MAX unanswered → Nurture.
       try {
         const fu = await maybeFollowUpOrNurture({ client, token, locationId, dts, cfg, item, contactId });
-        if (fu === "drafted") drafted++;
+        if (fu === "plan-drafted" || fu === "drafted") drafted++;
         else if (fu === "lost-recommended") { lostProposed++; reasons.push(`${item.name || contactId}: ${FOLLOWUP_MAX} follow-ups unanswered - Lost recommended in Hawkeye`); }
         else { skipped++; reasons.push(`${item.name || contactId}: ${fu}`); }
       } catch (e) { skipped++; reasons.push(`${item.name || contactId}: follow-up - ${e.message}`); }
@@ -743,6 +838,41 @@ async function handler(req, res) {
       if (d.error) return res.status(200).json({ error: d.error });
       if (d.skip) return res.status(200).json({ skip: d.skip });
       return res.status(200).json(d);
+    }
+
+    // Approve the whole follow-up PLAN in one tap: each pending followup_N row
+    // gets the (possibly edited) text and a send_after staggered 1 DAY APART.
+    // The detector's flush delivers each when due; a reply cancels the rest.
+    if (b.action === "approve-plan") {
+      if (!b.contact_id || !Array.isArray(b.edits) || !b.edits.length) return res.status(400).json({ error: "contact_id and edits required" });
+      const dtsP = await doneTrialStage(token, locationId, { clientId, sb });
+      if (!dtsP || !(await contactInRespondedStage(token, locationId, b.contact_id, dtsP, { clientId, sb }))) {
+        return res.status(409).json({ error: "This lead is no longer in the Done-Trial stage - not scheduling." });
+      }
+      let planRows = await sb(`agent_closing_replies?client_id=eq.${clientId}&ghl_contact_id=eq.${encodeURIComponent(b.contact_id)}&status=eq.pending&select=id,step_key,followup_not_before&order=created_at.asc`);
+      planRows = (Array.isArray(planRows) ? planRows : []).filter(r => (r.step_key || "").startsWith("followup_"));
+      if (!planRows.length) return res.status(404).json({ error: "no pending follow-up plan for this lead" });
+      const editById = new Map(b.edits.map(e => [String(e.id), String(e.reply || "").trim()]));
+      // The lead's decision date (if the agent extracted one) pushes the whole plan.
+      const holdMs = planRows.reduce((m, r) => Math.max(m, r.followup_not_before ? new Date(r.followup_not_before).getTime() : 0), 0);
+      const base = Math.max(Date.now(), holdMs || 0);
+      let scheduled = 0, dropped = 0, dayIdx = 0;
+      for (const row of planRows) {
+        const text = editById.get(String(row.id));
+        if (!text) {
+          // An emptied box = drop that step from the plan.
+          try { await sb(`agent_closing_replies?id=eq.${encodeURIComponent(row.id)}&client_id=eq.${clientId}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ status: "skipped", updated_at: new Date().toISOString() }) }); } catch (_) {}
+          dropped++;
+          continue;
+        }
+        const sendAfter = nextSendableTime(new Date(base + dayIdx * 86400000)).toISOString();
+        await sb(`agent_closing_replies?id=eq.${encodeURIComponent(row.id)}&client_id=eq.${clientId}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({
+          status: "approved", draft_message: text, send_after: sendAfter,
+          approved_by: staffEmail, approved_at: new Date().toISOString(), updated_at: new Date().toISOString(),
+        }) });
+        scheduled++; dayIdx++;
+      }
+      return res.status(200).json({ ok: true, scheduled, dropped });
     }
 
     if (b.action === "send") {

@@ -25901,9 +25901,66 @@ function _aclxRender() {
   const body = document.getElementById('aclx-body');
   if (!body) return;
   if (!_ACLX_DATA.length) { body.innerHTML = '<div style="max-width:860px;margin:0 auto">' + _apxEmpty('All clear - no closings waiting.') + '</div>'; return; }
-  const cards = _ACLX_DATA.map(r => r.kind === 'closing_enroll' ? _aclxEnrollCard(r) : r.kind === 'closing_lost' ? _aclxLostCard(r) : _aclxReplyCard(r)).join('');
+  // Follow-up PLAN grouping: a contact with 2+ pending followup_N rows renders
+  // as ONE plan card (all messages editable, approved together, sent 1 day apart).
+  const _isPlanRow = r => (r.step_key || '').startsWith('followup_') && r.status === 'pending';
+  const _planCount = new Map();
+  for (const r of _ACLX_DATA) if (_isPlanRow(r)) _planCount.set(r.ghl_contact_id, (_planCount.get(r.ghl_contact_id) || 0) + 1);
+  const _planRendered = new Set();
+  const cards = _ACLX_DATA.map(r => {
+    if (_isPlanRow(r) && (_planCount.get(r.ghl_contact_id) || 0) > 1) {
+      if (_planRendered.has(r.ghl_contact_id)) return '';
+      _planRendered.add(r.ghl_contact_id);
+      return _aclxPlanCard(_ACLX_DATA.filter(x => _isPlanRow(x) && x.ghl_contact_id === r.ghl_contact_id));
+    }
+    return r.kind === 'closing_enroll' ? _aclxEnrollCard(r) : r.kind === 'closing_lost' ? _aclxLostCard(r) : _aclxReplyCard(r);
+  }).join('');
   body.innerHTML = '<div style="max-width:860px;margin:0 auto">' + cards + '</div>';
-  _ACLX_DATA.forEach(r => _aclxLoadNotes(r));   // lazy-fill each card's team notes
+  const _notesDone = new Set();
+  _ACLX_DATA.forEach(r => { if (!_notesDone.has(r.ghl_contact_id)) { _notesDone.add(r.ghl_contact_id); _aclxLoadNotes(r); } });   // lazy-fill team notes (one per lead)
+}
+
+// One card for the whole follow-up plan: every message editable, one ✓ schedules
+// them 1 day apart (the agent cancels the rest the moment the lead replies).
+function _aclxPlanCard(rows) {
+  const first = rows[0];
+  const boxes = rows.map((r, i) => `
+    <div style="font-size:10px;color:var(--text-mute);text-transform:uppercase;letter-spacing:.09em;margin:${i ? '10px' : '2px'} 0 4px">Day ${i + 1}${i === rows.length - 1 ? ' · final, no-pressure' : ''} · clear the box to drop this step</div>
+    ${_aclxBox(r)}`).join('');
+  return `<div id="aclx-plan-${escapeHTML(first.ghl_contact_id)}" style="background:var(--surface);border:1px solid var(--accent-border,rgba(232,197,71,.3));border-radius:11px;padding:12px 14px;margin-bottom:9px">
+    ${_aclxHeader(first, `follow-up plan · ${rows.length} messages, 1 day apart`, 'var(--accent)')}
+    ${first.reasoning ? `<div style="font-size:11.5px;color:var(--text-sub);margin-bottom:6px">${escapeHTML(first.reasoning)}</div>` : ''}
+    ${_aclxContext(first)}
+    ${boxes}
+    ${_aclxNotesBlock(first)}
+    <div style="display:flex;align-items:stretch;gap:8px;margin-top:10px">
+      <button onclick="_aclxSkipPlan('${escapeHTML(first.ghl_contact_id)}')" title="Skip the whole plan" style="flex:1;background:transparent;border:1px solid var(--border);color:#e0654f;border-radius:9px;padding:9px;font-size:17px;cursor:pointer">✕</button>
+      <button onclick="_aclxApprovePlan('${escapeHTML(first.ghl_contact_id)}')" style="flex:2;background:var(--accent);border:1px solid var(--accent);color:#08080A;border-radius:9px;padding:9px;font-size:14px;font-weight:700;cursor:pointer">✓ Approve plan - sends 1 day apart</button>
+    </div>
+  </div>`;
+}
+async function _aclxApprovePlan(contactId) {
+  const rows = _ACLX_DATA.filter(x => (x.step_key || '').startsWith('followup_') && x.status === 'pending' && x.ghl_contact_id === contactId);
+  if (!rows.length) return;
+  const edits = rows.map(r => ({ id: r.id, reply: (document.getElementById('aclx-edit-' + r.id)?.value || '').trim() }));
+  try {
+    const token = await _mreqAuthToken();
+    const res = await fetch('/api/agent-closing', { method: 'POST', headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'approve-plan', client_id: CLIENT_ID, contact_id: contactId, edits }) });
+    const j = await _safeJson(res);
+    if (!res.ok) throw new Error(j.error || ('HTTP ' + res.status));
+    _ACLX_DATA = _ACLX_DATA.filter(x => !rows.some(r => r.id === x.id));
+    document.getElementById('aclx-plan-' + contactId)?.remove();
+    _apxToast(`Plan scheduled - ${j.scheduled} message(s), 1 day apart`, true);
+    if (!_ACLX_DATA.length) _aclxRender();
+  } catch (e) { alert('Could not schedule the plan: ' + (e.message || e)); }
+}
+async function _aclxSkipPlan(contactId) {
+  const rows = _ACLX_DATA.filter(x => (x.step_key || '').startsWith('followup_') && x.status === 'pending' && x.ghl_contact_id === contactId);
+  for (const r of rows) { try { await _apxPost('/api/agent-closing', 'skip-ready', { ready_id: r.id }); } catch (_) {} }
+  _ACLX_DATA = _ACLX_DATA.filter(x => !rows.some(r => r.id === x.id));
+  document.getElementById('aclx-plan-' + contactId)?.remove();
+  _apxToast('Plan skipped', true);
+  if (!_ACLX_DATA.length) _aclxRender();
 }
 
 // ── Team notes on a Done-Trial lead ──────────────────────────────────────────
