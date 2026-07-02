@@ -31400,7 +31400,9 @@ function _renderMemberModalBody(m, stripe, history) {
     <div style="${labelCss};margin-bottom:12px">Parent</div>
     ${rowGrid([
       ['Email', escapeHTML(m.parent_email || '-')],
-      ['Phone', escapeHTML(m.parent_phone || '-')],
+      ['Phone', m.parent_phone
+        ? `${escapeHTML(m.parent_phone)} <button onclick="_memberCall('${m.id}')" title="Rings your phone first, then connects you to this member" style="margin-left:8px;background:var(--gold,#E8C547);color:#0B0B0D;border:none;padding:4px 10px;font-weight:700;border-radius:4px;cursor:pointer;font-size:12px;font-family:inherit">📞 Call</button>`
+        : '-'],
     ])}
 
     ${divider}
@@ -31756,6 +31758,17 @@ async function _deleteMemberDoc(fileId, memberId, clientId) {
 
 // Inline-edit handler - saves a single field, then re-renders the drawer
 // with fresh data (re-fetches member + Stripe enrichment + history).
+// Click-to-call: rings the staff cell, then bridges to the member. The member
+// sees the academy number as caller ID. Backend: /api/members?action=call.
+async function _memberCall(memberId) {
+  try {
+    await _memberAction(memberId, 'call', {});
+    _plToast('📞 Calling - your phone will ring first, then it connects.');
+  } catch (e) {
+    _plToast('Call failed: ' + (e && e.message ? e.message : 'try again'));
+  }
+}
+
 async function _memberUpdateField(memberId, field, value) {
   try {
     await _memberAction(memberId, 'update-profile', { fields: { [field]: value } });
