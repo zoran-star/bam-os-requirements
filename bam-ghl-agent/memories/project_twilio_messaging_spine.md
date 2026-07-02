@@ -141,6 +141,11 @@ Build phases (after GTA proves the flow):
      API + status poller → auto-flip to Live. Extend client_twilio_config with
      brand_sid, campaign_sid, messaging_service_sid, a2p_status, provisioning_status.
   2. Self-serve screen (the 2-path flow) with prefilled info + status badge.
+     DECIDED 2026-07-02: the provisioner is CLIENT-facing (a "Set up your phone"
+     card in the client portal onboarding), NOT a staff button - Zoran wants zero
+     staff involvement. Client picks area code + ring cell + missed-call copy
+     (prefilled); staff only get a Slack note + a stuck-A2P alert. One number per
+     academy (idempotent). Port-in path = phase 2.
   3. New academies auto-run provisioning at onboarding → start on twilio day 1.
 
 ## Voice spine (calling) - built on top of this SMS spine
