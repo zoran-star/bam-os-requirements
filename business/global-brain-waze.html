@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Global Brain — Full Control</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --ink:#0A0A0B;--ink-2:#131316;--ink-3:#1C1C21;
+  --line-dark:#2A2A31;--line-dark-2:#383842;
+  --paper:#F5F1E8;--gold:#E8C547;--gold-3:#8B6F2A;--gold-hi:#F4D788;
+  --pace-go:#9FD88A;--pace-flow:#5A8FB8;
+  --display:"Space Grotesk","Inter",sans-serif;--sans:"Inter",system-ui,sans-serif;--mono:"JetBrains Mono",ui-monospace,monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--ink);color:var(--paper);font-family:var(--sans);font-size:14px;-webkit-font-smoothing:antialiased;padding:48px 40px}
+.wrap{max-width:1040px;margin:0 auto}
+.kicker{font-family:var(--mono);font-size:11px;letter-spacing:.18em;text-transform:uppercase;opacity:.45}
+.title{font-family:var(--display);font-size:46px;font-weight:500;letter-spacing:-.02em;line-height:1.02;margin-top:14px}
+.sub{font-size:15px;opacity:.62;margin-top:14px;max-width:640px;line-height:1.5}
+.sub b{color:var(--gold);font-weight:600}
+
+.pair{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--line-dark);border:1px solid var(--line-dark);margin-top:40px}
+.panel{background:var(--ink-2);padding:26px 24px}
+.panel.fc{background:linear-gradient(180deg,rgba(232,197,71,.06),rgba(232,197,71,.015))}
+.p-label{font-family:var(--mono);font-size:10px;letter-spacing:.16em;text-transform:uppercase;opacity:.5}
+.panel.fc .p-label{color:var(--gold);opacity:.9}
+.p-name{font-family:var(--display);font-size:24px;font-weight:600;letter-spacing:-.01em;margin-top:10px}
+.panel.fc .p-name{color:var(--gold)}
+.loop{margin-top:18px;display:flex;flex-direction:column;gap:10px}
+.step{display:flex;gap:12px;align-items:flex-start;font-size:14px;line-height:1.4}
+.step .n{font-family:var(--mono);font-size:10px;letter-spacing:.1em;color:var(--gold);opacity:.7;padding-top:3px;flex-shrink:0}
+.result{margin-top:16px;padding-top:16px;border-top:1px solid var(--line-dark);font-family:var(--display);font-size:16px;font-weight:500;letter-spacing:-.01em}
+.panel.fc .result{color:var(--gold)}
+
+.foot{margin-top:36px;border-top:1px solid var(--line-dark);padding-top:24px;display:flex;justify-content:space-between;align-items:flex-end;flex-wrap:wrap;gap:16px}
+.foot .punch{font-family:var(--display);font-size:22px;font-weight:500;letter-spacing:-.01em;line-height:1.4;max-width:720px}
+.foot .punch em{color:var(--gold);font-style:normal}
+.foot .meta{font-family:var(--mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;opacity:.4}
+@media(max-width:820px){.pair{grid-template-columns:1fr}.title{font-size:32px}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="kicker">§ The Moat · Global Brain</div>
+  <h1 class="title">It's Waze - for running an academy.</h1>
+  <p class="sub">Every academy that uses FullControl makes the AI smarter for <b>every other academy</b>. Your software has never done that. Ours does it every night.</p>
+
+  <div class="pair">
+    <div class="panel">
+      <div class="p-label">You already trust this</div>
+      <div class="p-name">Waze</div>
+      <div class="loop">
+        <div class="step"><span class="n">01</span><div>Every driver reports traffic, cops, hazards.</div></div>
+        <div class="step"><span class="n">02</span><div>The map learns from all of them at once.</div></div>
+        <div class="step"><span class="n">03</span><div>Every driver gets a better route.</div></div>
+      </div>
+      <div class="result">The more people drive it, the smarter it gets.</div>
+    </div>
+
+    <div class="panel fc">
+      <div class="p-label">Now for your business</div>
+      <div class="p-name">Global Brain</div>
+      <div class="loop">
+        <div class="step"><span class="n">01</span><div>Every academy teaches its AI what works - the pitches, the saves, the follow-ups.</div></div>
+        <div class="step"><span class="n">02</span><div>The best lessons flow into a shared brain.</div></div>
+        <div class="step"><span class="n">03</span><div>Every academy's AI gets sharper - automatically.</div></div>
+      </div>
+      <div class="result">The more academies on it, the smarter your AI gets.</div>
+    </div>
+  </div>
+
+  <div class="foot">
+    <div class="punch">The only academy platform that gets smarter every time <em>any</em> academy uses it. The more it learns, the more control you have.</div>
+    <div class="meta">Your data stays yours. Only the lessons are shared.</div>
+  </div>
+</div>
+</body>
+</html>

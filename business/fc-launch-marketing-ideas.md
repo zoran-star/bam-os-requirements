@@ -64,6 +64,9 @@ _Last updated: 2026-06-30 · Owners: Coleman, Zoran_
 
 ---
 
+## Content packs (ready-to-use)
+- **Global Brain — the Waze analogy** → [`content-global-brain-waze.md`](content-global-brain-waze.md) + visual [`global-brain-waze.html`](global-brain-waze.html). Network-effect moat made instantly clear: "Waze for running an academy." Hooks, captions, 15-sec script, sales + investor lines, taglines.
+
 ## Top 3 bets (if chasing only a few)
 1. **"Talk to your business" hero clip** — the wedge, most shareable
 2. **BAM GTA public case study** — proof + leverages your distribution
