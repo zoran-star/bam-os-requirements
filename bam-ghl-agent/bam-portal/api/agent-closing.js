@@ -217,11 +217,14 @@ async function draftForContact(token, locationId, clientId, contactId, cfg, opts
     return { error: "This lead isn't in the Done-Trial stage — the closing agent only works good-fit attendees." };
   }
   // Twilio academies: read the thread from the own-store (no GHL conversation).
+  // conversationId MUST live at function scope: the returns below reference it,
+  // and the Twilio branch never declared it - every AI draft on a Twilio academy
+  // crashed with "conversationId is not defined" (found via detect summaries).
+  let conversationId = opts.conversationId || null;
   let messages;
   if ((await smsProvider(clientId)) === "twilio") {
     messages = await readStoreThreadAgent(clientId, contactId);
   } else {
-    let conversationId = opts.conversationId;
     if (!conversationId) {
       const convo = await findConversation(token, locationId, contactId);
       if (!convo) return { error: "no conversation for contact" };
