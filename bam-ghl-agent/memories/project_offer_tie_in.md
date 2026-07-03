@@ -185,6 +185,16 @@ portal actions never block on sync failure, next Stripe event converges):
   program link pointing at a nonexistent/foreign program, or an enabled
   calendar entry point with no link.
 
+## Per-offer ANALYTICS lineage (2026-07-03, migration `20260703002342`)
+
+pipeline_outcomes / cancellations / refunds gained offer_id (kpi_events
+already had it). Filled by DB TRIGGERS at insert (fill_offer_from_opportunity
+/ _from_member / _from_contact_opp - best-effort, never block the insert), so
+every writer present and future is covered with zero JS changes. GTA history
+backfilled -> Training. Unlocks per-offer: conversion rate (win/loss), churn
+(cancellations), refund rate, and the lead->trial->member funnel. Non-GTA rows
+correctly stay NULL until those academies get offers.
+
 ## DONE. Future offers (ADAPT/camps) launch checklist
 1. Create the offer in BB + Stripe Matcher confirms prices (pricing_catalog).
 2. `scripts/offers-sync-run.mjs` preview -> apply with confirmed entitlement
