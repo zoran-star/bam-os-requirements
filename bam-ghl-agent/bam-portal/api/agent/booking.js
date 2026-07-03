@@ -177,6 +177,13 @@ export async function bookPortalTrial(clientId, { slotAtIso, group, calLabel, co
     const cr = await sbFetch(`contacts?client_id=eq.${encodeURIComponent(clientId)}&ghl_contact_id=eq.${encodeURIComponent(contactId)}&select=name,email,phone,athlete_name&limit=1`);
     c = (Array.isArray(cr) && cr[0]) || {};
   } catch (_) {}
+  // Offer lineage: the lead's open pipeline card knows which offer's funnel
+  // this trial belongs to (Wave 1 stamping). Best-effort - never blocks a book.
+  let oppOfferId = null;
+  try {
+    const opps = await sbFetch(`opportunities?client_id=eq.${encodeURIComponent(clientId)}&ghl_contact_id=eq.${encodeURIComponent(contactId)}&status=eq.open&select=offer_id&limit=1`);
+    oppOfferId = (Array.isArray(opps) && opps[0] && opps[0].offer_id) || null;
+  } catch (_) {}
   const r = await sbFetch(`rpc/book_trial_slot`, {
     method: "POST",
     body: JSON.stringify({
@@ -188,7 +195,7 @@ export async function bookPortalTrial(clientId, { slotAtIso, group, calLabel, co
       p_parent_phone: c.phone || null,
       p_athlete_dob: null,
       p_entry_point_id: null,
-      p_offer_id: null,
+      p_offer_id: oppOfferId,
       p_ghl_contact_id: contactId,
       p_source: "staff",
       p_metadata: { via: "agent-confirm-book", slot_name: slot.name },

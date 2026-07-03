@@ -506,7 +506,7 @@ async function handler(req, res) {
       appointmentStatus = "failed";
       try {
         const eps = await sbReq(
-          `entry_points?client_id=eq.${client.id}&type=eq.calendar&key=eq.${encodeURIComponent(booking.calendar_id)}&enabled=eq.true&select=id,label,pipeline_name,stage_name,ghl_workflow_id&limit=1`
+          `entry_points?client_id=eq.${client.id}&type=eq.calendar&key=eq.${encodeURIComponent(booking.calendar_id)}&enabled=eq.true&select=id,label,offer_id,pipeline_name,stage_name,ghl_workflow_id&limit=1`
         );
         if (!eps?.[0]) throw new Error("calendar not available");
         const calEp = eps[0];
@@ -544,7 +544,7 @@ async function handler(req, res) {
               p_parent_phone: phone || null,
               p_athlete_dob: null,
               p_entry_point_id: calEp.id,
-              p_offer_id: null,
+              p_offer_id: calEp.offer_id || null,
               p_ghl_contact_id: receipt.ghl_contact_id,
               p_source: "website",
               p_metadata: { website_lead_id: leadId, calendar_key: booking.calendar_id, slot_name: slot.name },

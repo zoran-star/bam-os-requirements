@@ -129,9 +129,41 @@ async function sbReq<T = unknown>(path: string): Promise<T> {
   return (text ? JSON.parse(text) : null) as T;
 }
 
+// Offer lineage when the site doesn't send offer_id: the slot knows its
+// bookable program, and the academy's entry points link that program to the
+// offer whose funnel it belongs to (offer tie-in step G). Unambiguous only -
+// zero or multiple candidate offers stays null. Best-effort, never blocks.
+async function deriveOfferIdForSlot(
+  supabase: ReturnType<typeof createRuntimeSupabaseClient>,
+  clientId: string,
+  slotId: string,
+): Promise<string | null> {
+  try {
+    const { data: slotData } = await supabase
+      .from("schedule_slots")
+      .select("bookable_program_id")
+      .eq("id", slotId)
+      .eq("tenant_id", clientId)
+      .maybeSingle();
+    const programId = (slotData as { bookable_program_id?: string | null } | null)?.bookable_program_id;
+    if (!programId) return null;
+    const { data: epData } = await supabase
+      .from("entry_points")
+      .select("offer_id")
+      .eq("client_id", clientId)
+      .eq("bookable_program_id", programId)
+      .not("offer_id", "is", null);
+    const offers = new Set(((epData as { offer_id: string }[] | null) || []).map((row) => row.offer_id));
+    return offers.size === 1 ? [...offers][0]! : null;
+  } catch {
+    return null;
+  }
+}
+
 async function createTrialBooking(req: RuntimeApiRequest) {
   const request = readCreateTrialBookingRequest(req);
   const supabase = createRuntimeSupabaseClient();
+  const offerId = request.offerId || (await deriveOfferIdForSlot(supabase, request.clientId, request.slotId));
   const { data, error } = await supabase.rpc("book_trial_slot", {
     p_tenant_id: request.clientId,
     p_slot_id: request.slotId,
@@ -141,7 +173,7 @@ async function createTrialBooking(req: RuntimeApiRequest) {
     p_parent_phone: request.parentPhone,
     p_athlete_dob: request.athleteDob,
     p_entry_point_id: request.entryPointId,
-    p_offer_id: request.offerId,
+    p_offer_id: offerId,
     p_ghl_contact_id: request.ghlContactId,
     p_source: "website",
     p_metadata: request.metadata,
