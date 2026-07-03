@@ -328,8 +328,9 @@ describe("runtime read-only APIs", () => {
       "live_member_price_unmapped_to_runtime",
       "entitlement_config_drift",
       "duplicate_identity_emails",
+      "entry_point_program_drift",
     ]);
-    expect(body.checks).toHaveLength(8);
+    expect(body.checks).toHaveLength(9);
     expect(body.checks.every((check) => check.status === "ok" || check.status === "fail")).toBe(true);
     expect(body.checks.every((check) => check.sample.length <= 10)).toBe(true);
 

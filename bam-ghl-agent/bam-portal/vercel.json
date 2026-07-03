@@ -198,6 +198,30 @@
       "destination": "/api/parent/student-entitlements?student_id=$1"
     },
     {
+      "source": "/api/parent/messages/read",
+      "destination": "/api/parent/messages?action=read"
+    },
+    {
+      "source": "/api/parent/messages/unread-count",
+      "destination": "/api/parent/messages?action=unread-count"
+    },
+    {
+      "source": "/api/client/parent-message-threads/unread-count",
+      "destination": "/api/client/parent-message-threads?action=unread-count"
+    },
+    {
+      "source": "/api/client/parent-message-threads/([^/]+)/messages",
+      "destination": "/api/client/parent-message-threads?thread_id=$1&action=messages"
+    },
+    {
+      "source": "/api/client/parent-message-threads/([^/]+)/read",
+      "destination": "/api/client/parent-message-threads?thread_id=$1&action=read"
+    },
+    {
+      "source": "/api/client/parent-message-threads/([^/]+)",
+      "destination": "/api/client/parent-message-threads?thread_id=$1"
+    },
+    {
       "source": "/api/runtime/offers/([^/]+)/options",
       "destination": "/api/runtime/offers?offer_id=$1"
     },

@@ -146,6 +146,13 @@ function publicRpcErrorMessage(message: string): string {
 }
 
 const SAFE_RPC_ERROR_MESSAGES = new Set([
+  "Author auth user is required.",
+  "Customer profile is required.",
+  "Invalid message author.",
+  "Invalid message type.",
+  "Invalid system author.",
+  "Message body is required.",
+  "Message not found.",
   "Membership is not active.",
   "Membership not found.",
   "No active entitlement with enough credits for this slot.",
@@ -161,6 +168,7 @@ const SAFE_RPC_ERROR_MESSAGES = new Set([
   "Slot not found.",
   "Student does not belong to membership.",
   "Student does not belong to this parent.",
+  "Thread not found.",
   "Waitlist entry cannot be removed from its current status.",
   "Waitlist entry not found.",
 ]);
