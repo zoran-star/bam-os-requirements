@@ -10416,9 +10416,9 @@ const _V15K_STEP_LABELS = {
   plan_viewed: 'Viewed plans', plan_picked: 'Picked plan', payment_started: 'Started payment', paid: 'Paid'
 };
 const _V15K_FUNNEL_LABELS = { 'free-trial': 'Free trial funnel', 'enroll': 'Enroll funnel' };
-// SAMPLE preview for the Website funnel section (Zoran, 2026-07-03): renders
-// ONLY while there are zero real events, so real visitor data retires it
-// automatically. TURN OFF EARLY: set _V15K_FUNNEL_SAMPLE_ON = false.
+// SAMPLE preview for the Website funnel section (Zoran, 2026-07-03): while ON
+// it FORCES the sample layout (real events keep collecting underneath).
+// TURN OFF: set _V15K_FUNNEL_SAMPLE_ON = false -> real data renders.
 const _V15K_FUNNEL_SAMPLE_ON = true;
 const _V15K_FUNNEL_SAMPLE = {
   funnels: {
@@ -10453,14 +10453,15 @@ function _v15kFunnelHtml() {
   const empty = `<div class="req-empty" style="padding:12px 0;color:var(--text-mute)">No funnel data yet - events start collecting from the next website visit.</div>`;
   let keys = Object.keys(f.funnels || {}).filter(k => Array.isArray((f.funnels[k] || {}).steps) && f.funnels[k].steps.length);
   let sampleNote = '';
-  if (!keys.length) {
-    if (!_V15K_FUNNEL_SAMPLE_ON) return empty;
+  if (_V15K_FUNNEL_SAMPLE_ON) {
     f = _V15K_FUNNEL_SAMPLE;
     keys = Object.keys(f.funnels);
     sampleNote = `<div style="display:flex;align-items:center;gap:8px;margin-top:10px">
       <span style="font-size:10.5px;font-weight:800;letter-spacing:.06em;color:#0A0A0A;background:var(--gold,#E8C547);border-radius:999px;padding:2px 9px">SAMPLE</span>
-      <span style="font-size:12px;color:var(--text-mute)">Example numbers so you can see the layout - real visitor events replace this automatically.</span>
+      <span style="font-size:12px;color:var(--text-mute)">Example numbers - real visitor events are collecting underneath. Turn off: _V15K_FUNNEL_SAMPLE_ON in client-portal.html.</span>
     </div>`;
+  } else if (!keys.length) {
+    return empty;
   }
   const blocks = keys.map(key => {
     const fn = f.funnels[key];
