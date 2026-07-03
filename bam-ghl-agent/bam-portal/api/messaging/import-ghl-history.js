@@ -28,6 +28,8 @@ async function sb(path, init = {}) {
 async function requireStaff(req) {
   const bearer = (req.headers.authorization || "").replace(/^Bearer\s+/i, "");
   if (!bearer) return null;
+  // The migration watcher (cron) triggers the catch-up import at cutover time.
+  if (process.env.CRON_SECRET && bearer === process.env.CRON_SECRET) return "migration-watch";
   const r = await fetch(`${SUPABASE_URL}/auth/v1/user`, { headers: { apikey: SUPABASE_SERVICE_KEY, Authorization: `Bearer ${bearer}` } });
   if (!r.ok) return null;
   const user = await r.json();
