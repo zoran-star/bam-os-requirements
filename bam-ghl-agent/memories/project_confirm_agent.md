@@ -209,3 +209,38 @@ RPC-only rule applies).
   should never sit in the stage).
 - Edit the templated 'thanks for coming out' copy: Train tab -> Closing ->
   📨 Initial automations.
+
+## Session handoff 2026-07-03 (~9:30 PM) - follow-up plans: ONE BLOCKER LEFT
+State: plan cards UI, Scan-all-agents button, approve-plan API, next-day cadence,
+decision-date holds, Lost recommendations, Hawkeye notes, member auto-won - ALL
+merged + deployed (#1058 #1065 #1067 #1072 #1074 #1075).
+
+**BLOCKER (next session's first job):** the plan drafter inserts 2-3 PENDING rows
+per contact, but the DB has
+  `agent_closing_replies_one_active_per_contact` UNIQUE (client_id, ghl_contact_id)
+  WHERE status IN ('pending','approved')
+so multi-row plans 409. Latest detect summary (automation_events type
+'closing_detect_summary') shows Tunde/Noora/Dhananjay failing on exactly this.
+Fix options: (a) relax the partial index to exclude step_key LIKE 'followup_%'
+(new migration + keep one-active semantics per step), or (b) single plan row with
+a plan_steps jsonb + approve-plan materializes the approved rows. (a) is simpler;
+approve-plan also creates multiple 'approved' rows so the index must allow those too.
+
+Bugs fixed this session (all Twilio-cutover fallout):
+- conversationId scoped inside the non-Twilio branch crashed EVERY AI draft on
+  Twilio academies (confirm + closing) - hoisted (#1074).
+- Queue recency: GHL conversations freeze at cutover -> overlayPortalSmsRecency
+  in agent/_stage.js merges sms_threads into confirm+closing queues (#1060).
+- Board's red '!' + 💬 recency: _plLoadLastMessages was last-write-wins across a
+  contact's MULTIPLE threads (old email thread clobbered fresh SMS) - newest
+  wins now (#1075). Also fixed _plV2 out-of-scope crash in _renderPipelineTabs.
+- Detect run summaries now persist to automation_events (type
+  'closing_detect_summary') - read the latest to debug the closing detector.
+
+Open loops (human/next session):
+- Monica Kapoor + Yvette Coetzee: filled trial form, never picked a slot, NO
+  phone - need manual outreach; SUSPECTED calendar bug at "Confirm your Spot"
+  (Tunde reported the click not working Jun 25) - UNTESTED.
+- computeClosingQueue got the recency overlay; the closing agent still caps
+  DETECT_CAP=10/run.
+- Reactivation cohort (8 texted Jul 2 ~5:18 PM): watch for replies in Hawkeye.
