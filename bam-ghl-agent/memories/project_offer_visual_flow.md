@@ -38,10 +38,11 @@ with real counts, where clicking a funnel node DISPLAYS the actual page.
 ## ⏰ REMINDER: sample data is ON in the KPI funnel section
 
 `_V15K_FUNNEL_SAMPLE_ON = true` in client-portal.html (near _v15kFunnelHtml).
-It renders ONLY while funnel_events has zero real rows for the academy, wears
-a gold SAMPLE badge, and real events retire it automatically - but Zoran asked
-to be REMINDED to turn it off. Flip the constant to false (or just confirm
-real data has replaced it) and delete this section.
+While true it FORCES the sample layout (gold SAMPLE badge; real events keep
+collecting underneath - attribution already proved live with a real ig visit
+on day one). Zoran asked to be REMINDED: flip to false to show real data,
+then delete this section. Check real volume first:
+`select step, count(*) from funnel_events where client_id='39875f07-0a4b-4429-a201-2249bc1f24df' group by step;`
 
 ## Future menu (not built - pick when needed)
 
@@ -49,3 +50,22 @@ real data has replaced it) and delete this section.
   return visits, slot supply-vs-demand by day/time, A/B copy variants,
   Meta CAPI server events (trial booked / member converted back to ads),
   payment_started/failed on enroll (needs Stripe element event hooks).
+
+## NEXT SESSION pickup (written 2026-07-03, session end)
+
+Everything A-G + trial-page cutover + funnel analytics is LIVE. Open items:
+1. Check access-sync + credit audits after first real Stripe events:
+   member_audit_log action_type in ('access-sync-on','access-sync-error',
+   'credit-grant','credit-grant-error').
+2. Ping Luka: PRs #1054 (offers sync) + #1057 (access sync) for pattern review;
+   everything else was in his domain too (#1052-#1083 arc).
+3. Turn off the KPI funnel SAMPLE when ready (section above).
+4. Marketing KPI section is slow (Meta API live pull, pre-existing): options =
+   cache-last-report-and-refresh-background, or collapse-until-clicked.
+5. Build next: the Offer Map (Level 1 above) - interactive per-offer board in
+   the Blueprint with click-to-preview funnel pages (docs/offer-tie-in-map.html
+   is the static reference).
+6. Run the align-core-data-model skill over this arc's schema changes
+   (funnel_events, offer_ad_campaigns, offer_id columns, access_sync/credit
+   gates) - not run during the build.
+7. ADAPT launch = the 4-step checklist in [[project_offer_tie_in]].
