@@ -6,8 +6,10 @@ type: project
 
 ## TL;DR (re-verified 2026-06-11 — AUTO-DEPLOY NOW WORKS)
 
-The `bam-portal` Vercel project (staff + client portal, custom domain
-`portal.byanymeansbusiness.com`, alias `bam-portal-tawny.vercel.app`) **DOES
+The `bam-portal` Vercel project (staff + client portal, custom domains
+`portal.byanymeansbusiness.com` AND `staff.byanymeansbusiness.com` - both serve
+the same app; Zoran calls the staff one by its staff subdomain (confirmed
+2026-07-03) - alias `bam-portal-tawny.vercel.app`) **DOES
 auto-deploy on push/merge to main** — verified 2026-06-11: PRs #197–#200 each
 produced a production deployment carrying `meta.githubCommitSha`. Project is
 linked to `zoran-star/bam-os-requirements`, production branch `main`, Root
