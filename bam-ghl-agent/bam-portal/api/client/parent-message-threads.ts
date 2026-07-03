@@ -265,7 +265,7 @@ async function markStaffRead(
 ) {
   const context = await getClientUserContext(req);
   const thread = await requireClientThread(context.tenantId, threadId);
-  const now = new Date().toISOString();
+  const lastReadAt = thread.last_message_at ?? new Date().toISOString();
 
   await sb(
     "customer_thread_reads?on_conflict=thread_id,auth_user_id",
@@ -278,8 +278,8 @@ async function markStaffRead(
         reader_type: "STAFF",
         customer_profile_id: null,
         auth_user_id: context.user.id,
-        last_read_at: now,
-        updated_at: now,
+        last_read_at: lastReadAt,
+        updated_at: new Date().toISOString(),
       }),
     },
   );
