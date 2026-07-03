@@ -83,6 +83,10 @@
     {
       "path": "/api/twilio/migration-watch",
       "schedule": "*/30 * * * *"
+    },
+    {
+      "path": "/api/twilio/usage-sync",
+      "schedule": "30 6 * * *"
     }
   ],
   "headers": [
