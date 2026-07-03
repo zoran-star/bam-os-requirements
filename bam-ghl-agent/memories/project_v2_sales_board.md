@@ -72,3 +72,15 @@ link" is on). Sends if note OR link present; never for a no-show.
 ## Related
 - [[project_followup_forcing_function]] — the quiet-lead → Ghosted engine (canonical)
 - [[project_client_agent_training]] — Hawkeye queue + brain training
+
+## Home command center (shipped 2026-07-02, PR #1084)
+V2 home = health strip (Sales/Members/You segments, month-pace vs prior 2
+months via /api/kpis-v15, closed months cached in localStorage `bam_cc_kpi_*`)
++ DO THIS NOW Hawkeye card + gradient stat cards + streak chips (per-device,
+`bam_cc_<clientId>` localStorage) + schedule rail (desktop right / mobile
+scroll-fade) + celebration popups (new member, sales pace, low churn; once per
+day per key). KPIs tab: "The machine" flow strip on top, momentum arrows on
+conversion + churn (sales/members always fetch prev window now), MRR 6-month
+sparkline (reuses Trends month cache). All code in client-portal.html
+(_cc* + _hv2* + _v15kBizmap/_v15kMomentum/_v15kMrr*). Skipped review items:
+CC-2/6/8/10/12/14/15.
