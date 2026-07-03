@@ -39,6 +39,14 @@ if flipped AND `client_twilio_config.status='active'`; else falls back to 'ghl'
   `ghl/_core.js sendSms`, and agents (`agent-followups`, `agent-approvals`,
   `agent-confirm`, `agent-closing` via `sendReplyViaGhl(token,contactId,reply,clientId)`).
   Read branch in `ghl/inbox.js` + the 3 agents' `draftForContact`.
+- Ghost engine off GHL (2026-07-03): `agent-followups.js` branches on
+  `smsProvider()==='twilio'` — detect reads `listStoreThreads()`/`readStoreThreadAgent()`
+  instead of GHL /conversations (which froze at the flip and made every lead look
+  quiet), and the send-time "did they reply?" guard uses `leadRepliedStore()`
+  (sms_messages inbound-since) instead of live-GHL + the ghl_inbound_messages mirror
+  (both blind for Twilio academies → double-text risk). Ghost cards for store
+  academies carry the sms_threads uuid in ghl_conversation_id (write/log only,
+  nothing fetches GHL by it). GHL academies byte-identical.
 
 ## Known small gaps (safe — stay on GHL)
 - `agent-confirm.js:528` + `agent-closing.js:471` self-drive sub-paths call

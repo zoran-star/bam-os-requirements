@@ -28,7 +28,8 @@ import { withSentryApiRoute } from "./_sentry.js";
 // Engine is per-academy gated by clients.ghl_kpi_config.followup_engine_enabled.
 
 import { pickGhlToken, ghl } from "./ghl/_core.js";
-import { maybeSendSmsViaProvider } from "./messaging/provider.js";
+import { maybeSendSmsViaProvider, smsProvider } from "./messaging/provider.js";
+import { readStoreThreadAgent, listStoreThreads } from "./messaging/read-thread.js";
 import { toIso, respondedContactIds, respondedContactIdSetCached, peekRespondedIdSet } from "./agent/_stage.js";
 import { withinQuietHours, nextSendableTime } from "./agent/_quiet.js";
 import { agentMode, modeIsOn, shouldAutoSend } from "./agent/_mode.js";
@@ -95,9 +96,14 @@ const hoursSince = (d) => d ? (Date.now() - new Date(d).getTime()) / 3600000 : I
 // multi-touch follow-up). No Claude call needed — the card shows the real thread.
 async function detectForClient(client) {
   if (!modeIsOn(agentMode(client))) return { client_id: client.id, skipped: "mode off" };
+  // Twilio academies read conversations from the own-store (sms_threads/sms_messages).
+  // Their GHL conversations froze at the messaging flip, so reading GHL here would
+  // surface stale threads and mark every lead "quiet". GHL academies keep the
+  // byte-identical GHL path below.
+  const usingStore = (await smsProvider(client.id)) === "twilio";
   const creds = await pickGhlToken(client);
-  if (!creds) return { client_id: client.id, skipped: "no GHL token" };
-  const { token, locationId } = creds;
+  if (!usingStore && !creds) return { client_id: client.id, skipped: "no GHL token" };
+  const { token, locationId } = creds || {};
 
   // The sales agent ONLY works leads in the Responded stage.
   const { rs, ids: respondedIds } = await respondedContactIds(token, locationId, { clientId: client.id, sb });
@@ -115,15 +121,30 @@ async function detectForClient(client) {
   // leads fall through both engines and silently read "All good". The fresh inbound
   // leads (quiet < a day) still go to the reply engine; this is the ≥24h fallback.
   const byContact = new Map();
-  try {
-    const cd = await ghl("GET", `/conversations/search?${new URLSearchParams({ locationId, limit: "100" })}`, { token });
-    for (const c of (cd.conversations || cd.data || [])) if (c.contactId) byContact.set(c.contactId, c);
-  } catch (e) { return { client_id: client.id, error: `conversations: ${e.message}` }; }
+  if (usingStore) {
+    try {
+      for (const t of await listStoreThreads(client.id)) {
+        if (t.contactId) byContact.set(t.contactId, { id: t.id, contactId: t.contactId, fullName: t.contactName, lastMessageDate: t.lastMessageDate, lastMessageDirection: t.lastMessageDirection });
+      }
+    } catch (e) { return { client_id: client.id, error: `threads: ${e.message}` }; }
+  } else {
+    try {
+      const cd = await ghl("GET", `/conversations/search?${new URLSearchParams({ locationId, limit: "100" })}`, { token });
+      for (const c of (cd.conversations || cd.data || [])) if (c.contactId) byContact.set(c.contactId, c);
+    } catch (e) { return { client_id: client.id, error: `conversations: ${e.message}` }; }
+  }
 
   const candidates = [];
   for (const cid of respondedIds) {
     let c = byContact.get(cid);
-    if (!c) {
+    if (!c && usingStore) {
+      // Cold lead outside the newest-200 window: look their thread up directly.
+      try {
+        const rows = await sb(`sms_threads?client_id=eq.${client.id}&ghl_contact_id=eq.${encodeURIComponent(cid)}&select=id,contact_name,last_message_at&limit=1`);
+        const t = Array.isArray(rows) && rows[0];
+        if (t) c = { id: t.id, contactId: cid, fullName: t.contact_name, lastMessageDate: t.last_message_at };
+      } catch (_) {}
+    } else if (!c) {
       try {
         const s = await ghl("GET", `/conversations/search?${new URLSearchParams({ locationId, contactId: cid })}`, { token });
         c = (s.conversations || s.data || [])[0] || null;
@@ -170,7 +191,7 @@ async function detectForClient(client) {
     } catch (_) {}
 
     let thread;
-    try { thread = await threadMessages(token, c.id); } catch (_) { skipped++; continue; }
+    try { thread = usingStore ? await readStoreThreadAgent(client.id, contactId) : await threadMessages(token, c.id); } catch (_) { skipped++; continue; }
     if (!thread.length) { skipped++; continue; }
     // The lead's last message + OUR last message (so the card shows both sides).
     const lastLeadMsg = [...thread].reverse().find(m => m.role === "parent");
@@ -235,6 +256,19 @@ async function leadRepliedSince(clientId, contactId, sinceISO) {
     return Array.isArray(rows) && rows.length > 0;
   } catch (_) { return false; }
 }
+// Store variant for Twilio academies: their inbound SMS lands in sms_messages (via
+// the Twilio webhook), NOT in GHL or the ghl_inbound_messages mirror — so both
+// checks above are blind for them and would let a nudge fire at a lead who already
+// replied. Any inbound store message after `sinceISO` cancels the send.
+async function leadRepliedStore(clientId, contactId, sinceISO) {
+  if (!clientId || !contactId || !sinceISO) return false;
+  try {
+    const t = await sb(`sms_threads?client_id=eq.${clientId}&ghl_contact_id=eq.${encodeURIComponent(contactId)}&select=id&limit=1`);
+    if (!Array.isArray(t) || !t[0]) return false;
+    const rows = await sb(`sms_messages?thread_id=eq.${t[0].id}&direction=eq.inbound&occurred_at=gt.${encodeURIComponent(sinceISO)}&select=id&limit=1`);
+    return Array.isArray(rows) && rows.length > 0;
+  } catch (_) { return false; }
+}
 
 async function sendOne(row, clientCache, respondedCache = {}) {
   let client = clientCache[row.client_id];
@@ -253,12 +287,15 @@ async function sendOne(row, clientCache, respondedCache = {}) {
     }
   }
 
-  // Cancel if the lead replied after this was drafted. Check LIVE GHL first (the
-  // source of truth — so we never text someone who already replied even if the
-  // inbound webhook/mirror is down), then the Supabase mirror as a cheap backup.
+  // Cancel if the lead replied after this was drafted. Twilio academies check the
+  // own-store (their replies never reach GHL); GHL academies check LIVE GHL first
+  // (source of truth), then the Supabase mirror as a cheap backup.
   const since = row.last_lead_at || row.created_at;
   if (since) {
-    const repliedLive = credsGuard && await leadRepliedLiveGHL(credsGuard.token, credsGuard.locationId, row.ghl_contact_id, since);
+    const usingStore = (await smsProvider(row.client_id)) === "twilio";
+    const repliedLive = usingStore
+      ? await leadRepliedStore(row.client_id, row.ghl_contact_id, since)
+      : (credsGuard && await leadRepliedLiveGHL(credsGuard.token, credsGuard.locationId, row.ghl_contact_id, since));
     const replied = repliedLive || await leadRepliedSince(row.client_id, row.ghl_contact_id, since);
     if (replied) {
       await sb(`agent_followups?id=eq.${row.id}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ status: "canceled", send_error: "lead replied", updated_at: new Date().toISOString() }) });
