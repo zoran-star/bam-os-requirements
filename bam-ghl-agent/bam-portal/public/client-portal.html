@@ -3687,6 +3687,7 @@
   .mm-funnel-line { font-size: 13px; color: var(--text-sub); margin-bottom: 10px; }
   .mm-funnel-line b { color: var(--text); }
   .mm-verdict { font-size: 14px; font-weight: 700; margin-top: 12px; }
+  .mm-line-since { font-family: var(--mono); font-size: 9px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-mute); margin-top: 5px; }
   .mm-spark { display: flex; align-items: flex-end; gap: 3px; height: 36px; margin: 12px 0 4px; }
   .mm-spark span { width: 10px; border-radius: 2px 2px 0 0; min-height: 4px; }
   .mm-anchor { font-size: 26px; font-weight: 800; letter-spacing: -0.01em; }
@@ -40029,6 +40030,37 @@ function _mmDotHtml(band) { return '<span class="mm-dot mm-dot-' + (band || 'gre
 function _mmCplFill(cpl) { if (cpl == null) return 30; return Math.max(8, Math.min(100, Math.round((1 - cpl / 70) * 100))); }
 function _mmPctFill(pct, full) { if (pct == null) return 30; return Math.max(8, Math.min(100, Math.round(pct / full * 100))); }
 function _mmBarHtml(fill, band) { return '<div class="mm-bar"><div class="mm-bar-fill mm-f-' + (band || 'grey') + '" style="width:' + fill + '%"></div></div>'; }
+function _mmShortDate(ymd) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(ymd || ''));
+  if (!m) return '';
+  const MO = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  return MO[+m[2] - 1] + ' ' + (+m[3]);
+}
+// Weekly CPL as a line graph (up = pricier). Dots carry each week's band color.
+function _mmLineHtml(spark, sinceYmd, h) {
+  const pts = (spark || []).filter(b => b.cpl != null);
+  const H = h || 34, W = 100;
+  let svg;
+  if (pts.length < 2) {
+    svg = '<div style="height:' + H + 'px;display:flex;align-items:center;font-size:10px;color:var(--text-mute);font-family:var(--mono)">not enough weeks yet</div>';
+  } else {
+    const max = Math.max(...pts.map(b => b.cpl)), min = Math.min(...pts.map(b => b.cpl));
+    const span = (max - min) || 1;
+    const xy = pts.map((b, i) => [
+      Math.round((i / (pts.length - 1)) * (W - 8)) + 4,
+      Math.round(((b.cpl - min) / span) * (H - 12)) + 6,
+    ]);
+    const line = xy.map(p => p[0] + ',' + (H - p[1])).join(' ');
+    const dotColor = (band) => band === 'green' ? 'var(--green)' : band === 'gold' ? 'var(--gold)' : band === 'red' ? 'var(--red)' : 'var(--text-mute)';
+    const dots = xy.map((p, i) => '<circle cx="' + p[0] + '" cy="' + (H - p[1]) + '" r="2.6" fill="' + dotColor(pts[i].band) + '"><title>' +
+      _escapeHtml(pts[i].week + ': ' + _mmMoney(pts[i].cpl) + '/lead') + '</title></circle>').join('');
+    svg = '<svg viewBox="0 0 ' + W + ' ' + H + '" preserveAspectRatio="none" style="width:100%;height:' + H + 'px;display:block">' +
+      '<polyline points="' + line + '" fill="none" stroke="var(--text-mute)" stroke-width="1.4" stroke-linejoin="round" stroke-linecap="round" opacity="0.7"/>' +
+      dots + '</svg>';
+  }
+  const caption = sinceYmd ? '<div class="mm-line-since">cost per lead by week &middot; since ' + _escapeHtml(_mmShortDate(sinceYmd)) + '</div>' : '';
+  return '<div class="mm-line">' + svg + caption + '</div>';
+}
 function _mmWorst(bands) {
   const real = bands.filter(b => b && b !== 'grey');
   if (!real.length) return 'grey';
@@ -40089,7 +40121,9 @@ function _mmRenderCard() {
         '<div class="mm-bar"><div class="mm-bar-fill mm-f-month" style="width:' + monthPct + '%"></div></div>' +
         '<span class="mm-month-meta">' + spendTxt + '</span></div>' +
       '<div class="mm-flow">' +
-        '<div><div class="mm-col-label">Campaign</div>' + _mmBarHtml(_mmCplFill(camp.health_cpl), camp.band) + '</div>' +
+        '<div><div class="mm-col-label">Campaign</div>' +
+        '<div style="font-size:15px;font-weight:800" class="' + _mmBandTxt(lt.band) + '">' + _mmMoney(lt.cpl) + '<span style="font-size:9px;font-weight:500;color:var(--text-mute);font-family:var(--mono);letter-spacing:0.08em"> /LEAD LIFETIME</span>' + cplTrend + '</div>' +
+        _mmLineHtml(camp.sparkline, lt.since) + '</div>' +
         '<div class="mm-arrow">&rsaquo;</div>' +
         '<div><div class="mm-col-label">Creatives</div>' + crRows + '</div>' +
         '<div class="mm-arrow">&rsaquo;</div>' +
@@ -40098,7 +40132,7 @@ function _mmRenderCard() {
         '<div><div class="mm-col-label">Result</div><div class="mm-result-box"><b>' + (r.leads ?? 0) + '</b> leads<br><b>' + (r.booked ?? 0) + '</b> trials</div></div>' +
       '</div>' +
       '<div class="mm-foot">' +
-        '<span class="mm-foot-cpl">COST PER LEAD <span class="' + _mmBandTxt(lt.band) + '">' + _mmMoney(lt.cpl) + '</span> lifetime' + cplTrend + '</span>' +
+
         (d.warning ? '<span class="mm-foot-warn">&#9888; ' + _escapeHtml(d.warning.text) + '</span>' : '') +
         '<span class="mm-foot-tap">tap &rsaquo;</span>' +
       '</div>' +
@@ -40167,14 +40201,7 @@ function _mmRenderModal(d) {
 
   // CAMPAIGN - lifetime CPL is the anchor, the window delta is the alarm
   const lt = camp.lifetime || {}, w = camp.window || {}, fastM = camp.fast || {};
-  const spark = (camp.sparkline || []);
-  const maxCpl = Math.max(...spark.map(b => b.cpl || 0), 1);
-  const sparkHtml = spark.length < 2 ? '' :
-    '<div class="mm-spark">' + spark.map(b => {
-      const h = b.cpl == null ? 4 : Math.max(5, Math.round((b.cpl / maxCpl) * 36));
-      const tip = b.week + ': ' + (b.cpl == null ? 'no leads' : _mmMoney(b.cpl) + '/lead') + ' ($' + Math.round(b.spend) + ')';
-      return '<span class="mm-f-' + (b.band || 'grey') + '" style="height:' + h + 'px" title="' + _escapeHtml(tip) + '"></span>';
-    }).join('') + '</div><div class="mm-context" style="margin-top:0">cost per lead by week (taller = pricier)</div>';
+  const sparkHtml = '<div style="max-width:340px;margin-top:12px">' + _mmLineHtml(camp.sparkline, lt.since, 48) + '</div>';
   let deltaLine;
   if (w.judged && w.drift_vs_lifetime_pct != null) {
     const up = w.drift_vs_lifetime_pct > 0;

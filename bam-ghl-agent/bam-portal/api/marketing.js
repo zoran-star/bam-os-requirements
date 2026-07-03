@@ -3566,7 +3566,7 @@ async function handleMetaMachine(req, res) {
     campaign: {
       band: barBand,                 // the card bar verdict
       health_cpl: healthCpl,         // what the bar's fill length maps
-      lifetime: { cpl: lifetimeCpl, band: lifetimeBand, spend: _r2(lifeSpend), leads: lifeLeads },
+      lifetime: { cpl: lifetimeCpl, band: lifetimeBand, spend: _r2(lifeSpend), leads: lifeLeads, since: firstLeadIdx >= 0 ? weeksSorted[firstLeadIdx][0] : null },
       window: { cpl: winCpl, band: windowBand, judged, leads: win.leads, spend: _r2(win.spend), drift_vs_lifetime_pct: driftPct, drift_band: driftBand },
       fast: { days: MM_FAST_DAYS, frequency: fastFreq, ctr: fastCtr },
       sparkline,
