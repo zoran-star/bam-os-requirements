@@ -6,6 +6,7 @@ import { TicketModal } from "./SystemsView";
 import { fetchTickets, fetchDelegationPool } from "../services/ticketsService";
 import MarketingDashboard, { GoalEditor } from "../components/MarketingDashboard";
 import GhlKpiDiscovery from "../components/GhlKpiDiscovery";
+import PhoneTab from "./PhoneTab.jsx";
 
 // ─── Combined Clients page ──────────────────────────────────────────────────
 // Replaces the old Clients tab + Client Setup tab. Two states:
@@ -430,6 +431,7 @@ function ClientDetail({ client, staff, staffMap, tokens, dark, me, session, onBa
     { id: "content",      label: "Content" },
     { id: "sales",        label: "Sales" },
     { id: "systems",      label: "Systems" },
+    { id: "phone",        label: "Phone" },
     { id: "actionItems",  label: "Action Items" },
     { id: "notes",        label: "Notes" },
   ].filter(t => !t.hide);
@@ -484,6 +486,7 @@ function ClientDetail({ client, staff, staffMap, tokens, dark, me, session, onBa
       {tab === "content" && <ContentTab client={client} tokens={t} role={role} session={session} onChanged={onChanged} />}
       {tab === "sales" && <div style={{ marginTop: 8 }}><GhlKpiDiscovery client={client} tokens={t} session={session} salesMode /></div>}
       {tab === "systems" && <SystemsTab client={client} tokens={t} dark={dark} me={me} />}
+      {tab === "phone" && <PhoneTab client={client} tokens={t} session={session} />}
       {tab === "actionItems" && <ActionItemsTab client={client} tokens={t} session={session} />}
       {tab === "notes" && <NotesTab client={client} tokens={t} me={me} session={session} staffMap={staffMap} />}
     </div>
