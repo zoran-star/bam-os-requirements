@@ -1668,7 +1668,17 @@ async function handleContentTickets(req, res) {
 
 const META_API_VERSION = "v22.0";
 const META_GRAPH = `https://graph.facebook.com/${META_API_VERSION}`;
-const META_OAUTH_SCOPES = ["ads_read", "ads_management", "business_management", "public_profile"];
+// Messaging scopes (Meta DM spine, 2026-07-03): pages_messaging +
+// instagram_manage_messages power direct IG/Messenger DMs; pages_show_list +
+// pages_manage_metadata let us derive the Page token + subscribe the Page to
+// the app's webhook; instagram_basic is required alongside IG messaging.
+// Staff must RECONNECT Meta after this deploys for the token to carry them
+// (same dance as the 2026-06-06 write-scopes add).
+const META_OAUTH_SCOPES = [
+  "ads_read", "ads_management", "business_management", "public_profile",
+  "pages_show_list", "pages_manage_metadata", "pages_messaging",
+  "instagram_basic", "instagram_manage_messages",
+];
 
 function metaGetOrigin(req) {
   // Pinned to the canonical staff URL — the Meta OAuth redirect URI
