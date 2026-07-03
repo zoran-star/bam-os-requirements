@@ -106,6 +106,22 @@ channel chips → pipeline dropdown), ACTIONS (Hawkeye/Mass send, full-width
 44px) sit on their own row below, count last. Desktop keeps its original
 layout + gains the compact (max-width 420px) segmented row.
 
+## Social passthrough (Phase 0, 2026-07-03)
+
+Store academies' inboxes now MERGE GHL's social conversations (IG/FB/WhatsApp/
+Live_Chat/GMB) back in - the store flip had silently hidden them (an Instagram
+DM looked like silence). In `api/ghl/inbox.js`:
+- `listGhlSocialThreads()` reads GHL `/conversations/search`, keeps only
+  `SOCIAL_CHANNELS` types (frozen SMS/Email GHL threads stay excluded - they'd
+  duplicate the store), caches via `ghl_inbox_cache` (12s TTL, stale-on-429).
+- Thread by id: uuid = store thread; non-uuid = GHL conversation id → falls
+  through to the GHL read. Thread by contact: empty store → tries the
+  contact's GHL social thread.
+- Replies already route per-channel (send-message.js TYPE_MAP → GHL for
+  IG/FB); the V1.5 inbox UI already shows channel chips + the 24h Meta note.
+- INTERIM: the direct Meta DM spine (IG + FB Messenger, `dm_threads`) replaces
+  this. Agents still don't see social threads (SMS-only engines).
+
 ## Gotchas
 
 - The V1.5 inbox is a separate view (`#view-v15inbox`, `.v15ib-*`) — and it is
