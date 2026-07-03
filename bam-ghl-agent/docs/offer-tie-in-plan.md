@@ -104,5 +104,12 @@ MCP-recorded version.
       plans no longer purchasable by hand-crafted keys. Parity-verified: all 5
       sellable keys resolve to identical stripe_price_id + amount. offer.js
       response gains additive `purchasable` (typed) block.
-- [ ] F: members/sorter spine
+- [x] F: members/sorter spine (2026-07-02). 9 access-sync hooks on the
+      non-webhook member paths: sorter promote (reason member-imported, grant),
+      pause/unpause/date-fix/card-setup/pause-cron (portal-action, mirror),
+      immediate cancel (override cancelled BEFORE the row delete), change-plan
+      recreate+swap (subscription-updated, grant+supersede). Period-end cancel
+      deliberately unhooked (paid-through access; C cancels at sub deletion).
+      Shared non-fatal caller api/_runtime/access-sync-portal.ts. Full roster
+      sweep applied: 41/41 members on the identity spine.
 - [ ] G: entry_points.bookable_program_id + drift check

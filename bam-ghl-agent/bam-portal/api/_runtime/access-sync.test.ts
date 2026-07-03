@@ -155,3 +155,28 @@ describe("syncAccessForMember (dryRun / decision routing)", () => {
     expect(out.membership_status).toContain("cancelled");
   });
 });
+
+describe("F reasons (portal paths)", () => {
+  const base = { clientId: "t1", memberId: "m1" } as const;
+
+  it("member-imported takes the grant path (sorter promote)", async () => {
+    const supabase = stubSupabase({ members: [MEMBER], offer_prices: [PRICE], entitlement_templates: [TEMPLATE] });
+    const out = await syncAccessForMember(
+      supabase,
+      { ...base, reason: "member-imported", subscriptionId: "sub_1" },
+      { dryRun: true },
+    );
+    expect(out.action).toBe("granted");
+    expect(out.source_ref).toBe("(shadow) subscription:sub_1:price_1");
+  });
+
+  it("portal-action mirrors status only, never grants", async () => {
+    const out = await syncAccessForMember(
+      stubSupabase({ members: [{ ...MEMBER, status: "paused" }] }),
+      { ...base, reason: "portal-action", subscriptionId: "sub_1" },
+      { dryRun: true },
+    );
+    expect(out.action).toBe("status-synced");
+    expect(out.membership_status).toContain("paused");
+  });
+});

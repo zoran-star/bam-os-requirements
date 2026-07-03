@@ -38,7 +38,13 @@ export type AccessSyncReason =
   | "invoice-paid"
   | "payment-failed"
   | "subscription-updated"
-  | "subscription-deleted";
+  | "subscription-deleted"
+  // member row minted outside the webhook (sorter promote of an already-paying
+  // import) - money moved historically, grant from the member's stripe ids
+  | "member-imported"
+  // portal/staff/cron status flips with no usable Stripe event (pause,
+  // unpause, card-setup, immediate cancel pre-delete) - mirror status only
+  | "portal-action";
 
 export type AccessSyncArgs = {
   clientId: string;
@@ -84,10 +90,11 @@ function skip(reason: AccessSyncReason, why: string, memberId?: string): AccessS
   return { action: "skipped", reason, skip_reason: why, member_id: memberId };
 }
 
-// Downgrade reasons only mirror status; paid/updated reasons (re)grant.
+// Downgrade/status reasons only mirror status; the rest (re)grant.
 const GRANT_REASONS: ReadonlySet<AccessSyncReason> = new Set([
   "invoice-paid",
   "subscription-updated",
+  "member-imported",
 ]);
 
 export async function syncAccessForMember(
