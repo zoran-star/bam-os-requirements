@@ -39,3 +39,11 @@ Texts the teammates an academy selects, **from the academy's own GHL number**, f
 - **GTA is fully wired live**: all 8 events → Zoran (`client_users` owner row, phone +14165733718).
 
 See [[project_multi_user_portal]] (teammate phone), [[project_sales_comms]] (post-trial), [[project_v15_tier]].
+
+## Idea parked 2026-07-03 (Zoran): customizable regular digest notifications
+Beyond per-event texts: RECURRING digest notifications (daily/weekly summary
+per academy) with owner-side customizability - which sections (leads, bookings,
+payments, marketing machine health), frequency (daily/weekly/off), channel
+(SMS/email/push), per teammate. Would slot into the existing
+notification_prefs jsonb + Blueprint -> Staff -> Notifications panel pattern.
+Not scoped, not scheduled - parked for a future session.
