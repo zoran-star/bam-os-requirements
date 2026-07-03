@@ -55,10 +55,12 @@ Decisions along the way (do NOT re-add):
 No bars. Every judged number is colored green/gold/red with a small dot;
 neutral facts (impressions, reach, age, raw counts) stay uncolored.
 Section headers carry a rollup dot (worst child wins) matching the simple
-card's bar. Range picker top-right (7 days / 30 days / this month).
+card's bar. Range picker top-right: DEFAULTS TO MTD (month to date, matches
+the simple card); custom start + end date picker for any window (Zoran
+decision 2026-07-03, replaced the 7d/30d presets).
 
 ```
-MARKETING MACHINE                              [ 7 days v ] [ x ]
+MARKETING MACHINE                       [ Jul 1 - today v ] [ x ]
 JULY  progress-bar  day 3 of 31 · spent $41 of ~$810 planned
 
 -- CAMPAIGN (dot) -----------------------------------------------
@@ -161,7 +163,8 @@ Gotchas (agent-verified):
 ## Build plan (locked 2026-07-03)
 
 ### Phase 1 - backend: one aggregate endpoint
-New marketing.js action `machine` (params: client_id, range=7d|30d|month).
+New marketing.js action `machine` (params: client_id, since, until;
+default = month to date).
 Returns ONE payload powering both the simple card and the modal (card is a
 rollup of the same health scores - never two sources of truth).
 
@@ -203,3 +206,16 @@ Marketing page feel slow. Run align-core-data-model when adding the table.
 - funnel step counts match a raw funnel_events query
 - agent split spot-checked against the pipeline board
 Build order: 1 -> verify vs live GTA data -> 3 -> 4 (2 folded into 1 if direct).
+
+## Simple-card bar math (proposed 2026-07-03, confirm at build)
+
+Every input scored by the thresholds above -> points: green 100, gold 55,
+red 15. Bar FILL LENGTH = weighted average of points; FILL COLOR by band:
+>=80 green, 50-79 gold, <50 red. Length = how healthy, color = the verdict.
+Scored server-side in the machine endpoint; UI draws what it is told.
+
+| Bar | Inputs (weight %) |
+|---|---|
+| CAMPAIGN | CPA drift (50), pacing spend% vs month% (30), learning status (20) |
+| each CREATIVE | hook rate (35), $/lead vs campaign avg (35), frequency (20), age (10) |
+| PAGE | visitors->form % (50), calendar abandonment (50) |
