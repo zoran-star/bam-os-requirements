@@ -176,8 +176,21 @@ portal actions never block on sync failure, next Stripe event converges):
   members on the identity spine; 40 stripe-source entitlements + 1 manual
   (Stefan). ACTIVE=32 mirrors live members exactly.
 
-## Next (Part 2, money->access; order G)
+## G: entry_points program link + drift check - SHIPPED (2026-07-02)
 
-G `entry_points.bookable_program_id` + drift check (Luka OK'd all of this 2026-07-02).
+- `entry_points.bookable_program_id` (migration `20260703000509`, Luka OK'd the
+  shared-table change). GTA backfill: 2 trial calendars + both free-trial forms
+  -> Training program; contact + adapt forms correctly unlinked.
+- Runtime diagnostics got a 9th check `entry_point_program_drift`: fails on a
+  program link pointing at a nonexistent/foreign program, or an enabled
+  calendar entry point with no link.
+
+## DONE. Future offers (ADAPT/camps) launch checklist
+1. Create the offer in BB + Stripe Matcher confirms prices (pricing_catalog).
+2. `scripts/offers-sync-run.mjs` preview -> apply with confirmed entitlement
+   rules (+ set invoice_grant_credits for weekly plans - sync CREATE doesn't).
+3. New pipeline_stages rows for the offer (one board per offer) + entry points
+   with offer_id + bookable_program_id.
+4. Everything else (access, credits, checkout) is automatic.
 
 Guardrails: `docs/parent-runtime-cutover-guardrails.md` still applies in full.
