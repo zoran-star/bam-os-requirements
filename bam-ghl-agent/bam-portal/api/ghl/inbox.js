@@ -293,6 +293,50 @@ async function classifyStoreConversations(clientId, conversations) {
   });
 }
 
+// ── Social passthrough (store academies) ────────────────────────────────
+// IG/FB/WhatsApp/Live_Chat/GMB DMs have no portal store yet — they still live
+// ONLY in GHL. Without this, flipping an academy to the own-store inbox
+// silently hides its social threads (an Instagram DM looks like silence).
+// Read them straight from GHL and merge into the store inbox; replies already
+// route per-channel through send-message.js. SMS/Email GHL conversations stay
+// excluded — they froze at the flip and would duplicate the store threads.
+// Uses ghl_inbox_cache (12s TTL) so the inbox's frequent count refresh doesn't
+// hammer GHL; a 429 serves the last cached social rows. The direct Meta spine
+// (dm_threads) replaces this later.
+const SOCIAL_CHANNELS = new Set(["ig", "fb", "whatsapp", "live_chat", "gmb"]);
+const channelOf = (c) => String(c.lastMessageType || c.type || "").replace(/^TYPE_/i, "").toLowerCase() || null;
+async function listGhlSocialThreads(clientId, token, locationId) {
+  const cached = await readInboxCache(clientId);
+  if (cached && cached.updated_at &&
+      (Date.now() - new Date(cached.updated_at).getTime()) < INBOX_CACHE_TTL_MS) {
+    return (cached.payload && cached.payload.conversations) || [];
+  }
+  let rows;
+  try {
+    const data = await ghl("GET", `/conversations/search?${new URLSearchParams({ locationId, limit: "100" })}`, { token });
+    rows = (data.conversations || data.data || [])
+      .filter((c) => SOCIAL_CHANNELS.has(channelOf(c)))
+      .map((c) => ({
+        id:                   c.id,
+        contactId:            c.contactId || null,
+        contactName:          c.fullName || c.contactName || "Lead",
+        email:                c.email || null,
+        phone:                c.phone || null,
+        lastMessageBody:      c.lastMessageBody || "",
+        lastMessageDate:      c.lastMessageDate || c.dateUpdated || null,
+        lastMessageType:      c.lastMessageType || "",
+        lastMessageDirection: c.lastMessageDirection || "",
+        unreadCount:          c.unreadCount || 0,
+        channel:              channelOf(c),
+      }));
+  } catch (e) {
+    if (cached) return (cached.payload && cached.payload.conversations) || [];  // stale beats missing
+    throw e;
+  }
+  writeInboxCache(clientId, { conversations: rows });
+  return rows;
+}
+
 // ─────────────────────────────────────────────────────────
 // Handler
 // ─────────────────────────────────────────────────────────
@@ -373,10 +417,25 @@ async function handler(req, res) {
   const conversationId = req.query.conversation_id;
   const contactId = req.query.contact_id;
 
+  // GHL returns `type` as a number for some channels — always coerce to a
+  // string so the client can safely call .replace() on it.
+  const mapMsg = (m) => ({
+    id:         m.id,
+    body:       m.body || m.message || "",
+    type:       String(m.type ?? m.messageType ?? ""),
+    direction:  m.direction || "",
+    status:     m.status || "",
+    date:       m.dateAdded || m.createdAt || m.timestamp || null,
+    attachments: m.attachments || [],
+    contactId:  m.contactId || null,
+  });
+
   // Own-store academies: serve the inbox from the portal store, not GHL. SMS
   // (messaging_provider='twilio') and Email (email_provider='resend') each have
-  // their own store; when both are on we MERGE them into one inbox. Dormant for
-  // an academy on neither → falls through to the GHL read below unchanged.
+  // their own store; when both are on we MERGE them into one inbox. Social
+  // (IG/FB/WhatsApp) threads passthrough from GHL — see listGhlSocialThreads.
+  // Dormant for an academy on neither → falls through to the GHL read below
+  // unchanged.
   try {
     const [smsOn, emailOn] = await Promise.all([
       smsProvider(clientId).then((p) => p === "twilio").catch(() => false),
@@ -391,52 +450,64 @@ async function handler(req, res) {
         ]);
         const messages = [...(parts[0].messages || []), ...(parts[1].messages || [])].sort((a, b) => new Date(a.date || 0) - new Date(b.date || 0));
         const conversation_id = parts[0].conversation_id || parts[1].conversation_id || null;
+        if (!messages.length) {
+          // Nothing in the store — could be a social-only lead (IG/FB threads
+          // have no store yet). Serve their GHL social thread if one exists;
+          // any GHL failure falls back to the empty store result.
+          try {
+            const search = await ghl("GET", `/conversations/search?${new URLSearchParams({ locationId, contactId })}`, { token });
+            const convo = (search.conversations || search.data || [])[0];
+            if (convo && SOCIAL_CHANNELS.has(channelOf(convo))) {
+              const data = await ghl("GET", `/conversations/${encodeURIComponent(convo.id)}/messages`, { token });
+              const msgs = (data.messages?.messages || data.messages || data.data || []).map(mapMsg);
+              if (msgs.length) return res.status(200).json({ conversation_id: convo.id, messages: msgs });
+            }
+          } catch (_) { /* fall back to the empty store thread */ }
+        }
         return res.status(200).json({ conversation_id, messages });
       }
-      // Thread by id: try whichever store owns it (both are uuids).
+      // Thread by id: store thread ids are uuids; anything else is a GHL
+      // conversation id (a social passthrough row) → fall through to the GHL
+      // thread read below.
       if (conversationId) {
-        if (smsOn) { const t = await readStoreThreadById(conversationId).catch(() => null); if (t && t.messages && t.messages.length) return res.status(200).json(t); }
-        if (emailOn) { const t = await readEmailStoreThreadById(conversationId).catch(() => null); if (t) return res.status(200).json(t); }
-        return res.status(200).json({ conversation_id: conversationId, messages: [] });
+        const isStoreId = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(conversationId);
+        if (isStoreId) {
+          if (smsOn) { const t = await readStoreThreadById(conversationId).catch(() => null); if (t && t.messages && t.messages.length) return res.status(200).json(t); }
+          if (emailOn) { const t = await readEmailStoreThreadById(conversationId).catch(() => null); if (t) return res.status(200).json(t); }
+          return res.status(200).json({ conversation_id: conversationId, messages: [] });
+        }
       }
-      // List: merge both stores' conversations, then classify member/lead
-      // off-GHL so the Members/Leads filters + counts work. Per-user read
-      // receipts (the same ghl_conversation_reads the mark-read action writes,
-      // keyed here by the store thread uuid) are applied so a thread you opened
-      // STAYS read across reloads and devices; sort matches the GHL path
-      // (unread first, then newest).
-      const [lists, readsMap] = await Promise.all([
-        Promise.all([
-          smsOn ? listStoreThreads(clientId).catch(() => []) : [],
-          emailOn ? listEmailStoreThreads(clientId).catch(() => []) : [],
-        ]),
-        loadUserReads(clientId, ctx.user.id),
-      ]);
-      const merged = [...lists[0], ...lists[1]];
-      const classified = await classifyStoreConversations(clientId, merged);
-      const conversations = sortByUnreadThenDate(applyReads(classified, readsMap));
-      const counts = {
-        all:     conversations.length,
-        members: conversations.filter((c) => c.classification === "member").length,
-        leads:   conversations.filter((c) => c.classification === "lead").length,
-        unread:  conversations.reduce((s, c) => s + (c.unreadCount || 0), 0),
-      };
-      return res.status(200).json({ conversations, counts });
+      // List: merge both stores' conversations + the GHL social passthrough,
+      // then classify member/lead off-GHL so the Members/Leads filters +
+      // counts work. Per-user read receipts (the same ghl_conversation_reads
+      // the mark-read action writes, keyed here by the store thread uuid or
+      // the GHL conversation id for social rows) are applied so a thread you
+      // opened STAYS read across reloads and devices; sort matches the GHL
+      // path (unread first, then newest).
+      if (!conversationId) {
+        const [lists, readsMap] = await Promise.all([
+          Promise.all([
+            smsOn ? listStoreThreads(clientId).catch(() => []) : [],
+            emailOn ? listEmailStoreThreads(clientId).catch(() => []) : [],
+            listGhlSocialThreads(clientId, token, locationId).catch(() => []),
+          ]),
+          loadUserReads(clientId, ctx.user.id),
+        ]);
+        const merged = [...lists[0], ...lists[1], ...lists[2]];
+        const classified = await classifyStoreConversations(clientId, merged);
+        const conversations = sortByUnreadThenDate(applyReads(classified, readsMap));
+        const counts = {
+          all:     conversations.length,
+          members: conversations.filter((c) => c.classification === "member").length,
+          leads:   conversations.filter((c) => c.classification === "lead").length,
+          unread:  conversations.reduce((s, c) => s + (c.unreadCount || 0), 0),
+        };
+        return res.status(200).json({ conversations, counts });
+      }
+      // conversationId is a GHL conversation id (a social passthrough row) —
+      // fall through to the GHL thread read below.
     }
   } catch (e) { console.error("inbox store-read:", e.message); /* fall through to GHL */ }
-
-  // GHL returns `type` as a number for some channels — always coerce to a
-  // string so the client can safely call .replace() on it.
-  const mapMsg = (m) => ({
-    id:         m.id,
-    body:       m.body || m.message || "",
-    type:       String(m.type ?? m.messageType ?? ""),
-    direction:  m.direction || "",
-    status:     m.status || "",
-    date:       m.dateAdded || m.createdAt || m.timestamp || null,
-    attachments: m.attachments || [],
-    contactId:  m.contactId || null,
-  });
 
   // ────────────────────────────────────────────────────────
   // Mode B: single thread (by conversation_id)
