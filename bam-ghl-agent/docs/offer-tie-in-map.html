@@ -1,0 +1,574 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>What's tied to the Training Offer</title>
+<style>
+  :root{
+    --canvas-bg:#f7f5f2;
+    --ink:#3b3630;
+    --ink-soft:#6f675c;
+    --yellow-fill:#FFF3BF; --yellow-head:#F5C518; --yellow-line:#D9A400;
+    --orange-fill:#FFE3C2; --orange-head:#FFB84D; --orange-line:#E8901A;
+    --green-fill:#D8F5DF;  --green-head:#7BD88F;  --green-line:#3FA65C;
+    --blue-fill:#DCEFFB;   --blue-head:#7EC8F2;   --blue-line:#3D9BD9;
+    --purple-fill:#EDE3FB; --purple-head:#C8A8F0; --purple-line:#9A6FE0;
+    --hand:'Marker Felt','Chalkboard SE','Segoe Print','Comic Sans MS',cursive;
+    --body:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%;overflow:hidden;background:var(--canvas-bg);font-family:var(--body);color:var(--ink)}
+
+  /* ---------- viewport + canvas ---------- */
+  #viewport{
+    position:fixed;inset:0;overflow:hidden;cursor:grab;touch-action:none;
+    background-color:var(--canvas-bg);
+    background-image:radial-gradient(circle,#d8d2c8 1.4px,transparent 1.6px);
+    background-size:26px 26px;
+  }
+  #viewport.dragging{cursor:grabbing}
+  #canvas{
+    position:absolute;left:0;top:0;width:2400px;height:1600px;
+    transform-origin:0 0;
+  }
+  #wires{position:absolute;inset:0;width:2400px;height:1600px;pointer-events:none}
+
+  /* ---------- header bar ---------- */
+  #hud{
+    position:fixed;top:16px;left:16px;z-index:50;
+    background:#fffdf8;border:2px solid #e3dccd;border-radius:14px;
+    box-shadow:0 6px 18px rgba(80,66,40,.14);
+    padding:12px 16px;max-width:340px;
+  }
+  #hud h1{font-family:var(--hand);font-size:19px;letter-spacing:.4px;line-height:1.15}
+  #hud .sub{font-size:12px;color:var(--ink-soft);margin-top:4px}
+  #hud .live{
+    display:inline-flex;align-items:center;gap:6px;margin-top:8px;
+    background:#e8f8ec;border:1.5px solid #7BD88F;border-radius:999px;
+    padding:3px 10px;font-size:11px;font-weight:700;color:#1f7a3a;letter-spacing:.5px;
+  }
+  #hud .live .dot{width:8px;height:8px;border-radius:50%;background:#2fbf5a;box-shadow:0 0 0 3px rgba(47,191,90,.25);animation:pulse 1.8s infinite}
+  @keyframes pulse{0%,100%{box-shadow:0 0 0 3px rgba(47,191,90,.25)}50%{box-shadow:0 0 0 6px rgba(47,191,90,.10)}}
+  #hud .zoomrow{display:flex;gap:6px;margin-top:10px;align-items:center}
+  #hud button{
+    width:34px;height:34px;border-radius:10px;border:2px solid #d8d0be;background:#fff;
+    font-size:17px;font-weight:800;color:var(--ink);cursor:pointer;line-height:1;
+  }
+  #hud button:hover{background:#fdf3d7;border-color:#e0b52a}
+  #hud button.fitbtn{width:auto;padding:0 12px;font-family:var(--hand);font-size:14px}
+  #hud .hint{font-size:10.5px;color:#a2988a;margin-top:8px}
+
+  /* ---------- clusters ---------- */
+  .cluster{
+    position:absolute;border-radius:18px;padding:14px 14px 16px;
+    border:2.5px dashed transparent;
+  }
+  .cluster .chead{
+    display:inline-block;font-family:var(--hand);font-weight:700;font-size:22px;
+    letter-spacing:.6px;padding:8px 18px;border-radius:12px;color:#33290f;
+    box-shadow:0 3px 0 rgba(0,0,0,.14);margin-bottom:6px;transform:rotate(-.6deg);
+  }
+  .cluster .csub{font-size:12px;color:var(--ink-soft);margin:2px 4px 10px;font-weight:600}
+  .cards{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  .cards .wide{grid-column:1 / -1}
+
+  .c-yellow{background:rgba(255,224,102,.14);border-color:rgba(217,164,0,.45)}
+  .c-yellow .chead{background:var(--yellow-head)}
+  .c-orange{background:rgba(255,184,77,.13);border-color:rgba(232,144,26,.45)}
+  .c-orange .chead{background:var(--orange-head)}
+  .c-green{background:rgba(123,216,143,.13);border-color:rgba(63,166,92,.45)}
+  .c-green .chead{background:var(--green-head)}
+  .c-blue{background:rgba(126,200,242,.14);border-color:rgba(61,155,217,.45)}
+  .c-blue .chead{background:var(--blue-head)}
+  .c-purple{background:rgba(200,168,240,.15);border-color:rgba(154,111,224,.45)}
+  .c-purple .chead{background:var(--purple-head)}
+
+  /* ---------- sticky cards ---------- */
+  .card{
+    position:relative;border-radius:8px;padding:12px 13px 11px;
+    box-shadow:0 4px 10px rgba(74,60,34,.16),0 1px 2px rgba(74,60,34,.12);
+    transform:rotate(var(--r,0deg));
+    transition:transform .15s ease,box-shadow .15s ease;
+    cursor:pointer;min-height:86px;
+  }
+  .card:hover{transform:rotate(0deg) scale(1.045);box-shadow:0 12px 24px rgba(74,60,34,.24);z-index:5}
+  .card:nth-child(5n+1){--r:-1deg}
+  .card:nth-child(5n+2){--r:.7deg}
+  .card:nth-child(5n+3){--r:-.4deg}
+  .card:nth-child(5n+4){--r:1deg}
+  .card:nth-child(5n+5){--r:-.8deg}
+
+  .c-yellow .card{background:var(--yellow-fill)}
+  .c-orange .card{background:var(--orange-fill)}
+  .c-green  .card{background:var(--green-fill)}
+  .c-blue   .card{background:var(--blue-fill)}
+  .c-purple .card{background:var(--purple-fill)}
+
+  .card h3{font-family:var(--hand);font-size:15.5px;line-height:1.2;letter-spacing:.2px;padding-right:8px}
+  .card p{font-size:11.5px;color:#5c5346;margin-top:5px;line-height:1.35}
+  .card .more{display:none;margin-top:8px;padding-top:7px;border-top:1.5px dashed rgba(0,0,0,.18);font-size:11px;color:#4c4437;line-height:1.4}
+  .card.open .more{display:block}
+  .card .tap{position:absolute;right:8px;bottom:6px;font-size:12px;color:rgba(0,0,0,.28)}
+  .card.open .tap{transform:rotate(45deg)}
+
+  .count{
+    display:inline-block;min-width:26px;text-align:center;
+    background:#3b3630;color:#ffe89c;border-radius:999px;
+    font-size:12.5px;font-weight:800;padding:2px 9px;margin-left:6px;
+    font-family:var(--body);vertical-align:2px;box-shadow:0 2px 0 rgba(0,0,0,.25);
+  }
+  .badge-new{
+    display:inline-block;background:#e6493f;color:#fff;border-radius:999px;
+    font-size:9.5px;font-weight:800;letter-spacing:1px;padding:2px 8px;margin-left:6px;
+    vertical-align:3px;box-shadow:0 2px 0 rgba(150,20,10,.35);font-family:var(--body);
+  }
+  .badge-on{
+    display:inline-block;background:#1f7a3a;color:#dff7e6;border-radius:999px;
+    font-size:9.5px;font-weight:800;letter-spacing:1px;padding:2px 8px;margin-left:6px;
+    vertical-align:3px;font-family:var(--body);
+  }
+
+  /* ---------- hub ---------- */
+  #hub{
+    position:absolute;left:990px;top:585px;width:420px;
+    background:linear-gradient(160deg,#ffd76a,#f6b93d);
+    border:3px solid #c78a12;border-radius:16px;
+    padding:20px 22px 18px;text-align:center;
+    box-shadow:0 12px 30px rgba(150,105,20,.35),0 3px 0 #b57d0e;
+    transform:rotate(-.5deg);z-index:4;transition:transform .15s ease,box-shadow .15s ease;cursor:pointer;
+  }
+  #hub:hover{transform:rotate(0deg) scale(1.03);box-shadow:0 18px 40px rgba(150,105,20,.45),0 3px 0 #b57d0e}
+  #hub h2{font-family:var(--hand);font-size:32px;letter-spacing:1px;color:#4a3407;text-shadow:0 1px 0 rgba(255,255,255,.4)}
+  #hub .hsub{font-family:var(--hand);font-size:14px;color:#6b4d0c;margin-top:2px}
+  #hub p{font-size:12.5px;color:#553d09;margin-top:10px;line-height:1.45;font-weight:600}
+
+  /* ---------- mini flow (green cluster) ---------- */
+  .miniflow{
+    grid-column:1 / -1;background:#fffdf4;border:2px solid rgba(63,166,92,.5);
+    border-radius:10px;padding:10px 12px;margin-top:2px;
+    box-shadow:0 3px 8px rgba(74,60,34,.12);transform:rotate(.3deg);
+  }
+  .miniflow .mfl{font-family:var(--hand);font-size:12px;color:#2c7a44;letter-spacing:1px;margin-bottom:6px}
+  .mfrow{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+  .mfrow .mp{
+    background:#7BD88F;color:#123f21;border-radius:999px;padding:4px 11px;
+    font-size:11.5px;font-weight:800;box-shadow:0 2px 0 rgba(20,80,40,.3);white-space:nowrap;
+  }
+  .mfrow .ma{color:#3FA65C;font-weight:800;font-size:15px}
+
+  /* ---------- bottom strip ---------- */
+  #flowstrip{
+    position:absolute;left:180px;top:1370px;width:2050px;
+    background:#fffdf6;border:2.5px solid #e0d7c2;border-radius:16px;
+    padding:16px 24px 14px;box-shadow:0 8px 22px rgba(74,60,34,.14);
+    transform:rotate(.15deg);
+  }
+  #flowstrip .ft{font-family:var(--hand);font-size:20px;letter-spacing:1.5px;color:#8a6a12;margin-bottom:10px}
+  #flowstrip .frow{display:flex;align-items:center;gap:8px;flex-wrap:nowrap}
+  #flowstrip .pill{
+    background:#3b3630;color:#ffe89c;border-radius:999px;padding:6px 14px;
+    font-size:13px;font-weight:700;white-space:nowrap;box-shadow:0 3px 0 rgba(0,0,0,.28);
+    font-family:var(--hand);letter-spacing:.4px;
+  }
+  #flowstrip .pill.money{background:#1f7a3a;color:#dff7e6}
+  #flowstrip .fa{color:#b3a583;font-weight:800;font-size:18px}
+  #flowstrip .fcap{margin-top:10px;font-size:12px;color:var(--ink-soft);font-weight:600}
+
+  /* wire labels */
+  .wlabel{font-family:var(--hand);font-size:15px;fill:#8a7a5c}
+
+  /* cluster positions */
+  #cl-in{left:110px;top:120px;width:580px}
+  #cl-pipe{left:1730px;top:110px;width:560px}
+  #cl-money{left:1580px;top:715px;width:720px}
+  #cl-members{left:110px;top:880px;width:600px}
+  #cl-config{left:880px;top:40px;width:520px}
+</style>
+</head>
+<body>
+
+<div id="hud">
+  <h1>What's tied to the Training Offer</h1>
+  <div class="sub">BAM GTA · July 2026</div>
+  <div class="live"><span class="dot"></span>LIVE COUNTS from production</div>
+  <div class="zoomrow">
+    <button id="zin" title="Zoom in">+</button>
+    <button id="zout" title="Zoom out">&minus;</button>
+    <button id="zfit" class="fitbtn" title="Fit board">fit</button>
+  </div>
+  <div class="hint">drag to pan · scroll / pinch to zoom · click a note for more</div>
+</div>
+
+<div id="viewport">
+  <div id="canvas">
+
+    <svg id="wires" viewBox="0 0 2400 1600">
+      <defs>
+        <marker id="arr" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path d="M0,0 L10,5 L0,10 z" fill="#8a7a5c"></path>
+        </marker>
+      </defs>
+
+      <!-- hub -> cluster connectors (dashed, per-cluster color) -->
+      <path d="M1030,640 Q680,470 440,215" fill="none" stroke="#D9A400" stroke-width="4" stroke-dasharray="10 9" stroke-linecap="round" opacity=".65"></path>
+      <path d="M1170,582 Q1148,340 1140,120" fill="none" stroke="#9A6FE0" stroke-width="4" stroke-dasharray="10 9" stroke-linecap="round" opacity=".65"></path>
+      <path d="M1372,640 Q1720,470 1975,200" fill="none" stroke="#E8901A" stroke-width="4" stroke-dasharray="10 9" stroke-linecap="round" opacity=".65"></path>
+      <path d="M1412,725 Q1550,700 1695,758" fill="none" stroke="#3FA65C" stroke-width="4" stroke-dasharray="10 9" stroke-linecap="round" opacity=".7"></path>
+      <path d="M1000,762 Q690,800 462,900" fill="none" stroke="#3D9BD9" stroke-width="4" stroke-dasharray="10 9" stroke-linecap="round" opacity=".65"></path>
+
+      <!-- thin money-flow arrows -->
+      <path d="M700,390 Q1200,590 1715,390" fill="none" stroke="#8a7a5c" stroke-width="2" marker-end="url(#arr)" opacity=".85"></path>
+      <text class="wlabel" x="1128" y="512">lead &#8594; board</text>
+
+      <path d="M2015,662 Q2040,698 2010,726" fill="none" stroke="#8a7a5c" stroke-width="2" marker-end="url(#arr)" opacity=".85"></path>
+      <text class="wlabel" x="2055" y="702">won &#8594; checkout</text>
+
+      <path d="M1568,1130 Q1150,1240 735,1095" fill="none" stroke="#8a7a5c" stroke-width="2" marker-end="url(#arr)" opacity=".85"></path>
+      <text class="wlabel" x="1010" y="1218">payment grants access + credits</text>
+    </svg>
+
+    <!-- ================= HUB ================= -->
+    <div id="hub" class="card" style="--r:-.5deg">
+      <h2>&#127936; TRAINING OFFER</h2>
+      <div class="hsub">the hub everything hangs off</div>
+      <p>One offer = its own funnel, board, prices, access rules.<br>
+      ADAPT / camps later = new offer, zero new code.</p>
+      <div class="more">Every object on this board carries the offer's id. Spin up a second offer and it gets its own copy of this entire map for free.</div>
+      <span class="tap">+</span>
+    </div>
+
+    <!-- ============ CLUSTER 1 : GETTING PEOPLE IN (yellow) ============ -->
+    <div class="cluster c-yellow" id="cl-in">
+      <div class="chead">&#128227; GETTING PEOPLE IN</div>
+      <div class="csub">top of funnel - everything is stamped with the offer on arrival</div>
+      <div class="cards">
+        <div class="card">
+          <h3>Meta ad campaigns <span class="count">1</span></h3>
+          <p>campaigns belong to the offer &#8594; true per-offer CAC</p>
+          <div class="more">Ad spend rolls up to the offer, so cost-per-member is real math, not a guess.</div>
+          <span class="tap">+</span>
+        </div>
+        <div class="card">
+          <h3>Entry points: forms + trial calendars <span class="count">6</span></h3>
+          <p>website free-trial + contact forms, GHL forms, 2 booking calendars</p>
+          <div class="more">Whichever door a lead walks through, the offer funnel tag comes with them.</div>
+          <span class="tap">+</span>
+        </div>
+        <div class="card">
+          <h3>Booking program link <span class="count">4</span></h3>
+          <p>4 entry points also linked to the Training booking program</p>
+          <div class="more">The trial calendars and forms point at the same booking program the offer grants access to.</div>
+          <span class="tap">+</span>
+        </div>
+        <div class="card">
+          <h3>Website leads <span class="count">84</span></h3>
+          <p>every lead stamped with the offer funnel it came through</p>
+          <div class="more">No orphan leads: source funnel is recorded at creation, forever queryable per offer.</div>
+          <span class="tap">+</span>
+        </div>
+        <div class="card wide">
+          <h3>Trial bookings</h3>
+          <p>every new trial carries the offer (website, agent, calendar paths)</p>
+          <div class="more">Website self-serve, AI agent bookings and manual calendar bookings all write the same offer stamp.</div>
+          <span class="tap">+</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ CLUSTER 5 : CONTENT + CONFIG (purple, top-center) ============ -->
+    <div class="cluster c-purple" id="cl-config">
+      <div class="chead">&#9881;&#65039; CONTENT + CONFIG</div>
+      <div class="cards">
+        <div class="card">
+          <h3>Offer-scoped intake fields <span class="count">2</span></h3>
+          <p>Oakville proximity, start timing</p>
+          <div class="more">Questions the sales flow asks only for this offer.</div>
+          <span class="tap">+</span>
+        </div>
+        <div class="card">
+          <h3>Signed agreement / waiver <span class="count">1</span></h3>
+          <p>1 file on the offer</p>
+          <div class="more">The waiver new members sign lives on the offer, not floating in a drive.</div>
+          <span class="tap">+</span>
+        </div>
+        <div class="card">
+          <h3>Welcome video slot</h3>
+          <p>ready for a per-offer welcome video</p>
+          <div class="more">Drop a video in and every new Training member gets it in onboarding.</div>
+          <span class="tap">+</span>
+        </div>
+        <div class="card">
+          <h3>Comms tags</h3>
+          <p>sales + onboarding tags scoped to the offer</p>
+          <div class="more">Messaging automations key off these, so copy can differ per offer later.</div>
+          <span class="tap">+</span>
+        </div>
+        <div class="card wide">
+          <h3>Booking program link + drift alarm</h3>
+          <p>funnel and trial APIs can never silently drift</p>
+          <div class="more">If the offer's booking program and the trial calendars ever point at different things, an alarm fires.</div>
+          <span class="tap">+</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ CLUSTER 2 : PIPELINE + AGENTS (orange) ============ -->
+    <div class="cluster c-orange" id="cl-pipe">
+      <div class="chead">&#128203; PIPELINE + AGENTS</div>
+      <div class="cards">
+        <div class="card">
+          <h3>The sales board <span class="count">5 stages</span></h3>
+          <p>one pipeline per offer (decided)</p>
+          <div class="more">New Lead through Won: the whole board belongs to the Training offer.</div>
+          <span class="tap">+</span>
+        </div>
+        <div class="card">
+          <h3>Opportunity cards <span class="count">29</span></h3>
+          <p>cards inherit the offer from their board</p>
+          <div class="more">No per-card tagging needed: board membership = offer membership.</div>
+          <span class="tap">+</span>
+        </div>
+        <div class="card">
+          <h3>Automations <span class="count">8</span></h3>
+          <p>Ghosted, Lead Nurture, form intros - per offer</p>
+          <div class="more">Follow-up sequences fire with offer context, so copy and timing can diverge per offer.</div>
+          <span class="tap">+</span>
+        </div>
+        <div class="card">
+          <h3>Post-trial staff forms <span class="count">13</span></h3>
+          <p>coach feedback after each trial</p>
+          <div class="more">Coaches log how the trial went; the form is tied back to the offer's funnel.</div>
+          <span class="tap">+</span>
+        </div>
+        <div class="card">
+          <h3>Agent brains</h3>
+          <p>per-offer slot ready; academy-wide until offers diverge</p>
+          <div class="more">The AI sales agents read one academy brain today, but each offer already has a slot for its own.</div>
+          <span class="tap">+</span>
+        </div>
+        <div class="card">
+          <h3>Win/loss outcomes <span class="count">31</span><span class="badge-new">NEW</span></h3>
+          <p>per-offer conversion rate</p>
+          <div class="more">Every closed card records won or lost, so the offer has a real conversion number.</div>
+          <span class="tap">+</span>
+        </div>
+        <div class="card wide">
+          <h3>KPI funnel events <span class="badge-new">NEW</span></h3>
+          <p>lead &#8594; trial &#8594; member, per offer</p>
+          <div class="more">Each hop emits an event with the offer id: the KPI dashboard reads straight off these.</div>
+          <span class="tap">+</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ CLUSTER 3 : MONEY -> ACCESS ENGINE (green) ============ -->
+    <div class="cluster c-green" id="cl-money">
+      <div class="chead">&#128176; MONEY &#8594; ACCESS ENGINE</div>
+      <div class="csub">the big one - money in becomes gym access, automatically</div>
+      <div class="cards">
+        <div class="card">
+          <h3>Purchase plans <span class="count">5</span></h3>
+          <p>Steady, Accelerate, Elevate, Dominate, Summer Unlimited</p>
+          <div class="more">The public menu: what a parent can actually buy on the offer.</div>
+          <span class="tap">+</span>
+        </div>
+        <div class="card">
+          <h3>Typed prices <span class="count">31</span></h3>
+          <p>every price ever sold, incl. legacy - old subscriptions resolve too</p>
+          <div class="more">Grandfathered 2024 prices and current ones all resolve to the same engine.</div>
+          <span class="tap">+</span>
+        </div>
+        <div class="card">
+          <h3>Access rules <span class="count">31</span></h3>
+          <p>what each price grants: 1/wk, 2/wk, 3/wk, unlimited</p>
+          <div class="more">One rule per price: pay X, get exactly Y sessions. No spreadsheet lookups.</div>
+          <span class="tap">+</span>
+        </div>
+        <div class="card">
+          <h3>Payment &#8594; entitlement <span class="badge-on">AUTOMATIC</span></h3>
+          <p>webhook access sync, ON</p>
+          <div class="more">Stripe webhook fires, entitlement updates. Nobody touches anything.</div>
+          <span class="tap">+</span>
+        </div>
+        <div class="card">
+          <h3>Credits engine <span class="badge-on">ON</span></h3>
+          <p>paid invoice grants weekly credits (4/8/12 per month-cycle), expiry swept daily</p>
+          <div class="more">Credits mint on payment, expire on schedule, and a daily sweep keeps ledgers honest.</div>
+          <span class="tap">+</span>
+        </div>
+        <div class="card">
+          <h3>Checkout sells typed prices</h3>
+          <p>can never sell what the engines can't fulfill</p>
+          <div class="more">Checkout only lists prices that have an access rule, so a sale always maps to real access.</div>
+          <span class="tap">+</span>
+        </div>
+        <div class="card">
+          <h3>Discount code <span class="count">1</span></h3>
+          <p>2SIBLING</p>
+          <div class="more">Sibling discount, scoped to the offer's checkout.</div>
+          <span class="tap">+</span>
+        </div>
+        <div class="card">
+          <h3>Refunds <span class="count">10</span><span class="badge-new">NEW</span></h3>
+          <p>per-offer refund rate</p>
+          <div class="more">Refunds tie back to the offer, so refund rate sits next to CAC and conversion.</div>
+          <span class="tap">+</span>
+        </div>
+        <div class="miniflow">
+          <div class="mfl">THE ENGINE, END TO END</div>
+          <div class="mfrow">
+            <span class="mp">payment &#10003;</span><span class="ma">&#8594;</span>
+            <span class="mp">entitlement</span><span class="ma">&#8594;</span>
+            <span class="mp">credits</span><span class="ma">&#8594;</span>
+            <span class="mp">booking access</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ CLUSTER 4 : MEMBERS (blue) ============ -->
+    <div class="cluster c-blue" id="cl-members">
+      <div class="chead">&#128101; MEMBERS</div>
+      <div class="cards">
+        <div class="card">
+          <h3>Members <span class="count">33</span></h3>
+          <p>active roster on the Training offer</p>
+          <div class="more">The people the whole machine exists for.</div>
+          <span class="tap">+</span>
+        </div>
+        <div class="card">
+          <h3>Access entitlements <span class="count">70</span></h3>
+          <p>incl. history - ACTIVE/SUSPENDED always mirrors member status</p>
+          <div class="more">Full history kept: pause a member and their entitlement suspends in lockstep.</div>
+          <span class="tap">+</span>
+        </div>
+        <div class="card">
+          <h3>Credit ledger <span class="count">27</span></h3>
+          <p>27 movements - every grant, spend and expiry</p>
+          <div class="more">Auditable trail: you can always answer "why does this kid have 3 credits?"</div>
+          <span class="tap">+</span>
+        </div>
+        <div class="card">
+          <h3>Cancellations <span class="count">28</span><span class="badge-new">NEW</span></h3>
+          <p>per-offer churn - retention is the north star</p>
+          <div class="more">Each cancellation records the offer, so churn is measurable per offer, not just academy-wide.</div>
+          <span class="tap">+</span>
+        </div>
+        <div class="card wide">
+          <h3>The identity spine <span class="count">41/41</span></h3>
+          <p>Every member-minting path ends on the identity spine: sorter imports, staff actions, crons, webhooks - 41/41</p>
+          <div class="more">All 41 code paths that can create a member funnel into one spine, so there is exactly one version of every person.</div>
+          <span class="tap">+</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ BOTTOM STRIP : THE FLOW ============ -->
+    <div id="flowstrip">
+      <div class="ft">&#127937; THE FLOW</div>
+      <div class="frow">
+        <span class="pill">ad</span><span class="fa">&#8594;</span>
+        <span class="pill">form / calendar</span><span class="fa">&#8594;</span>
+        <span class="pill">lead</span><span class="fa">&#8594;</span>
+        <span class="pill">pipeline card</span><span class="fa">&#8594;</span>
+        <span class="pill">trial</span><span class="fa">&#8594;</span>
+        <span class="pill">post-trial</span><span class="fa">&#8594;</span>
+        <span class="pill money">checkout</span><span class="fa">&#8594;</span>
+        <span class="pill money">payment</span><span class="fa">&#8594;</span>
+        <span class="pill money">entitlement</span><span class="fa">&#8594;</span>
+        <span class="pill money">credits</span><span class="fa">&#8594;</span>
+        <span class="pill money">booking access</span>
+      </div>
+      <div class="fcap">every hop stamped with the offer - all automatic</div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+(function(){
+  var vp = document.getElementById('viewport');
+  var cv = document.getElementById('canvas');
+  var CW = 2400, CH = 1600;
+  var s = 0.5, tx = 0, ty = 0;
+
+  function clamp(v){ return Math.max(0.12, Math.min(2.5, v)); }
+  function apply(){ cv.style.transform = 'translate(' + tx + 'px,' + ty + 'px) scale(' + s + ')'; }
+  function fit(){
+    var w = vp.clientWidth, h = vp.clientHeight;
+    s = clamp(Math.min(w / CW, h / CH) * 0.96);
+    tx = (w - CW * s) / 2;
+    ty = (h - CH * s) / 2;
+    apply();
+  }
+  function zoomAt(f, cx, cy){
+    var ns = clamp(s * f); f = ns / s;
+    tx = cx - (cx - tx) * f;
+    ty = cy - (cy - ty) * f;
+    s = ns; apply();
+  }
+
+  /* wheel zoom (toward cursor) */
+  vp.addEventListener('wheel', function(e){
+    e.preventDefault();
+    var r = vp.getBoundingClientRect();
+    zoomAt(e.deltaY < 0 ? 1.12 : 0.89, e.clientX - r.left, e.clientY - r.top);
+  }, { passive: false });
+
+  /* pointer pan + pinch */
+  var pts = new Map(), lastDist = 0, lastMid = null, moved = 0;
+  vp.addEventListener('pointerdown', function(e){
+    vp.setPointerCapture(e.pointerId);
+    pts.set(e.pointerId, [e.clientX, e.clientY]);
+    if (pts.size === 1) moved = 0;
+    lastDist = 0; lastMid = null;
+    vp.classList.add('dragging');
+  });
+  vp.addEventListener('pointermove', function(e){
+    if (!pts.has(e.pointerId)) return;
+    if (pts.size === 1){
+      var p = pts.get(e.pointerId);
+      var dx = e.clientX - p[0], dy = e.clientY - p[1];
+      tx += dx; ty += dy; moved += Math.abs(dx) + Math.abs(dy);
+      pts.set(e.pointerId, [e.clientX, e.clientY]);
+      apply();
+    } else if (pts.size === 2){
+      pts.set(e.pointerId, [e.clientX, e.clientY]);
+      var vals = Array.from(pts.values());
+      var d = Math.hypot(vals[0][0] - vals[1][0], vals[0][1] - vals[1][1]);
+      var mid = [(vals[0][0] + vals[1][0]) / 2, (vals[0][1] + vals[1][1]) / 2];
+      var r = vp.getBoundingClientRect();
+      if (lastDist) zoomAt(d / lastDist, mid[0] - r.left, mid[1] - r.top);
+      if (lastMid){ tx += mid[0] - lastMid[0]; ty += mid[1] - lastMid[1]; apply(); }
+      lastDist = d; lastMid = mid; moved = 99;
+    }
+  });
+  function endPtr(e){
+    pts.delete(e.pointerId);
+    lastDist = 0; lastMid = null;
+    if (pts.size === 0) vp.classList.remove('dragging');
+  }
+  vp.addEventListener('pointerup', endPtr);
+  vp.addEventListener('pointercancel', endPtr);
+
+  /* click a card to expand (only if it was not a drag) */
+  Array.prototype.forEach.call(document.querySelectorAll('.card'), function(c){
+    c.addEventListener('click', function(){
+      if (moved > 6) return;
+      c.classList.toggle('open');
+    });
+  });
+
+  /* buttons */
+  function center(){ return [vp.clientWidth / 2, vp.clientHeight / 2]; }
+  document.getElementById('zin').addEventListener('click', function(){ var c = center(); zoomAt(1.25, c[0], c[1]); });
+  document.getElementById('zout').addEventListener('click', function(){ var c = center(); zoomAt(0.8, c[0], c[1]); });
+  document.getElementById('zfit').addEventListener('click', fit);
+
+  window.addEventListener('resize', fit);
+  fit();
+})();
+</script>
+</body>
+</html>
