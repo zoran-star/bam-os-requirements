@@ -1,10 +1,38 @@
 # Meta DM spine - Instagram + FB Messenger off GHL
 
-<<<<<<< HEAD
-**Status 2026-07-03 EOD: GTA WIRED + ACTIVE. FB Messenger PROVEN end-to-end
-(real inbound stored in dm_threads). Instagram blocked on Meta App Review
-(Advanced Access) - that's the next session's job. Leads' IG DMs meanwhile
-still visible via the GHL passthrough in the inbox.**
+**Status 2026-07-03 late: ALL 4 INCREMENTS BUILT. GTA wired + active (webhook
+stores), FB Messenger proven end-to-end. Increment 4 (inbox read + Graph send
++ passthrough dedupe) is code-complete but GATED behind
+`client_meta_messaging_config.inbox_live` (false for everyone). Waiting on
+Meta App Review (Advanced Access). Leads' IG/FB DMs stay visible via the GHL
+passthrough until inbox_live flips.**
+
+## Increment 4 (built 2026-07-03, dormant behind inbox_live)
+- **`api/meta/_dm.js`** - the module: `metaDmConfig` (active cfg;
+  `{requireInboxLive:true}` for the inbox path), `listDmThreads` /
+  `readDmThreadById` / `readDmThreadInbox` (same row shapes as the sms store
+  readers), `maybeSendDmViaMeta` (same handled/ok contract as
+  maybeSendSmsViaProvider; Graph POST /{page_id}/messages, messaging_type
+  RESPONSE, friendly 24h-window error, attachments one-per-send, outbound
+  stored with mid so the webhook echo dedupes on the unique index).
+- **inbox.js** - store branch also enters on metaOn; merges dm_threads into
+  the list, reads dm threads by uuid + by contact, and when metaOn drops
+  ig/fb/instagram/facebook rows from the GHL passthrough (dedupe).
+- **send-message.js** - IG/FB gate runs BEFORE the GHL contact lookup (dm
+  threads may have no contact/phone); resolves thread by conversation_id
+  (dm_threads uuid) or contact_id+channel; unresolved → falls through to the
+  GHL send so passthrough replies still work. Logs sent_via='meta'.
+- **client-portal.html** `_v15ibSend` now passes `conversation_id` (a.convId).
+- **`inbox_live` gate** (migration `20260703230000`, applied to prod): WHY -
+  status='active' only stores what Meta DELIVERS, and Standard Access delivers
+  app-role senders only. Deduping the passthrough before real-lead DMs flow
+  would hide leads' threads (the regression phase 0 fixed). Flip per academy
+  AFTER App Review passes + a real lead DM lands in dm_threads:
+  `POST /api/meta/connect {action:'inbox-live', client_id, live:true}`
+  (rollback: live:false). `action:'status'` returns inbox_live.
+- **`public/data-deletion.html`** - Meta-required data deletion instructions,
+  live at https://portal.byanymeansbusiness.com/data-deletion.html (paste into
+  App Settings → Basic → Data deletion instructions URL).
 
 ## Session results (2026-07-03 evening)
 - GTA config ACTIVE: page 130045040185267 "By Any Means GTA",
@@ -51,10 +79,11 @@ Prep needed:
   after adding an Instagram Tester so the DM actually flows), plus a written
   use-case ("academy staff answer their own customers' DMs in our portal")
 - Settings → Basic completeness: icon, category, privacy policy (done),
-  data deletion instructions URL (may need to add)
+  data deletion instructions URL:
+  https://portal.byanymeansbusiness.com/data-deletion.html (built 2026-07-03)
 - Business Verification in Business Manager if Meta asks
-- While waiting: build increment 4 (inbox reads dm_threads + Graph send +
-  passthrough dedupe) so everything ships the moment review passes.
+- Increment 4 is BUILT (see above) - after approval: prove a real lead DM
+  lands in dm_threads, then flip inbox_live (connect.js action=inbox-live).
 
 ## Why
 GTA's IG/FB DMs only lived in GHL. Phase 0 (same day) made them visible again via
@@ -99,13 +128,12 @@ spine replaces that passthrough with direct Meta - the social sibling of
 4. POST /api/meta/connect action=wire for GTA (page "By Any Means GTA"), then
    send a test IG DM, check dm_threads, then action=activate.
 
-## Remaining (increment 4 + inbox/send)
-- Inbox read: list dm_threads in the store inbox; when config active, exclude
-  ig/fb from the GHL passthrough (dedupe).
-- Send: Graph API POST /{page_id}/messages via page_token_enc; 24h window;
-  wire into send-message.js TYPE_MAP branch.
+## Remaining (post-increment-4)
+- App Review approval → prove real-lead DM lands → flip inbox_live for GTA.
 - Contact mint/match (resolveOrMintPortalContact) + pipeline bounce +
   cancel-drafts side-effects (copy twilio/inbound-webhook.js pattern).
+  Until mint lands, dm_threads.ghl_contact_id is null → threads classify as
+  'lead' and contact-drawer shows "No GHL contact linked".
 - Agents channel-aware replies (they hardcode SMS today).
 - GHL DM history import (mirror import-ghl-history.js).
 
