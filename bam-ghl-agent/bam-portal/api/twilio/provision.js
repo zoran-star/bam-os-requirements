@@ -79,7 +79,7 @@ async function handler(req, res) {
 
   const body = (req.body && typeof req.body === "object") ? req.body : {};
   const clientId = String(body.client_id || "").trim();
-  if (!clientId) return res.status(400).json({ error: "client_id required" });
+  if (!/^[0-9a-f-]{36}$/i.test(clientId)) return res.status(400).json({ error: "client_id must be a uuid" });
   const country = String(body.country || "US").toUpperCase();
   if (!["US", "CA"].includes(country)) return res.status(400).json({ error: "country must be US or CA" });
   const areaCode = String(body.area_code || "").replace(/\D/g, "");
@@ -183,4 +183,9 @@ async function handler(req, res) {
   });
 }
 
-export default withSentryApiRoute(handler);
+async function safeHandler(req, res) {
+  try { return await handler(req, res); }
+  catch (e) { return res.status(502).json({ error: e.message || String(e) }); }
+}
+
+export default withSentryApiRoute(safeHandler);
