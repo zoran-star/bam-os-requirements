@@ -3215,6 +3215,10 @@ const MM_TESTING_AGE_DAYS = 3; // younger ads get a grey "testing" state
 const MM_TESTING_SPEND = 20;   // ...same for ads under this spend
 const MM_KILL_SPEND = 75;      // red CPL at this spend -> "kill it" guidance
 const MM_WANT_CREATIVES = 6;   // distinct live angles wanted (Andromeda note)
+const MM_WINDOW_DAYS = 14;     // judged window for lead-based metrics (sub-$1k/mo spends make 7d too noisy)
+const MM_FAST_DAYS = 7;        // impression-based metrics window (freq/CTR - high volume, fast signal)
+const MM_MIN_LEADS = 8;        // don't color a window CPL below this sample...
+const MM_MIN_SPEND = 250;      // ...unless spend says the silence itself is the signal
 
 function mmCplBand(cpl, spend) {
   if (cpl == null) return spend >= MM_KILL_SPEND ? "red" : "grey";
@@ -3269,15 +3273,16 @@ async function handleMetaMachine(req, res) {
   else if (ctx.client) targetClientId = ctx.client.id;
   if (!targetClientId) return res.status(403).json({ error: "client_id required (client login or staff with ?client_id)" });
 
-  // Range: default month-to-date (UTC). Custom since/until from the modal's
-  // date picker. Prior period = the equal-length window immediately before.
+  // Judged window: default = last MM_WINDOW_DAYS ending today (custom since/until
+  // from the modal's date picker overrides). Lifetime CPL is the anchor and is
+  // always computed over the campaign's whole life regardless of the window.
   const reDate = /^\d{4}-\d{2}-\d{2}$/;
   const fmt = (d) => d.toISOString().slice(0, 10);
   const DAY = 86400000;
   const now = new Date();
   const todayD = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
-  let sinceD = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
   let untilD = todayD;
+  let sinceD = new Date(todayD.getTime() - (MM_WINDOW_DAYS - 1) * DAY);
   const isCustom = reDate.test(String(req.query.since || "")) && reDate.test(String(req.query.until || ""));
   if (isCustom) {
     sinceD = new Date(req.query.since + "T00:00:00Z");
@@ -3285,9 +3290,10 @@ async function handleMetaMachine(req, res) {
     if (untilD < sinceD) return res.status(400).json({ error: "until must be on/after since" });
     if (untilD > todayD) untilD = todayD;
   }
-  const lenDays = Math.round((untilD - sinceD) / DAY) + 1;
+  const winDays = Math.round((untilD - sinceD) / DAY) + 1;
+  const fastSinceD = new Date(Math.max(sinceD.getTime(), untilD.getTime() - (MM_FAST_DAYS - 1) * DAY));
   const prevUntilD = new Date(sinceD.getTime() - DAY);
-  const prevSinceD = new Date(prevUntilD.getTime() - (lenDays - 1) * DAY);
+  const prevSinceD = new Date(prevUntilD.getTime() - (winDays - 1) * DAY);
   const sinceIso = sinceD.toISOString();
   const endIso = new Date(untilD.getTime() + DAY).toISOString(); // exclusive end
   const prevSinceIso = prevSinceD.toISOString();
@@ -3320,23 +3326,26 @@ async function handleMetaMachine(req, res) {
   const campFilter = JSON.stringify([{ field: "campaign.id", operator: "IN", value: allow }]);
   const activeFilter = JSON.stringify([{ field: "effective_status", operator: "IN", value: ["ACTIVE"] }]);
 
-  // Everything in parallel: 3 account/campaign Graph calls + 2 per campaign,
-  // plus the Supabase reads (funnel beacons + kpi events).
-  const [campJson, adInsJson, perCampaign, funnelRows, kpiRows] = await Promise.all([
-    // 1. Campaign-level insights, prior+current in ONE call, split at `since`.
+  const [lifeJson, monthJson, adDailyJson, perCampaign, funnelRows, kpiRows] = await Promise.all([
+    // 1. Lifetime weekly buckets: the anchor CPL + the sparkline, one call.
     graph(`${META_GRAPH}/${adAcct}/insights?` + new URLSearchParams({
-      level: "campaign", fields: META_CAMPAIGN_FIELDS,
-      time_range: JSON.stringify({ since: fmt(prevSinceD), until: fmt(untilD) }),
-      time_increment: "1", access_token: staffToken, limit: "500",
+      level: "campaign", fields: "campaign_id,spend,actions",
+      date_preset: "maximum", time_increment: "7", access_token: staffToken, limit: "500",
     })),
-    // 2. Ad-level insights for the current range (hook rate lives here).
+    // 2. Month-to-date spend for the pacing line (always MTD, independent of window).
+    graph(`${META_GRAPH}/${adAcct}/insights?` + new URLSearchParams({
+      level: "campaign", fields: "campaign_id,spend",
+      date_preset: "this_month", access_token: staffToken, limit: "500",
+    })),
+    // 3. Ad-level DAILY rows over prev+current window in one call - bucketed into
+    //    prev / window / fast(last 7) per ad. Hook rate lives in actions.video_view.
     graph(`${META_GRAPH}/${adAcct}/insights?` + new URLSearchParams({
       level: "ad",
       fields: "campaign_id,ad_id,ad_name,spend,impressions,reach,inline_link_clicks,actions",
-      time_range: JSON.stringify({ since: fmt(sinceD), until: fmt(untilD) }),
-      filtering: campFilter, access_token: staffToken, limit: "500",
+      time_range: JSON.stringify({ since: fmt(prevSinceD), until: fmt(untilD) }),
+      time_increment: "1", filtering: campFilter, access_token: staffToken, limit: "500",
     })),
-    // 3. Per campaign: live ads (creative + created_time), live ad sets
+    // 4. Per campaign: live ads (creative + created_time), live ad sets
     //    (learning stage + ABO budget fallback), campaign budget fields.
     Promise.all(allow.map(async (campId) => {
       const [ads, adsets, camp] = await Promise.all([
@@ -3354,37 +3363,82 @@ async function handleMetaMachine(req, res) {
       ]);
       return { ads: ads.data || [], adsets: adsets.data || [], camp };
     })),
-    sb(`funnel_events?client_id=eq.${targetClientId}&funnel=eq.free-trial&created_at=gte.${encodeURIComponent(sinceIso)}&created_at=lt.${encodeURIComponent(endIso)}&select=step,session_id&limit=20000`).catch(() => []),
+    sb(`funnel_events?client_id=eq.${targetClientId}&funnel=eq.free-trial&created_at=gte.${encodeURIComponent(sinceIso)}&created_at=lt.${encodeURIComponent(endIso)}&select=step,session_id,utm&limit=20000`).catch(() => []),
     sb(`kpi_events?client_id=eq.${targetClientId}&step=in.(lead,trial_booked)&occurred_at=gte.${encodeURIComponent(prevSinceIso)}&occurred_at=lt.${encodeURIComponent(endIso)}&select=step,occurred_at,ghl_contact_id&limit=10000`).catch(() => []),
-  ]).catch((err) => { throw err; });
+  ]);
 
-  // ── Campaign section (current vs prior period) ──
-  const splitDay = fmt(sinceD);
-  const curAcc = newAcc(), prevAcc = newAcc();
-  let curLeadsMeta = 0, prevLeadsMeta = 0;
-  for (const row of (campJson.data || [])) {
+  // ── Lifetime anchor + weekly sparkline ──
+  // Anchor starts at the FIRST week that ever recorded a lead: campaigns that
+  // ran before lead tracking existed (e.g. pre-BAM-funnel migration - GTA had
+  // ~11 months of spend with zero lead events) would otherwise poison the
+  // anchor with spend that could never produce a tracked lead.
+  const weekMap = new Map();
+  for (const row of (lifeJson.data || [])) {
     if (!allowSet.has(String(row.campaign_id))) continue;
-    const isCur = row.date_start >= splitDay;
-    sumRowInto(isCur ? curAcc : prevAcc, row);
-    if (isCur) curLeadsMeta += mmCountLeads(row.actions);
-    else prevLeadsMeta += mmCountLeads(row.actions);
+    const w = weekMap.get(row.date_start) || { spend: 0, leads: 0 };
+    w.spend += parseFloat(row.spend || "0") || 0;
+    w.leads += mmCountLeads(row.actions);
+    weekMap.set(row.date_start, w);
   }
-  const cur = finalizeMetrics(curAcc);
-  const prev = finalizeMetrics(prevAcc);
-  // Shared countLeads() double counts pixel leads; overwrite with the deduped total.
-  cur.leads = curLeadsMeta;
-  cur.cpl = curLeadsMeta > 0 ? _r2(cur.spend / curLeadsMeta) : null;
-  prev.leads = prevLeadsMeta;
-  prev.cpl = prevLeadsMeta > 0 ? _r2(prev.spend / prevLeadsMeta) : null;
-  const driftPct = (cur.cpl != null && prev.cpl != null && prev.cpl > 0)
-    ? _r2(((cur.cpl - prev.cpl) / prev.cpl) * 100) : null;
+  const weeksSorted = [...weekMap.entries()].sort((a, b) => a[0] < b[0] ? -1 : 1);
+  const firstLeadIdx = weeksSorted.findIndex(([, w]) => w.leads > 0);
+  let lifeSpend = 0, lifeLeads = 0;
+  if (firstLeadIdx >= 0) {
+    for (const [, w] of weeksSorted.slice(firstLeadIdx)) { lifeSpend += w.spend; lifeLeads += w.leads; }
+  }
+  const lifetimeCpl = lifeLeads > 0 ? _r2(lifeSpend / lifeLeads) : null;
+  const lifetimeBand = lifeLeads > 0 ? mmCplBand(lifetimeCpl, lifeSpend) : "grey";
+  const sparkline = weeksSorted.slice(-8)
+    .map(([week, w]) => {
+      const cpl = w.leads > 0 ? _r2(w.spend / w.leads) : null;
+      return { week, cpl, spend: _r2(w.spend), leads: w.leads, band: w.spend > 0 ? mmCplBand(cpl, w.spend) : "grey" };
+    });
+
+  // ── Month pacing (always MTD) ──
+  let monthSpend = 0;
+  for (const row of (monthJson.data || [])) {
+    if (allowSet.has(String(row.campaign_id))) monthSpend += parseFloat(row.spend || "0") || 0;
+  }
+
+  // ── Bucket ad-level daily rows: prev window / judged window / fast tail ──
+  const splitDay = fmt(sinceD), fastDay = fmt(fastSinceD);
+  const zero = () => ({ spend: 0, impressions: 0, reach: 0, clicks: 0, leads: 0, v3: 0 });
+  const win = zero(), fast = zero(), prevW = zero();
+  const adAgg = new Map(); // ad_id -> {name, ...zero()}
+  for (const row of (adDailyJson.data || [])) {
+    const spend = parseFloat(row.spend || "0") || 0;
+    const impressions = parseInt(row.impressions || "0", 10) || 0;
+    const reach = parseInt(row.reach || "0", 10) || 0;
+    const clicks = parseInt(row.inline_link_clicks || "0", 10) || 0;
+    const leads = mmCountLeads(row.actions);
+    const v3 = countAction(row.actions, "video_view");
+    const into = (b) => { b.spend += spend; b.impressions += impressions; b.reach += reach; b.clicks += clicks; b.leads += leads; b.v3 += v3; };
+    if (row.date_start < splitDay) { into(prevW); continue; }
+    into(win);
+    if (row.date_start >= fastDay) into(fast);
+    let a = adAgg.get(String(row.ad_id));
+    if (!a) { a = zero(); a.name = row.ad_name || ""; adAgg.set(String(row.ad_id), a); }
+    into(a);
+  }
+  const winCpl = win.leads > 0 ? _r2(win.spend / win.leads) : null;
+  // Minimum-sample guard: a window CPL earns a verdict once it has a real lead
+  // sample OR enough spend that the missing leads ARE the verdict.
+  const judged = win.leads >= MM_MIN_LEADS || win.spend >= MM_MIN_SPEND;
+  const windowBand = judged ? mmCplBand(winCpl, win.spend) : "grey";
+  const barBand = judged ? windowBand : lifetimeBand;
+  const healthCpl = judged ? winCpl : lifetimeCpl;
+  let driftPct = null, driftBand = null;
+  if (judged && winCpl != null && lifetimeCpl != null && lifetimeCpl > 0) {
+    driftPct = _r2(((winCpl - lifetimeCpl) / lifetimeCpl) * 100);
+    driftBand = driftPct <= 0 ? "green" : (driftPct <= 20 ? "gold" : "red");
+  }
+  const fastFreq = fast.reach > 0 ? _r2(fast.impressions / fast.reach) : null;
+  const fastCtr = fast.impressions > 0 ? _r2((fast.clicks / fast.impressions) * 100) : null;
 
   // Learning stage rollup: any set still LEARNING -> "learning"; FAIL -> "limited".
   const allAdsets = perCampaign.flatMap((p) => p.adsets);
   const stages = allAdsets.map((s) => s.learning_stage_info?.status).filter(Boolean);
   const learning = stages.includes("FAIL") ? "limited" : (stages.includes("LEARNING") ? "learning" : (stages.length ? "active" : null));
-
-  const campaignBand = mmCplBand(cur.cpl, cur.spend);
 
   // ── Planned monthly spend: staff-set goal, else campaign daily budget,
   //    else sum of ACTIVE ad sets' daily budgets (ABO - most clients). ──
@@ -3398,25 +3452,16 @@ async function handleMetaMachine(req, res) {
   const monthlyBudget = clientFull.meta_monthly_budget != null ? Number(clientFull.meta_monthly_budget) : null;
   const planned = monthlyBudget || (dailyPlanned > 0 ? _r2(dailyPlanned * daysInMonth) : null);
 
-  // ── Creatives: join ad-level insights onto the live ads list ──
-  const insByAd = new Map();
-  for (const row of (adInsJson.data || [])) insByAd.set(String(row.ad_id), row);
+  // ── Creatives: join windowed ad aggregates onto the live ads list ──
   const bestable = [];
   const creatives = perCampaign.flatMap((p) => p.ads).map((ad) => {
-    const ins = insByAd.get(String(ad.id)) || {};
-    const spend = _r2(parseFloat(ins.spend || "0") || 0);
-    const impressions = parseInt(ins.impressions || "0", 10) || 0;
-    const reach = parseInt(ins.reach || "0", 10) || 0;
-    const clicks = parseInt(ins.inline_link_clicks || "0", 10) || 0;
-    const leads = mmCountLeads(ins.actions);
-    const cpl = leads > 0 ? _r2(spend / leads) : null;
-    const ctr = impressions > 0 ? _r2((clicks / impressions) * 100) : null;
-    const frequency = reach > 0 ? _r2(impressions / reach) : null;
-    // 3-second video plays arrive as the standard "video_view" action -
-    // v22 rejects video_3_sec_watched_actions as a field (verified live 2026-07-03).
-    const v3 = countAction(ins.actions, "video_view");
+    const a = adAgg.get(String(ad.id)) || zero();
+    const spend = _r2(a.spend);
+    const cpl = a.leads > 0 ? _r2(spend / a.leads) : null;
+    const ctr = a.impressions > 0 ? _r2((a.clicks / a.impressions) * 100) : null;
+    const frequency = a.reach > 0 ? _r2(a.impressions / a.reach) : null;
     const isVideo = !!ad.creative?.video_id;
-    const hookRate = (isVideo && impressions > 0) ? _r2((v3 / impressions) * 100) : null;
+    const hookRate = (isVideo && a.impressions > 0) ? _r2((a.v3 / a.impressions) * 100) : null;
     const ageDays = ad.created_time ? Math.floor((now - new Date(ad.created_time)) / DAY) : null;
     const testing = (ageDays != null && ageDays < MM_TESTING_AGE_DAYS) || spend < MM_TESTING_SPEND;
 
@@ -3431,7 +3476,7 @@ async function handleMetaMachine(req, res) {
     const out = {
       ad_id: ad.id, name: ad.name || "(unnamed)",
       image_url: mmImageFromCreative(ad.creative), is_video: isVideo,
-      age_days: ageDays, spend, leads, cpl, ctr, frequency, hook_rate: hookRate,
+      age_days: ageDays, spend, leads: a.leads, cpl, ctr, frequency, hook_rate: hookRate,
       band, testing, demoted_by: demotedBy, best: false,
     };
     if (!testing && cpl != null) bestable.push(out);
@@ -3445,8 +3490,13 @@ async function handleMetaMachine(req, res) {
 
   // ── Page + result from our own beacons/events ──
   const sess = {};
+  const adVisitors = new Set();
   for (const row of (Array.isArray(funnelRows) ? funnelRows : [])) {
     (sess[row.step] = sess[row.step] || new Set()).add(row.session_id || "");
+    if (row.step === "page_view") {
+      const u = row.utm || {};
+      if (u.fbclid || /fb|ig|meta|facebook|instagram/i.test(String(u.source || ""))) adVisitors.add(row.session_id || "");
+    }
   }
   const nSess = (step) => (sess[step] ? sess[step].size : 0);
   const visitors = nSess("page_view");
@@ -3476,14 +3526,14 @@ async function handleMetaMachine(req, res) {
     } catch { /* split is best-effort; totals stay correct */ }
   }
 
-  const clicksToLeadsPct = pct(leadsCur, cur.link_clicks);
+  const clicksToLeadsPct = pct(leadsCur, win.clicks);
   const abandonmentPct = sawCalendar > 0 ? _r2(((sawCalendar - bookedSessions) / sawCalendar) * 100) : null;
   // Lower-is-better: <25 green, 25-40 gold, >40 red (heuristic from spec note).
   const abandonBand = abandonmentPct == null ? "grey" : (abandonmentPct < 25 ? "green" : (abandonmentPct <= 40 ? "gold" : "red"));
 
-  const cpbt = bookedCur > 0 ? _r2(cur.spend / bookedCur) : null;
-  const prevCpbt = bookedPrev > 0 && prev.spend > 0 ? _r2(prev.spend / bookedPrev) : null;
-  // Verdict number is judged by trend vs the prior period (no absolute $ bands).
+  const cpbt = bookedCur > 0 ? _r2(win.spend / bookedCur) : null;
+  const prevCpbt = bookedPrev > 0 && prevW.spend > 0 ? _r2(prevW.spend / bookedPrev) : null;
+  // Verdict number is judged by trend vs the prior equal-length window.
   let cpbtBand = "grey";
   if (cpbt != null && prevCpbt != null) {
     cpbtBand = cpbt <= prevCpbt ? "green" : (cpbt <= prevCpbt * 1.2 ? "gold" : "red");
@@ -3496,7 +3546,7 @@ async function handleMetaMachine(req, res) {
   const wornOut = liveJudged.find((c) => c.demoted_by === "frequency");
   const weakHook = liveJudged.find((c) => c.demoted_by === "hook");
   if (killer) warning = `"${killer.name}" is burning budget - kill it${bestName && bestName !== killer.name ? ` and move spend to "${bestName}"` : ""}`;
-  else if (campaignBand === "red") warning = "cost per lead is running hot - review the campaign";
+  else if (barBand === "red") warning = "cost per lead is running hot - review the campaign";
   else if (wornOut) warning = `"${wornOut.name}" is worn out - clone the winner with a fresh angle`;
   else if (weakHook) warning = `"${weakHook.name}" is not stopping thumbs - re-hook the first 3 seconds`;
   else if (clicksToLeadsPct != null && clicksToLeadsPct < MM_C2L_GOLD) warning = "the page is losing clicks - visitors are not becoming leads";
@@ -3506,33 +3556,38 @@ async function handleMetaMachine(req, res) {
     ok: true,
     meta_connected: true,
     range: {
-      since: fmt(sinceD), until: fmt(untilD), is_mtd: !isCustom,
+      since: fmt(sinceD), until: fmt(untilD), days: winDays, is_default: !isCustom,
       prev_since: fmt(prevSinceD), prev_until: fmt(prevUntilD),
     },
     month: {
       name: MONTH_NAMES[todayD.getUTCMonth()], day: todayD.getUTCDate(),
-      days_in_month: daysInMonth, planned,
-      spend: !isCustom ? cur.spend : null, // card is always MTD; null on custom ranges
+      days_in_month: daysInMonth, planned, spend: _r2(monthSpend),
     },
     campaign: {
-      spend: cur.spend, cpl: cur.cpl, band: campaignBand, drift_pct: driftPct,
-      frequency: cur.frequency, ctr: cur.ctr, impressions: cur.impressions,
-      reach: cur.reach, link_clicks: cur.link_clicks, leads_meta: cur.leads,
+      band: barBand,                 // the card bar verdict
+      health_cpl: healthCpl,         // what the bar's fill length maps
+      lifetime: { cpl: lifetimeCpl, band: lifetimeBand, spend: _r2(lifeSpend), leads: lifeLeads },
+      window: { cpl: winCpl, band: windowBand, judged, leads: win.leads, spend: _r2(win.spend), drift_vs_lifetime_pct: driftPct, drift_band: driftBand },
+      fast: { days: MM_FAST_DAYS, frequency: fastFreq, ctr: fastCtr },
+      sparkline,
+      impressions: win.impressions, reach: win.reach, link_clicks: win.clicks,
       learning,
     },
     creatives,
     creatives_live: liveJudged.length,
     creatives_band: liveJudged.length ? (liveJudged.some((c) => c.band === "red") ? "red" : (liveJudged.some((c) => c.band === "gold") ? "gold" : (liveJudged.length >= MM_WANT_CREATIVES ? "green" : "gold"))) : "grey",
     page: {
-      visitors, form_started: formStarted, saw_calendar: sawCalendar, booked_sessions: bookedSessions,
+      visitors, ad_visitors: adVisitors.size, form_started: formStarted, saw_calendar: sawCalendar, booked_sessions: bookedSessions,
       visitors_to_form_pct: pct(formStarted, visitors),
       clicks_to_leads_pct: clicksToLeadsPct,
       band: mmPctBand(clicksToLeadsPct, MM_C2L_GREEN, MM_C2L_GOLD),
       abandonment_pct: abandonmentPct, abandonment_band: abandonBand,
     },
     pills: {
-      click_to_visit_pct: pct(visitors, cur.link_clicks),
-      click_to_visit_band: mmPctBand(pct(visitors, cur.link_clicks), 70, 60),
+      // click->visit counts ONLY ad-tagged sessions (fbclid / meta source) so
+      // organic visitors can't flatter the number.
+      click_to_visit_pct: pct(adVisitors.size, win.clicks),
+      click_to_visit_band: mmPctBand(pct(adVisitors.size, win.clicks), 70, 60),
       visit_to_lead_pct: pct(leadsCur, visitors),
       visit_to_lead_band: mmPctBand(pct(leadsCur, visitors), 10, 5),
       lead_to_booked_pct: pct(bookedCur, leadsCur),

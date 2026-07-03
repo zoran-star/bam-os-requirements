@@ -26,9 +26,31 @@ type: project
   fill color = server band. Colored numbers + dots in modal, rollup dot per
   section (worst child wins).
 
+## Campaign health rework (Zoran decisions, shipped 2026-07-03 evening)
+CPL is THE marketing health metric. Display = lifetime anchor + trend:
+- LIFETIME CPL (big, banded $40/$55) = the anchor. Starts at the FIRST week
+  that ever recorded a lead - pre-tracking spend is trimmed (GTA: 11 months
+  of pre-funnel spend would have made the anchor $440 instead of $30.63).
+- Weekly CPL SPARKLINE (last 8 weeks, one Meta call: date_preset=maximum +
+  time_increment=7), each bar banded, taller = pricier.
+- WINDOW DELTA = last 14 days vs lifetime: <=0 green, +20% gold, >20% red
+  (the Andromeda drift rule on screen).
+- WINDOW SPLIT: lead-based metrics (CPL, cost/booked trial, page %, result)
+  judge on 14 days - 7d is coin-flip noise at sub-$1k/mo spend (~6 leads/wk
+  at $40 CPL). Impression-based (freq, CTR, hook) use the last 7 days.
+- MIN-SAMPLE GUARD: window CPL stays grey "gathering data" until 8+ leads
+  OR $250+ spend in the window. Bar falls back to the lifetime band.
+- click->visit pill counts ONLY ad-tagged sessions (utm fbclid / fb|ig|meta
+  source) - organic visitors were flattering it (GTA: 84% -> honest 59%,
+  which is a real page-speed flag; healthy 70-85%).
+- Default range = last 14 days (was MTD); month pacing line stays MTD via
+  its own date_preset=this_month spend call.
+
 ## Live-fire gotchas (found testing vs real GTA data 2026-07-03)
 - Meta v22 REJECTS `video_3_sec_watched_actions` as an insights field. 3-sec
   views = the standard `actions` entry `action_type=video_view`. Fixed.
+- Raw campaign lifetime is poisoned for migrated academies: months of spend
+  before lead tracking existed. Anchor trims to first-lead week (see above).
 - Meta reports ONE lead under several action_types at once (GTA: lead:5 +
   offsite_conversion.fb_pixel_lead:5 = 5 real leads). Shared countLeads()
   SUMS the set -> double counts pixel leads. Machine uses mmCountLeads()
