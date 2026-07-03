@@ -9837,6 +9837,7 @@ async function openV15Kpis() {
   _v15kRender();
   _v15kLoadSetup();   // lazy, non-blocking (Stripe + GHL fetch is slow)
   _v15kLoadMarketing();
+  _v15kLoadFunnel();  // V2 only; non-blocking (website funnel, fixed 30 days)
   // 12-month Meta data for the Trends modal (separate from the range view).
   (async () => {
     try {
@@ -9859,6 +9860,21 @@ async function _v15kLoadMarketing() {
     const j = await _safeJson(r);
     _V15K.mktRange[key] = (r.ok && Array.isArray(j.periods) && j.periods[0]) ? j.periods[0] : null;
   } catch (_) { _V15K.mktRange[key] = null; }
+  _v15kRender();
+}
+
+// Website funnel (V2 only, fixed 30 days): /api/kpis-v15?action=funnel.
+// _V15K.funnel: undefined = loading, null = fetch failed (section hides
+// silently), object = { funnels, top_sources }.
+async function _v15kLoadFunnel() {
+  if (!(typeof V2_ACCESS !== 'undefined' && V2_ACCESS)) return;
+  try {
+    const token = await _mreqAuthToken();
+    const r = await fetch(`/api/kpis-v15?action=funnel&days=30&client_id=${encodeURIComponent(CLIENT_ID)}`, { headers: { Authorization: 'Bearer ' + token } });
+    const j = await _safeJson(r);
+    if (!r.ok || !j.ok) throw new Error(j.error || ('HTTP ' + r.status));
+    _V15K.funnel = { funnels: j.funnels || {}, top_sources: j.top_sources || {} };
+  } catch (_) { _V15K.funnel = null; }
   _v15kRender();
 }
 
@@ -10074,6 +10090,7 @@ function _v15kRender() {
     </div>
     ${_v15kCompareStrip()}
     ${kpiOn('marketing') ? `${sectionHead('Marketing')}${marketing}` : ''}
+    ${(kpiOn('marketing') && (typeof V2_ACCESS !== 'undefined' && V2_ACCESS) && _V15K.funnel !== null) ? `${sectionHead('Website funnel · last 30 days')}<div id="v15k-funnel">${_v15kFunnelHtml()}</div>` : ''}
     ${kpiOn('sales')    ? `${sectionHead('Sales')}<div id="v15k-sales">${_v15kSecHtml('sales')}</div>` : ''}
     ${kpiOn('revenue')  ? `${sectionHead('Revenue')}<div id="v15k-revenue">${_v15kSecHtml('revenue')}</div>` : ''}
     ${kpiOn('members')  ? `${sectionHead('Members')}<div id="v15k-members">${_v15kSecHtml('members')}</div>` : ''}`;
@@ -10389,6 +10406,52 @@ function _v15kMarketingHtml(d) {
       ${_v15kStat('Cost per member (CAC)', per(d.joined))}
     </div>
     <div style="font-size:11px;color:var(--text-mute);margin-top:8px">Counts come from the portal funnel log; costs = ad spend divided by each count. History before the tracking launch fills in once the KPI import lands.</div>`;
+}
+
+// Website funnel (V2): step-by-step drop-off per funnel from website events.
+// Bar widths are proportional to the first step's count (simple div funnel).
+const _V15K_STEP_LABELS = {
+  page_view: 'Page views', form_started: 'Started form', form_completed: 'Form done',
+  calendar_viewed: 'Saw times', slot_picked: 'Picked a time', confirmed: 'Booked',
+  plan_viewed: 'Viewed plans', plan_picked: 'Picked plan', payment_started: 'Started payment', paid: 'Paid'
+};
+const _V15K_FUNNEL_LABELS = { 'free-trial': 'Free trial funnel', 'enroll': 'Enroll funnel' };
+function _v15kFunnelHtml() {
+  const f = _V15K.funnel;
+  if (f === undefined) return `<div class="req-empty" style="padding:14px 0"><span class="req-spin"></span> Loading…</div>`;
+  if (!f) return '';
+  const empty = `<div class="req-empty" style="padding:12px 0;color:var(--text-mute)">No funnel data yet - events start collecting from the next website visit.</div>`;
+  const keys = Object.keys(f.funnels || {}).filter(k => Array.isArray((f.funnels[k] || {}).steps) && f.funnels[k].steps.length);
+  if (!keys.length) return empty;
+  const blocks = keys.map(key => {
+    const fn = f.funnels[key];
+    const label = _V15K_FUNNEL_LABELS[key] || (key.replace(/[-_]/g, ' ').replace(/^./, c => c.toUpperCase()) + ' funnel');
+    const count = (s) => (s.sessions && s.sessions > 0) ? s.sessions : (s.events || 0);
+    const first = count(fn.steps[0]) || 1;
+    const rows = fn.steps.map((s, i) => {
+      const c = count(s);
+      const w = Math.max(2, Math.round((c / first) * 100));
+      const stepLabel = _V15K_STEP_LABELS[s.step] || escapeHTML(String(s.step || '').replace(/_/g, ' ').replace(/^./, ch => ch.toUpperCase()));
+      const pill = (i > 0 && s.pct_of_prev != null)
+        ? `<span style="font-size:10.5px;font-weight:700;color:var(--text-mute);background:var(--surface);border:1px solid var(--border);border-radius:999px;padding:1px 7px">${Math.round(s.pct_of_prev)}%</span>` : '';
+      return `<div style="display:flex;align-items:center;gap:10px;margin-top:7px">
+        <div style="width:112px;flex:none;font-size:12px;color:var(--text-sub)">${stepLabel}</div>
+        <div style="flex:1;min-width:0"><div style="height:20px;border-radius:5px;background:rgba(232,197,71,0.22);border:1px solid rgba(232,197,71,0.35);width:${w}%;min-width:3px"></div></div>
+        <div style="width:52px;flex:none;text-align:right;font-size:13px;font-weight:700;color:var(--text)">${_v15kNum(c)}</div>
+        <div style="width:48px;flex:none;text-align:right">${pill}</div>
+      </div>`;
+    }).join('');
+    const abandon = (key === 'free-trial' && fn.calendar_abandon_pct != null)
+      ? `<div style="font-size:12px;color:#c9871f;margin-top:10px">Calendar abandonment: ${Math.round(fn.calendar_abandon_pct)}% saw times but didn't book</div>` : '';
+    return `<div style="border:1px solid var(--border);border-radius:10px;padding:14px 16px;margin-top:12px">
+      <div style="font-weight:700;font-size:14px;color:var(--text);margin-bottom:4px">${escapeHTML(label)}</div>
+      ${rows}${abandon}
+    </div>`;
+  }).join('');
+  const srcEntries = Object.entries(f.top_sources || {});
+  const sources = srcEntries.length
+    ? `<div style="font-size:12px;color:var(--text-mute);margin-top:10px">Top sources: ${srcEntries.map(([s, n]) => `${escapeHTML(s)} ${_v15kNum(n)}`).join(' · ')}</div>` : '';
+  return blocks + sources;
 }
 
 function _v15kSalesHtml(d) {
