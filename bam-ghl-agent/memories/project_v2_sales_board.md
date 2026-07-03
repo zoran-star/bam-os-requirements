@@ -28,8 +28,13 @@ canonical doc). Board surfaces:
   Follow-ups. Cards always carry the conversation snapshot (incl. escalation cards).
 
 ## Stage card rules
-- **Interested:** card glows RED if no text/email in 5 days (not contacted; uses
-  `_PL_LASTMSG` from the GHL inbox list). Permanent.
+- **Interested:** card glows RED + "!" the moment the lead has NO active
+  automation enrollment (real check: `_PL_AUTO` set, loaded via automations
+  `active-contacts` action → `automation_enrollments` status=active). Fallback
+  while loading / on V1.5: old proxy, no text/email in 5 days (`_PL_LASTMSG`).
+- **Responded:** RED + "!" only when the newest message is 4+ days old - leads
+  here are agent-owned, so silence means the agent stalled (Zoran, 2026-07-02).
+  V2-gated.
 - **Scheduled Trial:** cards PARTITIONED by phase into groups → today (glowing) /
   〜past〜 / 〜upcoming〜 / no-date, each group rendered whole with its squiggle
   divider in front (`_plUpcomingDivider`). Never strand a card on the wrong side.
