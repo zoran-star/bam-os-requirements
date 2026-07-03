@@ -10066,6 +10066,36 @@ function _v15kCompareStrip() {
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(128px,1fr));gap:10px">${cells.join('')}</div></div>`;
 }
 
+// ── The machine (CC-5): Ads → Leads → Trials → Members → Revenue for the
+// selected range, live numbers riding the flow. Reads the same caches the
+// sections use, so it fills in as they load (_v15kEnsureSection re-renders).
+function _v15kBizmapHtml() {
+  const k = _v15kRangeKey();
+  const mt = (((_V15K.mktRange || {})[k]) || {}).totals || null;
+  const sales = (_V15K.sec.sales || {})[k];
+  const rev = (_V15K.sec.revenue || {})[k];
+  const offers = (sales && !sales.error && sales.offers) || null;
+  const sum = (key) => offers ? offers.reduce((n, o) => n + (((o[key] || {}).count) || 0), 0) : null;
+  const spend = mt ? _v15kMoney(mt.spend) : '·';
+  const leads = mt ? _v15kNum(mt.leads) : '·';
+  const trials = offers ? _v15kNum(sum('bookings')) : '·';
+  const joined = offers ? _v15kNum(sum('payments')) : '·';
+  const net = (rev && !rev.error && rev.stripe_ok !== false) ? _v15kMoney(rev.net) : '·';
+  // Leak flag: trials happened but nobody joined → the weak link goes red.
+  const leak = offers && sum('bookings') > 0 && sum('payments') === 0;
+  const node = (label, val) => `<div style="flex:none;text-align:center;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:10px 16px;min-width:86px">
+    <div style="font-size:19px;font-weight:800;color:var(--text);font-family:var(--mono,monospace)">${val}</div>
+    <div style="font-size:9.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--text-mute);margin-top:3px;white-space:nowrap">${label}</div></div>`;
+  const arrow = (bad) => `<div style="flex:none;color:${bad ? '#e0654f' : 'var(--gold,#E8C547)'};font-size:16px;font-weight:800">→</div>`;
+  return `<div style="border:1px solid var(--border);border-radius:14px;padding:14px 16px;margin-top:16px">
+    <div style="font-family:var(--mono,monospace);font-size:10.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--text-mute);margin-bottom:11px">The machine · ${_V15K.from} to ${_V15K.to}</div>
+    <div style="display:flex;align-items:center;gap:9px;overflow-x:auto;padding-bottom:2px">
+      ${node('Ad spend', spend)}${arrow(false)}${node('Leads', leads)}${arrow(false)}${node('Trials booked', trials)}${arrow(leak)}${node('New members', joined)}${arrow(false)}${node('Net revenue', net)}
+    </div>
+    ${leak ? `<div style="font-size:12px;color:#e0654f;margin-top:9px">Leak spotted: trials are happening but nobody joined in this range.</div>` : ''}
+  </div>`;
+}
+
 function _v15kRender() {
   const host = document.getElementById('v15kpis-content');
   if (!host) return;
@@ -10089,6 +10119,7 @@ function _v15kRender() {
       <button onclick="_v15kOpenSetup()" style="${btnSty}">⚙ Setup</button>
     </div>
     ${_v15kCompareStrip()}
+    <div id="v15k-bizmap">${_v15kBizmapHtml()}</div>
     ${kpiOn('marketing') ? `${sectionHead('Marketing')}${marketing}` : ''}
     ${(kpiOn('marketing') && (typeof V2_ACCESS !== 'undefined' && V2_ACCESS) && _V15K.funnel !== null) ? `${sectionHead('Website funnel · last 30 days')}<div id="v15k-funnel">${_v15kFunnelHtml()}</div>` : ''}
     ${kpiOn('sales')    ? `${sectionHead('Sales')}<div id="v15k-sales">${_v15kSecHtml('sales')}</div>` : ''}
@@ -10152,7 +10183,10 @@ async function _v15kEnsureSection(name) {
   // previous-period strip, so load that window too.
   const need = [];
   if (!_V15K.sec[name][k]) need.push({ key: k, from: _V15K.from, to: _V15K.to });
-  if (_V15K.compare && (name === 'revenue' || name === 'members')) {
+  // Sales + members ALWAYS load the previous window too - the momentum arrows
+  // (conversion / churn vs prev) need it. Revenue's prev only feeds the
+  // compare strip, so it stays behind the checkbox.
+  if (name === 'sales' || name === 'members' || (_V15K.compare && name === 'revenue')) {
     const pr = _v15kPrevRange();
     if (!_V15K.sec[name][pr.key]) need.push({ key: pr.key, from: pr.from, to: pr.to });
   }
@@ -10167,6 +10201,7 @@ async function _v15kEnsureSection(name) {
   }));
   _v15kPaintSection(name);
   _v15kRender();   // refresh the compare strip now that data (incl. prev) is in
+  if (name === 'revenue') _v15kMrrEnsure();   // MRR sparkline months (once)
 }
 
 // ── Trends (V1.5): multi-month line charts. Ad spend + leads come from
@@ -10494,10 +10529,34 @@ function _v15kFunnelHtml() {
   return sampleNote + blocks + sources;
 }
 
+// Momentum arrow (CC-3): current vs previous window, in percentage points.
+// invert=true means "down is good" (churn). Muted when the move is tiny.
+function _v15kMomentum(cur, prev, invert) {
+  if (cur == null || prev == null || !isFinite(prev)) return '';
+  const diff = cur - prev;
+  const good = invert ? diff <= 0 : diff >= 0;
+  const col = Math.abs(diff) < 0.5 ? 'var(--text-mute)' : (good ? '#7BC47F' : '#e0654f');
+  return `<span style="font-size:12px;font-weight:800;color:${col};white-space:nowrap">${diff >= 0 ? '▲' : '▼'} ${Math.abs(diff).toFixed(1)}pts <span style="font-weight:600;color:var(--text-mute)">vs prev period</span></span>`;
+}
+function _v15kConvOf(d) {
+  const offers = (d && !d.error && d.offers) || [];
+  const pipe = offers.reduce((n, o) => n + (o.has_pipelines ? ((o.pipeline || {}).count || 0) : 0), 0);
+  const pay  = offers.reduce((n, o) => n + (o.has_products  ? ((o.payments || {}).count || 0) : 0), 0);
+  return pipe > 0 ? (pay / pipe) * 100 : null;
+}
+
 function _v15kSalesHtml(d) {
   if (!d.offers || !d.offers.length) return `<div class="req-empty" style="padding:12px 0;color:var(--text-mute)">${escapeHTML(d.note || 'No offers tied yet.')}</div>`;
   const ghlWarn = d.ghl_error ? `<div style="font-size:12px;color:#c9871f;background:rgba(201,135,31,0.08);border:1px solid rgba(201,135,31,0.3);border-radius:8px;padding:8px 12px;margin-top:10px">⚠ Couldn't fully reach GoHighLevel just now - entered-pipeline and bookings counts may be understated. Refresh in a moment to retry.</div>` : '';
-  return ghlWarn + d.offers.map(o => {
+  // Conversion rate + momentum (CC-3): entered pipeline → paid, vs prev window.
+  const conv = _v15kConvOf(d);
+  const convPrev = _v15kConvOf((_V15K.sec.sales || {})[_v15kPrevRange().key]);
+  const convChip = (conv != null) ? `<div style="display:inline-flex;align-items:baseline;gap:10px;border:1px solid var(--border);border-radius:12px;padding:10px 16px;margin-top:12px;background:var(--surface)">
+    <span style="font-size:24px;font-weight:800;color:var(--text)">${conv.toFixed(0)}%</span>
+    <span style="font-size:12px;color:var(--text-mute)">conversion · pipeline → paid</span>
+    ${_v15kMomentum(conv, convPrev, false)}
+  </div>` : '';
+  return convChip + ghlWarn + d.offers.map(o => {
     const block = (group, metric, tiedLabel, untiedLabel, tied) => {
       const id = `v15ks-${metric}-${o.offer_id}`;
       return `<div>
@@ -10529,6 +10588,38 @@ function _v15kSalesHtml(d) {
   }).join('');
 }
 
+// MRR card (CC-4): net revenue by month, last 6 months, self-drawing sparkline.
+// Months load via the same per-month cache the Trends modal uses.
+let _V15K_MRR_KICKED = false;
+function _v15kMrrMonths() { return [5, 4, 3, 2, 1, 0].map(i => _ccMonthKey(i)); }
+async function _v15kMrrEnsure() {
+  if (_V15K_MRR_KICKED) return; _V15K_MRR_KICKED = true;
+  await Promise.all(_v15kMrrMonths().map(m => _v15kTrendsEnsure('revenue', m)));
+  _v15kPaintSection('revenue');
+}
+function _v15kMrrCard() {
+  const months = _v15kMrrMonths();
+  const vals = months.map(m => { const c = (_V15K.sec.revenue || {})[m]; return (c && !c.error && c.stripe_ok !== false) ? Number(c.net || 0) : null; });
+  const have = vals.map((v, i) => v == null ? null : { v, i }).filter(Boolean);
+  if (have.length < 2) return '';
+  const W = 190, H = 46, max = Math.max(1, ...have.map(p => p.v));
+  const pts = have.map(p => `${6 + p.i * ((W - 12) / (months.length - 1))},${H - 6 - (p.v / max) * (H - 12)}`).join(' ');
+  const cur = vals[vals.length - 1];
+  const lastClosed = vals[vals.length - 2];
+  const big = lastClosed != null ? lastClosed : cur;
+  return `<div style="display:flex;align-items:center;gap:18px;border:1px solid var(--border);border-radius:12px;padding:12px 16px;margin-top:12px;background:var(--surface);max-width:440px">
+    <div>
+      <div style="font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--text-mute)">MRR · net revenue per month</div>
+      <div style="font-size:26px;font-weight:800;color:var(--text);margin-top:4px">${_v15kMoney(big)}</div>
+      ${cur != null ? `<div style="font-size:11.5px;color:var(--text-mute);margin-top:2px">this month so far: ${_v15kMoney(cur)}</div>` : ''}
+    </div>
+    <svg viewBox="0 0 ${W} ${H}" style="width:${W}px;max-width:45%;height:auto;margin-left:auto">
+      <style>@keyframes v15kDraw{to{stroke-dashoffset:0}}</style>
+      <polyline points="${pts}" fill="none" stroke="#7BC47F" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="stroke-dasharray:600;stroke-dashoffset:600;animation:v15kDraw 1.5s ease .2s forwards"/>
+    </svg>
+  </div>`;
+}
+
 function _v15kRevenueHtml(d) {
   if (!d.stripe_ok) return `<div class="req-empty" style="padding:12px 0;color:var(--text-mute)">Stripe is not connected.</div>`;
   let failed;
@@ -10544,7 +10635,7 @@ function _v15kRevenueHtml(d) {
       <button onclick="_v15kToggle('v15k-failed')" style="background:none;border:none;cursor:pointer;text-align:left;padding:0;${_v15kLbl}">Failed payments (${d.failed.length}) <span id="v15k-failed-chev" style="display:inline-block;color:var(--text-mute);font-size:11px;transition:transform .15s">▾</span></button>
       <div id="v15k-failed" style="display:none;margin-top:8px">${rows}</div></div>`;
   } else failed = `<div style="font-size:12.5px;color:var(--text-mute);margin-top:12px">No failed payments this month.</div>`;
-  return `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-top:12px">
+  return _v15kMrrCard() + `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-top:12px">
     ${_v15kStat('Gross', _v15kMoney(d.gross))}
     ${_v15kStat('Net', _v15kMoney(d.net))}
     ${_v15kStat('Payouts', _v15kMoney(d.payouts) + (d.payouts_count ? ` · ${d.payouts_count}` : ''))}
@@ -10593,7 +10684,17 @@ function _v15kMembersHtml(d) {
     <div style="flex:1;min-width:0"><div style="font-size:13px;color:var(--text)">${escapeHTML(mc.contact_name || '-')}</div><div style="font-size:11px;color:var(--text-mute)">${mc.cancelled_on ? escapeHTML(mc.cancelled_on) : ''}${mc.reason ? ' · ' + escapeHTML(mc.reason) : ''}</div></div>
     <button onclick="_v15kDelManualCancel('${mc.id}')" style="${_v15kBtn}">×</button></div>`).join('');
   const roster = d.roster || { live: 0, paused: 0 };
-  const rosterRow = `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:12px;margin-bottom:18px">
+  // Churn rate + momentum (CC-3): cancellations ÷ (live + cancelled), down = good.
+  const churnOf = (cc) => (roster.live + cc > 0) ? (cc / (roster.live + cc)) * 100 : null;
+  const churn = churnOf(c.count || 0);
+  const prevD = (_V15K.sec.members || {})[_v15kPrevRange().key];
+  const churnPrev = (prevD && !prevD.error && prevD.cancelled) ? churnOf(prevD.cancelled.count || 0) : null;
+  const churnChip = (churn != null) ? `<div style="display:inline-flex;align-items:baseline;gap:10px;border:1px solid var(--border);border-radius:12px;padding:10px 16px;margin-bottom:14px;background:var(--surface)">
+    <span style="font-size:24px;font-weight:800;color:var(--text)">${churn.toFixed(1)}%</span>
+    <span style="font-size:12px;color:var(--text-mute)">churn · this window</span>
+    ${_v15kMomentum(churn, churnPrev, true)}
+  </div>` : '';
+  const rosterRow = churnChip + `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:12px;margin-bottom:18px">
     ${_v15kStat('Live members', _v15kNum(roster.live))}
     ${_v15kStat('Paused members', _v15kNum(roster.paused))}
   </div>`;
@@ -12619,6 +12720,33 @@ function _hv2Style() {
     '#home-v2 .hv2-num{font-size:38px;font-weight:800;line-height:1;font-family:"Space Grotesk",Inter,sans-serif}' +
     '#home-v2 .hv2-foot{font-size:10.5px;opacity:.62;margin-top:4px}' +
     '#home-v2 .hv2-slot{border-radius:20px;min-height:130px;border:1.5px dashed rgba(255,255,255,.09);display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,.13);font-size:24px;font-weight:300;background:repeating-linear-gradient(0deg,rgba(255,255,255,.018) 0 1px,transparent 1px 11px),repeating-linear-gradient(90deg,rgba(255,255,255,.018) 0 1px,transparent 1px 11px)}' +
+    // Command-center layer: health strip, do-this-now card, schedule rail, streaks, celebrations.
+    '#home-v2 .hv2-health{margin:6px 0 16px;animation:hv2In .42s ease forwards;opacity:0}' +
+    '#home-v2 .hv2-hbar{display:flex;gap:5px;height:6px}' +
+    '#home-v2 .hv2-hbar span{flex:1;border-radius:999px;background:var(--border);transition:background .5s}' +
+    '#home-v2 .hv2-htext{font-family:"Space Grotesk",Inter,sans-serif;font-size:18px;font-weight:800;margin-top:9px;line-height:1.35}' +
+    '#home-v2 .hv2-wrap{display:grid;grid-template-columns:1fr;gap:14px;align-items:start}' +
+    '@media(min-width:1000px){#home-v2 .hv2-wrap{grid-template-columns:minmax(0,1fr) 320px}}' +
+    '#home-v2 .hv2-one{display:block;width:100%;text-align:left;font-family:inherit;color:var(--text);border:1px solid rgba(232,197,71,.5);border-radius:14px;padding:13px 15px;background:linear-gradient(135deg,rgba(232,197,71,.12),rgba(232,197,71,.03));margin-bottom:12px;cursor:pointer;animation:hv2In .42s ease forwards;opacity:0;transition:transform .18s ease,box-shadow .25s}' +
+    '#home-v2 .hv2-one:hover{transform:translateY(-2px);box-shadow:0 8px 26px rgba(232,197,71,.16)}' +
+    '#home-v2 .hv2-one .k{font-family:var(--mono,monospace);font-size:10px;letter-spacing:.16em;color:var(--gold,#E8C547);font-weight:700}' +
+    '#home-v2 .hv2-one .t{font-size:14.5px;font-weight:700;margin-top:4px}' +
+    '#home-v2 .hv2-one .m{font-size:11.5px;color:var(--text-mute);margin-top:4px}' +
+    '#home-v2 .hv2-streaks{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0 2px}' +
+    '#home-v2 .hv2-streak{display:inline-flex;align-items:center;gap:6px;border:1px solid rgba(232,197,71,.45);color:var(--gold,#E8C547);border-radius:999px;padding:5px 12px;font-size:11.5px;font-weight:700;animation:hv2In .42s ease forwards;opacity:0}' +
+    '#home-v2 .hv2-streak svg{width:13px;height:13px;stroke:currentColor;stroke-width:2;fill:none;stroke-linecap:round;stroke-linejoin:round}' +
+    '#home-v2 .hv2-sched{border:1px solid var(--border);border-radius:16px;background:var(--surface);overflow:hidden;opacity:0;transform:translateY(22px);transition:opacity .55s ease,transform .55s ease}' +
+    '#home-v2 .hv2-sched.seen{opacity:1;transform:none}' +
+    '#home-v2 .hv2-sched-h{font-family:var(--mono,monospace);font-size:10.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--text-mute);padding:13px 15px 9px;border-bottom:1px solid var(--border)}' +
+    '#home-v2 .hv2-sched-f{display:block;width:100%;text-align:left;background:none;border:none;border-top:1px solid var(--border);color:var(--gold,#E8C547);font:inherit;font-size:12px;font-weight:700;padding:11px 15px;cursor:pointer}' +
+    '.hv2-cele{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9500;display:flex;align-items:center;justify-content:center;padding:24px}' +
+    '.hv2-cele-card{position:relative;background:var(--surface,#17181b);border:1px solid rgba(232,197,71,.6);border-radius:18px;padding:28px 30px;max-width:340px;text-align:center;box-shadow:0 0 60px rgba(232,197,71,.22);animation:hv2CeleIn .5s cubic-bezier(0.34,1.56,0.64,1) both}' +
+    '.hv2-cele-ic{width:52px;height:52px;margin:0 auto 12px;border-radius:50%;border:2px solid var(--gold,#E8C547);display:flex;align-items:center;justify-content:center;animation:hv2CelePulse 1.6s ease-in-out infinite}' +
+    '.hv2-cele-ic svg{width:24px;height:24px;stroke:var(--gold,#E8C547);stroke-width:2.2;fill:none;stroke-linecap:round;stroke-linejoin:round}' +
+    '.hv2-cele-t{font-family:"Space Grotesk",Inter,sans-serif;font-size:18px;font-weight:800;color:var(--text,#e8e8e6)}' +
+    '.hv2-cele-s{font-size:12.5px;color:var(--text-mute,#8a8d93);margin-top:5px}' +
+    '@keyframes hv2CeleIn{from{opacity:0;transform:translateY(24px) scale(.85)}to{opacity:1;transform:none}}' +
+    '@keyframes hv2CelePulse{0%,100%{box-shadow:0 0 0 0 rgba(232,197,71,.4)}50%{box-shadow:0 0 0 12px rgba(232,197,71,0)}}' +
     '@keyframes hv2In{to{opacity:1;transform:translateY(0)}}';
   document.head.appendChild(st);
 }
@@ -12657,33 +12785,64 @@ function _hv2OpenHawkeye() { try { switchView('pipelines'); } catch (_) {} setTi
 function renderHomeV2() {
   const host = document.getElementById('home-v2'); if (!host) return;
   _hv2Style();
-  host.innerHTML = `<div class="hv2-grid" style="margin-top:6px">
-      ${_hv2Tile('trials', 0,    'c-gold',   'calendar', 'Trials',  'today',      'see them in the pipeline', "switchView('pipelines')")}
-      ${_hv2Tile('hawk',   0.06, 'c-red',    'eye',      'Hawkeye', 'to approve', 'agent actions waiting',    '_hv2OpenHawkeye()')}
-      ${_hv2Tile('unread', 0.12, 'c-blue',   'mail',     'Unread',  'inbox',      'messages waiting on you',  "switchView('v15inbox')")}
-      ${_hv2Tile('done',   0.18, 'c-violet', 'chat',     'Replies', 'done trials','leads who texted back',    "switchView('pipelines')")}
-      <div class="hv2-slot" style="animation:hv2In .42s ease .24s forwards;opacity:0">+</div>
-      <div class="hv2-slot" style="animation:hv2In .42s ease .3s forwards;opacity:0">+</div>
+  host.innerHTML = `
+    <div class="hv2-health" id="hv2-health">
+      <div class="hv2-hbar"><span id="hv2-hseg-sales" title="Sales"></span><span id="hv2-hseg-members" title="Members"></span><span id="hv2-hseg-you" title="Waiting on you"></span></div>
+      <div class="hv2-htext" id="hv2-htext" style="color:var(--text-mute)">Checking the pulse of the business…</div>
+    </div>
+    <div class="hv2-wrap">
+      <div>
+        <div id="hv2-onething"></div>
+        <div class="hv2-grid">
+          ${_hv2Tile('trials', 0,    'c-gold',   'calendar', 'Trials',  'today',      'see them in the pipeline', "switchView('pipelines')")}
+          ${_hv2Tile('hawk',   0.06, 'c-red',    'eye',      'Hawkeye', 'to approve', 'agent actions waiting',    '_hv2OpenHawkeye()')}
+          ${_hv2Tile('unread', 0.12, 'c-blue',   'mail',     'Unread',  'inbox',      'messages waiting on you',  "switchView('v15inbox')")}
+          ${_hv2Tile('done',   0.18, 'c-violet', 'chat',     'Replies', 'done trials','leads who texted back',    "switchView('pipelines')")}
+          <div class="hv2-slot" style="animation:hv2In .42s ease .24s forwards;opacity:0">+</div>
+          <div class="hv2-slot" style="animation:hv2In .42s ease .3s forwards;opacity:0">+</div>
+        </div>
+        <div class="hv2-streaks" id="hv2-streaks"></div>
+      </div>
+      <div class="hv2-sched" id="hv2-sched">
+        <div class="hv2-sched-h">Today's schedule</div>
+        <div id="hv2-sched-body"><div class="req-empty" style="padding:14px 15px"><span class="req-spin"></span> Loading…</div></div>
+        <button class="hv2-sched-f" onclick="switchView('v15cal')">Open the calendar ›</button>
+      </div>
     </div>`;
+  // Schedule rail: desktop = always in view (right rail); mobile = fades up as
+  // you scroll down to it (CC-13). One IntersectionObserver covers both.
+  try {
+    const sched = document.getElementById('hv2-sched');
+    const io = new IntersectionObserver((es) => { es.forEach(e => { if (e.isIntersecting) { sched.classList.add('seen'); io.disconnect(); } }); }, { threshold: 0.12 });
+    io.observe(sched);
+  } catch (_) { const s = document.getElementById('hv2-sched'); if (s) s.classList.add('seen'); }
   _hv2Load();
 }
 async function _hv2Load() {
-  // Trials today
+  // Trials today (tile number + the schedule rail share one fetch)
   (async () => {
     try {
       const token = await _mreqAuthToken();
       const r = await fetch('/api/ghl/calendars-v15?action=trials-today&client_id=' + encodeURIComponent(CLIENT_ID), { headers: { Authorization: 'Bearer ' + token } });
-      const j = await _safeJson(r); _hv2Set('trials', (j && j.trials || []).length);
-    } catch (_) { _hv2Set('trials', 0); }
+      const j = await _safeJson(r); const trials = (j && j.trials) || [];
+      _hv2Set('trials', trials.length);
+      _hv2SchedulePaint(trials, j && j.timezone);
+    } catch (_) { _hv2Set('trials', 0); _hv2SchedulePaint([], null); }
   })();
-  // Hawkeye actions waiting (same split the inbox badge uses)
+  // Hawkeye actions waiting (same split the inbox badge uses) + "do this now"
   (async () => {
     try {
       const [fu, rd] = await Promise.all([ _apxPost('/api/agent-followups', 'list', {}).catch(() => ({})), _apxPost('/api/agent-approvals', 'list-ready', {}).catch(() => ({})) ]);
       const d = _apxSplit(fu, rd);
-      _hv2Set('hawk', d.followups.length + d.ready.length + (d.lost || []).length + (d.book || []).length + (d.ghost || []).length);
-    } catch (_) { _hv2Set('hawk', 0); }
+      const actionable = d.ready.length + (d.lost || []).length + (d.book || []).length + (d.ghost || []).length;
+      _hv2Set('hawk', d.followups.length + actionable);
+      _hv2OneThingPaint(d, actionable);
+      _ccWait('hawk', actionable);
+    } catch (_) { _hv2Set('hawk', 0); _ccWait('hawk', 0); }
   })();
+  // Business-health strip + celebration checks (KPI months load lazily)
+  _ccHealthLoad();
+  _ccMembersCheck();
   // Inbox unread + done-trial replies waiting (one inbox + one pipelines fetch)
   (async () => {
     try {
@@ -12693,6 +12852,7 @@ async function _hv2Load() {
         fetch('/api/ghl/pipelines?client_id=' + encodeURIComponent(CLIENT_ID), { headers: { Authorization: 'Bearer ' + token } }).then(_safeJson),
       ]);
       _hv2Set('unread', (ib && ib.counts && ib.counts.unread) || 0);
+      _ccWait('unread', (ib && ib.counts && ib.counts.unread) || 0);
       const byContact = new Map();
       for (const c of ((ib && ib.conversations) || [])) if (c.contactId) byContact.set(String(c.contactId), c);
       let doneReplies = 0;
@@ -12708,8 +12868,204 @@ async function _hv2Load() {
         }
       }
       _hv2Set('done', doneReplies);
-    } catch (_) { _hv2Set('unread', 0); _hv2Set('done', 0); }
+    } catch (_) { _hv2Set('unread', 0); _hv2Set('done', 0); _ccWait('unread', 0); }
   })();
+}
+
+// ── Command center (V2 home) ─────────────────────────────────────────────
+// CC review 2026-07-02: health strip (CC-1), do-this-now Hawkeye card (CC-11),
+// streak chips (CC-9), schedule rail w/ scroll fade (CC-13), celebration
+// popups (CC-7). Per-device state lives in localStorage (v1 - streaks and
+// celebration dedupe are per-device on purpose until a server home exists).
+function _ccKey() { return 'bam_cc_' + (typeof CLIENT_ID !== 'undefined' ? CLIENT_ID : ''); }
+function _ccState() { try { return JSON.parse(localStorage.getItem(_ccKey()) || '{}'); } catch (_) { return {}; } }
+function _ccSave(patch) { try { localStorage.setItem(_ccKey(), JSON.stringify({ ..._ccState(), ...patch })); } catch (_) {} }
+function _ccYmd(d) { const n = d || new Date(); return `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, '0')}-${String(n.getDate()).padStart(2, '0')}`; }
+function _ccMonthKey(back) { const n = new Date(); const d = new Date(n.getFullYear(), n.getMonth() - (back || 0), 1); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`; }
+
+// One month of KPI data (same /api/kpis-v15 the KPIs tab uses). Closed months
+// never change, so they cache in localStorage forever; the current month is
+// always fetched fresh. Returns null on any failure - callers degrade quietly.
+async function _ccMonth(sec, mKey) {
+  const isCur = mKey === _ccMonthKey(0);
+  const lsKey = 'bam_cc_kpi_' + (typeof CLIENT_ID !== 'undefined' ? CLIENT_ID : '') + '_' + sec + '_' + mKey;
+  if (!isCur) { try { const c = JSON.parse(localStorage.getItem(lsKey) || 'null'); if (c) return c; } catch (_) {} }
+  try {
+    const token = await _mreqAuthToken();
+    const r = await fetch(`/api/kpis-v15?section=${sec}&month=${encodeURIComponent(mKey)}&client_id=${encodeURIComponent(CLIENT_ID)}`, { headers: { Authorization: 'Bearer ' + token } });
+    const j = await _safeJson(r); if (!r.ok || j.error) return null;
+    if (!isCur) { try { localStorage.setItem(lsKey, JSON.stringify(j)); } catch (_) {} }
+    return j;
+  } catch (_) { return null; }
+}
+function _ccSalesTotals(j) {
+  const offers = (j && j.offers) || [];
+  return { pipe: offers.reduce((n, o) => n + ((o.pipeline && o.pipeline.count) || 0), 0), pay: offers.reduce((n, o) => n + ((o.payments && o.payments.count) || 0), 0) };
+}
+
+// ── Health strip (CC-1): color-coded bar + one bold sentence ──
+const _CC_COL = { good: '#7BC47F', warn: '#E8C547', bad: '#e0654f' };
+let _CC_SEGS = { sales: null, members: null, you: null };
+function _ccSegPaint(name, state, phrase) {
+  _CC_SEGS[name] = { state, phrase };
+  const seg = document.getElementById('hv2-hseg-' + name);
+  if (seg && state) seg.style.background = _CC_COL[state];
+  const txt = document.getElementById('hv2-htext'); if (!txt) return;
+  const parts = ['sales', 'members', 'you'].map(k => _CC_SEGS[k])
+    .filter(Boolean).map(p => `<span style="color:${_CC_COL[p.state]}">${p.phrase}</span>`);
+  if (parts.length) { txt.style.color = 'var(--text)'; txt.innerHTML = parts.join(' <span style="color:var(--text-mute)">·</span> '); }
+}
+// "Waiting on you" segment - fed by the tile loads (hawk actionable + unread).
+let _CC_WAIT = { hawk: null, unread: null };
+function _ccWait(k, n) {
+  _CC_WAIT[k] = n;
+  if (_CC_WAIT.hawk == null || _CC_WAIT.unread == null) return;
+  const w = _CC_WAIT.hawk + _CC_WAIT.unread;
+  _ccSegPaint('you', w <= 2 ? 'good' : (w <= 6 ? 'warn' : 'bad'), w === 0 ? 'Nothing waiting on you' : `${w} waiting on you`);
+  _ccStreakTick(w === 0);
+}
+// Sales + Members segments from this month's pace vs the prior two months.
+async function _ccHealthLoad() {
+  if (!_plIsV2()) return;
+  const day = new Date().getDate();
+  const daysIn = new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).getDate();
+  const frac = Math.max(day / daysIn, 0.08);
+  // SALES: month-to-date new payments vs prorated 2-month average.
+  (async () => {
+    const [cur, m1, m2] = await Promise.all([_ccMonth('sales', _ccMonthKey(0)), _ccMonth('sales', _ccMonthKey(1)), _ccMonth('sales', _ccMonthKey(2))]);
+    if (!cur) return;
+    const mtd = _ccSalesTotals(cur), b1 = m1 && _ccSalesTotals(m1), b2 = m2 && _ccSalesTotals(m2);
+    const base = (b1 || b2) ? (((b1 ? b1.pay : 0) + (b2 ? b2.pay : 0)) / ((b1 ? 1 : 0) + (b2 ? 1 : 0))) : null;
+    if (base == null || base === 0) { _ccSegPaint('sales', mtd.pay > 0 ? 'good' : (mtd.pipe > 0 ? 'warn' : 'good'), mtd.pay > 0 ? 'Sales strong' : (mtd.pipe > 0 ? 'Sales warming up' : 'Sales quiet')); return; }
+    const ratio = mtd.pay / Math.max(base * frac, 0.5);
+    _ccSegPaint('sales', ratio >= 0.9 ? 'good' : (ratio >= 0.55 ? 'warn' : 'bad'), ratio >= 0.9 ? 'Sales strong' : (ratio >= 0.55 ? 'Sales steady' : 'Sales needs a look'));
+    // CC-7: on pace for an above-average month (once per day, ≥3 joins).
+    if (day >= 7 && mtd.pay >= 3 && mtd.pay >= 1.2 * base * frac) {
+      _ccCelebrate('sales_pace', 'On track for an above-average month', `${mtd.pay} new member${mtd.pay === 1 ? '' : 's'} already this month`);
+    }
+  })();
+  // MEMBERS: month-to-date cancellations vs prorated 2-month average (inverted).
+  (async () => {
+    const [cur, m1, m2] = await Promise.all([_ccMonth('members', _ccMonthKey(0)), _ccMonth('members', _ccMonthKey(1)), _ccMonth('members', _ccMonthKey(2))]);
+    if (!cur || cur.stripe_ok === false) return;
+    const mtd = (cur.cancelled && cur.cancelled.count) || 0;
+    const c1 = m1 && m1.cancelled ? m1.cancelled.count : null, c2 = m2 && m2.cancelled ? m2.cancelled.count : null;
+    const base = (c1 != null || c2 != null) ? (((c1 || 0) + (c2 || 0)) / ((c1 != null ? 1 : 0) + (c2 != null ? 1 : 0))) : null;
+    if (base == null || base === 0) { _ccSegPaint('members', mtd === 0 ? 'good' : 'warn', mtd === 0 ? 'Retention strong' : `${mtd} cancellation${mtd === 1 ? '' : 's'}`); return; }
+    const ratio = mtd / Math.max(base * frac, 0.5);
+    _ccSegPaint('members', ratio <= 1 ? 'good' : (ratio <= 1.8 ? 'warn' : 'bad'), ratio <= 1 ? 'Retention strong' : (ratio <= 1.8 ? 'Retention steady' : 'Churn climbing'));
+    // CC-7: way-below-average churn, late in the month (once per day).
+    if (day >= 20 && base >= 2 && mtd <= 0.5 * base) {
+      _ccCelebrate('churn_low', 'Churn is way below average', `${mtd} cancellation${mtd === 1 ? '' : 's'} vs ~${Math.round(base)} in a normal month`);
+    }
+  })();
+}
+
+// ── "Do this now" card (CC-11): the top Hawkeye action, one tap to Hawkeye ──
+function _hv2OneThingPaint(d, total) {
+  const host = document.getElementById('hv2-onething'); if (!host) return;
+  if (!total) { host.innerHTML = ''; return; }
+  const top = (d.ready && d.ready[0]) || (d.book && d.book[0]) || (d.ghost && d.ghost[0]) || (d.lost && d.lost[0]);
+  if (!top) { host.innerHTML = ''; return; }
+  const name = top.contact_name || 'this lead';
+  const label = top._isFollowup ? `Send ${name}'s follow-up`
+    : top.kind === 'book' ? `Confirm ${name}'s booking`
+    : top.kind === 'ghost' ? `Send ${name} to the Ghosted automation`
+    : top.kind === 'mark_lost' ? `Confirm ${name} as lost`
+    : `Approve the reply to ${name}`;
+  const rest = total - 1;
+  host.innerHTML = `<button class="hv2-one" onclick="_hv2OpenHawkeye()">
+    <div class="k">DO THIS NOW</div>
+    <div class="t">${escapeHTML(label)}</div>
+    <div class="m">${rest > 0 ? `then ${rest} more waiting in Hawkeye ›` : 'last one - clears the queue ›'}</div>
+  </button>`;
+}
+
+// ── Schedule rail (CC-13): today's trials, right rail on desktop ──
+function _hv2SchedulePaint(trials, tz) {
+  const el = document.getElementById('hv2-sched-body'); if (!el) return;
+  if (!trials.length) { el.innerHTML = `<div style="padding:16px 15px;font-size:12.5px;color:var(--text-mute)">No trials booked today.</div>`; return; }
+  el.innerHTML = trials.map(t => `
+    <div onclick="_v15calOpenAppt(${JSON.stringify(t.id)})" style="${_HV_ROW}">
+      <span style="flex:none;font-weight:700;color:var(--gold);font-size:13px;min-width:62px;font-family:var(--mono,monospace)">${escapeHTML(_hvTime(t.start, tz))}</span>
+      <div style="flex:1;min-width:0"><div style="${_HV_TITLE}">${escapeHTML(t.contactName || 'Trial booking')}</div>${t.status ? `<div style="${_HV_SUB}">${escapeHTML(t.status)}</div>` : ''}</div>
+      <span style="${_HV_CHEV}">›</span>
+    </div>`).join('');
+}
+
+// ── Streak chips (CC-9): per-device v1 ──
+// "Clear days": every day the home is seen with 0 waiting counts as clear;
+// streak = consecutive clear days ending today/yesterday. "Growth weeks" is
+// fed by the roster check below.
+function _ccStreakTick(clearNow) {
+  const st = _ccState(); const days = st.days || {};
+  const today = _ccYmd();
+  if (clearNow) { if (days[today] !== 'clear') { days[today] = 'clear'; _ccSave({ days }); } }
+  else if (!days[today]) { days[today] = 'busy'; _ccSave({ days }); }
+  let streak = 0; const d = new Date();
+  if (days[_ccYmd(d)] !== 'clear') d.setDate(d.getDate() - 1);   // today not clear (yet) → count up to yesterday
+  while (days[_ccYmd(d)] === 'clear') { streak++; d.setDate(d.getDate() - 1); if (streak > 365) break; }
+  _ccStreaksPaint(streak, null);
+}
+const _CC_STREAK = { clear: 0, growth: 0 };
+function _ccStreaksPaint(clearDays, growthWeeks) {
+  if (clearDays != null) _CC_STREAK.clear = clearDays;
+  if (growthWeeks != null) _CC_STREAK.growth = growthWeeks;
+  clearDays = _CC_STREAK.clear; growthWeeks = _CC_STREAK.growth;
+  const host = document.getElementById('hv2-streaks'); if (!host) return;
+  const flame = '<svg viewBox="0 0 24 24"><path d="M12 22c4 0 7-2.7 7-7 0-3-2-5.5-3.5-7C15 10 13 10 13 7c0-2 .5-3.5 1-5-4 1.5-9 6-9 13 0 4.3 3 7 7 7z"/></svg>';
+  const trend = '<svg viewBox="0 0 24 24"><polyline points="2,17 9,10 13,14 22,5"/><polyline points="15,5 22,5 22,12"/></svg>';
+  const chips = [];
+  if (clearDays >= 2) chips.push(`<span class="hv2-streak">${flame} ${clearDays} days all clear</span>`);
+  if (growthWeeks >= 2) chips.push(`<span class="hv2-streak" style="border-color:rgba(123,196,127,.5);color:#7BC47F">${trend} ${growthWeeks} weeks member growth</span>`);
+  host.innerHTML = chips.join('');
+}
+
+// ── Roster check (CC-7 new-member popup + growth-weeks streak) ──
+function _ccWeekKey() { const n = new Date(); const day = (n.getDay() + 6) % 7; const mon = new Date(n); mon.setDate(n.getDate() - day); return _ccYmd(mon); }
+async function _ccMembersCheck() {
+  if (!_plIsV2()) return;
+  try {
+    const token = await _mreqAuthToken();
+    const r = await fetch('/api/members?scope=client&client_id=' + encodeURIComponent(CLIENT_ID), { headers: { Authorization: 'Bearer ' + token } });
+    const j = await _safeJson(r); if (!r.ok) return;
+    const members = Array.isArray(j.members) ? j.members : [];
+    const ids = members.map(m => String(m.id || m.ghl_contact_id || m.name)).filter(Boolean);
+    const st = _ccState();
+    // New-member celebration: someone in the roster we hadn't seen before.
+    if (Array.isArray(st.mem_ids) && st.mem_ids.length) {
+      const known = new Set(st.mem_ids);
+      const fresh = members.filter(m => !known.has(String(m.id || m.ghl_contact_id || m.name)));
+      if (fresh.length) {
+        const n = fresh[0].name || fresh[0].athlete_name || 'A new member';
+        _ccCelebrate('new_member_' + _ccYmd(), fresh.length === 1 ? `${n} just became a member` : `${fresh.length} new members joined`, 'The roster is growing - keep it rolling');
+      }
+    }
+    // Growth-weeks streak: week-over-week roster count.
+    const wk = _ccWeekKey(); const g = st.growth || { week: null, count: null, weeks: 0 };
+    if (g.week !== wk) {
+      if (g.count != null) g.weeks = (ids.length > g.count) ? (g.weeks || 0) + 1 : 0;
+      g.week = wk; g.count = ids.length;
+    } else if (g.count != null && ids.length > g.count) { g.count = ids.length; }
+    _ccSave({ mem_ids: ids, growth: g });
+    _ccStreaksPaint(null, g.weeks || 0);   // growth chip only - clear-days repaints on its own tick
+  } catch (_) {}
+}
+
+// ── Celebration popup (CC-7): FC brand, once per key per day ──
+function _ccCelebrate(key, title, sub) {
+  const st = _ccState(); const today = _ccYmd(); const seen = st.cele || {};
+  if (seen[key] === today) return;
+  seen[key] = today; _ccSave({ cele: seen });
+  const ov = document.createElement('div'); ov.className = 'hv2-cele';
+  ov.innerHTML = `<div class="hv2-cele-card">
+    <div class="hv2-cele-ic"><svg viewBox="0 0 24 24"><path d="M8 21h8M12 17v4M7 4h10v6a5 5 0 0 1-10 0V4z"/><path d="M7 6H4a3 3 0 0 0 3 5M17 6h3a3 3 0 0 1-3 5"/></svg></div>
+    <div class="hv2-cele-t">${escapeHTML(title)}</div>
+    <div class="hv2-cele-s">${escapeHTML(sub || '')}</div>
+  </div>`;
+  ov.onclick = () => ov.remove();
+  document.body.appendChild(ov);
+  setTimeout(() => { try { ov.remove(); } catch (_) {} }, 4500);
 }
 
 // ── V1.5 Home dashboard ──────────────────────────────────────────────────
