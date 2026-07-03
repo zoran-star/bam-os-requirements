@@ -195,6 +195,23 @@ backfilled -> Training. Unlocks per-offer: conversion rate (win/loss), churn
 (cancellations), refund rate, and the lead->trial->member funnel. Non-GTA rows
 correctly stay NULL until those academies get offers.
 
+## Trial PAGE is offer-driven (2026-07-03)
+
+- `/api/website/offer` gained a `trial` block (PR #1073): sales_path,
+  duration_price, info_collect, the offer's enabled CALENDAR entry points
+  (key+label+program), and schedule groups with weekly times.
+- `bam-client-sites` freetrial.jsx (PR #48, deployed via
+  `npx vercel deploy --prod --yes --scope zoran-stars-projects` from
+  clients/bam-gta/) fetches it on load and uses the offer's calendars
+  (label-matched elementary/high); hardcoded keys remain as fallback so the
+  funnel can never break. Re-pointing a calendar in the Entry Points wizard
+  re-points the live page - no deploy.
+- Marketing copy (headlines/FAQ/testimonials) stays website-owned on purpose.
+- Verified live: API serves both calendars + "1 hour for free"; deployed page
+  (bam-gta.vercel.app + byanymeanstoronto.ca) carries FT_OFFER_URL.
+- ⚠️ bam-client-sites checkout may be on another session's branch - route
+  changes through a temp `git worktree` + cherry-pick PR (this bit us).
+
 ## DONE. Future offers (ADAPT/camps) launch checklist
 1. Create the offer in BB + Stripe Matcher confirms prices (pricing_catalog).
 2. `scripts/offers-sync-run.mjs` preview -> apply with confirmed entitlement
