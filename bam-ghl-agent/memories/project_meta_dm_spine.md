@@ -1,5 +1,6 @@
 # Meta DM spine - Instagram + FB Messenger off GHL
 
+<<<<<<< HEAD
 **Status 2026-07-03 EOD: GTA WIRED + ACTIVE. FB Messenger PROVEN end-to-end
 (real inbound stored in dm_threads). Instagram blocked on Meta App Review
 (Advanced Access) - that's the next session's job. Leads' IG DMs meanwhile

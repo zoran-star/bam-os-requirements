@@ -3590,6 +3590,111 @@
     .month-progress-bar { width: 130px; }
   }
 
+  /* ── Marketing Machine card + modal (V2) ── */
+  .mm-card {
+    border: 1px solid var(--line); border-radius: 6px; background: var(--surface-el);
+    padding: 20px 22px; margin: 0 0 28px; cursor: pointer;
+    transition: border-color 0.2s ease;
+  }
+  .mm-card:hover { border-color: var(--accent-border); }
+  .mm-month { display: flex; align-items: center; gap: 12px; margin-bottom: 18px; }
+  .mm-month-name {
+    font-family: var(--mono); font-size: 11px; font-weight: 700;
+    letter-spacing: 0.18em; text-transform: uppercase; color: var(--text);
+  }
+  .mm-month .mm-bar { flex: 0 0 140px; }
+  .mm-month-meta { font-family: var(--mono); font-size: 10px; letter-spacing: 0.08em; color: var(--text-mute); }
+  .mm-bar { height: 8px; background: var(--line); border-radius: 4px; overflow: hidden; }
+  .mm-bar-fill { height: 100%; border-radius: 4px; transition: width 0.6s cubic-bezier(0.16, 1, 0.3, 1); }
+  .mm-f-green { background: var(--green); }
+  .mm-f-gold { background: var(--gold); }
+  .mm-f-red { background: var(--red); }
+  .mm-f-grey { background: var(--text-mute); opacity: 0.45; }
+  .mm-f-month { background: var(--gold); }
+  .mm-flow { display: grid; grid-template-columns: 1fr 24px 1.5fr 24px 1fr 24px auto; gap: 10px; align-items: start; }
+  .mm-arrow { color: var(--text-mute); font-size: 15px; text-align: center; padding-top: 26px; }
+  .mm-col-label {
+    font-family: var(--mono); font-size: 10px; font-weight: 600;
+    letter-spacing: 0.16em; text-transform: uppercase; color: var(--text-sub); margin-bottom: 9px;
+  }
+  .mm-cr-row { margin-bottom: 8px; }
+  .mm-cr-name {
+    display: block; font-size: 11px; color: var(--text-sub); margin-bottom: 3px;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 220px;
+  }
+  .mm-pill-tag {
+    font-family: var(--mono); font-size: 9px; letter-spacing: 0.08em; text-transform: uppercase;
+    border: 1px solid var(--line); border-radius: 3px; padding: 1px 5px; margin-left: 6px; color: var(--text-mute);
+  }
+  .mm-pill-tag.mm-best { color: var(--green); border-color: var(--green); }
+  .mm-result-box {
+    border: 1px solid var(--line); border-radius: 6px; padding: 12px 16px;
+    font-size: 13px; color: var(--text-sub); line-height: 1.7; white-space: nowrap;
+  }
+  .mm-result-box b { color: var(--text); font-size: 16px; }
+  .mm-foot { display: flex; align-items: center; gap: 16px; margin-top: 16px; flex-wrap: wrap; }
+  .mm-foot-cpl { font-family: var(--mono); font-size: 11px; letter-spacing: 0.1em; color: var(--text); }
+  .mm-foot-warn { font-size: 12px; color: var(--red); flex: 1; min-width: 180px; }
+  .mm-foot-tap { font-family: var(--mono); font-size: 11px; color: var(--text-mute); margin-left: auto; }
+  .mm-t-green { color: var(--green); }
+  .mm-t-gold { color: var(--gold); }
+  .mm-t-red { color: var(--red); }
+  .mm-t-grey { color: var(--text-mute); }
+  .mm-dot { display: inline-block; width: 6px; height: 6px; border-radius: 50%; margin-left: 5px; vertical-align: middle; }
+  .mm-dot-green { background: var(--green); }
+  .mm-dot-gold { background: var(--gold); }
+  .mm-dot-red { background: var(--red); }
+  .mm-dot-grey { background: var(--text-mute); }
+  .mm-modal-card { max-width: 760px; width: calc(100% - 32px); max-height: 88vh; overflow-y: auto; }
+  .mm-mod-head { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 4px; }
+  .mm-mod-range { display: flex; align-items: center; gap: 8px; margin-left: auto; flex-wrap: wrap; }
+  .mm-mod-range input[type="date"] {
+    background: var(--surface-el); border: 1px solid var(--line); border-radius: 6px;
+    color: var(--text); font-size: 12px; padding: 5px 8px; color-scheme: dark; font-family: inherit;
+  }
+  .mm-mod-range button {
+    background: none; border: 1px solid var(--line); border-radius: 6px; color: var(--text-sub);
+    font-size: 12px; padding: 5px 12px; cursor: pointer; font-family: inherit;
+  }
+  .mm-mod-range button:hover { border-color: var(--accent-border); color: var(--text); }
+  .mm-sect { border-top: 1px solid var(--line); margin-top: 20px; padding-top: 16px; }
+  .mm-sect-head {
+    font-family: var(--mono); font-size: 11px; font-weight: 600; letter-spacing: 0.16em;
+    text-transform: uppercase; color: var(--text-sub); margin-bottom: 12px;
+  }
+  .mm-stats { display: flex; gap: 28px; flex-wrap: wrap; }
+  .mm-stat-label {
+    display: block; font-family: var(--mono); font-size: 9px; letter-spacing: 0.14em;
+    text-transform: uppercase; color: var(--text-mute); margin-bottom: 3px;
+  }
+  .mm-stat-val { font-size: 17px; font-weight: 700; color: var(--text); }
+  .mm-context { font-size: 11px; color: var(--text-mute); margin-top: 10px; font-family: var(--mono); letter-spacing: 0.04em; }
+  .mm-tile { display: flex; gap: 12px; align-items: center; padding: 9px 0; border-bottom: 1px dashed var(--line); }
+  .mm-tile:last-child { border-bottom: none; }
+  .mm-tile-thumb {
+    width: 44px; height: 44px; border-radius: 4px; object-fit: cover; flex-shrink: 0;
+    background: var(--line); border: 1px solid var(--line);
+  }
+  .mm-tile-name { font-size: 13px; color: var(--text); margin-bottom: 3px; }
+  .mm-tile-stats { font-size: 11px; font-family: var(--mono); color: var(--text-mute); letter-spacing: 0.02em; }
+  .mm-conv-pill {
+    display: flex; justify-content: center; margin: 14px 0 -4px;
+  }
+  .mm-conv-pill span {
+    font-family: var(--mono); font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase;
+    border: 1px solid var(--line); border-radius: 12px; padding: 3px 12px;
+  }
+  .mm-funnel-line { font-size: 13px; color: var(--text-sub); margin-bottom: 10px; }
+  .mm-funnel-line b { color: var(--text); }
+  .mm-verdict { font-size: 14px; font-weight: 700; margin-top: 12px; }
+  .mm-warn-line { font-size: 12px; color: var(--red); margin-top: 10px; }
+  @media (max-width: 720px) {
+    .mm-flow { grid-template-columns: 1fr; }
+    .mm-arrow { padding: 0; transform: rotate(90deg); }
+    .mm-cr-name { max-width: none; }
+    .mm-result-box { white-space: normal; }
+  }
+
   @media (max-width: 520px) {
     .tour-card { padding: 24px 20px 18px; }
     .tour-title { font-size: 22px; }
@@ -6607,6 +6712,9 @@
         </div>
 
         <div class="content">
+
+          <!-- ── Marketing Machine (V2 only) - simple health card, tap for the detailed modal ── -->
+          <div id="marketing-machine-card" style="display:none"></div>
 
           <!-- ── Resource guides (collapsed PDFs - placeholder until walkthrough videos) ── -->
           <details class="guide-card">
@@ -21638,6 +21746,7 @@ function _showOrganicOnly() {
 }
 function _marketingEnter() {
   _renderFirstCampaignGuide();   // data-drive the "Your First Campaign" card from the default guide card
+  if (typeof _mmLoad === 'function') _mmLoad();   // Marketing Machine card (V2 only; quiet no-op otherwise)
   if (_hasOrganic() && !_hasAds()) {
     // Content-only client: straight to organic, no Ads | Organic split.
     _showOrganicOnly();
@@ -39875,6 +39984,247 @@ function toggleTheme() {
     </div>
   </div>
 </div>
+
+<!-- ── Marketing Machine detailed modal (V2) ── -->
+<div id="marketingMachineModal" class="modal-backdrop" style="display:none" onclick="if(event.target===this)closeMarketingMachine()">
+  <div class="modal-card mm-modal-card" onclick="event.stopPropagation()">
+    <div class="mm-mod-head">
+      <div>
+        <div class="modal-kicker">§ Marketing</div>
+        <div class="modal-title" style="margin-bottom:0">Marketing Machine</div>
+      </div>
+      <div class="mm-mod-range">
+        <input type="date" id="mm-range-from" aria-label="From date">
+        <span style="color:var(--text-mute);font-size:12px">to</span>
+        <input type="date" id="mm-range-to" aria-label="To date">
+        <button type="button" onclick="_mmApplyRange()">Apply</button>
+        <button type="button" onclick="closeMarketingMachine()" aria-label="Close" style="padding:5px 10px">&times;</button>
+      </div>
+    </div>
+    <div id="mm-modal-body">
+      <div class="req-empty" style="padding:20px 0"><span class="req-spin"></span>Loading…</div>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ─────────── Marketing Machine (V2) - simple card + detailed modal ───────────
+   ONE backend payload (marketing.js ?resource=meta-machine) powers both views;
+   all health colors are decided server-side so the two can never disagree.
+   Spec: bam-ghl-agent/memories/project_marketing_machine_dashboard.md          */
+let _MM = null;          // month-to-date payload (drives the card + default modal)
+let _MM_LOADED = false;
+
+function _mmBandTxt(band) { return 'mm-t-' + (band || 'grey'); }
+function _mmDotHtml(band) { return '<span class="mm-dot mm-dot-' + (band || 'grey') + '"></span>'; }
+// Fill length = how healthy (color = the verdict). CPL maps onto a $0-70 scale
+// inverted (lower cost = fuller bar); percentages map onto 0..full.
+function _mmCplFill(cpl) { if (cpl == null) return 30; return Math.max(8, Math.min(100, Math.round((1 - cpl / 70) * 100))); }
+function _mmPctFill(pct, full) { if (pct == null) return 30; return Math.max(8, Math.min(100, Math.round(pct / full * 100))); }
+function _mmBarHtml(fill, band) { return '<div class="mm-bar"><div class="mm-bar-fill mm-f-' + (band || 'grey') + '" style="width:' + fill + '%"></div></div>'; }
+function _mmWorst(bands) {
+  const real = bands.filter(b => b && b !== 'grey');
+  if (!real.length) return 'grey';
+  if (real.includes('red')) return 'red';
+  if (real.includes('gold')) return 'gold';
+  return 'green';
+}
+function _mmMoney(n) { return n == null ? '-' : '$' + (Math.round(n * 100) / 100).toFixed(2); }
+function _mmPctTxt(n) { return n == null ? '-' : (Math.round(n * 10) / 10) + '%'; }
+
+async function _mmLoad(force) {
+  const host = document.getElementById('marketing-machine-card');
+  if (!host) return;
+  if (!(typeof V2_ACCESS !== 'undefined' && V2_ACCESS)) { host.style.display = 'none'; return; }
+  if (_MM_LOADED && !force) { _mmRenderCard(); return; }
+  host.style.display = 'block';
+  host.innerHTML = '<div class="req-empty" style="padding:14px 0"><span class="req-spin"></span>Reading the machine…</div>';
+  try {
+    const token = await _mreqAuthToken();
+    const res = await fetch('/api/marketing?resource=meta-machine&client_id=' + encodeURIComponent(CLIENT_ID), {
+      headers: { 'Authorization': 'Bearer ' + token },
+    });
+    const json = await _safeJson(res);
+    if (!res.ok) throw new Error(json.error || ('HTTP ' + res.status));
+    _MM = json; _MM_LOADED = true;
+    _mmRenderCard();
+  } catch (e) {
+    host.style.display = 'none';   // quiet fail: the rest of the page still works
+  }
+}
+
+function _mmRenderCard() {
+  const host = document.getElementById('marketing-machine-card');
+  if (!host || !_MM) return;
+  if (!_MM.meta_connected) { host.style.display = 'none'; return; }
+  const d = _MM, m = d.month || {}, camp = d.campaign || {}, page = d.page || {}, r = d.result || {};
+  const monthPct = m.days_in_month ? Math.round((m.day / m.days_in_month) * 100) : 0;
+  const spendTxt = m.spend != null
+    ? ('day ' + m.day + ' of ' + m.days_in_month + ' &middot; spent $' + Math.round(m.spend) + (m.planned ? ' of ~$' + Math.round(m.planned) : ''))
+    : ('day ' + m.day + ' of ' + m.days_in_month);
+  const crRows = (d.creatives || []).slice(0, 6).map(c =>
+    '<div class="mm-cr-row"><span class="mm-cr-name">' + _escapeHtml(c.name) +
+    (c.best ? '<span class="mm-pill-tag mm-best">best</span>' : '') +
+    (c.testing ? '<span class="mm-pill-tag">testing</span>' : '') +
+    '</span>' + _mmBarHtml(c.testing ? 30 : _mmCplFill(c.cpl), c.band) + '</div>'
+  ).join('') || '<div style="font-size:12px;color:var(--text-mute)">no live creatives yet</div>';
+  const drift = camp.drift_pct;
+  const cplTrend = drift == null ? '' : (drift <= 0 ? ' <span class="mm-t-green">&darr;</span>' : ' <span class="mm-t-red">&uarr;</span>');
+  host.innerHTML =
+    '<div class="mm-card" onclick="openMarketingMachine()">' +
+      '<div class="mm-month"><span class="mm-month-name">' + _escapeHtml((m.name || '').toUpperCase()) + '</span>' +
+        '<div class="mm-bar"><div class="mm-bar-fill mm-f-month" style="width:' + monthPct + '%"></div></div>' +
+        '<span class="mm-month-meta">' + spendTxt + '</span></div>' +
+      '<div class="mm-flow">' +
+        '<div><div class="mm-col-label">Campaign</div>' + _mmBarHtml(_mmCplFill(camp.cpl), camp.band) + '</div>' +
+        '<div class="mm-arrow">&rsaquo;</div>' +
+        '<div><div class="mm-col-label">Creatives</div>' + crRows + '</div>' +
+        '<div class="mm-arrow">&rsaquo;</div>' +
+        '<div><div class="mm-col-label">Page</div>' + _mmBarHtml(_mmPctFill(page.clicks_to_leads_pct, 15), page.band) + '</div>' +
+        '<div class="mm-arrow">&rsaquo;</div>' +
+        '<div><div class="mm-col-label">Result</div><div class="mm-result-box"><b>' + (r.leads ?? 0) + '</b> leads<br><b>' + (r.booked ?? 0) + '</b> trials</div></div>' +
+      '</div>' +
+      '<div class="mm-foot">' +
+        '<span class="mm-foot-cpl">COST PER LEAD <span class="' + _mmBandTxt(camp.band) + '">' + _mmMoney(camp.cpl) + '</span>' + cplTrend + '</span>' +
+        (d.warning ? '<span class="mm-foot-warn">&#9888; ' + _escapeHtml(d.warning.text) + '</span>' : '') +
+        '<span class="mm-foot-tap">tap &rsaquo;</span>' +
+      '</div>' +
+    '</div>';
+  host.style.display = 'block';
+}
+
+function openMarketingMachine() {
+  const modal = document.getElementById('marketingMachineModal');
+  if (!modal || !_MM) return;
+  modal.style.display = 'flex';
+  const from = document.getElementById('mm-range-from');
+  const to = document.getElementById('mm-range-to');
+  if (from && _MM.range) from.value = _MM.range.since;
+  if (to && _MM.range) to.value = _MM.range.until;
+  _mmRenderModal(_MM);
+}
+function closeMarketingMachine() {
+  const modal = document.getElementById('marketingMachineModal');
+  if (modal) modal.style.display = 'none';
+}
+async function _mmApplyRange() {
+  const from = document.getElementById('mm-range-from')?.value;
+  const to = document.getElementById('mm-range-to')?.value;
+  const body = document.getElementById('mm-modal-body');
+  if (!from || !to || !body) return;
+  body.innerHTML = '<div class="req-empty" style="padding:20px 0"><span class="req-spin"></span>Loading…</div>';
+  try {
+    const token = await _mreqAuthToken();
+    const res = await fetch('/api/marketing?resource=meta-machine&client_id=' + encodeURIComponent(CLIENT_ID) +
+      '&since=' + encodeURIComponent(from) + '&until=' + encodeURIComponent(to), {
+      headers: { 'Authorization': 'Bearer ' + token },
+    });
+    const json = await _safeJson(res);
+    if (!res.ok) throw new Error(json.error || ('HTTP ' + res.status));
+    _mmRenderModal(json);
+  } catch (e) {
+    body.innerHTML = '<div style="font-size:13px;color:var(--text-mute);padding:16px 0">Could not load that range - please try again.</div>';
+  }
+}
+
+function _mmStatHtml(label, valueTxt, band) {
+  return '<div><span class="mm-stat-label">' + label + '</span><span class="mm-stat-val ' + (band ? _mmBandTxt(band) : '') + '">' +
+    valueTxt + (band ? _mmDotHtml(band) : '') + '</span></div>';
+}
+function _mmPillHtml(label, pct, band) {
+  return '<div class="mm-conv-pill"><span class="' + _mmBandTxt(band) + '">&darr; ' + label + ' ' + _mmPctTxt(pct) + '</span></div>';
+}
+function _mmRenderModal(d) {
+  const body = document.getElementById('mm-modal-body');
+  if (!body || !d) return;
+  if (!d.meta_connected) {
+    body.innerHTML = '<div style="font-size:13px;color:var(--text-mute);padding:16px 0">BAM is still wiring up your ads - numbers will appear here once your campaign is live.</div>';
+    return;
+  }
+  const m = d.month || {}, camp = d.campaign || {}, page = d.page || {}, r = d.result || {}, pills = d.pills || {};
+  const monthPct = m.days_in_month ? Math.round((m.day / m.days_in_month) * 100) : 0;
+  const rangeLabel = d.range && d.range.is_mtd ? 'month to date' : (d.range ? d.range.since + ' to ' + d.range.until : '');
+
+  // Header line: month pacing (MTD) or the picked range's spend
+  const headLine = d.range && d.range.is_mtd
+    ? '<div class="mm-month" style="margin-bottom:0"><span class="mm-month-name">' + _escapeHtml((m.name || '').toUpperCase()) + '</span>' +
+      '<div class="mm-bar" style="flex:0 0 140px"><div class="mm-bar-fill mm-f-month" style="width:' + monthPct + '%"></div></div>' +
+      '<span class="mm-month-meta">day ' + m.day + ' of ' + m.days_in_month + ' &middot; spent $' + Math.round(camp.spend || 0) +
+      (m.planned ? ' of ~$' + Math.round(m.planned) + ' planned' : '') + '</span></div>'
+    : '<div class="mm-month" style="margin-bottom:0"><span class="mm-month-meta">' + _escapeHtml(rangeLabel) + ' &middot; spent $' + Math.round(camp.spend || 0) + '</span></div>';
+
+  // CAMPAIGN
+  const driftTxt = camp.drift_pct == null ? '-' : ((camp.drift_pct > 0 ? '+' : '') + Math.round(camp.drift_pct) + '%');
+  const driftBand = camp.drift_pct == null ? null : (Math.abs(camp.drift_pct) <= 20 ? 'green' : (camp.drift_pct > 20 ? 'red' : 'green'));
+  const freqBand = camp.frequency == null ? null : (camp.frequency < 3 ? 'green' : (camp.frequency <= 3.5 ? 'gold' : 'red'));
+  const learnTxt = camp.learning ? camp.learning.toUpperCase() : '-';
+  const campSect =
+    '<div class="mm-sect"><div class="mm-sect-head">Campaign ' + _mmDotHtml(camp.band) + '</div>' +
+    '<div class="mm-stats">' +
+      _mmStatHtml('Cost per lead', _mmMoney(camp.cpl), camp.band) +
+      _mmStatHtml('CPA drift', driftTxt, driftBand) +
+      _mmStatHtml('Frequency', camp.frequency == null ? '-' : camp.frequency + 'x', freqBand) +
+      _mmStatHtml('CTR', _mmPctTxt(camp.ctr), null) +
+    '</div>' +
+    '<div class="mm-context">impressions ' + (camp.impressions || 0).toLocaleString() + ' &middot; reach ' + (camp.reach || 0).toLocaleString() +
+    ' &middot; learning ' + _escapeHtml(learnTxt) + '</div></div>';
+
+  // CREATIVES
+  const crBand = d.creatives_band || 'grey';
+  const liveN = d.creatives_live || 0;
+  const tiles = (d.creatives || []).map(c => {
+    const hookBand = c.hook_rate == null ? null : (c.hook_rate >= 30 ? 'green' : (c.hook_rate >= 25 ? 'gold' : 'red'));
+    const cFreqBand = c.frequency == null ? null : (c.frequency < 3 ? 'green' : (c.frequency <= 3.5 ? 'gold' : 'red'));
+    const stats = [
+      c.hook_rate != null ? ('<span class="' + _mmBandTxt(hookBand) + '">hook ' + _mmPctTxt(c.hook_rate) + '</span>') : null,
+      c.ctr != null ? ('ctr ' + _mmPctTxt(c.ctr)) : null,
+      '<span class="' + _mmBandTxt(c.testing ? 'grey' : c.band) + '">$/lead ' + (c.cpl == null ? '-' : _mmMoney(c.cpl)) + '</span>',
+      c.frequency != null ? ('<span class="' + _mmBandTxt(cFreqBand) + '">freq ' + c.frequency + 'x</span>') : null,
+      c.age_days != null ? ('age ' + c.age_days + 'd') : null,
+    ].filter(Boolean).join(' &middot; ');
+    return '<div class="mm-tile">' +
+      (c.image_url ? '<img class="mm-tile-thumb" src="' + _escapeHtml(c.image_url) + '" alt="" loading="lazy">' : '<span class="mm-tile-thumb"></span>') +
+      '<div style="min-width:0"><div class="mm-tile-name">' + _escapeHtml(c.name) +
+      (c.best ? '<span class="mm-pill-tag mm-best">best</span>' : '') +
+      (c.testing ? '<span class="mm-pill-tag">testing</span>' : '') +
+      '</div><div class="mm-tile-stats">' + stats + '</div></div></div>';
+  }).join('') || '<div style="font-size:12px;color:var(--text-mute)">no live creatives yet</div>';
+  const crSect =
+    '<div class="mm-sect"><div class="mm-sect-head">Creatives &middot; ' + liveN + ' live ' + _mmDotHtml(crBand) +
+    (liveN && liveN < 6 ? ' <span style="letter-spacing:0;text-transform:none;color:var(--text-mute)">(want 6+)</span>' : '') + '</div>' +
+    tiles +
+    (d.warning ? '<div class="mm-warn-line">&#9888; ' + _escapeHtml(d.warning.text) + '</div>' : '') +
+    '</div>';
+
+  // LANDING PAGE
+  const pageBand = _mmWorst([page.band, page.abandonment_band]);
+  const pageSect =
+    '<div class="mm-sect"><div class="mm-sect-head">Landing page ' + _mmDotHtml(pageBand) + '</div>' +
+    '<div class="mm-funnel-line"><b>' + (page.visitors || 0) + '</b> visitors &rarr; <b>' + (page.form_started || 0) + '</b> started form &rarr; <b>' +
+    (page.saw_calendar || 0) + '</b> saw calendar &rarr; <b>' + (page.booked_sessions || 0) + '</b> booked</div>' +
+    '<div class="mm-stats">' +
+      _mmStatHtml('Clicks to leads', _mmPctTxt(page.clicks_to_leads_pct), page.band) +
+      _mmStatHtml('Calendar abandonment', _mmPctTxt(page.abandonment_pct), page.abandonment_band) +
+    '</div>' +
+    '<div class="mm-context">saw the times but walked away = abandonment</div></div>';
+
+  // RESULT
+  const cpbtWas = r.prev_cost_per_booked_trial != null ? ' <span style="color:var(--text-mute);font-weight:400">(was ' + _mmMoney(r.prev_cost_per_booked_trial) + ')</span>' : '';
+  const resultSect =
+    '<div class="mm-sect"><div class="mm-sect-head">Result</div>' +
+    '<div class="mm-funnel-line"><b>' + (r.leads || 0) + '</b> leads &middot; <span class="' + _mmBandTxt(pills.lead_to_booked_band) + '">' +
+    _mmPctTxt(r.booked_pct) + ' booked' + _mmDotHtml(pills.lead_to_booked_band) + '</span> &rarr; <b>' + (r.booked || 0) + '</b> booked trials' +
+    (r.agent_booked ? ' <span style="color:var(--text-mute)">(' + r.agent_booked + ' with the booking agent)</span>' : '') + '</div>' +
+    '<div class="mm-verdict ' + _mmBandTxt(r.cpbt_band) + '">COST PER BOOKED TRIAL ' + (r.cost_per_booked_trial == null ? '-' : _mmMoney(r.cost_per_booked_trial)) +
+    _mmDotHtml(r.cpbt_band) + cpbtWas + '</div></div>';
+
+  body.innerHTML = headLine + campSect + crSect +
+    _mmPillHtml('click to visit', pills.click_to_visit_pct, pills.click_to_visit_band) +
+    pageSect +
+    _mmPillHtml('visit to lead', pills.visit_to_lead_pct, pills.visit_to_lead_band) +
+    resultSect;
+}
+</script>
 
 <script>
   /* Inject a bell button into every topbar that doesn't already have actions.
