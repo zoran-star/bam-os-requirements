@@ -54,15 +54,32 @@ canonical doc). Board surfaces:
 modal lets staff close the redundant card (mark Abandoned). Does NOT merge GHL
 contacts (manual). Pair with GHL setting: block duplicate contacts, match by phone.
 
-## V2 Home dashboard
+## V2 Home dashboard (prototype-mirror layout, 2026-07-03)
 `renderHomeV2()` (branch in `openHomeView`, takes precedence over V15/generic;
-container `#home-v2`). Home tab was previously HIDDEN for V2 - now un-hidden
-(`_homeHiddenForMe` returns false). Four animated count tiles (hover lift + gold
-pulse on non-zero, count-up):
-- 📅 Trials today (`calendars-v15?action=trials-today`) → pipeline
-- 💬 Done-trial replies waiting (Done-Trial opps whose last inbox msg is inbound) → pipeline
-- 👁 Hawkeye actions (followups + list-ready split) → opens pipeline THEN Hawkeye popup (× → pipeline)
-- ✉️ Unread messages (inbox `counts.unread`) → inbox
+container `#home-v2`). Rebuilt to Zoran's annotated-prototype sketch:
+- **Hero left = Daily win card.** First qualifying wins (priority order): new
+  clients today ≥1 (`kpis-v15?section=marketing&since=<today>&until=<today>` →
+  `joined`, fed by kpi_events from the Stripe webhook) → trials BOOKED today
+  (same call, `trials_booked`) → revenue yesterday > $20 (`section=revenue`
+  single-day range, `net`). None qualify → "Hello, <first name>" (from
+  `#userName`). NOTE: `joined` kpi_events had 0 rows for GTA as of 2026-07-03 -
+  the win fires once members go live post-Track-A.
+- **Hero right = first Hawkeye card.** Top queue item (ready → book → ghost →
+  lost → followup): lead's `last_message` bubble + `draft_message` proposed-reply
+  bubble + red "N actions waiting" pill. Click → `_apxOpen()` DIRECTLY over home
+  (no pipeline switch first). Zero actions → green "All clear" card, button stays.
+- **Middle row: Today's schedule (left) | Action items (right).** Schedule =
+  gold-highlighted "Trials today · N" sub-section (trials-today) + full session
+  list with fill counts via NEW `calendars-v15?action=slots-today`
+  (schedule_slots today + `rpc/slot_spots_taken_bulk` → `{slots:[{name,start,
+  capacity,booked}]}`). GTA has no Friday sessions - empty Fridays are correct.
+  Action items = open `/api/action-items` rows (top 5 + count pill) → action-items view.
+- **Bottom: 3 label-only nav cards** Marketing / Sales / Members →
+  switchView marketing / pipelines / members.
+- **Retired (2026-07-03):** health strip, 4 count tiles, streak chips,
+  celebration popups, `_cc*` state helpers. `_ccMonthKey` KEPT - the KPI page
+  MRR sparkline uses it. No voice bar existed in the live portal (prototype-only;
+  sketch said hide it - nothing to hide).
 
 ## Post-trial form
 New "First message to the parent" field. Backend (`api/ghl/post-trial.js`) composes

@@ -12936,50 +12936,25 @@ async function openHomeView() {
   } catch (e) { /* leave the action-items tile dashed */ }
 }
 
-// ── V2 Home dashboard (sales command center) ─────────────────────────────
-// Widget-style card grid: every metric is a color-coded gradient card with an
-// SVG line icon (no emojis) and a big count that routes to the right place.
-// Color = mental bucket: GOLD = schedule (trials), RED/BLUE/VIOLET = needs a
-// human (Hawkeye / unread / done-trial replies). Cards sit dim at 0 and light
-// up (full color + glow) when hot. Dashed empty slots reserve grid space for
-// future cards, like an editable widget board.
+// ── V2 Home dashboard (command center) ────────────────────────────────────
+// Prototype-mirror layout (Zoran sketch 2026-07-03):
+//   hero row   : Daily win card (or "Hello, Name") | first Hawkeye card
+//   middle row : Today's schedule (trials highlighted) | Action items
+//   bottom row : 3 nav cards - Marketing / Sales / Members
+// Daily win priority (first that qualifies wins the card): new clients today
+// >= 1 → trials booked today >= 1 → revenue yesterday > $20 → hello fallback.
+// Retired with this layout (2026-07-03): health strip, count tiles, streak
+// chips, celebration popups. _ccMonthKey stays - the KPI page uses it.
 function _hv2Style() {
   if (document.getElementById('hv2-style')) return;
   const st = document.createElement('style'); st.id = 'hv2-style';
   st.textContent =
-    // Prototype-derived skin (FC dark): soft elevated surface cards, 16px radius,
-    // small-caps gold labels, tinted icon chips, big display numbers, gentle
-    // hover lift. Same layout DNA as prototype/src Home, mapped onto FC tokens.
-    '#home-v2 .hv2-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin:4px 0 4px}' +
-    '@media(min-width:760px){#home-v2 .hv2-grid{grid-template-columns:repeat(4,minmax(0,1fr))}}' +
-    '#home-v2 .hv2-panel{background:var(--surface);border:1px solid var(--border);border-radius:16px;box-shadow:0 4px 14px rgba(0,0,0,.22)}' +
+    // FC dark tokens, prototype layout DNA: soft elevated cards, 16px radius,
+    // small-caps gold labels, gentle rise-in.
     '#home-v2 .hv2-lab{display:flex;align-items:center;gap:7px;font-family:var(--mono,monospace);font-size:10px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:var(--gold,#E8C547)}' +
     '#home-v2 .hv2-lab svg{width:13px;height:13px;stroke:currentColor;stroke-width:2;fill:none;stroke-linecap:round;stroke-linejoin:round}' +
-    '#home-v2 .hv2-card{position:relative;border-radius:16px;padding:14px 15px;min-height:118px;cursor:pointer;text-align:left;font-family:inherit;color:var(--text);background:var(--surface);border:1px solid var(--border);box-shadow:0 4px 14px rgba(0,0,0,.22);display:flex;flex-direction:column;justify-content:space-between;opacity:0;transform:translateY(10px);transition:transform .2s cubic-bezier(0.4,0,0.2,1),box-shadow .2s,border-color .2s;animation:hv2In .42s ease forwards}' +
-    '#home-v2 .hv2-card:hover{transform:translateY(-2px);box-shadow:0 8px 24px rgba(0,0,0,.3);border-color:var(--border-med,var(--border))}' +
-    '#home-v2 .hv2-chip{width:30px;height:30px;border-radius:10px;display:flex;align-items:center;justify-content:center;flex:none}' +
-    '#home-v2 .hv2-chip svg{width:16px;height:16px;display:block;stroke-width:1.9;fill:none;stroke-linecap:round;stroke-linejoin:round}' +
-    '#home-v2 .c-gold .hv2-chip{background:rgba(232,197,71,.14)}#home-v2 .c-gold .hv2-chip svg{stroke:#E8C547}' +
-    '#home-v2 .c-red .hv2-chip{background:rgba(224,101,79,.14)}#home-v2 .c-red .hv2-chip svg{stroke:#e0654f}' +
-    '#home-v2 .c-blue .hv2-chip{background:rgba(90,143,184,.16)}#home-v2 .c-blue .hv2-chip svg{stroke:#7fb0d8}' +
-    '#home-v2 .c-violet .hv2-chip{background:rgba(176,132,232,.15)}#home-v2 .c-violet .hv2-chip svg{stroke:#B084E8}' +
-    '#home-v2 .hv2-card .hv2-num{font-size:30px;font-weight:800;line-height:1;font-family:"Space Grotesk",Inter,sans-serif;color:var(--text-mute);transition:color .25s}' +
-    '#home-v2 .c-gold.hot .hv2-num{color:#E8C547}#home-v2 .c-red.hot .hv2-num{color:#e0654f}#home-v2 .c-blue.hot .hv2-num{color:#7fb0d8}#home-v2 .c-violet.hot .hv2-num{color:#B084E8}' +
-    '#home-v2 .hv2-card.hot{border-color:rgba(232,197,71,.25)}' +
-    '#home-v2 .hv2-head{display:flex;justify-content:space-between;align-items:flex-start;gap:8px}' +
-    '#home-v2 .hv2-t{font-size:13px;font-weight:700;line-height:1.2}' +
-    '#home-v2 .hv2-s{font-size:11px;font-weight:600;color:var(--text-mute);margin-top:1px}' +
-    '#home-v2 .hv2-foot{font-size:10.5px;color:var(--text-mute);margin-top:4px}' +
-    '#home-v2 .hv2-slot{border-radius:16px;min-height:118px;border:1.5px dashed var(--border-med,var(--border));display:flex;align-items:center;justify-content:center;color:var(--text-mute);opacity:.45;font-size:22px;font-weight:300}' +
-    '#home-v2 .hv2-wrap{display:grid;grid-template-columns:1fr;gap:14px;align-items:start}' +
-    '@media(min-width:1000px){#home-v2 .hv2-wrap{grid-template-columns:minmax(0,1fr) 320px}}' +
-    // Health strip
-    '#home-v2 .hv2-health{margin:6px 0 16px;animation:hv2In .42s ease forwards;opacity:0}' +
-    '#home-v2 .hv2-hbar{display:flex;gap:5px;height:6px;margin-top:9px}' +
-    '#home-v2 .hv2-hbar span{flex:1;border-radius:999px;background:var(--border);transition:background .5s}' +
-    '#home-v2 .hv2-htext{font-family:"Space Grotesk",Inter,sans-serif;font-size:18px;font-weight:800;margin-top:9px;line-height:1.35}' +
-    // Hero row: highlight (best thing) + #1 priority, prototype-style
-    '#home-v2 .hv2-hero{display:grid;grid-template-columns:1fr;gap:12px;margin-bottom:14px}' +
+    // Hero row: daily win + Hawkeye
+    '#home-v2 .hv2-hero{display:grid;grid-template-columns:1fr;gap:12px;margin:6px 0 14px}' +
     '@media(min-width:760px){#home-v2 .hv2-hero{grid-template-columns:1fr 1fr}}' +
     '#home-v2 .hv2-hi{padding:16px 18px;background:linear-gradient(135deg,rgba(232,197,71,.09),rgba(232,197,71,.02)),var(--surface);border:1px solid var(--border);border-radius:16px;box-shadow:0 4px 14px rgba(0,0,0,.22);display:flex;gap:14px;align-items:flex-start;animation:hv2In .42s ease forwards;opacity:0}' +
     '#home-v2 .hv2-hi-ic{width:42px;height:42px;border-radius:13px;background:rgba(123,196,127,.13);display:flex;align-items:center;justify-content:center;flex:none}' +
@@ -12988,390 +12963,255 @@ function _hv2Style() {
     '#home-v2 .hv2-hi-c{font-size:12px;color:var(--text-mute);margin-top:4px;line-height:1.45}' +
     '#home-v2 .hv2-one{display:block;width:100%;text-align:left;font-family:inherit;color:var(--text);border:1px solid var(--border);border-radius:16px;padding:16px 18px;background:var(--surface);box-shadow:0 4px 14px rgba(0,0,0,.22);cursor:pointer;animation:hv2In .42s ease .06s forwards;opacity:0;transition:transform .2s cubic-bezier(0.4,0,0.2,1),box-shadow .2s}' +
     '#home-v2 .hv2-one:hover{transform:translateY(-2px);box-shadow:0 6px 20px rgba(232,197,71,.14)}' +
-    '#home-v2 .hv2-one .t{font-size:15px;font-weight:700;margin-top:7px;font-family:"Space Grotesk",Inter,sans-serif}' +
+    '#home-v2 .hv2-one .t{font-size:15px;font-weight:700;margin-top:9px;font-family:"Space Grotesk",Inter,sans-serif}' +
     '#home-v2 .hv2-one .m{font-size:12px;color:var(--text-mute);margin-top:5px;line-height:1.45}' +
     '#home-v2 .hv2-one .b{display:inline-flex;align-items:center;gap:6px;margin-top:12px;background:var(--gold,#E8C547);color:#0B0B0D;border-radius:9px;padding:8px 16px;font-size:12.5px;font-weight:700}' +
-    // Streaks
-    '#home-v2 .hv2-streaks{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0 2px}' +
-    '#home-v2 .hv2-streak{display:inline-flex;align-items:center;gap:6px;background:rgba(232,197,71,.1);border:1px solid rgba(232,197,71,.3);color:var(--gold,#E8C547);border-radius:999px;padding:5px 12px;font-size:11.5px;font-weight:700;animation:hv2In .42s ease forwards;opacity:0}' +
-    '#home-v2 .hv2-streak svg{width:13px;height:13px;stroke:currentColor;stroke-width:2;fill:none;stroke-linecap:round;stroke-linejoin:round}' +
-    // Schedule rail (prototype "Today's Schedule" panel: colored dots per row)
-    '#home-v2 .hv2-sched{background:var(--surface);border:1px solid var(--border);border-radius:16px;box-shadow:0 4px 14px rgba(0,0,0,.22);overflow:hidden;opacity:0;transform:translateY(22px);transition:opacity .55s ease,transform .55s ease}' +
-    '#home-v2 .hv2-sched.seen{opacity:1;transform:none}' +
-    '#home-v2 .hv2-sched-h{padding:14px 16px 10px;border-bottom:1px solid var(--border)}' +
+    // Hawkeye conversation bubbles (last client message + proposed reply)
+    '#home-v2 .hv2-bub{border:1px solid var(--border);border-radius:12px;padding:9px 12px;margin-top:9px;font-size:12.5px;line-height:1.5;color:var(--text)}' +
+    '#home-v2 .hv2-bub .bh{font-family:var(--mono,monospace);font-size:9.5px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--text-mute);margin-bottom:3px}' +
+    '#home-v2 .hv2-bub .bt{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}' +
+    '#home-v2 .hv2-bub.gold{background:rgba(232,197,71,.07);border-color:rgba(232,197,71,.3)}' +
+    '#home-v2 .hv2-pill{margin-left:auto;flex:none;border-radius:999px;padding:3px 10px;font-size:11px;font-weight:800;background:rgba(232,197,71,.12);color:var(--gold,#E8C547);border:1px solid rgba(232,197,71,.35)}' +
+    '#home-v2 .hv2-pill.red{background:rgba(224,101,79,.14);color:#e0654f;border-color:rgba(224,101,79,.4)}' +
+    // Middle row: schedule | action items
+    '#home-v2 .hv2-mid{display:grid;grid-template-columns:1fr;gap:12px;margin-bottom:14px;align-items:start}' +
+    '@media(min-width:900px){#home-v2 .hv2-mid{grid-template-columns:1fr 1fr}}' +
+    '#home-v2 .hv2-panel{background:var(--surface);border:1px solid var(--border);border-radius:16px;box-shadow:0 4px 14px rgba(0,0,0,.22);overflow:hidden;animation:hv2In .42s ease forwards;opacity:0}' +
+    '#home-v2 .hv2-ph{padding:14px 16px 10px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px}' +
+    '#home-v2 .hv2-pf{display:block;width:100%;text-align:left;background:none;border:none;border-top:1px solid var(--border);color:var(--gold,#E8C547);font:inherit;font-size:12px;font-weight:700;padding:11px 16px;cursor:pointer}' +
+    // Highlighted "trials today" sub-section inside the schedule panel
+    '#home-v2 .hv2-hl{margin:12px 12px 6px;border:1px solid rgba(232,197,71,.35);background:rgba(232,197,71,.06);border-radius:12px;overflow:hidden}' +
+    '#home-v2 .hv2-hl-h{padding:9px 12px 7px;font-family:var(--mono,monospace);font-size:9.5px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--gold,#E8C547)}' +
     '#home-v2 .hv2-dot{width:8px;height:8px;border-radius:50%;background:var(--gold,#E8C547);flex:none}' +
-    '#home-v2 .hv2-sched-f{display:block;width:100%;text-align:left;background:none;border:none;border-top:1px solid var(--border);color:var(--gold,#E8C547);font:inherit;font-size:12px;font-weight:700;padding:11px 16px;cursor:pointer}' +
-    '.hv2-cele{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9500;display:flex;align-items:center;justify-content:center;padding:24px}' +
-    '.hv2-cele-card{position:relative;background:var(--surface,#17181b);border:1px solid rgba(232,197,71,.6);border-radius:18px;padding:28px 30px;max-width:340px;text-align:center;box-shadow:0 0 60px rgba(232,197,71,.22);animation:hv2CeleIn .5s cubic-bezier(0.34,1.56,0.64,1) both}' +
-    '.hv2-cele-ic{width:52px;height:52px;margin:0 auto 12px;border-radius:50%;border:2px solid var(--gold,#E8C547);display:flex;align-items:center;justify-content:center;animation:hv2CelePulse 1.6s ease-in-out infinite}' +
-    '.hv2-cele-ic svg{width:24px;height:24px;stroke:var(--gold,#E8C547);stroke-width:2.2;fill:none;stroke-linecap:round;stroke-linejoin:round}' +
-    '.hv2-cele-t{font-family:"Space Grotesk",Inter,sans-serif;font-size:18px;font-weight:800;color:var(--text,#e8e8e6)}' +
-    '.hv2-cele-s{font-size:12.5px;color:var(--text-mute,#8a8d93);margin-top:5px}' +
-    '@keyframes hv2CeleIn{from{opacity:0;transform:translateY(24px) scale(.85)}to{opacity:1;transform:none}}' +
-    '@keyframes hv2CelePulse{0%,100%{box-shadow:0 0 0 0 rgba(232,197,71,.4)}50%{box-shadow:0 0 0 12px rgba(232,197,71,0)}}' +
+    // Bottom nav cards: Marketing / Sales / Members
+    '#home-v2 .hv2-nav{display:grid;grid-template-columns:1fr;gap:12px;margin-bottom:8px}' +
+    '@media(min-width:760px){#home-v2 .hv2-nav{grid-template-columns:repeat(3,1fr)}}' +
+    '#home-v2 .hv2-nav-card{display:flex;flex-direction:column;align-items:flex-start;text-align:left;font-family:inherit;color:var(--text);background:var(--surface);border:1px solid var(--border);border-radius:16px;box-shadow:0 4px 14px rgba(0,0,0,.22);padding:20px;min-height:128px;cursor:pointer;opacity:0;transform:translateY(10px);animation:hv2In .42s ease forwards;transition:transform .2s cubic-bezier(0.4,0,0.2,1),box-shadow .2s,border-color .2s}' +
+    '#home-v2 .hv2-nav-card:hover{transform:translateY(-2px);box-shadow:0 8px 24px rgba(0,0,0,.3);border-color:rgba(232,197,71,.3)}' +
+    '#home-v2 .hv2-nav-card .hv2-chip{width:32px;height:32px;border-radius:10px;background:rgba(232,197,71,.12);display:flex;align-items:center;justify-content:center}' +
+    '#home-v2 .hv2-nav-card .hv2-chip svg{width:16px;height:16px;stroke:#E8C547;stroke-width:1.9;fill:none;stroke-linecap:round;stroke-linejoin:round}' +
+    '#home-v2 .hv2-nav-card .nt{font-family:"Space Grotesk",Inter,sans-serif;font-size:19px;font-weight:800;margin-top:12px}' +
+    '#home-v2 .hv2-nav-card .ns{font-size:11.5px;color:var(--text-mute);margin-top:3px}' +
+    '#home-v2 .hv2-nav-card .na{margin-top:auto;padding-top:10px;font-size:12px;font-weight:700;color:var(--gold,#E8C547)}' +
     '@keyframes hv2In{to{opacity:1;transform:translateY(0)}}';
   document.head.appendChild(st);
 }
 // SVG line icons (feather-style) - the design bans emojis on the home cards.
 const _HV2_ICONS = {
   calendar: '<svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="17" rx="3"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>',
-  chat: '<svg viewBox="0 0 24 24"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>',
   eye: '<svg viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>',
-  mail: '<svg viewBox="0 0 24 24"><rect x="2" y="4" width="20" height="16" rx="3"/><polyline points="22,6 12,13 2,6"/></svg>',
-  zap: '<svg viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>',
   trend: '<svg viewBox="0 0 24 24"><polyline points="2,17 9,10 13,14 22,5"/><polyline points="15,5 22,5 22,12"/></svg>',
   check: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="8,12.5 11,15.5 16,9"/></svg>',
+  users: '<svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>',
+  mega: '<svg viewBox="0 0 24 24"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M19 5a9 9 0 0 1 0 14"/></svg>',
 };
-function _hv2Tile(key, delay, color, icon, title, sub, foot, onclick) {
-  return `<button class="hv2-card ${color}" id="hv2-tile-${key}" style="animation-delay:${delay}s" onclick="${onclick}">
-    <div class="hv2-head">
-      <div><div class="hv2-t">${title}</div><div class="hv2-s">${sub}</div></div>
-      <span class="hv2-chip">${_HV2_ICONS[icon] || ''}</span>
-    </div>
-    <div>
-      <div class="hv2-num" id="hv2-num-${key}">·</div>
-      <div class="hv2-foot">${foot}</div>
-    </div>
+// Open the Hawkeye approval popup right over the home screen (× lands back home).
+function _hv2OpenHawkeye() { try { _apxOpen(); } catch (_) {} }
+function _hv2NavCard(icon, title, sub, view, delay) {
+  return `<button class="hv2-nav-card" style="animation-delay:${delay}s" onclick="switchView('${view}')">
+    <span class="hv2-chip">${_HV2_ICONS[icon] || ''}</span>
+    <span class="nt">${title}</span>
+    <span class="ns">${sub}</span>
+    <span class="na">Open ›</span>
   </button>`;
 }
-// Animate a tile's number up to n + flag it "hot" (gold + pulse) when n > 0.
-function _hv2Set(key, n) {
-  const el = document.getElementById('hv2-num-' + key); if (!el) return;
-  const tile = document.getElementById('hv2-tile-' + key);
-  const target = Math.max(0, Number(n) || 0);
-  if (tile) tile.classList.toggle('hot', target > 0);
-  const t0 = Date.now(), dur = 550;
-  const tick = () => { const p = Math.min(1, (Date.now() - t0) / dur); el.textContent = String(Math.round(p * target)); if (p < 1) requestAnimationFrame(tick); };
-  requestAnimationFrame(tick);
-}
-// Hawkeye tile: open the Sales pipeline FIRST, then the Hawkeye popup on top - so
-// closing the popup (×) lands you on the pipeline.
-function _hv2OpenHawkeye() { try { switchView('pipelines'); } catch (_) {} setTimeout(() => { try { _apxOpen(); } catch (_) {} }, 70); }
 function renderHomeV2() {
   const host = document.getElementById('home-v2'); if (!host) return;
   _hv2Style();
   host.innerHTML = `
-    <div class="hv2-health" id="hv2-health">
-      <div class="hv2-lab">Business health</div>
-      <div class="hv2-hbar"><span id="hv2-hseg-sales" title="Sales"></span><span id="hv2-hseg-members" title="Members"></span><span id="hv2-hseg-you" title="Waiting on you"></span></div>
-      <div class="hv2-htext" id="hv2-htext" style="color:var(--text-mute)">Checking the pulse of the business…</div>
-    </div>
     <div class="hv2-hero">
-      <div class="hv2-hi" id="hv2-best" style="display:none">
-        <div class="hv2-hi-ic">${_HV2_ICONS.trend}</div>
-        <div>
-          <div class="hv2-lab" style="color:#7BC47F">Best thing right now</div>
-          <div class="hv2-hi-v" id="hv2-best-v"></div>
-          <div class="hv2-hi-c" id="hv2-best-c"></div>
+      <div class="hv2-hi" id="hv2-win">
+        <div class="hv2-hi-ic">${_HV2_ICONS.check}</div>
+        <div style="min-width:0">
+          <div class="hv2-lab" style="color:#7BC47F" id="hv2-win-lab">Daily win</div>
+          <div class="hv2-hi-v" id="hv2-win-v">&nbsp;</div>
+          <div class="hv2-hi-c" id="hv2-win-c"></div>
         </div>
       </div>
-      <div id="hv2-onething"></div>
+      <div id="hv2-hawk">
+        <div class="hv2-one" style="cursor:default">
+          <div class="hv2-lab">${_HV2_ICONS.eye} Hawkeye</div>
+          <div class="m" style="margin-top:9px">Checking the agent queue…</div>
+        </div>
+      </div>
     </div>
-    <div class="hv2-wrap">
-      <div>
-        <div class="hv2-grid">
-          ${_hv2Tile('trials', 0,    'c-gold',   'calendar', 'Trials',  'today',      'see them in the pipeline', "switchView('pipelines')")}
-          ${_hv2Tile('hawk',   0.06, 'c-red',    'eye',      'Hawkeye', 'to approve', 'agent actions waiting',    '_hv2OpenHawkeye()')}
-          ${_hv2Tile('unread', 0.12, 'c-blue',   'mail',     'Unread',  'inbox',      'messages waiting on you',  "switchView('v15inbox')")}
-          ${_hv2Tile('done',   0.18, 'c-violet', 'chat',     'Replies', 'done trials','leads who texted back',    "switchView('pipelines')")}
-          <div class="hv2-slot" style="animation:hv2In .42s ease .24s forwards;opacity:0">+</div>
-          <div class="hv2-slot" style="animation:hv2In .42s ease .3s forwards;opacity:0">+</div>
-        </div>
-        <div class="hv2-streaks" id="hv2-streaks"></div>
-      </div>
-      <div class="hv2-sched" id="hv2-sched">
-        <div class="hv2-sched-h"><span class="hv2-lab" style="color:var(--text-sub)">${_HV2_ICONS.calendar} Today's schedule</span></div>
+    <div class="hv2-mid">
+      <div class="hv2-panel">
+        <div class="hv2-ph"><span class="hv2-lab" style="color:var(--text-sub)">${_HV2_ICONS.calendar} Today's schedule</span></div>
+        <div id="hv2-sched-trials"></div>
         <div id="hv2-sched-body"><div class="req-empty" style="padding:14px 16px"><span class="req-spin"></span> Loading…</div></div>
-        <button class="hv2-sched-f" onclick="switchView('v15cal')">Open the calendar ›</button>
+        <button class="hv2-pf" onclick="switchView('v15cal')">Open the calendar ›</button>
       </div>
+      <div class="hv2-panel" style="animation-delay:.06s">
+        <div class="hv2-ph"><span class="hv2-lab" style="color:var(--text-sub)">${_HV2_ICONS.check} Action items</span><span class="hv2-pill" id="hv2-acts-n" style="display:none"></span></div>
+        <div id="hv2-acts-body"><div class="req-empty" style="padding:14px 16px"><span class="req-spin"></span> Loading…</div></div>
+        <button class="hv2-pf" onclick="switchView('action-items')">Open action items ›</button>
+      </div>
+    </div>
+    <div class="hv2-nav">
+      ${_hv2NavCard('mega', 'Marketing', 'Campaigns, leads and content', 'marketing', 0.12)}
+      ${_hv2NavCard('trend', 'Sales', 'Pipeline, agents and trials', 'pipelines', 0.18)}
+      ${_hv2NavCard('users', 'Members', 'Roster, billing and check-ins', 'members', 0.24)}
     </div>`;
-  // Schedule rail: desktop = always in view (right rail); mobile = fades up as
-  // you scroll down to it (CC-13). One IntersectionObserver covers both.
-  try {
-    const sched = document.getElementById('hv2-sched');
-    const io = new IntersectionObserver((es) => { es.forEach(e => { if (e.isIntersecting) { sched.classList.add('seen'); io.disconnect(); } }); }, { threshold: 0.12 });
-    io.observe(sched);
-  } catch (_) { const s = document.getElementById('hv2-sched'); if (s) s.classList.add('seen'); }
   _hv2Load();
 }
-async function _hv2Load() {
-  // Trials today (tile number + the schedule rail share one fetch)
-  (async () => {
-    try {
-      const token = await _mreqAuthToken();
-      const r = await fetch('/api/ghl/calendars-v15?action=trials-today&client_id=' + encodeURIComponent(CLIENT_ID), { headers: { Authorization: 'Bearer ' + token } });
-      const j = await _safeJson(r); const trials = (j && j.trials) || [];
-      _hv2Set('trials', trials.length);
-      _hv2SchedulePaint(trials, j && j.timezone);
-      if (trials.length) _ccBest('trials', `+${trials.length} trial${trials.length === 1 ? '' : 's'} booked today`, 'Fresh chances to win a member - see them in the pipeline.', 2);
-    } catch (_) { _hv2Set('trials', 0); _hv2SchedulePaint([], null); }
-  })();
-  // Hawkeye actions waiting (same split the inbox badge uses) + "do this now"
-  (async () => {
-    try {
-      const [fu, rd] = await Promise.all([ _apxPost('/api/agent-followups', 'list', {}).catch(() => ({})), _apxPost('/api/agent-approvals', 'list-ready', {}).catch(() => ({})) ]);
-      const d = _apxSplit(fu, rd);
-      const actionable = d.ready.length + (d.lost || []).length + (d.book || []).length + (d.ghost || []).length;
-      _hv2Set('hawk', d.followups.length + actionable);
-      _hv2OneThingPaint(d, actionable);
-      _ccWait('hawk', actionable);
-    } catch (_) { _hv2Set('hawk', 0); _ccWait('hawk', 0); }
-  })();
-  // Business-health strip + celebration checks (KPI months load lazily)
-  _ccHealthLoad();
-  _ccMembersCheck();
-  // Inbox unread + done-trial replies waiting (one inbox + one pipelines fetch)
-  (async () => {
-    try {
-      const token = await _mreqAuthToken();
-      const [ib, pl] = await Promise.all([
-        fetch('/api/ghl/inbox?client_id=' + encodeURIComponent(CLIENT_ID), { headers: { Authorization: 'Bearer ' + token } }).then(_safeJson),
-        fetch('/api/ghl/pipelines?client_id=' + encodeURIComponent(CLIENT_ID), { headers: { Authorization: 'Bearer ' + token } }).then(_safeJson),
-      ]);
-      _hv2Set('unread', (ib && ib.counts && ib.counts.unread) || 0);
-      _ccWait('unread', (ib && ib.counts && ib.counts.unread) || 0);
-      const byContact = new Map();
-      for (const c of ((ib && ib.conversations) || [])) if (c.contactId) byContact.set(String(c.contactId), c);
-      let doneReplies = 0;
-      const pls = (pl && pl.pipelines) || [];
-      const pipe = pls.find(p => /training/i.test(p.name || '')) || pls[0];
-      const doneStage = pipe && (pipe.stages || []).find(s => _plIsDoneTrialStage(s));
-      if (pipe && doneStage) {
-        for (const o of (pipe.opportunities || [])) {
-          if (o.stageId !== doneStage.id) continue;
-          if (['won', 'lost', 'abandoned'].includes(String(o.status || 'open').toLowerCase())) continue;
-          const c = byContact.get(String(o.contactId || ''));
-          if (c && String(c.lastMessageDirection || '').toLowerCase() === 'inbound') doneReplies++;
-        }
-      }
-      _hv2Set('done', doneReplies);
-    } catch (_) { _hv2Set('unread', 0); _hv2Set('done', 0); _ccWait('unread', 0); }
-  })();
+function _hv2Load() {
+  _hv2WinLoad();
+  _hv2HawkLoad();
+  _hv2SchedLoad();
+  _hv2ActsLoad();
 }
-
-// ── Command center (V2 home) ─────────────────────────────────────────────
-// CC review 2026-07-02: health strip (CC-1), do-this-now Hawkeye card (CC-11),
-// streak chips (CC-9), schedule rail w/ scroll fade (CC-13), celebration
-// popups (CC-7). Per-device state lives in localStorage (v1 - streaks and
-// celebration dedupe are per-device on purpose until a server home exists).
-function _ccKey() { return 'bam_cc_' + (typeof CLIENT_ID !== 'undefined' ? CLIENT_ID : ''); }
-function _ccState() { try { return JSON.parse(localStorage.getItem(_ccKey()) || '{}'); } catch (_) { return {}; } }
-function _ccSave(patch) { try { localStorage.setItem(_ccKey(), JSON.stringify({ ..._ccState(), ...patch })); } catch (_) {} }
-function _ccYmd(d) { const n = d || new Date(); return `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, '0')}-${String(n.getDate()).padStart(2, '0')}`; }
-function _ccMonthKey(back) { const n = new Date(); const d = new Date(n.getFullYear(), n.getMonth() - (back || 0), 1); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`; }
-
-// One month of KPI data (same /api/kpis-v15 the KPIs tab uses). Closed months
-// never change, so they cache in localStorage forever; the current month is
-// always fetched fresh. Returns null on any failure - callers degrade quietly.
-async function _ccMonth(sec, mKey) {
-  const isCur = mKey === _ccMonthKey(0);
-  const lsKey = 'bam_cc_kpi_' + (typeof CLIENT_ID !== 'undefined' ? CLIENT_ID : '') + '_' + sec + '_' + mKey;
-  if (!isCur) { try { const c = JSON.parse(localStorage.getItem(lsKey) || 'null'); if (c) return c; } catch (_) {} }
+// ── Daily win (hero left) ──
+function _hv2Ymd(d) { return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; }
+function _hv2FirstName() {
+  const n = ((document.getElementById('userName') || {}).textContent || '').trim();
+  const first = n.split(/\s+/)[0] || '';
+  return (first && first !== '-' && first !== 'You' && !first.includes('@')) ? first : '';
+}
+async function _hv2Kpi(section, since, until) {
   try {
     const token = await _mreqAuthToken();
-    const r = await fetch(`/api/kpis-v15?section=${sec}&month=${encodeURIComponent(mKey)}&client_id=${encodeURIComponent(CLIENT_ID)}`, { headers: { Authorization: 'Bearer ' + token } });
-    const j = await _safeJson(r); if (!r.ok || j.error) return null;
-    if (!isCur) { try { localStorage.setItem(lsKey, JSON.stringify(j)); } catch (_) {} }
-    return j;
+    const r = await fetch(`/api/kpis-v15?section=${section}&since=${since}&until=${until}&client_id=${encodeURIComponent(CLIENT_ID)}`, { headers: { Authorization: 'Bearer ' + token } });
+    const j = await _safeJson(r);
+    return (r.ok && j && !j.error) ? j : null;
   } catch (_) { return null; }
 }
-function _ccSalesTotals(j) {
-  const offers = (j && j.offers) || [];
-  return { pipe: offers.reduce((n, o) => n + ((o.pipeline && o.pipeline.count) || 0), 0), pay: offers.reduce((n, o) => n + ((o.payments && o.payments.count) || 0), 0) };
+async function _hv2WinLoad() {
+  const now = new Date(), today = _hv2Ymd(now);
+  const yd = new Date(now); yd.setDate(yd.getDate() - 1); const yday = _hv2Ymd(yd);
+  const [mk, rev] = await Promise.all([_hv2Kpi('marketing', today, today), _hv2Kpi('revenue', yday, yday)]);
+  const joined = (mk && Number(mk.joined)) || 0;
+  const booked = (mk && Number(mk.trials_booked)) || 0;
+  const net = (rev && rev.stripe_ok !== false && Number(rev.net)) || 0;
+  let win = null;
+  if (joined >= 1) win = { v: `+${joined} new client${joined === 1 ? '' : 's'} today`, c: 'Somebody committed today - that is the whole game.' };
+  else if (booked >= 1) win = { v: `+${booked} trial${booked === 1 ? '' : 's'} booked today`, c: 'Fresh chances to win a member.' };
+  else if (net > 20) win = { v: `$${Math.round(net).toLocaleString()} collected yesterday`, c: 'Revenue landed while you were coaching.' };
+  const lab = document.getElementById('hv2-win-lab'), v = document.getElementById('hv2-win-v'), c = document.getElementById('hv2-win-c');
+  if (!v) return;
+  if (win) {
+    if (lab) lab.textContent = 'Daily win';
+    v.textContent = win.v;
+    if (c) c.textContent = win.c;
+  } else {
+    const first = _hv2FirstName();
+    if (lab) lab.textContent = now.toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric' });
+    v.textContent = first ? `Hello, ${first}` : 'Hello';
+    if (c) c.textContent = 'No win on the board yet today - go get one.';
+  }
 }
-
-// ── Health strip (CC-1): color-coded bar + one bold sentence ──
-const _CC_COL = { good: '#7BC47F', warn: '#E8C547', bad: '#e0654f' };
-let _CC_SEGS = { sales: null, members: null, you: null };
-function _ccSegPaint(name, state, phrase) {
-  _CC_SEGS[name] = { state, phrase };
-  const seg = document.getElementById('hv2-hseg-' + name);
-  if (seg && state) seg.style.background = _CC_COL[state];
-  const txt = document.getElementById('hv2-htext'); if (!txt) return;
-  const parts = ['sales', 'members', 'you'].map(k => _CC_SEGS[k])
-    .filter(Boolean).map(p => `<span style="color:${_CC_COL[p.state]}">${p.phrase}</span>`);
-  if (parts.length) { txt.style.color = 'var(--text)'; txt.innerHTML = parts.join(' <span style="color:var(--text-mute)">·</span> '); }
+// ── Hawkeye card (hero right): last client message + proposed reply ──
+async function _hv2HawkLoad() {
+  try {
+    const [fu, rd] = await Promise.all([
+      _apxPost('/api/agent-followups', 'list', {}).catch(() => ({})),
+      _apxPost('/api/agent-approvals', 'list-ready', {}).catch(() => ({})),
+    ]);
+    const d = _apxSplit(fu, rd);
+    const total = (d.followups || []).length + (d.ready || []).length + (d.lost || []).length + (d.book || []).length + (d.ghost || []).length;
+    _hv2HawkPaint(d, total);
+  } catch (_) { _hv2HawkPaint(null, 0); }
 }
-// "Waiting on you" segment - fed by the tile loads (hawk actionable + unread).
-let _CC_WAIT = { hawk: null, unread: null };
-function _ccWait(k, n) {
-  _CC_WAIT[k] = n;
-  if (_CC_WAIT.hawk == null || _CC_WAIT.unread == null) return;
-  const w = _CC_WAIT.hawk + _CC_WAIT.unread;
-  _ccSegPaint('you', w <= 2 ? 'good' : (w <= 6 ? 'warn' : 'bad'), w === 0 ? 'Nothing waiting on you' : `${w} waiting on you`);
-  if (w === 0) _ccBest('zero', 'Inbox at zero', 'Every lead has been answered. That is rare air.', 4);
-  _ccStreakTick(w === 0);
-}
-// Sales + Members segments from this month's pace vs the prior two months.
-async function _ccHealthLoad() {
-  if (!_plIsV2()) return;
-  const day = new Date().getDate();
-  const daysIn = new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).getDate();
-  const frac = Math.max(day / daysIn, 0.08);
-  // SALES: month-to-date new payments vs prorated 2-month average.
-  (async () => {
-    const [cur, m1, m2] = await Promise.all([_ccMonth('sales', _ccMonthKey(0)), _ccMonth('sales', _ccMonthKey(1)), _ccMonth('sales', _ccMonthKey(2))]);
-    if (!cur) return;
-    const mtd = _ccSalesTotals(cur), b1 = m1 && _ccSalesTotals(m1), b2 = m2 && _ccSalesTotals(m2);
-    const base = (b1 || b2) ? (((b1 ? b1.pay : 0) + (b2 ? b2.pay : 0)) / ((b1 ? 1 : 0) + (b2 ? 1 : 0))) : null;
-    if (base == null || base === 0) { _ccSegPaint('sales', mtd.pay > 0 ? 'good' : (mtd.pipe > 0 ? 'warn' : 'good'), mtd.pay > 0 ? 'Sales strong' : (mtd.pipe > 0 ? 'Sales warming up' : 'Sales quiet')); return; }
-    const ratio = mtd.pay / Math.max(base * frac, 0.5);
-    _ccSegPaint('sales', ratio >= 0.9 ? 'good' : (ratio >= 0.55 ? 'warn' : 'bad'), ratio >= 0.9 ? 'Sales strong' : (ratio >= 0.55 ? 'Sales steady' : 'Sales needs a look'));
-    // CC-7: on pace for an above-average month (once per day, ≥3 joins).
-    if (day >= 7 && mtd.pay >= 3 && mtd.pay >= 1.2 * base * frac) {
-      _ccCelebrate('sales_pace', 'On track for an above-average month', `${mtd.pay} new member${mtd.pay === 1 ? '' : 's'} already this month`);
-    }
-  })();
-  // MEMBERS: month-to-date cancellations vs prorated 2-month average (inverted).
-  (async () => {
-    const [cur, m1, m2] = await Promise.all([_ccMonth('members', _ccMonthKey(0)), _ccMonth('members', _ccMonthKey(1)), _ccMonth('members', _ccMonthKey(2))]);
-    if (!cur || cur.stripe_ok === false) return;
-    const mtd = (cur.cancelled && cur.cancelled.count) || 0;
-    const c1 = m1 && m1.cancelled ? m1.cancelled.count : null, c2 = m2 && m2.cancelled ? m2.cancelled.count : null;
-    const base = (c1 != null || c2 != null) ? (((c1 || 0) + (c2 || 0)) / ((c1 != null ? 1 : 0) + (c2 != null ? 1 : 0))) : null;
-    if (base == null || base === 0) { _ccSegPaint('members', mtd === 0 ? 'good' : 'warn', mtd === 0 ? 'Retention strong' : `${mtd} cancellation${mtd === 1 ? '' : 's'}`); return; }
-    const ratio = mtd / Math.max(base * frac, 0.5);
-    _ccSegPaint('members', ratio <= 1 ? 'good' : (ratio <= 1.8 ? 'warn' : 'bad'), ratio <= 1 ? 'Retention strong' : (ratio <= 1.8 ? 'Retention steady' : 'Churn climbing'));
-    // CC-7: way-below-average churn, late in the month (once per day).
-    if (day >= 20 && base >= 2 && mtd <= 0.5 * base) {
-      _ccCelebrate('churn_low', 'Churn is way below average', `${mtd} cancellation${mtd === 1 ? '' : 's'} vs ~${Math.round(base)} in a normal month`);
-    }
-  })();
-}
-
-// ── "#1 priority" card (CC-11): the top Hawkeye action, one tap to Hawkeye.
-// Prototype-style: small-caps label + bold task + gold CTA. All-clear state
-// keeps the hero row balanced when the queue is empty.
-function _hv2OneThingPaint(d, total) {
-  const host = document.getElementById('hv2-onething'); if (!host) return;
-  const top = total ? ((d.ready && d.ready[0]) || (d.book && d.book[0]) || (d.ghost && d.ghost[0]) || (d.lost && d.lost[0])) : null;
-  if (!top) {
-    host.innerHTML = `<div class="hv2-one" style="cursor:default">
-      <div class="hv2-lab">${_HV2_ICONS.zap} Your #1 priority</div>
+function _hv2HawkPaint(d, total) {
+  const host = document.getElementById('hv2-hawk'); if (!host) return;
+  if (!total) {
+    host.innerHTML = `<button class="hv2-one" onclick="_hv2OpenHawkeye()">
+      <div class="hv2-lab">${_HV2_ICONS.eye} Hawkeye</div>
       <div class="t" style="color:#7BC47F">All clear</div>
-      <div class="m">Nothing needs your approval right now - the agent has the queue handled.</div>
-    </div>`;
+      <div class="m">Nothing needs your approval right now - the agents are up to date.</div>
+      <span class="b">Open Hawkeye →</span>
+    </button>`;
     return;
   }
-  const name = top.contact_name || 'this lead';
-  const label = top._isFollowup ? `Send ${name}'s follow-up`
+  const top = (d.ready && d.ready[0]) || (d.book && d.book[0]) || (d.ghost && d.ghost[0]) || (d.lost && d.lost[0]) || (d.followups && d.followups[0]) || {};
+  const name = top.contact_name || 'Lead';
+  const lead = String(top.last_message || '').trim();
+  const reply = String(top.draft_message || top.message || '').trim();
+  const kindLine = top._isFollowup ? `Send ${name}'s follow-up`
     : top.kind === 'book' ? `Confirm ${name}'s booking`
-    : top.kind === 'ghost' ? `Send ${name} to the Ghosted automation`
+    : top.kind === 'ghost' ? `Move ${name} to the Ghosted automation`
     : top.kind === 'mark_lost' ? `Confirm ${name} as lost`
-    : `Approve the reply to ${name}`;
-  const rest = total - 1;
+    : `Reply to ${name}`;
   host.innerHTML = `<button class="hv2-one" onclick="_hv2OpenHawkeye()">
-    <div class="hv2-lab">${_HV2_ICONS.zap} Your #1 priority</div>
-    <div class="t">${escapeHTML(label)}</div>
-    <div class="m">${rest > 0 ? `${rest} more waiting behind it.` : 'Last one - this clears the queue.'}</div>
+    <div style="display:flex;align-items:center;gap:8px"><span class="hv2-lab">${_HV2_ICONS.eye} Hawkeye</span><span class="hv2-pill red">${total} action${total === 1 ? '' : 's'} waiting</span></div>
+    <div class="t">${escapeHTML(kindLine)}</div>
+    ${lead ? `<div class="hv2-bub"><div class="bh">${escapeHTML(name)} - last message</div><div class="bt">${escapeHTML(lead)}</div></div>` : ''}
+    ${reply ? `<div class="hv2-bub gold"><div class="bh">Proposed reply</div><div class="bt">${escapeHTML(reply)}</div></div>` : ''}
     <span class="b">Open Hawkeye →</span>
   </button>`;
 }
-
-// ── "Best thing right now" hero (prototype's highlight card) ──
-// Candidates land as data loads; the highest-ranked one wins the card.
-const _CC_BEST = {};
-function _ccBest(kind, value, context, rank) {
-  _CC_BEST[kind] = { value, context, rank };
-  const best = Object.values(_CC_BEST).sort((a, b) => a.rank - b.rank)[0];
-  const card = document.getElementById('hv2-best'); if (!card || !best) return;
-  card.style.display = '';
-  const v = document.getElementById('hv2-best-v'), c = document.getElementById('hv2-best-c');
-  if (v) v.textContent = best.value;
-  if (c) c.textContent = best.context;
+// ── Today's schedule: trials highlighted + full session list w/ fill ──
+async function _hv2SchedLoad() {
+  let token = null;
+  try { token = await _mreqAuthToken(); } catch (_) {}
+  const H = { Authorization: 'Bearer ' + token };
+  (async () => {
+    try {
+      const r = await fetch('/api/ghl/calendars-v15?action=trials-today&client_id=' + encodeURIComponent(CLIENT_ID), { headers: H });
+      const j = await _safeJson(r);
+      _hv2TrialsPaint((r.ok && j && j.trials) || [], j && j.timezone);
+    } catch (_) { _hv2TrialsPaint([], null); }
+  })();
+  (async () => {
+    try {
+      const r = await fetch('/api/ghl/calendars-v15?action=slots-today&client_id=' + encodeURIComponent(CLIENT_ID), { headers: H });
+      const j = await _safeJson(r);
+      _hv2SlotsPaint((r.ok && j && j.slots) || [], j && j.timezone);
+    } catch (_) { _hv2SlotsPaint([], null); }
+  })();
 }
-
-// ── Schedule rail (CC-13): today's trials, right rail on desktop ──
-function _hv2SchedulePaint(trials, tz) {
-  const el = document.getElementById('hv2-sched-body'); if (!el) return;
-  if (!trials.length) { el.innerHTML = `<div style="padding:16px;font-size:12.5px;color:var(--text-mute)">No trials booked today.</div>`; return; }
-  el.innerHTML = trials.map(t => `
-    <div onclick="_v15calOpenAppt(${JSON.stringify(t.id)})" style="${_HV_ROW}">
+function _hv2TrialsPaint(trials, tz) {
+  const el = document.getElementById('hv2-sched-trials'); if (!el) return;
+  if (!trials.length) {
+    el.innerHTML = `<div class="hv2-hl"><div class="hv2-hl-h">Trials today · 0</div><div style="padding:0 12px 10px;font-size:12.5px;color:var(--text-mute)">No trials booked for today.</div></div>`;
+    return;
+  }
+  el.innerHTML = `<div class="hv2-hl"><div class="hv2-hl-h">Trials today · ${trials.length}</div>` + trials.map((t, i) => `
+    <div onclick="_v15calOpenAppt(${JSON.stringify(t.id)})" style="${_HV_ROW}${i === trials.length - 1 ? ';border-bottom:none' : ''}">
       <span class="hv2-dot"></span>
       <div style="flex:1;min-width:0"><div style="${_HV_TITLE}">${escapeHTML(t.contactName || 'Trial booking')}</div>${t.status ? `<div style="${_HV_SUB}">${escapeHTML(t.status)}</div>` : ''}</div>
       <span style="flex:none;font-weight:700;color:var(--text-sub);font-size:12.5px;font-family:var(--mono,monospace)">${escapeHTML(_hvTime(t.start, tz))}</span>
+    </div>`).join('') + `</div>`;
+}
+function _hv2SlotsPaint(slots, tz) {
+  const el = document.getElementById('hv2-sched-body'); if (!el) return;
+  if (!slots.length) {
+    el.innerHTML = `<div style="padding:12px 16px 14px;font-size:12.5px;color:var(--text-mute)">Nothing on today's session calendar.</div>`;
+    return;
+  }
+  el.innerHTML = slots.map(s => `
+    <div onclick="switchView('v15cal')" style="${_HV_ROW}">
+      <span class="hv2-dot" style="background:#7fb0d8"></span>
+      <div style="flex:1;min-width:0"><div style="${_HV_TITLE}">${escapeHTML(s.name || 'Session')}</div><div style="${_HV_SUB}">${escapeHTML(_hvTime(s.start, tz))}</div></div>
+      ${s.capacity ? `<span style="flex:none;font-weight:700;color:var(--text-sub);font-size:12.5px;font-family:var(--mono,monospace)">${Number(s.booked) || 0}/${s.capacity}</span>` : ''}
     </div>`).join('');
 }
-
-// ── Streak chips (CC-9): per-device v1 ──
-// "Clear days": every day the home is seen with 0 waiting counts as clear;
-// streak = consecutive clear days ending today/yesterday. "Growth weeks" is
-// fed by the roster check below.
-function _ccStreakTick(clearNow) {
-  const st = _ccState(); const days = st.days || {};
-  const today = _ccYmd();
-  if (clearNow) { if (days[today] !== 'clear') { days[today] = 'clear'; _ccSave({ days }); } }
-  else if (!days[today]) { days[today] = 'busy'; _ccSave({ days }); }
-  let streak = 0; const d = new Date();
-  if (days[_ccYmd(d)] !== 'clear') d.setDate(d.getDate() - 1);   // today not clear (yet) → count up to yesterday
-  while (days[_ccYmd(d)] === 'clear') { streak++; d.setDate(d.getDate() - 1); if (streak > 365) break; }
-  if (streak >= 3) _ccBest('streak', `${streak} days all clear`, 'Nothing has waited on you for ' + streak + ' straight days.', 3);
-  _ccStreaksPaint(streak, null);
-}
-const _CC_STREAK = { clear: 0, growth: 0 };
-function _ccStreaksPaint(clearDays, growthWeeks) {
-  if (clearDays != null) _CC_STREAK.clear = clearDays;
-  if (growthWeeks != null) _CC_STREAK.growth = growthWeeks;
-  clearDays = _CC_STREAK.clear; growthWeeks = _CC_STREAK.growth;
-  const host = document.getElementById('hv2-streaks'); if (!host) return;
-  const flame = '<svg viewBox="0 0 24 24"><path d="M12 22c4 0 7-2.7 7-7 0-3-2-5.5-3.5-7C15 10 13 10 13 7c0-2 .5-3.5 1-5-4 1.5-9 6-9 13 0 4.3 3 7 7 7z"/></svg>';
-  const trend = '<svg viewBox="0 0 24 24"><polyline points="2,17 9,10 13,14 22,5"/><polyline points="15,5 22,5 22,12"/></svg>';
-  const chips = [];
-  if (clearDays >= 2) chips.push(`<span class="hv2-streak">${flame} ${clearDays} days all clear</span>`);
-  if (growthWeeks >= 2) chips.push(`<span class="hv2-streak" style="border-color:rgba(123,196,127,.5);color:#7BC47F">${trend} ${growthWeeks} weeks member growth</span>`);
-  host.innerHTML = chips.join('');
-}
-
-// ── Roster check (CC-7 new-member popup + growth-weeks streak) ──
-function _ccWeekKey() { const n = new Date(); const day = (n.getDay() + 6) % 7; const mon = new Date(n); mon.setDate(n.getDate() - day); return _ccYmd(mon); }
-async function _ccMembersCheck() {
-  if (!_plIsV2()) return;
+// ── Action items panel ──
+async function _hv2ActsLoad() {
+  const body = document.getElementById('hv2-acts-body'), pill = document.getElementById('hv2-acts-n');
   try {
     const token = await _mreqAuthToken();
-    const r = await fetch('/api/members?scope=client&client_id=' + encodeURIComponent(CLIENT_ID), { headers: { Authorization: 'Bearer ' + token } });
-    const j = await _safeJson(r); if (!r.ok) return;
-    const members = Array.isArray(j.members) ? j.members : [];
-    const ids = members.map(m => String(m.id || m.ghl_contact_id || m.name)).filter(Boolean);
-    const st = _ccState();
-    // New-member celebration: someone in the roster we hadn't seen before.
-    if (Array.isArray(st.mem_ids) && st.mem_ids.length) {
-      const known = new Set(st.mem_ids);
-      const fresh = members.filter(m => !known.has(String(m.id || m.ghl_contact_id || m.name)));
-      if (fresh.length) {
-        const n = fresh[0].name || fresh[0].athlete_name || 'A new member';
-        _ccCelebrate('new_member_' + _ccYmd(), fresh.length === 1 ? `${n} just became a member` : `${fresh.length} new members joined`, 'The roster is growing - keep it rolling');
-      }
-    }
-    // Growth-weeks streak: week-over-week roster count. week_start holds the
-    // roster size when the week began, so joins-this-week survives mid-week
-    // count updates (feeds the Best-thing hero).
-    const wk = _ccWeekKey(); const g = st.growth || { week: null, count: null, weeks: 0, week_start: null };
-    if (g.week !== wk) {
-      if (g.count != null) g.weeks = (ids.length > g.count) ? (g.weeks || 0) + 1 : 0;
-      g.week = wk; g.week_start = (g.count != null ? g.count : ids.length); g.count = ids.length;
-    } else if (g.count != null && ids.length > g.count) { g.count = ids.length; }
-    const joins = (g.week_start != null) ? Math.max(0, ids.length - g.week_start) : 0;
-    if (joins > 0) _ccBest('members', `+${joins} new member${joins === 1 ? '' : 's'} this week`, 'The roster is growing - keep it rolling.', 1);
-    _ccSave({ mem_ids: ids, growth: g });
-    _ccStreaksPaint(null, g.weeks || 0);   // growth chip only - clear-days repaints on its own tick
-  } catch (_) {}
+    const r = await fetch('/api/action-items?client_id=' + encodeURIComponent(CLIENT_ID), { headers: { Authorization: 'Bearer ' + token } });
+    const j = await _safeJson(r);
+    if (!r.ok) throw new Error((j && j.error) || ('HTTP ' + r.status));
+    const open = (Array.isArray(j.items) ? j.items : []).filter(i => !i.completed_at);
+    if (pill) { if (open.length) { pill.textContent = open.length; pill.style.display = ''; } else { pill.style.display = 'none'; } }
+    if (!body) return;
+    if (!open.length) { body.innerHTML = `<div style="padding:14px 16px;font-size:12.5px;color:var(--text-mute)">Nothing waiting on you.</div>`; return; }
+    const rows = open.slice(0, 5).map(i => `
+      <div onclick="switchView('action-items')" style="${_HV_ROW}">
+        <div style="flex:1;min-width:0"><div style="${_HV_TITLE}">${escapeHTML(i.title || 'Action item')}</div>${i.due_date ? `<div style="${_HV_SUB}">due ${escapeHTML(_aiFmtDate(i.due_date))}</div>` : ''}</div>
+        <span style="${_HV_CHEV}">›</span>
+      </div>`).join('');
+    const more = open.length > 5 ? `<div onclick="switchView('action-items')" style="${_HV_MORE}">+${open.length - 5} more</div>` : '';
+    body.innerHTML = rows + more;
+  } catch (_) {
+    if (body) body.innerHTML = `<div style="padding:14px 16px;font-size:12.5px;color:var(--text-mute)">Couldn't load action items.</div>`;
+  }
 }
-
-// ── Celebration popup (CC-7): FC brand, once per key per day ──
-function _ccCelebrate(key, title, sub) {
-  const st = _ccState(); const today = _ccYmd(); const seen = st.cele || {};
-  if (seen[key] === today) return;
-  seen[key] = today; _ccSave({ cele: seen });
-  const ov = document.createElement('div'); ov.className = 'hv2-cele';
-  ov.innerHTML = `<div class="hv2-cele-card">
-    <div class="hv2-cele-ic"><svg viewBox="0 0 24 24"><path d="M8 21h8M12 17v4M7 4h10v6a5 5 0 0 1-10 0V4z"/><path d="M7 6H4a3 3 0 0 0 3 5M17 6h3a3 3 0 0 1-3 5"/></svg></div>
-    <div class="hv2-cele-t">${escapeHTML(title)}</div>
-    <div class="hv2-cele-s">${escapeHTML(sub || '')}</div>
-  </div>`;
-  ov.onclick = () => ov.remove();
-  document.body.appendChild(ov);
-  setTimeout(() => { try { ov.remove(); } catch (_) {} }, 4500);
-}
+// Kept for the KPI page (MRR sparkline months) - previously part of the
+// retired command-center health strip.
+function _ccMonthKey(back) { const n = new Date(); const d = new Date(n.getFullYear(), n.getMonth() - (back || 0), 1); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`; }
 
 // ── V1.5 Home dashboard ──────────────────────────────────────────────────
 // Trials today · Missed calls (approx: last inbound activity was a call/voicemail,

@@ -246,6 +246,34 @@ async function portalHandler(req, res, { client, clientId, action }) {
       return res.status(200).json({ trials, timezone });
     }
 
+    if (action === "slots-today") {
+      // Today's full session schedule (schedule_slots) with fill counts - the
+      // Home "Today's schedule" panel. Trials-as-people come from trials-today;
+      // this is the room-level view (session name + booked/capacity).
+      const { start, end } = todayBoundsMs(timezone);
+      let rows = [];
+      try {
+        rows = (await sb(
+          `schedule_slots?tenant_id=eq.${clientId}&is_cancelled=eq.false&start_time=gte.${encodeURIComponent(new Date(start).toISOString())}&start_time=lt.${encodeURIComponent(new Date(end).toISOString())}&select=id,name,start_time,end_time,capacity&order=start_time.asc&limit=200`
+        )) || [];
+      } catch (_) { rows = []; }
+      const counts = new Map();
+      if (rows.length) {
+        try {
+          const c = await sb(`rpc/slot_spots_taken_bulk`, {
+            method: "POST",
+            body: JSON.stringify({ p_tenant_id: clientId, p_slot_ids: rows.map(r => r.id) }),
+          });
+          for (const row of (c || [])) counts.set(row.slot_id, Number(row.spots_taken || 0));
+        } catch (_) { /* fill counts are best-effort */ }
+      }
+      const slots = rows.map(s => ({
+        id: s.id, name: s.name, start: s.start_time, end: s.end_time,
+        capacity: s.capacity, booked: counts.has(s.id) ? counts.get(s.id) : null,
+      }));
+      return res.status(200).json({ slots, timezone });
+    }
+
     if (action === "appointment") {
       const id = req.query.id;
       if (!id) return res.status(400).json({ error: "id required" });
