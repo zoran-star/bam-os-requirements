@@ -1,6 +1,6 @@
 ---
 name: Marketing Machine dashboard (design locked, build pending)
-description: Zoran-approved design (2026-07-03) for the Marketing page card - simple flow view with colored health bars + detailed machine modal with colored numbers. Full ASCII specs inside. Build planned for a future session.
+description: Zoran-approved design (2026-07-03) for the Marketing page card - simple flow view with colored health bars + detailed machine modal with colored numbers. Full ASCII specs + verified data-source map + phased build plan inside. Build planned for a future session.
 type: project
 ---
 
@@ -122,3 +122,84 @@ Funnel-step decisions (from live-data verification 2026-07-03):
 5. Ad-set level: show learning-phase status badge; per-ad-set rows only when
    2+ ad sets exist (retargeting / second location - see strategy note).
 6. V2-gated (GTA first), no em dashes anywhere in UI copy.
+
+## Data source map (code-verified against origin/main 2026-07-03)
+
+Four sources. Auth: staff token from `staff_meta_tokens` (staff's own first,
+newest team token fallback via getAnyStaffMetaToken, marketing.js ~1856).
+Client link: `clients.meta_ad_account_id` + `clients.meta_campaign_ids`.
+
+| Dashboard number | Source | Status |
+|---|---|---|
+| Day N of month | date math | derived |
+| Spent MTD | meta-campaigns insights date_preset=this_month spend | EXISTS |
+| Planned spend | campaign daily_budget (marketing.js ~1955) | FIX: ad-set fallback |
+| Campaign CPL / freq / CTR / reach / impressions | meta-report insights level=campaign (marketing.js ~2148) | EXISTS |
+| CPA drift + trend arrows | same insights, current vs prior period | derived |
+| Learning status | learning_stage_info on ad sets | NEW adsets call |
+| Creative thumbnails | meta-creatives handler (/{campaign}/ads + video poster fetch ~3197-3308) | EXISTS |
+| Per-ad hook/CPL/CTR/freq | nothing fetches level=ad today | NEW insights level=ad |
+| Ad age | ad created_time | add field to existing /ads call |
+| Visitors/form/calendar/booked + abandonment | funnel_events via kpis-v15 action=funnel | EXISTS (days= only) |
+| Click->visit pill | Meta inline_link_clicks vs page_view sessions | derived |
+| Leads / trials booked | kpi_events via kpis-v15 section=marketing since/until | EXISTS |
+| Agent-booked split | no flag in kpi_events; join opportunities.source='agent' | FIX: join |
+| Cost per booked trial | spend / trial_booked, two periods | derived |
+
+Gotchas (agent-verified):
+- NO Meta caching anywhere in marketing.js - every handler hits Graph live.
+  Modal = 3-4 Graph calls per open; needs a cache table (Vercel lambdas make
+  in-memory useless). ~10 min TTL.
+- kpi_events trial_booked is idempotent per opp per month
+  (ref = trialbook:{opp}:{YYYY-MM}) - safe to count directly.
+- action=funnel takes days=N only; section=marketing already has since/until
+  (ymdSec helper, kpis-v15.js ~259) - reuse it.
+- opportunities.source values: website-form | agent | import | manual.
+  Join kpi_events (step=trial_booked) to opportunities on client_id +
+  ghl_contact_id to get the agent split.
+
+## Build plan (locked 2026-07-03)
+
+### Phase 1 - backend: one aggregate endpoint
+New marketing.js action `machine` (params: client_id, range=7d|30d|month).
+Returns ONE payload powering both the simple card and the modal (card is a
+rollup of the same health scores - never two sources of truth).
+
+Graph calls (parallel, current + prior period where trends needed):
+  a. campaign insights - reuse meta-report field set
+  b. NEW /{campaign}/adsets?fields=daily_budget,status,effective_status,
+     learning_stage_info  (one call = learning badge + ABO budget fallback)
+  c. NEW /{acct}/insights?level=ad&fields=ad_id,ad_name,spend,actions,
+     impressions,frequency,ctr,inline_link_clicks,video_3_sec_watched_actions
+  d. /{campaign}/ads - existing creatives fetch + ADD created_time
+     (thumbnail extraction hierarchy already handles image/carousel/video)
+
+Supabase reads:
+  e. funnel_events counts (page_view/form_started/calendar_viewed/confirmed)
+  f. kpi_events lead + trial_booked, joined to opportunities for agent split
+
+Server-side health scoring using the thresholds section above - endpoint
+returns color per number + the single worst-thing warning line; UI never
+re-derives judgments.
+Planned spend = campaign daily_budget || sum(ACTIVE ad sets' daily_budget).
+
+### Phase 2 - kpis-v15 tweak
+action=funnel accepts since/until (reuse ymdSec) so the modal range picker
+(7d/30d/this month) hits one convention everywhere. (Skippable if Phase 1
+reads funnel_events directly - decide at build time.)
+
+### Phase 3 - frontend
+Simple card on the V2 Marketing page (GTA first) + Marketing Machine modal
+per the ASCII specs above. Mobile stacks vertically. No em dashes.
+
+### Phase 4 - cache
+`meta_insights_cache` table (client_id, range, payload jsonb, fetched_at),
+~10 min TTL, serve-stale-while-refresh. Without it the card makes the
+Marketing page feel slow. Run align-core-data-model when adding the table.
+
+### Verification (build session exit criteria)
+- GTA numbers match Ads Manager for the same range (spend, CPL, freq, hook)
+- Planned spend matches Ximena's ad-set budgets for 3+ ABO clients
+- funnel step counts match a raw funnel_events query
+- agent split spot-checked against the pipeline board
+Build order: 1 -> verify vs live GTA data -> 3 -> 4 (2 folded into 1 if direct).
