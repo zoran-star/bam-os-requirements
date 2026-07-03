@@ -228,6 +228,36 @@ async function handler(req, res) {
       )) || [];
     } catch { /* additive block - never breaks the offer page */ }
 
+    // Trial block: everything the FREE TRIAL funnel page needs, sourced from
+    // the offer instead of hardcoded site constants. calendars = the offer's
+    // calendar entry points (so re-pointing a calendar in the Entry Points
+    // wizard re-points the live trial page); groups = the offer's schedule
+    // classes (titles, ages, weekly times); copy = the Blueprint sales section.
+    let trialCalendars = [];
+    try {
+      trialCalendars = (await sbReq(
+        `entry_points?client_id=eq.${encodeURIComponent(client_id)}&offer_id=eq.${offer.id}` +
+        `&type=eq.calendar&enabled=eq.true&order=label.asc&select=key,label,bookable_program_id`
+      )) || [];
+    } catch { /* additive - never breaks the offer page */ }
+    const salesData = (offer.data && offer.data.sales) || {};
+    const scheduleData = (offer.data && offer.data.schedule) || {};
+    const trial = {
+      sales_path: salesData.sales_path || null,
+      duration_price: salesData.trial_duration_price || null,
+      info_collect: Array.isArray(salesData.info_collect) ? salesData.info_collect : [],
+      calendars: trialCalendars,
+      groups: (Array.isArray(scheduleData.classes) ? scheduleData.classes : []).map((cls) => ({
+        title: cls && cls.title ? String(cls.title) : null,
+        age: cls && cls.age ? String(cls.age) : null,
+        weekly_times: (cls && Array.isArray(cls.weekly_times) ? cls.weekly_times : []).map((wt) => ({
+          days: (wt && wt.days) || [],
+          start: (wt && wt.start) || null,
+          end: (wt && wt.end) || null,
+        })),
+      })),
+    };
+
     const [agreementUrl, welcomeVideo] = await Promise.all([
       fileUrl(offer.id, ["onboarding:agreement", "agreement"]),
       fileUrl(offer.id, ["sales:welcome_video", "onboarding:welcome_video", "welcome_video"]),
@@ -244,6 +274,7 @@ async function handler(req, res) {
       intake_fields: buildIntakeFields(offer),
       pricing: buildPricing(offer, catalogRows),
       purchasable,
+      trial,
       agreement_url: agreementUrl,
       welcome_video: welcomeVideo,
     });
