@@ -119,10 +119,10 @@ Where BAM staff operates on everything the customer portal produces. Cole built 
 
 **Status as of 2026-05-17 — portal is live in production, public onboarding URL is shareable, focus is hardening + filling round-3 gaps.**
 
-**Portal URL:** `https://portal.byanymeansbusiness.com` (custom domain — replaced `bam-portal-tawny.vercel.app`; the old `.vercel.app` URL still resolves but the custom domain is canonical). Shareable signup: `/onboarding.html`. See [[memories/project_public_onboarding.md]] for the flow.
+**Portal URLs:** `https://staff.byanymeansbusiness.com` = STAFF portal (the React app, `bam-portal/src`); `https://portal.byanymeansbusiness.com` = CLIENT portal (`bam-portal/public/client-portal.html`). Same Vercel project, two domains; APIs + webhooks are served on `portal.byanymeansbusiness.com` (the `PROD` constants in `api/`). Old `bam-portal-tawny.vercel.app` still resolves but the custom domains are canonical. Shareable signup: `portal.byanymeansbusiness.com/onboarding.html`. See [[memories/project_public_onboarding.md]] for the flow.
 
 ### What's live end-to-end
-- **portal.byanymeansbusiness.com** — staff + client portals deployed on Vercel Pro (no fn cap).
+- **staff.byanymeansbusiness.com** (staff portal) + **portal.byanymeansbusiness.com** (client portal) — one Vercel Pro project (no fn cap).
 - **Supabase** — project ref `jnojmfmpnsfmtqmwhopz`. Tables: `clients` (13 GHL locations seeded), `staff`, `marketing_tickets`, `content_tickets`, `staff_meta_tokens`, `client_meta_tokens` (legacy), `Questions Database` (202 rows), plus auth.
 - **Meta API (staff-side)** — one BAM staff token powers every client's campaigns + creatives. Client Setup page bulk-wires clients to ad accounts. See `[[project_meta_api_integration]]`.
 - **Marketing/content two-stage flow** — clients submit raw assets, content team produces finals, marketing team launches. See `[[project_marketing_content_flow]]`.
