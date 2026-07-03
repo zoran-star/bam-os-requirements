@@ -48,6 +48,44 @@ async function handler(req, res) {
     return res.status(401).json({ error: "unauthorized" });
   }
 
+  // ── Rebill report mode (monthly cron): previous month's spend per client
+  //    + 10% markup, posted to Slack for staff to paste into GHL invoices.
+  //    (Billing runs through GHL today; full automation waits until client
+  //    billing moves off GHL - then these numbers become Stripe line items.)
+  if (req.query.report) {
+    const now = new Date();
+    const prev = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 1, 1));
+    const month = prev.toISOString().slice(0, 7);
+    const rows = await sb(
+      `twilio_usage?usage_date=gte.${month}-01&usage_date=lt.${nextMonth(month)}&select=client_id,usage_usd`
+    ).catch(() => []);
+    const per = {};
+    for (const r of (rows || [])) per[r.client_id] = (per[r.client_id] || 0) + Number(r.usage_usd || 0);
+    const ids = Object.keys(per);
+    let names = {};
+    if (ids.length) {
+      const cs = await sb(`clients?id=in.(${ids.join(",")})&select=id,business_name`).catch(() => []);
+      names = Object.fromEntries((cs || []).map(c => [c.id, c.business_name]));
+    }
+    const MARKUP = 1.10; // cost + 10% (Zoran, 2026-07-03)
+    const lines = ids
+      .map(id => ({ name: names[id] || id, cost: per[id], bill: per[id] * MARKUP }))
+      .filter(x => x.cost >= 0.01)
+      .sort((a, b) => b.cost - a.cost)
+      .map(x => `${x.name}: $${x.cost.toFixed(2)} -> bill $${x.bill.toFixed(2)}`);
+    const text = lines.length
+      ? `📊 Phone rebill for ${month} (cost -> +10%). Paste each into that client's GHL invoice:\n` + lines.join("\n")
+      : `📊 Phone rebill for ${month}: no billable usage.`;
+    try {
+      const token = process.env.SLACK_BOT_TOKEN, channel = process.env.FEEDBACK_SLACK_CHANNEL;
+      if (token && channel) await fetch("https://slack.com/api/chat.postMessage", {
+        method: "POST", headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ channel, text }),
+      });
+    } catch (_) {}
+    return res.status(200).json({ ok: true, month, markup: "10%", lines });
+  }
+
   // ── Summary mode: spend per client for a month ──
   if (req.query.summary) {
     const month = String(req.query.month || new Date().toISOString().slice(0, 7));
