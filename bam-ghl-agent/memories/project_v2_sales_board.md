@@ -84,3 +84,17 @@ conversion + churn (sales/members always fetch prev window now), MRR 6-month
 sparkline (reuses Trends month cache). All code in client-portal.html
 (_cc* + _hv2* + _v15kBizmap/_v15kMomentum/_v15kMrr*). Skipped review items:
 CC-2/6/8/10/12/14/15.
+
+## Home visual skin = prototype language (2026-07-02)
+V2 home restyled to ~80% of prototype/src Home's visual DNA mapped onto FC
+dark tokens: soft elevated surface cards (16px radius, 0 4px 14px shadow),
+small-caps gold mono labels, tinted icon chips, hero row = "Best thing right
+now" highlight card (_ccBest candidates: members joins > trials today > clear
+streak > inbox zero) + "Your #1 priority" card with gold CTA (all-clear state
+when queue empty). Schedule rail = prototype dot-rows, time on the right.
+
+## Mobile home vision (Zoran, 2026-07-02 - NOT built yet)
+When we do the mobile home UI: screen opens on a PUSH-TO-TALK button with a
+chat below it (talk/chat to the agent first), then scrolling down "unlocks"
+the home page UI (health strip, cards, schedule). Build this when mobile home
+gets its pass.
