@@ -23387,8 +23387,22 @@ async function _plLoadLastMessages() {
     const j = await _safeJson(r);
     if (!r.ok) return;
     const map = new Map();
+    // A contact can have SEVERAL threads (SMS store + email store + GHL). Keep
+    // the NEWEST one per contact - last-write-wins let a stale email thread
+    // clobber a fresh SMS entry, so cards we texted hours ago still showed the
+    // red "no contact in 5+ days" alert. Unread is OR'd across their threads.
     for (const c of (j.conversations || [])) {
-      if (c.contactId) map.set(String(c.contactId), { direction: (c.lastMessageDirection || '').toLowerCase(), date: c.lastMessageDate || null, unread: (c.unreadCount || 0) > 0, conversationId: c.id });
+      if (!c.contactId) continue;
+      const k = String(c.contactId);
+      const prev = map.get(k);
+      const dNew = c.lastMessageDate ? new Date(c.lastMessageDate).getTime() : 0;
+      const dOld = (prev && prev.date) ? new Date(prev.date).getTime() : -1;
+      const unread = ((prev && prev.unread) || (c.unreadCount || 0) > 0);
+      if (!prev || dNew > dOld) {
+        map.set(k, { direction: (c.lastMessageDirection || '').toLowerCase(), date: c.lastMessageDate || null, unread, conversationId: c.id });
+      } else {
+        prev.unread = unread;
+      }
     }
     _PL_LASTMSG = map;
     try { if (typeof _renderPipelineBoard === 'function') _renderPipelineBoard(); } catch (_) {}
@@ -23952,6 +23966,9 @@ async function _epWizSave(disconnect) {
 function _renderPipelineTabs() {
   const host = document.getElementById('pl-pipeline-tabs');
   if (!host || !_PL_DATA) return;
+  // _plV2 is a LOCAL inside _renderPipelineBoard - referencing it here threw
+  // "Couldn't load pipelines - _plV2 is not defined" intermittently. Resolve it.
+  const _plV2 = _plIsV2();
   const pls = _plVisiblePipelines();
   if (!pls.length) { host.innerHTML = ''; host.style.display = 'none'; return; }
   // If the selected pipeline isn't visible to this user, snap to the first one.
