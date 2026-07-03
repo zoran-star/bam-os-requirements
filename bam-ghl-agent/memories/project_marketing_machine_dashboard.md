@@ -46,9 +46,10 @@ Decisions along the way (do NOT re-add):
 - Month progress bar at top (day N of month), ad spend so far shown small/muted
   beside it (pacing read: month % vs spend %)
 - The ⚠ line names the single most broken thing; hidden when all green
-- Bar health recipes: CAMPAIGN = CPA drift + learning status + pacing;
-  each CREATIVE = its hook rate + CPL + frequency + age blended;
-  PAGE = visitors->form rate + calendar abandonment
+- Bar health recipes (FINAL, Zoran 2026-07-03): CAMPAIGN = cost per lead
+  only; each CREATIVE = hybrid CPL + fatigue demotions (see Bar recipes
+  section below); PAGE = clicks->leads % (Meta link clicks -> leads; the
+  ratio is also shown as a number in the modal's PAGE section)
 
 ## DETAILED MODAL (final v6/v7)
 
@@ -207,15 +208,35 @@ Marketing page feel slow. Run align-core-data-model when adding the table.
 - agent split spot-checked against the pipeline board
 Build order: 1 -> verify vs live GTA data -> 3 -> 4 (2 folded into 1 if direct).
 
-## Simple-card bar math (proposed 2026-07-03, confirm at build)
+## Bar recipes FINAL (Zoran decisions 2026-07-03; replaced weighted-avg idea)
 
-Every input scored by the thresholds above -> points: green 100, gold 55,
-red 15. Bar FILL LENGTH = weighted average of points; FILL COLOR by band:
->=80 green, 50-79 gold, <50 red. Length = how healthy, color = the verdict.
-Scored server-side in the machine endpoint; UI draws what it is told.
+One metric = one bar. Color = threshold band; fill length maps the metric
+onto its scale (lower CPL = fuller bar, higher ratio = fuller bar). All
+scored server-side in the machine endpoint; UI draws what it is told.
 
-| Bar | Inputs (weight %) |
-|---|---|
-| CAMPAIGN | CPA drift (50), pacing spend% vs month% (30), learning status (20) |
-| each CREATIVE | hook rate (35), $/lead vs campaign avg (35), frequency (20), age (10) |
-| PAGE | visitors->form % (50), calendar abandonment (50) |
+CAMPAIGN bar = COST PER LEAD (Zoran-set bands):
+  green < $40, gold $40-55, red >= $55
+
+PAGE bar = CLICKS -> LEADS % (Meta inline_link_clicks -> kpi_events leads).
+  Also displayed as a NUMBER in the detailed modal's LANDING PAGE section.
+  Bands PROPOSED (tune vs GTA real data): green >= 10%, gold 5-10%, red < 5%
+
+CREATIVE bar (hybrid, per live ad - Zoran approved 2026-07-03):
+  1. TESTING (grey): age < 3 days OR spend < $20 -> no verdict yet; bar
+     renders as a grey "testing" state, never red before it earned a read
+  2. Base band = the ad's own CPL, same $40/$55 bands as the campaign
+  3. Demote ONE band if frequency > 3.5x OR hook rate < 25%
+     (fatigue early warning - fires before CPL degrades)
+  4. An ad demoted for 0 leads at meaningful spend counts as red
+
+Refresh / kill guidance (feeds the simple card's single warning line;
+worst thing wins, one line only):
+  - red CPL with >= $75 spend -> "kill [ad], move budget to [best ad]"
+  - demoted by frequency (>3.5x) -> "audience worn out - clone the winner
+    with a fresh angle" (REFRESH trigger)
+  - demoted by hook (<25%) -> "first 3 seconds not stopping thumbs -
+    re-hook it" (REFRESH trigger: new opening, same body often fine)
+  - gold CPL + frequency climbing 2 checks in a row -> "start producing
+    the replacement now" (pre-emptive refresh)
+  - < 6 live creatives (excl. testing) -> "add angles (want 6+)"
+  Priority order: red creative > demotions > pre-emptive > creative count.
