@@ -3234,6 +3234,14 @@ function mmPctBand(pct, green, gold) {
   if (pct >= gold) return "gold";
   return "red";
 }
+// Meta reports one real lead under several action_types at once (verified on
+// GTA 2026-07-03: lead:5 + offsite_conversion.fb_pixel_lead:5 = 5 leads, not
+// 10). "lead" is Meta's deduped total - prefer it; fall back to the legacy
+// summed set only when the aggregate is absent.
+function mmCountLeads(actions) {
+  const direct = countAction(actions, "lead");
+  return direct > 0 ? direct : countLeads(actions);
+}
 function mmImageFromCreative(c) {
   if (!c) return null;
   if (c.image_url || c.thumbnail_url) return c.image_url || c.thumbnail_url;
@@ -3324,7 +3332,7 @@ async function handleMetaMachine(req, res) {
     // 2. Ad-level insights for the current range (hook rate lives here).
     graph(`${META_GRAPH}/${adAcct}/insights?` + new URLSearchParams({
       level: "ad",
-      fields: "campaign_id,ad_id,ad_name,spend,impressions,reach,inline_link_clicks,actions,video_3_sec_watched_actions",
+      fields: "campaign_id,ad_id,ad_name,spend,impressions,reach,inline_link_clicks,actions",
       time_range: JSON.stringify({ since: fmt(sinceD), until: fmt(untilD) }),
       filtering: campFilter, access_token: staffToken, limit: "500",
     })),
@@ -3353,12 +3361,21 @@ async function handleMetaMachine(req, res) {
   // ── Campaign section (current vs prior period) ──
   const splitDay = fmt(sinceD);
   const curAcc = newAcc(), prevAcc = newAcc();
+  let curLeadsMeta = 0, prevLeadsMeta = 0;
   for (const row of (campJson.data || [])) {
     if (!allowSet.has(String(row.campaign_id))) continue;
-    sumRowInto(row.date_start >= splitDay ? curAcc : prevAcc, row);
+    const isCur = row.date_start >= splitDay;
+    sumRowInto(isCur ? curAcc : prevAcc, row);
+    if (isCur) curLeadsMeta += mmCountLeads(row.actions);
+    else prevLeadsMeta += mmCountLeads(row.actions);
   }
   const cur = finalizeMetrics(curAcc);
   const prev = finalizeMetrics(prevAcc);
+  // Shared countLeads() double counts pixel leads; overwrite with the deduped total.
+  cur.leads = curLeadsMeta;
+  cur.cpl = curLeadsMeta > 0 ? _r2(cur.spend / curLeadsMeta) : null;
+  prev.leads = prevLeadsMeta;
+  prev.cpl = prevLeadsMeta > 0 ? _r2(prev.spend / prevLeadsMeta) : null;
   const driftPct = (cur.cpl != null && prev.cpl != null && prev.cpl > 0)
     ? _r2(((cur.cpl - prev.cpl) / prev.cpl) * 100) : null;
 
@@ -3391,12 +3408,13 @@ async function handleMetaMachine(req, res) {
     const impressions = parseInt(ins.impressions || "0", 10) || 0;
     const reach = parseInt(ins.reach || "0", 10) || 0;
     const clicks = parseInt(ins.inline_link_clicks || "0", 10) || 0;
-    const leads = countLeads(ins.actions);
+    const leads = mmCountLeads(ins.actions);
     const cpl = leads > 0 ? _r2(spend / leads) : null;
     const ctr = impressions > 0 ? _r2((clicks / impressions) * 100) : null;
     const frequency = reach > 0 ? _r2(impressions / reach) : null;
-    const v3 = Array.isArray(ins.video_3_sec_watched_actions)
-      ? (parseInt(ins.video_3_sec_watched_actions[0]?.value, 10) || 0) : 0;
+    // 3-second video plays arrive as the standard "video_view" action -
+    // v22 rejects video_3_sec_watched_actions as a field (verified live 2026-07-03).
+    const v3 = countAction(ins.actions, "video_view");
     const isVideo = !!ad.creative?.video_id;
     const hookRate = (isVideo && impressions > 0) ? _r2((v3 / impressions) * 100) : null;
     const ageDays = ad.created_time ? Math.floor((now - new Date(ad.created_time)) / DAY) : null;

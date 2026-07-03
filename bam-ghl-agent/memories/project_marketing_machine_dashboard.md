@@ -26,6 +26,17 @@ type: project
   fill color = server band. Colored numbers + dots in modal, rollup dot per
   section (worst child wins).
 
+## Live-fire gotchas (found testing vs real GTA data 2026-07-03)
+- Meta v22 REJECTS `video_3_sec_watched_actions` as an insights field. 3-sec
+  views = the standard `actions` entry `action_type=video_view`. Fixed.
+- Meta reports ONE lead under several action_types at once (GTA: lead:5 +
+  offsite_conversion.fb_pixel_lead:5 = 5 real leads). Shared countLeads()
+  SUMS the set -> double counts pixel leads. Machine uses mmCountLeads()
+  ("lead" aggregate first, legacy sum as fallback). ⚠ meta-report /
+  Ad Performance still uses countLeads() - likely shows inflated leads +
+  halved CPL for pixel-lead clients; fix separately (Ximena-validated
+  surface, do not change silently).
+
 ## Still open after ship
 - Phase 4 cache table (meta_insights_cache) NOT built - modal/card hit Graph
   live (4-6 calls per load). Add when it feels slow or clients scale.
