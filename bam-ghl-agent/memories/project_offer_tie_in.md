@@ -158,9 +158,26 @@ retries - the ONLY paths that can 5xx are access-sync ON failures).
 - Frontend (bam-client-sites enroll page) unchanged - keys still work.
 - Weekly-credit gating: moot, D activated before E.
 
-## Next (Part 2, money->access; order F->G)
+## F: members/sorter spine - SHIPPED (2026-07-02)
 
-F members.js/sorter full identity spine ->
+Non-webhook member paths now run the SAME gated idempotent access sync
+(new reasons in access-sync.ts: `member-imported` = grant, `portal-action` =
+status mirror; shared non-fatal caller `api/_runtime/access-sync-portal.ts` -
+portal actions never block on sync failure, next Stripe event converges):
+- sorter promote (api/sorter/cleanup.js): per promoted member, chunked x10.
+- api/members.js: pause (immediate), unpause, pause-date-fix, card-setup-link
+  mark_collecting, pause cron Phase A+B -> portal-action mirror; immediate
+  cancel -> override cancelled BEFORE the members DELETE (no later event can
+  find the row); change-plan recreate AND swap -> subscription-updated grant
+  (immediate entitlement move; invoice.paid converges on the same ref).
+- DELIBERATE: period-end cancel ('cancelling') NOT hooked - parent paid
+  through the period, access stays until C's subscription-deleted cancel.
+- Sweep tool got --apply (real sync per member). Applied to GTA: 41/41
+  members on the identity spine; 40 stripe-source entitlements + 1 manual
+  (Stefan). ACTIVE=32 mirrors live members exactly.
+
+## Next (Part 2, money->access; order G)
+
 G `entry_points.bookable_program_id` + drift check (Luka OK'd all of this 2026-07-02).
 
 Guardrails: `docs/parent-runtime-cutover-guardrails.md` still applies in full.

@@ -4,13 +4,17 @@
 // it would grant or why it would skip. Read-only - nothing is written.
 //
 //   VITE_SUPABASE_URL=... SUPABASE_SERVICE_KEY=... \
-//     npx tsx scripts/access-sync-sweep.mjs --client <client_id>
+//     npx tsx scripts/access-sync-sweep.mjs --client <client_id> [--apply]
+//
+// --apply runs the real (non-dry) sync per member: creates missing identity
+// spines + entitlements exactly like a paid-invoice webhook would.
 
 import { createRuntimeSupabaseClient } from "../api/_runtime/supabase.js";
 import { syncAccessForMember } from "../api/_runtime/access-sync.js";
 
 const idx = process.argv.indexOf("--client");
 const clientId = idx === -1 ? null : process.argv[idx + 1];
+const apply = process.argv.includes("--apply");
 if (!clientId) {
   console.error("usage: access-sync-sweep.mjs --client <client_id>");
   process.exit(1);
@@ -35,7 +39,7 @@ for (const m of members) {
       reason: "invoice-paid",
       subscriptionId: m.stripe_subscription_id,
     },
-    { dryRun: true },
+    { dryRun: !apply },
   );
   const label = `${(m.athlete_name || m.id).slice(0, 28).padEnd(30)} ${String(m.status).padEnd(24)} ${String(m.plan || "-").padEnd(8)}`;
   if (outcome.action === "granted") {
@@ -46,5 +50,5 @@ for (const m of members) {
     console.log(`  ⚠ ${label} ${outcome.action}: ${outcome.skip_reason || ""}`);
   }
 }
-console.log(`\n${members.length} members: ${granted} would grant, ${flagged.length} flagged`);
+console.log(`\n${members.length} members: ${granted} ${apply ? "granted" : "would grant"}, ${flagged.length} flagged${apply ? "" : " (dry run - use --apply)"}`);
 process.exit(flagged.length ? 2 : 0);

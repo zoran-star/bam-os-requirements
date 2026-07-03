@@ -24,6 +24,7 @@ import { loadVoiceConfig, startClickToCall, logCall } from "./twilio/_voice.js";
 import crypto from "node:crypto";
 import { timingSafeEqual } from "node:crypto";
 import { applyDiscountToCents, normCode, couponFromPromo } from "./_coupon-guardrails.js";
+import { syncMemberAccessNonFatal } from "./_runtime/access-sync-portal.js";
 
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
@@ -723,6 +724,8 @@ async function actionPauseDateFix(res, member, ctx, body) {
     method: "PATCH", headers: { Prefer: "return=minimal" },
     body: JSON.stringify({ status: "paused", pause_scheduled_for: null, updated_at: nowIso() }),
   });
+  // Offer tie-in F: mirror the paused state onto membership + entitlements.
+  await syncMemberAccessNonFatal({ clientId: member.client_id, memberId: member.id, reason: "portal-action" });
   await writeAudit({ client_id: member.client_id, member_id: member.id, action_type: "pause-date-fix", args: { pause_start: start_date, pause_end: end_date }, performed_by: ctx.user.id, performed_by_name: ctx.staff?.name || null, db_changes: { members: { status: { to: "paused" } }, cancellations: "inserted (date fix)" } });
   return res.status(200).json({ ok: true, action: "pause-date-fix", pause_start: start_date, pause_end: end_date });
 }
@@ -900,6 +903,8 @@ async function actionPause(res, member, stripeAccount, ctx, body) {
       body: JSON.stringify({ status: "paused", pause_scheduled_for: null, updated_at: nowIso() }),
     });
     dbChanges.members = { id: member.id, status: "paused", pause_scheduled_for: null };
+    // Offer tie-in F: mirror the paused state onto membership + entitlements.
+    await syncMemberAccessNonFatal({ clientId: member.client_id, memberId: member.id, reason: "portal-action" });
   } else {
     // Surface the queued state on the member row so the staff portal can
     // render a "Pause queued" pill without joining cancellations.
@@ -965,6 +970,8 @@ async function actionUnpause(res, member, stripeAccount, ctx, body) {
       body: JSON.stringify({ status: "live", pause_scheduled_for: null, updated_at: nowIso() }),
     });
     dbChanges.members = { id: member.id, status: "live", pause_scheduled_for: null };
+    // Offer tie-in F: reactivate membership + entitlements with the member.
+    await syncMemberAccessNonFatal({ clientId: member.client_id, memberId: member.id, reason: "portal-action" });
 
     // Mark any open pause rows (pending or active) completed.
     await sb(
@@ -1082,6 +1089,12 @@ async function actionCancel(res, member, stripeAccount, ctx, body) {
   // to clean them up, so don't leave them stuck in 'cancelling'.
   const willDeleteNow = body.immediate || !member.stripe_subscription_id || !stripeManaged;
   if (willDeleteNow) {
+    // Offer tie-in F: cancel typed access BEFORE the member row disappears -
+    // there is no later Stripe event that can still find this member.
+    await syncMemberAccessNonFatal({
+      clientId: member.client_id, memberId: member.id,
+      reason: "portal-action", overrideMemberStatus: "cancelled",
+    });
     await sb(`members?id=eq.${member.id}`, {
       method: "DELETE",
       headers: { Prefer: "return=minimal" },
@@ -1316,6 +1329,12 @@ async function actionChange(res, member, stripeAccount, ctx, body) {
         updated_at: nowIso(),
       }),
     });
+    // Offer tie-in F: move the entitlement to the new plan's template now
+    // (the invoice.paid webhook converges on the same source_ref later).
+    await syncMemberAccessNonFatal({
+      clientId: member.client_id, memberId: member.id,
+      reason: "subscription-updated", subscriptionId: sub.id, stripePriceId: newPriceId,
+    });
   } else {
     mode = "swap";
     const itemId = currentSub.items?.data?.[0]?.id;
@@ -1342,6 +1361,11 @@ async function actionChange(res, member, stripeAccount, ctx, body) {
       // Persist the new price too - without this the row keeps the old
       // stripe_price_id, so the roster shows the stale amount/Archived tag.
       body: JSON.stringify({ stripe_price_id: newPriceId, plan: newPlan, updated_at: nowIso() }),
+    });
+    // Offer tie-in F: move the entitlement to the new plan's template now.
+    await syncMemberAccessNonFatal({
+      clientId: member.client_id, memberId: member.id,
+      reason: "subscription-updated", subscriptionId: member.stripe_subscription_id, stripePriceId: newPriceId,
     });
   }
 
@@ -1607,6 +1631,8 @@ async function actionCardSetupLink(res, member, stripeAccount, ctx, body, req) {
       method: "PATCH", headers: { Prefer: "return=minimal" },
       body: JSON.stringify({ status: "payment_method_required", updated_at: nowIso() }),
     }).catch(() => {});
+    // Offer tie-in F: mirror the collecting state (suspends entitlements).
+    await syncMemberAccessNonFatal({ clientId: member.client_id, memberId: member.id, reason: "portal-action" });
   }
 
   await writeAudit({
@@ -1894,6 +1920,9 @@ async function cronProcessScheduledPauses(res) {
         body: JSON.stringify({ status: "paused", pause_scheduled_for: null, updated_at: nowIso() }),
       });
 
+      // Offer tie-in F: mirror the paused state onto membership + entitlements.
+      await syncMemberAccessNonFatal({ clientId: member.client_id, memberId: member.id, reason: "portal-action" });
+
       await writeAudit({
         client_id: member.client_id,
         member_id: member.id,
@@ -1955,6 +1984,8 @@ async function cronProcessScheduledPauses(res) {
           body: JSON.stringify({ status: "live", updated_at: nowIso() }),
         });
         flipped = true;
+        // Offer tie-in F: reactivate membership + entitlements with the member.
+        await syncMemberAccessNonFatal({ clientId: member.client_id, memberId: member.id, reason: "portal-action" });
       }
 
       await writeAudit({

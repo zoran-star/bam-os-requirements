@@ -1,4 +1,5 @@
 import { withSentryApiRoute } from "../_sentry.js";
+import { syncMemberAccessNonFatal } from "../_runtime/access-sync-portal.js";
 export const maxDuration = 60; // Stripe cross-checks + DB promote — avoid the short default timeout
 // Vercel Serverless Function — The Pricing Sorter, STEP 3: cleanup checks + promote.
 //
@@ -888,6 +889,16 @@ async function handler(req, res) {
 
         promoted.push({ id: s.id, member_id: memberId, reused: !!existing });
         if (memberId) memberIds.push(memberId);
+      }
+
+      // Offer tie-in step F: promoted members are already-paying imports with
+      // no Stripe event coming - mint their identity spine + entitlement now
+      // (same gated, idempotent sync the webhook runs). Non-fatal + chunked so
+      // a large promote can't blow the function budget.
+      for (let i = 0; i < memberIds.length; i += 10) {
+        await Promise.all(memberIds.slice(i, i + 10).map((mid) =>
+          syncMemberAccessNonFatal({ clientId, memberId: mid, reason: "member-imported" })
+        ));
       }
 
       return res.status(200).json({ ok: true, promoted, skipped, member_ids: memberIds, counts: { promoted: promoted.length, skipped: skipped.length } });
