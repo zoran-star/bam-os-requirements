@@ -3,6 +3,7 @@ import { smsProvider } from "../messaging/provider.js";
 import { readStoreThreadInbox, readStoreThreadById, listStoreThreads } from "../messaging/read-thread.js";
 import { emailProvider } from "../messaging/email-provider.js";
 import { readEmailStoreThreadInbox, readEmailStoreThreadById, listEmailStoreThreads } from "../messaging/email-read-thread.js";
+import { metaDmConfig, listDmThreads, readDmThreadById, readDmThreadInbox } from "../meta/_dm.js";
 // Vercel Serverless Function — Per-academy GHL Inbox
 //
 //   GET /api/ghl/inbox?client_id=<uuid>
@@ -431,25 +432,29 @@ async function handler(req, res) {
   });
 
   // Own-store academies: serve the inbox from the portal store, not GHL. SMS
-  // (messaging_provider='twilio') and Email (email_provider='resend') each have
-  // their own store; when both are on we MERGE them into one inbox. Social
-  // (IG/FB/WhatsApp) threads passthrough from GHL — see listGhlSocialThreads.
-  // Dormant for an academy on neither → falls through to the GHL read below
-  // unchanged.
+  // (messaging_provider='twilio'), Email (email_provider='resend'), and IG/FB
+  // DMs (client_meta_messaging_config.status='active' → dm_threads) each have
+  // their own store; whatever is on gets MERGED into one inbox. Social threads
+  // still passthrough from GHL (listGhlSocialThreads), minus IG/FB once the
+  // Meta spine is active (see the dedupe below). Dormant for an academy on
+  // none of the three → falls through to the GHL read below unchanged.
   try {
-    const [smsOn, emailOn] = await Promise.all([
+    const [smsOn, emailOn, metaCfg] = await Promise.all([
       smsProvider(clientId).then((p) => p === "twilio").catch(() => false),
       emailProvider(clientId).then((p) => p === "resend").catch(() => false),
+      metaDmConfig(clientId, { requireInboxLive: true }).catch(() => null),
     ]);
-    if (smsOn || emailOn) {
-      // Single thread by contact: merge this contact's SMS + Email messages.
+    const metaOn = !!metaCfg;
+    if (smsOn || emailOn || metaOn) {
+      // Single thread by contact: merge this contact's SMS + Email + DM messages.
       if (contactId) {
         const parts = await Promise.all([
           smsOn ? readStoreThreadInbox(clientId, contactId).catch(() => ({ messages: [] })) : { messages: [] },
           emailOn ? readEmailStoreThreadInbox(clientId, contactId).catch(() => ({ messages: [] })) : { messages: [] },
+          metaOn ? readDmThreadInbox(clientId, contactId).catch(() => ({ messages: [] })) : { messages: [] },
         ]);
-        const messages = [...(parts[0].messages || []), ...(parts[1].messages || [])].sort((a, b) => new Date(a.date || 0) - new Date(b.date || 0));
-        const conversation_id = parts[0].conversation_id || parts[1].conversation_id || null;
+        const messages = [...(parts[0].messages || []), ...(parts[1].messages || []), ...(parts[2].messages || [])].sort((a, b) => new Date(a.date || 0) - new Date(b.date || 0));
+        const conversation_id = parts[0].conversation_id || parts[1].conversation_id || parts[2].conversation_id || null;
         if (!messages.length) {
           // Nothing in the store — could be a social-only lead (IG/FB threads
           // have no store yet). Serve their GHL social thread if one exists;
@@ -473,6 +478,7 @@ async function handler(req, res) {
         const isStoreId = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(conversationId);
         if (isStoreId) {
           if (smsOn) { const t = await readStoreThreadById(conversationId).catch(() => null); if (t && t.messages && t.messages.length) return res.status(200).json(t); }
+          if (metaOn) { const t = await readDmThreadById(conversationId).catch(() => null); if (t) return res.status(200).json(t); }
           if (emailOn) { const t = await readEmailStoreThreadById(conversationId).catch(() => null); if (t) return res.status(200).json(t); }
           return res.status(200).json({ conversation_id: conversationId, messages: [] });
         }
@@ -490,10 +496,17 @@ async function handler(req, res) {
             smsOn ? listStoreThreads(clientId).catch(() => []) : [],
             emailOn ? listEmailStoreThreads(clientId).catch(() => []) : [],
             listGhlSocialThreads(clientId, token, locationId).catch(() => []),
+            metaOn ? listDmThreads(clientId).catch(() => []) : [],
           ]),
           loadUserReads(clientId, ctx.user.id),
         ]);
-        const merged = [...lists[0], ...lists[1], ...lists[2]];
+        // Meta-spine dedupe: once the academy's DMs come in directly
+        // (dm_threads), drop IG/FB rows from the GHL passthrough - GHL still
+        // receives the same DMs while its Meta integration stays connected,
+        // and both showing would duplicate every thread.
+        const META_CHANNELS = new Set(["ig", "fb", "instagram", "facebook"]);
+        const social = metaOn ? lists[2].filter((c) => !META_CHANNELS.has(c.channel)) : lists[2];
+        const merged = [...lists[0], ...lists[1], ...social, ...lists[3]];
         const classified = await classifyStoreConversations(clientId, merged);
         const conversations = sortByUnreadThenDate(applyReads(classified, readsMap));
         const counts = {

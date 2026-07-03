@@ -9,6 +9,7 @@ import { withSentryApiRoute } from "../_sentry.js";
 //   POST { action: "pages" }                      → pages visible to the staff token (picker)
 //   POST { action: "wire", client_id, page_id }   → store config (pending) + subscribe webhook
 //   POST { action: "activate", client_id }        → status='active' (webhook starts storing)
+//   POST { action: "inbox-live", client_id, live } → inbox serves dm_threads + passthrough dedupe (post-App-Review cutover)
 //   POST { action: "status", client_id }          → current config, secrets omitted
 //
 // Requires the staff token to carry the messaging scopes (reconnect Meta in
@@ -115,9 +116,26 @@ async function handler(req, res) {
       return res.status(200).json({ ok: true, status: "active" });
     }
 
+    // Inbox cutover switch (increment 4). status='active' just stores webhook
+    // deliveries; inbox_live=true makes the inbox SERVE dm_threads and drop
+    // IG/FB from the GHL passthrough. Flip only after App Review passes and a
+    // real lead's DM is proven to land in dm_threads. live:false = instant
+    // rollback to the passthrough.
+    if (b.action === "inbox-live") {
+      if (!b.client_id) return res.status(400).json({ error: "client_id required" });
+      const rows = await sb(`client_meta_messaging_config?client_id=eq.${encodeURIComponent(b.client_id)}&select=status&limit=1`);
+      if (!rows || !rows[0]) return res.status(404).json({ error: "wire the academy first" });
+      if (b.live !== false && rows[0].status !== "active") return res.status(400).json({ error: "activate the academy first" });
+      await sb(`client_meta_messaging_config?client_id=eq.${encodeURIComponent(b.client_id)}`, {
+        method: "PATCH", headers: { Prefer: "return=minimal" },
+        body: JSON.stringify({ inbox_live: b.live !== false, updated_at: new Date().toISOString() }),
+      });
+      return res.status(200).json({ ok: true, inbox_live: b.live !== false });
+    }
+
     if (b.action === "status") {
       if (!b.client_id) return res.status(400).json({ error: "client_id required" });
-      const rows = await sb(`client_meta_messaging_config?client_id=eq.${encodeURIComponent(b.client_id)}&select=page_id,ig_user_id,status,notes,updated_at&limit=1`);
+      const rows = await sb(`client_meta_messaging_config?client_id=eq.${encodeURIComponent(b.client_id)}&select=page_id,ig_user_id,status,inbox_live,notes,updated_at&limit=1`);
       return res.status(200).json({ config: (rows && rows[0]) || null });
     }
 

@@ -1,6 +1,7 @@
 import { withSentryApiRoute } from "../_sentry.js";
 import { maybeSendSmsViaProvider } from "../messaging/provider.js";
 import { emailProvider, maybeSendEmailViaResend } from "../messaging/email-provider.js";
+import { maybeSendDmViaMeta } from "../meta/_dm.js";
 // Vercel Serverless Function — GHL: send SMS or Email to an academy parent.
 //
 // POST /api/ghl/send-message
@@ -271,6 +272,36 @@ async function handler(req, res) {
     return res.status(400).json({ error: "message, html, or an attachment is required" });
   }
   if (type === "Email" && !subject) return res.status(400).json({ error: "subject required for Email" });
+
+  // Provider gate (IG/FB DMs): Meta-spine academies reply via the Graph API +
+  // own-store (dm_threads). Runs BEFORE the GHL contact lookup because a DM
+  // thread has no phone/email and may have no GHL contact yet - the lookup
+  // would 404 a perfectly sendable reply. Resolves the thread by
+  // conversation_id (dm_threads uuid) or contact_id; a GHL-passthrough thread
+  // resolves neither → { handled:false } → the normal GHL send below.
+  if (type === "IG" || type === "FB") {
+    const g = await maybeSendDmViaMeta(clientId, {
+      conversationId: body.conversation_id,
+      ghlContactId:   body.contact_id,
+      channel:        type === "IG" ? "instagram" : "facebook",
+      text:           message,
+      attachments,
+      sentBy:         (ctx.user && ctx.user.email) || "staff",
+    });
+    if (g.handled) {
+      const logMeta = (extra) => sb(`inbox_message_log`, {
+        method: "POST", headers: { Prefer: "return=minimal" },
+        body: JSON.stringify([{
+          client_id: clientId, ghl_contact_id: body.contact_id || null, channel: type,
+          message: String(message || "(attachment)").slice(0, 1000),
+          sent_by: (ctx.user && ctx.user.email) || null, ...extra,
+        }]),
+      }).catch(() => {});
+      if (!g.ok) { await logMeta({ status: "failed", error: g.error }); return res.status(502).json({ error: `Meta send failed: ${g.error}` }); }
+      await logMeta({ status: "sent", ghl_message_id: g.mid || null });
+      return res.status(200).json({ ok: true, sent_via: "meta", message_id: g.mid || null });
+    }
+  }
 
   // Find the contact. Callers can pass contact_id directly (Inbox reply
   // case — we already know who we're replying to) to skip the lookup.

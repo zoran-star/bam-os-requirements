@@ -12176,6 +12176,9 @@ async function _v15ibSend() {
         // Target the EXACT contact we're viewing - never re-look-up by phone
         // (which can resolve to a duplicate and send to the wrong conversation).
         contact_id: a.contactId || undefined,
+        // DM store threads (Meta spine) are keyed by thread id, not contact -
+        // send-message resolves IG/FB replies through this.
+        conversation_id: a.convId || undefined,
         contact_phone: a.phone || undefined, contact_email: a.email || undefined, contact_name: a.name || undefined,
         message: text, subject: _V15IB.type === 'Email' ? subject : undefined,
         attachments: _V15IB.pending,
