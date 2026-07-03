@@ -130,6 +130,21 @@ async function handler(req, res) {
 
       // ── CUTOVER ──
       if (portReady && a2pReady) {
+        // Attach the number to the Messaging Service (A2P sender pool) so
+        // registered traffic actually flows through the campaign.
+        try {
+          if (row.messaging_service_sid) {
+            const pnNow = pn || await findNumber(auth, row.account_sid, row.from_number);
+            const subToken = row.auth_token_enc ? decryptSecret(row.auth_token_enc) : null;
+            if (pnNow && subToken) {
+              await fetch(`https://messaging.twilio.com/v1/Services/${encodeURIComponent(row.messaging_service_sid)}/PhoneNumbers`, {
+                method: "POST",
+                headers: { Authorization: basic(row.account_sid, subToken), "Content-Type": "application/x-www-form-urlencoded" },
+                body: new URLSearchParams({ PhoneNumberSid: pnNow.sid }).toString(),
+              });
+            }
+          }
+        } catch (_) { /* best-effort; staff can attach in console */ }
         // 1. catch-up history import (idempotent; ok if it partially fails - staff can re-run)
         let imported = false;
         try {
