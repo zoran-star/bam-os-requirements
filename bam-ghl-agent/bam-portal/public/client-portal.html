@@ -3687,6 +3687,10 @@
   .mm-funnel-line { font-size: 13px; color: var(--text-sub); margin-bottom: 10px; }
   .mm-funnel-line b { color: var(--text); }
   .mm-verdict { font-size: 14px; font-weight: 700; margin-top: 12px; }
+  .mm-spark { display: flex; align-items: flex-end; gap: 3px; height: 36px; margin: 12px 0 4px; }
+  .mm-spark span { width: 10px; border-radius: 2px 2px 0 0; min-height: 4px; }
+  .mm-anchor { font-size: 26px; font-weight: 800; letter-spacing: -0.01em; }
+  .mm-anchor small { font-size: 11px; font-weight: 500; color: var(--text-mute); margin-left: 6px; letter-spacing: 0.06em; }
   .mm-warn-line { font-size: 12px; color: var(--red); margin-top: 10px; }
   @media (max-width: 720px) {
     .mm-flow { grid-template-columns: 1fr; }
@@ -40071,15 +40075,21 @@ function _mmRenderCard() {
     (c.testing ? '<span class="mm-pill-tag">testing</span>' : '') +
     '</span>' + _mmBarHtml(c.testing ? 30 : _mmCplFill(c.cpl), c.band) + '</div>'
   ).join('') || '<div style="font-size:12px;color:var(--text-mute)">no live creatives yet</div>';
-  const drift = camp.drift_pct;
-  const cplTrend = drift == null ? '' : (drift <= 0 ? ' <span class="mm-t-green">&darr;</span>' : ' <span class="mm-t-red">&uarr;</span>');
+  const lt = camp.lifetime || {}, w = camp.window || {};
+  let cplTrend = '';
+  if (w.judged && w.drift_vs_lifetime_pct != null) {
+    const up = w.drift_vs_lifetime_pct > 0;
+    cplTrend = ' <span class="' + _mmBandTxt(w.drift_band) + '">' + (up ? '&uarr;' : '&darr;') + ' ' + Math.abs(Math.round(w.drift_vs_lifetime_pct)) + '%</span>';
+  } else if (!w.judged) {
+    cplTrend = ' <span class="mm-t-grey">gathering data</span>';
+  }
   host.innerHTML =
     '<div class="mm-card" onclick="openMarketingMachine()">' +
       '<div class="mm-month"><span class="mm-month-name">' + _escapeHtml((m.name || '').toUpperCase()) + '</span>' +
         '<div class="mm-bar"><div class="mm-bar-fill mm-f-month" style="width:' + monthPct + '%"></div></div>' +
         '<span class="mm-month-meta">' + spendTxt + '</span></div>' +
       '<div class="mm-flow">' +
-        '<div><div class="mm-col-label">Campaign</div>' + _mmBarHtml(_mmCplFill(camp.cpl), camp.band) + '</div>' +
+        '<div><div class="mm-col-label">Campaign</div>' + _mmBarHtml(_mmCplFill(camp.health_cpl), camp.band) + '</div>' +
         '<div class="mm-arrow">&rsaquo;</div>' +
         '<div><div class="mm-col-label">Creatives</div>' + crRows + '</div>' +
         '<div class="mm-arrow">&rsaquo;</div>' +
@@ -40088,7 +40098,7 @@ function _mmRenderCard() {
         '<div><div class="mm-col-label">Result</div><div class="mm-result-box"><b>' + (r.leads ?? 0) + '</b> leads<br><b>' + (r.booked ?? 0) + '</b> trials</div></div>' +
       '</div>' +
       '<div class="mm-foot">' +
-        '<span class="mm-foot-cpl">COST PER LEAD <span class="' + _mmBandTxt(camp.band) + '">' + _mmMoney(camp.cpl) + '</span>' + cplTrend + '</span>' +
+        '<span class="mm-foot-cpl">COST PER LEAD <span class="' + _mmBandTxt(lt.band) + '">' + _mmMoney(lt.cpl) + '</span> lifetime' + cplTrend + '</span>' +
         (d.warning ? '<span class="mm-foot-warn">&#9888; ' + _escapeHtml(d.warning.text) + '</span>' : '') +
         '<span class="mm-foot-tap">tap &rsaquo;</span>' +
       '</div>' +
@@ -40146,31 +40156,47 @@ function _mmRenderModal(d) {
   }
   const m = d.month || {}, camp = d.campaign || {}, page = d.page || {}, r = d.result || {}, pills = d.pills || {};
   const monthPct = m.days_in_month ? Math.round((m.day / m.days_in_month) * 100) : 0;
-  const rangeLabel = d.range && d.range.is_mtd ? 'month to date' : (d.range ? d.range.since + ' to ' + d.range.until : '');
+  const rangeLabel = d.range && d.range.is_default ? ('last ' + d.range.days + ' days') : (d.range ? d.range.since + ' to ' + d.range.until : '');
 
   // Header line: month pacing (MTD) or the picked range's spend
-  const headLine = d.range && d.range.is_mtd
-    ? '<div class="mm-month" style="margin-bottom:0"><span class="mm-month-name">' + _escapeHtml((m.name || '').toUpperCase()) + '</span>' +
-      '<div class="mm-bar" style="flex:0 0 140px"><div class="mm-bar-fill mm-f-month" style="width:' + monthPct + '%"></div></div>' +
-      '<span class="mm-month-meta">day ' + m.day + ' of ' + m.days_in_month + ' &middot; spent $' + Math.round(camp.spend || 0) +
-      (m.planned ? ' of ~$' + Math.round(m.planned) + ' planned' : '') + '</span></div>'
-    : '<div class="mm-month" style="margin-bottom:0"><span class="mm-month-meta">' + _escapeHtml(rangeLabel) + ' &middot; spent $' + Math.round(camp.spend || 0) + '</span></div>';
+  const headLine =
+    '<div class="mm-month" style="margin-bottom:0"><span class="mm-month-name">' + _escapeHtml((m.name || '').toUpperCase()) + '</span>' +
+    '<div class="mm-bar" style="flex:0 0 140px"><div class="mm-bar-fill mm-f-month" style="width:' + monthPct + '%"></div></div>' +
+    '<span class="mm-month-meta">day ' + m.day + ' of ' + m.days_in_month + ' &middot; spent $' + Math.round(m.spend || 0) +
+    (m.planned ? ' of ~$' + Math.round(m.planned) + ' planned' : '') + ' &middot; judged window: ' + _escapeHtml(rangeLabel) + '</span></div>';
 
-  // CAMPAIGN
-  const driftTxt = camp.drift_pct == null ? '-' : ((camp.drift_pct > 0 ? '+' : '') + Math.round(camp.drift_pct) + '%');
-  const driftBand = camp.drift_pct == null ? null : (Math.abs(camp.drift_pct) <= 20 ? 'green' : (camp.drift_pct > 20 ? 'red' : 'green'));
-  const freqBand = camp.frequency == null ? null : (camp.frequency < 3 ? 'green' : (camp.frequency <= 3.5 ? 'gold' : 'red'));
+  // CAMPAIGN - lifetime CPL is the anchor, the window delta is the alarm
+  const lt = camp.lifetime || {}, w = camp.window || {}, fastM = camp.fast || {};
+  const spark = (camp.sparkline || []);
+  const maxCpl = Math.max(...spark.map(b => b.cpl || 0), 1);
+  const sparkHtml = spark.length < 2 ? '' :
+    '<div class="mm-spark">' + spark.map(b => {
+      const h = b.cpl == null ? 4 : Math.max(5, Math.round((b.cpl / maxCpl) * 36));
+      const tip = b.week + ': ' + (b.cpl == null ? 'no leads' : _mmMoney(b.cpl) + '/lead') + ' ($' + Math.round(b.spend) + ')';
+      return '<span class="mm-f-' + (b.band || 'grey') + '" style="height:' + h + 'px" title="' + _escapeHtml(tip) + '"></span>';
+    }).join('') + '</div><div class="mm-context" style="margin-top:0">cost per lead by week (taller = pricier)</div>';
+  let deltaLine;
+  if (w.judged && w.drift_vs_lifetime_pct != null) {
+    const up = w.drift_vs_lifetime_pct > 0;
+    deltaLine = '<div class="mm-verdict ' + _mmBandTxt(w.drift_band) + '">last ' + (d.range?.days || 14) + ' days ' + _mmMoney(w.cpl) +
+      ' ' + (up ? '&uarr;' : '&darr;') + ' ' + Math.abs(Math.round(w.drift_vs_lifetime_pct)) + '% vs lifetime' + _mmDotHtml(w.drift_band) + '</div>';
+  } else if (w.judged) {
+    deltaLine = '<div class="mm-verdict ' + _mmBandTxt(w.band) + '">last ' + (d.range?.days || 14) + ' days ' + _mmMoney(w.cpl) + _mmDotHtml(w.band) + '</div>';
+  } else {
+    deltaLine = '<div class="mm-verdict mm-t-grey">gathering data - ' + (w.leads || 0) + ' lead' + (w.leads === 1 ? '' : 's') + ' in this window so far</div>';
+  }
+  const freqBand = fastM.frequency == null ? null : (fastM.frequency < 3 ? 'green' : (fastM.frequency <= 3.5 ? 'gold' : 'red'));
   const learnTxt = camp.learning ? camp.learning.toUpperCase() : '-';
   const campSect =
     '<div class="mm-sect"><div class="mm-sect-head">Campaign ' + _mmDotHtml(camp.band) + '</div>' +
-    '<div class="mm-stats">' +
-      _mmStatHtml('Cost per lead', _mmMoney(camp.cpl), camp.band) +
-      _mmStatHtml('CPA drift', driftTxt, driftBand) +
-      _mmStatHtml('Frequency', camp.frequency == null ? '-' : camp.frequency + 'x', freqBand) +
-      _mmStatHtml('CTR', _mmPctTxt(camp.ctr), null) +
+    '<div class="mm-anchor ' + _mmBandTxt(lt.band) + '">' + _mmMoney(lt.cpl) + '<small>LIFETIME COST PER LEAD &middot; ' + (lt.leads || 0) + ' leads &middot; $' + Math.round(lt.spend || 0) + ' spent</small></div>' +
+    sparkHtml + deltaLine +
+    '<div class="mm-stats" style="margin-top:14px">' +
+      _mmStatHtml('Frequency (7d)', fastM.frequency == null ? '-' : fastM.frequency + 'x', freqBand) +
+      _mmStatHtml('CTR (7d)', _mmPctTxt(fastM.ctr), null) +
     '</div>' +
-    '<div class="mm-context">impressions ' + (camp.impressions || 0).toLocaleString() + ' &middot; reach ' + (camp.reach || 0).toLocaleString() +
-    ' &middot; learning ' + _escapeHtml(learnTxt) + '</div></div>';
+    '<div class="mm-context">window: impressions ' + (camp.impressions || 0).toLocaleString() + ' &middot; reach ' + (camp.reach || 0).toLocaleString() +
+    ' &middot; clicks ' + (camp.link_clicks || 0) + ' &middot; learning ' + _escapeHtml(learnTxt) + '</div></div>';
 
   // CREATIVES
   const crBand = d.creatives_band || 'grey';
