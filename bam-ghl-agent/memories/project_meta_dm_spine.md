@@ -1,6 +1,59 @@
 # Meta DM spine - Instagram + FB Messenger off GHL
 
-**Status: increments 1-3 built 2026-07-03 (dormant). Waiting on Meta app dashboard config + staff token reconnect before wiring GTA.**
+**Status 2026-07-03 EOD: GTA WIRED + ACTIVE. FB Messenger PROVEN end-to-end
+(real inbound stored in dm_threads). Instagram blocked on Meta App Review
+(Advanced Access) - that's the next session's job. Leads' IG DMs meanwhile
+still visible via the GHL passthrough in the inbox.**
+
+## Session results (2026-07-03 evening)
+- GTA config ACTIVE: page 130045040185267 "By Any Means GTA",
+  ig_user_id 17841465712982249 (@byanymeansgta), page token encrypted+stored.
+- App dashboard done by Zoran: Messenger + Instagram products, webhook
+  callback verified (both objects), page connected, **App Mode = LIVE**,
+  privacy policy URL = https://www.byanymeansbball.com/privacy-policy,
+  Facebook Login redirect whitelisted:
+  `https://staff.byanymeansbusiness.com/api/auth/staff-meta/callback`.
+- Staff Meta token is now ZORAN's (all ads + messaging scopes, expires
+  2026-09-01). Ximena's old token (ads_read only) EXPIRES 2026-07-13 - fine,
+  Zoran's is the newest team token and sees the 27 ad accounts.
+- **PROOF:** FB Messenger message from Zoran ("yo") delivered → dm_threads
+  row channel=facebook with contact_name resolved. Webhook self-test with a
+  signed fake IG payload also stored fine. The spine WORKS.
+
+## Gotchas discovered (important)
+1. **Dashboard "Verify and save" does NOT subscribe fields.** App-level
+   subscriptions existed with NO fields → zero deliveries. Fixed via
+   `POST /{app-id}/subscriptions` (object=instagram|page, fields=messages,
+   app token `id|secret`). Check with
+   `GET /{app-id}/subscriptions?fields=object,callback_url,active,fields`.
+2. **Standard Access only delivers app-role senders.** Zoran's FB = app
+   admin → FB message delivered. His personal IG = no app role → IG DM
+   silently dropped. The old IG "connected tools" toggle no longer exists
+   (default-on for pro accounts). For the public (real leads) we need
+   **Advanced Access via App Review** for `instagram_manage_messages` +
+   `pages_messaging` (likely + Business Verification).
+   Interim IG test option: App Roles → Instagram Testers → add a personal
+   IG handle → accept in IG app → that account's DMs then deliver.
+3. `vercel logs <deployment-url>` attached to a stale deployment shows
+   nothing - trust the DB, or fetch the current URL first.
+4. `vercel env pull` values can carry a trailing literal `\n` - strip it
+   before using pulled values in scripts.
+5. GHL is NOT in the page's subscribed_apps list (only BAMPORTAL) - GHL
+   receives IG via its own app-level plumbing; unaffected by ours.
+
+## NEXT SESSION: Meta App Review submission
+Goal: Advanced Access for `instagram_manage_messages` + `pages_messaging`
+(check `pages_manage_metadata` too) on app 2059912628202822.
+Prep needed:
+- App Review → Permissions and Features → request Advanced Access on those
+- Screencast: staff portal inbox receiving + replying to an IG DM (can film
+  after adding an Instagram Tester so the DM actually flows), plus a written
+  use-case ("academy staff answer their own customers' DMs in our portal")
+- Settings → Basic completeness: icon, category, privacy policy (done),
+  data deletion instructions URL (may need to add)
+- Business Verification in Business Manager if Meta asks
+- While waiting: build increment 4 (inbox reads dm_threads + Graph send +
+  passthrough dedupe) so everything ships the moment review passes.
 
 ## Why
 GTA's IG/FB DMs only lived in GHL. Phase 0 (same day) made them visible again via
