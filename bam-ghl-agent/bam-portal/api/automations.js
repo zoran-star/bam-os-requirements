@@ -586,6 +586,14 @@ async function handler(req, res) {
       return res.status(200).json({ people });
     }
 
+    // Distinct contacts with an ACTIVE enrollment in ANY automation. Powers the
+    // pipeline board's "!" alert (a lead nobody is messaging) - one cheap query.
+    if (b.action === "active-contacts") {
+      const rows = await sb(`automation_enrollments?client_id=eq.${clientId}&status=eq.active&select=contact_id&limit=5000`) || [];
+      const ids = [...new Set((Array.isArray(rows) ? rows : []).map(r => String(r.contact_id)).filter(Boolean))];
+      return res.status(200).json({ contact_ids: ids });
+    }
+
     return res.status(400).json({ error: "unknown action" });
   } catch (e) {
     console.error("[automations]", e);

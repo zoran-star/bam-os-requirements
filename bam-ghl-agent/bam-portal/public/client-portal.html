@@ -23441,8 +23441,20 @@ async function _plLoadNeedsAction() {
 // Last-message info per contact (from the GHL inbox list), for the Done Trial
 // cards: show when the last message was + glow if the LEAD messaged last.
 let _PL_LASTMSG = null;   // contactId → { direction, date }
+// Contacts with an ACTIVE automation enrollment (portal automation engine).
+// Powers the Interested-stage "!" - the REAL "is anybody messaging this lead"
+// check. null until loaded; on failure the badge falls back to message age.
+let _PL_AUTO = null;      // Set<contactId>
 // V2-only flow gate for the pipelines board. V1.5 = plain GHL mirror.
 function _plIsV2() { return typeof V2_ACCESS !== 'undefined' && V2_ACCESS; }
+async function _plLoadActiveAutomations() {
+  if (!_plIsV2()) return;
+  try {
+    const j = await _autoApi('active-contacts');
+    _PL_AUTO = new Set((j.contact_ids || []).map(String));
+    try { if (typeof _renderPipelineBoard === 'function') _renderPipelineBoard(); } catch (_) {}
+  } catch (_) { /* leave null - "!" falls back to the message-age rule */ }
+}
 async function _plLoadLastMessages() {
   try {
     const token = await _mreqAuthToken();
@@ -23563,6 +23575,7 @@ async function _plLoadAgentMode() {
   } catch (_) { _PL_AGENT_MODE = 'off'; }
   if (_PL_AGENT_MODE && _PL_AGENT_MODE !== 'off') { _plLoadNeedsAction(); try { _plScanNow(null, true); } catch (_) {} }   // load badges + auto-scan once the agent is known to be on
   _plLoadLastMessages();   // Done Trial cards: last-message time + lead-last glow
+  _plLoadActiveAutomations();   // Interested "!": real automation-enrollment check
   try { if (typeof _renderPipelineBoard === 'function') _renderPipelineBoard(); } catch (_) {}
 }
 
@@ -23768,6 +23781,7 @@ async function fetchAndRenderPipelines() {
     _renderPipelineTabs();
     _renderPipelineBoard();
     _plLoadLastMessages();   // Done Trial cards: last-message time + lead-last glow
+    _plLoadActiveAutomations();   // Interested "!": real automation-enrollment check
     // Auto-scan on load so recommendations are fresh without waiting for the cron
     // (debounced to 5 min; greys the Responded cards while it runs). If the agent
     // mode isn't known yet, _plLoadAgentMode kicks the scan once it resolves.
@@ -24865,15 +24879,26 @@ function _renderPipelineBoard() {
     const _goldGlow = 'box-shadow:0 0 0 1px var(--gold,#E8C547),0 0 18px rgba(232,197,71,0.5);border-color:var(--gold,#E8C547);';
     // Trial-today gold glow (non-done stages); Done Trial glows only on lead-last.
     let glow = isDone ? (_clientLast ? _goldGlow : '') : (todayTrial ? _goldGlow : '');
-    // Interested stage: flag the card RED when there's been no text/email in the
-    // last 5 days - they've fallen out of (or were never in) an active messaging
-    // automation, i.e. nobody's contacted them. Uses _PL_LASTMSG (GHL inbox list);
-    // a lead not seen there at all counts as not-recently-contacted.
+    // "Nobody's working this lead" alert (red ! + red glow), per stage owner:
+    // - Interested stage (Ghosted automation owns it): RED as soon as the lead
+    //   has NO active automation enrollment - the real check via
+    //   automation_enrollments (V2). Until that set loads, or on V1.5, fall
+    //   back to the old proxy: no text/email in 5+ days.
+    // - Responded stage (booking agent owns it): everyone here is agent-worked,
+    //   so only RED when the newest message is 4+ days old - the agent stalled
+    //   or dropped the lead.
     let _noContact = false;
-    if (_PL_LASTMSG && stage && /interest/i.test(stage.name || '')) {
-      const _ageMs = (_lastMsg && _lastMsg.date) ? (Date.now() - new Date(_lastMsg.date).getTime()) : Infinity;
-      if (_ageMs > 5 * 86400 * 1000) { glow = 'box-shadow:0 0 0 1px #e0654f,0 0 20px rgba(224,90,66,0.6);border-color:#e0654f;'; _noContact = true; }
+    let _alertTitle = '';
+    const _msgAgeMs = (_lastMsg && _lastMsg.date) ? (Date.now() - new Date(_lastMsg.date).getTime()) : Infinity;
+    if (stage && /interest/i.test(stage.name || '')) {
+      if (_plIsV2() && _PL_AUTO) _noContact = !_PL_AUTO.has(String(o.contactId || ''));
+      else if (_PL_LASTMSG) _noContact = _msgAgeMs > 5 * 86400 * 1000;
+      _alertTitle = "Not in an active automation - nobody's messaging this lead. Open the card to send them to the Ghosted automation.";
+    } else if (_plIsV2() && _PL_LASTMSG && stage && /respond/i.test(stage.name || '')) {
+      _noContact = _msgAgeMs > 4 * 86400 * 1000;
+      _alertTitle = 'No messages in 4+ days - the agent may have stalled on this lead. Open the card to check the conversation.';
     }
+    if (_noContact) glow = 'box-shadow:0 0 0 1px #e0654f,0 0 20px rgba(224,90,66,0.6);border-color:#e0654f;';
     // Responded-stage status: 🔴 Needs action when a Hawkeye card is waiting,
     // labelled by what the action is (reply / ghost / confirm lost / book). 🟢 All
     // good = nothing waiting (we're waiting on the lead). Tap → Hawkeye focused.
@@ -24902,7 +24927,7 @@ function _renderPipelineBoard() {
            ondragstart="_plDragStart(event,'${escapeHTML(o.id)}','${escapeHTML(o.stageId || '')}','${escapeHTML(p.id)}')"
            ondragend="_plDragEnd(event)"
            onclick="_plOpenCard('${escapeHTML(o.id)}')">
-        ${_noContact ? `<span class="pl-card-alert" title="No contact in 5+ days - nobody's working this lead. Open the card to send them to the Ghosted automation." style="position:absolute;top:8px;right:8px;width:19px;height:19px;border-radius:50%;background:#e0654f;color:#fff;font-size:12px;font-weight:800;line-height:1;display:flex;align-items:center;justify-content:center;z-index:2;box-shadow:0 0 10px rgba(224,90,66,0.7)">!</span>` : ''}
+        ${_noContact ? `<span class="pl-card-alert" title="${escapeHTML(_alertTitle)}" style="position:absolute;top:8px;right:8px;width:19px;height:19px;border-radius:50%;background:#e0654f;color:#fff;font-size:12px;font-weight:800;line-height:1;display:flex;align-items:center;justify-content:center;z-index:2;box-shadow:0 0 10px rgba(224,90,66,0.7)">!</span>` : ''}
         ${(_PL_DUPS && _PL_DUPS.has(o.id)) ? `<button onclick="event.stopPropagation(); _plResolveDup('${escapeHTML(o.id)}')" title="Possible duplicate - tap to resolve" style="width:100%;box-sizing:border-box;margin-bottom:7px;background:rgba(224,90,66,0.12);color:#e0654f;border:1px solid #e0654f;border-radius:6px;padding:4px 8px;font-size:11px;font-weight:700;cursor:pointer;text-align:center">⚠ Possible duplicate</button>` : ''}
         <div class="pl-card-name" style="padding-right:${_noContact ? '26px' : '8px'}"><span class="pl-card-tag">Parent</span> ${escapeHTML(parent)}</div>
         <div class="pl-card-contact"><span class="pl-card-tag">Athlete</span> ${o.athlete ? escapeHTML(o.athlete) : '<span style="opacity:0.5">-</span>'}</div>
