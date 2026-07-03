@@ -70,7 +70,8 @@ sql_paths = [
   "./seeds/30_local_parent_app_fixture.sql",
   "./seeds/35_local_parent_bookable_program_fixture.sql",
   "./seeds/40_local_parent_schedule_fixture.sql",
-  "./seeds/50_local_parent_offer_runtime_fixture.sql"
+  "./seeds/50_local_parent_offer_runtime_fixture.sql",
+  "./seeds/60_local_academy_user_fixture.sql"
 ]
 
 [db.network_restrictions]

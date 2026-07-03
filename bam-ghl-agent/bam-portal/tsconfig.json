@@ -22,5 +22,5 @@
     "noUnusedParameters": true,
     "types": ["node"]
   },
-  "include": ["api/parent/**/*.ts", "api/_runtime/**/*.ts", "api/runtime/**/*.ts", "api/website/**/*.ts", "vitest.config.ts"]
+  "include": ["api/client/**/*.ts", "api/parent/**/*.ts", "api/_runtime/**/*.ts", "api/runtime/**/*.ts", "api/website/**/*.ts", "vitest.config.ts"]
 }

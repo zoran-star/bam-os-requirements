@@ -5,7 +5,7 @@ import reactRefresh from 'eslint-plugin-react-refresh'
 import tseslint from 'typescript-eslint'
 import { defineConfig, globalIgnores } from 'eslint/config'
 
-const serverTsFiles = ['api/parent/**/*.ts', 'api/_runtime/**/*.ts', 'api/runtime/**/*.ts', 'api/website/**/*.ts', 'vitest.config.ts']
+const serverTsFiles = ['api/client/**/*.ts', 'api/parent/**/*.ts', 'api/_runtime/**/*.ts', 'api/runtime/**/*.ts', 'api/website/**/*.ts', 'vitest.config.ts']
 
 export default defineConfig([
   globalIgnores(['dist']),
