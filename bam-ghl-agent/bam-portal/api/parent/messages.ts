@@ -201,7 +201,7 @@ async function markRead(req: ParentApiRequest, res: ParentApiResponse) {
   const tenantId = resolveTenantId(context, optionalString(body.tenant_id));
   const threadId = requiredUuidString(body.thread_id, "thread_id");
   const thread = await requireParentThread(tenantId, context.profile.id, threadId);
-  const now = new Date().toISOString();
+  const lastReadAt = thread.last_message_at ?? new Date().toISOString();
 
   await sb(
     "customer_thread_reads?on_conflict=thread_id,auth_user_id",
@@ -214,8 +214,8 @@ async function markRead(req: ParentApiRequest, res: ParentApiResponse) {
         reader_type: "PARENT",
         customer_profile_id: context.profile.id,
         auth_user_id: context.user.id,
-        last_read_at: now,
-        updated_at: now,
+        last_read_at: lastReadAt,
+        updated_at: new Date().toISOString(),
       }),
     },
   );

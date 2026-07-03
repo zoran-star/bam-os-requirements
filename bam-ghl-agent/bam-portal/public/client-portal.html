@@ -2439,6 +2439,169 @@
     margin: 4px 0 0 auto;
   }
 
+  .pm-sidebar-head {
+    padding: 0 20px 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    border-bottom: 1px solid var(--line);
+    margin-bottom: 8px;
+  }
+
+  .pm-search {
+    margin: 0;
+    width: 100%;
+  }
+
+  .pm-filter-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    align-items: center;
+  }
+
+  .pm-filter {
+    min-height: 34px;
+    padding: 0 11px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: transparent;
+    color: var(--text-sub);
+    font: inherit;
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease, transform 0.15s ease;
+  }
+
+  .pm-filter:hover { color: var(--text); border-color: var(--border-med); }
+  .pm-filter:active { transform: scale(0.96); }
+  .pm-filter.active {
+    background: var(--gold);
+    border-color: var(--gold);
+    color: #16140F;
+  }
+
+  .pm-assigned-filter {
+    width: 100%;
+    min-height: 36px;
+    background: var(--surface-el);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    color: var(--text);
+    font: inherit;
+    font-size: 12px;
+    padding: 0 10px;
+    outline: none;
+  }
+
+  .pm-thread-count {
+    padding: 0 20px 8px;
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--text-mute);
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .pm-thread-unread {
+    min-width: 18px;
+    height: 18px;
+    border-radius: 999px;
+    background: var(--gold);
+    color: #16140F;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 10px;
+    font-weight: 800;
+    line-height: 1;
+    margin: 4px 0 0 auto;
+    padding: 0 5px;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .pm-parent-email {
+    font-size: 11px;
+    color: var(--text-mute);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    margin-top: 1px;
+  }
+
+  .pm-status-chip {
+    display: inline-flex;
+    align-items: center;
+    min-height: 24px;
+    padding: 0 8px;
+    border-radius: 999px;
+    background: rgba(255,255,255,0.06);
+    color: var(--text-sub);
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+
+  .pm-status-chip.open { background: rgba(232,197,71,0.14); color: var(--gold); }
+  .pm-status-chip.closed { background: rgba(255,255,255,0.05); color: var(--text-mute); }
+
+  .pm-header-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+  }
+
+  .pm-action {
+    min-height: 38px;
+    padding: 0 13px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: transparent;
+    color: var(--text-sub);
+    font: inherit;
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease, transform 0.15s ease;
+  }
+
+  .pm-action:hover { color: var(--text); border-color: var(--border-med); background: var(--surface-el); }
+  .pm-action:active { transform: scale(0.96); }
+  .pm-action.primary {
+    background: var(--gold);
+    border-color: var(--gold);
+    color: #16140F;
+  }
+  .pm-action[disabled] { opacity: 0.45; cursor: not-allowed; transform: none; }
+
+  .pm-send {
+    border: none;
+    border-radius: 999px;
+    min-width: 40px;
+    width: 40px;
+    height: 40px;
+    padding: 0;
+    justify-content: center;
+  }
+
+  .pm-empty-state {
+    padding: 48px 24px;
+    text-align: center;
+    color: var(--text-mute);
+    line-height: 1.5;
+  }
+
+  .pm-error-state { color: var(--red, #d96b5f); }
+
   /* Chat main */
   .chat-main {
     flex: 1;
@@ -4147,6 +4310,10 @@
     padding: 24px;
   }
   #admin-fb-overlay.open { display: flex; }
+  body:has(#view-messages.active) #admin-fb-wrap,
+  body:has(#view-messages.active) #admin-fb-overlay,
+  body:has(#view-parent-messages.active) #admin-fb-wrap,
+  body:has(#view-parent-messages.active) #admin-fb-overlay { display: none !important; }
   #admin-fb-modal {
     background: #131318; border: 1px solid rgba(255,255,255,0.12);
     border-radius: 10px; padding: 28px; max-width: 520px; width: 100%;
@@ -5456,12 +5623,23 @@
       height: calc(100dvh - var(--mobnav-h) - env(safe-area-inset-bottom));
       flex-direction: column;
     }
+    .parent-messages-layout { min-height: 0; }
     .chat-sidebar {
       width: 100%;
       max-height: 38dvh;
       border-right: none;
       border-bottom: 1px solid var(--line);
     }
+    .parent-messages-layout .chat-sidebar {
+      flex: 0 0 auto;
+      max-height: min(32dvh, 280px);
+    }
+    .parent-messages-layout .chat-main,
+    .parent-messages-layout .chat-messages { min-height: 0; }
+    .pm-sidebar-head { padding: 0 16px 12px; }
+    .pm-thread-count { padding: 0 16px 8px; }
+    .pm-header-actions { width: 100%; justify-content: flex-start; }
+    .pm-action { min-height: 40px; }
     .chat-header { padding: 14px 16px; }
     .chat-messages { padding: 16px; gap: 2px; }
     /* composer clears the home-indicator inside the native app */
@@ -5480,7 +5658,10 @@
     }
     #admin-fb-btn { width: 48px; height: 48px; }
     /* Hide it on the chat view so it never covers the send button */
-    body:has(#view-messages.active) #admin-fb-wrap { display: none; }
+    body:has(#view-messages.active) #admin-fb-wrap,
+    body:has(#view-messages.active) #admin-fb-overlay,
+    body:has(#view-parent-messages.active) #admin-fb-wrap,
+    body:has(#view-parent-messages.active) #admin-fb-overlay { display: none; }
 
     /* ── Inputs ≥16px so iOS doesn't zoom on focus ── */
     input, textarea, select,
@@ -5663,6 +5844,16 @@
         </span>
         <span id="nav-messages-label">Messages</span>
         <span class="nav-badge" id="messages-unread-badge" style="display:none;background:var(--accent);color:#0B0B0D;font-size:10px;font-weight:700;padding:2px 7px;border-radius:999px;margin-left:auto"></span>
+      </div>
+
+      <div class="nav-item" id="nav-parent-messages" onclick="switchView('parent-messages', this)">
+        <span class="nav-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/>
+          </svg>
+        </span>
+        Parent Inbox
+        <span class="nav-badge" id="parent-messages-unread-badge" style="display:none;background:var(--accent);color:#0B0B0D;font-size:10px;font-weight:700;padding:2px 7px;border-radius:999px;margin-left:auto"></span>
       </div>
 
       <!-- V1.5 "Support" accordion: groups Systems + Marketing under one expandable
@@ -6948,6 +7139,63 @@ Then the call to action."]</div>
                 oninput="onMessagesInputChange(event)"
                 onkeydown="onMessagesInputKeyDown(event)"></textarea>
               <div class="chat-send" id="messages-send-btn" onclick="sendCurrentMessage()" title="Send">↑</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════
+         PARENT INBOX (academy ↔ parents)
+    ══════════════════════════════ -->
+    <div class="view" id="view-parent-messages">
+      <div class="chat-layout parent-messages-layout">
+        <div class="chat-sidebar" id="pm-sidebar">
+          <div class="pm-sidebar-head">
+            <input class="chat-search pm-search" id="pm-search" placeholder="Search parents…" type="text" oninput="renderParentThreads()">
+            <div class="pm-filter-row" role="tablist" aria-label="Parent message filters">
+              <button type="button" class="pm-filter active" data-pm-filter="needs_reply" onclick="setParentMessagesFilter('needs_reply')">Needs reply</button>
+              <button type="button" class="pm-filter" data-pm-filter="all" onclick="setParentMessagesFilter('all')">All</button>
+              <button type="button" class="pm-filter" data-pm-filter="open" onclick="setParentMessagesFilter('open')">Open</button>
+              <button type="button" class="pm-filter" data-pm-filter="closed" onclick="setParentMessagesFilter('closed')">Closed</button>
+            </div>
+            <select id="pm-assigned-filter" class="pm-assigned-filter" onchange="setParentAssignedFilter(this.value)" aria-label="Assignment filter">
+              <option value="all">All assignments</option>
+              <option value="me">Assigned to me</option>
+              <option value="unassigned">Unassigned</option>
+            </select>
+          </div>
+          <div class="pm-thread-count" id="pm-thread-count">Loading</div>
+          <div id="pm-thread-list">
+            <div class="req-empty" style="padding:20px"><span class="req-spin"></span>Loading parent threads…</div>
+          </div>
+        </div>
+
+        <div class="chat-main" id="pm-main">
+          <div class="chat-header" id="pm-header">
+            <div style="min-width:0">
+              <div class="chat-header-name" id="pm-header-name">Parent Inbox</div>
+              <div class="chat-header-sub" id="pm-header-sub">Pick a thread to reply</div>
+            </div>
+            <div class="pm-header-actions" id="pm-header-actions" style="display:none">
+              <button type="button" class="pm-action" id="pm-claim-btn" onclick="patchParentThread('claim')">Claim</button>
+              <button type="button" class="pm-action" id="pm-unassign-btn" onclick="patchParentThread('unassign')">Unassign</button>
+              <button type="button" class="pm-action" id="pm-status-btn" onclick="patchParentThread('toggle-status')">Close</button>
+              <button type="button" class="pm-action" onclick="loadParentThreads({ force: true })" title="Refresh parent threads" aria-label="Refresh parent threads">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v6h-6"/></svg>
+                Refresh
+              </button>
+            </div>
+          </div>
+          <div class="chat-messages" id="pm-thread" onscroll="parentThreadScroll()">
+            <div class="pm-empty-state">Choose a parent thread from the list.</div>
+          </div>
+          <div class="chat-input-area" id="pm-composer-area" style="display:none">
+            <div class="chat-input-wrap">
+              <textarea class="chat-input" id="pm-input" rows="1" placeholder="Reply to parent…"
+                oninput="onParentMessageInputChange(event)"
+                onkeydown="onParentMessageKeyDown(event)"></textarea>
+              <button type="button" class="pm-action primary pm-send" id="pm-send-btn" onclick="sendParentReply()" title="Send" aria-label="Send parent reply">↑</button>
             </div>
           </div>
         </div>
@@ -12435,6 +12683,7 @@ function switchView(name, el) {
   // Train Agent is opt-in: block deep-links for users without the grant.
   if (name === 'train-agent' && !((typeof _MY_CAN_TRAIN_AGENT !== 'undefined' && _MY_CAN_TRAIN_AGENT === true) || _IS_BAM_STAFF === true)) { switchView(_landingView ? _landingView() : 'home'); return; }
   hapticTap('Light'); // #12 - tactile feedback on tab change (native only)
+  if (name !== 'parent-messages' && typeof stopParentMessagesPoll === 'function') stopParentMessagesPoll();
 
   // Remember where we came from so the "Talk to BAM Business" view can go back.
   if (name === 'messages') {
@@ -12468,6 +12717,9 @@ function switchView(name, el) {
 
   // When entering Messages, load conversations
   if (name === 'messages') openMessagesView();
+
+  // When entering Parent Inbox, load academy ↔ parent threads
+  if (name === 'parent-messages') openParentMessagesView();
 
   // When entering Members, load the roster
   if (name === 'members') fetchAndRenderMembers();
@@ -13603,6 +13855,7 @@ const _PERMISSIONABLE_TABS = [
   { key: 'marketing', label: 'Marketing',          icon: '📣', views: ['marketing'] },
   { key: 'resources', label: 'Resources',          icon: '📚', views: ['resources'] },
   { key: 'assets',    label: 'Assets',             icon: '🖼️', views: ['assets'] },
+  { key: 'parent_messages', label: 'Parent Inbox', icon: '💬', views: ['parent-messages'] },
   { key: 'blueprint', label: 'Business Blueprint', icon: '🗂', views: ['blueprint'] },
   { key: 'members',   label: 'Members',            icon: '👥', views: ['members'] },
   { key: 'inbox',     label: 'Inbox',              icon: '💬', views: ['inbox', 'v15inbox'] },
@@ -21285,6 +21538,7 @@ async function switchClient(newId) {
   const row = (CLIENT_ROWS || []).find(c => c.id === newId);
   if (!row) return;
   CLIENT_ID = row.id;
+  if (typeof stopParentMessagesPoll === 'function') stopParentMessagesPoll();
   try { localStorage.setItem('bam_active_client', row.id); } catch (_) {} // remember the choice
   MARKETING_INCLUDED = row.marketing_included !== false;
   ORGANIC_CONTENT = row.organic_content === true;
@@ -21308,6 +21562,8 @@ async function switchClient(newId) {
   // Re-resolve the logged-in user's identity for the newly-selected academy
   // (their client_users name/email can differ per academy).
   setMyIdentity();
+  if (typeof resetParentMessagesState === 'function') resetParentMessagesState();
+  if (typeof loadParentUnreadCount === 'function') loadParentUnreadCount().catch(() => {});
   await loadAcademyName();
   await loadTickets();
   subscribeTicketsRealtime();   // re-scope tickets subscription to new CLIENT_ID
@@ -38704,6 +38960,461 @@ function updateUnreadBadge() {
   setAppIconBadge(count);
 }
 
+// ═══════════════════════════════════════════════════════════════════
+// PARENT INBOX - academy ↔ parent threads
+// ═══════════════════════════════════════════════════════════════════
+let _pmThreads = [];
+let _pmActiveThreadId = null;
+let _pmMessages = [];
+let _pmFilter = 'needs_reply';
+let _pmAssigned = 'all';
+let _pmLoadingThreads = false;
+let _pmPollTimer = null;
+let _pmClientId = null;
+
+function resizeParentMessagesLayout() {
+  const layout = document.querySelector('#view-parent-messages .parent-messages-layout');
+  if (!layout) return;
+  if (!window.matchMedia('(max-width: 768px)').matches) {
+    layout.style.height = '';
+    return;
+  }
+  const top = layout.getBoundingClientRect().top;
+  const nav = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--mobnav-h')) || 64;
+  const available = Math.floor(window.innerHeight - top - nav - 8);
+  if (available > 0) layout.style.height = Math.max(360, available) + 'px';
+}
+
+function _pmActiveThread() {
+  return _pmThreads.find(t => String(t.id) === String(_pmActiveThreadId)) || null;
+}
+
+function _pmParentName(thread) {
+  const p = thread && thread.parent;
+  const name = [p?.first_name, p?.last_name].filter(Boolean).join(' ').trim();
+  return name || p?.email || 'Parent';
+}
+
+function _pmParentEmail(thread) {
+  return thread?.parent?.email || '';
+}
+
+function _pmThreadInitials(thread) {
+  return _initials(_pmParentName(thread));
+}
+
+function _pmStatusLabel(thread) {
+  return thread?.status === 'CLOSED' ? 'Closed' : 'Open';
+}
+
+function _pmThreadListUrl() {
+  const params = new URLSearchParams({ limit: '50', assigned: _pmAssigned });
+  if (_pmFilter === 'needs_reply') params.set('needs_reply', 'true');
+  else if (_pmFilter === 'open') params.set('status', 'OPEN');
+  else if (_pmFilter === 'closed') params.set('status', 'CLOSED');
+  return '/api/client/parent-message-threads?' + params.toString();
+}
+
+function _pmWithClientId(url) {
+  if (typeof CLIENT_ID === 'undefined' || !CLIENT_ID) throw new Error('No active academy selected.');
+  const sep = url.includes('?') ? '&' : '?';
+  return url + sep + 'client_id=' + encodeURIComponent(CLIENT_ID);
+}
+
+async function pmApi(url, opts = {}) {
+  const headers = { 'Content-Type': 'application/json', ...(await _msgAuthHeaders()), ...(opts.headers || {}) };
+  const res = await fetch(_pmWithClientId(url), { ...opts, headers });
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(json?.error || ('HTTP ' + res.status));
+  return json;
+}
+
+function resetParentMessagesState() {
+  _pmThreads = [];
+  _pmMessages = [];
+  _pmActiveThreadId = null;
+  _pmClientId = (typeof CLIENT_ID !== 'undefined' ? CLIENT_ID : null);
+  const list = document.getElementById('pm-thread-list');
+  if (list) list.innerHTML = '<div class="req-empty" style="padding:20px"><span class="req-spin"></span>Loading parent threads…</div>';
+  const thread = document.getElementById('pm-thread');
+  if (thread) thread.innerHTML = '<div class="pm-empty-state">Choose a parent thread from the list.</div>';
+  const composer = document.getElementById('pm-composer-area');
+  if (composer) composer.style.display = 'none';
+  renderParentHeader();
+}
+
+async function openParentMessagesView() {
+  resizeParentMessagesLayout();
+  requestAnimationFrame(resizeParentMessagesLayout);
+  if (!_myAuthUserId) {
+    try { const u = await _sb.auth.getUser(); _myAuthUserId = u?.data?.user?.id || null; } catch (_) {}
+  }
+  startParentMessagesPoll();
+  if (_pmClientId !== CLIENT_ID || _pmThreads.length === 0) {
+    resetParentMessagesState();
+    await loadParentThreads({ force: true });
+  } else {
+    renderParentThreads();
+    renderParentHeader();
+  }
+  loadParentUnreadCount().catch(() => {});
+}
+
+function startParentMessagesPoll() {
+  stopParentMessagesPoll();
+  _pmPollTimer = setInterval(() => {
+    const view = document.getElementById('view-parent-messages');
+    if (!view || !view.classList.contains('active')) return;
+    loadParentThreads({ force: false }).catch(() => {});
+    loadParentUnreadCount().catch(() => {});
+  }, 5000);
+}
+
+function stopParentMessagesPoll() {
+  if (_pmPollTimer) clearInterval(_pmPollTimer);
+  _pmPollTimer = null;
+}
+
+async function loadParentThreads(options = {}) {
+  const force = options.force === true;
+  if (_pmLoadingThreads) return;
+  _pmLoadingThreads = true;
+  const previousActiveThread = _pmActiveThread();
+  _pmClientId = (typeof CLIENT_ID !== 'undefined' ? CLIENT_ID : null);
+  const list = document.getElementById('pm-thread-list');
+  if (force && list) list.innerHTML = '<div class="req-empty" style="padding:20px"><span class="req-spin"></span>Loading parent threads…</div>';
+  try {
+    const json = await pmApi(_pmThreadListUrl());
+    _pmThreads = Array.isArray(json.threads) ? json.threads : [];
+    if (_pmActiveThreadId && !_pmThreads.some(t => String(t.id) === String(_pmActiveThreadId))) {
+      _pmActiveThreadId = null;
+      _pmMessages = [];
+    }
+    renderParentThreads();
+    if (!_pmActiveThreadId && _pmThreads.length) {
+      await openParentThread(_pmThreads[0].id);
+    } else {
+      renderParentHeader();
+      const nextActiveThread = _pmActiveThread();
+      const activeThreadChanged = previousActiveThread && nextActiveThread && (
+        previousActiveThread.last_message_at !== nextActiveThread.last_message_at ||
+        Number(nextActiveThread.unread_count || 0) > 0 ||
+        force
+      );
+      if (_pmActiveThreadId && activeThreadChanged) {
+        await refreshParentThreadMessages(_pmActiveThreadId, { showLoading: false }).catch(() => {});
+      }
+    }
+  } catch (e) {
+    if (list) list.innerHTML = `<div class="req-empty pm-error-state" style="padding:20px">Couldn't load parent threads - ${escapeHTML(e.message || String(e))}</div>`;
+  } finally {
+    _pmLoadingThreads = false;
+  }
+}
+
+function renderParentThreads() {
+  const list = document.getElementById('pm-thread-list');
+  const count = document.getElementById('pm-thread-count');
+  if (!list) return;
+  document.querySelectorAll('[data-pm-filter]').forEach(btn => {
+    btn.classList.toggle('active', btn.getAttribute('data-pm-filter') === _pmFilter);
+  });
+  const assigned = document.getElementById('pm-assigned-filter');
+  if (assigned && assigned.value !== _pmAssigned) assigned.value = _pmAssigned;
+  const search = (document.getElementById('pm-search')?.value || '').trim().toLowerCase();
+  const rows = search
+    ? _pmThreads.filter(t => (
+        _pmParentName(t) + ' ' + _pmParentEmail(t) + ' ' + (t.last_message_preview || '')
+      ).toLowerCase().includes(search))
+    : _pmThreads;
+
+  if (count) {
+    const label = rows.length === 1 ? '1 thread' : rows.length + ' threads';
+    count.textContent = label;
+  }
+
+  list.innerHTML = rows.map(t => {
+    const active = String(t.id) === String(_pmActiveThreadId);
+    const preview = t.last_message_preview
+      ? escapeHTML(t.last_message_preview)
+      : '<span style="font-style:italic;color:var(--text-mute)">No messages yet</span>';
+    const time = t.last_message_at ? msgRelTime(t.last_message_at) : '';
+    const unread = Number(t.unread_count || 0);
+    return `
+      <div class="chat-thread${active ? ' active' : ''}" onclick="openParentThread('${escapeAttr(t.id)}')" style="cursor:pointer">
+        <div class="thread-avatar" style="background:rgba(232,197,71,0.10);color:var(--gold);font-size:11px">${escapeHTML(_pmThreadInitials(t))}</div>
+        <div class="thread-info">
+          <div class="thread-name">${escapeHTML(_pmParentName(t))}</div>
+          <div class="pm-parent-email">${escapeHTML(_pmParentEmail(t))}</div>
+          <div class="thread-preview">${preview}</div>
+        </div>
+        <div class="thread-meta">
+          ${time ? `<div class="thread-time">${escapeHTML(time)}</div>` : ''}
+          <span class="pm-status-chip ${t.status === 'CLOSED' ? 'closed' : 'open'}">${escapeHTML(_pmStatusLabel(t))}</span>
+          ${unread > 0 ? `<div class="pm-thread-unread">${unread > 9 ? '9+' : unread}</div>` : ''}
+        </div>
+      </div>
+    `;
+  }).join('') || '<div class="req-empty" style="padding:18px">No parent threads match.</div>';
+}
+
+async function openParentThread(threadId) {
+  _pmActiveThreadId = threadId;
+  renderParentThreads();
+  renderParentHeader();
+  await refreshParentThreadMessages(threadId, { showLoading: true });
+}
+
+async function refreshParentThreadMessages(threadId, options = {}) {
+  const root = document.getElementById('pm-thread');
+  if (root && options.showLoading !== false) root.innerHTML = '<div class="req-empty" style="padding:24px;text-align:center"><span class="req-spin"></span>Loading thread…</div>';
+  try {
+    const json = await pmApi('/api/client/parent-message-threads/' + encodeURIComponent(threadId) + '/messages?limit=100');
+    _pmMessages = Array.isArray(json.messages) ? json.messages : [];
+    renderParentMessages();
+    await markParentThreadRead(threadId);
+  } catch (e) {
+    if (root) root.innerHTML = `<div class="req-empty pm-error-state" style="padding:24px;text-align:center">Couldn't load thread - ${escapeHTML(e.message || String(e))}</div>`;
+    throw e;
+  }
+}
+
+function renderParentHeader() {
+  const thread = _pmActiveThread();
+  const name = document.getElementById('pm-header-name');
+  const sub = document.getElementById('pm-header-sub');
+  const actions = document.getElementById('pm-header-actions');
+  const composer = document.getElementById('pm-composer-area');
+  const claim = document.getElementById('pm-claim-btn');
+  const unassign = document.getElementById('pm-unassign-btn');
+  const status = document.getElementById('pm-status-btn');
+  if (!thread) {
+    if (name) name.textContent = 'Parent Inbox';
+    if (sub) sub.textContent = 'Pick a thread to reply';
+    if (actions) actions.style.display = 'none';
+    if (composer) composer.style.display = 'none';
+    return;
+  }
+  if (name) name.textContent = _pmParentName(thread);
+  const bits = [_pmParentEmail(thread), _pmStatusLabel(thread)];
+  if (thread.assigned_auth_user_id) bits.push(thread.assigned_auth_user_id === _myAuthUserId ? 'assigned to you' : 'assigned');
+  else bits.push('unassigned');
+  if (sub) sub.textContent = bits.filter(Boolean).join(' · ');
+  if (actions) actions.style.display = 'flex';
+  if (claim) claim.style.display = thread.assigned_auth_user_id === _myAuthUserId ? 'none' : 'inline-flex';
+  if (unassign) unassign.style.display = thread.assigned_auth_user_id ? 'inline-flex' : 'none';
+  if (status) status.textContent = thread.status === 'CLOSED' ? 'Reopen' : 'Close';
+  if (composer) composer.style.display = thread.status === 'CLOSED' ? 'none' : '';
+}
+
+function renderParentMessages() {
+  const root = document.getElementById('pm-thread');
+  if (!root) return;
+  const thread = _pmActiveThread();
+  if (!_pmMessages.length) {
+    root.innerHTML = '<div class="pm-empty-state">No messages in this thread yet.</div>';
+    return;
+  }
+  const wasNearBottom = (root.scrollHeight - root.scrollTop - root.clientHeight) < 140;
+  const authorKey = (m) => m.author_type + ':' + (m.author_auth_user_id || m.author_display_name || 'parent');
+  const sameAuthor = (a, b) => authorKey(a) === authorKey(b);
+  const within5 = (a, b) => Math.abs(new Date(a.created_at) - new Date(b.created_at)) < 5 * 60 * 1000;
+  const sameDay = (a, b) => new Date(a.created_at).toDateString() === new Date(b.created_at).toDateString();
+
+  let html = '';
+  let prevDay = '';
+  for (let i = 0; i < _pmMessages.length; i++) {
+    const m = _pmMessages[i];
+    const d = new Date(m.created_at);
+    const day = d.toDateString();
+    if (day !== prevDay) { html += `<div class="chat-date-divider">${escapeHTML(dayLabel(d))}</div>`; prevDay = day; }
+
+    const prev = _pmMessages[i - 1], next = _pmMessages[i + 1];
+    const isStaff = m.author_type === 'STAFF';
+    const samePrev = prev && sameAuthor(prev, m) && within5(prev, m) && sameDay(prev, m);
+    const sameNext = next && sameAuthor(next, m) && within5(next, m) && sameDay(next, m);
+    const isFirst = !samePrev, isLast = !sameNext;
+    const displayName = isStaff ? (m.author_display_name || 'Academy team') : _pmParentName(thread);
+    const body = m.deleted_at
+      ? '<span style="color:var(--text-mute);font-style:italic">(deleted)</span>'
+      : escapeHTML((m.body || '').trim());
+    const avatar = isStaff
+      ? ''
+      : (isLast ? `<div class="msg-avatar">${escapeHTML(_pmThreadInitials(thread))}</div>` : '<div class="msg-avatar-spacer"></div>');
+    const nameLabel = (!isStaff && isFirst) ? `<div class="msg-sender">${escapeHTML(displayName)}</div>` : '';
+    const time = isLast
+      ? `<div class="msg-time">${m._optimistic ? 'Sending…' : (m._failed ? 'Failed' : msgShortTime(m.created_at))}</div>`
+      : '';
+    html += nameLabel + `<div class="msg-row${isStaff ? ' outgoing' : ''}${isFirst ? ' grp-first' : ''}${isLast ? ' grp-last' : ''}${m._optimistic ? ' optimistic' : ''}" data-mid="${escapeAttr(m.id)}">${avatar}<div class="msg-bubble">${body}</div>${time}</div>`;
+  }
+
+  root.innerHTML = html;
+  if (wasNearBottom) requestAnimationFrame(() => { root.scrollTop = root.scrollHeight; });
+}
+
+function parentThreadScroll() {}
+
+function setParentMessagesFilter(filter) {
+  _pmFilter = filter;
+  _pmActiveThreadId = null;
+  _pmMessages = [];
+  renderParentHeader();
+  loadParentThreads({ force: true }).catch(() => {});
+}
+
+function setParentAssignedFilter(value) {
+  _pmAssigned = value || 'all';
+  _pmActiveThreadId = null;
+  _pmMessages = [];
+  renderParentHeader();
+  loadParentThreads({ force: true }).catch(() => {});
+}
+
+async function sendParentReply() {
+  if (!_sendGuard('sendParentReply')) return;
+  const thread = _pmActiveThread();
+  if (!thread || thread.status === 'CLOSED') return;
+  const input = document.getElementById('pm-input');
+  const body = (input?.value || '').trim();
+  if (!body) return;
+  const tempId = 'pm-tmp-' + Date.now();
+  const clientMessageId = crypto.randomUUID ? crypto.randomUUID() : tempId;
+  const optimistic = {
+    id: tempId,
+    thread_id: thread.id,
+    author_type: 'STAFF',
+    author_auth_user_id: _myAuthUserId,
+    author_display_name: (document.getElementById('userName')?.textContent || '').trim() || 'Academy team',
+    message_type: 'TEXT',
+    body,
+    client_message_id: clientMessageId,
+    created_at: new Date().toISOString(),
+    edited_at: null,
+    deleted_at: null,
+    _optimistic: true,
+  };
+  _pmMessages.push(optimistic);
+  if (input) { input.value = ''; input.style.height = 'auto'; }
+  renderParentMessages();
+  const btn = document.getElementById('pm-send-btn');
+  if (btn) btn.disabled = true;
+  try {
+    const json = await pmApi('/api/client/parent-message-threads/' + encodeURIComponent(thread.id) + '/messages', {
+      method: 'POST',
+      body: JSON.stringify({ client_message_id: clientMessageId, body }),
+    });
+    _pmMessages = _pmMessages.filter(m => m.id !== tempId);
+    if (json.message && !_pmMessages.some(m => m.id === json.message.id)) _pmMessages.push(json.message);
+    if (json.thread) mergeParentThread(json.thread);
+    renderParentMessages();
+    renderParentThreads();
+    renderParentHeader();
+    loadParentUnreadCount().catch(() => {});
+  } catch (e) {
+    _pmMessages = _pmMessages.map(m => m.id === tempId ? { ...m, _optimistic: false, _failed: true } : m);
+    renderParentMessages();
+    alert('Send failed: ' + (e.message || e));
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+}
+
+function onParentMessageInputChange(e) {
+  e.target.style.height = 'auto';
+  e.target.style.height = Math.min(e.target.scrollHeight, 140) + 'px';
+}
+
+function onParentMessageKeyDown(e) {
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    sendParentReply();
+  }
+}
+
+async function markParentThreadRead(threadId) {
+  if (!threadId) return;
+  try {
+    await pmApi('/api/client/parent-message-threads/' + encodeURIComponent(threadId) + '/read', { method: 'POST' });
+    _pmThreads = _pmThreads.map(t => String(t.id) === String(threadId) ? { ...t, unread_count: 0 } : t);
+    renderParentThreads();
+    loadParentUnreadCount().catch(() => {});
+  } catch (_) {}
+}
+
+async function patchParentThread(action) {
+  const thread = _pmActiveThread();
+  if (!thread) return;
+  let patch;
+  if (action === 'claim') {
+    if (!_myAuthUserId) {
+      try { const u = await _sb.auth.getUser(); _myAuthUserId = u?.data?.user?.id || null; } catch (_) {}
+    }
+    if (!_myAuthUserId) return alert('Your session expired - please sign in again.');
+    patch = { assigned_auth_user_id: _myAuthUserId };
+  } else if (action === 'unassign') {
+    patch = { assigned_auth_user_id: null };
+  } else if (action === 'toggle-status') {
+    patch = { status: thread.status === 'CLOSED' ? 'OPEN' : 'CLOSED' };
+  } else {
+    return;
+  }
+  try {
+    const updated = await pmApi('/api/client/parent-message-threads/' + encodeURIComponent(thread.id), {
+      method: 'PATCH',
+      body: JSON.stringify(patch),
+    });
+    mergeParentThread(updated);
+    renderParentThreads();
+    renderParentHeader();
+  } catch (e) {
+    alert('Update failed: ' + (e.message || e));
+  }
+}
+
+function mergeParentThread(updated) {
+  if (!updated || !updated.id) return;
+  const idx = _pmThreads.findIndex(t => String(t.id) === String(updated.id));
+  if (idx === -1) {
+    _pmThreads.unshift(updated);
+    return;
+  }
+  const current = _pmThreads[idx];
+  _pmThreads[idx] = {
+    ...current,
+    ...updated,
+    parent: updated.parent || current.parent || null,
+    unread_count: typeof updated.unread_count === 'number' ? updated.unread_count : current.unread_count,
+  };
+}
+
+async function loadParentUnreadCount() {
+  if (typeof CLIENT_ID === 'undefined' || !CLIENT_ID || !_sb) return;
+  const json = await pmApi('/api/client/parent-message-threads/unread-count');
+  updateParentUnreadBadge(Number(json.unread_count || 0));
+}
+
+function updateParentUnreadBadge(count) {
+  const badge = document.getElementById('parent-messages-unread-badge');
+  if (!badge) return;
+  if (count > 0) {
+    badge.style.display = 'inline-block';
+    badge.textContent = count > 99 ? '99+' : String(count);
+  } else {
+    badge.style.display = 'none';
+    badge.textContent = '';
+  }
+}
+
+window.addEventListener('focus', () => {
+  loadParentUnreadCount().catch(() => {});
+  const view = document.getElementById('view-parent-messages');
+  if (view && view.classList.contains('active')) {
+    resizeParentMessagesLayout();
+    loadParentThreads({ force: false }).catch(() => {});
+  }
+});
+window.addEventListener('resize', resizeParentMessagesLayout);
+
 // #13 - set the iOS/Android app-icon badge. Safe everywhere: it only acts
 // inside the native wrapper when @capawesome/capacitor-badge is present.
 function setAppIconBadge(count) {
@@ -38992,6 +39703,7 @@ async function boot() {
   await loadTickets();
   subscribeTicketsRealtime();
   subscribeAllConversationsRealtime();
+  loadParentUnreadCount().catch(() => {});
 
   // Presence heartbeat - updates last_seen_at on every client_users row
   // for this user so the staff Clients page can show a green online dot.

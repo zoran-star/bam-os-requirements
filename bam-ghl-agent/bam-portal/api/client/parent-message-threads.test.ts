@@ -23,6 +23,7 @@ const clientUser = {
   email: "academy@example.test",
   id: clientUserId,
   name: "Academy Owner",
+  status: "active",
   user_id: userId,
 };
 
@@ -79,6 +80,63 @@ describe("api/client/parent-message-threads", () => {
 
     expect(res.statusCode).toBe(403);
     expect(res.body).toEqual({ error: "Not authorized for the client portal." });
+  });
+
+  it("requires client_id when the caller has multiple active academy memberships", async () => {
+    mockSupabaseFetch([
+      { body: { id: userId }, match: "/auth/v1/user" },
+      {
+        body: [
+          clientUser,
+          { ...clientUser, client_id: attackerTenantId, id: "91000000-0000-4000-8000-000000000202" },
+        ],
+        match: "/rest/v1/client_users?user_id=eq",
+      },
+    ]);
+
+    const res = await invoke({
+      headers: { authorization: "Bearer academy-token" },
+      method: "GET",
+    });
+
+    expect(res.statusCode).toBe(422);
+    expect(res.body).toEqual({ error: "Client is required for multi-academy accounts." });
+  });
+
+  it("verifies the requested active client_id before listing threads", async () => {
+    const fetchMock = mockSupabaseFetch([
+      ...clientContextResponses(),
+      { body: [], match: "/rest/v1/customer_message_threads?tenant_id=eq" },
+    ]);
+
+    const res = await invoke({
+      headers: { authorization: "Bearer academy-token" },
+      method: "GET",
+      query: { client_id: tenantId },
+    });
+
+    expect(res.statusCode).toBe(200);
+    const clientUserCall = fetchMock.mock.calls.find(([url]) =>
+      String(url).includes("/rest/v1/client_users"),
+    );
+    expect(String(clientUserCall?.[0])).toContain(`client_id=eq.${tenantId}`);
+    expect(String(clientUserCall?.[0])).toContain("status=eq.active");
+  });
+
+  it("rejects a requested client_id without an active membership", async () => {
+    mockSupabaseFetch([
+      { body: { id: userId }, match: "/auth/v1/user" },
+      { body: [], match: "/rest/v1/client_users?user_id=eq" },
+    ]);
+
+    const res = await invoke({
+      headers: { authorization: "Bearer academy-token" },
+      method: "GET",
+      query: { client_id: attackerTenantId },
+    });
+
+    expect(res.statusCode).toBe(403);
+    expect(res.body).toEqual({ error: "Not authorized for this client." });
   });
 
   it("lists threads scoped to the caller client_id and ignores query tenant_id", async () => {
