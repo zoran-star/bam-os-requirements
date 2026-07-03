@@ -197,6 +197,51 @@ async function handler(req, res) {
     if (req.method !== "GET") return res.status(405).json({ error: "GET or POST" });
 
     // ─────────── GET customer-search (manual cancellation picker) ───────────
+    // ─────────── Website funnel analytics (funnel_events beacons) ───────────
+    // GET ?action=funnel&days=30[&funnel=free-trial] → per-funnel step counts,
+    // unique sessions per step, step-to-step conversion, and top UTM sources.
+    if (action === "funnel") {
+      const days = Math.min(Math.max(parseInt(req.query.days, 10) || 30, 1), 180);
+      const since = new Date(Date.now() - days * 86400000).toISOString();
+      const funnelFilter = (req.query.funnel || "").trim();
+      let path = `funnel_events?client_id=eq.${encodeURIComponent(clientId)}&created_at=gte.${encodeURIComponent(since)}` +
+        `&select=funnel,step,session_id,utm,offer_id&limit=20000`;
+      if (funnelFilter) path += `&funnel=eq.${encodeURIComponent(funnelFilter)}`;
+      const rows = await sb(path) || [];
+      const funnels = {};
+      const utmCounts = {};
+      for (const r of rows) {
+        const f = funnels[r.funnel] || (funnels[r.funnel] = { steps: {}, sessions: {} });
+        f.steps[r.step] = (f.steps[r.step] || 0) + 1;
+        if (r.session_id) {
+          (f.sessions[r.step] || (f.sessions[r.step] = new Set())).add(r.session_id);
+        }
+        const src = r.utm && (r.utm.source || r.utm.fbclid ? (r.utm.source || "facebook") : null);
+        if (src && r.step === "page_view") utmCounts[src] = (utmCounts[src] || 0) + 1;
+      }
+      const STEP_ORDER = ["page_view", "form_started", "form_completed", "calendar_viewed", "slot_picked", "confirmed",
+                          "plan_viewed", "plan_picked", "payment_started", "paid"];
+      const out = {};
+      for (const [name, f] of Object.entries(funnels)) {
+        const steps = STEP_ORDER
+          .filter(s => f.steps[s])
+          .map(s => ({ step: s, events: f.steps[s], sessions: (f.sessions[s] && f.sessions[s].size) || 0 }));
+        for (let i = 0; i < steps.length; i++) {
+          const prev = i > 0 ? steps[i - 1].sessions || steps[i - 1].events : null;
+          const cur = steps[i].sessions || steps[i].events;
+          steps[i].pct_of_prev = prev ? Math.round((cur / prev) * 100) : 100;
+        }
+        // Calendar abandonment: saw times but never confirmed.
+        const calSeen = (f.sessions.calendar_viewed && f.sessions.calendar_viewed.size) || 0;
+        const confirmed = (f.sessions.confirmed && f.sessions.confirmed.size) || 0;
+        out[name] = {
+          steps,
+          calendar_abandon_pct: calSeen ? Math.round(((calSeen - confirmed) / calSeen) * 100) : null,
+        };
+      }
+      return res.status(200).json({ ok: true, days, funnels: out, top_sources: utmCounts });
+    }
+
     if (action === "customer-search") {
       const q = String(req.query.q || "").trim();
       if (q.length < 2) return res.status(200).json({ ghl: [], stripe: [] });
