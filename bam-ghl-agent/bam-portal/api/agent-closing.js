@@ -727,7 +727,18 @@ async function detectForClient(client) {
       } catch (e) { skipped++; reasons.push(`${item.name || contactId}: pending-insert failed — ${e.message}`); }
     }
   }
-  return { client_id: client.id, business: client.business_name, mode, queued: queue.length, drafted, enrolls_proposed: enrollsProposed, lost_proposed: lostProposed, auto_sent: autoSent, deferred, flushed, escalated, skipped, pruned, reasons };
+  const summary = { client_id: client.id, business: client.business_name, mode, queued: queue.length, drafted, enrolls_proposed: enrollsProposed, lost_proposed: lostProposed, auto_sent: autoSent, deferred, flushed, escalated, skipped, pruned, reasons };
+  // Persist the run summary - cron responses vanish, so per-lead skip reasons
+  // were invisible. Read the latest via:
+  //   select payload from automation_events where type='closing_detect_summary'
+  //   order by created_at desc limit 1;
+  try {
+    await sb(`automation_events`, { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify([{
+      client_id: client.id, contact_id: "detector", automation_id: null,
+      type: "closing_detect_summary", payload: summary,
+    }]) });
+  } catch (_) { /* observability only - never block the run */ }
+  return summary;
 }
 
 async function runDetect(res, onlyClientId) {
