@@ -87,6 +87,10 @@
     {
       "path": "/api/twilio/usage-sync",
       "schedule": "30 6 * * *"
+    },
+    {
+      "path": "/api/twilio/usage-sync?report=1",
+      "schedule": "0 13 1 * *"
     }
   ],
   "headers": [
