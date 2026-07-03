@@ -35,6 +35,14 @@ with real counts, where clicking a funnel node DISPLAYS the actual page.
   unique sessions, step-to-step %, calendar abandonment, top UTM sources;
   "Website funnel" section in the client-portal KPIs tab renders it.
 
+## ⏰ REMINDER: sample data is ON in the KPI funnel section
+
+`_V15K_FUNNEL_SAMPLE_ON = true` in client-portal.html (near _v15kFunnelHtml).
+It renders ONLY while funnel_events has zero real rows for the academy, wears
+a gold SAMPLE badge, and real events retire it automatically - but Zoran asked
+to be REMINDED to turn it off. Flip the constant to false (or just confirm
+real data has replaced it) and delete this section.
+
 ## Future menu (not built - pick when needed)
 
 - Per-field friction (which field kills them), device split, time-to-book,

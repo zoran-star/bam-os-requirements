@@ -10416,13 +10416,52 @@ const _V15K_STEP_LABELS = {
   plan_viewed: 'Viewed plans', plan_picked: 'Picked plan', payment_started: 'Started payment', paid: 'Paid'
 };
 const _V15K_FUNNEL_LABELS = { 'free-trial': 'Free trial funnel', 'enroll': 'Enroll funnel' };
+// SAMPLE preview for the Website funnel section (Zoran, 2026-07-03): renders
+// ONLY while there are zero real events, so real visitor data retires it
+// automatically. TURN OFF EARLY: set _V15K_FUNNEL_SAMPLE_ON = false.
+const _V15K_FUNNEL_SAMPLE_ON = true;
+const _V15K_FUNNEL_SAMPLE = {
+  funnels: {
+    'free-trial': {
+      steps: [
+        { step: 'page_view', events: 320, sessions: 280, pct_of_prev: 100 },
+        { step: 'form_started', events: 141, sessions: 138, pct_of_prev: 49 },
+        { step: 'form_completed', events: 96, sessions: 96, pct_of_prev: 70 },
+        { step: 'calendar_viewed', events: 88, sessions: 88, pct_of_prev: 92 },
+        { step: 'slot_picked', events: 66, sessions: 61, pct_of_prev: 69 },
+        { step: 'confirmed', events: 54, sessions: 54, pct_of_prev: 89 },
+      ],
+      calendar_abandon_pct: 39,
+    },
+    'enroll': {
+      steps: [
+        { step: 'page_view', events: 45, sessions: 41, pct_of_prev: 100 },
+        { step: 'plan_viewed', events: 30, sessions: 28, pct_of_prev: 68 },
+        { step: 'plan_picked', events: 19, sessions: 18, pct_of_prev: 64 },
+        { step: 'paid', events: 12, sessions: 12, pct_of_prev: 67 },
+      ],
+      calendar_abandon_pct: null,
+    },
+  },
+  top_sources: { facebook: 61, instagram: 24, google: 9 },
+};
+
 function _v15kFunnelHtml() {
-  const f = _V15K.funnel;
+  let f = _V15K.funnel;
   if (f === undefined) return `<div class="req-empty" style="padding:14px 0"><span class="req-spin"></span> Loading…</div>`;
   if (!f) return '';
   const empty = `<div class="req-empty" style="padding:12px 0;color:var(--text-mute)">No funnel data yet - events start collecting from the next website visit.</div>`;
-  const keys = Object.keys(f.funnels || {}).filter(k => Array.isArray((f.funnels[k] || {}).steps) && f.funnels[k].steps.length);
-  if (!keys.length) return empty;
+  let keys = Object.keys(f.funnels || {}).filter(k => Array.isArray((f.funnels[k] || {}).steps) && f.funnels[k].steps.length);
+  let sampleNote = '';
+  if (!keys.length) {
+    if (!_V15K_FUNNEL_SAMPLE_ON) return empty;
+    f = _V15K_FUNNEL_SAMPLE;
+    keys = Object.keys(f.funnels);
+    sampleNote = `<div style="display:flex;align-items:center;gap:8px;margin-top:10px">
+      <span style="font-size:10.5px;font-weight:800;letter-spacing:.06em;color:#0A0A0A;background:var(--gold,#E8C547);border-radius:999px;padding:2px 9px">SAMPLE</span>
+      <span style="font-size:12px;color:var(--text-mute)">Example numbers so you can see the layout - real visitor events replace this automatically.</span>
+    </div>`;
+  }
   const blocks = keys.map(key => {
     const fn = f.funnels[key];
     const label = _V15K_FUNNEL_LABELS[key] || (key.replace(/[-_]/g, ' ').replace(/^./, c => c.toUpperCase()) + ' funnel');
@@ -10451,7 +10490,7 @@ function _v15kFunnelHtml() {
   const srcEntries = Object.entries(f.top_sources || {});
   const sources = srcEntries.length
     ? `<div style="font-size:12px;color:var(--text-mute);margin-top:10px">Top sources: ${srcEntries.map(([s, n]) => `${escapeHTML(s)} ${_v15kNum(n)}`).join(' · ')}</div>` : '';
-  return blocks + sources;
+  return sampleNote + blocks + sources;
 }
 
 function _v15kSalesHtml(d) {
