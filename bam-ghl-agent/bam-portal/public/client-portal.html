@@ -12695,50 +12695,60 @@ function _hv2Style() {
   if (document.getElementById('hv2-style')) return;
   const st = document.createElement('style'); st.id = 'hv2-style';
   st.textContent =
-    '#home-v2 .hv2-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin:4px 0 18px}' +
+    // Prototype-derived skin (FC dark): soft elevated surface cards, 16px radius,
+    // small-caps gold labels, tinted icon chips, big display numbers, gentle
+    // hover lift. Same layout DNA as prototype/src Home, mapped onto FC tokens.
+    '#home-v2 .hv2-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin:4px 0 4px}' +
     '@media(min-width:760px){#home-v2 .hv2-grid{grid-template-columns:repeat(4,minmax(0,1fr))}}' +
-    '#home-v2 .hv2-card{position:relative;border-radius:20px;padding:14px 15px 13px;min-height:130px;cursor:pointer;text-align:left;font-family:inherit;color:#fff;border:1px solid rgba(255,255,255,.08);overflow:hidden;display:flex;flex-direction:column;justify-content:space-between;opacity:0;transform:translateY(10px);transition:transform .18s ease,filter .3s,box-shadow .3s;animation:hv2In .42s ease forwards;filter:saturate(.3) brightness(.72)}' +
-    '#home-v2 .hv2-card.hot{filter:none}' +
-    '#home-v2 .hv2-card:hover{transform:translateY(-4px);filter:none}' +
-    '#home-v2 .hv2-card.c-gold{background:radial-gradient(150% 120% at 22% 0%,#9a7d20 0%,#4d3f10 48%,#171208 100%)}' +
-    '#home-v2 .hv2-card.c-gold.hot{box-shadow:0 10px 36px rgba(232,197,71,.25)}' +
-    '#home-v2 .hv2-card.c-gold .hv2-s{color:#f2dd8e}' +
-    '#home-v2 .hv2-card.c-red{background:radial-gradient(150% 120% at 22% 0%,#a03823 0%,#521c11 48%,#170a06 100%)}' +
-    '#home-v2 .hv2-card.c-red.hot{box-shadow:0 10px 36px rgba(224,101,79,.28)}' +
-    '#home-v2 .hv2-card.c-red .hv2-s{color:#f2a795}' +
-    '#home-v2 .hv2-card.c-blue{background:radial-gradient(150% 120% at 22% 0%,#2e5f8a 0%,#152e47 48%,#080e16 100%)}' +
-    '#home-v2 .hv2-card.c-blue.hot{box-shadow:0 10px 36px rgba(90,143,184,.3)}' +
-    '#home-v2 .hv2-card.c-blue .hv2-s{color:#a3c6e3}' +
-    '#home-v2 .hv2-card.c-violet{background:radial-gradient(150% 120% at 22% 0%,#6b3fa0 0%,#341d52 48%,#0f0819 100%)}' +
-    '#home-v2 .hv2-card.c-violet.hot{box-shadow:0 10px 36px rgba(176,132,232,.28)}' +
-    '#home-v2 .hv2-card.c-violet .hv2-s{color:#d3b8f2}' +
+    '#home-v2 .hv2-panel{background:var(--surface);border:1px solid var(--border);border-radius:16px;box-shadow:0 4px 14px rgba(0,0,0,.22)}' +
+    '#home-v2 .hv2-lab{display:flex;align-items:center;gap:7px;font-family:var(--mono,monospace);font-size:10px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:var(--gold,#E8C547)}' +
+    '#home-v2 .hv2-lab svg{width:13px;height:13px;stroke:currentColor;stroke-width:2;fill:none;stroke-linecap:round;stroke-linejoin:round}' +
+    '#home-v2 .hv2-card{position:relative;border-radius:16px;padding:14px 15px;min-height:118px;cursor:pointer;text-align:left;font-family:inherit;color:var(--text);background:var(--surface);border:1px solid var(--border);box-shadow:0 4px 14px rgba(0,0,0,.22);display:flex;flex-direction:column;justify-content:space-between;opacity:0;transform:translateY(10px);transition:transform .2s cubic-bezier(0.4,0,0.2,1),box-shadow .2s,border-color .2s;animation:hv2In .42s ease forwards}' +
+    '#home-v2 .hv2-card:hover{transform:translateY(-2px);box-shadow:0 8px 24px rgba(0,0,0,.3);border-color:var(--border-med,var(--border))}' +
+    '#home-v2 .hv2-chip{width:30px;height:30px;border-radius:10px;display:flex;align-items:center;justify-content:center;flex:none}' +
+    '#home-v2 .hv2-chip svg{width:16px;height:16px;display:block;stroke-width:1.9;fill:none;stroke-linecap:round;stroke-linejoin:round}' +
+    '#home-v2 .c-gold .hv2-chip{background:rgba(232,197,71,.14)}#home-v2 .c-gold .hv2-chip svg{stroke:#E8C547}' +
+    '#home-v2 .c-red .hv2-chip{background:rgba(224,101,79,.14)}#home-v2 .c-red .hv2-chip svg{stroke:#e0654f}' +
+    '#home-v2 .c-blue .hv2-chip{background:rgba(90,143,184,.16)}#home-v2 .c-blue .hv2-chip svg{stroke:#7fb0d8}' +
+    '#home-v2 .c-violet .hv2-chip{background:rgba(176,132,232,.15)}#home-v2 .c-violet .hv2-chip svg{stroke:#B084E8}' +
+    '#home-v2 .hv2-card .hv2-num{font-size:30px;font-weight:800;line-height:1;font-family:"Space Grotesk",Inter,sans-serif;color:var(--text-mute);transition:color .25s}' +
+    '#home-v2 .c-gold.hot .hv2-num{color:#E8C547}#home-v2 .c-red.hot .hv2-num{color:#e0654f}#home-v2 .c-blue.hot .hv2-num{color:#7fb0d8}#home-v2 .c-violet.hot .hv2-num{color:#B084E8}' +
+    '#home-v2 .hv2-card.hot{border-color:rgba(232,197,71,.25)}' +
     '#home-v2 .hv2-head{display:flex;justify-content:space-between;align-items:flex-start;gap:8px}' +
-    '#home-v2 .hv2-t{font-size:13.5px;font-weight:800;line-height:1.15;font-family:"Space Grotesk",Inter,sans-serif}' +
-    '#home-v2 .hv2-s{font-size:11px;font-weight:700;margin-top:1px}' +
-    '#home-v2 .hv2-i{flex:none;opacity:.9}' +
-    '#home-v2 .hv2-i svg{width:20px;height:20px;display:block;stroke:#fff;stroke-width:1.8;fill:none;stroke-linecap:round;stroke-linejoin:round}' +
-    '#home-v2 .hv2-num{font-size:38px;font-weight:800;line-height:1;font-family:"Space Grotesk",Inter,sans-serif}' +
-    '#home-v2 .hv2-foot{font-size:10.5px;opacity:.62;margin-top:4px}' +
-    '#home-v2 .hv2-slot{border-radius:20px;min-height:130px;border:1.5px dashed rgba(255,255,255,.09);display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,.13);font-size:24px;font-weight:300;background:repeating-linear-gradient(0deg,rgba(255,255,255,.018) 0 1px,transparent 1px 11px),repeating-linear-gradient(90deg,rgba(255,255,255,.018) 0 1px,transparent 1px 11px)}' +
-    // Command-center layer: health strip, do-this-now card, schedule rail, streaks, celebrations.
-    '#home-v2 .hv2-health{margin:6px 0 16px;animation:hv2In .42s ease forwards;opacity:0}' +
-    '#home-v2 .hv2-hbar{display:flex;gap:5px;height:6px}' +
-    '#home-v2 .hv2-hbar span{flex:1;border-radius:999px;background:var(--border);transition:background .5s}' +
-    '#home-v2 .hv2-htext{font-family:"Space Grotesk",Inter,sans-serif;font-size:18px;font-weight:800;margin-top:9px;line-height:1.35}' +
+    '#home-v2 .hv2-t{font-size:13px;font-weight:700;line-height:1.2}' +
+    '#home-v2 .hv2-s{font-size:11px;font-weight:600;color:var(--text-mute);margin-top:1px}' +
+    '#home-v2 .hv2-foot{font-size:10.5px;color:var(--text-mute);margin-top:4px}' +
+    '#home-v2 .hv2-slot{border-radius:16px;min-height:118px;border:1.5px dashed var(--border-med,var(--border));display:flex;align-items:center;justify-content:center;color:var(--text-mute);opacity:.45;font-size:22px;font-weight:300}' +
     '#home-v2 .hv2-wrap{display:grid;grid-template-columns:1fr;gap:14px;align-items:start}' +
     '@media(min-width:1000px){#home-v2 .hv2-wrap{grid-template-columns:minmax(0,1fr) 320px}}' +
-    '#home-v2 .hv2-one{display:block;width:100%;text-align:left;font-family:inherit;color:var(--text);border:1px solid rgba(232,197,71,.5);border-radius:14px;padding:13px 15px;background:linear-gradient(135deg,rgba(232,197,71,.12),rgba(232,197,71,.03));margin-bottom:12px;cursor:pointer;animation:hv2In .42s ease forwards;opacity:0;transition:transform .18s ease,box-shadow .25s}' +
-    '#home-v2 .hv2-one:hover{transform:translateY(-2px);box-shadow:0 8px 26px rgba(232,197,71,.16)}' +
-    '#home-v2 .hv2-one .k{font-family:var(--mono,monospace);font-size:10px;letter-spacing:.16em;color:var(--gold,#E8C547);font-weight:700}' +
-    '#home-v2 .hv2-one .t{font-size:14.5px;font-weight:700;margin-top:4px}' +
-    '#home-v2 .hv2-one .m{font-size:11.5px;color:var(--text-mute);margin-top:4px}' +
+    // Health strip
+    '#home-v2 .hv2-health{margin:6px 0 16px;animation:hv2In .42s ease forwards;opacity:0}' +
+    '#home-v2 .hv2-hbar{display:flex;gap:5px;height:6px;margin-top:9px}' +
+    '#home-v2 .hv2-hbar span{flex:1;border-radius:999px;background:var(--border);transition:background .5s}' +
+    '#home-v2 .hv2-htext{font-family:"Space Grotesk",Inter,sans-serif;font-size:18px;font-weight:800;margin-top:9px;line-height:1.35}' +
+    // Hero row: highlight (best thing) + #1 priority, prototype-style
+    '#home-v2 .hv2-hero{display:grid;grid-template-columns:1fr;gap:12px;margin-bottom:14px}' +
+    '@media(min-width:760px){#home-v2 .hv2-hero{grid-template-columns:1fr 1fr}}' +
+    '#home-v2 .hv2-hi{padding:16px 18px;background:linear-gradient(135deg,rgba(232,197,71,.09),rgba(232,197,71,.02)),var(--surface);border:1px solid var(--border);border-radius:16px;box-shadow:0 4px 14px rgba(0,0,0,.22);display:flex;gap:14px;align-items:flex-start;animation:hv2In .42s ease forwards;opacity:0}' +
+    '#home-v2 .hv2-hi-ic{width:42px;height:42px;border-radius:13px;background:rgba(123,196,127,.13);display:flex;align-items:center;justify-content:center;flex:none}' +
+    '#home-v2 .hv2-hi-ic svg{width:20px;height:20px;stroke:#7BC47F;stroke-width:2;fill:none;stroke-linecap:round;stroke-linejoin:round}' +
+    '#home-v2 .hv2-hi-v{font-family:"Space Grotesk",Inter,sans-serif;font-size:21px;font-weight:800;color:var(--text);margin-top:5px}' +
+    '#home-v2 .hv2-hi-c{font-size:12px;color:var(--text-mute);margin-top:4px;line-height:1.45}' +
+    '#home-v2 .hv2-one{display:block;width:100%;text-align:left;font-family:inherit;color:var(--text);border:1px solid var(--border);border-radius:16px;padding:16px 18px;background:var(--surface);box-shadow:0 4px 14px rgba(0,0,0,.22);cursor:pointer;animation:hv2In .42s ease .06s forwards;opacity:0;transition:transform .2s cubic-bezier(0.4,0,0.2,1),box-shadow .2s}' +
+    '#home-v2 .hv2-one:hover{transform:translateY(-2px);box-shadow:0 6px 20px rgba(232,197,71,.14)}' +
+    '#home-v2 .hv2-one .t{font-size:15px;font-weight:700;margin-top:7px;font-family:"Space Grotesk",Inter,sans-serif}' +
+    '#home-v2 .hv2-one .m{font-size:12px;color:var(--text-mute);margin-top:5px;line-height:1.45}' +
+    '#home-v2 .hv2-one .b{display:inline-flex;align-items:center;gap:6px;margin-top:12px;background:var(--gold,#E8C547);color:#0B0B0D;border-radius:9px;padding:8px 16px;font-size:12.5px;font-weight:700}' +
+    // Streaks
     '#home-v2 .hv2-streaks{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0 2px}' +
-    '#home-v2 .hv2-streak{display:inline-flex;align-items:center;gap:6px;border:1px solid rgba(232,197,71,.45);color:var(--gold,#E8C547);border-radius:999px;padding:5px 12px;font-size:11.5px;font-weight:700;animation:hv2In .42s ease forwards;opacity:0}' +
+    '#home-v2 .hv2-streak{display:inline-flex;align-items:center;gap:6px;background:rgba(232,197,71,.1);border:1px solid rgba(232,197,71,.3);color:var(--gold,#E8C547);border-radius:999px;padding:5px 12px;font-size:11.5px;font-weight:700;animation:hv2In .42s ease forwards;opacity:0}' +
     '#home-v2 .hv2-streak svg{width:13px;height:13px;stroke:currentColor;stroke-width:2;fill:none;stroke-linecap:round;stroke-linejoin:round}' +
-    '#home-v2 .hv2-sched{border:1px solid var(--border);border-radius:16px;background:var(--surface);overflow:hidden;opacity:0;transform:translateY(22px);transition:opacity .55s ease,transform .55s ease}' +
+    // Schedule rail (prototype "Today's Schedule" panel: colored dots per row)
+    '#home-v2 .hv2-sched{background:var(--surface);border:1px solid var(--border);border-radius:16px;box-shadow:0 4px 14px rgba(0,0,0,.22);overflow:hidden;opacity:0;transform:translateY(22px);transition:opacity .55s ease,transform .55s ease}' +
     '#home-v2 .hv2-sched.seen{opacity:1;transform:none}' +
-    '#home-v2 .hv2-sched-h{font-family:var(--mono,monospace);font-size:10.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--text-mute);padding:13px 15px 9px;border-bottom:1px solid var(--border)}' +
-    '#home-v2 .hv2-sched-f{display:block;width:100%;text-align:left;background:none;border:none;border-top:1px solid var(--border);color:var(--gold,#E8C547);font:inherit;font-size:12px;font-weight:700;padding:11px 15px;cursor:pointer}' +
+    '#home-v2 .hv2-sched-h{padding:14px 16px 10px;border-bottom:1px solid var(--border)}' +
+    '#home-v2 .hv2-dot{width:8px;height:8px;border-radius:50%;background:var(--gold,#E8C547);flex:none}' +
+    '#home-v2 .hv2-sched-f{display:block;width:100%;text-align:left;background:none;border:none;border-top:1px solid var(--border);color:var(--gold,#E8C547);font:inherit;font-size:12px;font-weight:700;padding:11px 16px;cursor:pointer}' +
     '.hv2-cele{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9500;display:flex;align-items:center;justify-content:center;padding:24px}' +
     '.hv2-cele-card{position:relative;background:var(--surface,#17181b);border:1px solid rgba(232,197,71,.6);border-radius:18px;padding:28px 30px;max-width:340px;text-align:center;box-shadow:0 0 60px rgba(232,197,71,.22);animation:hv2CeleIn .5s cubic-bezier(0.34,1.56,0.64,1) both}' +
     '.hv2-cele-ic{width:52px;height:52px;margin:0 auto 12px;border-radius:50%;border:2px solid var(--gold,#E8C547);display:flex;align-items:center;justify-content:center;animation:hv2CelePulse 1.6s ease-in-out infinite}' +
@@ -12756,12 +12766,15 @@ const _HV2_ICONS = {
   chat: '<svg viewBox="0 0 24 24"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>',
   eye: '<svg viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>',
   mail: '<svg viewBox="0 0 24 24"><rect x="2" y="4" width="20" height="16" rx="3"/><polyline points="22,6 12,13 2,6"/></svg>',
+  zap: '<svg viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>',
+  trend: '<svg viewBox="0 0 24 24"><polyline points="2,17 9,10 13,14 22,5"/><polyline points="15,5 22,5 22,12"/></svg>',
+  check: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="8,12.5 11,15.5 16,9"/></svg>',
 };
 function _hv2Tile(key, delay, color, icon, title, sub, foot, onclick) {
   return `<button class="hv2-card ${color}" id="hv2-tile-${key}" style="animation-delay:${delay}s" onclick="${onclick}">
     <div class="hv2-head">
       <div><div class="hv2-t">${title}</div><div class="hv2-s">${sub}</div></div>
-      <span class="hv2-i">${_HV2_ICONS[icon] || ''}</span>
+      <span class="hv2-chip">${_HV2_ICONS[icon] || ''}</span>
     </div>
     <div>
       <div class="hv2-num" id="hv2-num-${key}">·</div>
@@ -12787,12 +12800,23 @@ function renderHomeV2() {
   _hv2Style();
   host.innerHTML = `
     <div class="hv2-health" id="hv2-health">
+      <div class="hv2-lab">Business health</div>
       <div class="hv2-hbar"><span id="hv2-hseg-sales" title="Sales"></span><span id="hv2-hseg-members" title="Members"></span><span id="hv2-hseg-you" title="Waiting on you"></span></div>
       <div class="hv2-htext" id="hv2-htext" style="color:var(--text-mute)">Checking the pulse of the business…</div>
     </div>
+    <div class="hv2-hero">
+      <div class="hv2-hi" id="hv2-best" style="display:none">
+        <div class="hv2-hi-ic">${_HV2_ICONS.trend}</div>
+        <div>
+          <div class="hv2-lab" style="color:#7BC47F">Best thing right now</div>
+          <div class="hv2-hi-v" id="hv2-best-v"></div>
+          <div class="hv2-hi-c" id="hv2-best-c"></div>
+        </div>
+      </div>
+      <div id="hv2-onething"></div>
+    </div>
     <div class="hv2-wrap">
       <div>
-        <div id="hv2-onething"></div>
         <div class="hv2-grid">
           ${_hv2Tile('trials', 0,    'c-gold',   'calendar', 'Trials',  'today',      'see them in the pipeline', "switchView('pipelines')")}
           ${_hv2Tile('hawk',   0.06, 'c-red',    'eye',      'Hawkeye', 'to approve', 'agent actions waiting',    '_hv2OpenHawkeye()')}
@@ -12804,8 +12828,8 @@ function renderHomeV2() {
         <div class="hv2-streaks" id="hv2-streaks"></div>
       </div>
       <div class="hv2-sched" id="hv2-sched">
-        <div class="hv2-sched-h">Today's schedule</div>
-        <div id="hv2-sched-body"><div class="req-empty" style="padding:14px 15px"><span class="req-spin"></span> Loading…</div></div>
+        <div class="hv2-sched-h"><span class="hv2-lab" style="color:var(--text-sub)">${_HV2_ICONS.calendar} Today's schedule</span></div>
+        <div id="hv2-sched-body"><div class="req-empty" style="padding:14px 16px"><span class="req-spin"></span> Loading…</div></div>
         <button class="hv2-sched-f" onclick="switchView('v15cal')">Open the calendar ›</button>
       </div>
     </div>`;
@@ -12827,6 +12851,7 @@ async function _hv2Load() {
       const j = await _safeJson(r); const trials = (j && j.trials) || [];
       _hv2Set('trials', trials.length);
       _hv2SchedulePaint(trials, j && j.timezone);
+      if (trials.length) _ccBest('trials', `+${trials.length} trial${trials.length === 1 ? '' : 's'} booked today`, 'Fresh chances to win a member - see them in the pipeline.', 2);
     } catch (_) { _hv2Set('trials', 0); _hv2SchedulePaint([], null); }
   })();
   // Hawkeye actions waiting (same split the inbox badge uses) + "do this now"
@@ -12922,6 +12947,7 @@ function _ccWait(k, n) {
   if (_CC_WAIT.hawk == null || _CC_WAIT.unread == null) return;
   const w = _CC_WAIT.hawk + _CC_WAIT.unread;
   _ccSegPaint('you', w <= 2 ? 'good' : (w <= 6 ? 'warn' : 'bad'), w === 0 ? 'Nothing waiting on you' : `${w} waiting on you`);
+  if (w === 0) _ccBest('zero', 'Inbox at zero', 'Every lead has been answered. That is rare air.', 4);
   _ccStreakTick(w === 0);
 }
 // Sales + Members segments from this month's pace vs the prior two months.
@@ -12961,12 +12987,20 @@ async function _ccHealthLoad() {
   })();
 }
 
-// ── "Do this now" card (CC-11): the top Hawkeye action, one tap to Hawkeye ──
+// ── "#1 priority" card (CC-11): the top Hawkeye action, one tap to Hawkeye.
+// Prototype-style: small-caps label + bold task + gold CTA. All-clear state
+// keeps the hero row balanced when the queue is empty.
 function _hv2OneThingPaint(d, total) {
   const host = document.getElementById('hv2-onething'); if (!host) return;
-  if (!total) { host.innerHTML = ''; return; }
-  const top = (d.ready && d.ready[0]) || (d.book && d.book[0]) || (d.ghost && d.ghost[0]) || (d.lost && d.lost[0]);
-  if (!top) { host.innerHTML = ''; return; }
+  const top = total ? ((d.ready && d.ready[0]) || (d.book && d.book[0]) || (d.ghost && d.ghost[0]) || (d.lost && d.lost[0])) : null;
+  if (!top) {
+    host.innerHTML = `<div class="hv2-one" style="cursor:default">
+      <div class="hv2-lab">${_HV2_ICONS.zap} Your #1 priority</div>
+      <div class="t" style="color:#7BC47F">All clear</div>
+      <div class="m">Nothing needs your approval right now - the agent has the queue handled.</div>
+    </div>`;
+    return;
+  }
   const name = top.contact_name || 'this lead';
   const label = top._isFollowup ? `Send ${name}'s follow-up`
     : top.kind === 'book' ? `Confirm ${name}'s booking`
@@ -12975,21 +13009,35 @@ function _hv2OneThingPaint(d, total) {
     : `Approve the reply to ${name}`;
   const rest = total - 1;
   host.innerHTML = `<button class="hv2-one" onclick="_hv2OpenHawkeye()">
-    <div class="k">DO THIS NOW</div>
+    <div class="hv2-lab">${_HV2_ICONS.zap} Your #1 priority</div>
     <div class="t">${escapeHTML(label)}</div>
-    <div class="m">${rest > 0 ? `then ${rest} more waiting in Hawkeye ›` : 'last one - clears the queue ›'}</div>
+    <div class="m">${rest > 0 ? `${rest} more waiting behind it.` : 'Last one - this clears the queue.'}</div>
+    <span class="b">Open Hawkeye →</span>
   </button>`;
+}
+
+// ── "Best thing right now" hero (prototype's highlight card) ──
+// Candidates land as data loads; the highest-ranked one wins the card.
+const _CC_BEST = {};
+function _ccBest(kind, value, context, rank) {
+  _CC_BEST[kind] = { value, context, rank };
+  const best = Object.values(_CC_BEST).sort((a, b) => a.rank - b.rank)[0];
+  const card = document.getElementById('hv2-best'); if (!card || !best) return;
+  card.style.display = '';
+  const v = document.getElementById('hv2-best-v'), c = document.getElementById('hv2-best-c');
+  if (v) v.textContent = best.value;
+  if (c) c.textContent = best.context;
 }
 
 // ── Schedule rail (CC-13): today's trials, right rail on desktop ──
 function _hv2SchedulePaint(trials, tz) {
   const el = document.getElementById('hv2-sched-body'); if (!el) return;
-  if (!trials.length) { el.innerHTML = `<div style="padding:16px 15px;font-size:12.5px;color:var(--text-mute)">No trials booked today.</div>`; return; }
+  if (!trials.length) { el.innerHTML = `<div style="padding:16px;font-size:12.5px;color:var(--text-mute)">No trials booked today.</div>`; return; }
   el.innerHTML = trials.map(t => `
     <div onclick="_v15calOpenAppt(${JSON.stringify(t.id)})" style="${_HV_ROW}">
-      <span style="flex:none;font-weight:700;color:var(--gold);font-size:13px;min-width:62px;font-family:var(--mono,monospace)">${escapeHTML(_hvTime(t.start, tz))}</span>
+      <span class="hv2-dot"></span>
       <div style="flex:1;min-width:0"><div style="${_HV_TITLE}">${escapeHTML(t.contactName || 'Trial booking')}</div>${t.status ? `<div style="${_HV_SUB}">${escapeHTML(t.status)}</div>` : ''}</div>
-      <span style="${_HV_CHEV}">›</span>
+      <span style="flex:none;font-weight:700;color:var(--text-sub);font-size:12.5px;font-family:var(--mono,monospace)">${escapeHTML(_hvTime(t.start, tz))}</span>
     </div>`).join('');
 }
 
@@ -13005,6 +13053,7 @@ function _ccStreakTick(clearNow) {
   let streak = 0; const d = new Date();
   if (days[_ccYmd(d)] !== 'clear') d.setDate(d.getDate() - 1);   // today not clear (yet) → count up to yesterday
   while (days[_ccYmd(d)] === 'clear') { streak++; d.setDate(d.getDate() - 1); if (streak > 365) break; }
+  if (streak >= 3) _ccBest('streak', `${streak} days all clear`, 'Nothing has waited on you for ' + streak + ' straight days.', 3);
   _ccStreaksPaint(streak, null);
 }
 const _CC_STREAK = { clear: 0, growth: 0 };
@@ -13041,12 +13090,16 @@ async function _ccMembersCheck() {
         _ccCelebrate('new_member_' + _ccYmd(), fresh.length === 1 ? `${n} just became a member` : `${fresh.length} new members joined`, 'The roster is growing - keep it rolling');
       }
     }
-    // Growth-weeks streak: week-over-week roster count.
-    const wk = _ccWeekKey(); const g = st.growth || { week: null, count: null, weeks: 0 };
+    // Growth-weeks streak: week-over-week roster count. week_start holds the
+    // roster size when the week began, so joins-this-week survives mid-week
+    // count updates (feeds the Best-thing hero).
+    const wk = _ccWeekKey(); const g = st.growth || { week: null, count: null, weeks: 0, week_start: null };
     if (g.week !== wk) {
       if (g.count != null) g.weeks = (ids.length > g.count) ? (g.weeks || 0) + 1 : 0;
-      g.week = wk; g.count = ids.length;
+      g.week = wk; g.week_start = (g.count != null ? g.count : ids.length); g.count = ids.length;
     } else if (g.count != null && ids.length > g.count) { g.count = ids.length; }
+    const joins = (g.week_start != null) ? Math.max(0, ids.length - g.week_start) : 0;
+    if (joins > 0) _ccBest('members', `+${joins} new member${joins === 1 ? '' : 's'} this week`, 'The roster is growing - keep it rolling.', 1);
     _ccSave({ mem_ids: ids, growth: g });
     _ccStreaksPaint(null, g.weeks || 0);   // growth chip only - clear-days repaints on its own tick
   } catch (_) {}
