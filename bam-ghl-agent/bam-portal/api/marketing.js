@@ -670,6 +670,9 @@ async function handler(req, res) {
     if (resource === "meta-creatives") {
       return await handleMetaCreatives(req, res);
     }
+    if (resource === "meta-machine") {
+      return await handleMetaMachine(req, res);
+    }
     if (resource === "meta-staff-auth") {
       return await handleStaffMetaAuth(req, res);
     }
@@ -3192,6 +3195,338 @@ async function metaOverviewSlackAlert(req, res) {
   } catch (err) {
     return res.status(200).json({ sent: false, reason: err?.message || "slack_error" });
   }
+}
+
+// ─── Marketing Machine (V2 client dashboard) ─────────────────────────────
+// GET ?resource=meta-machine&client_id=<id>[&since=YYYY-MM-DD&until=YYYY-MM-DD]
+// ONE aggregate payload powering both the Marketing page simple card and the
+// detailed "Marketing Machine" modal. Default range = month to date (UTC).
+// All health judgments are computed HERE (the UI only draws what it is told)
+// so the card and the modal can never disagree.
+// Spec + locked health recipes: memories/project_marketing_machine_dashboard.md
+
+const MM_CPL_GOLD = 40;        // $ cost per lead: green < 40 (Zoran 2026-07-03)
+const MM_CPL_RED = 55;         // gold 40-55, red >= 55
+const MM_C2L_GREEN = 10;       // % of link clicks becoming leads (proposed bands)
+const MM_C2L_GOLD = 5;
+const MM_HOOK_MIN = 25;        // % 3-sec views / impressions below this = demote
+const MM_FREQ_MAX = 3.5;       // frequency above this = demote
+const MM_TESTING_AGE_DAYS = 3; // younger ads get a grey "testing" state
+const MM_TESTING_SPEND = 20;   // ...same for ads under this spend
+const MM_KILL_SPEND = 75;      // red CPL at this spend -> "kill it" guidance
+const MM_WANT_CREATIVES = 6;   // distinct live angles wanted (Andromeda note)
+
+function mmCplBand(cpl, spend) {
+  if (cpl == null) return spend >= MM_KILL_SPEND ? "red" : "grey";
+  if (cpl < MM_CPL_GOLD) return "green";
+  if (cpl < MM_CPL_RED) return "gold";
+  return "red";
+}
+function mmDemote(band) {
+  if (band === "green") return "gold";
+  if (band === "gold") return "red";
+  return band;
+}
+// Higher-is-better percentage band.
+function mmPctBand(pct, green, gold) {
+  if (pct == null) return "grey";
+  if (pct >= green) return "green";
+  if (pct >= gold) return "gold";
+  return "red";
+}
+function mmImageFromCreative(c) {
+  if (!c) return null;
+  if (c.image_url || c.thumbnail_url) return c.image_url || c.thumbnail_url;
+  const slides = c.object_story_spec?.link_data?.child_attachments;
+  if (Array.isArray(slides)) {
+    const withPic = slides.find((a) => a.picture);
+    if (withPic) return withPic.picture;
+  }
+  if (Array.isArray(c.asset_feed_spec?.images) && c.asset_feed_spec.images.length) {
+    return c.asset_feed_spec.images[0].url || null;
+  }
+  return null;
+}
+
+async function handleMetaMachine(req, res) {
+  if (req.method !== "GET") return res.status(405).json({ error: "GET required" });
+  const ctx = await resolveUser(req);
+  if (ctx.error) return res.status(ctx.error.status).json({ error: ctx.error.message });
+
+  // Staff viewing a specific client via ?client_id= must win over any ctx.client
+  // the caller might also resolve to (otherwise a staff user who is also a client
+  // would silently read THEIR data, not the academy they opened).
+  let targetClientId = null;
+  if (req.query.client_id && (ctx.staff || (ctx.clientIds || []).includes(String(req.query.client_id)))) targetClientId = String(req.query.client_id);
+  else if (ctx.client) targetClientId = ctx.client.id;
+  if (!targetClientId) return res.status(403).json({ error: "client_id required (client login or staff with ?client_id)" });
+
+  // Range: default month-to-date (UTC). Custom since/until from the modal's
+  // date picker. Prior period = the equal-length window immediately before.
+  const reDate = /^\d{4}-\d{2}-\d{2}$/;
+  const fmt = (d) => d.toISOString().slice(0, 10);
+  const DAY = 86400000;
+  const now = new Date();
+  const todayD = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+  let sinceD = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+  let untilD = todayD;
+  const isCustom = reDate.test(String(req.query.since || "")) && reDate.test(String(req.query.until || ""));
+  if (isCustom) {
+    sinceD = new Date(req.query.since + "T00:00:00Z");
+    untilD = new Date(req.query.until + "T00:00:00Z");
+    if (untilD < sinceD) return res.status(400).json({ error: "until must be on/after since" });
+    if (untilD > todayD) untilD = todayD;
+  }
+  const lenDays = Math.round((untilD - sinceD) / DAY) + 1;
+  const prevUntilD = new Date(sinceD.getTime() - DAY);
+  const prevSinceD = new Date(prevUntilD.getTime() - (lenDays - 1) * DAY);
+  const sinceIso = sinceD.toISOString();
+  const endIso = new Date(untilD.getTime() + DAY).toISOString(); // exclusive end
+  const prevSinceIso = prevSinceD.toISOString();
+
+  let clientFull = null;
+  try {
+    const rows = await sb(`clients?id=eq.${targetClientId}&select=id,meta_ad_account_id,meta_campaign_ids,meta_cpl_goal,meta_monthly_budget`);
+    clientFull = rows?.[0] || null;
+  } catch {
+    const rows = await sb(`clients?id=eq.${targetClientId}&select=id,meta_ad_account_id,meta_campaign_ids`);
+    clientFull = rows?.[0] || null;
+  }
+  const notReady = (reason) => res.status(200).json({ ok: true, meta_connected: false, reason });
+  if (!clientFull?.meta_ad_account_id) return notReady("no_ad_account");
+  const staffToken = await getAnyStaffMetaToken();
+  if (!staffToken) return notReady("no_staff_token");
+  const allow = Array.isArray(clientFull.meta_campaign_ids) && clientFull.meta_campaign_ids.length
+    ? clientFull.meta_campaign_ids.map(String) : null;
+  if (!allow) return notReady("no_campaigns_selected");
+  const allowSet = new Set(allow);
+  const adAcct = clientFull.meta_ad_account_id.startsWith("act_")
+    ? clientFull.meta_ad_account_id : `act_${clientFull.meta_ad_account_id}`;
+
+  const graph = async (url) => {
+    const r = await fetch(url);
+    const j = await r.json();
+    if (!r.ok) throw new Error(j?.error?.message || "Meta API error");
+    return j;
+  };
+  const campFilter = JSON.stringify([{ field: "campaign.id", operator: "IN", value: allow }]);
+  const activeFilter = JSON.stringify([{ field: "effective_status", operator: "IN", value: ["ACTIVE"] }]);
+
+  // Everything in parallel: 3 account/campaign Graph calls + 2 per campaign,
+  // plus the Supabase reads (funnel beacons + kpi events).
+  const [campJson, adInsJson, perCampaign, funnelRows, kpiRows] = await Promise.all([
+    // 1. Campaign-level insights, prior+current in ONE call, split at `since`.
+    graph(`${META_GRAPH}/${adAcct}/insights?` + new URLSearchParams({
+      level: "campaign", fields: META_CAMPAIGN_FIELDS,
+      time_range: JSON.stringify({ since: fmt(prevSinceD), until: fmt(untilD) }),
+      time_increment: "1", access_token: staffToken, limit: "500",
+    })),
+    // 2. Ad-level insights for the current range (hook rate lives here).
+    graph(`${META_GRAPH}/${adAcct}/insights?` + new URLSearchParams({
+      level: "ad",
+      fields: "campaign_id,ad_id,ad_name,spend,impressions,reach,inline_link_clicks,actions,video_3_sec_watched_actions",
+      time_range: JSON.stringify({ since: fmt(sinceD), until: fmt(untilD) }),
+      filtering: campFilter, access_token: staffToken, limit: "500",
+    })),
+    // 3. Per campaign: live ads (creative + created_time), live ad sets
+    //    (learning stage + ABO budget fallback), campaign budget fields.
+    Promise.all(allow.map(async (campId) => {
+      const [ads, adsets, camp] = await Promise.all([
+        graph(`${META_GRAPH}/${campId}/ads?` + new URLSearchParams({
+          fields: "id,name,created_time,creative{id,image_url,thumbnail_url,video_id,object_story_spec,asset_feed_spec}",
+          filtering: activeFilter, access_token: staffToken, limit: "100",
+        })).catch(() => ({ data: [] })),
+        graph(`${META_GRAPH}/${campId}/adsets?` + new URLSearchParams({
+          fields: "id,daily_budget,learning_stage_info",
+          filtering: activeFilter, access_token: staffToken, limit: "50",
+        })).catch(() => ({ data: [] })),
+        graph(`${META_GRAPH}/${campId}?` + new URLSearchParams({
+          fields: "daily_budget,lifetime_budget", access_token: staffToken,
+        })).catch(() => ({})),
+      ]);
+      return { ads: ads.data || [], adsets: adsets.data || [], camp };
+    })),
+    sb(`funnel_events?client_id=eq.${targetClientId}&funnel=eq.free-trial&created_at=gte.${encodeURIComponent(sinceIso)}&created_at=lt.${encodeURIComponent(endIso)}&select=step,session_id&limit=20000`).catch(() => []),
+    sb(`kpi_events?client_id=eq.${targetClientId}&step=in.(lead,trial_booked)&occurred_at=gte.${encodeURIComponent(prevSinceIso)}&occurred_at=lt.${encodeURIComponent(endIso)}&select=step,occurred_at,ghl_contact_id&limit=10000`).catch(() => []),
+  ]).catch((err) => { throw err; });
+
+  // ── Campaign section (current vs prior period) ──
+  const splitDay = fmt(sinceD);
+  const curAcc = newAcc(), prevAcc = newAcc();
+  for (const row of (campJson.data || [])) {
+    if (!allowSet.has(String(row.campaign_id))) continue;
+    sumRowInto(row.date_start >= splitDay ? curAcc : prevAcc, row);
+  }
+  const cur = finalizeMetrics(curAcc);
+  const prev = finalizeMetrics(prevAcc);
+  const driftPct = (cur.cpl != null && prev.cpl != null && prev.cpl > 0)
+    ? _r2(((cur.cpl - prev.cpl) / prev.cpl) * 100) : null;
+
+  // Learning stage rollup: any set still LEARNING -> "learning"; FAIL -> "limited".
+  const allAdsets = perCampaign.flatMap((p) => p.adsets);
+  const stages = allAdsets.map((s) => s.learning_stage_info?.status).filter(Boolean);
+  const learning = stages.includes("FAIL") ? "limited" : (stages.includes("LEARNING") ? "learning" : (stages.length ? "active" : null));
+
+  const campaignBand = mmCplBand(cur.cpl, cur.spend);
+
+  // ── Planned monthly spend: staff-set goal, else campaign daily budget,
+  //    else sum of ACTIVE ad sets' daily budgets (ABO - most clients). ──
+  const daysInMonth = daysInUTCMonth(todayD);
+  let dailyPlanned = 0;
+  for (const p of perCampaign) {
+    const campDaily = p.camp?.daily_budget ? parseFloat(p.camp.daily_budget) / 100 : 0;
+    if (campDaily > 0) { dailyPlanned += campDaily; continue; }
+    dailyPlanned += p.adsets.reduce((a, s) => a + (s.daily_budget ? parseFloat(s.daily_budget) / 100 : 0), 0);
+  }
+  const monthlyBudget = clientFull.meta_monthly_budget != null ? Number(clientFull.meta_monthly_budget) : null;
+  const planned = monthlyBudget || (dailyPlanned > 0 ? _r2(dailyPlanned * daysInMonth) : null);
+
+  // ── Creatives: join ad-level insights onto the live ads list ──
+  const insByAd = new Map();
+  for (const row of (adInsJson.data || [])) insByAd.set(String(row.ad_id), row);
+  const bestable = [];
+  const creatives = perCampaign.flatMap((p) => p.ads).map((ad) => {
+    const ins = insByAd.get(String(ad.id)) || {};
+    const spend = _r2(parseFloat(ins.spend || "0") || 0);
+    const impressions = parseInt(ins.impressions || "0", 10) || 0;
+    const reach = parseInt(ins.reach || "0", 10) || 0;
+    const clicks = parseInt(ins.inline_link_clicks || "0", 10) || 0;
+    const leads = countLeads(ins.actions);
+    const cpl = leads > 0 ? _r2(spend / leads) : null;
+    const ctr = impressions > 0 ? _r2((clicks / impressions) * 100) : null;
+    const frequency = reach > 0 ? _r2(impressions / reach) : null;
+    const v3 = Array.isArray(ins.video_3_sec_watched_actions)
+      ? (parseInt(ins.video_3_sec_watched_actions[0]?.value, 10) || 0) : 0;
+    const isVideo = !!ad.creative?.video_id;
+    const hookRate = (isVideo && impressions > 0) ? _r2((v3 / impressions) * 100) : null;
+    const ageDays = ad.created_time ? Math.floor((now - new Date(ad.created_time)) / DAY) : null;
+    const testing = (ageDays != null && ageDays < MM_TESTING_AGE_DAYS) || spend < MM_TESTING_SPEND;
+
+    let band = mmCplBand(cpl, spend);
+    let demotedBy = null;
+    if (!testing) {
+      if (frequency != null && frequency > MM_FREQ_MAX) { band = mmDemote(band); demotedBy = "frequency"; }
+      else if (hookRate != null && hookRate < MM_HOOK_MIN) { band = mmDemote(band); demotedBy = "hook"; }
+    } else {
+      band = "grey";
+    }
+    const out = {
+      ad_id: ad.id, name: ad.name || "(unnamed)",
+      image_url: mmImageFromCreative(ad.creative), is_video: isVideo,
+      age_days: ageDays, spend, leads, cpl, ctr, frequency, hook_rate: hookRate,
+      band, testing, demoted_by: demotedBy, best: false,
+    };
+    if (!testing && cpl != null) bestable.push(out);
+    return out;
+  });
+  if (bestable.length) {
+    bestable.sort((a, b) => a.cpl - b.cpl);
+    bestable[0].best = true;
+  }
+  const liveJudged = creatives.filter((c) => !c.testing);
+
+  // ── Page + result from our own beacons/events ──
+  const sess = {};
+  for (const row of (Array.isArray(funnelRows) ? funnelRows : [])) {
+    (sess[row.step] = sess[row.step] || new Set()).add(row.session_id || "");
+  }
+  const nSess = (step) => (sess[step] ? sess[step].size : 0);
+  const visitors = nSess("page_view");
+  const formStarted = nSess("form_started");
+  const sawCalendar = nSess("calendar_viewed");
+  const bookedSessions = nSess("confirmed");
+  const pct = (num, den) => (den > 0 ? _r2((num / den) * 100) : null);
+
+  const kpiList = Array.isArray(kpiRows) ? kpiRows : [];
+  const inCur = (r) => r.occurred_at >= sinceIso;
+  const leadsCur = kpiList.filter((r) => r.step === "lead" && inCur(r)).length;
+  const leadsPrev = kpiList.filter((r) => r.step === "lead" && !inCur(r)).length;
+  const bookedCurRows = kpiList.filter((r) => r.step === "trial_booked" && inCur(r));
+  const bookedPrev = kpiList.filter((r) => r.step === "trial_booked" && !inCur(r)).length;
+  const bookedCur = bookedCurRows.length;
+
+  // Agent-booked split: kpi_events carries no booking source; the pipeline
+  // store does. Join booked contacts onto opportunities.source.
+  let agentBooked = 0;
+  const bookedContacts = [...new Set(bookedCurRows.map((r) => r.ghl_contact_id).filter(Boolean))];
+  if (bookedContacts.length) {
+    try {
+      const inList = bookedContacts.slice(0, 200).map((id) => `"${id.replace(/"/g, "")}"`).join(",");
+      const opps = await sb(`opportunities?client_id=eq.${targetClientId}&ghl_contact_id=in.(${encodeURIComponent(inList)})&select=ghl_contact_id,source`);
+      const agentContacts = new Set((opps || []).filter((o) => o.source === "agent").map((o) => o.ghl_contact_id));
+      agentBooked = bookedCurRows.filter((r) => agentContacts.has(r.ghl_contact_id)).length;
+    } catch { /* split is best-effort; totals stay correct */ }
+  }
+
+  const clicksToLeadsPct = pct(leadsCur, cur.link_clicks);
+  const abandonmentPct = sawCalendar > 0 ? _r2(((sawCalendar - bookedSessions) / sawCalendar) * 100) : null;
+  // Lower-is-better: <25 green, 25-40 gold, >40 red (heuristic from spec note).
+  const abandonBand = abandonmentPct == null ? "grey" : (abandonmentPct < 25 ? "green" : (abandonmentPct <= 40 ? "gold" : "red"));
+
+  const cpbt = bookedCur > 0 ? _r2(cur.spend / bookedCur) : null;
+  const prevCpbt = bookedPrev > 0 && prev.spend > 0 ? _r2(prev.spend / bookedPrev) : null;
+  // Verdict number is judged by trend vs the prior period (no absolute $ bands).
+  let cpbtBand = "grey";
+  if (cpbt != null && prevCpbt != null) {
+    cpbtBand = cpbt <= prevCpbt ? "green" : (cpbt <= prevCpbt * 1.2 ? "gold" : "red");
+  }
+
+  // ── The single warning line (worst thing wins) ──
+  const bestName = bestable[0]?.name;
+  let warning = null;
+  const killer = liveJudged.find((c) => c.band === "red" && c.spend >= MM_KILL_SPEND);
+  const wornOut = liveJudged.find((c) => c.demoted_by === "frequency");
+  const weakHook = liveJudged.find((c) => c.demoted_by === "hook");
+  if (killer) warning = `"${killer.name}" is burning budget - kill it${bestName && bestName !== killer.name ? ` and move spend to "${bestName}"` : ""}`;
+  else if (campaignBand === "red") warning = "cost per lead is running hot - review the campaign";
+  else if (wornOut) warning = `"${wornOut.name}" is worn out - clone the winner with a fresh angle`;
+  else if (weakHook) warning = `"${weakHook.name}" is not stopping thumbs - re-hook the first 3 seconds`;
+  else if (clicksToLeadsPct != null && clicksToLeadsPct < MM_C2L_GOLD) warning = "the page is losing clicks - visitors are not becoming leads";
+  else if (liveJudged.length && liveJudged.length < MM_WANT_CREATIVES) warning = `only ${liveJudged.length} proven creative${liveJudged.length === 1 ? "" : "s"} live - add fresh angles (want ${MM_WANT_CREATIVES}+)`;
+
+  return res.status(200).json({
+    ok: true,
+    meta_connected: true,
+    range: {
+      since: fmt(sinceD), until: fmt(untilD), is_mtd: !isCustom,
+      prev_since: fmt(prevSinceD), prev_until: fmt(prevUntilD),
+    },
+    month: {
+      name: MONTH_NAMES[todayD.getUTCMonth()], day: todayD.getUTCDate(),
+      days_in_month: daysInMonth, planned,
+      spend: !isCustom ? cur.spend : null, // card is always MTD; null on custom ranges
+    },
+    campaign: {
+      spend: cur.spend, cpl: cur.cpl, band: campaignBand, drift_pct: driftPct,
+      frequency: cur.frequency, ctr: cur.ctr, impressions: cur.impressions,
+      reach: cur.reach, link_clicks: cur.link_clicks, leads_meta: cur.leads,
+      learning,
+    },
+    creatives,
+    creatives_live: liveJudged.length,
+    creatives_band: liveJudged.length ? (liveJudged.some((c) => c.band === "red") ? "red" : (liveJudged.some((c) => c.band === "gold") ? "gold" : (liveJudged.length >= MM_WANT_CREATIVES ? "green" : "gold"))) : "grey",
+    page: {
+      visitors, form_started: formStarted, saw_calendar: sawCalendar, booked_sessions: bookedSessions,
+      visitors_to_form_pct: pct(formStarted, visitors),
+      clicks_to_leads_pct: clicksToLeadsPct,
+      band: mmPctBand(clicksToLeadsPct, MM_C2L_GREEN, MM_C2L_GOLD),
+      abandonment_pct: abandonmentPct, abandonment_band: abandonBand,
+    },
+    pills: {
+      click_to_visit_pct: pct(visitors, cur.link_clicks),
+      click_to_visit_band: mmPctBand(pct(visitors, cur.link_clicks), 70, 60),
+      visit_to_lead_pct: pct(leadsCur, visitors),
+      visit_to_lead_band: mmPctBand(pct(leadsCur, visitors), 10, 5),
+      lead_to_booked_pct: pct(bookedCur, leadsCur),
+      lead_to_booked_band: mmPctBand(pct(bookedCur, leadsCur), 35, 20),
+    },
+    result: {
+      leads: leadsCur, prev_leads: leadsPrev, booked: bookedCur, agent_booked: agentBooked,
+      booked_pct: pct(bookedCur, leadsCur),
+      cost_per_booked_trial: cpbt, prev_cost_per_booked_trial: prevCpbt, cpbt_band: cpbtBand,
+    },
+    warning: warning ? { text: warning } : null,
+  });
 }
 
 // GET ?resource=meta-creatives&campaign_id=<id>

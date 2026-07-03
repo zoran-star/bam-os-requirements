@@ -1,10 +1,40 @@
 ---
 name: Marketing Machine dashboard (design locked, build pending)
-description: Zoran-approved design (2026-07-03) for the Marketing page card - simple flow view with colored health bars + detailed machine modal with colored numbers. Full ASCII specs + verified data-source map + phased build plan inside. Build planned for a future session.
+description: SHIPPED 2026-07-03 (V2 client portal, GTA first) - simple flow card + detailed machine modal, one aggregate endpoint (marketing.js resource=meta-machine). Full specs, locked health recipes, data-source map + what is still open inside.
 type: project
 ---
 
-# Marketing Machine dashboard - DESIGN LOCKED 2026-07-03, NOT BUILT
+# Marketing Machine dashboard - SHIPPED 2026-07-03 (V2, GTA first)
+
+## Shipped implementation (2026-07-03)
+- Backend: `bam-portal/api/marketing.js` `?resource=meta-machine&client_id=`
+  `[&since=YYYY-MM-DD&until=YYYY-MM-DD]` (handleMetaMachine). ONE payload for
+  card + modal; ALL health bands computed server-side. Default range = MTD.
+  Graph calls: campaign insights (prev+current, one call, split at since),
+  NEW level=ad insights (hook rate via video_3_sec_watched_actions), per
+  campaign: /ads (creative + created_time), /adsets (learning_stage_info +
+  ABO daily_budget fallback), campaign budget fields. Supabase: funnel_events
+  (free-trial), kpi_events (lead + trial_booked, prev+current), opportunities
+  join for the agent-booked split. Planned spend = clients.meta_monthly_budget
+  || campaign daily_budget || sum(active ad sets daily_budget), x days in month.
+- Frontend: `bam-portal/public/client-portal.html` - card container
+  `#marketing-machine-card` (top of Marketing content), gated
+  `V2_ACCESS` only, loaded from `_marketingEnter()` via `_mmLoad()`.
+  Modal `#marketingMachineModal` (`openMarketingMachine()`), date range
+  picker defaults to MTD, Apply refetches. All `mm-*` CSS classes.
+- Bar fill length = health (CPL inverted on $0-70 scale; pct vs target),
+  fill color = server band. Colored numbers + dots in modal, rollup dot per
+  section (worst child wins).
+
+## Still open after ship
+- Phase 4 cache table (meta_insights_cache) NOT built - modal/card hit Graph
+  live (4-6 calls per load). Add when it feels slow or clients scale.
+- PAGE clicks->leads bands (10%/5%) + abandonment bands (25/40) + CPBT
+  trend-coloring are heuristics - tune against live GTA data.
+- Verification vs Ads Manager / Ximena budgets still to run (exit criteria
+  in build plan below).
+
+# Original design spec (locked 2026-07-03)
 
 Zoran iterated this in chat to a final locked design. Strategy + KPI rationale:
 [[project_meta_ads_strategy]] (post-Andromeda rules). Build in a future session.
