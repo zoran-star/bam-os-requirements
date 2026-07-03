@@ -1,7 +1,7 @@
 # Offer Tie-In Plan (BAM GTA v2)
 
 Owner: Zoran. Last updated: 2026-07-02.
-Status: approved by Zoran + Luka ("you're good to rip", 2026-07-02). Part 1 in progress.
+Status: COMPLETE (A-G all shipped 2026-07-02). Kept as the record of what was built and why.
 
 ## The idea, simply
 
@@ -112,4 +112,6 @@ MCP-recorded version.
       deliberately unhooked (paid-through access; C cancels at sub deletion).
       Shared non-fatal caller api/_runtime/access-sync-portal.ts. Full roster
       sweep applied: 41/41 members on the identity spine.
-- [ ] G: entry_points.bookable_program_id + drift check
+- [x] G: entry_points.bookable_program_id (migration `20260703000509`; GTA
+      booking surfaces -> Training program) + `entry_point_program_drift` check
+      added to /api/runtime/diagnostics (9th check). PLAN COMPLETE.

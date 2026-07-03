@@ -126,6 +126,11 @@ async function runDiagnostics(clientId: string): Promise<DiagnosticCheck[]> {
       "Duplicate identity emails",
       () => duplicateIdentityEmails(),
     ),
+    runCheck(
+      "entry_point_program_drift",
+      "Booking entry points without a valid bookable program link",
+      () => entryPointProgramDrift(clientId),
+    ),
   ]);
 }
 
@@ -156,6 +161,38 @@ async function runCheck(
       message: errorMessage(error),
     };
   }
+}
+
+// Offer tie-in step G: the funnel's booking surfaces (calendar entry points +
+// enabled booking forms with a program link) must point at a REAL bookable
+// program of this academy, or the funnel and the trial APIs drift apart.
+// Fails on: (a) a bookable_program_id that doesn't exist for this tenant,
+// (b) an enabled calendar-type entry point with no program link at all.
+async function entryPointProgramDrift(clientId: string): Promise<string[]> {
+  const supabase = createRuntimeSupabaseClient();
+  const { data: epData, error: epError } = await supabase
+    .from("entry_points")
+    .select("id, type, enabled, bookable_program_id")
+    .eq("client_id", clientId)
+    .range(0, SCAN_LIMIT - 1);
+  if (epError) throw new Error(epError.message);
+  const entryPoints = rows<{ id: string; type: string | null; enabled: boolean | null; bookable_program_id: string | null }>(epData);
+
+  const { data: programData, error: programError } = await supabase
+    .from("bookable_programs")
+    .select("id")
+    .eq("tenant_id", clientId)
+    .range(0, SCAN_LIMIT - 1);
+  if (programError) throw new Error(programError.message);
+  const programIds = new Set(rows<IdRow>(programData).map((program) => program.id));
+
+  return entryPoints
+    .filter((ep) =>
+      ep.bookable_program_id
+        ? !programIds.has(ep.bookable_program_id)
+        : ep.enabled === true && ep.type === "calendar",
+    )
+    .map((ep) => ep.id);
 }
 
 async function activePriceNoTemplate(clientId: string): Promise<string[]> {
