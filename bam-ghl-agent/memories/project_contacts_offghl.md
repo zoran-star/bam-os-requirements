@@ -108,4 +108,20 @@ Question came up: "are tags fully off GHL for GTA v2?" Answer: functionally yes.
 - **The ONE cosmetic residual**: `_bbLoadTags()` -> `/api/ghl/comms-config` still fetches the
   GHL location tag list, but for portal academies the dropdowns it fills are now hidden, so
   it's a harmless no-op (not worth an extra gate). Only fully removing the GHL tag catalog +
-  offer fields would need a `tag_provider` flag build (not scoped - GTA already functional).
+  offer fields would need a `tag_provider` flag build (scoped below - GTA already functional).
+
+## FUTURE BUILD: `tag_provider` flag (kill the last GHL tag call) - NOT urgent
+Scoped 2026-07-04. Only piece keeping GTA tied to GHL for tags = the tag LIST (catalog).
+Classification (members table) + tag writes (`contacts.tags[]`) are already off GHL. Mirror
+the `contact_provider` pattern:
+1. `clients.tag_provider` flag ('ghl'|'portal') + `ghl_tag_defs` table (client_id, name) =
+   portal-owned tag list per academy.
+2. One-time copy: pull GTA's current GHL location tags into `ghl_tag_defs`.
+3. New `/api/tag-defs?client_id=` endpoint serves the list from the portal table (no GHL).
+4. Offer builder: when tag_provider='portal', fill the tag dropdowns from `/api/tag-defs`
+   instead of `/api/ghl/comms-config`, and un-hide them (swap point = `_bbLoadTags()` + the
+   `_bbHideTagFields()` gate added 2026-07-04).
+5. Flip GTA `tag_provider='portal'`.
+Size: ~1 migration + 1 endpoint + small UI swap, behind a flag (zero risk to the 43 GHL
+academies). WORTH DOING WHEN: tags need to leave GHL entirely (other academies migrating, or
+GHL contract winddown). Tracked as a Notion Open Loop.
