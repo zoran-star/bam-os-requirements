@@ -44329,16 +44329,21 @@ function _mmRenderLandingFocus(d) {
   // Build the step spine. CLICKED + LOADED come from Meta (LPV is a subset of
   // clicks so it never widens); when Meta has no LPV, fall back to our beacon
   // page loads for a single LOADED stage. The rest are our own funnel beacons.
+  // timeKey = the median-time bucket for THIS step -> the next one (from the API
+  // page.step_times). No time on clicked->loaded (Meta gives no click/load
+  // timestamps per session).
+  const st = page.step_times || {};
   const steps = [];
   if (clk > 0 && lpv > 0) {
-    steps.push({ lbl: 'Clicked', sub: 'tapped the ad', did: 'clicked the ad', n: clk, fix: 'speed up the page', leak: 'the page is too slow to load' });
-    steps.push({ lbl: 'Loaded', sub: 'page opened', did: 'loaded the page', n: lpv, fix: 'rework the top of the page', leak: "the page isn't earning the click" });
+    steps.push({ lbl: 'Clicked', sub: 'tapped the ad', did: 'clicked the ad', n: clk, fix: 'speed up the page', leak: 'the page is too slow to load', timeKey: null });
+    steps.push({ lbl: 'Loaded', sub: 'page opened', did: 'loaded the page', n: lpv, fix: 'rework the top of the page', leak: "the page isn't earning the click", timeKey: 'loaded_to_form' });
   } else {
-    steps.push({ lbl: 'Loaded', sub: 'page opened', did: 'loaded the page', n: (page.visitors || page.ad_visitors || 0), fix: 'rework the top of the page', leak: "the page isn't earning the click" });
+    steps.push({ lbl: 'Loaded', sub: 'page opened', did: 'loaded the page', n: (page.visitors || page.ad_visitors || 0), fix: 'rework the top of the page', leak: "the page isn't earning the click", timeKey: 'loaded_to_form' });
   }
-  steps.push({ lbl: 'Form', sub: 'started the form', did: 'started the form', n: page.form_started || 0, fix: 'fix the form', leak: 'the form is leaking' });
-  steps.push({ lbl: 'Calendar', sub: 'saw the times', did: 'saw the times', n: page.saw_calendar || 0, fix: 'edit the calendar', leak: 'they saw the times but walked away' });
-  steps.push({ lbl: 'Booked', sub: 'trial booked', did: 'booked', n: page.booked_sessions || 0, fix: null, leak: null });
+  steps.push({ lbl: 'Form', sub: 'started the form', did: 'started the form', n: page.form_started || 0, fix: 'fix the form', leak: 'the form is leaking', timeKey: 'form_to_calendar' });
+  steps.push({ lbl: 'Calendar', sub: 'saw the times', did: 'saw the times', n: page.saw_calendar || 0, fix: 'edit the calendar', leak: 'they saw the times but walked away', timeKey: 'calendar_to_booked' });
+  steps.push({ lbl: 'Booked', sub: 'trial booked', did: 'booked', n: page.booked_sessions || 0, fix: null, leak: null, timeKey: null });
+  const _mmDur = (s) => s == null ? '' : (s < 60 ? s + 's' : (Math.floor(s / 60) + 'm' + (s % 60 ? ' ' + (s % 60) + 's' : '')));
 
   const top = steps[0].n || 0;
   if (!top) {
@@ -44381,11 +44386,16 @@ function _mmRenderLandingFocus(d) {
       const isLeak = flagLeak && i === worst;
       const col = isLeak ? 'var(--mm-red-t)' : 'var(--text-mute)';
       const wt = isLeak ? '700' : '500';
+      const tm = s.timeKey ? st[s.timeKey] : null;   // {median_s, n} or null
+      const timeChip = (tm && tm.median_s != null)
+        ? '<span style="font-family:var(--mm-ff);font-size:11px;color:var(--text-mute);display:inline-flex;align-items:center;gap:3px" title="median time to advance (' + tm.n + ' sessions)">&#9201; ~' + _mmDur(tm.median_s) + '</span>'
+        : '';
       rows +=
         '<div style="' + GRID + ';margin:3px 0">' +
           '<div></div>' +
           '<div style="display:flex;align-items:center;gap:8px;padding-left:2px;flex-wrap:wrap">' +
             '<span style="font-family:var(--mm-ff);font-size:12px;color:' + col + ';font-weight:' + wt + '">&#8595; ' + drop + '% dropped &middot; ' + lost + ' lost</span>' +
+            timeChip +
             (isLeak && s.fix ? '<span style="font-family:var(--mm-ff);font-size:11px;font-weight:700;background:rgba(224,90,66,0.12);color:#B5352F;padding:2px 9px;border-radius:6px">&#9998; ' + s.fix + '</span>' : '') +
           '</div>' +
           '<div></div>' +
