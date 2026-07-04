@@ -1179,6 +1179,36 @@ function ContentTicketDetail({ tk, session, ticket, me, owners = [], canReassign
       setAssignBusy(false);
     }
   }
+  // ── Edit the client's brief in place (staff correcting a typo / tightening notes) ──
+  const [editingCtx, setEditingCtx] = useState(false);
+  const [ctxDraft, setCtxDraft] = useState(null);   // working copy of ticket.context
+  const [notesDraft, setNotesDraft] = useState(""); // working copy of ticket.notes
+  const [savingCtx, setSavingCtx] = useState(false);
+  function startEditCtx() {
+    setCtxDraft(JSON.parse(JSON.stringify(ticket.context || {})));
+    setNotesDraft(ticket.notes || "");
+    setEditingCtx(true);
+  }
+  function cancelEditCtx() {
+    setEditingCtx(false);
+    setCtxDraft(null);
+  }
+  async function saveCtx() {
+    if (savingCtx) return;
+    setSavingCtx(true);
+    try {
+      await patchTicket(ticket.id, { action: "edit-context", context: ctxDraft || {}, notes: notesDraft });
+      setEditingCtx(false);
+      setCtxDraft(null);
+      await onRefetch();
+      showBanner("Brief updated.");
+    } catch (e) {
+      alert("Save failed: " + (e?.message || "error"));
+    } finally {
+      setSavingCtx(false);
+    }
+  }
+
   const [finalsToUpload, setFinalsToUpload] = useState([]); // local File objects
   const [finalsFolder, setFinalsFolder] = useState("");     // optional folder for the next upload batch
   const [finalsDragOver, setFinalsDragOver] = useState(false);
@@ -1433,9 +1463,40 @@ function ContentTicketDetail({ tk, session, ticket, me, owners = [], canReassign
       </details>
 
       {/* Client inputs */}
-      <SectionLabel tk={tk}>What the client submitted</SectionLabel>
+      {(() => {
+        const canEditCtx = ticket.status === "active" || ticket.status === "client-dependent";
+        return (
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
+            <SectionLabel tk={tk} style={{ marginBottom: 0 }}>What the client submitted</SectionLabel>
+            {canEditCtx && (
+              editingCtx ? (
+                <div style={{ display: "flex", gap: 8 }}>
+                  <button onClick={cancelEditCtx} disabled={savingCtx} style={{
+                    background: "transparent", border: `1px solid ${tk.border}`, color: tk.textSub,
+                    padding: "5px 14px", borderRadius: 7, cursor: "pointer", fontFamily: "inherit", fontSize: 12, fontWeight: 500,
+                  }}>Cancel</button>
+                  <button onClick={saveCtx} disabled={savingCtx} style={{
+                    background: tk.accent, color: "#0A0A0B", border: 0,
+                    padding: "5px 16px", borderRadius: 7, cursor: savingCtx ? "wait" : "pointer",
+                    fontFamily: "inherit", fontSize: 12, fontWeight: 700, opacity: savingCtx ? 0.6 : 1,
+                  }}>{savingCtx ? "Saving…" : "Save"}</button>
+                </div>
+              ) : (
+                <button onClick={startEditCtx} style={{
+                  background: "transparent", border: `1px solid ${tk.border}`, color: tk.textSub,
+                  padding: "5px 14px", borderRadius: 7, cursor: "pointer", fontFamily: "inherit", fontSize: 12, fontWeight: 500,
+                }}>✎ Edit</button>
+              )
+            )}
+          </div>
+        );
+      })()}
       <Card tk={tk} style={{ marginBottom: 22 }}>
-        <ClientInputs ticket={ticket} tk={tk} />
+        <ClientInputs
+          ticket={ticket}
+          tk={tk}
+          edit={editingCtx ? { draft: ctxDraft, setDraft: setCtxDraft, notesDraft, setNotesDraft } : null}
+        />
       </Card>
 
       {/* Finals (current + new upload) */}
@@ -1693,10 +1754,43 @@ function StatusBadge({ ticket, tk }) {
   );
 }
 
-function ClientInputs({ ticket, tk }) {
+function ClientInputs({ ticket, tk, edit = null }) {
   const ctx = ticket.context || {};
   const raw = Array.isArray(ticket.raw_files) ? ticket.raw_files : [];
   const subCreatives = Array.isArray(ctx.creatives) ? ctx.creatives : null;
+
+  // In edit mode we read/write the draft copy the parent owns; the branch
+  // structure (which fields show) stays keyed off the original ctx so the shape
+  // can't shift mid-edit.
+  const editing = !!edit;
+  const d = editing ? (edit.draft || {}) : ctx;
+  const setField = (key, value) => edit.setDraft(prev => ({ ...(prev || {}), [key]: value }));
+  const setCreative = (i, key, value) => edit.setDraft(prev => ({
+    ...(prev || {}),
+    creatives: (prev.creatives || []).map((c, j) => (j === i ? { ...c, [key]: value } : c)),
+  }));
+
+  const inputStyle = {
+    width: "100%", padding: "8px 10px", background: tk.surface,
+    border: `1px solid ${tk.border}`, borderRadius: 7, color: tk.text,
+    fontSize: 14, fontFamily: "inherit", outline: "none", boxSizing: "border-box",
+  };
+  const textInput = (key, { placeholder } = {}) => (
+    <input type="text" value={d[key] || ""} placeholder={placeholder || ""}
+      onChange={e => setField(key, e.target.value)} style={inputStyle} />
+  );
+  const textArea = (key, { placeholder, minRows = 3 } = {}) => (
+    <textarea value={d[key] || ""} placeholder={placeholder || ""} rows={minRows}
+      onChange={e => setField(key, e.target.value)} style={{ ...inputStyle, resize: "vertical", lineHeight: 1.5 }} />
+  );
+  const toggle = (key) => (
+    <button type="button" onClick={() => setField(key, !d[key])} style={{
+      display: "inline-flex", alignItems: "center", gap: 8, cursor: "pointer",
+      background: "transparent", border: `1px solid ${tk.border}`, borderRadius: 999,
+      padding: "5px 12px", color: d[key] ? (tk.green || "#7BC47F") : tk.textMute,
+      fontFamily: "inherit", fontSize: 13, fontWeight: 600,
+    }}>{d[key] ? "✓ Yes" : "✕ No"}</button>
+  );
 
   const row = (label, value) => (
     <div key={label} style={{
@@ -1716,19 +1810,31 @@ function ClientInputs({ ticket, tk }) {
     <>
       {ctx.source === "new-campaign" && (
         <>
-          {row("Source", <span><span style={{ color: tk.accent }}>📦 New campaign</span> · offer: <b>{ctx.offer || "—"}</b></span>)}
-          {ctx.is_new_offer && row("New offer description", ctx.new_offer_description || "—")}
-          {row("Monthly spend", <span style={{ color: tk.accent, fontWeight: 600 }}>{ctx.monthly_spend || "—"}</span>)}
-          {row("Landing page", ctx.landing_page ? <a href={ctx.landing_page} target="_blank" rel="noreferrer" style={{ color: tk.accent, textDecoration: "none" }}>{ctx.landing_page} ↗</a> : <span style={{ color: tk.textMute }}>(default funnel)</span>)}
+          {row("Offer", editing
+            ? textInput("offer", { placeholder: "Offer name" })
+            : <span><span style={{ color: tk.accent }}>📦 New campaign</span> · offer: <b>{ctx.offer || "—"}</b></span>)}
+          {ctx.is_new_offer && row("New offer description", editing
+            ? textArea("new_offer_description", { placeholder: "Describe the new offer", minRows: 2 })
+            : (ctx.new_offer_description || "—"))}
+          {row("Monthly spend", editing
+            ? textInput("monthly_spend", { placeholder: "e.g. $1,500/mo" })
+            : <span style={{ color: tk.accent, fontWeight: 600 }}>{ctx.monthly_spend || "—"}</span>)}
+          {row("Landing page", editing
+            ? textInput("landing_page", { placeholder: "https://… (blank = default funnel)" })
+            : (ctx.landing_page ? <a href={ctx.landing_page} target="_blank" rel="noreferrer" style={{ color: tk.accent, textDecoration: "none" }}>{ctx.landing_page} ↗</a> : <span style={{ color: tk.textMute }}>(default funnel)</span>))}
         </>
       )}
       {ctx.source === "add-creative" && row("Source", <span>Add-creative on <b>{ctx.campaign_title || "(unspecified)"}</b></span>)}
       {ctx.source === "marketing-revision" && row("Source", <span style={{ color: tk.red || "#ED7969" }}>↩ Revision requested by marketing</span>)}
 
-      {ctx.format && row("Format", <b style={{ color: tk.accent }}>{ctx.format}</b>)}
-      {ctx.captions !== undefined && row("On-screen captions", ctx.captions
-        ? <span style={{ color: tk.green || "#7BC47F", fontWeight: 600 }}>Yes</span>
-        : <span style={{ color: tk.textMute }}>No</span>)}
+      {(ctx.format !== undefined || editing) && row("Format", editing
+        ? textInput("format", { placeholder: "e.g. Reel, Static, Carousel" })
+        : (ctx.format ? <b style={{ color: tk.accent }}>{ctx.format}</b> : <span style={{ color: tk.textMute }}>—</span>))}
+      {ctx.captions !== undefined && row("On-screen captions", editing
+        ? toggle("captions")
+        : (ctx.captions
+          ? <span style={{ color: tk.green || "#7BC47F", fontWeight: 600 }}>Yes</span>
+          : <span style={{ color: tk.textMute }}>No</span>))}
 
       {subCreatives ? (
         <div style={{ padding: "10px 0" }}>
@@ -1736,38 +1842,55 @@ function ClientInputs({ ticket, tk }) {
             Creatives ({subCreatives.length})
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-            {subCreatives.map((c, i) => (
+            {subCreatives.map((c, i) => {
+              const cd = editing ? ((d.creatives || [])[i] || c) : c;
+              return (
               <div key={i} style={{
                 padding: 14, background: "rgba(255,255,255,0.02)",
                 border: `1px solid ${tk.borderSoft || tk.border}`, borderRadius: 8,
               }}>
                 <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: 8, marginBottom: 8 }}>
                   <span style={{ fontWeight: 600, color: tk.text }}>
-                    Creative {i + 1} · {(TYPE_META_CT[c.type] || {}).label || c.type}
+                    Creative {i + 1} · {(TYPE_META_CT[cd.type] || {}).label || cd.type}
                   </span>
-                  {c.angle && (
+                  {editing ? (
+                    <input type="text" value={cd.angle || ""} placeholder="Angle (optional)"
+                      onChange={e => setCreative(i, "angle", e.target.value)}
+                      style={{ ...inputStyle, width: "auto", flex: 1, minWidth: 160, padding: "4px 8px", fontSize: 12 }} />
+                  ) : (cd.angle && (
                     <span style={{
                       fontSize: 10, color: tk.accent, letterSpacing: "0.08em", textTransform: "uppercase",
                       padding: "2px 8px", borderRadius: 4,
                       border: `1px solid ${tk.accent}`, background: "rgba(232,197,71,0.08)",
                     }} title="Recommended angle from the offer's guide card">
-                      {c.angle}{c.type ? ` · ${c.type}` : ""}
+                      {cd.angle}{cd.type ? ` · ${cd.type}` : ""}
                     </span>
-                  )}
+                  ))}
                 </div>
-                <div style={{ fontSize: 13, color: tk.text, marginBottom: 10, whiteSpace: "pre-wrap" }}>
-                  {c.notes || <span style={{ color: tk.textMute, fontStyle: "italic" }}>(no notes)</span>}
-                </div>
+                {editing ? (
+                  <textarea value={cd.notes || ""} placeholder="Notes for this creative" rows={3}
+                    onChange={e => setCreative(i, "notes", e.target.value)}
+                    style={{ ...inputStyle, resize: "vertical", lineHeight: 1.5, marginBottom: 10 }} />
+                ) : (
+                  <div style={{ fontSize: 13, color: tk.text, marginBottom: 10, whiteSpace: "pre-wrap" }}>
+                    {cd.notes || <span style={{ color: tk.textMute, fontStyle: "italic" }}>(no notes)</span>}
+                  </div>
+                )}
                 <FilesByFolder files={c.raw_files} tk={tk} compact minmax={160} />
               </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       ) : (
         <>
-          {row("Notes", ticket.notes
-            ? <span style={{ whiteSpace: "pre-wrap" }}>{ticket.notes}</span>
-            : <span style={{ color: tk.textMute, fontStyle: "italic" }}>(no notes)</span>)}
+          {row("Notes", editing
+            ? <textarea value={edit.notesDraft} placeholder="Brief / notes" rows={4}
+                onChange={e => edit.setNotesDraft(e.target.value)}
+                style={{ ...inputStyle, resize: "vertical", lineHeight: 1.5 }} />
+            : (ticket.notes
+              ? <span style={{ whiteSpace: "pre-wrap" }}>{ticket.notes}</span>
+              : <span style={{ color: tk.textMute, fontStyle: "italic" }}>(no notes)</span>))}
           <div style={{ padding: "10px 0" }}>
             <div style={{ fontSize: 10, color: tk.textMute, letterSpacing: "0.2em", textTransform: "uppercase", marginBottom: 10 }}>
               Raw files ({raw.length})
@@ -2055,11 +2178,11 @@ function FilePreviewTile({ file, tk, compact }) {
   );
 }
 
-function SectionLabel({ children, tk }) {
+function SectionLabel({ children, tk, style }) {
   return (
     <div style={{
       fontSize: 10, color: tk.textMute, letterSpacing: "0.22em",
-      textTransform: "uppercase", marginBottom: 10,
+      textTransform: "uppercase", marginBottom: 10, ...style,
     }}>{children}</div>
   );
 }
