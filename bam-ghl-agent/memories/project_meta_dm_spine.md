@@ -1,11 +1,13 @@
 # Meta DM spine - Instagram + FB Messenger off GHL
 
-**Status 2026-07-03 late: ALL 4 INCREMENTS BUILT. GTA wired + active (webhook
-stores), FB Messenger proven end-to-end. Increment 4 (inbox read + Graph send
-+ passthrough dedupe) is code-complete but GATED behind
-`client_meta_messaging_config.inbox_live` (false for everyone). Waiting on
-Meta App Review (Advanced Access). Leads' IG/FB DMs stay visible via the GHL
-passthrough until inbox_live flips.**
+**Status 2026-07-04: ALL 4 INCREMENTS BUILT + LIVE FOR GTA. GTA
+`inbox_live=true` (Zoran's call 2026-07-04) - portal serves IG+FB DMs direct,
+GHL passthrough deduped out. IG delivery proven from Zoran's Accounts-Center-
+linked IG. ⚠️ KNOWN TRADEOFF he accepted: under Standard Access Meta only
+delivers app-role senders, so REAL parents' IG DMs do NOT reach the portal
+(and are no longer in the GHL passthrough either) until Meta App Review grants
+Advanced Access. Only Zoran's own/linked accounts are fully live. App Review
+still NOT submitted - that's the real unlock for real customers.**
 
 ## Increment 4 (built 2026-07-03, dormant behind inbox_live)
 - **`api/meta/_dm.js`** - the module: `metaDmConfig` (active cfg;
@@ -145,3 +147,9 @@ spine replaces that passthrough with direct Meta - the social sibling of
   marketing.js META_API_VERSION.
 - Meta retries non-200 webhook deliveries aggressively - the webhook never
   500s a batch; per-entry try/catch.
+- **Owner-notify SMS race (fixed 2026-07-04, PR #1125):** DMs stored fine but
+  the owner text often never sent. Cause: `notifyOwners()` was fire-and-forget,
+  then the webhook returned 200 immediately - Vercel freezes the fn on return
+  and killed the in-flight Twilio send. Fix: collect the notify promises and
+  `await Promise.allSettled` before responding. Lesson: never fire-and-forget
+  async side-effects before `res` in a serverless webhook; await them.
