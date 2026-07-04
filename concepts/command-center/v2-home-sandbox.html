@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>V2 Home — Command Center (sandbox)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+/* ==== REAL PORTAL TOKENS (dark) - copied from client-portal.html so this looks like the real thing ==== */
+:root{
+  --bg:#16140F; --ink:#16140F; --surface:#1A1916; --surface-el:#222120; --surface-hov:#2C2B28;
+  --border:rgba(255,255,255,0.08); --border-med:rgba(255,255,255,0.12); --border-str:rgba(255,255,255,0.16);
+  --text:#F0EDE8; --text-sub:#A5A19A; --text-mute:#6E6B63;
+  --gold:#D4B65C; --gold-l:#C8A84E; --gold-d:#E0C56A; --gold-glow:rgba(212,182,92,0.12);
+  --sans:"Inter",system-ui,sans-serif; --display:"Space Grotesk",Inter,sans-serif; --mono:"JetBrains Mono",ui-monospace,monospace;
+}
+html[data-theme="light"]{
+  --bg:#EFEAE0; --ink:#EFEAE0; --surface:#FFFFFF; --surface-el:#F7F2E7; --surface-hov:#E8E1D2;
+  --border:rgba(60,40,15,0.10); --border-med:rgba(60,40,15,0.16); --border-str:rgba(60,40,15,0.22);
+  --text:#1C1B18; --text-sub:#5F5A50; --text-mute:#8E867A;
+  --gold:#C8A84E; --gold-l:#D4B65C; --gold-d:#A08030; --gold-glow:rgba(200,168,78,0.10);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:14px;-webkit-font-smoothing:antialiased}
+
+/* sandbox control bar - NOT part of the real UI */
+.sbx{position:fixed;top:0;left:0;right:0;z-index:100;background:#0b0a08;border-bottom:1px solid var(--border);padding:8px 16px;display:flex;gap:10px;align-items:center;font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--text-mute)}
+.sbx b{color:var(--gold)}
+.sbx button{font-family:var(--mono);font-size:11px;text-transform:uppercase;letter-spacing:.08em;background:transparent;border:1px solid var(--border-med);color:var(--text-sub);padding:5px 11px;border-radius:6px;cursor:pointer}
+.sbx button:hover{border-color:var(--gold);color:var(--gold)}
+.sbx button.on{background:var(--gold);color:#16140F;border-color:var(--gold)}
+.sbx .sp{flex:1}
+
+/* app frame (mimics the portal main content column) */
+.frame{max-width:720px;margin:0 auto;padding:64px 20px 80px}
+.content{padding:8px 0}
+
+/* ===== real portal home markup (preserved order) ===== */
+.home-profile-row{display:flex;align-items:center;gap:14px;margin-bottom:22px}
+.my-avatar{width:52px;height:52px;border-radius:50%;border:1px solid var(--border-med);background:var(--surface-el);color:var(--gold);font-family:var(--display);font-weight:700;font-size:18px;display:flex;align-items:center;justify-content:center;cursor:pointer}
+.home-greeting{font-family:var(--display);font-size:24px;font-weight:600;letter-spacing:-.01em}
+.home-status{display:flex;align-items:center;gap:8px;margin-top:4px;font-size:13px;color:var(--text-sub)}
+.home-status .dot{width:7px;height:7px;border-radius:50%;background:var(--gold);animation:beat 2.4s ease-in-out infinite}
+.home-sec{margin:22px 0 12px}
+.home-sec-label{font-family:var(--mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--text-mute)}
+
+/* ===== V2 command-center additions ===== */
+.hv2-readout{font-family:var(--mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--text-mute);margin:2px 0 6px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.hv2-live{color:var(--gold);display:inline-flex;align-items:center;gap:7px}
+.hv2-live::before{content:"";width:7px;height:7px;border-radius:50%;background:currentColor;animation:beat 2.4s ease-in-out infinite}
+@keyframes beat{0%,100%{opacity:1}50%{opacity:.3}}
+
+.hv2-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin:4px 0 18px}
+.hv2-tile{position:relative;border:1px solid var(--border);border-radius:14px;padding:16px 16px 15px;background:var(--surface);cursor:pointer;text-align:left;font-family:inherit;color:var(--text);transition:transform .18s ease,border-color .18s,box-shadow .18s}
+.hv2-tile:hover{transform:translateY(-4px);border-color:var(--gold);box-shadow:0 12px 30px rgba(0,0,0,.42)}
+.hv2-tile.hot{animation:hv2Pulse 2.6s ease-in-out .7s infinite}
+.hv2-ic{font-size:20px;line-height:1}
+.hv2-num{font-size:36px;font-weight:800;line-height:1;margin:11px 0 3px;font-family:var(--display);color:var(--text-mute);transition:color .2s}
+.hv2-tile.hot .hv2-num{color:var(--gold)}
+.hv2-label{font-size:12.5px;font-weight:700;color:var(--text-sub)}
+.hv2-sub{font-size:11px;color:var(--text-mute);margin-top:2px}
+.hv2-go{position:absolute;top:13px;right:14px;color:var(--text-mute);font-size:18px;opacity:0;transform:translateX(-3px);transition:opacity .18s,transform .18s}
+.hv2-tile:hover .hv2-go{opacity:1;transform:translateX(0)}
+@keyframes hv2Pulse{0%,100%{box-shadow:0 0 0 1px rgba(212,182,92,.28)}50%{box-shadow:0 0 0 4px rgba(212,182,92,.12)}}
+
+/* Pulse scene (the approved addition) */
+.hv2-pulse{border:1px solid var(--border);border-radius:14px;padding:18px 18px 16px;background:var(--surface);margin:2px 0 4px;overflow:hidden}
+.hv2-ekg{height:44px;margin:-2px 0 12px;opacity:.9}
+.hv2-ekg svg{width:100%;height:100%;display:block}
+.hv2-ekg path{stroke:var(--gold);stroke-width:1.4;fill:none;stroke-dasharray:1600;stroke-dashoffset:1600;animation:sweep 5s linear infinite}
+@keyframes sweep{to{stroke-dashoffset:0}}
+.hv2-pstatus{font-family:var(--display);font-size:22px;font-weight:700;letter-spacing:-.01em;color:var(--gold)}
+.hv2-psub{font-size:13px;color:var(--text-sub);margin-top:6px;line-height:1.5}
+</style>
+</head>
+<body>
+
+<!-- SANDBOX CONTROLS (not in the real UI) -->
+<div class="sbx">
+  <span>Sandbox · <b>V2 Home</b> command center</span>
+  <span class="sp"></span>
+  <button id="btn-quiet" class="on" onclick="setScenario('quiet')">Quiet day</button>
+  <button id="btn-busy" onclick="setScenario('busy')">Busy day</button>
+  <button onclick="toggleTheme()">Theme</button>
+</div>
+
+<div class="frame">
+  <div class="content">
+    <div class="home-wrap">
+
+      <!-- 1. Profile row (preserved) -->
+      <div class="home-profile-row">
+        <button class="my-avatar">CA</button>
+        <div style="flex:1;min-width:0">
+          <div class="home-greeting" id="home-greeting">Good evening, Coleman</div>
+          <div class="home-status"><span class="dot"></span><span id="home-status-text">Loading…</span></div>
+        </div>
+      </div>
+
+      <!-- V2 command-center home (this is what renderHomeV2 will output) -->
+      <div id="home-v2">
+        <div class="hv2-readout"><span class="hv2-live" id="hv2-live">On course</span><span>· your command center</span></div>
+
+        <!-- 2. Today at a glance (preserved: same 4 tiles, same order) -->
+        <div class="home-sec" style="margin-top:2px"><span class="home-sec-label">Today at a glance</span></div>
+        <div class="hv2-grid">
+          <button class="hv2-tile" id="t-trials"><span class="hv2-go">›</span><div class="hv2-ic">📅</div><div class="hv2-num" id="n-trials">·</div><div class="hv2-label">Trials today</div><div class="hv2-sub">see them in the pipeline</div></button>
+          <button class="hv2-tile" id="t-done"><span class="hv2-go">›</span><div class="hv2-ic">💬</div><div class="hv2-num" id="n-done">·</div><div class="hv2-label">Done-trial replies</div><div class="hv2-sub">leads who texted back</div></button>
+          <button class="hv2-tile" id="t-hawk"><span class="hv2-go">›</span><div class="hv2-ic">👁</div><div class="hv2-num" id="n-hawk">·</div><div class="hv2-label">Hawkeye actions</div><div class="hv2-sub">to approve</div></button>
+          <button class="hv2-tile" id="t-unread"><span class="hv2-go">›</span><div class="hv2-ic">✉️</div><div class="hv2-num" id="n-unread">·</div><div class="hv2-label">Unread messages</div><div class="hv2-sub">in the inbox</div></button>
+        </div>
+
+        <!-- 3. Pulse scene (NEW - approved addition) -->
+        <div class="home-sec"><span class="home-sec-label">Pulse</span></div>
+        <div class="hv2-pulse">
+          <div class="hv2-ekg"><svg viewBox="0 0 1600 44" preserveAspectRatio="none"><path d="M0,22 L340,22 L358,22 L376,6 L394,40 L412,22 L780,22 L798,22 L816,10 L834,36 L852,22 L1220,22 L1238,22 L1256,4 L1274,40 L1292,22 L1600,22"/></svg></div>
+          <div class="hv2-pstatus" id="hv2-pstatus">On course.</div>
+          <div class="hv2-psub" id="hv2-psub">Your agents are on watch.</div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<script>
+// ==== mirrors the real _hv2Set / _hv2Pulse logic so porting is 1:1 ====
+function _set(key, n){
+  const el=document.getElementById('n-'+key); if(!el) return;
+  const tile=document.getElementById('t-'+key);
+  const target=Math.max(0,Number(n)||0);
+  if(tile) tile.classList.toggle('hot', target>0);
+  const t0=Date.now(), dur=550;
+  const tick=()=>{const p=Math.min(1,(Date.now()-t0)/dur); el.textContent=String(Math.round(p*target)); if(p<1)requestAnimationFrame(tick); else _pulse();};
+  requestAnimationFrame(tick);
+}
+function _pulse(){
+  const g=id=>{const e=document.getElementById(id); const v=e?parseInt(e.textContent,10):0; return isNaN(v)?0:v;};
+  const trials=g('n-trials'), done=g('n-done'), hawk=g('n-hawk'), unread=g('n-unread');
+  const needs=done+hawk+unread;
+  const statusEl=document.getElementById('hv2-pstatus'), subEl=document.getElementById('hv2-psub');
+  const liveEl=document.getElementById('hv2-live'), hs=document.getElementById('home-status-text');
+  if(statusEl&&subEl){
+    if(needs>0){
+      const w=[];
+      if(hawk>0) w.push(hawk+' to approve');
+      if(done>0) w.push(done+' trial '+(done>1?'replies':'reply'));
+      if(unread>0) w.push(unread+' unread');
+      statusEl.textContent='A few things need you.';
+      subEl.textContent='Your agents are on watch. Waiting on you: '+w.join(' · ')+'.'+(trials>0?' '+trials+' trial'+(trials>1?'s':'')+' today.':'');
+    } else {
+      statusEl.textContent='On course.';
+      subEl.textContent=trials>0
+        ? 'Your agents are on watch. '+trials+' trial'+(trials>1?'s':'')+' today, and nothing needs your attention right now.'
+        : "Your agents are on watch. Nothing needs your attention right now - you're on pace.";
+    }
+  }
+  if(liveEl) liveEl.textContent=needs>0?'Needs you':'On course';
+  if(hs) hs.textContent=needs>0?(needs+' thing'+(needs>1?'s':'')+' need you'):'All systems on · on course';
+}
+
+// ==== sandbox-only: simulate activity levels so you can feel quiet vs busy ====
+const SCENARIOS={ quiet:{trials:1,done:0,hawk:0,unread:0}, busy:{trials:3,done:2,hawk:4,unread:5} };
+function setScenario(name){
+  document.getElementById('btn-quiet').classList.toggle('on', name==='quiet');
+  document.getElementById('btn-busy').classList.toggle('on', name==='busy');
+  const s=SCENARIOS[name];
+  _set('trials',s.trials); _set('done',s.done); _set('hawk',s.hawk); _set('unread',s.unread);
+}
+function toggleTheme(){ const h=document.documentElement; h.dataset.theme = h.dataset.theme==='light'?'dark':'light'; }
+
+setScenario('quiet');
+</script>
+</body>
+</html>
