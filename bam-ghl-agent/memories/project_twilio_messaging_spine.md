@@ -209,3 +209,30 @@ bridges to the contact; academy number = caller ID.
 - GTA live: +12898166569 rings +14165733718, voicemail + missed-call text on
   (verified live 2026-07-02). Roadmap + billing/subaccount plan: Zoran's personal
   memory note `bam-twilio-voice`.
+
+
+## Master account + migration tooling (ALL SHIPPED 2026-07-03/04)
+
+BAM master Twilio account exists ("BAM Master"; account SID + Main-type API
+key live in Vercel env TWILIO_MASTER_* - not in git). TrustHub
+primary profile SUBMITTED (older entity; swap to new corp later). Endpoints
+(all api/twilio/, auth = CRON_SECRET or staff JWT):
+- provision.js - subaccount + buy number + webhooks + creds + voice defaults
+  (dry_run mode; idempotent)
+- start-migration.js - enqueue a GHL port: pending config row + console port
+  pack (port submission = human console step; LOA e-sign to client)
+- migration-watch.js - 30-min cron: port landed + A2P verified -> webhooks,
+  history import, messaging-service attach, provider flip, Slack note
+- register-a2p.js - full ISV chain (secondary profile -> trust product ->
+  brand -> messaging service -> LOW_VOLUME campaign), staged/resumable.
+  GATED on Vercel env TWILIO_PRIMARY_PROFILE_SID (set at TrustHub approval);
+  POLICY_A2P sid = verify on first run (env TWILIO_A2P_POLICY_SID overrides)
+- usage-sync.js - daily usage metering into twilio_usage + monthly rebill
+  report cron (1st): cost +10% (Zoran) -> Slack -> staff pastes into GHL
+  invoices (auto-Stripe once billing leaves GHL)
+Staff UI: client detail -> Phone tab (PhoneTab.jsx + migration-status.js).
+Migration list (audit 2026-07-02): 16 US LC-Phone ports (Wave 0 = BAM WV/
+San Jose/NY, Miami LAST white-glove auto_cutover=false), 7 no-phone clients
+= new numbers, 2 AU + 1 UK parked, BTG/BAMeans DC/Performance Space inactive.
+Rules: A2P starts the minute a port is requested; never cancel GHL mid-port.
+Full running state: Zoran's personal note `bam-twilio-voice`.
