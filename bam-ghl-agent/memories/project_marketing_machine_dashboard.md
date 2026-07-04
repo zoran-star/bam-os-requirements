@@ -49,8 +49,13 @@ CPL is THE marketing health metric. Display = lifetime anchor + trend:
 - click->visit pill counts ONLY ad-tagged sessions (utm fbclid / fb|ig|meta
   source) - organic visitors were flattering it (GTA: 84% -> honest 59%,
   which is a real page-speed flag; healthy 70-85%).
-- Default range = last 14 days (was MTD); month pacing line stays MTD via
-  its own date_preset=this_month spend call.
+- Default range = last 14 days (was MTD); month pacing + spend live in the
+  MODAL ONLY (Zoran 2026-07-03 evening: removed the month bar + spend from
+  the simple card - card is lifetime anchor + line + health bars + result,
+  result column labeled "last 14 days"). The this_month spend call stays for
+  the modal header.
+- PARKED idea: adaptive judged window - use 7d when spend gives ~8 leads/wk,
+  stretch to 14d when it does not; self-tunes as ad budgets grow.
 
 ## Live-fire gotchas (found testing vs real GTA data 2026-07-03)
 - Meta v22 REJECTS `video_3_sec_watched_actions` as an insights field. 3-sec
