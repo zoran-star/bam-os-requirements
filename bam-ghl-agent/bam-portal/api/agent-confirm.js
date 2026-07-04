@@ -317,6 +317,24 @@ async function trialAppts(token, contactId) {
   } catch (_) { return []; }
 }
 
+// The gym address for a contact's trial, from the OFFER tied to their pipeline
+// card: offers.data.general_info.location holds a Business Blueprint locations id
+// (set in the offer wizard's "Primary location" picker). This is the owner-managed
+// source of truth for where sessions happen - clients.address is the business's
+// registered address and sent families to the wrong building (2026-07-04).
+async function offerLocationAddress(clientId, contactId) {
+  try {
+    const opps = await sb(`opportunities?client_id=eq.${encodeURIComponent(clientId)}&ghl_contact_id=eq.${encodeURIComponent(contactId)}&status=eq.open&select=offer_id&limit=1`);
+    const offerId = opps && opps[0] && opps[0].offer_id;
+    if (!offerId) return null;
+    const offs = await sb(`offers?id=eq.${encodeURIComponent(offerId)}&select=data&limit=1`);
+    const locId = offs && offs[0] && offs[0].data && offs[0].data.general_info && offs[0].data.general_info.location;
+    if (!locId) return null;
+    const locs = await sb(`locations?id=eq.${encodeURIComponent(locId)}&select=address&limit=1`);
+    return (locs && locs[0] && String(locs[0].address || "").trim()) || null;
+  } catch (_) { return null; }
+}
+
 // Persist only the safe, editable slice of a confirm-automations override:
 // per-step enabled + template (known step keys only), sequence enabled, and the
 // approve flag. Timing ('when') is fixed to the shipped steps and never client-set.
@@ -374,9 +392,10 @@ async function fireScriptedStep({ client, token, locationId, mode, autos, cfg, i
     startMs: trialMs,
     endMs: appt && appt.endTime ? new Date(appt.endTime).getTime() : null,
     // Address chain: the booked slot's own address (portal slots often have no
-    // location_label) -> the Brain's business_info "Location:" line -> the
-    // academy's required BB General address (clients.address).
-    location: (appt && appt.address) || addressFromOverrides(cfg && cfg.overrides) || String(client.address || "").trim(),
+    // location_label) -> the OFFER's Blueprint primary location (owner-managed,
+    // where sessions actually happen) -> the Brain's business_info "Location:"
+    // line -> the academy's required BB General address (clients.address).
+    location: (appt && appt.address) || (await offerLocationAddress(client.id, contactId)) || addressFromOverrides(cfg && cfg.overrides) || String(client.address || "").trim(),
     title: (appt && appt.title) || "Free Trial",
   };
   const resolve = (tpl) => resolveMergeVars(resolveApptTokens(tpl, apptCtx), locFor(client.id), vars);
@@ -483,9 +502,13 @@ async function detectForClient(client) {
         if (!row.draft_message || !String(row.draft_message).trim()) continue;
         try {
           await sendReplyViaGhl(token, row.ghl_contact_id, row.draft_message, client.id);
-          await sb(`agent_confirm_replies?id=eq.${row.id}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ status: "sent", auto_sent: true, sent_at: new Date().toISOString(), updated_at: new Date().toISOString() }) });
+          await sb(`agent_confirm_replies?id=eq.${row.id}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ status: "sent", auto_sent: true, sent_at: new Date().toISOString(), send_error: null, updated_at: new Date().toISOString() }) });
           flushed++;
-        } catch (_) {}
+        } catch (e) {
+          // Keep the row approved so it retries, but make the failure visible -
+          // a swallowed error here starved first-touch confirm sends for days.
+          try { await sb(`agent_confirm_replies?id=eq.${row.id}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ send_error: String((e && e.message) || e).slice(0, 300), updated_at: new Date().toISOString() }) }); } catch (_) {}
+        }
       }
     } catch (_) {}
   }

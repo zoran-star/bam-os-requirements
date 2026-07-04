@@ -157,6 +157,13 @@ async function handler(req, res) {
   if (!channel) return res.status(200).json({ ok: true, skipped: "object" });
 
   let stored = 0;
+  // Collect owner-notify promises and AWAIT them before responding. Vercel
+  // freezes the function the moment we return 200, so a fire-and-forget
+  // notifyOwners() (which chains several Twilio fetches) is frequently killed
+  // mid-send - which is exactly why some inbound DMs never texted the owner.
+  // The SMS is a few hundred ms; Meta's webhook timeout is ~20s, so awaiting
+  // is safe and makes the notification reliable.
+  const notifies = [];
   for (const entry of (Array.isArray(event.entry) ? event.entry : [])) {
     try {
       const cfg = await configFor(channel, String(entry.id || ""));
@@ -168,11 +175,12 @@ async function handler(req, res) {
         if (r.direction === "inbound") {
           // Same owner ping the other inbound webhooks fire - best-effort.
           const label = r.channel === "instagram" ? "Instagram" : "Messenger";
-          notifyOwners(cfg.client_id, "inbox_message", `💬 New ${label} DM in your inbox${r.text ? `: "${String(r.text).slice(0, 80)}"` : ""}`).catch(() => {});
+          notifies.push(notifyOwners(cfg.client_id, "inbox_message", `💬 New ${label} DM in your inbox${r.text ? `: "${String(r.text).slice(0, 80)}"` : ""}`).catch(() => {}));
         }
       }
     } catch (e) { console.error("[meta-inbound]", e.message); /* next entry - never 500 the batch */ }
   }
+  if (notifies.length) await Promise.allSettled(notifies);
   return res.status(200).json({ ok: true, stored });
 }
 

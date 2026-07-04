@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="light">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
@@ -15,7 +15,9 @@
 <link rel="icon" type="image/png" href="/icon-192.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Archivo:wght@400;500;600;700;800;900&family=Geist+Mono:wght@400;500;600&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=DM+Mono:wght@400;500&family=Nunito:wght@700;800;900&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Archivo:wght@400;500;600;700;800;900&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<!-- Marketing Machine card uses the FullControl PROTOTYPE font stack (prototype/src/styles/theme.css) -->
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=DM+Mono:wght@400;500&family=Nunito:wght@700;800;900&display=swap" rel="stylesheet">
 <script>
   // Clients must NEVER be on the staff domain - same Vercel app, wrong host.
   // OAuth redirects (Stripe Connect) + Supabase auth fallbacks are registered
@@ -3598,40 +3600,63 @@
     .month-progress-bar { width: 130px; }
   }
 
-  /* ── Marketing Machine card + modal (V2) ── */
+  /* "Back to Ads / Organic" retired (Zoran 2026-07-04) - the sidebar re-entry
+     shows the channel split again, so the link was dead weight */
+  #marketing-ads-back { display: none !important; }
+  /* ── Marketing Machine card + modal (V2) ──
+     Skinned with tokens pulled DIRECTLY from the FullControl prototype
+     (prototype/src/styles/theme.css): Plus Jakarta Sans / DM Mono fonts,
+     status colors green #3EAF5C / amber #E09D24 / red #E05A42, 16px card
+     radius, soft shadow. */
+  .mm-card, .mm-modal-card {
+    --mm-ff: 'Plus Jakarta Sans', sans-serif;
+    --mm-fm: 'DM Mono', monospace;
+    --mm-green: #3EAF5C;   /* fills (theme.css:19) */
+    --mm-gold: #E09D24;
+    --mm-red: #E05A42;
+    --mm-green-t: #2D8A52; /* status TEXT (Marketing.module.css adStatus*) */
+    --mm-gold-t: #B08E30;
+    --mm-red-t: #B5352F;
+    font-family: var(--mm-ff);
+  }
   .mm-card {
-    border: 1px solid var(--line); border-radius: 6px; background: var(--surface-el);
-    padding: 20px 22px; margin: 0 0 28px; cursor: pointer;
+    position: relative;
+    border: 1px solid var(--line); border-radius: 16px; background: var(--surface-el);
+    box-shadow: 0 4px 14px rgba(0,0,0,0.06), 0 2px 6px rgba(0,0,0,0.04);
+    padding: 20px 24px; margin: 0 0 20px; cursor: pointer;
     transition: border-color 0.2s ease;
   }
   .mm-card:hover { border-color: var(--accent-border); }
   .mm-month { display: flex; align-items: center; gap: 12px; margin-bottom: 18px; }
   .mm-month-name {
-    font-family: var(--mono); font-size: 11px; font-weight: 700;
-    letter-spacing: 0.18em; text-transform: uppercase; color: var(--text);
+    font-family: var(--mm-ff); font-size: 12px; font-weight: 700;
+    letter-spacing: 0.05em; text-transform: uppercase; color: var(--text);
   }
   .mm-month .mm-bar { flex: 0 0 140px; }
-  .mm-month-meta { font-family: var(--mono); font-size: 10px; letter-spacing: 0.08em; color: var(--text-mute); }
-  .mm-bar { height: 8px; background: var(--line); border-radius: 4px; overflow: hidden; }
+  .mm-month-meta { font-family: var(--mm-ff); font-size: 12px; font-weight: 500; color: var(--text-mute); }
+  .mm-bar { position: relative; height: 8px; background: var(--line); border-radius: 4px; }
+  .mm-bar-fill-wrap { position: absolute; inset: 0; border-radius: 4px; overflow: hidden; }
   .mm-bar-fill { height: 100%; border-radius: 4px; transition: width 0.6s cubic-bezier(0.16, 1, 0.3, 1); }
-  .mm-f-green { background: var(--green); }
-  .mm-f-gold { background: var(--gold); }
-  .mm-f-red { background: var(--red); }
+  .mm-f-green { background: var(--mm-green); }
+  .mm-f-gold { background: var(--mm-gold); }
+  .mm-f-red { background: var(--mm-red); }
   .mm-f-grey { background: var(--text-mute); opacity: 0.45; }
   .mm-f-month { background: var(--gold); }
   .mm-flow { display: grid; grid-template-columns: 1fr 24px 1.5fr 24px 1fr 24px auto; gap: 10px; align-items: start; }
   .mm-arrow { color: var(--text-mute); font-size: 15px; text-align: center; padding-top: 26px; }
   .mm-col-label {
-    font-family: var(--mono); font-size: 10px; font-weight: 600;
-    letter-spacing: 0.16em; text-transform: uppercase; color: var(--text-sub); margin-bottom: 9px;
+    display: flex; align-items: center; gap: 7px;
+    font-family: var(--mm-ff); font-size: 14px; font-weight: 700;
+    letter-spacing: 0.05em; text-transform: uppercase; color: var(--text-sub); margin-bottom: 10px;
   }
+  .mm-col-label svg { width: 15px; height: 15px; flex-shrink: 0; }
   .mm-cr-row { margin-bottom: 8px; }
   .mm-cr-name {
-    display: block; font-size: 11px; color: var(--text-sub); margin-bottom: 3px;
+    display: block; font-size: 12px; font-weight: 600; color: var(--text); margin-bottom: 4px;
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 220px;
   }
   .mm-pill-tag {
-    font-family: var(--mono); font-size: 9px; letter-spacing: 0.08em; text-transform: uppercase;
+    font-family: var(--mm-ff); font-size: 10px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase;
     border: 1px solid var(--line); border-radius: 3px; padding: 1px 5px; margin-left: 6px; color: var(--text-mute);
   }
   .mm-pill-tag.mm-best { color: var(--green); border-color: var(--green); }
@@ -3641,20 +3666,67 @@
   }
   .mm-result-box b { color: var(--text); font-size: 16px; }
   .mm-foot { display: flex; align-items: center; gap: 16px; margin-top: 16px; flex-wrap: wrap; }
-  .mm-foot-cpl { font-family: var(--mono); font-size: 11px; letter-spacing: 0.1em; color: var(--text); }
+  .mm-foot-cpl { font-family: var(--mm-ff); font-size: 13px; font-weight: 600; color: var(--text-sub); }
   .mm-foot-warn { font-size: 12px; color: var(--red); flex: 1; min-width: 180px; }
-  .mm-foot-tap { font-family: var(--mono); font-size: 11px; color: var(--text-mute); margin-left: auto; }
-  .mm-t-green { color: var(--green); }
-  .mm-t-gold { color: var(--gold); }
-  .mm-t-red { color: var(--red); }
+  .mm-foot-tap { font-family: var(--mm-ff); font-size: 12px; font-weight: 600; color: var(--text-mute); margin-left: auto; }
+  .mm-t-green { color: var(--mm-green-t); }
+  .mm-t-gold { color: var(--mm-gold-t); }
+  .mm-t-red { color: var(--mm-red-t); }
   .mm-t-grey { color: var(--text-mute); }
   .mm-dot { display: inline-block; width: 6px; height: 6px; border-radius: 50%; margin-left: 5px; vertical-align: middle; }
-  .mm-dot-green { background: var(--green); }
-  .mm-dot-gold { background: var(--gold); }
-  .mm-dot-red { background: var(--red); }
+  .mm-dot-green { background: var(--mm-green); }
+  .mm-dot-gold { background: var(--mm-gold); }
+  .mm-dot-red { background: var(--mm-red); }
   .mm-dot-grey { background: var(--text-mute); }
   .mm-modal-card { max-width: 760px; width: calc(100% - 32px); max-height: 88vh; overflow-y: auto; }
+  .mm-focus-page {
+    position: fixed; inset: 0; z-index: 1000; overflow-y: auto;
+    background: var(--bg); justify-content: center; align-items: flex-start;
+    transform: translateX(100vw);
+    transition: transform 3s cubic-bezier(0.68, 0.01, 0.1, 1);
+  }
+  /* the seam between the two pages: a thin rounded gold bar with a sheen,
+     riding the focus page's left edge as it glides */
+  .mm-focus-page::before {
+    content: ''; position: fixed; left: 0; top: 14px; bottom: 14px; width: 5px;
+    border-radius: 3px; z-index: 2;
+    background: linear-gradient(180deg, #E9D68F 0%, #C8A84E 35%, #A08030 85%, #C8A84E 100%);
+    box-shadow: 0 0 14px rgba(200,168,78,0.45), inset 1px 0 1px rgba(255,255,255,0.55);
+  }
+  .mm-focus-page::after {
+    content: ''; position: fixed; inset: 0; pointer-events: none; opacity: 0;
+    background: radial-gradient(ellipse at center, transparent 78%, rgba(10,9,6,0.22) 100%);
+    transition: opacity 1s ease 2.2s;
+  }
+  .mm-focus-page .mm-modal-card {
+    max-width: 900px; width: min(900px, 96vw); max-height: none;
+    margin: 28px auto 48px; background: transparent; border: none; box-shadow: none;
+  }
+  /* pages ride together: main + sidebar pan left exactly as the focus page
+     arrives from the right - one attached surface, camera pans */
+  /* html.mm-prewarm scoping beats the theme-crossfade transition rule that
+     otherwise overrides .main/.sidebar transitions later in the cascade */
+  html.mm-prewarm .main, html.mm-prewarm .sidebar {
+    transition: transform 3s cubic-bezier(0.68, 0.01, 0.1, 1);
+    will-change: transform;
+  }
+  html.mm-prewarm .mm-focus-page { will-change: transform; }
+  html.mm-focus-open .main, html.mm-focus-open .sidebar { transform: translateX(-50vw); }
+  .mm-focus-page.mm-open { transform: translateX(0); }
+  html.mm-focus-open .mm-focus-page::after { opacity: 1; }
+  html.mm-focus-open, html.mm-focus-open body { overflow-x: hidden; }
+  @media (prefers-reduced-motion: reduce) {
+    .mm-focus-page, .main, .sidebar { transition: none; }
+  }
   .mm-mod-head { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 4px; }
+  .mm-back-btn {
+    display: inline-flex; align-items: center; gap: 6px; margin-bottom: 14px;
+    font-family: var(--mm-ff); font-size: 13px; font-weight: 700; color: var(--text-sub);
+    background: var(--surface-el); border: 1px solid var(--line); border-radius: 10px;
+    padding: 7px 14px; cursor: pointer; transition: all 0.15s ease;
+  }
+  .mm-back-btn:hover { color: var(--text); border-color: var(--borderm, var(--line)); }
+  .mm-back-btn:active { transform: scale(0.96); }
   .mm-mod-range { display: flex; align-items: center; gap: 8px; margin-left: auto; flex-wrap: wrap; }
   .mm-mod-range input[type="date"] {
     background: var(--surface-el); border: 1px solid var(--line); border-radius: 6px;
@@ -3666,17 +3738,53 @@
   }
   .mm-mod-range button:hover { border-color: var(--accent-border); color: var(--text); }
   .mm-sect { border-top: 1px solid var(--line); margin-top: 20px; padding-top: 16px; }
+  .mm-fsec { margin: 0; }
+  .mm-farrow { display: flex; justify-content: center; margin: 18px 0; }
+  .mm-farrow span { position: relative; width: 4px; height: 34px; background: var(--text-mute); opacity: 0.45; border-radius: 2px; }
+  .mm-farrow span::after { content: ''; position: absolute; bottom: -3px; left: 50%; transform: translateX(-50%); border: 8px solid transparent; border-top: 10px solid var(--text-mute); }
+  .mm-adset { border: 1px solid var(--line); border-radius: 14px; padding: 16px 18px; background: var(--surface-el); margin-bottom: 14px; }
+  .mm-adset-head { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; margin-bottom: 4px; }
+  .mm-adset-name { font-family: var(--mm-ff); font-size: 14px; font-weight: 700; color: var(--text); }
+  .mm-ftile { border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; margin-top: 12px; display: flex; gap: 14px; align-items: flex-start; }
+  .mm-ftile-thumb { width: 64px; height: 64px; border-radius: 10px; object-fit: cover; flex-shrink: 0; background: var(--line); }
+  .mm-cbtn { font-family: var(--mm-ff); font-size: 11px; font-weight: 700; border: 1px solid var(--line); border-radius: 8px; padding: 4px 12px; background: none; color: var(--text-sub); cursor: pointer; transition: all 0.15s ease; }
+  .mm-cbtn:hover { border-color: var(--gold); color: var(--text); }
+  .mm-cbtn.mm-danger:hover { border-color: #E05A42; color: #B5352F; }
+  .mm-addbtn { display: block; width: 100%; margin-top: 12px; border: 1.5px dashed rgba(200,168,78,0.55); border-radius: 10px; padding: 10px; background: none; font-family: var(--mm-ff); font-size: 12px; font-weight: 700; color: var(--gold-d, var(--gold)); cursor: pointer; transition: all 0.15s ease; }
+  .mm-addbtn:hover { background: rgba(200,168,78,0.08); border-style: solid; }
+  .mm-cv { display: flex; flex-direction: column; align-items: center; margin: -25px 0 -5px; position: relative; z-index: 2; }
+  .mm-cv-dot { width: 10px; height: 10px; border-radius: 50%; border: 2px solid var(--text-mute); opacity: 0.65; background: var(--bg); }
+  .mm-cv-line { width: 2px; height: 34px; background: var(--text-mute); opacity: 0.5; }
+  .mm-roi { border: 1.5px solid rgba(200,168,78,0.5); border-radius: 14px; padding: 16px 18px; background: rgba(200,168,78,0.05); }
+  .mm-roi-input { font-family: var(--mm-fm); font-size: 20px; font-weight: 600; color: var(--text); background: var(--surface-el); border: 1px solid var(--line); border-radius: 10px; padding: 7px 10px; width: 110px; }
+  .mm-roi-input:focus { outline: none; border-color: var(--gold); }
+  .mm-roi-gears { font-family: var(--mm-ff); font-size: 11px; font-weight: 500; color: var(--text-mute); margin: 10px 0; line-height: 1.7; }
+  .mm-roi-chain { font-family: var(--mm-ff); font-size: 13px; font-weight: 600; color: var(--text-sub); margin: 4px 0 10px; }
+  .mm-roi-chain b { font-size: 16px; color: var(--text); }
+  .mm-roi-out { font-family: var(--mm-ff); font-size: 22px; font-weight: 800; letter-spacing: -0.01em; }
+  .mm-roi-knob { font-family: var(--mm-fm); font-size: 12px; width: 64px; background: var(--surface-el); border: 1px solid var(--line); border-radius: 7px; padding: 3px 6px; color: var(--text); }
+  .mm-toast { position: fixed; top: 20px; left: 50%; transform: translateX(-50%); z-index: 1600; background: #1C1B18; color: #F8F7F5; font-family: var(--mm-ff); font-size: 12.5px; font-weight: 600; padding: 10px 18px; border-radius: 10px; animation: mmFadeIn 0.25s ease; }
+  /* vignette on a NON-transformed layer so it survives scrolling */
+  html.mm-focus-open body::after { content: ''; position: fixed; inset: 0; pointer-events: none; z-index: 1500; background: radial-gradient(ellipse at center, transparent 78%, rgba(10,9,6,0.22) 100%); animation: mmFadeIn 0.9s ease 1.4s both; }
+  .mm-focus-page::after { display: none; }
+  .mm-gallery { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+  @media (max-width: 720px) { .mm-gallery { grid-template-columns: 1fr; } }
+  .mm-g-collabel { font-family: var(--mm-ff); font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 10px; }
+  .mm-g-tile { border: 1px solid var(--line); border-radius: 12px; padding: 10px; background: var(--surface-el); margin-bottom: 12px; }
+  .mm-g-thumb { width: 100%; height: 92px; object-fit: cover; border-radius: 8px; background: var(--line); display: block; }
+  .mm-g-name { display: flex; align-items: center; gap: 8px; font-family: var(--mm-ff); font-size: 13px; font-weight: 700; color: var(--text); margin: 9px 0 4px; }
+  .mm-statgrid { display: flex; gap: 26px; flex-wrap: wrap; row-gap: 14px; }
   .mm-sect-head {
-    font-family: var(--mono); font-size: 11px; font-weight: 600; letter-spacing: 0.16em;
+    font-family: var(--mm-ff); font-size: 12px; font-weight: 600; letter-spacing: 0.05em;
     text-transform: uppercase; color: var(--text-sub); margin-bottom: 12px;
   }
   .mm-stats { display: flex; gap: 28px; flex-wrap: wrap; }
   .mm-stat-label {
-    display: block; font-family: var(--mono); font-size: 9px; letter-spacing: 0.14em;
-    text-transform: uppercase; color: var(--text-mute); margin-bottom: 3px;
+    display: block; font-family: var(--mm-ff); font-size: 12px; font-weight: 500;
+    color: var(--text-mute); margin-bottom: 3px;
   }
-  .mm-stat-val { font-size: 17px; font-weight: 700; color: var(--text); }
-  .mm-context { font-size: 11px; color: var(--text-mute); margin-top: 10px; font-family: var(--mono); letter-spacing: 0.04em; }
+  .mm-stat-val { font-family: var(--mm-fm); font-size: 16px; font-weight: 600; color: var(--text); }
+  .mm-context { font-size: 12px; font-weight: 500; color: var(--text-mute); margin-top: 10px; font-family: var(--mm-ff); }
   .mm-tile { display: flex; gap: 12px; align-items: center; padding: 9px 0; border-bottom: 1px dashed var(--line); }
   .mm-tile:last-child { border-bottom: none; }
   .mm-tile-thumb {
@@ -3684,22 +3792,165 @@
     background: var(--line); border: 1px solid var(--line);
   }
   .mm-tile-name { font-size: 13px; color: var(--text); margin-bottom: 3px; }
-  .mm-tile-stats { font-size: 11px; font-family: var(--mono); color: var(--text-mute); letter-spacing: 0.02em; }
+  .mm-tile-stats { font-size: 12px; font-weight: 500; font-family: var(--mm-ff); color: var(--text-mute); }
   .mm-conv-pill {
     display: flex; justify-content: center; margin: 14px 0 -4px;
   }
   .mm-conv-pill span {
-    font-family: var(--mono); font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase;
+    font-family: var(--mm-ff); font-size: 12px; font-weight: 600;
     border: 1px solid var(--line); border-radius: 12px; padding: 3px 12px;
   }
   .mm-funnel-line { font-size: 13px; color: var(--text-sub); margin-bottom: 10px; }
   .mm-funnel-line b { color: var(--text); }
   .mm-verdict { font-size: 14px; font-weight: 700; margin-top: 12px; }
-  .mm-line-since { font-family: var(--mono); font-size: 9px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-mute); margin-top: 5px; }
+  .mm-heroflex { display: flex; align-items: center; justify-content: center; gap: 18px; margin: 20px 0 0; }
+  .mm-hero-num-l { font-family: var(--mm-ff); font-size: 24px; font-weight: 800; letter-spacing: -0.01em; line-height: 1; color: var(--text); }
+  .mm-fade { opacity: 0; animation: mmFadeIn 0.45s ease forwards; }
+  .mm-warn-strip { border-left: 3px solid var(--gold); color: var(--gold-d, var(--gold)); font-size: 13px; font-weight: 600; padding: 7px 14px; margin-top: 20px; }
+  .mm-card-chevron { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); font-size: 24px; color: var(--text-mute); line-height: 1; }
+  .mm-skel { background: var(--line); border-radius: 4px; animation: mmPulse 1.6s ease-in-out infinite; }
+  .mm-hero-side { text-align: center; }
+  .mm-hero-num-xl { font-family: var(--mm-ff); font-size: 34px; font-weight: 800; letter-spacing: -0.02em; line-height: 1; }
+  .mm-connector { position: relative; flex: 1 1 auto; max-width: 220px; min-width: 90px; height: 34px; }
+  .mm-connector-line { position: absolute; left: 0; top: 50%; height: 2px; width: 0; border-radius: 1px; animation: mmSweep 0.9s cubic-bezier(0.16, 1, 0.3, 1) 0.15s forwards; }
+  .mm-connector-head { position: absolute; right: -2px; top: 50%; transform: translateY(-46%); font-size: 12px; opacity: 0; animation: mmFadeIn 0.3s ease 0.95s forwards; }
+  @keyframes mmFadeIn { to { opacity: 1; } }
+  .mm-connector-chip { position: absolute; left: 50%; transform: translateX(-50%); bottom: 58%; font-family: var(--mm-ff); font-weight: 700; font-size: 13px; white-space: nowrap; }
+  .mm-collapse-head { display: flex; align-items: center; gap: 8px; margin-top: 20px; padding-top: 20px; border-top: 1px solid var(--line); font-family: var(--mm-ff); font-size: 12px; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; color: var(--text-mute); cursor: pointer; }
+  .mm-collapse-head:hover { color: var(--text-sub); }
+  .mm-collapse-arrow { display: inline-block; transition: transform 0.25s ease; font-size: 12px; }
+  .mm-collapse-head.open .mm-collapse-arrow { transform: rotate(180deg); }
+  .mm-collapse-body { display: none; padding-top: 20px; }
+  @media (max-width: 720px) { .mm-hero-num-xl { font-size: 26px; } .mm-heroflex { gap: 10px; } .mm-connector { min-width: 60px; } }
+  .mm-hb-label { font-family: var(--mm-ff); font-size: 12px; font-weight: 500; color: var(--text-mute); margin-bottom: 5px; }
+  .mm-hb-sub { font-family: var(--mm-ff); font-size: 12px; font-weight: 500; color: var(--text-mute); margin-top: 5px; }
+  .mm-hero-word { font-size: 13px; font-weight: 600; letter-spacing: 0.02em; }
+  @keyframes mmBeat { 0%, 100% { transform: scale(1); } 50% { transform: scale(var(--beat, 1.06)); } }
+  .mm-beat { display: inline-block; transform-origin: left center; animation: mmBeat var(--beat-dur, 1.8s) ease-in-out infinite; }
+  @keyframes mmSweep { to { width: var(--sweep, 60%); } }
+  .mm-underline { height: 2px; border-radius: 1px; margin-top: 5px; width: 0; animation: mmSweep 0.9s cubic-bezier(0.16, 1, 0.3, 1) 0.15s forwards; }
+  .mm-livedot { width: 5px; height: 5px; border-radius: 50%; background: var(--mm-green); display: inline-block; margin-left: 6px; vertical-align: 1px; animation: mmPulse 2.2s ease-in-out infinite; }
+  .mm-glint { position: relative; overflow: hidden; }
+  .mm-glint::after { content: ''; position: absolute; top: 0; bottom: 0; width: 36%; left: -45%; background: rgba(255, 255, 255, 0.13); transform: skewX(-20deg); animation: mmGlint 1.3s ease-out 0.6s 1 both; }
+  @keyframes mmGlint { to { left: 135%; } }
+  @keyframes mmDraw { from { stroke-dashoffset: 100; } to { stroke-dashoffset: 0; } }
+  .mm-ticker polyline { stroke-dasharray: 100 100; animation: mmDraw 1.2s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+  @keyframes mmPulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.2; } }
+  .mm-pulse { animation: mmPulse 2.2s ease-in-out infinite; }
+  @keyframes mmBobDown { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(3px); } }
+  @keyframes mmBobUp { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-3px); } }
+  .mm-bob-down { display: inline-block; animation: mmBobDown 1.6s ease-in-out infinite; }
+  .mm-bob-up { display: inline-block; animation: mmBobUp 1.6s ease-in-out infinite; }
+  @media (prefers-reduced-motion: reduce) {
+    .mm-ticker polyline { animation: none; stroke-dashoffset: 0; }
+    .mm-pulse, .mm-bob-down, .mm-bob-up, .mm-beat, .mm-livedot, .mm-skel, .mm-dot-breathe, .mm-action-panel { animation: none; }
+    .mm-action-panel::after { display: none; }
+    .mm-fade { animation: none; opacity: 1; }
+    .mm-underline { animation: none; width: var(--sweep, 60%); }
+    .mm-connector-line { animation: none; width: var(--sweep, 100%); }
+    .mm-connector-head { animation: none; opacity: 1; }
+    .mm-glint::after { display: none; }
+  }
+  .mm-hero-label { font-family: var(--mm-ff); font-size: 14px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; color: var(--text-sub); }
+  .mm-hero-row { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; margin: 6px 0 2px; }
+  .mm-hero-num { font-size: 30px; font-weight: 800; letter-spacing: -0.02em; line-height: 1; }
+  .mm-hero-chip { font-family: var(--mm-fm); font-weight: 700; letter-spacing: 0.04em; }
+  .mm-ticker { position: relative; margin-top: 8px; }
+  .mm-ticker-life { position: absolute; right: 0; font-family: var(--mm-fm); font-size: 9px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-mute); transform: translateY(-50%); background: var(--surface-el); padding-left: 5px; }
+  .mm-drivers-fork { width: 1px; height: 12px; background: var(--line); margin: 12px auto 0; }
+  .mm-drivers-label { text-align: center; font-family: var(--mm-fm); font-size: 9px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--text-mute); margin: 4px 0 10px; }
+  .mm-drivers { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+  .mm-vsect { border-top: 1px solid var(--line); padding: 14px 0 0; margin-top: 14px; }
+  .mm-card-title { font-family: var(--mm-ff); font-size: 17px; font-weight: 800; letter-spacing: -0.01em; color: var(--text); margin-bottom: 12px; }
+  .mm-verdict-row { display: flex; align-items: center; gap: 8px; font-family: var(--mm-ff); font-size: 15px; font-weight: 700; color: var(--text); }
+  .mm-verdict-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .mm-hero-chip2 { font-family: var(--mm-ff); font-size: 15px; font-weight: 700; margin-left: 10px; }
+  .mm-spine { position: absolute; left: 0; top: 22px; bottom: 22px; width: 3px; display: flex; flex-direction: column; gap: 6px; }
+  .mm-spine span { flex: 1; border-radius: 2px; }
+  .mm-flow-arrow { font-size: 12px; color: var(--text-mute); opacity: 0.7; margin: 10px 0 -6px 1px; }
+  .mm-bar-tick { position: absolute; top: -3px; bottom: -3px; width: 2px; background: var(--text-mute); opacity: 0.55; border-radius: 1px; }
+  .mm-nest { border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px 8px; background: var(--surface-el); }
+  .mm-flowlink { display: flex; align-items: center; gap: 8px; margin: 4px 0 4px 22px; }
+  .mm-flowlink-line { width: 2px; height: 26px; background: var(--line); border-radius: 1px; position: relative; }
+  .mm-flowlink-line::after { content: ''; position: absolute; bottom: -4px; left: 50%; transform: translateX(-50%); border: 10px solid transparent; border-top: 12px solid var(--text-mute); }
+  .mm-flowlink-label { font-family: var(--mm-ff); font-size: 11px; font-weight: 600; color: var(--text-mute); }
+  .mm-crrow { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; }
+  .mm-crthumb { width: 38px; height: 38px; border-radius: 8px; object-fit: cover; flex-shrink: 0; background: var(--line); border: 1px solid var(--line); }
+  .mm-crbody { flex: 1; min-width: 0; }
+  .mm-crbody .mm-bar { margin-top: 5px; }
+  .mm-cr-namerow { display: flex; align-items: center; gap: 8px; min-width: 0; }
+  .mm-verdict-chip { font-family: var(--mm-ff); font-size: 10px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; border-radius: 6px; padding: 2px 8px; flex-shrink: 0; margin-left: auto; }
+  .mm-vc-keep { color: #2D8A52; background: rgba(62,175,92,0.10); }
+  .mm-vc-edit { color: #B08E30; background: rgba(224,157,36,0.10); }
+  .mm-vc-replace { color: #B5352F; background: rgba(224,90,66,0.10); }
+  .mm-vc-testing { color: var(--text-mute); background: var(--line); }
+  .mm-cr-note { font-family: var(--mm-ff); font-size: 11px; font-weight: 500; color: var(--text-mute); margin-top: 4px; }
+  .mm-status-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
+  .mm-dot-breathe { animation: mmPulse 2.2s ease-in-out infinite; }
+  .mm-status-word { font-family: var(--mm-ff); font-size: 13px; font-weight: 600; }
+  .mm-status-word-lg { font-family: var(--mm-ff); font-size: 21px; font-weight: 800; letter-spacing: -0.01em; }
+  .mm-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; align-items: stretch; }
+  @media (max-width: 760px) { .mm-grid { grid-template-columns: 1fr; } }
+  .mm-action-panel {
+    position: relative; overflow: hidden;
+    display: flex; flex-direction: column; gap: 10px;
+    background: rgba(200,168,78,0.07); border: 1px solid rgba(200,168,78,0.25);
+    border-radius: 12px; padding: 15px 16px; cursor: pointer;
+    transition: background 0.2s ease, border-color 0.2s ease;
+    animation: mmGlow 3s ease-in-out infinite, mmSpringIn 0.5s cubic-bezier(0.34,1.56,0.64,1) 0.85s backwards, mmSway 4.5s ease-in-out 1.6s infinite;
+  }
+  .mm-action-panel:hover { background: rgba(200,168,78,0.13); border-color: var(--gold); }
+  .mm-action-panel:hover { transform: translateX(4px); }
+  .mm-action-panel:active, .mm-action-panel.mm-launching { transform: translateX(4px) scale(0.97); }
+  .mm-action-panel { transition: background 0.2s ease, border-color 0.2s ease, transform 0.14s ease; }
+  .mm-ap-chevs { position: absolute; right: 14px; top: 50%; transform: translateY(-50%); display: flex; color: var(--gold); font-size: 18px; font-weight: 700; }
+  .mm-ap-chevs span { animation: mmChevDrift 1.9s ease-in-out infinite; }
+  .mm-ap-chevs span:nth-child(2) { animation-delay: 0.25s; margin-left: -6px; }
+  @keyframes mmChevDrift { 0%, 100% { transform: translateX(0); opacity: 0.35; } 50% { transform: translateX(5px); opacity: 0.9; } }
+  @keyframes mmSway { 0%, 100% { left: 0; } 50% { left: 2px; } }
+  html:not(.mm-focus-open) .main.mm-tease-ready { transition: transform 0.35s ease; }
+  html:not(.mm-focus-open) .main.mm-tease { transform: translateX(-4px); }
+  @keyframes mmGlow {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(200,168,78,0); border-color: rgba(200,168,78,0.25); }
+    50% { box-shadow: 0 0 14px 0 rgba(200,168,78,0.25); border-color: rgba(200,168,78,0.55); }
+  }
+  @keyframes mmSpringIn { from { opacity: 0; transform: translateY(10px) scale(0.97); } to { opacity: 1; transform: none; } }
+  .mm-action-panel::after {
+    content: ''; position: absolute; top: 0; bottom: 0; width: 40%; left: -50%;
+    background: rgba(255,255,255,0.16); transform: skewX(-20deg);
+    animation: mmSheenLoop 8s ease-in-out infinite;
+  }
+  @keyframes mmSheenLoop { 0%, 88% { left: -50%; } 100% { left: 140%; } }
+  .mm-ap-ghost {
+    position: absolute; left: 8px; right: 8px; bottom: 6px; height: 54px;
+    opacity: 0; transition: opacity 0.35s ease; pointer-events: none; color: var(--gold);
+  }
+  .mm-action-panel:hover .mm-ap-ghost { opacity: 0.22; }
+  .mm-ap-title { font-family: var(--mm-ff); font-size: 15px; font-weight: 800; color: var(--text); }
+  .mm-ap-item { font-family: var(--mm-ff); font-size: 12px; font-weight: 600; line-height: 1.5; }
+  .mm-ap-foot { margin-top: auto; font-family: var(--mm-ff); font-size: 13px; font-weight: 700; color: var(--gold-d, var(--gold)); }
+  .mm-verdict-block { border-radius: 12px; padding: 14px 16px; }
+  .mm-vb-green { background: rgba(62,175,92,0.08); }
+  .mm-vb-gold { background: rgba(224,157,36,0.08); }
+  .mm-vb-red { background: rgba(224,90,66,0.08); }
+  .mm-vb-grey { background: var(--line); }
+  .mm-results { font-family: var(--mm-ff); font-size: 13px; font-weight: 500; color: var(--text-mute); margin-left: auto; }
+  .mm-results b { font-size: 21px; font-weight: 800; color: var(--text); }
+  .mm-note-edit { color: #B08E30; }
+  .mm-note-replace { color: #B5352F; }
+  .mm-driver-sub { font-family: var(--mm-ff); font-size: 12px; font-weight: 500; color: var(--text-mute); margin-top: 6px; }
+  @media (max-width: 720px) { .mm-drivers { grid-template-columns: 1fr; } }
+  .mm-bullet-track { position: relative; height: 8px; background: var(--line); border-radius: 4px; }
+  .mm-bullet-fill { height: 100%; border-radius: 4px; transition: width 0.6s cubic-bezier(0.16, 1, 0.3, 1); }
+  .mm-bullet-tick { position: absolute; left: 50%; top: -4px; bottom: -4px; width: 2px; background: var(--text); transform: translateX(-50%); border-radius: 1px; }
+  .mm-bullet-labels { position: relative; margin-top: 7px; height: 12px; font-family: var(--mm-fm); font-size: 9px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-mute); white-space: nowrap; }
+  .mm-bullet-labels .mm-bl-wk { position: absolute; left: 0; }
+  .mm-bullet-labels .mm-bl-life { position: absolute; left: 50%; transform: translateX(-50%); }
+  .mm-line-since { font-family: var(--mm-ff); font-size: 11px; font-weight: 500; color: var(--text-mute); margin-top: 5px; }
   .mm-spark { display: flex; align-items: flex-end; gap: 3px; height: 36px; margin: 12px 0 4px; }
   .mm-spark span { width: 10px; border-radius: 2px 2px 0 0; min-height: 4px; }
   .mm-anchor { font-size: 26px; font-weight: 800; letter-spacing: -0.01em; }
-  .mm-anchor small { font-size: 11px; font-weight: 500; color: var(--text-mute); margin-left: 6px; letter-spacing: 0.06em; }
+  .mm-anchor small { font-family: var(--mm-ff); font-size: 12px; font-weight: 500; color: var(--text-mute); margin-left: 6px; }
   .mm-warn-line { font-size: 12px; color: var(--red); margin-top: 10px; }
   @media (max-width: 720px) {
     .mm-flow { grid-template-columns: 1fr; }
@@ -6732,8 +6983,9 @@
 
         <div class="content">
 
-          <!-- ── Marketing Machine (V2 only) - simple health card, tap for the detailed modal ── -->
+          <!-- ── Marketing Machine (V2 only) - Meta ads card + landing page card ── -->
           <div id="marketing-machine-card" style="display:none"></div>
+          <div id="landing-machine-card" style="display:none"></div>
 
           <!-- ── Resource guides (collapsed PDFs - placeholder until walkthrough videos) ── -->
           <details class="guide-card">
@@ -43337,8 +43589,9 @@ function toggleTheme() {
 </div>
 
 <!-- ── Marketing Machine detailed modal (V2) ── -->
-<div id="marketingMachineModal" class="modal-backdrop" style="display:none" onclick="if(event.target===this)closeMarketingMachine()">
+<div id="marketingMachineModal" class="modal-backdrop mm-focus-page" style="display:none" onclick="if(event.target===this)closeMarketingMachine()">
   <div class="modal-card mm-modal-card" onclick="event.stopPropagation()">
+    <button type="button" class="mm-back-btn" onclick="closeMarketingMachine()">&lsaquo; Back</button>
     <div class="mm-mod-head">
       <div>
         <div class="modal-kicker">§ Marketing</div>
@@ -43349,12 +43602,25 @@ function toggleTheme() {
         <span style="color:var(--text-mute);font-size:12px">to</span>
         <input type="date" id="mm-range-to" aria-label="To date">
         <button type="button" onclick="_mmApplyRange()">Apply</button>
-        <button type="button" onclick="closeMarketingMachine()" aria-label="Close" style="padding:5px 10px">&times;</button>
       </div>
     </div>
     <div id="mm-modal-body">
       <div class="req-empty" style="padding:20px 0"><span class="req-spin"></span>Loading…</div>
     </div>
+  </div>
+</div>
+
+<!-- ── Landing Page focus mode (V2) ── -->
+<div id="landingMachineModal" class="modal-backdrop mm-focus-page" style="display:none" onclick="if(event.target===this)closeLandingMachine()">
+  <div class="modal-card mm-modal-card" onclick="event.stopPropagation()">
+    <button type="button" class="mm-back-btn" onclick="closeLandingMachine()">&lsaquo; Back</button>
+    <div class="mm-mod-head">
+      <div>
+        <div class="modal-kicker">&sect; Marketing</div>
+        <div class="modal-title" style="margin-bottom:0">Landing Page</div>
+      </div>
+    </div>
+    <div id="lm-modal-body"></div>
   </div>
 </div>
 
@@ -43372,7 +43638,10 @@ function _mmDotHtml(band) { return '<span class="mm-dot mm-dot-' + (band || 'gre
 // inverted (lower cost = fuller bar); percentages map onto 0..full.
 function _mmCplFill(cpl) { if (cpl == null) return 30; return Math.max(8, Math.min(100, Math.round((1 - cpl / 70) * 100))); }
 function _mmPctFill(pct, full) { if (pct == null) return 30; return Math.max(8, Math.min(100, Math.round(pct / full * 100))); }
-function _mmBarHtml(fill, band) { return '<div class="mm-bar"><div class="mm-bar-fill mm-f-' + (band || 'grey') + '" style="width:' + fill + '%"></div></div>'; }
+function _mmBarHtml(fill, band, tick) {
+  return '<div class="mm-bar"><div class="mm-bar-fill-wrap"><div class="mm-bar-fill mm-f-' + (band || 'grey') + '" style="width:' + fill + '%"></div></div>' +
+    (tick != null ? '<div class="mm-bar-tick" style="left:' + tick + '%"></div>' : '') + '</div>';
+}
 function _mmShortDate(ymd) {
   const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(ymd || ''));
   if (!m) return '';
@@ -43396,13 +43665,116 @@ function _mmLineHtml(spark, sinceYmd, band, h) {
       const y = H - (Math.round(((b.cpl - min) / span) * (H - 8)) + 4);
       return x + ',' + y;
     }).join(' ');
-    svg = '<svg viewBox="0 0 ' + W + ' ' + H + '" preserveAspectRatio="none" style="width:100%;height:' + H + 'px;display:block">' +
+    svg = '<svg viewBox="0 -18 ' + W + ' ' + (H + 18) + '" preserveAspectRatio="none" style="width:100%;height:' + H + 'px;display:block">' +
       '<polyline points="' + line + '" fill="none" stroke="' + stroke + '" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"/>' +
       '</svg>';
   }
   const caption = sinceYmd ? '<div class="mm-line-since">' + _escapeHtml(_mmShortDate(sinceYmd)) + '</div>' : '';
   return '<div class="mm-line">' + svg + caption + '</div>';
 }
+// Diverging center-zero bar, styled to match the other health bars in the
+// row (same track, same fills). The center notch = the lifetime CPL. The
+// fill grows LEFT of center when the window is cheaper than lifetime and
+// RIGHT of center when pricier. Delta clamped to +/-40%, so +/-20% drift
+// deflects 3/4 of the half-width - real moves look big, noise stays a nub.
+function _mmBulletHtml(w, lt) {
+  if (!lt || lt.cpl == null) {
+    return '<div style="font-size:10px;color:var(--text-mute);font-family:var(--mono);padding:8px 0">no lead history yet</div>';
+  }
+  const judged = w && w.judged && w.cpl != null;
+  let half = 3, band = 'grey', better = false;
+  if (judged) {
+    const delta = Math.max(-40, Math.min(40, ((w.cpl - lt.cpl) / lt.cpl) * 100));
+    better = delta <= 0;
+    half = Math.max(3, Math.round((Math.abs(delta) / 40) * 50));
+    band = w.drift_band || 'grey';
+  }
+  const fillStyle = better
+    ? 'left:' + (50 - half) + '%;width:' + half + '%'
+    : 'left:50%;width:' + half + '%';
+  const wkLabel = judged ? ('14d ' + _mmMoney(w.cpl)) : 'gathering data';
+  return '<div class="mm-bullet">' +
+    '<div class="mm-bullet-track"><div class="mm-bullet-fill mm-f-' + band + '" style="position:absolute;' + fillStyle + '"></div><div class="mm-bullet-tick"></div></div>' +
+    '<div class="mm-bullet-labels"><span class="mm-bl-wk">' + wkLabel + '</span><span class="mm-bl-life">&#9650; life ' + _mmMoney(lt.cpl) + '</span></div>' +
+    '</div>';
+}
+// Ticker line: weekly CPL around a dashed lifetime baseline. Down = cheaper
+// = good. Deviations are gamma-scaled (pow 1.6) so noise hugs the baseline
+// while a real move swings hard toward the edge.
+function _mmTickerHtml(spark, lifeCpl, band, sinceYmd) {
+  const pts = (spark || []).filter(b => b.cpl != null);
+  const H = 44, W = 100, MID = H / 2;
+  const stroke = band === 'green' ? 'var(--green)' : band === 'gold' ? 'var(--gold)' : band === 'red' ? 'var(--red)' : 'var(--text-mute)';
+  let inner = '';
+  if (lifeCpl != null && pts.length >= 2) {
+    const maxAbs = Math.max(...pts.map(b => Math.abs(b.cpl - lifeCpl)), lifeCpl * 0.15);
+    const line = pts.map((b, i) => {
+      const x = Math.round((i / (pts.length - 1)) * (W - 4)) + 2;
+      const dev = (b.cpl - lifeCpl) / maxAbs;                    // -1..1 (+ = pricier)
+      const mag = Math.pow(Math.abs(dev), 1.6);                  // exaggerate big moves
+      const y = MID - (dev > 0 ? mag : -mag) * (MID - 5);        // pricier draws UP, cheaper DOWN
+      return x + ',' + Math.round(y);
+    }).join(' ');
+    const last = line.split(' ').pop().split(',');
+    inner =
+      '<line x1="0" y1="' + MID + '" x2="' + W + '" y2="' + MID + '" stroke="var(--text-mute)" stroke-width="0.8" stroke-dasharray="2.5 3" opacity="0.55"/>' +
+      '<polyline pathLength="100" points="' + line + '" fill="none" stroke="' + stroke + '" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"/>' +
+      '<circle class="mm-pulse" cx="' + last[0] + '" cy="' + last[1] + '" r="2.4" fill="' + stroke + '"/>';
+  }
+  const svg = inner
+    ? '<svg viewBox="0 -18 ' + W + ' ' + (H + 18) + '" preserveAspectRatio="none" style="width:100%;height:' + H + 'px;display:block">' + inner + '</svg>'
+    : '<div style="height:' + H + 'px;display:flex;align-items:center;font-size:10px;color:var(--text-mute);font-family:var(--mono)">not enough weeks yet</div>';
+  const lifeTag = lifeCpl != null ? '<span class="mm-ticker-life" style="top:50%">life ' + _mmMoney(lifeCpl) + '</span>' : '';
+  const caption = sinceYmd ? '<div class="mm-line-since">' + _escapeHtml(_mmShortDate(sinceYmd)) + '</div>' : '';
+  return '<div class="mm-ticker">' + lifeTag + svg + caption + '</div>';
+}
+// KEEP / EDIT / REPLACE per the approved table. Prefers the server verdict;
+// derives locally from the same signals when the field is not deployed yet.
+function _mmCreativeVerdict(c) {
+  if (c.verdict) return { verdict: c.verdict, note: c.verdict_note || null };
+  if (c.testing) return { verdict: 'testing', note: null };
+  if ((c.spend || 0) >= 75 && (c.cpl == null || c.cpl >= 55)) return { verdict: 'replace', note: 'not producing affordable leads' };
+  if (c.frequency != null && c.frequency > 3.5) return { verdict: 'replace', note: 'audience worn out - fresh angle' };
+  if (c.hook_rate != null && c.hook_rate < 25) return { verdict: 'edit', note: 'improve the hook - first 3 seconds' };
+  return { verdict: 'keep', note: null };
+}
+// 3-word version of the machine's warning for the top block; the full
+// instruction lives on the row it belongs to.
+function _mmShortAction(d) {
+  const cs = (d.creatives || []).map(c => ({ c, v: _mmCreativeVerdict(c) }));
+  const rep = cs.find(x => x.v.verdict === 'replace');
+  if (rep) return { html: '&#8635; replace "' + _escapeHtml(rep.c.name) + '"', cls: 'mm-note-replace' };
+  const ed = cs.find(x => x.v.verdict === 'edit');
+  if (ed) return { html: '&#9998; re-hook "' + _escapeHtml(ed.c.name) + '"', cls: 'mm-note-edit' };
+  if (d.page && (d.page.band === 'red' || d.page.band === 'gold')) return { html: '&#9998; fix the landing page', cls: 'mm-note-edit' };
+  if (d.warning) return { html: '&#9888; ' + _escapeHtml(d.warning.text), cls: 'mm-note-edit' };
+  return null;
+}
+// Every open to-do on the machine, for the action panel.
+function _mmActionItems(d) {
+  const items = [];
+  for (const c of (d.creatives || [])) {
+    const v = _mmCreativeVerdict(c);
+    if (v.verdict === 'replace') items.push({ html: '&#8635; replace "' + _escapeHtml(c.name) + '"', cls: 'mm-note-replace' });
+    else if (v.verdict === 'edit') items.push({ html: '&#9998; re-hook "' + _escapeHtml(c.name) + '"', cls: 'mm-note-edit' });
+  }
+  if ((d.creatives_live || 0) > 0 && (d.creatives_live || 0) < 6) items.push({ html: '+ add fresh ad angles (want 6+)', cls: 'mm-note-edit' });
+  return items;
+}
+// Right-aligned section status: dot + chip, same language as the creative
+// verdicts (Zoran 2026-07-03: this is THE status pattern for all sections).
+function _mmSectionStatus(band) {
+  const word = { green: 'healthy', gold: 'needs work', red: 'struggling', grey: 'gathering' }[band || 'grey'];
+  const chip = { green: 'keep', gold: 'edit', red: 'replace', grey: 'testing' }[band || 'grey'];
+  return '<span style="margin-left:auto;display:inline-flex;align-items:center;gap:8px;letter-spacing:0">' +
+    '<span class="mm-status-dot mm-f-' + (band || 'grey') + (band === 'green' ? ' mm-dot-breathe' : '') + '"></span>' +
+    '<span class="mm-verdict-chip mm-vc-' + chip + '" style="margin-left:0">' + word + '</span></span>';
+}
+const MM_ICONS = {
+  overall: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M1.5 8h3l2-4.5L10 12l1.8-4H14.5"/></svg>',
+  creatives: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2.5" width="12" height="11" rx="1.5"/><circle cx="5.5" cy="6" r="1.2"/><path d="M14 10.5l-3.5-3L4 14"/></svg>',
+  page: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2.5" width="12" height="11" rx="1.5"/><path d="M2 5.5h12"/><circle cx="4.2" cy="4" r="0.3"/><circle cx="6" cy="4" r="0.3"/></svg>',
+};
 function _mmWorst(bands) {
   const real = bands.filter(b => b && b !== 'grey');
   if (!real.length) return 'grey';
@@ -43419,7 +43791,15 @@ async function _mmLoad(force) {
   if (!(typeof V2_ACCESS !== 'undefined' && V2_ACCESS)) { host.style.display = 'none'; return; }
   if (_MM_LOADED && !force) { _mmRenderCard(); return; }
   host.style.display = 'block';
-  host.innerHTML = '<div class="req-empty" style="padding:14px 0"><span class="req-spin"></span>Reading the machine…</div>';
+  host.innerHTML = '<div class="mm-card" style="cursor:default">' +
+    '<div style="display:flex;justify-content:center;gap:24px;align-items:center;margin:20px 0">' +
+      '<span class="mm-skel" style="width:110px;height:26px"></span>' +
+      '<span class="mm-skel" style="width:140px;height:2px"></span>' +
+      '<span class="mm-skel" style="width:130px;height:34px"></span>' +
+    '</div>' +
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-top:20px;border-top:1px solid var(--line);padding-top:20px">' +
+      '<span class="mm-skel" style="height:8px"></span><span class="mm-skel" style="height:8px"></span>' +
+    '</div></div>';
   try {
     const token = await _mreqAuthToken();
     const res = await fetch('/api/marketing?resource=meta-machine&client_id=' + encodeURIComponent(CLIENT_ID), {
@@ -43439,56 +43819,290 @@ function _mmRenderCard() {
   if (!host || !_MM) return;
   if (!_MM.meta_connected) { host.style.display = 'none'; return; }
   const d = _MM, camp = d.campaign || {}, page = d.page || {}, r = d.result || {};
-  const crRows = (d.creatives || []).slice(0, 6).map(c =>
-    '<div class="mm-cr-row"><span class="mm-cr-name">' + _escapeHtml(c.name) +
-    (c.best ? '<span class="mm-pill-tag mm-best">best</span>' : '') +
-    (c.testing ? '<span class="mm-pill-tag">testing</span>' : '') +
-    '</span>' + _mmBarHtml(c.testing ? 30 : _mmCplFill(c.cpl), c.band) + '</div>'
-  ).join('') || '<div style="font-size:12px;color:var(--text-mute)">no live creatives yet</div>';
   const lt = camp.lifetime || {}, w = camp.window || {};
-  let cplTrend = '';
-  if (w.judged && w.drift_vs_lifetime_pct != null) {
-    const up = w.drift_vs_lifetime_pct > 0;
-    cplTrend = ' <span class="' + _mmBandTxt(w.drift_band) + '">' + (up ? '&uarr;' : '&darr;') + ' ' + Math.abs(Math.round(w.drift_vs_lifetime_pct)) + '%</span>';
-  } else if (!w.judged) {
-    cplTrend = ' <span class="mm-t-grey">gathering data</span>';
-  }
-  host.innerHTML =
-    '<div class="mm-card" onclick="openMarketingMachine()">' +
-      '<div class="mm-flow">' +
-        '<div><div class="mm-col-label">Campaign</div>' +
-        '<div style="font-size:15px;font-weight:800" class="' + _mmBandTxt(lt.band) + '">' + _mmMoney(lt.cpl) + '<span style="font-size:9px;font-weight:500;color:var(--text-mute);font-family:var(--mono);letter-spacing:0.08em"> /LEAD LIFETIME</span>' + cplTrend + '</div>' +
-        _mmLineHtml(camp.sparkline, lt.since, camp.band) + '</div>' +
-        '<div class="mm-arrow">&rsaquo;</div>' +
-        '<div><div class="mm-col-label">Creatives</div>' + crRows + '</div>' +
-        '<div class="mm-arrow">&rsaquo;</div>' +
-        '<div><div class="mm-col-label">Page</div>' + _mmBarHtml(_mmPctFill(page.clicks_to_leads_pct, 15), page.band) + '</div>' +
-        '<div class="mm-arrow">&rsaquo;</div>' +
-        '<div><div class="mm-col-label">Result &middot; last 14 days</div><div class="mm-result-box"><b>' + (r.leads ?? 0) + '</b> leads<br><b>' + (r.booked ?? 0) + '</b> trials</div></div>' +
-      '</div>' +
-      '<div class="mm-foot">' +
 
-        (d.warning ? '<span class="mm-foot-warn">&#9888; ' + _escapeHtml(d.warning.text) + '</span>' : '') +
-        '<span class="mm-foot-tap">tap &rsaquo;</span>' +
-      '</div>' +
+  // ── Verdict first, action second, ONE focal number, sections down a
+  //    single left rail with a traffic-light spine + benchmark ticks. ──
+  const judged = w.judged && w.cpl != null;
+  const VERDICT = { green: 'Healthy', gold: 'Needs attention', red: 'Struggling', grey: 'Warming up' };
+  const vBand = camp.band || 'grey';
+  const campName = camp.count > 1 ? (camp.count + ' campaigns') : (camp.name || 'Training');
+  let heroNum, heroSub;
+  if (judged) {
+    const pct = w.drift_vs_lifetime_pct;
+    const pctAbs = pct != null ? Math.abs(Math.round(pct)) : null;
+    const big = pctAbs != null && pctAbs >= 20;
+    const up = pct > 0;
+    const chipCls = big ? (up ? 'mm-t-red' : 'mm-t-green') : 'mm-t-grey';
+    const beat = big ? ' class="mm-beat" style="--beat:1.03;--beat-dur:2.4s"' : '';
+    heroNum = '<span class="mm-hero-num-xl ' + (big ? (up ? 'mm-t-red' : 'mm-t-green') : '') + (big ? ' mm-glint' : '') + '">' + _mmMoney(w.cpl) + '</span><span style="font-family:var(--mm-ff);font-size:13px;font-weight:600;color:var(--text-mute);margin-left:6px">per lead</span>';
+    heroSub = (pctAbs != null
+      ? '<span class="' + chipCls + '" style="font-weight:700"><span' + beat + '>' + (up ? '&#9650;' : '&#9660;') + ' ' + pctAbs + '%</span></span> vs usual ' + _mmMoney(lt.cpl)
+      : 'usually ' + _mmMoney(lt.cpl));
+  } else {
+    heroNum = '<span class="mm-hero-num-xl">' + _mmMoney(lt.cpl) + '</span>';
+    heroSub = 'gathering fresh data - ' + (w.leads || 0) + ' lead' + (w.leads === 1 ? '' : 's') + ' this window';
+  }
+  const hero =
+    '<div class="mm-vsect mm-fade" style="animation-delay:0.15s;border-top:none;padding-top:0;margin-top:0">' +
+      '<div class="mm-hero-label">Campaign &middot; <span style="color:var(--text)">' + _escapeHtml(campName) + '</span></div>' +
+      '<div style="margin-top:6px">' + heroNum + '</div>' +
+      '<div class="mm-hb-sub" style="margin-top:4px">' + heroSub + '</div>' +
     '</div>';
+
+  // benchmark ticks: "good" starts at $40 CPL (43% on the $0-70 inverted
+  // scale) and at a 10% clicks->leads rate (67% on the 0-15 scale)
+  const crRows = (d.creatives || []).slice(0, 4).map(c => {
+    const v = _mmCreativeVerdict(c);
+    const dotColor = { keep: 'green', edit: 'gold', replace: 'red', testing: 'grey' }[v.verdict] || 'grey';
+    const breathe = v.verdict === 'keep' ? ' mm-dot-breathe' : '';
+    return '<div class="mm-crrow">' +
+      (c.image_url ? '<img class="mm-crthumb" src="' + _escapeHtml(c.image_url) + '" alt="" loading="lazy">' : '<span class="mm-crthumb"></span>') +
+      '<div class="mm-crbody"><span class="mm-cr-namerow"><span class="mm-cr-name" style="margin-bottom:0">' + _escapeHtml(c.name) +
+      (c.best ? '<span class="mm-pill-tag mm-best">best</span>' : '') + '</span>' +
+      '<span class="mm-status-dot mm-f-' + dotColor + breathe + '" style="margin-left:auto"></span>' +
+      '<span class="mm-verdict-chip mm-vc-' + v.verdict + '" style="margin-left:0">' + v.verdict + '</span></span>' +
+      (v.note ? '<div class="mm-cr-note ' + (v.verdict === 'replace' ? 'mm-note-replace' : 'mm-note-edit') + '">' +
+        (v.verdict === 'replace' ? '&#8635; ' : '&#9998; ') + _escapeHtml(v.note) + '</div>' : '') +
+      '</div></div>';
+  }).join('') || '<div style="font-size:12px;color:var(--text-mute)">no live creatives yet</div>';
+  const collapse =
+    '<div class="mm-vsect mm-fade" style="animation-delay:0.45s">' +
+      '<div class="mm-col-label">' + MM_ICONS.creatives + 'Creative</div>' +
+      '<div class="mm-nest">' + crRows + '</div>' +
+    '</div>';
+  const heroFinal = hero, drivers = collapse, foot = '';
+  const apItems = _mmActionItems(d);
+  const panel =
+    '<div class="mm-action-panel">' +
+      '<div class="mm-ap-title">See the full picture</div>' +
+      (apItems.length
+        ? apItems.map(i => '<div class="mm-ap-item ' + i.cls + '">' + i.html + '</div>').join('')
+        : '<div class="mm-ap-item" style="color:var(--text-mute)">everything is running clean</div>') +
+      '<div class="mm-ap-foot">Focus mode &rsaquo;</div>' +
+      '<span class="mm-ap-chevs"><span>&rsaquo;</span><span>&rsaquo;</span></span>' +
+      '<svg class="mm-ap-ghost" viewBox="0 0 100 30" preserveAspectRatio="none" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M2 24 L18 18 L32 21 L48 10 L62 14 L78 5 L98 8"/><path d="M2 28h96" opacity="0.4"/></svg>' +
+    '</div>';
+  host.innerHTML = '<div class="mm-card" onclick="openMarketingMachine()">' +
+    '<div class="mm-col-label" style="margin-bottom:12px">' + MM_ICONS.overall + 'Meta ads</div>' +
+    '<div class="mm-grid">' +
+    '<div>' + heroFinal + drivers + foot + '</div>' + panel + '</div></div>';
+  _mmRenderLanding();
+  const pnl = host.querySelector('.mm-action-panel');
+  const mainEl = document.querySelector('.main');
+  if (pnl && mainEl) {
+    pnl.onmouseenter = () => { mainEl.classList.add('mm-tease-ready', 'mm-tease'); };
+    pnl.onmouseleave = () => mainEl.classList.remove('mm-tease');
+  }
+  host.style.display = 'block';
+  _mmCollapsePageRest(host);
+}
+// Fold everything else on the Marketing page (guides, ad performance, active
+// campaigns, requests) behind one arrow. The machine card is the page now;
+// the rest expands on demand.
+// Tapering funnel ribbon (Zoran sketch 2026-07-03): ribbon height = people
+// remaining at each stage; the worst drop-off segment is choked in red with
+// an arrow pointing at the fix. Replaces all text in the landing card body.
+function _mmFunnelSvg(page, clicks) {
+  // Stage 1 is Meta CLICKS vs stage 2 ad-tagged page LOADS: that gap is the
+  // page-speed read (healthy pages load 70-85% of clicks).
+  const stages = [];
+  if (clicks > 0 && clicks >= (page.ad_visitors || 0)) stages.push({ n: clicks, lbl: 'clicks', fix: '&#9998; speed up the page' });
+  stages.push({ n: (stages.length ? (page.ad_visitors || 0) : (page.visitors || 0)), lbl: 'loaded', fix: '&#9998; rework the top of the page' });
+  stages.push({ n: page.form_started || 0, lbl: 'form', fix: '&#9998; fix the form' });
+  stages.push({ n: page.saw_calendar || 0, lbl: 'calendar', fix: '&#9998; edit the calendar' });
+  stages.push({ n: page.booked_sessions || 0, lbl: 'booked', fix: null });
+  if (!stages[0].n) return '<div class="mm-driver-sub" style="margin:8px 0 0">gathering data - no ad visits in this window yet</div>';
+  const W = 300, H = 100, MID = 56, MAXH = 46, N = stages.length;
+  const X = stages.map((_, i) => 36 + (i * (W - 72)) / (N - 1));
+  // linear scale - heights ARE the values (real graph, mirrored)
+  const hOf = (v) => Math.max(2, (v / stages[0].n) * MAXH);
+  // stages whose ribbon would be under 4px collapse to a pure centerline
+  let T = N - 1;
+  for (let i = 1; i < N; i++) { if ((stages[i].n / stages[0].n) * MAXH < 4) { T = i; break; } }
+  const hAt = (i) => (i >= T ? 0 : hOf(stages[i].n));
+  const top = X.map((x, i) => [x, MID - hAt(i) / 2]);
+  const bot = X.map((x, i) => [x, MID + hAt(i) / 2]);
+  // smooth continuous curve: horizontal tangents at every stage = no corners
+  const smoothSegs = (pts, a, b, rev) => {
+    const idx = [];
+    if (rev) { for (let i = b; i >= a; i--) idx.push(i); } else { for (let i = a; i <= b; i++) idx.push(i); }
+    let d = '';
+    for (let k = 1; k < idx.length; k++) {
+      const p0 = pts[idx[k - 1]], p1 = pts[idx[k]];
+      const dx = ((p1[0] - p0[0]) * 0.18).toFixed(1);
+      d += ' C ' + (p0[0] + +dx).toFixed(1) + ',' + p0[1].toFixed(1) + ' ' + (p1[0] - +dx).toFixed(1) + ',' + p1[1].toFixed(1) + ' ' + p1[0].toFixed(1) + ',' + p1[1].toFixed(1);
+    }
+    return d;
+  };
+  const smoothLine = (pts, a, b) => 'M ' + pts[a][0].toFixed(1) + ',' + pts[a][1].toFixed(1) + smoothSegs(pts, a, b);
+  const ribbonPath = (a, b) =>
+    smoothLine(top, a, b) + ' L ' + bot[b][0].toFixed(1) + ',' + bot[b][1].toFixed(1) + smoothSegs(bot, a, b, true) + ' Z';
+  let worst = -1;
+  if (page.band !== 'green') {
+    let worstRate = 0.5;
+    for (let i = 0; i < N - 1; i++) {
+      if (!stages[i].n) continue;
+      const rate = (stages[i].n - stages[i + 1].n) / stages[i].n;
+      if (rate > worstRate) { worstRate = rate; worst = i; }
+    }
+  }
+  let svg = '<svg viewBox="0 0 ' + W + ' ' + H + '" style="width:100%;display:block;margin-top:8px" preserveAspectRatio="xMidYMid meet">';
+  // fixed label grid on top: stage name + mono count, one baseline each
+  X.forEach((x, i) => {
+    const anchor = 'middle';
+    svg += '<text x="' + x + '" y="8" text-anchor="' + anchor + '" font-family="var(--mm-ff)" font-size="6.8" font-weight="600" letter-spacing="0.03em" fill="var(--text-mute)">' + stages[i].lbl.toUpperCase() + '</text>' +
+      '<text x="' + x + '" y="21" text-anchor="' + anchor + '" font-family="var(--mm-fm)" font-size="11" font-weight="500" fill="var(--text)">' + stages[i].n + '</text>';
+    svg += '<line x1="' + x + '" y1="26" x2="' + x + '" y2="' + (MID + MAXH / 2 + 4) + '" stroke="var(--line)" stroke-width="0.8"/>';
+  });
+  // the double line graph: mirrored lines + soft area between + stage dots
+  svg += '<path d="' + ribbonPath(0, N - 1) + '" fill="rgba(62,175,92,0.14)"/>';
+  const arrowX = W - 30;
+  svg += '<path d="' + smoothLine(top, 0, T) + '" fill="none" stroke="#3EAF5C" stroke-width="1.1" stroke-linejoin="round" stroke-linecap="round"/>';
+  svg += '<path d="' + smoothLine(bot, 0, T) + '" fill="none" stroke="#3EAF5C" stroke-width="1.1" stroke-linejoin="round" stroke-linecap="round"/>';
+  // the collapsed thread runs on to the trial icon and becomes an arrow
+  svg += '<line x1="' + X[T] + '" y1="' + MID + '" x2="' + (arrowX - 3) + '" y2="' + MID + '" stroke="#3EAF5C" stroke-width="1.2" stroke-linecap="round"/>' +
+    '<path d="M ' + arrowX + ',' + MID + ' l -6,-3.6 v 7.2 Z" fill="#3EAF5C"/>';
+  if (worst >= 0) {
+    if (worst < T) {
+      svg += '<path d="' + ribbonPath(worst, Math.min(worst + 1, T)) + '" fill="rgba(224,90,66,0.16)"/>';
+      svg += '<path d="' + smoothLine(top, worst, Math.min(worst + 1, T)) + '" fill="none" stroke="#E05A42" stroke-width="1.2" stroke-linecap="round"/>';
+      svg += '<path d="' + smoothLine(bot, worst, Math.min(worst + 1, T)) + '" fill="none" stroke="#E05A42" stroke-width="1.2" stroke-linecap="round"/>';
+    } else {
+      svg += '<line x1="' + X[worst] + '" y1="' + MID + '" x2="' + X[worst + 1] + '" y2="' + MID + '" stroke="#E05A42" stroke-width="1.4" stroke-linecap="round"/>';
+    }
+    // clean leader + badge under the flagged segment (no hand-drawn arrow)
+    const mx = (X[worst] + X[worst + 1]) / 2;
+    const byTop = MID + MAXH / 2 + 8, bh = 15;
+    const label = stages[worst].fix;
+    const tw = (label.replace('&#9998; ', '').length * 4.6) + 22;
+    let bx = mx - tw / 2;
+    if (bx + tw > W - 4) bx = W - 4 - tw;
+    if (bx < 4) bx = 4;
+    svg += '<line x1="' + mx + '" y1="' + (bot[worst + 1][1] + 1) + '" x2="' + mx + '" y2="' + byTop + '" stroke="#E05A42" stroke-width="1.2"/>' +
+      '<rect x="' + bx.toFixed(1) + '" y="' + byTop + '" width="' + tw.toFixed(1) + '" height="' + bh + '" rx="7.5" fill="rgba(224,90,66,0.12)"/>' +
+      '<text x="' + (bx + tw / 2).toFixed(1) + '" y="' + (byTop + 10.5) + '" text-anchor="middle" font-family="var(--mm-ff)" font-size="9" font-weight="700" fill="#B5352F">' + label + '</text>';
+  }
+  const icoCol = 'var(--text-mute)';
+  // left: computer + phone (where the clicks happen)
+  svg += '<g fill="none" stroke="' + icoCol + '" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round">' +
+    '<rect x="4" y="' + (MID - 13) + '" width="17" height="11" rx="1.5"/>' +
+    '<path d="M 9.5 ' + (MID + 1) + ' h 6 M 12.5 ' + (MID - 2) + ' v 3"/>' +
+    '<rect x="17" y="' + (MID - 4) + '" width="8" height="13" rx="1.5" fill="var(--surface-el)"/>' +
+    '<path d="M 20 ' + (MID + 6.5) + ' h 2"/>' +
+    '</g>';
+  // right: calendar with a check (the booked free trial)
+  const rx = W - 24;
+  svg += '<g fill="none" stroke="' + icoCol + '" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round">' +
+    '<rect x="' + rx + '" y="' + (MID - 8) + '" width="16" height="15" rx="2"/>' +
+    '<path d="M ' + rx + ' ' + (MID - 3.5) + ' h 16 M ' + (rx + 4) + ' ' + (MID - 10.5) + ' v 4 M ' + (rx + 12) + ' ' + (MID - 10.5) + ' v 4"/>' +
+    '<path d="M ' + (rx + 4.5) + ' ' + (MID + 1.5) + ' l 2.5 2.5 l 4.5 -4.5" stroke="#3EAF5C"/>' +
+    '</g>';
+  return svg + '</svg>';
+}
+function _mmRenderLanding() {
+  const host = document.getElementById('landing-machine-card');
+  if (!host || !_MM) return;
+  if (!_MM.meta_connected || !(typeof V2_ACCESS !== 'undefined' && V2_ACCESS)) { host.style.display = 'none'; return; }
+  const d = _MM, page = d.page || {};
+  const funnelViz = _mmFunnelSvg(page, (page.clicks_comparable != null ? page.clicks_comparable : (d.campaign && d.campaign.link_clicks)));
+  const items = (page.band === 'red' || page.band === 'gold')
+    ? '<div class="mm-ap-item mm-note-edit">&#9998; fix the landing page</div>'
+    : '<div class="mm-ap-item" style="color:var(--text-mute)">everything is running clean</div>';
+  const campNameL = (d.campaign?.count > 1) ? (d.campaign.count + ' campaigns') : (d.campaign?.name || 'Training');
+  host.innerHTML =
+    '<div class="mm-cv"><span class="mm-cv-dot"></span><span class="mm-cv-line"></span><span class="mm-cv-dot"></span></div>' +
+    '<div class="mm-card" onclick="openLandingMachine()"><div class="mm-grid">' +
+      '<div><div class="mm-col-label">' + MM_ICONS.page + 'Landing page &middot; <span style="color:var(--text)">free trial</span>' + _mmSectionStatus(page.band) + '</div>' +
+      funnelViz + '</div>' +
+      '<div class="mm-action-panel">' +
+        '<div class="mm-ap-title">See the full picture</div>' + items +
+        '<div class="mm-ap-foot">Focus mode &rsaquo;</div>' +
+        '<span class="mm-ap-chevs"><span>&rsaquo;</span><span>&rsaquo;</span></span>' +
+      '</div>' +
+    '</div></div>';
   host.style.display = 'block';
 }
-
-function openMarketingMachine() {
-  const modal = document.getElementById('marketingMachineModal');
+function _mmCollapsePageRest(card) {
+  const content = card.parentElement;
+  if (!content) return;
+  let bar = document.getElementById('mm-page-toggle');
+  if (!bar) {
+    bar = document.createElement('div');
+    bar.id = 'mm-page-toggle';
+    bar.className = 'mm-collapse-head';
+    bar.style.marginBottom = '8px';
+    bar.innerHTML = '<span class="mm-collapse-arrow">&#9662;</span><span>guides, campaigns and requests</span><span id="mm-toggle-count" style="margin-left:auto;color:var(--text-sub)"></span>';
+    setTimeout(() => {
+      const list = document.getElementById('marketing-request-list-pending');
+      const chipEl = document.getElementById('mm-toggle-count');
+      if (!list || !chipEl) return;
+      const n = Array.from(list.children).filter((c) => !/req-empty/.test(c.className || '')).length;
+      if (n > 0) chipEl.textContent = n + ' in flight';
+    }, 2500);
+    bar.onclick = () => {
+      const open = bar.classList.toggle('open');
+      Array.from(content.children).forEach((el) => {
+        if (el === card || el === bar || el.id === 'landing-machine-card') return;
+        el.style.display = open ? '' : 'none';
+      });
+    };
+    const landingEl = document.getElementById('landing-machine-card');
+    (landingEl || card).after(bar);
+  }
+  if (!bar.classList.contains('open')) {
+    Array.from(content.children).forEach((el) => {
+      if (el === card || el === bar || el.id === 'landing-machine-card') return;
+      el.style.display = 'none';
+    });
+  }
+}
+function _mmOpenFocus(modalId, panelSel) {
+  const modal = document.getElementById(modalId);
   if (!modal || !_MM) return;
+  // wind-up: the panel compresses for a beat, then the whole surface pans left
+  const panelEl = document.querySelector(panelSel);
+  if (panelEl) { panelEl.classList.add('mm-launching'); setTimeout(() => panelEl.classList.remove('mm-launching'), 400); }
+  const mainEl = document.querySelector('.main');
+  if (mainEl) mainEl.classList.remove('mm-tease', 'mm-tease-ready');
+  document.documentElement.classList.add('mm-prewarm');
   modal.style.display = 'flex';
+  // layers rasterize + the detail page paints during this beat, so the pan
+  // starts on already-composited surfaces (no first-frame jank)
+  setTimeout(() => {
+    requestAnimationFrame(() => {
+      document.documentElement.classList.add('mm-focus-open');
+      modal.classList.add('mm-open');
+    });
+  }, 280);
+}
+function _mmCloseFocus(modalId) {
+  const modal = document.getElementById(modalId);
+  document.documentElement.classList.remove('mm-focus-open');
+  if (modal) {
+    modal.classList.remove('mm-open');
+    setTimeout(() => {
+      modal.style.display = 'none';
+      document.documentElement.classList.remove('mm-prewarm');
+    }, 3200);
+  }
+}
+function openMarketingMachine() {
+  if (!_MM) return;
   const from = document.getElementById('mm-range-from');
   const to = document.getElementById('mm-range-to');
   if (from && _MM.range) from.value = _MM.range.since;
   if (to && _MM.range) to.value = _MM.range.until;
-  _mmRenderModal(_MM);
+  _mmRenderMetaFocus(_MM);
+  _mmOpenFocus('marketingMachineModal', '#marketing-machine-card .mm-action-panel');
 }
-function closeMarketingMachine() {
-  const modal = document.getElementById('marketingMachineModal');
-  if (modal) modal.style.display = 'none';
+function closeMarketingMachine() { _mmCloseFocus('marketingMachineModal'); }
+function openLandingMachine() {
+  if (!_MM) return;
+  _mmRenderLandingFocus(_MM);
+  _mmOpenFocus('landingMachineModal', '#landing-machine-card .mm-action-panel');
 }
+function closeLandingMachine() { _mmCloseFocus('landingMachineModal'); }
 async function _mmApplyRange() {
   const from = document.getElementById('mm-range-from')?.value;
   const to = document.getElementById('mm-range-to')?.value;
@@ -43503,7 +44117,7 @@ async function _mmApplyRange() {
     });
     const json = await _safeJson(res);
     if (!res.ok) throw new Error(json.error || ('HTTP ' + res.status));
-    _mmRenderModal(json);
+    _mmRenderMetaFocus(json);
   } catch (e) {
     body.innerHTML = '<div style="font-size:13px;color:var(--text-mute);padding:16px 0">Could not load that range - please try again.</div>';
   }
@@ -43516,78 +44130,186 @@ function _mmStatHtml(label, valueTxt, band) {
 function _mmPillHtml(label, pct, band) {
   return '<div class="mm-conv-pill"><span class="' + _mmBandTxt(band) + '">&darr; ' + label + ' ' + _mmPctTxt(pct) + '</span></div>';
 }
-function _mmRenderModal(d) {
+// ── ROI MACHINE: type a spend, your measured rates crank, ROAS pops out ──
+function _mmRoiMachineHtml(d) {
+  const base = (d.month && d.month.planned) || null;
+  return '<div class="mm-roi">' +
+    '<div class="mm-col-label" style="margin-bottom:10px">' + MM_ICONS.overall + 'ROI machine</div>' +
+    '<div style="display:flex;align-items:center;gap:9px;flex-wrap:wrap">' +
+      '<span style="font-family:var(--mm-ff);font-size:13px;font-weight:600;color:var(--text-sub)">If I spend</span>' +
+      '<span style="font-family:var(--mm-fm);font-weight:600;color:var(--text-mute)">$</span>' +
+      '<input class="mm-roi-input" id="mm-roi-spend" type="number" inputmode="numeric" value="' + Math.round(base || 1000) + '" oninput="_mmRoiRecalc()">' +
+      '<span style="font-family:var(--mm-ff);font-size:13px;font-weight:600;color:var(--text-sub)">/month&hellip;</span>' +
+    '</div>' +
+    '<div class="mm-roi-gears" id="mm-roi-gears"></div>' +
+    '<div class="mm-roi-chain" id="mm-roi-chain"></div>' +
+    '<div class="mm-roi-out" id="mm-roi-out"></div>' +
+    '<div style="display:flex;align-items:center;gap:8px;margin-top:12px;font-family:var(--mm-ff);font-size:11px;font-weight:500;color:var(--text-mute)">' +
+      'member pays $<input class="mm-roi-knob" id="mm-roi-val" type="number" value="250" oninput="_mmRoiRecalc()">/mo' +
+      ' &middot; stays <input class="mm-roi-knob" id="mm-roi-mo" type="number" value="6" style="width:44px" oninput="_mmRoiRecalc()"> months' +
+    '</div>' +
+    '<div class="mm-driver-sub" id="mm-roi-warn" style="margin-top:8px"></div>' +
+  '</div>';
+}
+function _mmRoiRecalc() {
+  const d = _MM; if (!d) return;
+  const el = (id) => document.getElementById(id);
+  if (!el('mm-roi-spend')) return;
+  const camp = d.campaign || {}, lt = camp.lifetime || {}, w = camp.window || {}, r = d.result || {}, roi = d.roi || {};
+  const spend = Math.max(0, parseFloat(el('mm-roi-spend').value) || 0);
+  const memberVal = Math.max(0, parseFloat(el('mm-roi-val').value) || 0);
+  const months = Math.max(1, parseFloat(el('mm-roi-mo').value) || 6);
+  const cpls = [w.judged ? w.cpl : null, lt.cpl].filter((v) => v != null);
+  if (!spend || !cpls.length) {
+    el('mm-roi-gears').innerHTML = ''; el('mm-roi-chain').innerHTML = '';
+    el('mm-roi-out').innerHTML = '<span class="mm-t-grey" style="font-size:14px">gathering data - no cost per lead yet</span>';
+    el('mm-roi-warn').textContent = ''; return;
+  }
+  const cplBest = Math.min(...cpls), cplWorst = Math.max(...cpls);
+  const bookedRate = (r.booked_pct != null ? r.booked_pct / 100 : 0.4);
+  const bookedDefault = r.booked_pct == null;
+  const showRate = roi.show_rate != null ? roi.show_rate : 0.8;
+  const showDefault = roi.show_rate == null;
+  const joinRate = roi.attended_to_join != null ? roi.attended_to_join : (roi.booked_to_join != null ? roi.booked_to_join / (showRate || 1) : 0.5);
+  const joinDefault = roi.attended_to_join == null && roi.booked_to_join == null;
+  const run = (cpl) => {
+    const leads = spend / cpl;
+    const trials = leads * bookedRate;
+    const attended = trials * showRate;
+    const members = attended * joinRate;
+    return { leads, trials, members, revLTV: members * memberVal * months, revM1: members * memberVal };
+  };
+  const best = run(cplBest), worst = run(cplWorst);
+  const fx = (n) => (n >= 10 ? Math.round(n) : Math.round(n * 10) / 10);
+  const roasLo = spend > 0 ? worst.revLTV / spend : 0;
+  const roasHi = spend > 0 ? best.revLTV / spend : 0;
+  const m1Lo = spend > 0 ? worst.revM1 / spend : 0;
+  const band = roasLo >= 3 ? 'green' : (roasLo >= 1 ? 'gold' : 'red');
+  const tag = (isDefault) => (isDefault ? ' <span style="opacity:0.55">(default)</span>' : '');
+  el('mm-roi-gears').innerHTML =
+    'your gears: $' + cplBest.toFixed(2) + (cplWorst > cplBest ? '-' + cplWorst.toFixed(2) : '') + '/lead &middot; ' +
+    Math.round(bookedRate * 100) + '% book' + tag(bookedDefault) + ' &middot; ' +
+    Math.round(showRate * 100) + '% show up' + tag(showDefault) + ' &middot; ' +
+    Math.round(joinRate * 100) + '% join' + tag(joinDefault);
+  el('mm-roi-chain').innerHTML =
+    '<b>' + fx(worst.leads) + (best.leads - worst.leads >= 1 ? '-' + fx(best.leads) : '') + '</b> leads &rarr; ' +
+    '<b>' + fx(worst.trials) + '</b> trials &rarr; <b>' + fx(worst.members) + (best.members - worst.members >= 0.5 ? '-' + fx(best.members) : '') + '</b> new members';
+  el('mm-roi-out').innerHTML =
+    '<span class="' + _mmBandTxt(band) + '">ROAS ' + (roasLo === roasHi ? roasLo.toFixed(1) : roasLo.toFixed(1) + '-' + roasHi.toFixed(1)) + 'x' + _mmDotHtml(band) + '</span>' +
+    '<span style="font-size:12px;font-weight:600;color:var(--text-mute);margin-left:10px">first month ' + m1Lo.toFixed(1) + 'x</span>';
+  const baseSpend = (d.month && d.month.planned) || null;
+  el('mm-roi-warn').textContent = (baseSpend && spend > baseSpend * 2)
+    ? 'estimates get fuzzy up here - cost per lead usually rises past 2x your current budget (~$' + Math.round(baseSpend) + ')'
+    : '';
+}
+function _mmToast(msg) {
+  document.querySelectorAll('.mm-toast').forEach((t) => t.remove());
+  const t = document.createElement('div');
+  t.className = 'mm-toast';
+  t.textContent = msg;
+  document.body.appendChild(t);
+  setTimeout(() => t.remove(), 3200);
+}
+function _mmCreativeAction(action, name) {
+  _mmToast('"' + action + (name ? ' ' + name : '') + '" noted - creative requests plug into support tickets next');
+}
+function _mmRenderMetaFocus(d) {
   const body = document.getElementById('mm-modal-body');
   if (!body || !d) return;
   if (!d.meta_connected) {
     body.innerHTML = '<div style="font-size:13px;color:var(--text-mute);padding:16px 0">BAM is still wiring up your ads - numbers will appear here once your campaign is live.</div>';
     return;
   }
-  const m = d.month || {}, camp = d.campaign || {}, page = d.page || {}, r = d.result || {}, pills = d.pills || {};
-  const monthPct = m.days_in_month ? Math.round((m.day / m.days_in_month) * 100) : 0;
-  const rangeLabel = d.range && d.range.is_default ? ('last ' + d.range.days + ' days') : (d.range ? d.range.since + ' to ' + d.range.until : '');
+  const m = d.month || {}, camp = d.campaign || {}, r = d.result || {}, pills = d.pills || {};
+  const lt = camp.lifetime || {}, w = camp.window || {};
+  // per-campaign structure from the backend; synthesized fallback until the
+  // backend field is deployed
+  const camps = (d.campaigns && d.campaigns.length) ? d.campaigns : [{
+    id: 'agg', name: camp.name || 'Training', spend: w.spend, leads: w.leads, cpl: w.cpl,
+    band: (w.judged ? w.band : 'grey'), adsets: [{ id: 'agg', name: null, daily_budget: null, learning: camp.learning, targeting_brief: null, creatives: d.creatives || [] }],
+  }];
+  const arrow = '<div class="mm-farrow"><span></span></div>';
 
-  // Header line: month pacing (MTD) or the picked range's spend
-  const headLine =
-    '<div class="mm-month" style="margin-bottom:0"><span class="mm-month-name">' + _escapeHtml((m.name || '').toUpperCase()) + '</span>' +
-    '<div class="mm-bar" style="flex:0 0 140px"><div class="mm-bar-fill mm-f-month" style="width:' + monthPct + '%"></div></div>' +
-    '<span class="mm-month-meta">day ' + m.day + ' of ' + m.days_in_month + ' &middot; spent $' + Math.round(m.spend || 0) +
-    (m.planned ? ' of ~$' + Math.round(m.planned) + ' planned' : '') + ' &middot; judged window: ' + _escapeHtml(rangeLabel) + '</span></div>';
-
-  // CAMPAIGN - lifetime CPL is the anchor, the window delta is the alarm
-  const lt = camp.lifetime || {}, w = camp.window || {}, fastM = camp.fast || {};
-  const sparkHtml = '<div style="max-width:340px;margin-top:12px">' + _mmLineHtml(camp.sparkline, lt.since, camp.band, 48) + '</div>';
-  let deltaLine;
-  if (w.judged && w.drift_vs_lifetime_pct != null) {
-    const up = w.drift_vs_lifetime_pct > 0;
-    deltaLine = '<div class="mm-verdict ' + _mmBandTxt(w.drift_band) + '">last ' + (d.range?.days || 14) + ' days ' + _mmMoney(w.cpl) +
-      ' ' + (up ? '&uarr;' : '&darr;') + ' ' + Math.abs(Math.round(w.drift_vs_lifetime_pct)) + '% vs lifetime' + _mmDotHtml(w.drift_band) + '</div>';
-  } else if (w.judged) {
-    deltaLine = '<div class="mm-verdict ' + _mmBandTxt(w.band) + '">last ' + (d.range?.days || 14) + ' days ' + _mmMoney(w.cpl) + _mmDotHtml(w.band) + '</div>';
-  } else {
-    deltaLine = '<div class="mm-verdict mm-t-grey">gathering data - ' + (w.leads || 0) + ' lead' + (w.leads === 1 ? '' : 's') + ' in this window so far</div>';
-  }
-  const freqBand = fastM.frequency == null ? null : (fastM.frequency < 3 ? 'green' : (fastM.frequency <= 3.5 ? 'gold' : 'red'));
-  const learnTxt = camp.learning ? camp.learning.toUpperCase() : '-';
-  const campSect =
-    '<div class="mm-sect"><div class="mm-sect-head">Campaign ' + _mmDotHtml(camp.band) + '</div>' +
-    '<div class="mm-anchor ' + _mmBandTxt(lt.band) + '">' + _mmMoney(lt.cpl) + '<small>LIFETIME COST PER LEAD &middot; ' + (lt.leads || 0) + ' leads &middot; $' + Math.round(lt.spend || 0) + ' spent</small></div>' +
-    sparkHtml + deltaLine +
-    '<div class="mm-stats" style="margin-top:14px">' +
-      _mmStatHtml('Frequency (7d)', fastM.frequency == null ? '-' : fastM.frequency + 'x', freqBand) +
-      _mmStatHtml('CTR (7d)', _mmPctTxt(fastM.ctr), null) +
-    '</div>' +
-    '<div class="mm-context">window: impressions ' + (camp.impressions || 0).toLocaleString() + ' &middot; reach ' + (camp.reach || 0).toLocaleString() +
-    ' &middot; clicks ' + (camp.link_clicks || 0) + ' &middot; learning ' + _escapeHtml(learnTxt) + '</div></div>';
-
-  // CREATIVES
-  const crBand = d.creatives_band || 'grey';
-  const liveN = d.creatives_live || 0;
-  const tiles = (d.creatives || []).map(c => {
+  const tile = (c) => {
+    const v = _mmCreativeVerdict(c);
     const hookBand = c.hook_rate == null ? null : (c.hook_rate >= 30 ? 'green' : (c.hook_rate >= 25 ? 'gold' : 'red'));
-    const cFreqBand = c.frequency == null ? null : (c.frequency < 3 ? 'green' : (c.frequency <= 3.5 ? 'gold' : 'red'));
+    const fBand = c.frequency == null ? null : (c.frequency < 3 ? 'green' : (c.frequency <= 3.5 ? 'gold' : 'red'));
     const stats = [
-      c.hook_rate != null ? ('<span class="' + _mmBandTxt(hookBand) + '">hook ' + _mmPctTxt(c.hook_rate) + '</span>') : null,
-      c.ctr != null ? ('ctr ' + _mmPctTxt(c.ctr)) : null,
       '<span class="' + _mmBandTxt(c.testing ? 'grey' : c.band) + '">$/lead ' + (c.cpl == null ? '-' : _mmMoney(c.cpl)) + '</span>',
-      c.frequency != null ? ('<span class="' + _mmBandTxt(cFreqBand) + '">freq ' + c.frequency + 'x</span>') : null,
+      c.leads != null ? (c.leads + ' lead' + (c.leads === 1 ? '' : 's')) : null,
+      c.hook_rate != null ? '<span class="' + _mmBandTxt(hookBand) + '">hook ' + _mmPctTxt(c.hook_rate) + '</span>' : null,
+      c.ctr != null ? ('ctr ' + _mmPctTxt(c.ctr)) : null,
+      c.frequency != null ? '<span class="' + _mmBandTxt(fBand) + '">freq ' + c.frequency + 'x</span>' : null,
       c.age_days != null ? ('age ' + c.age_days + 'd') : null,
+      c.spend != null ? ('$' + Math.round(c.spend) + ' spent') : null,
     ].filter(Boolean).join(' &middot; ');
-    return '<div class="mm-tile">' +
-      (c.image_url ? '<img class="mm-tile-thumb" src="' + _escapeHtml(c.image_url) + '" alt="" loading="lazy">' : '<span class="mm-tile-thumb"></span>') +
-      '<div style="min-width:0"><div class="mm-tile-name">' + _escapeHtml(c.name) +
-      (c.best ? '<span class="mm-pill-tag mm-best">best</span>' : '') +
-      (c.testing ? '<span class="mm-pill-tag">testing</span>' : '') +
-      '</div><div class="mm-tile-stats">' + stats + '</div></div></div>';
-  }).join('') || '<div style="font-size:12px;color:var(--text-mute)">no live creatives yet</div>';
-  const crSect =
-    '<div class="mm-sect"><div class="mm-sect-head">Creatives &middot; ' + liveN + ' live ' + _mmDotHtml(crBand) +
-    (liveN && liveN < 6 ? ' <span style="letter-spacing:0;text-transform:none;color:var(--text-mute)">(want 6+)</span>' : '') + '</div>' +
-    tiles +
-    (d.warning ? '<div class="mm-warn-line">&#9888; ' + _escapeHtml(d.warning.text) + '</div>' : '') +
-    '</div>';
+    return '<div class="mm-ftile">' +
+      (c.image_url ? '<img class="mm-ftile-thumb" src="' + _escapeHtml(c.image_url) + '" alt="" loading="lazy">' : '<span class="mm-ftile-thumb"></span>') +
+      '<div style="flex:1;min-width:0">' +
+        '<div class="mm-g-name" style="margin-top:0">' + _escapeHtml(c.name) +
+        (c.best ? '<span class="mm-pill-tag mm-best">best</span>' : '') +
+        '<span class="mm-verdict-chip mm-vc-' + v.verdict + '" style="margin-left:auto">' + v.verdict + '</span></div>' +
+        '<div class="mm-tile-stats">' + stats + '</div>' +
+        (v.note ? '<div class="mm-cr-note ' + (v.verdict === 'replace' ? 'mm-note-replace' : 'mm-note-edit') + '">' + (v.verdict === 'replace' ? '&#8635; ' : '&#9998; ') + _escapeHtml(v.note) + '</div>' : '') +
+        '<div style="display:flex;gap:8px;margin-top:10px">' +
+          '<button type="button" class="mm-cbtn" onclick="event.stopPropagation();_mmCreativeAction(\'replace\', \'' + _escapeHtml(c.name).replace(/'/g, '') + '\')">&#8635; replace</button>' +
+          '<button type="button" class="mm-cbtn mm-danger" onclick="event.stopPropagation();_mmCreativeAction(\'delete\', \'' + _escapeHtml(c.name).replace(/'/g, '') + '\')">&#10005; delete</button>' +
+        '</div>' +
+      '</div></div>';
+  };
 
-  // LANDING PAGE
+  let out = '';
+  camps.forEach((cp, ci) => {
+    if (ci > 0) out += arrow;
+    // campaign header block
+    out += '<div class="mm-fsec"><div class="mm-col-label" style="margin-bottom:6px">' + MM_ICONS.overall + 'Campaign &middot; <span style="color:var(--text)">' + _escapeHtml(cp.name || 'Campaign') + '</span>' + _mmSectionStatus(cp.band) + '</div>' +
+      '<div class="mm-funnel-line" style="margin:0">' + (cp.cpl != null ? '<b>' + _mmMoney(cp.cpl) + '</b> per lead &middot; ' : '') + '<b>' + (cp.leads || 0) + '</b> leads &middot; $' + Math.round(cp.spend || 0) + ' spent this window</div></div>';
+    out += arrow;
+    const multi = (cp.adsets || []).length > 1;
+    if (multi) out += '<div class="mm-driver-sub" style="text-align:center;margin:-8px 0 10px">' + cp.adsets.length + ' ad sets inside this campaign</div>';
+    (cp.adsets || []).forEach((a2) => {
+      out += '<div class="mm-adset">' +
+        '<div class="mm-adset-head"><span class="mm-adset-name">' + _escapeHtml(a2.name || 'Ad set') + '</span>' +
+        (a2.daily_budget != null ? '<span class="mm-driver-sub" style="margin:0">$' + a2.daily_budget + '/day</span>' : '') +
+        (a2.learning ? '<span class="mm-driver-sub" style="margin:0">learning ' + _escapeHtml(String(a2.learning)) + '</span>' : '') + '</div>' +
+        (a2.targeting_brief ? '<div class="mm-driver-sub" style="margin:0 0 2px">' + a2.targeting_brief + '</div>' : '') +
+        ((a2.creatives || []).map(tile).join('') || '<div class="mm-driver-sub" style="margin-top:10px">no live creatives in this ad set</div>') +
+        '<button type="button" class="mm-addbtn" onclick="event.stopPropagation();_mmCreativeAction(\'add a new creative\', \'\')">+ add a new creative</button>' +
+        '</div>';
+    });
+  });
+
+  // results + spend range at the bottom
+  const cpbtWas = r.prev_cost_per_booked_trial != null ? ' <span style="color:var(--text-mute);font-weight:400">(was ' + _mmMoney(r.prev_cost_per_booked_trial) + ')</span>' : '';
+  const paceBand = m.pace_status === 'on pace' ? 'green' : (m.pace_status === 'under' ? 'gold' : (m.pace_status === 'over' ? 'red' : 'grey'));
+  const spendFill = m.planned ? Math.min(100, Math.round(((m.spend || 0) / m.planned) * 100)) : 0;
+  const elapsedTick = m.days_in_month ? Math.round((m.day / m.days_in_month) * 100) : null;
+  out += arrow +
+    '<div class="mm-fsec"><div class="mm-grid" style="align-items:start"><div><div class="mm-col-label" style="margin-bottom:6px">' + MM_ICONS.page + 'Results</div>' +
+    '<div class="mm-funnel-line" style="margin:0"><b>' + (r.leads || 0) + '</b> leads &middot; <span class="' + _mmBandTxt(pills.lead_to_booked_band) + '">' +
+    _mmPctTxt(r.booked_pct) + ' booked' + _mmDotHtml(pills.lead_to_booked_band) + '</span> &rarr; <b>' + (r.booked || 0) + '</b> booked trials' +
+    (r.agent_booked ? ' <span style="color:var(--text-mute)">(' + r.agent_booked + ' with the booking agent)</span>' : '') + '</div>' +
+    '<div class="mm-verdict ' + _mmBandTxt(r.cpbt_band) + '" style="margin-top:10px">Cost per booked trial ' + (r.cost_per_booked_trial == null ? '-' : _mmMoney(r.cost_per_booked_trial)) + _mmDotHtml(r.cpbt_band) + cpbtWas + '</div>' +
+    '<div style="margin-top:16px;max-width:420px">' +
+      '<div class="mm-hb-label" style="margin-bottom:6px">Ad spend &middot; $' + Math.round(m.spend || 0) + (m.planned ? ' of ~$' + Math.round(m.planned) : '') + ' this month' +
+      (m.pace_status ? ' &middot; <span class="' + _mmBandTxt(paceBand) + '" style="font-weight:700;text-transform:uppercase">' + m.pace_status + '</span>' : '') + '</div>' +
+      (m.planned ? _mmBarHtml(spendFill, paceBand, elapsedTick) : '') +
+      (m.planned && elapsedTick != null ? '<div class="mm-driver-sub" style="margin-top:5px">the notch is where the month says you should be (day ' + m.day + ' of ' + m.days_in_month + ')</div>' : '') +
+    '</div></div>' +
+    _mmRoiMachineHtml(d) +
+    '</div></div>';
+
+  body.innerHTML = out;
+  _mmRoiRecalc();
+}
+function _mmRenderLandingFocus(d) {
+  const body = document.getElementById('lm-modal-body');
+  if (!body || !d) return;
+  if (!d.meta_connected) {
+    body.innerHTML = '<div style="font-size:13px;color:var(--text-mute);padding:16px 0">BAM is still wiring up your funnel - numbers will appear here soon.</div>';
+    return;
+  }
+  const page = d.page || {}, pills = d.pills || {}, r = d.result || {};
   const pageBand = _mmWorst([page.band, page.abandonment_band]);
   const pageSect =
     '<div class="mm-sect"><div class="mm-sect-head">Landing page ' + _mmDotHtml(pageBand) + '</div>' +
@@ -43599,21 +44321,11 @@ function _mmRenderModal(d) {
     '</div>' +
     '<div class="mm-context">saw the times but walked away = abandonment</div></div>';
 
-  // RESULT
-  const cpbtWas = r.prev_cost_per_booked_trial != null ? ' <span style="color:var(--text-mute);font-weight:400">(was ' + _mmMoney(r.prev_cost_per_booked_trial) + ')</span>' : '';
-  const resultSect =
-    '<div class="mm-sect"><div class="mm-sect-head">Result</div>' +
-    '<div class="mm-funnel-line"><b>' + (r.leads || 0) + '</b> leads &middot; <span class="' + _mmBandTxt(pills.lead_to_booked_band) + '">' +
-    _mmPctTxt(r.booked_pct) + ' booked' + _mmDotHtml(pills.lead_to_booked_band) + '</span> &rarr; <b>' + (r.booked || 0) + '</b> booked trials' +
-    (r.agent_booked ? ' <span style="color:var(--text-mute)">(' + r.agent_booked + ' with the booking agent)</span>' : '') + '</div>' +
-    '<div class="mm-verdict ' + _mmBandTxt(r.cpbt_band) + '">COST PER BOOKED TRIAL ' + (r.cost_per_booked_trial == null ? '-' : _mmMoney(r.cost_per_booked_trial)) +
-    _mmDotHtml(r.cpbt_band) + cpbtWas + '</div></div>';
-
-  body.innerHTML = headLine + campSect + crSect +
-    _mmPillHtml('click to visit', pills.click_to_visit_pct, pills.click_to_visit_band) +
+  body.innerHTML =
+    '<div class="mm-month" style="margin-bottom:0"><span class="mm-month-meta">judged window: last ' + (d.range?.days || 14) + ' days</span></div>' +
     pageSect +
     _mmPillHtml('visit to lead', pills.visit_to_lead_pct, pills.visit_to_lead_band) +
-    resultSect;
+    _mmPillHtml('lead to booked', pills.lead_to_booked_pct, pills.lead_to_booked_band);
 }
 </script>
 

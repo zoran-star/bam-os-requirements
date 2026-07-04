@@ -78,14 +78,42 @@ async function upsertThread(clientId, phone, ghlContactId, name) {
   return Array.isArray(rows) ? rows[0] : null;
 }
 
-// If only a GHL contactId is known, recover the phone from the imported store.
+// Loose E.164 normalization for stored 10/11-digit North American numbers
+// ("4165652497" → "+14165652497"). Anything already prefixed passes through.
+function normalizePhone(raw) {
+  const s = String(raw || "").trim();
+  if (!s) return null;
+  if (s.startsWith("+")) return s;
+  const digits = s.replace(/\D/g, "");
+  if (digits.length === 10) return `+1${digits}`;
+  if (digits.length === 11 && digits.startsWith("1")) return `+${digits}`;
+  return digits ? `+${digits}` : null;
+}
+
+// If only a GHL contactId is known, recover the phone. A lead who has never
+// texted us has NO sms_thread yet (this silently starved every first-touch
+// confirm send), so fall back to the contact stores and finally the trial
+// booking itself.
 async function phoneForContact(clientId, ghlContactId) {
   if (!ghlContactId) return null;
   try {
     const rows = await sb(`sms_threads?client_id=eq.${clientId}&ghl_contact_id=eq.${encodeURIComponent(ghlContactId)}&select=contact_phone&limit=1`);
     const p = rows && rows[0] && rows[0].contact_phone;
-    return p && !p.startsWith("ghl:") && !p.startsWith("ghl-conv:") ? p : null;
-  } catch (_) { return null; }
+    if (p && !p.startsWith("ghl:") && !p.startsWith("ghl-conv:")) return p;
+  } catch (_) {}
+  try {
+    const c = await sb(`contacts?client_id=eq.${clientId}&ghl_contact_id=eq.${encodeURIComponent(ghlContactId)}&select=phone&limit=1`);
+    if (c && c[0] && c[0].phone) return normalizePhone(c[0].phone);
+  } catch (_) {}
+  try {
+    const g = await sb(`ghl_contacts?client_id=eq.${clientId}&ghl_contact_id=eq.${encodeURIComponent(ghlContactId)}&select=phone&limit=1`);
+    if (g && g[0] && g[0].phone) return normalizePhone(g[0].phone);
+  } catch (_) {}
+  try {
+    const tb = await sb(`trial_bookings?tenant_id=eq.${clientId}&ghl_contact_id=eq.${encodeURIComponent(ghlContactId)}&select=parent_phone&order=created_at.desc&limit=1`);
+    if (tb && tb[0] && tb[0].parent_phone) return normalizePhone(tb[0].parent_phone);
+  } catch (_) {}
+  return null;
 }
 
 // Send one SMS via the academy's own Twilio + record it in the own-store.
