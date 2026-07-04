@@ -3407,7 +3407,7 @@ async function handleMetaMachine(req, res) {
 
   // ── Bucket ad-level daily rows: prev window / judged window / fast tail ──
   const splitDay = fmt(sinceD), fastDay = fmt(fastSinceD);
-  const zero = () => ({ spend: 0, impressions: 0, reach: 0, clicks: 0, leads: 0, v3: 0 });
+  const zero = () => ({ spend: 0, impressions: 0, reach: 0, clicks: 0, leads: 0, v3: 0, lpv: 0 });
   const win = zero(), fast = zero(), prevW = zero();
   const adAgg = new Map(); // ad_id -> {name, ...zero()}
   for (const row of (adDailyJson.data || [])) {
@@ -3417,7 +3417,11 @@ async function handleMetaMachine(req, res) {
     const clicks = parseInt(row.inline_link_clicks || "0", 10) || 0;
     const leads = mmCountLeads(row.actions);
     const v3 = countAction(row.actions, "video_view");
-    const into = (b) => { b.spend += spend; b.impressions += impressions; b.reach += reach; b.clicks += clicks; b.leads += leads; b.v3 += v3; };
+    // Meta's landing_page_view = the click actually loaded the page (a subset of
+    // clicks, so lpv <= clicks always). The clicks->lpv gap is the page-speed /
+    // bounce read that opens the funnel.
+    const lpv = countAction(row.actions, "landing_page_view");
+    const into = (b) => { b.spend += spend; b.impressions += impressions; b.reach += reach; b.clicks += clicks; b.leads += leads; b.v3 += v3; b.lpv += lpv; };
     if (row.date_start < splitDay) { into(prevW); continue; }
     into(win);
     if (row.date_start >= fastDay) into(fast);
@@ -3426,10 +3430,13 @@ async function handleMetaMachine(req, res) {
     into(a);
   }
   const beaconDay = firstBeaconRows?.[0]?.created_at ? String(firstBeaconRows[0].created_at).slice(0, 10) : null;
-  let clicksComparable = 0;
+  let clicksComparable = 0, lpvComparable = 0;
   if (beaconDay) {
     for (const row of (adDailyJson.data || [])) {
-      if (row.date_start >= splitDay && row.date_start >= beaconDay) clicksComparable += parseInt(row.inline_link_clicks || "0", 10) || 0;
+      if (row.date_start >= splitDay && row.date_start >= beaconDay) {
+        clicksComparable += parseInt(row.inline_link_clicks || "0", 10) || 0;
+        lpvComparable += countAction(row.actions, "landing_page_view");
+      }
     }
   }
   const winCpl = win.leads > 0 ? _r2(win.spend / win.leads) : null;
@@ -3676,7 +3683,9 @@ async function handleMetaMachine(req, res) {
     page: {
       funnel: "free-trial",
       fed_by: allow,
-      clicks_comparable: clicksComparable,   // clicks on days beacons were live
+      clicks_comparable: clicksComparable,   // Meta clicks on days beacons were live
+      lpv_comparable: lpvComparable,         // Meta landing-page-views, same day window
+      link_clicks: win.clicks, landing_page_views: win.lpv,   // full-window Meta totals
       visitors, ad_visitors: adVisitors.size, form_started: formStarted, saw_calendar: sawCalendar, booked_sessions: bookedSessions,
       visitors_to_form_pct: pct(formStarted, visitors),
       clicks_to_leads_pct: clicksToLeadsPct,
