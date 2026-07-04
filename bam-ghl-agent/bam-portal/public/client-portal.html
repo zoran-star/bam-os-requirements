@@ -3727,6 +3727,13 @@
   }
   .mm-mod-range button:hover { border-color: var(--accent-border); color: var(--text); }
   .mm-sect { border-top: 1px solid var(--line); margin-top: 20px; padding-top: 16px; }
+  .mm-gallery { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+  @media (max-width: 720px) { .mm-gallery { grid-template-columns: 1fr; } }
+  .mm-g-collabel { font-family: var(--mm-ff); font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 10px; }
+  .mm-g-tile { border: 1px solid var(--line); border-radius: 12px; padding: 10px; background: var(--surface-el); margin-bottom: 12px; }
+  .mm-g-thumb { width: 100%; height: 92px; object-fit: cover; border-radius: 8px; background: var(--line); display: block; }
+  .mm-g-name { display: flex; align-items: center; gap: 8px; font-family: var(--mm-ff); font-size: 13px; font-weight: 700; color: var(--text); margin: 9px 0 4px; }
+  .mm-statgrid { display: flex; gap: 26px; flex-wrap: wrap; row-gap: 14px; }
   .mm-sect-head {
     font-family: var(--mm-ff); font-size: 12px; font-weight: 600; letter-spacing: 0.05em;
     text-transform: uppercase; color: var(--text-sub); margin-bottom: 12px;
@@ -40755,85 +40762,89 @@ function _mmRenderMetaFocus(d) {
     body.innerHTML = '<div style="font-size:13px;color:var(--text-mute);padding:16px 0">BAM is still wiring up your ads - numbers will appear here once your campaign is live.</div>';
     return;
   }
-  const m = d.month || {}, camp = d.campaign || {}, page = d.page || {}, r = d.result || {}, pills = d.pills || {};
-  const monthPct = m.days_in_month ? Math.round((m.day / m.days_in_month) * 100) : 0;
-  const rangeLabel = d.range && d.range.is_default ? ('last ' + d.range.days + ' days') : (d.range ? d.range.since + ' to ' + d.range.until : '');
-
-  // Header line: month pacing (MTD) or the picked range's spend
-  const headLine =
-    '<div class="mm-month" style="margin-bottom:0"><span class="mm-month-name">' + _escapeHtml((m.name || '').toUpperCase()) + '</span>' +
-    '<div class="mm-bar" style="flex:0 0 140px"><div class="mm-bar-fill mm-f-month" style="width:' + monthPct + '%"></div></div>' +
-    '<span class="mm-month-meta">day ' + m.day + ' of ' + m.days_in_month + ' &middot; spent $' + Math.round(m.spend || 0) +
-    (m.planned ? ' of ~$' + Math.round(m.planned) + ' planned' : '') + ' &middot; judged window: ' + _escapeHtml(rangeLabel) + '</span></div>';
-
-  // CAMPAIGN - lifetime CPL is the anchor, the window delta is the alarm
+  const m = d.month || {}, camp = d.campaign || {}, r = d.result || {}, pills = d.pills || {};
   const lt = camp.lifetime || {}, w = camp.window || {}, fastM = camp.fast || {};
-  const sparkHtml = '<div style="max-width:340px;margin-top:12px">' + _mmLineHtml(camp.sparkline, lt.since, camp.band, 48) + '</div>';
-  let deltaLine;
-  if (w.judged && w.drift_vs_lifetime_pct != null) {
-    const up = w.drift_vs_lifetime_pct > 0;
-    deltaLine = '<div class="mm-verdict ' + _mmBandTxt(w.drift_band) + '">last ' + (d.range?.days || 14) + ' days ' + _mmMoney(w.cpl) +
-      ' ' + (up ? '&uarr;' : '&darr;') + ' ' + Math.abs(Math.round(w.drift_vs_lifetime_pct)) + '% vs lifetime' + _mmDotHtml(w.drift_band) + '</div>';
-  } else if (w.judged) {
-    deltaLine = '<div class="mm-verdict ' + _mmBandTxt(w.band) + '">last ' + (d.range?.days || 14) + ' days ' + _mmMoney(w.cpl) + _mmDotHtml(w.band) + '</div>';
-  } else {
-    deltaLine = '<div class="mm-verdict mm-t-grey">gathering data - ' + (w.leads || 0) + ' lead' + (w.leads === 1 ? '' : 's') + ' in this window so far</div>';
-  }
-  const freqBand = fastM.frequency == null ? null : (fastM.frequency < 3 ? 'green' : (fastM.frequency <= 3.5 ? 'gold' : 'red'));
-  const learnTxt = camp.learning ? camp.learning.toUpperCase() : '-';
-  const campSect =
-    '<div class="mm-sect"><div class="mm-sect-head">Campaign ' + _mmDotHtml(camp.band) + '</div>' +
-    '<div class="mm-anchor ' + _mmBandTxt(lt.band) + '">' + _mmMoney(lt.cpl) + '<small>lifetime cost per lead &middot; ' + (lt.leads || 0) + ' leads &middot; $' + Math.round(lt.spend || 0) + ' spent</small></div>' +
-    sparkHtml + deltaLine +
-    '<div class="mm-stats" style="margin-top:14px">' +
-      _mmStatHtml('Frequency (7d)', fastM.frequency == null ? '-' : fastM.frequency + 'x', freqBand) +
-      _mmStatHtml('CTR (7d)', _mmPctTxt(fastM.ctr), null) +
-    '</div>' +
-    '<div class="mm-context">window: impressions ' + (camp.impressions || 0).toLocaleString() + ' &middot; reach ' + (camp.reach || 0).toLocaleString() +
-    ' &middot; clicks ' + (camp.link_clicks || 0) + ' &middot; learning ' + _escapeHtml(learnTxt) + '</div></div>';
+  const judged = w.judged && w.cpl != null;
 
-  // CREATIVES
-  const crBand = d.creatives_band || 'grey';
-  const liveN = d.creatives_live || 0;
-  const tiles = (d.creatives || []).map(c => {
+  // ── 1 · AM I WINNING? - the verdict number + the weekly line ──
+  let chip = '';
+  if (judged && w.drift_vs_lifetime_pct != null) {
+    const pctAbs = Math.abs(Math.round(w.drift_vs_lifetime_pct));
+    const up = w.drift_vs_lifetime_pct > 0;
+    const big = pctAbs >= 20;
+    chip = '<span class="' + (big ? (up ? 'mm-t-red' : 'mm-t-green') : 'mm-t-grey') + '" style="font-size:15px;font-weight:700;margin-left:10px">' +
+      (up ? '&#9650; ' + pctAbs + '% pricier' : '&#9660; ' + pctAbs + '% cheaper') + ' than usual</span>';
+  } else if (!judged) {
+    chip = '<span class="mm-t-grey" style="font-size:13px;font-weight:600;margin-left:10px">gathering data - ' + (w.leads || 0) + ' leads this window</span>';
+  }
+  const zone1 =
+    '<div class="mm-sect" style="border-top:none;margin-top:8px"><div class="mm-sect-head">Am I winning?</div>' +
+    '<div style="display:flex;align-items:baseline"><span class="mm-hero-num-xl ' + (judged ? _mmBandTxt(w.band) : '') + '">' + _mmMoney(judged ? w.cpl : lt.cpl) + '</span>' +
+    '<span style="font-size:13px;font-weight:600;color:var(--text-mute);margin-left:6px">per lead</span>' + chip + '</div>' +
+    '<div style="max-width:520px">' + _mmTickerHtml(camp.sparkline, lt.cpl, judged ? (w.drift_band || 'grey') : 'grey', lt.since) + '</div></div>';
+
+  // ── 2 · WHAT'S RUNNING? - the creative gallery, sorted by verdict ──
+  const tile = (c) => {
+    const v = _mmCreativeVerdict(c);
     const hookBand = c.hook_rate == null ? null : (c.hook_rate >= 30 ? 'green' : (c.hook_rate >= 25 ? 'gold' : 'red'));
-    const cFreqBand = c.frequency == null ? null : (c.frequency < 3 ? 'green' : (c.frequency <= 3.5 ? 'gold' : 'red'));
+    const fBand = c.frequency == null ? null : (c.frequency < 3 ? 'green' : (c.frequency <= 3.5 ? 'gold' : 'red'));
     const stats = [
-      c.hook_rate != null ? ('<span class="' + _mmBandTxt(hookBand) + '">hook ' + _mmPctTxt(c.hook_rate) + '</span>') : null,
-      c.ctr != null ? ('ctr ' + _mmPctTxt(c.ctr)) : null,
       '<span class="' + _mmBandTxt(c.testing ? 'grey' : c.band) + '">$/lead ' + (c.cpl == null ? '-' : _mmMoney(c.cpl)) + '</span>',
-      c.frequency != null ? ('<span class="' + _mmBandTxt(cFreqBand) + '">freq ' + c.frequency + 'x</span>') : null,
+      c.hook_rate != null ? '<span class="' + _mmBandTxt(hookBand) + '">hook ' + _mmPctTxt(c.hook_rate) + '</span>' : null,
+      c.ctr != null ? ('ctr ' + _mmPctTxt(c.ctr)) : null,
+      c.frequency != null ? '<span class="' + _mmBandTxt(fBand) + '">freq ' + c.frequency + 'x</span>' : null,
       c.age_days != null ? ('age ' + c.age_days + 'd') : null,
     ].filter(Boolean).join(' &middot; ');
-    return '<div class="mm-tile">' +
-      (c.image_url ? '<img class="mm-tile-thumb" src="' + _escapeHtml(c.image_url) + '" alt="" loading="lazy">' : '<span class="mm-tile-thumb"></span>') +
-      '<div style="min-width:0"><div class="mm-tile-name">' + _escapeHtml(c.name) +
+    return '<div class="mm-g-tile">' +
+      (c.image_url ? '<img class="mm-g-thumb" src="' + _escapeHtml(c.image_url) + '" alt="" loading="lazy">' : '<span class="mm-g-thumb"></span>') +
+      '<div class="mm-g-name">' + _escapeHtml(c.name) +
       (c.best ? '<span class="mm-pill-tag mm-best">best</span>' : '') +
-      (c.testing ? '<span class="mm-pill-tag">testing</span>' : '') +
-      '</div><div class="mm-tile-stats">' + stats + '</div></div></div>';
-  }).join('') || '<div style="font-size:12px;color:var(--text-mute)">no live creatives yet</div>';
-  const crSect =
-    '<div class="mm-sect"><div class="mm-sect-head">Creatives &middot; ' + liveN + ' live ' + _mmDotHtml(crBand) +
-    (liveN && liveN < 6 ? ' <span style="letter-spacing:0;text-transform:none;color:var(--text-mute)">(want 6+)</span>' : '') + '</div>' +
-    tiles +
-    (d.warning ? '<div class="mm-warn-line">&#9888; ' + _escapeHtml(d.warning.text) + '</div>' : '') +
-    '</div>';
+      '<span class="mm-verdict-chip mm-vc-' + v.verdict + '" style="margin-left:auto">' + v.verdict + '</span></div>' +
+      '<div class="mm-tile-stats">' + stats + '</div>' +
+      (v.note ? '<div class="mm-cr-note ' + (v.verdict === 'replace' ? 'mm-note-replace' : 'mm-note-edit') + '">' + (v.verdict === 'replace' ? '&#8635; ' : '&#9998; ') + _escapeHtml(v.note) + '</div>' : '') +
+      '</div>';
+  };
+  const good = (d.creatives || []).filter((c) => { const v = _mmCreativeVerdict(c).verdict; return v === 'keep' || v === 'testing'; });
+  const bad = (d.creatives || []).filter((c) => { const v = _mmCreativeVerdict(c).verdict; return v === 'edit' || v === 'replace'; });
+  const zone2 =
+    '<div class="mm-sect"><div class="mm-sect-head">What&apos;s running?</div>' +
+    '<div class="mm-gallery">' +
+      '<div><div class="mm-g-collabel" style="color:#2D8A52">Working well</div>' + (good.map(tile).join('') || '<div class="mm-driver-sub">nothing here yet</div>') + '</div>' +
+      '<div><div class="mm-g-collabel" style="color:#B5352F">Needs a fix</div>' + (bad.map(tile).join('') || '<div class="mm-driver-sub">nothing needs fixing</div>') + '</div>' +
+    '</div></div>';
 
-  // RESULT
+  // ── 3 · WHAT DID IT MAKE ME? ──
   const cpbtWas = r.prev_cost_per_booked_trial != null ? ' <span style="color:var(--text-mute);font-weight:400">(was ' + _mmMoney(r.prev_cost_per_booked_trial) + ')</span>' : '';
-  const resultSect =
-    '<div class="mm-sect"><div class="mm-sect-head">Result</div>' +
+  const zone3 =
+    '<div class="mm-sect"><div class="mm-sect-head">What did it make me?</div>' +
     '<div class="mm-funnel-line"><b>' + (r.leads || 0) + '</b> leads &middot; <span class="' + _mmBandTxt(pills.lead_to_booked_band) + '">' +
     _mmPctTxt(r.booked_pct) + ' booked' + _mmDotHtml(pills.lead_to_booked_band) + '</span> &rarr; <b>' + (r.booked || 0) + '</b> booked trials' +
     (r.agent_booked ? ' <span style="color:var(--text-mute)">(' + r.agent_booked + ' with the booking agent)</span>' : '') + '</div>' +
     '<div class="mm-verdict ' + _mmBandTxt(r.cpbt_band) + '">Cost per booked trial ' + (r.cost_per_booked_trial == null ? '-' : _mmMoney(r.cost_per_booked_trial)) +
     _mmDotHtml(r.cpbt_band) + cpbtWas + '</div></div>';
 
-  body.innerHTML = headLine + campSect + crSect +
-    _mmPillHtml('click to visit', pills.click_to_visit_pct, pills.click_to_visit_band) +
-    resultSect;
-}
+  // ── 4 · THE NERD NUMBERS - everything, visible ──
+  const driftTxt = w.drift_vs_lifetime_pct == null ? '-' : ((w.drift_vs_lifetime_pct > 0 ? '+' : '') + Math.round(w.drift_vs_lifetime_pct) + '%');
+  const zone4 =
+    '<div class="mm-sect"><div class="mm-sect-head">The nerd numbers</div>' +
+    '<div class="mm-statgrid">' +
+      _mmStatHtml('Impressions', (camp.impressions || 0).toLocaleString(), null) +
+      _mmStatHtml('Reach', (camp.reach || 0).toLocaleString(), null) +
+      _mmStatHtml('Link clicks', (camp.link_clicks || 0).toLocaleString(), null) +
+      _mmStatHtml('Frequency (7d)', fastM.frequency == null ? '-' : fastM.frequency + 'x', fastM.frequency == null ? null : (fastM.frequency < 3 ? 'green' : (fastM.frequency <= 3.5 ? 'gold' : 'red'))) +
+      _mmStatHtml('CTR (7d)', _mmPctTxt(fastM.ctr), null) +
+      _mmStatHtml('CPL drift', driftTxt, w.drift_band) +
+      _mmStatHtml('Learning', camp.learning ? camp.learning.toUpperCase() : '-', null) +
+      _mmStatHtml('Window spend', '$' + Math.round(w.spend || 0), null) +
+      _mmStatHtml('Lifetime spend', '$' + Math.round(lt.spend || 0), null) +
+      _mmStatHtml('Lifetime leads', String(lt.leads || 0), null) +
+      _mmStatHtml('Month spend', '$' + Math.round(m.spend || 0), null) +
+      _mmStatHtml('Month planned', m.planned ? '~$' + Math.round(m.planned) : '-', null) +
+      _mmStatHtml('Click to visit', _mmPctTxt(pills.click_to_visit_pct), pills.click_to_visit_band) +
+    '</div></div>';
 
+  body.innerHTML = zone1 + zone2 + zone3 + zone4;
+}
 function _mmRenderLandingFocus(d) {
   const body = document.getElementById('lm-modal-body');
   if (!body || !d) return;
