@@ -3546,8 +3546,9 @@ async function handleMetaMachine(req, res) {
   }
   // Median seconds to advance from one step to the next, over sessions that hit
   // both. Median (not mean) resists idle/abandoned tabs skewing the number.
-  // Guarded: needs >= 3 sessions or the sample is too thin to show.
-  const MM_TIME_MIN_N = 3;
+  // Guarded: needs >= 2 sessions (need at least two points for a median; the
+  // chip's tooltip discloses the sample size so a thin sample reads as tentative).
+  const MM_TIME_MIN_N = 2;
   const _medianAdvanceS = (fromStep, toStep) => {
     const a = stepTs[fromStep], b = stepTs[toStep];
     if (!a || !b) return null;
