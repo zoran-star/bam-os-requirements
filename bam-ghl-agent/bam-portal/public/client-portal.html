@@ -40487,9 +40487,7 @@ function _mmRenderCard() {
   const collapse =
     '<div class="mm-vsect mm-fade" style="animation-delay:0.45s">' +
       '<div class="mm-col-label">' + MM_ICONS.creatives + 'Creative</div>' +
-      '<div class="mm-nest">' + crRows +
-        '<div class="mm-driver-sub" style="margin:2px 0 4px">' + (d.creatives_live || 0) + ' proven creative' + ((d.creatives_live || 0) === 1 ? '' : 's') + ' live &middot; want 6+</div>' +
-      '</div>' +
+      '<div class="mm-nest">' + crRows + '</div>' +
     '</div>';
   const heroFinal = hero, drivers = collapse, foot = '';
   const apItems = _mmActionItems(d);
