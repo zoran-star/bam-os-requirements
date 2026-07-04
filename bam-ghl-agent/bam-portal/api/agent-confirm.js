@@ -483,9 +483,13 @@ async function detectForClient(client) {
         if (!row.draft_message || !String(row.draft_message).trim()) continue;
         try {
           await sendReplyViaGhl(token, row.ghl_contact_id, row.draft_message, client.id);
-          await sb(`agent_confirm_replies?id=eq.${row.id}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ status: "sent", auto_sent: true, sent_at: new Date().toISOString(), updated_at: new Date().toISOString() }) });
+          await sb(`agent_confirm_replies?id=eq.${row.id}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ status: "sent", auto_sent: true, sent_at: new Date().toISOString(), send_error: null, updated_at: new Date().toISOString() }) });
           flushed++;
-        } catch (_) {}
+        } catch (e) {
+          // Keep the row approved so it retries, but make the failure visible -
+          // a swallowed error here starved first-touch confirm sends for days.
+          try { await sb(`agent_confirm_replies?id=eq.${row.id}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ send_error: String((e && e.message) || e).slice(0, 300), updated_at: new Date().toISOString() }) }); } catch (_) {}
+        }
       }
     } catch (_) {}
   }
