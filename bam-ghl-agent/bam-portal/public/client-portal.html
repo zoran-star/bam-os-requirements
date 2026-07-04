@@ -3727,6 +3727,35 @@
   }
   .mm-mod-range button:hover { border-color: var(--accent-border); color: var(--text); }
   .mm-sect { border-top: 1px solid var(--line); margin-top: 20px; padding-top: 16px; }
+  .mm-fsec { margin: 0; }
+  .mm-farrow { display: flex; justify-content: center; margin: 18px 0; }
+  .mm-farrow span { position: relative; width: 4px; height: 34px; background: var(--text-mute); opacity: 0.45; border-radius: 2px; }
+  .mm-farrow span::after { content: ''; position: absolute; bottom: -3px; left: 50%; transform: translateX(-50%); border: 8px solid transparent; border-top: 10px solid var(--text-mute); }
+  .mm-adset { border: 1px solid var(--line); border-radius: 14px; padding: 16px 18px; background: var(--surface-el); margin-bottom: 14px; }
+  .mm-adset-head { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; margin-bottom: 4px; }
+  .mm-adset-name { font-family: var(--mm-ff); font-size: 14px; font-weight: 700; color: var(--text); }
+  .mm-ftile { border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; margin-top: 12px; display: flex; gap: 14px; align-items: flex-start; }
+  .mm-ftile-thumb { width: 64px; height: 64px; border-radius: 10px; object-fit: cover; flex-shrink: 0; background: var(--line); }
+  .mm-cbtn { font-family: var(--mm-ff); font-size: 11px; font-weight: 700; border: 1px solid var(--line); border-radius: 8px; padding: 4px 12px; background: none; color: var(--text-sub); cursor: pointer; transition: all 0.15s ease; }
+  .mm-cbtn:hover { border-color: var(--gold); color: var(--text); }
+  .mm-cbtn.mm-danger:hover { border-color: #E05A42; color: #B5352F; }
+  .mm-addbtn { display: block; width: 100%; margin-top: 12px; border: 1.5px dashed rgba(200,168,78,0.55); border-radius: 10px; padding: 10px; background: none; font-family: var(--mm-ff); font-size: 12px; font-weight: 700; color: var(--gold-d, var(--gold)); cursor: pointer; transition: all 0.15s ease; }
+  .mm-addbtn:hover { background: rgba(200,168,78,0.08); border-style: solid; }
+  .mm-cv { display: flex; flex-direction: column; align-items: center; margin: -25px 0 -5px; position: relative; z-index: 2; }
+  .mm-cv-dot { width: 10px; height: 10px; border-radius: 50%; border: 2px solid var(--text-mute); opacity: 0.65; background: var(--bg); }
+  .mm-cv-line { width: 2px; height: 34px; background: var(--text-mute); opacity: 0.5; }
+  .mm-roi { border: 1.5px solid rgba(200,168,78,0.5); border-radius: 14px; padding: 16px 18px; background: rgba(200,168,78,0.05); }
+  .mm-roi-input { font-family: var(--mm-fm); font-size: 20px; font-weight: 600; color: var(--text); background: var(--surface-el); border: 1px solid var(--line); border-radius: 10px; padding: 7px 10px; width: 110px; }
+  .mm-roi-input:focus { outline: none; border-color: var(--gold); }
+  .mm-roi-gears { font-family: var(--mm-ff); font-size: 11px; font-weight: 500; color: var(--text-mute); margin: 10px 0; line-height: 1.7; }
+  .mm-roi-chain { font-family: var(--mm-ff); font-size: 13px; font-weight: 600; color: var(--text-sub); margin: 4px 0 10px; }
+  .mm-roi-chain b { font-size: 16px; color: var(--text); }
+  .mm-roi-out { font-family: var(--mm-ff); font-size: 22px; font-weight: 800; letter-spacing: -0.01em; }
+  .mm-roi-knob { font-family: var(--mm-fm); font-size: 12px; width: 64px; background: var(--surface-el); border: 1px solid var(--line); border-radius: 7px; padding: 3px 6px; color: var(--text); }
+  .mm-toast { position: fixed; top: 20px; left: 50%; transform: translateX(-50%); z-index: 1600; background: #1C1B18; color: #F8F7F5; font-family: var(--mm-ff); font-size: 12.5px; font-weight: 600; padding: 10px 18px; border-radius: 10px; animation: mmFadeIn 0.25s ease; }
+  /* vignette on a NON-transformed layer so it survives scrolling */
+  html.mm-focus-open body::after { content: ''; position: fixed; inset: 0; pointer-events: none; z-index: 1500; background: radial-gradient(ellipse at center, transparent 78%, rgba(10,9,6,0.22) 100%); animation: mmFadeIn 0.9s ease 1.4s both; }
+  .mm-focus-page::after { display: none; }
   .mm-gallery { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
   @media (max-width: 720px) { .mm-gallery { grid-template-columns: 1fr; } }
   .mm-g-collabel { font-family: var(--mm-ff); font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 10px; }
@@ -40636,7 +40665,7 @@ function _mmRenderLanding() {
     : '<div class="mm-ap-item" style="color:var(--text-mute)">everything is running clean</div>';
   const campNameL = (d.campaign?.count > 1) ? (d.campaign.count + ' campaigns') : (d.campaign?.name || 'Training');
   host.innerHTML =
-    '<div class="mm-flowlink" style="margin:-8px 0 2px;justify-content:center"><span class="mm-flowlink-line" style="height:48px;width:5px;background:var(--text-mute);opacity:0.5;border-radius:3px"></span></div>' +
+    '<div class="mm-cv"><span class="mm-cv-dot"></span><span class="mm-cv-line"></span><span class="mm-cv-dot"></span></div>' +
     '<div class="mm-card" onclick="openLandingMachine()"><div class="mm-grid">' +
       '<div><div class="mm-col-label">' + MM_ICONS.page + 'Landing page &middot; <span style="color:var(--text)">free trial</span>' + _mmSectionStatus(page.band) + '</div>' +
       funnelViz + '</div>' +
@@ -40755,6 +40784,89 @@ function _mmStatHtml(label, valueTxt, band) {
 function _mmPillHtml(label, pct, band) {
   return '<div class="mm-conv-pill"><span class="' + _mmBandTxt(band) + '">&darr; ' + label + ' ' + _mmPctTxt(pct) + '</span></div>';
 }
+// ── ROI MACHINE: type a spend, your measured rates crank, ROAS pops out ──
+function _mmRoiMachineHtml(d) {
+  const base = (d.month && d.month.planned) || null;
+  return '<div class="mm-roi">' +
+    '<div class="mm-col-label" style="margin-bottom:10px">' + MM_ICONS.overall + 'ROI machine</div>' +
+    '<div style="display:flex;align-items:center;gap:9px;flex-wrap:wrap">' +
+      '<span style="font-family:var(--mm-ff);font-size:13px;font-weight:600;color:var(--text-sub)">If I spend</span>' +
+      '<span style="font-family:var(--mm-fm);font-weight:600;color:var(--text-mute)">$</span>' +
+      '<input class="mm-roi-input" id="mm-roi-spend" type="number" inputmode="numeric" value="' + Math.round(base || 1000) + '" oninput="_mmRoiRecalc()">' +
+      '<span style="font-family:var(--mm-ff);font-size:13px;font-weight:600;color:var(--text-sub)">/month&hellip;</span>' +
+    '</div>' +
+    '<div class="mm-roi-gears" id="mm-roi-gears"></div>' +
+    '<div class="mm-roi-chain" id="mm-roi-chain"></div>' +
+    '<div class="mm-roi-out" id="mm-roi-out"></div>' +
+    '<div style="display:flex;align-items:center;gap:8px;margin-top:12px;font-family:var(--mm-ff);font-size:11px;font-weight:500;color:var(--text-mute)">' +
+      'member pays $<input class="mm-roi-knob" id="mm-roi-val" type="number" value="250" oninput="_mmRoiRecalc()">/mo' +
+      ' &middot; stays <input class="mm-roi-knob" id="mm-roi-mo" type="number" value="6" style="width:44px" oninput="_mmRoiRecalc()"> months' +
+    '</div>' +
+    '<div class="mm-driver-sub" id="mm-roi-warn" style="margin-top:8px"></div>' +
+  '</div>';
+}
+function _mmRoiRecalc() {
+  const d = _MM; if (!d) return;
+  const el = (id) => document.getElementById(id);
+  if (!el('mm-roi-spend')) return;
+  const camp = d.campaign || {}, lt = camp.lifetime || {}, w = camp.window || {}, r = d.result || {}, roi = d.roi || {};
+  const spend = Math.max(0, parseFloat(el('mm-roi-spend').value) || 0);
+  const memberVal = Math.max(0, parseFloat(el('mm-roi-val').value) || 0);
+  const months = Math.max(1, parseFloat(el('mm-roi-mo').value) || 6);
+  const cpls = [w.judged ? w.cpl : null, lt.cpl].filter((v) => v != null);
+  if (!spend || !cpls.length) {
+    el('mm-roi-gears').innerHTML = ''; el('mm-roi-chain').innerHTML = '';
+    el('mm-roi-out').innerHTML = '<span class="mm-t-grey" style="font-size:14px">gathering data - no cost per lead yet</span>';
+    el('mm-roi-warn').textContent = ''; return;
+  }
+  const cplBest = Math.min(...cpls), cplWorst = Math.max(...cpls);
+  const bookedRate = (r.booked_pct != null ? r.booked_pct / 100 : 0.4);
+  const bookedDefault = r.booked_pct == null;
+  const showRate = roi.show_rate != null ? roi.show_rate : 0.8;
+  const showDefault = roi.show_rate == null;
+  const joinRate = roi.attended_to_join != null ? roi.attended_to_join : (roi.booked_to_join != null ? roi.booked_to_join / (showRate || 1) : 0.5);
+  const joinDefault = roi.attended_to_join == null && roi.booked_to_join == null;
+  const run = (cpl) => {
+    const leads = spend / cpl;
+    const trials = leads * bookedRate;
+    const attended = trials * showRate;
+    const members = attended * joinRate;
+    return { leads, trials, members, revLTV: members * memberVal * months, revM1: members * memberVal };
+  };
+  const best = run(cplBest), worst = run(cplWorst);
+  const fx = (n) => (n >= 10 ? Math.round(n) : Math.round(n * 10) / 10);
+  const roasLo = spend > 0 ? worst.revLTV / spend : 0;
+  const roasHi = spend > 0 ? best.revLTV / spend : 0;
+  const m1Lo = spend > 0 ? worst.revM1 / spend : 0;
+  const band = roasLo >= 3 ? 'green' : (roasLo >= 1 ? 'gold' : 'red');
+  const tag = (isDefault) => (isDefault ? ' <span style="opacity:0.55">(default)</span>' : '');
+  el('mm-roi-gears').innerHTML =
+    'your gears: $' + cplBest.toFixed(2) + (cplWorst > cplBest ? '-' + cplWorst.toFixed(2) : '') + '/lead &middot; ' +
+    Math.round(bookedRate * 100) + '% book' + tag(bookedDefault) + ' &middot; ' +
+    Math.round(showRate * 100) + '% show up' + tag(showDefault) + ' &middot; ' +
+    Math.round(joinRate * 100) + '% join' + tag(joinDefault);
+  el('mm-roi-chain').innerHTML =
+    '<b>' + fx(worst.leads) + (best.leads - worst.leads >= 1 ? '-' + fx(best.leads) : '') + '</b> leads &rarr; ' +
+    '<b>' + fx(worst.trials) + '</b> trials &rarr; <b>' + fx(worst.members) + (best.members - worst.members >= 0.5 ? '-' + fx(best.members) : '') + '</b> new members';
+  el('mm-roi-out').innerHTML =
+    '<span class="' + _mmBandTxt(band) + '">ROAS ' + (roasLo === roasHi ? roasLo.toFixed(1) : roasLo.toFixed(1) + '-' + roasHi.toFixed(1)) + 'x' + _mmDotHtml(band) + '</span>' +
+    '<span style="font-size:12px;font-weight:600;color:var(--text-mute);margin-left:10px">first month ' + m1Lo.toFixed(1) + 'x</span>';
+  const baseSpend = (d.month && d.month.planned) || null;
+  el('mm-roi-warn').textContent = (baseSpend && spend > baseSpend * 2)
+    ? 'estimates get fuzzy up here - cost per lead usually rises past 2x your current budget (~$' + Math.round(baseSpend) + ')'
+    : '';
+}
+function _mmToast(msg) {
+  document.querySelectorAll('.mm-toast').forEach((t) => t.remove());
+  const t = document.createElement('div');
+  t.className = 'mm-toast';
+  t.textContent = msg;
+  document.body.appendChild(t);
+  setTimeout(() => t.remove(), 3200);
+}
+function _mmCreativeAction(action, name) {
+  _mmToast('"' + action + (name ? ' ' + name : '') + '" noted - creative requests plug into support tickets next');
+}
 function _mmRenderMetaFocus(d) {
   const body = document.getElementById('mm-modal-body');
   if (!body || !d) return;
@@ -40763,87 +40875,86 @@ function _mmRenderMetaFocus(d) {
     return;
   }
   const m = d.month || {}, camp = d.campaign || {}, r = d.result || {}, pills = d.pills || {};
-  const lt = camp.lifetime || {}, w = camp.window || {}, fastM = camp.fast || {};
-  const judged = w.judged && w.cpl != null;
+  const lt = camp.lifetime || {}, w = camp.window || {};
+  // per-campaign structure from the backend; synthesized fallback until the
+  // backend field is deployed
+  const camps = (d.campaigns && d.campaigns.length) ? d.campaigns : [{
+    id: 'agg', name: camp.name || 'Training', spend: w.spend, leads: w.leads, cpl: w.cpl,
+    band: (w.judged ? w.band : 'grey'), adsets: [{ id: 'agg', name: null, daily_budget: null, learning: camp.learning, targeting_brief: null, creatives: d.creatives || [] }],
+  }];
+  const arrow = '<div class="mm-farrow"><span></span></div>';
 
-  // ── 1 · AM I WINNING? - the verdict number + the weekly line ──
-  let chip = '';
-  if (judged && w.drift_vs_lifetime_pct != null) {
-    const pctAbs = Math.abs(Math.round(w.drift_vs_lifetime_pct));
-    const up = w.drift_vs_lifetime_pct > 0;
-    const big = pctAbs >= 20;
-    chip = '<span class="' + (big ? (up ? 'mm-t-red' : 'mm-t-green') : 'mm-t-grey') + '" style="font-size:15px;font-weight:700;margin-left:10px">' +
-      (up ? '&#9650; ' + pctAbs + '% pricier' : '&#9660; ' + pctAbs + '% cheaper') + ' than usual</span>';
-  } else if (!judged) {
-    chip = '<span class="mm-t-grey" style="font-size:13px;font-weight:600;margin-left:10px">gathering data - ' + (w.leads || 0) + ' leads this window</span>';
-  }
-  const zone1 =
-    '<div class="mm-sect" style="border-top:none;margin-top:8px"><div class="mm-sect-head">Am I winning?</div>' +
-    '<div style="display:flex;align-items:baseline"><span class="mm-hero-num-xl ' + (judged ? _mmBandTxt(w.band) : '') + '">' + _mmMoney(judged ? w.cpl : lt.cpl) + '</span>' +
-    '<span style="font-size:13px;font-weight:600;color:var(--text-mute);margin-left:6px">per lead</span>' + chip + '</div>' +
-    '<div style="max-width:520px">' + _mmTickerHtml(camp.sparkline, lt.cpl, judged ? (w.drift_band || 'grey') : 'grey', lt.since) + '</div></div>';
-
-  // ── 2 · WHAT'S RUNNING? - the creative gallery, sorted by verdict ──
   const tile = (c) => {
     const v = _mmCreativeVerdict(c);
     const hookBand = c.hook_rate == null ? null : (c.hook_rate >= 30 ? 'green' : (c.hook_rate >= 25 ? 'gold' : 'red'));
     const fBand = c.frequency == null ? null : (c.frequency < 3 ? 'green' : (c.frequency <= 3.5 ? 'gold' : 'red'));
     const stats = [
       '<span class="' + _mmBandTxt(c.testing ? 'grey' : c.band) + '">$/lead ' + (c.cpl == null ? '-' : _mmMoney(c.cpl)) + '</span>',
+      c.leads != null ? (c.leads + ' lead' + (c.leads === 1 ? '' : 's')) : null,
       c.hook_rate != null ? '<span class="' + _mmBandTxt(hookBand) + '">hook ' + _mmPctTxt(c.hook_rate) + '</span>' : null,
       c.ctr != null ? ('ctr ' + _mmPctTxt(c.ctr)) : null,
       c.frequency != null ? '<span class="' + _mmBandTxt(fBand) + '">freq ' + c.frequency + 'x</span>' : null,
       c.age_days != null ? ('age ' + c.age_days + 'd') : null,
+      c.spend != null ? ('$' + Math.round(c.spend) + ' spent') : null,
     ].filter(Boolean).join(' &middot; ');
-    return '<div class="mm-g-tile">' +
-      (c.image_url ? '<img class="mm-g-thumb" src="' + _escapeHtml(c.image_url) + '" alt="" loading="lazy">' : '<span class="mm-g-thumb"></span>') +
-      '<div class="mm-g-name">' + _escapeHtml(c.name) +
-      (c.best ? '<span class="mm-pill-tag mm-best">best</span>' : '') +
-      '<span class="mm-verdict-chip mm-vc-' + v.verdict + '" style="margin-left:auto">' + v.verdict + '</span></div>' +
-      '<div class="mm-tile-stats">' + stats + '</div>' +
-      (v.note ? '<div class="mm-cr-note ' + (v.verdict === 'replace' ? 'mm-note-replace' : 'mm-note-edit') + '">' + (v.verdict === 'replace' ? '&#8635; ' : '&#9998; ') + _escapeHtml(v.note) + '</div>' : '') +
-      '</div>';
+    return '<div class="mm-ftile">' +
+      (c.image_url ? '<img class="mm-ftile-thumb" src="' + _escapeHtml(c.image_url) + '" alt="" loading="lazy">' : '<span class="mm-ftile-thumb"></span>') +
+      '<div style="flex:1;min-width:0">' +
+        '<div class="mm-g-name" style="margin-top:0">' + _escapeHtml(c.name) +
+        (c.best ? '<span class="mm-pill-tag mm-best">best</span>' : '') +
+        '<span class="mm-verdict-chip mm-vc-' + v.verdict + '" style="margin-left:auto">' + v.verdict + '</span></div>' +
+        '<div class="mm-tile-stats">' + stats + '</div>' +
+        (v.note ? '<div class="mm-cr-note ' + (v.verdict === 'replace' ? 'mm-note-replace' : 'mm-note-edit') + '">' + (v.verdict === 'replace' ? '&#8635; ' : '&#9998; ') + _escapeHtml(v.note) + '</div>' : '') +
+        '<div style="display:flex;gap:8px;margin-top:10px">' +
+          '<button type="button" class="mm-cbtn" onclick="event.stopPropagation();_mmCreativeAction(\'replace\', \'' + _escapeHtml(c.name).replace(/'/g, '') + '\')">&#8635; replace</button>' +
+          '<button type="button" class="mm-cbtn mm-danger" onclick="event.stopPropagation();_mmCreativeAction(\'delete\', \'' + _escapeHtml(c.name).replace(/'/g, '') + '\')">&#10005; delete</button>' +
+        '</div>' +
+      '</div></div>';
   };
-  const good = (d.creatives || []).filter((c) => { const v = _mmCreativeVerdict(c).verdict; return v === 'keep' || v === 'testing'; });
-  const bad = (d.creatives || []).filter((c) => { const v = _mmCreativeVerdict(c).verdict; return v === 'edit' || v === 'replace'; });
-  const zone2 =
-    '<div class="mm-sect"><div class="mm-sect-head">What&apos;s running?</div>' +
-    '<div class="mm-gallery">' +
-      '<div><div class="mm-g-collabel" style="color:#2D8A52">Working well</div>' + (good.map(tile).join('') || '<div class="mm-driver-sub">nothing here yet</div>') + '</div>' +
-      '<div><div class="mm-g-collabel" style="color:#B5352F">Needs a fix</div>' + (bad.map(tile).join('') || '<div class="mm-driver-sub">nothing needs fixing</div>') + '</div>' +
-    '</div></div>';
 
-  // ── 3 · WHAT DID IT MAKE ME? ──
+  let out = '';
+  camps.forEach((cp, ci) => {
+    if (ci > 0) out += arrow;
+    // campaign header block
+    out += '<div class="mm-fsec"><div class="mm-col-label" style="margin-bottom:6px">' + MM_ICONS.overall + 'Campaign &middot; <span style="color:var(--text)">' + _escapeHtml(cp.name || 'Campaign') + '</span>' + _mmSectionStatus(cp.band) + '</div>' +
+      '<div class="mm-funnel-line" style="margin:0">' + (cp.cpl != null ? '<b>' + _mmMoney(cp.cpl) + '</b> per lead &middot; ' : '') + '<b>' + (cp.leads || 0) + '</b> leads &middot; $' + Math.round(cp.spend || 0) + ' spent this window</div></div>';
+    out += arrow;
+    const multi = (cp.adsets || []).length > 1;
+    if (multi) out += '<div class="mm-driver-sub" style="text-align:center;margin:-8px 0 10px">' + cp.adsets.length + ' ad sets inside this campaign</div>';
+    (cp.adsets || []).forEach((a2) => {
+      out += '<div class="mm-adset">' +
+        '<div class="mm-adset-head"><span class="mm-adset-name">' + _escapeHtml(a2.name || 'Ad set') + '</span>' +
+        (a2.daily_budget != null ? '<span class="mm-driver-sub" style="margin:0">$' + a2.daily_budget + '/day</span>' : '') +
+        (a2.learning ? '<span class="mm-driver-sub" style="margin:0">learning ' + _escapeHtml(String(a2.learning)) + '</span>' : '') + '</div>' +
+        (a2.targeting_brief ? '<div class="mm-driver-sub" style="margin:0 0 2px">' + a2.targeting_brief + '</div>' : '') +
+        ((a2.creatives || []).map(tile).join('') || '<div class="mm-driver-sub" style="margin-top:10px">no live creatives in this ad set</div>') +
+        '<button type="button" class="mm-addbtn" onclick="event.stopPropagation();_mmCreativeAction(\'add a new creative\', \'\')">+ add a new creative</button>' +
+        '</div>';
+    });
+  });
+
+  // results + spend range at the bottom
   const cpbtWas = r.prev_cost_per_booked_trial != null ? ' <span style="color:var(--text-mute);font-weight:400">(was ' + _mmMoney(r.prev_cost_per_booked_trial) + ')</span>' : '';
-  const zone3 =
-    '<div class="mm-sect"><div class="mm-sect-head">What did it make me?</div>' +
-    '<div class="mm-funnel-line"><b>' + (r.leads || 0) + '</b> leads &middot; <span class="' + _mmBandTxt(pills.lead_to_booked_band) + '">' +
+  const paceBand = m.pace_status === 'on pace' ? 'green' : (m.pace_status === 'under' ? 'gold' : (m.pace_status === 'over' ? 'red' : 'grey'));
+  const spendFill = m.planned ? Math.min(100, Math.round(((m.spend || 0) / m.planned) * 100)) : 0;
+  const elapsedTick = m.days_in_month ? Math.round((m.day / m.days_in_month) * 100) : null;
+  out += arrow +
+    '<div class="mm-fsec"><div class="mm-grid" style="align-items:start"><div><div class="mm-col-label" style="margin-bottom:6px">' + MM_ICONS.page + 'Results</div>' +
+    '<div class="mm-funnel-line" style="margin:0"><b>' + (r.leads || 0) + '</b> leads &middot; <span class="' + _mmBandTxt(pills.lead_to_booked_band) + '">' +
     _mmPctTxt(r.booked_pct) + ' booked' + _mmDotHtml(pills.lead_to_booked_band) + '</span> &rarr; <b>' + (r.booked || 0) + '</b> booked trials' +
     (r.agent_booked ? ' <span style="color:var(--text-mute)">(' + r.agent_booked + ' with the booking agent)</span>' : '') + '</div>' +
-    '<div class="mm-verdict ' + _mmBandTxt(r.cpbt_band) + '">Cost per booked trial ' + (r.cost_per_booked_trial == null ? '-' : _mmMoney(r.cost_per_booked_trial)) +
-    _mmDotHtml(r.cpbt_band) + cpbtWas + '</div></div>';
-
-  // ── 4 · THE NERD NUMBERS - everything, visible ──
-  const driftTxt = w.drift_vs_lifetime_pct == null ? '-' : ((w.drift_vs_lifetime_pct > 0 ? '+' : '') + Math.round(w.drift_vs_lifetime_pct) + '%');
-  const zone4 =
-    '<div class="mm-sect"><div class="mm-sect-head">The nerd numbers</div>' +
-    '<div class="mm-statgrid">' +
-      _mmStatHtml('Impressions', (camp.impressions || 0).toLocaleString(), null) +
-      _mmStatHtml('Reach', (camp.reach || 0).toLocaleString(), null) +
-      _mmStatHtml('Link clicks', (camp.link_clicks || 0).toLocaleString(), null) +
-      _mmStatHtml('Frequency (7d)', fastM.frequency == null ? '-' : fastM.frequency + 'x', fastM.frequency == null ? null : (fastM.frequency < 3 ? 'green' : (fastM.frequency <= 3.5 ? 'gold' : 'red'))) +
-      _mmStatHtml('CTR (7d)', _mmPctTxt(fastM.ctr), null) +
-      _mmStatHtml('CPL drift', driftTxt, w.drift_band) +
-      _mmStatHtml('Learning', camp.learning ? camp.learning.toUpperCase() : '-', null) +
-      _mmStatHtml('Window spend', '$' + Math.round(w.spend || 0), null) +
-      _mmStatHtml('Lifetime spend', '$' + Math.round(lt.spend || 0), null) +
-      _mmStatHtml('Lifetime leads', String(lt.leads || 0), null) +
-      _mmStatHtml('Month spend', '$' + Math.round(m.spend || 0), null) +
-      _mmStatHtml('Month planned', m.planned ? '~$' + Math.round(m.planned) : '-', null) +
-      _mmStatHtml('Click to visit', _mmPctTxt(pills.click_to_visit_pct), pills.click_to_visit_band) +
+    '<div class="mm-verdict ' + _mmBandTxt(r.cpbt_band) + '" style="margin-top:10px">Cost per booked trial ' + (r.cost_per_booked_trial == null ? '-' : _mmMoney(r.cost_per_booked_trial)) + _mmDotHtml(r.cpbt_band) + cpbtWas + '</div>' +
+    '<div style="margin-top:16px;max-width:420px">' +
+      '<div class="mm-hb-label" style="margin-bottom:6px">Ad spend &middot; $' + Math.round(m.spend || 0) + (m.planned ? ' of ~$' + Math.round(m.planned) : '') + ' this month' +
+      (m.pace_status ? ' &middot; <span class="' + _mmBandTxt(paceBand) + '" style="font-weight:700;text-transform:uppercase">' + m.pace_status + '</span>' : '') + '</div>' +
+      (m.planned ? _mmBarHtml(spendFill, paceBand, elapsedTick) : '') +
+      (m.planned && elapsedTick != null ? '<div class="mm-driver-sub" style="margin-top:5px">the notch is where the month says you should be (day ' + m.day + ' of ' + m.days_in_month + ')</div>' : '') +
+    '</div></div>' +
+    _mmRoiMachineHtml(d) +
     '</div></div>';
 
-  body.innerHTML = zone1 + zone2 + zone3 + zone4;
+  body.innerHTML = out;
+  _mmRoiRecalc();
 }
 function _mmRenderLandingFocus(d) {
   const body = document.getElementById('lm-modal-body');

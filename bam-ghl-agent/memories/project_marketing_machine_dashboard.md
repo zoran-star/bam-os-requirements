@@ -80,6 +80,28 @@ verdict/verdict_note (keep/edit/replace table).
 Open: beacon fires before React renders (sites repo fix #2) + precompile JSX
 on bam-client-sites (Babel-in-browser, 524KB) - see audit in chat 2026-07-04.
 
+## PICKUP (saved 2026-07-04 ~1am, session ended mid-review)
+STATE: everything lives UNMERGED on PR #1120 (branch feat/mm-design-session,
+worktree ~/bam-os-worktrees/marketing-machine). Zoran was reviewing on the
+LOCAL preview (port 5174, vite proxy -> prod API). NEXT SESSION:
+1. Reload local preview, final eyeball, then MERGE PR #1120 (auto-deploys).
+   After deploy the fallbacks go real: campaign names, ad-set structure,
+   matched-days clicks, 7d results, creative verdicts, ROI machine rates.
+2. Landing focus page never got the redesign treatment (still the old
+   sections) - restyle to match.
+3. Creative replace/delete/add buttons are stubs (toast) - design the
+   marketing support-ticket flow with Zoran (he wants to discuss).
+4. bam-client-sites: precompile JSX (Babel-in-browser, 524KB) + fire the
+   page_view beacon AFTER React mounts - separate repo, big load-rate win.
+5. Coleman may be building the HOME page in parallel (hm- prefix, prompt
+   given 2026-07-03) - coordinate merges on client-portal.html.
+Added since the last shipped commit on the PR: original meta focus RESTORED
+then rebuilt as vertical flow (campaign -> ad sets -> creatives w/ action
+buttons -> results), backend campaigns[]/adsets[]/targeting briefs, month
+pace status, 90d roi rates (show/join), ROI machine widget (spend input ->
+gears -> ROAS range), circles+line card connector, body-level vignette
+(survives scroll + theme rule conflict fix), light theme default.
+
 ## Live-fire gotchas (found testing vs real GTA data 2026-07-03)
 - Meta v22 REJECTS `video_3_sec_watched_actions` as an insights field. 3-sec
   views = the standard `actions` entry `action_type=video_view`. Fixed.
