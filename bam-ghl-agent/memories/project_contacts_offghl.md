@@ -83,7 +83,29 @@ portal id. So joins never change - only the id's origin does.
 ## Status - GTA FLIPPED LIVE 2026-07-01
 - GTA contact_provider='portal' (flipped after the cron gate deployed; store verified:
   1,725 contacts, tags/emails intact, superset of the mirror). All other 43 academies 'ghl'.
-- GTA now: messaging=twilio, email=resend, pipeline=portal, contacts=portal.
+- GTA now: messaging=twilio, email=resend, pipeline=portal, contacts=portal, booking=portal.
 - GHL touches left for GTA contacts: (1) the booking-flow GHL upsert (calendar residual,
   above), (2) pipeline stage-NAME reads (documented in project_pipeline_offghl). Plus the
   deferred KPIs + calendars.
+
+## Tags for GTA are effectively OFF GHL (verified 2026-07-04)
+Question came up: "are tags fully off GHL for GTA v2?" Answer: functionally yes.
+- **Writes**: portal-native already (`mergePortalContactTags` -> `contacts.tags[]`, Stage 2 above).
+- **Classification (lead vs member)**: GTA does NOT use GHL tags. Because GTA is on the
+  own-store inbox path (twilio+resend), `inbox.js` classifies via `classifyStoreConversations`
+  (inbox.js:239-295) = match against the portal `members` table (by contact id / phone /
+  email); member if matched, else lead. ZERO GHL calls. The GHL tag classification path
+  (inbox.js:621-673, reads `offers.data.lead_tags`/`client_tag` then hits GHL
+  `/contacts/search`) is only reached by academies NOT on the store path (the 43 GHL ones).
+  The store-path branch is chosen at inbox.js:448 (`if (smsOn || emailOn || metaOn)`).
+- **So the offer's `lead_tags`/`client_tag` fields are DEAD CONFIG for GTA** - nothing reads
+  them. Left in place (harmless); not deleted.
+- **UI change 2026-07-04** (client-portal.html): offer builder now HIDES the GHL tag dropdowns
+  (`ghl_tags_multi` "Lead tags" + `ghl_tag` "Member tag") for portal academies. New global
+  `CONTACT_PROVIDER` ('ghl'|'portal') set on login (~43226) + academy switch (~25101) from
+  the clients `.select` (contact_provider added at ~43153). Gate `_bbHideTagFields()` +
+  `_TAG_TYPES` used in `_bbRenderStepFields` (~24424). Mirrors the existing `_bbIsV1()` gate.
+- **The ONE cosmetic residual**: `_bbLoadTags()` -> `/api/ghl/comms-config` still fetches the
+  GHL location tag list, but for portal academies the dropdowns it fills are now hidden, so
+  it's a harmless no-op (not worth an extra gate). Only fully removing the GHL tag catalog +
+  offer fields would need a `tag_provider` flag build (not scoped - GTA already functional).
