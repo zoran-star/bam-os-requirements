@@ -57,6 +57,29 @@ CPL is THE marketing health metric. Display = lifetime anchor + trend:
 - PARKED idea: adaptive judged window - use 7d when spend gives ~8 leads/wk,
   stretch to 14d when it does not; self-tunes as ad budgets grow.
 
+## Design session v2 (2026-07-03/04 overnight, local-preview iteration)
+Final shipped shape - TWO cards on the Marketing page (V2):
+1. META ADS card: label-row title, CAMPAIGN section (campaign name from Meta,
+   14d CPL hero + delta vs lifetime), CREATIVE section (thumb rows + KEEP/
+   EDIT/REPLACE verdict chips + notes). Right half = gold action panel
+   (glow/sheen/sway/tease motion) -> "Focus mode".
+2. LANDING PAGE card (fed-by arrow between cards): mirrored double-line
+   funnel SVG (clicks/loaded/form/calendar/booked, linear heights, thin tail
+   collapses to an arrow into a trial icon, worst >50% drop tinted red with
+   fix badge), device icons left, calendar-check right. Own Focus mode.
+Focus mode = camera-pan page transition: main+sidebar and the focus page move
+as one surface (3s heavy ease, 50vw parallax, gold seam bar, edge vignette,
+GPU prewarm during a 280ms wind-up). Gotcha: a theme-crossfade rule overrides
+.main/.sidebar transitions - pan rules must be scoped under html.mm-prewarm.
+Skin = prototype tokens verbatim (Plus Jakarta Sans, DM Mono for values only,
+status text #2D8A52/#B08E30/#B5352F, washes). Light theme now portal default.
+Backend adds: campaign.name/count/sends_to, page.funnel/fed_by/
+clicks_comparable (clicks counted only on days beacons existed - the 164-vs-28
+"17% load rate" was a window artifact), result.leads_7d/booked_7d, creative
+verdict/verdict_note (keep/edit/replace table).
+Open: beacon fires before React renders (sites repo fix #2) + precompile JSX
+on bam-client-sites (Babel-in-browser, 524KB) - see audit in chat 2026-07-04.
+
 ## Live-fire gotchas (found testing vs real GTA data 2026-07-03)
 - Meta v22 REJECTS `video_3_sec_watched_actions` as an insights field. 3-sec
   views = the standard `actions` entry `action_type=video_view`. Fixed.

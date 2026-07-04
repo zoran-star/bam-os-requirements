@@ -3329,7 +3329,7 @@ async function handleMetaMachine(req, res) {
   const campFilter = JSON.stringify([{ field: "campaign.id", operator: "IN", value: allow }]);
   const activeFilter = JSON.stringify([{ field: "effective_status", operator: "IN", value: ["ACTIVE"] }]);
 
-  const [lifeJson, monthJson, adDailyJson, perCampaign, funnelRows, kpiRows] = await Promise.all([
+  const [lifeJson, monthJson, adDailyJson, perCampaign, funnelRows, firstBeaconRows, kpiRows] = await Promise.all([
     // 1. Lifetime weekly buckets: the anchor CPL + the sparkline, one call.
     graph(`${META_GRAPH}/${adAcct}/insights?` + new URLSearchParams({
       level: "campaign", fields: "campaign_id,spend,actions",
@@ -3361,12 +3361,13 @@ async function handleMetaMachine(req, res) {
           filtering: activeFilter, access_token: staffToken, limit: "50",
         })).catch(() => ({ data: [] })),
         graph(`${META_GRAPH}/${campId}?` + new URLSearchParams({
-          fields: "daily_budget,lifetime_budget", access_token: staffToken,
+          fields: "name,daily_budget,lifetime_budget", access_token: staffToken,
         })).catch(() => ({})),
       ]);
       return { ads: ads.data || [], adsets: adsets.data || [], camp };
     })),
     sb(`funnel_events?client_id=eq.${targetClientId}&funnel=eq.free-trial&created_at=gte.${encodeURIComponent(sinceIso)}&created_at=lt.${encodeURIComponent(endIso)}&select=step,session_id,utm&limit=20000`).catch(() => []),
+    sb(`funnel_events?client_id=eq.${targetClientId}&funnel=eq.free-trial&select=created_at&order=created_at.asc&limit=1`).catch(() => []),
     sb(`kpi_events?client_id=eq.${targetClientId}&step=in.(lead,trial_booked)&occurred_at=gte.${encodeURIComponent(prevSinceIso)}&occurred_at=lt.${encodeURIComponent(endIso)}&select=step,occurred_at,ghl_contact_id&limit=10000`).catch(() => []),
   ]);
 
@@ -3423,6 +3424,13 @@ async function handleMetaMachine(req, res) {
     if (!a) { a = zero(); a.name = row.ad_name || ""; adAgg.set(String(row.ad_id), a); }
     into(a);
   }
+  const beaconDay = firstBeaconRows?.[0]?.created_at ? String(firstBeaconRows[0].created_at).slice(0, 10) : null;
+  let clicksComparable = 0;
+  if (beaconDay) {
+    for (const row of (adDailyJson.data || [])) {
+      if (row.date_start >= splitDay && row.date_start >= beaconDay) clicksComparable += parseInt(row.inline_link_clicks || "0", 10) || 0;
+    }
+  }
   const winCpl = win.leads > 0 ? _r2(win.spend / win.leads) : null;
   // Minimum-sample guard: a window CPL earns a verdict once it has a real lead
   // sample OR enough spend that the missing leads ARE the verdict.
@@ -3476,11 +3484,27 @@ async function handleMetaMachine(req, res) {
     } else {
       band = "grey";
     }
+    // KEEP / EDIT / REPLACE call (Zoran-approved table 2026-07-03):
+    // replace = the audience decided (priced out or worn out);
+    // edit = salvageable (only the opening fails); keep = leave it alone.
+    let verdict = null, verdictNote = null;
+    if (!testing) {
+      if (spend >= MM_KILL_SPEND && (cpl == null || cpl >= MM_CPL_RED)) {
+        verdict = "replace"; verdictNote = "not producing affordable leads";
+      } else if (frequency != null && frequency > MM_FREQ_MAX) {
+        verdict = "replace"; verdictNote = "audience worn out - fresh angle";
+      } else if (hookRate != null && hookRate < MM_HOOK_MIN) {
+        verdict = "edit"; verdictNote = "improve the hook - first 3 seconds";
+      } else {
+        verdict = "keep"; verdictNote = null;
+      }
+    }
     const out = {
       ad_id: ad.id, name: ad.name || "(unnamed)",
       image_url: mmImageFromCreative(ad.creative), is_video: isVideo,
       age_days: ageDays, spend, leads: a.leads, cpl, ctr, frequency, hook_rate: hookRate,
       band, testing, demoted_by: demotedBy, best: false,
+      verdict, verdict_note: verdictNote,
     };
     if (!testing && cpl != null) bestable.push(out);
     return out;
@@ -3510,6 +3534,10 @@ async function handleMetaMachine(req, res) {
 
   const kpiList = Array.isArray(kpiRows) ? kpiRows : [];
   const inCur = (r) => r.occurred_at >= sinceIso;
+  // Fixed last-7-days counts for the card's OVERALL line (independent of the
+  // judged window, which is 14d by default).
+  const since7Iso = new Date(untilD.getTime() + DAY - 7 * 86400000).toISOString();
+  const in7 = (r) => r.occurred_at >= since7Iso;
   const leadsCur = kpiList.filter((r) => r.step === "lead" && inCur(r)).length;
   const leadsPrev = kpiList.filter((r) => r.step === "lead" && !inCur(r)).length;
   const bookedCurRows = kpiList.filter((r) => r.step === "trial_booked" && inCur(r));
@@ -3567,6 +3595,12 @@ async function handleMetaMachine(req, res) {
       days_in_month: daysInMonth, planned, spend: _r2(monthSpend),
     },
     campaign: {
+      name: perCampaign[0]?.camp?.name || null,
+      count: allow.length,
+      // The machine's flow edge: this campaign's clicks land on this funnel.
+      // Today every campaign feeds the free-trial funnel; when campaigns get
+      // per-funnel routing this becomes a real mapping.
+      sends_to: "free-trial",
       band: barBand,                 // the card bar verdict
       health_cpl: healthCpl,         // what the bar's fill length maps
       lifetime: { cpl: lifetimeCpl, band: lifetimeBand, spend: _r2(lifeSpend), leads: lifeLeads, since: firstLeadIdx >= 0 ? weeksSorted[firstLeadIdx][0] : null },
@@ -3580,6 +3614,9 @@ async function handleMetaMachine(req, res) {
     creatives_live: liveJudged.length,
     creatives_band: liveJudged.length ? (liveJudged.some((c) => c.band === "red") ? "red" : (liveJudged.some((c) => c.band === "gold") ? "gold" : (liveJudged.length >= MM_WANT_CREATIVES ? "green" : "gold"))) : "grey",
     page: {
+      funnel: "free-trial",
+      fed_by: allow,
+      clicks_comparable: clicksComparable,   // clicks on days beacons were live
       visitors, ad_visitors: adVisitors.size, form_started: formStarted, saw_calendar: sawCalendar, booked_sessions: bookedSessions,
       visitors_to_form_pct: pct(formStarted, visitors),
       clicks_to_leads_pct: clicksToLeadsPct,
@@ -3589,8 +3626,8 @@ async function handleMetaMachine(req, res) {
     pills: {
       // click->visit counts ONLY ad-tagged sessions (fbclid / meta source) so
       // organic visitors can't flatter the number.
-      click_to_visit_pct: pct(adVisitors.size, win.clicks),
-      click_to_visit_band: mmPctBand(pct(adVisitors.size, win.clicks), 70, 60),
+      click_to_visit_pct: pct(adVisitors.size, clicksComparable),
+      click_to_visit_band: mmPctBand(pct(adVisitors.size, clicksComparable), 70, 60),
       visit_to_lead_pct: pct(leadsCur, visitors),
       visit_to_lead_band: mmPctBand(pct(leadsCur, visitors), 10, 5),
       lead_to_booked_pct: pct(bookedCur, leadsCur),
@@ -3598,6 +3635,8 @@ async function handleMetaMachine(req, res) {
     },
     result: {
       leads: leadsCur, prev_leads: leadsPrev, booked: bookedCur, agent_booked: agentBooked,
+      leads_7d: kpiList.filter((r) => r.step === "lead" && in7(r)).length,
+      booked_7d: kpiList.filter((r) => r.step === "trial_booked" && in7(r)).length,
       booked_pct: pct(bookedCur, leadsCur),
       cost_per_booked_trial: cpbt, prev_cost_per_booked_trial: prevCpbt, cpbt_band: cpbtBand,
     },
