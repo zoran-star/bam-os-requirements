@@ -40095,11 +40095,7 @@ function _mmRenderCard() {
   const host = document.getElementById('marketing-machine-card');
   if (!host || !_MM) return;
   if (!_MM.meta_connected) { host.style.display = 'none'; return; }
-  const d = _MM, m = d.month || {}, camp = d.campaign || {}, page = d.page || {}, r = d.result || {};
-  const monthPct = m.days_in_month ? Math.round((m.day / m.days_in_month) * 100) : 0;
-  const spendTxt = m.spend != null
-    ? ('day ' + m.day + ' of ' + m.days_in_month + ' &middot; spent $' + Math.round(m.spend) + (m.planned ? ' of ~$' + Math.round(m.planned) : ''))
-    : ('day ' + m.day + ' of ' + m.days_in_month);
+  const d = _MM, camp = d.campaign || {}, page = d.page || {}, r = d.result || {};
   const crRows = (d.creatives || []).slice(0, 6).map(c =>
     '<div class="mm-cr-row"><span class="mm-cr-name">' + _escapeHtml(c.name) +
     (c.best ? '<span class="mm-pill-tag mm-best">best</span>' : '') +
@@ -40116,9 +40112,6 @@ function _mmRenderCard() {
   }
   host.innerHTML =
     '<div class="mm-card" onclick="openMarketingMachine()">' +
-      '<div class="mm-month"><span class="mm-month-name">' + _escapeHtml((m.name || '').toUpperCase()) + '</span>' +
-        '<div class="mm-bar"><div class="mm-bar-fill mm-f-month" style="width:' + monthPct + '%"></div></div>' +
-        '<span class="mm-month-meta">' + spendTxt + '</span></div>' +
       '<div class="mm-flow">' +
         '<div><div class="mm-col-label">Campaign</div>' +
         '<div style="font-size:15px;font-weight:800" class="' + _mmBandTxt(lt.band) + '">' + _mmMoney(lt.cpl) + '<span style="font-size:9px;font-weight:500;color:var(--text-mute);font-family:var(--mono);letter-spacing:0.08em"> /LEAD LIFETIME</span>' + cplTrend + '</div>' +
@@ -40128,7 +40121,7 @@ function _mmRenderCard() {
         '<div class="mm-arrow">&rsaquo;</div>' +
         '<div><div class="mm-col-label">Page</div>' + _mmBarHtml(_mmPctFill(page.clicks_to_leads_pct, 15), page.band) + '</div>' +
         '<div class="mm-arrow">&rsaquo;</div>' +
-        '<div><div class="mm-col-label">Result</div><div class="mm-result-box"><b>' + (r.leads ?? 0) + '</b> leads<br><b>' + (r.booked ?? 0) + '</b> trials</div></div>' +
+        '<div><div class="mm-col-label">Result &middot; last 14 days</div><div class="mm-result-box"><b>' + (r.leads ?? 0) + '</b> leads<br><b>' + (r.booked ?? 0) + '</b> trials</div></div>' +
       '</div>' +
       '<div class="mm-foot">' +
 
