@@ -67,10 +67,11 @@ const PRICE_TO_PLAN = {
 function nowIso() { return new Date().toISOString(); }
 
 // Subscriptions WE create + own (the parent funnels): the portal /funnel/
-// (fullcontrol-portal) and the academy-site enrollment (fullcontrol-website-
-// enrollment). Both are created `incomplete` and activated on first paid
-// invoice. Keep external subs (CoachIQ/GHL/manual) out of the onboarding path.
-const PORTAL_OWNED_ORIGINS = new Set(["fullcontrol-portal", "fullcontrol-website-enrollment"]);
+// (fullcontrol-portal), the academy-site enrollment (fullcontrol-website-
+// enrollment), and the parent app's in-app checkout (fullcontrol-parent-app,
+// api/parent/checkout.ts). All are created `incomplete` and activated on first
+// paid invoice. Keep external subs (CoachIQ/GHL/manual) out of the onboarding path.
+const PORTAL_OWNED_ORIGINS = new Set(["fullcontrol-portal", "fullcontrol-website-enrollment", "fullcontrol-parent-app"]);
 export function isPortalOwnedOrigin(origin) { return PORTAL_OWNED_ORIGINS.has(origin); }
 
 async function readRawBody(req) {
