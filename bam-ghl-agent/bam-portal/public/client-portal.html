@@ -40988,14 +40988,14 @@ function _mmRenderLandingFocus(d) {
   // page loads for a single LOADED stage. The rest are our own funnel beacons.
   const steps = [];
   if (clk > 0 && lpv > 0) {
-    steps.push({ lbl: 'Clicked', sub: 'tapped the ad', n: clk, fix: 'speed up the page', leak: 'the page is too slow to load' });
-    steps.push({ lbl: 'Loaded', sub: 'page opened', n: lpv, fix: 'rework the top of the page', leak: "the page isn't earning the click" });
+    steps.push({ lbl: 'Clicked', sub: 'tapped the ad', did: 'clicked the ad', n: clk, fix: 'speed up the page', leak: 'the page is too slow to load' });
+    steps.push({ lbl: 'Loaded', sub: 'page opened', did: 'loaded the page', n: lpv, fix: 'rework the top of the page', leak: "the page isn't earning the click" });
   } else {
-    steps.push({ lbl: 'Loaded', sub: 'page opened', n: (page.visitors || page.ad_visitors || 0), fix: 'rework the top of the page', leak: "the page isn't earning the click" });
+    steps.push({ lbl: 'Loaded', sub: 'page opened', did: 'loaded the page', n: (page.visitors || page.ad_visitors || 0), fix: 'rework the top of the page', leak: "the page isn't earning the click" });
   }
-  steps.push({ lbl: 'Form', sub: 'started the form', n: page.form_started || 0, fix: 'fix the form', leak: 'the form is leaking' });
-  steps.push({ lbl: 'Calendar', sub: 'saw the times', n: page.saw_calendar || 0, fix: 'edit the calendar', leak: 'they saw the times but walked away' });
-  steps.push({ lbl: 'Booked', sub: 'trial booked', n: page.booked_sessions || 0, fix: null, leak: null });
+  steps.push({ lbl: 'Form', sub: 'started the form', did: 'started the form', n: page.form_started || 0, fix: 'fix the form', leak: 'the form is leaking' });
+  steps.push({ lbl: 'Calendar', sub: 'saw the times', did: 'saw the times', n: page.saw_calendar || 0, fix: 'edit the calendar', leak: 'they saw the times but walked away' });
+  steps.push({ lbl: 'Booked', sub: 'trial booked', did: 'booked', n: page.booked_sessions || 0, fix: null, leak: null });
 
   const top = steps[0].n || 0;
   if (!top) {
@@ -41055,7 +41055,7 @@ function _mmRenderLandingFocus(d) {
     const lost = steps[worst].n - steps[worst + 1].n;
     takeaway =
       '<div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--line);font-family:var(--mm-ff);font-size:13px;color:var(--text-sub);line-height:1.6">' +
-        '<span style="color:var(--mm-red-t);font-weight:700">Biggest leak:</span> ' + lost + ' of ' + steps[worst].n + ' who ' + steps[worst].sub + ' never ' + steps[worst + 1].sub + '. ' + _escapeHtml(steps[worst].leak) + '.' +
+        '<span style="color:var(--mm-red-t);font-weight:700">Biggest leak:</span> ' + lost + ' of ' + steps[worst].n + ' who ' + steps[worst].did + ' never ' + steps[worst + 1].did + '. ' + _escapeHtml(steps[worst].leak) + '.' +
       '</div>';
   } else {
     takeaway =
