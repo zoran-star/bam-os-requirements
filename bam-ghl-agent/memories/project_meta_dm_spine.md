@@ -145,3 +145,9 @@ spine replaces that passthrough with direct Meta - the social sibling of
   marketing.js META_API_VERSION.
 - Meta retries non-200 webhook deliveries aggressively - the webhook never
   500s a batch; per-entry try/catch.
+- **Owner-notify SMS race (fixed 2026-07-04, PR #1125):** DMs stored fine but
+  the owner text often never sent. Cause: `notifyOwners()` was fire-and-forget,
+  then the webhook returned 200 immediately - Vercel freezes the fn on return
+  and killed the in-flight Twilio send. Fix: collect the notify promises and
+  `await Promise.allSettled` before responding. Lesson: never fire-and-forget
+  async side-effects before `res` in a serverless webhook; await them.
