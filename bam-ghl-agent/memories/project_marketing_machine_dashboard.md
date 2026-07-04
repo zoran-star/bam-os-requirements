@@ -386,3 +386,5 @@ the single worst leak is painted red with its fix chip, one plain-english
 "Biggest leak:" takeaway line at the bottom. Replaced the old cluttered
 inline text-funnel + 2 stat boxes + 2 overlapping ratio pills. Simple
 card funnel SVG (_mmFunnelSvg) takes the same clicked/loaded pair.
+
+SHIPPED to production 2026-07-04 via PR #1130 (merge commit 1c9bed9).
