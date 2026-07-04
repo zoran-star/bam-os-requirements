@@ -520,12 +520,30 @@ export async function createOpp(opts = {}) {
       } catch (_) { /* best-effort */ }
     }
     const now = new Date().toISOString();
+    // Denormalize the contact's phone/name onto the card when the caller didn't
+    // pass them (the website booking flow only sends `name`) - otherwise cards
+    // render without a number and click-to-call/texting can't work on them.
+    let cRow = null;
+    if (contactId && (contactPhone == null || contactName == null)) {
+      try {
+        const crows = await sbRest(`contacts?client_id=eq.${clientId}&ghl_contact_id=eq.${encodeURIComponent(contactId)}&select=id,name,phone&limit=1`);
+        cRow = (Array.isArray(crows) && crows[0]) || null;
+      } catch (_) { /* best-effort */ }
+    }
+    const e164 = (p) => {
+      const d = String(p || "").replace(/\D/g, "");
+      if (String(p || "").startsWith("+")) return p;
+      if (d.length === 10) return `+1${d}`;
+      if (d.length === 11 && d[0] === "1") return `+${d}`;
+      return p || null;
+    };
     const body = {
       client_id: clientId,
       ghl_contact_id: contactId || null,
-      contact_name: contactName != null ? contactName : (name || null),
+      contact_id: (cRow && cRow.id) || null,
+      contact_name: contactName != null ? contactName : (name || (cRow && cRow.name) || null),
       athlete_name: athleteName != null ? athleteName : null,
-      contact_phone: contactPhone != null ? contactPhone : null,
+      contact_phone: contactPhone != null ? contactPhone : (cRow && cRow.phone ? e164(cRow.phone) : null),
       stage_role: role || "responded",
       stage_id: stageId || null,
       offer_id: offerId,
