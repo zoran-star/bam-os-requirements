@@ -359,3 +359,30 @@ worst thing wins, one line only):
     the replacement now" (pre-emptive refresh)
   - < 6 live creatives (excl. testing) -> "add angles (want 6+)"
   Priority order: red creative > demotions > pre-emptive > creative count.
+
+---
+
+LANDING-PAGE FUNNEL: CLICKED -> LOADED added (Zoran 2026-07-04)
+
+The funnel now opens with two Meta-sourced steps before the beacon steps:
+  CLICKED (Meta inline_link_clicks) -> LOADED (Meta landing_page_view)
+  -> FORM -> CALENDAR -> BOOKED  (our own funnel_events beacons)
+
+Why Meta for the first two: landing_page_view is a SUBSET of clicks, so
+LPV <= clicks always -> the funnel can never widen (the old gate that hid
+the clicks stage when beacon ad_visitors > clicks is gone). The clicked->
+loaded gap is the page-speed / bounce read. If Meta has no LPV (no pixel),
+it falls back to the beacon page-load count for a single LOADED stage.
+
+API (api/marketing.js meta-machine): win.lpv sums
+countAction(actions,"landing_page_view"); page block now also emits
+link_clicks, landing_page_views, and lpv_comparable (LPV on beacon-live
+days, same day window as clicks_comparable so all 5 steps share a range).
+
+Focus-mode landing view (client-portal.html _mmRenderLandingFocus):
+rebuilt as a VERTICAL WATERFALL - one row per step (label + bar =
+volume + count), drop % and "N lost" live in the gap between rows, only
+the single worst leak is painted red with its fix chip, one plain-english
+"Biggest leak:" takeaway line at the bottom. Replaced the old cluttered
+inline text-funnel + 2 stat boxes + 2 overlapping ratio pills. Simple
+card funnel SVG (_mmFunnelSvg) takes the same clicked/loaded pair.

@@ -43951,12 +43951,20 @@ function _mmRenderCard() {
 // Tapering funnel ribbon (Zoran sketch 2026-07-03): ribbon height = people
 // remaining at each stage; the worst drop-off segment is choked in red with
 // an arrow pointing at the fix. Replaces all text in the landing card body.
-function _mmFunnelSvg(page, clicks) {
-  // Stage 1 is Meta CLICKS vs stage 2 ad-tagged page LOADS: that gap is the
-  // page-speed read (healthy pages load 70-85% of clicks).
+function _mmFunnelSvg(page, clicks, loaded) {
+  // Stage 1 CLICKED (Meta clicks) vs stage 2 LOADED (Meta landing_page_views):
+  // that gap is the page-speed / bounce read. Both are Meta metrics and LPV is a
+  // subset of clicks, so the funnel can never widen. If Meta has no LPV (no pixel
+  // configured) fall back to our own beacon page loads for a single LOADED stage.
   const stages = [];
-  if (clicks > 0 && clicks >= (page.ad_visitors || 0)) stages.push({ n: clicks, lbl: 'clicks', fix: '&#9998; speed up the page' });
-  stages.push({ n: (stages.length ? (page.ad_visitors || 0) : (page.visitors || 0)), lbl: 'loaded', fix: '&#9998; rework the top of the page' });
+  const clk = clicks > 0 ? clicks : 0;
+  const lpv = loaded > 0 ? loaded : 0;
+  if (clk && lpv) {
+    stages.push({ n: clk, lbl: 'clicked', fix: '&#9998; speed up the page' });
+    stages.push({ n: lpv, lbl: 'loaded', fix: '&#9998; rework the top of the page' });
+  } else {
+    stages.push({ n: (page.visitors || page.ad_visitors || 0), lbl: 'loaded', fix: '&#9998; rework the top of the page' });
+  }
   stages.push({ n: page.form_started || 0, lbl: 'form', fix: '&#9998; fix the form' });
   stages.push({ n: page.saw_calendar || 0, lbl: 'calendar', fix: '&#9998; edit the calendar' });
   stages.push({ n: page.booked_sessions || 0, lbl: 'booked', fix: null });
@@ -44053,7 +44061,9 @@ function _mmRenderLanding() {
   if (!host || !_MM) return;
   if (!_MM.meta_connected || !(typeof V2_ACCESS !== 'undefined' && V2_ACCESS)) { host.style.display = 'none'; return; }
   const d = _MM, page = d.page || {};
-  const funnelViz = _mmFunnelSvg(page, (page.clicks_comparable != null ? page.clicks_comparable : (d.campaign && d.campaign.link_clicks)));
+  const _clk = page.clicks_comparable != null ? page.clicks_comparable : (d.campaign && d.campaign.link_clicks);
+  const _lpv = page.lpv_comparable != null ? page.lpv_comparable : page.landing_page_views;
+  const funnelViz = _mmFunnelSvg(page, _clk, _lpv);
   const items = (page.band === 'red' || page.band === 'gold')
     ? '<div class="mm-ap-item mm-note-edit">&#9998; fix the landing page</div>'
     : '<div class="mm-ap-item" style="color:var(--text-mute)">everything is running clean</div>';
@@ -44350,6 +44360,10 @@ function _mmRenderMetaFocus(d) {
   body.innerHTML = out;
   _mmRoiRecalc();
 }
+// Focus-mode landing view: ONE vertical waterfall. Each micro-step is a row
+// whose bar width = people remaining; the drop % + who was lost lives in the
+// gap between rows (that's where the eye already looks). Only the single worst
+// leak is painted red, with its fix chip attached. No overlapping ratio pills.
 function _mmRenderLandingFocus(d) {
   const body = document.getElementById('lm-modal-body');
   if (!body || !d) return;
@@ -44357,23 +44371,93 @@ function _mmRenderLandingFocus(d) {
     body.innerHTML = '<div style="font-size:13px;color:var(--text-mute);padding:16px 0">BAM is still wiring up your funnel - numbers will appear here soon.</div>';
     return;
   }
-  const page = d.page || {}, pills = d.pills || {}, r = d.result || {};
-  const pageBand = _mmWorst([page.band, page.abandonment_band]);
-  const pageSect =
-    '<div class="mm-sect"><div class="mm-sect-head">Landing page ' + _mmDotHtml(pageBand) + '</div>' +
-    '<div class="mm-funnel-line"><b>' + (page.visitors || 0) + '</b> visitors &rarr; <b>' + (page.form_started || 0) + '</b> started form &rarr; <b>' +
-    (page.saw_calendar || 0) + '</b> saw calendar &rarr; <b>' + (page.booked_sessions || 0) + '</b> booked</div>' +
-    '<div class="mm-stats">' +
-      _mmStatHtml('Clicks to leads', _mmPctTxt(page.clicks_to_leads_pct), page.band) +
-      _mmStatHtml('Calendar abandonment', _mmPctTxt(page.abandonment_pct), page.abandonment_band) +
-    '</div>' +
-    '<div class="mm-context">saw the times but walked away = abandonment</div></div>';
+  const page = d.page || {};
+  const clk = page.clicks_comparable != null ? page.clicks_comparable : (d.campaign && d.campaign.link_clicks);
+  const lpv = page.lpv_comparable != null ? page.lpv_comparable : page.landing_page_views;
+  // Build the step spine. CLICKED + LOADED come from Meta (LPV is a subset of
+  // clicks so it never widens); when Meta has no LPV, fall back to our beacon
+  // page loads for a single LOADED stage. The rest are our own funnel beacons.
+  const steps = [];
+  if (clk > 0 && lpv > 0) {
+    steps.push({ lbl: 'Clicked', sub: 'tapped the ad', did: 'clicked the ad', n: clk, fix: 'speed up the page', leak: 'the page is too slow to load' });
+    steps.push({ lbl: 'Loaded', sub: 'page opened', did: 'loaded the page', n: lpv, fix: 'rework the top of the page', leak: "the page isn't earning the click" });
+  } else {
+    steps.push({ lbl: 'Loaded', sub: 'page opened', did: 'loaded the page', n: (page.visitors || page.ad_visitors || 0), fix: 'rework the top of the page', leak: "the page isn't earning the click" });
+  }
+  steps.push({ lbl: 'Form', sub: 'started the form', did: 'started the form', n: page.form_started || 0, fix: 'fix the form', leak: 'the form is leaking' });
+  steps.push({ lbl: 'Calendar', sub: 'saw the times', did: 'saw the times', n: page.saw_calendar || 0, fix: 'edit the calendar', leak: 'they saw the times but walked away' });
+  steps.push({ lbl: 'Booked', sub: 'trial booked', did: 'booked', n: page.booked_sessions || 0, fix: null, leak: null });
+
+  const top = steps[0].n || 0;
+  if (!top) {
+    body.innerHTML =
+      '<div class="mm-month" style="margin-bottom:0"><span class="mm-month-meta">last ' + (d.range?.days || 14) + ' days</span></div>' +
+      '<div style="font-size:13px;color:var(--text-mute);padding:16px 0">gathering data - no ad visits in this window yet</div>';
+    return;
+  }
+  // Worst drop = biggest single step-to-step loss. Only flag it red when the
+  // page band actually warrants concern (green = leave it be).
+  let worst = -1, worstRate = 0;
+  for (let i = 0; i < steps.length - 1; i++) {
+    if (!steps[i].n) continue;
+    const rate = (steps[i].n - steps[i + 1].n) / steps[i].n;
+    if (rate > worstRate) { worstRate = rate; worst = i; }
+  }
+  const flagLeak = (page.band === 'red' || page.band === 'gold') && worst >= 0;
+
+  const GRID = 'display:grid;grid-template-columns:104px 1fr 40px;align-items:center;gap:12px';
+  let rows = '';
+  for (let i = 0; i < steps.length; i++) {
+    const s = steps[i];
+    const w = Math.max((s.n / top) * 100, 3);
+    const isLeakRow = flagLeak && i === worst + 1;
+    const fill = isLeakRow ? 'var(--mm-red)' : 'var(--text-sub)';
+    rows +=
+      '<div style="' + GRID + '">' +
+        '<div style="text-align:right">' +
+          '<div style="font-family:var(--mm-ff);font-size:14px;font-weight:700;color:var(--text)">' + s.lbl + '</div>' +
+          '<div style="font-family:var(--mm-ff);font-size:11px;color:var(--text-mute)">' + s.sub + '</div>' +
+        '</div>' +
+        '<div style="height:26px;background:var(--surface-el);border-radius:6px;overflow:hidden">' +
+          '<div style="height:100%;width:' + w.toFixed(1) + '%;min-width:6px;background:' + fill + ';border-radius:6px"></div>' +
+        '</div>' +
+        '<div style="font-family:var(--mm-fm);font-size:15px;font-weight:500;color:var(--text);text-align:right">' + s.n + '</div>' +
+      '</div>';
+    if (i < steps.length - 1) {
+      const lost = steps[i].n - steps[i + 1].n;
+      const drop = steps[i].n > 0 ? Math.round((lost / steps[i].n) * 100) : 0;
+      const isLeak = flagLeak && i === worst;
+      const col = isLeak ? 'var(--mm-red-t)' : 'var(--text-mute)';
+      const wt = isLeak ? '700' : '500';
+      rows +=
+        '<div style="' + GRID + ';margin:3px 0">' +
+          '<div></div>' +
+          '<div style="display:flex;align-items:center;gap:8px;padding-left:2px;flex-wrap:wrap">' +
+            '<span style="font-family:var(--mm-ff);font-size:12px;color:' + col + ';font-weight:' + wt + '">&#8595; ' + drop + '% dropped &middot; ' + lost + ' lost</span>' +
+            (isLeak && s.fix ? '<span style="font-family:var(--mm-ff);font-size:11px;font-weight:700;background:rgba(224,90,66,0.12);color:#B5352F;padding:2px 9px;border-radius:6px">&#9998; ' + s.fix + '</span>' : '') +
+          '</div>' +
+          '<div></div>' +
+        '</div>';
+    }
+  }
+
+  let takeaway = '';
+  if (flagLeak && worst >= 0) {
+    const lost = steps[worst].n - steps[worst + 1].n;
+    takeaway =
+      '<div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--line);font-family:var(--mm-ff);font-size:13px;color:var(--text-sub);line-height:1.6">' +
+        '<span style="color:var(--mm-red-t);font-weight:700">Biggest leak:</span> ' + lost + ' of ' + steps[worst].n + ' who ' + steps[worst].did + ' never ' + steps[worst + 1].did + '. ' + _escapeHtml(steps[worst].leak) + '.' +
+      '</div>';
+  } else {
+    takeaway =
+      '<div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--line);font-family:var(--mm-ff);font-size:13px;color:var(--text-mute);line-height:1.6">' +
+        'The funnel is flowing clean - no single step is leaking.' +
+      '</div>';
+  }
 
   body.innerHTML =
-    '<div class="mm-month" style="margin-bottom:0"><span class="mm-month-meta">judged window: last ' + (d.range?.days || 14) + ' days</span></div>' +
-    pageSect +
-    _mmPillHtml('visit to lead', pills.visit_to_lead_pct, pills.visit_to_lead_band) +
-    _mmPillHtml('lead to booked', pills.lead_to_booked_pct, pills.lead_to_booked_band);
+    '<div class="mm-month" style="margin-bottom:14px"><span class="mm-month-meta">last ' + (d.range?.days || 14) + ' days</span></div>' +
+    rows + takeaway;
 }
 </script>
 
