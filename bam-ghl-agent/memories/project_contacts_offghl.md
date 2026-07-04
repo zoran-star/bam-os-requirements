@@ -105,23 +105,23 @@ Question came up: "are tags fully off GHL for GTA v2?" Answer: functionally yes.
   `CONTACT_PROVIDER` ('ghl'|'portal') set on login (~43226) + academy switch (~25101) from
   the clients `.select` (contact_provider added at ~43153). Gate `_bbHideTagFields()` +
   `_TAG_TYPES` used in `_bbRenderStepFields` (~24424). Mirrors the existing `_bbIsV1()` gate.
-- **The ONE cosmetic residual**: `_bbLoadTags()` -> `/api/ghl/comms-config` still fetches the
-  GHL location tag list, but for portal academies the dropdowns it fills are now hidden, so
-  it's a harmless no-op (not worth an extra gate). Only fully removing the GHL tag catalog +
-  offer fields would need a `tag_provider` flag build (scoped below - GTA already functional).
-
-## FUTURE BUILD: `tag_provider` flag (kill the last GHL tag call) - NOT urgent
-Scoped 2026-07-04. Only piece keeping GTA tied to GHL for tags = the tag LIST (catalog).
-Classification (members table) + tag writes (`contacts.tags[]`) are already off GHL. Mirror
-the `contact_provider` pattern:
-1. `clients.tag_provider` flag ('ghl'|'portal') + `ghl_tag_defs` table (client_id, name) =
-   portal-owned tag list per academy.
-2. One-time copy: pull GTA's current GHL location tags into `ghl_tag_defs`.
-3. New `/api/tag-defs?client_id=` endpoint serves the list from the portal table (no GHL).
-4. Offer builder: when tag_provider='portal', fill the tag dropdowns from `/api/tag-defs`
-   instead of `/api/ghl/comms-config`, and un-hide them (swap point = `_bbLoadTags()` + the
-   `_bbHideTagFields()` gate added 2026-07-04).
-5. Flip GTA `tag_provider='portal'`.
-Size: ~1 migration + 1 endpoint + small UI swap, behind a flag (zero risk to the 43 GHL
-academies). WORTH DOING WHEN: tags need to leave GHL entirely (other academies migrating, or
-GHL contract winddown). Tracked as a Notion Open Loop.
+## Tag catalog off GHL - DONE 2026-07-04 (simpler than the original scope)
+The last GHL tag-list call for GTA (`_bbLoadTags()` -> `/api/ghl/comms-config` ->
+GHL `/locations/{id}/tags`) is gone. The original scope proposed a new `tag_provider`
+flag + `ghl_tag_defs` table + GHL sync - all UNNECESSARY. The academy's live tag
+catalog = the DISTINCT tags already on its portal contacts, so we DERIVE it from
+`contacts.tags[]` (the same pattern `mass-send.js` already used). No new table, no
+migration, no cron, no new flag - gated on the existing `contact_provider='portal'`.
+- **Endpoint**: `GET /api/contacts?action=tag-list&client_id=` -> `{ tags: [names] }`,
+  distinct `unnest(tags)` over `contactsReadTable(clientId)` (works for portal + GHL).
+- **`_bbLoadTags()`** (client-portal.html): for `CONTACT_PROVIDER==='portal'`, fetch
+  `action=tag-list` instead of comms-config. Populates `_bbTagList` (feeds the contact
+  tag editor + the now-hidden offer fields) with ZERO GHL calls.
+- **Free-type new tags**: the contact tag editor (`_tagEditorHtml`/`_tagAddNew`) gained a
+  "+ new tag" text input for portal academies. Needed because a derived catalog only
+  contains APPLIED tags - typing is how a brand-new tag first enters. On add it's pushed
+  into `_bbTagList` locally so it shows immediately. GHL academies: dropdown-only, unchanged.
+- **No flip needed**: GTA is already `contact_provider='portal'`, so this is live for GTA
+  on deploy; the 43 GHL academies are untouched (still use comms-config/GHL).
+Net: GTA tags are now 100% off GHL - classification (members table), writes
+(`contacts.tags[]`), AND the catalog (derived from `contacts.tags[]`). Shipped in PR #1131.

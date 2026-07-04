@@ -204,6 +204,20 @@ async function handler(req, res) {
 
   if (req.method !== "GET") return res.status(405).json({ error: "GET/POST only" });
 
+  // ── GET ?action=tag-list: the academy's tag catalog, portal-native (no GHL) ──
+  // Distinct tag names across the academy's contact store. Reads whichever table
+  // contact_provider points at, so it works for portal ('contacts') and GHL
+  // ('ghl_contacts' mirror) academies alike. Powers the contact tag-add dropdown
+  // (+ the offer builder) for portal academies, replacing the GHL /locations/tags
+  // fetch. Self-maintaining: a tag exists here once it's applied to any contact.
+  if (action === "tag-list") {
+    const rows = await sb(`${await contactsReadTable(clientId)}?client_id=eq.${encodeURIComponent(clientId)}&select=tags&limit=5000`);
+    const set = new Set();
+    for (const r of (rows || [])) for (const t of (r.tags || [])) { const v = String(t).trim(); if (v) set.add(v); }
+    const tags = [...set].sort((a, b) => a.localeCompare(b));
+    return res.status(200).json({ tags });
+  }
+
   // ── GET ?action=custom-fields: live GHL custom-field defs + has-data + suggestion ──
   if (action === "custom-fields") {
     const rows = await sb(`clients?id=eq.${clientId}&select=id,business_name,ghl_location_id,ghl_access_token,ghl_refresh_token,ghl_token_expires_at,v15_config&limit=1`);

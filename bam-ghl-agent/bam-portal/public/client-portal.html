@@ -14414,7 +14414,11 @@ async function _contactsOpenDrawer(idx) {
 }
 // ── Reusable contact-tag editor (Contacts drawer + Inbox thread) ──
 // View current tags as chips (× to remove) + an "add tag" dropdown sourced from
-// the academy's GHL tags (_bbTagList). Writes via /api/contacts add-tag/remove-tag.
+// the academy's tag catalog (_bbTagList - GHL tags for GHL academies, or the
+// portal contact store's distinct tags for portal academies). Portal academies
+// also get a free-type input to introduce a brand-new tag (the catalog is
+// derived from applied tags, so typing is how a new one first appears). Writes
+// via /api/contacts add-tag/remove-tag.
 let _TAGW = {};  // hostId -> { contactId, tags:[] }
 function _tagEditorHtml(hostId) {
   const st = _TAGW[hostId] || { contactId: null, tags: [] };
@@ -14426,7 +14430,12 @@ function _tagEditorHtml(hostId) {
   const avail = all.filter(t => !tags.some(x => String(x).toLowerCase() === String(t).toLowerCase()));
   const opts = avail.map(t => `<option value="${escapeHTML(t)}">${escapeHTML(t)}</option>`).join('');
   const dropdown = `<select onchange="_tagAdd('${hostId}', this)" style="background:var(--surface);border:1px solid var(--border-med);border-radius:999px;color:var(--text-sub);font:inherit;font-size:11.5px;padding:3px 10px;cursor:pointer;margin-bottom:5px">${'<option value="">＋ add tag</option>'}${opts}</select>`;
-  return `<div style="display:flex;flex-wrap:wrap;align-items:center;gap:0">${chips}${dropdown}<span id="${hostId}-status" style="font-size:11px;color:var(--text-mute);margin:0 0 5px 6px"></span></div>`;
+  // Portal academies: free-type a new tag (Enter or the Add button applies it).
+  const canCreate = (typeof CONTACT_PROVIDER !== 'undefined' && CONTACT_PROVIDER === 'portal');
+  const newTag = canCreate
+    ? `<input id="${hostId}-new" type="text" placeholder="＋ new tag" onkeydown="if(event.key==='Enter'){event.preventDefault();_tagAddNew('${hostId}')}" style="background:var(--surface);border:1px solid var(--border-med);border-radius:999px;color:var(--text-sub);font:inherit;font-size:11.5px;padding:3px 10px;margin:0 0 5px 5px;width:88px" /><button onclick="_tagAddNew('${hostId}')" title="Add new tag" style="background:none;border:none;color:var(--accent);cursor:pointer;font:inherit;font-size:11.5px;padding:3px 4px;margin-bottom:5px">Add</button>`
+    : '';
+  return `<div style="display:flex;flex-wrap:wrap;align-items:center;gap:0">${chips}${dropdown}${newTag}<span id="${hostId}-status" style="font-size:11px;color:var(--text-mute);margin:0 0 5px 6px"></span></div>`;
 }
 async function _renderTagEditor(hostId, contactId, tags) {
   _TAGW[hostId] = { contactId, tags: Array.isArray(tags) ? tags.slice() : [] };
@@ -14461,12 +14470,17 @@ async function _tagChange(hostId, action, tag) {
     const j = await _safeJson(res);
     if (!res.ok) throw new Error(j.error || ('HTTP ' + res.status));
     if (Array.isArray(j.tags)) st.tags = j.tags;
+    // Keep the in-memory catalog current so a newly-typed tag shows in other
+    // editors this session without a refetch (portal academies derive the list
+    // from applied tags).
+    if (action === 'add-tag' && Array.isArray(_bbTagList) && !_bbTagList.some(x => String(x).toLowerCase() === String(tag).toLowerCase())) _bbTagList.push(tag);
     const host = document.getElementById(hostId); if (host) host.innerHTML = _tagEditorHtml(hostId);
   } catch (e) {
     const s = document.getElementById(hostId + '-status'); if (s) s.textContent = e.message;
   }
 }
 function _tagAdd(hostId, sel) { const t = sel.value; if (!t) return; sel.value = ''; _tagChange(hostId, 'add-tag', t); }
+function _tagAddNew(hostId) { const el = document.getElementById(hostId + '-new'); if (!el) return; const t = String(el.value || '').trim(); if (!t) return; el.value = ''; _tagChange(hostId, 'add-tag', t); }
 function _tagRemove(hostId, i) { const st = _TAGW[hostId]; const t = st && st.tags && st.tags[i]; if (t) _tagChange(hostId, 'remove-tag', t); }
 
 function _cdBody() {
@@ -24610,6 +24624,24 @@ let _bbTagRecommend = { lead: null, client: null };
 let _bbTagsLoadedFor = null;
 async function _bbLoadTags() {
   if (!CLIENT_ID || _bbTagsLoadedFor === CLIENT_ID) return _bbTagList;
+  // Portal academies own their tags in the portal contacts store - derive the
+  // catalog from there (no GHL). Feeds the contact tag editor + (hidden) offer
+  // fields. Endpoint returns distinct tags already applied to the academy's
+  // contacts; new tags enter via free-typing in the tag editor.
+  if (typeof CONTACT_PROVIDER !== 'undefined' && CONTACT_PROVIDER === 'portal') {
+    try {
+      const token = await _mreqAuthToken();
+      const r = await fetch('/api/contacts?action=tag-list&client_id=' + encodeURIComponent(CLIENT_ID), { headers: { 'Authorization': 'Bearer ' + token } });
+      const j = await _safeJson(r);
+      if (r.ok) {
+        _bbTagList = Array.isArray(j.tags) ? j.tags : [];
+        _bbTagRecommend = { lead: null, client: null };
+        _bbTagsLoadedFor = CLIENT_ID;
+        if (_bbState.offer) _bbRenderWizardBody();
+      }
+    } catch (_) {}
+    return _bbTagList;
+  }
   try {
     const token = await _mreqAuthToken();
     const r = await fetch('/api/ghl/comms-config?client_id=' + encodeURIComponent(CLIENT_ID), { headers: { 'Authorization': 'Bearer ' + token } });
