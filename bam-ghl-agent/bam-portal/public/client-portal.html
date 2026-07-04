@@ -40036,29 +40036,28 @@ function _mmShortDate(ymd) {
   const MO = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
   return MO[+m[2] - 1] + ' ' + (+m[3]);
 }
-// Weekly CPL as a line graph (up = pricier). Dots carry each week's band color.
-function _mmLineHtml(spark, sinceYmd, h) {
+// Weekly CPL as a clean line (up = pricier), stroke = campaign band color,
+// start date alone at the bottom-left.
+function _mmLineHtml(spark, sinceYmd, band, h) {
   const pts = (spark || []).filter(b => b.cpl != null);
   const H = h || 34, W = 100;
+  const stroke = band === 'green' ? 'var(--green)' : band === 'gold' ? 'var(--gold)' : band === 'red' ? 'var(--red)' : 'var(--text-mute)';
   let svg;
   if (pts.length < 2) {
     svg = '<div style="height:' + H + 'px;display:flex;align-items:center;font-size:10px;color:var(--text-mute);font-family:var(--mono)">not enough weeks yet</div>';
   } else {
     const max = Math.max(...pts.map(b => b.cpl)), min = Math.min(...pts.map(b => b.cpl));
     const span = (max - min) || 1;
-    const xy = pts.map((b, i) => [
-      Math.round((i / (pts.length - 1)) * (W - 8)) + 4,
-      Math.round(((b.cpl - min) / span) * (H - 12)) + 6,
-    ]);
-    const line = xy.map(p => p[0] + ',' + (H - p[1])).join(' ');
-    const dotColor = (band) => band === 'green' ? 'var(--green)' : band === 'gold' ? 'var(--gold)' : band === 'red' ? 'var(--red)' : 'var(--text-mute)';
-    const dots = xy.map((p, i) => '<circle cx="' + p[0] + '" cy="' + (H - p[1]) + '" r="2.6" fill="' + dotColor(pts[i].band) + '"><title>' +
-      _escapeHtml(pts[i].week + ': ' + _mmMoney(pts[i].cpl) + '/lead') + '</title></circle>').join('');
+    const line = pts.map((b, i) => {
+      const x = Math.round((i / (pts.length - 1)) * (W - 4)) + 2;
+      const y = H - (Math.round(((b.cpl - min) / span) * (H - 8)) + 4);
+      return x + ',' + y;
+    }).join(' ');
     svg = '<svg viewBox="0 0 ' + W + ' ' + H + '" preserveAspectRatio="none" style="width:100%;height:' + H + 'px;display:block">' +
-      '<polyline points="' + line + '" fill="none" stroke="var(--text-mute)" stroke-width="1.4" stroke-linejoin="round" stroke-linecap="round" opacity="0.7"/>' +
-      dots + '</svg>';
+      '<polyline points="' + line + '" fill="none" stroke="' + stroke + '" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"/>' +
+      '</svg>';
   }
-  const caption = sinceYmd ? '<div class="mm-line-since">cost per lead by week &middot; since ' + _escapeHtml(_mmShortDate(sinceYmd)) + '</div>' : '';
+  const caption = sinceYmd ? '<div class="mm-line-since">' + _escapeHtml(_mmShortDate(sinceYmd)) + '</div>' : '';
   return '<div class="mm-line">' + svg + caption + '</div>';
 }
 function _mmWorst(bands) {
@@ -40123,7 +40122,7 @@ function _mmRenderCard() {
       '<div class="mm-flow">' +
         '<div><div class="mm-col-label">Campaign</div>' +
         '<div style="font-size:15px;font-weight:800" class="' + _mmBandTxt(lt.band) + '">' + _mmMoney(lt.cpl) + '<span style="font-size:9px;font-weight:500;color:var(--text-mute);font-family:var(--mono);letter-spacing:0.08em"> /LEAD LIFETIME</span>' + cplTrend + '</div>' +
-        _mmLineHtml(camp.sparkline, lt.since) + '</div>' +
+        _mmLineHtml(camp.sparkline, lt.since, camp.band) + '</div>' +
         '<div class="mm-arrow">&rsaquo;</div>' +
         '<div><div class="mm-col-label">Creatives</div>' + crRows + '</div>' +
         '<div class="mm-arrow">&rsaquo;</div>' +
@@ -40201,7 +40200,7 @@ function _mmRenderModal(d) {
 
   // CAMPAIGN - lifetime CPL is the anchor, the window delta is the alarm
   const lt = camp.lifetime || {}, w = camp.window || {}, fastM = camp.fast || {};
-  const sparkHtml = '<div style="max-width:340px;margin-top:12px">' + _mmLineHtml(camp.sparkline, lt.since, 48) + '</div>';
+  const sparkHtml = '<div style="max-width:340px;margin-top:12px">' + _mmLineHtml(camp.sparkline, lt.since, camp.band, 48) + '</div>';
   let deltaLine;
   if (w.judged && w.drift_vs_lifetime_pct != null) {
     const up = w.drift_vs_lifetime_pct > 0;
