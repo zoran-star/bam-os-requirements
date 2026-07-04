@@ -3243,8 +3243,11 @@ function mmPctBand(pct, green, gold) {
 // 10). "lead" is Meta's deduped total - prefer it; fall back to the legacy
 // summed set only when the aggregate is absent.
 function mmCountLeads(actions) {
-  const direct = countAction(actions, "lead");
-  return direct > 0 ? direct : countLeads(actions);
+  // STRICT: only Meta's deduped "lead" aggregate. The legacy countLeads()
+  // fallback let offsite_conversion.fb_pixel_custom (a custom event, not a
+  // lead) count as leads in pre-funnel weeks, which polluted the lifetime
+  // anchor and its "since" date (seen live on GTA 2026-07-03).
+  return countAction(actions, "lead");
 }
 function mmImageFromCreative(c) {
   if (!c) return null;

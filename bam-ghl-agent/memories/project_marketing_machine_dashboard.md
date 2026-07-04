@@ -32,8 +32,11 @@ CPL is THE marketing health metric. Display = lifetime anchor + trend:
   that ever recorded a lead - pre-tracking spend is trimmed (GTA: 11 months
   of pre-funnel spend would have made the anchor $440 instead of $30.63).
 - Weekly CPL LINE GRAPH (last 8 weeks, one Meta call: date_preset=maximum +
-  time_increment=7): SVG polyline, dots banded per week, up = pricier, small
-  "since <first-lead week>" caption. Lives ON THE SIMPLE CARD (campaign
+  time_increment=7): clean SVG polyline (no dots), stroke = campaign band
+  color, up = pricier, start date alone bottom-left (Zoran 2026-07-03).
+  Anchor "since" = start of the WEEK of the first tracked lead (weekly
+  buckets). mmCountLeads is STRICT action_type=lead only - the legacy
+  fallback let fb_pixel_custom count as leads and polluted the anchor. Lives ON THE SIMPLE CARD (campaign
   column = lifetime $ + delta + line graph; Zoran 2026-07-03 evening) and
   bigger in the modal. Helper: _mmLineHtml() in client-portal.html.
 - WINDOW DELTA = last 14 days vs lifetime: <=0 green, +20% gold, >20% red
