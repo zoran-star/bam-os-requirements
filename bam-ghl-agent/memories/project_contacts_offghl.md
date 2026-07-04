@@ -83,7 +83,45 @@ portal id. So joins never change - only the id's origin does.
 ## Status - GTA FLIPPED LIVE 2026-07-01
 - GTA contact_provider='portal' (flipped after the cron gate deployed; store verified:
   1,725 contacts, tags/emails intact, superset of the mirror). All other 43 academies 'ghl'.
-- GTA now: messaging=twilio, email=resend, pipeline=portal, contacts=portal.
+- GTA now: messaging=twilio, email=resend, pipeline=portal, contacts=portal, booking=portal.
 - GHL touches left for GTA contacts: (1) the booking-flow GHL upsert (calendar residual,
   above), (2) pipeline stage-NAME reads (documented in project_pipeline_offghl). Plus the
   deferred KPIs + calendars.
+
+## Tags for GTA are effectively OFF GHL (verified 2026-07-04)
+Question came up: "are tags fully off GHL for GTA v2?" Answer: functionally yes.
+- **Writes**: portal-native already (`mergePortalContactTags` -> `contacts.tags[]`, Stage 2 above).
+- **Classification (lead vs member)**: GTA does NOT use GHL tags. Because GTA is on the
+  own-store inbox path (twilio+resend), `inbox.js` classifies via `classifyStoreConversations`
+  (inbox.js:239-295) = match against the portal `members` table (by contact id / phone /
+  email); member if matched, else lead. ZERO GHL calls. The GHL tag classification path
+  (inbox.js:621-673, reads `offers.data.lead_tags`/`client_tag` then hits GHL
+  `/contacts/search`) is only reached by academies NOT on the store path (the 43 GHL ones).
+  The store-path branch is chosen at inbox.js:448 (`if (smsOn || emailOn || metaOn)`).
+- **So the offer's `lead_tags`/`client_tag` fields are DEAD CONFIG for GTA** - nothing reads
+  them. Left in place (harmless); not deleted.
+- **UI change 2026-07-04** (client-portal.html): offer builder now HIDES the GHL tag dropdowns
+  (`ghl_tags_multi` "Lead tags" + `ghl_tag` "Member tag") for portal academies. New global
+  `CONTACT_PROVIDER` ('ghl'|'portal') set on login (~43226) + academy switch (~25101) from
+  the clients `.select` (contact_provider added at ~43153). Gate `_bbHideTagFields()` +
+  `_TAG_TYPES` used in `_bbRenderStepFields` (~24424). Mirrors the existing `_bbIsV1()` gate.
+## Tag catalog off GHL - DONE 2026-07-04 (simpler than the original scope)
+The last GHL tag-list call for GTA (`_bbLoadTags()` -> `/api/ghl/comms-config` ->
+GHL `/locations/{id}/tags`) is gone. The original scope proposed a new `tag_provider`
+flag + `ghl_tag_defs` table + GHL sync - all UNNECESSARY. The academy's live tag
+catalog = the DISTINCT tags already on its portal contacts, so we DERIVE it from
+`contacts.tags[]` (the same pattern `mass-send.js` already used). No new table, no
+migration, no cron, no new flag - gated on the existing `contact_provider='portal'`.
+- **Endpoint**: `GET /api/contacts?action=tag-list&client_id=` -> `{ tags: [names] }`,
+  distinct `unnest(tags)` over `contactsReadTable(clientId)` (works for portal + GHL).
+- **`_bbLoadTags()`** (client-portal.html): for `CONTACT_PROVIDER==='portal'`, fetch
+  `action=tag-list` instead of comms-config. Populates `_bbTagList` (feeds the contact
+  tag editor + the now-hidden offer fields) with ZERO GHL calls.
+- **Free-type new tags**: the contact tag editor (`_tagEditorHtml`/`_tagAddNew`) gained a
+  "+ new tag" text input for portal academies. Needed because a derived catalog only
+  contains APPLIED tags - typing is how a brand-new tag first enters. On add it's pushed
+  into `_bbTagList` locally so it shows immediately. GHL academies: dropdown-only, unchanged.
+- **No flip needed**: GTA is already `contact_provider='portal'`, so this is live for GTA
+  on deploy; the 43 GHL academies are untouched (still use comms-config/GHL).
+Net: GTA tags are now 100% off GHL - classification (members table), writes
+(`contacts.tags[]`), AND the catalog (derived from `contacts.tags[]`). Shipped in PR #1131.
