@@ -56,6 +56,21 @@ resolution, shipped_at.
 3. notifications (Slack now; client status visibility)
 4. LATER: GHL agent drafts the change from ticket context for staff approval
 
+## Annotator = INLINE dropdown (Zoran 2026-07-05, revised)
+Reworked from a modal to an INLINE collapsible on the landing focus view:
+- "Request a change to this page" is a gold DROPDOWN bar (`_v2Toggle` / `_V2_OPEN`
+  / chevron); expands a panel in place (`_v2InlineHtml`, `_v2Sync` restores
+  open state across a focus re-render).
+- Change/Add/Fix picker at top; 2-col body = LIVE iframe of the real page (left)
+  + notes stacked on the RIGHT; footer = optional description + "Send request"
+  bottom-right.
+- The iframe loads the REAL landing page from `page.url` (marketing.js meta-
+  machine now builds it: most-common page_view path from funnel_events.url +
+  the client's preferred allowed_domain, skipping *.vercel.app/www). GTA =
+  https://www.byanymeanstoronto.ca/free-trial (frameable, no X-Frame-Options).
+- Each note editable (pencil / click text -> note popover) + deletable (x);
+  parent-side click overlay drops numbered pins over the iframe.
+
 ## Status (2026-07-05)
 FRONTEND SHIPPED, backend stubbed (Zoran chose "skip the table for now" because
 core repo Full-Control/fc-core-srvc is inaccessible - "Repository not found" for

@@ -1515,9 +1515,26 @@ async function handleContentTickets(req, res) {
       if (body.assigned_to !== undefined) patch.assigned_to = body.assigned_to || null;
 
     } else if (action === "edit-context") {
+      // Staff correcting the client's brief in place (fix a typo, tighten notes,
+      // adjust format/offer) without bouncing the ticket back to the client.
+      const changed = [];
       if (body.context && typeof body.context === "object") {
         patch.context = { ...(ticket.context || {}), ...body.context };
+        changed.push("brief details");
       }
+      if (typeof body.notes === "string" && body.notes !== (ticket.notes || "")) {
+        patch.notes = body.notes;
+        changed.push("notes");
+      }
+      if (patch.context === undefined && patch.notes === undefined) {
+        return res.status(400).json({ error: "nothing to update" });
+      }
+      patch.messages = appendMessage(ticket.messages, {
+        author_type: "staff", author_id: ctx.staff.id, author_name: authorName,
+        body: `Edited the client brief${changed.length ? ` (${changed.join(", ")})` : ""}.`,
+        is_action_request: false,
+        internal: true,
+      });
 
     } else if (action === "cancel") {
       if (!["active", "client-dependent"].includes(ticket.status)) {
@@ -3303,7 +3320,7 @@ async function handleMetaMachine(req, res) {
 
   let clientFull = null;
   try {
-    const rows = await sb(`clients?id=eq.${targetClientId}&select=id,meta_ad_account_id,meta_campaign_ids,meta_cpl_goal,meta_monthly_budget`);
+    const rows = await sb(`clients?id=eq.${targetClientId}&select=id,meta_ad_account_id,meta_campaign_ids,meta_cpl_goal,meta_monthly_budget,allowed_domains`);
     clientFull = rows?.[0] || null;
   } catch {
     const rows = await sb(`clients?id=eq.${targetClientId}&select=id,meta_ad_account_id,meta_campaign_ids`);
@@ -3366,7 +3383,7 @@ async function handleMetaMachine(req, res) {
       ]);
       return { ads: ads.data || [], adsets: adsets.data || [], camp };
     })),
-    sb(`funnel_events?client_id=eq.${targetClientId}&funnel=eq.free-trial&created_at=gte.${encodeURIComponent(sinceIso)}&created_at=lt.${encodeURIComponent(endIso)}&select=step,session_id,utm,created_at&limit=20000`).catch(() => []),
+    sb(`funnel_events?client_id=eq.${targetClientId}&funnel=eq.free-trial&created_at=gte.${encodeURIComponent(sinceIso)}&created_at=lt.${encodeURIComponent(endIso)}&select=step,session_id,utm,created_at,url&limit=20000`).catch(() => []),
     sb(`funnel_events?client_id=eq.${targetClientId}&funnel=eq.free-trial&select=created_at&order=created_at.asc&limit=1`).catch(() => []),
     sb(`kpi_events?client_id=eq.${targetClientId}&step=in.(lead,trial_booked)&occurred_at=gte.${encodeURIComponent(prevSinceIso)}&occurred_at=lt.${encodeURIComponent(endIso)}&select=step,occurred_at,ghl_contact_id&limit=10000`).catch(() => []),
     sb(`kpi_events?client_id=eq.${targetClientId}&step=in.(trial_booked,trial_attended,trial_no_show,joined)&occurred_at=gte.${encodeURIComponent(new Date(todayD.getTime() - 89 * 86400000).toISOString())}&select=step&limit=10000`).catch(() => []),
@@ -3563,6 +3580,23 @@ async function handleMetaMachine(req, res) {
     const med = deltas.length % 2 ? deltas[mid] : (deltas[mid - 1] + deltas[mid]) / 2;
     return { median_s: Math.round(med), n: deltas.length };
   };
+  // Full landing-page URL for the in-portal annotator iframe: most-common
+  // page_view path joined to the client's preferred domain (skip *.vercel.app
+  // and www when a cleaner branded domain exists). Beacon logs a path; if it
+  // ever logs an absolute URL we pass it straight through.
+  const pageUrl = (() => {
+    const rows = (Array.isArray(funnelRows) ? funnelRows : []).filter((r) => r.step === "page_view" && r.url);
+    if (!rows.length) return null;
+    const counts = {};
+    for (const r of rows) counts[r.url] = (counts[r.url] || 0) + 1;
+    const path = Object.keys(counts).sort((a, b) => counts[b] - counts[a])[0];
+    if (/^https?:\/\//i.test(path)) return path;
+    const domains = Array.isArray(clientFull.allowed_domains) ? clientFull.allowed_domains : [];
+    if (!domains.length) return null;
+    const pick = domains.find((d) => !/vercel\.app$/i.test(d) && !/^www\./i.test(d))
+      || domains.find((d) => !/vercel\.app$/i.test(d)) || domains[0];
+    return "https://" + pick.replace(/\/+$/, "") + "/" + String(path).replace(/^\/+/, "");
+  })();
   const nSess = (step) => (sess[step] ? sess[step].size : 0);
   const visitors = nSess("page_view");
   const formStarted = nSess("form_started");
@@ -3712,6 +3746,7 @@ async function handleMetaMachine(req, res) {
     page: {
       funnel: "free-trial",
       fed_by: allow,
+      url: pageUrl,                          // full landing-page URL for the annotator iframe
       clicks_comparable: clicksComparable,   // Meta clicks on days beacons were live
       lpv_comparable: lpvComparable,         // Meta landing-page-views, same day window
       link_clicks: win.clicks, landing_page_views: win.lpv,   // full-window Meta totals
