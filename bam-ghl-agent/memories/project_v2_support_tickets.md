@@ -18,6 +18,22 @@ Button `Request a change` on every V2 module view. One click opens a slim
 modal that has ALREADY captured context; client only picks change/add/fix +
 1-2 sentences. No forms about which page/metrics - auto-attached.
 
+## Page annotation flow (Landing Page view - Zoran 2026-07-05)
+V2 landing pages are OUR OWN pages (bam-client-sites), NOT GHL - so a LIVE
+IFRAME works (no X-Frame-Options block; we control the headers). UX must be
+dead simple:
+- Portal opens the live V2 landing page in an iframe in "annotate mode".
+- Hovering a SECTION highlights it; clicking it pops out a note input anchored
+  to that section.
+- Each note = {section id/label + note text}; they accumulate and ride along
+  with the ticket context (page URL + metric snapshot + flagged leak).
+- Needs an annotation BRIDGE in bam-client-sites (separate repo): mark sections
+  with a stable id/label, and on ?annotate=1 (or postMessage handshake) add
+  hover-highlight + post the clicked section back to the parent via
+  postMessage. Portal side listens and renders the note popover. CROSS-REPO
+  dependency - portal side can ship first with the listener; pages light up
+  once the bridge lands.
+
 ## Ticket structure (v2_support_tickets)
 id, client_id, module (landing-page/meta-ads/...), request_type
 (change|add|fix), title, description, context (metric snapshot + flagged
@@ -39,6 +55,23 @@ resolution, shipped_at.
 2. staff V2 Systems page (per-module tabs, statuses)
 3. notifications (Slack now; client status visibility)
 4. LATER: GHL agent drafts the change from ticket context for staff approval
+
+## Status (2026-07-05)
+FRONTEND SHIPPED, backend stubbed (Zoran chose "skip the table for now" because
+core repo Full-Control/fc-core-srvc is inaccessible - "Repository not found" for
+the zoran-star account, so align-core-data-model could not run). In
+client-portal.html (V2 landing focus view):
+- "Request a change to this page" button + `#v2ReqModal` annotator: live iframe
+  (`_MM.page.url` / `window._V2_PAGE_URL`) with a parent-side click overlay that
+  drops numbered pins + note popover (`_v2PinAt` / `_v2NoteSave` / `_v2RenderNotes`).
+  Change/Add/Fix picker + optional description. `_v2Submit` MOCKS the POST
+  (console.log payload + optimistic row) - TODO real `POST /api/v2-support-tickets`.
+- `_v2ActionItemsHtml()` renders "Your requests" (V1-style status list) from the
+  `_V2_REQUESTS` MOCK array - swap for a fetch once the table lands.
+- postMessage listener (`type:'fc-annotate'`) is wired + dormant; lights up when
+  the bam-client-sites bridge posts section hover/click events.
+STILL TODO (needs core access): v2_support_tickets table + submit API + wire the
+mocks to it; the bam-client-sites annotation bridge; staff V2 Systems page.
 
 ## When building
 - New persistent table => run the `align-core-data-model` skill first (fc-core-srvc).
