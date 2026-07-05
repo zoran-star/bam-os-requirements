@@ -43675,35 +43675,8 @@ function toggleTheme() {
      pins + notes. Hover-highlight of SECTIONS arrives when the bam-client-sites
      annotation bridge lands (postMessage) - listener is wired below. Submit is
      mocked until the v2_support_tickets table is created (core access pending). -->
-<div id="v2ReqModal" class="modal-backdrop mm-focus-page" style="display:none" onclick="if(event.target===this)closeV2Request()">
-  <div class="modal-card mm-modal-card" onclick="event.stopPropagation()" style="max-width:1040px">
-    <button type="button" class="mm-back-btn" onclick="closeV2Request()">&lsaquo; Back</button>
-    <div class="mm-mod-head"><div>
-      <div class="modal-title" style="margin-bottom:2px">Request a change</div>
-      <div class="mm-month-meta" id="v2ReqSub">Click a spot on your page to leave a note</div>
-    </div></div>
-    <div class="v2req-grid">
-      <div class="v2req-stage" id="v2ReqStage">
-        <div class="v2req-stage-hint" id="v2ReqHint">your page loads here</div>
-        <iframe id="v2ReqFrame" title="Your landing page" referrerpolicy="no-referrer"></iframe>
-        <div class="v2req-overlay" id="v2ReqOverlay" onclick="_v2PinAt(event)"></div>
-      </div>
-      <div class="v2req-side">
-        <div class="v2req-label">What kind of change?</div>
-        <div class="v2req-types" id="v2ReqTypes">
-          <button type="button" class="v2req-type is-on" data-t="change" onclick="_v2PickType(this)">Change</button>
-          <button type="button" class="v2req-type" data-t="add" onclick="_v2PickType(this)">Add</button>
-          <button type="button" class="v2req-type" data-t="fix" onclick="_v2PickType(this)">Fix</button>
-        </div>
-        <div class="v2req-label" style="margin-top:14px">Your notes</div>
-        <div class="v2req-notes" id="v2ReqNotes"><div class="v2req-empty">No notes yet. Click a spot on your page to pin one.</div></div>
-        <div class="v2req-label" style="margin-top:14px">Anything else? (optional)</div>
-        <textarea id="v2ReqDesc" class="v2req-desc" rows="3" placeholder="A sentence or two of extra context"></textarea>
-        <button type="button" class="v2req-submit" id="v2ReqSubmit" onclick="_v2Submit()">Send request</button>
-      </div>
-    </div>
-  </div>
-</div>
+<!-- v2 "Request a change" renders INLINE inside the landing focus view now
+     (_v2InlineHtml); no separate modal. The note popover below is still used. -->
 
 <!-- note popover (anchored to a pin) -->
 <div id="v2NotePop" class="v2note-pop" style="display:none">
@@ -43715,37 +43688,45 @@ function toggleTheme() {
 </div>
 
 <style>
-  .v2req-grid { display:grid; grid-template-columns:1.55fr 1fr; gap:18px; margin-top:8px; }
-  .v2req-stage { position:relative; background:var(--surface-el); border:1px solid var(--line); border-radius:12px; overflow:hidden; min-height:440px; }
+  .v2req-wrap { margin-top:18px; }
+  .v2req-drop { width:100%; display:flex; align-items:center; justify-content:space-between; font-family:var(--mm-ff); font-size:14px; font-weight:700; border:none; border-radius:10px; padding:13px 16px; background:var(--gold); color:#0B0B0D; cursor:pointer; }
+  .v2req-drop.is-open { border-radius:10px 10px 0 0; }
+  .v2req-chev { transition:transform .18s ease; }
+  .v2req-drop.is-open .v2req-chev { transform:rotate(180deg); }
+  .v2req-panel { border:1px solid var(--line); border-top:none; border-radius:0 0 12px 12px; padding:16px; }
+  .v2req-body { display:grid; grid-template-columns:1.5fr 1fr; gap:16px; margin-top:14px; }
+  .v2req-stage { position:relative; background:var(--surface-el); border:1px solid var(--line); border-radius:12px; overflow:hidden; min-height:420px; }
   .v2req-stage-hint { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-family:var(--mm-ff); font-size:13px; color:var(--text-mute); }
-  #v2ReqFrame { position:relative; width:100%; height:100%; min-height:440px; border:0; display:block; }
+  #v2ReqFrame { position:relative; width:100%; height:100%; min-height:420px; border:0; display:block; background:#fff; }
   .v2req-overlay { position:absolute; inset:0; cursor:crosshair; }
   .v2req-pin { position:absolute; transform:translate(-50%,-50%); width:24px; height:24px; border-radius:50%; background:var(--gold); color:#0B0B0D; font-family:var(--mm-fm); font-size:12px; font-weight:600; display:flex; align-items:center; justify-content:center; box-shadow:0 1px 4px rgba(0,0,0,.3); cursor:pointer; z-index:2; }
-  .v2req-side { display:flex; flex-direction:column; }
+  .v2req-side { display:flex; flex-direction:column; min-width:0; }
   .v2req-label { font-family:var(--mm-ff); font-size:12px; font-weight:700; text-transform:uppercase; letter-spacing:0.04em; color:var(--text-mute); margin-bottom:8px; }
   .v2req-types { display:flex; gap:8px; }
   .v2req-type { flex:1; font-family:var(--mm-ff); font-size:13px; font-weight:700; border:1px solid var(--line); border-radius:9px; padding:8px; background:none; color:var(--text-sub); cursor:pointer; transition:all .15s ease; }
   .v2req-type.is-on { border-color:var(--gold); color:var(--text); background:rgba(200,168,78,0.1); }
-  .v2req-notes { display:flex; flex-direction:column; gap:8px; max-height:190px; overflow-y:auto; }
+  .v2req-notes { display:flex; flex-direction:column; gap:8px; flex:1; max-height:380px; overflow-y:auto; }
   .v2req-empty { font-family:var(--mm-ff); font-size:12px; color:var(--text-mute); padding:10px 0; }
-  .v2req-note { display:flex; gap:9px; align-items:flex-start; border:1px solid var(--line); border-radius:9px; padding:8px 10px; }
+  .v2req-note { display:flex; gap:8px; align-items:flex-start; border:1px solid var(--line); border-radius:9px; padding:8px 9px; }
   .v2req-note-num { flex:0 0 auto; width:20px; height:20px; border-radius:50%; background:var(--gold); color:#0B0B0D; font-family:var(--mm-fm); font-size:11px; font-weight:600; display:flex; align-items:center; justify-content:center; }
-  .v2req-note-txt { font-family:var(--mm-ff); font-size:12.5px; color:var(--text); line-height:1.4; flex:1; }
-  .v2req-note-del { background:none; border:none; color:var(--text-mute); cursor:pointer; font-size:14px; line-height:1; }
-  .v2req-desc { width:100%; box-sizing:border-box; font-family:var(--mm-ff); font-size:13px; color:var(--text); background:var(--surface-el); border:1px solid var(--line); border-radius:9px; padding:9px 11px; resize:vertical; }
-  .v2req-submit { margin-top:14px; width:100%; font-family:var(--mm-ff); font-size:14px; font-weight:700; border:none; border-radius:10px; padding:12px; background:var(--gold); color:#0B0B0D; cursor:pointer; }
-  .v2req-submit:disabled { opacity:.5; cursor:not-allowed; }
+  .v2req-note-txt { font-family:var(--mm-ff); font-size:12.5px; color:var(--text); line-height:1.4; flex:1; min-width:0; cursor:text; }
+  .v2req-note-btn { flex:0 0 auto; background:none; border:none; color:var(--text-mute); cursor:pointer; font-size:15px; line-height:1; padding:0 2px; display:flex; align-items:center; }
+  .v2req-note-btn:hover { color:var(--text); }
+  .v2req-foot { display:flex; align-items:flex-end; gap:12px; margin-top:14px; }
+  .v2req-desc { flex:1; box-sizing:border-box; font-family:var(--mm-ff); font-size:13px; color:var(--text); background:var(--surface-el); border:1px solid var(--line); border-radius:9px; padding:9px 11px; resize:vertical; }
+  .v2req-send { flex:0 0 auto; font-family:var(--mm-ff); font-size:14px; font-weight:700; border:none; border-radius:10px; padding:12px 22px; background:var(--gold); color:#0B0B0D; cursor:pointer; }
+  .v2req-send:disabled { opacity:.5; cursor:not-allowed; }
   .v2note-pop { position:fixed; z-index:1700; width:240px; background:var(--surface); border:1px solid var(--line); border-radius:12px; padding:12px; box-shadow:0 12px 34px rgba(0,0,0,.28); }
   .v2note-pop textarea { width:100%; box-sizing:border-box; font-family:var(--mm-ff); font-size:13px; color:var(--text); background:var(--surface-el); border:1px solid var(--line); border-radius:8px; padding:8px; resize:none; }
   .v2note-pop-row { display:flex; justify-content:flex-end; gap:8px; margin-top:8px; }
   .v2note-cancel { font-family:var(--mm-ff); font-size:12px; font-weight:600; border:1px solid var(--line); border-radius:7px; padding:5px 11px; background:none; color:var(--text-sub); cursor:pointer; }
   .v2note-save { font-family:var(--mm-ff); font-size:12px; font-weight:700; border:none; border-radius:7px; padding:5px 12px; background:var(--gold); color:#0B0B0D; cursor:pointer; }
-  .v2req-mine { border:1px solid var(--line); border-radius:11px; padding:12px 14px; margin-top:10px; }
+  .v2req-mine { border:1px solid var(--line); border-radius:11px; padding:12px 14px; margin-top:14px; }
   .v2req-mine-head { display:flex; align-items:center; gap:8px; font-family:var(--mm-ff); font-size:13px; font-weight:700; color:var(--text); }
   .v2req-mine-row { display:flex; align-items:center; gap:10px; padding:9px 0; border-top:1px solid var(--line); }
   .v2req-mine-row:first-of-type { border-top:none; }
   .v2req-status { font-family:var(--mm-ff); font-size:10.5px; font-weight:700; text-transform:uppercase; letter-spacing:0.03em; padding:2px 8px; border-radius:20px; }
-  @media (max-width:720px){ .v2req-grid{ grid-template-columns:1fr; } .v2req-stage{ min-height:320px; } #v2ReqFrame{ min-height:320px; } }
+  @media (max-width:720px){ .v2req-body{ grid-template-columns:1fr; } .v2req-stage{ min-height:300px; } #v2ReqFrame{ min-height:300px; } .v2req-foot{ flex-direction:column; align-items:stretch; } .v2req-send{ width:100%; } }
 </style>
 
 <script>
@@ -44573,9 +44554,9 @@ function _mmRenderLandingFocus(d) {
         '<span style="display:inline-block;width:2px;height:13px;background:var(--text);opacity:0.5;border-radius:1px"></span>industry benchmark</span>' +
     '</div>' +
     rows + takeaway +
-    '<button type="button" class="v2req-submit" style="margin-top:18px;display:flex;align-items:center;justify-content:center;gap:8px" onclick="openV2Request()">' +
-      '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3v10M3 8h10"/></svg>Request a change to this page</button>' +
+    _v2InlineHtml() +
     _v2ActionItemsHtml();
+  _v2Sync();   // restore the annotator's open/closed state across a re-render
 }
 
 /* ── V2 "Request a change" annotator + client action items ──
@@ -44585,6 +44566,7 @@ function _mmRenderLandingFocus(d) {
 let _V2_PINS = [];       // {x,y,note}
 let _V2_TYPE = 'change';
 let _V2_PENDING = null;  // pin index awaiting a note, or 'new'
+let _V2_OPEN = false;    // inline "Request a change" panel expanded?
 // Mock "my requests" - replace with a fetch once the table lands.
 const _V2_REQUESTS = [
   { title: 'Rework the hero headline', type: 'change', status: 'in_progress', when: '2d ago' },
@@ -44612,22 +44594,62 @@ function _v2ActionItemsHtml() {
     '<div class="v2req-mine-head"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8l1.5 1.5L11 6"/><rect x="2" y="2" width="12" height="12" rx="2"/></svg>Your requests</div>' +
     rows + '</div>';
 }
-function openV2Request() {
-  const m = document.getElementById('v2ReqModal');
-  if (!m) return;
-  _V2_PINS = []; _V2_TYPE = 'change'; _V2_PENDING = null;
-  document.querySelectorAll('#v2ReqTypes .v2req-type').forEach(b => b.classList.toggle('is-on', b.dataset.t === 'change'));
-  const desc = document.getElementById('v2ReqDesc'); if (desc) desc.value = '';
-  // Point the iframe at the client's own page if we know it; else leave the hint.
-  const url = (typeof _MM !== 'undefined' && _MM && _MM.page && _MM.page.url) || (window._V2_PAGE_URL || '');
-  const fr = document.getElementById('v2ReqFrame'), hint = document.getElementById('v2ReqHint');
-  if (url) { fr.src = url; fr.style.display = 'block'; if (hint) hint.style.display = 'none'; }
-  else { fr.removeAttribute('src'); fr.style.display = 'none'; if (hint) hint.style.display = 'flex'; }
-  _v2RenderNotes();
-  m.style.display = 'flex'; requestAnimationFrame(() => m.classList.add('mm-open'));
-  document.documentElement.classList.add('mm-focus-open');
+// Inline collapsible "Request a change" - lives in the landing focus view.
+function _v2InlineHtml() {
+  const plus = '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3v10M3 8h10"/></svg>';
+  const chev = '<svg class="v2req-chev" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6l4 4 4-4"/></svg>';
+  return '<div class="v2req-wrap">' +
+    '<button type="button" class="v2req-drop" id="v2ReqDrop" aria-expanded="false" onclick="_v2Toggle()">' +
+      '<span style="display:flex;align-items:center;gap:9px">' + plus + 'Request a change to this page</span>' + chev +
+    '</button>' +
+    '<div class="v2req-panel" id="v2ReqPanel" style="display:none">' +
+      '<div class="v2req-types" id="v2ReqTypes">' +
+        '<button type="button" class="v2req-type is-on" data-t="change" onclick="_v2PickType(this)">Change</button>' +
+        '<button type="button" class="v2req-type" data-t="add" onclick="_v2PickType(this)">Add</button>' +
+        '<button type="button" class="v2req-type" data-t="fix" onclick="_v2PickType(this)">Fix</button>' +
+      '</div>' +
+      '<div class="v2req-body">' +
+        '<div class="v2req-stage" id="v2ReqStage">' +
+          '<div class="v2req-stage-hint" id="v2ReqHint">loading your page&hellip;</div>' +
+          '<iframe id="v2ReqFrame" title="Your landing page" referrerpolicy="no-referrer"></iframe>' +
+          '<div class="v2req-overlay" id="v2ReqOverlay" onclick="_v2PinAt(event)"></div>' +
+        '</div>' +
+        '<div class="v2req-side">' +
+          '<div class="v2req-label">Your notes <span style="font-weight:500;text-transform:none;letter-spacing:0;color:var(--text-mute)">- click the page to pin one</span></div>' +
+          '<div class="v2req-notes" id="v2ReqNotes"></div>' +
+        '</div>' +
+      '</div>' +
+      '<div class="v2req-foot">' +
+        '<textarea id="v2ReqDesc" class="v2req-desc" rows="2" placeholder="Anything else? (optional)"></textarea>' +
+        '<button type="button" class="v2req-send" id="v2ReqSubmit" onclick="_v2Submit()">Send request &rarr;</button>' +
+      '</div>' +
+    '</div>' +
+  '</div>';
 }
-function closeV2Request() { _v2NoteCancel(); _mmCloseFocus('v2ReqModal'); }
+function _v2Sync() {
+  const panel = document.getElementById('v2ReqPanel'), drop = document.getElementById('v2ReqDrop');
+  if (!panel) return;
+  panel.style.display = _V2_OPEN ? 'block' : 'none';
+  if (drop) { drop.classList.toggle('is-open', _V2_OPEN); drop.setAttribute('aria-expanded', String(_V2_OPEN)); }
+  if (_V2_OPEN) _v2MountStage();
+}
+function _v2Toggle() {
+  _V2_OPEN = !_V2_OPEN;
+  if (_V2_OPEN) { _V2_PINS = []; _V2_TYPE = 'change'; _V2_PENDING = null; }
+  else _v2NoteCancel();
+  _v2Sync();
+  if (_V2_OPEN) { const p = document.getElementById('v2ReqPanel'); if (p) setTimeout(() => p.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 60); }
+}
+function _v2MountStage() {
+  const fr = document.getElementById('v2ReqFrame'), hint = document.getElementById('v2ReqHint');
+  const url = (typeof _MM !== 'undefined' && _MM && _MM.page && _MM.page.url) || window._V2_PAGE_URL || '';
+  if (fr) {
+    if (url) { if (fr.getAttribute('src') !== url) fr.setAttribute('src', url); fr.style.display = 'block'; if (hint) hint.style.display = 'none'; }
+    else { fr.removeAttribute('src'); fr.style.display = 'none'; if (hint) { hint.style.display = 'flex'; hint.textContent = 'your page preview will appear here'; } }
+  }
+  document.querySelectorAll('#v2ReqTypes .v2req-type').forEach(b => b.classList.toggle('is-on', b.dataset.t === _V2_TYPE));
+  _v2RenderNotes();
+}
 function _v2PickType(btn) {
   _V2_TYPE = btn.dataset.t;
   document.querySelectorAll('#v2ReqTypes .v2req-type').forEach(b => b.classList.toggle('is-on', b === btn));
@@ -44681,19 +44703,19 @@ function _v2RenderNotes() {
       ov.appendChild(el);
     });
   }
-  // list on the side
+  // list on the side - each note editable (pencil / click text) + deletable (x)
   const list = document.getElementById('v2ReqNotes');
   if (!list) return;
+  const pencil = '<svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M11.5 2.5l2 2L6 12l-2.5.5L4 10z"/></svg>';
   list.innerHTML = _V2_PINS.length
     ? _V2_PINS.map((p, i) =>
         '<div class="v2req-note">' +
           '<span class="v2req-note-num">' + (i + 1) + '</span>' +
-          '<span class="v2req-note-txt">' + _escapeHtml(p.note) + (p.section ? ' <span style="color:var(--text-mute)">&middot; ' + _escapeHtml(p.section) + '</span>' : '') + '</span>' +
-          '<button type="button" class="v2req-note-del" title="Remove" onclick="_v2DelNote(' + i + ',event)">&times;</button>' +
+          '<span class="v2req-note-txt" title="Click to edit" onclick="_v2EditNote(' + i + ',event)">' + _escapeHtml(p.note) + (p.section ? ' <span style="color:var(--text-mute)">&middot; ' + _escapeHtml(p.section) + '</span>' : '') + '</span>' +
+          '<button type="button" class="v2req-note-btn" title="Edit" onclick="_v2EditNote(' + i + ',event)">' + pencil + '</button>' +
+          '<button type="button" class="v2req-note-btn" title="Delete" onclick="_v2DelNote(' + i + ',event)">&times;</button>' +
         '</div>').join('')
     : '<div class="v2req-empty">No notes yet. Click a spot on your page to pin one.</div>';
-  const sub = document.getElementById('v2ReqSub');
-  if (sub) sub.textContent = _V2_PINS.length ? (_V2_PINS.length + ' note' + (_V2_PINS.length === 1 ? '' : 's') + ' pinned') : 'Click a spot on your page to leave a note';
 }
 function _v2Submit() {
   const desc = (document.getElementById('v2ReqDesc')?.value || '').trim();
@@ -44712,15 +44734,15 @@ function _v2Submit() {
   };
   console.log('[v2-request] MOCK submit (no table yet):', payload);   // TODO: POST /api/v2-support-tickets
   _V2_REQUESTS.unshift({ title: desc || (_V2_PINS[0] && _V2_PINS[0].note) || 'Landing page change', type: _V2_TYPE, status: 'new', when: 'just now' });
+  _V2_PINS = []; _V2_OPEN = false; _v2NoteCancel();
   _mmToast('Request sent - staff will take a look');
-  closeV2Request();
   if (typeof _mmRenderLandingFocus === 'function' && typeof _MM !== 'undefined') _mmRenderLandingFocus(_MM);
 }
 // Bridge listener: the client's V2 page (bam-client-sites) posts section hover/
 // click events when it loads in annotate mode. Until that ships this is dormant.
 window.addEventListener('message', (e) => {
   const d = e.data;
-  if (!d || d.type !== 'fc-annotate' || document.getElementById('v2ReqModal').style.display === 'none') return;
+  if (!d || d.type !== 'fc-annotate' || !_V2_OPEN) return;
   if (d.action === 'section-click' && d.rect) {
     _V2_PENDING = { x: d.rect.xPct, y: d.rect.yPct, section: d.label || null };
     _v2OpenNotePop((window.innerWidth / 2), (window.innerHeight / 2), '');
