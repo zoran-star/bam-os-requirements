@@ -44644,7 +44644,9 @@ function _v2Toggle() {
 }
 function _v2MountStage() {
   const fr = document.getElementById('v2ReqFrame'), hint = document.getElementById('v2ReqHint');
-  let url = (typeof _MM !== 'undefined' && _MM && _MM.page && _MM.page.url) || window._V2_PAGE_URL || '';
+  // window._V2_PAGE_URL is a local-dev override (unset in prod) so we can point
+  // the annotator iframe at a local bam-client-sites server; else the real URL.
+  let url = window._V2_PAGE_URL || (typeof _MM !== 'undefined' && _MM && _MM.page && _MM.page.url) || '';
   // annotate=1 tells the page (bam-client-sites) to turn on section hover-outline
   // + post section clicks back to us.
   if (url) url += (url.indexOf('?') === -1 ? '?' : '&') + 'annotate=1';
