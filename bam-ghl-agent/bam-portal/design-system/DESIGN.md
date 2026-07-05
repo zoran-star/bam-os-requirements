@@ -1,6 +1,6 @@
 # FullControl V2 Design System
 
-**Version 1.0 - 2026-07-05 | Living document: update it every time the UI evolves.**
+**Version 1.1 - 2026-07-05 | Living document: update it every time the UI evolves.**
 
 > ⛔ **RULE FOR EVERY AGENT + HUMAN: read this file BEFORE any front-end work in the V2 portal.**
 > Use the tokens in [`tokens.css`](tokens.css). Never hardcode a color, radius, font, or shadow that a token covers. If the design needs something the system doesn't have, ADD IT HERE FIRST (see "How to change this system" at the bottom), then use it.
@@ -83,7 +83,7 @@ transition:transform var(--t-med) var(--es), box-shadow var(--t-med);
 **Detail views:** ONE idiom - the **right-side drawer** (`#cal-drawer` pattern: overlay `rgba(0,0,0,.55)` + blur, 460px max, full-width on mobile). No bottom sheets.
 **Modals (confirm/pick):** centered, `--r-xl`, `--shadow-pop`, overlay `rgba(0,0,0,.5)`.
 **Empty states:** centered, dashed `--border-med` box (or icon at `opacity:.3`) + 1-line muted message + one CTA button.
-**Icons:** feather-style stroke SVGs (`stroke-width:2, round caps`). **No emoji in UI chrome** (nav, buttons, card headers, badges). Emoji OK inside user-generated content only.
+**Icons:** feather-style stroke SVGs (`stroke-width:2, round caps`). **No emojis, period.** Not in nav, buttons, headers, badges, labels, empty states, tooltips, or any copy we write. The only place an emoji may appear is inside text a client/lead typed themselves (their messages render as-is - we never add our own).
 
 ## 6 · Motion
 
@@ -106,13 +106,13 @@ transition:transform var(--t-med) var(--es), box-shadow var(--t-med);
 | `var(--on-gold)` on gold fills | `#0B0B0D`, `#000`, ad-hoc blacks |
 | Right-side drawer for detail views | Bottom sheets, second modal idioms |
 | Tokens for semantic colors | Near-miss hexes (`#e07070`, `#7BC47F`, `#4CAF50`) |
-| SVG stroke icons | Emoji in chrome |
+| SVG stroke icons | Emojis anywhere (UI, copy, labels - zero) |
 | New CSS classes for repeated patterns | Long inline `style="…"` chains for reusable UI |
 
 ## 9 · Known debt (safe to fix when touched)
 
 - `client-portal.html` still has many legacy radii/hardcodes OUTSIDE Home/Assets/Calendar - normalize per-view as each view gets its consistency pass ("disperse to the rest of V2").
-- Home KPI catalog + Hawkeye feed still use emoji icons (`_HM_KPI_CATALOG`, feed rows) - swap to `_HV2_ICONS`-style SVGs in a future pass.
+- Home KPI catalog + Hawkeye feed + inbox system group still use emoji icons (`_HM_KPI_CATALOG`, feed rows, the bell row) - these now VIOLATE the no-emoji rule; swap to `_HV2_ICONS`-style SVGs in the next Home pass.
 - Assets page uses native `alert()/prompt()` for feedback - needs the shared toast/banner pattern.
 - Hardcoded gold tints (`rgba(212,182,92,.NN)`) don't shift in light mode - acceptable (hues are close); prefer `--gold-glow`/`--gold-sheen`/`color-mix` in new code.
 - Staff portal (`bam-portal/src/tokens/tokens.js`) is a separate palette - fold in later or keep deliberately distinct (open decision).
@@ -129,4 +129,5 @@ transition:transform var(--t-med) var(--es), box-shadow var(--t-med);
 
 | Date | v | Change |
 |---|---|---|
+| 2026-07-05 | 1.1 | Emoji rule tightened: NO emojis at all in product UI or copy we write (was: banned in chrome only, allowed elsewhere). Only client-typed message content renders emojis as-is. |
 | 2026-07-05 | 1.0 | Initial system extracted from V2 Home / Assets / Calendar. Killed stale gold `#E8C547` portal-wide, locked radius scale, unified fonts (Plus Jakarta Sans + Nunito) across the 3 reference pages, added `--on-gold`/`--font-ui`/`--font-num` tokens, converted calendar booking popup to the right-drawer idiom, normalized off-token greens/reds on the 3 pages. |

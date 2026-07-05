@@ -269,7 +269,7 @@ bam-ghl-agent/
 - ONE gold: `var(--gold)` = `#D4B65C` dark / `#C8A84E` light. The old `#E8C547` is DEAD - never reintroduce it.
 - Fonts: Plus Jakarta Sans (`--font-ui`) + Nunito for big numbers (`--font-num`) + DM Mono for technical values.
 - Locked radius scale: 6 / 8 / 12 / 16 / 24 / 999 via `--r-*` tokens. Nothing in between.
-- Rounded warm-SaaS look, soft lift shadows, right-side drawer for detail views, no emoji in UI chrome.
+- Rounded warm-SaaS look, soft lift shadows, right-side drawer for detail views, **NO emojis anywhere in product UI or copy** (SVG stroke icons only; client-typed message content renders as-is).
 
 Scope exceptions:
 - **`bam-gta-staff/` keeps its own branding** - do not apply the design system there.
