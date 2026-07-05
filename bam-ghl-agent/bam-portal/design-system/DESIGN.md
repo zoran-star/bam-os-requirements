@@ -1,6 +1,6 @@
 # FullControl V2 Design System
 
-**Version 1.2 - 2026-07-05 | Living document: update it every time the UI evolves.**
+**Version 1.3 - 2026-07-05 | Living document: update it every time the UI evolves.**
 
 > ⛔ **RULE FOR EVERY AGENT + HUMAN: read this file BEFORE any front-end work in the V2 portal.**
 > Use the tokens in [`tokens.css`](tokens.css). Never hardcode a color, radius, font, or shadow that a token covers. If the design needs something the system doesn't have, ADD IT HERE FIRST (see "How to change this system" at the bottom), then use it.
@@ -93,7 +93,8 @@ transition:transform var(--t-med) var(--es), box-shadow var(--t-med);
 
 ## 7 · Copy rules
 
-- ⛔ **Never an em dash** in anything person-facing. Use `-` or restructure.
+- ⛔ **Never an em dash** in anything person-facing.
+- ⛔ **No dash-as-pause at all** (v1.3): don't use a hyphen to join sentence halves either ("Somebody committed today - that is the whole game" is WRONG). Restructure with a period, comma, or colon ("Somebody committed today. That is the whole game."). Hyphens stay fine inside compound words and ranges.
 - Sentence case for labels + buttons; uppercase only for micro-labels.
 - Plain, confident, athletic. No "seamlessly / effortlessly / delightful".
 
@@ -129,6 +130,7 @@ transition:transform var(--t-med) var(--es), box-shadow var(--t-med);
 
 | Date | v | Change |
 |---|---|---|
+| 2026-07-05 | 1.3 | Copy rule tightened: no dash-as-pause in person-facing copy (not even a hyphen). Restructure with period, comma or colon. Portal copy swept (win card, command center, home empty states). |
 | 2026-07-05 | 1.2 | Emoji purge executed on Home + mobile More menu: `_HV2_ICONS` extended with 9 icons (clock, dollar, msg, refresh, chart, x, mail, ghost, activity); KPI catalog, Hawkeye feed, inbox bell, perfect-day star, preview-as eye/x/check all now SVG. |
 | 2026-07-05 | 1.1 | Emoji rule tightened: NO emojis at all in product UI or copy we write (was: banned in chrome only, allowed elsewhere). Only client-typed message content renders emojis as-is. |
 | 2026-07-05 | 1.0 | Initial system extracted from V2 Home / Assets / Calendar. Killed stale gold `#E8C547` portal-wide, locked radius scale, unified fonts (Plus Jakarta Sans + Nunito) across the 3 reference pages, added `--on-gold`/`--font-ui`/`--font-num` tokens, converted calendar booking popup to the right-drawer idiom, normalized off-token greens/reds on the 3 pages. |

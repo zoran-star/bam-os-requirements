@@ -15481,7 +15481,7 @@ async function _hv2WinLoad() {
   const booked = (mk && Number(mk.trials_booked)) || 0;
   const net = (rev && rev.stripe_ok !== false && Number(rev.net)) || 0;
   let win = null;
-  if (joined >= 1) win = { v: `+${joined} new client${joined === 1 ? '' : 's'} today`, c: 'Somebody committed today - that is the whole game.' };
+  if (joined >= 1) win = { v: `+${joined} new client${joined === 1 ? '' : 's'} today`, c: 'Somebody committed today. That is the whole game.' };
   else if (booked >= 2) win = { v: `+${booked} trials booked today`, c: 'Fresh chances to win members.' };
   else if (net >= 20000) win = { v: `$${Math.round(net).toLocaleString()} collected yesterday`, c: 'Twenty thousand. Monster day.' };
   else if (net >= 15000) win = { v: `$${Math.round(net).toLocaleString()} collected yesterday`, c: 'Fifteen grand. You are scaling.' };
@@ -15509,8 +15509,8 @@ async function _hv2WinLoad() {
     try { week = await _hv2Kpi('marketing', _hv2Ymd(wk), today); } catch (_) {}
     const j7 = (week && Number(week.joined)) || 0;
     const b7 = (week && Number(week.trials_booked)) || 0;
-    if (j7 >= 1) pool.push({ v: `+${j7} new client${j7 === 1 ? '' : 's'} this week`, c: 'Already won this week - go stack another one today.' });
-    if (b7 >= 1) pool.push({ v: `${b7} trial${b7 === 1 ? '' : 's'} booked this week`, c: 'The pipeline is moving - close them out.' });
+    if (j7 >= 1) pool.push({ v: `+${j7} new client${j7 === 1 ? '' : 's'} this week`, c: 'Already won this week. Go stack another one today.' });
+    if (b7 >= 1) pool.push({ v: `${b7} trial${b7 === 1 ? '' : 's'} booked this week`, c: 'The pipeline is moving. Close them out.' });
     pool.push(...await _hv2StateWins(now, today));
     if (!pool.length) pool.push({ v: 'Your command center is live', c: 'Systems on. Now go put the first win on the board.' });
     const doy = Math.floor((now - new Date(now.getFullYear(), 0, 0)) / 86400000);
@@ -15532,7 +15532,7 @@ async function _hv2StateWins(now, today) {
   const payments = (mem && Array.isArray(mem.payments)) ? mem.payments.length : 0;
   const roster = (Array.isArray(window._MEMBERS_ALL) && window._MEMBERS_ALL) || [];
   const wins = [];
-  if (live >= 1) wins.push({ v: `${live} active member${live === 1 ? '' : 's'} strong`, c: `${live === 1 ? 'A family' : live + ' families'} chose you - and they're still here.` });
+  if (live >= 1) wins.push({ v: `${live} active member${live === 1 ? '' : 's'} strong`, c: `${live === 1 ? 'A family' : live + ' families'} chose you, and they are still here.` });
   if (live >= 2 && cancelled === 0) wins.push({ v: '0 cancellations in 30 days', c: 'Everyone stayed. Retention is the quiet win.' });
   if (payments >= 2) wins.push({ v: `${payments} payments collected in 30 days`, c: 'The machine keeps collecting while you coach.' });
   if (roster.length) {
@@ -15790,7 +15790,7 @@ async function _hv2ActsLoad() {
     if (!body) return;
     if (!open.length) {
       // UX #9: Empty state CTA for action items
-      body.innerHTML = `<div class="hm-empty-cta"><span class="hm-empty-msg">Nothing waiting on you - all clear.</span><button class="hm-empty-btn" onclick="switchView('action-items')">View completed items</button></div>`;
+      body.innerHTML = `<div class="hm-empty-cta"><span class="hm-empty-msg">Nothing waiting on you. All clear.</span><button class="hm-empty-btn" onclick="switchView('action-items')">View completed items</button></div>`;
       return;
     }
     const todayStr = new Date().toISOString().split('T')[0];
@@ -16290,7 +16290,7 @@ function _hmRenderHawkFeed(host, d, total) {
       <div class="hm-reply-info"><div class="hm-reply-val" id="hm-reply-val">-</div><div class="hm-reply-lab">Avg reply time</div></div>
       <div class="hm-reply-grade" id="hm-reply-grade">-</div>
     </div>
-    <div class="hm-feed-body">${rows || '<div class="hm-empty-cta"><div class="hm-hawk-quiet"><svg width="36" height="36" viewBox="0 0 36 36" fill="none"><circle cx="18" cy="18" r="17" stroke="var(--gold)" stroke-opacity="0.18" stroke-width="1.5"/><circle cx="18" cy="18" r="11" stroke="var(--gold)" stroke-opacity="0.10" stroke-width="1"/><path d="M10 18c0-3 3.6-7 8-7s8 4 8 7-3.6 5-8 5-8-2-8-5z" fill="var(--gold)" fill-opacity="0.08" stroke="var(--gold)" stroke-opacity="0.25" stroke-width="1.2"/><circle cx="18" cy="18" r="2.5" fill="var(--gold)" fill-opacity="0.35"/></svg></div><span class="hm-empty-msg">All quiet - agents are up to date.</span></div>'}</div>
+    <div class="hm-feed-body">${rows || '<div class="hm-empty-cta"><div class="hm-hawk-quiet"><svg width="36" height="36" viewBox="0 0 36 36" fill="none"><circle cx="18" cy="18" r="17" stroke="var(--gold)" stroke-opacity="0.18" stroke-width="1.5"/><circle cx="18" cy="18" r="11" stroke="var(--gold)" stroke-opacity="0.10" stroke-width="1"/><path d="M10 18c0-3 3.6-7 8-7s8 4 8 7-3.6 5-8 5-8-2-8-5z" fill="var(--gold)" fill-opacity="0.08" stroke="var(--gold)" stroke-opacity="0.25" stroke-width="1.2"/><circle cx="18" cy="18" r="2.5" fill="var(--gold)" fill-opacity="0.35"/></svg></div><span class="hm-empty-msg">All quiet. Agents are up to date.</span></div>'}</div>
     <button class="hm-feed-open" onclick="_hv2OpenHawkeye()">Open Hawkeye &#8250;</button>
   </div>`;
   // UI #7: Update nav dots with Hawkeye count
@@ -43802,7 +43802,7 @@ function _ccMountSales(host) {
         <button type="button" class="cc-btn primary" onclick="_ccOpenClassic('pipelines')">Open sales board</button>
         <button type="button" class="cc-btn" onclick="_hv2OpenHawkeye()">Hawkeye actions</button>
       </div>
-      <div class="cc-note">Sales focus mode arrives with the new Sales build - this section is its slot.</div>
+      <div class="cc-note">Sales focus mode arrives with the new Sales build. This section is its slot.</div>
     </div>`;
   _ccLoadTrialsCount();
 }
@@ -44050,7 +44050,7 @@ function openMembersFocus() {
   _ccOpenFocusPage('membersMachineModal', '#cc-agent-bar');
   if (!window._MMA_GREETED) {
     window._MMA_GREETED = true;
-    _mmaAdd('in', "I'm your member agent. Type a member's name to pull their card, or ask about your member KPIs. Full AI brain coming soon - for now I match names and read numbers.");
+    _mmaAdd('in', "I'm your member agent. Type a member's name to pull their card, or ask about your member KPIs. Full AI brain coming soon. For now I match names and read numbers.");
   }
   _ccEnsureMembers();
   setTimeout(() => document.getElementById('mma-input')?.focus(), 700);
@@ -44079,7 +44079,7 @@ async function _mmaHandle(q) {
   if (matches.length === 1) {
     _mmaAdd('in', 'This the one?' + _mmaCardHtml(matches[0], true));
   } else if (matches.length > 1) {
-    _mmaAdd('in', 'A few matches - which one?' + matches.map(m => _mmaCardHtml(m, false)).join(''));
+    _mmaAdd('in', 'A few matches. Which one?' + matches.map(m => _mmaCardHtml(m, false)).join(''));
   } else {
     _mmaAdd('in', "Didn't catch that. Type a member's name to pull their card, or ask about your KPIs (try \"how's my MRR\").");
   }
