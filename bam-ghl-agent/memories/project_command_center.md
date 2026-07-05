@@ -36,6 +36,11 @@
 - **Esc ejects** from any focus page (`_ccFocusCloseOpen` resolves the right closer by open modal id; bound in `_ccKeys`).
 - **Two-finger swipe** `_ccInitSwipe`: trackpad wheel deltaX accumulator (>170 in a 450ms window) or two-finger touch drag (80px). Swipe left in Members section -> member agent, in Marketing -> marketing machine; swipe right inside any focus page -> exit. Guards: cc active, not classic, deltaX must dominate deltaY.
 
+## Focus FX pass (2026-07-05, Cole picks T2+T3+B1+B2)
+- Vignette REMOVED (both layers). Focus background = blueprint grid (44px graph paper via layered gradients + gold intersection dots every 220px, tokens only) + **data wallpaper**: `_ccFocusWallpaper` draws the academy's cumulative member-growth curve (12 months from roster join dates) as a huge faint gold SVG area+line behind the card, line draws itself in 1.4s. Skipped when roster empty. Card z-index 1 above `.cc-wall` z 0.
+- Seam now GROWS bottom-up like a rising chart (mmSeamGrow) then glints. HUD types itself in (`_ccHudType`, 16ms/char) on every entry. Member-agent KPI grid numbers count up via existing `_hmCountUp`.
+- All reduced-motion safe.
+
 ## Section mounts (current skeleton)
 | Section | Mount | Content |
 |---|---|---|
