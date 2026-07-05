@@ -15498,10 +15498,32 @@ async function _hv2WinLoad() {
     v.textContent = win.v;
     if (c) c.textContent = win.c;
   } else {
-    const first = _hv2FirstName();
+    // Never a bare "Hello": climb to this week's wins, then yesterday's
+    // revenue however small, then a time-of-day greeting with a nudge.
+    const wk = new Date(now); wk.setDate(wk.getDate() - 6);
+    let week = null;
+    try { week = await _hv2Kpi('marketing', _hv2Ymd(wk), today); } catch (_) {}
+    const j7 = (week && Number(week.joined)) || 0;
+    const b7 = (week && Number(week.trials_booked)) || 0;
     if (lab) lab.textContent = now.toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric' });
-    v.textContent = first ? `Hello, ${first}` : 'Hello';
-    if (c) c.textContent = 'No win on the board yet today - go get one.';
+    if (j7 >= 1) {
+      if (lab) lab.textContent = 'This week';
+      v.textContent = `+${j7} new client${j7 === 1 ? '' : 's'} this week`;
+      if (c) c.textContent = 'Already won this week - go stack another one today.';
+    } else if (b7 >= 1) {
+      if (lab) lab.textContent = 'This week';
+      v.textContent = `${b7} trial${b7 === 1 ? '' : 's'} booked this week`;
+      if (c) c.textContent = 'The pipeline is moving - close them out.';
+    } else if (net > 0) {
+      v.textContent = `$${Math.round(net).toLocaleString()} collected yesterday`;
+      if (c) c.textContent = 'Money moved while you were coaching.';
+    } else {
+      const gh = now.getHours();
+      const gw = gh < 12 ? 'Good morning' : gh < 18 ? 'Good afternoon' : 'Good evening';
+      const first = _hv2FirstName();
+      v.textContent = `${gw}, ${first || 'coach'}.`;
+      if (c) c.textContent = 'Clean slate today. First win is out there - go take it.';
+    }
   }
 }
 // ── Hawkeye card (hero right): last client message + proposed reply ──
@@ -43321,12 +43343,24 @@ function _ccStyle() {
     'body.cc-mode.cc-classic .cc-dock{display:none}' +
     '.cc-dock.tuck{transform:translateY(90px);opacity:0;pointer-events:none}' +
     '.cc-glass{background:color-mix(in srgb,var(--surface) 62%,transparent);backdrop-filter:blur(14px) saturate(1.25);-webkit-backdrop-filter:blur(14px) saturate(1.25);border:1px solid var(--accent-border)}' +
-    '.cc-orb{width:46px;height:46px;border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--gold);box-shadow:0 4px 18px rgba(0,0,0,.14);transition:transform .3s var(--espring,ease)}' +
-    '.cc-orb svg{width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;transition:transform .3s var(--es,ease)}' +
-    '.cc-dock.open .cc-orb{transform:rotate(0) scale(1.04)}' +
-    '.cc-dock.open .cc-orb svg{transform:rotate(45deg)}' +
-    '.cc-orb:hover{transform:scale(1.06)}' +
-    '.cc-fan{position:absolute;left:3px;bottom:54px;display:flex;flex-direction:column;gap:8px}' +
+    '.cc-orb{position:relative;width:54px;height:54px;border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--gold);box-shadow:0 6px 24px rgba(0,0,0,.18),0 0 0 0 rgba(212,182,92,.0);transition:transform .3s var(--espring,ease);animation:ccOrbBreathe 4s ease-in-out infinite}' +
+    '.cc-dock{transform-origin:27px calc(100% - 27px)}' +
+    '.cc-dock:not(.cc-dock-in){transform:scale(0);opacity:0}' +
+    '.cc-dock.cc-dock-in{transition:transform .55s var(--espring,ease),opacity .3s}' +
+    '@keyframes ccOrbBreathe{0%,100%{box-shadow:0 6px 24px rgba(0,0,0,.18),0 0 0 0 rgba(212,182,92,.25)}50%{box-shadow:0 6px 24px rgba(0,0,0,.18),0 0 0 9px rgba(212,182,92,0)}}' +
+    '.cc-dock.open .cc-orb,.cc-orb:active{animation:none}' +
+    '.cc-orb::before{content:"";position:absolute;inset:-2px;border-radius:50%;background:conic-gradient(from 20deg,var(--gold),rgba(212,182,92,.12),var(--gold) 55%,rgba(212,182,92,.2),var(--gold));-webkit-mask:radial-gradient(farthest-side,transparent calc(100% - 3px),#000 calc(100% - 2px));mask:radial-gradient(farthest-side,transparent calc(100% - 3px),#000 calc(100% - 2px));pointer-events:none}' +
+    '.cc-orb:hover::before{animation:ccRingSpin 2.6s linear infinite}' +
+    '@keyframes ccRingSpin{to{transform:rotate(360deg)}}' +
+    '.cc-orb svg{width:24px;height:24px;transition:transform .35s var(--espring,ease)}' +
+    '.cc-dock.open .cc-orb{transform:scale(1.05)}' +
+    '.cc-dock.open .cc-orb svg{transform:rotate(45deg) scale(.9)}' +
+    '.cc-orb:hover{transform:scale(1.07)}' +
+    '.cc-orb:active{transform:scale(.94)}' +
+    '.cc-orb-hint{position:absolute;left:62px;top:50%;transform:translateY(-50%) translateX(-6px);font-size:11px;font-weight:700;color:var(--text);background:color-mix(in srgb,var(--surface) 78%,transparent);backdrop-filter:blur(10px);border:1px solid var(--accent-border);border-radius:8px;padding:4px 10px;white-space:nowrap;opacity:0;pointer-events:none;transition:opacity .3s,transform .3s}' +
+    '.cc-orb-hint.show{opacity:1;transform:translateY(-50%) translateX(0)}' +
+    '@media(prefers-reduced-motion:reduce){.cc-orb{animation:none}.cc-orb:hover::before{animation:none}}' +
+    '.cc-fan{position:absolute;left:7px;bottom:62px;display:flex;flex-direction:column;gap:8px}' +
     '.cc-fan-btn{position:relative;width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--text-sub);opacity:0;transform:translateY(12px) scale(.8);pointer-events:none;transition:opacity .22s var(--es,ease),transform .22s var(--es,ease),color .15s}' +
     '.cc-dock.open .cc-fan-btn{opacity:1;transform:translateY(0) scale(1);pointer-events:auto}' +
     '.cc-dock.open .cc-fan-btn:nth-child(1){transition-delay:.08s}' +
@@ -43477,10 +43511,18 @@ function _ccBuildChrome() {
        <button type="button" class="cc-fan-btn cc-glass" data-lab="Business blueprint" onclick="_ccOrbToggle(false);_ccOpenClassic('blueprint')">${_ccIcons().grid}</button>
        <button type="button" class="cc-fan-btn cc-glass" data-lab="Settings" onclick="_ccDockPop('settings')">${_ccIcons().gear}</button>
      </div>
-     <button type="button" class="cc-orb cc-glass" id="cc-orb" aria-label="Menu" onclick="_ccOrbToggle()"><svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></button>
+     <button type="button" class="cc-orb cc-glass" id="cc-orb" aria-label="Menu" onclick="_ccOrbToggle()"><svg viewBox="0 0 512 512" fill="currentColor" stroke="none"><path d="M 256 80 L 290 230 L 432 256 L 290 282 L 256 432 L 222 282 L 80 256 L 222 230 Z"/><circle cx="256" cy="256" r="14"/></svg><span class="cc-orb-hint">Menu</span></button>
      <div id="cc-dock-pop"></div>`;
   document.body.appendChild(dock);
   _ccKeys();
+  // Entrance: orb springs in, "Menu" hint shows for a few seconds
+  requestAnimationFrame(() => {
+    dock.classList.add('cc-dock-in');
+    setTimeout(() => {
+      document.querySelector('.cc-orb-hint')?.classList.add('show');
+      setTimeout(() => document.querySelector('.cc-orb-hint')?.classList.remove('show'), 4200);
+    }, 700);
+  });
 
   const pill = document.createElement('button');
   pill.type = 'button'; pill.className = 'cc-back-pill'; pill.id = 'cc-back-pill';
