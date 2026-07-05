@@ -29,6 +29,13 @@
 ## Daily win = never empty (2026-07-05)
 `_hv2WinLoad`: STRONG wins show outright (client joined today, 2+ trials today, $500+ yesterday). Anything modest (+1 trial, small revenue, weekly momentum) joins a POOL with `_hv2StateWins()` standing wins (kpis-v15 members 30d: active count, 0 cancellations, payments collected, longest tenure, clean books) and the day-of-year rotation picks one - a different card every day, label 'On the board'. Floor: "Your command center is live". Bare "Hello" impossible. Applies to classic V2 Home too (same card).
 
+## Focus-mode warp pan (2026-07-05)
+- Transition retimed 3s -> .55s expo-out (`cubic-bezier(0.16,1,0.3,1)`) with 80ms wind-up (was 280), close hide 700ms (was 3200). Applies to ALL focus pages (marketing + members, classic view included).
+- Depth: `html.mm-focus-open .main/.sidebar` now also `scale(.965)` + `blur(5px)` (the page you leave recedes). Seam glint keyframe on landing; `.mm-modal-card > *` blocks cascade up (mmRise, staggered .18-.40s). All reduced-motion safe.
+- **HUD readout**: `_ccFocusHud(modalId)` injects `FOCUS · <SECTION> · LIVE` mono line (pulsing gold dot) into every focus card. Injected by `_mmOpenFocus` + `_ccOpenFocusPage` (guarded try, idempotent).
+- **Esc ejects** from any focus page (`_ccFocusCloseOpen` resolves the right closer by open modal id; bound in `_ccKeys`).
+- **Two-finger swipe** `_ccInitSwipe`: trackpad wheel deltaX accumulator (>170 in a 450ms window) or two-finger touch drag (80px). Swipe left in Members section -> member agent, in Marketing -> marketing machine; swipe right inside any focus page -> exit. Guards: cc active, not classic, deltaX must dominate deltaY.
+
 ## Section mounts (current skeleton)
 | Section | Mount | Content |
 |---|---|---|

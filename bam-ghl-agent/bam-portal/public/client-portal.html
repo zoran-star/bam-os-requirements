@@ -3687,7 +3687,7 @@
     position: fixed; inset: 0; z-index: 1000; overflow-y: auto;
     background: var(--bg); justify-content: center; align-items: flex-start;
     transform: translateX(100vw);
-    transition: transform 3s cubic-bezier(0.68, 0.01, 0.1, 1);
+    transition: transform .55s cubic-bezier(0.16, 1, 0.3, 1);
   }
   /* the seam between the two pages: a thin rounded gold bar with a sheen,
      riding the focus page's left edge as it glides */
@@ -3711,16 +3711,36 @@
   /* html.mm-prewarm scoping beats the theme-crossfade transition rule that
      otherwise overrides .main/.sidebar transitions later in the cascade */
   html.mm-prewarm .main, html.mm-prewarm .sidebar {
-    transition: transform 3s cubic-bezier(0.68, 0.01, 0.1, 1);
-    will-change: transform;
+    transition: transform .55s cubic-bezier(0.16, 1, 0.3, 1), filter .55s ease;
+    will-change: transform, filter;
   }
   html.mm-prewarm .mm-focus-page { will-change: transform; }
-  html.mm-focus-open .main, html.mm-focus-open .sidebar { transform: translateX(-50vw); }
+  html.mm-focus-open .main, html.mm-focus-open .sidebar { transform: translateX(-50vw) scale(.965); filter: blur(5px); }
   .mm-focus-page.mm-open { transform: translateX(0); }
+  /* landing: the gold seam glints once as the page docks */
+  .mm-focus-page.mm-open::before { animation: mmSeamGlint .7s ease .3s both; }
+  @keyframes mmSeamGlint {
+    0%, 100% { box-shadow: 0 0 14px rgba(200,168,78,0.45), inset 1px 0 1px rgba(255,255,255,0.55); }
+    45% { box-shadow: 0 0 30px rgba(212,182,92,0.9), inset 1px 0 1px rgba(255,255,255,0.9); }
+  }
+  /* stagger landing: focus-page blocks cascade up as you arrive */
+  .mm-focus-page.mm-open .mm-modal-card > * { animation: mmRise .38s cubic-bezier(0.16, 1, 0.3, 1) both; }
+  .mm-focus-page.mm-open .mm-modal-card > *:nth-child(1) { animation-delay: .18s; }
+  .mm-focus-page.mm-open .mm-modal-card > *:nth-child(2) { animation-delay: .24s; }
+  .mm-focus-page.mm-open .mm-modal-card > *:nth-child(3) { animation-delay: .30s; }
+  .mm-focus-page.mm-open .mm-modal-card > *:nth-child(4) { animation-delay: .36s; }
+  .mm-focus-page.mm-open .mm-modal-card > *:nth-child(n+5) { animation-delay: .40s; }
+  @keyframes mmRise { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
+  /* HUD readout: mono telemetry line at the top of every focus page */
+  .cc-hud { display: flex; align-items: center; gap: 7px; font-family: var(--mono); font-size: 10px; font-weight: 600; letter-spacing: .18em; text-transform: uppercase; color: var(--text-mute); margin: 2px 0 10px; }
+  .cc-hud-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--gold); animation: ccHudPulse 2s ease-in-out infinite; }
+  @keyframes ccHudPulse { 0%, 100% { opacity: 1; } 50% { opacity: .35; } }
   html.mm-focus-open .mm-focus-page::after { opacity: 1; }
   html.mm-focus-open, html.mm-focus-open body { overflow-x: hidden; }
   @media (prefers-reduced-motion: reduce) {
     .mm-focus-page, .main, .sidebar { transition: none; }
+    .mm-focus-page.mm-open .mm-modal-card > *, .mm-focus-page.mm-open::before { animation: none; }
+    .cc-hud-dot { animation: none; }
   }
   .mm-mod-head { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 4px; }
   .mm-back-btn {
@@ -43611,11 +43631,85 @@ function _ccRailFx(rail) {
   });
 }
 
+// HUD readout: a mono telemetry line at the top of a focus page. Cheap,
+// idempotent, and label comes from the modal id.
+function _ccFocusHud(modalId) {
+  const card = document.querySelector('#' + modalId + ' .mm-modal-card');
+  if (!card || card.querySelector('.cc-hud')) return;
+  const label = modalId === 'membersMachineModal' ? 'MEMBERS'
+    : modalId === 'landingMachineModal' ? 'LANDING PAGE'
+    : 'MARKETING';
+  const hud = document.createElement('div');
+  hud.className = 'cc-hud';
+  hud.innerHTML = '<span class="cc-hud-dot"></span>FOCUS · ' + label + ' · LIVE';
+  const head = card.querySelector('.mm-mod-head');
+  if (head) card.insertBefore(hud, head); else card.prepend(hud);
+}
+
+// Close whichever focus page is open (Esc, swipe back).
+function _ccFocusCloseOpen() {
+  const open = document.querySelector('.mm-focus-page.mm-open');
+  if (!open) return false;
+  try {
+    if (open.id === 'marketingMachineModal') closeMarketingMachine();
+    else if (open.id === 'landingMachineModal') closeLandingMachine();
+    else if (open.id === 'membersMachineModal') closeMembersFocus();
+    else { open.classList.remove('mm-open'); document.documentElement.classList.remove('mm-focus-open'); }
+  } catch (_) {}
+  return true;
+}
+
+// Two-finger swipe: horizontal trackpad swipe (or two-finger touch drag)
+// enters the active section's focus mode; swipe the other way exits.
+function _ccInitSwipe(root) {
+  if (root._ccSwipe) return;
+  root._ccSwipe = true;
+  let acc = 0, t0 = 0;
+  function fire(dir) {
+    if (document.documentElement.classList.contains('mm-focus-open')) {
+      if (dir < 0) _ccFocusCloseOpen();
+      return;
+    }
+    if (dir < 0) return;
+    if (!_ccActive() || document.body.classList.contains('cc-classic')) return;
+    if (!document.getElementById('view-cc')?.classList.contains('active')) return;
+    const key = document.querySelector('.cc-dot.on')?.id.replace('cc-dot-', '');
+    if (key === 'members') openMembersFocus();
+    else if (key === 'marketing') { try { openMarketingMachine(); } catch (_) {} }
+  }
+  function onWheel(e) {
+    if (Math.abs(e.deltaX) <= Math.abs(e.deltaY) * 1.2) return;
+    const t = performance.now();
+    if (t - t0 > 450) acc = 0;
+    t0 = t;
+    acc += e.deltaX;
+    if (acc > 170) { acc = 0; fire(1); }
+    else if (acc < -170) { acc = 0; fire(-1); }
+  }
+  document.addEventListener('wheel', onWheel, { passive: true });
+  let tX = null;
+  document.addEventListener('touchstart', e => {
+    tX = e.touches.length === 2 ? (e.touches[0].clientX + e.touches[1].clientX) / 2 : null;
+  }, { passive: true });
+  document.addEventListener('touchmove', e => {
+    if (tX === null || e.touches.length !== 2) return;
+    const x = (e.touches[0].clientX + e.touches[1].clientX) / 2;
+    const dx = tX - x;
+    if (dx > 80) { tX = null; fire(1); }
+    else if (dx < -80) { tX = null; fire(-1); }
+  }, { passive: true });
+  document.addEventListener('touchend', () => { tX = null; }, { passive: true });
+}
+
 // Keyboard: arrows step sections, 1-4 jump direct. Skipped while typing,
-// in classic mode, or when a focus page / modal is open.
+// in classic mode, or when a focus page / modal is open. Esc ejects from
+// any open focus page.
 function _ccKeys() {
   if (window._ccKeysBound) return;
   window._ccKeysBound = true;
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') _ccFocusCloseOpen();
+  });
   document.addEventListener('keydown', e => {
     if (!_ccActive() || document.body.classList.contains('cc-classic')) return;
     if (!document.getElementById('view-cc')?.classList.contains('active')) return;
@@ -43659,6 +43753,7 @@ function _ccInitObserver() {
   }, { root, threshold: [0.05, 0.2, 0.45, 0.7] });
   secs.forEach(s => io.observe(s));
   _ccInitRecede(root, secs);
+  _ccInitSwipe(root);
   setTimeout(() => root.dispatchEvent(new Event('scroll')), 400);
 }
 
@@ -44035,15 +44130,16 @@ function _ccOpenFocusPage(modalId, panelSel) {
   const modal = document.getElementById(modalId);
   if (!modal) return;
   const panelEl = document.querySelector(panelSel);
-  if (panelEl) { panelEl.classList.add('mm-launching'); setTimeout(() => panelEl.classList.remove('mm-launching'), 400); }
+  if (panelEl) { panelEl.classList.add('mm-launching'); setTimeout(() => panelEl.classList.remove('mm-launching'), 200); }
   document.documentElement.classList.add('mm-prewarm');
   modal.style.display = 'flex';
+  try { _ccFocusHud(modalId); } catch (_) {}
   setTimeout(() => {
     requestAnimationFrame(() => {
       document.documentElement.classList.add('mm-focus-open');
       modal.classList.add('mm-open');
     });
-  }, 280);
+  }, 80);
 }
 function openMembersFocus() {
   _mmaEnsureModal();
@@ -45159,19 +45255,19 @@ function _mmOpenFocus(modalId, panelSel) {
   if (!modal || !_MM) return;
   // wind-up: the panel compresses for a beat, then the whole surface pans left
   const panelEl = document.querySelector(panelSel);
-  if (panelEl) { panelEl.classList.add('mm-launching'); setTimeout(() => panelEl.classList.remove('mm-launching'), 400); }
+  if (panelEl) { panelEl.classList.add('mm-launching'); setTimeout(() => panelEl.classList.remove('mm-launching'), 200); }
   const mainEl = document.querySelector('.main');
   if (mainEl) mainEl.classList.remove('mm-tease', 'mm-tease-ready');
   document.documentElement.classList.add('mm-prewarm');
   modal.style.display = 'flex';
-  // layers rasterize + the detail page paints during this beat, so the pan
-  // starts on already-composited surfaces (no first-frame jank)
+  try { _ccFocusHud(modalId); } catch (_) {}
+  // one short beat so layers composite, then the warp pan fires
   setTimeout(() => {
     requestAnimationFrame(() => {
       document.documentElement.classList.add('mm-focus-open');
       modal.classList.add('mm-open');
     });
-  }, 280);
+  }, 80);
 }
 function _mmCloseFocus(modalId) {
   const modal = document.getElementById(modalId);
@@ -45181,7 +45277,7 @@ function _mmCloseFocus(modalId) {
     setTimeout(() => {
       modal.style.display = 'none';
       document.documentElement.classList.remove('mm-prewarm');
-    }, 3200);
+    }, 700);
   }
 }
 function openMarketingMachine() {
