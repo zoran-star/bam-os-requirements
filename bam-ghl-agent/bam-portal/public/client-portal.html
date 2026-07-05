@@ -3696,10 +3696,10 @@
   .mm-focus-page::after {
     content: ''; position: fixed; inset: 0; pointer-events: none; opacity: 0;
     background: radial-gradient(ellipse at center, transparent 78%, rgba(10,9,6,0.22) 100%);
-    transition: opacity 1s ease 2.2s;
+    transition: opacity 0.85s ease 3s;   /* edges smooth in only after the 3s slide settles */
   }
   .mm-focus-page .mm-modal-card {
-    max-width: 900px; width: min(900px, 96vw); max-height: none;
+    max-width: 1120px; width: min(1120px, 96vw); max-height: none;
     margin: 28px auto 48px; background: transparent; border: none; box-shadow: none;
   }
   /* pages ride together: main + sidebar pan left exactly as the focus page
@@ -3765,7 +3765,7 @@
   .mm-roi-knob { font-family: var(--mm-fm); font-size: 12px; width: 64px; background: var(--surface-el); border: 1px solid var(--line); border-radius: 7px; padding: 3px 6px; color: var(--text); }
   .mm-toast { position: fixed; top: 20px; left: 50%; transform: translateX(-50%); z-index: 1600; background: #1C1B18; color: #F8F7F5; font-family: var(--mm-ff); font-size: 12.5px; font-weight: 600; padding: 10px 18px; border-radius: 10px; animation: mmFadeIn 0.25s ease; }
   /* vignette on a NON-transformed layer so it survives scrolling */
-  html.mm-focus-open body::after { content: ''; position: fixed; inset: 0; pointer-events: none; z-index: 1500; background: radial-gradient(ellipse at center, transparent 78%, rgba(10,9,6,0.22) 100%); animation: mmFadeIn 0.9s ease 1.4s both; }
+  html.mm-focus-open body::after { content: ''; position: fixed; inset: 0; pointer-events: none; z-index: 1500; background: radial-gradient(ellipse at center, transparent 78%, rgba(10,9,6,0.22) 100%); animation: mmFadeIn 0.85s ease 3s both; }
   .mm-focus-page::after { display: none; }
   .mm-gallery { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
   @media (max-width: 720px) { .mm-gallery { grid-template-columns: 1fr; } }
@@ -43697,8 +43697,8 @@ function toggleTheme() {
   .v2req-nudge { display:flex; align-items:center; gap:9px; margin-top:14px; padding:10px 14px; border-radius:10px; background:rgba(200,168,78,0.12); border:1px solid rgba(200,168,78,0.4); font-family:var(--mm-ff); font-size:13px; color:var(--text-sub); }
   .v2req-nudge b { color:var(--text); font-weight:700; }
   .v2req-nudge svg { flex:0 0 auto; color:#9a7d2b; }
-  .v2req-body { display:grid; grid-template-columns:1.5fr 1fr; gap:16px; margin-top:14px; }
-  .v2req-stage { position:relative; background:#fff; border:1px solid var(--line); border-radius:12px; overflow:hidden; height:460px; }
+  .v2req-body { display:grid; grid-template-columns:2.6fr 1fr; gap:16px; margin-top:14px; }
+  .v2req-stage { position:relative; background:#fff; border:1px solid var(--line); border-radius:12px; overflow:hidden; height:520px; }
   .v2req-stage-hint { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-family:var(--mm-ff); font-size:13px; color:var(--text-mute); pointer-events:none; }
   #v2ReqFrame { width:100%; height:100%; border:0; display:block; background:#fff; }
   .v2req-side { display:flex; flex-direction:column; min-width:0; }
