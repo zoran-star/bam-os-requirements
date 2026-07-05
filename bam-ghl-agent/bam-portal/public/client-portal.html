@@ -7026,7 +7026,7 @@
             <div class="guide-card-body" id="firstCampaignGuideBody">
               <p class="gc-intro">Your first campaign is <b>three angles in two formats</b> - video and graphic. Here's what to send.</p>
               <div class="gc-group">The core videos - your phone is fine</div>
-              <div class="gc-step"><span class="gc-num">1</span><span class="gc-tx"><span class="gc-h">Free trial</span><span class="gc-t">You to camera, <b>offer in the first three seconds</b>. Two hooks if you can - one specific, one general.</span></span></div>
+              <div class="gc-step"><span class="gc-num">1</span><span class="gc-tx"><span class="gc-h">Direct offer</span><span class="gc-t">You to camera, <b>offer in the first three seconds</b>. Two hooks if you can - one specific, one general.</span></span></div>
               <div class="gc-step"><span class="gc-num">2</span><span class="gc-tx"><span class="gc-h">Transformation</span><span class="gc-t">One athlete whose progress jumps out. Before and after - they tell it, or you voice over the B-roll.</span></span></div>
               <div class="gc-step"><span class="gc-num">3</span><span class="gc-tx"><span class="gc-h">Testimonial</span><span class="gc-t">Two to four parents or athletes right after a session. Use the four-question version in the Checklist.</span></span></div>
               <div class="gc-group">The core graphics - send photos + words, we design</div>
@@ -25821,6 +25821,8 @@ function openAddCreativeModal(channel) {
   _renderInputAssetsFilesList();
   const notes = document.getElementById('inputAssetsNotes');
   if (notes) notes.value = '';
+  const ttl = document.getElementById('inputAssetsTitle');
+  if (ttl) ttl.value = '';
   const fld = document.getElementById('inputAssetsFolder');
   if (fld) fld.value = '';
   // Reset the creative-spec fields each open.
@@ -26019,6 +26021,7 @@ async function submitInputAssets() {
     return;
   }
   const notes = document.getElementById('inputAssetsNotes')?.value?.trim() || '';
+  const title = document.getElementById('inputAssetsTitle')?.value?.trim() || '';
   const format = document.getElementById('inputAssetsFormat')?.value || '';
   const captions = !!(document.getElementById('inputAssetsCaptions') || {}).checked;
   // Snapshot files + type BEFORE closing the modal - closeInputAssetsModal()
@@ -26039,6 +26042,7 @@ async function submitInputAssets() {
     await _ctkCreateTicket({
       type: assetType,
       channel,
+      title,
       notes,
       raw_files: uploaded,
       context: {
@@ -44316,14 +44320,17 @@ function toggleTheme() {
     <div class="modal-title">Input assets</div>
     <div class="modal-sub" id="inputAssetsSub">Submit raw assets here. Our content team will turn them into a finished creative and add it to your campaign.</div>
 
-    <label class="modal-label">Raw files</label>
+    <label class="modal-label" for="inputAssetsTitle">Creative name <span style="color:var(--text-mute);font-weight:400">(optional)</span></label>
+    <input id="inputAssetsTitle" class="modal-input" type="text" maxlength="120" placeholder="e.g. August camp promo" />
+
+    <label class="modal-label" style="margin-top:18px">Raw files</label>
     <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:8px">
-      <input id="inputAssetsFolder" class="modal-input" list="inputAssetsFolderList" placeholder="📁 Folder (optional) - e.g. Game footage" style="flex:1 1 200px;min-width:150px" />
+      <input id="inputAssetsFolder" class="modal-input" list="inputAssetsFolderList" placeholder="Group name (optional) - e.g. Game footage" style="flex:1 1 200px;min-width:150px" />
       <datalist id="inputAssetsFolderList"></datalist>
-      <label for="inputAssetsFolderInput" class="btn-modal-secondary" style="cursor:pointer;white-space:nowrap;margin:0">🗂 Upload a folder</label>
+      <label for="inputAssetsFolderInput" class="btn-modal-secondary" style="cursor:pointer;white-space:nowrap;margin:0">Upload a folder</label>
       <input type="file" id="inputAssetsFolderInput" webkitdirectory directory multiple style="display:none" onchange="_inputAssetsAddFiles(this.files, true)" />
     </div>
-    <div style="font-size:11px;color:var(--text-mute);margin-bottom:8px">Type a folder name to group what you upload next, or upload a whole folder at once - keeps your categories for the team.</div>
+    <div style="font-size:11px;color:var(--text-mute);margin-bottom:8px">Type a group name for what you upload next, or upload a whole folder at once - keeps your categories for the team.</div>
     <label for="inputAssetsFileInput" class="file-drop-label">
       <span class="file-drop-icon">↑</span>
       <span class="file-drop-text">Click to upload (you can pick multiple)</span>

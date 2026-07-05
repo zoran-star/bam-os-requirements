@@ -1072,6 +1072,7 @@ function ContentTicketsTab({ tk, session, me }) {
           const meta = TYPE_META_CT[t.type] || { icon: "•", label: t.type };
           const academyName = t.client?.business_name || "—";
           const previewNotes = (t.notes || "").split("\n").filter(Boolean).slice(0, 1).join(" ").slice(0, 110) || "(no notes)";
+          const titleLine = (t.title || "").trim();
           const dateStr = t.submitted_at ? new Date(t.submitted_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "—";
           const pri = ctkPriorityOf(t);
           // Deadline is only meaningful while the ticket is still being worked.
@@ -1117,7 +1118,16 @@ function ContentTicketsTab({ tk, session, me }) {
                 <CtkChannelBadge channel={t.channel} />
                 <CtkPriorityChip priority={pri} tk={tk} />
               </div>
-              <div style={{ color: tk.textSub, fontSize: 13, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{previewNotes}</div>
+              <div style={{ overflow: "hidden" }}>
+                {titleLine ? (
+                  <>
+                    <div style={{ color: tk.text, fontSize: 13, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{titleLine}</div>
+                    <div style={{ color: tk.textMute, fontSize: 12, marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{previewNotes}</div>
+                  </>
+                ) : (
+                  <div style={{ color: tk.textSub, fontSize: 13, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{previewNotes}</div>
+                )}
+              </div>
               <div style={{ color: tk.textSub, fontSize: 13 }}>
                 <span style={{ marginRight: 6 }}>{meta.icon}</span>{meta.label}
               </div>
@@ -1183,10 +1193,12 @@ function ContentTicketDetail({ tk, session, ticket, me, owners = [], canReassign
   const [editingCtx, setEditingCtx] = useState(false);
   const [ctxDraft, setCtxDraft] = useState(null);   // working copy of ticket.context
   const [notesDraft, setNotesDraft] = useState(""); // working copy of ticket.notes
+  const [titleDraft, setTitleDraft] = useState(""); // working copy of ticket.title
   const [savingCtx, setSavingCtx] = useState(false);
   function startEditCtx() {
     setCtxDraft(JSON.parse(JSON.stringify(ticket.context || {})));
     setNotesDraft(ticket.notes || "");
+    setTitleDraft(ticket.title || "");
     setEditingCtx(true);
   }
   function cancelEditCtx() {
@@ -1197,7 +1209,7 @@ function ContentTicketDetail({ tk, session, ticket, me, owners = [], canReassign
     if (savingCtx) return;
     setSavingCtx(true);
     try {
-      await patchTicket(ticket.id, { action: "edit-context", context: ctxDraft || {}, notes: notesDraft });
+      await patchTicket(ticket.id, { action: "edit-context", context: ctxDraft || {}, notes: notesDraft, title: titleDraft });
       setEditingCtx(false);
       setCtxDraft(null);
       await onRefetch();
@@ -1375,8 +1387,30 @@ function ContentTicketDetail({ tk, session, ticket, me, owners = [], canReassign
           <div style={{ fontSize: 11, color: tk.textMute, letterSpacing: "0.18em", textTransform: "uppercase", marginBottom: 6 }}>
             § Content · Ticket · {ctkCode(ticket.id)}
           </div>
-          <div style={{ fontSize: 24, fontWeight: 500, color: tk.text, letterSpacing: "-0.01em" }}>
-            {meta.icon}  {meta.label}{ticket.type === "mixed" ? " bundle" : ""}
+          {/* Title where the type used to be; when titled, the type demotes to a
+              divided suffix (Cam's spec: "Title | Graphic"). Untitled = old look. */}
+          <div style={{ fontSize: 24, fontWeight: 500, color: tk.text, letterSpacing: "-0.01em", display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+            {editingCtx ? (
+              <input
+                value={titleDraft}
+                onChange={e => setTitleDraft(e.target.value)}
+                maxLength={120}
+                placeholder="Creative name"
+                style={{
+                  background: tk.surfaceEl, border: `1px solid ${tk.borderMed}`, color: tk.text,
+                  fontSize: 18, fontWeight: 500, fontFamily: "inherit", borderRadius: 8,
+                  padding: "6px 12px", minWidth: 260,
+                }}
+              />
+            ) : (
+              <span>{meta.icon}  {(ticket.title || "").trim() || `${meta.label}${ticket.type === "mixed" ? " bundle" : ""}`}</span>
+            )}
+            {(ticket.title || "").trim() || editingCtx ? (
+              <>
+                <span style={{ width: 1, height: 22, background: tk.borderStr || tk.border, flex: "none" }} />
+                <span style={{ color: tk.textSub, fontSize: 16, fontWeight: 500 }}>{meta.label}{ticket.type === "mixed" ? " bundle" : ""}</span>
+              </>
+            ) : null}
           </div>
           <div style={{ fontSize: 13, color: tk.textSub, marginTop: 4 }}>
             {academyName} · Submitted {ticket.submitted_at ? new Date(ticket.submitted_at).toLocaleString() : "—"}

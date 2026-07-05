@@ -20,6 +20,7 @@ Ad-campaign requests that marketing team works on. Columns we added during this 
 ### `content_tickets` (new this session)
 Raw asset packages awaiting content team production.
 - `type text` — `graphic` | `video` | `mixed` (mixed = mega-ticket from new-campaign wizard bundling multiple sub-creatives in `context.creatives`)
+- `title text` — optional client-facing creative name (added 2026-07-05, migration `20260705204424`, applied to prod). Client sets it in the Add-Creative modal ("Creative name"); staff edit it via the `edit-context` action (title input appears in the detail header while editing). Staff list shows title bold + notes grey beneath; detail header shows "Title | Type" with a divider (untitled = old type-only look). NOTE: the new-campaign wizard path does NOT set titles yet - only the Add-Creative/organic-request modal.
 - `status text` — `active` | `client-dependent` | `completed` | `cancelled`
 - `client_action_status text` — `none` | `requested` | `responded`
 - `raw_files jsonb` — what the client uploaded
