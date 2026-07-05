@@ -27,7 +27,7 @@
 - **Active dot is computed in the scroll handler** (section under the 45% viewport line, containment first, last-crossed fallback) - NOT IntersectionObserver ratios (misfire when sections are shorter than the viewport). Observer only handles reveal now.
 
 ## Daily win = never empty (2026-07-05)
-`_hv2WinLoad` ladder: today (clients joined / trials booked) -> yesterday revenue tiers -> THIS WEEK (clients / trials via a second marketing-kpi call, only when no daily win) -> any revenue yesterday -> `_hv2StateWin()` standing wins (kpis-v15 section=members 30d: active-members count, 0 cancellations in 30d, payments collected, longest-member tenure from roster, clean-payments; rotates by day-of-year) -> absolute floor "Your command center is live". Bare "Hello" is impossible. Applies to classic V2 Home too (same card).
+`_hv2WinLoad`: STRONG wins show outright (client joined today, 2+ trials today, $500+ yesterday). Anything modest (+1 trial, small revenue, weekly momentum) joins a POOL with `_hv2StateWins()` standing wins (kpis-v15 members 30d: active count, 0 cancellations, payments collected, longest tenure, clean books) and the day-of-year rotation picks one - a different card every day, label 'On the board'. Floor: "Your command center is live". Bare "Hello" impossible. Applies to classic V2 Home too (same card).
 
 ## Section mounts (current skeleton)
 | Section | Mount | Content |
