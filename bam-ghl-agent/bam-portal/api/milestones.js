@@ -28,22 +28,43 @@ async function sb(path, init = {}) {
   return txt ? JSON.parse(txt) : null;
 }
 
+// Validate the caller's JWT and resolve which academies they may touch. Staff
+// see everything; a client_users member sees only their own academies. Mirrors
+// the resolveUser pattern in contacts.js. Without this, /api/milestones would
+// take client_id straight from the request and expose any academy's revenue
+// milestones to any caller (the service key bypasses RLS).
+async function resolveUser(req) {
+  const token = (req.headers.authorization || "").replace(/^Bearer\s+/i, "");
+  if (!token) throw Object.assign(new Error("Unauthorized"), { status: 401 });
+  const ur = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
+    headers: { apikey: SUPABASE_SERVICE_KEY, Authorization: `Bearer ${token}` },
+  });
+  if (!ur.ok) throw Object.assign(new Error("Unauthorized"), { status: 401 });
+  const user = await ur.json();
+  let staff = await sb(`staff?user_id=eq.${user.id}&select=id&limit=1`);
+  if ((!staff || !staff[0]) && user.email) staff = await sb(`staff?email=eq.${encodeURIComponent(user.email)}&select=id&limit=1`);
+  const isStaff = Array.isArray(staff) && staff[0];
+  const m = await sb(`client_users?user_id=eq.${user.id}&status=eq.active&select=client_id`);
+  const clientIds = Array.isArray(m) ? m.map((x) => x.client_id) : [];
+  return { isStaff: !!isStaff, clientIds };
+}
+const _owns = (ctx, clientId) => ctx.isStaff || ctx.clientIds.includes(clientId);
+
 export default async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type,Authorization");
   if (req.method === "OPTIONS") return res.status(200).end();
 
-  // Basic auth check
-  const auth = req.headers.authorization;
-  if (!auth || !auth.startsWith("Bearer ")) {
-    return res.status(401).json({ error: "Unauthorized" });
-  }
+  let ctx;
+  try { ctx = await resolveUser(req); }
+  catch (e) { return res.status(e.status || 401).json({ error: e.message || "Unauthorized" }); }
 
   try {
     if (req.method === "GET") {
       const clientId = req.query.client_id;
       if (!clientId) return res.status(400).json({ error: "client_id required" });
+      if (!_owns(ctx, clientId)) return res.status(403).json({ error: "not your academy" });
       const rows = await sb(
         `client_milestones?client_id=eq.${encodeURIComponent(clientId)}&select=key,value,achieved_at&order=achieved_at.desc`
       );
@@ -53,6 +74,7 @@ export default async function handler(req, res) {
     if (req.method === "POST") {
       const { client_id, key, value } = req.body || {};
       if (!client_id || !key) return res.status(400).json({ error: "client_id and key required" });
+      if (!_owns(ctx, client_id)) return res.status(403).json({ error: "not your academy" });
 
       const numVal = Number(value) || 0;
       const isRecord = key.startsWith("record_");
