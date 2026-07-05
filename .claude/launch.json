@@ -41,6 +41,12 @@
       "runtimeArgs": ["node_modules/vite/bin/vite.js", "--port", "5184", "--strictPort"],
       "port": 5184,
       "cwd": "bam-ghl-agent/bam-portal"
+    },
+    {
+      "name": "scratchpad",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["serve", "-l", "5199", "/private/tmp/claude-501/-Users-zoransavic-bam-os-requirements--claude-worktrees-intelligent-sinoussi-a0af72/5a101f87-70a2-49cb-a804-07217a1de828/scratchpad"],
+      "port": 5199
     }
   ]
 }

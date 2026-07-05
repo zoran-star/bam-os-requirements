@@ -44578,19 +44578,19 @@ function _mmRenderLandingFocus(d) {
         '</div>' +
         '<div style="font-family:var(--mm-fm);font-size:15px;font-weight:500;color:var(--text);text-align:right">' + s.n + '</div>' +
       '</div>';
-    // between-stage connector: median time only (no drop %, no problem framing)
+    // between-stage connector: fixed-height slot between EVERY pair of rows so
+    // the vertical rhythm stays even whether or not a step has a median time.
     if (i < steps.length - 1) {
       const tm = s.timeKey ? st[s.timeKey] : null;
-      if (tm && tm.median_s != null) {
-        rows +=
-          '<div style="' + GRID + ';margin:4px 0">' +
-            '<div></div><div></div>' +
-            '<div style="display:flex;align-items:center;padding-left:2px">' +
-              '<span style="font-family:var(--mm-ff);font-size:11px;color:var(--text-mute);display:inline-flex;align-items:center;gap:3px" title="median time to advance (' + tm.n + ' sessions)">&#9201; ~' + _mmDur(tm.median_s) + '</span>' +
-            '</div>' +
-            '<div></div>' +
-          '</div>';
-      }
+      const chip = (tm && tm.median_s != null)
+        ? '<span style="font-family:var(--mm-ff);font-size:11px;color:var(--text-mute);display:inline-flex;align-items:center;gap:3px" title="median time to advance (' + tm.n + ' sessions)">&#9201; ~' + _mmDur(tm.median_s) + '</span>'
+        : '';
+      rows +=
+        '<div style="' + GRID + ';height:22px">' +
+          '<div></div><div></div>' +
+          '<div style="display:flex;align-items:center;padding-left:2px">' + chip + '</div>' +
+          '<div></div>' +
+        '</div>';
     }
   }
 
