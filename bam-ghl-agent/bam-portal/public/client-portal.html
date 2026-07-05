@@ -43698,22 +43698,24 @@ function toggleTheme() {
   .v2req-nudge { display:flex; align-items:center; gap:9px; margin-top:14px; padding:10px 14px; border-radius:10px; background:rgba(200,168,78,0.12); border:1px solid rgba(200,168,78,0.4); font-family:var(--mm-ff); font-size:13px; color:var(--text-sub); }
   .v2req-nudge b { color:var(--text); font-weight:700; }
   .v2req-nudge svg { flex:0 0 auto; color:#9a7d2b; }
-  /* funnel stage flow - spread out with arrows */
-  .v2req-flow { display:flex; align-items:flex-start; justify-content:center; flex-wrap:wrap; margin:18px 0 8px; }
-  .v2req-flownode { display:flex; flex-direction:column; align-items:center; gap:7px; width:100px; font-family:var(--mm-ff); font-size:12.5px; font-weight:700; color:var(--text-mute); background:none; border:none; cursor:pointer; padding:0; }
-  .v2req-flowdot { width:36px; height:36px; border-radius:50%; border:2px solid var(--line); display:flex; align-items:center; justify-content:center; font-family:var(--mm-fm); font-size:14px; color:var(--text-mute); background:var(--surface); transition:all .15s; }
-  .v2req-flownode.is-on { color:var(--text); }
-  .v2req-flownode.is-on .v2req-flowdot { border-color:var(--gold); background:var(--gold); color:#0B0B0D; box-shadow:0 2px 9px rgba(200,168,78,.45); }
-  .v2req-flowarrow { flex:0 0 auto; height:36px; display:flex; align-items:center; color:var(--text-mute); margin:0 2px; }
+  /* funnel stage flow - connected chevron boxes (own line, centered) */
+  .v2req-flow { display:flex; justify-content:center; margin:2px 0 14px; }
+  .v2req-phase { position:relative; display:inline-flex; align-items:center; gap:8px; font-family:var(--mm-ff); font-size:13px; font-weight:700; color:var(--text-sub); background:var(--surface-el); border:none; cursor:pointer; padding:11px 20px 11px 30px; margin-left:-10px; clip-path:polygon(14px 0, calc(100% - 14px) 0, 100% 50%, calc(100% - 14px) 100%, 14px 100%, 0 50%); transition:background .12s,color .12s; }
+  .v2req-phase.is-first { margin-left:0; padding-left:20px; clip-path:polygon(0 0, calc(100% - 14px) 0, 100% 50%, calc(100% - 14px) 100%, 0 100%); }
+  .v2req-phase.is-last { padding-right:22px; clip-path:polygon(14px 0, 100% 0, 100% 100%, 14px 100%, 0 50%); }
+  .v2req-phase.is-first.is-last { margin-left:0; clip-path:none; border-radius:8px; }
+  .v2req-phase.is-on { background:var(--gold); color:#0B0B0D; }
+  .v2req-phase-num { display:inline-flex; align-items:center; justify-content:center; width:20px; height:20px; border-radius:50%; background:rgba(0,0,0,0.1); font-family:var(--mm-fm); font-size:12px; }
+  .v2req-phase.is-on .v2req-phase-num { background:rgba(0,0,0,0.18); }
   /* device tab + frame */
   .v2req-body { display:grid; grid-template-columns:2.6fr 1fr; gap:16px; margin-top:8px; align-items:start; }
   .v2req-stagecol { min-width:0; text-align:center; }
-  .v2req-devtab { display:inline-flex; gap:3px; background:#26262b; border-radius:9px 9px 0 0; padding:4px 4px 0; }
+  .v2req-devtab { display:inline-flex; gap:3px; background:#26262b; border-radius:10px 10px 0 0; padding:4px 4px 0; position:relative; z-index:2; margin-bottom:-2px; }
   .v2req-devbtn { display:inline-flex; align-items:center; gap:6px; font-family:var(--mm-ff); font-size:12px; font-weight:700; color:rgba(255,255,255,.55); background:none; border:none; border-radius:6px 6px 0 0; padding:6px 13px; cursor:pointer; transition:background .12s,color .12s; }
   .v2req-devbtn.is-on { background:#000; color:#fff; }
   .v2req-frame { position:relative; }
   .v2req-screen { position:relative; background:#000; box-sizing:border-box; overflow:hidden; text-align:left; }
-  .v2req-frame--desktop .v2req-screen { width:100%; height:460px; border:10px solid #26262b; border-top:none; border-radius:0 0 14px 14px; }
+  .v2req-frame--desktop .v2req-screen { width:100%; height:460px; border:10px solid #26262b; border-radius:14px; }
   .v2req-stand { display:flex; flex-direction:column; align-items:center; }
   .v2req-neck { width:74px; height:16px; background:#26262b; }
   .v2req-base { width:190px; height:9px; background:#26262b; border-radius:0 0 6px 6px; }
@@ -43744,8 +43746,9 @@ function toggleTheme() {
   .v2req-send { flex:0 0 auto; font-family:var(--mm-ff); font-size:14px; font-weight:700; border:none; border-radius:10px; padding:12px 22px; background:var(--gold); color:#0B0B0D; cursor:pointer; }
   .v2req-send:disabled { opacity:.5; cursor:not-allowed; }
   .v2note-pop { position:fixed; z-index:1700; width:240px; background:var(--surface); border:1px solid var(--line); border-radius:12px; padding:12px; box-shadow:0 12px 34px rgba(0,0,0,.28); }
-  .v2note-sec { font-family:var(--mm-ff); font-size:10.5px; font-weight:700; text-transform:uppercase; letter-spacing:0.03em; color:var(--gold-d,#9a7d2b); margin-bottom:7px; }
+  .v2note-sec { display:flex; align-items:center; gap:7px; font-family:var(--mm-ff); font-size:10.5px; font-weight:700; text-transform:uppercase; letter-spacing:0.03em; color:var(--gold-d,#9a7d2b); margin-bottom:7px; }
   .v2note-sec:empty { display:none; }
+  .v2note-dev { font-family:var(--mm-ff); font-size:9.5px; font-weight:700; text-transform:uppercase; letter-spacing:0.03em; color:var(--text-sub); background:var(--surface-el); border:1px solid var(--line); padding:1px 6px; border-radius:20px; }
   .v2note-pop textarea { width:100%; box-sizing:border-box; font-family:var(--mm-ff); font-size:13px; color:var(--text); background:var(--surface-el); border:1px solid var(--line); border-radius:8px; padding:8px; resize:none; }
   .v2note-pop-row { display:flex; justify-content:flex-end; gap:8px; margin-top:8px; }
   .v2note-cancel { font-family:var(--mm-ff); font-size:12px; font-weight:600; border:1px solid var(--line); border-radius:7px; padding:5px 11px; background:none; color:var(--text-sub); cursor:pointer; }
@@ -44590,9 +44593,9 @@ function _v2InlineHtml() {
         '<svg width="17" height="17" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3.5V9M6 9l-2 .3 3.4 4.2 1.2-2.6 2.4 1L8 6.8 6 9z"/><path d="M6 3.5a2.3 2.3 0 1 0-2.3 2.3"/></svg>' +
         '<span>Scroll your page below, then <b>click any section</b> to leave a note on it.</span>' +
       '</div>' +
-      '<div class="v2req-flow" id="v2ReqStages"></div>' +
       '<div class="v2req-body">' +
         '<div class="v2req-stagecol">' +
+          '<div class="v2req-flow" id="v2ReqStages"></div>' +
           '<div class="v2req-devtab" id="v2ReqDevice">' +
             '<button type="button" class="v2req-devbtn is-on" data-d="desktop" onclick="_v2SetDevice(\'desktop\')"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="1.5" y="2.5" width="13" height="9" rx="1"/><path d="M6 14h4M8 11.5V14"/></svg>Desktop</button>' +
             '<button type="button" class="v2req-devbtn" data-d="mobile" onclick="_v2SetDevice(\'mobile\')"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="4.5" y="1.5" width="7" height="13" rx="1.5"/><path d="M7 12.5h2"/></svg>Mobile</button>' +
@@ -44682,13 +44685,12 @@ function _v2RenderStages() {
   if (!_V2_STEPS.length) { el.innerHTML = ''; el.style.display = 'none'; return; }
   el.style.display = '';
   if (!_V2_STAGE || !_V2_STEPS.some(s => s.key === _V2_STAGE)) _V2_STAGE = _V2_STEPS[0].key;
-  const arrow = '<span class="v2req-flowarrow"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h13M13 6l6 6-6 6"/></svg></span>';
+  const n = _V2_STEPS.length;
   el.innerHTML = _V2_STEPS.map((s, i) =>
-    '<button type="button" class="v2req-flownode' + (s.key === _V2_STAGE ? ' is-on' : '') + '" onclick="_v2SetStage(\'' + s.key + '\')">' +
-      '<span class="v2req-flowdot">' + (i + 1) + '</span>' +
-      '<span>' + _escapeHtml(s.label) + '</span>' +
+    '<button type="button" class="v2req-phase' + (s.key === _V2_STAGE ? ' is-on' : '') + (i === 0 ? ' is-first' : '') + (i === n - 1 ? ' is-last' : '') + '" onclick="_v2SetStage(\'' + s.key + '\')">' +
+      '<span class="v2req-phase-num">' + (i + 1) + '</span>' + _escapeHtml(s.label) +
     '</button>'
-  ).join(arrow);
+  ).join('');
 }
 function _v2SetStage(key) {
   _V2_STAGE = key;
@@ -44698,11 +44700,12 @@ function _v2SetStage(key) {
 }
 function _v2OpenNotePop(clientX, clientY, val) {
   const pop = document.getElementById('v2NotePop'), ta = document.getElementById('v2NoteText');
-  // show which section this note is on (new pin's section, or the edited note's)
-  const sec = (_V2_PENDING && (_V2_PENDING.section
-    || (typeof _V2_PENDING.idx === 'number' && _V2_PINS[_V2_PENDING.idx] && _V2_PINS[_V2_PENDING.idx].section))) || '';
+  // show the device + which section this note is on (new pin, or edited note)
+  const editing = _V2_PENDING && typeof _V2_PENDING.idx === 'number' ? _V2_PINS[_V2_PENDING.idx] : null;
+  const sec = (_V2_PENDING && (_V2_PENDING.section || (editing && editing.section))) || '';
+  const dev = (_V2_PENDING && (_V2_PENDING.device || (editing && editing.device))) || _V2_DEVICE;
   const secEl = document.getElementById('v2NoteSec');
-  if (secEl) secEl.textContent = sec;
+  if (secEl) secEl.innerHTML = '<span class="v2note-dev">' + (dev === 'mobile' ? 'Mobile' : 'Desktop') + '</span>' + (sec ? _escapeHtml(sec) : '');
   ta.value = val || '';
   pop.style.display = 'block';
   const pw = 240, ph = 130;
