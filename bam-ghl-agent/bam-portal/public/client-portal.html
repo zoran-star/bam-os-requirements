@@ -15482,7 +15482,7 @@ async function _hv2WinLoad() {
   const net = (rev && rev.stripe_ok !== false && Number(rev.net)) || 0;
   let win = null;
   if (joined >= 1) win = { v: `+${joined} new client${joined === 1 ? '' : 's'} today`, c: 'Somebody committed today - that is the whole game.' };
-  else if (booked >= 1) win = { v: `+${booked} trial${booked === 1 ? '' : 's'} booked today`, c: 'Fresh chances to win a member.' };
+  else if (booked >= 2) win = { v: `+${booked} trials booked today`, c: 'Fresh chances to win members.' };
   else if (net >= 20000) win = { v: `$${Math.round(net).toLocaleString()} collected yesterday`, c: 'Twenty thousand. Monster day.' };
   else if (net >= 15000) win = { v: `$${Math.round(net).toLocaleString()} collected yesterday`, c: 'Fifteen grand. You are scaling.' };
   else if (net >= 10000) win = { v: `$${Math.round(net).toLocaleString()} collected yesterday`, c: 'Five figures. Machine mode.' };
@@ -15490,7 +15490,6 @@ async function _hv2WinLoad() {
   else if (net >= 2500) win = { v: `$${Math.round(net).toLocaleString()} collected yesterday`, c: 'Big revenue day. Keep this pace up.' };
   else if (net >= 1000) win = { v: `$${Math.round(net).toLocaleString()} collected yesterday`, c: 'Four-figure day. The system is working.' };
   else if (net >= 500) win = { v: `$${Math.round(net).toLocaleString()} collected yesterday`, c: 'Half a grand in a day. Solid.' };
-  else if (net > 20) win = { v: `$${Math.round(net).toLocaleString()} collected yesterday`, c: 'Revenue landed while you were coaching.' };
   const lab = document.getElementById('hv2-win-lab'), v = document.getElementById('hv2-win-v'), c = document.getElementById('hv2-win-c');
   if (!v) return;
   if (win) {
@@ -15498,38 +15497,33 @@ async function _hv2WinLoad() {
     v.textContent = win.v;
     if (c) c.textContent = win.c;
   } else {
-    // Never a bare "Hello": climb to this week's wins, then yesterday's
-    // revenue however small, then a time-of-day greeting with a nudge.
+    // No strong win: rotate the day's pick from a pool of modest activity
+    // wins, weekly momentum and standing wins - a different card each day
+    // instead of the same underwhelming stat.
+    const pool = [];
+    if (booked === 1) pool.push({ v: '+1 trial booked today', c: 'A fresh chance to win a member.' });
+    if (net > 20) pool.push({ v: `$${Math.round(net).toLocaleString()} collected yesterday`, c: 'Revenue landed while you were coaching.' });
+    else if (net > 0) pool.push({ v: `$${Math.round(net).toLocaleString()} collected yesterday`, c: 'Money moved while you were coaching.' });
     const wk = new Date(now); wk.setDate(wk.getDate() - 6);
     let week = null;
     try { week = await _hv2Kpi('marketing', _hv2Ymd(wk), today); } catch (_) {}
     const j7 = (week && Number(week.joined)) || 0;
     const b7 = (week && Number(week.trials_booked)) || 0;
-    if (lab) lab.textContent = now.toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric' });
-    if (j7 >= 1) {
-      if (lab) lab.textContent = 'This week';
-      v.textContent = `+${j7} new client${j7 === 1 ? '' : 's'} this week`;
-      if (c) c.textContent = 'Already won this week - go stack another one today.';
-    } else if (b7 >= 1) {
-      if (lab) lab.textContent = 'This week';
-      v.textContent = `${b7} trial${b7 === 1 ? '' : 's'} booked this week`;
-      if (c) c.textContent = 'The pipeline is moving - close them out.';
-    } else if (net > 0) {
-      v.textContent = `$${Math.round(net).toLocaleString()} collected yesterday`;
-      if (c) c.textContent = 'Money moved while you were coaching.';
-    } else {
-      const sw = await _hv2StateWin(now, today);
-      if (lab) lab.textContent = 'On the board';
-      v.textContent = sw.v;
-      if (c) c.textContent = sw.c;
-    }
+    if (j7 >= 1) pool.push({ v: `+${j7} new client${j7 === 1 ? '' : 's'} this week`, c: 'Already won this week - go stack another one today.' });
+    if (b7 >= 1) pool.push({ v: `${b7} trial${b7 === 1 ? '' : 's'} booked this week`, c: 'The pipeline is moving - close them out.' });
+    pool.push(...await _hv2StateWins(now, today));
+    if (!pool.length) pool.push({ v: 'Your command center is live', c: 'Systems on. Now go put the first win on the board.' });
+    const doy = Math.floor((now - new Date(now.getFullYear(), 0, 0)) / 86400000);
+    const pick = pool[doy % pool.length];
+    if (lab) lab.textContent = 'On the board';
+    v.textContent = pick.v;
+    if (c) c.textContent = pick.c;
   }
 }
 
-// Standing wins: achievements the business already holds. A live academy
-// always has at least one, so the board is never empty - and they rotate
-// daily (stable within a day) so the card does not go stale.
-async function _hv2StateWin(now, today) {
+// Standing wins the business already holds - returned as a list so the
+// caller can rotate them with modest activity wins.
+async function _hv2StateWins(now, today) {
   const wk = new Date(now); wk.setDate(wk.getDate() - 29);
   let mem = null;
   try { mem = await _hv2Kpi('members', _hv2Ymd(wk), today); } catch (_) {}
@@ -15557,9 +15551,7 @@ async function _hv2StateWin(now, today) {
       wins.push({ v: 'Every payment on the books is clean', c: 'No failed charges anywhere. Tidy business.' });
     }
   }
-  if (!wins.length) return { v: 'Your command center is live', c: 'Systems on. Now go put the first win on the board.' };
-  const doy = Math.floor((now - new Date(now.getFullYear(), 0, 0)) / 86400000);
-  return wins[doy % wins.length];
+  return wins;
 }
 // ── Hawkeye card (hero right): last client message + proposed reply ──
 async function _hv2HawkLoad() {
