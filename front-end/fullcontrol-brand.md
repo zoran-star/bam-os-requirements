@@ -3,6 +3,8 @@
 > **How to build frontend interfaces in the Full Control design language.**
 > This is the canonical reference. Any new component, screen, or page in the BAM OS / client portal must read like it was drawn by the same hand.
 
+> ⚠️ **Scope note (2026-07-05):** the **V2 client portal** (`bam-ghl-agent/bam-portal/`) now follows its own living design system at [`bam-ghl-agent/bam-portal/design-system/DESIGN.md`](../bam-ghl-agent/bam-portal/design-system/DESIGN.md) - warm SaaS, gold `#D4B65C`/`#C8A84E`, rounded 8-24px, soft shadows. This document remains the reference for marketing/editorial surfaces (investor pages, landing pages, decks). Where the two disagree on portal UI, the portal design system wins.
+
 Source of truth: `Full Control — Brand Identity v1.0` (April 2026, Internal Review Build). Tagline: **Navigate · Command · Lead.** Positioning: *The Operating System for Elite Sport.*
 
 ---

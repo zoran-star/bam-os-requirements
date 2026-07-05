@@ -1,5 +1,7 @@
 # Client Portal — Design System
 
+> ⚠️ **SUPERSEDED 2026-07-05.** The living design system now lives at [`../design-system/DESIGN.md`](../design-system/DESIGN.md) + [`../design-system/tokens.css`](../design-system/tokens.css). Use that for all new work. This file is kept as historical context for the 2026-05-17 skin pass (some token values below are stale, e.g. fonts and radii).
+
 Applied 2026-05-17, derived from the FullControl prototype at https://fullcontrol-prototype-six.vercel.app
 
 Goal: bring the same warm, premium, gold-accent feel into `public/client-portal.html` without breaking any of the JavaScript flow logic.
