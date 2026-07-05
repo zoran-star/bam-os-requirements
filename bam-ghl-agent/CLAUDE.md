@@ -265,12 +265,16 @@ bam-ghl-agent/
 
 ## Design standards
 
-All frontend work follows the **Full Control design system** at [`front-end/fullcontrol-brand.md`](../front-end/fullcontrol-brand.md) (repo root). **Exception: `bam-gta-staff/` keeps its own branding — do not apply FullControl design system there.**
-- Dark-first (ink surfaces); light mode via `data-theme="light"` toggle
-- Space Grotesk for display, Inter for body, JetBrains Mono for labels
-- Gold (`#E8C547`) is the only accent — one moment per screen
-- No shadows, no gradients, no rounded corners > 6px
-- UX principle: guiding info at the point of action; minimize eye travel
+**⛔ MANDATORY for any V2 portal front-end work: read [`bam-portal/design-system/DESIGN.md`](bam-portal/design-system/DESIGN.md) FIRST and use its tokens ([`bam-portal/design-system/tokens.css`](bam-portal/design-system/tokens.css)).** It is the living design system extracted from the V2 Home / Assets / Calendar pages (2026-07-05) and it supersedes the old brand guide for portal surfaces. Quick anchors:
+- ONE gold: `var(--gold)` = `#D4B65C` dark / `#C8A84E` light. The old `#E8C547` is DEAD - never reintroduce it.
+- Fonts: Plus Jakarta Sans (`--font-ui`) + Nunito for big numbers (`--font-num`) + DM Mono for technical values.
+- Locked radius scale: 6 / 8 / 12 / 16 / 24 / 999 via `--r-*` tokens. Nothing in between.
+- Rounded warm-SaaS look, soft lift shadows, right-side drawer for detail views, no emoji in UI chrome.
+
+Scope exceptions:
+- **`bam-gta-staff/` keeps its own branding** - do not apply the design system there.
+- Marketing/editorial pages (non-portal) still follow [`front-end/fullcontrol-brand.md`](../front-end/fullcontrol-brand.md).
+- UX principle everywhere: guiding info at the point of action; minimize eye travel.
 - **NEVER use an em dash (Unicode U+2014, the long dash) in ANY person-facing output** - emails, SMS, automation messages, UI copy, client sites, agent/chat replies, in every repo, always (this is the repo-wide HARD RULE). Use a hyphen `-`. In the portals specifically (client portal `bam-portal/public/client-portal.html` + staff portal `bam-portal/src/`): for empty fields use `-`; don't use an em dash as a JS "empty" sentinel - detect the placeholder by shape (e.g. money `startsWith('$')`). Note: backend `api/*.js` still emits some U+2014 placeholders; the client should hide/replace them, not render them.
 
 ---
