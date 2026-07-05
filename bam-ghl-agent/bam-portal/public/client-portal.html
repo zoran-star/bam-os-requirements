@@ -44192,7 +44192,7 @@ async function _ccLoadMemberMsgs() {
 }
 function _ccIbRow(c) {
   const unread = c.unreadCount > 0;
-  const name = (c.contactName || c.fullName || 'Member').split(' ').slice(0, 2).join(' ');
+  const name = _ccCapName((c.contactName || c.fullName || 'Member').split(' ').slice(0, 2).join(' '));
   const initials = name.split(' ').map(w => w[0] || '').join('').toUpperCase().slice(0, 2);
   const preview = _hmStripEm((c.lastMessageBody || '').slice(0, 60));
   const reply = c.contactId ? `<button type="button" class="cc-ib-reply" onclick="event.stopPropagation();_ccQuickReply(this, '${String(c.contactId).replace(/[^A-Za-z0-9_-]/g, '')}')">Reply</button>` : '';
@@ -44247,7 +44247,7 @@ async function _ccLoadMemberActions() {
   const roster = await _ccEnsureMembers();
   const items = [];
   for (const m of roster) {
-    const n = m.athlete_name || m.parent_name || 'Member';
+    const n = _ccCapName(m.athlete_name || m.parent_name || 'Member');
     const amt = Math.round(_ccMonthly(m));
     const tail = amt > 0 ? ' · $' + amt.toLocaleString() + '/mo' : '';
     if (m.status === 'payment_failed') items.push({ cls: 'red', label: 'Failed payment', n: n + tail, id: m.id, w: 1000 + amt });
@@ -44266,7 +44266,7 @@ async function _ccLoadMemberActions() {
       anniv.setMonth(anniv.getMonth() + mo);
       const days = Math.ceil((anniv.getTime() - Date.now()) / 86400000);
       if (days >= 0 && days <= 14) {
-        items.push({ cls: 'gold', label: mo + ' month milestone', n: (m.athlete_name || 'Member') + (days === 0 ? ' · today' : ' · in ' + days + 'd'), id: m.id, w: 100 - days });
+        items.push({ cls: 'gold', label: mo + ' month milestone', n: _ccCapName(m.athlete_name || 'Member') + (days === 0 ? ' · today' : ' · in ' + days + 'd'), id: m.id, w: 100 - days });
         break;
       }
     }
@@ -44341,7 +44341,7 @@ function _ccMemberListRender(q) {
     let plan = ''; try { plan = m.pricing ? _memberPriceLabel(m.pricing) : (m.plan || ''); } catch (_) { plan = m.plan || ''; }
     return `<div class="cc-mlist-row" onclick="openMemberPopup('${m.id}')">
       ${(typeof _memberAvatar === 'function') ? _memberAvatar(m, 30) : ''}
-      <div style="flex:1;min-width:0"><div class="cc-ib-name">${escapeHTML(m.athlete_name || 'Member')}</div><div class="cc-ib-prev">${escapeHTML(m.parent_name || '')}</div></div>
+      <div style="flex:1;min-width:0"><div class="cc-ib-name">${escapeHTML(_ccCapName(m.athlete_name || 'Member'))}</div><div class="cc-ib-prev">${escapeHTML(_ccCapName(m.parent_name || ''))}</div></div>
       <button type="button" class="cc-mlist-msg" onclick="event.stopPropagation();document.getElementById('cc-mlist-overlay')?.remove();_ccOpenClassic('v15inbox')">Message</button>
       <span class="cc-mlist-plan">${plan ? String(plan) : ''}</span>
       ${status}
@@ -44352,6 +44352,15 @@ function _ccMemberListRender(q) {
 // _MEMBERS_ALL is a top-level `let`, so it is NOT a window property -
 // always read it through this helper (bare identifier reaches the global
 // lexical binding; window._MEMBERS_ALL is forever undefined).
+// GHL often stores names lowercase; title-case them for display. Words in
+// mixed case (McDonald, DeAndre) are left alone.
+function _ccCapName(n) {
+  return String(n || '').split(' ').map(w => {
+    if (!w) return w;
+    if (w === w.toLowerCase() || w === w.toUpperCase()) return w.charAt(0).toUpperCase() + w.slice(1).toLowerCase();
+    return w;
+  }).join(' ');
+}
 function _ccRoster() {
   try { return (typeof _MEMBERS_ALL !== 'undefined' && Array.isArray(_MEMBERS_ALL)) ? _MEMBERS_ALL : []; } catch (_) { return []; }
 }
@@ -44428,7 +44437,7 @@ function _ccPulseRender(roster) {
     const cls = (m.status === 'payment_failed' || m.status === 'payment_method_required') ? 'red'
       : (m.status === 'paused') ? 'mute'
       : (m.status === 'cancelling' || m.pause_scheduled_for) ? 'amber' : 'ok';
-    const tip = (m.athlete_name || 'Member') + (m.status && m.status !== 'live' ? ' · ' + m.status.replace(/_/g, ' ') : '');
+    const tip = _ccCapName(m.athlete_name || 'Member') + (m.status && m.status !== 'live' ? ' · ' + m.status.replace(/_/g, ' ') : '');
     return '<button type="button" class="cc-pd ' + cls + '" title="' + escapeHTML(tip) + '" onclick="openMemberPopup(\'' + m.id + '\')"></button>';
   }).join('');
 }
@@ -44557,12 +44566,12 @@ function _mmaCardHtml(m, detailed) {
   let plan = '';
   try { plan = m.pricing ? _memberPriceLabel(m.pricing) : (m.plan || ''); } catch (_) { plan = m.plan || ''; }
   // plan comes from our own _memberPriceLabel helper and is already HTML
-  const sub = [escapeHTML(m.parent_name || ''), plan ? String(plan) : '']
+  const sub = [escapeHTML(_ccCapName(m.parent_name || '')), plan ? String(plan) : '']
     .filter(Boolean).join(' · ');
   const extra = detailed
     ? `<div class="mma-card-sub">${[m.trainer ? 'Trainer: ' + escapeHTML(m.trainer) : '', m.joined_date ? 'Joined ' + escapeHTML(String(m.joined_date).slice(0, 10)) : ''].filter(Boolean).join(' · ')}</div>`
     : '';
-  return `<div class="mma-card">${av}<div style="min-width:0"><div class="mma-card-name">${escapeHTML(m.athlete_name || 'Member')} ${status}</div><div class="mma-card-sub">${sub}</div>${extra}</div><button type="button" class="mma-open" onclick="openMemberPopup('${m.id}')">Open card</button></div>`;
+  return `<div class="mma-card">${av}<div style="min-width:0"><div class="mma-card-name">${escapeHTML(_ccCapName(m.athlete_name || 'Member'))} ${status}</div><div class="mma-card-sub">${sub}</div>${extra}</div><button type="button" class="mma-open" onclick="openMemberPopup('${m.id}')">Open card</button></div>`;
 }
 async function _mmaKpis() {
   const roster = await _ccEnsureMembers();
