@@ -41,6 +41,12 @@
 - Seam now GROWS bottom-up like a rising chart (mmSeamGrow) then glints. HUD types itself in (`_ccHudType`, 16ms/char) on every entry. Member-agent KPI grid numbers count up via existing `_hmCountUp`.
 - All reduced-motion safe.
 
+## Members pass 2 + wiring fix (2026-07-05)
+- **CRITICAL FIX**: `_MEMBERS_ALL` is a top-level `let` = NOT a window property. All roster reads now go through `_ccRoster()` (bare identifier hits the global lexical binding). `window._MEMBERS_ALL` reads silently returned undefined in production = the "no data wired" bug. In page-context tests assign BARE `_MEMBERS_ALL = [...]`, not window.
+- Members section: KPI skeleton shimmer + one 5s retry, trend deltas (+N / +$N this month from 30d joins), 6-month growth sparklines, roster **pulse strip** (dot per member by status), action items with **$/mo at risk** sorted by weight + **milestone chips** (3/6/12/18/24-month anniversaries within 14d, gold), alive empty states ("All N members are current." / "Inbox clear."), **quick reply** on message rows (POST /api/ghl/send-message type SMS + contactId, fallback link to inbox), **Sage bar** ported from prototype SageBar (pill + gradient gold icon + drawerUp entrance + typewriter prompt rotation `_ccSageType`), member popup with segment tabs (All/Live/Paused/Issues) + hover Message action.
+- Light theme v1.4: prototype cream #F8F7F5, neutral borders, prototype grays (was #EFEAE0, read too yellow). Mirrored in tokens.css.
+- **Radar/ticker spans the whole flow**: `.hm-ticker-bg` reparented to #view-cc with `.cc-full` (fixed, 100vw/100vh, z0; cc-content z1). Reparent avoids transformed-ancestor breakage from section recede.
+
 ## Section mounts (current skeleton)
 | Section | Mount | Content |
 |---|---|---|

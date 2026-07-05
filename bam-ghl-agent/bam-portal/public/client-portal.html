@@ -4401,27 +4401,27 @@
 
   /* ── Light theme override ── */
   html[data-theme="light"] {
-    /* Warm cream palette - lighter than #E0D7C1, still warm and editorial.
-       Sidebar + main share one cream tone; cards POP as pure white. */
-    --bg:           #EFEAE0;
-    --ink:          #EFEAE0;
+    /* Prototype cream palette (fullcontrol-prototype) - neutral, not
+       yellow. Cards stay pure white on the soft #F8F7F5 canvas. */
+    --bg:           #F8F7F5;
+    --ink:          #F8F7F5;
     --surface:      #FFFFFF;
-    --surface-el:   #F7F2E7;          /* warm-tinted sub-surface (inputs) */
-    --surface-hov:  #E8E1D2;
-    --surface-alt:  #F7F2E7;
-    --surface-3:    #E8E1D2;
+    --surface-el:   #FAFAF8;          /* faint elevated sub-surface (inputs) */
+    --surface-hov:  #F0EFEC;
+    --surface-alt:  #FAFAF8;
+    --surface-3:    #F0EFEC;
 
-    /* Warm-tinted borders - read better on cream than neutral black-on-cream */
-    --line:         rgba(60,40,15,0.10);
-    --line-str:     rgba(60,40,15,0.18);
-    --line-md:      rgba(60,40,15,0.16);
-    --border:       rgba(60,40,15,0.10);
-    --border-med:   rgba(60,40,15,0.16);
-    --border-str:   rgba(60,40,15,0.22);
+    /* Neutral borders, matching the prototype */
+    --line:         rgba(0,0,0,0.07);
+    --line-str:     rgba(0,0,0,0.14);
+    --line-md:      rgba(0,0,0,0.12);
+    --border:       rgba(0,0,0,0.07);
+    --border-med:   rgba(0,0,0,0.12);
+    --border-str:   rgba(0,0,0,0.16);
 
     --text:         #1C1B18;          /* warm near-black, not pure */
-    --text-sub:     #5F5A50;          /* slightly warmer for hierarchy */
-    --text-mute:    #8E867A;          /* readable on cream */
+    --text-sub:     #6E6B63;
+    --text-mute:    #A5A19A;
 
     --accent:       #C8A84E;
     --gold:         #C8A84E;
@@ -15561,7 +15561,7 @@ async function _hv2StateWins(now, today) {
   const live = (mem && mem.roster && Number(mem.roster.live)) || 0;
   const cancelled = (mem && mem.cancelled && Number(mem.cancelled.count)) || 0;
   const payments = (mem && Array.isArray(mem.payments)) ? mem.payments.length : 0;
-  const roster = (Array.isArray(window._MEMBERS_ALL) && window._MEMBERS_ALL) || [];
+  const roster = (typeof _ccRoster === 'function' ? _ccRoster() : []);
   const wins = [];
   if (live >= 1) wins.push({ v: `${live} active member${live === 1 ? '' : 's'} strong`, c: `${live === 1 ? 'A family' : live + ' families'} chose you, and they are still here.` });
   if (live >= 2 && cancelled === 0) wins.push({ v: '0 cancellations in 30 days', c: 'Everyone stayed. Retention is the quiet win.' });
@@ -43493,6 +43493,50 @@ function _ccStyle() {
     '.cc-mlist-plan{flex:none;font-size:11px;color:var(--text-mute)}' +
     /* scroll recede */
     '.cc-sec.cc-recede{transition:none;will-change:transform,opacity,filter}' +
+    /* skeletons + KPI trims */
+    '.cc-skel{display:inline-block;min-width:44px;border-radius:6px;background:linear-gradient(90deg,var(--surface-el) 25%,var(--surface-hov) 50%,var(--surface-el) 75%);background-size:200% 100%;animation:ccShimmer 1.4s ease-in-out infinite;color:transparent;user-select:none}' +
+    '@keyframes ccShimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}' +
+    '.cc-stat{position:relative;overflow:hidden}' +
+    '.cc-stat-d{font-size:11px;font-weight:700;color:var(--green);margin-top:3px;min-height:14px}' +
+    '.cc-spark{position:absolute;right:12px;bottom:12px;pointer-events:none}' +
+    /* roster pulse strip */
+    '.cc-pulse{display:flex;flex-wrap:wrap;gap:5px;margin:0 0 14px}' +
+    '.cc-pd{width:8px;height:8px;border-radius:50%;border:none;padding:0;cursor:pointer;transition:transform .15s var(--es,ease)}' +
+    '.cc-pd:hover{transform:scale(1.8)}' +
+    '.cc-pd.ok{background:var(--green)}.cc-pd.amber{background:var(--amber)}.cc-pd.red{background:var(--red)}.cc-pd.mute{background:var(--border-med)}' +
+    /* alive empty states + milestone chips */
+    '.cc-mem-good{display:flex;align-items:center;gap:8px;padding:14px 16px;font-size:12.5px;font-weight:600;color:var(--green)}' +
+    '.cc-mem-good svg{flex:none}' +
+    '.cc-act-chip.gold{background:var(--gold-glow);color:var(--gold)}' +
+    /* quick reply */
+    '.cc-ib-reply{flex:none;background:transparent;border:1px solid var(--border-med);border-radius:8px;padding:4px 10px;font:inherit;font-size:11px;font-weight:700;color:var(--text-mute);cursor:pointer;opacity:0;transition:opacity .15s,color .12s,border-color .12s}' +
+    '.cc-ib-row:hover .cc-ib-reply{opacity:1}' +
+    '.cc-ib-reply:hover{color:var(--gold);border-color:var(--gold)}' +
+    '.cc-qr{display:flex;gap:8px;padding:8px 16px;border-bottom:1px solid var(--border);background:var(--gold-sheen)}' +
+    '.cc-qr-in{flex:1;background:var(--surface-el);border:1px solid var(--border-med);border-radius:8px;padding:8px 12px;font:inherit;font-size:12.5px;color:var(--text);outline:none}' +
+    '.cc-qr-in:focus{border-color:var(--gold)}' +
+    '.cc-qr-send{background:var(--gold);color:var(--on-gold);border:none;border-radius:8px;padding:8px 14px;font:inherit;font-size:12px;font-weight:700;cursor:pointer}' +
+    /* Sage bar - ported from the prototype SageBar (pill, gradient icon, drawerUp) */
+    '.cc-sage{display:flex;align-items:center;gap:10px;padding:8px;background:var(--surface);border:1px solid var(--border);border-radius:9999px;box-shadow:0 4px 24px rgba(0,0,0,.08),0 2px 12px rgba(200,168,78,.06);cursor:pointer;transition:box-shadow .2s,border-color .2s}' +
+    '.cc-sage:hover{border-color:var(--accent-border);box-shadow:0 4px 28px rgba(0,0,0,.1),0 2px 16px rgba(200,168,78,.12)}' +
+    '.cc-sec.cc-visible .cc-sage{animation:ccDrawerUp .35s cubic-bezier(0.22,1,0.36,1)}' +
+    '@keyframes ccDrawerUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}' +
+    '.cc-sage-ic{width:34px;height:34px;border-radius:9999px;background:linear-gradient(135deg,var(--gold),var(--gold-d,#E0C56A));color:#fff;display:flex;align-items:center;justify-content:center;flex:none;box-shadow:0 2px 10px rgba(200,168,78,.25)}' +
+    '.cc-sage-ic svg{width:16px;height:16px}' +
+    '.cc-sage-ph{flex:1;font-size:14px;font-weight:500;color:var(--text-mute);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:left}' +
+    '.cc-sage:hover .cc-sage-ph{color:var(--gold);opacity:.6}' +
+    '.cc-sage-go{width:34px;height:34px;border-radius:9999px;background:var(--gold);color:var(--on-gold);display:flex;align-items:center;justify-content:center;flex:none}' +
+    '.cc-sage-go svg{width:15px;height:15px}' +
+    /* member popup tabs + hover action */
+    '.cc-mlist-tabs{display:flex;gap:4px;background:var(--surface-el);border:1px solid var(--border);border-radius:8px;padding:3px;margin-bottom:8px}' +
+    '.cc-mlist-tab{flex:1;background:none;border:none;border-radius:6px;padding:6px 8px;font:inherit;font-size:11.5px;font-weight:600;color:var(--text-mute);cursor:pointer}' +
+    '.cc-mlist-tab.on{background:var(--gold-glow);color:var(--gold)}' +
+    '.cc-mlist-tab span{opacity:.7;font-weight:700}' +
+    '.cc-mlist-msg{flex:none;background:transparent;border:1px solid var(--border-med);border-radius:8px;padding:4px 10px;font:inherit;font-size:11px;font-weight:700;color:var(--text-mute);cursor:pointer;opacity:0;transition:opacity .15s,color .12s,border-color .12s}' +
+    '.cc-mlist-row:hover .cc-mlist-msg{opacity:1}' +
+    '.cc-mlist-msg:hover{color:var(--gold);border-color:var(--gold)}' +
+    '.hm-ticker-bg.cc-full{position:fixed !important;inset:0;width:100vw;height:100vh;z-index:0;pointer-events:none}' +
+    'body.cc-mode #view-cc .cc-content{position:relative;z-index:1}' +
     '@media(max-width:768px){body.cc-mode .cc-rail{display:none}#view-cc .cc-content{padding:16px 16px 120px}}' +
     '@media(prefers-reduced-motion:reduce){.cc-sec{opacity:1;transform:none;transition:none}}';
   document.head.appendChild(st);
@@ -43514,6 +43558,20 @@ function openCommandCenter() {
     _ccInitObserver();
     // sales alert dot mirrors the Hawkeye count (set by the home loaders)
     setInterval(() => _ccSetBadge('sales', window._hmHawkTotal || 0), 8000);
+    // the home radar/ticker canvas backs the ENTIRE flow, full width:
+    // reparent it to #view-cc (no transformed ancestors) and pin it fixed
+    const liftTicker = () => {
+      const tb = document.querySelector('.hm-ticker-bg');
+      const vc = document.getElementById('view-cc');
+      if (!tb || !vc) return false;
+      if (tb.parentElement !== vc) {
+        tb.classList.add('cc-full');
+        vc.prepend(tb);
+        window.dispatchEvent(new Event('resize'));
+      }
+      return true;
+    };
+    setTimeout(() => { if (!liftTicker()) setTimeout(liftTicker, 1500); }, 900);
   }
 }
 
@@ -43679,7 +43737,7 @@ function _ccFocusWallpaper(modalId) {
   const modal = document.getElementById(modalId);
   if (!modal) return;
   modal.querySelector('.cc-wall')?.remove();
-  const roster = (Array.isArray(window._MEMBERS_ALL) && window._MEMBERS_ALL) || [];
+  const roster = (typeof _ccRoster === 'function' ? _ccRoster() : []);
   const joins = roster
     .map(m => new Date(m.joined_date || m.start_date || m.stripe_joined_at || 0).getTime())
     .filter(t => t > 0);
@@ -43971,11 +44029,12 @@ function _ccMountMembers(host) {
   host.innerHTML = _ccHead('Members', 'Messages, action items and your roster.') + `
     <div id="cc-members-mount">
       <div class="cc-stats" id="cc-mem-kpis">
-        <div class="cc-stat"><div class="cc-stat-v" id="cc-mem-live">-</div><div class="cc-stat-l">Active members</div></div>
-        <div class="cc-stat"><div class="cc-stat-v" id="cc-mem-paused">-</div><div class="cc-stat-l">Paused</div></div>
-        <div class="cc-stat"><div class="cc-stat-v" id="cc-mem-mrr">-</div><div class="cc-stat-l">MRR (approx)</div></div>
-        <div class="cc-stat"><div class="cc-stat-v" id="cc-mem-arpu">-</div><div class="cc-stat-l">Rev / member</div></div>
+        <div class="cc-stat"><div class="cc-stat-v" id="cc-mem-live"><span class="cc-skel">--</span></div><div class="cc-stat-l">Active members</div><div class="cc-stat-d" id="cc-mem-live-d"></div><div class="cc-spark" id="cc-mem-live-s"></div></div>
+        <div class="cc-stat"><div class="cc-stat-v" id="cc-mem-paused"><span class="cc-skel">--</span></div><div class="cc-stat-l">Paused</div></div>
+        <div class="cc-stat"><div class="cc-stat-v" id="cc-mem-mrr"><span class="cc-skel">--</span></div><div class="cc-stat-l">MRR (approx)</div><div class="cc-stat-d" id="cc-mem-mrr-d"></div><div class="cc-spark" id="cc-mem-mrr-s"></div></div>
+        <div class="cc-stat"><div class="cc-stat-v" id="cc-mem-arpu"><span class="cc-skel">--</span></div><div class="cc-stat-l">Rev / member</div></div>
       </div>
+      <div class="cc-pulse" id="cc-mem-pulse"></div>
       <div class="cc-mem-grid">
         <div class="cc-mem-card">
           <div class="cc-mem-card-h">Unread member messages</div>
@@ -43989,13 +44048,47 @@ function _ccMountMembers(host) {
           </div>
         </div>
       </div>
-      <button type="button" class="cc-agent-bar" id="cc-agent-bar" onclick="openMembersFocus()">
-        ${_ccIcons().search}<span>Ask about a member, your KPIs, anything...</span>
-      </button>
+      <div class="cc-sage" id="cc-agent-bar" onclick="openMembersFocus()" role="button" tabindex="0">
+        <span class="cc-sage-ic"><svg viewBox="0 0 512 512" fill="currentColor" stroke="none"><path d="M 256 80 L 290 230 L 432 256 L 290 282 L 256 432 L 222 282 L 80 256 L 222 230 Z"/></svg></span>
+        <span class="cc-sage-ph" id="cc-sage-ph">Ask about a member, your KPIs, anything...</span>
+        <span class="cc-sage-go"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></svg></span>
+      </div>
     </div>`;
   _ccLoadMemberKpis();
   _ccLoadMemberMsgs();
   _ccLoadMemberActions();
+  _ccSageType();
+  // the roster fetch can lose the boot race; one retry refills everything
+  setTimeout(() => {
+    if (!_ccRoster().length) { _ccLoadMemberKpis(); _ccLoadMemberMsgs(); _ccLoadMemberActions(); }
+  }, 5000);
+}
+
+// Typewriter placeholder on the Sage bar (ported prompt rotation from the
+// prototype SageBar, typed instead of swapped).
+function _ccSageType() {
+  const el = document.getElementById('cc-sage-ph');
+  if (!el || el._typing) return;
+  el._typing = true;
+  const prompts = [
+    "How's my roster doing?",
+    "Pull up a member's card...",
+    "Who's at risk of churning?",
+    "What's my MRR this month?",
+    "Who's pausing this month?",
+    "Any payments failing right now?",
+  ];
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) { el.textContent = prompts[0]; return; }
+  let p = 0, i = 0, dir = 1;
+  (function tick() {
+    const text = prompts[p];
+    i += dir;
+    el.textContent = text.slice(0, Math.max(0, i)) || '\u00a0';
+    let wait = dir > 0 ? 34 : 11;
+    if (dir > 0 && i >= text.length) { dir = -1; wait = 2400; }
+    else if (dir < 0 && i <= 0) { dir = 1; p = (p + 1) % prompts.length; wait = 350; }
+    el._typeT = setTimeout(tick, wait);
+  })();
 }
 
 // Unread member messages: the shared GHL inbox filtered to conversations
@@ -44018,7 +44111,7 @@ async function _ccLoadMemberMsgs() {
     });
     mine.sort((a, b) => (b.unreadCount > 0) - (a.unreadCount > 0));
     const rows = mine.slice(0, 4);
-    if (!rows.length) { body.innerHTML = '<div class="cc-mem-empty">No member messages.</div>'; return; }
+    if (!rows.length) { body.innerHTML = '<div class="cc-mem-good">' + '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>' + 'Inbox clear. Every parent answered.</div>'; return; }
     body.innerHTML = rows.map(c => _ccIbRow(c)).join('') +
       `<button type="button" class="cc-mem-more" onclick="switchView('v15inbox')">Open member inbox</button>`;
   } catch (_) {
@@ -44030,15 +44123,51 @@ function _ccIbRow(c) {
   const name = (c.contactName || c.fullName || 'Member').split(' ').slice(0, 2).join(' ');
   const initials = name.split(' ').map(w => w[0] || '').join('').toUpperCase().slice(0, 2);
   const preview = _hmStripEm((c.lastMessageBody || '').slice(0, 60));
+  const reply = c.contactId ? `<button type="button" class="cc-ib-reply" onclick="event.stopPropagation();_ccQuickReply(this, '${String(c.contactId).replace(/[^A-Za-z0-9_-]/g, '')}')">Reply</button>` : '';
   return `<div class="cc-ib-row${unread ? ' unread' : ''}" onclick="switchView('v15inbox')">
     <span class="cc-ib-av">${escapeHTML(initials)}</span>
     <div style="flex:1;min-width:0"><div class="cc-ib-name">${escapeHTML(name)}</div><div class="cc-ib-prev">${escapeHTML(preview)}</div></div>
+    ${reply}
     ${unread ? '<span class="cc-ib-dot"></span>' : ''}
   </div>`;
 }
 
-// Member action items derived from the live roster: failed payments first,
-// then scheduled pauses / cancellations. Click opens the member drawer.
+// Inline quick reply: answer a member without leaving the flow. Sends SMS
+// through the same endpoint the inbox composer uses.
+function _ccQuickReply(btn, contactId) {
+  const row = btn.closest('.cc-ib-row');
+  if (!row) return;
+  if (row.nextElementSibling && row.nextElementSibling.classList.contains('cc-qr')) {
+    row.nextElementSibling.querySelector('input')?.focus();
+    return;
+  }
+  row.insertAdjacentHTML('afterend',
+    `<div class="cc-qr"><input type="text" class="cc-qr-in" placeholder="Type a reply..." onkeydown="if(event.key==='Enter')_ccQuickSend(this,'${contactId}')"><button type="button" class="cc-qr-send" onclick="_ccQuickSend(this.previousElementSibling,'${contactId}')">Send</button></div>`);
+  row.nextElementSibling.querySelector('input').focus();
+}
+async function _ccQuickSend(inp, contactId) {
+  const text = (inp.value || '').trim();
+  if (!text) return;
+  const box = inp.closest('.cc-qr');
+  box.innerHTML = '<div class="cc-mem-empty" style="padding:4px 0">Sending...</div>';
+  try {
+    const token = await _mreqAuthToken();
+    const r = await fetch('/api/ghl/send-message', {
+      method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+      body: JSON.stringify({ client_id: CLIENT_ID, type: 'SMS', contactId, message: text }),
+    });
+    const j = await _safeJson(r);
+    if (!r.ok) throw new Error((j && j.error) || 'send failed');
+    box.innerHTML = '<div class="cc-mem-good" style="padding:4px 0">' + '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>' + 'Sent.</div>';
+    setTimeout(() => box.remove(), 2200);
+  } catch (_) {
+    box.innerHTML = '<div class="cc-mem-empty" style="padding:4px 0">Could not send from here. <button type="button" class="cc-mem-more" style="display:inline;width:auto;border:none;margin:0;padding:0" onclick="switchView(\'v15inbox\')">Open inbox</button></div>';
+  }
+}
+
+// Member action items from the live roster: money problems first (sorted
+// by dollars at risk), then pauses and cancellations, then upcoming
+// member milestones. Click opens the member drawer.
 async function _ccLoadMemberActions() {
   const body = document.getElementById('cc-mem-actions');
   if (!body) return;
@@ -44046,15 +44175,38 @@ async function _ccLoadMemberActions() {
   const items = [];
   for (const m of roster) {
     const n = m.athlete_name || m.parent_name || 'Member';
-    if (m.status === 'payment_failed') items.push({ cls: 'red', label: 'Failed payment', n, id: m.id });
-    else if (m.status === 'payment_method_required') items.push({ cls: 'red', label: 'Needs payment method', n, id: m.id });
-    else if (m.pause_scheduled_for) items.push({ cls: 'amber', label: 'Pause scheduled', n, id: m.id });
-    else if (m.status === 'cancelling') items.push({ cls: 'amber', label: 'Cancelling', n, id: m.id });
+    const amt = Math.round(_ccMonthly(m));
+    const tail = amt > 0 ? ' · $' + amt.toLocaleString() + '/mo' : '';
+    if (m.status === 'payment_failed') items.push({ cls: 'red', label: 'Failed payment', n: n + tail, id: m.id, w: 1000 + amt });
+    else if (m.status === 'payment_method_required') items.push({ cls: 'red', label: 'Needs payment method', n: n + tail, id: m.id, w: 900 + amt });
+    else if (m.pause_scheduled_for) items.push({ cls: 'amber', label: 'Pause scheduled', n: n + tail, id: m.id, w: 500 + amt });
+    else if (m.status === 'cancelling') items.push({ cls: 'amber', label: 'Cancelling', n: n + tail, id: m.id, w: 400 + amt });
   }
-  _ccSetBadge('members', items.length);
-  if (!items.length) { body.innerHTML = '<div class="cc-mem-empty">Nothing needs attention.</div>'; return; }
-  const more = items.length > 5 ? `<div class="cc-mem-empty">+${items.length - 5} more in the member list</div>` : '';
-  body.innerHTML = items.slice(0, 5).map(i =>
+  const alerts = items.length;
+  // milestone chips: anniversaries landing inside the next 14 days
+  for (const m of roster) {
+    if (m.status !== 'live') continue;
+    const t = new Date(m.joined_date || m.start_date || m.stripe_joined_at || 0).getTime();
+    if (!(t > 0)) continue;
+    for (const mo of [3, 6, 12, 18, 24]) {
+      const anniv = new Date(t);
+      anniv.setMonth(anniv.getMonth() + mo);
+      const days = Math.ceil((anniv.getTime() - Date.now()) / 86400000);
+      if (days >= 0 && days <= 14) {
+        items.push({ cls: 'gold', label: mo + ' month milestone', n: (m.athlete_name || 'Member') + (days === 0 ? ' · today' : ' · in ' + days + 'd'), id: m.id, w: 100 - days });
+        break;
+      }
+    }
+  }
+  _ccSetBadge('members', alerts);
+  if (!items.length) {
+    const live = roster.filter(m => m.status === 'live' || m.status === 'cancelling').length;
+    body.innerHTML = '<div class="cc-mem-good">' + '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>' + (live ? 'All ' + live + ' members are current.' : 'No open items.') + '</div>';
+    return;
+  }
+  items.sort((a, b) => b.w - a.w);
+  const more = items.length > 6 ? `<div class="cc-mem-empty">+${items.length - 6} more in the member list</div>` : '';
+  body.innerHTML = items.slice(0, 6).map(i =>
     `<button type="button" class="cc-act-chip ${i.cls}" onclick="openMemberPopup('${i.id}')"><span>${escapeHTML(i.label)}</span><span class="cc-act-name">${escapeHTML(i.n)}</span></button>`
   ).join('') + more;
 }
@@ -44073,6 +44225,7 @@ async function _ccMemberListOpen() {
           </button>
         </div>
         <input type="text" class="cc-mlist-search" id="cc-mlist-search" placeholder="Search members..." oninput="_ccMemberListRender(this.value)">
+        <div class="cc-mlist-tabs" id="cc-mlist-tabs"></div>
         <div class="cc-mlist-body" id="cc-mlist-body"><div class="req-empty" style="padding:20px 0"><span class="req-spin"></span>Loading...</div></div>
       </div>
     </div>`);
@@ -44083,10 +44236,25 @@ async function _ccMemberListOpen() {
 function _ccMemberListRender(q) {
   const body = document.getElementById('cc-mlist-body');
   if (!body) return;
-  const roster = (Array.isArray(window._MEMBERS_ALL) && window._MEMBERS_ALL) || [];
+  const roster = (typeof _ccRoster === 'function' ? _ccRoster() : []);
+  const isIssue = m => m.status === 'payment_failed' || m.status === 'payment_method_required';
+  const isLive = m => m.status === 'live' || m.status === 'cancelling';
+  const tab = window._CC_MLTAB || 'all';
+  const counts = {
+    all: roster.length,
+    live: roster.filter(isLive).length,
+    paused: roster.filter(m => m.status === 'paused').length,
+    issues: roster.filter(isIssue).length,
+  };
+  const tabsEl = document.getElementById('cc-mlist-tabs');
+  if (tabsEl) tabsEl.innerHTML = [['all', 'All'], ['live', 'Live'], ['paused', 'Paused'], ['issues', 'Issues']].map(t =>
+    `<button type="button" class="cc-mlist-tab${tab === t[0] ? ' on' : ''}" onclick="window._CC_MLTAB='${t[0]}';_ccMemberListRender(document.getElementById('cc-mlist-search') ? document.getElementById('cc-mlist-search').value : '')">${t[1]} <span>${counts[t[0]]}</span></button>`).join('');
   const needle = (q || '').toLowerCase().trim();
-  const rows = roster.filter(m => !needle ||
+  let rows = roster.filter(m => !needle ||
     ((m.athlete_name || '') + ' ' + (m.parent_name || '')).toLowerCase().includes(needle));
+  if (tab === 'live') rows = rows.filter(isLive);
+  else if (tab === 'paused') rows = rows.filter(m => m.status === 'paused');
+  else if (tab === 'issues') rows = rows.filter(isIssue);
   if (!rows.length) { body.innerHTML = '<div class="cc-mem-empty" style="padding:20px 0">No matches.</div>'; return; }
   body.innerHTML = rows.map(m => {
     const status = (typeof _memberStatusPill === 'function') ? _memberStatusPill(m.status) : escapeHTML(m.status || '');
@@ -44094,16 +44262,23 @@ function _ccMemberListRender(q) {
     return `<div class="cc-mlist-row" onclick="openMemberPopup('${m.id}')">
       ${(typeof _memberAvatar === 'function') ? _memberAvatar(m, 30) : ''}
       <div style="flex:1;min-width:0"><div class="cc-ib-name">${escapeHTML(m.athlete_name || 'Member')}</div><div class="cc-ib-prev">${escapeHTML(m.parent_name || '')}</div></div>
+      <button type="button" class="cc-mlist-msg" onclick="event.stopPropagation();document.getElementById('cc-mlist-overlay')?.remove();_ccOpenClassic('v15inbox')">Message</button>
       <span class="cc-mlist-plan">${plan ? String(plan) : ''}</span>
       ${status}
     </div>`;
   }).join('');
 }
 
+// _MEMBERS_ALL is a top-level `let`, so it is NOT a window property -
+// always read it through this helper (bare identifier reaches the global
+// lexical binding; window._MEMBERS_ALL is forever undefined).
+function _ccRoster() {
+  try { return (typeof _MEMBERS_ALL !== 'undefined' && Array.isArray(_MEMBERS_ALL)) ? _MEMBERS_ALL : []; } catch (_) { return []; }
+}
 async function _ccEnsureMembers() {
-  if (Array.isArray(window._MEMBERS_ALL) && window._MEMBERS_ALL.length) return window._MEMBERS_ALL;
+  if (_ccRoster().length) return _ccRoster();
   try { await fetchAndRenderMembers(); } catch (_) {}
-  return (Array.isArray(window._MEMBERS_ALL) && window._MEMBERS_ALL) || [];
+  return _ccRoster();
 }
 // Monthly-equivalent price for a member (catalog rows are tax-inclusive, so
 // MRR/ARPU here are approximations - labeled as such in the UI).
@@ -44130,6 +44305,52 @@ async function _ccLoadMemberKpis() {
   set('cc-mem-paused', String(k.paused));
   set('cc-mem-mrr', '$' + Math.round(k.mrr).toLocaleString());
   set('cc-mem-arpu', '$' + Math.round(k.arpu).toLocaleString());
+  // trend deltas: what the last 30 days added
+  const cut = Date.now() - 30 * 86400000;
+  const joins = roster.filter(m => {
+    const t = new Date(m.joined_date || m.start_date || m.stripe_joined_at || 0).getTime();
+    return t > cut;
+  });
+  const dl = document.getElementById('cc-mem-live-d');
+  if (dl && joins.length) dl.textContent = '+' + joins.length + ' this month';
+  const mrrNew = joins.reduce((s, m) => s + _ccMonthly(m), 0);
+  const dm = document.getElementById('cc-mem-mrr-d');
+  if (dm && mrrNew > 0) dm.textContent = '+$' + Math.round(mrrNew).toLocaleString() + ' this month';
+  _ccSparkInto('cc-mem-live-s', _ccGrowthSeries(roster, 6, false));
+  _ccSparkInto('cc-mem-mrr-s', _ccGrowthSeries(roster, 6, true));
+  _ccPulseRender(roster);
+}
+function _ccGrowthSeries(roster, months, money) {
+  const now = new Date(), out = [];
+  for (let i = months - 1; i >= 0; i--) {
+    const end = new Date(now.getFullYear(), now.getMonth() - i + 1, 1).getTime();
+    let v = 0;
+    for (const m of roster) {
+      const t = new Date(m.joined_date || m.start_date || m.stripe_joined_at || 0).getTime();
+      if (t > 0 && t < end) v += money ? _ccMonthly(m) : 1;
+    }
+    out.push(v);
+  }
+  return out;
+}
+function _ccSparkInto(id, series) {
+  const host = document.getElementById(id);
+  if (!host || series.length < 2) return;
+  const max = Math.max.apply(null, series.concat([1]));
+  const pts = series.map((v, i) => (i / (series.length - 1) * 60).toFixed(1) + ',' + (22 - (v / max) * 18).toFixed(1)).join(' ');
+  host.innerHTML = '<svg viewBox="0 0 60 24" width="60" height="24"><polyline points="' + pts + '" fill="none" stroke="var(--gold)" stroke-width="1.5" opacity=".55"/></svg>';
+}
+// One dot per member, colored by status. The whole roster at a glance.
+function _ccPulseRender(roster) {
+  const host = document.getElementById('cc-mem-pulse');
+  if (!host) return;
+  host.innerHTML = roster.map(m => {
+    const cls = (m.status === 'payment_failed' || m.status === 'payment_method_required') ? 'red'
+      : (m.status === 'paused') ? 'mute'
+      : (m.status === 'cancelling' || m.pause_scheduled_for) ? 'amber' : 'ok';
+    const tip = (m.athlete_name || 'Member') + (m.status && m.status !== 'live' ? ' · ' + m.status.replace(/_/g, ' ') : '');
+    return '<button type="button" class="cc-pd ' + cls + '" title="' + escapeHTML(tip) + '" onclick="openMemberPopup(\'' + m.id + '\')"></button>';
+  }).join('');
 }
 
 // MARKETING: reparents the Marketing Machine cards. Their CSS is global
@@ -44236,6 +44457,7 @@ async function _mmaHandle(q) {
 async function _mmaMatchMembers(q) {
   const stop = new Set(['the', 'and', 'about', 'member', 'members', 'who', 'what', 'can', 'you', 'tell', 'show', 'pull', 'card', 'for', 'his', 'her', 'their', 'this', 'that', 'guy']);
   const roster = await _ccEnsureMembers();
+  // (roster reads fixed to the lexical binding via _ccRoster)
   const words = q.split(/[^a-z0-9']+/).filter(w => w.length >= 3 && !stop.has(w));
   if (!words.length) return [];
   const scored = [];
