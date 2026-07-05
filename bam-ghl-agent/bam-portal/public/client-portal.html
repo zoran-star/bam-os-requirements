@@ -44515,6 +44515,23 @@ function _mmRenderMetaFocus(d) {
 // whose bar width = people remaining; the drop % + who was lost lives in the
 // gap between rows (that's where the eye already looks). Only the single worst
 // leak is painted red, with its fix chip attached. No overlapping ratio pills.
+// Page-load speed chip for the clicked -> loaded connector. Headline = median
+// full-load seconds (all traffic); tooltip discloses the per-source split plus
+// LCP / TTFB and the sample size.
+function _mmLoadChip(load) {
+  const secs = (ms) => { const s = ms / 1000; return (s < 10 ? s.toFixed(1) : String(Math.round(s))) + 's'; };
+  const order = ['meta', 'internal', 'direct', 'search', 'referral', 'other'];
+  const bs = load.by_source || {};
+  const parts = [];
+  order.forEach((k) => { if (bs[k] && bs[k].median_ms != null) parts.push(k + ' ' + secs(bs[k].median_ms) + ' (' + bs[k].n + ')'); });
+  const extra = [];
+  if (load.lcp_ms != null) extra.push('LCP ' + secs(load.lcp_ms));
+  if (load.ttfb_ms != null) extra.push('TTFB ' + secs(load.ttfb_ms));
+  const tip = ('median page load ' + secs(load.median_ms) + ' over ' + load.n + ' visit' + (load.n === 1 ? '' : 's')
+    + (parts.length ? ' - ' + parts.join(', ') : '')
+    + (extra.length ? ' | ' + extra.join(' · ') : '')).replace(/"/g, '&quot;');
+  return '<span style="font-family:var(--mm-ff);font-size:11px;color:var(--text-mute);display:inline-flex;align-items:center;gap:3px" title="' + tip + '">&#9889; loads in ~' + secs(load.median_ms) + '</span>';
+}
 function _mmRenderLandingFocus(d) {
   const body = document.getElementById('lm-modal-body');
   if (!body || !d) return;
@@ -44545,7 +44562,7 @@ function _mmRenderLandingFocus(d) {
   // before flagging anything. Descriptive one/two-word stage names, no subtext.
   const steps = [];
   if (clk > 0 && lpv > 0) {
-    steps.push({ lbl: 'Clicked ad', n: clk, icon: ICO.clicked, timeKey: null });
+    steps.push({ lbl: 'Clicked ad', n: clk, icon: ICO.clicked, timeKey: null, loadChip: true });
     steps.push({ lbl: 'Page loaded', n: lpv, icon: ICO.loaded, timeKey: 'loaded_to_form' });
   } else {
     steps.push({ lbl: 'Page loaded', n: (page.visitors || page.ad_visitors || 0), icon: ICO.loaded, timeKey: 'loaded_to_form' });
@@ -44579,12 +44596,17 @@ function _mmRenderLandingFocus(d) {
         '<div style="font-family:var(--mm-fm);font-size:15px;font-weight:500;color:var(--text);text-align:right">' + s.n + '</div>' +
       '</div>';
     // between-stage connector: fixed-height slot between EVERY pair of rows so
-    // the vertical rhythm stays even whether or not a step has a median time.
+    // the vertical rhythm stays even whether or not a step has a chip.
     if (i < steps.length - 1) {
       const tm = s.timeKey ? st[s.timeKey] : null;
-      const chip = (tm && tm.median_s != null)
-        ? '<span style="font-family:var(--mm-ff);font-size:11px;color:var(--text-mute);display:inline-flex;align-items:center;gap:3px" title="median time to advance (' + tm.n + ' sessions)">&#9201; ~' + _mmDur(tm.median_s) + '</span>'
-        : '';
+      let chip = '';
+      if (tm && tm.median_s != null) {
+        // time to ADVANCE from this step to the next (median over sessions)
+        chip = '<span style="font-family:var(--mm-ff);font-size:11px;color:var(--text-mute);display:inline-flex;align-items:center;gap:3px" title="median time to advance (' + tm.n + ' sessions)">&#9201; ~' + _mmDur(tm.median_s) + '</span>';
+      } else if (s.loadChip && page.load && page.load.median_ms != null) {
+        // page-load speed on the clicked -> loaded transition (all sources)
+        chip = _mmLoadChip(page.load);
+      }
       rows +=
         '<div style="' + GRID + ';height:22px">' +
           '<div></div><div></div>' +
