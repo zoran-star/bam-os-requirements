@@ -43688,6 +43688,61 @@ function toggleTheme() {
   </div>
 </div>
 
+<!-- Review-and-send modal: all edits with thumbnails + device tags, filterable -->
+<div id="v2ReviewModal" class="v2rev-backdrop" style="display:none" onclick="if(event.target===this)_v2CloseReview()">
+  <div class="v2rev-card" onclick="event.stopPropagation()">
+    <div class="v2rev-head">
+      <div>
+        <div class="v2rev-title">Review your changes</div>
+        <div class="v2rev-sub" id="v2RevCount"></div>
+      </div>
+      <button type="button" class="v2rev-close" onclick="_v2CloseReview()" aria-label="Close">&times;</button>
+    </div>
+    <div class="v2rev-filter" id="v2RevFilter">
+      <button type="button" class="is-on" data-f="all" onclick="_v2SetReviewFilter('all')">All</button>
+      <button type="button" data-f="desktop" onclick="_v2SetReviewFilter('desktop')">Desktop</button>
+      <button type="button" data-f="mobile" onclick="_v2SetReviewFilter('mobile')">Mobile</button>
+    </div>
+    <div class="v2rev-list" id="v2RevList"></div>
+    <div class="v2rev-foot">
+      <textarea id="v2ReqDesc" class="v2rev-desc" rows="2" placeholder="Anything else? (optional)"></textarea>
+      <div class="v2rev-foot-row">
+        <button type="button" class="v2rev-back" onclick="_v2CloseReview()">&lsaquo; Back to page</button>
+        <button type="button" class="v2rev-send" onclick="_v2Submit()">Send request &rarr;</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<style>
+  .v2rev-backdrop { position:fixed; inset:0; z-index:1800; background:rgba(20,18,14,.5); display:flex; align-items:center; justify-content:center; padding:20px; }
+  .v2rev-card { width:min(560px,96vw); max-height:88vh; display:flex; flex-direction:column; background:var(--surface); border:1px solid var(--line); border-radius:16px; box-shadow:0 24px 60px rgba(0,0,0,.35); overflow:hidden; }
+  .v2rev-head { display:flex; align-items:flex-start; justify-content:space-between; padding:18px 20px 12px; }
+  .v2rev-title { font-family:var(--mm-ff); font-size:17px; font-weight:800; color:var(--text); }
+  .v2rev-sub { font-family:var(--mm-ff); font-size:12px; color:var(--text-mute); margin-top:2px; }
+  .v2rev-close { background:none; border:none; font-size:22px; line-height:1; color:var(--text-mute); cursor:pointer; padding:0 2px; }
+  .v2rev-filter { display:inline-flex; margin:0 20px 12px; background:var(--surface-el); border:1px solid var(--line); border-radius:9px; padding:3px; gap:2px; align-self:flex-start; }
+  .v2rev-filter button { font-family:var(--mm-ff); font-size:12.5px; font-weight:700; color:var(--text-sub); background:none; border:none; border-radius:7px; padding:6px 14px; cursor:pointer; }
+  .v2rev-filter button.is-on { background:var(--surface); color:var(--text); box-shadow:0 1px 2px rgba(0,0,0,.08); }
+  .v2rev-list { flex:1; overflow-y:auto; padding:0 20px; display:flex; flex-direction:column; gap:10px; }
+  .v2rev-empty { font-family:var(--mm-ff); font-size:13px; color:var(--text-mute); padding:24px 0; text-align:center; }
+  .v2rev-item { display:flex; gap:12px; align-items:flex-start; border:1px solid var(--line); border-radius:12px; padding:10px 12px; }
+  .v2rev-thumb { flex:0 0 auto; width:58px; height:44px; border-radius:8px; display:flex; align-items:center; justify-content:center; color:#0B0B0D; }
+  .v2rev-thumb--desktop { background:linear-gradient(160deg,#efe6c8,#d9c98a); }
+  .v2rev-thumb--mobile { background:linear-gradient(160deg,#e6e6ea,#c9c9d2); }
+  .v2rev-cbody { flex:1; min-width:0; }
+  .v2rev-cmeta { display:flex; align-items:center; gap:7px; margin-bottom:6px; }
+  .v2rev-sec { font-family:var(--mm-ff); font-size:10.5px; font-weight:700; text-transform:uppercase; letter-spacing:0.03em; color:var(--gold-d,#9a7d2b); }
+  .v2rev-note { width:100%; box-sizing:border-box; font-family:var(--mm-ff); font-size:13px; color:var(--text); background:var(--surface-el); border:1px solid var(--line); border-radius:8px; padding:7px 9px; resize:vertical; }
+  .v2rev-del { flex:0 0 auto; background:none; border:none; color:var(--text-mute); cursor:pointer; font-size:17px; line-height:1; padding:2px; }
+  .v2rev-del:hover { color:var(--mm-red-t); }
+  .v2rev-foot { padding:14px 20px 18px; border-top:1px solid var(--line); }
+  .v2rev-desc { width:100%; box-sizing:border-box; font-family:var(--mm-ff); font-size:13px; color:var(--text); background:var(--surface-el); border:1px solid var(--line); border-radius:9px; padding:9px 11px; resize:vertical; margin-bottom:12px; }
+  .v2rev-foot-row { display:flex; align-items:center; justify-content:space-between; gap:12px; }
+  .v2rev-back { font-family:var(--mm-ff); font-size:13px; font-weight:600; color:var(--text-sub); background:none; border:none; cursor:pointer; }
+  .v2rev-send { font-family:var(--mm-ff); font-size:14px; font-weight:700; border:none; border-radius:10px; padding:12px 22px; background:var(--gold); color:#0B0B0D; cursor:pointer; }
+</style>
+
 <style>
   .v2req-wrap { margin-top:18px; }
   .v2req-drop { width:100%; display:flex; align-items:center; justify-content:space-between; font-family:var(--mm-ff); font-size:14px; font-weight:700; border:none; border-radius:10px; padding:13px 16px; background:var(--gold); color:#0B0B0D; cursor:pointer; }
@@ -44553,6 +44608,8 @@ let _V2_DEVICE = 'desktop';  // preview viewport: desktop | mobile
 let _V2_STAGE = null;    // selected funnel step key
 let _V2_STEPS = [];      // [{key,label}] announced by the page
 let _V2_SCALE = 1;       // iframe scale (desktop is scaled to fit)
+let _V2_REVIEW_FILTER = 'all';  // review modal filter: all | desktop | mobile
+let _V2_REVIEW_OPEN = false;
 // Mock "my requests" - replace with a fetch once the table lands.
 const _V2_REQUESTS = [
   { title: 'Rework the hero headline', type: 'change', status: 'in_progress', when: '2d ago' },
@@ -44614,8 +44671,7 @@ function _v2InlineHtml() {
         '</div>' +
       '</div>' +
       '<div class="v2req-foot">' +
-        '<textarea id="v2ReqDesc" class="v2req-desc" rows="2" placeholder="Anything else? (optional)"></textarea>' +
-        '<button type="button" class="v2req-send" id="v2ReqSubmit" onclick="_v2Submit()">Send request &rarr;</button>' +
+        '<button type="button" class="v2req-send" id="v2ReqSubmit" onclick="_v2OpenReview()">Review and send &rarr;</button>' +
       '</div>' +
     '</div>' +
   '</div>';
@@ -44629,7 +44685,7 @@ function _v2Sync() {
 }
 function _v2Toggle() {
   _V2_OPEN = !_V2_OPEN;
-  if (_V2_OPEN) { _V2_PINS = []; _V2_TYPE = 'change'; _V2_PENDING = null; }
+  if (_V2_OPEN) { _V2_PINS = []; _V2_TYPE = 'change'; _V2_PENDING = null; const dsc = document.getElementById('v2ReqDesc'); if (dsc) dsc.value = ''; }
   else _v2NoteCancel();
   _v2Sync();
   if (_V2_OPEN) { const p = document.getElementById('v2ReqPanel'); if (p) setTimeout(() => p.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 60); }
@@ -44756,6 +44812,44 @@ function _v2RenderNotes() {
   });
   list.innerHTML = html;
 }
+function _v2OpenReview() {
+  const desc = (document.getElementById('v2ReqDesc')?.value || '').trim();
+  if (!_V2_PINS.length && !desc) { _mmToast('Add a note or a line of context first'); return; }
+  _V2_REVIEW_OPEN = true;
+  document.querySelectorAll('#v2RevFilter button').forEach(b => b.classList.toggle('is-on', b.dataset.f === _V2_REVIEW_FILTER));
+  _v2RenderReview();
+  const m = document.getElementById('v2ReviewModal');
+  if (m) m.style.display = 'flex';
+}
+function _v2CloseReview() { _V2_REVIEW_OPEN = false; const m = document.getElementById('v2ReviewModal'); if (m) m.style.display = 'none'; }
+function _v2SetReviewFilter(f) {
+  _V2_REVIEW_FILTER = f;
+  document.querySelectorAll('#v2RevFilter button').forEach(b => b.classList.toggle('is-on', b.dataset.f === f));
+  _v2RenderReview();
+}
+function _v2RenderReview() {
+  const list = document.getElementById('v2RevList'), cnt = document.getElementById('v2RevCount');
+  if (!list) return;
+  const MON = '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="4" width="19" height="13" rx="1.5"/><path d="M9 21h6M12 17v4"/></svg>';
+  const PHN = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="7" y="2.5" width="10" height="19" rx="2.5"/><path d="M10.5 18.5h3"/></svg>';
+  const items = _V2_PINS.map((p, i) => ({ p, i })).filter(x => _V2_REVIEW_FILTER === 'all' || (x.p.device || 'desktop') === _V2_REVIEW_FILTER);
+  const total = _V2_PINS.length;
+  if (cnt) cnt.textContent = total ? (total + ' note' + (total === 1 ? '' : 's') + ' on your page') : 'No notes yet';
+  if (!items.length) { list.innerHTML = '<div class="v2rev-empty">No ' + (_V2_REVIEW_FILTER === 'all' ? '' : _V2_REVIEW_FILTER + ' ') + 'notes yet.</div>'; return; }
+  list.innerHTML = items.map(x => {
+    const p = x.p, i = x.i, dev = p.device || 'desktop';
+    return '<div class="v2rev-item">' +
+      '<div class="v2rev-thumb v2rev-thumb--' + dev + '">' + (dev === 'mobile' ? PHN : MON) + '</div>' +
+      '<div class="v2rev-cbody">' +
+        '<div class="v2rev-cmeta"><span class="v2note-dev">' + (dev === 'mobile' ? 'Mobile' : 'Desktop') + '</span>' + (p.section ? '<span class="v2rev-sec">' + _escapeHtml(p.section) + '</span>' : '') + '</div>' +
+        '<textarea class="v2rev-note" rows="2" oninput="_v2ReviewEdit(' + i + ',this.value)">' + _escapeHtml(p.note) + '</textarea>' +
+      '</div>' +
+      '<button type="button" class="v2rev-del" title="Remove note" onclick="_v2ReviewDel(' + i + ')">&times;</button>' +
+    '</div>';
+  }).join('');
+}
+function _v2ReviewEdit(i, val) { if (_V2_PINS[i]) { _V2_PINS[i].note = val; _v2RenderNotes(); } }
+function _v2ReviewDel(i) { _V2_PINS.splice(i, 1); _v2RenderReview(); _v2RenderNotes(); }
 function _v2Submit() {
   const desc = (document.getElementById('v2ReqDesc')?.value || '').trim();
   if (!_V2_PINS.length && !desc) { _mmToast('Add a note or a line of context first'); return; }
@@ -44768,12 +44862,12 @@ function _v2Submit() {
         visitors: _MM.page.visitors, form_started: _MM.page.form_started,
         saw_calendar: _MM.page.saw_calendar, booked: _MM.page.booked_sessions,
       } : null,
-      annotations: _V2_PINS.map(p => ({ x: p.x, y: p.y, note: p.note, section: p.section || null })),
+      annotations: _V2_PINS.map(p => ({ note: p.note, section: p.section || null, device: p.device || 'desktop' })),
     },
   };
   console.log('[v2-request] MOCK submit (no table yet):', payload);   // TODO: POST /api/v2-support-tickets
   _V2_REQUESTS.unshift({ title: desc || (_V2_PINS[0] && _V2_PINS[0].note) || 'Landing page change', type: _V2_TYPE, status: 'new', when: 'just now' });
-  _V2_PINS = []; _V2_OPEN = false; _v2NoteCancel();
+  _V2_PINS = []; _V2_OPEN = false; _v2NoteCancel(); _v2CloseReview();
   _mmToast('Request sent - staff will take a look');
   if (typeof _mmRenderLandingFocus === 'function' && typeof _MM !== 'undefined') _mmRenderLandingFocus(_MM);
 }
