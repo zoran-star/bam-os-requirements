@@ -52,6 +52,16 @@
 - **Win card loading state**: pulsing green dot + typed "READING THE BOARD..." label (`_hv2BootType`) + `cc-skel2` shimmer bars (defined in _hv2Style so classic home gets it too); `_hv2WinLoad` replaces when data lands.
 - **Sound design** (all Cole's picks except confirm-tone): new _SFX methods tick/whooshOut/sent/typeTap/thud/rollClick/sparkle/zip/boot + reused whoosh/kaching/fanfare/chime. Wired: rail lock tick, focus in/out whooshes, revenue-win kaching (once/session), orb pop, quick-reply sent, HUD type taps, red-items thud vs milestone fanfare (once/session), count-up roll clicks (700ms throttle), unread-member chime (once/session), perfect-day sparkle, scrub zip (70ms throttle, pitch=position), CC boot chord. `_SFX._isMuted()` now returns true on <=768px (all portal sounds off on mobile) + "Sounds: on/off" toggle in the dock Settings popover (hm_sfx_muted).
 
+## Coworker pass (2026-07-05, Cole picks 1,2,3,4,5,7)
+- Member agent focus mode made "a coworker, not a dashboard": presence header (avatar orb + "Roster agent" + status line), status line types what it is doing, conversational openers rotate, reply cards slide in as chat bubbles, suggestion chips under the composer, wallpaper opacity lowered. Names title-cased everywhere via `_ccCapName` (also fixes lowercase GHL contact names in messages + actions).
+
+## Actions redesign (2026-07-05, Cole picks A1+A2+A4, B1, P2)
+- **A1 grouping**: `_ccLoadMemberActions` splits roster into probs (payment_failed/payment_method_required red, pause_scheduled_for/cancelling amber) + miles (gold milestones), groups probs by `cls|label`; duplicates collapse into one `.cc-act-group` row with stacked avatars (`.cc-act-avs`, first 3), "N members", $total/mo, chevron; click toggles `.cc-act-exp` subrows (each opens `openMemberPopup`).
+- **A2 quiet rows**: rows are avatar + name + $amt sub-line + soft colored `.cc-act-tag` pill on the right (no loud chip backgrounds).
+- **A4 risk in header**: card header is `Actions` + `#cc-act-risk` ("$N/mo at risk", red) filled from the probs sum. The old in-card "See all members" button is gone.
+- **B1 header link**: `_ccHead(label, sub, right)` grew a third `right` param rendering `.cc-head-right` (stopPropagation so the click-to-focus head doesn't fire). Members head uses it for the gold "All members ›" link -> `_ccMemberListOpen()`.
+- **P2 health bar**: `_ccPulseRender` now renders `.cc-hb`, a full-width segmented bar (green live / amber issues / red critical / gray paused, proportional widths) + label "N live · N paused · N issues ›". Whole thing is a button -> `_ccMemberListOpen()`; hover scales the bar. Replaces the per-member pulse dots (looked funky).
+
 ## Section mounts (current skeleton)
 | Section | Mount | Content |
 |---|---|---|
