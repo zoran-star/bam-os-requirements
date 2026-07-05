@@ -15518,13 +15518,48 @@ async function _hv2WinLoad() {
       v.textContent = `$${Math.round(net).toLocaleString()} collected yesterday`;
       if (c) c.textContent = 'Money moved while you were coaching.';
     } else {
-      const gh = now.getHours();
-      const gw = gh < 12 ? 'Good morning' : gh < 18 ? 'Good afternoon' : 'Good evening';
-      const first = _hv2FirstName();
-      v.textContent = `${gw}, ${first || 'coach'}.`;
-      if (c) c.textContent = 'Clean slate today. First win is out there - go take it.';
+      const sw = await _hv2StateWin(now, today);
+      if (lab) lab.textContent = 'On the board';
+      v.textContent = sw.v;
+      if (c) c.textContent = sw.c;
     }
   }
+}
+
+// Standing wins: achievements the business already holds. A live academy
+// always has at least one, so the board is never empty - and they rotate
+// daily (stable within a day) so the card does not go stale.
+async function _hv2StateWin(now, today) {
+  const wk = new Date(now); wk.setDate(wk.getDate() - 29);
+  let mem = null;
+  try { mem = await _hv2Kpi('members', _hv2Ymd(wk), today); } catch (_) {}
+  const live = (mem && mem.roster && Number(mem.roster.live)) || 0;
+  const cancelled = (mem && mem.cancelled && Number(mem.cancelled.count)) || 0;
+  const payments = (mem && Array.isArray(mem.payments)) ? mem.payments.length : 0;
+  const roster = (Array.isArray(window._MEMBERS_ALL) && window._MEMBERS_ALL) || [];
+  const wins = [];
+  if (live >= 1) wins.push({ v: `${live} active member${live === 1 ? '' : 's'} strong`, c: `${live === 1 ? 'A family' : live + ' families'} chose you - and they're still here.` });
+  if (live >= 2 && cancelled === 0) wins.push({ v: '0 cancellations in 30 days', c: 'Everyone stayed. Retention is the quiet win.' });
+  if (payments >= 2) wins.push({ v: `${payments} payments collected in 30 days`, c: 'The machine keeps collecting while you coach.' });
+  if (roster.length) {
+    let oldest = null;
+    for (const m of roster) {
+      if (m.status !== 'live' && m.status !== 'cancelling') continue;
+      const d = m.joined_date || m.start_date || m.stripe_joined_at;
+      const t = d ? new Date(d).getTime() : NaN;
+      if (!isNaN(t) && (oldest === null || t < oldest)) oldest = t;
+    }
+    if (oldest) {
+      const months = Math.floor((Date.now() - oldest) / (30.44 * 86400000));
+      if (months >= 2) wins.push({ v: `${months} months of loyalty`, c: 'Your longest-running member is still showing up. That is trust.' });
+    }
+    if (roster.length >= 2 && !roster.some(m => m.status === 'payment_failed')) {
+      wins.push({ v: 'Every payment on the books is clean', c: 'No failed charges anywhere. Tidy business.' });
+    }
+  }
+  if (!wins.length) return { v: 'Your command center is live', c: 'Systems on. Now go put the first win on the board.' };
+  const doy = Math.floor((now - new Date(now.getFullYear(), 0, 0)) / 86400000);
+  return wins[doy % wins.length];
 }
 // ── Hawkeye card (hero right): last client message + proposed reply ──
 async function _hv2HawkLoad() {
