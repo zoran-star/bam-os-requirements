@@ -25822,6 +25822,8 @@ function openAddCreativeModal(channel) {
   _renderInputAssetsFilesList();
   const notes = document.getElementById('inputAssetsNotes');
   if (notes) notes.value = '';
+  const ttl = document.getElementById('inputAssetsTitle');
+  if (ttl) ttl.value = '';
   const fld = document.getElementById('inputAssetsFolder');
   if (fld) fld.value = '';
   // Reset the creative-spec fields each open.
@@ -26020,6 +26022,7 @@ async function submitInputAssets() {
     return;
   }
   const notes = document.getElementById('inputAssetsNotes')?.value?.trim() || '';
+  const title = document.getElementById('inputAssetsTitle')?.value?.trim() || '';
   const format = document.getElementById('inputAssetsFormat')?.value || '';
   const captions = !!(document.getElementById('inputAssetsCaptions') || {}).checked;
   // Snapshot files + type BEFORE closing the modal - closeInputAssetsModal()
@@ -26040,6 +26043,7 @@ async function submitInputAssets() {
     await _ctkCreateTicket({
       type: assetType,
       channel,
+      title,
       notes,
       raw_files: uploaded,
       context: {
@@ -44129,7 +44133,10 @@ function toggleTheme() {
     <div class="modal-title">Input assets</div>
     <div class="modal-sub" id="inputAssetsSub">Submit raw assets here. Our content team will turn them into a finished creative and add it to your campaign.</div>
 
-    <label class="modal-label">Raw files</label>
+    <label class="modal-label" for="inputAssetsTitle">Creative name <span style="color:var(--text-mute);font-weight:400">(optional)</span></label>
+    <input id="inputAssetsTitle" class="modal-input" type="text" maxlength="120" placeholder="e.g. August camp promo" />
+
+    <label class="modal-label" style="margin-top:18px">Raw files</label>
     <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:8px">
       <input id="inputAssetsFolder" class="modal-input" list="inputAssetsFolderList" placeholder="📁 Folder (optional) - e.g. Game footage" style="flex:1 1 200px;min-width:150px" />
       <datalist id="inputAssetsFolderList"></datalist>
