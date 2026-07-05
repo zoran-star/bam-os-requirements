@@ -10432,6 +10432,23 @@ Then the call to action."]</div>
       </div>
     </div>
 
+
+    <!-- ── COMMAND CENTER (beta) - sidebar-less one-page flow ──
+         Hidden toggle: ?cc=1 enters (persists), ?cc=0 exits. V2 only.
+         Each <section> is an independent plop-in slot: replace a section by
+         swapping its mount() in CC_SECTIONS (JS) - keep the section id. -->
+    <div class="view" id="view-cc">
+      <div class="content cc-content">
+        <div class="cc-flow" id="cc-flow">
+          <section class="cc-sec" id="cc-sec-home"></section>
+          <section class="cc-sec" id="cc-sec-sales"></section>
+          <section class="cc-sec" id="cc-sec-members"></section>
+          <section class="cc-sec" id="cc-sec-marketing"></section>
+          <section class="cc-sec" id="cc-sec-resources"></section>
+        </div>
+      </div>
+    </div>
+
     <!-- view-team removed 2026-05-26 - full Team management lives in
          Business Blueprint > Staff. The invite + revoke modals (still
          used by BB Staff) sit below in the modals block. -->
@@ -14711,6 +14728,15 @@ async function _contactsSaveSetup() {
 
 let _MSG_RETURN_VIEW = null;
 function switchView(name, el) {
+  // Command center (beta): while the one-page flow is active, section-mapped
+  // views scroll to their section instead of swapping views; anything else
+  // opens classically with a "back to command center" pill. _CC_BYPASS lets
+  // the dock/quick buttons open classic views deliberately.
+  if (typeof _ccActive === 'function' && _ccActive() && !window._CC_BYPASS) {
+    const secMap = { home: 'home', pipelines: 'sales', members: 'members', marketing: 'marketing', assets: 'resources' };
+    if (secMap[name] && document.getElementById('view-cc')?.classList.contains('active')) { _ccScrollTo(secMap[name]); return; }
+    document.body.classList.add('cc-classic');
+  }
   // Clients without marketing have the Marketing nav greyed + click-blocked
   if (name === 'marketing' && !MARKETING_INCLUDED && !(typeof ORGANIC_CONTENT !== 'undefined' && ORGANIC_CONTENT)) return;
   // Home is hidden for V2 users (BAM staff keep it) → bounce to their landing tab.
@@ -43173,6 +43199,512 @@ async function _submitOnbFeedback() {
   }
 }
 
+
+// ═════════════════════════════════════════════════════════════════════════
+// COMMAND CENTER (beta) - sidebar-less one-page business flow
+// ═════════════════════════════════════════════════════════════════════════
+// Figma 2026-07-05: all sections stack on one scroll; left bubble rail is
+// the only nav; floating dock (bottom-left) holds Info / Blueprint /
+// Settings; per-section focus modes (marketing's exists, members' is new).
+//
+// Rollout: hidden while it's a skeleton. ?cc=1 enters (persists via
+// localStorage bam_cc_mode), ?cc=0 exits. V2 academies only.
+//
+// PLOP-IN CONTRACT: each section is independent. To replace one (e.g. the
+// new Sales build), swap its mount() in CC_SECTIONS and keep the section id
+// (cc-sec-<key>). Nothing outside a mount references section internals.
+// ═════════════════════════════════════════════════════════════════════════
+
+// NOTE: this module is deliberately all function declarations (hoisted, no
+// top-level const/let/statements) so it can never be knocked out by an
+// earlier top-level failure in this script block.
+function _ccFlagSync() {
+  try {
+    const v = new URLSearchParams(location.search).get('cc');
+    if (v === '1') localStorage.setItem('bam_cc_mode', '1');
+    if (v === '0') localStorage.removeItem('bam_cc_mode');
+    if (v !== null) history.replaceState(null, '', location.pathname + location.hash);
+  } catch (_) {}
+}
+function _ccWanted() { _ccFlagSync(); try { return localStorage.getItem('bam_cc_mode') === '1'; } catch (_) { return false; } }
+function _ccActive() { return document.body.classList.contains('cc-mode'); }
+
+function _ccSections() {
+  return [
+    { key: 'home',      kicker: '§ Command', label: 'Home',      mount: _ccMountHome },
+    { key: 'sales',     kicker: '§ 01',      label: 'Sales',     mount: _ccMountSales },
+    { key: 'members',   kicker: '§ 02',      label: 'Members',   mount: _ccMountMembers },
+    { key: 'marketing', kicker: '§ 03',      label: 'Marketing', mount: _ccMountMarketing },
+    { key: 'resources', kicker: '§ 04',      label: 'Resources', mount: _ccMountResources },
+  ];
+}
+
+function _ccIcons() {
+  return {
+  info: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>',
+  gear: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>',
+  grid: '<svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>',
+  cal: '<svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="17" rx="3"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>',
+  contacts: '<svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>',
+  inbox: '<svg viewBox="0 0 24 24"><path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></svg>',
+  support: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>',
+  spark: '<svg viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>',
+  search: '<svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>',
+  };
+}
+
+function _ccStyle() {
+  if (document.getElementById('cc-style')) return;
+  const st = document.createElement('style'); st.id = 'cc-style';
+  st.textContent =
+    /* mode: hide the classic chrome */
+    'body.cc-mode .sidebar{display:none !important}' +
+    'body.cc-mode .mobile-nav{display:none !important}' +
+    'body.cc-mode .main{margin-left:0 !important}' +
+    '#view-cc .cc-content{max-width:none;padding:20px 64px 140px}' +
+    /* stacked sections */
+    '.cc-sec{max-width:1140px;margin:0 auto;padding:34px 0 46px;border-bottom:1px solid var(--border);opacity:0;transform:translateY(24px);transition:opacity .5s var(--es,ease),transform .5s var(--es,ease)}' +
+    '.cc-sec:last-child{border-bottom:none}' +
+    '.cc-sec.cc-visible{opacity:1;transform:none}' +
+    '.cc-sec-head{margin-bottom:16px}' +
+    '.cc-kicker{font-family:var(--mono);font-size:10px;font-weight:600;letter-spacing:.18em;text-transform:uppercase;color:var(--text-mute)}' +
+    '.cc-title{font-family:var(--font-num);font-size:24px;font-weight:800;color:var(--text);margin-top:2px}' +
+    '.cc-sub{font-size:12.5px;color:var(--text-mute);margin-top:3px}' +
+    /* stat tiles + action buttons */
+    '.cc-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:14px}' +
+    '.cc-stat{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:16px 18px;box-shadow:0 1px 3px rgba(0,0,0,.04)}' +
+    '.cc-stat.click{cursor:pointer;transition:transform .2s var(--es,ease),box-shadow .2s}' +
+    '.cc-stat.click:hover{transform:translateY(-2px);box-shadow:0 4px 14px rgba(0,0,0,.06)}' +
+    '.cc-stat-v{font-family:var(--font-num);font-size:22px;font-weight:800;color:var(--text)}' +
+    '.cc-stat-l{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;color:var(--text-mute);margin-top:2px}' +
+    '.cc-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:4px}' +
+    '.cc-btn{display:inline-flex;align-items:center;gap:6px;background:transparent;border:1px solid var(--border-med);border-radius:8px;padding:8px 14px;font:inherit;font-size:12px;font-weight:600;color:var(--text);cursor:pointer;transition:border-color .12s,color .12s}' +
+    '.cc-btn:hover{border-color:var(--gold);color:var(--gold)}' +
+    '.cc-btn.primary{background:var(--gold);border-color:var(--gold);color:var(--on-gold);font-weight:700}' +
+    '.cc-btn.primary:hover{color:var(--on-gold);filter:brightness(1.05)}' +
+    '.cc-note{font-size:11.5px;color:var(--text-mute);margin-top:10px}' +
+    /* member agent bar */
+    '.cc-agent-bar{display:flex;align-items:center;gap:10px;width:100%;text-align:left;background:var(--surface);border:1px solid var(--border-med);border-radius:999px;padding:13px 20px;font:inherit;font-size:13px;color:var(--text-mute);cursor:text;margin-bottom:14px;transition:border-color .2s,box-shadow .2s}' +
+    '.cc-agent-bar:hover{border-color:var(--accent-border);box-shadow:0 0 0 3px var(--gold-sheen)}' +
+    '.cc-agent-bar svg{width:15px;height:15px;stroke:var(--gold);fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;flex:none}' +
+    /* resources quick buttons */
+    '.cc-quick{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:24px}' +
+    '.cc-quick-btn{display:flex;align-items:center;gap:10px;background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:16px 18px;font:inherit;font-size:13px;font-weight:700;color:var(--text);cursor:pointer;box-shadow:0 1px 3px rgba(0,0,0,.04);transition:transform .2s var(--es,ease),box-shadow .2s,border-color .2s;text-align:left}' +
+    '.cc-quick-btn:hover{transform:translateY(-2px);box-shadow:0 4px 14px rgba(0,0,0,.06);border-color:var(--accent-border)}' +
+    '.cc-quick-btn svg{width:16px;height:16px;stroke:var(--gold);fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;flex:none}' +
+    /* bubble rail */
+    '.cc-rail{display:none}' +
+    'body.cc-mode .cc-rail{position:fixed;left:16px;top:50%;transform:translateY(-50%);display:flex;flex-direction:column;gap:16px;z-index:90}' +
+    'body.cc-mode.cc-classic .cc-rail{display:none}' +
+    '.cc-dot{width:9px;height:9px;border-radius:50%;background:var(--border-med);border:none;padding:0;cursor:pointer;position:relative;transition:width .25s var(--es,ease),height .25s var(--es,ease),background .25s}' +
+    '.cc-dot:hover{background:var(--text-mute)}' +
+    '.cc-dot.on{width:15px;height:15px;background:var(--gold);box-shadow:0 0 0 4px var(--gold-glow)}' +
+    '.cc-dot-lab{position:absolute;left:24px;top:50%;transform:translateY(-50%);font-size:11px;font-weight:700;color:var(--text-sub);background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:3px 9px;opacity:0;pointer-events:none;transition:opacity .15s;white-space:nowrap}' +
+    '.cc-dot:hover .cc-dot-lab{opacity:1}' +
+    /* floating dock (bottom-left) */
+    '.cc-dock{display:none}' +
+    'body.cc-mode .cc-dock{position:fixed;left:16px;bottom:16px;display:flex;flex-direction:column;gap:8px;z-index:90}' +
+    'body.cc-mode.cc-classic .cc-dock{display:none}' +
+    '.cc-dock-btn{display:flex;align-items:center;gap:8px;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:8px 12px;font:inherit;font-size:12px;font-weight:600;color:var(--text-sub);cursor:pointer;box-shadow:0 1px 3px rgba(0,0,0,.04);transition:border-color .12s,color .12s}' +
+    '.cc-dock-btn:hover{border-color:var(--accent-border);color:var(--text)}' +
+    '.cc-dock-btn svg{width:14px;height:14px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}' +
+    '#cc-dock-pop{position:fixed;left:16px;bottom:132px;z-index:95;background:var(--surface);border:1px solid var(--border);border-radius:12px;box-shadow:0 12px 40px rgba(0,0,0,.3);padding:6px;min-width:190px;display:none}' +
+    '#cc-dock-pop.open{display:block}' +
+    '.cc-pop-item{display:flex;align-items:center;gap:8px;width:100%;text-align:left;background:none;border:none;border-radius:8px;padding:9px 11px;font:inherit;font-size:12.5px;font-weight:600;color:var(--text);cursor:pointer}' +
+    '.cc-pop-item:hover{background:var(--gold-sheen);color:var(--gold)}' +
+    /* back pill for classic views opened from the flow */
+    '.cc-back-pill{display:none}' +
+    'body.cc-mode.cc-classic .cc-back-pill{position:fixed;top:14px;left:14px;z-index:95;display:inline-flex;align-items:center;gap:6px;background:var(--gold);color:var(--on-gold);border:none;border-radius:999px;padding:9px 16px;font:inherit;font-size:12px;font-weight:700;cursor:pointer;box-shadow:0 4px 14px rgba(0,0,0,.25)}' +
+    /* members focus mode (agent chat) */
+    '#membersMachineModal .mm-modal-card{display:flex;flex-direction:column;max-width:760px}' +
+    '.mma-thread{flex:1;overflow-y:auto;display:flex;flex-direction:column;padding:8px 2px;min-height:300px;max-height:calc(100vh - 280px)}' +
+    '.mma-bub{max-width:82%;border:1px solid var(--border);border-radius:12px;padding:10px 14px;font-size:13px;line-height:1.5;color:var(--text);margin:5px 0}' +
+    '.mma-bub.out{margin-left:auto;background:var(--gold-sheen);border-color:var(--accent-border)}' +
+    '.mma-bub.in{background:var(--surface-el)}' +
+    '.mma-card{display:flex;align-items:center;gap:10px;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:10px 12px;margin-top:8px}' +
+    '.mma-card-name{font-weight:700;font-size:13px}' +
+    '.mma-card-sub{font-size:11.5px;color:var(--text-mute);margin-top:1px}' +
+    '.mma-open{margin-left:auto;flex:none;background:transparent;border:1px solid var(--accent-border);color:var(--gold);border-radius:8px;padding:6px 10px;font:inherit;font-size:11px;font-weight:700;cursor:pointer}' +
+    '.mma-open:hover{background:var(--gold-sheen)}' +
+    '.mma-kgrid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px}' +
+    '.mma-k{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:8px 12px}' +
+    '.mma-k-v{font-family:var(--font-num);font-size:17px;font-weight:800;color:var(--text)}' +
+    '.mma-k-l{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;color:var(--text-mute)}' +
+    '.mma-compose{display:flex;gap:8px;margin-top:12px}' +
+    '.mma-input{flex:1;background:var(--surface-el);border:1px solid var(--border-med);border-radius:12px;padding:11px 14px;font:inherit;font-size:13px;color:var(--text);outline:none;resize:none;min-height:44px;max-height:120px}' +
+    '.mma-input:focus{border-color:var(--gold)}' +
+    '.mma-send{width:44px;height:44px;border-radius:12px;background:var(--gold);color:var(--on-gold);border:none;font-size:16px;font-weight:800;cursor:pointer;flex:none}' +
+    /* member drawer must sit above the focus page when opened from chat */
+    'html.mm-focus-open #member-drawer{z-index:9600 !important}' +
+    'html.mm-focus-open #member-drawer-backdrop{z-index:9590 !important}' +
+    '@media(max-width:768px){body.cc-mode .cc-rail{display:none}#view-cc .cc-content{padding:16px 16px 120px}}' +
+    '@media(prefers-reduced-motion:reduce){.cc-sec{opacity:1;transform:none;transition:none}}';
+  document.head.appendChild(st);
+}
+
+function openCommandCenter() {
+  _ccStyle();
+  document.body.classList.add('cc-mode');
+  document.body.classList.remove('cc-classic');
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  document.getElementById('view-cc').classList.add('active');
+  if (!window._CC_MOUNTED) {
+    window._CC_MOUNTED = true;
+    _ccBuildChrome();
+    for (const s of _ccSections()) {
+      const host = document.getElementById('cc-sec-' + s.key);
+      try { s.mount(host); } catch (e) { console.error('[cc] mount failed:', s.key, e); }
+    }
+    _ccInitObserver();
+  }
+}
+
+function _ccHead(s, sub) {
+  return `<div class="cc-sec-head"><div class="cc-kicker">${s.kicker}</div><div class="cc-title">${s.label}</div>${sub ? `<div class="cc-sub">${sub}</div>` : ''}</div>`;
+}
+
+function _ccScrollTo(key) {
+  document.getElementById('cc-sec-' + key)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+// Open a classic view from inside the flow (dock, quick buttons, stat tiles).
+function _ccOpenClassic(view) {
+  window._CC_BYPASS = true;
+  try { document.body.classList.add('cc-classic'); switchView(view); }
+  finally { window._CC_BYPASS = false; }
+}
+function _ccReturn() {
+  document.body.classList.remove('cc-classic', 'ib-scroll-lock');
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  document.getElementById('view-cc').classList.add('active');
+}
+function _ccExitBeta() {
+  try { localStorage.removeItem('bam_cc_mode'); } catch (_) {}
+  location.reload();
+}
+
+// ── chrome: bubble rail + dock + back pill ──
+function _ccBuildChrome() {
+  if (document.getElementById('cc-rail')) return;
+  const rail = document.createElement('nav');
+  rail.id = 'cc-rail'; rail.className = 'cc-rail'; rail.setAttribute('aria-label', 'Sections');
+  rail.innerHTML = _ccSections().map(s =>
+    `<button type="button" class="cc-dot" id="cc-dot-${s.key}" aria-label="${s.label}" onclick="_ccScrollTo('${s.key}')"><span class="cc-dot-lab">${s.label}</span></button>`
+  ).join('');
+  document.body.appendChild(rail);
+
+  const dock = document.createElement('div');
+  dock.id = 'cc-dock'; dock.className = 'cc-dock';
+  dock.innerHTML =
+    `<button type="button" class="cc-dock-btn" onclick="_ccDockPop('info')">${_ccIcons().info}<span>Info</span></button>` +
+    `<button type="button" class="cc-dock-btn" onclick="_ccOpenClassic('blueprint')">${_ccIcons().grid}<span>Business blueprint</span></button>` +
+    `<button type="button" class="cc-dock-btn" onclick="_ccDockPop('settings')">${_ccIcons().gear}<span>Settings</span></button>` +
+    `<div id="cc-dock-pop"></div>`;
+  document.body.appendChild(dock);
+
+  const pill = document.createElement('button');
+  pill.type = 'button'; pill.className = 'cc-back-pill'; pill.id = 'cc-back-pill';
+  pill.innerHTML = '&lsaquo; Command center';
+  pill.onclick = _ccReturn;
+  document.body.appendChild(pill);
+
+  document.addEventListener('click', e => {
+    const pop = document.getElementById('cc-dock-pop');
+    if (pop && pop.classList.contains('open') && !e.target.closest('#cc-dock')) pop.classList.remove('open');
+  });
+}
+
+function _ccDockPop(kind) {
+  const pop = document.getElementById('cc-dock-pop');
+  if (!pop) return;
+  if (pop.dataset.kind === kind && pop.classList.contains('open')) { pop.classList.remove('open'); return; }
+  pop.dataset.kind = kind;
+  pop.innerHTML = kind === 'settings'
+    ? `<button type="button" class="cc-pop-item" onclick="toggleTheme()">Toggle light / dark</button>` +
+      `<button type="button" class="cc-pop-item" onclick="_ccExitBeta()">Exit command center beta</button>` +
+      `<button type="button" class="cc-pop-item" onclick="signOut()">Sign out</button>`
+    : `<button type="button" class="cc-pop-item" onclick="document.getElementById('cc-dock-pop').classList.remove('open');startOnboardingTour()">Take the tour</button>` +
+      `<button type="button" class="cc-pop-item" onclick="document.getElementById('cc-dock-pop').classList.remove('open');_ccOpenClassic('messages')">Talk to BAM</button>`;
+  pop.classList.add('open');
+}
+
+// ── scroll: reveal sections + track the active rail dot ──
+function _ccInitObserver() {
+  const root = document.querySelector('.main');
+  const secs = Array.from(document.querySelectorAll('#view-cc .cc-sec'));
+  const ratios = new Map();
+  const io = new IntersectionObserver(entries => {
+    for (const e of entries) {
+      if (e.isIntersecting) e.target.classList.add('cc-visible');
+      ratios.set(e.target.id, e.isIntersecting ? e.intersectionRatio : 0);
+    }
+    let best = null, bestR = 0;
+    for (const s of secs) { const r = ratios.get(s.id) || 0; if (r > bestR) { bestR = r; best = s; } }
+    if (best) {
+      const key = best.id.replace('cc-sec-', '');
+      document.querySelectorAll('.cc-dot').forEach(d => d.classList.toggle('on', d.id === 'cc-dot-' + key));
+    }
+  }, { root, threshold: [0.05, 0.2, 0.45, 0.7] });
+  secs.forEach(s => io.observe(s));
+}
+
+// ─────────────────────────────────────────────────────────────
+// SECTION MOUNTS
+// ─────────────────────────────────────────────────────────────
+
+// HOME: reparents the V2 Home dashboard. All its CSS/JS is scoped to
+// #home-v2, so it renders identically here. Nav cards + panel footers keep
+// working - switchView calls for mapped views scroll the flow instead.
+function _ccMountHome(host) {
+  const h = new Date().getHours();
+  const g = h < 12 ? 'Good morning' : h < 18 ? 'Good afternoon' : 'Good evening';
+  host.innerHTML = `<div class="cc-sec-head"><div class="cc-kicker">§ Command</div><div class="cc-title">${g}.</div><div class="cc-sub">Your whole business on one page. Scroll, or use the dots on the left.</div></div>`;
+  const hv = document.getElementById('home-v2');
+  if (hv) {
+    host.appendChild(hv);
+    try { _hv2Style(); hv.style.display = 'block'; renderHomeV2(); } catch (e) { console.error('[cc] home', e); }
+  }
+}
+
+// SALES (skeleton): quick stats + jump-offs, per the Figma (pipeline cards,
+// hawkeye actions, quick stats). PLOP-IN SLOT - Zoran's new Sales section
+// replaces the contents of #cc-sales-mount.
+function _ccMountSales(host) {
+  host.innerHTML = _ccHead(_ccSections()[1], 'Pipeline, agents and trials.') + `
+    <div id="cc-sales-mount">
+      <div class="cc-stats">
+        <div class="cc-stat click" onclick="_ccOpenClassic('calendar')" title="Jump to the calendar">
+          <div class="cc-stat-v" id="cc-sal-trials">-</div><div class="cc-stat-l">Trials today</div>
+        </div>
+        <div class="cc-stat"><div class="cc-stat-v" id="cc-sal-7d">-</div><div class="cc-stat-l">Sales - 7 days</div></div>
+        <div class="cc-stat"><div class="cc-stat-v" id="cc-sal-close">-</div><div class="cc-stat-l">Trial closing rate</div></div>
+      </div>
+      <div class="cc-actions">
+        <button type="button" class="cc-btn primary" onclick="_ccOpenClassic('pipelines')">Open sales board</button>
+        <button type="button" class="cc-btn" onclick="_hv2OpenHawkeye()">Hawkeye actions</button>
+      </div>
+      <div class="cc-note">Sales focus mode arrives with the new Sales build - this section is its slot.</div>
+    </div>`;
+  _ccLoadTrialsCount();
+}
+async function _ccLoadTrialsCount() {
+  const el = document.getElementById('cc-sal-trials');
+  if (!el) return;
+  try {
+    const token = await _mreqAuthToken();
+    const r = await fetch('/api/ghl/calendars-v15?action=trials-today&client_id=' + encodeURIComponent(CLIENT_ID), { headers: { Authorization: 'Bearer ' + token } });
+    const j = await _safeJson(r);
+    if (r.ok && !j.no_config) el.textContent = String((j.trials || []).length);
+  } catch (_) {}
+}
+
+// MEMBERS (skeleton): agent bar (opens the members focus mode), roster KPIs
+// computed client-side from the live roster, jump-offs.
+function _ccMountMembers(host) {
+  host.innerHTML = _ccHead(_ccSections()[2], 'Ask the member agent, scan your roster numbers.') + `
+    <div id="cc-members-mount">
+      <button type="button" class="cc-agent-bar" id="cc-agent-bar" onclick="openMembersFocus()">
+        ${_ccIcons().search}<span>Ask about a member, your KPIs, anything...</span>
+      </button>
+      <div class="cc-stats" id="cc-mem-kpis">
+        <div class="cc-stat"><div class="cc-stat-v" id="cc-mem-live">-</div><div class="cc-stat-l">Active members</div></div>
+        <div class="cc-stat"><div class="cc-stat-v" id="cc-mem-paused">-</div><div class="cc-stat-l">Paused</div></div>
+        <div class="cc-stat"><div class="cc-stat-v" id="cc-mem-mrr">-</div><div class="cc-stat-l">MRR (approx)</div></div>
+        <div class="cc-stat"><div class="cc-stat-v" id="cc-mem-arpu">-</div><div class="cc-stat-l">Rev / member</div></div>
+      </div>
+      <div class="cc-actions">
+        <button type="button" class="cc-btn primary" onclick="_ccOpenClassic('members')">Open member list</button>
+        <button type="button" class="cc-btn" onclick="_ccOpenClassic('v15inbox')">Member inbox</button>
+      </div>
+    </div>`;
+  _ccLoadMemberKpis();
+}
+
+async function _ccEnsureMembers() {
+  if (Array.isArray(window._MEMBERS_ALL) && window._MEMBERS_ALL.length) return window._MEMBERS_ALL;
+  try { await fetchAndRenderMembers(); } catch (_) {}
+  return (Array.isArray(window._MEMBERS_ALL) && window._MEMBERS_ALL) || [];
+}
+// Monthly-equivalent price for a member (catalog rows are tax-inclusive, so
+// MRR/ARPU here are approximations - labeled as such in the UI).
+function _ccMonthly(m) {
+  const p = m.pricing || {};
+  const amt = (p.amount_cents || 0) / 100;
+  const iv = String(p.interval || 'month').toLowerCase();
+  if (iv.startsWith('week')) return amt * 4.33;
+  if (iv.startsWith('year')) return amt / 12;
+  return amt;
+}
+function _ccMemberKpis(roster) {
+  const live = roster.filter(m => m.status === 'live' || m.status === 'cancelling');
+  const paused = roster.filter(m => m.status === 'paused');
+  const mrr = live.reduce((s, m) => s + _ccMonthly(m), 0);
+  return { live: live.length, paused: paused.length, mrr, arpu: live.length ? mrr / live.length : 0 };
+}
+async function _ccLoadMemberKpis() {
+  const roster = await _ccEnsureMembers();
+  if (!roster.length) return;
+  const k = _ccMemberKpis(roster);
+  const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
+  set('cc-mem-live', String(k.live));
+  set('cc-mem-paused', String(k.paused));
+  set('cc-mem-mrr', '$' + Math.round(k.mrr).toLocaleString());
+  set('cc-mem-arpu', '$' + Math.round(k.arpu).toLocaleString());
+}
+
+// MARKETING: reparents the Marketing Machine cards. Their CSS is global
+// (.mm-*) and both focus modals live at body level, so the existing
+// marketing focus mode works unchanged from here.
+function _ccMountMarketing(host) {
+  host.innerHTML = _ccHead(_ccSections()[3], 'Your machine: ads in, leads out.') + '<div id="cc-marketing-mount"></div>' +
+    `<div class="cc-actions"><button type="button" class="cc-btn" onclick="_ccOpenClassic('marketing')">Open full marketing</button></div>`;
+  const mount = document.getElementById('cc-marketing-mount');
+  const mm = document.getElementById('marketing-machine-card');
+  const lm = document.getElementById('landing-machine-card');
+  if (mm) mount.appendChild(mm);
+  if (lm) mount.appendChild(lm);
+  try { _mmLoad(); } catch (e) { console.error('[cc] marketing', e); }
+}
+
+// RESOURCES: assets library (host-override render) + quick buttons for the
+// stragglers that have no home in the flow yet.
+function _ccMountResources(host) {
+  host.innerHTML = _ccHead(_ccSections()[4], 'Your brand library, plus everything that lives off the main flow.') + `
+    <div class="cc-quick">
+      <button type="button" class="cc-quick-btn" onclick="_ccOpenClassic('calendar')">${_ccIcons().cal}<span>Calendar</span></button>
+      <button type="button" class="cc-quick-btn" onclick="_ccOpenClassic('contacts')">${_ccIcons().contacts}<span>Contacts</span></button>
+      <button type="button" class="cc-quick-btn" onclick="_ccOpenClassic('v15inbox')">${_ccIcons().inbox}<span>Inbox</span></button>
+      <button type="button" class="cc-quick-btn" onclick="_ccOpenClassic('systems')">${_ccIcons().support}<span>Support</span></button>
+    </div>
+    <div id="cc-assets-content"></div>`;
+  try { _ASSETS_HOST_ID = 'cc-assets-content'; openAssetsView(); } catch (e) { console.error('[cc] assets', e); }
+}
+
+// ─────────────────────────────────────────────────────────────
+// MEMBERS FOCUS MODE - the member agent (rule-based skeleton)
+// ─────────────────────────────────────────────────────────────
+// Reuses the marketing focus-mode camera pan (_mmOpenFocus/_mmCloseFocus).
+// TODO(LLM): replace _mmaHandle's rule-based router with the real
+// member-agent endpoint when it lands. Contract: user text + roster + KPI
+// snapshot in, reply text + optional member ids to card-out.
+
+function _mmaEnsureModal() {
+  if (document.getElementById('membersMachineModal')) return;
+  document.body.insertAdjacentHTML('beforeend', `
+    <div id="membersMachineModal" class="modal-backdrop mm-focus-page" style="display:none" onclick="if(event.target===this)closeMembersFocus()">
+      <div class="modal-card mm-modal-card" onclick="event.stopPropagation()">
+        <button type="button" class="mm-back-btn" onclick="closeMembersFocus()">&lsaquo; Back</button>
+        <div class="mm-mod-head"><div><div class="modal-title" style="margin-bottom:0">Member agent</div>
+          <div style="font-size:12px;color:var(--text-mute);margin-top:2px">Pull up a member, read your numbers, take action.</div></div></div>
+        <div class="mma-thread" id="mma-thread"></div>
+        <div class="mma-compose">
+          <textarea class="mma-input" id="mma-input" rows="1" placeholder="Try a member's name, or 'how's my MRR'"></textarea>
+          <button type="button" class="mma-send" onclick="_mmaSend()" aria-label="Send">&#8593;</button>
+        </div>
+      </div>
+    </div>`);
+  const inp = document.getElementById('mma-input');
+  inp.addEventListener('keydown', e => {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); _mmaSend(); }
+  });
+}
+// Same camera-pan as _mmOpenFocus, minus its _MM (marketing data) guard -
+// the member agent must open even when marketing hasn't loaded.
+function _ccOpenFocusPage(modalId, panelSel) {
+  const modal = document.getElementById(modalId);
+  if (!modal) return;
+  const panelEl = document.querySelector(panelSel);
+  if (panelEl) { panelEl.classList.add('mm-launching'); setTimeout(() => panelEl.classList.remove('mm-launching'), 400); }
+  document.documentElement.classList.add('mm-prewarm');
+  modal.style.display = 'flex';
+  setTimeout(() => {
+    requestAnimationFrame(() => {
+      document.documentElement.classList.add('mm-focus-open');
+      modal.classList.add('mm-open');
+    });
+  }, 280);
+}
+function openMembersFocus() {
+  _mmaEnsureModal();
+  _ccOpenFocusPage('membersMachineModal', '#cc-agent-bar');
+  if (!window._MMA_GREETED) {
+    window._MMA_GREETED = true;
+    _mmaAdd('in', "I'm your member agent. Type a member's name to pull their card, or ask about your member KPIs. Full AI brain coming soon - for now I match names and read numbers.");
+  }
+  _ccEnsureMembers();
+  setTimeout(() => document.getElementById('mma-input')?.focus(), 700);
+}
+function closeMembersFocus() {
+  try { _mmCloseFocus('membersMachineModal'); }
+  catch (_) { const m = document.getElementById('membersMachineModal'); m.classList.remove('mm-open'); m.style.display = 'none'; }
+}
+function _mmaAdd(dir, html) {
+  const t = document.getElementById('mma-thread');
+  if (!t) return;
+  t.insertAdjacentHTML('beforeend', `<div class="mma-bub ${dir}">${html}</div>`);
+  t.scrollTop = t.scrollHeight;
+}
+function _mmaSend() {
+  const inp = document.getElementById('mma-input');
+  const txt = (inp?.value || '').trim();
+  if (!txt) return;
+  inp.value = '';
+  _mmaAdd('out', escapeHTML(txt));
+  _mmaHandle(txt.toLowerCase());
+}
+async function _mmaHandle(q) {
+  if (/\b(kpi|kpis|mrr|revenue|churn|arpu|numbers|how many|active|paused)\b/.test(q)) return _mmaKpis();
+  const matches = await _mmaMatchMembers(q);
+  if (matches.length === 1) {
+    _mmaAdd('in', 'This the one?' + _mmaCardHtml(matches[0], true));
+  } else if (matches.length > 1) {
+    _mmaAdd('in', 'A few matches - which one?' + matches.map(m => _mmaCardHtml(m, false)).join(''));
+  } else {
+    _mmaAdd('in', "Didn't catch that. Type a member's name to pull their card, or ask about your KPIs (try \"how's my MRR\").");
+  }
+}
+async function _mmaMatchMembers(q) {
+  const stop = new Set(['the', 'and', 'about', 'member', 'members', 'who', 'what', 'can', 'you', 'tell', 'show', 'pull', 'card', 'for', 'his', 'her', 'their', 'this', 'that', 'guy']);
+  const roster = await _ccEnsureMembers();
+  const words = q.split(/[^a-z0-9']+/).filter(w => w.length >= 3 && !stop.has(w));
+  if (!words.length) return [];
+  const scored = [];
+  for (const m of roster) {
+    const hay = ((m.athlete_name || '') + ' ' + (m.parent_name || '')).toLowerCase();
+    let score = 0;
+    for (const w of words) if (hay.includes(w)) score++;
+    if (score) scored.push({ m, score });
+  }
+  if (!scored.length) return [];
+  scored.sort((a, b) => b.score - a.score);
+  return scored.filter(s => s.score === scored[0].score).slice(0, 4).map(s => s.m);
+}
+function _mmaCardHtml(m, detailed) {
+  const av = (typeof _memberAvatar === 'function') ? _memberAvatar(m, 32) : '';
+  const status = (typeof _memberStatusPill === 'function') ? _memberStatusPill(m.status) : escapeHTML(m.status || '');
+  let plan = '';
+  try { plan = m.pricing ? _memberPriceLabel(m.pricing) : (m.plan || ''); } catch (_) { plan = m.plan || ''; }
+  // plan comes from our own _memberPriceLabel helper and is already HTML
+  const sub = [escapeHTML(m.parent_name || ''), plan ? String(plan) : '']
+    .filter(Boolean).join(' · ');
+  const extra = detailed
+    ? `<div class="mma-card-sub">${[m.trainer ? 'Trainer: ' + escapeHTML(m.trainer) : '', m.joined_date ? 'Joined ' + escapeHTML(String(m.joined_date).slice(0, 10)) : ''].filter(Boolean).join(' · ')}</div>`
+    : '';
+  return `<div class="mma-card">${av}<div style="min-width:0"><div class="mma-card-name">${escapeHTML(m.athlete_name || 'Member')} ${status}</div><div class="mma-card-sub">${sub}</div>${extra}</div><button type="button" class="mma-open" onclick="openMemberPopup('${m.id}')">Open card</button></div>`;
+}
+async function _mmaKpis() {
+  const roster = await _ccEnsureMembers();
+  if (!roster.length) return _mmaAdd('in', 'No roster loaded yet - open the member list once and try again.');
+  const k = _ccMemberKpis(roster);
+  _mmaAdd('in', 'Your roster right now:' +
+    `<div class="mma-kgrid">` +
+    `<div class="mma-k"><div class="mma-k-v">${k.live}</div><div class="mma-k-l">Active members</div></div>` +
+    `<div class="mma-k"><div class="mma-k-v">${k.paused}</div><div class="mma-k-l">Paused</div></div>` +
+    `<div class="mma-k"><div class="mma-k-v">$${Math.round(k.mrr).toLocaleString()}</div><div class="mma-k-l">MRR (approx)</div></div>` +
+    `<div class="mma-k"><div class="mma-k-v">$${Math.round(k.arpu).toLocaleString()}</div><div class="mma-k-l">Rev / member</div></div>` +
+    `</div><div style="font-size:11px;color:var(--text-mute);margin-top:6px">Figures are monthly equivalents from the live roster, tax inclusive.</div>`);
+}
+
 async function boot() {
   // Snapshot URL state BEFORE any awaits - the SDK can consume the hash.
   const hash = (window.location.hash || '').replace(/^#/, '');
@@ -43359,7 +43891,12 @@ async function boot() {
   } else if (!location.hash) {
     // Returning user (tour already done) → land on Home, or their first tab when
     // Home is hidden (V2 users). Skip when a deep link already targets a view.
-    switchView(typeof _landingView === 'function' ? _landingView() : 'home');
+    // Command center beta (?cc=1, V2 only) replaces the landing entirely.
+    if (typeof _ccWanted === 'function' && _ccWanted() && typeof V2_ACCESS !== 'undefined' && V2_ACCESS) {
+      openCommandCenter();
+    } else {
+      switchView(typeof _landingView === 'function' ? _landingView() : 'home');
+    }
   }
 
   // Strip any leftover ?meta=connected / ?meta=error query params if a
