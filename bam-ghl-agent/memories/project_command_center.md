@@ -15,6 +15,12 @@
 - Bubble rail: `.cc-rail` fixed left, dots enlarge+gold when their section is most visible (IntersectionObserver, root `.main`); sections fade-rise in (`.cc-visible`).
 - CSS injected by `_ccStyle()`; design-system tokens throughout.
 
+## Pass 2 (2026-07-05, Cole feedback)
+- Flow = Home / Sales / Members / Marketing only (Resources SECTION removed; training home ignored for now). Kickers (the section-symbol + 01/02 labels) removed - titles only.
+- **Quick links widget** on the Home right rail (the red-circle spot): Resources / Assets / Calendar / Support via `_ccOpenClassic` (`#cc-res-widget`, injected by `_ccMountHome` after renderHomeV2).
+- **Members section = sketch layout**: KPI strip, then two cards (Unread member messages `_ccLoadMemberMsgs` = /api/ghl/inbox filtered to roster by ghl_contact_id/name, own `.cc-ib-row` markup | Member action items `_ccLoadMemberActions` = roster-derived chips: payment_failed/payment_method_required red, pause_scheduled_for + cancelling amber, click -> openMemberPopup) + "See all members" -> `_ccMemberListOpen()` popup (z 8800, UNDER the member drawer so drill-in works; client-side search) + agent chat bar at the BOTTOM -> focus mode.
+- **Scroll recede** `_ccInitRecede`: sections blur/fade/scale back as they exit the top (like the home hero), rAF-throttled, reduced-motion safe. Section heads are click-to-focus (scrollIntoView).
+
 ## Section mounts (current skeleton)
 | Section | Mount | Content |
 |---|---|---|
