@@ -2,9 +2,10 @@
 
 Shipped 2026-06-18. A second content pipeline alongside Ads, gated per-client.
 
-## The two pipelines (both ride `content_tickets`, distinguished by `channel`)
+## The three pipelines (all ride `content_tickets`, distinguished by `channel`)
 - `channel='ads'` (default) → client → content team → **Send to Marketing** → marketing_tickets → Meta. (the existing flow)
 - `channel='organic'` → client → content team → **Send for client review** → client Approves/Requests-changes → **Creative Bank**. NO marketing ticket spawned.
+- `channel='funnel'` (added 2026-07-05) → client → content team → **Send to Systems** → creates a `tickets` row (type change, source `funnel-content`, finals attached, backlink `fields.funnel_content_ticket_id`) → systems team adds it to the website. Content ticket flips completed + `context.systems_ticket_id`. No credits, no marketing ticket. Gate = `marketing_included` (server-enforced on POST); routes like ads (content_assignee_ads_id → Cam default). **Client split is now Ads | Funnel | Organic (organic 3rd, hidden when off) and shows for EVERY marketing client - previously only organic-enabled clients saw a split (V1-visible change, Zoran-flagged on the PR).**
 
 ## Schema (migrations applied 2026-06-18)
 - `content_tickets.channel text not null default 'ads'`

@@ -7548,18 +7548,25 @@ Then the call to action."]</div>
         </div>
       </div><!-- /#marketing-new-campaign -->
 
-      <!-- ── Channel split (Ads | Organic) - shown when ORGANIC_CONTENT is on ── -->
+      <!-- ── Channel split (Ads | Funnel | Organic) - shown when the client has
+           more than one content surface. Order is deliberate: every scaling
+           client has Ads + Funnel; Organic is per-client so it sits last. ── -->
       <div id="marketing-channel-split" style="display:none">
         <div class="channel-choose">
           <div class="section-label">Marketing</div>
           <div style="color:var(--text-sub);font-size:13px;margin:4px 0 18px">What do you want to work on?</div>
           <div class="channel-grid">
-            <button class="channel-card" onclick="_chooseChannel('ads')">
+            <button class="channel-card" id="channel-card-ads" onclick="_chooseChannel('ads')">
               <span class="channel-card-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 11 18-5v12L3 14v-3z"/><path d="M11.6 16.8a3 3 0 1 1-5.8-1.6"/></svg></span>
               <span class="channel-card-name">Ads</span>
               <span class="channel-card-desc">Paid campaigns on Meta</span>
             </button>
-            <button class="channel-card" onclick="_chooseChannel('organic')">
+            <button class="channel-card" id="channel-card-funnel" onclick="_chooseChannel('funnel')">
+              <span class="channel-card-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 4h18l-7 8v6l-4 2v-8L3 4z"/></svg></span>
+              <span class="channel-card-name">Funnel</span>
+              <span class="channel-card-desc">Videos and graphics for your website</span>
+            </button>
+            <button class="channel-card" id="channel-card-organic" onclick="_chooseChannel('organic')">
               <span class="channel-card-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 20h10"/><path d="M10 20c5.5-2.5.8-6.4 3-10"/><path d="M9.5 9.4c1.1.8 1.8 2.2 2.3 3.7-2 .4-3.5.4-4.8-.3-1.2-.6-2.3-1.9-3-4.2 2.8-.5 4.4 0 5.5.8z"/><path d="M14.1 6a7 7 0 0 0-1.1 4c1.9-.1 3.3-.6 4.3-1.4 1-1 1.6-2.3 1.7-4.6-2.7.1-4 1-4.9 2z"/></svg></span>
               <span class="channel-card-name">Organic</span>
               <span class="channel-card-desc">Content for your socials</span>
@@ -7568,9 +7575,21 @@ Then the call to action."]</div>
         </div>
       </div>
 
+      <!-- ── Funnel content view (website content -> systems team) ── -->
+      <div id="marketing-funnel" style="display:none">
+        <button onclick="_backToChannelSplit()" style="background:none;border:none;color:var(--text-mute);font-size:13px;cursor:pointer;padding:0;margin-bottom:14px">← Back</button>
+
+        <div class="section-label">Funnel content</div>
+        <div style="color:var(--text-sub);font-size:13px;margin:6px 0 14px;line-height:1.5">Videos and graphics for your website and funnels. Our content team produces the finals, then our systems team adds them to your site - you can track that step under <b>Systems</b>.</div>
+        <button class="btn-add-campaign" style="margin-bottom:22px" onclick="openAddCreativeModal('funnel')">+ Request funnel content</button>
+
+        <div class="section-label">Status</div>
+        <div id="funnel-status-list" style="margin-top:8px"></div>
+      </div>
+
       <!-- ── Organic content view ── -->
       <div id="marketing-organic" style="display:none">
-        <button id="organic-back-btn" onclick="_backToChannelSplit()" style="background:none;border:none;color:var(--text-mute);font-size:13px;cursor:pointer;padding:0;margin-bottom:14px">← Back to Ads / Organic</button>
+        <button id="organic-back-btn" onclick="_backToChannelSplit()" style="background:none;border:none;color:var(--text-mute);font-size:13px;cursor:pointer;padding:0;margin-bottom:14px">← Back</button>
 
         <!-- ── Resource guide (collapsed PDF - placeholder until walkthrough video) ── -->
         <details class="guide-card">
@@ -25893,12 +25912,15 @@ function closeCampaignDetail() {
 
 // ─────────── Ads | Organic channel split ───────────
 function _hideAllMarketingSub() {
-  ['marketing-list','marketing-detail','marketing-request-detail','marketing-new-campaign','marketing-channel-split','marketing-organic']
+  ['marketing-list','marketing-detail','marketing-request-detail','marketing-new-campaign','marketing-channel-split','marketing-organic','marketing-funnel']
     .forEach(id => { const e = document.getElementById(id); if (e) e.style.display = 'none'; });
   const back = document.getElementById('marketing-ads-back'); if (back) back.style.display = 'none';
 }
 function _hasOrganic() { return typeof ORGANIC_CONTENT !== 'undefined' && ORGANIC_CONTENT; }
 function _hasAds() { return typeof MARKETING_INCLUDED === 'undefined' || MARKETING_INCLUDED; }
+// Funnel content rides the scaling service: every client with a BAM-run
+// website (marketing_included) has it. Content-only clients don't.
+function _hasFunnel() { return _hasAds(); }
 function _showOrganicOnly() {
   _hideAllMarketingSub();
   const back = document.getElementById('organic-back-btn'); if (back) back.style.display = 'none';
@@ -25909,9 +25931,10 @@ function _marketingEnter() {
   _renderFirstCampaignGuide();   // data-drive the "Your First Campaign" card from the default guide card
   if (typeof _mmLoad === 'function') _mmLoad();   // Marketing Machine card (V2 only; quiet no-op otherwise)
   if (_hasOrganic() && !_hasAds()) {
-    // Content-only client: straight to organic, no Ads | Organic split.
+    // Content-only client: straight to organic, no channel split.
     _showOrganicOnly();
-  } else if (_hasOrganic()) {
+  } else if (_hasAds()) {
+    // Scaling client: Ads + Funnel always, Organic when enabled.
     _showChannelSplit();
   } else {
     _hideAllMarketingSub();
@@ -25920,6 +25943,9 @@ function _marketingEnter() {
 }
 function _showChannelSplit() {
   _hideAllMarketingSub();
+  // Organic card only when the client's organic pipeline is on.
+  const org = document.getElementById('channel-card-organic');
+  if (org) org.style.display = _hasOrganic() ? '' : 'none';
   const e = document.getElementById('marketing-channel-split'); if (e) e.style.display = 'block';
 }
 function _chooseChannel(ch) {
@@ -25927,20 +25953,74 @@ function _chooseChannel(ch) {
   if (ch === 'organic') {
     const e = document.getElementById('marketing-organic'); if (e) e.style.display = 'block';
     _fetchAndRenderOrganic();
+  } else if (ch === 'funnel') {
+    const e = document.getElementById('marketing-funnel'); if (e) e.style.display = 'block';
+    _fetchAndRenderFunnel();
   } else {
     const l = document.getElementById('marketing-list'); if (l) l.style.display = 'block';
-    const b = document.getElementById('marketing-ads-back'); if (b) b.style.display = (ORGANIC_CONTENT ? 'block' : 'none');
+    // The split now exists for every ads client (Ads | Funnel), so the back
+    // button always shows on the ads view.
+    const b = document.getElementById('marketing-ads-back'); if (b) b.style.display = 'block';
   }
 }
 function _backToChannelSplit() {
   if (_hasOrganic() && !_hasAds()) {
-    _showOrganicOnly();           // content-only: no Ads | Organic split to return to
-  } else if (_hasOrganic()) {
+    _showOrganicOnly();           // content-only: no channel split to return to
+  } else if (_hasAds()) {
     _showChannelSplit();
   } else {
     _hideAllMarketingSub();
     const l = document.getElementById('marketing-list'); if (l) l.style.display = 'block';
   }
+}
+
+// ─────────── Funnel content (request → production → systems team) ───────────
+let _FUNNEL_TICKETS = [];
+async function _fetchAndRenderFunnel() {
+  const el = document.getElementById('funnel-status-list');
+  if (el) el.innerHTML = '<div style="color:var(--text-mute);font-size:13px;padding:8px 0">Loading…</div>';
+  try {
+    const token = await _mreqAuthToken();
+    const res = await fetch('/api/marketing?resource=content-tickets&scope=client&channel=funnel&all=1&client_id=' + encodeURIComponent(CLIENT_ID), {
+      headers: { 'Authorization': 'Bearer ' + token },
+    });
+    const json = await _safeJson(res);
+    if (!res.ok) throw new Error(json.error || ('HTTP ' + res.status));
+    _FUNNEL_TICKETS = Array.isArray(json.tickets) ? json.tickets : [];
+    _renderFunnel();
+  } catch (e) {
+    if (el) el.innerHTML = `<div style="color:var(--text-mute);font-size:13px;padding:8px 0">Couldn't load right now - please refresh and try again.</div>`;
+  }
+}
+function _renderFunnel() {
+  const el = document.getElementById('funnel-status-list');
+  if (!el) return;
+  const live = _FUNNEL_TICKETS.filter(t => t.status !== 'cancelled');
+  if (!live.length) {
+    el.innerHTML = `<div style="color:var(--text-mute);font-size:13px;padding:8px 0">Nothing yet - request your first funnel content above.</div>`;
+    return;
+  }
+  el.innerHTML = live.map(t => {
+    const name = escapeHTML((t.title || '').trim() || ((t.type === 'video' ? 'Video' : t.type === 'mixed' ? 'Video + graphic' : 'Graphic') + ' content'));
+    const date = t.submitted_at ? new Date(t.submitted_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '';
+    let pill;
+    if (t.status === 'completed') {
+      pill = `<span style="font-size:11px;font-weight:700;color:var(--green);border:1px solid var(--green);padding:3px 10px;border-radius:999px;white-space:nowrap">With systems team</span>`;
+    } else if (t.client_action_status === 'requested') {
+      pill = `<span style="font-size:11px;font-weight:700;color:var(--gold);border:1px solid var(--gold);padding:3px 10px;border-radius:999px;white-space:nowrap">Action needed</span>`;
+    } else {
+      pill = `<span style="font-size:11px;font-weight:700;color:var(--text-sub);border:1px solid var(--line);padding:3px 10px;border-radius:999px;white-space:nowrap">In production</span>`;
+    }
+    const sysNote = t.status === 'completed'
+      ? `<div style="font-size:12px;color:var(--text-mute);margin-top:4px">Being added to your website - track it under Systems.</div>` : '';
+    return `<div style="background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px 16px;margin-bottom:10px;display:flex;align-items:center;gap:12px">
+      <div style="flex:1;min-width:0">
+        <div style="font-size:14px;font-weight:600;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${name}</div>
+        <div style="font-size:12px;color:var(--text-mute);margin-top:2px">Requested ${date}</div>${sysNote}
+      </div>
+      ${pill}
+    </div>`;
+  }).join('');
 }
 
 // ─────────── Organic content (request → status → bank) ───────────
@@ -26285,7 +26365,7 @@ async function confirmRemove() {
 // ── Input assets modal (raw assets → goes to content team) ──
 function openAddCreativeModal(channel) {
   // Kept name for backward compat with the existing button onclick (ads path).
-  _inputAssetsChannel = (channel === 'organic') ? 'organic' : 'ads';
+  _inputAssetsChannel = (channel === 'organic' || channel === 'funnel') ? channel : 'ads';
   _inputAssetsState = { type: 'graphic', files: [] };
   _selectInputAssetsType('graphic');
   _renderInputAssetsFilesList();
@@ -26306,6 +26386,8 @@ function openAddCreativeModal(channel) {
   const sub = document.getElementById('inputAssetsSub');
   if (sub) sub.textContent = _inputAssetsChannel === 'organic'
     ? 'Submit raw assets here. Our content team will create your post, then send it back to you to review and approve.'
+    : _inputAssetsChannel === 'funnel'
+    ? 'Submit raw assets here. Our content team will produce the finals, then our systems team will add them to your website.'
     : 'Submit raw assets here. Our content team will turn them into a finished creative and add it to your campaign.';
   _refreshInputAssetsFolderList();
   document.getElementById('inputAssetsModal').style.display = 'flex';
@@ -26516,7 +26598,7 @@ async function submitInputAssets() {
       notes,
       raw_files: uploaded,
       context: {
-        source: channel === 'organic' ? 'organic-request' : 'add-creative',
+        source: channel === 'organic' ? 'organic-request' : channel === 'funnel' ? 'funnel-request' : 'add-creative',
         campaign_title: _detailCampaignTitle(),
         format,
         captions,
@@ -26527,6 +26609,10 @@ async function submitInputAssets() {
       _fetchAndRenderOrganic();
       showConfirmation('Request received',
         'We got your organic content request. Our content team will create it and send it back to you for review.');
+    } else if (channel === 'funnel') {
+      _fetchAndRenderFunnel();
+      showConfirmation('Request received',
+        'We got your funnel content request. Our content team will produce it, then our systems team will add it to your website.');
     } else {
       await fetchAndRenderMarketingRequests();
       showConfirmation('Assets received',
