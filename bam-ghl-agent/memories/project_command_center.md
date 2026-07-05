@@ -26,6 +26,9 @@
 - **Rail FX**: magnetic dot scaling near cursor (`_ccRailFx` gaussian), scroll-progress ring around the active dot (SVG `rfg` dashoffset), label flash ~1.7s on section lock-in, drag-to-scrub the page along the rail (pointer events, click-swallow after drag), keyboard ArrowUp/Down + 1-4 (`_ccKeys`, skipped in inputs/classic/focus mode), tick pop animation (`ccTick`), idle fade to 35% after 2.8s (wakes on scroll or mouse near left edge), **red alert dot** `.cc-dot.alert` via `_ccSetBadge(key,n)` - members = roster action items, sales = `_hmHawkTotal` (8s interval).
 - **Active dot is computed in the scroll handler** (section under the 45% viewport line, containment first, last-crossed fallback) - NOT IntersectionObserver ratios (misfire when sections are shorter than the viewport). Observer only handles reveal now.
 
+## Daily win = never empty (2026-07-05)
+`_hv2WinLoad` ladder: today (clients joined / trials booked) -> yesterday revenue tiers -> THIS WEEK (clients / trials via a second marketing-kpi call, only when no daily win) -> any revenue yesterday -> `_hv2StateWin()` standing wins (kpis-v15 section=members 30d: active-members count, 0 cancellations in 30d, payments collected, longest-member tenure from roster, clean-payments; rotates by day-of-year) -> absolute floor "Your command center is live". Bare "Hello" is impossible. Applies to classic V2 Home too (same card).
+
 ## Section mounts (current skeleton)
 | Section | Mount | Content |
 |---|---|---|
