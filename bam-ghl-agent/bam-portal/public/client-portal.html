@@ -44739,10 +44739,12 @@ function _v2ApplyDevice() {
 // push "Your notes" down so its top lines up with the top of the device frame
 // (below the phase flow + device tab), not the top of the whole column.
 function _v2AlignNotes() {
-  const frame = document.getElementById('v2ReqDeviceFrame'), side = document.querySelector('.v2req-side'), col = document.querySelector('.v2req-stagecol');
-  if (!frame || !side || !col) return;
-  const offset = frame.getBoundingClientRect().top - col.getBoundingClientRect().top;
-  side.style.paddingTop = (offset > 0 ? Math.round(offset) : 0) + 'px';
+  requestAnimationFrame(function () {   // measure after layout settles (phases/frame moved)
+    const screen = document.getElementById('v2ReqStage'), side = document.querySelector('.v2req-side'), col = document.querySelector('.v2req-stagecol');
+    if (!screen || !side || !col) return;
+    const offset = screen.getBoundingClientRect().top - col.getBoundingClientRect().top;
+    side.style.paddingTop = (offset > 0 ? Math.round(offset) : 0) + 'px';
+  });
 }
 function _v2SetDevice(d) {
   _V2_DEVICE = d;
@@ -44762,6 +44764,7 @@ function _v2RenderStages() {
       '<span class="v2req-phase-num">' + (i + 1) + '</span>' + _escapeHtml(s.label) +
     '</button>'
   ).join('');
+  _v2AlignNotes();   // phases changed the frame's vertical offset -> re-align notes
 }
 function _v2SetStage(key) {
   _V2_STAGE = key;
