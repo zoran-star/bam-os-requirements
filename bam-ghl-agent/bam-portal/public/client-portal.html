@@ -44138,12 +44138,12 @@ function toggleTheme() {
 
     <label class="modal-label" style="margin-top:18px">Raw files</label>
     <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:8px">
-      <input id="inputAssetsFolder" class="modal-input" list="inputAssetsFolderList" placeholder="📁 Folder (optional) - e.g. Game footage" style="flex:1 1 200px;min-width:150px" />
+      <input id="inputAssetsFolder" class="modal-input" list="inputAssetsFolderList" placeholder="Group name (optional) - e.g. Game footage" style="flex:1 1 200px;min-width:150px" />
       <datalist id="inputAssetsFolderList"></datalist>
-      <label for="inputAssetsFolderInput" class="btn-modal-secondary" style="cursor:pointer;white-space:nowrap;margin:0">🗂 Upload a folder</label>
+      <label for="inputAssetsFolderInput" class="btn-modal-secondary" style="cursor:pointer;white-space:nowrap;margin:0">Upload a folder</label>
       <input type="file" id="inputAssetsFolderInput" webkitdirectory directory multiple style="display:none" onchange="_inputAssetsAddFiles(this.files, true)" />
     </div>
-    <div style="font-size:11px;color:var(--text-mute);margin-bottom:8px">Type a folder name to group what you upload next, or upload a whole folder at once - keeps your categories for the team.</div>
+    <div style="font-size:11px;color:var(--text-mute);margin-bottom:8px">Type a group name for what you upload next, or upload a whole folder at once - keeps your categories for the team.</div>
     <label for="inputAssetsFileInput" class="file-drop-label">
       <span class="file-drop-icon">↑</span>
       <span class="file-drop-text">Click to upload (you can pick multiple)</span>
