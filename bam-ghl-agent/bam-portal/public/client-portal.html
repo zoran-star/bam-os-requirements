@@ -43680,6 +43680,7 @@ function toggleTheme() {
 
 <!-- note popover (anchored to a pin) -->
 <div id="v2NotePop" class="v2note-pop" style="display:none">
+  <div id="v2NoteSec" class="v2note-sec"></div>
   <textarea id="v2NoteText" rows="3" placeholder="What should we change here?"></textarea>
   <div class="v2note-pop-row">
     <button type="button" class="v2note-cancel" onclick="_v2NoteCancel()">Cancel</button>
@@ -43720,6 +43721,8 @@ function toggleTheme() {
   .v2req-send { flex:0 0 auto; font-family:var(--mm-ff); font-size:14px; font-weight:700; border:none; border-radius:10px; padding:12px 22px; background:var(--gold); color:#0B0B0D; cursor:pointer; }
   .v2req-send:disabled { opacity:.5; cursor:not-allowed; }
   .v2note-pop { position:fixed; z-index:1700; width:240px; background:var(--surface); border:1px solid var(--line); border-radius:12px; padding:12px; box-shadow:0 12px 34px rgba(0,0,0,.28); }
+  .v2note-sec { font-family:var(--mm-ff); font-size:10.5px; font-weight:700; text-transform:uppercase; letter-spacing:0.03em; color:var(--gold-d,#9a7d2b); margin-bottom:7px; }
+  .v2note-sec:empty { display:none; }
   .v2note-pop textarea { width:100%; box-sizing:border-box; font-family:var(--mm-ff); font-size:13px; color:var(--text); background:var(--surface-el); border:1px solid var(--line); border-radius:8px; padding:8px; resize:none; }
   .v2note-pop-row { display:flex; justify-content:flex-end; gap:8px; margin-top:8px; }
   .v2note-cancel { font-family:var(--mm-ff); font-size:12px; font-weight:600; border:1px solid var(--line); border-radius:7px; padding:5px 11px; background:none; color:var(--text-sub); cursor:pointer; }
@@ -44658,6 +44661,11 @@ function _v2MountStage() {
 }
 function _v2OpenNotePop(clientX, clientY, val) {
   const pop = document.getElementById('v2NotePop'), ta = document.getElementById('v2NoteText');
+  // show which section this note is on (new pin's section, or the edited note's)
+  const sec = (_V2_PENDING && (_V2_PENDING.section
+    || (typeof _V2_PENDING.idx === 'number' && _V2_PINS[_V2_PENDING.idx] && _V2_PINS[_V2_PENDING.idx].section))) || '';
+  const secEl = document.getElementById('v2NoteSec');
+  if (secEl) secEl.textContent = sec;
   ta.value = val || '';
   pop.style.display = 'block';
   const pw = 240, ph = 130;
