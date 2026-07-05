@@ -3742,8 +3742,10 @@
   .cc-wall { position: fixed; inset: 0; pointer-events: none; z-index: 0; }
   .cc-wall svg { width: 100%; height: 100%; }
   .cc-wall-area { fill: var(--gold); opacity: 0; transition: opacity .9s ease .55s; }
-  .cc-wall.draw .cc-wall-area { opacity: .05; }
-  .cc-wall-line { fill: none; stroke: var(--gold); stroke-width: 2; opacity: .16; stroke-dasharray: 4200; stroke-dashoffset: 4200; transition: stroke-dashoffset 1.4s cubic-bezier(0.16, 1, 0.3, 1) .25s; }
+  .cc-wall.draw .cc-wall-area { opacity: .035; }
+  .cc-wall-line { fill: none; stroke: var(--gold); stroke-width: 2; opacity: .11; stroke-dasharray: 4200; stroke-dashoffset: 4200; transition: stroke-dashoffset 1.4s cubic-bezier(0.16, 1, 0.3, 1) .25s; }
+  .cc-wall-hl { fill: var(--gold); opacity: 0; animation: ccWallHl 2.4s ease .6s 3; }
+  @keyframes ccWallHl { 0%, 100% { opacity: 0; r: 7; } 40% { opacity: .5; r: 11; } }
   .cc-wall.draw .cc-wall-line { stroke-dashoffset: 0; }
   .mm-focus-page .mm-modal-card { position: relative; z-index: 1; }
   html.mm-focus-open, html.mm-focus-open body { overflow-x: hidden; }
@@ -43490,8 +43492,33 @@ function _ccStyle() {
     '.cc-back-pill{display:none}' +
     'body.cc-mode.cc-classic .cc-back-pill{position:fixed;top:14px;left:14px;z-index:95;display:inline-flex;align-items:center;gap:6px;background:var(--gold);color:var(--on-gold);border:none;border-radius:999px;padding:9px 16px;font:inherit;font-size:12px;font-weight:700;cursor:pointer;box-shadow:0 4px 14px rgba(0,0,0,.25)}' +
     /* members focus mode (agent chat) */
-    '#membersMachineModal .mm-modal-card{display:flex;flex-direction:column;max-width:760px}' +
-    '.mma-thread{flex:1;overflow-y:auto;display:flex;flex-direction:column;padding:8px 2px;min-height:300px;max-height:calc(100vh - 280px)}' +
+    '#membersMachineModal .mm-modal-card{display:flex;flex-direction:column;max-width:1040px}' +
+    '.mma-split{display:flex;gap:20px;align-items:stretch}' +
+    '.mma-main{flex:1;min-width:0;display:flex;flex-direction:column}' +
+    '.mma-rail{width:230px;flex:none;border-left:1px solid var(--border);padding-left:18px;display:flex;flex-direction:column;gap:8px}' +
+    '@media(max-width:980px){.mma-rail{display:none}}' +
+    '.mma-rail-h{font-family:var(--mono);font-size:10px;font-weight:600;letter-spacing:.16em;text-transform:uppercase;color:var(--text-mute);padding:6px 0}' +
+    '.mma-rail-empty{font-size:12px;color:var(--text-mute)}' +
+    '.mma-pin{text-align:left;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:10px 12px;cursor:pointer;transition:border-color .15s,transform .2s var(--es,ease);animation:ccDrawerUp .3s cubic-bezier(0.22,1,0.36,1)}' +
+    '.mma-pin:hover{border-color:var(--accent-border);transform:translateY(-1px)}' +
+    '.mma-pin-t{display:block;font-size:12.5px;font-weight:700;color:var(--text)}' +
+    '.mma-pin-s{display:block;font-size:11px;color:var(--text-mute);margin-top:2px}' +
+    '.mma-thread{flex:1;overflow-y:auto;display:flex;flex-direction:column;padding:8px 2px;min-height:300px;max-height:calc(100vh - 320px);-webkit-mask-image:linear-gradient(180deg,transparent 0,#000 14%);mask-image:linear-gradient(180deg,transparent 0,#000 14%)}' +
+    '.mma-bub{transition:opacity .5s ease}' +
+    '.mma-bub.past{opacity:.55}' +
+    '.mma-bub.mma-think{font-family:var(--mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--text-mute);background:transparent;border-style:dashed}' +
+    '.mma-chips{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;justify-content:center}' +
+    '.mma-chip{background:transparent;border:1px solid var(--border-med);border-radius:999px;padding:6px 14px;font:inherit;font-size:12px;font-weight:600;color:var(--text-sub);cursor:pointer;transition:color .12s,border-color .12s}' +
+    '.mma-chip:hover{color:var(--gold);border-color:var(--gold)}' +
+    '.mma-orb{width:38px;height:38px;border-radius:50%;background:linear-gradient(135deg,var(--gold),var(--gold-d,#E0C56A));color:#fff;display:flex;align-items:center;justify-content:center;flex:none;box-shadow:0 2px 10px rgba(200,168,78,.25);animation:ccOrbBreathe 4s ease-in-out infinite}' +
+    '.mma-orb svg{width:16px;height:16px}' +
+    '.mma-orb.think{animation:mmaOrbThink .7s ease-in-out infinite}' +
+    '@keyframes mmaOrbThink{0%,100%{box-shadow:0 0 0 0 rgba(212,182,92,.35)}50%{box-shadow:0 0 0 8px rgba(212,182,92,0)}}' +
+    '.mma-orb.say{animation:mmaOrbSay .45s var(--espring,ease)}' +
+    '@keyframes mmaOrbSay{0%{transform:scale(1)}40%{transform:scale(1.22)}100%{transform:scale(1)}}' +
+    '.mma-card-acts{display:flex;gap:6px;margin-top:8px}' +
+    '.mma-act{background:transparent;border:1px solid var(--border-med);border-radius:8px;padding:5px 10px;font:inherit;font-size:11px;font-weight:700;color:var(--text-sub);cursor:pointer;transition:color .12s,border-color .12s}' +
+    '.mma-act:hover{color:var(--gold);border-color:var(--gold)}' +
     '.mma-bub{max-width:82%;border:1px solid var(--border);border-radius:12px;padding:10px 14px;font-size:13px;line-height:1.5;color:var(--text);margin:5px 0}' +
     '.mma-bub.out{margin-left:auto;background:var(--gold-sheen);border-color:var(--accent-border)}' +
     '.mma-bub.in{background:var(--surface-el)}' +
@@ -43505,7 +43532,7 @@ function _ccStyle() {
     '.mma-k-v{font-family:var(--font-num);font-size:17px;font-weight:800;color:var(--text)}' +
     '.mma-k-l{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;color:var(--text-mute)}' +
     '.mma-compose{display:flex;gap:8px;margin-top:12px}' +
-    '.mma-input{flex:1;background:var(--surface-el);border:1px solid var(--border-med);border-radius:12px;padding:11px 14px;font:inherit;font-size:13px;color:var(--text);outline:none;resize:none;min-height:44px;max-height:120px}' +
+    '.mma-input{flex:1;background:var(--surface-el);border:1px solid var(--border-med);border-radius:14px;padding:14px 16px;font:inherit;font-size:15px;color:var(--text);outline:none;resize:none;min-height:50px;max-height:130px}' +
     '.mma-input:focus{border-color:var(--gold)}' +
     '.mma-send{width:44px;height:44px;border-radius:12px;background:var(--gold);color:var(--on-gold);border:none;font-size:16px;font-weight:800;cursor:pointer;flex:none}' +
     /* member drawer must sit above the focus page when opened from chat */
@@ -43799,34 +43826,45 @@ function _ccHudType(hud, text) {
 // Data wallpaper: the academy's cumulative member growth over the last 12
 // months, drawn huge and faint behind the focus card. Real data from the
 // roster; skipped when the roster has not loaded.
-function _ccFocusWallpaper(modalId) {
+function _ccFocusWallpaper(modalId, opts) {
   const modal = document.getElementById(modalId);
   if (!modal) return;
+  opts = opts || {};
   modal.querySelector('.cc-wall')?.remove();
   const roster = (typeof _ccRoster === 'function' ? _ccRoster() : []);
   const joins = roster
-    .map(m => new Date(m.joined_date || m.start_date || m.stripe_joined_at || 0).getTime())
-    .filter(t => t > 0);
+    .map(m => ({ t: new Date(m.joined_date || m.start_date || m.stripe_joined_at || 0).getTime(), v: _ccMonthly(m) }))
+    .filter(j => j.t > 0);
   if (joins.length < 2) return;
   const now = new Date();
+  const start = new Date(now.getFullYear(), now.getMonth() - 11, 1).getTime();
   const series = [];
   for (let i = 11; i >= 0; i--) {
     const end = new Date(now.getFullYear(), now.getMonth() - i + 1, 1).getTime();
-    series.push(joins.filter(j => j < end).length);
+    series.push(joins.reduce((s, j) => s + (j.t < end ? (opts.money ? j.v : 1) : 0), 0));
   }
   const max = Math.max(...series, 1);
   const W = 1440, H = 900;
-  const pts = series.map((val, i) => [
-    (i / (series.length - 1)) * W,
-    H - H * 0.15 - (val / max) * H * 0.55,
-  ]);
+  const px = i => (i / (series.length - 1)) * W;
+  const py = v => H - H * 0.15 - (v / max) * H * 0.55;
+  const pts = series.map((val, i) => [px(i), py(val)]);
   const line = pts.map((p, i) => (i ? 'L' : 'M') + p[0].toFixed(0) + ' ' + p[1].toFixed(0)).join(' ');
   const area = line + ' L ' + W + ' ' + H + ' L 0 ' + H + ' Z';
+  // pulse the spot where a pulled member joined the curve
+  let hl = '';
+  if (opts.highlight) {
+    const span = Date.now() - start;
+    const f = Math.min(1, Math.max(0, (opts.highlight - start) / Math.max(1, span)));
+    const idx = f * (series.length - 1);
+    const lo = Math.floor(idx), hi = Math.min(series.length - 1, lo + 1);
+    const y = py(series[lo] + (series[hi] - series[lo]) * (idx - lo));
+    hl = '<circle class="cc-wall-hl" cx="' + (f * W).toFixed(0) + '" cy="' + y.toFixed(0) + '" r="7"/>';
+  }
   const el = document.createElement('div');
   el.className = 'cc-wall';
   el.innerHTML = '<svg viewBox="0 0 ' + W + ' ' + H + '" preserveAspectRatio="none">' +
     '<path class="cc-wall-area" d="' + area + '"/>' +
-    '<path class="cc-wall-line" d="' + line + '"/></svg>';
+    '<path class="cc-wall-line" d="' + line + '"/>' + hl + '</svg>';
   modal.prepend(el);
   requestAnimationFrame(() => requestAnimationFrame(() => el.classList.add('draw')));
 }
@@ -44109,7 +44147,7 @@ function _ccMountMembers(host) {
           <div id="cc-mem-msgs"><div class="req-empty" style="padding:14px 16px"><span class="req-spin"></span>Loading...</div></div>
         </div>
         <div class="cc-mem-card">
-          <div class="cc-mem-card-h">Member action items</div>
+          <div class="cc-mem-card-h">Actions</div>
           <div class="cc-mem-card-b">
             <div id="cc-mem-actions"><div class="req-empty" style="padding:4px 0"><span class="req-spin"></span>Loading...</div></div>
             <button type="button" class="cc-btn" style="width:100%;justify-content:center;margin-top:10px" onclick="_ccMemberListOpen()">See all members</button>
@@ -44471,14 +44509,29 @@ function _mmaEnsureModal() {
   if (document.getElementById('membersMachineModal')) return;
   document.body.insertAdjacentHTML('beforeend', `
     <div id="membersMachineModal" class="modal-backdrop mm-focus-page" style="display:none" onclick="if(event.target===this)closeMembersFocus()">
-      <div class="modal-card mm-modal-card" onclick="event.stopPropagation()">
+      <div class="modal-card mm-modal-card mma-shell" onclick="event.stopPropagation()">
         <button type="button" class="mm-back-btn" onclick="closeMembersFocus()">&lsaquo; Back</button>
         <div class="mm-mod-head"><div><div class="modal-title" style="margin-bottom:0">Member agent</div>
           <div style="font-size:12px;color:var(--text-mute);margin-top:2px">Pull up a member, read your numbers, take action.</div></div></div>
-        <div class="mma-thread" id="mma-thread"></div>
-        <div class="mma-compose">
-          <textarea class="mma-input" id="mma-input" rows="1" placeholder="Try a member's name, or 'how's my MRR'"></textarea>
-          <button type="button" class="mma-send" onclick="_mmaSend()" aria-label="Send">&#8593;</button>
+        <div class="mma-split">
+          <div class="mma-main">
+            <div class="mma-thread" id="mma-thread"></div>
+            <div class="mma-compose">
+              <span class="mma-orb" id="mma-orb"><svg viewBox="0 0 512 512" fill="currentColor" stroke="none"><path d="M 256 80 L 290 230 L 432 256 L 290 282 L 256 432 L 222 282 L 80 256 L 222 230 Z"/></svg></span>
+              <textarea class="mma-input" id="mma-input" rows="1" placeholder="Try a member's name, or 'how's my MRR'"></textarea>
+              <button type="button" class="mma-send" onclick="_mmaSend()" aria-label="Send">&#8593;</button>
+            </div>
+            <div class="mma-chips">
+              <button type="button" class="mma-chip" onclick="_mmaChip(&quot;How's my roster?&quot;)">How's my roster?</button>
+              <button type="button" class="mma-chip" onclick="_mmaChip('Who is at risk?')">Who's at risk?</button>
+              <button type="button" class="mma-chip" onclick="_mmaChip('What is my MRR?')">What's my MRR?</button>
+              <button type="button" class="mma-chip" onclick="_mmaChip('Pull up ', true)">Pull up a member</button>
+            </div>
+          </div>
+          <aside class="mma-rail" id="mma-rail">
+            <div class="mma-rail-h">Pulled this session</div>
+            <div class="mma-rail-empty" id="mma-rail-empty">Nothing pulled yet.</div>
+          </aside>
         </div>
       </div>
     </div>`);
@@ -44486,6 +44539,61 @@ function _mmaEnsureModal() {
   inp.addEventListener('keydown', e => {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); _mmaSend(); }
   });
+}
+// Suggestion chips: fill the composer; sends unless it's a starter phrase.
+function _mmaChip(text, fillOnly) {
+  const inp = document.getElementById('mma-input');
+  if (!inp) return;
+  inp.value = text;
+  inp.focus();
+  if (!fillOnly) _mmaSend();
+}
+// Presence orb states: '' idle breathe, 'think' ripple, quick 'say' pulse.
+function _mmaOrb(state) {
+  const o = document.getElementById('mma-orb');
+  if (!o) return;
+  o.classList.toggle('think', state === 'think');
+  if (state === 'say') {
+    o.classList.remove('say');
+    void o.offsetWidth;
+    o.classList.add('say');
+  }
+}
+// Visible work: a mono ticker bubble that steps through what the agent is
+// doing, then hands off to the real answer. Becomes real tool-call output
+// when the LLM lands.
+function _mmaThink(lines) {
+  return new Promise(resolve => {
+    const t = document.getElementById('mma-thread');
+    if (!t || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return resolve();
+    _mmaOrb('think');
+    const el = document.createElement('div');
+    el.className = 'mma-bub in mma-think';
+    t.appendChild(el);
+    t.scrollTop = t.scrollHeight;
+    let i = 0;
+    (function step() {
+      if (!el.isConnected) return resolve();
+      el.textContent = lines[i];
+      i++;
+      if (i < lines.length) setTimeout(step, 240);
+      else setTimeout(() => { el.remove(); _mmaOrb(''); resolve(); }, 260);
+    })();
+  });
+}
+// Workbench rail: pin what the agent pulled so the session builds a desk.
+function _mmaPin(html, onclick) {
+  const rail = document.getElementById('mma-rail');
+  if (!rail) return;
+  document.getElementById('mma-rail-empty')?.remove();
+  const el = document.createElement('button');
+  el.type = 'button';
+  el.className = 'mma-pin';
+  el.innerHTML = html;
+  if (onclick) el.addEventListener('click', onclick);
+  rail.insertBefore(el, rail.children[1] || null);
+  const pins = rail.querySelectorAll('.mma-pin');
+  if (pins.length > 8) pins[pins.length - 1].remove();
 }
 // Same camera-pan as _mmOpenFocus, minus its _MM (marketing data) guard -
 // the member agent must open even when marketing hasn't loaded.
@@ -44521,8 +44629,10 @@ function closeMembersFocus() {
 function _mmaAdd(dir, html) {
   const t = document.getElementById('mma-thread');
   if (!t) return;
+  t.querySelectorAll('.mma-bub:not(.past)').forEach(b => b.classList.add('past'));
   t.insertAdjacentHTML('beforeend', `<div class="mma-bub ${dir}">${html}</div>`);
   t.scrollTop = t.scrollHeight;
+  if (dir === 'in') _mmaOrb('say');
 }
 function _mmaSend() {
   const inp = document.getElementById('mma-input');
@@ -44533,10 +44643,19 @@ function _mmaSend() {
   _mmaHandle(txt.toLowerCase());
 }
 async function _mmaHandle(q) {
-  if (/\b(kpi|kpis|mrr|revenue|churn|arpu|numbers|how many|active|paused)\b/.test(q)) return _mmaKpis();
+  const roster = await _ccEnsureMembers();
+  if (/\b(kpi|kpis|mrr|revenue|churn|arpu|numbers|how many|active|paused|roster|risk)\b/.test(q)) {
+    await _mmaThink(['SCANNING ROSTER...', roster.length + ' RECORDS', 'COMPUTING NUMBERS...']);
+    return _mmaKpis();
+  }
   const matches = await _mmaMatchMembers(q);
+  await _mmaThink(['SEARCHING ROSTER...', roster.length + ' RECORDS', matches.length + (matches.length === 1 ? ' MATCH' : ' MATCHES')]);
   if (matches.length === 1) {
-    _mmaAdd('in', 'This the one?' + _mmaCardHtml(matches[0], true));
+    const m = matches[0];
+    _mmaAdd('in', 'This the one?' + _mmaCardHtml(m, true));
+    _mmaPin('<span class="mma-pin-t">' + escapeHTML(_ccCapName(m.athlete_name || 'Member')) + '</span><span class="mma-pin-s">member card</span>', () => openMemberPopup(m.id));
+    const jt = new Date(m.joined_date || m.start_date || m.stripe_joined_at || 0).getTime();
+    _ccFocusWallpaper('membersMachineModal', { highlight: jt > 0 ? jt : null });
   } else if (matches.length > 1) {
     _mmaAdd('in', 'A few matches. Which one?' + matches.map(m => _mmaCardHtml(m, false)).join(''));
   } else {
@@ -44569,7 +44688,12 @@ function _mmaCardHtml(m, detailed) {
   const sub = [escapeHTML(_ccCapName(m.parent_name || '')), plan ? String(plan) : '']
     .filter(Boolean).join(' · ');
   const extra = detailed
-    ? `<div class="mma-card-sub">${[m.trainer ? 'Trainer: ' + escapeHTML(m.trainer) : '', m.joined_date ? 'Joined ' + escapeHTML(String(m.joined_date).slice(0, 10)) : ''].filter(Boolean).join(' · ')}</div>`
+    ? `<div class="mma-card-sub">${[m.trainer ? 'Trainer: ' + escapeHTML(m.trainer) : '', m.joined_date ? 'Joined ' + escapeHTML(String(m.joined_date).slice(0, 10)) : ''].filter(Boolean).join(' · ')}</div>
+       <div class="mma-card-acts">
+         <button type="button" class="mma-act" onclick="openMemberPopup('${m.id}')">Pause</button>
+         <button type="button" class="mma-act" onclick="openMemberPopup('${m.id}')">Payment link</button>
+         <button type="button" class="mma-act" onclick="switchView('v15inbox')">Message</button>
+       </div>`
     : '';
   return `<div class="mma-card">${av}<div style="min-width:0"><div class="mma-card-name">${escapeHTML(_ccCapName(m.athlete_name || 'Member'))} ${status}</div><div class="mma-card-sub">${sub}</div>${extra}</div><button type="button" class="mma-open" onclick="openMemberPopup('${m.id}')">Open card</button></div>`;
 }
@@ -44577,6 +44701,8 @@ async function _mmaKpis() {
   const roster = await _ccEnsureMembers();
   if (!roster.length) return _mmaAdd('in', 'No roster loaded yet - open the member list once and try again.');
   const k = _ccMemberKpis(roster);
+  _ccFocusWallpaper('membersMachineModal', { money: true });
+  _mmaPin('<span class="mma-pin-t">$' + Math.round(k.mrr).toLocaleString() + ' MRR</span><span class="mma-pin-s">' + k.live + ' active · ' + k.paused + ' paused</span>');
   _mmaAdd('in', 'Your roster right now:' +
     `<div class="mma-kgrid">` +
     `<div class="mma-k"><div class="mma-k-v">${k.live}</div><div class="mma-k-l">Active members</div></div>` +
