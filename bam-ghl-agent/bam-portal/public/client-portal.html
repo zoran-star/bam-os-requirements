@@ -43298,21 +43298,45 @@ function _ccStyle() {
     '.cc-quick-btn svg{width:16px;height:16px;stroke:var(--gold);fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;flex:none}' +
     /* bubble rail */
     '.cc-rail{display:none}' +
-    'body.cc-mode .cc-rail{position:fixed;left:16px;top:50%;transform:translateY(-50%);display:flex;flex-direction:column;gap:16px;z-index:90}' +
+    'body.cc-mode .cc-rail{position:fixed;left:10px;top:50%;transform:translateY(-50%);display:flex;flex-direction:column;gap:6px;z-index:90;padding:6px;touch-action:none;transition:opacity .5s}' +
     'body.cc-mode.cc-classic .cc-rail{display:none}' +
-    '.cc-dot{width:9px;height:9px;border-radius:50%;background:var(--border-med);border:none;padding:0;cursor:pointer;position:relative;transition:width .25s var(--es,ease),height .25s var(--es,ease),background .25s}' +
-    '.cc-dot:hover{background:var(--text-mute)}' +
-    '.cc-dot.on{width:15px;height:15px;background:var(--gold);box-shadow:0 0 0 4px var(--gold-glow)}' +
-    '.cc-dot-lab{position:absolute;left:24px;top:50%;transform:translateY(-50%);font-size:11px;font-weight:700;color:var(--text-sub);background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:3px 9px;opacity:0;pointer-events:none;transition:opacity .15s;white-space:nowrap}' +
-    '.cc-dot:hover .cc-dot-lab{opacity:1}' +
-    /* floating dock (bottom-left) */
+    '.cc-rail.idle{opacity:.35}' +
+    '.cc-dot{position:relative;width:30px;height:30px;background:none;border:none;padding:0;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:transform .18s var(--es,ease)}' +
+    '.cc-dot-core{width:9px;height:9px;border-radius:50%;background:var(--border-med);transition:width .25s var(--es,ease),height .25s var(--es,ease),background .25s}' +
+    '.cc-dot:hover .cc-dot-core{background:var(--text-mute)}' +
+    '.cc-dot.on .cc-dot-core{width:13px;height:13px;background:var(--gold);box-shadow:0 0 0 4px var(--gold-glow)}' +
+    '.cc-dot.tick .cc-dot-core{animation:ccTick .35s var(--espring,ease)}' +
+    '@keyframes ccTick{0%{transform:scale(1)}45%{transform:scale(1.45)}100%{transform:scale(1)}}' +
+    '.cc-dot-ring{position:absolute;inset:0;opacity:0;transition:opacity .25s;transform:rotate(-90deg);pointer-events:none}' +
+    '.cc-dot.on .cc-dot-ring{opacity:1}' +
+    '.cc-dot-ring .rbg{fill:none;stroke:var(--border);stroke-width:2}' +
+    '.cc-dot-ring .rfg{fill:none;stroke:var(--gold);stroke-width:2;stroke-linecap:round;stroke-dasharray:81.7;stroke-dashoffset:81.7}' +
+    '.cc-dot-alert{position:absolute;top:1px;right:1px;width:7px;height:7px;border-radius:50%;background:var(--red);box-shadow:0 0 6px rgba(240,112,96,.6);display:none}' +
+    '.cc-dot.alert .cc-dot-alert{display:block}' +
+    '.cc-dot-lab{position:absolute;left:34px;top:50%;transform:translateY(-50%) translateX(-4px);font-size:11px;font-weight:700;color:var(--text-sub);background:color-mix(in srgb,var(--surface) 72%,transparent);backdrop-filter:blur(10px);border:1px solid var(--border);border-radius:8px;padding:3px 9px;opacity:0;pointer-events:none;transition:opacity .18s,transform .18s;white-space:nowrap}' +
+    '.cc-dot:hover .cc-dot-lab,.cc-dot.flash .cc-dot-lab{opacity:1;transform:translateY(-50%) translateX(0)}' +
+    /* floating dock: glass speed-dial orb (bottom-left) */
     '.cc-dock{display:none}' +
-    'body.cc-mode .cc-dock{position:fixed;left:16px;bottom:16px;display:flex;flex-direction:column;gap:8px;z-index:90}' +
+    'body.cc-mode .cc-dock{position:fixed;left:16px;bottom:16px;z-index:90;display:block;transition:transform .35s var(--es,ease),opacity .35s}' +
     'body.cc-mode.cc-classic .cc-dock{display:none}' +
-    '.cc-dock-btn{display:flex;align-items:center;gap:8px;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:8px 12px;font:inherit;font-size:12px;font-weight:600;color:var(--text-sub);cursor:pointer;box-shadow:0 1px 3px rgba(0,0,0,.04);transition:border-color .12s,color .12s}' +
-    '.cc-dock-btn:hover{border-color:var(--accent-border);color:var(--text)}' +
-    '.cc-dock-btn svg{width:14px;height:14px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}' +
-    '#cc-dock-pop{position:fixed;left:16px;bottom:132px;z-index:95;background:var(--surface);border:1px solid var(--border);border-radius:12px;box-shadow:0 12px 40px rgba(0,0,0,.3);padding:6px;min-width:190px;display:none}' +
+    '.cc-dock.tuck{transform:translateY(90px);opacity:0;pointer-events:none}' +
+    '.cc-glass{background:color-mix(in srgb,var(--surface) 62%,transparent);backdrop-filter:blur(14px) saturate(1.25);-webkit-backdrop-filter:blur(14px) saturate(1.25);border:1px solid var(--accent-border)}' +
+    '.cc-orb{width:46px;height:46px;border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--gold);box-shadow:0 4px 18px rgba(0,0,0,.14);transition:transform .3s var(--espring,ease)}' +
+    '.cc-orb svg{width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;transition:transform .3s var(--es,ease)}' +
+    '.cc-dock.open .cc-orb{transform:rotate(0) scale(1.04)}' +
+    '.cc-dock.open .cc-orb svg{transform:rotate(45deg)}' +
+    '.cc-orb:hover{transform:scale(1.06)}' +
+    '.cc-fan{position:absolute;left:3px;bottom:54px;display:flex;flex-direction:column;gap:8px}' +
+    '.cc-fan-btn{position:relative;width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--text-sub);opacity:0;transform:translateY(12px) scale(.8);pointer-events:none;transition:opacity .22s var(--es,ease),transform .22s var(--es,ease),color .15s}' +
+    '.cc-dock.open .cc-fan-btn{opacity:1;transform:translateY(0) scale(1);pointer-events:auto}' +
+    '.cc-dock.open .cc-fan-btn:nth-child(1){transition-delay:.08s}' +
+    '.cc-dock.open .cc-fan-btn:nth-child(2){transition-delay:.04s}' +
+    '.cc-dock.open .cc-fan-btn:nth-child(3){transition-delay:0s}' +
+    '.cc-fan-btn:hover{color:var(--gold)}' +
+    '.cc-fan-btn svg{width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}' +
+    '.cc-fan-btn::after{content:attr(data-lab);position:absolute;left:48px;top:50%;transform:translateY(-50%) translateX(-4px);font-size:11px;font-weight:700;color:var(--text);background:color-mix(in srgb,var(--surface) 72%,transparent);backdrop-filter:blur(10px);border:1px solid var(--border);border-radius:8px;padding:4px 10px;white-space:nowrap;opacity:0;pointer-events:none;transition:opacity .15s,transform .15s}' +
+    '.cc-fan-btn:hover::after{opacity:1;transform:translateY(-50%) translateX(0)}' +
+    '#cc-dock-pop{position:fixed;left:70px;bottom:16px;z-index:95;border-radius:12px;box-shadow:0 12px 40px rgba(0,0,0,.3);padding:6px;min-width:190px;display:none;background:color-mix(in srgb,var(--surface) 78%,transparent);backdrop-filter:blur(14px);border:1px solid var(--border)}' +
     '#cc-dock-pop.open{display:block}' +
     '.cc-pop-item{display:flex;align-items:center;gap:8px;width:100%;text-align:left;background:none;border:none;border-radius:8px;padding:9px 11px;font:inherit;font-size:12.5px;font-weight:600;color:var(--text);cursor:pointer}' +
     '.cc-pop-item:hover{background:var(--gold-sheen);color:var(--gold)}' +
@@ -43400,6 +43424,8 @@ function openCommandCenter() {
       try { s.mount(host); } catch (e) { console.error('[cc] mount failed:', s.key, e); }
     }
     _ccInitObserver();
+    // sales alert dot mirrors the Hawkeye count (set by the home loaders)
+    setInterval(() => _ccSetBadge('sales', window._hmHawkTotal || 0), 8000);
   }
 }
 
@@ -43427,24 +43453,34 @@ function _ccExitBeta() {
   location.reload();
 }
 
-// ── chrome: bubble rail + dock + back pill ──
+// ── chrome: bubble rail + speed-dial dock + back pill ──
 function _ccBuildChrome() {
   if (document.getElementById('cc-rail')) return;
   const rail = document.createElement('nav');
   rail.id = 'cc-rail'; rail.className = 'cc-rail'; rail.setAttribute('aria-label', 'Sections');
   rail.innerHTML = _ccSections().map(s =>
-    `<button type="button" class="cc-dot" id="cc-dot-${s.key}" aria-label="${s.label}" onclick="_ccScrollTo('${s.key}')"><span class="cc-dot-lab">${s.label}</span></button>`
+    `<button type="button" class="cc-dot" id="cc-dot-${s.key}" aria-label="${s.label}" onclick="_ccScrollTo('${s.key}')">
+       <svg class="cc-dot-ring" viewBox="0 0 30 30"><circle class="rbg" cx="15" cy="15" r="13"/><circle class="rfg" cx="15" cy="15" r="13"/></svg>
+       <span class="cc-dot-core"></span>
+       <span class="cc-dot-alert"></span>
+       <span class="cc-dot-lab">${s.label}</span>
+     </button>`
   ).join('');
   document.body.appendChild(rail);
+  _ccRailFx(rail);
 
   const dock = document.createElement('div');
   dock.id = 'cc-dock'; dock.className = 'cc-dock';
   dock.innerHTML =
-    `<button type="button" class="cc-dock-btn" onclick="_ccDockPop('info')">${_ccIcons().info}<span>Info</span></button>` +
-    `<button type="button" class="cc-dock-btn" onclick="_ccOpenClassic('blueprint')">${_ccIcons().grid}<span>Business blueprint</span></button>` +
-    `<button type="button" class="cc-dock-btn" onclick="_ccDockPop('settings')">${_ccIcons().gear}<span>Settings</span></button>` +
-    `<div id="cc-dock-pop"></div>`;
+    `<div class="cc-fan" id="cc-fan">
+       <button type="button" class="cc-fan-btn cc-glass" data-lab="Info" onclick="_ccDockPop('info')">${_ccIcons().info}</button>
+       <button type="button" class="cc-fan-btn cc-glass" data-lab="Business blueprint" onclick="_ccOrbToggle(false);_ccOpenClassic('blueprint')">${_ccIcons().grid}</button>
+       <button type="button" class="cc-fan-btn cc-glass" data-lab="Settings" onclick="_ccDockPop('settings')">${_ccIcons().gear}</button>
+     </div>
+     <button type="button" class="cc-orb cc-glass" id="cc-orb" aria-label="Menu" onclick="_ccOrbToggle()"><svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></button>
+     <div id="cc-dock-pop"></div>`;
   document.body.appendChild(dock);
+  _ccKeys();
 
   const pill = document.createElement('button');
   pill.type = 'button'; pill.className = 'cc-back-pill'; pill.id = 'cc-back-pill';
@@ -43453,8 +43489,76 @@ function _ccBuildChrome() {
   document.body.appendChild(pill);
 
   document.addEventListener('click', e => {
-    const pop = document.getElementById('cc-dock-pop');
-    if (pop && pop.classList.contains('open') && !e.target.closest('#cc-dock')) pop.classList.remove('open');
+    if (e.target.closest('#cc-dock')) return;
+    document.getElementById('cc-dock-pop')?.classList.remove('open');
+    document.getElementById('cc-dock')?.classList.remove('open');
+  });
+}
+
+function _ccOrbToggle(force) {
+  const dock = document.getElementById('cc-dock');
+  if (!dock) return;
+  const open = force !== undefined ? force : !dock.classList.contains('open');
+  dock.classList.toggle('open', open);
+  if (!open) document.getElementById('cc-dock-pop')?.classList.remove('open');
+}
+
+// Red alert dot on a rail bubble (e.g. members has action items waiting).
+function _ccSetBadge(key, n) {
+  document.getElementById('cc-dot-' + key)?.classList.toggle('alert', (n || 0) > 0);
+}
+
+// Rail FX: magnetic scaling near the cursor + drag-to-scrub the whole page.
+function _ccRailFx(rail) {
+  rail.addEventListener('mousemove', e => {
+    for (const d of rail.querySelectorAll('.cc-dot')) {
+      const r = d.getBoundingClientRect();
+      const dy = Math.abs(e.clientY - (r.top + r.height / 2));
+      const s = 1 + 0.45 * Math.exp(-(dy * dy) / (2 * 34 * 34));
+      d.style.transform = 'scale(' + s.toFixed(3) + ')';
+    }
+  });
+  rail.addEventListener('mouseleave', () => {
+    rail.querySelectorAll('.cc-dot').forEach(d => { d.style.transform = ''; });
+  });
+  // Scrub: drag along the rail to fly through the page like a timeline.
+  let scrubbing = false, moved = 0, startY = 0;
+  rail.addEventListener('pointerdown', e => { scrubbing = true; moved = 0; startY = e.clientY; });
+  window.addEventListener('pointermove', e => {
+    if (!scrubbing) return;
+    moved = Math.max(moved, Math.abs(e.clientY - startY));
+    if (moved < 5) return;
+    const main = document.querySelector('.main');
+    const rr = rail.getBoundingClientRect();
+    const p = Math.min(1, Math.max(0, (e.clientY - rr.top) / rr.height));
+    main.scrollTop = p * (main.scrollHeight - main.clientHeight);
+  });
+  window.addEventListener('pointerup', () => {
+    if (scrubbing && moved >= 5) {
+      // swallow the click that follows a drag so it doesn't jump sections
+      rail.addEventListener('click', ev => { ev.stopPropagation(); ev.preventDefault(); }, { capture: true, once: true });
+    }
+    scrubbing = false;
+  });
+}
+
+// Keyboard: arrows step sections, 1-4 jump direct. Skipped while typing,
+// in classic mode, or when a focus page / modal is open.
+function _ccKeys() {
+  if (window._ccKeysBound) return;
+  window._ccKeysBound = true;
+  document.addEventListener('keydown', e => {
+    if (!_ccActive() || document.body.classList.contains('cc-classic')) return;
+    if (!document.getElementById('view-cc')?.classList.contains('active')) return;
+    if (document.documentElement.classList.contains('mm-focus-open')) return;
+    const t = e.target;
+    if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable)) return;
+    const keys = _ccSections().map(s => s.key);
+    const activeKey = document.querySelector('.cc-dot.on')?.id.replace('cc-dot-', '') || keys[0];
+    const idx = Math.max(0, keys.indexOf(activeKey));
+    if (e.key === 'ArrowDown') { e.preventDefault(); _ccScrollTo(keys[Math.min(keys.length - 1, idx + 1)]); }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); _ccScrollTo(keys[Math.max(0, idx - 1)]); }
+    else if (/^[1-9]$/.test(e.key) && keys[+e.key - 1]) { _ccScrollTo(keys[+e.key - 1]); }
   });
 }
 
@@ -43476,21 +43580,17 @@ function _ccDockPop(kind) {
 function _ccInitObserver() {
   const root = document.querySelector('.main');
   const secs = Array.from(document.querySelectorAll('#view-cc .cc-sec'));
-  const ratios = new Map();
   const io = new IntersectionObserver(entries => {
     for (const e of entries) {
       if (e.isIntersecting) e.target.classList.add('cc-visible');
-      ratios.set(e.target.id, e.isIntersecting ? e.intersectionRatio : 0);
     }
-    let best = null, bestR = 0;
-    for (const s of secs) { const r = ratios.get(s.id) || 0; if (r > bestR) { bestR = r; best = s; } }
-    if (best) {
-      const key = best.id.replace('cc-sec-', '');
-      document.querySelectorAll('.cc-dot').forEach(d => d.classList.toggle('on', d.id === 'cc-dot-' + key));
-    }
+    // (active dot is tracked deterministically in the scroll handler -
+    // ratio-based detection misfires when sections are shorter than the
+    // viewport, e.g. before their data loads)
   }, { root, threshold: [0.05, 0.2, 0.45, 0.7] });
   secs.forEach(s => io.observe(s));
   _ccInitRecede(root, secs);
+  setTimeout(() => root.dispatchEvent(new Event('scroll')), 400);
 }
 
 // Sections recede as they scroll out the top - blur back and fade, like the
@@ -43499,6 +43599,15 @@ function _ccInitRecede(root, secs) {
   if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
   if (!root || root._ccRecede) return;
   root._ccRecede = true;
+  document.addEventListener('mousemove', e => {
+    if (e.clientX > 90) return;
+    const rail = document.getElementById('cc-rail');
+    if (rail) {
+      rail.classList.remove('idle');
+      clearTimeout(rail._idleT);
+      rail._idleT = setTimeout(() => rail.classList.add('idle'), 2800);
+    }
+  }, { passive: true });
   let ticking = false;
   root.addEventListener('scroll', () => {
     if (ticking) return;
@@ -43506,6 +43615,52 @@ function _ccInitRecede(root, secs) {
     requestAnimationFrame(() => {
       ticking = false;
       if (!document.getElementById('view-cc')?.classList.contains('active')) return;
+      // dock auto-hide: tuck on scroll down, return on scroll up
+      const dock = document.getElementById('cc-dock');
+      const top = root.scrollTop;
+      if (dock && !dock.classList.contains('open')) {
+        if (top > (root._ccLastTop || 0) + 4 && top > 120) dock.classList.add('tuck');
+        else if (top < (root._ccLastTop || 0) - 4) dock.classList.remove('tuck');
+      }
+      root._ccLastTop = top;
+      // rail idle fade: wake on scroll, doze after 2.8s
+      const rail = document.getElementById('cc-rail');
+      if (rail) {
+        rail.classList.remove('idle');
+        clearTimeout(rail._idleT);
+        rail._idleT = setTimeout(() => rail.classList.add('idle'), 2800);
+      }
+      // active dot: the last section whose top has crossed 45% of the viewport
+      let act = secs[0];
+      const th = root.clientHeight * 0.45;
+      for (const s of secs) {
+        const rr2 = s.getBoundingClientRect();
+        if (rr2.top <= th && rr2.bottom > th) { act = s; break; }
+        if (rr2.top <= th) act = s;
+      }
+      const actKey = act.id.replace('cc-sec-', '');
+      document.querySelectorAll('.cc-dot').forEach(d => {
+        const on = d.id === 'cc-dot-' + actKey;
+        if (on && !d.classList.contains('on')) {
+          d.classList.add('tick', 'flash');
+          setTimeout(() => d.classList.remove('tick'), 400);
+          clearTimeout(d._flashT);
+          d._flashT = setTimeout(() => d.classList.remove('flash'), 1700);
+        }
+        d.classList.toggle('on', on);
+      });
+      // progress ring on the active dot
+      const onDot = document.querySelector('.cc-dot.on');
+      if (onDot) {
+        const sec = document.getElementById('cc-sec-' + onDot.id.replace('cc-dot-', ''));
+        const fg = onDot.querySelector('.rfg');
+        if (sec && fg) {
+          const rr = sec.getBoundingClientRect();
+          const vh = root.clientHeight;
+          const prog = Math.min(1, Math.max(0, (vh * 0.45 - rr.top) / Math.max(1, rr.height)));
+          fg.style.strokeDashoffset = String(81.7 * (1 - prog));
+        }
+      }
       for (const s of secs) {
         if (!s.classList.contains('cc-visible')) continue;
         const r = s.getBoundingClientRect();
@@ -43674,6 +43829,7 @@ async function _ccLoadMemberActions() {
     else if (m.pause_scheduled_for) items.push({ cls: 'amber', label: 'Pause scheduled', n, id: m.id });
     else if (m.status === 'cancelling') items.push({ cls: 'amber', label: 'Cancelling', n, id: m.id });
   }
+  _ccSetBadge('members', items.length);
   if (!items.length) { body.innerHTML = '<div class="cc-mem-empty">Nothing needs attention.</div>'; return; }
   const more = items.length > 5 ? `<div class="cc-mem-empty">+${items.length - 5} more in the member list</div>` : '';
   body.innerHTML = items.slice(0, 5).map(i =>
