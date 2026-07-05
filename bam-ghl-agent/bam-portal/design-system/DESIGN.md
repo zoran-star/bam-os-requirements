@@ -1,6 +1,6 @@
 # FullControl V2 Design System
 
-**Version 1.3 - 2026-07-05 | Living document: update it every time the UI evolves.**
+**Version 1.4 - 2026-07-05 | Living document: update it every time the UI evolves.**
 
 > ⛔ **RULE FOR EVERY AGENT + HUMAN: read this file BEFORE any front-end work in the V2 portal.**
 > Use the tokens in [`tokens.css`](tokens.css). Never hardcode a color, radius, font, or shadow that a token covers. If the design needs something the system doesn't have, ADD IT HERE FIRST (see "How to change this system" at the bottom), then use it.
@@ -130,6 +130,7 @@ transition:transform var(--t-med) var(--es), box-shadow var(--t-med);
 
 | Date | v | Change |
 |---|---|---|
+| 2026-07-05 | 1.4 | Light theme back to the prototype cream: bg #F8F7F5 (was #EFEAE0, too yellow), neutral rgba(0,0,0,…) borders, prototype text-sub/mute grays. Mirrored in client-portal.html. |
 | 2026-07-05 | 1.3 | Copy rule tightened: no dash-as-pause in person-facing copy (not even a hyphen). Restructure with period, comma or colon. Portal copy swept (win card, command center, home empty states). |
 | 2026-07-05 | 1.2 | Emoji purge executed on Home + mobile More menu: `_HV2_ICONS` extended with 9 icons (clock, dollar, msg, refresh, chart, x, mail, ghost, activity); KPI catalog, Hawkeye feed, inbox bell, perfect-day star, preview-as eye/x/check all now SVG. |
 | 2026-07-05 | 1.1 | Emoji rule tightened: NO emojis at all in product UI or copy we write (was: banned in chrome only, allowed elsewhere). Only client-typed message content renders emojis as-is. |
