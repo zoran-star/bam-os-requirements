@@ -43698,15 +43698,33 @@ function toggleTheme() {
   .v2req-nudge { display:flex; align-items:center; gap:9px; margin-top:14px; padding:10px 14px; border-radius:10px; background:rgba(200,168,78,0.12); border:1px solid rgba(200,168,78,0.4); font-family:var(--mm-ff); font-size:13px; color:var(--text-sub); }
   .v2req-nudge b { color:var(--text); font-weight:700; }
   .v2req-nudge svg { flex:0 0 auto; color:#9a7d2b; }
-  .v2req-tools { display:flex; flex-direction:column; gap:8px; align-items:flex-start; margin-top:14px; }
-  .v2req-seg { display:inline-flex; background:var(--surface-el); border:1px solid var(--line); border-radius:9px; padding:3px; gap:2px; max-width:100%; overflow-x:auto; }
-  .v2req-segbtn { display:inline-flex; align-items:center; gap:6px; white-space:nowrap; font-family:var(--mm-ff); font-size:12.5px; font-weight:700; color:var(--text-sub); background:none; border:none; border-radius:7px; padding:6px 12px; cursor:pointer; transition:background .12s ease,color .12s ease; }
-  .v2req-segbtn.is-on { background:var(--surface); color:var(--text); box-shadow:0 1px 2px rgba(0,0,0,.08); }
-  .v2req-body { display:grid; grid-template-columns:2.6fr 1fr; gap:16px; margin-top:12px; }
-  .v2req-stage { position:relative; background:#fff; border:1px solid var(--line); border-radius:12px; overflow:hidden; height:520px; }
+  /* funnel stage flow - spread out with arrows */
+  .v2req-flow { display:flex; align-items:flex-start; justify-content:center; flex-wrap:wrap; margin:18px 0 8px; }
+  .v2req-flownode { display:flex; flex-direction:column; align-items:center; gap:7px; width:100px; font-family:var(--mm-ff); font-size:12.5px; font-weight:700; color:var(--text-mute); background:none; border:none; cursor:pointer; padding:0; }
+  .v2req-flowdot { width:36px; height:36px; border-radius:50%; border:2px solid var(--line); display:flex; align-items:center; justify-content:center; font-family:var(--mm-fm); font-size:14px; color:var(--text-mute); background:var(--surface); transition:all .15s; }
+  .v2req-flownode.is-on { color:var(--text); }
+  .v2req-flownode.is-on .v2req-flowdot { border-color:var(--gold); background:var(--gold); color:#0B0B0D; box-shadow:0 2px 9px rgba(200,168,78,.45); }
+  .v2req-flowarrow { flex:0 0 auto; height:36px; display:flex; align-items:center; color:var(--text-mute); margin:0 2px; }
+  /* device tab + frame */
+  .v2req-body { display:grid; grid-template-columns:2.6fr 1fr; gap:16px; margin-top:8px; align-items:start; }
+  .v2req-stagecol { min-width:0; text-align:center; }
+  .v2req-devtab { display:inline-flex; gap:3px; background:#26262b; border-radius:9px 9px 0 0; padding:4px 4px 0; }
+  .v2req-devbtn { display:inline-flex; align-items:center; gap:6px; font-family:var(--mm-ff); font-size:12px; font-weight:700; color:rgba(255,255,255,.55); background:none; border:none; border-radius:6px 6px 0 0; padding:6px 13px; cursor:pointer; transition:background .12s,color .12s; }
+  .v2req-devbtn.is-on { background:#000; color:#fff; }
+  .v2req-frame { position:relative; }
+  .v2req-screen { position:relative; background:#000; box-sizing:border-box; overflow:hidden; text-align:left; }
+  .v2req-frame--desktop .v2req-screen { width:100%; height:460px; border:10px solid #26262b; border-top:none; border-radius:0 0 14px 14px; }
+  .v2req-stand { display:flex; flex-direction:column; align-items:center; }
+  .v2req-neck { width:74px; height:16px; background:#26262b; }
+  .v2req-base { width:190px; height:9px; background:#26262b; border-radius:0 0 6px 6px; }
+  .v2req-frame--mobile .v2req-stand { display:none; }
+  .v2req-frame--mobile .v2req-screen { width:414px; max-width:100%; height:620px; margin:0 auto; border:13px solid #1a1a1e; border-radius:42px; }
+  .v2req-frame--mobile .v2req-screen::before { content:''; position:absolute; top:0; left:50%; transform:translateX(-50%); width:130px; height:22px; background:#1a1a1e; border-radius:0 0 14px 14px; z-index:4; }
   .v2req-stage-hint { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-family:var(--mm-ff); font-size:13px; color:var(--text-mute); pointer-events:none; }
   .v2req-scaler { position:absolute; top:0; left:0; }
   #v2ReqFrame { width:100%; height:100%; border:0; display:block; background:#fff; }
+  .v2req-notegroup { font-family:var(--mm-ff); font-size:10.5px; font-weight:700; text-transform:uppercase; letter-spacing:0.04em; color:var(--text-mute); margin:12px 0 6px; }
+  .v2req-notegroup:first-child { margin-top:0; }
   .v2req-side { display:flex; flex-direction:column; min-width:0; }
   .v2req-label { font-family:var(--mm-ff); font-size:12px; font-weight:700; text-transform:uppercase; letter-spacing:0.04em; color:var(--text-mute); margin-bottom:8px; }
   .v2req-types { display:flex; gap:8px; }
@@ -44623,17 +44641,20 @@ function _v2InlineHtml() {
         '<svg width="17" height="17" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3.5V9M6 9l-2 .3 3.4 4.2 1.2-2.6 2.4 1L8 6.8 6 9z"/><path d="M6 3.5a2.3 2.3 0 1 0-2.3 2.3"/></svg>' +
         '<span>Scroll your page below, then <b>click any section</b> to leave a note on it.</span>' +
       '</div>' +
-      '<div class="v2req-tools">' +
-        '<div class="v2req-seg" id="v2ReqDevice">' +
-          '<button type="button" class="v2req-segbtn is-on" data-d="desktop" onclick="_v2SetDevice(\'desktop\')"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="1.5" y="2.5" width="13" height="9" rx="1"/><path d="M6 14h4M8 11.5V14"/></svg>Desktop</button>' +
-          '<button type="button" class="v2req-segbtn" data-d="mobile" onclick="_v2SetDevice(\'mobile\')"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="4.5" y="1.5" width="7" height="13" rx="1.5"/><path d="M7 12.5h2"/></svg>Mobile</button>' +
-        '</div>' +
-        '<div class="v2req-seg" id="v2ReqStages"></div>' +
-      '</div>' +
+      '<div class="v2req-flow" id="v2ReqStages"></div>' +
       '<div class="v2req-body">' +
-        '<div class="v2req-stage" id="v2ReqStage">' +
-          '<div class="v2req-stage-hint" id="v2ReqHint">loading your page&hellip;</div>' +
-          '<div class="v2req-scaler" id="v2ReqScaler"><iframe id="v2ReqFrame" title="Your landing page" referrerpolicy="no-referrer"></iframe></div>' +
+        '<div class="v2req-stagecol">' +
+          '<div class="v2req-devtab" id="v2ReqDevice">' +
+            '<button type="button" class="v2req-devbtn is-on" data-d="desktop" onclick="_v2SetDevice(\'desktop\')"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="1.5" y="2.5" width="13" height="9" rx="1"/><path d="M6 14h4M8 11.5V14"/></svg>Desktop</button>' +
+            '<button type="button" class="v2req-devbtn" data-d="mobile" onclick="_v2SetDevice(\'mobile\')"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="4.5" y="1.5" width="7" height="13" rx="1.5"/><path d="M7 12.5h2"/></svg>Mobile</button>' +
+          '</div>' +
+          '<div class="v2req-frame v2req-frame--desktop" id="v2ReqDeviceFrame">' +
+            '<div class="v2req-screen" id="v2ReqStage">' +
+              '<div class="v2req-stage-hint" id="v2ReqHint">loading your page&hellip;</div>' +
+              '<div class="v2req-scaler" id="v2ReqScaler"><iframe id="v2ReqFrame" title="Your landing page" referrerpolicy="no-referrer"></iframe></div>' +
+            '</div>' +
+            '<div class="v2req-stand"><span class="v2req-neck"></span><span class="v2req-base"></span></div>' +
+          '</div>' +
         '</div>' +
         '<div class="v2req-side">' +
           '<div class="v2req-label">Your notes</div>' +
@@ -44673,10 +44694,15 @@ function _v2MountStage() {
     if (url) { if (fr.getAttribute('src') !== url) fr.setAttribute('src', url); fr.style.display = 'block'; if (hint) hint.style.display = 'none'; }
     else { fr.removeAttribute('src'); fr.style.display = 'none'; if (hint) { hint.style.display = 'flex'; hint.textContent = 'your page preview will appear here'; } }
   }
-  document.querySelectorAll('#v2ReqDevice .v2req-segbtn').forEach(b => b.classList.toggle('is-on', b.dataset.d === _V2_DEVICE));
+  _v2ReflectDevice();
   _v2RenderStages();
   _v2ApplyDevice();
   _v2RenderNotes();
+}
+function _v2ReflectDevice() {
+  document.querySelectorAll('#v2ReqDevice .v2req-devbtn').forEach(b => b.classList.toggle('is-on', b.dataset.d === _V2_DEVICE));
+  const frame = document.getElementById('v2ReqDeviceFrame');
+  if (frame) { frame.classList.toggle('v2req-frame--desktop', _V2_DEVICE === 'desktop'); frame.classList.toggle('v2req-frame--mobile', _V2_DEVICE === 'mobile'); }
 }
 // Scale the preview to a real viewport: mobile = 390px actual (centered),
 // desktop = 1280px scaled down to fit the stage, so the page renders at the
@@ -44697,7 +44723,7 @@ function _v2ApplyDevice() {
 }
 function _v2SetDevice(d) {
   _V2_DEVICE = d;
-  document.querySelectorAll('#v2ReqDevice .v2req-segbtn').forEach(b => b.classList.toggle('is-on', b.dataset.d === d));
+  _v2ReflectDevice();
   _v2ApplyDevice();
 }
 window.addEventListener('resize', function () { if (_V2_OPEN) _v2ApplyDevice(); });
@@ -44707,9 +44733,13 @@ function _v2RenderStages() {
   if (!_V2_STEPS.length) { el.innerHTML = ''; el.style.display = 'none'; return; }
   el.style.display = '';
   if (!_V2_STAGE || !_V2_STEPS.some(s => s.key === _V2_STAGE)) _V2_STAGE = _V2_STEPS[0].key;
-  el.innerHTML = _V2_STEPS.map(s =>
-    '<button type="button" class="v2req-segbtn' + (s.key === _V2_STAGE ? ' is-on' : '') + '" onclick="_v2SetStage(\'' + s.key + '\')">' + _escapeHtml(s.label) + '</button>'
-  ).join('');
+  const arrow = '<span class="v2req-flowarrow"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h13M13 6l6 6-6 6"/></svg></span>';
+  el.innerHTML = _V2_STEPS.map((s, i) =>
+    '<button type="button" class="v2req-flownode' + (s.key === _V2_STAGE ? ' is-on' : '') + '" onclick="_v2SetStage(\'' + s.key + '\')">' +
+      '<span class="v2req-flowdot">' + (i + 1) + '</span>' +
+      '<span>' + _escapeHtml(s.label) + '</span>' +
+    '</button>'
+  ).join(arrow);
 }
 function _v2SetStage(key) {
   _V2_STAGE = key;
@@ -44738,7 +44768,7 @@ function _v2NoteSave() {
   const txt = (ta.value || '').trim();
   if (!txt) { _v2NoteCancel(); return; }
   if (_V2_PENDING && typeof _V2_PENDING.idx === 'number') _V2_PINS[_V2_PENDING.idx].note = txt;
-  else if (_V2_PENDING) _V2_PINS.push({ x: _V2_PENDING.x, y: _V2_PENDING.y, note: txt, section: _V2_PENDING.section || null });
+  else if (_V2_PENDING) _V2_PINS.push({ x: _V2_PENDING.x, y: _V2_PENDING.y, note: txt, section: _V2_PENDING.section || null, device: _V2_PENDING.device || _V2_DEVICE });
   _V2_PENDING = null;
   document.getElementById('v2NotePop').style.display = 'none';
   _v2RenderNotes();
@@ -44753,19 +44783,26 @@ function _v2DelNote(i, evt) { evt.stopPropagation(); _V2_PINS.splice(i, 1); _v2R
 function _v2RenderNotes() {
   const list = document.getElementById('v2ReqNotes');
   if (!list) return;
+  if (!_V2_PINS.length) { list.innerHTML = '<div class="v2req-empty">No notes yet. Click a section of your page to add one.</div>'; return; }
   const pencil = '<svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M11.5 2.5l2 2L6 12l-2.5.5L4 10z"/></svg>';
-  list.innerHTML = _V2_PINS.length
-    ? _V2_PINS.map((p, i) =>
-        '<div class="v2req-note">' +
-          '<span class="v2req-note-num">' + (i + 1) + '</span>' +
-          '<div class="v2req-note-body">' +
-            (p.section ? '<div class="v2req-note-sec">' + _escapeHtml(p.section) + '</div>' : '') +
-            '<span class="v2req-note-txt" title="Click to edit" onclick="_v2EditNote(' + i + ',event)">' + _escapeHtml(p.note) + '</span>' +
-          '</div>' +
-          '<button type="button" class="v2req-note-btn" title="Edit" onclick="_v2EditNote(' + i + ',event)">' + pencil + '</button>' +
-          '<button type="button" class="v2req-note-btn" title="Delete" onclick="_v2DelNote(' + i + ',event)">&times;</button>' +
-        '</div>').join('')
-    : '<div class="v2req-empty">No notes yet. Click a section of your page to add one.</div>';
+  const noteRow = (p, i) =>
+    '<div class="v2req-note">' +
+      '<span class="v2req-note-num">' + (i + 1) + '</span>' +
+      '<div class="v2req-note-body">' +
+        (p.section ? '<div class="v2req-note-sec">' + _escapeHtml(p.section) + '</div>' : '') +
+        '<span class="v2req-note-txt" title="Click to edit" onclick="_v2EditNote(' + i + ',event)">' + _escapeHtml(p.note) + '</span>' +
+      '</div>' +
+      '<button type="button" class="v2req-note-btn" title="Edit" onclick="_v2EditNote(' + i + ',event)">' + pencil + '</button>' +
+      '<button type="button" class="v2req-note-btn" title="Delete" onclick="_v2DelNote(' + i + ',event)">&times;</button>' +
+    '</div>';
+  // group by the device the note was made in
+  let html = '';
+  ['desktop', 'mobile'].forEach(dev => {
+    const items = _V2_PINS.map((p, i) => ({ p, i })).filter(x => (x.p.device || 'desktop') === dev);
+    if (!items.length) return;
+    html += '<div class="v2req-notegroup">' + (dev === 'desktop' ? 'Desktop' : 'Mobile') + '</div>' + items.map(x => noteRow(x.p, x.i)).join('');
+  });
+  list.innerHTML = html;
 }
 function _v2Submit() {
   const desc = (document.getElementById('v2ReqDesc')?.value || '').trim();
@@ -44800,7 +44837,7 @@ window.addEventListener('message', (e) => {
     return;
   }
   if (d.action === 'section-click') {
-    _V2_PENDING = { section: d.label || 'Section' };
+    _V2_PENDING = { section: d.label || 'Section', device: _V2_DEVICE };
     // place the note popover near the click (coords are in the iframe's own
     // viewport, so scale them to where they land on screen)
     const fr = document.getElementById('v2ReqFrame');
