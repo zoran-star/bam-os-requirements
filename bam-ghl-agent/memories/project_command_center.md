@@ -21,6 +21,11 @@
 - **Members section = sketch layout**: KPI strip, then two cards (Unread member messages `_ccLoadMemberMsgs` = /api/ghl/inbox filtered to roster by ghl_contact_id/name, own `.cc-ib-row` markup | Member action items `_ccLoadMemberActions` = roster-derived chips: payment_failed/payment_method_required red, pause_scheduled_for + cancelling amber, click -> openMemberPopup) + "See all members" -> `_ccMemberListOpen()` popup (z 8800, UNDER the member drawer so drill-in works; client-side search) + agent chat bar at the BOTTOM -> focus mode.
 - **Scroll recede** `_ccInitRecede`: sections blur/fade/scale back as they exit the top (like the home hero), rAF-throttled, reduced-motion safe. Section heads are click-to-focus (scrollIntoView).
 
+## Pass 3 (2026-07-05, Cole picks)
+- **Dock = glass speed-dial orb**: one 46px `.cc-orb` (frosted `color-mix` + backdrop-blur `.cc-glass`, gold plus icon rotates to X); click fans out 3 icon circles (Info popover / Blueprint / Settings popover) with stagger; labels slide out on hover; auto-tucks on scroll down, returns on scroll up (`.cc-dock.tuck`).
+- **Rail FX**: magnetic dot scaling near cursor (`_ccRailFx` gaussian), scroll-progress ring around the active dot (SVG `rfg` dashoffset), label flash ~1.7s on section lock-in, drag-to-scrub the page along the rail (pointer events, click-swallow after drag), keyboard ArrowUp/Down + 1-4 (`_ccKeys`, skipped in inputs/classic/focus mode), tick pop animation (`ccTick`), idle fade to 35% after 2.8s (wakes on scroll or mouse near left edge), **red alert dot** `.cc-dot.alert` via `_ccSetBadge(key,n)` - members = roster action items, sales = `_hmHawkTotal` (8s interval).
+- **Active dot is computed in the scroll handler** (section under the 45% viewport line, containment first, last-crossed fallback) - NOT IntersectionObserver ratios (misfire when sections are shorter than the viewport). Observer only handles reveal now.
+
 ## Section mounts (current skeleton)
 | Section | Mount | Content |
 |---|---|---|
