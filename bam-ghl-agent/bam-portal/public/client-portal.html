@@ -43698,9 +43698,14 @@ function toggleTheme() {
   .v2req-nudge { display:flex; align-items:center; gap:9px; margin-top:14px; padding:10px 14px; border-radius:10px; background:rgba(200,168,78,0.12); border:1px solid rgba(200,168,78,0.4); font-family:var(--mm-ff); font-size:13px; color:var(--text-sub); }
   .v2req-nudge b { color:var(--text); font-weight:700; }
   .v2req-nudge svg { flex:0 0 auto; color:#9a7d2b; }
-  .v2req-body { display:grid; grid-template-columns:2.6fr 1fr; gap:16px; margin-top:14px; }
+  .v2req-tools { display:flex; flex-direction:column; gap:8px; align-items:flex-start; margin-top:14px; }
+  .v2req-seg { display:inline-flex; background:var(--surface-el); border:1px solid var(--line); border-radius:9px; padding:3px; gap:2px; max-width:100%; overflow-x:auto; }
+  .v2req-segbtn { display:inline-flex; align-items:center; gap:6px; white-space:nowrap; font-family:var(--mm-ff); font-size:12.5px; font-weight:700; color:var(--text-sub); background:none; border:none; border-radius:7px; padding:6px 12px; cursor:pointer; transition:background .12s ease,color .12s ease; }
+  .v2req-segbtn.is-on { background:var(--surface); color:var(--text); box-shadow:0 1px 2px rgba(0,0,0,.08); }
+  .v2req-body { display:grid; grid-template-columns:2.6fr 1fr; gap:16px; margin-top:12px; }
   .v2req-stage { position:relative; background:#fff; border:1px solid var(--line); border-radius:12px; overflow:hidden; height:520px; }
   .v2req-stage-hint { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-family:var(--mm-ff); font-size:13px; color:var(--text-mute); pointer-events:none; }
+  .v2req-scaler { position:absolute; top:0; left:0; }
   #v2ReqFrame { width:100%; height:100%; border:0; display:block; background:#fff; }
   .v2req-side { display:flex; flex-direction:column; min-width:0; }
   .v2req-label { font-family:var(--mm-ff); font-size:12px; font-weight:700; text-transform:uppercase; letter-spacing:0.04em; color:var(--text-mute); margin-bottom:8px; }
@@ -44574,6 +44579,10 @@ let _V2_PINS = [];       // {x,y,note}
 let _V2_TYPE = 'change';
 let _V2_PENDING = null;  // pin index awaiting a note, or 'new'
 let _V2_OPEN = false;    // inline "Request a change" panel expanded?
+let _V2_DEVICE = 'desktop';  // preview viewport: desktop | mobile
+let _V2_STAGE = null;    // selected funnel step key
+let _V2_STEPS = [];      // [{key,label}] announced by the page
+let _V2_SCALE = 1;       // iframe scale (desktop is scaled to fit)
 // Mock "my requests" - replace with a fetch once the table lands.
 const _V2_REQUESTS = [
   { title: 'Rework the hero headline', type: 'change', status: 'in_progress', when: '2d ago' },
@@ -44614,10 +44623,17 @@ function _v2InlineHtml() {
         '<svg width="17" height="17" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3.5V9M6 9l-2 .3 3.4 4.2 1.2-2.6 2.4 1L8 6.8 6 9z"/><path d="M6 3.5a2.3 2.3 0 1 0-2.3 2.3"/></svg>' +
         '<span>Scroll your page below, then <b>click any section</b> to leave a note on it.</span>' +
       '</div>' +
+      '<div class="v2req-tools">' +
+        '<div class="v2req-seg" id="v2ReqDevice">' +
+          '<button type="button" class="v2req-segbtn is-on" data-d="desktop" onclick="_v2SetDevice(\'desktop\')"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="1.5" y="2.5" width="13" height="9" rx="1"/><path d="M6 14h4M8 11.5V14"/></svg>Desktop</button>' +
+          '<button type="button" class="v2req-segbtn" data-d="mobile" onclick="_v2SetDevice(\'mobile\')"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="4.5" y="1.5" width="7" height="13" rx="1.5"/><path d="M7 12.5h2"/></svg>Mobile</button>' +
+        '</div>' +
+        '<div class="v2req-seg" id="v2ReqStages"></div>' +
+      '</div>' +
       '<div class="v2req-body">' +
         '<div class="v2req-stage" id="v2ReqStage">' +
           '<div class="v2req-stage-hint" id="v2ReqHint">loading your page&hellip;</div>' +
-          '<iframe id="v2ReqFrame" title="Your landing page" referrerpolicy="no-referrer"></iframe>' +
+          '<div class="v2req-scaler" id="v2ReqScaler"><iframe id="v2ReqFrame" title="Your landing page" referrerpolicy="no-referrer"></iframe></div>' +
         '</div>' +
         '<div class="v2req-side">' +
           '<div class="v2req-label">Your notes</div>' +
@@ -44657,7 +44673,49 @@ function _v2MountStage() {
     if (url) { if (fr.getAttribute('src') !== url) fr.setAttribute('src', url); fr.style.display = 'block'; if (hint) hint.style.display = 'none'; }
     else { fr.removeAttribute('src'); fr.style.display = 'none'; if (hint) { hint.style.display = 'flex'; hint.textContent = 'your page preview will appear here'; } }
   }
+  document.querySelectorAll('#v2ReqDevice .v2req-segbtn').forEach(b => b.classList.toggle('is-on', b.dataset.d === _V2_DEVICE));
+  _v2RenderStages();
+  _v2ApplyDevice();
   _v2RenderNotes();
+}
+// Scale the preview to a real viewport: mobile = 390px actual (centered),
+// desktop = 1280px scaled down to fit the stage, so the page renders at the
+// true responsive breakpoint.
+function _v2ApplyDevice() {
+  const stage = document.getElementById('v2ReqStage'), scaler = document.getElementById('v2ReqScaler');
+  if (!stage || !scaler) return;
+  const stageW = stage.clientWidth, stageH = stage.clientHeight || 520;
+  if (!stageW) { if (stage.offsetParent !== null) requestAnimationFrame(_v2ApplyDevice); return; }  // wait for layout
+  const logicalW = _V2_DEVICE === 'mobile' ? 390 : 1280;
+  const scale = Math.min(1, stageW / logicalW);
+  _V2_SCALE = scale;
+  scaler.style.transformOrigin = 'top left';
+  scaler.style.width = logicalW + 'px';
+  scaler.style.height = Math.round(stageH / scale) + 'px';
+  scaler.style.transform = 'scale(' + scale + ')';
+  scaler.style.left = _V2_DEVICE === 'mobile' ? Math.round((stageW - logicalW * scale) / 2) + 'px' : '0px';
+}
+function _v2SetDevice(d) {
+  _V2_DEVICE = d;
+  document.querySelectorAll('#v2ReqDevice .v2req-segbtn').forEach(b => b.classList.toggle('is-on', b.dataset.d === d));
+  _v2ApplyDevice();
+}
+window.addEventListener('resize', function () { if (_V2_OPEN) _v2ApplyDevice(); });
+function _v2RenderStages() {
+  const el = document.getElementById('v2ReqStages');
+  if (!el) return;
+  if (!_V2_STEPS.length) { el.innerHTML = ''; el.style.display = 'none'; return; }
+  el.style.display = '';
+  if (!_V2_STAGE || !_V2_STEPS.some(s => s.key === _V2_STAGE)) _V2_STAGE = _V2_STEPS[0].key;
+  el.innerHTML = _V2_STEPS.map(s =>
+    '<button type="button" class="v2req-segbtn' + (s.key === _V2_STAGE ? ' is-on' : '') + '" onclick="_v2SetStage(\'' + s.key + '\')">' + _escapeHtml(s.label) + '</button>'
+  ).join('');
+}
+function _v2SetStage(key) {
+  _V2_STAGE = key;
+  _v2RenderStages();
+  const fr = document.getElementById('v2ReqFrame');
+  if (fr && fr.contentWindow) { try { fr.contentWindow.postMessage({ type: 'fc-preview', action: 'set-step', step: key }, '*'); } catch (e) {} }
 }
 function _v2OpenNotePop(clientX, clientY, val) {
   const pop = document.getElementById('v2NotePop'), ta = document.getElementById('v2NoteText');
@@ -44735,13 +44793,20 @@ function _v2Submit() {
 window.addEventListener('message', (e) => {
   const d = e.data;
   if (!d || d.type !== 'fc-annotate' || !_V2_OPEN) return;
+  if (d.action === 'steps' && Array.isArray(d.steps)) {   // page announced its funnel steps
+    _V2_STEPS = d.steps;
+    if (!_V2_STAGE) _V2_STAGE = _V2_STEPS[0] && _V2_STEPS[0].key;
+    _v2RenderStages();
+    return;
+  }
   if (d.action === 'section-click') {
     _V2_PENDING = { section: d.label || 'Section' };
-    // place the note popover near the click (bridge sends coords inside the iframe)
+    // place the note popover near the click (coords are in the iframe's own
+    // viewport, so scale them to where they land on screen)
     const fr = document.getElementById('v2ReqFrame');
     const r = fr ? fr.getBoundingClientRect() : { left: 0, top: 0, width: 0 };
-    const cx = r.left + (d.x != null ? d.x : r.width / 2);
-    const cy = r.top + (d.y != null ? d.y : 120);
+    const cx = r.left + (d.x != null ? d.x * _V2_SCALE : r.width / 2);
+    const cy = r.top + (d.y != null ? d.y * _V2_SCALE : 120);
     _v2OpenNotePop(cx, cy, '');
   }
 });
