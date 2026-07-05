@@ -43694,12 +43694,13 @@ function toggleTheme() {
   .v2req-chev { transition:transform .18s ease; }
   .v2req-drop.is-open .v2req-chev { transform:rotate(180deg); }
   .v2req-panel { border:1px solid var(--line); border-top:none; border-radius:0 0 12px 12px; padding:16px; }
+  .v2req-nudge { display:flex; align-items:center; gap:9px; margin-top:14px; padding:10px 14px; border-radius:10px; background:rgba(200,168,78,0.12); border:1px solid rgba(200,168,78,0.4); font-family:var(--mm-ff); font-size:13px; color:var(--text-sub); }
+  .v2req-nudge b { color:var(--text); font-weight:700; }
+  .v2req-nudge svg { flex:0 0 auto; color:#9a7d2b; }
   .v2req-body { display:grid; grid-template-columns:1.5fr 1fr; gap:16px; margin-top:14px; }
-  .v2req-stage { position:relative; background:var(--surface-el); border:1px solid var(--line); border-radius:12px; overflow:hidden; min-height:420px; }
-  .v2req-stage-hint { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-family:var(--mm-ff); font-size:13px; color:var(--text-mute); }
-  #v2ReqFrame { position:relative; width:100%; height:100%; min-height:420px; border:0; display:block; background:#fff; }
-  .v2req-overlay { position:absolute; inset:0; cursor:crosshair; }
-  .v2req-pin { position:absolute; transform:translate(-50%,-50%); width:24px; height:24px; border-radius:50%; background:var(--gold); color:#0B0B0D; font-family:var(--mm-fm); font-size:12px; font-weight:600; display:flex; align-items:center; justify-content:center; box-shadow:0 1px 4px rgba(0,0,0,.3); cursor:pointer; z-index:2; }
+  .v2req-stage { position:relative; background:#fff; border:1px solid var(--line); border-radius:12px; overflow:hidden; height:460px; }
+  .v2req-stage-hint { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-family:var(--mm-ff); font-size:13px; color:var(--text-mute); pointer-events:none; }
+  #v2ReqFrame { width:100%; height:100%; border:0; display:block; background:#fff; }
   .v2req-side { display:flex; flex-direction:column; min-width:0; }
   .v2req-label { font-family:var(--mm-ff); font-size:12px; font-weight:700; text-transform:uppercase; letter-spacing:0.04em; color:var(--text-mute); margin-bottom:8px; }
   .v2req-types { display:flex; gap:8px; }
@@ -43709,7 +43710,9 @@ function toggleTheme() {
   .v2req-empty { font-family:var(--mm-ff); font-size:12px; color:var(--text-mute); padding:10px 0; }
   .v2req-note { display:flex; gap:8px; align-items:flex-start; border:1px solid var(--line); border-radius:9px; padding:8px 9px; }
   .v2req-note-num { flex:0 0 auto; width:20px; height:20px; border-radius:50%; background:var(--gold); color:#0B0B0D; font-family:var(--mm-fm); font-size:11px; font-weight:600; display:flex; align-items:center; justify-content:center; }
-  .v2req-note-txt { font-family:var(--mm-ff); font-size:12.5px; color:var(--text); line-height:1.4; flex:1; min-width:0; cursor:text; }
+  .v2req-note-body { flex:1; min-width:0; }
+  .v2req-note-sec { font-family:var(--mm-ff); font-size:10.5px; font-weight:700; text-transform:uppercase; letter-spacing:0.03em; color:var(--gold-d,#9a7d2b); margin-bottom:1px; }
+  .v2req-note-txt { display:block; font-family:var(--mm-ff); font-size:12.5px; color:var(--text); line-height:1.4; min-width:0; cursor:text; }
   .v2req-note-btn { flex:0 0 auto; background:none; border:none; color:var(--text-mute); cursor:pointer; font-size:15px; line-height:1; padding:0 2px; display:flex; align-items:center; }
   .v2req-note-btn:hover { color:var(--text); }
   .v2req-foot { display:flex; align-items:flex-end; gap:12px; margin-top:14px; }
@@ -44214,6 +44217,7 @@ function openMarketingMachine() {
 function closeMarketingMachine() { _mmCloseFocus('marketingMachineModal'); }
 function openLandingMachine() {
   if (!_MM) return;
+  _V2_OPEN = false; _V2_PINS = []; _V2_PENDING = null;   // annotator always starts collapsed
   _mmRenderLandingFocus(_MM);
   _mmOpenFocus('landingMachineModal', '#landing-machine-card .mm-action-panel');
 }
@@ -44603,19 +44607,17 @@ function _v2InlineHtml() {
       '<span style="display:flex;align-items:center;gap:9px">' + plus + 'Request a change to this page</span>' + chev +
     '</button>' +
     '<div class="v2req-panel" id="v2ReqPanel" style="display:none">' +
-      '<div class="v2req-types" id="v2ReqTypes">' +
-        '<button type="button" class="v2req-type is-on" data-t="change" onclick="_v2PickType(this)">Change</button>' +
-        '<button type="button" class="v2req-type" data-t="add" onclick="_v2PickType(this)">Add</button>' +
-        '<button type="button" class="v2req-type" data-t="fix" onclick="_v2PickType(this)">Fix</button>' +
+      '<div class="v2req-nudge">' +
+        '<svg width="17" height="17" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3.5V9M6 9l-2 .3 3.4 4.2 1.2-2.6 2.4 1L8 6.8 6 9z"/><path d="M6 3.5a2.3 2.3 0 1 0-2.3 2.3"/></svg>' +
+        '<span>Scroll your page below, then <b>click any section</b> to leave a note on it.</span>' +
       '</div>' +
       '<div class="v2req-body">' +
         '<div class="v2req-stage" id="v2ReqStage">' +
           '<div class="v2req-stage-hint" id="v2ReqHint">loading your page&hellip;</div>' +
           '<iframe id="v2ReqFrame" title="Your landing page" referrerpolicy="no-referrer"></iframe>' +
-          '<div class="v2req-overlay" id="v2ReqOverlay" onclick="_v2PinAt(event)"></div>' +
         '</div>' +
         '<div class="v2req-side">' +
-          '<div class="v2req-label">Your notes <span style="font-weight:500;text-transform:none;letter-spacing:0;color:var(--text-mute)">- click the page to pin one</span></div>' +
+          '<div class="v2req-label">Your notes</div>' +
           '<div class="v2req-notes" id="v2ReqNotes"></div>' +
         '</div>' +
       '</div>' +
@@ -44642,25 +44644,15 @@ function _v2Toggle() {
 }
 function _v2MountStage() {
   const fr = document.getElementById('v2ReqFrame'), hint = document.getElementById('v2ReqHint');
-  const url = (typeof _MM !== 'undefined' && _MM && _MM.page && _MM.page.url) || window._V2_PAGE_URL || '';
+  let url = (typeof _MM !== 'undefined' && _MM && _MM.page && _MM.page.url) || window._V2_PAGE_URL || '';
+  // annotate=1 tells the page (bam-client-sites) to turn on section hover-outline
+  // + post section clicks back to us.
+  if (url) url += (url.indexOf('?') === -1 ? '?' : '&') + 'annotate=1';
   if (fr) {
     if (url) { if (fr.getAttribute('src') !== url) fr.setAttribute('src', url); fr.style.display = 'block'; if (hint) hint.style.display = 'none'; }
     else { fr.removeAttribute('src'); fr.style.display = 'none'; if (hint) { hint.style.display = 'flex'; hint.textContent = 'your page preview will appear here'; } }
   }
-  document.querySelectorAll('#v2ReqTypes .v2req-type').forEach(b => b.classList.toggle('is-on', b.dataset.t === _V2_TYPE));
   _v2RenderNotes();
-}
-function _v2PickType(btn) {
-  _V2_TYPE = btn.dataset.t;
-  document.querySelectorAll('#v2ReqTypes .v2req-type').forEach(b => b.classList.toggle('is-on', b === btn));
-}
-function _v2PinAt(evt) {
-  const ov = document.getElementById('v2ReqOverlay');
-  const r = ov.getBoundingClientRect();
-  const x = ((evt.clientX - r.left) / r.width) * 100;
-  const y = ((evt.clientY - r.top) / r.height) * 100;
-  _V2_PENDING = { x, y };
-  _v2OpenNotePop(evt.clientX, evt.clientY, '');
 }
 function _v2OpenNotePop(clientX, clientY, val) {
   const pop = document.getElementById('v2NotePop'), ta = document.getElementById('v2NoteText');
@@ -44691,19 +44683,6 @@ function _v2EditNote(i, evt) {
 }
 function _v2DelNote(i, evt) { evt.stopPropagation(); _V2_PINS.splice(i, 1); _v2RenderNotes(); }
 function _v2RenderNotes() {
-  // pins on the overlay
-  const ov = document.getElementById('v2ReqOverlay');
-  if (ov) {
-    ov.querySelectorAll('.v2req-pin').forEach(p => p.remove());
-    _V2_PINS.forEach((p, i) => {
-      const el = document.createElement('div');
-      el.className = 'v2req-pin'; el.textContent = (i + 1);
-      el.style.left = p.x + '%'; el.style.top = p.y + '%';
-      el.onclick = (e) => _v2EditNote(i, e);
-      ov.appendChild(el);
-    });
-  }
-  // list on the side - each note editable (pencil / click text) + deletable (x)
   const list = document.getElementById('v2ReqNotes');
   if (!list) return;
   const pencil = '<svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M11.5 2.5l2 2L6 12l-2.5.5L4 10z"/></svg>';
@@ -44711,11 +44690,14 @@ function _v2RenderNotes() {
     ? _V2_PINS.map((p, i) =>
         '<div class="v2req-note">' +
           '<span class="v2req-note-num">' + (i + 1) + '</span>' +
-          '<span class="v2req-note-txt" title="Click to edit" onclick="_v2EditNote(' + i + ',event)">' + _escapeHtml(p.note) + (p.section ? ' <span style="color:var(--text-mute)">&middot; ' + _escapeHtml(p.section) + '</span>' : '') + '</span>' +
+          '<div class="v2req-note-body">' +
+            (p.section ? '<div class="v2req-note-sec">' + _escapeHtml(p.section) + '</div>' : '') +
+            '<span class="v2req-note-txt" title="Click to edit" onclick="_v2EditNote(' + i + ',event)">' + _escapeHtml(p.note) + '</span>' +
+          '</div>' +
           '<button type="button" class="v2req-note-btn" title="Edit" onclick="_v2EditNote(' + i + ',event)">' + pencil + '</button>' +
           '<button type="button" class="v2req-note-btn" title="Delete" onclick="_v2DelNote(' + i + ',event)">&times;</button>' +
         '</div>').join('')
-    : '<div class="v2req-empty">No notes yet. Click a spot on your page to pin one.</div>';
+    : '<div class="v2req-empty">No notes yet. Click a section of your page to add one.</div>';
 }
 function _v2Submit() {
   const desc = (document.getElementById('v2ReqDesc')?.value || '').trim();
@@ -44743,9 +44725,14 @@ function _v2Submit() {
 window.addEventListener('message', (e) => {
   const d = e.data;
   if (!d || d.type !== 'fc-annotate' || !_V2_OPEN) return;
-  if (d.action === 'section-click' && d.rect) {
-    _V2_PENDING = { x: d.rect.xPct, y: d.rect.yPct, section: d.label || null };
-    _v2OpenNotePop((window.innerWidth / 2), (window.innerHeight / 2), '');
+  if (d.action === 'section-click') {
+    _V2_PENDING = { section: d.label || 'Section' };
+    // place the note popover near the click (bridge sends coords inside the iframe)
+    const fr = document.getElementById('v2ReqFrame');
+    const r = fr ? fr.getBoundingClientRect() : { left: 0, top: 0, width: 0 };
+    const cx = r.left + (d.x != null ? d.x : r.width / 2);
+    const cy = r.top + (d.y != null ? d.y : 120);
+    _v2OpenNotePop(cx, cy, '');
   }
 });
 </script>
