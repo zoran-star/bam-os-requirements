@@ -14859,7 +14859,7 @@ function _mobileMoreRender() {
       const active = c.id === (typeof CLIENT_ID !== 'undefined' ? CLIENT_ID : null);
       return `<button type="button" class="mobile-more-item" onclick="_mobileMorePickClient('${c.id}')">
         <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHTML(c.business_name || '(unnamed)')}</span>
-        ${active ? '<span style="color:var(--gold);font-weight:700">✓</span>' : ''}</button>`;
+        ${active ? '<span style="color:var(--gold)"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-1px"><polyline points="20 6 9 17 4 12"/></svg></span>' : ''}</button>`;
     }).join('') || `<div style="padding:10px 12px;color:var(--text-mute)">No matches</div>`;
     html += `<div class="mobile-more-divider"></div><div class="mobile-more-title">Tabs</div>`;
   } else {
@@ -14890,10 +14890,10 @@ function _mobileMoreRender() {
   if (_canPv) {
     html += `<div class="mobile-more-divider"></div>`;
     if (typeof _PREVIEW_AS !== 'undefined' && _PREVIEW_AS) {
-      html += `<div class="mobile-more-title">👁 Previewing as ${escapeHTML(_PREVIEW_AS.name)}</div>`;
-      html += `<button type="button" class="mobile-more-item" onclick="_exitPreview(); _mobileMoreClose();"><span>✕ Exit preview</span></button>`;
+      html += `<div class="mobile-more-title"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-1px"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg> Previewing as ${escapeHTML(_PREVIEW_AS.name)}</div>`;
+      html += `<button type="button" class="mobile-more-item" onclick="_exitPreview(); _mobileMoreClose();"><span><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" style="vertical-align:-1px"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg> Exit preview</span></button>`;
     } else if ((typeof _PREVIEW_STAFF_LIST !== 'undefined' ? _PREVIEW_STAFF_LIST : []).length) {
-      html += `<div class="mobile-more-title">👁 Preview as</div>`;
+      html += `<div class="mobile-more-title"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-1px"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg> Preview as</div>`;
       html += _PREVIEW_STAFF_LIST.map(r => `<button type="button" class="mobile-more-item" onclick="_previewAsStaff('${r.id}'); _mobileMoreClose();"><span>${escapeHTML(r.name || r.email || 'teammate')}</span></button>`).join('');
     }
   }
@@ -15110,7 +15110,8 @@ function _hv2Style() {
     '#home-v2 .hm-kpi-dash-item{display:flex;align-items:center;gap:8px;padding:10px 12px;background:var(--surface-el,rgba(255,255,255,.04));border:1px solid var(--border);border-radius:12px;margin-bottom:6px;cursor:grab;transition:all .15s}' +
     '#home-v2 .hm-kpi-dash-item:hover{border-color:rgba(212,182,92,.2)}' +
     '#home-v2 .hm-kpi-drag{color:var(--text-mute);opacity:.4;flex-shrink:0;font-size:14px;line-height:1;letter-spacing:-2px}' +
-    '#home-v2 .hm-kpi-dash-icon{width:24px;height:24px;border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:13px}' +
+    '#home-v2 .hm-kpi-dash-icon{width:24px;height:24px;border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0}' +
+    '#home-v2 .hm-kpi-dash-icon svg{width:13px;height:13px;stroke:currentColor;stroke-width:2;fill:none;stroke-linecap:round;stroke-linejoin:round}' +
     '#home-v2 .hm-kpi-dash-name{flex:1;font-size:13px;font-weight:600;color:var(--text)}' +
     '#home-v2 .hm-kpi-remove{background:none;border:none;color:var(--text-mute);cursor:pointer;font-size:16px;padding:2px 6px;border-radius:6px;transition:all .12s;line-height:1}' +
     '#home-v2 .hm-kpi-remove:hover{color:var(--text);background:rgba(240,112,96,.1)}' +
@@ -15120,7 +15121,8 @@ function _hv2Style() {
     '#home-v2 .hm-kpi-card:hover{border-color:rgba(212,182,92,.2);background:rgba(212,182,92,.03)}' +
     '#home-v2 .hm-kpi-card.selected{border-color:var(--gold);background:rgba(212,182,92,.06)}' +
     '#home-v2 .hm-kpi-card-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}' +
-    '#home-v2 .hm-kpi-card-icon{width:28px;height:28px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:14px}' +
+    '#home-v2 .hm-kpi-card-icon{width:28px;height:28px;border-radius:8px;display:flex;align-items:center;justify-content:center}' +
+    '#home-v2 .hm-kpi-card-icon svg{width:15px;height:15px;stroke:currentColor;stroke-width:2;fill:none;stroke-linecap:round;stroke-linejoin:round}' +
     '#home-v2 .hm-kpi-card-check{width:18px;height:18px;border-radius:50%;border:2px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:800;color:transparent;transition:all .15s}' +
     '#home-v2 .hm-kpi-card.selected .hm-kpi-card-check{border-color:var(--gold);background:rgba(212,182,92,.15);color:var(--gold)}' +
     '#home-v2 .hm-kpi-card-name{font-size:12px;font-weight:700;color:var(--text);margin-bottom:2px}' +
@@ -15147,7 +15149,8 @@ function _hv2Style() {
     '#home-v2 .hm-feed-item{display:flex;gap:10px;padding:11px 18px;border-bottom:1px solid var(--border);cursor:pointer;transition:background .12s}' +
     '#home-v2 .hm-feed-item:last-child{border-bottom:none}' +
     '#home-v2 .hm-feed-item:hover{background:var(--surface-el)}' +
-    '#home-v2 .hm-feed-ic{width:28px;height:28px;border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:13px}' +
+    '#home-v2 .hm-feed-ic{width:28px;height:28px;border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0}' +
+    '#home-v2 .hm-feed-ic svg{width:14px;height:14px;stroke:currentColor;stroke-width:2;fill:none;stroke-linecap:round;stroke-linejoin:round}' +
     '#home-v2 .hm-feed-ic-reply{background:rgba(212,182,92,.12);color:var(--gold)}' +
     '#home-v2 .hm-feed-ic-book{background:rgba(76,199,106,.12);color:#4CC76A}' +
     '#home-v2 .hm-feed-ic-lost{background:rgba(240,112,96,.12);color:#F07060}' +
@@ -15326,6 +15329,15 @@ const _HV2_ICONS = {
   check: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="8,12.5 11,15.5 16,9"/></svg>',
   users: '<svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>',
   mega: '<svg viewBox="0 0 24 24"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M19 5a9 9 0 0 1 0 14"/></svg>',
+  clock: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>',
+  dollar: '<svg viewBox="0 0 24 24"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>',
+  msg: '<svg viewBox="0 0 24 24"><path d="M21 11.5a8.5 8.5 0 0 1-8.5 8.5 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 8.5-8.5 8.38 8.38 0 0 1 3.8.9 8.5 8.5 0 0 1 4.7 7.6z"/></svg>',
+  refresh: '<svg viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>',
+  chart: '<svg viewBox="0 0 24 24"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>',
+  x: '<svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>',
+  mail: '<svg viewBox="0 0 24 24"><rect x="2" y="4" width="20" height="16" rx="2"/><polyline points="22,6 12,13 2,6"/></svg>',
+  ghost: '<svg viewBox="0 0 24 24"><path d="M12 3a7 7 0 0 0-7 7v10l2.33-2 2.34 2L12 18l2.33 2 2.34-2L19 20V10a7 7 0 0 0-7-7z"/><circle cx="9.5" cy="11" r="1"/><circle cx="14.5" cy="11" r="1"/></svg>',
+  activity: '<svg viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>',
 };
 // Open the Hawkeye approval popup right over the home screen (× lands back home).
 function _hv2OpenHawkeye() { try { _apxOpen(); } catch (_) {} }
@@ -15828,7 +15840,7 @@ async function _hmLoadInboxPreview() {
     if (system.length) {
       const gid = 'hm-ib-sysgroup';
       html += `<div class="hm-ib-group" onclick="var el=document.getElementById('${gid}');el.classList.toggle('open');this.classList.toggle('open')">
-        <span style="flex:none;font-size:13px;opacity:.5">\u{1F514}</span>
+        <span style="flex:none;display:inline-flex;opacity:.5"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg></span>
         <span class="hm-ib-group-label">System notifications</span>
         <span class="hm-ib-group-count">${system.length}</span>
         <span class="hm-ib-group-chevron">\u203A</span>
@@ -15857,16 +15869,16 @@ function _hmRestoreToggle() {
 // For rate KPIs (reply, churn, conversion, attendance): value IS the percentage.
 // For churn: INVERSE - lower is better, so ring fills more when churn is low.
 const _HM_KPI_CATALOG = [
-  { key: 'leads', label: 'New Leads', desc: 'New leads generated this week', color: '#D4B65C', icon: '\u{1F465}', iconBg: 'rgba(212,182,92,.12)', ringMode: 'target-or-wow' },
-  { key: 'trials', label: 'Trials Booked', desc: 'Free trial signups this week', color: '#4CC76A', icon: '\u{23F1}', iconBg: 'rgba(76,199,106,.12)', ringMode: 'target-or-wow' },
-  { key: 'mrr', label: 'MRR Growth', desc: 'Monthly recurring revenue', color: '#5A8FB8', prefix: '$', icon: '\u{1F4B0}', iconBg: 'rgba(90,143,184,.12)', ringMode: 'target-or-mom' },
-  { key: 'rev', label: 'Revenue', desc: 'Revenue collected yesterday', color: '#F0B84A', prefix: '$', icon: '\u{1F4B0}', iconBg: 'rgba(240,184,74,.12)', ringMode: 'target-or-wow' },
-  { key: 'members', label: 'Active Members', desc: 'Total active memberships', color: '#9B8CE8', icon: '\u{1F3C3}', iconBg: 'rgba(155,140,232,.12)', ringMode: 'target-or-mom' },
-  { key: 'replies', label: 'Reply Rate', desc: 'Lead reply rate this week', color: '#E87C71', suffix: '%', icon: '\u{1F4AC}', iconBg: 'rgba(232,124,113,.12)', ringMode: 'pct' },
-  { key: 'churn', label: 'Churn Rate', desc: 'Cancellation rate (lower is better)', color: '#F07060', suffix: '%', icon: '\u{1F504}', iconBg: 'rgba(240,112,96,.12)', ringMode: 'inverse-pct' },
-  { key: 'attendance', label: 'Avg Attendance', desc: 'Average athletes per session', color: '#7fb0d8', icon: '\u{1F4C5}', iconBg: 'rgba(127,176,216,.12)', ringMode: 'target-or-wow' },
-  { key: 'conversion', label: 'Trial Conversion', desc: 'Trials converting to paid', color: '#4CC76A', suffix: '%', icon: '\u{2705}', iconBg: 'rgba(76,199,106,.12)', ringMode: 'pct' },
-  { key: 'revmember', label: 'Revenue / Member', desc: 'Avg monthly revenue per member', color: '#D4B65C', prefix: '$', icon: '\u{1F4CA}', iconBg: 'rgba(212,182,92,.12)', ringMode: 'target-or-mom' },
+  { key: 'leads', label: 'New Leads', desc: 'New leads generated this week', color: '#D4B65C', icon: _HV2_ICONS.users, iconBg: 'rgba(212,182,92,.12)', ringMode: 'target-or-wow' },
+  { key: 'trials', label: 'Trials Booked', desc: 'Free trial signups this week', color: '#4CC76A', icon: _HV2_ICONS.clock, iconBg: 'rgba(76,199,106,.12)', ringMode: 'target-or-wow' },
+  { key: 'mrr', label: 'MRR Growth', desc: 'Monthly recurring revenue', color: '#5A8FB8', prefix: '$', icon: _HV2_ICONS.dollar, iconBg: 'rgba(90,143,184,.12)', ringMode: 'target-or-mom' },
+  { key: 'rev', label: 'Revenue', desc: 'Revenue collected yesterday', color: '#F0B84A', prefix: '$', icon: _HV2_ICONS.dollar, iconBg: 'rgba(240,184,74,.12)', ringMode: 'target-or-wow' },
+  { key: 'members', label: 'Active Members', desc: 'Total active memberships', color: '#9B8CE8', icon: _HV2_ICONS.activity, iconBg: 'rgba(155,140,232,.12)', ringMode: 'target-or-mom' },
+  { key: 'replies', label: 'Reply Rate', desc: 'Lead reply rate this week', color: '#E87C71', suffix: '%', icon: _HV2_ICONS.msg, iconBg: 'rgba(232,124,113,.12)', ringMode: 'pct' },
+  { key: 'churn', label: 'Churn Rate', desc: 'Cancellation rate (lower is better)', color: '#F07060', suffix: '%', icon: _HV2_ICONS.refresh, iconBg: 'rgba(240,112,96,.12)', ringMode: 'inverse-pct' },
+  { key: 'attendance', label: 'Avg Attendance', desc: 'Average athletes per session', color: '#7fb0d8', icon: _HV2_ICONS.calendar, iconBg: 'rgba(127,176,216,.12)', ringMode: 'target-or-wow' },
+  { key: 'conversion', label: 'Trial Conversion', desc: 'Trials converting to paid', color: '#4CC76A', suffix: '%', icon: _HV2_ICONS.check, iconBg: 'rgba(76,199,106,.12)', ringMode: 'pct' },
+  { key: 'revmember', label: 'Revenue / Member', desc: 'Avg monthly revenue per member', color: '#D4B65C', prefix: '$', icon: _HV2_ICONS.chart, iconBg: 'rgba(212,182,92,.12)', ringMode: 'target-or-mom' },
 ];
 const _HM_DEFAULT_KPIS = ['leads', 'trials', 'mrr', 'rev'];
 function _hmGetSelectedKpis() {
@@ -15954,7 +15966,7 @@ function _hmOpenKpiPicker() {
       return `<div class="hm-kpi-dash-item" draggable="true" data-key="${k.key}"
         ondragstart="_hmKpiDragStart(event,'${k.key}')" ondragover="event.preventDefault()" ondrop="_hmKpiDrop(event,'${k.key}')">
         <span class="hm-kpi-drag">&#8942;&#8942;</span>
-        <span class="hm-kpi-dash-icon" style="background:${k.iconBg}">${k.icon}</span>
+        <span class="hm-kpi-dash-icon" style="background:${k.iconBg};color:${k.color}">${k.icon}</span>
         <span class="hm-kpi-dash-name">${k.label}</span>
         <button class="hm-kpi-remove" onclick="_hmKpiRemove('${k.key}')" title="Remove">&times;</button>
       </div>`;
@@ -15965,7 +15977,7 @@ function _hmOpenKpiPicker() {
       const isSel = selected.includes(k.key);
       return `<div class="hm-kpi-card${isSel ? ' selected' : ''}" onclick="_hmKpiCardTap('${k.key}')">
         <div class="hm-kpi-card-top">
-          <span class="hm-kpi-card-icon" style="background:${k.iconBg}">${k.icon}</span>
+          <span class="hm-kpi-card-icon" style="background:${k.iconBg};color:${k.color}">${k.icon}</span>
           <span class="hm-kpi-card-check">${isSel ? '&#10003;' : ''}</span>
         </div>
         <div class="hm-kpi-card-name">${k.label}</div>
@@ -16173,25 +16185,25 @@ async function _hmLoadRailBottom() {
 
 function _hmRenderHawkFeed(host, d, total) {
   const items = [];
-  const kindMap = { book: { icon: 'hm-feed-ic-book', emoji: '&#10003;', verb: 'Booking to confirm' },
-                    ghost: { icon: 'hm-feed-ic-ghost', emoji: '&#128123;', verb: 'Mark as ghosted' },
-                    mark_lost: { icon: 'hm-feed-ic-lost', emoji: '&#10005;', verb: 'Mark as lost' } };
+  const kindMap = { book: { icon: 'hm-feed-ic-book', svg: _HV2_ICONS.check, verb: 'Booking to confirm' },
+                    ghost: { icon: 'hm-feed-ic-ghost', svg: _HV2_ICONS.ghost, verb: 'Mark as ghosted' },
+                    mark_lost: { icon: 'hm-feed-ic-lost', svg: _HV2_ICONS.x, verb: 'Mark as lost' } };
   for (const r of (d.ready || [])) {
-    const k = kindMap[r.kind] || { icon: 'hm-feed-ic-reply', emoji: '&#9993;', verb: 'Reply drafted' };
-    items.push({ name: r.contact_name || 'Lead', desc: k.verb, icon: k.icon, emoji: k.emoji });
+    const k = kindMap[r.kind] || { icon: 'hm-feed-ic-reply', svg: _HV2_ICONS.mail, verb: 'Reply drafted' };
+    items.push({ name: r.contact_name || 'Lead', desc: k.verb, icon: k.icon, svg: k.svg });
   }
   for (const f of (d.followups || [])) {
     const when = f.scheduled_at ? new Date(f.scheduled_at) : null;
     const desc = when ? 'Follow-up ' + when.toLocaleDateString(undefined, { weekday: 'short', hour: 'numeric', minute: '2-digit' }) : 'Follow-up queued';
-    items.push({ name: f.contact_name || 'Lead', desc, icon: 'hm-feed-ic-fu', emoji: '&#8635;' });
+    items.push({ name: f.contact_name || 'Lead', desc, icon: 'hm-feed-ic-fu', svg: _HV2_ICONS.refresh });
   }
-  for (const b of (d.book || [])) items.push({ name: b.contact_name || 'Lead', desc: 'Trial booking to confirm', icon: 'hm-feed-ic-book', emoji: '&#10003;' });
-  for (const g of (d.ghost || [])) items.push({ name: g.contact_name || 'Lead', desc: 'Move to ghosted', icon: 'hm-feed-ic-ghost', emoji: '&#128123;' });
-  for (const l of (d.lost || [])) items.push({ name: l.contact_name || 'Lead', desc: 'Confirm as lost', icon: 'hm-feed-ic-lost', emoji: '&#10005;' });
+  for (const b of (d.book || [])) items.push({ name: b.contact_name || 'Lead', desc: 'Trial booking to confirm', icon: 'hm-feed-ic-book', svg: _HV2_ICONS.check });
+  for (const g of (d.ghost || [])) items.push({ name: g.contact_name || 'Lead', desc: 'Move to ghosted', icon: 'hm-feed-ic-ghost', svg: _HV2_ICONS.ghost });
+  for (const l of (d.lost || [])) items.push({ name: l.contact_name || 'Lead', desc: 'Confirm as lost', icon: 'hm-feed-ic-lost', svg: _HV2_ICONS.x });
 
   const rows = items.slice(0, 8).map(i => `
     <div class="hm-feed-item" onclick="_hv2OpenHawkeye()">
-      <div class="hm-feed-ic ${i.icon}">${i.emoji}</div>
+      <div class="hm-feed-ic ${i.icon}">${i.svg}</div>
       <div class="hm-feed-text"><div class="hm-feed-name">${escapeHTML(_hmStripEm(i.name))}</div><div class="hm-feed-desc">${escapeHTML(_hmStripEm(i.desc))}</div></div>
     </div>`).join('');
 
@@ -16638,7 +16650,7 @@ function _hmCheckPerfectDay(actionCount, hawkTotal) {
   const greeting = document.getElementById('home-greeting');
   if (greeting) {
     greeting.insertAdjacentHTML('afterend',
-      `<span class="hm-perfect-day">&#9733; Perfect day <span class="hm-perfect-day-count">${count} this month</span><span class="hm-perfect-tip"><div class="hm-perfect-tip-h">0 overdue items, 0 pending approvals</div><div class="hm-perfect-tip-b">You've had ${count} perfect day${count === 1 ? '' : 's'} this month. Keep it up!</div></span></span>`);
+      `<span class="hm-perfect-day"><svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" stroke="none"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26"/></svg> Perfect day <span class="hm-perfect-day-count">${count} this month</span><span class="hm-perfect-tip"><div class="hm-perfect-tip-h">0 overdue items, 0 pending approvals</div><div class="hm-perfect-tip-b">You've had ${count} perfect day${count === 1 ? '' : 's'} this month. Keep it up!</div></span></span>`);
   }
 }
 

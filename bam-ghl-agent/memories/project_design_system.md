@@ -1,6 +1,6 @@
 # V2 Design System (living)
 
-**2026-07-05 - v1.1.** (v1.1 = emoji rule tightened: NO emojis at all in product UI/copy; SVG icons only.) Canonical system extracted from the three "good skin" V2 pages (Home `renderHomeV2`, Assets, Calendar) in `bam-portal/public/client-portal.html`.
+**2026-07-05 - v1.2.** (v1.1 = emoji rule tightened: NO emojis at all in product UI/copy, SVG icons only. v1.2 = emoji purge executed on Home + mobile More: `_HV2_ICONS` +9 icons, KPI catalog/Hawkeye feed/inbox bell/perfect-day star/preview-as glyphs all SVG now.) Canonical system extracted from the three "good skin" V2 pages (Home `renderHomeV2`, Assets, Calendar) in `bam-portal/public/client-portal.html`.
 
 ## Where it lives
 - **Spec:** `bam-portal/design-system/DESIGN.md` (living doc - version + changelog at the bottom)
@@ -23,7 +23,7 @@
 Change tokens.css + DESIGN.md FIRST (bump version/changelog) → mirror `client-portal.html` `:root` in the same commit → the 3 reference pages must always be 100% on-system → commit prefix `design-system:` → big-picture changes (gold/fonts/corner personality) need Zoran/Cole sign-off.
 
 ## Known debt (in DESIGN.md §9)
-Other views still on legacy radii/hardcodes (disperse per-view); Home KPI catalog + Hawkeye feed + inbox bell emoji icons (now rule violations, swap to SVG next Home pass); Assets alert()/prompt() feedback; staff portal `src/tokens/tokens.js` separate palette (open decision).
+Other views still on legacy radii/hardcodes (disperse per-view); emoji icons in OTHER views (staff blueprint checkboxes, notif drawer, modal opts.icon, mreq icons - swap per-view); Assets alert()/prompt() feedback; staff portal `src/tokens/tokens.js` separate palette (open decision).
 
 ## Gotchas
 - client-portal.html `:root` and tokens.css MUST stay mirrored - drift breaks the system.
