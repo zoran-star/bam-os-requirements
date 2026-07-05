@@ -44476,20 +44476,19 @@ function _mmRenderLandingFocus(d) {
     calendar: '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="3" width="11" height="10.5" rx="1.5"/><path d="M2.5 6.5h11M5.5 1.5v3M10.5 1.5v3"/></svg>',
     booked: '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="3" width="11" height="10.5" rx="1.5"/><path d="M2.5 6.5h11M5.5 1.5v3M10.5 1.5v3"/><path d="M5.8 9.9l1.5 1.5 3-3.1"/></svg>',
   };
-  // Benchmark = industry-standard conversion INTO this stage from the previous
-  // one (researched 2026-07-05): clicks load ~80%, page->form ~10%, form->
-  // calendar ~60%, calendar->booked ~50%. Drives the tic on each bar = the count
-  // you'd hit at benchmark; bar past the tic = beating industry, short = leaking.
+  // Neutral funnel (Zoran 2026-07-05): counts + descriptive names only. No drop
+  // %, no industry benchmark, no "biggest leak" - the team runs its own analysis
+  // before flagging anything. Descriptive one/two-word stage names, no subtext.
   const steps = [];
   if (clk > 0 && lpv > 0) {
-    steps.push({ lbl: 'Clicked', sub: 'tapped the ad', did: 'clicked the ad', n: clk, icon: ICO.clicked, rate: null, fix: 'speed up the page', leak: 'the page is too slow to load', timeKey: null });
-    steps.push({ lbl: 'Loaded', sub: 'page opened', did: 'loaded the page', n: lpv, icon: ICO.loaded, rate: 0.80, fix: 'rework the top of the page', leak: "the page isn't earning the click", timeKey: 'loaded_to_form' });
+    steps.push({ lbl: 'Clicked ad', n: clk, icon: ICO.clicked, timeKey: null });
+    steps.push({ lbl: 'Page loaded', n: lpv, icon: ICO.loaded, timeKey: 'loaded_to_form' });
   } else {
-    steps.push({ lbl: 'Loaded', sub: 'page opened', did: 'loaded the page', n: (page.visitors || page.ad_visitors || 0), icon: ICO.loaded, rate: null, fix: 'rework the top of the page', leak: "the page isn't earning the click", timeKey: 'loaded_to_form' });
+    steps.push({ lbl: 'Page loaded', n: (page.visitors || page.ad_visitors || 0), icon: ICO.loaded, timeKey: 'loaded_to_form' });
   }
-  steps.push({ lbl: 'Form', sub: 'started the form', did: 'started the form', n: page.form_started || 0, icon: ICO.form, rate: 0.10, fix: 'fix the form', leak: 'the form is leaking', timeKey: 'form_to_calendar' });
-  steps.push({ lbl: 'Calendar', sub: 'saw the times', did: 'saw the times', n: page.saw_calendar || 0, icon: ICO.calendar, rate: 0.60, fix: 'edit the calendar', leak: 'they saw the times but walked away', timeKey: 'calendar_to_booked' });
-  steps.push({ lbl: 'Booked', sub: 'trial booked', did: 'booked', n: page.booked_sessions || 0, icon: ICO.booked, rate: 0.50, fix: null, leak: null, timeKey: null });
+  steps.push({ lbl: 'Form started', n: page.form_started || 0, icon: ICO.form, timeKey: 'form_to_calendar' });
+  steps.push({ lbl: 'Saw times', n: page.saw_calendar || 0, icon: ICO.calendar, timeKey: 'calendar_to_booked' });
+  steps.push({ lbl: 'Trial booked', n: page.booked_sessions || 0, icon: ICO.booked, timeKey: null });
   const _mmDur = (s) => s == null ? '' : (s < 60 ? s + 's' : (Math.floor(s / 60) + 'm' + (s % 60 ? ' ' + (s % 60) + 's' : '')));
 
   const top = steps[0].n || 0;
@@ -44499,91 +44498,41 @@ function _mmRenderLandingFocus(d) {
       '<div style="font-size:13px;color:var(--text-mute);padding:16px 0">gathering data - no ad visits in this window yet</div>';
     return;
   }
-  // Worst drop = biggest single step-to-step loss. Only flag it red when the
-  // page band actually warrants concern (green = leave it be).
-  let worst = -1, worstRate = 0;
-  for (let i = 0; i < steps.length - 1; i++) {
-    if (!steps[i].n) continue;
-    const rate = (steps[i].n - steps[i + 1].n) / steps[i].n;
-    if (rate > worstRate) { worstRate = rate; worst = i; }
-  }
-  const flagLeak = (page.band === 'red' || page.band === 'gold') && worst >= 0;
-
-  const GRID = 'display:grid;grid-template-columns:34px 78px 1fr 40px;align-items:center;gap:10px';
+  const GRID = 'display:grid;grid-template-columns:34px 100px 1fr 44px;align-items:center;gap:10px';
   let rows = '';
   for (let i = 0; i < steps.length; i++) {
     const s = steps[i];
     const w = Math.max((s.n / top) * 100, 3);
-    const isLeakRow = flagLeak && i === worst + 1;
-    const fill = isLeakRow ? 'var(--mm-red)' : 'var(--text-sub)';
-    const chipBg = isLeakRow ? 'rgba(224,90,66,0.14)' : 'var(--surface-el)';
-    const chipFg = isLeakRow ? 'var(--mm-red-t)' : 'var(--text)';
-    // Benchmark tic: the count this stage would hit if the prior stage converted
-    // at the industry rate. Positioned on the same top-scaled axis as the bars.
-    const benchN = (s.rate != null && i > 0) ? steps[i - 1].n * s.rate : null;
-    const ticPct = benchN != null ? Math.min(99, Math.max(1, (benchN / top) * 100)) : null;
-    const tic = ticPct != null
-      ? '<div title="industry benchmark: ~' + Math.round(s.rate * 100) + '% of ' + steps[i - 1].lbl.toLowerCase() + ' (&asymp;' + Math.round(benchN) + ')" style="position:absolute;top:-3px;bottom:-3px;left:' + ticPct.toFixed(1) + '%;width:2px;background:var(--text);opacity:0.5;border-radius:1px"></div>'
-      : '';
     rows +=
       '<div style="' + GRID + '">' +
         '<div style="display:flex;justify-content:center">' +
-          '<span style="width:30px;height:30px;border-radius:50%;background:' + chipBg + ';color:' + chipFg + ';display:flex;align-items:center;justify-content:center;flex:0 0 auto">' + s.icon + '</span>' +
+          '<span style="width:30px;height:30px;border-radius:50%;background:var(--surface-el);color:var(--text);display:flex;align-items:center;justify-content:center;flex:0 0 auto">' + s.icon + '</span>' +
         '</div>' +
-        '<div>' +
-          '<div style="font-family:var(--mm-ff);font-size:14px;font-weight:700;color:var(--text)">' + s.lbl + '</div>' +
-          '<div style="font-family:var(--mm-ff);font-size:11px;color:var(--text-mute)">' + s.sub + '</div>' +
-        '</div>' +
-        '<div style="position:relative;height:26px;background:var(--surface-el);border-radius:6px">' +
-          '<div style="height:100%;width:' + w.toFixed(1) + '%;min-width:6px;background:' + fill + ';border-radius:6px"></div>' +
-          tic +
+        '<div style="font-family:var(--mm-ff);font-size:14px;font-weight:700;color:var(--text)">' + s.lbl + '</div>' +
+        '<div style="height:26px;background:var(--surface-el);border-radius:6px;overflow:hidden">' +
+          '<div style="height:100%;width:' + w.toFixed(1) + '%;min-width:6px;background:var(--text-sub);border-radius:6px"></div>' +
         '</div>' +
         '<div style="font-family:var(--mm-fm);font-size:15px;font-weight:500;color:var(--text);text-align:right">' + s.n + '</div>' +
       '</div>';
+    // between-stage connector: median time only (no drop %, no problem framing)
     if (i < steps.length - 1) {
-      const lost = steps[i].n - steps[i + 1].n;
-      const drop = steps[i].n > 0 ? Math.round((lost / steps[i].n) * 100) : 0;
-      const isLeak = flagLeak && i === worst;
-      const col = isLeak ? 'var(--mm-red-t)' : 'var(--text-mute)';
-      const wt = isLeak ? '700' : '500';
-      const tm = s.timeKey ? st[s.timeKey] : null;   // {median_s, n} or null
-      const timeChip = (tm && tm.median_s != null)
-        ? '<span style="font-family:var(--mm-ff);font-size:11px;color:var(--text-mute);display:inline-flex;align-items:center;gap:3px" title="median time to advance (' + tm.n + ' sessions)">&#9201; ~' + _mmDur(tm.median_s) + '</span>'
-        : '';
-      rows +=
-        '<div style="' + GRID + ';margin:5px 0">' +
-          '<div></div><div></div>' +
-          '<div style="display:flex;align-items:center;gap:8px;padding-left:2px;flex-wrap:wrap">' +
-            '<span style="font-family:var(--mm-ff);font-size:12px;color:' + col + ';font-weight:' + wt + '">&#8595; ' + drop + '% dropped &middot; ' + lost + ' lost</span>' +
-            timeChip +
-            (isLeak && s.fix ? '<span style="font-family:var(--mm-ff);font-size:11px;font-weight:700;background:rgba(224,90,66,0.12);color:#B5352F;padding:2px 9px;border-radius:6px">&#9998; ' + s.fix + '</span>' : '') +
-          '</div>' +
-          '<div></div>' +
-        '</div>';
+      const tm = s.timeKey ? st[s.timeKey] : null;
+      if (tm && tm.median_s != null) {
+        rows +=
+          '<div style="' + GRID + ';margin:4px 0">' +
+            '<div></div><div></div>' +
+            '<div style="display:flex;align-items:center;padding-left:2px">' +
+              '<span style="font-family:var(--mm-ff);font-size:11px;color:var(--text-mute);display:inline-flex;align-items:center;gap:3px" title="median time to advance (' + tm.n + ' sessions)">&#9201; ~' + _mmDur(tm.median_s) + '</span>' +
+            '</div>' +
+            '<div></div>' +
+          '</div>';
+      }
     }
   }
 
-  let takeaway = '';
-  if (flagLeak && worst >= 0) {
-    const lost = steps[worst].n - steps[worst + 1].n;
-    takeaway =
-      '<div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--line);font-family:var(--mm-ff);font-size:13px;color:var(--text-sub);line-height:1.6">' +
-        '<span style="color:var(--mm-red-t);font-weight:700">Biggest leak:</span> ' + lost + ' of ' + steps[worst].n + ' who ' + steps[worst].did + ' never ' + steps[worst + 1].did + '. ' + _escapeHtml(steps[worst].leak) + '.' +
-      '</div>';
-  } else {
-    takeaway =
-      '<div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--line);font-family:var(--mm-ff);font-size:13px;color:var(--text-mute);line-height:1.6">' +
-        'The funnel is flowing clean - no single step is leaking.' +
-      '</div>';
-  }
-
   body.innerHTML =
-    '<div class="mm-month" style="margin-bottom:12px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">' +
-      '<span class="mm-month-meta">last ' + (d.range?.days || 14) + ' days</span>' +
-      '<span style="display:inline-flex;align-items:center;gap:5px;font-family:var(--mm-ff);font-size:11px;color:var(--text-mute)">' +
-        '<span style="display:inline-block;width:2px;height:13px;background:var(--text);opacity:0.5;border-radius:1px"></span>industry benchmark</span>' +
-    '</div>' +
-    rows + takeaway +
+    '<div class="mm-month" style="margin-bottom:14px"><span class="mm-month-meta">last ' + (d.range?.days || 14) + ' days</span></div>' +
+    rows +
     _v2InlineHtml() +
     _v2ActionItemsHtml();
   _v2Sync();   // restore the annotator's open/closed state across a re-render
