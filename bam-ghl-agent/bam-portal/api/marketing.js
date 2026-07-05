@@ -402,6 +402,10 @@ async function organicDefaultStaffId() {
 //   2. the global channel default (organic -> Eli, ads -> Cam).
 // The explicit per-ticket override (admin "assign" action) is applied separately.
 async function resolveContentAssignee(clientId, channel) {
+  // Funnel content is owned by the marketing manager (Cam) - fixed owner, no
+  // per-client roster override (deliberate; add a funnel roster column if
+  // that ever changes).
+  if (channel === "funnel") return await marketingManagerStaffId();
   const col = channel === "organic" ? "content_assignee_organic_id" : "content_assignee_ads_id";
   try {
     const rows = await sb(`clients?id=eq.${clientId}&select=${col}`);
@@ -1387,7 +1391,7 @@ async function handleContentTickets(req, res) {
       // DM the resolved owner that a new content request landed (carries the urgent flag).
       const code = String(newCt.id || "").slice(0, 3).toUpperCase();
       const pr = (context?.priority === "high") ? "⚡ HIGH priority " : "";
-      const label = channel === "organic" ? "organic content" : "content";
+      const label = channel === "organic" ? "organic content" : channel === "funnel" ? "funnel content" : "content";
       staffSlackIdById(assignedTo).then(sid => {
         if (sid) postStaffSlackDM(sid, `🆕 New ${label} request ${pr}- ${ctx.client.business_name || "client"} [${code}]`, req);
         const who = slackMention(sid);
@@ -1586,6 +1590,10 @@ async function handleContentTickets(req, res) {
           priority: "normal",
           source: "funnel-content",
           fields: {
+            // `title` doubles as the headline in the tickets-insert Slack
+            // trigger (fields->>'title'), so the client channel confirm reads
+            // "Change request submitted: Add funnel content..." not "(no title)".
+            title: `Add funnel content to the website: ${label}`,
             what: `Add new funnel content to the website: ${label}`,
             how: [
               staffNote,
@@ -1610,11 +1618,9 @@ async function handleContentTickets(req, res) {
         body: "Content finished - sent to the systems team to be added to your website.",
         is_action_request: false,
       });
-      postClientSlackNotification(
-        ticket.client_id,
-        `🌐 Your funnel content "${label}" is finished and with our systems team to be added to your website. Track it under Systems in your portal.`,
-        req
-      );
+      // No explicit client Slack here: the tickets-insert trigger
+      // (notify_slack_on_new_ticket) already confirms the new Change ticket
+      // in the client's channel - a second message would double-notify.
 
     } else if (action === "cancel") {
       if (!["active", "client-dependent"].includes(ticket.status)) {
