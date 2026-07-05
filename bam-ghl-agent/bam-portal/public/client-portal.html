@@ -43730,6 +43730,8 @@ function toggleTheme() {
   .v2rev-thumb { flex:0 0 auto; width:58px; height:44px; border-radius:8px; display:flex; align-items:center; justify-content:center; color:#0B0B0D; }
   .v2rev-thumb--desktop { background:linear-gradient(160deg,#efe6c8,#d9c98a); }
   .v2rev-thumb--mobile { background:linear-gradient(160deg,#e6e6ea,#c9c9d2); }
+  .v2rev-thumb--img { padding:0; overflow:hidden; border:1px solid var(--line); }
+  .v2rev-thumb--img img { width:100%; height:100%; object-fit:cover; object-position:top; display:block; }
   .v2rev-cbody { flex:1; min-width:0; }
   .v2rev-cmeta { display:flex; align-items:center; gap:7px; margin-bottom:6px; }
   .v2rev-sec { font-family:var(--mm-ff); font-size:10.5px; font-weight:700; text-transform:uppercase; letter-spacing:0.03em; color:var(--gold-d,#9a7d2b); }
@@ -43791,6 +43793,10 @@ function toggleTheme() {
   .v2req-empty { font-family:var(--mm-ff); font-size:12px; color:var(--text-mute); padding:10px 0; }
   .v2req-note { display:flex; gap:8px; align-items:flex-start; border:1px solid var(--line); border-radius:9px; padding:8px 9px; }
   .v2req-note-num { flex:0 0 auto; width:20px; height:20px; border-radius:50%; background:var(--gold); color:#0B0B0D; font-family:var(--mm-fm); font-size:11px; font-weight:600; display:flex; align-items:center; justify-content:center; }
+  .v2req-note-thumb { flex:0 0 auto; width:46px; height:34px; border-radius:7px; overflow:hidden; display:flex; align-items:center; justify-content:center; background:var(--surface-el); border:1px solid var(--line); color:#0B0B0D; }
+  .v2req-note-thumb img { width:100%; height:100%; object-fit:cover; object-position:top; display:block; }
+  .v2req-note-thumb--desktop { background:linear-gradient(160deg,#efe6c8,#d9c98a); }
+  .v2req-note-thumb--mobile { background:linear-gradient(160deg,#e6e6ea,#c9c9d2); }
   .v2req-note-body { flex:1; min-width:0; }
   .v2req-note-sec { font-family:var(--mm-ff); font-size:10.5px; font-weight:700; text-transform:uppercase; letter-spacing:0.03em; color:var(--gold-d,#9a7d2b); margin-bottom:1px; }
   .v2req-note-txt { display:block; font-family:var(--mm-ff); font-size:12.5px; color:var(--text); line-height:1.4; min-width:0; cursor:text; }
@@ -44785,7 +44791,7 @@ function _v2NoteSave() {
   const txt = (ta.value || '').trim();
   if (!txt) { _v2NoteCancel(); return; }
   if (_V2_PENDING && typeof _V2_PENDING.idx === 'number') _V2_PINS[_V2_PENDING.idx].note = txt;
-  else if (_V2_PENDING) _V2_PINS.push({ x: _V2_PENDING.x, y: _V2_PENDING.y, note: txt, section: _V2_PENDING.section || null, device: _V2_PENDING.device || _V2_DEVICE });
+  else if (_V2_PENDING) _V2_PINS.push({ x: _V2_PENDING.x, y: _V2_PENDING.y, note: txt, section: _V2_PENDING.section || null, device: _V2_PENDING.device || _V2_DEVICE, thumb: _V2_PENDING.thumb || null });
   _V2_PENDING = null;
   document.getElementById('v2NotePop').style.display = 'none';
   _v2RenderNotes();
@@ -44802,9 +44808,12 @@ function _v2RenderNotes() {
   if (!list) return;
   if (!_V2_PINS.length) { list.innerHTML = '<div class="v2req-empty">No notes yet. Click a section of your page to add one.</div>'; return; }
   const pencil = '<svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M11.5 2.5l2 2L6 12l-2.5.5L4 10z"/></svg>';
+  const dico = { desktop: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="4" width="19" height="13" rx="1.5"/><path d="M9 21h6M12 17v4"/></svg>', mobile: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="7" y="2.5" width="10" height="19" rx="2.5"/><path d="M10.5 18.5h3"/></svg>' };
   const noteRow = (p, i) =>
     '<div class="v2req-note">' +
-      '<span class="v2req-note-num">' + (i + 1) + '</span>' +
+      (p.thumb
+        ? '<span class="v2req-note-thumb"><img src="' + p.thumb + '" alt=""></span>'
+        : '<span class="v2req-note-thumb v2req-note-thumb--' + (p.device || 'desktop') + '">' + (dico[p.device] || dico.desktop) + '</span>') +
       '<div class="v2req-note-body">' +
         (p.section ? '<div class="v2req-note-sec">' + _escapeHtml(p.section) + '</div>' : '') +
         '<span class="v2req-note-txt" title="Click to edit" onclick="_v2EditNote(' + i + ',event)">' + _escapeHtml(p.note) + '</span>' +
@@ -44847,8 +44856,11 @@ function _v2RenderReview() {
   if (!items.length) { list.innerHTML = '<div class="v2rev-empty">No ' + (_V2_REVIEW_FILTER === 'all' ? '' : _V2_REVIEW_FILTER + ' ') + 'notes yet.</div>'; return; }
   list.innerHTML = items.map(x => {
     const p = x.p, i = x.i, dev = p.device || 'desktop';
+    const thumb = p.thumb
+      ? '<div class="v2rev-thumb v2rev-thumb--img"><img src="' + p.thumb + '" alt=""></div>'
+      : '<div class="v2rev-thumb v2rev-thumb--' + dev + '">' + (dev === 'mobile' ? PHN : MON) + '</div>';
     return '<div class="v2rev-item">' +
-      '<div class="v2rev-thumb v2rev-thumb--' + dev + '">' + (dev === 'mobile' ? PHN : MON) + '</div>' +
+      thumb +
       '<div class="v2rev-cbody">' +
         '<div class="v2rev-cmeta"><span class="v2note-dev">' + (dev === 'mobile' ? 'Mobile' : 'Desktop') + '</span>' + (p.section ? '<span class="v2rev-sec">' + _escapeHtml(p.section) + '</span>' : '') + '</div>' +
         '<textarea class="v2rev-note" rows="2" oninput="_v2ReviewEdit(' + i + ',this.value)">' + _escapeHtml(p.note) + '</textarea>' +
@@ -44892,7 +44904,7 @@ window.addEventListener('message', (e) => {
     return;
   }
   if (d.action === 'section-click') {
-    _V2_PENDING = { section: d.label || 'Section', device: _V2_DEVICE };
+    _V2_PENDING = { section: d.label || 'Section', device: _V2_DEVICE, thumb: d.thumb || null };
     // place the note popover near the click (coords are in the iframe's own
     // viewport, so scale them to where they land on screen)
     const fr = document.getElementById('v2ReqFrame');
