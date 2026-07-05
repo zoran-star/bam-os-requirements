@@ -43840,14 +43840,6 @@ function _ccInitRecede(root, secs) {
     requestAnimationFrame(() => {
       ticking = false;
       if (!document.getElementById('view-cc')?.classList.contains('active')) return;
-      // dock auto-hide: tuck on scroll down, return on scroll up
-      const dock = document.getElementById('cc-dock');
-      const top = root.scrollTop;
-      if (dock && !dock.classList.contains('open')) {
-        if (top > (root._ccLastTop || 0) + 4 && top > 120) dock.classList.add('tuck');
-        else if (top < (root._ccLastTop || 0) - 4) dock.classList.remove('tuck');
-      }
-      root._ccLastTop = top;
       // rail idle fade: wake on scroll, doze after 2.8s
       const rail = document.getElementById('cc-rail');
       if (rail) {
