@@ -1,5 +1,11 @@
 # bam-portal Agent Notes
 
+## ⛔ Front-end work: load the design system first
+
+Before ANY UI/front-end change in this folder (client portal, new pages, components), read [`design-system/DESIGN.md`](design-system/DESIGN.md) and use the tokens in [`design-system/tokens.css`](design-system/tokens.css). Never hardcode colors/radii/fonts/shadows a token covers. If a token changes, mirror it in `public/client-portal.html`'s `:root` in the same commit (and vice versa). The V2 Home / Assets / Calendar views are the reference implementations.
+
+## Supabase
+
 Before touching Supabase migrations, seeds, local replay, storage buckets, or linked project repair, read [`supabase/README.md`](supabase/README.md).
 
 That README explains the current temporary migration state:
