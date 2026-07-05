@@ -388,3 +388,16 @@ inline text-funnel + 2 stat boxes + 2 overlapping ratio pills. Simple
 card funnel SVG (_mmFunnelSvg) takes the same clicked/loaded pair.
 
 SHIPPED to production 2026-07-04 via PR #1130 (merge commit 1c9bed9).
+
+TIME BETWEEN STAGES (Zoran 2026-07-04)
+
+The focus-mode waterfall now shows median seconds to advance between the
+beacon-tracked steps, in the gap next to the drop %: loaded->form,
+form->calendar, calendar->booked. Computed server-side in meta-machine
+from funnel_events.created_at (earliest ts per step per session; median,
+not mean, to resist idle tabs). Guarded: needs >= 2 sessions or it's null
+(hidden). Exposed as page.step_times.{loaded_to_form,form_to_calendar,
+calendar_to_booked} = {median_s, n}. NO time on clicked->loaded - Meta
+gives no per-session click/page-load timestamps. GTA sample (last 14d):
+~19s / ~28s / ~39s. Time-UNTIL-drop (dwell before bouncing) is NOT
+tracked - would need a new exit/heartbeat beacon.

@@ -43642,7 +43642,6 @@ function toggleTheme() {
     <button type="button" class="mm-back-btn" onclick="closeMarketingMachine()">&lsaquo; Back</button>
     <div class="mm-mod-head">
       <div>
-        <div class="modal-kicker">§ Marketing</div>
         <div class="modal-title" style="margin-bottom:0">Marketing Machine</div>
       </div>
       <div class="mm-mod-range">
@@ -43664,13 +43663,90 @@ function toggleTheme() {
     <button type="button" class="mm-back-btn" onclick="closeLandingMachine()">&lsaquo; Back</button>
     <div class="mm-mod-head">
       <div>
-        <div class="modal-kicker">&sect; Marketing</div>
         <div class="modal-title" style="margin-bottom:0">Landing Page</div>
       </div>
     </div>
     <div id="lm-modal-body"></div>
   </div>
 </div>
+
+<!-- ── V2 "Request a change" annotator (V2 only) ──
+     Live-iframe the client's own V2 page; parent-side overlay drops numbered
+     pins + notes. Hover-highlight of SECTIONS arrives when the bam-client-sites
+     annotation bridge lands (postMessage) - listener is wired below. Submit is
+     mocked until the v2_support_tickets table is created (core access pending). -->
+<div id="v2ReqModal" class="modal-backdrop mm-focus-page" style="display:none" onclick="if(event.target===this)closeV2Request()">
+  <div class="modal-card mm-modal-card" onclick="event.stopPropagation()" style="max-width:1040px">
+    <button type="button" class="mm-back-btn" onclick="closeV2Request()">&lsaquo; Back</button>
+    <div class="mm-mod-head"><div>
+      <div class="modal-title" style="margin-bottom:2px">Request a change</div>
+      <div class="mm-month-meta" id="v2ReqSub">Click a spot on your page to leave a note</div>
+    </div></div>
+    <div class="v2req-grid">
+      <div class="v2req-stage" id="v2ReqStage">
+        <div class="v2req-stage-hint" id="v2ReqHint">your page loads here</div>
+        <iframe id="v2ReqFrame" title="Your landing page" referrerpolicy="no-referrer"></iframe>
+        <div class="v2req-overlay" id="v2ReqOverlay" onclick="_v2PinAt(event)"></div>
+      </div>
+      <div class="v2req-side">
+        <div class="v2req-label">What kind of change?</div>
+        <div class="v2req-types" id="v2ReqTypes">
+          <button type="button" class="v2req-type is-on" data-t="change" onclick="_v2PickType(this)">Change</button>
+          <button type="button" class="v2req-type" data-t="add" onclick="_v2PickType(this)">Add</button>
+          <button type="button" class="v2req-type" data-t="fix" onclick="_v2PickType(this)">Fix</button>
+        </div>
+        <div class="v2req-label" style="margin-top:14px">Your notes</div>
+        <div class="v2req-notes" id="v2ReqNotes"><div class="v2req-empty">No notes yet. Click a spot on your page to pin one.</div></div>
+        <div class="v2req-label" style="margin-top:14px">Anything else? (optional)</div>
+        <textarea id="v2ReqDesc" class="v2req-desc" rows="3" placeholder="A sentence or two of extra context"></textarea>
+        <button type="button" class="v2req-submit" id="v2ReqSubmit" onclick="_v2Submit()">Send request</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- note popover (anchored to a pin) -->
+<div id="v2NotePop" class="v2note-pop" style="display:none">
+  <textarea id="v2NoteText" rows="3" placeholder="What should we change here?"></textarea>
+  <div class="v2note-pop-row">
+    <button type="button" class="v2note-cancel" onclick="_v2NoteCancel()">Cancel</button>
+    <button type="button" class="v2note-save" onclick="_v2NoteSave()">Save note</button>
+  </div>
+</div>
+
+<style>
+  .v2req-grid { display:grid; grid-template-columns:1.55fr 1fr; gap:18px; margin-top:8px; }
+  .v2req-stage { position:relative; background:var(--surface-el); border:1px solid var(--line); border-radius:12px; overflow:hidden; min-height:440px; }
+  .v2req-stage-hint { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-family:var(--mm-ff); font-size:13px; color:var(--text-mute); }
+  #v2ReqFrame { position:relative; width:100%; height:100%; min-height:440px; border:0; display:block; }
+  .v2req-overlay { position:absolute; inset:0; cursor:crosshair; }
+  .v2req-pin { position:absolute; transform:translate(-50%,-50%); width:24px; height:24px; border-radius:50%; background:var(--gold); color:#0B0B0D; font-family:var(--mm-fm); font-size:12px; font-weight:600; display:flex; align-items:center; justify-content:center; box-shadow:0 1px 4px rgba(0,0,0,.3); cursor:pointer; z-index:2; }
+  .v2req-side { display:flex; flex-direction:column; }
+  .v2req-label { font-family:var(--mm-ff); font-size:12px; font-weight:700; text-transform:uppercase; letter-spacing:0.04em; color:var(--text-mute); margin-bottom:8px; }
+  .v2req-types { display:flex; gap:8px; }
+  .v2req-type { flex:1; font-family:var(--mm-ff); font-size:13px; font-weight:700; border:1px solid var(--line); border-radius:9px; padding:8px; background:none; color:var(--text-sub); cursor:pointer; transition:all .15s ease; }
+  .v2req-type.is-on { border-color:var(--gold); color:var(--text); background:rgba(200,168,78,0.1); }
+  .v2req-notes { display:flex; flex-direction:column; gap:8px; max-height:190px; overflow-y:auto; }
+  .v2req-empty { font-family:var(--mm-ff); font-size:12px; color:var(--text-mute); padding:10px 0; }
+  .v2req-note { display:flex; gap:9px; align-items:flex-start; border:1px solid var(--line); border-radius:9px; padding:8px 10px; }
+  .v2req-note-num { flex:0 0 auto; width:20px; height:20px; border-radius:50%; background:var(--gold); color:#0B0B0D; font-family:var(--mm-fm); font-size:11px; font-weight:600; display:flex; align-items:center; justify-content:center; }
+  .v2req-note-txt { font-family:var(--mm-ff); font-size:12.5px; color:var(--text); line-height:1.4; flex:1; }
+  .v2req-note-del { background:none; border:none; color:var(--text-mute); cursor:pointer; font-size:14px; line-height:1; }
+  .v2req-desc { width:100%; box-sizing:border-box; font-family:var(--mm-ff); font-size:13px; color:var(--text); background:var(--surface-el); border:1px solid var(--line); border-radius:9px; padding:9px 11px; resize:vertical; }
+  .v2req-submit { margin-top:14px; width:100%; font-family:var(--mm-ff); font-size:14px; font-weight:700; border:none; border-radius:10px; padding:12px; background:var(--gold); color:#0B0B0D; cursor:pointer; }
+  .v2req-submit:disabled { opacity:.5; cursor:not-allowed; }
+  .v2note-pop { position:fixed; z-index:1700; width:240px; background:var(--surface); border:1px solid var(--line); border-radius:12px; padding:12px; box-shadow:0 12px 34px rgba(0,0,0,.28); }
+  .v2note-pop textarea { width:100%; box-sizing:border-box; font-family:var(--mm-ff); font-size:13px; color:var(--text); background:var(--surface-el); border:1px solid var(--line); border-radius:8px; padding:8px; resize:none; }
+  .v2note-pop-row { display:flex; justify-content:flex-end; gap:8px; margin-top:8px; }
+  .v2note-cancel { font-family:var(--mm-ff); font-size:12px; font-weight:600; border:1px solid var(--line); border-radius:7px; padding:5px 11px; background:none; color:var(--text-sub); cursor:pointer; }
+  .v2note-save { font-family:var(--mm-ff); font-size:12px; font-weight:700; border:none; border-radius:7px; padding:5px 12px; background:var(--gold); color:#0B0B0D; cursor:pointer; }
+  .v2req-mine { border:1px solid var(--line); border-radius:11px; padding:12px 14px; margin-top:10px; }
+  .v2req-mine-head { display:flex; align-items:center; gap:8px; font-family:var(--mm-ff); font-size:13px; font-weight:700; color:var(--text); }
+  .v2req-mine-row { display:flex; align-items:center; gap:10px; padding:9px 0; border-top:1px solid var(--line); }
+  .v2req-mine-row:first-of-type { border-top:none; }
+  .v2req-status { font-family:var(--mm-ff); font-size:10.5px; font-weight:700; text-transform:uppercase; letter-spacing:0.03em; padding:2px 8px; border-radius:20px; }
+  @media (max-width:720px){ .v2req-grid{ grid-template-columns:1fr; } .v2req-stage{ min-height:320px; } #v2ReqFrame{ min-height:320px; } }
+</style>
 
 <script>
 /* ─────────── Marketing Machine (V2) - simple card + detailed modal ───────────
@@ -44377,16 +44453,33 @@ function _mmRenderLandingFocus(d) {
   // Build the step spine. CLICKED + LOADED come from Meta (LPV is a subset of
   // clicks so it never widens); when Meta has no LPV, fall back to our beacon
   // page loads for a single LOADED stage. The rest are our own funnel beacons.
+  // timeKey = the median-time bucket for THIS step -> the next one (from the API
+  // page.step_times). No time on clicked->loaded (Meta gives no click/load
+  // timestamps per session).
+  const st = page.step_times || {};
+  // Prominent per-stage icons (16px, currentColor).
+  const ICO = {
+    clicked: '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 2.4l8.4 3.5-3.3 1.1L6.7 11 3 2.4z"/></svg>',
+    loaded: '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="12" height="10" rx="1.5"/><path d="M2 6.2h12"/><circle cx="4.1" cy="4.6" r="0.35"/><circle cx="5.7" cy="4.6" r="0.35"/></svg>',
+    form: '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="2" width="10" height="12" rx="1.5"/><path d="M5.5 6h5M5.5 8.5h5M5.5 11h3"/></svg>',
+    calendar: '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="3" width="11" height="10.5" rx="1.5"/><path d="M2.5 6.5h11M5.5 1.5v3M10.5 1.5v3"/></svg>',
+    booked: '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="3" width="11" height="10.5" rx="1.5"/><path d="M2.5 6.5h11M5.5 1.5v3M10.5 1.5v3"/><path d="M5.8 9.9l1.5 1.5 3-3.1"/></svg>',
+  };
+  // Benchmark = industry-standard conversion INTO this stage from the previous
+  // one (researched 2026-07-05): clicks load ~80%, page->form ~10%, form->
+  // calendar ~60%, calendar->booked ~50%. Drives the tic on each bar = the count
+  // you'd hit at benchmark; bar past the tic = beating industry, short = leaking.
   const steps = [];
   if (clk > 0 && lpv > 0) {
-    steps.push({ lbl: 'Clicked', sub: 'tapped the ad', did: 'clicked the ad', n: clk, fix: 'speed up the page', leak: 'the page is too slow to load' });
-    steps.push({ lbl: 'Loaded', sub: 'page opened', did: 'loaded the page', n: lpv, fix: 'rework the top of the page', leak: "the page isn't earning the click" });
+    steps.push({ lbl: 'Clicked', sub: 'tapped the ad', did: 'clicked the ad', n: clk, icon: ICO.clicked, rate: null, fix: 'speed up the page', leak: 'the page is too slow to load', timeKey: null });
+    steps.push({ lbl: 'Loaded', sub: 'page opened', did: 'loaded the page', n: lpv, icon: ICO.loaded, rate: 0.80, fix: 'rework the top of the page', leak: "the page isn't earning the click", timeKey: 'loaded_to_form' });
   } else {
-    steps.push({ lbl: 'Loaded', sub: 'page opened', did: 'loaded the page', n: (page.visitors || page.ad_visitors || 0), fix: 'rework the top of the page', leak: "the page isn't earning the click" });
+    steps.push({ lbl: 'Loaded', sub: 'page opened', did: 'loaded the page', n: (page.visitors || page.ad_visitors || 0), icon: ICO.loaded, rate: null, fix: 'rework the top of the page', leak: "the page isn't earning the click", timeKey: 'loaded_to_form' });
   }
-  steps.push({ lbl: 'Form', sub: 'started the form', did: 'started the form', n: page.form_started || 0, fix: 'fix the form', leak: 'the form is leaking' });
-  steps.push({ lbl: 'Calendar', sub: 'saw the times', did: 'saw the times', n: page.saw_calendar || 0, fix: 'edit the calendar', leak: 'they saw the times but walked away' });
-  steps.push({ lbl: 'Booked', sub: 'trial booked', did: 'booked', n: page.booked_sessions || 0, fix: null, leak: null });
+  steps.push({ lbl: 'Form', sub: 'started the form', did: 'started the form', n: page.form_started || 0, icon: ICO.form, rate: 0.10, fix: 'fix the form', leak: 'the form is leaking', timeKey: 'form_to_calendar' });
+  steps.push({ lbl: 'Calendar', sub: 'saw the times', did: 'saw the times', n: page.saw_calendar || 0, icon: ICO.calendar, rate: 0.60, fix: 'edit the calendar', leak: 'they saw the times but walked away', timeKey: 'calendar_to_booked' });
+  steps.push({ lbl: 'Booked', sub: 'trial booked', did: 'booked', n: page.booked_sessions || 0, icon: ICO.booked, rate: 0.50, fix: null, leak: null, timeKey: null });
+  const _mmDur = (s) => s == null ? '' : (s < 60 ? s + 's' : (Math.floor(s / 60) + 'm' + (s % 60 ? ' ' + (s % 60) + 's' : '')));
 
   const top = steps[0].n || 0;
   if (!top) {
@@ -44405,21 +44498,34 @@ function _mmRenderLandingFocus(d) {
   }
   const flagLeak = (page.band === 'red' || page.band === 'gold') && worst >= 0;
 
-  const GRID = 'display:grid;grid-template-columns:104px 1fr 40px;align-items:center;gap:12px';
+  const GRID = 'display:grid;grid-template-columns:34px 78px 1fr 40px;align-items:center;gap:10px';
   let rows = '';
   for (let i = 0; i < steps.length; i++) {
     const s = steps[i];
     const w = Math.max((s.n / top) * 100, 3);
     const isLeakRow = flagLeak && i === worst + 1;
     const fill = isLeakRow ? 'var(--mm-red)' : 'var(--text-sub)';
+    const chipBg = isLeakRow ? 'rgba(224,90,66,0.14)' : 'var(--surface-el)';
+    const chipFg = isLeakRow ? 'var(--mm-red-t)' : 'var(--text)';
+    // Benchmark tic: the count this stage would hit if the prior stage converted
+    // at the industry rate. Positioned on the same top-scaled axis as the bars.
+    const benchN = (s.rate != null && i > 0) ? steps[i - 1].n * s.rate : null;
+    const ticPct = benchN != null ? Math.min(99, Math.max(1, (benchN / top) * 100)) : null;
+    const tic = ticPct != null
+      ? '<div title="industry benchmark: ~' + Math.round(s.rate * 100) + '% of ' + steps[i - 1].lbl.toLowerCase() + ' (&asymp;' + Math.round(benchN) + ')" style="position:absolute;top:-3px;bottom:-3px;left:' + ticPct.toFixed(1) + '%;width:2px;background:var(--text);opacity:0.5;border-radius:1px"></div>'
+      : '';
     rows +=
       '<div style="' + GRID + '">' +
-        '<div style="text-align:right">' +
+        '<div style="display:flex;justify-content:center">' +
+          '<span style="width:30px;height:30px;border-radius:50%;background:' + chipBg + ';color:' + chipFg + ';display:flex;align-items:center;justify-content:center;flex:0 0 auto">' + s.icon + '</span>' +
+        '</div>' +
+        '<div>' +
           '<div style="font-family:var(--mm-ff);font-size:14px;font-weight:700;color:var(--text)">' + s.lbl + '</div>' +
           '<div style="font-family:var(--mm-ff);font-size:11px;color:var(--text-mute)">' + s.sub + '</div>' +
         '</div>' +
-        '<div style="height:26px;background:var(--surface-el);border-radius:6px;overflow:hidden">' +
+        '<div style="position:relative;height:26px;background:var(--surface-el);border-radius:6px">' +
           '<div style="height:100%;width:' + w.toFixed(1) + '%;min-width:6px;background:' + fill + ';border-radius:6px"></div>' +
+          tic +
         '</div>' +
         '<div style="font-family:var(--mm-fm);font-size:15px;font-weight:500;color:var(--text);text-align:right">' + s.n + '</div>' +
       '</div>';
@@ -44429,11 +44535,16 @@ function _mmRenderLandingFocus(d) {
       const isLeak = flagLeak && i === worst;
       const col = isLeak ? 'var(--mm-red-t)' : 'var(--text-mute)';
       const wt = isLeak ? '700' : '500';
+      const tm = s.timeKey ? st[s.timeKey] : null;   // {median_s, n} or null
+      const timeChip = (tm && tm.median_s != null)
+        ? '<span style="font-family:var(--mm-ff);font-size:11px;color:var(--text-mute);display:inline-flex;align-items:center;gap:3px" title="median time to advance (' + tm.n + ' sessions)">&#9201; ~' + _mmDur(tm.median_s) + '</span>'
+        : '';
       rows +=
-        '<div style="' + GRID + ';margin:3px 0">' +
-          '<div></div>' +
+        '<div style="' + GRID + ';margin:5px 0">' +
+          '<div></div><div></div>' +
           '<div style="display:flex;align-items:center;gap:8px;padding-left:2px;flex-wrap:wrap">' +
             '<span style="font-family:var(--mm-ff);font-size:12px;color:' + col + ';font-weight:' + wt + '">&#8595; ' + drop + '% dropped &middot; ' + lost + ' lost</span>' +
+            timeChip +
             (isLeak && s.fix ? '<span style="font-family:var(--mm-ff);font-size:11px;font-weight:700;background:rgba(224,90,66,0.12);color:#B5352F;padding:2px 9px;border-radius:6px">&#9998; ' + s.fix + '</span>' : '') +
           '</div>' +
           '<div></div>' +
@@ -44456,9 +44567,165 @@ function _mmRenderLandingFocus(d) {
   }
 
   body.innerHTML =
-    '<div class="mm-month" style="margin-bottom:14px"><span class="mm-month-meta">last ' + (d.range?.days || 14) + ' days</span></div>' +
-    rows + takeaway;
+    '<div class="mm-month" style="margin-bottom:12px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">' +
+      '<span class="mm-month-meta">last ' + (d.range?.days || 14) + ' days</span>' +
+      '<span style="display:inline-flex;align-items:center;gap:5px;font-family:var(--mm-ff);font-size:11px;color:var(--text-mute)">' +
+        '<span style="display:inline-block;width:2px;height:13px;background:var(--text);opacity:0.5;border-radius:1px"></span>industry benchmark</span>' +
+    '</div>' +
+    rows + takeaway +
+    '<button type="button" class="v2req-submit" style="margin-top:18px;display:flex;align-items:center;justify-content:center;gap:8px" onclick="openV2Request()">' +
+      '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3v10M3 8h10"/></svg>Request a change to this page</button>' +
+    _v2ActionItemsHtml();
 }
+
+/* ── V2 "Request a change" annotator + client action items ──
+   Skip-the-table build (Zoran 2026-07-05): submit is MOCKED and requests are
+   sample rows until v2_support_tickets exists (core access pending). Section
+   hover-highlight lights up when the bam-client-sites bridge posts messages. */
+let _V2_PINS = [];       // {x,y,note}
+let _V2_TYPE = 'change';
+let _V2_PENDING = null;  // pin index awaiting a note, or 'new'
+// Mock "my requests" - replace with a fetch once the table lands.
+const _V2_REQUESTS = [
+  { title: 'Rework the hero headline', type: 'change', status: 'in_progress', when: '2d ago' },
+  { title: 'Add a testimonials strip', type: 'add', status: 'triaged', when: '5d ago' },
+  { title: 'Calendar not loading on mobile', type: 'fix', status: 'shipped', when: '1w ago' },
+];
+const _V2_STATUS_STYLE = {
+  new: ['new', 'var(--text-mute)', 'var(--surface-el)'],
+  triaged: ['triaged', 'var(--mm-gold-t)', 'rgba(224,157,36,0.14)'],
+  in_progress: ['in progress', 'var(--mm-gold-t)', 'rgba(224,157,36,0.14)'],
+  shipped: ['done', 'var(--mm-green-t)', 'rgba(62,175,92,0.14)'],
+  on_hold: ['on hold', 'var(--text-mute)', 'var(--surface-el)'],
+};
+function _v2ActionItemsHtml() {
+  const rows = _V2_REQUESTS.map(r => {
+    const s = _V2_STATUS_STYLE[r.status] || _V2_STATUS_STYLE.new;
+    return '<div class="v2req-mine-row">' +
+      '<span style="font-family:var(--mm-fm);font-size:10px;font-weight:600;text-transform:uppercase;color:var(--text-mute);width:46px">' + r.type + '</span>' +
+      '<span style="font-family:var(--mm-ff);font-size:13px;color:var(--text);flex:1">' + _escapeHtml(r.title) + '</span>' +
+      '<span style="font-family:var(--mm-ff);font-size:11px;color:var(--text-mute)">' + r.when + '</span>' +
+      '<span class="v2req-status" style="color:' + s[1] + ';background:' + s[2] + '">' + s[0] + '</span>' +
+      '</div>';
+  }).join('') || '<div class="v2req-empty">No requests yet.</div>';
+  return '<div class="v2req-mine">' +
+    '<div class="v2req-mine-head"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8l1.5 1.5L11 6"/><rect x="2" y="2" width="12" height="12" rx="2"/></svg>Your requests</div>' +
+    rows + '</div>';
+}
+function openV2Request() {
+  const m = document.getElementById('v2ReqModal');
+  if (!m) return;
+  _V2_PINS = []; _V2_TYPE = 'change'; _V2_PENDING = null;
+  document.querySelectorAll('#v2ReqTypes .v2req-type').forEach(b => b.classList.toggle('is-on', b.dataset.t === 'change'));
+  const desc = document.getElementById('v2ReqDesc'); if (desc) desc.value = '';
+  // Point the iframe at the client's own page if we know it; else leave the hint.
+  const url = (typeof _MM !== 'undefined' && _MM && _MM.page && _MM.page.url) || (window._V2_PAGE_URL || '');
+  const fr = document.getElementById('v2ReqFrame'), hint = document.getElementById('v2ReqHint');
+  if (url) { fr.src = url; fr.style.display = 'block'; if (hint) hint.style.display = 'none'; }
+  else { fr.removeAttribute('src'); fr.style.display = 'none'; if (hint) hint.style.display = 'flex'; }
+  _v2RenderNotes();
+  m.style.display = 'flex'; requestAnimationFrame(() => m.classList.add('mm-open'));
+  document.documentElement.classList.add('mm-focus-open');
+}
+function closeV2Request() { _v2NoteCancel(); _mmCloseFocus('v2ReqModal'); }
+function _v2PickType(btn) {
+  _V2_TYPE = btn.dataset.t;
+  document.querySelectorAll('#v2ReqTypes .v2req-type').forEach(b => b.classList.toggle('is-on', b === btn));
+}
+function _v2PinAt(evt) {
+  const ov = document.getElementById('v2ReqOverlay');
+  const r = ov.getBoundingClientRect();
+  const x = ((evt.clientX - r.left) / r.width) * 100;
+  const y = ((evt.clientY - r.top) / r.height) * 100;
+  _V2_PENDING = { x, y };
+  _v2OpenNotePop(evt.clientX, evt.clientY, '');
+}
+function _v2OpenNotePop(clientX, clientY, val) {
+  const pop = document.getElementById('v2NotePop'), ta = document.getElementById('v2NoteText');
+  ta.value = val || '';
+  pop.style.display = 'block';
+  const pw = 240, ph = 130;
+  let left = clientX + 12, top = clientY + 12;
+  if (left + pw > window.innerWidth - 8) left = clientX - pw - 12;
+  if (top + ph > window.innerHeight - 8) top = clientY - ph - 12;
+  pop.style.left = Math.max(8, left) + 'px'; pop.style.top = Math.max(8, top) + 'px';
+  setTimeout(() => ta.focus(), 30);
+}
+function _v2NoteSave() {
+  const ta = document.getElementById('v2NoteText');
+  const txt = (ta.value || '').trim();
+  if (!txt) { _v2NoteCancel(); return; }
+  if (_V2_PENDING && typeof _V2_PENDING.idx === 'number') _V2_PINS[_V2_PENDING.idx].note = txt;
+  else if (_V2_PENDING) _V2_PINS.push({ x: _V2_PENDING.x, y: _V2_PENDING.y, note: txt, section: _V2_PENDING.section || null });
+  _V2_PENDING = null;
+  document.getElementById('v2NotePop').style.display = 'none';
+  _v2RenderNotes();
+}
+function _v2NoteCancel() { _V2_PENDING = null; const p = document.getElementById('v2NotePop'); if (p) p.style.display = 'none'; }
+function _v2EditNote(i, evt) {
+  evt.stopPropagation();
+  _V2_PENDING = { idx: i };
+  _v2OpenNotePop(evt.clientX, evt.clientY, _V2_PINS[i].note);
+}
+function _v2DelNote(i, evt) { evt.stopPropagation(); _V2_PINS.splice(i, 1); _v2RenderNotes(); }
+function _v2RenderNotes() {
+  // pins on the overlay
+  const ov = document.getElementById('v2ReqOverlay');
+  if (ov) {
+    ov.querySelectorAll('.v2req-pin').forEach(p => p.remove());
+    _V2_PINS.forEach((p, i) => {
+      const el = document.createElement('div');
+      el.className = 'v2req-pin'; el.textContent = (i + 1);
+      el.style.left = p.x + '%'; el.style.top = p.y + '%';
+      el.onclick = (e) => _v2EditNote(i, e);
+      ov.appendChild(el);
+    });
+  }
+  // list on the side
+  const list = document.getElementById('v2ReqNotes');
+  if (!list) return;
+  list.innerHTML = _V2_PINS.length
+    ? _V2_PINS.map((p, i) =>
+        '<div class="v2req-note">' +
+          '<span class="v2req-note-num">' + (i + 1) + '</span>' +
+          '<span class="v2req-note-txt">' + _escapeHtml(p.note) + (p.section ? ' <span style="color:var(--text-mute)">&middot; ' + _escapeHtml(p.section) + '</span>' : '') + '</span>' +
+          '<button type="button" class="v2req-note-del" title="Remove" onclick="_v2DelNote(' + i + ',event)">&times;</button>' +
+        '</div>').join('')
+    : '<div class="v2req-empty">No notes yet. Click a spot on your page to pin one.</div>';
+  const sub = document.getElementById('v2ReqSub');
+  if (sub) sub.textContent = _V2_PINS.length ? (_V2_PINS.length + ' note' + (_V2_PINS.length === 1 ? '' : 's') + ' pinned') : 'Click a spot on your page to leave a note';
+}
+function _v2Submit() {
+  const desc = (document.getElementById('v2ReqDesc')?.value || '').trim();
+  if (!_V2_PINS.length && !desc) { _mmToast('Add a note or a line of context first'); return; }
+  const payload = {
+    module: 'landing-page', request_type: _V2_TYPE, source: 'v2_portal_oneclick',
+    description: desc,
+    context: {
+      page_url: (typeof _MM !== 'undefined' && _MM?.page?.url) || null,
+      metric_snapshot: (typeof _MM !== 'undefined' && _MM?.page) ? {
+        visitors: _MM.page.visitors, form_started: _MM.page.form_started,
+        saw_calendar: _MM.page.saw_calendar, booked: _MM.page.booked_sessions,
+      } : null,
+      annotations: _V2_PINS.map(p => ({ x: p.x, y: p.y, note: p.note, section: p.section || null })),
+    },
+  };
+  console.log('[v2-request] MOCK submit (no table yet):', payload);   // TODO: POST /api/v2-support-tickets
+  _V2_REQUESTS.unshift({ title: desc || (_V2_PINS[0] && _V2_PINS[0].note) || 'Landing page change', type: _V2_TYPE, status: 'new', when: 'just now' });
+  _mmToast('Request sent - staff will take a look');
+  closeV2Request();
+  if (typeof _mmRenderLandingFocus === 'function' && typeof _MM !== 'undefined') _mmRenderLandingFocus(_MM);
+}
+// Bridge listener: the client's V2 page (bam-client-sites) posts section hover/
+// click events when it loads in annotate mode. Until that ships this is dormant.
+window.addEventListener('message', (e) => {
+  const d = e.data;
+  if (!d || d.type !== 'fc-annotate' || document.getElementById('v2ReqModal').style.display === 'none') return;
+  if (d.action === 'section-click' && d.rect) {
+    _V2_PENDING = { x: d.rect.xPct, y: d.rect.yPct, section: d.label || null };
+    _v2OpenNotePop((window.innerWidth / 2), (window.innerHeight / 2), '');
+  }
+});
 </script>
 
 <script>

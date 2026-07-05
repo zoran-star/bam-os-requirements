@@ -3366,7 +3366,7 @@ async function handleMetaMachine(req, res) {
       ]);
       return { ads: ads.data || [], adsets: adsets.data || [], camp };
     })),
-    sb(`funnel_events?client_id=eq.${targetClientId}&funnel=eq.free-trial&created_at=gte.${encodeURIComponent(sinceIso)}&created_at=lt.${encodeURIComponent(endIso)}&select=step,session_id,utm&limit=20000`).catch(() => []),
+    sb(`funnel_events?client_id=eq.${targetClientId}&funnel=eq.free-trial&created_at=gte.${encodeURIComponent(sinceIso)}&created_at=lt.${encodeURIComponent(endIso)}&select=step,session_id,utm,created_at&limit=20000`).catch(() => []),
     sb(`funnel_events?client_id=eq.${targetClientId}&funnel=eq.free-trial&select=created_at&order=created_at.asc&limit=1`).catch(() => []),
     sb(`kpi_events?client_id=eq.${targetClientId}&step=in.(lead,trial_booked)&occurred_at=gte.${encodeURIComponent(prevSinceIso)}&occurred_at=lt.${encodeURIComponent(endIso)}&select=step,occurred_at,ghl_contact_id&limit=10000`).catch(() => []),
     sb(`kpi_events?client_id=eq.${targetClientId}&step=in.(trial_booked,trial_attended,trial_no_show,joined)&occurred_at=gte.${encodeURIComponent(new Date(todayD.getTime() - 89 * 86400000).toISOString())}&select=step&limit=10000`).catch(() => []),
@@ -3527,13 +3527,42 @@ async function handleMetaMachine(req, res) {
   // ── Page + result from our own beacons/events ──
   const sess = {};
   const adVisitors = new Set();
+  // Earliest timestamp per (step, session) so we can measure how long people
+  // linger between micro-steps. Only the FIRST hit of a step counts (a session
+  // that bounces back and re-views a step shouldn't restart the clock).
+  const stepTs = {}; // step -> Map(session_id -> earliest ms)
   for (const row of (Array.isArray(funnelRows) ? funnelRows : [])) {
-    (sess[row.step] = sess[row.step] || new Set()).add(row.session_id || "");
+    const sid = row.session_id || "";
+    (sess[row.step] = sess[row.step] || new Set()).add(sid);
+    const ts = row.created_at ? Date.parse(row.created_at) : NaN;
+    if (!Number.isNaN(ts)) {
+      const m = (stepTs[row.step] = stepTs[row.step] || new Map());
+      if (!m.has(sid) || ts < m.get(sid)) m.set(sid, ts);
+    }
     if (row.step === "page_view") {
       const u = row.utm || {};
       if (u.fbclid || /fb|ig|meta|facebook|instagram/i.test(String(u.source || ""))) adVisitors.add(row.session_id || "");
     }
   }
+  // Median seconds to advance from one step to the next, over sessions that hit
+  // both. Median (not mean) resists idle/abandoned tabs skewing the number.
+  // Guarded: needs >= 2 sessions (need at least two points for a median; the
+  // chip's tooltip discloses the sample size so a thin sample reads as tentative).
+  const MM_TIME_MIN_N = 2;
+  const _medianAdvanceS = (fromStep, toStep) => {
+    const a = stepTs[fromStep], b = stepTs[toStep];
+    if (!a || !b) return null;
+    const deltas = [];
+    for (const [sid, t0] of a) {
+      const t1 = b.get(sid);
+      if (t1 != null && t1 >= t0) deltas.push((t1 - t0) / 1000);
+    }
+    if (deltas.length < MM_TIME_MIN_N) return null;
+    deltas.sort((x, y) => x - y);
+    const mid = Math.floor(deltas.length / 2);
+    const med = deltas.length % 2 ? deltas[mid] : (deltas[mid - 1] + deltas[mid]) / 2;
+    return { median_s: Math.round(med), n: deltas.length };
+  };
   const nSess = (step) => (sess[step] ? sess[step].size : 0);
   const visitors = nSess("page_view");
   const formStarted = nSess("form_started");
@@ -3687,6 +3716,14 @@ async function handleMetaMachine(req, res) {
       lpv_comparable: lpvComparable,         // Meta landing-page-views, same day window
       link_clicks: win.clicks, landing_page_views: win.lpv,   // full-window Meta totals
       visitors, ad_visitors: adVisitors.size, form_started: formStarted, saw_calendar: sawCalendar, booked_sessions: bookedSessions,
+      // median seconds to move between the beacon-tracked micro-steps (null when
+      // the sample is too thin). No timing for clicked->loaded: Meta gives no
+      // per-session click/page-load timestamps.
+      step_times: {
+        loaded_to_form: _medianAdvanceS("page_view", "form_started"),
+        form_to_calendar: _medianAdvanceS("form_started", "calendar_viewed"),
+        calendar_to_booked: _medianAdvanceS("calendar_viewed", "confirmed"),
+      },
       visitors_to_form_pct: pct(formStarted, visitors),
       clicks_to_leads_pct: clicksToLeadsPct,
       band: mmPctBand(clicksToLeadsPct, MM_C2L_GREEN, MM_C2L_GOLD),
