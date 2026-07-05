@@ -43752,20 +43752,20 @@ function toggleTheme() {
   .v2req-chev { transition:transform .18s ease; }
   .v2req-drop.is-open .v2req-chev { transform:rotate(180deg); }
   .v2req-panel { border:1px solid var(--line); border-top:none; border-radius:0 0 12px 12px; padding:16px; }
-  .v2req-nudge { display:flex; align-items:center; gap:7px; margin-top:12px; padding:0 2px; background:none; border:none; font-family:var(--mm-ff); font-size:12px; color:var(--text-mute); }
+  .v2req-nudge { display:flex; align-items:center; gap:7px; margin-top:2px; padding:0 2px; background:none; border:none; font-family:var(--mm-ff); font-size:12px; color:var(--text-mute); }
   .v2req-nudge b { color:var(--text-sub); font-weight:700; }
   .v2req-nudge svg { flex:0 0 auto; width:14px; height:14px; color:var(--text-mute); opacity:0.8; }
   /* funnel stage flow - connected chevron boxes (own line, centered) */
-  .v2req-flow { display:flex; justify-content:center; gap:3px; margin:2px 0 14px; }
-  .v2req-phase { position:relative; display:inline-flex; align-items:center; gap:8px; font-family:var(--mm-ff); font-size:13px; font-weight:700; color:var(--text-sub); background:var(--surface-el); border:none; cursor:pointer; height:40px; padding:0 20px 0 30px; clip-path:polygon(0 0, calc(100% - 13px) 0, 100% 50%, calc(100% - 13px) 100%, 0 100%, 13px 50%); transition:background .12s,color .12s; }
-  .v2req-phase.is-first { padding-left:20px; clip-path:polygon(0 0, calc(100% - 13px) 0, 100% 50%, calc(100% - 13px) 100%, 0 100%); }
-  .v2req-phase.is-last { padding-right:22px; clip-path:polygon(0 0, 100% 0, 100% 100%, 0 100%, 13px 50%); }
-  .v2req-phase.is-first.is-last { clip-path:none; border-radius:8px; padding:0 20px; }
+  .v2req-flow { display:flex; gap:3px; width:100%; margin:0 0 10px; }
+  .v2req-phase { flex:1; min-width:0; position:relative; display:inline-flex; align-items:center; justify-content:center; gap:7px; font-family:var(--mm-ff); font-size:12px; font-weight:700; color:var(--text-sub); background:var(--surface-el); border:none; cursor:pointer; height:34px; padding:0 14px; clip-path:polygon(0 0, calc(100% - 12px) 0, 100% 50%, calc(100% - 12px) 100%, 0 100%, 12px 50%); transition:background .12s,color .12s; }
+  .v2req-phase.is-first { clip-path:polygon(0 0, calc(100% - 12px) 0, 100% 50%, calc(100% - 12px) 100%, 0 100%); }
+  .v2req-phase.is-last { clip-path:polygon(0 0, 100% 0, 100% 100%, 0 100%, 12px 50%); }
+  .v2req-phase.is-first.is-last { clip-path:none; border-radius:8px; }
   .v2req-phase.is-on { background:var(--gold); color:#0B0B0D; }
-  .v2req-phase-num { display:inline-flex; align-items:center; justify-content:center; width:22px; height:22px; border-radius:50%; background:rgba(0,0,0,0.08); font-family:var(--mm-fm); font-size:12px; }
+  .v2req-phase-num { flex:0 0 auto; display:inline-flex; align-items:center; justify-content:center; width:20px; height:20px; border-radius:50%; background:rgba(0,0,0,0.08); font-family:var(--mm-fm); font-size:11px; }
   .v2req-phase.is-on .v2req-phase-num { background:rgba(0,0,0,0.16); }
   /* device tab + frame */
-  .v2req-body { display:grid; grid-template-columns:2.6fr 1fr; gap:16px; margin-top:8px; align-items:start; }
+  .v2req-body { display:grid; grid-template-columns:2.6fr 1fr; gap:16px; margin-top:16px; align-items:start; }
   .v2req-stagecol { min-width:0; text-align:center; }
   .v2req-devtab { display:inline-flex; gap:3px; background:#26262b; border-radius:10px 10px 0 0; padding:4px 4px 0; position:relative; z-index:2; margin-bottom:-2px; }
   .v2req-devbtn { display:inline-flex; align-items:center; gap:6px; font-family:var(--mm-ff); font-size:12px; font-weight:700; color:rgba(255,255,255,.55); background:none; border:none; border-radius:6px 6px 0 0; padding:6px 13px; cursor:pointer; transition:background .12s,color .12s; }
