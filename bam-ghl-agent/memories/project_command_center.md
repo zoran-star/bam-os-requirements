@@ -47,6 +47,11 @@
 - Light theme v1.4: prototype cream #F8F7F5, neutral borders, prototype grays (was #EFEAE0, read too yellow). Mirrored in tokens.css.
 - **Radar/ticker spans the whole flow**: `.hm-ticker-bg` reparented to #view-cc with `.cc-full` (fixed, 100vw/100vh, z0; cc-content z1). Reparent avoids transformed-ancestor breakage from section recede.
 
+## Charcoal + sound pass (2026-07-05, Cole picks)
+- **Dark = true charcoal (design-system v1.5)**: global hex swap #131416 bg/ink/on-gold, #1B1D1F surface, #232629 elevated, #2B2E32 hover. Mirrored in tokens.css. Light stays prototype cream (v1.4).
+- **Win card loading state**: pulsing green dot + typed "READING THE BOARD..." label (`_hv2BootType`) + `cc-skel2` shimmer bars (defined in _hv2Style so classic home gets it too); `_hv2WinLoad` replaces when data lands.
+- **Sound design** (all Cole's picks except confirm-tone): new _SFX methods tick/whooshOut/sent/typeTap/thud/rollClick/sparkle/zip/boot + reused whoosh/kaching/fanfare/chime. Wired: rail lock tick, focus in/out whooshes, revenue-win kaching (once/session), orb pop, quick-reply sent, HUD type taps, red-items thud vs milestone fanfare (once/session), count-up roll clicks (700ms throttle), unread-member chime (once/session), perfect-day sparkle, scrub zip (70ms throttle, pitch=position), CC boot chord. `_SFX._isMuted()` now returns true on <=768px (all portal sounds off on mobile) + "Sounds: on/off" toggle in the dock Settings popover (hm_sfx_muted).
+
 ## Section mounts (current skeleton)
 | Section | Mount | Content |
 |---|---|---|

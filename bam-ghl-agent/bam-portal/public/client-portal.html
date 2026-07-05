@@ -6,7 +6,7 @@
 <title>FullControl</title>
 <!-- ── PWA: installable app (Add to Home Screen) ── -->
 <link rel="manifest" href="/manifest.webmanifest">
-<meta name="theme-color" content="#16140F">
+<meta name="theme-color" content="#131416">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black">
@@ -75,13 +75,13 @@
     interpolate-size: allow-keywords;
 
     /* Surfaces - warm dark, layered */
-    --bg:           #16140F;
-    --ink:          #16140F;
-    --surface:      #1A1916;
-    --surface-el:   #222120;
-    --surface-hov:  #2C2B28;
-    --surface-alt:  #1A1916;
-    --surface-3:    #2C2B28;
+    --bg:           #131416;
+    --ink:          #131416;
+    --surface:      #1B1D1F;
+    --surface-el:   #232629;
+    --surface-hov:  #2B2E32;
+    --surface-alt:  #1B1D1F;
+    --surface-3:    #2B2E32;
 
     /* Borders */
     --line:         rgba(255,255,255,0.08);
@@ -158,7 +158,7 @@
     /* V2 design-system tokens (see bam-portal/design-system/DESIGN.md) */
     --font-ui: "Plus Jakarta Sans", -apple-system, system-ui, sans-serif;
     --font-num:"Nunito", sans-serif;
-    --on-gold: #16140F;   /* text on gold fills - constant across themes */
+    --on-gold: #131416;   /* text on gold fills - constant across themes */
   }
 
   html, body {
@@ -1759,7 +1759,7 @@
     font-weight: 600;
     cursor: pointer;
   }
-  .asset-modal-dl { background: var(--gold); color: #16140F; border: 1px solid var(--gold); }
+  .asset-modal-dl { background: var(--gold); color: #131416; border: 1px solid var(--gold); }
   .asset-modal-dl:disabled { opacity: 0.6; }
   .asset-modal-x { background: transparent; color: var(--text-sub); border: 1px solid var(--line); }
 
@@ -2493,7 +2493,7 @@
   .pm-filter.active {
     background: var(--gold);
     border-color: var(--gold);
-    color: #16140F;
+    color: #131416;
   }
 
   .pm-assigned-filter {
@@ -2524,7 +2524,7 @@
     height: 18px;
     border-radius: 999px;
     background: var(--gold);
-    color: #16140F;
+    color: #131416;
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -2593,7 +2593,7 @@
   .pm-action.primary {
     background: var(--gold);
     border-color: var(--gold);
-    color: #16140F;
+    color: #131416;
   }
   .pm-action[disabled] { opacity: 0.45; cursor: not-allowed; transform: none; }
 
@@ -2689,7 +2689,7 @@
   #msg-jump-pill {
     position: absolute; left: 50%; transform: translateX(-50%);
     bottom: 88px; z-index: 5; display: none; align-items: center; gap: 6px;
-    background: var(--gold, #D4B65C); color: #16140F; border: none; cursor: pointer;
+    background: var(--gold, #D4B65C); color: #131416; border: none; cursor: pointer;
     font-family: inherit; font-size: 12px; font-weight: 600; padding: 8px 14px;
     border-radius: 999px; box-shadow: 0 6px 18px rgba(0,0,0,0.35);
   }
@@ -2747,10 +2747,10 @@
   /* Outgoing = filled gold "you" bubble (iMessage-style), dark text. */
   .msg-row.outgoing .msg-bubble {
     background: var(--gold, #D4B65C);
-    color: #16140F;
+    color: #131416;
     border: none;
   }
-  .msg-row.outgoing .msg-bubble a { color: #16140F; }
+  .msg-row.outgoing .msg-bubble a { color: #131416; }
 
   /* Connected-group corners: flatten the side that touches the next bubble in
      a group so a run of messages reads as one stack. */
@@ -4475,7 +4475,7 @@
 
 <!-- Boot splash - shown instantly on load, hidden by boot() once the auth
      check resolves, so the login screen never flashes for a signed-in user. -->
-<div id="boot-splash" style="position:fixed;inset:0;z-index:10001;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:22px;background:#16140F">
+<div id="boot-splash" style="position:fixed;inset:0;z-index:10001;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:22px;background:#131416">
   <svg class="boot-splash-icon" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
     <defs>
       <linearGradient id="boot-gold" x1="0" y1="0" x2="1" y2="1">
@@ -6545,7 +6545,7 @@
       #view-home .my-avatar img { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; }
       #view-home .my-avatar-cam {
         position: absolute; right: -4px; bottom: -4px; width: 22px; height: 22px; border-radius: 50%;
-        background: var(--gold, #D4B65C); color: #16140F; display: flex; align-items: center; justify-content: center;
+        background: var(--gold, #D4B65C); color: #131416; display: flex; align-items: center; justify-content: center;
         border: 2px solid var(--surface, #0F0E0C); z-index: 2;
       }
       #view-home .my-avatar-cam svg { width: 11px; height: 11px; }
@@ -8527,7 +8527,7 @@ Then the call to action."]</div>
       #view-pipelines .pl-card-tag { font-size:9px; text-transform:uppercase; letter-spacing:0.06em; color:var(--text-mute); margin-right:5px; }
       .tagcfg-bar { display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:16px; padding:10px 14px; background:var(--surface, rgba(255,255,255,0.03)); border:1px solid var(--border); border-radius:10px; }
       .tagcfg-label { font-size:11px; text-transform:uppercase; letter-spacing:0.06em; color:var(--text-mute); font-weight:700; }
-      .tagcfg-select { background:var(--surface-el, #222120); color:var(--text); border:1px solid var(--border); border-radius:7px; padding:7px 10px; font-size:13px; font-family:inherit; max-width:280px; }
+      .tagcfg-select { background:var(--surface-el, #232629); color:var(--text); border:1px solid var(--border); border-radius:7px; padding:7px 10px; font-size:13px; font-family:inherit; max-width:280px; }
       .tagcfg-hint { font-size:11px; color:var(--text-mute); }
       #view-pipelines .pl-card-coach { font-size:12px; color:var(--text-sub, var(--text-mute)); margin-top:4px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
       #view-pipelines .pl-card-trial { font-size:11px; color:var(--accent); font-weight:600; margin-top:5px; }
@@ -9397,7 +9397,7 @@ Then the call to action."]</div>
       #view-resources .rb-check .rb-box {
         width: 18px; height: 18px; border-radius: 5px; flex-shrink: 0; margin-top: 1px;
         border: 1.5px solid var(--border-str); display: flex; align-items: center;
-        justify-content: center; color: #16140F; font-size: 12px; transition: all .15s;
+        justify-content: center; color: #131416; font-size: 12px; transition: all .15s;
       }
       #view-resources .rb-check.done .rb-box { background: var(--accent); border-color: var(--accent); }
       #view-resources .rb-check.done { color: var(--text-mute); text-decoration: line-through; }
@@ -15056,6 +15056,9 @@ function _hv2Style() {
     // small-caps gold labels, gentle rise-in.
     '#home-v2 .hv2-lab{display:flex;align-items:center;gap:7px;font-family:var(--ff);font-size:15px;font-weight:700;letter-spacing:normal;text-transform:none;color:var(--gold,#D4B65C)}' +
     '#home-v2 .hv2-lab svg{width:13px;height:13px;stroke:currentColor;stroke-width:2;fill:none;stroke-linecap:round;stroke-linejoin:round}' +
+    // win-card loading: pulsing dot + typed boot label + shimmer skeletons
+    '#home-v2 .hm-boot-dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--green);margin-right:7px;animation:hmBreathe 1.6s ease-in-out infinite;vertical-align:1px}' +
+    '#home-v2 .cc-skel2{display:inline-block;border-radius:6px;background:linear-gradient(90deg,var(--surface-el) 25%,var(--surface-hov) 50%,var(--surface-el) 75%);background-size:200% 100%;animation:hmShimmer 1.4s ease-in-out infinite;color:transparent;user-select:none}' +
     // Hero row: daily win + Hawkeye
     '#home-v2 .hv2-hero{display:grid;grid-template-columns:1fr;gap:12px;margin:0 0 4px}' +
     '@media(min-width:760px){#home-v2 .hv2-hero{grid-template-columns:1fr 1fr}}' +
@@ -15415,9 +15418,9 @@ function renderHomeV2() {
           <div class="hv2-hi" id="hv2-win">
             <div class="hv2-hi-ic">${_HV2_ICONS.check}</div>
             <div style="min-width:0">
-              <div class="hv2-lab" style="color:var(--green)" id="hv2-win-lab">Daily win</div>
-              <div class="hv2-hi-v" id="hv2-win-v">&nbsp;</div>
-              <div class="hv2-hi-c" id="hv2-win-c"></div>
+              <div class="hv2-lab" style="color:var(--green)" id="hv2-win-lab"><span class="hm-boot-dot"></span><span id="hv2-win-boot"></span></div>
+              <div class="hv2-hi-v" id="hv2-win-v"><span class="cc-skel2" style="min-width:220px">--</span></div>
+              <div class="hv2-hi-c" id="hv2-win-c"><span class="cc-skel2" style="min-width:150px;font-size:11px">--</span></div>
             </div>
           </div>
         </div>
@@ -15504,7 +15507,21 @@ async function _hv2Kpi(section, since, until) {
     return (r.ok && j && !j.error) ? j : null;
   } catch (_) { return null; }
 }
+function _hv2BootType() {
+  const el = document.getElementById('hv2-win-boot');
+  if (!el || el.textContent) return;
+  const t = 'READING THE BOARD...';
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) { el.textContent = t; return; }
+  let i = 0;
+  (function step() {
+    if (!el.isConnected) return;
+    i++;
+    el.textContent = t.slice(0, i);
+    if (i < t.length) setTimeout(step, 26);
+  })();
+}
 async function _hv2WinLoad() {
+  _hv2BootType();
   const now = new Date(), today = _hv2Ymd(now);
   const yd = new Date(now); yd.setDate(yd.getDate() - 1); const yday = _hv2Ymd(yd);
   const [mk, rev] = await Promise.all([_hv2Kpi('marketing', today, today), _hv2Kpi('revenue', yday, yday)]);
@@ -15526,6 +15543,7 @@ async function _hv2WinLoad() {
   if (win) {
     if (lab) lab.textContent = 'Daily win';
     v.textContent = win.v;
+    if (win.v.charAt(0) === '$' && !window._sfxKachinged) { window._sfxKachinged = true; try { _SFX.kaching(); } catch (_) {} }
     if (c) c.textContent = win.c;
   } else {
     // No strong win: rotate the day's pick from a pool of modest activity
@@ -16361,6 +16379,10 @@ function _hmCountUp(el, target, prefix, duration) {
   const dur = duration || 900;
   const start = performance.now();
   el.classList.add('hm-countup');
+  if (!window._sfxRollT || Date.now() - window._sfxRollT > 700) {
+    window._sfxRollT = Date.now();
+    try { for (let k = 0; k < 4; k++) _SFX.rollClick(k * 0.12); } catch (_) {}
+  }
   function tick(now) {
     const p = Math.min((now - start) / dur, 1);
     const ease = 1 - Math.pow(1 - p, 3); // ease-out cubic
@@ -16562,6 +16584,8 @@ const _SFX = {
   },
   _isMuted() {
     if (this._muted) return true;
+    // sounds default OFF on phones - taps there should stay silent
+    if (window.matchMedia && window.matchMedia('(max-width: 768px)').matches) return true;
     try { return localStorage.getItem('hm_sfx_muted') === '1'; } catch (_) { return false; }
   },
   toggleMute() {
@@ -16622,6 +16646,35 @@ const _SFX = {
   pop() {
     this._tone(600, 0.06, 'sine', 0.12, 0);
     this._tone(900, 0.10, 'sine', 0.08, 0.04);
+  },
+  // ── command center set ──
+  tick() { this._tone(1300, 0.045, 'sine', 0.05, 0); },
+  whooshOut() {
+    this._noise(0.18, 0.05, 0);
+    this._tone(520, 0.16, 'sine', 0.06, 0);
+    this._tone(330, 0.2, 'sine', 0.05, 0.08);
+  },
+  sent() {
+    this._tone(880, 0.07, 'sine', 0.1, 0);
+    this._tone(1397, 0.14, 'sine', 0.08, 0.06);
+  },
+  typeTap() { this._tone(2600, 0.015, 'square', 0.015, 0); },
+  thud() {
+    this._tone(110, 0.22, 'sine', 0.14, 0);
+    this._tone(75, 0.25, 'sine', 0.1, 0.02);
+  },
+  rollClick(delay) { this._tone(1900, 0.02, 'sine', 0.03, delay || 0); },
+  sparkle() {
+    this._tone(1046, 0.09, 'sine', 0.07, 0);
+    this._tone(1318, 0.09, 'sine', 0.07, 0.07);
+    this._tone(1568, 0.2, 'sine', 0.08, 0.14);
+  },
+  zip(p) { this._tone(400 + 900 * (p || 0), 0.03, 'sine', 0.03, 0); },
+  boot() {
+    this._tone(392, 0.5, 'sine', 0.05, 0);
+    this._tone(523, 0.5, 'sine', 0.05, 0.04);
+    this._tone(659, 0.6, 'sine', 0.06, 0.08);
+    this._tone(784, 0.7, 'sine', 0.05, 0.12);
   },
   // 6. Low pulse - urgency (overdue item)
   pulse() {
@@ -16756,6 +16809,7 @@ function _hmCheckPerfectDay(actionCount, hawkTotal) {
   if (greeting) {
     greeting.insertAdjacentHTML('afterend',
       `<span class="hm-perfect-day"><svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" stroke="none"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26"/></svg> Perfect day <span class="hm-perfect-day-count">${count} this month</span><span class="hm-perfect-tip"><div class="hm-perfect-tip-h">0 overdue items, 0 pending approvals</div><div class="hm-perfect-tip-b">You've had ${count} perfect day${count === 1 ? '' : 's'} this month. Keep it up!</div></span></span>`);
+  if (!window._sfxPdPlayed) { window._sfxPdPlayed = true; try { _SFX.sparkle(); } catch (_) {} }
   }
 }
 
@@ -32844,7 +32898,7 @@ function _sorterRenderStep1(host) {
     // create path. Creating a new price auto-demotes the old LIVE to legacy.
     const createBtn = (liveChips.length && !drifted) ? '' :
       `<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;">
-        <button onclick="_sorterSearchExisting('${escapeHTML(t.key)}')" style="font-size:11.5px;font-weight:700;padding:5px 10px;border-radius:7px;border:1px solid var(--border,#2a2a31);background:var(--surface-el,#222120);color:var(--text,#eee);cursor:pointer;">🔎 Match an existing Stripe price</button>
+        <button onclick="_sorterSearchExisting('${escapeHTML(t.key)}')" style="font-size:11.5px;font-weight:700;padding:5px 10px;border-radius:7px;border:1px solid var(--border,#2a2a31);background:var(--surface-el,#232629);color:var(--text,#eee);cursor:pointer;">🔎 Match an existing Stripe price</button>
         <button onclick="_sorterProposeMissing('${escapeHTML(t.key)}')" style="font-size:11.5px;font-weight:700;padding:5px 10px;border-radius:7px;border:1px solid var(--accent,#D4B65C);background:rgba(212,182,92,0.12);color:var(--accent,#D4B65C);cursor:pointer;">✨ Create ${drifted ? 'the updated price' : 'a new price'}</button>
       </div>`;
     const driftHint = drifted
@@ -43551,6 +43605,7 @@ function openCommandCenter() {
   if (!window._CC_MOUNTED) {
     window._CC_MOUNTED = true;
     _ccBuildChrome();
+    try { _SFX.boot(); } catch (_) {}
     for (const s of _ccSections()) {
       const host = document.getElementById('cc-sec-' + s.key);
       try { s.mount(host); } catch (e) { console.error('[cc] mount failed:', s.key, e); }
@@ -43654,6 +43709,7 @@ function _ccOrbToggle(force) {
   if (!dock) return;
   const open = force !== undefined ? force : !dock.classList.contains('open');
   dock.classList.toggle('open', open);
+  if (open) { try { _SFX.pop(); } catch (_) {} }
   if (!open) document.getElementById('cc-dock-pop')?.classList.remove('open');
 }
 
@@ -43686,6 +43742,10 @@ function _ccRailFx(rail) {
     const rr = rail.getBoundingClientRect();
     const p = Math.min(1, Math.max(0, (e.clientY - rr.top) / rr.height));
     main.scrollTop = p * (main.scrollHeight - main.clientHeight);
+    if (!window._sfxZipT || performance.now() - window._sfxZipT > 70) {
+      window._sfxZipT = performance.now();
+      try { _SFX.zip(p); } catch (_) {}
+    }
   });
   window.addEventListener('pointerup', () => {
     if (scrubbing && moved >= 5) {
@@ -43702,6 +43762,7 @@ function _ccRailFx(rail) {
 function _ccFocusHud(modalId) {
   const card = document.querySelector('#' + modalId + ' .mm-modal-card');
   if (!card) return;
+  try { _SFX.whoosh(); } catch (_) {}
   let hud = card.querySelector('.cc-hud');
   if (!hud) {
     hud = document.createElement('div');
@@ -43726,6 +43787,7 @@ function _ccHudType(hud, text) {
   hud._typeT = setInterval(() => {
     i++;
     span.textContent = text.slice(0, i);
+    if (i % 3 === 0) { try { _SFX.typeTap(); } catch (_) {} }
     if (i >= text.length) clearInterval(hud._typeT);
   }, 16);
 }
@@ -43851,6 +43913,7 @@ function _ccDockPop(kind) {
   pop.dataset.kind = kind;
   pop.innerHTML = kind === 'settings'
     ? `<button type="button" class="cc-pop-item" onclick="toggleTheme()">Toggle light / dark</button>` +
+      `<button type="button" class="cc-pop-item" onclick="this.textContent='Sounds: ' + (_SFX.toggleMute() ? 'off' : 'on')">Sounds: ${_SFX._isMuted() ? 'off' : 'on'}</button>` +
       `<button type="button" class="cc-pop-item" onclick="_ccExitBeta()">Exit command center beta</button>` +
       `<button type="button" class="cc-pop-item" onclick="signOut()">Sign out</button>`
     : `<button type="button" class="cc-pop-item" onclick="document.getElementById('cc-dock-pop').classList.remove('open');startOnboardingTour()">Take the tour</button>` +
@@ -43918,6 +43981,7 @@ function _ccInitRecede(root, secs) {
         const on = d.id === 'cc-dot-' + actKey;
         if (on && !d.classList.contains('on')) {
           d.classList.add('tick', 'flash');
+          try { _SFX.tick(); } catch (_) {}
           setTimeout(() => d.classList.remove('tick'), 400);
           clearTimeout(d._flashT);
           d._flashT = setTimeout(() => d.classList.remove('flash'), 1700);
@@ -44112,6 +44176,10 @@ async function _ccLoadMemberMsgs() {
     mine.sort((a, b) => (b.unreadCount > 0) - (a.unreadCount > 0));
     const rows = mine.slice(0, 4);
     if (!rows.length) { body.innerHTML = '<div class="cc-mem-good">' + '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>' + 'Inbox clear. Every parent answered.</div>'; return; }
+    if (rows.some(c => c.unreadCount > 0) && !window._sfxMsgPlayed) {
+      window._sfxMsgPlayed = true;
+      try { _SFX.chime(); } catch (_) {}
+    }
     body.innerHTML = rows.map(c => _ccIbRow(c)).join('') +
       `<button type="button" class="cc-mem-more" onclick="switchView('v15inbox')">Open member inbox</button>`;
   } catch (_) {
@@ -44158,6 +44226,7 @@ async function _ccQuickSend(inp, contactId) {
     });
     const j = await _safeJson(r);
     if (!r.ok) throw new Error((j && j.error) || 'send failed');
+    try { _SFX.sent(); } catch (_) {}
     box.innerHTML = '<div class="cc-mem-good" style="padding:4px 0">' + '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>' + 'Sent.</div>';
     setTimeout(() => box.remove(), 2200);
   } catch (_) {
@@ -44197,6 +44266,13 @@ async function _ccLoadMemberActions() {
         break;
       }
     }
+  }
+  if (items.length && !window._sfxActsPlayed) {
+    window._sfxActsPlayed = true;
+    try {
+      if (items.some(i => i.cls === 'red')) _SFX.thud();
+      else if (items.some(i => i.cls === 'gold')) _SFX.fanfare();
+    } catch (_) {}
   }
   _ccSetBadge('members', alerts);
   if (!items.length) {
@@ -45553,6 +45629,7 @@ function _mmOpenFocus(modalId, panelSel) {
 }
 function _mmCloseFocus(modalId) {
   const modal = document.getElementById(modalId);
+  try { if (typeof _SFX !== 'undefined' && document.documentElement.classList.contains('mm-focus-open')) _SFX.whooshOut(); } catch (_) {}
   document.documentElement.classList.remove('mm-focus-open');
   if (modal) {
     modal.classList.remove('mm-open');
@@ -46205,7 +46282,7 @@ window.addEventListener('message', (e) => {
   // env(safe-area-inset-top) reads 0 in this WebView, so the CSS padding has
   // nothing to add and the sticky header tucks under the clock. Fix at the
   // native layer: tell the status bar NOT to overlay the webview, so the web
-  // content sits *below* it. The configured ink background (#16140F) fills the
+  // content sits *below* it. The configured ink background (#131416) fills the
   // bar, so it stays seamless. Uses the already-installed @capacitor/status-bar
   // plugin → no rebuild, takes effect on the next app load.
   function fixNativeStatusBar() {
@@ -46215,7 +46292,7 @@ window.addEventListener('message', (e) => {
       var SB = Cap.Plugins && Cap.Plugins.StatusBar;
       if (!SB) return;
       if (SB.setOverlaysWebView) SB.setOverlaysWebView({ overlay: false });
-      if (SB.setBackgroundColor) SB.setBackgroundColor({ color: '#16140F' });
+      if (SB.setBackgroundColor) SB.setBackgroundColor({ color: '#131416' });
     } catch (e) { /* cosmetic - never throw */ }
   }
 
