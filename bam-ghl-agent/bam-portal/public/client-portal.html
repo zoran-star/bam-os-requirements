@@ -3685,7 +3685,13 @@
   .mm-modal-card { max-width: 760px; width: calc(100% - 32px); max-height: 88vh; overflow-y: auto; }
   .mm-focus-page {
     position: fixed; inset: 0; z-index: 1000; overflow-y: auto;
-    background: var(--bg); justify-content: center; align-items: flex-start;
+    /* blueprint grid: faint graph paper + gold intersection dots */
+    background:
+      radial-gradient(circle, var(--accent-border) 1px, transparent 1.5px) 0 0/220px 220px,
+      linear-gradient(var(--border) 1px, transparent 1px) 0 0/44px 44px,
+      linear-gradient(90deg, var(--border) 1px, transparent 1px) 0 0/44px 44px,
+      var(--bg);
+    justify-content: center; align-items: flex-start;
     transform: translateX(100vw);
     transition: transform .55s cubic-bezier(0.16, 1, 0.3, 1);
   }
@@ -3712,8 +3718,10 @@
   html.mm-prewarm .mm-focus-page { will-change: transform; }
   html.mm-focus-open .main, html.mm-focus-open .sidebar { transform: translateX(-50vw) scale(.965); filter: blur(5px); }
   .mm-focus-page.mm-open { transform: translateX(0); }
-  /* landing: the gold seam glints once as the page docks */
-  .mm-focus-page.mm-open::before { animation: mmSeamGlint .7s ease .3s both; }
+  /* landing: the seam draws itself upward like a rising chart, then glints */
+  .mm-focus-page::before { transform-origin: bottom; }
+  .mm-focus-page.mm-open::before { animation: mmSeamGrow .5s cubic-bezier(0.16, 1, 0.3, 1) .12s both, mmSeamGlint .7s ease .5s both; }
+  @keyframes mmSeamGrow { from { transform: scaleY(0); } to { transform: scaleY(1); } }
   @keyframes mmSeamGlint {
     0%, 100% { box-shadow: 0 0 14px rgba(200,168,78,0.45), inset 1px 0 1px rgba(255,255,255,0.55); }
     45% { box-shadow: 0 0 30px rgba(212,182,92,0.9), inset 1px 0 1px rgba(255,255,255,0.9); }
@@ -3730,11 +3738,21 @@
   .cc-hud { display: flex; align-items: center; gap: 7px; font-family: var(--mono); font-size: 10px; font-weight: 600; letter-spacing: .18em; text-transform: uppercase; color: var(--text-mute); margin: 2px 0 10px; }
   .cc-hud-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--gold); animation: ccHudPulse 2s ease-in-out infinite; }
   @keyframes ccHudPulse { 0%, 100% { opacity: 1; } 50% { opacity: .35; } }
+  /* data wallpaper: the academy's own growth curve, huge and faint */
+  .cc-wall { position: fixed; inset: 0; pointer-events: none; z-index: 0; }
+  .cc-wall svg { width: 100%; height: 100%; }
+  .cc-wall-area { fill: var(--gold); opacity: 0; transition: opacity .9s ease .55s; }
+  .cc-wall.draw .cc-wall-area { opacity: .05; }
+  .cc-wall-line { fill: none; stroke: var(--gold); stroke-width: 2; opacity: .16; stroke-dasharray: 4200; stroke-dashoffset: 4200; transition: stroke-dashoffset 1.4s cubic-bezier(0.16, 1, 0.3, 1) .25s; }
+  .cc-wall.draw .cc-wall-line { stroke-dashoffset: 0; }
+  .mm-focus-page .mm-modal-card { position: relative; z-index: 1; }
   html.mm-focus-open, html.mm-focus-open body { overflow-x: hidden; }
   @media (prefers-reduced-motion: reduce) {
     .mm-focus-page, .main, .sidebar { transition: none; }
     .mm-focus-page.mm-open .mm-modal-card > *, .mm-focus-page.mm-open::before { animation: none; }
     .cc-hud-dot { animation: none; }
+    .cc-wall-line, .cc-wall-area { transition: none; }
+    .cc-wall .cc-wall-line { stroke-dashoffset: 0; }
   }
   .mm-mod-head { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 4px; }
   .mm-back-btn {
@@ -43624,19 +43642,73 @@ function _ccRailFx(rail) {
   });
 }
 
-// HUD readout: a mono telemetry line at the top of a focus page. Cheap,
-// idempotent, and label comes from the modal id.
+// HUD readout: a mono telemetry line at the top of a focus page. Types
+// itself in on every entry (terminal boot feel) and triggers the data
+// wallpaper. Label comes from the modal id.
 function _ccFocusHud(modalId) {
   const card = document.querySelector('#' + modalId + ' .mm-modal-card');
-  if (!card || card.querySelector('.cc-hud')) return;
+  if (!card) return;
+  let hud = card.querySelector('.cc-hud');
+  if (!hud) {
+    hud = document.createElement('div');
+    hud.className = 'cc-hud';
+    hud.innerHTML = '<span class="cc-hud-dot"></span><span class="cc-hud-txt"></span>';
+    const head = card.querySelector('.mm-mod-head');
+    if (head) card.insertBefore(hud, head); else card.prepend(hud);
+  }
   const label = modalId === 'membersMachineModal' ? 'MEMBERS'
     : modalId === 'landingMachineModal' ? 'LANDING PAGE'
     : 'MARKETING';
-  const hud = document.createElement('div');
-  hud.className = 'cc-hud';
-  hud.innerHTML = '<span class="cc-hud-dot"></span>FOCUS · ' + label + ' · LIVE';
-  const head = card.querySelector('.mm-mod-head');
-  if (head) card.insertBefore(hud, head); else card.prepend(hud);
+  _ccHudType(hud, 'FOCUS · ' + label + ' · LIVE');
+  _ccFocusWallpaper(modalId);
+}
+function _ccHudType(hud, text) {
+  const span = hud.querySelector('.cc-hud-txt');
+  if (!span) return;
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) { span.textContent = text; return; }
+  span.textContent = '';
+  let i = 0;
+  clearInterval(hud._typeT);
+  hud._typeT = setInterval(() => {
+    i++;
+    span.textContent = text.slice(0, i);
+    if (i >= text.length) clearInterval(hud._typeT);
+  }, 16);
+}
+
+// Data wallpaper: the academy's cumulative member growth over the last 12
+// months, drawn huge and faint behind the focus card. Real data from the
+// roster; skipped when the roster has not loaded.
+function _ccFocusWallpaper(modalId) {
+  const modal = document.getElementById(modalId);
+  if (!modal) return;
+  modal.querySelector('.cc-wall')?.remove();
+  const roster = (Array.isArray(window._MEMBERS_ALL) && window._MEMBERS_ALL) || [];
+  const joins = roster
+    .map(m => new Date(m.joined_date || m.start_date || m.stripe_joined_at || 0).getTime())
+    .filter(t => t > 0);
+  if (joins.length < 2) return;
+  const now = new Date();
+  const series = [];
+  for (let i = 11; i >= 0; i--) {
+    const end = new Date(now.getFullYear(), now.getMonth() - i + 1, 1).getTime();
+    series.push(joins.filter(j => j < end).length);
+  }
+  const max = Math.max(...series, 1);
+  const W = 1440, H = 900;
+  const pts = series.map((val, i) => [
+    (i / (series.length - 1)) * W,
+    H - H * 0.15 - (val / max) * H * 0.55,
+  ]);
+  const line = pts.map((p, i) => (i ? 'L' : 'M') + p[0].toFixed(0) + ' ' + p[1].toFixed(0)).join(' ');
+  const area = line + ' L ' + W + ' ' + H + ' L 0 ' + H + ' Z';
+  const el = document.createElement('div');
+  el.className = 'cc-wall';
+  el.innerHTML = '<svg viewBox="0 0 ' + W + ' ' + H + '" preserveAspectRatio="none">' +
+    '<path class="cc-wall-area" d="' + area + '"/>' +
+    '<path class="cc-wall-line" d="' + line + '"/></svg>';
+  modal.prepend(el);
+  requestAnimationFrame(() => requestAnimationFrame(() => el.classList.add('draw')));
 }
 
 // Close whichever focus page is open (Esc, swipe back).
@@ -44213,6 +44285,16 @@ async function _mmaKpis() {
     `<div class="mma-k"><div class="mma-k-v">$${Math.round(k.mrr).toLocaleString()}</div><div class="mma-k-l">MRR (approx)</div></div>` +
     `<div class="mma-k"><div class="mma-k-v">$${Math.round(k.arpu).toLocaleString()}</div><div class="mma-k-l">Rev / member</div></div>` +
     `</div><div style="font-size:11px;color:var(--text-mute);margin-top:6px">Figures are monthly equivalents from the live roster, tax inclusive.</div>`);
+  // the grid's numbers count up as they land
+  const grids = document.querySelectorAll('#mma-thread .mma-kgrid');
+  const g = grids[grids.length - 1];
+  if (g && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    g.querySelectorAll('.mma-k-v').forEach(el => {
+      const raw = el.textContent.trim();
+      const num = Number(raw.replace(/[^0-9.]/g, ''));
+      if (!isNaN(num) && num > 0) { try { _hmCountUp(el, num, raw.indexOf('$') === 0 ? '$' : '', 700); } catch (_) {} }
+    });
+  }
 }
 
 async function boot() {
