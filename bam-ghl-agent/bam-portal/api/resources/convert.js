@@ -135,7 +135,7 @@ function sanitizeBlocks(raw) {
 async function pdfToBlocks(pdfBase64) {
   const body = {
     model: ANTHROPIC_MODEL,
-    max_tokens: 4096,
+    max_tokens: 16000, // 4096 truncated detailed PDFs mid-output → empty/partial tool result
     system: SYSTEM_PROMPT,
     tools: [EMIT_TOOL],
     tool_choice: { type: "tool", name: "emit_blocks" },
@@ -161,7 +161,21 @@ async function pdfToBlocks(pdfBase64) {
   if (!r.ok) throw new Error(`Claude ${r.status}: ${(await r.text()).slice(0, 500)}`);
   const data = await r.json();
   const tool = (data.content || []).find((b) => b.type === "tool_use" && b.name === "emit_blocks");
-  return sanitizeBlocks(tool?.input?.blocks);
+  const blocks = sanitizeBlocks(tool?.input?.blocks);
+  if (!blocks.length) {
+    // 200 OK but nothing usable. Surface WHY so "no blocks" is actionable:
+    //  - max_tokens  → output truncated (raise max_tokens / smaller PDF)
+    //  - refusal     → Claude declined (unlikely, but possible)
+    //  - end_turn w/ no tool → scanned/image-only PDF with no extractable text
+    const stop = data.stop_reason || "unknown";
+    const hint =
+      stop === "max_tokens" ? "output truncated - PDF too long for one pass"
+      : stop === "refusal" ? "Claude declined this document"
+      : !tool ? "no content extracted - likely a scanned/image-only PDF"
+      : "emitted 0 usable blocks";
+    throw new Error(`Claude returned no blocks (stop_reason=${stop}: ${hint})`);
+  }
+  return blocks;
 }
 
 // Convert one resource row (must include resource_files). Returns blocks or throws.
@@ -173,8 +187,7 @@ async function convertResource(resource) {
   if (!res.ok) throw new Error(`fetch PDF ${res.status}`);
   const buf = Buffer.from(await res.arrayBuffer());
   if (buf.length > MAX_PDF_BYTES) throw new Error("PDF too large to convert");
-  const blocks = await pdfToBlocks(buf.toString("base64"));
-  if (!blocks.length) throw new Error("Claude returned no blocks");
+  const blocks = await pdfToBlocks(buf.toString("base64")); // throws a diagnostic error if empty
   await sb(`resources?id=eq.${resource.id}`, {
     method: "PATCH",
     headers: { Prefer: "return=minimal" },
