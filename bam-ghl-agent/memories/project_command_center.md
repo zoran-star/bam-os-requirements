@@ -113,6 +113,25 @@
 - Inline quick reply (`.cc-qr`) got an exit: X button + Escape.
 - **Members-only inbox popup (2026-07-06)**: "Open member inbox" on the members card opens `_ccMemberInbox()` - a body-level popup (`#cc-minbox-ov`, unscoped `.cc-minbox-*` CSS, z 9800) listing the shared GHL inbox filtered to the roster via `_ccMemberConvs(convs, roster)` (contact id match, else athlete/parent name - same logic the card preview uses, now shared). Sorted unread-first then newest; count line "N conversations · M unread"; caps at 30 rows. Rows register into `window._hmIbById` and open `_hmMsgPeek` ON TOP (peek z 9820 > 9800; member popup stays underneath). `_ccIbRow` card rows also now open the peek instead of jumping to the full inbox. "Open full inbox ›" still escapes to v15inbox.
 
+## Functionality sweep (2026-07-06, Cole: "no happy path, no dead ends")
+Full audit: static wiring script (all onclick handlers defined, all switchView targets exist as `view-*`, all `/api/*` paths resolve via files or vercel rewrites) + Playwright click-through of all 18 views (every view mounts with a real error state, breadcrumb everywhere, 0 JS errors with supabase stubbed) + 4 parallel semantic audits. 18 small fixes shipped in one pass (`cc_sweepfix.py` pattern):
+- KPIs view: Marketing section was NEVER ensured on first open (only on range change) -> stuck "Loading..." forever; `_v15kRender` now ensures it. Auth-token await in `_v15kEnsureSection` moved inside try (session-expiry no longer freezes the spinner).
+- Peek popup now REFLECTS state: rows carry `data-cid`; `_hmReflectRead(c)` clears unread class/dots + decrements the `hv2-inbox-n` pill, `_hmReflectReply(c, text)` updates row previews. Fired from `_hmMsgPeek` (after mark-read) and `_hmMsgPeekSend`.
+- v15 inbox swipe-left "Archive" fake affordance removed (see shelved doc). Swipe-right read kept (local-only, GHL has no mark-read API).
+- Calendar week: event-fetch failure now shows a red "Couldn't load this week's bookings - retry" line instead of a silent empty (bookable-looking) week (`_V15CAL.evErr`).
+- New booking: "No calendars are connected yet." replaces the misleading "Load the Calendars tab first."; picked-contact-without-ghl-id gets its own message.
+- Mass-send progress: 5 consecutive status-poll failures -> "Lost track of this send" note instead of endless silent poll.
+- Esc handling: closes peek -> member inbox popup -> KPI picker (saves via modal click) -> focus page; `_ccFocusCloseOpen` also matches a focus page still in its 80ms open beat.
+- Members card KPIs: empty roster renders 0/$0 instead of infinite `--` shimmer.
+- Sales section: `no_config` trials -> "0" + "No trial calendar connected" sub; pipeline strip gets "No sales pipeline set up yet." / "Couldn't load the pipeline." states.
+- Support tickets: Supabase load error renders a visible error in `#ticket-list-live` (was silent blank).
+- `_ccOpenClassic('systems')` resets a stale open ticket detail (closeDetail()).
+- Contacts: raw JSON-parse error message replaced with a friendly one.
+- Dead `_hv2HawkLoad()` call removed from Home (2 wasted fetches; `#hv2-hawk` host never existed).
+- Member-agent card: Pause -> `closeMembersFocus();mPause(id)` (pause modal is z 80/81, focus page is far higher - MUST close focus first), Payment link -> `mPaymentLink(id)` same pattern, Message -> `openMemberPopup(id)` (thread lives in the card). Bench copy narrowed to "Ask about a member or a number." (rule-based stub honesty). `mPauseDateFix` now toasts.
+KNOWN + ACCEPTED (not bugs): two guarded 8s intervals never cleared (sales badge + hawk count); `_mmLoad` hides the whole marketing card on API error (quiet fail by design); bulk mark-read is local-only (GHL API gap); Attendance/Fill Rate KPIs selectable but "-" (shelved); Sales 7-day/closing-rate tiles "-" (awaiting Zoran's wiring).
+BIG DECISIONS parked for Cole: mocked creative-request + landing-change submits fake success (`_mmcSubmit` 'MOCK submit' + `_v2Submit`) - wire to real marketing-tickets vs honest gate.
+
 ## Section mounts (current skeleton)
 | Section | Mount | Content |
 |---|---|---|

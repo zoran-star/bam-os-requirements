@@ -11620,6 +11620,7 @@ function _v15kRender() {
     ${kpiOn('sales')    ? `${sectionHead('Sales')}<div id="v15k-sales">${_v15kSecHtml('sales')}</div>` : ''}
     ${kpiOn('revenue')  ? `${sectionHead('Revenue')}<div id="v15k-revenue">${_v15kSecHtml('revenue')}</div>` : ''}
     ${kpiOn('members')  ? `${sectionHead('Members')}<div id="v15k-members">${_v15kSecHtml('members')}</div>` : ''}`;
+  if (kpiOn('marketing')) _v15kEnsureSection('marketing');
   if (kpiOn('sales')) _v15kEnsureSection('sales');
   if (kpiOn('revenue')) _v15kEnsureSection('revenue');
   if (kpiOn('members')) _v15kEnsureSection('members');
@@ -11686,7 +11687,13 @@ async function _v15kEnsureSection(name) {
     if (!_V15K.sec[name][pr.key]) need.push({ key: pr.key, from: pr.from, to: pr.to });
   }
   if (!need.length) { _v15kPaintSection(name); return; }
-  const token = await _mreqAuthToken();
+  let token;
+  try { token = await _mreqAuthToken(); }
+  catch (e) {
+    need.forEach(n => { _V15K.sec[name][n.key] = { error: e.message || String(e) }; });
+    _v15kPaintSection(name);
+    return;
+  }
   await Promise.all(need.map(async n => {
     try {
       const r = await fetch(`/api/kpis-v15?section=${name}&since=${encodeURIComponent(n.from)}&until=${encodeURIComponent(n.to)}&client_id=${encodeURIComponent(CLIENT_ID)}`, { headers: { Authorization: 'Bearer ' + token } });
@@ -12526,6 +12533,7 @@ function _v15calRenderGrid() {
 }
 
 async function _v15calLoadEvents() {
+  _V15CAL.evErr = false;
   const ids = [..._V15CAL.selected];
   const grid = document.getElementById('v15cal-grid');
   if (!ids.length) { _V15CAL.events = []; _v15calRenderGrid(); return; }
@@ -12536,8 +12544,12 @@ async function _v15calLoadEvents() {
     const r = await fetch(`/api/ghl/calendars-v15?action=events&client_id=${encodeURIComponent(CLIENT_ID)}&calendar_ids=${encodeURIComponent(ids.join(','))}&start=${start.getTime()}&end=${end.getTime()}`, { headers: { Authorization: 'Bearer ' + token } });
     const j = await _safeJson(r); if (!r.ok) throw new Error(j.error || ('HTTP ' + r.status));
     _V15CAL.events = j.events || [];
-  } catch (e) { _V15CAL.events = []; }
+  } catch (e) { _V15CAL.events = []; _V15CAL.evErr = true; }
   _v15calRenderGrid();
+  if (_V15CAL.evErr) {
+    const g = document.getElementById('v15cal-grid');
+    if (g) g.insertAdjacentHTML('afterbegin', `<div class="req-empty" style="padding:10px 0;color:#9a3b2f">Couldn't load this week's bookings - <button onclick="_v15calLoadEvents()" style="background:none;border:none;color:var(--gold);font:inherit;font-size:12.5px;cursor:pointer;text-decoration:underline;padding:0">retry</button></div>`);
+  }
 }
 
 // ── Drawer infra ──
@@ -12770,7 +12782,7 @@ async function _v15calSaveSettings(calId) {
 // ── New booking for an existing contact ──
 let _v15nbSearchT = null;
 function _v15calNewBooking(prefillDate, prefillTime) {
-  if (!_V15CAL.calendars.length) { alert('Load the Calendars tab first.'); return; }
+  if (!_V15CAL.calendars.length) { alert('No calendars are connected yet.'); return; }
   _V15CAL.nbContact = null;
   const calOpts = _V15CAL.calendars.map(c => `<option value="${c.id}">${escapeHTML(c.name || c.id)}</option>`).join('');
   const t = new Date(); t.setDate(t.getDate() + 1);
@@ -12821,7 +12833,8 @@ async function _v15calCreateBooking() {
   const calId = document.getElementById('v15nb-cal')?.value;
   const date = document.getElementById('v15nb-date')?.value;
   const time = document.getElementById('v15nb-time')?.value;
-  if (!ct || !ct.ghl_contact_id) { if (err) { err.textContent = 'Pick a contact first.'; err.style.display = 'block'; } return; }
+  if (!ct) { if (err) { err.textContent = 'Pick a contact first.'; err.style.display = 'block'; } return; }
+  if (!ct.ghl_contact_id) { if (err) { err.textContent = "This contact isn't linked to GoHighLevel yet, so a booking can't be created for them."; err.style.display = 'block'; } return; }
   if (!calId || !date || !time) { if (err) { err.textContent = 'Pick a calendar, date and time.'; err.style.display = 'block'; } return; }
   const btn = document.getElementById('v15nb-create'); if (btn) { btn.disabled = true; btn.textContent = 'Creating…'; }
   try {
@@ -13461,7 +13474,6 @@ function _v15ibConvRow(c, idx) {
 
   return `<div class="v15ib-conv ${unread ? 'unread' : ''}${repliedClass}${hotClass}${isActive ? ' v15ib-active' : ''}${needsReply ? ' unread' : ''}" style="${stagger}" data-conv-id="${escapeHTML(c.id)}" onclick='${_V15IB.multiSelect ? `_v15ibToggleSelect("${c.id}",event)` : `_v15ibOpenSplit(${JSON.stringify(c.id)},${JSON.stringify(c.contactId || "")},${JSON.stringify(c.phone || "")},${JSON.stringify(c.email || "")},${JSON.stringify(c.contactName || "")},${JSON.stringify(c.lastMessageType || c.channel || "")})`}'>
     <span class="v15ib-swipe-bg left">Read</span>
-    <span class="v15ib-swipe-bg right">Archive</span>
     <div class="v15ib-check${checked}" onclick="_v15ibToggleSelect('${c.id}',event)"></div>
     <div style="position:relative;flex:none">
       <div style="width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;flex:none;${_ibAvatarStyle(smart.display)}">${escapeHTML(_ibInitials(smart.display))}</div>
@@ -13851,10 +13863,6 @@ function _ibInitSwipe() {
         const convId = el.dataset.convId;
         const conv = (_V15IB.convos || []).find(c => c.id === convId);
         if (conv) { conv.unreadCount = conv.unreadCount > 0 ? 0 : 1; _v15ibRenderList(); }
-      } else if (dx < -60) {
-        // Swipe left = archive (visual feedback only for now)
-        el.style.opacity = '0.3';
-        setTimeout(() => { el.style.opacity = ''; }, 800);
       }
     });
   });
@@ -14439,8 +14447,13 @@ function _v15msProgress(jobId, total) {
       const token = await _mreqAuthToken();
       const r = await fetch('/api/mass-send?action=status&job_id=' + encodeURIComponent(jobId), { headers: { Authorization: 'Bearer ' + token } });
       const j = await _safeJson(r);
-      if (r.ok && j.job) { draw(j.job.sent || 0, j.job.failed || 0, j.job.status); if (j.job.status === 'done' || j.job.status === 'canceled') return; }
-    } catch (_) {}
+      if (r.ok && j.job) { poll._fails = 0; draw(j.job.sent || 0, j.job.failed || 0, j.job.status); if (j.job.status === 'done' || j.job.status === 'canceled') return; }
+      else poll._fails = (poll._fails || 0) + 1;
+    } catch (_) { poll._fails = (poll._fails || 0) + 1; }
+    if (poll._fails >= 5) {
+      inner.insertAdjacentHTML('beforeend', '<div style="font-size:12px;color:#9a3b2f;margin-top:8px">Lost track of this send - it keeps going in the background. Check back in a few minutes.</div>');
+      return;
+    }
     _V15MS.pollTimer = setTimeout(poll, 4000);
   };
   poll();
@@ -14497,7 +14510,8 @@ async function _contactsLoad() {
     _CONTACTS = j.contacts || [];
     _contactsRender();
   } catch (e) {
-    list.innerHTML = `<div class="req-empty" style="padding:24px 0;color:#9a3b2f">Couldn't load contacts - ${escapeHTML(e.message || String(e))}</div>`;
+    const cMsg = /unexpected token|json/i.test(String(e.message)) ? 'server unreachable, try again in a minute.' : (e.message || String(e));
+    list.innerHTML = `<div class="req-empty" style="padding:24px 0;color:#9a3b2f">Couldn't load contacts - ${escapeHTML(cMsg)}</div>`;
   }
 }
 
@@ -15731,7 +15745,6 @@ function renderHomeV2() {
 }
 function _hv2Load() {
   _hv2WinLoad();
-  _hv2HawkLoad();
   _hv2SchedLoad();
   _hv2ActsLoad();
   _hmLoadScoreboard();
@@ -16192,6 +16205,7 @@ async function _hmMsgPeek(convId, focusReply) {
       method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
       body: JSON.stringify({ conversation_id: c.id }),
     }).catch(() => {});
+    _hmReflectRead(c);
     const r = await fetch(`/api/ghl/inbox?client_id=${encodeURIComponent(CLIENT_ID)}&conversation_id=${encodeURIComponent(c.id)}`, { headers: { Authorization: 'Bearer ' + token } });
     const j = await _safeJson(r);
     if (!r.ok) throw new Error(j.error || ('HTTP ' + r.status));
@@ -16227,10 +16241,33 @@ async function _hmMsgPeekSend(convId) {
     try { _SFX.sent(); } catch (_) {}
     const box = document.getElementById('hm-peek-thread');
     if (box) { box.insertAdjacentHTML('beforeend', `<div class="hm-peek-bub out">${escapeHTML(text)}</div>`); box.scrollTop = box.scrollHeight; }
+    _hmReflectReply(c, text);
   } catch (_) {
     const box = document.getElementById('hm-peek-thread');
     if (box) box.insertAdjacentHTML('beforeend', '<div class="req-empty" style="padding:6px 0">Could not send from here. Use the full inbox.</div>');
   } finally { if (inp) inp.disabled = false; }
+}
+// Mirror a mark-read / quick reply into every visible row of this
+// conversation (home preview, members card, member inbox popup) without a
+// refetch - rows carry data-cid.
+function _hmReflectRead(c) {
+  if (!c || !(c.unreadCount > 0)) return;
+  c.unreadCount = 0;
+  document.querySelectorAll(`[data-cid="${CSS.escape(String(c.id))}"]`).forEach(row => {
+    row.classList.remove('hm-ib-unread', 'unread');
+    row.querySelectorAll('.hm-ib-dot, .cc-ib-dot, .cc-minbox-dot').forEach(d => { d.style.visibility = 'hidden'; });
+    row.style.borderLeft = '';
+  });
+  const pill = document.getElementById('hv2-inbox-n');
+  if (pill && pill._count > 0) { pill._count -= 1; pill.textContent = pill._count; if (!pill._count) pill.style.display = 'none'; }
+}
+function _hmReflectReply(c, text) {
+  if (!c) return;
+  c.lastMessageBody = text;
+  document.querySelectorAll(`[data-cid="${CSS.escape(String(c.id))}"]`).forEach(row => {
+    const prev = row.querySelector('.hm-ib-prev, .cc-ib-prev, .cc-minbox-prev');
+    if (prev) prev.textContent = text.slice(0, 70);
+  });
 }
 function _hmInboxTimeStr(msgDate) {
   const mins = Math.round((Date.now() - msgDate.getTime()) / 60000);
@@ -16253,7 +16290,7 @@ function _hmInboxRow(c, opts) {
   let urgStyle = '';
   if (unread && ageHrs > 24) urgStyle = 'border-left:3px solid #F07060;';       // overdue (unread > 24h)
   else if (unread && ageHrs <= 4) urgStyle = 'border-left:3px solid #F0B84A;';   // fresh unread
-  return `<div class="hm-ib-row${unread ? ' hm-ib-unread' : ''}" onclick="_hmMsgPeek('${escapeHTML(String(c.id))}')" style="${urgStyle}">
+  return `<div class="hm-ib-row${unread ? ' hm-ib-unread' : ''}" data-cid="${escapeHTML(String(c.id))}" onclick="_hmMsgPeek('${escapeHTML(String(c.id))}')" style="${urgStyle}">
     ${unread ? '<span class="hm-ib-dot"></span>' : '<span style="width:7px;flex:none"></span>'}
     <span class="hm-ib-av">${escapeHTML(initials)}</span>
     <div style="flex:1;min-width:0"><div class="hm-ib-name">${escapeHTML(name)}</div><div class="hm-ib-prev">${escapeHTML(preview)}</div></div>
@@ -38600,6 +38637,7 @@ async function mPauseDateFix(memberId) {
   if (!dates) return;
   try {
     await _memberAction(memberId, 'pause-date-fix', { start_date: dates.start, end_date: dates.end });
+    if (typeof _plToast === 'function') _plToast('Pause dates saved.');
     if (typeof fetchAndRenderMembers === 'function') fetchAndRenderMembers();
     if (typeof openMemberPopup === 'function') openMemberPopup(memberId);
   } catch (e) { alert('Pause date fix failed: ' + (e.message || e)); }
@@ -41288,7 +41326,12 @@ async function loadTickets() {
     .select('id,type,menu_item,fields,files,status,priority,client_action_request,user_guide,submitted_at,updated_at,messages')
     .eq('client_id', CLIENT_ID)
     .order('updated_at', { ascending: false });
-  if (error) { console.error('loadTickets:', error.message); return; }
+  if (error) {
+    console.error('loadTickets:', error.message);
+    const live = document.getElementById('ticket-list-live');
+    if (live && !live.children.length) live.innerHTML = '<div class="req-empty" style="padding:14px 0;color:#9a3b2f">Couldn\'t load your tickets - refresh to retry.</div>';
+    return;
+  }
   tickets = (data || []).map(mapTicket);
   // Awaiting-client + final-review pinned to the top (anything that
   // needs the client's attention).
@@ -44770,7 +44813,11 @@ function _ccScrollTo(key) {
 // Open a classic view from inside the flow (dock, quick buttons, stat tiles).
 function _ccOpenClassic(view) {
   window._CC_BYPASS = true;
-  try { document.body.classList.add('cc-classic'); switchView(view); _ccCrumb(view); }
+  try {
+    document.body.classList.add('cc-classic'); switchView(view);
+    if (view === 'systems') { try { closeDetail(); } catch (_) {} }
+    _ccCrumb(view);
+  }
   finally { window._CC_BYPASS = false; }
 }
 // The breadcrumb's right side reads the open view's name off its nav item.
@@ -44973,7 +45020,8 @@ function _ccFocusWallpaper(modalId, opts) {
 
 // Close whichever focus page is open (Esc, swipe back).
 function _ccFocusCloseOpen() {
-  const open = document.querySelector('.mm-focus-page.mm-open');
+  let open = document.querySelector('.mm-focus-page.mm-open');
+  if (!open) open = [...document.querySelectorAll('.mm-focus-page')].find(m => m.style.display === 'flex') || null;
   if (!open) return false;
   try {
     if (open.id === 'marketingMachineModal') closeMarketingMachine();
@@ -45033,7 +45081,13 @@ function _ccKeys() {
   if (window._ccKeysBound) return;
   window._ccKeysBound = true;
   document.addEventListener('keydown', e => {
-    if (e.key === 'Escape') _ccFocusCloseOpen();
+    if (e.key === 'Escape') {
+      if (document.getElementById('hm-peek-ov')) { _hmMsgPeekClose(); return; }
+      if (document.getElementById('cc-minbox-ov')) { _ccMemberInboxClose(); return; }
+      const kpiOv = document.getElementById('hm-kpi-modal');
+      if (kpiOv) { kpiOv.click(); return; }
+      _ccFocusCloseOpen();
+    }
   });
   document.addEventListener('keydown', e => {
     if (!_ccActive() || document.body.classList.contains('cc-classic')) return;
@@ -45243,6 +45297,10 @@ async function _ccLoadTrialsCount() {
       const n = (j.trials || []).length;
       el.textContent = String(n);
       if (!n) _ccNextTrial();
+    } else if (j && j.no_config) {
+      el.textContent = '0';
+      const sub = document.getElementById('cc-sal-next');
+      if (sub) sub.textContent = 'No trial calendar connected';
     }
   } catch (_) {}
 }
@@ -45300,8 +45358,14 @@ async function _ccSalesLoad() {
             }).join('')
           : '';
       }
+    } else {
+      const strip = document.getElementById('cc-sal-strip');
+      if (strip) strip.innerHTML = '<div class="cc-mem-empty">No sales pipeline set up yet.</div>';
     }
-  } catch (_) {}
+  } catch (_) {
+    const strip = document.getElementById('cc-sal-strip');
+    if (strip && !strip.children.length) strip.innerHTML = '<div class="cc-mem-empty">Couldn\'t load the pipeline.</div>';
+  }
   _ccSalesHawk();
 }
 function _ccSalesHawk() {
@@ -45407,7 +45471,7 @@ function _ccIbRow(c) {
   const initials = name.split(' ').map(w => w[0] || '').join('').toUpperCase().slice(0, 2);
   const preview = _hmStripEm((c.lastMessageBody || '').slice(0, 60));
   const reply = c.contactId ? `<button type="button" class="cc-ib-reply" onclick="event.stopPropagation();_ccQuickReply(this, '${String(c.contactId).replace(/[^A-Za-z0-9_-]/g, '')}')">Reply</button>` : '';
-  return `<div class="cc-ib-row${unread ? ' unread' : ''}" onclick="_hmMsgPeek('${String(c.id).replace(/[^A-Za-z0-9_-]/g, '')}')">
+  return `<div class="cc-ib-row${unread ? ' unread' : ''}" data-cid="${String(c.id).replace(/[^A-Za-z0-9_-]/g, '')}" onclick="_hmMsgPeek('${String(c.id).replace(/[^A-Za-z0-9_-]/g, '')}')">
     <span class="cc-ib-av">${escapeHTML(initials)}</span>
     <div style="flex:1;min-width:0"><div class="cc-ib-name">${escapeHTML(name)}</div><div class="cc-ib-prev">${escapeHTML(preview)}</div></div>
     ${reply}
@@ -45478,7 +45542,7 @@ function _ccMinboxRow(c) {
   const initials = name.split(' ').map(w => w[0] || '').join('').toUpperCase().slice(0, 2);
   const preview = _hmStripEm((c.lastMessageBody || '').slice(0, 70));
   const timeStr = c.lastMessageDate ? _hmInboxTimeStr(new Date(c.lastMessageDate)) : '';
-  return `<div class="cc-minbox-row${unread ? ' unread' : ''}" onclick="_hmMsgPeek('${String(c.id).replace(/[^A-Za-z0-9_-]/g, '')}')">
+  return `<div class="cc-minbox-row${unread ? ' unread' : ''}" data-cid="${String(c.id).replace(/[^A-Za-z0-9_-]/g, '')}" onclick="_hmMsgPeek('${String(c.id).replace(/[^A-Za-z0-9_-]/g, '')}')">
     <span class="cc-minbox-av">${escapeHTML(initials)}</span>
     <div style="flex:1;min-width:0"><div class="cc-minbox-name">${escapeHTML(name)}</div><div class="cc-minbox-prev">${escapeHTML(preview)}</div></div>
     <span class="cc-minbox-time">${escapeHTML(timeStr)}</span>
@@ -45689,7 +45753,11 @@ function _ccMemberKpis(roster) {
 }
 async function _ccLoadMemberKpis() {
   const roster = await _ccEnsureMembers();
-  if (!roster.length) return;
+  if (!roster.length) {
+    ['cc-mem-live', 'cc-mem-paused'].forEach(id => { const el = document.getElementById(id); if (el) el.textContent = '0'; });
+    ['cc-mem-mrr', 'cc-mem-arpu'].forEach(id => { const el = document.getElementById(id); if (el) el.textContent = '$0'; });
+    return;
+  }
   const k = _ccMemberKpis(roster);
   const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
   set('cc-mem-live', String(k.live));
@@ -45791,7 +45859,7 @@ function _mmaEnsureModal() {
               <span class="mma-orb mma-orb-lg" id="mma-orb"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></span>
               <div class="mma-bench-name">Shield</div>
               <div class="mma-bench-role">Member manager</div>
-              <div class="mma-bench-status" id="mma-status">Watching the roster. Ask me anything.</div>
+              <div class="mma-bench-status" id="mma-status">Watching the roster. Ask about a member or a number.</div>
             </div>
             <div class="mma-rail-h">Since you left</div>
             <div class="mma-shift" id="mma-shift"></div>
@@ -46072,9 +46140,9 @@ function _mmaCardHtml(m, detailed) {
   const extra = detailed
     ? `<div class="mma-card-sub">${[m.trainer ? 'Trainer: ' + escapeHTML(m.trainer) : '', m.joined_date ? 'Joined ' + escapeHTML(String(m.joined_date).slice(0, 10)) : ''].filter(Boolean).join(' · ')}</div>
        <div class="mma-card-acts">
-         <button type="button" class="mma-act" onclick="openMemberPopup('${m.id}')">Pause</button>
-         <button type="button" class="mma-act" onclick="openMemberPopup('${m.id}')">Payment link</button>
-         <button type="button" class="mma-act" onclick="switchView('v15inbox')">Message</button>
+         <button type="button" class="mma-act" onclick="closeMembersFocus();mPause('${m.id}')">Pause</button>
+         <button type="button" class="mma-act" onclick="closeMembersFocus();mPaymentLink('${m.id}')">Payment link</button>
+         <button type="button" class="mma-act" onclick="openMemberPopup('${m.id}')">Message</button>
        </div>`
     : '';
   return `<div class="mma-card">${av}<div style="min-width:0"><div class="mma-card-name">${escapeHTML(_ccCapName(m.athlete_name || 'Member'))} ${status}</div><div class="mma-card-sub">${sub}</div>${extra}</div><button type="button" class="mma-open" onclick="openMemberPopup('${m.id}')">Open card</button></div>`;
@@ -47861,7 +47929,6 @@ function _mmRenderMetaFocus(d) {
         (v.note ? '<div class="mm-cr-note ' + (v.verdict === 'replace' ? 'mm-note-replace' : 'mm-note-edit') + '">' + (v.verdict === 'replace' ? '&#8635; ' : '&#9998; ') + _escapeHtml(v.note) + '</div>' : '') +
         '<div style="display:flex;gap:8px;margin-top:10px">' +
           '<button type="button" class="mm-cbtn" onclick="event.stopPropagation();_mmcOpen(\'replace\',' + repIdx + ')">&#8635; replace</button>' +
-          '<button type="button" class="mm-cbtn mm-danger" onclick="event.stopPropagation();_mmCreativeAction(\'delete\', \'' + _escapeHtml(c.name).replace(/'/g, '') + '\')">&#10005; delete</button>' +
         '</div>' +
       '</div></div>';
   };
