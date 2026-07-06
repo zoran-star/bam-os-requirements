@@ -39,9 +39,12 @@ academies, so leads move by the academy's authored edges, not hardcoded per-agen
   interested) now calls `routeTransition` with the old `interestedStage`+`moveStage` as the
   matched:false fallback. GTA seed = went_quiet→interested, so behavior-IDENTICAL for GTA.
   Verify on prod: confirm-ghost a Responded lead → card lands in Interested (unchanged).
-- **⏭ NEXT swaps (Phase 3), one per session w/ verify between:** book (responded→scheduled_trial,
-  agent-approvals ~995) · cant_make_it/no_show (confirm→responded) · ghosted_ran_out
-  (automations ~271) · then terminals (enrolls→member, marked_unqualified, complaint→human) —
+- **Swap #2 done:** `agent-approvals.js` booking action (responded --booked--> scheduled_trial)
+  now routes through the edge, old scheduledTrialStage+moveStage as fallback. GTA seed matches;
+  `kpiTrialBooked` hook fires on either path (role stays scheduled_trial) so KPI unaffected.
+- **⏭ NEXT swaps (Phase 3), one per session w/ verify between:** cant_make_it/no_show
+  (confirm→responded, agent-confirm ~818/933) · ghosted_ran_out (automations ~271) · not_interested
+  (responded→nurture) · then terminals (enrolls→member, marked_unqualified, complaint→human) —
   each needs the router's terminal path built + verified against the caller's current close logic.
 - **Phase 4:** delete the hardcoded destination resolution once every site routes.
 
