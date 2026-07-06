@@ -1,5 +1,37 @@
 # Sales Focus Mode (V2) — design spec (locked 2026-07-05)
 
+## ▶ NEXT SESSION — START HERE (state @ 2026-07-06)
+
+**LIVE ON GTA PROD** (deployed 2026-07-06, PR #1178 → main): V2 Sales **overview**
+(KPI row + collapsed stage strip + expand/single-stage takeover) **and** **focus mode**
+(per-stage config: stacked Entry→Engine→Exit; engine reuses the real Train Agent
+renderers `_taRenderPanel`/`_taRenderAutomations` = live agents + automations). All in
+`bam-portal/public/client-portal.html`, V2-gated + additive. Verify: portal.byanymeansbusiness.com → GTA → Sales.
+
+**`stage_transitions` table LIVE** (prod migration `20260706122103`) + **GTA seeded** with
+the 20-edge Sales-Crew flow. Enums `transition_trigger`/`stage_role`/`transition_destination_kind`;
+edge-per-row (`from_stage_role, trigger, to_kind, to_stage_role|to_terminal`), client-scoped RLS,
+`seed_default_stage_transitions(client_id)`. Design: `docs/core-handoff/sales-flow.md`.
+
+**⏭ THE NEXT TASK (was mid-flight):** wire the focus-mode **Entry/Exit sections** to READ
+the real `stage_transitions` edges per stage (they're placeholder rows in `_plRenderFocus`
+right now) + make them **editable** (CRUD the edges — "fully per-academy authorable"). Entry
+points of a stage = edges where `to_stage_role`=stage; exit = edges where `from_stage_role`=stage.
+The exact per-stage entry/exit is listed below + verified live in the DB.
+
+**Then / later:** backend **router** that reads the edges to actually move leads (today still
+hardcoded `api/agent/_stage.js` + per-agent logic); the unbuilt engines (Closing agent, Lead
+Nurture automation, Resend email — see doc redesign notes). Core parity BLOCKED (fc-core-srvc
+inaccessible to `zoran-star`).
+
+**Source-of-truth doc (Figma-style):** `bam-ghl-agent/docs/sales-crew-model.html`.
+**Deploy:** push to main → Vercel auto-builds (~3 min); client-portal HTML is public so poll
+`curl portal.byanymeansbusiness.com/client-portal.html | grep _plOpenFocus` to confirm live.
+Coleman tip: Vercel "Prioritize Production Builds" toggle jumps prod ahead of preview builds.
+
+---
+
+
 Phase 2 of the V2 Sales-page restructure. Phase 1 (the Sales **overview**: KPI row +
 collapsed stage strip + expand/single-stage takeover) is already wired into
 `client-portal.html` — see [[project_client_agent_training]] for the agent side.
