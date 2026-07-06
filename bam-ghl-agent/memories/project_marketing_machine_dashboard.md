@@ -6,15 +6,18 @@ type: project
 
 # Marketing Machine dashboard - SHIPPED 2026-07-03 (V2, GTA first)
 
-## Page-load speed tracking (added 2026-07-05, branch claude/intelligent-sinoussi-a0af72)
-The Clicked -> Page loaded funnel connector shows "⚡ loads in ~1.4s" (median full
-load). Wiring:
-- **bam-client-sites** `clients/bam-gta/gta/beacon.js` (loaded in free-trial.html)
-  fires ONE `page_view` funnel-event per visit via sendBeacon, meta = { load_ms,
-  dom_ms, ttfb_ms, lcp_ms, source }. This is the FIRST real funnel-event beacon in
-  bam-client-sites (nothing else posts to /api/website/funnel-event). Skipped when
-  ?annotate=1 (portal preview). session_id in sessionStorage. Fires on load+1.5s
-  (LCP settle) and on pagehide.
+## Page-load speed tracking (MERGED to main 2026-07-06, portal PR #1176 + sites PR #54)
+The Clicked -> Page loaded funnel connector shows "⏱ ~1.4s" (median full load;
+chip matches the between-step time chips). Wiring:
+- **bam-client-sites** `clients/bam-gta/gta/freetrial.jsx`: load timing rides on
+  the EXISTING `bamFunnel('free-trial','page_view', meta)` beacon (shared.jsx) via
+  a second, post-load page_view whose meta = { load_ms, ttfb_ms, lcp_ms, source }.
+  Same `bam_sid` session as the mount page_view, so marketing.js dedupes visitors
+  and just picks up the numbers. Fires on load+1.5s (LCP settle) + pagehide.
+  NOTE: the earlier standalone `gta/beacon.js` was REMOVED - it used a different
+  session id (fc_sid) and would have double-counted page_view. bamFunnel is the
+  canonical funnel beacon (page_view/form_started/calendar_viewed/slot_picked/
+  form_completed/confirmed).
 - `source` tag = meta | internal | direct | search | referral | other (fbclid/utm
   win, else referrer host). Collected from ALL sources so load speed can be sliced.
 - **marketing.js** page_view loop reads `row.meta` (added `meta` to the select),
