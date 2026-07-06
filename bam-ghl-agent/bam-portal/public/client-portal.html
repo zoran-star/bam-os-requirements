@@ -3686,12 +3686,13 @@
   .mm-modal-card { max-width: 760px; width: calc(100% - 32px); max-height: 88vh; overflow-y: auto; }
   .mm-focus-page {
     position: fixed; inset: 0; z-index: 1000; overflow-y: auto;
-    /* pan idiom (marketing/landing): a solid lit room sliding in from the right */
+    /* zoom-through idiom (marketing/landing): the old page flies past the
+       camera and this solid lit room settles in beneath you */
     background:
       radial-gradient(120% 60% at 50% -10%, color-mix(in srgb, var(--gold) 5%, transparent), transparent 60%),
       var(--bg);
     justify-content: center; align-items: flex-start;
-    transform: translateX(100vw);
+    opacity: 0; transform: scale(.965);
     transition: transform .55s cubic-bezier(0.16, 1, 0.3, 1), opacity .55s cubic-bezier(0.16, 1, 0.3, 1);
   }
   /* depth idiom (members only): translucent room fades in over the page,
@@ -3721,9 +3722,9 @@
     will-change: transform, filter, opacity;
   }
   html.mm-prewarm .mm-focus-page { will-change: transform, opacity; }
-  html.mm-focus-open .main, html.mm-focus-open .sidebar { transform: translateX(-50vw) scale(.965); filter: blur(5px); }
-  html.mm-focus-open.mm-depth .main, html.mm-focus-open.mm-depth .sidebar { transform: perspective(1400px) translateY(-1.5vh) scale(.86) rotateX(7deg); transform-origin: 50% 10%; filter: blur(10px) brightness(.8); }
-  .mm-focus-page.mm-open { transform: translateX(0); }
+  html.mm-focus-open .main, html.mm-focus-open .sidebar { transform: scale(1.18); filter: blur(14px); opacity: 0; }
+  html.mm-focus-open.mm-depth .main, html.mm-focus-open.mm-depth .sidebar { transform: perspective(1400px) translateY(-1.5vh) scale(.86) rotateX(7deg); transform-origin: 50% 10%; filter: blur(10px) brightness(.8); opacity: 1; }
+  .mm-focus-page.mm-open { transform: scale(1); opacity: 1; }
   #membersMachineModal.mm-focus-page.mm-open { transform: scale(1); opacity: 1; }
   /* landing: the seam draws itself upward like a rising chart, then glints */
   .mm-focus-page::before { transform-origin: bottom; }
