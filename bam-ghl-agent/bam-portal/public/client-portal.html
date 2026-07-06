@@ -3686,10 +3686,12 @@
   .mm-modal-card { max-width: 760px; width: calc(100% - 32px); max-height: 88vh; overflow-y: auto; }
   .mm-focus-page {
     position: fixed; inset: 0; z-index: 1000; overflow-y: auto;
-    /* depth stack: translucent room, the page you left stays visible behind */
-    background: color-mix(in srgb, var(--bg) 60%, transparent);
+    /* a real room: solid floor, soft ambient light falling from above */
+    background:
+      radial-gradient(120% 60% at 50% -10%, color-mix(in srgb, var(--gold) 5%, transparent), transparent 60%),
+      var(--bg);
     justify-content: center; align-items: flex-start;
-    opacity: 0; transform: scale(1.05);
+    opacity: 0; transform: scale(.965);
     transition: transform .55s cubic-bezier(0.16, 1, 0.3, 1), opacity .55s cubic-bezier(0.16, 1, 0.3, 1);
   }
   /* the seam between the two pages: a thin rounded gold bar with a sheen,
@@ -3709,11 +3711,11 @@
   /* html.mm-prewarm scoping beats the theme-crossfade transition rule that
      otherwise overrides .main/.sidebar transitions later in the cascade */
   html.mm-prewarm .main, html.mm-prewarm .sidebar {
-    transition: transform .55s cubic-bezier(0.16, 1, 0.3, 1), filter .55s ease;
-    will-change: transform, filter;
+    transition: transform .55s cubic-bezier(0.16, 1, 0.3, 1), filter .55s ease, opacity .55s ease;
+    will-change: transform, filter, opacity;
   }
   html.mm-prewarm .mm-focus-page { will-change: transform, opacity; }
-  html.mm-focus-open .main, html.mm-focus-open .sidebar { transform: perspective(1400px) translateY(-1.5vh) scale(.86) rotateX(7deg); transform-origin: 50% 10%; filter: blur(10px) brightness(.8); }
+  html.mm-focus-open .main, html.mm-focus-open .sidebar { transform: scale(1.18); filter: blur(14px); opacity: 0; }
   .mm-focus-page.mm-open { transform: scale(1); opacity: 1; }
   /* landing: the seam draws itself upward like a rising chart, then glints */
   .mm-focus-page::before { transform-origin: bottom; }
@@ -43566,7 +43568,7 @@ function _ccStyle() {
     '#membersMachineModal .mm-modal-card{display:flex;flex-direction:column;max-width:1040px}' +
     '.mma-split{display:flex;gap:20px;align-items:stretch}' +
     '.mma-main{flex:1;min-width:0;display:flex;flex-direction:column}' +
-    '.mma-rail{width:240px;flex:none;border-right:1px solid var(--border);padding-right:18px;display:flex;flex-direction:column;gap:8px}' +
+    '.mma-rail{width:250px;flex:none;background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:16px;box-shadow:0 1px 3px rgba(0,0,0,.05);align-self:flex-start;position:sticky;top:14px;display:flex;flex-direction:column;gap:8px}' +
     '.mma-bench{display:flex;flex-direction:column;align-items:flex-start;gap:8px;padding:2px 0 14px;border-bottom:1px solid var(--border);margin-bottom:8px}' +
     '.mma-orb-lg{width:44px;height:44px}' +
     '.mma-orb-lg svg{width:20px;height:20px}' +
