@@ -13,13 +13,20 @@ the 20-edge Sales-Crew flow. Enums `transition_trigger`/`stage_role`/`transition
 edge-per-row (`from_stage_role, trigger, to_kind, to_stage_role|to_terminal`), client-scoped RLS,
 `seed_default_stage_transitions(client_id)`. Design: `docs/core-handoff/sales-flow.md`.
 
-**⏭ THE NEXT TASK (was mid-flight):** wire the focus-mode **Entry/Exit sections** to READ
-the real `stage_transitions` edges per stage (they're placeholder rows in `_plRenderFocus`
-right now) + make them **editable** (CRUD the edges — "fully per-academy authorable"). Entry
-points of a stage = edges where `to_stage_role`=stage; exit = edges where `from_stage_role`=stage.
-The exact per-stage entry/exit is listed below + verified live in the DB.
+**✅ DONE 2026-07-06 (this session):** focus-mode **Entry/Exit now read the real
+`stage_transitions` edges** per stage + **Exit is fully editable** (CRUD). In
+`client-portal.html`: `_plEdgesEnsure()` loads edges via `_sb` (client-scoped RLS,
+`stage_transitions_rw` = is_staff OR my_client_ids, so the logged-in client can CRUD);
+`_plStageRole(name)` maps GHL stage → role (booking→responded, confirm→scheduled_trial,
+closing→done_trial, ghosted→interested, nurture→nurture). Entry section = read-only
+(each chip = another stage's exit, with a "Configure {source}" jump); Exit section =
+editable rows (toggle `enabled`, edit trigger+destination, delete) + "Add exit branch"
+inline form. One-destination-per-trigger enforced in UI; DB unique/check constraints +
+23505 handled. Inserts use `pipeline_id=null` (client-wide flow), `is_seed=false`.
+Helpers/handlers: `_plRenderEntrySec`/`_plRenderExitSec`/`_plEdgeFormHtml`/`_plEdgeAdd`/
+`_plEdgeEdit`/`_plEdgeFormSave`/`_plEdgeToggle`/`_plEdgeDelete` + `_plFocusRerender`.
 
-**Then / later:** backend **router** that reads the edges to actually move leads (today still
+**⏭ THE NEXT TASK:** backend **router** that reads the edges to actually move leads (today still
 hardcoded `api/agent/_stage.js` + per-agent logic); the unbuilt engines (Closing agent, Lead
 Nurture automation, Resend email — see doc redesign notes). Core parity BLOCKED (fc-core-srvc
 inaccessible to `zoran-star`).
