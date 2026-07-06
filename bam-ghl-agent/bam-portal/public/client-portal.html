@@ -46532,11 +46532,11 @@ function _mmRenderMetaFocus(d) {
       (m.planned ? _mmBarHtml(spendFill, paceBand, elapsedTick) : '') +
       (m.planned && elapsedTick != null ? '<div class="mm-driver-sub" style="margin-top:5px">the notch is where the month says you should be (day ' + m.day + ' of ' + m.days_in_month + ')</div>' : '') +
     '</div></div>' +
-    _mmRoiMachineHtml(d) +
+    /* ROI machine hidden for now (Zoran 2026-07-06): restore by re-adding _mmRoiMachineHtml(d) here */
     '</div></div>';
 
   body.innerHTML = out;
-  _mmRoiRecalc();
+  _mmRoiRecalc();   // safe no-op while the ROI machine is hidden (early-returns if #mm-roi-spend is absent)
 }
 // Focus-mode landing view: ONE vertical waterfall. Each micro-step is a row
 // whose bar width = people remaining; the drop % + who was lost lives in the
