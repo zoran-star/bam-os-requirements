@@ -93,7 +93,8 @@
 
 ## Greeting hint fade (2026-07-06, Cole picks 5+4)
 - The "Your whole business on one page..." sub under the CC greeting shows only for the first 3 visits (localStorage `bam_cc_visits` incremented per home mount), then renders nothing. `_ccHead` already skips empty subs.
-- Member drawer Actions emoji sweep done (billing/card/coupon/pause/lock/CoachIQ/alt-pay + imported pill + coupon modal icon). ~36 emoji of those kinds remain in OTHER views (marketing modals, agent settings) = known debt, sweep per-view.
+- **FULL portal emoji purge done (2026-07-06)**: ~520 pictographs removed portal-wide. Sole icon slots (36) became 1em stroke SVGs; label prefixes/toasts/blurbs just dropped the emoji. Logic couplings unhooked FIRST: `_TA_AGENTS/_TA_AUTOS/_TA_ENTRY` values lost their emoji and BOTH `.replace(/^\S+\s/,'')` first-token strips were removed with them (they would have eaten the first word); callout `ic` ternary + Hawkeye `circleInner` now emit SVG. KEPT monochrome text glyphs: arrows, checks/crosses, ✎, ★, theme toggle bare sun/moon. Client-typed message content still renders emojis as-is.
+- **Avatar chips neutralized (2026-07-06, Cole: cut random colors)**: `_memberAvatar` no longer hashes names into an 8-color palette; everyone gets one neutral chip (surface-el bg, border, muted initials). Status pills carry the color.
 
 ## Section mounts (current skeleton)
 | Section | Mount | Content |
