@@ -3704,6 +3704,21 @@
   /* the seam between the two pages: a thin rounded gold bar with a sheen,
      riding the focus page's left edge as it glides */
   .mm-focus-page::before { content: none; }
+  /* marketing/landing: slow broadcast waves drifting out from the top right,
+     barely-there gold rings expanding like a signal going out */
+  #marketingMachineModal.mm-focus-page::before, #landingMachineModal.mm-focus-page::before {
+    content: ''; position: fixed; left: 82%; top: 10%; width: 95vmax; height: 95vmax;
+    transform: translate(-50%, -50%) scale(.72); border-radius: 50%; pointer-events: none; z-index: 0;
+    background: repeating-radial-gradient(circle, color-mix(in srgb, var(--gold) 7%, transparent) 0 2px, transparent 2px 110px);
+    opacity: 0;
+    animation: mmPing 16s linear infinite;
+  }
+  @keyframes mmPing {
+    0% { transform: translate(-50%, -50%) scale(.72); opacity: 0; }
+    18% { opacity: .85; }
+    82% { opacity: .85; }
+    100% { transform: translate(-50%, -50%) scale(1.18); opacity: 0; }
+  }
   .mm-focus-page .mm-modal-card {
     max-width: 900px; width: min(900px, 96vw); max-height: none;
     margin: 28px auto 48px; background: transparent; border: none; box-shadow: none;
@@ -3727,8 +3742,7 @@
   .mm-focus-page.mm-open { transform: scale(1); opacity: 1; }
   #membersMachineModal.mm-focus-page.mm-open { transform: scale(1); opacity: 1; }
   /* landing: the seam draws itself upward like a rising chart, then glints */
-  .mm-focus-page::before { transform-origin: bottom; }
-  .mm-focus-page.mm-open::before { animation: mmSeamGrow .5s cubic-bezier(0.16, 1, 0.3, 1) .12s both, mmSeamGlint .7s ease .5s both; }
+
   @keyframes mmSeamGrow { from { transform: scaleY(0); } to { transform: scaleY(1); } }
   @keyframes mmSeamGlint {
     0%, 100% { box-shadow: 0 0 14px rgba(200,168,78,0.45), inset 1px 0 1px rgba(255,255,255,0.55); }
