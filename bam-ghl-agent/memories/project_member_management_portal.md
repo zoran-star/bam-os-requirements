@@ -1100,7 +1100,11 @@ are the agent's tools.
   Claude tool-use loop (model `claude-sonnet-4-6`, same as the sales agents).
   - READ tools run server-side automatically: `find_members(query)` (roster
     ILIKE search → member_id + status), `get_member(member_id)` (DB fields +
-    recent Stripe charges w/ charge_id, for refunds).
+    recent Stripe charges w/ charge_id + status, for refunds / "why did the
+    payment fail"), `list_members({status?, issues_only?})` (roster-level
+    Q&A: "who has failed payments" → status=payment_failed;
+    issues_only=true = payment_failed + payment_method_required; no args =
+    counts by status). The agent ANSWERS questions too, not just acts.
   - WRITE tools are named EXACTLY like the members.js action strings
     (pause, pause-date-fix, unpause, cancel, refund, change, apply-coupon,
     remove-coupon, payment-link, card-setup-link, referred, update-profile,
