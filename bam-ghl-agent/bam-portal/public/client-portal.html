@@ -46727,19 +46727,20 @@ function _mmFunnelSvg(page, clicks, loaded) {
   svg += '<ellipse cx="' + X[0].toFixed(1) + '" cy="' + MID + '" rx="10" ry="' + (hAt(0) / 2).toFixed(1) + '" fill="url(#mmfzg)"/>';
   svg += '<path d="' + ribbonPath(0, N - 1) + '" fill="url(#mmfzg)"/>';
   svg += '<line x1="' + X[T] + '" y1="' + MID + '" x2="' + (arrowX - 4) + '" y2="' + MID + '" stroke="#C8A84E" stroke-width="1.1" stroke-linecap="round" opacity="0.7"/>';
-  // leak spotlight: the worst segment cools to red, fix chip rides inside it
+  // leak marker: no red in the band for now - one action chip under the
+  //   worst segment, styled like a pressable button (sentence case, chevron)
   if (worst >= 0) {
-    if (worst < T) svg += '<path d="' + ribbonPath(worst, Math.min(worst + 1, T)) + '" fill="rgba(224,90,66,0.15)"/>';
-    else svg += '<line x1="' + X[worst] + '" y1="' + MID + '" x2="' + X[worst + 1] + '" y2="' + MID + '" stroke="#E05A42" stroke-width="1.2" stroke-linecap="round"/>';
-    const label = stages[worst].fix;
+    const label = (stages[worst].fix || '').replace('&#9998; ', '');
+    const nice = label.charAt(0).toUpperCase() + label.slice(1) + ' &rsaquo;';
     const mx = (X[worst] + X[worst + 1]) / 2;
-    const tw = (label.replace('&#9998; ', '').length * 4.9) + 24;
+    const tw = (label.length * 4.9) + 34;
     let bx = mx - tw / 2;
     if (bx + tw > W - 6) bx = W - 6 - tw;
     if (bx < 6) bx = 6;
-    const byTop = MID + MAXH / 2 + 8, bh = 16;
-    svg += '<rect x="' + bx.toFixed(1) + '" y="' + byTop + '" width="' + tw.toFixed(1) + '" height="' + bh + '" rx="8" fill="rgba(224,90,66,0.10)"/>' +
-      '<text x="' + (bx + tw / 2).toFixed(1) + '" y="' + (byTop + 11) + '" text-anchor="middle" font-family="var(--mm-ff)" font-size="8.8" font-weight="700" fill="#B5352F">' + label + '</text>';
+    const byTop = MID + MAXH / 2 + 8, bh = 18;
+    svg += '<g style="cursor:pointer" onclick="event.stopPropagation();openLandingMachine(\'' + stages[worst].lbl + '\')">' +
+      '<rect x="' + bx.toFixed(1) + '" y="' + byTop + '" width="' + tw.toFixed(1) + '" height="' + bh + '" rx="9" fill="var(--surface)" stroke="rgba(176,142,48,0.5)" stroke-width="1"/>' +
+      '<text x="' + (bx + tw / 2).toFixed(1) + '" y="' + (byTop + 12) + '" text-anchor="middle" font-family="var(--mm-ff)" font-size="8.8" font-weight="700" fill="#B08E30">' + nice + '</text></g>';
   }
   svg += '</g>';
   // particle flow: traffic drifts through the band on staggered lanes
