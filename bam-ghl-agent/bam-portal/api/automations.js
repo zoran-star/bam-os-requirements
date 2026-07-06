@@ -16,6 +16,7 @@ import { contactsReadTable } from "./_contacts.js";
 import { pickGhlToken, ghl } from "./ghl/_core.js";
 import { nurtureStage, interestedStage, scheduledTrialContactIdSetCached } from "./agent/_stage.js";
 import { moveStage, setStatus, findOpenOpp as findOpenOppStore } from "./agent/_store.js";
+import { routeTransition } from "./agent/_router.js";
 import { nextSessionLabel } from "./_next_session.js";
 import { sendOn } from "./_send.js";
 import { renderEmail } from "./email-shells.js";
@@ -266,9 +267,17 @@ async function runWork(res) {
               await enrollContact({ clientId: job.client_id, automationKey: "nurture", contactId: job.contact_id });
               const creds = await ensureCreds();
               if (creds && creds.token) {
-                const ns = await nurtureStage(creds.token, creds.locationId, { clientId: job.client_id, sb });
                 const oppRef = await findOpenOppRef(job.client_id, creds.token, creds.locationId, job.contact_id);
-                if (ns && oppRef) await moveStage({ clientId: job.client_id, ghl, token: creds.token, oppRef, stage: ns, role: "nurture", contactId: job.contact_id, reason: `${a.automation_key} ran out - rolled into nurture` });
+                // Roll into the long game per the academy's authored flow (the
+                // ghosted_ran_out edge; GTA seed = interested -> nurture). Router
+                // reads the edge; on no edge (unseeded / paused / lookup blip) it
+                // returns matched:false and we run the original hardcoded move to
+                // nurture - behavior-identical for GTA.
+                const routed = await routeTransition({ clientId: job.client_id, sb, ghl, token: creds.token, locationId: creds.locationId, fromRole: "interested", trigger: "ghosted_ran_out", contactId: job.contact_id, oppRef, reason: `${a.automation_key} ran out - rolled into nurture` });
+                if (!routed.matched) {
+                  const ns = await nurtureStage(creds.token, creds.locationId, { clientId: job.client_id, sb });
+                  if (ns && oppRef) await moveStage({ clientId: job.client_id, ghl, token: creds.token, oppRef, stage: ns, role: "nurture", contactId: job.contact_id, reason: `${a.automation_key} ran out - rolled into nurture` });
+                }
               }
               await logEvent({ clientId: job.client_id, contactId: job.contact_id, automationId: job.automation_id, type: `${a.automation_key}_to_nurture`, payload: null });
             } else {
