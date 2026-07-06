@@ -44579,7 +44579,8 @@ function _mmRenderLandingFocus(d) {
       '<div style="font-size:13px;color:var(--text-mute);padding:16px 0">gathering data - no ad visits in this window yet</div>';
     return;
   }
-  const GRID = 'display:grid;grid-template-columns:34px 100px 1fr 44px;align-items:center;gap:10px';
+  // icon | label | count (right-aligned, hugs the bar) | bar
+  const GRID = 'display:grid;grid-template-columns:34px 100px 46px 1fr;align-items:center;gap:10px';
   let rows = '';
   for (let i = 0; i < steps.length; i++) {
     const s = steps[i];
@@ -44590,13 +44591,14 @@ function _mmRenderLandingFocus(d) {
           '<span style="width:30px;height:30px;border-radius:50%;background:var(--surface-el);color:var(--text);display:flex;align-items:center;justify-content:center;flex:0 0 auto">' + s.icon + '</span>' +
         '</div>' +
         '<div style="font-family:var(--mm-ff);font-size:14px;font-weight:700;color:var(--text)">' + s.lbl + '</div>' +
+        '<div style="font-family:var(--mm-fm);font-size:15px;font-weight:500;color:var(--text);text-align:right">' + s.n + '</div>' +
         '<div style="height:26px;background:var(--surface-el);border-radius:6px;overflow:hidden">' +
           '<div style="height:100%;width:' + w.toFixed(1) + '%;min-width:6px;background:var(--text-sub);border-radius:6px"></div>' +
         '</div>' +
-        '<div style="font-family:var(--mm-fm);font-size:15px;font-weight:500;color:var(--text);text-align:right">' + s.n + '</div>' +
       '</div>';
     // between-stage connector: fixed-height slot between EVERY pair of rows so
-    // the vertical rhythm stays even whether or not a step has a chip.
+    // the vertical rhythm stays even whether or not a step has a chip. Chip sits
+    // under the BAR column (4th cell).
     if (i < steps.length - 1) {
       const tm = s.timeKey ? st[s.timeKey] : null;
       let chip = '';
@@ -44609,9 +44611,8 @@ function _mmRenderLandingFocus(d) {
       }
       rows +=
         '<div style="' + GRID + ';height:22px">' +
-          '<div></div><div></div>' +
+          '<div></div><div></div><div></div>' +
           '<div style="display:flex;align-items:center;padding-left:2px">' + chip + '</div>' +
-          '<div></div>' +
         '</div>';
     }
   }
