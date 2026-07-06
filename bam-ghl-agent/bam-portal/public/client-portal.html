@@ -7762,6 +7762,24 @@ Then the call to action."]</div>
         </div>
       </div>
       <div class="content">
+        <!-- ── Member agent command bar ─────────────────────────
+             Type a plain-English command ("pause Tristan 30 days").
+             It proposes ONE billing action; you click Confirm to run it
+             on the proven PATCH /api/members path. No write happens here. -->
+        <div id="magent-bar" style="margin-bottom:18px">
+          <div style="display:flex;gap:8px;align-items:stretch">
+            <div style="flex:1;position:relative;display:flex;align-items:center">
+              <span aria-hidden="true" style="position:absolute;left:12px;color:var(--accent,#D4B65C);font-weight:800;pointer-events:none">›</span>
+              <input id="magent-input" autocomplete="off"
+                placeholder="Ask the agent…  e.g. pause Tristan 30 days · refund Aarav $50 · change Maya to 3/wk"
+                onkeydown="if(event.key==='Enter'){event.preventDefault();magentSend();}"
+                style="flex:1;box-sizing:border-box;background:var(--surface,#16161a);border:1px solid var(--border,#2a2a31);border-radius:10px;color:var(--text);padding:12px 12px 12px 28px;font:inherit;font-size:14px">
+            </div>
+            <button id="magent-send" onclick="magentSend()"
+              style="background:var(--accent,#D4B65C);color:#0B0B0D;border:none;border-radius:10px;padding:0 18px;font:inherit;font-size:14px;font-weight:700;cursor:pointer;white-space:nowrap">Send</button>
+          </div>
+          <div id="magent-thread" style="display:none;margin-top:12px;flex-direction:column;gap:10px"></div>
+        </div>
         <div id="members-list-container">
           <div class="req-empty" style="padding:20px 0"><span class="req-spin"></span>Loading members…</div>
         </div>
@@ -37792,6 +37810,113 @@ async function _memberAction(memberId, action, body) {
   const json = await _safeJson(res);
   if (!res.ok) throw new Error(json.error || ('HTTP ' + res.status));
   return json;
+}
+
+// ── Member agent (natural-language command bar) ─────────────
+// Sends the typed command to /api/members-agent, which returns either a
+// prose reply (a question) or a single proposed action. The proposal is
+// NEVER auto-run: it renders a Confirm/Cancel card, and Confirm fires the
+// same _memberAction() path as the drawer buttons. history = plain-text
+// turns so follow-ups ("make it 60 days") keep context.
+let _MAGENT = { history: [], busy: false, proposal: null };
+
+function _magentEsc(s) { return (typeof escapeHTML === 'function') ? escapeHTML(String(s == null ? '' : s)) : String(s == null ? '' : s); }
+
+function magentRender() {
+  const thread = document.getElementById('magent-thread');
+  if (!thread) return;
+  const turns = _MAGENT.history.map(t => {
+    if (t.role === 'user') {
+      return `<div style="align-self:flex-end;max-width:82%;background:var(--accent,#D4B65C);color:#0B0B0D;border-radius:12px 12px 3px 12px;padding:9px 13px;font-size:13.5px;font-weight:600">${_magentEsc(t.text)}</div>`;
+    }
+    return `<div style="align-self:flex-start;max-width:88%;background:var(--surface,#16161a);border:1px solid var(--border,#2a2a31);color:var(--text);border-radius:12px 12px 12px 3px;padding:9px 13px;font-size:13.5px;line-height:1.5">${_magentEsc(t.text)}</div>`;
+  });
+  if (_MAGENT.busy) {
+    turns.push(`<div style="align-self:flex-start;color:var(--text-mute);font-size:13px;padding:4px 2px"><span class="req-spin"></span> thinking…</div>`);
+  }
+  const p = _MAGENT.proposal;
+  if (p) {
+    const destructive = (p.action === 'cancel' || p.action === 'refund');
+    const accent = destructive ? '#e0654f' : 'var(--accent,#D4B65C)';
+    turns.push(
+      `<div style="align-self:flex-start;width:88%;background:var(--surface,#16161a);border:1px solid ${accent};border-radius:12px;padding:13px 14px">
+        <div style="display:flex;align-items:center;gap:7px;margin-bottom:6px">
+          <span style="font-size:11px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:${accent}">Proposed action</span>
+        </div>
+        <div style="font-size:14px;font-weight:600;color:var(--text);line-height:1.45;margin-bottom:12px">${_magentEsc(p.summary)}</div>
+        <div style="display:flex;gap:8px">
+          <button onclick="magentConfirm()" style="background:${accent};color:#0B0B0D;border:none;border-radius:8px;padding:9px 16px;font:inherit;font-size:13px;font-weight:700;cursor:pointer">Confirm</button>
+          <button onclick="magentCancel()" style="background:transparent;color:var(--text-sub);border:1px solid var(--border,#2a2a31);border-radius:8px;padding:9px 16px;font:inherit;font-size:13px;font-weight:600;cursor:pointer">Cancel</button>
+        </div>
+      </div>`
+    );
+  }
+  thread.innerHTML = turns.join('');
+  thread.style.display = turns.length ? 'flex' : 'none';
+  thread.scrollTop = thread.scrollHeight;
+}
+
+async function magentSend() {
+  if (_MAGENT.busy) return;
+  const input = document.getElementById('magent-input');
+  const msg = input ? input.value.trim() : '';
+  if (!msg) return;
+  const clientId = (typeof CLIENT_ID !== 'undefined') ? CLIENT_ID : null;
+  if (!clientId) { alert('Pick an academy first.'); return; }
+  if (input) input.value = '';
+  _MAGENT.proposal = null;
+  _MAGENT.history.push({ role: 'user', text: msg });
+  _MAGENT.busy = true;
+  magentRender();
+  try {
+    const token = await _mreqAuthToken();
+    const res = await fetch('/api/members-agent', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+      body: JSON.stringify({ client_id: clientId, message: msg, history: _MAGENT.history.slice(0, -1) }),
+    });
+    const json = await _safeJson(res);
+    if (!res.ok) throw new Error(json.error || ('HTTP ' + res.status));
+    _MAGENT.busy = false;
+    if (json.reply) _MAGENT.history.push({ role: 'assistant', text: json.reply });
+    _MAGENT.proposal = json.proposal || null;
+    if (!json.reply && !json.proposal) _MAGENT.history.push({ role: 'assistant', text: 'Okay.' });
+    magentRender();
+  } catch (e) {
+    _MAGENT.busy = false;
+    _MAGENT.history.push({ role: 'assistant', text: "Couldn't reach the agent: " + (e.message || e) });
+    magentRender();
+  }
+}
+
+async function magentConfirm() {
+  const p = _MAGENT.proposal;
+  if (!p) return;
+  _MAGENT.proposal = null;
+  _MAGENT.busy = true;
+  magentRender();
+  try {
+    const result = await _memberAction(p.member_id, p.action, p.body || {});
+    _MAGENT.busy = false;
+    // payment-link / card-setup-link return a URL rather than a state change.
+    let done = 'Done. ' + (p.summary || (p.action + ' applied.'));
+    if ((p.action === 'payment-link' || p.action === 'card-setup-link') && result && result.url) {
+      done = 'Link ready: ' + result.url;
+    }
+    _MAGENT.history.push({ role: 'assistant', text: done });
+    magentRender();
+    if (typeof fetchAndRenderMembers === 'function') fetchAndRenderMembers();
+  } catch (e) {
+    _MAGENT.busy = false;
+    _MAGENT.history.push({ role: 'assistant', text: "That didn't go through: " + (e.message || e) });
+    magentRender();
+  }
+}
+
+function magentCancel() {
+  _MAGENT.proposal = null;
+  _MAGENT.history.push({ role: 'assistant', text: 'Cancelled. Nothing was changed.' });
+  magentRender();
 }
 
 // Strict YYYY-MM-DD validation: must match the format AND round-trip via
