@@ -1,3 +1,4 @@
+// Marketing page: Sage conversational advisor (MKT-013). See sageReply() below.
 import { useState, useRef, useEffect } from 'react';
 import useBannerCanvas from '../hooks/useBannerCanvas';
 import useTypewriter from '../hooks/useTypewriter';
