@@ -990,10 +990,19 @@ async function handler(req, res) {
       // TODO(effort E — portal opportunity store): once the portal owns opportunities
       // natively, replace this GHL find-opp + PUT with a local stage write, and unify
       // with the website-calendar advance in api/website/leads.js behind one helper.
+      // Advance the opp per the academy's authored flow (the booked edge; GTA
+      // seed = -> Scheduled Trial). Router reads the stage_transitions edge; on
+      // no edge (unseeded / paused / lookup blip) it returns matched:false and we
+      // run the original hardcoded move. moveStage's kpiTrialBooked hook fires on
+      // either path (role stays scheduled_trial), so the trial-booked KPI is
+      // unaffected. Best-effort - a stage-move failure must never break a booking.
       try {
         const oppRef = await findOpenOpp({ clientId, ghl, token, locationId, contactId });
-        const sts = await scheduledTrialStage(token, locationId, { clientId, sb });
-        if (sts && oppRef) await moveStage({ clientId, ghl, token, oppRef, stage: sts, role: "scheduled_trial", contactId });
+        const routed = await routeTransition({ clientId, sb, ghl, token, locationId, fromRole: "responded", trigger: "booked", contactId, oppRef, reason: "booking approved" });
+        if (!routed.matched) {
+          const sts = await scheduledTrialStage(token, locationId, { clientId, sb });
+          if (sts && oppRef) await moveStage({ clientId, ghl, token, oppRef, stage: sts, role: "scheduled_trial", contactId });
+        }
       } catch (_) {}
       try { await sb(`agent_ready_replies?id=eq.${encodeURIComponent(b.ready_id)}&client_id=eq.${clientId}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ status: "sent", approved_by: staffEmail, approved_at: new Date().toISOString(), sent_at: new Date().toISOString(), updated_at: new Date().toISOString() }) }); } catch (_) {}
       try { await logApproval({ client_id: clientId, ghl_contact_id: contactId, contact_name: row.contact_name || null, final_reply: `[booked ${row.book_group || "trial"} @ ${startIso}]`, status: "sent", created_by: staffEmail }); } catch (_) {}
