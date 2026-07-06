@@ -3697,7 +3697,7 @@
   }
   /* depth idiom (members only): translucent room fades in over the page,
      which stays visible behind, blurred and tilted back */
-  #membersMachineModal.mm-focus-page {
+  #membersMachineModal.mm-focus-page, #gmMachineModal.mm-focus-page {
     background: color-mix(in srgb, var(--bg) 60%, transparent);
     opacity: 0; transform: scale(1.05);
   }
@@ -3741,6 +3741,7 @@
   html.mm-focus-open.mm-depth .main, html.mm-focus-open.mm-depth .sidebar { transform: perspective(1400px) translateY(-1.5vh) scale(.86) rotateX(7deg); transform-origin: 50% 10%; filter: blur(10px) brightness(.8); opacity: 1; }
   .mm-focus-page.mm-open { transform: scale(1); opacity: 1; }
   #membersMachineModal.mm-focus-page.mm-open { transform: scale(1); opacity: 1; }
+  #gmMachineModal.mm-focus-page.mm-open { transform: scale(1); opacity: 1; }
   /* landing: the seam draws itself upward like a rising chart, then glints */
 
   @keyframes mmSeamGrow { from { transform: scaleY(0); } to { transform: scaleY(1); } }
@@ -10779,6 +10780,7 @@ Then the call to action."]</div>
 // #12 - haptics. Feature-detected: a light tap inside the native app when the
 // @capacitor/haptics plugin is present; a silent no-op on web / PWA.
 function hapticTap(style) {
+  try { if (localStorage.getItem('bam_haptics_off') === '1') return; } catch (_) {}
   try {
     var Cap = window.Capacitor;
     if (!Cap || !Cap.isNativePlatform || !Cap.isNativePlatform()) return;
@@ -15870,7 +15872,7 @@ async function _hv2WinLoad() {
   if (win) {
     if (lab) lab.textContent = 'Daily win';
     v.textContent = win.v;
-    if (win.v.charAt(0) === '$' && !window._sfxKachinged) { window._sfxKachinged = true; try { _SFX.kaching(); } catch (_) {} }
+    if (win.v.charAt(0) === '$' && !window._sfxKachinged) { window._sfxKachinged = true; try { _SFX.kaching(); hapticTap('HEAVY'); } catch (_) {} }
     if (c) c.textContent = win.c;
   } else {
     // No strong win: rotate the day's pick from a pool of modest activity
@@ -16238,6 +16240,7 @@ async function _hmMsgPeek(convId, focusReply) {
   const c = (window._hmIbById || {})[convId];
   if (!c) return switchView('v15inbox');
   _hmMsgPeekClose();
+  try { hapticTap('LIGHT'); } catch (_) {}
   const name = _ccCapName((c.contactName || 'Conversation').split(' ').slice(0, 3).join(' '));
   document.body.insertAdjacentHTML('beforeend', `
     <div id="hm-peek-ov" onclick="if(event.target===this)_hmMsgPeekClose()">
@@ -16294,7 +16297,7 @@ async function _hmMsgPeekSend(convId) {
     });
     const j = await _safeJson(r);
     if (!r.ok) throw new Error((j && j.error) || 'send failed');
-    try { _SFX.sent(); } catch (_) {}
+    try { _SFX.sent(); hapticTap('MEDIUM'); } catch (_) {}
     const box = document.getElementById('hm-peek-thread');
     if (box) { box.insertAdjacentHTML('beforeend', `<div class="hm-peek-bub out">${escapeHTML(text)}</div>`); box.scrollTop = box.scrollHeight; }
     _hmReflectReply(c, text);
@@ -17047,7 +17050,7 @@ async function _hmCheckMilestones(stats) {
 function _hmShowCelebration(data) {
   // Play sound based on type
   if (data.type === 'record') _SFX.fanfare();
-  else if (data.cat === 'revenue' || data.cat === 'mrr') _SFX.kaching();
+  else if (data.cat === 'revenue' || data.cat === 'mrr') { _SFX.kaching(); try { hapticTap('HEAVY'); } catch (_) {} }
   else _SFX.levelUp();
 
   const overlay = document.createElement('div');
@@ -45092,6 +45095,13 @@ function _ccStyle() {
     '.cc-crumb-sep{opacity:.5}' +
     /* members focus mode (agent chat) */
     '#membersMachineModal .mm-modal-card{display:flex;flex-direction:column;max-width:1040px}' +
+    '#gmMachineModal .mm-modal-card{display:flex;flex-direction:column;max-width:1150px}' +
+    '.gma-floor-row{display:flex;align-items:center;gap:9px;width:100%;text-align:left;background:none;border:none;padding:8px 6px;border-radius:10px;cursor:pointer;font:inherit;color:var(--text)}' +
+    '.gma-floor-row:hover{background:var(--surface-el,rgba(0,0,0,.05))}' +
+    '.gma-floor-ic{flex:none;width:26px;height:26px;border-radius:999px;background:var(--surface-el,rgba(0,0,0,.05));border:1px solid var(--border);display:inline-flex;align-items:center;justify-content:center;color:var(--gold)}' +
+    '.gma-floor-ic svg{width:13px;height:13px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}' +
+    '.gma-floor-nm{font-size:12.5px;font-weight:700}' +
+    '.gma-floor-st{font-size:11.5px;color:var(--text-mute);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}' +
     '.mma-split{display:flex;gap:20px;align-items:stretch}' +
     '.mma-main{flex:1;min-width:0;display:flex;flex-direction:column}' +
     '.mma-rail{width:250px;flex:none;background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:16px;box-shadow:0 1px 3px rgba(0,0,0,.05);align-self:flex-start;position:sticky;top:14px;display:flex;flex-direction:column;gap:8px}' +
@@ -45286,6 +45296,16 @@ function _ccStyle() {
     '.cc-mtab{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;background:none;border:none;padding:6px 2px;color:var(--text-mute);font:inherit;font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;cursor:pointer;border-radius:12px;min-height:44px}' +
     '.cc-mtab svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}' +
     '.cc-mtab.on{color:var(--gold)}' +
+    '.cc-mtab{position:relative}' +
+    '.cc-mtab.on::before{content:\'\';position:absolute;top:0;left:50%;transform:translateX(-50%);width:22px;height:2.5px;border-radius:999px;background:var(--gold);animation:mtabInd .25s ease}' +
+    '@keyframes mtabInd{from{width:4px;opacity:0}to{width:22px;opacity:1}}' +
+    '.cc-mtab svg{transition:transform .18s}' +
+    '.cc-mtab.on svg{animation:mtabPop .3s cubic-bezier(.34,1.56,.64,1)}' +
+    '@keyframes mtabPop{0%{transform:scale(.85)}60%{transform:scale(1.14)}100%{transform:scale(1)}}' +
+    '.cc-mtab-orb{flex:none;width:56px;height:56px;margin:-20px 2px 0;border-radius:999px;background:linear-gradient(135deg,var(--gold),var(--gold-d,#E0C56A));color:#fff;border:4px solid var(--surface);box-shadow:0 4px 16px rgba(200,168,78,.4);display:inline-flex;align-items:center;justify-content:center;cursor:pointer;-webkit-user-select:none;user-select:none;transition:transform .15s}' +
+    '.cc-mtab-orb svg{width:26px;height:26px}' +
+    '.cc-mtab-orb:active{transform:scale(.92)}' +
+    '@media(max-width:768px){html.mm-prewarm .main,html.mm-prewarm .sidebar{transition-duration:.32s}html.mm-focus-open .main,html.mm-focus-open .sidebar{filter:blur(7px)}.mm-focus-page{transition-duration:.32s}}' +
     'body.cc-mode .cc-dock{bottom:calc(76px + env(safe-area-inset-bottom))}' +
     'body.cc-mode #admin-fb-wrap{bottom:calc(78px + env(safe-area-inset-bottom))}' +
     '}' +
@@ -45341,6 +45361,7 @@ function _ccOpenClassic(view) {
   window._CC_BYPASS = true;
   try {
     document.body.classList.add('cc-classic'); switchView(view);
+    window._ccLastClassic = view;
     if (view === 'systems') { try { closeDetail(); } catch (_) {} }
     try { _ccMtabOn(view === 'v15inbox' ? 'inbox' : ''); } catch (_) {}
     _ccCrumb(view);
@@ -45429,21 +45450,71 @@ function _ccBuildChrome() {
     const mt = document.createElement('nav');
     mt.id = 'cc-mtabs';
     mt.setAttribute('aria-label', 'Sections');
-    mt.innerHTML = _ccSections().map(s =>
-      `<button type="button" class="cc-mtab${s.key === 'home' ? ' on' : ''}" id="cc-mtab-${s.key}" onclick="_ccMtabGo('${s.key}')">${tabIcons[s.key] || ''}<span>${s.label}</span></button>`
-    ).join('') +
+    const tabBtn = s => `<button type="button" class="cc-mtab${s.key === 'home' ? ' on' : ''}" id="cc-mtab-${s.key}" onclick="_ccMtabGo('${s.key}')">${tabIcons[s.key] || ''}<span>${s.label}</span></button>`;
+    const secs = _ccSections().filter(s => s.key !== 'marketing');
+    mt.innerHTML = secs.slice(0, 2).map(tabBtn).join('') +
+      `<button type="button" class="cc-mtab-orb" id="cc-mtab-orb" aria-label="Ask Tower"><svg viewBox="0 0 512 512" fill="currentColor" stroke="none"><path d="M 256 80 L 290 230 L 432 256 L 290 282 L 256 432 L 222 282 L 80 256 L 222 230 Z"/></svg></button>` +
+      secs.slice(2).map(tabBtn).join('') +
       `<button type="button" class="cc-mtab" id="cc-mtab-inbox" onclick="_ccMtabOn('inbox');_ccOpenClassic('v15inbox')">${tabIcons.inbox}<span>Inbox</span></button>`;
     document.body.appendChild(mt);
+    // Orb: tap = boardroom with the keyboard up; hold = boardroom listening.
+    const orb = mt.querySelector('#cc-mtab-orb');
+    if (orb) {
+      let holdT = null, held = false;
+      const down = () => { held = false; holdT = setTimeout(() => { held = true; try { hapticTap('MEDIUM'); } catch (_) {} openGmFocus(true); }, 450); };
+      const up = () => { clearTimeout(holdT); if (!held) { try { hapticTap('LIGHT'); } catch (_) {} openGmFocus(false); } held = true; };
+      orb.addEventListener('touchstart', down, { passive: true });
+      orb.addEventListener('touchend', e => { e.preventDefault(); up(); });
+      orb.addEventListener('touchmove', () => { clearTimeout(holdT); held = true; }, { passive: true });
+      orb.addEventListener('mousedown', down);
+      orb.addEventListener('mouseup', up);
+      orb.addEventListener('contextmenu', e => e.preventDefault());
+    }
+    // Smart landing (phones): reopen on the section you were last working in.
+    setTimeout(() => {
+      try {
+        const k = localStorage.getItem('bam_cc_lastsec');
+        if (k && k !== 'home' && k !== 'marketing' && window.matchMedia('(max-width: 768px)').matches && !document.body.classList.contains('cc-classic')) { _ccScrollTo(k); _ccMtabOn(k); }
+      } catch (e) {}
+    }, 900);
   }
 }
 function _ccMtabOn(key) {
   document.querySelectorAll('.cc-mtab').forEach(b => b.classList.toggle('on', b.id === 'cc-mtab-' + key));
 }
 function _ccMtabGo(key) {
+  try { hapticTap('LIGHT'); } catch (_) {}
+  // Double-tap Home jumps back to the last classic view you had open.
+  if (key === 'home' && window._ccLastClassic && Date.now() - (window._ccMtabHomeT || 0) < 420) {
+    window._ccMtabHomeT = 0;
+    _ccOpenClassic(window._ccLastClassic);
+    return;
+  }
+  if (key === 'home') window._ccMtabHomeT = Date.now();
   if (document.body.classList.contains('cc-classic')) _ccReturn();
   _ccMtabOn(key);
   requestAnimationFrame(() => _ccScrollTo(key));
 }
+// Edge-swipe back on phones: a right-swipe that starts on the left screen
+// edge inside a classic view returns to the command center.
+(function () {
+  let sx = null, sy = 0;
+  document.addEventListener('touchstart', e => {
+    const t = e.touches && e.touches[0];
+    sx = (t && t.clientX <= 24) ? t.clientX : null;
+    sy = t ? t.clientY : 0;
+  }, { passive: true });
+  document.addEventListener('touchend', e => {
+    if (sx === null) return;
+    const t = e.changedTouches && e.changedTouches[0];
+    const ox = sx; sx = null;
+    if (!t) return;
+    if (t.clientX - ox > 70 && Math.abs(t.clientY - sy) < 60 && document.body.classList.contains('cc-classic')) {
+      try { hapticTap('LIGHT'); } catch (_) {}
+      _ccReturn();
+    }
+  }, { passive: true });
+})();
 
 function _ccOrbToggle(force) {
   const dock = document.getElementById('cc-dock');
@@ -45507,7 +45578,8 @@ function _ccFocusHud(modalId) {
     const head = card.querySelector('.mm-mod-head');
     if (head) card.insertBefore(hud, head); else card.prepend(hud);
   }
-  const label = modalId === 'membersMachineModal' ? 'MEMBERS'
+  const label = modalId === 'gmMachineModal' ? 'GM OFFICE'
+    : modalId === 'membersMachineModal' ? 'MEMBERS'
     : modalId === 'landingMachineModal' ? 'LANDING PAGE'
     : 'MARKETING';
   _ccHudType(hud, 'FOCUS · ' + label + ' · LIVE');
@@ -45582,6 +45654,7 @@ function _ccFocusCloseOpen() {
     if (open.id === 'marketingMachineModal') closeMarketingMachine();
     else if (open.id === 'landingMachineModal') closeLandingMachine();
     else if (open.id === 'membersMachineModal') closeMembersFocus();
+    else if (open.id === 'gmMachineModal') closeGmFocus();
     else { open.classList.remove('mm-open'); document.documentElement.classList.remove('mm-focus-open'); }
   } catch (_) {}
   return true;
@@ -45667,6 +45740,7 @@ function _ccDockPop(kind) {
   pop.innerHTML = kind === 'settings'
     ? `<button type="button" class="cc-pop-item" onclick="toggleTheme()">Toggle light / dark</button>` +
       `<button type="button" class="cc-pop-item" onclick="this.textContent='Sounds: ' + (_SFX.toggleMute() ? 'off' : 'on')">Sounds: ${_SFX._isMuted() ? 'off' : 'on'}</button>` +
+      `<button type="button" class="cc-pop-item" onclick="var off=localStorage.getItem('bam_haptics_off')==='1';localStorage.setItem('bam_haptics_off', off?'0':'1');this.textContent='Haptics: '+(off?'on':'off')">Haptics: ${(function(){try{return localStorage.getItem('bam_haptics_off')==='1'?'off':'on'}catch(_){return 'on'}})()}</button>` +
       `<button type="button" class="cc-pop-item" onclick="_ccExitBeta()">Exit command center beta</button>` +
       `<button type="button" class="cc-pop-item" onclick="signOut()">Sign out</button>`
     : `<button type="button" class="cc-pop-item" onclick="document.getElementById('cc-dock-pop').classList.remove('open');startOnboardingTour()">Take the tour</button>` +
@@ -45733,6 +45807,7 @@ function _ccInitRecede(root, secs) {
       document.querySelectorAll('.cc-dot').forEach(d => {
         const on = d.id === 'cc-dot-' + actKey;
         if (on && !d.classList.contains('on')) {
+          try { hapticTap('LIGHT'); } catch (_) {}
           d.classList.add('tick', 'flash');
           setTimeout(() => d.classList.remove('tick'), 400);
           clearTimeout(d._flashT);
@@ -45741,6 +45816,7 @@ function _ccInitRecede(root, secs) {
         d.classList.toggle('on', on);
       });
       if (!document.body.classList.contains('cc-classic')) _ccMtabOn(actKey);
+      try { localStorage.setItem('bam_cc_lastsec', actKey); } catch (_) {}
       // progress ring on the active dot
       const onDot = document.querySelector('.cc-dot.on');
       if (onDot) {
@@ -46093,6 +46169,7 @@ function _ccMemberConvs(convs, roster) {
 function _ccMemberInboxClose() { document.getElementById('cc-minbox-ov')?.remove(); }
 async function _ccMemberInbox() {
   _ccMemberInboxClose();
+  try { hapticTap('LIGHT'); } catch (_) {}
   document.body.insertAdjacentHTML('beforeend', `
     <div id="cc-minbox-ov" onclick="if(event.target===this)_ccMemberInboxClose()">
       <div class="cc-minbox-card">
@@ -46172,7 +46249,7 @@ async function _ccQuickSend(inp, contactId) {
     });
     const j = await _safeJson(r);
     if (!r.ok) throw new Error((j && j.error) || 'send failed');
-    try { _SFX.sent(); } catch (_) {}
+    try { _SFX.sent(); hapticTap('MEDIUM'); } catch (_) {}
     box.innerHTML = '<div class="cc-mem-good" style="padding:4px 0">' + '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>' + 'Sent.</div>';
     setTimeout(() => box.remove(), 2200);
   } catch (_) {
@@ -46576,7 +46653,7 @@ function _mmaPin(html, onclick) {
 function _ccOpenFocusPage(modalId, panelSel) {
   const modal = document.getElementById(modalId);
   if (!modal) return;
-  document.documentElement.classList.toggle('mm-depth', modalId === 'membersMachineModal');
+  document.documentElement.classList.toggle('mm-depth', modalId === 'membersMachineModal' || modalId === 'gmMachineModal');
   const panelEl = document.querySelector(panelSel);
   if (panelEl) { panelEl.classList.add('mm-launching'); setTimeout(() => panelEl.classList.remove('mm-launching'), 200); }
   document.documentElement.classList.add('mm-prewarm');
@@ -46678,6 +46755,217 @@ function closeMembersFocus() {
   try { _mmCloseFocus('membersMachineModal'); }
   catch (_) { const m = document.getElementById('membersMachineModal'); m.classList.remove('mm-open'); m.style.display = 'none'; }
 }
+// ── Tower (GM agent): the boardroom. Rule-based router like Shield's -
+// answers whole-business questions itself, hands specialist asks to the
+// right staff member. Opens from the mobile tab-bar orb (tap = type,
+// hold = speak). Reuses the mma-* room styling. ──
+function _gmaEnsureModal() {
+  if (document.getElementById('gmMachineModal')) return;
+  document.body.insertAdjacentHTML('beforeend', `
+    <div id="gmMachineModal" class="modal-backdrop mm-focus-page" style="display:none" onclick="if(event.target===this)closeGmFocus()">
+      <div class="modal-card mm-modal-card mma-shell" onclick="event.stopPropagation()">
+        <button type="button" class="mm-back-btn" onclick="closeGmFocus()">&lsaquo; Back</button>
+        <div class="mma-split">
+          <aside class="mma-rail" id="gma-rail">
+            <div class="mma-bench">
+              <span class="mma-orb mma-orb-lg" id="gma-orb"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4.9 16.1C1 12.2 1 5.8 4.9 1.9"/><path d="M7.8 4.7a6.14 6.14 0 0 0-.8 7.5"/><circle cx="12" cy="9" r="2"/><path d="M16.2 4.7a6.14 6.14 0 0 1 .8 7.5"/><path d="M19.1 1.9a10 10 0 0 1 0 14.2"/><path d="M9.5 18h5"/><path d="m8 22 4-11 4 11"/></svg></span>
+              <div class="mma-bench-name">Tower</div>
+              <div class="mma-bench-role">General manager</div>
+              <div class="mma-bench-status" id="gma-status">Running the floor.</div>
+            </div>
+            <div class="mma-rail-h">The floor</div>
+            <div id="gma-floor"></div>
+          </aside>
+          <div class="mma-main">
+            <div class="mma-log" id="gma-log"></div>
+            <div class="mma-voice" id="gma-voice"></div>
+            <div class="mma-desk" id="gma-desk"></div>
+            <div class="mma-compose">
+              <textarea class="mma-input" id="gma-input" rows="1" placeholder="Ask about the whole business..."></textarea>
+              <button type="button" class="mma-send" onclick="_gmaSend()" aria-label="Send">&#8593;</button>
+            </div>
+            <div class="mma-chips">
+              <button type="button" class="mma-chip" onclick="_gmaChip(&quot;How's business?&quot;)">How's business?</button>
+              <button type="button" class="mma-chip" onclick="_gmaChip('What needs me today?')">What needs me?</button>
+              <button type="button" class="mma-chip" onclick="_gmaChip(&quot;How's the roster?&quot;)">How's the roster?</button>
+              <button type="button" class="mma-chip" onclick="_gmaChip('How are the ads doing?')">How are the ads?</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>`);
+  const inp = document.getElementById('gma-input');
+  inp.addEventListener('keydown', e => {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); _gmaSend(); }
+  });
+}
+function openGmFocus(voice) {
+  _gmaEnsureModal();
+  _ccOpenFocusPage('gmMachineModal', '#cc-mtab-orb');
+  _gmaFloor();
+  if (!window._GMA_GREETED) { window._GMA_GREETED = true; setTimeout(() => _gmaHandle('business snapshot'), 500); }
+  setTimeout(() => {
+    if (voice) _gmaVoice();
+    else document.getElementById('gma-input')?.focus();
+  }, 650);
+}
+function closeGmFocus() {
+  try { _mmCloseFocus('gmMachineModal'); }
+  catch (_) { const m = document.getElementById('gmMachineModal'); if (m) { m.classList.remove('mm-open'); m.style.display = 'none'; } }
+}
+// One-line live status per staff member, from data already on the page.
+function _gmaFloor() {
+  const host = document.getElementById('gma-floor');
+  if (!host) return;
+  const hawk = window._hmHawkTotal || 0;
+  const roster = (typeof _ccRoster === 'function') ? _ccRoster() : [];
+  const live = roster.filter(m => m.status === 'live' || m.status === 'cancelling').length;
+  const mm = (typeof _MM !== 'undefined' && _MM) ? _MM : null;
+  const spark = mm && Array.isArray(mm.sparkline) && mm.sparkline.length ? mm.sparkline[mm.sparkline.length - 1] : null;
+  const rows = [
+    { n: 'Hawk', st: hawk > 0 ? hawk + (hawk === 1 ? ' action' : ' actions') + ' waiting on you' : 'Working the pipeline. Caught up.', go: () => { closeGmFocus(); setTimeout(() => { try { _hv2OpenHawkeye(); } catch (_) {} }, 420); }, ic: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="2.5"/><line x1="12" y1="1.5" x2="12" y2="5"/><line x1="12" y1="19" x2="12" y2="22.5"/><line x1="1.5" y1="12" x2="5" y2="12"/><line x1="19" y1="12" x2="22.5" y2="12"/></svg>' },
+    { n: 'Flare', st: spark ? 'CPL sitting at $' + Number(spark.cpl).toFixed(2) : 'Campaigns running.', go: () => { closeGmFocus(); setTimeout(() => document.getElementById('cc-sec-marketing')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 480); }, ic: '<svg viewBox="0 0 24 24"><path d="m3 11 18-5v12L3 14v-3z"/><path d="M11.6 16.8a3 3 0 1 1-5.8-1.6"/></svg>' },
+    { n: 'Shield', st: live ? live + ' members on the books.' : 'Watching the roster.', go: () => { closeGmFocus(); setTimeout(() => { try { openMembersFocus(); } catch (_) {} }, 480); }, ic: '<svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>' },
+  ];
+  host.innerHTML = rows.map((r, i) => `<button type="button" class="gma-floor-row" id="gma-fl-${i}"><span class="gma-floor-ic">${r.ic}</span><span style="min-width:0"><span class="gma-floor-nm">${r.n}</span><br><span class="gma-floor-st">${escapeHTML(r.st)}</span></span></button>`).join('');
+  rows.forEach((r, i) => { const el = document.getElementById('gma-fl-' + i); if (el) el.addEventListener('click', r.go); });
+}
+function _gmaChip(text) {
+  const inp = document.getElementById('gma-input');
+  if (!inp) return;
+  inp.value = text;
+  _gmaSend();
+}
+function _gmaLogLine(text) {
+  const log = document.getElementById('gma-log');
+  if (!log || !text) return;
+  log.insertAdjacentHTML('beforeend', '<div class="mma-log-line">' + escapeHTML(text) + '</div>');
+  while (log.children.length > 3) log.firstElementChild.remove();
+}
+function _gmaThink(lines) {
+  return new Promise(resolve => {
+    const v = document.getElementById('gma-voice');
+    const st = document.getElementById('gma-status');
+    if (st) st.textContent = 'Reading the business...';
+    if (!v || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return resolve();
+    if (!v.classList.contains('think')) _gmaLogLine(v.textContent.trim());
+    v.classList.add('think');
+    let i = 0;
+    (function step() {
+      if (!v.isConnected) return resolve();
+      v.textContent = lines[i];
+      i++;
+      if (i < lines.length) setTimeout(step, 240);
+      else setTimeout(() => { if (st) st.textContent = 'Running the floor.'; resolve(); }, 260);
+    })();
+  });
+}
+function _gmaSay(text, cardsHtml) {
+  const v = document.getElementById('gma-voice');
+  if (!v) return;
+  if (!v.classList.contains('think')) _gmaLogLine(v.textContent.trim());
+  v.classList.remove('think');
+  const desk = document.getElementById('gma-desk');
+  if (desk) desk.innerHTML = cardsHtml || '';
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) { v.textContent = text; return; }
+  v.textContent = '';
+  let i = 0;
+  clearInterval(window._gmaTypeT);
+  window._gmaTypeT = setInterval(() => {
+    if (!v.isConnected) return clearInterval(window._gmaTypeT);
+    i++;
+    v.textContent = text.slice(0, i);
+    if (i >= text.length) clearInterval(window._gmaTypeT);
+  }, 14);
+}
+function _gmaTiles(pairs) {
+  return '<div style="display:flex;gap:10px;flex-wrap:wrap">' + pairs.map(p =>
+    `<div style="flex:1;min-width:110px;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:12px 14px"><div style="font-family:var(--font-num);font-size:22px;font-weight:800;color:var(--text)">${escapeHTML(p[1])}</div><div style="font-size:10.5px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--text-mute);margin-top:2px">${escapeHTML(p[0])}</div></div>`).join('') + '</div>';
+}
+function _gmaHandoff(label, fn) {
+  const id = 'gma-ho-' + Math.floor(performance.now());
+  setTimeout(() => { const el = document.getElementById(id); if (el) el.addEventListener('click', fn); }, 60);
+  return `<button type="button" class="mma-chip" id="${id}" style="margin-top:4px">${escapeHTML(label)} &rsaquo;</button>`;
+}
+function _gmaSend() {
+  const inp = document.getElementById('gma-input');
+  const txt = (inp?.value || '').trim();
+  if (!txt) return;
+  inp.value = '';
+  try { hapticTap('LIGHT'); } catch (_) {}
+  const v = document.getElementById('gma-voice');
+  if (v && !v.classList.contains('think')) { _gmaLogLine(v.textContent.trim()); v.textContent = ''; }
+  _gmaLogLine('You: ' + txt);
+  _gmaHandle(txt.toLowerCase());
+}
+async function _gmaHandle(q) {
+  const roster = (typeof _ccRoster === 'function') ? _ccRoster() : [];
+  const live = roster.filter(m => m.status === 'live' || m.status === 'cancelling');
+  const mrr = live.reduce((s, m) => s + (typeof _ccMonthly === 'function' ? _ccMonthly(m) : 0), 0);
+  const hawk = window._hmHawkTotal || 0;
+  if (/business|snapshot|overview|numbers|how.?s (it|things|everything)|today look/.test(q)) {
+    await _gmaThink(['Pulling the floor reports...', 'Money, roster, pipeline...']);
+    _gmaSay(`Steady. ${live.length} member${live.length === 1 ? '' : 's'} on the books, MRR around $${Math.round(mrr).toLocaleString()}, and ${hawk ? hawk + ' thing' + (hawk === 1 ? '' : 's') + ' waiting on you.' : 'nothing waiting on you.'}`,
+      _gmaTiles([['Members', String(live.length)], ['MRR (approx)', '$' + Math.round(mrr).toLocaleString()], ['Waiting on you', String(hawk)]]));
+    return;
+  }
+  if (/need|waiting|action|approve|do today|priorit/.test(q)) {
+    await _gmaThink(['Checking with Hawk...']);
+    _gmaSay(hawk ? `Hawk has ${hawk} thing${hawk === 1 ? '' : 's'} queued for your sign-off. Everything else is running.` : 'Nothing needs you right now. The floor is running itself.',
+      hawk ? _gmaHandoff('Open Hawkeye', () => { closeGmFocus(); setTimeout(() => { try { _hv2OpenHawkeye(); } catch (_) {} }, 420); }) : '');
+    return;
+  }
+  if (/roster|member|churn|paused|athlete|kid|mrr|revenue|pay/.test(q)) {
+    await _gmaThink(['That is Shield\'s desk...']);
+    _gmaSay(`Shield runs the roster - ${live.length} live member${live.length === 1 ? '' : 's'} right now. Want me to bring them in?`,
+      _gmaHandoff('Bring in Shield', () => { closeGmFocus(); setTimeout(() => { try { openMembersFocus(); } catch (_) {} }, 480); }));
+    return;
+  }
+  if (/ad|market|lead|campaign|cpl|content|creative|funnel/.test(q)) {
+    await _gmaThink(['Flare has the campaign reports...']);
+    const mm = (typeof _MM !== 'undefined' && _MM) ? _MM : null;
+    const spark = mm && Array.isArray(mm.sparkline) && mm.sparkline.length ? mm.sparkline[mm.sparkline.length - 1] : null;
+    _gmaSay(spark ? `Flare says cost per lead is sitting at $${Number(spark.cpl).toFixed(2)}. The full picture is on the marketing board.` : 'Flare is running the campaigns. The full picture is on the marketing board.',
+      _gmaHandoff('See marketing', () => { closeGmFocus(); setTimeout(() => document.getElementById('cc-sec-marketing')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 480); }));
+    return;
+  }
+  if (/sale|trial|pipeline|book|close/.test(q)) {
+    await _gmaThink(['Hawk has the board...']);
+    _gmaSay('Hawk runs the pipeline. The sales board has the live picture.',
+      _gmaHandoff('See sales', () => { closeGmFocus(); setTimeout(() => document.getElementById('cc-sec-sales')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 480); }));
+    return;
+  }
+  _gmaSay('I run the floor. Ask how business is doing, what needs you today, or call on Hawk, Flare or Shield.', '');
+}
+// Hold-to-speak: browser speech recognition when the device has it,
+// honest fallback to typing when it does not (WKWebView often lacks it).
+function _gmaVoice() {
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  const inp = document.getElementById('gma-input');
+  if (!SR) {
+    _gmaSay("Voice isn't available on this device yet - type it and I'm on it.", '');
+    if (inp) inp.focus();
+    return;
+  }
+  try {
+    const rec = new SR();
+    rec.lang = 'en-US';
+    rec.interimResults = true;
+    const st = document.getElementById('gma-status');
+    if (st) st.textContent = 'Listening...';
+    let heard = '';
+    rec.onresult = e => {
+      let t = '';
+      for (let i = 0; i < e.results.length; i++) t += e.results[i][0].transcript;
+      heard = t;
+      if (inp) inp.value = t;
+    };
+    rec.onend = () => { if (st) st.textContent = 'Running the floor.'; if (heard.trim()) _gmaSend(); else if (inp) inp.focus(); };
+    rec.onerror = () => { if (st) st.textContent = 'Running the floor.'; if (inp) inp.focus(); };
+    rec.start();
+  } catch (_) { if (inp) inp.focus(); }
+}
+
 function _mmaSend() {
   const inp = document.getElementById('mma-input');
   const txt = (inp?.value || '').trim();
