@@ -46239,11 +46239,37 @@ async function boot() {
   // client_users table (owner OR invited teammate); RLS scopes this query
   // to exactly the caller's clients via my_client_ids(). One auth user can
   // belong to multiple clients - the bottom-left switcher lets them flip.
+  const CLIENT_SELECT_COLS = 'id, business_name, owner_name, email, onboarding_completed_at, marketing_included, v2_access, v15_access, v4_access, organic_content, ads_content_approval_required, onboarding_feedback_requested_at, onboarding_feedback_submitted_at, contact_provider';
   const { data: clientRows } = await _sb.from('clients')
-    .select('id, business_name, owner_name, email, onboarding_completed_at, marketing_included, v2_access, v15_access, v4_access, organic_content, ads_content_approval_required, onboarding_feedback_requested_at, onboarding_feedback_submitted_at, contact_provider')
+    .select(CLIENT_SELECT_COLS)
     .is('archived_at', null)
     .order('business_name');
   CLIENT_ROWS = clientRows || [];
+
+  // Deferred-signup provisioning (Option B): the public signup no longer creates
+  // the clients row up front. The first time a freshly-invited owner logs in they
+  // have no academy yet - create it now from the pending_academy stashed on their
+  // invite, then reload the list. Only runs when there's nothing to show, so it
+  // never touches existing clients. Falls through to the not-linked message below
+  // if there's genuinely nothing to provision (e.g. a mis-routed staff user).
+  if (!CLIENT_ROWS.length) {
+    try {
+      const prov = await fetch('/api/clients?action=provision-account', {
+        method: 'POST',
+        headers: { Authorization: 'Bearer ' + session.access_token },
+      });
+      if (prov.ok) {
+        const pj = await prov.json().catch(() => ({}));
+        if (pj && pj.client) {
+          const { data: reRows } = await _sb.from('clients')
+            .select(CLIENT_SELECT_COLS)
+            .is('archived_at', null)
+            .order('business_name');
+          CLIENT_ROWS = reRows || [];
+        }
+      }
+    } catch (_) { /* non-fatal - falls through to the not-linked message */ }
+  }
   // Pick the active academy: (1) the one you last selected on this device, else
   // (2) an academy you OWN, else (3) the first alphabetically.
   // For (2): when you own several academies, prefer the HIGHEST tier (V2 >
@@ -46253,27 +46279,27 @@ async function boot() {
   // yet - without it, an owner of both a V1 and a V2 academy would boot into
   // the V1 one just because its name sorts earlier.
   let clientRow = null;
-  if (clientRows && clientRows.length) {
+  if (CLIENT_ROWS && CLIENT_ROWS.length) {
     let stored = null;
     try { stored = localStorage.getItem('bam_active_client'); } catch (_) {}
-    if (stored) clientRow = clientRows.find(c => c.id === stored) || null;
+    if (stored) clientRow = CLIENT_ROWS.find(c => c.id === stored) || null;
     if (!clientRow) {
       try {
         const { data: ownRows } = await _sb.from('client_users')
           .select('client_id').eq('user_id', session.user.id).eq('role', 'owner').eq('status', 'active');
         const ownedIds = new Set((ownRows || []).map(r => r.client_id));
         if (ownedIds.size) {
-          // clientRows is already alpha-sorted; a stable sort by tier (desc)
+          // CLIENT_ROWS is already alpha-sorted; a stable sort by tier (desc)
           // keeps alphabetical order as the tiebreak within the same tier.
           const tierRank = (c) => c.v2_access === true ? 3
             : (c.v15_access === true || c.v4_access === true ? 2 : 1);
-          const owned = clientRows.filter(c => ownedIds.has(c.id));
+          const owned = CLIENT_ROWS.filter(c => ownedIds.has(c.id));
           owned.sort((a, b) => tierRank(b) - tierRank(a));
           clientRow = owned[0] || null;
         }
       } catch (_) {}
     }
-    if (!clientRow) clientRow = clientRows[0];
+    if (!clientRow) clientRow = CLIENT_ROWS[0];
   }
   if (!clientRow) {
     // Defensive: if this is actually a STAFF user (e.g. they clicked a staff

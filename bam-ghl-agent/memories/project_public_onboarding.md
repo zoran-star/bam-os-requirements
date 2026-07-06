@@ -15,11 +15,14 @@ type: project
 ## What the onboarding flow does
 
 1. User fills form: Academy name, Owner name, Email
-2. `POST /api/clients` (no auth) creates the `clients` row (status=onboarding) + sends Supabase invite email via Resend SMTP (custom SMTP wired 2026-05-15 — `byanymeansbball.com` verified in Resend, sender `portal@byanymeansbball.com`)
+2. `POST /api/clients` (no auth) sends the Supabase invite email via Resend SMTP (custom SMTP wired 2026-05-15 — `byanymeansbball.com` verified in Resend, sender `portal@byanymeansbball.com`). **⚠️ DEFERRED ROW CREATION (Option B, 2026-07-06):** it does **NOT** create the `clients` row here. The academy details ride on the invite as `user_metadata.pending_academy = { business_name, owner_name }`. So an abandoned signup (invite never accepted) leaves **no `clients` row** — nothing to clean out of the staff Clients tab. (Exception: if the email already has an auth account → 422 → it falls back to creating the row immediately, since there's no fresh "first login" to trigger provisioning.)
 3. User clicks email link → Supabase verifies → redirects to `/client-portal.html?type=invite#access_token=...`
 4. Client portal `boot()` detects either the URL flag OR `user_metadata.needs_password=true` and shows the "Welcome — choose your password" form
 5. User sets password (`updateUser({ password, data: { needs_password: false } })`) → reloads as logged-in client
-6. **Lands on the Systems tab** (the sidebar's default-active nav item) — the Systems tab hosts the "Start setup" progress card that opens the 6-section onboarding-reloaded.html flow in an iframe sub-screen. The Marketing tab still has the sample campaign cards + Connect Meta CTA, but the client lands on Systems first because that's where setup happens.
+6. **First-login provisioning:** `boot()` loads the caller's academies; if there are **none**, it calls `POST /api/clients?action=provision-account` which creates the `clients` row (status=onboarding) + owner `client_users` membership from `pending_academy`, clears `pending_academy`, and reloads the list. Idempotent (membership/auth_user_id check first); a no-op for users with nothing pending. This is the moment the academy first appears in the staff Clients tab. Existing clients (≥1 academy) skip this block entirely.
+7. **Lands on the Systems tab** (the sidebar's default-active nav item) — the Systems tab hosts the "Start setup" progress card that opens the 6-section onboarding-reloaded.html flow in an iframe sub-screen.
+
+**Tradeoff of Option B (Zoran's call 2026-07-06):** abandoned signups get NO auto-resend-invite nudge (the resend cron finds clients by row, and there's no row until first login). Chosen deliberately to keep the Clients tab clean. See also the staff Clients-tab filter that hides `status=onboarding` + `onboarding_completed_at is null` rows from the default view (they're still reachable via the Onboarding status filter) — that filter now mainly covers legacy pre-Option-B shells + logged-in-but-tour-incomplete clients.
 
 ## Connect Meta flow (optional, post-onboarding)
 
