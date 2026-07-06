@@ -158,6 +158,7 @@
     /* V2 design-system tokens (see bam-portal/design-system/DESIGN.md) */
     --font-ui: "Plus Jakarta Sans", -apple-system, system-ui, sans-serif;
     --font-num:"Nunito", sans-serif;
+    --font-mono:"DM Mono", ui-monospace, monospace;
     --on-gold: #131416;   /* text on gold fills - constant across themes */
   }
 
@@ -3707,8 +3708,9 @@
     max-width: 900px; width: min(900px, 96vw); max-height: none;
     margin: 28px auto 48px; background: transparent; border: none; box-shadow: none;
   }
-  /* focus pages run on the design system: Jakarta UI + Nunito display */
-  .mm-focus-page { font-family: var(--font-ui); }
+  /* focus pages run on the design system: Jakarta UI + Nunito display,
+     DM Mono for the telemetry labels (redefines --mono for children) */
+  .mm-focus-page { font-family: var(--font-ui); --mono: var(--font-mono); }
   .mm-focus-page input, .mm-focus-page textarea, .mm-focus-page button, .mm-focus-page select { font-family: inherit; }
   .mm-focus-page .modal-title { font-family: var(--font-num); font-weight: 800; letter-spacing: 0; }
   /* pages ride together: main + sidebar pan left exactly as the focus page
@@ -16000,8 +16002,9 @@ function _hmRestoreToggle() {
 const _HM_KPI_CATALOG = [
   { key: 'leads', label: 'New Leads', desc: 'New leads generated this week', color: '#D4B65C', icon: _HV2_ICONS.users, iconBg: 'rgba(212,182,92,.12)', ringMode: 'target-or-wow' },
   { key: 'trials', label: 'Trials Booked', desc: 'Free trial signups this week', color: '#4CC76A', icon: _HV2_ICONS.clock, iconBg: 'rgba(76,199,106,.12)', ringMode: 'target-or-wow' },
-  { key: 'mrr', label: 'MRR Growth', desc: 'Monthly recurring revenue', color: '#5A8FB8', prefix: '$', icon: _HV2_ICONS.dollar, iconBg: 'rgba(90,143,184,.12)', ringMode: 'target-or-mom' },
-  { key: 'rev', label: 'Revenue', desc: 'Revenue collected yesterday', color: '#F0B84A', prefix: '$', icon: _HV2_ICONS.dollar, iconBg: 'rgba(240,184,74,.12)', ringMode: 'target-or-wow' },
+  { key: 'mrr', label: 'MRR', desc: 'Monthly recurring revenue right now', color: '#5A8FB8', prefix: '$', icon: _HV2_ICONS.dollar, iconBg: 'rgba(90,143,184,.12)', ringMode: 'target-or-mom' },
+  { key: 'newmembers', label: 'New Members', desc: 'New members this month', color: '#9B8CE8', icon: _HV2_ICONS.users, iconBg: 'rgba(155,140,232,.12)', ringMode: 'target-or-mom' },
+  { key: 'rev', label: 'Revenue', desc: 'Net revenue, last 7 days', color: '#F0B84A', prefix: '$', icon: _HV2_ICONS.dollar, iconBg: 'rgba(240,184,74,.12)', ringMode: 'target-or-wow' },
   { key: 'members', label: 'Active Members', desc: 'Total active memberships', color: '#9B8CE8', icon: _HV2_ICONS.activity, iconBg: 'rgba(155,140,232,.12)', ringMode: 'target-or-mom' },
   { key: 'replies', label: 'Reply Rate', desc: 'Lead reply rate this week', color: '#E87C71', suffix: '%', icon: _HV2_ICONS.msg, iconBg: 'rgba(232,124,113,.12)', ringMode: 'pct' },
   { key: 'churn', label: 'Churn Rate', desc: 'Cancellation rate (lower is better)', color: '#F07060', suffix: '%', icon: _HV2_ICONS.refresh, iconBg: 'rgba(240,112,96,.12)', ringMode: 'inverse-pct' },
@@ -16009,7 +16012,7 @@ const _HM_KPI_CATALOG = [
   { key: 'conversion', label: 'Trial Conversion', desc: 'Trials converting to paid', color: '#4CC76A', suffix: '%', icon: _HV2_ICONS.check, iconBg: 'rgba(76,199,106,.12)', ringMode: 'pct' },
   { key: 'revmember', label: 'Revenue / Member', desc: 'Avg monthly revenue per member', color: '#D4B65C', prefix: '$', icon: _HV2_ICONS.chart, iconBg: 'rgba(212,182,92,.12)', ringMode: 'target-or-mom' },
 ];
-const _HM_DEFAULT_KPIS = ['leads', 'trials', 'mrr', 'rev'];
+const _HM_DEFAULT_KPIS = ['leads', 'trials', 'mrr', 'newmembers'];
 function _hmGetSelectedKpis() {
   try { const s = localStorage.getItem('hm_kpis'); if (s) { const p = JSON.parse(s); if (Array.isArray(p) && p.length >= 1 && p.length <= 6) return p; } } catch (_) {}
   return _HM_DEFAULT_KPIS;
@@ -16196,13 +16199,15 @@ async function _hmLoadScoreboard() {
   const yd = new Date(now); yd.setDate(yd.getDate() - 1);
   const yesterday = _hv2Ymd(yd);
 
-  // Current month for MRR
+  // Current month for MRR fallback; revenue window = last 7 days
   const monthStart = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
-  const [mkWeek, mkPrev, rev, mrr] = await Promise.all([
+  const wk7 = _hv2Ymd(new Date(now.getTime() - 6 * 86400000));
+  const [mkWeek, mkPrev, rev, mrr, roster] = await Promise.all([
     _hv2Kpi('marketing', weekStart, today),
     _hv2Kpi('marketing', prevWeekStart, prevWeekEnd),
-    _hv2Kpi('revenue', yesterday, yesterday),
+    _hv2Kpi('revenue', wk7, today),
     _hv2Kpi('revenue', monthStart, today),
+    (typeof _ccEnsureMembers === 'function' ? _ccEnsureMembers().catch(() => []) : Promise.resolve([])),
   ]);
 
   // Build data map for all possible KPIs
@@ -16210,15 +16215,27 @@ async function _hmLoadScoreboard() {
   const prevLeads = (mkPrev && Number(mkPrev.leads)) || 0;
   const trials = (mkWeek && Number(mkWeek.trials_booked)) || 0;
   const prevTrials = (mkPrev && Number(mkPrev.trials_booked)) || 0;
-  const mrrVal = (mrr && mrr.stripe_ok !== false && Number(mrr.mrr || mrr.net)) || 0;
   const net = (rev && rev.stripe_ok !== false && Number(rev.net)) || 0;
+
+  // Roster-derived: ongoing MRR, joins this / last month, active count
+  const people = Array.isArray(roster) ? roster : [];
+  const rk = (typeof _ccMemberKpis === 'function' && people.length) ? _ccMemberKpis(people) : { live: 0, mrr: 0 };
+  const joinT = (m) => new Date(m.joined_date || m.start_date || m.stripe_joined_at || 0).getTime();
+  const m0 = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
+  const mPrev = new Date(now.getFullYear(), now.getMonth() - 1, 1).getTime();
+  const joinsNow = people.filter(m => joinT(m) >= m0);
+  const joinsPrev = people.filter(m => { const t = joinT(m); return t >= mPrev && t < m0; });
+  const mrrVal = rk.mrr > 0 ? rk.mrr : ((mrr && mrr.stripe_ok !== false && Number(mrr.mrr || mrr.net)) || 0);
+  const newMrr = joinsNow.reduce((s, m) => s + (typeof _ccMonthly === 'function' ? _ccMonthly(m) : 0), 0);
 
   const kpiData = {
     leads: { val: leads, prefix: '', delay: 900 },
     trials: { val: trials, prefix: '', delay: 900 },
     mrr: { val: Math.round(mrrVal), prefix: mrrVal > 0 ? '$' : '', delay: 1100 },
+    newmembers: { val: joinsNow.length, prefix: '', delay: 900 },
     rev: { val: Math.round(net), prefix: net > 0 ? '$' : '', delay: 1100 },
-    members: { val: 0, prefix: '', delay: 900 },
+    members: { val: rk.live, prefix: '', delay: 900 },
+    revmember: { val: rk.live ? Math.round(mrrVal / rk.live) : 0, prefix: rk.live && mrrVal > 0 ? '$' : '', delay: 1100 },
     replies: { val: 0, prefix: '', delay: 900, suffix: '%' },
   };
 
@@ -16226,14 +16243,20 @@ async function _hmLoadScoreboard() {
   const kpiPrev = {
     leads: prevLeads,
     trials: prevTrials,
-    mrr: 0, rev: 0, members: 0, replies: 0, churn: 0, attendance: 0, conversion: 0, revmember: 0,
+    mrr: Math.max(0, mrrVal - newMrr),
+    newmembers: joinsPrev.length,
+    rev: 0, members: 0, replies: 0, churn: 0, attendance: 0, conversion: 0, revmember: 0,
   };
 
   // Populate each visible stat
   const selected = _hmGetSelectedKpis();
   for (const key of selected) {
     const d = kpiData[key];
-    if (!d) continue;
+    if (!d) {
+      const el0 = document.getElementById('hm-s-' + key);
+      if (el0) { el0.classList.remove('hm-stat-skel'); el0.textContent = '-'; }
+      continue;
+    }
     const el = document.getElementById('hm-s-' + key);
     if (el) { el.classList.remove('hm-stat-skel'); _hmCountUp(el, d.val, d.prefix, d.delay); }
     // Set ring fill (target if set, otherwise period-over-period)
@@ -16253,9 +16276,11 @@ async function _hmLoadScoreboard() {
   window._hmStatContext = {
     leads: { val: leads, prev: prevLeads, label: prevLeads > 0 ? (leads > prevLeads ? '+' : '') + (leads - prevLeads) + ' vs last week' : 'No prior week data' },
     trials: { val: trials, prev: prevTrials, label: prevTrials > 0 ? (trials > prevTrials ? '+' : '') + (trials - prevTrials) + ' vs last week' : (trials > 0 ? trials + ' this week' : 'None yet this week') },
-    mrr: { val: mrrVal, label: mrrVal > 0 ? '$' + Math.round(mrrVal).toLocaleString() + '/mo recurring' : 'No recurring revenue' },
-    rev: { val: net, label: net > 0 ? '$' + Math.round(net).toLocaleString() + ' collected yesterday' : 'No collections yesterday' },
-    members: { val: 0, label: 'Coming soon' },
+    mrr: { val: mrrVal, label: mrrVal > 0 ? '$' + Math.round(mrrVal).toLocaleString() + '/mo recurring right now' : 'No recurring revenue yet' },
+    newmembers: { val: joinsNow.length, label: joinsNow.length > 0 ? '+' + joinsNow.length + ' joined this month' : 'No new members yet this month' },
+    rev: { val: net, label: net > 0 ? '$' + Math.round(net).toLocaleString() + ' collected in the last 7 days' : 'No collections in the last 7 days' },
+    members: { val: rk.live, label: rk.live > 0 ? rk.live + ' active memberships' : 'No active members yet' },
+    revmember: { val: rk.live ? mrrVal / rk.live : 0, label: rk.live ? '$' + Math.round(mrrVal / rk.live).toLocaleString() + '/mo average per member' : 'No members yet' },
     replies: { val: 0, label: 'Coming soon' },
   };
   // #1: Pulse ring on value change
@@ -16264,7 +16289,7 @@ async function _hmLoadScoreboard() {
   _hmUpdateTicker(leads, trials, net, mrrVal);
 
   // UX #3: Check milestones after scoreboard loads
-  _hmCheckMilestones({ leads, trials, revenue: net, members: 0, mrr: mrrVal });
+  _hmCheckMilestones({ leads, trials, revenue: net, members: rk.live, mrr: mrrVal });
 
   // UX #5: Start auto-refresh
   _hmStartScoreRefresh();
@@ -16385,10 +16410,6 @@ function _hmCountUp(el, target, prefix, duration) {
   const dur = duration || 900;
   const start = performance.now();
   el.classList.add('hm-countup');
-  if (!window._sfxRollT || Date.now() - window._sfxRollT > 700) {
-    window._sfxRollT = Date.now();
-    try { for (let k = 0; k < 4; k++) _SFX.rollClick(k * 0.12); } catch (_) {}
-  }
   function tick(now) {
     const p = Math.min((now - start) / dur, 1);
     const ease = 1 - Math.pow(1 - p, 3); // ease-out cubic
@@ -16815,7 +16836,6 @@ function _hmCheckPerfectDay(actionCount, hawkTotal) {
   if (greeting) {
     greeting.insertAdjacentHTML('afterend',
       `<span class="hm-perfect-day"><svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" stroke="none"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26"/></svg> Perfect day <span class="hm-perfect-day-count">${count} this month</span><span class="hm-perfect-tip"><div class="hm-perfect-tip-h">0 overdue items, 0 pending approvals</div><div class="hm-perfect-tip-b">You've had ${count} perfect day${count === 1 ? '' : 's'} this month. Keep it up!</div></span></span>`);
-  if (!window._sfxPdPlayed) { window._sfxPdPlayed = true; try { _SFX.sparkle(); } catch (_) {} }
   }
 }
 
@@ -43772,7 +43792,6 @@ function _ccOrbToggle(force) {
   if (!dock) return;
   const open = force !== undefined ? force : !dock.classList.contains('open');
   dock.classList.toggle('open', open);
-  if (open) { try { _SFX.pop(); } catch (_) {} }
   if (!open) document.getElementById('cc-dock-pop')?.classList.remove('open');
 }
 
@@ -43805,10 +43824,6 @@ function _ccRailFx(rail) {
     const rr = rail.getBoundingClientRect();
     const p = Math.min(1, Math.max(0, (e.clientY - rr.top) / rr.height));
     main.scrollTop = p * (main.scrollHeight - main.clientHeight);
-    if (!window._sfxZipT || performance.now() - window._sfxZipT > 70) {
-      window._sfxZipT = performance.now();
-      try { _SFX.zip(p); } catch (_) {}
-    }
   });
   window.addEventListener('pointerup', () => {
     if (scrubbing && moved >= 5) {
@@ -43850,7 +43865,6 @@ function _ccHudType(hud, text) {
   hud._typeT = setInterval(() => {
     i++;
     span.textContent = text.slice(0, i);
-    if (i % 3 === 0) { try { _SFX.typeTap(); } catch (_) {} }
     if (i >= text.length) clearInterval(hud._typeT);
   }, 16);
 }
@@ -44055,7 +44069,6 @@ function _ccInitRecede(root, secs) {
         const on = d.id === 'cc-dot-' + actKey;
         if (on && !d.classList.contains('on')) {
           d.classList.add('tick', 'flash');
-          try { _SFX.tick(); } catch (_) {}
           setTimeout(() => d.classList.remove('tick'), 400);
           clearTimeout(d._flashT);
           d._flashT = setTimeout(() => d.classList.remove('flash'), 1700);
@@ -44249,10 +44262,6 @@ async function _ccLoadMemberMsgs() {
     mine.sort((a, b) => (b.unreadCount > 0) - (a.unreadCount > 0));
     const rows = mine.slice(0, 4);
     if (!rows.length) { body.innerHTML = '<div class="cc-mem-good">' + '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>' + 'Inbox clear. Every parent answered.</div>'; return; }
-    if (rows.some(c => c.unreadCount > 0) && !window._sfxMsgPlayed) {
-      window._sfxMsgPlayed = true;
-      try { _SFX.chime(); } catch (_) {}
-    }
     body.innerHTML = rows.map(c => _ccIbRow(c)).join('') +
       `<button type="button" class="cc-mem-more" onclick="switchView('v15inbox')">Open member inbox</button>`;
   } catch (_) {
