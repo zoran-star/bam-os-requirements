@@ -45729,6 +45729,16 @@ function toggleTheme() {
   .mmc-sum-files { display:flex; flex-direction:column; gap:6px; margin:2px 0 4px; }
   .mmc-sum-file { display:flex; align-items:center; gap:8px; }
   .mmc-sum-brief { font-family:var(--font-ui); font-size:13px; color:var(--text-sub); line-height:1.55; white-space:pre-wrap; word-break:break-word; padding:2px 0 2px; }
+  /* sending / sent status views */
+  .mmc-status { display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; gap:15px; padding:40px 24px 34px; min-height:210px; }
+  .mmc-status-title { font-family:var(--font-num); font-size:20px; font-weight:800; color:var(--text); }
+  .mmc-status-sub { font-family:var(--font-ui); font-size:13px; color:var(--text-sub); max-width:300px; line-height:1.5; }
+  .mmc-spinner { width:44px; height:44px; border:3px solid var(--surface-hov); border-top-color:var(--gold); border-radius:50%; animation:mmcSpin 0.7s linear infinite; }
+  @keyframes mmcSpin { to { transform:rotate(360deg); } }
+  .mmc-check { width:54px; height:54px; border-radius:var(--radius-full); background:var(--green-soft); color:var(--green); display:flex; align-items:center; justify-content:center; animation:mmcPop 0.42s var(--espring, cubic-bezier(.34,1.56,.64,1)) both; }
+  @keyframes mmcPop { from { transform:scale(0.4); opacity:0; } to { transform:scale(1); opacity:1; } }
+  .mmc-status .mmc-btn-gold { margin-top:4px; }
+  @media (prefers-reduced-motion:reduce) { .mmc-spinner { animation-duration:1.4s; } .mmc-check { animation:none; } }
   @media (max-width:720px){ .v2req-body{ grid-template-columns:1fr; } .v2req-stage{ min-height:300px; } #v2ReqFrame{ min-height:300px; } .v2req-foot{ flex-direction:column; align-items:stretch; } .v2req-send{ width:100%; } }
 </style>
 
@@ -46359,6 +46369,8 @@ function _mmcCapture() {   // keep the typed brief / drive link across a re-rend
 function _mmcRender() {
   const card = document.getElementById('mmcCard');
   if (!card || !_MMC) return;
+  if (_MMC.step === 'sending') { card.innerHTML = _mmcSendingHtml(); return; }
+  if (_MMC.step === 'sent') { card.innerHTML = _mmcSentHtml(); return; }
   if (_MMC.step === 'confirm') { card.innerHTML = _mmcConfirmHtml(); return; }
   const isRep = _MMC.mode === 'replace', c = _MMC.creative, v = _MMC.verdict;
   const ctxLine = [_MMC.ctx && _MMC.ctx.campaign, _MMC.ctx && _MMC.ctx.adset].filter(Boolean).join(' &middot; ');
@@ -46503,8 +46515,31 @@ function _mmcSubmit() {   // fires from the confirmation step (already validated
     },
   };
   console.log('[v2-creative] MOCK submit (no table yet):', payload);   // TODO: POST /api/v2-support-tickets
-  _mmcClose();
-  _mmToast(isRep ? 'Replacement requested - your team is on it' : 'New creative requested - your team is on it');
+  // Loading -> sent checkmark. The setTimeout stands in for the real POST.
+  _MMC.step = 'sending';
+  _mmcRender();
+  setTimeout(() => {
+    if (!_MMC || _MMC.step !== 'sending') return;   // user closed mid-send
+    _MMC.step = 'sent';
+    _mmcRender();
+    setTimeout(() => { if (_MMC && _MMC.step === 'sent') _mmcClose(); }, 2600);   // auto-dismiss
+  }, 950);
+}
+function _mmcSendingHtml() {
+  return '<div class="mmc-status">' +
+    '<div class="mmc-spinner" role="status" aria-label="Sending"></div>' +
+    '<div class="mmc-status-title">Sending your request</div>' +
+    '<div class="mmc-status-sub">Packaging your assets and brief for the team.</div>' +
+  '</div>';
+}
+function _mmcSentHtml() {
+  const isRep = _MMC && _MMC.mode === 'replace';
+  return '<div class="mmc-status">' +
+    '<div class="mmc-check"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7"/></svg></div>' +
+    '<div class="mmc-status-title">Request sent</div>' +
+    '<div class="mmc-status-sub">' + (isRep ? 'Your team is on the replacement. Track it anytime in Systems.' : 'Your team is on it. Track it anytime in Systems.') + '</div>' +
+    '<button type="button" class="mmc-btn-gold" onclick="_mmcClose()">Done</button>' +
+  '</div>';
 }
 function _mmRenderMetaFocus(d) {
   const body = document.getElementById('mm-modal-body');
