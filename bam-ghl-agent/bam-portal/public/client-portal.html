@@ -3823,7 +3823,7 @@
   .mm-roi-chain b { font-size: 16px; color: var(--text); }
   .mm-roi-out { font-family: var(--mm-ff); font-size: 22px; font-weight: 800; letter-spacing: -0.01em; }
   .mm-roi-knob { font-family: var(--mm-fm); font-size: 12px; width: 64px; background: var(--surface-el); border: 1px solid var(--line); border-radius: 7px; padding: 3px 6px; color: var(--text); }
-  .mm-toast { position: fixed; top: 20px; left: 50%; transform: translateX(-50%); z-index: 1600; background: #1C1B18; color: #F8F7F5; font-family: var(--mm-ff); font-size: 12.5px; font-weight: 600; padding: 10px 18px; border-radius: 10px; animation: mmFadeIn 0.25s ease; }
+  .mm-toast { position: fixed; top: 20px; left: 50%; transform: translateX(-50%); z-index: 10080; background: #1C1B18; color: #F8F7F5; font-family: var(--mm-ff); font-size: 12.5px; font-weight: 600; padding: 10px 18px; border-radius: 10px; animation: mmFadeIn 0.25s ease; }
   /* vignette on a NON-transformed layer so it survives scrolling */
   .mm-focus-page::after { display: none; }
   .mm-gallery { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
@@ -45715,6 +45715,11 @@ function toggleTheme() {
   .mmc-btn-gold { font-family:var(--font-ui); font-size:13px; font-weight:700; color:var(--on-gold); background:var(--gold); border:none; border-radius:var(--radius-sm); padding:10px 20px; cursor:pointer; transition:filter var(--t-fast,.12s), transform var(--t-fast,.12s); }
   .mmc-btn-gold:hover { filter:brightness(1.05); }
   .mmc-btn-gold:active { transform:scale(0.98); }
+  /* "no-no" shake + red flag on a missing required field */
+  @keyframes mmcShake { 10%,90%{transform:translateX(-1px)} 20%,80%{transform:translateX(2px)} 30%,50%,70%{transform:translateX(-5px)} 40%,60%{transform:translateX(5px)} }
+  .mmc-shake { animation:mmcShake 0.42s cubic-bezier(.36,.07,.19,.97) both; }
+  .mmc-invalid { border-color:var(--red) !important; }
+  @media (prefers-reduced-motion:reduce) { .mmc-shake { animation:none; } }
   @media (max-width:720px){ .v2req-body{ grid-template-columns:1fr; } .v2req-stage{ min-height:300px; } #v2ReqFrame{ min-height:300px; } .v2req-foot{ flex-direction:column; align-items:stretch; } .v2req-send{ width:100%; } }
 </style>
 
@@ -46381,7 +46386,7 @@ function _mmcRender() {
     '</div>' +
     repCard +
     '<div class="mmc-field"><label class="mmc-label">Your footage &amp; photos</label>' +
-      '<label class="mmc-drop" ondragover="event.preventDefault();this.classList.add(\'is-over\')" ondragleave="this.classList.remove(\'is-over\')" ondrop="_mmcDrop(event)">' +
+      '<label class="mmc-drop" id="mmcDrop" ondragover="event.preventDefault();this.classList.add(\'is-over\')" ondragleave="this.classList.remove(\'is-over\')" ondrop="_mmcDrop(event)">' +
         '<input type="file" multiple accept="image/*,video/*" style="display:none" onchange="_mmcPick(this)">' +
         '<svg width="22" height="22" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8 11V3M8 3L5 6M8 3l3 3"/><path d="M2.5 10.5V12a1.5 1.5 0 0 0 1.5 1.5h8a1.5 1.5 0 0 0 1.5-1.5v-1.5"/></svg>' +
         '<span class="mmc-drop-main">Drop files or <b>browse</b></span>' +
@@ -46397,12 +46402,27 @@ function _mmcRender() {
       '<button type="button" class="mmc-btn-gold" onclick="_mmcSubmit()">' + (isRep ? 'Request replacement' : 'Request creative') + ' &rarr;</button>' +
     '</div>';
 }
+function _mmcShake(id) {   // "no-no" shake + red flag on a missing field
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.classList.remove('mmc-shake');
+  void el.offsetWidth;   // reflow so the animation can retrigger
+  el.classList.add('mmc-shake', 'mmc-invalid');
+  setTimeout(() => el.classList.remove('mmc-invalid'), 1400);
+}
 function _mmcSubmit() {
   if (!_MMC) return;
   _mmcCapture();
   const brief = (_MMC.brief || '').trim(), drive = (_MMC.drive || '').trim();
-  if (!_MMC.files.length && !drive) { _mmToast('Add your footage or photos (upload or a Drive link)'); return; }
-  if (!brief) { _mmToast('Add a quick brief so the team knows the vibe'); return; }
+  const needAssets = !_MMC.files.length && !drive, needBrief = !brief;
+  if (needAssets || needBrief) {
+    if (needAssets) _mmcShake('mmcDrop');
+    if (needBrief) _mmcShake('mmcBrief');
+    _mmToast(needAssets && needBrief ? 'Add your footage and a quick brief'
+      : needAssets ? 'Add your footage or photos (upload or a Drive link)'
+      : 'Add a quick brief so the team knows the vibe');
+    return;
+  }
   const isRep = _MMC.mode === 'replace', c = _MMC.creative, v = _MMC.verdict;
   const payload = {
     module: 'meta-ads', request_type: isRep ? 'replace' : 'add', source: 'v2_portal_creative',
