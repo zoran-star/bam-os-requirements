@@ -13,10 +13,38 @@ flow on purpose.
 - **Fulfillment: staff-manual first.** GHL agent drafting the change is a
   LATER phase, not launch.
 
+## Meta Ads creative requests (front end built 2026-07-05)
+The marketing-machine creatives section (`_mmRenderMetaFocus`) has per-creative
+**replace** + per-ad-set **+ add a new creative** buttons. They open a centered
+modal (`#mmCreativeModal`, `_mmcOpen('add'|'replace', idx)` / `_mmcRender` /
+`_mmcSubmit` in client-portal.html), built on design-system v1.5 (`.mmc-*`
+classes, tokens). Fields: format picker (9:16/4:5/1:1/16:9), asset upload + Drive
+link, brief. Replace mode pre-loads the losing creative (thumb + cpl/hook/freq/
+spend + the verdict's why-note) and reframes the brief as "what to keep, what to
+beat". Context maps `window._MMC_REP` / `_MMC_ADD` (rebuilt each render) carry
+campaign/ad set/offer + the creative being replaced into the payload. Submit is
+MOCKED (`console.log('[v2-creative] MOCK submit')` + toast) until
+v2_support_tickets lands, same pattern as the landing-page flow. Locked with
+Zoran: centered modal (not drawer), assets+brief required, mock backend. The
+**delete** button is still the old `_mmCreativeAction` toast stub.
+Confirmed flow before building (Zoran asked to). Decisions via popup:
+modal / assets+brief / mock-now.
+
 ## The one-click trigger (client side)
 Button `Request a change` on every V2 module view. One click opens a slim
 modal that has ALREADY captured context; client only picks change/add/fix +
 1-2 sentences. No forms about which page/metrics - auto-attached.
+
+## Where the tracker lives (Zoran 2026-07-05, built)
+The support-ticket TRACKER does NOT live on the marketing/landing focus view.
+It lives on the **Systems page** (`#view-systems`, "Systems Support Tickets",
+the existing real ticket list off the `tickets` global). The landing focus view
+instead shows a **nudge** (`_v2TicketsNudgeHtml` in client-portal.html) that
+renders ONLY when there are live (non-terminal) tickets: gold + "N to reply"
+badge when any are awaiting_client/final_review, neutral "in progress"
+otherwise, hidden when nothing is live. Click -> `_v2GoToTickets()` =
+closeLandingMachine() + switchView('systems'). The old mock "Your requests"
+list (_V2_REQUESTS / _v2ActionItemsHtml) was removed.
 
 ## Page annotation flow (Landing Page view - Zoran 2026-07-05)
 V2 landing pages are OUR OWN pages (bam-client-sites), NOT GHL - so a LIVE

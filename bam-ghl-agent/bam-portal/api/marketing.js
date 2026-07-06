@@ -3394,7 +3394,7 @@ async function handleMetaMachine(req, res) {
       ]);
       return { ads: ads.data || [], adsets: adsets.data || [], camp };
     })),
-    sb(`funnel_events?client_id=eq.${targetClientId}&funnel=eq.free-trial&created_at=gte.${encodeURIComponent(sinceIso)}&created_at=lt.${encodeURIComponent(endIso)}&select=step,session_id,utm,created_at,url&limit=20000`).catch(() => []),
+    sb(`funnel_events?client_id=eq.${targetClientId}&funnel=eq.free-trial&created_at=gte.${encodeURIComponent(sinceIso)}&created_at=lt.${encodeURIComponent(endIso)}&select=step,session_id,utm,meta,created_at,url&limit=20000`).catch(() => []),
     sb(`funnel_events?client_id=eq.${targetClientId}&funnel=eq.free-trial&select=created_at&order=created_at.asc&limit=1`).catch(() => []),
     sb(`kpi_events?client_id=eq.${targetClientId}&step=in.(lead,trial_booked)&occurred_at=gte.${encodeURIComponent(prevSinceIso)}&occurred_at=lt.${encodeURIComponent(endIso)}&select=step,occurred_at,ghl_contact_id&limit=10000`).catch(() => []),
     sb(`kpi_events?client_id=eq.${targetClientId}&step=in.(trial_booked,trial_attended,trial_no_show,joined)&occurred_at=gte.${encodeURIComponent(new Date(todayD.getTime() - 89 * 86400000).toISOString())}&select=step&limit=10000`).catch(() => []),
@@ -3559,6 +3559,10 @@ async function handleMetaMachine(req, res) {
   // linger between micro-steps. Only the FIRST hit of a step counts (a session
   // that bounces back and re-views a step shouldn't restart the clock).
   const stepTs = {}; // step -> Map(session_id -> earliest ms)
+  // Page-load performance samples from the page_view beacon's meta blob. Kept as
+  // a per-session best (fastest) value so a session that fires twice (load +
+  // pagehide) counts once. Bucketed by traffic source so the portal can slice it.
+  const loadBySession = new Map(); // session_id -> {load,lcp,ttfb,source}
   for (const row of (Array.isArray(funnelRows) ? funnelRows : [])) {
     const sid = row.session_id || "";
     (sess[row.step] = sess[row.step] || new Set()).add(sid);
@@ -3570,6 +3574,19 @@ async function handleMetaMachine(req, res) {
     if (row.step === "page_view") {
       const u = row.utm || {};
       if (u.fbclid || /fb|ig|meta|facebook|instagram/i.test(String(u.source || ""))) adVisitors.add(row.session_id || "");
+      const pm = row.meta || {};
+      const load = Number(pm.load_ms);
+      if (Number.isFinite(load) && load > 0 && load < 60000) {   // drop absurd/idle outliers
+        const prev = loadBySession.get(sid);
+        if (!prev || load < prev.load) {
+          loadBySession.set(sid, {
+            load,
+            lcp: (Number.isFinite(Number(pm.lcp_ms)) && Number(pm.lcp_ms) > 0) ? Number(pm.lcp_ms) : null,
+            ttfb: (Number.isFinite(Number(pm.ttfb_ms)) && Number(pm.ttfb_ms) > 0) ? Number(pm.ttfb_ms) : null,
+            source: String(pm.source || "other"),
+          });
+        }
+      }
     }
   }
   // Median seconds to advance from one step to the next, over sessions that hit
@@ -3607,6 +3624,28 @@ async function handleMetaMachine(req, res) {
     const pick = domains.find((d) => !/vercel\.app$/i.test(d) && !/^www\./i.test(d))
       || domains.find((d) => !/vercel\.app$/i.test(d)) || domains[0];
     return "https://" + pick.replace(/\/+$/, "") + "/" + String(path).replace(/^\/+/, "");
+  })();
+  // ── Page-load speed (median, resists idle-tab outliers) overall + per source ──
+  const _median = (arr) => {
+    if (!arr || !arr.length) return null;
+    const a = arr.slice().sort((x, y) => x - y);
+    const mid = Math.floor(a.length / 2);
+    return Math.round(a.length % 2 ? a[mid] : (a[mid - 1] + a[mid]) / 2);
+  };
+  const loadPerf = (() => {
+    const rows = [...loadBySession.values()];
+    if (!rows.length) return null;
+    const bySrc = {};
+    for (const r of rows) (bySrc[r.source] = bySrc[r.source] || []).push(r.load);
+    const by_source = {};
+    for (const k of Object.keys(bySrc)) by_source[k] = { median_ms: _median(bySrc[k]), n: bySrc[k].length };
+    return {
+      median_ms: _median(rows.map((r) => r.load)),
+      lcp_ms: _median(rows.map((r) => r.lcp).filter((v) => v != null)),
+      ttfb_ms: _median(rows.map((r) => r.ttfb).filter((v) => v != null)),
+      n: rows.length,
+      by_source,
+    };
   })();
   const nSess = (step) => (sess[step] ? sess[step].size : 0);
   const visitors = nSess("page_view");
@@ -3770,6 +3809,9 @@ async function handleMetaMachine(req, res) {
         form_to_calendar: _medianAdvanceS("form_started", "calendar_viewed"),
         calendar_to_booked: _medianAdvanceS("calendar_viewed", "confirmed"),
       },
+      // median page-load ms (full load event) + LCP/TTFB + per-source split from
+      // the page_view beacon. null until beacons start arriving (no backfill).
+      load: loadPerf,
       visitors_to_form_pct: pct(formStarted, visitors),
       clicks_to_leads_pct: clicksToLeadsPct,
       band: mmPctBand(clicksToLeadsPct, MM_C2L_GREEN, MM_C2L_GOLD),

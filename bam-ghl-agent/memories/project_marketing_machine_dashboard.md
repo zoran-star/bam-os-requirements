@@ -6,6 +6,26 @@ type: project
 
 # Marketing Machine dashboard - SHIPPED 2026-07-03 (V2, GTA first)
 
+## Page-load speed tracking (added 2026-07-05, branch claude/intelligent-sinoussi-a0af72)
+The Clicked -> Page loaded funnel connector shows "⚡ loads in ~1.4s" (median full
+load). Wiring:
+- **bam-client-sites** `clients/bam-gta/gta/beacon.js` (loaded in free-trial.html)
+  fires ONE `page_view` funnel-event per visit via sendBeacon, meta = { load_ms,
+  dom_ms, ttfb_ms, lcp_ms, source }. This is the FIRST real funnel-event beacon in
+  bam-client-sites (nothing else posts to /api/website/funnel-event). Skipped when
+  ?annotate=1 (portal preview). session_id in sessionStorage. Fires on load+1.5s
+  (LCP settle) and on pagehide.
+- `source` tag = meta | internal | direct | search | referral | other (fbclid/utm
+  win, else referrer host). Collected from ALL sources so load speed can be sliced.
+- **marketing.js** page_view loop reads `row.meta` (added `meta` to the select),
+  medians load_ms overall + per source (fastest per session), returns
+  `page.load = { median_ms, lcp_ms, ttfb_ms, n, by_source }`. null until beacons
+  arrive (NO backfill - starts at deploy).
+- **client-portal.html** `_mmLoadChip(page.load)` renders on the step marked
+  loadChip:true (Clicked ad). Headline = full load; tooltip = per-source + LCP/TTFB.
+  Nav Timing has no cross-origin redirect time, so it's OUR-page load, not the
+  Meta redirect hop. Both branches UNMERGED as of 2026-07-05.
+
 ## Shipped implementation (2026-07-03)
 - Backend: `bam-portal/api/marketing.js` `?resource=meta-machine&client_id=`
   `[&since=YYYY-MM-DD&until=YYYY-MM-DD]` (handleMetaMachine). ONE payload for
