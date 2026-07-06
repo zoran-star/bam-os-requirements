@@ -1534,6 +1534,13 @@ async function handler(req, res) {
         // user_metadata.needs_password=true is a defensive marker: the client portal
         // checks this on boot and forces the password-set form even if redirect query
         // params get stripped. Cleared on first successful password update.
+        //
+        // Option B (deferred row creation): we do NOT create the clients row here.
+        // The academy details ride along on the invite as user_metadata.pending_academy,
+        // and the row + owner membership are created on FIRST LOGIN by the
+        // provision-account action below. So an abandoned signup (invite never
+        // accepted) leaves NO clients row - nothing to clean out of the Clients tab.
+        const pendingAcademy = { business_name, owner_name };
         const { clientUrl } = portalUrls(req);
         const redirectTo = `${clientUrl}/client-portal.html?type=invite`;
         const inviteRes = await fetch(`${SUPABASE_URL}/auth/v1/invite`, {
@@ -1543,29 +1550,29 @@ async function handler(req, res) {
             Authorization: `Bearer ${SUPABASE_SERVICE_KEY}`,
             "Content-Type": "application/json",
           },
-          body: JSON.stringify({ email, redirect_to: redirectTo, data: { needs_password: true } }),
+          body: JSON.stringify({ email, redirect_to: redirectTo, data: { needs_password: true, pending_academy: pendingAcademy } }),
         });
-        let auth_user_id = null;
+
         if (inviteRes.ok) {
-          const invited = await inviteRes.json();
-          auth_user_id = invited?.id || invited?.user?.id || null;
-        } else {
-          // 422 = the email already has an auth account (likely staff at
-          // another academy, or a prior client). Fall back to linking the
-          // existing user instead of silently dropping the signup.
-          const errText = await inviteRes.text();
-          if (inviteRes.status === 422 || /already/i.test(errText)) {
-            const existingAuth = await findAuthUserByEmail(email);
-            if (existingAuth?.id) auth_user_id = existingAuth.id;
-          }
-          if (!auth_user_id) {
-            // Genuine failure (network / other Supabase error). Generic success
-            // to avoid leaking; logged as failure for our metrics.
-            await logAttempt(false);
-            return res.status(200).json(GENERIC_RESPONSE);
-          }
+          // Fresh invite sent. Row creation is deferred to first login
+          // (provision-account). Nothing appears in the Clients tab yet.
+          await logAttempt(true);
+          return res.status(200).json(GENERIC_RESPONSE);
+        }
+
+        // Invite failed. Common case: 422 = this email already has an auth account
+        // (staff elsewhere, or a returning client). That user can already sign in,
+        // so there's no fresh "first login" to trigger deferred provisioning - keep
+        // the original behavior and create the row now, linking the existing user.
+        const errText = await inviteRes.text();
+        let auth_user_id = null;
+        if (inviteRes.status === 422 || /already/i.test(errText)) {
+          const existingAuth = await findAuthUserByEmail(email);
+          if (existingAuth?.id) auth_user_id = existingAuth.id;
         }
         if (!auth_user_id) {
+          // Genuine failure (network / other Supabase error). Generic success
+          // to avoid leaking; logged as failure for our metrics.
           await logAttempt(false);
           return res.status(200).json(GENERIC_RESPONSE);
         }
@@ -1583,11 +1590,9 @@ async function handler(req, res) {
           await logAttempt(true);
           return res.status(200).json(GENERIC_RESPONSE);
         } catch (_insertErr) {
-          // Roll back the auth user if the clients insert fails so they don't get orphaned
-          await fetch(`${SUPABASE_URL}/auth/v1/admin/users/${auth_user_id}`, {
-            method: "DELETE",
-            headers: { apikey: SUPABASE_SERVICE_KEY, Authorization: `Bearer ${SUPABASE_SERVICE_KEY}` },
-          }).catch(() => {});
+          // NOTE: no auth-user rollback here - this branch links a PRE-EXISTING
+          // auth user, so deleting it would nuke a real account. The fresh-invite
+          // path above never reaches here.
           await logAttempt(false);
           // Still return generic success — caller doesn't get to see internal failures.
           return res.status(200).json(GENERIC_RESPONSE);
@@ -1634,6 +1639,78 @@ async function handler(req, res) {
           return res.status(404).json({ error: "no client row linked to this user" });
         }
         return res.status(200).json({ ok: true });
+      }
+
+      // ── Authenticated client action: provision-account (Option B) ──
+      // Public signup defers the clients row to first login. The FIRST time a
+      // freshly-invited owner reaches the portal (no academy resolved), this
+      // creates their academy row + owner membership from the pending_academy
+      // stashed on their invite. Idempotent: if they already have a membership
+      // or a row linked by auth_user_id, it just returns that. No-op
+      // (client:null) for users with nothing pending (e.g. staff).
+      if (publicSignupAction === "provision-account") {
+        const provAuth = req.headers.authorization || "";
+        const provToken = provAuth.startsWith("Bearer ") ? provAuth.slice(7) : null;
+        if (!provToken) return res.status(401).json({ error: "auth required" });
+
+        const whoRes = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
+          headers: { apikey: SUPABASE_SERVICE_KEY, Authorization: `Bearer ${provToken}` },
+        });
+        if (!whoRes.ok) return res.status(401).json({ error: "invalid token" });
+        const who = await whoRes.json();
+        if (!who?.id) return res.status(401).json({ error: "invalid token" });
+
+        const CLIENT_COLS = "id,business_name,owner_name,email,status,onboarding_completed_at,marketing_included,v2_access,v15_access,v4_access,organic_content,ads_content_approval_required,onboarding_feedback_requested_at,onboarding_feedback_submitted_at,contact_provider,archived_at";
+
+        // Already provisioned? Return the existing client (idempotent).
+        const existingMembership = await supabaseSelect(
+          `client_users?user_id=eq.${who.id}&status=eq.active&select=client_id&limit=1`
+        ).catch(() => []);
+        if (Array.isArray(existingMembership) && existingMembership[0]?.client_id) {
+          const rows = await supabaseSelect(`clients?id=eq.${existingMembership[0].client_id}&select=${CLIENT_COLS}&limit=1`).catch(() => []);
+          return res.status(200).json({ ok: true, provisioned: false, client: rows?.[0] || null });
+        }
+        // Defensive: a row linked by auth_user_id but no membership → backfill it.
+        const byAuth = await supabaseSelect(`clients?auth_user_id=eq.${who.id}&select=${CLIENT_COLS}&limit=1`).catch(() => []);
+        if (Array.isArray(byAuth) && byAuth[0]) {
+          await ensureOwnerMembership({ clientId: byAuth[0].id, authUserId: who.id, name: byAuth[0].owner_name, email: who.email });
+          return res.status(200).json({ ok: true, provisioned: false, client: byAuth[0] });
+        }
+
+        // Nothing pending → nothing to create (e.g. a staff user). No-op.
+        const pending = who.user_metadata?.pending_academy;
+        if (!pending || !pending.business_name) {
+          return res.status(200).json({ ok: true, provisioned: false, client: null });
+        }
+
+        // Create the academy row + owner membership now (the "finish" moment).
+        let newClient = null;
+        try {
+          const newRows = await supabaseInsert("clients", {
+            business_name: String(pending.business_name).trim(),
+            owner_name: pending.owner_name ? String(pending.owner_name).trim() : null,
+            email: who.email || null,
+            status: "onboarding",
+            auth_user_id: who.id,
+          });
+          newClient = Array.isArray(newRows) ? newRows[0] : newRows;
+        } catch (e) {
+          return res.status(500).json({ error: `provision failed: ${e.message}` });
+        }
+        if (!newClient?.id) return res.status(500).json({ error: "provision failed: no row" });
+        await ensureOwnerMembership({ clientId: newClient.id, authUserId: who.id, name: pending.owner_name, email: who.email });
+
+        // Clear pending_academy so a later boot never double-provisions.
+        try {
+          await fetch(`${SUPABASE_URL}/auth/v1/admin/users/${who.id}`, {
+            method: "PUT",
+            headers: { apikey: SUPABASE_SERVICE_KEY, Authorization: `Bearer ${SUPABASE_SERVICE_KEY}`, "Content-Type": "application/json" },
+            body: JSON.stringify({ user_metadata: { ...(who.user_metadata || {}), pending_academy: null } }),
+          });
+        } catch (_) { /* non-fatal — the membership check above already prevents a dup */ }
+
+        const finalRows = await supabaseSelect(`clients?id=eq.${newClient.id}&select=${CLIENT_COLS}&limit=1`).catch(() => []);
+        return res.status(200).json({ ok: true, provisioned: true, client: finalRows?.[0] || newClient });
       }
 
       // ── Dual-auth actions: client portal Team management ──
