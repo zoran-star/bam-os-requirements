@@ -8,7 +8,7 @@
     /* Self-contained: this page renders with NO network, so everything is
        inline — no remote fonts, no remote images. Matches the portal's ink
        theme + gold accent so the offline state still feels like the app. */
-    :root { --ink:#16140F; --gold:#E8C547; --text:#F5F2EA; --mute:#8A857A; }
+    :root { --ink:#16140F; --gold:#D4B65C; --text:#F5F2EA; --mute:#8A857A; }
     * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
     html, body { height: 100%; margin: 0; background: var(--ink); color: var(--text);
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
@@ -32,7 +32,7 @@
 <body>
   <div class="wrap">
     <div class="mark" aria-hidden="true">
-      <svg viewBox="0 0 24 24" fill="none" stroke="#E8C547" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <svg viewBox="0 0 24 24" fill="none" stroke="#D4B65C" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <path d="M5 12.55a11 11 0 0 1 14.08 0" />
         <path d="M1.42 9a16 16 0 0 1 21.16 0" />
         <path d="M8.53 16.11a6 6 0 0 1 6.95 0" />
@@ -45,6 +45,11 @@
     <button onclick="location.reload()">Try again</button>
   </div>
   <script>
+    // This page loads when the portal is unreachable at cold start - the
+    // native splash (launchAutoHide:false) is still up and the remote page
+    // that normally hides it never ran. Hide it here or the user is stuck
+    // staring at a spinner forever.
+    try { window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.SplashScreen && window.Capacitor.Plugins.SplashScreen.hide(); } catch (e) {}
     // Auto-retry the moment the device comes back online.
     window.addEventListener('online', function () { location.reload(); });
   </script>

@@ -12185,8 +12185,25 @@ function _v15kStripeCust(id) { _openStripeUrl('https://dashboard.stripe.com/cust
 // Open a Stripe dashboard URL. On mobile, navigate in the SAME tab so the OS can
 // route the dashboard.stripe.com universal link to the Stripe app (a new tab /
 // window.open usually forces the browser instead). Desktop opens a new tab.
+// Open an external URL without hijacking the native webview: in the app,
+// prefer the Capacitor Browser sheet (needs a store build with the plugin);
+// fall back to window.open, which Capacitor bounces to the system browser.
+function _extOpen(url) {
+  if (!url) return;
+  try {
+    const Cap = window.Capacitor;
+    if (Cap && Cap.isNativePlatform && Cap.isNativePlatform()) {
+      const B = Cap.Plugins && Cap.Plugins.Browser;
+      if (B && B.open) { B.open({ url: url }); return; }
+      window.open(url, '_blank', 'noopener');
+      return;
+    }
+  } catch (_) {}
+  window.open(url, '_blank', 'noopener');
+}
 function _openStripeUrl(url) {
   if (!url) return;
+  if (typeof isNativeApp === 'function' && isNativeApp()) { _extOpen(url); return; }
   const mobile = window.matchMedia && window.matchMedia('(max-width: 768px)').matches;
   if (mobile) window.location.href = url;
   else window.open(url, '_blank', 'noopener');
@@ -12195,6 +12212,11 @@ function _openStripeUrl(url) {
 document.addEventListener('click', function (e) {
   const a = e.target && e.target.closest && e.target.closest('a[href^="https://dashboard.stripe.com"]');
   if (!a) return;
+  if (typeof isNativeApp === 'function' && isNativeApp()) {
+    e.preventDefault();
+    _extOpen(a.href);
+    return;
+  }
   if (window.matchMedia && window.matchMedia('(max-width: 768px)').matches) {
     e.preventDefault();
     window.location.href = a.href;
@@ -17519,7 +17541,7 @@ const _HV_MORE  = 'padding:11px 14px;text-align:center;font-size:12px;color:var(
 function _hvCard(inner) { return `<div style="border:1px solid var(--border);border-radius:12px;overflow:hidden">${inner}</div>`; }
 function _hvEmpty(msg) { return `<div style="border:1px solid var(--border);border-radius:12px;padding:18px 14px;font-size:13px;color:var(--text-mute);text-align:center">${escapeHTML(msg)}</div>`; }
 function _hvTime(iso, tz) { if (!iso) return ''; try { return new Date(iso).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', timeZone: tz || undefined }); } catch (_) { return ''; } }
-function _hvOpenContact(loc, cid) { const u = _ghlContactUrl(loc, cid); if (u) window.open(u, '_blank', 'noopener'); }
+function _hvOpenContact(loc, cid) { const u = _ghlContactUrl(loc, cid); if (u) _extOpen(u); }
 function _hvMissedKey() { return 'bam_missed_cleared_' + (typeof CLIENT_ID !== 'undefined' ? CLIENT_ID : ''); }
 function _hvMissedDismissed() { try { return new Set(JSON.parse(localStorage.getItem(_hvMissedKey()) || '[]')); } catch (_) { return new Set(); } }
 function _hvMissedClear(id) { try { const s = _hvMissedDismissed(); s.add(id); localStorage.setItem(_hvMissedKey(), JSON.stringify([...s])); } catch (_) {} _hvLoadMissed(); }
@@ -18309,7 +18331,9 @@ function applyCrmSupersetNav() {
               (typeof V2_ACCESS !== 'undefined' && V2_ACCESS);
   const isV2 = (typeof V2_ACCESS !== 'undefined' && V2_ACCESS);
   const native = (typeof isNativeApp === 'function' && isNativeApp());
-  const show = crm && !native;
+  // Native gate lifted 2026-07-06 alongside Members/Calendar - V2 mobile is
+  // a first-class target now.
+  const show = crm;
   // Full-CRM nav items shared by V1.5 + V2
   ['nav-contacts', 'nav-v15inbox', 'nav-v15kpis'].forEach(id => {
     const el = document.getElementById(id);
@@ -18462,9 +18486,9 @@ function applyMemberMgmtNavState() {
   document.querySelectorAll('[data-feature="team"]').forEach(el => {
     el.style.display = showTeam ? '' : 'none';
   });
-  // Business Blueprint is web-only - hidden inside the native app
-  // (not part of the App Store v1, same treatment as Members and Team).
-  const showBlueprint = !isNativeApp();
+  // Business Blueprint native gate lifted 2026-07-06: the command center
+  // dock, offers and coupon flows already route into it in the app.
+  const showBlueprint = true;
   document.querySelectorAll('[data-feature="blueprint"]').forEach(el => {
     el.style.display = showBlueprint ? '' : 'none';
   });
@@ -22996,13 +23020,6 @@ let _obtPanelOpen = false;
 
 function _obtRender() {
   let widget = document.getElementById('obt-widget');
-  // Onboarding tracker is a Business Blueprint feature, and BB is web-only
-  // in app v1. Hide the pill inside the native wrapper so it doesn't point
-  // at sections that aren't reachable in-app.
-  if (isNativeApp()) {
-    if (widget) widget.setAttribute('data-visible', 'false');
-    return;
-  }
   const p = _obtProgress;
   if (!p) {
     if (widget) widget.setAttribute('data-visible', 'false');
@@ -37381,7 +37398,8 @@ async function connectStripe() {
     });
     const json = await _safeJson(res);
     if (!res.ok || !json.redirect_url) throw new Error(json.error || ('HTTP ' + res.status));
-    window.location.href = json.redirect_url;
+    if (typeof isNativeApp === 'function' && isNativeApp()) _extOpen(json.redirect_url);
+    else window.location.href = json.redirect_url;
   } catch (e) {
     alert("Couldn't start Stripe connection - " + e.message);
   }
@@ -37533,7 +37551,8 @@ async function _startGhlConnect() {
     });
     const json = await _safeJson(res);
     if (!res.ok || !json.redirect_url) throw new Error(json.error || ('HTTP ' + res.status));
-    window.location.href = json.redirect_url;  // bounce to GHL
+    if (typeof isNativeApp === 'function' && isNativeApp()) _extOpen(json.redirect_url);
+    else window.location.href = json.redirect_url;  // bounce to GHL
   } catch (e) {
     alert('Couldn\'t start GHL connect: ' + e.message);
   }
@@ -41331,6 +41350,7 @@ function closeAssetModal() {
 }
 
 async function downloadAsset(url, name) {
+  if (typeof isNativeApp === 'function' && isNativeApp()) { _extOpen(url); return; }
   const btn = document.getElementById('assetModalDl');
   if (btn) { btn.disabled = true; btn.textContent = 'Downloading…'; }
   try {
@@ -49226,6 +49246,28 @@ window.addEventListener('message', (e) => {
       }
     } catch (e) {}
   }
+
+  // Android hardware back: close overlays first, step back through the app,
+  // and only exit from the root screen. Without this listener Capacitor's
+  // default is exit-app from anywhere.
+  try {
+    var CapBack = window.Capacitor;
+    var AppPlugBack = CapBack && CapBack.Plugins && CapBack.Plugins.App;
+    if (AppPlugBack && AppPlugBack.addListener && CapBack.isNativePlatform && CapBack.isNativePlatform()) {
+      AppPlugBack.addListener('backButton', function () {
+        try {
+          if (typeof _ccFocusCloseOpen === 'function' && _ccFocusCloseOpen()) return;
+          if (document.getElementById('hm-peek-ov')) { _hmMsgPeekClose(); return; }
+          if (document.getElementById('cc-minbox-ov')) { _ccMemberInboxClose(); return; }
+          if (document.body.classList.contains('cc-classic') && typeof _ccReturn === 'function') { _ccReturn(); return; }
+          var act = document.querySelector('.view.active');
+          var atRoot = !act || act.id === 'view-home' || act.id === 'view-cc';
+          if (!atRoot) { appGoBack(); return; }
+          AppPlugBack.exitApp();
+        } catch (e) { try { AppPlugBack.exitApp(); } catch (_) {} }
+      });
+    }
+  } catch (e) {}
 
   // #11 - Face ID / biometric unlock. FAIL-OPEN + feature-detected: a total
   // no-op until @aparajita/capacitor-biometric-auth is installed AND the user

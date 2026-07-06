@@ -49,5 +49,11 @@
 	<true/>
 	<key>NSFaceIDUsageDescription</key>
 	<string>FullControl uses Face ID to unlock your portal so your academy data stays private.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>FullControl uses the camera so you can take a photo or video to attach to a message, request, or your profile.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>FullControl uses your photo library so you can attach existing photos and videos to messages and requests.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>FullControl uses the microphone when you record a video to attach to a message or request.</string>
 </dict>
 </plist>

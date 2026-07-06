@@ -237,3 +237,15 @@ improve instead), tab audit (#8), connect-copy reword (#9).
   the native app (still live on web)
 - [[project_member_management_portal]] — the Members feature, now hidden in
   the native app (still live on web)
+
+
+## Native audit + V2-in-app pass (2026-07-06, Cole: "audit the app for functionality")
+
+Full audit (wrapper config + every isNativeApp path + Playwright ?native=1 runtime). FIXES SHIPPED:
+- **V2 native gates lifted**: Members/Pricing/Calendar (earlier same day), now also Inbox/Contacts/KPIs (`applyCrmSupersetNav` dropped `!native`) and **Business Blueprint** (`showBlueprint = true` - the cc dock, offers and coupon flows already routed into it in-app) + the onboarding tracker pill un-hidden in native. Team stays web-only.
+- **External links no longer hijack the webview**: new `_extOpen(url)` helper (Capacitor Browser sheet when the plugin is in the build, else window.open which Capacitor bounces to the system browser). Used by: Stripe dashboard links (`_openStripeUrl` + the global dashboard.stripe.com click handler now check `isNativeApp()` BEFORE the mobile same-tab branch), Stripe Connect + GHL Connect OAuth starts (native only; web keeps location.href), GHL contact hover links (`_hvOpenContact`), asset downloads (webview ignores `a.download` - native opens the asset externally instead).
+- **Android hardware back**: `App.addListener('backButton')` next to `appGoBack()` - closes focus page -> peek -> member inbox popup -> exits cc-classic -> steps to home -> exitApp only at root. (Default was exit-from-anywhere.)
+- **Wrapper (bam-portal-app/)**: offline.html now calls `SplashScreen.hide()` (cold-start offline used to strand users behind the never-hiding splash); dead gold #E8C547 -> #D4B65C in www pages; Info.plist got NSCamera/NSPhotoLibrary/NSMicrophone usage strings (file inputs with image/video accept CRASH iOS without them); `aps-environment` development -> **production**; StatusBar color #16140F -> #131416 (portal bg); dead `launchShowDuration` removed; `@capacitor/browser` added to package.json; versions bumped (iOS 1.1/build 2, Android versionCode 2/1.1); README got a **release checklist**.
+- **NEEDS THE MAC (cannot do from repo)**: `npm install && npx cap sync` then rebuild + resubmit - the committed Package.swift/capacitor.settings.gradle only include app/splash-screen/status-bar, so push-notifications, keyboard, haptics, badge AND the new browser plugin are NOT in the store build until a sync + rebuild happens. Push tokens are silently not captured by the current store build.
+- Verified clean: push JS client (register/upsert/delete/tap deep-link), tel:/mailto:, no PWA-prompt/userAgent traps, service worker no-ops in WKWebView.
+- Deferred (fine for now): universal links (web links open Safari, not the app), CSV import untested in-app, `?native=1` previews native behavior in any browser.
