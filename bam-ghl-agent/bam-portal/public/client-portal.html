@@ -4410,6 +4410,11 @@
   .v15k-linkrow{ display: grid; grid-template-columns: 1fr 190px; gap: 10px; align-items: center;
                  padding: 9px 12px; border: 1px solid var(--border); border-radius: 9px; margin-bottom: 7px; }
   .v15cal-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .v15cal-open { transition: background .12s, border-color .12s; }
+  .v15cal-open:hover { border: 1px dashed var(--accent-border) !important; background: rgba(212,182,92,.08) !important; }
+  .v15cal-flash { animation: v15calFlash .9s ease 2; }
+  @keyframes v15calFlash { 0%, 100% { box-shadow: none; } 50% { box-shadow: 0 0 0 3px rgba(212,182,92,.5); } }
+  .v15cal-head-row { position: sticky; top: 0; z-index: 2; }
   .v15cal-board  { border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
   @media (max-width: 768px) {
     .v15k-2col    { grid-template-columns: 1fr; gap: 22px; }
@@ -12229,6 +12234,7 @@ function _v15calHoursToRows(openHours) {
 async function openV15Cal() {
   const host = document.getElementById('v15cal-content');
   if (!host || typeof CLIENT_ID === 'undefined') return;
+  _V15CAL._scrolled = false; _V15CAL._seek = 0;
   if (!_swrKeep(host)) host.innerHTML = `<div class="req-empty" style="padding:24px 0"><span class="req-spin"></span> Loading calendars…</div>`;
   try {
     const token = await _mreqAuthToken();
@@ -12265,14 +12271,25 @@ async function _v15calToggleCal(id) {
   _v15calLoadEvents();
 }
 function _v15calWeek(delta) { _V15CAL.weekOffset = delta === 0 ? 0 : _V15CAL.weekOffset + delta; _v15calRender(); _v15calLoadEvents(); }
+document.addEventListener('keydown', (e) => {
+  if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+  const view = document.getElementById('view-v15cal');
+  if (!view || view.offsetParent === null) return;
+  const a = document.activeElement;
+  if (a && (a.tagName === 'INPUT' || a.tagName === 'TEXTAREA' || a.tagName === 'SELECT' || a.isContentEditable)) return;
+  if (document.getElementById('v15cal-ov')) return;
+  _v15calWeek(e.key === 'ArrowLeft' ? -1 : 1);
+});
 
 function _v15calRender() {
   const host = document.getElementById('v15cal-content'); if (!host) return;
   const chips = _V15CAL.calendars.map((c, i) => {
     const on = _V15CAL.selected.has(c.id); const col = bkColor(i);
-    return `<span style="display:inline-flex;align-items:center;gap:6px;border:1px solid var(--border-med);border-radius:999px;padding:5px 10px 5px 8px;margin:0 6px 6px 0;background:${on ? col.bg : 'transparent'}">
-      <input type="checkbox" ${on ? 'checked' : ''} onchange="_v15calToggleCal('${c.id}')" style="accent-color:${col.text}">
-      <span style="font-size:12.5px;color:var(--text)">${escapeHTML(c.name || c.id)}</span>
+    return `<span style="display:inline-flex;align-items:center;gap:8px;border:1px solid ${on ? 'var(--accent-border)' : 'var(--border-med)'};border-radius:999px;padding:6px 10px 6px 12px;margin:0 6px 6px 0;background:${on ? 'rgba(212,182,92,.06)' : 'transparent'}">
+      <button onclick="_v15calToggleCal('${c.id}')" style="display:inline-flex;align-items:center;gap:8px;background:none;border:none;padding:0;cursor:pointer;font:inherit">
+        <span style="width:9px;height:9px;border-radius:50%;background:${col.text};opacity:${on ? '1' : '.3'};flex:none"></span>
+        <span style="font-size:12.5px;font-weight:600;color:${on ? 'var(--text)' : 'var(--text-mute)'}">${escapeHTML(c.name || c.id)}</span>
+      </button>
       <button onclick="_v15calSettings('${c.id}')" title="Settings" style="background:none;border:none;color:var(--text-mute);cursor:pointer;font-size:13px;padding:0 2px"><svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-0.12em"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></button>
     </span>`;
   }).join('');
@@ -12284,7 +12301,9 @@ function _v15calRender() {
       <button onclick="_v15calWeek(0)" style="background:var(--surface);border:1px solid var(--border-med);border-radius:7px;color:var(--text);padding:6px 12px;cursor:pointer;font-size:12.5px">Today</button>
       <button onclick="_v15calWeek(1)" style="background:var(--surface);border:1px solid var(--border-med);border-radius:7px;color:var(--text);padding:6px 11px;cursor:pointer">›</button>
       <div style="font-weight:700;color:var(--text);font-size:14px">${calFormatRange(start)}</div>
-      <div style="margin-left:auto;font-size:11.5px;color:var(--text-mute)"><span style="display:inline-block;width:10px;height:10px;border:1px dashed var(--border-med);border-radius:2px;vertical-align:-1px;margin-right:4px"></span>available &nbsp; <span style="display:inline-block;width:10px;height:10px;background:var(--gold);border-radius:2px;vertical-align:-1px;margin:0 4px 0 6px"></span>booked</div>
+      <button onclick="_v15calNextSession()" style="background:transparent;border:1px solid var(--border-med);border-radius:999px;color:var(--text);padding:6px 14px;cursor:pointer;font-size:12px;font-weight:600">Next session ›</button>
+      <button onclick="_v15calToggleDay()" style="background:transparent;border:1px solid var(--border-med);border-radius:999px;color:var(--text-mute);padding:6px 14px;cursor:pointer;font-size:12px;font-weight:600">${_V15CAL.fullDay ? 'Compact hours' : 'Show full day'}</button>
+      <div style="margin-left:auto;font-size:11.5px;color:var(--text-mute)">Tap an open slot to book</div>
     </div>
     <div id="v15cal-grid"></div>`;
   _v15calRenderGrid();
@@ -12299,8 +12318,36 @@ function _v15calHourRange() {
   }
   for (const ev of _V15CAL.events) { const d = new Date(ev.start); if (!isNaN(d.getTime())) { lo = Math.min(lo, d.getHours()); hi = Math.max(hi, d.getHours() + 1); } }
   if (!found && !_V15CAL.events.length) { lo = 8; hi = 21; }
-  lo = Math.max(0, Math.min(lo, 12)); hi = Math.min(24, Math.max(hi, lo + 4));
+  // compact (default): hug the week's sessions with an hour of air each side
+  let clampLo = 12;
+  if (!_V15CAL.fullDay && _V15CAL.events.length) {
+    let elo = 24, ehi = 0;
+    for (const ev of _V15CAL.events) { const d = new Date(ev.start); if (!isNaN(d.getTime())) { elo = Math.min(elo, d.getHours()); ehi = Math.max(ehi, d.getHours() + 1); } }
+    if (ehi > elo) { lo = Math.max(0, elo - 1); hi = Math.min(24, ehi + 1); clampLo = 23; }
+  }
+  lo = Math.max(0, Math.min(lo, clampLo)); hi = Math.min(24, Math.max(hi, lo + 4));
   return [lo, hi];
+}
+function _v15calToggleDay() { _V15CAL.fullDay = !_V15CAL.fullDay; _v15calRender(); }
+// Jump to whatever is next on the schedule (hops up to 6 weeks forward)
+function _v15calUpcoming() {
+  const now = Date.now();
+  return _V15CAL.events
+    .filter(ev => _V15CAL.selected.has(ev.calendarId) && ev.status !== 'cancelled' && new Date(ev.start).getTime() >= now)
+    .sort((a, b) => new Date(a.start) - new Date(b.start))[0] || null;
+}
+function _v15calNextSession() {
+  const up = _v15calUpcoming();
+  if (up) return _v15calFlashEvent(up);
+  _V15CAL._seek = 6;
+  _v15calWeek(1);
+}
+function _v15calFlashEvent(ev) {
+  const d = new Date(ev.start);
+  const el = document.querySelector(`[data-slot="${calDateKey(d)}-${d.getHours()}"]`);
+  if (!el) return;
+  el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  el.classList.remove('v15cal-flash'); void el.offsetWidth; el.classList.add('v15cal-flash');
 }
 function _v15calOpenAt(calId, dateObj, hour) {
   const s = _V15CAL.settings[calId]; if (!s) return false;
@@ -12322,14 +12369,17 @@ function _v15calCellBookings(dateKey, hour) {
 function _v15calRenderGrid() {
   const host = document.getElementById('v15cal-grid'); if (!host) return;
   const start = calStartOfWeek(_V15CAL.weekOffset);
-  const todayKey = calDateKey(new Date());
+  const now = new Date();
+  const todayKey = calDateKey(now);
   const days = [0,1,2,3,4,5,6].map(i => { const d = new Date(start); d.setDate(d.getDate() + i); return d; });
   const [h0, h1] = _v15calHourRange();
-  const dotted = `background-image:radial-gradient(var(--border-med) 0.6px,transparent 0.6px);background-size:8px 8px`;
 
+  // per-day session counts ride under the date
+  const dayCount = (dk) => _V15CAL.events.filter(ev => _V15CAL.selected.has(ev.calendarId) && ev.status !== 'cancelled' && calDateKey(new Date(ev.start)) === dk).length;
   let head = `<div style="font-size:10px"></div>` + days.map(d => {
     const isToday = calDateKey(d) === todayKey;
-    return `<div style="text-align:center;padding:6px 2px;font-size:11px;font-weight:700;color:${isToday ? 'var(--gold)' : 'var(--text)'}">${['SUN','MON','TUE','WED','THU','FRI','SAT'][d.getDay()]}<div style="font-size:13px;font-weight:600;color:${isToday ? 'var(--gold)' : 'var(--text-mute)'}">${d.getDate()}</div></div>`;
+    const n = dayCount(calDateKey(d));
+    return `<div style="text-align:center;padding:6px 2px 5px;font-size:11px;font-weight:700;color:${isToday ? 'var(--gold)' : 'var(--text)'}">${['SUN','MON','TUE','WED','THU','FRI','SAT'][d.getDay()]}<div style="font-size:13px;font-weight:600;color:${isToday ? 'var(--gold)' : 'var(--text-mute)'}">${d.getDate()}</div><div style="font-size:9px;font-weight:600;letter-spacing:.03em;color:var(--text-mute);min-height:11px">${n ? n + (n === 1 ? ' session' : ' sessions') : ''}</div></div>`;
   }).join('');
 
   let rows = '';
@@ -12340,20 +12390,42 @@ function _v15calRenderGrid() {
       const books = _v15calCellBookings(dk, h);
       const avail = [..._V15CAL.selected].some(id => _v15calOpenAt(id, d, h));
       if (books.length) {
-        const label = books.length > 1 ? `${books.length} bookings` : escapeHTML(books[0].contactName || 'Booked');
-        cells += `<div onclick="_v15calOpenSlot('${dk}',${h})" title="${label}" style="min-height:34px;border:1px solid var(--border);border-radius:5px;margin:1px;background:rgba(212,182,92,0.18);border-color:rgba(212,182,92,0.5);cursor:pointer;padding:3px 5px;overflow:hidden">
+        const ev0 = books[0];
+        const t0 = new Date(ev0.start);
+        const ci = Math.max(0, _V15CAL.calendars.findIndex(c => c.id === ev0.calendarId));
+        const col = bkColor(ci);
+        const nm = books.length > 1 ? `${books.length} bookings` : escapeHTML(_ccCapName(ev0.contactName || 'Booked'));
+        const label = `${calFormatTime(t0.getHours() + t0.getMinutes() / 60)} · ${nm}`;
+        cells += `<div data-slot="${dk}-${h}" onclick="_v15calOpenSlot('${dk}',${h})" title="${label}" style="min-height:34px;border:1px solid rgba(212,182,92,0.4);border-left:3px solid ${col.text};border-radius:5px;margin:1px;background:rgba(212,182,92,0.14);cursor:pointer;padding:3px 6px;overflow:hidden">
           <div style="font-size:10.5px;font-weight:700;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${label}</div></div>`;
       } else if (avail) {
-        cells += `<div style="min-height:34px;border:1px dashed var(--border-med);border-radius:5px;margin:1px;${dotted}"></div>`;
+        cells += `<div class="v15cal-open" onclick="_v15calNewBooking('${dk}', '${String(h).padStart(2, '0')}:00')" title="Book this slot" style="min-height:34px;border:1px solid transparent;border-radius:5px;margin:1px;background:rgba(212,182,92,.04);cursor:pointer"></div>`;
       } else {
         cells += `<div style="min-height:34px;margin:1px"></div>`;
       }
     }
-    rows += `<div style="display:grid;grid-template-columns:46px repeat(7,1fr);align-items:stretch">${cells}</div>`;
+    // the gold now line rides across today's column at the current minute
+    let nowLine = '';
+    if (todayKey >= calDateKey(days[0]) && todayKey <= calDateKey(days[6]) && now.getHours() === h) {
+      const idx = days.findIndex(d => calDateKey(d) === todayKey);
+      if (idx >= 0) nowLine = `<div id="v15cal-now" style="position:absolute;top:${(now.getMinutes() / 60 * 100).toFixed(1)}%;left:calc(46px + (100% - 46px) / 7 * ${idx});width:calc((100% - 46px) / 7);height:2px;background:var(--gold);border-radius:2px;box-shadow:0 0 6px rgba(212,182,92,.7);pointer-events:none;z-index:1"></div>`;
+    }
+    rows += `<div style="display:grid;grid-template-columns:46px repeat(7,1fr);align-items:stretch;position:relative">${cells}${nowLine}</div>`;
   }
   host.innerHTML = `<div class="v15cal-scroll"><div class="v15cal-board">
-    <div style="display:grid;grid-template-columns:46px repeat(7,1fr);border-bottom:1px solid var(--border);background:var(--surface)">${head}</div>
+    <div class="v15cal-head-row" style="display:grid;grid-template-columns:46px repeat(7,1fr);border-bottom:1px solid var(--border);background:var(--surface)">${head}</div>
     <div>${rows}</div></div></div>`;
+  // land on "now" once per visit
+  if (!_V15CAL._scrolled && document.getElementById('v15cal-now')) {
+    _V15CAL._scrolled = true;
+    setTimeout(() => document.getElementById('v15cal-now')?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 150);
+  }
+  // next-session seek across weeks
+  if (_V15CAL._seek > 0) {
+    const up = _v15calUpcoming();
+    if (up) { _V15CAL._seek = 0; setTimeout(() => _v15calFlashEvent(up), 200); }
+    else if (--_V15CAL._seek > 0) _v15calWeek(1);
+  }
 }
 
 async function _v15calLoadEvents() {
@@ -12395,7 +12467,7 @@ function _v15calOpenSlot(dateKey, hour) {
     const cal = _V15CAL.calendars.find(c => c.id === ev.calendarId);
     const t = new Date(ev.start);
     return `<button onclick="_v15calOpenAppt('${ev.id}')" style="display:block;width:100%;text-align:left;background:var(--surface);border:1px solid var(--border);border-radius:9px;padding:11px 13px;margin-bottom:8px;cursor:pointer">
-      <div style="font-weight:700;font-size:13.5px;color:var(--text)">${escapeHTML(ev.contactName || 'Booked')}</div>
+      <div style="font-weight:700;font-size:13.5px;color:var(--text)">${escapeHTML(_ccCapName(ev.contactName || 'Booked'))}</div>
       <div style="font-size:11.5px;color:var(--text-mute);margin-top:2px">${calFormatTime(t.getHours() + t.getMinutes() / 60)} · ${escapeHTML(cal ? cal.name : '')}${ev.status ? ' · ' + escapeHTML(_v15calStatusLabel(ev.status)) : ''}</div>
     </button>`;
   }).join('') || `<div class="req-empty" style="padding:10px 0">No bookings.</div>`;
@@ -12600,7 +12672,7 @@ async function _v15calSaveSettings(calId) {
 
 // ── New booking for an existing contact ──
 let _v15nbSearchT = null;
-function _v15calNewBooking() {
+function _v15calNewBooking(prefillDate, prefillTime) {
   if (!_V15CAL.calendars.length) { alert('Load the Calendars tab first.'); return; }
   _V15CAL.nbContact = null;
   const calOpts = _V15CAL.calendars.map(c => `<option value="${c.id}">${escapeHTML(c.name || c.id)}</option>`).join('');
@@ -12614,9 +12686,9 @@ function _v15calNewBooking() {
     <div id="v15nb-picked" style="margin-top:6px"></div>
     <div style="display:flex;gap:10px;margin-top:14px">
       <div style="flex:1"><div style="font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--text-mute);margin-bottom:6px">Date</div>
-        <input type="date" id="v15nb-date" value="${calDateKey(t)}" style="width:100%;box-sizing:border-box;background:var(--surface);border:1px solid var(--border-med);border-radius:7px;color:var(--text);padding:8px 10px;font:inherit;font-size:13px"></div>
+        <input type="date" id="v15nb-date" value="${prefillDate || calDateKey(t)}" style="width:100%;box-sizing:border-box;background:var(--surface);border:1px solid var(--border-med);border-radius:7px;color:var(--text);padding:8px 10px;font:inherit;font-size:13px"></div>
       <div style="flex:1"><div style="font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--text-mute);margin-bottom:6px">Time</div>
-        <input type="time" id="v15nb-time" value="17:00" style="width:100%;box-sizing:border-box;background:var(--surface);border:1px solid var(--border-med);border-radius:7px;color:var(--text);padding:8px 10px;font:inherit;font-size:13px"></div>
+        <input type="time" id="v15nb-time" value="${prefillTime || '17:00'}" style="width:100%;box-sizing:border-box;background:var(--surface);border:1px solid var(--border-med);border-radius:7px;color:var(--text);padding:8px 10px;font:inherit;font-size:13px"></div>
     </div>
     <div id="v15nb-err" style="display:none;color:#9a3b2f;font-size:12.5px;margin-top:10px"></div>
     <button onclick="_v15calCreateBooking()" id="v15nb-create" style="margin-top:16px;width:100%;background:var(--gold);color:#0B0B0D;border:none;padding:10px;border-radius:8px;font-weight:700;font-size:13.5px;cursor:pointer">Create booking</button>`);
@@ -18381,10 +18453,10 @@ function bkToggleSetup() {
 
 // Distinct colors for booking calendars on the weekly grid (separate from venue colors)
 const BK_COLORS = [
-  { bg:'rgba(94,210,190,0.16)',  border:'rgba(94,210,190,0.55)',  text:'#5ED2BE' },  // teal
-  { bg:'rgba(240,150,90,0.16)',  border:'rgba(240,150,90,0.55)',  text:'#F0965A' },  // orange
-  { bg:'rgba(236,116,166,0.16)', border:'rgba(236,116,166,0.55)', text:'#EC74A6' },  // pink
-  { bg:'rgba(150,170,255,0.16)', border:'rgba(150,170,255,0.55)', text:'#96AAFF' },  // periwinkle
+  { bg:'rgba(212,182,92,0.14)', border:'rgba(212,182,92,0.5)',  text:'#C8A84E' },  // gold
+  { bg:'rgba(90,143,184,0.14)', border:'rgba(90,143,184,0.5)',  text:'#5A8FB8' },  // blue
+  { bg:'rgba(76,199,106,0.14)', border:'rgba(76,199,106,0.5)',  text:'#3DA456' },  // green
+  { bg:'rgba(240,184,74,0.14)', border:'rgba(240,184,74,0.5)',  text:'#C58F2A' },  // amber
 ];
 function bkColor(i) { return BK_COLORS[i % BK_COLORS.length]; }
 
@@ -43824,7 +43896,7 @@ async function _submitOnbFeedback() {
 // Settings; per-section focus modes (marketing's exists, members' is new).
 //
 // Rollout: hidden while it's a skeleton. ?cc=1 enters (persists via
-// localStorage bam_cc_mode), ?cc=0 exits. V2 academies only.
+// DEFAULT for V2 academies. ?cc=0 or the Settings dock opt out (localStorage bam_cc_optout); ?cc=1 opts back in.
 //
 // PLOP-IN CONTRACT: each section is independent. To replace one (e.g. the
 // new Sales build), swap its mount() in CC_SECTIONS and keep the section id
@@ -43837,12 +43909,12 @@ async function _submitOnbFeedback() {
 function _ccFlagSync() {
   try {
     const v = new URLSearchParams(location.search).get('cc');
-    if (v === '1') localStorage.setItem('bam_cc_mode', '1');
-    if (v === '0') localStorage.removeItem('bam_cc_mode');
+    if (v === '1') localStorage.removeItem('bam_cc_optout');
+    if (v === '0') localStorage.setItem('bam_cc_optout', '1');
     if (v !== null) history.replaceState(null, '', location.pathname + location.hash);
   } catch (_) {}
 }
-function _ccWanted() { _ccFlagSync(); try { return localStorage.getItem('bam_cc_mode') === '1'; } catch (_) { return false; } }
+function _ccWanted() { _ccFlagSync(); try { return localStorage.getItem('bam_cc_optout') !== '1'; } catch (_) { return true; } }
 function _ccActive() { return document.body.classList.contains('cc-mode'); }
 
 function _ccSections() {
@@ -44206,7 +44278,7 @@ function _ccReturn() {
   document.getElementById('view-cc').classList.add('active');
 }
 function _ccExitBeta() {
-  try { localStorage.removeItem('bam_cc_mode'); } catch (_) {}
+  try { localStorage.setItem('bam_cc_optout', '1'); } catch (_) {}
   location.reload();
 }
 
