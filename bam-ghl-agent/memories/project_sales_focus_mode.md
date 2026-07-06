@@ -29,23 +29,32 @@ Helpers/handlers: `_plRenderEntrySec`/`_plRenderExitSec`/`_plEdgeFormHtml`/`_plE
 **🚧 ROUTER — IN PROGRESS (Phase 1+2 done 2026-07-06, PR #1189):** goal = scale to more
 academies, so leads move by the academy's authored edges, not hardcoded per-agent logic.
 - **`api/agent/_router.js` built (Phase 1):** `resolveEdge(clientId, fromRole, trigger)` reads
-  the single enabled edge on the client-wide flow (`pipeline_id IS NULL`) via `sbRest` (now
-  exported from `_store.js`); `routeTransition({...})` resolves + moves using the existing
-  `_store` primitives (`resolveStage` + `moveStage`, so it inherits the ghl/portal provider
-  split + shadow mirror + KPI hooks). **Additive/safe:** no edge / paused / lookup blip →
-  `{matched:false}` → caller runs its hardcoded move. **Terminals (member/unqualified/human)
-  DEFER** to hardcoded close logic this phase — router only does stage→stage moves.
-- **First swap (Phase 2):** `agent-approvals.js` `confirm-ghost` action (responded --went_quiet-->
-  interested) now calls `routeTransition` with the old `interestedStage`+`moveStage` as the
-  matched:false fallback. GTA seed = went_quiet→interested, so behavior-IDENTICAL for GTA.
-  Verify on prod: confirm-ghost a Responded lead → card lands in Interested (unchanged).
-- **Swap #2 done:** `agent-approvals.js` booking action (responded --booked--> scheduled_trial)
-  now routes through the edge, old scheduledTrialStage+moveStage as fallback. GTA seed matches;
-  `kpiTrialBooked` hook fires on either path (role stays scheduled_trial) so KPI unaffected.
-- **⏭ NEXT swaps (Phase 3), one per session w/ verify between:** cant_make_it/no_show
-  (confirm→responded, agent-confirm ~818/933) · ghosted_ran_out (automations ~271) · not_interested
-  (responded→nurture) · then terminals (enrolls→member, marked_unqualified, complaint→human) —
-  each needs the router's terminal path built + verified against the caller's current close logic.
+  the edge on the client-wide flow (`pipeline_id IS NULL`) via `sbRest` (now exported from
+  `_store.js`); `routeTransition({...})` resolves + moves using the existing `_store` primitives
+  (`resolveStage` + `moveStage`, so it inherits the ghl/portal provider split + shadow mirror +
+  KPI hooks). **Additive/safe:** no edge / lookup blip → `{matched:false}` → caller runs its
+  hardcoded move. **Terminals (member/unqualified/human) DEFER** to hardcoded close logic this
+  phase — router only does stage→stage moves.
+- **Pause semantics (2026-07-06):** `resolveEdge` no longer filters `enabled=true` — it returns
+  the row incl. its `enabled` flag so the router can tell a PAUSED route (enabled=false → row
+  exists) from an ABSENT one (null). `routeTransition` on a paused edge returns
+  `{matched:true, moved:false, paused:true}` → caller skips BOTH the move and the hardcoded
+  fallback, so **pausing an edge in focus mode now actually stops that move**. Editing a
+  destination already worked (router returns the new dest). **DELETE still doesn't take effect**
+  (a deleted row is indistinguishable from unseeded → fallback fires) — only becomes real at
+  Phase 4 when fallbacks are removed. GTA unaffected (all edges enabled).
+- **Swaps DONE (all stage→stage, each keeps old move as matched:false fallback, GTA-identical):**
+  #1 `went_quiet` responded→interested (`agent-approvals.js` confirm-ghost) ·
+  #2 `booked` responded→scheduled_trial (`agent-approvals.js` booking; `kpiTrialBooked` fires
+  either path so KPI unaffected) ·
+  #3 `cant_make_it` scheduled_trial→responded (`agent-confirm.js` confirm-handoff rebook) ·
+  #4 `ghosted_ran_out` interested→nurture (`automations.js` seq-complete; covers ghosted +
+  summer_special; nurture-off LOST branch untouched).
+- **⏭ NEXT swaps (Phase 3), one per session w/ verify between:** `not_interested` responded→nurture ·
+  `says_no` done_trial→nurture (`agent-closing.js`) · `replied` interested/nurture→responded (the
+  ghosted/nurture reply bounce — find the site) · `no_show` + `post_trial_good_fit` (post-trial
+  form router) · then **terminals** (enrolls→member, marked_unqualified, complaint→human) — each
+  needs the router's terminal path built + verified against the caller's current close logic.
 - **Phase 4:** delete the hardcoded destination resolution once every site routes.
 
 **Other unbuilt engines:** Closing agent, Lead Nurture automation, Resend email (see doc redesign

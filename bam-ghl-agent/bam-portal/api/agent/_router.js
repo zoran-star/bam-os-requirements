@@ -22,11 +22,15 @@
 import { sbRest, resolveStage, moveStage, findOpenOpp } from "./_store.js";
 import { ghl as ghlDefault } from "../ghl/_core.js";
 
-// Read the single enabled transition edge for (clientId, fromRole, trigger) on
-// the client-wide default flow (pipeline_id IS NULL). Returns the edge row or
-// null (no edge / disabled / lookup failure). Never throws — a lookup blip must
-// fall back to the caller's hardcoded path, not break a live agent action.
-// `fromRole` may be null for the external new_lead entry (from_stage_role IS NULL).
+// Read the single transition edge for (clientId, fromRole, trigger) on the
+// client-wide default flow (pipeline_id IS NULL). Returns the edge row (including
+// its `enabled` flag) or null (no such row / lookup failure). Never throws — a
+// lookup blip must fall back to the caller's hardcoded path, not break a live
+// agent action. NOTE: disabled rows are returned too (not filtered out) so the
+// caller can tell "academy paused this route on purpose" (enabled=false) apart
+// from "academy has no such row" (null) — the pause must win over the fallback.
+// An enabled duplicate wins over a disabled one (order enabled.desc). `fromRole`
+// may be null for the external new_lead entry (from_stage_role IS NULL).
 export async function resolveEdge(clientId, fromRole, trigger) {
   if (!clientId || !trigger) return null;
   const fromClause = fromRole ? `from_stage_role=eq.${encodeURIComponent(fromRole)}` : `from_stage_role=is.null`;
@@ -35,8 +39,8 @@ export async function resolveEdge(clientId, fromRole, trigger) {
       `stage_transitions?client_id=eq.${encodeURIComponent(clientId)}` +
       `&${fromClause}` +
       `&trigger=eq.${encodeURIComponent(trigger)}` +
-      `&enabled=eq.true&pipeline_id=is.null` +
-      `&select=trigger,to_kind,to_stage_role,to_terminal&order=sort_order.asc&limit=1`
+      `&pipeline_id=is.null` +
+      `&select=trigger,to_kind,to_stage_role,to_terminal,enabled&order=enabled.desc,sort_order.asc&limit=1`
     );
     return (Array.isArray(rows) && rows[0]) || null;
   } catch (_) {
@@ -57,6 +61,11 @@ export async function routeTransition(opts = {}) {
 
   const edge = await resolveEdge(clientId, fromRole, trigger);
   if (!edge) return { matched: false, reason: "no-edge" };
+
+  // Pause wins over the fallback: the academy explicitly turned this route OFF in
+  // focus mode. Return matched:true (so the caller does NOT run its hardcoded
+  // move) but moved:false — the lead stays put by design.
+  if (edge.enabled === false) return { matched: true, moved: false, paused: true };
 
   // Phase 1: terminals defer to the caller's verified hardcoded close logic.
   if (edge.to_kind !== "stage" || !edge.to_stage_role) {
