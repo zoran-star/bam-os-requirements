@@ -45292,6 +45292,19 @@ function _ccStyle() {
     '@media(hover:none){.cc-ib-reply{opacity:1}}' +
     'body.cc-mode .cc-dock{bottom:calc(16px + env(safe-area-inset-bottom))}' +
     'html.native-app .hv2-nav-card{display:none !important}' +
+    '.mm-fz-nums{display:none}' +
+    '@media(max-width:640px){' +
+    '.mm-fz-nums{display:flex;align-items:baseline;justify-content:space-between;gap:4px;margin:2px 2px 8px}' +
+    '.mm-fz-num{display:flex;flex-direction:column;align-items:center;gap:1px;position:relative;flex:1}' +
+    '.mm-fz-num b{font-family:var(--font-num);font-size:20px;font-weight:800;color:var(--text)}' +
+    '.mm-fz-num i{font-style:normal;font-size:9px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--text-mute)}' +
+    '.mm-fz-num[data-arrow]::after{content:"\\203A";position:absolute;right:-6px;top:2px;color:var(--gold);font-size:13px}' +
+    '}' +
+    'html.native-app .cc-back-pill{position:fixed;top:calc(8px + env(safe-area-inset-top));left:10px;right:auto;width:auto;border-radius:999px;padding:7px 14px;box-shadow:0 4px 14px rgba(0,0,0,.18);z-index:96}' +
+    'html.native-app .cc-back-pill b{font-size:0}' +
+    'html.native-app .cc-back-pill b::before{content:"\\2039 Back";font-size:12.5px;font-weight:800}' +
+    'html.native-app .cc-back-pill .cc-crumb-sep{display:none}' +
+    'html.native-app #cc-crumb-view{font-size:12.5px;font-weight:700}' +
     'html.native-app .mm-ap-btn{display:none !important}' +
     '@media(max-width:768px){' +
     '.mm-focus-page .mm-modal-card{margin:calc(8px + env(safe-area-inset-top)) auto 90px;width:100%}' +
@@ -48282,7 +48295,9 @@ function _mmFunnelSvg(page, clicks, loaded) {
     '<path d="M ' + rx + ' ' + (arY - 3.5).toFixed(1) + ' h 18 M ' + (rx + 4.5) + ' ' + (arY - 12).toFixed(1) + ' v 5 M ' + (rx + 13.5) + ' ' + (arY - 12).toFixed(1) + ' v 5"/>' +
     '<path d="M ' + (rx + 5) + ' ' + (arY + 2).toFixed(1) + ' l 3 3 l 5 -5.5" stroke="#3EAF5C"/>' +
     '</g>';
-  return svg + '</svg>';
+  const nums = '<div class="mm-fz-nums">' + stages.map((s, i) =>
+    '<span class="mm-fz-num"' + (i < N - 1 ? ' data-arrow="1"' : '') + '><b>' + s.n + '</b><i>' + s.lbl + '</i></span>').join('') + '</div>';
+  return nums + svg + '</svg>';
 }
 function _mmRenderLanding() {
   const host = document.getElementById('landing-machine-card');
