@@ -1140,6 +1140,34 @@ only exercisable on Vercel). Env: `ANTHROPIC_API_KEY` already live in prod.
   applies (non-GTA academies without Stripe connect will get clean errors on Confirm).
 - Voice input (mic) reusing the ticket-form voice pattern.
 
+## Session 8b — 2026-07-06 — Payment-link modal off GHL
+
+The member payment-link / card-link send modal (`_openPaymentLinkModal` in
+client-portal.html) used to label its buttons "Send SMS via GHL" / "Send Email
+via GHL" and DISABLE them unless the academy had a GHL `location_id`
+(`ghl.ready`). GTA is fully off GHL, so both buttons were stuck disabled.
+
+Fix (the send endpoint `api/ghl/send-message` was ALREADY provider-aware -
+routes SMS→Twilio, Email→Resend for off-GHL academies via
+`maybeSendSmsViaProvider` / `maybeSendEmailViaResend`; only the modal was
+wrong):
+- **members.js** `actionPaymentLink` + `actionCardSetupLink` now return a
+  `messaging: { sms_provider, email_provider, sms_ready, email_ready }` block,
+  computed by new `messagingReadiness()` (imports `smsProvider` from
+  `messaging/provider.js` = "twilio"|"ghl", `emailProvider` from
+  `messaging/email-provider.js` = "resend"|"ghl"). sms_ready = twilio OR has
+  GHL location; email_ready = resend OR has GHL location.
+- **client-portal.html** modal gates SMS on `messaging.sms_ready && hasPhone`,
+  Email on `messaging.email_ready && hasEmail` (falls back to legacy `ghl.ready`
+  if `messaging` absent). Buttons relabeled **"Send SMS" / "Send Email"**;
+  status text "Sending X…"; reasons line drops the GHL mention and says
+  "SMS/Email is not set up for this academy yet." when a channel isn't ready.
+- Also fixed 2 em-dashes in the suggested email subjects (HARD RULE).
+
+Note: other surfaces (Inbox reply, pipelines) still POST to the same
+provider-aware `send-message` so they FUNCTION off GHL, but some of their
+labels may still say "via GHL" - out of scope here, a possible follow-up.
+
 ## Related notes
 - [[project_client_auth]] — how client login + client_id scoping works
 - [[project_marketing_content_flow]] — the api/ + view pattern to model

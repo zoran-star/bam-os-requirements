@@ -25,6 +25,8 @@ import crypto from "node:crypto";
 import { timingSafeEqual } from "node:crypto";
 import { applyDiscountToCents, normCode, couponFromPromo } from "./_coupon-guardrails.js";
 import { syncMemberAccessNonFatal } from "./_runtime/access-sync-portal.js";
+import { smsProvider } from "./messaging/provider.js";
+import { emailProvider } from "./messaging/email-provider.js";
 
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
@@ -1528,6 +1530,24 @@ async function actionRemoveCoupon(res, member, stripeAccount, ctx, body) {
   return res.status(200).json({ ok: true, removed: true });
 }
 
+// Per-academy messaging readiness for the send modal (payment-link / card link).
+// SMS is sendable when the academy is on native Twilio OR still has a GHL location;
+// email when on native Resend OR GHL. Drives which buttons the modal enables now
+// that academies can be fully off GHL. Never throws.
+async function messagingReadiness(clientId, client) {
+  const [smsProv, emailProv] = await Promise.all([
+    smsProvider(clientId).catch(() => "ghl"),
+    emailProvider(clientId).catch(() => "ghl"),
+  ]);
+  const hasGhl = Boolean(client?.ghl_location_id);
+  return {
+    sms_provider: smsProv,       // "twilio" | "ghl"
+    email_provider: emailProv,   // "resend" | "ghl"
+    sms_ready: smsProv === "twilio" || hasGhl,
+    email_ready: emailProv === "resend" || hasGhl,
+  };
+}
+
 // ─────────────────────────────────────────────────────────
 // Action: PAYMENT-LINK
 // ─────────────────────────────────────────────────────────
@@ -1571,12 +1591,14 @@ async function actionPaymentLink(res, member, stripeAccount, ctx, body, req) {
   // Default text for the SMS/Email modal — staff can edit before sending.
   const academyName = ctx.client?.business_name || "your academy";
   const suggestedSms = `Hi, here's the link to update your card with ${academyName}: ${session.url}`;
-  const suggestedEmailSubject = `Update your card on file — ${academyName}`;
+  const suggestedEmailSubject = `Update your card on file - ${academyName}`;
   const suggestedEmailHtml =
     `<p>Hi${member.parent_name ? ` ${member.parent_name.split(/\s+/)[0]}` : ""},</p>` +
     `<p>Here's the link to update your card with ${academyName}:</p>` +
     `<p><a href="${session.url}">${session.url}</a></p>` +
     `<p>Thanks!<br>${academyName}</p>`;
+
+  const messaging = await messagingReadiness(member.client_id, ctx.client);
 
   return res.status(200).json({
     ok: true,
@@ -1588,12 +1610,14 @@ async function actionPaymentLink(res, member, stripeAccount, ctx, body, req) {
       email: member.parent_email || null,
     },
     ghl: {
-      // location_id present → academy is wired to GHL → SMS/Email send is possible.
-      // Front-end still has to call /api/ghl/send-message which does the contact
-      // lookup + actual send.
+      // location_id present → academy is wired to GHL. Kept for back-compat;
+      // the modal now gates on `messaging` (Twilio/Resend OR GHL) instead.
       ready:       Boolean(academyGhl),
       location_id: academyGhl,
     },
+    // Per-channel send readiness. The send endpoint (/api/ghl/send-message) is
+    // provider-aware and routes SMS→Twilio, Email→Resend for off-GHL academies.
+    messaging,
     suggested: {
       sms_text:     suggestedSms,
       email_subject: suggestedEmailSubject,
@@ -1645,13 +1669,15 @@ async function actionCardSetupLink(res, member, stripeAccount, ctx, body, req) {
 
   const academyName = ctx.client?.business_name || "your academy";
   const suggestedSms = `Hi, please add your card on file with ${academyName}: ${session.url}`;
+  const messaging = await messagingReadiness(member.client_id, ctx.client);
   return res.status(200).json({
     ok: true, url: session.url, expires_at: session.expires_at || null,
     parent: { name: member.parent_name || null, phone: member.parent_phone || null, email: member.parent_email || null },
     ghl: { ready: Boolean(ctx.client?.ghl_location_id), location_id: ctx.client?.ghl_location_id || null },
+    messaging,
     suggested: {
       sms_text: suggestedSms,
-      email_subject: `Add your card on file — ${academyName}`,
+      email_subject: `Add your card on file - ${academyName}`,
       email_html: `<p>Hi${member.parent_name ? ` ${member.parent_name.split(/\s+/)[0]}` : ""},</p><p>Please add your card on file with ${academyName}:</p><p><a href="${session.url}">${session.url}</a></p><p>Thanks!<br>${academyName}</p>`,
     },
   });
