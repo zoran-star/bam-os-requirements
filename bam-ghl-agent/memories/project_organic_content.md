@@ -52,6 +52,9 @@ New `content_executor` role — CONTENT-ONLY. In `_roles.js` it's in `ANY_STAFF_
 
 ⚠️ **GOTCHA — `staff.role` has a DB CHECK constraint `staff_role_check`** enumerating allowed role strings. Adding a new staff role needs BOTH the app-layer sets in `api/_roles.js`/`StaffModals` AND a migration that rebuilds `staff_role_check` to include it — otherwise invite-staff fails with `new row for relation "staff" violates check constraint "staff_role_check"`. Fixed for content_executor in `20260620120000_staff_role_add_content_executor.sql`. Keep the constraint's role list in sync with `ANY_STAFF_ROLES`.
 
+## Type toggle (2026-07-06 - fixed the everything-shows-as-graphic bug)
+The Add-Creative modal now has an explicit **"What should we make?" Video/Graphic toggle** (`#inputAssetsTypeToggle`, restored - the JS existed but the HTML had been removed). `content_tickets.type` = the toggle, NOT derived from raw-file MIME types anymore. Why: raw inputs never determined the output (photos in, video out is normal), and **link-only submissions (Drive/Dropbox) derived to 'graphic' every time** - that's why organic tickets all showed Graphic on staff side. Auto-suggests from uploads (any video file → video) until the client clicks the toggle (`typeTouched`). Also means per-type credit caps now count the right type. Ads Add-Creative can no longer produce 'mixed' (one creative = one output type; mixed still comes from the campaign-wizard bundles).
+
 ## Organic credits + content-only clients (V1, added 2026-06-20, branch `feat/organic-content-credits`)
 
 **Monthly credits (hard cap, no billing).** Migrations `20260620180000` (per-type) + `20260621120000` (combined pool):

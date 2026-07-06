@@ -26408,6 +26408,18 @@ function _selectInputAssetsType(t) {
     el.classList.toggle('active', el.dataset.value === t);
   });
 }
+// User explicitly picked a type - stop auto-suggesting from file uploads.
+function _pickInputAssetsType(t) {
+  _inputAssetsState.typeTouched = true;
+  _selectInputAssetsType(t);
+}
+// Auto-suggest the output type from what's been uploaded, but never override
+// an explicit choice. Any video file suggests a video creative.
+function _suggestInputAssetsType() {
+  if (_inputAssetsState.typeTouched) return;
+  const hasVideo = (_inputAssetsState.files || []).some(f => ((f.file && f.file.type) || f.type || '').startsWith('video/'));
+  _selectInputAssetsType(hasVideo ? 'video' : 'graphic');
+}
 
 // Files larger than this can't reliably upload directly to Supabase storage
 // from the browser - the connection resets mid-transfer. Clients are pointed
@@ -26501,6 +26513,7 @@ function _inputAssetsAddFiles(filesList, fromFolderUpload) {
     _inputAssetsState.files = _inputAssetsState.files.concat(incoming);
     _renderInputAssetsFilesList();
     _refreshInputAssetsFolderList();
+    _suggestInputAssetsType();
   }
   const input = document.getElementById('inputAssetsFileInput');   if (input) input.value = '';
   const finput = document.getElementById('inputAssetsFolderInput'); if (finput) finput.value = '';
@@ -26510,6 +26523,7 @@ function _inputAssetsRemoveFile(idx) {
   _inputAssetsState.files.splice(idx, 1);
   _renderInputAssetsFilesList();
   _refreshInputAssetsFolderList();
+  _suggestInputAssetsType();
 }
 
 // Populate the folder autocomplete with folders already in use this submission.
@@ -26580,7 +26594,11 @@ async function submitInputAssets() {
   // resets _inputAssetsState to { files: [] } which would otherwise wipe the
   // upload list and silently submit a ticket with no files attached.
   const filesToUpload = _inputAssetsState.files.slice();
-  const assetType = _deriveAssetType(filesToUpload);
+  // The toggle is the source of truth for the OUTPUT type - raw inputs don't
+  // determine it (photos in, video out is normal), and link-only submissions
+  // have no files to derive from at all (the old way silently made every
+  // Drive/Dropbox submission a 'graphic').
+  const assetType = _inputAssetsState.type || _deriveAssetType(filesToUpload);
   const fileCount = filesToUpload.length;
   closeInputAssetsModal();
   showLoading(
@@ -46111,6 +46129,13 @@ function toggleTheme() {
 
     <label class="modal-label" for="inputAssetsTitle">Creative name <span style="color:var(--text-mute);font-weight:400">(optional)</span></label>
     <input id="inputAssetsTitle" class="modal-input" type="text" maxlength="120" placeholder="e.g. August camp promo" />
+
+    <label class="modal-label" style="margin-top:18px">What should we make?</label>
+    <div id="inputAssetsTypeToggle" class="binary-toggle">
+      <button type="button" class="binary-toggle-opt" data-value="video" onclick="_pickInputAssetsType('video')">Video</button>
+      <button type="button" class="binary-toggle-opt active" data-value="graphic" onclick="_pickInputAssetsType('graphic')">Graphic</button>
+    </div>
+    <div style="font-size:11px;color:var(--text-mute);margin-top:6px">The finished creative - not what you're uploading. Photos in, video out is fine.</div>
 
     <label class="modal-label" style="margin-top:18px">Raw files</label>
     <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:8px">
