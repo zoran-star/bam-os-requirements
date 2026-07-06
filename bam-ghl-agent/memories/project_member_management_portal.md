@@ -1,6 +1,6 @@
 ---
 name: Member Management → Client Portal
-description: 2026-05-30 (Session 6 final) — GHL OAuth flow LIVE end-to-end for BAM GTA. Marketplace App created (Sub-Account type, white-label), redirect URI moved to /api/messaging/connect (GHL rejects "ghl" in path). clients.ghl_access_token populated. Kun Liu/Ryan + John Fu BACKFILLED into members (athlete name pulled from GHL custom fields). Pipelines view shipped. Mike's stuck client switcher fixed. Persistent GHL-not-connected banner across all views. NEXT: test the 6 PATCH actions (pause/unpause/change/refund/cancel/referred + payment-link) end-to-end — start by clicking Cancel on Ryan to clear Sergio's ticket. Onboarding wizard still parked (now ready to unpark).
+description: 2026-07-06 (Session 8) — Member agent SHIPPED: natural-language command bar in the V2 Members tab. New api/members-agent.js runs a Claude tool-use loop (find_members/get_member auto; 13 write tools return a PROPOSAL, never executed). client-portal.html #magent-bar renders the proposal with Confirm/Cancel; Confirm fires the existing _memberAction() PATCH path. node --check + tour verifier pass. NOT yet tested live (needs deployed fn + ANTHROPIC_API_KEY + auth + Stripe — Vercel only). NEXT: push, then live-test on GTA safe-first (find_members, payment-link). Prior: Session 7 members offer-scoped; Sessions 1-6 built the whole Members tab + billing + intake + catalog + GHL/Inbox/Pipelines.
 type: project
 ---
 
@@ -1086,6 +1086,55 @@ from the price match you already built (`pricing_catalog.offer_id`).
   (needs the single-member GET to enrich offer too); a real offer switcher header
   on the Members tab (deferred with Sales' until offer #2). See
   [[project_website_leads]] "Offer scoping" + [[project_pricing_sorter_wizard]].
+
+## Session 8 — 2026-07-06 — Member agent (natural-language command bar)
+
+Conversational agent in the V2 Members tab: staff type plain English
+("pause Tristan 30 days", "refund Aarav $50", "change Maya to 3/wk") and
+Claude proposes ONE billing action; a Confirm click runs it. Like bambot
+(the GTA Discord bot) but portal-native. The 13 existing members.js actions
+are the agent's tools.
+
+**Design — translator, not executor (lowest risk):**
+- **`api/members-agent.js`** (new): `POST { client_id, message, history? }`.
+  Claude tool-use loop (model `claude-sonnet-4-6`, same as the sales agents).
+  - READ tools run server-side automatically: `find_members(query)` (roster
+    ILIKE search → member_id + status), `get_member(member_id)` (DB fields +
+    recent Stripe charges w/ charge_id, for refunds).
+  - WRITE tools are named EXACTLY like the members.js action strings
+    (pause, pause-date-fix, unpause, cancel, refund, change, apply-coupon,
+    remove-coupon, payment-link, card-setup-link, referred, update-profile,
+    call). When Claude calls one, the endpoint STOPS and returns
+    `{ proposal: {action, member_id, member_name, body, summary} }` — it does
+    NOT execute. `toActionBody()` maps tool input → members.js PATCH body
+    (refund: amount_dollars→amount_cents; update-profile: fields wrapped).
+    `summarize()` builds the confirm-card line server-side (trustworthy).
+  - Auth = same resolveUser pattern as members.js (staff any academy, client
+    only their own). Scope re-checked. This file never writes billing.
+- **`client-portal.html`** command bar at top of `#view-members` content
+  (`#magent-bar`): input + Send, thread of bubbles, proposal card with
+  Confirm/Cancel (red accent for cancel/refund). `magentSend/Confirm/Cancel`
+  + `_MAGENT` state. **Confirm calls the existing `_memberAction(id, action,
+  body)` executor** → proven `PATCH /api/members?id=` path (auth re-checked,
+  Stripe conventions honored, audit row written THERE). Then
+  `fetchAndRenderMembers()` refreshes. history = plain-text turns for
+  follow-ups ("make it 60 days").
+
+**Safety:** every write is behind a human Confirm click AND re-authorized by
+members.js PATCH. Even a bad proposal can't fire on its own. V1 untouched —
+the bar lives inside the V2/web-only Members view (native-app firewall +
+`data-feature="members"`).
+
+**Verified:** `node --check api/members-agent.js` clean; tour verifier passes.
+NOT yet tested live (needs deployed fn + ANTHROPIC_API_KEY + auth + Stripe —
+only exercisable on Vercel). Env: `ANTHROPIC_API_KEY` already live in prod.
+
+**Follow-ups / polish (not built):**
+- Live end-to-end test on GTA (safe-first: find_members, payment-link).
+- Multi-action commands ("pause X and Y") — v1 does one action per proposal.
+- Quick-suggestion chips under the bar; per-academy MEMBER_MGMT gating already
+  applies (non-GTA academies without Stripe connect will get clean errors on Confirm).
+- Voice input (mic) reusing the ticket-form voice pattern.
 
 ## Related notes
 - [[project_client_auth]] — how client login + client_id scoping works
