@@ -44515,6 +44515,8 @@ function _mmRenderMetaFocus(d) {
 // whose bar width = people remaining; the drop % + who was lost lives in the
 // gap between rows (that's where the eye already looks). Only the single worst
 // leak is painted red, with its fix chip attached. No overlapping ratio pills.
+// Shared soft-pill style for the between-step metadata chips (time / load).
+const MM_PILL = 'font-family:var(--mm-ff);font-size:11px;color:var(--text-mute);display:inline-flex;align-items:center;gap:3px;background:var(--surface-el);padding:2px 9px;border-radius:999px';
 // Page-load speed chip for the clicked -> loaded connector. Headline = median
 // full-load seconds (all traffic); tooltip discloses the per-source split plus
 // LCP / TTFB and the sample size.
@@ -44530,7 +44532,7 @@ function _mmLoadChip(load) {
   const tip = ('median page load ' + secs(load.median_ms) + ' over ' + load.n + ' visit' + (load.n === 1 ? '' : 's')
     + (parts.length ? ' - ' + parts.join(', ') : '')
     + (extra.length ? ' | ' + extra.join(' · ') : '')).replace(/"/g, '&quot;');
-  return '<span style="font-family:var(--mm-ff);font-size:11px;color:var(--text-mute);display:inline-flex;align-items:center;gap:3px" title="' + tip + '">&#9201; ~' + secs(load.median_ms) + '</span>';
+  return '<span style="' + MM_PILL + '" title="' + tip + '">&#9201; ~' + secs(load.median_ms) + '</span>';
 }
 function _mmRenderLandingFocus(d) {
   const body = document.getElementById('lm-modal-body');
@@ -44551,7 +44553,7 @@ function _mmRenderLandingFocus(d) {
   const st = page.step_times || {};
   // Prominent per-stage icons (16px, currentColor).
   const ICO = {
-    clicked: '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 2.4l8.4 3.5-3.3 1.1L6.7 11 3 2.4z"/></svg>',
+    clicked: '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3.6 2.8l9 3.75-3.55 1.2L7.6 12.6 3.6 2.8z"/></svg>',
     loaded: '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="12" height="10" rx="1.5"/><path d="M2 6.2h12"/><circle cx="4.1" cy="4.6" r="0.35"/><circle cx="5.7" cy="4.6" r="0.35"/></svg>',
     form: '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="2" width="10" height="12" rx="1.5"/><path d="M5.5 6h5M5.5 8.5h5M5.5 11h3"/></svg>',
     calendar: '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="3" width="11" height="10.5" rx="1.5"/><path d="M2.5 6.5h11M5.5 1.5v3M10.5 1.5v3"/></svg>',
@@ -44582,18 +44584,21 @@ function _mmRenderLandingFocus(d) {
   // icon | label | count (right-aligned, hugs the bar) | bar
   const GRID = 'display:grid;grid-template-columns:34px 100px 46px 1fr;align-items:center;gap:10px';
   let rows = '';
+  const MM_LOW_SAMPLE = 5;   // below this a bar is noise -> fade it + flag it
   for (let i = 0; i < steps.length; i++) {
     const s = steps[i];
     const w = Math.max((s.n / top) * 100, 3);
+    const thin = s.n > 0 && s.n < MM_LOW_SAMPLE;
     rows +=
       '<div style="' + GRID + '">' +
         '<div style="display:flex;justify-content:center">' +
           '<span style="width:30px;height:30px;border-radius:50%;background:var(--surface-el);color:var(--text);display:flex;align-items:center;justify-content:center;flex:0 0 auto">' + s.icon + '</span>' +
         '</div>' +
         '<div style="font-family:var(--mm-ff);font-size:14px;font-weight:700;color:var(--text)">' + s.lbl + '</div>' +
-        '<div style="font-family:var(--mm-fm);font-size:15px;font-weight:500;color:var(--text);text-align:right">' + s.n + '</div>' +
-        '<div style="height:26px;background:var(--surface-el);border-radius:6px;overflow:hidden">' +
-          '<div style="height:100%;width:' + w.toFixed(1) + '%;min-width:6px;background:var(--text-sub);border-radius:6px"></div>' +
+        '<div style="font-family:var(--mm-fm);font-size:15px;font-weight:500;color:' + (thin ? 'var(--text-mute)' : 'var(--text)') + ';text-align:right">' + s.n + '</div>' +
+        '<div style="height:26px;background:var(--surface-el);border-radius:6px;overflow:hidden;position:relative">' +
+          '<div style="height:100%;width:' + w.toFixed(1) + '%;min-width:6px;background:var(--text-sub);border-radius:6px;opacity:' + (thin ? '0.4' : '1') + '"></div>' +
+          (thin ? '<span style="position:absolute;top:50%;right:10px;transform:translateY(-50%);font-family:var(--mm-ff);font-size:10px;letter-spacing:.03em;color:var(--text-mute)" title="only ' + s.n + ' - too few to read into">thin sample</span>' : '') +
         '</div>' +
       '</div>';
     // between-stage connector: fixed-height slot between EVERY pair of rows so
@@ -44604,7 +44609,7 @@ function _mmRenderLandingFocus(d) {
       let chip = '';
       if (tm && tm.median_s != null) {
         // time to ADVANCE from this step to the next (median over sessions)
-        chip = '<span style="font-family:var(--mm-ff);font-size:11px;color:var(--text-mute);display:inline-flex;align-items:center;gap:3px" title="median time to advance (' + tm.n + ' sessions)">&#9201; ~' + _mmDur(tm.median_s) + '</span>';
+        chip = '<span style="' + MM_PILL + '" title="median time to advance (' + tm.n + ' sessions)">&#9201; ~' + _mmDur(tm.median_s) + '</span>';
       } else if (s.loadChip && page.load && page.load.median_ms != null) {
         // page-load speed on the clicked -> loaded transition (all sources)
         chip = _mmLoadChip(page.load);
