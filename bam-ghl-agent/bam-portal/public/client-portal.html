@@ -4772,7 +4772,11 @@
 -->
 <style>
   #admin-fb-wrap {
-    position: fixed; bottom: 24px; right: 24px; z-index: 10000;
+    position: fixed; bottom: calc(24px + env(safe-area-inset-bottom)); right: 24px; z-index: 9700;
+  }
+  @media (max-width: 640px) {
+    #admin-fb-wrap { bottom: calc(14px + env(safe-area-inset-bottom)); right: 12px; }
+    #admin-fb-btn { width: 44px; height: 44px; }
   }
   #admin-fb-btn {
     width: 56px; height: 56px; border-radius: 50%;
@@ -15444,6 +15448,14 @@ function _hv2Style() {
     '.hm-peek-send{background:var(--gold);color:var(--on-gold);border:none;border-radius:8px;padding:9px 18px;font:inherit;font-size:13px;font-weight:700;cursor:pointer}' +
     '.hm-peek-full{background:none;border:none;color:var(--gold);font:inherit;font-size:12.5px;font-weight:700;cursor:pointer;padding:10px 0 14px}' +
     '.hm-peek-full:hover{text-decoration:underline}' +
+    '@media(max-width:640px){' +
+    '#hm-peek-ov{align-items:flex-end}' +
+    '.hm-peek-card{width:100%;max-width:none;max-height:86dvh;border-radius:24px 24px 0 0;border-bottom:none;padding-bottom:env(safe-area-inset-bottom);animation:hmSheetUp .32s cubic-bezier(0.22,1,0.36,1)}' +
+    '.hm-kpi-modal{align-items:flex-end}' +
+    '.hm-kpi-body{width:100%;max-width:none;border-radius:24px 24px 0 0;max-height:88dvh;padding-bottom:calc(28px + env(safe-area-inset-bottom));animation:hmSheetUp .32s cubic-bezier(0.22,1,0.36,1)}' +
+    '}' +
+    '@keyframes hmSheetUp{from{transform:translateY(48px);opacity:.5}to{transform:translateY(0);opacity:1}}' +
+    '@media(prefers-reduced-motion:reduce){.hm-peek-card,.cc-minbox-card,.hm-kpi-body{animation:none !important}}' +
     '#cc-minbox-ov{position:fixed;inset:0;z-index:9800;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;animation:hv2In .2s ease}' +
     '.cc-minbox-card{font-family:var(--font-ui);background:var(--surface);border:1px solid var(--border);border-radius:24px;width:min(520px,92vw);max-height:80vh;display:flex;flex-direction:column;box-shadow:0 12px 40px rgba(0,0,0,.3);overflow:hidden}' +
     '.cc-minbox-head{display:flex;align-items:flex-start;justify-content:space-between;padding:18px 22px 10px}' +
@@ -15458,6 +15470,7 @@ function _hv2Style() {
     '.cc-minbox-row.unread .cc-minbox-prev{color:var(--text)}' +
     '.cc-minbox-time{font-size:11px;color:var(--text-mute);flex:none}' +
     '.cc-minbox-dot{flex:none;width:7px;height:7px;border-radius:999px;background:var(--gold)}' +
+    '@media(max-width:640px){#cc-minbox-ov{align-items:flex-end}.cc-minbox-card{width:100%;max-width:none;max-height:86dvh;border-radius:24px 24px 0 0;border-bottom:none;padding-bottom:env(safe-area-inset-bottom);animation:hmSheetUp .32s cubic-bezier(0.22,1,0.36,1)}}' +
     '@media(max-width:480px){#home-v2 .hm-kpi-grid{grid-template-columns:1fr 1fr}}' +
     // Stat expand tooltip
     '#home-v2 .hm-stat-tip{position:absolute;bottom:calc(100% + 6px);left:50%;transform:translateX(-50%) scale(0.95);opacity:0;pointer-events:none;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:8px 12px;box-shadow:0 6px 20px rgba(0,0,0,.3);white-space:nowrap;z-index:10;transition:opacity .18s,transform .18s}' +
@@ -44763,7 +44776,17 @@ function _ccStyle() {
     '.cc-mlist-msg:hover{color:var(--gold);border-color:var(--gold)}' +
     '.hm-ticker-bg.cc-full{position:fixed !important;inset:0;width:100vw;height:100vh;z-index:0;pointer-events:none}' +
     'body.cc-mode #view-cc .cc-content{position:relative;z-index:1}' +
-    '@media(max-width:768px){body.cc-mode .cc-rail{display:none}#view-cc .cc-content{padding:16px 16px 120px}}' +
+    '@media(max-width:768px){body.cc-mode .cc-rail{display:none}#view-cc .cc-content{padding:16px 16px calc(120px + env(safe-area-inset-bottom))}}' +
+    '@media(max-width:640px){' +
+    '.cc-stats{grid-template-columns:repeat(2,1fr);gap:10px}' +
+    '.cc-stat{padding:12px 14px;border-radius:12px}' +
+    '.cc-stat-v{font-size:24px}' +
+    '.cc-actions{flex-wrap:wrap}' +
+    '.cc-btn{min-height:44px}' +
+    '.cc-sage{padding:6px}' +
+    '}' +
+    '@media(hover:none){.cc-ib-reply{opacity:1}}' +
+    'body.cc-mode .cc-dock{bottom:calc(16px + env(safe-area-inset-bottom))}' +
     '@media(prefers-reduced-motion:reduce){.cc-sec{opacity:1;transform:none;transition:none}}';
   document.head.appendChild(st);
 }

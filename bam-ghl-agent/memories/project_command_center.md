@@ -132,6 +132,14 @@ Full audit: static wiring script (all onclick handlers defined, all switchView t
 KNOWN + ACCEPTED (not bugs): two guarded 8s intervals never cleared (sales badge + hawk count); `_mmLoad` hides the whole marketing card on API error (quiet fail by design); bulk mark-read is local-only (GHL API gap); Attendance/Fill Rate KPIs selectable but "-" (shelved); Sales 7-day/closing-rate tiles "-" (awaiting Zoran's wiring).
 BIG DECISIONS parked for Cole: mocked creative-request + landing-change submits fake success (`_mmcSubmit` 'MOCK submit' + `_v2Submit`) - wire to real marketing-tickets vs honest gate.
 
+## Mobile phase 1 (2026-07-06, Cole: "let's do it" - app already approved on the App Store, ship updates through the Capacitor wrapper `bam-portal-app/`)
+Audited CC at iPhone 13 size first: NO horizontal overflow, viewport meta already has `viewport-fit=cover`, rail hides <=768 and the dock shows. Shipped:
+- Popups become BOTTOM SHEETS <=640px: `.hm-peek-card`, `.cc-minbox-card`, `.hm-kpi-body` go full-width, bottom-aligned, 24px top radius, 86dvh cap, `hmSheetUp` slide (reduced-motion off). CASCADE GOTCHA: the minbox media block must sit AFTER the `.cc-minbox-*` base rules in the style string (same specificity, later wins) - it lives after `.cc-minbox-dot`.
+- Safe areas: cc-content mobile bottom padding + `.cc-dock` + `#admin-fb-wrap` get `env(safe-area-inset-bottom)`; fb bubble shrinks to 44px <=640 and its z-index dropped 10000 -> 9700 so it no longer floats OVER popups (peek 9820 / minbox 9800 / kpi 9999).
+- Compact tiles <=640: `.cc-stats` 2-col, tighter `.cc-stat` padding, `.cc-stat-v` 24px, `.cc-btn` min-height 44px.
+- Touch: `@media(hover:none)` shows `.cc-ib-reply` always (was hover-revealed).
+NEXT mobile candidates (not built): bottom tab bar to jump CC sections, focus modes as full-screen sheets, service-worker shell cache, push via Capacitor, table->card layouts for roster/KPI setup. EXCLUDED from mobile per Cole: marketing focus mode, sales pipeline configuring.
+
 ## Section mounts (current skeleton)
 | Section | Mount | Content |
 |---|---|---|
