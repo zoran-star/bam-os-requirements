@@ -55,17 +55,37 @@ academies, so leads move by the academy's authored edges, not hardcoded per-agen
   #6 `says_no` done_trial→nurture (`agent-closing.js` confirm-lost; same shape as #5).
   → **Every straightforward stage→stage move in portal code is now routed.** Shipped in one
   session (2026-07-06, PR #1189) — NOT yet prod-verified on GTA; verify the batch before Phase 3+.
-- **⏭ NEXT (Phase 3 — needs investigation / new capability, NOT clean like-for-like):**
-  - `no_show` scheduled_trial→responded + `post_trial_good_fit` scheduled_trial→done_trial +
-    `post_trial_not_fit`→unqualified — live in the **post-trial form router** (find that handler;
-    good_fit/no_show are stage moves, not_fit is terminal).
-  - `replied` interested/nurture→responded — the ghosted/nurture reply bounce may be a **GHL
-    workflow, not portal code** (memory: Ghosted/Nurture still rigid GHL workflows). If so it's
-    NOT swappable until those are rebuilt as portal automations — confirm before assuming a site.
-  - **Terminals** (enrolls→member, marked_unqualified→unqualified, complaint_offtopic→human):
-    build the router's terminal path (setStatus won/lost + role stamp / human escalation) and
-    verify each against the caller's current close logic. Router returns `terminal-deferred`
-    (matched:false) today so these still run hardcoded.
+- **TERMINAL PATH BUILT (2026-07-06):** `routeTransition` handles terminal edges when the caller
+  passes **`allowTerminal:true`** (opt-in, so the 6 stage-swap callers are unaffected + an academy
+  re-pointing a stage trigger at a terminal can't make a stage-only caller mis-close a lead).
+  member→`setStatus(won)` · unqualified→`setStatus(abandoned, role:unqualified)` (mirrors
+  confirm-abandoned's core close) · human→NO status change, returns `{escalate:true}` for the
+  caller. GHL tag / outcome-log side effects stay caller-side.
+- **POST-TRIAL FORM (`api/ghl/post-trial.js`) — 2 of 3 done:**
+  - ✅ `post_trial_good_fit` scheduled_trial→done_trial — routed (stage), provider-branch fallback,
+    GTA-identical.
+  - ✅ `post_trial_not_fit` → **Unqualified** — was a NO-OP (not-a-fit leads stranded in Scheduled
+    Trial); now closes via the terminal path (`allowTerminal:true`) + stamps unqualified tag +
+    outcome row (mirrors confirm-abandoned). Fires on `showed_up===true && !good_fit`. Quiet close.
+    NEW behavior (Zoran-approved).
+  - ⏸️ `no_show` — **DECISION: Zoran wants → Responded (NOT the current code's → Interested), WITH
+    an initial automation.** BLOCKED on the new model below + reconciling the existing `missed_trial`
+    automation (today fired on no-show; it assumes the Interested/Ghosted path — can't also send
+    the lead to Responded for the booking agent without double-touch). NOT changed yet.
+- **🧭 NEW MODEL DIRECTION (Zoran, 2026-07-06) — "initial automations per entry point":** every
+  stage whose engine is an AGENT (Responded=Booking, Scheduled Trial=Confirm, Done Trial=Closing)
+  should have, **for each ENTRY POINT into it, an initial automation** — an on-entry triggered
+  sequence (e.g. no_show→Responded fires a rebook-opener; new_lead→Responded fires the first
+  outreach). Distinct from the agent's conversational replies. Partially exists today as the
+  `agent_contact_notes` "Entry:" note trick (confirm-handoff writes one so the booking opener
+  drafts a rebook). This is a real model/feature build, not a swap — design it (where do initial
+  automations live? per-edge config in `stage_transitions`? reuse the automations engine?) then
+  build. It also resolves the no_show question (its Responded-entry initial automation replaces
+  the standalone missed_trial automation). See [[project_client_agent_training]] for the agent side.
+- **⏭ OTHER remaining swaps:** `replied` interested/nurture→responded (the ghosted/nurture reply
+  bounce — likely a **GHL workflow, not portal code**; confirm before assuming a site) ·
+  `enrolls`→member (Stripe payment path — deterministic, low value, probably leave direct) ·
+  `marked_unqualified` (manual confirm-abandoned action — from-role-agnostic; probably leave direct).
 - **Phase 4:** delete the hardcoded destination resolution once every site routes.
 
 **Other unbuilt engines:** Closing agent, Lead Nurture automation, Resend email (see doc redesign
