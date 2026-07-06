@@ -249,3 +249,9 @@ Full audit (wrapper config + every isNativeApp path + Playwright ?native=1 runti
 - **NEEDS THE MAC (cannot do from repo)**: `npm install && npx cap sync` then rebuild + resubmit - the committed Package.swift/capacitor.settings.gradle only include app/splash-screen/status-bar, so push-notifications, keyboard, haptics, badge AND the new browser plugin are NOT in the store build until a sync + rebuild happens. Push tokens are silently not captured by the current store build.
 - Verified clean: push JS client (register/upsert/delete/tap deep-link), tel:/mailto:, no PWA-prompt/userAgent traps, service worker no-ops in WKWebView.
 - Deferred (fine for now): universal links (web links open Safari, not the app), CSV import untested in-app, `?native=1` previews native behavior in any browser.
+
+
+## Push notification plan (2026-07-06, Cole's picks)
+ON BY DEFAULT: 1 new parent message, 2 Hawkeye needs you, 3 payment failed, 4 trial booked, 5 milestone moments, 8 pause/cancel requests. OPT-IN: 6 Tower morning briefing, 7 weekly digest (cron exists).
+WIRED so far (this commit): `payment-failed` (api/stripe/webhook.js handleInvoiceFailed, beside the owner SMS) and `hawkeye-ready` (agent-approvals detect cron - one push per client per run when NEW drafts land: drafted + lost_proposed). Both new kinds in the `_send.js` EVENTS catalog. All sends are silent no-ops until the APNs env vars exist.
+STILL TO WIRE: new parent message (parent-message create path in api/client/parent-message-threads.ts / api/parent side), trial booked (needs a GHL appointment webhook or cron diff), milestones (server-side calc - client-side only today), pause/cancel request (parent-initiated path), Tower briefing (new cron, opt-in), per-client notification prefs UI (today: all-on, no prefs storage for push kinds - notification_prefs exists for SMS/notifyOwners, consider reusing it).

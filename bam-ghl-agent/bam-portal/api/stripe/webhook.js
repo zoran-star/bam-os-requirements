@@ -1,5 +1,6 @@
 /* global Buffer, process */
 import { withSentryApiRoute } from "../_sentry.js";
+import { notifyClientPush } from "../push/_send.js";
 // Vercel Serverless Function — Stripe webhook (Connect events)
 //
 // Single platform-level Stripe webhook receiving events from every
@@ -785,6 +786,11 @@ async function handleInvoiceFailed(event, connectedAccount, res) {
   // Owner/staff SMS (V1.5/V2, per notification_prefs). Non-fatal.
   notifyOwners(member.client_id, "payment_failure",
     `⚠️ Payment failed: ${member.athlete_name || member.parent_name || "a member"}. They're flagged in your portal.`).catch(() => {});
+
+  // Native push to the owner's phone (silent no-op until APNs env exists).
+  notifyClientPush(member.client_id, "payment-failed", {
+    name: member.athlete_name || member.parent_name || "A member",
+  }).catch(() => {});
 
   // Phase 5 access sync: mirror the failed state onto membership +
   // entitlements (suspend, never delete). Mirrors the member ROW so member
