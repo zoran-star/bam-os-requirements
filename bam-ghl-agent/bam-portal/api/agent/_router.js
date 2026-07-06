@@ -14,12 +14,14 @@
 // seeded, edge paused, lookup blip), routeTransition returns { matched:false }
 // and the caller keeps its existing hardcoded move. The router never guesses.
 //
-// PHASE 1 SCOPE: only stage->stage moves are routed here. Terminal edges
-// (member / unqualified / human) still DEFER to each caller's verified hardcoded
-// close/status logic until their own swap lands — the router will never invent a
-// won/lost/abandoned. See docs / project_sales_focus_mode.md for the swap order.
+// TERMINALS ARE OPT-IN. By default routeTransition only performs stage->stage
+// moves; a terminal edge (member / unqualified / human) returns matched:false so
+// a stage-only caller keeps its verified hardcoded close logic (and so an academy
+// re-pointing a stage trigger at a terminal can't make a stage caller
+// accidentally close a lead). A caller that KNOWS how to handle a terminal passes
+// { allowTerminal:true } to enable it. See project_sales_focus_mode.md.
 
-import { sbRest, resolveStage, moveStage, findOpenOpp } from "./_store.js";
+import { sbRest, resolveStage, moveStage, setStatus, findOpenOpp } from "./_store.js";
 import { ghl as ghlDefault } from "../ghl/_core.js";
 
 // Read the single transition edge for (clientId, fromRole, trigger) on the
@@ -55,8 +57,11 @@ export async function resolveEdge(clientId, fromRole, trigger) {
 //   { matched:false, reason }                     — caller should run its hardcoded move
 // The move reuses the _store primitives (resolveStage + moveStage), so it inherits
 // the ghl/portal provider split, the shadow mirror, and KPI hooks for free.
+// A terminal result adds { kind:"terminal", terminal:"member"|"unqualified"|"human" };
+// for "human" moved is false + escalate is true (the router performs no status
+// change — escalation is caller-specific). Requires opts.allowTerminal:true.
 export async function routeTransition(opts = {}) {
-  const { clientId, sb, ghl, token, locationId, fromRole, trigger, contactId } = opts;
+  const { clientId, sb, ghl, token, locationId, fromRole, trigger, contactId, allowTerminal } = opts;
   let { oppRef } = opts;
 
   const edge = await resolveEdge(clientId, fromRole, trigger);
@@ -67,10 +72,9 @@ export async function routeTransition(opts = {}) {
   // move) but moved:false — the lead stays put by design.
   if (edge.enabled === false) return { matched: true, moved: false, paused: true };
 
-  // Phase 1: terminals defer to the caller's verified hardcoded close logic.
-  if (edge.to_kind !== "stage" || !edge.to_stage_role) {
-    return { matched: false, reason: "terminal-deferred" };
-  }
+  const isTerminal = edge.to_kind === "terminal" || !edge.to_stage_role;
+  // Terminals are opt-in: a stage-only caller defers to its hardcoded close.
+  if (isTerminal && !allowTerminal) return { matched: false, reason: "terminal-deferred" };
 
   const ghlFn = ghl || ghlDefault;
   // Resolve the contact's open opp if the caller didn't hand one in.
@@ -78,12 +82,25 @@ export async function routeTransition(opts = {}) {
     try { oppRef = await findOpenOpp({ clientId, sb, ghl: ghlFn, token, locationId, contactId }); }
     catch (_) { oppRef = null; }
   }
+  const reason = opts.reason || `flow: ${fromRole || "entry"} + ${trigger}`;
+
+  if (isTerminal) {
+    const term = edge.to_terminal;
+    // human = needs a person. The router changes NO status (escalation — task /
+    // Slack / queue — is the caller's job); it just flags the branch.
+    if (term === "human") return { matched: true, kind: "terminal", terminal: "human", moved: false, escalate: true };
+    // member = enrolled/won; unqualified = the dead-end abandon, role-stamped so
+    // the board + unqualified tag stay in sync (mirrors confirm-abandoned). Any
+    // GHL tag / outcome-log side effects stay with the caller.
+    const status = term === "member" ? "won" : "abandoned";
+    const role = term === "unqualified" ? "unqualified" : undefined;
+    if (oppRef) await setStatus({ clientId, sb, ghl: ghlFn, token, oppRef, status, role, contactId, reason });
+    return { matched: true, kind: "terminal", terminal: term, moved: !!oppRef };
+  }
 
   const role = edge.to_stage_role;
   const stage = await resolveStage(sb, ghlFn, { clientId, token, locationId, role });
   if (!stage) return { matched: false, reason: "no-stage" };
-
-  const reason = opts.reason || `flow: ${fromRole || "entry"} + ${trigger}`;
   if (oppRef) {
     await moveStage({ clientId, sb, ghl: ghlFn, token, oppRef, stage, role, contactId, reason });
   }

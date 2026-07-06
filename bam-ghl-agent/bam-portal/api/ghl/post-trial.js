@@ -12,6 +12,7 @@
 
 import { withSentryApiRoute } from "../_sentry.js";
 import { moveStage, pipelineFlags, oppMatchClause, resolveStage } from "../agent/_store.js";
+import { routeTransition } from "../agent/_router.js";
 import { contactProvider } from "../_contacts.js";
 import { recordKpiEvent } from "../_kpi.js";
 import { enrollContact, isAutomationLive } from "../automations.js";
@@ -279,24 +280,31 @@ async function handler(req, res) {
   }
 
   if (goodFit) {
-    // Move to the Done Trial stage of the opp's pipeline. Same provider branch
-    // as the no-show move above: portal -> registry, ghl -> live GHL + regex.
+    // Advance to Done Trial per the academy's authored flow (the post_trial_good_fit
+    // edge; GTA seed = scheduled_trial -> done_trial). Router reads the edge; on no
+    // edge (unseeded / paused / lookup blip) it returns matched:false and we run the
+    // original provider-branch resolve + move - behavior-identical for GTA.
     try {
-      let stage = null;
-      if (provider === "portal") {
-        const st = await resolveStage(sb, ghl, { clientId, token, locationId: client.ghl_location_id, role: "done_trial" });
-        if (st) stage = { pipelineId: st.pipelineId || pipelineId, stageId: st.stageId, stageName: st.stageName || "Done Trial" };
+      const routed = await routeTransition({ clientId, sb, ghl, token, locationId: client.ghl_location_id, fromRole: "scheduled_trial", trigger: "post_trial_good_fit", contactId, oppRef, reason: "post-trial: good fit" });
+      if (routed.matched) {
+        if (routed.moved) result.moved = true;
       } else {
-        const pls = (await ghl("GET", `/opportunities/pipelines?locationId=${encodeURIComponent(client.ghl_location_id)}`, { token })).pipelines || [];
-        const pl = pls.find(p => p.id === pipelineId) || pls[0];
-        const doneStage = (pl?.stages || []).find(s => { const n = (s.name || "").toLowerCase(); return n.includes("trial") && (n.includes("done") || n.includes("complete") || n.includes("attended")); });
-        if (doneStage) stage = { pipelineId: pl.id, stageId: doneStage.id, stageName: doneStage.name };
-      }
-      if (stage) {
-        // Move through the provider-aware store; on ghl it is the identical PUT and the
-        // store does the shadow mirror internally (replacing the manual shadowMirrorMove).
-        await moveStage({ clientId, sb, ghl, token, oppRef, stage, role: "done_trial", contactId });
-        result.moved = true;
+        let stage = null;
+        if (provider === "portal") {
+          const st = await resolveStage(sb, ghl, { clientId, token, locationId: client.ghl_location_id, role: "done_trial" });
+          if (st) stage = { pipelineId: st.pipelineId || pipelineId, stageId: st.stageId, stageName: st.stageName || "Done Trial" };
+        } else {
+          const pls = (await ghl("GET", `/opportunities/pipelines?locationId=${encodeURIComponent(client.ghl_location_id)}`, { token })).pipelines || [];
+          const pl = pls.find(p => p.id === pipelineId) || pls[0];
+          const doneStage = (pl?.stages || []).find(s => { const n = (s.name || "").toLowerCase(); return n.includes("trial") && (n.includes("done") || n.includes("complete") || n.includes("attended")); });
+          if (doneStage) stage = { pipelineId: pl.id, stageId: doneStage.id, stageName: doneStage.name };
+        }
+        if (stage) {
+          // Move through the provider-aware store; on ghl it is the identical PUT and the
+          // store does the shadow mirror internally (replacing the manual shadowMirrorMove).
+          await moveStage({ clientId, sb, ghl, token, oppRef, stage, role: "done_trial", contactId });
+          result.moved = true;
+        }
       }
     } catch (e) { console.error("done-trial move failed (non-fatal):", e.message); }
 
