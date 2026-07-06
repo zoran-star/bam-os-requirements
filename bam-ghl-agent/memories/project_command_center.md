@@ -67,6 +67,11 @@
 - Focus pages (`.mm-focus-page`, so marketing + members) now run on the design system fonts: `--font-ui` body/inputs/buttons, `--font-num` 800 for `.modal-title` (they were inheriting legacy Inter/Archivo).
 - Focus background dropped way down: blueprint grid lines at 45% of `--border` via color-mix, gold dots at 10% gold; growth-curve wallpaper area .035 -> .018, line .11 -> .055, highlight pulse .5 -> .28.
 
+## KPI picker fix + inbox capitalization (2026-07-06)
+- **"Choose Your KPIs" gear was dead-looking**: the modal appends to document.body but ALL its CSS was scoped `#home-v2 .hm-kpi-*`, so it rendered unstyled/invisible. Fixed by de-scoping the 28 selectors to `.hm-kpi-*` + giving `.hm-kpi-body` the design-system fonts directly (body-level nodes can't see #home-v2's --ff/--fn vars).
+- `_ccCapName` now skips anything containing '@' (emails stay verbatim). Applied to the home inbox card rows (`_hmInboxRow`) and the v15 inbox list (`_ibSmartName` person branch).
+- Scoreboard periods (as built): New Leads + Trials Booked = this week Mon-today (ring vs last week); MRR Growth = month-to-date from /kpis revenue; Revenue = yesterday only. Time-period options are an open decision with Cole.
+
 ## Section mounts (current skeleton)
 | Section | Mount | Content |
 |---|---|---|
