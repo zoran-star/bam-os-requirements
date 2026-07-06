@@ -7372,16 +7372,23 @@
             <div class="card" style="margin-bottom:28px">
               <div class="card-title" style="margin-bottom:12px">Quick guide</div>
               <p style="color:var(--text-sub);font-size:14px;line-height:1.6;margin-bottom:10px">
-                Picking the right offer below will pull up a guide card with the exact info we need from you.
-                That guide will walk you through what kind of photos, video, and copy makes a great ad for that offer.
+                <b style="color:var(--text)">1. Pick the offer you're promoting.</b> Every campaign sells one offer.
+                Picking it pulls up a short guide with exactly what to send - the photos, video, and copy that work for that offer.
+                The guide is a starting point: your own creative concepts are always welcome, just describe them in the notes.
+              </p>
+              <p style="color:var(--text-sub);font-size:14px;line-height:1.6;margin-bottom:10px">
+                <b style="color:var(--text)">2. Send raw, not edited.</b> Phone footage and photos are perfect.
+                Cutting, designing, and writing are on us.
               </p>
               <p style="color:var(--text-sub);font-size:14px;line-height:1.6">
-                After you upload your assets, set a monthly spend and (optionally) link a landing page. Your account
-                manager will review, build the campaign in Meta, and launch it within 1-2 business days.
+                <b style="color:var(--text)">3. Set spend and submit.</b> Add a monthly budget and, if you have one,
+                a landing page. Your account manager builds the campaign in Meta and launches it within 1-2 business days.
               </p>
-              <p style="color:var(--text-mute);font-size:12px;font-style:italic;margin-top:14px">
-                Placeholder content. Cam will replace this with the final guide.
-              </p>
+              <div style="border-top:1px solid var(--line);margin-top:14px;padding-top:12px;color:var(--text-sub);font-size:14px;line-height:1.6">
+                <b style="color:var(--text)">Promoting something that isn't listed?</b> A new camp, clinic, tryout, or membership
+                needs its own offer - hit <b style="color:var(--text)">Create a new offer</b> below first. Campaigns attach to an offer,
+                so this keeps your leads and results tracked to the right thing. If it's already in the list, pick it - don't create a duplicate.
+              </div>
             </div>
 
             <div class="section-label">Pick an offer</div>
@@ -7466,6 +7473,14 @@ Then the call to action."]</div>
                 </div>
               </div>
             </div>
+            <div class="card" style="margin-bottom:18px;border-style:dashed">
+              <div style="color:var(--text-sub);font-size:14px;line-height:1.6">
+                <b style="color:var(--text)">Got your own concept?</b> This guide is our proven starting point, not a rulebook.
+                If you have a different idea for this offer - a trend, a skit, a series, anything - run with it:
+                describe the concept in the <b style="color:var(--text)">notes</b> on the next step and send whatever raw
+                footage or photos it needs. We'll build it your way and flag anything we'd tweak before launch.
+              </div>
+            </div>
             <div style="display:flex;gap:10px;justify-content:flex-end">
               <button class="btn-modal-secondary" onclick="wizardGoBack()">Back</button>
               <button class="btn-modal-primary" onclick="wizardGoToStep('asset-upload')">Ready to input assets? →</button>
@@ -7548,18 +7563,25 @@ Then the call to action."]</div>
         </div>
       </div><!-- /#marketing-new-campaign -->
 
-      <!-- ── Channel split (Ads | Organic) - shown when ORGANIC_CONTENT is on ── -->
+      <!-- ── Channel split (Ads | Funnel | Organic) - shown when the client has
+           more than one content surface. Order is deliberate: every scaling
+           client has Ads + Funnel; Organic is per-client so it sits last. ── -->
       <div id="marketing-channel-split" style="display:none">
         <div class="channel-choose">
           <div class="section-label">Marketing</div>
           <div style="color:var(--text-sub);font-size:13px;margin:4px 0 18px">What do you want to work on?</div>
           <div class="channel-grid">
-            <button class="channel-card" onclick="_chooseChannel('ads')">
+            <button class="channel-card" id="channel-card-ads" onclick="_chooseChannel('ads')">
               <span class="channel-card-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 11 18-5v12L3 14v-3z"/><path d="M11.6 16.8a3 3 0 1 1-5.8-1.6"/></svg></span>
               <span class="channel-card-name">Ads</span>
               <span class="channel-card-desc">Paid campaigns on Meta</span>
             </button>
-            <button class="channel-card" onclick="_chooseChannel('organic')">
+            <button class="channel-card" id="channel-card-funnel" onclick="_chooseChannel('funnel')">
+              <span class="channel-card-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 4h18l-7 8v6l-4 2v-8L3 4z"/></svg></span>
+              <span class="channel-card-name">Funnel</span>
+              <span class="channel-card-desc">Videos and graphics for your website</span>
+            </button>
+            <button class="channel-card" id="channel-card-organic" onclick="_chooseChannel('organic')">
               <span class="channel-card-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 20h10"/><path d="M10 20c5.5-2.5.8-6.4 3-10"/><path d="M9.5 9.4c1.1.8 1.8 2.2 2.3 3.7-2 .4-3.5.4-4.8-.3-1.2-.6-2.3-1.9-3-4.2 2.8-.5 4.4 0 5.5.8z"/><path d="M14.1 6a7 7 0 0 0-1.1 4c1.9-.1 3.3-.6 4.3-1.4 1-1 1.6-2.3 1.7-4.6-2.7.1-4 1-4.9 2z"/></svg></span>
               <span class="channel-card-name">Organic</span>
               <span class="channel-card-desc">Content for your socials</span>
@@ -7568,9 +7590,21 @@ Then the call to action."]</div>
         </div>
       </div>
 
+      <!-- ── Funnel content view (website content -> systems team) ── -->
+      <div id="marketing-funnel" style="display:none">
+        <button onclick="_backToChannelSplit()" style="background:none;border:none;color:var(--text-mute);font-size:13px;cursor:pointer;padding:0;margin-bottom:14px">← Back</button>
+
+        <div class="section-label">Funnel content</div>
+        <div style="color:var(--text-sub);font-size:13px;margin:6px 0 14px;line-height:1.5">Videos and graphics for your website and funnels. Our content team produces the finals, then our systems team adds them to your site - you can track that step under <b>Systems</b>.</div>
+        <button class="btn-add-campaign" style="margin-bottom:22px" onclick="openAddCreativeModal('funnel')">+ Request funnel content</button>
+
+        <div class="section-label">Status</div>
+        <div id="funnel-status-list" style="margin-top:8px"></div>
+      </div>
+
       <!-- ── Organic content view ── -->
       <div id="marketing-organic" style="display:none">
-        <button id="organic-back-btn" onclick="_backToChannelSplit()" style="background:none;border:none;color:var(--text-mute);font-size:13px;cursor:pointer;padding:0;margin-bottom:14px">← Back to Ads / Organic</button>
+        <button id="organic-back-btn" onclick="_backToChannelSplit()" style="background:none;border:none;color:var(--text-mute);font-size:13px;cursor:pointer;padding:0;margin-bottom:14px">← Back</button>
 
         <!-- ── Resource guide (collapsed PDF - placeholder until walkthrough video) ── -->
         <details class="guide-card">
@@ -25893,12 +25927,15 @@ function closeCampaignDetail() {
 
 // ─────────── Ads | Organic channel split ───────────
 function _hideAllMarketingSub() {
-  ['marketing-list','marketing-detail','marketing-request-detail','marketing-new-campaign','marketing-channel-split','marketing-organic']
+  ['marketing-list','marketing-detail','marketing-request-detail','marketing-new-campaign','marketing-channel-split','marketing-organic','marketing-funnel']
     .forEach(id => { const e = document.getElementById(id); if (e) e.style.display = 'none'; });
   const back = document.getElementById('marketing-ads-back'); if (back) back.style.display = 'none';
 }
 function _hasOrganic() { return typeof ORGANIC_CONTENT !== 'undefined' && ORGANIC_CONTENT; }
 function _hasAds() { return typeof MARKETING_INCLUDED === 'undefined' || MARKETING_INCLUDED; }
+// Funnel content rides the scaling service: every client with a BAM-run
+// website (marketing_included) has it. Content-only clients don't.
+function _hasFunnel() { return _hasAds(); }
 function _showOrganicOnly() {
   _hideAllMarketingSub();
   const back = document.getElementById('organic-back-btn'); if (back) back.style.display = 'none';
@@ -25909,9 +25946,10 @@ function _marketingEnter() {
   _renderFirstCampaignGuide();   // data-drive the "Your First Campaign" card from the default guide card
   if (typeof _mmLoad === 'function') _mmLoad();   // Marketing Machine card (V2 only; quiet no-op otherwise)
   if (_hasOrganic() && !_hasAds()) {
-    // Content-only client: straight to organic, no Ads | Organic split.
+    // Content-only client: straight to organic, no channel split.
     _showOrganicOnly();
-  } else if (_hasOrganic()) {
+  } else if (_hasAds()) {
+    // Scaling client: Ads + Funnel always, Organic when enabled.
     _showChannelSplit();
   } else {
     _hideAllMarketingSub();
@@ -25920,6 +25958,9 @@ function _marketingEnter() {
 }
 function _showChannelSplit() {
   _hideAllMarketingSub();
+  // Organic card only when the client's organic pipeline is on.
+  const org = document.getElementById('channel-card-organic');
+  if (org) org.style.display = _hasOrganic() ? '' : 'none';
   const e = document.getElementById('marketing-channel-split'); if (e) e.style.display = 'block';
 }
 function _chooseChannel(ch) {
@@ -25927,20 +25968,74 @@ function _chooseChannel(ch) {
   if (ch === 'organic') {
     const e = document.getElementById('marketing-organic'); if (e) e.style.display = 'block';
     _fetchAndRenderOrganic();
+  } else if (ch === 'funnel') {
+    const e = document.getElementById('marketing-funnel'); if (e) e.style.display = 'block';
+    _fetchAndRenderFunnel();
   } else {
     const l = document.getElementById('marketing-list'); if (l) l.style.display = 'block';
-    const b = document.getElementById('marketing-ads-back'); if (b) b.style.display = (ORGANIC_CONTENT ? 'block' : 'none');
+    // The split now exists for every ads client (Ads | Funnel), so the back
+    // button always shows on the ads view.
+    const b = document.getElementById('marketing-ads-back'); if (b) b.style.display = 'block';
   }
 }
 function _backToChannelSplit() {
   if (_hasOrganic() && !_hasAds()) {
-    _showOrganicOnly();           // content-only: no Ads | Organic split to return to
-  } else if (_hasOrganic()) {
+    _showOrganicOnly();           // content-only: no channel split to return to
+  } else if (_hasAds()) {
     _showChannelSplit();
   } else {
     _hideAllMarketingSub();
     const l = document.getElementById('marketing-list'); if (l) l.style.display = 'block';
   }
+}
+
+// ─────────── Funnel content (request → production → systems team) ───────────
+let _FUNNEL_TICKETS = [];
+async function _fetchAndRenderFunnel() {
+  const el = document.getElementById('funnel-status-list');
+  if (el) el.innerHTML = '<div style="color:var(--text-mute);font-size:13px;padding:8px 0">Loading…</div>';
+  try {
+    const token = await _mreqAuthToken();
+    const res = await fetch('/api/marketing?resource=content-tickets&scope=client&channel=funnel&all=1&client_id=' + encodeURIComponent(CLIENT_ID), {
+      headers: { 'Authorization': 'Bearer ' + token },
+    });
+    const json = await _safeJson(res);
+    if (!res.ok) throw new Error(json.error || ('HTTP ' + res.status));
+    _FUNNEL_TICKETS = Array.isArray(json.tickets) ? json.tickets : [];
+    _renderFunnel();
+  } catch (e) {
+    if (el) el.innerHTML = `<div style="color:var(--text-mute);font-size:13px;padding:8px 0">Couldn't load right now - please refresh and try again.</div>`;
+  }
+}
+function _renderFunnel() {
+  const el = document.getElementById('funnel-status-list');
+  if (!el) return;
+  const live = _FUNNEL_TICKETS.filter(t => t.status !== 'cancelled');
+  if (!live.length) {
+    el.innerHTML = `<div style="color:var(--text-mute);font-size:13px;padding:8px 0">Nothing yet - request your first funnel content above.</div>`;
+    return;
+  }
+  el.innerHTML = live.map(t => {
+    const name = escapeHTML((t.title || '').trim() || ((t.type === 'video' ? 'Video' : t.type === 'mixed' ? 'Video + graphic' : 'Graphic') + ' content'));
+    const date = t.submitted_at ? new Date(t.submitted_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '';
+    let pill;
+    if (t.status === 'completed') {
+      pill = `<span style="font-size:11px;font-weight:700;color:var(--green);border:1px solid var(--green);padding:3px 10px;border-radius:999px;white-space:nowrap">With systems team</span>`;
+    } else if (t.client_action_status === 'requested') {
+      pill = `<span style="font-size:11px;font-weight:700;color:var(--gold);border:1px solid var(--gold);padding:3px 10px;border-radius:999px;white-space:nowrap">Action needed</span>`;
+    } else {
+      pill = `<span style="font-size:11px;font-weight:700;color:var(--text-sub);border:1px solid var(--line);padding:3px 10px;border-radius:999px;white-space:nowrap">In production</span>`;
+    }
+    const sysNote = t.status === 'completed'
+      ? `<div style="font-size:12px;color:var(--text-mute);margin-top:4px">Being added to your website - track it under Systems.</div>` : '';
+    return `<div style="background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px 16px;margin-bottom:10px;display:flex;align-items:center;gap:12px">
+      <div style="flex:1;min-width:0">
+        <div style="font-size:14px;font-weight:600;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${name}</div>
+        <div style="font-size:12px;color:var(--text-mute);margin-top:2px">Requested ${date}</div>${sysNote}
+      </div>
+      ${pill}
+    </div>`;
+  }).join('');
 }
 
 // ─────────── Organic content (request → status → bank) ───────────
@@ -26285,7 +26380,7 @@ async function confirmRemove() {
 // ── Input assets modal (raw assets → goes to content team) ──
 function openAddCreativeModal(channel) {
   // Kept name for backward compat with the existing button onclick (ads path).
-  _inputAssetsChannel = (channel === 'organic') ? 'organic' : 'ads';
+  _inputAssetsChannel = (channel === 'organic' || channel === 'funnel') ? channel : 'ads';
   _inputAssetsState = { type: 'graphic', files: [] };
   _selectInputAssetsType('graphic');
   _renderInputAssetsFilesList();
@@ -26306,6 +26401,8 @@ function openAddCreativeModal(channel) {
   const sub = document.getElementById('inputAssetsSub');
   if (sub) sub.textContent = _inputAssetsChannel === 'organic'
     ? 'Submit raw assets here. Our content team will create your post, then send it back to you to review and approve.'
+    : _inputAssetsChannel === 'funnel'
+    ? 'Submit raw assets here. Our content team will produce the finals, then our systems team will add them to your website.'
     : 'Submit raw assets here. Our content team will turn them into a finished creative and add it to your campaign.';
   _refreshInputAssetsFolderList();
   document.getElementById('inputAssetsModal').style.display = 'flex';
@@ -26325,6 +26422,18 @@ function _selectInputAssetsType(t) {
   document.querySelectorAll('#inputAssetsTypeToggle .binary-toggle-opt').forEach(el => {
     el.classList.toggle('active', el.dataset.value === t);
   });
+}
+// User explicitly picked a type - stop auto-suggesting from file uploads.
+function _pickInputAssetsType(t) {
+  _inputAssetsState.typeTouched = true;
+  _selectInputAssetsType(t);
+}
+// Auto-suggest the output type from what's been uploaded, but never override
+// an explicit choice. Any video file suggests a video creative.
+function _suggestInputAssetsType() {
+  if (_inputAssetsState.typeTouched) return;
+  const hasVideo = (_inputAssetsState.files || []).some(f => ((f.file && f.file.type) || f.type || '').startsWith('video/'));
+  _selectInputAssetsType(hasVideo ? 'video' : 'graphic');
 }
 
 // Files larger than this can't reliably upload directly to Supabase storage
@@ -26419,6 +26528,7 @@ function _inputAssetsAddFiles(filesList, fromFolderUpload) {
     _inputAssetsState.files = _inputAssetsState.files.concat(incoming);
     _renderInputAssetsFilesList();
     _refreshInputAssetsFolderList();
+    _suggestInputAssetsType();
   }
   const input = document.getElementById('inputAssetsFileInput');   if (input) input.value = '';
   const finput = document.getElementById('inputAssetsFolderInput'); if (finput) finput.value = '';
@@ -26428,6 +26538,7 @@ function _inputAssetsRemoveFile(idx) {
   _inputAssetsState.files.splice(idx, 1);
   _renderInputAssetsFilesList();
   _refreshInputAssetsFolderList();
+  _suggestInputAssetsType();
 }
 
 // Populate the folder autocomplete with folders already in use this submission.
@@ -26498,7 +26609,11 @@ async function submitInputAssets() {
   // resets _inputAssetsState to { files: [] } which would otherwise wipe the
   // upload list and silently submit a ticket with no files attached.
   const filesToUpload = _inputAssetsState.files.slice();
-  const assetType = _deriveAssetType(filesToUpload);
+  // The toggle is the source of truth for the OUTPUT type - raw inputs don't
+  // determine it (photos in, video out is normal), and link-only submissions
+  // have no files to derive from at all (the old way silently made every
+  // Drive/Dropbox submission a 'graphic').
+  const assetType = _inputAssetsState.type || _deriveAssetType(filesToUpload);
   const fileCount = filesToUpload.length;
   closeInputAssetsModal();
   showLoading(
@@ -26516,7 +26631,7 @@ async function submitInputAssets() {
       notes,
       raw_files: uploaded,
       context: {
-        source: channel === 'organic' ? 'organic-request' : 'add-creative',
+        source: channel === 'organic' ? 'organic-request' : channel === 'funnel' ? 'funnel-request' : 'add-creative',
         campaign_title: _detailCampaignTitle(),
         format,
         captions,
@@ -26527,6 +26642,10 @@ async function submitInputAssets() {
       _fetchAndRenderOrganic();
       showConfirmation('Request received',
         'We got your organic content request. Our content team will create it and send it back to you for review.');
+    } else if (channel === 'funnel') {
+      _fetchAndRenderFunnel();
+      showConfirmation('Request received',
+        'We got your funnel content request. Our content team will produce it, then our systems team will add it to your website.');
     } else {
       await fetchAndRenderMarketingRequests();
       showConfirmation('Assets received',
@@ -39950,8 +40069,9 @@ function _wizardInitState() {
 
 function openNewCampaignWizard() {
   _wizardInitState();
-  // Seed with one initial creative block so the user has somewhere to drop files
-  wizardAddCreativeBlock();
+  // No starter block here: if the client adds suggested angles from the guide
+  // step, those become the blocks. A blank one is seeded only if they reach
+  // the upload step with nothing picked (see wizardGoToStep).
   document.getElementById('marketing-list').style.display = 'none';
   document.getElementById('marketing-detail').style.display = 'none';
   document.getElementById('marketing-request-detail').style.display = 'none';
@@ -40019,6 +40139,9 @@ function wizardGoToStep(stepName) {
   if (!_wizard) return;
   const idx = _wizard.path.indexOf(stepName);
   if (idx === -1) return;
+  // Arriving at upload with nothing picked from the guide -> seed one blank
+  // folder so there's somewhere to drop files. Angle picks mean no blank.
+  if (stepName === 'asset-upload' && !_wizard.creatives.length) wizardAddCreativeBlock();
   _wizard.stepIdx = idx;
   _renderWizardStep();
 }
@@ -40244,6 +40367,8 @@ function _wizardSeedCreativeFromAngle(angleName, medium, btn) {
       angle: name,
       guide_card_id: (_wizard && _wizard.guideCardId) || null,
     });
+    // The most recently picked angle is the one open when they reach upload.
+    _wizard.openCreativeId = 'c' + _wizardCreativeSeq;
     _renderWizardCreatives();
   }
   // Lightweight feedback on the button.
@@ -40549,6 +40674,15 @@ function wizardAddCreativeBlock() {
   _wizardCreativeSeq += 1;
   // Each block is now a named FOLDER (the content drop is folder-first).
   _wizard.creatives.push({ id: 'c' + _wizardCreativeSeq, name: '', type: 'graphic', files: [], notes: '', driveLink: '', angle: '', guide_card_id: null });
+  _wizard.openCreativeId = 'c' + _wizardCreativeSeq;   // new block opens expanded
+  _renderWizardCreatives();
+}
+
+// Accordion: exactly one block expanded at a time (clicking the open one's
+// header collapses it). Values live in _wizard.creatives, so re-render is safe.
+function _wizardToggleCreative(id) {
+  if (!_wizard) return;
+  _wizard.openCreativeId = (_wizard.openCreativeId === id) ? null : id;
   _renderWizardCreatives();
 }
 
@@ -40612,9 +40746,38 @@ function _renderWizardCreatives() {
     return;
   }
 
-  list.innerHTML = _wizard.creatives.map((c, idx) => `
+  // One block expanded at a time. Default open: the tracked one if it still
+  // exists, otherwise the first block that has no content yet, otherwise none.
+  if (!_wizard.creatives.some(c => c.id === _wizard.openCreativeId)) {
+    const firstEmpty = _wizard.creatives.find(c => !_wizardCreativeHasContent(c));
+    _wizard.openCreativeId = (firstEmpty || (_wizard.creatives.length === 1 ? _wizard.creatives[0] : null))?.id || null;
+  }
+
+  list.innerHTML = _wizard.creatives.map((c, idx) => {
+    if (c.id !== _wizard.openCreativeId) {
+      // Collapsed summary row: name, what's in it, chevron. Click to expand.
+      const bits = [];
+      if (c.files.length) bits.push(c.files.length + ' file' + (c.files.length === 1 ? '' : 's'));
+      if (_isValidAssetLink(c.driveLink)) bits.push('link');
+      if ((c.notes || '').trim()) bits.push('notes');
+      const summary = bits.length ? bits.join(' · ') : 'empty';
+      const done = _wizardCreativeHasContent(c);
+      return `
+    <div class="card" style="margin-bottom:10px;padding:14px 18px;cursor:pointer;display:flex;align-items:center;gap:12px" onclick="_wizardToggleCreative('${c.id}')" role="button" aria-expanded="false">
+      <span style="width:8px;height:8px;border-radius:50%;flex:none;background:${done ? 'var(--green,#4CC76A)' : 'var(--line-str)'}"></span>
+      <span style="flex:1;min-width:0;font-size:14px;font-weight:600;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHTML((c.name || '').trim() || 'Untitled folder')}</span>
+      <span style="font-size:12px;color:${done ? 'var(--text-sub)' : 'var(--text-mute)'};white-space:nowrap">${summary}</span>
+      ${_wizard.creatives.length > 1 ? `<button onclick="event.stopPropagation();wizardRemoveCreativeBlock('${c.id}')" title="Remove this folder" aria-label="Remove" style="width:26px;height:26px;border-radius:50%;border:1px solid var(--line);background:transparent;color:var(--text-mute);cursor:pointer;font-size:13px;flex:none">×</button>` : ''}
+      <span style="color:var(--text-mute);font-size:14px;flex:none">˅</span>
+    </div>`;
+    }
+    return `
     <div class="card" style="margin-bottom:14px;position:relative">
-      ${_wizard.creatives.length > 1 ? `<button onclick="wizardRemoveCreativeBlock('${c.id}')" title="Remove this folder" aria-label="Remove" style="position:absolute;top:14px;right:14px;width:28px;height:28px;border-radius:50%;border:1px solid var(--line);background:transparent;color:var(--text-mute);cursor:pointer;font-size:14px">×</button>` : ''}
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px;cursor:pointer" onclick="_wizardToggleCreative('${c.id}')" role="button" aria-expanded="true">
+        <span style="flex:1;font-size:12px;letter-spacing:0.08em;text-transform:uppercase;color:var(--text-mute)">Folder ${idx + 1} of ${_wizard.creatives.length}</span>
+        ${_wizard.creatives.length > 1 ? `<button onclick="event.stopPropagation();wizardRemoveCreativeBlock('${c.id}')" title="Remove this folder" aria-label="Remove" style="width:28px;height:28px;border-radius:50%;border:1px solid var(--line);background:transparent;color:var(--text-mute);cursor:pointer;font-size:14px">×</button>` : ''}
+        <span style="color:var(--text-mute);font-size:14px">˄</span>
+      </div>
 
       <label class="modal-label">Folder name</label>
       <input class="modal-input" placeholder="e.g. Game footage, Logos, Testimonials" value="${escapeHTML(c.name || '')}" oninput="wizardSetFolderName('${c.id}', this.value)" style="margin-bottom:14px" />
@@ -40654,8 +40817,8 @@ function _renderWizardCreatives() {
 
       <label class="modal-label" style="margin-top:12px">Notes (optional)</label>
       <textarea class="modal-textarea" placeholder="What's the vibe? Hook? Key copy? Anything special the team should know?" oninput="wizardSetCreativeNotes('${c.id}', this.value)">${escapeHTML(c.notes)}</textarea>
-    </div>
-  `).join('');
+    </div>`;
+  }).join('');
 
   _updateWizardContinueBtn();
 }
@@ -46025,6 +46188,13 @@ function toggleTheme() {
 
     <label class="modal-label" for="inputAssetsTitle">Creative name <span style="color:var(--text-mute);font-weight:400">(optional)</span></label>
     <input id="inputAssetsTitle" class="modal-input" type="text" maxlength="120" placeholder="e.g. August camp promo" />
+
+    <label class="modal-label" style="margin-top:18px">What should we make?</label>
+    <div id="inputAssetsTypeToggle" class="binary-toggle">
+      <button type="button" class="binary-toggle-opt" data-value="video" onclick="_pickInputAssetsType('video')">Video</button>
+      <button type="button" class="binary-toggle-opt active" data-value="graphic" onclick="_pickInputAssetsType('graphic')">Graphic</button>
+    </div>
+    <div style="font-size:11px;color:var(--text-mute);margin-top:6px">The finished creative - not what you're uploading. Photos in, video out is fine.</div>
 
     <label class="modal-label" style="margin-top:18px">Raw files</label>
     <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:8px">
