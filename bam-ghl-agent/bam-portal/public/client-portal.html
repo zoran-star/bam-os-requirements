@@ -15288,21 +15288,21 @@ function _hv2Style() {
     '@media(prefers-reduced-motion:reduce){#home-v2 .hm-hawk-quiet{animation:none;opacity:.55}}' +
 
     // ── UX #3: Milestone celebration overlay ──
-    '#home-v2 .hm-milestone-overlay{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9800;display:flex;align-items:center;justify-content:center;animation:hmMileFadeIn .3s ease}' +
-    '#home-v2 .hm-milestone-card{background:var(--surface);border-radius:24px;padding:40px 48px;text-align:center;max-width:380px;box-shadow:0 12px 40px rgba(0,0,0,.4);animation:hmMilePopIn .4s cubic-bezier(.34,1.56,.64,1);position:relative;overflow:hidden}' +
-    '#home-v2 .hm-mile-label{font-family:var(--ff);font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--gold);margin-bottom:8px;display:inline-block;padding:4px 14px;border:1px solid rgba(212,182,92,.25);border-radius:999px;background:rgba(212,182,92,.08)}' +
-    '#home-v2 .hm-mile-label.record{color:#4CC76A;border-color:rgba(76,199,106,.25);background:rgba(76,199,106,.08)}' +
-    '#home-v2 .hm-mile-title{font-family:var(--ff);font-size:22px;font-weight:800;color:var(--text);margin-bottom:4px}' +
-    '#home-v2 .hm-mile-value{font-family:var(--ff);font-size:32px;font-weight:800;color:var(--gold);margin:8px 0 4px}' +
-    '#home-v2 .hm-mile-desc{font-size:13px;color:var(--text-mute);line-height:1.5;margin-bottom:6px}' +
-    '#home-v2 .hm-mile-next{font-size:11.5px;color:var(--text-mute);margin-bottom:16px;opacity:.7}' +
-    '#home-v2 .hm-mile-dismiss{font-family:inherit;font-size:14px;font-weight:700;color:var(--on-gold);background:var(--gold);border:none;border-radius:8px;padding:10px 28px;cursor:pointer;transition:all .18s;position:relative;z-index:2}' +
-    '#home-v2 .hm-mile-dismiss:hover{transform:translateY(-1px);box-shadow:0 4px 16px rgba(212,182,92,.3)}' +
+    '.hm-milestone-overlay{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9800;display:flex;align-items:center;justify-content:center;animation:hmMileFadeIn .3s ease}' +
+    '.hm-milestone-card{font-family:var(--font-ui);background:var(--surface);border-radius:24px;padding:40px 48px;text-align:center;max-width:380px;box-shadow:0 12px 40px rgba(0,0,0,.4);animation:hmMilePopIn .4s cubic-bezier(.34,1.56,.64,1);position:relative;overflow:hidden}' +
+    '.hm-mile-label{font-family:var(--font-ui);font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--gold);margin-bottom:8px;display:inline-block;padding:4px 14px;border:1px solid rgba(212,182,92,.25);border-radius:999px;background:rgba(212,182,92,.08)}' +
+    '.hm-mile-label.record{color:#4CC76A;border-color:rgba(76,199,106,.25);background:rgba(76,199,106,.08)}' +
+    '.hm-mile-title{font-family:var(--font-num);font-size:22px;font-weight:800;color:var(--text);margin-bottom:4px}' +
+    '.hm-mile-value{font-family:var(--font-num);font-size:32px;font-weight:800;color:var(--gold);margin:8px 0 4px}' +
+    '.hm-mile-desc{font-size:13px;color:var(--text-mute);line-height:1.5;margin-bottom:6px}' +
+    '.hm-mile-next{font-size:11.5px;color:var(--text-mute);margin-bottom:16px;opacity:.7}' +
+    '.hm-mile-dismiss{font-family:inherit;font-size:14px;font-weight:700;color:var(--on-gold);background:var(--gold);border:none;border-radius:8px;padding:10px 28px;cursor:pointer;transition:all .18s;position:relative;z-index:2}' +
+    '.hm-mile-dismiss:hover{transform:translateY(-1px);box-shadow:0 4px 16px rgba(212,182,92,.3)}' +
     // Confetti particles — CSS-only gold sparkles
-    '#home-v2 .hm-mile-confetti{position:absolute;inset:0;pointer-events:none;overflow:hidden}' +
-    '#home-v2 .hm-mile-confetti::before,#home-v2 .hm-mile-confetti::after{content:"";position:absolute;width:100%;height:100%}' +
-    '#home-v2 .hm-mile-confetti::before{background:radial-gradient(2px 2px at 20% 30%,var(--gold) 50%,transparent 51%),radial-gradient(2px 2px at 75% 15%,var(--gold) 50%,transparent 51%),radial-gradient(1.5px 1.5px at 45% 60%,rgba(212,182,92,.7) 50%,transparent 51%),radial-gradient(2px 2px at 85% 45%,var(--gold) 50%,transparent 51%),radial-gradient(1.5px 1.5px at 10% 70%,rgba(212,182,92,.6) 50%,transparent 51%),radial-gradient(2px 2px at 60% 85%,var(--gold) 50%,transparent 51%),radial-gradient(1.5px 1.5px at 30% 90%,rgba(212,182,92,.5) 50%,transparent 51%),radial-gradient(2px 2px at 90% 80%,var(--gold) 50%,transparent 51%);animation:hmConfettiFall 2.5s ease-out forwards}' +
-    '#home-v2 .hm-mile-confetti::after{background:radial-gradient(1.5px 1.5px at 55% 20%,rgba(212,182,92,.6) 50%,transparent 51%),radial-gradient(2px 2px at 15% 50%,var(--gold) 50%,transparent 51%),radial-gradient(1.5px 1.5px at 80% 65%,rgba(212,182,92,.5) 50%,transparent 51%),radial-gradient(2px 2px at 35% 40%,var(--gold) 50%,transparent 51%),radial-gradient(1.5px 1.5px at 65% 75%,rgba(212,182,92,.4) 50%,transparent 51%),radial-gradient(2px 2px at 50% 10%,var(--gold) 50%,transparent 51%);animation:hmConfettiFall 2.8s ease-out .15s forwards;opacity:0}' +
+    '.hm-mile-confetti{position:absolute;inset:0;pointer-events:none;overflow:hidden}' +
+    '.hm-mile-confetti::before,.hm-mile-confetti::after{content:"";position:absolute;width:100%;height:100%}' +
+    '.hm-mile-confetti::before{background:radial-gradient(2px 2px at 20% 30%,var(--gold) 50%,transparent 51%),radial-gradient(2px 2px at 75% 15%,var(--gold) 50%,transparent 51%),radial-gradient(1.5px 1.5px at 45% 60%,rgba(212,182,92,.7) 50%,transparent 51%),radial-gradient(2px 2px at 85% 45%,var(--gold) 50%,transparent 51%),radial-gradient(1.5px 1.5px at 10% 70%,rgba(212,182,92,.6) 50%,transparent 51%),radial-gradient(2px 2px at 60% 85%,var(--gold) 50%,transparent 51%),radial-gradient(1.5px 1.5px at 30% 90%,rgba(212,182,92,.5) 50%,transparent 51%),radial-gradient(2px 2px at 90% 80%,var(--gold) 50%,transparent 51%);animation:hmConfettiFall 2.5s ease-out forwards}' +
+    '.hm-mile-confetti::after{background:radial-gradient(1.5px 1.5px at 55% 20%,rgba(212,182,92,.6) 50%,transparent 51%),radial-gradient(2px 2px at 15% 50%,var(--gold) 50%,transparent 51%),radial-gradient(1.5px 1.5px at 80% 65%,rgba(212,182,92,.5) 50%,transparent 51%),radial-gradient(2px 2px at 35% 40%,var(--gold) 50%,transparent 51%),radial-gradient(1.5px 1.5px at 65% 75%,rgba(212,182,92,.4) 50%,transparent 51%),radial-gradient(2px 2px at 50% 10%,var(--gold) 50%,transparent 51%);animation:hmConfettiFall 2.8s ease-out .15s forwards;opacity:0}' +
     '@keyframes hmConfettiFall{0%{transform:translateY(-30px) scale(1.2);opacity:0}15%{opacity:1}100%{transform:translateY(20px) scale(.8);opacity:0}}' +
     '@keyframes hmMileFadeIn{from{opacity:0}to{opacity:1}}' +
     '@keyframes hmMilePopIn{from{opacity:0;transform:scale(.85) translateY(20px)}to{opacity:1;transform:scale(1) translateY(0)}}' +
@@ -15314,7 +15314,7 @@ function _hv2Style() {
     '#home-v2 .hm-draggable:hover .hm-drag-handle{display:flex}' +
     '#home-v2 .hm-drag-over{outline:2px dashed var(--gold);outline-offset:4px;border-radius:16px}' +
 
-    '@media(prefers-reduced-motion:reduce){#home-v2 .hm-nav-dot{animation:none}#home-v2 .hm-milestone-card{animation:none}#home-v2 .hm-mile-confetti::before,#home-v2 .hm-mile-confetti::after{animation:none}}' +
+    '@media(prefers-reduced-motion:reduce){#home-v2 .hm-nav-dot{animation:none}.hm-milestone-card{animation:none}.hm-mile-confetti::before,.hm-mile-confetti::after{animation:none}}' +
 
     // ── Response time row (below scoreboard grid) ──
     '#home-v2 .hm-reply-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding-top:2px}' +
@@ -16646,8 +16646,7 @@ function _hmShowCelebration(data) {
     <button class="hm-mile-dismiss" onclick="this.closest('.hm-milestone-overlay').remove()">Nice</button>
   </div>`;
   overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
-  const homeV2 = document.getElementById('home-v2');
-  if (homeV2) homeV2.appendChild(overlay);
+  document.body.appendChild(overlay);
 }
 
 // ── Sound system (Web Audio API - no external files) ──
