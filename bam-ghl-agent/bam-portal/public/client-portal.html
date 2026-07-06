@@ -46981,7 +46981,7 @@ function _mmFunnelSvg(page, clicks, loaded) {
   stages.push({ n: page.saw_calendar || 0, lbl: 'calendar', fix: 'edit the calendar' });
   stages.push({ n: page.booked_sessions || 0, lbl: 'booked', fix: null });
   if (!stages[0].n) return '<div class="mm-driver-sub" style="margin:8px 0 0">gathering data - no ad visits in this window yet</div>';
-  const W = 560, H = 128, MAXH = 56, N = stages.length;
+  const W = 560, H = 144, MAXH = 56, N = stages.length;
   const BASE = 104;
   const X = stages.map((_, i) => 52 + (i * (W - 120)) / (N - 1));
   const yOf = (v) => BASE - Math.max(3, (v / stages[0].n) * MAXH);
