@@ -81,6 +81,16 @@
 ## Milestone baseline fix (2026-07-06)
 - Wiring real members/MRR into the scoreboard woke `_hmCheckMilestones` up: it started dumping a backlog of historic "achievements" (record popups first, then tiers, one per 60s refresh). Fix: first run per client with no `baseline_v1` key silently saves every currently-true tier + current record values, then returns. Celebrations only fire for crossings AFTER the baseline exists. Verified: fresh backlog = 0 popups; 25->50 members afterwards = 1 popup. Popup VISUAL fix same day: overlay was appended inside #home-v2 (clipped by transformed cc sections, looked cut off) with #home-v2-scoped CSS; now appends to document.body with de-scoped selectors, rgba(0,0,0,.45) scrim, --font-num title. Same bug class as the KPI picker: anything position:fixed must live at body level with unscoped CSS.
 
+## Staff-member personas (2026-07-06, Cole direction)
+- **Agents are positioned as STAFF MEMBERS.** Team locked at 4: Sales, Marketing, Member manager, + the GM/master agent who talks to all of them (GM is NOT a peer staff member; front desk folded into the others; keep slots open for future features). Small icons per agent, NO face portraits. Names TBD by Cole; placeholders: Ace (sales), Echo (marketing), **Keeper (members - LIVE in UI)**, Sage (GM, ties to prototype Sage bar). Staff names/personas will become Onboarding Data Points when committed.
+- **Member focus mode = the persona template (picks 2,3,4,6), minimal interface.** Marketing focus untouched for now.
+  - Bench: shield icon orb (#mma-orb keeps think/say/wake states), "Keeper", MEMBER MANAGER role line, status line.
+  - **Walk-in standup** `_mmaStandup()` (once/session): worst payment problem ("Before you ask: X's payment failed. $N/mo at risk." + card) > nearest 14d milestone (+card) > all-clear line with MRR.
+  - **Desk not thread**: chat bubbles GONE. `_mmaSay(text, cardsHtml)` types the agent's line into `#mma-voice` (14ms/char), previous line + "You: ..." fall into `#mma-log` (3 lines max), cards land on `#mma-desk` (mmaDeal slide-in, REPLACED each turn, not appended). `_mmaThink` runs its mono ticker in the voice line (.think class). `_mmaSend` logs the old voice line then the user line (chronological order).
+  - **Shift report** `_mmaShiftLoad()` each open: "SINCE YOU LEFT" block in bench (issues red / milestones gold / joins green / MRR).
+  - **Presence**: orb wake bounce on every open; nod (`say` pulse) on desk card action clicks (delegated listener).
+- Gotcha: anything writing to the voice line must first drop the existing line into the log (`_mmaLogLine`); think does it, send does it (then clears).
+
 ## Section mounts (current skeleton)
 | Section | Mount | Content |
 |---|---|---|
