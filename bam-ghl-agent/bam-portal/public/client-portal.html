@@ -4014,8 +4014,15 @@
   .mm-hero-row { display: flex; align-items: center; gap: 26px; flex-wrap: wrap; }
   .mm-cpl-spark { flex: 1; min-width: 160px; max-width: 280px; margin-left: auto; }
   .mm-cpl-spark-lab { font-family: var(--mm-ff); font-size: 9.5px; font-weight: 700; letter-spacing: 0.07em; text-transform: uppercase; color: var(--text-mute); margin-top: 2px; text-align: right; }
-  .mm-ap-btn { position: relative; display: inline-flex; align-items: center; gap: 8px; background: var(--gold); color: var(--on-gold, #131416); border: none; border-radius: 8px; padding: 9px 16px; font-family: var(--mm-ff); font-size: 12.5px; font-weight: 800; cursor: pointer; box-shadow: 0 2px 10px rgba(200,168,78,0.30); transition: transform 0.15s ease, box-shadow 0.2s ease; }
-  .mm-ap-btn:hover { transform: translateX(2px); box-shadow: 0 4px 16px rgba(200,168,78,0.45); }
+  .mm-ap-btn { position: relative; display: flex; flex-direction: column; align-items: flex-start; gap: 1px; background: transparent; color: var(--gold-d, var(--gold)); border: 1px solid var(--gold); border-radius: 10px; padding: 7px 16px 8px; font-family: var(--mm-ff); cursor: pointer; overflow: hidden; transition: transform 0.15s ease, box-shadow 0.2s ease; }
+  .mm-ap-btn.urgent { background: var(--gold); color: var(--on-gold, #131416); box-shadow: 0 2px 10px rgba(200,168,78,0.30); }
+  .mm-ap-btn:hover { transform: translateX(2px); box-shadow: 0 4px 16px rgba(200,168,78,0.40); }
+  .mm-ap-btn-k { font-size: 8.5px; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; opacity: 0.72; }
+  .mm-ap-btn-t { font-size: 12.5px; font-weight: 800; display: inline-flex; align-items: center; gap: 6px; line-height: 1.2; }
+  .mm-ap-btn.urgent::before { content: ''; position: absolute; inset: -1px; border-radius: 10px; pointer-events: none; animation: mmBtnPing 5s ease-out infinite; }
+  @keyframes mmBtnPing { 0%, 74% { box-shadow: 0 0 0 0 rgba(200,168,78,0.45); } 88% { box-shadow: 0 0 0 9px rgba(200,168,78,0); } 100% { box-shadow: 0 0 0 0 rgba(200,168,78,0); } }
+  .mm-ap-btn.urgent::after { content: ''; position: absolute; top: 0; bottom: 0; width: 45%; left: -60%; background: rgba(255,255,255,0.28); transform: skewX(-20deg); animation: mmSheenLoop 8s ease-in-out infinite; pointer-events: none; }
+  @media (prefers-reduced-motion: reduce) { .mm-ap-btn.urgent::before, .mm-ap-btn.urgent::after, .mm-ap-chevs2 span { animation: none; } }
   .mm-ap-chevs2 { display: inline-flex; }
   .mm-ap-chevs2 span { animation: mmChevDrift 1.9s ease-in-out infinite; }
   .mm-ap-chevs2 span:nth-child(2) { animation-delay: 0.25s; margin-left: -4px; }
@@ -46497,8 +46504,12 @@ function _mmCplSpark(d) {
     '<div class="mm-cpl-spark-lab">cost per lead &middot; last ' + pts.length + ' weeks</div></div>';
 }
 function _mmApRow(checks, n) {
+  const urgent = n > 0;
   return '<div class="mm-ap-row">' + _mmApChecks(checks) +
-    '<button type="button" class="mm-ap-btn">Focus mode' + (n > 0 ? ' &middot; ' + n + (n === 1 ? ' thing needs you' : ' things need you') : '') + ' <span class="mm-ap-chevs2"><span>&rsaquo;</span><span>&rsaquo;</span></span></button></div>';
+    '<button type="button" class="mm-ap-btn' + (urgent ? ' urgent' : '') + '">' +
+      '<span class="mm-ap-btn-k">Focus mode</span>' +
+      '<span class="mm-ap-btn-t">' + (urgent ? n + (n === 1 ? ' thing needs you' : ' things need you') : 'All running clean') + ' <span class="mm-ap-chevs2"><span>&rsaquo;</span><span>&rsaquo;</span></span></span>' +
+    '</button></div>';
 }
 function _mmActionItems(d) {
   const items = [];
@@ -46697,10 +46708,11 @@ function _mmFunnelSvg(page, clicks, loaded) {
   const arrowX = W - 42;
   let svg = '<svg viewBox="0 0 ' + W + ' ' + H + '" style="width:100%;display:block;margin-top:10px" preserveAspectRatio="xMidYMid meet">';
   svg += '<defs><linearGradient id="mmfzg" x1="0" y1="0" x2="1" y2="0">' +
-    '<stop offset="0%" stop-color="#C8A84E" stop-opacity="0.20"/>' +
-    '<stop offset="55%" stop-color="#8FBE62" stop-opacity="0.16"/>' +
-    '<stop offset="100%" stop-color="#3EAF5C" stop-opacity="0.22"/>' +
-    '</linearGradient></defs>';
+    '<stop offset="0%" stop-color="#C8A84E" stop-opacity="0.22"/>' +
+    '<stop offset="60%" stop-color="#C8A84E" stop-opacity="0.13"/>' +
+    '<stop offset="100%" stop-color="#C8A84E" stop-opacity="0.18"/>' +
+    '</linearGradient>' +
+    '<filter id="mmfzb" x="-20%" y="-40%" width="140%" height="200%"><feGaussianBlur stdDeviation="3"/></filter></defs>';
   // labels + count chips (no guide lines - whitespace does that job)
   X.forEach((x, i) => {
     const nTxt = String(stages[i].n);
@@ -46709,10 +46721,12 @@ function _mmFunnelSvg(page, clicks, loaded) {
       '<rect x="' + (x - cw / 2).toFixed(1) + '" y="16" width="' + cw + '" height="17" rx="8.5" fill="var(--surface-el)"/>' +
       '<text x="' + x + '" y="28" text-anchor="middle" font-family="var(--mm-fm)" font-size="10.5" font-weight="500" fill="var(--text)">' + nTxt + '</text>';
   });
-  // the band: one soft gradient shape, no outlines
+  // the band: one gold shape, rounded entry, soft glow underneath
   svg += '<g class="mm-fz-band">';
+  svg += '<path d="' + ribbonPath(0, N - 1) + '" fill="rgba(200,168,78,0.15)" filter="url(#mmfzb)" transform="translate(0,4)"/>';
+  svg += '<ellipse cx="' + X[0].toFixed(1) + '" cy="' + MID + '" rx="10" ry="' + (hAt(0) / 2).toFixed(1) + '" fill="url(#mmfzg)"/>';
   svg += '<path d="' + ribbonPath(0, N - 1) + '" fill="url(#mmfzg)"/>';
-  svg += '<line x1="' + X[T] + '" y1="' + MID + '" x2="' + (arrowX - 4) + '" y2="' + MID + '" stroke="#3EAF5C" stroke-width="1.1" stroke-linecap="round" opacity="0.7"/>';
+  svg += '<line x1="' + X[T] + '" y1="' + MID + '" x2="' + (arrowX - 4) + '" y2="' + MID + '" stroke="#C8A84E" stroke-width="1.1" stroke-linecap="round" opacity="0.7"/>';
   // leak spotlight: the worst segment cools to red, fix chip rides inside it
   if (worst >= 0) {
     if (worst < T) svg += '<path d="' + ribbonPath(worst, Math.min(worst + 1, T)) + '" fill="rgba(224,90,66,0.15)"/>';
@@ -46730,14 +46744,14 @@ function _mmFunnelSvg(page, clicks, loaded) {
   svg += '</g>';
   // particle flow: traffic drifts through the band on staggered lanes
   svg += '<g class="mm-fz-pts">';
-  const lanes = [-0.68, -0.34, 0, 0.34, 0.68];
-  for (let p = 0; p < 12; p++) {
+  const lanes = [-0.62, -0.28, 0.06, 0.4, 0.66];
+  for (let p = 0; p < 7; p++) {
     const f = lanes[p % lanes.length];
     const pts = X.map((x, i) => [x, MID + f * (hAt(i) / 2) * 0.86]);
     const lane = smoothLine(pts, 0, N - 1) + ' L ' + (arrowX - 6) + ',' + MID;
-    const dur = (5.5 + (p % 5) * 0.9).toFixed(1);
-    const beg = (-(p * 1.15) % 11).toFixed(2);
-    svg += '<circle r="1.7" fill="#3EAF5C" opacity="0.5"><animateMotion dur="' + dur + 's" begin="' + beg + 's" repeatCount="indefinite" path="' + lane + '"/></circle>';
+    const dur = (8 + (p % 4) * 1.2).toFixed(1);
+    const beg = (-(p * 1.7) % 12).toFixed(2);
+    svg += '<circle r="1.4" fill="#C8A84E" opacity="0.42"><animateMotion dur="' + dur + 's" begin="' + beg + 's" repeatCount="indefinite" path="' + lane + '"/></circle>';
   }
   svg += '</g>';
   // per-stage hit zones: click a column to open focus mode at that stage
