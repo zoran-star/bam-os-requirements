@@ -43814,11 +43814,9 @@ function toggleTheme() {
   .v2note-pop-row { display:flex; justify-content:flex-end; gap:8px; margin-top:8px; }
   .v2note-cancel { font-family:var(--mm-ff); font-size:12px; font-weight:600; border:1px solid var(--line); border-radius:7px; padding:5px 11px; background:none; color:var(--text-sub); cursor:pointer; }
   .v2note-save { font-family:var(--mm-ff); font-size:12px; font-weight:700; border:none; border-radius:7px; padding:5px 12px; background:var(--gold); color:#0B0B0D; cursor:pointer; }
-  .v2req-mine { border:1px solid var(--line); border-radius:11px; padding:12px 14px; margin-top:14px; }
-  .v2req-mine-head { display:flex; align-items:center; gap:8px; font-family:var(--mm-ff); font-size:13px; font-weight:700; color:var(--text); }
-  .v2req-mine-row { display:flex; align-items:center; gap:10px; padding:9px 0; border-top:1px solid var(--line); }
-  .v2req-mine-row:first-of-type { border-top:none; }
   .v2req-status { font-family:var(--mm-ff); font-size:10.5px; font-weight:700; text-transform:uppercase; letter-spacing:0.03em; padding:2px 8px; border-radius:20px; }
+  .v2req-tix-nudge:hover { filter:brightness(0.98); }
+  .v2req-tix-nudge:active { transform:scale(0.995); }
   @media (max-width:720px){ .v2req-body{ grid-template-columns:1fr; } .v2req-stage{ min-height:300px; } #v2ReqFrame{ min-height:300px; } .v2req-foot{ flex-direction:column; align-items:stretch; } .v2req-send{ width:100%; } }
 </style>
 
@@ -44626,7 +44624,7 @@ function _mmRenderLandingFocus(d) {
     '<div class="mm-month" style="margin-bottom:14px"><span class="mm-month-meta">last ' + (d.range?.days || 14) + ' days</span></div>' +
     rows +
     _v2InlineHtml() +
-    _v2ActionItemsHtml();
+    _v2TicketsNudgeHtml();
   _v2Sync();   // restore the annotator's open/closed state across a re-render
 }
 
@@ -44644,32 +44642,43 @@ let _V2_STEPS = [];      // [{key,label}] announced by the page
 let _V2_SCALE = 1;       // iframe scale (desktop is scaled to fit)
 let _V2_REVIEW_FILTER = 'all';  // review modal filter: all | desktop | mobile
 let _V2_REVIEW_OPEN = false;
-// Mock "my requests" - replace with a fetch once the table lands.
-const _V2_REQUESTS = [
-  { title: 'Rework the hero headline', type: 'change', status: 'in_progress', when: '2d ago' },
-  { title: 'Add a testimonials strip', type: 'add', status: 'triaged', when: '5d ago' },
-  { title: 'Calendar not loading on mobile', type: 'fix', status: 'shipped', when: '1w ago' },
-];
-const _V2_STATUS_STYLE = {
-  new: ['new', 'var(--text-mute)', 'var(--surface-el)'],
-  triaged: ['triaged', 'var(--mm-gold-t)', 'rgba(224,157,36,0.14)'],
-  in_progress: ['in progress', 'var(--mm-gold-t)', 'rgba(224,157,36,0.14)'],
-  shipped: ['done', 'var(--mm-green-t)', 'rgba(62,175,92,0.14)'],
-  on_hold: ['on hold', 'var(--text-mute)', 'var(--surface-el)'],
-};
-function _v2ActionItemsHtml() {
-  const rows = _V2_REQUESTS.map(r => {
-    const s = _V2_STATUS_STYLE[r.status] || _V2_STATUS_STYLE.new;
-    return '<div class="v2req-mine-row">' +
-      '<span style="font-family:var(--mm-fm);font-size:10px;font-weight:600;text-transform:uppercase;color:var(--text-mute);width:46px">' + r.type + '</span>' +
-      '<span style="font-family:var(--mm-ff);font-size:13px;color:var(--text);flex:1">' + _escapeHtml(r.title) + '</span>' +
-      '<span style="font-family:var(--mm-ff);font-size:11px;color:var(--text-mute)">' + r.when + '</span>' +
-      '<span class="v2req-status" style="color:' + s[1] + ';background:' + s[2] + '">' + s[0] + '</span>' +
-      '</div>';
-  }).join('') || '<div class="v2req-empty">No requests yet.</div>';
-  return '<div class="v2req-mine">' +
-    '<div class="v2req-mine-head"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8l1.5 1.5L11 6"/><rect x="2" y="2" width="12" height="12" rx="2"/></svg>Your requests</div>' +
-    rows + '</div>';
+// The support-ticket TRACKER lives on the Systems page. Here we only NUDGE the
+// client to go see it when there are live (non-terminal) tickets. Reads the real
+// `tickets` global (same source the home "Open requests" tile counts).
+function _v2TicketsNudgeHtml() {
+  const terminal = new Set(['done', 'approved', 'cancelled']);
+  const open = (typeof tickets !== 'undefined' && Array.isArray(tickets))
+    ? tickets.filter(t => t && !terminal.has(t.rawStatus)) : [];
+  if (!open.length) return '';   // nothing live -> no nudge at all
+  const needReply = open.filter(t => t.rawStatus === 'awaiting_client' || t.rawStatus === 'final_review').length;
+  const n = open.length;
+  const gold = needReply > 0;
+  const accent = gold ? 'var(--mm-gold-t)' : 'var(--text-sub)';
+  const bg = gold ? 'rgba(224,157,36,0.10)' : 'var(--surface-el)';
+  const bd = gold ? 'rgba(224,157,36,0.34)' : 'var(--line)';
+  const label = n + ' live support ' + (n === 1 ? 'request' : 'requests');
+  const sub = gold
+    ? (needReply + (needReply === 1 ? ' needs' : ' need') + ' your reply')
+    : 'in progress with our team';
+  return '<button type="button" class="v2req-tix-nudge" onclick="_v2GoToTickets()" ' +
+      'style="width:100%;margin-top:16px;display:flex;align-items:center;gap:12px;text-align:left;' +
+      'background:' + bg + ';border:1px solid ' + bd + ';border-radius:10px;padding:12px 15px;cursor:pointer">' +
+      '<span style="width:30px;height:30px;border-radius:50%;background:var(--surface-el);color:' + accent + ';display:flex;align-items:center;justify-content:center;flex:0 0 auto">' +
+        '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 5.5A1.5 1.5 0 0 1 4 4h8a1.5 1.5 0 0 1 1.5 1.5V7a1.4 1.4 0 0 0 0 2.8v.7A1.5 1.5 0 0 1 12 12H4a1.5 1.5 0 0 1-1.5-1.5v-.7A1.4 1.4 0 0 0 2.5 7V5.5z"/><path d="M9.5 4v8" stroke-dasharray="1.4 1.6"/></svg>' +
+      '</span>' +
+      '<span style="flex:1;min-width:0">' +
+        '<span style="display:block;font-family:var(--mm-ff);font-size:14px;font-weight:700;color:var(--text)">' + label + '</span>' +
+        '<span style="display:block;font-family:var(--mm-ff);font-size:12px;color:var(--text-mute);margin-top:1px">' + sub + '</span>' +
+      '</span>' +
+      (gold ? '<span class="v2req-status" style="color:var(--mm-gold-t);background:rgba(224,157,36,0.14)">' + needReply + ' to reply</span>' : '') +
+      '<span style="font-family:var(--mm-ff);font-size:13px;font-weight:600;color:' + accent + ';flex:0 0 auto;white-space:nowrap">View &rarr;</span>' +
+    '</button>';
+}
+// Nudge action: leave the marketing focus view and land on the Systems support
+// tickets page (the pan-back reveals it underneath).
+function _v2GoToTickets() {
+  try { closeLandingMachine(); } catch (e) {}
+  try { switchView('systems'); } catch (e) {}
 }
 // Inline collapsible "Request a change" - lives in the landing focus view.
 function _v2InlineHtml() {
@@ -44918,7 +44927,6 @@ function _v2Submit() {
     },
   };
   console.log('[v2-request] MOCK submit (no table yet):', payload);   // TODO: POST /api/v2-support-tickets
-  _V2_REQUESTS.unshift({ title: desc || (_V2_PINS[0] && _V2_PINS[0].note) || 'Landing page change', type: _V2_TYPE, status: 'new', when: 'just now' });
   _V2_PINS = []; _V2_OPEN = false; _v2NoteCancel(); _v2CloseReview();
   _mmToast('Request sent - staff will take a look');
   if (typeof _mmRenderLandingFocus === 'function' && typeof _MM !== 'undefined') _mmRenderLandingFocus(_MM);
