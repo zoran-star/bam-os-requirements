@@ -39,6 +39,7 @@ import {
 } from "./agent/_stage.js";
 import { enrollContact, isAutomationLive, resolveContactInfo } from "./automations.js";
 import { moveStage, setStatus, findOpenOpp as findOpenOppStore } from "./agent/_store.js";
+import { routeTransition } from "./agent/_router.js";
 import {
   DEFAULT_CONFIRM_AUTOMATIONS, getConfirmAutomations, automationsLive,
   nextDueStep, resolveApptTokens, addressFromOverrides,
@@ -897,8 +898,16 @@ async function handler(req, res) {
       try {
         const oppRef = await findOpenOpp(clientId, token, locationId, contactId);
         oppId = oppRef && (oppRef.ghlOpportunityId || oppRef.id) || null;
-        const rs = await respondedStage(token, locationId, { clientId, sb });
-        if (rs && oppRef) { await moveStage({ clientId, ghl, token, oppRef, stage: rs, role: "responded", contactId, reason: note.slice(0, 300) }); moved = true; }
+        // Bounce back per the academy's authored flow (the cant_make_it edge; GTA
+        // seed = -> Responded so the booking agent rebooks). Router reads the edge;
+        // on no edge (unseeded / paused / lookup blip) it returns matched:false and
+        // we run the original hardcoded move - behavior-identical for GTA.
+        const routed = await routeTransition({ clientId, sb, ghl, token, locationId, fromRole: "scheduled_trial", trigger: "cant_make_it", contactId, oppRef, reason: note.slice(0, 300) });
+        if (routed.matched) { moved = routed.moved; }
+        else {
+          const rs = await respondedStage(token, locationId, { clientId, sb });
+          if (rs && oppRef) { await moveStage({ clientId, ghl, token, oppRef, stage: rs, role: "responded", contactId, reason: note.slice(0, 300) }); moved = true; }
+        }
       } catch (_) {}
       try { if (oppId) await sb(`pipeline_outcomes`, { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify([{ client_id: clientId, opportunity_id: oppId, status: "rebook", reason: note.slice(0, 300) }]) }); } catch (_) {}
       if (b.ready_id) {
