@@ -109,6 +109,8 @@
 - Both "See the full picture" panels (Meta + Landing) now carry a **machine checkline** (`_mmApChecks`: Tracking/Creative/Ad variety on Meta; Tracking/Page/Bookings on Landing - all derived from real data, no fake checks) and a **counted CTA** (`_mmApFoot`: "Focus mode · N things need you ›"). **Doorway hover**: right-edge gold gradient lights + chevrons speed up.
 - Funnel svg sleekness: strokes 1.1->0.85 (red .95), fills .14->.09 (red .11), guide lines 0.5w/70%, annotation badge quieter (fill .09, 8.5px). **Clickable stages**: transparent hit rects per column -> `openLandingMachine(stageKey)`; focus spine rows carry `data-mmstage` and the opener scrolls+flashes the row (~750ms after open, reuses .v15cal-flash).
 - NOTE: this touches Zoran's fresh MM code (panels/funnel are his); anchors were count-asserted against his current text.
+- **v2 same day (Cole picks 4/5/6/7/8 + layout)**: `.mm-action-panel` REMOVED from both cards; content is full width and a compact footer row (`_mmApRow` = checkline left + gold `.mm-ap-btn` "Focus mode · N things need you ››" right) replaces it. Funnel rewritten (`_mmFunnelSvg`, W=560): gradient band (gold->green, no outlines), 12 SMIL particles on staggered lanes (`.mm-fz-pts`, hidden under reduced motion), count CHIPS + labels (no guide lines), leak segment tinted red with the fix chip, standard stroke end icons, draw-in entrance (`.mm-fz-band` scaleX) + one arrow pulse. Focus openers' launch selector now `.mm-ap-btn`. Meta card's freed space = OPEN (suggestions pending Cole).
+- Inline quick reply (`.cc-qr`) got an exit: X button + Escape.
 
 ## Section mounts (current skeleton)
 | Section | Mount | Content |
