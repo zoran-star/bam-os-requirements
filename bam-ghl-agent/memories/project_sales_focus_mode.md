@@ -84,11 +84,27 @@ academies, so leads move by the academy's authored edges, not hardcoded per-agen
   `reengaged` = replied). Exports `DEFAULT_BOOKING_AUTOMATIONS`, `getBookingAutomations(client)`
   (override in `ghl_kpi_config.booking_initial_automations`), `bookingEntryForTrigger(trigger)`,
   `automationsLive(autos, entryKey)`, `nextDueStep(autos, entryKey, {nowMs, startedMs, sentKeys})`.
-  DORMANT — nothing calls it (wiring = Phase C). **⏭ Phases B-E:** B router stamps entry trigger on
-  move-in · C booking detector fires the entry opener (fallback to AI opener) · D switch
-  no_show→Responded + **remove missed_trial firing** · E focus-mode per-entry editor.
-  **DECIDED: retire `missed_trial`** (Zoran) — no-shows go active booking-rebook only, not the
-  gentle nurture path. See [[project_client_agent_training]] for the agent side.
+  **✅ ALL PHASES B-E SHIPPED 2026-07-06 (PR #1189):**
+  - **B/C (`agent-approvals.js`):** the booking detector's opener + rebook passes now use the
+    academy's SCRIPTED opener via `scriptedBookingOpener(client, entryKey, firstName)` when
+    `bookingAutosLive` for that entry (opener pass = `new_lead`, rebook pass = `rebook`), else
+    fall back to the AI `draftOpener`. Resolves `{{contact.first_name}}` before queueing (draft
+    goes straight to the Hawkeye queue, not the send-engine token pass). Name fetched before
+    drafting. approved:false default → GTA byte-identical until approved.
+  - **D (`post-trial.js`):** no-show now bounces to **Responded** (router; hardcoded Responded
+    fallback) + writes a rebook memory note + an "Entry: Rebook" trigger note the rebook pass
+    consumes. **`missed_trial` firing REMOVED** (retired per Zoran); dropped the dead
+    enrollContact/isAutomationLive import. THIS IS A LIVE BEHAVIOR CHANGE (no-shows go
+    active-rebook, not the nurture path) — verify on GTA.
+  - **E (editor):** `agent-approvals.js` `booking-automations-get`/`-set` actions +
+    `sanitizeBookingAutomations` (per-entry). `client-portal.html`: the Confirm/Closing "Initial
+    automations" editor now renders for the Booking agent too via a separate `_bookingAutosRender`
+    path (per entry point), `_CA` is agent-aware (endpoint `/api/agent-approvals` + booking action
+    names), `_caToggleEntryStep`. Focus mode: Responded stage gear → Engine → Initial automations
+    card shows the 3 entry openers, editable + approvable. Confirm/closing flat editor byte-identical.
+  **DECIDED: retire `missed_trial`** (Zoran). **NOTE:** none of B-E prod-verified yet — verify on
+  GTA. `reengaged` entry defined but unwired (no caller writes that note; the nurture/ghosted reply
+  bounce may be a GHL workflow — Phase C+ once it's portal code). See [[project_client_agent_training]].
 - **⏭ OTHER remaining swaps:** `replied` interested/nurture→responded (the ghosted/nurture reply
   bounce — likely a **GHL workflow, not portal code**; confirm before assuming a site) ·
   `enrolls`→member (Stripe payment path — deterministic, low value, probably leave direct) ·
