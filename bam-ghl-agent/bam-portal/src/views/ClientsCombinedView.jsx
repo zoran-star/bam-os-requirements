@@ -168,6 +168,13 @@ export default function ClientsCombinedView({ tokens, dark, me, session, initial
 
   const filtered = useMemo(() => {
     let list = clients.filter(c => !c.archived_at); // Hide archived
+    // Hide half-started onboarding: a clients row is created the moment someone
+    // submits step 1 of the public form, so abandoned signups leave permanent
+    // status='onboarding' + onboarding_completed_at=null shells. Keep them out of
+    // the default view but still reachable via the explicit "Onboarding" filter,
+    // so a real in-progress/abandoned signup can still be found. Note: live V1.x
+    // academies are status='active' (completion may be null) so they're unaffected.
+    if (statusFilter === "all") list = list.filter(c => !isIncompleteOnboarding(c));
     if (statusFilter !== "all") list = list.filter(c => c.status === statusFilter);
     if (search.trim()) {
       const q = search.trim().toLowerCase();
@@ -216,7 +223,9 @@ export default function ClientsCombinedView({ tokens, dark, me, session, initial
 
   // ─── LIST VIEW ───────────────────────────────────────────────────────────
   const counts = {
-    all: clients.filter(c => !c.archived_at).length,
+    // Total mirrors the default list: archived AND half-started onboarding are
+    // excluded (the latter stay reachable via the Onboarding status filter).
+    all: clients.filter(c => !c.archived_at && !isIncompleteOnboarding(c)).length,
     active: clients.filter(c => c.status === "active" && !c.archived_at).length,
     onboarding: clients.filter(c => c.status === "onboarding" && !c.archived_at).length,
     paused: clients.filter(c => c.status === "paused" && !c.archived_at).length,
@@ -499,6 +508,15 @@ function ClientDetail({ client, staff, staffMap, tokens, dark, me, session, onBa
 // Numeric progress for the Status-column sort: Live counts as 100,
 // onboarding clients use their step percentage, paused/churned sink to
 // the bottom regardless of direction-flip context.
+// "Started the public onboarding form but never finished it." A clients row is
+// created at step 1 of signup (status='onboarding', onboarding_completed_at=null)
+// and only gets onboarding_completed_at once the client finishes the first-login
+// tour. So this pair = an abandoned/in-flight signup. Live academies are
+// status='active' (their completion may be null) and are NOT matched here.
+function isIncompleteOnboarding(client) {
+  return client && client.status === "onboarding" && !client.onboarding_completed_at;
+}
+
 function clientStatusPct(client) {
   if (client.status === "paused" || client.status === "churned") return -1;
   const derived = deriveClientStatus(client, { green: "", red: "", amber: "", textMute: "" });
