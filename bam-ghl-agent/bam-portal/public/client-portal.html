@@ -16006,10 +16006,10 @@ const _HM_KPI_CATALOG = [
   { key: 'newmembers', label: 'New Members', desc: 'New members this month', color: '#9B8CE8', icon: _HV2_ICONS.users, iconBg: 'rgba(155,140,232,.12)', ringMode: 'target-or-mom' },
   { key: 'rev', label: 'Revenue', desc: 'Net revenue, last 7 days', color: '#F0B84A', prefix: '$', icon: _HV2_ICONS.dollar, iconBg: 'rgba(240,184,74,.12)', ringMode: 'target-or-wow' },
   { key: 'members', label: 'Active Members', desc: 'Total active memberships', color: '#9B8CE8', icon: _HV2_ICONS.activity, iconBg: 'rgba(155,140,232,.12)', ringMode: 'target-or-mom' },
-  { key: 'replies', label: 'Reply Rate', desc: 'Lead reply rate this week', color: '#E87C71', suffix: '%', icon: _HV2_ICONS.msg, iconBg: 'rgba(232,124,113,.12)', ringMode: 'pct' },
-  { key: 'churn', label: 'Churn Rate', desc: 'Cancellation rate (lower is better)', color: '#F07060', suffix: '%', icon: _HV2_ICONS.refresh, iconBg: 'rgba(240,112,96,.12)', ringMode: 'inverse-pct' },
+  { key: 'replies', label: 'Reply Rate', desc: 'Leads replying, last 7 days', color: '#E87C71', suffix: '%', icon: _HV2_ICONS.msg, iconBg: 'rgba(232,124,113,.12)', ringMode: 'pct' },
+  { key: 'churn', label: 'Churn Rate', desc: 'Cancellations, last 30 days (lower is better)', color: '#F07060', suffix: '%', icon: _HV2_ICONS.refresh, iconBg: 'rgba(240,112,96,.12)', ringMode: 'inverse-pct' },
   { key: 'attendance', label: 'Avg Attendance', desc: 'Average athletes per session', color: '#7fb0d8', icon: _HV2_ICONS.calendar, iconBg: 'rgba(127,176,216,.12)', ringMode: 'target-or-wow' },
-  { key: 'conversion', label: 'Trial Conversion', desc: 'Trials converting to paid', color: '#4CC76A', suffix: '%', icon: _HV2_ICONS.check, iconBg: 'rgba(76,199,106,.12)', ringMode: 'pct' },
+  { key: 'conversion', label: 'Trial Conversion', desc: 'Trials converting to paid, last 30 days', color: '#4CC76A', suffix: '%', icon: _HV2_ICONS.check, iconBg: 'rgba(76,199,106,.12)', ringMode: 'pct' },
   { key: 'revmember', label: 'Revenue / Member', desc: 'Avg monthly revenue per member', color: '#D4B65C', prefix: '$', icon: _HV2_ICONS.chart, iconBg: 'rgba(212,182,92,.12)', ringMode: 'target-or-mom' },
 ];
 const _HM_DEFAULT_KPIS = ['leads', 'trials', 'mrr', 'newmembers'];
@@ -16217,6 +16217,26 @@ async function _hmLoadScoreboard() {
   const prevTrials = (mkPrev && Number(mkPrev.trials_booked)) || 0;
   const net = (rev && rev.stripe_ok !== false && Number(rev.net)) || 0;
 
+  // Extra data only when the picker includes these metrics
+  const selKeys = _hmGetSelectedKpis();
+  let mk30 = null, ibConvs = null;
+  const extra = [];
+  if (selKeys.includes('conversion') || selKeys.includes('churn')) {
+    const d30 = _hv2Ymd(new Date(now.getTime() - 29 * 86400000));
+    extra.push(_hv2Kpi('marketing', d30, today).then(j => { mk30 = j; }).catch(() => {}));
+  }
+  if (selKeys.includes('replies')) {
+    extra.push((async () => {
+      try {
+        const token = await _mreqAuthToken();
+        const r = await fetch('/api/ghl/inbox?client_id=' + encodeURIComponent(CLIENT_ID), { headers: { Authorization: 'Bearer ' + token } });
+        const j = await _safeJson(r);
+        if (r.ok && j) ibConvs = j.conversations || [];
+      } catch (_) {}
+    })());
+  }
+  if (extra.length) await Promise.all(extra);
+
   // Roster-derived: ongoing MRR, joins this / last month, active count
   const people = Array.isArray(roster) ? roster : [];
   const rk = (typeof _ccMemberKpis === 'function' && people.length) ? _ccMemberKpis(people) : { live: 0, mrr: 0 };
@@ -16236,8 +16256,25 @@ async function _hmLoadScoreboard() {
     rev: { val: Math.round(net), prefix: net > 0 ? '$' : '', delay: 1100 },
     members: { val: rk.live, prefix: '', delay: 900 },
     revmember: { val: rk.live ? Math.round(mrrVal / rk.live) : 0, prefix: rk.live && mrrVal > 0 ? '$' : '', delay: 1100 },
-    replies: { val: 0, prefix: '', delay: 900, suffix: '%' },
   };
+  // Trial conversion + churn (30d event counts) and reply rate (7d inbox)
+  const t30 = (mk30 && Number(mk30.trials_booked)) || 0;
+  const j30 = (mk30 && Number(mk30.joined)) || 0;
+  const c30 = (mk30 && Number(mk30.cancelled)) || 0;
+  if (mk30) {
+    kpiData.conversion = { val: t30 > 0 ? Math.min(100, Math.round(j30 / t30 * 100)) : 0, prefix: '', suffix: '%', delay: 1100 };
+    kpiData.churn = { val: Math.round(c30 / ((rk.live + c30) || 1) * 100), prefix: '', suffix: '%', delay: 1100 };
+  }
+  let rr7 = { act: 0, inb: 0 };
+  if (Array.isArray(ibConvs)) {
+    const cut7 = Date.now() - 7 * 86400000;
+    for (const c of ibConvs) {
+      if (new Date(c.lastMessageDate || 0).getTime() < cut7) continue;
+      rr7.act++;
+      if (String(c.lastMessageDirection || '').toLowerCase() === 'inbound') rr7.inb++;
+    }
+    kpiData.replies = { val: rr7.act ? Math.round(rr7.inb / rr7.act * 100) : 0, prefix: '', suffix: '%', delay: 1100 };
+  }
 
   // Previous period data for ring fallback comparison
   const kpiPrev = {
@@ -16258,7 +16295,7 @@ async function _hmLoadScoreboard() {
       continue;
     }
     const el = document.getElementById('hm-s-' + key);
-    if (el) { el.classList.remove('hm-stat-skel'); _hmCountUp(el, d.val, d.prefix, d.delay); }
+    if (el) { el.classList.remove('hm-stat-skel'); _hmCountUp(el, d.val, d.prefix, d.delay, d.suffix); }
     // Set ring fill (target if set, otherwise period-over-period)
     _hmSetRing(key, _hmRingPct(key, d.val, kpiPrev[key] || 0));
   }
@@ -16281,7 +16318,9 @@ async function _hmLoadScoreboard() {
     rev: { val: net, label: net > 0 ? '$' + Math.round(net).toLocaleString() + ' collected in the last 7 days' : 'No collections in the last 7 days' },
     members: { val: rk.live, label: rk.live > 0 ? rk.live + ' active memberships' : 'No active members yet' },
     revmember: { val: rk.live ? mrrVal / rk.live : 0, label: rk.live ? '$' + Math.round(mrrVal / rk.live).toLocaleString() + '/mo average per member' : 'No members yet' },
-    replies: { val: 0, label: 'Coming soon' },
+    conversion: { val: kpiData.conversion ? kpiData.conversion.val : 0, label: t30 > 0 ? j30 + ' of ' + t30 + ' trials joined, last 30 days' : 'No trials in the last 30 days' },
+    churn: { val: kpiData.churn ? kpiData.churn.val : 0, label: c30 > 0 ? c30 + ' cancelled, last 30 days' : 'No cancellations in the last 30 days' },
+    replies: { val: kpiData.replies ? kpiData.replies.val : 0, label: rr7.act > 0 ? rr7.inb + ' of ' + rr7.act + ' active conversations replied, last 7 days' : 'No active conversations in the last 7 days' },
   };
   // #1: Pulse ring on value change
   _hmCheckScoreChange(leads, trials, net, mrrVal);
@@ -16404,9 +16443,10 @@ async function _hmRenderMktSnapshot(host) {
 function _hmStripEm(s) { return s ? s.replace(/\u2014/g, ' - ') : s; }
 
 // ── UI #8: Count-up animation on scoreboard numbers ──
-function _hmCountUp(el, target, prefix, duration) {
-  if (!el || !target) { if (el) el.textContent = (prefix || '') + String(target || 0); return; }
-  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) { el.textContent = (prefix || '') + target.toLocaleString(); return; }
+function _hmCountUp(el, target, prefix, duration, suffix) {
+  const sfx = suffix || '';
+  if (!el || !target) { if (el) el.textContent = (prefix || '') + String(target || 0) + sfx; return; }
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) { el.textContent = (prefix || '') + target.toLocaleString() + sfx; return; }
   const dur = duration || 900;
   const start = performance.now();
   el.classList.add('hm-countup');
@@ -16414,7 +16454,7 @@ function _hmCountUp(el, target, prefix, duration) {
     const p = Math.min((now - start) / dur, 1);
     const ease = 1 - Math.pow(1 - p, 3); // ease-out cubic
     const curr = Math.round(target * ease);
-    el.textContent = (prefix || '') + curr.toLocaleString();
+    el.textContent = (prefix || '') + curr.toLocaleString() + sfx;
     if (p < 1) requestAnimationFrame(tick);
   }
   requestAnimationFrame(tick);
