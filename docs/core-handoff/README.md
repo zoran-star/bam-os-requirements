@@ -5,6 +5,7 @@ Short developer handoffs for reviewing prototype architecture and tracking `fc-c
 | Domain | Handoff | Review | Prototype | Core parity | Reviewed |
 |---|---|---|---|---|---|
 | Platform foundations | [`platform-foundations.md`](platform-foundations.md) | `ready-for-review` | `partial` | `partial` | 2026-06-04 |
+| Sales flow (entry/exit transitions) | [`sales-flow.md`](sales-flow.md) | `ready-for-review` | `partial` | `not-reviewed` | 2026-07-06 |
 
 Use one handoff per durable domain, not per ticket, screen, or table. Start from [`_template.md`](_template.md).
 
