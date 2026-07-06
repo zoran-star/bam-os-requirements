@@ -29,6 +29,7 @@ Project notes for the BAM GHL Agent / portal work. Read the relevant file when i
 - [Supabase local replay and migration cleanup](project_supabase_local_replay.md) — **READ before migrations/seeds/repair/fetch.** Points to `bam-portal/supabase/README.md`, the source of truth for historical backfills, local seed ordering, linked repair requirements, and `fetch --linked` limits.
 - [BAM GHL North Star](project_bam_ghl_north_star.md) — dual client+staff portal (chat, ad spend, tickets), not just an autonomous agent
 - [BAM GHL Agent Files](project_bam_ghl_agent_files.md) — local + git + Vercel file locations and workflow
+- [Client portal error copy](project_client_error_copy.md) — 2026-07-06: ALL client-facing error renders in client-portal.html go through `_friendlyErr(e, fallback)` (PR #1192, extends #1191). Raw provider/HTTP/JSON errors → console.error + calm generic copy; short human messages pass through. Never add a new `escapeHTML(e.message)` render site.
 - [Client Portal Flow](project_client_portal_flow.md) — onboarding.html → client row, client-portal.html shows tickets, live on Vercel
 - [Action Items + ONBOARDING](project_action_items.md) — **the client onboarding flow lives here.** Shared to-do list AND the 17-step Onboarding checklist (subway-map UI, collapsible, hides when done; SM/Cam/Ximena booking steps; staff-only trigger-buildout + review gate). **Has a "📍 ONBOARDING STATE — read first" block at the top + open items.**
 - [Support Ticket System](project_support_ticket_system.md) — full ticket pipeline + Systems portal status
