@@ -102,11 +102,22 @@ const READ_TOOLS = [
   },
   {
     name: "get_member",
-    description: "Get one member's full billing context by id: current plan, subscription status, and recent charges (with charge_id + amount) needed to propose a refund. Call this before proposing a refund so you can pick the right charge.",
+    description: "Get one member's full billing context by id: current plan, subscription status, and recent charges (with charge_id + amount + status, so you can see a failed charge). Call this before proposing a refund, or to explain why a specific member's payment failed.",
     input_schema: {
       type: "object",
       properties: { member_id: { type: "string", description: "The member's uuid from find_members." } },
       required: ["member_id"],
+    },
+  },
+  {
+    name: "list_members",
+    description: "List or count members by billing status. Use for roster questions like 'who has failed payments', 'how many are paused', or 'show members with billing issues'. Omit everything to get a count of every status. status: live | paused | payment_failed (a charge bounced) | payment_method_required (no card on file) | cancelling. Set issues_only=true to get everyone in a problem state (payment_failed + payment_method_required).",
+    input_schema: {
+      type: "object",
+      properties: {
+        status: { type: "string", enum: ["live", "paused", "payment_failed", "payment_method_required", "cancelling"] },
+        issues_only: { type: "boolean", description: "true = return all members with a billing problem (failed payment OR no card on file)." },
+      },
     },
   },
 ];
@@ -285,6 +296,11 @@ function systemPrompt(academyName) {
   return (
     `You are the Member Management assistant for ${academyName || "this academy"}, embedded in the staff portal's Members tab. ` +
     `Staff type short commands to manage the athlete roster's billing. Today's date is ${todayYMD()} (UTC).\n\n` +
+    `You can also ANSWER QUESTIONS, not just take actions. For roster/billing questions ` +
+    `("who has failed payments", "how many are paused", "list members with billing issues"), call list_members ` +
+    `(with issues_only=true for problem accounts, or a specific status) and answer in a short plain sentence, naming the members. ` +
+    `payment_failed = a charge bounced; payment_method_required = no card on file. To explain ONE member's failed payment, ` +
+    `use get_member and read their recent charges (a charge with status "failed" is the bounce).\n\n` +
     `HOW TO WORK:\n` +
     `1. Almost every command names a member. Call find_members to resolve the name to a member_id BEFORE any action. ` +
     `If find_members returns more than one plausible match, do NOT guess — ask the user which one (list the candidates with their status).\n` +
@@ -339,6 +355,30 @@ async function execFindMembers(clientId, query) {
     has_subscription: !!m.stripe_subscription_id,
   }));
   return { matches };
+}
+
+const ISSUE_STATUSES = ["payment_failed", "payment_method_required"];
+
+async function execListMembers(clientId, { status, issues_only } = {}) {
+  const rows = await sb(
+    `members?client_id=eq.${clientId}&select=id,athlete_name,parent_name,plan,status&order=athlete_name.asc`
+  ).catch(() => []);
+  const all = Array.isArray(rows) ? rows : [];
+  const counts = {};
+  for (const m of all) counts[m.status || "unknown"] = (counts[m.status || "unknown"] || 0) + 1;
+
+  let filtered = null;
+  if (issues_only) filtered = all.filter(m => ISSUE_STATUSES.includes(m.status));
+  else if (status) filtered = all.filter(m => m.status === status);
+
+  const out = { total: all.length, counts };
+  if (filtered) {
+    out.matches = filtered.map(m => ({
+      member_id: m.id, athlete_name: m.athlete_name, parent_name: m.parent_name, plan: m.plan, status: m.status,
+    }));
+    out.count = filtered.length;
+  }
+  return out;
 }
 
 async function execGetMember(clientId, memberId, stripeAccountByClient) {
@@ -506,6 +546,9 @@ async function handler(req, res) {
         let result;
         if (t.name === "find_members") {
           result = await execFindMembers(clientId, t.input?.query);
+          for (const m of (result.matches || [])) nameById[m.member_id] = m.athlete_name || m.parent_name;
+        } else if (t.name === "list_members") {
+          result = await execListMembers(clientId, t.input || {});
           for (const m of (result.matches || [])) nameById[m.member_id] = m.athlete_name || m.parent_name;
         } else if (t.name === "get_member") {
           result = await execGetMember(clientId, t.input?.member_id, stripeAccount);
