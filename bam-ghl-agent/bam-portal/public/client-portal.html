@@ -3686,24 +3686,15 @@
   .mm-modal-card { max-width: 760px; width: calc(100% - 32px); max-height: 88vh; overflow-y: auto; }
   .mm-focus-page {
     position: fixed; inset: 0; z-index: 1000; overflow-y: auto;
-    /* blueprint grid: faint graph paper + gold intersection dots */
-    background:
-      radial-gradient(circle, color-mix(in srgb, var(--gold) 10%, transparent) 1px, transparent 1.5px) 0 0/220px 220px,
-      linear-gradient(color-mix(in srgb, var(--border) 45%, transparent) 1px, transparent 1px) 0 0/44px 44px,
-      linear-gradient(90deg, color-mix(in srgb, var(--border) 45%, transparent) 1px, transparent 1px) 0 0/44px 44px,
-      var(--bg);
+    /* depth stack: translucent room, the page you left stays visible behind */
+    background: color-mix(in srgb, var(--bg) 60%, transparent);
     justify-content: center; align-items: flex-start;
-    transform: translateX(100vw);
-    transition: transform .55s cubic-bezier(0.16, 1, 0.3, 1);
+    opacity: 0; transform: scale(1.05);
+    transition: transform .55s cubic-bezier(0.16, 1, 0.3, 1), opacity .55s cubic-bezier(0.16, 1, 0.3, 1);
   }
   /* the seam between the two pages: a thin rounded gold bar with a sheen,
      riding the focus page's left edge as it glides */
-  .mm-focus-page::before {
-    content: ''; position: fixed; left: 0; top: 14px; bottom: 14px; width: 5px;
-    border-radius: 3px; z-index: 2;
-    background: linear-gradient(180deg, #E9D68F 0%, #C8A84E 35%, #A08030 85%, #C8A84E 100%);
-    box-shadow: 0 0 14px rgba(200,168,78,0.45), inset 1px 0 1px rgba(255,255,255,0.55);
-  }
+  .mm-focus-page::before { content: none; }
   .mm-focus-page .mm-modal-card {
     max-width: 900px; width: min(900px, 96vw); max-height: none;
     margin: 28px auto 48px; background: transparent; border: none; box-shadow: none;
@@ -3721,9 +3712,9 @@
     transition: transform .55s cubic-bezier(0.16, 1, 0.3, 1), filter .55s ease;
     will-change: transform, filter;
   }
-  html.mm-prewarm .mm-focus-page { will-change: transform; }
-  html.mm-focus-open .main, html.mm-focus-open .sidebar { transform: translateX(-50vw) scale(.965); filter: blur(5px); }
-  .mm-focus-page.mm-open { transform: translateX(0); }
+  html.mm-prewarm .mm-focus-page { will-change: transform, opacity; }
+  html.mm-focus-open .main, html.mm-focus-open .sidebar { transform: perspective(1400px) translateY(-1.5vh) scale(.86) rotateX(7deg); transform-origin: 50% 10%; filter: blur(10px) brightness(.8); }
+  .mm-focus-page.mm-open { transform: scale(1); opacity: 1; }
   /* landing: the seam draws itself upward like a rising chart, then glints */
   .mm-focus-page::before { transform-origin: bottom; }
   .mm-focus-page.mm-open::before { animation: mmSeamGrow .5s cubic-bezier(0.16, 1, 0.3, 1) .12s both, mmSeamGlint .7s ease .5s both; }
@@ -43559,7 +43550,12 @@ function _ccStyle() {
     '#membersMachineModal .mm-modal-card{display:flex;flex-direction:column;max-width:1040px}' +
     '.mma-split{display:flex;gap:20px;align-items:stretch}' +
     '.mma-main{flex:1;min-width:0;display:flex;flex-direction:column}' +
-    '.mma-rail{width:230px;flex:none;border-left:1px solid var(--border);padding-left:18px;display:flex;flex-direction:column;gap:8px}' +
+    '.mma-rail{width:240px;flex:none;border-right:1px solid var(--border);padding-right:18px;display:flex;flex-direction:column;gap:8px}' +
+    '.mma-bench{display:flex;flex-direction:column;align-items:flex-start;gap:8px;padding:2px 0 14px;border-bottom:1px solid var(--border);margin-bottom:8px}' +
+    '.mma-orb-lg{width:44px;height:44px}' +
+    '.mma-orb-lg svg{width:20px;height:20px}' +
+    '.mma-bench-name{font-family:var(--font-num);font-size:16px;font-weight:800;color:var(--text)}' +
+    '.mma-bench-status{font-size:11.5px;color:var(--text-mute);line-height:1.4;min-height:32px}' +
     '@media(max-width:980px){.mma-rail{display:none}}' +
     '.mma-rail-h{font-family:var(--mono);font-size:10px;font-weight:600;letter-spacing:.16em;text-transform:uppercase;color:var(--text-mute);padding:6px 0}' +
     '.mma-rail-empty{font-size:12px;color:var(--text-mute)}' +
@@ -44619,13 +44615,19 @@ function _mmaEnsureModal() {
     <div id="membersMachineModal" class="modal-backdrop mm-focus-page" style="display:none" onclick="if(event.target===this)closeMembersFocus()">
       <div class="modal-card mm-modal-card mma-shell" onclick="event.stopPropagation()">
         <button type="button" class="mm-back-btn" onclick="closeMembersFocus()">&lsaquo; Back</button>
-        <div class="mm-mod-head"><div><div class="modal-title" style="margin-bottom:0">Member agent</div>
-          <div style="font-size:12px;color:var(--text-mute);margin-top:2px">Pull up a member, read your numbers, take action.</div></div></div>
         <div class="mma-split">
+          <aside class="mma-rail" id="mma-rail">
+            <div class="mma-bench">
+              <span class="mma-orb mma-orb-lg" id="mma-orb"><svg viewBox="0 0 512 512" fill="currentColor" stroke="none"><path d="M 256 80 L 290 230 L 432 256 L 290 282 L 256 432 L 222 282 L 80 256 L 222 230 Z"/></svg></span>
+              <div class="mma-bench-name">Member agent</div>
+              <div class="mma-bench-status" id="mma-status">Watching the roster. Ask me anything.</div>
+            </div>
+            <div class="mma-rail-h">Pulled this session</div>
+            <div class="mma-rail-empty" id="mma-rail-empty">Nothing pulled yet.</div>
+          </aside>
           <div class="mma-main">
             <div class="mma-thread" id="mma-thread"></div>
             <div class="mma-compose">
-              <span class="mma-orb" id="mma-orb"><svg viewBox="0 0 512 512" fill="currentColor" stroke="none"><path d="M 256 80 L 290 230 L 432 256 L 290 282 L 256 432 L 222 282 L 80 256 L 222 230 Z"/></svg></span>
               <textarea class="mma-input" id="mma-input" rows="1" placeholder="Try a member's name, or 'how's my MRR'"></textarea>
               <button type="button" class="mma-send" onclick="_mmaSend()" aria-label="Send">&#8593;</button>
             </div>
@@ -44636,10 +44638,6 @@ function _mmaEnsureModal() {
               <button type="button" class="mma-chip" onclick="_mmaChip('Pull up ', true)">Pull up a member</button>
             </div>
           </div>
-          <aside class="mma-rail" id="mma-rail">
-            <div class="mma-rail-h">Pulled this session</div>
-            <div class="mma-rail-empty" id="mma-rail-empty">Nothing pulled yet.</div>
-          </aside>
         </div>
       </div>
     </div>`);
@@ -44658,6 +44656,8 @@ function _mmaChip(text, fillOnly) {
 }
 // Presence orb states: '' idle breathe, 'think' ripple, quick 'say' pulse.
 function _mmaOrb(state) {
+  const st = document.getElementById('mma-status');
+  if (st) st.textContent = state === 'think' ? 'Reading the roster...' : 'Watching the roster. Ask me anything.';
   const o = document.getElementById('mma-orb');
   if (!o) return;
   o.classList.toggle('think', state === 'think');
@@ -44699,7 +44699,8 @@ function _mmaPin(html, onclick) {
   el.className = 'mma-pin';
   el.innerHTML = html;
   if (onclick) el.addEventListener('click', onclick);
-  rail.insertBefore(el, rail.children[1] || null);
+  const h = rail.querySelector('.mma-rail-h');
+  rail.insertBefore(el, h ? h.nextSibling : null);
   const pins = rail.querySelectorAll('.mma-pin');
   if (pins.length > 8) pins[pins.length - 1].remove();
 }
