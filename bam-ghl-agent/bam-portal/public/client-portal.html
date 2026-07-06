@@ -30125,7 +30125,7 @@ function _plTrialsToday() {
 function _ploCss() {
   if (document.getElementById('plo-css')) return;
   const st = document.createElement('style'); st.id = 'plo-css';
-  st.textContent = [
+  const _ploRules = [
     '#pl-overview .plo-kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:24px;align-items:start}',
     '#pl-overview .plo-kpi{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-md);padding:16px 18px;box-shadow:var(--card-shadow)}',
     '#pl-overview .plo-lab{font-size:10.5px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--text-mute)}',
@@ -30228,7 +30228,15 @@ function _ploCss() {
     '#pl-board-container.plenter .pl-col{animation:plColRise .44s var(--es) both}',
     '#pl-board-container.plenter .pl-band-cell{animation:ploUp .4s var(--es) both}',
     '@media(prefers-reduced-motion:reduce){#pl-overview *,#pl-board-container *{animation:none!important}}',
-  ].join('');
+  ];
+  // The command-center home reuses the collapsed stage strip: mirror the
+  // descendant .plo-* rules onto the #cc-sal-strip scope so the same cells style
+  // up there too. Entrance animations (#pl-overview.enter) + kpi-layout rules stay
+  // Sales-scoped.
+  const _homeRules = _ploRules
+    .filter(r => r.startsWith('#pl-overview .plo'))
+    .map(r => r.split('#pl-overview ').join('#cc-sal-strip '));
+  st.textContent = _ploRules.concat(_homeRules).join('');
   document.head.appendChild(st);
 }
 
@@ -30256,32 +30264,47 @@ function _plRenderOverview() {
     + `</div>`;
 
   // ── collapsed stage strip ──
-  const cells = stages.map((s, i) => {
-    const opps = s.opportunities || [];
-    const bot = (typeof _plStageBot === 'function') ? _plStageBot(s.name) : null;
-    const kind = bot ? bot.kind : 'human';
-    // Label = the engine's role + kind, e.g. "Nurture automation", "Closing agent".
-    const engLab = (bot && bot.kind === 'terminal') ? bot.tag
-                 : bot ? `${bot.tag} ${bot.kind}` : 'Manual';
-    const engIcon = kind === 'agent' ? 'cpu' : kind === 'automation' ? 'gear' : kind === 'terminal' ? 'target' : 'user';
-    const sig = _plStageSignals(s, opps);
-    let pills = '';
-    if (sig.errors) pills += `<span class="plo-pill red" onclick="event.stopPropagation();_plSVStage('${escapeHTML(s.id)}')">${_plIcon('alert', 11)} ${sig.errors} ${sig.errors === 1 ? 'error' : 'errors'}</span>`;
-    if (sig.hawk && bot) pills += `<span class="plo-pill gold" onclick="event.stopPropagation();_plEngineHawk('${escapeHTML(bot.key)}')">${_plIcon('eye', 11)} ${sig.hawk} hawkeye action${sig.hawk === 1 ? '' : 's'}</span>`;
-    if (!pills) pills = '<span class="plo-clear">all clear</span>';
-    const conn = i < stages.length - 1 ? `<div class="plo-conn">${_plIcon('chevR', 16)}</div>` : '';
-    return `<div class="plo-stage" onclick="_plSVStage('${escapeHTML(s.id)}')">`
-      + `<div class="plo-toprow"><span class="plo-name">${escapeHTML(_plCap(s.name))}</span>`
-      + `<button class="plo-gear" title="Configure this stage" onclick="event.stopPropagation();_plOpenFocus('${escapeHTML(s.id)}')">${_plIcon('sliders', 14)}</button></div>`
-      + `<div class="plo-eng">${_ploEngIcon(engIcon)}<span>${escapeHTML(engLab)}</span></div>`
-      + `<div class="plo-count">${opps.length}<small>cards</small></div>`
-      + `<div class="plo-pills">${pills}</div></div>${conn}`;
-  }).join('');
+  const cells = _ploStripCells(stages, false);
 
   host.innerHTML = kpis
     + `<div class="plo-plhead"><h3>Pipeline</h3><button class="plo-expand" onclick="_plSVExpand()">${_plIcon('expand', 13)} Expand board</button></div>`
     + `<div class="plo-strip">${cells}</div>`;
 }
+
+// Build the collapsed stage-strip cells. Shared by the Sales overview and the
+// command-center home. `nav` overrides the click handlers (name strings) so the
+// home strip can jump into the Sales view; default acts in place.
+function _ploStripCells(stages, nav) {
+  const stageClick = (nav && nav.stage) || '_plSVStage';
+  const gearClick = (nav && nav.gear) || '_plOpenFocus';
+  const hawkClick = (nav && nav.hawk) || '_plEngineHawk';
+  return stages.map((s, i) => {
+    const opps = s.opportunities || [];
+    const bot = (typeof _plStageBot === 'function') ? _plStageBot(s.name) : null;
+    const kind = bot ? bot.kind : 'human';
+    const engLab = (bot && bot.kind === 'terminal') ? bot.tag
+                 : bot ? `${bot.tag} ${bot.kind}` : 'Manual';
+    const engIcon = kind === 'agent' ? 'cpu' : kind === 'automation' ? 'gear' : kind === 'terminal' ? 'target' : 'user';
+    const sig = _plStageSignals(s, opps);
+    let pills = '';
+    if (sig.errors) pills += `<span class="plo-pill red" onclick="event.stopPropagation();${stageClick}('${escapeHTML(s.id)}')">${_plIcon('alert', 11)} ${sig.errors} ${sig.errors === 1 ? 'error' : 'errors'}</span>`;
+    if (sig.hawk && bot) pills += `<span class="plo-pill gold" onclick="event.stopPropagation();${hawkClick}('${escapeHTML(bot.key)}')">${_plIcon('eye', 11)} ${sig.hawk} hawkeye action${sig.hawk === 1 ? '' : 's'}</span>`;
+    if (!pills) pills = '<span class="plo-clear">all clear</span>';
+    const conn = i < stages.length - 1 ? `<div class="plo-conn">${_plIcon('chevR', 16)}</div>` : '';
+    return `<div class="plo-stage" onclick="${stageClick}('${escapeHTML(s.id)}')">`
+      + `<div class="plo-toprow"><span class="plo-name">${escapeHTML(_plCap(s.name))}</span>`
+      + `<button class="plo-gear" title="Configure this stage" onclick="event.stopPropagation();${gearClick}('${escapeHTML(s.id)}')">${_plIcon('sliders', 14)}</button></div>`
+      + `<div class="plo-eng">${_ploEngIcon(engIcon)}<span>${escapeHTML(engLab)}</span></div>`
+      + `<div class="plo-count">${opps.length}<small>cards</small></div>`
+      + `<div class="plo-pills">${pills}</div></div>${conn}`;
+  }).join('');
+}
+// Command-center home strip handlers: leave cc-mode into the classic Sales view,
+// then focus the tapped stage / gear / hawkeye once it has mounted.
+function _ccPipeStage(id) { try { _ccOpenClassic('pipelines'); } catch (_) {} setTimeout(() => { try { _plSVStage(id); } catch (_) {} }, 120); }
+function _ccPipeFocus(id) { try { _ccOpenClassic('pipelines'); } catch (_) {} setTimeout(() => { try { _plOpenFocus(id); } catch (_) {} }, 120); }
+function _ccPipeHawk(key) { try { _ccOpenClassic('pipelines'); } catch (_) {} setTimeout(() => { try { _plEngineHawk(key); } catch (_) {} }, 120); }
+const _CC_PIPE_NAV = { stage: '_ccPipeStage', gear: '_ccPipeFocus', hawk: '_ccPipeHawk' };
 
 // engine glyphs the strip needs that aren't in the base _plIcon set
 function _ploEngIcon(name) {
@@ -45702,6 +45725,7 @@ function _ccMountSales(host) {
         <div class="cc-stat"><div class="cc-stat-v" id="cc-sal-7d">-</div><div class="cc-stat-l">Sales - 7 days</div></div>
         <div class="cc-stat"><div class="cc-stat-v" id="cc-sal-close">-</div><div class="cc-stat-l">Trial closing rate</div></div>
       </div>
+      <div id="cc-sal-trials-list"></div>
       <div class="cc-pipe-strip" id="cc-sal-strip"></div>
       <div class="cc-actions">
         <button type="button" class="cc-btn primary" onclick="_ccOpenClassic('pipelines')">Open sales board</button>
@@ -45721,15 +45745,34 @@ async function _ccLoadTrialsCount() {
     const r = await fetch('/api/ghl/calendars-v15?action=trials-today&client_id=' + encodeURIComponent(CLIENT_ID), { headers: { Authorization: 'Bearer ' + token } });
     const j = await _safeJson(r);
     if (r.ok && !j.no_config) {
-      const n = (j.trials || []).length;
-      el.textContent = String(n);
-      if (!n) _ccNextTrial();
+      const trials = j.trials || [];
+      el.textContent = String(trials.length);
+      _ccRenderTrialsList(trials, j.timezone || 'America/Toronto');
+      if (!trials.length) _ccNextTrial();
     } else if (j && j.no_config) {
       el.textContent = '0';
       const sub = document.getElementById('cc-sal-next');
       if (sub) sub.textContent = 'No trial calendar connected';
     }
   } catch (_) {}
+}
+// Today's trials, listed out with time · athlete name · age (exact once DOB is
+// captured, else the group band, e.g. "Elementary"). Clears when there are none.
+function _ccRenderTrialsList(trials, tz) {
+  const host = document.getElementById('cc-sal-trials-list'); if (!host) return;
+  if (!trials || !trials.length) { host.innerHTML = ''; return; }
+  const rows = trials.map(t => {
+    let time = '';
+    try { if (t.start) time = new Date(t.start).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: tz || 'America/Toronto' }); } catch (_) {}
+    const nm = escapeHTML(t.athlete || t.contactName || 'Trial');
+    const ageStr = (t.age != null) ? (t.age + ' yrs') : (t.group ? escapeHTML(t.group) : '');
+    return `<div style="display:flex;align-items:baseline;gap:10px;padding:6px 0;border-top:1px solid var(--border)">`
+      + `<span style="font-family:var(--font-num,monospace);font-weight:800;color:var(--gold);min-width:66px;font-size:13px">${escapeHTML(time)}</span>`
+      + `<span style="font-weight:700;color:var(--text);flex:1;font-size:13.5px">${nm}</span>`
+      + (ageStr ? `<span style="color:var(--text-mute);font-size:12px;white-space:nowrap">${ageStr}</span>` : '')
+      + `</div>`;
+  }).join('');
+  host.innerHTML = `<div style="font-size:10px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--text-mute);margin:16px 0 4px">Today's trials</div>${rows}`;
 }
 // "Trials today: 0" is a dead number - show the next booked trial instead.
 async function _ccNextTrial() {
@@ -45765,11 +45808,19 @@ async function _ccSalesLoad() {
     const pl = ((j && j.pipelines) || []).find(p => (p.stages || []).length);
     if (pl) {
       const open = (pl.opportunities || []).filter(o => String(o.status || 'open').toLowerCase() === 'open');
+      // Feed the pipeline store so the click-through into the classic Sales view
+      // (and _plActivePipeline for stage focus) has data ready instantly.
+      _PL_DATA = j;
+      if (!_PL_PIPELINE) _PL_PIPELINE = pl.id;
+      // Attach open opps to each stage for the strip's card counts, then render the
+      // full stage cards (same as the Sales overview) instead of the compact pills.
+      const byStage = {};
+      (pl.stages || []).forEach(s => { byStage[s.id] = []; });
+      open.forEach(o => { if (byStage[o.stageId]) byStage[o.stageId].push(o); });
+      let cardStages = (pl.stages || []).map(s => ({ ...s, opportunities: byStage[s.id] || [] }));
+      if (typeof _isStageAllowed === 'function') cardStages = cardStages.filter(s => _isStageAllowed(s.id));
       const strip = document.getElementById('cc-sal-strip');
-      if (strip) strip.innerHTML = (pl.stages || []).map(s => {
-        const n = open.filter(o => o.stageId === s.id).length;
-        return `<button type="button" class="cc-pipe-pill${n ? '' : ' dim'}" onclick="_ccOpenClassic('pipelines')"><span>${escapeHTML(s.name)}</span><b>${n}</b></button>`;
-      }).join('');
+      if (strip) { _ploCss(); strip.innerHTML = `<div class="plo-strip" style="width:100%">${_ploStripCells(cardStages, _CC_PIPE_NAV)}</div>`; }
       const feed = document.getElementById('cc-sal-feed');
       if (feed) {
         const stageName = {};
@@ -45794,6 +45845,18 @@ async function _ccSalesLoad() {
     if (strip && !strip.children.length) strip.innerHTML = '<div class="cc-mem-empty">Couldn\'t load the pipeline.</div>';
   }
   _ccSalesHawk();
+  _ccSalesKpis();
+}
+// Sales - 7 days + Trial closing rate (off-GHL, from api/ghl/cc-sales-kpis).
+async function _ccSalesKpis() {
+  try {
+    const token = await _mreqAuthToken();
+    const r = await fetch('/api/ghl/cc-sales-kpis?client_id=' + encodeURIComponent(CLIENT_ID), { headers: { Authorization: 'Bearer ' + token } });
+    const j = await _safeJson(r);
+    if (!r.ok) return;
+    const s7 = document.getElementById('cc-sal-7d'); if (s7) s7.textContent = (j.sales_7d != null ? String(j.sales_7d) : '-');
+    const cl = document.getElementById('cc-sal-close'); if (cl) cl.textContent = (j.closing_rate != null ? j.closing_rate + '%' : '-');
+  } catch (_) { /* leave the dashes */ }
 }
 function _ccSalesHawk() {
   const n = window._hmHawkTotal || 0;
