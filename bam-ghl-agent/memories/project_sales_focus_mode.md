@@ -26,7 +26,7 @@ inline form. One-destination-per-trigger enforced in UI; DB unique/check constra
 Helpers/handlers: `_plRenderEntrySec`/`_plRenderExitSec`/`_plEdgeFormHtml`/`_plEdgeAdd`/
 `_plEdgeEdit`/`_plEdgeFormSave`/`_plEdgeToggle`/`_plEdgeDelete` + `_plFocusRerender`.
 
-**🚧 ROUTER — IN PROGRESS (Phase 1+2 done 2026-07-06, PR #____):** goal = scale to more
+**🚧 ROUTER — IN PROGRESS (Phase 1+2 done 2026-07-06, PR #1189):** goal = scale to more
 academies, so leads move by the academy's authored edges, not hardcoded per-agent logic.
 - **`api/agent/_router.js` built (Phase 1):** `resolveEdge(clientId, fromRole, trigger)` reads
   the single enabled edge on the client-wide flow (`pipeline_id IS NULL`) via `sbRest` (now
