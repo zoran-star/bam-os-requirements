@@ -72,6 +72,7 @@ The Add-Creative modal now has an explicit **"What should we make?" Video/Graphi
 
 **Content-only clients.** Organic is now **decoupled from ads** (`marketing_included`):
 - Surface shows when `marketing_included OR organic_content` (gates in `switchView`, `mobileSwitchView`, `applyMarketingNavState`).
+- **2026-07-06 nav trim:** content-only clients no longer see **Home, Systems (flat + accordion), or Action Items** - `applyContentOnlyNav(contentOnly)` runs at the end of `applyMarketingNavState()` (boot + client-switch, reversible for multi-academy users), hides desktop + mobile items, and redirects off a hidden active view onto Content. **Business Blueprint stays visible on purpose** (Cam 2026-07-06: Brand section feeds their creatives). Sidebar = Content · Resources · Assets · Messages · Team · Blueprint. Resources are further RLS-gated to the Content category - see [[project_resources_library]].
 - Content-only (`organic_content` ON + `marketing_included` OFF) → `_marketingEnter`/`_backToChannelSplit` go **straight to organic** (no Ads|Organic split, back button hidden via `_showOrganicOnly`); nav relabels **"Marketing" → "Content"**.
 - Staff one-click **"Make content-only"** preset in MarketingTab → sets `marketing_included=false` + `organic_content=true`.
 

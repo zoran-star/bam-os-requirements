@@ -1,6 +1,8 @@
 # Resources Library
 
-Content library shown to **all clients** (global, not per-client). Staff publish from `bam-portal/`; clients browse via the Resources tile in `client-portal.html`.
+Content library shown to clients (global, not per-client). Staff publish from `bam-portal/`; clients browse via the Resources tile in `client-portal.html`.
+
+> **2026-07-06 — audience gating for content-only clients.** `resource_categories.audience` ('all' default | 'content') + new SECURITY DEFINER fn `public.is_content_only_user()` (TRUE when every client the caller belongs to has `organic_content AND NOT marketing_included`). RLS on resources/resource_files/resource_categories now hides everything except audience='content' categories from content-only clients (e.g. Schmidt Performance) - protects Sales scripts/Strategy playbooks/HR docs from content-accelerator clients Mike is upselling. Migration `20260706174248_resources_content_only_audience.sql` (applied). Also created the **Content** category (audience='content') and moved 6 resources into it from Marketing: Content Starter Pack, Organic Content Flow Walkthrough, Pillars Guide, Repurposing Playbook, The Perfect Testimonial, Starter Campaign Content Capture Checklist (4 stayed: Paid Ads Flow Walkthrough, Setting Up Your First Campaign, Ad Video Examples, Graphic Ad Examples). Staff toggle = "Content clients: visible/hidden" pill per category in the Manage categories modal. Client portal needs no filter code - RLS does it. Full clients see zero change.
 
 > **2026-06-14 — content team can now manage it (not just admins).** Feedback
 > from Cam ("content category + I have some ready to upload") surfaced that the

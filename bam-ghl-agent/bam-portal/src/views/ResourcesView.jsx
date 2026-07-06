@@ -609,6 +609,22 @@ function CategoryManagerModal({ tokens: tk, categories, onClose, onChanged }) {
     }
   };
 
+  // audience: 'all' = full/scaling clients only; 'content' = content-only
+  // clients see it too (RLS enforces this server-side).
+  const toggleAudience = async (cat) => {
+    setBusy(true); setErr(null);
+    try {
+      const next = cat.audience === "content" ? "all" : "content";
+      const { error } = await supabase.from("resource_categories").update({ audience: next }).eq("id", cat.id);
+      if (error) throw error;
+      onChanged();
+    } catch (e) {
+      setErr(e.message || String(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const deleteCategory = async (cat) => {
     if (!window.confirm(`Delete category "${cat.name}"? Only works if no resources use it.`)) return;
     setBusy(true); setErr(null);
@@ -646,6 +662,20 @@ function CategoryManagerModal({ tokens: tk, categories, onClose, onChanged }) {
               disabled={busy}
             />
             <div style={{ flex: 1, color: tk.text, fontSize: 14 }}>{c.name}</div>
+            <button
+              onClick={() => toggleAudience(c)}
+              disabled={busy}
+              title={c.audience === "content"
+                ? "Content-only clients CAN see this category. Click to restrict to full clients."
+                : "Hidden from content-only clients. Click to make it visible to them too."}
+              style={{
+                background: c.audience === "content" ? `${tk.green}1A` : "transparent",
+                border: `1px solid ${c.audience === "content" ? tk.green : tk.border}`,
+                color: c.audience === "content" ? tk.green : tk.textMute,
+                fontSize: 11, fontWeight: 600, padding: "4px 10px", borderRadius: 999, cursor: "pointer",
+              }}>
+              {c.audience === "content" ? "Content clients: visible" : "Content clients: hidden"}
+            </button>
             <button onClick={() => deleteCategory(c)} style={btnIconDanger(tk)} disabled={busy}>Delete</button>
           </div>
         ))}
