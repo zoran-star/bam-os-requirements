@@ -7,7 +7,7 @@ import sh from '../styles/shared.module.css';
 const SAGE_PROMPTS = [
   'Increase Saturday ad budget by $50...',
   'Create a new Instagram Reel ad for summer camp...',
-  'Pause the Free Trial story ad — it has zero conversions...',
+  'Pause the Free Trial story ad - it has zero conversions...',
   'Show me cost per lead by channel this month...',
   'Generate a parent testimonial ad from Maria R...',
   'Set up a referral campaign with $25 credit reward...',
@@ -24,49 +24,49 @@ const CHANNELS = [
   {
     name: 'Instagram', leads: 14, cpl: '$12.40', trend: '+22%', trendUp: true, cplTrend: '-6%', cplTrendGood: true, icon: <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>, accent: '#E1306C',
     campaigns: [
-      { name: 'Youth Basketball Reel — Saturday Energy', spend: '$89', impressions: '4,210', cpm: '$21.14', reach: '3,680', frequency: '1.1', clicks: 187, ctr: '4.2%', cpc: '$0.48', lpv: 142, lpvRate: '75.9%', formFills: 4, trialBookings: 2, cpl: '$14.83', convRate: '4.2%', demo: { age: '28-42', gender: '62% F', geo: 'Within 15mi', onTarget: true } },
+      { name: 'Youth Basketball Reel - Saturday Energy', spend: '$89', impressions: '4,210', cpm: '$21.14', reach: '3,680', frequency: '1.1', clicks: 187, ctr: '4.2%', cpc: '$0.48', lpv: 142, lpvRate: '75.9%', formFills: 4, trialBookings: 2, cpl: '$14.83', convRate: '4.2%', demo: { age: '28-42', gender: '62% F', geo: 'Within 15mi', onTarget: true } },
       { name: 'Summer Skills Camp Promo', spend: '$134', impressions: '6,820', cpm: '$19.65', reach: '5,100', frequency: '1.3', clicks: 245, ctr: '3.6%', cpc: '$0.55', lpv: 189, lpvRate: '77.1%', formFills: 5, trialBookings: 3, cpl: '$16.75', convRate: '4.2%', demo: { age: '25-38', gender: '71% F', geo: 'Within 10mi', onTarget: true } },
     ],
   },
   {
     name: 'Facebook', leads: 8, cpl: '$18.60', trend: '+5%', trendUp: true, cplTrend: '+3%', cplTrendGood: false, icon: <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>, accent: '#1877F2',
     campaigns: [
-      { name: 'Parent Testimonial — Maria R.', spend: '$134', impressions: '5,430', cpm: '$24.68', reach: '4,200', frequency: '1.3', clicks: 206, ctr: '3.8%', cpc: '$0.65', lpv: 158, lpvRate: '76.7%', formFills: 3, trialBookings: 2, cpl: '$26.80', convRate: '3.2%', demo: { age: '30-45', gender: '58% F', geo: 'Within 20mi', onTarget: true } },
+      { name: 'Parent Testimonial - Maria R.', spend: '$134', impressions: '5,430', cpm: '$24.68', reach: '4,200', frequency: '1.3', clicks: 206, ctr: '3.8%', cpc: '$0.65', lpv: 158, lpvRate: '76.7%', formFills: 3, trialBookings: 2, cpl: '$26.80', convRate: '3.2%', demo: { age: '30-45', gender: '58% F', geo: 'Within 20mi', onTarget: true } },
       { name: 'Back-to-School Registration', spend: '$67', impressions: '3,150', cpm: '$21.27', reach: '2,800', frequency: '1.1', clicks: 98, ctr: '3.1%', cpc: '$0.68', lpv: 74, lpvRate: '75.5%', formFills: 2, trialBookings: 1, cpl: '$22.33', convRate: '4.1%', demo: { age: '22-35', gender: '65% F', geo: 'Within 25mi', onTarget: false, flag: 'Geo reaching beyond 20mi target radius' } },
     ],
   },
   {
     name: 'Google', leads: 6, cpl: '$24.10', trend: '-8%', trendUp: false, cplTrend: '-12%', cplTrendGood: true, icon: <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>, accent: '#4285F4',
     campaigns: [
-      { name: 'Search — Basketball Training Near Me', spend: '$145', impressions: '2,300', cpm: '$63.04', reach: '2,100', frequency: '1.1', clicks: 89, ctr: '3.9%', cpc: '$1.63', lpv: 67, lpvRate: '75.3%', formFills: 4, trialBookings: 2, cpl: '$24.17', convRate: '9.0%', demo: { age: '28-50', gender: '52% M', geo: 'Within 12mi', onTarget: true } },
+      { name: 'Search - Basketball Training Near Me', spend: '$145', impressions: '2,300', cpm: '$63.04', reach: '2,100', frequency: '1.1', clicks: 89, ctr: '3.9%', cpc: '$1.63', lpv: 67, lpvRate: '75.3%', formFills: 4, trialBookings: 2, cpl: '$24.17', convRate: '9.0%', demo: { age: '28-50', gender: '52% M', geo: 'Within 12mi', onTarget: true } },
     ],
   },
   {
     name: 'Referral', leads: 4, cpl: '$0', trend: '+50%', trendUp: true, cplTrend: '$0', cplTrendGood: true, icon: <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>, accent: '#3EAF5C',
     campaigns: [
-      { name: 'Member Referral Links', spend: '$0', impressions: '—', cpm: '—', reach: '—', frequency: '—', clicks: 28, ctr: '—', cpc: '$0', lpv: 22, lpvRate: '78.6%', formFills: 2, trialBookings: 2, cpl: '$0', convRate: '18.2%', demo: { age: '30-42', gender: '55% F', geo: 'Within 8mi', onTarget: true } },
+      { name: 'Member Referral Links', spend: '$0', impressions: '-', cpm: '-', reach: '-', frequency: '-', clicks: 28, ctr: '-', cpc: '$0', lpv: 22, lpvRate: '78.6%', formFills: 2, trialBookings: 2, cpl: '$0', convRate: '18.2%', demo: { age: '30-42', gender: '55% F', geo: 'Within 8mi', onTarget: true } },
     ],
   },
 ];
 
 const ADS_NEEDING_REFRESH = [
   { name: 'Summer Skills Camp Promo', days: 47, status: 'Stale', spend: '$312', conversions: 2, trend: 'declining' },
-  { name: 'Free Trial — Instagram Story', days: 62, status: 'Stop-loss', spend: '$158', conversions: 0, trend: 'zero' },
+  { name: 'Free Trial - Instagram Story', days: 62, status: 'Stop-loss', spend: '$158', conversions: 0, trend: 'zero' },
 ];
 
 const TOP_ADS = [
-  { name: 'Youth Basketball Reel — Saturday Energy', spend: '$89', conversions: 6, ctr: '4.2%', days: 12, status: 'healthy' },
-  { name: 'Parent Testimonial — Maria R.', spend: '$134', conversions: 5, ctr: '3.8%', days: 21, status: 'healthy' },
+  { name: 'Youth Basketball Reel - Saturday Energy', spend: '$89', conversions: 6, ctr: '4.2%', days: 12, status: 'healthy' },
+  { name: 'Parent Testimonial - Maria R.', spend: '$134', conversions: 5, ctr: '3.8%', days: 21, status: 'healthy' },
   { name: 'Back-to-School Registration', spend: '$67', conversions: 3, ctr: '3.1%', days: 8, status: 'new' },
 ];
 
 const BUDGET = { monthly: 500, spent: 312, daysLeft: 15, pacing: 'on-pace' };
 
 const CAMPAIGN_BUDGETS = [
-  { name: 'Youth Basketball Reel — Saturday Energy', daily: '$8.50', monthly: '$255', status: 'Active' },
-  { name: 'Parent Testimonial — Maria R.', daily: '$5.00', monthly: '$150', status: 'Active' },
+  { name: 'Youth Basketball Reel - Saturday Energy', daily: '$8.50', monthly: '$255', status: 'Active' },
+  { name: 'Parent Testimonial - Maria R.', daily: '$5.00', monthly: '$150', status: 'Active' },
   { name: 'Back-to-School Registration', daily: '$3.20', monthly: '$95', status: 'Active' },
-  { name: 'Free Trial — Instagram Story', daily: '$0', monthly: '$0', status: 'Paused' },
+  { name: 'Free Trial - Instagram Story', daily: '$0', monthly: '$0', status: 'Paused' },
 ];
 
 const MORE_TOOLS = [
@@ -86,7 +86,7 @@ const PERIODS = [
   { id: '3m', label: 'Last 3 months', days: 90 },
 ];
 
-/* Metric education — MKT-003 */
+/* Metric education - MKT-003 */
 const METRIC_EDUCATION = {
   cpl: { label: 'Cost Per Lead', explain: 'Total ad spend divided by number of leads (form fills + trial bookings). Lower is better - under $15 is strong for youth sports.' },
   ctr: { label: 'Click-Through Rate', explain: 'Percentage of people who saw your ad and clicked. Above 3% is solid for Meta ads in the youth sports space.' },
@@ -96,7 +96,7 @@ const METRIC_EDUCATION = {
   frequency: { label: 'Frequency', explain: 'Average number of times each person saw your ad. Above 2.0 means audience fatigue may be setting in - time to refresh creative.' },
 };
 
-/* ─── SAGE MARKETING ADVISOR — conversational knowledge engine (MKT-013) ─── */
+/* ─── SAGE MARKETING ADVISOR - conversational knowledge engine (MKT-013) ─── */
 const money = str => parseFloat(String(str).replace(/[^0-9.]/g, '')) || 0;
 
 const STARTERS = [
@@ -280,7 +280,7 @@ function FullDashboard({ onClose }) {
       <div className={s.dashBody}>
         <div className={s.dashNotes}>
           <span className={s.dashNotesLabel}>Sage</span>
-          <span>Instagram is your most efficient channel at $12.40 CPL — 3x better than Google. Your Saturday Reel is driving 42% of all conversions. Consider reallocating $50 from the stale Summer Camp ad to the Saturday slot.</span>
+          <span>Instagram is your most efficient channel at $12.40 CPL - 3x better than Google. Your Saturday Reel is driving 42% of all conversions. Consider reallocating $50 from the stale Summer Camp ad to the Saturday slot.</span>
         </div>
 
         <div className={s.dashSectionLabel}>Top-Level KPIs <span className={s.dashRef}>MKT-001</span></div>
@@ -378,7 +378,7 @@ function ChannelDetail({ channel, onClose }) {
     <div className={s.modalOverlay} onClick={onClose}>
       <div className={s.modalPanel} onClick={e => e.stopPropagation()}>
         <button className={s.modalClose} onClick={onClose}>✕</button>
-        <div className={s.modalTitle}>{channel.icon} {channel.name} — Campaign Detail</div>
+        <div className={s.modalTitle}>{channel.icon} {channel.name} - Campaign Detail</div>
         <div className={s.modalRef}>MKT-001a · MKT-003</div>
 
         {channel.campaigns.map((c, i) => (
@@ -422,7 +422,7 @@ function ChannelDetail({ channel, onClose }) {
           </div>
         ))}
 
-        {/* Budget Pacing — inside channel detail */}
+        {/* Budget Pacing - inside channel detail */}
         <div style={{ marginTop: 20, borderTop: '1px solid var(--border)', paddingTop: 16 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
             <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-1)' }}>Budget Pacing</span>
@@ -546,7 +546,7 @@ function CreateAdModal({ onClose }) {
           {step === 3 && (
             <div className={s.wizardContent}>
               <label className={s.budgetFormLabel}>Targeting</label>
-              <div className={s.sageTipSmall}><span className={s.sageTipLabel}>Sage</span> Advantage+ audience is enabled — Meta's algorithm will find the best parents near your academy. Your existing members will be automatically excluded.</div>
+              <div className={s.sageTipSmall}><span className={s.sageTipLabel}>Sage</span> Advantage+ audience is enabled - Meta's algorithm will find the best parents near your academy. Your existing members will be automatically excluded.</div>
               <div className={s.budgetCurrentCard}>
                 <div className={s.budgetCurrentRow}><span>Location</span><span>Within 15mi of BAM Academy</span></div>
                 <div className={s.budgetCurrentRow}><span>Targeting</span><span>Advantage+ (broad)</span></div>
@@ -678,7 +678,7 @@ export default function Marketing() {
   return (
     <>
       <main className={sh.main}>
-        {/* ═══ COMMAND BAR — Sage-powered top bar ═══ */}
+        {/* ═══ COMMAND BAR - Sage-powered top bar ═══ */}
         <div className={s.topBar}>
           <div className={s.topBarCanvas}>
             <canvas ref={canvasRef} />
@@ -784,7 +784,7 @@ export default function Marketing() {
         </div>
 
         <div className={sh.scroll}>
-          {/* ═══ META ADS — channel detail section with swipe nav ═══ */}
+          {/* ═══ META ADS - channel detail section with swipe nav ═══ */}
           <div className={s.channelSectionWrap}>
             <div className={s.channelSection}>
             <div className={s.channelSectionHead}>
@@ -840,7 +840,7 @@ export default function Marketing() {
                 ))}
               </div>
             </div>
-            {/* Budget Pacing — inside Meta section */}
+            {/* Budget Pacing - inside Meta section */}
             <div className={s.metaBudget}>
               <div className={s.metaBudgetHead}>
                 <span className={s.metaBudgetTitle}>Budget Pacing</span>
@@ -893,7 +893,7 @@ export default function Marketing() {
             </div>
           </div>
 
-          {/* ═══ PERFORMANCE — channels + budget ═══ */}
+          {/* ═══ PERFORMANCE - channels + budget ═══ */}
           <div className={s.sectionBanner} style={{ '--accent': 'var(--gold)' }}>
             <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
             <span>Performance</span>
