@@ -28,6 +28,7 @@ import { respondedStage, contactInRespondedStage, computeQueue, respondedContact
 import { markUnqualified, unmarkUnqualified } from "./agent/_tags.js";
 import { enrollContact, isAutomationLive } from "./automations.js";
 import { moveStage, setStatus, findOpenOpp } from "./agent/_store.js";
+import { routeTransition } from "./agent/_router.js";
 import { agentMode, modeIsOn, shouldAutoSend } from "./agent/_mode.js";
 import { mutedContactIdSet, isMuted } from "./agent/_mutes.js";
 import { withinQuietHours, nextSendableTime } from "./agent/_quiet.js";
@@ -1029,11 +1030,18 @@ async function handler(req, res) {
           workflowId = await enrollGhosted(client, token, contactId);
         }
       } catch (e) { return res.status(e.status || 502).json({ error: e.message }); }
-      // Move the opp to Interested so it leaves Responded (best-effort — the enroll
-      // already happened; the GHL workflow will move them too).
+      // Move the opp OUT of Responded per the academy's authored flow (the
+      // went_quiet edge; GTA seed = -> Interested). Best-effort — the enroll
+      // already happened; the GHL workflow will move them too. Router reads the
+      // stage_transitions edge; if the academy has no edge (unseeded / paused /
+      // lookup blip) it returns matched:false and we run the original hardcoded
+      // move to Interested — behavior-identical for GTA, zero regression.
       try {
-        const is = await interestedStage(token, locationId, { clientId, sb });
-        if (is && oppRef) await moveStage({ clientId, ghl, token, oppRef, stage: is, role: "interested", contactId });
+        const routed = await routeTransition({ clientId, sb, ghl, token, locationId, fromRole: "responded", trigger: "went_quiet", contactId, oppRef, reason: "confirm-ghost: went quiet" });
+        if (!routed.matched) {
+          const is = await interestedStage(token, locationId, { clientId, sb });
+          if (is && oppRef) await moveStage({ clientId, ghl, token, oppRef, stage: is, role: "interested", contactId });
+        }
       } catch (_) {}
       try { if (oppId) await sb(`pipeline_outcomes`, { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify([{ client_id: clientId, opportunity_id: oppId, status: "ghosted", reason: "sent to ghosted automation" }]) }); } catch (_) {}
       // Clear ALL of this lead's queued cards (replies + follow-ups) — they've left Responded.

@@ -26,10 +26,27 @@ inline form. One-destination-per-trigger enforced in UI; DB unique/check constra
 Helpers/handlers: `_plRenderEntrySec`/`_plRenderExitSec`/`_plEdgeFormHtml`/`_plEdgeAdd`/
 `_plEdgeEdit`/`_plEdgeFormSave`/`_plEdgeToggle`/`_plEdgeDelete` + `_plFocusRerender`.
 
-**⏭ THE NEXT TASK:** backend **router** that reads the edges to actually move leads (today still
-hardcoded `api/agent/_stage.js` + per-agent logic); the unbuilt engines (Closing agent, Lead
-Nurture automation, Resend email — see doc redesign notes). Core parity BLOCKED (fc-core-srvc
-inaccessible to `zoran-star`).
+**🚧 ROUTER — IN PROGRESS (Phase 1+2 done 2026-07-06, PR #____):** goal = scale to more
+academies, so leads move by the academy's authored edges, not hardcoded per-agent logic.
+- **`api/agent/_router.js` built (Phase 1):** `resolveEdge(clientId, fromRole, trigger)` reads
+  the single enabled edge on the client-wide flow (`pipeline_id IS NULL`) via `sbRest` (now
+  exported from `_store.js`); `routeTransition({...})` resolves + moves using the existing
+  `_store` primitives (`resolveStage` + `moveStage`, so it inherits the ghl/portal provider
+  split + shadow mirror + KPI hooks). **Additive/safe:** no edge / paused / lookup blip →
+  `{matched:false}` → caller runs its hardcoded move. **Terminals (member/unqualified/human)
+  DEFER** to hardcoded close logic this phase — router only does stage→stage moves.
+- **First swap (Phase 2):** `agent-approvals.js` `confirm-ghost` action (responded --went_quiet-->
+  interested) now calls `routeTransition` with the old `interestedStage`+`moveStage` as the
+  matched:false fallback. GTA seed = went_quiet→interested, so behavior-IDENTICAL for GTA.
+  Verify on prod: confirm-ghost a Responded lead → card lands in Interested (unchanged).
+- **⏭ NEXT swaps (Phase 3), one per session w/ verify between:** book (responded→scheduled_trial,
+  agent-approvals ~995) · cant_make_it/no_show (confirm→responded) · ghosted_ran_out
+  (automations ~271) · then terminals (enrolls→member, marked_unqualified, complaint→human) —
+  each needs the router's terminal path built + verified against the caller's current close logic.
+- **Phase 4:** delete the hardcoded destination resolution once every site routes.
+
+**Other unbuilt engines:** Closing agent, Lead Nurture automation, Resend email (see doc redesign
+notes). Core parity BLOCKED (fc-core-srvc inaccessible to `zoran-star`).
 
 **Source-of-truth doc (Figma-style):** `bam-ghl-agent/docs/sales-crew-model.html`.
 **Deploy:** push to main → Vercel auto-builds (~3 min); client-portal HTML is public so poll
