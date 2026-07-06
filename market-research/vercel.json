@@ -1,3 +1,6 @@
 {
-  "alias": ["fullcontrol-survey.vercel.app"]
+  "alias": [
+    "fullcontrol-survey.vercel.app"
+  ],
+  "ignoreCommand": "git diff --quiet HEAD^ HEAD -- ."
 }

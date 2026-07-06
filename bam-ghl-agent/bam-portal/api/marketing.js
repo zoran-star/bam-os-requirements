@@ -1292,6 +1292,9 @@ async function handleContentTickets(req, res) {
     if (!isClient) return res.status(403).json({ error: "only clients can submit content tickets" });
     const body = (req.body && typeof req.body === "object") ? req.body : {};
     const { type, notes, raw_files, context } = body;
+    // Optional client-supplied creative name ("August camp promo"). Falls back
+    // to null - lists render the type/notes preview when untitled.
+    const title = typeof body.title === "string" ? body.title.trim().slice(0, 120) : "";
     if (!type) return res.status(400).json({ error: "type is required" });
     if (!["graphic", "video", "mixed"].includes(type)) {
       return res.status(400).json({ error: "type must be 'graphic', 'video', or 'mixed'" });
@@ -1356,6 +1359,7 @@ async function handleContentTickets(req, res) {
         client_id: ctx.client.id,
         type,
         channel,
+        title: title || null,
         status: "active",
         client_action_status: "none",
         notes: notes || "",
@@ -1515,9 +1519,33 @@ async function handleContentTickets(req, res) {
       if (body.assigned_to !== undefined) patch.assigned_to = body.assigned_to || null;
 
     } else if (action === "edit-context") {
+      // Staff correcting the client's brief in place (fix a typo, tighten notes,
+      // adjust format/offer) without bouncing the ticket back to the client.
+      const changed = [];
       if (body.context && typeof body.context === "object") {
         patch.context = { ...(ticket.context || {}), ...body.context };
+        changed.push("brief details");
       }
+      if (typeof body.notes === "string" && body.notes !== (ticket.notes || "")) {
+        patch.notes = body.notes;
+        changed.push("notes");
+      }
+      if (typeof body.title === "string") {
+        const newTitle = body.title.trim().slice(0, 120) || null;
+        if (newTitle !== (ticket.title || null)) {
+          patch.title = newTitle;
+          changed.push("title");
+        }
+      }
+      if (patch.context === undefined && patch.notes === undefined && patch.title === undefined) {
+        return res.status(400).json({ error: "nothing to update" });
+      }
+      patch.messages = appendMessage(ticket.messages, {
+        author_type: "staff", author_id: ctx.staff.id, author_name: authorName,
+        body: `Edited the client brief${changed.length ? ` (${changed.join(", ")})` : ""}.`,
+        is_action_request: false,
+        internal: true,
+      });
 
     } else if (action === "cancel") {
       if (!["active", "client-dependent"].includes(ticket.status)) {
