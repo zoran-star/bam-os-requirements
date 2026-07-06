@@ -67,7 +67,7 @@ The staff "V2 access" toggle (per client) is the only switch. Today V2 unlocks *
 | Pipelines | ❌ | ✅ |
 | Calendar | ❌ | ✅ |
 
-**Gating mechanism (client-portal.html):** Members, Pricing, Inbox, Pipelines all carry `data-feature="members"` and are toggled together by `applyMemberMgmtNavState()` (`MEMBER_MGMT_ENABLED && V2_ACCESS && !isNativeApp()`). Calendar carries `data-feature="calendar"` and is toggled by `applyCalendarNavState()` (`CALENDAR_ENABLED && V2_ACCESS && !isNativeApp()`). All 5 are **web-only** — hidden in the native iOS/Android wrapper. (Business Blueprint + Team are also web-only via `!isNativeApp()` but are NOT V2-gated — every web client sees them.)
+**Gating mechanism (client-portal.html):** Members, Pricing, Inbox, Pipelines all carry `data-feature="members"` and are toggled together by `applyMemberMgmtNavState()` (`MEMBER_MGMT_ENABLED && V2_ACCESS`). Calendar carries `data-feature="calendar"` and is toggled by `applyCalendarNavState()` (`CALENDAR_ENABLED && (V2_ACCESS || V4_ACCESS)`). **Native gate LIFTED 2026-07-06** (Cole: testing BAM GTA in the iOS app, mobile is a first-class V2 target) — the 5 V2 items now show in the native wrapper too. Business Blueprint + Team remain **web-only** via `!isNativeApp()` (NOT V2-gated — every web client sees them).
 
 ## The staff toggle
 

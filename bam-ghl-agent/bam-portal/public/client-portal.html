@@ -18429,9 +18429,9 @@ function isNativeApp() {
 
 function applyMemberMgmtNavState() {
   // Members is a V2 feature - show only when the client has V2_ACCESS
-  // (per-client staff toggle) AND the global gate is on AND not in
-  // the native iOS/Android wrapper.
-  const showMembers = MEMBER_MGMT_ENABLED && V2_ACCESS && !isNativeApp();
+  // (per-client staff toggle) AND the global gate is on. Native gate
+  // lifted 2026-07-06: mobile is a first-class V2 target now.
+  const showMembers = MEMBER_MGMT_ENABLED && V2_ACCESS;
   document.querySelectorAll('[data-feature="members"]').forEach(el => {
     el.style.display = showMembers ? '' : 'none';
   });
@@ -18453,7 +18453,7 @@ function applyMemberMgmtNavState() {
 // V4 clients also get the V2 calendar (in place of the v15 Calendars view).
 const CALENDAR_ENABLED = true;
 function applyCalendarNavState() {
-  const showCalendar = CALENDAR_ENABLED && (V2_ACCESS || V4_ACCESS) && !isNativeApp();
+  const showCalendar = CALENDAR_ENABLED && (V2_ACCESS || V4_ACCESS);
   document.querySelectorAll('[data-feature="calendar"]').forEach(el => {
     el.style.display = showCalendar ? '' : 'none';
   });
