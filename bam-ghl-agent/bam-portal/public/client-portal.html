@@ -17862,6 +17862,43 @@ function applyMarketingNavState() {
     const lbl = mNav.querySelector('.mobile-nav-label');
     if (lbl) lbl.textContent = label;
   }
+
+  applyContentOnlyNav(contentOnly);
+}
+
+// ── Content-only nav trim ──────────────────────────────────────────────
+// Content-accelerator clients (organic on, ads off - e.g. Schmidt
+// Performance) have no BAM-run systems, campaigns, or onboarding checklist,
+// so Home / Systems / Action Items are noise for them. Sidebar becomes:
+// Content · Resources · Assets · Messages · Team (+ Business Blueprint,
+// kept on purpose - its Brand section feeds their creatives).
+// Reversible on purpose: multi-academy users can switch between a full
+// client and a content-only one in the same session.
+function applyContentOnlyNav(contentOnly) {
+  const hideSelectors = [
+    '#nav-home',
+    '#nav-systems-flat',
+    '#nav-support-toggle',
+    `.nav-item[onclick*="switchView('action-items'"]`,
+  ];
+  hideSelectors.forEach(sel => {
+    document.querySelectorAll(sel).forEach(el => { el.style.display = contentOnly ? 'none' : ''; });
+  });
+  ['home', 'systems', 'action-items'].forEach(v => {
+    document.querySelectorAll(`.mobile-nav-item[data-view="${v}"]`).forEach(el => {
+      if (contentOnly) el.style.setProperty('display', 'none', 'important');
+      else el.style.removeProperty('display');
+    });
+  });
+  // If they're sitting on a now-hidden view (Systems is the boot default),
+  // land them on their Content tab instead.
+  if (contentOnly) {
+    const cur = (document.querySelector('.view.active') || {}).id || '';
+    if (['view-home', 'view-systems', 'view-action-items'].includes(cur)) {
+      const mk = document.querySelector(`.nav-item[onclick*="switchView('marketing'"]`);
+      try { switchView('marketing', mk || undefined); } catch (_) { /* boot order - marketing enter will re-run */ }
+    }
+  }
 }
 
 // ── Presence heartbeat ─────────────────────────────────────────────────
