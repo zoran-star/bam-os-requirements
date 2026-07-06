@@ -145,6 +145,25 @@ function groupPrefixOf(label) {
 const slotMatchesGroup = (slotName, prefix) =>
   !prefix || String(slotName || "").toLowerCase().replace(/\s+/g, " ").includes(prefix);
 
+// Whole-years age from a DOB (null if missing / unparseable). Athlete DOB is only
+// present once the booking form captures it - falls back to the group band below.
+function ageFromDob(dob) {
+  if (!dob) return null;
+  const d = new Date(dob);
+  if (isNaN(d.getTime())) return null;
+  const now = new Date();
+  let a = now.getFullYear() - d.getFullYear();
+  const m = now.getMonth() - d.getMonth();
+  if (m < 0 || (m === 0 && now.getDate() < d.getDate())) a--;
+  return (a >= 0 && a < 120) ? a : null;
+}
+// The age band from a group slot name, e.g. "Group 1 (Elementary) - Weeknights"
+// -> "Elementary". The parenthetical is the academy's own age-group label.
+function groupFromSlot(name) {
+  const m = String(name || "").match(/\(([^)]+)\)/);
+  return m ? m[1].trim() : null;
+}
+
 async function portalCalendarEntries(clientId) {
   const rows = await sb(`entry_points?client_id=eq.${clientId}&type=eq.calendar&enabled=eq.true&select=key,label`);
   return (Array.isArray(rows) ? rows : []).map(r => ({ key: r.key, label: r.label || r.key, prefix: groupPrefixOf(r.label) }));
@@ -187,7 +206,7 @@ async function portalBookingsInRange(clientId, entries, startMs, endMs, { includ
   const slotById = new Map(slots.map(s => [s.id, s]));
   const inList = slots.map(s => encodeURIComponent(s.id)).join(",");
   const tbs = (await sb(
-    `trial_bookings?tenant_id=eq.${clientId}&slot_id=in.(${inList})&select=id,slot_id,status,ghl_contact_id,parent_name,athlete_name&limit=2000`
+    `trial_bookings?tenant_id=eq.${clientId}&slot_id=in.(${inList})&select=id,slot_id,status,ghl_contact_id,parent_name,athlete_name,athlete_dob&limit=2000`
   )) || [];
   const events = [];
   for (const tb of tbs) {
@@ -204,6 +223,10 @@ async function portalBookingsInRange(clientId, entries, startMs, endMs, { includ
       status: TB_TO_GHL_STATUS[tb.status] || null,
       contactId: tb.ghl_contact_id || null,
       contactName: tb.parent_name || tb.athlete_name || null,
+      athlete: tb.athlete_name || null,
+      parent: tb.parent_name || null,
+      dob: tb.athlete_dob || null,
+      slotName: s.name || null,
     });
   }
   return events;
@@ -241,7 +264,14 @@ async function portalHandler(req, res, { client, clientId, action }) {
       const { start, end } = todayBoundsMs(timezone);
       const evs = await portalBookingsInRange(clientId, entries, start, end, { includeCancelled: false });
       const trials = evs
-        .map(ev => ({ id: ev.id, start: ev.start, status: ev.status, contactId: ev.contactId, contactName: ev.contactName || "Trial booking" }))
+        .map(ev => ({
+          id: ev.id, start: ev.start, status: ev.status, contactId: ev.contactId,
+          contactName: ev.contactName || "Trial booking",
+          athlete: ev.athlete || null,
+          parent: ev.parent || null,
+          age: ageFromDob(ev.dob),          // exact age once DOB is captured, else null
+          group: groupFromSlot(ev.slotName), // age-band fallback, e.g. "Elementary"
+        }))
         .sort((a, b) => new Date(a.start || 0) - new Date(b.start || 0));
       return res.status(200).json({ trials, timezone });
     }
