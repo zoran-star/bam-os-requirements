@@ -16547,6 +16547,23 @@ async function _hmSaveMilestone(key, value) {
 async function _hmCheckMilestones(stats) {
   const achieved = await _hmFetchAchieved();
 
+  // First run for this client: everything already true gets recorded
+  // SILENTLY. Celebrations are only for crossings that happen after we
+  // start watching, never a backlog dump of historic progress.
+  if (!achieved.has('baseline_v1')) {
+    for (const m of _HM_MILESTONES) {
+      if (!achieved.has(m.key) && m.check(stats)) { _hmSaveMilestone(m.key, 0); achieved.set(m.key, { value: 0 }); }
+    }
+    for (const rec of _HM_RECORDS) {
+      const v = stats[rec.stat];
+      const existing = achieved.get(rec.key);
+      if (v > 0 && (!existing || v > Number(existing.value || 0))) { _hmSaveMilestone(rec.key, v); achieved.set(rec.key, { value: v }); }
+    }
+    _hmSaveMilestone('baseline_v1', 1);
+    achieved.set('baseline_v1', { value: 1 });
+    return;
+  }
+
   // Check tier milestones (highest unachieved tier that's been hit)
   let newMilestone = null;
   for (let i = _HM_MILESTONES.length - 1; i >= 0; i--) {
