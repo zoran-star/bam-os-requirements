@@ -3686,13 +3686,20 @@
   .mm-modal-card { max-width: 760px; width: calc(100% - 32px); max-height: 88vh; overflow-y: auto; }
   .mm-focus-page {
     position: fixed; inset: 0; z-index: 1000; overflow-y: auto;
-    /* a real room: solid floor, soft ambient light falling from above */
+    /* zoom-through idiom (marketing/landing): the old page flies past the
+       camera and this solid lit room settles in beneath you */
     background:
       radial-gradient(120% 60% at 50% -10%, color-mix(in srgb, var(--gold) 5%, transparent), transparent 60%),
       var(--bg);
     justify-content: center; align-items: flex-start;
     opacity: 0; transform: scale(.965);
     transition: transform .55s cubic-bezier(0.16, 1, 0.3, 1), opacity .55s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  /* depth idiom (members only): translucent room fades in over the page,
+     which stays visible behind, blurred and tilted back */
+  #membersMachineModal.mm-focus-page {
+    background: color-mix(in srgb, var(--bg) 60%, transparent);
+    opacity: 0; transform: scale(1.05);
   }
   /* the seam between the two pages: a thin rounded gold bar with a sheen,
      riding the focus page's left edge as it glides */
@@ -3716,7 +3723,9 @@
   }
   html.mm-prewarm .mm-focus-page { will-change: transform, opacity; }
   html.mm-focus-open .main, html.mm-focus-open .sidebar { transform: scale(1.18); filter: blur(14px); opacity: 0; }
+  html.mm-focus-open.mm-depth .main, html.mm-focus-open.mm-depth .sidebar { transform: perspective(1400px) translateY(-1.5vh) scale(.86) rotateX(7deg); transform-origin: 50% 10%; filter: blur(10px) brightness(.8); opacity: 1; }
   .mm-focus-page.mm-open { transform: scale(1); opacity: 1; }
+  #membersMachineModal.mm-focus-page.mm-open { transform: scale(1); opacity: 1; }
   /* landing: the seam draws itself upward like a rising chart, then glints */
   .mm-focus-page::before { transform-origin: bottom; }
   .mm-focus-page.mm-open::before { animation: mmSeamGrow .5s cubic-bezier(0.16, 1, 0.3, 1) .12s both, mmSeamGlint .7s ease .5s both; }
@@ -44777,6 +44786,7 @@ function _mmaPin(html, onclick) {
 function _ccOpenFocusPage(modalId, panelSel) {
   const modal = document.getElementById(modalId);
   if (!modal) return;
+  document.documentElement.classList.toggle('mm-depth', modalId === 'membersMachineModal');
   const panelEl = document.querySelector(panelSel);
   if (panelEl) { panelEl.classList.add('mm-launching'); setTimeout(() => panelEl.classList.remove('mm-launching'), 200); }
   document.documentElement.classList.add('mm-prewarm');
@@ -45999,6 +46009,7 @@ function _mmCollapsePageRest(card) {
 function _mmOpenFocus(modalId, panelSel) {
   const modal = document.getElementById(modalId);
   if (!modal || !_MM) return;
+  document.documentElement.classList.remove('mm-depth');
   // wind-up: the panel compresses for a beat, then the whole surface pans left
   const panelEl = document.querySelector(panelSel);
   if (panelEl) { panelEl.classList.add('mm-launching'); setTimeout(() => panelEl.classList.remove('mm-launching'), 200); }
