@@ -4022,16 +4022,23 @@
   .mm-ap-btn.urgent::before { content: ''; position: absolute; inset: -1px; border-radius: 10px; pointer-events: none; animation: mmBtnPing 5s ease-out infinite; }
   @keyframes mmBtnPing { 0%, 74% { box-shadow: 0 0 0 0 rgba(200,168,78,0.45); } 88% { box-shadow: 0 0 0 9px rgba(200,168,78,0); } 100% { box-shadow: 0 0 0 0 rgba(200,168,78,0); } }
   .mm-ap-btn.urgent::after { content: ''; position: absolute; top: 0; bottom: 0; width: 45%; left: -60%; background: rgba(255,255,255,0.28); transform: skewX(-20deg); animation: mmSheenLoop 8s ease-in-out infinite; pointer-events: none; }
-  @media (prefers-reduced-motion: reduce) { .mm-ap-btn.urgent::before, .mm-ap-btn.urgent::after, .mm-ap-chevs2 span { animation: none; } }
-  .mm-ap-chevs2 { display: inline-flex; }
-  .mm-ap-chevs2 span { animation: mmChevDrift 1.9s ease-in-out infinite; }
-  .mm-ap-chevs2 span:nth-child(2) { animation-delay: 0.25s; margin-left: -4px; }
+  @media (prefers-reduced-motion: reduce) { .mm-ap-btn.urgent::before, .mm-ap-btn.urgent::after { animation: none; } .mm-ap-x path { transition: none; } }
+  .mm-ap-x { flex: none; }
+  .mm-ap-x path { transition: transform 0.22s ease; }
+  .mm-ap-btn:hover .x1 { transform: translate(-1.6px, -1.6px); }
+  .mm-ap-btn:hover .x2 { transform: translate(1.6px, -1.6px); }
+  .mm-ap-btn:hover .x3 { transform: translate(1.6px, 1.6px); }
+  .mm-ap-btn:hover .x4 { transform: translate(-1.6px, 1.6px); }
   /* funnel v2 */
   .mm-fz-band { transform-origin: 46px 50%; animation: mmBandIn 0.9s cubic-bezier(0.16,1,0.3,1) both; }
   @keyframes mmBandIn { from { transform: scaleX(0); opacity: 0; } to { transform: scaleX(1); opacity: 1; } }
   .mm-fz-pts { animation: mmPtsIn 0.6s ease 0.75s both; }
   @keyframes mmPtsIn { from { opacity: 0; } to { opacity: 1; } }
   .mm-fz-arrow { animation: mmArrowPulse 1.1s ease 0.95s 1; transform-origin: center; transform-box: fill-box; }
+  .mm-fz-node { transition: r 0.2s ease; }
+  .mm-fz-chip { transition: fill 0.2s ease; }
+  .mm-fz-fix circle { transition: transform 0.2s ease; transform-origin: center; transform-box: fill-box; }
+  .mm-fz-fix:hover circle { transform: scale(1.18); }
   @keyframes mmArrowPulse { 0%, 100% { transform: scale(1); } 40% { transform: scale(1.4); } }
   @media (prefers-reduced-motion: reduce) { .mm-fz-band, .mm-fz-arrow { animation: none; } .mm-fz-pts { display: none; } }
   .mm-ap-checks span { font-family: var(--mm-ff); font-size: 10.5px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; }
@@ -7365,16 +7372,23 @@
             <div class="card" style="margin-bottom:28px">
               <div class="card-title" style="margin-bottom:12px">Quick guide</div>
               <p style="color:var(--text-sub);font-size:14px;line-height:1.6;margin-bottom:10px">
-                Picking the right offer below will pull up a guide card with the exact info we need from you.
-                That guide will walk you through what kind of photos, video, and copy makes a great ad for that offer.
+                <b style="color:var(--text)">1. Pick the offer you're promoting.</b> Every campaign sells one offer.
+                Picking it pulls up a short guide with exactly what to send - the photos, video, and copy that work for that offer.
+                The guide is a starting point: your own creative concepts are always welcome, just describe them in the notes.
+              </p>
+              <p style="color:var(--text-sub);font-size:14px;line-height:1.6;margin-bottom:10px">
+                <b style="color:var(--text)">2. Send raw, not edited.</b> Phone footage and photos are perfect.
+                Cutting, designing, and writing are on us.
               </p>
               <p style="color:var(--text-sub);font-size:14px;line-height:1.6">
-                After you upload your assets, set a monthly spend and (optionally) link a landing page. Your account
-                manager will review, build the campaign in Meta, and launch it within 1-2 business days.
+                <b style="color:var(--text)">3. Set spend and submit.</b> Add a monthly budget and, if you have one,
+                a landing page. Your account manager builds the campaign in Meta and launches it within 1-2 business days.
               </p>
-              <p style="color:var(--text-mute);font-size:12px;font-style:italic;margin-top:14px">
-                Placeholder content. Cam will replace this with the final guide.
-              </p>
+              <div style="border-top:1px solid var(--line);margin-top:14px;padding-top:12px;color:var(--text-sub);font-size:14px;line-height:1.6">
+                <b style="color:var(--text)">Promoting something that isn't listed?</b> A new camp, clinic, tryout, or membership
+                needs its own offer - hit <b style="color:var(--text)">Create a new offer</b> below first. Campaigns attach to an offer,
+                so this keeps your leads and results tracked to the right thing. If it's already in the list, pick it - don't create a duplicate.
+              </div>
             </div>
 
             <div class="section-label">Pick an offer</div>
@@ -7459,6 +7473,14 @@ Then the call to action."]</div>
                 </div>
               </div>
             </div>
+            <div class="card" style="margin-bottom:18px;border-style:dashed">
+              <div style="color:var(--text-sub);font-size:14px;line-height:1.6">
+                <b style="color:var(--text)">Got your own concept?</b> This guide is our proven starting point, not a rulebook.
+                If you have a different idea for this offer - a trend, a skit, a series, anything - run with it:
+                describe the concept in the <b style="color:var(--text)">notes</b> on the next step and send whatever raw
+                footage or photos it needs. We'll build it your way and flag anything we'd tweak before launch.
+              </div>
+            </div>
             <div style="display:flex;gap:10px;justify-content:flex-end">
               <button class="btn-modal-secondary" onclick="wizardGoBack()">Back</button>
               <button class="btn-modal-primary" onclick="wizardGoToStep('asset-upload')">Ready to input assets? →</button>
@@ -7541,18 +7563,25 @@ Then the call to action."]</div>
         </div>
       </div><!-- /#marketing-new-campaign -->
 
-      <!-- ── Channel split (Ads | Organic) - shown when ORGANIC_CONTENT is on ── -->
+      <!-- ── Channel split (Ads | Funnel | Organic) - shown when the client has
+           more than one content surface. Order is deliberate: every scaling
+           client has Ads + Funnel; Organic is per-client so it sits last. ── -->
       <div id="marketing-channel-split" style="display:none">
         <div class="channel-choose">
           <div class="section-label">Marketing</div>
           <div style="color:var(--text-sub);font-size:13px;margin:4px 0 18px">What do you want to work on?</div>
           <div class="channel-grid">
-            <button class="channel-card" onclick="_chooseChannel('ads')">
+            <button class="channel-card" id="channel-card-ads" onclick="_chooseChannel('ads')">
               <span class="channel-card-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 11 18-5v12L3 14v-3z"/><path d="M11.6 16.8a3 3 0 1 1-5.8-1.6"/></svg></span>
               <span class="channel-card-name">Ads</span>
               <span class="channel-card-desc">Paid campaigns on Meta</span>
             </button>
-            <button class="channel-card" onclick="_chooseChannel('organic')">
+            <button class="channel-card" id="channel-card-funnel" onclick="_chooseChannel('funnel')">
+              <span class="channel-card-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 4h18l-7 8v6l-4 2v-8L3 4z"/></svg></span>
+              <span class="channel-card-name">Funnel</span>
+              <span class="channel-card-desc">Videos and graphics for your website</span>
+            </button>
+            <button class="channel-card" id="channel-card-organic" onclick="_chooseChannel('organic')">
               <span class="channel-card-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 20h10"/><path d="M10 20c5.5-2.5.8-6.4 3-10"/><path d="M9.5 9.4c1.1.8 1.8 2.2 2.3 3.7-2 .4-3.5.4-4.8-.3-1.2-.6-2.3-1.9-3-4.2 2.8-.5 4.4 0 5.5.8z"/><path d="M14.1 6a7 7 0 0 0-1.1 4c1.9-.1 3.3-.6 4.3-1.4 1-1 1.6-2.3 1.7-4.6-2.7.1-4 1-4.9 2z"/></svg></span>
               <span class="channel-card-name">Organic</span>
               <span class="channel-card-desc">Content for your socials</span>
@@ -7561,9 +7590,21 @@ Then the call to action."]</div>
         </div>
       </div>
 
+      <!-- ── Funnel content view (website content -> systems team) ── -->
+      <div id="marketing-funnel" style="display:none">
+        <button onclick="_backToChannelSplit()" style="background:none;border:none;color:var(--text-mute);font-size:13px;cursor:pointer;padding:0;margin-bottom:14px">← Back</button>
+
+        <div class="section-label">Funnel content</div>
+        <div style="color:var(--text-sub);font-size:13px;margin:6px 0 14px;line-height:1.5">Videos and graphics for your website and funnels. Our content team produces the finals, then our systems team adds them to your site - you can track that step under <b>Systems</b>.</div>
+        <button class="btn-add-campaign" style="margin-bottom:22px" onclick="openAddCreativeModal('funnel')">+ Request funnel content</button>
+
+        <div class="section-label">Status</div>
+        <div id="funnel-status-list" style="margin-top:8px"></div>
+      </div>
+
       <!-- ── Organic content view ── -->
       <div id="marketing-organic" style="display:none">
-        <button id="organic-back-btn" onclick="_backToChannelSplit()" style="background:none;border:none;color:var(--text-mute);font-size:13px;cursor:pointer;padding:0;margin-bottom:14px">← Back to Ads / Organic</button>
+        <button id="organic-back-btn" onclick="_backToChannelSplit()" style="background:none;border:none;color:var(--text-mute);font-size:13px;cursor:pointer;padding:0;margin-bottom:14px">← Back</button>
 
         <!-- ── Resource guide (collapsed PDF - placeholder until walkthrough video) ── -->
         <details class="guide-card">
@@ -25886,12 +25927,15 @@ function closeCampaignDetail() {
 
 // ─────────── Ads | Organic channel split ───────────
 function _hideAllMarketingSub() {
-  ['marketing-list','marketing-detail','marketing-request-detail','marketing-new-campaign','marketing-channel-split','marketing-organic']
+  ['marketing-list','marketing-detail','marketing-request-detail','marketing-new-campaign','marketing-channel-split','marketing-organic','marketing-funnel']
     .forEach(id => { const e = document.getElementById(id); if (e) e.style.display = 'none'; });
   const back = document.getElementById('marketing-ads-back'); if (back) back.style.display = 'none';
 }
 function _hasOrganic() { return typeof ORGANIC_CONTENT !== 'undefined' && ORGANIC_CONTENT; }
 function _hasAds() { return typeof MARKETING_INCLUDED === 'undefined' || MARKETING_INCLUDED; }
+// Funnel content rides the scaling service: every client with a BAM-run
+// website (marketing_included) has it. Content-only clients don't.
+function _hasFunnel() { return _hasAds(); }
 function _showOrganicOnly() {
   _hideAllMarketingSub();
   const back = document.getElementById('organic-back-btn'); if (back) back.style.display = 'none';
@@ -25902,9 +25946,10 @@ function _marketingEnter() {
   _renderFirstCampaignGuide();   // data-drive the "Your First Campaign" card from the default guide card
   if (typeof _mmLoad === 'function') _mmLoad();   // Marketing Machine card (V2 only; quiet no-op otherwise)
   if (_hasOrganic() && !_hasAds()) {
-    // Content-only client: straight to organic, no Ads | Organic split.
+    // Content-only client: straight to organic, no channel split.
     _showOrganicOnly();
-  } else if (_hasOrganic()) {
+  } else if (_hasAds()) {
+    // Scaling client: Ads + Funnel always, Organic when enabled.
     _showChannelSplit();
   } else {
     _hideAllMarketingSub();
@@ -25913,6 +25958,9 @@ function _marketingEnter() {
 }
 function _showChannelSplit() {
   _hideAllMarketingSub();
+  // Organic card only when the client's organic pipeline is on.
+  const org = document.getElementById('channel-card-organic');
+  if (org) org.style.display = _hasOrganic() ? '' : 'none';
   const e = document.getElementById('marketing-channel-split'); if (e) e.style.display = 'block';
 }
 function _chooseChannel(ch) {
@@ -25920,20 +25968,74 @@ function _chooseChannel(ch) {
   if (ch === 'organic') {
     const e = document.getElementById('marketing-organic'); if (e) e.style.display = 'block';
     _fetchAndRenderOrganic();
+  } else if (ch === 'funnel') {
+    const e = document.getElementById('marketing-funnel'); if (e) e.style.display = 'block';
+    _fetchAndRenderFunnel();
   } else {
     const l = document.getElementById('marketing-list'); if (l) l.style.display = 'block';
-    const b = document.getElementById('marketing-ads-back'); if (b) b.style.display = (ORGANIC_CONTENT ? 'block' : 'none');
+    // The split now exists for every ads client (Ads | Funnel), so the back
+    // button always shows on the ads view.
+    const b = document.getElementById('marketing-ads-back'); if (b) b.style.display = 'block';
   }
 }
 function _backToChannelSplit() {
   if (_hasOrganic() && !_hasAds()) {
-    _showOrganicOnly();           // content-only: no Ads | Organic split to return to
-  } else if (_hasOrganic()) {
+    _showOrganicOnly();           // content-only: no channel split to return to
+  } else if (_hasAds()) {
     _showChannelSplit();
   } else {
     _hideAllMarketingSub();
     const l = document.getElementById('marketing-list'); if (l) l.style.display = 'block';
   }
+}
+
+// ─────────── Funnel content (request → production → systems team) ───────────
+let _FUNNEL_TICKETS = [];
+async function _fetchAndRenderFunnel() {
+  const el = document.getElementById('funnel-status-list');
+  if (el) el.innerHTML = '<div style="color:var(--text-mute);font-size:13px;padding:8px 0">Loading…</div>';
+  try {
+    const token = await _mreqAuthToken();
+    const res = await fetch('/api/marketing?resource=content-tickets&scope=client&channel=funnel&all=1&client_id=' + encodeURIComponent(CLIENT_ID), {
+      headers: { 'Authorization': 'Bearer ' + token },
+    });
+    const json = await _safeJson(res);
+    if (!res.ok) throw new Error(json.error || ('HTTP ' + res.status));
+    _FUNNEL_TICKETS = Array.isArray(json.tickets) ? json.tickets : [];
+    _renderFunnel();
+  } catch (e) {
+    if (el) el.innerHTML = `<div style="color:var(--text-mute);font-size:13px;padding:8px 0">Couldn't load right now - please refresh and try again.</div>`;
+  }
+}
+function _renderFunnel() {
+  const el = document.getElementById('funnel-status-list');
+  if (!el) return;
+  const live = _FUNNEL_TICKETS.filter(t => t.status !== 'cancelled');
+  if (!live.length) {
+    el.innerHTML = `<div style="color:var(--text-mute);font-size:13px;padding:8px 0">Nothing yet - request your first funnel content above.</div>`;
+    return;
+  }
+  el.innerHTML = live.map(t => {
+    const name = escapeHTML((t.title || '').trim() || ((t.type === 'video' ? 'Video' : t.type === 'mixed' ? 'Video + graphic' : 'Graphic') + ' content'));
+    const date = t.submitted_at ? new Date(t.submitted_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '';
+    let pill;
+    if (t.status === 'completed') {
+      pill = `<span style="font-size:11px;font-weight:700;color:var(--green);border:1px solid var(--green);padding:3px 10px;border-radius:999px;white-space:nowrap">With systems team</span>`;
+    } else if (t.client_action_status === 'requested') {
+      pill = `<span style="font-size:11px;font-weight:700;color:var(--gold);border:1px solid var(--gold);padding:3px 10px;border-radius:999px;white-space:nowrap">Action needed</span>`;
+    } else {
+      pill = `<span style="font-size:11px;font-weight:700;color:var(--text-sub);border:1px solid var(--line);padding:3px 10px;border-radius:999px;white-space:nowrap">In production</span>`;
+    }
+    const sysNote = t.status === 'completed'
+      ? `<div style="font-size:12px;color:var(--text-mute);margin-top:4px">Being added to your website - track it under Systems.</div>` : '';
+    return `<div style="background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px 16px;margin-bottom:10px;display:flex;align-items:center;gap:12px">
+      <div style="flex:1;min-width:0">
+        <div style="font-size:14px;font-weight:600;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${name}</div>
+        <div style="font-size:12px;color:var(--text-mute);margin-top:2px">Requested ${date}</div>${sysNote}
+      </div>
+      ${pill}
+    </div>`;
+  }).join('');
 }
 
 // ─────────── Organic content (request → status → bank) ───────────
@@ -26278,7 +26380,7 @@ async function confirmRemove() {
 // ── Input assets modal (raw assets → goes to content team) ──
 function openAddCreativeModal(channel) {
   // Kept name for backward compat with the existing button onclick (ads path).
-  _inputAssetsChannel = (channel === 'organic') ? 'organic' : 'ads';
+  _inputAssetsChannel = (channel === 'organic' || channel === 'funnel') ? channel : 'ads';
   _inputAssetsState = { type: 'graphic', files: [] };
   _selectInputAssetsType('graphic');
   _renderInputAssetsFilesList();
@@ -26299,6 +26401,8 @@ function openAddCreativeModal(channel) {
   const sub = document.getElementById('inputAssetsSub');
   if (sub) sub.textContent = _inputAssetsChannel === 'organic'
     ? 'Submit raw assets here. Our content team will create your post, then send it back to you to review and approve.'
+    : _inputAssetsChannel === 'funnel'
+    ? 'Submit raw assets here. Our content team will produce the finals, then our systems team will add them to your website.'
     : 'Submit raw assets here. Our content team will turn them into a finished creative and add it to your campaign.';
   _refreshInputAssetsFolderList();
   document.getElementById('inputAssetsModal').style.display = 'flex';
@@ -26318,6 +26422,18 @@ function _selectInputAssetsType(t) {
   document.querySelectorAll('#inputAssetsTypeToggle .binary-toggle-opt').forEach(el => {
     el.classList.toggle('active', el.dataset.value === t);
   });
+}
+// User explicitly picked a type - stop auto-suggesting from file uploads.
+function _pickInputAssetsType(t) {
+  _inputAssetsState.typeTouched = true;
+  _selectInputAssetsType(t);
+}
+// Auto-suggest the output type from what's been uploaded, but never override
+// an explicit choice. Any video file suggests a video creative.
+function _suggestInputAssetsType() {
+  if (_inputAssetsState.typeTouched) return;
+  const hasVideo = (_inputAssetsState.files || []).some(f => ((f.file && f.file.type) || f.type || '').startsWith('video/'));
+  _selectInputAssetsType(hasVideo ? 'video' : 'graphic');
 }
 
 // Files larger than this can't reliably upload directly to Supabase storage
@@ -26412,6 +26528,7 @@ function _inputAssetsAddFiles(filesList, fromFolderUpload) {
     _inputAssetsState.files = _inputAssetsState.files.concat(incoming);
     _renderInputAssetsFilesList();
     _refreshInputAssetsFolderList();
+    _suggestInputAssetsType();
   }
   const input = document.getElementById('inputAssetsFileInput');   if (input) input.value = '';
   const finput = document.getElementById('inputAssetsFolderInput'); if (finput) finput.value = '';
@@ -26421,6 +26538,7 @@ function _inputAssetsRemoveFile(idx) {
   _inputAssetsState.files.splice(idx, 1);
   _renderInputAssetsFilesList();
   _refreshInputAssetsFolderList();
+  _suggestInputAssetsType();
 }
 
 // Populate the folder autocomplete with folders already in use this submission.
@@ -26491,7 +26609,11 @@ async function submitInputAssets() {
   // resets _inputAssetsState to { files: [] } which would otherwise wipe the
   // upload list and silently submit a ticket with no files attached.
   const filesToUpload = _inputAssetsState.files.slice();
-  const assetType = _deriveAssetType(filesToUpload);
+  // The toggle is the source of truth for the OUTPUT type - raw inputs don't
+  // determine it (photos in, video out is normal), and link-only submissions
+  // have no files to derive from at all (the old way silently made every
+  // Drive/Dropbox submission a 'graphic').
+  const assetType = _inputAssetsState.type || _deriveAssetType(filesToUpload);
   const fileCount = filesToUpload.length;
   closeInputAssetsModal();
   showLoading(
@@ -26509,7 +26631,7 @@ async function submitInputAssets() {
       notes,
       raw_files: uploaded,
       context: {
-        source: channel === 'organic' ? 'organic-request' : 'add-creative',
+        source: channel === 'organic' ? 'organic-request' : channel === 'funnel' ? 'funnel-request' : 'add-creative',
         campaign_title: _detailCampaignTitle(),
         format,
         captions,
@@ -26520,6 +26642,10 @@ async function submitInputAssets() {
       _fetchAndRenderOrganic();
       showConfirmation('Request received',
         'We got your organic content request. Our content team will create it and send it back to you for review.');
+    } else if (channel === 'funnel') {
+      _fetchAndRenderFunnel();
+      showConfirmation('Request received',
+        'We got your funnel content request. Our content team will produce it, then our systems team will add it to your website.');
     } else {
       await fetchAndRenderMarketingRequests();
       showConfirmation('Assets received',
@@ -38984,7 +39110,11 @@ async function _renderMarketingCampaigns() {
     const res = await fetch('/api/meta/campaigns?client_id=' + encodeURIComponent(CLIENT_ID), { headers: { Authorization: 'Bearer ' + token } });
     const json = await _safeJson(res);
     if (!res.ok) {
-      containerEl.innerHTML = `<div class="req-empty" style="padding:18px 0">Couldn't load campaigns: ${escapeHTML(json.error || ('HTTP ' + res.status))}</div>`;
+      // Raw provider errors (Meta #200 permission strings etc) are for us,
+      // not clients - log them, show calm copy. The campaigns themselves
+      // keep running regardless of whether the portal can read them.
+      console.error('campaigns load failed:', json.error || res.status);
+      containerEl.innerHTML = `<div class="req-empty" style="padding:18px 0">We're having trouble reaching your ad account right now. Your campaigns are unaffected and still running - the BAM team can see the details and will get the connection back.</div>`;
       return;
     }
 
@@ -39033,7 +39163,8 @@ async function _renderMarketingCampaigns() {
         </div>`;
     }).join('');
   } catch (e) {
-    containerEl.innerHTML = `<div class="req-empty" style="padding:18px 0">Couldn't load campaigns: ${escapeHTML(e.message)}</div>`;
+    console.error('campaigns load failed:', e);
+    containerEl.innerHTML = `<div class="req-empty" style="padding:18px 0">We're having trouble reaching your ad account right now. Your campaigns are unaffected and still running - refresh in a minute or check back soon.</div>`;
   }
 }
 
@@ -39943,8 +40074,9 @@ function _wizardInitState() {
 
 function openNewCampaignWizard() {
   _wizardInitState();
-  // Seed with one initial creative block so the user has somewhere to drop files
-  wizardAddCreativeBlock();
+  // No starter block here: if the client adds suggested angles from the guide
+  // step, those become the blocks. A blank one is seeded only if they reach
+  // the upload step with nothing picked (see wizardGoToStep).
   document.getElementById('marketing-list').style.display = 'none';
   document.getElementById('marketing-detail').style.display = 'none';
   document.getElementById('marketing-request-detail').style.display = 'none';
@@ -40012,6 +40144,9 @@ function wizardGoToStep(stepName) {
   if (!_wizard) return;
   const idx = _wizard.path.indexOf(stepName);
   if (idx === -1) return;
+  // Arriving at upload with nothing picked from the guide -> seed one blank
+  // folder so there's somewhere to drop files. Angle picks mean no blank.
+  if (stepName === 'asset-upload' && !_wizard.creatives.length) wizardAddCreativeBlock();
   _wizard.stepIdx = idx;
   _renderWizardStep();
 }
@@ -40237,6 +40372,8 @@ function _wizardSeedCreativeFromAngle(angleName, medium, btn) {
       angle: name,
       guide_card_id: (_wizard && _wizard.guideCardId) || null,
     });
+    // The most recently picked angle is the one open when they reach upload.
+    _wizard.openCreativeId = 'c' + _wizardCreativeSeq;
     _renderWizardCreatives();
   }
   // Lightweight feedback on the button.
@@ -40542,6 +40679,15 @@ function wizardAddCreativeBlock() {
   _wizardCreativeSeq += 1;
   // Each block is now a named FOLDER (the content drop is folder-first).
   _wizard.creatives.push({ id: 'c' + _wizardCreativeSeq, name: '', type: 'graphic', files: [], notes: '', driveLink: '', angle: '', guide_card_id: null });
+  _wizard.openCreativeId = 'c' + _wizardCreativeSeq;   // new block opens expanded
+  _renderWizardCreatives();
+}
+
+// Accordion: exactly one block expanded at a time (clicking the open one's
+// header collapses it). Values live in _wizard.creatives, so re-render is safe.
+function _wizardToggleCreative(id) {
+  if (!_wizard) return;
+  _wizard.openCreativeId = (_wizard.openCreativeId === id) ? null : id;
   _renderWizardCreatives();
 }
 
@@ -40605,9 +40751,38 @@ function _renderWizardCreatives() {
     return;
   }
 
-  list.innerHTML = _wizard.creatives.map((c, idx) => `
+  // One block expanded at a time. Default open: the tracked one if it still
+  // exists, otherwise the first block that has no content yet, otherwise none.
+  if (!_wizard.creatives.some(c => c.id === _wizard.openCreativeId)) {
+    const firstEmpty = _wizard.creatives.find(c => !_wizardCreativeHasContent(c));
+    _wizard.openCreativeId = (firstEmpty || (_wizard.creatives.length === 1 ? _wizard.creatives[0] : null))?.id || null;
+  }
+
+  list.innerHTML = _wizard.creatives.map((c, idx) => {
+    if (c.id !== _wizard.openCreativeId) {
+      // Collapsed summary row: name, what's in it, chevron. Click to expand.
+      const bits = [];
+      if (c.files.length) bits.push(c.files.length + ' file' + (c.files.length === 1 ? '' : 's'));
+      if (_isValidAssetLink(c.driveLink)) bits.push('link');
+      if ((c.notes || '').trim()) bits.push('notes');
+      const summary = bits.length ? bits.join(' · ') : 'empty';
+      const done = _wizardCreativeHasContent(c);
+      return `
+    <div class="card" style="margin-bottom:10px;padding:14px 18px;cursor:pointer;display:flex;align-items:center;gap:12px" onclick="_wizardToggleCreative('${c.id}')" role="button" aria-expanded="false">
+      <span style="width:8px;height:8px;border-radius:50%;flex:none;background:${done ? 'var(--green,#4CC76A)' : 'var(--line-str)'}"></span>
+      <span style="flex:1;min-width:0;font-size:14px;font-weight:600;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHTML((c.name || '').trim() || 'Untitled folder')}</span>
+      <span style="font-size:12px;color:${done ? 'var(--text-sub)' : 'var(--text-mute)'};white-space:nowrap">${summary}</span>
+      ${_wizard.creatives.length > 1 ? `<button onclick="event.stopPropagation();wizardRemoveCreativeBlock('${c.id}')" title="Remove this folder" aria-label="Remove" style="width:26px;height:26px;border-radius:50%;border:1px solid var(--line);background:transparent;color:var(--text-mute);cursor:pointer;font-size:13px;flex:none">×</button>` : ''}
+      <span style="color:var(--text-mute);font-size:14px;flex:none">˅</span>
+    </div>`;
+    }
+    return `
     <div class="card" style="margin-bottom:14px;position:relative">
-      ${_wizard.creatives.length > 1 ? `<button onclick="wizardRemoveCreativeBlock('${c.id}')" title="Remove this folder" aria-label="Remove" style="position:absolute;top:14px;right:14px;width:28px;height:28px;border-radius:50%;border:1px solid var(--line);background:transparent;color:var(--text-mute);cursor:pointer;font-size:14px">×</button>` : ''}
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px;cursor:pointer" onclick="_wizardToggleCreative('${c.id}')" role="button" aria-expanded="true">
+        <span style="flex:1;font-size:12px;letter-spacing:0.08em;text-transform:uppercase;color:var(--text-mute)">Folder ${idx + 1} of ${_wizard.creatives.length}</span>
+        ${_wizard.creatives.length > 1 ? `<button onclick="event.stopPropagation();wizardRemoveCreativeBlock('${c.id}')" title="Remove this folder" aria-label="Remove" style="width:28px;height:28px;border-radius:50%;border:1px solid var(--line);background:transparent;color:var(--text-mute);cursor:pointer;font-size:14px">×</button>` : ''}
+        <span style="color:var(--text-mute);font-size:14px">˄</span>
+      </div>
 
       <label class="modal-label">Folder name</label>
       <input class="modal-input" placeholder="e.g. Game footage, Logos, Testimonials" value="${escapeHTML(c.name || '')}" oninput="wizardSetFolderName('${c.id}', this.value)" style="margin-bottom:14px" />
@@ -40647,8 +40822,8 @@ function _renderWizardCreatives() {
 
       <label class="modal-label" style="margin-top:12px">Notes (optional)</label>
       <textarea class="modal-textarea" placeholder="What's the vibe? Hook? Key copy? Anything special the team should know?" oninput="wizardSetCreativeNotes('${c.id}', this.value)">${escapeHTML(c.notes)}</textarea>
-    </div>
-  `).join('');
+    </div>`;
+  }).join('');
 
   _updateWizardContinueBtn();
 }
@@ -46019,6 +46194,13 @@ function toggleTheme() {
     <label class="modal-label" for="inputAssetsTitle">Creative name <span style="color:var(--text-mute);font-weight:400">(optional)</span></label>
     <input id="inputAssetsTitle" class="modal-input" type="text" maxlength="120" placeholder="e.g. August camp promo" />
 
+    <label class="modal-label" style="margin-top:18px">What should we make?</label>
+    <div id="inputAssetsTypeToggle" class="binary-toggle">
+      <button type="button" class="binary-toggle-opt" data-value="video" onclick="_pickInputAssetsType('video')">Video</button>
+      <button type="button" class="binary-toggle-opt active" data-value="graphic" onclick="_pickInputAssetsType('graphic')">Graphic</button>
+    </div>
+    <div style="font-size:11px;color:var(--text-mute);margin-top:6px">The finished creative - not what you're uploading. Photos in, video out is fine.</div>
+
     <label class="modal-label" style="margin-top:18px">Raw files</label>
     <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:8px">
       <input id="inputAssetsFolder" class="modal-input" list="inputAssetsFolderList" placeholder="Group name (optional) - e.g. Game footage" style="flex:1 1 200px;min-width:150px" />
@@ -46508,7 +46690,7 @@ function _mmApRow(checks, n) {
   return '<div class="mm-ap-row">' + _mmApChecks(checks) +
     '<button type="button" class="mm-ap-btn' + (urgent ? ' urgent' : '') + '">' +
       '<span class="mm-ap-btn-k">Focus mode</span>' +
-      '<span class="mm-ap-btn-t">' + (urgent ? n + (n === 1 ? ' thing needs you' : ' things need you') : 'All running clean') + ' <span class="mm-ap-chevs2"><span>&rsaquo;</span><span>&rsaquo;</span></span></span>' +
+      '<span class="mm-ap-btn-t">' + (urgent ? n + (n === 1 ? ' thing needs you' : ' things need you') : 'All running clean') + ' <svg class="mm-ap-x" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path class="x1" d="M4 9V4h5"/><path class="x2" d="M15 4h5v5"/><path class="x3" d="M20 15v5h-5"/><path class="x4" d="M9 20H4v-5"/></svg></span>' +
     '</button></div>';
 }
 function _mmActionItems(d) {
@@ -46659,43 +46841,36 @@ function _mmRenderCard() {
 // an arrow pointing at the fix. Replaces all text in the landing card body.
 function _mmFunnelSvg(page, clicks, loaded) {
   // Stage spine: CLICKED/LOADED from Meta (LPV is a subset of clicks), the
-  // rest from our funnel beacons. Rendered as a soft gradient band with
-  // particles flowing through it; the worst drop gets the spotlight.
+  // rest from our funnel beacons. Rendered as a classic area chart: flat
+  // baseline, one smooth gold line across the top, counts in chips above.
   const stages = [];
   const clk = clicks > 0 ? clicks : 0;
   const lpv = loaded > 0 ? loaded : 0;
   if (clk && lpv) {
-    stages.push({ n: clk, lbl: 'clicked', fix: '&#9998; speed up the page' });
-    stages.push({ n: lpv, lbl: 'loaded', fix: '&#9998; rework the top of the page' });
+    stages.push({ n: clk, lbl: 'clicked', fix: 'speed up the page' });
+    stages.push({ n: lpv, lbl: 'loaded', fix: 'rework the top of the page' });
   } else {
-    stages.push({ n: (page.visitors || page.ad_visitors || 0), lbl: 'loaded', fix: '&#9998; rework the top of the page' });
+    stages.push({ n: (page.visitors || page.ad_visitors || 0), lbl: 'loaded', fix: 'rework the top of the page' });
   }
-  stages.push({ n: page.form_started || 0, lbl: 'form', fix: '&#9998; fix the form' });
-  stages.push({ n: page.saw_calendar || 0, lbl: 'calendar', fix: '&#9998; edit the calendar' });
+  stages.push({ n: page.form_started || 0, lbl: 'form', fix: 'fix the form' });
+  stages.push({ n: page.saw_calendar || 0, lbl: 'calendar', fix: 'edit the calendar' });
   stages.push({ n: page.booked_sessions || 0, lbl: 'booked', fix: null });
   if (!stages[0].n) return '<div class="mm-driver-sub" style="margin:8px 0 0">gathering data - no ad visits in this window yet</div>';
-  const W = 560, H = 128, MID = 74, MAXH = 52, N = stages.length;
+  const W = 560, H = 128, MAXH = 56, N = stages.length;
+  const BASE = 104;
   const X = stages.map((_, i) => 52 + (i * (W - 120)) / (N - 1));
-  const hOf = (v) => Math.max(2.5, (v / stages[0].n) * MAXH);
-  let T = N - 1;
-  for (let i = 1; i < N; i++) { if ((stages[i].n / stages[0].n) * MAXH < 4) { T = i; break; } }
-  const hAt = (i) => (i >= T ? 0 : hOf(stages[i].n));
-  const top = X.map((x, i) => [x, MID - hAt(i) / 2]);
-  const bot = X.map((x, i) => [x, MID + hAt(i) / 2]);
-  const smoothSegs = (pts, a2, b2, rev) => {
-    const idx = [];
-    if (rev) { for (let i = b2; i >= a2; i--) idx.push(i); } else { for (let i = a2; i <= b2; i++) idx.push(i); }
+  const yOf = (v) => BASE - Math.max(3, (v / stages[0].n) * MAXH);
+  const top = X.map((x, i) => [x, yOf(stages[i].n)]);
+  const smoothSegs = (pts, a2, b2) => {
     let d = '';
-    for (let k = 1; k < idx.length; k++) {
-      const p0 = pts[idx[k - 1]], p1 = pts[idx[k]];
-      const dx = ((p1[0] - p0[0]) * 0.22).toFixed(1);
+    for (let k = a2 + 1; k <= b2; k++) {
+      const p0 = pts[k - 1], p1 = pts[k];
+      const dx = ((p1[0] - p0[0]) * 0.34).toFixed(1);
       d += ' C ' + (p0[0] + +dx).toFixed(1) + ',' + p0[1].toFixed(1) + ' ' + (p1[0] - +dx).toFixed(1) + ',' + p1[1].toFixed(1) + ' ' + p1[0].toFixed(1) + ',' + p1[1].toFixed(1);
     }
     return d;
   };
-  const smoothLine = (pts, a2, b2) => 'M ' + pts[a2][0].toFixed(1) + ',' + pts[a2][1].toFixed(1) + smoothSegs(pts, a2, b2);
-  const ribbonPath = (a2, b2) =>
-    smoothLine(top, a2, b2) + ' L ' + bot[b2][0].toFixed(1) + ',' + bot[b2][1].toFixed(1) + smoothSegs(bot, a2, b2, true) + ' Z';
+  const lineFrom = (a2, b2) => 'M ' + top[a2][0].toFixed(1) + ',' + top[a2][1].toFixed(1) + smoothSegs(top, a2, b2);
   let worst = -1;
   if (page.band !== 'green') {
     let worstRate = 0.5;
@@ -46707,71 +46882,83 @@ function _mmFunnelSvg(page, clicks, loaded) {
   }
   const arrowX = W - 42;
   let svg = '<svg viewBox="0 0 ' + W + ' ' + H + '" style="width:100%;display:block;margin-top:10px" preserveAspectRatio="xMidYMid meet">';
-  svg += '<defs><linearGradient id="mmfzg" x1="0" y1="0" x2="1" y2="0">' +
-    '<stop offset="0%" stop-color="#C8A84E" stop-opacity="0.22"/>' +
-    '<stop offset="60%" stop-color="#C8A84E" stop-opacity="0.13"/>' +
-    '<stop offset="100%" stop-color="#C8A84E" stop-opacity="0.18"/>' +
-    '</linearGradient>' +
-    '<filter id="mmfzb" x="-20%" y="-40%" width="140%" height="200%"><feGaussianBlur stdDeviation="3"/></filter></defs>';
-  // labels + count chips (no guide lines - whitespace does that job)
+  svg += '<defs><linearGradient id="mmfzg" x1="0" y1="0" x2="0" y2="1">' +
+    '<stop offset="0%" stop-color="#C8A84E" stop-opacity="0.16"/>' +
+    '<stop offset="100%" stop-color="#C8A84E" stop-opacity="0"/>' +
+    '</linearGradient></defs>';
+  // stage labels + count chips
   X.forEach((x, i) => {
     const nTxt = String(stages[i].n);
     const cw = Math.max(26, nTxt.length * 7.5 + 14);
     svg += '<text x="' + x + '" y="10" text-anchor="middle" font-family="var(--mm-ff)" font-size="7" font-weight="700" letter-spacing="0.09em" fill="var(--text-mute)">' + stages[i].lbl.toUpperCase() + '</text>' +
-      '<rect x="' + (x - cw / 2).toFixed(1) + '" y="16" width="' + cw + '" height="17" rx="8.5" fill="var(--surface-el)"/>' +
+      '<rect id="mmfz-c' + i + '" class="mm-fz-chip" x="' + (x - cw / 2).toFixed(1) + '" y="16" width="' + cw + '" height="17" rx="8.5" fill="var(--surface-el)"/>' +
       '<text x="' + x + '" y="28" text-anchor="middle" font-family="var(--mm-fm)" font-size="10.5" font-weight="500" fill="var(--text)">' + nTxt + '</text>';
   });
-  // the band: one gold shape, rounded entry, soft glow underneath
   svg += '<g class="mm-fz-band">';
-  svg += '<path d="' + ribbonPath(0, N - 1) + '" fill="rgba(200,168,78,0.15)" filter="url(#mmfzb)" transform="translate(0,4)"/>';
-  svg += '<ellipse cx="' + X[0].toFixed(1) + '" cy="' + MID + '" rx="10" ry="' + (hAt(0) / 2).toFixed(1) + '" fill="url(#mmfzg)"/>';
-  svg += '<path d="' + ribbonPath(0, N - 1) + '" fill="url(#mmfzg)"/>';
-  svg += '<line x1="' + X[T] + '" y1="' + MID + '" x2="' + (arrowX - 4) + '" y2="' + MID + '" stroke="#C8A84E" stroke-width="1.1" stroke-linecap="round" opacity="0.7"/>';
-  // leak marker: no red in the band for now - one action chip under the
-  //   worst segment, styled like a pressable button (sentence case, chevron)
+  // baseline axis
+  svg += '<line x1="' + (X[0] - 12) + '" y1="' + BASE + '" x2="' + arrowX + '" y2="' + BASE + '" stroke="var(--line)" stroke-width="1"/>';
+  // area under the line + the line itself
+  svg += '<path d="' + lineFrom(0, N - 1) + ' L ' + top[N - 1][0].toFixed(1) + ',' + BASE + ' L ' + top[0][0].toFixed(1) + ',' + BASE + ' Z" fill="url(#mmfzg)"/>';
+  svg += '<path d="' + lineFrom(0, N - 1) + '" fill="none" stroke="var(--gold)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>';
+  // the leak: that stretch of the line in deep amber
   if (worst >= 0) {
-    const label = (stages[worst].fix || '').replace('&#9998; ', '');
-    const nice = label.charAt(0).toUpperCase() + label.slice(1) + ' &rsaquo;';
+    svg += '<path d="' + lineFrom(worst, worst + 1) + '" fill="none" stroke="#B08E30" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>';
+  }
+  // run-out: the line eases to the arrow at the last stage's height
+  svg += '<line x1="' + top[N - 1][0].toFixed(1) + '" y1="' + top[N - 1][1].toFixed(1) + '" x2="' + (arrowX - 6) + '" y2="' + top[N - 1][1].toFixed(1) + '" stroke="var(--gold)" stroke-width="1.2" stroke-linecap="round" opacity="0.6"/>';
+  // stage nodes riding the line (hover pops them via the hit zones)
+  top.forEach((p, i) => {
+    svg += '<circle id="mmfz-n' + i + '" class="mm-fz-node" cx="' + p[0].toFixed(1) + '" cy="' + p[1].toFixed(1) + '" r="3" fill="var(--surface)" stroke="var(--gold)" stroke-width="1.5"/>';
+  });
+  // leak marker: a small "fix" badge with a stem pointing at the leak;
+  //   the full instruction lives in the tooltip + focus mode
+  if (worst >= 0) {
+    const label = stages[worst].fix || '';
     const mx = (X[worst] + X[worst + 1]) / 2;
-    const tw = (label.length * 4.9) + 34;
-    let bx = mx - tw / 2;
-    if (bx + tw > W - 6) bx = W - 6 - tw;
-    if (bx < 6) bx = 6;
-    const byTop = MID + MAXH / 2 + 8, bh = 18;
-    svg += '<g style="cursor:pointer" onclick="event.stopPropagation();openLandingMachine(\'' + stages[worst].lbl + '\')">' +
-      '<rect x="' + bx.toFixed(1) + '" y="' + byTop + '" width="' + tw.toFixed(1) + '" height="' + bh + '" rx="9" fill="var(--surface)" stroke="rgba(176,142,48,0.5)" stroke-width="1"/>' +
-      '<text x="' + (bx + tw / 2).toFixed(1) + '" y="' + (byTop + 12) + '" text-anchor="middle" font-family="var(--mm-ff)" font-size="8.8" font-weight="700" fill="#B08E30">' + nice + '</text></g>';
+    const lyMid = (top[worst][1] + top[worst + 1][1]) / 2;
+    const by = BASE + 16;
+    svg += '<g class="mm-fz-fix" style="cursor:pointer" onclick="event.stopPropagation();openLandingMachine(\'' + stages[worst].lbl + '\')">' +
+      '<title>Fix: ' + label + '</title>' +
+      '<line x1="' + mx.toFixed(1) + '" y1="' + (lyMid + 4).toFixed(1) + '" x2="' + mx.toFixed(1) + '" y2="' + (by - 10).toFixed(1) + '" stroke="rgba(176,142,48,0.55)" stroke-width="0.9" stroke-dasharray="2 2.5"/>' +
+      '<circle cx="' + mx.toFixed(1) + '" cy="' + by + '" r="9" fill="var(--surface)" stroke="rgba(176,142,48,0.55)" stroke-width="1"/>' +
+      '<g transform="translate(' + (mx - 5.5).toFixed(1) + ',' + (by - 5.5) + ') scale(0.46)" fill="none" stroke="#B08E30" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">' +
+      '<path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></g></g>';
   }
   svg += '</g>';
-  // particle flow: traffic drifts through the band on staggered lanes
+  // particles drifting through the area, thinning with the line
   svg += '<g class="mm-fz-pts">';
-  const lanes = [-0.62, -0.28, 0.06, 0.4, 0.66];
+  const lanes = [0.28, 0.5, 0.72, 0.4, 0.62];
   for (let p = 0; p < 7; p++) {
     const f = lanes[p % lanes.length];
-    const pts = X.map((x, i) => [x, MID + f * (hAt(i) / 2) * 0.86]);
-    const lane = smoothLine(pts, 0, N - 1) + ' L ' + (arrowX - 6) + ',' + MID;
+    const pts = X.map((x, i) => [x, BASE - f * (BASE - top[i][1]) ]);
+    let lane = 'M ' + pts[0][0].toFixed(1) + ',' + pts[0][1].toFixed(1) + smoothSegs(pts, 0, N - 1) + ' L ' + (arrowX - 6) + ',' + pts[N - 1][1].toFixed(1);
     const dur = (8 + (p % 4) * 1.2).toFixed(1);
     const beg = (-(p * 1.7) % 12).toFixed(2);
     svg += '<circle r="1.4" fill="#C8A84E" opacity="0.42"><animateMotion dur="' + dur + 's" begin="' + beg + 's" repeatCount="indefinite" path="' + lane + '"/></circle>';
   }
   svg += '</g>';
-  // per-stage hit zones: click a column to open focus mode at that stage
+  // per-stage hit zones: hover pops the node + lights the chip, click opens
   X.forEach((x, i) => {
     const half = (W - 120) / (N - 1) / 2;
-    svg += '<rect x="' + (x - half).toFixed(1) + '" y="0" width="' + (half * 2).toFixed(1) + '" height="' + H + '" fill="transparent" style="cursor:pointer" onclick="event.stopPropagation();openLandingMachine(\'' + stages[i].lbl + '\')"><title>Open ' + stages[i].lbl + ' in focus mode</title></rect>';
+    svg += '<rect x="' + (x - half).toFixed(1) + '" y="0" width="' + (half * 2).toFixed(1) + '" height="' + H + '" fill="transparent" style="cursor:pointer" ' +
+      'onmouseover="var n=document.getElementById(\'mmfz-n' + i + '\');if(n)n.setAttribute(\'r\',\'4.8\');var c=document.getElementById(\'mmfz-c' + i + '\');if(c)c.setAttribute(\'fill\',\'rgba(200,168,78,0.16)\')" ' +
+      'onmouseout="var n=document.getElementById(\'mmfz-n' + i + '\');if(n)n.setAttribute(\'r\',\'3\');var c=document.getElementById(\'mmfz-c' + i + '\');if(c)c.setAttribute(\'fill\',\'var(--surface-el)\')" ' +
+      'onclick="event.stopPropagation();openLandingMachine(\'' + stages[i].lbl + '\')"><title>Open ' + stages[i].lbl + ' in focus mode</title></rect>';
   });
-  // end caps: the portal's standard stroke icons
+  // end caps: monitor where clicks start, calendar-check where trials land
   const icoCol = 'var(--text-mute)';
+  const liY = top[0][1];
   svg += '<g fill="none" stroke="' + icoCol + '" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round">' +
-    '<rect x="14" y="' + (MID - 10) + '" width="20" height="13" rx="2"/>' +
-    '<path d="M 21 ' + (MID + 7) + ' h 6 M 24 ' + (MID + 3) + ' v 4"/>' +
+    '<rect x="14" y="' + (liY - 6) + '" width="20" height="13" rx="2"/>' +
+    '<path d="M 21 ' + (liY + 11) + ' h 6 M 24 ' + (liY + 7) + ' v 4"/>' +
     '</g>';
-  svg += '<g class="mm-fz-arrow"><path d="M ' + arrowX + ',' + MID + ' l -7,-4 v 8 Z" fill="#3EAF5C"/></g>';
+  const arY = top[N - 1][1];
+  svg += '<g class="mm-fz-arrow"><path d="M ' + arrowX + ',' + arY.toFixed(1) + ' l -7,-4 v 8 Z" fill="#3EAF5C"/></g>';
   const rx = W - 34;
   svg += '<g fill="none" stroke="' + icoCol + '" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round">' +
-    '<rect x="' + rx + '" y="' + (MID - 9) + '" width="18" height="17" rx="2.5"/>' +
-    '<path d="M ' + rx + ' ' + (MID - 3.5) + ' h 18 M ' + (rx + 4.5) + ' ' + (MID - 12) + ' v 5 M ' + (rx + 13.5) + ' ' + (MID - 12) + ' v 5"/>' +
-    '<path d="M ' + (rx + 5) + ' ' + (MID + 2) + ' l 3 3 l 5 -5.5" stroke="#3EAF5C"/>' +
+    '<rect x="' + rx + '" y="' + (arY - 9).toFixed(1) + '" width="18" height="17" rx="2.5"/>' +
+    '<path d="M ' + rx + ' ' + (arY - 3.5).toFixed(1) + ' h 18 M ' + (rx + 4.5) + ' ' + (arY - 12).toFixed(1) + ' v 5 M ' + (rx + 13.5) + ' ' + (arY - 12).toFixed(1) + ' v 5"/>' +
+    '<path d="M ' + (rx + 5) + ' ' + (arY + 2).toFixed(1) + ' l 3 3 l 5 -5.5" stroke="#3EAF5C"/>' +
     '</g>';
   return svg + '</svg>';
 }

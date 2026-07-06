@@ -402,6 +402,10 @@ async function organicDefaultStaffId() {
 //   2. the global channel default (organic -> Eli, ads -> Cam).
 // The explicit per-ticket override (admin "assign" action) is applied separately.
 async function resolveContentAssignee(clientId, channel) {
+  // Funnel content is owned by the marketing manager (Cam) - fixed owner, no
+  // per-client roster override (deliberate; add a funnel roster column if
+  // that ever changes).
+  if (channel === "funnel") return await marketingManagerStaffId();
   const col = channel === "organic" ? "content_assignee_organic_id" : "content_assignee_ads_id";
   try {
     const rows = await sb(`clients?id=eq.${clientId}&select=${col}`);
@@ -1263,7 +1267,7 @@ async function handleContentTickets(req, res) {
     const pageQS = `&limit=${limit}&offset=${offset}`;
     // Optional channel filter ('ads' | 'organic').
     const channel = req.query.channel;
-    const channelFilter = (channel === "organic" || channel === "ads") ? `&channel=eq.${channel}` : "";
+    const channelFilter = ["organic", "ads", "funnel"].includes(channel) ? `&channel=eq.${channel}` : "";
 
     if (asStaff) {
       // Staff list — oldest first per spec (so content team works FIFO)
@@ -1300,7 +1304,18 @@ async function handleContentTickets(req, res) {
       return res.status(400).json({ error: "type must be 'graphic', 'video', or 'mixed'" });
     }
 
-    const channel = body.channel === "organic" ? "organic" : "ads";
+    // Three channels: ads (Meta campaigns), organic (client socials, credit-
+    // capped), funnel (website content - finals hand off to the systems team).
+    const channel = ["organic", "funnel"].includes(body.channel) ? body.channel : "ads";
+
+    // Funnel content is part of the scaling service (the client has a BAM-run
+    // website). Content-only clients have no site to put it on.
+    if (channel === "funnel") {
+      const crows = await sb(`clients?id=eq.${ctx.client.id}&select=marketing_included`);
+      if (crows?.[0]?.marketing_included === false) {
+        return res.status(403).json({ error: "Funnel content isn't part of your current BAM plan." });
+      }
+    }
 
     // Per-type monthly organic credit cap (V1 hard limit, no overage). NULL allowance
     // = unlimited; 0 = none. Counts at request; cancelling a request frees the credit.
@@ -1376,7 +1391,7 @@ async function handleContentTickets(req, res) {
       // DM the resolved owner that a new content request landed (carries the urgent flag).
       const code = String(newCt.id || "").slice(0, 3).toUpperCase();
       const pr = (context?.priority === "high") ? "⚡ HIGH priority " : "";
-      const label = channel === "organic" ? "organic content" : "content";
+      const label = channel === "organic" ? "organic content" : channel === "funnel" ? "funnel content" : "content";
       staffSlackIdById(assignedTo).then(sid => {
         if (sid) postStaffSlackDM(sid, `🆕 New ${label} request ${pr}- ${ctx.client.business_name || "client"} [${code}]`, req);
         const who = slackMention(sid);
@@ -1399,6 +1414,7 @@ async function handleContentTickets(req, res) {
 
     const staffActions = new Set([
       "upload-final", "set-final", "send-to-marketing", "send-for-review",
+      "send-to-systems",
       "request-client-action", "mark-completed",
       "assign", "edit-context",
     ]);
@@ -1546,6 +1562,65 @@ async function handleContentTickets(req, res) {
         is_action_request: false,
         internal: true,
       });
+
+    } else if (action === "send-to-systems") {
+      // Funnel content only: finals are done, hand off to the systems team to
+      // place on the client's website. Creates a Change ticket in the systems
+      // flow (rides its existing Slack-on-insert + auto-due-date triggers) and
+      // closes out the content side.
+      if (ticket.channel !== "funnel") {
+        return res.status(409).json({ error: "only funnel content can be sent to systems" });
+      }
+      if (ticket.status !== "active") {
+        return res.status(409).json({ error: "ticket is not active" });
+      }
+      const finals = Array.isArray(ticket.final_files) ? ticket.final_files : [];
+      if (!finals.length) {
+        return res.status(400).json({ error: "upload at least one final file before sending to systems" });
+      }
+      const staffNote = (body.note || "").trim();
+      const label = (ticket.title || "").trim() || `${ticket.type} content`;
+      const inserted = await sb("tickets", {
+        method: "POST",
+        headers: { Prefer: "return=representation" },
+        body: JSON.stringify([{
+          client_id: ticket.client_id,
+          type: "change",
+          status: "open",
+          priority: "normal",
+          source: "funnel-content",
+          fields: {
+            // `title` doubles as the headline in the tickets-insert Slack
+            // trigger (fields->>'title'), so the client channel confirm reads
+            // "Change request submitted: Add funnel content..." not "(no title)".
+            title: `Add funnel content to the website: ${label}`,
+            what: `Add new funnel content to the website: ${label}`,
+            how: [
+              staffNote,
+              (ticket.notes || "").trim() ? `Client brief: ${ticket.notes.trim()}` : "",
+              `Final files are attached. Produced by the content team (content ticket ${String(ticket.id).slice(0, 3).toUpperCase()}).`,
+            ].filter(Boolean).join("\n\n"),
+            funnel_content_ticket_id: ticket.id,
+          },
+          menu_item: null,
+          files: finals,
+          messages: [],
+          submitted_by_staff: ctx.staff.id,
+        }]),
+      });
+      const sysTicket = inserted?.[0];
+      if (!sysTicket) return res.status(500).json({ error: "failed to create the systems ticket" });
+      patch.status = "completed";
+      patch.resolved_at = nowIso();
+      patch.context = { ...(ticket.context || {}), systems_ticket_id: sysTicket.id };
+      patch.messages = appendMessage(ticket.messages, {
+        author_type: "staff", author_id: ctx.staff.id, author_name: authorName,
+        body: "Content finished - sent to the systems team to be added to your website.",
+        is_action_request: false,
+      });
+      // No explicit client Slack here: the tickets-insert trigger
+      // (notify_slack_on_new_ticket) already confirms the new Change ticket
+      // in the client's channel - a second message would double-notify.
 
     } else if (action === "cancel") {
       if (!["active", "client-dependent"].includes(ticket.status)) {

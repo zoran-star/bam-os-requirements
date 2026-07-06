@@ -40,8 +40,8 @@ const server = http.createServer(async (req, res) => {
 
     // Vercel semantics: the filesystem wins over rewrites. Only rewrite when
     // no handler file matches the raw path.
-    let handler = await resolveHandler(pathname);
-    if (!handler) {
+    let entry = await resolveHandler(pathname);
+    if (!entry) {
       for (const rewrite of rewrites) {
         const match = rewrite.source.exec(pathname);
         if (!match) continue;
@@ -51,17 +51,17 @@ const server = http.createServer(async (req, res) => {
         for (const [k, v] of destUrl.searchParams.entries()) query[k] = v;
         break;
       }
-      handler = await resolveHandler(pathname);
+      entry = await resolveHandler(pathname);
     }
-    if (!handler) {
+    if (!entry) {
       res.writeHead(404, { "content-type": "application/json" });
       res.end(JSON.stringify({ error: `no handler for ${pathname}` }));
       return;
     }
 
-    const vreq = await buildRequest(req, query);
+    const vreq = await buildRequest(req, query, entry.bodyParser);
     const vres = buildResponse(res);
-    await handler(vreq, vres);
+    await entry.handler(vreq, vres);
   } catch (error) {
     console.error(`[local-api] ${req.method} ${req.url} failed:`, error);
     if (!res.headersSent) res.writeHead(500, { "content-type": "application/json" });
@@ -94,25 +94,30 @@ async function resolveHandler(pathname) {
   }
   const mod = await import(pathToFileURL(file).href);
   const handler = mod.default;
-  handlerCache.set(rel, typeof handler === "function" ? handler : null);
+  // Vercel semantics: `export const config = { api: { bodyParser: false } }`
+  // means the handler reads the raw stream itself (Stripe signature checks).
+  const bodyParser = mod.config?.api?.bodyParser !== false;
+  handlerCache.set(rel, typeof handler === "function" ? { handler, bodyParser } : null);
   return handlerCache.get(rel);
 }
 
-async function buildRequest(req, query) {
-  const chunks = [];
-  for await (const chunk of req) chunks.push(chunk);
-  const raw = Buffer.concat(chunks);
-  let body;
-  const contentType = String(req.headers["content-type"] || "");
-  if (raw.length) {
-    if (contentType.includes("application/json")) {
-      try { body = JSON.parse(raw.toString("utf8")); } catch { body = undefined; }
-    } else {
-      body = raw.toString("utf8");
+async function buildRequest(req, query, bodyParser = true) {
+  if (bodyParser) {
+    const chunks = [];
+    for await (const chunk of req) chunks.push(chunk);
+    const raw = Buffer.concat(chunks);
+    let body;
+    const contentType = String(req.headers["content-type"] || "");
+    if (raw.length) {
+      if (contentType.includes("application/json")) {
+        try { body = JSON.parse(raw.toString("utf8")); } catch { body = undefined; }
+      } else {
+        body = raw.toString("utf8");
+      }
     }
+    req.body = body;
   }
   req.query = query;
-  req.body = body;
   req.cookies = {};
   return req;
 }

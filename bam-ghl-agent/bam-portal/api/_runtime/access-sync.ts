@@ -9,7 +9,8 @@
 //
 // Invariants (docs/parent-runtime-cutover-guardrails.md):
 //   - access is granted only on paid invoices, never on subscription.created
-//   - prices resolve authoritatively via offer_prices.stripe_price_id
+//   - prices resolve authoritatively via subscription metadata offer_price_id
+//     when present, falling back to offer_prices.stripe_price_id
 //   - source_ref convention: subscription:<sub_id>:<price_id>, one-time
 //     invoice:<invoice_id>:<price_id>
 //   - idempotent: retries converge via the uq_customer_entitlements_source_ref
@@ -55,6 +56,10 @@ export type AccessSyncArgs = {
   // Authoritative price id from the Stripe subscription/invoice line when the
   // caller has it; falls back to the member row's stripe_price_id.
   stripePriceId?: string | null;
+  // Authoritative offer_prices.id from subscription metadata (stamped by
+  // portal-owned checkouts, api/parent/checkout.ts). Wins over stripe-price
+  // matching: test-mode/inline/dynamic prices are never in the catalog.
+  offerPriceId?: string | null;
   // For subscription-deleted the legacy webhook deletes the member row right
   // after; the entitlement cancel must run first against the final status.
   overrideMemberStatus?: RuntimeMember["status"];
@@ -96,6 +101,9 @@ const GRANT_REASONS: ReadonlySet<AccessSyncReason> = new Set([
   "subscription-updated",
   "member-imported",
 ]);
+
+const OFFER_PRICE_SELECT =
+  "id, tenant_id, offer_option_id, title, amount_cents, currency, billing_interval, stripe_price_id, stripe_product_id, source_offer_id, source_offer_price_key, source_pricing_catalog_id, is_active, is_routable, sort_order";
 
 export async function syncAccessForMember(
   supabase: RuntimeSupabaseClient,
@@ -145,21 +153,36 @@ export async function syncAccessForMember(
 
   // ---- grant path (paid invoice / plan change) ----
   const priceId = args.stripePriceId || member.stripe_price_id;
-  if (!priceId) return skip(args.reason, "no stripe_price_id on event or member", member.id);
+  let offerPrice: OfferPrice | undefined;
 
-  // Authoritative resolution: offer_prices.stripe_price_id is unique per tenant
-  // (uq_offer_prices_stripe_price). Legacy prices are is_active=false but still
-  // resolve - existing members keep access on plans no longer sold.
-  const { data: priceRows, error: priceError } = await supabase
-    .from("offer_prices")
-    .select(
-      "id, tenant_id, offer_option_id, title, amount_cents, currency, billing_interval, stripe_price_id, stripe_product_id, source_offer_id, source_offer_price_key, source_pricing_catalog_id, is_active, is_routable, sort_order",
-    )
-    .eq("tenant_id", args.clientId)
-    .eq("stripe_price_id", priceId)
-    .limit(1);
-  const offerPrice = assertRows<OfferPrice>(priceRows, priceError)[0];
-  if (!offerPrice) return skip(args.reason, `no typed offer_price for stripe price ${priceId}`, member.id);
+  // Portal-owned checkouts stamp the typed offer_prices.id onto subscription
+  // metadata. Prefer that over Stripe price matching because test-mode inline
+  // and dynamic billed prices are not guaranteed to exist in the catalog.
+  if (args.offerPriceId) {
+    const { data: metadataPriceRows, error: metadataPriceError } = await supabase
+      .from("offer_prices")
+      .select(OFFER_PRICE_SELECT)
+      .eq("tenant_id", args.clientId)
+      .eq("id", args.offerPriceId)
+      .limit(1);
+    offerPrice = assertRows<OfferPrice>(metadataPriceRows, metadataPriceError)[0];
+  }
+
+  if (!offerPrice) {
+    if (!priceId) return skip(args.reason, "no stripe_price_id on event or member", member.id);
+
+    // Fallback resolution: offer_prices.stripe_price_id is unique per tenant
+    // (uq_offer_prices_stripe_price). Legacy prices are is_active=false but
+    // still resolve - existing members keep access on plans no longer sold.
+    const { data: priceRows, error: priceError } = await supabase
+      .from("offer_prices")
+      .select(OFFER_PRICE_SELECT)
+      .eq("tenant_id", args.clientId)
+      .eq("stripe_price_id", priceId)
+      .limit(1);
+    offerPrice = assertRows<OfferPrice>(priceRows, priceError)[0];
+    if (!offerPrice) return skip(args.reason, `no typed offer_price for stripe price ${priceId}`, member.id);
+  }
 
   const { data: tplRows, error: tplError } = await supabase
     .from("entitlement_templates")
@@ -174,10 +197,13 @@ export async function syncAccessForMember(
   // No confirmed entitlement rule -> this price must not mint access.
   if (!template) return skip(args.reason, `no ACTIVE entitlement template for offer_price ${offerPrice.id}`, member.id);
 
+  const sourcePriceId = priceId || offerPrice.stripe_price_id;
+  if (!sourcePriceId) return skip(args.reason, "no stripe_price_id on event or member", member.id);
+
   const sourceRef = args.subscriptionId
-    ? `subscription:${args.subscriptionId}:${priceId}`
+    ? `subscription:${args.subscriptionId}:${sourcePriceId}`
     : args.invoiceId
-      ? `invoice:${args.invoiceId}:${priceId}`
+      ? `invoice:${args.invoiceId}:${sourcePriceId}`
       : null;
   if (!sourceRef) return skip(args.reason, "no subscription or invoice id for source_ref", member.id);
 

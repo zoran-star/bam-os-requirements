@@ -84,6 +84,7 @@ function CtkPriorityChip({ priority, tk }) {
 const CT_CHANNEL_META = {
   organic: { label: "Organic", color: "#7BC47F" },
   ads:     { label: "Ads",     color: "#7E9CD9" },
+  funnel:  { label: "Funnel",  color: "#D9A87E" },
 };
 function CtkChannelBadge({ channel }) {
   const meta = CT_CHANNEL_META[channel] || CT_CHANNEL_META.ads;
@@ -1243,6 +1244,9 @@ function ContentTicketDetail({ tk, session, ticket, me, owners = [], canReassign
   // to marketing.
   const adsApprovalGate = ticket.channel === "ads" && !!ticket.client?.ads_content_approval_required;
   const reviewMode = ticket.channel === "organic" || adsApprovalGate;
+  // Funnel content ends with the SYSTEMS team (website placement) - not
+  // marketing, not client review.
+  const funnelMode = ticket.channel === "funnel";
 
   // ── Upload selected finals to Supabase Storage and persist on ticket ──
   async function commitFinals() {
@@ -1315,6 +1319,26 @@ function ContentTicketDetail({ tk, session, ticket, me, owners = [], canReassign
       await onRefetch();
     } catch (e) {
       alert("Send for review failed: " + e.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  // Funnel tickets hand off to the systems team as a Change ticket (website work).
+  async function sendToSystems() {
+    if (busy) return;
+    if (!finalsExisting.length) {
+      alert("Upload at least one final file before sending to systems.");
+      return;
+    }
+    setBusy(true);
+    try {
+      await patchTicket(ticket.id, { action: "send-to-systems" });
+      showBanner(`Sent ${academyName}'s funnel content to the systems team.`);
+      onBack();
+      await onRefetch();
+    } catch (e) {
+      alert("Send to systems failed: " + e.message);
     } finally {
       setBusy(false);
     }
@@ -1660,16 +1684,16 @@ function ContentTicketDetail({ tk, session, ticket, me, owners = [], canReassign
             fontFamily: "inherit", fontSize: 13, fontWeight: 500,
           }}>Request Client Action</button>
           <button
-            onClick={() => reviewMode ? sendForReview() : setSendModalOpen(true)}
+            onClick={() => funnelMode ? sendToSystems() : reviewMode ? sendForReview() : setSendModalOpen(true)}
             disabled={busy || !finalsExisting.length}
-            title={adsApprovalGate ? "This academy reviews ads content before it goes to marketing. On approval it auto-sends." : ""}
+            title={funnelMode ? "Creates a Change ticket for the systems team with the final files attached." : adsApprovalGate ? "This academy reviews ads content before it goes to marketing. On approval it auto-sends." : ""}
             style={{
               background: tk.accent, color: "#0A0A0B", border: 0,
               padding: "10px 22px", borderRadius: 8,
               cursor: (busy || !finalsExisting.length) ? "not-allowed" : "pointer",
               fontFamily: "inherit", fontSize: 13, fontWeight: 700,
               opacity: (busy || !finalsExisting.length) ? 0.5 : 1,
-            }}>{reviewMode ? "📤  Send for client review" : "📤  Send to Marketing"}</button>
+            }}>{funnelMode ? "📤  Send to Systems" : reviewMode ? "📤  Send for client review" : "📤  Send to Marketing"}</button>
         </div>
       )}
 

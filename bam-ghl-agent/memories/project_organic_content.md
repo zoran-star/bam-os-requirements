@@ -2,9 +2,10 @@
 
 Shipped 2026-06-18. A second content pipeline alongside Ads, gated per-client.
 
-## The two pipelines (both ride `content_tickets`, distinguished by `channel`)
+## The three pipelines (all ride `content_tickets`, distinguished by `channel`)
 - `channel='ads'` (default) → client → content team → **Send to Marketing** → marketing_tickets → Meta. (the existing flow)
 - `channel='organic'` → client → content team → **Send for client review** → client Approves/Requests-changes → **Creative Bank**. NO marketing ticket spawned.
+- `channel='funnel'` (added 2026-07-05) → client → content team → **Send to Systems** → creates a `tickets` row (type change, source `funnel-content`, finals attached, backlink `fields.funnel_content_ticket_id`) → systems team adds it to the website. Content ticket flips completed + `context.systems_ticket_id`. No credits, no marketing ticket. Gate = `marketing_included` (server-enforced on POST). **Owner = Cam, fixed** (`resolveContentAssignee` returns marketingManagerStaffId for funnel - deliberately NO per-client roster override; content_executors never see funnel tickets since queue scoping is assigned_to). Slack: request DM goes to Cam + #content-marketing labeled "funnel content"; on send-to-systems the client channel gets ONE message via the tickets-insert trigger (fields.title feeds its headline) - no explicit API Slack, that would double-notify. **Client split is now Ads | Funnel | Organic (organic 3rd, hidden when off) and shows for EVERY marketing client - previously only organic-enabled clients saw a split (V1-visible change, Zoran-flagged on the PR).**
 
 ## Schema (migrations applied 2026-06-18)
 - `content_tickets.channel text not null default 'ads'`
@@ -50,6 +51,9 @@ New `content_executor` role — CONTENT-ONLY. In `_roles.js` it's in `ANY_STAFF_
 **Env to set in Vercel:** `CONTENT_ORGANIC_ASSIGNEE_EMAIL` = Eli's staff email (else falls back to first `content_executor` row). `MARKETING_MANAGER_EMAIL` already defaults to `cameron@byanymeansbusiness.com`.
 
 ⚠️ **GOTCHA — `staff.role` has a DB CHECK constraint `staff_role_check`** enumerating allowed role strings. Adding a new staff role needs BOTH the app-layer sets in `api/_roles.js`/`StaffModals` AND a migration that rebuilds `staff_role_check` to include it — otherwise invite-staff fails with `new row for relation "staff" violates check constraint "staff_role_check"`. Fixed for content_executor in `20260620120000_staff_role_add_content_executor.sql`. Keep the constraint's role list in sync with `ANY_STAFF_ROLES`.
+
+## Type toggle (2026-07-06 - fixed the everything-shows-as-graphic bug)
+The Add-Creative modal now has an explicit **"What should we make?" Video/Graphic toggle** (`#inputAssetsTypeToggle`, restored - the JS existed but the HTML had been removed). `content_tickets.type` = the toggle, NOT derived from raw-file MIME types anymore. Why: raw inputs never determined the output (photos in, video out is normal), and **link-only submissions (Drive/Dropbox) derived to 'graphic' every time** - that's why organic tickets all showed Graphic on staff side. Auto-suggests from uploads (any video file → video) until the client clicks the toggle (`typeTouched`). Also means per-type credit caps now count the right type. Ads Add-Creative can no longer produce 'mixed' (one creative = one output type; mixed still comes from the campaign-wizard bundles).
 
 ## Organic credits + content-only clients (V1, added 2026-06-20, branch `feat/organic-content-credits`)
 
