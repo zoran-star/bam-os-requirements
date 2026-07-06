@@ -15430,6 +15430,20 @@ function _hv2Style() {
     '.hm-peek-send{background:var(--gold);color:var(--on-gold);border:none;border-radius:8px;padding:9px 18px;font:inherit;font-size:13px;font-weight:700;cursor:pointer}' +
     '.hm-peek-full{background:none;border:none;color:var(--gold);font:inherit;font-size:12.5px;font-weight:700;cursor:pointer;padding:10px 0 14px}' +
     '.hm-peek-full:hover{text-decoration:underline}' +
+    '#cc-minbox-ov{position:fixed;inset:0;z-index:9800;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;animation:hv2In .2s ease}' +
+    '.cc-minbox-card{font-family:var(--font-ui);background:var(--surface);border:1px solid var(--border);border-radius:24px;width:min(520px,92vw);max-height:80vh;display:flex;flex-direction:column;box-shadow:0 12px 40px rgba(0,0,0,.3);overflow:hidden}' +
+    '.cc-minbox-head{display:flex;align-items:flex-start;justify-content:space-between;padding:18px 22px 10px}' +
+    '.cc-minbox-title{font-family:var(--font-num);font-size:18px;font-weight:800;color:var(--text)}' +
+    '.cc-minbox-sub{font-size:12px;color:var(--text-mute);margin-top:2px}' +
+    '.cc-minbox-list{flex:1;overflow-y:auto;padding:4px 12px 8px;display:flex;flex-direction:column;gap:2px}' +
+    '.cc-minbox-row{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:12px;cursor:pointer}' +
+    '.cc-minbox-row:hover{background:var(--surface-el,rgba(0,0,0,.05))}' +
+    '.cc-minbox-av{flex:none;width:30px;height:30px;border-radius:999px;background:var(--surface-el,rgba(0,0,0,.05));border:1px solid var(--border);color:var(--text-mute);font-size:11px;font-weight:700;display:inline-flex;align-items:center;justify-content:center}' +
+    '.cc-minbox-name{font-size:13px;font-weight:700;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}' +
+    '.cc-minbox-prev{font-size:12px;color:var(--text-mute);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}' +
+    '.cc-minbox-row.unread .cc-minbox-prev{color:var(--text)}' +
+    '.cc-minbox-time{font-size:11px;color:var(--text-mute);flex:none}' +
+    '.cc-minbox-dot{flex:none;width:7px;height:7px;border-radius:999px;background:var(--gold)}' +
     '@media(max-width:480px){#home-v2 .hm-kpi-grid{grid-template-columns:1fr 1fr}}' +
     // Stat expand tooltip
     '#home-v2 .hm-stat-tip{position:absolute;bottom:calc(100% + 6px);left:50%;transform:translateX(-50%) scale(0.95);opacity:0;pointer-events:none;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:8px 12px;box-shadow:0 6px 20px rgba(0,0,0,.3);white-space:nowrap;z-index:10;transition:opacity .18s,transform .18s}' +
@@ -45376,33 +45390,99 @@ async function _ccLoadMemberMsgs() {
     const r = await fetch('/api/ghl/inbox?client_id=' + encodeURIComponent(CLIENT_ID), { headers: { Authorization: 'Bearer ' + token } });
     const j = await _safeJson(r);
     if (!r.ok || !j.conversations) throw new Error('no data');
-    const ids = new Set(roster.map(m => m.ghl_contact_id).filter(Boolean));
-    const names = new Set(roster.flatMap(m => [m.athlete_name, m.parent_name]).filter(Boolean).map(n => n.toLowerCase().trim()));
-    const mine = (j.conversations || []).filter(c => {
-      if (c.contactId && ids.has(c.contactId)) return true;
-      const n = (c.contactName || c.fullName || '').toLowerCase().trim();
-      return n && names.has(n);
-    });
+    const mine = _ccMemberConvs(j.conversations || [], roster);
     mine.sort((a, b) => (b.unreadCount > 0) - (a.unreadCount > 0));
     const rows = mine.slice(0, 4);
     if (!rows.length) { body.innerHTML = '<div class="cc-mem-good">' + '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>' + 'Inbox clear. Every parent answered.</div>'; return; }
     body.innerHTML = rows.map(c => _ccIbRow(c)).join('') +
-      `<button type="button" class="cc-mem-more" onclick="switchView('v15inbox')">Open member inbox</button>`;
+      `<button type="button" class="cc-mem-more" onclick="_ccMemberInbox()">Open member inbox</button>`;
   } catch (_) {
     body.innerHTML = '<div class="cc-mem-empty">Couldn\'t load messages.</div>';
   }
 }
 function _ccIbRow(c) {
+  (window._hmIbById = window._hmIbById || {})[c.id] = c;
   const unread = c.unreadCount > 0;
   const name = _ccCapName((c.contactName || c.fullName || 'Member').split(' ').slice(0, 2).join(' '));
   const initials = name.split(' ').map(w => w[0] || '').join('').toUpperCase().slice(0, 2);
   const preview = _hmStripEm((c.lastMessageBody || '').slice(0, 60));
   const reply = c.contactId ? `<button type="button" class="cc-ib-reply" onclick="event.stopPropagation();_ccQuickReply(this, '${String(c.contactId).replace(/[^A-Za-z0-9_-]/g, '')}')">Reply</button>` : '';
-  return `<div class="cc-ib-row${unread ? ' unread' : ''}" onclick="switchView('v15inbox')">
+  return `<div class="cc-ib-row${unread ? ' unread' : ''}" onclick="_hmMsgPeek('${String(c.id).replace(/[^A-Za-z0-9_-]/g, '')}')">
     <span class="cc-ib-av">${escapeHTML(initials)}</span>
     <div style="flex:1;min-width:0"><div class="cc-ib-name">${escapeHTML(name)}</div><div class="cc-ib-prev">${escapeHTML(preview)}</div></div>
     ${reply}
     ${unread ? '<span class="cc-ib-dot"></span>' : ''}
+  </div>`;
+}
+
+// Which shared-inbox conversations belong to the roster (by GHL contact id,
+// else by athlete/parent name).
+function _ccMemberConvs(convs, roster) {
+  const ids = new Set(roster.map(m => m.ghl_contact_id).filter(Boolean));
+  const names = new Set(roster.flatMap(m => [m.athlete_name, m.parent_name]).filter(Boolean).map(n => n.toLowerCase().trim()));
+  return (convs || []).filter(c => {
+    if (c.contactId && ids.has(c.contactId)) return true;
+    const n = (c.contactName || c.fullName || '').toLowerCase().trim();
+    return n && names.has(n);
+  });
+}
+
+// ── Members-only inbox popup: the shared inbox filtered to the roster.
+// Body-level with unscoped CSS on purpose (transformed CC sections clip
+// fixed-position UI). Rows open the existing message peek popup on top. ──
+function _ccMemberInboxClose() { document.getElementById('cc-minbox-ov')?.remove(); }
+async function _ccMemberInbox() {
+  _ccMemberInboxClose();
+  document.body.insertAdjacentHTML('beforeend', `
+    <div id="cc-minbox-ov" onclick="if(event.target===this)_ccMemberInboxClose()">
+      <div class="cc-minbox-card">
+        <div class="cc-minbox-head">
+          <div>
+            <div class="cc-minbox-title">Member inbox</div>
+            <div class="cc-minbox-sub" id="cc-minbox-sub">Loading conversations...</div>
+          </div>
+          <button type="button" class="hm-peek-x" onclick="_ccMemberInboxClose()" aria-label="Close"><svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+        </div>
+        <div class="cc-minbox-list" id="cc-minbox-list"><div class="req-empty" style="padding:16px 0"><span class="req-spin"></span> Loading...</div></div>
+        <button type="button" class="hm-peek-full" onclick="_ccMemberInboxClose();switchView('v15inbox')">Open full inbox &rsaquo;</button>
+      </div>
+    </div>`);
+  const list = document.getElementById('cc-minbox-list');
+  const sub = document.getElementById('cc-minbox-sub');
+  try {
+    const roster = await _ccEnsureMembers();
+    const token = await _mreqAuthToken();
+    const r = await fetch('/api/ghl/inbox?client_id=' + encodeURIComponent(CLIENT_ID), { headers: { Authorization: 'Bearer ' + token } });
+    const j = await _safeJson(r);
+    if (!r.ok || !j.conversations) throw new Error('no data');
+    const mine = _ccMemberConvs(j.conversations || [], roster);
+    mine.sort((a, b) => ((b.unreadCount > 0) - (a.unreadCount > 0)) || (new Date(b.lastMessageDate || 0) - new Date(a.lastMessageDate || 0)));
+    if (!list || !document.getElementById('cc-minbox-ov')) return;
+    if (!mine.length) {
+      if (sub) sub.textContent = 'No member conversations yet';
+      list.innerHTML = '<div class="req-empty" style="padding:16px 0">Nothing from members yet. New messages land here.</div>';
+      return;
+    }
+    const unread = mine.filter(c => c.unreadCount > 0).length;
+    if (sub) sub.textContent = mine.length + (mine.length === 1 ? ' conversation' : ' conversations') + (unread ? ' \u00b7 ' + unread + ' unread' : '');
+    list.innerHTML = mine.slice(0, 30).map(c => _ccMinboxRow(c)).join('');
+  } catch (_) {
+    if (sub) sub.textContent = '';
+    if (list) list.innerHTML = '<div class="req-empty" style="padding:16px 0">Couldn\'t load member messages.</div>';
+  }
+}
+function _ccMinboxRow(c) {
+  (window._hmIbById = window._hmIbById || {})[c.id] = c;
+  const unread = c.unreadCount > 0;
+  const name = _ccCapName((c.contactName || c.fullName || 'Member').split(' ').slice(0, 2).join(' '));
+  const initials = name.split(' ').map(w => w[0] || '').join('').toUpperCase().slice(0, 2);
+  const preview = _hmStripEm((c.lastMessageBody || '').slice(0, 70));
+  const timeStr = c.lastMessageDate ? _hmInboxTimeStr(new Date(c.lastMessageDate)) : '';
+  return `<div class="cc-minbox-row${unread ? ' unread' : ''}" onclick="_hmMsgPeek('${String(c.id).replace(/[^A-Za-z0-9_-]/g, '')}')">
+    <span class="cc-minbox-av">${escapeHTML(initials)}</span>
+    <div style="flex:1;min-width:0"><div class="cc-minbox-name">${escapeHTML(name)}</div><div class="cc-minbox-prev">${escapeHTML(preview)}</div></div>
+    <span class="cc-minbox-time">${escapeHTML(timeStr)}</span>
+    ${unread ? '<span class="cc-minbox-dot"></span>' : ''}
   </div>`;
 }
 
