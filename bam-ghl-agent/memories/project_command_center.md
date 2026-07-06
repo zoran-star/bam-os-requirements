@@ -60,7 +60,7 @@
 - **A2 quiet rows**: rows are avatar + name + $amt sub-line + soft colored `.cc-act-tag` pill on the right (no loud chip backgrounds).
 - **A4 risk in header**: card header is `Actions` + `#cc-act-risk` ("$N/mo at risk", red) filled from the probs sum. The old in-card "See all members" button is gone.
 - **B1 header link**: `_ccHead(label, sub, right)` grew a third `right` param rendering `.cc-head-right` (stopPropagation so the click-to-focus head doesn't fire). Members head uses it for the gold "All members ›" link -> `_ccMemberListOpen()`.
-- **P2 health bar**: `_ccPulseRender` now renders `.cc-hb`, a full-width segmented bar (green live / amber issues / red critical / gray paused, proportional widths) + label "N live · N paused · N issues ›". Whole thing is a button -> `_ccMemberListOpen()`; hover scales the bar. Replaces the per-member pulse dots (looked funky).
+- **P2 health bar**: `_ccPulseRender` now renders `.cc-hb`, a full-width segmented bar (green live / amber issues / red critical / gray paused, proportional widths) + label "N live · N paused · N issues ›". Whole thing is a button -> `_ccMemberListOpen()`; hover scales the bar. Replaces the per-member pulse dots (looked funky). 2026-07-06: paused members removed from the bar segments (grey tail read as clutter); bar = live/amber/red only summing to 100%, paused stays in the text label.
 
 ## Focus polish (2026-07-06, Cole feedback)
 - Win-card boot label copy: "READING THE BUSINESS..." (was BOARD).
