@@ -195,6 +195,11 @@ async function handler(req: ParentApiRequest, res: ParentApiResponse) {
         payment_behavior: "default_incomplete",
         "payment_settings[save_default_payment_method]": "on_subscription",
       },
+      // Scoped to the subscription being replaced: retrying the same attempt
+      // replays idempotently, but switching plans away and back (A -> B -> A)
+      // must mint a FRESH subscription — the bare student+price key would
+      // replay the original create and hand back a since-cancelled sub whose
+      // PaymentIntent is terminal (Payment Element then 400s).
       idempotencyKey: [
         "parent-sub-",
         testMode ? "test-" : "",
@@ -205,7 +210,9 @@ async function handler(req: ParentApiRequest, res: ParentApiResponse) {
         student.id,
         "-",
         price.id,
-      ].join("").slice(0, 200),
+        "-r-",
+        member?.stripe_subscription_id || "none",
+      ].join("").slice(0, 255),
       method: "POST",
       stripeAccount,
     });

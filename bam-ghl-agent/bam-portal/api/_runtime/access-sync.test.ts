@@ -15,18 +15,40 @@ function stubSupabase(tables: TableData): RuntimeSupabaseClient {
   return {
     from(table: string) {
       const rows = tables[table];
+      const eqFilters: Array<{ column: string; value: unknown }> = [];
+      let limitCount: number | null = null;
       const builder: Record<string, unknown> = {};
       const chain = () => builder;
-      for (const method of ["select", "eq", "neq", "not", "in", "order", "limit", "update", "insert"]) {
+      for (const method of ["select", "neq", "not", "in", "order", "update", "insert"]) {
         builder[method] = chain;
       }
+      builder.eq = (column: string, value: unknown) => {
+        eqFilters.push({ column, value });
+        return builder;
+      };
+      builder.limit = (count: number) => {
+        limitCount = count;
+        return builder;
+      };
+      const resolveRows = () => {
+        let resolved = Array.isArray(rows) ? rows : rows == null ? [] : [rows];
+        for (const filter of eqFilters) {
+          if (!resolved.some((row) => hasColumn(row, filter.column))) continue;
+          resolved = resolved.filter((row) => hasColumn(row, filter.column) && row[filter.column] === filter.value);
+        }
+        return limitCount == null ? resolved : resolved.slice(0, limitCount);
+      };
       builder.maybeSingle = () =>
-        Promise.resolve({ data: Array.isArray(rows) ? rows[0] ?? null : rows, error: null });
+        Promise.resolve({ data: resolveRows()[0] ?? null, error: null });
       builder.then = (resolve: (value: { data: unknown; error: null }) => unknown) =>
-        Promise.resolve({ data: Array.isArray(rows) ? rows : rows == null ? [] : [rows], error: null }).then(resolve);
+        Promise.resolve({ data: resolveRows(), error: null }).then(resolve);
       return builder;
     },
   } as unknown as RuntimeSupabaseClient;
+}
+
+function hasColumn(row: unknown, column: string): row is Record<string, unknown> {
+  return Boolean(row && typeof row === "object" && Object.prototype.hasOwnProperty.call(row, column));
 }
 
 const MEMBER = {
@@ -95,6 +117,60 @@ describe("syncAccessForMember (dryRun / decision routing)", () => {
       { dryRun: true },
     );
     expect(out.source_ref).toBe("(shadow) subscription:sub_1:price_NEW");
+  });
+
+  it("uses metadata offer_price_id when the Stripe price is not cataloged", async () => {
+    const supabase = stubSupabase({
+      members: [MEMBER],
+      offer_prices: [{ ...PRICE, stripe_price_id: "price_catalog" }],
+      entitlement_templates: [TEMPLATE],
+    });
+    const out = await syncAccessForMember(
+      supabase,
+      {
+        ...base,
+        reason: "invoice-paid",
+        subscriptionId: "sub_1",
+        offerPriceId: "op1",
+        stripePriceId: "price_inline",
+      },
+      { dryRun: true },
+    );
+    expect(out.action).toBe("granted");
+    expect(out.source_ref).toBe("(shadow) subscription:sub_1:price_inline");
+  });
+
+  it("falls back to Stripe price resolution when metadata offer_price_id is not found", async () => {
+    const supabase = stubSupabase({ members: [MEMBER], offer_prices: [PRICE], entitlement_templates: [TEMPLATE] });
+    const out = await syncAccessForMember(
+      supabase,
+      {
+        ...base,
+        reason: "invoice-paid",
+        subscriptionId: "sub_1",
+        offerPriceId: "op_missing",
+        stripePriceId: "price_1",
+      },
+      { dryRun: true },
+    );
+    expect(out.action).toBe("granted");
+    expect(out.source_ref).toBe("(shadow) subscription:sub_1:price_1");
+  });
+
+  it("skips when metadata and Stripe price resolution both miss", async () => {
+    const out = await syncAccessForMember(
+      stubSupabase({ members: [MEMBER], offer_prices: [] }),
+      {
+        ...base,
+        reason: "invoice-paid",
+        subscriptionId: "sub_1",
+        offerPriceId: "op_missing",
+        stripePriceId: "price_inline",
+      },
+      { dryRun: true },
+    );
+    expect(out.action).toBe("skipped");
+    expect(out.skip_reason).toBe("no typed offer_price for stripe price price_inline");
   });
 
   it("skips when the member row is gone", async () => {

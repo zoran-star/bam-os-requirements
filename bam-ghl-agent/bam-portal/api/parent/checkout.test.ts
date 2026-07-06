@@ -222,6 +222,8 @@ describe("POST /api/parent/checkout", () => {
     expect(subscriptionParams.get("metadata[student_id]")).toBe(studentId);
     expect(subscriptionParams.get("metadata[customer_profile_id]")).toBe(profileId);
     expect(subscriptionParams.get("metadata[origin]")).toBe("fullcontrol-parent-app");
+    const createHeaders = subscriptionCall?.[1]?.headers as Record<string, string>;
+    expect(createHeaders["Idempotency-Key"]).toContain("-r-none");
 
     const memberPostCall = fetchMock.mock.calls.find(
       ([url, init]) => String(url).includes("/rest/v1/members?select=") && init?.method === "POST",
@@ -389,6 +391,13 @@ describe("POST /api/parent/checkout", () => {
     expect(subscriptionCall).toBeTruthy();
     const subscriptionParams = new URLSearchParams(String(subscriptionCall?.[1]?.body));
     expect(subscriptionParams.get("metadata[offer_price_id]")).toBe(offerPriceId);
+
+    // The create key must be scoped to the sub it replaces: a bare
+    // student+price key would idempotently REPLAY the original create on an
+    // A -> B -> A plan switch and hand back a cancelled subscription whose
+    // PaymentIntent is terminal.
+    const createHeaders = subscriptionCall?.[1]?.headers as Record<string, string>;
+    expect(createHeaders["Idempotency-Key"]).toContain(`-r-${staleSubscriptionId}`);
 
     const memberPatchCall = fetchMock.mock.calls.find(
       ([url, init]) => String(url).includes("/rest/v1/members?id=eq") && init?.method === "PATCH",
