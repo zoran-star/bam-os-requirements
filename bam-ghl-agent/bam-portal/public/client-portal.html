@@ -39071,28 +39071,35 @@ async function _setupBillingCreate() {
 }
 
 // Right-side modal: shows the Stripe portal URL + pre-formatted SMS/email
-// the staff can edit, then sends via GHL (or copies the link if GHL isn't
-// available for this parent).
+// the staff can edit, then sends it. The send endpoint is provider-aware:
+// SMS routes through Twilio and Email through Resend for academies off GHL,
+// and through GHL for academies still on it. Buttons gate on per-channel
+// readiness (data.messaging), not on GHL specifically.
 function _openPaymentLinkModal(memberId, data) {
   const host = document.getElementById('member-modal-host') || document.body;
   const url       = data.url || '';
   const parent    = data.parent || {};
   const ghl       = data.ghl    || { ready: false };
+  const messaging = data.messaging || null;
   const suggested = data.suggested || {};
   const sms       = suggested.sms_text       || `Update your card: ${url}`;
   const emailSub  = suggested.email_subject  || 'Update your card on file';
   const emailHtml = suggested.email_html     || `<p>Update your card: <a href="${url}">${url}</a></p>`;
 
-  // Precondition logic - drives which buttons are enabled
+  // Precondition logic - drives which buttons are enabled. Per-channel send
+  // readiness comes from the backend (Twilio/Resend OR GHL). Fall back to the
+  // legacy GHL flag if an older response shape has no messaging block.
   const hasPhone = !!parent.phone;
   const hasEmail = !!parent.email;
-  const ghlReady = !!ghl.ready;
+  const smsReady   = messaging ? !!messaging.sms_ready   : !!ghl.ready;
+  const emailReady = messaging ? !!messaging.email_ready : !!ghl.ready;
 
   // Status pills (small reasons line so staff sees WHY a button might be off)
   const reasons = [];
-  if (!ghlReady) reasons.push('Academy not connected to GHL.');
   if (!hasPhone) reasons.push('No parent phone on file.');
+  else if (!smsReady) reasons.push('SMS is not set up for this academy yet.');
   if (!hasEmail) reasons.push('No parent email on file.');
+  else if (!emailReady) reasons.push('Email is not set up for this academy yet.');
 
   const wrap = document.createElement('div');
   wrap.id = 'pl-modal';
@@ -39118,13 +39125,13 @@ function _openPaymentLinkModal(memberId, data) {
       <!-- SMS panel -->
       <div style="font-size:11px;font-weight:700;color:var(--text-mute);letter-spacing:0.6px;text-transform:uppercase;margin-bottom:6px">SMS preview</div>
       <textarea id="pl-sms" rows="3" style="width:100%;background:var(--surface);border:1px solid var(--border);border-radius:4px;padding:8px 10px;color:var(--text);font:inherit;font-size:13px;outline:none;resize:vertical;margin-bottom:8px">${escapeHTML(sms)}</textarea>
-      <button id="pl-sms-btn" onclick="_plSend('SMS','${memberId}')" ${(!ghlReady || !hasPhone) ? 'disabled' : ''} style="width:100%;background:${(ghlReady && hasPhone) ? 'var(--gold,#D4B65C)' : 'var(--border)'};color:${(ghlReady && hasPhone) ? '#0B0B0D' : 'var(--text-mute)'};border:1px solid var(--border);padding:10px 12px;font-weight:700;border-radius:4px;cursor:${(ghlReady && hasPhone) ? 'pointer' : 'not-allowed'};font-size:13px;font-family:inherit;margin-bottom:18px"> Send SMS via GHL</button>
+      <button id="pl-sms-btn" onclick="_plSend('SMS','${memberId}')" ${(!smsReady || !hasPhone) ? 'disabled' : ''} style="width:100%;background:${(smsReady && hasPhone) ? 'var(--gold,#D4B65C)' : 'var(--border)'};color:${(smsReady && hasPhone) ? '#0B0B0D' : 'var(--text-mute)'};border:1px solid var(--border);padding:10px 12px;font-weight:700;border-radius:4px;cursor:${(smsReady && hasPhone) ? 'pointer' : 'not-allowed'};font-size:13px;font-family:inherit;margin-bottom:18px">Send SMS</button>
 
       <!-- Email panel -->
       <div style="font-size:11px;font-weight:700;color:var(--text-mute);letter-spacing:0.6px;text-transform:uppercase;margin-bottom:6px">Email preview</div>
       <input id="pl-email-subject" value="${escapeHTML(emailSub)}" placeholder="Subject" style="width:100%;background:var(--surface);border:1px solid var(--border);border-radius:4px;padding:8px 10px;color:var(--text);font:inherit;font-size:13px;outline:none;margin-bottom:6px">
       <textarea id="pl-email-body" rows="3" style="width:100%;background:var(--surface);border:1px solid var(--border);border-radius:4px;padding:8px 10px;color:var(--text);font:inherit;font-size:13px;outline:none;resize:vertical;margin-bottom:8px">${escapeHTML(sms)}</textarea>
-      <button id="pl-email-btn" onclick="_plSend('Email','${memberId}')" ${(!ghlReady || !hasEmail) ? 'disabled' : ''} style="width:100%;background:transparent;color:${(ghlReady && hasEmail) ? 'var(--text)' : 'var(--text-mute)'};border:1px solid var(--border);padding:10px 12px;font-weight:700;border-radius:4px;cursor:${(ghlReady && hasEmail) ? 'pointer' : 'not-allowed'};font-size:13px;font-family:inherit;margin-bottom:14px"> Send Email via GHL</button>
+      <button id="pl-email-btn" onclick="_plSend('Email','${memberId}')" ${(!emailReady || !hasEmail) ? 'disabled' : ''} style="width:100%;background:transparent;color:${(emailReady && hasEmail) ? 'var(--text)' : 'var(--text-mute)'};border:1px solid var(--border);padding:10px 12px;font-weight:700;border-radius:4px;cursor:${(emailReady && hasEmail) ? 'pointer' : 'not-allowed'};font-size:13px;font-family:inherit;margin-bottom:14px">Send Email</button>
 
       ${reasons.length ? `<div style="background:rgba(154,59,47,0.08);border:1px solid rgba(154,59,47,0.4);border-radius:6px;padding:10px 12px;margin-bottom:14px"><div style="font-size:12px;color:#c47a6a;font-weight:600;margin-bottom:4px">Why some buttons are off</div><div style="font-size:12px;color:var(--text-mute);line-height:1.5">${reasons.map(r => '• ' + escapeHTML(r)).join('<br>')}</div></div>` : ''}
 
@@ -39173,7 +39180,7 @@ async function _plSend(type, memberId) {
   if (!message) { _plStatus('Message body is empty.', 'err'); return; }
   if (!isSms && !subject) { _plStatus('Email needs a subject.', 'err'); return; }
 
-  _plStatus(`Sending ${type} via GHL…`);
+  _plStatus(`Sending ${type}…`);
   const btn = document.getElementById(isSms ? 'pl-sms-btn' : 'pl-email-btn');
   if (btn) btn.disabled = true;
 
