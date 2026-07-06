@@ -13,6 +13,23 @@ flow on purpose.
 - **Fulfillment: staff-manual first.** GHL agent drafting the change is a
   LATER phase, not launch.
 
+## Meta Ads creative requests (front end built 2026-07-05)
+The marketing-machine creatives section (`_mmRenderMetaFocus`) has per-creative
+**replace** + per-ad-set **+ add a new creative** buttons. They open a centered
+modal (`#mmCreativeModal`, `_mmcOpen('add'|'replace', idx)` / `_mmcRender` /
+`_mmcSubmit` in client-portal.html), built on design-system v1.5 (`.mmc-*`
+classes, tokens). Fields: format picker (9:16/4:5/1:1/16:9), asset upload + Drive
+link, brief. Replace mode pre-loads the losing creative (thumb + cpl/hook/freq/
+spend + the verdict's why-note) and reframes the brief as "what to keep, what to
+beat". Context maps `window._MMC_REP` / `_MMC_ADD` (rebuilt each render) carry
+campaign/ad set/offer + the creative being replaced into the payload. Submit is
+MOCKED (`console.log('[v2-creative] MOCK submit')` + toast) until
+v2_support_tickets lands, same pattern as the landing-page flow. Locked with
+Zoran: centered modal (not drawer), assets+brief required, mock backend. The
+**delete** button is still the old `_mmCreativeAction` toast stub.
+Confirmed flow before building (Zoran asked to). Decisions via popup:
+modal / assets+brief / mock-now.
+
 ## The one-click trigger (client side)
 Button `Request a change` on every V2 module view. One click opens a slim
 modal that has ALREADY captured context; client only picks change/add/fix +
