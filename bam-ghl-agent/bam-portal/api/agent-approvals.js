@@ -1,4 +1,5 @@
 import { withSentryApiRoute } from "./_sentry.js";
+import { notifyClientPush } from "./push/_send.js";
 import { contactsReadTable } from "./_contacts.js";
 // Vercel Serverless Function — Bot Approval Queue (responded-stage booking agent)
 //
@@ -724,7 +725,13 @@ async function runDetect(res, onlyClientId) {
   } catch (_) {}
   const out = [];
   for (const client of (Array.isArray(clients) ? clients : [])) {
-    try { out.push(await detectForClient(client)); }
+    try {
+      const r = await detectForClient(client);
+      out.push(r);
+      // New drafts landed in Hawkeye this run -> one push per client per run.
+      const fresh = (r.drafted || 0) + (r.lost_proposed || 0);
+      if (fresh > 0) notifyClientPush(client.id, "hawkeye-ready", { count: fresh }).catch(() => {});
+    }
     catch (e) { out.push({ client_id: client.id, error: e.message }); }
   }
   return res.status(200).json({ ok: true, academies: out });

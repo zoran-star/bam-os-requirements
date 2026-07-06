@@ -171,6 +171,14 @@ const EVENTS = {
     title: "Due tomorrow",
     body: `Reminder: "${d.label || "an action item"}" is due soon`,
   }),
+  "payment-failed": (d) => ({
+    title: "Payment failed",
+    body: `${d.name || "A member"}'s payment didn't go through - they're flagged in your portal`,
+  }),
+  "hawkeye-ready": (d) => ({
+    title: "Hawkeye has something for you",
+    body: (d.count || 1) > 1 ? `${d.count} drafts are waiting for your approval` : "A draft is waiting for your approval",
+  }),
   "new-message": (d) => ({
     title: d.sender ? `New message from ${d.sender}` : "New message",
     body: d.preview || "You have a new message from your BAM team",
