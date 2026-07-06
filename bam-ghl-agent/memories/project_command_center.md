@@ -3,7 +3,7 @@
 **2026-07-05 - SKELETON SHIPPED (hidden).** The Figma vision: no side nav, the whole business on one scrolling page with a left bubble rail, floating dock (Info / Business blueprint / Settings), and per-section focus modes. Built as a parallel mode in `bam-portal/public/client-portal.html` - the classic nav is untouched and stays the default.
 
 ## How to enter / exit
-- `?cc=1` on the portal URL enters (persists via `localStorage.bam_cc_mode`); `?cc=0` or Settings dock > "Exit command center beta" exits. **V2 academies only** (checked at boot landing dispatch).
+- **DEFAULT for V2 academies since 2026-07-06** (boot still gates on V2_ACCESS). `?cc=0` or Settings dock exit stores `localStorage.bam_cc_optout='1'`; `?cc=1` clears the opt-out. The old bam_cc_mode opt-IN key is gone.
 - Boot hook: landing dispatch in `boot()` calls `openCommandCenter()` instead of `switchView(_landingView())` when flagged.
 
 ## Architecture (the plop-in contract)
@@ -95,6 +95,9 @@
 - The "Your whole business on one page..." sub under the CC greeting shows only for the first 3 visits (localStorage `bam_cc_visits` incremented per home mount), then renders nothing. `_ccHead` already skips empty subs.
 - **FULL portal emoji purge done (2026-07-06)**: ~520 pictographs removed portal-wide. Sole icon slots (36) became 1em stroke SVGs; label prefixes/toasts/blurbs just dropped the emoji. Logic couplings unhooked FIRST: `_TA_AGENTS/_TA_AUTOS/_TA_ENTRY` values lost their emoji and BOTH `.replace(/^\S+\s/,'')` first-token strips were removed with them (they would have eaten the first word); callout `ic` ternary + Hawkeye `circleInner` now emit SVG. KEPT monochrome text glyphs: arrows, checks/crosses, ✎, ★, theme toggle bare sun/moon. Client-typed message content still renders emojis as-is.
 - **Avatar chips neutralized (2026-07-06, Cole: cut random colors)**: `_memberAvatar` no longer hashes names into an 8-color palette; everyone gets one neutral chip (surface-el bg, border, muted initials). Status pills carry the color.
+
+## Booking Calendars view rebuild (2026-07-06, Cole: all 10)
+- v15cal grid: compact hours by default (hugs the week's sessions ±1h; the old `min(lo,12)` clamp is bypassed in compact) + "Show full day" toggle; gold now-line across today's column (minute-accurate) + one-time autoscroll (`_V15CAL._scrolled`); chips are on-system pills with token dots (BK_COLORS = gold/blue/green/amber, replacing teal/orange/pink/periwinkle - also affects the other booking view using bkColor); open slots = faint gold tint + hover dash, CLICK TO BOOK (`_v15calNewBooking(date, time)` now takes prefills); booked chips show time + title-cased name + calendar color bar + data-slot attr; per-day session counts under the day headers; sticky grid header; ArrowLeft/Right change weeks (guarded: view visible, no input focus, no drawer); "Next session ›" jumps/flashes the next upcoming booking, hopping up to 6 weeks (`_V15CAL._seek`).
 
 ## Section mounts (current skeleton)
 | Section | Mount | Content |
