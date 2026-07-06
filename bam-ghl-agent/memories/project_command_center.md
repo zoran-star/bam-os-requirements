@@ -49,7 +49,7 @@
 
 ## Charcoal + sound pass (2026-07-05, Cole picks)
 - **Dark = true charcoal (design-system v1.5)**: global hex swap #131416 bg/ink/on-gold, #1B1D1F surface, #232629 elevated, #2B2E32 hover. Mirrored in tokens.css. Light stays prototype cream (v1.4).
-- **Win card loading state**: pulsing green dot + typed "READING THE BOARD..." label (`_hv2BootType`) + `cc-skel2` shimmer bars (defined in _hv2Style so classic home gets it too); `_hv2WinLoad` replaces when data lands.
+- **Win card loading state**: pulsing green dot + typed "READING THE BUSINESS..." label (`_hv2BootType`) + `cc-skel2` shimmer bars (defined in _hv2Style so classic home gets it too); `_hv2WinLoad` replaces when data lands.
 - **Sound design** (all Cole's picks except confirm-tone): new _SFX methods tick/whooshOut/sent/typeTap/thud/rollClick/sparkle/zip/boot + reused whoosh/kaching/fanfare/chime. Wired: rail lock tick, focus in/out whooshes, revenue-win kaching (once/session), orb pop, quick-reply sent, HUD type taps, red-items thud vs milestone fanfare (once/session), count-up roll clicks (700ms throttle), unread-member chime (once/session), perfect-day sparkle, scrub zip (70ms throttle, pitch=position), CC boot chord. `_SFX._isMuted()` now returns true on <=768px (all portal sounds off on mobile) + "Sounds: on/off" toggle in the dock Settings popover (hm_sfx_muted).
 
 ## Coworker pass (2026-07-05, Cole picks 1,2,3,4,5,7)
@@ -61,6 +61,11 @@
 - **A4 risk in header**: card header is `Actions` + `#cc-act-risk` ("$N/mo at risk", red) filled from the probs sum. The old in-card "See all members" button is gone.
 - **B1 header link**: `_ccHead(label, sub, right)` grew a third `right` param rendering `.cc-head-right` (stopPropagation so the click-to-focus head doesn't fire). Members head uses it for the gold "All members ›" link -> `_ccMemberListOpen()`.
 - **P2 health bar**: `_ccPulseRender` now renders `.cc-hb`, a full-width segmented bar (green live / amber issues / red critical / gray paused, proportional widths) + label "N live · N paused · N issues ›". Whole thing is a button -> `_ccMemberListOpen()`; hover scales the bar. Replaces the per-member pulse dots (looked funky).
+
+## Focus polish (2026-07-06, Cole feedback)
+- Win-card boot label copy: "READING THE BUSINESS..." (was BOARD).
+- Focus pages (`.mm-focus-page`, so marketing + members) now run on the design system fonts: `--font-ui` body/inputs/buttons, `--font-num` 800 for `.modal-title` (they were inheriting legacy Inter/Archivo).
+- Focus background dropped way down: blueprint grid lines at 45% of `--border` via color-mix, gold dots at 10% gold; growth-curve wallpaper area .035 -> .018, line .11 -> .055, highlight pulse .5 -> .28.
 
 ## Section mounts (current skeleton)
 | Section | Mount | Content |
