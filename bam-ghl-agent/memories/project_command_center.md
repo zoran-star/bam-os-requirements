@@ -78,6 +78,9 @@
 - **Sounds trimmed to 5 impactful moments** (Cole: prevent annoyance): boot chord, focus whoosh in/out, revenue kaching, actions thud/fanfare, quick-reply sent. Unwired (methods kept in _SFX): rail tick, orb pop, HUD typeTap, count-up rollClick, unread chime, perfect-day sparkle, scrub zip.
 - **Focus experience v2 (2026-07-06, Cole picked Depth Stack + Dugout, said he may change it)**: blueprint grid REMOVED. Focus page bg = `color-mix(var(--bg) 60%, transparent)`; the page you left stays visible behind (`perspective(1400px) translateY(-1.5vh) scale(.86) rotateX(7deg)` + blur(10px) brightness(.8)); focus page fades/scales in (opacity 0 + scale(1.05) -> 1), gold left seam removed (`::before content:none`). Member agent = dugout layout: `.mma-rail` moved LEFT (border-right) with `.mma-bench` on top (44px orb carries #mma-orb so think/say states animate the bench, name in --font-num, `#mma-status` line driven by `_mmaOrb`: 'Watching the roster...' / 'Reading the roster...'), top `mm-mod-head` removed. `_mmaPin` inserts after `.mma-rail-h` (was children[1], broke when bench became first child). ROLLBACK: revert commit tagged 'Focus experience v2'.
 
+## Milestone baseline fix (2026-07-06)
+- Wiring real members/MRR into the scoreboard woke `_hmCheckMilestones` up: it started dumping a backlog of historic "achievements" (record popups first, then tiers, one per 60s refresh). Fix: first run per client with no `baseline_v1` key silently saves every currently-true tier + current record values, then returns. Celebrations only fire for crossings AFTER the baseline exists. Verified: fresh backlog = 0 popups; 25->50 members afterwards = 1 popup.
+
 ## Section mounts (current skeleton)
 | Section | Mount | Content |
 |---|---|---|
