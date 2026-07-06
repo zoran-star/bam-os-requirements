@@ -3687,9 +3687,9 @@
     position: fixed; inset: 0; z-index: 1000; overflow-y: auto;
     /* blueprint grid: faint graph paper + gold intersection dots */
     background:
-      radial-gradient(circle, var(--accent-border) 1px, transparent 1.5px) 0 0/220px 220px,
-      linear-gradient(var(--border) 1px, transparent 1px) 0 0/44px 44px,
-      linear-gradient(90deg, var(--border) 1px, transparent 1px) 0 0/44px 44px,
+      radial-gradient(circle, color-mix(in srgb, var(--gold) 10%, transparent) 1px, transparent 1.5px) 0 0/220px 220px,
+      linear-gradient(color-mix(in srgb, var(--border) 45%, transparent) 1px, transparent 1px) 0 0/44px 44px,
+      linear-gradient(90deg, color-mix(in srgb, var(--border) 45%, transparent) 1px, transparent 1px) 0 0/44px 44px,
       var(--bg);
     justify-content: center; align-items: flex-start;
     transform: translateX(100vw);
@@ -3707,6 +3707,10 @@
     max-width: 900px; width: min(900px, 96vw); max-height: none;
     margin: 28px auto 48px; background: transparent; border: none; box-shadow: none;
   }
+  /* focus pages run on the design system: Jakarta UI + Nunito display */
+  .mm-focus-page { font-family: var(--font-ui); }
+  .mm-focus-page input, .mm-focus-page textarea, .mm-focus-page button, .mm-focus-page select { font-family: inherit; }
+  .mm-focus-page .modal-title { font-family: var(--font-num); font-weight: 800; letter-spacing: 0; }
   /* pages ride together: main + sidebar pan left exactly as the focus page
      arrives from the right - one attached surface, camera pans */
   /* html.mm-prewarm scoping beats the theme-crossfade transition rule that
@@ -3742,10 +3746,10 @@
   .cc-wall { position: fixed; inset: 0; pointer-events: none; z-index: 0; }
   .cc-wall svg { width: 100%; height: 100%; }
   .cc-wall-area { fill: var(--gold); opacity: 0; transition: opacity .9s ease .55s; }
-  .cc-wall.draw .cc-wall-area { opacity: .035; }
-  .cc-wall-line { fill: none; stroke: var(--gold); stroke-width: 2; opacity: .11; stroke-dasharray: 4200; stroke-dashoffset: 4200; transition: stroke-dashoffset 1.4s cubic-bezier(0.16, 1, 0.3, 1) .25s; }
+  .cc-wall.draw .cc-wall-area { opacity: .018; }
+  .cc-wall-line { fill: none; stroke: var(--gold); stroke-width: 2; opacity: .055; stroke-dasharray: 4200; stroke-dashoffset: 4200; transition: stroke-dashoffset 1.4s cubic-bezier(0.16, 1, 0.3, 1) .25s; }
   .cc-wall-hl { fill: var(--gold); opacity: 0; animation: ccWallHl 2.4s ease .6s 3; }
-  @keyframes ccWallHl { 0%, 100% { opacity: 0; r: 7; } 40% { opacity: .5; r: 11; } }
+  @keyframes ccWallHl { 0%, 100% { opacity: 0; r: 7; } 40% { opacity: .28; r: 11; } }
   .cc-wall.draw .cc-wall-line { stroke-dashoffset: 0; }
   .mm-focus-page .mm-modal-card { position: relative; z-index: 1; }
   html.mm-focus-open, html.mm-focus-open body { overflow-x: hidden; }
@@ -15512,7 +15516,7 @@ async function _hv2Kpi(section, since, until) {
 function _hv2BootType() {
   const el = document.getElementById('hv2-win-boot');
   if (!el || el.textContent) return;
-  const t = 'READING THE BOARD...';
+  const t = 'READING THE BUSINESS...';
   if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) { el.textContent = t; return; }
   let i = 0;
   (function step() {
