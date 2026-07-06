@@ -10805,7 +10805,7 @@ async function openAssetsView() {
     _ASSET_TARGETS = { offers: offers.data || [], staff: staff.data || [], locations: locations.data || [] };
     _renderAssets();
   } catch (e) {
-    host.innerHTML = `<div class="req-empty" style="padding:24px 0;color:#9a3b2f">Couldn't load assets - ${escapeHTML(e.message || String(e))}</div>`;
+    host.innerHTML = `<div class="req-empty" style="padding:24px 0;color:#9a3b2f">Couldn't load assets - ${escapeHTML(_friendlyErr(e, 'please try again in a minute'))}</div>`;
   }
 }
 
@@ -11200,7 +11200,7 @@ async function _assetBankLoad(field, id, category) {
     if (error) throw error;
     rows = data || [];
   } catch (e) {
-    el.innerHTML = `<div style="font-size:12px;color:#9a3b2f">Couldn't load images - ${escapeHTML(e.message || String(e))}</div>`;
+    el.innerHTML = `<div style="font-size:12px;color:#9a3b2f">Couldn't load images - ${escapeHTML(_friendlyErr(e, 'please try again in a minute'))}</div>`;
     return;
   }
   const thumbs = rows.map(a => `
@@ -11912,7 +11912,7 @@ async function _v15kPersonDrawer(obj) {
     const j = await _safeJson(r); if (!r.ok) throw new Error(j.error || ('HTTP ' + r.status));
     if (body) body.innerHTML = _v15kContactInfoHtml(j.contact);
   } catch (e) {
-    const body = document.getElementById('v15cal-drawer-body'); if (body) body.innerHTML = `<div class="req-empty" style="padding:14px 0;color:#9a3b2f">${escapeHTML(e.message || String(e))}</div>`;
+    const body = document.getElementById('v15cal-drawer-body'); if (body) body.innerHTML = `<div class="req-empty" style="padding:14px 0;color:#9a3b2f">${escapeHTML(_friendlyErr(e))}</div>`;
   }
 }
 
@@ -12257,7 +12257,7 @@ function _v15kMcSearch() {
       box.innerHTML = all.length ? all.map(c => `<button onclick='_v15kMcPick(${JSON.stringify(c).replace(/'/g, "&#39;")})' style="display:block;width:100%;text-align:left;background:var(--surface);border:1px solid var(--border);border-radius:7px;padding:8px 10px;margin-bottom:5px;cursor:pointer">
         <div style="font-size:13px;font-weight:600;color:var(--text)">${escapeHTML(c.name || 'Unnamed')} <span style="font-size:10px;color:var(--text-mute);font-weight:400">${c._src === 'stripe' ? 'Stripe' : 'GHL'}</span></div>
         <div style="font-size:11px;color:var(--text-mute)">${escapeHTML(c.email || c.phone || '')}</div></button>`).join('') : `<div style="font-size:12px;color:var(--text-mute);padding:4px 0">No matches.</div>`;
-    } catch (e) { if (box) box.innerHTML = `<div style="font-size:12px;color:#9a3b2f">${escapeHTML(e.message || String(e))}</div>`; }
+    } catch (e) { if (box) box.innerHTML = `<div style="font-size:12px;color:#9a3b2f">${escapeHTML(_friendlyErr(e))}</div>`; }
   }, 280);
 }
 function _v15kMcPick(c) {
@@ -12347,7 +12347,7 @@ async function openV15Cal() {
     _v15calRender();
     _v15calLoadEvents();
   } catch (e) {
-    if (!_swrKeep(host)) host.innerHTML = `<div class="req-empty" style="padding:24px 0;color:#9a3b2f">Couldn't load calendars - ${escapeHTML(e.message || String(e))}</div>`;
+    if (!_swrKeep(host)) host.innerHTML = `<div class="req-empty" style="padding:24px 0;color:#9a3b2f">Couldn't load calendars - ${escapeHTML(_friendlyErr(e, 'please try again in a minute'))}</div>`;
   }
 }
 
@@ -12583,7 +12583,7 @@ async function _v15calOpenAppt(apptId) {
     _V15CAL.msgType = 'SMS';
     const body = document.getElementById('v15cal-drawer-body'); if (body) body.innerHTML = _v15calApptBody(j);
   } catch (e) {
-    const body = document.getElementById('v15cal-drawer-body'); if (body) body.innerHTML = `<div class="req-empty" style="padding:14px 0;color:#9a3b2f">${escapeHTML(e.message || String(e))}</div>`;
+    const body = document.getElementById('v15cal-drawer-body'); if (body) body.innerHTML = `<div class="req-empty" style="padding:14px 0;color:#9a3b2f">${escapeHTML(_friendlyErr(e))}</div>`;
   }
 }
 
@@ -12687,7 +12687,7 @@ async function _v15calSettings(calId) {
     _V15CAL.editSpecial = (j.calendar.special || []).map(s => ({ date: s.date, closed: !!s.closed, open: s.open || '17:00', close: s.close || '20:00' }));
     const body = document.getElementById('v15cal-drawer-body'); if (body) body.innerHTML = _v15calSettingsBody(calId);
   } catch (e) {
-    const body = document.getElementById('v15cal-drawer-body'); if (body) body.innerHTML = `<div class="req-empty" style="padding:14px 0;color:#9a3b2f">${escapeHTML(e.message || String(e))}</div>`;
+    const body = document.getElementById('v15cal-drawer-body'); if (body) body.innerHTML = `<div class="req-empty" style="padding:14px 0;color:#9a3b2f">${escapeHTML(_friendlyErr(e))}</div>`;
   }
 }
 function _v15calSettingsBody(calId) {
@@ -12805,7 +12805,7 @@ function _v15calNbSearch() {
       box.innerHTML = list.length ? list.map(ct => `<button onclick='_v15calNbPick(${JSON.stringify(ct).replace(/'/g, "&#39;")})' style="display:block;width:100%;text-align:left;background:var(--surface);border:1px solid var(--border);border-radius:7px;padding:8px 10px;margin-bottom:5px;cursor:pointer">
         <div style="font-size:13px;font-weight:600;color:var(--text)">${escapeHTML(ct.name || 'Unnamed')}${ct.athlete_name ? ` <span style="color:var(--text-mute);font-weight:400">· ${escapeHTML(ct.athlete_name)}</span>` : ''}</div>
         <div style="font-size:11px;color:var(--text-mute)">${escapeHTML(ct.phone || '')}${ct.phone && ct.email ? ' · ' : ''}${escapeHTML(ct.email || '')}</div></button>`).join('') : `<div style="font-size:12px;color:var(--text-mute);padding:4px 0">No matches.</div>`;
-    } catch (e) { if (box) box.innerHTML = `<div style="font-size:12px;color:#9a3b2f">${escapeHTML(e.message || String(e))}</div>`; }
+    } catch (e) { if (box) box.innerHTML = `<div style="font-size:12px;color:#9a3b2f">${escapeHTML(_friendlyErr(e))}</div>`; }
   }, 280);
 }
 function _v15calNbPick(ct) {
@@ -12941,7 +12941,7 @@ async function openV15Inbox() {
     _ibEnsureMembers().then(() => { _IB_MEMBER_IDX = null; try { _v15ibRenderList(); } catch (_) {} });
   } catch (e) {
     // Keep showing the old data if we had it; only blank to an error otherwise.
-    if (!hadData) host.innerHTML = `<div class="req-empty" style="padding:24px 0;color:#9a3b2f">Couldn't load inbox - ${escapeHTML(e.message || String(e))}</div>`;
+    if (!hadData) host.innerHTML = `<div class="req-empty" style="padding:24px 0;color:#9a3b2f">Couldn't load inbox - ${escapeHTML(_friendlyErr(e, 'please try again in a minute'))}</div>`;
   }
 }
 function _v15ibPill(on) {
@@ -13523,7 +13523,7 @@ async function _v15ibLoadThread(pane) {
     _V15IB.messages = j.messages || [];
     _v15ibRenderThreadSplit(pane);
   } catch (e) {
-    pane.innerHTML = `<div class="req-empty" style="padding:24px;color:#9a3b2f">Couldn't load thread - ${escapeHTML(e.message)}</div>`;
+    pane.innerHTML = `<div class="req-empty" style="padding:24px;color:#9a3b2f">Couldn't load thread - ${escapeHTML(_friendlyErr(e, 'please try again in a minute'))}</div>`;
   }
 }
 
@@ -14076,7 +14076,7 @@ async function _v15ibOpen(convId, contactId, phone, email, name, channel) {
     _V15IB.messages = j.messages || [];
     _v15ibRenderThread();
   } catch (e) {
-    if (body) body.innerHTML = `<div class="req-empty" style="padding:24px 0;color:#9a3b2f">Couldn't load thread - ${escapeHTML(e.message || String(e))}</div>`;
+    if (body) body.innerHTML = `<div class="req-empty" style="padding:24px 0;color:#9a3b2f">Couldn't load thread - ${escapeHTML(_friendlyErr(e, 'please try again in a minute'))}</div>`;
   }
 }
 
@@ -14314,7 +14314,7 @@ async function _v15ibSetup() {
         ${row('Email', j.email)}
       </div>`;
   } catch (e) {
-    body.innerHTML = `<div class="req-empty" style="padding:24px 0;color:#9a3b2f">Couldn't load sender info - ${escapeHTML(e.message || String(e))}</div>`;
+    body.innerHTML = `<div class="req-empty" style="padding:24px 0;color:#9a3b2f">Couldn't load sender info - ${escapeHTML(_friendlyErr(e, 'please try again in a minute'))}</div>`;
   }
 }
 
@@ -14336,7 +14336,7 @@ async function _v15ibMassSend() {
     _v15msForm();
   } catch (e) {
     const inner = document.getElementById('v15ms-inner');
-    if (inner) inner.innerHTML = `<div style="color:#9a3b2f">Couldn't load tags - ${escapeHTML(e.message || String(e))}</div><div style="text-align:right;margin-top:12px"><button onclick="_v15msClose()" style="background:none;border:1px solid var(--border);border-radius:8px;color:var(--text-sub);padding:8px 16px;cursor:pointer">Close</button></div>`;
+    if (inner) inner.innerHTML = `<div style="color:#9a3b2f">Couldn't load tags - ${escapeHTML(_friendlyErr(e, 'please try again in a minute'))}</div><div style="text-align:right;margin-top:12px"><button onclick="_v15msClose()" style="background:none;border:1px solid var(--border);border-radius:8px;color:var(--text-sub);padding:8px 16px;cursor:pointer">Close</button></div>`;
   }
 }
 function _v15msClose() { clearTimeout(_V15MS.pollTimer); document.getElementById('v15ms-overlay')?.remove(); }
@@ -14497,7 +14497,7 @@ async function _contactsLoad() {
     _CONTACTS = j.contacts || [];
     _contactsRender();
   } catch (e) {
-    list.innerHTML = `<div class="req-empty" style="padding:24px 0;color:#9a3b2f">Couldn't load contacts - ${escapeHTML(e.message || String(e))}</div>`;
+    list.innerHTML = `<div class="req-empty" style="padding:24px 0;color:#9a3b2f">Couldn't load contacts - ${escapeHTML(_friendlyErr(e, 'please try again in a minute'))}</div>`;
   }
 }
 
@@ -14803,7 +14803,7 @@ async function _cdLoadMemory(c) {
     if (!r.ok) throw new Error(j.error || ('HTTP ' + r.status));
     const el = host(); if (el) el.innerHTML = _cdMemoryHtml(j);
   } catch (e) {
-    const el = host(); if (el) el.innerHTML = `<div style="font-size:12px;color:var(--text-mute)">Memory unavailable - ${escapeHTML(e.message || String(e))}</div>`;
+    const el = host(); if (el) el.innerHTML = `<div style="font-size:12px;color:var(--text-mute)">Memory unavailable - ${escapeHTML(_friendlyErr(e, 'please try again in a minute'))}</div>`;
   }
 }
 function _cdMemoryHtml(j) {
@@ -14863,7 +14863,7 @@ async function _contactsLoadStripe(c) {
     if (!r.ok) throw new Error(j.error || ('HTTP ' + r.status));
     const el = host(); if (el) el.innerHTML = _cdStripeSection(j);
   } catch (e) {
-    const el = host(); if (el) el.innerHTML = `<div style="font-size:12px;color:var(--text-mute)">Stripe unavailable - ${escapeHTML(e.message || String(e))}</div>`;
+    const el = host(); if (el) el.innerHTML = `<div style="font-size:12px;color:var(--text-mute)">Stripe unavailable - ${escapeHTML(_friendlyErr(e, 'please try again in a minute'))}</div>`;
   }
 }
 function _cdStripeSection(j) {
@@ -14962,7 +14962,7 @@ async function _contactsOpenSetup() {
         <button id="contacts-setup-save" onclick="_contactsSaveSetup()" style="margin-top:14px;background:var(--gold);color:#0B0B0D;border:none;padding:10px 18px;border-radius:8px;font-weight:700;font-size:13px;cursor:pointer">Save</button>
       </div>`;
   } catch (e) {
-    host.innerHTML = `<div class="req-empty" style="padding:24px 0;color:#9a3b2f">Couldn't load setup - ${escapeHTML(e.message || String(e))}</div>`;
+    host.innerHTML = `<div class="req-empty" style="padding:24px 0;color:#9a3b2f">Couldn't load setup - ${escapeHTML(_friendlyErr(e, 'please try again in a minute'))}</div>`;
   }
 }
 async function _contactsSaveSetup() {
@@ -18554,7 +18554,7 @@ async function bkFetchAndRender() {
     bkBuildEvents();
     renderCalendar();
   } catch (e) {
-    host.innerHTML = `<div class="req-empty" style="padding:14px 0">Couldn't load booking calendars - ${escapeHTML(e.message)}</div>`;
+    host.innerHTML = `<div class="req-empty" style="padding:14px 0">Couldn't load booking calendars - ${escapeHTML(_friendlyErr(e, 'please try again in a minute'))}</div>`;
   }
 }
 
@@ -18745,7 +18745,7 @@ async function bkCreate(name, capacity, slotDurationMinutes) {
     bkFetchAndRender();
     if (typeof _epFetchAndRender === 'function') _epFetchAndRender(); // new entry point appears on Pipelines rail
   } catch (e) {
-    if (host) host.insertAdjacentHTML('afterbegin', `<div class="bk-err">Couldn't create calendar - ${escapeHTML(e.message)}</div>`);
+    if (host) host.insertAdjacentHTML('afterbegin', `<div class="bk-err">Couldn't create calendar - ${escapeHTML(_friendlyErr(e, 'please try again in a minute'))}</div>`);
   }
 }
 
@@ -20610,7 +20610,7 @@ async function _bbStaffStagesLoad(memberId) {
       `<div style="flex-basis:100%;font-size:11px;color:var(--text-mute)">Tick a pipeline to make it visible to this teammate, then choose which stages they see. Unticking a pipeline hides it entirely.</div>`;
   } catch (e) {
     host.dataset.loaded = '';
-    host.innerHTML = `<div style="color:#9a3b2f;font-size:12px">Couldn't load - ${escapeHTML(e.message)}</div>`;
+    host.innerHTML = `<div style="color:#9a3b2f;font-size:12px">Couldn't load - ${escapeHTML(_friendlyErr(e, 'please try again in a minute'))}</div>`;
   }
 }
 
@@ -21250,7 +21250,7 @@ async function _bbRenderAgentLearnings(panel) {
     const json = await _safeJson(r);
     const host = document.getElementById('bb-learn-list');
     if (!host) return;
-    if (!r.ok) { host.innerHTML = `<div class="bb-empty">Couldn't load - ${escapeHTML(json.error || ('HTTP ' + r.status))}</div>`; return; }
+    if (!r.ok) { host.innerHTML = `<div class="bb-empty">Couldn't load - ${escapeHTML(_friendlyErr(json.error || ('HTTP ' + r.status), 'please try again in a minute'))}</div>`; return; }
     const lessons = (json.lessons || []).filter(l => l.active !== false);
     if (!lessons.length) { host.innerHTML = `<div class="bb-empty">No learnings yet. As you coach the agent (in the sandbox, or when you adjust a reply in Inbox → Hawkeye), what it learns shows up here.</div>`; return; }
     host.innerHTML = lessons.map(l => `
@@ -21259,7 +21259,7 @@ async function _bbRenderAgentLearnings(panel) {
         <div style="margin-top:6px;font-size:11px;color:var(--text-mute,#5A5A60);font-family:'JetBrains Mono',monospace">learned ${escapeHTML(_ibFormatDate(l.created_at))}${l.scope === 'general' ? ' · shared brain' : ''}</div>
       </div>`).join('');
   } catch (e) {
-    const host = document.getElementById('bb-learn-list'); if (host) host.innerHTML = `<div class="bb-empty">Couldn't load - ${escapeHTML(e.message)}</div>`;
+    const host = document.getElementById('bb-learn-list'); if (host) host.innerHTML = `<div class="bb-empty">Couldn't load - ${escapeHTML(_friendlyErr(e, 'please try again in a minute'))}</div>`;
   }
 }
 
@@ -21398,7 +21398,7 @@ async function _taRenderMode() {
     const d = await _taConfigApi('get-mode', { client_id: CLIENT_ID });
     cur = d[_TA_MODE_FIELD[agent]] || 'off';
     selfDriveOn = !!d.self_drive_enabled;   // global kill-switch
-  } catch (e) { p.innerHTML = `<div style="color:#e07070;font-size:13px">Couldn't load - ${escapeHTML(e.message)}</div>`; return; }
+  } catch (e) { p.innerHTML = `<div style="color:#e07070;font-size:13px">Couldn't load - ${escapeHTML(_friendlyErr(e, 'please try again in a minute'))}</div>`; return; }
   _TA.mode = cur; _TA.selfDriveOn = selfDriveOn;
   const modes = _TA_MODES.filter(m => selfDriveOn || m.key !== 'self_drive');
   const seg = (on, danger) => `background:${on ? (danger ? '#e05a42' : 'var(--gold)') : 'transparent'};color:${on ? '#0B0B0D' : 'var(--text-sub)'};border:1px solid ${on ? (danger ? '#e05a42' : 'var(--gold)') : 'var(--border)'};border-radius:9px;padding:9px 16px;font-size:13.5px;font-weight:700;cursor:pointer;font-family:inherit`;
@@ -21499,7 +21499,7 @@ async function _taRenderEntryPoints() {
     const al = await _autoApi('list');
     _AUTO.list = al.automations || [];
     try { const ov = await _autoApi('overview'); _AUTO.overview = ov.overview || []; } catch (_) { _AUTO.overview = []; }
-  } catch (e) { p.innerHTML = `<div style="color:#e07070;font-size:13px">Couldn't load - ${escapeHTML(e.message)}</div>`; return; }
+  } catch (e) { p.innerHTML = `<div style="color:#e07070;font-size:13px">Couldn't load - ${escapeHTML(_friendlyErr(e, 'please try again in a minute'))}</div>`; return; }
   _taEpForm();
 }
 function _taEpStageOpts(selected) {
@@ -21624,7 +21624,7 @@ async function _taRenderAutomations() {
     // Dormant (approved:false) until the academy reviews + approves it.
     if (!have.has('missed_trial')) { await _autoApi('seed-form-intro', { automation_key: 'missed_trial' }); seeded = true; }
     if (seeded) { d = await _autoApi('list'); list = d.automations || []; }
-  } catch (e) { p.innerHTML = `<div style="color:#e07070;font-size:13px">Couldn't load - ${escapeHTML(e.message)}</div>`; return; }
+  } catch (e) { p.innerHTML = `<div style="color:#e07070;font-size:13px">Couldn't load - ${escapeHTML(_friendlyErr(e, 'please try again in a minute'))}</div>`; return; }
   const order = { onboarding: 0, missed_trial: 1, ghosted: 2, nurture: 3 };
   list.sort((a, b) => ((order[a.automation_key] ?? 9) - (order[b.automation_key] ?? 9)));
   _AUTO.list = list;
@@ -21663,7 +21663,7 @@ async function _autoOpenPeople(autoId, position) {
       ? people.map(pp => `<button onclick="_autoOpenContact('${escapeHTML(pp.contact_id)}','${escapeHTML((pp.contact_name || '').replace(/'/g, ''))}')" style="display:flex;width:100%;align-items:center;gap:9px;text-align:left;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:9px 11px;margin-bottom:7px;cursor:pointer;font-family:inherit"><span style="font-size:13.5px;color:var(--text);font-weight:600">${escapeHTML(pp.contact_name || pp.contact_id)}</span><span style="flex:1"></span><span style="font-size:11px;color:var(--text-mute)">step ${Number(pp.current_position) + 1} ›</span></button>`).join('')
       : '<div style="color:var(--text-mute);font-size:13px;padding:18px 0;text-align:center">Nobody here yet.</div>';
     _autoPeopleModalBody(body);
-  } catch (e) { _autoPeopleModalBody(`<div style="color:#e07070;font-size:13px;padding:12px 0">Couldn't load - ${escapeHTML(e.message)}</div>`); }
+  } catch (e) { _autoPeopleModalBody(`<div style="color:#e07070;font-size:13px;padding:12px 0">Couldn't load - ${escapeHTML(_friendlyErr(e, 'please try again in a minute'))}</div>`); }
 }
 function _autoPeopleModal(title, bodyHtml) {
   _autoPeopleClose();
@@ -21795,7 +21795,7 @@ async function _autoPreviewEmail(sid) {
     if (f) f.srcdoc = d.html || '<p style="padding:24px;font-family:sans-serif">Empty.</p>';
   } catch (e) {
     const b = document.getElementById('auto-prev-body');
-    if (b) b.innerHTML = `<div style="padding:24px;color:#e07070;font-family:inherit">Couldn't render - ${escapeHTML(e.message)}</div>`;
+    if (b) b.innerHTML = `<div style="padding:24px;color:#e07070;font-family:inherit">Couldn't render - ${escapeHTML(_friendlyErr(e, 'please try again in a minute'))}</div>`;
   }
 }
 function _autoPreviewClose() { const o = document.getElementById('auto-prev-ov'); if (o) o.remove(); }
@@ -21931,7 +21931,7 @@ async function _taHealthLoad() {
     const needN = opps.filter(o => cardBy.get(String(o.contactId || ''))).length;
     body.innerHTML = `<div style="font-size:12px;color:var(--text-mute);margin-bottom:8px">${opps.length} in Responded · ${needN} need action</div>${rows}`;
   } catch (e) {
-    body.innerHTML = `<div style="color:#e07070;font-size:13px">Couldn't load - ${escapeHTML(e.message || String(e))}</div>`;
+    body.innerHTML = `<div style="color:#e07070;font-size:13px">Couldn't load - ${escapeHTML(_friendlyErr(e, 'please try again in a minute'))}</div>`;
   }
 }
 async function _taHealthScan() {
@@ -22006,7 +22006,7 @@ async function _taChatTeachSave(i) {
       ? `<span style="color:var(--gold)">Looks like global strategy - sent to BAM for approval.</span>`
       : `<span style="color:#5BBF7B">Saved to your academy.</span>`;
     ta.value = '';
-  } catch (e) { if (note) note.innerHTML = `<span style="color:#E5736A">${escapeHTML(e.message)}</span>`; }
+  } catch (e) { if (note) note.innerHTML = `<span style="color:#E5736A">${escapeHTML(_friendlyErr(e))}</span>`; }
 }
 // Save the last lead message + this agent reply as an approved example.
 async function _taSaveExample(i) {
@@ -22071,7 +22071,7 @@ async function _taTeach() {
       ? `<span style="color:var(--gold)">Looks like global strategy - sent to BAM for approval. It already applies to your academy.</span>`
       : `<span style="color:#5BBF7B">Saved to your academy.</span>`;
     await _taLoadLessons();
-  } catch (e) { if (note) note.innerHTML = `<span style="color:#E5736A">${escapeHTML(e.message)}</span>`; }
+  } catch (e) { if (note) note.innerHTML = `<span style="color:#E5736A">${escapeHTML(_friendlyErr(e))}</span>`; }
   finally { if (btn) { btn.disabled = false; btn.textContent = 'Teach lesson'; } }
 }
 
@@ -22094,7 +22094,7 @@ async function _taLoadLessons() {
         </div>
       </div>`;
     }).join('');
-  } catch (e) { host.innerHTML = `<div class="bb-empty">Couldn't load - ${escapeHTML(e.message)}</div>`; }
+  } catch (e) { host.innerHTML = `<div class="bb-empty">Couldn't load - ${escapeHTML(_friendlyErr(e, 'please try again in a minute'))}</div>`; }
 }
 
 async function _taForget(id) {
@@ -22146,7 +22146,7 @@ async function _taRenderKnowledge() {
     host.innerHTML = autosSlot + (html || `<div class="bb-empty">No editable sections.</div>`);
     if (hasAutos) _confirmAutosLoad(_TA.target);
   } catch (e) {
-    const host = document.getElementById('ta-section-list'); if (host) host.innerHTML = `<div class="bb-empty">Couldn't load - ${escapeHTML(e.message)}</div>`;
+    const host = document.getElementById('ta-section-list'); if (host) host.innerHTML = `<div class="bb-empty">Couldn't load - ${escapeHTML(_friendlyErr(e, 'please try again in a minute'))}</div>`;
   }
 }
 
@@ -22170,7 +22170,7 @@ async function _confirmAutosLoad(agent) {
     _CA.data = res.automations || null;
     _confirmAutosRender();
   } catch (e) {
-    host.innerHTML = `<div class="bb-empty">Couldn't load automations - ${escapeHTML(e.message)}</div>`;
+    host.innerHTML = `<div class="bb-empty">Couldn't load automations - ${escapeHTML(_friendlyErr(e, 'please try again in a minute'))}</div>`;
   }
 }
 
@@ -22259,7 +22259,7 @@ async function _confirmAutosSave() {
     _confirmAutosRender();
     const n = document.getElementById('ca-note'); if (n) n.innerHTML = `<span style="color:#5BBF7B">Saved ✓</span>`;
   } catch (e) {
-    const n = document.getElementById('ca-note'); if (n) n.innerHTML = `<span style="color:#E5736A">${escapeHTML(e.message)}</span>`;
+    const n = document.getElementById('ca-note'); if (n) n.innerHTML = `<span style="color:#E5736A">${escapeHTML(_friendlyErr(e))}</span>`;
   }
 }
 
@@ -22279,7 +22279,7 @@ async function _taSaveSection(key, scope) {
     await _taApi('update-section', { key, body: ta.value });
     if (note) note.innerHTML = `<span style="color:#5BBF7B">Saved ✓${scope === 'global' ? ' (global)' : ''}</span>`;
     setTimeout(() => _taRenderKnowledge(), 700);
-  } catch (e) { if (note) note.innerHTML = `<span style="color:#E5736A">${escapeHTML(e.message)}</span>`; }
+  } catch (e) { if (note) note.innerHTML = `<span style="color:#E5736A">${escapeHTML(_friendlyErr(e))}</span>`; }
 }
 
 async function _taResetSection(key, scope) {
@@ -25823,7 +25823,7 @@ async function _renderCampaignCreatives(campaignId) {
     });
     const json = await _safeJson(res);
     if (!res.ok) {
-      gridEl.innerHTML = `<div class="req-empty" style="grid-column:1/-1;padding:18px 0">Couldn't load creatives: ${escapeHTML(json.error || ('HTTP ' + res.status))}</div>`;
+      gridEl.innerHTML = `<div class="req-empty" style="grid-column:1/-1;padding:18px 0">Couldn't load creatives: ${escapeHTML(_friendlyErr(json.error || ('HTTP ' + res.status), 'please try again in a minute'))}</div>`;
       return;
     }
     const creatives = json.creatives || [];
@@ -25927,7 +25927,7 @@ async function _renderCampaignCreatives(campaignId) {
         </div>`;
     }).join('');
   } catch (e) {
-    gridEl.innerHTML = `<div class="req-empty" style="grid-column:1/-1;padding:18px 0">Failed: ${escapeHTML(e.message)}</div>`;
+    gridEl.innerHTML = `<div class="req-empty" style="grid-column:1/-1;padding:18px 0">Failed: ${escapeHTML(_friendlyErr(e, 'please try again in a minute'))}</div>`;
   }
 }
 
@@ -27263,7 +27263,7 @@ async function fetchAndRenderActionItems() {
       try { await loadTickets(); _renderActionItems(); _updateActionItemsBadge(); } catch (_) {}
     }
   } catch (e) {
-    container.innerHTML = `<div class="req-empty" style="padding:20px 0">Couldn't load action items - ${escapeHTML(e.message)}</div>`;
+    container.innerHTML = `<div class="req-empty" style="padding:20px 0">Couldn't load action items - ${escapeHTML(_friendlyErr(e, 'please try again in a minute'))}</div>`;
   }
 }
 
@@ -27738,7 +27738,7 @@ async function fetchAndRenderMembers() {
     await _loadMemberPriceStatusMap();   // priceId → live/archived (offer-aware), one fetch for the whole roster
     _renderMembersView();
   } catch (e) {
-    container.innerHTML = `<div class="req-empty" style="padding:20px 0">Couldn't load members - ${escapeHTML(e.message)}</div>`;
+    container.innerHTML = `<div class="req-empty" style="padding:20px 0">Couldn't load members - ${escapeHTML(_friendlyErr(e, 'please try again in a minute'))}</div>`;
   }
 }
 
@@ -28769,7 +28769,7 @@ async function fetchAndRenderPipelines() {
     // mode isn't known yet, _plLoadAgentMode kicks the scan once it resolves.
     if (_PL_AGENT_MODE && _PL_AGENT_MODE !== 'off') { try { _plScanNow(null, true); } catch (_) {} }
   } catch (e) {
-    if (!hadData) container.innerHTML = `<div class="req-empty" style="padding:20px 0">Couldn't load pipelines - ${escapeHTML(e.message)}</div>`;
+    if (!hadData) container.innerHTML = `<div class="req-empty" style="padding:20px 0">Couldn't load pipelines - ${escapeHTML(_friendlyErr(e, 'please try again in a minute'))}</div>`;
   }
 }
 
@@ -28792,7 +28792,7 @@ async function _epFetchAndRender() {
     _EP_DATA = json.entry_points || [];
     _renderEntryRail();
   } catch (e) {
-    host.innerHTML = `<div class="pl-empty">Couldn't load entry points - ${escapeHTML(e.message)}</div>`;
+    host.innerHTML = `<div class="pl-empty">Couldn't load entry points - ${escapeHTML(_friendlyErr(e, 'please try again in a minute'))}</div>`;
   }
 }
 
@@ -30093,7 +30093,7 @@ function _plRenderFocus(stage, stages, idx) {
   if (kind === 'agent' || kind === 'automation') {
     _TA.target = bot.key;
     if (kind === 'agent' && !['test', 'lessons', 'knowledge', 'mode'].includes(_TA.tab)) _TA.tab = 'test';
-    try { _taRenderPanel(); } catch (e) { const pp = document.getElementById('ta-panel'); if (pp) pp.innerHTML = '<div style="color:var(--red);font-size:13px">Could not load - ' + escapeHTML(e.message || String(e)) + '</div>'; }
+    try { _taRenderPanel(); } catch (e) { const pp = document.getElementById('ta-panel'); if (pp) pp.innerHTML = '<div style="color:var(--red);font-size:13px">Could not load - ' + escapeHTML(_friendlyErr(e, 'please try again in a minute')) + '</div>'; }
   }
 }
 function _plFocusTab(k) {
@@ -30706,7 +30706,7 @@ async function _plLoadMessages() {
     _PL_MSG.conversationId = j.conversation_id || null;
     _plRenderThread(j.messages || []);
   } catch (e) {
-    host.innerHTML = `<div style="color:#9a3b2f;font-size:13px">Couldn't load messages - ${escapeHTML(e.message)}</div>`;
+    host.innerHTML = `<div style="color:#9a3b2f;font-size:13px">Couldn't load messages - ${escapeHTML(_friendlyErr(e, 'please try again in a minute'))}</div>`;
   }
 }
 
@@ -30900,7 +30900,7 @@ async function fetchAndRenderInbox() {
     _acxRefreshCount();
     _aclxRefreshCount();
   } catch (e) {
-    container.innerHTML = `<div class="req-empty" style="padding:20px 0">Couldn't load inbox - ${escapeHTML(e.message)}</div>`;
+    container.innerHTML = `<div class="req-empty" style="padding:20px 0">Couldn't load inbox - ${escapeHTML(_friendlyErr(e, 'please try again in a minute'))}</div>`;
   }
 }
 
@@ -31650,7 +31650,7 @@ async function _vmxLoad() {
     _VMX.rows = j.voicemails || [];
     _vmxRender();
   } catch (e) {
-    body.innerHTML = `<div style="max-width:720px;margin:0 auto;color:#9a3b2f;font-size:13px">Couldn't load voicemails - ${escapeHTML(e.message)}</div>`;
+    body.innerHTML = `<div style="max-width:720px;margin:0 auto;color:#9a3b2f;font-size:13px">Couldn't load voicemails - ${escapeHTML(_friendlyErr(e, 'please try again in a minute'))}</div>`;
   }
 }
 
@@ -31723,7 +31723,7 @@ async function _vmxPlay(id) {
     holder.innerHTML = `<audio controls autoplay src="${src}" style="width:100%;height:36px"></audio>`;
     _vmxHeard(id);
   } catch (e) {
-    holder.innerHTML = `<span style="font-size:12px;color:#9a3b2f">Couldn't load the recording - ${escapeHTML(e.message)}</span>`;
+    holder.innerHTML = `<span style="font-size:12px;color:#9a3b2f">Couldn't load the recording - ${escapeHTML(_friendlyErr(e, 'please try again in a minute'))}</span>`;
   }
 }
 
@@ -32532,7 +32532,7 @@ async function _botRenderQueue() {
         <div class="ib-row-date">${escapeHTML(_ibFormatDate(q.last_at))}</div>
       </div>`).join('');
   } catch (e) {
-    container.innerHTML = `<div class="req-empty" style="padding:20px 0">Couldn't load the bot queue - ${escapeHTML(e.message)}</div>`;
+    container.innerHTML = `<div class="req-empty" style="padding:20px 0">Couldn't load the bot queue - ${escapeHTML(_friendlyErr(e, 'please try again in a minute'))}</div>`;
   }
 }
 
@@ -32551,7 +32551,7 @@ async function _botOpenApproval(idx) {
     _BOT_CUR.draft = d;
     _botRenderApproval();
   } catch (e) {
-    drawer.innerHTML = `<div style="padding:24px;color:var(--text)">Couldn't draft: ${escapeHTML(e.message)}<br><br><button onclick="closeInboxDrawer()" style="background:transparent;border:1px solid var(--border-med);color:var(--text);border-radius:8px;padding:8px 16px;cursor:pointer">Close</button></div>`;
+    drawer.innerHTML = `<div style="padding:24px;color:var(--text)">Couldn't draft: ${escapeHTML(_friendlyErr(e, 'please try again in a minute'))}<br><br><button onclick="closeInboxDrawer()" style="background:transparent;border:1px solid var(--border-med);color:var(--text);border-radius:8px;padding:8px 16px;cursor:pointer">Close</button></div>`;
   }
 }
 
@@ -32723,7 +32723,7 @@ async function openInboxThread(conversationId, contactId) {
     _INBOX_THREAD = { convo, messages: json.messages || [], conversationId, contactId };
     _renderInboxDrawer();
   } catch (e) {
-    drawer.innerHTML = `<div style="padding:24px;color:#9a3b2f">Couldn't load thread - ${escapeHTML(e.message)}</div>`;
+    drawer.innerHTML = `<div style="padding:24px;color:#9a3b2f">Couldn't load thread - ${escapeHTML(_friendlyErr(e, 'please try again in a minute'))}</div>`;
   }
 }
 
@@ -32982,7 +32982,7 @@ function _ibComposeSearch(q) {
           </div>`).join('')
         : `<div style="padding:10px;color:var(--text-mute);font-size:13px">No contacts match “${escapeHTML(query)}”.</div>`;
     } catch (e) {
-      if (host) host.innerHTML = `<div style="padding:10px;color:#9a3b2f;font-size:13px">${escapeHTML(e.message)}</div>`;
+      if (host) host.innerHTML = `<div style="padding:10px;color:#9a3b2f;font-size:13px">${escapeHTML(_friendlyErr(e))}</div>`;
     }
   }, 300);
 }
@@ -33223,7 +33223,7 @@ async function openCoachiqLinks(highlightKeys) {
     _renderCoachiqLinks(json, highlightKeys);
   } catch (e) {
     const b = document.getElementById('ciq-links-body');
-    if (b) b.innerHTML = '<div style="color:var(--danger,#e0654f);">' + escapeHTML(e.message || String(e)) + '</div>';
+    if (b) b.innerHTML = '<div style="color:var(--danger,#e0654f);">' + escapeHTML(_friendlyErr(e)) + '</div>';
   }
 }
 
@@ -33919,7 +33919,7 @@ async function _sorterSearchExisting(key) {
     _sorterFilterPrices(slotId);
   } catch (e) {
     const list = document.getElementById(slotId + '-list');
-    if (list) list.innerHTML = `<div style="font-size:11.5px;color:#e0654f;">Failed: ${escapeHTML(e.message)}</div>`;
+    if (list) list.innerHTML = `<div style="font-size:11.5px;color:#e0654f;">Failed: ${escapeHTML(_friendlyErr(e, 'please try again in a minute'))}</div>`;
   }
 }
 function _sorterFilterPrices(slotId) {
@@ -33954,7 +33954,7 @@ async function _sorterLinkExisting(slotId, priceId) {
     if (!r.ok) throw new Error(_sorterErr(json.error) || ('HTTP ' + r.status));
     _sorterLoadStep1(); // refresh so the linked price shows as the LIVE chip
   } catch (e) {
-    slot.innerHTML = `<div style="font-size:11.5px;color:#e0654f;margin-top:6px;">Failed: ${escapeHTML(e.message)}</div>`;
+    slot.innerHTML = `<div style="font-size:11.5px;color:#e0654f;margin-top:6px;">Failed: ${escapeHTML(_friendlyErr(e, 'please try again in a minute'))}</div>`;
   }
 }
 
@@ -34001,7 +34001,7 @@ async function _sorterProposeMissing(key) {
       </div>`;
     }
   } catch (e) {
-    if (slot) slot.innerHTML = `<div style="font-size:11.5px;color:#e0654f;margin-top:6px;">Failed: ${escapeHTML(e.message)}</div>`;
+    if (slot) slot.innerHTML = `<div style="font-size:11.5px;color:#e0654f;margin-top:6px;">Failed: ${escapeHTML(_friendlyErr(e, 'please try again in a minute'))}</div>`;
   }
 }
 
@@ -34383,7 +34383,7 @@ async function _sorterOnFile(input) {
         body.prepend(note);
       }
     } else if (body) {
-      body.innerHTML = `<div class="req-empty" style="padding:24px 0">Couldn't read CSV - ${escapeHTML(e.message)}</div>`;
+      body.innerHTML = `<div class="req-empty" style="padding:24px 0">Couldn't read CSV - ${escapeHTML(_friendlyErr(e, 'please try again in a minute'))}</div>`;
     }
   }
 }
@@ -35870,7 +35870,7 @@ async function _sorterRunChecks() {
     if (json.batch_id) _SORTER.batchId = json.batch_id;
     _sorterRenderBody();
   } catch (e) {
-    if (host) host.innerHTML = `<div class="req-empty" style="padding:24px 0">Checks failed - ${escapeHTML(e.message)}</div>`;
+    if (host) host.innerHTML = `<div class="req-empty" style="padding:24px 0">Checks failed - ${escapeHTML(_friendlyErr(e, 'please try again in a minute'))}</div>`;
   }
 }
 
@@ -35922,7 +35922,7 @@ async function _sorterCiqLoad() {
     const json = await _safeJson(r);
     if (!r.ok) throw new Error(json.error || ('HTTP ' + r.status));
     _sorterCiqRender(json);
-  } catch (e) { host.innerHTML = '<div style="color:var(--danger,#e0654f);">' + escapeHTML(e.message || String(e)) + '</div>'; }
+  } catch (e) { host.innerHTML = '<div style="color:var(--danger,#e0654f);">' + escapeHTML(_friendlyErr(e)) + '</div>'; }
 }
 // app.coachiq.io/<slug>/athletes → admin.coachiq.io/<slug>/athletes/people/clients (the
 // academy's client list - best we can deep-link to; no per-member profile id available).
@@ -36290,7 +36290,7 @@ function _sorterRenderStepFinish(host) {
       _sorterSetNext(`<button onclick="_sorterPromote()" ${clean > 0 ? '' : 'disabled'} style="font-size:13px;font-weight:700;padding:9px 18px;border-radius:9px;border:none;background:${clean > 0 ? 'var(--accent,#D4B65C)' : 'rgba(255,255,255,0.08)'};color:${clean > 0 ? '#1a1a1a' : 'var(--text-mute,#888)'};cursor:${clean > 0 ? 'pointer' : 'not-allowed'};">&#9989; Promote ${clean} to live roster</button>`);
     } catch (e) {
       const fhost = document.getElementById('pc-sorter-finish-host');
-      if (fhost) fhost.innerHTML = '<div style="color:var(--danger,#e0654f);">' + escapeHTML(e.message || String(e)) + '</div>';
+      if (fhost) fhost.innerHTML = '<div style="color:var(--danger,#e0654f);">' + escapeHTML(_friendlyErr(e)) + '</div>';
     }
   })();
 }
@@ -36430,7 +36430,7 @@ async function fetchAndRenderPricing() {
     _PRICING_DATA = json;
     _renderPricingView();
   } catch (e) {
-    container.innerHTML = `<div class="req-empty" style="padding:20px 0">Couldn't load pricing - ${escapeHTML(e.message)}</div>`;
+    container.innerHTML = `<div class="req-empty" style="padding:20px 0">Couldn't load pricing - ${escapeHTML(_friendlyErr(e, 'please try again in a minute'))}</div>`;
   }
 }
 
@@ -36574,7 +36574,7 @@ async function openPricingDrawer(priceId) {
     if (!r.ok) throw new Error(json.error || ('HTTP ' + r.status));
     _renderPricingDrawer(json);
   } catch (e) {
-    drawer.innerHTML = `<div style="padding:20px;color:#9a3b2f">Couldn't load price - ${escapeHTML(e.message)}</div>`;
+    drawer.innerHTML = `<div style="padding:20px;color:#9a3b2f">Couldn't load price - ${escapeHTML(_friendlyErr(e, 'please try again in a minute'))}</div>`;
   }
 }
 
@@ -36716,7 +36716,7 @@ async function mViewPrice(priceId) {
     _mRenderPrice(j);
   } catch (e) {
     const box = document.querySelector('#m-price-host [role="dialog"]');
-    if (box) box.innerHTML = `<div style="font-size:13px;color:#9a3b2f">Couldn't load price - ${escapeHTML(e.message)}</div>`;
+    if (box) box.innerHTML = `<div style="font-size:13px;color:#9a3b2f">Couldn't load price - ${escapeHTML(_friendlyErr(e, 'please try again in a minute'))}</div>`;
   }
 }
 
@@ -37083,7 +37083,7 @@ async function openMemberPopup(memberId) {
     _renderMemberModalBody(json.member, json.stripe, json.history, json.calls);
   } catch (e) {
     const body = document.getElementById('member-modal-body');
-    if (body) body.innerHTML = `<div style="padding:24px 0;color:#9a3b2f">Couldn't load - ${escapeHTML(e.message)}</div>`;
+    if (body) body.innerHTML = `<div style="padding:24px 0;color:#9a3b2f">Couldn't load - ${escapeHTML(_friendlyErr(e, 'please try again in a minute'))}</div>`;
   }
 }
 
@@ -37398,7 +37398,7 @@ async function _loadMemberCustomFields(m) {
     if (!r.ok) throw new Error(j.error || ('HTTP ' + r.status));
     _renderMemberCF(sec, j.contact_id, j.fields || []);
   } catch (e) {
-    sec.innerHTML = `<div style="font-size:12px;color:var(--text-mute)">Couldn't load custom fields - ${escapeHTML(e.message)}</div>`;
+    sec.innerHTML = `<div style="font-size:12px;color:var(--text-mute)">Couldn't load custom fields - ${escapeHTML(_friendlyErr(e, 'please try again in a minute'))}</div>`;
   }
 }
 
@@ -37492,7 +37492,7 @@ async function _loadMemberInbox(m) {
     if (!r.ok) throw new Error(j.error || ('HTTP ' + r.status));
     _renderMemberInbox(sec, j.messages || []);
   } catch (e) {
-    sec.innerHTML = `<div style="font-size:12px;color:var(--text-mute);margin-bottom:8px">Couldn't load messages - ${escapeHTML(e.message)}</div>${_memberInboxComposer()}`;
+    sec.innerHTML = `<div style="font-size:12px;color:var(--text-mute);margin-bottom:8px">Couldn't load messages - ${escapeHTML(_friendlyErr(e, 'please try again in a minute'))}</div>${_memberInboxComposer()}`;
   }
 }
 
@@ -37756,7 +37756,7 @@ async function _openMemberLog() {
     _renderMemberLog();
   } catch (e) {
     const el = document.getElementById('mlog-list');
-    if (el) el.innerHTML = `<div style="padding:24px 16px;color:#e0654f;font-size:13px">Couldn't load: ${escapeHTML(e.message || String(e))}</div>`;
+    if (el) el.innerHTML = `<div style="padding:24px 16px;color:#e0654f;font-size:13px">Couldn't load: ${escapeHTML(_friendlyErr(e, 'please try again in a minute'))}</div>`;
   }
 }
 function _closeMemberLog() { const h = document.getElementById('member-log-host'); if (h) h.innerHTML = ''; }
@@ -39824,7 +39824,7 @@ async function _loadAdReport() {
     const res = await fetch('/api/marketing?resource=meta-report&months=8&client_id=' + encodeURIComponent(CLIENT_ID), { headers: { Authorization: 'Bearer ' + token } });
     const json = await _safeJson(res);
     if (!res.ok) {
-      el.innerHTML = `<div class="req-empty" style="padding:18px 0">Couldn't load report: ${escapeHTML(json.error || ('HTTP ' + res.status))}</div>`;
+      el.innerHTML = `<div class="req-empty" style="padding:18px 0">Couldn't load report: ${escapeHTML(_friendlyErr(json.error || ('HTTP ' + res.status), 'please try again in a minute'))}</div>`;
       return;
     }
     const controls = document.querySelector('.report-head .report-controls');
@@ -39845,7 +39845,7 @@ async function _loadAdReport() {
     _populateMonthDropdown();
     _renderAdReport();
   } catch (e) {
-    el.innerHTML = `<div class="req-empty" style="padding:18px 0">Couldn't load report: ${escapeHTML(e.message)}</div>`;
+    el.innerHTML = `<div class="req-empty" style="padding:18px 0">Couldn't load report: ${escapeHTML(_friendlyErr(e, 'please try again in a minute'))}</div>`;
   }
 }
 
@@ -39876,7 +39876,7 @@ async function _loadRangeReport() {
     const json = await _safeJson(res);
     const controls = document.querySelector('.report-head .report-controls');
     if (!res.ok) {
-      el.innerHTML = `<div class="req-empty" style="padding:18px 0">Couldn't load report: ${escapeHTML(json.error || ('HTTP ' + res.status))}</div>`;
+      el.innerHTML = `<div class="req-empty" style="padding:18px 0">Couldn't load report: ${escapeHTML(_friendlyErr(json.error || ('HTTP ' + res.status), 'please try again in a minute'))}</div>`;
       return;
     }
     if (json.reason || !(Array.isArray(json.periods) && json.periods.length)) {
@@ -39897,7 +39897,7 @@ async function _loadRangeReport() {
     _reportRange = json;
     _renderAdReport();
   } catch (e) {
-    el.innerHTML = `<div class="req-empty" style="padding:18px 0">Couldn't load report: ${escapeHTML(e.message)}</div>`;
+    el.innerHTML = `<div class="req-empty" style="padding:18px 0">Couldn't load report: ${escapeHTML(_friendlyErr(e, 'please try again in a minute'))}</div>`;
   }
 }
 function _onReportRangeChange() {
@@ -41308,6 +41308,25 @@ function rowHTML(t) {
 
 function escapeHTML(s) {
   return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+// Client-facing error copy. Raw exception/provider messages (Meta "(#200)"
+// permission strings, HTTP statuses, JSON blobs, fetch noise) are for us,
+// not clients - log those to the console and return calm copy instead.
+// A short, plain, human-readable message passes through untouched.
+// Pass a `fallback` when the surrounding copy needs a different generic tail
+// (e.g. after a "Couldn't load X - " prefix).
+function _friendlyErr(e, fallback) {
+  const msg = (e && typeof e.message === 'string' ? e.message : (e == null ? '' : String(e))).trim();
+  const technical = !msg
+    || msg.length > 80
+    || msg.indexOf('{') !== -1
+    || msg.indexOf('<') !== -1
+    || msg.indexOf('(#') !== -1
+    || /HTTP|\b[45]\d{2}\b|failed to fetch|networkerror|load failed|unexpected token|\bJSON\b|\btoken\b|\bAPI\b|\bfetch\b|\bundefined\b|\bnull\b/i.test(msg);
+  if (!technical) return msg;
+  console.error('portal error (shown to client as generic copy):', e);
+  return fallback || 'Something went wrong on our end - please try again in a minute.';
 }
 
 function switchTicketTab(tab, el) {
@@ -43251,7 +43270,7 @@ async function openMessagesView() {
   } catch (err) {
     console.error('openMessagesView failed:', err);
     document.getElementById('messages-thread').innerHTML =
-      '<div class="req-empty" style="padding:24px;color:var(--red);text-align:center">' + escapeHTML(err.message) + '</div>';
+      '<div class="req-empty" style="padding:24px;color:var(--red);text-align:center">' + escapeHTML(_friendlyErr(err)) + '</div>';
   }
 }
 
@@ -43316,7 +43335,7 @@ async function openMessageConvo(conversationId) {
     }
   } catch (err) {
     document.getElementById('messages-thread').innerHTML =
-      '<div class="req-empty" style="padding:24px;color:var(--red);text-align:center">' + escapeHTML(err.message) + '</div>';
+      '<div class="req-empty" style="padding:24px;color:var(--red);text-align:center">' + escapeHTML(_friendlyErr(err)) + '</div>';
   }
 }
 
@@ -43866,7 +43885,7 @@ async function loadParentThreads(options = {}) {
       }
     }
   } catch (e) {
-    if (list) list.innerHTML = `<div class="req-empty pm-error-state" style="padding:20px">Couldn't load parent threads - ${escapeHTML(e.message || String(e))}</div>`;
+    if (list) list.innerHTML = `<div class="req-empty pm-error-state" style="padding:20px">Couldn't load parent threads - ${escapeHTML(_friendlyErr(e, 'please try again in a minute'))}</div>`;
   } finally {
     _pmLoadingThreads = false;
   }
@@ -43934,7 +43953,7 @@ async function refreshParentThreadMessages(threadId, options = {}) {
     renderParentMessages();
     await markParentThreadRead(threadId);
   } catch (e) {
-    if (root) root.innerHTML = `<div class="req-empty pm-error-state" style="padding:24px;text-align:center">Couldn't load thread - ${escapeHTML(e.message || String(e))}</div>`;
+    if (root) root.innerHTML = `<div class="req-empty pm-error-state" style="padding:24px;text-align:center">Couldn't load thread - ${escapeHTML(_friendlyErr(e, 'please try again in a minute'))}</div>`;
     throw e;
   }
 }
