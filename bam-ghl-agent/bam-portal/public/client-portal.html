@@ -3797,6 +3797,26 @@
     font-size: 12px; padding: 5px 12px; cursor: pointer; font-family: inherit;
   }
   .mm-mod-range button:hover { border-color: var(--accent-border); color: var(--text); }
+  /* custom date trigger (replaces native input[type=date]) */
+  .mm-mod-range .mm-datefield { display:inline-flex; align-items:center; gap:7px; background:var(--surface-el); border:1px solid var(--line); border-radius:6px; color:var(--text); font-family:var(--font-mono); font-size:12px; padding:5px 10px; cursor:pointer; transition:border-color var(--t-fast,.12s); }
+  .mm-mod-range .mm-datefield:hover { border-color:var(--accent-border); color:var(--text); }
+  .mm-mod-range .mm-datefield svg { color:var(--text-mute); flex:0 0 auto; }
+  /* mini calendar popover */
+  .mm-dp { position:fixed; z-index:10075; width:250px; background:var(--surface); border:1px solid var(--border-med); border-radius:var(--radius-md); box-shadow:var(--shadow-lg); padding:12px; font-family:var(--font-ui); animation:mmFadeIn .12s ease; }
+  .mm-dp-head { display:flex; align-items:center; justify-content:space-between; margin-bottom:9px; }
+  .mm-dp-title { font-family:var(--font-num); font-size:14px; font-weight:800; color:var(--text); }
+  .mm-dp-nav { width:26px; height:26px; display:flex; align-items:center; justify-content:center; background:var(--surface-el); border:1px solid var(--line); border-radius:var(--radius-sm); color:var(--text-sub); font-size:15px; line-height:1; cursor:pointer; transition:border-color var(--t-fast,.12s), color var(--t-fast,.12s); }
+  .mm-dp-nav:hover { border-color:var(--accent-border); color:var(--text); }
+  .mm-dp-nav.is-off { opacity:.3; cursor:default; pointer-events:none; }
+  .mm-dp-grid { display:grid; grid-template-columns:repeat(7,1fr); gap:2px; }
+  .mm-dp-dow { margin-bottom:3px; }
+  .mm-dp-dowc { text-align:center; font-size:10px; font-weight:700; color:var(--text-mute); padding:2px 0; }
+  .mm-dp-cell { height:30px; display:flex; align-items:center; justify-content:center; font-family:var(--font-ui); font-size:12.5px; font-weight:600; color:var(--text); background:none; border:none; border-radius:var(--radius-sm); cursor:pointer; padding:0; }
+  .mm-dp-cell:hover:not(.is-off):not(.is-sel) { background:var(--surface-hov); }
+  .mm-dp-empty { visibility:hidden; }
+  .mm-dp-cell.is-off { color:var(--text-mute); opacity:.4; cursor:default; }
+  .mm-dp-cell.is-today { box-shadow:inset 0 0 0 1px var(--accent-border); }
+  .mm-dp-cell.is-sel { background:var(--gold); color:var(--on-gold); }
   .mm-sect { border-top: 1px solid var(--line); margin-top: 20px; padding-top: 16px; }
   .mm-fsec { margin: 0; }
   .mm-farrow { display: flex; justify-content: center; margin: 18px 0; }
@@ -45498,9 +45518,11 @@ function toggleTheme() {
         <div class="modal-title" style="margin-bottom:0">Marketing Machine</div>
       </div>
       <div class="mm-mod-range">
-        <input type="date" id="mm-range-from" aria-label="From date">
+        <button type="button" class="mm-datefield" id="mm-range-from-btn" onclick="_mmDpOpen('from', event)" aria-label="From date"><svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="3" width="11" height="10.5" rx="1.5"/><path d="M2.5 6.5h11M5.5 1.5v3M10.5 1.5v3"/></svg><span id="mm-range-from-lbl">Pick a date</span></button>
+        <input type="hidden" id="mm-range-from">
         <span style="color:var(--text-mute);font-size:12px">to</span>
-        <input type="date" id="mm-range-to" aria-label="To date">
+        <button type="button" class="mm-datefield" id="mm-range-to-btn" onclick="_mmDpOpen('to', event)" aria-label="To date"><svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="3" width="11" height="10.5" rx="1.5"/><path d="M2.5 6.5h11M5.5 1.5v3M10.5 1.5v3"/></svg><span id="mm-range-to-lbl">Pick a date</span></button>
+        <input type="hidden" id="mm-range-to">
         <button type="button" onclick="_mmApplyRange()">Apply</button>
       </div>
     </div>
@@ -45529,6 +45551,9 @@ function toggleTheme() {
 <div id="mmCreativeModal" class="modal-backdrop" style="display:none;z-index:10060" onclick="if(event.target===this)_mmcClose()">
   <div class="mmc-card" id="mmcCard" onclick="event.stopPropagation()"></div>
 </div>
+
+<!-- Mini date picker (Marketing Machine range) - positioned under the trigger -->
+<div id="mmDatePop" class="mm-dp" style="display:none"></div>
 
 <!-- ── V2 "Request a change" annotator (V2 only) ──
      Live-iframe the client's own V2 page; parent-side overlay drops numbered
@@ -46221,8 +46246,7 @@ function openMarketingMachine() {
   if (!_MM) return;
   const from = document.getElementById('mm-range-from');
   const to = document.getElementById('mm-range-to');
-  if (from && _MM.range) from.value = _MM.range.since;
-  if (to && _MM.range) to.value = _MM.range.until;
+  if (_MM.range) { _mmDpSetValue('from', _MM.range.since); _mmDpSetValue('to', _MM.range.until); }
   _mmRenderMetaFocus(_MM);
   _mmOpenFocus('marketingMachineModal', '#marketing-machine-card .mm-action-panel');
 }
@@ -46234,6 +46258,97 @@ function openLandingMachine() {
   _mmOpenFocus('landingMachineModal', '#landing-machine-card .mm-action-panel');
 }
 function closeLandingMachine() { _mmCloseFocus('landingMachineModal'); }
+
+/* ── Mini date picker for the Marketing Machine range ──
+   Replaces the native date inputs with a styled calendar popover. The values
+   still live in the hidden #mm-range-from / #mm-range-to inputs that
+   _mmApplyRange reads, so the range flow is unchanged. Future dates are
+   disabled (no data past today). */
+const _MM_DP_MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+const _MM_DP_MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const _MM_DP_DOW = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
+let _mmDp = { field: null, y: 0, m: 0 };
+function _mmDpPad(n) { return (n < 10 ? '0' : '') + n; }
+function _mmDpToday() { const d = new Date(); return { y: d.getFullYear(), m: d.getMonth(), d: d.getDate() }; }
+function _mmDpFmt(str) {   // 'YYYY-MM-DD' -> 'Jun 23, 2026'
+  if (!str) return 'Pick a date';
+  const p = str.split('-'); if (p.length !== 3) return str;
+  return _MM_DP_MON[(+p[1]) - 1] + ' ' + (+p[2]) + ', ' + p[0];
+}
+function _mmDpSetValue(field, str) {
+  const inp = document.getElementById('mm-range-' + field);
+  const lbl = document.getElementById('mm-range-' + field + '-lbl');
+  if (inp) inp.value = str || '';
+  if (lbl) lbl.textContent = _mmDpFmt(str);
+}
+function _mmDpOpen(field, ev) {
+  if (ev) ev.stopPropagation();
+  const pop = document.getElementById('mmDatePop'), btn = document.getElementById('mm-range-' + field + '-btn');
+  if (!pop || !btn) return;
+  if (_mmDp.field === field && pop.style.display === 'block') { _mmDpClose(); return; }   // toggle off
+  const cur = (document.getElementById('mm-range-' + field) || {}).value || '';
+  let y, m;
+  if (cur) { const p = cur.split('-'); y = +p[0]; m = (+p[1]) - 1; } else { const t = _mmDpToday(); y = t.y; m = t.m; }
+  _mmDp = { field, y, m };
+  _mmDpRender();
+  pop.style.display = 'block';
+  const r = btn.getBoundingClientRect(), pw = pop.offsetWidth || 250;
+  let left = r.left; if (left + pw > window.innerWidth - 10) left = window.innerWidth - pw - 10;
+  pop.style.left = Math.max(10, left) + 'px';
+  pop.style.top = (r.bottom + 6) + 'px';
+}
+function _mmDpClose() { const pop = document.getElementById('mmDatePop'); if (pop) pop.style.display = 'none'; _mmDp.field = null; }
+function _mmDpNav(delta) {
+  let m = _mmDp.m + delta, y = _mmDp.y;
+  if (m < 0) { m = 11; y--; } else if (m > 11) { m = 0; y++; }
+  const t = _mmDpToday();
+  if (y > t.y || (y === t.y && m > t.m)) return;   // don't page into the future
+  _mmDp.y = y; _mmDp.m = m; _mmDpRender();
+}
+function _mmDpRender() {
+  const pop = document.getElementById('mmDatePop');
+  if (!pop) return;
+  const y = _mmDp.y, m = _mmDp.m, field = _mmDp.field, t = _mmDpToday();
+  const cur = (document.getElementById('mm-range-' + field) || {}).value || '';
+  const first = new Date(y, m, 1).getDay(), days = new Date(y, m + 1, 0).getDate();
+  const atCur = (y === t.y && m === t.m);
+  let cells = '';
+  for (let i = 0; i < first; i++) cells += '<span class="mm-dp-cell mm-dp-empty"></span>';
+  for (let d = 1; d <= days; d++) {
+    const iso = y + '-' + _mmDpPad(m + 1) + '-' + _mmDpPad(d);
+    const future = (y > t.y) || (y === t.y && m > t.m) || (y === t.y && m === t.m && d > t.d);
+    const cls = 'mm-dp-cell' + (iso === cur ? ' is-sel' : '') + (y === t.y && m === t.m && d === t.d ? ' is-today' : '') + (future ? ' is-off' : '');
+    cells += future
+      ? '<span class="' + cls + '">' + d + '</span>'
+      : '<button type="button" class="' + cls + '" onclick="_mmDpPick(\'' + iso + '\')">' + d + '</button>';
+  }
+  pop.innerHTML =
+    '<div class="mm-dp-head">' +
+      '<button type="button" class="mm-dp-nav" onclick="_mmDpNav(-1)" aria-label="Previous month">&lsaquo;</button>' +
+      '<span class="mm-dp-title">' + _MM_DP_MONTHS[m] + ' ' + y + '</span>' +
+      '<button type="button" class="mm-dp-nav' + (atCur ? ' is-off' : '') + '"' + (atCur ? ' disabled' : '') + ' onclick="_mmDpNav(1)" aria-label="Next month">&rsaquo;</button>' +
+    '</div>' +
+    '<div class="mm-dp-grid mm-dp-dow">' + _MM_DP_DOW.map((x) => '<span class="mm-dp-dowc">' + x + '</span>').join('') + '</div>' +
+    '<div class="mm-dp-grid">' + cells + '</div>';
+}
+function _mmDpPick(iso) {
+  const field = _mmDp.field;
+  _mmDpSetValue(field, iso);
+  // keep from <= to (pull the other end along if the range inverts)
+  const fromV = (document.getElementById('mm-range-from') || {}).value;
+  const toV = (document.getElementById('mm-range-to') || {}).value;
+  if (fromV && toV && fromV > toV) _mmDpSetValue(field === 'from' ? 'to' : 'from', iso);
+  _mmDpClose();
+}
+document.addEventListener('click', (e) => {   // click-outside closes
+  const pop = document.getElementById('mmDatePop');
+  if (!pop || pop.style.display !== 'block') return;
+  if (pop.contains(e.target) || (e.target.closest && e.target.closest('.mm-datefield'))) return;
+  _mmDpClose();
+});
+window.addEventListener('scroll', () => { if (_mmDp.field) _mmDpClose(); }, true);
+window.addEventListener('resize', () => { if (_mmDp.field) _mmDpClose(); });
+
 async function _mmApplyRange() {
   const from = document.getElementById('mm-range-from')?.value;
   const to = document.getElementById('mm-range-to')?.value;
