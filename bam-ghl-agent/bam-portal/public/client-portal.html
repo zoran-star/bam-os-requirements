@@ -4009,6 +4009,14 @@
   .mm-ap-title { font-family: var(--mm-ff); font-size: 15px; font-weight: 800; color: var(--text); }
   .mm-ap-item { font-family: var(--mm-ff); font-size: 12px; font-weight: 600; line-height: 1.5; }
   .mm-ap-foot { margin-top: auto; font-family: var(--mm-ff); font-size: 13px; font-weight: 700; color: var(--gold-d, var(--gold)); }
+  .mm-ap-checks { display: flex; flex-wrap: wrap; gap: 6px 14px; margin-top: 10px; }
+  .mm-ap-checks span { font-family: var(--mm-ff); font-size: 10.5px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; }
+  .mm-ap-checks .ok { color: #2D8A52; opacity: 0.72; }
+  .mm-ap-checks .bad { color: #B5352F; }
+  /* doorway: the right edge lights up and the chevrons hurry when hovered */
+  .mm-action-panel::before { content: ''; position: absolute; top: 0; bottom: 0; right: 0; width: 36%; background: linear-gradient(90deg, transparent, rgba(200,168,78,0.20)); opacity: 0; transition: opacity 0.25s ease; pointer-events: none; }
+  .mm-action-panel:hover::before { opacity: 1; }
+  .mm-action-panel:hover .mm-ap-chevs span { animation-duration: 0.8s; }
   .mm-verdict-block { border-radius: 12px; padding: 14px 16px; }
   .mm-vb-green { background: rgba(62,175,92,0.08); }
   .mm-vb-gold { background: rgba(224,157,36,0.08); }
@@ -46435,6 +46443,13 @@ function _mmShortAction(d) {
   return null;
 }
 // Every open to-do on the machine, for the action panel.
+function _mmApChecks(list) {
+  return '<div class="mm-ap-checks">' + list.map(c =>
+    '<span class="' + (c.ok ? 'ok' : 'bad') + '">' + (c.ok ? '&#10003;' : '&#10005;') + ' ' + c.lbl + '</span>').join('') + '</div>';
+}
+function _mmApFoot(n) {
+  return '<div class="mm-ap-foot">Focus mode' + (n > 0 ? ' &middot; ' + n + (n === 1 ? ' thing needs you' : ' things need you') : '') + ' &rsaquo;</div>';
+}
 function _mmActionItems(d) {
   const items = [];
   for (const c of (d.creatives || [])) {
@@ -46557,13 +46572,19 @@ function _mmRenderCard() {
     '</div>';
   const heroFinal = hero, drivers = collapse, foot = '';
   const apItems = _mmActionItems(d);
+  const apChecks = [
+    { lbl: 'Tracking', ok: !!d.meta_connected },
+    { lbl: 'Creative', ok: !(d.creatives || []).some(c => { const v = _mmCreativeVerdict(c); return v.verdict === 'edit' || v.verdict === 'replace'; }) },
+    { lbl: 'Ad variety', ok: (d.creatives_live || 0) >= 6 },
+  ];
   const panel =
     '<div class="mm-action-panel">' +
       '<div class="mm-ap-title">See the full picture</div>' +
       (apItems.length
         ? apItems.map(i => '<div class="mm-ap-item ' + i.cls + '">' + i.html + '</div>').join('')
         : '<div class="mm-ap-item" style="color:var(--text-mute)">everything is running clean</div>') +
-      '<div class="mm-ap-foot">Focus mode &rsaquo;</div>' +
+      _mmApChecks(apChecks) +
+      _mmApFoot(apItems.length) +
       '<span class="mm-ap-chevs"><span>&rsaquo;</span><span>&rsaquo;</span></span>' +
       '<svg class="mm-ap-ghost" viewBox="0 0 100 30" preserveAspectRatio="none" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M2 24 L18 18 L32 21 L48 10 L62 14 L78 5 L98 8"/><path d="M2 28h96" opacity="0.4"/></svg>' +
     '</div>';
@@ -46645,21 +46666,21 @@ function _mmFunnelSvg(page, clicks, loaded) {
     const anchor = 'middle';
     svg += '<text x="' + x + '" y="8" text-anchor="' + anchor + '" font-family="var(--mm-ff)" font-size="6.8" font-weight="600" letter-spacing="0.03em" fill="var(--text-mute)">' + stages[i].lbl.toUpperCase() + '</text>' +
       '<text x="' + x + '" y="21" text-anchor="' + anchor + '" font-family="var(--mm-fm)" font-size="11" font-weight="500" fill="var(--text)">' + stages[i].n + '</text>';
-    svg += '<line x1="' + x + '" y1="26" x2="' + x + '" y2="' + (MID + MAXH / 2 + 4) + '" stroke="var(--line)" stroke-width="0.8"/>';
+    svg += '<line x1="' + x + '" y1="26" x2="' + x + '" y2="' + (MID + MAXH / 2 + 4) + '" stroke="var(--line)" stroke-width="0.5" opacity="0.7"/>';
   });
   // the double line graph: mirrored lines + soft area between + stage dots
-  svg += '<path d="' + ribbonPath(0, N - 1) + '" fill="rgba(62,175,92,0.14)"/>';
+  svg += '<path d="' + ribbonPath(0, N - 1) + '" fill="rgba(62,175,92,0.09)"/>';
   const arrowX = W - 30;
-  svg += '<path d="' + smoothLine(top, 0, T) + '" fill="none" stroke="#3EAF5C" stroke-width="1.1" stroke-linejoin="round" stroke-linecap="round"/>';
-  svg += '<path d="' + smoothLine(bot, 0, T) + '" fill="none" stroke="#3EAF5C" stroke-width="1.1" stroke-linejoin="round" stroke-linecap="round"/>';
+  svg += '<path d="' + smoothLine(top, 0, T) + '" fill="none" stroke="#3EAF5C" stroke-width="0.85" stroke-linejoin="round" stroke-linecap="round"/>';
+  svg += '<path d="' + smoothLine(bot, 0, T) + '" fill="none" stroke="#3EAF5C" stroke-width="0.85" stroke-linejoin="round" stroke-linecap="round"/>';
   // the collapsed thread runs on to the trial icon and becomes an arrow
   svg += '<line x1="' + X[T] + '" y1="' + MID + '" x2="' + (arrowX - 3) + '" y2="' + MID + '" stroke="#3EAF5C" stroke-width="1.2" stroke-linecap="round"/>' +
     '<path d="M ' + arrowX + ',' + MID + ' l -6,-3.6 v 7.2 Z" fill="#3EAF5C"/>';
   if (worst >= 0) {
     if (worst < T) {
-      svg += '<path d="' + ribbonPath(worst, Math.min(worst + 1, T)) + '" fill="rgba(224,90,66,0.16)"/>';
-      svg += '<path d="' + smoothLine(top, worst, Math.min(worst + 1, T)) + '" fill="none" stroke="#E05A42" stroke-width="1.2" stroke-linecap="round"/>';
-      svg += '<path d="' + smoothLine(bot, worst, Math.min(worst + 1, T)) + '" fill="none" stroke="#E05A42" stroke-width="1.2" stroke-linecap="round"/>';
+      svg += '<path d="' + ribbonPath(worst, Math.min(worst + 1, T)) + '" fill="rgba(224,90,66,0.11)"/>';
+      svg += '<path d="' + smoothLine(top, worst, Math.min(worst + 1, T)) + '" fill="none" stroke="#E05A42" stroke-width="0.95" stroke-linecap="round"/>';
+      svg += '<path d="' + smoothLine(bot, worst, Math.min(worst + 1, T)) + '" fill="none" stroke="#E05A42" stroke-width="0.95" stroke-linecap="round"/>';
     } else {
       svg += '<line x1="' + X[worst] + '" y1="' + MID + '" x2="' + X[worst + 1] + '" y2="' + MID + '" stroke="#E05A42" stroke-width="1.4" stroke-linecap="round"/>';
     }
@@ -46671,10 +46692,15 @@ function _mmFunnelSvg(page, clicks, loaded) {
     let bx = mx - tw / 2;
     if (bx + tw > W - 4) bx = W - 4 - tw;
     if (bx < 4) bx = 4;
-    svg += '<line x1="' + mx + '" y1="' + (bot[worst + 1][1] + 1) + '" x2="' + mx + '" y2="' + byTop + '" stroke="#E05A42" stroke-width="1.2"/>' +
-      '<rect x="' + bx.toFixed(1) + '" y="' + byTop + '" width="' + tw.toFixed(1) + '" height="' + bh + '" rx="7.5" fill="rgba(224,90,66,0.12)"/>' +
-      '<text x="' + (bx + tw / 2).toFixed(1) + '" y="' + (byTop + 10.5) + '" text-anchor="middle" font-family="var(--mm-ff)" font-size="9" font-weight="700" fill="#B5352F">' + label + '</text>';
+    svg += '<line x1="' + mx + '" y1="' + (bot[worst + 1][1] + 1) + '" x2="' + mx + '" y2="' + byTop + '" stroke="#E05A42" stroke-width="0.8" opacity="0.7"/>' +
+      '<rect x="' + bx.toFixed(1) + '" y="' + byTop + '" width="' + tw.toFixed(1) + '" height="' + bh + '" rx="7.5" fill="rgba(224,90,66,0.09)"/>' +
+      '<text x="' + (bx + tw / 2).toFixed(1) + '" y="' + (byTop + 10.5) + '" text-anchor="middle" font-family="var(--mm-ff)" font-size="8.5" font-weight="700" fill="#B5352F">' + label + '</text>';
   }
+  // per-stage hit zones: click a column to open focus mode at that stage
+  X.forEach((x, i) => {
+    const half = (W - 72) / (N - 1) / 2;
+    svg += '<rect x="' + (x - half).toFixed(1) + '" y="0" width="' + (half * 2).toFixed(1) + '" height="' + H + '" fill="transparent" style="cursor:pointer" onclick="event.stopPropagation();openLandingMachine(\'' + stages[i].lbl + '\')"><title>Open ' + stages[i].lbl + ' in focus mode</title></rect>';
+  });
   const icoCol = 'var(--text-mute)';
   // left: computer + phone (where the clicks happen)
   svg += '<g fill="none" stroke="' + icoCol + '" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round">' +
@@ -46711,7 +46737,12 @@ function _mmRenderLanding() {
       funnelViz + '</div>' +
       '<div class="mm-action-panel">' +
         '<div class="mm-ap-title">See the full picture</div>' + items +
-        '<div class="mm-ap-foot">Focus mode &rsaquo;</div>' +
+        _mmApChecks([
+          { lbl: 'Tracking', ok: page.form_started != null || page.visitors != null },
+          { lbl: 'Page', ok: page.band === 'green' },
+          { lbl: 'Bookings', ok: (page.booked_sessions || 0) > 0 },
+        ]) +
+        _mmApFoot((page.band === 'red' || page.band === 'gold') ? 1 : 0) +
         '<span class="mm-ap-chevs"><span>&rsaquo;</span><span>&rsaquo;</span></span>' +
       '</div>' +
     '</div></div>';
@@ -46792,11 +46823,19 @@ function openMarketingMachine() {
   _mmOpenFocus('marketingMachineModal', '#marketing-machine-card .mm-action-panel');
 }
 function closeMarketingMachine() { _mmCloseFocus('marketingMachineModal'); }
-function openLandingMachine() {
+function openLandingMachine(stage) {
   if (!_MM) return;
   _V2_OPEN = false; _V2_PINS = []; _V2_PENDING = null;   // annotator always starts collapsed
   _mmRenderLandingFocus(_MM);
   _mmOpenFocus('landingMachineModal', '#landing-machine-card .mm-action-panel');
+  if (stage && typeof stage === 'string') {
+    setTimeout(() => {
+      const row = document.querySelector('#landingMachineModal [data-mmstage="' + stage + '"]');
+      if (!row) return;
+      row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      row.classList.remove('v15cal-flash'); void row.offsetWidth; row.classList.add('v15cal-flash');
+    }, 750);
+  }
 }
 function closeLandingMachine() { _mmCloseFocus('landingMachineModal'); }
 
@@ -47367,12 +47406,13 @@ function _mmRenderLandingFocus(d) {
   const GRID = 'display:grid;grid-template-columns:34px 100px 46px 1fr;align-items:center;gap:10px';
   let rows = '';
   const MM_LOW_SAMPLE = 5;   // below this a bar is noise -> fade it + flag it
+  const _mmStageKey = { 'Clicked ad': 'clicked', 'Page loaded': 'loaded', 'Form started': 'form', 'Saw times': 'calendar', 'Trial booked': 'booked' };
   for (let i = 0; i < steps.length; i++) {
     const s = steps[i];
     const w = Math.max((s.n / top) * 100, 3);
     const thin = s.n > 0 && s.n < MM_LOW_SAMPLE;
     rows +=
-      '<div style="' + GRID + '">' +
+      '<div data-mmstage="' + (_mmStageKey[s.lbl] || '') + '" style="' + GRID + '">' +
         '<div style="display:flex;justify-content:center">' +
           '<span style="width:30px;height:30px;border-radius:50%;background:var(--surface-el);color:var(--text);display:flex;align-items:center;justify-content:center;flex:0 0 auto">' + s.icon + '</span>' +
         '</div>' +
