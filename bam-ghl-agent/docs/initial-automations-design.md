@@ -141,28 +141,38 @@ no_show → Responded, entry point = "rebook"
 
 This removes the double-touch risk: today `no_show` fires `missed_trial` (which
 lives in Interested → Ghosted → Nurture). Under the model, the rebook opener owns
-the outreach and the booking agent works the reply. **Decision needed:** retire
-`missed_trial` entirely, or keep it only for academies that prefer the
-nurture-path no-show handling.
+the outreach and the booking agent works the reply.
+
+**DECIDED (Zoran, 2026-07-06): retire `missed_trial`.** No-shows go through the
+active booking-agent rebook path only - one clear path, the booking agent owns
+rebooking. The gentle nurture-path handling is dropped (can be re-added later as an
+academy toggle if one asks). Phase D removes the `missed_trial` firing from
+`post-trial.js` when it switches no_show → Responded.
 
 ---
 
 ## 5. Build phases
 
-| Phase | What | Risk |
-|---|---|---|
-| A | `booking-automations.js` (copy confirm) + `getBookingAutomations` + defaults | none (dormant) |
-| B | Router stamps entry trigger on every move into an agent stage | low |
-| C | Booking detector fires the entry's initial automation (fallback to AI opener) | med (touches live opener) |
-| D | Switch `no_show` → Responded + rebook opener; reconcile `missed_trial` | med (behavior change) |
-| E | Focus-mode per-entry initial-automations editor | UI only |
+| Phase | What | Risk | Status |
+|---|---|---|---|
+| A | `booking-automations.js` (copy confirm) + `getBookingAutomations` + defaults | none (dormant) | ✅ done 2026-07-06 |
+| B | Router stamps entry trigger on every move into an agent stage | low | ⬜ |
+| C | Booking detector fires the entry's initial automation (fallback to AI opener) | med (touches live opener) | ⬜ |
+| D | Switch `no_show` → Responded + rebook opener; **remove `missed_trial` firing** | med (behavior change) | ⬜ |
+| E | Focus-mode per-entry initial-automations editor | UI only | ⬜ |
+
+**Phase A shipped:** `api/agent/booking-automations.js` - `DEFAULT_BOOKING_AUTOMATIONS`
+keyed by entry point (`new_lead` / `rebook` / `reengaged`), `getBookingAutomations`,
+`bookingEntryForTrigger`, `automationsLive(autos, entryKey)`, `nextDueStep(autos, entryKey, ...)`.
+Config store: `clients.ghl_kpi_config.booking_initial_automations`. Dormant - nothing
+calls it until Phase C.
 
 ---
 
 ## Open questions
-- **`missed_trial`**: retire, or keep as an academy option for no-show handling?
-- **Multi-step openers?** Confirm/Closing are multi-step; Booking openers may only
-  need 1 step (the agent takes over on reply). Start with 1, allow more.
+- **Multi-step openers?** Confirm/Closing are multi-step; Booking openers ship with
+  1 immediate step each (the agent takes over on reply). `after_days` timing is
+  supported for adding more later.
 - **`replied` bounce**: is the ghosted/nurture → Responded reply bounce portal code
-  or a GHL workflow? If GHL, its entry-point automation can't fire until it's rebuilt
-  portal-side (tracked separately).
+  or a GHL workflow? If GHL, its `reengaged` entry automation can't fire until it's
+  rebuilt portal-side (tracked separately).

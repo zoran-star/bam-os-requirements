@@ -72,16 +72,23 @@ academies, so leads move by the academy's authored edges, not hardcoded per-agen
     an initial automation.** BLOCKED on the new model below + reconciling the existing `missed_trial`
     automation (today fired on no-show; it assumes the Interested/Ghosted path — can't also send
     the lead to Responded for the booking agent without double-touch). NOT changed yet.
-- **🧭 NEW MODEL DIRECTION (Zoran, 2026-07-06) — "initial automations per entry point":** every
-  stage whose engine is an AGENT (Responded=Booking, Scheduled Trial=Confirm, Done Trial=Closing)
-  should have, **for each ENTRY POINT into it, an initial automation** — an on-entry triggered
-  sequence (e.g. no_show→Responded fires a rebook-opener; new_lead→Responded fires the first
-  outreach). Distinct from the agent's conversational replies. Partially exists today as the
-  `agent_contact_notes` "Entry:" note trick (confirm-handoff writes one so the booking opener
-  drafts a rebook). This is a real model/feature build, not a swap — design it (where do initial
-  automations live? per-edge config in `stage_transitions`? reuse the automations engine?) then
-  build. It also resolves the no_show question (its Responded-entry initial automation replaces
-  the standalone missed_trial automation). See [[project_client_agent_training]] for the agent side.
+- **🧭 INITIAL AUTOMATIONS PER ENTRY POINT (Zoran model, 2026-07-06) — DESIGNED + Phase A BUILT.**
+  Design doc: [`docs/initial-automations-design.md`](../docs/initial-automations-design.md).
+  Model: every AGENT-engine stage fires an initial automation FOR EACH ENTRY POINT (on-entry
+  scripted sequence, agent takes over on reply). **What GTA already had:** `confirm-automations.js`
+  (Scheduled Trial) + `closing-automations.js` (Done Trial) = proven scripted, approval+mode-gated,
+  `ghl_kpi_config`-stored sequences. Both are single-entry so already "per-entry." **The gap =
+  Responded (Booking), the 5-entry hub** — had only an AI cold-opener seeded by "Entry:" notes,
+  no scripted sequence. **✅ Phase A built (2026-07-06):** `api/agent/booking-automations.js`
+  clones the confirm pattern, keyed by entry point (`new_lead` / `rebook` = no_show+cant_make_it /
+  `reengaged` = replied). Exports `DEFAULT_BOOKING_AUTOMATIONS`, `getBookingAutomations(client)`
+  (override in `ghl_kpi_config.booking_initial_automations`), `bookingEntryForTrigger(trigger)`,
+  `automationsLive(autos, entryKey)`, `nextDueStep(autos, entryKey, {nowMs, startedMs, sentKeys})`.
+  DORMANT — nothing calls it (wiring = Phase C). **⏭ Phases B-E:** B router stamps entry trigger on
+  move-in · C booking detector fires the entry opener (fallback to AI opener) · D switch
+  no_show→Responded + **remove missed_trial firing** · E focus-mode per-entry editor.
+  **DECIDED: retire `missed_trial`** (Zoran) — no-shows go active booking-rebook only, not the
+  gentle nurture path. See [[project_client_agent_training]] for the agent side.
 - **⏭ OTHER remaining swaps:** `replied` interested/nurture→responded (the ghosted/nurture reply
   bounce — likely a **GHL workflow, not portal code**; confirm before assuming a site) ·
   `enrolls`→member (Stripe payment path — deterministic, low value, probably leave direct) ·
