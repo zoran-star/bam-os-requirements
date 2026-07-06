@@ -29,6 +29,7 @@ import { markUnqualified, unmarkUnqualified } from "./agent/_tags.js";
 import { enrollContact, isAutomationLive } from "./automations.js";
 import { moveStage, setStatus, findOpenOpp } from "./agent/_store.js";
 import { routeTransition } from "./agent/_router.js";
+import { getBookingAutomations, automationsLive as bookingAutosLive, nextDueStep as bookingNextStep } from "./agent/booking-automations.js";
 import { agentMode, modeIsOn, shouldAutoSend } from "./agent/_mode.js";
 import { mutedContactIdSet, isMuted } from "./agent/_mutes.js";
 import { withinQuietHours, nextSendableTime } from "./agent/_quiet.js";
@@ -320,6 +321,30 @@ async function draftOpener(token, locationId, clientId, contactId, cfg, calendar
   };
 }
 
+// Scripted BOOKING initial-automation opener (Phase C). When the academy has its
+// booking initial automations LIVE + APPROVED for this entry point, use the
+// scripted template as the opener instead of the AI draft - the agent still takes
+// over the moment the lead replies. Returns a draft-shaped object or null to fall
+// back to draftOpener (so an unapproved academy is byte-identical to before).
+// {{contact.first_name}} is resolved HERE (this text goes straight to the Hawkeye
+// queue, not through the send engine's token pass, so an unresolved token would
+// reach the lead). One immediate step per entry today: startedMs=null + empty
+// sentKeys means that immediate opener is what's due.
+function scriptedBookingOpener(client, entryKey, firstName) {
+  const autos = getBookingAutomations(client);
+  if (!bookingAutosLive(autos, entryKey)) return null;
+  const step = bookingNextStep(autos, entryKey, { nowMs: Date.now(), startedMs: null, sentKeys: [] });
+  if (!step || !step.template) return null;
+  const text = String(step.template).replace(/\{\{\s*contact\.first_name\s*\}\}/g, firstName || "there");
+  if (!text.trim()) return null;
+  return {
+    reply: text,
+    reasoning: `Scripted booking opener (${entryKey}).`,
+    confidence: 1, escalate: false, asked_to_book: BOOK_ASK.test(text),
+    summary: null, book: false, book_group: null, book_slot_at: null, book_calendar_id: null,
+  };
+}
+
 // Fire a reply (used by manual approve + self-drive auto-send). Pass clientId to
 // route Twilio academies through their own number + own-store; without it (or for
 // GHL academies) it sends via GHL exactly as before.
@@ -579,12 +604,16 @@ async function detectForClient(client) {
         if (Array.isArray(prior) && prior.length) continue;
         // Skip if a GHL conversation already exists (they wrote, or were texted).
         try { if (await findConversation(token, locationId, contactId)) continue; } catch (_) {}
-        let d;
-        try { d = await draftOpener(token, locationId, client.id, contactId, cfg, calendars); }
-        catch (e) { reasons.push(`opener ${contactId}: draft threw — ${e.message}`); continue; }
-        if (!d.reply || !String(d.reply).trim()) { if (d.escalate) escalated++; continue; }
+        // Name first (the scripted opener resolves {{contact.first_name}} from it).
         let nm = null;
         try { const c = await sb(`${await contactsReadTable(client.id)}?client_id=eq.${client.id}&ghl_contact_id=eq.${encodeURIComponent(contactId)}&select=name&limit=1`); nm = (Array.isArray(c) && c[0] && c[0].name) || null; } catch (_) {}
+        const firstName = nm ? String(nm).trim().split(/\s+/)[0] : null;
+        let d;
+        // Phase C: a fresh cold-open lead = the "new_lead" booking entry point. Use
+        // the academy's scripted opener when it's live+approved; else the AI opener.
+        try { d = scriptedBookingOpener(client, "new_lead", firstName) || await draftOpener(token, locationId, client.id, contactId, cfg, calendars); }
+        catch (e) { reasons.push(`opener ${contactId}: draft threw - ${e.message}`); continue; }
+        if (!d.reply || !String(d.reply).trim()) { if (d.escalate) escalated++; continue; }
         const isBook = !!(d.book && d.book_slot_at && d.book_calendar_id);
         try {
           await sb(`agent_ready_replies`, { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify([{
@@ -621,12 +650,15 @@ async function detectForClient(client) {
         try { active = await sb(`agent_ready_replies?client_id=eq.${client.id}&ghl_contact_id=eq.${encodeURIComponent(contactId)}&status=in.(pending,approved)&select=id&limit=1`); }
         catch (e) { reasons.push(`rebook ${contactId}: dedup error - ${e.message}`); continue; }
         if (Array.isArray(active) && active.length) continue;
-        let d;
-        try { d = await draftOpener(token, locationId, client.id, contactId, cfg, calendars); }
-        catch (e) { reasons.push(`rebook ${contactId}: draft threw - ${e.message}`); continue; }
-        if (!d.reply || !String(d.reply).trim()) { if (d.escalate) escalated++; continue; }
         let nm = null;
         try { const c = await sb(`${await contactsReadTable(client.id)}?client_id=eq.${client.id}&ghl_contact_id=eq.${encodeURIComponent(contactId)}&select=name&limit=1`); nm = (Array.isArray(c) && c[0] && c[0].name) || null; } catch (_) {}
+        const firstName = nm ? String(nm).trim().split(/\s+/)[0] : null;
+        let d;
+        // Phase C: a bounced-back lead = the "rebook" booking entry point. Scripted
+        // opener when live+approved; else the AI rebook opener (uses the memory note).
+        try { d = scriptedBookingOpener(client, "rebook", firstName) || await draftOpener(token, locationId, client.id, contactId, cfg, calendars); }
+        catch (e) { reasons.push(`rebook ${contactId}: draft threw - ${e.message}`); continue; }
+        if (!d.reply || !String(d.reply).trim()) { if (d.escalate) escalated++; continue; }
         const isBook = !!(d.book && d.book_slot_at && d.book_calendar_id);
         let queued = false;
         try {
