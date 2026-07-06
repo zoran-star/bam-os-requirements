@@ -39110,7 +39110,11 @@ async function _renderMarketingCampaigns() {
     const res = await fetch('/api/meta/campaigns?client_id=' + encodeURIComponent(CLIENT_ID), { headers: { Authorization: 'Bearer ' + token } });
     const json = await _safeJson(res);
     if (!res.ok) {
-      containerEl.innerHTML = `<div class="req-empty" style="padding:18px 0">Couldn't load campaigns: ${escapeHTML(json.error || ('HTTP ' + res.status))}</div>`;
+      // Raw provider errors (Meta #200 permission strings etc) are for us,
+      // not clients - log them, show calm copy. The campaigns themselves
+      // keep running regardless of whether the portal can read them.
+      console.error('campaigns load failed:', json.error || res.status);
+      containerEl.innerHTML = `<div class="req-empty" style="padding:18px 0">We're having trouble reaching your ad account right now. Your campaigns are unaffected and still running - the BAM team can see the details and will get the connection back.</div>`;
       return;
     }
 
@@ -39159,7 +39163,8 @@ async function _renderMarketingCampaigns() {
         </div>`;
     }).join('');
   } catch (e) {
-    containerEl.innerHTML = `<div class="req-empty" style="padding:18px 0">Couldn't load campaigns: ${escapeHTML(e.message)}</div>`;
+    console.error('campaigns load failed:', e);
+    containerEl.innerHTML = `<div class="req-empty" style="padding:18px 0">We're having trouble reaching your ad account right now. Your campaigns are unaffected and still running - refresh in a minute or check back soon.</div>`;
   }
 }
 
