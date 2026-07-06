@@ -7116,6 +7116,27 @@
 
         <div class="content">
 
+          <!-- ── Marketing agent (answer-only advisor) ─────────────
+               V1.5/V2 ONLY - _renderMarketingCampaigns() reveals it for
+               those tiers and keeps it hidden for V1 (default display:none).
+               Ask plain-English questions about ad performance; Claude
+               answers from live Meta numbers via /api/marketing-agent.
+               READ-ONLY: it explains and advises, it never changes anything. -->
+          <div id="mktagent-bar" style="display:none;margin-bottom:18px">
+            <div style="display:flex;gap:8px;align-items:stretch">
+              <div style="flex:1;position:relative;display:flex;align-items:center">
+                <span aria-hidden="true" style="position:absolute;left:12px;color:var(--accent,#D4B65C);font-weight:800;pointer-events:none">›</span>
+                <input id="mktagent-input" autocomplete="off"
+                  placeholder="Ask about your ads…  e.g. how are my ads doing? · why is my cost per lead up? · which campaign is best?"
+                  onkeydown="if(event.key==='Enter'){event.preventDefault();mktagentSend();}"
+                  style="flex:1;box-sizing:border-box;background:var(--surface,#16161a);border:1px solid var(--border,#2a2a31);border-radius:10px;color:var(--text);padding:12px 12px 12px 28px;font:inherit;font-size:14px">
+              </div>
+              <button id="mktagent-send" onclick="mktagentSend()"
+                style="background:var(--accent,#D4B65C);color:#0B0B0D;border:none;border-radius:10px;padding:0 18px;font:inherit;font-size:14px;font-weight:700;cursor:pointer;white-space:nowrap">Ask</button>
+            </div>
+            <div id="mktagent-thread" style="display:none;margin-top:12px;flex-direction:column;gap:10px"></div>
+          </div>
+
           <!-- ── Marketing Machine (V2 only) - Meta ads card + landing page card ── -->
           <div id="marketing-machine-card" style="display:none"></div>
           <div id="landing-machine-card" style="display:none"></div>
@@ -38400,6 +38421,61 @@ function magentCancel() {
   magentRender();
 }
 
+// ── Marketing agent (answer-only advisor for the Marketing view) ──────
+// Mirrors the member agent UX but READ-ONLY: posts to /api/marketing-agent,
+// which reads the academy's live Meta numbers and answers. No proposals, no
+// writes. Shown for V1.5/V2 only (gated in _renderMarketingCampaigns).
+let _MKTAGENT = { history: [], busy: false };
+
+function _mktagentEsc(s) { return (typeof escapeHTML === 'function') ? escapeHTML(String(s == null ? '' : s)) : String(s == null ? '' : s); }
+
+function mktagentRender() {
+  const thread = document.getElementById('mktagent-thread');
+  if (!thread) return;
+  const turns = _MKTAGENT.history.map(t => {
+    if (t.role === 'user') {
+      return `<div style="align-self:flex-end;max-width:82%;background:var(--accent,#D4B65C);color:#0B0B0D;border-radius:12px 12px 3px 12px;padding:9px 13px;font-size:13.5px;font-weight:600">${_mktagentEsc(t.text)}</div>`;
+    }
+    return `<div style="align-self:flex-start;max-width:88%;background:var(--surface,#16161a);border:1px solid var(--border,#2a2a31);color:var(--text);border-radius:12px 12px 12px 3px;padding:9px 13px;font-size:13.5px;line-height:1.5;white-space:pre-wrap">${_mktagentEsc(t.text)}</div>`;
+  });
+  if (_MKTAGENT.busy) {
+    turns.push(`<div style="align-self:flex-start;color:var(--text-mute);font-size:13px;padding:4px 2px"><span class="req-spin"></span> thinking…</div>`);
+  }
+  thread.innerHTML = turns.join('');
+  thread.style.display = turns.length ? 'flex' : 'none';
+  thread.scrollTop = thread.scrollHeight;
+}
+
+async function mktagentSend() {
+  if (_MKTAGENT.busy) return;
+  const input = document.getElementById('mktagent-input');
+  const msg = input ? input.value.trim() : '';
+  if (!msg) return;
+  const clientId = (typeof CLIENT_ID !== 'undefined') ? CLIENT_ID : null;
+  if (!clientId) { alert('Pick an academy first.'); return; }
+  if (input) input.value = '';
+  _MKTAGENT.history.push({ role: 'user', text: msg });
+  _MKTAGENT.busy = true;
+  mktagentRender();
+  try {
+    const token = await _mreqAuthToken();
+    const res = await fetch('/api/marketing-agent', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+      body: JSON.stringify({ client_id: clientId, message: msg, history: _MKTAGENT.history.slice(0, -1) }),
+    });
+    const json = await _safeJson(res);
+    if (!res.ok) throw new Error(json.error || ('HTTP ' + res.status));
+    _MKTAGENT.busy = false;
+    _MKTAGENT.history.push({ role: 'assistant', text: json.reply || 'Okay.' });
+    mktagentRender();
+  } catch (e) {
+    _MKTAGENT.busy = false;
+    _MKTAGENT.history.push({ role: 'assistant', text: "Couldn't reach the agent: " + (e.message || e) });
+    mktagentRender();
+  }
+}
+
 // Strict YYYY-MM-DD validation: must match the format AND round-trip via
 // Date so that '2026-13-45' / '2026-02-30' get rejected.
 function _isValidYMD(s) {
@@ -39716,6 +39792,16 @@ function _renderAdConnectGate_legacy_DISABLED() {
 //   connected, has ad account, N campaigns → real campaign cards
 async function _renderMarketingCampaigns() {
   _renderAdConnectGate();
+
+  // Marketing agent bar: V1.5 / V2 only. Never show it for V1 (hard rule -
+  // the marketing view is visible to V1, but this feature must not be).
+  const _mktBar = document.getElementById('mktagent-bar');
+  if (_mktBar) {
+    const _mktAgentOn = (typeof V15_ACCESS !== 'undefined' && V15_ACCESS) ||
+                        (typeof V2_ACCESS !== 'undefined' && V2_ACCESS);
+    _mktBar.style.display = _mktAgentOn ? 'block' : 'none';
+  }
+
   const containerEl = document.getElementById('marketing-campaigns-container');
   if (!containerEl) return;
 
