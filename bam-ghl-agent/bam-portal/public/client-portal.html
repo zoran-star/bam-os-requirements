@@ -22080,7 +22080,7 @@ async function _taRenderKnowledge() {
     }
     // Confirm + Closing agents: the scripted "Initial automations" sequence sits above
     // the fact sections (it's a structured editor, not a prompt section).
-    const hasAutos = (_TA.target === 'confirm' || _TA.target === 'closing');
+    const hasAutos = (_TA.target === 'confirm' || _TA.target === 'closing' || _TA.target === 'booking');
     const autosSlot = hasAutos
       ? `<div id="confirm-autos-card"><div class="req-empty"><span class="req-spin"></span>Loading automations…</div></div>`
       : '';
@@ -22095,19 +22095,26 @@ async function _taRenderKnowledge() {
 // One editor, agent-aware (_CA.agent / _CA.endpoint). Edits live in a working copy
 // (_CA.data) and only persist on Save, so toggling a step never loses unsaved copy.
 // Posts to /api/agent-<agent> automations-get/-set.
-const _CA = { data: null, agent: 'confirm', endpoint: '/api/agent-confirm' };
+const _CA = { data: null, agent: 'confirm', endpoint: '/api/agent-confirm', isBooking: false, getAction: 'automations-get', setAction: 'automations-set' };
 const _CA_WHEN_LABEL = { immediate: 'Immediately', day_before: 'Day before', morning_of: 'Morning of' };
+// Booking is per-ENTRY-POINT (Responded is the hub); confirm/closing are flat.
+const _BOOKING_ENTRY_LABEL = { new_lead: 'New lead', rebook: 'Rebook (no-show / can\'t make it)', reengaged: 'Re-engaged (nurture / ghosted reply)' };
 function _caWhenLabel(s) {
   if (s.when === 'after_days') { const n = s.offset_days || 0; return n + ' day' + (n === 1 ? '' : 's') + ' later'; }
   return _CA_WHEN_LABEL[s.when] || s.when;
 }
 
 async function _confirmAutosLoad(agent) {
-  _CA.agent = (agent === 'closing') ? 'closing' : 'confirm';
-  _CA.endpoint = '/api/agent-' + _CA.agent;
+  _CA.agent = (agent === 'closing') ? 'closing' : (agent === 'booking') ? 'booking' : 'confirm';
+  _CA.isBooking = _CA.agent === 'booking';
+  // Booking's config lives on the booking agent endpoint (/api/agent-approvals) under
+  // its own action names + per-entry shape; confirm/closing keep their flat editor.
+  _CA.endpoint = _CA.isBooking ? '/api/agent-approvals' : ('/api/agent-' + _CA.agent);
+  _CA.getAction = _CA.isBooking ? 'booking-automations-get' : 'automations-get';
+  _CA.setAction = _CA.isBooking ? 'booking-automations-set' : 'automations-set';
   const host = document.getElementById('confirm-autos-card'); if (!host) return;
   try {
-    const res = await _apxPost(_CA.endpoint, 'automations-get', {});
+    const res = await _apxPost(_CA.endpoint, _CA.getAction, {});
     _CA.data = res.automations || null;
     _confirmAutosRender();
   } catch (e) {
@@ -22118,6 +22125,15 @@ async function _confirmAutosLoad(agent) {
 // Pull the current textarea values back into the working copy before any re-render.
 function _confirmAutosSync() {
   if (!_CA.data) return;
+  if (_CA.isBooking) {
+    Object.entries(_CA.data.entries || {}).forEach(([ek, entry]) => {
+      (entry.steps || []).forEach(s => {
+        const ta = document.getElementById('ca-tpl-' + ek + '-' + s.key);
+        if (ta) s.template = ta.value;
+      });
+    });
+    return;
+  }
   (_CA.data.steps || []).forEach(s => {
     const ta = document.getElementById('ca-tpl-' + s.key);
     if (ta) s.template = ta.value;
@@ -22140,8 +22156,71 @@ function _caSetLive() {
   _confirmAutosRender();
 }
 
+// Toggle one booking opener step's enabled flag (entry-aware).
+function _caToggleEntryStep(entryKey, key) {
+  _confirmAutosSync();
+  if (!_CA.data || !_CA.data.entries) return;
+  const entry = _CA.data.entries[entryKey]; if (!entry) return;
+  const s = (entry.steps || []).find(x => x.key === key); if (s) s.enabled = !s.enabled;
+  _confirmAutosRender();
+}
+
+// Booking initial-automations render (per entry point). Kept separate from the
+// confirm/closing renderer so that flat-shape path stays byte-identical.
+function _bookingAutosRender(host) {
+  const d = _CA.data;
+  const seg = (on) => `background:${on ? 'var(--gold)' : 'transparent'};color:${on ? '#0B0B0D' : 'var(--text-sub)'};border:1px solid ${on ? 'var(--gold)' : 'var(--border)'};border-radius:8px;padding:5px 12px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit`;
+  const entries = d.entries || {};
+  const totalOn = Object.values(entries).reduce((n, e) => n + (e.steps || []).filter(s => s.enabled).length, 0);
+  const willSend = d.enabled && d.approved && totalOn > 0;
+  const status = willSend
+    ? `<span style="color:#5BBF7B">Live - ${totalOn} opener${totalOn === 1 ? '' : 's'} fire when a lead enters the booking queue</span>`
+    : (!d.enabled ? `<span style="color:var(--text-mute)">Sequence off - nothing sends</span>`
+      : (!d.approved ? `<span style="color:#D4B65C">Approve the sequence before anything sends</span>`
+        : `<span style="color:var(--text-mute)">No openers enabled</span>`));
+  const entryGroups = Object.entries(entries).map(([ek, entry]) => {
+    const steps = (entry.steps || []).map(s => `
+      <div style="background:var(--surface-el,#1a1a1d);border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:8px">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px">
+          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+            <span style="font-weight:600;font-size:13.5px">${escapeHTML(s.label || 'Opener')}</span>
+            <span style="color:var(--text-mute);font-size:10.5px;font-family:monospace;border:1px solid var(--border);border-radius:99px;padding:1px 8px">${_caWhenLabel(s)}</span>
+            <span style="color:var(--text-mute);font-size:10.5px;font-family:monospace;border:1px solid var(--border);border-radius:99px;padding:1px 8px">SMS</span>
+          </div>
+          <button style="${seg(s.enabled)}" onclick="_caToggleEntryStep('${ek}','${s.key}')">${s.enabled ? 'On' : 'Off'}</button>
+        </div>
+        <textarea id="ca-tpl-${ek}-${s.key}" rows="4" ${s.enabled ? '' : 'disabled'} style="width:100%;box-sizing:border-box;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:9px 11px;color:var(--text);font-size:13px;resize:vertical;font-family:inherit;line-height:1.5;opacity:${s.enabled ? 1 : .5}">${escapeHTML(s.template)}</textarea>
+      </div>`).join('');
+    const elabel = entry.label || _BOOKING_ENTRY_LABEL[ek] || ek;
+    return `<div style="margin-bottom:14px">
+      <div style="font-size:11px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--text-mute);margin-bottom:7px">${escapeHTML(elabel)}</div>
+      ${steps}
+    </div>`;
+  }).join('');
+  host.innerHTML = `
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;margin-bottom:16px;overflow:hidden">
+      <div style="padding:14px 16px;border-bottom:1px solid var(--border)">
+        <div style="font-weight:700;font-size:14px;margin-bottom:3px">Initial automations</div>
+        <div style="color:var(--text-mute);font-size:12px;line-height:1.5">Scripted first texts that open the conversation when a lead enters the booking queue, one per entry point (a fresh lead, a rebook after a no-show or can't-make-it, or a nurture / ghosted lead who replied). The moment they reply, the AI booking agent takes over. Once you approve the sequence, these openers queue for your one-tap ✓ in Hawkeye.</div>
+      </div>
+      <div style="padding:14px 16px">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap">
+          <button style="${seg(d.enabled && d.approved)}" onclick="_caSetLive()">${(d.enabled && d.approved) ? 'Sequence on' : 'Sequence off'}</button>
+        </div>
+        <div style="font-size:12px;margin-bottom:12px">${status}</div>
+        ${entryGroups}
+        <div style="font-size:11px;color:var(--text-mute);margin:4px 0 12px;line-height:1.7">Tokens (filled in automatically): <code>{{contact.first_name}}</code></div>
+        <div style="display:flex;gap:10px;align-items:center">
+          <button style="${_TA_BTN}" onclick="_confirmAutosSave()">Save</button>
+          <span id="ca-note" style="font-size:12px"></span>
+        </div>
+      </div>
+    </div>`;
+}
+
 function _confirmAutosRender() {
   const host = document.getElementById('confirm-autos-card'); if (!host || !_CA.data) return;
+  if (_CA.isBooking) return _bookingAutosRender(host);
   const d = _CA.data;
   const isClosing = _CA.agent === 'closing';
   const seg = (on) => `background:${on ? 'var(--gold)' : 'transparent'};color:${on ? '#0B0B0D' : 'var(--text-sub)'};border:1px solid ${on ? 'var(--gold)' : 'var(--border)'};border-radius:8px;padding:5px 12px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit`;
@@ -22195,7 +22274,7 @@ function _confirmAutosRender() {
 async function _confirmAutosSave() {
   _confirmAutosSync();
   try {
-    const res = await _apxPost(_CA.endpoint, 'automations-set', { automations: _CA.data });
+    const res = await _apxPost(_CA.endpoint, _CA.setAction, { automations: _CA.data });
     _CA.data = res.automations || _CA.data;
     _confirmAutosRender();
     const n = document.getElementById('ca-note'); if (n) n.innerHTML = `<span style="color:#5BBF7B">Saved ✓</span>`;

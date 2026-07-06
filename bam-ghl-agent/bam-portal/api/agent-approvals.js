@@ -29,7 +29,7 @@ import { markUnqualified, unmarkUnqualified } from "./agent/_tags.js";
 import { enrollContact, isAutomationLive } from "./automations.js";
 import { moveStage, setStatus, findOpenOpp } from "./agent/_store.js";
 import { routeTransition } from "./agent/_router.js";
-import { getBookingAutomations, automationsLive as bookingAutosLive, nextDueStep as bookingNextStep } from "./agent/booking-automations.js";
+import { DEFAULT_BOOKING_AUTOMATIONS, getBookingAutomations, automationsLive as bookingAutosLive, nextDueStep as bookingNextStep } from "./agent/booking-automations.js";
 import { agentMode, modeIsOn, shouldAutoSend } from "./agent/_mode.js";
 import { mutedContactIdSet, isMuted } from "./agent/_mutes.js";
 import { withinQuietHours, nextSendableTime } from "./agent/_quiet.js";
@@ -342,6 +342,35 @@ function scriptedBookingOpener(client, entryKey, firstName) {
     reasoning: `Scripted booking opener (${entryKey}).`,
     confidence: 1, escalate: false, asked_to_book: BOOK_ASK.test(text),
     summary: null, book: false, book_group: null, book_slot_at: null, book_calendar_id: null,
+  };
+}
+
+// Sanitize an incoming booking-automations edit against the shipped defaults
+// (per-entry, per-step). Only enabled/approved (top) + per-step enabled + template
+// (capped) are writable; entry set, step keys, timing/channel come from defaults.
+// Mirrors sanitizeAutomations in agent-confirm.js, extended for the entries shape.
+function sanitizeBookingAutomations(incoming, cur = {}) {
+  const inEntries = (incoming && incoming.entries && typeof incoming.entries === "object") ? incoming.entries : {};
+  const entries = {};
+  for (const [ekey, edef] of Object.entries(DEFAULT_BOOKING_AUTOMATIONS.entries)) {
+    const ie = inEntries[ekey] || {};
+    const seen = new Map((Array.isArray(ie.steps) ? ie.steps : []).map(s => [s && s.key, s]));
+    entries[ekey] = {
+      steps: edef.steps.map(def => {
+        const s = seen.get(def.key) || {};
+        return {
+          key: def.key,
+          enabled: typeof s.enabled === "boolean" ? s.enabled : def.enabled,
+          template: typeof s.template === "string" ? s.template.slice(0, 800) : def.template,
+        };
+      }),
+    };
+  }
+  return {
+    enabled: typeof incoming.enabled === "boolean" ? incoming.enabled
+      : (typeof cur.enabled === "boolean" ? cur.enabled : DEFAULT_BOOKING_AUTOMATIONS.enabled),
+    approved: incoming.approved === true,
+    entries,
   };
 }
 
@@ -782,6 +811,25 @@ async function handler(req, res) {
       // Scope the patch to this academy so an actor can't skip another's row.
       await sb(`agent_ready_replies?id=eq.${encodeURIComponent(b.ready_id)}&client_id=eq.${clientId}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ status: "skipped", updated_at: new Date().toISOString() }) });
       return res.status(200).json({ ok: true });
+    }
+    // Booking initial-automations editor (per-entry scripted openers) - read.
+    if (b.action === "booking-automations-get") {
+      const client = await loadClient(clientId);
+      if (!client) return res.status(404).json({ error: "academy not found" });
+      return res.status(200).json({ automations: getBookingAutomations(client) });
+    }
+    // Booking initial-automations editor - save (per-entry, per-step enabled + copy,
+    // sequence enable, approve toggle). Entry set + timing are fixed.
+    if (b.action === "booking-automations-set") {
+      const client = await loadClient(clientId);
+      if (!client) return res.status(404).json({ error: "academy not found" });
+      const cur = (client.ghl_kpi_config && client.ghl_kpi_config.booking_initial_automations) || {};
+      const merged = sanitizeBookingAutomations(b.automations && typeof b.automations === "object" ? b.automations : {}, cur);
+      const cfg = { ...(client.ghl_kpi_config || {}), booking_initial_automations: merged };
+      try {
+        await sb(`clients?id=eq.${clientId}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ ghl_kpi_config: cfg }) });
+      } catch (e) { return res.status(500).json({ error: `couldn't save: ${e.message}` }); }
+      return res.status(200).json({ ok: true, automations: getBookingAutomations({ ghl_kpi_config: cfg }) });
     }
   } catch (e) {
     console.error("[agent-approvals]", e);
