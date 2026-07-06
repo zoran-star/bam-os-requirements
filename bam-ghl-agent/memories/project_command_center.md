@@ -116,7 +116,7 @@
 | Section | Mount | Content |
 |---|---|---|
 | home | `_ccMountHome` | REPARENTS `#home-v2` (all CSS scoped to it, renders identically) + greeting head |
-| sales | `_ccMountSales` | quick stats (trials today live via calendars-v15; 7-day sales + closing rate = placeholders), Open sales board, Hawkeye. **Zoran's slot: `#cc-sales-mount`** |
+| sales | `_ccMountSales` | **Hawk bench line** (target orb, SALES REP, status = live hawkeye count via 8s interval `_ccSalesHawk`), quick stats (trials today via calendars-v15 + **Next: <day time> fallback** `_ccNextTrial` when 0; 7-day sales + closing rate still placeholder '-'), **live pipeline strip** `_ccSalesLoad` (stage pills w/ open-opp counts from /api/ghl/pipelines first pipeline), Open sales board, Hawkeye button **with count badge**, **Recent movement feed** (top 3 opps by lastStageChangeAt/updatedAt). Builder note removed. **Zoran's slot: `#cc-sales-mount`** |
 | members | `_ccMountMembers` | agent bar (opens members focus mode) + roster KPIs computed client-side (`_ccMemberKpis`: live/paused counts, MRR + rev/member = monthlyized `pricing.amount_cents`, tax-inclusive approx) |
 | marketing | `_ccMountMarketing` | REPARENTS `#marketing-machine-card` + `#landing-machine-card` (mm CSS is global; focus modals live at body level so marketing focus mode works unchanged) |
 | resources | `_ccMountResources` | 4 quick buttons (Calendar/Contacts/Inbox/Support) + assets library via `_ASSETS_HOST_ID='cc-assets-content'` host-override |

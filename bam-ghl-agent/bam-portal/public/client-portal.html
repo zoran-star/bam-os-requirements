@@ -44436,6 +44436,24 @@ function _ccStyle() {
     '.cc-btn.primary:hover{color:var(--on-gold);filter:brightness(1.05)}' +
     '.cc-note{font-size:11.5px;color:var(--text-mute);margin-top:10px}' +
     /* member agent bar */
+    '.cc-sal-bench{display:flex;align-items:center;gap:12px;margin-bottom:18px}' +
+    '.cc-sal-orb{width:38px;height:38px;border-radius:50%;background:linear-gradient(135deg,var(--gold),#D4B85C);color:#fff;display:flex;align-items:center;justify-content:center;flex:none}' +
+    '.cc-sal-orb svg{width:17px;height:17px}' +
+    '.cc-sal-bench-t b{display:block;font-family:var(--font-num);font-size:15px;font-weight:800;color:var(--text);line-height:1.15}' +
+    '.cc-sal-bench-t span{font-size:9.5px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--gold)}' +
+    '.cc-sal-bench-s{margin-left:auto;font-size:12px;color:var(--text-mute)}' +
+    '.cc-pipe-strip{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:18px}' +
+    '.cc-pipe-pill{display:inline-flex;align-items:center;gap:8px;background:var(--surface);border:1px solid var(--border);border-radius:999px;padding:7px 8px 7px 14px;font:inherit;font-size:12px;font-weight:600;color:var(--text);cursor:pointer;transition:border-color .15s,transform .15s}' +
+    '.cc-pipe-pill:hover{border-color:var(--accent-border);transform:translateY(-1px)}' +
+    '.cc-pipe-pill b{background:var(--surface-el);border-radius:999px;min-width:22px;text-align:center;padding:2px 7px;font-family:var(--font-num);font-weight:800;font-size:12px}' +
+    '.cc-pipe-pill.dim{color:var(--text-mute)}' +
+    '.cc-btn-badge{display:inline-flex;min-width:18px;height:18px;align-items:center;justify-content:center;background:var(--gold);color:var(--on-gold,#131416);border-radius:999px;font-size:10.5px;font-weight:800;padding:0 5px;margin-left:8px}' +
+    '.cc-sal-feed{margin-top:16px}' +
+    '.cc-sal-feed-h{font-size:10px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--text-mute);margin-bottom:8px}' +
+    '.cc-sal-feed-row{display:flex;align-items:baseline;gap:8px;font-size:12.5px;color:var(--text-sub);padding:4px 0}' +
+    '.cc-sal-feed-nm{font-weight:700;color:var(--text)}' +
+    '.cc-sal-feed-arr{color:var(--gold)}' +
+    '.cc-sal-feed-t{margin-left:auto;font-size:11px;color:var(--text-mute)}' +
     '.cc-qr-x{background:none;border:none;color:var(--text-mute);cursor:pointer;padding:6px;border-radius:8px;display:inline-flex;align-items:center;flex:none}' +
     '.cc-qr-x:hover{color:var(--text);background:var(--surface-el,rgba(0,0,0,.05))}' +
     '.cc-agent-bar{display:flex;align-items:center;gap:10px;width:100%;text-align:left;background:var(--surface);border:1px solid var(--border-med);border-radius:999px;padding:13px 20px;font:inherit;font-size:13px;color:var(--text-mute);cursor:text;margin-bottom:14px;transition:border-color .2s,box-shadow .2s}' +
@@ -45177,20 +45195,28 @@ function _ccMountHome(host) {
 function _ccMountSales(host) {
   host.innerHTML = _ccHead('Sales', 'Pipeline, agents and trials.') + `
     <div id="cc-sales-mount">
+      <div class="cc-sal-bench">
+        <span class="cc-sal-orb"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8"/><line x1="12" y1="2" x2="12" y2="6"/><line x1="12" y1="18" x2="12" y2="22"/><line x1="2" y1="12" x2="6" y2="12"/><line x1="18" y1="12" x2="22" y2="12"/><circle cx="12" cy="12" r="2"/></svg></span>
+        <div class="cc-sal-bench-t"><b>Hawk</b><span>Sales rep</span></div>
+        <div class="cc-sal-bench-s" id="cc-sal-status">Watching the pipeline.</div>
+      </div>
       <div class="cc-stats">
         <div class="cc-stat click" onclick="_ccOpenClassic('calendar')" title="Jump to the calendar">
-          <div class="cc-stat-v" id="cc-sal-trials">-</div><div class="cc-stat-l">Trials today</div>
+          <div class="cc-stat-v" id="cc-sal-trials">-</div><div class="cc-stat-l">Trials today</div><div class="cc-stat-d" id="cc-sal-next"></div>
         </div>
         <div class="cc-stat"><div class="cc-stat-v" id="cc-sal-7d">-</div><div class="cc-stat-l">Sales - 7 days</div></div>
         <div class="cc-stat"><div class="cc-stat-v" id="cc-sal-close">-</div><div class="cc-stat-l">Trial closing rate</div></div>
       </div>
+      <div class="cc-pipe-strip" id="cc-sal-strip"></div>
       <div class="cc-actions">
         <button type="button" class="cc-btn primary" onclick="_ccOpenClassic('pipelines')">Open sales board</button>
-        <button type="button" class="cc-btn" onclick="_hv2OpenHawkeye()">Hawkeye actions</button>
+        <button type="button" class="cc-btn" onclick="_hv2OpenHawkeye()">Hawkeye actions<span class="cc-btn-badge" id="cc-sal-hawkn" style="display:none"></span></button>
       </div>
-      <div class="cc-note">Sales focus mode arrives with the new Sales build. This section is its slot.</div>
+      <div class="cc-sal-feed" id="cc-sal-feed"></div>
     </div>`;
   _ccLoadTrialsCount();
+  _ccSalesLoad();
+  if (!window._ccSalHawkT) window._ccSalHawkT = setInterval(_ccSalesHawk, 8000);
 }
 async function _ccLoadTrialsCount() {
   const el = document.getElementById('cc-sal-trials');
@@ -45199,8 +45225,77 @@ async function _ccLoadTrialsCount() {
     const token = await _mreqAuthToken();
     const r = await fetch('/api/ghl/calendars-v15?action=trials-today&client_id=' + encodeURIComponent(CLIENT_ID), { headers: { Authorization: 'Bearer ' + token } });
     const j = await _safeJson(r);
-    if (r.ok && !j.no_config) el.textContent = String((j.trials || []).length);
+    if (r.ok && !j.no_config) {
+      const n = (j.trials || []).length;
+      el.textContent = String(n);
+      if (!n) _ccNextTrial();
+    }
   } catch (_) {}
+}
+// "Trials today: 0" is a dead number - show the next booked trial instead.
+async function _ccNextTrial() {
+  const sub = document.getElementById('cc-sal-next');
+  if (!sub) return;
+  try {
+    const token = await _mreqAuthToken();
+    const lr = await fetch('/api/ghl/calendars-v15?action=list&client_id=' + encodeURIComponent(CLIENT_ID), { headers: { Authorization: 'Bearer ' + token } });
+    const lj = await _safeJson(lr);
+    const ids = ((lj && lj.calendars) || []).map(c => c.id);
+    if (!lr.ok || !ids.length) return;
+    const start = Date.now(), end = start + 7 * 86400000;
+    const er = await fetch(`/api/ghl/calendars-v15?action=events&client_id=${encodeURIComponent(CLIENT_ID)}&calendar_ids=${encodeURIComponent(ids.join(','))}&start=${start}&end=${end}`, { headers: { Authorization: 'Bearer ' + token } });
+    const ej = await _safeJson(er);
+    if (!er.ok) return;
+    const next = ((ej && ej.events) || [])
+      .filter(ev => ev.status !== 'cancelled' && new Date(ev.start).getTime() > Date.now())
+      .sort((a, b) => new Date(a.start) - new Date(b.start))[0];
+    if (next) {
+      const d = new Date(next.start);
+      sub.textContent = 'Next: ' + d.toLocaleDateString('en-US', { weekday: 'short' }) + ' ' + calFormatTime(d.getHours() + d.getMinutes() / 60);
+    }
+  } catch (_) {}
+}
+// Live pipeline strip + recent movement, from the same board data the
+// sales page renders (portal store once the cutover flips).
+async function _ccSalesLoad() {
+  try {
+    const token = await _mreqAuthToken();
+    const r = await fetch('/api/ghl/pipelines?client_id=' + encodeURIComponent(CLIENT_ID), { headers: { Authorization: 'Bearer ' + token } });
+    const j = await _safeJson(r);
+    if (!r.ok) throw new Error('pipelines');
+    const pl = ((j && j.pipelines) || []).find(p => (p.stages || []).length);
+    if (pl) {
+      const open = (pl.opportunities || []).filter(o => String(o.status || 'open').toLowerCase() === 'open');
+      const strip = document.getElementById('cc-sal-strip');
+      if (strip) strip.innerHTML = (pl.stages || []).map(s => {
+        const n = open.filter(o => o.stageId === s.id).length;
+        return `<button type="button" class="cc-pipe-pill${n ? '' : ' dim'}" onclick="_ccOpenClassic('pipelines')"><span>${escapeHTML(s.name)}</span><b>${n}</b></button>`;
+      }).join('');
+      const feed = document.getElementById('cc-sal-feed');
+      if (feed) {
+        const stageName = {};
+        (pl.stages || []).forEach(s => { stageName[s.id] = s.name; });
+        const moves = (pl.opportunities || [])
+          .filter(o => o.lastStageChangeAt || o.updatedAt)
+          .sort((a, b) => new Date(b.lastStageChangeAt || b.updatedAt) - new Date(a.lastStageChangeAt || a.updatedAt))
+          .slice(0, 3);
+        feed.innerHTML = moves.length
+          ? '<div class="cc-sal-feed-h">Recent movement</div>' + moves.map(o => {
+              const t = new Date(o.lastStageChangeAt || o.updatedAt);
+              return `<div class="cc-sal-feed-row"><span class="cc-sal-feed-nm">${escapeHTML(_ccCapName((o.name || 'Lead').split(' ').slice(0, 2).join(' ')))}</span><span class="cc-sal-feed-arr">&rarr;</span><span>${escapeHTML(stageName[o.stageId] || 'Stage')}</span><span class="cc-sal-feed-t">${_hmInboxTimeStr(t)} ago</span></div>`;
+            }).join('')
+          : '';
+      }
+    }
+  } catch (_) {}
+  _ccSalesHawk();
+}
+function _ccSalesHawk() {
+  const n = window._hmHawkTotal || 0;
+  const b = document.getElementById('cc-sal-hawkn');
+  if (b) { b.textContent = String(n); b.style.display = n > 0 ? '' : 'none'; }
+  const st = document.getElementById('cc-sal-status');
+  if (st) st.textContent = n > 0 ? n + (n === 1 ? ' follow-up queued.' : ' follow-ups queued.') : 'Watching the pipeline.';
 }
 
 // MEMBERS (skeleton): agent bar (opens the members focus mode), roster KPIs
@@ -47073,8 +47168,10 @@ function _mmFunnelSvg(page, clicks, loaded) {
     svg += '<circle id="mmfz-n' + i + '" class="mm-fz-node" cx="' + p[0].toFixed(1) + '" cy="' + p[1].toFixed(1) + '" r="3" fill="var(--surface)" stroke="var(--gold)" stroke-width="1.5"/>';
   });
   // leak marker: a small "fix" badge with a stem pointing at the leak;
-  //   the full instruction lives in the tooltip + focus mode
-  if (worst >= 0) {
+  //   the full instruction lives in the tooltip + focus mode.
+  //   SHELVED 2026-07-06 (memories/project_shelved_features.md) - set
+  //   window._MM_SHOW_FIX_BADGE = true to bring it back.
+  if (worst >= 0 && window._MM_SHOW_FIX_BADGE) {
     const label = stages[worst].fix || '';
     const mx = (X[worst] + X[worst + 1]) / 2;
     const lyMid = (top[worst][1] + top[worst + 1][1]) / 2;
