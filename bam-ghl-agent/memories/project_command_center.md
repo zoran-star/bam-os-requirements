@@ -72,6 +72,12 @@
 - `_ccCapName` now skips anything containing '@' (emails stay verbatim). Applied to the home inbox card rows (`_hmInboxRow`) and the v15 inbox list (`_ibSmartName` person branch).
 - Scoreboard periods (as built): New Leads + Trials Booked = this week Mon-today (ring vs last week); MRR Growth = month-to-date from /kpis revenue; Revenue = yesterday only. Time-period options are an open decision with Cole.
 
+## KPI defaults + sound trim (2026-07-06, Cole picks)
+- Scoreboard defaults now `leads, trials, mrr, newmembers`. MRR = ONGOING (roster-derived via `_ccMemberKpis`, falls back to /kpis month-to-date); New Members = joins this month (ring vs last month); Revenue stays in the catalog but reads last 7 days (was yesterday, always $0). Active Members + Rev/Member also wired from roster. Selected metrics with no data render '-' instead of eternal skeleton. Wired: leads/trials/mrr/newmembers/rev/members/revmember; still stub: replies/churn/attendance/conversion.
+- Portal :root now has `--font-mono` (DM Mono, mirrors tokens.css); `.mm-focus-page` redefines `--mono: var(--font-mono)` so all focus telemetry (HUD, PULLED THIS SESSION, pins) is DM Mono not Geist.
+- **Sounds trimmed to 5 impactful moments** (Cole: prevent annoyance): boot chord, focus whoosh in/out, revenue kaching, actions thud/fanfare, quick-reply sent. Unwired (methods kept in _SFX): rail tick, orb pop, HUD typeTap, count-up rollClick, unread chime, perfect-day sparkle, scrub zip.
+- Focus-mode background = OPEN: Cole dislikes the blueprint grid, wants something more unique; options pending his pick.
+
 ## Section mounts (current skeleton)
 | Section | Mount | Content |
 |---|---|---|
