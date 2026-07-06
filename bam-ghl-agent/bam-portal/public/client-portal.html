@@ -43572,6 +43572,21 @@ function _ccStyle() {
     '.mma-orb-lg svg{width:20px;height:20px}' +
     '.mma-bench-name{font-family:var(--font-num);font-size:16px;font-weight:800;color:var(--text)}' +
     '.mma-bench-status{font-size:11.5px;color:var(--text-mute);line-height:1.4;min-height:32px}' +
+    '.mma-bench-role{font-size:10px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--gold)}' +
+    '.mma-shift{display:flex;flex-direction:column;gap:6px;padding:2px 0 12px;border-bottom:1px solid var(--border);margin-bottom:8px}' +
+    '.mma-shift-line{display:flex;gap:8px;align-items:baseline;font-size:12px;color:var(--text-sub);line-height:1.4}' +
+    '.mma-shift-dot{width:6px;height:6px;border-radius:50%;flex:none;background:var(--border-med);position:relative;top:-1px}' +
+    '.mma-shift-dot.red{background:var(--red)}.mma-shift-dot.gold{background:var(--gold)}.mma-shift-dot.green{background:var(--green)}' +
+    '.mma-log{display:flex;flex-direction:column;gap:3px;margin-bottom:8px}' +
+    '.mma-log-line{font-size:11.5px;color:var(--text-mute);opacity:.65;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}' +
+    '.mma-voice{min-height:46px;font-size:15px;line-height:1.55;color:var(--text);padding:0 0 12px}' +
+    '.mma-voice.think{font-family:var(--mono);font-size:11px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--text-mute)}' +
+    '.mma-desk{display:flex;flex-direction:column;gap:10px;padding-bottom:14px}' +
+    '.mma-desk>*{animation:mmaDeal .35s var(--es,ease) both}' +
+    '@keyframes mmaDeal{from{opacity:0;transform:translateY(10px) scale(.98)}to{opacity:1;transform:none}}' +
+    '.mma-orb.wake{animation:mmaWake .7s cubic-bezier(.34,1.56,.64,1)}' +
+    '@keyframes mmaWake{0%{transform:translateY(4px) scale(.92)}55%{transform:translateY(-3px) scale(1.06)}100%{transform:none}}' +
+    '@media(prefers-reduced-motion:reduce){.mma-desk>*{animation:none}.mma-orb.wake{animation:none}}' +
     '@media(max-width:980px){.mma-rail{display:none}}' +
     '.mma-rail-h{font-family:var(--mono);font-size:10px;font-weight:600;letter-spacing:.16em;text-transform:uppercase;color:var(--text-mute);padding:6px 0}' +
     '.mma-rail-empty{font-size:12px;color:var(--text-mute)}' +
@@ -44634,15 +44649,20 @@ function _mmaEnsureModal() {
         <div class="mma-split">
           <aside class="mma-rail" id="mma-rail">
             <div class="mma-bench">
-              <span class="mma-orb mma-orb-lg" id="mma-orb"><svg viewBox="0 0 512 512" fill="currentColor" stroke="none"><path d="M 256 80 L 290 230 L 432 256 L 290 282 L 256 432 L 222 282 L 80 256 L 222 230 Z"/></svg></span>
-              <div class="mma-bench-name">Member agent</div>
+              <span class="mma-orb mma-orb-lg" id="mma-orb"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></span>
+              <div class="mma-bench-name">Keeper</div>
+              <div class="mma-bench-role">Member manager</div>
               <div class="mma-bench-status" id="mma-status">Watching the roster. Ask me anything.</div>
             </div>
+            <div class="mma-rail-h">Since you left</div>
+            <div class="mma-shift" id="mma-shift"></div>
             <div class="mma-rail-h">Pulled this session</div>
             <div class="mma-rail-empty" id="mma-rail-empty">Nothing pulled yet.</div>
           </aside>
           <div class="mma-main">
-            <div class="mma-thread" id="mma-thread"></div>
+            <div class="mma-log" id="mma-log"></div>
+            <div class="mma-voice" id="mma-voice"></div>
+            <div class="mma-desk" id="mma-desk"></div>
             <div class="mma-compose">
               <textarea class="mma-input" id="mma-input" rows="1" placeholder="Try a member's name, or 'how's my MRR'"></textarea>
               <button type="button" class="mma-send" onclick="_mmaSend()" aria-label="Send">&#8593;</button>
@@ -44660,6 +44680,9 @@ function _mmaEnsureModal() {
   const inp = document.getElementById('mma-input');
   inp.addEventListener('keydown', e => {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); _mmaSend(); }
+  });
+  document.getElementById('mma-desk').addEventListener('click', e => {
+    if (e.target.closest('.mma-act, .mma-open')) _mmaOrb('say');
   });
 }
 // Suggestion chips: fill the composer; sends unless it's a starter phrase.
@@ -44688,22 +44711,47 @@ function _mmaOrb(state) {
 // when the LLM lands.
 function _mmaThink(lines) {
   return new Promise(resolve => {
-    const t = document.getElementById('mma-thread');
-    if (!t || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return resolve();
+    const v = document.getElementById('mma-voice');
+    if (!v || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return resolve();
     _mmaOrb('think');
-    const el = document.createElement('div');
-    el.className = 'mma-bub in mma-think';
-    t.appendChild(el);
-    t.scrollTop = t.scrollHeight;
+    if (!v.classList.contains('think')) _mmaLogLine(v.textContent.trim());
+    v.classList.add('think');
     let i = 0;
     (function step() {
-      if (!el.isConnected) return resolve();
-      el.textContent = lines[i];
+      if (!v.isConnected) return resolve();
+      v.textContent = lines[i];
       i++;
       if (i < lines.length) setTimeout(step, 240);
-      else setTimeout(() => { el.remove(); _mmaOrb(''); resolve(); }, 260);
+      else setTimeout(() => { _mmaOrb(''); resolve(); }, 260);
     })();
   });
+}
+// The agent speaks: previous line drops into the log, the new line types
+// itself out, and whatever they are handing you lands on the desk.
+function _mmaLogLine(text) {
+  const log = document.getElementById('mma-log');
+  if (!log || !text) return;
+  log.insertAdjacentHTML('beforeend', '<div class="mma-log-line">' + escapeHTML(text) + '</div>');
+  while (log.children.length > 3) log.firstElementChild.remove();
+}
+function _mmaSay(text, cardsHtml) {
+  const v = document.getElementById('mma-voice');
+  if (!v) return;
+  if (!v.classList.contains('think')) _mmaLogLine(v.textContent.trim());
+  v.classList.remove('think');
+  _mmaOrb('say');
+  const desk = document.getElementById('mma-desk');
+  if (desk) desk.innerHTML = cardsHtml || '';
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) { v.textContent = text; return; }
+  v.textContent = '';
+  let i = 0;
+  clearInterval(window._mmaTypeT);
+  window._mmaTypeT = setInterval(() => {
+    if (!v.isConnected) return clearInterval(window._mmaTypeT);
+    i++;
+    v.textContent = text.slice(0, i);
+    if (i >= text.length) clearInterval(window._mmaTypeT);
+  }, 14);
 }
 // Workbench rail: pin what the agent pulled so the session builds a desk.
 function _mmaPin(html, onclick) {
@@ -44740,31 +44788,100 @@ function _ccOpenFocusPage(modalId, panelSel) {
 function openMembersFocus() {
   _mmaEnsureModal();
   _ccOpenFocusPage('membersMachineModal', '#cc-agent-bar');
+  const orb = document.getElementById('mma-orb');
+  if (orb) { orb.classList.remove('wake'); void orb.offsetWidth; orb.classList.add('wake'); }
+  _mmaShiftLoad();
   if (!window._MMA_GREETED) {
     window._MMA_GREETED = true;
-    _mmaAdd('in', "I'm your member agent. Type a member's name to pull their card, or ask about your member KPIs. Full AI brain coming soon. For now I match names and read numbers.");
+    _mmaStandup();
   }
-  _ccEnsureMembers();
   setTimeout(() => document.getElementById('mma-input')?.focus(), 700);
+}
+// Walk-in standup: the first thing out of Keeper's mouth is whatever
+// matters most on the roster right now, card in hand.
+async function _mmaStandup() {
+  const roster = await _ccEnsureMembers();
+  if (!roster.length) {
+    _mmaSay("I keep your roster. Pull up a member by name, or ask for the numbers.", '');
+    return;
+  }
+  const k = _ccMemberKpis(roster);
+  const bad = roster.filter(m => m.status === 'payment_failed')
+    .concat(roster.filter(m => m.status === 'payment_method_required'));
+  if (bad.length) {
+    const m = bad[0], amt = Math.round(_ccMonthly(m));
+    const nm = _ccCapName(m.athlete_name || m.parent_name || 'A member');
+    const more = bad.length > 1 ? ' ' + (bad.length - 1) + ' more behind them.' : '';
+    _mmaSay('Before you ask: ' + nm + (m.status === 'payment_failed' ? "'s payment failed." : ' has no payment method on file.')
+      + (amt > 0 ? ' $' + amt.toLocaleString() + '/mo at risk.' : '') + more + ' Here is the card.',
+      _mmaCardHtml(m, true));
+    return;
+  }
+  const mile = _mmaNextMilestone(roster);
+  if (mile) {
+    _mmaSay(_ccCapName(mile.m.athlete_name || 'A member') + ' hits ' + mile.mo + ' months '
+      + (mile.days === 0 ? 'today' : 'in ' + mile.days + ' days') + '. Good moment for a shoutout.',
+      _mmaCardHtml(mile.m, true));
+    return;
+  }
+  _mmaSay('All ' + k.live + ' members are current. MRR sits at $' + Math.round(k.mrr).toLocaleString() + '. Quiet shift.', '');
+}
+function _mmaNextMilestone(roster) {
+  let best = null;
+  for (const m of roster) {
+    if (m.status !== 'live') continue;
+    const t = new Date(m.joined_date || m.start_date || m.stripe_joined_at || 0).getTime();
+    if (!(t > 0)) continue;
+    for (const mo of [3, 6, 12, 18, 24]) {
+      const anniv = new Date(t);
+      anniv.setMonth(anniv.getMonth() + mo);
+      const days = Math.ceil((anniv.getTime() - Date.now()) / 86400000);
+      if (days >= 0 && days <= 14 && (!best || days < best.days)) best = { m, mo, days };
+    }
+  }
+  return best;
+}
+// Shift report: what Keeper has been watching while you were gone.
+async function _mmaShiftLoad() {
+  const host = document.getElementById('mma-shift');
+  if (!host) return;
+  const roster = await _ccEnsureMembers();
+  if (!roster.length) { host.innerHTML = '<div class="mma-shift-line"><span class="mma-shift-dot"></span>Roster not loaded yet.</div>'; return; }
+  const k = _ccMemberKpis(roster);
+  const probs = roster.filter(m => m.status === 'payment_failed' || m.status === 'payment_method_required' || m.status === 'cancelling' || m.pause_scheduled_for).length;
+  const m0 = new Date(); m0.setDate(1); m0.setHours(0, 0, 0, 0);
+  const joins = roster.filter(m => new Date(m.joined_date || m.start_date || m.stripe_joined_at || 0).getTime() >= m0.getTime()).length;
+  let miles = 0;
+  for (const m of roster) {
+    if (m.status !== 'live') continue;
+    const t = new Date(m.joined_date || m.start_date || m.stripe_joined_at || 0).getTime();
+    if (!(t > 0)) continue;
+    for (const mo of [3, 6, 12, 18, 24]) {
+      const anniv = new Date(t);
+      anniv.setMonth(anniv.getMonth() + mo);
+      const days = Math.ceil((anniv.getTime() - Date.now()) / 86400000);
+      if (days >= 0 && days <= 14) { miles++; break; }
+    }
+  }
+  const line = (cls, html) => '<div class="mma-shift-line"><span class="mma-shift-dot ' + cls + '"></span><span>' + html + '</span></div>';
+  host.innerHTML =
+    (probs ? line('red', '<b>' + probs + '</b> payment or retention issue' + (probs === 1 ? '' : 's') + ' open') : line('green', 'No payment issues open')) +
+    (miles ? line('gold', '<b>' + miles + '</b> milestone' + (miles === 1 ? '' : 's') + ' in the next 14 days') : '') +
+    (joins ? line('green', '<b>+' + joins + '</b> member' + (joins === 1 ? '' : 's') + ' this month') : '') +
+    line('', 'MRR at <b>$' + Math.round(k.mrr).toLocaleString() + '</b>');
 }
 function closeMembersFocus() {
   try { _mmCloseFocus('membersMachineModal'); }
   catch (_) { const m = document.getElementById('membersMachineModal'); m.classList.remove('mm-open'); m.style.display = 'none'; }
-}
-function _mmaAdd(dir, html) {
-  const t = document.getElementById('mma-thread');
-  if (!t) return;
-  t.querySelectorAll('.mma-bub:not(.past)').forEach(b => b.classList.add('past'));
-  t.insertAdjacentHTML('beforeend', `<div class="mma-bub ${dir}">${html}</div>`);
-  t.scrollTop = t.scrollHeight;
-  if (dir === 'in') _mmaOrb('say');
 }
 function _mmaSend() {
   const inp = document.getElementById('mma-input');
   const txt = (inp?.value || '').trim();
   if (!txt) return;
   inp.value = '';
-  _mmaAdd('out', escapeHTML(txt));
+  const v = document.getElementById('mma-voice');
+  if (v && !v.classList.contains('think')) { _mmaLogLine(v.textContent.trim()); v.textContent = ''; }
+  _mmaLogLine('You: ' + txt);
   _mmaHandle(txt.toLowerCase());
 }
 async function _mmaHandle(q) {
@@ -44777,14 +44894,14 @@ async function _mmaHandle(q) {
   await _mmaThink(['SEARCHING ROSTER...', roster.length + ' RECORDS', matches.length + (matches.length === 1 ? ' MATCH' : ' MATCHES')]);
   if (matches.length === 1) {
     const m = matches[0];
-    _mmaAdd('in', 'This the one?' + _mmaCardHtml(m, true));
+    _mmaSay('This the one?', _mmaCardHtml(m, true));
     _mmaPin('<span class="mma-pin-t">' + escapeHTML(_ccCapName(m.athlete_name || 'Member')) + '</span><span class="mma-pin-s">member card</span>', () => openMemberPopup(m.id));
     const jt = new Date(m.joined_date || m.start_date || m.stripe_joined_at || 0).getTime();
     _ccFocusWallpaper('membersMachineModal', { highlight: jt > 0 ? jt : null });
   } else if (matches.length > 1) {
-    _mmaAdd('in', 'A few matches. Which one?' + matches.map(m => _mmaCardHtml(m, false)).join(''));
+    _mmaSay('A few matches. Which one?', matches.map(m => _mmaCardHtml(m, false)).join(''));
   } else {
-    _mmaAdd('in', "Didn't catch that. Type a member's name to pull their card, or ask about your KPIs (try \"how's my MRR\").");
+    _mmaSay("Didn't catch that. Type a member's name to pull their card, or ask about your KPIs (try \"how's my MRR\").", '');
   }
 }
 async function _mmaMatchMembers(q) {
@@ -44824,11 +44941,11 @@ function _mmaCardHtml(m, detailed) {
 }
 async function _mmaKpis() {
   const roster = await _ccEnsureMembers();
-  if (!roster.length) return _mmaAdd('in', 'No roster loaded yet - open the member list once and try again.');
+  if (!roster.length) return _mmaSay('No roster loaded yet. Open the member list once and try again.', '');
   const k = _ccMemberKpis(roster);
   _ccFocusWallpaper('membersMachineModal', { money: true });
   _mmaPin('<span class="mma-pin-t">$' + Math.round(k.mrr).toLocaleString() + ' MRR</span><span class="mma-pin-s">' + k.live + ' active · ' + k.paused + ' paused</span>');
-  _mmaAdd('in', 'Your roster right now:' +
+  _mmaSay('Your roster right now:',
     `<div class="mma-kgrid">` +
     `<div class="mma-k"><div class="mma-k-v">${k.live}</div><div class="mma-k-l">Active members</div></div>` +
     `<div class="mma-k"><div class="mma-k-v">${k.paused}</div><div class="mma-k-l">Paused</div></div>` +
@@ -44836,7 +44953,7 @@ async function _mmaKpis() {
     `<div class="mma-k"><div class="mma-k-v">$${Math.round(k.arpu).toLocaleString()}</div><div class="mma-k-l">Rev / member</div></div>` +
     `</div><div style="font-size:11px;color:var(--text-mute);margin-top:6px">Figures are monthly equivalents from the live roster, tax inclusive.</div>`);
   // the grid's numbers count up as they land
-  const grids = document.querySelectorAll('#mma-thread .mma-kgrid');
+  const grids = document.querySelectorAll('#mma-desk .mma-kgrid');
   const g = grids[grids.length - 1];
   if (g && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
     g.querySelectorAll('.mma-k-v').forEach(el => {
