@@ -15696,7 +15696,7 @@ function _hv2NavCard(icon, title, sub, view, delay) {
 function renderHomeV2() {
   const host = document.getElementById('home-v2'); if (!host) return;
   _hv2Style();
-  host.innerHTML = `<div class="hm-layout">
+  host.innerHTML = `<div id="hm-pipeline" style="margin-bottom:20px;display:none"></div><div class="hm-layout">
     <div class="hm-left">
       <div class="hm-bubble hm-visible">
         <div class="hv2-hero" style="grid-template-columns:1fr">
@@ -15757,6 +15757,7 @@ function renderHomeV2() {
   _hv2Load();
 }
 function _hv2Load() {
+  _hmPipelineLoad();
   _hv2WinLoad();
   _hv2SchedLoad();
   _hv2ActsLoad();
@@ -30125,7 +30126,7 @@ function _plTrialsToday() {
 function _ploCss() {
   if (document.getElementById('plo-css')) return;
   const st = document.createElement('style'); st.id = 'plo-css';
-  st.textContent = [
+  const _ploRules = [
     '#pl-overview .plo-kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:24px;align-items:start}',
     '#pl-overview .plo-kpi{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-md);padding:16px 18px;box-shadow:var(--card-shadow)}',
     '#pl-overview .plo-lab{font-size:10.5px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--text-mute)}',
@@ -30228,7 +30229,14 @@ function _ploCss() {
     '#pl-board-container.plenter .pl-col{animation:plColRise .44s var(--es) both}',
     '#pl-board-container.plenter .pl-band-cell{animation:ploUp .4s var(--es) both}',
     '@media(prefers-reduced-motion:reduce){#pl-overview *,#pl-board-container *{animation:none!important}}',
-  ].join('');
+  ];
+  // The home page reuses the collapsed stage strip: mirror the descendant .plo-*
+  // rules onto a #hm-pipeline scope so the same cells style up there too. Entrance
+  // animations (#pl-overview.enter) and layout-only rules stay Sales-scoped.
+  const _homeRules = _ploRules
+    .filter(r => r.startsWith('#pl-overview .plo'))
+    .map(r => r.split('#pl-overview ').join('#hm-pipeline '));
+  st.textContent = _ploRules.concat(_homeRules).join('');
   document.head.appendChild(st);
 }
 
@@ -30256,32 +30264,79 @@ function _plRenderOverview() {
     + `</div>`;
 
   // ── collapsed stage strip ──
-  const cells = stages.map((s, i) => {
-    const opps = s.opportunities || [];
-    const bot = (typeof _plStageBot === 'function') ? _plStageBot(s.name) : null;
-    const kind = bot ? bot.kind : 'human';
-    // Label = the engine's role + kind, e.g. "Nurture automation", "Closing agent".
-    const engLab = (bot && bot.kind === 'terminal') ? bot.tag
-                 : bot ? `${bot.tag} ${bot.kind}` : 'Manual';
-    const engIcon = kind === 'agent' ? 'cpu' : kind === 'automation' ? 'gear' : kind === 'terminal' ? 'target' : 'user';
-    const sig = _plStageSignals(s, opps);
-    let pills = '';
-    if (sig.errors) pills += `<span class="plo-pill red" onclick="event.stopPropagation();_plSVStage('${escapeHTML(s.id)}')">${_plIcon('alert', 11)} ${sig.errors} ${sig.errors === 1 ? 'error' : 'errors'}</span>`;
-    if (sig.hawk && bot) pills += `<span class="plo-pill gold" onclick="event.stopPropagation();_plEngineHawk('${escapeHTML(bot.key)}')">${_plIcon('eye', 11)} ${sig.hawk} hawkeye action${sig.hawk === 1 ? '' : 's'}</span>`;
-    if (!pills) pills = '<span class="plo-clear">all clear</span>';
-    const conn = i < stages.length - 1 ? `<div class="plo-conn">${_plIcon('chevR', 16)}</div>` : '';
-    return `<div class="plo-stage" onclick="_plSVStage('${escapeHTML(s.id)}')">`
-      + `<div class="plo-toprow"><span class="plo-name">${escapeHTML(_plCap(s.name))}</span>`
-      + `<button class="plo-gear" title="Configure this stage" onclick="event.stopPropagation();_plOpenFocus('${escapeHTML(s.id)}')">${_plIcon('sliders', 14)}</button></div>`
-      + `<div class="plo-eng">${_ploEngIcon(engIcon)}<span>${escapeHTML(engLab)}</span></div>`
-      + `<div class="plo-count">${opps.length}<small>cards</small></div>`
-      + `<div class="plo-pills">${pills}</div></div>${conn}`;
-  }).join('');
+  const cells = _ploStripCells(stages, false);
 
   host.innerHTML = kpis
     + `<div class="plo-plhead"><h3>Pipeline</h3><button class="plo-expand" onclick="_plSVExpand()">${_plIcon('expand', 13)} Expand board</button></div>`
     + `<div class="plo-strip">${cells}</div>`;
 }
+
+// Build the collapsed stage-strip cells. Shared by the Sales overview and the home
+// page. `home=true` swaps the click handlers to first jump to the Sales view (the
+// home strip is a shortcut), otherwise they act in place.
+function _ploStripCells(stages, home) {
+  const stageClick = home ? '_hmPipeStage' : '_plSVStage';
+  const gearClick = home ? '_hmPipeFocus' : '_plOpenFocus';
+  return stages.map((s, i) => {
+    const opps = s.opportunities || [];
+    const bot = (typeof _plStageBot === 'function') ? _plStageBot(s.name) : null;
+    const kind = bot ? bot.kind : 'human';
+    const engLab = (bot && bot.kind === 'terminal') ? bot.tag
+                 : bot ? `${bot.tag} ${bot.kind}` : 'Manual';
+    const engIcon = kind === 'agent' ? 'cpu' : kind === 'automation' ? 'gear' : kind === 'terminal' ? 'target' : 'user';
+    const sig = _plStageSignals(s, opps);
+    let pills = '';
+    if (sig.errors) pills += `<span class="plo-pill red" onclick="event.stopPropagation();${stageClick}('${escapeHTML(s.id)}')">${_plIcon('alert', 11)} ${sig.errors} ${sig.errors === 1 ? 'error' : 'errors'}</span>`;
+    if (sig.hawk && bot) pills += `<span class="plo-pill gold" onclick="event.stopPropagation();${home ? `_hmPipeHawk('${escapeHTML(bot.key)}')` : `_plEngineHawk('${escapeHTML(bot.key)}')`}">${_plIcon('eye', 11)} ${sig.hawk} hawkeye action${sig.hawk === 1 ? '' : 's'}</span>`;
+    if (!pills) pills = '<span class="plo-clear">all clear</span>';
+    const conn = i < stages.length - 1 ? `<div class="plo-conn">${_plIcon('chevR', 16)}</div>` : '';
+    return `<div class="plo-stage" onclick="${stageClick}('${escapeHTML(s.id)}')">`
+      + `<div class="plo-toprow"><span class="plo-name">${escapeHTML(_plCap(s.name))}</span>`
+      + `<button class="plo-gear" title="Configure this stage" onclick="event.stopPropagation();${gearClick}('${escapeHTML(s.id)}')">${_plIcon('sliders', 14)}</button></div>`
+      + `<div class="plo-eng">${_ploEngIcon(engIcon)}<span>${escapeHTML(engLab)}</span></div>`
+      + `<div class="plo-count">${opps.length}<small>cards</small></div>`
+      + `<div class="plo-pills">${pills}</div></div>${conn}`;
+  }).join('');
+}
+
+// ── Home page pipeline strip ────────────────────────────────────────────────
+// The same collapsed strip, shown on the main page. Loads pipeline data on demand
+// (independent of opening the Sales view) then renders. Clicking a stage / gear /
+// hawkeye pill jumps into the Sales view focused there.
+async function _hmPipelineLoad() {
+  const host = document.getElementById('hm-pipeline'); if (!host) return;
+  try {
+    const has = _PL_DATA && Array.isArray(_PL_DATA.pipelines) && _PL_DATA.pipelines.length;
+    if (!has) {
+      if (typeof CLIENT_ID === 'undefined' || !CLIENT_ID) throw new Error('no client');
+      const token = await _mreqAuthToken();
+      const r = await fetch('/api/ghl/pipelines?client_id=' + encodeURIComponent(CLIENT_ID), { headers: { Authorization: 'Bearer ' + token } });
+      const json = await _safeJson(r);
+      if (!r.ok) throw new Error(json.error || ('HTTP ' + r.status));
+      _PL_DATA = json;
+      if (!_PL_PIPELINE && json.pipelines && json.pipelines.length) _PL_PIPELINE = json.pipelines[0].id;
+    }
+    _hmPipelineRender();
+  } catch (e) {
+    host.style.display = 'none';   // no pipeline / not permitted → hide the section
+  }
+}
+function _hmPipelineRender() {
+  const host = document.getElementById('hm-pipeline'); if (!host) return;
+  _ploCss();
+  const p = _plActivePipeline();
+  if (!p) { host.style.display = 'none'; return; }
+  const stages = (p.stages || []).filter(s => (typeof _isStageAllowed !== 'function') || _isStageAllowed(s.id));
+  if (!stages.length) { host.style.display = 'none'; return; }
+  host.style.display = '';
+  host.innerHTML = `<div class="plo-plhead"><h3>Pipeline</h3><button class="plo-expand" onclick="switchView('pipelines')">${_plIcon('expand', 13)} Open board</button></div>`
+    + `<div class="plo-strip">${_ploStripCells(stages, true)}</div>`;
+}
+// Home strip handlers: open the Sales view, then focus the tapped stage / gear /
+// hawkeye once it has mounted.
+function _hmPipeStage(id) { switchView('pipelines'); setTimeout(() => { try { _plSVStage(id); } catch (_) {} }, 80); }
+function _hmPipeFocus(id) { switchView('pipelines'); setTimeout(() => { try { _plOpenFocus(id); } catch (_) {} }, 80); }
+function _hmPipeHawk(key) { switchView('pipelines'); setTimeout(() => { try { _plEngineHawk(key); } catch (_) {} }, 80); }
 
 // engine glyphs the strip needs that aren't in the base _plIcon set
 function _ploEngIcon(name) {
