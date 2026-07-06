@@ -28,6 +28,8 @@ import { respondedStage, contactInRespondedStage, computeQueue, respondedContact
 import { markUnqualified, unmarkUnqualified } from "./agent/_tags.js";
 import { enrollContact, isAutomationLive } from "./automations.js";
 import { moveStage, setStatus, findOpenOpp } from "./agent/_store.js";
+import { routeTransition } from "./agent/_router.js";
+import { DEFAULT_BOOKING_AUTOMATIONS, getBookingAutomations, automationsLive as bookingAutosLive, nextDueStep as bookingNextStep } from "./agent/booking-automations.js";
 import { agentMode, modeIsOn, shouldAutoSend } from "./agent/_mode.js";
 import { mutedContactIdSet, isMuted } from "./agent/_mutes.js";
 import { withinQuietHours, nextSendableTime } from "./agent/_quiet.js";
@@ -319,6 +321,59 @@ async function draftOpener(token, locationId, clientId, contactId, cfg, calendar
   };
 }
 
+// Scripted BOOKING initial-automation opener (Phase C). When the academy has its
+// booking initial automations LIVE + APPROVED for this entry point, use the
+// scripted template as the opener instead of the AI draft - the agent still takes
+// over the moment the lead replies. Returns a draft-shaped object or null to fall
+// back to draftOpener (so an unapproved academy is byte-identical to before).
+// {{contact.first_name}} is resolved HERE (this text goes straight to the Hawkeye
+// queue, not through the send engine's token pass, so an unresolved token would
+// reach the lead). One immediate step per entry today: startedMs=null + empty
+// sentKeys means that immediate opener is what's due.
+function scriptedBookingOpener(client, entryKey, firstName) {
+  const autos = getBookingAutomations(client);
+  if (!bookingAutosLive(autos, entryKey)) return null;
+  const step = bookingNextStep(autos, entryKey, { nowMs: Date.now(), startedMs: null, sentKeys: [] });
+  if (!step || !step.template) return null;
+  const text = String(step.template).replace(/\{\{\s*contact\.first_name\s*\}\}/g, firstName || "there");
+  if (!text.trim()) return null;
+  return {
+    reply: text,
+    reasoning: `Scripted booking opener (${entryKey}).`,
+    confidence: 1, escalate: false, asked_to_book: BOOK_ASK.test(text),
+    summary: null, book: false, book_group: null, book_slot_at: null, book_calendar_id: null,
+  };
+}
+
+// Sanitize an incoming booking-automations edit against the shipped defaults
+// (per-entry, per-step). Only enabled/approved (top) + per-step enabled + template
+// (capped) are writable; entry set, step keys, timing/channel come from defaults.
+// Mirrors sanitizeAutomations in agent-confirm.js, extended for the entries shape.
+function sanitizeBookingAutomations(incoming, cur = {}) {
+  const inEntries = (incoming && incoming.entries && typeof incoming.entries === "object") ? incoming.entries : {};
+  const entries = {};
+  for (const [ekey, edef] of Object.entries(DEFAULT_BOOKING_AUTOMATIONS.entries)) {
+    const ie = inEntries[ekey] || {};
+    const seen = new Map((Array.isArray(ie.steps) ? ie.steps : []).map(s => [s && s.key, s]));
+    entries[ekey] = {
+      steps: edef.steps.map(def => {
+        const s = seen.get(def.key) || {};
+        return {
+          key: def.key,
+          enabled: typeof s.enabled === "boolean" ? s.enabled : def.enabled,
+          template: typeof s.template === "string" ? s.template.slice(0, 800) : def.template,
+        };
+      }),
+    };
+  }
+  return {
+    enabled: typeof incoming.enabled === "boolean" ? incoming.enabled
+      : (typeof cur.enabled === "boolean" ? cur.enabled : DEFAULT_BOOKING_AUTOMATIONS.enabled),
+    approved: incoming.approved === true,
+    entries,
+  };
+}
+
 // Fire a reply (used by manual approve + self-drive auto-send). Pass clientId to
 // route Twilio academies through their own number + own-store; without it (or for
 // GHL academies) it sends via GHL exactly as before.
@@ -578,12 +633,16 @@ async function detectForClient(client) {
         if (Array.isArray(prior) && prior.length) continue;
         // Skip if a GHL conversation already exists (they wrote, or were texted).
         try { if (await findConversation(token, locationId, contactId)) continue; } catch (_) {}
-        let d;
-        try { d = await draftOpener(token, locationId, client.id, contactId, cfg, calendars); }
-        catch (e) { reasons.push(`opener ${contactId}: draft threw — ${e.message}`); continue; }
-        if (!d.reply || !String(d.reply).trim()) { if (d.escalate) escalated++; continue; }
+        // Name first (the scripted opener resolves {{contact.first_name}} from it).
         let nm = null;
         try { const c = await sb(`${await contactsReadTable(client.id)}?client_id=eq.${client.id}&ghl_contact_id=eq.${encodeURIComponent(contactId)}&select=name&limit=1`); nm = (Array.isArray(c) && c[0] && c[0].name) || null; } catch (_) {}
+        const firstName = nm ? String(nm).trim().split(/\s+/)[0] : null;
+        let d;
+        // Phase C: a fresh cold-open lead = the "new_lead" booking entry point. Use
+        // the academy's scripted opener when it's live+approved; else the AI opener.
+        try { d = scriptedBookingOpener(client, "new_lead", firstName) || await draftOpener(token, locationId, client.id, contactId, cfg, calendars); }
+        catch (e) { reasons.push(`opener ${contactId}: draft threw - ${e.message}`); continue; }
+        if (!d.reply || !String(d.reply).trim()) { if (d.escalate) escalated++; continue; }
         const isBook = !!(d.book && d.book_slot_at && d.book_calendar_id);
         try {
           await sb(`agent_ready_replies`, { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify([{
@@ -620,12 +679,15 @@ async function detectForClient(client) {
         try { active = await sb(`agent_ready_replies?client_id=eq.${client.id}&ghl_contact_id=eq.${encodeURIComponent(contactId)}&status=in.(pending,approved)&select=id&limit=1`); }
         catch (e) { reasons.push(`rebook ${contactId}: dedup error - ${e.message}`); continue; }
         if (Array.isArray(active) && active.length) continue;
-        let d;
-        try { d = await draftOpener(token, locationId, client.id, contactId, cfg, calendars); }
-        catch (e) { reasons.push(`rebook ${contactId}: draft threw - ${e.message}`); continue; }
-        if (!d.reply || !String(d.reply).trim()) { if (d.escalate) escalated++; continue; }
         let nm = null;
         try { const c = await sb(`${await contactsReadTable(client.id)}?client_id=eq.${client.id}&ghl_contact_id=eq.${encodeURIComponent(contactId)}&select=name&limit=1`); nm = (Array.isArray(c) && c[0] && c[0].name) || null; } catch (_) {}
+        const firstName = nm ? String(nm).trim().split(/\s+/)[0] : null;
+        let d;
+        // Phase C: a bounced-back lead = the "rebook" booking entry point. Scripted
+        // opener when live+approved; else the AI rebook opener (uses the memory note).
+        try { d = scriptedBookingOpener(client, "rebook", firstName) || await draftOpener(token, locationId, client.id, contactId, cfg, calendars); }
+        catch (e) { reasons.push(`rebook ${contactId}: draft threw - ${e.message}`); continue; }
+        if (!d.reply || !String(d.reply).trim()) { if (d.escalate) escalated++; continue; }
         const isBook = !!(d.book && d.book_slot_at && d.book_calendar_id);
         let queued = false;
         try {
@@ -749,6 +811,25 @@ async function handler(req, res) {
       // Scope the patch to this academy so an actor can't skip another's row.
       await sb(`agent_ready_replies?id=eq.${encodeURIComponent(b.ready_id)}&client_id=eq.${clientId}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ status: "skipped", updated_at: new Date().toISOString() }) });
       return res.status(200).json({ ok: true });
+    }
+    // Booking initial-automations editor (per-entry scripted openers) - read.
+    if (b.action === "booking-automations-get") {
+      const client = await loadClient(clientId);
+      if (!client) return res.status(404).json({ error: "academy not found" });
+      return res.status(200).json({ automations: getBookingAutomations(client) });
+    }
+    // Booking initial-automations editor - save (per-entry, per-step enabled + copy,
+    // sequence enable, approve toggle). Entry set + timing are fixed.
+    if (b.action === "booking-automations-set") {
+      const client = await loadClient(clientId);
+      if (!client) return res.status(404).json({ error: "academy not found" });
+      const cur = (client.ghl_kpi_config && client.ghl_kpi_config.booking_initial_automations) || {};
+      const merged = sanitizeBookingAutomations(b.automations && typeof b.automations === "object" ? b.automations : {}, cur);
+      const cfg = { ...(client.ghl_kpi_config || {}), booking_initial_automations: merged };
+      try {
+        await sb(`clients?id=eq.${clientId}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ ghl_kpi_config: cfg }) });
+      } catch (e) { return res.status(500).json({ error: `couldn't save: ${e.message}` }); }
+      return res.status(200).json({ ok: true, automations: getBookingAutomations({ ghl_kpi_config: cfg }) });
     }
   } catch (e) {
     console.error("[agent-approvals]", e);
@@ -880,13 +961,24 @@ async function handler(req, res) {
       let routedToNurture = false;
       try {
         if (await isAutomationLive(clientId, "nurture")) {
-          const ns = await nurtureStage(token, locationId, { clientId, sb });
-          if (ns) {
-            // Provider-aware: on provider='ghl' this is the identical PUT (+ shadow
-            // mirror); on 'portal' it updates the store row and writes NO GHL.
-            await moveStage({ clientId, ghl, token, oppRef, stage: ns, role: "nurture", contactId, reason });
-            await enrollContact({ clientId, automationKey: "nurture", contactId });
-            routedToNurture = true;
+          // Route per the academy's authored flow (the not_interested edge; GTA
+          // seed = responded -> nurture). Router reads the edge; if the academy
+          // PAUSED it, routed.matched is true but routed.moved is false -> we
+          // respect the pause and fall through to the terminal LOST path (no
+          // move). On no edge (unseeded / lookup blip) we run the original
+          // hardcoded move to nurture - behavior-identical for GTA.
+          const routed = await routeTransition({ clientId, sb, ghl, token, locationId, fromRole: "responded", trigger: "not_interested", contactId, oppRef, reason });
+          if (routed.matched) {
+            if (routed.moved) { await enrollContact({ clientId, automationKey: "nurture", contactId }); routedToNurture = true; }
+          } else {
+            const ns = await nurtureStage(token, locationId, { clientId, sb });
+            if (ns) {
+              // Provider-aware: on provider='ghl' this is the identical PUT (+ shadow
+              // mirror); on 'portal' it updates the store row and writes NO GHL.
+              await moveStage({ clientId, ghl, token, oppRef, stage: ns, role: "nurture", contactId, reason });
+              await enrollContact({ clientId, automationKey: "nurture", contactId });
+              routedToNurture = true;
+            }
           }
         }
       } catch (_) { /* fall through to the GHL-native lost path below */ }
@@ -989,10 +1081,19 @@ async function handler(req, res) {
       // TODO(effort E — portal opportunity store): once the portal owns opportunities
       // natively, replace this GHL find-opp + PUT with a local stage write, and unify
       // with the website-calendar advance in api/website/leads.js behind one helper.
+      // Advance the opp per the academy's authored flow (the booked edge; GTA
+      // seed = -> Scheduled Trial). Router reads the stage_transitions edge; on
+      // no edge (unseeded / paused / lookup blip) it returns matched:false and we
+      // run the original hardcoded move. moveStage's kpiTrialBooked hook fires on
+      // either path (role stays scheduled_trial), so the trial-booked KPI is
+      // unaffected. Best-effort - a stage-move failure must never break a booking.
       try {
         const oppRef = await findOpenOpp({ clientId, ghl, token, locationId, contactId });
-        const sts = await scheduledTrialStage(token, locationId, { clientId, sb });
-        if (sts && oppRef) await moveStage({ clientId, ghl, token, oppRef, stage: sts, role: "scheduled_trial", contactId });
+        const routed = await routeTransition({ clientId, sb, ghl, token, locationId, fromRole: "responded", trigger: "booked", contactId, oppRef, reason: "booking approved" });
+        if (!routed.matched) {
+          const sts = await scheduledTrialStage(token, locationId, { clientId, sb });
+          if (sts && oppRef) await moveStage({ clientId, ghl, token, oppRef, stage: sts, role: "scheduled_trial", contactId });
+        }
       } catch (_) {}
       try { await sb(`agent_ready_replies?id=eq.${encodeURIComponent(b.ready_id)}&client_id=eq.${clientId}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ status: "sent", approved_by: staffEmail, approved_at: new Date().toISOString(), sent_at: new Date().toISOString(), updated_at: new Date().toISOString() }) }); } catch (_) {}
       try { await logApproval({ client_id: clientId, ghl_contact_id: contactId, contact_name: row.contact_name || null, final_reply: `[booked ${row.book_group || "trial"} @ ${startIso}]`, status: "sent", created_by: staffEmail }); } catch (_) {}
@@ -1029,11 +1130,18 @@ async function handler(req, res) {
           workflowId = await enrollGhosted(client, token, contactId);
         }
       } catch (e) { return res.status(e.status || 502).json({ error: e.message }); }
-      // Move the opp to Interested so it leaves Responded (best-effort — the enroll
-      // already happened; the GHL workflow will move them too).
+      // Move the opp OUT of Responded per the academy's authored flow (the
+      // went_quiet edge; GTA seed = -> Interested). Best-effort — the enroll
+      // already happened; the GHL workflow will move them too. Router reads the
+      // stage_transitions edge; if the academy has no edge (unseeded / paused /
+      // lookup blip) it returns matched:false and we run the original hardcoded
+      // move to Interested — behavior-identical for GTA, zero regression.
       try {
-        const is = await interestedStage(token, locationId, { clientId, sb });
-        if (is && oppRef) await moveStage({ clientId, ghl, token, oppRef, stage: is, role: "interested", contactId });
+        const routed = await routeTransition({ clientId, sb, ghl, token, locationId, fromRole: "responded", trigger: "went_quiet", contactId, oppRef, reason: "confirm-ghost: went quiet" });
+        if (!routed.matched) {
+          const is = await interestedStage(token, locationId, { clientId, sb });
+          if (is && oppRef) await moveStage({ clientId, ghl, token, oppRef, stage: is, role: "interested", contactId });
+        }
       } catch (_) {}
       try { if (oppId) await sb(`pipeline_outcomes`, { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify([{ client_id: clientId, opportunity_id: oppId, status: "ghosted", reason: "sent to ghosted automation" }]) }); } catch (_) {}
       // Clear ALL of this lead's queued cards (replies + follow-ups) — they've left Responded.

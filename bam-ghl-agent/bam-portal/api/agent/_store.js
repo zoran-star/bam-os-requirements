@@ -150,7 +150,7 @@ export async function resolveStage(sb, ghl, { clientId, token, locationId, role 
 
 // Write-capable service-role Supabase REST. Throws on a non-2xx so callers (which
 // always wrap in try/catch) can swallow it; returns parsed JSON or null.
-async function sbRest(path, init = {}) {
+export async function sbRest(path, init = {}) {
   if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY) return null;
   const res = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
     ...init,

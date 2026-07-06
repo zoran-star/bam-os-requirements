@@ -12,9 +12,10 @@
 
 import { withSentryApiRoute } from "../_sentry.js";
 import { moveStage, pipelineFlags, oppMatchClause, resolveStage } from "../agent/_store.js";
+import { routeTransition } from "../agent/_router.js";
+import { markUnqualified } from "../agent/_tags.js";
 import { contactProvider } from "../_contacts.js";
 import { recordKpiEvent } from "../_kpi.js";
-import { enrollContact, isAutomationLive } from "../automations.js";
 
 const SUPABASE_URL = (process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || "").trim();
 const SUPABASE_SERVICE_KEY = (process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY || "").trim();
@@ -214,89 +215,77 @@ async function handler(req, res) {
 
   const result = { ok: true, good_fit: goodFit, showed_up: showedUp, moved: false, trainer, signup_text: "none" };
 
-  // Missed-trial first-touch: when the trainer marks the athlete as NOT attended,
-  // start a rebooking outreach. PREFER the portal-native "missed_trial" automation
-  // (configurable in Train Agent -> 📵 Missed Trial). Its completion rolls into 👻
-  // Ghosted automatically (api/automations.js roll-forward), so the chain is:
-  //   no-show -> missed_trial first-touch -> Ghosted -> Nurture.
-  // Only fall back to the academy's chosen GHL "missed trial" workflow
-  // (offers.data.missed_trial_workflow) when the portal automation is NOT live, so a
-  // contact never gets both. Non-fatal.
-  if (showedUp === false && contactId) {
-    let portalMissedLive = false;
-    try { portalMissedLive = await isAutomationLive(clientId, "missed_trial"); } catch (_) { portalMissedLive = false; }
-    if (portalMissedLive) {
-      try {
-        const en = await enrollContact({ clientId, automationKey: "missed_trial", contactId });
-        result.missed_trial = (en && en.ok) ? "portal_enrolled" : `portal_${(en && en.skipped) || "skipped"}`;
-      } catch (e) {
-        console.error("missed-trial portal enroll failed (non-fatal):", e.message);
-        result.missed_trial = "portal_failed";
-      }
-    } else {
-      try {
-        const offers = await sb(`offers?client_id=eq.${encodeURIComponent(clientId)}&type=eq.training&select=data&order=sort_order.asc&limit=1`);
-        const wfId = ((offers && offers[0] && offers[0].data && offers[0].data.missed_trial_workflow) || "").trim();
-        if (!wfId) {
-          result.missed_trial = "no_workflow";   // portal automation off + no GHL workflow set
-        } else {
-          await ghl("POST", `/contacts/${encodeURIComponent(contactId)}/workflow/${encodeURIComponent(wfId)}`, { token });
-          result.missed_trial = "fired";
-        }
-      } catch (e) {
-        console.error("missed-trial workflow failed (non-fatal):", e.message);
-        result.missed_trial = "failed";
-      }
-    }
-  }
-
-  // No-show → move the opportunity back to the Interested stage so it re-enters
-  // the nurture flow (the missed-trial automation handles the outreach). We don't
-  // ask about "good fit" for a no-show, so this is the whole outcome for them.
+  // No-show: bounce the lead back to RESPONDED so the BOOKING agent actively
+  // rebooks them (Zoran 2026-07-06). This REPLACES the old Interested + missed_trial
+  // nurture path - the standalone missed_trial firing is retired here; the booking
+  // rebook opener (scripted if the academy approved its booking initial automations,
+  // else the AI opener) owns the outreach. Route the no_show edge (GTA seed =
+  // scheduled_trial -> responded); on no edge, hardcode the Responded move. Then drop
+  // a persistent rebook-context note + an "Entry: Rebook" trigger note the booking
+  // rebook pass consumes to open the lead exactly once. Non-fatal.
   if (showedUp === false) {
     try {
-      // Stage lookup: provider='portal' resolves from the portal pipeline_stages
-      // registry (resolveStage; registry-first, no GHL read). Every other academy
-      // keeps the exact GHL pipelines fetch + name regex.
-      let stage = null;
-      if (provider === "portal") {
-        const st = await resolveStage(sb, ghl, { clientId, token, locationId: client.ghl_location_id, role: "interested" });
-        if (st) stage = { pipelineId: st.pipelineId || pipelineId, stageId: st.stageId, stageName: st.stageName || "Interested" };
+      const routed = await routeTransition({ clientId, sb, ghl, token, locationId: client.ghl_location_id, fromRole: "scheduled_trial", trigger: "no_show", contactId, oppRef, reason: "post-trial: no-show, rebook" });
+      if (routed.matched) {
+        if (routed.moved) { result.moved = true; result.moved_to = "responded"; }
       } else {
-        const pls = (await ghl("GET", `/opportunities/pipelines?locationId=${encodeURIComponent(client.ghl_location_id)}`, { token })).pipelines || [];
-        const pl = pls.find(p => p.id === pipelineId) || pls[0];
-        const interested = (pl?.stages || []).find(s => /interested/i.test(s.name || ""));
-        if (interested) stage = { pipelineId: pl.id, stageId: interested.id, stageName: interested.name };
+        let stage = null;
+        if (provider === "portal") {
+          const st = await resolveStage(sb, ghl, { clientId, token, locationId: client.ghl_location_id, role: "responded" });
+          if (st) stage = { pipelineId: st.pipelineId || pipelineId, stageId: st.stageId, stageName: st.stageName || "Responded" };
+        } else {
+          const pls = (await ghl("GET", `/opportunities/pipelines?locationId=${encodeURIComponent(client.ghl_location_id)}`, { token })).pipelines || [];
+          const pl = pls.find(p => p.id === pipelineId) || pls[0];
+          const responded = (pl?.stages || []).find(s => /respond/i.test(s.name || ""));
+          if (responded) stage = { pipelineId: pl.id, stageId: responded.id, stageName: responded.name };
+        }
+        if (stage) {
+          await moveStage({ clientId, sb, ghl, token, oppRef, stage, role: "responded", contactId });
+          result.moved = true;
+          result.moved_to = "responded";
+        }
       }
-      if (stage) {
-        // Move through the provider-aware store; on ghl it is the identical PUT and the
-        // store does the shadow mirror internally (replacing the manual shadowMirrorMove).
-        await moveStage({ clientId, sb, ghl, token, oppRef, stage, role: "interested", contactId });
-        result.moved = true;
-        result.moved_to = "interested";
-      }
-    } catch (e) { console.error("no-show interested move failed (non-fatal):", e.message); }
+    } catch (e) { console.error("no-show responded move failed (non-fatal):", e.message); }
+    // Rebook context + trigger notes for the booking agent (best-effort). The
+    // "Entry: Rebook" note is consumed (deactivated) by the rebook pass after it
+    // opens, so the lead is texted exactly once.
+    if (contactId) {
+      try {
+        await sb(`agent_contact_notes`, { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify([
+          { client_id: clientId, ghl_contact_id: String(contactId), active: true, note: "Rebook needed (no-show): they didn't show for their booked trial.", created_by: "post-trial-noshow" },
+          { client_id: clientId, ghl_contact_id: String(contactId), active: true, note: "Entry: Rebook needed - no-show", created_by: "post-trial-noshow" },
+        ]) });
+      } catch (e) { console.error("no-show rebook notes failed (non-fatal):", e.message); }
+    }
+    result.missed_trial = "retired";
   }
 
   if (goodFit) {
-    // Move to the Done Trial stage of the opp's pipeline. Same provider branch
-    // as the no-show move above: portal -> registry, ghl -> live GHL + regex.
+    // Advance to Done Trial per the academy's authored flow (the post_trial_good_fit
+    // edge; GTA seed = scheduled_trial -> done_trial). Router reads the edge; on no
+    // edge (unseeded / paused / lookup blip) it returns matched:false and we run the
+    // original provider-branch resolve + move - behavior-identical for GTA.
     try {
-      let stage = null;
-      if (provider === "portal") {
-        const st = await resolveStage(sb, ghl, { clientId, token, locationId: client.ghl_location_id, role: "done_trial" });
-        if (st) stage = { pipelineId: st.pipelineId || pipelineId, stageId: st.stageId, stageName: st.stageName || "Done Trial" };
+      const routed = await routeTransition({ clientId, sb, ghl, token, locationId: client.ghl_location_id, fromRole: "scheduled_trial", trigger: "post_trial_good_fit", contactId, oppRef, reason: "post-trial: good fit" });
+      if (routed.matched) {
+        if (routed.moved) result.moved = true;
       } else {
-        const pls = (await ghl("GET", `/opportunities/pipelines?locationId=${encodeURIComponent(client.ghl_location_id)}`, { token })).pipelines || [];
-        const pl = pls.find(p => p.id === pipelineId) || pls[0];
-        const doneStage = (pl?.stages || []).find(s => { const n = (s.name || "").toLowerCase(); return n.includes("trial") && (n.includes("done") || n.includes("complete") || n.includes("attended")); });
-        if (doneStage) stage = { pipelineId: pl.id, stageId: doneStage.id, stageName: doneStage.name };
-      }
-      if (stage) {
-        // Move through the provider-aware store; on ghl it is the identical PUT and the
-        // store does the shadow mirror internally (replacing the manual shadowMirrorMove).
-        await moveStage({ clientId, sb, ghl, token, oppRef, stage, role: "done_trial", contactId });
-        result.moved = true;
+        let stage = null;
+        if (provider === "portal") {
+          const st = await resolveStage(sb, ghl, { clientId, token, locationId: client.ghl_location_id, role: "done_trial" });
+          if (st) stage = { pipelineId: st.pipelineId || pipelineId, stageId: st.stageId, stageName: st.stageName || "Done Trial" };
+        } else {
+          const pls = (await ghl("GET", `/opportunities/pipelines?locationId=${encodeURIComponent(client.ghl_location_id)}`, { token })).pipelines || [];
+          const pl = pls.find(p => p.id === pipelineId) || pls[0];
+          const doneStage = (pl?.stages || []).find(s => { const n = (s.name || "").toLowerCase(); return n.includes("trial") && (n.includes("done") || n.includes("complete") || n.includes("attended")); });
+          if (doneStage) stage = { pipelineId: pl.id, stageId: doneStage.id, stageName: doneStage.name };
+        }
+        if (stage) {
+          // Move through the provider-aware store; on ghl it is the identical PUT and the
+          // store does the shadow mirror internally (replacing the manual shadowMirrorMove).
+          await moveStage({ clientId, sb, ghl, token, oppRef, stage, role: "done_trial", contactId });
+          result.moved = true;
+        }
       }
     } catch (e) { console.error("done-trial move failed (non-fatal):", e.message); }
 
@@ -311,6 +300,24 @@ async function handler(req, res) {
       } catch (e) { console.error("trainer write failed (non-fatal):", e.message); }
     }
 
+  }
+
+  // Showed up, but NOT a fit -> the dead end. Route the post_trial_not_fit edge
+  // through the router's terminal path (GTA seed = scheduled_trial -> Unqualified):
+  // close the opp (setStatus abandoned + role:unqualified) and stamp the GHL
+  // unqualified tag + an outcome row, mirroring the confirm-abandoned action.
+  // Only fires when the coach explicitly marked showed-up + not-a-fit; a paused or
+  // missing edge leaves the lead put (no legacy behavior to preserve here). No
+  // message is sent - it's a quiet close.
+  if (showedUp === true && !goodFit) {
+    try {
+      const routed = await routeTransition({ clientId, sb, ghl, token, locationId: client.ghl_location_id, fromRole: "scheduled_trial", trigger: "post_trial_not_fit", contactId, oppRef, allowTerminal: true, reason: "post-trial: showed up, not a fit" });
+      if (routed.matched && routed.terminal === "unqualified" && routed.moved) {
+        result.unqualified = true;
+        if (contactId) { try { await markUnqualified(token, contactId, clientId); } catch (_) {} }
+        try { await sb(`pipeline_outcomes`, { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify([{ client_id: clientId, opportunity_id: oppId, status: "abandoned", reason: "post-trial: not a fit" }]) }); } catch (_) {}
+      }
+    } catch (e) { console.error("not-a-fit unqualified close failed (non-fatal):", e.message); }
   }
 
   // Send the trainer's first follow-up message: their personal note (TOP) + the

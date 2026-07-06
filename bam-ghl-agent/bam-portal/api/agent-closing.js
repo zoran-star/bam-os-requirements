@@ -37,6 +37,7 @@ import {
 } from "./agent/_stage.js";
 import { enrollContact, isAutomationLive, resolveContactInfo } from "./automations.js";
 import { moveStage, setStatus, findOpenOpp as findOpenOppStore, resolveStage } from "./agent/_store.js";
+import { routeTransition } from "./agent/_router.js";
 import {
   DEFAULT_CLOSING_AUTOMATIONS, getClosingAutomations,
   automationsLive as closingAutomationsLive, nextDueStep as nextDueClosingStep,
@@ -1009,11 +1010,20 @@ async function handler(req, res) {
       let routedToNurture = false;
       try {
         if (await isAutomationLive(clientId, "nurture")) {
-          const ns = await nurtureStage(token, locationId, { clientId, sb });
-          if (ns) {
-            await moveStage({ clientId, ghl, token, oppRef, stage: ns, role: "nurture", contactId, reason });
-            await enrollContact({ clientId, automationKey: "nurture", contactId });
-            routedToNurture = true;
+          // Route per the academy's authored flow (the says_no edge; GTA seed =
+          // done_trial -> nurture). Paused-aware: a paused edge returns matched
+          // but not moved, so we respect the pause and fall through to LOST. No
+          // edge -> original hardcoded move to nurture (GTA-identical).
+          const routed = await routeTransition({ clientId, sb, ghl, token, locationId, fromRole: "done_trial", trigger: "says_no", contactId, oppRef, reason });
+          if (routed.matched) {
+            if (routed.moved) { await enrollContact({ clientId, automationKey: "nurture", contactId }); routedToNurture = true; }
+          } else {
+            const ns = await nurtureStage(token, locationId, { clientId, sb });
+            if (ns) {
+              await moveStage({ clientId, ghl, token, oppRef, stage: ns, role: "nurture", contactId, reason });
+              await enrollContact({ clientId, automationKey: "nurture", contactId });
+              routedToNurture = true;
+            }
           }
         }
       } catch (_) { /* fall through to status=lost */ }

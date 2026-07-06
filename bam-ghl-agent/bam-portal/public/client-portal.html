@@ -22240,7 +22240,7 @@ async function _taRenderKnowledge() {
     }
     // Confirm + Closing agents: the scripted "Initial automations" sequence sits above
     // the fact sections (it's a structured editor, not a prompt section).
-    const hasAutos = (_TA.target === 'confirm' || _TA.target === 'closing');
+    const hasAutos = (_TA.target === 'confirm' || _TA.target === 'closing' || _TA.target === 'booking');
     const autosSlot = hasAutos
       ? `<div id="confirm-autos-card"><div class="req-empty"><span class="req-spin"></span>Loading automations…</div></div>`
       : '';
@@ -22255,19 +22255,26 @@ async function _taRenderKnowledge() {
 // One editor, agent-aware (_CA.agent / _CA.endpoint). Edits live in a working copy
 // (_CA.data) and only persist on Save, so toggling a step never loses unsaved copy.
 // Posts to /api/agent-<agent> automations-get/-set.
-const _CA = { data: null, agent: 'confirm', endpoint: '/api/agent-confirm' };
+const _CA = { data: null, agent: 'confirm', endpoint: '/api/agent-confirm', isBooking: false, getAction: 'automations-get', setAction: 'automations-set' };
 const _CA_WHEN_LABEL = { immediate: 'Immediately', day_before: 'Day before', morning_of: 'Morning of' };
+// Booking is per-ENTRY-POINT (Responded is the hub); confirm/closing are flat.
+const _BOOKING_ENTRY_LABEL = { new_lead: 'New lead', rebook: 'Rebook (no-show / can\'t make it)', reengaged: 'Re-engaged (nurture / ghosted reply)' };
 function _caWhenLabel(s) {
   if (s.when === 'after_days') { const n = s.offset_days || 0; return n + ' day' + (n === 1 ? '' : 's') + ' later'; }
   return _CA_WHEN_LABEL[s.when] || s.when;
 }
 
 async function _confirmAutosLoad(agent) {
-  _CA.agent = (agent === 'closing') ? 'closing' : 'confirm';
-  _CA.endpoint = '/api/agent-' + _CA.agent;
+  _CA.agent = (agent === 'closing') ? 'closing' : (agent === 'booking') ? 'booking' : 'confirm';
+  _CA.isBooking = _CA.agent === 'booking';
+  // Booking's config lives on the booking agent endpoint (/api/agent-approvals) under
+  // its own action names + per-entry shape; confirm/closing keep their flat editor.
+  _CA.endpoint = _CA.isBooking ? '/api/agent-approvals' : ('/api/agent-' + _CA.agent);
+  _CA.getAction = _CA.isBooking ? 'booking-automations-get' : 'automations-get';
+  _CA.setAction = _CA.isBooking ? 'booking-automations-set' : 'automations-set';
   const host = document.getElementById('confirm-autos-card'); if (!host) return;
   try {
-    const res = await _apxPost(_CA.endpoint, 'automations-get', {});
+    const res = await _apxPost(_CA.endpoint, _CA.getAction, {});
     _CA.data = res.automations || null;
     _confirmAutosRender();
   } catch (e) {
@@ -22278,6 +22285,15 @@ async function _confirmAutosLoad(agent) {
 // Pull the current textarea values back into the working copy before any re-render.
 function _confirmAutosSync() {
   if (!_CA.data) return;
+  if (_CA.isBooking) {
+    Object.entries(_CA.data.entries || {}).forEach(([ek, entry]) => {
+      (entry.steps || []).forEach(s => {
+        const ta = document.getElementById('ca-tpl-' + ek + '-' + s.key);
+        if (ta) s.template = ta.value;
+      });
+    });
+    return;
+  }
   (_CA.data.steps || []).forEach(s => {
     const ta = document.getElementById('ca-tpl-' + s.key);
     if (ta) s.template = ta.value;
@@ -22300,8 +22316,71 @@ function _caSetLive() {
   _confirmAutosRender();
 }
 
+// Toggle one booking opener step's enabled flag (entry-aware).
+function _caToggleEntryStep(entryKey, key) {
+  _confirmAutosSync();
+  if (!_CA.data || !_CA.data.entries) return;
+  const entry = _CA.data.entries[entryKey]; if (!entry) return;
+  const s = (entry.steps || []).find(x => x.key === key); if (s) s.enabled = !s.enabled;
+  _confirmAutosRender();
+}
+
+// Booking initial-automations render (per entry point). Kept separate from the
+// confirm/closing renderer so that flat-shape path stays byte-identical.
+function _bookingAutosRender(host) {
+  const d = _CA.data;
+  const seg = (on) => `background:${on ? 'var(--gold)' : 'transparent'};color:${on ? '#0B0B0D' : 'var(--text-sub)'};border:1px solid ${on ? 'var(--gold)' : 'var(--border)'};border-radius:8px;padding:5px 12px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit`;
+  const entries = d.entries || {};
+  const totalOn = Object.values(entries).reduce((n, e) => n + (e.steps || []).filter(s => s.enabled).length, 0);
+  const willSend = d.enabled && d.approved && totalOn > 0;
+  const status = willSend
+    ? `<span style="color:#5BBF7B">Live - ${totalOn} opener${totalOn === 1 ? '' : 's'} fire when a lead enters the booking queue</span>`
+    : (!d.enabled ? `<span style="color:var(--text-mute)">Sequence off - nothing sends</span>`
+      : (!d.approved ? `<span style="color:#D4B65C">Approve the sequence before anything sends</span>`
+        : `<span style="color:var(--text-mute)">No openers enabled</span>`));
+  const entryGroups = Object.entries(entries).map(([ek, entry]) => {
+    const steps = (entry.steps || []).map(s => `
+      <div style="background:var(--surface-el,#1a1a1d);border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:8px">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px">
+          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+            <span style="font-weight:600;font-size:13.5px">${escapeHTML(s.label || 'Opener')}</span>
+            <span style="color:var(--text-mute);font-size:10.5px;font-family:monospace;border:1px solid var(--border);border-radius:99px;padding:1px 8px">${_caWhenLabel(s)}</span>
+            <span style="color:var(--text-mute);font-size:10.5px;font-family:monospace;border:1px solid var(--border);border-radius:99px;padding:1px 8px">SMS</span>
+          </div>
+          <button style="${seg(s.enabled)}" onclick="_caToggleEntryStep('${ek}','${s.key}')">${s.enabled ? 'On' : 'Off'}</button>
+        </div>
+        <textarea id="ca-tpl-${ek}-${s.key}" rows="4" ${s.enabled ? '' : 'disabled'} style="width:100%;box-sizing:border-box;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:9px 11px;color:var(--text);font-size:13px;resize:vertical;font-family:inherit;line-height:1.5;opacity:${s.enabled ? 1 : .5}">${escapeHTML(s.template)}</textarea>
+      </div>`).join('');
+    const elabel = entry.label || _BOOKING_ENTRY_LABEL[ek] || ek;
+    return `<div style="margin-bottom:14px">
+      <div style="font-size:11px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--text-mute);margin-bottom:7px">${escapeHTML(elabel)}</div>
+      ${steps}
+    </div>`;
+  }).join('');
+  host.innerHTML = `
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;margin-bottom:16px;overflow:hidden">
+      <div style="padding:14px 16px;border-bottom:1px solid var(--border)">
+        <div style="font-weight:700;font-size:14px;margin-bottom:3px">Initial automations</div>
+        <div style="color:var(--text-mute);font-size:12px;line-height:1.5">Scripted first texts that open the conversation when a lead enters the booking queue, one per entry point (a fresh lead, a rebook after a no-show or can't-make-it, or a nurture / ghosted lead who replied). The moment they reply, the AI booking agent takes over. Once you approve the sequence, these openers queue for your one-tap ✓ in Hawkeye.</div>
+      </div>
+      <div style="padding:14px 16px">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap">
+          <button style="${seg(d.enabled && d.approved)}" onclick="_caSetLive()">${(d.enabled && d.approved) ? 'Sequence on' : 'Sequence off'}</button>
+        </div>
+        <div style="font-size:12px;margin-bottom:12px">${status}</div>
+        ${entryGroups}
+        <div style="font-size:11px;color:var(--text-mute);margin:4px 0 12px;line-height:1.7">Tokens (filled in automatically): <code>{{contact.first_name}}</code></div>
+        <div style="display:flex;gap:10px;align-items:center">
+          <button style="${_TA_BTN}" onclick="_confirmAutosSave()">Save</button>
+          <span id="ca-note" style="font-size:12px"></span>
+        </div>
+      </div>
+    </div>`;
+}
+
 function _confirmAutosRender() {
   const host = document.getElementById('confirm-autos-card'); if (!host || !_CA.data) return;
+  if (_CA.isBooking) return _bookingAutosRender(host);
   const d = _CA.data;
   const isClosing = _CA.agent === 'closing';
   const seg = (on) => `background:${on ? 'var(--gold)' : 'transparent'};color:${on ? '#0B0B0D' : 'var(--text-sub)'};border:1px solid ${on ? 'var(--gold)' : 'var(--border)'};border-radius:8px;padding:5px 12px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit`;
@@ -22355,7 +22434,7 @@ function _confirmAutosRender() {
 async function _confirmAutosSave() {
   _confirmAutosSync();
   try {
-    const res = await _apxPost(_CA.endpoint, 'automations-set', { automations: _CA.data });
+    const res = await _apxPost(_CA.endpoint, _CA.setAction, { automations: _CA.data });
     _CA.data = res.automations || _CA.data;
     _confirmAutosRender();
     const n = document.getElementById('ca-note'); if (n) n.innerHTML = `<span style="color:#5BBF7B">Saved ✓</span>`;
@@ -29839,6 +29918,10 @@ function _plIcon(name, size) {
     collapse:'<polyline points="4 14 10 14 10 20"/><polyline points="20 10 14 10 14 4"/><line x1="14" y1="10" x2="21" y2="3"/><line x1="3" y1="21" x2="10" y2="14"/>',
     sliders: '<line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/>',
     up:      '<polyline points="18 15 12 9 6 15"/>',
+    plus:    '<line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>',
+    x:       '<line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>',
+    power:   '<path d="M18.36 6.64a9 9 0 1 1-12.73 0"/><line x1="12" y1="2" x2="12" y2="12"/>',
+    arrIn:   '<line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/>',
   };
   return `<svg width="${sz}" height="${sz}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex:0 0 auto;vertical-align:-2px">${P[name] || ''}</svg>`;
 }
@@ -29857,6 +29940,89 @@ function _plStageBot(name) {
   if (/member|liveclient|enrolled|\bwon\b/.test(n))          return { color: '#EC4899', kind: 'terminal',   key: 'member',      icon: 'award',  tag: 'Member' };
   if (/unqualif/.test(n))                                    return { color: '#FB923C', kind: 'terminal',   key: 'unqualified', icon: 'ban',    tag: 'Unqualified' };
   return null;
+}
+
+// ── Stage-transition edges (the Sales-Crew flow graph) ─────────────────────
+// A stage's ENTRY points = edges landing on its role; EXIT points = edges
+// leaving its role. Rows live in `stage_transitions` (client-scoped RLS), the
+// standard flow is seeded per academy, and academies can author their own via
+// the Exit editor in focus mode. Enums:
+//   stage_role      = responded | interested | scheduled_trial | done_trial | nurture
+//   trigger         = base library (below)
+//   destination     = a role (to_kind='stage') OR a terminal member/unqualified/human.
+let _PL_EDGES = null;        // cached edge rows for CLIENT_ID
+let _plEdgesLoading = false;
+let _PL_EDGE_FORM = null;    // {mode:'add'|'edit', role, id?} — the open inline Exit editor
+// Map a GHL stage NAME → its transition role (null for terminal/unknown stages).
+function _plStageRole(name) {
+  const b = _plStageBot(name);
+  if (!b) return null;
+  return ({ booking: 'responded', confirm: 'scheduled_trial', closing: 'done_trial', ghosted: 'interested', nurture: 'nurture' })[b.key] || null;
+}
+// Human-readable trigger labels (order = the library shown in the destination picker).
+const _EDGE_TRIGGERS = {
+  new_lead:            'New lead (form / ad)',
+  replied:             'Lead replies',
+  booked:              'Books a trial',
+  went_quiet:          'Goes quiet',
+  cant_make_it:        "Can't make it",
+  no_show:             'No-show',
+  post_trial_good_fit: 'Post-trial: good fit',
+  post_trial_not_fit:  'Post-trial: not a fit',
+  not_interested:      'Not interested',
+  no_longer_wants:     'No longer wants it',
+  says_no:             'Says no',
+  enrolls:             'Enrolls',
+  marked_unqualified:  'Marked unqualified',
+  complaint_offtopic:  'Complaint / off-topic',
+  ghosted_ran_out:     'Nudges ran out',
+};
+const _EDGE_ROLE_LABEL = { responded: 'Responded', interested: 'Interested', scheduled_trial: 'Scheduled Trial', done_trial: 'Done Trial', nurture: 'Nurture' };
+const _EDGE_TERMINAL_LABEL = { member: 'Member', unqualified: 'Unqualified', human: 'Human takeover' };
+const _EDGE_ROLE_ICON = { responded: 'phone', interested: 'ghost', scheduled_trial: 'calendar', done_trial: 'target', nurture: 'heart' };
+const _EDGE_TERMINAL_ICON = { member: 'award', unqualified: 'ban', human: 'alert' };
+// A destination's label + icon, whether it's a role or a terminal.
+function _edgeDestLabel(e) { return e.to_kind === 'terminal' ? (_EDGE_TERMINAL_LABEL[e.to_terminal] || e.to_terminal) : (_EDGE_ROLE_LABEL[e.to_stage_role] || e.to_stage_role); }
+function _edgeDestIcon(e)  { return e.to_kind === 'terminal' ? (_EDGE_TERMINAL_ICON[e.to_terminal] || 'target') : (_EDGE_ROLE_ICON[e.to_stage_role] || 'chevR'); }
+// An edge's source label + icon (for the entry list). null from-role = external.
+function _edgeSrcLabel(e) { return e.from_stage_role ? (_EDGE_ROLE_LABEL[e.from_stage_role] || e.from_stage_role) : 'Lead form / ad'; }
+function _edgeSrcIcon(e)  { return e.from_stage_role ? (_EDGE_ROLE_ICON[e.from_stage_role] || 'chevR') : 'form'; }
+function _edgeTrigLabel(t) { return _EDGE_TRIGGERS[t] || t; }
+// Encode/parse a destination for the <select> in the editor.
+function _edgeDestValue(e) { return e.to_kind === 'terminal' ? ('terminal:' + e.to_terminal) : ('stage:' + e.to_stage_role); }
+function _edgeParseDest(v) {
+  const [kind, id] = String(v || '').split(':');
+  return kind === 'terminal'
+    ? { to_kind: 'terminal', to_stage_role: null, to_terminal: id }
+    : { to_kind: 'stage', to_stage_role: id, to_terminal: null };
+}
+// Load (or return cached) the edge rows for this client. Async; callers that
+// need a fresh render pass _plFocusRerender through .then().
+async function _plEdgesEnsure(force) {
+  if (!force && Array.isArray(_PL_EDGES)) return _PL_EDGES;
+  if (!_sb || typeof CLIENT_ID === 'undefined') { _PL_EDGES = []; return _PL_EDGES; }
+  try {
+    const { data, error } = await _sb.from('stage_transitions').select('*').eq('client_id', CLIENT_ID).order('sort_order');
+    if (error) throw error;
+    _PL_EDGES = data || [];
+  } catch (e) { console.warn('stage_transitions load failed', e); if (!Array.isArray(_PL_EDGES)) _PL_EDGES = []; }
+  return _PL_EDGES;
+}
+// Entry (edges landing on role) + Exit (edges leaving role), enabled-first-ish
+// by sort_order. Terminal/unknown stages have no role → empty graph view.
+function _plStageEdges(role) {
+  const all = Array.isArray(_PL_EDGES) ? _PL_EDGES : [];
+  if (!role) return { entry: [], exit: [] };
+  const entry = all.filter(e => e.to_kind === 'stage' && e.to_stage_role === role);
+  const exit = all.filter(e => e.from_stage_role === role);
+  return { entry, exit };
+}
+// Find the stage id in the current pipeline that owns a given role (for the
+// "configure on source" jump from an entry chip).
+function _plStageIdForRole(role, stages) {
+  if (!role || !Array.isArray(stages)) return null;
+  const s = stages.find(x => _plStageRole(x.name) === role);
+  return s ? s.id : null;
 }
 
 // ── Stage-engine header band helpers (V2) ──────────────────────────────────
@@ -30019,6 +30185,31 @@ function _ploCss() {
     '#pl-focus .plf-tab{border:none;background:transparent;color:var(--text-sub);font:inherit;font-size:12.5px;font-weight:700;padding:7px 13px;border-radius:6px;cursor:pointer}',
     '#pl-focus .plf-tab.on{background:var(--accent);color:var(--on-gold)}',
     '#pl-focus .plf-manual{font-size:13px;color:var(--text-sub);background:var(--surface-el);border:1px solid var(--border);border-radius:var(--radius-sm);padding:14px 16px;display:flex;align-items:center;gap:9px}',
+    // ── entry/exit edge rows (the flow graph, per stage) ──
+    '#pl-focus .plf-sechead{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:2px}',
+    '#pl-focus .plf-hint{font-size:11.5px;color:var(--text-mute);margin:0 0 2px}',
+    '#pl-focus .edge{display:flex;align-items:center;gap:9px;font-size:13px;background:var(--surface-el);border:1px solid var(--border);border-radius:var(--radius-sm);padding:9px 11px}',
+    '#pl-focus .edge.off{opacity:.5}',
+    '#pl-focus .edge .etrig{font-weight:700;color:var(--text)}',
+    '#pl-focus .edge .earr{color:var(--text-mute);flex:0 0 auto}',
+    '#pl-focus .edge .edest,#pl-focus .edge .esrc{display:inline-flex;align-items:center;gap:5px;font-family:var(--font-num);font-weight:800;white-space:nowrap}',
+    '#pl-focus .edge .edest.term{color:var(--gold,#D4B65C)}',
+    '#pl-focus .edge .espacer{flex:1 1 auto}',
+    '#pl-focus .edge .eact{display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;flex:0 0 auto;border:1px solid var(--border-med);background:var(--surface);color:var(--text-sub);border-radius:8px;cursor:pointer;padding:0}',
+    '#pl-focus .edge .eact:hover{border-color:var(--accent);color:var(--text)}',
+    '#pl-focus .edge .eact.on{background:var(--accent);border-color:var(--accent);color:var(--on-gold)}',
+    '#pl-focus .edge .eact.danger:hover{border-color:var(--red);color:var(--red)}',
+    '#pl-focus .edge .ego{margin-left:auto;font-size:11px;color:var(--text-mute);display:inline-flex;align-items:center;gap:5px;background:none;border:none;cursor:pointer;padding:2px 4px}',
+    '#pl-focus .edge .ego:hover{color:var(--accent)}',
+    '#pl-focus .plf-empty{font-size:12.5px;color:var(--text-mute);padding:6px 2px}',
+    '#pl-focus .plf-addbtn{display:inline-flex;align-items:center;gap:6px;margin-top:10px;background:var(--surface);border:1px dashed var(--border-med);color:var(--text-sub);border-radius:var(--radius-sm);padding:9px 13px;font:inherit;font-size:12.5px;font-weight:700;cursor:pointer}',
+    '#pl-focus .plf-addbtn:hover{border-color:var(--accent);border-style:solid;color:var(--text)}',
+    '#pl-focus .edge-form{display:flex;flex-wrap:wrap;align-items:center;gap:8px;background:var(--surface-el);border:1px solid var(--accent);border-radius:var(--radius-sm);padding:11px 12px;margin-top:8px}',
+    '#pl-focus .edge-form select{font:inherit;font-size:12.5px;font-weight:600;color:var(--text);background:var(--surface);border:1px solid var(--border-med);border-radius:8px;padding:7px 9px;cursor:pointer;flex:1 1 150px;min-width:120px}',
+    '#pl-focus .edge-form .efarr{color:var(--text-mute);font-size:12px;flex:0 0 auto}',
+    '#pl-focus .edge-form .efbtns{display:inline-flex;gap:7px;margin-left:auto}',
+    '#pl-focus .edge-form .efsave{background:var(--accent);color:var(--on-gold);border:none;border-radius:8px;padding:8px 15px;font:inherit;font-size:12.5px;font-weight:800;cursor:pointer}',
+    '#pl-focus .edge-form .efcancel{background:var(--surface);color:var(--text-sub);border:1px solid var(--border-med);border-radius:8px;padding:8px 13px;font:inherit;font-size:12.5px;font-weight:700;cursor:pointer}',
     '@keyframes plfIn{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}',
     '#pl-focus.plfin .plf-sec{animation:plfIn .42s var(--es) both}',
     '#pl-focus.plfin .plf-sec:nth-of-type(2){animation-delay:.06s}',
@@ -30153,6 +30344,7 @@ function _plOpenFocus(stageId) {
   const idx = stages.findIndex(s => s.id === stageId);
   const stage = stages[idx]; if (!stage) return;
   _PL_FOCUS = { stageId };
+  _PL_EDGE_FORM = null;
   _PL_SV = 'focus';
   _plRenderFocus(stage, stages, idx);
   _plSVApply();
@@ -30166,13 +30358,15 @@ function _plRenderFocus(stage, stages, idx) {
   const kind = bot ? bot.kind : 'human';
   const engLab = bot ? (bot.kind === 'terminal' ? bot.tag : `${bot.tag} ${bot.kind}`) : 'Manual';
   const engIcon = kind === 'agent' ? 'cpu' : kind === 'automation' ? 'gear' : kind === 'terminal' ? 'target' : 'user';
-  const prev = stages[idx - 1], next = stages[idx + 1];
-  const entryRow = idx === 0
-    ? `<div class="plf-row">${_ploEngIcon('gear')}<b>Lead form / ad</b><span class="plf-via">external</span></div>`
-    : `<div class="plf-row">${_plIcon('arrIn', 15)}<b>${escapeHTML(_plCap(prev.name))}</b><span class="plf-via">${_plIcon('arrIn', 12)} enters from here</span></div>`;
-  const exitRow = next
-    ? `<div class="plf-row">${_plIcon('chevR', 15)}<b>${escapeHTML(_plCap(next.name))}</b><span class="plf-via">${_plIcon('chevR', 12)} leaves to here</span></div>`
-    : `<div class="plf-row">${_plIcon('check', 15)}<b>Won / Lost</b><span class="plf-via">final</span></div>`;
+  // Entry/Exit are driven by the real stage_transitions edges (the Sales-Crew
+  // flow graph). Load lazily on first open, then re-render.
+  const role = _plStageRole(stage.name);
+  if (role && !Array.isArray(_PL_EDGES) && !_plEdgesLoading) {
+    _plEdgesLoading = true;
+    _plEdgesEnsure().then(() => { _plEdgesLoading = false; _plFocusRerender(); }).catch(() => { _plEdgesLoading = false; });
+  }
+  const entrySec = _plRenderEntrySec(role, stages);
+  const exitSec = _plRenderExitSec(role, stage);
   let engineBody;
   if (kind === 'agent') {
     const tabs = [['test', 'Test'], ['lessons', 'Lessons'], ['knowledge', 'Knowledge'], ['mode', 'Autonomy']];
@@ -30188,9 +30382,9 @@ function _plRenderFocus(stage, stages, idx) {
       <span class="plf-pill">${_ploEngIcon(engIcon)} ${escapeHTML(engLab)}</span>
     </div>
     <div class="plf-name">${escapeHTML(_plCap(stage.name))}</div>
-    <div class="plf-sec"><div class="plf-lab">Entry points</div><div class="plf-flow">${entryRow}</div></div>
+    ${entrySec}
     <div class="plf-sec"><div class="plf-lab">Engine</div>${engineBody}</div>
-    <div class="plf-sec"><div class="plf-lab">Exit points</div><div class="plf-flow">${exitRow}</div></div>`;
+    ${exitSec}`;
   if (kind === 'agent' || kind === 'automation') {
     _TA.target = bot.key;
     if (kind === 'agent' && !['test', 'lessons', 'knowledge', 'mode'].includes(_TA.tab)) _TA.tab = 'test';
@@ -30201,6 +30395,165 @@ function _plFocusTab(k) {
   _TA.tab = k;
   document.querySelectorAll('#pl-focus .plf-tab').forEach(b => b.classList.toggle('on', b.dataset.tab === k));
   try { _taRenderPanel(); } catch (_) {}
+}
+// Re-render the currently open focus page in place (after an edge edit/load).
+function _plFocusRerender() {
+  if (!_PL_FOCUS) return;
+  const p = _plActivePipeline(); if (!p) return;
+  const stages = (p.stages || []).filter(s => (typeof _isStageAllowed !== 'function') || _isStageAllowed(s.id));
+  const idx = stages.findIndex(s => s.id === _PL_FOCUS.stageId);
+  const stage = stages[idx]; if (!stage) return;
+  _plRenderFocus(stage, stages, idx);
+}
+
+// ── Entry section (read-only: edges are authored on their source stage) ──────
+function _plRenderEntrySec(role, stages) {
+  if (!role) return '';
+  if (!Array.isArray(_PL_EDGES)) return `<div class="plf-sec"><div class="plf-lab">Entry points</div><div class="plf-empty">Loading flow…</div></div>`;
+  const { entry } = _plStageEdges(role);
+  const rows = entry.map(e => {
+    const jumpId = e.from_stage_role ? _plStageIdForRole(e.from_stage_role, stages) : null;
+    const jump = jumpId ? `<button class="ego" title="Configure ${escapeHTML(_edgeSrcLabel(e))}" onclick="_plOpenFocus('${escapeHTML(jumpId)}')">Configure ${_plIcon('chevR', 12)}</button>` : '';
+    return `<div class="edge${e.enabled ? '' : ' off'}">
+      <span class="esrc">${_plIcon(_edgeSrcIcon(e), 15)}${escapeHTML(_edgeSrcLabel(e))}</span>
+      ${_plIcon('arrIn', 14)}
+      <span class="etrig" style="font-weight:600;color:var(--text-sub)">when ${escapeHTML(_edgeTrigLabel(e.trigger))}</span>
+      <span class="espacer"></span>${jump}
+    </div>`;
+  }).join('');
+  return `<div class="plf-sec">
+    <div class="plf-sechead"><div class="plf-lab">Entry points</div></div>
+    <div class="plf-hint">How leads land in this stage. Each one is the exit of another stage, so edit it there.</div>
+    <div class="plf-flow">${rows || '<div class="plf-empty">Nothing routes here yet.</div>'}</div>
+  </div>`;
+}
+
+// ── Exit section (editable: CRUD the edges leaving this stage's role) ─────────
+function _plRenderExitSec(role, stage) {
+  if (!role) {
+    return `<div class="plf-sec"><div class="plf-lab">Exit points</div><div class="plf-empty">This stage isn't part of the automated flow, so it has no routing rules.</div></div>`;
+  }
+  if (!Array.isArray(_PL_EDGES)) return `<div class="plf-sec"><div class="plf-lab">Exit points</div><div class="plf-empty">Loading flow…</div></div>`;
+  const { exit } = _plStageEdges(role);
+  const editing = _PL_EDGE_FORM && _PL_EDGE_FORM.role === role ? _PL_EDGE_FORM : null;
+  const rows = exit.map(e => {
+    if (editing && editing.mode === 'edit' && editing.id === e.id) return _plEdgeFormHtml(role, exit, e);
+    const isTerm = e.to_kind === 'terminal';
+    return `<div class="edge${e.enabled ? '' : ' off'}">
+      <span class="etrig">${escapeHTML(_edgeTrigLabel(e.trigger))}</span>
+      ${_plIcon('chevR', 14)}
+      <span class="edest${isTerm ? ' term' : ''}">${_plIcon(_edgeDestIcon(e), 15)}${escapeHTML(_edgeDestLabel(e))}</span>
+      <span class="espacer"></span>
+      <button class="eact${e.enabled ? ' on' : ''}" title="${e.enabled ? 'Enabled - click to pause' : 'Paused - click to enable'}" onclick="_plEdgeToggle('${escapeHTML(e.id)}')">${_plIcon('power', 14)}</button>
+      <button class="eact" title="Edit" onclick="_plEdgeEdit('${escapeHTML(e.id)}')">${_plIcon('pencil', 13)}</button>
+      <button class="eact danger" title="Remove" onclick="_plEdgeDelete('${escapeHTML(e.id)}')">${_plIcon('x', 14)}</button>
+    </div>`;
+  }).join('');
+  const adder = (editing && editing.mode === 'add')
+    ? _plEdgeFormHtml(role, exit, null)
+    : `<button class="plf-addbtn" onclick="_plEdgeAdd('${role}')">${_plIcon('plus', 14)} Add exit branch</button>`;
+  return `<div class="plf-sec">
+    <div class="plf-sechead"><div class="plf-lab">Exit points</div></div>
+    <div class="plf-hint">Where a lead goes next, and what triggers the move. Fully editable per academy.</div>
+    <div class="plf-flow">${rows || '<div class="plf-empty">No exits yet - add the first branch below.</div>'}</div>
+    ${adder}
+  </div>`;
+}
+
+// Inline add/edit form. `edit` is the edge being edited (null = add).
+function _plEdgeFormHtml(role, exitEdges, edit) {
+  const usedTriggers = new Set(exitEdges.filter(e => !edit || e.id !== edit.id).map(e => e.trigger));
+  const trigOpts = Object.keys(_EDGE_TRIGGERS)
+    .filter(t => t !== 'new_lead')
+    .filter(t => !usedTriggers.has(t) || (edit && edit.trigger === t))
+    .map(t => `<option value="${t}"${edit && edit.trigger === t ? ' selected' : ''}>${escapeHTML(_edgeTrigLabel(t))}</option>`).join('');
+  const roleOpts = Object.keys(_EDGE_ROLE_LABEL).filter(r => r !== role)
+    .map(r => `<option value="stage:${r}"${edit && _edgeDestValue(edit) === 'stage:' + r ? ' selected' : ''}>${escapeHTML(_EDGE_ROLE_LABEL[r])}</option>`).join('');
+  const termOpts = Object.keys(_EDGE_TERMINAL_LABEL)
+    .map(t => `<option value="terminal:${t}"${edit && _edgeDestValue(edit) === 'terminal:' + t ? ' selected' : ''}>${escapeHTML(_EDGE_TERMINAL_LABEL[t])}</option>`).join('');
+  return `<div class="edge-form">
+    <select id="edge-trig">${trigOpts || '<option value="">All triggers used</option>'}</select>
+    <span class="efarr">${_plIcon('chevR', 13)}</span>
+    <select id="edge-dest"><optgroup label="Move to stage">${roleOpts}</optgroup><optgroup label="End the lead">${termOpts}</optgroup></select>
+    <div class="efbtns">
+      <button class="efcancel" onclick="_plEdgeFormCancel()">Cancel</button>
+      <button class="efsave" onclick="_plEdgeFormSave()">${edit ? 'Save' : 'Add'}</button>
+    </div>
+  </div>`;
+}
+
+function _plEdgeAdd(role) { _PL_EDGE_FORM = { mode: 'add', role }; _plFocusRerender(); }
+function _plEdgeEdit(id) {
+  const e = (_PL_EDGES || []).find(x => x.id === id); if (!e) return;
+  _PL_EDGE_FORM = { mode: 'edit', role: e.from_stage_role, id, trigger: e.trigger, to_kind: e.to_kind, to_stage_role: e.to_stage_role, to_terminal: e.to_terminal };
+  _plFocusRerender();
+}
+function _plEdgeFormCancel() { _PL_EDGE_FORM = null; _plFocusRerender(); }
+
+async function _plEdgeFormSave() {
+  const form = _PL_EDGE_FORM; if (!form) return;
+  const trig = document.getElementById('edge-trig')?.value;
+  const destVal = document.getElementById('edge-dest')?.value;
+  if (!trig || !destVal) { _plToast('Pick a trigger and a destination.'); return; }
+  const dest = _edgeParseDest(destVal);
+  const role = form.role;
+  // One destination per trigger: block a second exit on the same trigger.
+  const clash = (_PL_EDGES || []).find(e => e.from_stage_role === role && e.trigger === trig && (!form.id || e.id !== form.id));
+  if (clash) { _plToast(`"${_edgeTrigLabel(trig)}" already has an exit. Edit or remove it first.`); return; }
+  if (!_sb || typeof CLIENT_ID === 'undefined') { _plToast('Not connected.'); return; }
+  try {
+    if (form.mode === 'edit') {
+      const { error } = await _sb.from('stage_transitions').update({ trigger: trig, to_kind: dest.to_kind, to_stage_role: dest.to_stage_role, to_terminal: dest.to_terminal, is_seed: false }).eq('id', form.id);
+      if (error) throw error;
+    } else {
+      const sorts = (_PL_EDGES || []).filter(e => e.from_stage_role === role).map(e => e.sort_order || 0);
+      const nextSort = (sorts.length ? Math.max(...sorts) : 0) + 1;
+      const { error } = await _sb.from('stage_transitions').insert({
+        client_id: CLIENT_ID, pipeline_id: null, from_stage_role: role, trigger: trig,
+        to_kind: dest.to_kind, to_stage_role: dest.to_stage_role, to_terminal: dest.to_terminal,
+        enabled: true, is_seed: false, sort_order: nextSort,
+      });
+      if (error) throw error;
+    }
+    _PL_EDGE_FORM = null;
+    await _plEdgesEnsure(true);
+    _plFocusRerender();
+    _plToast(form.mode === 'edit' ? 'Exit branch updated.' : 'Exit branch added.');
+  } catch (e) {
+    const msg = (e && e.code === '23505') ? 'That exact branch already exists.' : (e && e.message) || 'Could not save.';
+    _plToast(msg);
+  }
+}
+
+async function _plEdgeToggle(id) {
+  const e = (_PL_EDGES || []).find(x => x.id === id); if (!e) return;
+  const next = !e.enabled;
+  e.enabled = next; // optimistic
+  _plFocusRerender();
+  try {
+    const { error } = await _sb.from('stage_transitions').update({ enabled: next }).eq('id', id);
+    if (error) throw error;
+  } catch (err) { e.enabled = !next; _plFocusRerender(); _plToast('Could not update.'); }
+}
+
+function _plEdgeDelete(id) {
+  const e = (_PL_EDGES || []).find(x => x.id === id); if (!e) return;
+  _plConfirmModal({
+    icon: '', title: 'Remove this exit branch?',
+    body: `Leads won't move on <b>${escapeHTML(_edgeTrigLabel(e.trigger))}</b> anymore. You can add it back later.`,
+    okLabel: 'Remove', danger: true,
+    onOk: () => _plEdgeDeleteGo(id),
+  });
+}
+async function _plEdgeDeleteGo(id) {
+  try {
+    const { error } = await _sb.from('stage_transitions').delete().eq('id', id);
+    if (error) throw error;
+    if (_PL_EDGE_FORM && _PL_EDGE_FORM.id === id) _PL_EDGE_FORM = null;
+    await _plEdgesEnsure(true);
+    _plFocusRerender();
+    _plToast('Exit branch removed.');
+  } catch (e) { _plToast((e && e.message) || 'Could not remove.'); }
 }
 
 function _renderPipelineBoard() {
