@@ -1,3 +1,4 @@
+/* global Buffer, process */
 import { withSentryApiRoute } from "../_sentry.js";
 // Vercel Serverless Function — Stripe webhook (Connect events)
 //
@@ -100,7 +101,7 @@ function verifyStripeSignature(rawBody, sigHeader, secret) {
       Buffer.from(parts.v1, "hex"),
       Buffer.from(expected, "hex")
     );
-  } catch (_) { return false; }
+  } catch { return false; }
 }
 
 async function sb(path, init = {}) {
@@ -193,7 +194,7 @@ async function markOpportunityWon({ member, oppIdHint, allowContactSearch }) {
           locationId: client.ghl_location_id, contactId: member.ghl_contact_id,
         });
         if (ref) { oppRef = ref; oppId = ref.ghlOpportunityId || ref.id || null; }
-      } catch (_) { /* non-fatal — fall through to skip */ }
+      } catch { /* non-fatal — fall through to skip */ }
     }
     if (!oppId) return { skipped: "no opportunity to mark" };
 
@@ -202,7 +203,7 @@ async function markOpportunityWon({ member, oppIdHint, allowContactSearch }) {
       try {
         await sb(`members?id=eq.${member.id}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ ghl_opportunity_id: oppId, updated_at: nowIso() }) });
         member.ghl_opportunity_id = oppId;
-      } catch (_) { /* non-fatal */ }
+      } catch { /* non-fatal */ }
     }
 
     // Idempotency: if a WON outcome already exists for this opp (retry, or the
@@ -210,14 +211,14 @@ async function markOpportunityWon({ member, oppIdHint, allowContactSearch }) {
     try {
       const prior = await sb(`pipeline_outcomes?client_id=eq.${encodeURIComponent(member.client_id)}&opportunity_id=eq.${encodeURIComponent(oppId)}&status=eq.won&select=id&limit=1`);
       if (Array.isArray(prior) && prior.length > 0) return { ok: true, opportunity_id: oppId, already_won: true };
-    } catch (_) { /* if the check fails, fall through — re-PUT to WON is itself idempotent in GHL */ }
+    } catch { /* if the check fails, fall through — re-PUT to WON is itself idempotent in GHL */ }
 
     // Mark the opportunity WON through the provider-aware store. On provider='ghl'
     // this is the identical PUT { status: 'won' }; on 'portal' it updates the store
     // row. Resolve a proper oppRef (a portal-native row matches on `id`, not a GHL id):
     // if we didn't already get one from findOpenOpp, look it up by contact.
     if (!oppRef && member.ghl_contact_id && client.ghl_location_id) {
-      try { oppRef = await findOpenOpp({ clientId: member.client_id, sb, ghl, token, locationId: client.ghl_location_id, contactId: member.ghl_contact_id }); } catch (_) {}
+      try { oppRef = await findOpenOpp({ clientId: member.client_id, sb, ghl, token, locationId: client.ghl_location_id, contactId: member.ghl_contact_id }); } catch { /* non-fatal */ }
     }
     if (!oppRef) oppRef = { ghlOpportunityId: oppId };
     await setStatus({
@@ -229,7 +230,7 @@ async function markOpportunityWon({ member, oppIdHint, allowContactSearch }) {
     // Record the outcome (mirrors the manual mark-won + agent flows).
     try {
       await sb(`pipeline_outcomes`, { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify([{ client_id: member.client_id, opportunity_id: oppId, status: "won", reason: "auto: paid via portal" }]) });
-    } catch (_) { /* non-fatal */ }
+    } catch { /* non-fatal */ }
 
     return { ok: true, opportunity_id: oppId, marked_won: true };
   } catch (e) {
@@ -260,7 +261,7 @@ async function maybeAttachCommitmentSchedule({ subId, onbSub, connectedAccount }
     const d = (Array.isArray(full.discounts) ? full.discounts[0] : null) || full.discount || null;
     const cp = d && (typeof d.coupon === "object" ? d.coupon : null);
     couponId = cp && cp.id ? cp.id : null;
-  } catch (_) { couponId = null; }
+  } catch { couponId = null; }
 
   const sched = await stripePost("/subscription_schedules", { from_subscription: subId }, connectedAccount);
   const p0 = sched.phases && sched.phases[0];
@@ -298,7 +299,7 @@ async function writeAudit({ client_id, member_id, action_type, args, stripe_resp
         db_changes:        db_changes || null,
       }]),
     });
-  } catch (_) { /* non-fatal */ }
+  } catch { /* non-fatal */ }
 }
 
 // ─────────────────────────────────────────────────────────
@@ -330,6 +331,12 @@ function linePriceId(line) {
 function invoiceLinePriceId(inv) {
   const line = inv && inv.lines && inv.lines.data && inv.lines.data[0];
   return linePriceId(line);
+}
+
+function invoiceSubMetadata(inv) {
+  if (inv && inv.subscription_details && inv.subscription_details.metadata) return inv.subscription_details.metadata;
+  if (inv && inv.parent && inv.parent.subscription_details && inv.parent.subscription_details.metadata) return inv.parent.subscription_details.metadata;
+  return {};
 }
 
 // ─────────────────────────────────────────────────────────
@@ -434,7 +441,7 @@ async function handler(req, res) {
 
   let event;
   try { event = JSON.parse(rawBody); }
-  catch (_) { return res.status(400).json({ error: "invalid JSON" }); }
+  catch { return res.status(400).json({ error: "invalid JSON" }); }
 
   const connectedAccount = event.account || null;
 
@@ -560,7 +567,7 @@ async function handleSubCreated(event, connectedAccount, res) {
       oppIdHint: sub.metadata && sub.metadata.ghl_opportunity_id,
       allowContactSearch: false,
     });
-  } catch (_) { /* non-fatal */ }
+  } catch { /* non-fatal */ }
 
   // C3 fix — exit active SALES sequences on conversion. The member just went live,
   // so any active portal sales drip (nurture / ghosted) must be exited or they keep
@@ -573,7 +580,7 @@ async function handleSubCreated(event, connectedAccount, res) {
     if (exitContactId) {
       await exitEnrollment({ clientId: target.client_id, contactId: exitContactId, reason: "converted" });
     }
-  } catch (_) { /* non-fatal */ }
+  } catch { /* non-fatal */ }
 
   // Funnel KPI: record the conversion (lead went live on Stripe), tied to the
   // lead by email. Best-effort — never blocks member linking. ref=sub.id keeps
@@ -719,7 +726,9 @@ async function handleSubUpdated(event, connectedAccount, res) {
   // on the next paid invoice instead.
   const accessFail = await accessSync(res, {
     clientId: member.client_id, memberId: member.id,
-    reason: "subscription-updated", subscriptionId: sub.id, stripePriceId: newPriceId,
+    reason: "subscription-updated", subscriptionId: sub.id,
+    offerPriceId: (sub.metadata && sub.metadata.offer_price_id) || null,
+    stripePriceId: newPriceId,
   });
   if (accessFail) return accessFail;
 
@@ -949,6 +958,7 @@ async function handleInvoiceSucceeded(event, connectedAccount, res) {
       const accessFail = await accessSync(res, {
         clientId: member.client_id, memberId: member.id,
         reason: "invoice-paid", subscriptionId: subId, invoiceId: inv.id,
+        offerPriceId: (onbSub.metadata && onbSub.metadata.offer_price_id) || null,
         stripePriceId:
           (onbSub.items && onbSub.items.data && onbSub.items.data[0] &&
            onbSub.items.data[0].price && onbSub.items.data[0].price.id) ||
@@ -983,6 +993,7 @@ async function handleInvoiceSucceeded(event, connectedAccount, res) {
       const accessFail = await accessSync(res, {
         clientId: member.client_id, memberId: member.id,
         reason: "invoice-paid", subscriptionId: subId, invoiceId: inv.id,
+        offerPriceId: invoiceSubMetadata(inv).offer_price_id || null,
         stripePriceId: invoiceLinePriceId(inv),
       });
       if (accessFail) return accessFail;
@@ -1026,6 +1037,7 @@ async function handleInvoiceSucceeded(event, connectedAccount, res) {
   const accessFail = await accessSync(res, {
     clientId: member.client_id, memberId: member.id,
     reason: "invoice-paid", subscriptionId: subId, invoiceId: inv.id,
+    offerPriceId: invoiceSubMetadata(inv).offer_price_id || null,
     stripePriceId: invoiceLinePriceId(inv),
   });
   if (accessFail) return accessFail;
