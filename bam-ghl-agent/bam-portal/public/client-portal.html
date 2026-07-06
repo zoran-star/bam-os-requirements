@@ -44608,11 +44608,13 @@ function _ccPulseRender(roster) {
       : (m.status === 'cancelling' || m.pause_scheduled_for) ? 'amber' : 'ok';
     c[cls]++;
   }
-  const total = roster.length;
-  const seg = (n, cls) => n ? '<span class="cc-hb-seg ' + cls + '" style="width:' + (n / total * 100).toFixed(2) + '%"></span>' : '';
+  // paused members stay in the label only - a grey tail on the bar read
+  // as clutter (Cole 2026-07-06)
+  const total = c.ok + c.amber + c.red;
+  const seg = (n, cls) => (n && total) ? '<span class="cc-hb-seg ' + cls + '" style="width:' + (n / total * 100).toFixed(2) + '%"></span>' : '';
   const issues = c.red + c.amber;
   host.innerHTML = '<button type="button" class="cc-hb" onclick="_ccMemberListOpen()" title="Open the member list">' +
-    '<span class="cc-hb-bar">' + seg(c.ok, 'ok') + seg(c.amber, 'amber') + seg(c.red, 'red') + seg(c.mute, 'mute') + '</span>' +
+    '<span class="cc-hb-bar">' + seg(c.ok, 'ok') + seg(c.amber, 'amber') + seg(c.red, 'red') + '</span>' +
     '<span class="cc-hb-lab">' + c.ok + ' live' + (c.mute ? ' · ' + c.mute + ' paused' : '') + (issues ? ' · ' + issues + ' issue' + (issues === 1 ? '' : 's') : '') + ' &rsaquo;</span>' +
     '</button>';
 }
