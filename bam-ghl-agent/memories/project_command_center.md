@@ -99,6 +99,12 @@
 ## Booking Calendars view rebuild (2026-07-06, Cole: all 10)
 - v15cal grid: compact hours by default (hugs the week's sessions ±1h; the old `min(lo,12)` clamp is bypassed in compact) + "Show full day" toggle; gold now-line across today's column (minute-accurate) + one-time autoscroll (`_V15CAL._scrolled`); chips are on-system pills with token dots (BK_COLORS = gold/blue/green/amber, replacing teal/orange/pink/periwinkle - also affects the other booking view using bkColor); open slots = faint gold tint + hover dash, CLICK TO BOOK (`_v15calNewBooking(date, time)` now takes prefills); booked chips show time + title-cased name + calendar color bar + data-slot attr; per-day session counts under the day headers; sticky grid header; ArrowLeft/Right change weeks (guarded: view visible, no input focus, no drawer); "Next session ›" jumps/flashes the next upcoming booking, hopping up to 6 weeks (`_V15CAL._seek`).
 
+## Breadcrumb + message peek + polish (2026-07-06, Cole picks)
+- **Back pill -> breadcrumb**: the floating gold "‹ Command center" pill is now a slim sticky breadcrumb bar at the top of `.main` in classic views: "‹ Command center › {View}". `_ccCrumb(view)` reads the label off `#nav-<view>` textContent; called from the switchView cc guard AND `_ccOpenClassic`.
+- **Message peek popup**: home inbox card rows open `_hmMsgPeek(convId)` (centered popup, body-level, unscoped `.hm-peek-*` CSS) with the last 8 messages (GET inbox?conversation_id=), mark-read fired, QUICK REPLY (SMS via send-message + contactId; uses the sent sfx) and "Open full inbox ›". Conversations cached in `window._hmIbById` by `_hmInboxRow`. Rows' hover "Reply" opens the peek focused; "Open inbox" goes to the full view.
+- **Gold bar at page bottom** = the default-height horizontal scrollbar (thumb colored by the global scrollbar style) from slight sideways overflow in the flow. Fixed: `::-webkit-scrollbar{height:4px}` + `body.cc-mode(.main){overflow-x:hidden}`.
+- **Every view swap eases in**: `.view.active{animation:viewIn .26s}` fade-rise, reduced-motion safe. (Inbox already had `_skelInboxHTML` skeleton + SWR re-open.)
+
 ## Section mounts (current skeleton)
 | Section | Mount | Content |
 |---|---|---|
