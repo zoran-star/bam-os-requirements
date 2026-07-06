@@ -49,12 +49,23 @@ academies, so leads move by the academy's authored edges, not hardcoded per-agen
   either path so KPI unaffected) ·
   #3 `cant_make_it` scheduled_trial→responded (`agent-confirm.js` confirm-handoff rebook) ·
   #4 `ghosted_ran_out` interested→nurture (`automations.js` seq-complete; covers ghosted +
-  summer_special; nurture-off LOST branch untouched).
-- **⏭ NEXT swaps (Phase 3), one per session w/ verify between:** `not_interested` responded→nurture ·
-  `says_no` done_trial→nurture (`agent-closing.js`) · `replied` interested/nurture→responded (the
-  ghosted/nurture reply bounce — find the site) · `no_show` + `post_trial_good_fit` (post-trial
-  form router) · then **terminals** (enrolls→member, marked_unqualified, complaint→human) — each
-  needs the router's terminal path built + verified against the caller's current close logic.
+  summer_special; nurture-off LOST branch untouched) ·
+  #5 `not_interested` responded→nurture (`agent-approvals.js` confirm-lost; nurture-live-gated,
+  paused→falls through to LOST, enroll + routedToNurture preserved) ·
+  #6 `says_no` done_trial→nurture (`agent-closing.js` confirm-lost; same shape as #5).
+  → **Every straightforward stage→stage move in portal code is now routed.** Shipped in one
+  session (2026-07-06, PR #1189) — NOT yet prod-verified on GTA; verify the batch before Phase 3+.
+- **⏭ NEXT (Phase 3 — needs investigation / new capability, NOT clean like-for-like):**
+  - `no_show` scheduled_trial→responded + `post_trial_good_fit` scheduled_trial→done_trial +
+    `post_trial_not_fit`→unqualified — live in the **post-trial form router** (find that handler;
+    good_fit/no_show are stage moves, not_fit is terminal).
+  - `replied` interested/nurture→responded — the ghosted/nurture reply bounce may be a **GHL
+    workflow, not portal code** (memory: Ghosted/Nurture still rigid GHL workflows). If so it's
+    NOT swappable until those are rebuilt as portal automations — confirm before assuming a site.
+  - **Terminals** (enrolls→member, marked_unqualified→unqualified, complaint_offtopic→human):
+    build the router's terminal path (setStatus won/lost + role stamp / human escalation) and
+    verify each against the caller's current close logic. Router returns `terminal-deferred`
+    (matched:false) today so these still run hardcoded.
 - **Phase 4:** delete the hardcoded destination resolution once every site routes.
 
 **Other unbuilt engines:** Closing agent, Lead Nurture automation, Resend email (see doc redesign
