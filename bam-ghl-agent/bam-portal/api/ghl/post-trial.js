@@ -13,6 +13,7 @@
 import { withSentryApiRoute } from "../_sentry.js";
 import { moveStage, pipelineFlags, oppMatchClause, resolveStage } from "../agent/_store.js";
 import { routeTransition } from "../agent/_router.js";
+import { markUnqualified } from "../agent/_tags.js";
 import { contactProvider } from "../_contacts.js";
 import { recordKpiEvent } from "../_kpi.js";
 import { enrollContact, isAutomationLive } from "../automations.js";
@@ -319,6 +320,24 @@ async function handler(req, res) {
       } catch (e) { console.error("trainer write failed (non-fatal):", e.message); }
     }
 
+  }
+
+  // Showed up, but NOT a fit -> the dead end. Route the post_trial_not_fit edge
+  // through the router's terminal path (GTA seed = scheduled_trial -> Unqualified):
+  // close the opp (setStatus abandoned + role:unqualified) and stamp the GHL
+  // unqualified tag + an outcome row, mirroring the confirm-abandoned action.
+  // Only fires when the coach explicitly marked showed-up + not-a-fit; a paused or
+  // missing edge leaves the lead put (no legacy behavior to preserve here). No
+  // message is sent - it's a quiet close.
+  if (showedUp === true && !goodFit) {
+    try {
+      const routed = await routeTransition({ clientId, sb, ghl, token, locationId: client.ghl_location_id, fromRole: "scheduled_trial", trigger: "post_trial_not_fit", contactId, oppRef, allowTerminal: true, reason: "post-trial: showed up, not a fit" });
+      if (routed.matched && routed.terminal === "unqualified" && routed.moved) {
+        result.unqualified = true;
+        if (contactId) { try { await markUnqualified(token, contactId, clientId); } catch (_) {} }
+        try { await sb(`pipeline_outcomes`, { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify([{ client_id: clientId, opportunity_id: oppId, status: "abandoned", reason: "post-trial: not a fit" }]) }); } catch (_) {}
+      }
+    } catch (e) { console.error("not-a-fit unqualified close failed (non-fatal):", e.message); }
   }
 
   // Send the trainer's first follow-up message: their personal note (TOP) + the
