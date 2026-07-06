@@ -7,7 +7,7 @@ import sh from '../styles/shared.module.css';
 const SAGE_PROMPTS = [
   'Increase Saturday ad budget by $50...',
   'Create a new Instagram Reel ad for summer camp...',
-  'Pause the Free Trial story ad — it has zero conversions...',
+  'Pause the Free Trial story ad - it has zero conversions...',
   'Show me cost per lead by channel this month...',
   'Generate a parent testimonial ad from Maria R...',
   'Set up a referral campaign with $25 credit reward...',
@@ -24,49 +24,49 @@ const CHANNELS = [
   {
     name: 'Instagram', leads: 14, cpl: '$12.40', trend: '+22%', trendUp: true, cplTrend: '-6%', cplTrendGood: true, icon: <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>, accent: '#E1306C',
     campaigns: [
-      { name: 'Youth Basketball Reel — Saturday Energy', spend: '$89', impressions: '4,210', cpm: '$21.14', reach: '3,680', frequency: '1.1', clicks: 187, ctr: '4.2%', cpc: '$0.48', lpv: 142, lpvRate: '75.9%', formFills: 4, trialBookings: 2, cpl: '$14.83', convRate: '4.2%', demo: { age: '28-42', gender: '62% F', geo: 'Within 15mi', onTarget: true } },
+      { name: 'Youth Basketball Reel - Saturday Energy', spend: '$89', impressions: '4,210', cpm: '$21.14', reach: '3,680', frequency: '1.1', clicks: 187, ctr: '4.2%', cpc: '$0.48', lpv: 142, lpvRate: '75.9%', formFills: 4, trialBookings: 2, cpl: '$14.83', convRate: '4.2%', demo: { age: '28-42', gender: '62% F', geo: 'Within 15mi', onTarget: true } },
       { name: 'Summer Skills Camp Promo', spend: '$134', impressions: '6,820', cpm: '$19.65', reach: '5,100', frequency: '1.3', clicks: 245, ctr: '3.6%', cpc: '$0.55', lpv: 189, lpvRate: '77.1%', formFills: 5, trialBookings: 3, cpl: '$16.75', convRate: '4.2%', demo: { age: '25-38', gender: '71% F', geo: 'Within 10mi', onTarget: true } },
     ],
   },
   {
     name: 'Facebook', leads: 8, cpl: '$18.60', trend: '+5%', trendUp: true, cplTrend: '+3%', cplTrendGood: false, icon: <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>, accent: '#1877F2',
     campaigns: [
-      { name: 'Parent Testimonial — Maria R.', spend: '$134', impressions: '5,430', cpm: '$24.68', reach: '4,200', frequency: '1.3', clicks: 206, ctr: '3.8%', cpc: '$0.65', lpv: 158, lpvRate: '76.7%', formFills: 3, trialBookings: 2, cpl: '$26.80', convRate: '3.2%', demo: { age: '30-45', gender: '58% F', geo: 'Within 20mi', onTarget: true } },
+      { name: 'Parent Testimonial - Maria R.', spend: '$134', impressions: '5,430', cpm: '$24.68', reach: '4,200', frequency: '1.3', clicks: 206, ctr: '3.8%', cpc: '$0.65', lpv: 158, lpvRate: '76.7%', formFills: 3, trialBookings: 2, cpl: '$26.80', convRate: '3.2%', demo: { age: '30-45', gender: '58% F', geo: 'Within 20mi', onTarget: true } },
       { name: 'Back-to-School Registration', spend: '$67', impressions: '3,150', cpm: '$21.27', reach: '2,800', frequency: '1.1', clicks: 98, ctr: '3.1%', cpc: '$0.68', lpv: 74, lpvRate: '75.5%', formFills: 2, trialBookings: 1, cpl: '$22.33', convRate: '4.1%', demo: { age: '22-35', gender: '65% F', geo: 'Within 25mi', onTarget: false, flag: 'Geo reaching beyond 20mi target radius' } },
     ],
   },
   {
     name: 'Google', leads: 6, cpl: '$24.10', trend: '-8%', trendUp: false, cplTrend: '-12%', cplTrendGood: true, icon: <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>, accent: '#4285F4',
     campaigns: [
-      { name: 'Search — Basketball Training Near Me', spend: '$145', impressions: '2,300', cpm: '$63.04', reach: '2,100', frequency: '1.1', clicks: 89, ctr: '3.9%', cpc: '$1.63', lpv: 67, lpvRate: '75.3%', formFills: 4, trialBookings: 2, cpl: '$24.17', convRate: '9.0%', demo: { age: '28-50', gender: '52% M', geo: 'Within 12mi', onTarget: true } },
+      { name: 'Search - Basketball Training Near Me', spend: '$145', impressions: '2,300', cpm: '$63.04', reach: '2,100', frequency: '1.1', clicks: 89, ctr: '3.9%', cpc: '$1.63', lpv: 67, lpvRate: '75.3%', formFills: 4, trialBookings: 2, cpl: '$24.17', convRate: '9.0%', demo: { age: '28-50', gender: '52% M', geo: 'Within 12mi', onTarget: true } },
     ],
   },
   {
     name: 'Referral', leads: 4, cpl: '$0', trend: '+50%', trendUp: true, cplTrend: '$0', cplTrendGood: true, icon: <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>, accent: '#3EAF5C',
     campaigns: [
-      { name: 'Member Referral Links', spend: '$0', impressions: '—', cpm: '—', reach: '—', frequency: '—', clicks: 28, ctr: '—', cpc: '$0', lpv: 22, lpvRate: '78.6%', formFills: 2, trialBookings: 2, cpl: '$0', convRate: '18.2%', demo: { age: '30-42', gender: '55% F', geo: 'Within 8mi', onTarget: true } },
+      { name: 'Member Referral Links', spend: '$0', impressions: '-', cpm: '-', reach: '-', frequency: '-', clicks: 28, ctr: '-', cpc: '$0', lpv: 22, lpvRate: '78.6%', formFills: 2, trialBookings: 2, cpl: '$0', convRate: '18.2%', demo: { age: '30-42', gender: '55% F', geo: 'Within 8mi', onTarget: true } },
     ],
   },
 ];
 
 const ADS_NEEDING_REFRESH = [
   { name: 'Summer Skills Camp Promo', days: 47, status: 'Stale', spend: '$312', conversions: 2, trend: 'declining' },
-  { name: 'Free Trial — Instagram Story', days: 62, status: 'Stop-loss', spend: '$158', conversions: 0, trend: 'zero' },
+  { name: 'Free Trial - Instagram Story', days: 62, status: 'Stop-loss', spend: '$158', conversions: 0, trend: 'zero' },
 ];
 
 const TOP_ADS = [
-  { name: 'Youth Basketball Reel — Saturday Energy', spend: '$89', conversions: 6, ctr: '4.2%', days: 12, status: 'healthy' },
-  { name: 'Parent Testimonial — Maria R.', spend: '$134', conversions: 5, ctr: '3.8%', days: 21, status: 'healthy' },
+  { name: 'Youth Basketball Reel - Saturday Energy', spend: '$89', conversions: 6, ctr: '4.2%', days: 12, status: 'healthy' },
+  { name: 'Parent Testimonial - Maria R.', spend: '$134', conversions: 5, ctr: '3.8%', days: 21, status: 'healthy' },
   { name: 'Back-to-School Registration', spend: '$67', conversions: 3, ctr: '3.1%', days: 8, status: 'new' },
 ];
 
 const BUDGET = { monthly: 500, spent: 312, daysLeft: 15, pacing: 'on-pace' };
 
 const CAMPAIGN_BUDGETS = [
-  { name: 'Youth Basketball Reel — Saturday Energy', daily: '$8.50', monthly: '$255', status: 'Active' },
-  { name: 'Parent Testimonial — Maria R.', daily: '$5.00', monthly: '$150', status: 'Active' },
+  { name: 'Youth Basketball Reel - Saturday Energy', daily: '$8.50', monthly: '$255', status: 'Active' },
+  { name: 'Parent Testimonial - Maria R.', daily: '$5.00', monthly: '$150', status: 'Active' },
   { name: 'Back-to-School Registration', daily: '$3.20', monthly: '$95', status: 'Active' },
-  { name: 'Free Trial — Instagram Story', daily: '$0', monthly: '$0', status: 'Paused' },
+  { name: 'Free Trial - Instagram Story', daily: '$0', monthly: '$0', status: 'Paused' },
 ];
 
 const MORE_TOOLS = [
@@ -86,15 +86,148 @@ const PERIODS = [
   { id: '3m', label: 'Last 3 months', days: 90 },
 ];
 
-/* Metric education — MKT-003 */
+/* Metric education - MKT-003 */
 const METRIC_EDUCATION = {
-  cpl: { label: 'Cost Per Lead', explain: 'Total ad spend divided by number of leads (form fills + trial bookings). Lower is better — under $15 is strong for youth sports.' },
+  cpl: { label: 'Cost Per Lead', explain: 'Total ad spend divided by number of leads (form fills + trial bookings). Lower is better - under $15 is strong for youth sports.' },
   ctr: { label: 'Click-Through Rate', explain: 'Percentage of people who saw your ad and clicked. Above 3% is solid for Meta ads in the youth sports space.' },
-  cpm: { label: 'Cost Per 1,000 Impressions', explain: 'How much it costs to show your ad 1,000 times. Under $25 is healthy — higher CPM usually means more competitive audience targeting.' },
+  cpm: { label: 'Cost Per 1,000 Impressions', explain: 'How much it costs to show your ad 1,000 times. Under $25 is healthy - higher CPM usually means more competitive audience targeting.' },
   convRate: { label: 'Conversion Rate', explain: 'Percentage of landing page visitors who took an action (form fill or trial booking). Above 5% is excellent.' },
   lpvRate: { label: 'Landing Page View Rate', explain: 'Percentage of clickers who actually loaded your landing page. Below 70% may indicate slow page load or mismatched ad-to-page experience.' },
-  frequency: { label: 'Frequency', explain: 'Average number of times each person saw your ad. Above 2.0 means audience fatigue may be setting in — time to refresh creative.' },
+  frequency: { label: 'Frequency', explain: 'Average number of times each person saw your ad. Above 2.0 means audience fatigue may be setting in - time to refresh creative.' },
 };
+
+/* ─── SAGE MARKETING ADVISOR - conversational knowledge engine (MKT-013) ─── */
+const money = str => parseFloat(String(str).replace(/[^0-9.]/g, '')) || 0;
+
+const STARTERS = [
+  "How's my marketing doing?",
+  'Which channel is cheapest?',
+  'Any ads I should pause?',
+  "What's CPL?",
+];
+
+function sageGreeting() {
+  return {
+    role: 'sage',
+    text: `Hey - I'm Sage, your marketing advisor. I can explain your numbers, tell you what's working, and take action for you.\n\nOne thing stands out right now: your Free Trial Instagram Story ad has spent $158 with 0 conversions in 62 days. I'd pause it and move that budget to your Saturday Reel.`,
+    actions: [
+      { label: 'Pause that ad', act: 'budget' },
+      { label: "How's everything doing?", act: 'ask:how is my marketing doing' },
+    ],
+  };
+}
+
+/* Rule-based intent engine. Reads the live prototype data (CHANNELS, BUDGET,
+   TOP_ADS, ADS_NEEDING_REFRESH, METRIC_EDUCATION) and returns { text, actions }.
+   Actions carry an `act` key resolved by runSageAction in the component. */
+function sageReply(raw) {
+  const t = ` ${raw.toLowerCase()} `;
+  const has = (...w) => w.some(x => t.includes(x));
+
+  // Launch / create a campaign
+  if (has('create', 'launch', 'new ad', 'new campaign', 'set up a', 'make an ad', 'start a campaign', 'build a campaign')) {
+    return {
+      text: `Let's launch a new campaign. For youth academies, Trial Bookings is the highest-ROI objective - short Reels with a clear "book a free trial" CTA convert best. I'll open the builder and walk you through objective, creative, copy, audience and budget.`,
+      actions: [{ label: 'Open campaign builder', act: 'createAd' }],
+    };
+  }
+
+  // Pause / underperformers / refresh
+  if (has('pause', 'stop', 'kill', 'underperform', 'refresh', 'stale', 'wasting', 'not working', 'worst', 'bad ad', 'cut')) {
+    return {
+      text: `Two ads are dragging your spend:\n\n- Free Trial - Instagram Story: $158 spent, 0 conversions, 62 days. This one hit stop-loss - I'd kill it.\n- Summer Skills Camp Promo: $312 spent, only 2 conversions, 47 days and declining. Time to refresh the creative.\n\nEverything else is pulling its weight.`,
+      actions: [
+        { label: 'Adjust budgets', act: 'budget' },
+        { label: 'See full dashboard', act: 'dashboard' },
+      ],
+    };
+  }
+
+  // Best / working well
+  if (has('best', ' top ', 'working', 'winner', 'performing well', 'do more', 'scale up')) {
+    return {
+      text: `Your winners right now:\n\n- Youth Basketball Reel - Saturday Energy: 6 conversions, 4.2% CTR, only $89 spent. This is your best ad - it drives about 42% of all conversions.\n- Parent Testimonial - Maria R.: 5 conversions, 3.8% CTR. Testimonials convert about 2x better than training footage.\n\nI'd put more budget behind the Saturday Reel.`,
+      actions: [
+        { label: 'Shift budget to winners', act: 'budget' },
+        { label: 'Make a similar ad', act: 'createAd' },
+      ],
+    };
+  }
+
+  // Budget / spend / pacing
+  if (has('budget', 'spend', 'spent', 'pacing', 'pace', 'how much', 'money left', 'afford', 'raise')) {
+    return {
+      text: `You're on pace. Monthly budget is $${BUDGET.monthly}, you've spent $${BUDGET.spent} with ${BUDGET.daysLeft} days left - that's ${Math.round((BUDGET.spent / BUDGET.monthly) * 100)}% used, right where you should be. If you want to grow, the safest move is shifting spend from the stale Summer Camp ad into your Saturday Reel rather than adding new budget.`,
+      actions: [{ label: 'Adjust budget', act: 'budget' }],
+    };
+  }
+
+  // Channel-specific (Instagram, Facebook, Google, Referral)
+  const chan = CHANNELS.find(c => t.includes(c.name.toLowerCase()));
+  if (chan && !has('cheap', 'compare', 'each', 'all channel', 'by channel')) {
+    const note = chan.name === 'Instagram' ? 'This is your most efficient channel - keep leaning in.'
+      : chan.name === 'Referral' ? 'Free leads that convert at 18% - your highest-quality source. Worth a referral push.'
+      : chan.cplTrendGood ? 'Trending the right way.'
+      : 'CPL is creeping up - worth a look.';
+    return {
+      text: `${chan.name}: ${chan.leads} leads at ${chan.cpl} cost-per-lead this month (${chan.cplTrend} vs last month). ${note}`,
+      actions: [{ label: `Open ${chan.name} detail`, act: `channel:${chan.name}` }],
+    };
+  }
+
+  // Compare channels by cost
+  if (has('cheap', 'expensive', 'compare', 'which channel', 'by channel', 'each channel', 'best channel', 'source')) {
+    const ranked = [...CHANNELS].filter(c => money(c.cpl) > 0).sort((a, b) => money(a.cpl) - money(b.cpl));
+    const lines = ranked.map(c => `- ${c.name}: ${c.cpl} CPL, ${c.leads} leads`).join('\n');
+    return {
+      text: `Cost per lead by channel (cheapest first):\n\n- Referral: $0 (free) - 4 leads, converts at 18%\n${lines}\n\nInstagram is your best paid channel at $12.40 - about 2x cheaper than Google. I'd move spend toward Instagram and push referrals harder.`,
+      actions: [{ label: 'Open full dashboard', act: 'dashboard' }],
+    };
+  }
+
+  // Metric explanations
+  const metricMap = [
+    { keys: ['cpl', 'cost per lead'], id: 'cpl' },
+    { keys: ['ctr', 'click through', 'click-through'], id: 'ctr' },
+    { keys: ['cpm', 'impression'], id: 'cpm' },
+    { keys: ['conversion rate', 'conv rate', 'convert'], id: 'convRate' },
+    { keys: ['landing page', 'lpv'], id: 'lpvRate' },
+    { keys: ['frequency', 'fatigue'], id: 'frequency' },
+  ];
+  const hit = metricMap.find(m => m.keys.some(k => t.includes(k)));
+  if (hit) {
+    const m = METRIC_EDUCATION[hit.id];
+    return { text: `${m.label}: ${m.explain}`, actions: [{ label: 'See it in my numbers', act: 'dashboard' }] };
+  }
+
+  // Content / creative ideas
+  if (has('content', 'creative', 'reel', 'video', 'post', 'testimonial', 'idea', 'what should i make', 'caption')) {
+    return {
+      text: `For your academy, the content that converts is short Reels (under 30s) with upbeat music, plus parent testimonials - those pull about 2x the conversions of training footage. A strong hook like "Your kid deserves better than rec league" with a clear free-trial CTA works well. Post Saturday mornings for peak parent attention.`,
+      actions: [{ label: 'Create ad content', act: 'createAd' }],
+    };
+  }
+
+  // Overview / how am I doing
+  if (has('how', 'doing', 'overview', 'summary', 'performance', 'going', 'leads', 'result', 'this month', 'status', 'picture')) {
+    return {
+      text: `Here's the picture this month:\n\n- ${CHANNELS.reduce((sum, c) => sum + c.leads, 0)} leads at $14.80 average cost-per-lead - solid for youth sports (under $15 is strong).\n- Instagram is carrying it at $12.40 CPL; Google is your priciest at $24.10.\n- Budget is on pace: $${BUDGET.spent} of $${BUDGET.monthly} with ${BUDGET.daysLeft} days left.\n- One drag: the Free Trial Story ad has 0 conversions, worth cutting.`,
+      actions: [
+        { label: 'Open dashboard', act: 'dashboard' },
+        { label: 'What should I pause?', act: 'ask:which ads should I pause' },
+      ],
+    };
+  }
+
+  // Help / fallback
+  return {
+    text: `I can help with your marketing a few ways:\n\n- Explain your numbers (CPL, CTR, conversion rate...)\n- Tell you what's working and what to pause\n- Compare your channels\n- Launch a campaign or create ad content\n\nTry one of the suggestions below, or just ask in your own words.`,
+    actions: [
+      { label: "How's my marketing doing?", act: 'ask:how is my marketing doing' },
+      { label: 'What should I pause?', act: 'ask:which ads should I pause' },
+    ],
+  };
+}
 
 /* ─── FULL DASHBOARD ─── */
 function FullDashboard({ onClose }) {
@@ -147,7 +280,7 @@ function FullDashboard({ onClose }) {
       <div className={s.dashBody}>
         <div className={s.dashNotes}>
           <span className={s.dashNotesLabel}>Sage</span>
-          <span>Instagram is your most efficient channel at $12.40 CPL — 3x better than Google. Your Saturday Reel is driving 42% of all conversions. Consider reallocating $50 from the stale Summer Camp ad to the Saturday slot.</span>
+          <span>Instagram is your most efficient channel at $12.40 CPL - 3x better than Google. Your Saturday Reel is driving 42% of all conversions. Consider reallocating $50 from the stale Summer Camp ad to the Saturday slot.</span>
         </div>
 
         <div className={s.dashSectionLabel}>Top-Level KPIs <span className={s.dashRef}>MKT-001</span></div>
@@ -245,7 +378,7 @@ function ChannelDetail({ channel, onClose }) {
     <div className={s.modalOverlay} onClick={onClose}>
       <div className={s.modalPanel} onClick={e => e.stopPropagation()}>
         <button className={s.modalClose} onClick={onClose}>✕</button>
-        <div className={s.modalTitle}>{channel.icon} {channel.name} — Campaign Detail</div>
+        <div className={s.modalTitle}>{channel.icon} {channel.name} - Campaign Detail</div>
         <div className={s.modalRef}>MKT-001a · MKT-003</div>
 
         {channel.campaigns.map((c, i) => (
@@ -289,7 +422,7 @@ function ChannelDetail({ channel, onClose }) {
           </div>
         ))}
 
-        {/* Budget Pacing — inside channel detail */}
+        {/* Budget Pacing - inside channel detail */}
         <div style={{ marginTop: 20, borderTop: '1px solid var(--border)', paddingTop: 16 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
             <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-1)' }}>Budget Pacing</span>
@@ -317,7 +450,25 @@ function ChannelDetail({ channel, onClose }) {
           </div>
         </div>
 
+      </div>
+    </div>
+  );
+}
+
+/* ─── BUDGET EDITOR MODAL ─── */
+function BudgetEditor({ onClose }) {
+  const camp = CAMPAIGN_BUDGETS.find(c => c.status === 'Active') || CAMPAIGN_BUDGETS[0];
+  const [newDaily, setNewDaily] = useState(camp.daily.replace('$', ''));
+
+  return (
+    <div className={s.modalOverlay} onClick={onClose}>
+      <div className={s.modalPanel} onClick={e => e.stopPropagation()}>
+        <button className={s.modalClose} onClick={onClose}>✕</button>
+        <div className={s.modalTitle}>Adjust Budget</div>
+        <div className={s.modalRef}>MKT-006</div>
+
         <div className={s.budgetCurrentCard}>
+          <div className={s.budgetCurrentRow}><span>Campaign</span><span>{camp.name}</span></div>
           <div className={s.budgetCurrentRow}><span>Current daily budget</span><span>{camp.daily}</span></div>
           <div className={s.budgetCurrentRow}><span>Current monthly estimate</span><span>{camp.monthly}</span></div>
           <div className={s.budgetCurrentRow}><span>Status</span><span>{camp.status}</span></div>
@@ -395,7 +546,7 @@ function CreateAdModal({ onClose }) {
           {step === 3 && (
             <div className={s.wizardContent}>
               <label className={s.budgetFormLabel}>Targeting</label>
-              <div className={s.sageTipSmall}><span className={s.sageTipLabel}>Sage</span> Advantage+ audience is enabled — Meta's algorithm will find the best parents near your academy. Your existing members will be automatically excluded.</div>
+              <div className={s.sageTipSmall}><span className={s.sageTipLabel}>Sage</span> Advantage+ audience is enabled - Meta's algorithm will find the best parents near your academy. Your existing members will be automatically excluded.</div>
               <div className={s.budgetCurrentCard}>
                 <div className={s.budgetCurrentRow}><span>Location</span><span>Within 15mi of BAM Academy</span></div>
                 <div className={s.budgetCurrentRow}><span>Targeting</span><span>Advantage+ (broad)</span></div>
@@ -446,7 +597,8 @@ export default function Marketing() {
   const [briefInput, setBriefInput] = useState('');
   const [lastBrief, setLastBrief] = useState(null);
   const [cmdInput, setCmdInput] = useState('');
-  const [cmdResponse, setCmdResponse] = useState(null);
+  const [chatOpen, setChatOpen] = useState(false);
+  const [messages, setMessages] = useState([]);
   const [isListening, setIsListening] = useState(false);
   const [dashOpen, setDashOpen] = useState(false);
   const [channelDetail, setChannelDetail] = useState(null);
@@ -457,7 +609,13 @@ export default function Marketing() {
   const typewriterText = useTypewriter(SAGE_PROMPTS);
   const cmdInputRef = useRef(null);
   const canvasRef = useRef(null);
+  const threadRef = useRef(null);
   useBannerCanvas(canvasRef);
+
+  // Keep the conversation scrolled to the latest message
+  useEffect(() => {
+    if (threadRef.current) threadRef.current.scrollTop = threadRef.current.scrollHeight;
+  }, [messages, chatOpen]);
 
   // Close tools dropdown on scroll
   useEffect(() => {
@@ -473,25 +631,27 @@ export default function Marketing() {
   const topChannel = CHANNELS[0].name;
 
   const handleCommand = (text) => {
-    const cmd = text || cmdInput;
-    if (!cmd.trim()) return;
-    const lowCmd = cmd.toLowerCase();
-    if (lowCmd.includes('create') && lowCmd.includes('ad')) { setCmdInput(''); setCreateAdOpen(true); return; }
-    if (lowCmd.includes('budget') || lowCmd.includes('adjust')) { setCmdInput(''); setBudgetOpen(true); return; }
-    setCmdResponse({
-      input: cmd,
-      reply: lowCmd.includes('generate')
-        ? `I'll draft that for you now. Based on your best-performing content, I'd suggest a high-energy format with a clear trial CTA.`
-        : lowCmd.includes('pause') || lowCmd.includes('stop')
-        ? `I'll pause that ad and reallocate the daily budget across your remaining active campaigns.`
-        : `On it — pulling that data for you now. Here's what I found for "${cmd}"...`,
-      actions: lowCmd.includes('generate')
-        ? ['Generate draft', 'Set audience first', 'Cancel']
-        : lowCmd.includes('pause')
-        ? ['Confirm pause', 'Reallocate budget', 'Cancel']
-        : ['View details', 'Export', 'Cancel'],
+    const cmd = (text || cmdInput).trim();
+    if (!cmd) return;
+    const reply = sageReply(cmd);
+    setMessages(prev => {
+      const seeded = prev.length === 0 ? [sageGreeting()] : prev;
+      return [...seeded, { role: 'user', text: cmd }, { role: 'sage', ...reply }];
     });
+    setChatOpen(true);
     setCmdInput('');
+  };
+
+  // Resolve an action button on a Sage message
+  const runSageAction = (act) => {
+    if (act === 'createAd') return setCreateAdOpen(true);
+    if (act === 'budget') return setBudgetOpen(true);
+    if (act === 'dashboard') return setDashOpen(true);
+    if (act?.startsWith('channel:')) {
+      const name = act.split(':')[1];
+      return setChannelDetail(CHANNELS.find(c => c.name === name));
+    }
+    if (act?.startsWith('ask:')) return handleCommand(act.slice(4));
   };
 
   const toggleListening = () => {
@@ -518,7 +678,7 @@ export default function Marketing() {
   return (
     <>
       <main className={sh.main}>
-        {/* ═══ COMMAND BAR — Sage-powered top bar ═══ */}
+        {/* ═══ COMMAND BAR - Sage-powered top bar ═══ */}
         <div className={s.topBar}>
           <div className={s.topBarCanvas}>
             <canvas ref={canvasRef} />
@@ -583,15 +743,40 @@ export default function Marketing() {
           </div>
         </div>
 
-        {/* Sage response area (no chips) */}
+        {/* Sage conversational advisor (MKT-013) */}
         <div className={s.topActions}>
-          {cmdResponse && (
-            <div className={s.topResponse}>
-              <div className={s.topResponseQ}>You said: &ldquo;{cmdResponse.input}&rdquo;</div>
-              <div className={s.topResponseA}>{cmdResponse.reply}</div>
-              <div className={s.topResponseActions}>
-                {cmdResponse.actions.map(a => (
-                  <button key={a} className={a === 'Cancel' ? s.topResponseCancel : s.topResponseConfirm} style={a === 'Confirm pause' ? { border: '1px solid #C8A84E', color: '#C8A84E', background: 'transparent' } : undefined} onClick={() => setCmdResponse(null)}>{a}</button>
+          {chatOpen && (
+            <div className={s.chatPanel}>
+              <div className={s.chatHead}>
+                <div className={s.chatHeadOrb}>S</div>
+                <div className={s.chatHeadText}>
+                  <div className={s.chatHeadName}>Sage · Marketing Advisor</div>
+                  <div className={s.chatHeadSub}>Knows your ads, budget &amp; numbers</div>
+                </div>
+                <button className={s.chatClose} onClick={() => setChatOpen(false)} aria-label="Close">
+                  <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                </button>
+              </div>
+              <div className={s.chatThread} ref={threadRef}>
+                {messages.map((m, i) => (
+                  <div key={i} className={m.role === 'user' ? s.chatRowUser : s.chatRowSage}>
+                    {m.role === 'sage' && <div className={s.chatAvatar}>S</div>}
+                    <div className={m.role === 'user' ? s.chatBubbleUser : s.chatBubbleSage}>
+                      <div className={s.chatText}>{m.text}</div>
+                      {m.actions?.length > 0 && (
+                        <div className={s.chatActions}>
+                          {m.actions.map(a => (
+                            <button key={a.label} className={s.chatActBtn} onClick={() => runSageAction(a.act)}>{a.label}</button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <div className={s.chatSuggest}>
+                {STARTERS.map(q => (
+                  <button key={q} className={s.chatSuggestChip} onClick={() => handleCommand(q)}>{q}</button>
                 ))}
               </div>
             </div>
@@ -599,7 +784,7 @@ export default function Marketing() {
         </div>
 
         <div className={sh.scroll}>
-          {/* ═══ META ADS — channel detail section with swipe nav ═══ */}
+          {/* ═══ META ADS - channel detail section with swipe nav ═══ */}
           <div className={s.channelSectionWrap}>
             <div className={s.channelSection}>
             <div className={s.channelSectionHead}>
@@ -655,7 +840,7 @@ export default function Marketing() {
                 ))}
               </div>
             </div>
-            {/* Budget Pacing — inside Meta section */}
+            {/* Budget Pacing - inside Meta section */}
             <div className={s.metaBudget}>
               <div className={s.metaBudgetHead}>
                 <span className={s.metaBudgetTitle}>Budget Pacing</span>
@@ -708,7 +893,7 @@ export default function Marketing() {
             </div>
           </div>
 
-          {/* ═══ PERFORMANCE — channels + budget ═══ */}
+          {/* ═══ PERFORMANCE - channels + budget ═══ */}
           <div className={s.sectionBanner} style={{ '--accent': 'var(--gold)' }}>
             <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
             <span>Performance</span>
@@ -735,8 +920,7 @@ export default function Marketing() {
                   <span className={ch.cplTrendGood ? s.channelTrendUp : s.channelTrendDown}>{ch.cplTrend}</span>
                 </div>
                 {ch.campaigns.some(c => !c.demo.onTarget) && (
-                  <div cladiff3: invalid print range
-ssName={s.channelDemoFlag}>Demo off-target</div>
+                  <div className={s.channelDemoFlag}>Demo off-target</div>
                 )}
               </div>
             ))}
