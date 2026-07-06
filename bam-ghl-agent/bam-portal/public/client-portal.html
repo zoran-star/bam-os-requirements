@@ -3771,6 +3771,7 @@
   .cc-wall.draw .cc-wall-line { stroke-dashoffset: 0; }
   .mm-focus-page .mm-modal-card { position: relative; z-index: 1; }
   html.mm-focus-open, html.mm-focus-open body { overflow-x: hidden; }
+  body.cc-mode, body.cc-mode .main { overflow-x: hidden; }
   @media (prefers-reduced-motion: reduce) {
     .mm-focus-page, .main, .sidebar { transition: none; }
     .mm-focus-page.mm-open .mm-modal-card > *, .mm-focus-page.mm-open::before { animation: none; }
@@ -4375,10 +4376,15 @@
   }
 
   /* Scrollbar */
-  ::-webkit-scrollbar { width: 4px; }
+  ::-webkit-scrollbar { width: 4px; height: 4px; }
   ::-webkit-scrollbar-track { background: transparent; }
   ::-webkit-scrollbar-thumb { background: var(--line-str); border-radius: 0; }
   ::-webkit-scrollbar-thumb:hover { background: var(--gold-3); }
+
+  /* every page open eases in instead of snapping */
+  .view.active { animation: viewIn .26s cubic-bezier(0.16, 1, 0.3, 1); }
+  @keyframes viewIn { from { opacity: 0; transform: translateY(7px); } to { opacity: 1; transform: none; } }
+  @media (prefers-reduced-motion: reduce) { .view.active { animation: none; } }
 
   /* ── Readout line ── */
   .readout {
@@ -14895,6 +14901,7 @@ function switchView(name, el) {
     const secMap = { home: 'home', pipelines: 'sales', members: 'members', marketing: 'marketing' };
     if (secMap[name] && document.getElementById('view-cc')?.classList.contains('active')) { _ccScrollTo(secMap[name]); return; }
     document.body.classList.add('cc-classic');
+    if (typeof _ccCrumb === 'function') _ccCrumb(name);
   }
   // Clients without marketing have the Marketing nav greyed + click-blocked
   if (name === 'marketing' && !MARKETING_INCLUDED && !(typeof ORGANIC_CONTENT !== 'undefined' && ORGANIC_CONTENT)) return;
@@ -15315,6 +15322,23 @@ function _hv2Style() {
     '.hm-kpi-card.selected .hm-kpi-card-check{border-color:var(--gold);background:rgba(212,182,92,.15);color:var(--gold)}' +
     '.hm-kpi-card-name{font-size:12px;font-weight:700;color:var(--text);margin-bottom:2px}' +
     '.hm-kpi-card-desc{font-size:10px;color:var(--text-mute);line-height:1.3}' +
+    // message peek popup (body-level)
+    '#hm-peek-ov{position:fixed;inset:0;z-index:9820;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;animation:hv2In .2s ease}' +
+    '.hm-peek-card{font-family:var(--font-ui);background:var(--surface);border:1px solid var(--border);border-radius:24px;width:min(480px,92vw);max-height:78vh;display:flex;flex-direction:column;box-shadow:0 12px 40px rgba(0,0,0,.3);overflow:hidden}' +
+    '.hm-peek-head{display:flex;align-items:center;justify-content:space-between;padding:18px 22px 10px}' +
+    '.hm-peek-title{font-family:var(--font-num);font-size:18px;font-weight:800;color:var(--text)}' +
+    '.hm-peek-x{background:none;border:none;color:var(--text-mute);cursor:pointer;padding:4px;border-radius:8px}' +
+    '.hm-peek-x:hover{color:var(--text);background:var(--surface-el,rgba(0,0,0,.05))}' +
+    '.hm-peek-thread{flex:1;overflow-y:auto;padding:6px 22px 12px;display:flex;flex-direction:column;gap:8px}' +
+    '.hm-peek-bub{max-width:82%;padding:9px 13px;border-radius:16px;font-size:13px;line-height:1.5;color:var(--text);white-space:pre-wrap;word-break:break-word}' +
+    '.hm-peek-bub.in{align-self:flex-start;background:var(--surface-el,rgba(0,0,0,.05));border-bottom-left-radius:6px}' +
+    '.hm-peek-bub.out{align-self:flex-end;background:rgba(212,182,92,.14);border:1px solid rgba(212,182,92,.25);border-bottom-right-radius:6px}' +
+    '.hm-peek-compose{display:flex;gap:8px;padding:10px 22px 6px;border-top:1px solid var(--border)}' +
+    '.hm-peek-compose input{flex:1;background:var(--bg);border:1px solid var(--border-med);border-radius:8px;color:var(--text);padding:9px 12px;font:inherit;font-size:13px}' +
+    '.hm-peek-compose input:focus{outline:none;border-color:var(--accent-border)}' +
+    '.hm-peek-send{background:var(--gold);color:var(--on-gold);border:none;border-radius:8px;padding:9px 18px;font:inherit;font-size:13px;font-weight:700;cursor:pointer}' +
+    '.hm-peek-full{background:none;border:none;color:var(--gold);font:inherit;font-size:12.5px;font-weight:700;cursor:pointer;padding:10px 0 14px}' +
+    '.hm-peek-full:hover{text-decoration:underline}' +
     '@media(max-width:480px){#home-v2 .hm-kpi-grid{grid-template-columns:1fr 1fr}}' +
     // Stat expand tooltip
     '#home-v2 .hm-stat-tip{position:absolute;bottom:calc(100% + 6px);left:50%;transform:translateX(-50%) scale(0.95);opacity:0;pointer-events:none;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:8px 12px;box-shadow:0 6px 20px rgba(0,0,0,.3);white-space:nowrap;z-index:10;transition:opacity .18s,transform .18s}' +
@@ -16034,6 +16058,75 @@ function _hmToggleTab(tab) {
 // #4: System notification patterns — group these senders into an accordion
 const _HM_SYSTEM_SENDERS = /^(facebook|meta|google|stripe|square|twilio|mailchimp|quickbooks|zapier|intuit|paypal)/i;
 
+// ── Message peek: a popup for one conversation + quick reply ──
+function _hmMsgPeekClose() { document.getElementById('hm-peek-ov')?.remove(); }
+async function _hmMsgPeek(convId, focusReply) {
+  const c = (window._hmIbById || {})[convId];
+  if (!c) return switchView('v15inbox');
+  _hmMsgPeekClose();
+  const name = _ccCapName((c.contactName || 'Conversation').split(' ').slice(0, 3).join(' '));
+  document.body.insertAdjacentHTML('beforeend', `
+    <div id="hm-peek-ov" onclick="if(event.target===this)_hmMsgPeekClose()">
+      <div class="hm-peek-card">
+        <div class="hm-peek-head">
+          <div class="hm-peek-title">${escapeHTML(name)}</div>
+          <button type="button" class="hm-peek-x" onclick="_hmMsgPeekClose()" aria-label="Close"><svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+        </div>
+        <div class="hm-peek-thread" id="hm-peek-thread"><div class="req-empty" style="padding:16px 0"><span class="req-spin"></span> Loading...</div></div>
+        ${c.contactId ? `<div class="hm-peek-compose">
+          <input type="text" id="hm-peek-input" placeholder="Quick reply..." onkeydown="if(event.key==='Enter')_hmMsgPeekSend('${escapeHTML(String(c.id))}')">
+          <button type="button" class="hm-peek-send" onclick="_hmMsgPeekSend('${escapeHTML(String(c.id))}')">Send</button>
+        </div>` : ''}
+        <button type="button" class="hm-peek-full" onclick="_hmMsgPeekClose();switchView('v15inbox')">Open full inbox &rsaquo;</button>
+      </div>
+    </div>`);
+  if (focusReply) setTimeout(() => document.getElementById('hm-peek-input')?.focus(), 120);
+  try {
+    const token = await _mreqAuthToken();
+    fetch(`/api/ghl/inbox?action=mark-read&client_id=${encodeURIComponent(CLIENT_ID)}`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+      body: JSON.stringify({ conversation_id: c.id }),
+    }).catch(() => {});
+    const r = await fetch(`/api/ghl/inbox?client_id=${encodeURIComponent(CLIENT_ID)}&conversation_id=${encodeURIComponent(c.id)}`, { headers: { Authorization: 'Bearer ' + token } });
+    const j = await _safeJson(r);
+    if (!r.ok) throw new Error(j.error || ('HTTP ' + r.status));
+    const box = document.getElementById('hm-peek-thread');
+    if (!box) return;
+    const msgs = (j.messages || [])
+      .filter(m => (m.body || '').trim())
+      .sort((a, b) => new Date(a.date || 0) - new Date(b.date || 0))
+      .slice(-8);
+    box.innerHTML = msgs.length
+      ? msgs.map(m => `<div class="hm-peek-bub ${String(m.direction || '').toLowerCase() === 'inbound' ? 'in' : 'out'}">${escapeHTML(m.body)}</div>`).join('')
+      : '<div class="req-empty" style="padding:12px 0">No messages to show.</div>';
+    box.scrollTop = box.scrollHeight;
+  } catch (e) {
+    const box = document.getElementById('hm-peek-thread');
+    if (box) box.innerHTML = `<div class="req-empty" style="padding:12px 0">Couldn't load this conversation.</div>`;
+  }
+}
+async function _hmMsgPeekSend(convId) {
+  const c = (window._hmIbById || {})[convId];
+  const inp = document.getElementById('hm-peek-input');
+  const text = (inp?.value || '').trim();
+  if (!c || !c.contactId || !text) return;
+  inp.value = ''; inp.disabled = true;
+  try {
+    const token = await _mreqAuthToken();
+    const r = await fetch('/api/ghl/send-message?client_id=' + encodeURIComponent(CLIENT_ID), {
+      method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+      body: JSON.stringify({ client_id: CLIENT_ID, type: 'SMS', contactId: c.contactId, message: text }),
+    });
+    const j = await _safeJson(r);
+    if (!r.ok) throw new Error((j && j.error) || 'send failed');
+    try { _SFX.sent(); } catch (_) {}
+    const box = document.getElementById('hm-peek-thread');
+    if (box) { box.insertAdjacentHTML('beforeend', `<div class="hm-peek-bub out">${escapeHTML(text)}</div>`); box.scrollTop = box.scrollHeight; }
+  } catch (_) {
+    const box = document.getElementById('hm-peek-thread');
+    if (box) box.insertAdjacentHTML('beforeend', '<div class="req-empty" style="padding:6px 0">Could not send from here. Use the full inbox.</div>');
+  } finally { if (inp) inp.disabled = false; }
+}
 function _hmInboxTimeStr(msgDate) {
   const mins = Math.round((Date.now() - msgDate.getTime()) / 60000);
   if (mins < 60) return mins + 'm';
@@ -16042,6 +16135,7 @@ function _hmInboxTimeStr(msgDate) {
 }
 
 function _hmInboxRow(c, opts) {
+  (window._hmIbById = window._hmIbById || {})[c.id] = c;
   const unread = c.unreadCount > 0;
   const name = _ccCapName((c.contactName || c.fullName || 'Unknown').split(' ').slice(0, 2).join(' '));
   const initials = name.split(' ').map(w => w[0] || '').join('').toUpperCase().slice(0, 2);
@@ -16054,12 +16148,12 @@ function _hmInboxRow(c, opts) {
   let urgStyle = '';
   if (unread && ageHrs > 24) urgStyle = 'border-left:3px solid #F07060;';       // overdue (unread > 24h)
   else if (unread && ageHrs <= 4) urgStyle = 'border-left:3px solid #F0B84A;';   // fresh unread
-  return `<div class="hm-ib-row${unread ? ' hm-ib-unread' : ''}" onclick="switchView('v15inbox')" style="${urgStyle}">
+  return `<div class="hm-ib-row${unread ? ' hm-ib-unread' : ''}" onclick="_hmMsgPeek('${escapeHTML(String(c.id))}')" style="${urgStyle}">
     ${unread ? '<span class="hm-ib-dot"></span>' : '<span style="width:7px;flex:none"></span>'}
     <span class="hm-ib-av">${escapeHTML(initials)}</span>
     <div style="flex:1;min-width:0"><div class="hm-ib-name">${escapeHTML(name)}</div><div class="hm-ib-prev">${escapeHTML(preview)}</div></div>
     <span class="hm-ib-time">${timeStr}</span>
-    <span class="hm-ib-actions"><button class="hm-ib-act" onclick="event.stopPropagation();switchView('v15inbox')">Reply</button><button class="hm-ib-act" onclick="event.stopPropagation()">Archive</button></span>
+    <span class="hm-ib-actions"><button class="hm-ib-act" onclick="event.stopPropagation();_hmMsgPeek('${escapeHTML(String(c.id))}', true)">Reply</button><button class="hm-ib-act" onclick="event.stopPropagation();switchView('v15inbox')">Open inbox</button></span>
   </div>`;
 }
 
@@ -44039,7 +44133,11 @@ function _ccStyle() {
     '.cc-pop-item:hover{background:var(--gold-sheen);color:var(--gold)}' +
     /* back pill for classic views opened from the flow */
     '.cc-back-pill{display:none}' +
-    'body.cc-mode.cc-classic .cc-back-pill{position:fixed;top:14px;left:14px;z-index:95;display:inline-flex;align-items:center;gap:6px;background:var(--gold);color:var(--on-gold);border:none;border-radius:999px;padding:9px 16px;font:inherit;font-size:12px;font-weight:700;cursor:pointer;box-shadow:0 4px 14px rgba(0,0,0,.25)}' +
+    // breadcrumb: part of the page structure, not a sticker floating over it
+    'body.cc-mode.cc-classic .cc-back-pill{display:flex;align-items:center;gap:8px;width:100%;background:var(--bg);border:none;border-bottom:1px solid var(--border);padding:11px 28px;font:inherit;font-size:12.5px;font-weight:600;color:var(--text-mute);cursor:pointer;text-align:left;position:sticky;top:0;z-index:95}' +
+    'body.cc-mode.cc-classic .cc-back-pill b{color:var(--gold);font-weight:700}' +
+    'body.cc-mode.cc-classic .cc-back-pill:hover b{text-decoration:underline}' +
+    '.cc-crumb-sep{opacity:.5}' +
     /* members focus mode (agent chat) */
     '#membersMachineModal .mm-modal-card{display:flex;flex-direction:column;max-width:1040px}' +
     '.mma-split{display:flex;gap:20px;align-items:stretch}' +
@@ -44269,8 +44367,17 @@ function _ccScrollTo(key) {
 // Open a classic view from inside the flow (dock, quick buttons, stat tiles).
 function _ccOpenClassic(view) {
   window._CC_BYPASS = true;
-  try { document.body.classList.add('cc-classic'); switchView(view); }
+  try { document.body.classList.add('cc-classic'); switchView(view); _ccCrumb(view); }
   finally { window._CC_BYPASS = false; }
+}
+// The breadcrumb's right side reads the open view's name off its nav item.
+function _ccCrumb(view) {
+  const el = document.getElementById('cc-crumb-view');
+  if (!el) return;
+  const nav = document.getElementById('nav-' + view);
+  let label = nav ? nav.textContent.replace(/\d+$/, '').trim() : '';
+  if (!label) label = String(view || '').replace(/[-_]/g, ' ').replace(/\b\w/g, ch => ch.toUpperCase());
+  el.textContent = label;
 }
 function _ccReturn() {
   document.body.classList.remove('cc-classic', 'ib-scroll-lock');
@@ -44321,9 +44428,10 @@ function _ccBuildChrome() {
 
   const pill = document.createElement('button');
   pill.type = 'button'; pill.className = 'cc-back-pill'; pill.id = 'cc-back-pill';
-  pill.innerHTML = '&lsaquo; Command center';
+  pill.innerHTML = '<b>&lsaquo; Command center</b><span class="cc-crumb-sep">&rsaquo;</span><span id="cc-crumb-view"></span>';
   pill.onclick = _ccReturn;
-  document.body.appendChild(pill);
+  const mainEl = document.querySelector('.main');
+  if (mainEl) mainEl.insertBefore(pill, mainEl.firstChild); else document.body.appendChild(pill);
 
   document.addEventListener('click', e => {
     if (e.target.closest('#cc-dock')) return;
