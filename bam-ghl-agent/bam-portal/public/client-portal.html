@@ -44530,7 +44530,7 @@ function _mmLoadChip(load) {
   const tip = ('median page load ' + secs(load.median_ms) + ' over ' + load.n + ' visit' + (load.n === 1 ? '' : 's')
     + (parts.length ? ' - ' + parts.join(', ') : '')
     + (extra.length ? ' | ' + extra.join(' · ') : '')).replace(/"/g, '&quot;');
-  return '<span style="font-family:var(--mm-ff);font-size:11px;color:var(--text-mute);display:inline-flex;align-items:center;gap:3px" title="' + tip + '">&#9889; loads in ~' + secs(load.median_ms) + '</span>';
+  return '<span style="font-family:var(--mm-ff);font-size:11px;color:var(--text-mute);display:inline-flex;align-items:center;gap:3px" title="' + tip + '">&#9201; ~' + secs(load.median_ms) + '</span>';
 }
 function _mmRenderLandingFocus(d) {
   const body = document.getElementById('lm-modal-body');
