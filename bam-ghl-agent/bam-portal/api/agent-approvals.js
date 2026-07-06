@@ -881,13 +881,24 @@ async function handler(req, res) {
       let routedToNurture = false;
       try {
         if (await isAutomationLive(clientId, "nurture")) {
-          const ns = await nurtureStage(token, locationId, { clientId, sb });
-          if (ns) {
-            // Provider-aware: on provider='ghl' this is the identical PUT (+ shadow
-            // mirror); on 'portal' it updates the store row and writes NO GHL.
-            await moveStage({ clientId, ghl, token, oppRef, stage: ns, role: "nurture", contactId, reason });
-            await enrollContact({ clientId, automationKey: "nurture", contactId });
-            routedToNurture = true;
+          // Route per the academy's authored flow (the not_interested edge; GTA
+          // seed = responded -> nurture). Router reads the edge; if the academy
+          // PAUSED it, routed.matched is true but routed.moved is false -> we
+          // respect the pause and fall through to the terminal LOST path (no
+          // move). On no edge (unseeded / lookup blip) we run the original
+          // hardcoded move to nurture - behavior-identical for GTA.
+          const routed = await routeTransition({ clientId, sb, ghl, token, locationId, fromRole: "responded", trigger: "not_interested", contactId, oppRef, reason });
+          if (routed.matched) {
+            if (routed.moved) { await enrollContact({ clientId, automationKey: "nurture", contactId }); routedToNurture = true; }
+          } else {
+            const ns = await nurtureStage(token, locationId, { clientId, sb });
+            if (ns) {
+              // Provider-aware: on provider='ghl' this is the identical PUT (+ shadow
+              // mirror); on 'portal' it updates the store row and writes NO GHL.
+              await moveStage({ clientId, ghl, token, oppRef, stage: ns, role: "nurture", contactId, reason });
+              await enrollContact({ clientId, automationKey: "nurture", contactId });
+              routedToNurture = true;
+            }
           }
         }
       } catch (_) { /* fall through to the GHL-native lost path below */ }
