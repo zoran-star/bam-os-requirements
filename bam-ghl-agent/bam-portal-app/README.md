@@ -67,6 +67,23 @@ and upload the `.aab` to the Google Play Console.
   `assets/splash.png`, run `npm run assets`, then rebuild.
 - **Native change (push notifications, plugins)** → rebuild and resubmit.
 
+## ⚠️ Release checklist (every store resubmission)
+
+Run these on the Mac before archiving - skipping either has bitten us:
+
+1. **`npm install && npx cap sync`** - the committed `ios/App/CapApp-SPM/Package.swift`
+   and `android/capacitor.settings.gradle` are GENERATED and go stale when
+   `package.json` plugins change. Without a sync, push notifications, keyboard,
+   haptics, badge, and the in-app browser are silently MISSING from the build.
+2. **Bump the build numbers** - App Store Connect and Play both reject a
+   re-upload with the same number. iOS: `CURRENT_PROJECT_VERSION` (and
+   `MARKETING_VERSION` for a user-visible version) in Xcode. Android:
+   `versionCode` / `versionName` in `android/app/build.gradle`.
+3. **Check the APNs entitlement** - `ios/App/App/App.entitlements` must say
+   `production` for TestFlight/App Store builds (dev tokens get no pushes).
+   Currently set to production; Xcode can flip it back when toggling
+   capabilities, so verify before archive.
+
 ## Regenerating icons / splash
 
 Source art is in `assets/` (`icon.png` 1024×1024, `splash.png` 2732×2732).

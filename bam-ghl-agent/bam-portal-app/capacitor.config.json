@@ -13,7 +13,6 @@
   "plugins": {
     "SplashScreen": {
       "launchAutoHide": false,
-      "launchShowDuration": 6000,
       "backgroundColor": "#16140F",
       "showSpinner": true,
       "spinnerStyle": "small",
@@ -21,7 +20,7 @@
     },
     "StatusBar": {
       "style": "DARK",
-      "backgroundColor": "#16140F"
+      "backgroundColor": "#131416"
     },
     "PushNotifications": {
       "presentationOptions": ["badge", "sound", "alert"]
