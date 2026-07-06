@@ -18476,6 +18476,7 @@ function isNativeApp() {
 }
 
 function applyMemberMgmtNavState() {
+  document.documentElement.classList.toggle('native-app', isNativeApp());
   // Members is a V2 feature - show only when the client has V2_ACCESS
   // (per-client staff toggle) AND the global gate is on. Native gate
   // lifted 2026-07-06: mobile is a first-class V2 target now.
@@ -45290,6 +45291,12 @@ function _ccStyle() {
     '}' +
     '@media(hover:none){.cc-ib-reply{opacity:1}}' +
     'body.cc-mode .cc-dock{bottom:calc(16px + env(safe-area-inset-bottom))}' +
+    'html.native-app .hv2-nav-card{display:none !important}' +
+    'html.native-app .mm-ap-btn{display:none !important}' +
+    '@media(max-width:768px){' +
+    '.mm-focus-page .mm-modal-card{margin:calc(8px + env(safe-area-inset-top)) auto 90px;width:100%}' +
+    'html.mm-focus-open.mm-depth .main,html.mm-focus-open.mm-depth .sidebar{transform:none;filter:blur(6px) brightness(.85);opacity:.5}' +
+    '}' +
     '#cc-mtabs{display:none}' +
     '@media(max-width:768px){' +
     'body.cc-mode #cc-mtabs{position:fixed;left:0;right:0;bottom:0;z-index:95;display:flex;background:color-mix(in srgb,var(--surface) 90%,transparent);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border-top:1px solid var(--border);padding:6px 4px calc(6px + env(safe-area-inset-bottom))}' +
@@ -46676,7 +46683,7 @@ function openMembersFocus() {
     window._MMA_GREETED = true;
     _mmaStandup();
   }
-  setTimeout(() => document.getElementById('mma-input')?.focus(), 700);
+  setTimeout(() => document.getElementById('mma-input')?.focus(), 150);
 }
 // Walk-in standup: the first thing out of Keeper's mouth is whatever
 // matters most on the roster right now, card in hand.
@@ -46804,10 +46811,8 @@ function openGmFocus(voice) {
   _ccOpenFocusPage('gmMachineModal', '#cc-mtab-orb');
   _gmaFloor();
   if (!window._GMA_GREETED) { window._GMA_GREETED = true; setTimeout(() => _gmaHandle('business snapshot'), 500); }
-  setTimeout(() => {
-    if (voice) _gmaVoice();
-    else document.getElementById('gma-input')?.focus();
-  }, 650);
+  if (voice) setTimeout(() => _gmaVoice(), 650);
+  else setTimeout(() => document.getElementById('gma-input')?.focus(), 120);
 }
 function closeGmFocus() {
   try { _mmCloseFocus('gmMachineModal'); }
