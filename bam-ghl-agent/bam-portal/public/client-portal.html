@@ -27412,7 +27412,7 @@ function _memberSetupBadge(m) {
 // persisted on the member row and lazily backfilled the first time the drawer opens.
 function _memberBillingFlag(m) {
   if (!m || m.billing_portal_owned !== false) return '';
-  return `<span title="This subscription was imported (created outside the portal). Open the member and use Set up billing to manage it here." style="display:inline-block;font-size:10px;font-weight:800;padding:2px 8px;border-radius:999px;background:transparent;border:1px solid #7a5a2f;color:#c79a4a;white-space:nowrap">🔒 imported</span>`;
+  return `<span title="This subscription was imported (created outside the portal). Open the member and use Set up billing to manage it here." style="display:inline-block;font-size:10px;font-weight:800;padding:2px 8px;border-radius:999px;background:transparent;border:1px solid #7a5a2f;color:#c79a4a;white-space:nowrap">imported</span>`;
 }
 
 function _memberEngagementChip(eng) {
@@ -36446,7 +36446,7 @@ function _renderMemberModalBody(m, stripe, history, calls) {
     billingRows = [['Status', 'Loading Stripe…']];
   } else if (m.billing_mode === 'alternate') {
     billingRows = [
-      ['Status', '💵 Alternate payment method - not billed via Stripe.'],
+      ['Status', 'Alternate payment method - not billed via Stripe.'],
       ...(joinedIso ? [['Joined', joinedLabel]] : []),
     ];
   } else if (joinedIso) {
@@ -36488,7 +36488,7 @@ function _renderMemberModalBody(m, stripe, history, calls) {
   // a data attr so we never have to escape it into an inline JS string.
   const gbtn = (label, onclick, enabled) => enabled
     ? btn(label, onclick)
-    : `<button data-why="${escapeHTML(mgmtWhy)}" title="${escapeHTML(mgmtWhy)}" onclick="_plToast(this.getAttribute('data-why'))" style="background:transparent;color:var(--text-mute,#888);border:1px solid var(--border);padding:10px 12px;font-weight:600;border-radius:4px;cursor:not-allowed;font-size:13px;font-family:inherit;opacity:0.5">🔒 ${label}</button>`;
+    : `<button data-why="${escapeHTML(mgmtWhy)}" title="${escapeHTML(mgmtWhy)}" onclick="_plToast(this.getAttribute('data-why'))" style="background:transparent;color:var(--text-mute,#888);border:1px solid var(--border);padding:10px 12px;font-weight:600;border-radius:4px;cursor:not-allowed;font-size:13px;font-family:inherit;opacity:0.5">${label}</button>`;
   // Pause/Unpause button - hidden on cancelling members (backend rejects).
   // Gated on manageability (a no-sub or foreign-sub member can't be paused here).
   let toggleBtn = '';
@@ -36501,7 +36501,7 @@ function _renderMemberModalBody(m, stripe, history, calls) {
   // date → create a portal-owned sub they can then be managed by. Prominent when
   // the member can't be managed today.
   const setupBtn = canManage ? '' :
-    `<button onclick="mSetupBilling('${m.id}','${m.client_id || ''}')" style="grid-column:1/-1;background:var(--gold,#D4B65C);color:#0B0B0D;border:none;padding:11px 12px;font-weight:800;border-radius:4px;cursor:pointer;font-size:13px;font-family:inherit">💳 Set up billing</button>`;
+    `<button onclick="mSetupBilling('${m.id}','${m.client_id || ''}')" style="grid-column:1/-1;background:var(--gold,#D4B65C);color:#0B0B0D;border:none;padding:11px 12px;font-weight:800;border-radius:4px;cursor:pointer;font-size:13px;font-family:inherit">Set up billing</button>`;
 
   // "View in Stripe" - opens the customer page on the academy's connected
   // Stripe account in a new tab. Requires both a connected account id
@@ -36639,19 +36639,19 @@ function _renderMemberModalBody(m, stripe, history, calls) {
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
       ${setupBtn}
       ${toggleBtn}
-      ${btn('⏸ Pause date fix', `mPauseDateFix('${m.id}')`)}
+      ${btn('Pause date fix', `mPauseDateFix('${m.id}')`)}
       ${gbtn('Change plan', `mChange('${m.id}','${escapeHTML(m.plan||'')}')`, canManage)}
       ${gbtn('Refund',      `mRefund('${m.id}','${escapeHTML(m.stripe_customer_id||'')}')`, canManage)}
-      ${gbtn('🎟 ' + (stripe && stripe.coupon ? 'Change coupon' : 'Apply coupon'), `mApplyCoupon('${m.id}')`, canManage)}
+      ${gbtn((stripe && stripe.coupon ? 'Change coupon' : 'Apply coupon'), `mApplyCoupon('${m.id}')`, canManage)}
       ${(stripe && stripe.coupon) ? gbtn('Remove coupon', `mRemoveCoupon('${m.id}','${escapeHTML(stripe.coupon.code||'')}')`, canManage) : ''}
       ${btn('Cancel',       `mCancel('${m.id}','${escapeHTML((m.athlete_name||'').replace(/'/g, ''))}')`)}
       ${btn('Payment link',`mPaymentLink('${m.id}')`)}
-      ${btn('💳 Get card link',`mGetCardLink('${m.id}')`)}
-      ${(_MEMBERS_CIQ && _MEMBERS_CIQ.enabled && !m.coachiq_member_id) ? btn('🟦 Set up CoachIQ', `mSetupCoachiq('${m.id}','${escapeHTML((m.parent_email||'').replace(/'/g,''))}','${escapeHTML((m.athlete_name||'').replace(/'/g,''))}')`) : ''}
+      ${btn('Get card link',`mGetCardLink('${m.id}')`)}
+      ${(_MEMBERS_CIQ && _MEMBERS_CIQ.enabled && !m.coachiq_member_id) ? btn('Set up CoachIQ', `mSetupCoachiq('${m.id}','${escapeHTML((m.parent_email||'').replace(/'/g,''))}','${escapeHTML((m.athlete_name||'').replace(/'/g,''))}')`) : ''}
       ${gbtn('Referred',    `mReferred('${m.id}')`, canManage)}
       ${m.billing_mode === 'alternate'
         ? btn('Switch to Stripe billing', `_memberUpdateField('${m.id}','billing_mode','')`)
-        : btn('💵 Alternate payment', `_memberUpdateField('${m.id}','billing_mode','alternate')`)}
+        : btn('Alternate payment', `_memberUpdateField('${m.id}','billing_mode','alternate')`)}
       ${stripeBtn}
     </div>
   `;
@@ -37455,7 +37455,7 @@ async function mApplyCoupon(memberId) {
   const opts = codes.map(c => ({ value: c.code, label: `${c.code} · ${fmt(c)}` }));
   opts.push({ value: '__create__', label: '＋ Create a new coupon…' });
   const vals = await _mmModal({
-    icon: '🎟', title: 'Apply coupon',
+    icon: '', title: 'Apply coupon',
     body: 'Applies to this member’s next invoice and replaces any existing coupon. Blocked if it would drop the charge below $1.',
     okLabel: 'Apply',
     fields: [{ key: 'code', label: 'Coupon', type: 'select', value: opts[0].value, options: opts }],
@@ -37715,7 +37715,7 @@ function _memberDateRangeModal(heading, body, okLabel) {
 
 // "Pause date fix" - record a pause with start/end dates, NO Stripe change.
 async function mPauseDateFix(memberId) {
-  const dates = await _memberDateRangeModal('⏸ Pause date fix', 'Record a pause with these dates. No Stripe change - works on any subscription (or none).', 'Save pause');
+  const dates = await _memberDateRangeModal('Pause date fix', 'Record a pause with these dates. No Stripe change - works on any subscription (or none).', 'Save pause');
   if (!dates) return;
   try {
     await _memberAction(memberId, 'pause-date-fix', { start_date: dates.start, end_date: dates.end });
@@ -44212,7 +44212,12 @@ function _ccInitRecede(root, secs) {
 function _ccMountHome(host) {
   const h = new Date().getHours();
   const g = h < 12 ? 'Good morning' : h < 18 ? 'Good afternoon' : 'Good evening';
-  host.innerHTML = _ccHead(g + '.', 'Your whole business on one page. Scroll, or use the dots on the left.');
+  let _ccVisits = 0;
+  try {
+    _ccVisits = parseInt(localStorage.getItem('bam_cc_visits') || '0', 10) || 0;
+    localStorage.setItem('bam_cc_visits', String(_ccVisits + 1));
+  } catch (_) {}
+  host.innerHTML = _ccHead(g + '.', _ccVisits < 3 ? 'Your whole business on one page. Scroll, or use the dots on the left.' : '');
   const hv = document.getElementById('home-v2');
   if (hv) {
     host.appendChild(hv);

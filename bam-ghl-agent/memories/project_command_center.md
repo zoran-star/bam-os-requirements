@@ -91,6 +91,10 @@
   - **Presence**: orb wake bounce on every open; nod (`say` pulse) on desk card action clicks (delegated listener).
 - Gotcha: anything writing to the voice line must first drop the existing line into the log (`_mmaLogLine`); think does it, send does it (then clears).
 
+## Greeting hint fade (2026-07-06, Cole picks 5+4)
+- The "Your whole business on one page..." sub under the CC greeting shows only for the first 3 visits (localStorage `bam_cc_visits` incremented per home mount), then renders nothing. `_ccHead` already skips empty subs.
+- Member drawer Actions emoji sweep done (billing/card/coupon/pause/lock/CoachIQ/alt-pay + imported pill + coupon modal icon). ~36 emoji of those kinds remain in OTHER views (marketing modals, agent settings) = known debt, sweep per-view.
+
 ## Section mounts (current skeleton)
 | Section | Mount | Content |
 |---|---|---|
