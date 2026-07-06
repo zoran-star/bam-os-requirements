@@ -6,6 +6,29 @@ type: project
 
 # Marketing Machine dashboard - SHIPPED 2026-07-03 (V2, GTA first)
 
+## Page-load speed tracking (MERGED to main 2026-07-06, portal PR #1176 + sites PR #54)
+The Clicked -> Page loaded funnel connector shows "⏱ ~1.4s" (median full load;
+chip matches the between-step time chips). Wiring:
+- **bam-client-sites** `clients/bam-gta/gta/freetrial.jsx`: load timing rides on
+  the EXISTING `bamFunnel('free-trial','page_view', meta)` beacon (shared.jsx) via
+  a second, post-load page_view whose meta = { load_ms, ttfb_ms, lcp_ms, source }.
+  Same `bam_sid` session as the mount page_view, so marketing.js dedupes visitors
+  and just picks up the numbers. Fires on load+1.5s (LCP settle) + pagehide.
+  NOTE: the earlier standalone `gta/beacon.js` was REMOVED - it used a different
+  session id (fc_sid) and would have double-counted page_view. bamFunnel is the
+  canonical funnel beacon (page_view/form_started/calendar_viewed/slot_picked/
+  form_completed/confirmed).
+- `source` tag = meta | internal | direct | search | referral | other (fbclid/utm
+  win, else referrer host). Collected from ALL sources so load speed can be sliced.
+- **marketing.js** page_view loop reads `row.meta` (added `meta` to the select),
+  medians load_ms overall + per source (fastest per session), returns
+  `page.load = { median_ms, lcp_ms, ttfb_ms, n, by_source }`. null until beacons
+  arrive (NO backfill - starts at deploy).
+- **client-portal.html** `_mmLoadChip(page.load)` renders on the step marked
+  loadChip:true (Clicked ad). Headline = full load; tooltip = per-source + LCP/TTFB.
+  Nav Timing has no cross-origin redirect time, so it's OUR-page load, not the
+  Meta redirect hop. Both branches UNMERGED as of 2026-07-05.
+
 ## Shipped implementation (2026-07-03)
 - Backend: `bam-portal/api/marketing.js` `?resource=meta-machine&client_id=`
   `[&since=YYYY-MM-DD&until=YYYY-MM-DD]` (handleMetaMachine). ONE payload for

@@ -1,6 +1,6 @@
 # FullControl V2 Design System
 
-**Version 1.2 - 2026-07-05 | Living document: update it every time the UI evolves.**
+**Version 1.6 - 2026-07-06 | Living document: update it every time the UI evolves.**
 
 > ⛔ **RULE FOR EVERY AGENT + HUMAN: read this file BEFORE any front-end work in the V2 portal.**
 > Use the tokens in [`tokens.css`](tokens.css). Never hardcode a color, radius, font, or shadow that a token covers. If the design needs something the system doesn't have, ADD IT HERE FIRST (see "How to change this system" at the bottom), then use it.
@@ -93,7 +93,8 @@ transition:transform var(--t-med) var(--es), box-shadow var(--t-med);
 
 ## 7 · Copy rules
 
-- ⛔ **Never an em dash** in anything person-facing. Use `-` or restructure.
+- ⛔ **Never an em dash** in anything person-facing.
+- ⛔ **No dash-as-pause at all** (v1.3): don't use a hyphen to join sentence halves either ("Somebody committed today - that is the whole game" is WRONG). Restructure with a period, comma, or colon ("Somebody committed today. That is the whole game."). Hyphens stay fine inside compound words and ranges.
 - Sentence case for labels + buttons; uppercase only for micro-labels.
 - Plain, confident, athletic. No "seamlessly / effortlessly / delightful".
 
@@ -112,7 +113,6 @@ transition:transform var(--t-med) var(--es), box-shadow var(--t-med);
 ## 9 · Known debt (safe to fix when touched)
 
 - `client-portal.html` still has many legacy radii/hardcodes OUTSIDE Home/Assets/Calendar - normalize per-view as each view gets its consistency pass ("disperse to the rest of V2").
-- Emoji sweep done for Home + mobile More menu (v1.2). OTHER views still contain emoji icons (e.g. staff blueprint checkboxes, notification drawer title, generic modal `opts.icon`, marketing request icons) - swap to `_HV2_ICONS` SVGs as each view gets its consistency pass.
 - Assets page uses native `alert()/prompt()` for feedback - needs the shared toast/banner pattern.
 - Hardcoded gold tints (`rgba(212,182,92,.NN)`) don't shift in light mode - acceptable (hues are close); prefer `--gold-glow`/`--gold-sheen`/`color-mix` in new code.
 - Staff portal (`bam-portal/src/tokens/tokens.js`) is a separate palette - fold in later or keep deliberately distinct (open decision).
@@ -129,6 +129,10 @@ transition:transform var(--t-med) var(--es), box-shadow var(--t-med);
 
 | Date | v | Change |
 |---|---|---|
+| 2026-07-06 | 1.6 | Emoji purge COMPLETE portal-wide (~520 removed; sole icon slots became 1em stroke SVGs, label prefixes dropped). Monochrome text glyphs (arrows, check/cross, star, theme sun/moon) stay. Member avatars: random 8-color hash replaced by one neutral chip (surface-el + border + muted initials); status pills own the color. |
+| 2026-07-05 | 1.5 | Dark theme moves to true charcoal (bg #131416, surface #1B1D1F, elevated #232629, hover #2B2E32; --on-gold follows to #131416). Neutral graphite replaces the warm brown-black. Sound design added to the command center (SFX set + Settings toggle, off on mobile). |
+| 2026-07-05 | 1.4 | Light theme back to the prototype cream: bg #F8F7F5 (was #EFEAE0, too yellow), neutral rgba(0,0,0,…) borders, prototype text-sub/mute grays. Mirrored in client-portal.html. |
+| 2026-07-05 | 1.3 | Copy rule tightened: no dash-as-pause in person-facing copy (not even a hyphen). Restructure with period, comma or colon. Portal copy swept (win card, command center, home empty states). |
 | 2026-07-05 | 1.2 | Emoji purge executed on Home + mobile More menu: `_HV2_ICONS` extended with 9 icons (clock, dollar, msg, refresh, chart, x, mail, ghost, activity); KPI catalog, Hawkeye feed, inbox bell, perfect-day star, preview-as eye/x/check all now SVG. |
 | 2026-07-05 | 1.1 | Emoji rule tightened: NO emojis at all in product UI or copy we write (was: banned in chrome only, allowed elsewhere). Only client-typed message content renders emojis as-is. |
 | 2026-07-05 | 1.0 | Initial system extracted from V2 Home / Assets / Calendar. Killed stale gold `#E8C547` portal-wide, locked radius scale, unified fonts (Plus Jakarta Sans + Nunito) across the 3 reference pages, added `--on-gold`/`--font-ui`/`--font-num` tokens, converted calendar booking popup to the right-drawer idiom, normalized off-token greens/reds on the 3 pages. |

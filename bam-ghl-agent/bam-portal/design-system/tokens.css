@@ -13,12 +13,12 @@
    ============================================================ */
 
 :root {
-  /* ── Surfaces ── */
-  --bg:          #16140F;
-  --ink:         #16140F;
-  --surface:     #1A1916;
-  --surface-el:  #222120;
-  --surface-hov: #2C2B28;
+  /* ── Surfaces (v1.5: true charcoal - neutral graphite, gold pops) ── */
+  --bg:          #131416;
+  --ink:         #131416;
+  --surface:     #1B1D1F;
+  --surface-el:  #232629;
+  --surface-hov: #2B2E32;
 
   /* ── Borders ── */
   --border:      rgba(255,255,255,0.08);
@@ -37,7 +37,7 @@
   --gold-sheen:    rgba(212,182,92,0.06);
   --accent-ghost:  rgba(212,182,92,0.10);
   --accent-border: rgba(212,182,92,0.25);
-  --on-gold:       #16140F;   /* text on gold fills - constant across themes */
+  --on-gold:       #131416;   /* text on gold fills - constant across themes */
 
   /* ── Semantic ── */
   --green:      #4CC76A;  --green-soft: rgba(76,199,106,0.12);
@@ -73,19 +73,20 @@
 }
 
 html[data-theme="light"] {
-  --bg:          #EFEAE0;
-  --ink:         #EFEAE0;
+  /* v1.4: prototype cream - neutral, not yellow */
+  --bg:          #F8F7F5;
+  --ink:         #F8F7F5;
   --surface:     #FFFFFF;
-  --surface-el:  #F7F2E7;
-  --surface-hov: #E8E1D2;
+  --surface-el:  #FAFAF8;
+  --surface-hov: #F0EFEC;
 
-  --border:      rgba(60,40,15,0.10);
-  --border-med:  rgba(60,40,15,0.16);
-  --border-str:  rgba(60,40,15,0.22);
+  --border:      rgba(0,0,0,0.07);
+  --border-med:  rgba(0,0,0,0.12);
+  --border-str:  rgba(0,0,0,0.16);
 
   --text:        #1C1B18;
-  --text-sub:    #5F5A50;
-  --text-mute:   #8E867A;
+  --text-sub:    #6E6B63;
+  --text-mute:   #A5A19A;
 
   --gold:          #C8A84E;
   --accent:        #C8A84E;

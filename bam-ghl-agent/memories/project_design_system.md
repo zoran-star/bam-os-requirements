@@ -1,6 +1,6 @@
 # V2 Design System (living)
 
-**2026-07-05 - v1.2.** (v1.1 = emoji rule tightened: NO emojis at all in product UI/copy, SVG icons only. v1.2 = emoji purge executed on Home + mobile More: `_HV2_ICONS` +9 icons, KPI catalog/Hawkeye feed/inbox bell/perfect-day star/preview-as glyphs all SVG now.) Canonical system extracted from the three "good skin" V2 pages (Home `renderHomeV2`, Assets, Calendar) in `bam-portal/public/client-portal.html`.
+**2026-07-05 - v1.3.** (v1.3 = copy rule: NO dash-as-pause in person-facing copy, not even a hyphen; restructure with period/comma/colon. Win card + command center + home empty-state copy swept.) (v1.1 = emoji rule tightened: NO emojis at all in product UI/copy, SVG icons only. v1.2 = emoji purge executed on Home + mobile More: `_HV2_ICONS` +9 icons, KPI catalog/Hawkeye feed/inbox bell/perfect-day star/preview-as glyphs all SVG now.) Canonical system extracted from the three "good skin" V2 pages (Home `renderHomeV2`, Assets, Calendar) in `bam-portal/public/client-portal.html`.
 
 ## Where it lives
 - **Spec:** `bam-portal/design-system/DESIGN.md` (living doc - version + changelog at the bottom)
