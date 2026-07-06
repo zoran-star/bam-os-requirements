@@ -18,6 +18,17 @@ Button `Request a change` on every V2 module view. One click opens a slim
 modal that has ALREADY captured context; client only picks change/add/fix +
 1-2 sentences. No forms about which page/metrics - auto-attached.
 
+## Where the tracker lives (Zoran 2026-07-05, built)
+The support-ticket TRACKER does NOT live on the marketing/landing focus view.
+It lives on the **Systems page** (`#view-systems`, "Systems Support Tickets",
+the existing real ticket list off the `tickets` global). The landing focus view
+instead shows a **nudge** (`_v2TicketsNudgeHtml` in client-portal.html) that
+renders ONLY when there are live (non-terminal) tickets: gold + "N to reply"
+badge when any are awaiting_client/final_review, neutral "in progress"
+otherwise, hidden when nothing is live. Click -> `_v2GoToTickets()` =
+closeLandingMachine() + switchView('systems'). The old mock "Your requests"
+list (_V2_REQUESTS / _v2ActionItemsHtml) was removed.
+
 ## Page annotation flow (Landing Page view - Zoran 2026-07-05)
 V2 landing pages are OUR OWN pages (bam-client-sites), NOT GHL - so a LIVE
 IFRAME works (no X-Frame-Options block; we control the headers). UX must be
