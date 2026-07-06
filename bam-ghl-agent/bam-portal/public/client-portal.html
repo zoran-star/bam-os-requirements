@@ -46659,43 +46659,36 @@ function _mmRenderCard() {
 // an arrow pointing at the fix. Replaces all text in the landing card body.
 function _mmFunnelSvg(page, clicks, loaded) {
   // Stage spine: CLICKED/LOADED from Meta (LPV is a subset of clicks), the
-  // rest from our funnel beacons. Rendered as a soft gradient band with
-  // particles flowing through it; the worst drop gets the spotlight.
+  // rest from our funnel beacons. Rendered as a classic area chart: flat
+  // baseline, one smooth gold line across the top, counts in chips above.
   const stages = [];
   const clk = clicks > 0 ? clicks : 0;
   const lpv = loaded > 0 ? loaded : 0;
   if (clk && lpv) {
-    stages.push({ n: clk, lbl: 'clicked', fix: '&#9998; speed up the page' });
-    stages.push({ n: lpv, lbl: 'loaded', fix: '&#9998; rework the top of the page' });
+    stages.push({ n: clk, lbl: 'clicked', fix: 'speed up the page' });
+    stages.push({ n: lpv, lbl: 'loaded', fix: 'rework the top of the page' });
   } else {
-    stages.push({ n: (page.visitors || page.ad_visitors || 0), lbl: 'loaded', fix: '&#9998; rework the top of the page' });
+    stages.push({ n: (page.visitors || page.ad_visitors || 0), lbl: 'loaded', fix: 'rework the top of the page' });
   }
-  stages.push({ n: page.form_started || 0, lbl: 'form', fix: '&#9998; fix the form' });
-  stages.push({ n: page.saw_calendar || 0, lbl: 'calendar', fix: '&#9998; edit the calendar' });
+  stages.push({ n: page.form_started || 0, lbl: 'form', fix: 'fix the form' });
+  stages.push({ n: page.saw_calendar || 0, lbl: 'calendar', fix: 'edit the calendar' });
   stages.push({ n: page.booked_sessions || 0, lbl: 'booked', fix: null });
   if (!stages[0].n) return '<div class="mm-driver-sub" style="margin:8px 0 0">gathering data - no ad visits in this window yet</div>';
-  const W = 560, H = 128, MID = 74, MAXH = 52, N = stages.length;
+  const W = 560, H = 128, MAXH = 56, N = stages.length;
+  const BASE = 104;
   const X = stages.map((_, i) => 52 + (i * (W - 120)) / (N - 1));
-  const hOf = (v) => Math.max(2.5, (v / stages[0].n) * MAXH);
-  let T = N - 1;
-  for (let i = 1; i < N; i++) { if ((stages[i].n / stages[0].n) * MAXH < 4) { T = i; break; } }
-  const hAt = (i) => (i >= T ? 0 : hOf(stages[i].n));
-  const top = X.map((x, i) => [x, MID - hAt(i) / 2]);
-  const bot = X.map((x, i) => [x, MID + hAt(i) / 2]);
-  const smoothSegs = (pts, a2, b2, rev) => {
-    const idx = [];
-    if (rev) { for (let i = b2; i >= a2; i--) idx.push(i); } else { for (let i = a2; i <= b2; i++) idx.push(i); }
+  const yOf = (v) => BASE - Math.max(3, (v / stages[0].n) * MAXH);
+  const top = X.map((x, i) => [x, yOf(stages[i].n)]);
+  const smoothSegs = (pts, a2, b2) => {
     let d = '';
-    for (let k = 1; k < idx.length; k++) {
-      const p0 = pts[idx[k - 1]], p1 = pts[idx[k]];
-      const dx = ((p1[0] - p0[0]) * 0.22).toFixed(1);
+    for (let k = a2 + 1; k <= b2; k++) {
+      const p0 = pts[k - 1], p1 = pts[k];
+      const dx = ((p1[0] - p0[0]) * 0.34).toFixed(1);
       d += ' C ' + (p0[0] + +dx).toFixed(1) + ',' + p0[1].toFixed(1) + ' ' + (p1[0] - +dx).toFixed(1) + ',' + p1[1].toFixed(1) + ' ' + p1[0].toFixed(1) + ',' + p1[1].toFixed(1);
     }
     return d;
   };
-  const smoothLine = (pts, a2, b2) => 'M ' + pts[a2][0].toFixed(1) + ',' + pts[a2][1].toFixed(1) + smoothSegs(pts, a2, b2);
-  const ribbonPath = (a2, b2) =>
-    smoothLine(top, a2, b2) + ' L ' + bot[b2][0].toFixed(1) + ',' + bot[b2][1].toFixed(1) + smoothSegs(bot, a2, b2, true) + ' Z';
+  const lineFrom = (a2, b2) => 'M ' + top[a2][0].toFixed(1) + ',' + top[a2][1].toFixed(1) + smoothSegs(top, a2, b2);
   let worst = -1;
   if (page.band !== 'green') {
     let worstRate = 0.5;
@@ -46707,13 +46700,11 @@ function _mmFunnelSvg(page, clicks, loaded) {
   }
   const arrowX = W - 42;
   let svg = '<svg viewBox="0 0 ' + W + ' ' + H + '" style="width:100%;display:block;margin-top:10px" preserveAspectRatio="xMidYMid meet">';
-  svg += '<defs><linearGradient id="mmfzg" x1="0" y1="0" x2="1" y2="0">' +
-    '<stop offset="0%" stop-color="#C8A84E" stop-opacity="0.22"/>' +
-    '<stop offset="60%" stop-color="#C8A84E" stop-opacity="0.13"/>' +
-    '<stop offset="100%" stop-color="#C8A84E" stop-opacity="0.18"/>' +
-    '</linearGradient>' +
-    '<filter id="mmfzb" x="-20%" y="-40%" width="140%" height="200%"><feGaussianBlur stdDeviation="3"/></filter></defs>';
-  // labels + count chips (no guide lines - whitespace does that job)
+  svg += '<defs><linearGradient id="mmfzg" x1="0" y1="0" x2="0" y2="1">' +
+    '<stop offset="0%" stop-color="#C8A84E" stop-opacity="0.16"/>' +
+    '<stop offset="100%" stop-color="#C8A84E" stop-opacity="0"/>' +
+    '</linearGradient></defs>';
+  // stage labels + count chips
   X.forEach((x, i) => {
     const nTxt = String(stages[i].n);
     const cw = Math.max(26, nTxt.length * 7.5 + 14);
@@ -46721,35 +46712,44 @@ function _mmFunnelSvg(page, clicks, loaded) {
       '<rect x="' + (x - cw / 2).toFixed(1) + '" y="16" width="' + cw + '" height="17" rx="8.5" fill="var(--surface-el)"/>' +
       '<text x="' + x + '" y="28" text-anchor="middle" font-family="var(--mm-fm)" font-size="10.5" font-weight="500" fill="var(--text)">' + nTxt + '</text>';
   });
-  // the band: one gold shape, rounded entry, soft glow underneath
   svg += '<g class="mm-fz-band">';
-  svg += '<path d="' + ribbonPath(0, N - 1) + '" fill="rgba(200,168,78,0.15)" filter="url(#mmfzb)" transform="translate(0,4)"/>';
-  svg += '<ellipse cx="' + X[0].toFixed(1) + '" cy="' + MID + '" rx="10" ry="' + (hAt(0) / 2).toFixed(1) + '" fill="url(#mmfzg)"/>';
-  svg += '<path d="' + ribbonPath(0, N - 1) + '" fill="url(#mmfzg)"/>';
-  svg += '<line x1="' + X[T] + '" y1="' + MID + '" x2="' + (arrowX - 4) + '" y2="' + MID + '" stroke="#C8A84E" stroke-width="1.1" stroke-linecap="round" opacity="0.7"/>';
-  // leak marker: no red in the band for now - one action chip under the
-  //   worst segment, styled like a pressable button (sentence case, chevron)
+  // baseline axis
+  svg += '<line x1="' + (X[0] - 12) + '" y1="' + BASE + '" x2="' + arrowX + '" y2="' + BASE + '" stroke="var(--line)" stroke-width="1"/>';
+  // area under the line + the line itself
+  svg += '<path d="' + lineFrom(0, N - 1) + ' L ' + top[N - 1][0].toFixed(1) + ',' + BASE + ' L ' + top[0][0].toFixed(1) + ',' + BASE + ' Z" fill="url(#mmfzg)"/>';
+  svg += '<path d="' + lineFrom(0, N - 1) + '" fill="none" stroke="var(--gold)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>';
+  // the leak: that stretch of the line in deep amber
   if (worst >= 0) {
-    const label = (stages[worst].fix || '').replace('&#9998; ', '');
+    svg += '<path d="' + lineFrom(worst, worst + 1) + '" fill="none" stroke="#B08E30" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>';
+  }
+  // run-out: the line eases to the arrow at the last stage's height
+  svg += '<line x1="' + top[N - 1][0].toFixed(1) + '" y1="' + top[N - 1][1].toFixed(1) + '" x2="' + (arrowX - 6) + '" y2="' + top[N - 1][1].toFixed(1) + '" stroke="var(--gold)" stroke-width="1.2" stroke-linecap="round" opacity="0.6"/>';
+  // stage nodes riding the line
+  top.forEach((p) => {
+    svg += '<circle cx="' + p[0].toFixed(1) + '" cy="' + p[1].toFixed(1) + '" r="3" fill="var(--surface)" stroke="var(--gold)" stroke-width="1.5"/>';
+  });
+  // leak action chip: pressable, sentence case, chevron
+  if (worst >= 0) {
+    const label = stages[worst].fix || '';
     const nice = label.charAt(0).toUpperCase() + label.slice(1) + ' &rsaquo;';
     const mx = (X[worst] + X[worst + 1]) / 2;
     const tw = (label.length * 4.9) + 34;
     let bx = mx - tw / 2;
     if (bx + tw > W - 6) bx = W - 6 - tw;
     if (bx < 6) bx = 6;
-    const byTop = MID + MAXH / 2 + 8, bh = 18;
+    const byTop = BASE + 6, bh = 18;
     svg += '<g style="cursor:pointer" onclick="event.stopPropagation();openLandingMachine(\'' + stages[worst].lbl + '\')">' +
       '<rect x="' + bx.toFixed(1) + '" y="' + byTop + '" width="' + tw.toFixed(1) + '" height="' + bh + '" rx="9" fill="var(--surface)" stroke="rgba(176,142,48,0.5)" stroke-width="1"/>' +
       '<text x="' + (bx + tw / 2).toFixed(1) + '" y="' + (byTop + 12) + '" text-anchor="middle" font-family="var(--mm-ff)" font-size="8.8" font-weight="700" fill="#B08E30">' + nice + '</text></g>';
   }
   svg += '</g>';
-  // particle flow: traffic drifts through the band on staggered lanes
+  // particles drifting through the area, thinning with the line
   svg += '<g class="mm-fz-pts">';
-  const lanes = [-0.62, -0.28, 0.06, 0.4, 0.66];
+  const lanes = [0.28, 0.5, 0.72, 0.4, 0.62];
   for (let p = 0; p < 7; p++) {
     const f = lanes[p % lanes.length];
-    const pts = X.map((x, i) => [x, MID + f * (hAt(i) / 2) * 0.86]);
-    const lane = smoothLine(pts, 0, N - 1) + ' L ' + (arrowX - 6) + ',' + MID;
+    const pts = X.map((x, i) => [x, BASE - f * (BASE - top[i][1]) ]);
+    let lane = 'M ' + pts[0][0].toFixed(1) + ',' + pts[0][1].toFixed(1) + smoothSegs(pts, 0, N - 1) + ' L ' + (arrowX - 6) + ',' + pts[N - 1][1].toFixed(1);
     const dur = (8 + (p % 4) * 1.2).toFixed(1);
     const beg = (-(p * 1.7) % 12).toFixed(2);
     svg += '<circle r="1.4" fill="#C8A84E" opacity="0.42"><animateMotion dur="' + dur + 's" begin="' + beg + 's" repeatCount="indefinite" path="' + lane + '"/></circle>';
@@ -46760,18 +46760,20 @@ function _mmFunnelSvg(page, clicks, loaded) {
     const half = (W - 120) / (N - 1) / 2;
     svg += '<rect x="' + (x - half).toFixed(1) + '" y="0" width="' + (half * 2).toFixed(1) + '" height="' + H + '" fill="transparent" style="cursor:pointer" onclick="event.stopPropagation();openLandingMachine(\'' + stages[i].lbl + '\')"><title>Open ' + stages[i].lbl + ' in focus mode</title></rect>';
   });
-  // end caps: the portal's standard stroke icons
+  // end caps: monitor where clicks start, calendar-check where trials land
   const icoCol = 'var(--text-mute)';
+  const liY = top[0][1];
   svg += '<g fill="none" stroke="' + icoCol + '" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round">' +
-    '<rect x="14" y="' + (MID - 10) + '" width="20" height="13" rx="2"/>' +
-    '<path d="M 21 ' + (MID + 7) + ' h 6 M 24 ' + (MID + 3) + ' v 4"/>' +
+    '<rect x="14" y="' + (liY - 6) + '" width="20" height="13" rx="2"/>' +
+    '<path d="M 21 ' + (liY + 11) + ' h 6 M 24 ' + (liY + 7) + ' v 4"/>' +
     '</g>';
-  svg += '<g class="mm-fz-arrow"><path d="M ' + arrowX + ',' + MID + ' l -7,-4 v 8 Z" fill="#3EAF5C"/></g>';
+  const arY = top[N - 1][1];
+  svg += '<g class="mm-fz-arrow"><path d="M ' + arrowX + ',' + arY.toFixed(1) + ' l -7,-4 v 8 Z" fill="#3EAF5C"/></g>';
   const rx = W - 34;
   svg += '<g fill="none" stroke="' + icoCol + '" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round">' +
-    '<rect x="' + rx + '" y="' + (MID - 9) + '" width="18" height="17" rx="2.5"/>' +
-    '<path d="M ' + rx + ' ' + (MID - 3.5) + ' h 18 M ' + (rx + 4.5) + ' ' + (MID - 12) + ' v 5 M ' + (rx + 13.5) + ' ' + (MID - 12) + ' v 5"/>' +
-    '<path d="M ' + (rx + 5) + ' ' + (MID + 2) + ' l 3 3 l 5 -5.5" stroke="#3EAF5C"/>' +
+    '<rect x="' + rx + '" y="' + (arY - 9).toFixed(1) + '" width="18" height="17" rx="2.5"/>' +
+    '<path d="M ' + rx + ' ' + (arY - 3.5).toFixed(1) + ' h 18 M ' + (rx + 4.5) + ' ' + (arY - 12).toFixed(1) + ' v 5 M ' + (rx + 13.5) + ' ' + (arY - 12).toFixed(1) + ' v 5"/>' +
+    '<path d="M ' + (rx + 5) + ' ' + (arY + 2).toFixed(1) + ' l 3 3 l 5 -5.5" stroke="#3EAF5C"/>' +
     '</g>';
   return svg + '</svg>';
 }
