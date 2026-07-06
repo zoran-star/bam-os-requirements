@@ -1164,9 +1164,26 @@ wrong):
   "SMS/Email is not set up for this academy yet." when a channel isn't ready.
 - Also fixed 2 em-dashes in the suggested email subjects (HARD RULE).
 
-Note: other surfaces (Inbox reply, pipelines) still POST to the same
-provider-aware `send-message` so they FUNCTION off GHL, but some of their
-labels may still say "via GHL" - out of scope here, a possible follow-up.
+### Full "off GHL" label audit (2026-07-06)
+
+Audited every send surface + user-facing GHL string in client-portal.html.
+Conclusion: the Inbox / V1.5 Inbox / Member inbox / Contacts / Calendar / Home
+send boxes (`_ibSendReply`, `_ibComposeSend`, `_v15ibSend`, `_memberInboxSend`,
+`_contactsSendMsg`, `_ccQuickSend`, etc.) already just say "Send"/"Reply" with
+NO GHL label and NO GHL gating - they POST to the provider-aware
+`/api/ghl/send-message` which routes Twilio/Resend off GHL. So they were
+already correct; nothing to clean (cleaning = redundant).
+
+The one genuinely-wrong item was the **persistent top banner** (`#ghl-banner`,
+toggled in `renderGhlConnectButton`): it told EVERY not-connected academy
+"Inbox, Sales, and Payment-Link SMS are inactive until you connect [GHL]" -
+false for native academies. Fixed: banner now also requires
+`CONTACT_PROVIDER !== 'portal'`, so fully-off-GHL academies (GTA) never see it;
+GHL-intended academies still get nagged until they connect.
+
+Left as-is (legit GHL-only, not redundant): workflow picker "No GHL workflows
+found", "Open in GHL", "Link GHL contacts", GHL tags/pipelines/calendars refs -
+these name real GHL data/features, shown only in GHL context.
 
 ## Related notes
 - [[project_client_auth]] — how client login + client_id scoping works

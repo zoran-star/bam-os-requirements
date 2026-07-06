@@ -37397,10 +37397,14 @@ function renderGhlConnectButton(ghl) {
   const status = (ghl && ghl.status) || 'not_connected';
 
   // Persistent banner across every view - unmissable until connected.
+  // Suppressed for academies that are fully off GHL (contact_provider='portal'):
+  // their Inbox/Sales/Payment-Link SMS run on portal-native Twilio/Resend, so
+  // "connect GHL" is neither true nor relevant for them.
   const banner = document.getElementById('ghl-banner');
   if (banner) {
     const dismissed = sessionStorage.getItem('ghl_banner_dismissed') === '1';
-    const shouldShow = status === 'not_connected' && !dismissed;
+    const isNative = (typeof CONTACT_PROVIDER !== 'undefined' && CONTACT_PROVIDER === 'portal');
+    const shouldShow = status === 'not_connected' && !dismissed && !isNative;
     banner.style.display = shouldShow ? 'flex' : 'none';
   }
 
