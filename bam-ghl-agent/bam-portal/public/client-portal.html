@@ -45774,6 +45774,18 @@ async function _ccSalesLoad() {
     if (strip && !strip.children.length) strip.innerHTML = '<div class="cc-mem-empty">Couldn\'t load the pipeline.</div>';
   }
   _ccSalesHawk();
+  _ccSalesKpis();
+}
+// Sales - 7 days + Trial closing rate (off-GHL, from api/ghl/cc-sales-kpis).
+async function _ccSalesKpis() {
+  try {
+    const token = await _mreqAuthToken();
+    const r = await fetch('/api/ghl/cc-sales-kpis?client_id=' + encodeURIComponent(CLIENT_ID), { headers: { Authorization: 'Bearer ' + token } });
+    const j = await _safeJson(r);
+    if (!r.ok) return;
+    const s7 = document.getElementById('cc-sal-7d'); if (s7) s7.textContent = (j.sales_7d != null ? String(j.sales_7d) : '-');
+    const cl = document.getElementById('cc-sal-close'); if (cl) cl.textContent = (j.closing_rate != null ? j.closing_rate + '%' : '-');
+  } catch (_) { /* leave the dashes */ }
 }
 function _ccSalesHawk() {
   const n = window._hmHawkTotal || 0;
