@@ -105,6 +105,11 @@
 - **Gold bar at page bottom** = the default-height horizontal scrollbar (thumb colored by the global scrollbar style) from slight sideways overflow in the flow. Fixed: `::-webkit-scrollbar{height:4px}` + `body.cc-mode(.main){overflow-x:hidden}`.
 - **Every view swap eases in**: `.view.active{animation:viewIn .26s}` fade-rise, reduced-motion safe. (Inbox already had `_skelInboxHTML` skeleton + SWR re-open.)
 
+## Marketing full-picture panels + funnel polish (2026-07-06, Cole picks 2/4/6)
+- Both "See the full picture" panels (Meta + Landing) now carry a **machine checkline** (`_mmApChecks`: Tracking/Creative/Ad variety on Meta; Tracking/Page/Bookings on Landing - all derived from real data, no fake checks) and a **counted CTA** (`_mmApFoot`: "Focus mode · N things need you ›"). **Doorway hover**: right-edge gold gradient lights + chevrons speed up.
+- Funnel svg sleekness: strokes 1.1->0.85 (red .95), fills .14->.09 (red .11), guide lines 0.5w/70%, annotation badge quieter (fill .09, 8.5px). **Clickable stages**: transparent hit rects per column -> `openLandingMachine(stageKey)`; focus spine rows carry `data-mmstage` and the opener scrolls+flashes the row (~750ms after open, reuses .v15cal-flash).
+- NOTE: this touches Zoran's fresh MM code (panels/funnel are his); anchors were count-asserted against his current text.
+
 ## Section mounts (current skeleton)
 | Section | Mount | Content |
 |---|---|---|
