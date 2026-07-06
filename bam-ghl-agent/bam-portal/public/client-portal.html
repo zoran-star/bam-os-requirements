@@ -4011,6 +4011,9 @@
   .mm-ap-foot { margin-top: auto; font-family: var(--mm-ff); font-size: 13px; font-weight: 700; color: var(--gold-d, var(--gold)); }
   .mm-ap-checks { display: flex; flex-wrap: wrap; gap: 6px 14px; }
   .mm-ap-row { display: flex; align-items: center; justify-content: flex-end; gap: 18px; margin-top: 14px; flex-wrap: wrap; }
+  .mm-hero-row { display: flex; align-items: center; gap: 26px; flex-wrap: wrap; }
+  .mm-cpl-spark { flex: 1; min-width: 160px; max-width: 280px; margin-left: auto; }
+  .mm-cpl-spark-lab { font-family: var(--mm-ff); font-size: 9.5px; font-weight: 700; letter-spacing: 0.07em; text-transform: uppercase; color: var(--text-mute); margin-top: 2px; text-align: right; }
   .mm-ap-btn { position: relative; display: inline-flex; align-items: center; gap: 8px; background: var(--gold); color: var(--on-gold, #131416); border: none; border-radius: 8px; padding: 9px 16px; font-family: var(--mm-ff); font-size: 12.5px; font-weight: 800; cursor: pointer; box-shadow: 0 2px 10px rgba(200,168,78,0.30); transition: transform 0.15s ease, box-shadow 0.2s ease; }
   .mm-ap-btn:hover { transform: translateX(2px); box-shadow: 0 4px 16px rgba(200,168,78,0.45); }
   .mm-ap-chevs2 { display: inline-flex; }
@@ -46467,6 +46470,32 @@ function _mmApFoot(n) {
   return '<div class="mm-ap-foot">Focus mode' + (n > 0 ? ' &middot; ' + n + (n === 1 ? ' thing needs you' : ' things need you') : '') + ' &rsaquo;</div>';
 }
 // Compact footer row: checkline left, one focus-mode button right.
+// Real cost-per-lead trend from the weekly sparkline in the payload.
+// Lower is better, so an improving CPL literally slopes downhill.
+function _mmCplSpark(d) {
+  const pts = (d.sparkline || []).filter(p => p.cpl != null);
+  if (pts.length < 2) return '';
+  const w = 230, h = 62, pad = 8;
+  const vals = pts.map(p => p.cpl);
+  const mn = Math.min(...vals), mx = Math.max(...vals);
+  const xy = pts.map((p, i) => [
+    pad + i * (w - pad * 2) / (pts.length - 1),
+    mx === mn ? h / 2 : pad + (1 - (p.cpl - mn) / (mx - mn)) * (h - pad * 2 - 12),
+  ]);
+  let line = '';
+  for (let i = 0; i < xy.length; i++) line += (i ? ' L ' : 'M ') + xy[i][0].toFixed(1) + ',' + xy[i][1].toFixed(1);
+  const area = line + ' L ' + xy[xy.length - 1][0].toFixed(1) + ',' + (h - 4) + ' L ' + xy[0][0].toFixed(1) + ',' + (h - 4) + ' Z';
+  const last = xy[xy.length - 1];
+  const bandCol = { green: '#3EAF5C', gold: '#B08E30', red: '#B5352F', grey: 'var(--text-mute)' }[pts[pts.length - 1].band || 'grey'];
+  return '<div class="mm-cpl-spark">' +
+    '<svg viewBox="0 0 ' + w + ' ' + h + '" style="width:100%;display:block">' +
+    '<path d="' + area + '" fill="rgba(200,168,78,0.08)"/>' +
+    '<path d="' + line + '" fill="none" stroke="var(--gold)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>' +
+    '<circle cx="' + last[0].toFixed(1) + '" cy="' + last[1].toFixed(1) + '" r="2.6" fill="' + bandCol + '"/>' +
+    '<text x="' + last[0].toFixed(1) + '" y="' + Math.max(9, last[1] - 6).toFixed(1) + '" text-anchor="end" font-family="var(--mm-fm)" font-size="9" fill="var(--text)">$' + pts[pts.length - 1].cpl + '</text>' +
+    '</svg>' +
+    '<div class="mm-cpl-spark-lab">cost per lead &middot; last ' + pts.length + ' weeks</div></div>';
+}
 function _mmApRow(checks, n) {
   return '<div class="mm-ap-row">' + _mmApChecks(checks) +
     '<button type="button" class="mm-ap-btn">Focus mode' + (n > 0 ? ' &middot; ' + n + (n === 1 ? ' thing needs you' : ' things need you') : '') + ' <span class="mm-ap-chevs2"><span>&rsaquo;</span><span>&rsaquo;</span></span></button></div>';
@@ -46600,7 +46629,7 @@ function _mmRenderCard() {
   ];
   host.innerHTML = '<div class="mm-card" onclick="openMarketingMachine()">' +
     '<div class="mm-col-label" style="margin-bottom:12px">' + MM_ICONS.overall + 'Meta ads</div>' +
-    '<div>' + heroFinal + drivers + foot + '</div>' + _mmApRow(apChecks, apItems.length) + '</div>';
+    '<div><div class="mm-hero-row"><div style="min-width:0">' + heroFinal + '</div>' + _mmCplSpark(d) + '</div>' + drivers + foot + '</div>' + _mmApRow(apChecks, apItems.length) + '</div>';
   _mmRenderLanding();
   const pnl = host.querySelector('.mm-ap-btn');
   const mainEl = document.querySelector('.main');
