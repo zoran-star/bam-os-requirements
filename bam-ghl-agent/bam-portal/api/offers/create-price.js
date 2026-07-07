@@ -32,7 +32,7 @@ const SUPABASE_URL = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
 const STRIPE_API = "https://api.stripe.com/v1";
 const MODEL = "claude-sonnet-4-6";
-const HST = 1.13; // 13% Ontario HST — mirrors buildOfferTargets() in match-prices.js
+const FALLBACK_CURRENCY = "usd"; // only if the connected account can't be read
 
 function nowIso() { return new Date().toISOString(); }
 
@@ -97,6 +97,19 @@ async function stripeFetch(path, { method = "GET", body, stripeAccount, idempote
   return json;
 }
 
+// The academy's Stripe account default_currency is the source of truth for what
+// we price in - USD for a US academy (e.g. DETAIL Miami), CAD for a Canadian one.
+// Never hardcode it. Falls back only if the account can't be read.
+async function accountCurrency(clientId) {
+  try {
+    const rows = await sb(`clients?id=eq.${encodeURIComponent(clientId)}&select=stripe_connect_account_id&limit=1`);
+    const acct = Array.isArray(rows) && rows[0] && rows[0].stripe_connect_account_id;
+    if (!acct || !stripeKey()) return FALLBACK_CURRENCY;
+    const a = await stripeFetch(`/accounts/${encodeURIComponent(acct)}`);
+    return String(a.default_currency || FALLBACK_CURRENCY).toLowerCase();
+  } catch (_) { return FALLBACK_CURRENCY; }
+}
+
 // Map an offer term ("monthly"/"4_weeks"/"3_months"/"6_months") → the catalog
 // interval label we store, plus the Stripe recurring shape (checkout.js intervalFor).
 function termToInterval(term) {
@@ -107,7 +120,7 @@ function termToInterval(term) {
 }
 
 function money(cents, currency) {
-  const c = String(currency || "cad").toUpperCase();
+  const c = String(currency || FALLBACK_CURRENCY).toUpperCase();
   return `$${(cents / 100).toLocaleString("en-CA", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${c}`;
 }
 function cadenceLabel(recurring) {
@@ -117,21 +130,23 @@ function cadenceLabel(recurring) {
 }
 
 // ── PROPOSE: ask Claude for a plain-language recommendation per unmatched target ──
-async function aiRecommend(targets) {
+async function aiRecommend(targets, currency) {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) throw Object.assign(new Error("ANTHROPIC_API_KEY not configured"), { status: 500 });
 
+  const cur = String(currency || FALLBACK_CURRENCY).toUpperCase();
   const system =
     "A sports academy typed offer prices (plan × term) into their Offers, but some have NO matching " +
-    "Stripe price yet. For EACH target, recommend the Stripe price to create. Each target has a " +
-    "base_cents (pre-tax) and allin_cents (base + 13% HST). Academies usually CHARGE THE ALL-IN amount " +
-    "(tax included). Pick unit_amount_cents = allin_cents unless the label clearly implies tax-exclusive. " +
+    "Stripe price yet. For EACH target, recommend the Stripe price to create. `base_cents` is the " +
+    "exact price the academy typed. CHARGE THAT price: pick unit_amount_cents = base_cents. Do NOT add " +
+    "tax, HST, or any markup automatically - tax/fees are configured separately by the academy in their " +
+    "offer's added-fees setting, not here. " +
     "The recurring shape is fixed by the term: monthly/4_weeks → {interval:'week',interval_count:4}; " +
     "3_months → {interval:'month',interval_count:3}; 6_months → {interval:'month',interval_count:6}. " +
-    "Write a SHORT plain_explanation a non-technical owner understands, e.g. " +
-    "'$226 every 4 weeks = your $200 + 13% HST'. Set matches_offer=true when the amount equals base or " +
-    "all-in of the target; offer_impact_note = one short line on what creating this does (e.g. 'new " +
-    "signups on the Steady plan will be billed this'). Currency is CAD unless told otherwise. " +
+    "Write a SHORT plain_explanation a non-technical owner understands, e.g. '$200 every 4 weeks'. " +
+    "Set matches_offer=true when unit_amount_cents equals the target's base_cents; offer_impact_note = " +
+    "one short line on what creating this does (e.g. 'new signups on the Steady plan will be billed this'). " +
+    `Currency is ${cur} (the academy's Stripe account currency) - use it for every recommendation. ` +
     "Respond with ONLY a JSON array, one object per input target, same order, no prose:\n" +
     '[{"key","recurring":{"interval","interval_count"},"unit_amount_cents","currency","plain_explanation","matches_offer"(bool),"offer_impact_note"}]';
 
@@ -146,22 +161,18 @@ async function aiRecommend(targets) {
 }
 
 // Deterministic fallback recommendation (also used to harden/normalize the AI output).
-function fallbackRecommend(t) {
+// Charges the BASE (pre-tax) price the academy typed - no automatic HST/markup.
+function fallbackRecommend(t, currency) {
   const iv = termToInterval(t.term);
-  const amount = t.allin_cents || t.base_cents || 0;
-  const base = t.base_cents || Math.round(amount / HST);
+  const amount = t.base_cents || t.allin_cents || 0;
   const cadence = cadenceLabel(iv.recurring);
   const planLabel = (t.offering || String(t.key || "").split("|")[0] || "this plan").trim();
-  let plain = `${money(amount, "cad")} ${cadence}`;
-  if (base && Math.abs(Math.round(base * HST) - amount) <= 2 && base !== amount) {
-    plain += ` = your ${money(base, "cad")} + 13% HST`;
-  }
   return {
     key: t.key,
     recurring: iv.recurring,
     unit_amount_cents: amount,
-    currency: "cad",
-    plain_explanation: plain,
+    currency,
+    plain_explanation: `${money(amount, currency)} ${cadence}`,
     matches_offer: true,
     offer_impact_note: `New signups on ${planLabel} (${String(t.term || "").replace("_", " ")}) will be billed this.`,
   };
@@ -171,12 +182,14 @@ async function runPropose(req, res, ctx, body, clientId) {
   const targets = Array.isArray(body.targets) ? body.targets : [];
   if (!targets.length) return res.status(400).json({ error: "targets[] required" });
 
+  const currency = await accountCurrency(clientId); // USD for DETAIL Miami, CAD for a CA academy
+
   let aiOut = [];
-  try { aiOut = await aiRecommend(targets); } catch (_) { aiOut = []; }
+  try { aiOut = await aiRecommend(targets, currency); } catch (_) { aiOut = []; }
   const byKey = Object.fromEntries((Array.isArray(aiOut) ? aiOut : []).map(r => [String(r.key), r]));
 
   const recommendations = targets.map(t => {
-    const fb = fallbackRecommend(t);
+    const fb = fallbackRecommend(t, currency);
     const a = byKey[t.key];
     if (!a) return fb;
     const recurring = (a.recurring && a.recurring.interval) ? a.recurring : fb.recurring;
@@ -189,7 +202,7 @@ async function runPropose(req, res, ctx, body, clientId) {
       label: t.label || null,
       recurring,
       unit_amount_cents: amount,
-      currency: (a.currency || fb.currency || "cad").toLowerCase(),
+      currency, // forced to the account currency - can't create a price in one the account doesn't support
       plain_explanation: a.plain_explanation || fb.plain_explanation,
       matches_offer: a.matches_offer != null ? !!a.matches_offer : fb.matches_offer,
       offer_impact_note: a.offer_impact_note || fb.offer_impact_note,
@@ -210,13 +223,14 @@ async function runApply(req, res, ctx, body, clientId) {
   if (!client) return res.status(404).json({ error: "academy not found" });
   if (!client.stripe_connect_account_id) return res.status(409).json({ error: "academy not connected to Stripe" });
   const stripeAccount = client.stripe_connect_account_id;
+  const acctCurrency = await accountCurrency(clientId); // default to the academy's account currency, not CAD
 
   const created = [];
   for (const c of creations) {
     const key = c.key || null;
     const amount = Math.round(Number(c.unit_amount_cents));
     if (!Number.isFinite(amount) || amount <= 0) { created.push({ key, error: "invalid unit_amount_cents" }); continue; }
-    const currency = String(c.currency || "cad").toLowerCase();
+    const currency = String(c.currency || acctCurrency).toLowerCase();
     const recurring = (c.recurring && c.recurring.interval)
       ? c.recurring
       : termToInterval(c.term).recurring;
