@@ -45665,6 +45665,20 @@ function _ccStyle() {
     '.cc-sal-hawkmsg .cc-sal-hawk-txt b{font-weight:800;color:var(--text)}' +
     '.cc-sal-hawkmsg .cc-sal-hawk-more{color:var(--text-mute);font-size:11px}' +
     '.cc-sal-hawkmsg .cc-sal-hawk-go{flex:none;color:var(--gold);font-weight:800;white-space:nowrap}' +
+    /* full-width Hawkeye action card: next queued action, opens focus mode on click */
+    '.cc-hawk-card{display:flex;align-items:center;gap:20px;background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:16px 18px;box-shadow:0 1px 3px rgba(0,0,0,.04);margin-bottom:12px;cursor:pointer;transition:transform .2s var(--es,ease),box-shadow .2s,border-color .2s,background .2s}' +
+    '.cc-hawk-card:hover{transform:translateY(-2px);box-shadow:0 4px 14px rgba(0,0,0,.06)}' +
+    '.cc-hawk-card.has{border-color:var(--gold);background:var(--gold-glow,rgba(212,182,92,.08))}' +
+    '.cc-hawk-hero{display:flex;flex-direction:column;justify-content:center;padding-right:20px;border-right:1px solid var(--border);min-width:96px;flex:0 0 auto}' +
+    '.cc-hawk-n{font-family:var(--font-num);font-size:38px;font-weight:800;color:var(--text);line-height:1}' +
+    '.cc-hawk-card.has .cc-hawk-n{color:var(--gold)}' +
+    '.cc-hawk-lab{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;color:var(--text-mute);margin-top:4px}' +
+    '.cc-hawk-body{flex:1;min-width:0;display:flex;flex-direction:column;justify-content:center;gap:3px}' +
+    '.cc-hawk-top{font-size:14px;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}' +
+    '.cc-hawk-top b{font-weight:800}' +
+    '.cc-hawk-more{font-size:12px;color:var(--text-mute)}' +
+    '.cc-hawk-empty{font-size:13.5px;color:var(--text-mute)}' +
+    '.cc-hawk-go{flex:none;color:var(--gold);font-weight:800;white-space:nowrap;font-size:13px}' +
     '.cc-pipe-strip{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:18px}' +
     '.cc-pipe-pill{display:inline-flex;align-items:center;gap:8px;background:var(--surface);border:1px solid var(--border);border-radius:999px;padding:7px 8px 7px 14px;font:inherit;font-size:12px;font-weight:600;color:var(--text);cursor:pointer;transition:border-color .15s,transform .15s}' +
     '.cc-pipe-pill:hover{border-color:var(--accent-border);transform:translateY(-1px)}' +
@@ -46630,6 +46644,14 @@ function _ccMountSales(host) {
         <div class="cc-sal-bench-t"><b>Hawk</b><span>Sales rep</span></div>
         <button class="cc-sal-hawkmsg" id="cc-sal-hawkmsg" onclick="_hv2OpenHawkeye()" title="Open Hawkeye"><span class="cc-sal-hawk-txt">Watching the pipeline.</span></button>
       </div>
+      <div class="cc-hawk-card" id="cc-sal-hawkcard" onclick="_hv2OpenHawkeye()" title="Open Hawkeye focus mode">
+        <div class="cc-hawk-hero">
+          <div class="cc-hawk-n" id="cc-sal-hawkcard-n">-</div>
+          <div class="cc-hawk-lab">Hawkeye actions</div>
+        </div>
+        <div class="cc-hawk-body" id="cc-sal-hawkcard-body"><div class="cc-hawk-empty">Checking with Hawk...</div></div>
+        <span class="cc-hawk-go" id="cc-sal-hawkcard-go" style="display:none">Review &rsaquo;</span>
+      </div>
       <div class="cc-trials-card" onclick="_ccOpenClassic('calendar')" title="Jump to the calendar">
         <div class="cc-trials-hero">
           <div class="cc-trials-n" id="cc-sal-trials">-</div>
@@ -46793,6 +46815,28 @@ async function _ccSalesHawk() {
   window._hmHawkTotal = total;
   const badge = document.getElementById('cc-sal-hawkn');
   if (badge) { badge.textContent = String(total); badge.style.display = total > 0 ? '' : 'none'; }
+  const top = total ? items[0] : null;
+  const topNm = top ? escapeHTML(_hmStripEm(top.name || 'A lead')) : '';
+
+  // Full-width Hawkeye action card: big count + the next queued action, or an
+  // all-clear empty state. Tapping the card opens the Hawkeye focus view.
+  const cardN = document.getElementById('cc-sal-hawkcard-n');
+  const cardBody = document.getElementById('cc-sal-hawkcard-body');
+  const cardGo = document.getElementById('cc-sal-hawkcard-go');
+  const card = document.getElementById('cc-sal-hawkcard');
+  if (cardN) cardN.textContent = String(total);
+  if (card) card.classList.toggle('has', total > 0);
+  if (cardGo) cardGo.style.display = total > 0 ? '' : 'none';
+  if (cardBody) {
+    if (!total) {
+      cardBody.innerHTML = `<div class="cc-hawk-empty">All caught up. No Hawkeye actions waiting.</div>`;
+    } else {
+      const more = total > 1 ? `<div class="cc-hawk-more">+${total - 1} more waiting</div>` : '';
+      cardBody.innerHTML = `<div class="cc-hawk-top"><b>${topNm}</b> ${escapeHTML(top.desc)}</div>${more}`;
+    }
+  }
+
+  // Bench line stays a short ambient status so it doesn't duplicate the card.
   const el = document.getElementById('cc-sal-hawkmsg');
   if (!el) return;
   if (!total) {
@@ -46800,11 +46844,9 @@ async function _ccSalesHawk() {
     el.innerHTML = `<span class="cc-sal-hawk-txt">All caught up. Watching the pipeline.</span>`;
     return;
   }
-  const top = items[0];
-  const nm = escapeHTML(_hmStripEm(top.name || 'A lead'));
-  const more = total > 1 ? ` <span class="cc-sal-hawk-more">+${total - 1} more</span>` : '';
   el.classList.add('has');
-  el.innerHTML = `<span class="cc-sal-hawk-pill">${total}</span><span class="cc-sal-hawk-txt"><b>${nm}</b> ${escapeHTML(top.desc)}${more}</span><span class="cc-sal-hawk-go">Review ›</span>`;
+  const summary = total === 1 ? '1 action needs you.' : `${total} actions need you.`;
+  el.innerHTML = `<span class="cc-sal-hawk-pill">${total}</span><span class="cc-sal-hawk-txt">${summary}</span>`;
 }
 
 // MEMBERS (skeleton): agent bar (opens the members focus mode), roster KPIs
