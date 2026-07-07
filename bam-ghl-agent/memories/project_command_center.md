@@ -150,6 +150,12 @@ NEXT mobile candidates (not built): focus modes as full-screen sheets, service-w
 - **Transitions**: active tab gets gold top indicator (`mtabInd`) + icon spring pop (`mtabPop`); focus zoom faster/lighter on <=768 (.32s, blur 7px).
 - WAVE 2 (picked, not yet built): horizontal section paging, long-press tab quick actions, pull-down search, push deep links to exact item, shared-element member row->card, sheet drag handles + rubber-band dismiss, swipe between conversations in peek, gold PTR ring, PTR haptic.
 
+## Inbox pack + native typing (2026-07-06, Cole: "do all")
+- v15 inbox mobile: cls tabs = snap-scrolling pills w/ badges; Broadcast + mute hidden <=640 and added to the overflow menu; previews clamp 2 lines; channel = stroke svg (`chSvg` by `_ghlChannelLabel`) not a text tag; need-reply ring tappable -> `_v15ibTab('unread')`; gold `.v15ib-fab` compose (bottom 148px + safe, ABOVE the fb bubble) -> `_ibShowCompose()`.
+- AVATARS: `_ibAvatarStyle` neutralized (was hsl-by-name) -> surface bg / border-med / text-sub. Also `.v15ib-avatar` CSS hardened with !important.
+- Native typing: composers get `enterkeyhint=send` + autocapitalize (gma/mma/peek/qr markup + focusin delegate for dynamic ones); <=768 composer inputs 16px !important (iOS zoom kill); visualViewport -> `--kb` var pins `.hm-peek-compose`/`.mma-compose` above the keyboard; overscroll-behavior:contain on threads/lists. After the Mac rebuild the Keyboard plugin unlocks keyboardWillShow-synced motion + accessory bar off (queued).
+- Earlier same day: funnel `.mm-fz-nums` big-numbers strip (phones, hidden desktop) prepended by `_mmFunnelSvg`; app breadcrumb = floating "back chip" via html.native-app CSS; native-app hides `.hv2-nav-card` + `.mm-ap-btn`; focus rooms on phones drop the 3D tilt + notch-safe margins; agent input focus at ~120ms.
+
 ## Section mounts (current skeleton)
 | Section | Mount | Content |
 |---|---|---|
