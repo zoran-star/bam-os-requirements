@@ -16480,8 +16480,8 @@ function _hmInboxRow(c, opts) {
   const now = Date.now();
   const ageHrs = (now - msgDate.getTime()) / 3600000;
   let urgStyle = '';
-  if (unread && ageHrs > 24) urgStyle = 'border-left:3px solid #F07060;';       // overdue (unread > 24h)
-  else if (unread && ageHrs <= 4) urgStyle = 'border-left:3px solid #F0B84A;';   // fresh unread
+  if (unread && ageHrs > 24) urgStyle = 'border-left:3px solid #B08E30;';       // overdue (unread > 24h) - deep amber, on-system
+  else if (unread && ageHrs <= 4) urgStyle = 'border-left:3px solid var(--gold);';   // fresh unread
   return `<div class="hm-ib-row${unread ? ' hm-ib-unread' : ''}" data-cid="${escapeHTML(String(c.id))}" onclick="_hmMsgPeek('${escapeHTML(String(c.id))}')" style="${urgStyle}">
     ${unread ? '<span class="hm-ib-dot"></span>' : '<span style="width:7px;flex:none"></span>'}
     <span class="hm-ib-av">${escapeHTML(initials)}</span>
@@ -45469,7 +45469,15 @@ function _ccStyle() {
     '}' +
     '@media(hover:none){.cc-ib-reply{opacity:1}}' +
     'body.cc-mode .cc-dock{bottom:calc(16px + env(safe-area-inset-bottom))}' +
+    '.cc-dock.open::before{content:\'\';position:fixed;inset:0;background:rgba(11,11,13,.32);z-index:-1;animation:hv2In .18s ease}' +
     'html.native-app .hv2-nav-card{display:none !important}' +
+    '@media(max-width:768px){' +
+    '#view-cc .hm-ticker-bg{display:none !important}' +
+    '.mm-fz-pts{display:none}' +
+    '.cc-wall{display:none !important}' +
+    'body.cc-mode nav#cc-mtabs{background:var(--surface);backdrop-filter:none;-webkit-backdrop-filter:none}' +
+    '.cc-glass{backdrop-filter:none !important;-webkit-backdrop-filter:none !important;background:var(--surface) !important}' +
+    '}' +
     '.mm-fz-nums{display:none}' +
     '@media(max-width:640px){' +
     '.mm-fz-nums{display:flex;align-items:baseline;justify-content:space-between;gap:4px;margin:2px 2px 8px}' +
@@ -45654,7 +45662,9 @@ function _ccBuildChrome() {
   if (mainEl) mainEl.insertBefore(pill, mainEl.firstChild); else document.body.appendChild(pill);
 
   document.addEventListener('click', e => {
-    if (e.target.closest('#cc-dock')) return;
+    // Clicks on the scrim (the dock's ::before) report the dock itself as
+    // the target - treat those as outside so tapping the dim closes the fan.
+    if (e.target.closest('#cc-dock') && e.target.id !== 'cc-dock') return;
     document.getElementById('cc-dock-pop')?.classList.remove('open');
     document.getElementById('cc-dock')?.classList.remove('open');
   });
@@ -45992,6 +46002,9 @@ function _ccInitObserver() {
 // Home hero. Continuous (scroll-driven), skipped for reduced motion.
 function _ccInitRecede(root, secs) {
   if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  // Phones skip the scroll-linked blur/scale entirely - it fights the GPU
+  // on every frame and made real-device scrolling feel clunky.
+  if (window.matchMedia('(max-width: 768px)').matches) return;
   if (!root || root._ccRecede) return;
   root._ccRecede = true;
   document.addEventListener('mousemove', e => {
@@ -49899,8 +49912,15 @@ window.addEventListener('message', (e) => {
       var h = Math.min(pulled * 0.45, MAX);
       armed = dist >= TRIGGER;
       var el = ensureIndicator();
-      el.style.height = h + 'px';
-      el.querySelector('.ptr-label').textContent = armed ? 'Release to refresh' : 'Pull to refresh';
+      if (!el._ptrRaf) {
+        el._ptrRaf = requestAnimationFrame(function () {
+          el._ptrRaf = null;
+          el.style.height = el._ptrH + 'px';
+          var lb = el.querySelector('.ptr-label');
+          if (lb) lb.textContent = el._ptrArmed ? 'Release to refresh' : 'Pull to refresh';
+        });
+      }
+      el._ptrH = h; el._ptrArmed = armed;
     }, { passive: true });
 
     document.addEventListener('touchend', function () {
