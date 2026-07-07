@@ -56,6 +56,7 @@ export const DEFAULT_CONFIRM_AUTOMATIONS = {
       key: "same_day",
       label: "Same-day check-in",
       when: "morning_of",
+      send_hour: 9,          // fires at 9am (academy time) on the day of the trial
       channel: "sms",
       email: false,
       enabled: true,
@@ -111,13 +112,26 @@ function dayDiffInTz(nowMs, trialMs) {
   const b = Date.parse(tzDateStr(trialMs) + "T00:00:00Z");
   return Math.round((b - a) / 86400000);
 }
-export function stepIsDue(when, nowMs, trialMs) {
+// Hour-of-day (0-23) in the academy timezone.
+function tzHour(ms) {
+  const s = new Date(ms).toLocaleString("en-US", { timeZone: TZ, hour: "2-digit", hourCycle: "h23" });
+  const m = s.match(/\d{1,2}/);
+  return m ? Number(m[0]) : 0;
+}
+export function stepIsDue(step, nowMs, trialMs) {
+  const when = step && step.when;
   if (!trialMs) return when === "immediate";
   const diff = dayDiffInTz(nowMs, trialMs);
   if (diff < 0) return false;
   if (when === "immediate") return true;
   if (when === "day_before") return diff === 1;
-  if (when === "morning_of") return diff === 0 && nowMs < trialMs;
+  if (when === "morning_of") {
+    // Same day, but hold until the configured local hour (default 9am), and only
+    // while the trial itself is still ahead. The cron fires it on its first run
+    // at/after that hour.
+    const sendHour = Number.isFinite(step && step.send_hour) ? step.send_hour : 9;
+    return diff === 0 && tzHour(nowMs) >= sendHour && nowMs < trialMs;
+  }
   return false;
 }
 export function nextDueStep(autos, { nowMs, trialMs, sentKeys }) {
@@ -125,7 +139,7 @@ export function nextDueStep(autos, { nowMs, trialMs, sentKeys }) {
   for (const step of (autos.steps || [])) {
     if (!step.enabled) continue;
     if (handled.has(step.key)) continue;
-    if (stepIsDue(step.when, nowMs, trialMs)) return step;
+    if (stepIsDue(step, nowMs, trialMs)) return step;
   }
   return null;
 }
