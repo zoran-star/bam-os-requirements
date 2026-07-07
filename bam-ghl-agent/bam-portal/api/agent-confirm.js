@@ -388,7 +388,16 @@ async function fireScriptedStep({ client, token, locationId, mode, autos, cfg, i
   // the contact/location tokens via the send engine's resolver — so the stored card
   // is final text (clean in the approval inbox, and quiet-hours flush can send it raw).
   const info = await resolveContactInfo(token, contactId).catch(() => ({ email: null, phone: null, firstName: null, fullName: null }));
-  const vars = { first_name: info.firstName, full_name: info.fullName };
+  // Greet the PARENT by first name (they booked the trial and receive this SMS).
+  // The parent name lives in the portal booking (trial_bookings.parent_name), off
+  // GHL; fall back to the queue item name, then the GHL contact first name.
+  let parentFirst = null;
+  try {
+    const tb = await sb(`trial_bookings?tenant_id=eq.${client.id}&ghl_contact_id=eq.${encodeURIComponent(contactId)}&select=parent_name&order=created_at.desc&limit=1`);
+    const pn = (tb && tb[0] && tb[0].parent_name) || item.name || null;
+    if (pn) parentFirst = String(pn).trim().split(/\s+/)[0];
+  } catch (_) { if (item && item.name) parentFirst = String(item.name).trim().split(/\s+/)[0]; }
+  const vars = { first_name: parentFirst || info.firstName, full_name: info.fullName };
   const apptCtx = {
     startMs: trialMs,
     endMs: appt && appt.endTime ? new Date(appt.endTime).getTime() : null,
