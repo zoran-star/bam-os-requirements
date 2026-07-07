@@ -1161,6 +1161,20 @@ guided in-chat flow via `_mmaChip`. System prompt rule 8 (GUIDED STYLE):
 1-3 short sentences, ONE question per turn, settle pause window → next
 payment → then propose.
 
+**2026-07-07 — payment cards + per-charge refund button:** the agent used to
+dump a markdown table when asked to list a member's payments. Added a
+`show_payments(member_id)` DISPLAY tool: the endpoint returns
+`member_context { member_id, member_name, stripe_customer_id, charges[] }`
+(charges = {charge_id, amount_dollars, amount_refunded_dollars, currency, date,
+status}) and STOPS (terminal, like a proposal). System prompt forbids text
+tables and routes payment/charge/billing-history requests to show_payments.
+Frontend `_mmaChargesHtml(ctx)` renders one card per charge (amount, date,
+status pill, $refunded note) with a **Refund** button on succeeded/partial rows
+→ opens the existing `mRefund(memberId, customerId, preselectChargeId)` modal
+(extended with a 3rd arg to default the picker to that charge).
+`_mmaAgentAsk` shows charge cards when `member_context` is present (proposal
+cards still win when a proposal exists).
+
 **Follow-ups / polish (not built):**
 - Live end-to-end test on GTA (safe-first: find_members, payment-link).
 - Multi-action commands ("pause X and Y") — v1 does one action per proposal.
