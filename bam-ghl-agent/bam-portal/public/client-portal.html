@@ -13643,6 +13643,7 @@ function _v15ibOpenSplit(convId, contactId, phone, email, name, channel) {
   }
   _V15IB.type = _ghlSendType(channel || '');
   _v15ibLoadThread(pane);
+  _v15ibStartThreadPoll();
 }
 
 async function _v15ibLoadThread(pane) {
@@ -13662,6 +13663,56 @@ async function _v15ibLoadThread(pane) {
   } catch (e) {
     pane.innerHTML = `<div class="req-empty" style="padding:24px;color:#9a3b2f">Couldn't load thread - ${escapeHTML(e.message)}</div>`;
   }
+}
+
+// ── Live thread auto-refresh ─────────────────────────────────────────────────
+// Polls the OPEN thread every few seconds so new inbound replies appear on their
+// own, and a just-sent "sending..." bubble flips to the confirmed message once the
+// provider records it. Only re-renders when something actually changed (so it
+// never yanks scroll or drops a draft needlessly), preserves the compose draft +
+// focus across a re-render, and keeps still-unconfirmed optimistic sends visible.
+let _v15ibPollTimer = null;
+function _v15ibThreadSig(msgs) {
+  const real = (msgs || []).filter(m => !m._optimistic);
+  const last = real[real.length - 1];
+  return real.length + '|' + (last ? (last.date || '') + '|' + String(last.body || '').slice(0, 24) : '');
+}
+function _v15ibStopThreadPoll() { if (_v15ibPollTimer) { clearInterval(_v15ibPollTimer); _v15ibPollTimer = null; } }
+function _v15ibStartThreadPoll() { _v15ibStopThreadPoll(); _v15ibPollTimer = setInterval(_v15ibPollTick, 6000); }
+async function _v15ibPollTick() {
+  const a = _V15IB.active;
+  const split = document.getElementById('v15ib-thread-pane');
+  const full = document.getElementById('v15ib-body');
+  // Self-stop once the thread/inbox DOM is gone; skip work while hidden.
+  if (!a || (!split && !full)) { _v15ibStopThreadPoll(); return; }
+  const vis = (split && split.offsetParent !== null) || (full && full.offsetParent !== null);
+  if (!vis) return;
+  try {
+    const token = await _mreqAuthToken();
+    const r = await fetch(`/api/ghl/inbox?client_id=${encodeURIComponent(CLIENT_ID)}&conversation_id=${encodeURIComponent(a.convId)}`, { headers: { Authorization: 'Bearer ' + token } });
+    const j = await _safeJson(r); if (!r.ok) return;
+    if (!_V15IB.active || _V15IB.active.convId !== a.convId) return;   // switched away mid-fetch
+    const fetched = j.messages || [];
+    // Keep optimistic sends the fetch hasn't confirmed yet (so "sending..." doesn't
+    // blink out), drop the ones now present in the fetched outbound messages.
+    const stillPending = (_V15IB.messages || []).filter(m => m._optimistic
+      && !fetched.some(f => (f.direction || '').toLowerCase() === 'outbound' && String(f.body || '').trim() === String(m.body || '').trim()));
+    const merged = [...fetched, ...stillPending];
+    if (_v15ibThreadSig(merged) === _v15ibThreadSig(_V15IB.messages)) return;   // nothing new
+    // Preserve the in-progress draft + focus across the re-render.
+    const ta = document.getElementById('v15ib-text');
+    const subj = document.getElementById('v15ib-subject');
+    const draft = ta ? ta.value : null;
+    const draftSubj = subj ? subj.value : null;
+    const wasFocused = ta && document.activeElement === ta;
+    const caret = ta ? ta.selectionStart : null;
+    _V15IB.messages = merged;
+    if (split) _v15ibRenderThreadSplit(split); else _v15ibRenderThread();
+    const ta2 = document.getElementById('v15ib-text');
+    if (ta2 && draft != null) { ta2.value = draft; if (wasFocused) { try { ta2.focus(); ta2.setSelectionRange(caret, caret); } catch (_) {} } }
+    const subj2 = document.getElementById('v15ib-subject');
+    if (subj2 && draftSubj != null) subj2.value = draftSubj;
+  } catch (_) {}
 }
 
 // ── Split-pane thread renderer ──────────────────────────────────────────────
@@ -13809,6 +13860,9 @@ async function _v15ibSendSplit() {
     _V15IB.pending = [];
     const pane = document.getElementById('v15ib-thread-pane');
     _v15ibRenderThreadSplit(pane);
+    // Confirm the send quickly: poll shortly after so "sending..." flips to the
+    // real delivered bubble (and any reply that lands meanwhile shows up).
+    setTimeout(_v15ibPollTick, 2500);
     // Update last message in list
     const conv = (_V15IB.convos || []).find(c => c.id === a.convId);
     if (conv) { conv.lastMessageBody = text; conv.lastMessageDate = new Date().toISOString(); conv.lastMessageDirection = 'outbound'; }
@@ -14219,6 +14273,7 @@ async function _v15ibOpen(convId, contactId, phone, email, name, channel) {
     if (!r.ok) throw new Error(j.error || ('HTTP ' + r.status));
     _V15IB.messages = j.messages || [];
     _v15ibRenderThread();
+    _v15ibStartThreadPoll();
   } catch (e) {
     if (body) body.innerHTML = `<div class="req-empty" style="padding:24px 0;color:#9a3b2f">Couldn't load thread - ${escapeHTML(e.message || String(e))}</div>`;
   }
