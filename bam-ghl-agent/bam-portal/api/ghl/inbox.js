@@ -272,6 +272,30 @@ async function classifyStoreConversations(clientId, conversations) {
       if (r.ghl_contact_id && nm && !_nameless(nm)) nameByContactId.set(r.ghl_contact_id, nm);
     }
   }
+  // Still nameless (a lead with no contacts-store name)? Pull the name from their
+  // trial booking (parent first, else athlete) so an inbox row isn't just a phone.
+  const stillNeed = needIds.filter((id) => !nameByContactId.has(id));
+  for (let i = 0; i < stillNeed.length; i += 100) {
+    const chunk = stillNeed.slice(i, i + 100);
+    const brows = await sb(
+      `trial_bookings?tenant_id=eq.${clientId}` +
+      `&ghl_contact_id=in.(${chunk.map(encodeURIComponent).join(",")})` +
+      `&select=ghl_contact_id,parent_name,athlete_name&order=created_at.desc`
+    ).catch(() => []);
+    for (const r of (Array.isArray(brows) ? brows : [])) {
+      if (!r.ghl_contact_id || nameByContactId.has(r.ghl_contact_id)) continue;
+      const nm = String(r.parent_name || r.athlete_name || "").trim();
+      if (nm && !_nameless(nm)) nameByContactId.set(r.ghl_contact_id, nm);
+    }
+  }
+
+  // Manually spam-marked contacts (a global mute tagged reason='spam'): the inbox
+  // hides them into its Spam group and the sales agent skips them.
+  let spamSet = new Set();
+  try {
+    const srows = await sb(`agent_mutes?client_id=eq.${clientId}&reason=eq.spam&agent=is.null&select=ghl_contact_id`).catch(() => []);
+    spamSet = new Set((Array.isArray(srows) ? srows : []).map((r) => r.ghl_contact_id).filter(Boolean));
+  } catch (_) {}
 
   return conversations.map((c) => {
     const m =
@@ -288,7 +312,7 @@ async function classifyStoreConversations(clientId, conversations) {
     return {
       ...c,
       contactName,
-      classification: m ? "member" : "lead",
+      classification: (c.contactId && spamSet.has(c.contactId)) ? "spam" : (m ? "member" : "lead"),
       member: m ? { id: m.id, athlete_name: m.athlete_name, status: m.status } : null,
     };
   });
