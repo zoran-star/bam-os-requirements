@@ -30859,7 +30859,7 @@ function _ploStripCells(stages, nav) {
     let pills = '';
     if (sig.errors) pills += `<span class="plo-pill red" onclick="event.stopPropagation();${stageClick}('${escapeHTML(s.id)}')">${_plIcon('alert', 11)} ${sig.errors} ${sig.errors === 1 ? 'error' : 'errors'}</span>`;
     if (sig.hawk && bot) pills += `<span class="plo-pill gold" onclick="event.stopPropagation();${hawkClick}('${escapeHTML(bot.key)}')">${_plIcon('eye', 11)} ${sig.hawk} hawkeye action${sig.hawk === 1 ? '' : 's'}</span>`;
-    if (!pills) pills = '<span class="plo-clear">all clear</span>';
+    if (!pills && !(nav && nav.hideClear)) pills = '<span class="plo-clear">all clear</span>';
     const conn = i < stages.length - 1 ? `<div class="plo-conn">${_plIcon('chevR', 16)}</div>` : '';
     return `<div class="plo-stage" onclick="${stageClick}('${escapeHTML(s.id)}')">`
       + `<div class="plo-toprow"><span class="plo-name">${escapeHTML(_plCap(s.name))}</span>`
@@ -30874,7 +30874,7 @@ function _ploStripCells(stages, nav) {
 function _ccPipeStage(id) { try { _ccOpenClassic('pipelines'); } catch (_) {} setTimeout(() => { try { _plSVStage(id); } catch (_) {} }, 120); }
 function _ccPipeFocus(id) { try { _ccOpenClassic('pipelines'); } catch (_) {} setTimeout(() => { try { _plOpenFocus(id); } catch (_) {} }, 120); }
 function _ccPipeHawk(key) { try { _ccOpenClassic('pipelines'); } catch (_) {} setTimeout(() => { try { _plEngineHawk(key); } catch (_) {} }, 120); }
-const _CC_PIPE_NAV = { stage: '_ccPipeStage', gear: '_ccPipeFocus', hawk: '_ccPipeHawk' };
+const _CC_PIPE_NAV = { stage: '_ccPipeStage', gear: '_ccPipeFocus', hawk: '_ccPipeHawk', hideClear: true };
 
 // engine glyphs the strip needs that aren't in the base _plIcon set
 function _ploEngIcon(name) {
@@ -45657,14 +45657,6 @@ function _ccStyle() {
     '.cc-sal-bench-t b{display:block;font-family:var(--font-num);font-size:15px;font-weight:800;color:var(--text);line-height:1.15}' +
     '.cc-sal-bench-t span{font-size:9.5px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--gold)}' +
     '.cc-sal-bench-s{margin-left:auto;font-size:12px;color:var(--text-mute)}' +
-    '.cc-sal-hawkmsg{margin-left:auto;display:inline-flex;align-items:center;gap:9px;max-width:min(600px,58%);min-width:0;background:none;border:1px solid transparent;border-radius:999px;padding:6px 6px 6px 2px;font:inherit;font-size:12.5px;color:var(--text-mute);cursor:pointer;text-align:left;transition:border-color .15s,background .15s,transform .1s}' +
-    '.cc-sal-hawkmsg.has{background:var(--gold-glow,rgba(212,182,92,.10));border-color:var(--gold);padding-left:6px;color:var(--text)}' +
-    '.cc-sal-hawkmsg.has:hover{transform:translateY(-1px)}' +
-    '.cc-sal-hawkmsg .cc-sal-hawk-pill{flex:none;min-width:22px;height:22px;border-radius:999px;background:var(--gold);color:var(--on-gold,#0B0B0D);font-family:var(--font-num);font-weight:800;font-size:12px;display:inline-flex;align-items:center;justify-content:center;padding:0 6px}' +
-    '.cc-sal-hawkmsg .cc-sal-hawk-txt{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}' +
-    '.cc-sal-hawkmsg .cc-sal-hawk-txt b{font-weight:800;color:var(--text)}' +
-    '.cc-sal-hawkmsg .cc-sal-hawk-more{color:var(--text-mute);font-size:11px}' +
-    '.cc-sal-hawkmsg .cc-sal-hawk-go{flex:none;color:var(--gold);font-weight:800;white-space:nowrap}' +
     /* full-width Hawkeye action card: next queued action, opens focus mode on click */
     '.cc-hawk-card{display:flex;align-items:center;gap:20px;background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:16px 18px;box-shadow:0 1px 3px rgba(0,0,0,.04);margin-bottom:12px;cursor:pointer;transition:transform .2s var(--es,ease),box-shadow .2s,border-color .2s,background .2s}' +
     '.cc-hawk-card:hover{transform:translateY(-2px);box-shadow:0 4px 14px rgba(0,0,0,.06)}' +
@@ -46642,7 +46634,6 @@ function _ccMountSales(host) {
       <div class="cc-sal-bench">
         <span class="cc-sal-orb"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8"/><line x1="12" y1="2" x2="12" y2="6"/><line x1="12" y1="18" x2="12" y2="22"/><line x1="2" y1="12" x2="6" y2="12"/><line x1="18" y1="12" x2="22" y2="12"/><circle cx="12" cy="12" r="2"/></svg></span>
         <div class="cc-sal-bench-t"><b>Hawk</b><span>Sales rep</span></div>
-        <button class="cc-sal-hawkmsg" id="cc-sal-hawkmsg" onclick="_hv2OpenHawkeye()" title="Open Hawkeye"><span class="cc-sal-hawk-txt">Watching the pipeline.</span></button>
       </div>
       <div class="cc-hawk-card" id="cc-sal-hawkcard" onclick="_hv2OpenHawkeye()" title="Open Hawkeye focus mode">
         <div class="cc-hawk-hero">
@@ -46652,22 +46643,18 @@ function _ccMountSales(host) {
         <div class="cc-hawk-body" id="cc-sal-hawkcard-body"><div class="cc-hawk-empty">Checking with Hawk...</div></div>
         <span class="cc-hawk-go" id="cc-sal-hawkcard-go" style="display:none">Review &rsaquo;</span>
       </div>
-      <div class="cc-trials-card" onclick="_ccOpenClassic('calendar')" title="Jump to the calendar">
-        <div class="cc-trials-hero">
-          <div class="cc-trials-n" id="cc-sal-trials">-</div>
-          <div class="cc-trials-lab">Trials today</div>
+      <div class="cc-stats">
+        <div class="cc-stat click" onclick="_ccOpenClassic('calendar')" title="Jump to the calendar">
+          <div class="cc-stat-v" id="cc-sal-trials">-</div>
+          <div class="cc-stat-l">Trials today</div>
           <div class="cc-stat-d" id="cc-sal-next"></div>
         </div>
-        <div class="cc-trials-body" id="cc-sal-trials-list"></div>
-      </div>
-      <div class="cc-stats">
         <div class="cc-stat"><div class="cc-stat-v" id="cc-sal-7d">-</div><div class="cc-stat-l">Sales - 7 days</div></div>
         <div class="cc-stat"><div class="cc-stat-v" id="cc-sal-close">-</div><div class="cc-stat-l">Trial closing rate</div></div>
       </div>
       <div class="cc-pipe-strip" id="cc-sal-strip"></div>
       <div class="cc-actions">
         <button type="button" class="cc-btn primary" onclick="_ccOpenClassic('pipelines')">Open sales board</button>
-        <button type="button" class="cc-btn" onclick="_hv2OpenHawkeye()">Hawkeye actions<span class="cc-btn-badge" id="cc-sal-hawkn" style="display:none"></span></button>
       </div>
       <div class="cc-sal-feed" id="cc-sal-feed"></div>
     </div>`;
@@ -46694,18 +46681,18 @@ async function _ccLoadTrialsCount() {
     }
   } catch (_) {}
 }
-// Today's trials, listed out with time · athlete name · age (exact once DOB is
-// captured, else the group band, e.g. "Elementary"). Clears when there are none.
+// Compact sub-line under the Trials-today KPI: the soonest of today's trials
+// (time · athlete name). The full list lives one tap away on the calendar.
 function _ccRenderTrialsList(trials, tz) {
-  const host = document.getElementById('cc-sal-trials-list'); if (!host) return;
-  if (!trials || !trials.length) { host.innerHTML = '<div class="cc-trials-empty">No trials booked today.</div>'; return; }
-  host.innerHTML = trials.map(t => {
-    let time = '';
-    try { if (t.start) time = new Date(t.start).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: tz || 'America/Toronto' }); } catch (_) {}
-    const nm = escapeHTML(t.athlete || t.contactName || 'Trial');
-    const ageStr = (t.age != null) ? (t.age + ' yrs') : (t.group ? escapeHTML(t.group) : '');
-    return `<div class="cc-tr-row"><span class="cc-tr-time">${escapeHTML(time)}</span><span class="cc-tr-nm">${nm}</span>${ageStr ? `<span class="cc-tr-age">${ageStr}</span>` : ''}</div>`;
-  }).join('');
+  const sub = document.getElementById('cc-sal-next'); if (!sub) return;
+  if (!trials || !trials.length) { sub.textContent = ''; return; }
+  const next = trials
+    .filter(t => t.start)
+    .sort((a, b) => new Date(a.start) - new Date(b.start))[0] || trials[0];
+  let time = '';
+  try { if (next.start) time = new Date(next.start).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: tz || 'America/Toronto' }); } catch (_) {}
+  const nm = _ccCapName((next.athlete || next.contactName || 'Trial').split(' ').slice(0, 2).join(' '));
+  sub.textContent = (time ? time + ' · ' : '') + nm;
 }
 // "Trials today: 0" is a dead number - show the next booked trial instead.
 async function _ccNextTrial() {
@@ -46813,13 +46800,12 @@ async function _ccSalesHawk() {
   } catch (_) {}
   const total = items.length;
   window._hmHawkTotal = total;
-  const badge = document.getElementById('cc-sal-hawkn');
-  if (badge) { badge.textContent = String(total); badge.style.display = total > 0 ? '' : 'none'; }
   const top = total ? items[0] : null;
-  const topNm = top ? escapeHTML(_hmStripEm(top.name || 'A lead')) : '';
+  const topNm = top ? escapeHTML(_hmStripEm(_ccHawkCleanName(top.name))) : '';
 
-  // Full-width Hawkeye action card: big count + the next queued action, or an
-  // all-clear empty state. Tapping the card opens the Hawkeye focus view.
+  // Full-width Hawkeye action card is the single Hawkeye surface on the Sales
+  // page: big count + the next queued action, or an all-clear empty state.
+  // Tapping the card opens the Hawkeye focus view.
   const cardN = document.getElementById('cc-sal-hawkcard-n');
   const cardBody = document.getElementById('cc-sal-hawkcard-body');
   const cardGo = document.getElementById('cc-sal-hawkcard-go');
@@ -46835,18 +46821,13 @@ async function _ccSalesHawk() {
       cardBody.innerHTML = `<div class="cc-hawk-top"><b>${topNm}</b> ${escapeHTML(top.desc)}</div>${more}`;
     }
   }
-
-  // Bench line stays a short ambient status so it doesn't duplicate the card.
-  const el = document.getElementById('cc-sal-hawkmsg');
-  if (!el) return;
-  if (!total) {
-    el.classList.remove('has');
-    el.innerHTML = `<span class="cc-sal-hawk-txt">All caught up. Watching the pipeline.</span>`;
-    return;
-  }
-  el.classList.add('has');
-  const summary = total === 1 ? '1 action needs you.' : `${total} actions need you.`;
-  el.innerHTML = `<span class="cc-sal-hawk-pill">${total}</span><span class="cc-sal-hawk-txt">${summary}</span>`;
+}
+// A lead with no resolved name comes back as a raw phone/contact id - never show
+// that. Fall back to "A lead" so the card reads like a sentence.
+function _ccHawkCleanName(n) {
+  n = (n || '').trim();
+  if (!n || /^\+?[\d\s()\-.]{5,}$/.test(n)) return 'A lead';
+  return n;
 }
 
 // MEMBERS (skeleton): agent bar (opens the members focus mode), roster KPIs
