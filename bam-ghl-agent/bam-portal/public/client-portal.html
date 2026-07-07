@@ -14279,6 +14279,7 @@ function _ibOpenContactDrawer(a) {
         <div style="height:1px;background:var(--border);margin:20px 0"></div>
         <div style="font-size:11px;font-weight:700;color:var(--text-mute);letter-spacing:0.6px;text-transform:uppercase;margin-bottom:10px">Tags</div>
         <div id="ib-cd-tags"></div>
+        <div id="ib-cd-dupes" style="margin-top:20px"></div>
         <div style="font-size:12px;color:var(--text-mute);margin-top:18px;line-height:1.5">Not a member yet. When they sign up they will show a Member pill and link to their full profile here.</div>
         ${ghlUrl ? `<a href="${escapeHTML(ghlUrl)}" target="_blank" rel="noopener" style="display:flex;align-items:center;justify-content:center;gap:8px;margin-top:18px;background:transparent;color:var(--text);border:1px solid var(--border);padding:10px 12px;font-weight:600;border-radius:6px;cursor:pointer;font-size:13px;text-decoration:none">Open in GHL ↗</a>` : ''}
       </div>
@@ -14288,8 +14289,59 @@ function _ibOpenContactDrawer(a) {
     if (bd) bd.style.opacity = '1';
     if (dr) dr.style.transform = 'translateX(0)';
   });
-  if (a.contactId) _renderTagEditorFetch('ib-cd-tags', a.contactId);
+  if (a.contactId) { _renderTagEditorFetch('ib-cd-tags', a.contactId); _ibLoadDupes(a.contactId); }
   else { const t = document.getElementById('ib-cd-tags'); if (t) t.innerHTML = '<span style="font-size:12px;color:var(--text-mute)">No GHL contact linked.</span>'; }
+}
+
+// Duplicate contacts (same phone / name) for the contact whose drawer is open.
+// Merging pulls the duplicate's messages, trials, opps and history into THIS
+// contact and removes the duplicate (atomic server-side function).
+async function _ibLoadDupes(contactId) {
+  const host = document.getElementById('ib-cd-dupes'); if (!host) return;
+  try {
+    const token = await _mreqAuthToken();
+    const r = await fetch('/api/ghl/merge-contacts?client_id=' + encodeURIComponent(CLIENT_ID), {
+      method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+      body: JSON.stringify({ client_id: CLIENT_ID, action: 'find', contact_id: contactId }),
+    });
+    const j = await _safeJson(r);
+    const cands = (r.ok && j.candidates) || [];
+    if (!cands.length) { host.innerHTML = ''; return; }
+    const rows = cands.map(c => {
+      const nm = escapeHTML(c.name || c.phone || c.email || 'Contact');
+      const sub = [c.phone, c.msgs ? (c.msgs + ' thread' + (c.msgs === 1 ? '' : 's')) : ''].filter(Boolean).join(' · ');
+      return `<div style="display:flex;align-items:center;gap:8px;padding:8px 0;border-top:1px solid var(--border)">
+          <div style="flex:1;min-width:0"><div style="font-size:13px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${nm}</div>${sub ? `<div style="font-size:11px;color:var(--text-mute);margin-top:1px">${escapeHTML(sub)}</div>` : ''}</div>
+          <button onclick="_ibMergeDupe('${escapeHTML(c.ghl_contact_id)}')" style="flex:none;background:none;border:1px solid var(--border-med);border-radius:6px;color:var(--text-sub);padding:5px 11px;font:inherit;font-size:11px;font-weight:700;cursor:pointer">Merge in</button>
+        </div>`;
+    }).join('');
+    host.innerHTML = `<div style="font-size:11px;font-weight:700;color:var(--text-mute);letter-spacing:0.6px;text-transform:uppercase;margin-bottom:6px">Possible duplicates (${cands.length})</div>
+      <div style="font-size:11px;color:var(--text-mute);margin-bottom:4px;line-height:1.5">Same phone or name. "Merge in" pulls their messages and history into this contact, then removes the duplicate.</div>${rows}`;
+  } catch (_) { host.innerHTML = ''; }
+}
+function _ibMergeDupe(dropId) {
+  const keep = _V15IB.active && _V15IB.active.contactId; if (!keep || !dropId) return;
+  _plConfirmModal({
+    icon: '', title: 'Merge this duplicate?',
+    body: "Their messages, trials and history move into the contact you're viewing, and the duplicate is removed. This can't be undone.",
+    okLabel: 'Merge', onOk: () => _ibMergeDupeGo(keep, dropId),
+  });
+}
+async function _ibMergeDupeGo(keep, dropId) {
+  try {
+    const token = await _mreqAuthToken();
+    const r = await fetch('/api/ghl/merge-contacts?client_id=' + encodeURIComponent(CLIENT_ID), {
+      method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+      body: JSON.stringify({ client_id: CLIENT_ID, action: 'merge', contact_id: keep, drop_id: dropId }),
+    });
+    const j = await _safeJson(r);
+    if (!r.ok) throw new Error((j && j.error) || 'merge failed');
+    // Drop the merged duplicate's conversation from the list immediately.
+    _V15IB.convos = (_V15IB.convos || []).filter(c => c.contactId !== dropId);
+    try { _v15ibRenderAll(); } catch (_) {}
+    _ibLoadDupes(keep);
+    if (typeof _plToast === 'function') _plToast('Merged - the duplicate is gone.');
+  } catch (e) { alert("Couldn't merge: " + (e.message || e)); }
 }
 function _ibCloseContactDrawer() {
   const bd = document.getElementById('ib-cd-backdrop'); const dr = document.getElementById('ib-cd-drawer');
