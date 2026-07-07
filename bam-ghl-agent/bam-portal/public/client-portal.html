@@ -4819,7 +4819,9 @@
   body:has(#view-messages.active) #admin-fb-wrap,
   body:has(#view-messages.active) #admin-fb-overlay,
   body:has(#view-parent-messages.active) #admin-fb-wrap,
-  body:has(#view-parent-messages.active) #admin-fb-overlay { display: none !important; }
+  body:has(#view-parent-messages.active) #admin-fb-overlay,
+  body:has(#view-v15inbox.active) #admin-fb-wrap,
+  body:has(#view-v15inbox.active) #admin-fb-overlay { display: none !important; }
   #admin-fb-modal {
     background: #131318; border: 1px solid rgba(255,255,255,0.12);
     border-radius: 10px; padding: 28px; max-width: 520px; width: 100%;
@@ -6167,7 +6169,9 @@
     body:has(#view-messages.active) #admin-fb-wrap,
     body:has(#view-messages.active) #admin-fb-overlay,
     body:has(#view-parent-messages.active) #admin-fb-wrap,
-    body:has(#view-parent-messages.active) #admin-fb-overlay { display: none; }
+    body:has(#view-parent-messages.active) #admin-fb-overlay,
+    body:has(#view-v15inbox.active) #admin-fb-wrap,
+    body:has(#view-v15inbox.active) #admin-fb-overlay { display: none; }
 
     /* ── Inputs ≥16px so iOS doesn't zoom on focus ── */
     input, textarea, select,
