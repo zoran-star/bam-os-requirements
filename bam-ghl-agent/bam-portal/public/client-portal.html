@@ -46771,6 +46771,7 @@ function _mmaEnsureModal() {
             </div>
             <div class="mma-chips">
               <button type="button" class="mma-chip" onclick="_mmaChip(&quot;How's my roster?&quot;)">How's my roster?</button>
+              <button type="button" class="mma-chip" onclick="_mmaChip('Who just signed up?')">Who's new?</button>
               <button type="button" class="mma-chip" onclick="_mmaChip('Who is at risk?')">Who's at risk?</button>
               <button type="button" class="mma-chip" onclick="_mmaChip('What is my MRR?')">What's my MRR?</button>
               <button type="button" class="mma-chip" onclick="_mmaChip('Pull up ', true)">Pull up a member</button>
@@ -47196,8 +47197,16 @@ function _mmaSend() {
   _mmaLogLine('You: ' + txt);
   _mmaHandle(txt.toLowerCase());
 }
+// Recent-signups intent: "who just signed up?", "who's new?", "any new
+// members this week?" - checked BEFORE KPIs so "how many signed up" reads
+// as a signup question, not a numbers dump.
+const _MMA_SIGNUP_RE = /sign(ed)?[\s-]?up|\bsignups?\b|just (joined|signed)|new(est)?\s+(member|sign|join|athlete|kid)|recent(ly)?\s+(join|sign|member|signup|add)|who(?:se|'?s| is| are)?\s+(?:just\s+|recently\s+)?(?:joined|signed|new)\b|latest\s+(member|sign|join|athlete)|joined\s+(this|last|recent)|any(?:one|body)?\s+(?:new\s+)?(?:just\s+)?(join|sign)/;
 async function _mmaHandle(q) {
   const roster = await _ccEnsureMembers();
+  if (_MMA_SIGNUP_RE.test(q)) {
+    await _mmaThink(['SCANNING ROSTER...', roster.length + ' RECORDS', 'SORTING BY JOIN DATE...']);
+    return _mmaRecentJoins(q);
+  }
   if (/\b(kpi|kpis|mrr|revenue|churn|arpu|numbers|how many|active|paused|roster|risk)\b/.test(q)) {
     await _mmaThink(['SCANNING ROSTER...', roster.length + ' RECORDS', 'COMPUTING NUMBERS...']);
     return _mmaKpis();
@@ -47274,6 +47283,70 @@ async function _mmaKpis() {
       if (!isNaN(num) && num > 0) { try { _hmCountUp(el, num, raw.indexOf('$') === 0 ? '$' : '', 700); } catch (_) {} }
     });
   }
+}
+// Join timestamp for a member, tolerant of the three date fields the roster
+// can carry (0 when we have no date on file).
+function _mmaJoinT(m) {
+  return new Date(m.joined_date || m.start_date || m.stripe_joined_at || 0).getTime();
+}
+// Human "when" for a join, tuned for how an owner talks about signups.
+function _mmaJoinAgo(t) {
+  const d = Math.floor((Date.now() - t) / 86400000);
+  if (d <= 0) return 'today';
+  if (d === 1) return 'yesterday';
+  if (d < 7) return d + ' days ago';
+  if (d < 14) return 'last week';
+  if (d < 31) { const w = Math.round(d / 7); return w + ' week' + (w === 1 ? '' : 's') + ' ago'; }
+  const mo = Math.round(d / 30);
+  return mo + ' month' + (mo === 1 ? '' : 's') + ' ago';
+}
+// Signup card: same shell as _mmaCardHtml but the sub line leads with when
+// they joined - that's the fact the owner asked for.
+function _mmaSignupCardHtml(m, t) {
+  const av = (typeof _memberAvatar === 'function') ? _memberAvatar(m, 32) : '';
+  const status = (typeof _memberStatusPill === 'function') ? _memberStatusPill(m.status) : escapeHTML(m.status || '');
+  let plan = '';
+  try { plan = m.pricing ? _memberPriceLabel(m.pricing) : (m.plan || ''); } catch (_) { plan = m.plan || ''; }
+  // plan comes from our own _memberPriceLabel helper and is already HTML
+  const sub = ['Joined ' + _mmaJoinAgo(t), plan ? String(plan) : ''].filter(Boolean).join(' · ');
+  return `<div class="mma-card">${av}<div style="min-width:0"><div class="mma-card-name">${escapeHTML(_ccCapName(m.athlete_name || 'Member'))} ${status}</div><div class="mma-card-sub">${sub}</div></div><button type="button" class="mma-open" onclick="openMemberPopup('${m.id}')">Open card</button></div>`;
+}
+// Answer "who just signed up?" - newest members first, windowed by the
+// phrasing (today / week / month, default last 30 days), with the MRR the
+// new signups added. Falls back to the most recent signups when the window
+// is empty so the agent always has something to say.
+async function _mmaRecentJoins(q) {
+  const roster = await _ccEnsureMembers();
+  const withT = roster.map(m => ({ m, t: _mmaJoinT(m) })).filter(x => x.t > 0).sort((a, b) => b.t - a.t);
+  if (!withT.length) {
+    return _mmaSay("I don't have join dates on the roster yet, so I can't tell you who's new. Open the member list once and try me again.", '');
+  }
+  let winDays = 30, label = 'the last 30 days';
+  if (/\btoday\b/.test(q)) { winDays = 1; label = 'today'; }
+  else if (/\byesterday\b/.test(q)) { winDays = 2; label = 'the last day'; }
+  else if (/\bweek\b/.test(q)) { winDays = 7; label = 'the last 7 days'; }
+  else if (/\bmonth\b/.test(q)) { winDays = 31; label = 'this month'; }
+  const cut = Date.now() - winDays * 86400000;
+  let recent = withT.filter(x => x.t >= cut);
+  const fellBack = !recent.length;
+  if (fellBack) recent = withT.slice(0, 3);
+  const show = recent.slice(0, 5);
+  const newMrr = show.reduce((s, x) => s + _ccMonthly(x.m), 0);
+  const mrrTail = newMrr > 0 ? ' +$' + Math.round(newMrr).toLocaleString() + '/mo.' : '';
+  const top = show[0];
+  const topNm = _ccCapName(top.m.athlete_name || top.m.parent_name || 'A member');
+  let text;
+  if (fellBack) {
+    text = 'No new signups in ' + label + '. Your most recent was ' + topNm + ', ' + _mmaJoinAgo(top.t) + '. Here are the latest few.';
+  } else if (recent.length === 1) {
+    text = topNm + ' signed up ' + _mmaJoinAgo(top.t) + ' - your only new member in ' + label + '.' + mrrTail;
+  } else {
+    text = recent.length + ' new members in ' + label + '. Newest is ' + topNm + ', ' + _mmaJoinAgo(top.t) + '.' + mrrTail;
+  }
+  _mmaSay(text, show.map(x => _mmaSignupCardHtml(x.m, x.t)).join(''));
+  _mmaPin('<span class="mma-pin-t">' + (fellBack ? 'Latest signups' : '+' + recent.length + ' new') + '</span><span class="mma-pin-s">' + escapeHTML(label) + '</span>',
+    () => { try { _ccMemberListOpen(); } catch (_) {} });
+  _ccFocusWallpaper('membersMachineModal', { highlight: top.t });
 }
 
 async function boot() {
