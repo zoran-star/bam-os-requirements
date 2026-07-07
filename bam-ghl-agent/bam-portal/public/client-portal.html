@@ -21379,19 +21379,30 @@ function _bbTermFromLength(s) {
   if (/6\s*month/.test(t) || /\b24\s*week/.test(t)) return '6_months';
   return null;
 }
+// Mirror of api/_fees.js (client-side): base cents + the academy's "added fees"
+// free-text -> all-in cents. No fee typed = base unchanged (no automatic HST).
+// Keep in sync with api/_fees.js.
+function _bbApplyFee(baseCents, raw) {
+  const s = String(raw == null ? '' : raw).trim();
+  if (!s || !(baseCents > 0)) return baseCents;
+  const pct = s.match(/(\d+(?:\.\d+)?)\s*%/);
+  if (pct) { const p = parseFloat(pct[1]); return p > 0 ? Math.round(baseCents * (1 + p / 100)) : baseCents; }
+  const flat = s.match(/(\d+(?:\.\d+)?)/);
+  if (flat) { const v = parseFloat(flat[1]); return v > 0 ? baseCents + Math.round(v * 100) : baseCents; }
+  return baseCents;
+}
 function _bbPlanKeys(offering) {
   if (!offering || offering.archived || String(offering.type || '').toLowerCase() !== 'membership') return [];
   const title = String(offering.title || '').trim();
   if (!title) return [];
-  const HST = 1.13;
   const cents = (n) => Math.round(n * 100);
   const keys = []; // { key, base_cents, allin_cents } - amounts power drift detection
   const base = parseFloat(offering.price);
-  if (!isNaN(base)) keys.push({ key: `${title}|monthly`, base_cents: cents(base), allin_cents: cents(base * HST) });
+  if (!isNaN(base)) keys.push({ key: `${title}|monthly`, base_cents: cents(base), allin_cents: _bbApplyFee(cents(base), offering.added_fees) });
   for (const c of (offering.commitments || [])) {
     const term = _bbTermFromLength(c.length);
     const cb = parseFloat(c.price);
-    if (term && !isNaN(cb)) keys.push({ key: `${title}|${term}`, base_cents: cents(cb), allin_cents: cents(cb * HST) });
+    if (term && !isNaN(cb)) keys.push({ key: `${title}|${term}`, base_cents: cents(cb), allin_cents: _bbApplyFee(cents(cb), c.added_fees) });
   }
   return keys;
 }
@@ -34852,7 +34863,7 @@ async function _sorterProposeMissing(key) {
     const r = await fetch('/api/offers/create-price', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
-      body: JSON.stringify({ client_id: _aiClientId(), mode: 'propose', targets: [{ key: t.key, offering: t.offering, term: t.term, base_cents: t.base_cents, allin_cents: t.allin_cents, label: t.label }] }),
+      body: JSON.stringify({ client_id: _aiClientId(), mode: 'propose', targets: [{ key: t.key, offering: t.offering, term: t.term, base_cents: t.base_cents, allin_cents: t.allin_cents, fee_label: t.fee_label, label: t.label }] }),
     });
     const json = await _safeJson(r);
     if (!r.ok) throw new Error(json.error || ('HTTP ' + r.status));

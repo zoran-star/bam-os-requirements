@@ -138,13 +138,15 @@ async function aiRecommend(targets, currency) {
   const system =
     "A sports academy typed offer prices (plan × term) into their Offers, but some have NO matching " +
     "Stripe price yet. For EACH target, recommend the Stripe price to create. `base_cents` is the " +
-    "exact price the academy typed. CHARGE THAT price: pick unit_amount_cents = base_cents. Do NOT add " +
-    "tax, HST, or any markup automatically - tax/fees are configured separately by the academy in their " +
-    "offer's added-fees setting, not here. " +
+    "pre-tax price the academy typed; `allin_cents` is base plus the academy's OWN configured added " +
+    "fees (it equals base when no fee was set); `fee_label` describes that fee (e.g. '13% HST') or is " +
+    "null. CHARGE THE ALL-IN: pick unit_amount_cents = allin_cents. Never invent tax - the fee is only " +
+    "whatever the academy configured, which may be nothing. " +
     "The recurring shape is fixed by the term: monthly/4_weeks → {interval:'week',interval_count:4}; " +
     "3_months → {interval:'month',interval_count:3}; 6_months → {interval:'month',interval_count:6}. " +
-    "Write a SHORT plain_explanation a non-technical owner understands, e.g. '$200 every 4 weeks'. " +
-    "Set matches_offer=true when unit_amount_cents equals the target's base_cents; offer_impact_note = " +
+    "plain_explanation: if allin_cents > base_cents, write e.g. '$563.87 every 3 months = your $499.00 " +
+    "+ 13% HST' using fee_label; otherwise just '$499.00 every 3 months'. " +
+    "Set matches_offer=true when unit_amount_cents equals the target's base or all-in; offer_impact_note = " +
     "one short line on what creating this does (e.g. 'new signups on the Steady plan will be billed this'). " +
     `Currency is ${cur} (the academy's Stripe account currency) - use it for every recommendation. ` +
     "Respond with ONLY a JSON array, one object per input target, same order, no prose:\n" +
@@ -153,7 +155,7 @@ async function aiRecommend(targets, currency) {
   const payload = {
     targets: targets.map(t => ({
       key: t.key, offering: t.offering, term: t.term,
-      base_cents: t.base_cents, allin_cents: t.allin_cents, label: t.label,
+      base_cents: t.base_cents, allin_cents: t.allin_cents, fee_label: t.fee_label || null, label: t.label,
     })),
   };
 
@@ -161,18 +163,23 @@ async function aiRecommend(targets, currency) {
 }
 
 // Deterministic fallback recommendation (also used to harden/normalize the AI output).
-// Charges the BASE (pre-tax) price the academy typed - no automatic HST/markup.
+// Charges the ALL-IN = base + the academy's configured added fee (equals base
+// when no fee was set - no automatic HST/markup).
 function fallbackRecommend(t, currency) {
   const iv = termToInterval(t.term);
-  const amount = t.base_cents || t.allin_cents || 0;
+  const base = t.base_cents || 0;
+  const amount = t.allin_cents || base || 0;
   const cadence = cadenceLabel(iv.recurring);
   const planLabel = (t.offering || String(t.key || "").split("|")[0] || "this plan").trim();
+  const plain = (t.fee_label && amount > base && base > 0)
+    ? `${money(amount, currency)} ${cadence} = your ${money(base, currency)} + ${t.fee_label}`
+    : `${money(amount, currency)} ${cadence}`;
   return {
     key: t.key,
     recurring: iv.recurring,
     unit_amount_cents: amount,
     currency,
-    plain_explanation: `${money(amount, currency)} ${cadence}`,
+    plain_explanation: plain,
     matches_offer: true,
     offer_impact_note: `New signups on ${planLabel} (${String(t.term || "").replace("_", " ")}) will be billed this.`,
   };
