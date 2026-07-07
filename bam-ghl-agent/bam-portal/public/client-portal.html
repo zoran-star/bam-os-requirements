@@ -45657,6 +45657,14 @@ function _ccStyle() {
     '.cc-sal-bench-t b{display:block;font-family:var(--font-num);font-size:15px;font-weight:800;color:var(--text);line-height:1.15}' +
     '.cc-sal-bench-t span{font-size:9.5px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--gold)}' +
     '.cc-sal-bench-s{margin-left:auto;font-size:12px;color:var(--text-mute)}' +
+    '.cc-sal-hawkmsg{margin-left:auto;display:inline-flex;align-items:center;gap:9px;max-width:min(600px,58%);min-width:0;background:none;border:1px solid transparent;border-radius:999px;padding:6px 6px 6px 2px;font:inherit;font-size:12.5px;color:var(--text-mute);cursor:pointer;text-align:left;transition:border-color .15s,background .15s,transform .1s}' +
+    '.cc-sal-hawkmsg.has{background:var(--gold-glow,rgba(212,182,92,.10));border-color:var(--gold);padding-left:6px;color:var(--text)}' +
+    '.cc-sal-hawkmsg.has:hover{transform:translateY(-1px)}' +
+    '.cc-sal-hawkmsg .cc-sal-hawk-pill{flex:none;min-width:22px;height:22px;border-radius:999px;background:var(--gold);color:var(--on-gold,#0B0B0D);font-family:var(--font-num);font-weight:800;font-size:12px;display:inline-flex;align-items:center;justify-content:center;padding:0 6px}' +
+    '.cc-sal-hawkmsg .cc-sal-hawk-txt{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}' +
+    '.cc-sal-hawkmsg .cc-sal-hawk-txt b{font-weight:800;color:var(--text)}' +
+    '.cc-sal-hawkmsg .cc-sal-hawk-more{color:var(--text-mute);font-size:11px}' +
+    '.cc-sal-hawkmsg .cc-sal-hawk-go{flex:none;color:var(--gold);font-weight:800;white-space:nowrap}' +
     '.cc-pipe-strip{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:18px}' +
     '.cc-pipe-pill{display:inline-flex;align-items:center;gap:8px;background:var(--surface);border:1px solid var(--border);border-radius:999px;padding:7px 8px 7px 14px;font:inherit;font-size:12px;font-weight:600;color:var(--text);cursor:pointer;transition:border-color .15s,transform .15s}' +
     '.cc-pipe-pill:hover{border-color:var(--accent-border);transform:translateY(-1px)}' +
@@ -46620,7 +46628,7 @@ function _ccMountSales(host) {
       <div class="cc-sal-bench">
         <span class="cc-sal-orb"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8"/><line x1="12" y1="2" x2="12" y2="6"/><line x1="12" y1="18" x2="12" y2="22"/><line x1="2" y1="12" x2="6" y2="12"/><line x1="18" y1="12" x2="22" y2="12"/><circle cx="12" cy="12" r="2"/></svg></span>
         <div class="cc-sal-bench-t"><b>Hawk</b><span>Sales rep</span></div>
-        <div class="cc-sal-bench-s" id="cc-sal-status">Watching the pipeline.</div>
+        <button class="cc-sal-hawkmsg" id="cc-sal-hawkmsg" onclick="_hv2OpenHawkeye()" title="Open Hawkeye"><span class="cc-sal-hawk-txt">Watching the pipeline.</span></button>
       </div>
       <div class="cc-trials-card" onclick="_ccOpenClassic('calendar')" title="Jump to the calendar">
         <div class="cc-trials-hero">
@@ -46761,12 +46769,42 @@ async function _ccSalesKpis() {
     const cl = document.getElementById('cc-sal-close'); if (cl) cl.textContent = (j.closing_rate != null ? j.closing_rate + '%' : '-');
   } catch (_) { /* leave the dashes */ }
 }
-function _ccSalesHawk() {
-  const n = window._hmHawkTotal || 0;
-  const b = document.getElementById('cc-sal-hawkn');
-  if (b) { b.textContent = String(n); b.style.display = n > 0 ? '' : 'none'; }
-  const st = document.getElementById('cc-sal-status');
-  if (st) st.textContent = n > 0 ? n + (n === 1 ? ' follow-up queued.' : ' follow-ups queued.') : 'Watching the pipeline.';
+function _ccHawkVerb(kind) {
+  return ({ reply: 'needs a reply', book: 'has a trial to confirm', ghost: 'should go to Ghosted', mark_lost: 'to confirm as lost' })[kind] || 'needs a look';
+}
+// Hawk's live message on the right of the Sales bench: the top queued action +
+// how many are waiting. Tapping it opens the Hawkeye focus view. Fetches its own
+// data (the command center doesn't run the home rail loader).
+async function _ccSalesHawk() {
+  const items = [];
+  try {
+    const [fu, rd] = await Promise.all([
+      _apxPost('/api/agent-followups', 'list', {}).catch(() => ({})),
+      _apxPost('/api/agent-approvals', 'list-ready', {}).catch(() => ({})),
+    ]);
+    const d = _apxSplit(fu, rd);
+    for (const r of (d.ready || []))     items.push({ name: r.contact_name, desc: _ccHawkVerb(r.kind) });
+    for (const f of (d.followups || [])) items.push({ name: f.contact_name, desc: 'has a follow-up ready' });
+    for (const b of (d.book || []))      items.push({ name: b.contact_name, desc: 'has a trial to confirm' });
+    for (const g of (d.ghost || []))     items.push({ name: g.contact_name, desc: 'should go to Ghosted' });
+    for (const l of (d.lost || []))      items.push({ name: l.contact_name, desc: 'to confirm as lost' });
+  } catch (_) {}
+  const total = items.length;
+  window._hmHawkTotal = total;
+  const badge = document.getElementById('cc-sal-hawkn');
+  if (badge) { badge.textContent = String(total); badge.style.display = total > 0 ? '' : 'none'; }
+  const el = document.getElementById('cc-sal-hawkmsg');
+  if (!el) return;
+  if (!total) {
+    el.classList.remove('has');
+    el.innerHTML = `<span class="cc-sal-hawk-txt">All caught up. Watching the pipeline.</span>`;
+    return;
+  }
+  const top = items[0];
+  const nm = escapeHTML(_hmStripEm(top.name || 'A lead'));
+  const more = total > 1 ? ` <span class="cc-sal-hawk-more">+${total - 1} more</span>` : '';
+  el.classList.add('has');
+  el.innerHTML = `<span class="cc-sal-hawk-pill">${total}</span><span class="cc-sal-hawk-txt"><b>${nm}</b> ${escapeHTML(top.desc)}${more}</span><span class="cc-sal-hawk-go">Review ›</span>`;
 }
 
 // MEMBERS (skeleton): agent bar (opens the members focus mode), roster KPIs
