@@ -26976,17 +26976,19 @@ function openAddCreativeModal(channel) {
   // page-placement framing (values are freeform text carried in context.format).
   const fmt = document.getElementById('inputAssetsFormat');
   if (fmt) {
+    // Funnel = wide or tall (websites); square/feed shapes belong to the
+    // social paths - and the team's finished feed graphics are 1:1, not 4:5
+    // (Cam 2026-07-06). Odd shapes on funnel are what "Best fit" is for.
     const OPTS = _inputAssetsChannel === 'funnel'
       ? [
           ['Best fit', 'Best fit - let the team match the page'],
           ['16:9 Wide', '16:9 - Wide (hero video / VSL / banner)'],
-          ['1:1 Square', '1:1 - Square (page section image)'],
           ['9:16 Tall', '9:16 - Tall (mobile section)'],
         ]
       : [
           ['9:16 Vertical', '9:16 - Vertical (Reels / Stories / TikTok)'],
           ['16:9 Landscape', '16:9 - Landscape (YouTube)'],
-          ['4:5 Feed', '4:5 - Feed (Instagram / Facebook post)'],
+          ['1:1 Square', '1:1 - Square (feed post)'],
         ];
     fmt.innerHTML = OPTS.map(([v, l]) => `<option value="${v}">${l}</option>`).join('');
     fmt.value = OPTS[0][0];
@@ -48078,10 +48080,12 @@ function toggleTheme() {
     <div style="font-size:12px;color:var(--text-mute);margin-top:4px">Set sharing to "Anyone with the link" so we can open it.</div>
 
     <label class="modal-label" for="inputAssetsFormat" style="margin-top:18px">Format</label>
+    <!-- Options are rebuilt per channel in openAddCreativeModal(); this static
+         set is the ads/organic default and just keeps the markup readable. -->
     <select id="inputAssetsFormat" class="modal-input">
       <option value="9:16 Vertical">9:16 - Vertical (Reels / Stories / TikTok)</option>
       <option value="16:9 Landscape">16:9 - Landscape (YouTube)</option>
-      <option value="4:5 Feed">4:5 - Feed (Instagram / Facebook post)</option>
+      <option value="1:1 Square">1:1 - Square (feed post)</option>
     </select>
 
     <label class="modal-label" id="inputAssetsCaptionsRow" style="margin-top:16px;display:flex;align-items:center;gap:10px;cursor:pointer;font-weight:400">
