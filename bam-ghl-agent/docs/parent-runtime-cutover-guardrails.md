@@ -2,7 +2,11 @@
 
 Owner: Luka. Audience: Zoran's agents doing Phase 5/6 cutover work (checkout,
 offers, webhook, members billing, sorter -> typed runtime tables).
-Last updated: 2026-07-02
+Last updated: 2026-07-07
+
+2026-07-07 status note: the Phase 5/6/6.8 cutover work this doc guarded is now
+implemented; see `offer-tie-in-plan.md` for the shipped record. These guardrails
+still apply to follow-up work and repairs.
 
 Read this BEFORE writing any cutover code. The full plan with per-endpoint
 target behavior and acceptance criteria is
@@ -43,8 +47,9 @@ exists because of a concrete failure mode.
 
 5. **`source_ref` conventions are load-bearing.** Credit grants:
    `invoice_line:<id>`. Booking debits/refunds: `reservation:<id>`.
-   Entitlements: granularity is an OPEN LUKA DECISION that blocks Phase 6.0 -
-   do not pick one ad hoc.
+   Entitlements: `subscription:<sub_id>:<price_id>` for subscriptions and
+   `invoice:<invoice_id>:<price_id>` for one-time purchases. Do not invent a
+   different convention in follow-up paths.
 
 6. **Webhook rules (Phase 5).** The access-sync path must return 5xx on failure
    so Stripe retries (the current webhook's return-200-on-error pattern is NOT
@@ -62,12 +67,11 @@ exists because of a concrete failure mode.
    INSERT/UPDATE/DELETE on `schedule_slots`, `reservations`, `trial_bookings`,
    `waitlist_entries` - including "quick fixes" and test cleanup in prod.
 
-9. **The credit engine is dormant until Phase 6 activation.** Do not call
-   `apply_stripe_credit_grant` / `expire_lapsed_credit_entitlements` or wire
-   the reconcile endpoint into webhook/cron. Activation is a deliberate cutover
-   step with its own checklist (grant amounts need the Stripe interval check
-   first). Weekly-credit prices must stay gated out of any checkout cutover
-   until the engine is activated.
+9. **The credit engine is live behind explicit gates.** Webhook grants run only
+   when `clients.credit_engine_enabled` allows them, expiry runs through the
+   scheduled sweep, and repair uses the protected reconcile endpoint. Do not
+   hand-call `apply_stripe_credit_grant` / `expire_lapsed_credit_entitlements`
+   as an ad hoc production fix.
 
 10. **Deny-all RLS stays deny-all.** No policies on parent/runtime tables, and
     no new staff tables with plain `authenticated` policies (parents hold real
@@ -183,5 +187,6 @@ checkout to read JSON.
   `api/ghl/post-trial.js` require a GHL token before checking
   `booking_provider='portal'`. Harmless for GTA (has GHL config); fix before
   onboarding a portal academy without GHL.
-- `entry_points.bookable_program_id` linkage (shared-table sync with Luka).
+- ~~`entry_points.bookable_program_id` linkage~~ Landed via migration
+  `20260703000509`; diagnostics now include the drift check.
 - Delete the monthly slot-extend Routine once Luka ships the native cron.

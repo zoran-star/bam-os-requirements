@@ -2,8 +2,10 @@
 
 Owner: Luka
 Audience: Zoran's agent and BAM Portal agents
-Last updated: 2026-07-02 (major status change: scheduling/trial/credit DB layer
-is live in production; API layer awaiting deploy - see "What Is Already Done")
+Last updated: 2026-07-07 (major status change: scheduling/trial/runtime API
+layer is deployed; offer tie-in checkout/webhook/member spine is complete; the
+remaining work is parent-app registration, notifications, live-mode smoke, and
+small launch follow-ups)
 
 This doc is the BAM Portal-side handoff for the parent app, typed Offer runtime,
 checkout cutover, and future internal free-trial scheduling work. It exists here
@@ -102,8 +104,10 @@ backfill migrations):
   `reschedule_trial_booking`, `set_trial_outcome` RPCs.
 - Staff ops: `staff_cancel_slot` RPC (cancels reservations, refunds credits,
   clears waitlist, cancels trials; idempotent).
-- Credit engine RPCs exist but are DORMANT (no cron, webhook untouched);
-  do not call them outside the Phase 6 cutover.
+- Credit engine RPCs exist and the offer tie-in cutover activated webhook grants
+  behind `clients.credit_engine_enabled`; expiry sweep is registered at
+  `/api/runtime/credits/cron-sweep`. Treat `credit_ledger` as live production
+  data.
 - Uniqueness guards (runtime + identity spine) are applied.
 
 API layer, merged to main and deployed to Vercel 2026-07-02 (PR #1020;
@@ -238,19 +242,25 @@ Recommended sequence:
 The parent-app backend/mobile work is separate from the portal checkout cutover,
 but it uses the same runtime tables.
 
-Still outstanding before production parent booking (updated 2026-07-02):
+Still outstanding before production parent booking (updated 2026-07-07):
 
-- registration endpoint and parent JWT canary
+- registration/claim endpoint with targeted auth/RLS coverage
 - ~~production identity/member linking~~ ✅ backfilled (30 member_links)
-- production schedule import or staff-published schedule rows ← the remaining
-  data gate (0 slots in prod)
+- ~~production schedule import or staff-published schedule rows~~ ✅ live
+  (4 templates, 86 slots through the staff endpoints as of 2026-07-02)
 - ~~production entitlement import~~ ✅ backfilled (30 entitlements)
-- production credit opening balances where needed (credit engine RPCs exist,
-  dormant; real `invoice_grant_credits` values pend the Stripe interval check)
+- ~~production credit opening balances where needed~~ ✅ backfilled; credit
+  engine grants are active behind `clients.credit_engine_enabled`
 - ~~review/push of booking-write RPC slice~~ ✅ applied to prod 2026-07-02
 - ~~deploy of the `parent/refactor` API layer~~ ✅ merged + deployed 2026-07-02
-- mobile polish for leave-waitlist and no-credit booking states; All Classes
-  screen also lacks pull-to-refresh
+- parent-app production/live-mode smoke for add-child checkout, billing card
+  update/history, and credit-ledger grant/debit/refund/expiry behavior
+- parent notifications (SMS booking/cancel confirmations first; push later if
+  kept in V1 scope)
+- optional member-management scope: pause/change/cancel and remove-child remain
+  deliberately hidden/deferred until policy exists
+- trial `CONVERTED` status exists, but `converted_member_id` /
+  `converted_membership_id` linkage still needs the checkout/conversion endpoint
 
 ## Free Trials After GHL
 
@@ -272,11 +282,10 @@ Free trials are not member reservations. A free-trial lead does not have an
 `academy_membership_id`, does not consume credits, and does not need an active
 entitlement. Therefore free trials should not be forced into `reservations`.
 
-Recommended additions (status 2026-07-02):
+Recommended additions (status 2026-07-07):
 
-- Add `entry_points.bookable_program_id`. ← still pending; `entry_points` is a
-  shared table, so this needs a Luka/Zoran sync. Until then the trial APIs
-  accept `client_id`/`bookable_program_id` directly.
+- `entry_points.bookable_program_id`: ✅ landed via migration `20260703000509`
+  with the runtime diagnostics drift check.
 - `booking_kind` was REJECTED for shared sessions (see
   `trial-calendars-confirmed-decisions.md`); trials book into normal slots.
 - `trial_bookings`: ✅ in production.
@@ -372,7 +381,9 @@ capacity ✅. The handoff has happened: Zoran's surfaces (website trials, agent
 booking, staff Calendars tab, post-trial outcomes) are live on this spine for
 GTA - see `memories/project_calendars_offghl.md` for what was built and
 `docs/parent-runtime-cutover-guardrails.md` for the rules his agents follow
-next (Phase 5/6 cutover work).
+next. The Phase 5/6/6.8 cutover work referenced in older handoffs is complete;
+see `offer-tie-in-plan.md` for the implementation record and current rollout
+gates.
 
 ## Why This Architecture Holds
 
@@ -415,8 +426,8 @@ from member/credit booking state.
 - Do not `INSERT`/`UPDATE` `trial_bookings` or `schedule_slots` directly - go
   through the RPCs/endpoints (see "What Zoran's surfaces may do" in
   `parent-app-db-boundary.md`).
-- Do not call the dormant credit engine RPCs (`apply_stripe_credit_grant`,
-  `expire_lapsed_credit_entitlements`) before the Phase 6 cutover.
+- Do not hand-call credit engine RPCs as an ad hoc data fix; use the gated
+  webhook path, scheduled expiry sweep, or the protected reconcile/repair route.
 - Do not modify shared tables (`offers`, `offer_teams`, `pricing_catalog`,
   `entry_points`, `members`) in a way that breaks the lineage described here
   without syncing with Luka.
