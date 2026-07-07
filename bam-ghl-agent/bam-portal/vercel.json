@@ -218,6 +218,18 @@
       "destination": "/api/parent/messages?action=unread-count"
     },
     {
+      "source": "/api/parent/billing/payment-method/default",
+      "destination": "/api/parent/billing?action=payment-method-default"
+    },
+    {
+      "source": "/api/parent/billing/payment-method",
+      "destination": "/api/parent/billing?action=payment-method"
+    },
+    {
+      "source": "/api/parent/billing/summary",
+      "destination": "/api/parent/billing?action=summary"
+    },
+    {
       "source": "/api/client/parent-message-threads/unread-count",
       "destination": "/api/client/parent-message-threads?action=unread-count"
     },
