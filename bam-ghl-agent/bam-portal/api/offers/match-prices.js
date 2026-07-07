@@ -1,5 +1,6 @@
 import { withSentryApiRoute } from "../_sentry.js";
 import { claudeJsonArray } from "../_ai.js";
+import { parseFee, applyFee, feeLabel } from "../_fees.js";
 // Reads ALL live Stripe subs/products/charges (paginated) + an AI call — the
 // default ~10s function timeout is not enough, which surfaces as "Failed to
 // fetch" on the client. Give it headroom.
@@ -208,7 +209,8 @@ async function aiMatch(targets, prices) {
   const system =
     "You reconcile a sports academy's messy live Stripe prices to the academy's OWN offer prices " +
     "(the plans + terms they typed into their Offers). Each target has BOTH a base_cents amount and " +
-    "an allin_cents amount (base + 13% tax). For EACH live price, pick the single best matching " +
+    "an allin_cents amount (base + the academy's own added fees, if any; allin equals base when no " +
+    "fee was set). For EACH live price, pick the single best matching " +
     "offer_price_key (or null if none). Match the live amount_cents to EITHER the base OR the all-in " +
     "amount of a target (small rounding differences are fine), then by NAME, then by interval. " +
     "Assign a tier — ONLY two values:\n" +
@@ -226,7 +228,7 @@ async function aiMatch(targets, prices) {
     '[{"price_id","offer_price_key"(or null),"tier":"live"|"legacy","confidence"(0-1),"needs_review"(bool),"reason"(<=18 words)}]';
 
   const payload = {
-    offer_price_targets: targets.map(t => ({ key: t.key, label: t.label, offering: t.offering, term: t.term, base_cents: t.base_cents, allin_cents: t.allin_cents })),
+    offer_price_targets: targets.map(t => ({ key: t.key, label: t.label, offering: t.offering, term: t.term, base_cents: t.base_cents, allin_cents: t.allin_cents, fee_label: t.fee_label })),
     live_prices: prices.map(p => ({
       price_id: p.price_id, amount_cents: p.unit_amount, currency: p.currency,
       interval: p.interval, interval_count: p.interval_count,
@@ -252,11 +254,12 @@ function _termFromLength(s) {
 
 // Build the match TARGETS from what the academy filled out in their Offers →
 // Pricing section (data.pricing.pricing_offerings). Each Membership offering →
-// a monthly target + one per commitment, with base + all-in (×1.13) amounts.
+// a monthly target + one per commitment, with base + all-in amounts. All-in =
+// base + the academy's own "added fees" (per offering / per commitment); no fee
+// typed = all-in equals base. Nothing is added automatically.
 async function buildOfferTargets(clientId) {
   const offers = await sb(`offers?client_id=eq.${encodeURIComponent(clientId)}&status=neq.archived&select=id,title,type,data`) || [];
   const targets = [];
-  const HST = 1.13;
   const cents = n => Math.round(n * 100);
   for (const o of offers) {
     const offerings = (o.data && o.data.pricing && o.data.pricing.pricing_offerings) || [];
@@ -267,15 +270,19 @@ async function buildOfferTargets(clientId) {
       if (!title) continue;
       const base = parseFloat(off.price);
       if (!isNaN(base)) {
+        const fee = parseFee(off.added_fees);
         targets.push({ key: `${title}|monthly`, offer_id: o.id, offering: title, term: "monthly",
-          base_cents: cents(base), allin_cents: cents(base * HST), label: `${title} · Monthly` });
+          base_cents: cents(base), allin_cents: applyFee(cents(base), fee), fee_label: feeLabel(fee),
+          label: `${title} · Monthly` });
       }
       for (const c of (off.commitments || [])) {
         const term = _termFromLength(c.length);
         const cb = parseFloat(c.price);
         if (term && !isNaN(cb)) {
+          const fee = parseFee(c.added_fees);
           targets.push({ key: `${title}|${term}`, offer_id: o.id, offering: title, term,
-            base_cents: cents(cb), allin_cents: cents(cb * HST), label: `${title} · ${term.replace("_", " ")}` });
+            base_cents: cents(cb), allin_cents: applyFee(cents(cb), fee), fee_label: feeLabel(fee),
+            label: `${title} · ${term.replace("_", " ")}` });
         }
       }
     }
@@ -517,7 +524,7 @@ async function handler(req, res) {
       ok: true,
       academy: client.business_name,
       counts: { live_prices: prices.length, targets: targets.length, needs_review: proposals.filter(p => p.needs_review).length },
-      targets: targets.map(t => ({ key: t.key, offer_id: t.offer_id, offering: t.offering, term: t.term, label: t.label, base_cents: t.base_cents, allin_cents: t.allin_cents })),
+      targets: targets.map(t => ({ key: t.key, offer_id: t.offer_id, offering: t.offering, term: t.term, label: t.label, base_cents: t.base_cents, allin_cents: t.allin_cents, fee_label: t.fee_label })),
       proposals,
     });
   } catch (e) {
