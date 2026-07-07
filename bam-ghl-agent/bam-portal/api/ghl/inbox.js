@@ -289,6 +289,26 @@ async function classifyStoreConversations(clientId, conversations) {
     }
   }
 
+  // Same-phone named contact: a nameless thread frequently has a NAMED duplicate
+  // contact on the exact same number (one record owns the thread, another holds the
+  // name). Resolve the name from that sibling so the row shows a name, not a number.
+  const needPhones = [...new Set(conversations
+    .filter((c) => _nameless(c.contactName) && c.phone && !(c.contactId && nameByContactId.has(c.contactId)))
+    .map((c) => c.phone))];
+  const nameByPhone = new Map();
+  for (let i = 0; i < needPhones.length; i += 100) {
+    const chunk = needPhones.slice(i, i + 100);
+    const rows = await sb(
+      `contacts?client_id=eq.${clientId}` +
+      `&phone=in.(${chunk.map((p) => encodeURIComponent(`"${p}"`)).join(",")})` +
+      `&select=phone,name,first_name,last_name`
+    ).catch(() => []);
+    for (const r of (Array.isArray(rows) ? rows : [])) {
+      const nm = String(r.name || `${r.first_name || ""} ${r.last_name || ""}`).trim();
+      if (r.phone && nm && !_nameless(nm) && !nameByPhone.has(r.phone)) nameByPhone.set(r.phone, nm);
+    }
+  }
+
   // Manually spam-marked contacts (a global mute tagged reason='spam'): the inbox
   // hides them into its Spam group and the sales agent skips them.
   let spamSet = new Set();
@@ -307,6 +327,7 @@ async function classifyStoreConversations(clientId, conversations) {
     if (_nameless(contactName)) {
       contactName = (c.contactId && nameByContactId.get(c.contactId))
         || (m && (m.parent_name || m.athlete_name))
+        || (c.phone && nameByPhone.get(c.phone))
         || contactName;
     }
     return {
