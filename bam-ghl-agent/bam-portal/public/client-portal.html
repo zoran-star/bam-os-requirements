@@ -6623,6 +6623,21 @@
       </div>
     </div>
 
+    <!-- "Completed while you were away" banner (Mike's suggestion 2026-07-06).
+         Hidden by default; _checkCompletedBanner() flips it visible when a
+         ticket/creative finished since the client's last dismiss. Lives above
+         every view, same treatment as the GHL banner. -->
+    <div id="completed-banner" style="display:none; background:rgba(212,182,92,0.12); border-bottom:1px solid rgba(212,182,92,0.4); padding:12px 22px; gap:14px; align-items:center; justify-content:space-between; flex-wrap:wrap; font-size:13px;">
+      <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap; min-width:0;">
+        <span style="font-size:16px; color:var(--gold,#D4B65C);"><svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-0.12em"><polyline points="20 6 9 17 4 12"/></svg></span>
+        <span id="completed-banner-msg" style="min-width:0;"></span>
+      </div>
+      <div style="display:flex; gap:8px; flex-wrap:wrap;">
+        <button onclick="_cbOpen()" style="background:var(--gold,#D4B65C); color:#0B0B0D; border:none; padding:8px 16px; font-size:13px; font-weight:700; border-radius:4px; cursor:pointer; font-family:inherit;">View it</button>
+        <button onclick="_cbDismiss()" title="Dismiss" style="background:transparent; color:var(--text-mute); border:1px solid var(--border); padding:8px 12px; font-size:12px; border-radius:4px; cursor:pointer; font-family:inherit;">Dismiss</button>
+      </div>
+    </div>
+
     <!-- ══════════════════════════════
          HOME / DASHBOARD VIEW (MVP)
     ══════════════════════════════ -->
@@ -26267,6 +26282,7 @@ async function switchClient(newId) {
   await loadTickets();
   subscribeTicketsRealtime();   // re-scope tickets subscription to new CLIENT_ID
   _obtLoadProgress();           // refresh tracker for the new client's progress state
+  _checkCompletedBanner();      // re-check "while you were away" for the new academy
 }
 
 // ─────────────────────────────────────────────────────────────────
@@ -42283,6 +42299,91 @@ function closeDetail() {
   document.getElementById('systems-list').style.display = 'block';
 }
 
+// ── "Completed while you were away" banner ───────────────────────────
+// Shows once per completion wave: anything finished since the client's
+// last dismiss (localStorage baseline per client, 14-day floor so first
+// run doesn't dredge up ancient tickets). Systems tickets count at
+// final_review (work delivered, review it); creatives/campaigns at
+// completed. Funnel content tickets are excluded - their visible finish
+// is the systems Change ticket. Best-effort: any fetch failing just
+// means no banner.
+let _cbTarget = null;
+let _cbNewestIso = null;
+async function _checkCompletedBanner() {
+  try {
+    if (!CLIENT_ID) return;
+    const host = document.getElementById('completed-banner');
+    if (!host) return;
+    host.style.display = 'none';
+    const KEY = 'bam_completed_seen_' + CLIENT_ID;
+    let baseline = 0;
+    try { baseline = Date.parse(localStorage.getItem(KEY) || '') || 0; } catch (_) {}
+    const since = Math.max(baseline, Date.now() - 14 * 86400 * 1000);
+
+    const done = [];
+    try {
+      const { data } = await _sb.from('tickets')
+        .select('id,type,menu_item,fields,status,updated_at')
+        .eq('client_id', CLIENT_ID).eq('status', 'final_review')
+        .order('updated_at', { ascending: false }).limit(5);
+      (data || []).forEach(t => done.push({
+        ts: Date.parse(t.updated_at) || 0,
+        label: t.menu_item || (t.fields && (t.fields.title || t.fields.what)) || ((t.type || 'support') + ' ticket'),
+        kind: 'systems', id: t.id,
+      }));
+    } catch (_) {}
+    try {
+      const list = await _ctkFetchForClient();
+      (list || []).forEach(t => {
+        if (t.status !== 'completed' || t.channel === 'funnel' || !t.resolved_at) return;
+        done.push({
+          ts: Date.parse(t.resolved_at) || 0,
+          label: (t.title || '').trim() || ((t.type === 'video' ? 'Video' : 'Graphic') + ' creative'),
+          kind: 'marketing', id: t.id,
+        });
+      });
+    } catch (_) {}
+    try {
+      const list = await _mreqFetchAll();
+      (list || []).forEach(t => {
+        if (t.status !== 'completed' || !t.resolved_at) return;
+        done.push({ ts: Date.parse(t.resolved_at) || 0, label: 'Campaign request', kind: 'marketing', id: t.id });
+      });
+    } catch (_) {}
+
+    const fresh = done.filter(d => d.ts > since).sort((a, b) => b.ts - a.ts);
+    if (!fresh.length) return;
+    _cbTarget = fresh[0];
+    _cbNewestIso = new Date(fresh[0].ts).toISOString();
+    const msgEl = document.getElementById('completed-banner-msg');
+    if (msgEl) {
+      msgEl.innerHTML = fresh.length === 1
+        ? `<strong>${escapeHTML(_cbTarget.label)}</strong> was completed while you were away.`
+        : `<strong>${fresh.length} items</strong> were finished while you were away.`;
+    }
+    host.style.display = 'flex';
+  } catch (_) { /* banner is best-effort, never block boot */ }
+}
+function _cbMarkSeen() {
+  try { if (CLIENT_ID && _cbNewestIso) localStorage.setItem('bam_completed_seen_' + CLIENT_ID, _cbNewestIso); } catch (_) {}
+  const host = document.getElementById('completed-banner');
+  if (host) host.style.display = 'none';
+}
+function _cbDismiss() { _cbMarkSeen(); }
+function _cbOpen() {
+  const t = _cbTarget;
+  _cbMarkSeen();
+  if (!t) return;
+  if (t.kind === 'systems') {
+    const nav = document.getElementById('nav-systems-flat');
+    switchView('systems', nav || undefined);
+    try { if (typeof getTicket === 'function' && getTicket(t.id)) openTicket(t.id); } catch (_) { /* list is fine */ }
+  } else {
+    const mk = document.querySelector(`.nav-item[onclick*="switchView('marketing'"]`);
+    switchView('marketing', mk || undefined);
+  }
+}
+
 function getTicket(id) { return tickets.find(t => t.id === id); }
 
 function renderDetail() {
@@ -47609,6 +47710,7 @@ async function boot() {
   _loadPreviewStaff();         // populate the "Preview as" account-menu switcher
   _stripeConnectMaybeSwitch();
   renderClientSwitcher();
+  _checkCompletedBanner();     // "completed while you were away" (fire-and-forget)
   document.getElementById('login-overlay').style.display = 'none';
 
   // Staff-triggered onboarding feedback form — hard-blocks the portal until
