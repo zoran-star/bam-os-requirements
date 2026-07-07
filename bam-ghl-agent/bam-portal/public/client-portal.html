@@ -47690,27 +47690,112 @@ function _mmaSend() {
   const v = document.getElementById('mma-voice');
   if (v && !v.classList.contains('think')) { _mmaLogLine(v.textContent.trim()); v.textContent = ''; }
   _mmaLogLine('You: ' + txt);
-  _mmaHandle(txt.toLowerCase());
+  _mmaHandle(txt);
 }
-async function _mmaHandle(q) {
+// Router: instant local paths for KPIs + bare-name lookups; everything that
+// smells like an ACTION or a follow-up in an ongoing conversation goes to the
+// real agent (/api/members-agent) which reasons + proposes → Confirm on desk.
+const _MMA_ACTION_RE = /\b(pause|unpause|resume|cancel|refund|change|upgrade|downgrade|coupon|discount|charge|credit|referr\w*|call|payment|link|card|set|update|adjust|switch|move|apply|remove|send|why|fail\w*|help|walk|next)\b/i;
+async function _mmaHandle(qRaw) {
+  const q = String(qRaw || '');
+  const ql = q.toLowerCase();
   const roster = await _ccEnsureMembers();
-  if (/\b(kpi|kpis|mrr|revenue|churn|arpu|numbers|how many|active|paused|roster|risk)\b/.test(q)) {
+  if (/\b(kpi|kpis|mrr|revenue|churn|arpu|numbers|how many|active|roster|risk)\b/.test(ql) && !_MMA_AI.engaged) {
     await _mmaThink(['SCANNING ROSTER...', roster.length + ' RECORDS', 'COMPUTING NUMBERS...']);
     return _mmaKpis();
   }
-  const matches = await _mmaMatchMembers(q);
+  // Ongoing agent conversation, or an action-shaped request → the real agent.
+  if (_MMA_AI.engaged || _MMA_AI.proposal || _MMA_ACTION_RE.test(ql)) return _mmaAgentAsk(q);
+  const matches = await _mmaMatchMembers(ql);
   await _mmaThink(['SEARCHING ROSTER...', roster.length + ' RECORDS', matches.length + (matches.length === 1 ? ' MATCH' : ' MATCHES')]);
   if (matches.length === 1) {
     const m = matches[0];
     _mmaSay('This the one?', _mmaCardHtml(m, true));
+    // Seed the agent conversation so a follow-up ("pause him 2 weeks") knows
+    // exactly who without re-asking. member_id lets it skip the name lookup.
+    _MMA_AI.history.push({ role: 'assistant', text: 'Pulled up ' + (m.athlete_name || 'a member') + ' (parent ' + (m.parent_name || '-') + ', member_id ' + m.id + ').' });
     _mmaPin('<span class="mma-pin-t">' + escapeHTML(_ccCapName(m.athlete_name || 'Member')) + '</span><span class="mma-pin-s">member card</span>', () => openMemberPopup(m.id));
     const jt = new Date(m.joined_date || m.start_date || m.stripe_joined_at || 0).getTime();
     _ccFocusWallpaper('membersMachineModal', { highlight: jt > 0 ? jt : null });
   } else if (matches.length > 1) {
     _mmaSay('A few matches. Which one?', matches.map(m => _mmaCardHtml(m, false)).join(''));
   } else {
-    _mmaSay("Didn't catch that. Type a member's name to pull their card, or ask about your KPIs (try \"how's my MRR\").", '');
+    // Not a name we know - let the agent take a swing instead of shrugging.
+    return _mmaAgentAsk(q);
   }
+}
+
+// ── Real agent bridge (guided flows: pause + next payment, refunds, etc) ──
+let _MMA_AI = { history: [], engaged: false, proposal: null, busy: false };
+
+async function _mmaAgentAsk(message) {
+  if (_MMA_AI.busy) return;
+  if (typeof CLIENT_ID === 'undefined' || !CLIENT_ID) return _mmaSay('No academy in scope - refresh and try again.', '');
+  _MMA_AI.busy = true;
+  const thinkP = _mmaThink(['CALLING THE AGENT...', 'READING BILLING...', 'REASONING...']);
+  try {
+    const token = await _mreqAuthToken();
+    const res = await fetch('/api/members-agent', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+      body: JSON.stringify({ client_id: CLIENT_ID, message, history: _MMA_AI.history.slice(-12) }),
+    });
+    const json = await _safeJson(res);
+    await thinkP;
+    if (!res.ok) throw new Error(json.error || ('HTTP ' + res.status));
+    _MMA_AI.history.push({ role: 'user', text: message });
+    if (json.reply) _MMA_AI.history.push({ role: 'assistant', text: json.reply });
+    _MMA_AI.engaged = true;
+    _MMA_AI.proposal = json.proposal || null;
+    _mmaSay(json.reply || (json.proposal ? 'Ready when you are.' : 'Okay.'), json.proposal ? _mmaProposalHtml(json.proposal) : '');
+  } catch (e) {
+    await thinkP;
+    _mmaSay("Couldn't reach the agent: " + (e.message || e), '');
+  }
+  _MMA_AI.busy = false;
+}
+
+function _mmaProposalHtml(p) {
+  const destructive = (p.action === 'cancel' || p.action === 'refund');
+  const accent = destructive ? 'var(--red,#e0654f)' : 'var(--gold,#D4B65C)';
+  return '<div class="mma-card" style="border-color:' + accent + ';display:block">' +
+    '<div style="font-size:10px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:' + accent + ';margin-bottom:5px">Proposed action</div>' +
+    '<div style="font-size:13px;font-weight:600;line-height:1.45;margin-bottom:10px">' + escapeHTML(p.summary || p.action) + '</div>' +
+    '<div class="mma-card-acts" style="margin-top:0">' +
+      '<button type="button" class="mma-act" style="background:' + accent + ';color:var(--on-gold,#0B0B0D);border-color:' + accent + '" onclick="_mmaAgentConfirm()">Confirm</button>' +
+      '<button type="button" class="mma-act" onclick="_mmaAgentCancel()">Cancel</button>' +
+    '</div></div>';
+}
+
+async function _mmaAgentConfirm() {
+  const p = _MMA_AI.proposal;
+  if (!p || _MMA_AI.busy) return;
+  _MMA_AI.busy = true;
+  _MMA_AI.proposal = null;
+  const thinkP = _mmaThink(['EXECUTING...', 'WRITING TO STRIPE...', 'LOGGING AUDIT...']);
+  try {
+    const result = await _memberAction(p.member_id, p.action, p.body || {});
+    await thinkP;
+    _MMA_AI.history.push({ role: 'assistant', text: '(Executed: ' + (p.summary || p.action) + ')' });
+    if ((p.action === 'payment-link' || p.action === 'card-setup-link') && result && result.url) {
+      _mmaSay('Link ready - pick how to send it.', '');
+      _openPaymentLinkModal(p.member_id, result);
+    } else {
+      _mmaSay('Done. ' + (p.summary || p.action), '');
+    }
+    if (typeof fetchAndRenderMembers === 'function') fetchAndRenderMembers();
+  } catch (e) {
+    await thinkP;
+    _MMA_AI.history.push({ role: 'assistant', text: '(Execution failed: ' + (e.message || e) + ')' });
+    _mmaSay("That didn't go through: " + (e.message || e), '');
+  }
+  _MMA_AI.busy = false;
+}
+
+function _mmaAgentCancel() {
+  _MMA_AI.proposal = null;
+  _MMA_AI.history.push({ role: 'assistant', text: '(Proposal cancelled - nothing changed.)' });
+  _mmaSay('Cancelled. Nothing was changed.', '');
 }
 async function _mmaMatchMembers(q) {
   const stop = new Set(['the', 'and', 'about', 'member', 'members', 'who', 'what', 'can', 'you', 'tell', 'show', 'pull', 'card', 'for', 'his', 'her', 'their', 'this', 'that', 'guy']);
@@ -47740,8 +47825,8 @@ function _mmaCardHtml(m, detailed) {
   const extra = detailed
     ? `<div class="mma-card-sub">${[m.trainer ? 'Trainer: ' + escapeHTML(m.trainer) : '', m.joined_date ? 'Joined ' + escapeHTML(String(m.joined_date).slice(0, 10)) : ''].filter(Boolean).join(' · ')}</div>
        <div class="mma-card-acts">
-         <button type="button" class="mma-act" onclick="closeMembersFocus();mPause('${m.id}')">Pause</button>
-         <button type="button" class="mma-act" onclick="closeMembersFocus();mPaymentLink('${m.id}')">Payment link</button>
+         <button type="button" class="mma-act" onclick="_mmaChip('Pause ${escapeHTML(_ccCapName(m.athlete_name || 'this member').replace(/['"\\\\]/g, ''))}')">Pause</button>
+         <button type="button" class="mma-act" onclick="_mmaChip('Payment link for ${escapeHTML(_ccCapName(m.athlete_name || 'this member').replace(/['"\\\\]/g, ''))}')">Payment link</button>
          <button type="button" class="mma-act" onclick="openMemberPopup('${m.id}')">Message</button>
        </div>`
     : '';

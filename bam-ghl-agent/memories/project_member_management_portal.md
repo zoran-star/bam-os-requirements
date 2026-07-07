@@ -1144,6 +1144,23 @@ user, then propose ONE `pause` action with `start_date` + `end_date` +
 payment" is a single conversational flow → one confirm. members.js
 `actionPause` already honored `next_payment_date` as the manual trial_end.
 
+**2026-07-07 — focus-mode chat wired to the real agent:** the Members
+focus-mode "machine" chat (`_mma*`, the "This the one?" card UI) was a LOCAL
+keyword matcher (name→card, kpi regex→numbers; its Pause chip jumped to the
+old date modal). Now `_mmaHandle` routes to `/api/members-agent` whenever the
+message is action-shaped (`_MMA_ACTION_RE`), a conversation is engaged
+(`_MMA_AI` state), or no roster name matches; bare-name lookups + KPI queries
+stay local/instant. Showing a member card seeds the agent history with the
+member_id so follow-ups ("pause him 2 weeks") skip re-resolution. Proposals
+render as an mma-styled Confirm/Cancel card on the desk
+(`_mmaProposalHtml` / `_mmaAgentConfirm` → `_memberAction`, payment-link
+results open `_openPaymentLinkModal`); executed/cancelled outcomes are pushed
+into history as "(Executed: ...)" / "(Proposal cancelled ...)" so the agent
+knows what really happened. Card Pause / Payment-link chips now start the
+guided in-chat flow via `_mmaChip`. System prompt rule 8 (GUIDED STYLE):
+1-3 short sentences, ONE question per turn, settle pause window → next
+payment → then propose.
+
 **Follow-ups / polish (not built):**
 - Live end-to-end test on GTA (safe-first: find_members, payment-link).
 - Multi-action commands ("pause X and Y") — v1 does one action per proposal.
