@@ -273,6 +273,12 @@ async function handler(req, res) {
   }
   if (type === "Email" && !subject) return res.status(400).json({ error: "subject required for Email" });
 
+  // Accept both snake_case (contact_phone/contact_id/contact_email) and camelCase
+  // (phone/contactId/email) param names - inbox callers use the short forms.
+  const inContactId = body.contact_id || body.contactId || null;
+  const inPhone     = body.contact_phone || body.phone || null;
+  const inEmail     = body.contact_email || body.email || null;
+
   // Provider gate (IG/FB DMs): Meta-spine academies reply via the Graph API +
   // own-store (dm_threads). Runs BEFORE the GHL contact lookup because a DM
   // thread has no phone/email and may have no GHL contact yet - the lookup
@@ -282,7 +288,7 @@ async function handler(req, res) {
   if (type === "IG" || type === "FB") {
     const g = await maybeSendDmViaMeta(clientId, {
       conversationId: body.conversation_id,
-      ghlContactId:   body.contact_id,
+      ghlContactId:   inContactId,
       channel:        type === "IG" ? "instagram" : "facebook",
       text:           message,
       attachments,
@@ -292,7 +298,7 @@ async function handler(req, res) {
       const logMeta = (extra) => sb(`inbox_message_log`, {
         method: "POST", headers: { Prefer: "return=minimal" },
         body: JSON.stringify([{
-          client_id: clientId, ghl_contact_id: body.contact_id || null, channel: type,
+          client_id: clientId, ghl_contact_id: inContactId || null, channel: type,
           message: String(message || "(attachment)").slice(0, 1000),
           sent_by: (ctx.user && ctx.user.email) || null, ...extra,
         }]),
@@ -303,13 +309,36 @@ async function handler(req, res) {
     }
   }
 
+  // SMS via Twilio needs ONLY a phone number - no GHL contact. Run it BEFORE the
+  // GHL-contact requirement so an off-GHL lead (no GHL contact) can still be texted
+  // from the inbox. V2 academies are fully off GHL; this is the send path that
+  // keeps them off it. maybeSendSmsViaProvider returns { handled:false } for a
+  // non-Twilio academy, so the GHL path below runs unchanged for them.
+  if (type === "SMS" && (inPhone || inContactId)) {
+    const g = await maybeSendSmsViaProvider(clientId, { ghlContactId: inContactId, toPhone: inPhone, body: message, sentBy: (ctx.user && ctx.user.email) || "staff", contactName: body.contact_name || null });
+    if (g.handled) {
+      const logTw = (extra) => sb(`inbox_message_log`, {
+        method: "POST", headers: { Prefer: "return=minimal" },
+        body: JSON.stringify([{
+          client_id: clientId, ghl_contact_id: inContactId || null, channel: "SMS",
+          message: String(message || "(attachment)").slice(0, 1000),
+          sent_by: (ctx.user && ctx.user.email) || null, ...extra,
+        }]),
+      }).catch(() => {});
+      if (!g.ok) { await logTw({ status: "failed", error: g.error }); return res.status(502).json({ error: `Twilio send failed: ${g.error}` }); }
+      await logTw({ status: "sent", ghl_message_id: g.sid || null });
+      return res.status(200).json({ ok: true, sent_via: "twilio", message_id: g.sid || null });
+    }
+  }
+
   // Find the contact. Callers can pass contact_id directly (Inbox reply
-  // case — we already know who we're replying to) to skip the lookup.
-  const contactId = body.contact_id || await lookupContact({
+  // case — we already know who we're replying to) to skip the lookup. Only the
+  // GHL passthrough send + email lookups need it now.
+  const contactId = inContactId || await lookupContact({
     token,
     locationId,
-    phone:      body.contact_phone,
-    email:      body.contact_email,
+    phone:      inPhone,
+    email:      inEmail,
   });
   if (!contactId) {
     return res.status(404).json({
