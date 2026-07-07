@@ -172,7 +172,7 @@ export default function MarketingOverview({ tokens, session }) {
           <thead><tr>
             <th style={th}>Client</th><th style={th}>Verdict</th><th style={{ ...th, textAlign: "right" }}>Spend</th>
             <th style={{ ...th, textAlign: "right" }}>Leads</th><th style={{ ...th, textAlign: "right" }}>CPL</th>
-            <th style={th}>Trend</th><th style={th}>Pacing</th><th style={th}>Budget status</th>
+            <th style={th}>Trend</th><th style={{ ...th, textAlign: "right" }}>Budget</th><th style={th}>Pacing</th><th style={th}>Budget status</th>
           </tr></thead>
           <tbody>
             {rows.map(r => {
@@ -194,13 +194,14 @@ export default function MarketingOverview({ tokens, session }) {
                   <td style={{ ...td, textAlign: "right" }}>{showNums ? fmtMoney(r.spend) : "—"}</td>
                   <td style={{ ...td, textAlign: "right" }}>{showNums ? fmtNum(r.leads) : "—"}</td>
                   <td style={{ ...td, textAlign: "right", color: r.cpl == null ? t.textMute : (r.cpl <= target ? t.green : t.amber) }}>{r.cpl != null ? fmtMoney(r.cpl) : "—"}</td>
+                  <td style={{ ...td, textAlign: "right" }}>{r.monthly_budget != null ? fmtMoney(r.monthly_budget) : <span style={{ color: t.textMute }}>—</span>}</td>
                   <td style={td}>{r.trend?.leads_pct == null ? <span style={{ color: t.textMute }}>—</span> : <span style={{ fontSize: 12, color: r.trend.leads_pct >= 0 ? t.green : t.amber }}>{r.trend.leads_pct > 0 ? "▲" : r.trend.leads_pct < 0 ? "▼" : "■"} {Math.abs(r.trend.leads_pct)}% leads</span>}</td>
                   <td style={td}>{r.pacing?.spent_pct == null ? <span style={{ color: t.textMute }}>—</span> : <span style={{ fontSize: 12, color: r.pacing.spent_pct > r.pacing.month_pct + 15 ? t.amber : t.textSub }}>{r.pacing.spent_pct}% of budget</span>}</td>
                   <td style={td}>{budgetStatusCell(r.budget_status)}</td>
                 </tr>
               );
             })}
-            {!rows.length && <tr><td style={{ ...td, color: t.textSub }} colSpan={8}>No marketing clients yet.</td></tr>}
+            {!rows.length && <tr><td style={{ ...td, color: t.textSub }} colSpan={9}>No marketing clients yet.</td></tr>}
           </tbody>
         </table>
       </div>
