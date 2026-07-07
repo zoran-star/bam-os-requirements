@@ -45464,6 +45464,18 @@ function _ccStyle() {
     '.cc-stat.click:hover{transform:translateY(-2px);box-shadow:0 4px 14px rgba(0,0,0,.06)}' +
     '.cc-stat-v{font-family:var(--font-num);font-size:22px;font-weight:800;color:var(--text)}' +
     '.cc-stat-l{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;color:var(--text-mute);margin-top:2px}' +
+    '.cc-trials-card{display:flex;gap:20px;background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:16px 18px;box-shadow:0 1px 3px rgba(0,0,0,.04);margin-bottom:12px;cursor:pointer;transition:transform .2s var(--es,ease),box-shadow .2s}' +
+    '.cc-trials-card:hover{transform:translateY(-2px);box-shadow:0 4px 14px rgba(0,0,0,.06)}' +
+    '.cc-trials-hero{display:flex;flex-direction:column;justify-content:center;padding-right:20px;border-right:1px solid var(--border);min-width:88px;flex:0 0 auto}' +
+    '.cc-trials-n{font-family:var(--font-num);font-size:38px;font-weight:800;color:var(--text);line-height:1}' +
+    '.cc-trials-lab{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;color:var(--text-mute);margin-top:4px}' +
+    '.cc-trials-body{flex:1;min-width:0;display:flex;flex-direction:column;justify-content:center}' +
+    '.cc-trials-empty{font-size:13px;color:var(--text-mute)}' +
+    '.cc-tr-row{display:flex;align-items:baseline;gap:12px;padding:7px 0}' +
+    '.cc-tr-row+.cc-tr-row{border-top:1px solid var(--border)}' +
+    '.cc-tr-time{font-family:var(--font-num);font-weight:800;color:var(--gold,#D4B65C);min-width:70px;font-size:13px}' +
+    '.cc-tr-nm{font-weight:700;color:var(--text);flex:1;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}' +
+    '.cc-tr-age{color:var(--text-mute);font-size:12px;white-space:nowrap}' +
     '.cc-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:4px}' +
     '.cc-btn{display:inline-flex;align-items:center;gap:6px;background:transparent;border:1px solid var(--border-med);border-radius:8px;padding:8px 14px;font:inherit;font-size:12px;font-weight:600;color:var(--text);cursor:pointer;transition:border-color .12s,color .12s}' +
     '.cc-btn:hover{border-color:var(--gold);color:var(--gold)}' +
@@ -46442,14 +46454,18 @@ function _ccMountSales(host) {
         <div class="cc-sal-bench-t"><b>Hawk</b><span>Sales rep</span></div>
         <div class="cc-sal-bench-s" id="cc-sal-status">Watching the pipeline.</div>
       </div>
-      <div class="cc-stats">
-        <div class="cc-stat click" onclick="_ccOpenClassic('calendar')" title="Jump to the calendar">
-          <div class="cc-stat-v" id="cc-sal-trials">-</div><div class="cc-stat-l">Trials today</div><div class="cc-stat-d" id="cc-sal-next"></div>
+      <div class="cc-trials-card" onclick="_ccOpenClassic('calendar')" title="Jump to the calendar">
+        <div class="cc-trials-hero">
+          <div class="cc-trials-n" id="cc-sal-trials">-</div>
+          <div class="cc-trials-lab">Trials today</div>
+          <div class="cc-stat-d" id="cc-sal-next"></div>
         </div>
+        <div class="cc-trials-body" id="cc-sal-trials-list"></div>
+      </div>
+      <div class="cc-stats">
         <div class="cc-stat"><div class="cc-stat-v" id="cc-sal-7d">-</div><div class="cc-stat-l">Sales - 7 days</div></div>
         <div class="cc-stat"><div class="cc-stat-v" id="cc-sal-close">-</div><div class="cc-stat-l">Trial closing rate</div></div>
       </div>
-      <div id="cc-sal-trials-list"></div>
       <div class="cc-pipe-strip" id="cc-sal-strip"></div>
       <div class="cc-actions">
         <button type="button" class="cc-btn primary" onclick="_ccOpenClassic('pipelines')">Open sales board</button>
@@ -46484,19 +46500,14 @@ async function _ccLoadTrialsCount() {
 // captured, else the group band, e.g. "Elementary"). Clears when there are none.
 function _ccRenderTrialsList(trials, tz) {
   const host = document.getElementById('cc-sal-trials-list'); if (!host) return;
-  if (!trials || !trials.length) { host.innerHTML = ''; return; }
-  const rows = trials.map(t => {
+  if (!trials || !trials.length) { host.innerHTML = '<div class="cc-trials-empty">No trials booked today.</div>'; return; }
+  host.innerHTML = trials.map(t => {
     let time = '';
     try { if (t.start) time = new Date(t.start).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: tz || 'America/Toronto' }); } catch (_) {}
     const nm = escapeHTML(t.athlete || t.contactName || 'Trial');
     const ageStr = (t.age != null) ? (t.age + ' yrs') : (t.group ? escapeHTML(t.group) : '');
-    return `<div style="display:flex;align-items:baseline;gap:10px;padding:6px 0;border-top:1px solid var(--border)">`
-      + `<span style="font-family:var(--font-num,monospace);font-weight:800;color:var(--gold);min-width:66px;font-size:13px">${escapeHTML(time)}</span>`
-      + `<span style="font-weight:700;color:var(--text);flex:1;font-size:13.5px">${nm}</span>`
-      + (ageStr ? `<span style="color:var(--text-mute);font-size:12px;white-space:nowrap">${ageStr}</span>` : '')
-      + `</div>`;
+    return `<div class="cc-tr-row"><span class="cc-tr-time">${escapeHTML(time)}</span><span class="cc-tr-nm">${nm}</span>${ageStr ? `<span class="cc-tr-age">${ageStr}</span>` : ''}</div>`;
   }).join('');
-  host.innerHTML = `<div style="font-size:10px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--text-mute);margin:16px 0 4px">Today's trials</div>${rows}`;
 }
 // "Trials today: 0" is a dead number - show the next booked trial instead.
 async function _ccNextTrial() {
