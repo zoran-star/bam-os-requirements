@@ -1133,6 +1133,17 @@ the bar lives inside the V2/web-only Members view (native-app firewall +
 NOT yet tested live (needs deployed fn + ANTHROPIC_API_KEY + auth + Stripe —
 only exercisable on Vercel). Env: `ANTHROPIC_API_KEY` already live in prod.
 
+**2026-07-07 — pause + next-payment reasoning:** enriched `get_member` to
+return `subscription` (status, `next_charge_date`, `trial_end`,
+`current_period_end`, `amount_dollars`, `interval`) + `current_pause`
+(open pause window) + `pause_scheduled_for`. System prompt step 4b tells the
+agent to read the current next charge, reason out loud about the natural
+next-payment date (current next charge + pause length), settle it with the
+user, then propose ONE `pause` action with `start_date` + `end_date` +
+`next_payment_date`. So "change Kristine's pause period and adjust her next
+payment" is a single conversational flow → one confirm. members.js
+`actionPause` already honored `next_payment_date` as the manual trial_end.
+
 **Follow-ups / polish (not built):**
 - Live end-to-end test on GTA (safe-first: find_members, payment-link).
 - Multi-action commands ("pause X and Y") — v1 does one action per proposal.
