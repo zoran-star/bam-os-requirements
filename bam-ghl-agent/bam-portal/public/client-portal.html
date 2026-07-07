@@ -12987,7 +12987,18 @@ async function openV15Inbox() {
   _V15IB.active = null; _V15IB.pending = []; _V15IB._listRendered = false;
   // Instant render: if we already have this academy's inbox loaded, show it
   // immediately and refresh in the background - no blank spinner on re-open.
-  const hadData = Array.isArray(_V15IB.convos) && _V15IB.convos.length;
+  let hadData = Array.isArray(_V15IB.convos) && _V15IB.convos.length;
+  if (!hadData) {
+    // Cache-first cold start: last-known list paints instantly, live fetch
+    // below replaces it silently.
+    try {
+      const snap = JSON.parse(localStorage.getItem('bam_ib_snap_' + CLIENT_ID) || 'null');
+      if (snap && Array.isArray(snap.convos) && snap.convos.length && Date.now() - (snap.t || 0) < 48 * 3600000) {
+        _V15IB.convos = snap.convos;
+        hadData = true;
+      }
+    } catch (_) {}
+  }
   if (hadData) { try { _v15ibRenderAll(); } catch (_) {} }
   else host.innerHTML = _skelInboxHTML();
   try {
@@ -13000,6 +13011,9 @@ async function openV15Inbox() {
     if (!ir.ok) throw new Error(ij.error || ('HTTP ' + ir.status));
     _V15IB.convos = ij.conversations || [];
     _V15IB.ghlLoc = ij.location_id || '';
+    try {
+      localStorage.setItem('bam_ib_snap_' + CLIENT_ID, JSON.stringify({ t: Date.now(), convos: (_V15IB.convos || []).slice(0, 30).map(c => ({ id: c.id, contactId: c.contactId, contactName: c.contactName, fullName: c.fullName, lastMessageBody: (c.lastMessageBody || '').slice(0, 120), lastMessageDate: c.lastMessageDate, lastMessageDirection: c.lastMessageDirection, lastMessageType: c.lastMessageType, unreadCount: c.unreadCount, classification: c.classification, matched_member_name: c.matched_member_name })) }));
+    } catch (_) {}
     // Build contactId → {pipeline, stage} from the pipeline board.
     _V15IB.pipelines = []; _V15IB.contactPipe = {}; _V15IB.pipeOppCount = 0;
     try {
@@ -16341,7 +16355,10 @@ async function _hmMsgPeekSend(convId) {
     _hmReflectReply(c, text);
   } catch (_) {
     const box = document.getElementById('hm-peek-thread');
-    if (box) box.insertAdjacentHTML('beforeend', '<div class="req-empty" style="padding:6px 0">Could not send from here. Use the full inbox.</div>');
+    if (!navigator.onLine && c.contactId) {
+      _sendQueuePush({ contactId: c.contactId, message: text });
+      if (box) { box.insertAdjacentHTML('beforeend', `<div class="hm-peek-bub out" style="opacity:.55">${escapeHTML(text)}<div style="font-size:10px;margin-top:3px;color:var(--text-mute)">Sending when back online</div></div>`); box.scrollTop = box.scrollHeight; }
+    } else if (box) box.insertAdjacentHTML('beforeend', '<div class="req-empty" style="padding:6px 0">Could not send from here. Use the full inbox.</div>');
   } finally { if (inp) inp.disabled = false; }
 }
 // Mirror a mark-read / quick reply into every visible row of this
@@ -16370,6 +16387,34 @@ async function _hmMsgPeekSend(convId) {
     if (!el.getAttribute('enterkeyhint') && el.closest('.v15ib-thread, .mma-compose, .hm-peek-compose, .cc-qr')) el.setAttribute('enterkeyhint', 'send');
   });
 })();
+// Offline send queue: replies composed with no signal are stored and
+// delivered the moment the device comes back online.
+function _sendQueuePush(p) {
+  try {
+    const q = JSON.parse(localStorage.getItem('bam_send_queue') || '[]');
+    q.push({ contactId: p.contactId, message: p.message, client_id: (typeof CLIENT_ID !== 'undefined' ? CLIENT_ID : ''), t: Date.now() });
+    localStorage.setItem('bam_send_queue', JSON.stringify(q.slice(-20)));
+  } catch (_) {}
+}
+async function _sendQueueFlush() {
+  let q = [];
+  try { q = JSON.parse(localStorage.getItem('bam_send_queue') || '[]'); } catch (_) { return; }
+  if (!q.length) return;
+  try { localStorage.setItem('bam_send_queue', '[]'); } catch (_) {}
+  for (const p of q) {
+    if (!p.contactId || Date.now() - (p.t || 0) > 86400000) continue;
+    try {
+      const token = await _mreqAuthToken();
+      const r = await fetch('/api/ghl/send-message?client_id=' + encodeURIComponent(p.client_id), {
+        method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+        body: JSON.stringify({ client_id: p.client_id, type: 'SMS', contactId: p.contactId, message: p.message }),
+      });
+      if (!r.ok) throw new Error('send failed');
+    } catch (_) { _sendQueuePush(p); }
+  }
+}
+window.addEventListener('online', () => { try { _sendQueueFlush(); } catch (_) {} });
+
 // Native App Store review prompt: only in the app, only off a win moment,
 // at most once per 90 days. No-op until the review plugin is in the build.
 function _natMaybeAskReview() {
@@ -16676,6 +16721,18 @@ function _hmSaveAndCloseKpi() {
 async function _hmLoadScoreboard() {
   // Render the grid with selected KPIs (rings + skeletons)
   _hmRenderScoreGrid();
+  // Cache-first: paint the last-known numbers instantly (no skeleton flash),
+  // the live fetch below repaints when it lands. Kills the cold-start wait.
+  try {
+    const snap = JSON.parse(localStorage.getItem('bam_kpi_snap_' + CLIENT_ID) || 'null');
+    if (snap && snap.kpiData && Date.now() - (snap.t || 0) < 48 * 3600000) {
+      for (const key of _hmGetSelectedKpis()) {
+        const d = snap.kpiData[key];
+        const el = document.getElementById('hm-s-' + key);
+        if (el && d) { el.classList.remove('hm-stat-skel'); el.textContent = (d.prefix || '') + Number(d.val).toLocaleString() + (d.suffix || ''); }
+      }
+    }
+  } catch (_) {}
 
   const now = new Date();
   const today = _hv2Ymd(now);
@@ -16775,6 +16832,9 @@ async function _hmLoadScoreboard() {
     newmembers: joinsPrev.length,
     rev: 0, members: 0, replies: 0, churn: 0, attendance: 0, conversion: 0, revmember: 0,
   };
+
+  // Snapshot for the instant next-boot paint above
+  try { localStorage.setItem('bam_kpi_snap_' + CLIENT_ID, JSON.stringify({ t: Date.now(), kpiData })); } catch (_) {}
 
   // Populate each visible stat
   const selected = _hmGetSelectedKpis();
