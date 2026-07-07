@@ -841,7 +841,12 @@ async function handleMarketingTickets(req, res) {
     const staffActions = new Set(["approve-content", "request-client-action", "mark-completed", "request-content-revision", "hold", "resume"]);
     const clientActions = new Set(["cancel", "edit", "respond"]);
 
-    if (staffActions.has(action)) {
+    if (action === "cancel" && isStaff) {
+      // Staff may cancel any ticket (the UI has always offered the button; the
+      // handler already writes "Cancelled by <staff name>"). Staff who are ALSO
+      // client members previously fell into the client branch and got
+      // "not your ticket" on other academies' tickets.
+    } else if (staffActions.has(action)) {
       if (!isStaff) return res.status(403).json({ error: "staff only" });
     } else if (clientActions.has(action)) {
       if (!isClient) return res.status(403).json({ error: "client only" });
@@ -1420,7 +1425,11 @@ async function handleContentTickets(req, res) {
     ]);
     const clientActions = new Set(["cancel", "respond", "edit", "approve", "request-changes"]);
 
-    if (staffActions.has(action)) {
+    if (action === "cancel" && isStaff) {
+      // Staff may cancel any content ticket - same fix as the marketing
+      // handler above; the cancel body already writes a staff-attributed
+      // message. Cancelling frees an organic credit by design.
+    } else if (staffActions.has(action)) {
       if (!isStaff) return res.status(403).json({ error: "staff only" });
     } else if (clientActions.has(action)) {
       if (!isClient) return res.status(403).json({ error: "client only" });
