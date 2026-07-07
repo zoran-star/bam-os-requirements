@@ -8087,6 +8087,17 @@ Then the call to action."]</div>
         .hm-peek-compose, .mma-compose { transition:padding-bottom .2s ease; padding-bottom:var(--kb, 0px); }
       }
       .v15ib-list, .mma-log, .hm-peek-thread, .cc-minbox-list { overscroll-behavior:contain; -webkit-overflow-scrolling:touch; }
+      /* Native touch feel (phones): our own press states, no grey tap flash,
+         no long-press selection callouts on UI chrome - text stays selectable
+         inside inputs and message content. */
+      html { -webkit-tap-highlight-color: transparent; }
+      @media (hover: none) {
+        body { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+        input, textarea, [contenteditable="true"], .hm-peek-bub, .msg-body, .msg-bubble, .mma-voice, .v15ib-thread { -webkit-user-select: text; user-select: text; -webkit-touch-callout: default; }
+        button, a, [onclick], [role="button"] { touch-action: manipulation; }
+        .cc-btn:active, .cc-mtab:active, .mma-chip:active, .cc-stat.click:active, .cc-pipe-pill:active, .hm-feed-open:active, .cc-mem-more:active, .hv2-nav-card:active { transform: scale(.97); transition: transform .08s; }
+        .main { overscroll-behavior-y: contain; }
+      }
       .v15ib-chip { font-size:10px; color:var(--text-mute); background:var(--bg); border:1px solid var(--border); border-radius:999px; padding:2px 9px; display:inline-flex; align-items:center; gap:5px; max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
       .v15ib-chip::before { content:""; width:5px; height:5px; border-radius:50%; background:var(--gold); flex:0 0 auto; }
       /* Segmented filter (All / Members / Leads / Spam / Unread) */
@@ -15899,7 +15910,7 @@ async function _hv2WinLoad() {
   if (win) {
     if (lab) lab.textContent = 'Daily win';
     v.textContent = win.v;
-    if (win.v.charAt(0) === '$' && !window._sfxKachinged) { window._sfxKachinged = true; try { _SFX.kaching(); hapticTap('HEAVY'); } catch (_) {} }
+    if (win.v.charAt(0) === '$' && !window._sfxKachinged) { window._sfxKachinged = true; try { _SFX.kaching(); hapticTap('HEAVY'); } catch (_) {} try { _natMaybeAskReview(); } catch (_) {} }
     if (c) c.textContent = win.c;
   } else {
     // No strong win: rotate the day's pick from a pool of modest activity
@@ -16359,6 +16370,20 @@ async function _hmMsgPeekSend(convId) {
     if (!el.getAttribute('enterkeyhint') && el.closest('.v15ib-thread, .mma-compose, .hm-peek-compose, .cc-qr')) el.setAttribute('enterkeyhint', 'send');
   });
 })();
+// Native App Store review prompt: only in the app, only off a win moment,
+// at most once per 90 days. No-op until the review plugin is in the build.
+function _natMaybeAskReview() {
+  try {
+    const Cap = window.Capacitor;
+    if (!(Cap && Cap.isNativePlatform && Cap.isNativePlatform())) return;
+    const R = Cap.Plugins && (Cap.Plugins.InAppReview || Cap.Plugins.RateApp);
+    if (!R || !R.requestReview) return;
+    const last = +(localStorage.getItem('bam_rate_asked') || 0);
+    if (Date.now() - last < 90 * 86400000) return;
+    localStorage.setItem('bam_rate_asked', String(Date.now()));
+    setTimeout(() => { try { R.requestReview(); } catch (_) {} }, 1600);
+  } catch (_) {}
+}
 function _hmReflectRead(c) {
   if (!c || !(c.unreadCount > 0)) return;
   c.unreadCount = 0;
@@ -16882,6 +16907,14 @@ function _hmRenderHawkFeed(host, d, total) {
   _hmUpdateNavDots(total, 0);
   // Perfect day: stash hawkeye count for cross-check
   window._hmHawkTotal = total;
+  // Home-screen icon badge (native builds with the Badge plugin)
+  try {
+    const CapB = window.Capacitor;
+    const Badge = CapB && CapB.Plugins && CapB.Plugins.Badge;
+    if (Badge && CapB.isNativePlatform && CapB.isNativePlatform()) {
+      if (total > 0) Badge.set({ count: total }); else Badge.clear();
+    }
+  } catch (_) {}
 }
 
 async function _hmRenderMktSnapshot(host) {
@@ -39258,6 +39291,22 @@ function _openPaymentLinkModal(memberId, data) {
   const ghl       = data.ghl    || { ready: false };
   const messaging = data.messaging || null;
   const suggested = data.suggested || {};
+  // Native share sheet (app builds with the Share plugin)
+  setTimeout(() => {
+    try {
+      const Cap = window.Capacitor;
+      if (!(Cap && Cap.isNativePlatform && Cap.isNativePlatform() && Cap.Plugins && Cap.Plugins.Share && url)) return;
+      const card = document.getElementById('pl-modal-card');
+      if (!card || card.querySelector('.pl-nat-share')) return;
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'pl-nat-share';
+      b.textContent = 'Share link...';
+      b.style.cssText = 'margin-top:10px;width:100%;background:var(--surface);border:1px solid var(--border-med);border-radius:8px;padding:10px;font:inherit;font-size:13px;font-weight:700;color:var(--text);cursor:pointer';
+      b.onclick = () => { try { Cap.Plugins.Share.share({ title: 'Payment link', url: url }); } catch (_) {} };
+      card.appendChild(b);
+    } catch (_) {}
+  }, 120);
   const sms       = suggested.sms_text       || `Update your card: ${url}`;
   const emailSub  = suggested.email_subject  || 'Update your card on file';
   const emailHtml = suggested.email_html     || `<p>Update your card: <a href="${url}">${url}</a></p>`;
@@ -47430,6 +47479,7 @@ function toggleTheme() {
   html.setAttribute('data-theme', next);
   document.getElementById('themeToggleIcon').textContent = isLight ? '' : '☾';
   document.getElementById('themeToggleLabel').textContent = isLight ? 'Light mode' : 'Dark mode';
+  try { if (typeof window._natThemeSync === 'function') window._natThemeSync(next); } catch (_) {}
 }
 </script>
 
@@ -49502,6 +49552,18 @@ window.addEventListener('message', (e) => {
   // content sits *below* it. The configured ink background (#131416) fills the
   // bar, so it stays seamless. Uses the already-installed @capacitor/status-bar
   // plugin → no rebuild, takes effect on the next app load.
+  // Status bar mirrors the active theme (called from toggleTheme too).
+  window._natThemeSync = function (theme) {
+    try {
+      var Cap = window.Capacitor;
+      if (!Cap || !Cap.isNativePlatform || !Cap.isNativePlatform()) return;
+      var SB = Cap.Plugins && Cap.Plugins.StatusBar;
+      if (!SB) return;
+      var light = theme === 'light';
+      if (SB.setStyle) SB.setStyle({ style: light ? 'LIGHT' : 'DARK' });
+      if (SB.setBackgroundColor) SB.setBackgroundColor({ color: light ? '#F8F7F5' : '#131416' });
+    } catch (e) {}
+  };
   function fixNativeStatusBar() {
     try {
       var Cap = window.Capacitor;

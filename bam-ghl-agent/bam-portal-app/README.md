@@ -71,6 +71,9 @@ and upload the `.aab` to the Google Play Console.
 
 Run these on the Mac before archiving - skipping either has bitten us:
 
+0. **Optional but recommended:** `npm i @capacitor-community/in-app-review`
+   (App Store rating prompt - the portal already calls it, guarded, when the
+   plugin exists). Pick the version matching the installed Capacitor major.
 1. **`npm install && npx cap sync`** - the committed `ios/App/CapApp-SPM/Package.swift`
    and `android/capacitor.settings.gradle` are GENERATED and go stale when
    `package.json` plugins change. Without a sync, push notifications, keyboard,
