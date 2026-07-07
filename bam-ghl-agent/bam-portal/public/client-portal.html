@@ -16317,6 +16317,18 @@ async function _hmMsgPeek(convId, focusReply) {
     </div>`);
   if (focusReply) setTimeout(() => document.getElementById('hm-peek-input')?.focus(), 120);
   const peekCard = document.querySelector('#hm-peek-ov .hm-peek-card');
+  if (window._peekSlideDir && peekCard) {
+    // Arriving via a swipe: slide in from the opposite side, no re-pop.
+    const dir = window._peekSlideDir; window._peekSlideDir = 0;
+    peekCard.style.transition = 'none';
+    peekCard.style.transform = 'translateX(' + (-dir * 110) + 'px)';
+    peekCard.style.opacity = '0';
+    requestAnimationFrame(() => {
+      peekCard.style.transition = 'transform 220ms cubic-bezier(0.32, 0.72, 0, 1), opacity 180ms';
+      peekCard.style.transform = '';
+      peekCard.style.opacity = '';
+    });
+  }
   _sheetDragify(peekCard, _hmMsgPeekClose);
   _peekSwipeNav(peekCard, convId);
   try {
@@ -16403,68 +16415,125 @@ function _sheetDragify(card, closeFn) {
   if (!card || card._sheetDrag || !window.matchMedia('(max-width: 640px)').matches) return;
   card._sheetDrag = true;
   const scroller = card.querySelector('.hm-peek-thread, .cc-minbox-list') || card;
-  let sy = null, dy = 0, dragging = false;
-  card.addEventListener('touchstart', e => { sy = e.touches[0].clientY; dy = 0; dragging = false; }, { passive: true });
+  const ov = card.parentElement;
+  let sy = null, dy = 0, dragging = false, lastY = 0, lastT = 0, vel = 0;
+  card.addEventListener('touchstart', e => {
+    const t = e.touches[0];
+    sy = t.clientY; dy = 0; dragging = false; vel = 0; lastY = t.clientY; lastT = e.timeStamp;
+    card.style.transition = 'none';   // interruptible: grabbing mid-spring sticks to the finger
+  }, { passive: true });
   card.addEventListener('touchmove', e => {
     if (sy === null) return;
-    const d = e.touches[0].clientY - sy;
-    if (!dragging && d > 8 && (scroller.scrollTop || 0) <= 0) dragging = true;
+    const t = e.touches[0];
+    const d = t.clientY - sy;
+    const dt = e.timeStamp - lastT;
+    if (dt > 0) { vel = vel * 0.7 + ((t.clientY - lastY) / dt) * 0.3; lastY = t.clientY; lastT = e.timeStamp; }
+    if (!dragging && d > 6 && (scroller.scrollTop || 0) <= 0) dragging = true;
     if (!dragging) return;
     dy = Math.max(0, d);
-    card.style.transition = 'none';
-    card.style.transform = 'translateY(' + (dy * 0.72).toFixed(1) + 'px)';
+    card.style.transform = 'translateY(' + dy.toFixed(1) + 'px)';   // 1:1 finger tracking
+    if (ov) ov.style.background = 'rgba(0,0,0,' + Math.max(0.1, 0.45 * (1 - dy / (card.offsetHeight || 400))).toFixed(3) + ')';
   }, { passive: true });
   card.addEventListener('touchend', () => {
     sy = null;
     if (!dragging) return;
     dragging = false;
-    card.style.transition = 'transform .22s ease';
-    if (dy > 110) {
+    const flick = vel > 0.55;   // a quick flick dismisses at any distance
+    if (flick || dy > (card.offsetHeight || 400) * 0.32) {
       try { hapticTap('LIGHT'); } catch (_) {}
-      card.style.transform = 'translateY(110%)';
-      setTimeout(closeFn, 180);
-    } else card.style.transform = '';
+      const remain = (card.offsetHeight || 400) - dy + 60;
+      const ms = Math.max(120, Math.min(280, remain / Math.max(vel, 0.9)));   // carry the finger's speed
+      card.style.transition = 'transform ' + ms.toFixed(0) + 'ms cubic-bezier(0.32, 0.72, 0, 1)';
+      card.style.transform = 'translateY(112%)';
+      if (ov) { ov.style.transition = 'background ' + ms.toFixed(0) + 'ms'; ov.style.background = 'rgba(0,0,0,0)'; }
+      setTimeout(closeFn, ms);
+    } else {
+      card.style.transition = 'transform 320ms cubic-bezier(0.175, 0.885, 0.32, 1.12)';   // spring with a touch of overshoot
+      card.style.transform = '';
+      if (ov) { ov.style.transition = 'background 200ms'; ov.style.background = ''; }
+    }
     dy = 0;
   });
 }
 function _peekSwipeNav(card, convId) {
   if (!card) return;
-  let sx = null, syv = 0;
-  card.addEventListener('touchstart', e => { sx = e.touches[0].clientX; syv = e.touches[0].clientY; }, { passive: true });
-  card.addEventListener('touchend', e => {
+  let sx = null, syv = 0, dx = 0, horiz = null, lastX = 0, lastT = 0, vx = 0;
+  card.addEventListener('touchstart', e => {
+    const t = e.touches[0];
+    sx = t.clientX; syv = t.clientY; dx = 0; horiz = null; vx = 0; lastX = t.clientX; lastT = e.timeStamp;
+  }, { passive: true });
+  card.addEventListener('touchmove', e => {
     if (sx === null) return;
-    const t = e.changedTouches[0];
-    const dx = t.clientX - sx, dyv = Math.abs(t.clientY - syv);
+    const t = e.touches[0];
+    const mx = t.clientX - sx, my = t.clientY - syv;
+    if (horiz === null && (Math.abs(mx) > 10 || Math.abs(my) > 10)) horiz = Math.abs(mx) > Math.abs(my);
+    if (!horiz) return;
+    const dt = e.timeStamp - lastT;
+    if (dt > 0) { vx = vx * 0.7 + ((t.clientX - lastX) / dt) * 0.3; lastX = t.clientX; lastT = e.timeStamp; }
+    dx = mx;
+    card.style.transition = 'none';
+    card.style.transform = 'translateX(' + (dx * 0.85).toFixed(1) + 'px)';
+    card.style.opacity = String(Math.max(0.35, 1 - Math.abs(dx) / 420));
+  }, { passive: true });
+  card.addEventListener('touchend', () => {
+    if (sx === null) return;
     sx = null;
-    if (Math.abs(dx) < 64 || dyv > 50) return;
+    if (!horiz) return;
     const ids = (typeof _V15IB !== 'undefined' && Array.isArray(_V15IB.convos) && _V15IB.convos.length)
       ? _V15IB.convos.map(c => String(c.id)) : Object.keys(window._hmIbById || {});
     const i = ids.indexOf(String(convId));
-    if (i < 0) return;
     const ni = dx < 0 ? i + 1 : i - 1;
-    if (ni < 0 || ni >= ids.length) return;
-    try { hapticTap('LIGHT'); } catch (_) {}
-    _hmMsgPeek(ids[ni]);
+    if ((Math.abs(dx) > 90 || Math.abs(vx) > 0.5) && i >= 0 && ni >= 0 && ni < ids.length) {
+      try { hapticTap('LIGHT'); } catch (_) {}
+      const dir = dx < 0 ? -1 : 1;
+      card.style.transition = 'transform 150ms ease-out, opacity 150ms';
+      card.style.transform = 'translateX(' + dir * 110 + 'px)';
+      card.style.opacity = '0';
+      window._peekSlideDir = dir;
+      setTimeout(() => _hmMsgPeek(ids[ni]), 140);
+    } else {
+      card.style.transition = 'transform 300ms cubic-bezier(0.175, 0.885, 0.32, 1.1), opacity 200ms';
+      card.style.transform = '';
+      card.style.opacity = '';
+    }
+    dx = 0;
   });
 }
-// One-finger pull from the top of an open focus room closes it (phones).
+// One-finger pull from the top of an open focus room: the room follows the
+// finger with resistance, then commits down or springs back (phones).
 (function () {
-  let syf = null;
+  let syf = null, pull = 0, target = null;
   document.addEventListener('touchstart', e => {
     const t = e.touches[0];
-    syf = (document.documentElement.classList.contains('mm-focus-open') && t.clientY < 140) ? t.clientY : null;
-  }, { passive: true });
-  document.addEventListener('touchend', e => {
-    if (syf === null) return;
-    const dyf = e.changedTouches[0].clientY - syf;
-    syf = null;
-    if (dyf > 90 && window.matchMedia('(max-width: 768px)').matches) {
-      const open = document.querySelector('.mm-focus-page.mm-open');
-      if (open && open.scrollTop <= 0) {
-        try { hapticTap('LIGHT'); } catch (_) {}
-        try { _ccFocusCloseOpen(); } catch (_) {}
-      }
+    pull = 0; target = null;
+    syf = (document.documentElement.classList.contains('mm-focus-open') && t.clientY < 160 && window.matchMedia('(max-width: 768px)').matches) ? t.clientY : null;
+    if (syf !== null) {
+      target = document.querySelector('.mm-focus-page.mm-open');
+      if (!target || target.scrollTop > 0) { syf = null; target = null; }
     }
+  }, { passive: true });
+  document.addEventListener('touchmove', e => {
+    if (syf === null || !target) return;
+    pull = Math.max(0, e.touches[0].clientY - syf);
+    const card = target.querySelector('.mm-modal-card');
+    if (card) { card.style.transition = 'none'; card.style.transform = 'translateY(' + (pull * 0.55).toFixed(1) + 'px)'; }
+  }, { passive: true });
+  document.addEventListener('touchend', () => {
+    if (syf === null || !target) return;
+    const card = target.querySelector('.mm-modal-card');
+    syf = null;
+    if (pull > 110) {
+      try { hapticTap('LIGHT'); } catch (_) {}
+      if (card) { card.style.transition = 'transform 200ms ease-in'; card.style.transform = 'translateY(60vh)'; }
+      setTimeout(() => {
+        try { _ccFocusCloseOpen(); } catch (_) {}
+        if (card) setTimeout(() => { card.style.transform = ''; card.style.transition = ''; }, 750);
+      }, 150);
+    } else if (card) {
+      card.style.transition = 'transform 300ms cubic-bezier(0.175, 0.885, 0.32, 1.1)';
+      card.style.transform = '';
+    }
+    pull = 0; target = null;
   }, { passive: true });
 })();
 
