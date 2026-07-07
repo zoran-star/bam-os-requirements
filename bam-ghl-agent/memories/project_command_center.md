@@ -161,6 +161,9 @@ Shipped across #1222/#1223/#1224: (1-4) touch feel - transparent tap highlight, 
 REBUILD-GATED (wired, no-op till plugins land): (9) share sheet on payment-link modal (`.pl-nat-share`, @capacitor/share added to wrapper deps), (10) icon Badge follows _hmHawkTotal, (11) `_natMaybeAskReview` 90-day throttle off the money-milestone kaching (in-app-review = install-on-Mac step in wrapper README), (12) `window._natThemeSync` status bar follows toggleTheme. MAC-DAY: (5) iOS page transitions plugin (untested, do NOT add blind to package.json), (13) biometric lock finish.
 REACT MIGRATION (Cole asked): possible anytime (Capacitor agnostic; migrate view-by-view as islands), recommended NOT yet - single-file velocity is the asset; revisit when team grows or at the Tower LLM boundary.
 
+## Mobile nav DECISION (2026-07-07, Cole): keep it
+Bar stays HOME / SALES / [Tower orb] / MEMBERS / INBOX. Marketing deliberately has NO tab (scroll-reachable only) - Cole reviewed the alternatives (5 tabs + orb, orb-absorbs-home, swipe paging, radial orb nav, contextual slot) and chose to keep the current layout. Do not re-add a Marketing tab without a new decision. Orb tap opens Tower (tap = type, hold = speak; >12px drag cancels - the zero-tolerance wiggle cancel was the "dead orb" device bug, fixed #1231).
+
 ## Section mounts (current skeleton)
 | Section | Mount | Content |
 |---|---|---|
