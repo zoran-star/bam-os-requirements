@@ -102,7 +102,7 @@ const READ_TOOLS = [
   },
   {
     name: "get_member",
-    description: "Get one member's full billing context by id: current plan, subscription status, and recent charges (with charge_id + amount + status, so you can see a failed charge). Call this before proposing a refund, or to explain why a specific member's payment failed.",
+    description: "Get one member's full billing context by id: current plan, subscription status, recent charges (with charge_id + amount + status), the CURRENT next-charge date (subscription.next_charge_date), plan price (subscription.amount_dollars), and any open pause window (current_pause). Call this before proposing a refund, a pause, or a next-payment change - you need next_charge_date and the pause window to reason about dates.",
     input_schema: {
       type: "object",
       properties: { member_id: { type: "string", description: "The member's uuid from find_members." } },
@@ -308,13 +308,27 @@ function systemPrompt(academyName) {
     `3. For a refund, call get_member first to read recent charges, then propose the refund with the correct charge_id.\n` +
     `4. Once you know the member and the intent, call the SINGLE matching action tool with the fields filled in. ` +
     `Convert relative time to explicit YYYY-MM-DD dates (e.g. "30 days" pause → start today, end today+30).\n` +
+    `4b. PAUSE + NEXT PAYMENT: pausing and setting the next payment date is ONE 'pause' action ` +
+    `(start_date, end_date, and optional next_payment_date - all YYYY-MM-DD). First call get_member to read ` +
+    `subscription.next_charge_date (the current next charge) and current_pause (any existing pause window). ` +
+    `By default a pause pushes the next charge out by the pause length: natural_next_charge = current next_charge_date + (end_date - start_date). ` +
+    `REASON OUT LOUD with the user: state the current next charge, what the pause length would make it, and ` +
+    `either confirm that date or ask what next-payment date they want, THEN set next_payment_date to that. ` +
+    `If they only give a pause period, compute and propose the natural next-payment date; if they give a specific ` +
+    `next-payment date, use it as next_payment_date. Do not propose the pause until the pause window AND the ` +
+    `next payment date are both settled with the user.\n` +
     `5. You CANNOT execute anything. Calling an action tool only PROPOSES it; a human then reviews and clicks Confirm. ` +
     `So never say "done" or "I've paused them" — say what you're proposing. If the user replies "yes"/"confirm", they still ` +
     `need to click the Confirm button; re-propose the action rather than claiming it ran.\n` +
     `6. Before calling an action tool, write ONE short sentence stating exactly what you're about to propose (member name + what changes). ` +
     `Keep it plain, no emojis, no em dashes.\n` +
-    `7. If a request is ambiguous, out of scope, or missing info, ask a brief clarifying question instead of calling a tool.\n\n` +
-    `Actions you can propose: pause, unpause, cancel, change plan (1/wk 2/wk 3/wk unlmtd), refund, apply/remove coupon, ` +
+    `7. If a request is ambiguous, out of scope, or missing info, ask a brief clarifying question instead of calling a tool.\n` +
+    `8. GUIDED STYLE: you are a walk-through assistant, not an essay writer. Keep every reply to 1-3 short sentences ` +
+    `and ask at most ONE question per turn. For multi-decision requests (e.g. pause window + next payment), settle the ` +
+    `decisions one at a time across turns: confirm the member, then the pause window, then the next payment date, then propose. ` +
+    `State facts plainly with real dates and amounts ("Her next charge is $315.27 on Jul 20"). ` +
+    `A history line like "(Executed: ...)" means that action already ran; "(Proposal cancelled ...)" means it did not.\n\n` +
+    `Actions you can propose: pause (with an optional next-payment date), unpause, cancel, change plan (1/wk 2/wk 3/wk unlmtd), refund, apply/remove coupon, ` +
     `payment link, card-setup link, referral credit, profile edits, and click-to-call.`
   );
 }
@@ -385,6 +399,7 @@ async function execGetMember(clientId, memberId, stripeAccountByClient) {
   const rows = await sb(`members?id=eq.${encodeURIComponent(memberId)}&client_id=eq.${clientId}&select=*`).catch(() => []);
   const m = Array.isArray(rows) && rows[0] ? rows[0] : null;
   if (!m) return { error: "member not found for this academy" };
+  const unixToDate = (u) => (u ? new Date(u * 1000).toISOString().slice(0, 10) : null);
   const out = {
     member_id: m.id,
     athlete_name: m.athlete_name,
@@ -393,7 +408,10 @@ async function execGetMember(clientId, memberId, stripeAccountByClient) {
     plan: m.plan,
     has_subscription: !!m.stripe_subscription_id,
     has_customer: !!m.stripe_customer_id,
+    pause_scheduled_for: m.pause_scheduled_for || null,
     charges: [],
+    subscription: null,   // current billing timing (for pause / next-payment reasoning)
+    current_pause: null,  // the member's open pause window, if any
   };
   const acct = stripeAccountByClient;
   if (acct && m.stripe_customer_id) {
@@ -408,6 +426,41 @@ async function execGetMember(clientId, memberId, stripeAccountByClient) {
       }));
     } catch (_) { /* non-fatal — refund can still be proposed without the list */ }
   }
+  // Subscription timing: what the NEXT charge date currently is + the plan price.
+  // next_charge_date = trial_end (a pause/credit pushes the charge here) if set,
+  // else current_period_end. This is what the agent reasons about when changing a
+  // pause or setting a new next-payment date.
+  if (acct && m.stripe_subscription_id) {
+    try {
+      const sub = await stripeFetch(`/subscriptions/${m.stripe_subscription_id}`, { stripeAccount: acct });
+      const item = sub.items?.data?.[0];
+      const periodEnd = sub.current_period_end || item?.current_period_end || null;
+      const nextUnix = sub.trial_end || periodEnd || null;
+      const rec = item?.price?.recurring;
+      out.subscription = {
+        status: sub.status,
+        next_charge_date: unixToDate(nextUnix),
+        trial_end: unixToDate(sub.trial_end),
+        current_period_end: unixToDate(periodEnd),
+        cancel_at_period_end: !!sub.cancel_at_period_end,
+        amount_dollars: item?.price?.unit_amount != null ? +(item.price.unit_amount / 100).toFixed(2) : null,
+        currency: (item?.price?.currency || "cad").toUpperCase(),
+        interval: rec ? `${rec.interval_count || 1} ${rec.interval}${(rec.interval_count || 1) > 1 ? "s" : ""}` : null,
+      };
+    } catch (_) { /* non-fatal — pause can still be proposed without exact timing */ }
+  }
+  // The member's open pause window (if any), so "change the pause period" can be
+  // reasoned against what's already set rather than guessed.
+  try {
+    const pr = await sb(`cancellations?member_id=eq.${encodeURIComponent(memberId)}&type=eq.pause&completed_at=is.null&select=pause_start,pause_end,manual_trial_end&order=created_at.desc&limit=1`);
+    if (Array.isArray(pr) && pr[0]) {
+      out.current_pause = {
+        pause_start: pr[0].pause_start,
+        pause_end: pr[0].pause_end,
+        manual_next_payment: pr[0].manual_trial_end || null,
+      };
+    }
+  } catch (_) { /* non-fatal */ }
   return out;
 }
 

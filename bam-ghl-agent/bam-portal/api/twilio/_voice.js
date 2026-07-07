@@ -154,13 +154,9 @@ const DEFAULT_MISSED_TEXT = "Sorry we missed your call! Reply to this text and w
 // Auto-text a caller after a missed inbound call. Routes through the portal SMS
 // spine first so it threads in the portal inbox (fully off-GHL) and the lead's
 // reply lands there; falls back to a direct Twilio send. Best-effort.
-// A "save our number" vCard link rides along - once saved, the academy's name
-// shows on every future call, on all carriers (Canada has no CNAM; network
-// branded calling is beta-only on Rogers/Bell).
 export async function sendMissedCallText(cfg, callerPhone) {
   if (!cfg || !cfg.missedTextEnabled || !callerPhone) return { skipped: true };
-  const body = ((cfg.missedText && cfg.missedText.trim()) || DEFAULT_MISSED_TEXT)
-    + `\nSave our number: ${PROD_BASE}/api/vcard?c=${cfg.clientId}`;
+  const body = (cfg.missedText && cfg.missedText.trim()) || DEFAULT_MISSED_TEXT;
   try {
     const r = await maybeSendSmsViaProvider(cfg.clientId, { toPhone: callerPhone, body, sentBy: "missed-call-auto" });
     if (r && r.handled) return { ok: true, via: "provider" };

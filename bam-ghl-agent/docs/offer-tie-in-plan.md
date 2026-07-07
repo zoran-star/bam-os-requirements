@@ -88,8 +88,8 @@ MCP-recorded version.
 - [x] Wave 1 migration (columns + backfill + offer_ad_campaigns) - PR #1052
 - [x] Write-path stamping (opportunities, leads, post-trial, automations) - PR #1052
 - [x] B: offers sync - PRs #1054/#1055, APPLIED to prod (31 typed prices live)
-- [x] C: webhook access sync - built + shipped DORMANT (`clients.access_sync_mode`
-      off/shadow/on; migration `20260702224203`). Activation = Phase 6 cutover:
+- [x] C: webhook access sync - built + shipped gated (`clients.access_sync_mode`
+      off/shadow/on; migration `20260702224203`). Rollout control remains
       shadow-watch GTA, then flip to on.
 - [x] D: credit engine ACTIVATED (2026-07-02). Interval check: all monthlies are
       true week x4 (no 48/52 gap); grants = sold promise (monthly N x4, 3mo N x12,

@@ -14,7 +14,7 @@ cutover work (checkout/webhook/members/sorter -> typed runtime), also read
 **For agents:** before making schema changes (new tables, columns, RLS, functions, drops/renames),
 diff your plan against the lists below. If anything overlaps → **stop and tell Zoran to message Luka.**
 
-Owner: Luka (fc-mobile parent app backend). Last updated: 2026-07-02.
+Owner: Luka (fc-mobile parent app backend). Last updated: 2026-07-07.
 Original planning context lives in `fc-mobile/docs/parent-app-architecture-plan.md`
 and `fc-mobile/docs/parent-app-decisions-log.md`, which may not be available to
 all BAM Portal agents.
@@ -34,11 +34,12 @@ all BAM Portal agents.
 | Applied 2026-07-02 (booking writes + shared capacity) | booking/waitlist/cancel/leave-waitlist RPCs (`0005`), rewired through `slot_spots_taken` (`20260702115745`) - the single capacity source of truth |
 | Applied 2026-07-02 (trials) | `trial_bookings` table + `book_trial_slot` / `cancel_trial_booking` / `reschedule_trial_booking` / `set_trial_outcome` RPCs (`20260702115748`) |
 | Applied 2026-07-02 (staff ops) | `staff_cancel_slot` RPC (`20260702115746`, extended by `115748` to cancel trials) |
-| Applied 2026-07-02 (credit engine, DORMANT) | `apply_stripe_credit_grant` / `expire_lapsed_credit_entitlements` (`20260702115747`); no cron registered, webhook untouched - do not call these in production flows yet |
+| Applied 2026-07-02 (credit engine, live behind gate) | `apply_stripe_credit_grant` / `expire_lapsed_credit_entitlements` (`20260702115747`); offer tie-in activated webhook grants behind `clients.credit_engine_enabled` and registered the expiry sweep cron |
 | Applied 2026-07-02 (guards) | identity-spine uniqueness guards (`20260702115744`) on top of the runtime guards (`20260701161000`) |
 | Deployed 2026-07-02 (API layer) | `/api/runtime/*` (staff schedule CRUD, generate-slots, calendar, diagnostics, offers read), `/api/website/trial-slots` + `/api/website/trial-booking`, parent availability alignment - merged via PR #1020, live on Vercel |
+| Applied 2026-07-03 (parent messaging baseline) | `customer_message_threads` · `customer_thread_messages` · `customer_thread_reads` + `customer_send_thread_message` RPC (`20260703020000`) |
 | Not in v1 unless explicitly revived | `subscriptions` |
-| Planned (later) | `membership_change_requests` · parent messaging/notification tables (names TBD) |
+| Planned (later) | `membership_change_requests` · parent notification tables/preferences (names TBD) |
 
 ⚠️ These names are **reserved even before the tables/projections exist** — creating one of
 these names is itself a conflict. `offer_purchase_options` is reserved as a possible
@@ -66,8 +67,10 @@ Luka-owned tables keep the default rule.
   Luka API that uses it). Never compute spots from your own counts.
 - ⛔ Never `INSERT`/`UPDATE`/`DELETE` `schedule_slots`, `reservations`,
   `waitlist_entries`, or `trial_bookings` directly. One capacity gate, one owner.
-- ⛔ Do not call the credit engine RPCs (`apply_stripe_credit_grant`,
-  `expire_lapsed_credit_entitlements`) - dormant until the Phase 6 cutover.
+- ⛔ Do not hand-call the credit engine RPCs
+  (`apply_stripe_credit_grant`, `expire_lapsed_credit_entitlements`) as an ad
+  hoc production fix. Use the Stripe webhook path, scheduled expiry sweep, or
+  protected reconcile/repair endpoint.
 - ⚠️ Creating slots (templates + generation) is a Luka-owned write path. Use
   the staff endpoints (`POST /api/runtime/schedule/templates` +
   `POST /api/runtime/schedule/generate-slots`, staff Bearer auth) - never

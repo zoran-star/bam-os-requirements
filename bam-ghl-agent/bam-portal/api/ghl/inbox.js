@@ -272,6 +272,48 @@ async function classifyStoreConversations(clientId, conversations) {
       if (r.ghl_contact_id && nm && !_nameless(nm)) nameByContactId.set(r.ghl_contact_id, nm);
     }
   }
+  // Still nameless (a lead with no contacts-store name)? Pull the name from their
+  // trial booking (parent first, else athlete) so an inbox row isn't just a phone.
+  const stillNeed = needIds.filter((id) => !nameByContactId.has(id));
+  for (let i = 0; i < stillNeed.length; i += 100) {
+    const chunk = stillNeed.slice(i, i + 100);
+    const brows = await sb(
+      `trial_bookings?tenant_id=eq.${clientId}` +
+      `&ghl_contact_id=in.(${chunk.map(encodeURIComponent).join(",")})` +
+      `&select=ghl_contact_id,parent_name,athlete_name&order=created_at.desc`
+    ).catch(() => []);
+    for (const r of (Array.isArray(brows) ? brows : [])) {
+      if (!r.ghl_contact_id || nameByContactId.has(r.ghl_contact_id)) continue;
+      const nm = String(r.parent_name || r.athlete_name || "").trim();
+      if (nm && !_nameless(nm)) nameByContactId.set(r.ghl_contact_id, nm);
+    }
+  }
+
+  // A thread may have NO ghl_contact_id but still match a NAMED contact by phone or
+  // email (common for Twilio threads - the thread row has a number but no id). Build
+  // name-by-phone/email from the contacts store so those rows show a name, not a bare
+  // number.
+  const nameByPhone10 = new Map();
+  const nameByEmailC = new Map();
+  try {
+    const named = await sb(`contacts?client_id=eq.${clientId}&select=name,first_name,last_name,phone,email&limit=8000`).catch(() => []);
+    for (const r of (Array.isArray(named) ? named : [])) {
+      const nm = String(r.name || `${r.first_name || ""} ${r.last_name || ""}`).trim();
+      if (!nm || _nameless(nm)) continue;
+      const p10 = normPhone(r.phone).slice(-10);
+      if (p10.length === 10 && !nameByPhone10.has(p10)) nameByPhone10.set(p10, nm);
+      const em = r.email ? String(r.email).toLowerCase() : "";
+      if (em && !nameByEmailC.has(em)) nameByEmailC.set(em, nm);
+    }
+  } catch (_) {}
+
+  // Manually spam-marked contacts (a global mute tagged reason='spam'): the inbox
+  // hides them into its Spam group and the sales agent skips them.
+  let spamSet = new Set();
+  try {
+    const srows = await sb(`agent_mutes?client_id=eq.${clientId}&reason=eq.spam&agent=is.null&select=ghl_contact_id`).catch(() => []);
+    spamSet = new Set((Array.isArray(srows) ? srows : []).map((r) => r.ghl_contact_id).filter(Boolean));
+  } catch (_) {}
 
   return conversations.map((c) => {
     const m =
@@ -281,14 +323,18 @@ async function classifyStoreConversations(clientId, conversations) {
       null;
     let contactName = c.contactName;
     if (_nameless(contactName)) {
+      const p10 = c.phone ? normPhone(c.phone).slice(-10) : "";
+      const em = c.email ? String(c.email).toLowerCase() : "";
       contactName = (c.contactId && nameByContactId.get(c.contactId))
+        || (p10.length === 10 && nameByPhone10.get(p10))
+        || (em && nameByEmailC.get(em))
         || (m && (m.parent_name || m.athlete_name))
         || contactName;
     }
     return {
       ...c,
       contactName,
-      classification: m ? "member" : "lead",
+      classification: (c.contactId && spamSet.has(c.contactId)) ? "spam" : (m ? "member" : "lead"),
       member: m ? { id: m.id, athlete_name: m.athlete_name, status: m.status } : null,
     };
   });

@@ -4819,7 +4819,9 @@
   body:has(#view-messages.active) #admin-fb-wrap,
   body:has(#view-messages.active) #admin-fb-overlay,
   body:has(#view-parent-messages.active) #admin-fb-wrap,
-  body:has(#view-parent-messages.active) #admin-fb-overlay { display: none !important; }
+  body:has(#view-parent-messages.active) #admin-fb-overlay,
+  body:has(#view-v15inbox.active) #admin-fb-wrap,
+  body:has(#view-v15inbox.active) #admin-fb-overlay { display: none !important; }
   #admin-fb-modal {
     background: #131318; border: 1px solid rgba(255,255,255,0.12);
     border-radius: 10px; padding: 28px; max-width: 520px; width: 100%;
@@ -6167,7 +6169,9 @@
     body:has(#view-messages.active) #admin-fb-wrap,
     body:has(#view-messages.active) #admin-fb-overlay,
     body:has(#view-parent-messages.active) #admin-fb-wrap,
-    body:has(#view-parent-messages.active) #admin-fb-overlay { display: none; }
+    body:has(#view-parent-messages.active) #admin-fb-overlay,
+    body:has(#view-v15inbox.active) #admin-fb-wrap,
+    body:has(#view-v15inbox.active) #admin-fb-overlay { display: none; }
 
     /* ── Inputs ≥16px so iOS doesn't zoom on focus ── */
     input, textarea, select,
@@ -13643,6 +13647,7 @@ function _v15ibOpenSplit(convId, contactId, phone, email, name, channel) {
   }
   _V15IB.type = _ghlSendType(channel || '');
   _v15ibLoadThread(pane);
+  _v15ibStartThreadPoll();
 }
 
 async function _v15ibLoadThread(pane) {
@@ -13662,6 +13667,56 @@ async function _v15ibLoadThread(pane) {
   } catch (e) {
     pane.innerHTML = `<div class="req-empty" style="padding:24px;color:#9a3b2f">Couldn't load thread - ${escapeHTML(e.message)}</div>`;
   }
+}
+
+// ── Live thread auto-refresh ─────────────────────────────────────────────────
+// Polls the OPEN thread every few seconds so new inbound replies appear on their
+// own, and a just-sent "sending..." bubble flips to the confirmed message once the
+// provider records it. Only re-renders when something actually changed (so it
+// never yanks scroll or drops a draft needlessly), preserves the compose draft +
+// focus across a re-render, and keeps still-unconfirmed optimistic sends visible.
+let _v15ibPollTimer = null;
+function _v15ibThreadSig(msgs) {
+  const real = (msgs || []).filter(m => !m._optimistic);
+  const last = real[real.length - 1];
+  return real.length + '|' + (last ? (last.date || '') + '|' + String(last.body || '').slice(0, 24) : '');
+}
+function _v15ibStopThreadPoll() { if (_v15ibPollTimer) { clearInterval(_v15ibPollTimer); _v15ibPollTimer = null; } }
+function _v15ibStartThreadPoll() { _v15ibStopThreadPoll(); _v15ibPollTimer = setInterval(_v15ibPollTick, 6000); }
+async function _v15ibPollTick() {
+  const a = _V15IB.active;
+  const split = document.getElementById('v15ib-thread-pane');
+  const full = document.getElementById('v15ib-body');
+  // Self-stop once the thread/inbox DOM is gone; skip work while hidden.
+  if (!a || (!split && !full)) { _v15ibStopThreadPoll(); return; }
+  const vis = (split && split.offsetParent !== null) || (full && full.offsetParent !== null);
+  if (!vis) return;
+  try {
+    const token = await _mreqAuthToken();
+    const r = await fetch(`/api/ghl/inbox?client_id=${encodeURIComponent(CLIENT_ID)}&conversation_id=${encodeURIComponent(a.convId)}`, { headers: { Authorization: 'Bearer ' + token } });
+    const j = await _safeJson(r); if (!r.ok) return;
+    if (!_V15IB.active || _V15IB.active.convId !== a.convId) return;   // switched away mid-fetch
+    const fetched = j.messages || [];
+    // Keep optimistic sends the fetch hasn't confirmed yet (so "sending..." doesn't
+    // blink out), drop the ones now present in the fetched outbound messages.
+    const stillPending = (_V15IB.messages || []).filter(m => m._optimistic
+      && !fetched.some(f => (f.direction || '').toLowerCase() === 'outbound' && String(f.body || '').trim() === String(m.body || '').trim()));
+    const merged = [...fetched, ...stillPending];
+    if (_v15ibThreadSig(merged) === _v15ibThreadSig(_V15IB.messages)) return;   // nothing new
+    // Preserve the in-progress draft + focus across the re-render.
+    const ta = document.getElementById('v15ib-text');
+    const subj = document.getElementById('v15ib-subject');
+    const draft = ta ? ta.value : null;
+    const draftSubj = subj ? subj.value : null;
+    const wasFocused = ta && document.activeElement === ta;
+    const caret = ta ? ta.selectionStart : null;
+    _V15IB.messages = merged;
+    if (split) _v15ibRenderThreadSplit(split); else _v15ibRenderThread();
+    const ta2 = document.getElementById('v15ib-text');
+    if (ta2 && draft != null) { ta2.value = draft; if (wasFocused) { try { ta2.focus(); ta2.setSelectionRange(caret, caret); } catch (_) {} } }
+    const subj2 = document.getElementById('v15ib-subject');
+    if (subj2 && draftSubj != null) subj2.value = draftSubj;
+  } catch (_) {}
 }
 
 // ── Split-pane thread renderer ──────────────────────────────────────────────
@@ -13734,11 +13789,13 @@ function _v15ibRenderThreadSplit(pane) {
             <div style="font-size:15px;font-weight:700;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-decoration:underline;text-decoration-style:dotted;text-decoration-color:var(--border-med);text-underline-offset:3px">${escapeHTML(a.name || a.phone || a.email || 'Conversation')}</div>
             ${(a.name && a.phone && a.name !== a.phone) ? `<div style="font-size:11px;color:var(--text-mute);margin-top:1px">${escapeHTML(a.phone)}</div>` : ''}
           </div>
+          <button onclick="event.stopPropagation();_ibEditName()" title="Edit name" aria-label="Edit name" style="flex:none;background:none;border:none;color:var(--text-mute);cursor:pointer;padding:2px;display:inline-flex">${_plIcon('pencil', 13)}</button>
           ${mem ? _ibMemberPill(false) : ''}
           <span style="flex:none;font-size:13px;color:var(--text-mute)">\u203a</span>
         </div>
         <div style="display:flex;align-items:center;gap:8px">
           ${countBadge}
+          ${(() => { const _c = (_V15IB.convos || []).find(x => x.id === a.convId); const _sp = _c && _c.classification === 'spam'; return `<button onclick="_ibMarkSpam(${_sp ? 'false' : 'true'})" title="${_sp ? 'Not spam - restore to the inbox' : 'Mark spam - hides it and stops the agent'}" style="display:inline-flex;align-items:center;gap:5px;background:none;border:1px solid var(--border-med);border-radius:6px;color:var(--text-mute);padding:5px 9px;font:inherit;font-size:11px;font-weight:700;cursor:pointer">${_plIcon('ban', 12)} ${_sp ? 'Not spam' : 'Spam'}</button>`; })()}
           ${ghlUrl ? `<a href="${escapeHTML(ghlUrl)}" target="_blank" rel="noopener" title="Open in GHL" style="display:inline-flex;align-items:center;gap:5px;background:rgba(212,182,92,0.12);border:1px solid var(--gold);border-radius:6px;color:var(--gold);padding:5px 9px;font:inherit;font-size:11px;font-weight:700;text-decoration:none">GHL</a>` : ''}
         </div>
       </div>
@@ -13809,6 +13866,9 @@ async function _v15ibSendSplit() {
     _V15IB.pending = [];
     const pane = document.getElementById('v15ib-thread-pane');
     _v15ibRenderThreadSplit(pane);
+    // Confirm the send quickly: poll shortly after so "sending..." flips to the
+    // real delivered bubble (and any reply that lands meanwhile shows up).
+    setTimeout(_v15ibPollTick, 2500);
     // Update last message in list
     const conv = (_V15IB.convos || []).find(c => c.id === a.convId);
     if (conv) { conv.lastMessageBody = text; conv.lastMessageDate = new Date().toISOString(); conv.lastMessageDirection = 'outbound'; }
@@ -14144,6 +14204,56 @@ function _ibOpenContact() {
   if (m && m.id) { openMemberPopup(m.id); return; }
   _ibOpenContactDrawer(a);
 }
+
+// Name this contact from the inbox header. Saves to the portal contacts store so
+// the name shows across the inbox (and the agent greets them by it). A phone-only
+// "name" starts blank so you don't edit a number.
+async function _ibEditName() {
+  const a = _V15IB.active; if (!a) return;
+  const looksPhone = a.name && /^\+?[\d\s()-]{6,}$/.test(String(a.name));
+  const cur = (a.name && !looksPhone) ? a.name : '';
+  const input = prompt('Name for this contact', cur);
+  if (input == null) return;
+  const name = String(input).trim();
+  if (!name) return;
+  try {
+    const token = await _mreqAuthToken();
+    const r = await fetch('/api/ghl/set-contact-name?client_id=' + encodeURIComponent(CLIENT_ID), {
+      method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+      body: JSON.stringify({ client_id: CLIENT_ID, contact_id: a.contactId || undefined, phone: a.phone || undefined, name }),
+    });
+    const j = await _safeJson(r);
+    if (!r.ok) throw new Error((j && j.error) || 'save failed');
+    a.name = name;
+    const c = (_V15IB.convos || []).find(x => x.id === a.convId);
+    if (c) c.contactName = name;
+    const pane = document.getElementById('v15ib-thread-pane');
+    if (pane && pane.offsetParent !== null) _v15ibRenderThreadSplit(pane); else _v15ibRenderThread();
+    try { _v15ibRenderList(); } catch (_) {}
+  } catch (e) { alert("Couldn't save name: " + (e.message || e)); }
+}
+
+// Mark / unmark this conversation as spam. Hides it into the Spam group and mutes
+// the sales agent for that lead (one agent_mutes row, reason='spam'). Reversible.
+async function _ibMarkSpam(spam) {
+  const a = _V15IB.active; if (!a) return;
+  if (!a.contactId) { alert('This conversation has no linked contact to mark.'); return; }
+  try {
+    const token = await _mreqAuthToken();
+    const r = await fetch('/api/ghl/mark-spam?client_id=' + encodeURIComponent(CLIENT_ID), {
+      method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+      body: JSON.stringify({ client_id: CLIENT_ID, contact_id: a.contactId, spam: !!spam }),
+    });
+    const j = await _safeJson(r);
+    if (!r.ok) throw new Error((j && j.error) || 'failed');
+    const c = (_V15IB.convos || []).find(x => x.id === a.convId);
+    if (c) c.classification = spam ? 'spam' : 'lead';   // next refresh re-derives member/lead
+    try { _v15ibRenderList(); } catch (_) {}
+    const pane = document.getElementById('v15ib-thread-pane');
+    if (pane && pane.offsetParent !== null) _v15ibRenderThreadSplit(pane); else _v15ibRenderThread();
+    if (typeof _plToast === 'function') _plToast(spam ? 'Marked spam - hidden and the agent will skip them.' : 'Restored - no longer spam.');
+  } catch (e) { alert("Couldn't update spam: " + (e.message || e)); }
+}
 // Lightweight contact drawer for non-members (leads). Body-level host so it shows
 // over any view; mirrors the member drawer's slide-in shell.
 function _ibOpenContactDrawer(a) {
@@ -14173,6 +14283,7 @@ function _ibOpenContactDrawer(a) {
         <div style="height:1px;background:var(--border);margin:20px 0"></div>
         <div style="font-size:11px;font-weight:700;color:var(--text-mute);letter-spacing:0.6px;text-transform:uppercase;margin-bottom:10px">Tags</div>
         <div id="ib-cd-tags"></div>
+        <div id="ib-cd-dupes" style="margin-top:20px"></div>
         <div style="font-size:12px;color:var(--text-mute);margin-top:18px;line-height:1.5">Not a member yet. When they sign up they will show a Member pill and link to their full profile here.</div>
         ${ghlUrl ? `<a href="${escapeHTML(ghlUrl)}" target="_blank" rel="noopener" style="display:flex;align-items:center;justify-content:center;gap:8px;margin-top:18px;background:transparent;color:var(--text);border:1px solid var(--border);padding:10px 12px;font-weight:600;border-radius:6px;cursor:pointer;font-size:13px;text-decoration:none">Open in GHL ↗</a>` : ''}
       </div>
@@ -14182,8 +14293,59 @@ function _ibOpenContactDrawer(a) {
     if (bd) bd.style.opacity = '1';
     if (dr) dr.style.transform = 'translateX(0)';
   });
-  if (a.contactId) _renderTagEditorFetch('ib-cd-tags', a.contactId);
+  if (a.contactId) { _renderTagEditorFetch('ib-cd-tags', a.contactId); _ibLoadDupes(a.contactId); }
   else { const t = document.getElementById('ib-cd-tags'); if (t) t.innerHTML = '<span style="font-size:12px;color:var(--text-mute)">No GHL contact linked.</span>'; }
+}
+
+// Duplicate contacts (same phone / name) for the contact whose drawer is open.
+// Merging pulls the duplicate's messages, trials, opps and history into THIS
+// contact and removes the duplicate (atomic server-side function).
+async function _ibLoadDupes(contactId) {
+  const host = document.getElementById('ib-cd-dupes'); if (!host) return;
+  try {
+    const token = await _mreqAuthToken();
+    const r = await fetch('/api/ghl/merge-contacts?client_id=' + encodeURIComponent(CLIENT_ID), {
+      method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+      body: JSON.stringify({ client_id: CLIENT_ID, action: 'find', contact_id: contactId }),
+    });
+    const j = await _safeJson(r);
+    const cands = (r.ok && j.candidates) || [];
+    if (!cands.length) { host.innerHTML = ''; return; }
+    const rows = cands.map(c => {
+      const nm = escapeHTML(c.name || c.phone || c.email || 'Contact');
+      const sub = [c.phone, c.msgs ? (c.msgs + ' thread' + (c.msgs === 1 ? '' : 's')) : ''].filter(Boolean).join(' · ');
+      return `<div style="display:flex;align-items:center;gap:8px;padding:8px 0;border-top:1px solid var(--border)">
+          <div style="flex:1;min-width:0"><div style="font-size:13px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${nm}</div>${sub ? `<div style="font-size:11px;color:var(--text-mute);margin-top:1px">${escapeHTML(sub)}</div>` : ''}</div>
+          <button onclick="_ibMergeDupe('${escapeHTML(c.ghl_contact_id)}')" style="flex:none;background:none;border:1px solid var(--border-med);border-radius:6px;color:var(--text-sub);padding:5px 11px;font:inherit;font-size:11px;font-weight:700;cursor:pointer">Merge in</button>
+        </div>`;
+    }).join('');
+    host.innerHTML = `<div style="font-size:11px;font-weight:700;color:var(--text-mute);letter-spacing:0.6px;text-transform:uppercase;margin-bottom:6px">Possible duplicates (${cands.length})</div>
+      <div style="font-size:11px;color:var(--text-mute);margin-bottom:4px;line-height:1.5">Same phone or name. "Merge in" pulls their messages and history into this contact, then removes the duplicate.</div>${rows}`;
+  } catch (_) { host.innerHTML = ''; }
+}
+function _ibMergeDupe(dropId) {
+  const keep = _V15IB.active && _V15IB.active.contactId; if (!keep || !dropId) return;
+  _plConfirmModal({
+    icon: '', title: 'Merge this duplicate?',
+    body: "Their messages, trials and history move into the contact you're viewing, and the duplicate is removed. This can't be undone.",
+    okLabel: 'Merge', onOk: () => _ibMergeDupeGo(keep, dropId),
+  });
+}
+async function _ibMergeDupeGo(keep, dropId) {
+  try {
+    const token = await _mreqAuthToken();
+    const r = await fetch('/api/ghl/merge-contacts?client_id=' + encodeURIComponent(CLIENT_ID), {
+      method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+      body: JSON.stringify({ client_id: CLIENT_ID, action: 'merge', contact_id: keep, drop_id: dropId }),
+    });
+    const j = await _safeJson(r);
+    if (!r.ok) throw new Error((j && j.error) || 'merge failed');
+    // Drop the merged duplicate's conversation from the list immediately.
+    _V15IB.convos = (_V15IB.convos || []).filter(c => c.contactId !== dropId);
+    try { _v15ibRenderAll(); } catch (_) {}
+    _ibLoadDupes(keep);
+    if (typeof _plToast === 'function') _plToast('Merged - the duplicate is gone.');
+  } catch (e) { alert("Couldn't merge: " + (e.message || e)); }
 }
 function _ibCloseContactDrawer() {
   const bd = document.getElementById('ib-cd-backdrop'); const dr = document.getElementById('ib-cd-drawer');
@@ -14219,6 +14381,7 @@ async function _v15ibOpen(convId, contactId, phone, email, name, channel) {
     if (!r.ok) throw new Error(j.error || ('HTTP ' + r.status));
     _V15IB.messages = j.messages || [];
     _v15ibRenderThread();
+    _v15ibStartThreadPoll();
   } catch (e) {
     if (body) body.innerHTML = `<div class="req-empty" style="padding:24px 0;color:#9a3b2f">Couldn't load thread - ${escapeHTML(e.message || String(e))}</div>`;
   }
@@ -14299,10 +14462,14 @@ function _v15ibRenderThread() {
           <div style="font-size:15px;font-weight:700;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-decoration:underline;text-decoration-style:dotted;text-decoration-color:var(--border-med);text-underline-offset:3px">${escapeHTML(a.name || a.phone || a.email || 'Conversation')}</div>
           ${(a.name && a.phone && a.name !== a.phone) ? `<div style="font-size:11px;color:var(--text-mute);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHTML(a.phone)}</div>` : ''}
         </div>
+        <button onclick="event.stopPropagation();_ibEditName()" title="Edit name" aria-label="Edit name" style="flex:none;background:none;border:none;color:var(--text-mute);cursor:pointer;padding:2px;display:inline-flex">${_plIcon('pencil', 13)}</button>
         ${mem ? _ibMemberPill(false) : ''}
         <span style="flex:none;font-size:13px;color:var(--text-mute)">›</span>
       </div>
-      <span id="ib-call-slot" style="flex:none">${ghlUrl ? `<a href="${escapeHTML(ghlUrl)}" target="_blank" rel="noopener" title="Open this contact in GHL to call" style="display:inline-flex;align-items:center;gap:6px;background:rgba(212,182,92,0.12);border:1px solid var(--gold);border-radius:8px;color:var(--gold);padding:6px 10px;font:inherit;font-size:12px;font-weight:700;text-decoration:none">Call in GHL</a>` : ''}</span>
+      <div style="display:flex;align-items:center;gap:8px;flex:none">
+        ${(() => { const _c = (_V15IB.convos || []).find(x => x.id === a.convId); const _sp = _c && _c.classification === 'spam'; return `<button onclick="_ibMarkSpam(${_sp ? 'false' : 'true'})" title="${_sp ? 'Not spam - restore to the inbox' : 'Mark spam - hides it and stops the agent'}" style="display:inline-flex;align-items:center;gap:5px;background:none;border:1px solid var(--border-med);border-radius:8px;color:var(--text-mute);padding:6px 10px;font:inherit;font-size:12px;font-weight:700;cursor:pointer">${_plIcon('ban', 13)} ${_sp ? 'Not spam' : 'Spam'}</button>`; })()}
+        <span id="ib-call-slot">${ghlUrl ? `<a href="${escapeHTML(ghlUrl)}" target="_blank" rel="noopener" title="Open this contact in GHL to call" style="display:inline-flex;align-items:center;gap:6px;background:rgba(212,182,92,0.12);border:1px solid var(--gold);border-radius:8px;color:var(--gold);padding:6px 10px;font:inherit;font-size:12px;font-weight:700;text-decoration:none">Call in GHL</a>` : ''}</span>
+      </div>
     </div>
     <div id="ib-tags" style="margin-bottom:10px"></div>
     <div class="v15ib-thread-layout">
@@ -30705,7 +30872,7 @@ function _ploStripCells(stages, nav) {
     let pills = '';
     if (sig.errors) pills += `<span class="plo-pill red" onclick="event.stopPropagation();${stageClick}('${escapeHTML(s.id)}')">${_plIcon('alert', 11)} ${sig.errors} ${sig.errors === 1 ? 'error' : 'errors'}</span>`;
     if (sig.hawk && bot) pills += `<span class="plo-pill gold" onclick="event.stopPropagation();${hawkClick}('${escapeHTML(bot.key)}')">${_plIcon('eye', 11)} ${sig.hawk} hawkeye action${sig.hawk === 1 ? '' : 's'}</span>`;
-    if (!pills) pills = '<span class="plo-clear">all clear</span>';
+    if (!pills && !(nav && nav.hideClear)) pills = '<span class="plo-clear">all clear</span>';
     const conn = i < stages.length - 1 ? `<div class="plo-conn">${_plIcon('chevR', 16)}</div>` : '';
     return `<div class="plo-stage" onclick="${stageClick}('${escapeHTML(s.id)}')">`
       + `<div class="plo-toprow"><span class="plo-name">${escapeHTML(_plCap(s.name))}</span>`
@@ -30720,7 +30887,7 @@ function _ploStripCells(stages, nav) {
 function _ccPipeStage(id) { try { _ccOpenClassic('pipelines'); } catch (_) {} setTimeout(() => { try { _plSVStage(id); } catch (_) {} }, 120); }
 function _ccPipeFocus(id) { try { _ccOpenClassic('pipelines'); } catch (_) {} setTimeout(() => { try { _plOpenFocus(id); } catch (_) {} }, 120); }
 function _ccPipeHawk(key) { try { _ccOpenClassic('pipelines'); } catch (_) {} setTimeout(() => { try { _plEngineHawk(key); } catch (_) {} }, 120); }
-const _CC_PIPE_NAV = { stage: '_ccPipeStage', gear: '_ccPipeFocus', hawk: '_ccPipeHawk' };
+const _CC_PIPE_NAV = { stage: '_ccPipeStage', gear: '_ccPipeFocus', hawk: '_ccPipeHawk', hideClear: true };
 
 // engine glyphs the strip needs that aren't in the base _plIcon set
 function _ploEngIcon(name) {
@@ -41942,6 +42109,7 @@ function _renderWizardCreatives() {
 
       <label class="modal-label" style="margin-top:12px">Notes (optional)</label>
       <textarea class="modal-textarea" placeholder="What's the vibe? Hook? Key copy? Anything special the team should know?" oninput="wizardSetCreativeNotes('${c.id}', this.value)">${escapeHTML(c.notes)}</textarea>
+      <div style="font-size:11px;color:var(--text-mute);margin-top:4px;line-height:1.5">Helpful: creative direction · offer details (who it's for, benefits, dates) · speaker names · do's and don'ts.</div>
     </div>`;
   }).join('');
 
@@ -45502,6 +45670,20 @@ function _ccStyle() {
     '.cc-sal-bench-t b{display:block;font-family:var(--font-num);font-size:15px;font-weight:800;color:var(--text);line-height:1.15}' +
     '.cc-sal-bench-t span{font-size:9.5px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--gold)}' +
     '.cc-sal-bench-s{margin-left:auto;font-size:12px;color:var(--text-mute)}' +
+    /* full-width Hawkeye action card: next queued action, opens focus mode on click */
+    '.cc-hawk-card{display:flex;align-items:center;gap:20px;background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:16px 18px;box-shadow:0 1px 3px rgba(0,0,0,.04);margin-bottom:12px;cursor:pointer;transition:transform .2s var(--es,ease),box-shadow .2s,border-color .2s,background .2s}' +
+    '.cc-hawk-card:hover{transform:translateY(-2px);box-shadow:0 4px 14px rgba(0,0,0,.06)}' +
+    '.cc-hawk-card.has{border-color:var(--gold);background:var(--gold-glow,rgba(212,182,92,.08))}' +
+    '.cc-hawk-hero{display:flex;flex-direction:column;justify-content:center;padding-right:20px;border-right:1px solid var(--border);min-width:96px;flex:0 0 auto}' +
+    '.cc-hawk-n{font-family:var(--font-num);font-size:38px;font-weight:800;color:var(--text);line-height:1}' +
+    '.cc-hawk-card.has .cc-hawk-n{color:var(--gold)}' +
+    '.cc-hawk-lab{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;color:var(--text-mute);margin-top:4px}' +
+    '.cc-hawk-body{flex:1;min-width:0;display:flex;flex-direction:column;justify-content:center;gap:3px}' +
+    '.cc-hawk-top{font-size:14px;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}' +
+    '.cc-hawk-top b{font-weight:800}' +
+    '.cc-hawk-more{font-size:12px;color:var(--text-mute)}' +
+    '.cc-hawk-empty{font-size:13.5px;color:var(--text-mute)}' +
+    '.cc-hawk-go{flex:none;color:var(--gold);font-weight:800;white-space:nowrap;font-size:13px}' +
     '.cc-pipe-strip{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:18px}' +
     '.cc-pipe-pill{display:inline-flex;align-items:center;gap:8px;background:var(--surface);border:1px solid var(--border);border-radius:999px;padding:7px 8px 7px 14px;font:inherit;font-size:12px;font-weight:600;color:var(--text);cursor:pointer;transition:border-color .15s,transform .15s}' +
     '.cc-pipe-pill:hover{border-color:var(--accent-border);transform:translateY(-1px)}' +
@@ -46465,24 +46647,27 @@ function _ccMountSales(host) {
       <div class="cc-sal-bench">
         <span class="cc-sal-orb"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8"/><line x1="12" y1="2" x2="12" y2="6"/><line x1="12" y1="18" x2="12" y2="22"/><line x1="2" y1="12" x2="6" y2="12"/><line x1="18" y1="12" x2="22" y2="12"/><circle cx="12" cy="12" r="2"/></svg></span>
         <div class="cc-sal-bench-t"><b>Hawk</b><span>Sales rep</span></div>
-        <div class="cc-sal-bench-s" id="cc-sal-status">Watching the pipeline.</div>
       </div>
-      <div class="cc-trials-card" onclick="_ccOpenClassic('calendar')" title="Jump to the calendar">
-        <div class="cc-trials-hero">
-          <div class="cc-trials-n" id="cc-sal-trials">-</div>
-          <div class="cc-trials-lab">Trials today</div>
-          <div class="cc-stat-d" id="cc-sal-next"></div>
+      <div class="cc-hawk-card" id="cc-sal-hawkcard" onclick="_hv2OpenHawkeye()" title="Open Hawkeye focus mode">
+        <div class="cc-hawk-hero">
+          <div class="cc-hawk-n" id="cc-sal-hawkcard-n">-</div>
+          <div class="cc-hawk-lab">Hawkeye actions</div>
         </div>
-        <div class="cc-trials-body" id="cc-sal-trials-list"></div>
+        <div class="cc-hawk-body" id="cc-sal-hawkcard-body"><div class="cc-hawk-empty">Checking with Hawk...</div></div>
+        <span class="cc-hawk-go" id="cc-sal-hawkcard-go" style="display:none">Review &rsaquo;</span>
       </div>
       <div class="cc-stats">
+        <div class="cc-stat click" onclick="_ccOpenClassic('calendar')" title="Jump to the calendar">
+          <div class="cc-stat-v" id="cc-sal-trials">-</div>
+          <div class="cc-stat-l">Trials today</div>
+          <div class="cc-stat-d" id="cc-sal-next"></div>
+        </div>
         <div class="cc-stat"><div class="cc-stat-v" id="cc-sal-7d">-</div><div class="cc-stat-l">Sales - 7 days</div></div>
         <div class="cc-stat"><div class="cc-stat-v" id="cc-sal-close">-</div><div class="cc-stat-l">Trial closing rate</div></div>
       </div>
       <div class="cc-pipe-strip" id="cc-sal-strip"></div>
       <div class="cc-actions">
         <button type="button" class="cc-btn primary" onclick="_ccOpenClassic('pipelines')">Open sales board</button>
-        <button type="button" class="cc-btn" onclick="_hv2OpenHawkeye()">Hawkeye actions<span class="cc-btn-badge" id="cc-sal-hawkn" style="display:none"></span></button>
       </div>
       <div class="cc-sal-feed" id="cc-sal-feed"></div>
     </div>`;
@@ -46509,18 +46694,18 @@ async function _ccLoadTrialsCount() {
     }
   } catch (_) {}
 }
-// Today's trials, listed out with time · athlete name · age (exact once DOB is
-// captured, else the group band, e.g. "Elementary"). Clears when there are none.
+// Compact sub-line under the Trials-today KPI: the soonest of today's trials
+// (time · athlete name). The full list lives one tap away on the calendar.
 function _ccRenderTrialsList(trials, tz) {
-  const host = document.getElementById('cc-sal-trials-list'); if (!host) return;
-  if (!trials || !trials.length) { host.innerHTML = '<div class="cc-trials-empty">No trials booked today.</div>'; return; }
-  host.innerHTML = trials.map(t => {
-    let time = '';
-    try { if (t.start) time = new Date(t.start).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: tz || 'America/Toronto' }); } catch (_) {}
-    const nm = escapeHTML(t.athlete || t.contactName || 'Trial');
-    const ageStr = (t.age != null) ? (t.age + ' yrs') : (t.group ? escapeHTML(t.group) : '');
-    return `<div class="cc-tr-row"><span class="cc-tr-time">${escapeHTML(time)}</span><span class="cc-tr-nm">${nm}</span>${ageStr ? `<span class="cc-tr-age">${ageStr}</span>` : ''}</div>`;
-  }).join('');
+  const sub = document.getElementById('cc-sal-next'); if (!sub) return;
+  if (!trials || !trials.length) { sub.textContent = ''; return; }
+  const next = trials
+    .filter(t => t.start)
+    .sort((a, b) => new Date(a.start) - new Date(b.start))[0] || trials[0];
+  let time = '';
+  try { if (next.start) time = new Date(next.start).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: tz || 'America/Toronto' }); } catch (_) {}
+  const nm = _ccCapName((next.athlete || next.contactName || 'Trial').split(' ').slice(0, 2).join(' '));
+  sub.textContent = (time ? time + ' · ' : '') + nm;
 }
 // "Trials today: 0" is a dead number - show the next booked trial instead.
 async function _ccNextTrial() {
@@ -46606,12 +46791,56 @@ async function _ccSalesKpis() {
     const cl = document.getElementById('cc-sal-close'); if (cl) cl.textContent = (j.closing_rate != null ? j.closing_rate + '%' : '-');
   } catch (_) { /* leave the dashes */ }
 }
-function _ccSalesHawk() {
-  const n = window._hmHawkTotal || 0;
-  const b = document.getElementById('cc-sal-hawkn');
-  if (b) { b.textContent = String(n); b.style.display = n > 0 ? '' : 'none'; }
-  const st = document.getElementById('cc-sal-status');
-  if (st) st.textContent = n > 0 ? n + (n === 1 ? ' follow-up queued.' : ' follow-ups queued.') : 'Watching the pipeline.';
+function _ccHawkVerb(kind) {
+  return ({ reply: 'needs a reply', book: 'has a trial to confirm', ghost: 'should go to Ghosted', mark_lost: 'to confirm as lost' })[kind] || 'needs a look';
+}
+// Hawk's live message on the right of the Sales bench: the top queued action +
+// how many are waiting. Tapping it opens the Hawkeye focus view. Fetches its own
+// data (the command center doesn't run the home rail loader).
+async function _ccSalesHawk() {
+  const items = [];
+  try {
+    const [fu, rd] = await Promise.all([
+      _apxPost('/api/agent-followups', 'list', {}).catch(() => ({})),
+      _apxPost('/api/agent-approvals', 'list-ready', {}).catch(() => ({})),
+    ]);
+    const d = _apxSplit(fu, rd);
+    for (const r of (d.ready || []))     items.push({ name: r.contact_name, desc: _ccHawkVerb(r.kind) });
+    for (const f of (d.followups || [])) items.push({ name: f.contact_name, desc: 'has a follow-up ready' });
+    for (const b of (d.book || []))      items.push({ name: b.contact_name, desc: 'has a trial to confirm' });
+    for (const g of (d.ghost || []))     items.push({ name: g.contact_name, desc: 'should go to Ghosted' });
+    for (const l of (d.lost || []))      items.push({ name: l.contact_name, desc: 'to confirm as lost' });
+  } catch (_) {}
+  const total = items.length;
+  window._hmHawkTotal = total;
+  const top = total ? items[0] : null;
+  const topNm = top ? escapeHTML(_hmStripEm(_ccHawkCleanName(top.name))) : '';
+
+  // Full-width Hawkeye action card is the single Hawkeye surface on the Sales
+  // page: big count + the next queued action, or an all-clear empty state.
+  // Tapping the card opens the Hawkeye focus view.
+  const cardN = document.getElementById('cc-sal-hawkcard-n');
+  const cardBody = document.getElementById('cc-sal-hawkcard-body');
+  const cardGo = document.getElementById('cc-sal-hawkcard-go');
+  const card = document.getElementById('cc-sal-hawkcard');
+  if (cardN) cardN.textContent = String(total);
+  if (card) card.classList.toggle('has', total > 0);
+  if (cardGo) cardGo.style.display = total > 0 ? '' : 'none';
+  if (cardBody) {
+    if (!total) {
+      cardBody.innerHTML = `<div class="cc-hawk-empty">All caught up. No Hawkeye actions waiting.</div>`;
+    } else {
+      const more = total > 1 ? `<div class="cc-hawk-more">+${total - 1} more waiting</div>` : '';
+      cardBody.innerHTML = `<div class="cc-hawk-top"><b>${topNm}</b> ${escapeHTML(top.desc)}</div>${more}`;
+    }
+  }
+}
+// A lead with no resolved name comes back as a raw phone/contact id - never show
+// that. Fall back to "A lead" so the card reads like a sentence.
+function _ccHawkCleanName(n) {
+  n = (n || '').trim();
+  if (!n || /^\+?[\d\s()\-.]{5,}$/.test(n)) return 'A lead';
+  return n;
 }
 
 // MEMBERS (skeleton): agent bar (opens the members focus mode), roster KPIs
@@ -47539,27 +47768,112 @@ function _mmaSend() {
   const v = document.getElementById('mma-voice');
   if (v && !v.classList.contains('think')) { _mmaLogLine(v.textContent.trim()); v.textContent = ''; }
   _mmaLogLine('You: ' + txt);
-  _mmaHandle(txt.toLowerCase());
+  _mmaHandle(txt);
 }
-async function _mmaHandle(q) {
+// Router: instant local paths for KPIs + bare-name lookups; everything that
+// smells like an ACTION or a follow-up in an ongoing conversation goes to the
+// real agent (/api/members-agent) which reasons + proposes → Confirm on desk.
+const _MMA_ACTION_RE = /\b(pause|unpause|resume|cancel|refund|change|upgrade|downgrade|coupon|discount|charge|credit|referr\w*|call|payment|link|card|set|update|adjust|switch|move|apply|remove|send|why|fail\w*|help|walk|next)\b/i;
+async function _mmaHandle(qRaw) {
+  const q = String(qRaw || '');
+  const ql = q.toLowerCase();
   const roster = await _ccEnsureMembers();
-  if (/\b(kpi|kpis|mrr|revenue|churn|arpu|numbers|how many|active|paused|roster|risk)\b/.test(q)) {
+  if (/\b(kpi|kpis|mrr|revenue|churn|arpu|numbers|how many|active|roster|risk)\b/.test(ql) && !_MMA_AI.engaged) {
     await _mmaThink(['SCANNING ROSTER...', roster.length + ' RECORDS', 'COMPUTING NUMBERS...']);
     return _mmaKpis();
   }
-  const matches = await _mmaMatchMembers(q);
+  // Ongoing agent conversation, or an action-shaped request → the real agent.
+  if (_MMA_AI.engaged || _MMA_AI.proposal || _MMA_ACTION_RE.test(ql)) return _mmaAgentAsk(q);
+  const matches = await _mmaMatchMembers(ql);
   await _mmaThink(['SEARCHING ROSTER...', roster.length + ' RECORDS', matches.length + (matches.length === 1 ? ' MATCH' : ' MATCHES')]);
   if (matches.length === 1) {
     const m = matches[0];
     _mmaSay('This the one?', _mmaCardHtml(m, true));
+    // Seed the agent conversation so a follow-up ("pause him 2 weeks") knows
+    // exactly who without re-asking. member_id lets it skip the name lookup.
+    _MMA_AI.history.push({ role: 'assistant', text: 'Pulled up ' + (m.athlete_name || 'a member') + ' (parent ' + (m.parent_name || '-') + ', member_id ' + m.id + ').' });
     _mmaPin('<span class="mma-pin-t">' + escapeHTML(_ccCapName(m.athlete_name || 'Member')) + '</span><span class="mma-pin-s">member card</span>', () => openMemberPopup(m.id));
     const jt = new Date(m.joined_date || m.start_date || m.stripe_joined_at || 0).getTime();
     _ccFocusWallpaper('membersMachineModal', { highlight: jt > 0 ? jt : null });
   } else if (matches.length > 1) {
     _mmaSay('A few matches. Which one?', matches.map(m => _mmaCardHtml(m, false)).join(''));
   } else {
-    _mmaSay("Didn't catch that. Type a member's name to pull their card, or ask about your KPIs (try \"how's my MRR\").", '');
+    // Not a name we know - let the agent take a swing instead of shrugging.
+    return _mmaAgentAsk(q);
   }
+}
+
+// ── Real agent bridge (guided flows: pause + next payment, refunds, etc) ──
+let _MMA_AI = { history: [], engaged: false, proposal: null, busy: false };
+
+async function _mmaAgentAsk(message) {
+  if (_MMA_AI.busy) return;
+  if (typeof CLIENT_ID === 'undefined' || !CLIENT_ID) return _mmaSay('No academy in scope - refresh and try again.', '');
+  _MMA_AI.busy = true;
+  const thinkP = _mmaThink(['CALLING THE AGENT...', 'READING BILLING...', 'REASONING...']);
+  try {
+    const token = await _mreqAuthToken();
+    const res = await fetch('/api/members-agent', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+      body: JSON.stringify({ client_id: CLIENT_ID, message, history: _MMA_AI.history.slice(-12) }),
+    });
+    const json = await _safeJson(res);
+    await thinkP;
+    if (!res.ok) throw new Error(json.error || ('HTTP ' + res.status));
+    _MMA_AI.history.push({ role: 'user', text: message });
+    if (json.reply) _MMA_AI.history.push({ role: 'assistant', text: json.reply });
+    _MMA_AI.engaged = true;
+    _MMA_AI.proposal = json.proposal || null;
+    _mmaSay(json.reply || (json.proposal ? 'Ready when you are.' : 'Okay.'), json.proposal ? _mmaProposalHtml(json.proposal) : '');
+  } catch (e) {
+    await thinkP;
+    _mmaSay("Couldn't reach the agent: " + (e.message || e), '');
+  }
+  _MMA_AI.busy = false;
+}
+
+function _mmaProposalHtml(p) {
+  const destructive = (p.action === 'cancel' || p.action === 'refund');
+  const accent = destructive ? 'var(--red,#e0654f)' : 'var(--gold,#D4B65C)';
+  return '<div class="mma-card" style="border-color:' + accent + ';display:block">' +
+    '<div style="font-size:10px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:' + accent + ';margin-bottom:5px">Proposed action</div>' +
+    '<div style="font-size:13px;font-weight:600;line-height:1.45;margin-bottom:10px">' + escapeHTML(p.summary || p.action) + '</div>' +
+    '<div class="mma-card-acts" style="margin-top:0">' +
+      '<button type="button" class="mma-act" style="background:' + accent + ';color:var(--on-gold,#0B0B0D);border-color:' + accent + '" onclick="_mmaAgentConfirm()">Confirm</button>' +
+      '<button type="button" class="mma-act" onclick="_mmaAgentCancel()">Cancel</button>' +
+    '</div></div>';
+}
+
+async function _mmaAgentConfirm() {
+  const p = _MMA_AI.proposal;
+  if (!p || _MMA_AI.busy) return;
+  _MMA_AI.busy = true;
+  _MMA_AI.proposal = null;
+  const thinkP = _mmaThink(['EXECUTING...', 'WRITING TO STRIPE...', 'LOGGING AUDIT...']);
+  try {
+    const result = await _memberAction(p.member_id, p.action, p.body || {});
+    await thinkP;
+    _MMA_AI.history.push({ role: 'assistant', text: '(Executed: ' + (p.summary || p.action) + ')' });
+    if ((p.action === 'payment-link' || p.action === 'card-setup-link') && result && result.url) {
+      _mmaSay('Link ready - pick how to send it.', '');
+      _openPaymentLinkModal(p.member_id, result);
+    } else {
+      _mmaSay('Done. ' + (p.summary || p.action), '');
+    }
+    if (typeof fetchAndRenderMembers === 'function') fetchAndRenderMembers();
+  } catch (e) {
+    await thinkP;
+    _MMA_AI.history.push({ role: 'assistant', text: '(Execution failed: ' + (e.message || e) + ')' });
+    _mmaSay("That didn't go through: " + (e.message || e), '');
+  }
+  _MMA_AI.busy = false;
+}
+
+function _mmaAgentCancel() {
+  _MMA_AI.proposal = null;
+  _MMA_AI.history.push({ role: 'assistant', text: '(Proposal cancelled - nothing changed.)' });
+  _mmaSay('Cancelled. Nothing was changed.', '');
 }
 async function _mmaMatchMembers(q) {
   const stop = new Set(['the', 'and', 'about', 'member', 'members', 'who', 'what', 'can', 'you', 'tell', 'show', 'pull', 'card', 'for', 'his', 'her', 'their', 'this', 'that', 'guy']);
@@ -47589,8 +47903,8 @@ function _mmaCardHtml(m, detailed) {
   const extra = detailed
     ? `<div class="mma-card-sub">${[m.trainer ? 'Trainer: ' + escapeHTML(m.trainer) : '', m.joined_date ? 'Joined ' + escapeHTML(String(m.joined_date).slice(0, 10)) : ''].filter(Boolean).join(' · ')}</div>
        <div class="mma-card-acts">
-         <button type="button" class="mma-act" onclick="closeMembersFocus();mPause('${m.id}')">Pause</button>
-         <button type="button" class="mma-act" onclick="closeMembersFocus();mPaymentLink('${m.id}')">Payment link</button>
+         <button type="button" class="mma-act" onclick="_mmaChip('Pause ${escapeHTML(_ccCapName(m.athlete_name || 'this member').replace(/['"\\\\]/g, ''))}')">Pause</button>
+         <button type="button" class="mma-act" onclick="_mmaChip('Payment link for ${escapeHTML(_ccCapName(m.athlete_name || 'this member').replace(/['"\\\\]/g, ''))}')">Payment link</button>
          <button type="button" class="mma-act" onclick="openMemberPopup('${m.id}')">Message</button>
        </div>`
     : '';
@@ -48119,6 +48433,7 @@ function toggleTheme() {
 
     <label class="modal-label" for="inputAssetsNotes" style="margin-top:18px">Notes for the content team</label>
     <textarea id="inputAssetsNotes" class="modal-textarea" placeholder="What's the vibe? Hook? Key copy? Brand colors? Anything special the team should know?"></textarea>
+    <div style="font-size:11px;color:var(--text-mute);margin-top:4px;line-height:1.5">Helpful: creative direction · offer details (who it's for, benefits, dates) · speaker names · do's and don'ts.</div>
 
     <div class="modal-footer">
       <button class="btn-modal-secondary" onclick="closeInputAssetsModal()">Cancel</button>
