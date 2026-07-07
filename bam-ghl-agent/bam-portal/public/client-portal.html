@@ -41929,6 +41929,7 @@ function _renderWizardCreatives() {
 
       <label class="modal-label" style="margin-top:12px">Notes (optional)</label>
       <textarea class="modal-textarea" placeholder="What's the vibe? Hook? Key copy? Anything special the team should know?" oninput="wizardSetCreativeNotes('${c.id}', this.value)">${escapeHTML(c.notes)}</textarea>
+      <div style="font-size:11px;color:var(--text-mute);margin-top:4px;line-height:1.5">Helpful to include: creative direction or vibe · offer details (price, dates, who it's for) · names of anyone speaking in videos · phrases or colors to use or avoid.</div>
     </div>`;
   }).join('');
 
@@ -48106,6 +48107,7 @@ function toggleTheme() {
 
     <label class="modal-label" for="inputAssetsNotes" style="margin-top:18px">Notes for the content team</label>
     <textarea id="inputAssetsNotes" class="modal-textarea" placeholder="What's the vibe? Hook? Key copy? Brand colors? Anything special the team should know?"></textarea>
+    <div style="font-size:11px;color:var(--text-mute);margin-top:4px;line-height:1.5">Helpful to include: creative direction or vibe · offer details (price, dates, who it's for) · names of anyone speaking in videos · phrases or colors to use or avoid.</div>
 
     <div class="modal-footer">
       <button class="btn-modal-secondary" onclick="closeInputAssetsModal()">Cancel</button>
