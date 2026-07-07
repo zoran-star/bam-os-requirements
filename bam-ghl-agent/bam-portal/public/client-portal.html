@@ -15557,6 +15557,7 @@ function _hv2Style() {
     '.hm-kpi-body{width:100%;max-width:none;border-radius:24px 24px 0 0;max-height:88dvh;padding-bottom:calc(28px + env(safe-area-inset-bottom));animation:hmSheetUp .32s cubic-bezier(0.22,1,0.36,1)}' +
     '}' +
     '@keyframes hmSheetUp{from{transform:translateY(48px);opacity:.5}to{transform:translateY(0);opacity:1}}' +
+    '@media(max-width:640px){.hm-peek-card::before,.cc-minbox-card::before,.hm-kpi-body::before{content:\'\';display:block;flex:none;width:38px;height:4px;border-radius:999px;background:var(--border-med);margin:8px auto 2px}}' +
     '@media(prefers-reduced-motion:reduce){.hm-peek-card,.cc-minbox-card,.hm-kpi-body{animation:none !important}}' +
     '#cc-minbox-ov{position:fixed;inset:0;z-index:9800;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;animation:hv2In .2s ease}' +
     '.cc-minbox-card{font-family:var(--font-ui);background:var(--surface);border:1px solid var(--border);border-radius:24px;width:min(520px,92vw);max-height:80vh;display:flex;flex-direction:column;box-shadow:0 12px 40px rgba(0,0,0,.3);overflow:hidden}' +
@@ -16315,6 +16316,9 @@ async function _hmMsgPeek(convId, focusReply) {
       </div>
     </div>`);
   if (focusReply) setTimeout(() => document.getElementById('hm-peek-input')?.focus(), 120);
+  const peekCard = document.querySelector('#hm-peek-ov .hm-peek-card');
+  _sheetDragify(peekCard, _hmMsgPeekClose);
+  _peekSwipeNav(peekCard, convId);
   try {
     const token = await _mreqAuthToken();
     fetch(`/api/ghl/inbox?action=mark-read&client_id=${encodeURIComponent(CLIENT_ID)}`, {
@@ -16392,6 +16396,78 @@ async function _hmMsgPeekSend(convId) {
     if (!el.getAttribute('enterkeyhint') && el.closest('.v15ib-thread, .mma-compose, .hm-peek-compose, .cc-qr')) el.setAttribute('enterkeyhint', 'send');
   });
 })();
+// Sheet gestures (phones): drag a bottom sheet down past ~110px to dismiss
+// (rubber-banded, springs back otherwise), and swipe the message peek left or
+// right to hop to the next/previous conversation.
+function _sheetDragify(card, closeFn) {
+  if (!card || card._sheetDrag || !window.matchMedia('(max-width: 640px)').matches) return;
+  card._sheetDrag = true;
+  const scroller = card.querySelector('.hm-peek-thread, .cc-minbox-list') || card;
+  let sy = null, dy = 0, dragging = false;
+  card.addEventListener('touchstart', e => { sy = e.touches[0].clientY; dy = 0; dragging = false; }, { passive: true });
+  card.addEventListener('touchmove', e => {
+    if (sy === null) return;
+    const d = e.touches[0].clientY - sy;
+    if (!dragging && d > 8 && (scroller.scrollTop || 0) <= 0) dragging = true;
+    if (!dragging) return;
+    dy = Math.max(0, d);
+    card.style.transition = 'none';
+    card.style.transform = 'translateY(' + (dy * 0.72).toFixed(1) + 'px)';
+  }, { passive: true });
+  card.addEventListener('touchend', () => {
+    sy = null;
+    if (!dragging) return;
+    dragging = false;
+    card.style.transition = 'transform .22s ease';
+    if (dy > 110) {
+      try { hapticTap('LIGHT'); } catch (_) {}
+      card.style.transform = 'translateY(110%)';
+      setTimeout(closeFn, 180);
+    } else card.style.transform = '';
+    dy = 0;
+  });
+}
+function _peekSwipeNav(card, convId) {
+  if (!card) return;
+  let sx = null, syv = 0;
+  card.addEventListener('touchstart', e => { sx = e.touches[0].clientX; syv = e.touches[0].clientY; }, { passive: true });
+  card.addEventListener('touchend', e => {
+    if (sx === null) return;
+    const t = e.changedTouches[0];
+    const dx = t.clientX - sx, dyv = Math.abs(t.clientY - syv);
+    sx = null;
+    if (Math.abs(dx) < 64 || dyv > 50) return;
+    const ids = (typeof _V15IB !== 'undefined' && Array.isArray(_V15IB.convos) && _V15IB.convos.length)
+      ? _V15IB.convos.map(c => String(c.id)) : Object.keys(window._hmIbById || {});
+    const i = ids.indexOf(String(convId));
+    if (i < 0) return;
+    const ni = dx < 0 ? i + 1 : i - 1;
+    if (ni < 0 || ni >= ids.length) return;
+    try { hapticTap('LIGHT'); } catch (_) {}
+    _hmMsgPeek(ids[ni]);
+  });
+}
+// One-finger pull from the top of an open focus room closes it (phones).
+(function () {
+  let syf = null;
+  document.addEventListener('touchstart', e => {
+    const t = e.touches[0];
+    syf = (document.documentElement.classList.contains('mm-focus-open') && t.clientY < 140) ? t.clientY : null;
+  }, { passive: true });
+  document.addEventListener('touchend', e => {
+    if (syf === null) return;
+    const dyf = e.changedTouches[0].clientY - syf;
+    syf = null;
+    if (dyf > 90 && window.matchMedia('(max-width: 768px)').matches) {
+      const open = document.querySelector('.mm-focus-page.mm-open');
+      if (open && open.scrollTop <= 0) {
+        try { hapticTap('LIGHT'); } catch (_) {}
+        try { _ccFocusCloseOpen(); } catch (_) {}
+      }
+    }
+  }, { passive: true });
+})();
+
 // Skeleton block: shimmer lines instead of a spinner (professional apps
 // never show a loading circle).
 function _skelPanel(n, big) {
@@ -46419,6 +46495,7 @@ async function _ccMemberInbox() {
         <button type="button" class="hm-peek-full" onclick="_ccMemberInboxClose();switchView('v15inbox')">Open full inbox &rsaquo;</button>
       </div>
     </div>`);
+  _sheetDragify(document.querySelector('#cc-minbox-ov .cc-minbox-card'), _ccMemberInboxClose);
   const list = document.getElementById('cc-minbox-list');
   const sub = document.getElementById('cc-minbox-sub');
   try {
