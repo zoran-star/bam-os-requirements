@@ -32,9 +32,10 @@ Pure, no I/O. Maps `offer.data.classes[].weekly_times[]` + `offer.data.capacity`
   `capacity` (the new "Max capacity per session" field).
 - **Output** per row: `{ payload, matchKey }` where `payload` =
   `{ client_id, name, slot_type:'GROUP_CLASS', default_start_time, default_end_time,
-  default_capacity, default_credit_cost:1, recurrence_rule:'WEEKLY:MO,WE', is_active,
+  default_capacity, default_credit_cost:0, recurrence_rule:'WEEKLY:MO,WE', is_active,
   location_id|default_location, bookable_program_id }` and
-  `matchKey = "recurrence|start|end"` (the dedupe key).
+  `matchKey = "recurrence|start|end"` (the dedupe key). `default_credit_cost` is 0
+  (trials cost 0 credits).
 - Skips + warns on: ad-hoc classes (`consistent:'No'`), empty/invalid days or times,
   `start>=end`, duplicate rows. Missing capacity -> omit field (endpoint default 10) + warn.
 - Time parsing handles `18:00` and `6:00 PM`. Days handle `Mon`/`Monday`/`mon`.
@@ -61,7 +62,8 @@ does so via his sanctioned endpoints (never direct inserts):
 3. **Create** payloads whose `matchKey` is new -> `POST /api/runtime/schedule/templates`.
    **Skip** ones that already exist (re-sync safe). Optionally **deactivate**
    (`is_active:false` via PATCH) templates that no longer appear in the offer.
-4. `POST /api/runtime/schedule/generate-slots { client_id, date_from: today, date_to: +60d }`.
+4. `POST /api/runtime/schedule/generate-slots { client_id, date_from: today, date_to: +365d }`
+   (1-year coverage - see Piece 3).
 5. Return `{ created, skipped, deactivated, slots_generated, warnings }`.
 
 **Auth:** these runtime endpoints require a real staff JWT (`getStaffContext`, no secret
@@ -74,21 +76,26 @@ calendar" action in the offer wizard. Re-runnable any time the schedule/capacity
 
 ## Piece 3 - slot coverage (TO DO)
 
-Generated slots run out (+60d window). Mirror GTA's monthly Routine that re-runs
-generate-slots (see `scripts/extend-gta-slots.mjs`), or wait for Luka's native auto-extend cron.
+Maintain a **rolling 1-year window** (Zoran 2026-07-07): initial generate-slots runs to
++365d, and a scheduled job keeps re-running generate-slots (idempotent) so coverage never
+falls below ~1 year ahead. Mirror GTA's Routine pattern (`scripts/extend-gta-slots.mjs`,
+but `date_to = +365d`), unless Luka ships a native auto-extend cron (Q5).
 
-## Open questions for Luka (align before wiring Piece 2)
+## Decisions (2026-07-07, Zoran + agent leans)
 
-1. **Ownership:** should offer->slots live in the portal orchestrator (calling your
-   template + generate-slots endpoints, as specced here), or should `offers-sync` own it on
-   your side? Portal-orchestrator keeps your endpoints as the only write path.
-2. **Trial credit cost:** templates default `default_credit_cost:1` (matches GTA). Do free
-   trials deduct a credit, or should trial-serving templates be `0`?
-3. **Location:** offer stores a location-picker value. Map to `location_id` (uuid, when it
-   is one) else `default_location` free text - OK, or do you want a strict location_id?
-4. **Deactivation policy:** when a class is removed from the offer, deactivate its template
-   (`is_active:false`) vs delete (endpoint blocks delete when future slots exist). Confirm.
-5. **Auto-extend cron:** native slot extension on your side, or keep a portal Routine per academy?
+1. **Ownership -> portal orchestrator.** Offer->slots lives portal-side, calling Luka's
+   `templates` + `generate-slots` endpoints. His endpoints stay the only write path.
+2. **Trial credit cost -> 0.** Trials cost 0 credits; `default_credit_cost:0` on the
+   templates. (Revisit only if a credit-based member plan books the same slots.)
+3. **Location -> flexible.** `location_id` when the offer's location value is a uuid, else
+   `default_location` free text.
+4. **Deactivation -> deactivate, never delete.** Removing a class from the offer sets its
+   template `is_active:false` (delete is blocked while future slots exist anyway).
+5. **Auto-extend -> rolling 1 year, keep extending.** Generate to +365d up front; a
+   scheduled job keeps extending so ~1 year of slots is always live.
+
+Still worth a quick note to Luka: confirm he's fine with the portal orchestrating via his
+endpoints (Q1), or whether he'd rather own offer->slots on his side.
 
 ## Status
 

@@ -79,7 +79,10 @@ function locationFields(loc) {
  *
  * @param {object} offer  the offers row: { id, title, data: { capacity, classes[] } }
  * @param {object} opts   { clientId, bookableProgramId?, slotType='GROUP_CLASS',
- *                          creditCost=1, capacityFallback=null }
+ *                          creditCost=0, capacityFallback=null }
+ *                          creditCost defaults to 0: trials cost 0 credits
+ *                          (Zoran 2026-07-07). Pass a non-zero value only for
+ *                          credit-based member plans booking the same slots.
  * @returns {{ templates: Array<{payload:object, matchKey:string}>, warnings: string[] }}
  *          matchKey = `${recurrence}|${start}|${end}` - a natural key the
  *          orchestrator uses to skip templates that already exist (re-sync safe).
@@ -89,7 +92,7 @@ export function offerToTemplatePayloads(offer, opts = {}) {
     clientId,
     bookableProgramId = null,
     slotType = "GROUP_CLASS",
-    creditCost = 1,
+    creditCost = 0,
     capacityFallback = null,
   } = opts;
 

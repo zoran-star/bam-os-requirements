@@ -14,6 +14,7 @@ ok(p.recurrence_rule==="WEEKLY:MO,WE", "recurrence WEEKLY:MO,WE");
 ok(p.default_start_time==="18:00" && p.default_end_time==="20:00", "times 18:00-20:00");
 ok(p.default_capacity===25, "capacity 25 from offer");
 ok(p.slot_type==="GROUP_CLASS", "slot_type GROUP_CLASS");
+ok(p.default_credit_cost===0, "trial costs 0 credits");
 ok(p.bookable_program_id==="p-1", "program attached");
 ok(p.default_location==="1079 Linbrook", "location as free text");
 ok(p.name==="Training - MS / HS (Mon, Wed)", "human name: "+p.name);
