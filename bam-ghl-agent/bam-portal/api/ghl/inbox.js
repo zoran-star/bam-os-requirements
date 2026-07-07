@@ -289,6 +289,14 @@ async function classifyStoreConversations(clientId, conversations) {
     }
   }
 
+  // Manually spam-marked contacts (a global mute tagged reason='spam'): the inbox
+  // hides them into its Spam group and the sales agent skips them.
+  let spamSet = new Set();
+  try {
+    const srows = await sb(`agent_mutes?client_id=eq.${clientId}&reason=eq.spam&agent=is.null&select=ghl_contact_id`).catch(() => []);
+    spamSet = new Set((Array.isArray(srows) ? srows : []).map((r) => r.ghl_contact_id).filter(Boolean));
+  } catch (_) {}
+
   return conversations.map((c) => {
     const m =
       (c.contactId && byContactId.get(c.contactId)) ||
@@ -304,7 +312,7 @@ async function classifyStoreConversations(clientId, conversations) {
     return {
       ...c,
       contactName,
-      classification: m ? "member" : "lead",
+      classification: (c.contactId && spamSet.has(c.contactId)) ? "spam" : (m ? "member" : "lead"),
       member: m ? { id: m.id, athlete_name: m.athlete_name, status: m.status } : null,
     };
   });

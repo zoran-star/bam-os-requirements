@@ -13740,6 +13740,7 @@ function _v15ibRenderThreadSplit(pane) {
         </div>
         <div style="display:flex;align-items:center;gap:8px">
           ${countBadge}
+          ${(() => { const _c = (_V15IB.convos || []).find(x => x.id === a.convId); const _sp = _c && _c.classification === 'spam'; return `<button onclick="_ibMarkSpam(${_sp ? 'false' : 'true'})" title="${_sp ? 'Not spam - restore to the inbox' : 'Mark spam - hides it and stops the agent'}" style="display:inline-flex;align-items:center;gap:5px;background:none;border:1px solid var(--border-med);border-radius:6px;color:var(--text-mute);padding:5px 9px;font:inherit;font-size:11px;font-weight:700;cursor:pointer">${_plIcon('ban', 12)} ${_sp ? 'Not spam' : 'Spam'}</button>`; })()}
           ${ghlUrl ? `<a href="${escapeHTML(ghlUrl)}" target="_blank" rel="noopener" title="Open in GHL" style="display:inline-flex;align-items:center;gap:5px;background:rgba(212,182,92,0.12);border:1px solid var(--gold);border-radius:6px;color:var(--gold);padding:5px 9px;font:inherit;font-size:11px;font-weight:700;text-decoration:none">GHL</a>` : ''}
         </div>
       </div>
@@ -14173,6 +14174,28 @@ async function _ibEditName() {
     try { _v15ibRenderList(); } catch (_) {}
   } catch (e) { alert("Couldn't save name: " + (e.message || e)); }
 }
+
+// Mark / unmark this conversation as spam. Hides it into the Spam group and mutes
+// the sales agent for that lead (one agent_mutes row, reason='spam'). Reversible.
+async function _ibMarkSpam(spam) {
+  const a = _V15IB.active; if (!a) return;
+  if (!a.contactId) { alert('This conversation has no linked contact to mark.'); return; }
+  try {
+    const token = await _mreqAuthToken();
+    const r = await fetch('/api/ghl/mark-spam?client_id=' + encodeURIComponent(CLIENT_ID), {
+      method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+      body: JSON.stringify({ client_id: CLIENT_ID, contact_id: a.contactId, spam: !!spam }),
+    });
+    const j = await _safeJson(r);
+    if (!r.ok) throw new Error((j && j.error) || 'failed');
+    const c = (_V15IB.convos || []).find(x => x.id === a.convId);
+    if (c) c.classification = spam ? 'spam' : 'lead';   // next refresh re-derives member/lead
+    try { _v15ibRenderList(); } catch (_) {}
+    const pane = document.getElementById('v15ib-thread-pane');
+    if (pane && pane.offsetParent !== null) _v15ibRenderThreadSplit(pane); else _v15ibRenderThread();
+    if (typeof _plToast === 'function') _plToast(spam ? 'Marked spam - hidden and the agent will skip them.' : 'Restored - no longer spam.');
+  } catch (e) { alert("Couldn't update spam: " + (e.message || e)); }
+}
 // Lightweight contact drawer for non-members (leads). Body-level host so it shows
 // over any view; mirrors the member drawer's slide-in shell.
 function _ibOpenContactDrawer(a) {
@@ -14332,7 +14355,10 @@ function _v15ibRenderThread() {
         ${mem ? _ibMemberPill(false) : ''}
         <span style="flex:none;font-size:13px;color:var(--text-mute)">›</span>
       </div>
-      <span id="ib-call-slot" style="flex:none">${ghlUrl ? `<a href="${escapeHTML(ghlUrl)}" target="_blank" rel="noopener" title="Open this contact in GHL to call" style="display:inline-flex;align-items:center;gap:6px;background:rgba(212,182,92,0.12);border:1px solid var(--gold);border-radius:8px;color:var(--gold);padding:6px 10px;font:inherit;font-size:12px;font-weight:700;text-decoration:none">Call in GHL</a>` : ''}</span>
+      <div style="display:flex;align-items:center;gap:8px;flex:none">
+        ${(() => { const _c = (_V15IB.convos || []).find(x => x.id === a.convId); const _sp = _c && _c.classification === 'spam'; return `<button onclick="_ibMarkSpam(${_sp ? 'false' : 'true'})" title="${_sp ? 'Not spam - restore to the inbox' : 'Mark spam - hides it and stops the agent'}" style="display:inline-flex;align-items:center;gap:5px;background:none;border:1px solid var(--border-med);border-radius:8px;color:var(--text-mute);padding:6px 10px;font:inherit;font-size:12px;font-weight:700;cursor:pointer">${_plIcon('ban', 13)} ${_sp ? 'Not spam' : 'Spam'}</button>`; })()}
+        <span id="ib-call-slot">${ghlUrl ? `<a href="${escapeHTML(ghlUrl)}" target="_blank" rel="noopener" title="Open this contact in GHL to call" style="display:inline-flex;align-items:center;gap:6px;background:rgba(212,182,92,0.12);border:1px solid var(--gold);border-radius:8px;color:var(--gold);padding:6px 10px;font:inherit;font-size:12px;font-weight:700;text-decoration:none">Call in GHL</a>` : ''}</span>
+      </div>
     </div>
     <div id="ib-tags" style="margin-bottom:10px"></div>
     <div class="v15ib-thread-layout">
