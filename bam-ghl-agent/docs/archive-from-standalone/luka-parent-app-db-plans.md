@@ -4,6 +4,10 @@
 diff your plan against the lists below. If anything overlaps → **stop and tell Zoran to message Luka.**
 
 Owner: Luka (fc-mobile parent app backend). Last updated: 2026-06-26.
+Archived/superseded 2026-07-07: use
+`bam-ghl-agent/docs/parent-app-db-boundary.md` as the active boundary doc. This
+copy is retained for history only; booking writes, trials, credit engine, parent
+messaging, and the runtime API layer have since shipped.
 Full context: [`fc-mobile/docs/parent-app-architecture-plan.md`](../../../fc-mobile/docs/parent-app-architecture-plan.md)
 and [`fc-mobile/docs/parent-app-decisions-log.md`](../../../fc-mobile/docs/parent-app-decisions-log.md).
 
@@ -19,7 +23,7 @@ and [`fc-mobile/docs/parent-app-decisions-log.md`](../../../fc-mobile/docs/paren
 | Applied (schedule read model) | `slot_templates` · `schedule_slots` · `reservations` · `waitlist_entries` |
 | Applied (commerce/credits runtime) | `offer_options` · `offer_prices` · `entitlement_templates` · `customer_entitlements` · `credit_ledger` |
 | Applied (access spine before booking) | `bookable_programs`; `bookable_program_id` columns on `entitlement_templates`, `customer_entitlements`, `slot_templates`, and `schedule_slots` via `20260626030258_parent_0004_bookable_programs_access_spine.sql` |
-| Implemented locally only (booking writes) | booking/waitlist/cancel/leave-waitlist RPCs via `20260626034238_parent_0005_booking_write_rpcs.sql`; Vercel/mobile wiring exists locally but is not approved for prod push |
+| Superseded (booking writes now shipped) | booking/waitlist/cancel/leave-waitlist RPCs via `20260626034238_parent_0005_booking_write_rpcs.sql`; see active boundary doc for current production status |
 | Not in v1 unless explicitly revived | `subscriptions` |
 | Planned (later) | `membership_change_requests` · parent messaging/notification tables (names TBD) |
 
@@ -109,11 +113,11 @@ syncing with Luka. `offer_options.bookable_program_id` is deliberately deferred;
 or listing views can derive the program through `offer_prices -> entitlement_templates`
 until there is a concrete need for a direct grouping FK.
 
-Current local-only booking slice: `20260626034238_parent_0005_booking_write_rpcs.sql`
+Superseded booking slice: `20260626034238_parent_0005_booking_write_rpcs.sql`
 adds service-role-only booking, waitlist join/leave, and cancel/refund RPCs plus
-Vercel/mobile wiring. It has local reset/API/type/lint/simulator proof, including a
-dedicated full-slot seed for waitlist testing, but it is not approved for production
-push yet. Opus review follow-ups now implemented locally: visible mobile
+Vercel/mobile wiring. It has local reset/API/type/lint/simulator proof, including
+a dedicated full-slot seed for waitlist testing, and has since shipped to the
+production runtime. Opus review follow-ups implemented: visible mobile
 booking/waitlist/cancel errors, per-child partial-result handling, student-id
 ownership validation, slot-first cancel locking, and defensive capacity guarding.
 Waitlist promotion on cancellation is also implemented locally: it promotes the

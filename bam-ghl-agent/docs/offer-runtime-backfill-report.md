@@ -1,16 +1,30 @@
 # Offer Runtime Backfill Report
 
 Owner: Luka
-Last updated: 2026-07-01
+Last updated: 2026-07-07
 Scope: BAM GTA production read-only data review for moving operational pricing,
 checkout, and entitlement rules out of `offers.data` and into typed runtime
 tables.
 
 ## Summary
 
-This report is read-only. No production data was changed.
+This report started as a read-only review. Superseding status 2026-07-07:
+the reviewed BAM GTA typed runtime backfill and offer tie-in cutover have since
+shipped. Keep the findings below as the audit trail for why those rows were safe
+to create/update.
 
-The typed runtime schema is ready, but production data is not backfilled yet:
+Current production status for the parent/runtime lane:
+
+- 31 typed `offer_prices` are live from the offer sync.
+- BAM GTA identity/runtime backfill is live: 29 `customer_profiles`, 30
+  `students`, 30 `academy_memberships`, 30 `member_links`, and 30
+  `customer_entitlements`.
+- Credit engine is active behind `clients.credit_engine_enabled`; opening
+  balances were backfilled through the credit backfill run.
+- The original 2026-07-01 read-only counts are kept below for historical
+  comparison.
+
+Original 2026-07-01 pre-backfill snapshot:
 
 | Table | BAM GTA rows | Notes |
 |---|---:|---|
@@ -55,8 +69,8 @@ prices we intend to support:
 - `Steady|3_months` as active/direct checkout, not shown on onboarding
 - `Steady|6_months` as active/direct checkout, not shown on onboarding
 
-The typed runtime tables are still empty in production. Do not push production
-writes until the local backfill and API behavior are reviewed.
+Superseded 2026-07-07: the local backfill/API behavior was reviewed and the
+typed runtime production writes shipped.
 
 ## Source Rules
 
@@ -277,18 +291,18 @@ history/reconciliation, but they should not define parent booking access.
 
 ### 1. Build The Identity Spine First
 
-This is the real gate before importing `customer_entitlements`. Production has
-0 rows in the parent identity tables today:
+This was the real gate before importing `customer_entitlements`. Production had
+0 rows in the parent identity tables in the original 2026-07-01 snapshot:
 
 - `customer_profiles`: 0
 - `students`: 0
 - `academy_memberships`: 0
 - `member_links`: 0
 
-`customer_entitlements.academy_membership_id` and
-`customer_entitlements.bookable_program_id` are both `NOT NULL`, so entitlement
-import cannot run for any live member until the identity spine exists. This is
-not only a Stefan/manual-payment issue.
+Superseding status 2026-07-07: the identity spine now exists in production and
+the entitlement import/backfill has run. `customer_entitlements.academy_membership_id`
+and `customer_entitlements.bookable_program_id` remain `NOT NULL`, so future
+imports still need the identity spine first.
 
 Runtime meaning of the identity tables:
 

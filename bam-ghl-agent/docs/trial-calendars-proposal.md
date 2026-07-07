@@ -2,8 +2,14 @@
 
 Owner: Zoran (BAM Portal)
 For review by: Luka (fc-mobile parent app backend)
-Status: Proposal - needs Luka sync before any migration
-Last updated: 2026-06-29
+Status: Historical proposal; shipped on the runtime spine
+Last updated: 2026-07-07
+
+2026-07-07 status note: the trial booking infra this proposal describes has
+shipped: `trial_bookings`, shared capacity through `slot_spots_taken`, public
+trial slot/booking APIs, staff trial outcome APIs, and staff calendar visibility.
+Use `parent-app-architecture-handoff.md` and `parent-app-db-boundary.md` for the
+active guardrails.
 
 ## TL;DR
 
@@ -129,17 +135,17 @@ These are the handoff doc's open questions, with our case applied:
 - Should land **after** the operational offer-pricing cutover, not before (Luka's
   stated sequencing).
 - Luka tables stay deny-all RLS (service-role only). No new `authenticated` policies.
-- `0005` booking-write RPCs are still local-only; not affected here, but trial booking
-  writes should follow the same service-role-RPC pattern.
+- `0005` booking-write RPCs are now deployed; trial booking writes follow the
+  same service-role-RPC pattern.
 
 ## 7. Current state reference
 
 - Schema for the member spine is applied in prod (`parent_0001` to `0004`);
   `bookable_programs` has the BAM GTA Training row seeded.
-- All parent runtime tables currently have 0 rows (no live bookings yet).
-- Booking-write RPCs (`0005`) are implemented locally only, awaiting Luka's prod
-  sign-off.
-- Trial booking infra does not exist yet - this doc is the proposal for it.
+- Parent runtime identity/schedule/entitlement data is live; parent-created
+  member reservations remain empty until parent launch traffic.
+- Booking-write RPCs (`0005`) are deployed.
+- Trial booking infra is deployed and live for website trials.
 
 ## Related docs
 

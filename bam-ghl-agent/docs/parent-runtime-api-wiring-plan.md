@@ -2,23 +2,29 @@
 
 Owner: Luka
 Audience: BAM Portal agents, Zoran's agents
-Last updated: 2026-07-02
-Status: Phases 1-4 + 7 implemented, merged to main (PR #1020, 2026-07-02);
-migrations applied to production; API layer deployed via Vercel.
-Phase 5 and Phase 6 cutovers not started
+Last updated: 2026-07-07
+Status: Phases 1-4 + 7 implemented, merged to main (PR #1020, 2026-07-02),
+migrations applied to production, and API layer deployed via Vercel. The later
+offer tie-in work completed the Phase 6.8 offers sync, Phase 5 webhook access
+sync behind `clients.access_sync_mode`, credit-engine webhook/cron activation
+behind `clients.credit_engine_enabled`, website checkout cutover, members/sorter
+spine, and `entry_points.bookable_program_id` drift check. Remaining parent-app
+V1 work is registration/claim, parent notifications, production/live-mode
+checkout/billing/credit smoke, and any explicit membership-change/remove-child
+scope.
 
-## Implementation Status (2026-07-02)
+## Implementation Status (2026-07-07)
 
 | Phase | Status | What's left |
 |---|---|---|
-| 0 Preconditions | Partially done | Prod preflights + backfill re-verification; Stripe interval check for real grant amounts |
-| 1 Shared helpers | DONE locally | Nothing (all review rules below implemented) |
-| 2 Read-only APIs | DONE locally | Nothing |
-| 3 Scheduling APIs | DONE locally | Nothing |
-| 4 Credit engine | DONE locally, dormant | Activate via cron/webhook only at Phase 6; set real `invoice_grant_credits` after interval check |
-| 5 Webhook access sync | NOT STARTED | Whole phase |
-| 6 Production cutovers | NOT STARTED | Whole phase (blocked on 5 + open decisions) |
-| 7 Trial bookings | DONE locally | `entry_points.bookable_program_id` linkage (needs Zoran sync); trial conversion flow (CONVERTED + lineage) is deliberately not wired - it belongs with checkout cutover |
+| 0 Preconditions | DONE for current runtime cutover | Keep final parent-app live-mode smoke before real parent traffic |
+| 1 Shared helpers | DONE + deployed | Nothing |
+| 2 Read-only APIs | DONE + deployed | Nothing |
+| 3 Scheduling APIs | DONE + deployed | Native slot auto-extend still runs as monthly Routine until a cron replaces `scripts/extend-gta-slots.mjs` |
+| 4 Credit engine | ACTIVATED behind gate | Final credit-ledger lifecycle smoke for parent-app launch |
+| 5 Webhook access sync | SHIPPED gated | Shadow-watch / flip `clients.access_sync_mode` per rollout; code is no longer a greenfield phase |
+| 6 Production cutovers | MOSTLY COMPLETE | Website checkout, offers sync, members/sorter spine, and credit engine are cut over; parent-app live-mode rollout remains |
+| 7 Trial bookings | DONE + deployed | `CONVERTED` status exists; `converted_member_id` / `converted_membership_id` linkage still needs the checkout/conversion endpoint |
 
 Everything above is verified by full local `db reset` replay, 35 vitest tests,
 tsc/lint, and live iOS-simulator E2Es. As of 2026-07-02: merged to main
@@ -27,16 +33,20 @@ APPLIED TO PRODUCTION after a clean read-only preflight. Later the same day
 Zoran created the real BAM GTA schedule via the staff endpoints (4 templates,
 86 slots, capacity 12), flipped GTA to `booking_provider='portal'`, and website
 trial bookings went LIVE on the runtime spine (see
-`memories/project_calendars_offghl.md`). Phase 5/6 cutover work is handed to
-Zoran under `docs/parent-runtime-cutover-guardrails.md`.
+`memories/project_calendars_offghl.md`). The subsequent Phase 5/6/6.8 cutover
+work is recorded as complete in `docs/offer-tie-in-plan.md`; use that doc for
+current checkout/webhook/access-sync status and this doc for runtime design
+context.
 
 Luka action items:
 - Native slot auto-extend cron (replaces the monthly Routine running
   `scripts/extend-gta-slots.mjs`; slots currently generated through ~Aug 31).
-- Decide entitlement `source_ref` granularity (blocks Phase 6.0; see Open
-  Decisions).
-- Verify real Stripe billing intervals and set `invoice_grant_credits` values
-  (Phase 0 item 6).
+- Parent registration/claim endpoint and targeted auth/RLS coverage.
+- Parent notifications (SMS first, push later if V1 keeps that scope).
+- Production/live-mode parent-app smoke for T2 checkout, T4 billing, and
+  credit-ledger grant/debit/refund/expiry behavior.
+- Trial conversion lineage fill-in if launch reporting needs
+  `converted_member_id` / `converted_membership_id`.
 
 Migration drift RESOLVED (2026-07-02): the four remote-only migrations that
 shipped concurrently overnight (`20260701210626` members start_date,
@@ -103,7 +113,7 @@ Keep this separation:
 | Parent/customer identity | `customer_profiles`, `students`, `academy_memberships`, `member_links` |
 | Bookable access target | `bookable_programs` |
 | Dated sessions and bookings | `slot_templates`, `schedule_slots`, `reservations`, `waitlist_entries` |
-| Free-trial lead bookings | `trial_bookings` (exists locally via `20260702115748`; not in production yet) |
+| Free-trial lead bookings | `trial_bookings` (production via `20260702115748`) |
 
 RLS on parent/runtime tables is deny-all. These tables must be read/written
 through service-role API functions, not direct browser Supabase writes.
@@ -123,13 +133,11 @@ through service-role API functions, not direct browser Supabase writes.
   slot templates, and schedule slots.
 - Local seed/backfill data exists for runtime testing.
 - Production runtime backfill has been performed for BAM GTA Training runtime
-  rows, identity spine, and entitlements; re-verify against
-  `offer-runtime-backfill-report.md` before production cutover.
+  rows, identity spine, and entitlements; use
+  `offer-runtime-backfill-report.md` as the audit record.
 - Runtime uniqueness guards (`20260701161000_parent_runtime_uniqueness_guards.sql`)
-  are applied to production per remote migration history (verified 2026-07-02).
-  The identity-spine guards (`20260702115744`) are local-only and still need a
-  prod preflight + apply.
-- 2026-07-02 (local only, not applied to production; verified via local db
+  and identity-spine guards (`20260702115744`) are applied to production.
+- 2026-07-02 runtime deploy (applied to production; verified first via local db
   reset + vitest + live iOS simulator E2E):
   - Identity-spine uniqueness guards:
     `20260702115744_parent_identity_uniqueness_guards.sql` (case-insensitive
@@ -155,16 +163,17 @@ through service-role API functions, not direct browser Supabase writes.
   - Local dev lane: `scripts/local-api-dev.mjs` replaces `vercel dev`
     (function-count cap); fc-mobile E2E verified booking + staff cancel +
     credit refund round-trip on the iOS simulator.
-- 2026-07-02 second pass (local only, dormant, not applied to production):
+- 2026-07-02 second pass (applied to production; credit engine later activated
+  behind gate by the offer tie-in cutover):
   - Phase 4 credit engine: `20260702115747_parent_credit_engine_rpcs.sql`
     (`apply_stripe_credit_grant` with expiry-at-grant + idempotent EXPIRE/GRANT
     refs, `expire_lapsed_credit_entitlements` sweeper) +
     `api/_runtime/credit-engine.ts` (invoice -> runtime price -> member spine
     -> entitlement; amount from template config `invoice_grant_credits`,
     rollover from `credit_rollover` EXPIRE|CARRY_OVER - the future owner-facing
-    carry-over setting reads this flag) + dormant
-    `POST /api/runtime/credits/reconcile-invoice` (CRON_SECRET/staff gated; NOT
-    cron-registered, webhook untouched). Confirmed decisions: grants only on
+    carry-over setting reads this flag) + protected
+    `POST /api/runtime/credits/reconcile-invoice` repair path (CRON_SECRET/staff
+    gated). Confirmed decisions: grants only on
     paid invoices; expiry default with per-offer carry-over flag; no per-week
     booking cap; no refund clawback in v1.
   - Phase 7 trials: `20260702115748_parent_trial_bookings.sql`
@@ -173,8 +182,8 @@ through service-role API functions, not direct browser Supabase writes.
     trial capacity automatically, book/cancel/reschedule/outcome RPCs,
     `staff_cancel_slot` extended with `trials_cancelled`), public
     `api/website/trial-slots.ts` + `trial-booking.ts` (origin-gated,
-    email-verified cancel/reschedule; entry_points linkage deferred pending
-    shared-table sync with Zoran), staff `api/runtime/trial-bookings.ts`,
+    email-verified cancel/reschedule; `entry_points.bookable_program_id` later
+    landed via `20260703000509`), staff `api/runtime/trial-bookings.ts`,
     and parent/staff/trial availability all aligned on the shared capacity
     calculation. Verified live on the iOS simulator: a trial lead + a member
     booking fill a capacity-2 slot, app shows "0 spots left", further trial
@@ -309,14 +318,13 @@ Rules:
 - Existing production routes are mostly `.js`; keep them unchanged until their
   cutover, then either convert the route to TypeScript or add a thin JS adapter.
   Do not keep separate TS and JS copies of the same runtime logic.
-- Stripe grant `source_ref` should use invoice or invoice-line identity, not only
-  subscription id.
-- Entitlement `source_ref` granularity must be decided before Phase 6.0. The
-  sync helper upserts by `(tenant, source, source_ref)`; if the ref is the bare
-  subscription id, a plan change mutates the existing entitlement in place and
-  cannot "suspend old, create new" as 6.5 expects, and plan history is lost.
-  Using `sub_id:price_id` or the subscription-item id lets old and new coexist.
-  Backfilled refs are painful to change later.
+- Stripe grant `source_ref` uses invoice-line identity. Entitlement `source_ref`
+  granularity is decided by the 2026-07-02 offer tie-in cutover:
+  `subscription:<sub_id>:<price_id>` for subscriptions and
+  `invoice:<invoice_id>:<price_id>` for one-time purchases. The sync helper
+  upserts by `(tenant, source, source_ref)`, so the price-qualified subscription
+  ref preserves plan-change history instead of mutating one bare-subscription
+  entitlement in place.
 - Booking/cancel ledger rows should not be globally deduped by reservation id;
   the booking flow can legitimately book, cancel, and rebook the same
   reservation row.
@@ -1025,35 +1033,29 @@ When checkout converts a trial lead:
 
 ## Rollout Plan
 
-Recommended order (status as of 2026-07-02):
+Recommended order (status as of 2026-07-07):
 
-1. Finish and verify production migration history. ← NEXT: reconcile the four
-   remote-only migrations noted in the drift warning above.
-2. Run duplicate preflight checks for runtime uniqueness guards. (Runtime
-   guards already on prod; preflight still needed for identity guards.)
-3. Apply the identity-spine guards migration (`20260702115744`) to prod.
-4. Verify backfill and entitlement import.
-5. Build shared helpers and diagnostics. ✅ done locally
-6. Add read-only runtime offer APIs. ✅ done locally
-7. Add additive staff scheduling APIs. ✅ done locally
-8. Add credit accrual/expiry engine before selling weekly-credit plans through
-   typed checkout. ✅ done locally (dormant)
-9. Implement webhook access sync behind existing behavior. ← not started
-10. Activate Stripe webhook access sync in a low-traffic cutover.
-11. Cut over `api/website/offer.js`.
-12. Cut over `api/website/checkout.js`, gating weekly-credit prices if Phase 4
-    is not live.
-13. Gate/cut over legacy onboarding and other public member-minting endpoints.
-14. Sync `api/members.js` billing actions.
-15. Sync sorter/import/cleanup paths.
-16. Add trial booking schema/APIs. ✅ done locally
-17. Update parent/staff/trial availability to include trial bookings in the same
-    deploy that trial bookings begin consuming capacity. ✅ done locally (same
-    working tree; ship together)
+1. ✅ Finish and verify production migration history.
+2. ✅ Run duplicate preflight checks for runtime + identity guards.
+3. ✅ Apply the identity-spine guards migration (`20260702115744`) to prod.
+4. ✅ Verify backfill and entitlement import.
+5. ✅ Build shared helpers and diagnostics.
+6. ✅ Add read-only runtime offer APIs.
+7. ✅ Add additive staff scheduling APIs.
+8. ✅ Add credit accrual/expiry engine before selling weekly-credit plans through
+   typed checkout; activated behind `clients.credit_engine_enabled`.
+9. ✅ Implement webhook access sync behind existing behavior; shipped behind
+   `clients.access_sync_mode`.
+10. ✅ Cut over typed offer reads / website checkout / commitment-revert lookup.
+11. ✅ Gate/cut over members, sorter/import/cleanup, and billing action paths to
+    the runtime identity/access spine.
+12. ✅ Add trial booking schema/APIs and shared parent/staff/trial availability.
+13. Remaining parent-app launch work: registration/claim, notifications,
+    production/live-mode checkout + billing smoke, and trial conversion lineage
+    fill-in if needed.
 
-Steps 5-8 and 16-17 ship to production as one reviewed deploy of the
-`parent/refactor` diff (code additive + dormant, migrations 20260702115744
-through 20260702115748); steps 1-4 gate that deploy, steps 9-15 remain.
+Historical Phase 5/6 design sections below remain useful for invariants and test
+ideas, but the current implementation record is `offer-tie-in-plan.md`.
 
 ## Local API Test Plan
 
