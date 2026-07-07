@@ -4570,7 +4570,7 @@
 
 <!-- Boot splash - shown instantly on load, hidden by boot() once the auth
      check resolves, so the login screen never flashes for a signed-in user. -->
-<div id="boot-splash" style="position:fixed;inset:0;z-index:10001;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:22px;background:#131416">
+<div id="boot-splash" style="position:fixed;inset:0;z-index:10001;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:26px;background:#16140F">
   <svg class="boot-splash-icon" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
     <defs>
       <linearGradient id="boot-gold" x1="0" y1="0" x2="1" y2="1">
@@ -4580,7 +4580,7 @@
       </linearGradient>
     </defs>
     <circle cx="256" cy="256" r="220" fill="none" stroke="currentColor" stroke-width="1.5" opacity="0.35"/>
-    <g stroke="currentColor" stroke-width="2" opacity="0.5">
+    <g class="boot-ring" stroke="currentColor" stroke-width="2" opacity="0.5">
       <line x1="256" y1="58" x2="256" y2="40"/>
       <line x1="331.7713196082878" y1="73.07185256276523" x2="338.6596213908594" y2="56.442020977562066"/>
       <line x1="396.0071426749364" y1="115.9928573250636" x2="408.73506473629425" y2="103.26493526370575"/>
@@ -4598,26 +4598,29 @@
       <line x1="115.99285732506357" y1="115.9928573250636" x2="103.2649352637057" y2="103.26493526370575"/>
       <line x1="180.22868039171212" y1="73.07185256276526" x2="173.3403786091405" y2="56.44202097756212"/>
     </g>
-    <path d="M 256 80 L 290 230 L 432 256 L 290 282 L 256 432 L 222 282 L 80 256 L 222 230 Z" fill="url(#boot-gold)"/>
+    <path class="boot-star" d="M 256 80 L 290 230 L 432 256 L 290 282 L 256 432 L 222 282 L 80 256 L 222 230 Z" fill="url(#boot-gold)"/>
     <circle cx="256" cy="256" r="10" fill="#D4B65C"/>
   </svg>
-  <div class="boot-splash-spinner"></div>
+  <div class="boot-splash-word">FullControl</div>
 </div>
 
 <style>
-  /* Boot splash - instant cover during the auth check */
-  #boot-splash { transition: opacity 0.32s ease; }
-  #boot-splash.hide { opacity: 0; pointer-events: none; }
-  .boot-splash-icon { width: 60px; height: 60px; color: var(--text-sub); }
-  .boot-splash-spinner {
-    width: 24px;
-    height: 24px;
-    border: 2.5px solid var(--line);
-    border-top-color: var(--gold);
-    border-radius: 50%;
-    animation: bootSplashSpin 0.7s linear infinite;
+  /* Boot splash - the launch moment. Mark ignites, ring drifts, wordmark
+     rises; no spinner anywhere. Exits by scaling INTO the app. */
+  #boot-splash { transition: opacity 0.34s ease, transform 0.34s ease; }
+  #boot-splash.hide { opacity: 0; transform: scale(1.06); pointer-events: none; }
+  .boot-splash-icon { width: 64px; height: 64px; color: #8A857A; animation: bootBreathe 2.6s ease-in-out 0.9s infinite; }
+  .boot-splash-icon .boot-star { transform-origin: 256px 256px; animation: bootIgnite 0.85s cubic-bezier(0.34, 1.56, 0.64, 1) both; }
+  .boot-splash-icon .boot-ring { transform-origin: 256px 256px; animation: bootRingDrift 16s linear infinite; }
+  .boot-splash-word { font-family: ui-monospace, "DM Mono", Menlo, monospace; font-size: 11px; letter-spacing: 0.42em; text-indent: 0.42em; text-transform: uppercase; color: #8A857A; animation: bootWord 0.8s ease 0.4s both; }
+  @keyframes bootIgnite { from { transform: scale(0.7); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+  @keyframes bootBreathe { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.035); } }
+  @keyframes bootRingDrift { to { transform: rotate(360deg); } }
+  @keyframes bootWord { from { opacity: 0; transform: translateY(7px); } to { opacity: 0.85; transform: translateY(0); } }
+  @media (prefers-reduced-motion: reduce) {
+    .boot-splash-icon, .boot-splash-icon .boot-star, .boot-splash-icon .boot-ring, .boot-splash-word { animation: none; }
+    #boot-splash.hide { transform: none; }
   }
-  @keyframes bootSplashSpin { to { transform: rotate(360deg); } }
 
   /* Login overlay - FullControl design system */
   #login-overlay {
@@ -47687,7 +47690,7 @@ function _hideBootSplash() {
   if (!s || s.classList.contains('hide') || s.dataset.hiding) return;
   // Hold the splash for a minimum beat so it reads as intentional, never
   // a flicker - even when boot resolves instantly from a cached session.
-  const MIN_MS = 1100;
+  const MIN_MS = 950;
   const wait = Math.max(0, MIN_MS - (Date.now() - _bootSplashStart));
   s.dataset.hiding = '1';
   setTimeout(() => {

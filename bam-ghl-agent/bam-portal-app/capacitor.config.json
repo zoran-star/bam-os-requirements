@@ -14,9 +14,7 @@
     "SplashScreen": {
       "launchAutoHide": false,
       "backgroundColor": "#16140F",
-      "showSpinner": true,
-      "spinnerStyle": "small",
-      "iosSpinnerStyle": "small"
+      "showSpinner": false
     },
     "StatusBar": {
       "style": "DARK",
