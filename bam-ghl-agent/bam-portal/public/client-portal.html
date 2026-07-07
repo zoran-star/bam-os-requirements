@@ -7807,7 +7807,7 @@ Then the call to action."]</div>
           <div id="magent-thread" style="display:none;margin-top:12px;flex-direction:column;gap:10px"></div>
         </div>
         <div id="members-list-container">
-          <div class="req-empty" style="padding:20px 0"><span class="req-spin"></span>Loading members…</div>
+          <div class="skel-panel"><div class="skel-line big"></div><div class="skel-line" style="width:90%"></div><div class="skel-line" style="width:76%"></div><div class="skel-line" style="width:84%"></div><div class="skel-line" style="width:68%"></div></div>
         </div>
         <!-- member-modal-host moved to body level (near #stripe-modal-host) so the
              member drawer shows when opened from the Inbox too, not just Members. -->
@@ -8091,6 +8091,11 @@ Then the call to action."]</div>
          no long-press selection callouts on UI chrome - text stays selectable
          inside inputs and message content. */
       html { -webkit-tap-highlight-color: transparent; }
+      .skel-panel { padding: 12px 0; }
+      .skel-line { height: 14px; border-radius: 7px; margin: 12px 0; background: linear-gradient(90deg, var(--surface-el, rgba(0,0,0,.06)) 25%, var(--surface, rgba(0,0,0,.02)) 50%, var(--surface-el, rgba(0,0,0,.06)) 75%); background-size: 200% 100%; animation: skelShimmer 1.4s ease-in-out infinite; }
+      .skel-line.big { height: 26px; width: 42% !important; border-radius: 8px; }
+      @keyframes skelShimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+      @media (prefers-reduced-motion: reduce) { .skel-line { animation: none; } }
       @media (hover: none) {
         body { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
         input, textarea, [contenteditable="true"], .hm-peek-bub, .msg-body, .msg-bubble, .mma-voice, .v15ib-thread { -webkit-user-select: text; user-select: text; -webkit-touch-callout: default; }
@@ -10852,7 +10857,7 @@ async function openAssetsView() {
   const host = document.getElementById(_ASSETS_HOST_ID);
   if (!host || !_sb || typeof CLIENT_ID === 'undefined') return;
   _astRendered = false; _astSelected.clear();
-  host.innerHTML = '<div class="req-empty" style="padding:24px 0"><span class="req-spin"></span> Loading assets…</div>';
+  host.innerHTML = _skelPanel(5, true);
   try {
     const [assets, offers, staff, locations] = await Promise.all([
       _sb.from('client_assets').select('*').eq('client_id', CLIENT_ID).order('created_at', { ascending: false }),
@@ -11381,7 +11386,7 @@ function _v15kPrevRange() {
 async function openV15Kpis() {
   const host = document.getElementById('v15kpis-content');
   if (!host || typeof CLIENT_ID === 'undefined') return;
-  if (!_swrKeep(host)) host.innerHTML = `<div class="req-empty" style="padding:24px 0"><span class="req-spin"></span> Loading KPIs…</div>`;
+  if (!_swrKeep(host)) host.innerHTML = _skelPanel(6, true);
   // Month list still powers the Trends modal.
   _V15K.periods = _v15kBuildMonths(12);
   _V15K.monthKey = _V15K.periods[0].key;
@@ -12420,7 +12425,7 @@ async function openV15Cal() {
   const host = document.getElementById('v15cal-content');
   if (!host || typeof CLIENT_ID === 'undefined') return;
   _V15CAL._scrolled = false; _V15CAL._seek = 0;
-  if (!_swrKeep(host)) host.innerHTML = `<div class="req-empty" style="padding:24px 0"><span class="req-spin"></span> Loading calendars…</div>`;
+  if (!_swrKeep(host)) host.innerHTML = _skelPanel(5, true);
   try {
     const token = await _mreqAuthToken();
     const r = await fetch('/api/ghl/calendars-v15?action=list&client_id=' + encodeURIComponent(CLIENT_ID), { headers: { Authorization: 'Bearer ' + token } });
@@ -16387,6 +16392,14 @@ async function _hmMsgPeekSend(convId) {
     if (!el.getAttribute('enterkeyhint') && el.closest('.v15ib-thread, .mma-compose, .hm-peek-compose, .cc-qr')) el.setAttribute('enterkeyhint', 'send');
   });
 })();
+// Skeleton block: shimmer lines instead of a spinner (professional apps
+// never show a loading circle).
+function _skelPanel(n, big) {
+  let h = '<div class="skel-panel">' + (big ? '<div class="skel-line big"></div>' : '');
+  for (let i = 0; i < (n || 4); i++) h += '<div class="skel-line" style="width:' + (92 - ((i * 17) % 38)) + '%"></div>';
+  return h + '</div>';
+}
+
 // Offline send queue: replies composed with no signal are stored and
 // delivered the moment the device comes back online.
 function _sendQueuePush(p) {
@@ -38469,6 +38482,12 @@ function _mlogOpen(memberId) { _closeMemberLog(); openMemberPopup(memberId); }
 
 // ── Billing action calls ────────────────────────────────────
 async function _memberAction(memberId, action, body) {
+  // Instant feedback: the request takes seconds (Stripe round-trips), the
+  // toast lands the moment you confirm. Completion/failure toasts follow.
+  try {
+    const workingLbl = { pause: 'Pausing...', unpause: 'Resuming...', cancel: 'Cancelling...', 'payment-link': 'Creating the payment link...', 'pause-date-fix': 'Saving...', refund: 'Refunding...' }[action];
+    if (workingLbl && typeof _plToast === 'function') _plToast(workingLbl);
+  } catch (_) {}
   const token = await _mreqAuthToken();
   const res = await fetch('/api/members?id=' + encodeURIComponent(memberId), {
     method: 'PATCH',
@@ -45503,9 +45522,33 @@ function openCommandCenter() {
     window._CC_MOUNTED = true;
     _ccBuildChrome();
     try { _SFX.boot(); } catch (_) {}
+    const lazyMobile = window.matchMedia('(max-width: 768px)').matches;
     for (const s of _ccSections()) {
       const host = document.getElementById('cc-sec-' + s.key);
+      if (lazyMobile && s.key !== 'home') {
+        // Phones: defer below-the-fold sections until they approach the
+        // viewport - faster first paint, lighter DOM on old devices.
+        host._ccPendingMount = s.mount;
+        host.style.minHeight = '60vh';
+        host.insertAdjacentHTML('beforeend', _skelPanel(4, true));
+        continue;
+      }
       try { s.mount(host); } catch (e) { console.error('[cc] mount failed:', s.key, e); }
+    }
+    if (lazyMobile) {
+      const mio = new IntersectionObserver(entries => {
+        for (const e of entries) {
+          const m = e.target._ccPendingMount;
+          if (e.isIntersecting && m) {
+            e.target._ccPendingMount = null;
+            e.target.querySelector('.skel-panel')?.remove();
+            e.target.style.minHeight = '';
+            try { m(e.target); } catch (err) { console.error('[cc] lazy mount failed:', err); }
+            mio.unobserve(e.target);
+          }
+        }
+      }, { root: document.querySelector('.main'), rootMargin: '900px 0px' });
+      _ccSections().forEach(s => { const h = document.getElementById('cc-sec-' + s.key); if (h && h._ccPendingMount) mio.observe(h); });
     }
     _ccInitObserver();
     // sales alert dot mirrors the Hawkeye count (set by the home loaders)
