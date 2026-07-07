@@ -39332,6 +39332,7 @@ async function mRefund(memberId, customerId, preselectChargeId) {
   // agent's payment cards) defaults the picker to that specific charge.
   let refundable = [];
   if (customerId) {
+    _plToast('Loading payments…');
     try {
       const token = await _mreqAuthToken();
       const r = await fetch('/api/sorter/cleanup?action=stripe-detail', {
@@ -39376,11 +39377,27 @@ async function mRefund(memberId, customerId, preselectChargeId) {
     });
   }
   if (!vals) return;
+
+  // Confirmation step: refunds are real money and not reversible, so show exactly
+  // what's about to happen and require an explicit yes before firing.
+  const _sel = refundable.find(c => c.id === vals.charge_id) || null;
+  const _remainCents = _sel ? ((_sel.amount_cents || 0) - (_sel.amount_refunded || 0)) : null;
+  const _amtCents = vals.amount ? parseInt(vals.amount, 10) : (_remainCents != null ? _remainCents : null);
+  const _amtStr = (_amtCents != null && !isNaN(_amtCents)) ? '$' + (_amtCents / 100).toFixed(2) : 'the full amount';
+  const _onLine = _sel && _sel.date ? ' on the ' + escapeHTML(_sel.date) + ' payment' : '';
+  const confirmed = await _mmModal({
+    danger: true, title: 'Confirm refund',
+    body: `Refund <b>${_amtStr}</b>${_onLine}? This sends a real refund to the parent's card and can't be undone.`,
+    okLabel: 'Yes, refund',
+  });
+  if (!confirmed) return;
+
   const body = { charge_id: vals.charge_id };
   if (vals.amount) body.amount_cents = parseInt(vals.amount, 10);
   if (vals.notes) body.notes = vals.notes;
   try {
-    const r = await _memberAction(memberId, 'refund', body);
+    // Spinner while Stripe processes → check-mark → auto-close (same as pause).
+    const r = await _mmProgress(() => _memberAction(memberId, 'refund', body), { label: 'Refunding…', doneLabel: 'Refunded' });
     _plToast(`Refunded $${(r.refund.amount_cents / 100).toFixed(2)} (${r.refund.id}).`);
     closeMemberPopup();
     fetchAndRenderMembers();
