@@ -6257,7 +6257,8 @@
     </div>
 
     <label for="admin-fb-body" id="admin-fb-body-label">What's the bug?</label>
-    <textarea id="admin-fb-body" placeholder="What you saw, what you expected, what page you were on..."></textarea>
+    <textarea id="admin-fb-body" placeholder="Just describe what you saw and what you expected..."></textarea>
+    <div style="font-size:11px;color:#6E6E78;margin-top:6px;line-height:1.4">Your page and recent clicks are attached automatically, no need to explain where you were.</div>
 
     <label>Attach a screenshot or file <span style="color:#6E6E78; text-transform:none; letter-spacing:0; font-weight:400;">(optional)</span></label>
     <div id="admin-fb-file-row">
@@ -44342,6 +44343,100 @@ async function _sendFreshLink() {
 // for backwards compat with the boot() call.
 async function setupAdminFeedbackWidget() { /* widget always-on now */ }
 
+// ── Feedback context recorder ──────────────────────────────────────────
+// The Zoran widget auto-attaches a context snapshot so clients only need
+// to type a description: active view, click path, view history, recent JS
+// errors, tier and device. Ring buffers keep it tiny; typed input values
+// are NEVER recorded (only placeholders/ids). Lands in
+// portal_feedback.context (jsonb) and is read by the /v2-tickets skill.
+const _FB_CTX = { started: Date.now(), clicks: [], views: [], errors: [] };
+
+function _fbNow() { return Math.round((Date.now() - _FB_CTX.started) / 1000); }
+
+function _fbActiveView() {
+  const el = document.querySelector('.view.active');
+  return el ? el.id.replace(/^view-/, '') : null;
+}
+
+function _fbElLabel(target) {
+  // Nearest actionable ancestor gives the most readable label.
+  const el = target.closest?.('button, a, [onclick], [role="button"], .nav-item, input, select, textarea, label') || target;
+  const tag = (el.tagName || '').toLowerCase();
+  let label = '';
+  if (tag === 'input' || tag === 'select' || tag === 'textarea') {
+    label = el.placeholder || el.name || el.id || tag; // never the typed value
+  } else {
+    label = (el.getAttribute?.('aria-label') || el.textContent || '').trim().replace(/\s+/g, ' ').slice(0, 60);
+  }
+  const id = el.id ? ` #${el.id}` : '';
+  return `${label || tag}${id}`.trim().slice(0, 80);
+}
+
+document.addEventListener('click', (e) => {
+  try {
+    if (!e.target || e.target.closest?.('#admin-fb-overlay, #admin-fb-wrap')) return; // not the widget itself
+    _FB_CTX.clicks.push({ t: _fbNow(), view: _fbActiveView(), el: _fbElLabel(e.target) });
+    if (_FB_CTX.clicks.length > 30) _FB_CTX.clicks.shift();
+  } catch (_) {}
+}, true);
+
+window.addEventListener('error', (e) => {
+  try {
+    _FB_CTX.errors.push({ t: _fbNow(), msg: String(e.message || e.error || 'error').slice(0, 200) });
+    if (_FB_CTX.errors.length > 10) _FB_CTX.errors.shift();
+  } catch (_) {}
+});
+window.addEventListener('unhandledrejection', (e) => {
+  try {
+    _FB_CTX.errors.push({ t: _fbNow(), msg: ('promise: ' + String(e.reason?.message || e.reason || '')).slice(0, 200) });
+    if (_FB_CTX.errors.length > 10) _FB_CTX.errors.shift();
+  } catch (_) {}
+});
+
+// Track view changes by wrapping switchView once all scripts are loaded.
+window.addEventListener('load', () => {
+  try {
+    if (typeof window.switchView !== 'function') return;
+    const _fbOrigSwitchView = window.switchView;
+    window.switchView = function (view) {
+      try {
+        const last = _FB_CTX.views[_FB_CTX.views.length - 1];
+        if (view && (!last || last.view !== view)) {
+          _FB_CTX.views.push({ t: _fbNow(), view });
+          if (_FB_CTX.views.length > 15) _FB_CTX.views.shift();
+        }
+      } catch (_) {}
+      return _fbOrigSwitchView.apply(this, arguments);
+    };
+  } catch (_) {}
+});
+
+function _fbBuildContext() {
+  let tier = 'v1';
+  try {
+    if (typeof V2_ACCESS !== 'undefined' && V2_ACCESS) tier = 'v2';
+    else if (typeof V15_ACCESS !== 'undefined' && V15_ACCESS) tier = 'v1.5';
+  } catch (_) {}
+  let academy = null;
+  try { academy = (document.getElementById('academyName')?.textContent || '').trim() || null; } catch (_) {}
+  return {
+    v: 1,
+    tier,
+    academy,
+    view: _fbActiveView(),
+    view_trail: _FB_CTX.views.slice(-15),
+    clicks: _FB_CTX.clicks.slice(-30),
+    errors: _FB_CTX.errors.slice(-10),
+    url: location.href,
+    viewport: { w: window.innerWidth, h: window.innerHeight },
+    ua: (navigator.userAgent || '').slice(0, 200),
+    native_app: document.body.classList.contains('native-app'),
+    online: navigator.onLine,
+    seconds_on_page: _fbNow(),
+    submitted_at: new Date().toISOString(),
+  };
+}
+
 let _adminFbSelectedFile = null;
 let _adminFbKind = 'bug';
 
@@ -44373,7 +44468,7 @@ function setFeedbackKind(kind) {
   const labelEl = document.getElementById('admin-fb-body-label');
   if (_adminFbKind === 'bug') {
     labelEl.textContent = "What's the bug?";
-    bodyEl.placeholder = "What you saw, what you expected, what page you were on...";
+    bodyEl.placeholder = "Just describe what you saw and what you expected...";
   } else {
     labelEl.textContent = "What's the feature?";
     bodyEl.placeholder = "What would you like to be able to do? Who needs it, why...";
@@ -44442,6 +44537,7 @@ async function submitAdminFeedback() {
         page: window.location.pathname + window.location.search,
         portal: 'client',
         client_id: (typeof CLIENT_ID !== 'undefined' ? CLIENT_ID : undefined),
+        context: (() => { try { return _fbBuildContext(); } catch (_) { return null; } })(),
       }),
     });
     const data = await res.json().catch(() => ({}));

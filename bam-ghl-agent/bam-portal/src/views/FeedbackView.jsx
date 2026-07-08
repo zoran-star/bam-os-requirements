@@ -270,6 +270,70 @@ function FilterRow({ tokens, label, options, value, onChange, extra }) {
   );
 }
 
+// Auto-captured context snapshot attached by the client-portal widget:
+// tier, active view, click path, view trail, JS errors, device. Collapsed
+// to a one-line summary until expanded. Read alongside /v2-tickets triage.
+function ContextPanel({ ctx, t }) {
+  const [open, setOpen] = useState(false);
+  const clicks = Array.isArray(ctx.clicks) ? ctx.clicks : [];
+  const views = Array.isArray(ctx.view_trail) ? ctx.view_trail : [];
+  const errors = Array.isArray(ctx.errors) ? ctx.errors : [];
+  const summary = [
+    ctx.tier ? ctx.tier.toUpperCase() : null,
+    ctx.view ? `view: ${ctx.view}` : null,
+    clicks.length ? `${clicks.length} clicks` : null,
+    errors.length ? `${errors.length} JS error${errors.length > 1 ? "s" : ""}` : null,
+    ctx.native_app ? "native app" : null,
+  ].filter(Boolean).join(" · ");
+  const mono = { fontFamily: "JetBrains Mono, monospace" };
+
+  return (
+    <div style={{ marginTop: 10 }}>
+      <button
+        onClick={() => setOpen(o => !o)}
+        style={{
+          fontSize: 11, fontWeight: 600, padding: "4px 10px", borderRadius: 6,
+          border: `1px solid ${t.border}`, background: t.surface,
+          color: errors.length ? (t.red || "#ED7969") : t.textMute,
+          cursor: "pointer", fontFamily: "inherit",
+        }}
+      >{open ? "▾" : "▸"} 🧭 Context{summary ? ` · ${summary}` : ""}</button>
+
+      {open && (
+        <div style={{
+          marginTop: 8, padding: "10px 12px", background: t.surface,
+          border: `1px solid ${t.border}`, borderRadius: 6,
+          fontSize: 11, color: t.textMute, lineHeight: 1.7, ...mono,
+        }}>
+          {ctx.url && <div>url: {ctx.url}</div>}
+          {ctx.academy && <div>academy: {ctx.academy}</div>}
+          {ctx.viewport && <div>viewport: {ctx.viewport.w}×{ctx.viewport.h}{ctx.native_app ? " (native app)" : ""}</div>}
+          {typeof ctx.seconds_on_page === "number" && <div>time on page: {Math.round(ctx.seconds_on_page / 60)}m {ctx.seconds_on_page % 60}s</div>}
+          {views.length > 0 && (
+            <div style={{ marginTop: 6 }}>
+              <div style={{ fontWeight: 700, color: t.text }}>View trail</div>
+              {views.map((v, i) => <div key={i}>+{v.t}s → {v.view}</div>)}
+            </div>
+          )}
+          {clicks.length > 0 && (
+            <div style={{ marginTop: 6 }}>
+              <div style={{ fontWeight: 700, color: t.text }}>Click path (last {clicks.length})</div>
+              {clicks.map((c, i) => <div key={i}>+{c.t}s [{c.view || "?"}] {c.el}</div>)}
+            </div>
+          )}
+          {errors.length > 0 && (
+            <div style={{ marginTop: 6 }}>
+              <div style={{ fontWeight: 700, color: t.red || "#ED7969" }}>JS errors</div>
+              {errors.map((e, i) => <div key={i} style={{ color: t.red || "#ED7969" }}>+{e.t}s {e.msg}</div>)}
+            </div>
+          )}
+          {ctx.ua && <div style={{ marginTop: 6, opacity: 0.7 }}>{ctx.ua}</div>}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function FeedbackRow({ f, staff, tokens, onToggleResolved, onSpec }) {
   const t = tokens;
   const resolved = !!f.resolved_at;
@@ -378,6 +442,8 @@ function FeedbackRow({ f, staff, tokens, onToggleResolved, onSpec }) {
               Page: {f.page}
             </div>
           )}
+
+          {f.context && typeof f.context === "object" && <ContextPanel ctx={f.context} t={t} />}
 
           {/* Build spec → GitHub issue (Phase 2 of feedback → action) */}
           <div style={{ marginTop: 12 }}>
