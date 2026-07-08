@@ -39325,12 +39325,14 @@ async function mCancel(memberId, athleteName) {
   } catch (e) { _plToast('Cancel failed: ' + e.message); }
 }
 
-async function mRefund(memberId, customerId) {
+async function mRefund(memberId, customerId, preselectChargeId) {
   // Pull the member's recent Stripe payments so the user picks one to refund
   // (instead of hunting for a charge ID in Stripe). Falls back to manual entry
-  // if there's no customer link or the lookup fails.
+  // if there's no customer link or the lookup fails. preselectChargeId (from the
+  // agent's payment cards) defaults the picker to that specific charge.
   let refundable = [];
   if (customerId) {
+    _plToast('Loading payments…');
     try {
       const token = await _mreqAuthToken();
       const r = await fetch('/api/sorter/cleanup?action=stripe-detail', {
@@ -39353,11 +39355,13 @@ async function mRefund(memberId, customerId) {
       const desc = c.description ? ' · ' + c.description : (c.one_time ? ' · one-time' : '');
       return { value: c.id, label: `${c.date || ''} · $${(remain / 100).toFixed(2)}${part}${desc}` };
     });
+    const _defCharge = (preselectChargeId && opts.some(o => o.value === preselectChargeId)) ? preselectChargeId : opts[0].value;
     vals = await _mmModal({
       icon: '', title: 'Refund', body: 'Select the payment to refund.', okLabel: 'Issue refund',
       fields: [
-        { key: 'charge_id', label: 'Payment', type: 'select', value: opts[0].value, options: opts },
-        { key: 'amount', label: 'Amount in cents (blank = full refund of that payment)', type: 'number', placeholder: '9039 = $90.39' },
+        { key: 'charge_id', label: 'Payment', type: 'select', value: _defCharge, options: opts },
+        { key: 'amount', label: 'Amount in dollars (blank = full refund of that payment)', type: 'number', placeholder: 'e.g. 112.88',
+          validate: v => (!v || parseFloat(v) > 0) ? '' : 'Enter a dollar amount like 112.88.' },
         { key: 'notes', label: 'Reason / note', type: 'text', placeholder: 'e.g. Plan downgrade - May difference' },
       ],
     });
@@ -39368,17 +39372,34 @@ async function mRefund(memberId, customerId) {
       fields: [
         { key: 'charge_id', label: 'Stripe charge ID', type: 'text', placeholder: 'ch_...', required: true,
           validate: v => /^ch_/.test(v) ? '' : 'Charge IDs start with "ch_".' },
-        { key: 'amount', label: 'Amount in cents (blank = full refund)', type: 'number', placeholder: '9039 = $90.39' },
+        { key: 'amount', label: 'Amount in dollars (blank = full refund)', type: 'number', placeholder: 'e.g. 112.88',
+          validate: v => (!v || parseFloat(v) > 0) ? '' : 'Enter a dollar amount like 112.88.' },
         { key: 'notes', label: 'Reason / note', type: 'text', placeholder: 'e.g. Plan downgrade - May difference' },
       ],
     });
   }
   if (!vals) return;
+
+  // Confirmation step: refunds are real money and not reversible, so show exactly
+  // what's about to happen and require an explicit yes before firing.
+  const _sel = refundable.find(c => c.id === vals.charge_id) || null;
+  const _remainCents = _sel ? ((_sel.amount_cents || 0) - (_sel.amount_refunded || 0)) : null;
+  const _amtCents = vals.amount ? Math.round(parseFloat(vals.amount) * 100) : (_remainCents != null ? _remainCents : null);
+  const _amtStr = (_amtCents != null && !isNaN(_amtCents)) ? '$' + (_amtCents / 100).toFixed(2) : 'the full amount';
+  const _onLine = _sel && _sel.date ? ' on the ' + escapeHTML(_sel.date) + ' payment' : '';
+  const confirmed = await _mmModal({
+    danger: true, title: 'Confirm refund',
+    body: `Refund <b>${_amtStr}</b>${_onLine}? This sends a real refund to the parent's card and can't be undone.`,
+    okLabel: 'Yes, refund',
+  });
+  if (!confirmed) return;
+
   const body = { charge_id: vals.charge_id };
-  if (vals.amount) body.amount_cents = parseInt(vals.amount, 10);
+  if (vals.amount) body.amount_cents = Math.round(parseFloat(vals.amount) * 100);
   if (vals.notes) body.notes = vals.notes;
   try {
-    const r = await _memberAction(memberId, 'refund', body);
+    // Spinner while Stripe processes → check-mark → auto-close (same as pause).
+    const r = await _mmProgress(() => _memberAction(memberId, 'refund', body), { label: 'Refunding…', doneLabel: 'Refunded' });
     _plToast(`Refunded $${(r.refund.amount_cents / 100).toFixed(2)} (${r.refund.id}).`);
     closeMemberPopup();
     fetchAndRenderMembers();
@@ -47825,7 +47846,9 @@ async function _mmaAgentAsk(message) {
     if (json.reply) _MMA_AI.history.push({ role: 'assistant', text: json.reply });
     _MMA_AI.engaged = true;
     _MMA_AI.proposal = json.proposal || null;
-    _mmaSay(json.reply || (json.proposal ? 'Ready when you are.' : 'Okay.'), json.proposal ? _mmaProposalHtml(json.proposal) : '');
+    const cards = json.proposal ? _mmaProposalHtml(json.proposal)
+      : (json.member_context && Array.isArray(json.member_context.charges) ? _mmaChargesHtml(json.member_context) : '');
+    _mmaSay(json.reply || (json.proposal ? 'Ready when you are.' : 'Okay.'), cards);
   } catch (e) {
     await thinkP;
     _mmaSay("Couldn't reach the agent: " + (e.message || e), '');
@@ -47843,6 +47866,35 @@ function _mmaProposalHtml(p) {
       '<button type="button" class="mma-act" style="background:' + accent + ';color:var(--on-gold,#0B0B0D);border-color:' + accent + '" onclick="_mmaAgentConfirm()">Confirm</button>' +
       '<button type="button" class="mma-act" onclick="_mmaAgentCancel()">Cancel</button>' +
     '</div></div>';
+}
+
+// Payment cards on the desk: one box per charge, with a Refund button that
+// opens the existing refund modal (mRefund) pre-pointed at that charge.
+function _mmaChargesHtml(ctx) {
+  const charges = (ctx && ctx.charges) || [];
+  if (!charges.length) return '<div class="mma-card" style="color:var(--text-mute)">No payments found for this member.</div>';
+  const mid = String(ctx.member_id || '').replace(/[^a-f0-9-]/gi, '');
+  const cid = String(ctx.stripe_customer_id || '').replace(/[^a-zA-Z0-9_]/g, '');
+  const pill = (s) => {
+    const map = { succeeded: ['Succeeded', 'var(--green,#7BC47F)'], refunded: ['Refunded', 'var(--text-mute,#9aa0a6)'], partial_refund: ['Partial refund', 'var(--amber,#cfa647)'], failed: ['Failed', 'var(--red,#e0654f)'], pending: ['Pending', 'var(--text-mute,#9aa0a6)'] };
+    const [lbl, col] = map[s] || [(s || '-'), 'var(--text-mute,#9aa0a6)'];
+    return '<span style="font-size:10px;font-weight:700;color:' + col + ';background:' + col + '22;border-radius:999px;padding:3px 9px;white-space:nowrap">' + escapeHTML(lbl) + '</span>';
+  };
+  const fmtDate = (d) => { if (!d) return ''; try { return new Date(d + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }); } catch (_) { return d; } };
+  const rows = charges.map(c => {
+    const canRefund = (c.status === 'succeeded' || c.status === 'partial_refund') && !!c.charge_id;
+    const chId = String(c.charge_id || '').replace(/[^a-zA-Z0-9_]/g, '');
+    const refundBtn = canRefund
+      ? '<button type="button" class="mma-act" style="padding:5px 12px" onclick="mRefund(\'' + mid + '\',\'' + cid + '\',\'' + chId + '\')">Refund</button>'
+      : '';
+    const refundedNote = c.amount_refunded_dollars ? '<div style="font-size:10.5px;color:var(--text-mute);margin-top:2px">$' + Number(c.amount_refunded_dollars).toFixed(2) + ' refunded</div>' : '';
+    return '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:11px 13px">'
+      + '<div style="min-width:0"><div style="font-weight:700;font-size:14px;font-family:var(--font-num,inherit)">$' + (c.amount_dollars != null ? Number(c.amount_dollars).toFixed(2) : '-') + ' <span style="font-size:10.5px;color:var(--text-mute);font-weight:600">' + escapeHTML(c.currency || 'CAD') + '</span></div>'
+      + '<div style="font-size:11.5px;color:var(--text-mute);margin-top:1px">' + escapeHTML(fmtDate(c.date)) + '</div>' + refundedNote + '</div>'
+      + '<div style="display:flex;align-items:center;gap:8px;flex-shrink:0">' + pill(c.status) + refundBtn + '</div>'
+      + '</div>';
+  }).join('');
+  return '<div style="display:flex;flex-direction:column;gap:8px">' + rows + '</div>';
 }
 
 async function _mmaAgentConfirm() {

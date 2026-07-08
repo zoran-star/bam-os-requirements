@@ -120,6 +120,15 @@ const READ_TOOLS = [
       },
     },
   },
+  {
+    name: "show_payments",
+    description: "Display a member's recent payments as nicely formatted cards to the user, each with a Refund button. ALWAYS use this (never a text/markdown table) when the user asks to see, list, review, or pull up a member's payments, charges, or billing history. Give a one-line intro; the cards render below it.",
+    input_schema: {
+      type: "object",
+      properties: { member_id: { type: "string", description: "The member's uuid from find_members." } },
+      required: ["member_id"],
+    },
+  },
 ];
 
 // Each WRITE tool mirrors the body shape of the matching api/members.js action.
@@ -300,7 +309,10 @@ function systemPrompt(academyName) {
     `("who has failed payments", "how many are paused", "list members with billing issues"), call list_members ` +
     `(with issues_only=true for problem accounts, or a specific status) and answer in a short plain sentence, naming the members. ` +
     `payment_failed = a charge bounced; payment_method_required = no card on file. To explain ONE member's failed payment, ` +
-    `use get_member and read their recent charges (a charge with status "failed" is the bounce).\n\n` +
+    `use get_member and read their recent charges (a charge with status "failed" is the bounce).\n` +
+    `When the user asks to SEE / LIST / review a member's payments, charges, or billing history, call show_payments ` +
+    `(after find_members resolves the member) with a one-line intro - it renders payment cards with a Refund button. ` +
+    `NEVER hand-write a markdown/text table of charges.\n\n` +
     `HOW TO WORK:\n` +
     `1. Almost every command names a member. Call find_members to resolve the name to a member_id BEFORE any action. ` +
     `If find_members returns more than one plausible match, do NOT guess — ask the user which one (list the candidates with their status).\n` +
@@ -464,6 +476,35 @@ async function execGetMember(clientId, memberId, stripeAccountByClient) {
   return out;
 }
 
+// DISPLAY tool: the member's recent charges shaped for the UI cards (amount,
+// date, status, refund state). Returned to the frontend as member_context so it
+// renders payment cards + a Refund button per charge, instead of a text table.
+async function execShowPayments(clientId, memberId, acct) {
+  const rows = await sb(`members?id=eq.${encodeURIComponent(memberId)}&client_id=eq.${clientId}&select=id,athlete_name,parent_name,stripe_customer_id`).catch(() => []);
+  const m = Array.isArray(rows) && rows[0] ? rows[0] : null;
+  if (!m) return { error: "member not found for this academy" };
+  const ctx = {
+    member_id: m.id,
+    member_name: m.athlete_name || m.parent_name || "Member",
+    stripe_customer_id: m.stripe_customer_id || null,
+    charges: [],
+  };
+  if (acct && m.stripe_customer_id) {
+    try {
+      const ch = await stripeFetch(`/charges?customer=${m.stripe_customer_id}&limit=8`, { stripeAccount: acct });
+      ctx.charges = (ch?.data || []).map(c => ({
+        charge_id: c.id,
+        amount_dollars: c.amount != null ? +(c.amount / 100).toFixed(2) : null,
+        amount_refunded_dollars: c.amount_refunded ? +(c.amount_refunded / 100).toFixed(2) : 0,
+        currency: (c.currency || "cad").toUpperCase(),
+        date: c.created ? new Date(c.created * 1000).toISOString().slice(0, 10) : null,
+        status: c.refunded ? "refunded" : (c.amount_refunded ? "partial_refund" : c.status),
+      }));
+    } catch (_) { /* non-fatal — cards just render empty */ }
+  }
+  return ctx;
+}
+
 // Build the members.js PATCH body from a write tool's input.
 function toActionBody(action, input) {
   const b = {};
@@ -589,6 +630,26 @@ async function handler(req, res) {
             body: actionBody,
             summary: summarize(action, name, input, actionBody),
           },
+        });
+      }
+
+      // A DISPLAY tool (show_payments) → return the charges as member_context so
+      // the UI renders payment cards + refund buttons. Terminal, like a proposal.
+      const display = toolUses.find(t => t.name === "show_payments");
+      if (display) {
+        const memberId = display.input?.member_id;
+        if (!memberId) {
+          return res.status(200).json({ reply: text || "Which member's payments?", proposal: null });
+        }
+        const ctx = await execShowPayments(clientId, memberId, stripeAccount);
+        if (ctx.error) {
+          return res.status(200).json({ reply: text || ctx.error, proposal: null });
+        }
+        const name = ctx.member_name || nameById[memberId] || "this member";
+        return res.status(200).json({
+          reply: text || `Here are ${name}'s recent payments:`,
+          proposal: null,
+          member_context: ctx,
         });
       }
 
