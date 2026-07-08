@@ -3187,15 +3187,29 @@ async function handleMetaOverview(req, res) {
   //   requested  = sent but client hasn't filled it → orange dot
   //   (no ticket) = never sent → grey dot (falls back to "none")
   const budgetStatusById = {};
+  const confirmedBudgetById = {}; // newest budget-review ticket → client-confirmed total + per-campaign breakdown
   try {
-    const bt = await sb(`marketing_tickets?type=eq.budget-review&select=client_id,client_action_status,status,submitted_at&order=submitted_at.desc`);
+    const bt = await sb(`marketing_tickets?type=eq.budget-review&select=client_id,client_action_status,status,submitted_at,fields&order=submitted_at.desc`);
     for (const t of (bt || [])) {
       if (budgetStatusById[t.client_id]) continue; // first = newest
       budgetStatusById[t.client_id] = t.status === "completed" ? "complete"
         : t.client_action_status === "responded" ? "confirmed"
         : "requested";
+      // Client's picked budgets live in fields.confirmed_budgets (written on respond).
+      // Surface them so staff see WHAT the client chose, not just that they answered.
+      const cb = Array.isArray(t.fields?.confirmed_budgets) ? t.fields.confirmed_budgets : null;
+      if (cb && cb.length) {
+        const campaigns = cb.map(b => ({
+          name: String(b.name || "Campaign"),
+          current: b.current == null || b.current === "" ? null : Number(b.current),
+          confirmed: b.confirmed == null || b.confirmed === "" ? null : Number(b.confirmed),
+          changed: !!b.changed,
+        }));
+        const total = campaigns.reduce((s, b) => s + (b.confirmed || 0), 0);
+        confirmedBudgetById[t.client_id] = { total: total || null, campaigns };
+      }
     }
-  } catch { /* leave map empty — every client falls back to "none" */ }
+  } catch { /* leave maps empty — every client falls back to "none" */ }
 
   const staffToken = await getAnyStaffMetaToken();
   const now = new Date();
@@ -3212,7 +3226,8 @@ async function handleMetaOverview(req, res) {
   const rows = await Promise.all(clients.map(async (c) => {
     const goal_cpl = c.meta_cpl_goal != null ? Number(c.meta_cpl_goal) : null;
     const monthly_budget = c.meta_monthly_budget != null ? Number(c.meta_monthly_budget) : null;
-    const baseRow = { id: c.id, business_name: c.business_name, goal_cpl, monthly_budget, budget_status: budgetStatusById[c.id] || "none" };
+    const cbInfo = confirmedBudgetById[c.id] || null;
+    const baseRow = { id: c.id, business_name: c.business_name, goal_cpl, monthly_budget, budget_status: budgetStatusById[c.id] || "none", confirmed_budget: cbInfo?.total ?? null, confirmed_budgets: cbInfo?.campaigns ?? null };
     if (!c.meta_ad_account_id || !staffToken) return { ...baseRow, connected: false };
     try {
       const adAcct = c.meta_ad_account_id.startsWith("act_") ? c.meta_ad_account_id : `act_${c.meta_ad_account_id}`;
