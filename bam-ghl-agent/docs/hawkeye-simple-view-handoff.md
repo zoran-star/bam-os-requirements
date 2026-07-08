@@ -93,6 +93,7 @@ to build for config itself.
 | 2026-07-08 | Morphed pill = up arrow centered (collapse) + 3-line config icon top-right (was: gear only) |
 | 2026-07-08 | Deck card footer = TWO buttons: "Other" (bottom left, cascades UP to every other option) + confirm (bottom right; label flips to "Confirm edits and send/book/..." the moment the user edits anything) |
 | 2026-07-08 | Book-it cards = PICKERS, not free text: a Calendar select limited to the calendars tied to the lead's OFFER + a Slot select (that calendar's open slots, with spots-left counts). Switching either = an edit (mandatory note) |
+| 2026-07-08 | The popup modal shares the deck card's kind-aware guts: Book-it popup shows the same Calendar + Slot pickers, ghost/plan kinds swap the reply box, and the same edited-label + mandatory-note rule applies |
 | 2026-07-08 | Teach-why note is MANDATORY for any change away from the agent's guess (draft, plan message, booking detail) - confirm is blocked until the note is filled. Applies to every Hawkeye surface in the real build |
 
 ## Action model per agent (revised 2026-07-08, SHIPPED end to end)

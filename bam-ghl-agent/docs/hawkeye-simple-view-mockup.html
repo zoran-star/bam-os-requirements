@@ -474,8 +474,9 @@ bamgta.com/join/fall-group</div>
       <div class="hk-right">
         <div class="thread" id="hkm-thread"></div>
         <div class="hk-compose">
-          <textarea id="hkm-draft" oninput="document.getElementById('hkm-teach').style.display='block'"></textarea>
-          <input class="hk-teach" id="hkm-teach" placeholder="Teach the agent: why did you change it? (saved as a lesson)">
+          <div id="hkm-extra"></div>
+          <textarea id="hkm-draft" oninput="modalEdited()"></textarea>
+          <input class="hk-teach" id="hkm-teach" placeholder="Required when you change anything: why? (saved as a lesson)">
           <div class="hk-actions">
             <button class="hk-send" id="hkm-send" onclick="nextHawk()">Approve and send</button>
             <button class="hk-lesson">Save as lesson only</button>
@@ -615,17 +616,68 @@ bamgta.com/join/fall-group</div>
       var tg=document.createElement('span');tg.className='tag';tg.textContent='Suggested reply - edit below';
       sug.appendChild(tg);sug.appendChild(document.createTextNode(d.draft));th.appendChild(sug);
     }
-    document.getElementById('hkm-draft').value=d.draft||'';
-    document.getElementById('hkm-teach').style.display='none';
+    // Kind-specific guts (same content as the deck card): Book it = calendar +
+    // slot pickers tied to the offer; Went quiet + plan hide the reply box.
+    var extra=document.getElementById('hkm-extra');
+    var draftEl=document.getElementById('hkm-draft');
+    mkEditedFlag=false; mkKey=key;
+    if(d.kind==='book'){
+      var calOpts=d.cals.map(function(c,i){return '<option value="'+i+'"'+(i===0?' selected':'')+'>'+c.name+'</option>';}).join('');
+      var slotOpts=d.cals[0].slots.map(function(t,i){return '<option value="'+i+'"'+(i===0?' selected':'')+'>'+t+'</option>';}).join('');
+      extra.innerHTML='<div class="dc-lbl" style="margin-bottom:6px">Booking details - the agent\'s pick, change if needed</div>'
+        +'<div class="dc-fields">'
+        +'<label><span>Calendar</span><select id="hkm-cal" onchange="mkCalChange(this)">'+calOpts+'</select></label>'
+        +'<label><span>Slot</span><select id="hkm-slot" onchange="modalEdited()">'+slotOpts+'</select></label>'
+        +'</div>'
+        +'<div class="dc-note" style="margin-top:6px">Only calendars tied to this lead\'s offer ('+d.offer+') show here.</div>';
+      draftEl.style.display='none';
+    } else if(d.kind==='ghost'){
+      extra.innerHTML='<div class="dc-note">Nothing sends now - Ghosted takes over with the day 1 / 3 / 7 nudges. A reply bounces them straight back to Booking.</div>';
+      draftEl.style.display='none';
+    } else if(d.kind==='plan'){
+      extra.innerHTML='<div class="dc-lbl" style="margin-bottom:6px">The plan - every message editable</div>'
+        +d.plan.map(function(t,i){return '<div class="dc-lbl" style="margin:4px 0 3px">Day '+(i+1)+(i===d.plan.length-1?' · final, no-pressure':'')+'</div><textarea class="dc-draft sm" style="width:100%" oninput="modalEdited()">'+t+'</textarea>';}).join('');
+      draftEl.style.display='none';
+    } else {
+      extra.innerHTML='';
+      draftEl.style.display='';
+      draftEl.value=d.draft||'';
+    }
+    var teach=document.getElementById('hkm-teach');
+    teach.style.display='none'; teach.value=''; teach.classList.remove('miss');
     var send=document.getElementById('hkm-send');
     send.textContent=PRIMARY[d.kind][0];
     send.className='hk-send '+PRIMARY[d.kind][2];
     document.getElementById('hk-overlay').classList.add('on');
     th.scrollTop=th.scrollHeight;
   }
+  var mkEditedFlag=false, mkKey=null;
+  // Same rule as the deck: any change away from the agent's pick flips the button
+  // to "Confirm edits ..." and the teach-why note becomes MANDATORY.
+  function modalEdited(){
+    var t=document.getElementById('hkm-teach');
+    if(t)t.style.display='block';
+    if(mkEditedFlag)return; mkEditedFlag=true;
+    var d=HK[mkKey]||HK.jordan;
+    var send=document.getElementById('hkm-send');
+    if(send)send.textContent=PRIMARY[d.kind][1];
+  }
+  function mkCalChange(sel){
+    var d=HK[mkKey]||{};
+    var slot=document.getElementById('hkm-slot');
+    if(d.cals && slot){
+      var c=d.cals[Number(sel.value)]||d.cals[0];
+      slot.innerHTML=c.slots.map(function(t,i){return '<option value="'+i+'"'+(i===0?' selected':'')+'>'+t+'</option>';}).join('');
+    }
+    modalEdited();
+  }
   function closeHawk(){document.getElementById('hk-overlay').classList.remove('on')}
   var HK_ORDER=['jordan','marco','sam','dana','rachel','owen','kayla','devon','mia'];
   function nextHawk(){
+    if(mkEditedFlag){
+      var t=document.getElementById('hkm-teach');
+      if(!t || !t.value.trim()){ if(t){t.classList.add('miss');t.style.display='block';t.focus();} return; }
+    }
     var cur=document.getElementById('hkm-name').textContent;
     var idx=HK_ORDER.findIndex(function(k){return HK[k].name===cur});
     if(idx>=0&&idx<HK_ORDER.length-1){openHawk(HK_ORDER[idx+1]);}else{closeHawk();}
