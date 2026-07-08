@@ -39360,7 +39360,8 @@ async function mRefund(memberId, customerId, preselectChargeId) {
       icon: '', title: 'Refund', body: 'Select the payment to refund.', okLabel: 'Issue refund',
       fields: [
         { key: 'charge_id', label: 'Payment', type: 'select', value: _defCharge, options: opts },
-        { key: 'amount', label: 'Amount in cents (blank = full refund of that payment)', type: 'number', placeholder: '9039 = $90.39' },
+        { key: 'amount', label: 'Amount in dollars (blank = full refund of that payment)', type: 'number', placeholder: 'e.g. 112.88',
+          validate: v => (!v || parseFloat(v) > 0) ? '' : 'Enter a dollar amount like 112.88.' },
         { key: 'notes', label: 'Reason / note', type: 'text', placeholder: 'e.g. Plan downgrade - May difference' },
       ],
     });
@@ -39371,7 +39372,8 @@ async function mRefund(memberId, customerId, preselectChargeId) {
       fields: [
         { key: 'charge_id', label: 'Stripe charge ID', type: 'text', placeholder: 'ch_...', required: true,
           validate: v => /^ch_/.test(v) ? '' : 'Charge IDs start with "ch_".' },
-        { key: 'amount', label: 'Amount in cents (blank = full refund)', type: 'number', placeholder: '9039 = $90.39' },
+        { key: 'amount', label: 'Amount in dollars (blank = full refund)', type: 'number', placeholder: 'e.g. 112.88',
+          validate: v => (!v || parseFloat(v) > 0) ? '' : 'Enter a dollar amount like 112.88.' },
         { key: 'notes', label: 'Reason / note', type: 'text', placeholder: 'e.g. Plan downgrade - May difference' },
       ],
     });
@@ -39382,7 +39384,7 @@ async function mRefund(memberId, customerId, preselectChargeId) {
   // what's about to happen and require an explicit yes before firing.
   const _sel = refundable.find(c => c.id === vals.charge_id) || null;
   const _remainCents = _sel ? ((_sel.amount_cents || 0) - (_sel.amount_refunded || 0)) : null;
-  const _amtCents = vals.amount ? parseInt(vals.amount, 10) : (_remainCents != null ? _remainCents : null);
+  const _amtCents = vals.amount ? Math.round(parseFloat(vals.amount) * 100) : (_remainCents != null ? _remainCents : null);
   const _amtStr = (_amtCents != null && !isNaN(_amtCents)) ? '$' + (_amtCents / 100).toFixed(2) : 'the full amount';
   const _onLine = _sel && _sel.date ? ' on the ' + escapeHTML(_sel.date) + ' payment' : '';
   const confirmed = await _mmModal({
@@ -39393,7 +39395,7 @@ async function mRefund(memberId, customerId, preselectChargeId) {
   if (!confirmed) return;
 
   const body = { charge_id: vals.charge_id };
-  if (vals.amount) body.amount_cents = parseInt(vals.amount, 10);
+  if (vals.amount) body.amount_cents = Math.round(parseFloat(vals.amount) * 100);
   if (vals.notes) body.notes = vals.notes;
   try {
     // Spinner while Stripe processes → check-mark → auto-close (same as pause).
