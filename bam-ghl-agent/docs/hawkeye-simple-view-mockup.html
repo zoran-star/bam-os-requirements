@@ -216,6 +216,11 @@
   .dc-fields input{flex:1;background:var(--surface-el);border:1px solid var(--border-med);border-radius:8px;color:var(--text);
     font-family:var(--font-ui);font-size:13px;padding:8px 10px;outline:none;min-width:0}
   .dc-fields input:focus{border-color:var(--gold)}
+  .dc-fields select{flex:1;background:var(--surface-el);border:1px solid var(--border-med);border-radius:8px;color:var(--text);
+    font-family:var(--font-ui);font-size:13px;padding:8px 10px;outline:none;min-width:0;appearance:none;cursor:pointer;
+    background-image:url('data:image/svg+xml;utf8,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%2212%22 height=%2212%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22%23A5A19A%22 stroke-width=%222.5%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22><path d=%22m6 9 6 6 6-6%22/></svg>');
+    background-repeat:no-repeat;background-position:right 10px center;padding-right:28px}
+  .dc-fields select:focus{border-color:var(--gold)}
   .allclear{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;
     border:1px dashed var(--border-med);border-radius:24px;color:var(--text-sub)}
   .allclear .big{width:64px;height:64px;border-radius:50%;background:var(--green-soft);color:var(--green);
@@ -539,7 +544,9 @@ bamgta.com/join/fall-group</div>
       draft:'Saturday works! We have a 10am group at Linbrook. Want me to lock it in for Aiden?'},
     marco:{agent:'booking',kind:'book',av:'MV',name:'Marco V.',sub:'Parent of Zoe (10)',stage:'Responded',phone:'(647) 555-0resents',last:'6 min ago',
       ctx:'Lead picked a slot. One tap books it and hands them to Confirm.',
-      book_day:'Sat, Jul 12 · 10:00 AM', book_loc:'Linbrook gym', book_group:'U11 Saturday group',
+      offer:'U11 Fall Training',
+      cals:[{name:'U11 Saturday group · Linbrook gym',slots:['Sat, Jul 12 · 10:00 AM (3 spots left)','Sat, Jul 19 · 10:00 AM (5 spots left)']},
+            {name:'U11 Tue/Thu group · Linbrook gym',slots:['Tue, Jul 15 · 6:00 PM (2 spots left)','Thu, Jul 17 · 6:00 PM (4 spots left)']}],
       thread:[['bot','We have Sat 10am or Sun 1pm open this week - which works for Zoe?'],
               ['in','sat 10am works for zoe!']],
       draft:''},
@@ -661,14 +668,15 @@ bamgta.com/join/fall-group</div>
     });
     var body='';
     if(d.kind==='book'){
+      var calOpts=d.cals.map(function(c,i){return '<option value="'+i+'"'+(i===0?' selected':'')+'>'+c.name+'</option>';}).join('');
+      var slotOpts=d.cals[0].slots.map(function(t,i){return '<option value="'+i+'"'+(i===0?' selected':'')+'>'+t+'</option>';}).join('');
       body='<div class="dc-thread">'+th+'</div>'
-        +'<div class="dc-lbl">Booking details - the agent\'s guess, edit anything</div>'
+        +'<div class="dc-lbl">Booking details - the agent\'s pick, change if needed</div>'
         +'<div class="dc-fields">'
-        +'<label><span>Day + time</span><input value="'+d.book_day+'" oninput="dcEdited()"></label>'
-        +'<label><span>Location</span><input value="'+d.book_loc+'" oninput="dcEdited()"></label>'
-        +'<label><span>Group</span><input value="'+d.book_group+'" oninput="dcEdited()"></label>'
+        +'<label><span>Calendar</span><select'+(isTop?' id="dc-cal"':'')+' onchange="dcCalChange(this)">'+calOpts+'</select></label>'
+        +'<label><span>Slot</span><select'+(isTop?' id="dc-slot"':'')+' onchange="dcEdited()">'+slotOpts+'</select></label>'
         +'</div>'
-        +'<div class="dc-note">Books the slot and hands them to the Confirm agent (the confirmation + same-day check-in send from config).</div>';
+        +'<div class="dc-note">Only calendars tied to this lead\'s offer ('+d.offer+') show here. Booking the slot hands them to the Confirm agent (the confirmation + same-day check-in send from config).</div>';
     } else if(d.kind==='ghost'){
       body='<div class="dc-thread">'+th+'</div>'
         +'<div class="dc-note">Nothing sends now - Ghosted takes over with the day 1 / 3 / 7 nudges. A reply bounces them straight back to Booking.</div>';
@@ -710,6 +718,17 @@ bamgta.com/join/fall-group</div>
     if(btn)btn.textContent=PRIMARY[d.kind][1];
     var t=document.getElementById('dc-teach');
     if(t)t.style.display='block';
+  }
+  // Switching the calendar repopulates its open slots; both pickers count as an
+  // edit (the agent's pick changed), so the teach-why note becomes required.
+  function dcCalChange(sel){
+    var d=HK[HK_QUEUES[hkStage][hkPos[hkStage]]];
+    var slot=document.getElementById('dc-slot');
+    if(d.cals && slot){
+      var c=d.cals[Number(sel.value)]||d.cals[0];
+      slot.innerHTML=c.slots.map(function(t,i){return '<option value="'+i+'"'+(i===0?' selected':'')+'>'+t+'</option>';}).join('');
+    }
+    dcEdited();
   }
   function toggleOther(btn){
     var p=document.getElementById('dc-other');
