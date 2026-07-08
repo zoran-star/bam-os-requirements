@@ -42,6 +42,11 @@ scattered autonomy/config entry points. KEEPS: inline drawer suggestion on lead 
 - Enroll = reply with the sign-up link EMBEDDED in the draft (buildEnrollUrl at detect
   time; confirm-enroll appends only if the edited draft lost the link).
 - Closing deck order: Reply -> Follow-up plan (stacked next) -> Suggested Lost.
+- EVERY agent can mark Unqualified: `confirm-abandoned` now exists on /api/agent-confirm
+  and /api/agent-closing too (mirrors agent-approvals': setStatus abandoned+role
+  unqualified, markUnqualified tag, pipeline_outcomes, clears that agent's cards).
+  UI: Unqualified button on all Confirm/Closing cards (_acxUnqualified/_aclxUnqualified/
+  _aclxUnqualifiedPlan), 6s undo via _hawkDefer.
 - Reference page: bam-portal/public/hawkeye-actions.html (+ claude.ai artifact).
 ⚠️ NOT prod-verified on GTA yet (live behavior change if GTA had closing autos approved).
 

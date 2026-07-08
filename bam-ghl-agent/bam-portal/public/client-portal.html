@@ -32444,6 +32444,7 @@ function _acxReplyCard(r) {
     ${_acxBox(r)}
     <div style="display:flex;align-items:stretch;gap:8px;margin-top:10px">
       <button onclick="_acxSkip('${r.id}')" title="Skip" style="flex:1;background:transparent;border:1px solid var(--border);color:var(--red);border-radius:8px;padding:9px;font-size:17px;cursor:pointer">✕</button>
+      <button onclick="_acxUnqualified('${r.id}')" title="Remove from the pipeline as unqualified - no message, no nurture" style="background:transparent;border:1px solid var(--text-mute);color:var(--text-sub);border-radius:8px;padding:9px 11px;font-size:12px;cursor:pointer">Unqualified</button>
       <button onclick="_acxSend('${r.id}')" style="flex:2;background:var(--accent);border:1px solid var(--accent);color:#08080A;border-radius:8px;padding:9px;font-size:14px;font-weight:700;cursor:pointer">✓ Approve &amp; send</button>
     </div>
   </div>`;
@@ -32458,6 +32459,7 @@ function _acxHandoffCard(r) {
     ${_acxBox(r, 'optional warm message before handing off')}
     <div style="display:flex;align-items:stretch;gap:8px;margin-top:10px">
       <button onclick="_acxSkip('${r.id}')" title="Skip" style="flex:1;background:transparent;border:1px solid var(--border);color:var(--red);border-radius:8px;padding:9px;font-size:17px;cursor:pointer">✕</button>
+      <button onclick="_acxUnqualified('${r.id}')" title="Remove from the pipeline as unqualified - no message, no nurture" style="background:transparent;border:1px solid var(--text-mute);color:var(--text-sub);border-radius:8px;padding:9px 11px;font-size:12px;cursor:pointer">Unqualified</button>
       <button onclick="_acxHandoff('${r.id}')" style="flex:2;background:#5A8FB8;border:1px solid #5A8FB8;color:#08080A;border-radius:8px;padding:9px;font-size:14px;font-weight:700;cursor:pointer">↩ Approve handoff</button>
     </div>
   </div>`;
@@ -32472,6 +32474,7 @@ function _acxLostCard(r) {
     ${_acxBox(r, 'optional closing message')}
     <div style="display:flex;align-items:stretch;gap:8px;margin-top:10px">
       <button onclick="_acxSkip('${r.id}')" title="Skip" style="flex:1;background:transparent;border:1px solid var(--border);color:var(--text-sub);border-radius:8px;padding:9px;font-size:17px;cursor:pointer">✕</button>
+      <button onclick="_acxUnqualified('${r.id}')" title="Remove from the pipeline as unqualified - no message, no nurture" style="background:transparent;border:1px solid var(--text-mute);color:var(--text-sub);border-radius:8px;padding:9px 11px;font-size:12px;cursor:pointer">Unqualified</button>
       <button onclick="_acxLost('${r.id}')" style="flex:2;background:var(--red);border:1px solid var(--red);color:#fff;border-radius:8px;padding:9px;font-size:14px;font-weight:700;cursor:pointer">Mark lost</button>
     </div>
   </div>`;
@@ -32512,6 +32515,13 @@ function _acxLost(id) {
 function _acxSkip(id) {
   _hawkDefer({ cardId: 'acx-' + id, label: 'Skipped', restore: _acxRender, run: async () => {
     await _apxPost('/api/agent-confirm', 'skip-ready', { ready_id: id }); _acxRemove(id); _apxToast('Skipped', true);
+  } });
+}
+// Unqualified: the dead end (Zoran 2026-07-08: every agent can mark unqualified).
+// Closes the opp + stamps the GHL unqualified tag - no message, no nurture.
+function _acxUnqualified(id) {
+  _hawkDefer({ cardId: 'acx-' + id, label: 'Unqualified', restore: _acxRender, run: async () => {
+    await _apxPost('/api/agent-confirm', 'confirm-abandoned', { ready_id: id }); _acxRemove(id); _apxToast('Marked unqualified', true);
   } });
 }
 
@@ -32622,6 +32632,7 @@ function _aclxPlanCard(rows) {
     ${_aclxNotesBlock(first)}
     <div style="display:flex;align-items:stretch;gap:8px;margin-top:10px">
       <button onclick="_aclxSkipPlan('${escapeHTML(first.ghl_contact_id)}')" title="Skip the whole plan" style="flex:1;background:transparent;border:1px solid var(--border);color:var(--red);border-radius:8px;padding:9px;font-size:17px;cursor:pointer">✕</button>
+      <button onclick="_aclxUnqualifiedPlan('${escapeHTML(first.ghl_contact_id)}')" title="Remove from the pipeline as unqualified - no message, no nurture" style="background:transparent;border:1px solid var(--text-mute);color:var(--text-sub);border-radius:8px;padding:9px 11px;font-size:12px;cursor:pointer">Unqualified</button>
       <button onclick="_aclxApprovePlan('${escapeHTML(first.ghl_contact_id)}')" style="flex:2;background:var(--accent);border:1px solid var(--accent);color:#08080A;border-radius:8px;padding:9px;font-size:14px;font-weight:700;cursor:pointer">✓ Approve plan - sends 1 day apart</button>
     </div>
   </div>`;
@@ -32724,6 +32735,7 @@ function _aclxReplyCard(r) {
     ${_aclxNotesBlock(r)}
     <div style="display:flex;align-items:stretch;gap:8px;margin-top:10px">
       <button onclick="_aclxSkip('${r.id}')" title="Skip" style="flex:1;background:transparent;border:1px solid var(--border);color:var(--red);border-radius:8px;padding:9px;font-size:17px;cursor:pointer">✕</button>
+      <button onclick="_aclxUnqualified('${r.id}')" title="Remove from the pipeline as unqualified - no message, no nurture" style="background:transparent;border:1px solid var(--text-mute);color:var(--text-sub);border-radius:8px;padding:9px 11px;font-size:12px;cursor:pointer">Unqualified</button>
       <button onclick="_aclxSend('${r.id}')" style="flex:2;background:var(--accent);border:1px solid var(--accent);color:#08080A;border-radius:8px;padding:9px;font-size:14px;font-weight:700;cursor:pointer">✓ Approve &amp; send</button>
     </div>
   </div>`;
@@ -32739,6 +32751,7 @@ function _aclxEnrollCard(r) {
     ${_aclxNotesBlock(r)}
     <div style="display:flex;align-items:stretch;gap:8px;margin-top:10px">
       <button onclick="_aclxSkip('${r.id}')" title="Skip" style="flex:1;background:transparent;border:1px solid var(--border);color:var(--red);border-radius:8px;padding:9px;font-size:17px;cursor:pointer">✕</button>
+      <button onclick="_aclxUnqualified('${r.id}')" title="Remove from the pipeline as unqualified - no message, no nurture" style="background:transparent;border:1px solid var(--text-mute);color:var(--text-sub);border-radius:8px;padding:9px 11px;font-size:12px;cursor:pointer">Unqualified</button>
       <button onclick="_aclxEnroll('${r.id}')" style="flex:2;background:#3DBE8B;border:1px solid #3DBE8B;color:#08080A;border-radius:8px;padding:9px;font-size:14px;font-weight:700;cursor:pointer">✓ Approve &amp; send</button>
     </div>
   </div>`;
@@ -32754,6 +32767,7 @@ function _aclxLostCard(r) {
     ${_aclxNotesBlock(r)}
     <div style="display:flex;align-items:stretch;gap:8px;margin-top:10px">
       <button onclick="_aclxSkip('${r.id}')" title="Skip" style="flex:1;background:transparent;border:1px solid var(--border);color:var(--text-sub);border-radius:8px;padding:9px;font-size:17px;cursor:pointer">✕</button>
+      <button onclick="_aclxUnqualified('${r.id}')" title="Remove from the pipeline as unqualified - no message, no nurture" style="background:transparent;border:1px solid var(--text-mute);color:var(--text-sub);border-radius:8px;padding:9px 11px;font-size:12px;cursor:pointer">Unqualified</button>
       <button onclick="_aclxLost('${r.id}')" style="flex:2;background:var(--red);border:1px solid var(--red);color:#fff;border-radius:8px;padding:9px;font-size:14px;font-weight:700;cursor:pointer">Mark lost</button>
     </div>
   </div>`;
@@ -32795,6 +32809,24 @@ function _aclxLost(id) {
 function _aclxSkip(id) {
   _hawkDefer({ cardId: 'aclx-' + id, label: 'Skipped', restore: _aclxRender, run: async () => {
     await _apxPost('/api/agent-closing', 'skip-ready', { ready_id: id }); _aclxRemove(id); _apxToast('Skipped', true);
+  } });
+}
+// Unqualified: the dead end (Zoran 2026-07-08: every agent can mark unqualified).
+// Closes the opp + stamps the GHL unqualified tag - no message, no nurture.
+function _aclxUnqualified(id) {
+  _hawkDefer({ cardId: 'aclx-' + id, label: 'Unqualified', restore: _aclxRender, run: async () => {
+    await _apxPost('/api/agent-closing', 'confirm-abandoned', { ready_id: id }); _aclxRemove(id); _apxToast('Marked unqualified', true);
+  } });
+}
+// Unqualified from a follow-up PLAN card: one call closes the lead; the backend
+// cancels every open closing card for them, so the whole plan comes off the queue.
+function _aclxUnqualifiedPlan(contactId) {
+  const rows = _ACLX_DATA.filter(x => x.ghl_contact_id === contactId && x.status === 'pending');
+  if (!rows.length) return;
+  _hawkDefer({ cardId: 'aclx-plan-' + contactId, label: 'Unqualified', restore: _aclxRender, run: async () => {
+    await _apxPost('/api/agent-closing', 'confirm-abandoned', { ready_id: rows[0].id });
+    _ACLX_DATA = _ACLX_DATA.filter(x => x.ghl_contact_id !== contactId);
+    _aclxRender(); _apxToast('Marked unqualified', true);
   } });
 }
 

@@ -84,6 +84,7 @@ to build for config itself.
 | 2026-07-08 | Reschedule approve = handoff AND Booking's first rebook action queues (was already wired; now canon) |
 | 2026-07-08 | Done Trial has NO automations - post-trial form (trainer note + optional sign-up link + coach notes) is the only preplanned touch; scripted closing sequence + its editor REMOVED |
 | 2026-07-08 | Closing deck = stacked cards: 1 Reply (enroll = reply with link embedded in draft) -> 2 Follow-up plan -> 3 Suggested Lost after 3 unanswered follow-ups (agent prompt told: silence alone is never lost) |
+| 2026-07-08 | EVERY agent can mark Unqualified: confirm-abandoned action added to agent-confirm + agent-closing (opp abandoned + role unqualified + GHL tag, no nurture); Unqualified button on all Confirm/Closing cards incl. the follow-up plan card |
 
 ## Action model per agent (revised 2026-07-08, SHIPPED end to end)
 Mobile reference page (design-system styled): `bam-portal/public/hawkeye-actions.html`
