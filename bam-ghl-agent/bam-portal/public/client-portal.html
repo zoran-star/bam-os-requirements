@@ -21656,7 +21656,28 @@ async function _bbDeleteOffer(id, title) {
 // Replaces the retired Pricing nav page. Connection state comes from the same
 // /api/members payload the Members tab uses (also caches _STRIPE_CONNECT_STATE
 // so openStripeConnectModal works from here).
+// Auto-tie: whenever the pricing strip renders (initial load + every re-render
+// after a match/apply), nudge the make-sellable bridge. Server-side it is a
+// cheap no-op unless an offer has confirmed pricing and no typed prices yet -
+// then it creates the bookable program + sellable prices (offers-sync) with
+// entitlements derived from the plan names. Debounced; best-effort.
+let _msLastFire = 0;
+async function _msFire() {
+  if (typeof CLIENT_ID === 'undefined' || !CLIENT_ID) return;
+  const now = Date.now();
+  if (now - _msLastFire < 15000) return;
+  _msLastFire = now;
+  try {
+    const token = await _mreqAuthToken();
+    const r = await fetch('/api/offers/make-sellable', { method: 'POST', headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' }, body: JSON.stringify({ client_id: CLIENT_ID }) });
+    const j = await _safeJson(r);
+    if (r.ok && Array.isArray(j.synced) && j.synced.some(x => x.result)) {
+      _plToast('Plans are now bookable and sellable.');
+    }
+  } catch (_) {}
+}
 async function _bbRenderOffersPricing() {
+  _msFire();
   const host = document.getElementById('bb-offers-pricing');
   if (!host || (typeof V2_ACCESS !== 'undefined' && !V2_ACCESS)) return;
   host.innerHTML = `<div class="bb-empty" style="padding:14px 0">Checking your Stripe connection…</div>`;
