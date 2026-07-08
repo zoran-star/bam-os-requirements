@@ -47868,12 +47868,14 @@ async function _mmaAgentAsk(message) {
     _MMA_AI.engaged = true;
     _MMA_AI.proposal = json.proposal || null;
     const _mc = json.member_context;
+    // Payment cards render only when charges came back (show_payments); an
+    // open_contact turn has a member but no charges, so no cards - just the drawer.
     const cards = json.proposal ? _mmaProposalHtml(json.proposal)
       : (_mc && Array.isArray(_mc.charges) ? _mmaChargesHtml(_mc) : '');
     _mmaSay(json.reply || (json.proposal ? 'Ready when you are.' : 'Okay.'), cards);
-    // Showing payments → also pop the member's contact card on the right (over
-    // the focus chat, no dimming) so the roster context sits beside the charges.
-    if (_mc && _mc.member_id && Array.isArray(_mc.charges) && typeof openMemberPopup === 'function') {
+    // Any member_context (payments OR contact-card request) → pop the member's
+    // contact drawer on the right, over the chat, without dimming it.
+    if (_mc && _mc.member_id && typeof openMemberPopup === 'function') {
       openMemberPopup(_mc.member_id, { elevated: true });
     }
   } catch (e) {
