@@ -143,6 +143,27 @@ async function runActivation(a) {
   return report;
 }
 
+// Persist the last report onto the program row (config.activation_report) so
+// the public offer endpoint's telemetry block can surface WHY an activation
+// is stuck - the cron's own response needs CRON_SECRET nobody has at hand.
+async function recordReport(report) {
+  if (!report) return;
+  try {
+    if (!report.program_id) {
+      // Failure before the program lookup - resolve it so the error still lands.
+      const progs = await sb(`bookable_programs?tenant_id=eq.${encodeURIComponent(report.client_id)}&status=eq.ACTIVE&select=id&order=sort_order.asc&limit=1`);
+      report.program_id = progs?.[0]?.id || null;
+      if (!report.program_id) return;
+    }
+    const rows = await sb(`bookable_programs?id=eq.${encodeURIComponent(report.program_id)}&select=config&limit=1`);
+    const config = (rows?.[0] && rows[0].config) || {};
+    await sb(`bookable_programs?id=eq.${encodeURIComponent(report.program_id)}`, {
+      method: "PATCH", headers: { Prefer: "return=minimal" },
+      body: JSON.stringify({ config: { ...config, activation_report: { ...report, at: new Date().toISOString() } } }),
+    });
+  } catch (_) { /* telemetry only - never fail the run over it */ }
+}
+
 async function handler(req, res) {
   const isCron = !!req.headers["x-vercel-cron"];
   const bearer = (req.headers.authorization || "").replace(/^Bearer\s+/i, "");
@@ -154,11 +175,14 @@ async function handler(req, res) {
     const results = [];
     for (const a of ACTIVATIONS) {
       if (one && a.client_id !== one) continue;
+      let report;
       try {
-        results.push(await runActivation(a));
+        report = await runActivation(a);
       } catch (e) {
-        results.push({ client_id: a.client_id, offer_id: a.offer_id, error: e.message });
+        report = { client_id: a.client_id, offer_id: a.offer_id, error: e.message };
       }
+      results.push(report);
+      await recordReport(report);
     }
     return res.status(200).json({ ok: true, activations: results.length, results });
   } catch (e) {

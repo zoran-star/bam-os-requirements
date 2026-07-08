@@ -269,12 +269,13 @@ async function handler(req, res) {
     let activation = null;
     try {
       const [progs, clientRows] = await Promise.all([
-        sbReq(`bookable_programs?tenant_id=eq.${encodeURIComponent(client_id)}&status=eq.ACTIVE&select=id&limit=5`),
+        sbReq(`bookable_programs?tenant_id=eq.${encodeURIComponent(client_id)}&status=eq.ACTIVE&select=id,config&limit=5`),
         sbReq(`clients?id=eq.${encodeURIComponent(client_id)}&select=booking_provider&limit=1`),
       ]);
       activation = {
         active_programs: Array.isArray(progs) ? progs.length : 0,
         booking_provider: (clientRows && clientRows[0] && clientRows[0].booking_provider) || "ghl",
+        last_run: (progs && progs[0] && progs[0].config && progs[0].config.activation_report) || null,
       };
     } catch { /* additive - never breaks the offer page */ }
 
