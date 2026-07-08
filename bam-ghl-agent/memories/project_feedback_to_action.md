@@ -115,8 +115,38 @@ later: install the App + secret (one-time admin task) and re-add the label in
 ## `portal_feedback` shape (relevant cols)
 `id, body, kind (bug|feature|idea|other), source, page, file_url, file_name,
 submitter_email, author_id, portal, status (pending…), resolved_at, resolved_by,
-created_at`. Open filter = `resolved_at is null`. Admin Feedback tab is the
-resolve UI (`/?nav=feedback`).
+context (jsonb, 2026-07-08), created_at`. Open filter = `resolved_at is null`.
+Admin Feedback tab is the resolve UI (`/?nav=feedback`).
+
+## Auto-captured context + /v2-tickets triage skill (2026-07-08)
+
+Prep for making the lil Zoran icon **description-only** for users: the widget now
+auto-attaches a `context` jsonb snapshot on every submit, so clients never have to
+explain where they were.
+
+- **Recorder** (client-portal.html, `_FB_CTX` / `_fbBuildContext()` next to the
+  widget JS): ring buffers for the last 30 clicks (`{t, view, el}` - element label
+  only, NEVER typed input values), last 15 view changes (wraps `switchView` on
+  window load), last 10 JS errors (`error` + `unhandledrejection`). Snapshot also
+  carries tier (v2/v1.5/v1 from `V2_ACCESS`/`V15_ACCESS`), academy name, active
+  view, full URL, viewport, UA, `native_app`, online, seconds_on_page.
+- **API** (`api/clients.js` submit-feedback): accepts `fb.context`, caps at 20KB
+  (drops trails first), and retries the insert WITHOUT context if the column isn't
+  migrated yet - feedback is never lost.
+- **Migration**: `supabase/migrations/20260708150000_portal_feedback_context.sql`
+  (`add column if not exists context jsonb`). Idempotent; the /v2-tickets skill
+  also runs it defensively.
+- **Staff Feedback tab** (`FeedbackView.jsx` `ContextPanel`): collapsible
+  "🧭 Context" line per item - tier/view/click count/error count summary, expands
+  to full click path, view trail, errors, device.
+- **Widget copy** updated: placeholder no longer asks which page they were on;
+  note under the textarea says page + clicks are attached automatically.
+- **`/v2-tickets` skill** (repo root `.claude/commands/v2-tickets.md`): one-by-one
+  triage of outstanding V2 tickets (`resolved_at is null`, `portal='client'`,
+  client `v2_access` or `context->>'tier'='v2'`, oldest first). Per ticket: visual
+  card + click path, plain-English proposal + effort pill, workshop with Zoran,
+  then stamp the decision (`notes` append + status; `done`/`rejected` also set
+  `resolved_at`/`resolved_by`). Skipped tickets stay in the queue.
 
 ## Instant SMS to Zoran on feedback submit (2026-06-24)
 Every portal feedback submission now texts Zoran (`FEEDBACK_NOTIFY_PHONE`, default
