@@ -91,6 +91,45 @@ function deriveRules(planKeys) {
   return rules;
 }
 
+// The whole bridge for one client, callable without an HTTP request (the cron
+// backstop uses this too). ctx defaults to a synthetic non-staff caller so
+// withStaffToken mints its disposable staff session.
+export async function runMakeSellable(clientId, { offerId = "", force = false, ctx = null } = {}) {
+  // Offers with confirmed canonical pricing = ready to become sellable.
+  const rows = await sb(
+    `pricing_catalog?client_id=eq.${encodeURIComponent(clientId)}&match_status=eq.confirmed&tier=eq.canonical&offer_id=not.is.null&offer_price_key=not.is.null` +
+    (offerId ? `&offer_id=eq.${encodeURIComponent(offerId)}` : "") +
+    `&select=offer_id,offer_price_key`
+  ) || [];
+  const byOffer = new Map();
+  for (const r of rows) {
+    if (!byOffer.has(r.offer_id)) byOffer.set(r.offer_id, new Set());
+    byOffer.get(r.offer_id).add(String(r.offer_price_key).split("|")[0]);
+  }
+  if (!byOffer.size) return { synced: [], note: "no offers with confirmed pricing yet - run the Stripe Matcher first" };
+
+  const synced = [];
+  await withStaffToken(ctx || { isStaff: false, user: { id: "cron" } }, async (staffToken) => {
+    for (const [oid, planSet] of byOffer) {
+      // Idempotence: typed prices already exist -> already sellable.
+      if (force !== true) {
+        const typed = await sb(`offer_prices?tenant_id=eq.${encodeURIComponent(clientId)}&source_offer_id=eq.${encodeURIComponent(oid)}&select=id&limit=1`);
+        if (Array.isArray(typed) && typed[0]) { synced.push({ offer_id: oid, already: true }); continue; }
+      }
+      const rules = deriveRules([...planSet]);
+      const r = await fetch(`${PORTAL}/api/runtime/offers-sync`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${staffToken}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ client_id: clientId, offer_id: oid, mode: "apply", entitlement_rules: rules, offer_type: "TRAINING", purchase_kind: "MEMBERSHIP" }),
+      });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) { synced.push({ offer_id: oid, error: j.error || `runtime ${r.status}` }); continue; }
+      synced.push({ offer_id: oid, rules, result: { options: j.options?.length ?? j.planned?.options?.length, prices: j.prices?.length ?? undefined, ok: true } });
+    }
+  });
+  return { synced };
+}
+
 async function handler(req, res) {
   if (req.method !== "POST") return res.status(405).json({ error: "POST required" });
   try {
@@ -100,41 +139,12 @@ async function handler(req, res) {
     if (!clientId) return res.status(400).json({ error: "client_id required" });
     if (!ctx.isStaff && !ctx.clientIds.includes(clientId)) return res.status(403).json({ error: "forbidden" });
 
-    // Offers with confirmed canonical pricing = ready to become sellable.
-    const oneOffer = String(body.offer_id || "").trim();
-    const rows = await sb(
-      `pricing_catalog?client_id=eq.${encodeURIComponent(clientId)}&match_status=eq.confirmed&tier=eq.canonical&offer_id=not.is.null&offer_price_key=not.is.null` +
-      (oneOffer ? `&offer_id=eq.${encodeURIComponent(oneOffer)}` : "") +
-      `&select=offer_id,offer_price_key`
-    ) || [];
-    const byOffer = new Map();
-    for (const r of rows) {
-      if (!byOffer.has(r.offer_id)) byOffer.set(r.offer_id, new Set());
-      byOffer.get(r.offer_id).add(String(r.offer_price_key).split("|")[0]);
-    }
-    if (!byOffer.size) return res.status(200).json({ ok: true, synced: [], note: "no offers with confirmed pricing yet - run the Stripe Matcher first" });
-
-    const synced = [];
-    await withStaffToken(ctx, async (staffToken) => {
-      for (const [offerId, planSet] of byOffer) {
-        // Idempotence: typed prices already exist -> already sellable.
-        if (body.force !== true) {
-          const typed = await sb(`offer_prices?tenant_id=eq.${encodeURIComponent(clientId)}&source_offer_id=eq.${encodeURIComponent(offerId)}&select=id&limit=1`);
-          if (Array.isArray(typed) && typed[0]) { synced.push({ offer_id: offerId, already: true }); continue; }
-        }
-        const rules = deriveRules([...planSet]);
-        const r = await fetch(`${PORTAL}/api/runtime/offers-sync`, {
-          method: "POST",
-          headers: { Authorization: `Bearer ${staffToken}`, "Content-Type": "application/json" },
-          body: JSON.stringify({ client_id: clientId, offer_id: offerId, mode: "apply", entitlement_rules: rules, offer_type: "TRAINING", purchase_kind: "MEMBERSHIP" }),
-        });
-        const j = await r.json().catch(() => ({}));
-        if (!r.ok) { synced.push({ offer_id: offerId, error: j.error || `runtime ${r.status}` }); continue; }
-        synced.push({ offer_id: offerId, rules, result: { options: j.options?.length ?? j.planned?.options?.length, prices: j.prices?.length ?? undefined, ok: true } });
-      }
+    const { synced, note } = await runMakeSellable(clientId, {
+      offerId: String(body.offer_id || "").trim(),
+      force: body.force === true,
+      ctx,
     });
-
-    return res.status(200).json({ ok: true, synced });
+    return res.status(200).json({ ok: true, synced, ...(note ? { note } : {}) });
   } catch (e) {
     return res.status(e.status || 500).json({ error: e.message || String(e) });
   }
