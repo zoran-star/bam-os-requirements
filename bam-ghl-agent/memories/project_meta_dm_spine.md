@@ -36,6 +36,37 @@ still NOT submitted - that's the real unlock for real customers.**
   live at https://portal.byanymeansbusiness.com/data-deletion.html (paste into
   App Settings → Basic → Data deletion instructions URL).
 
+## Client self-serve Instagram wizard (2026-07-08)
+Academy owners connect their OWN Instagram from the portal - no staff involved.
+V2-only surface (V1/V1.5 keep GHL's IG passthrough; wiring them pre-App-Review
+would trip the inbox_live dedupe trap above).
+- **`api/meta/ig-connect.js`** (client-or-staff auth, same pattern as
+  email/domain-setup.js): status / start (FB OAuth dialog URL) / pages /
+  wire / disconnect. Wire is ONE-SHOT: subscribe webhook + config
+  status='active' + inbox_live=true (self-serve implies no GHL passthrough
+  to protect).
+- **`api/meta/ig-callback.js`** - OAuth callback: code → long-lived user
+  token → me/accounts. 1 page = auto-wire → `?ig=connected`; several =
+  token+list parked on `clients.ig_setup` → `?ig=pick` (wizard shows page
+  picker); errors → `?ig=error&msg=`.
+- **`clients.ig_setup` jsonb** (migration `20260708151740`, applied to prod) -
+  wizard state + display info (page_name, ig_username), mirrors email_setup.
+- **client-portal.html**: `_igw*` wizard (card in Inbox Setup for V2 +
+  standalone modal from the Command Center Settings dock, next to "Email
+  domain"); `_igwBoot()` (from applyCrmSupersetNav, V2 only) handles the
+  `?ig=` return + sets `_IG_LIVE`; `_v15ibVisibleChannels()` now shows the
+  IG/FB inbox toggles per-academy (`_IG_LIVE` = config active + inbox_live)
+  instead of blanket-hiding them for all V2 - GTA gets its toggles back.
+- **Status display**: staff-wired academies (GTA) get ig_username/page_name
+  lazily enriched into ig_setup from Graph on first status read.
+- ⚠️ **Manual Meta app step (NOT done yet):** add
+  `https://portal.byanymeansbusiness.com/api/meta/ig-callback` to Facebook
+  Login → Valid OAuth Redirect URIs on app 2059912628202822, or connects die
+  with "URL Blocked". Optional env `CLIENT_PORTAL_URL` overrides the pinned
+  origin.
+- Pre-App-Review reality: only app-role/tester Meta users can complete the
+  OAuth + have DMs delivered. Real academy owners unlock after App Review.
+
 ## Session results (2026-07-03 evening)
 - GTA config ACTIVE: page 130045040185267 "By Any Means GTA",
   ig_user_id 17841465712982249 (@byanymeansgta), page token encrypted+stored.
