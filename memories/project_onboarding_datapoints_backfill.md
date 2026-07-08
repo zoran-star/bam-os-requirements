@@ -1,8 +1,9 @@
-# Onboarding Data Points DB - integration rows backfill (APPROVED, NOT YET SAVED)
+# Onboarding Data Points DB - integration rows backfill (PARKED)
 
-**Status 2026-07-08: Zoran approved the 5 backfills below ("Save all 5") but the
-session was paused before the Notion writes ran. Next session: execute them
-verbatim, no re-approval needed.**
+**Status 2026-07-08: PARKED - Zoran said "don't worry about the notion db" when
+pausing the session. The 5 backfills below were drafted and approved earlier
+the same day but never written. Only pick this up if Zoran asks for it; the
+approved values are kept so nothing needs re-drafting.**
 
 ## Context
 - DB: Onboarding Data Points `49be4ce65ada4d45b736070e11452edb`
