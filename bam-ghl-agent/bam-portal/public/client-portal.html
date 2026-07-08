@@ -39094,7 +39094,7 @@ function _mmFieldHtml(f) {
         <span><span style="font-size:13.5px;font-weight:600;color:var(--text)">${esc(o.label)}</span>${o.hint ? `<span style="display:block;font-size:11.5px;color:var(--text-mute);margin-top:2px">${esc(o.hint)}</span>` : ''}</span>
       </label>`).join('')}</div>`;
   } else {
-    ctrl = `<input id="mm-f-${f.key}" type="${f.type || 'text'}" value="${esc(f.value)}" placeholder="${esc(f.placeholder)}" ${f.min != null ? `min="${f.min}"` : ''} ${f.max != null ? `max="${f.max}"` : ''} style="${base}">`;
+    ctrl = `<input id="mm-f-${f.key}" type="${f.type || 'text'}" value="${esc(f.value)}" placeholder="${esc(f.placeholder)}" ${f.min != null ? `min="${f.min}"` : ''} ${f.max != null ? `max="${f.max}"` : ''} ${f.step != null ? `step="${esc(f.step)}"` : ''} style="${base}">`;
   }
   return `<div style="margin-bottom:16px;text-align:left">${lbl}${ctrl}${hint}</div>`;
 }
@@ -39360,7 +39360,7 @@ async function mRefund(memberId, customerId, preselectChargeId) {
       icon: '', title: 'Refund', body: 'Select the payment to refund.', okLabel: 'Issue refund',
       fields: [
         { key: 'charge_id', label: 'Payment', type: 'select', value: _defCharge, options: opts },
-        { key: 'amount', label: 'Amount in dollars (blank = full refund of that payment)', type: 'number', placeholder: 'e.g. 112.88',
+        { key: 'amount', label: 'Amount in dollars (blank = full refund of that payment)', type: 'number', step: '0.01', placeholder: 'e.g. 112.88',
           validate: v => (!v || parseFloat(v) > 0) ? '' : 'Enter a dollar amount like 112.88.' },
         { key: 'notes', label: 'Reason / note', type: 'text', placeholder: 'e.g. Plan downgrade - May difference' },
       ],
@@ -39372,7 +39372,7 @@ async function mRefund(memberId, customerId, preselectChargeId) {
       fields: [
         { key: 'charge_id', label: 'Stripe charge ID', type: 'text', placeholder: 'ch_...', required: true,
           validate: v => /^ch_/.test(v) ? '' : 'Charge IDs start with "ch_".' },
-        { key: 'amount', label: 'Amount in dollars (blank = full refund)', type: 'number', placeholder: 'e.g. 112.88',
+        { key: 'amount', label: 'Amount in dollars (blank = full refund)', type: 'number', step: '0.01', placeholder: 'e.g. 112.88',
           validate: v => (!v || parseFloat(v) > 0) ? '' : 'Enter a dollar amount like 112.88.' },
         { key: 'notes', label: 'Reason / note', type: 'text', placeholder: 'e.g. Plan downgrade - May difference' },
       ],
