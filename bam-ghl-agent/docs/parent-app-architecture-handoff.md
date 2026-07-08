@@ -91,10 +91,12 @@ The schema for the typed operational runtime exists in production:
 Applied to production (`20260702115744`-`20260702115748` plus earlier July
 backfill migrations):
 
-- Identity/runtime backfill is LIVE: 29 `customer_profiles`, 30 `students`,
-  30 `academy_memberships`, 30 `member_links`, 6 `offer_prices`,
-  6 `entitlement_templates`, 30 `customer_entitlements`, 9 `credit_ledger`
-  rows (checked 2026-07-02).
+- Identity/runtime backfill is LIVE and was rechecked 2026-07-08: 38
+  `customer_profiles`, 41 `students`, 41 `academy_memberships`, 40
+  `member_links`, 71 `customer_entitlements`, and 36 `credit_ledger` rows.
+  Active-parent slice: 29 profiles have active memberships, students, member
+  links, and active entitlements. Claim state is still clean: 0 profiles have
+  `supabase_user_id` / `claimed_at`.
 - Booking writes: `parent_book_slot` / `parent_join_waitlist` /
   `parent_cancel_reservation` / `parent_leave_waitlist` RPCs, all capacity
   checks routed through `slot_spots_taken` - the single capacity source of
@@ -245,10 +247,12 @@ but it uses the same runtime tables.
 Still outstanding before production parent booking (updated 2026-07-07):
 
 - registration/claim endpoint with targeted auth/RLS coverage
-- ~~production identity/member linking~~ ✅ backfilled (30 member_links)
+- ~~production identity/member linking~~ ✅ backfilled (40 member_links; 29
+  active parent profiles fully linked)
 - ~~production schedule import or staff-published schedule rows~~ ✅ live
   (4 templates, 86 slots through the staff endpoints as of 2026-07-02)
-- ~~production entitlement import~~ ✅ backfilled (30 entitlements)
+- ~~production entitlement import~~ ✅ backfilled (71 entitlements; 29 active
+  parent profiles have active entitlements)
 - ~~production credit opening balances where needed~~ ✅ backfilled; credit
   engine grants are active behind `clients.credit_engine_enabled`
 - ~~review/push of booking-write RPC slice~~ ✅ applied to prod 2026-07-02
@@ -259,7 +263,8 @@ Still outstanding before production parent booking (updated 2026-07-07):
   kept in V1 scope)
 - optional member-management scope: pause/change/cancel and remove-child remain
   deliberately hidden/deferred until policy exists
-- trial `CONVERTED` status exists, but `converted_member_id` /
+- trial bookings exist in prod (6 rows as of 2026-07-08: 4 `BOOKED`, 1 `SHOWED`,
+  1 `NO_SHOW`); `CONVERTED` status exists, but `converted_member_id` /
   `converted_membership_id` linkage still needs the checkout/conversion endpoint
 
 ## Free Trials After GHL
