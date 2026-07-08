@@ -49691,7 +49691,8 @@ function _mmCreativeAction(action, name) {
    being replaced) is auto-attached. */
 let _MMC = null;
 function _mmcOpen(mode, idx) {
-  const ctx = (mode === 'replace' ? (window._MMC_REP || []) : (window._MMC_ADD || []))[idx] || {};
+  // replace + remove both act on an existing creative, so both read _MMC_REP
+  const ctx = (mode === 'add' ? (window._MMC_ADD || []) : (window._MMC_REP || []))[idx] || {};
   _MMC = { mode, step: 'form', files: [], drive: '', brief: '', creative: ctx.creative || null, verdict: ctx.verdict || null, ctx };
   _mmcRender();
   const bd = document.getElementById('mmCreativeModal');
@@ -49711,11 +49712,11 @@ function _mmcRender() {
   if (_MMC.step === 'sending') { card.innerHTML = _mmcSendingHtml(); return; }
   if (_MMC.step === 'sent') { card.innerHTML = _mmcSentHtml(); return; }
   if (_MMC.step === 'confirm') { card.innerHTML = _mmcConfirmHtml(); return; }
-  const isRep = _MMC.mode === 'replace', c = _MMC.creative, v = _MMC.verdict;
+  const isRep = _MMC.mode === 'replace', isDel = _MMC.mode === 'remove', c = _MMC.creative, v = _MMC.verdict;
   const ctxLine = [_MMC.ctx && _MMC.ctx.campaign, _MMC.ctx && _MMC.ctx.adset].filter(Boolean).join(' &middot; ');
-  // the creative being replaced (thumb + its numbers + why-replace)
+  // the creative being replaced / deleted (thumb + its numbers + why)
   let repCard = '';
-  if (isRep && c) {
+  if ((isRep || isDel) && c) {
     const stats = [
       c.cpl != null ? ('$/lead ' + _mmMoney(c.cpl)) : null,
       c.hook_rate != null ? ('hook ' + _mmPctTxt(c.hook_rate)) : null,
@@ -49738,13 +49739,26 @@ function _mmcRender() {
           '<button type="button" class="mmc-file-x" onclick="_mmcRmFile(' + i + ')" aria-label="Remove">&#10005;</button>' +
         '</div>').join('') + '</div>'
     : '';
-  card.innerHTML =
-    '<div class="mmc-head">' +
-      '<div><div class="mmc-kicker">' + (isRep ? 'Replace creative' : 'New creative') + '</div>' +
-        '<div class="mmc-title">' + (isRep ? 'Swap this ad for a fresh one' : 'Request a new creative') + '</div>' +
+  const head = '<div class="mmc-head">' +
+      '<div><div class="mmc-kicker">' + (isDel ? 'Delete creative' : (isRep ? 'Replace creative' : 'New creative')) + '</div>' +
+        '<div class="mmc-title">' + (isDel ? 'Take this ad down' : (isRep ? 'Swap this ad for a fresh one' : 'Request a new creative')) + '</div>' +
         (ctxLine ? '<div class="mmc-ctx">' + ctxLine + '</div>' : '') + '</div>' +
       '<button type="button" class="mmc-x" onclick="_mmcClose()" aria-label="Close"><svg width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M4 4l8 8M12 4l-8 8"/></svg></button>' +
-    '</div>' +
+    '</div>';
+  if (isDel) {
+    // delete asks for nothing but an optional note - no assets, no brief required
+    card.innerHTML = head + repCard +
+      '<div class="mmc-field"><label class="mmc-label" for="mmcBrief">Why take it down? <span style="font-weight:400;color:var(--text-mute)">(optional)</span></label>' +
+        '<textarea id="mmcBrief" class="mmc-textarea" placeholder="Anything the team should know before pulling this ad...">' + _escapeHtml(_MMC.brief || '') + '</textarea>' +
+      '</div>' +
+      '<div class="mmc-foot">' +
+        '<button type="button" class="mmc-btn-ghost" onclick="_mmcClose()">Cancel</button>' +
+        '<button type="button" class="mmc-btn-gold" onclick="_mmcReview()">Review request &rarr;</button>' +
+      '</div>';
+    return;
+  }
+  card.innerHTML =
+    head +
     repCard +
     '<div class="mmc-field"><label class="mmc-label">Your footage &amp; photos</label>' +
       '<label class="mmc-drop" id="mmcDrop" ondragover="event.preventDefault();this.classList.add(\'is-over\')" ondragleave="this.classList.remove(\'is-over\')" ondrop="_mmcDrop(event)">' +
@@ -49765,11 +49779,11 @@ function _mmcRender() {
 }
 // Confirmation step: a read-only summary of the request before it goes.
 function _mmcConfirmHtml() {
-  const isRep = _MMC.mode === 'replace', c = _MMC.creative, v = _MMC.verdict;
+  const isRep = _MMC.mode === 'replace', isDel = _MMC.mode === 'remove', c = _MMC.creative, v = _MMC.verdict;
   const ctxLine = [_MMC.ctx && _MMC.ctx.campaign, _MMC.ctx && _MMC.ctx.adset].filter(Boolean).join(' &middot; ');
-  // the creative being replaced (same card as the form step)
+  // the creative being replaced / deleted (same card as the form step)
   let repCard = '';
-  if (isRep && c) {
+  if ((isRep || isDel) && c) {
     const stats = [
       c.cpl != null ? ('$/lead ' + _mmMoney(c.cpl)) : null,
       c.hook_rate != null ? ('hook ' + _mmPctTxt(c.hook_rate)) : null,
@@ -49791,20 +49805,27 @@ function _mmcConfirmHtml() {
         '<div class="mmc-sum-file"><span class="mmc-file-name">' + _escapeHtml(f.name) + '</span><span class="mmc-file-size">' + _formatFileSize(f.size) + '</span></div>').join('') + '</div>'
     : '';
   const row = (k, val) => '<div class="mmc-sum-row"><span class="mmc-sum-k">' + k + '</span><span class="mmc-sum-v">' + val + '</span></div>';
-  return '<div class="mmc-head">' +
-      '<div><div class="mmc-kicker">Confirm request</div>' +
-        '<div class="mmc-title">' + (isRep ? 'Send this replacement?' : 'Send this request?') + '</div>' +
-        (ctxLine ? '<div class="mmc-ctx">' + ctxLine + '</div>' : '') + '</div>' +
-      '<button type="button" class="mmc-x" onclick="_mmcClose()" aria-label="Close"><svg width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M4 4l8 8M12 4l-8 8"/></svg></button>' +
-    '</div>' +
-    repCard +
-    '<div class="mmc-sum">' +
+  const note = (_MMC.brief || '').trim();
+  const sum = isDel
+    ? '<div class="mmc-sum">' +
+        row('Request', 'Take this ad down (delete it from the campaign)') +
+        (note ? '<div class="mmc-sum-row"><span class="mmc-sum-k">Note</span></div><div class="mmc-sum-brief">' + _escapeHtml(note) + '</div>' : '') +
+      '</div>'
+    : '<div class="mmc-sum">' +
       row('Request', isRep ? 'Replace this ad with a fresh creative' : 'A brand-new creative') +
       row('Assets', assetLine) + fileList +
       ((_MMC.drive || '').trim() ? row('Link', '<span style="word-break:break-all">' + _escapeHtml(_MMC.drive.trim()) + '</span>') : '') +
       '<div class="mmc-sum-row"><span class="mmc-sum-k">' + (isRep ? 'What to beat' : 'Brief') + '</span></div>' +
-      '<div class="mmc-sum-brief">' + _escapeHtml((_MMC.brief || '').trim()) + '</div>' +
+      '<div class="mmc-sum-brief">' + _escapeHtml(note) + '</div>' +
+    '</div>';
+  return '<div class="mmc-head">' +
+      '<div><div class="mmc-kicker">Confirm request</div>' +
+        '<div class="mmc-title">' + (isDel ? 'Take this ad down?' : (isRep ? 'Send this replacement?' : 'Send this request?')) + '</div>' +
+        (ctxLine ? '<div class="mmc-ctx">' + ctxLine + '</div>' : '') + '</div>' +
+      '<button type="button" class="mmc-x" onclick="_mmcClose()" aria-label="Close"><svg width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M4 4l8 8M12 4l-8 8"/></svg></button>' +
     '</div>' +
+    repCard +
+    sum +
     '<div class="mmc-foot">' +
       '<button type="button" class="mmc-btn-ghost" onclick="_mmcBack()">&lsaquo; Back</button>' +
       '<button type="button" class="mmc-btn-gold" onclick="_mmcSubmit()">Confirm &amp; send &rarr;</button>' +
@@ -49815,7 +49836,8 @@ function _mmcReview() {   // validate the form, then move to the confirmation st
   if (!_MMC) return;
   _mmcCapture();
   const brief = (_MMC.brief || '').trim(), drive = (_MMC.drive || '').trim();
-  const needAssets = !_MMC.files.length && !drive, needBrief = !brief;
+  const isDel = _MMC.mode === 'remove';   // delete: note is optional, no assets
+  const needAssets = !isDel && !_MMC.files.length && !drive, needBrief = !isDel && !brief;
   if (needAssets || needBrief) {
     if (needAssets) _mmcShake('mmcDrop');
     if (needBrief) _mmcShake('mmcBrief');
@@ -49838,19 +49860,21 @@ function _mmcShake(id) {   // "no-no" shake + red flag on a missing field
 function _mmcSubmit() {   // fires from the confirmation step (already validated)
   if (!_MMC) return;
   const brief = (_MMC.brief || '').trim(), drive = (_MMC.drive || '').trim();
-  const isRep = _MMC.mode === 'replace', c = _MMC.creative, v = _MMC.verdict;
+  const isRep = _MMC.mode === 'replace', isDel = _MMC.mode === 'remove', c = _MMC.creative, v = _MMC.verdict;
+  const cinfo = c ? {
+    id: c.id || null, name: c.name || null, cpl: c.cpl, hook_rate: c.hook_rate,
+    frequency: c.frequency, spend: c.spend, verdict: v && v.verdict, why: v && v.note,
+  } : null;
   const payload = {
-    module: 'meta-ads', request_type: isRep ? 'replace' : 'add', source: 'v2_portal_creative',
+    module: 'meta-ads', request_type: isDel ? 'remove' : (isRep ? 'replace' : 'add'), source: 'v2_portal_creative',
     brief,
     assets: { files: _MMC.files.map((f) => ({ name: f.name, size: f.size })), drive_link: drive || null },
     context: {
       campaign: (_MMC.ctx && _MMC.ctx.campaign) || null,
       adset: (_MMC.ctx && _MMC.ctx.adset) || null,
       offer: (_MMC.ctx && _MMC.ctx.offer) || null,
-      replacing: (isRep && c) ? {
-        id: c.id || null, name: c.name || null, cpl: c.cpl, hook_rate: c.hook_rate,
-        frequency: c.frequency, spend: c.spend, verdict: v && v.verdict, why: v && v.note,
-      } : null,
+      replacing: isRep ? cinfo : null,
+      removing: isDel ? cinfo : null,
     },
   };
   console.log('[v2-creative] MOCK submit (no table yet):', payload);   // TODO: POST /api/v2-support-tickets
@@ -49872,11 +49896,11 @@ function _mmcSendingHtml() {
   '</div>';
 }
 function _mmcSentHtml() {
-  const isRep = _MMC && _MMC.mode === 'replace';
+  const isRep = _MMC && _MMC.mode === 'replace', isDel = _MMC && _MMC.mode === 'remove';
   return '<div class="mmc-status">' +
     '<div class="mmc-check"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7"/></svg></div>' +
     '<div class="mmc-status-title">Request sent</div>' +
-    '<div class="mmc-status-sub">' + (isRep ? 'Your team is on the replacement. Track it anytime in Systems.' : 'Your team is on it. Track it anytime in Systems.') + '</div>' +
+    '<div class="mmc-status-sub">' + (isDel ? 'Your team will take this ad down. Track it anytime in Systems.' : (isRep ? 'Your team is on the replacement. Track it anytime in Systems.' : 'Your team is on it. Track it anytime in Systems.')) + '</div>' +
     '<button type="button" class="mmc-btn-gold" onclick="_mmcClose()">Done</button>' +
   '</div>';
 }
@@ -49927,6 +49951,7 @@ function _mmRenderMetaFocus(d) {
         (v.note ? '<div class="mm-cr-note ' + (v.verdict === 'replace' ? 'mm-note-replace' : 'mm-note-edit') + '">' + (v.verdict === 'replace' ? '&#8635; ' : '&#9998; ') + _escapeHtml(v.note) + '</div>' : '') +
         '<div style="display:flex;gap:8px;margin-top:10px">' +
           '<button type="button" class="mm-cbtn" onclick="event.stopPropagation();_mmcOpen(\'replace\',' + repIdx + ')">&#8635; replace</button>' +
+          '<button type="button" class="mm-cbtn mm-danger" onclick="event.stopPropagation();_mmcOpen(\'remove\',' + repIdx + ')">&#10005; delete</button>' +
         '</div>' +
       '</div></div>';
   };
