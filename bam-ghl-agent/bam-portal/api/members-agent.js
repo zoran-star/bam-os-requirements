@@ -138,6 +138,14 @@ const READ_TOOLS = [
       required: ["member_id"],
     },
   },
+  {
+    name: "start_returning_signup",
+    description: "Open the Returning Client Signup wizard (the guided flow that signs an EXISTING Stripe customer onto a live offer, no public checkout). Use this whenever the user wants to ADD / SIGN UP / ENROLL someone as a new member manually - a returning or past client, someone who paid before, or anyone NOT on the roster ('add Jim back', 'sign up Houssein', 'enroll a returning client on 2/wk'). Also use it when find_members can't find the person AND the user's intent is to enroll them. Do NOT use billing action tools for new signups. Pass search_query = the name, email, or phone mentioned so the wizard pre-searches Stripe. Give a one-line intro; the wizard opens as a drawer.",
+    input_schema: {
+      type: "object",
+      properties: { search_query: { type: "string", description: "Name, email, or phone of the person to sign up, taken from the user's message. Empty if none was given." } },
+    },
+  },
 ];
 
 // Each WRITE tool mirrors the body shape of the matching api/members.js action.
@@ -323,7 +331,13 @@ function systemPrompt(academyName) {
     `(after find_members resolves the member) with a one-line intro - it renders payment cards with a Refund button. ` +
     `NEVER hand-write a markdown/text table of charges. When the user instead asks to open/see a member's CONTACT CARD, ` +
     `profile, contact info, or details, call open_contact (NOT show_payments) - it opens their detail drawer. ` +
-    `Pick the tool by what they asked for this turn: "payments/charges" → show_payments; "contact card/profile" → open_contact.\n\n` +
+    `Pick the tool by what they asked for this turn: "payments/charges" → show_payments; "contact card/profile" → open_contact.\n` +
+    `NEW MEMBER SIGNUPS: when the user wants to ADD, SIGN UP, or ENROLL someone as a member manually - a returning ` +
+    `or past client, someone who paid before, or a person NOT on the roster - call start_returning_signup with ` +
+    `search_query set to the name/email/phone they mentioned. It opens the guided signup wizard (search Stripe → ` +
+    `pick a live plan → consent → confirm). If find_members finds nothing for a name and the user's intent is to ` +
+    `enroll that person, route to start_returning_signup instead of just saying they weren't found. Never use ` +
+    `change/pause/payment-link tools to create a brand-new member.\n\n` +
     `HOW TO WORK:\n` +
     `1. Almost every command names a member. Call find_members to resolve the name to a member_id BEFORE any action. ` +
     `If find_members returns more than one plausible match, do NOT guess — ask the user which one (list the candidates with their status).\n` +
@@ -352,7 +366,8 @@ function systemPrompt(academyName) {
     `State facts plainly with real dates and amounts ("Her next charge is $315.27 on Jul 20"). ` +
     `A history line like "(Executed: ...)" means that action already ran; "(Proposal cancelled ...)" means it did not.\n\n` +
     `Actions you can propose: pause (with an optional next-payment date), unpause, cancel, change plan (1/wk 2/wk 3/wk unlmtd), refund, apply/remove coupon, ` +
-    `payment link, card-setup link, referral credit, profile edits, and click-to-call.`
+    `payment link, card-setup link, referral credit, profile edits, and click-to-call. ` +
+    `To manually sign up a returning/new client, use start_returning_signup (opens the wizard).`
   );
 }
 
@@ -650,6 +665,19 @@ async function handler(req, res) {
             body: actionBody,
             summary: summarize(action, name, input, actionBody),
           },
+        });
+      }
+
+      // UI-ACTION tool → tell the front-end to open the Returning Client Signup
+      // wizard (nothing is written here; the wizard has its own consent gate +
+      // server-side permission check). Terminal, like a proposal.
+      const enrollUi = toolUses.find(t => t.name === "start_returning_signup");
+      if (enrollUi) {
+        const q = String((enrollUi.input && enrollUi.input.search_query) || "").trim();
+        return res.status(200).json({
+          reply: text || "Opening the returning-client signup wizard.",
+          proposal: null,
+          ui_action: { kind: "open_returning_enroll", search_query: q },
         });
       }
 
