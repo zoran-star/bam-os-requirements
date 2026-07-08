@@ -2,23 +2,37 @@ import { offerToTemplatePayloads, _internals } from "./_offer-schedule.js";
 let pass=0, fail=0;
 const ok=(c,m)=>{ if(c){pass++;console.log("  ✅ "+m);} else {fail++;console.log("  ❌ "+m);} };
 
-console.log("\n── Detail MS/HS: Mon+Wed 6-8pm, cap 25 ──");
-const detail = { id:"off-1", title:"Training", data:{ capacity:25, classes:[
-  { title:"MS / HS", consistent:"Yes", weekly_times:[ { days:["Mon","Wed"], start:"18:00", end:"20:00", location:"1079 Linbrook" } ] }
-]}};
+console.log("\n── DETAIL Miami LIVE shape: wizard-namespaced sections, uuid location ──");
+// Mirrors the real offers row (2026-07-07): classes under data.schedule.classes,
+// capacity under data.general_info.capacity, location = a locations uuid.
+const detail = { id:"off-1", title:"Training", data:{
+  general_info: { capacity: "25" },
+  schedule: { year_round:"Year-round", classes:[
+    { title:"DETAIL Academy", age:"Grades 5-12", gender:["Boys"], consistent:"Yes",
+      weekly_times:[ { days:["Mon","Wed","Fri"], start:"18:00", end:"20:00", location:"615e11a0-c48a-4ce2-9832-f46883f786d6" } ] }
+  ]},
+  pricing: { pricing_offerings: [] }, sales: { sales_path:"Free trial" },
+}};
 let r = offerToTemplatePayloads(detail, { clientId:"c-1", bookableProgramId:"p-1" });
 console.log(JSON.stringify(r.templates[0].payload, null, 2));
 ok(r.templates.length===1, "one template");
 const p = r.templates[0].payload;
-ok(p.recurrence_rule==="WEEKLY:MO,WE", "recurrence WEEKLY:MO,WE");
+ok(p.recurrence_rule==="WEEKLY:MO,WE,FR", "recurrence WEEKLY:MO,WE,FR");
 ok(p.default_start_time==="18:00" && p.default_end_time==="20:00", "times 18:00-20:00");
-ok(p.default_capacity===25, "capacity 25 from offer");
+ok(p.default_capacity===25, "capacity 25 from data.general_info.capacity (string coerced)");
 ok(p.slot_type==="GROUP_CLASS", "slot_type GROUP_CLASS");
 ok(p.default_credit_cost===0, "trial costs 0 credits");
 ok(p.bookable_program_id==="p-1", "program attached");
-ok(p.default_location==="1079 Linbrook", "location as free text");
-ok(p.name==="Training - MS / HS (Mon, Wed)", "human name: "+p.name);
-ok(r.templates[0].matchKey==="WEEKLY:MO,WE|18:00|20:00", "matchKey for dedupe");
+ok(p.location_id==="615e11a0-c48a-4ce2-9832-f46883f786d6" && p.default_location===undefined, "uuid location -> location_id");
+ok(p.name==="Training - DETAIL Academy (Mon, Wed, Fri)", "human name: "+p.name);
+ok(r.templates[0].matchKey==="WEEKLY:MO,WE,FR|18:00|20:00", "matchKey for dedupe");
+
+console.log("\n── legacy top-level shape still works ──");
+r = offerToTemplatePayloads({ id:"o", title:"T", data:{ capacity:25, classes:[
+  { title:"MS / HS", consistent:"Yes", weekly_times:[ { days:["Mon","Wed"], start:"18:00", end:"20:00", location:"1079 Linbrook" } ] }
+]}}, { clientId:"c-1" });
+ok(r.templates.length===1 && r.templates[0].payload.default_capacity===25, "top-level classes/capacity fallback");
+ok(r.templates[0].payload.default_location==="1079 Linbrook", "free-text location -> default_location");
 
 console.log("\n── Edge: no capacity set ──");
 r = offerToTemplatePayloads({ id:"o", title:"T", data:{ classes:[{title:"A",consistent:"Yes",weekly_times:[{days:["Sat"],start:"10:00",end:"11:00"}]}] }}, { clientId:"c" });

@@ -101,5 +101,9 @@ endpoints (Q1), or whether he'd rather own offer->slots on his side.
 
 - [x] Piece 1 transformation - built + tested (`api/_offer-schedule.js`)
 - [x] "Max capacity per session" field on the Training offer wizard
-- [ ] Piece 2 orchestrator - blocked on a `bookable_program` (Stripe Matcher) + Luka align
-- [ ] Piece 3 slot-coverage cron
+- [~] Piece 2 orchestrator - **DRAFTED** (`api/schedule/sync-offer.js`), DORMANT (not wired to any
+  trigger). Can't be live-tested until a `bookable_program` exists (Stripe Matcher). Also needs Luka to
+  OK the temp-staff-mint auth path for owner-triggered syncs. Pipeline: transform → dedupe by matchKey →
+  POST/PATCH templates → generate-slots in 92-day windows to +365d.
+- [ ] Piece 3 slot-coverage cron (re-run generate-slots monthly to hold the rolling 1-year window)
+- [ ] Wire a trigger (offer publish, or a "Sync schedule to calendar" button)
