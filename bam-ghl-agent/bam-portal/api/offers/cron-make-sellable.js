@@ -18,13 +18,45 @@ export const maxDuration = 60;
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
 
-async function sb(path) {
+async function sb(path, init = {}) {
   const res = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
-    headers: { apikey: SUPABASE_SERVICE_KEY, Authorization: `Bearer ${SUPABASE_SERVICE_KEY}` },
+    ...init,
+    headers: { apikey: SUPABASE_SERVICE_KEY, Authorization: `Bearer ${SUPABASE_SERVICE_KEY}`, "Content-Type": "application/json", ...(init.headers || {}) },
   });
   if (!res.ok) throw new Error(`Supabase ${res.status}: ${await res.text()}`);
   const txt = await res.text();
   return txt ? JSON.parse(txt) : null;
+}
+
+// Data heal: typed billing_interval must speak the checkout term vocabulary
+// (4_weeks / 3_months / 6_months / one_time). Early Stripe-Matcher applies
+// stored Stripe's raw recurring unit in pricing_catalog ("week" for a
+// billed-every-4-weeks price) and offers-sync copied it into offer_prices -
+// which silently disables checkout's commitment-revert logic and drops the
+// term noun off the signed agreement PDF. The source_offer_price_key's term
+// is the academy-confirmed truth, so converge on it. Surgical on purpose:
+// touches ONLY billing_interval (never entitlements/options/rules), no-ops
+// once everything speaks the vocabulary. offers-sync derives the same value
+// now (billingIntervalOf), so the heal is stable, not tug-of-war.
+const TERM_TO_INTERVAL = { monthly: "4_weeks", "4_weeks": "4_weeks", "3_months": "3_months", "6_months": "6_months", one_time: "one_time" };
+
+async function healBillingIntervals(clientId) {
+  const rows = await sb(
+    `offer_prices?tenant_id=eq.${encodeURIComponent(clientId)}&source_offer_price_key=not.is.null&select=id,billing_interval,source_offer_price_key`
+  );
+  const healed = [];
+  for (const r of rows || []) {
+    const term = String(r.source_offer_price_key).split("|")[1];
+    const want = term ? TERM_TO_INTERVAL[term.trim().toLowerCase()] : null;
+    if (!want || r.billing_interval === want) continue;
+    await sb(`offer_prices?id=eq.${encodeURIComponent(r.id)}`, {
+      method: "PATCH",
+      headers: { Prefer: "return=minimal" },
+      body: JSON.stringify({ billing_interval: want, updated_at: new Date().toISOString() }),
+    });
+    healed.push({ id: r.id, key: r.source_offer_price_key, from: r.billing_interval, to: want });
+  }
+  return healed;
 }
 
 async function handler(req, res) {
@@ -41,7 +73,8 @@ async function handler(req, res) {
     for (const c of clients || []) {
       try {
         const { synced, note } = await runMakeSellable(c.id);
-        results.push({ client_id: c.id, business: c.business_name, synced, ...(note ? { note } : {}) });
+        const healed = await healBillingIntervals(c.id);
+        results.push({ client_id: c.id, business: c.business_name, synced, ...(healed.length ? { healed } : {}), ...(note ? { note } : {}) });
       } catch (e) {
         results.push({ client_id: c.id, business: c.business_name, error: e.message });
       }

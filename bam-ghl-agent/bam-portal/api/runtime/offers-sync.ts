@@ -146,6 +146,24 @@ function planKeyOf(offerPriceKey: string): string {
   return idx === -1 ? offerPriceKey : offerPriceKey.slice(0, idx);
 }
 
+// billing_interval on typed prices speaks the checkout term vocabulary
+// (4_weeks / 3_months / 6_months / one_time) - website/checkout.js gates the
+// commitment-revert logic and the agreement PDF's term noun on these exact
+// strings. The offer_price_key's term is the intent the academy confirmed in
+// the Stripe Matcher, so it wins over pricing_catalog.interval, which
+// historically stored Stripe's raw recurring unit ("week" for a
+// billed-every-4-weeks price, dropping interval_count).
+export function billingIntervalOf(row: Pick<CatalogRow, "offer_price_key" | "interval">): string | null {
+  const key = row.offer_price_key || "";
+  const idx = key.indexOf("|");
+  const term = idx === -1 ? "" : key.slice(idx + 1).trim().toLowerCase();
+  if (term === "monthly" || term === "4_weeks") return "4_weeks";
+  if (term === "3_months") return "3_months";
+  if (term === "6_months") return "6_months";
+  if (term === "one_time") return "one_time";
+  return row.interval;
+}
+
 function ruleDisplayLabel(rule: EntitlementRule): string {
   if (rule.kind === "UNLIMITED_BOOKING") return "Unlimited bookings";
   const n = rule.credits_per_period;
@@ -312,7 +330,8 @@ export function buildSyncPlan(args: {
     if (row.amount_cents != null && existing.amount_cents !== row.amount_cents) changes.amount_cents = row.amount_cents;
     if (row.stripe_price_id && existing.stripe_price_id !== row.stripe_price_id) changes.stripe_price_id = row.stripe_price_id;
     if (row.stripe_product_id && existing.stripe_product_id !== row.stripe_product_id) changes.stripe_product_id = row.stripe_product_id;
-    if (row.interval && existing.billing_interval !== row.interval) changes.billing_interval = row.interval;
+    const interval = billingIntervalOf(row);
+    if (interval && existing.billing_interval !== interval) changes.billing_interval = interval;
     if (existing.source_pricing_catalog_id !== row.id) changes.source_pricing_catalog_id = row.id;
     if (existing.source_offer_id !== row.offer_id) changes.source_offer_id = row.offer_id;
     if (existing.source_offer_price_key !== row.offer_price_key) changes.source_offer_price_key = row.offer_price_key;
@@ -443,7 +462,7 @@ async function applyPlan(
       title: price.title,
       amount_cents: price.catalog.amount_cents ?? 0,
       currency: price.catalog.currency || "cad",
-      billing_interval: price.catalog.interval,
+      billing_interval: billingIntervalOf(price.catalog),
       stripe_price_id: price.catalog.stripe_price_id,
       stripe_product_id: price.catalog.stripe_product_id,
       source_offer_id: price.catalog.offer_id,
