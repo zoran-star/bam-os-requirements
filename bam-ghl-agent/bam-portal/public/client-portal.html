@@ -14709,6 +14709,20 @@ async function _edwCheck(btn) {
   } catch (e) { _plToast('Check failed: ' + e.message); }
   _edwRender();
 }
+// Standalone modal host for the wizard - opened from the Command Center dock's
+// Settings pop ("Email domain"). Same card, same _edwRender; just a different home.
+function _edwOpenModal() {
+  document.getElementById('edw-overlay')?.remove();
+  document.body.insertAdjacentHTML('beforeend', `<div id="edw-overlay" style="position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9000;display:flex;align-items:center;justify-content:center;padding:18px" onclick="if(event.target===this)this.remove()">
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;width:100%;max-width:560px;max-height:90vh;overflow-y:auto;padding:22px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+        <div style="font-size:16px;font-weight:700;color:var(--text)">Email</div>
+        <button onclick="document.getElementById('edw-overlay')?.remove()" aria-label="Close" style="background:none;border:none;color:var(--text-mute);font-size:18px;cursor:pointer;line-height:1">×</button>
+      </div>
+      <div id="email-domain-card"></div>
+    </div></div>`);
+  _edwRender();
+}
 
 // ── Mass send (V1.5 Inbox) - tag-filtered, queued, DND-safe blast ──
 let _V15MS = { tags: [], channel: 'SMS', selected: [], pollTimer: null };
@@ -46625,6 +46639,7 @@ function _ccDockPop(kind) {
     ? `<button type="button" class="cc-pop-item" onclick="toggleTheme()">Toggle light / dark</button>` +
       `<button type="button" class="cc-pop-item" onclick="this.textContent='Sounds: ' + (_SFX.toggleMute() ? 'off' : 'on')">Sounds: ${_SFX._isMuted() ? 'off' : 'on'}</button>` +
       `<button type="button" class="cc-pop-item" onclick="var off=localStorage.getItem('bam_haptics_off')==='1';localStorage.setItem('bam_haptics_off', off?'0':'1');this.textContent='Haptics: '+(off?'on':'off')">Haptics: ${(function(){try{return localStorage.getItem('bam_haptics_off')==='1'?'off':'on'}catch(_){return 'on'}})()}</button>` +
+      `<button type="button" class="cc-pop-item" onclick="document.getElementById('cc-dock-pop').classList.remove('open');_edwOpenModal()">Email domain</button>` +
       `<button type="button" class="cc-pop-item" onclick="_ccExitBeta()">Exit command center beta</button>` +
       `<button type="button" class="cc-pop-item" onclick="signOut()">Sign out</button>`
     : `<button type="button" class="cc-pop-item" onclick="document.getElementById('cc-dock-pop').classList.remove('open');startOnboardingTour()">Take the tour</button>` +
