@@ -39399,8 +39399,8 @@ async function mRefund(memberId, customerId, preselectChargeId) {
   if (vals.notes) body.notes = vals.notes;
   try {
     // Spinner while Stripe processes → check-mark → auto-close (same as pause).
-    const r = await _mmProgress(() => _memberAction(memberId, 'refund', body), { label: 'Refunding…', doneLabel: 'Refunded' });
-    _plToast(`Refunded $${(r.refund.amount_cents / 100).toFixed(2)} (${r.refund.id}).`);
+    // The check-mark IS the confirmation; no extra toast (failure toast kept below).
+    await _mmProgress(() => _memberAction(memberId, 'refund', body), { label: 'Refunding…', doneLabel: 'Refunded' });
     closeMemberPopup();
     fetchAndRenderMembers();
   } catch (e) { _plToast('Refund failed: ' + e.message); }
