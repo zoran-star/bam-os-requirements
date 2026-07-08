@@ -3,7 +3,7 @@
 // convergence with existing typed rows, routability gating, and skip logic.
 import { describe, expect, it } from "vitest";
 
-import { buildSyncPlan, type EntitlementRule } from "./offers-sync.js";
+import { billingIntervalOf, buildSyncPlan, type EntitlementRule } from "./offers-sync.js";
 
 const TENANT = "39875f07-0a4b-4429-a201-000000000000";
 const OFFER = "52a6285c-0000-4000-8000-000000000000";
@@ -174,6 +174,46 @@ describe("buildSyncPlan", () => {
     expect(result.options[0]!.title).toBe("1/Wk"); // staff-curated title kept
     expect(result.prices[0]!.action).toBe("unchanged");
     expect(result.templates[0]!.action).toBe("unchanged");
+  });
+
+  it("derives billing_interval from the key's term, not the catalog's raw Stripe unit", () => {
+    // Early Stripe-Matcher applies stored the raw recurring unit ("week" for a
+    // billed-every-4-weeks price). The confirmed key term is the truth checkout
+    // needs (commitment-revert + agreement PDF speak 4_weeks/3_months/6_months).
+    expect(billingIntervalOf({ offer_price_key: "Steady|monthly", interval: "week" })).toBe("4_weeks");
+    expect(billingIntervalOf({ offer_price_key: "Steady|monthly", interval: "month" })).toBe("4_weeks");
+    expect(billingIntervalOf({ offer_price_key: "Accelerate|6_months", interval: "week" })).toBe("6_months");
+    expect(billingIntervalOf({ offer_price_key: "Accelerate|3_months", interval: "week" })).toBe("3_months");
+    // unknown/absent term: keep whatever the catalog says (never invent)
+    expect(billingIntervalOf({ offer_price_key: "Drop-in", interval: "one_time" })).toBe("one_time");
+    expect(billingIntervalOf({ offer_price_key: "Steady|weekly", interval: "week" })).toBe("week");
+  });
+
+  it("converge repairs an existing typed price whose billing_interval came from the raw unit", () => {
+    const existingPrices = [
+      {
+        id: "p1",
+        offer_option_id: "opt1",
+        title: "2/Wk - 6 months",
+        amount_cents: 119900,
+        currency: "usd",
+        billing_interval: "week",
+        stripe_price_id: "price_c1",
+        stripe_product_id: "prod_c1",
+        source_offer_id: OFFER,
+        source_offer_price_key: "Accelerate|6_months",
+        source_pricing_catalog_id: "c1",
+        is_active: true,
+        is_routable: true,
+        sort_order: 23,
+      },
+    ];
+    const result = plan({
+      catalog: [{ id: "c1", key: "Accelerate|6_months", interval: "week", amount: 119900 }],
+      existingPrices,
+    });
+    expect(result.prices[0]!.action).toBe("update");
+    expect(result.prices[0]!.changes).toMatchObject({ billing_interval: "6_months" });
   });
 
   it("adopts a price typed earlier without catalog lineage by matching stripe_price_id", () => {

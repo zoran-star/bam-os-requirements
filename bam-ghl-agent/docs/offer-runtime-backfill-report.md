@@ -16,9 +16,13 @@ to create/update.
 Current production status for the parent/runtime lane:
 
 - 31 typed `offer_prices` are live from the offer sync.
-- BAM GTA identity/runtime backfill is live: 29 `customer_profiles`, 30
-  `students`, 30 `academy_memberships`, 30 `member_links`, and 30
-  `customer_entitlements`.
+- BAM GTA identity/runtime backfill is live and was rechecked 2026-07-08: 38
+  `customer_profiles`, 41 `students`, 41 `academy_memberships`, 40
+  `member_links`, 71 `customer_entitlements`, and 36 `credit_ledger` rows.
+  The active-parent slice has 29 profiles, all with students, member links, and
+  active entitlements.
+- No parent profiles are claimed yet: 0 `supabase_user_id`, 0 `claimed_at`, and
+  0 duplicate parent-email groups.
 - Credit engine is active behind `clients.credit_engine_enabled`; opening
   balances were backfilled through the credit backfill run.
 - The original 2026-07-01 read-only counts are kept below for historical

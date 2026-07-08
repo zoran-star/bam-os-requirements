@@ -48,6 +48,14 @@ Luka action items:
 - Trial conversion lineage fill-in if launch reporting needs
   `converted_member_id` / `converted_membership_id`.
 
+Production data snapshot (read-only Supabase check 2026-07-08): 38
+`customer_profiles`, 41 `students`, 41 `academy_memberships`, 40
+`member_links`, 71 `customer_entitlements`, 36 `credit_ledger` rows, 4
+`slot_templates`, 86 `schedule_slots`, and 6 `trial_bookings`. No parent
+profiles are claimed yet (`supabase_user_id` / `claimed_at` both 0). The active
+parent slice is complete: 29 active profiles all have students, member links,
+and active entitlements.
+
 Migration drift RESOLVED (2026-07-02): the four remote-only migrations that
 shipped concurrently overnight (`20260701210626` members start_date,
 `20260701223936`/`20260701223951` kpi_events, `20260702014912` twilio voice)

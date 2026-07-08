@@ -93,10 +93,10 @@ export default function MarketingOverview({ tokens, session }) {
 
   function exportCSV() {
     const budgetStatusLabel = (s) => s === "complete" ? "Confirmed" : s === "confirmed" ? "Confirmed, needs action" : s === "requested" ? "Sent, awaiting" : "Not sent";
-    const head = ["Client", "Verdict", "Spend", "Leads", "CPL", "Goal CPL", "Budget", "Leads vs last %", "CPL vs last %", "Spent % of budget", "Budget status"];
+    const head = ["Client", "Verdict", "Spend", "Leads", "CPL", "Goal CPL", "Budget", "Client-confirmed budget", "Leads vs last %", "CPL vs last %", "Spent % of budget", "Budget status"];
     const lines = rows.map(r => [
       r.business_name, r.needs_campaigns ? "Needs campaigns" : r.connected ? (r.verdict_label || "") : "Not connected",
-      r.needs_campaigns ? "" : (r.spend ?? ""), r.needs_campaigns ? "" : (r.leads ?? ""), r.needs_campaigns ? "" : (r.cpl ?? ""), r.goal_cpl ?? "", r.monthly_budget ?? "",
+      r.needs_campaigns ? "" : (r.spend ?? ""), r.needs_campaigns ? "" : (r.leads ?? ""), r.needs_campaigns ? "" : (r.cpl ?? ""), r.goal_cpl ?? "", r.monthly_budget ?? "", r.confirmed_budget ?? "",
       r.trend?.leads_pct ?? "", r.trend?.cpl_pct ?? "", r.pacing?.spent_pct ?? "", budgetStatusLabel(r.budget_status),
     ].map(v => `"${String(v).replace(/"/g, '""')}"`).join(","));
     const csv = [head.join(","), ...lines].join("\n");
@@ -194,7 +194,12 @@ export default function MarketingOverview({ tokens, session }) {
                   <td style={{ ...td, textAlign: "right" }}>{showNums ? fmtMoney(r.spend) : "—"}</td>
                   <td style={{ ...td, textAlign: "right" }}>{showNums ? fmtNum(r.leads) : "—"}</td>
                   <td style={{ ...td, textAlign: "right", color: r.cpl == null ? t.textMute : (r.cpl <= target ? t.green : t.amber) }}>{r.cpl != null ? fmtMoney(r.cpl) : "—"}</td>
-                  <td style={{ ...td, textAlign: "right" }}>{r.monthly_budget != null ? fmtMoney(r.monthly_budget) : <span style={{ color: t.textMute }}>—</span>}</td>
+                  <td style={{ ...td, textAlign: "right" }}>{r.confirmed_budget != null ? (
+                    <span style={{ display: "inline-flex", flexDirection: "column", alignItems: "flex-end", gap: 2 }}>
+                      <span>{fmtMoney(r.confirmed_budget)}</span>
+                      <span style={{ fontSize: 9, letterSpacing: "0.08em", textTransform: "uppercase", color: t.green }}>client confirmed</span>
+                    </span>
+                  ) : r.monthly_budget != null ? fmtMoney(r.monthly_budget) : <span style={{ color: t.textMute }}>—</span>}</td>
                   <td style={td}>{r.trend?.leads_pct == null ? <span style={{ color: t.textMute }}>—</span> : <span style={{ fontSize: 12, color: r.trend.leads_pct >= 0 ? t.green : t.amber }}>{r.trend.leads_pct > 0 ? "▲" : r.trend.leads_pct < 0 ? "▼" : "■"} {Math.abs(r.trend.leads_pct)}% leads</span>}</td>
                   <td style={td}>{r.pacing?.spent_pct == null ? <span style={{ color: t.textMute }}>—</span> : <span style={{ fontSize: 12, color: r.pacing.spent_pct > r.pacing.month_pct + 15 ? t.amber : t.textSub }}>{r.pacing.spent_pct}% of budget</span>}</td>
                   <td style={td}>{budgetStatusCell(r.budget_status)}</td>
