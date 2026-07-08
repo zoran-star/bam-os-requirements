@@ -29488,7 +29488,7 @@ async function _enrollApi(action, payload) {
   return json;
 }
 
-function openEnrollDrawer() {
+function openEnrollDrawer(opts = {}) {
   let host = document.getElementById('enroll-drawer-host');
   if (!host) {
     host = document.createElement('div');
@@ -29501,9 +29501,13 @@ function openEnrollDrawer() {
     startDate: '', consent: false, preview: null, busy: false, error: null, result: null,
     couponCode: '', coupon: null, couponBusy: false, couponError: null,
   };
+  // Elevated: opened from the members focus-mode chat (z 9999) - sit above it,
+  // same trick as the member drawer's elevated mode.
+  const bdZ = opts.elevated ? 10055 : 8900;
+  const drZ = opts.elevated ? 10060 : 8950;
   host.innerHTML = `
-    <div id="enroll-drawer-backdrop" style="position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:8900;opacity:0;transition:opacity 0.2s ease" onclick="closeEnrollDrawer()"></div>
-    <div id="enroll-drawer" style="position:fixed;top:0;right:0;width:min(480px,92vw);height:100vh;background:var(--surface);border-left:1px solid var(--border);box-shadow:-12px 0 32px rgba(0,0,0,0.25);z-index:8950;overflow-y:auto;transform:translateX(100%);transition:transform 0.25s ease;color:var(--text)">
+    <div id="enroll-drawer-backdrop" style="position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:${bdZ};opacity:0;transition:opacity 0.2s ease" onclick="closeEnrollDrawer()"></div>
+    <div id="enroll-drawer" style="position:fixed;top:0;right:0;width:min(480px,92vw);height:100vh;background:var(--surface);border-left:1px solid var(--border);box-shadow:-12px 0 32px rgba(0,0,0,0.25);z-index:${drZ};overflow-y:auto;transform:translateX(100%);transition:transform 0.25s ease;color:var(--text)">
       <div id="enroll-body" style="padding:26px 26px 36px"></div>
     </div>`;
   requestAnimationFrame(() => {
@@ -29513,6 +29517,22 @@ function openEnrollDrawer() {
     if (dr) dr.style.transform = 'translateX(0)';
   });
   _enrollRender();
+}
+
+// Agent bridge: the members agent's start_returning_signup tool lands here.
+// Opens the wizard (permission-gated) and pre-runs the Stripe search with
+// whatever name/email/phone the user mentioned. Returns false if this user
+// can't enroll so the caller can say why.
+function _enrollOpenFromAgent(searchQuery, opts = {}) {
+  if (!_canEnrollReturning()) return false;
+  openEnrollDrawer(opts);
+  const q = String(searchQuery || '').trim();
+  if (q && _ENROLL) {
+    _ENROLL.q = q;
+    _enrollRender();
+    if (q.length >= 2) _enrollSearch();
+  }
+  return true;
 }
 
 function closeEnrollDrawer() {
@@ -39734,7 +39754,12 @@ async function magentSend() {
     _MAGENT.busy = false;
     if (json.reply) _MAGENT.history.push({ role: 'assistant', text: json.reply });
     _MAGENT.proposal = json.proposal || null;
-    if (!json.reply && !json.proposal) _MAGENT.history.push({ role: 'assistant', text: 'Okay.' });
+    // Agent asked to open the Returning Client Signup wizard.
+    if (json.ui_action && json.ui_action.kind === 'open_returning_enroll') {
+      const opened = _enrollOpenFromAgent(json.ui_action.search_query || '');
+      if (!opened) _MAGENT.history.push({ role: 'assistant', text: "You don't have access to sign up returning clients - ask the account owner to enable it in the Team section." });
+    }
+    if (!json.reply && !json.proposal && !json.ui_action) _MAGENT.history.push({ role: 'assistant', text: 'Okay.' });
     magentRender();
   } catch (e) {
     _MAGENT.busy = false;
@@ -48882,6 +48907,12 @@ async function _mmaAgentAsk(message) {
     // contact drawer on the right, over the chat, without dimming it.
     if (_mc && _mc.member_id && typeof openMemberPopup === 'function') {
       openMemberPopup(_mc.member_id, { elevated: true });
+    }
+    // Agent asked to open the Returning Client Signup wizard - elevated so it
+    // sits above the focus-mode chat.
+    if (json.ui_action && json.ui_action.kind === 'open_returning_enroll' && typeof _enrollOpenFromAgent === 'function') {
+      const opened = _enrollOpenFromAgent(json.ui_action.search_query || '', { elevated: true });
+      if (!opened) _mmaSay("You don't have access to sign up returning clients - ask the account owner to enable it in the Team section.", '');
     }
   } catch (e) {
     await thinkP;

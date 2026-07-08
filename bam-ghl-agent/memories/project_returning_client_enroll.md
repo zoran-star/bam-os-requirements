@@ -66,12 +66,26 @@ Next = apply the migration, deploy, then pilot for client Houssein.**
 4. Pilot: safest first run = a customer WITH a saved card + "Start on a
    date" (no immediate charge), verify the webhook flips the member live.
 
+## Members-agent integration (2026-07-08, after the merge of PR #1288)
+
+The member agent now routes "add / sign up / enroll someone manually" to the
+wizard. New `start_returning_signup` tool in `api/members-agent.js` (terminal
+UI-action, like open_contact): the agent passes `search_query` from the
+message, the server returns `ui_action: { kind: 'open_returning_enroll',
+search_query }`, and BOTH front-end consumers handle it -
+`magentAsk` (Members command bar) and `_mmaAgentAsk` (focus-mode chat,
+elevated z so the drawer sits above the chat). Shared helper
+`_enrollOpenFromAgent(q, opts)` checks `_canEnrollReturning()` (says "ask the
+owner" if not), opens the drawer, prefills the search, and auto-runs it.
+System prompt teaches: find_members-miss + enroll intent -> wizard, never
+change/pause/payment-link for brand-new members. `openEnrollDrawer(opts)` now
+takes `{elevated}`.
+
 ## Still open in later phases
 
 - Phase 2: contact attach prefill beyond athlete name + the missing-info
   mini-form (core custom_field_defs).
-- Phase 3: members-agent `enroll_returning_client` tool + notify SMS +
-  receipt hook.
+- Phase 3: notify SMS + receipt hook (agent tool DONE - see above).
 - Door B follow-through: after the card link is used, staff re-run the
   wizard to complete (documented in the result screen). Auto-complete on
   `checkout.session.completed` is a candidate improvement.
