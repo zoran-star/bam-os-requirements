@@ -1,10 +1,13 @@
 // Vercel Serverless Function - command-center Sales KPIs (off-GHL, V2).
 //
 //   GET /api/ghl/cc-sales-kpis?client_id=<uuid>
-//     → { sales_7d, converted_45d, not_a_fit_45d, closing_rate }
+//     → { sales_7d, sales: [{id,name,joined_date}], converted_45d, not_a_fit_45d, closing_rate }
 //
 // Fully off GHL - sourced from the portal's own tables:
-//   sales_7d      = new paying members in the last 7 days   (members.joined_date)
+//   sales_7d      = new PAYING members in the last 7 calendar days
+//                   (members.joined_date, status in live/paused/payment_failed -
+//                   payment_method_required = never completed checkout, not a sale)
+//   sales         = those members listed out (id + athlete name) for the UI
 //   closing_rate  = trial closing rate over the last 45 days, BY RESOLUTION DATE
 //                   (so conversion lag can't distort it):
 //                     converted  = new members joined in the last 45 days
@@ -58,22 +61,28 @@ async function handler(req, res) {
   catch (e) { return res.status(e.status || 401).json({ error: e.message }); }
   if (!ctx.isStaff && !ctx.clientIds.includes(clientId)) return res.status(403).json({ error: "not your academy" });
 
-  const iso = (days) => new Date(Date.now() - days * 86400000).toISOString();
+  // joined_date is a DATE column - compare with calendar days, not a timestamp,
+  // or the 7-day window drifts with the time of day the endpoint is hit.
+  const day = (days) => new Date(Date.now() - days * 86400000).toISOString().slice(0, 10);
   const cid = encodeURIComponent(clientId);
-  const c7 = encodeURIComponent(iso(7)), c45 = encodeURIComponent(iso(45));
+  const c7 = day(6), c45 = day(44); // inclusive: today + the N-1 days before it
+  // A "sale" is a member who completed checkout. payment_method_required rows
+  // signed up but never paid - they are not sales (and test rows live there too).
+  const PAID = "status=in.(live,paused,payment_failed)";
 
   try {
     const [m7, m45, notFit] = await Promise.all([
-      sb(`members?client_id=eq.${cid}&joined_date=gte.${c7}&select=id`),
-      sb(`members?client_id=eq.${cid}&joined_date=gte.${c45}&select=id`),
+      sb(`members?client_id=eq.${cid}&${PAID}&joined_date=gte.${c7}&select=id,athlete_name,joined_date&order=joined_date.desc`),
+      sb(`members?client_id=eq.${cid}&${PAID}&joined_date=gte.${c45}&select=id`),
       sb(`post_trial_reviews?client_id=eq.${cid}&good_fit=eq.false&created_at=gte.${c45}&select=id`),
     ]);
-    const sales_7d = (m7 || []).length;
+    const sales = (m7 || []).map((m) => ({ id: m.id, name: m.athlete_name || "Member", joined_date: m.joined_date }));
+    const sales_7d = sales.length;
     const converted_45d = (m45 || []).length;
     const not_a_fit_45d = (notFit || []).length;
     const denom = converted_45d + not_a_fit_45d;
     const closing_rate = denom > 0 ? Math.round((converted_45d / denom) * 100) : null;
-    return res.status(200).json({ sales_7d, converted_45d, not_a_fit_45d, closing_rate });
+    return res.status(200).json({ sales_7d, sales, converted_45d, not_a_fit_45d, closing_rate });
   } catch (e) {
     return res.status(500).json({ error: e.message || "internal error" });
   }
