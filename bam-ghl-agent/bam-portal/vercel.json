@@ -9,6 +9,10 @@
       "schedule": "*/10 * * * *"
     },
     {
+      "path": "/api/offers/cron-make-sellable",
+      "schedule": "*/10 * * * *"
+    },
+    {
       "path": "/api/clients?action=cron-resend-invites",
       "schedule": "0 * * * *"
     },
