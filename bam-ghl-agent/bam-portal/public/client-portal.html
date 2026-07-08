@@ -46307,6 +46307,12 @@ function _ccExitBeta() {
 // portal, a V2 academy boots its command center - so this is the way back
 // into all the other academies from inside V2.
 let _ccAcctFilter = '';
+// Locked to Zoran + Mike only (both email domains they may sign in with).
+const _CC_ACCT_EMAILS = [
+  'zoran@byanymeansbball.com', 'zoran@byanymeansbusiness.com',
+  'mike@byanymeansbball.com', 'mike@byanymeansbusiness.com',
+];
+let _ccAcctEmailOk = false;
 
 function _ccAcctBuild() {
   if (document.getElementById('cc-acct')) return;
@@ -46325,9 +46331,13 @@ function _ccAcctBuild() {
     if (e.target.closest('#cc-acct')) return;
     document.getElementById('cc-acct-pop')?.classList.remove('open');
   });
-  // Reveal only once we know staff status (resolved async on boot).
+  // Reveal only for Zoran / Mike - match the signed-in auth email against the allowlist.
   (async () => {
-    try { if (_IS_BAM_STAFF === null && typeof _ensureStaffFlag === 'function') await _ensureStaffFlag(); } catch (_) {}
+    try {
+      const { data: { session } } = await _sb.auth.getSession();
+      const em = (session?.user?.email || '').trim().toLowerCase();
+      _ccAcctEmailOk = _CC_ACCT_EMAILS.includes(em);
+    } catch (_) { _ccAcctEmailOk = false; }
     _ccAcctSync();
   })();
 }
@@ -46336,7 +46346,7 @@ function _ccAcctSync() {
   const wrap = document.getElementById('cc-acct');
   if (!wrap) return;
   const rows = (typeof CLIENT_ROWS !== 'undefined' && CLIENT_ROWS) ? CLIENT_ROWS : [];
-  const ok = _IS_BAM_STAFF === true && rows.length > 1;
+  const ok = _ccAcctEmailOk === true && rows.length > 1;
   wrap.classList.toggle('show', ok);
   const cnt = document.getElementById('cc-acct-count');
   if (cnt) cnt.textContent = ok ? String(rows.length) : '';
