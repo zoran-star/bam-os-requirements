@@ -6,7 +6,17 @@ type: project
 
 # Marketing Machine dashboard - SHIPPED 2026-07-03 (V2, GTA first)
 
-## Page-load speed tracking (MERGED to main 2026-07-06, portal PR #1176 + sites PR #54)
+## Page-load speed tracking (MERGED 2026-07-06, portal PR #1176 + sites PR #54; LIVE 2026-07-08)
+
+**GOTCHA (2026-07-08): merging bam-client-sites to main does NOT deploy bam-gta.**
+The bam-gta Vercel project has no git integration - deploys are manual
+(`npx vercel deploy --prod --yes --scope zoran-stars-projects` from
+`clients/bam-gta/`, per that folder's CLAUDE.md). PR #54 merged Jul 6 but
+production stayed on the Jul 2 commit, so no page_view beacons carried
+`meta.load_ms` and the V2 load chip stayed hidden (`page.load` = null).
+Deployed Jul 8; chip appears once fresh visits accumulate (no backfill,
+median needs live traffic). Always run the manual deploy after merging
+bam-gta changes.
 The Clicked -> Page loaded funnel connector shows "⏱ ~1.4s" (median full load;
 chip matches the between-step time chips). Wiring:
 - **bam-client-sites** `clients/bam-gta/gta/freetrial.jsx`: load timing rides on
