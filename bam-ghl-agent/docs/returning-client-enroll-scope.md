@@ -1,6 +1,6 @@
-# Returning Client Enroll - Design Scope (DRAFT, for workshop)
+# Returning Client Enroll - Design Scope (DECISIONS LOCKED 2026-07-08)
 
-**Status:** PROPOSED - not built. Workshop + approve before any code.
+**Status:** Q1-Q6 answered by Zoran 2026-07-08 (see Decisions below). Two companion scopes came out of the workshop: [Stripe-contact cleanup](stripe-contact-cleanup-scope.md) and [Resend receipts](resend-receipts-scope.md). Not built yet.
 **Where it lives:** V2 client portal, Members tab (`public/client-portal.html`)
 **One-liner:** Take someone who has already paid this academy in Stripe before (an old client) and put them straight onto a live offer, without sending them through the public checkout page.
 
@@ -51,16 +51,16 @@ This mirrors the lesson from the GTA billing cleanup: dead sub means start fresh
 - **Wrong price:** only live, confirmed prices are offered. No typing amounts.
 - **Un-manageable subs:** everything created here is portal-owned, so pause/cancel/change/refund all work later.
 
-### Questions to workshop (need Zoran's call)
+### Decisions (LOCKED 2026-07-08, Zoran)
 
-| # | Question | Options |
+| # | Question | Decision |
 |---|---|---|
-| Q1 | **Charge timing** | Charge saved card immediately vs anchor to a chosen start date (trial_end until then) vs always ask |
-| Q2 | **Consent** | OK to charge a saved card with zero parent interaction? Or always send a "reply YES / tap to confirm" text first? (Recommend: owner chooses per enroll, default = notify + charge) |
-| Q3 | **Search scope** | Stripe customers only, or also past-member history (cancellations) + GHL contacts so you can find them by athlete name? |
-| Q4 | **Who can use it** | Owner only, or any staff with Members access? |
-| Q5 | **Athlete name** | Stripe knows the parent, not the kid. Owner types the athlete name during enroll - fine? |
-| Q6 | **Notify** | Auto-send confirmation SMS/email after enroll? Copy? |
+| Q1 | **Charge timing** | **Owner's option per enroll**: "Charge now" or "Start on [date]" (trial_end anchor). Both shown in the review step. |
+| Q2 | **Consent** | **Always ask the staff user**: a required checkbox on the review step, "I confirm the parent agreed to this signup and charge." Confirm button stays disabled until checked. Logged in the audit row. |
+| Q3 | **Search scope** | **Stripe only** for the search itself. Each Stripe customer result gets its **contact record attached** (from the GHL contact import) so past-member history, athlete name, and collected fields show up. The linking/cleanup of Stripe customers to imported contacts is its own build: [stripe-contact-cleanup-scope.md](stripe-contact-cleanup-scope.md). Enroll works before that ships, just with thinner result cards. |
+| Q4 | **Who can use it** | **Owner-configurable per staff member.** New per-staff grant on `client_users` (same pattern as `can_train_agent` / `allowed_tabs`), managed from the Team section. Owner always has it. |
+| Q5 | **Athlete name + missing info** | Owner types the athlete name, **and the wizard shows a "missing info" mini-form**: any core fields (from `custom_field_defs`, academy-level set) the linked contact doesn't already have values for. Prefilled fields are shown read-only, not re-asked. |
+| Q6 | **Receipts** | Receipts move off Stripe's automatic emails onto **Resend, portal-built and academy-branded**. Own scope: [resend-receipts-scope.md](resend-receipts-scope.md). Enroll plugs into it once live. |
 
 ---
 
@@ -86,9 +86,15 @@ Every primitive exists; nothing wires them together for a brand-new roster entry
 
 ```
 INPUT  { client_id, customer_query | stripe_customer_id,
-         athlete_name, parent fields, offer_id + offer_price_key
+         athlete_name, parent fields, missing core-field values,
+         offer_id + offer_price_key
          (resolved to pricing_catalog / typed offer_prices row),
-         start_date, charge_mode, notify: bool }
+         charge_mode: 'now' | 'on_date', start_date,
+         consent_confirmed: true (required, rejected if absent),
+         notify: bool }
+
+GATE   caller must be owner OR client_users.can_enroll_members=true
+       (new boolean, default false, owner toggles in Team section)
 
 FLOW   1. resolve live price        (reuse buildTargets logic)
        2. resolve Stripe customer   (stored id -> /customers?email= -> ?phone=)
@@ -100,10 +106,19 @@ FLOW   1. resolve live price        (reuse buildTargets logic)
        5b. no card: insert member status='payment_method_required'
                     + setup Checkout link -> SMS/email; sub created after
                     card saved (webhook or existing setup-monthly path)
-       6. upsert members row (client_id, stripe_customer_id, sub id, price id, plan)
-       7. member_audit_log row ('enroll-returning')
-       8. optional GHL notify
+       6. upsert members row (client_id, stripe_customer_id, sub id, price id,
+          plan, contact_id when a linked contact exists)
+       7. write missing core-field values -> contact_field_values
+          (reuse writePortalFieldValues)
+       8. member_audit_log row ('enroll-returning', args include
+          consent_confirmed + acting user)
+       9. optional notify + receipt via the Resend receipts system once live
 ```
+
+Search results are enriched from `contacts` via `contacts.stripe_customer_id`
+(email/phone fallback until the cleanup build stamps the links): past-member
+badge (cancellations match), athlete name, core-field values for the
+"missing info" mini-form.
 
 Search endpoint (step 1 of the UI): `GET /api/members?action=find-customer&q=` - proxies `GET /customers/search` on the connected account (query by email/name/phone), merges hits from `cancellations` + `members_staging` for "past member" badges (Q3).
 
@@ -144,14 +159,16 @@ Search endpoint (step 1 of the UI): `GET /api/members?action=find-customer&q=` -
 
 | Phase | What | Size |
 |---|---|---|
-| 1 | `find-customer` search + `enroll` action + drawer wizard (both doors) | ~1 session |
-| 2 | Agent tool + notify SMS copy + audit polish | small |
-| 3 | "Win-back" candidates surface (auto-list past members from cancellations) | later, optional |
+| 1 | `find-customer` search + `enroll` action (consent gate, charge-now/on-date, both card doors) + drawer wizard + `can_enroll_members` staff grant | ~1 session |
+| 2 | Contact attach + prefill + missing-info mini-form (needs [stripe-contact-cleanup](stripe-contact-cleanup-scope.md) links for full value) | small |
+| 3 | Agent tool + notify SMS copy + receipt hook ([resend-receipts](resend-receipts-scope.md)) | small |
+| 4 | "Win-back" candidates surface (auto-list past members from cancellations) | later, optional |
 
 ### Onboarding data check
 
-Only if Q2/Q6 land on "configurable": a per-academy default for **enroll notification channel + copy** (Onboarding Data Points DB, Category: Member Management, Phase: Settings). Otherwise nothing to add.
+- Per-academy default for **enroll notification channel + copy** (Category: Member Management, Phase: Settings)
+- Receipt-related data points live in the receipts scope doc
 
 ---
 
-*Draft 2026-07-08. Workshop with Zoran, then update this doc with decisions before building.*
+*Drafted + decisions locked 2026-07-08. Companion scopes: [stripe-contact-cleanup-scope.md](stripe-contact-cleanup-scope.md), [resend-receipts-scope.md](resend-receipts-scope.md).*
