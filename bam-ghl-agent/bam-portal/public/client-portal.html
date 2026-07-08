@@ -12979,12 +12979,16 @@ const _V15IB_CHANNELS = [
   { key: 'facebook',  label: 'FB',        icon: '' },
 ];
 // V2 academies run their inbox off the own-store (SMS via Twilio + Email via
-// Resend) - Instagram/Facebook DMs are GHL-only and never surface here, so the
-// Meta toggles are dead buttons. Hide them for V2. (Icon lookups still use the
-// full list, so a stray Meta thread would still render its icon correctly.)
+// Resend). IG/FB DMs only flow once the academy is wired to the Meta DM spine
+// (client_meta_messaging_config active + inbox_live - GTA today, self-serve
+// for everyone else via the Instagram wizard in Settings). Until then the Meta
+// toggles are dead buttons - hide them. _IG_LIVE is set async by _igwBoot().
+// (Icon lookups still use the full list, so a stray Meta thread would still
+// render its icon correctly.)
 function _v15ibVisibleChannels() {
   const isV2 = (typeof V2_ACCESS !== 'undefined' && V2_ACCESS);
-  return isV2 ? _V15IB_CHANNELS.filter(c => c.key !== 'instagram' && c.key !== 'facebook') : _V15IB_CHANNELS;
+  if (!isV2 || _IG_LIVE) return _V15IB_CHANNELS;
+  return _V15IB_CHANNELS.filter(c => c.key !== 'instagram' && c.key !== 'facebook');
 }
 const _V15IB_FAILED = ['failed', 'undelivered', 'error', 'rejected'];
 
@@ -14624,8 +14628,10 @@ async function _v15ibSetup() {
         ${row('Phone', j.phone)}
         ${row('Email', j.email)}
         <div id="email-domain-card" style="margin-top:22px"></div>
+        ${(typeof V2_ACCESS !== 'undefined' && V2_ACCESS) ? '<div id="ig-connect-card" style="margin-top:22px"></div>' : ''}
       </div>`;
     _edwRender();
+    _igwRender();
   } catch (e) {
     body.innerHTML = `<div class="req-empty" style="padding:24px 0;color:#9a3b2f">Couldn't load sender info - ${escapeHTML(e.message || String(e))}</div>`;
   }
@@ -14722,6 +14728,138 @@ function _edwOpenModal() {
       <div id="email-domain-card"></div>
     </div></div>`);
   _edwRender();
+}
+
+// ── Instagram connect wizard (client self-serve Meta OAuth) ──
+// Same shape as the email domain wizard above: a card that renders wherever a
+// #ig-connect-card div exists (Inbox Setup + the Settings dock modal), backed
+// by /api/meta/ig-connect. Connect sends the owner through Facebook OAuth
+// (/api/meta/ig-callback brings them back with ?ig=connected|pick|error);
+// once wired, IG+FB DMs land in the portal Inbox via the Meta DM spine.
+let _IG_LIVE = false;      // active + inbox_live - drives the inbox channel toggles
+let _IGW_BOOTED = false;
+async function _igwApi(action, extra) {
+  const token = await _mreqAuthToken();
+  const r = await fetch('/api/meta/ig-connect', {
+    method: 'POST',
+    headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ client_id: CLIENT_ID, action, ...(extra || {}) }),
+  });
+  const j = await _safeJson(r);
+  if (!r.ok) throw new Error(j.error || ('HTTP ' + r.status));
+  return j;
+}
+async function _igwRender() {
+  const card = document.getElementById('ig-connect-card');
+  if (!card) return;
+  card.innerHTML = `<div class="req-empty" style="padding:8px 0"><span class="req-spin"></span> Checking Instagram…</div>`;
+  let st;
+  try { st = await _igwApi('status'); }
+  catch (e) { card.innerHTML = `<div style="font-size:12px;color:#9a3b2f">Couldn't check Instagram - ${escapeHTML(e.message)}</div>`; return; }
+  const head = `<div style="font-size:15px;font-weight:700;color:var(--text);margin-bottom:4px">Instagram DMs</div>`;
+  if (st.status === 'active') {
+    const who = st.ig_username ? `<b>@${escapeHTML(st.ig_username)}</b>` : `<b>${escapeHTML(st.page_name || 'your page')}</b>`;
+    if (st.inbox_live === false) {
+      card.innerHTML = `${head}<div style="display:flex;align-items:center;gap:8px;padding:12px 14px;border:1px solid var(--border);background:var(--amber-soft,rgba(224,176,80,.08));border-radius:8px;font-size:13px;color:var(--text)">Connected as ${who} - DMs will appear in your Inbox once BAM flips it live.</div>`;
+      return;
+    }
+    card.innerHTML = `${head}
+      <div style="display:flex;align-items:center;gap:8px;padding:12px 14px;border:1px solid rgba(123,196,127,.4);background:rgba(123,196,127,.08);border-radius:8px;font-size:13px;color:var(--text)"><span style="color:#7BC47F;font-weight:700">✓</span> Instagram and Facebook DMs from ${who} land in your Inbox.</div>
+      <div style="margin-top:8px;text-align:right"><button onclick="_igwDisconnect(this)" style="background:none;border:none;color:var(--text-mute);font-size:11.5px;cursor:pointer;text-decoration:underline;padding:0">Disconnect</button></div>`;
+    return;
+  }
+  if (st.status === 'pending') {
+    card.innerHTML = `${head}<div style="padding:12px 14px;border:1px solid var(--border);background:var(--amber-soft,rgba(224,176,80,.08));border-radius:8px;font-size:13px;color:var(--text)">Setup started by BAM - your DMs will appear in the Inbox once it's activated.</div>`;
+    return;
+  }
+  if (st.status === 'pick') {
+    const rows = (st.pages || []).map(p => `
+      <div style="display:flex;align-items:center;gap:12px;padding:10px 12px;border:1px solid var(--border);border-radius:8px;margin-bottom:8px">
+        <div style="flex:1;min-width:0">
+          <div style="font-size:13px;font-weight:600;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHTML(p.page_name || p.page_id)}</div>
+          <div style="font-size:11.5px;color:var(--text-mute)">${p.ig_username ? '@' + escapeHTML(p.ig_username) : 'no Instagram linked - Messenger only'}</div>
+        </div>
+        <button data-igw-page="${escapeHTML(p.page_id)}" onclick="_igwWire(this.dataset.igwPage, this)" style="background:var(--gold,#D4B65C);color:#0B0B0D;border:none;border-radius:8px;padding:7px 14px;font-weight:700;font-size:12px;cursor:pointer;font-family:inherit">Connect</button>
+      </div>`).join('');
+    card.innerHTML = `${head}
+      <div style="font-size:12.5px;color:var(--text-mute);margin-bottom:10px">Pick the Facebook Page linked to your academy's Instagram.</div>
+      ${rows}`;
+    return;
+  }
+  card.innerHTML = `${head}
+    <div style="font-size:12.5px;color:var(--text-mute);margin-bottom:10px">Connect your Instagram so DMs land straight in your portal Inbox. You'll sign into Facebook and pick your page - your Instagram must be a professional account linked to a Facebook Page.</div>
+    <button onclick="_igwStart(this)" style="background:var(--gold,#D4B65C);color:#0B0B0D;border:none;border-radius:8px;padding:10px 16px;font-weight:700;font-size:13px;cursor:pointer;font-family:inherit">${st.status === 'disconnected' ? 'Reconnect Instagram' : 'Connect Instagram'}</button>`;
+}
+async function _igwStart(btn) {
+  if (btn) { btn.disabled = true; btn.textContent = 'Opening Facebook…'; }
+  try {
+    const j = await _igwApi('start');
+    window.location.href = j.redirect_url;
+  } catch (e) {
+    _plToast('Couldn\'t start Instagram connect - ' + e.message);
+    if (btn) { btn.disabled = false; btn.textContent = 'Connect Instagram'; }
+  }
+}
+async function _igwWire(pageId, btn) {
+  if (btn) { btn.disabled = true; btn.textContent = 'Connecting…'; }
+  try {
+    const j = await _igwApi('wire', { page_id: pageId });
+    _plToast('Instagram connected' + (j.ig_username ? ' - @' + j.ig_username : '') + '. DMs now land in your Inbox.');
+    _IG_LIVE = true;
+    try { _v15ibRenderAll(); } catch (_) {}
+  } catch (e) {
+    _plToast('Connect failed - ' + e.message);
+    if (btn) { btn.disabled = false; btn.textContent = 'Connect'; }
+  }
+  _igwRender();
+}
+// Two-tap disconnect - first tap arms the button, second confirms.
+async function _igwDisconnect(btn) {
+  if (btn && btn.dataset.armed !== '1') { btn.dataset.armed = '1'; btn.textContent = 'Tap again to disconnect'; btn.style.color = '#9a3b2f'; return; }
+  try {
+    await _igwApi('disconnect');
+    _IG_LIVE = false;
+    try { _v15ibRenderAll(); } catch (_) {}
+    _plToast('Instagram disconnected.');
+  } catch (e) { _plToast('Disconnect failed - ' + e.message); }
+  _igwRender();
+}
+// Standalone modal host - opened from the Command Center dock's Settings pop.
+function _igwOpenModal() {
+  document.getElementById('igw-overlay')?.remove();
+  document.body.insertAdjacentHTML('beforeend', `<div id="igw-overlay" style="position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9000;display:flex;align-items:center;justify-content:center;padding:18px" onclick="if(event.target===this)this.remove()">
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;width:100%;max-width:560px;max-height:90vh;overflow-y:auto;padding:22px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+        <div style="font-size:16px;font-weight:700;color:var(--text)">Instagram</div>
+        <button onclick="document.getElementById('igw-overlay')?.remove()" aria-label="Close" style="background:none;border:none;color:var(--text-mute);font-size:18px;cursor:pointer;line-height:1">×</button>
+      </div>
+      <div id="ig-connect-card"></div>
+    </div></div>`);
+  _igwRender();
+}
+// Runs once per load for V2 academies: handles the OAuth return
+// (?ig=connected|pick|error), then fetches connection status so the
+// V2 inbox knows whether to show the IG/FB channel toggles.
+async function _igwBoot() {
+  if (_IGW_BOOTED) return;
+  _IGW_BOOTED = true;
+  try {
+    const u = new URL(window.location.href);
+    const igParam = u.searchParams.get('ig');
+    if (igParam) {
+      const msg = u.searchParams.get('msg');
+      u.searchParams.delete('ig'); u.searchParams.delete('msg');
+      window.history.replaceState({}, document.title, u.pathname + (u.searchParams.toString() ? '?' + u.searchParams.toString() : '') + u.hash);
+      if (igParam === 'error') _plToast('Instagram connect failed - ' + (msg || 'try again.'));
+      if (igParam === 'connected') _plToast('Instagram connected - DMs now land in your Inbox.');
+      _igwOpenModal();
+    }
+  } catch (_) {}
+  try {
+    const st = await _igwApi('status');
+    _IG_LIVE = st.status === 'active' && st.inbox_live !== false;
+    if (_IG_LIVE) { try { _v15ibRenderAll(); } catch (_) {} }
+  } catch (_) {}
 }
 
 // ── Mass send (V1.5 Inbox) - tag-filtered, queued, DND-safe blast ──
@@ -18945,6 +19083,12 @@ function applyCrmSupersetNav() {
   if (monthProg) monthProg.style.display = crm ? 'none' : '';
   const acHead = document.getElementById('active-campaigns-head');
   if (acHead) acHead.style.marginTop = crm ? '0' : '48px';
+  // Instagram wizard boot (once): OAuth return handling + connection status
+  // for the inbox channel toggles. V2 only - V1/V1.5 keep GHL's own IG/FB
+  // passthrough, and wiring the Meta spine there pre-App-Review would DROP
+  // their GHL social threads (the inbox_live dedupe trap - see
+  // memories/project_meta_dm_spine.md).
+  if (isV2 && typeof _igwBoot === 'function') { try { _igwBoot(); } catch (_) {} }
 }
 
 // ── V1.5 feature gate ──
@@ -46640,6 +46784,7 @@ function _ccDockPop(kind) {
       `<button type="button" class="cc-pop-item" onclick="this.textContent='Sounds: ' + (_SFX.toggleMute() ? 'off' : 'on')">Sounds: ${_SFX._isMuted() ? 'off' : 'on'}</button>` +
       `<button type="button" class="cc-pop-item" onclick="var off=localStorage.getItem('bam_haptics_off')==='1';localStorage.setItem('bam_haptics_off', off?'0':'1');this.textContent='Haptics: '+(off?'on':'off')">Haptics: ${(function(){try{return localStorage.getItem('bam_haptics_off')==='1'?'off':'on'}catch(_){return 'on'}})()}</button>` +
       `<button type="button" class="cc-pop-item" onclick="document.getElementById('cc-dock-pop').classList.remove('open');_edwOpenModal()">Email domain</button>` +
+      `<button type="button" class="cc-pop-item" onclick="document.getElementById('cc-dock-pop').classList.remove('open');_igwOpenModal()">Instagram</button>` +
       `<button type="button" class="cc-pop-item" onclick="_ccExitBeta()">Exit command center beta</button>` +
       `<button type="button" class="cc-pop-item" onclick="signOut()">Sign out</button>`
     : `<button type="button" class="cc-pop-item" onclick="document.getElementById('cc-dock-pop').classList.remove('open');startOnboardingTour()">Take the tour</button>` +
