@@ -43,12 +43,14 @@
   .card h2 .swatch{width:10px;height:10px;border-radius:3px;flex-shrink:0}
   .card .note{font-size:12px;color:var(--text-sub);line-height:1.55;margin-top:4px}
 
+  .changes{border-color:rgba(76,199,106,.3)}
+  .changes .li b{color:var(--green)}
+
   /* pipeline map */
   .map{display:flex;flex-direction:column;gap:0;margin-top:12px}
   .mrow{display:flex;align-items:center;gap:10px}
   .mstage{flex:1;display:flex;align-items:center;gap:9px;background:var(--surface-el);border:1.5px solid var(--c,var(--border-med));
     border-radius:var(--r12);padding:9px 12px;min-width:0}
-  .mstage.dashed{border-style:dashed}
   .mstage .nm{font-size:13px;font-weight:700;white-space:nowrap}
   .mstage .eng{font-size:10px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--c);margin-left:auto;
     background:color-mix(in srgb,var(--c) 14%,transparent);border-radius:var(--r6);padding:2px 7px;white-space:nowrap}
@@ -70,7 +72,10 @@
 
   .ctype{background:var(--surface-el);border:1px solid var(--border-med);border-radius:var(--r12);padding:11px 12px;margin-bottom:8px}
   .ctype:last-child{margin-bottom:0}
+  .ctype.cfgnote{border-style:dashed;background:transparent}
   .ctype .cname{font-size:13px;font-weight:700;display:flex;align-items:center;gap:7px;flex-wrap:wrap}
+  .ctype .cname .seq{font-size:9.5px;font-weight:800;letter-spacing:.05em;color:var(--on-gold);background:var(--gold);
+    border-radius:999px;padding:2px 8px;text-transform:uppercase}
   .ctype .cwhen{font-size:11.5px;color:var(--text-mute);margin-top:2px;line-height:1.45}
   .acts{display:flex;flex-direction:column;gap:6px;margin-top:9px}
   .act{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
@@ -122,12 +127,13 @@
 <div class="wrap">
 
   <header>
-    <div class="eyebrow">Hawkeye V2 - reference</div>
+    <div class="eyebrow">Hawkeye V2 - reference (v2, updated)</div>
     <h1>Every Hawkeye action, and where it moves the lead</h1>
-    <div class="sub">Pulled from the live portal code (agent-approvals, agent-confirm, agent-closing) on 2026-07-08. Swipe-worthy on purpose: this is the raw material for the deck redesign.</div>
+    <div class="sub">Matches the portal code as of 2026-07-08 after Zoran's revision. This is the raw material for the Tinder-deck build - the swipe decision is at the bottom.</div>
   </header>
 
   <nav class="jump">
+    <a href="#changed">What changed</a>
     <a href="#map">Pipeline</a>
     <a href="#booking"><span class="dot" style="background:var(--blue)"></span>Booking</a>
     <a href="#confirm"><span class="dot" style="background:var(--green)"></span>Confirm</a>
@@ -135,6 +141,19 @@
     <a href="#moves">All moves</a>
     <a href="#decide">Open decision</a>
   </nav>
+
+  <!-- ================= WHAT CHANGED ================= -->
+  <section class="card changes" id="changed">
+    <h2><span class="swatch" style="background:var(--green)"></span>Shipped today (your 2026-07-08 calls)</h2>
+    <div class="list">
+      <div class="li"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="2" stroke-linecap="round"><path d="M20 6 9 17l-5-5"/></svg><span><b>"Abandon" is now "Unqualified"</b> on every Hawkeye button.</span></div>
+      <div class="li"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="2" stroke-linecap="round"><path d="M20 6 9 17l-5-5"/></svg><span><b>Booking follow-up nudges are gone</b> - a quiet lead now always comes back as a "Send to Ghosted" proposal.</span></div>
+      <div class="li"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="2" stroke-linecap="round"><path d="M20 6 9 17l-5-5"/></svg><span><b>Confirm reminders live in the step config</b> (gear), not in Hawkeye - approve the templates once, they send on their own.</span></div>
+      <div class="li"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="2" stroke-linecap="round"><path d="M20 6 9 17l-5-5"/></svg><span><b>Done Trial has zero automations now</b> - the post-trial form (trainer note + optional sign-up link + notes for the agent) is the only preplanned touch. The scripted 3-step sequence is retired.</span></div>
+      <div class="li"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="2" stroke-linecap="round"><path d="M20 6 9 17l-5-5"/></svg><span><b>"Ready to enroll" is just a reply with the link</b> - the sign-up link is embedded in the editable draft, one Approve &amp; send.</span></div>
+      <div class="li"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="2" stroke-linecap="round"><path d="M20 6 9 17l-5-5"/></svg><span><b>Lost after 3</b> - the closing agent never calls a quiet lead lost itself; the follow-up loop raises the Lost card after 3 unanswered follow-ups.</span></div>
+    </div>
+  </section>
 
   <!-- ================= PIPELINE MAP ================= -->
   <section class="card" id="map">
@@ -146,7 +165,7 @@
       <div class="mrow"><div class="mstage" style="--c:var(--green)"><span class="nm">Scheduled Trial</span><span class="eng">Confirm agent</span></div></div>
       <div class="mlink"><svg width="14" height="18" viewBox="0 0 14 18" fill="none" stroke="var(--green)" stroke-width="2" stroke-linecap="round"><path d="M7 1v13m0 0l-4-4m4 4l4-4"/></svg><span class="why">good_fit - post-trial form says they showed + fit</span></div>
       <div class="mrow"><div class="mstage" style="--c:var(--purple)"><span class="nm">Done Trial</span><span class="eng">Closing agent</span></div></div>
-      <div class="mlink"><svg width="14" height="18" viewBox="0 0 14 18" fill="none" stroke="var(--purple)" stroke-width="2" stroke-linecap="round"><path d="M7 1v13m0 0l-4-4m4 4l4-4"/></svg><span class="why">enrolls - payment lands on the enroll link</span></div>
+      <div class="mlink"><svg width="14" height="18" viewBox="0 0 14 18" fill="none" stroke="var(--purple)" stroke-width="2" stroke-linecap="round"><path d="M7 1v13m0 0l-4-4m4 4l4-4"/></svg><span class="why">enrolls - payment lands on the sign-up link</span></div>
       <div class="mrow"><div class="mstage" style="--c:var(--pink)"><span class="nm">Member</span><span class="eng">You run it</span></div></div>
     </div>
     <div class="mside">
@@ -160,14 +179,16 @@
   <!-- ================= BOOKING ================= -->
   <section class="card agent" id="booking" style="--c:var(--blue)">
     <h2><span class="swatch" style="background:var(--blue)"></span>Booking agent<span class="stagechip">Responded</span></h2>
-    <div class="note">The hub. Goal: get a day + time locked for the free trial.</div>
+    <div class="note">The hub. Goal: get a day + time locked for the free trial. No follow-up nudges here anymore: silence always turns into a "Send to Ghosted" proposal.</div>
     <div class="grouplbl">Leads land here when</div>
     <div class="chips">
       <span class="chip"><b>New lead</b> - form or inbound text</span>
       <span class="chip"><b>Rebook</b> - no-show or can't make it</span>
       <span class="chip"><b>Re-engaged</b> - replied to Ghosted or Nurture</span>
     </div>
-    <div class="grouplbl">Cards you'll see + what each button does</div>
+    <div class="grouplbl">In the step config (gear), not Hawkeye</div>
+    <div class="chips"><span class="chip"><b>3 entry openers</b> - a scripted first text per entry point (new lead / rebook / re-engaged), approved once</span></div>
+    <div class="grouplbl">Hawkeye cards + what each button does</div>
 
     <div class="ctype">
       <div class="cname">Reply draft</div>
@@ -175,20 +196,8 @@
       <div class="acts">
         <div class="act"><span class="abtn primary">Approve &amp; send</span><span class="route stay">stays in Responded</span></div>
         <div class="act"><span class="abtn danger">Mark Lost</span><span class="route" style="--rc:var(--deep)"><span class="st" style="color:var(--blue)">Responded</span><svg width="12" height="10" viewBox="0 0 12 10" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M1 5h9m0 0L7 2m3 3L7 8"/></svg><span class="st">Nurture</span></span></div>
-        <div class="act"><span class="abtn">Abandon</span><span class="route" style="--rc:var(--red)"><span class="st" style="color:var(--blue)">Responded</span><svg width="12" height="10" viewBox="0 0 12 10" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M1 5h9m0 0L7 2m3 3L7 8"/></svg><span class="st">Unqualified</span></span></div>
+        <div class="act"><span class="abtn">Unqualified</span><span class="route" style="--rc:var(--red)"><span class="st" style="color:var(--blue)">Responded</span><svg width="12" height="10" viewBox="0 0 12 10" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M1 5h9m0 0L7 2m3 3L7 8"/></svg><span class="st">out, no nurture</span></span></div>
         <div class="act"><span class="abtn dying">Skip</span><span class="dyingtag">dies in V2 - no skip</span></div>
-      </div>
-    </div>
-
-    <div class="ctype">
-      <div class="cname">Follow-up nudge</div>
-      <div class="cwhen">Scheduled chase message came due (shows "sends in 2h" / "overdue").</div>
-      <div class="acts">
-        <div class="act"><span class="abtn primary">Send now</span><span class="route stay">stays in Responded</span></div>
-        <div class="act"><span class="abtn">Edit first</span><span class="route stay">stays</span></div>
-        <div class="act"><span class="abtn danger">Mark Lost</span><span class="route" style="--rc:var(--deep)"><span class="st" style="color:var(--blue)">Responded</span><svg width="12" height="10" viewBox="0 0 12 10" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M1 5h9m0 0L7 2m3 3L7 8"/></svg><span class="st">Nurture</span></span></div>
-        <div class="act"><span class="abtn">Abandon</span><span class="route" style="--rc:var(--red)"><span class="st" style="color:var(--blue)">Responded</span><svg width="12" height="10" viewBox="0 0 12 10" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M1 5h9m0 0L7 2m3 3L7 8"/></svg><span class="st">Unqualified</span></span></div>
-        <div class="act"><span class="abtn dying">Skip</span><span class="dyingtag">dies in V2</span></div>
       </div>
     </div>
 
@@ -197,18 +206,18 @@
       <div class="cwhen">Lead picked a day + time. One tap books the slot and hands them to Confirm.</div>
       <div class="acts">
         <div class="act"><span class="abtn win">Approve &amp; book</span><span class="route" style="--rc:var(--green)"><span class="st" style="color:var(--blue)">Responded</span><svg width="12" height="10" viewBox="0 0 12 10" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M1 5h9m0 0L7 2m3 3L7 8"/></svg><span class="st">Scheduled Trial</span></span></div>
-        <div class="act"><span class="abtn">Abandon</span><span class="route" style="--rc:var(--red)"><span class="st" style="color:var(--blue)">Responded</span><svg width="12" height="10" viewBox="0 0 12 10" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M1 5h9m0 0L7 2m3 3L7 8"/></svg><span class="st">Unqualified</span></span></div>
+        <div class="act"><span class="abtn">Unqualified</span><span class="route" style="--rc:var(--red)"><span class="st" style="color:var(--blue)">Responded</span><svg width="12" height="10" viewBox="0 0 12 10" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M1 5h9m0 0L7 2m3 3L7 8"/></svg><span class="st">out</span></span></div>
         <div class="act"><span class="abtn dying">Skip</span><span class="dyingtag">dies in V2</span></div>
       </div>
     </div>
 
     <div class="ctype">
       <div class="cname">Went quiet</div>
-      <div class="cwhen">No reply for a while. The agent wants to hand them to the Ghosted automation.</div>
+      <div class="cwhen">No reply for about a day. The agent proposes handing them to the Ghosted automation - this IS the follow-up path now.</div>
       <div class="acts">
         <div class="act"><span class="abtn primary">Send to Ghosted</span><span class="route" style="--rc:var(--amber)"><span class="st" style="color:var(--blue)">Responded</span><svg width="12" height="10" viewBox="0 0 12 10" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M1 5h9m0 0L7 2m3 3L7 8"/></svg><span class="st">Ghosted</span></span></div>
         <div class="act"><span class="abtn danger">Mark Lost</span><span class="route" style="--rc:var(--deep)"><span class="st" style="color:var(--blue)">Responded</span><svg width="12" height="10" viewBox="0 0 12 10" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M1 5h9m0 0L7 2m3 3L7 8"/></svg><span class="st">Nurture</span></span></div>
-        <div class="act"><span class="abtn">Abandon</span><span class="route" style="--rc:var(--red)"><span class="st" style="color:var(--blue)">Responded</span><svg width="12" height="10" viewBox="0 0 12 10" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M1 5h9m0 0L7 2m3 3L7 8"/></svg><span class="st">Unqualified</span></span></div>
+        <div class="act"><span class="abtn">Unqualified</span><span class="route" style="--rc:var(--red)"><span class="st" style="color:var(--blue)">Responded</span><svg width="12" height="10" viewBox="0 0 12 10" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M1 5h9m0 0L7 2m3 3L7 8"/></svg><span class="st">out</span></span></div>
         <div class="act"><span class="abtn dying">Skip</span><span class="dyingtag">dies in V2</span></div>
       </div>
     </div>
@@ -218,7 +227,7 @@
       <div class="cwhen">The agent believes this one's dead and proposes closing it, with an optional goodbye text.</div>
       <div class="acts">
         <div class="act"><span class="abtn danger">Send &amp; mark Lost</span><span class="route" style="--rc:var(--deep)"><span class="st" style="color:var(--blue)">Responded</span><svg width="12" height="10" viewBox="0 0 12 10" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M1 5h9m0 0L7 2m3 3L7 8"/></svg><span class="st">Nurture</span></span></div>
-        <div class="act"><span class="abtn">Abandon</span><span class="route" style="--rc:var(--red)"><span class="st" style="color:var(--blue)">Responded</span><svg width="12" height="10" viewBox="0 0 12 10" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M1 5h9m0 0L7 2m3 3L7 8"/></svg><span class="st">Unqualified</span></span></div>
+        <div class="act"><span class="abtn">Unqualified</span><span class="route" style="--rc:var(--red)"><span class="st" style="color:var(--blue)">Responded</span><svg width="12" height="10" viewBox="0 0 12 10" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M1 5h9m0 0L7 2m3 3L7 8"/></svg><span class="st">out</span></span></div>
         <div class="act"><span class="abtn dying">Dismiss</span><span class="dyingtag">dies in V2</span></div>
       </div>
     </div>
@@ -230,11 +239,20 @@
     <div class="note">Goal: make sure the athlete actually shows up to the booked trial.</div>
     <div class="grouplbl">Leads land here when</div>
     <div class="chips"><span class="chip"><b>Booked</b> - the Booking agent locked a day + time</span></div>
-    <div class="grouplbl">Cards you'll see + what each button does</div>
+    <div class="grouplbl">In the step config (gear), not Hawkeye</div>
+    <div class="chips">
+      <span class="chip"><b>Booking confirmation</b> - SMS + email, sends on booking</span>
+      <span class="chip"><b>Same-day check-in</b> - 9am on trial day</span>
+    </div>
+    <div class="ctype cfgnote">
+      <div class="cname">Why reminders never hit Hawkeye</div>
+      <div class="cwhen">The reminder templates are edited and approved ONCE in the pipeline-step configuration. After that they send on their own (quiet-hours aware). The moment the parent replies, the AI takes over and Hawkeye cards start.</div>
+    </div>
+    <div class="grouplbl">Hawkeye cards + what each button does</div>
 
     <div class="ctype">
-      <div class="cname">Reply / automated reminder</div>
-      <div class="cwhen">Confirmation and reminder texts, plus drafted answers when the parent asks questions.</div>
+      <div class="cname">Reply draft</div>
+      <div class="cwhen">Parent asked something ("what should she bring?") - the agent drafted the answer.</div>
       <div class="acts">
         <div class="act"><span class="abtn primary">Approve &amp; send</span><span class="route stay">stays in Scheduled Trial</span></div>
         <div class="act"><span class="abtn dying">Skip</span><span class="dyingtag">dies in V2</span></div>
@@ -243,9 +261,9 @@
 
     <div class="ctype">
       <div class="cname">Reschedule</div>
-      <div class="cwhen">Parent says they can't make it. Optional warm acknowledgement, then Booking rebooks them.</div>
+      <div class="cwhen">Parent can't make it. One approve does BOTH: optional warm acknowledgement + hands the lead to Booking, and the Booking agent immediately drafts its first rebook action (whatever fits the conversation).</div>
       <div class="acts">
-        <div class="act"><span class="abtn win">Approve handoff</span><span class="route" style="--rc:var(--blue)"><span class="st" style="color:var(--green)">Scheduled Trial</span><svg width="12" height="10" viewBox="0 0 12 10" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M1 5h9m0 0L7 2m3 3L7 8"/></svg><span class="st">Responded (rebook)</span></span></div>
+        <div class="act"><span class="abtn win">Approve handoff</span><span class="route" style="--rc:var(--blue)"><span class="st" style="color:var(--green)">Scheduled Trial</span><svg width="12" height="10" viewBox="0 0 12 10" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M1 5h9m0 0L7 2m3 3L7 8"/></svg><span class="st">Responded + rebook opener queued</span></span></div>
         <div class="act"><span class="abtn dying">Skip</span><span class="dyingtag">dies in V2</span></div>
       </div>
     </div>
@@ -259,13 +277,13 @@
       </div>
     </div>
 
-    <div class="ctype" style="border-style:dashed">
+    <div class="ctype cfgnote">
       <div class="cname">Not a Hawkeye card: the post-trial form</div>
-      <div class="cwhen">After trial day, the form routes the lead automatically - no approval needed.</div>
+      <div class="cwhen">After trial day the coach fills it: showed up? good fit? trainer, NOTES (the closing agent reads these), a personal first message, and whether to attach the sign-up link. It routes the lead automatically:</div>
       <div class="acts">
         <div class="act"><span class="abtn" style="color:var(--text)">Showed + good fit</span><span class="route" style="--rc:var(--purple)"><svg width="12" height="10" viewBox="0 0 12 10" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M1 5h9m0 0L7 2m3 3L7 8"/></svg><span class="st">Done Trial</span></span></div>
         <div class="act"><span class="abtn" style="color:var(--text)">Showed + not a fit</span><span class="route" style="--rc:var(--red)"><svg width="12" height="10" viewBox="0 0 12 10" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M1 5h9m0 0L7 2m3 3L7 8"/></svg><span class="st">Unqualified</span></span></div>
-        <div class="act"><span class="abtn" style="color:var(--text)">No-show</span><span class="route" style="--rc:var(--blue)"><svg width="12" height="10" viewBox="0 0 12 10" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M1 5h9m0 0L7 2m3 3L7 8"/></svg><span class="st">Responded (rebook)</span></span></div>
+        <div class="act"><span class="abtn" style="color:var(--text)">No-show</span><span class="route" style="--rc:var(--blue)"><svg width="12" height="10" viewBox="0 0 12 10" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M1 5h9m0 0L7 2m3 3L7 8"/></svg><span class="st">Responded (rebook opener queued)</span></span></div>
       </div>
     </div>
   </section>
@@ -273,44 +291,36 @@
   <!-- ================= CLOSING ================= -->
   <section class="card agent" id="closing" style="--c:var(--purple)">
     <h2><span class="swatch" style="background:var(--purple)"></span>Closing agent<span class="stagechip">Done Trial</span></h2>
-    <div class="note">Goal: turn a good trial into a paid enrollment.</div>
+    <div class="note">Goal: turn a good trial into a paid enrollment. <b style="color:var(--text)">No automations in this stage.</b> The post-trial form's trainer text (+ optional link) is the only preplanned touch; everything after is the agent, one stacked card at a time.</div>
     <div class="grouplbl">Leads land here when</div>
-    <div class="chips"><span class="chip"><b>Good fit</b> - post-trial form: showed up + coach says fit</span></div>
-    <div class="grouplbl">Cards you'll see + what each button does</div>
+    <div class="chips"><span class="chip"><b>Good fit</b> - post-trial form: showed up + coach says fit (coach notes ride along for the agent)</span></div>
+    <div class="grouplbl">The stacked cadence (deck order)</div>
 
     <div class="ctype">
-      <div class="cname">Reply / follow-up 1-3 / automated</div>
-      <div class="cwhen">Post-trial conversation plus the 3-strike follow-up cadence, one message a day.</div>
+      <div class="cname"><span class="seq">Card 1</span>Reply</div>
+      <div class="cwhen">The conversation: answers, objection handling, and the close. When the lead is READY, this reply simply has the sign-up link embedded in the draft ("ready to enroll" pill) - payment marks them won automatically.</div>
       <div class="acts">
         <div class="act"><span class="abtn primary">Approve &amp; send</span><span class="route stay">stays in Done Trial</span></div>
+        <div class="act"><span class="abtn win">Ready-to-enroll reply</span><span class="route" style="--rc:var(--pink)"><span class="st" style="color:var(--purple)">Done Trial</span><svg width="12" height="10" viewBox="0 0 12 10" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M1 5h9m0 0L7 2m3 3L7 8"/></svg><span class="st">Member, when they pay</span></span></div>
         <div class="act"><span class="abtn dying">Skip</span><span class="dyingtag">dies in V2</span></div>
       </div>
     </div>
 
     <div class="ctype">
-      <div class="cname">Ready to enroll</div>
-      <div class="cwhen">The close. Sends the academy's enroll link, optionally with a warm message first.</div>
+      <div class="cname"><span class="seq">Card 2</span>Follow-up plan</div>
+      <div class="cwhen">Stacked behind the reply: once it's approved and the lead goes quiet, the follow-up plan is the next card - up to 3 fresh messages, one day apart, each only if the previous got no answer. One approve schedules the whole plan.</div>
       <div class="acts">
-        <div class="act"><span class="abtn win">Send enroll link</span><span class="route" style="--rc:var(--pink)"><span class="st" style="color:var(--purple)">Done Trial</span><svg width="12" height="10" viewBox="0 0 12 10" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M1 5h9m0 0L7 2m3 3L7 8"/></svg><span class="st">Member, when they pay</span></span></div>
-        <div class="act"><span class="abtn dying">Skip</span><span class="dyingtag">dies in V2</span></div>
+        <div class="act"><span class="abtn primary">Approve plan</span><span class="route stay">stays - sends over 3 days</span></div>
+        <div class="act"><span class="abtn dying">Skip plan</span><span class="dyingtag">dies in V2</span></div>
       </div>
     </div>
 
     <div class="ctype">
-      <div class="cname">Suggested Lost</div>
-      <div class="cwhen">Attendee won't enroll. Optional warm goodbye goes out with the move.</div>
+      <div class="cname"><span class="seq">Card 3</span>Suggested Lost - after 3 unanswered follow-ups</div>
+      <div class="cwhen">The loop raises this automatically when all 3 follow-ups go unanswered (or the agent gets an explicit no). Silence alone never marks anyone lost - you confirm.</div>
       <div class="acts">
         <div class="act"><span class="abtn danger">Mark lost</span><span class="route" style="--rc:var(--deep)"><span class="st" style="color:var(--purple)">Done Trial</span><svg width="12" height="10" viewBox="0 0 12 10" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M1 5h9m0 0L7 2m3 3L7 8"/></svg><span class="st">Nurture</span></span></div>
         <div class="act"><span class="abtn dying">Skip</span><span class="dyingtag">dies in V2</span></div>
-      </div>
-    </div>
-
-    <div class="ctype">
-      <div class="cname">Follow-up plan</div>
-      <div class="cwhen">The agent proposes a whole 3-message plan at once, spaced a day apart.</div>
-      <div class="acts">
-        <div class="act"><span class="abtn primary">Approve plan</span><span class="route stay">stays - schedules all 3</span></div>
-        <div class="act"><span class="abtn dying">Skip plan</span><span class="dyingtag">dies in V2</span></div>
       </div>
     </div>
   </section>
@@ -337,14 +347,14 @@
           <tr><td class="trig">booked</td><td><span class="rt"><span style="color:var(--blue)">Responded</span><svg width="11" height="9" viewBox="0 0 12 10" fill="none" stroke="var(--text-mute)" stroke-width="1.8" stroke-linecap="round"><path d="M1 5h9m0 0L7 2m3 3L7 8"/></svg><span style="color:var(--green)">Scheduled</span></span></td><td class="how">Approve &amp; book</td></tr>
           <tr><td class="trig">went_quiet</td><td><span class="rt"><span style="color:var(--blue)">Responded</span><svg width="11" height="9" viewBox="0 0 12 10" fill="none" stroke="var(--text-mute)" stroke-width="1.8" stroke-linecap="round"><path d="M1 5h9m0 0L7 2m3 3L7 8"/></svg><span style="color:var(--amber)">Ghosted</span></span></td><td class="how">Send to Ghosted</td></tr>
           <tr><td class="trig">not_interested</td><td><span class="rt"><span style="color:var(--blue)">Responded</span><svg width="11" height="9" viewBox="0 0 12 10" fill="none" stroke="var(--text-mute)" stroke-width="1.8" stroke-linecap="round"><path d="M1 5h9m0 0L7 2m3 3L7 8"/></svg><span style="color:var(--deep)">Nurture</span></span></td><td class="how">Mark Lost (Booking)</td></tr>
-          <tr><td class="trig">cant_make_it</td><td><span class="rt"><span style="color:var(--green)">Scheduled</span><svg width="11" height="9" viewBox="0 0 12 10" fill="none" stroke="var(--text-mute)" stroke-width="1.8" stroke-linecap="round"><path d="M1 5h9m0 0L7 2m3 3L7 8"/></svg><span style="color:var(--blue)">Responded</span></span></td><td class="how">Approve handoff (rebook)</td></tr>
+          <tr><td class="trig">cant_make_it</td><td><span class="rt"><span style="color:var(--green)">Scheduled</span><svg width="11" height="9" viewBox="0 0 12 10" fill="none" stroke="var(--text-mute)" stroke-width="1.8" stroke-linecap="round"><path d="M1 5h9m0 0L7 2m3 3L7 8"/></svg><span style="color:var(--blue)">Responded</span></span></td><td class="how">Approve handoff + rebook opener</td></tr>
           <tr><td class="trig">no_longer_wants</td><td><span class="rt"><span style="color:var(--green)">Scheduled</span><svg width="11" height="9" viewBox="0 0 12 10" fill="none" stroke="var(--text-mute)" stroke-width="1.8" stroke-linecap="round"><path d="M1 5h9m0 0L7 2m3 3L7 8"/></svg><span style="color:var(--deep)">Nurture</span></span></td><td class="how">Mark lost (Confirm)</td></tr>
           <tr><td class="trig">post_trial_good_fit</td><td><span class="rt"><span style="color:var(--green)">Scheduled</span><svg width="11" height="9" viewBox="0 0 12 10" fill="none" stroke="var(--text-mute)" stroke-width="1.8" stroke-linecap="round"><path d="M1 5h9m0 0L7 2m3 3L7 8"/></svg><span style="color:var(--purple)">Done Trial</span></span></td><td class="how">Post-trial form</td></tr>
           <tr><td class="trig">post_trial_not_fit</td><td><span class="rt"><span style="color:var(--green)">Scheduled</span><svg width="11" height="9" viewBox="0 0 12 10" fill="none" stroke="var(--text-mute)" stroke-width="1.8" stroke-linecap="round"><path d="M1 5h9m0 0L7 2m3 3L7 8"/></svg><span style="color:var(--red)">Unqualified</span></span></td><td class="how">Post-trial form</td></tr>
           <tr><td class="trig">no_show</td><td><span class="rt"><span style="color:var(--green)">Scheduled</span><svg width="11" height="9" viewBox="0 0 12 10" fill="none" stroke="var(--text-mute)" stroke-width="1.8" stroke-linecap="round"><path d="M1 5h9m0 0L7 2m3 3L7 8"/></svg><span style="color:var(--blue)">Responded</span></span></td><td class="how">Post-trial form (rebook)</td></tr>
-          <tr><td class="trig">says_no</td><td><span class="rt"><span style="color:var(--purple)">Done Trial</span><svg width="11" height="9" viewBox="0 0 12 10" fill="none" stroke="var(--text-mute)" stroke-width="1.8" stroke-linecap="round"><path d="M1 5h9m0 0L7 2m3 3L7 8"/></svg><span style="color:var(--deep)">Nurture</span></span></td><td class="how">Mark lost (Closing)</td></tr>
-          <tr><td class="trig">enrolls</td><td><span class="rt"><span style="color:var(--purple)">Done Trial</span><svg width="11" height="9" viewBox="0 0 12 10" fill="none" stroke="var(--text-mute)" stroke-width="1.8" stroke-linecap="round"><path d="M1 5h9m0 0L7 2m3 3L7 8"/></svg><span style="color:var(--pink)">Member</span></span></td><td class="how">Enroll link + payment</td></tr>
-          <tr><td class="trig">marked_unqualified</td><td><span class="rt"><span style="color:var(--text-sub)">Any stage</span><svg width="11" height="9" viewBox="0 0 12 10" fill="none" stroke="var(--text-mute)" stroke-width="1.8" stroke-linecap="round"><path d="M1 5h9m0 0L7 2m3 3L7 8"/></svg><span style="color:var(--red)">Unqualified</span></span></td><td class="how">Abandon</td></tr>
+          <tr><td class="trig">says_no</td><td><span class="rt"><span style="color:var(--purple)">Done Trial</span><svg width="11" height="9" viewBox="0 0 12 10" fill="none" stroke="var(--text-mute)" stroke-width="1.8" stroke-linecap="round"><path d="M1 5h9m0 0L7 2m3 3L7 8"/></svg><span style="color:var(--deep)">Nurture</span></span></td><td class="how">Mark lost (Closing, after 3 follow-ups or an explicit no)</td></tr>
+          <tr><td class="trig">enrolls</td><td><span class="rt"><span style="color:var(--purple)">Done Trial</span><svg width="11" height="9" viewBox="0 0 12 10" fill="none" stroke="var(--text-mute)" stroke-width="1.8" stroke-linecap="round"><path d="M1 5h9m0 0L7 2m3 3L7 8"/></svg><span style="color:var(--pink)">Member</span></span></td><td class="how">Sign-up link reply + payment</td></tr>
+          <tr><td class="trig">marked_unqualified</td><td><span class="rt"><span style="color:var(--text-sub)">Any stage</span><svg width="11" height="9" viewBox="0 0 12 10" fill="none" stroke="var(--text-mute)" stroke-width="1.8" stroke-linecap="round"><path d="M1 5h9m0 0L7 2m3 3L7 8"/></svg><span style="color:var(--red)">Unqualified</span></span></td><td class="how">Unqualified button</td></tr>
           <tr><td class="trig">replied</td><td><span class="rt"><span style="color:var(--amber)">Ghosted</span><span style="color:var(--text-mute)">/</span><span style="color:var(--deep)">Nurture</span><svg width="11" height="9" viewBox="0 0 12 10" fill="none" stroke="var(--text-mute)" stroke-width="1.8" stroke-linecap="round"><path d="M1 5h9m0 0L7 2m3 3L7 8"/></svg><span style="color:var(--blue)">Responded</span></span></td><td class="how">Automation catches a reply</td></tr>
           <tr><td class="trig">ghosted_ran_out</td><td><span class="rt"><span style="color:var(--amber)">Ghosted</span><svg width="11" height="9" viewBox="0 0 12 10" fill="none" stroke="var(--text-mute)" stroke-width="1.8" stroke-linecap="round"><path d="M1 5h9m0 0L7 2m3 3L7 8"/></svg><span style="color:var(--deep)">Nurture</span></span></td><td class="how">Day 1/3/7 nudges end silent</td></tr>
         </tbody>
@@ -354,15 +364,15 @@
 
   <!-- ================= OPEN DECISION ================= -->
   <section class="card decide" id="decide">
-    <h2><span class="swatch" style="background:var(--gold)"></span>The open decision: swipe-left</h2>
-    <div class="note">In the new Tinder deck, swipe right = the card's main action. Swipe left = "move it somewhere else". But "somewhere else" differs per agent - these are the real destinations:</div>
-    <div class="opt" style="--c:var(--blue)"><span class="who">Booking</span><span class="dst" style="--c:var(--amber)">Ghosted</span><span class="dst" style="--c:var(--deep)">Nurture</span><span class="dst" style="--c:var(--red)">Unqualified</span></div>
-    <div class="opt" style="--c:var(--green)"><span class="who">Confirm</span><span class="dst" style="--c:var(--blue)">Rebook</span><span class="dst" style="--c:var(--deep)">Nurture</span><span class="dst" style="--c:var(--red)">Unqualified</span></div>
-    <div class="opt" style="--c:var(--purple)"><span class="who">Closing</span><span class="dst" style="--c:var(--deep)">Nurture</span><span class="dst" style="--c:var(--red)">Unqualified</span></div>
-    <div class="note" style="margin-top:10px">To decide: does swipe-left pop these options before committing, fire a per-agent default with the 6s undo, or stay buttons-only on mobile?</div>
+    <h2><span class="swatch" style="background:var(--gold)"></span>The open decision: swipe right + swipe left</h2>
+    <div class="note"><b style="color:var(--text)">Swipe RIGHT</b> = the card's main action (send / book / handoff / plan / send to Ghosted). <b style="color:var(--text)">Swipe LEFT</b> = "move it somewhere else" - and the real destinations differ per agent:</div>
+    <div class="opt" style="--c:var(--blue)"><span class="who">Booking</span><span class="dst" style="--c:var(--amber)">Ghosted</span><span class="dst" style="--c:var(--deep)">Nurture (Lost)</span><span class="dst" style="--c:var(--red)">Unqualified</span></div>
+    <div class="opt" style="--c:var(--green)"><span class="who">Confirm</span><span class="dst" style="--c:var(--blue)">Rebook</span><span class="dst" style="--c:var(--deep)">Nurture (Lost)</span><span class="dst" style="--c:var(--red)">Unqualified</span></div>
+    <div class="opt" style="--c:var(--purple)"><span class="who">Closing</span><span class="dst" style="--c:var(--deep)">Nurture (Lost)</span><span class="dst" style="--c:var(--red)">Unqualified</span></div>
+    <div class="note" style="margin-top:10px">To decide: (1) does swipe-left pop these options before committing, fire a per-agent default with the 6s undo, or stay buttons-only on mobile? (2) is swipe-right always safe to commit instantly, given it can SEND a message?</div>
   </section>
 
-  <footer>Hawkeye V2 reference - generated 2026-07-08 from client-portal.html + agent APIs.<br>Lives at bam-portal/public/hawkeye-actions.html</footer>
+  <footer>Hawkeye V2 reference - v2, updated 2026-07-08 after Zoran's action-model revision.<br>Lives at bam-portal/public/hawkeye-actions.html</footer>
 </div>
 </body>
 </html>

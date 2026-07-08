@@ -28,9 +28,27 @@ hosted at https://claude.ai/code/artifact/7a9a5268-048a-4dda-9750-62d9f69a4150
 `_apx`/`_acx`/`_aclx` Hawkeye overlay buttons · Train Agent picker as a destination ·
 scattered autonomy/config entry points. KEEPS: inline drawer suggestion on lead cards.
 
+## Action model revision (Zoran 2026-07-08) - SHIPPED end to end
+- "Abandon" -> "Unqualified" on every Hawkeye button (overlays updated).
+- Booking follow-up nudges RETIRED: Follow-ups tab removed from the _apx overlay;
+  nothing creates agent_followups rows (quiet lead = "Send to Ghosted" proposal).
+- Confirm reminders = step config only (approved templates self-send; never Hawkeye).
+- Reschedule approve = handoff + Booking rebook opener queues (Entry: Rebook note).
+- Done Trial: NO automations. agent-closing.js scripted sequence + automations-get/set
+  + focus-mode editor REMOVED; post-trial form (trainer msg + optional link + coach
+  notes) is the only preplanned touch. Proactive path restructured: opener (A6-guarded)
+  -> follow-up loop for ANY engaged lead (incl. form-opened) -> Lost card after 3
+  unanswered. Prompt told: silence alone is never lost.
+- Enroll = reply with the sign-up link EMBEDDED in the draft (buildEnrollUrl at detect
+  time; confirm-enroll appends only if the edited draft lost the link).
+- Closing deck order: Reply -> Follow-up plan (stacked next) -> Suggested Lost.
+- Reference page: bam-portal/public/hawkeye-actions.html (+ claude.ai artifact).
+⚠️ NOT prod-verified on GTA yet (live behavior change if GTA had closing autos approved).
+
 ## Open item (ask Zoran before building)
-Mobile swipe-left has 3 destinations (Ghosted/Nurture/Unqualified) - should pop a 3-option
-choice before committing, not fly away blind. Confirm exact behavior.
+Swipe RIGHT commits the card's main action (can SEND) - confirm it's instant-commit.
+Swipe LEFT destinations differ per agent: Booking Ghosted/Nurture/Unqualified ·
+Confirm Rebook/Nurture · Closing Nurture. Pop options vs default+undo vs buttons-only.
 
 ## See also
 [[project_sales_focus_mode]] (focus mode + engines model + router, what's already live) ·

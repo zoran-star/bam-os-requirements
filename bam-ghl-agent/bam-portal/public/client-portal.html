@@ -22979,9 +22979,11 @@ async function _taRenderKnowledge() {
       html += `<div style="margin-top:20px"><div style="font-size:12px;color:var(--text-mute);font-family:'JetBrains Mono',monospace;text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px">Managed by BAM (global)</div>` +
         locked.map(s => `<div style="opacity:.6;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:10px 14px;margin-bottom:6px;font-size:13px">${escapeHTML(s.label)}</div>`).join('') + `</div>`;
     }
-    // Confirm + Closing agents: the scripted "Initial automations" sequence sits above
-    // the fact sections (it's a structured editor, not a prompt section).
-    const hasAutos = (_TA.target === 'confirm' || _TA.target === 'closing' || _TA.target === 'booking');
+    // Confirm + Booking agents: the scripted "Initial automations" sequence sits above
+    // the fact sections (it's a structured editor, not a prompt section). Closing has
+    // NO initial automations (Zoran 2026-07-08): the post-trial form's trainer text +
+    // optional sign-up link is the only preplanned Done-Trial touch.
+    const hasAutos = (_TA.target === 'confirm' || _TA.target === 'booking');
     const autosSlot = hasAutos
       ? `<div id="confirm-autos-card"><div class="req-empty"><span class="req-spin"></span>Loading automations…</div></div>`
       : '';
@@ -32730,14 +32732,14 @@ function _aclxEnrollCard(r) {
   const note = r.enroll_note ? `<div style="font-size:12px;color:var(--text-sub);background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:8px;padding:8px 10px;margin:4px 0 8px"><b style="color:var(--text)">Plan / context:</b> ${escapeHTML(r.enroll_note)}</div>` : '';
   return `<div id="aclx-${r.id}" style="background:var(--surface);border:1px solid #3DBE8B;border-radius:11px;padding:12px 14px;margin-bottom:9px">
     ${_aclxHeader(r, 'ready to enroll', '#3DBE8B')}
-    <div style="font-size:11.5px;color:#3DBE8B;margin-bottom:6px">${_plIcon('award', 12)} The close: sends the academy's enroll link. The opportunity is marked won automatically when they pay.</div>
+    <div style="font-size:11.5px;color:#3DBE8B;margin-bottom:6px">${_plIcon('award', 12)} The close: this reply includes the academy's sign-up link. The opportunity is marked won automatically when they pay.</div>
     ${_aclxContext(r)}${note}
-    <div style="text-align:center;font-size:9.5px;color:var(--text-mute);text-transform:uppercase;letter-spacing:.09em;margin:2px 0 5px">warm message before the link (optional)</div>
-    ${_aclxBox(r, 'optional warm message before the sign-up link')}
+    <div style="text-align:center;font-size:9.5px;color:var(--text-mute);text-transform:uppercase;letter-spacing:.09em;margin:2px 0 5px">the reply, sign-up link included · edit it right here</div>
+    ${_aclxBox(r, 'warm message with the sign-up link')}
     ${_aclxNotesBlock(r)}
     <div style="display:flex;align-items:stretch;gap:8px;margin-top:10px">
       <button onclick="_aclxSkip('${r.id}')" title="Skip" style="flex:1;background:transparent;border:1px solid var(--border);color:var(--red);border-radius:8px;padding:9px;font-size:17px;cursor:pointer">✕</button>
-      <button onclick="_aclxEnroll('${r.id}')" style="flex:2;background:#3DBE8B;border:1px solid #3DBE8B;color:#08080A;border-radius:8px;padding:9px;font-size:14px;font-weight:700;cursor:pointer">✓ Send enroll link</button>
+      <button onclick="_aclxEnroll('${r.id}')" style="flex:2;background:#3DBE8B;border:1px solid #3DBE8B;color:#08080A;border-radius:8px;padding:9px;font-size:14px;font-weight:700;cursor:pointer">✓ Approve &amp; send</button>
     </div>
   </div>`;
 }
@@ -32796,7 +32798,7 @@ function _aclxSkip(id) {
   } });
 }
 
-let _APX_TAB = 'followups';
+let _APX_TAB = 'ghost';   // follow-up nudges retired (Zoran 2026-07-08): quiet leads get a ghost proposal instead
 function _apxSetTab(t) { _APX_TAB = t; _apxRender(); document.getElementById('apx-body')?.scrollTo(0, 0); }
 function _apxEmpty(msg) { return `<div style="text-align:center;color:var(--text-mute);font-size:14px;padding:48px 10px">${escapeHTML(msg)}</div>`; }
 
@@ -33095,7 +33097,7 @@ async function _apxLoad() {
     const readyN = _APX_DATA.ready.length + (_APX_DATA.book || []).length;
     const ghostN = (_APX_DATA.ghost || []).length;
     if (ghostN) _APX_TAB = 'ghost';
-    else if (!_APX_DATA.followups.length) _APX_TAB = readyN ? 'ready' : ((_APX_DATA.lost || []).length ? 'lost' : 'followups');
+    else _APX_TAB = readyN ? 'ready' : ((_APX_DATA.lost || []).length ? 'lost' : 'ghost');
     _apxRender();
     const span = document.getElementById('apx-count');
     const n = _APX_DATA.followups.length + readyN + _APX_DATA.lost.length + ghostN;
@@ -33257,7 +33259,7 @@ function _apxLostCard(r) {
       <button onclick="_apxOpenCardThread('${r.id}')" style="background:transparent;border:1px solid var(--border);color:var(--text-mute);border-radius:8px;padding:5px 10px;font-size:12px;cursor:pointer">${_plIcon('msg', 12)} chat</button>
       <div style="flex:1"></div>
       <button onclick="_apxLostDismiss('${r.id}')" style="background:transparent;border:1px solid var(--border);color:var(--text-sub);border-radius:8px;padding:5px 11px;font-size:12px;cursor:pointer">✕ Dismiss</button>
-      <button onclick="_apxLostAbandon('${r.id}')" title="Remove from pipeline - no nurture" style="background:transparent;border:1px solid var(--text-mute);color:var(--text-sub);border-radius:8px;padding:5px 11px;font-size:12px;cursor:pointer">Abandon</button>
+      <button onclick="_apxLostAbandon('${r.id}')" title="Remove from pipeline as unqualified - no nurture" style="background:transparent;border:1px solid var(--text-mute);color:var(--text-sub);border-radius:8px;padding:5px 11px;font-size:12px;cursor:pointer">Unqualified</button>
       <button id="apx-lost-confirm-${r.id}" onclick="_apxLostConfirm('${r.id}')" title="Mark Lost - enters the nurture automation" style="background:var(--red);border:1px solid var(--red);color:#fff;border-radius:8px;padding:5px 13px;font-size:12px;font-weight:700;cursor:pointer">${_plIcon('ban', 12)} ${closing ? 'Send &amp; mark Lost' : 'Mark Lost'}</button>
     </div>
   </div>`;
@@ -33296,8 +33298,8 @@ function _apxLostDismiss(id) { _hawkDefer({ cardId: 'apx-' + id, label: 'Dismiss
 // closing message (vs Mark Lost, which enrolls them in the nurture automation).
 function _apxLostAbandon(id) {
   const r = _APX_DATA.lost.find(x => x.id === id); if (!r) return;
-  _hawkDefer({ cardId: 'apx-' + id, label: 'Abandoned', restore: _apxRender, run: async () => {
-    await _apxPost('/api/agent-approvals', 'confirm-abandoned', { ready_id: r.id }); _apxRemove(id); _apxToast('Abandoned', true);
+  _hawkDefer({ cardId: 'apx-' + id, label: 'Unqualified', restore: _apxRender, run: async () => {
+    await _apxPost('/api/agent-approvals', 'confirm-abandoned', { ready_id: r.id }); _apxRemove(id); _apxToast('Marked unqualified', true);
   } });
 }
 
@@ -33325,12 +33327,12 @@ function _apxBookCard(r) {
       <button onclick="_apxOpenCardThread('${r.id}')" style="background:transparent;border:1px solid var(--border);color:var(--text-mute);border-radius:8px;padding:5px 10px;font-size:12px;cursor:pointer">${_plIcon('msg', 12)} chat</button>
       <div style="flex:1"></div>
       <button onclick="_apxBookSkip('${r.id}')" style="background:transparent;border:1px solid var(--border);color:#e07070;border-radius:8px;padding:5px 11px;font-size:12px;cursor:pointer">✕ skip</button>
-      <button onclick="_apxBookAbandon('${r.id}')" title="Remove from the pipeline - no message, no nurture" style="background:transparent;border:1px solid var(--text-mute);color:var(--text-sub);border-radius:8px;padding:5px 11px;font-size:12px;cursor:pointer">Abandon</button>
+      <button onclick="_apxBookAbandon('${r.id}')" title="Remove from the pipeline as unqualified - no message, no nurture" style="background:transparent;border:1px solid var(--text-mute);color:var(--text-sub);border-radius:8px;padding:5px 11px;font-size:12px;cursor:pointer">Unqualified</button>
       <button onclick="_apxBookConfirm('${r.id}')" style="background:var(--blue,#5A8FB8);border:1px solid var(--blue,#5A8FB8);color:#fff;border-radius:8px;padding:5px 13px;font-size:12px;font-weight:700;cursor:pointer">${_plIcon('calendar', 12)} approve &amp; book</button>
     </div>
   </div>`;
 }
-function _apxBookAbandon(id) { _hawkDefer({ cardId: 'apx-' + id, label: 'Abandoned', restore: _apxRender, run: async () => { await _apxPost('/api/agent-approvals', 'confirm-abandoned', { ready_id: id }); _apxRemove(id); _apxToast('Abandoned', true); } }); }
+function _apxBookAbandon(id) { _hawkDefer({ cardId: 'apx-' + id, label: 'Unqualified', restore: _apxRender, run: async () => { await _apxPost('/api/agent-approvals', 'confirm-abandoned', { ready_id: id }); _apxRemove(id); _apxToast('Marked unqualified', true); } }); }
 function _apxBookConfirm(id) {
   const r = (_APX_DATA.book || []).find(x => x.id === id); if (!r) return;
   _hawkDefer({ cardId: 'apx-' + id, label: 'Booked', restore: _apxRender, run: async () => {
@@ -33357,7 +33359,7 @@ function _apxGhostCard(r) {
     <div style="display:flex;align-items:center;gap:7px;margin-top:8px;flex-wrap:wrap">
       <button onclick="_apxOpenCardThread('${r.id}')" style="background:transparent;border:1px solid var(--border);color:var(--text-mute);border-radius:8px;padding:5px 10px;font-size:12px;cursor:pointer">${_plIcon('msg', 12)} chat</button>
       <div style="flex:1"></div>
-      <button onclick="_apxGhostSkip('${r.id}')" title="Skip, mark Lost, or Abandon (and optionally teach why)" style="background:transparent;border:1px solid var(--border);color:var(--red);border-radius:8px;padding:5px 11px;font-size:12px;cursor:pointer">✕ other</button>
+      <button onclick="_apxGhostSkip('${r.id}')" title="Skip, mark Lost, or mark Unqualified (and optionally teach why)" style="background:transparent;border:1px solid var(--border);color:var(--red);border-radius:8px;padding:5px 11px;font-size:12px;cursor:pointer">✕ other</button>
       <button onclick="_apxGhostConfirm('${r.id}', this)" title="Send to the Ghosted automation" style="display:inline-flex;align-items:center;gap:6px;background:var(--gold,#D4B65C);border:1px solid var(--gold,#D4B65C);color:var(--on-gold);border-radius:8px;padding:5px 13px;font-size:12px;font-weight:700;cursor:pointer">${_plIcon('ghost', 12)} Send to Ghosted</button>
     </div>
   </div>`;
@@ -33381,7 +33383,7 @@ function _apxGhostConfirm(id, btn) {
     },
   });
 }
-// The ✕ on a ghost card: skip it, mark Lost, or Abandon - each with an optional
+// The ✕ on a ghost card: skip it, mark Lost, or mark Unqualified - each with an optional
 // "why" note that teaches the agent (e.g. "don't ghost - they asked us to wait").
 function _apxGhostSkip(id) {
   const r = (_APX_DATA.ghost || []).find(x => x.id === id); if (!r) return;
@@ -33406,7 +33408,7 @@ function _apxGhostSkip(id) {
     onAbandon: async () => {
       if (_PL_NEEDS && r.ghl_contact_id) _PL_NEEDS.delete(String(r.ghl_contact_id));
       _plCloseByContact(r.ghl_contact_id, 'abandoned');
-      _apxRemove(id); _apxToast('Abandoned', true);
+      _apxRemove(id); _apxToast('Marked unqualified', true);
       try { await _apxPost('/api/agent-approvals', 'confirm-abandoned', { ready_id: id }); }
       catch (e) { _apxToast(_apxErr(e), false); }
     },
@@ -33426,17 +33428,14 @@ function _apxRender() {
     };
     tabsEl.innerHTML = tab('ghost', 'Went quiet', ghostN, 'var(--gold,#D4B65C)')
       + tab('ready', 'Ready messages', readyN)
-      + tab('lost', 'Lost', lostN, '#e0654f')
-      + tab('followups', 'Follow-ups', followups.length);
+      + tab('lost', 'Lost', lostN, '#e0654f');
   }
 
   // Active tab content (centered to a readable width on wide screens).
   const body = document.getElementById('apx-body');
   if (!body) return;
   let inner = '';
-  if (_APX_TAB === 'followups') {
-    inner = followups.length ? followups.map(r => _apxCard('followup', r)).join('') : _apxEmpty('No follow-ups waiting.');
-  } else if (_APX_TAB === 'ready') {
+  if (_APX_TAB === 'ready') {
     if (bookN) {
       inner += `<div style="font-size:13px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:var(--blue,#5A8FB8);margin:2px 0 10px">Booking requests · ${bookN}</div>`
         + book.map(_apxBookCard).join('');
@@ -33588,8 +33587,8 @@ async function _apxFollowupSkip(id) {
       } catch (e) { _apxToast(_apxErr(e), false); }
     },
     onAbandon: async () => {
-      if (!r.ghl_contact_id) { _apxToast('No contact linked - can\'t Abandon', false); return; }
-      _apxRemove(id); _apxToast('Abandoned', true);   // instant
+      if (!r.ghl_contact_id) { _apxToast('No contact linked - can\'t mark Unqualified', false); return; }
+      _apxRemove(id); _apxToast('Marked unqualified', true);   // instant
       try {
         await _apxPost('/api/agent-followups', 'skip', { id });   // drop the nudge
         await _apxPost('/api/agent-approvals', 'confirm-abandoned', { contact_id: r.ghl_contact_id });
@@ -33660,14 +33659,14 @@ function _apxSkipModal(r, handlers) {
     <div id="apx-edit-overlay" onclick="if(event.target===this)this.remove()" style="position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9650;display:flex;align-items:flex-start;justify-content:center;padding:7vh 14px 0">
       <div style="background:var(--surface);border:1px solid var(--border);border-radius:16px;width:100%;max-width:520px;padding:18px;box-shadow:0 20px 60px rgba(0,0,0,.5)">
         <div style="font-size:15px;font-weight:700;margin-bottom:3px">Skip the draft for ${escapeHTML(r.contact_name || 'this lead')}?</div>
-        <div style="font-size:12px;color:var(--text-mute);margin-bottom:13px">Skip it, mark the lead Lost (nurture), or Abandon (remove). Teaching the agent why is optional.</div>
+        <div style="font-size:12px;color:var(--text-mute);margin-bottom:13px">Skip it, mark the lead Lost (nurture), or mark Unqualified (removed, no nurture). Teaching the agent why is optional.</div>
         <label style="display:block;font-size:11px;color:var(--text-mute);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">why? (teach the agent)</label>
         <input id="apx-skip-lesson" type="text" placeholder="e.g. they already said no / wrong number / picked another program" style="width:100%;background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);padding:10px 12px;font:inherit;font-size:13px;outline:none">
         <div id="apx-skip-note" style="font-size:11.5px;color:#e0654f;margin-top:6px;min-height:14px"></div>
         <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-top:8px;flex-wrap:wrap">
           <div style="display:flex;gap:8px;flex-wrap:wrap">
             <button id="apx-skip-lost" title="Lost - enters the nurture automation" style="background:rgba(224,90,66,0.08);border:1px solid #e0654f;color:#e0654f;border-radius:9px;padding:10px 14px;font:inherit;font-size:13.5px;font-weight:700;cursor:pointer">Mark lost</button>
-            ${handlers.onAbandon ? `<button id="apx-skip-abandon" title="Abandon - removed from pipeline, no nurture" style="background:transparent;border:1px solid var(--text-mute);color:var(--text-sub);border-radius:9px;padding:10px 14px;font:inherit;font-size:13.5px;cursor:pointer">Abandon</button>` : ''}
+            ${handlers.onAbandon ? `<button id="apx-skip-abandon" title="Unqualified - removed from pipeline, no nurture" style="background:transparent;border:1px solid var(--text-mute);color:var(--text-sub);border-radius:9px;padding:10px 14px;font:inherit;font-size:13.5px;cursor:pointer">Unqualified</button>` : ''}
           </div>
           <div style="display:flex;gap:10px">
             <button onclick="document.getElementById('apx-edit-overlay').remove()" style="background:transparent;border:1px solid var(--border);color:var(--text-sub);border-radius:9px;padding:10px 16px;font:inherit;font-size:13.5px;cursor:pointer">Cancel</button>
@@ -33707,7 +33706,7 @@ async function _apxReadySkip(id) {
       } catch (e) { _apxToast(_apxErr(e), false); }
     },
     onAbandon: async () => {
-      _apxRemove(id); _apxToast('Abandoned', true);   // instant
+      _apxRemove(id); _apxToast('Marked unqualified', true);   // instant
       try { await _apxPost('/api/agent-approvals', 'confirm-abandoned', { ready_id: id }); }
       catch (e) { _apxToast(_apxErr(e), false); }
     },

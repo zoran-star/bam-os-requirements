@@ -78,6 +78,26 @@ to build for config itself.
 | 2026-07-08 | Agent stages split (cards left, actions right); automation/human = single column |
 | 2026-07-08 | NO Skip - every Hawkeye action gets resolved; approve auto-advances |
 | 2026-07-08 | Hawkeye page = Tinder deck: 3 tabs across top, one card at a time, swipe on mobile |
+| 2026-07-08 | "Abandon" button renamed "Unqualified" everywhere (SHIPPED in overlays) |
+| 2026-07-08 | Booking follow-up nudges RETIRED - quiet lead always = "Send to Ghosted" proposal (tab removed) |
+| 2026-07-08 | Confirm reminders are step-CONFIG, never Hawkeye cards (approve templates once, they self-send) |
+| 2026-07-08 | Reschedule approve = handoff AND Booking's first rebook action queues (was already wired; now canon) |
+| 2026-07-08 | Done Trial has NO automations - post-trial form (trainer note + optional sign-up link + coach notes) is the only preplanned touch; scripted closing sequence + its editor REMOVED |
+| 2026-07-08 | Closing deck = stacked cards: 1 Reply (enroll = reply with link embedded in draft) -> 2 Follow-up plan -> 3 Suggested Lost after 3 unanswered follow-ups (agent prompt told: silence alone is never lost) |
+
+## Action model per agent (revised 2026-07-08, SHIPPED end to end)
+Mobile reference page (design-system styled): `bam-portal/public/hawkeye-actions.html`
+(live at portal.byanymeansbusiness.com/hawkeye-actions.html once on main).
+- **Booking (Responded)**: Reply / Book it / Went quiet / Suggested Lost. NO follow-up
+  nudge cards (tab removed; nothing creates agent_followups rows). Moves: Ghosted,
+  Nurture (Lost), Unqualified.
+- **Confirm (Scheduled Trial)**: Reply / Reschedule / Suggested Lost. Reminders =
+  step config only. Reschedule approve also queues Booking's rebook opener.
+  Moves: Rebook (back to Responded), Nurture (Lost).
+- **Closing (Done Trial)**: stacked - Reply (enroll = reply with sign-up link in the
+  draft) -> Follow-up plan (3 msgs, 1/day) -> Suggested Lost after 3 unanswered.
+  NO stage automations; post-trial form = only preplanned touch (trainer first
+  message + optional link + coach notes -> contact memory). Moves: Nurture (Lost).
 
 ## What already exists (reuse, don't rebuild)
 - **Focus mode config page** - `_plOpenFocus`/`_plRenderFocus` in `bam-portal/public/client-portal.html`
