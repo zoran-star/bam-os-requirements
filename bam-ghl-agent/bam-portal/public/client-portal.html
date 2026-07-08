@@ -14623,10 +14623,91 @@ async function _v15ibSetup() {
         <div style="font-size:12.5px;color:var(--text-mute);margin-bottom:16px">The phone number and email synced with GoHighLevel for this academy.</div>
         ${row('Phone', j.phone)}
         ${row('Email', j.email)}
+        <div id="email-domain-card" style="margin-top:22px"></div>
       </div>`;
+    _edwRender();
   } catch (e) {
     body.innerHTML = `<div class="req-empty" style="padding:24px 0;color:#9a3b2f">Couldn't load sender info - ${escapeHTML(e.message || String(e))}</div>`;
   }
+}
+
+// ── Branded email domain wizard (Resend, straight through the portal) ──
+// Lives in the Inbox Setup modal. create -> shows the DNS records to paste at
+// the registrar -> Check status polls Resend -> verified auto-flips the academy
+// to email_provider='resend' on their own mail.<domain>. Backend: /api/email/domain-setup.
+async function _edwApi(action, extra) {
+  const token = await _mreqAuthToken();
+  const r = await fetch('/api/email/domain-setup', {
+    method: 'POST',
+    headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ client_id: CLIENT_ID, action, ...(extra || {}) }),
+  });
+  const j = await _safeJson(r);
+  if (!r.ok) throw new Error(j.error || ('HTTP ' + r.status));
+  return j;
+}
+function _edwRecordsHtml(records) {
+  const rows = (records || []).map(rc => `
+    <tr>
+      <td style="padding:7px 8px;font-size:11px;color:var(--text-mute);white-space:nowrap">${escapeHTML(rc.type || '')}</td>
+      <td style="padding:7px 8px;font-size:11.5px;color:var(--text);word-break:break-all">${escapeHTML(rc.name || '')}</td>
+      <td style="padding:7px 8px;font-size:11.5px;color:var(--text);word-break:break-all">${escapeHTML(rc.value || '')}${rc.priority != null ? ` <span style=\"color:var(--text-mute)\">(priority ${escapeHTML(String(rc.priority))})</span>` : ''}</td>
+      <td style="padding:7px 4px"><button data-edw-copy="${escapeHTML(rc.value || '')}" onclick="navigator.clipboard.writeText(this.dataset.edwCopy);this.textContent='Copied';setTimeout(()=>this.textContent='Copy',1200)" style="background:none;border:1px solid var(--border);border-radius:6px;color:var(--text-sub);padding:3px 8px;font-size:11px;cursor:pointer">Copy</button></td>
+    </tr>`).join('');
+  return `<div style="border:1px solid var(--border);border-radius:8px;overflow-x:auto;margin:10px 0">
+    <table style="width:100%;border-collapse:collapse"><thead><tr>
+      <th style="text-align:left;padding:7px 8px;font-size:10.5px;color:var(--text-mute);text-transform:uppercase;letter-spacing:.05em">Type</th>
+      <th style="text-align:left;padding:7px 8px;font-size:10.5px;color:var(--text-mute);text-transform:uppercase;letter-spacing:.05em">Name</th>
+      <th style="text-align:left;padding:7px 8px;font-size:10.5px;color:var(--text-mute);text-transform:uppercase;letter-spacing:.05em">Value</th><th></th>
+    </tr></thead><tbody>${rows}</tbody></table></div>`;
+}
+async function _edwRender() {
+  const card = document.getElementById('email-domain-card');
+  if (!card) return;
+  card.innerHTML = `<div class="req-empty" style="padding:8px 0"><span class="req-spin"></span> Checking email domain…</div>`;
+  let st;
+  try { st = await _edwApi('status'); }
+  catch (e) { card.innerHTML = `<div style="font-size:12px;color:#9a3b2f">Couldn't check email domain - ${escapeHTML(e.message)}</div>`; return; }
+  const head = `<div style="font-size:15px;font-weight:700;color:var(--text);margin-bottom:4px">Your email domain</div>`;
+  if (st.status === 'live') {
+    card.innerHTML = `${head}<div style="display:flex;align-items:center;gap:8px;padding:12px 14px;border:1px solid rgba(123,196,127,.4);background:rgba(123,196,127,.08);border-radius:8px;font-size:13px;color:var(--text)"><span style="color:#7BC47F;font-weight:700">✓</span> Sending and receiving as <b>${escapeHTML(st.domain || '')}</b> through the portal.</div>`;
+    return;
+  }
+  if (st.status === 'none') {
+    card.innerHTML = `${head}
+      <div style="font-size:12.5px;color:var(--text-mute);margin-bottom:10px">Send email from your own domain instead of GoHighLevel. We set up <b>mail.yourdomain.com</b>, so your regular email is never touched.</div>
+      <div style="display:flex;gap:8px">
+        <input id="edw-domain" type="text" placeholder="yourdomain.com" style="flex:1;background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);padding:10px 12px;font:inherit;font-size:13px;outline:none">
+        <button onclick="_edwCreate()" style="background:var(--gold,#D4B65C);color:#0B0B0D;border:none;border-radius:8px;padding:10px 16px;font-weight:700;font-size:13px;cursor:pointer;font-family:inherit">Connect</button>
+      </div>`;
+    return;
+  }
+  card.innerHTML = `${head}
+    <div style="font-size:12.5px;color:var(--text-mute);margin-bottom:6px">Add these records at your domain provider (GoDaddy, Namecheap, Cloudflare…) for <b>${escapeHTML(st.domain || '')}</b>. They usually verify within minutes.</div>
+    ${_edwRecordsHtml(st.records)}
+    <div style="display:flex;align-items:center;gap:10px">
+      <button onclick="_edwCheck(this)" style="background:var(--gold,#D4B65C);color:#0B0B0D;border:none;border-radius:8px;padding:9px 16px;font-weight:700;font-size:13px;cursor:pointer;font-family:inherit">Check status</button>
+      <span style="font-size:12px;color:var(--text-mute)">Status: ${escapeHTML(st.status || 'pending')}</span>
+    </div>`;
+}
+async function _edwCreate() {
+  const input = document.getElementById('edw-domain');
+  const domain = input && input.value;
+  if (!domain || !domain.trim()) { if (input) input.focus(); return; }
+  const card = document.getElementById('email-domain-card');
+  if (card) card.innerHTML = `<div class="req-empty" style="padding:8px 0"><span class="req-spin"></span> Setting up your domain…</div>`;
+  try { await _edwApi('create', { domain: domain.trim() }); }
+  catch (e) { _plToast('Setup failed: ' + e.message); }
+  _edwRender();
+}
+async function _edwCheck(btn) {
+  if (btn) { btn.disabled = true; btn.textContent = 'Checking…'; }
+  try {
+    const st = await _edwApi('status');
+    if (st.status === 'live') _plToast('Verified - your email now runs through the portal.');
+    else _plToast('Not verified yet - records can take a few minutes to propagate.');
+  } catch (e) { _plToast('Check failed: ' + e.message); }
+  _edwRender();
 }
 
 // ── Mass send (V1.5 Inbox) - tag-filtered, queued, DND-safe blast ──
