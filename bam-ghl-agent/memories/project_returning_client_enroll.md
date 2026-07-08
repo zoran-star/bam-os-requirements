@@ -7,8 +7,65 @@ metadata:
 
 # Returning Client Enroll (Members V2)
 
-**State 2026-07-08 (end of day): ALL THREE SCOPES DECISION-LOCKED. Nothing
-built. Next = build enroll Phase 1, then pilot for client Houssein.**
+**State 2026-07-08 (late): ENROLL PHASE 1 CODE-COMPLETE (not live-tested).
+Next = apply the migration, deploy, then pilot for client Houssein.**
+
+## Phase 1 build (2026-07-08) - what shipped
+
+- **Migration `20260708190000_returning_client_enroll_grant.sql`** -
+  `client_users.can_enroll_members boolean not null default false` (opt-in
+  grant, can_train_agent pattern). **NOT YET APPLIED to prod** - run in the
+  Supabase SQL editor (project jnojmfmpnsfmtqmwhopz). All reads are
+  migration-safe (fallback selects), so deploying before the SQL is safe;
+  grantees just need the column.
+- **`api/members/enroll.js`** (new) - POST actions: `find-customer` (Stripe
+  /customers/search on the connected account, enriched with roster /
+  cancellations / contacts matches), `targets` (live offer prices, same rule
+  as fix-payment buildTargets), `preview` (price + card check + duplicate
+  guard), `enroll` (consent HARD gate; door A saved card -> portal-owned sub,
+  `origin=fullcontrol-portal` + `import_silent=1`, charge now or trial_end
+  anchor; door B no card -> pending member + mode:'setup' Checkout link,
+  re-run completes via the `resumable` row reuse). Member row is created
+  BEFORE the sub; status stays payment_method_required and the invoice.paid
+  webhook (activatePortalOnboardingMember, import_silent branch) flips live +
+  runs access/credit sync. Audit rows: `enroll-returning` /
+  `enroll-returning-failed` with consent_confirmed.
+- **`api/clients.js`** - set-staff-tabs action now accepts a
+  `can_enroll_members` boolean in its patch.
+- **`client-portal.html`** - `+ Returning client` gold button in the Members
+  toolbar (`_canEnrollReturning()`: BAM staff / owner / grantee, hidden in
+  Preview-as); 3-step right-drawer wizard (`openEnrollDrawer`, `_ENROLL`
+  state, `_enrollApi`): Find (search + result cards with On roster / Past
+  member / Card on file badges) -> Offer+plan (live price cards, athlete
+  input prefilled from past-member/contact, Charge now vs Start on a date) ->
+  Review (line items + REQUIRED consent checkbox gating Confirm; duplicate
+  block). Result screens: charged / scheduled / card_link (copy link +
+  suggested SMS). Team section: "Can sign up returning clients" checkbox per
+  teammate (`_bbStaffEnrollSave`), owner-only, shown when the academy has the
+  Members tab.
+- Checks: node --check on api files, all 8 inline scripts vm-parse clean,
+  tour verifier passes, zero em dashes in the diff.
+
+## Before the Houssein pilot (deploy steps)
+
+1. Run migration `20260708190000` in Supabase SQL editor.
+2. Merge/deploy (Vercel auto).
+3. Houssein pre-flight: `clients.stripe_connect_status='connected'` + at
+   least one canonical + is_routable `pricing_catalog` row on a non-archived
+   offer (else the wizard's step 2 shows the "confirm prices in Stripe
+   Matcher" notice).
+4. Pilot: safest first run = a customer WITH a saved card + "Start on a
+   date" (no immediate charge), verify the webhook flips the member live.
+
+## Still open in later phases
+
+- Phase 2: contact attach prefill beyond athlete name + the missing-info
+  mini-form (core custom_field_defs).
+- Phase 3: members-agent `enroll_returning_client` tool + notify SMS +
+  receipt hook.
+- Door B follow-through: after the card link is used, staff re-run the
+  wizard to complete (documented in the result screen). Auto-complete on
+  `checkout.session.completed` is a candidate improvement.
 
 Canonical docs (all decisions written in):
 - [`docs/returning-client-enroll-scope.md`](../docs/returning-client-enroll-scope.md)
