@@ -5,6 +5,7 @@
 
 import { withSentryApiRoute } from "../_sentry.js";
 import { getClientGhlToken } from "./availability.js";
+import { createOpp, pipelineFlags } from "../agent/_store.js";
 
 const SB_URL  = (process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || "").trim();
 const SB_KEY  = (process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY || "").trim();
@@ -124,6 +125,30 @@ async function handler(req, res) {
           body: JSON.stringify({ body: note }),
         });
       } catch (_) {}
+
+      // Portal-native pipeline: when Detail's pipeline_provider='portal', the
+      // portal board reads the store - and Detail's GHL workflow (which creates
+      // the GHL opp off the miami-lead tag) is invisible to it. Mint the store
+      // card here so every new lead lands on the board (Interested; offer_id
+      // inherits Training from the seeded stage row). Gated on provider so on
+      // 'ghl' we change NOTHING (the workflow keeps sole ownership - calling
+      // createOpp there would double-create on the GHL board). Best-effort.
+      try {
+        const { provider } = await pipelineFlags(MIAMI_CLIENT_UUID);
+        if (provider === "portal") {
+          await createOpp({
+            clientId: MIAMI_CLIENT_UUID,
+            contactId,
+            role: "interested",
+            name: `${firstName.trim()} ${lastName?.trim() || ""}`.trim(),
+            contactPhone: phone?.trim() || null,
+            source: "website",
+            entryPoint: "miami-lead",
+          });
+        }
+      } catch (e) {
+        console.error("miami-lead: portal opp create failed (non-fatal):", e.message);
+      }
     }
   }
 
