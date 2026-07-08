@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Sales Simple View - Hawkeye V2 mockup</title>
+<title>Sales Simple View - Hawkeye V2 mockup (v2)</title>
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Nunito:wght@700;800&display=swap" rel="stylesheet">
 <style>
   :root{
@@ -62,10 +62,10 @@
   .gear-ic{width:20px;height:20px;display:block}
 
   .panel{overflow:hidden;max-height:0;transition:max-height .45s var(--es);margin-top:0}
-  .panel.open{max-height:900px;margin-top:14px}
+  .panel.open{max-height:1100px;margin-top:14px}
   .panel-inner{border-radius:16px;background:var(--surface);border:1px solid var(--border);padding:16px}
   .panel-head{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--text-mute);margin-bottom:12px;
-    display:flex;align-items:center;gap:8px}
+    display:flex;align-items:center;gap:8px;flex-wrap:wrap}
   .engine-tag{font-size:10px;font-weight:700;border-radius:6px;padding:3px 8px;letter-spacing:.05em}
 
   .rows{display:flex;flex-direction:column;gap:8px}
@@ -85,8 +85,8 @@
   .action{flex:1;background:var(--gold-glow);border:1px solid rgba(212,182,92,.30);border-radius:12px;
     padding:9px 12px;display:flex;flex-direction:column;gap:7px;justify-content:center}
   .action .draft{font-size:12px;color:var(--text);background:var(--surface-el);border-radius:8px;padding:7px 9px;
-    line-height:1.45}
-  .action .abtns{display:flex;gap:6px}
+    line-height:1.45;white-space:pre-line}
+  .action .abtns{display:flex;gap:6px;flex-wrap:wrap}
   .abtn{border-radius:8px;border:1px solid var(--border-med);background:var(--surface-el);color:var(--text-sub);
     font-family:var(--font-ui);font-size:11.5px;font-weight:600;padding:5px 11px;cursor:pointer}
   .abtn.go{background:var(--green-soft);border-color:rgba(76,199,106,.4);color:var(--green)}
@@ -107,13 +107,6 @@
   .hk-tab.sel .n{background:var(--on-gold);color:var(--gold)}
   .hk-tab .tgear{display:none;margin-left:2px}
   .hk-tab.sel .tgear{display:block}
-  .qcard{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:16px;margin-bottom:12px}
-  .qcard .meta{font-size:12px;color:var(--text-sub);margin-bottom:8px}
-  .qcard .lastmsg{font-size:13px;background:var(--surface-el);border-radius:12px 12px 12px 4px;padding:9px 12px;
-    margin-bottom:8px;max-width:75%;color:var(--text-sub)}
-  .qcard .draft{font-size:13px;background:var(--gold-glow);border:1px solid rgba(212,182,92,.25);
-    border-radius:12px 12px 4px 12px;padding:9px 12px;margin:0 0 10px auto;max-width:75%;line-height:1.5}
-  .qcard .abtns{display:flex;gap:8px;justify-content:flex-end}
 
   .cfg-sec{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:16px;margin-bottom:12px}
   .cfg-sec h3{font-size:13px;font-weight:700;margin-bottom:8px;display:flex;gap:8px;align-items:center}
@@ -167,6 +160,9 @@
   .hk-send{background:var(--gold);color:var(--on-gold);border:none;border-radius:999px;padding:9px 18px;
     font-family:var(--font-ui);font-size:13px;font-weight:700;cursor:pointer}
   .hk-send:hover{filter:brightness(1.06)}
+  .hk-send.blue{background:var(--blue);color:#fff}
+  .hk-send.green{background:var(--green);color:#0B0B0D}
+  .hk-send.red{background:var(--red);color:#fff}
   .hk-lesson{background:transparent;border:1px solid var(--border-med);border-radius:999px;padding:8px 14px;
     color:var(--text-sub);font-family:var(--font-ui);font-size:12px;font-weight:600;cursor:pointer}
   .hk-lesson:hover{color:var(--text);border-color:var(--border-str)}
@@ -177,7 +173,7 @@
   @media(max-width:720px){.hk-modal{grid-template-columns:1fr;max-height:92vh}.hk-left{flex-direction:row;flex-wrap:wrap;align-items:center;gap:10px}.hk-exits{margin-top:0;flex-direction:row}.hk-fact{display:none}}
 
   .hk-toggle .hk-tab{flex:1;justify-content:center}
-  .deck{position:relative;max-width:620px;margin:0 auto;height:600px}
+  .deck{position:relative;max-width:620px;margin:0 auto;height:620px}
   .deckcard{position:absolute;inset:0;background:var(--surface);border:1px solid var(--border-str);border-radius:24px;
     padding:20px;display:flex;flex-direction:column;gap:10px;box-shadow:0 12px 40px rgba(0,0,0,.35);
     transition:transform .32s var(--es),opacity .32s var(--es);touch-action:pan-y}
@@ -188,10 +184,17 @@
   .dc-head{display:flex;align-items:center;gap:12px}
   .dc-head .who{font-size:17px;font-weight:700}
   .dc-head .sub{font-size:12px;color:var(--text-sub);margin-top:2px}
+  .kpill{font-size:9.5px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;border-radius:999px;
+    padding:3px 9px;white-space:nowrap}
   .dc-thread{flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column;gap:8px;padding:4px 2px}
   .dc-draft{background:var(--surface-el);border:1px solid rgba(212,182,92,.35);border-radius:12px;color:var(--text);
     font-family:var(--font-ui);font-size:13px;line-height:1.5;padding:10px 12px;resize:none;min-height:56px;outline:none}
   .dc-draft:focus{border-color:var(--gold)}
+  .dc-draft.sm{min-height:40px;font-size:12.5px}
+  .dc-slot{display:flex;align-items:center;gap:8px;background:var(--blue-soft);border:1px solid var(--blue);
+    border-radius:12px;padding:9px 12px;font-size:13px;font-weight:700;color:var(--text)}
+  .dc-note{font-size:11px;color:var(--text-mute);line-height:1.45}
+  .dc-lbl{font-size:9.5px;font-weight:800;letter-spacing:.07em;text-transform:uppercase;color:var(--text-mute)}
   .dc-move{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
   .dc-move .lbl{font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--text-mute);margin-right:2px}
   .allclear{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;
@@ -202,7 +205,7 @@
 </head>
 <body>
 <div class="wrap">
-  <div class="demo-note">Clickable mockup - click stages, the Hawkeye button, and gears</div>
+  <div class="demo-note">Clickable mockup v2 (2026-07-08 action model) - click stages, the Hawkeye button, and gears</div>
 
   <!-- ============ SCREEN 1: SIMPLE VIEW ============ -->
   <div class="screen on" id="scr-simple">
@@ -211,7 +214,7 @@
       <div class="spacer"></div>
       <button class="hawkeye-btn" onclick="show('scr-hawkeye')">
         <svg class="gear-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:17px;height:17px"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
-        Hawkeye <span class="cnt">8</span>
+        Hawkeye <span class="cnt">9</span>
       </button>
     </div>
 
@@ -229,7 +232,7 @@
         </div>
       </div>
       <div class="pill g-booking" data-stage="booking" onclick="toggleStage(this)">
-        <div class="nm">Booking</div><div class="sub hot">5 need you</div>
+        <div class="nm">Booking</div><div class="sub hot">4 need you</div>
         <div class="gearwrap" onclick="event.stopPropagation();show('scr-config')" title="Configure">
           <svg class="gear-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z"/></svg>
         </div>
@@ -241,7 +244,7 @@
         </div>
       </div>
       <div class="pill g-closing" data-stage="closing" onclick="toggleStage(this)">
-        <div class="nm">Closing</div><div class="sub hot">1 needs you</div>
+        <div class="nm">Closing</div><div class="sub hot">3 need you</div>
         <div class="gearwrap" onclick="event.stopPropagation();show('scr-config')" title="Configure">
           <svg class="gear-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z"/></svg>
         </div>
@@ -259,24 +262,30 @@
       <div class="panel-inner">
         <div class="panel-head">Booking · Responded
           <span class="engine-tag" style="background:var(--blue-soft);color:var(--blue)">AGENT ENGINE</span>
-          <span style="flex:1"></span><span style="text-transform:none;letter-spacing:0">gold ring = needs you</span>
+          <span style="flex:1"></span><span style="text-transform:none;letter-spacing:0">gold ring = needs you · no follow-up nudges, quiet leads go to Ghosted</span>
         </div>
         <div class="rows">
           <div class="row split">
-            <div class="lead needs" onclick="openHawk('jordan')"><div class="avatar">JM</div><div><div class="who">Jordan M.</div><div class="st">draft ready</div></div></div>
+            <div class="lead needs" onclick="openHawk('jordan')"><div class="avatar">JM</div><div><div class="who">Jordan M.</div><div class="st">reply · draft ready</div></div></div>
             <div class="action">
               <div class="draft">Saturday works! We have a 10am group at Linbrook. Want me to lock it in for Aiden?</div>
               <div class="abtns"><button class="abtn go">Approve and send</button><button class="abtn" onclick="event.stopPropagation();openHawk(hkKeyFromRow(this))">Review</button></div>
             </div>
           </div>
           <div class="row split">
-            <div class="lead needs" onclick="openHawk('sam')"><div class="avatar">SK</div><div><div class="who">Sam K.</div><div class="st">went quiet 2 days</div></div></div>
+            <div class="lead needs" onclick="openHawk('marco')"><div class="avatar">MV</div><div><div class="who">Marco V.</div><div class="st">picked Sat 10am</div></div></div>
             <div class="action">
-              <div class="abtns"><button class="abtn go">Send to Ghosted</button><button class="abtn">Mark lost</button></div>
+              <div class="abtns"><button class="abtn go">Approve and book</button><button class="abtn" onclick="event.stopPropagation();openHawk(hkKeyFromRow(this))">Review</button></div>
             </div>
           </div>
           <div class="row split">
-            <div class="lead needs" onclick="openHawk('dana')"><div class="avatar">DT</div><div><div class="who">Dana T.</div><div class="st">draft ready</div></div></div>
+            <div class="lead needs" onclick="openHawk('sam')"><div class="avatar">SK</div><div><div class="who">Sam K.</div><div class="st">went quiet 2 days</div></div></div>
+            <div class="action">
+              <div class="abtns"><button class="abtn go">Send to Ghosted</button><button class="abtn">Mark lost</button><button class="abtn">Unqualified</button></div>
+            </div>
+          </div>
+          <div class="row split">
+            <div class="lead needs" onclick="openHawk('dana')"><div class="avatar">DT</div><div><div class="who">Dana T.</div><div class="st">reply · draft ready</div></div></div>
             <div class="action">
               <div class="draft">Totally get it! Weeknights we run 6pm and 7:30pm groups. Would either work for Maya?</div>
               <div class="abtns"><button class="abtn go">Approve and send</button><button class="abtn" onclick="event.stopPropagation();openHawk(hkKeyFromRow(this))">Review</button></div>
@@ -305,7 +314,7 @@
       </div>
     </div>
 
-    <!-- MEMBER: human stage. Cards cascade straight down -->
+    <!-- MEMBER: human stage -->
     <div class="panel" id="panel-member">
       <div class="panel-inner">
         <div class="panel-head">Member
@@ -320,30 +329,55 @@
       </div>
     </div>
 
-    <!-- Confirm / Closing / Nurture reuse the same patterns; stubs so every pill responds -->
+    <!-- CONFIRM: agent stage. Reminders live in config, not here -->
     <div class="panel" id="panel-confirm">
       <div class="panel-inner">
         <div class="panel-head">Confirm · Scheduled Trial
-          <span class="engine-tag" style="background:var(--green-soft);color:var(--green)">AGENT ENGINE</span></div>
+          <span class="engine-tag" style="background:var(--green-soft);color:var(--green)">AGENT ENGINE</span>
+          <span style="flex:1"></span><span style="text-transform:none;letter-spacing:0">reminders auto-send from config · only replies + reschedules land here</span>
+        </div>
         <div class="rows">
           <div class="row split">
-            <div class="lead needs" onclick="openHawk('rachel')"><div class="avatar">RB</div><div><div class="who">Rachel B.</div><div class="st">draft ready</div></div></div>
-            <div class="action"><div class="draft">See you tomorrow at 6pm! Address is 1079 Linbrook Rd. Text me if anything comes up.</div>
+            <div class="lead needs" onclick="openHawk('rachel')"><div class="avatar">RB</div><div><div class="who">Rachel B.</div><div class="st">reply · draft ready</div></div></div>
+            <div class="action"><div class="draft">Just runners, a water bottle and a ball if she has one - we have spares! See you at 1079 Linbrook Rd.</div>
             <div class="abtns"><button class="abtn go">Approve and send</button><button class="abtn" onclick="event.stopPropagation();openHawk(hkKeyFromRow(this))">Review</button></div></div>
           </div>
-          <div class="row"><div class="lead"><div class="avatar">OC</div><div><div class="who">Owen C.</div><div class="st">trial Friday · agent handling it</div></div></div></div>
+          <div class="row split">
+            <div class="lead needs" onclick="openHawk('owen')"><div class="avatar">OC</div><div><div class="who">Owen C.</div><div class="st">can't make Friday</div></div></div>
+            <div class="action">
+              <div class="abtns"><button class="abtn go">Approve handoff</button><button class="abtn" onclick="event.stopPropagation();openHawk(hkKeyFromRow(this))">Review</button></div>
+            </div>
+          </div>
+          <div class="row"><div class="lead"><div class="avatar">SW</div><div><div class="who">Sara W.</div><div class="st">trial Tuesday · confirmation sent from config</div></div></div></div>
         </div>
       </div>
     </div>
+
+    <!-- CLOSING: agent stage. No automations - stacked reply -> plan -> lost -->
     <div class="panel" id="panel-closing">
       <div class="panel-inner">
         <div class="panel-head">Closing · Done Trial
-          <span class="engine-tag" style="background:var(--purple-soft);color:var(--purple)">AGENT ENGINE</span></div>
+          <span class="engine-tag" style="background:var(--purple-soft);color:var(--purple)">AGENT ENGINE</span>
+          <span style="flex:1"></span><span style="text-transform:none;letter-spacing:0">no automations · post-trial form is the only preplanned touch</span>
+        </div>
         <div class="rows">
           <div class="row split">
-            <div class="lead needs" onclick="openHawk('kayla')"><div class="avatar">KH</div><div><div class="who">Kayla H.</div><div class="st">good fit · draft ready</div></div></div>
-            <div class="action"><div class="draft">Aiden crushed it yesterday! Here is the sign-up link to grab his spot for the fall group.</div>
-            <div class="abtns"><button class="abtn go">Send enroll link</button><button class="abtn" onclick="event.stopPropagation();openHawk(hkKeyFromRow(this))">Review</button></div></div>
+            <div class="lead needs" onclick="openHawk('kayla')"><div class="avatar">KH</div><div><div class="who">Kayla H.</div><div class="st">ready to enroll · link in draft</div></div></div>
+            <div class="action"><div class="draft">Amazing! Here is the sign-up link to grab Aiden's spot in the fall group.
+bamgta.com/join/fall-group</div>
+            <div class="abtns"><button class="abtn go">Approve and send</button><button class="abtn" onclick="event.stopPropagation();openHawk(hkKeyFromRow(this))">Review</button></div></div>
+          </div>
+          <div class="row split">
+            <div class="lead needs" onclick="openHawk('devon')"><div class="avatar">DP</div><div><div class="who">Devon P.</div><div class="st">follow-up plan ready · 3 messages</div></div></div>
+            <div class="action">
+              <div class="abtns"><button class="abtn go">Approve plan</button><button class="abtn" onclick="event.stopPropagation();openHawk(hkKeyFromRow(this))">Review</button></div>
+            </div>
+          </div>
+          <div class="row split">
+            <div class="lead needs" onclick="openHawk('mia')"><div class="avatar">MF</div><div><div class="who">Mia F.</div><div class="st">3 follow-ups unanswered</div></div></div>
+            <div class="action">
+              <div class="abtns"><button class="abtn">Mark lost</button><button class="abtn">Unqualified</button><button class="abtn" onclick="event.stopPropagation();openHawk(hkKeyFromRow(this))">Review</button></div>
+            </div>
           </div>
         </div>
       </div>
@@ -369,12 +403,12 @@
       <div class="spacer"></div>
     </div>
     <div class="hk-toggle">
-      <button class="hk-tab sel" id="hkt-booking" onclick="hkPick('booking')">Booking <span class="n" id="hkn-booking">3</span> <svg class="gear-ic tgear" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px" onclick="event.stopPropagation();show('scr-config')"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z"/></svg></button>
+      <button class="hk-tab sel" id="hkt-booking" onclick="hkPick('booking')">Booking <span class="n" id="hkn-booking">4</span> <svg class="gear-ic tgear" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px" onclick="event.stopPropagation();show('scr-config')"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z"/></svg></button>
       <button class="hk-tab" id="hkt-confirm" onclick="hkPick('confirm')">Confirm <span class="n" id="hkn-confirm">2</span> <svg class="gear-ic tgear" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px" onclick="event.stopPropagation();show('scr-config')"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z"/></svg></button>
-      <button class="hk-tab" id="hkt-closing" onclick="hkPick('closing')">Closing <span class="n" id="hkn-closing">1</span> <svg class="gear-ic tgear" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px" onclick="event.stopPropagation();show('scr-config')"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z"/></svg></button>
+      <button class="hk-tab" id="hkt-closing" onclick="hkPick('closing')">Closing <span class="n" id="hkn-closing">3</span> <svg class="gear-ic tgear" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px" onclick="event.stopPropagation();show('scr-config')"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z"/></svg></button>
     </div>
     <div class="deck" id="hk-deck"></div>
-    <div class="hint">desktop: buttons &middot; mobile: swipe right = approve and send &middot; swipe left = move the lead</div>
+    <div class="hint">every card resolves: the big button OR move the lead - no skip anywhere<br>mobile swipe: right = main action, left = move (exact behavior = open decision)</div>
   </div>
 
   <!-- ============ SCREEN 3: CONFIGURE (existing focus mode) ============ -->
@@ -397,6 +431,10 @@
       <p>Where leads go next (editable branches).</p>
       <span class="chip">Books a time &#8594; Confirm</span><span class="chip">Goes quiet &#8594; Ghosted</span><span class="chip">Not interested &#8594; Nurture</span><span class="chip">Unqualified &#8594; out</span>
     </div>
+    <div class="cfg-sec" style="border-style:dashed"><h3>Per-agent config differences</h3>
+      <p><b style="color:var(--text)">Confirm</b>: reminder templates (booking confirmation + same-day check-in) live HERE - approved once, then they self-send. Never Hawkeye cards.<br>
+      <b style="color:var(--text)">Closing</b>: NO automations section. The post-trial form (trainer's message + optional sign-up link + notes for the agent) is the only preplanned touch.</p>
+    </div>
     <div class="hint">This is the focus-mode page that shipped 2026-07-06 - the gear simply routes here.</div>
   </div>
 
@@ -411,11 +449,8 @@
         <div class="hk-fact"><span>Phone</span><b id="hkm-phone">(416) 555-0184</b></div>
         <div class="hk-fact"><span>Last active</span><b id="hkm-last">14 min ago</b></div>
         <div class="hk-ctx" id="hkm-ctx">Entry: new lead - website form. 3 days in stage.</div>
-        <div class="hk-exits">
+        <div class="hk-exits" id="hkm-exits">
           <div class="lbl">Move the lead</div>
-          <button class="xbtn">Send to Ghosted</button>
-          <button class="xbtn">Not interested &#8594; Nurture</button>
-          <button class="xbtn">Unqualified</button>
         </div>
       </div>
       <div class="hk-right">
@@ -424,9 +459,9 @@
           <textarea id="hkm-draft" oninput="document.getElementById('hkm-teach').style.display='block'"></textarea>
           <input class="hk-teach" id="hkm-teach" placeholder="Teach the agent: why did you change it? (saved as a lesson)">
           <div class="hk-actions">
-            <button class="hk-send" onclick="nextHawk()">Approve and send</button>
+            <button class="hk-send" id="hkm-send" onclick="nextHawk()">Approve and send</button>
             <button class="hk-lesson">Save as lesson only</button>
-            <span class="hk-prog" id="hkm-prog">1 of 5 in Booking</span>
+            <span class="hk-prog" id="hkm-prog">1 of 4 in Booking</span>
           </div>
         </div>
       </div>
@@ -464,36 +499,67 @@
       rows.forEach(function(r,i){r.style.transitionDelay=(60+i*70)+'ms'});
     }
   }
+
+  // Per-agent move destinations (Zoran 2026-07-08: every agent can mark Unqualified).
+  var MOVES={
+    booking:[['Send to Ghosted','var(--amber)'],['Not interested: Nurture','var(--deep)'],['Unqualified','var(--red)']],
+    confirm:[['Rebook: back to Booking','var(--blue)'],['Not coming: Nurture','var(--deep)'],['Unqualified','var(--red)']],
+    closing:[['Says no: Nurture','var(--deep)'],['Unqualified','var(--red)']]
+  };
+  var KIND_LABEL={reply:'Reply',book:'Book it',ghost:'Went quiet',handoff:'Reschedule',enroll:'Ready to enroll',plan:'Follow-up plan',lost:'Suggested lost'};
+  var KIND_COLOR={reply:'var(--gold)',book:'var(--blue)',ghost:'var(--amber)',handoff:'var(--blue)',enroll:'var(--green)',plan:'var(--gold)',lost:'var(--red)'};
+  var PRIMARY={reply:['Approve and send',''],book:['Approve and book','blue'],ghost:['Send to Ghosted',''],
+    handoff:['Approve handoff','green'],enroll:['Approve and send','green'],plan:['Approve plan - sends 1 day apart',''],lost:['Mark lost','red']};
+
   var HK={
-    jordan:{av:'JM',name:'Jordan M.',sub:'Parent of Aiden (9)',stage:'Responded',phone:'(416) 555-0184',last:'14 min ago',
-      ctx:'Entry: new lead - website form. 3 days in stage.',prog:'1 of 5 in Booking',
+    jordan:{agent:'booking',kind:'reply',av:'JM',name:'Jordan M.',sub:'Parent of Aiden (9)',stage:'Responded',phone:'(416) 555-0184',last:'14 min ago',
+      ctx:'Entry: new lead - website form. 3 days in stage.',
       thread:[['in','hey is this where you book the free basketball trial?'],
               ['bot','Hey Jordan! Yes - free trials run at Linbrook gym. What day works best for Aiden?'],
               ['in','does saturday work instead?']],
       draft:'Saturday works! We have a 10am group at Linbrook. Want me to lock it in for Aiden?'},
-    sam:{av:'SK',name:'Sam K.',sub:'Parent of Leo (11)',stage:'Responded',phone:'(647) 555-0117',last:'2 days ago',
-      ctx:'Went quiet: no reply for 2 days after our last message.',prog:'2 of 5 in Booking',
+    marco:{agent:'booking',kind:'book',av:'MV',name:'Marco V.',sub:'Parent of Zoe (10)',stage:'Responded',phone:'(647) 555-0resents',last:'6 min ago',
+      ctx:'Lead picked a slot. One tap books it and hands them to Confirm.',
+      slot:'Sat, Jul 12 · 10:00 AM · Linbrook gym',
+      thread:[['bot','We have Sat 10am or Sun 1pm open this week - which works for Zoe?'],
+              ['in','sat 10am works for zoe!']],
+      draft:''},
+    sam:{agent:'booking',kind:'ghost',av:'SK',name:'Sam K.',sub:'Parent of Leo (11)',stage:'Responded',phone:'(647) 555-0117',last:'2 days ago',
+      ctx:'Quiet for 2 days after our last message. Ghosted = day 1 / 3 / 7 nudges; a reply bounces them right back here.',
       thread:[['bot','Hey Sam! Do weekday evenings or the weekend work better for Leo?'],
               ['in','ok ill think about it']],
-      draft:'No pressure at all! Spots for this weekend are filling up - want me to hold one for Leo while you decide?'},
-    dana:{av:'DT',name:'Dana T.',sub:'Parent of Maya (10)',stage:'Responded',phone:'(905) 555-0163',last:'1 hr ago',
-      ctx:'Entry: new lead - Instagram ad. First conversation.',prog:'3 of 5 in Booking',
+      draft:''},
+    dana:{agent:'booking',kind:'reply',av:'DT',name:'Dana T.',sub:'Parent of Maya (10)',stage:'Responded',phone:'(905) 555-0163',last:'1 hr ago',
+      ctx:'Entry: new lead - Instagram ad. First conversation.',
       thread:[['in','weekends are tough for us honestly']],
       draft:'Totally get it! Weeknights we run 6pm and 7:30pm groups. Would either work for Maya?'},
-    rachel:{av:'RB',name:'Rachel B.',sub:'Parent of Sofia (9)',stage:'Scheduled Trial',phone:'(416) 555-0139',last:'25 min ago',
-      ctx:'Trial tomorrow 6pm at Linbrook. Confirmation sent, she replied.',prog:'1 of 2 in Confirm',
+    rachel:{agent:'confirm',kind:'reply',av:'RB',name:'Rachel B.',sub:'Parent of Sofia (9)',stage:'Scheduled Trial',phone:'(416) 555-0139',last:'25 min ago',
+      ctx:'Trial tomorrow 6pm at Linbrook. Confirmation auto-sent from config; she replied with a question.',
       thread:[['bot','Sofia is all set for tomorrow at 6pm! Address is 1079 Linbrook Rd.'],
               ['in','what should she bring?']],
       draft:'Just runners, a water bottle and a ball if she has one - we have spares! See you at 1079 Linbrook Rd.'},
-    owen:{av:'OC',name:'Owen C.',sub:'Parent of Jack (12)',stage:'Scheduled Trial',phone:'(289) 555-0142',last:'1 day ago',
-      ctx:'No reply to the trial confirmation. Trial is Friday 7pm.',prog:'2 of 2 in Confirm',
-      thread:[['bot','Hey Owen! Confirming Jack for Friday 7pm at Linbrook - can you reply YES so I know he is coming?']],
-      draft:'Hey Owen, just a quick reminder about Jack\'s free trial this Friday at 7pm - are you still good to make it?'},
-    kayla:{av:'KH',name:'Kayla H.',sub:'Parent of Aiden J. (10)',stage:'Done Trial',phone:'(416) 555-0171',last:'3 hrs ago',
-      ctx:'Post-trial form: showed up, good fit. Ready to enroll.',prog:'1 of 1 in Closing',
+    owen:{agent:'confirm',kind:'handoff',av:'OC',name:'Owen C.',sub:'Parent of Jack (12)',stage:'Scheduled Trial',phone:'(289) 555-0142',last:'20 min ago',
+      ctx:'Can\'t make Friday 7pm. Approving does BOTH: sends your note + hands Jack to Booking, and the Booking agent drafts the rebook text next.',
+      thread:[['bot','Hey Owen! Confirming Jack for Friday 7pm at Linbrook - can you reply YES so I know he is coming?'],
+              ['in','coach we cant make friday anymore, sorry']],
+      draft:'No stress Owen! Let\'s find Jack a better time - I\'ll text you some options in a minute.'},
+    kayla:{agent:'closing',kind:'enroll',av:'KH',name:'Kayla H.',sub:'Parent of Aiden J. (10)',stage:'Done Trial',phone:'(416) 555-0171',last:'3 hrs ago',
+      ctx:'Post-trial form: showed up, good fit. Coach note: "great handle, needs defensive reps." The sign-up link is already IN the draft - won lands automatically when they pay.',
       thread:[['in','he loved it! what are next steps']],
-      draft:'Amazing! Here is the sign-up link to grab Aiden\'s spot in the fall group.'}
+      draft:'Amazing! Here is the sign-up link to grab Aiden\'s spot in the fall group.\n\nbamgta.com/join/fall-group'},
+    devon:{agent:'closing',kind:'plan',av:'DP',name:'Devon P.',sub:'Parent of Isaiah (11)',stage:'Done Trial',phone:'(905) 555-0128',last:'1 day ago',
+      ctx:'Good fit Monday, reply approved yesterday, quiet since. The next card: a 3-message plan, one day apart, each only if the previous gets no answer.',
+      thread:[['bot','Isaiah looked great out there Monday! Any questions about getting started?']],
+      plan:['Hey Devon! Want me to hold Isaiah\'s spot in the Tue/Thu group he trialed with?',
+            'Quick one - that group has 2 spots left this fall. Happy to answer anything!',
+            'Last check-in from me, no pressure at all. The door is always open for Isaiah.'],
+      draft:''},
+    mia:{agent:'closing',kind:'lost',av:'MF',name:'Mia F.',sub:'Parent of Ava (9)',stage:'Done Trial',phone:'(416) 555-0195',last:'5 days ago',
+      ctx:'3 follow-ups sent, no reply since the trial. Recommend marking Lost - Nurture keeps the long game going. Optional goodbye goes out with the move.',
+      thread:[['bot','Last check-in from me, no pressure at all. The door is always open for Ava.']],
+      draft:'Totally understand life gets busy! We\'d love to have Ava back whenever it works.'}
   };
+
   function openHawk(key){
     var d=HK[key]; if(!d) d=HK.jordan;
     document.getElementById('hkm-av').textContent=d.av;
@@ -503,7 +569,13 @@
     document.getElementById('hkm-phone').textContent=d.phone;
     document.getElementById('hkm-last').textContent=d.last;
     document.getElementById('hkm-ctx').textContent=d.ctx;
-    document.getElementById('hkm-prog').textContent=d.prog;
+    var q=HK_QUEUES[d.agent];
+    document.getElementById('hkm-prog').textContent=(q.indexOf(key)+1)+' of '+q.length+' in '+(d.agent.charAt(0).toUpperCase()+d.agent.slice(1));
+    // Per-agent move buttons
+    var ex=document.getElementById('hkm-exits');
+    ex.innerHTML='<div class="lbl">Move the lead</div>'+MOVES[d.agent].map(function(m){
+      return '<button class="xbtn" style="border-color:'+m[1]+'" onclick="closeHawk()">'+m[0]+'</button>';
+    }).join('');
     var th=document.getElementById('hkm-thread'); th.innerHTML='';
     d.thread.forEach(function(m){
       var b=document.createElement('div');
@@ -512,16 +584,21 @@
       b.appendChild(document.createTextNode(m[1]));
       th.appendChild(b);
     });
-    var sug=document.createElement('div');sug.className='bub bot';sug.style.opacity='.75';
-    var tg=document.createElement('span');tg.className='tag';tg.textContent='Suggested reply - edit below';
-    sug.appendChild(tg);sug.appendChild(document.createTextNode(d.draft));th.appendChild(sug);
-    document.getElementById('hkm-draft').value=d.draft;
+    if(d.draft){
+      var sug=document.createElement('div');sug.className='bub bot';sug.style.opacity='.75';
+      var tg=document.createElement('span');tg.className='tag';tg.textContent='Suggested reply - edit below';
+      sug.appendChild(tg);sug.appendChild(document.createTextNode(d.draft));th.appendChild(sug);
+    }
+    document.getElementById('hkm-draft').value=d.draft||'';
     document.getElementById('hkm-teach').style.display='none';
+    var send=document.getElementById('hkm-send');
+    send.textContent=PRIMARY[d.kind][0];
+    send.className='hk-send '+PRIMARY[d.kind][1];
     document.getElementById('hk-overlay').classList.add('on');
     th.scrollTop=th.scrollHeight;
   }
   function closeHawk(){document.getElementById('hk-overlay').classList.remove('on')}
-  var HK_ORDER=['jordan','sam','dana','rachel','owen','kayla'],hkIdx=0;
+  var HK_ORDER=['jordan','marco','sam','dana','rachel','owen','kayla','devon','mia'];
   function nextHawk(){
     var cur=document.getElementById('hkm-name').textContent;
     var idx=HK_ORDER.findIndex(function(k){return HK[k].name===cur});
@@ -529,12 +606,12 @@
   }
 
   function hkKeyFromRow(btn){
-    var row=btn.closest('.row')||btn.closest('.qcard');
+    var row=btn.closest('.row')||btn.closest('.deckcard');
     var av=row?row.querySelector('.avatar'):null;
-    var map={JM:'jordan',SK:'sam',DT:'dana',RB:'rachel',OC:'owen',KH:'kayla'};
+    var map={JM:'jordan',MV:'marco',SK:'sam',DT:'dana',RB:'rachel',OC:'owen',KH:'kayla',DP:'devon',MF:'mia'};
     return av&&map[av.textContent]?map[av.textContent]:'jordan';
   }
-  var HK_QUEUES={booking:['jordan','sam','dana'],confirm:['rachel','owen'],closing:['kayla']};
+  var HK_QUEUES={booking:['jordan','marco','sam','dana'],confirm:['rachel','owen'],closing:['kayla','devon','mia']};
   var hkStage='booking', hkPos={booking:0,confirm:0,closing:0};
   function hkPick(stage){
     hkStage=stage;
@@ -550,25 +627,51 @@
       el.textContent=left; el.style.visibility=left?'visible':'hidden';
     });
   }
+  function moveBtnsHtml(d){
+    // The move row hides whatever destination IS the card's primary action.
+    var skip={ghost:'Send to Ghosted',handoff:'Rebook: back to Booking',lost:'Says no: Nurture'}[d.kind]||null;
+    return MOVES[d.agent].filter(function(m){return m[0]!==skip}).map(function(m){
+      return '<button class="xbtn" style="border-color:'+m[1]+'" onclick="hkMove()">'+m[0]+'</button>';
+    }).join('');
+  }
   function deckCardHtml(key,pos,total){
     var d=HK[key], th='';
     d.thread.forEach(function(m){
       if(m[0]==='in'){th+='<div class="bub in">'+m[1]+'</div>';}
       else{th+='<div class="bub bot"><span class="tag">Agent</span>'+m[1]+'</div>';}
     });
-    th+='<div class="bub bot" style="opacity:.75"><span class="tag">Suggested reply - edit below</span>'+d.draft+'</div>';
-    return '<div class="dc-head"><div class="bigav">'+d.av+'</div>'+
-      '<div style="flex:1"><div class="who">'+d.name+'</div><div class="sub">'+d.sub+' &middot; '+d.stage+' &middot; '+d.last+'</div></div>'+
-      '<span class="hk-prog">'+(pos+1)+' of '+total+'</span></div>'+
-      '<div class="hk-ctx">'+d.ctx+'</div>'+
-      '<div class="dc-thread">'+th+'</div>'+
-      '<textarea class="dc-draft">'+d.draft+'</textarea>'+
-      '<input class="hk-teach" placeholder="Changed it? Teach the agent why (saved as a lesson)">'+
-      '<div class="hk-actions"><button class="hk-send" style="flex:1" onclick="hkApprove()">Approve and send</button></div>'+
-      '<div class="dc-move"><span class="lbl">Move the lead</span>'+
-      '<button class="xbtn" onclick="hkMove()">Ghosted</button>'+
-      '<button class="xbtn" onclick="hkMove()">Nurture</button>'+
-      '<button class="xbtn" onclick="hkMove()">Unqualified</button></div>';
+    var body='';
+    if(d.kind==='book'){
+      body='<div class="dc-thread">'+th+'</div>'
+        +'<div class="dc-lbl">Booking request</div><div class="dc-slot">'+d.slot+'</div>'
+        +'<div class="dc-note">Books the slot and hands them to the Confirm agent (the confirmation + same-day check-in send from config).</div>';
+    } else if(d.kind==='ghost'){
+      body='<div class="dc-thread">'+th+'</div>'
+        +'<div class="dc-note">Nothing sends now - Ghosted takes over with the day 1 / 3 / 7 nudges. A reply bounces them straight back to Booking.</div>';
+    } else if(d.kind==='plan'){
+      body='<div class="dc-thread" style="max-height:90px">'+th+'</div><div class="dc-lbl">The plan - every message editable</div>'
+        +d.plan.map(function(t,i){return '<div class="dc-lbl" style="margin-top:2px">Day '+(i+1)+(i===d.plan.length-1?' · final, no-pressure':'')+'</div><textarea class="dc-draft sm">'+t+'</textarea>';}).join('');
+    } else if(d.kind==='lost'){
+      body='<div class="dc-thread" style="max-height:110px">'+th+'</div>'
+        +'<div class="dc-lbl">Optional goodbye - sends with the move</div><textarea class="dc-draft">'+d.draft+'</textarea>'
+        +'<div class="dc-note">Approving routes them to Nurture (the long game). Silence alone never marks anyone lost - this card only appears after 3 unanswered follow-ups or an explicit no.</div>';
+    } else {
+      body='<div class="dc-thread">'+th
+        +'<div class="bub bot" style="opacity:.75"><span class="tag">Suggested reply - edit below</span>'+d.draft.split('\n')[0]+'</div></div>'
+        +'<textarea class="dc-draft">'+d.draft+'</textarea>'
+        +'<input class="hk-teach" placeholder="Changed it? Teach the agent why (saved as a lesson)">';
+      if(d.kind==='enroll') body+='<div class="dc-note">The sign-up link rides in the draft - the opportunity is marked won automatically when they pay.</div>';
+      if(d.kind==='handoff') body+='<div class="dc-note">One approve does BOTH: sends your note + moves Jack to Booking, and the Booking agent drafts the rebook text as its next action.</div>';
+    }
+    var p=PRIMARY[d.kind];
+    return '<div class="dc-head"><div class="avatar" style="display:none">'+d.av+'</div><div class="bigav" style="width:44px;height:44px;font-size:15px;border-radius:50%;background:var(--gold-glow);color:var(--gold);display:flex;align-items:center;justify-content:center;font-weight:800">'+d.av+'</div>'
+      +'<div style="flex:1"><div class="who">'+d.name+'</div><div class="sub">'+d.sub+' &middot; '+d.stage+' &middot; '+d.last+'</div></div>'
+      +'<span class="kpill" style="color:'+KIND_COLOR[d.kind]+';background:color-mix(in srgb,'+KIND_COLOR[d.kind]+' 14%,transparent)">'+KIND_LABEL[d.kind]+'</span>'
+      +'<span class="hk-prog">'+(pos+1)+' of '+total+'</span></div>'
+      +'<div class="hk-ctx">'+d.ctx+'</div>'
+      +body
+      +'<div class="hk-actions"><button class="hk-send '+p[1]+'" style="flex:1" onclick="hkApprove()">'+p[0]+'</button></div>'
+      +'<div class="dc-move"><span class="lbl">Move the lead</span>'+moveBtnsHtml(d)+'</div>';
   }
   function renderDeck(){
     var q=HK_QUEUES[hkStage], pos=hkPos[hkStage], deck=document.getElementById('hk-deck');

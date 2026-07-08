@@ -48,6 +48,8 @@ scattered autonomy/config entry points. KEEPS: inline drawer suggestion on lead 
   UI: Unqualified button on all Confirm/Closing cards (_acxUnqualified/_aclxUnqualified/
   _aclxUnqualifiedPlan), 6s undo via _hawkDefer.
 - Reference page: bam-portal/public/hawkeye-actions.html (+ claude.ai artifact).
+- Mockup REBUILT to v2 (same file + same artifact URL): kind-aware deck cards, per-agent
+  move rows incl. Unqualified, stacked Closing cadence, config screen notes per agent.
 ⚠️ NOT prod-verified on GTA yet (live behavior change if GTA had closing autos approved).
 
 ## Open item (ask Zoran before building)

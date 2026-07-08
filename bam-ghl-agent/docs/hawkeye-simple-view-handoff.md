@@ -1,8 +1,11 @@
 # Hawkeye V2 + Sales Simple View - build handoff
 
-**Status: DESIGN LOCKED 2026-07-08 via clickable mockup. Nothing built yet.**
+**Status: DESIGN LOCKED 2026-07-08 via clickable mockup (v2, updated same day to the revised action model). Deck/cascade UI not built yet; the action-model backend changes ARE shipped.**
 Mockup (open in browser, fully clickable): [`docs/hawkeye-simple-view-mockup.html`](hawkeye-simple-view-mockup.html)
 Also hosted: https://claude.ai/code/artifact/7a9a5268-048a-4dda-9750-62d9f69a4150
+Mockup v2 shows: kind-aware deck cards (Reply / Book it / Went quiet / Reschedule /
+Ready to enroll / Follow-up plan / Suggested lost), per-agent move rows with
+Unqualified everywhere, no Skip, reminders-in-config notes, stacked Closing cadence.
 
 ## What we're building (one sentence)
 Redesign the V2 Sales page into a **simple pipeline strip** (no cards visible) with a
