@@ -96,11 +96,17 @@ export function offerToTemplatePayloads(offer, opts = {}) {
     capacityFallback = null,
   } = opts;
 
+  // Wizard fields save to offer.data[sectionId][key] (verified against DETAIL
+  // Miami's live row): classes live at data.schedule.classes, capacity at
+  // data.general_info.capacity. Top-level fallbacks kept for older/hand-written rows.
   const data = (offer && offer.data) || {};
-  const rawCap = Number(data.capacity);
+  const gi = data.general_info || {};
+  const sched = data.schedule || {};
+  const rawCap = Number(gi.capacity != null ? gi.capacity : data.capacity);
   const capacity = Number.isFinite(rawCap) && rawCap > 0 ? Math.floor(rawCap)
     : (capacityFallback && capacityFallback > 0 ? Math.floor(capacityFallback) : null);
-  const classes = Array.isArray(data.classes) ? data.classes : [];
+  const classes = Array.isArray(sched.classes) ? sched.classes
+    : (Array.isArray(data.classes) ? data.classes : []);
 
   const templates = [];
   const warnings = [];
