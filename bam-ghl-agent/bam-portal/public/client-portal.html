@@ -38124,12 +38124,21 @@ function _ghlConnectReturnCheck() {
 // ── Member detail popup ──────────────────────────────────────
 // Right-side drawer (not centered modal): slides in from the edge,
 // stacks above a dimmed backdrop. Backdrop click closes.
-async function openMemberPopup(memberId) {
+async function openMemberPopup(memberId, opts = {}) {
   const host = document.getElementById('member-modal-host');
   if (!host) return;
+  // Elevated mode: open ABOVE the members focus-chat modal (z 9999) with no
+  // dimming backdrop, so the payment cards in the chat stay visible + clickable
+  // on the left while the contact drawer sits on the right. Close via its own ×.
+  const elevated = !!opts.elevated;
+  const bdZ = elevated ? 10055 : 8900;
+  const drZ = elevated ? 10060 : 8950;
+  const bdStyle = elevated
+    ? `position:fixed;inset:0;background:transparent;z-index:${bdZ};pointer-events:none`
+    : `position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:${bdZ};opacity:0;transition:opacity 0.2s ease`;
   host.innerHTML = `
-    <div id="member-drawer-backdrop" style="position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:8900;opacity:0;transition:opacity 0.2s ease" onclick="closeMemberPopup()"></div>
-    <div id="member-drawer" style="position:fixed;top:0;right:0;width:min(480px,92vw);height:100vh;background:var(--surface);border-left:1px solid var(--border);box-shadow:-12px 0 32px rgba(0,0,0,0.25);z-index:8950;overflow-y:auto;transform:translateX(100%);transition:transform 0.25s ease;color:var(--text)">
+    <div id="member-drawer-backdrop" style="${bdStyle}" onclick="closeMemberPopup()"></div>
+    <div id="member-drawer" style="position:fixed;top:0;right:0;width:min(480px,92vw);height:100vh;background:var(--surface);border-left:1px solid var(--border);box-shadow:-12px 0 32px rgba(0,0,0,0.25);z-index:${drZ};overflow-y:auto;transform:translateX(100%);transition:transform 0.25s ease;color:var(--text)">
       <div id="member-modal-body" style="padding:28px 28px 36px"><div class="req-empty" style="padding:24px 0"><span class="req-spin"></span>Loading…</div></div>
     </div>`;
   // Slide in on next frame so the transition fires.
@@ -39422,8 +39431,8 @@ async function mRefund(memberId, customerId, preselectChargeId) {
   if (vals.notes) body.notes = vals.notes;
   try {
     // Spinner while Stripe processes → check-mark → auto-close (same as pause).
-    const r = await _mmProgress(() => _memberAction(memberId, 'refund', body), { label: 'Refunding…', doneLabel: 'Refunded' });
-    _plToast(`Refunded $${(r.refund.amount_cents / 100).toFixed(2)} (${r.refund.id}).`);
+    // The check-mark IS the confirmation; no extra toast (failure toast kept below).
+    await _mmProgress(() => _memberAction(memberId, 'refund', body), { label: 'Refunding…', doneLabel: 'Refunded' });
     closeMemberPopup();
     fetchAndRenderMembers();
   } catch (e) { _plToast('Refund failed: ' + e.message); }
@@ -47601,6 +47610,9 @@ async function _mmaShiftLoad() {
     line('', 'MRR at <b>$' + Math.round(k.mrr).toLocaleString() + '</b>');
 }
 function closeMembersFocus() {
+  // Close any elevated contact drawer opened alongside the chat, so it doesn't
+  // linger over a dismissed focus page.
+  try { if (typeof closeMemberPopup === 'function') closeMemberPopup(); } catch (_) {}
   try { _mmCloseFocus('membersMachineModal'); }
   catch (_) { const m = document.getElementById('membersMachineModal'); m.classList.remove('mm-open'); m.style.display = 'none'; }
 }
@@ -47878,9 +47890,17 @@ async function _mmaAgentAsk(message) {
     if (json.reply) _MMA_AI.history.push({ role: 'assistant', text: json.reply });
     _MMA_AI.engaged = true;
     _MMA_AI.proposal = json.proposal || null;
+    const _mc = json.member_context;
+    // Payment cards render only when charges came back (show_payments); an
+    // open_contact turn has a member but no charges, so no cards - just the drawer.
     const cards = json.proposal ? _mmaProposalHtml(json.proposal)
-      : (json.member_context && Array.isArray(json.member_context.charges) ? _mmaChargesHtml(json.member_context) : '');
+      : (_mc && Array.isArray(_mc.charges) ? _mmaChargesHtml(_mc) : '');
     _mmaSay(json.reply || (json.proposal ? 'Ready when you are.' : 'Okay.'), cards);
+    // Any member_context (payments OR contact-card request) → pop the member's
+    // contact drawer on the right, over the chat, without dimming it.
+    if (_mc && _mc.member_id && typeof openMemberPopup === 'function') {
+      openMemberPopup(_mc.member_id, { elevated: true });
+    }
   } catch (e) {
     await thinkP;
     _mmaSay("Couldn't reach the agent: " + (e.message || e), '');

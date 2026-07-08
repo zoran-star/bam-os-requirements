@@ -122,7 +122,16 @@ const READ_TOOLS = [
   },
   {
     name: "show_payments",
-    description: "Display a member's recent payments as nicely formatted cards to the user, each with a Refund button. ALWAYS use this (never a text/markdown table) when the user asks to see, list, review, or pull up a member's payments, charges, or billing history. Give a one-line intro; the cards render below it.",
+    description: "Display a member's recent payments as nicely formatted cards to the user, each with a Refund button. ALWAYS use this (never a text/markdown table) when the user asks to see, list, review, or pull up a member's payments, charges, or billing history. Give a one-line intro; the cards render below it. This is ONLY for payments - to open the member's contact/profile card use open_contact instead.",
+    input_schema: {
+      type: "object",
+      properties: { member_id: { type: "string", description: "The member's uuid from find_members." } },
+      required: ["member_id"],
+    },
+  },
+  {
+    name: "open_contact",
+    description: "Open the member's contact/profile card (the detail drawer on the right) - their athlete + parent info, plan, and history. Use this when the user asks to see, open, or pull up a member's contact card, profile, contact info, or details. Does NOT list payments (use show_payments for that). Give a one-line intro.",
     input_schema: {
       type: "object",
       properties: { member_id: { type: "string", description: "The member's uuid from find_members." } },
@@ -312,7 +321,9 @@ function systemPrompt(academyName) {
     `use get_member and read their recent charges (a charge with status "failed" is the bounce).\n` +
     `When the user asks to SEE / LIST / review a member's payments, charges, or billing history, call show_payments ` +
     `(after find_members resolves the member) with a one-line intro - it renders payment cards with a Refund button. ` +
-    `NEVER hand-write a markdown/text table of charges.\n\n` +
+    `NEVER hand-write a markdown/text table of charges. When the user instead asks to open/see a member's CONTACT CARD, ` +
+    `profile, contact info, or details, call open_contact (NOT show_payments) - it opens their detail drawer. ` +
+    `Pick the tool by what they asked for this turn: "payments/charges" → show_payments; "contact card/profile" → open_contact.\n\n` +
     `HOW TO WORK:\n` +
     `1. Almost every command names a member. Call find_members to resolve the name to a member_id BEFORE any action. ` +
     `If find_members returns more than one plausible match, do NOT guess — ask the user which one (list the candidates with their status).\n` +
@@ -505,6 +516,15 @@ async function execShowPayments(clientId, memberId, acct) {
   return ctx;
 }
 
+// DISPLAY tool: just resolve the member's identity so the UI can pop the
+// contact drawer (no charges → no payment cards).
+async function execOpenContact(clientId, memberId) {
+  const rows = await sb(`members?id=eq.${encodeURIComponent(memberId)}&client_id=eq.${clientId}&select=id,athlete_name,parent_name`).catch(() => []);
+  const m = Array.isArray(rows) && rows[0] ? rows[0] : null;
+  if (!m) return { error: "member not found for this academy" };
+  return { member_id: m.id, member_name: m.athlete_name || m.parent_name || "Member", open_contact: true };
+}
+
 // Build the members.js PATCH body from a write tool's input.
 function toActionBody(action, input) {
   const b = {};
@@ -633,13 +653,19 @@ async function handler(req, res) {
         });
       }
 
-      // A DISPLAY tool (show_payments) → return the charges as member_context so
-      // the UI renders payment cards + refund buttons. Terminal, like a proposal.
-      const display = toolUses.find(t => t.name === "show_payments");
+      // DISPLAY tools → return member_context so the UI renders (payment cards for
+      // show_payments, contact drawer for open_contact). Terminal, like a proposal.
+      const display = toolUses.find(t => t.name === "show_payments" || t.name === "open_contact");
       if (display) {
         const memberId = display.input?.member_id;
         if (!memberId) {
-          return res.status(200).json({ reply: text || "Which member's payments?", proposal: null });
+          return res.status(200).json({ reply: text || "Which member?", proposal: null });
+        }
+        if (display.name === "open_contact") {
+          const ctx = await execOpenContact(clientId, memberId);
+          if (ctx.error) return res.status(200).json({ reply: text || ctx.error, proposal: null });
+          const nm = ctx.member_name || nameById[memberId] || "their";
+          return res.status(200).json({ reply: text || `Opening ${nm}'s contact card.`, proposal: null, member_context: ctx });
         }
         const ctx = await execShowPayments(clientId, memberId, stripeAccount);
         if (ctx.error) {
