@@ -1807,8 +1807,13 @@ async function handler(req, res) {
             if (a === undefined) return res.status(400).json({ error: "allowed_kpis must be an array or null" });
             patch.allowed_kpis = a;
           }
-          if (!("allowed_tabs" in patch) && !("allowed_stages" in patch) && !("allowed_kpis" in patch)) {
-            return res.status(400).json({ error: "provide allowed_tabs, allowed_stages, and/or allowed_kpis" });
+          // Opt-in grant: teammate may use the Returning Client Enroll flow
+          // (Members tab). Boolean, owner-managed; the owner always can.
+          if ("can_enroll_members" in teamBody) {
+            patch.can_enroll_members = teamBody.can_enroll_members === true;
+          }
+          if (!("allowed_tabs" in patch) && !("allowed_stages" in patch) && !("allowed_kpis" in patch) && !("can_enroll_members" in patch)) {
+            return res.status(400).json({ error: "provide allowed_tabs, allowed_stages, allowed_kpis, and/or can_enroll_members" });
           }
           // Target must belong to THIS client and not be the owner.
           const targetRows = await supabaseSelect(
