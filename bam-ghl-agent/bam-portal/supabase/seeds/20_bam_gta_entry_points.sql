@@ -72,23 +72,6 @@ values
     '2026-06-11 22:25:28.781+00'::timestamptz
   ),
   (
-    '6925c94d-31ec-4344-9c56-e5e0c018eee7',
-    '39875f07-0a4b-4429-a201-2249bc1f24df',
-    'ghl-form',
-    '00MuBSi1GxsRcSqklOkF',
-    'GHL Free Trial Form',
-    array[]::text[],
-    null,
-    null,
-    false,
-    '{}'::jsonb,
-    '52a6285c-7832-44e1-b531-ab7ef9d8fc21',
-    null,
-    null,
-    '2026-06-11 21:11:26.180602+00'::timestamptz,
-    '2026-06-11 21:11:26.180602+00'::timestamptz
-  ),
-  (
     '87ae3fdd-e5bf-46dd-9871-c46bd169ee9b',
     '39875f07-0a4b-4429-a201-2249bc1f24df',
     'calendar',
@@ -121,23 +104,6 @@ values
     'free trial booked',
     '2026-06-11 21:11:26.180602+00'::timestamptz,
     '2026-06-11 23:34:16.266+00'::timestamptz
-  ),
-  (
-    'adfc764a-b8e7-41fb-8a2c-5821a5a30509',
-    '39875f07-0a4b-4429-a201-2249bc1f24df',
-    'ghl-form',
-    'GLI35e0zHS4cFrft92le',
-    'GHL Contact Form',
-    array[]::text[],
-    null,
-    null,
-    false,
-    '{}'::jsonb,
-    '52a6285c-7832-44e1-b531-ab7ef9d8fc21',
-    null,
-    null,
-    '2026-06-11 21:11:26.180602+00'::timestamptz,
-    '2026-06-11 21:11:26.180602+00'::timestamptz
   ),
   (
     'e9e91d47-fcb9-4656-ab3b-872bd099b789',

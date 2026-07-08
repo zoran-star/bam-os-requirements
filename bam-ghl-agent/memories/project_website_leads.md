@@ -70,7 +70,9 @@ client site form
 - **The OFFER is the organizing unit**: each offer (training, team/ADAPT, …)
   gets its own pipeline, website funnel, entry points, calendars, agents,
   member management, and KPIs. `entry_points.offer_id` → `offers(id)`;
-  GTA's 6 entry points belong to the Training offer (`52a6285c-…`).
+  GTA's Training-offer entry points (`52a6285c-…`) = 2 website forms +
+  2 booking calendars (the 2 legacy GHL forms were deleted 2026-07-08,
+  migration `20260708170000_delete_gta_ghl_entry_points.sql`).
 - Client portal "Pipelines" page renamed **Sales** — currently the Training
   offer's sales page; offer switcher comes when offer #2 goes live.
 - NEXT (discussed, not built): KPI strip on the Sales page — Leads → Trials
@@ -90,8 +92,9 @@ client site form
   dropdowns from live GHL data, tag chips, save/disconnect).
 - Only **website-form** rows are enforced by the leads API; ghl-form/calendar
   rows are standardized reference config (enforce via GHL workflows for now).
-- BAM GTA seeded with 6: website contact, website free-trial, 2 GHL forms,
-  2 booking calendars.
+- BAM GTA has 4 live: website contact, website free-trial, 2 booking
+  calendars (+ ADAPT intake, separate offer). The 2 legacy GHL-form rows
+  were deleted 2026-07-08 (never connected, V2 landing pages bypass GHL forms).
 - This is the onboarding primitive for V2: new academy = seed entry points,
   owner maps them in the wizard; off-GHL migration = repoint destinations.
 
