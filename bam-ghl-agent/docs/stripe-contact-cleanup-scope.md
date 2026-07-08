@@ -1,7 +1,7 @@
-# Stripe-Contact Link Cleanup - Design Scope (DRAFT, for workshop)
+# Stripe-Contact Link Cleanup - Design Scope (DECISIONS LOCKED 2026-07-08)
 
-**Status:** PROPOSED - not built. Came out of the Returning Client Enroll workshop (Q3, 2026-07-08).
-**Where it lives:** V2 client portal, most likely a new step in the existing Stripe Matcher strip
+**Status:** C1-C4 answered by Zoran 2026-07-08. Not built.
+**Where it lives:** STAFF portal, attached to the GHL contact import (Zoran's C1 call - see Decisions)
 **One-liner:** Link every Stripe customer in the academy's account to their contact record from the GoHighLevel contact import, and keep those links clean going forward.
 
 ---
@@ -39,14 +39,22 @@ A one-time cleanup + an always-on tie:
 - One person = one record. No more "which Jim is this?"
 - The same links power receipts, the member drawer, and the agent later.
 
-### Questions to workshop (need Zoran's call)
+### Decisions (LOCKED 2026-07-08, Zoran)
 
-| # | Question | Options |
+| # | Question | Decision |
 |---|---|---|
-| C1 | **Where it lives** | New step in the Stripe Matcher strip (Stripe -> Match -> Import -> Cleanup -> **Contacts**) vs a standalone tool on the Members tab |
-| C2 | **Auto-link threshold** | Exact-email matches link silently (recommended) vs everything reviewed the first time |
-| C3 | **Orphan Stripe customers** | Auto-create contact rows for them (recommended, `source='stripe-import'`) vs leave unlinked |
-| C4 | **Duplicate contacts** | Two+ contact rows sharing one email: build a small merge tool now, or park merging and just link to the best row? |
+| C1 | **Where it lives** | **Split by import type.** The **member import** (Stripe Matcher / sorter) keeps matching *members* only - unchanged. The **GHL contact import** (staff side) owns the whole Stripe-to-contacts cleaning: sweep + review + keep-clean all live on the **staff portal**, attached to the contact import. Where the member import surfaces in V2 gets spec'd LATER - after the Returning Client Enroll build ships and is run for real for the client **Houssein**. |
+| C2 | **Auto-link threshold** | **Exact-email matches link silently.** Everything else reviewed. |
+| C3 | **Orphan Stripe customers** | **Yes** - auto-create contact rows (`source='stripe-import'`). |
+| C4 | **Duplicate contacts** | **Build the merge tool** - duplicates sharing an email get merged, not just best-row linked. |
+
+### Sequencing (from C1)
+
+```
+1. Returning Client Enroll ships  ->  2. Run it live for Houssein
+->  3. Spec where the member import lives in V2
+->  4. This cleanup build (staff-side, GHL contact import)
+```
 
 ---
 
@@ -79,7 +87,7 @@ A one-time cleanup + an always-on tie:
 5. audit rows per link (who/how: auto-email | auto-phone | manual)
 ```
 
-**B. Review UI** - side-by-side match cards inside the chosen surface (C1), Link / Skip per row, progress counter. Reuses the Matcher's visual language.
+**B. Review UI** - side-by-side match cards on the **staff portal**, inside/next to the GHL contact import surface (per C1), Link / Skip per row, progress counter. Reuses the Matcher's visual language.
 
 **C. Keep-clean hooks**
 - `api/stripe/webhook.js`: `customer.created` -> try auto-link, else create contact
@@ -97,11 +105,15 @@ A one-time cleanup + an always-on tie:
 
 | Phase | What | Size |
 |---|---|---|
-| 1 | Sweep + auto-link + orphan creation + audit | ~half session |
-| 2 | Review UI for ambiguous matches | ~half session |
+| 1 | Sweep + auto-link + orphan creation + audit (staff-side) | ~half session |
+| 2 | Review UI for ambiguous matches (staff-side, at the GHL contact import) | ~half session |
 | 3 | Webhook + write-path stamps (keep-clean) | small |
-| 4 | Duplicate-contact merge tool (if C4 = yes) | separate |
+| 4 | Duplicate-contact merge tool (C4 = yes) | ~half session |
+
+Merge tool sketch (Phase 4): pick surviving row, repoint `members.contact_id` /
+`website_leads.contact_id` / `opportunities.contact_id` + `contact_field_values`,
+union tags, keep non-empty fields, archive the loser (never hard-delete), audit row.
 
 ---
 
-*Draft 2026-07-08. Workshop C1-C4 with Zoran, then update this doc before building.*
+*Decisions locked 2026-07-08. Build waits behind the enroll pilot (Houssein) per the sequencing above.*

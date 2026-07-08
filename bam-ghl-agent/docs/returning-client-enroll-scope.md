@@ -164,6 +164,16 @@ Search endpoint (step 1 of the UI): `GET /api/members?action=find-customer&q=` -
 | 3 | Agent tool + notify SMS copy + receipt hook ([resend-receipts](resend-receipts-scope.md)) | small |
 | 4 | "Win-back" candidates surface (auto-list past members from cancellations) | later, optional |
 
+### Pilot (locked 2026-07-08)
+
+First live run of this feature = **manually add a member who already exists in
+Stripe for the client Houssein**. That pilot gates the next steps: after it
+succeeds we spec where the member import lives in V2, and then the
+[Stripe-contact cleanup](stripe-contact-cleanup-scope.md) build runs on the
+staff side. Pre-flight for the pilot: Houssein's academy row needs
+`stripe_connect_status='connected'` + at least one live/confirmed
+`pricing_catalog` price on a non-archived offer.
+
 ### Onboarding data check
 
 - Per-academy default for **enroll notification channel + copy** (Category: Member Management, Phase: Settings)

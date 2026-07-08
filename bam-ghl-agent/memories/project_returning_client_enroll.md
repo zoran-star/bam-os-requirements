@@ -1,19 +1,27 @@
 ---
 name: Returning Client Enroll (Members V2) + companion scopes
-description: 2026-07-08 - enroll design DECISIONS LOCKED (Q1-Q6 answered by Zoran); spawned two companion scopes awaiting workshop - Stripe-contact cleanup (C1-C4 open) and Resend receipts (R1-R8 open). Nothing built. Docs in docs/*-scope.md.
+description: 2026-07-08 - ALL decisions locked (enroll Q1-Q6, cleanup C1-C4, receipts R1-R8). Build order = enroll -> pilot for client Houssein -> spec V2 member-import placement -> staff-side Stripe-contact cleanup; receipts build independent. Nothing built. Docs in docs/*-scope.md.
 metadata:
   type: project
 ---
 
 # Returning Client Enroll (Members V2)
 
-**State 2026-07-08 (later same day): enroll decisions LOCKED. Two companion
-scopes drafted, open questions pending Zoran. Nothing built.**
+**State 2026-07-08 (end of day): ALL THREE SCOPES DECISION-LOCKED. Nothing
+built. Next = build enroll Phase 1, then pilot for client Houssein.**
 
-Canonical docs:
-- [`docs/returning-client-enroll-scope.md`](../docs/returning-client-enroll-scope.md) - DECISIONS LOCKED
-- [`docs/stripe-contact-cleanup-scope.md`](../docs/stripe-contact-cleanup-scope.md) - DRAFT, questions C1-C4 open
-- [`docs/resend-receipts-scope.md`](../docs/resend-receipts-scope.md) - DRAFT, questions R1-R8 open
+Canonical docs (all decisions written in):
+- [`docs/returning-client-enroll-scope.md`](../docs/returning-client-enroll-scope.md)
+- [`docs/stripe-contact-cleanup-scope.md`](../docs/stripe-contact-cleanup-scope.md)
+- [`docs/resend-receipts-scope.md`](../docs/resend-receipts-scope.md)
+
+## Build order (locked via C1)
+
+```
+enroll build -> pilot: add Stripe-existing member for client HOUSSEIN
+-> spec V2 member-import placement -> staff-side Stripe-contact cleanup
+(receipts track runs independently; starts with the fees-section tax rework)
+```
 
 ## Enroll in one breath
 
@@ -40,22 +48,28 @@ template), live-price targets (`fix-payment.js buildTargets`), card-setup link
 Net-new = `enroll` action + `find-customer` search + 3-step drawer wizard +
 staff grant + member-agent tool.
 
-## Companion scope gists
+## Companion scope decisions (locked 2026-07-08)
 
-- **Stripe-contact cleanup:** sweep connected-account Stripe customers, link to
-  `contacts` (fills the existing `contacts.stripe_customer_id`), exact
-  email/phone auto-link, ambiguous -> Matcher-style review UI, orphans ->
-  contact created (`source='stripe-import'`), keep-clean via `customer.created`
-  webhook + write-path stamps. Open: C1 surface, C2 threshold, C3 orphans, C4 merge tool.
-- **Resend receipts:** new `receipts` table + `invoice.paid`/`charge.succeeded`
-  handlers in `api/stripe/webhook.js` -> branded template -> `sendEmail()`
-  (email spine), per-academy `clients.receipt_provider` gate, guided manual
-  step to turn OFF Stripe's own receipt emails (Standard Connect = owner's
-  dashboard setting, not API-flippable). Open: R1 coverage, R2 HST + GST number
-  (onboarding data point!), R3 branding source, R4 from-address, R5 manual
-  cutover ok, R6 refunds, R7 surfaces, R8 numbering.
+- **Stripe-contact cleanup (STAFF side, at the GHL contact import - C1):**
+  member import (Matcher/sorter) keeps matching members only. Sweep
+  connected-account Stripe customers -> `contacts.stripe_customer_id`;
+  exact-email auto-link silent (C2); orphans auto-create contacts,
+  `source='stripe-import'` (C3); duplicate contacts get a MERGE tool (C4:
+  repoint contact_id FKs + values, union tags, archive loser). Keep-clean via
+  `customer.created` webhook + write-path stamps.
+- **Resend receipts:** PORTAL-CREATED charges only (R1, gate on
+  metadata.origin='fullcontrol-portal'). Tax line only for academies with tax;
+  fees section gets structured tax profile (clients.tax_enabled/label/rate_bp/
+  tax_number) replacing free-text-only added_fees, end-to-end to the receipt
+  breakdown (R2 - onboarding data point: GST/HST number). Branding from
+  Business Blueprint (R3). From-address = academy input in Settings email
+  domain connection (R4, e.g. clients.receipt_from_email). Stripe's own
+  receipt emails OFF via guided manual dashboard step (R5). No refund receipts
+  in v1 (R6). Receipts delivered THROUGH THE CONVERSATION - email spine logs
+  to email_threads/email_messages so they show in the Inbox thread; member
+  drawer gets list + re-send (R7). Sequential numbering RCP-YYYY-NNNN (R8).
 
 ## Update this note when
 
-- Zoran answers C1-C4 / R1-R8 -> record + flip the doc statuses
-- Build starts/ships -> phase status here, details in the docs
+- Enroll Phase 1 / Houssein pilot / cleanup / receipts phases start or ship
+- The V2 member-import placement spec lands (new doc or section)
