@@ -1,0 +1,623 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sales Simple View - Hawkeye V2 mockup</title>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Nunito:wght@700;800&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#131416; --surface:#1B1D1F; --surface-el:#232629; --surface-hov:#2B2E32;
+    --border:rgba(255,255,255,0.08); --border-med:rgba(255,255,255,0.12); --border-str:rgba(255,255,255,0.16);
+    --text:#F0EDE8; --text-sub:#A5A19A; --text-mute:#6E6B63;
+    --gold:#D4B65C; --gold-glow:rgba(212,182,92,0.12); --on-gold:#131416;
+    --green:#4CC76A; --green-soft:rgba(76,199,106,0.14);
+    --amber:#F0B84A; --amber-soft:rgba(240,184,74,0.14);
+    --red:#F07060; --red-soft:rgba(240,112,96,0.14);
+    --blue:#5A8FB8; --blue-soft:rgba(90,143,184,0.14);
+    --purple:#A78BDA; --purple-soft:rgba(167,139,218,0.14);
+    --pink:#E08BB0; --pink-soft:rgba(224,139,176,0.14);
+    --deep:#4A6FA5; --deep-soft:rgba(74,111,165,0.14);
+    --font-ui:"Plus Jakarta Sans",-apple-system,system-ui,sans-serif;
+    --font-num:"Nunito",sans-serif;
+    --es:cubic-bezier(0.4,0,0.2,1);
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--text);font-family:var(--font-ui);min-height:100vh;padding:28px 20px 60px}
+  .wrap{max-width:860px;margin:0 auto}
+  .demo-note{font-size:11px;color:var(--text-mute);text-transform:uppercase;letter-spacing:.08em;margin-bottom:18px;text-align:center}
+
+  .topbar{display:flex;align-items:center;gap:12px;margin-bottom:22px}
+  .topbar h1{font-family:var(--font-num);font-size:26px;font-weight:800}
+  .spacer{flex:1}
+  .hawkeye-btn{display:flex;align-items:center;gap:8px;background:var(--gold);color:var(--on-gold);border:none;
+    border-radius:999px;padding:10px 18px;font-family:var(--font-ui);font-size:14px;font-weight:700;cursor:pointer;
+    box-shadow:0 6px 20px rgba(212,182,92,.18);transition:transform .12s var(--es)}
+  .hawkeye-btn:hover{transform:translateY(-1px)}
+  .hawkeye-btn .cnt{background:var(--on-gold);color:var(--gold);border-radius:999px;font-size:12px;font-weight:800;
+    min-width:20px;height:20px;display:flex;align-items:center;justify-content:center;padding:0 5px}
+  .back-btn{display:inline-flex;align-items:center;gap:6px;background:var(--surface-el);color:var(--text-sub);
+    border:1px solid var(--border-med);border-radius:999px;padding:8px 16px;font-size:13px;font-weight:600;cursor:pointer}
+  .back-btn:hover{color:var(--text)}
+
+  .strip{display:flex;gap:8px;margin-bottom:0}
+  .pill{flex:1;border-radius:12px;padding:12px 8px;text-align:center;cursor:pointer;position:relative;
+    border:1.5px solid var(--border-med);background:var(--surface);transition:all .25s var(--es);min-width:0}
+  .pill .nm{font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .pill .sub{font-size:11px;margin-top:3px;color:var(--text-sub)}
+  .pill .sub.hot{color:var(--red);font-weight:700}
+  .pill.auto{border-style:dashed}
+  .pill.a-ghosted{border-color:var(--amber)} .pill.a-nurture{border-color:var(--deep)}
+  .pill.g-booking{border-color:var(--blue)} .pill.g-confirm{border-color:var(--green)}
+  .pill.g-closing{border-color:var(--purple)} .pill.h-member{border-color:var(--pink)}
+  .pill:hover{background:var(--surface-el)}
+  .pill.dim{opacity:.45}
+  .pill.active{color:#131416}
+  .pill.active .nm,.pill.active .sub{display:none}
+  .pill.active.a-ghosted{background:var(--amber)} .pill.active.a-nurture{background:var(--deep);color:#fff}
+  .pill.active.g-booking{background:var(--blue);color:#fff} .pill.active.g-confirm{background:var(--green)}
+  .pill.active.g-closing{background:var(--purple)} .pill.active.h-member{background:var(--pink)}
+  .pill .gearwrap{display:none;align-items:center;justify-content:center;gap:6px}
+  .pill.active .gearwrap{display:flex}
+  .gear-ic{width:20px;height:20px;display:block}
+
+  .panel{overflow:hidden;max-height:0;transition:max-height .45s var(--es);margin-top:0}
+  .panel.open{max-height:900px;margin-top:14px}
+  .panel-inner{border-radius:16px;background:var(--surface);border:1px solid var(--border);padding:16px}
+  .panel-head{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--text-mute);margin-bottom:12px;
+    display:flex;align-items:center;gap:8px}
+  .engine-tag{font-size:10px;font-weight:700;border-radius:6px;padding:3px 8px;letter-spacing:.05em}
+
+  .rows{display:flex;flex-direction:column;gap:8px}
+  .row{display:flex;gap:10px;align-items:stretch;opacity:0;transform:translateY(-8px);transition:all .35s var(--es)}
+  .panel.open .row{opacity:1;transform:none}
+  .lead{background:var(--surface-el);border:1px solid var(--border-med);border-radius:12px;padding:10px 14px;
+    display:flex;align-items:center;gap:10px;cursor:pointer;transition:border-color .12s}
+  .lead:hover{border-color:var(--border-str)}
+  .row .lead{flex:1}
+  .row.split .lead{flex:0 0 46%}
+  .lead .who{font-size:13.5px;font-weight:600}
+  .lead .st{font-size:11.5px;color:var(--text-mute);margin-top:2px}
+  .lead.needs{border-color:var(--gold);box-shadow:0 0 0 1px var(--gold-glow),0 4px 14px rgba(212,182,92,.10)}
+  .lead.needs .st{color:var(--gold)}
+  .avatar{width:30px;height:30px;border-radius:50%;background:var(--surface-hov);display:flex;align-items:center;
+    justify-content:center;font-size:11px;font-weight:700;color:var(--text-sub);flex-shrink:0}
+  .action{flex:1;background:var(--gold-glow);border:1px solid rgba(212,182,92,.30);border-radius:12px;
+    padding:9px 12px;display:flex;flex-direction:column;gap:7px;justify-content:center}
+  .action .draft{font-size:12px;color:var(--text);background:var(--surface-el);border-radius:8px;padding:7px 9px;
+    line-height:1.45}
+  .action .abtns{display:flex;gap:6px}
+  .abtn{border-radius:8px;border:1px solid var(--border-med);background:var(--surface-el);color:var(--text-sub);
+    font-family:var(--font-ui);font-size:11.5px;font-weight:600;padding:5px 11px;cursor:pointer}
+  .abtn.go{background:var(--green-soft);border-color:rgba(76,199,106,.4);color:var(--green)}
+  .abtn:hover{border-color:var(--border-str);color:var(--text)}
+  .abtn.go:hover{color:var(--green)}
+
+  .screen{display:none}
+  .screen.on{display:block;animation:fadeIn .3s var(--es)}
+  @keyframes fadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+
+  .hk-toggle{display:flex;gap:8px;margin-bottom:18px;align-items:center}
+  .hk-tab{display:flex;align-items:center;gap:8px;border-radius:999px;border:1.5px solid var(--border-med);
+    background:var(--surface);color:var(--text-sub);padding:9px 16px;font-family:var(--font-ui);font-size:13px;
+    font-weight:600;cursor:pointer;transition:all .15s var(--es)}
+  .hk-tab .n{background:var(--red-soft);color:var(--red);border-radius:999px;font-size:11px;font-weight:800;
+    min-width:18px;height:18px;display:flex;align-items:center;justify-content:center;padding:0 5px}
+  .hk-tab.sel{background:var(--gold);border-color:var(--gold);color:var(--on-gold)}
+  .hk-tab.sel .n{background:var(--on-gold);color:var(--gold)}
+  .hk-tab .tgear{display:none;margin-left:2px}
+  .hk-tab.sel .tgear{display:block}
+  .qcard{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:16px;margin-bottom:12px}
+  .qcard .meta{font-size:12px;color:var(--text-sub);margin-bottom:8px}
+  .qcard .lastmsg{font-size:13px;background:var(--surface-el);border-radius:12px 12px 12px 4px;padding:9px 12px;
+    margin-bottom:8px;max-width:75%;color:var(--text-sub)}
+  .qcard .draft{font-size:13px;background:var(--gold-glow);border:1px solid rgba(212,182,92,.25);
+    border-radius:12px 12px 4px 12px;padding:9px 12px;margin:0 0 10px auto;max-width:75%;line-height:1.5}
+  .qcard .abtns{display:flex;gap:8px;justify-content:flex-end}
+
+  .cfg-sec{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:16px;margin-bottom:12px}
+  .cfg-sec h3{font-size:13px;font-weight:700;margin-bottom:8px;display:flex;gap:8px;align-items:center}
+  .cfg-sec p{font-size:12.5px;color:var(--text-sub);line-height:1.55}
+  .chip{display:inline-block;font-size:11px;border:1px solid var(--border-med);border-radius:999px;
+    padding:4px 10px;margin:3px 4px 0 0;color:var(--text-sub)}
+  .live-badge{font-size:10px;font-weight:800;letter-spacing:.06em;background:var(--green-soft);color:var(--green);
+    border-radius:6px;padding:3px 8px;text-transform:uppercase}
+  .hint{font-size:11.5px;color:var(--text-mute);margin-top:10px;text-align:center}
+
+  .hk-overlay{position:fixed;inset:0;background:rgba(0,0,0,.55);display:none;align-items:center;
+    justify-content:center;z-index:50;padding:20px;backdrop-filter:blur(3px)}
+  .hk-overlay.on{display:flex}
+  .hk-modal{width:100%;max-width:880px;max-height:88vh;background:var(--surface);border:1px solid var(--border-str);
+    border-radius:24px;display:grid;grid-template-columns:270px 1fr;overflow:hidden;
+    box-shadow:0 12px 40px rgba(0,0,0,.5);animation:popIn .28s cubic-bezier(0.34,1.56,0.64,1)}
+  @keyframes popIn{from{opacity:0;transform:scale(.96) translateY(10px)}to{opacity:1;transform:none}}
+  .hk-left{background:var(--surface-el);border-right:1px solid var(--border);padding:22px 18px;
+    display:flex;flex-direction:column;gap:14px;overflow-y:auto}
+  .hk-left .bigav{width:56px;height:56px;border-radius:50%;background:var(--gold-glow);color:var(--gold);
+    display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:800;font-family:var(--font-num)}
+  .hk-left h2{font-size:17px;font-weight:700}
+  .hk-left .sub{font-size:12.5px;color:var(--text-sub);margin-top:2px}
+  .hk-fact{font-size:12px;color:var(--text-sub);display:flex;justify-content:space-between;gap:8px;
+    border-bottom:1px solid var(--border);padding-bottom:8px}
+  .hk-fact b{color:var(--text);font-weight:600;text-align:right}
+  .hk-ctx{font-size:11.5px;color:var(--text-mute);background:var(--surface);border:1px dashed var(--border-med);
+    border-radius:10px;padding:8px 10px;line-height:1.5}
+  .hk-exits{margin-top:auto;display:flex;flex-direction:column;gap:6px}
+  .hk-exits .lbl{font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--text-mute)}
+  .xbtn{border-radius:8px;border:1px solid var(--border-med);background:transparent;color:var(--text-sub);
+    font-family:var(--font-ui);font-size:12px;font-weight:600;padding:7px 10px;cursor:pointer;text-align:left}
+  .xbtn:hover{border-color:var(--border-str);color:var(--text)}
+  .hk-right{display:flex;flex-direction:column;min-height:0}
+  .hk-right .thread{flex:1;overflow-y:auto;padding:20px 20px 8px;display:flex;flex-direction:column;gap:8px;min-height:220px}
+  .bub{font-size:13px;line-height:1.5;padding:9px 13px;border-radius:14px;max-width:78%}
+  .bub.in{background:var(--surface-el);color:var(--text);border-bottom-left-radius:4px;align-self:flex-start}
+  .bub.out{background:var(--surface-hov);color:var(--text-sub);border-bottom-right-radius:4px;align-self:flex-end}
+  .bub.bot{background:var(--gold-glow);border:1px solid rgba(212,182,92,.3);border-bottom-right-radius:4px;align-self:flex-end}
+  .bub .tag{display:block;font-size:9.5px;font-weight:800;letter-spacing:.07em;text-transform:uppercase;
+    color:var(--gold);margin-bottom:4px}
+  .hk-compose{border-top:1px solid var(--border);padding:14px 20px 18px;display:flex;flex-direction:column;gap:9px}
+  .hk-compose textarea{background:var(--surface-el);border:1px solid rgba(212,182,92,.35);border-radius:12px;
+    color:var(--text);font-family:var(--font-ui);font-size:13px;line-height:1.5;padding:10px 12px;resize:vertical;
+    min-height:58px;outline:none}
+  .hk-compose textarea:focus{border-color:var(--gold)}
+  .hk-teach{background:var(--surface);border:1px dashed var(--border-med);border-radius:10px;color:var(--text-sub);
+    font-family:var(--font-ui);font-size:12px;padding:8px 11px;outline:none;width:100%}
+  .hk-teach:focus{border-color:var(--gold);border-style:solid}
+  .hk-actions{display:flex;gap:8px;align-items:center}
+  .hk-send{background:var(--gold);color:var(--on-gold);border:none;border-radius:999px;padding:9px 18px;
+    font-family:var(--font-ui);font-size:13px;font-weight:700;cursor:pointer}
+  .hk-send:hover{filter:brightness(1.06)}
+  .hk-lesson{background:transparent;border:1px solid var(--border-med);border-radius:999px;padding:8px 14px;
+    color:var(--text-sub);font-family:var(--font-ui);font-size:12px;font-weight:600;cursor:pointer}
+  .hk-lesson:hover{color:var(--text);border-color:var(--border-str)}
+  .hk-close{position:absolute;top:14px;right:16px;background:transparent;border:none;color:var(--text-mute);
+    font-size:22px;cursor:pointer;line-height:1}
+  .hk-close:hover{color:var(--text)}
+  .hk-prog{font-size:11px;color:var(--text-mute);margin-left:auto}
+  @media(max-width:720px){.hk-modal{grid-template-columns:1fr;max-height:92vh}.hk-left{flex-direction:row;flex-wrap:wrap;align-items:center;gap:10px}.hk-exits{margin-top:0;flex-direction:row}.hk-fact{display:none}}
+
+  .hk-toggle .hk-tab{flex:1;justify-content:center}
+  .deck{position:relative;max-width:620px;margin:0 auto;height:600px}
+  .deckcard{position:absolute;inset:0;background:var(--surface);border:1px solid var(--border-str);border-radius:24px;
+    padding:20px;display:flex;flex-direction:column;gap:10px;box-shadow:0 12px 40px rgba(0,0,0,.35);
+    transition:transform .32s var(--es),opacity .32s var(--es);touch-action:pan-y}
+  .deckcard.behind{transform:scale(.94) translateY(16px);opacity:.45;z-index:0;pointer-events:none}
+  .deckcard.top{z-index:2}
+  .deckcard.fly-right{transform:translateX(130%) rotate(10deg);opacity:0}
+  .deckcard.fly-left{transform:translateX(-130%) rotate(-10deg);opacity:0}
+  .dc-head{display:flex;align-items:center;gap:12px}
+  .dc-head .who{font-size:17px;font-weight:700}
+  .dc-head .sub{font-size:12px;color:var(--text-sub);margin-top:2px}
+  .dc-thread{flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column;gap:8px;padding:4px 2px}
+  .dc-draft{background:var(--surface-el);border:1px solid rgba(212,182,92,.35);border-radius:12px;color:var(--text);
+    font-family:var(--font-ui);font-size:13px;line-height:1.5;padding:10px 12px;resize:none;min-height:56px;outline:none}
+  .dc-draft:focus{border-color:var(--gold)}
+  .dc-move{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+  .dc-move .lbl{font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--text-mute);margin-right:2px}
+  .allclear{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;
+    border:1px dashed var(--border-med);border-radius:24px;color:var(--text-sub)}
+  .allclear .big{width:64px;height:64px;border-radius:50%;background:var(--green-soft);color:var(--green);
+    display:flex;align-items:center;justify-content:center;font-size:28px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="demo-note">Clickable mockup - click stages, the Hawkeye button, and gears</div>
+
+  <!-- ============ SCREEN 1: SIMPLE VIEW ============ -->
+  <div class="screen on" id="scr-simple">
+    <div class="topbar">
+      <h1>Sales</h1>
+      <div class="spacer"></div>
+      <button class="hawkeye-btn" onclick="show('scr-hawkeye')">
+        <svg class="gear-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:17px;height:17px"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
+        Hawkeye <span class="cnt">8</span>
+      </button>
+    </div>
+
+    <div class="strip" id="strip">
+      <div class="pill auto a-ghosted" data-stage="ghosted" onclick="toggleStage(this)">
+        <div class="nm">Ghosted</div><div class="sub">18 enrolled</div>
+        <div class="gearwrap" onclick="event.stopPropagation();show('scr-config')" title="Configure">
+          <svg class="gear-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z"/></svg>
+        </div>
+      </div>
+      <div class="pill auto a-nurture" data-stage="nurture" onclick="toggleStage(this)">
+        <div class="nm">Nurture</div><div class="sub">42 enrolled</div>
+        <div class="gearwrap" onclick="event.stopPropagation();show('scr-config')" title="Configure">
+          <svg class="gear-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z"/></svg>
+        </div>
+      </div>
+      <div class="pill g-booking" data-stage="booking" onclick="toggleStage(this)">
+        <div class="nm">Booking</div><div class="sub hot">5 need you</div>
+        <div class="gearwrap" onclick="event.stopPropagation();show('scr-config')" title="Configure">
+          <svg class="gear-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z"/></svg>
+        </div>
+      </div>
+      <div class="pill g-confirm" data-stage="confirm" onclick="toggleStage(this)">
+        <div class="nm">Confirm</div><div class="sub hot">2 need you</div>
+        <div class="gearwrap" onclick="event.stopPropagation();show('scr-config')" title="Configure">
+          <svg class="gear-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z"/></svg>
+        </div>
+      </div>
+      <div class="pill g-closing" data-stage="closing" onclick="toggleStage(this)">
+        <div class="nm">Closing</div><div class="sub hot">1 needs you</div>
+        <div class="gearwrap" onclick="event.stopPropagation();show('scr-config')" title="Configure">
+          <svg class="gear-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z"/></svg>
+        </div>
+      </div>
+      <div class="pill h-member" data-stage="member" onclick="toggleStage(this)">
+        <div class="nm">Member</div><div class="sub">31 active</div>
+        <div class="gearwrap" onclick="event.stopPropagation();show('scr-config')" title="Configure">
+          <svg class="gear-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z"/></svg>
+        </div>
+      </div>
+    </div>
+
+    <!-- BOOKING: agent stage. Cards slide LEFT, each card's hawkeye action sits to its right -->
+    <div class="panel" id="panel-booking">
+      <div class="panel-inner">
+        <div class="panel-head">Booking · Responded
+          <span class="engine-tag" style="background:var(--blue-soft);color:var(--blue)">AGENT ENGINE</span>
+          <span style="flex:1"></span><span style="text-transform:none;letter-spacing:0">gold ring = needs you</span>
+        </div>
+        <div class="rows">
+          <div class="row split">
+            <div class="lead needs" onclick="openHawk('jordan')"><div class="avatar">JM</div><div><div class="who">Jordan M.</div><div class="st">draft ready</div></div></div>
+            <div class="action">
+              <div class="draft">Saturday works! We have a 10am group at Linbrook. Want me to lock it in for Aiden?</div>
+              <div class="abtns"><button class="abtn go">Approve and send</button><button class="abtn" onclick="event.stopPropagation();openHawk(hkKeyFromRow(this))">Review</button></div>
+            </div>
+          </div>
+          <div class="row split">
+            <div class="lead needs" onclick="openHawk('sam')"><div class="avatar">SK</div><div><div class="who">Sam K.</div><div class="st">went quiet 2 days</div></div></div>
+            <div class="action">
+              <div class="abtns"><button class="abtn go">Send to Ghosted</button><button class="abtn">Mark lost</button></div>
+            </div>
+          </div>
+          <div class="row split">
+            <div class="lead needs" onclick="openHawk('dana')"><div class="avatar">DT</div><div><div class="who">Dana T.</div><div class="st">draft ready</div></div></div>
+            <div class="action">
+              <div class="draft">Totally get it! Weeknights we run 6pm and 7:30pm groups. Would either work for Maya?</div>
+              <div class="abtns"><button class="abtn go">Approve and send</button><button class="abtn" onclick="event.stopPropagation();openHawk(hkKeyFromRow(this))">Review</button></div>
+            </div>
+          </div>
+          <div class="row"><div class="lead"><div class="avatar">PS</div><div><div class="who">Priya S.</div><div class="st">agent handling it</div></div></div></div>
+          <div class="row"><div class="lead"><div class="avatar">MT</div><div><div class="who">Marcus T.</div><div class="st">agent handling it</div></div></div></div>
+        </div>
+        <div class="hint">glowing card = Hawkeye popup · plain card = lead drawer</div>
+      </div>
+    </div>
+
+    <!-- GHOSTED: automation stage. Cards cascade straight down, single column -->
+    <div class="panel" id="panel-ghosted">
+      <div class="panel-inner">
+        <div class="panel-head">Ghosted · Interested
+          <span class="engine-tag" style="background:var(--amber-soft);color:var(--amber)">AUTOMATION ENGINE</span>
+          <span style="flex:1"></span><span style="text-transform:none;letter-spacing:0">3 steps over 3 days · reply wakes the Booking agent</span>
+        </div>
+        <div class="rows">
+          <div class="row"><div class="lead"><div class="avatar">AR</div><div><div class="who">Alex R.</div><div class="st">step 2 of 3 · SMS sends tomorrow</div></div></div></div>
+          <div class="row"><div class="lead"><div class="avatar">NB</div><div><div class="who">Nina B.</div><div class="st">step 1 of 3 · sent today</div></div></div></div>
+          <div class="row"><div class="lead"><div class="avatar">TW</div><div><div class="who">Theo W.</div><div class="st">step 3 of 3 · email sends day 3</div></div></div></div>
+          <div class="row"><div class="lead"><div class="avatar">+</div><div><div class="who">15 more enrolled</div><div class="st">view all</div></div></div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- MEMBER: human stage. Cards cascade straight down -->
+    <div class="panel" id="panel-member">
+      <div class="panel-inner">
+        <div class="panel-head">Member
+          <span class="engine-tag" style="background:var(--pink-soft);color:var(--pink)">HUMAN ENGINE</span>
+          <span style="flex:1"></span><span style="text-transform:none;letter-spacing:0">you run this stage - no bot</span>
+        </div>
+        <div class="rows">
+          <div class="row"><div class="lead"><div class="avatar">LG</div><div><div class="who">Liam G.</div><div class="st">joined this week</div></div></div></div>
+          <div class="row"><div class="lead"><div class="avatar">EK</div><div><div class="who">Emma K.</div><div class="st">active member</div></div></div></div>
+          <div class="row"><div class="lead"><div class="avatar">+</div><div><div class="who">29 more members</div><div class="st">view all</div></div></div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Confirm / Closing / Nurture reuse the same patterns; stubs so every pill responds -->
+    <div class="panel" id="panel-confirm">
+      <div class="panel-inner">
+        <div class="panel-head">Confirm · Scheduled Trial
+          <span class="engine-tag" style="background:var(--green-soft);color:var(--green)">AGENT ENGINE</span></div>
+        <div class="rows">
+          <div class="row split">
+            <div class="lead needs" onclick="openHawk('rachel')"><div class="avatar">RB</div><div><div class="who">Rachel B.</div><div class="st">draft ready</div></div></div>
+            <div class="action"><div class="draft">See you tomorrow at 6pm! Address is 1079 Linbrook Rd. Text me if anything comes up.</div>
+            <div class="abtns"><button class="abtn go">Approve and send</button><button class="abtn" onclick="event.stopPropagation();openHawk(hkKeyFromRow(this))">Review</button></div></div>
+          </div>
+          <div class="row"><div class="lead"><div class="avatar">OC</div><div><div class="who">Owen C.</div><div class="st">trial Friday · agent handling it</div></div></div></div>
+        </div>
+      </div>
+    </div>
+    <div class="panel" id="panel-closing">
+      <div class="panel-inner">
+        <div class="panel-head">Closing · Done Trial
+          <span class="engine-tag" style="background:var(--purple-soft);color:var(--purple)">AGENT ENGINE</span></div>
+        <div class="rows">
+          <div class="row split">
+            <div class="lead needs" onclick="openHawk('kayla')"><div class="avatar">KH</div><div><div class="who">Kayla H.</div><div class="st">good fit · draft ready</div></div></div>
+            <div class="action"><div class="draft">Aiden crushed it yesterday! Here is the sign-up link to grab his spot for the fall group.</div>
+            <div class="abtns"><button class="abtn go">Send enroll link</button><button class="abtn" onclick="event.stopPropagation();openHawk(hkKeyFromRow(this))">Review</button></div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="panel" id="panel-nurture">
+      <div class="panel-inner">
+        <div class="panel-head">Nurture
+          <span class="engine-tag" style="background:var(--deep-soft);color:var(--blue)">AUTOMATION ENGINE</span>
+          <span style="flex:1"></span><span style="text-transform:none;letter-spacing:0">4 emails over 8 weeks · the long game</span></div>
+        <div class="rows">
+          <div class="row"><div class="lead"><div class="avatar">JD</div><div><div class="who">Jamie D.</div><div class="st">email 2 of 4 · sends next week</div></div></div></div>
+          <div class="row"><div class="lead"><div class="avatar">+</div><div><div class="who">41 more enrolled</div><div class="st">view all</div></div></div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ SCREEN 2: HAWKEYE FOCUS PAGE (tinder deck) ============ -->
+  <div class="screen" id="scr-hawkeye">
+    <div class="topbar">
+      <button class="back-btn" onclick="show('scr-simple')">&#8592; Sales</button>
+      <h1 style="font-size:22px">Hawkeye</h1>
+      <div class="spacer"></div>
+    </div>
+    <div class="hk-toggle">
+      <button class="hk-tab sel" id="hkt-booking" onclick="hkPick('booking')">Booking <span class="n" id="hkn-booking">3</span> <svg class="gear-ic tgear" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px" onclick="event.stopPropagation();show('scr-config')"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z"/></svg></button>
+      <button class="hk-tab" id="hkt-confirm" onclick="hkPick('confirm')">Confirm <span class="n" id="hkn-confirm">2</span> <svg class="gear-ic tgear" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px" onclick="event.stopPropagation();show('scr-config')"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z"/></svg></button>
+      <button class="hk-tab" id="hkt-closing" onclick="hkPick('closing')">Closing <span class="n" id="hkn-closing">1</span> <svg class="gear-ic tgear" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px" onclick="event.stopPropagation();show('scr-config')"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z"/></svg></button>
+    </div>
+    <div class="deck" id="hk-deck"></div>
+    <div class="hint">desktop: buttons &middot; mobile: swipe right = approve and send &middot; swipe left = move the lead</div>
+  </div>
+
+  <!-- ============ SCREEN 3: CONFIGURE (existing focus mode) ============ -->
+  <div class="screen" id="scr-config">
+    <div class="topbar">
+      <button class="back-btn" onclick="show('scr-simple')">&#8592; Back</button>
+      <h1 style="font-size:22px">Configure · Booking</h1>
+      <span class="live-badge">Already live in prod</span>
+      <div class="spacer"></div>
+    </div>
+    <div class="cfg-sec"><h3>Entry points</h3>
+      <p>How leads land in this stage (read-only, auto-linked from other stages' exits).</p>
+      <span class="chip">New lead - form or inbound text</span><span class="chip">Rebook - no-show or can't make it</span><span class="chip">Re-engaged - replied to Ghosted or Nurture</span>
+    </div>
+    <div class="cfg-sec"><h3>Engine <span class="engine-tag" style="background:var(--blue-soft);color:var(--blue)">AGENT</span></h3>
+      <p>Everything editable: autonomy mode (Off / Hawkeye), initial automations per entry point, brain and offer data, lessons, test sandbox.</p>
+      <span class="chip">Autonomy: Hawkeye</span><span class="chip">Initial automations: 3 entry openers</span><span class="chip">Brain</span><span class="chip">Lessons</span><span class="chip">Test chat</span>
+    </div>
+    <div class="cfg-sec"><h3>Exit points</h3>
+      <p>Where leads go next (editable branches).</p>
+      <span class="chip">Books a time &#8594; Confirm</span><span class="chip">Goes quiet &#8594; Ghosted</span><span class="chip">Not interested &#8594; Nurture</span><span class="chip">Unqualified &#8594; out</span>
+    </div>
+    <div class="hint">This is the focus-mode page that shipped 2026-07-06 - the gear simply routes here.</div>
+  </div>
+
+  <!-- ============ HAWKEYE POPUP MODAL ============ -->
+  <div class="hk-overlay" id="hk-overlay" onclick="if(event.target===this)closeHawk()">
+    <div class="hk-modal" style="position:relative">
+      <button class="hk-close" onclick="closeHawk()" aria-label="Close">&times;</button>
+      <div class="hk-left">
+        <div class="bigav" id="hkm-av">JM</div>
+        <div><h2 id="hkm-name">Jordan M.</h2><div class="sub" id="hkm-sub">Parent of Aiden (9)</div></div>
+        <div class="hk-fact"><span>Stage</span><b id="hkm-stage">Responded</b></div>
+        <div class="hk-fact"><span>Phone</span><b id="hkm-phone">(416) 555-0184</b></div>
+        <div class="hk-fact"><span>Last active</span><b id="hkm-last">14 min ago</b></div>
+        <div class="hk-ctx" id="hkm-ctx">Entry: new lead - website form. 3 days in stage.</div>
+        <div class="hk-exits">
+          <div class="lbl">Move the lead</div>
+          <button class="xbtn">Send to Ghosted</button>
+          <button class="xbtn">Not interested &#8594; Nurture</button>
+          <button class="xbtn">Unqualified</button>
+        </div>
+      </div>
+      <div class="hk-right">
+        <div class="thread" id="hkm-thread"></div>
+        <div class="hk-compose">
+          <textarea id="hkm-draft" oninput="document.getElementById('hkm-teach').style.display='block'"></textarea>
+          <input class="hk-teach" id="hkm-teach" placeholder="Teach the agent: why did you change it? (saved as a lesson)">
+          <div class="hk-actions">
+            <button class="hk-send" onclick="nextHawk()">Approve and send</button>
+            <button class="hk-lesson">Save as lesson only</button>
+            <span class="hk-prog" id="hkm-prog">1 of 5 in Booking</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+<script>
+  function show(id){
+    document.querySelectorAll('.screen').forEach(function(s){s.classList.remove('on')});
+    document.getElementById(id).classList.add('on');
+    window.scrollTo({top:0});
+  }
+  var openStage=null;
+  function toggleStage(pill){
+    var stage=pill.dataset.stage;
+    var pills=document.querySelectorAll('#strip .pill');
+    var panels=document.querySelectorAll('#scr-simple .panel');
+    if(openStage===stage){
+      openStage=null;
+      pills.forEach(function(p){p.classList.remove('active','dim')});
+      panels.forEach(function(p){p.classList.remove('open')});
+      return;
+    }
+    openStage=stage;
+    pills.forEach(function(p){
+      p.classList.toggle('active',p===pill);
+      p.classList.toggle('dim',p!==pill);
+    });
+    panels.forEach(function(p){p.classList.remove('open')});
+    var panel=document.getElementById('panel-'+stage);
+    if(panel){
+      requestAnimationFrame(function(){panel.classList.add('open')});
+      var rows=panel.querySelectorAll('.row');
+      rows.forEach(function(r,i){r.style.transitionDelay=(60+i*70)+'ms'});
+    }
+  }
+  var HK={
+    jordan:{av:'JM',name:'Jordan M.',sub:'Parent of Aiden (9)',stage:'Responded',phone:'(416) 555-0184',last:'14 min ago',
+      ctx:'Entry: new lead - website form. 3 days in stage.',prog:'1 of 5 in Booking',
+      thread:[['in','hey is this where you book the free basketball trial?'],
+              ['bot','Hey Jordan! Yes - free trials run at Linbrook gym. What day works best for Aiden?'],
+              ['in','does saturday work instead?']],
+      draft:'Saturday works! We have a 10am group at Linbrook. Want me to lock it in for Aiden?'},
+    sam:{av:'SK',name:'Sam K.',sub:'Parent of Leo (11)',stage:'Responded',phone:'(647) 555-0117',last:'2 days ago',
+      ctx:'Went quiet: no reply for 2 days after our last message.',prog:'2 of 5 in Booking',
+      thread:[['bot','Hey Sam! Do weekday evenings or the weekend work better for Leo?'],
+              ['in','ok ill think about it']],
+      draft:'No pressure at all! Spots for this weekend are filling up - want me to hold one for Leo while you decide?'},
+    dana:{av:'DT',name:'Dana T.',sub:'Parent of Maya (10)',stage:'Responded',phone:'(905) 555-0163',last:'1 hr ago',
+      ctx:'Entry: new lead - Instagram ad. First conversation.',prog:'3 of 5 in Booking',
+      thread:[['in','weekends are tough for us honestly']],
+      draft:'Totally get it! Weeknights we run 6pm and 7:30pm groups. Would either work for Maya?'},
+    rachel:{av:'RB',name:'Rachel B.',sub:'Parent of Sofia (9)',stage:'Scheduled Trial',phone:'(416) 555-0139',last:'25 min ago',
+      ctx:'Trial tomorrow 6pm at Linbrook. Confirmation sent, she replied.',prog:'1 of 2 in Confirm',
+      thread:[['bot','Sofia is all set for tomorrow at 6pm! Address is 1079 Linbrook Rd.'],
+              ['in','what should she bring?']],
+      draft:'Just runners, a water bottle and a ball if she has one - we have spares! See you at 1079 Linbrook Rd.'},
+    owen:{av:'OC',name:'Owen C.',sub:'Parent of Jack (12)',stage:'Scheduled Trial',phone:'(289) 555-0142',last:'1 day ago',
+      ctx:'No reply to the trial confirmation. Trial is Friday 7pm.',prog:'2 of 2 in Confirm',
+      thread:[['bot','Hey Owen! Confirming Jack for Friday 7pm at Linbrook - can you reply YES so I know he is coming?']],
+      draft:'Hey Owen, just a quick reminder about Jack\'s free trial this Friday at 7pm - are you still good to make it?'},
+    kayla:{av:'KH',name:'Kayla H.',sub:'Parent of Aiden J. (10)',stage:'Done Trial',phone:'(416) 555-0171',last:'3 hrs ago',
+      ctx:'Post-trial form: showed up, good fit. Ready to enroll.',prog:'1 of 1 in Closing',
+      thread:[['in','he loved it! what are next steps']],
+      draft:'Amazing! Here is the sign-up link to grab Aiden\'s spot in the fall group.'}
+  };
+  function openHawk(key){
+    var d=HK[key]; if(!d) d=HK.jordan;
+    document.getElementById('hkm-av').textContent=d.av;
+    document.getElementById('hkm-name').textContent=d.name;
+    document.getElementById('hkm-sub').textContent=d.sub;
+    document.getElementById('hkm-stage').textContent=d.stage;
+    document.getElementById('hkm-phone').textContent=d.phone;
+    document.getElementById('hkm-last').textContent=d.last;
+    document.getElementById('hkm-ctx').textContent=d.ctx;
+    document.getElementById('hkm-prog').textContent=d.prog;
+    var th=document.getElementById('hkm-thread'); th.innerHTML='';
+    d.thread.forEach(function(m){
+      var b=document.createElement('div');
+      b.className='bub '+(m[0]==='in'?'in':'bot');
+      if(m[0]==='bot'){var t=document.createElement('span');t.className='tag';t.textContent='Agent';b.appendChild(t);}
+      b.appendChild(document.createTextNode(m[1]));
+      th.appendChild(b);
+    });
+    var sug=document.createElement('div');sug.className='bub bot';sug.style.opacity='.75';
+    var tg=document.createElement('span');tg.className='tag';tg.textContent='Suggested reply - edit below';
+    sug.appendChild(tg);sug.appendChild(document.createTextNode(d.draft));th.appendChild(sug);
+    document.getElementById('hkm-draft').value=d.draft;
+    document.getElementById('hkm-teach').style.display='none';
+    document.getElementById('hk-overlay').classList.add('on');
+    th.scrollTop=th.scrollHeight;
+  }
+  function closeHawk(){document.getElementById('hk-overlay').classList.remove('on')}
+  var HK_ORDER=['jordan','sam','dana','rachel','owen','kayla'],hkIdx=0;
+  function nextHawk(){
+    var cur=document.getElementById('hkm-name').textContent;
+    var idx=HK_ORDER.findIndex(function(k){return HK[k].name===cur});
+    if(idx>=0&&idx<HK_ORDER.length-1){openHawk(HK_ORDER[idx+1]);}else{closeHawk();}
+  }
+
+  function hkKeyFromRow(btn){
+    var row=btn.closest('.row')||btn.closest('.qcard');
+    var av=row?row.querySelector('.avatar'):null;
+    var map={JM:'jordan',SK:'sam',DT:'dana',RB:'rachel',OC:'owen',KH:'kayla'};
+    return av&&map[av.textContent]?map[av.textContent]:'jordan';
+  }
+  var HK_QUEUES={booking:['jordan','sam','dana'],confirm:['rachel','owen'],closing:['kayla']};
+  var hkStage='booking', hkPos={booking:0,confirm:0,closing:0};
+  function hkPick(stage){
+    hkStage=stage;
+    ['booking','confirm','closing'].forEach(function(k){
+      document.getElementById('hkt-'+k).classList.toggle('sel',k===stage);
+    });
+    renderDeck();
+  }
+  function hkBadges(){
+    ['booking','confirm','closing'].forEach(function(k){
+      var left=HK_QUEUES[k].length-hkPos[k];
+      var el=document.getElementById('hkn-'+k);
+      el.textContent=left; el.style.visibility=left?'visible':'hidden';
+    });
+  }
+  function deckCardHtml(key,pos,total){
+    var d=HK[key], th='';
+    d.thread.forEach(function(m){
+      if(m[0]==='in'){th+='<div class="bub in">'+m[1]+'</div>';}
+      else{th+='<div class="bub bot"><span class="tag">Agent</span>'+m[1]+'</div>';}
+    });
+    th+='<div class="bub bot" style="opacity:.75"><span class="tag">Suggested reply - edit below</span>'+d.draft+'</div>';
+    return '<div class="dc-head"><div class="bigav">'+d.av+'</div>'+
+      '<div style="flex:1"><div class="who">'+d.name+'</div><div class="sub">'+d.sub+' &middot; '+d.stage+' &middot; '+d.last+'</div></div>'+
+      '<span class="hk-prog">'+(pos+1)+' of '+total+'</span></div>'+
+      '<div class="hk-ctx">'+d.ctx+'</div>'+
+      '<div class="dc-thread">'+th+'</div>'+
+      '<textarea class="dc-draft">'+d.draft+'</textarea>'+
+      '<input class="hk-teach" placeholder="Changed it? Teach the agent why (saved as a lesson)">'+
+      '<div class="hk-actions"><button class="hk-send" style="flex:1" onclick="hkApprove()">Approve and send</button></div>'+
+      '<div class="dc-move"><span class="lbl">Move the lead</span>'+
+      '<button class="xbtn" onclick="hkMove()">Ghosted</button>'+
+      '<button class="xbtn" onclick="hkMove()">Nurture</button>'+
+      '<button class="xbtn" onclick="hkMove()">Unqualified</button></div>';
+  }
+  function renderDeck(){
+    var q=HK_QUEUES[hkStage], pos=hkPos[hkStage], deck=document.getElementById('hk-deck');
+    deck.innerHTML='';
+    hkBadges();
+    if(pos>=q.length){
+      deck.innerHTML='<div class="allclear"><div class="big">&#10003;</div><div style="font-size:16px;font-weight:700;color:var(--text)">All clear</div><div style="font-size:13px">No actions waiting in this stage</div></div>';
+      return;
+    }
+    if(pos+1<q.length){
+      var behind=document.createElement('div');
+      behind.className='deckcard behind';
+      behind.innerHTML=deckCardHtml(q[pos+1],pos+1,q.length);
+      deck.appendChild(behind);
+    }
+    var top=document.createElement('div');
+    top.className='deckcard top';
+    top.innerHTML=deckCardHtml(q[pos],pos,q.length);
+    deck.appendChild(top);
+    attachSwipe(top);
+  }
+  function hkAdvance(dir){
+    var deck=document.getElementById('hk-deck');
+    var top=deck.querySelector('.deckcard.top');
+    if(top){top.style.transform='';top.classList.add(dir==='left'?'fly-left':'fly-right');}
+    hkPos[hkStage]++;
+    setTimeout(renderDeck,300);
+  }
+  function hkApprove(){hkAdvance('right')}
+  function hkMove(){hkAdvance('left')}
+  function attachSwipe(el){
+    var sx=0,dx=0,drag=false;
+    el.addEventListener('touchstart',function(e){
+      if(e.target.tagName==='TEXTAREA'||e.target.tagName==='INPUT'||e.target.tagName==='BUTTON')return;
+      sx=e.touches[0].clientX;drag=true;el.style.transition='none';
+    },{passive:true});
+    el.addEventListener('touchmove',function(e){
+      if(!drag)return;dx=e.touches[0].clientX-sx;
+      el.style.transform='translateX('+dx+'px) rotate('+(dx/22)+'deg)';
+    },{passive:true});
+    el.addEventListener('touchend',function(){
+      if(!drag)return;drag=false;el.style.transition='';
+      if(dx>90){hkApprove();}
+      else if(dx<-90){hkMove();}
+      else{el.style.transform='';}
+      dx=0;
+    });
+  }
+  renderDeck();
+</script>
+</body>
+</html>

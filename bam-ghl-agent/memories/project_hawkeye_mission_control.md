@@ -1,48 +1,38 @@
 ---
 name: hawkeye-mission-control
-description: 2026-07-07 V2 design decision - one Hawkeye mission control screen (all agents + automations by pipeline stage, per-row configure drawer). Replaces the 3 board buttons + Train Agent picker. NOT built yet.
+description: 2026-07-08 V2 design LOCKED via clickable mockup - Sales simple view (strip, click-to-cascade, pill morphs to gear) + Tinder-style Hawkeye deck + popup modal, no Skip anywhere. Handoff doc + build order in docs/. NOT built yet.
 type: project
 ---
 
-# Hawkeye mission control (V2 redesign) - DESIGN LOCKED 2026-07-07, not built
+# Hawkeye V2 + Sales simple view - DESIGN LOCKED 2026-07-08, not built
 
-Zoran's call: Hawkeye is scattered across 5 surfaces (3 per-stage board buttons, Train Agent
-picker, Automations sub-tab, autonomy toggles, staff AgentModePanel). V2 gets ONE screen.
+**SOURCE OF TRUTH = [`docs/hawkeye-simple-view-handoff.md`](../docs/hawkeye-simple-view-handoff.md)**
+(full spec, decision log, build order, next-session prompt). Clickable mockup:
+[`docs/hawkeye-simple-view-mockup.html`](../docs/hawkeye-simple-view-mockup.html) +
+hosted at https://claude.ai/code/artifact/7a9a5268-048a-4dda-9750-62d9f69a4150
 
-## The screen (mission control)
-One view listing the whole sales crew **organized by the lead journey**:
+## The design in 6 lines
+1. **Simple view** = pipeline strip ONLY (no cards). Click a stage -> cards CASCADE down;
+   the pill morphs to a solid-colour gear button -> existing focus-mode config page.
+2. Cascade shape by ENGINE: agent stages = cards left + Hawkeye action right per card;
+   automation/human stages = single column.
+3. **Hawkeye page** (gold button) = TINDER DECK: 3 agent tabs span the top (Booking/Confirm/
+   Closing, gear on active), ONE card at a time, next peeks behind, approve flies right,
+   move flies left, swipe on mobile, buttons on desktop. Automations never appear here.
+4. **Popup modal** (glowing card in cascade): contact info left, chat + editable suggested
+   reply + teach-why + move-lead right. Approve auto-advances through the queue.
+5. **NO SKIP anywhere** - every Hawkeye action must be resolved (approve or move).
+6. Configure page = the LIVE focus mode (Entry->Engine->Exit, PR #1178) - reuse, don't rebuild.
 
-- **Main path** (agents, solid left border): Booking (Responded) -> Confirm (Scheduled Trial)
-  -> Closing (Done Trial). Each row: name + type pill + stage one-liner + red "N waiting"
-  count + mode label + gear.
-- **Recovery loop** (automations, DASHED left border): Ghosted, Lead Nurture. Each row:
-  step/cadence summary + "N enrolled" count + On/approved state + gear.
-- Rows with waiting actions expand INLINE to their queue: lead's last message + editable
-  draft + Approve-and-send / Edit / Skip. **Queue is grouped by stage** (decision), not one
-  mixed feed.
-- Header: total actions pill + one Scan button (board top-left Scan moves here).
+## Replaces
+`_apx`/`_acx`/`_aclx` Hawkeye overlay buttons · Train Agent picker as a destination ·
+scattered autonomy/config entry points. KEEPS: inline drawer suggestion on lead cards.
 
-## Configure drawer (the gear) - same shape for every row
-- Agents: Autonomy · Brain (Knowledge) · Lessons · Test chat
-- Automations: Autonomy(On/Off) · Steps + approve-sequence (replaces Lessons/Test)
-- This ABSORBS the Train Agent picker navigation (picker UI goes away; the underlying
-  `_TA` machinery/tabs get reused inside the drawer).
-
-## Decisions (Zoran, 2026-07-07)
-1. **Replace** the 3 per-stage Hawkeye buttons on the sales board - one Hawkeye button
-   opens mission control scrolled to that stage. One mental model.
-2. Queue **grouped by stage** under each agent row (matches pipeline mental model).
-3. Inline drawer suggestion on a lead card stays as-is (good for working one lead).
-
-## Consolidates (5 -> 1)
-`_apxOpen`/`_acxOpen`/`_aclxOpen` overlays · Train Agent picker (`_taPick`) · Automations
-sub-tab (`_taRenderAutomations`) · per-agent Autonomy controls · board Scan button.
-
-## Visual language kept
-Agent = solid border, automation = dashed (matches board stage-colour borders,
-[[project_sales_crew_guardrails]]). Design system: `bam-portal/design-system/DESIGN.md`
-(gold #D4B65C, no emojis - SVG icons, radius scale).
+## Open item (ask Zoran before building)
+Mobile swipe-left has 3 destinations (Ghosted/Nurture/Unqualified) - should pop a 3-option
+choice before committing, not fly away blind. Confirm exact behavior.
 
 ## See also
-[[project_sales_crew_model]] (the crew + what's live) · [[project_v2_sales_board]] (board
-surfaces being replaced/kept).
+[[project_sales_focus_mode]] (focus mode + engines model + router, what's already live) ·
+[[project_sales_crew_model]] (the crew) · [[project_sales_crew_guardrails]] (solid vs dashed
+visual language) · [[project_v2_sales_board]] (board surfaces being replaced/kept).
