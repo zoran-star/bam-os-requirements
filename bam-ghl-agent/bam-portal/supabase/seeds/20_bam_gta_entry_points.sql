@@ -133,3 +133,17 @@ on conflict (client_id, type, key) do update set
   ghl_workflow_id = excluded.ghl_workflow_id,
   ghl_workflow_name = excluded.ghl_workflow_name,
   updated_at = excluded.updated_at;
+
+-- Link direct entry points to their funnels (seeded in 15_bam_gta_funnels.sql):
+-- free-trial page hosts the trial form + both calendars; contact page hosts
+-- the contact form. ADAPT intake stays unlinked (no funnel yet).
+update public.entry_points ep
+   set funnel_id = f.id
+  from public.funnels f
+ where ep.client_id = '39875f07-0a4b-4429-a201-2249bc1f24df'
+   and f.client_id = ep.client_id
+   and f.key = case
+         when ep.type = 'calendar' then 'free-trial'
+         when ep.type = 'website-form' and ep.key = 'free-trial' then 'free-trial'
+         when ep.type = 'website-form' and ep.key = 'contact' then 'contact'
+       end;
