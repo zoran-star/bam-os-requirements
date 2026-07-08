@@ -149,6 +149,8 @@ function normalizeTicket(apiTicket) {
     isNewOffer: fields.is_new_offer,
     newOfferDescription: fields.new_offer_description,
     budget: fields.monthly_spend,
+    confirmedBudgets: Array.isArray(fields.confirmed_budgets) ? fields.confirmed_budgets : null,
+    changesCount: fields.changes_count,
     landingPage: fields.landing_page,
     status: apiTicket.status,
     contentCheckStatus: apiTicket.content_check_status,
@@ -1095,6 +1097,31 @@ function renderSubmittedInfo(t, tk) {
     rows.push(["Landing page", t.landingPage
       ? <a href={t.landingPage} target="_blank" rel="noreferrer" style={{ color: tk.accent, textDecoration: "none" }}>{t.landingPage} ↗</a>
       : <span style={{ color: tk.textMute }}>Using default funnel</span>]);
+  } else if (t.type === "budget-review") {
+    const cb = Array.isArray(t.confirmedBudgets) ? t.confirmedBudgets : [];
+    if (cb.length) {
+      const total = cb.reduce((s, b) => s + (Number(b.confirmed) || 0), 0);
+      rows.push(["Client confirmed", (
+        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+          {cb.map((b, i) => {
+            const cur = b.current == null || b.current === "" ? null : Number(b.current);
+            const conf = b.confirmed == null || b.confirmed === "" ? null : Number(b.confirmed);
+            return (
+              <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, flexWrap: "wrap" }}>
+                <span style={{ color: tk.text, fontWeight: 600, minWidth: 150 }}>{b.name || "Campaign"}</span>
+                <span style={{ color: tk.textMute }}>{cur != null ? `$${cur}/mo` : "-"}</span>
+                <span style={{ color: tk.textMute }}>→</span>
+                <span style={{ color: b.changed ? tk.accent : tk.text, fontWeight: 600 }}>{conf != null ? `$${conf}/mo` : "-"}</span>
+                {b.changed ? <span style={{ fontSize: 10, color: tk.accent, fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase" }}>changed</span> : null}
+              </div>
+            );
+          })}
+        </div>
+      )]);
+      rows.push(["Total confirmed", <span style={{ color: tk.accent, fontWeight: 600 }}>{`$${total}/mo`}</span>]);
+    } else {
+      rows.push(["Client confirmed", <span style={{ color: tk.textMute }}>Not confirmed yet</span>]);
+    }
     rows.push(["Files", t.files && t.files.length
       ? (
         <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
