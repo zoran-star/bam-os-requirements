@@ -180,9 +180,11 @@ async function handler(req, res) {
         body: JSON.stringify({
           p_tenant_id: MIAMI_CLIENT_UUID,
           p_slot_id: slot.id,
+          // The trial form collects ONE name (the player's) - the RPC requires
+          // a non-null athlete name, so it fills both roles here.
           p_parent_name: `${firstName}${lastName ? ' ' + lastName : ''}` || null,
           p_parent_email: email.toLowerCase(),
-          p_athlete_name: null,
+          p_athlete_name: `${firstName}${lastName ? ' ' + lastName : ''}`,
           p_parent_phone: phone || null,
           p_athlete_dob: null,
           p_entry_point_id: ep?.id || null,
