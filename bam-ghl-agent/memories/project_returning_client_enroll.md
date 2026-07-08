@@ -43,6 +43,15 @@ Next = apply the migration, deploy, then pilot for client Houssein.**
   suggested SMS). Team section: "Can sign up returning clients" checkbox per
   teammate (`_bbStaffEnrollSave`), owner-only, shown when the academy has the
   Members tab.
+- **Coupons (added same day):** Review step has a "Coupon code (optional)"
+  input -> `check-coupon` action validates the promotion code on the
+  connected account (same rules + guardrails as members.js apply-coupon:
+  live/not-expired/not-fully-redeemed, never $0 or negative via
+  applyDiscountToCents) and shows the struck-through vs discounted price.
+  `enroll` re-validates server-side and attaches
+  `discounts[0][promotion_code]` at sub creation, so charge-now bills the
+  discounted amount immediately. Card-link door: coupon noted in audit +
+  the staff note says to re-enter it on the completing run.
 - Checks: node --check on api files, all 8 inline scripts vm-parse clean,
   tour verifier passes, zero em dashes in the diff.
 

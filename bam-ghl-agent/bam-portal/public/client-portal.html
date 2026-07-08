@@ -29354,6 +29354,7 @@ function openEnrollDrawer() {
     step: 1, q: '', searching: false, results: null, customer: null,
     targets: null, offerKey: null, athlete: '', chargeMode: 'now',
     startDate: '', consent: false, preview: null, busy: false, error: null, result: null,
+    couponCode: '', coupon: null, couponBusy: false, couponError: null,
   };
   host.innerHTML = `
     <div id="enroll-drawer-backdrop" style="position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:8900;opacity:0;transition:opacity 0.2s ease" onclick="closeEnrollDrawer()"></div>
@@ -29548,7 +29549,9 @@ async function _enrollToReview() {
   if (input) s.athlete = input.value;
   if (!s.offerKey || !String(s.athlete || '').trim()) return;
   if (s.chargeMode === 'on_date' && !s.startDate) return;
-  s.error = null; s.step = 3; s.preview = null; s.consent = false; _enrollRender();
+  s.error = null; s.step = 3; s.preview = null; s.consent = false;
+  s.coupon = null; s.couponCode = ''; s.couponError = null; // price may have changed - re-check any coupon
+  _enrollRender();
   try {
     s.preview = await _enrollApi('preview', {
       customer_id: s.customer.id, offer_price_key: s.offerKey, athlete_name: s.athlete.trim(),
@@ -29581,10 +29584,23 @@ function _enrollRenderStep3(body) {
       ${line('Client', escapeHTML(s.customer.name || s.customer.email || '-'))}
       ${line('Athlete', escapeHTML(s.athlete.trim()))}
       ${line('Plan', escapeHTML((s.targets.find(t => t.key === s.offerKey) || {}).label || s.offerKey))}
-      ${line('Price', _enrollMoney(p.price.amount_cents, p.price.interval))}
+      ${s.coupon
+        ? line('Price', `<s style="color:var(--text-mute);font-weight:400">${_enrollMoney(p.price.amount_cents, p.price.interval)}</s> <span style="color:var(--gold,#D4B65C)">${_enrollMoney(s.coupon.discounted_cents, p.price.interval)}</span>`)
+        : line('Price', _enrollMoney(p.price.amount_cents, p.price.interval))}
+      ${s.coupon ? line('Coupon', `${escapeHTML(s.coupon.code)} · ${escapeHTML(s.coupon.label || '')} <a href="#" onclick="_enrollRemoveCoupon();return false" style="color:var(--text-mute);margin-left:6px">remove</a>`) : ''}
       ${line('First charge', firstCharge)}
       <div style="display:flex;justify-content:space-between;gap:12px;padding:7px 0;font-size:13.5px"><span style="color:var(--text-mute)">Payment</span><span style="font-weight:600;text-align:right">${cardLine}</span></div>
     </div>
+    ${s.coupon ? '' : `
+    <div style="margin-bottom:16px">
+      <div style="display:flex;gap:8px">
+        <input id="enroll-coupon" type="text" value="${escapeHTML(s.couponCode)}" placeholder="Coupon code (optional)"
+               onkeydown="if(event.key==='Enter')_enrollApplyCoupon()"
+               style="flex:1;padding:8px 12px;background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);font:inherit;font-size:13px;outline:none;text-transform:uppercase">
+        <button onclick="_enrollApplyCoupon()" ${s.couponBusy ? 'disabled' : ''} style="background:transparent;border:1px solid var(--border);color:var(--text);padding:8px 14px;font-size:12.5px;font-weight:700;border-radius:8px;cursor:pointer;font-family:inherit">${s.couponBusy ? 'Checking…' : 'Apply'}</button>
+      </div>
+      ${s.couponError ? `<div style="font-size:12px;color:#e08a7d;margin-top:6px">${escapeHTML(s.couponError)}</div>` : ''}
+    </div>`}
     <label style="display:flex;gap:10px;align-items:flex-start;padding:12px 13px;border:1px solid ${s.consent ? 'var(--gold,#D4B65C)' : 'var(--border)'};border-radius:10px;cursor:pointer;margin-bottom:16px">
       <input type="checkbox" ${s.consent ? 'checked' : ''} onchange="_ENROLL.consent=this.checked;_enrollRender()" style="margin-top:2px">
       <span style="font-size:13px;line-height:1.45">I confirm the parent agreed to this signup${p.needs_card ? '' : ' and to the charge on their saved card'}.</span>
@@ -29593,6 +29609,28 @@ function _enrollRenderStep3(body) {
       <button onclick="_ENROLL.step=2;_enrollRender()" style="background:transparent;border:1px solid var(--border);color:var(--text);padding:10px 16px;font-size:13px;font-weight:600;border-radius:8px;cursor:pointer;font-family:inherit">Back</button>
       <button onclick="_enrollConfirm()" ${canConfirm ? '' : 'disabled'} style="flex:1;background:${canConfirm ? 'var(--gold,#D4B65C)' : 'var(--border)'};color:${canConfirm ? '#0B0B0D' : 'var(--text-mute)'};border:none;padding:10px 16px;font-size:13.5px;font-weight:700;border-radius:8px;cursor:${canConfirm ? 'pointer' : 'not-allowed'};font-family:inherit">${s.busy ? 'Working…' : confirmLabel}</button>
     </div>`;
+}
+
+// Validate the coupon against the chosen plan price server-side, show the
+// discounted price on the review lines. Re-validated again at enroll time.
+async function _enrollApplyCoupon() {
+  const s = _ENROLL; if (!s || s.couponBusy) return;
+  const input = document.getElementById('enroll-coupon');
+  s.couponCode = input ? input.value.trim().toUpperCase() : s.couponCode;
+  if (!s.couponCode) { s.couponError = 'Type a code first.'; return _enrollRender(); }
+  s.couponBusy = true; s.couponError = null; _enrollRender();
+  try {
+    const json = await _enrollApi('check-coupon', { offer_price_key: s.offerKey, code: s.couponCode });
+    s.coupon = json.coupon || null;
+  } catch (e) {
+    s.coupon = null; s.couponError = e.message;
+  }
+  s.couponBusy = false; _enrollRender();
+}
+
+function _enrollRemoveCoupon() {
+  const s = _ENROLL; if (!s) return;
+  s.coupon = null; s.couponCode = ''; s.couponError = null; _enrollRender();
 }
 
 async function _enrollConfirm() {
@@ -29608,6 +29646,7 @@ async function _enrollConfirm() {
       parent_phone: s.customer.phone || null,
       charge_mode: s.chargeMode,
       start_date: s.chargeMode === 'on_date' ? s.startDate : null,
+      coupon_code: s.coupon ? s.coupon.code : null,
       consent_confirmed: true,
     });
   } catch (e) {
@@ -29639,6 +29678,7 @@ function _enrollRenderResult(body) {
       <b>${escapeHTML(s.athlete.trim())}</b> is on the roster. ${scheduled
         ? `First charge of <b>${_enrollMoney(r.amount_cents, null)}</b> on <b>${escapeHTML(r.first_charge_iso || s.startDate)}</b>, then billing runs automatically.`
         : `<b>${_enrollMoney(r.amount_cents, null)}</b> charged to the card on file${r.card_last4 ? ' (···· ' + escapeHTML(r.card_last4) + ')' : ''}. Billing runs automatically from here.`}
+      ${r.coupon ? ` Coupon <b>${escapeHTML(r.coupon.code)}</b> applied (${escapeHTML(r.coupon.label || '')}).` : ''}
     </div>
     ${r.warning ? `<div style="margin-bottom:14px;padding:11px 13px;border:1px solid #9a3b2f;border-radius:10px;background:rgba(154,59,47,0.1);color:#e08a7d;font-size:13px">${escapeHTML(r.warning)}</div>` : ''}
     <button onclick="closeEnrollDrawer()" style="width:100%;background:var(--gold,#D4B65C);color:#0B0B0D;border:none;padding:10px 16px;font-size:13.5px;font-weight:700;border-radius:8px;cursor:pointer;font-family:inherit">Done</button>`;

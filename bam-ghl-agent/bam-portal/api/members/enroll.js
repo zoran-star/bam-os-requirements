@@ -1,4 +1,5 @@
 import { withSentryApiRoute } from "../_sentry.js";
+import { applyDiscountToCents, normCode, couponFromPromo } from "../_coupon-guardrails.js";
 export const maxDuration = 60; // Stripe search + customer + sub writes
 
 // Vercel Serverless Function - Returning Client Enroll (Members V2)
@@ -19,9 +20,11 @@ export const maxDuration = 60; // Stripe search + customer + sub writes
 //     -> { targets: [{ key, label, amount_cents, currency, interval, offer_id }] }
 //   action=preview { customer_id, offer_price_key }
 //     -> { price, card_last4, needs_card, duplicates }
+//   action=check-coupon { offer_price_key, code }
+//     -> { coupon: { code, label, discount_cents, discounted_cents, plan_cents } }
 //   action=enroll { customer_id, offer_price_key, athlete_name, parent_name?,
 //                   parent_email?, parent_phone?, charge_mode: 'now'|'on_date',
-//                   start_date?, consent_confirmed: true }
+//                   start_date?, coupon_code?, consent_confirmed: true }
 //     -> door A: { ok, mode: 'charged'|'scheduled', member_id, subscription_id, ... }
 //     -> door B: { ok, mode: 'card_link', member_id, url, parent, suggested }
 //
@@ -192,6 +195,29 @@ function planFromKey(offerPriceKey) {
   return String(offerPriceKey || "").split("|")[0] || null;
 }
 
+// Resolve + validate a promotion code on the connected account against a plan
+// price. Same rules as members.js actionApplyCoupon: live code, not expired /
+// fully redeemed, and the guardrails (never $0 / negative). Throws a clean
+// message on any failure; returns { pc, label, discount_cents, discounted_cents }.
+async function resolvePromo(codeRaw, acct, planCents) {
+  const code = normCode(codeRaw);
+  if (!code) throw Object.assign(new Error("coupon code required"), { status: 400 });
+  const list = await stripeFetch(`/promotion_codes?code=${encodeURIComponent(code)}&limit=1&expand[]=data.promotion.coupon`, { stripeAccount: acct });
+  const pc = (list.data || [])[0];
+  const fail = (msg) => { throw Object.assign(new Error(msg), { status: 400 }); };
+  if (!pc) fail(`no coupon named ${code} exists in Stripe - create it in the offer's Pricing section first`);
+  if (pc.active === false) fail(`${code} is deactivated`);
+  if (pc.expires_at && Math.floor(Date.now() / 1000) > pc.expires_at) fail(`${code} has expired`);
+  if (pc.max_redemptions && (pc.times_redeemed || 0) >= pc.max_redemptions) fail(`${code} is fully redeemed`);
+  const cp = couponFromPromo(pc);
+  const def = cp.percent_off != null
+    ? { kind: "Percent off", value: cp.percent_off }
+    : { kind: "Dollar off", value: (cp.amount_off || 0) / 100 };
+  const applied = applyDiscountToCents(def, planCents);
+  if (!applied.ok) fail(applied.error);
+  return { pc, code, label: applied.label, discount_cents: applied.discountCents, discounted_cents: applied.discountedCents };
+}
+
 function setupLinkBase(req) {
   const origin = req.headers.origin || `https://${req.headers.host || ""}`;
   return /localhost|127\.0\.0\.1/.test(origin) ? origin : "https://portal.byanymeansbusiness.com";
@@ -283,6 +309,21 @@ async function actionPreview(res, { clientId, acct, body }) {
   });
 }
 
+// ── action: check-coupon ───────────────────────────────────
+async function actionCheckCoupon(res, { clientId, acct, body }) {
+  const target = await resolveTarget(clientId, body.offer_price_key);
+  if (!target) return res.status(409).json({ error: "pick an offer price first" });
+  const promo = await resolvePromo(body.code, acct, target.amount_cents);
+  return res.status(200).json({
+    ok: true,
+    coupon: {
+      code: promo.code, label: promo.label,
+      discount_cents: promo.discount_cents, discounted_cents: promo.discounted_cents,
+      plan_cents: target.amount_cents,
+    },
+  });
+}
+
 // ── action: enroll ─────────────────────────────────────────
 async function actionEnroll(res, req, { clientId, acct, ctx, body }) {
   // Consent gate - locked decision: the staff user must confirm the parent
@@ -304,6 +345,13 @@ async function actionEnroll(res, req, { clientId, acct, ctx, body }) {
   }
   const target = await resolveTarget(clientId, body.offer_price_key);
   if (!target) return res.status(409).json({ error: "That price isn't live for this academy anymore - re-pick the offer price." });
+
+  // Optional coupon - re-validated server-side at enroll time (never trust a
+  // stale client-side check; the code could expire between Review and Confirm).
+  let promo = null;
+  if (body.coupon_code) {
+    promo = await resolvePromo(body.coupon_code, acct, target.amount_cents);
+  }
 
   const { customer, pm, last4 } = await findCard(customerId, acct);
   const parentEmail = String(body.parent_email || customer.email || "").toLowerCase().trim() || null;
@@ -374,6 +422,7 @@ async function actionEnroll(res, req, { clientId, acct, ctx, body }) {
       args: {
         door: "card_link", offer_price_key: target.key, charge_mode: chargeMode, start_date: startDate,
         consent_confirmed: true, customer_id: customerId,
+        coupon_code: promo ? promo.code : null,
       },
       stripe_response: { checkout_session: session.id },
       db_changes: { members: { status: "payment_method_required", created: !resumable } },
@@ -387,7 +436,9 @@ async function actionEnroll(res, req, { clientId, acct, ctx, body }) {
         sms_text: `Hi, here's the secure link to add your card and finish ${athleteName}'s signup with ${academyName}: ${session.url}`,
         email_subject: `Finish ${athleteName}'s signup - ${academyName}`,
       },
-      note: "No usable card on file. Send the link; once the card is saved, run this signup again and it will complete.",
+      note: promo
+        ? `No usable card on file. Send the link; once the card is saved, run this signup again WITH coupon ${promo.code} and it will complete at the discounted price.`
+        : "No usable card on file. Send the link; once the card is saved, run this signup again and it will complete.",
     });
   }
 
@@ -413,6 +464,7 @@ async function actionEnroll(res, req, { clientId, acct, ctx, body }) {
     "metadata[enroll_consent]": "1",
   };
   if (trialEnd) subBody.trial_end = trialEnd;
+  if (promo) subBody["discounts[0][promotion_code]"] = promo.pc.id;
 
   let sub;
   try {
@@ -451,8 +503,10 @@ async function actionEnroll(res, req, { clientId, acct, ctx, body }) {
       door: "subscription", offer_price_key: target.key, charge_mode: chargeMode,
       start_date: startDate, consent_confirmed: true, customer_id: customerId,
       amount_cents: target.amount_cents,
+      coupon_code: promo ? promo.code : null,
+      discount_cents: promo ? promo.discount_cents : null,
     },
-    stripe_response: { id: sub.id, status: sub.status },
+    stripe_response: { id: sub.id, status: sub.status, promotion_code: promo ? promo.pc.id : null },
     db_changes: { members: { created: !resumable, stripe_subscription_id: sub.id } },
   });
 
@@ -461,7 +515,8 @@ async function actionEnroll(res, req, { clientId, acct, ctx, body }) {
     ok: true,
     mode: chargeMode === "on_date" ? "scheduled" : "charged",
     member_id: memberId, subscription_id: sub.id, subscription_status: sub.status,
-    amount_cents: target.amount_cents, currency: target.currency,
+    amount_cents: promo ? promo.discounted_cents : target.amount_cents, currency: target.currency,
+    coupon: promo ? { code: promo.code, label: promo.label, discount_cents: promo.discount_cents } : null,
     first_charge_iso: firstChargeIso, card_last4: last4,
     warning: (sub.status === "incomplete" || sub.status === "incomplete_expired")
       ? "The first charge did not go through - the card on file was declined. Send a card link from the member card."
@@ -499,6 +554,7 @@ async function handler(req, res) {
       case "find-customer": return await actionFindCustomer(res, { clientId, acct, body });
       case "targets":       return res.status(200).json({ targets: await liveTargets(clientId) });
       case "preview":       return await actionPreview(res, { clientId, acct, body });
+      case "check-coupon":  return await actionCheckCoupon(res, { clientId, acct, body });
       case "enroll":        return await actionEnroll(res, req, { clientId, acct, ctx, body });
       default:              return res.status(400).json({ error: `unknown action: ${body.action || "(none)"}` });
     }
