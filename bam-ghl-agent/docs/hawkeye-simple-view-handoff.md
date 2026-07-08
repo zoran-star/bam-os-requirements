@@ -22,8 +22,10 @@ the Train Agent picker as a destination, and the scattered config entry points.
 - Strip only. NO cards visible by default. Counts on each pill ("5 need you" red / "18 enrolled").
 - **Click a stage** -> that stage's cards CASCADE DOWN below the strip (staggered animation),
   other pills dim. Click again = collapse.
-- **The clicked pill morphs**: fills SOLID in its stage colour, text disappears, shows ONLY the
-  gear icon -> click gear = go to that stage's configure page.
+- **The clicked pill morphs**: fills SOLID in its stage colour, text disappears, shows an
+  UP ARROW centered (click = collapse the cascade) + a small 3-LINE config icon (sliders)
+  pinned TOP-RIGHT of the pill -> click it = that stage's configure page. (Zoran 2026-07-08,
+  replaces the earlier gear-only morph.)
 - Cascade layout depends on the stage's ENGINE (agent / automation / human - the
   entry-exit-engines model, see [[project_sales_focus_mode]]):
   - **Agent stage** (Booking/Confirm/Closing): cards slide LEFT, each needs-action card gets its
@@ -88,6 +90,7 @@ to build for config itself.
 | 2026-07-08 | Done Trial has NO automations - post-trial form (trainer note + optional sign-up link + coach notes) is the only preplanned touch; scripted closing sequence + its editor REMOVED |
 | 2026-07-08 | Closing deck = stacked cards: 1 Reply (enroll = reply with link embedded in draft) -> 2 Follow-up plan -> 3 Suggested Lost after 3 unanswered follow-ups (agent prompt told: silence alone is never lost) |
 | 2026-07-08 | EVERY agent can mark Unqualified: confirm-abandoned action added to agent-confirm + agent-closing (opp abandoned + role unqualified + GHL tag, no nurture); Unqualified button on all Confirm/Closing cards incl. the follow-up plan card |
+| 2026-07-08 | Morphed pill = up arrow centered (collapse) + 3-line config icon top-right (was: gear only) |
 
 ## Action model per agent (revised 2026-07-08, SHIPPED end to end)
 Mobile reference page (design-system styled): `bam-portal/public/hawkeye-actions.html`
