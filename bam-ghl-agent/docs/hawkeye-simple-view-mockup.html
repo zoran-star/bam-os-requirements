@@ -202,6 +202,20 @@
   .dc-lbl{font-size:9.5px;font-weight:800;letter-spacing:.07em;text-transform:uppercase;color:var(--text-mute)}
   .dc-move{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
   .dc-move .lbl{font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--text-mute);margin-right:2px}
+  .dc-bar{display:flex;gap:8px;align-items:stretch}
+  .dc-otherbtn{flex:0 0 auto;background:var(--surface-el);border:1px solid var(--border-med);color:var(--text-sub);
+    border-radius:999px;padding:9px 18px;font-family:var(--font-ui);font-size:13px;font-weight:700;cursor:pointer}
+  .dc-otherbtn.on,.dc-otherbtn:hover{color:var(--text);border-color:var(--border-str)}
+  .dc-other{overflow:hidden;max-height:0;transition:max-height .3s var(--es)}
+  .dc-other.open{max-height:240px}
+  .dc-other-inner{display:flex;flex-direction:column;gap:6px;padding:2px 0 8px}
+  .hk-teach.miss{border-color:var(--red);border-style:solid}
+  .dc-fields{display:flex;flex-direction:column;gap:6px}
+  .dc-fields label{display:flex;align-items:center;gap:8px;font-size:10px;color:var(--text-mute);text-transform:uppercase;letter-spacing:.06em;font-weight:700}
+  .dc-fields label span{flex:0 0 76px;text-align:right}
+  .dc-fields input{flex:1;background:var(--surface-el);border:1px solid var(--border-med);border-radius:8px;color:var(--text);
+    font-family:var(--font-ui);font-size:13px;padding:8px 10px;outline:none;min-width:0}
+  .dc-fields input:focus{border-color:var(--gold)}
   .allclear{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;
     border:1px dashed var(--border-med);border-radius:24px;color:var(--text-sub)}
   .allclear .big{width:64px;height:64px;border-radius:50%;background:var(--green-soft);color:var(--green);
@@ -407,7 +421,7 @@ bamgta.com/join/fall-group</div>
       <button class="hk-tab" id="hkt-closing" onclick="hkPick('closing')">Closing <span class="n" id="hkn-closing">3</span> <svg class="gear-ic tgear" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px" onclick="event.stopPropagation();show('scr-config')"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z"/></svg></button>
     </div>
     <div class="deck" id="hk-deck"></div>
-    <div class="hint">every card resolves: the big button OR move the lead - no skip anywhere<br>mobile swipe: right = main action, left = move (exact behavior = open decision)</div>
+    <div class="hint">two buttons: Other (cascades up) + confirm - edits flip it to "Confirm edits" and the teach-why note becomes required<br>mobile swipe: right = main action, left = move (exact behavior = open decision)</div>
   </div>
 
   <!-- ============ SCREEN 3: CONFIGURE (existing focus mode) ============ -->
@@ -507,8 +521,14 @@ bamgta.com/join/fall-group</div>
   };
   var KIND_LABEL={reply:'Reply',book:'Book it',ghost:'Went quiet',handoff:'Reschedule',enroll:'Ready to enroll',plan:'Follow-up plan',lost:'Suggested lost'};
   var KIND_COLOR={reply:'var(--gold)',book:'var(--blue)',ghost:'var(--amber)',handoff:'var(--blue)',enroll:'var(--green)',plan:'var(--gold)',lost:'var(--red)'};
-  var PRIMARY={reply:['Approve and send',''],book:['Approve and book','blue'],ghost:['Send to Ghosted',''],
-    handoff:['Approve handoff','green'],enroll:['Approve and send','green'],plan:['Approve plan - sends 1 day apart',''],lost:['Mark lost','red']};
+  // [normal label, label after the user edits anything, button colour class]
+  var PRIMARY={reply:['Approve and send','Confirm edits and send',''],
+    book:['Approve and book','Confirm edits and book','blue'],
+    ghost:['Send to Ghosted','Send to Ghosted',''],
+    handoff:['Approve handoff','Confirm edits and hand off','green'],
+    enroll:['Approve and send','Confirm edits and send','green'],
+    plan:['Approve plan - sends 1 day apart','Confirm edits and approve plan',''],
+    lost:['Mark lost','Confirm edits and mark lost','red']};
 
   var HK={
     jordan:{agent:'booking',kind:'reply',av:'JM',name:'Jordan M.',sub:'Parent of Aiden (9)',stage:'Responded',phone:'(416) 555-0184',last:'14 min ago',
@@ -519,7 +539,7 @@ bamgta.com/join/fall-group</div>
       draft:'Saturday works! We have a 10am group at Linbrook. Want me to lock it in for Aiden?'},
     marco:{agent:'booking',kind:'book',av:'MV',name:'Marco V.',sub:'Parent of Zoe (10)',stage:'Responded',phone:'(647) 555-0resents',last:'6 min ago',
       ctx:'Lead picked a slot. One tap books it and hands them to Confirm.',
-      slot:'Sat, Jul 12 · 10:00 AM · Linbrook gym',
+      book_day:'Sat, Jul 12 · 10:00 AM', book_loc:'Linbrook gym', book_group:'U11 Saturday group',
       thread:[['bot','We have Sat 10am or Sun 1pm open this week - which works for Zoe?'],
               ['in','sat 10am works for zoe!']],
       draft:''},
@@ -592,7 +612,7 @@ bamgta.com/join/fall-group</div>
     document.getElementById('hkm-teach').style.display='none';
     var send=document.getElementById('hkm-send');
     send.textContent=PRIMARY[d.kind][0];
-    send.className='hk-send '+PRIMARY[d.kind][1];
+    send.className='hk-send '+PRIMARY[d.kind][2];
     document.getElementById('hk-overlay').classList.add('on');
     th.scrollTop=th.scrollHeight;
   }
@@ -633,7 +653,7 @@ bamgta.com/join/fall-group</div>
       return '<button class="xbtn" style="border-color:'+m[1]+'" onclick="hkMove()">'+m[0]+'</button>';
     }).join('');
   }
-  function deckCardHtml(key,pos,total){
+  function deckCardHtml(key,pos,total,isTop){
     var d=HK[key], th='';
     d.thread.forEach(function(m){
       if(m[0]==='in'){th+='<div class="bub in">'+m[1]+'</div>';}
@@ -642,39 +662,64 @@ bamgta.com/join/fall-group</div>
     var body='';
     if(d.kind==='book'){
       body='<div class="dc-thread">'+th+'</div>'
-        +'<div class="dc-lbl">Booking request</div><div class="dc-slot">'+d.slot+'</div>'
+        +'<div class="dc-lbl">Booking details - the agent\'s guess, edit anything</div>'
+        +'<div class="dc-fields">'
+        +'<label><span>Day + time</span><input value="'+d.book_day+'" oninput="dcEdited()"></label>'
+        +'<label><span>Location</span><input value="'+d.book_loc+'" oninput="dcEdited()"></label>'
+        +'<label><span>Group</span><input value="'+d.book_group+'" oninput="dcEdited()"></label>'
+        +'</div>'
         +'<div class="dc-note">Books the slot and hands them to the Confirm agent (the confirmation + same-day check-in send from config).</div>';
     } else if(d.kind==='ghost'){
       body='<div class="dc-thread">'+th+'</div>'
         +'<div class="dc-note">Nothing sends now - Ghosted takes over with the day 1 / 3 / 7 nudges. A reply bounces them straight back to Booking.</div>';
     } else if(d.kind==='plan'){
       body='<div class="dc-thread" style="max-height:90px">'+th+'</div><div class="dc-lbl">The plan - every message editable</div>'
-        +d.plan.map(function(t,i){return '<div class="dc-lbl" style="margin-top:2px">Day '+(i+1)+(i===d.plan.length-1?' · final, no-pressure':'')+'</div><textarea class="dc-draft sm">'+t+'</textarea>';}).join('');
+        +d.plan.map(function(t,i){return '<div class="dc-lbl" style="margin-top:2px">Day '+(i+1)+(i===d.plan.length-1?' · final, no-pressure':'')+'</div><textarea class="dc-draft sm" oninput="dcEdited()">'+t+'</textarea>';}).join('');
     } else if(d.kind==='lost'){
       body='<div class="dc-thread" style="max-height:110px">'+th+'</div>'
-        +'<div class="dc-lbl">Optional goodbye - sends with the move</div><textarea class="dc-draft">'+d.draft+'</textarea>'
+        +'<div class="dc-lbl">Optional goodbye - sends with the move</div><textarea class="dc-draft" oninput="dcEdited()">'+d.draft+'</textarea>'
         +'<div class="dc-note">Approving routes them to Nurture (the long game). Silence alone never marks anyone lost - this card only appears after 3 unanswered follow-ups or an explicit no.</div>';
     } else {
       body='<div class="dc-thread">'+th
         +'<div class="bub bot" style="opacity:.75"><span class="tag">Suggested reply - edit below</span>'+d.draft.split('\n')[0]+'</div></div>'
-        +'<textarea class="dc-draft">'+d.draft+'</textarea>'
-        +'<input class="hk-teach" placeholder="Changed it? Teach the agent why (saved as a lesson)">';
+        +'<textarea class="dc-draft" oninput="dcEdited()">'+d.draft+'</textarea>';
       if(d.kind==='enroll') body+='<div class="dc-note">The sign-up link rides in the draft - the opportunity is marked won automatically when they pay.</div>';
       if(d.kind==='handoff') body+='<div class="dc-note">One approve does BOTH: sends your note + moves Jack to Booking, and the Booking agent drafts the rebook text as its next action.</div>';
     }
     var p=PRIMARY[d.kind];
-    return '<div class="dc-head"><div class="avatar" style="display:none">'+d.av+'</div><div class="bigav" style="width:44px;height:44px;font-size:15px;border-radius:50%;background:var(--gold-glow);color:var(--gold);display:flex;align-items:center;justify-content:center;font-weight:800">'+d.av+'</div>'
+    var ids=isTop?{teach:' id="dc-teach"',other:' id="dc-other"',primary:' id="dc-primary"'}:{teach:'',other:'',primary:''};
+    return '<div class="dc-head"><div class="bigav" style="width:44px;height:44px;font-size:15px;border-radius:50%;background:var(--gold-glow);color:var(--gold);display:flex;align-items:center;justify-content:center;font-weight:800">'+d.av+'</div>'
       +'<div style="flex:1"><div class="who">'+d.name+'</div><div class="sub">'+d.sub+' &middot; '+d.stage+' &middot; '+d.last+'</div></div>'
       +'<span class="kpill" style="color:'+KIND_COLOR[d.kind]+';background:color-mix(in srgb,'+KIND_COLOR[d.kind]+' 14%,transparent)">'+KIND_LABEL[d.kind]+'</span>'
       +'<span class="hk-prog">'+(pos+1)+' of '+total+'</span></div>'
       +'<div class="hk-ctx">'+d.ctx+'</div>'
       +body
-      +'<div class="hk-actions"><button class="hk-send '+p[1]+'" style="flex:1" onclick="hkApprove()">'+p[0]+'</button></div>'
-      +'<div class="dc-move"><span class="lbl">Move the lead</span>'+moveBtnsHtml(d)+'</div>';
+      +'<input class="hk-teach"'+ids.teach+' style="display:none" placeholder="Required: teach the agent why you changed it (saved as a lesson)">'
+      +'<div class="dc-other"'+ids.other+'><div class="dc-other-inner"><span style="font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--text-mute)">Move the lead</span>'+moveBtnsHtml(d)+'</div></div>'
+      +'<div class="dc-bar"><button class="dc-otherbtn" onclick="toggleOther(this)">Other</button>'
+      +'<button class="hk-send '+p[2]+'"'+ids.primary+' style="flex:1" onclick="hkApprove()">'+p[0]+'</button></div>';
+  }
+  var dcEditedFlag=false;
+  // ANY change away from the agent's guess (draft, plan message, booking detail)
+  // flips the confirm button to its "Confirm edits" label and makes the teach-why
+  // note MANDATORY (Zoran 2026-07-08).
+  function dcEdited(){
+    if(dcEditedFlag)return; dcEditedFlag=true;
+    var d=HK[HK_QUEUES[hkStage][hkPos[hkStage]]];
+    var btn=document.getElementById('dc-primary');
+    if(btn)btn.textContent=PRIMARY[d.kind][1];
+    var t=document.getElementById('dc-teach');
+    if(t)t.style.display='block';
+  }
+  function toggleOther(btn){
+    var p=document.getElementById('dc-other');
+    if(p)p.classList.toggle('open');
+    btn.classList.toggle('on');
   }
   function renderDeck(){
     var q=HK_QUEUES[hkStage], pos=hkPos[hkStage], deck=document.getElementById('hk-deck');
     deck.innerHTML='';
+    dcEditedFlag=false;
     hkBadges();
     if(pos>=q.length){
       deck.innerHTML='<div class="allclear"><div class="big">&#10003;</div><div style="font-size:16px;font-weight:700;color:var(--text)">All clear</div><div style="font-size:13px">No actions waiting in this stage</div></div>';
@@ -683,12 +728,12 @@ bamgta.com/join/fall-group</div>
     if(pos+1<q.length){
       var behind=document.createElement('div');
       behind.className='deckcard behind';
-      behind.innerHTML=deckCardHtml(q[pos+1],pos+1,q.length);
+      behind.innerHTML=deckCardHtml(q[pos+1],pos+1,q.length,false);
       deck.appendChild(behind);
     }
     var top=document.createElement('div');
     top.className='deckcard top';
-    top.innerHTML=deckCardHtml(q[pos],pos,q.length);
+    top.innerHTML=deckCardHtml(q[pos],pos,q.length,true);
     deck.appendChild(top);
     attachSwipe(top);
   }
@@ -699,7 +744,13 @@ bamgta.com/join/fall-group</div>
     hkPos[hkStage]++;
     setTimeout(renderDeck,300);
   }
-  function hkApprove(){hkAdvance('right')}
+  function hkApprove(){
+    if(dcEditedFlag){
+      var t=document.getElementById('dc-teach');
+      if(!t || !t.value.trim()){ if(t){t.classList.add('miss');t.focus();} return; }
+    }
+    hkAdvance('right');
+  }
   function hkMove(){hkAdvance('left')}
   function attachSwipe(el){
     var sx=0,dx=0,drag=false;

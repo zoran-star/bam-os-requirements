@@ -91,6 +91,9 @@ to build for config itself.
 | 2026-07-08 | Closing deck = stacked cards: 1 Reply (enroll = reply with link embedded in draft) -> 2 Follow-up plan -> 3 Suggested Lost after 3 unanswered follow-ups (agent prompt told: silence alone is never lost) |
 | 2026-07-08 | EVERY agent can mark Unqualified: confirm-abandoned action added to agent-confirm + agent-closing (opp abandoned + role unqualified + GHL tag, no nurture); Unqualified button on all Confirm/Closing cards incl. the follow-up plan card |
 | 2026-07-08 | Morphed pill = up arrow centered (collapse) + 3-line config icon top-right (was: gear only) |
+| 2026-07-08 | Deck card footer = TWO buttons: "Other" (bottom left, cascades UP to every other option) + confirm (bottom right; label flips to "Confirm edits and send/book/..." the moment the user edits anything) |
+| 2026-07-08 | Book-it cards expose EDITABLE booking detail fields (day + time, location, group) - the agent's guess, staff can correct before booking |
+| 2026-07-08 | Teach-why note is MANDATORY for any change away from the agent's guess (draft, plan message, booking detail) - confirm is blocked until the note is filled. Applies to every Hawkeye surface in the real build |
 
 ## Action model per agent (revised 2026-07-08, SHIPPED end to end)
 Mobile reference page (design-system styled): `bam-portal/public/hawkeye-actions.html`

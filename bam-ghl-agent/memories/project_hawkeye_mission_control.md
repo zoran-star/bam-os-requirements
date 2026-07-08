@@ -50,6 +50,11 @@ scattered autonomy/config entry points. KEEPS: inline drawer suggestion on lead 
 - Reference page: bam-portal/public/hawkeye-actions.html (+ claude.ai artifact).
 - Mockup REBUILT to v2 (same file + same artifact URL): kind-aware deck cards, per-agent
   move rows incl. Unqualified, stacked Closing cadence, config screen notes per agent.
+- Deck card footer LOCKED (2026-07-08): two buttons - "Other" (left, cascades up to the
+  move options) + confirm (right, flips to "Confirm edits and ..." on any edit). Book-it
+  cards get editable booking detail fields (day+time / location / group). Teach-why note
+  is MANDATORY on any change away from the agent's guess (confirm blocked until filled).
+  Pill morph = up arrow center (collapse) + 3-line config icon top-right.
 ⚠️ NOT prod-verified on GTA yet (live behavior change if GTA had closing autos approved).
 
 ## Open item (ask Zoran before building)
