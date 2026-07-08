@@ -38366,7 +38366,7 @@ function _renderMemberModalBody(m, stripe, history, calls) {
     ${rowGrid([
       ['Email', escapeHTML(m.parent_email || '-')],
       ['Phone', m.parent_phone
-        ? `${escapeHTML(m.parent_phone)} <button onclick="_memberCall('${m.id}')" title="Rings your phone first, then connects you to this member" style="margin-left:8px;background:var(--gold,#D4B65C);color:#0B0B0D;border:none;padding:4px 10px;font-weight:700;border-radius:4px;cursor:pointer;font-size:12px;font-family:inherit">Call</button>`
+        ? `${escapeHTML(m.parent_phone)} <span id="member-call-slot">${_memberGhlCallLink(m)}</span>`
         : '-'],
     ])}
 
@@ -38448,6 +38448,29 @@ function _renderMemberModalBody(m, stripe, history, calls) {
   if (m.ghl_contact_id) _loadMemberInbox(m);
   if (m.ghl_contact_id) _loadMemberCustomFields(m);
   if (m.stripe_price_id) _mFillPlanStatus(m.stripe_price_id);
+  _memberCallSlotUpgrade(m);
+}
+
+// The member drawer's Call: renders the "Call in GHL" link synchronously (GHL-
+// wrapper academies like DETAIL Miami - their calling lives in GHL), then swaps
+// in the portal click-to-call button ONLY when the academy's Twilio voice is
+// live (same _voicePrime gate as the Inbox/Pipeline call slots). Keeps
+// _memberCall (the member-audited /api/members call path) for the upgrade -
+// GTA behavior unchanged.
+function _memberGhlCallLink(m) {
+  const loc = (typeof _GHL_CONNECT_STATE !== 'undefined' && _GHL_CONNECT_STATE && _GHL_CONNECT_STATE.location_id)
+    || (typeof _PL_DATA !== 'undefined' && _PL_DATA && _PL_DATA.location_id) || '';
+  const u = _ghlContactUrl(loc, m.ghl_contact_id);
+  if (!u) return '';
+  return `<a href="${escapeHTML(u)}" target="_blank" rel="noopener" title="Open this contact in GHL to call" style="margin-left:8px;display:inline-flex;align-items:center;gap:6px;background:rgba(212,182,92,0.12);border:1px solid var(--gold);border-radius:4px;color:var(--gold);padding:4px 10px;font:inherit;font-size:12px;font-weight:700;text-decoration:none">Call in GHL</a>`;
+}
+async function _memberCallSlotUpgrade(m) {
+  if (!m || !m.parent_phone) return;
+  const on = await _voicePrime();
+  if (!on) return;
+  const slot = document.getElementById('member-call-slot');
+  if (!slot) return; // drawer closed while we checked
+  slot.innerHTML = `<button onclick="_memberCall('${m.id}')" title="Rings your phone first, then connects you to this member" style="margin-left:8px;background:var(--gold,#D4B65C);color:#0B0B0D;border:none;padding:4px 10px;font-weight:700;border-radius:4px;cursor:pointer;font-size:12px;font-family:inherit">Call</button>`;
 }
 
 // ─── Per-member custom fields (portal contact_field_values, editable inline) ──
