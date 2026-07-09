@@ -14,11 +14,23 @@ All in `bam-portal/public/client-portal.html`, `_obf*` prefix (next to the domai
 - `_obfPopItem()` / `_obfPopRefresh()` - the navigation pop entry (both pop kinds, settings + info), 15px ring + "· n/N" count; hidden for non-V2 and when complete; refreshes in the background (2 min cache)
 - Deep links are command-center aware (`_ccOpenClassic` vs `switchView`); member import goes Blueprint -> `_bbNavigate('member_onboarding')`
 
-## Steps live today (Detail Miami's remaining list)
-1. **Import your members** -> Blueprint Member Onboarding card
-2. **Connect your email domain** -> Domains wizard
-3. **Launch your new website** -> Domains wizard
-4. **Send us your EIN** -> Messages (auto-completes when `clients.ein` is set)
+## Grouped structure (2026-07-09, Zoran: separate general from the training offer)
+Steps carry a `group`; `_OBF_GROUPS` renders them in sections with a per-group n/N:
+- **Academy setup (general)**: business tax ID, email domain, website domain
+- **Training offer**: member import (lives under the offer - it maps the roster onto the offer's plans; reuses the Member Onboarding card UI)
+As more offer types come online each gets its own group; general steps stay shared. Detectors unchanged (live-data), still deep-link to the real UIs.
+
+## Steps live today
+1. **Add your business tax ID** (general) -> Blueprint General. Auto-completes when `clients.ein` is set. **Skippable** (`skippable:true`): Canadian businesses without an EIN/BN click "Not applicable - skip for now" (localStorage `bam_obf_skip_<clientId>`, cleared automatically once a real EIN lands) so the flow can still reach 100%.
+2. **Connect your email domain** (general) -> Domains wizard
+3. **Launch your new website** (general) -> Domains wizard. Detector also recognizes **pre-wizard hand-wired sites** (GTA): when `website_setup` is empty it probes `clients.allowed_domains` against the sites Vercel project.
+4. **Import your members** (training offer) -> Blueprint Member Onboarding card
+
+## Custom values tied end to end (offer.js, 2026-07-09)
+The offer wizard writes lead/member custom questions to `custom_field_defs` (offer_id + `section` = sales|onboarding; academy-core defs have offer_id null). `api/website/offer.js` now reads them and returns:
+- `intake_fields` = training defaults + legacy `offer.data.onboarding.intake_form_fields` + academy-core + **onboarding** defs (the join/enroll form - enroll.jsx already renders `intake_fields`, so member custom fields flow live; CORE_SKIP dedupes the contact basics)
+- `lead_fields` = academy-core + **sales** defs (the lead-capture form; generated/future sites consume it - Detail's hardcoded miami-lead form does not yet)
+`cfDefToField`/`cfDefType` map the owner's chosen type to the funnel vocab (text/email/tel/date/select/textarea). leads.js persists submitted values via `writePortalFieldValues` keyed by `custom_field_defs`.
 
 ## Steps to add (agreed backlog, academy-level vs per-offer split per Zoran)
 Academy-level: locations · staff/team invites · branding/assets · Stripe Connect check · contact import · Meta/KPI wiring.
