@@ -26807,6 +26807,18 @@ async function switchClient(newId) {
   if (!newId || newId === CLIENT_ID) return;
   const row = (CLIENT_ROWS || []).find(c => c.id === newId);
   if (!row) return;
+  // The command center can't hot-swap academies cleanly (its chrome + section
+  // data mount per-academy), so when CC is involved - we're in it now, or the
+  // target is a V2 academy that should boot into it - reload and let boot() set
+  // up the right experience. This is why switching back to a V2 academy (e.g.
+  // GTA) from a V1.5 one now returns to the command center instead of classic.
+  const wantsCc = (typeof _ccWanted !== 'function') || _ccWanted();
+  const ccInvolved = (typeof _ccActive === 'function' && _ccActive()) || (row.v2_access === true && wantsCc);
+  if (ccInvolved) {
+    try { localStorage.setItem('bam_active_client', newId); } catch (_) {}
+    location.reload();
+    return;
+  }
   CLIENT_ID = row.id;
   CONTACT_PROVIDER = row.contact_provider || 'ghl';
   if (typeof stopParentMessagesPoll === 'function') stopParentMessagesPoll();
