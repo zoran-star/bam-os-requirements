@@ -322,6 +322,19 @@ async function handler(req, res) {
     if (body.apply === true) {
       const approvals = Array.isArray(body.approvals) ? body.approvals : [];
       if (!approvals.length) return res.status(400).json({ error: "apply=true needs approvals[]" });
+      // catalog.interval speaks the term vocabulary (4_weeks/3_months/6_months,
+      // same labels create-price.js writes) - the matched key's term is that
+      // truth. Stripe's raw recurring unit ("week" on a billed-every-4-weeks
+      // price) drops interval_count and poisons offer_prices.billing_interval
+      // downstream (offers-sync -> checkout term logic), so never store it raw
+      // once a key is confirmed.
+      const intervalFromKey = (key) => {
+        const term = String(key || "").split("|")[1];
+        const t = term ? term.trim().toLowerCase() : "";
+        if (t === "monthly" || t === "4_weeks") return "4_weeks";
+        if (t === "3_months" || t === "6_months" || t === "one_time") return t;
+        return null;
+      };
       const results = [];
       for (const a of approvals) {
         if (!a.price_id) continue;
@@ -333,6 +346,7 @@ async function handler(req, res) {
         const patch = {
           offer_id: a.offer_id || body.offer_id || null,
           offer_price_key: a.offer_price_key || null,
+          interval: intervalFromKey(a.offer_price_key) || undefined,
           coachiq_product_id: a.coachiq_product_id || null,
           tier: tier || undefined,
           match_status: "confirmed",
@@ -361,7 +375,7 @@ async function handler(req, res) {
               display_name: a.name || null,
               amount_cents: a.amount_cents,
               currency: a.currency || "cad",
-              interval: a.interval || null,
+              interval: intervalFromKey(a.offer_price_key) || a.interval || null,
               is_routable: (tier || "canonical") === "canonical",
               offer_id: a.offer_id || body.offer_id || null,
               offer_price_key: a.offer_price_key || null,

@@ -176,9 +176,11 @@ through ~Aug 31, capacity 12) and flipped GTA to `clients.booking_provider =
 post-trial outcomes all run on this spine via the RPCs (see
 `memories/project_calendars_offghl.md`). Real trial bookings exist - treat
 `trial_bookings` and `schedule_slots` as live production data. The
-identity/runtime backfill is also live (29 profiles, 30 students, 30
-memberships, 30 member_links, 6 offer_prices, 30 entitlements). Parent-app
-member booking (`reservations`) is not launched yet.
+identity/runtime backfill is also live (rechecked 2026-07-08: 38 profiles, 41
+students, 41 memberships, 40 member_links, 31 offer_prices, 71 entitlements, 36
+credit_ledger rows). No parent profiles are claimed yet (`supabase_user_id` /
+`claimed_at` are 0). Parent-app member booking (`reservations`) is not launched
+yet.
 
 MVP simplification rules:
 - No `entitlement_template_program_grants` or `customer_entitlement_program_grants`

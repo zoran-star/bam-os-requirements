@@ -263,6 +263,22 @@ async function handler(req, res) {
       fileUrl(offer.id, ["sales:welcome_video", "onboarding:welcome_video", "welcome_video"]),
     ]);
 
+    // Activation telemetry (additive): the ops side live-checks the
+    // sellable -> bookable chain from here without DB credentials (program
+    // count + booking provider are not sensitive; CORS-gated like the rest).
+    let activation = null;
+    try {
+      const [progs, clientRows] = await Promise.all([
+        sbReq(`bookable_programs?tenant_id=eq.${encodeURIComponent(client_id)}&status=eq.ACTIVE&select=id,config&limit=5`),
+        sbReq(`clients?id=eq.${encodeURIComponent(client_id)}&select=booking_provider&limit=1`),
+      ]);
+      activation = {
+        active_programs: Array.isArray(progs) ? progs.length : 0,
+        booking_provider: (clientRows && clientRows[0] && clientRows[0].booking_provider) || "ghl",
+        last_run: (progs && progs[0] && progs[0].config && progs[0].config.activation_report) || null,
+      };
+    } catch { /* additive - never breaks the offer page */ }
+
     res.setHeader("Cache-Control", "s-maxage=60, stale-while-revalidate=300");
     return res.status(200).json({
       offer: {
@@ -275,6 +291,7 @@ async function handler(req, res) {
       pricing: buildPricing(offer, catalogRows),
       purchasable,
       trial,
+      activation,
       agreement_url: agreementUrl,
       welcome_video: welcomeVideo,
     });

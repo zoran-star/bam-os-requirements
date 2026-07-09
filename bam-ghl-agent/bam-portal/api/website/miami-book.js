@@ -5,6 +5,7 @@
 
 import { withSentryApiRoute } from '../_sentry.js';
 import { getClientGhlToken } from './availability.js';
+import { findOpenOpp, moveStage } from '../agent/_store.js';
 
 const ALLOWED_CALENDARS = new Set([
   '290AH08i2I7Ts3yzd4W0', // Free Trial - Elementary Academy
@@ -17,19 +18,33 @@ const GHL_BASE          = 'https://services.leadconnectorhq.com';
 const SB_URL = (process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || '').trim();
 const SB_KEY = (process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY || '').trim();
 
-async function getMiamiToken() {
+async function sb(path, init = {}) {
+  const res = await fetch(`${SB_URL}/rest/v1/${path}`, {
+    ...init,
+    headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}`, 'Content-Type': 'application/json', ...(init.headers || {}) },
+  });
+  if (!res.ok) throw new Error(`Supabase ${res.status}: ${await res.text()}`);
+  const txt = await res.text();
+  return txt ? JSON.parse(txt) : null;
+}
+
+// One clients read powers both the GHL token and the booking_provider branch.
+async function getMiamiClient() {
   if (SB_URL && SB_KEY) {
     try {
-      const r = await fetch(
-        `${SB_URL}/rest/v1/clients?id=eq.${MIAMI_CLIENT_UUID}&select=id,ghl_location_id,ghl_kpi_config,ghl_access_token,ghl_refresh_token,ghl_token_expires_at&limit=1`,
-        { headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` } }
+      const rows = await sb(
+        `clients?id=eq.${MIAMI_CLIENT_UUID}&select=id,booking_provider,ghl_location_id,ghl_kpi_config,ghl_access_token,ghl_refresh_token,ghl_token_expires_at&limit=1`
       );
-      if (r.ok) {
-        const rows = await r.json();
-        if (rows?.[0]) return await getClientGhlToken(rows[0]);
-      }
+      if (rows?.[0]) return rows[0];
     } catch (_) {}
   }
+  return { ghl_location_id: MIAMI_LOC };
+}
+
+async function getMiamiToken(client) {
+  try {
+    if (client?.id) return await getClientGhlToken(client);
+  } catch (_) {}
   return process.env.GHLKEY || '';
 }
 
@@ -72,7 +87,8 @@ async function handler(req, res) {
   const endTime   = new Date(new Date(start).getTime() + 2 * 60 * 60 * 1000).toISOString(); // 2-hour sessions
   const group     = calendarId === '290AH08i2I7Ts3yzd4W0' ? 'Elementary' : 'MS / HS';
 
-  const ghlToken = await getMiamiToken();
+  const client = await getMiamiClient();
+  const ghlToken = await getMiamiToken(client);
   const ghlH = makeHeaders(ghlToken);
 
   let contactId = passedContactId || null;
@@ -124,6 +140,94 @@ async function handler(req, res) {
     return res.status(502).json({
       error: 'Booking failed — please go back and resubmit the form, or contact us directly.',
       detail: lastErrText ? lastErrText.slice(0, 200) : 'Could not resolve contact',
+    });
+  }
+
+  // ── booking_provider='portal': book onto OUR slot via the capacity-safe RPC
+  // (mirrors api/website/leads.js's portal booking branch). The contact still
+  // lives in GHL (contacts stay GHL-backed until Twilio), so the layers above
+  // are unchanged - only the appointment write moves off GHL. Response shape
+  // is identical to the GHL branch so the site needs no changes.
+  if ((client.booking_provider || '') === 'portal') {
+    const t = new Date(start);
+    if (isNaN(t.getTime())) return res.status(400).json({ error: 'Invalid start time' });
+
+    let ep = null;
+    try {
+      const eps = await sb(
+        `entry_points?client_id=eq.${MIAMI_CLIENT_UUID}&type=eq.calendar&key=eq.${encodeURIComponent(calendarId)}&enabled=eq.true&select=id,label,offer_id,stage_name&limit=1`
+      );
+      ep = eps?.[0] || null;
+    } catch (_) {}
+
+    let slot = null;
+    try {
+      const slotRows = (await sb(
+        `schedule_slots?tenant_id=eq.${MIAMI_CLIENT_UUID}&is_cancelled=eq.false&start_time=eq.${encodeURIComponent(t.toISOString())}&select=id,name&limit=10`
+      )) || [];
+      const groupMatch = /group\s*\d+/i.exec(ep?.label || '');
+      const groupPrefix = groupMatch ? groupMatch[0].toLowerCase().replace(/\s+/g, ' ') : null;
+      slot = slotRows.find(s => !groupPrefix || (s.name || '').toLowerCase().replace(/\s+/g, ' ').includes(groupPrefix)) || slotRows[0] || null;
+    } catch (e) {
+      return res.status(502).json({ error: 'Failed to book appointment', detail: String(e.message).slice(0, 200) });
+    }
+    if (!slot) return res.status(409).json({ error: 'That time is no longer available - please pick another time.' });
+
+    let rpcRes;
+    try {
+      rpcRes = await sb(`rpc/book_trial_slot`, {
+        method: 'POST',
+        body: JSON.stringify({
+          p_tenant_id: MIAMI_CLIENT_UUID,
+          p_slot_id: slot.id,
+          // The trial form collects ONE name (the player's) - the RPC requires
+          // a non-null athlete name, so it fills both roles here.
+          p_parent_name: `${firstName}${lastName ? ' ' + lastName : ''}` || null,
+          p_parent_email: email.toLowerCase(),
+          p_athlete_name: `${firstName}${lastName ? ' ' + lastName : ''}`,
+          p_parent_phone: phone || null,
+          p_athlete_dob: null,
+          p_entry_point_id: ep?.id || null,
+          p_offer_id: ep?.offer_id || null,
+          p_ghl_contact_id: contactId,
+          p_source: 'website',
+          p_metadata: { calendar_key: calendarId, slot_name: slot.name },
+        }),
+      });
+    } catch (e) {
+      return res.status(502).json({ error: 'Failed to book appointment', detail: String(e.message).slice(0, 200) });
+    }
+    const trialBookingId = typeof rpcRes === 'string' ? rpcRes : (rpcRes && rpcRes.trial_booking_id) || null;
+    if (!trialBookingId) return res.status(502).json({ error: 'Failed to book appointment' });
+
+    // No GHL appointment fires on a portal booking, so Detail's GHL nurture
+    // workflows get no AppointmentCreate stop signal - stamp the booked tag on
+    // the (GHL-backed) contact as their hook. Best-effort.
+    try {
+      await fetch(`${GHL_BASE}/contacts/${encodeURIComponent(contactId)}/tags`, {
+        method: 'POST', headers: ghlH, body: JSON.stringify({ tags: ['miami-free-trial-booked'] }),
+      });
+    } catch (_) {}
+
+    // Advance the lead's card to the entry point's stage through the
+    // provider-aware store (records the trial_booked KPI). Non-fatal.
+    try {
+      const ref = await findOpenOpp({ clientId: MIAMI_CLIENT_UUID, token: ghlToken, locationId: MIAMI_LOC, contactId });
+      if (ref) {
+        await moveStage({
+          clientId: MIAMI_CLIENT_UUID, token: ghlToken, oppRef: ref,
+          stage: { stageName: ep?.stage_name || 'Schedule Trial' },
+          role: 'scheduled_trial', contactId,
+        });
+      }
+    } catch (e) { console.error('miami-book: stage move failed (non-fatal):', e.message); }
+
+    const fmt = formatDatetime(start);
+    return res.status(200).json({
+      ok: true, contactId,
+      appointmentId: trialBookingId,
+      start, ...fmt, group,
+      location: '16414 NW 54th Ave, Hialeah, FL 33014',
     });
   }
 

@@ -159,7 +159,11 @@ async function handler(req, res) {
       const today = new Date();
       let slots = 0, from = today;
       for (let off = 0; off < COVERAGE_DAYS; off += MAX_WINDOW_DAYS) {
-        const to = addDays(today, Math.min(off + MAX_WINDOW_DAYS, COVERAGE_DAYS));
+        // generate-slots validates the INCLUSIVE span (daySpanInclusive counts
+        // both endpoints), so a window must end at from+91 to span exactly 92
+        // days - ending at +92 spans 93 and fails validation (bit Detail's
+        // unattended activation on its first window).
+        const to = addDays(today, Math.min(off + MAX_WINDOW_DAYS - 1, COVERAGE_DAYS));
         const g = await runtimeFetch(staffToken, "POST", `/generate-slots`, { client_id: clientId, date_from: ymd(from), date_to: ymd(to) });
         slots += Number(g.created || 0);
         from = addDays(to, 1);

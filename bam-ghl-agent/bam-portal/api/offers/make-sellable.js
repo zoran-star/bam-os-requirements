@@ -3,9 +3,10 @@ export const maxDuration = 60;
 
 // The missing backend handshake between the Stripe Matcher and the sellable
 // runtime (Zoran 2026-07-08: "auto-fire after price match"). Once an offer's
-// prices are CONFIRMED in pricing_catalog, this bridges them into Luka's typed
-// runtime via /api/runtime/offers-sync - creating the bookable_program (unlocks
-// the trial calendar) + the typed offer_prices (fills the enroll page's
+// prices are CONFIRMED in pricing_catalog, this creates the bookable_program
+// itself (ensureBookableProgram - nothing else in the pipeline does; unlocks
+// the trial calendar) and bridges the prices into Luka's typed runtime via
+// /api/runtime/offers-sync (the typed offer_prices that fill the enroll page's
 // `purchasable`). Entitlement rules are DERIVED from the plan names:
 //   "1x/week" -> 1 session credit/week · "2x/week" -> 2 · "Unlimited" -> unlimited
 // (Future: these become an explicit field in the offer wizard's pricing section
@@ -91,6 +92,91 @@ function deriveRules(planKeys) {
   return rules;
 }
 
+// The bookable program is the access target slots + entitlements hang off.
+// NOTHING else in the pipeline creates it (offers-sync only validates a passed
+// id; GTA's came from a hand-written backfill migration) - so the bridge
+// ensures it here. source_program_key is stable per offer, so the unique
+// guard (tenant_id, source_program_key) makes creation race-safe.
+async function ensureBookableProgram(clientId, offerId) {
+  const active = await sb(`bookable_programs?tenant_id=eq.${encodeURIComponent(clientId)}&status=eq.ACTIVE&select=id&order=sort_order.asc&limit=1`);
+  if (Array.isArray(active) && active[0]) return { programId: active[0].id, created: false };
+
+  const offers = await sb(`offers?id=eq.${encodeURIComponent(offerId)}&select=title&limit=1`);
+  const clients = await sb(`clients?id=eq.${encodeURIComponent(clientId)}&select=business_name&limit=1`);
+  const offerTitle = offers?.[0]?.title || "Training";
+  const title = `${clients?.[0]?.business_name || "Academy"} ${offerTitle}`.trim();
+  try {
+    const ins = await sb(`bookable_programs`, {
+      method: "POST", headers: { Prefer: "return=representation" },
+      body: JSON.stringify([{
+        tenant_id: clientId,
+        source_program_key: `offer-${offerId}`,
+        title,
+        program_type: "TRAINING",
+        status: "ACTIVE",
+        description: `Auto-created by make-sellable from the ${offerTitle} offer`,
+        sort_order: 0,
+        config: { source_offer_id: offerId },
+      }]),
+    });
+    if (ins?.[0]?.id) return { programId: ins[0].id, created: true };
+  } catch (e) {
+    if (!/duplicate|unique|23505/i.test(String(e.message))) throw e;
+  }
+  // Lost a creation race - the winner's row is the program.
+  const again = await sb(`bookable_programs?tenant_id=eq.${encodeURIComponent(clientId)}&source_program_key=eq.${encodeURIComponent(`offer-${offerId}`)}&select=id&limit=1`);
+  if (Array.isArray(again) && again[0]) return { programId: again[0].id, created: false };
+  throw new Error("bookable program create failed");
+}
+
+// The whole bridge for one client, callable without an HTTP request (the cron
+// backstop uses this too). ctx defaults to a synthetic non-staff caller so
+// withStaffToken mints its disposable staff session.
+export async function runMakeSellable(clientId, { offerId = "", force = false, ctx = null } = {}) {
+  // Offers with confirmed canonical pricing = ready to become sellable.
+  const rows = await sb(
+    `pricing_catalog?client_id=eq.${encodeURIComponent(clientId)}&match_status=eq.confirmed&tier=eq.canonical&offer_id=not.is.null&offer_price_key=not.is.null` +
+    (offerId ? `&offer_id=eq.${encodeURIComponent(offerId)}` : "") +
+    `&select=offer_id,offer_price_key`
+  ) || [];
+  const byOffer = new Map();
+  for (const r of rows) {
+    if (!byOffer.has(r.offer_id)) byOffer.set(r.offer_id, new Set());
+    byOffer.get(r.offer_id).add(String(r.offer_price_key).split("|")[0]);
+  }
+  if (!byOffer.size) return { synced: [], note: "no offers with confirmed pricing yet - run the Stripe Matcher first" };
+
+  const synced = [];
+  await withStaffToken(ctx || { isStaff: false, user: { id: "cron" } }, async (staffToken) => {
+    for (const [oid, planSet] of byOffer) {
+      // The program must exist BEFORE the idempotence skip: a client whose
+      // typed prices landed while the program creation failed (Detail's
+      // make-sellable race, 2026-07-08) would otherwise never get one.
+      let program = null;
+      try { program = await ensureBookableProgram(clientId, oid); }
+      catch (e) { synced.push({ offer_id: oid, error: `bookable program: ${e.message}` }); continue; }
+
+      // Idempotence: typed prices already exist -> already sellable. A program
+      // created JUST NOW still re-syncs once, so the entitlement templates
+      // converge their bookable_program_id from null onto the new program.
+      if (force !== true && !program.created) {
+        const typed = await sb(`offer_prices?tenant_id=eq.${encodeURIComponent(clientId)}&source_offer_id=eq.${encodeURIComponent(oid)}&select=id&limit=1`);
+        if (Array.isArray(typed) && typed[0]) { synced.push({ offer_id: oid, already: true }); continue; }
+      }
+      const rules = deriveRules([...planSet]);
+      const r = await fetch(`${PORTAL}/api/runtime/offers-sync`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${staffToken}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ client_id: clientId, offer_id: oid, mode: "apply", entitlement_rules: rules, offer_type: "TRAINING", purchase_kind: "MEMBERSHIP", bookable_program_id: program.programId }),
+      });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) { synced.push({ offer_id: oid, error: j.error || `runtime ${r.status}` }); continue; }
+      synced.push({ offer_id: oid, rules, program_id: program.programId, program_created: program.created, result: { options: j.options?.length ?? j.planned?.options?.length, prices: j.prices?.length ?? undefined, ok: true } });
+    }
+  });
+  return { synced };
+}
+
 async function handler(req, res) {
   if (req.method !== "POST") return res.status(405).json({ error: "POST required" });
   try {
@@ -100,41 +186,12 @@ async function handler(req, res) {
     if (!clientId) return res.status(400).json({ error: "client_id required" });
     if (!ctx.isStaff && !ctx.clientIds.includes(clientId)) return res.status(403).json({ error: "forbidden" });
 
-    // Offers with confirmed canonical pricing = ready to become sellable.
-    const oneOffer = String(body.offer_id || "").trim();
-    const rows = await sb(
-      `pricing_catalog?client_id=eq.${encodeURIComponent(clientId)}&match_status=eq.confirmed&tier=eq.canonical&offer_id=not.is.null&offer_price_key=not.is.null` +
-      (oneOffer ? `&offer_id=eq.${encodeURIComponent(oneOffer)}` : "") +
-      `&select=offer_id,offer_price_key`
-    ) || [];
-    const byOffer = new Map();
-    for (const r of rows) {
-      if (!byOffer.has(r.offer_id)) byOffer.set(r.offer_id, new Set());
-      byOffer.get(r.offer_id).add(String(r.offer_price_key).split("|")[0]);
-    }
-    if (!byOffer.size) return res.status(200).json({ ok: true, synced: [], note: "no offers with confirmed pricing yet - run the Stripe Matcher first" });
-
-    const synced = [];
-    await withStaffToken(ctx, async (staffToken) => {
-      for (const [offerId, planSet] of byOffer) {
-        // Idempotence: typed prices already exist -> already sellable.
-        if (body.force !== true) {
-          const typed = await sb(`offer_prices?tenant_id=eq.${encodeURIComponent(clientId)}&source_offer_id=eq.${encodeURIComponent(offerId)}&select=id&limit=1`);
-          if (Array.isArray(typed) && typed[0]) { synced.push({ offer_id: offerId, already: true }); continue; }
-        }
-        const rules = deriveRules([...planSet]);
-        const r = await fetch(`${PORTAL}/api/runtime/offers-sync`, {
-          method: "POST",
-          headers: { Authorization: `Bearer ${staffToken}`, "Content-Type": "application/json" },
-          body: JSON.stringify({ client_id: clientId, offer_id: offerId, mode: "apply", entitlement_rules: rules, offer_type: "TRAINING", purchase_kind: "MEMBERSHIP" }),
-        });
-        const j = await r.json().catch(() => ({}));
-        if (!r.ok) { synced.push({ offer_id: offerId, error: j.error || `runtime ${r.status}` }); continue; }
-        synced.push({ offer_id: offerId, rules, result: { options: j.options?.length ?? j.planned?.options?.length, prices: j.prices?.length ?? undefined, ok: true } });
-      }
+    const { synced, note } = await runMakeSellable(clientId, {
+      offerId: String(body.offer_id || "").trim(),
+      force: body.force === true,
+      ctx,
     });
-
-    return res.status(200).json({ ok: true, synced });
+    return res.status(200).json({ ok: true, synced, ...(note ? { note } : {}) });
   } catch (e) {
     return res.status(e.status || 500).json({ error: e.message || String(e) });
   }

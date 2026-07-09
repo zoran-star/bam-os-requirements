@@ -1290,6 +1290,21 @@ async function handler(req, res) {
           ? fb.portal : "client";
         if (!fbBody) return res.status(400).json({ error: "feedback body required" });
 
+        // Auto-captured context snapshot from the widget (view, click path,
+        // errors, tier, device). Size-capped so a hostile payload can't bloat
+        // the row; the trails are dropped first if it's oversized.
+        let fbContext = null;
+        if (fb.context && typeof fb.context === "object" && !Array.isArray(fb.context)) {
+          try {
+            let ctxStr = JSON.stringify(fb.context);
+            if (ctxStr.length > 20000) {
+              const slim = { ...fb.context, clicks: undefined, view_trail: undefined, errors: undefined, truncated: true };
+              ctxStr = JSON.stringify(slim);
+            }
+            if (ctxStr.length <= 20000) fbContext = JSON.parse(ctxStr);
+          } catch (_) { /* malformed context is dropped, feedback still lands */ }
+        }
+
         // Try to resolve the submitter from the Bearer token if present.
         // Auth failures don't reject the submission, just leave fields blank.
         let submitterEmail = null;
@@ -1370,7 +1385,16 @@ async function handler(req, res) {
           const cid = fbClientId || (typeof fb.client_id === "string" && fb.client_id ? fb.client_id : null);
           if (cid) insertRow.client_id = cid;
           if (fbPhone) insertRow.submitter_phone = fbPhone;
-          const rows = await supabaseInsert("portal_feedback", insertRow);
+          if (fbContext) insertRow.context = fbContext;
+          let rows;
+          try {
+            rows = await supabaseInsert("portal_feedback", insertRow);
+          } catch (ctxErr) {
+            // context column may not be migrated yet; never lose the feedback
+            if (!insertRow.context) throw ctxErr;
+            delete insertRow.context;
+            rows = await supabaseInsert("portal_feedback", insertRow);
+          }
           const row = Array.isArray(rows) ? rows[0] : rows;
           // Text Zoran immediately (fire-and-forget — never blocks the submit).
           notifyFeedbackBySms(row || insertRow, { page, portalKind, submitterEmail }).catch(() => {});
@@ -1783,8 +1807,13 @@ async function handler(req, res) {
             if (a === undefined) return res.status(400).json({ error: "allowed_kpis must be an array or null" });
             patch.allowed_kpis = a;
           }
-          if (!("allowed_tabs" in patch) && !("allowed_stages" in patch) && !("allowed_kpis" in patch)) {
-            return res.status(400).json({ error: "provide allowed_tabs, allowed_stages, and/or allowed_kpis" });
+          // Opt-in grant: teammate may use the Returning Client Enroll flow
+          // (Members tab). Boolean, owner-managed; the owner always can.
+          if ("can_enroll_members" in teamBody) {
+            patch.can_enroll_members = teamBody.can_enroll_members === true;
+          }
+          if (!("allowed_tabs" in patch) && !("allowed_stages" in patch) && !("allowed_kpis" in patch) && !("can_enroll_members" in patch)) {
+            return res.status(400).json({ error: "provide allowed_tabs, allowed_stages, allowed_kpis, and/or can_enroll_members" });
           }
           // Target must belong to THIS client and not be the owner.
           const targetRows = await supabaseSelect(

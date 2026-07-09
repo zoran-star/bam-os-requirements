@@ -185,6 +185,13 @@ Bar stays HOME / SALES / [Tower orb] / MEMBERS / INBOX. Marketing deliberately h
 - Smoke test: `scratchpad cc_smoke2.mjs` pattern - serve `public/` locally, `openCommandCenter()` via console; boot splash covers everything in offline envs (remove `#boot-splash` for screenshots).
 - Tour verifier still passes; V1/V1.5 completely unaffected (flag + V2 check).
 
+## BAM-staff academy switcher above the dock (2026-07-08)
+- CC hides the sidebar + mobile nav, so the normal bottom-left account switcher (`#clientSwitcher` / `renderClientSwitcher`) is unreachable inside V2. Added `#cc-acct`: a small glass "layers" button stacked just above the dock orb (fixed `left:16px; bottom:82px` desktop, `142px + safe-area` on ≤768px) that fans a "Switch portal" popover UP with every academy the user can reach (CLIENT_ROWS), tier pill (V2/V1.5/V1) + active check, search when >6.
+- **Locked to Zoran + Mike only**: `_ccAcctEmailOk === true && CLIENT_ROWS.length > 1`. `_ccAcctEmailOk` is set in `_ccAcctBuild` by matching the signed-in auth email (`_sb.auth.getSession()`) against `_CC_ACCT_EMAILS` (zoran@/mike@ across both byanymeansbball.com + byanymeansbusiness.com, plus `info@byanymeanstoronto.ca` = the BAM GTA/Toronto login). To add someone, append to that array.
+- Picking an academy = `_ccAcctPick`: stores `bam_active_client` + `location.reload()` so `boot()` re-runs per-academy gating - a V1.5 academy lands on its classic "older" portal, a V2 one on its CC. (Deliberately a reload, not `switchClient`, to avoid hot-swapping CC chrome onto a non-V2 academy.)
+- Fns near `_ccExitBeta`; built in `_ccBuildChrome` right after the dock; CSS in `_ccStyle` next to the dock-pop rules. Hidden in `cc-classic` like the dock/rail. V1 academies untouched (CC-only).
+- **`switchClient` reloads when CC is involved (2026-07-08 fix):** CC can't hot-swap academies (chrome + section data mount per-academy), so `switchClient` now short-circuits to `localStorage.bam_active_client = id` + `location.reload()` when `_ccActive()` OR (target `v2_access` && `_ccWanted()`) - so switching *back* to a V2 academy (e.g. GTA) from a V1.5 one returns to the command center instead of landing in classic. Classic↔classic (V1.5/V1) still switches in-place. Same reload path `_ccAcctPick` uses.
+
 ## Next steps (agreed with Cole)
 1. Zoran plops his new Sales section into `#cc-sales-mount` (then Marketing rebuild).
 2. Wire the real LLM member agent.

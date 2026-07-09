@@ -6257,7 +6257,8 @@
     </div>
 
     <label for="admin-fb-body" id="admin-fb-body-label">What's the bug?</label>
-    <textarea id="admin-fb-body" placeholder="What you saw, what you expected, what page you were on..."></textarea>
+    <textarea id="admin-fb-body" placeholder="Just describe what you saw and what you expected..."></textarea>
+    <div style="font-size:11px;color:#6E6E78;margin-top:6px;line-height:1.4">Your page and recent clicks are attached automatically, no need to explain where you were.</div>
 
     <label>Attach a screenshot or file <span style="color:#6E6E78; text-transform:none; letter-spacing:0; font-weight:400;">(optional)</span></label>
     <div id="admin-fb-file-row">
@@ -13079,12 +13080,16 @@ const _V15IB_CHANNELS = [
   { key: 'facebook',  label: 'FB',        icon: '' },
 ];
 // V2 academies run their inbox off the own-store (SMS via Twilio + Email via
-// Resend) - Instagram/Facebook DMs are GHL-only and never surface here, so the
-// Meta toggles are dead buttons. Hide them for V2. (Icon lookups still use the
-// full list, so a stray Meta thread would still render its icon correctly.)
+// Resend). IG/FB DMs only flow once the academy is wired to the Meta DM spine
+// (client_meta_messaging_config active + inbox_live - GTA today, self-serve
+// for everyone else via the Instagram wizard in Settings). Until then the Meta
+// toggles are dead buttons - hide them. _IG_LIVE is set async by _igwBoot().
+// (Icon lookups still use the full list, so a stray Meta thread would still
+// render its icon correctly.)
 function _v15ibVisibleChannels() {
   const isV2 = (typeof V2_ACCESS !== 'undefined' && V2_ACCESS);
-  return isV2 ? _V15IB_CHANNELS.filter(c => c.key !== 'instagram' && c.key !== 'facebook') : _V15IB_CHANNELS;
+  if (!isV2 || _IG_LIVE) return _V15IB_CHANNELS;
+  return _V15IB_CHANNELS.filter(c => c.key !== 'instagram' && c.key !== 'facebook');
 }
 const _V15IB_FAILED = ['failed', 'undelivered', 'error', 'rejected'];
 
@@ -14725,9 +14730,11 @@ async function _v15ibSetup() {
         ${row('Email', j.email)}
         <div id="email-domain-card" style="margin-top:22px"></div>
         <div id="website-domain-card" style="margin-top:22px"></div>
+        ${(typeof V2_ACCESS !== 'undefined' && V2_ACCESS) ? '<div id="ig-connect-card" style="margin-top:22px"></div>' : ''}
       </div>`;
     _edwRender();
     _wdwRender();
+    _igwRender();
   } catch (e) {
     body.innerHTML = `<div class="req-empty" style="padding:24px 0;color:#9a3b2f">Couldn't load sender info - ${escapeHTML(e.message || String(e))}</div>`;
   }
@@ -14889,6 +14896,138 @@ async function _wdwCheck(btn) {
     else _plToast('Not switched yet - DNS can take a few minutes to propagate.');
   } catch (e) { _plToast('Check failed: ' + e.message); }
   _wdwRender();
+}
+
+// ── Instagram connect wizard (client self-serve Meta OAuth) ──
+// Same shape as the email domain wizard above: a card that renders wherever a
+// #ig-connect-card div exists (Inbox Setup + the Settings dock modal), backed
+// by /api/meta/ig-connect. Connect sends the owner through Facebook OAuth
+// (/api/meta/ig-callback brings them back with ?ig=connected|pick|error);
+// once wired, IG+FB DMs land in the portal Inbox via the Meta DM spine.
+let _IG_LIVE = false;      // active + inbox_live - drives the inbox channel toggles
+let _IGW_BOOTED = false;
+async function _igwApi(action, extra) {
+  const token = await _mreqAuthToken();
+  const r = await fetch('/api/meta/ig-connect', {
+    method: 'POST',
+    headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ client_id: CLIENT_ID, action, ...(extra || {}) }),
+  });
+  const j = await _safeJson(r);
+  if (!r.ok) throw new Error(j.error || ('HTTP ' + r.status));
+  return j;
+}
+async function _igwRender() {
+  const card = document.getElementById('ig-connect-card');
+  if (!card) return;
+  card.innerHTML = `<div class="req-empty" style="padding:8px 0"><span class="req-spin"></span> Checking Instagram…</div>`;
+  let st;
+  try { st = await _igwApi('status'); }
+  catch (e) { card.innerHTML = `<div style="font-size:12px;color:#9a3b2f">Couldn't check Instagram - ${escapeHTML(e.message)}</div>`; return; }
+  const head = `<div style="font-size:15px;font-weight:700;color:var(--text);margin-bottom:4px">Instagram DMs</div>`;
+  if (st.status === 'active') {
+    const who = st.ig_username ? `<b>@${escapeHTML(st.ig_username)}</b>` : `<b>${escapeHTML(st.page_name || 'your page')}</b>`;
+    if (st.inbox_live === false) {
+      card.innerHTML = `${head}<div style="display:flex;align-items:center;gap:8px;padding:12px 14px;border:1px solid var(--border);background:var(--amber-soft,rgba(224,176,80,.08));border-radius:8px;font-size:13px;color:var(--text)">Connected as ${who} - DMs will appear in your Inbox once BAM flips it live.</div>`;
+      return;
+    }
+    card.innerHTML = `${head}
+      <div style="display:flex;align-items:center;gap:8px;padding:12px 14px;border:1px solid rgba(123,196,127,.4);background:rgba(123,196,127,.08);border-radius:8px;font-size:13px;color:var(--text)"><span style="color:#7BC47F;font-weight:700">✓</span> Instagram and Facebook DMs from ${who} land in your Inbox.</div>
+      <div style="margin-top:8px;text-align:right"><button onclick="_igwDisconnect(this)" style="background:none;border:none;color:var(--text-mute);font-size:11.5px;cursor:pointer;text-decoration:underline;padding:0">Disconnect</button></div>`;
+    return;
+  }
+  if (st.status === 'pending') {
+    card.innerHTML = `${head}<div style="padding:12px 14px;border:1px solid var(--border);background:var(--amber-soft,rgba(224,176,80,.08));border-radius:8px;font-size:13px;color:var(--text)">Setup started by BAM - your DMs will appear in the Inbox once it's activated.</div>`;
+    return;
+  }
+  if (st.status === 'pick') {
+    const rows = (st.pages || []).map(p => `
+      <div style="display:flex;align-items:center;gap:12px;padding:10px 12px;border:1px solid var(--border);border-radius:8px;margin-bottom:8px">
+        <div style="flex:1;min-width:0">
+          <div style="font-size:13px;font-weight:600;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHTML(p.page_name || p.page_id)}</div>
+          <div style="font-size:11.5px;color:var(--text-mute)">${p.ig_username ? '@' + escapeHTML(p.ig_username) : 'no Instagram linked - Messenger only'}</div>
+        </div>
+        <button data-igw-page="${escapeHTML(p.page_id)}" onclick="_igwWire(this.dataset.igwPage, this)" style="background:var(--gold,#D4B65C);color:#0B0B0D;border:none;border-radius:8px;padding:7px 14px;font-weight:700;font-size:12px;cursor:pointer;font-family:inherit">Connect</button>
+      </div>`).join('');
+    card.innerHTML = `${head}
+      <div style="font-size:12.5px;color:var(--text-mute);margin-bottom:10px">Pick the Facebook Page linked to your academy's Instagram.</div>
+      ${rows}`;
+    return;
+  }
+  card.innerHTML = `${head}
+    <div style="font-size:12.5px;color:var(--text-mute);margin-bottom:10px">Connect your Instagram so DMs land straight in your portal Inbox. You'll sign into Facebook and pick your page - your Instagram must be a professional account linked to a Facebook Page.</div>
+    <button onclick="_igwStart(this)" style="background:var(--gold,#D4B65C);color:#0B0B0D;border:none;border-radius:8px;padding:10px 16px;font-weight:700;font-size:13px;cursor:pointer;font-family:inherit">${st.status === 'disconnected' ? 'Reconnect Instagram' : 'Connect Instagram'}</button>`;
+}
+async function _igwStart(btn) {
+  if (btn) { btn.disabled = true; btn.textContent = 'Opening Facebook…'; }
+  try {
+    const j = await _igwApi('start');
+    window.location.href = j.redirect_url;
+  } catch (e) {
+    _plToast('Couldn\'t start Instagram connect - ' + e.message);
+    if (btn) { btn.disabled = false; btn.textContent = 'Connect Instagram'; }
+  }
+}
+async function _igwWire(pageId, btn) {
+  if (btn) { btn.disabled = true; btn.textContent = 'Connecting…'; }
+  try {
+    const j = await _igwApi('wire', { page_id: pageId });
+    _plToast('Instagram connected' + (j.ig_username ? ' - @' + j.ig_username : '') + '. DMs now land in your Inbox.');
+    _IG_LIVE = true;
+    try { _v15ibRenderAll(); } catch (_) {}
+  } catch (e) {
+    _plToast('Connect failed - ' + e.message);
+    if (btn) { btn.disabled = false; btn.textContent = 'Connect'; }
+  }
+  _igwRender();
+}
+// Two-tap disconnect - first tap arms the button, second confirms.
+async function _igwDisconnect(btn) {
+  if (btn && btn.dataset.armed !== '1') { btn.dataset.armed = '1'; btn.textContent = 'Tap again to disconnect'; btn.style.color = '#9a3b2f'; return; }
+  try {
+    await _igwApi('disconnect');
+    _IG_LIVE = false;
+    try { _v15ibRenderAll(); } catch (_) {}
+    _plToast('Instagram disconnected.');
+  } catch (e) { _plToast('Disconnect failed - ' + e.message); }
+  _igwRender();
+}
+// Standalone modal host - opened from the Command Center dock's Settings pop.
+function _igwOpenModal() {
+  document.getElementById('igw-overlay')?.remove();
+  document.body.insertAdjacentHTML('beforeend', `<div id="igw-overlay" style="position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9000;display:flex;align-items:center;justify-content:center;padding:18px" onclick="if(event.target===this)this.remove()">
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;width:100%;max-width:560px;max-height:90vh;overflow-y:auto;padding:22px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+        <div style="font-size:16px;font-weight:700;color:var(--text)">Instagram</div>
+        <button onclick="document.getElementById('igw-overlay')?.remove()" aria-label="Close" style="background:none;border:none;color:var(--text-mute);font-size:18px;cursor:pointer;line-height:1">×</button>
+      </div>
+      <div id="ig-connect-card"></div>
+    </div></div>`);
+  _igwRender();
+}
+// Runs once per load for V2 academies: handles the OAuth return
+// (?ig=connected|pick|error), then fetches connection status so the
+// V2 inbox knows whether to show the IG/FB channel toggles.
+async function _igwBoot() {
+  if (_IGW_BOOTED) return;
+  _IGW_BOOTED = true;
+  try {
+    const u = new URL(window.location.href);
+    const igParam = u.searchParams.get('ig');
+    if (igParam) {
+      const msg = u.searchParams.get('msg');
+      u.searchParams.delete('ig'); u.searchParams.delete('msg');
+      window.history.replaceState({}, document.title, u.pathname + (u.searchParams.toString() ? '?' + u.searchParams.toString() : '') + u.hash);
+      if (igParam === 'error') _plToast('Instagram connect failed - ' + (msg || 'try again.'));
+      if (igParam === 'connected') _plToast('Instagram connected - DMs now land in your Inbox.');
+      _igwOpenModal();
+    }
+  } catch (_) {}
+  try {
+    const st = await _igwApi('status');
+    _IG_LIVE = st.status === 'active' && st.inbox_live !== false;
+    if (_IG_LIVE) { try { _v15ibRenderAll(); } catch (_) {} }
+  } catch (_) {}
 }
 
 // ── Mass send (V1.5 Inbox) - tag-filtered, queued, DND-safe blast ──
@@ -18841,6 +18980,7 @@ let _MY_ALLOWED_STAGES = null; // null = all pipeline stages
 let _MY_ALLOWED_KPIS = null;   // null = all KPI categories
 let _MY_TAB_ROLE = null;       // 'owner' | 'member' | null
 let _MY_CAN_TRAIN_AGENT = false; // opt-in grant: shows the Train Agent nav (default off)
+let _MY_CAN_ENROLL_MEMBERS = false; // opt-in grant: Returning Client Enroll in Members (owner always can)
 
 // Owner "Preview as <staff>" - when set, the owner temporarily adopts a
 // teammate's permissions to see exactly what that teammate sees.
@@ -19032,15 +19172,22 @@ async function loadMyPermissionsAndApply() {
     if (typeof CLIENT_ID === 'undefined' || !CLIENT_ID) return;
     if (!_myAuthUserId) { const u = await _sb.auth.getUser(); _myAuthUserId = u?.data?.user?.id || null; }
     if (!_myAuthUserId) return;
-    const { data } = await _sb.from('client_users')
-      .select('role, allowed_tabs, allowed_stages, allowed_kpis, can_train_agent')
+    let { data } = await _sb.from('client_users')
+      .select('role, allowed_tabs, allowed_stages, allowed_kpis, can_train_agent, can_enroll_members')
       .eq('user_id', _myAuthUserId).eq('client_id', CLIENT_ID).eq('status', 'active').limit(1);
+    if (!data) {
+      // Migration-safe fallback: can_enroll_members may not exist yet.
+      ({ data } = await _sb.from('client_users')
+        .select('role, allowed_tabs, allowed_stages, allowed_kpis, can_train_agent')
+        .eq('user_id', _myAuthUserId).eq('client_id', CLIENT_ID).eq('status', 'active').limit(1));
+    }
     const row = (data || [])[0] || null;
     _MY_TAB_ROLE = row?.role || null;
     _MY_ALLOWED_TABS = Array.isArray(row?.allowed_tabs) ? row.allowed_tabs : null;
     _MY_ALLOWED_STAGES = Array.isArray(row?.allowed_stages) ? row.allowed_stages : null;
     _MY_ALLOWED_KPIS = Array.isArray(row?.allowed_kpis) ? row.allowed_kpis : null;
     _MY_CAN_TRAIN_AGENT = row?.can_train_agent === true;
+    _MY_CAN_ENROLL_MEMBERS = row?.can_enroll_members === true;
   } catch (_) { _MY_ALLOWED_TABS = null; _MY_ALLOWED_STAGES = null; _MY_ALLOWED_KPIS = null; }
   applyTabPermissions();
   if (typeof _renderPreviewAsMenu === 'function') _renderPreviewAsMenu(); // owner role now known
@@ -19118,6 +19265,12 @@ function applyCrmSupersetNav() {
   if (monthProg) monthProg.style.display = crm ? 'none' : '';
   const acHead = document.getElementById('active-campaigns-head');
   if (acHead) acHead.style.marginTop = crm ? '0' : '48px';
+  // Instagram wizard boot (once): OAuth return handling + connection status
+  // for the inbox channel toggles. V2 only - V1/V1.5 keep GHL's own IG/FB
+  // passthrough, and wiring the Meta spine there pre-App-Review would DROP
+  // their GHL social threads (the inbox_live dedupe trap - see
+  // memories/project_meta_dm_spine.md).
+  if (isV2 && typeof _igwBoot === 'function') { try { _igwBoot(); } catch (_) {} }
 }
 
 // ── V1.5 feature gate ──
@@ -21266,11 +21419,19 @@ async function _bbStaffRefreshList() {
   // Pull the list straight from client_users - same source as the
   // existing Team tab. Mirror its TEAM_ROWS / TEAM_MY_ROLE side-effects
   // so the invite/revoke modals (which read those globals) keep working.
-  const { data, error } = await _sb.from('client_users')
-    .select('id, name, email, phone, role, user_id, allowed_tabs, allowed_stages')
+  let { data, error } = await _sb.from('client_users')
+    .select('id, name, email, phone, role, user_id, allowed_tabs, allowed_stages, can_enroll_members')
     .eq('client_id', CLIENT_ID)
     .eq('status', 'active')
     .eq('hide_from_team', false);
+  if (error) {
+    // Migration-safe fallback: can_enroll_members may not exist yet.
+    ({ data, error } = await _sb.from('client_users')
+      .select('id, name, email, phone, role, user_id, allowed_tabs, allowed_stages')
+      .eq('client_id', CLIENT_ID)
+      .eq('status', 'active')
+      .eq('hide_from_team', false));
+  }
   const list = document.getElementById('bb-staff-list');
   if (!list) return;
   if (error) { list.innerHTML = `<div class="bb-empty">Couldn't load - ${_bbEscapeHtml(error.message)}</div>`; return; }
@@ -21357,6 +21518,18 @@ async function _bbStaffRefreshList() {
           <div style="flex-basis:100%;font-size:11px;color:var(--text-mute)">Home &amp; Messages are always visible. Unchecked = hidden for this teammate.</div>
         </div>
       </details>`;
+    // Opt-in grant: teammate may use the Returning Client Enroll flow in
+    // Members. Only offered when this academy actually has the Members tab.
+    const canManageEnroll = iAmOwner && !isOwner && relevantTabs.some(t => t.key === 'members');
+    const enrollHtml = !canManageEnroll ? '' : `
+      <div style="margin-top:6px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:9px 12px;background:var(--surface);border:1px solid var(--border-med);border-radius:10px">
+        <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer">
+          <input type="checkbox" ${r.can_enroll_members === true ? 'checked' : ''} onchange="_bbStaffEnrollSave('${r.id}', this.checked)">
+          Can sign up returning clients
+        </label>
+        <span id="staff-enroll-status-${r.id}" style="font-size:11px;color:var(--text-mute)"></span>
+        <span style="flex-basis:100%;font-size:11px;color:var(--text-mute)">Lets this teammate enroll past clients from the Members tab. You always can.</span>
+      </div>`;
     const notInvited = !r.user_id;
     // Contact edit (email + phone) for any owner-managed teammate - editable at
     // any point, invited or not. Not-yet-invited rows also get the Invite button.
@@ -21386,6 +21559,7 @@ async function _bbStaffRefreshList() {
       </div>
       ${inviteHtml}
       ${tabsHtml}
+      ${enrollHtml}
       ${stagesHtml}
       ${kpisHtml}
       <div style="margin-top:6px;padding:10px 12px;background:var(--surface);border:1px solid var(--border-med);border-radius:10px">
@@ -21394,6 +21568,26 @@ async function _bbStaffRefreshList() {
       </div>
     </div>`;
   }).join('');
+}
+
+// Owner toggles a teammate's Returning Client Enroll grant (Members tab).
+// Same owner-gated set-staff-tabs action; boolean field.
+async function _bbStaffEnrollSave(memberId, checked) {
+  const statusEl = document.getElementById('staff-enroll-status-' + memberId);
+  if (statusEl) statusEl.textContent = 'Saving…';
+  try {
+    const token = await _mreqAuthToken();
+    const res = await fetch('/api/clients?action=set-staff-tabs', {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ client_id: CLIENT_ID, member_id: memberId, can_enroll_members: checked === true }),
+    });
+    const j = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(j.error || ('HTTP ' + res.status));
+    if (statusEl) { statusEl.textContent = 'Saved'; setTimeout(() => { if (statusEl) statusEl.textContent = ''; }, 1500); }
+  } catch (e) {
+    if (statusEl) statusEl.textContent = '' + e.message;
+  }
 }
 
 // Owner saves a teammate's tab access. Collects the checked tab keys in that
@@ -26721,6 +26915,18 @@ async function switchClient(newId) {
   if (!newId || newId === CLIENT_ID) return;
   const row = (CLIENT_ROWS || []).find(c => c.id === newId);
   if (!row) return;
+  // The command center can't hot-swap academies cleanly (its chrome + section
+  // data mount per-academy), so when CC is involved - we're in it now, or the
+  // target is a V2 academy that should boot into it - reload and let boot() set
+  // up the right experience. This is why switching back to a V2 academy (e.g.
+  // GTA) from a V1.5 one now returns to the command center instead of classic.
+  const wantsCc = (typeof _ccWanted !== 'function') || _ccWanted();
+  const ccInvolved = (typeof _ccActive === 'function' && _ccActive()) || (row.v2_access === true && wantsCc);
+  if (ccInvolved) {
+    try { localStorage.setItem('bam_active_client', newId); } catch (_) {}
+    location.reload();
+    return;
+  }
   CLIENT_ID = row.id;
   CONTACT_PROVIDER = row.contact_provider || 'ghl';
   if (typeof stopParentMessagesPoll === 'function') stopParentMessagesPoll();
@@ -29346,6 +29552,11 @@ function _renderMembersView() {
         </button>
         ${popover}
       </div>
+      ${_canEnrollReturning() ? `
+      <button onclick="openEnrollDrawer()" title="Sign up a past client who already exists in Stripe - no public checkout needed"
+              style="background:var(--gold,#D4B65C);color:#0B0B0D;border:1px solid var(--gold,#D4B65C);padding:8px 14px;font-size:13px;font-weight:700;border-radius:4px;cursor:pointer;font-family:inherit;white-space:nowrap">
+        + Returning client
+      </button>` : ''}
     </div>
   `;
 
@@ -29368,6 +29579,394 @@ function _renderMembersView() {
 
   container.innerHTML = toolbar + _membersColHeaderMarkup() + `<div id="members-cards">${cards}</div>`;
   if (wasFocused) _membersRestoreSearchFocus(cursorPos);
+}
+
+// ═══════════════════════════════════════════════════════════
+// Returning Client Enroll - "+ Returning client" wizard (V2)
+// ═══════════════════════════════════════════════════════════
+// Signs an existing Stripe customer (a past client) onto a live offer price
+// without the public checkout. 3 steps in a right drawer: Find -> Offer ->
+// Review (consent checkbox gates Confirm). Backend: /api/members/enroll.
+// Access: BAM staff, the owner, or a can_enroll_members grantee.
+
+function _canEnrollReturning() {
+  if (_PREVIEW_AS) return false; // previewing a teammate: keep the surface conservative
+  return _IS_BAM_STAFF === true || _MY_TAB_ROLE === 'owner' || _MY_CAN_ENROLL_MEMBERS === true;
+}
+
+let _ENROLL = null;
+
+async function _enrollApi(action, payload) {
+  const token = await _mreqAuthToken();
+  const res = await fetch('/api/members/enroll', {
+    method: 'POST',
+    headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action, client_id: CLIENT_ID, ...(payload || {}) }),
+  });
+  const json = await _safeJson(res);
+  if (!res.ok) throw new Error(json.error || ('HTTP ' + res.status));
+  return json;
+}
+
+function openEnrollDrawer(opts = {}) {
+  let host = document.getElementById('enroll-drawer-host');
+  if (!host) {
+    host = document.createElement('div');
+    host.id = 'enroll-drawer-host';
+    document.body.appendChild(host);
+  }
+  _ENROLL = {
+    step: 1, q: '', searching: false, results: null, customer: null,
+    targets: null, offerKey: null, athlete: '', chargeMode: 'now',
+    startDate: '', consent: false, preview: null, busy: false, error: null, result: null,
+    couponCode: '', coupon: null, couponBusy: false, couponError: null,
+  };
+  // Elevated: opened from the members focus-mode chat (z 9999) - sit above it,
+  // same trick as the member drawer's elevated mode.
+  const bdZ = opts.elevated ? 10055 : 8900;
+  const drZ = opts.elevated ? 10060 : 8950;
+  host.innerHTML = `
+    <div id="enroll-drawer-backdrop" style="position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:${bdZ};opacity:0;transition:opacity 0.2s ease" onclick="closeEnrollDrawer()"></div>
+    <div id="enroll-drawer" style="position:fixed;top:0;right:0;width:min(480px,92vw);height:100vh;background:var(--surface);border-left:1px solid var(--border);box-shadow:-12px 0 32px rgba(0,0,0,0.25);z-index:${drZ};overflow-y:auto;transform:translateX(100%);transition:transform 0.25s ease;color:var(--text)">
+      <div id="enroll-body" style="padding:26px 26px 36px"></div>
+    </div>`;
+  requestAnimationFrame(() => {
+    const bd = document.getElementById('enroll-drawer-backdrop');
+    const dr = document.getElementById('enroll-drawer');
+    if (bd) bd.style.opacity = '1';
+    if (dr) dr.style.transform = 'translateX(0)';
+  });
+  _enrollRender();
+}
+
+// Agent bridge: the members agent's start_returning_signup tool lands here.
+// Opens the wizard (permission-gated) and pre-runs the Stripe search with
+// whatever name/email/phone the user mentioned. Returns false if this user
+// can't enroll so the caller can say why.
+function _enrollOpenFromAgent(searchQuery, opts = {}) {
+  if (!_canEnrollReturning()) return false;
+  openEnrollDrawer(opts);
+  const q = String(searchQuery || '').trim();
+  if (q && _ENROLL) {
+    _ENROLL.q = q;
+    _enrollRender();
+    if (q.length >= 2) _enrollSearch();
+  }
+  return true;
+}
+
+function closeEnrollDrawer() {
+  const bd = document.getElementById('enroll-drawer-backdrop');
+  const dr = document.getElementById('enroll-drawer');
+  if (bd) bd.style.opacity = '0';
+  if (dr) dr.style.transform = 'translateX(100%)';
+  setTimeout(() => {
+    const host = document.getElementById('enroll-drawer-host');
+    if (host) host.innerHTML = '';
+  }, 260);
+  // If a signup completed, refresh the roster so the new row shows.
+  if (_ENROLL && _ENROLL.result) { try { fetchAndRenderMembers(); } catch (_) {} }
+  _ENROLL = null;
+}
+
+function _enrollHeader(title, sub) {
+  const step = _ENROLL.step;
+  const dots = [1, 2, 3].map(n =>
+    `<span style="width:8px;height:8px;border-radius:999px;display:inline-block;background:${n <= step ? 'var(--gold,#D4B65C)' : 'var(--border)'}"></span>`
+  ).join('<span style="width:14px;height:1px;background:var(--border);display:inline-block;margin:0 2px;vertical-align:middle"></span>');
+  return `
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px">
+      <div style="font-size:19px;font-weight:800">${escapeHTML(title)}</div>
+      <button onclick="closeEnrollDrawer()" style="background:transparent;border:none;color:var(--text-mute);font-size:18px;cursor:pointer;padding:2px 6px;line-height:1">×</button>
+    </div>
+    ${sub ? `<div style="font-size:12.5px;color:var(--text-mute);margin-bottom:14px">${sub}</div>` : ''}
+    <div style="display:flex;align-items:center;margin-bottom:18px">${dots}</div>
+    ${_ENROLL.error ? `<div style="margin-bottom:14px;padding:10px 12px;border:1px solid #9a3b2f;border-radius:8px;background:rgba(154,59,47,0.1);color:#e08a7d;font-size:13px">${escapeHTML(_ENROLL.error)}</div>` : ''}`;
+}
+
+function _enrollRender() {
+  const body = document.getElementById('enroll-body');
+  if (!body || !_ENROLL) return;
+  const s = _ENROLL;
+
+  // Stripe must be connected before anything here can work.
+  const stripeOk = typeof _STRIPE_CONNECT_STATE === 'undefined' || !_STRIPE_CONNECT_STATE
+    || _STRIPE_CONNECT_STATE.status === 'connected';
+  if (!stripeOk) {
+    body.innerHTML = _enrollHeader('Returning client', '') + `
+      <div style="padding:14px;border:1px solid var(--border);border-radius:12px;font-size:13.5px;color:var(--text-sub)">
+        Stripe isn't connected for this academy yet. Connect Stripe from the button at the top of the Members tab, then come back here.
+      </div>`;
+    return;
+  }
+
+  if (s.result) return _enrollRenderResult(body);
+  if (s.step === 1) return _enrollRenderStep1(body);
+  if (s.step === 2) return _enrollRenderStep2(body);
+  if (s.step === 3) return _enrollRenderStep3(body);
+}
+
+// ── Step 1: find the client in Stripe ──
+function _enrollRenderStep1(body) {
+  const s = _ENROLL;
+  const results = s.results;
+  let list = '';
+  if (s.searching) {
+    list = `<div class="req-empty" style="padding:18px 0"><span class="req-spin"></span>Searching Stripe…</div>`;
+  } else if (Array.isArray(results)) {
+    list = results.length ? results.map((c, i) => {
+      const roster = c.on_roster && c.on_roster.length ? c.on_roster[0] : null;
+      const badges = [
+        roster ? `<span style="font-size:10.5px;font-weight:700;padding:2px 8px;border-radius:999px;border:1px solid #c47424;color:#c47424">On roster · ${escapeHTML(roster.athlete_name || '')}</span>` : '',
+        (!roster && c.past_member) ? `<span style="font-size:10.5px;font-weight:700;padding:2px 8px;border-radius:999px;border:1px solid var(--gold,#D4B65C);color:var(--gold,#D4B65C)">Past member${c.past_member.athlete_name ? ' · ' + escapeHTML(c.past_member.athlete_name) : ''}</span>` : '',
+        c.has_default_pm ? `<span style="font-size:10.5px;font-weight:700;padding:2px 8px;border-radius:999px;border:1px solid #1f7a3d;color:#7BC47F">Card on file</span>` : '',
+      ].filter(Boolean).join(' ');
+      return `
+        <div onclick="_enrollPickCustomer(${i})" style="padding:12px 14px;border:1px solid var(--border);border-radius:12px;margin-bottom:8px;cursor:pointer;transition:border-color 0.15s ease" onmouseover="this.style.borderColor='var(--gold,#D4B65C)'" onmouseout="this.style.borderColor='var(--border)'">
+          <div style="font-weight:700;font-size:14.5px">${escapeHTML(c.name || c.email || 'Unnamed customer')}</div>
+          <div style="font-size:12px;color:var(--text-mute);margin-top:2px">${escapeHTML(c.email || '-')}${c.phone ? ' · ' + escapeHTML(c.phone) : ''}${c.created_iso ? ' · customer since ' + escapeHTML(c.created_iso) : ''}</div>
+          ${badges ? `<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:7px">${badges}</div>` : ''}
+        </div>`;
+    }).join('') : `<div class="req-empty" style="padding:18px 0">No Stripe customers match. Try their email or phone number.</div>`;
+  }
+  body.innerHTML = _enrollHeader('Sign up a returning client', 'Find the parent in this academy\'s Stripe account - people who have paid before.') + `
+    <div style="display:flex;gap:8px;margin-bottom:14px">
+      <input id="enroll-q" type="text" value="${escapeHTML(s.q)}" placeholder="Name, email, or phone"
+             onkeydown="if(event.key==='Enter')_enrollSearch()"
+             style="flex:1;padding:9px 12px;background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);font:inherit;font-size:13.5px;outline:none">
+      <button onclick="_enrollSearch()" style="background:var(--gold,#D4B65C);color:#0B0B0D;border:none;padding:9px 16px;font-size:13px;font-weight:700;border-radius:8px;cursor:pointer;font-family:inherit">Search</button>
+    </div>
+    ${list}`;
+  const input = document.getElementById('enroll-q');
+  if (input && !s.searching) { input.focus(); input.setSelectionRange(input.value.length, input.value.length); }
+}
+
+async function _enrollSearch() {
+  const s = _ENROLL; if (!s) return;
+  const input = document.getElementById('enroll-q');
+  s.q = input ? input.value.trim() : s.q;
+  if (s.q.length < 2) { s.error = 'Type at least 2 characters.'; return _enrollRender(); }
+  s.error = null; s.searching = true; _enrollRender();
+  try {
+    const json = await _enrollApi('find-customer', { q: s.q });
+    s.results = json.customers || [];
+  } catch (e) {
+    s.results = []; s.error = e.message;
+  }
+  s.searching = false; _enrollRender();
+}
+
+async function _enrollPickCustomer(idx) {
+  const s = _ENROLL; if (!s || !Array.isArray(s.results)) return;
+  const c = s.results[idx]; if (!c) return;
+  s.customer = c; s.error = null;
+  // Prefill the athlete name from what we already know about this person.
+  s.athlete = (c.past_member && c.past_member.athlete_name) || (c.contact && c.contact.athlete_name) || '';
+  s.step = 2; s.busy = true; _enrollRender();
+  if (!s.targets) {
+    try {
+      const json = await _enrollApi('targets', {});
+      s.targets = json.targets || [];
+    } catch (e) { s.targets = []; s.error = e.message; }
+  }
+  s.busy = false; _enrollRender();
+}
+
+// ── Step 2: offer price + athlete + start ──
+function _enrollMoney(cents, interval) {
+  const dollars = (Number(cents || 0) / 100);
+  const amt = '$' + (Number.isInteger(dollars) ? dollars : dollars.toFixed(2));
+  const map = { '4_weeks': '/4wk', monthly: '/mo', month: '/mo', '3_months': '/3mo', '6_months': '/6mo', '12_months': '/yr', one_time: ' one-time' };
+  return amt + (map[interval] || '');
+}
+
+function _enrollRenderStep2(body) {
+  const s = _ENROLL;
+  const c = s.customer || {};
+  let prices;
+  if (s.busy || s.targets === null) {
+    prices = `<div class="req-empty" style="padding:16px 0"><span class="req-spin"></span>Loading live prices…</div>`;
+  } else if (!s.targets.length) {
+    prices = `<div style="padding:12px;border:1px solid #c47424;border-radius:10px;font-size:13px;color:#c79a4a">No live prices found. Confirm prices in Blueprint > Offers > Pricing (Stripe Matcher) first.</div>`;
+  } else {
+    prices = s.targets.map(t => {
+      const on = s.offerKey === t.key;
+      return `
+        <div onclick="_enrollSetPrice('${escapeHTML(t.key).replace(/'/g, "\\'")}')" style="display:flex;justify-content:space-between;align-items:center;padding:11px 13px;border:1px solid ${on ? 'var(--gold,#D4B65C)' : 'var(--border)'};border-radius:10px;margin-bottom:7px;cursor:pointer;background:${on ? 'rgba(212,182,92,0.08)' : 'transparent'}">
+          <div style="font-weight:600;font-size:13.5px">${escapeHTML(t.label)}</div>
+          <div style="font-size:13px;font-weight:700;color:${on ? 'var(--gold,#D4B65C)' : 'var(--text-sub)'}">${_enrollMoney(t.amount_cents, t.interval)}</div>
+        </div>`;
+    }).join('');
+  }
+  const chip = (mode, label) => {
+    const on = s.chargeMode === mode;
+    return `<button onclick="_enrollSetChargeMode('${mode}')" style="background:${on ? 'var(--gold,#D4B65C)' : 'transparent'};color:${on ? '#0B0B0D' : 'var(--text)'};border:1px solid ${on ? 'var(--gold,#D4B65C)' : 'var(--border)'};padding:7px 13px;font-size:12.5px;font-weight:700;border-radius:999px;cursor:pointer;font-family:inherit">${label}</button>`;
+  };
+  const canContinue = s.offerKey && String(s.athlete || '').trim() && (s.chargeMode !== 'on_date' || s.startDate);
+  body.innerHTML = _enrollHeader('Offer and plan', `For <b>${escapeHTML(c.name || c.email || 'the selected client')}</b> · <a href="#" onclick="_ENROLL.step=1;_enrollRender();return false" style="color:var(--gold,#D4B65C)">change</a>`) + `
+    <div style="font-size:11px;font-weight:700;color:var(--text-mute);letter-spacing:0.5px;text-transform:uppercase;margin-bottom:8px">Live offer prices</div>
+    ${prices}
+    <div style="font-size:11px;font-weight:700;color:var(--text-mute);letter-spacing:0.5px;text-transform:uppercase;margin:16px 0 8px">Athlete</div>
+    <input id="enroll-athlete" type="text" value="${escapeHTML(s.athlete || '')}" placeholder="Athlete's full name"
+           oninput="_ENROLL.athlete=this.value"
+           style="width:100%;box-sizing:border-box;padding:9px 12px;background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);font:inherit;font-size:13.5px;outline:none">
+    <div style="font-size:11px;font-weight:700;color:var(--text-mute);letter-spacing:0.5px;text-transform:uppercase;margin:16px 0 8px">First charge</div>
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+      ${chip('now', 'Charge now')}
+      ${chip('on_date', 'Start on a date')}
+      ${s.chargeMode === 'on_date' ? `<input id="enroll-date" type="date" value="${escapeHTML(s.startDate)}" min="${new Date().toISOString().slice(0, 10)}"
+        onchange="_ENROLL.startDate=this.value;_enrollRender()"
+        style="padding:7px 10px;background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);font:inherit;font-size:13px;outline:none">` : ''}
+    </div>
+    ${s.chargeMode === 'on_date' ? `<div style="font-size:12px;color:var(--text-mute);margin-top:6px">No charge until that date. Billing then continues automatically.</div>` : ''}
+    <div style="display:flex;gap:10px;margin-top:22px">
+      <button onclick="_ENROLL.step=1;_enrollRender()" style="background:transparent;border:1px solid var(--border);color:var(--text);padding:10px 16px;font-size:13px;font-weight:600;border-radius:8px;cursor:pointer;font-family:inherit">Back</button>
+      <button onclick="_enrollToReview()" ${canContinue ? '' : 'disabled'} style="flex:1;background:${canContinue ? 'var(--gold,#D4B65C)' : 'var(--border)'};color:${canContinue ? '#0B0B0D' : 'var(--text-mute)'};border:none;padding:10px 16px;font-size:13.5px;font-weight:700;border-radius:8px;cursor:${canContinue ? 'pointer' : 'not-allowed'};font-family:inherit">Review</button>
+    </div>`;
+}
+
+function _enrollSetPrice(key) { if (_ENROLL) { _ENROLL.offerKey = key; _enrollRender(); } }
+function _enrollSetChargeMode(mode) { if (_ENROLL) { _ENROLL.chargeMode = mode; _enrollRender(); } }
+
+async function _enrollToReview() {
+  const s = _ENROLL; if (!s) return;
+  const input = document.getElementById('enroll-athlete');
+  if (input) s.athlete = input.value;
+  if (!s.offerKey || !String(s.athlete || '').trim()) return;
+  if (s.chargeMode === 'on_date' && !s.startDate) return;
+  s.error = null; s.step = 3; s.preview = null; s.consent = false;
+  s.coupon = null; s.couponCode = ''; s.couponError = null; // price may have changed - re-check any coupon
+  _enrollRender();
+  try {
+    s.preview = await _enrollApi('preview', {
+      customer_id: s.customer.id, offer_price_key: s.offerKey, athlete_name: s.athlete.trim(),
+    });
+  } catch (e) {
+    s.error = e.message; s.step = 2;
+  }
+  _enrollRender();
+}
+
+// ── Step 3: review + consent + confirm ──
+function _enrollRenderStep3(body) {
+  const s = _ENROLL;
+  const p = s.preview;
+  if (!p) {
+    body.innerHTML = _enrollHeader('Review', '') + `<div class="req-empty" style="padding:18px 0"><span class="req-spin"></span>Checking Stripe…</div>`;
+    return;
+  }
+  const dup = Array.isArray(p.duplicates) && p.duplicates.length ? p.duplicates[0] : null;
+  const line = (k, v) => `<div style="display:flex;justify-content:space-between;gap:12px;padding:7px 0;border-bottom:1px solid var(--border);font-size:13.5px"><span style="color:var(--text-mute)">${k}</span><span style="font-weight:600;text-align:right">${v}</span></div>`;
+  const firstCharge = s.chargeMode === 'on_date' ? escapeHTML(s.startDate) : 'Today';
+  const cardLine = p.needs_card
+    ? `<span style="color:#c79a4a">No usable card - a secure card link will be created</span>`
+    : escapeHTML(((p.card_brand || 'Card') + ' ').replace(/^\w/, ch => ch.toUpperCase()) + '···· ' + (p.card_last4 || ''));
+  const confirmLabel = p.needs_card ? 'Add as pending + create card link' : (s.chargeMode === 'on_date' ? 'Confirm - schedule the signup' : 'Confirm - charge the card');
+  const canConfirm = s.consent && !s.busy && !dup;
+  body.innerHTML = _enrollHeader('Review and confirm', '') + `
+    ${dup ? `<div style="margin-bottom:14px;padding:11px 13px;border:1px solid #c47424;border-radius:10px;background:rgba(196,116,36,0.08);font-size:13px;color:#c79a4a"><b>${escapeHTML(dup.athlete_name || 'This athlete')}</b> is already on the roster (${escapeHTML(dup.status)}). Use Change plan on their member card instead.</div>` : ''}
+    <div style="padding:4px 14px;border:1px solid var(--border);border-radius:12px;margin-bottom:16px">
+      ${line('Client', escapeHTML(s.customer.name || s.customer.email || '-'))}
+      ${line('Athlete', escapeHTML(s.athlete.trim()))}
+      ${line('Plan', escapeHTML((s.targets.find(t => t.key === s.offerKey) || {}).label || s.offerKey))}
+      ${s.coupon
+        ? line('Price', `<s style="color:var(--text-mute);font-weight:400">${_enrollMoney(p.price.amount_cents, p.price.interval)}</s> <span style="color:var(--gold,#D4B65C)">${_enrollMoney(s.coupon.discounted_cents, p.price.interval)}</span>`)
+        : line('Price', _enrollMoney(p.price.amount_cents, p.price.interval))}
+      ${s.coupon ? line('Coupon', `${escapeHTML(s.coupon.code)} · ${escapeHTML(s.coupon.label || '')} <a href="#" onclick="_enrollRemoveCoupon();return false" style="color:var(--text-mute);margin-left:6px">remove</a>`) : ''}
+      ${line('First charge', firstCharge)}
+      <div style="display:flex;justify-content:space-between;gap:12px;padding:7px 0;font-size:13.5px"><span style="color:var(--text-mute)">Payment</span><span style="font-weight:600;text-align:right">${cardLine}</span></div>
+    </div>
+    ${s.coupon ? '' : `
+    <div style="margin-bottom:16px">
+      <div style="display:flex;gap:8px">
+        <input id="enroll-coupon" type="text" value="${escapeHTML(s.couponCode)}" placeholder="Coupon code (optional)"
+               onkeydown="if(event.key==='Enter')_enrollApplyCoupon()"
+               style="flex:1;padding:8px 12px;background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);font:inherit;font-size:13px;outline:none;text-transform:uppercase">
+        <button onclick="_enrollApplyCoupon()" ${s.couponBusy ? 'disabled' : ''} style="background:transparent;border:1px solid var(--border);color:var(--text);padding:8px 14px;font-size:12.5px;font-weight:700;border-radius:8px;cursor:pointer;font-family:inherit">${s.couponBusy ? 'Checking…' : 'Apply'}</button>
+      </div>
+      ${s.couponError ? `<div style="font-size:12px;color:#e08a7d;margin-top:6px">${escapeHTML(s.couponError)}</div>` : ''}
+    </div>`}
+    <label style="display:flex;gap:10px;align-items:flex-start;padding:12px 13px;border:1px solid ${s.consent ? 'var(--gold,#D4B65C)' : 'var(--border)'};border-radius:10px;cursor:pointer;margin-bottom:16px">
+      <input type="checkbox" ${s.consent ? 'checked' : ''} onchange="_ENROLL.consent=this.checked;_enrollRender()" style="margin-top:2px">
+      <span style="font-size:13px;line-height:1.45">I confirm the parent agreed to this signup${p.needs_card ? '' : ' and to the charge on their saved card'}.</span>
+    </label>
+    <div style="display:flex;gap:10px">
+      <button onclick="_ENROLL.step=2;_enrollRender()" style="background:transparent;border:1px solid var(--border);color:var(--text);padding:10px 16px;font-size:13px;font-weight:600;border-radius:8px;cursor:pointer;font-family:inherit">Back</button>
+      <button onclick="_enrollConfirm()" ${canConfirm ? '' : 'disabled'} style="flex:1;background:${canConfirm ? 'var(--gold,#D4B65C)' : 'var(--border)'};color:${canConfirm ? '#0B0B0D' : 'var(--text-mute)'};border:none;padding:10px 16px;font-size:13.5px;font-weight:700;border-radius:8px;cursor:${canConfirm ? 'pointer' : 'not-allowed'};font-family:inherit">${s.busy ? 'Working…' : confirmLabel}</button>
+    </div>`;
+}
+
+// Validate the coupon against the chosen plan price server-side, show the
+// discounted price on the review lines. Re-validated again at enroll time.
+async function _enrollApplyCoupon() {
+  const s = _ENROLL; if (!s || s.couponBusy) return;
+  const input = document.getElementById('enroll-coupon');
+  s.couponCode = input ? input.value.trim().toUpperCase() : s.couponCode;
+  if (!s.couponCode) { s.couponError = 'Type a code first.'; return _enrollRender(); }
+  s.couponBusy = true; s.couponError = null; _enrollRender();
+  try {
+    const json = await _enrollApi('check-coupon', { offer_price_key: s.offerKey, code: s.couponCode });
+    s.coupon = json.coupon || null;
+  } catch (e) {
+    s.coupon = null; s.couponError = e.message;
+  }
+  s.couponBusy = false; _enrollRender();
+}
+
+function _enrollRemoveCoupon() {
+  const s = _ENROLL; if (!s) return;
+  s.coupon = null; s.couponCode = ''; s.couponError = null; _enrollRender();
+}
+
+async function _enrollConfirm() {
+  const s = _ENROLL; if (!s || !s.consent || s.busy) return;
+  s.busy = true; s.error = null; _enrollRender();
+  try {
+    s.result = await _enrollApi('enroll', {
+      customer_id: s.customer.id,
+      offer_price_key: s.offerKey,
+      athlete_name: s.athlete.trim(),
+      parent_name: s.customer.name || null,
+      parent_email: s.customer.email || null,
+      parent_phone: s.customer.phone || null,
+      charge_mode: s.chargeMode,
+      start_date: s.chargeMode === 'on_date' ? s.startDate : null,
+      coupon_code: s.coupon ? s.coupon.code : null,
+      consent_confirmed: true,
+    });
+  } catch (e) {
+    s.error = e.message;
+  }
+  s.busy = false; _enrollRender();
+}
+
+function _enrollRenderResult(body) {
+  const s = _ENROLL;
+  const r = s.result;
+  if (r.mode === 'card_link') {
+    body.innerHTML = _enrollHeader('Pending - card link created', '') + `
+      <div style="padding:13px 14px;border:1px solid #c47424;border-radius:12px;background:rgba(199,154,74,0.08);font-size:13.5px;line-height:1.5;margin-bottom:14px">
+        <b>${escapeHTML(s.athlete.trim())}</b> was added as <b>Signup in progress</b>. ${escapeHTML(s.customer.name || 'The parent')} has no usable card in Stripe, so nothing was charged. Send them this secure link - once the card is saved, run this signup again and it completes.
+      </div>
+      <div style="display:flex;gap:8px;margin-bottom:12px">
+        <input id="enroll-link" type="text" readonly value="${escapeHTML(r.url || '')}" style="flex:1;padding:9px 12px;background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:12px;outline:none">
+        <button onclick="const i=document.getElementById('enroll-link');i.select();document.execCommand('copy');this.textContent='Copied'" style="background:var(--gold,#D4B65C);color:#0B0B0D;border:none;padding:9px 14px;font-size:12.5px;font-weight:700;border-radius:8px;cursor:pointer;font-family:inherit">Copy</button>
+      </div>
+      ${r.suggested && r.suggested.sms_text ? `<div style="font-size:11px;font-weight:700;color:var(--text-mute);letter-spacing:0.5px;text-transform:uppercase;margin-bottom:6px">Suggested text</div>
+      <div style="padding:11px 13px;border:1px solid var(--border);border-radius:10px;font-size:13px;color:var(--text-sub);margin-bottom:16px">${escapeHTML(r.suggested.sms_text)}</div>` : ''}
+      <button onclick="closeEnrollDrawer()" style="width:100%;background:transparent;border:1px solid var(--border);color:var(--text);padding:10px 16px;font-size:13.5px;font-weight:700;border-radius:8px;cursor:pointer;font-family:inherit">Done</button>`;
+    return;
+  }
+  const scheduled = r.mode === 'scheduled';
+  body.innerHTML = _enrollHeader(scheduled ? 'Signup scheduled' : 'Signed up', '') + `
+    <div style="padding:13px 14px;border:1px solid #1f7a3d;border-radius:12px;background:rgba(31,122,61,0.08);font-size:13.5px;line-height:1.5;margin-bottom:14px">
+      <b>${escapeHTML(s.athlete.trim())}</b> is on the roster. ${scheduled
+        ? `First charge of <b>${_enrollMoney(r.amount_cents, null)}</b> on <b>${escapeHTML(r.first_charge_iso || s.startDate)}</b>, then billing runs automatically.`
+        : `<b>${_enrollMoney(r.amount_cents, null)}</b> charged to the card on file${r.card_last4 ? ' (···· ' + escapeHTML(r.card_last4) + ')' : ''}. Billing runs automatically from here.`}
+      ${r.coupon ? ` Coupon <b>${escapeHTML(r.coupon.code)}</b> applied (${escapeHTML(r.coupon.label || '')}).` : ''}
+    </div>
+    ${r.warning ? `<div style="margin-bottom:14px;padding:11px 13px;border:1px solid #9a3b2f;border-radius:10px;background:rgba(154,59,47,0.1);color:#e08a7d;font-size:13px">${escapeHTML(r.warning)}</div>` : ''}
+    <button onclick="closeEnrollDrawer()" style="width:100%;background:var(--gold,#D4B65C);color:#0B0B0D;border:none;padding:10px 16px;font-size:13.5px;font-weight:700;border-radius:8px;cursor:pointer;font-family:inherit">Done</button>`;
 }
 
 // Divider that labels the signup-in-progress group and spells out that these
@@ -39751,7 +40350,12 @@ async function magentSend() {
     _MAGENT.busy = false;
     if (json.reply) _MAGENT.history.push({ role: 'assistant', text: json.reply });
     _MAGENT.proposal = json.proposal || null;
-    if (!json.reply && !json.proposal) _MAGENT.history.push({ role: 'assistant', text: 'Okay.' });
+    // Agent asked to open the Returning Client Signup wizard.
+    if (json.ui_action && json.ui_action.kind === 'open_returning_enroll') {
+      const opened = _enrollOpenFromAgent(json.ui_action.search_query || '');
+      if (!opened) _MAGENT.history.push({ role: 'assistant', text: "You don't have access to sign up returning clients - ask the account owner to enable it in the Team section." });
+    }
+    if (!json.reply && !json.proposal && !json.ui_action) _MAGENT.history.push({ role: 'assistant', text: 'Okay.' });
     magentRender();
   } catch (e) {
     _MAGENT.busy = false;
@@ -44782,6 +45386,100 @@ async function _sendFreshLink() {
 // for backwards compat with the boot() call.
 async function setupAdminFeedbackWidget() { /* widget always-on now */ }
 
+// ── Feedback context recorder ──────────────────────────────────────────
+// The Zoran widget auto-attaches a context snapshot so clients only need
+// to type a description: active view, click path, view history, recent JS
+// errors, tier and device. Ring buffers keep it tiny; typed input values
+// are NEVER recorded (only placeholders/ids). Lands in
+// portal_feedback.context (jsonb) and is read by the /v2-tickets skill.
+const _FB_CTX = { started: Date.now(), clicks: [], views: [], errors: [] };
+
+function _fbNow() { return Math.round((Date.now() - _FB_CTX.started) / 1000); }
+
+function _fbActiveView() {
+  const el = document.querySelector('.view.active');
+  return el ? el.id.replace(/^view-/, '') : null;
+}
+
+function _fbElLabel(target) {
+  // Nearest actionable ancestor gives the most readable label.
+  const el = target.closest?.('button, a, [onclick], [role="button"], .nav-item, input, select, textarea, label') || target;
+  const tag = (el.tagName || '').toLowerCase();
+  let label = '';
+  if (tag === 'input' || tag === 'select' || tag === 'textarea') {
+    label = el.placeholder || el.name || el.id || tag; // never the typed value
+  } else {
+    label = (el.getAttribute?.('aria-label') || el.textContent || '').trim().replace(/\s+/g, ' ').slice(0, 60);
+  }
+  const id = el.id ? ` #${el.id}` : '';
+  return `${label || tag}${id}`.trim().slice(0, 80);
+}
+
+document.addEventListener('click', (e) => {
+  try {
+    if (!e.target || e.target.closest?.('#admin-fb-overlay, #admin-fb-wrap')) return; // not the widget itself
+    _FB_CTX.clicks.push({ t: _fbNow(), view: _fbActiveView(), el: _fbElLabel(e.target) });
+    if (_FB_CTX.clicks.length > 30) _FB_CTX.clicks.shift();
+  } catch (_) {}
+}, true);
+
+window.addEventListener('error', (e) => {
+  try {
+    _FB_CTX.errors.push({ t: _fbNow(), msg: String(e.message || e.error || 'error').slice(0, 200) });
+    if (_FB_CTX.errors.length > 10) _FB_CTX.errors.shift();
+  } catch (_) {}
+});
+window.addEventListener('unhandledrejection', (e) => {
+  try {
+    _FB_CTX.errors.push({ t: _fbNow(), msg: ('promise: ' + String(e.reason?.message || e.reason || '')).slice(0, 200) });
+    if (_FB_CTX.errors.length > 10) _FB_CTX.errors.shift();
+  } catch (_) {}
+});
+
+// Track view changes by wrapping switchView once all scripts are loaded.
+window.addEventListener('load', () => {
+  try {
+    if (typeof window.switchView !== 'function') return;
+    const _fbOrigSwitchView = window.switchView;
+    window.switchView = function (view) {
+      try {
+        const last = _FB_CTX.views[_FB_CTX.views.length - 1];
+        if (view && (!last || last.view !== view)) {
+          _FB_CTX.views.push({ t: _fbNow(), view });
+          if (_FB_CTX.views.length > 15) _FB_CTX.views.shift();
+        }
+      } catch (_) {}
+      return _fbOrigSwitchView.apply(this, arguments);
+    };
+  } catch (_) {}
+});
+
+function _fbBuildContext() {
+  let tier = 'v1';
+  try {
+    if (typeof V2_ACCESS !== 'undefined' && V2_ACCESS) tier = 'v2';
+    else if (typeof V15_ACCESS !== 'undefined' && V15_ACCESS) tier = 'v1.5';
+  } catch (_) {}
+  let academy = null;
+  try { academy = (document.getElementById('academyName')?.textContent || '').trim() || null; } catch (_) {}
+  return {
+    v: 1,
+    tier,
+    academy,
+    view: _fbActiveView(),
+    view_trail: _FB_CTX.views.slice(-15),
+    clicks: _FB_CTX.clicks.slice(-30),
+    errors: _FB_CTX.errors.slice(-10),
+    url: location.href,
+    viewport: { w: window.innerWidth, h: window.innerHeight },
+    ua: (navigator.userAgent || '').slice(0, 200),
+    native_app: document.body.classList.contains('native-app'),
+    online: navigator.onLine,
+    seconds_on_page: _fbNow(),
+    submitted_at: new Date().toISOString(),
+  };
+}
+
 let _adminFbSelectedFile = null;
 let _adminFbKind = 'bug';
 
@@ -44813,7 +45511,7 @@ function setFeedbackKind(kind) {
   const labelEl = document.getElementById('admin-fb-body-label');
   if (_adminFbKind === 'bug') {
     labelEl.textContent = "What's the bug?";
-    bodyEl.placeholder = "What you saw, what you expected, what page you were on...";
+    bodyEl.placeholder = "Just describe what you saw and what you expected...";
   } else {
     labelEl.textContent = "What's the feature?";
     bodyEl.placeholder = "What would you like to be able to do? Who needs it, why...";
@@ -44882,6 +45580,7 @@ async function submitAdminFeedback() {
         page: window.location.pathname + window.location.search,
         portal: 'client',
         client_id: (typeof CLIENT_ID !== 'undefined' ? CLIENT_ID : undefined),
+        context: (() => { try { return _fbBuildContext(); } catch (_) { return null; } })(),
       }),
     });
     const data = await res.json().catch(() => ({}));
@@ -46586,6 +47285,30 @@ function _ccStyle() {
     '#cc-dock-pop.open{display:block}' +
     '.cc-pop-item{display:flex;align-items:center;gap:8px;width:100%;text-align:left;background:none;border:none;border-radius:8px;padding:9px 11px;font:inherit;font-size:12.5px;font-weight:600;color:var(--text);cursor:pointer}' +
     '.cc-pop-item:hover{background:var(--gold-sheen);color:var(--gold)}' +
+    /* BAM-staff-only academy switcher, stacked above the dock orb (Mike / Zoran). */
+    '#cc-acct{position:fixed;left:16px;bottom:82px;z-index:91;display:none;flex-direction:column;gap:8px}' +
+    '#cc-acct.show{display:flex}' +
+    'body.cc-mode.cc-classic #cc-acct{display:none !important}' +
+    '#cc-acct-btn{position:relative;width:46px;height:46px;border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--gold);background:color-mix(in srgb,var(--surface) 78%,transparent);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border:1px solid var(--accent-border);box-shadow:0 6px 20px rgba(0,0,0,.18);transition:transform .25s var(--espring,ease)}' +
+    '#cc-acct-btn:hover{transform:translateY(-2px)}' +
+    '#cc-acct-btn svg{width:20px;height:20px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}' +
+    '#cc-acct-btn .cc-acct-count{position:absolute;top:-3px;right:-3px;min-width:16px;height:16px;padding:0 4px;box-sizing:border-box;border-radius:9px;background:var(--gold);color:#0B0B0D;font-size:9.5px;font-weight:800;font-family:var(--mono);display:flex;align-items:center;justify-content:center;box-shadow:0 0 0 2px var(--bg)}' +
+    '#cc-acct-btn .cc-acct-hint{position:absolute;left:58px;top:50%;transform:translateY(-50%) translateX(-6px);font-size:11px;font-weight:700;color:var(--text);background:color-mix(in srgb,var(--surface) 78%,transparent);backdrop-filter:blur(10px);border:1px solid var(--accent-border);border-radius:8px;padding:4px 10px;white-space:nowrap;opacity:0;pointer-events:none;transition:opacity .2s,transform .2s}' +
+    '#cc-acct-btn:hover .cc-acct-hint{opacity:1;transform:translateY(-50%) translateX(0)}' +
+    '#cc-acct-pop{display:none;flex-direction:column;gap:2px;width:242px;max-height:min(58vh,440px);overflow-y:auto;padding:8px;border-radius:14px;background:color-mix(in srgb,var(--surface) 84%,transparent);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border:1px solid var(--border);box-shadow:0 18px 48px rgba(0,0,0,.36);transform-origin:0 100%;animation:ccAcctPop .2s var(--espring,ease)}' +
+    '#cc-acct-pop.open{display:flex}' +
+    '@keyframes ccAcctPop{from{opacity:0;transform:translateY(10px) scale(.96)}to{opacity:1;transform:none}}' +
+    '.cc-acct-lab{font-size:9.5px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:var(--text-mute);font-family:var(--mono);padding:4px 8px 6px}' +
+    '.cc-acct-search{width:100%;box-sizing:border-box;margin:0 0 6px;padding:8px 10px;border-radius:9px;border:1px solid var(--border);background:var(--bg);color:var(--text);font:inherit;font-size:12.5px}' +
+    '.cc-acct-item{position:relative;display:flex;align-items:center;gap:8px;width:100%;text-align:left;background:none;border:none;border-radius:9px;padding:9px 10px;font:inherit;font-size:12.5px;font-weight:600;color:var(--text);cursor:pointer}' +
+    '.cc-acct-item:hover{background:var(--gold-sheen);color:var(--gold)}' +
+    '.cc-acct-item.active{background:var(--gold-sheen);color:var(--gold)}' +
+    '.cc-acct-item .cc-acct-nm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1}' +
+    '.cc-acct-item .cc-acct-tier{font-size:9px;font-weight:800;font-family:var(--mono);letter-spacing:.06em;color:var(--text-mute);border:1px solid var(--border);border-radius:99px;padding:1px 6px;flex:0 0 auto}' +
+    '.cc-acct-item.active .cc-acct-tier{color:var(--gold);border-color:var(--accent-border)}' +
+    '.cc-acct-ck{flex:0 0 auto;display:flex;color:var(--gold)}' +
+    '.cc-acct-empty{padding:14px 10px;font-size:12px;color:var(--text-mute);text-align:center}' +
+    '@media(max-width:768px){#cc-acct{bottom:calc(142px + env(safe-area-inset-bottom))}}' +
     /* back pill for classic views opened from the flow */
     '.cc-back-pill{display:none}' +
     // breadcrumb: part of the page structure, not a sticker floating over it
@@ -46946,6 +47669,115 @@ function _ccExitBeta() {
   location.reload();
 }
 
+// ── BAM-staff academy switcher (Mike / Zoran) ──────────────────────
+// The command center hides both the sidebar and the mobile nav, so the
+// normal bottom-left account switcher is unreachable here. For BAM staff
+// who belong to more than one academy we add a small button just above the
+// dock orb that fans up the list of every portal they can access. Picking
+// one reloads into that academy - a V1.5 academy boots its classic ("older")
+// portal, a V2 academy boots its command center - so this is the way back
+// into all the other academies from inside V2.
+let _ccAcctFilter = '';
+// Locked to Zoran + Mike only (both email domains they may sign in with).
+const _CC_ACCT_EMAILS = [
+  'zoran@byanymeansbball.com', 'zoran@byanymeansbusiness.com',
+  'mike@byanymeansbball.com', 'mike@byanymeansbusiness.com',
+  'info@byanymeanstoronto.ca',
+];
+let _ccAcctEmailOk = false;
+
+function _ccAcctBuild() {
+  if (document.getElementById('cc-acct')) return;
+  const wrap = document.createElement('div');
+  wrap.id = 'cc-acct';
+  wrap.innerHTML =
+    `<div id="cc-acct-pop" role="menu" aria-label="Switch academy"></div>
+     <button type="button" id="cc-acct-btn" aria-label="Switch academy" aria-haspopup="true" onclick="_ccAcctToggle()">
+       <svg viewBox="0 0 24 24"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>
+       <span class="cc-acct-count" id="cc-acct-count"></span>
+       <span class="cc-acct-hint">Switch academy</span>
+     </button>`;
+  document.body.appendChild(wrap);
+  // Close when clicking anywhere outside the switcher.
+  document.addEventListener('click', e => {
+    if (e.target.closest('#cc-acct')) return;
+    document.getElementById('cc-acct-pop')?.classList.remove('open');
+  });
+  // Reveal only for Zoran / Mike - match the signed-in auth email against the allowlist.
+  (async () => {
+    try {
+      const { data: { session } } = await _sb.auth.getSession();
+      const em = (session?.user?.email || '').trim().toLowerCase();
+      _ccAcctEmailOk = _CC_ACCT_EMAILS.includes(em);
+    } catch (_) { _ccAcctEmailOk = false; }
+    _ccAcctSync();
+  })();
+}
+
+function _ccAcctSync() {
+  const wrap = document.getElementById('cc-acct');
+  if (!wrap) return;
+  const rows = (typeof CLIENT_ROWS !== 'undefined' && CLIENT_ROWS) ? CLIENT_ROWS : [];
+  const ok = _ccAcctEmailOk === true && rows.length > 1;
+  wrap.classList.toggle('show', ok);
+  const cnt = document.getElementById('cc-acct-count');
+  if (cnt) cnt.textContent = ok ? String(rows.length) : '';
+  if (!ok) document.getElementById('cc-acct-pop')?.classList.remove('open');
+}
+
+function _ccAcctToggle(force) {
+  const pop = document.getElementById('cc-acct-pop');
+  if (!pop) return;
+  const open = force != null ? force : !pop.classList.contains('open');
+  if (!open) { pop.classList.remove('open'); return; }
+  _ccAcctFilter = '';
+  _ccAcctRender();
+  pop.classList.add('open');
+  const s = pop.querySelector('.cc-acct-search');
+  if (s) setTimeout(() => s.focus(), 30);
+}
+
+function _ccAcctRender() {
+  const pop = document.getElementById('cc-acct-pop');
+  if (!pop) return;
+  const rows = (typeof CLIENT_ROWS !== 'undefined' && CLIENT_ROWS) ? CLIENT_ROWS : [];
+  const esc = s => (s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  const search = rows.length > 6
+    ? `<input type="text" class="cc-acct-search" placeholder="Search academies… (${rows.length})" value="${esc(_ccAcctFilter)}" oninput="_ccAcctFilter=this.value;_ccAcctRenderList()">`
+    : '';
+  pop.innerHTML = `<div class="cc-acct-lab">Switch portal</div>${search}<div id="cc-acct-list"></div>`;
+  _ccAcctRenderList();
+}
+
+function _ccAcctRenderList() {
+  const box = document.getElementById('cc-acct-list');
+  if (!box) return;
+  const rows = (typeof CLIENT_ROWS !== 'undefined' && CLIENT_ROWS) ? CLIENT_ROWS : [];
+  const esc = s => (s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  const f = (_ccAcctFilter || '').toLowerCase().trim();
+  const list = f ? rows.filter(c => (c.business_name || '').toLowerCase().includes(f)) : rows;
+  const tier = c => c.v2_access === true ? 'V2' : (c.v15_access === true || c.v4_access === true ? 'V1.5' : 'V1');
+  box.innerHTML = list.map(c => {
+    const active = c.id === CLIENT_ID;
+    const nm = esc(c.business_name || '(unnamed academy)');
+    return `<button type="button" class="cc-acct-item${active ? ' active' : ''}" role="menuitem" title="${nm}" onclick="_ccAcctPick('${c.id}')">
+      <span class="cc-acct-nm">${nm}</span>
+      <span class="cc-acct-tier">${tier(c)}</span>
+      ${active ? '<span class="cc-acct-ck"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>' : ''}
+    </button>`;
+  }).join('') || '<div class="cc-acct-empty">No academies match.</div>';
+}
+
+function _ccAcctPick(id) {
+  if (!id) return;
+  document.getElementById('cc-acct-pop')?.classList.remove('open');
+  if (id === CLIENT_ID) return;
+  // Reload into the picked academy: boot() re-runs its per-academy gating, so
+  // a V1.5 academy lands on its classic older portal and a V2 one on its CC.
+  try { localStorage.setItem('bam_active_client', id); } catch (_) {}
+  location.reload();
+}
+
 // ── chrome: bubble rail + speed-dial dock + back pill ──
 function _ccBuildChrome() {
   if (document.getElementById('cc-rail')) return;
@@ -46973,6 +47805,7 @@ function _ccBuildChrome() {
      <button type="button" class="cc-orb cc-glass" id="cc-orb" aria-label="Menu" onclick="_ccOrbToggle()"><svg viewBox="0 0 512 512" fill="currentColor" stroke="none"><path d="M 256 80 L 290 230 L 432 256 L 290 282 L 256 432 L 222 282 L 80 256 L 222 230 Z"/><circle cx="256" cy="256" r="14"/></svg><span class="cc-orb-hint">Menu</span></button>
      <div id="cc-dock-pop"></div>`;
   document.body.appendChild(dock);
+  _ccAcctBuild();   // BAM-staff academy switcher, stacked above the orb
   _ccKeys();
   // Entrance: orb springs in, "Menu" hint shows for a few seconds
   requestAnimationFrame(() => {
@@ -47312,6 +48145,7 @@ function _ccDockPop(kind) {
       `<button type="button" class="cc-pop-item" onclick="this.textContent='Sounds: ' + (_SFX.toggleMute() ? 'off' : 'on')">Sounds: ${_SFX._isMuted() ? 'off' : 'on'}</button>` +
       `<button type="button" class="cc-pop-item" onclick="var off=localStorage.getItem('bam_haptics_off')==='1';localStorage.setItem('bam_haptics_off', off?'0':'1');this.textContent='Haptics: '+(off?'on':'off')">Haptics: ${(function(){try{return localStorage.getItem('bam_haptics_off')==='1'?'off':'on'}catch(_){return 'on'}})()}</button>` +
       `<button type="button" class="cc-pop-item" onclick="document.getElementById('cc-dock-pop').classList.remove('open');_edwOpenModal()">Domains (email + website)</button>` +
+      `<button type="button" class="cc-pop-item" onclick="document.getElementById('cc-dock-pop').classList.remove('open');_igwOpenModal()">Instagram</button>` +
       `<button type="button" class="cc-pop-item" onclick="_ccExitBeta()">Exit command center beta</button>` +
       `<button type="button" class="cc-pop-item" onclick="signOut()">Sign out</button>`
     : `<button type="button" class="cc-pop-item" onclick="document.getElementById('cc-dock-pop').classList.remove('open');startOnboardingTour()">Take the tour</button>` +
@@ -47453,6 +48287,7 @@ function _ccMountHome(host) {
         <div class="cc-res-widget" id="cc-res-widget">
           <div class="cc-res-title">Quick links</div>
           <div class="cc-res-grid">
+            <button type="button" class="cc-res-btn" onclick="_ccOpenClassic('contacts')">${_ccIcons().contacts}<span>Contacts</span></button>
             <button type="button" class="cc-res-btn" onclick="_ccOpenClassic('resources')">${_ccIcons().book}<span>Resources</span></button>
             <button type="button" class="cc-res-btn" onclick="_ccOpenClassic('assets')">${_ccIcons().image}<span>Assets</span></button>
             <button type="button" class="cc-res-btn" onclick="_ccOpenClassic('calendar')">${_ccIcons().cal}<span>Calendar</span></button>
@@ -48668,6 +49503,12 @@ async function _mmaAgentAsk(message) {
     // contact drawer on the right, over the chat, without dimming it.
     if (_mc && _mc.member_id && typeof openMemberPopup === 'function') {
       openMemberPopup(_mc.member_id, { elevated: true });
+    }
+    // Agent asked to open the Returning Client Signup wizard - elevated so it
+    // sits above the focus-mode chat.
+    if (json.ui_action && json.ui_action.kind === 'open_returning_enroll' && typeof _enrollOpenFromAgent === 'function') {
+      const opened = _enrollOpenFromAgent(json.ui_action.search_query || '', { elevated: true });
+      if (!opened) _mmaSay("You don't have access to sign up returning clients - ask the account owner to enable it in the Team section.", '');
     }
   } catch (e) {
     await thinkP;
