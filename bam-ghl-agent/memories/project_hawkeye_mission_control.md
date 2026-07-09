@@ -1,10 +1,10 @@
 ---
 name: hawkeye-mission-control
-description: 2026-07-08 V2 design LOCKED via clickable mockup - Sales simple view (strip, click-to-cascade, pill morphs to gear) + Tinder-style Hawkeye deck + popup modal, no Skip anywhere. Handoff doc + build order in docs/. NOT built yet.
+description: 2026-07-08 Hawkeye V2 BUILT + MERGED to main (PR #1298) - the _hk2* deck + _plo2* simple view in client-portal.html, revised action model shipped in the agent APIs. Open: swipe gestures decision + GTA prod verification.
 type: project
 ---
 
-# Hawkeye V2 + Sales simple view - DESIGN LOCKED 2026-07-08, not built
+# Hawkeye V2 + Sales simple view - BUILT + MERGED 2026-07-08 (PR #1298)
 
 **SOURCE OF TRUTH = [`docs/hawkeye-simple-view-handoff.md`](../docs/hawkeye-simple-view-handoff.md)**
 (full spec, decision log, build order, next-session prompt). Clickable mockup:
@@ -19,8 +19,9 @@ hosted at https://claude.ai/code/artifact/7a9a5268-048a-4dda-9750-62d9f69a4150
 3. **Hawkeye page** (gold button) = TINDER DECK: 3 agent tabs span the top (Booking/Confirm/
    Closing, gear on active), ONE card at a time, next peeks behind, approve flies right,
    move flies left, swipe on mobile, buttons on desktop. Automations never appear here.
-4. **Popup modal** (glowing card in cascade): contact info left, chat + editable suggested
-   reply + teach-why + move-lead right. Approve auto-advances through the queue.
+4. **Popup modal RETIRED (2026-07-08 later)**: the cascade shows highlight rows only (no
+   actions); clicking a glowing lead opens the Hawkeye PAGE on that lead's card. The deck
+   is the single Hawkeye surface.
 5. **NO SKIP anywhere** - every Hawkeye action must be resolved (approve or move).
 6. Configure page = the LIVE focus mode (Entry->Engine->Exit, PR #1178) - reuse, don't rebuild.
 
@@ -28,9 +29,86 @@ hosted at https://claude.ai/code/artifact/7a9a5268-048a-4dda-9750-62d9f69a4150
 `_apx`/`_acx`/`_aclx` Hawkeye overlay buttons · Train Agent picker as a destination ·
 scattered autonomy/config entry points. KEEPS: inline drawer suggestion on lead cards.
 
+## Action model revision (Zoran 2026-07-08) - SHIPPED end to end
+- "Abandon" -> "Unqualified" on every Hawkeye button (overlays updated).
+- Booking follow-up nudges RETIRED: Follow-ups tab removed from the _apx overlay;
+  nothing creates agent_followups rows (quiet lead = "Send to Ghosted" proposal).
+- Confirm reminders = step config only (approved templates self-send; never Hawkeye).
+- Reschedule approve = handoff + Booking rebook opener queues (Entry: Rebook note).
+- Done Trial: NO automations. agent-closing.js scripted sequence + automations-get/set
+  + focus-mode editor REMOVED; post-trial form (trainer msg + optional link + coach
+  notes) is the only preplanned touch. Proactive path restructured: opener (A6-guarded)
+  -> follow-up loop for ANY engaged lead (incl. form-opened) -> Lost card after 3
+  unanswered. Prompt told: silence alone is never lost.
+- Enroll = reply with the sign-up link EMBEDDED in the draft (buildEnrollUrl at detect
+  time; confirm-enroll appends only if the edited draft lost the link).
+- Closing deck order: Reply -> Follow-up plan (stacked next) -> Suggested Lost.
+- EVERY agent can mark Unqualified: `confirm-abandoned` now exists on /api/agent-confirm
+  and /api/agent-closing too (mirrors agent-approvals': setStatus abandoned+role
+  unqualified, markUnqualified tag, pipeline_outcomes, clears that agent's cards).
+  UI: Unqualified button on all Confirm/Closing cards (_acxUnqualified/_aclxUnqualified/
+  _aclxUnqualifiedPlan), 6s undo via _hawkDefer.
+- Reference page: bam-portal/public/hawkeye-actions.html (+ claude.ai artifact).
+- Mockup REBUILT to v2 (same file + same artifact URL): kind-aware deck cards, per-agent
+  move rows incl. Unqualified, stacked Closing cadence, config screen notes per agent.
+- Deck card footer LOCKED (2026-07-08): two buttons - "Other" (left, cascades up to the
+  move options) + confirm (right, flips to "Confirm edits and ..." on any edit). Book-it
+  cards = Calendar picker (offer-tied calendars only) + Slot picker (open slots with
+  spots-left); switching either = edit. Teach-why note
+  is MANDATORY on any change away from the agent's guess (confirm blocked until filled).
+  Pill morph = up arrow center (collapse) + 3-line config icon top-right.
+⚠️ NOT prod-verified on GTA yet (live behavior change if GTA had closing autos approved).
+
+## BUILD STATUS (2026-07-08)
+- STEP 1 BUILT: the deck lives in client-portal.html as the `_hk2*` module (V2-gated).
+  View state: `_PL_SV='hawkeye'` + host `#pl-hawkeye` (sibling of pl-focus). Cards are
+  kind-aware (reply/book/ghost/handoff/enroll/plan/lost), footer = Other + morphing
+  confirm, teach-why MANDATORY on any edit (agent-scoped lesson via agent-train),
+  Book-it uses the NEW `book-options` action on agent-approvals (trial calendars +
+  open slots), closing followup_N rows group into one plan card, board badges deep-link
+  (_hk2Open(null, contactId)), tab gear -> _plOpenFocus for that stage. All commits ride
+  _hawkDefer (6s undo). V2 entries repointed (_hv2OpenHawkeye/_plEngineHawk/board
+  hawk buttons/scanBtn); V1.5 keeps _apx/_acx/_aclx overlays. 2-hourly digest SMS retired.
+- Scheduled Trial = TWO engines: Confirm agent + post-trial form (in engine config for
+  now; configurable later). Mockup config screen shows both.
+- STEP 3 BUILT: _plRenderOverview rewritten to the simple view (_plo2* helpers): KPI row
+  kept; colour pills per stage role (_plo2Color; automation = dashed), "N need you" from
+  _plStageSignals; click = in-place cascade (_plo2Cascade: needy rows first w/ gold ring
+  -> _hk2Open(null, contactId); plain rows -> _plOpenCard drawer; 30-row cap -> board);
+  active pill morphs (up arrow = collapse, 3-line icon -> _plOpenFocus); gold Hawkeye
+  button w/ cross-agent count; Expand board kept. _plLoadNeedsAction now merges confirm +
+  closing ready queues into _PL_NEEDS on V2 (V1.5 stays booking-only).
+- HOME STRIP (2026-07-09): the command-center home Sales section renders the SAME
+  simple-view pills (shared _plo2Pills/_plo2Cascade; home state = _CC2_OPEN,
+  _cc2Render into #cc-sal-strip). Cascade opens in place on home; deeper actions
+  leave cc-mode first (_ccPipeFocus config, _cc2Lead -> deck, _cc2Card -> drawer,
+  _ccPipeStage -> board). Old stage cards (_ploStripCells) = V1.5 fallback only.
+- PILL ORDER locked (_plo2Order, home + overview): Nurture, Ghosted, Booking,
+  Confirm, Closing. NO Member pill - terminal stages never render in the strip.
+- PILL DESIGN (2026-07-09, Zoran's redesign - current): stage name TOP-LEFT,
+  engine wording under it ("Nurture automation" / "Closing agent"), total cards
+  under that, gold "N need you" badge centered right. GOLD ONLY (per-stage
+  palette killed; _plo2Color removed); dashed border = automation; chevrons
+  between pills show the left-to-right flow; open pill = gold fill + up arrow
+  + config icon. History: a design-system restyle shipped and was reverted
+  earlier the same day - always confirm before restyling.
+- CASCADE (automation stages): rows show "enrolled · step N of M", newest
+  entries first, via automations.js `active-enrollments` -> _PL_ENR map
+  (loaded by _plLoadActiveAutomations; home kicks it too).
+- DECK = TINDER (2026-07-09): _hk2Confirm/_hk2Move capture inputs at click,
+  resolve the card ~0.5s later (badges update, empty queue auto-jumps to the
+  next agent with cards) while the API rides the 6s undo (_hk2Unresolve puts
+  it back). thread_tail cap now 2000 chars (was 320 - messages were cut off).
+  Config gear on EVERY deck tab. _hk2Back = home Sales section, cascades closed.
+- Home Sales section: "Open sales board" button gone; Recent movement lowkey.
+  Cascade width:100% (home container .cc-pipe-strip is flex). _ccReturn clears
+  the frozen scroll-recede blur (the "back from classic = blurry home" bug).
+- STILL TO DO: swipe gestures (open decision), GTA prod verification of the whole batch.
+
 ## Open item (ask Zoran before building)
-Mobile swipe-left has 3 destinations (Ghosted/Nurture/Unqualified) - should pop a 3-option
-choice before committing, not fly away blind. Confirm exact behavior.
+Swipe RIGHT commits the card's main action (can SEND) - confirm it's instant-commit.
+Swipe LEFT destinations differ per agent: Booking Ghosted/Nurture/Unqualified ·
+Confirm Rebook/Nurture · Closing Nurture. Pop options vs default+undo vs buttons-only.
 
 ## See also
 [[project_sales_focus_mode]] (focus mode + engines model + router, what's already live) ·

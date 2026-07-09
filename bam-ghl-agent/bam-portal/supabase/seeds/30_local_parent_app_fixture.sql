@@ -11,6 +11,7 @@
 -- Local login credentials:
 --   parent.alex.rivera@example.test / local-password
 --   parent.jamie.chen@example.test / local-password
+--   parent.taylor.morgan@example.test / local-password
 --   staff.admin@example.test        / local-password
 
 insert into auth.users (
@@ -82,6 +83,28 @@ values
   ),
   (
     '00000000-0000-0000-0000-000000000000',
+    'f7a7d6e5-7c6d-4dd1-95c2-1c7f5d72e9a4',
+    'authenticated',
+    'authenticated',
+    'parent.taylor.morgan@example.test',
+    extensions.crypt('local-password', extensions.gen_salt('bf')),
+    now(),
+    '',
+    '',
+    '',
+    '',
+    '',
+    '',
+    '',
+    0,
+    '',
+    '{"provider":"email","providers":["email"],"role":"parent"}'::jsonb,
+    '{"first_name":"Taylor","last_name":"Morgan"}'::jsonb,
+    now(),
+    now()
+  ),
+  (
+    '00000000-0000-0000-0000-000000000000',
     '8d3b7b5f-02e3-48f6-9a91-5a7d51e6c3f2',
     'authenticated',
     'authenticated',
@@ -145,6 +168,16 @@ values
     'ef6ef39e-0e94-4673-9544-25ee9c68b8cf',
     'ef6ef39e-0e94-4673-9544-25ee9c68b8cf',
     '{"sub":"ef6ef39e-0e94-4673-9544-25ee9c68b8cf","email":"parent.jamie.chen@example.test","email_verified":true,"phone_verified":false}'::jsonb,
+    'email',
+    now(),
+    now(),
+    now()
+  ),
+  (
+    'f7a7d6e5-7c6d-4dd1-95c2-1c7f5d72e9a4',
+    'f7a7d6e5-7c6d-4dd1-95c2-1c7f5d72e9a4',
+    'f7a7d6e5-7c6d-4dd1-95c2-1c7f5d72e9a4',
+    '{"sub":"f7a7d6e5-7c6d-4dd1-95c2-1c7f5d72e9a4","email":"parent.taylor.morgan@example.test","email_verified":true,"phone_verified":false}'::jsonb,
     'email',
     now(),
     now(),
@@ -220,6 +253,16 @@ values
     '+14165550102',
     'PARENT',
     now()
+  ),
+  (
+    '7c269b89-17df-4f7d-9258-c2d442f1b6df',
+    'f7a7d6e5-7c6d-4dd1-95c2-1c7f5d72e9a4',
+    'Taylor',
+    'Morgan',
+    'parent.taylor.morgan@example.test',
+    '+14165550103',
+    'PARENT',
+    now()
   )
 on conflict (id) do update set
   supabase_user_id = excluded.supabase_user_id,
@@ -263,6 +306,14 @@ values
     'Chen',
     '2014-01-18',
     'Synthetic local fixture: payment issue member.'
+  ),
+  (
+    'fe899a4d-e7cb-4c39-bd8d-345c7316e789',
+    '7c269b89-17df-4f7d-9258-c2d442f1b6df',
+    'Avery',
+    'Morgan',
+    '2015-06-08',
+    'Synthetic local fixture: trial-eligible child with no paid academy membership.'
   )
 on conflict (id) do update set
   parent_id = excluded.parent_id,
@@ -406,6 +457,7 @@ on conflict (id) do update set
 insert into public.academy_memberships (
   id,
   academy_id,
+  customer_id,
   student_id,
   stripe_customer_id,
   status,
@@ -416,6 +468,7 @@ values
   (
     '8f4f7dc6-a0ab-4549-95e5-7e6e32c2da8f',
     '39875f07-0a4b-4429-a201-2249bc1f24df',
+    null,
     '531a0580-56c6-4029-a72f-c42221e17bfb',
     'cus_local_maya_rivera',
     'ACTIVE',
@@ -425,6 +478,7 @@ values
   (
     '6543bff1-4f54-4760-a82f-2c0d210ec27d',
     '39875f07-0a4b-4429-a201-2249bc1f24df',
+    null,
     '5c0bf246-1612-4e82-8aca-4fba43e13f6e',
     'cus_local_leo_rivera',
     'SUSPENDED',
@@ -434,11 +488,22 @@ values
   (
     'a5ac9fd2-8d34-456a-8b56-1ae457f256f4',
     '39875f07-0a4b-4429-a201-2249bc1f24df',
+    null,
     'ccfd4c6a-9e7a-41f4-8d7a-8f6e80e69825',
     'cus_local_noah_chen',
     'ACTIVE',
     now() - interval '14 days',
     'ghl_local_noah_chen'
+  ),
+  (
+    '2fba5d9d-5f08-4b65-9f98-6bbd604d4908',
+    '39875f07-0a4b-4429-a201-2249bc1f24df',
+    '7c269b89-17df-4f7d-9258-c2d442f1b6df',
+    null,
+    null,
+    'SUSPENDED',
+    now(),
+    'ghl_local_taylor_morgan'
   )
 on conflict (id) do update set
   academy_id = excluded.academy_id,

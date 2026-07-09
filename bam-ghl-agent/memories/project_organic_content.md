@@ -57,6 +57,16 @@ New `content_executor` role — CONTENT-ONLY. In `_roles.js` it's in `ANY_STAFF_
 ## Type toggle (2026-07-06 - fixed the everything-shows-as-graphic bug)
 The Add-Creative modal now has an explicit **"What should we make?" Video/Graphic toggle** (`#inputAssetsTypeToggle`, restored - the JS existed but the HTML had been removed). `content_tickets.type` = the toggle, NOT derived from raw-file MIME types anymore. Why: raw inputs never determined the output (photos in, video out is normal), and **link-only submissions (Drive/Dropbox) derived to 'graphic' every time** - that's why organic tickets all showed Graphic on staff side. Auto-suggests from uploads (any video file → video) until the client clicks the toggle (`typeTouched`). Also means per-type credit caps now count the right type. Ads Add-Creative can no longer produce 'mixed' (one creative = one output type; mixed still comes from the campaign-wizard bundles).
 
+## Client edit + cancel on in-progress requests (2026-07-08, feedback ticket f4ba8f13)
+
+Clients can now **edit or cancel** an organic request from its "In progress" card, but ONLY until the content team uploads finals (`final_files` non-empty → card shows "In production. Message us if you need a change of direction." and the API 409s).
+
+- **Card actions** (`_organicStatusCard`): active + no finals → "Edit request" + "Cancel request"; active + finals → locked hint; review → unchanged Approve / Request changes.
+- **Edit** (`_organicEdit`) reuses the input-assets modal in edit mode: `_inputAssetsEditId` + `_inputAssetsExistingFiles` (existing raw_files with per-file remove/undo in `#inputAssetsExistingList`), prefilled title/notes/format/captions, **type toggle LOCKED** (credits count per type, switching would dodge caps). `submitInputAssets` branches on edit mode → PATCH `action=edit`.
+- **API `edit` action extended** (was files+note only): now also accepts `title`, `notes`, and a **whitelisted** context merge (`format`, `captions` only - internal context keys are untouchable). Appends a client-visible message summarizing what changed ("Added 2 files, Updated the notes"). Blocks when finals exist.
+- **Slack ping on edit** (Zoran-approved): DM to the ticket's assigned owner + #content-marketing message, "Request edited - {business} [{code}]" - same pattern as the new-request ping.
+- **Cancel** (`_organicCancel`): confirm → PATCH `action=cancel` (already existed server-side; frees the monthly credit since used = status != cancelled).
+
 ## Organic credits + content-only clients (V1, added 2026-06-20, branch `feat/organic-content-credits`)
 
 **Monthly credits (hard cap, no billing).** Migrations `20260620180000` (per-type) + `20260621120000` (combined pool):

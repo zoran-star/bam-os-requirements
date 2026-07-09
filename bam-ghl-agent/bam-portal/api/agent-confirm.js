@@ -47,6 +47,7 @@ import {
 import { sendOn } from "./_send.js";
 import { resolveMergeVars, locFor } from "./email-shells.js";
 import { confirmAgentMode, modeIsOn, shouldAutoSend, shouldAutoSendScripted } from "./agent/_mode.js";
+import { markUnqualified } from "./agent/_tags.js";
 import { mutedContactIdSet, isMuted } from "./agent/_mutes.js";
 import { withinQuietHours, nextSendableTime } from "./agent/_quiet.js";
 import { resolveAgentActor } from "./agent/_auth.js";
@@ -261,7 +262,7 @@ async function draftForContact(token, locationId, clientId, contactId, cfg, opts
     summary: out.summary ? String(out.summary).slice(0, 600) : null,
     last_message: (() => { const lead = [...messages].reverse().find(m => m.role === "parent"); return lead ? String(lead.text).slice(0, 500) : null; })(),
     last_outbound: (() => { const ours = [...messages].reverse().find(m => m.role === "agent"); return ours ? String(ours.text).slice(0, 500) : null; })(),
-    thread_tail: messages.slice(-6).map(m => ({ role: m.role === "agent" ? "agent" : "lead", text: String(m.text).slice(0, 320), at: toIso(m.date) })),
+    thread_tail: messages.slice(-6).map(m => ({ role: m.role === "agent" ? "agent" : "lead", text: String(m.text).slice(0, 2000), at: toIso(m.date) })),
     reply_count: agentMsgs.length,
   };
 }
@@ -966,6 +967,35 @@ async function handler(req, res) {
       }
       await clearConfirmCards(clientId, contactId, "marked lost");
       return res.status(200).json({ ok: true, marked_lost: !routedToNurture, routed_to_nurture: routedToNurture, opportunity_id: oppId, reason });
+    }
+
+    // Mark Unqualified (Zoran 2026-07-08: every agent can mark unqualified). The
+    // dead end: close the opp (abandoned + role unqualified), stamp the GHL
+    // `unqualified` tag, log the outcome, drop the confirm cards. No nurture, no
+    // message. Mirrors agent-approvals' confirm-abandoned.
+    if (b.action === "confirm-abandoned") {
+      let row = null, contactId = b.contact_id || null;
+      if (b.ready_id) {
+        [row] = await sb(`agent_confirm_replies?id=eq.${encodeURIComponent(b.ready_id)}&client_id=eq.${clientId}&select=*`);
+        if (!row) return res.status(404).json({ error: "not found" });
+        contactId = row.ghl_contact_id;
+      }
+      if (!contactId) return res.status(400).json({ error: "ready_id or contact_id required" });
+      let oppId = null, oppRef = null;
+      try { oppRef = await findOpenOpp(clientId, token, locationId, contactId); oppId = oppRef && (oppRef.ghlOpportunityId || oppRef.id) || null; }
+      catch (e) { return res.status(e.status || 502).json({ error: `find opp: ${e.message}` }); }
+      if (!oppRef) return res.status(200).json({ error: "No opportunity found for this contact - nothing to close." });
+      const reason = (b.reason || (row && row.lost_reason) || "").toString().trim() || null;
+      try {
+        await setStatus({ clientId, ghl, token, oppRef, status: "abandoned", role: "unqualified", contactId, reason });
+      } catch (e) { return res.status(e.status || 502).json({ error: `mark unqualified: ${e.message}` }); }
+      try { await markUnqualified(token, contactId, clientId); } catch (_) {}
+      try { await sb(`pipeline_outcomes`, { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify([{ client_id: clientId, opportunity_id: oppId, status: "abandoned", reason }]) }); } catch (_) {}
+      if (b.ready_id) {
+        try { await sb(`agent_confirm_replies?id=eq.${encodeURIComponent(b.ready_id)}&client_id=eq.${clientId}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ status: "sent", approved_by: staffEmail, approved_at: new Date().toISOString(), sent_at: new Date().toISOString(), updated_at: new Date().toISOString() }) }); } catch (_) {}
+      }
+      await clearConfirmCards(clientId, contactId, "marked unqualified");
+      return res.status(200).json({ ok: true, marked_abandoned: true, unqualified: true, opportunity_id: oppId, reason });
     }
 
     return res.status(400).json({ error: "unknown action" });

@@ -19,11 +19,10 @@ import { withSentryApiRoute } from "./_sentry.js";
 //     "snooze"   { id, hours }                  → push the send time out
 //     "send-now" { id }                         → send immediately
 //     "detect-now" { client_id? }              → manually run the detector once
-//     "draft-one" { client_id, contact_id, conversation_id?, contact_name? }
-//                                               → draft+queue ONE follow-up for a
-//                                                 single lead (the forced 2-step
-//                                                 after a Hawkeye reply). Idempotent.
-//                                                 {stop:true} = brain says no f/u.
+//
+// NOTE (Zoran 2026-07-08): booking follow-up NUDGES are retired - nothing creates
+// agent_followups rows anymore. A quiet Responded lead gets a "Send to Ghosted"
+// proposal instead (this detector); the Ghosted automation owns the chase.
 //
 // Engine is per-academy gated by clients.ghl_kpi_config.followup_engine_enabled.
 

@@ -48,7 +48,7 @@ Slash commands available in this repo (in `.claude/commands/`, shared via git):
 - `/setup` — **one-time setup for a new portal team member** (Cole, Cam, etc.): session-recording config, jq, git identity + a verify check. Run this first on a new machine.
 - `/setup-project-memory <folder>` — scaffold CLAUDE.md + memories/ for a new project folder
 - `/memory-audit` — audit all CLAUDE.md + memories/ folders for drift, stale notes, broken links
-- `/v2-tickets` — triage outstanding V2 tickets from the lil Zoran icon one by one: full context, plain-English fix proposal, workshop with Zoran, record decision, repeat until the queue is empty
+- `/v2-tickets` — triage outstanding tickets from the lil Zoran icon one by one (client-side V2 + staff-side bug reports): full context, plain-English fix proposal, workshop with Zoran, record decision, repeat until the queue is empty
 
 **Portal build sessions** (in `bam-ghl-agent/`): `/showtime` primes the session (pulls latest, loads the engineering guide + safe-build rules) and starts recording; `/byebye` generates a test script for what changed, then saves the session to the staff review page.
 
@@ -183,6 +183,8 @@ Both apps auto-deploy on every push to `main` via Vercel Git integration:
 **Do NOT manually deploy via CLI.** Just push to `main` and Vercel handles it.
 
 **Deploy speed (2026-07-05):** every project's `vercel.json` has `"ignoreCommand": "git diff --quiet HEAD^ HEAD -- ."` so a push only builds the projects whose folder actually changed - no more all-projects build queue. If you add a new Vercel project to this repo, add the same ignoreCommand to its `vercel.json`.
+
+**Deploy speed round 2 (2026-07-09):** `bam-ghl-agent/bam-portal/vercel.json` additionally skips ALL preview builds (`[ "$VERCEL_ENV" != "production" ] || git diff ...`) - branch pushes no longer eat the team's single build slot; only merges to `main` build. Tradeoff: no Vercel preview links on bam-portal PRs (test locally). Also flip "Prioritize Production Builds" ON in the Vercel dashboard (bam-portal -> Settings -> Git) - dashboard setting, not in git.
 
 ## Whiteboard — Planning Tool
 

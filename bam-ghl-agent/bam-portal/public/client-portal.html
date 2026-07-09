@@ -7164,6 +7164,8 @@
           <!-- ── Marketing Machine (V2 only) - Meta ads card + landing page card ── -->
           <div id="marketing-machine-card" style="display:none"></div>
           <div id="landing-machine-card" style="display:none"></div>
+          <!-- Other entry point funnels (contact page etc.) - dropdown config list -->
+          <div id="other-funnels-card" style="display:none"></div>
 
           <!-- ── Resource guides (collapsed PDFs - placeholder until walkthrough videos) ── -->
           <details class="guide-card">
@@ -9039,6 +9041,113 @@ Then the call to action."]</div>
         <!-- V2 Sales FOCUS MODE (per-stage config: Entry -> Engine -> Exit). The
              engine reuses the real Train Agent renderers (_taRenderPanel). -->
         <div id="pl-focus" style="display:none"></div>
+        <!-- Hawkeye deck (V2): the single Hawkeye surface - one card at a time. -->
+        <style>
+          #pl-hawkeye{max-width:680px;margin:0 auto;padding:4px 0 44px}
+          .hk2-topbar{display:flex;align-items:center;gap:12px;margin:2px 0 14px}
+          .hk2-back{display:inline-flex;align-items:center;gap:6px;background:var(--surface);color:var(--text-sub);border:1px solid var(--border);border-radius:999px;padding:8px 15px;font:inherit;font-size:13px;font-weight:600;cursor:pointer}
+          .hk2-back:hover{color:var(--text)}
+          .hk2-title{display:flex;align-items:center;gap:8px;font-size:19px;font-weight:800;color:var(--text)}
+          .hk2-tabs{display:flex;gap:8px;margin-bottom:14px}
+          .hk2-tab{flex:1;display:flex;align-items:center;justify-content:space-between;gap:7px;border-radius:999px;border:1.5px solid var(--border);background:var(--surface);color:var(--text-sub);padding:9px 14px;font:inherit;font-size:13px;font-weight:700;cursor:pointer;min-width:0}
+          .hk2-tab.on{background:var(--accent);border-color:var(--accent);color:var(--on-gold,#131416)}
+          .hk2-tmain{display:inline-flex;align-items:center;gap:7px;min-width:0;flex:1;justify-content:center}
+          .hk2-n{background:var(--gold-glow,rgba(212,182,92,.14));color:var(--accent);border-radius:999px;font-size:11px;font-weight:800;min-width:18px;height:18px;display:inline-flex;align-items:center;justify-content:center;padding:0 5px}
+          .hk2-tab.on .hk2-n{background:var(--on-gold,#131416);color:var(--accent)}
+          .hk2-tgear{display:inline-flex;cursor:pointer;opacity:.6;flex-shrink:0}
+          .hk2-tgear:hover{opacity:1}
+          .hk2-tab.on .hk2-tgear{opacity:.85}
+          .hk2-deck{position:relative;min-height:420px}
+          .hk2-card{background:var(--surface);border:1px solid var(--border-str,rgba(255,255,255,.16));border-radius:16px;padding:16px;display:flex;flex-direction:column;gap:10px;box-shadow:0 12px 40px rgba(0,0,0,.22)}
+          .hk2-behind{position:absolute;inset:0;transform:scale(.96) translateY(14px);opacity:.4;pointer-events:none;overflow:hidden}
+          .hk2-top{position:relative;z-index:2}
+          .hk2-head{display:flex;align-items:center;gap:11px;flex-wrap:wrap}
+          .hk2-av{width:42px;height:42px;border-radius:50%;background:var(--accent-glow,rgba(212,182,92,.12));color:var(--accent);display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:800;flex-shrink:0}
+          .hk2-who{font-size:16px;font-weight:700;color:var(--text)}
+          .hk2-sub{font-size:12px;color:var(--text-sub);margin-top:1px}
+          .hk2-pill{font-size:9.5px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;border-radius:999px;padding:3px 9px;white-space:nowrap}
+          .hk2-prog{font-size:11px;color:var(--text-mute);margin-left:auto;white-space:nowrap}
+          .hk2-ctx{font-size:11.5px;color:var(--text-mute);background:var(--bg);border:1px dashed var(--border);border-radius:10px;padding:8px 10px;line-height:1.5}
+          .hk2-esc{font-size:11.5px;color:#e0a020}
+          .hk2-thread{max-height:340px;overflow-y:auto;display:flex;flex-direction:column;gap:7px;padding:2px}
+          .hk2-bub{font-size:13px;line-height:1.5;padding:8px 12px;border-radius:13px;max-width:82%;white-space:pre-wrap;word-break:break-word}
+          .hk2-bub.in{background:rgba(255,255,255,.05);border:1px solid var(--border);color:var(--text);border-bottom-left-radius:4px;align-self:flex-start}
+          .hk2-bub.bot{background:var(--accent-glow,rgba(212,182,92,.10));border:1px solid var(--accent-border,rgba(212,182,92,.3));color:var(--text);border-bottom-right-radius:4px;align-self:flex-end}
+          .hk2-lbl{font-size:9.5px;font-weight:800;letter-spacing:.07em;text-transform:uppercase;color:var(--text-mute)}
+          .hk2-draft{width:100%;box-sizing:border-box;background:var(--accent-glow,rgba(212,182,92,.08));border:1px solid var(--accent-border,rgba(212,182,92,.3));border-radius:11px;color:var(--text);font:inherit;font-size:13.5px;line-height:1.5;padding:10px 12px;resize:vertical;min-height:64px;outline:none}
+          .hk2-draft.sm{min-height:44px;font-size:12.5px}
+          .hk2-draft:focus{border-color:var(--accent)}
+          .hk2-note{font-size:11px;color:var(--text-mute);line-height:1.45}
+          .hk2-teach{width:100%;box-sizing:border-box;background:var(--bg);border:1px dashed var(--border);border-radius:9px;color:var(--text-sub);font:inherit;font-size:12.5px;padding:9px 11px;outline:none}
+          .hk2-teach:focus{border-color:var(--accent);border-style:solid}
+          .hk2-teach.hk2-miss{border-color:var(--red,#F07060);border-style:solid}
+          .hk2-fields{display:flex;flex-direction:column;gap:6px}
+          .hk2-fields label{display:flex;align-items:center;gap:8px;font-size:10px;color:var(--text-mute);text-transform:uppercase;letter-spacing:.06em;font-weight:700}
+          .hk2-fields label span{flex:0 0 74px;text-align:right}
+          .hk2-fields select{flex:1;background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);font:inherit;font-size:13px;padding:8px 10px;outline:none;min-width:0}
+          .hk2-fields select:focus{border-color:var(--accent)}
+          .hk2-other{overflow:hidden;max-height:0;transition:max-height .28s ease}
+          .hk2-other.open{max-height:240px}
+          .hk2-other-in{display:flex;flex-direction:column;gap:6px;padding:2px 0 8px}
+          .hk2-x{border-radius:8px;border:1px solid var(--border);background:transparent;color:var(--text-sub);font:inherit;font-size:12.5px;font-weight:600;padding:8px 11px;cursor:pointer;text-align:left}
+          .hk2-x:hover{color:var(--text);border-color:var(--border-str,rgba(255,255,255,.2))}
+          .hk2-bar{display:flex;gap:8px;align-items:stretch}
+          .hk2-otherbtn{flex:0 0 auto;background:var(--bg);border:1px solid var(--border);color:var(--text-sub);border-radius:999px;padding:10px 18px;font:inherit;font-size:13px;font-weight:700;cursor:pointer}
+          .hk2-otherbtn.on,.hk2-otherbtn:hover{color:var(--text);border-color:var(--border-str,rgba(255,255,255,.2))}
+          .hk2-go{flex:1;background:var(--accent);color:#0B0B0D;border:none;border-radius:999px;padding:10px 16px;font:inherit;font-size:13.5px;font-weight:800;cursor:pointer}
+          .hk2-go:hover{filter:brightness(1.06)}
+          .hk2-go.blue{background:var(--blue,#5A8FB8);color:#fff}
+          .hk2-go.green{background:var(--green,#4CC76A);color:#0B0B0D}
+          .hk2-go.red{background:var(--red,#F07060);color:#fff}
+          .hk2-clear{min-height:380px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;border:1px dashed var(--border);border-radius:16px;color:var(--text-sub);font-size:13px}
+          .hk2-clear b{color:var(--text);font-size:16px}
+          .hk2-clear .big{width:56px;height:56px;border-radius:50%;background:rgba(76,199,106,.14);color:var(--green,#4CC76A);display:flex;align-items:center;justify-content:center;font-size:26px}
+          .hk2-hint{font-size:11px;color:var(--text-mute);margin-top:12px;text-align:center;line-height:1.5}
+          .hk2-load{min-height:300px;display:flex;align-items:center;justify-content:center;gap:8px;color:var(--text-sub);font-size:13px}
+          @media(max-width:560px){.hk2-tab{font-size:12px;padding:8px 8px}.hk2-thread{max-height:240px}}
+          /* ── simple view strip + cascade (Zoran 2026-07-09 redesign: stage
+                 top-left, engine wording, card count, Hawkeye need on the
+                 right; GOLD is the only colour; chevrons show the flow) ── */
+          .plo2-hawkbtn{display:inline-flex;align-items:center;gap:7px;background:var(--accent);color:var(--on-gold,#131416);border:none;border-radius:999px;padding:8px 16px;font:inherit;font-size:13px;font-weight:800;cursor:pointer;margin-left:auto}
+          .plo2-hawkbtn:hover{filter:brightness(1.06)}
+          .plo2-hawkbtn .cnt{background:var(--on-gold,#131416);color:var(--accent);border-radius:999px;font-size:11px;font-weight:800;min-width:18px;height:18px;display:inline-flex;align-items:center;justify-content:center;padding:0 5px}
+          .plo2-strip{display:flex;gap:6px;align-items:stretch}
+          .plo2-pill{flex:1;position:relative;display:flex;align-items:center;justify-content:space-between;gap:8px;border-radius:12px;padding:10px 12px;text-align:left;cursor:pointer;border:1.5px solid var(--border-med);background:var(--surface);transition:all .22s ease;min-width:0;min-height:64px}
+          .plo2-pill.auto{border-style:dashed}
+          .plo2-pill:hover{border-color:var(--accent)}
+          .plo2-pill.dim{opacity:.45}
+          .plo2-pill.active{background:var(--accent);border-color:var(--accent);border-style:solid;color:var(--on-gold,#131416);justify-content:center}
+          .plo2-pill .plo2-l{min-width:0}
+          .plo2-pill .nm{font-size:12.5px;font-weight:800;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+          .plo2-pill .eng{font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--text-sub);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+          .plo2-pill .cnt{font-size:10.5px;color:var(--text-mute);margin-top:3px;white-space:nowrap}
+          .plo2-need{font-size:10.5px;font-weight:800;color:var(--accent);background:var(--gold-glow,rgba(212,182,92,.12));border:1px solid var(--accent-border,rgba(212,182,92,.25));border-radius:999px;padding:3px 9px;white-space:nowrap;flex-shrink:0}
+          .plo2-arr{display:flex;align-items:center;color:var(--text-mute);opacity:.55;flex-shrink:0}
+          .plo2-up{display:flex;align-items:center;justify-content:center;min-height:34px}
+          .plo2-cfg{position:absolute;top:6px;right:7px;width:15px;height:15px;cursor:pointer;opacity:.8}
+          .plo2-cfg:hover{opacity:1}
+          .plo2-cfg svg{width:100%;height:100%;display:block}
+          .plo2-casc{margin-top:14px;width:100%}
+          .plo2-panel{border-radius:16px;background:var(--surface);border:1px solid var(--border);padding:15px}
+          .plo2-phead{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--text-mute);margin-bottom:11px;display:flex;align-items:center;gap:8px;font-weight:700}
+          .plo2-eng{font-size:10px;font-weight:800;border-radius:6px;padding:3px 8px;letter-spacing:.05em;color:var(--text-sub);background:var(--surface-el,var(--bg));border:1px solid var(--border)}
+          .plo2-rows{display:flex;flex-direction:column;gap:7px}
+          .plo2-row{animation:plo2in .3s ease both}
+          @keyframes plo2in{from{opacity:0;transform:translateY(-7px)}to{opacity:1;transform:none}}
+          .plo2-lead{background:var(--bg);border:1px solid var(--border);border-radius:12px;padding:9px 13px;display:flex;align-items:center;gap:10px;cursor:pointer;transition:border-color .12s}
+          .plo2-lead:hover{border-color:var(--border-str,rgba(255,255,255,.2))}
+          .plo2-lead.needs{border-color:var(--accent);box-shadow:0 0 0 1px var(--gold-glow,rgba(212,182,92,.12)),0 4px 14px rgba(212,182,92,.10)}
+          .plo2-lead .who{font-size:13px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+          .plo2-lead .st{font-size:11px;color:var(--text-mute);margin-top:1px}
+          .plo2-lead.needs .st{color:var(--accent)}
+          .plo2-av{width:28px;height:28px;border-radius:50%;background:var(--surface);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:10.5px;font-weight:700;color:var(--text-sub);flex-shrink:0}
+          .plo2-more{font-size:12px;color:var(--text-sub);text-align:center;padding:8px;cursor:pointer;border:1px dashed var(--border);border-radius:10px}
+          .plo2-more:hover{color:var(--text)}
+          .plo2-none{font-size:12.5px;color:var(--text-mute);text-align:center;padding:14px}
+          .plo2-hint{font-size:10.5px;color:var(--text-mute);text-align:center;margin-top:10px}
+          @media(max-width:640px){.plo2-strip{flex-wrap:wrap}.plo2-pill{flex:1 1 44%}.plo2-arr{display:none}}
+        </style>
+        <div id="pl-hawkeye" style="display:none"></div>
         <div id="pl-pipeline-tabs" class="pl-tabs"></div>
         <div id="pl-board-container">
           <div class="req-empty" style="padding:20px 0"><span class="req-spin"></span>Loading pipelines…</div>
@@ -14291,6 +14400,9 @@ function _ibOpenContactDrawer(a) {
         <div style="height:1px;background:var(--border);margin:20px 0"></div>
         <div style="font-size:11px;font-weight:700;color:var(--text-mute);letter-spacing:0.6px;text-transform:uppercase;margin-bottom:10px">Tags</div>
         <div id="ib-cd-tags"></div>
+        <div style="height:1px;background:var(--border);margin:20px 0"></div>
+        <div style="font-size:11px;font-weight:700;color:var(--text-mute);letter-spacing:0.6px;text-transform:uppercase;margin-bottom:10px">Custom fields</div>
+        <div id="ib-cd-cf"><div style="font-size:12px;color:var(--text-mute)">Loading…</div></div>
         <div id="ib-cd-dupes" style="margin-top:20px"></div>
         <div style="font-size:12px;color:var(--text-mute);margin-top:18px;line-height:1.5">Not a member yet. When they sign up they will show a Member pill and link to their full profile here.</div>
         ${ghlUrl ? `<a href="${escapeHTML(ghlUrl)}" target="_blank" rel="noopener" style="display:flex;align-items:center;justify-content:center;gap:8px;margin-top:18px;background:transparent;color:var(--text);border:1px solid var(--border);padding:10px 12px;font-weight:600;border-radius:6px;cursor:pointer;font-size:13px;text-decoration:none">Open in GHL ↗</a>` : ''}
@@ -14301,8 +14413,16 @@ function _ibOpenContactDrawer(a) {
     if (bd) bd.style.opacity = '1';
     if (dr) dr.style.transform = 'translateX(0)';
   });
-  if (a.contactId) { _renderTagEditorFetch('ib-cd-tags', a.contactId); _ibLoadDupes(a.contactId); }
-  else { const t = document.getElementById('ib-cd-tags'); if (t) t.innerHTML = '<span style="font-size:12px;color:var(--text-mute)">No GHL contact linked.</span>'; }
+  if (a.contactId) {
+    _renderTagEditorFetch('ib-cd-tags', a.contactId);
+    _ibLoadDupes(a.contactId);
+    // Leads see the LEAD (sales-section) fields + academy-level fields.
+    const cf = document.getElementById('ib-cd-cf');
+    if (cf) _loadContactCF(cf, { clientId: CLIENT_ID, ghlContactId: a.contactId, section: 'sales' });
+  } else {
+    const t = document.getElementById('ib-cd-tags'); if (t) t.innerHTML = '<span style="font-size:12px;color:var(--text-mute)">No GHL contact linked.</span>';
+    const cf = document.getElementById('ib-cd-cf'); if (cf) cf.innerHTML = '<span style="font-size:12px;color:var(--text-mute)">No contact linked yet.</span>';
+  }
 }
 
 // Duplicate contacts (same phone / name) for the contact whose drawer is open.
@@ -14799,6 +14919,196 @@ async function _wdwCheck(btn) {
     else _plToast('Not switched yet - DNS can take a few minutes to propagate.');
   } catch (e) { _plToast('Check failed: ' + e.message); }
   _wdwRender();
+}
+
+// ── Academy onboarding flow (its own side page - leave any time) ──
+// Zoran 2026-07-08: onboarding lives OUTSIDE the regular V2 pages. Opened from
+// the navigation orb's pop ("Finish your onboarding" + a progress ring), and
+// every step auto-detects completion from live data - nothing is hand-checked.
+// Steps today (Detail Miami's remaining list): member import, email domain,
+// website domain, EIN. The list grows as more onboarding steps come online.
+let _OBF_STATE = null;   // { members, email, website, ein } after first fetch
+let _OBF_AT = 0;
+
+// Steps carry a `group` so the flow separates GENERAL academy setup from the
+// per-offer setup (Zoran 2026-07-09: "training is one offer type, separate the
+// general stuff from the training offer"). Member import lives UNDER the
+// training offer (it maps the roster onto that offer's plans), reusing the
+// Member Onboarding card's UI. As more offer types come online each gets its
+// own group; general steps stay shared.
+const _OBF_GROUPS = [
+  { key: 'general',  label: 'Academy setup', sub: 'Shared across every offer you run' },
+  { key: 'training', label: 'Training offer', sub: 'Your first offer - members, schedule and enrollment' },
+];
+const _OBF_STEPS = [
+  { key: 'ein',     group: 'general',  title: 'Add your business tax ID', sub: 'EIN (US) or Business Number (Canada) - unlocks offer publishing and the payment paperwork. Canadian businesses without one can skip this for now.', cta: 'Add it in Blueprint', go: '_obfGoGeneral()', skippable: true },
+  { key: 'email',   group: 'general',  title: 'Connect your email domain', sub: 'Emails send from your own domain - one DNS paste at your registrar', cta: 'Set up email', go: '_obfGoDomains()' },
+  { key: 'website', group: 'general',  title: 'Launch your new website', sub: 'Point your domain at the rebuilt site - the old one retires on the flip', cta: 'Set up website', go: '_obfGoDomains()' },
+  { key: 'members', group: 'training', title: 'Import your members', sub: 'Bring your roster onto this offer - import from Stripe or CSV, clean it up, link contacts', cta: 'Import members', go: '_obfGoMembers()' },
+];
+
+function _obfIsV2() { return typeof V2_ACCESS !== 'undefined' && !!V2_ACCESS; }
+
+async function _obfFetchState() {
+  const token = await _mreqAuthToken();
+  const next = { members: false, email: false, website: false, ein: false };
+  const [mem, em, web] = await Promise.allSettled([
+    fetch('/api/members?scope=client&client_id=' + encodeURIComponent(CLIENT_ID), { headers: { Authorization: 'Bearer ' + token } }).then(_safeJson),
+    _edwApi('status'),
+    _wdwApi('status'),
+  ]);
+  if (mem.status === 'fulfilled') next.members = Array.isArray(mem.value.members) && mem.value.members.length > 0;
+  if (em.status === 'fulfilled') { next.email = em.value.status === 'live'; next.ein = !!em.value.ein_set || _obfSkipped('ein'); }
+  if (web.status === 'fulfilled') next.website = web.value.status === 'live';
+  _OBF_STATE = next; _OBF_AT = Date.now();
+  _obfFanSync();
+  return next;
+}
+
+// The navigation fan's onboarding circle: the progress ring IS the icon.
+// Shown for V2 academies with steps left; hides itself once complete. First
+// call (no state yet) shows an empty ring and kicks a background check.
+let _OBF_FETCHING = false;
+function _obfFanSync() {
+  const btn = document.getElementById('cc-fan-obf');
+  if (!btn) return;
+  if (!_obfIsV2()) { btn.style.display = 'none'; return; }
+  const total = _OBF_STEPS.length;
+  const done = _OBF_STATE ? _obfDone(_OBF_STATE) : 0;
+  if (_OBF_STATE && done === total) { btn.style.display = 'none'; return; }
+  btn.style.display = '';
+  const ring = document.getElementById('cc-fan-obf-ring');
+  if (ring) ring.innerHTML = _obfRing(done, total, 18);
+  btn.dataset.lab = _OBF_STATE ? `Finish onboarding · ${done}/${total}` : 'Finish onboarding';
+  if (!_OBF_STATE && !_OBF_FETCHING) {
+    _OBF_FETCHING = true;
+    _obfFetchState().catch(() => {}).finally(() => { _OBF_FETCHING = false; });
+  }
+}
+
+function _obfDone(st) { return _OBF_STEPS.filter(s => st && st[s.key]).length; }
+
+// Gold progress ring (SVG, r=8 -> circumference ~50.27).
+function _obfRing(done, total, px) {
+  const r = 8, c = 2 * Math.PI * r;
+  const frac = total ? Math.max(0, Math.min(1, done / total)) : 0;
+  return `<svg width="${px}" height="${px}" viewBox="0 0 20 20" style="flex:none;transform:rotate(-90deg)" aria-hidden="true">
+    <circle cx="10" cy="10" r="${r}" fill="none" stroke="var(--border-med)" stroke-width="2.5"/>
+    <circle cx="10" cy="10" r="${r}" fill="none" stroke="var(--gold)" stroke-width="2.5" stroke-linecap="round" stroke-dasharray="${c.toFixed(2)}" stroke-dashoffset="${(c * (1 - frac)).toFixed(2)}"/>
+  </svg>`;
+}
+
+// Per-client "not applicable" dismissal for optional steps (EIN today). Kept
+// local-only on purpose: it is a personal "hide this nudge," not academy data,
+// and it clears itself the moment the real thing lands (a saved EIN wins).
+function _obfSkipKey() { return 'bam_obf_skip_' + (typeof CLIENT_ID !== 'undefined' ? CLIENT_ID : ''); }
+function _obfSkipped(key) {
+  try { return (JSON.parse(localStorage.getItem(_obfSkipKey()) || '[]') || []).includes(key); } catch (_) { return false; }
+}
+function _obfSkip(key) {
+  try {
+    const set = new Set(JSON.parse(localStorage.getItem(_obfSkipKey()) || '[]'));
+    set.add(key);
+    localStorage.setItem(_obfSkipKey(), JSON.stringify([...set]));
+  } catch (_) {}
+  if (_OBF_STATE) _OBF_STATE[key] = true;
+  _obfRender(_OBF_STATE);
+  _obfFanSync();
+}
+
+// Deep links close the flow first; command-center vs classic aware.
+function _obfNav(view) {
+  _obfClose();
+  if (document.body.classList.contains('cc-mode') && !document.body.classList.contains('cc-classic') && typeof _ccOpenClassic === 'function') _ccOpenClassic(view);
+  else switchView(view);
+}
+function _obfGoMembers() { _obfNav('blueprint'); setTimeout(() => { try { _bbNavigate('member_onboarding'); } catch (_) { /* blueprint not rendered yet */ } }, 150); }
+function _obfGoGeneral() { _obfNav('blueprint'); setTimeout(() => { try { _bbNavigate('general'); } catch (_) { /* blueprint not rendered yet */ } }, 150); }
+function _obfGoDomains() { _obfClose(); _edwOpenModal(); }
+function _obfGoMessages() { _obfNav('messages'); }
+
+function _obfClose() { document.getElementById('obf-overlay')?.remove(); }
+
+async function _obfOpen() {
+  if (!_obfIsV2()) return;
+  _obfClose();
+  document.body.insertAdjacentHTML('beforeend', `<div id="obf-overlay" style="position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9000;display:flex;align-items:center;justify-content:center;padding:18px" onclick="if(event.target===this)_obfClose()">
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:24px;width:100%;max-width:620px;max-height:92vh;overflow-y:auto;padding:26px 26px 20px">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:12px">
+        <div>
+          <div style="font-size:10.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--text-mute)">Academy setup</div>
+          <div style="font-family:var(--font-num,inherit);font-size:20px;font-weight:800;color:var(--text)">Finish your onboarding</div>
+        </div>
+        <button onclick="_obfClose()" style="background:transparent;border:1px solid var(--border-med);border-radius:8px;color:var(--text);padding:7px 12px;font:inherit;font-size:12px;font-weight:600;cursor:pointer">Back to home</button>
+      </div>
+      <div id="obf-progress" style="display:flex;align-items:center;gap:10px;margin:16px 0 4px"></div>
+      <div id="obf-steps"><div class="req-empty" style="padding:14px 0"><span class="req-spin"></span> Checking your setup…</div></div>
+      <div style="margin-top:14px;font-size:11.5px;color:var(--text-mute)">Leave any time - progress saves itself. Steps turn gold as the system sees them done.</div>
+    </div></div>`);
+  let st = null;
+  try { st = await _obfFetchState(); } catch (_) { st = _OBF_STATE; }
+  _obfRender(st);
+}
+
+function _obfRender(st) {
+  const host = document.getElementById('obf-steps');
+  const prog = document.getElementById('obf-progress');
+  if (!host) return;
+  if (!st) { host.innerHTML = `<div style="font-size:12.5px;color:var(--red,#c96856)">Couldn't check your setup - try again in a minute.</div>`; return; }
+  const done = _obfDone(st), total = _OBF_STEPS.length;
+  if (prog) prog.innerHTML = `${_obfRing(done, total, 30)}<div style="font-size:13px;font-weight:700;color:var(--text)">${done} of ${total} done</div>` + (done === total ? `<div style="font-size:12px;color:var(--green,#7BC47F);font-weight:700">All set - your academy is fully onboarded</div>` : '');
+  const stepRow = (s) => {
+    const ok = !!st[s.key];
+    return `<div style="display:flex;align-items:center;gap:13px;padding:13px 14px;border:1px solid ${ok ? 'var(--accent-border,rgba(212,182,92,.25))' : 'var(--border)'};background:${ok ? 'var(--gold-sheen,rgba(212,182,92,.06))' : 'transparent'};border-radius:12px;margin-top:9px">
+      <span style="flex:none;width:22px;height:22px;border-radius:999px;display:flex;align-items:center;justify-content:center;${ok ? 'background:var(--gold);color:var(--on-gold,#1a1608)' : 'border:1.5px solid var(--border-med);color:transparent'}">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+      </span>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:13.5px;font-weight:700;color:var(--text)">${s.title}</div>
+        <div style="font-size:12px;color:var(--text-sub,var(--text-mute));margin-top:1px">${s.sub}</div>
+        ${(!ok && s.skippable) ? `<button onclick="_obfSkip('${s.key}')" style="margin-top:6px;background:none;border:none;padding:0;font:inherit;font-size:11px;font-weight:600;color:var(--text-mute);text-decoration:underline;cursor:pointer">Not applicable - skip for now</button>` : ''}
+      </div>
+      ${ok ? '' : `<button onclick="${s.go}" style="flex:none;background:var(--gold);border:none;border-radius:8px;color:var(--on-gold,#1a1608);padding:8px 13px;font:inherit;font-size:12px;font-weight:700;cursor:pointer">${s.cta}</button>`}
+    </div>`;
+  };
+  // Render group by group; a group with no steps is skipped. Each header shows
+  // the group's own n/N so the offer vs general split reads at a glance.
+  host.innerHTML = _OBF_GROUPS.map(g => {
+    const steps = _OBF_STEPS.filter(s => s.group === g.key);
+    if (!steps.length) return '';
+    const gDone = steps.filter(s => !!st[s.key]).length;
+    return `<div style="margin-top:20px">
+      <div style="display:flex;align-items:baseline;gap:8px">
+        <div style="font-size:11px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--text-mute)">${g.label}</div>
+        <div style="font-size:11px;font-weight:700;color:${gDone === steps.length ? 'var(--green,#7BC47F)' : 'var(--text-mute)'}">${gDone}/${steps.length}</div>
+      </div>
+      <div style="font-size:11.5px;color:var(--text-mute);margin-top:1px">${g.sub}</div>
+      ${steps.map(stepRow).join('')}
+    </div>`;
+  }).join('');
+}
+
+// The navigation pop's entry: "Finish your onboarding" + live progress ring.
+// Rendered instantly from cache, refreshed in the background. Hidden for
+// non-V2 academies and once everything is done.
+function _obfPopItem() {
+  if (!_obfIsV2()) return '';
+  const st = _OBF_STATE, total = _OBF_STEPS.length;
+  const done = st ? _obfDone(st) : null;
+  if (st && done === total) return '';
+  const count = done == null ? '' : ` · ${done}/${total}`;
+  return `<button type="button" class="cc-pop-item" id="obf-pop-item" onclick="document.getElementById('cc-dock-pop').classList.remove('open');_obfOpen()">${_obfRing(done || 0, total, 15)} Finish your onboarding${count}</button>`;
+}
+function _obfPopRefresh() {
+  if (!_obfIsV2()) return;
+  if (_OBF_STATE && Date.now() - _OBF_AT < 120000) return;
+  _obfFetchState().then(() => {
+    const el = document.getElementById('obf-pop-item');
+    if (!el) return;
+    const done = _obfDone(_OBF_STATE), total = _OBF_STEPS.length;
+    if (done === total) { el.remove(); return; }
+    el.innerHTML = `${_obfRing(done, total, 15)} Finish your onboarding · ${done}/${total}`;
+  }).catch(() => {});
 }
 
 // ── Instagram connect wizard (client self-serve Meta OAuth) ──
@@ -16288,7 +16598,13 @@ const _HV2_ICONS = {
   activity: '<svg viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>',
 };
 // Open the Hawkeye approval popup right over the home screen (× lands back home).
-function _hv2OpenHawkeye() { try { _apxOpen(); } catch (_) {} }
+function _hv2OpenHawkeye() {
+  // V2: the deck page on the Sales view. V1.5: the legacy overlay.
+  try {
+    if (typeof _plIsV2 === 'function' && _plIsV2()) { switchView('pipelines'); _hk2Open(); }
+    else { _apxOpen(); }
+  } catch (_) { try { _apxOpen(); } catch (_) {} }
+}
 function _hv2NavCard(icon, title, sub, view, delay) {
   return `<button class="hv2-nav-card" style="animation-delay:${delay}s" onclick="switchView('${view}')">
     <span class="hv2-chip">${_HV2_ICONS[icon] || ''}</span>
@@ -23176,9 +23492,11 @@ async function _taRenderKnowledge() {
       html += `<div style="margin-top:20px"><div style="font-size:12px;color:var(--text-mute);font-family:'JetBrains Mono',monospace;text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px">Managed by BAM (global)</div>` +
         locked.map(s => `<div style="opacity:.6;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:10px 14px;margin-bottom:6px;font-size:13px">${escapeHTML(s.label)}</div>`).join('') + `</div>`;
     }
-    // Confirm + Closing agents: the scripted "Initial automations" sequence sits above
-    // the fact sections (it's a structured editor, not a prompt section).
-    const hasAutos = (_TA.target === 'confirm' || _TA.target === 'closing' || _TA.target === 'booking');
+    // Confirm + Booking agents: the scripted "Initial automations" sequence sits above
+    // the fact sections (it's a structured editor, not a prompt section). Closing has
+    // NO initial automations (Zoran 2026-07-08): the post-trial form's trainer text +
+    // optional sign-up link is the only preplanned Done-Trial touch.
+    const hasAutos = (_TA.target === 'confirm' || _TA.target === 'booking');
     const autosSlot = hasAutos
       ? `<div id="confirm-autos-card"><div class="req-empty"><span class="req-spin"></span>Loading automations…</div></div>`
       : '';
@@ -26231,6 +26549,7 @@ function _bbCqOpenAdd(offerId, sectionId, clientId) {
       <label style="${lbl}">Options (one per line)</label>
       <textarea id="bb-cq-opts" rows="3" placeholder="Small&#10;Medium&#10;Large" style="${inp};resize:vertical"></textarea>
     </div>
+    <div id="bb-cq-also-wrap" style="margin-bottom:14px"></div>
     <div style="display:flex;gap:10px;justify-content:flex-end">
       <button onclick="document.getElementById('bb-cq-modal').remove()" style="padding:9px 16px;background:transparent;border:1px solid var(--border);border-radius:6px;color:var(--text-sub);font-size:13px;font-weight:600;cursor:pointer">Cancel</button>
       <button id="bb-cq-save" onclick="_bbCqSave('${offerId}','${sectionId}','${clientId}')" style="padding:9px 18px;background:var(--gold);border:1px solid var(--gold);border-radius:6px;color:#1a1a1a;font-size:13px;font-weight:700;cursor:pointer">Add</button>
@@ -26239,6 +26558,20 @@ function _bbCqOpenAdd(offerId, sectionId, clientId) {
   wrap.onclick = (e) => { if (e.target === wrap) wrap.remove(); };
   document.body.appendChild(wrap);
   setTimeout(() => { document.getElementById('bb-cq-label')?.focus(); }, 0);
+  // "Also applies to" - attach this field to other offers too (multi-offer).
+  // The current offer is always included; here the owner ticks any extras.
+  _bbLoadOffersList().then(offers => {
+    const host = document.getElementById('bb-cq-also-wrap');
+    if (!host) return;
+    const others = (offers || []).filter(o => o.id !== offerId);
+    if (!others.length) return; // nothing else to attach to
+    host.innerHTML = `<label style="${lbl}">Also collect this on other offers (optional)</label>
+      <div style="display:flex;flex-direction:column;gap:6px;margin-top:6px;max-height:132px;overflow-y:auto;border:1px solid var(--border);border-radius:6px;padding:8px 10px">
+        ${others.map(o => `<label style="display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--text);cursor:pointer">
+          <input type="checkbox" class="bb-cq-also" value="${escapeHTML(o.id)}"> ${escapeHTML(o.title || o.type || 'Offer')}
+        </label>`).join('')}
+      </div>`;
+  }).catch(() => {});
 }
 
 async function _bbCqSave(offerId, sectionId, clientId) {
@@ -26247,6 +26580,7 @@ async function _bbCqSave(offerId, sectionId, clientId) {
   if (!label) { document.getElementById('bb-cq-label')?.focus(); return; }
   const optsRaw = document.getElementById('bb-cq-opts')?.value || '';
   const options = (type === 'select' || type === 'multiselect') ? optsRaw.split('\n').map(s => s.trim()).filter(Boolean) : [];
+  const alsoOfferIds = Array.from(document.querySelectorAll('.bb-cq-also:checked')).map(el => el.value).filter(Boolean);
   const btn = document.getElementById('bb-cq-save');
   if (btn) { btn.disabled = true; btn.style.opacity = '0.6'; btn.style.cursor = 'not-allowed'; btn.textContent = 'Adding…'; }
   try {
@@ -26254,7 +26588,7 @@ async function _bbCqSave(offerId, sectionId, clientId) {
     const r = await fetch('/api/custom-fields', {
       method: 'POST',
       headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ client_id: clientId, offer_id: offerId, section: sectionId, label, type, options }),
+      body: JSON.stringify({ client_id: clientId, offer_id: offerId, section: sectionId, label, type, options, also_offer_ids: alsoOfferIds }),
     });
     if (!r.ok) { const j = await r.json().catch(() => ({})); throw new Error(j.error || 'Save failed'); }
   } catch (e) {
@@ -26264,6 +26598,9 @@ async function _bbCqSave(offerId, sectionId, clientId) {
   }
   document.getElementById('bb-cq-modal')?.remove();
   delete _bbCqCache[offerId + ':' + sectionId];
+  // The field now also lives on the picked offers (same section) - drop their
+  // caches so it shows when the owner opens them.
+  alsoOfferIds.forEach(oid => { delete _bbCqCache[oid + ':' + sectionId]; });
   _bbRenderWizardBody();
 }
 
@@ -26810,6 +27147,18 @@ async function switchClient(newId) {
   if (!newId || newId === CLIENT_ID) return;
   const row = (CLIENT_ROWS || []).find(c => c.id === newId);
   if (!row) return;
+  // The command center can't hot-swap academies cleanly (its chrome + section
+  // data mount per-academy), so when CC is involved - we're in it now, or the
+  // target is a V2 academy that should boot into it - reload and let boot() set
+  // up the right experience. This is why switching back to a V2 academy (e.g.
+  // GTA) from a V1.5 one now returns to the command center instead of classic.
+  const wantsCc = (typeof _ccWanted !== 'function') || _ccWanted();
+  const ccInvolved = (typeof _ccActive === 'function' && _ccActive()) || (row.v2_access === true && wantsCc);
+  if (ccInvolved) {
+    try { localStorage.setItem('bam_active_client', newId); } catch (_) {}
+    location.reload();
+    return;
+  }
   CLIENT_ID = row.id;
   CONTACT_PROVIDER = row.contact_provider || 'ghl';
   if (typeof stopParentMessagesPoll === 'function') stopParentMessagesPoll();
@@ -27270,11 +27619,19 @@ function _organicStatusCard(t) {
     : '<span style="font-size:10px;font-weight:700;color:var(--text-mute);background:rgba(255,255,255,.05);padding:3px 9px;border-radius:999px;text-transform:uppercase;letter-spacing:.06em">In progress</span>';
   const title = ((t.notes || '').split('\n')[0] || 'Organic creative').slice(0, 80);
   const finalsHtml = (inReview && finals.length) ? `<div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:10px">${finals.map(_organicFileTile).join('')}</div>` : '';
+  // Edit/cancel are open until the content team produces finals; after that
+  // the brief is locked and direction changes go through review/messages.
+  const editable = !inReview && !finals.length;
   const actions = inReview ? `
     <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">
-      <button onclick="_organicRequestChanges('${t.id}')" style="background:transparent;border:1px solid var(--line);color:var(--text-sub);padding:8px 14px;border-radius:7px;font-size:12px;font-weight:600;cursor:pointer">Request changes</button>
-      <button onclick="_organicApprove('${t.id}')" style="background:var(--gold);border:none;color:#0B0B0D;padding:8px 16px;border-radius:7px;font-size:12px;font-weight:700;cursor:pointer">✓ Approve</button>
-    </div>` : '';
+      <button onclick="_organicRequestChanges('${t.id}')" style="background:transparent;border:1px solid var(--line);color:var(--text-sub);padding:8px 14px;border-radius:var(--r-sm,8px);font-size:12px;font-weight:600;cursor:pointer">Request changes</button>
+      <button onclick="_organicApprove('${t.id}')" style="background:var(--gold);border:none;color:var(--on-gold,#131416);padding:8px 16px;border-radius:var(--r-sm,8px);font-size:12px;font-weight:700;cursor:pointer">✓ Approve</button>
+    </div>` : editable ? `
+    <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">
+      <button onclick="_organicEdit('${t.id}')" style="background:transparent;border:1px solid var(--line);color:var(--text-sub);padding:8px 14px;border-radius:var(--r-sm,8px);font-size:12px;font-weight:600;cursor:pointer">Edit request</button>
+      <button onclick="_organicCancel('${t.id}')" style="background:transparent;border:1px solid var(--line);color:var(--red,#e06c6c);padding:8px 14px;border-radius:var(--r-sm,8px);font-size:12px;font-weight:600;cursor:pointer">Cancel request</button>
+    </div>` : `
+    <div style="font-size:11px;color:var(--text-mute);margin-top:8px">In production. Message us if you need a change of direction.</div>`;
   return `<div style="border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:10px;background:var(--surface)">
     <div style="display:flex;align-items:center;gap:10px">
       <span style="font-family:var(--mono);font-size:10px;color:var(--text-mute)">${code}</span>
@@ -27302,6 +27659,10 @@ function _organicFileTile(f) {
 
 // Request modal in organic mode (reuses the input-assets modal, tags channel=organic).
 let _inputAssetsChannel = 'ads';
+// Edit mode: id of the organic ticket being edited (null = creating new) and
+// its already-uploaded files, each with a _removed flag the client can toggle.
+let _inputAssetsEditId = null;
+let _inputAssetsExistingFiles = [];
 function openOrganicRequestModal() {
   openAddCreativeModal('organic');
 }
@@ -27364,6 +27725,71 @@ async function _organicRequestChanges(id) {
     if (!res.ok) { const j = await _safeJson(res); throw new Error(j.error || ('HTTP ' + res.status)); }
     _fetchAndRenderOrganic();
   } catch (e) { alert('Failed: ' + e.message); }
+}
+
+// ── Organic request edit / cancel (feedback ticket f4ba8f13, 2026-07-08) ──
+// Edit reuses the input-assets modal in "edit mode": prefilled fields, the
+// already-attached files listed with remove toggles, type locked (credits
+// count per type). Submitting PATCHes action=edit, which pings the team.
+function _organicEdit(id) {
+  const t = _ORGANIC_TICKETS.find(x => String(x.id) === String(id));
+  if (!t) return;
+  openAddCreativeModal('organic');   // full reset first, then layer edit mode on top
+  _inputAssetsEditId = String(id);
+  _inputAssetsExistingFiles = (Array.isArray(t.raw_files) ? t.raw_files : []).map(f => ({ ...f, _removed: false }));
+  const ttl = document.getElementById('inputAssetsTitle');
+  if (ttl) ttl.value = t.title || '';
+  const notes = document.getElementById('inputAssetsNotes');
+  if (notes) notes.value = t.notes || '';
+  const tctx = t.context || {};
+  const fmt = document.getElementById('inputAssetsFormat');
+  if (fmt && tctx.format) {
+    if (![...fmt.options].some(o => o.value === tctx.format)) fmt.add(new Option(tctx.format, tctx.format));
+    fmt.value = tctx.format;
+  }
+  const cap = document.getElementById('inputAssetsCaptions');
+  if (cap) cap.checked = !!tctx.captions;
+  // Lock the output type: organic credits count per type, so switching
+  // video<->graphic on an existing request would dodge the caps.
+  _selectInputAssetsType(t.type === 'video' ? 'video' : 'graphic');
+  _inputAssetsState.typeTouched = true;
+  document.querySelectorAll('#inputAssetsTypeToggle .binary-toggle-opt').forEach(b => {
+    b.disabled = true; b.style.opacity = '.5'; b.style.cursor = 'not-allowed';
+  });
+  const sub = document.getElementById('inputAssetsSub');
+  if (sub) sub.textContent = 'Update your request. The content team gets notified of your changes.';
+  const mtitle = document.querySelector('#inputAssetsModal .modal-title');
+  if (mtitle) mtitle.textContent = 'Edit request';
+  const btn = document.getElementById('inputAssetsSubmitBtn');
+  if (btn) btn.textContent = 'Save changes';
+  _renderInputAssetsExistingList();
+}
+
+function _renderInputAssetsExistingList() {
+  const el = document.getElementById('inputAssetsExistingList');
+  if (!el) return;
+  if (!_inputAssetsEditId || !_inputAssetsExistingFiles.length) { el.innerHTML = ''; return; }
+  el.innerHTML = '<div style="font-size:11px;color:var(--text-mute);margin:8px 0 4px;font-weight:600;text-transform:uppercase;letter-spacing:.04em">Already attached</div>' +
+    _inputAssetsExistingFiles.map((f, i) => `
+      <div class="wizard-file-item" style="${f._removed ? 'opacity:.45' : ''}">
+        <div class="wizard-file-name" style="${f._removed ? 'text-decoration:line-through' : ''}">${escapeHTML(f.name || 'File')}</div>
+        <button class="wizard-file-remove" onclick="_inputAssetsToggleExisting(${i})" aria-label="${f._removed ? 'Keep file' : 'Remove file'}" style="${f._removed ? 'font-size:10px;width:auto;padding:0 6px' : ''}">${f._removed ? 'Undo' : '×'}</button>
+      </div>`).join('');
+}
+
+function _inputAssetsToggleExisting(i) {
+  const f = _inputAssetsExistingFiles[i];
+  if (f) f._removed = !f._removed;
+  _renderInputAssetsExistingList();
+}
+
+async function _organicCancel(id) {
+  if (!confirm('Cancel this request? The credit it used goes back to your monthly allowance.')) return;
+  try {
+    await _ctkPatchTicket(id, { action: 'cancel' });
+    _fetchAndRenderOrganic();
+    showConfirmation('Request cancelled', 'Your credit is back in your monthly allowance.');
+  } catch (e) { alert('Cancel failed: ' + (e.message || e)); }
 }
 
 function toggleCreativeActions(tileEl) {
@@ -27514,6 +27940,17 @@ function openAddCreativeModal(channel) {
   // Kept name for backward compat with the existing button onclick (ads path).
   _inputAssetsChannel = (channel === 'organic' || channel === 'funnel') ? channel : 'ads';
   _inputAssetsState = { type: 'graphic', files: [] };
+  // Clear any leftover edit-mode chrome (edit layers on top of this reset).
+  _inputAssetsEditId = null;
+  _inputAssetsExistingFiles = [];
+  _renderInputAssetsExistingList();
+  document.querySelectorAll('#inputAssetsTypeToggle .binary-toggle-opt').forEach(b => {
+    b.disabled = false; b.style.opacity = ''; b.style.cursor = '';
+  });
+  const _mtitle = document.querySelector('#inputAssetsModal .modal-title');
+  if (_mtitle) _mtitle.textContent = 'Input assets';
+  const _sbtn = document.getElementById('inputAssetsSubmitBtn');
+  if (_sbtn) _sbtn.textContent = 'Submit';
   _selectInputAssetsType('graphic');
   _renderInputAssetsFilesList();
   const notes = document.getElementById('inputAssetsNotes');
@@ -27572,6 +28009,9 @@ function openAddCreativeModal(channel) {
 function closeInputAssetsModal() {
   document.getElementById('inputAssetsModal').style.display = 'none';
   _inputAssetsState = { type: 'graphic', files: [] };
+  _inputAssetsEditId = null;
+  _inputAssetsExistingFiles = [];
+  _renderInputAssetsExistingList();
   const input = document.getElementById('inputAssetsFileInput');
   if (input) input.value = '';
   const drive = document.getElementById('inputAssetsDriveLink');
@@ -27758,7 +28198,18 @@ async function submitInputAssets() {
     alert('That doesn\'t look like a valid URL. Paste a full link starting with https:// (Drive, Dropbox, WeTransfer, OneDrive - any host).');
     return;
   }
-  if (!_inputAssetsState.files.length && !hasDriveLink) {
+  // Edit mode: files are optional (the request keeps its existing ones), but
+  // at least one attachment must remain overall.
+  const editId = _inputAssetsEditId;
+  const keptFiles = editId
+    ? _inputAssetsExistingFiles.filter(f => !f._removed).map(f => { const c = { ...f }; delete c._removed; return c; })
+    : [];
+  if (editId) {
+    if (!keptFiles.length && !_inputAssetsState.files.length && !hasDriveLink) {
+      alert('Keep or add at least one file or link.');
+      return;
+    }
+  } else if (!_inputAssetsState.files.length && !hasDriveLink) {
     alert('Add at least one file or a share link to submit.');
     return;
   }
@@ -27778,13 +28229,29 @@ async function submitInputAssets() {
   const fileCount = filesToUpload.length;
   closeInputAssetsModal();
   showLoading(
-    `Uploading ${fileCount} file${fileCount === 1 ? '' : 's'}…`,
-    "This can take a minute for video. Don't close this tab."
+    fileCount ? `Uploading ${fileCount} file${fileCount === 1 ? '' : 's'}…` : 'Saving changes…',
+    fileCount ? "This can take a minute for video. Don't close this tab." : 'Just a moment.'
   );
   const channel = (typeof _inputAssetsChannel !== 'undefined') ? _inputAssetsChannel : 'ads';
   try {
-    const uploaded = await _mreqUploadFiles(filesToUpload, _uploadProgress(fileCount));
+    const uploaded = fileCount ? await _mreqUploadFiles(filesToUpload, _uploadProgress(fileCount)) : [];
     if (hasDriveLink) uploaded.push(_buildAssetLinkEntry(driveLinkRaw));
+    if (editId) {
+      // Editing an existing organic request: PATCH instead of creating a new
+      // ticket. The API records what changed and pings the content team.
+      await _ctkPatchTicket(editId, {
+        action: 'edit',
+        raw_files: [...keptFiles, ...uploaded],
+        title,
+        notes,
+        context: { format, captions },
+      });
+      hideLoading();
+      _fetchAndRenderOrganic();
+      showConfirmation('Changes saved',
+        'Your request is updated and the content team has been notified.');
+      return;   // the finally below resets the channel
+    }
     await _ctkCreateTicket({
       type: assetType,
       channel,
@@ -30085,13 +30552,22 @@ let _PL_NEEDS = null;
 const _PL_NEED_PRIO = { book: 4, mark_lost: 3, reply: 2, ghost: 1 };
 async function _plLoadNeedsAction() {
   try {
-    const j = await _apxPost('/api/agent-approvals', 'list-ready', {});
+    // V2: the needs map spans ALL THREE agents (deck + simple-view highlights).
+    // V1.5 keeps the booking-only behaviour (its board only badges Responded).
+    const [j, jc, jl] = await Promise.all([
+      _apxPost('/api/agent-approvals', 'list-ready', {}),
+      _plIsV2() ? _apxPost('/api/agent-confirm', 'list-ready', {}).catch(() => ({})) : Promise.resolve({}),
+      _plIsV2() ? _apxPost('/api/agent-closing', 'list-ready', {}).catch(() => ({})) : Promise.resolve({}),
+    ]);
     const map = new Map();
-    for (const r of (j.ready || [])) {
-      if ((r.status !== 'pending' && r.status !== 'approved') || !r.ghl_contact_id) continue;
-      const id = String(r.ghl_contact_id), k = r.kind || 'reply', cur = map.get(id);
-      if (!cur || (_PL_NEED_PRIO[k] || 0) > (_PL_NEED_PRIO[cur] || 0)) map.set(id, k);
-    }
+    const add = (rows) => {
+      for (const r of (rows || [])) {
+        if ((r.status !== 'pending' && r.status !== 'approved') || !r.ghl_contact_id) continue;
+        const id = String(r.ghl_contact_id), k = r.kind || 'reply', cur = map.get(id);
+        if (!cur || (_PL_NEED_PRIO[k] || 0) > (_PL_NEED_PRIO[cur] || 0)) map.set(id, k);
+      }
+    };
+    add(j.ready); add(jc.ready); add(jl.ready);
     _PL_NEEDS = map;
   } catch (e) {
     // Permission denied → this viewer can't read agent status; hide the badges
@@ -30107,13 +30583,20 @@ let _PL_LASTMSG = null;   // contactId → { direction, date }
 // Powers the Interested-stage "!" - the REAL "is anybody messaging this lead"
 // check. null until loaded; on failure the badge falls back to message age.
 let _PL_AUTO = null;      // Set<contactId>
+// Active enrollment detail per contact: { step, steps_total, entered_at }.
+// Powers the simple-view cascade rows ("enrolled · step 2 of 3", newest first).
+let _PL_ENR = null;       // Map<contactId, enrollment>
 // V2-only flow gate for the pipelines board. V1.5 = plain GHL mirror.
 function _plIsV2() { return typeof V2_ACCESS !== 'undefined' && V2_ACCESS; }
 async function _plLoadActiveAutomations() {
   if (!_plIsV2()) return;
   try {
-    const j = await _autoApi('active-contacts');
-    _PL_AUTO = new Set((j.contact_ids || []).map(String));
+    const j = await _autoApi('active-enrollments');
+    const rows = (j && j.enrollments) || [];
+    const map = new Map();
+    for (const r of rows) { const k = String(r.contact_id); if (!map.has(k)) map.set(k, r); }
+    _PL_ENR = map;
+    _PL_AUTO = new Set(rows.map(r => String(r.contact_id)));
     try { if (typeof _renderPipelineBoard === 'function') _renderPipelineBoard(); } catch (_) {}
   } catch (_) { /* leave null - "!" falls back to the message-age rule */ }
 }
@@ -31554,9 +32037,400 @@ function _plEngineEdit(key) {
 }
 // Eye on an agent → open that agent's Hawkeye queue over the board.
 function _plEngineHawk(key) {
+  if (typeof _plIsV2 === 'function' && _plIsV2()) { _hk2Open(_HK2_AGENTS.includes(key) ? key : 'booking'); return; }
   const fn = key === 'booking' ? _apxOpen : key === 'confirm' ? _acxOpen : key === 'closing' ? _aclxOpen : null;
   if (fn) try { fn(); } catch (e) { alert(e && e.message || e); }
 }
+
+// ═════════════ HAWKEYE DECK (V2) - one card at a time ═════════════
+// The single Hawkeye surface (Zoran 2026-07-08): 3 agent tabs across the top,
+// kind-aware cards, footer = [Other] (cascades up to the move options) + one
+// confirm button whose label flips to "Confirm edits and ..." the moment the
+// user edits anything - and then the teach-why note is REQUIRED. No skip
+// anywhere. Every commit rides _hawkDefer (6s undo). Swipe gestures are an
+// open item - buttons only for now. V1.5 keeps the legacy _apx/_acx/_aclx
+// overlays; this view is V2-gated (see _hk2Open).
+let _HK2 = { agent: 'booking', q: null, edited: false, otherOpen: false, focusContact: null, bookOpts: null, bookOptsLoading: false };
+const _HK2_AGENTS = ['booking', 'confirm', 'closing'];
+const _HK2_META = {
+  booking: { label: 'Booking', ep: '/api/agent-approvals', role: 'responded' },
+  confirm: { label: 'Confirm', ep: '/api/agent-confirm', role: 'scheduled_trial' },
+  closing: { label: 'Closing', ep: '/api/agent-closing', role: 'done_trial' },
+};
+const _HK2_KIND = {
+  reply:   { pill: 'Reply',           color: 'var(--accent)',          cls: '',      go: 'Approve and send',              goEdit: 'Confirm edits and send' },
+  book:    { pill: 'Book it',         color: 'var(--blue,#5A8FB8)',    cls: 'blue',  go: 'Approve and book',              goEdit: 'Confirm edits and book' },
+  ghost:   { pill: 'Went quiet',      color: 'var(--gold,#D4B65C)',    cls: '',      go: 'Send to Ghosted',               goEdit: 'Send to Ghosted' },
+  handoff: { pill: 'Reschedule',      color: 'var(--blue,#5A8FB8)',    cls: 'green', go: 'Approve handoff',               goEdit: 'Confirm edits and hand off' },
+  enroll:  { pill: 'Ready to enroll', color: 'var(--green,#4CC76A)',   cls: 'green', go: 'Approve and send',              goEdit: 'Confirm edits and send' },
+  plan:    { pill: 'Follow-up plan',  color: 'var(--accent)',          cls: '',      go: 'Approve plan - sends 1 day apart', goEdit: 'Confirm edits and approve plan' },
+  lost:    { pill: 'Suggested lost',  color: 'var(--red,#F07060)',     cls: 'red',   go: 'Mark lost',                     goEdit: 'Confirm edits and mark lost' },
+};
+
+function _hk2Open(agent, contactId) {
+  if (typeof _plIsV2 !== 'function' || !_plIsV2()) { try { _apxOpen(contactId || undefined); } catch (_) {} return; }
+  if (agent && _HK2_AGENTS.includes(agent)) _HK2.agent = agent;
+  _HK2.focusContact = contactId ? String(contactId) : null;
+  _PL_SV = 'hawkeye';
+  _plSVApply();
+  window.scrollTo(0, 0);
+  _hk2Refresh();
+}
+async function _hk2Refresh() {
+  const host = document.getElementById('pl-hawkeye'); if (!host) return;
+  if (!_HK2.q) host.innerHTML = '<div class="hk2-load"><span class="req-spin"></span> Loading Hawkeye…</div>';
+  try { _HK2.q = await _hk2Load(); }
+  catch (e) { host.innerHTML = `<div class="hk2-load">Couldn't load - ${escapeHTML(_apxErr(e))}</div>`; return; }
+  // Deep link from a board card: surface that lead's card on top of its queue.
+  if (_HK2.focusContact) {
+    for (const a of _HK2_AGENTS) {
+      const i = _HK2.q[a].findIndex(r => String(r.ghl_contact_id || '') === _HK2.focusContact);
+      if (i >= 0) { _HK2.agent = a; const row = _HK2.q[a].splice(i, 1)[0]; _HK2.q[a].unshift(row); break; }
+    }
+    _HK2.focusContact = null;
+  }
+  _hk2Render();
+}
+// Normalize the 3 ready queues into kind-tagged cards. Closing's pending
+// followup_N rows for one contact collapse into ONE plan card.
+async function _hk2Load() {
+  const [b, c, l] = await Promise.all([
+    _apxPost('/api/agent-approvals', 'list-ready', {}).catch(() => ({})),
+    _apxPost('/api/agent-confirm', 'list-ready', {}).catch(() => ({})),
+    _apxPost('/api/agent-closing', 'list-ready', {}).catch(() => ({})),
+  ]);
+  const pend = r => ((r && r.ready) || []).filter(x => x.status === 'pending');
+  const booking = pend(b).map(r => ({ ...r, _kind: r.kind === 'book' ? 'book' : r.kind === 'ghost' ? 'ghost' : r.kind === 'mark_lost' ? 'lost' : 'reply' }));
+  const confirm = pend(c).map(r => ({ ...r, _kind: r.kind === 'confirm_handoff' ? 'handoff' : r.kind === 'confirm_lost' ? 'lost' : 'reply' }));
+  const clRows = pend(l);
+  const plans = new Map(), rest = [];
+  for (const r of clRows) {
+    if ((r.step_key || '').startsWith('followup_')) { const k = String(r.ghl_contact_id); if (!plans.has(k)) plans.set(k, []); plans.get(k).push(r); }
+    else rest.push(r);
+  }
+  const closing = [
+    ...rest.map(r => ({ ...r, _kind: r.kind === 'closing_enroll' ? 'enroll' : r.kind === 'closing_lost' ? 'lost' : 'reply' })),
+    ...[...plans.values()].map(rows => ({
+      _kind: 'plan', id: 'plan:' + rows[0].ghl_contact_id, ghl_contact_id: rows[0].ghl_contact_id,
+      ghl_conversation_id: rows[0].ghl_conversation_id, contact_name: rows[0].contact_name,
+      reasoning: rows[0].reasoning, summary: rows[0].summary, thread_tail: rows[0].thread_tail, rows,
+    })),
+  ];
+  return { booking, confirm, closing };
+}
+function _hk2Pick(a) { _HK2.agent = a; _hk2Render(); }
+// Back from the deck = the HOME page's Sales section (Zoran 2026-07-09), with
+// every cascade closed - not the standalone Sales page.
+function _hk2Back() {
+  _PLO2_OPEN = null;
+  try { _CC2_OPEN = null; } catch (_) {}
+  _PL_SV = 'overview';
+  try { _plRenderOverview(); } catch (_) {}
+  _plSVApply();
+  if (typeof _ccActive === 'function' && _ccActive()) {
+    _ccReturn();
+    try { _cc2Render(); } catch (_) {}
+    setTimeout(() => { try { _ccScrollTo('sales'); } catch (_) {} }, 80);
+  }
+  window.scrollTo(0, 0);
+}
+// The gear on the active tab = that stage's focus-mode config page.
+function _hk2Gear(a) {
+  try {
+    const p = _plActivePipeline(); if (!p) return;
+    const st = (p.stages || []).find(x => _plStageRole(x.name) === _HK2_META[a].role);
+    if (st) _plOpenFocus(st.id);
+  } catch (_) {}
+}
+function _hk2Initials(name) {
+  const parts = String(name || '?').trim().split(/\s+/);
+  return ((parts[0] || '?')[0] + (parts[1] ? parts[1][0] : '')).toUpperCase();
+}
+function _hk2ThreadHtml(r) {
+  const tail = Array.isArray(r.thread_tail) ? r.thread_tail : [];
+  if (!tail.length && !r.last_message) return '';
+  let bubs = tail.map(m => {
+    const out = m.role === 'agent';
+    return `<div class="hk2-bub ${out ? 'bot' : 'in'}">${escapeHTML(String(m.text || '').trim())}</div>`;
+  }).join('');
+  if (!bubs && r.last_message) bubs = `<div class="hk2-bub in">${escapeHTML(r.last_message)}</div>`;
+  return `<div class="hk2-thread" onclick="_hk2OpenThread()" title="Tap for the full conversation">${bubs}</div>`;
+}
+function _hk2OpenThread() {
+  const r = _hk2Top(); if (!r || !r.ghl_contact_id) return;
+  try { _apxOpenThread(r.ghl_contact_id, r.contact_name || 'Conversation'); } catch (_) {}
+}
+function _hk2Top() { return (_HK2.q && _HK2.q[_HK2.agent] || [])[0] || null; }
+// Per-agent move destinations, minus whatever IS the card's primary action.
+// Every agent can mark Unqualified (Zoran 2026-07-08).
+function _hk2Moves(r) {
+  const a = _HK2.agent, k = r._kind, m = [];
+  if (a === 'booking') {
+    if (k !== 'ghost') m.push(['Send to Ghosted', 'ghost']);
+    if (k !== 'lost') m.push(['Not interested: Nurture', 'lost']);
+  } else if (a === 'confirm') {
+    if (k !== 'handoff') m.push(['Rebook: back to Booking', 'handoff']);
+    if (k !== 'lost') m.push(['Not coming: Nurture', 'lost']);
+  } else {
+    if (k !== 'lost') m.push(['Says no: Nurture', 'lost']);
+  }
+  m.push(['Unqualified', 'unq']);
+  return m;
+}
+function _hk2CardHtml(r, pos, total, isTop) {
+  const km = _HK2_KIND[r._kind];
+  const id = isTop ? { draft: ' id="hk2-draft"', teach: ' id="hk2-teach"', other: ' id="hk2-other"', go: ' id="hk2-go"', cal: ' id="hk2-cal"', slot: ' id="hk2-slot"' } : { draft: '', teach: '', other: '', go: '', cal: '', slot: '' };
+  const esc = r.escalate ? `<div class="hk2-esc">agent escalated${r.escalate_reason ? ': ' + escapeHTML(r.escalate_reason) : ''}</div>` : '';
+  const ctx = r.reasoning || r.summary || '';
+  let body = '';
+  if (r._kind === 'book') {
+    const guessSlot = r.book_slot_at || '';
+    body = `${_hk2ThreadHtml(r)}
+      <div class="hk2-lbl">Booking details - the agent's pick, change if needed</div>
+      <div class="hk2-fields">
+        <label><span>Calendar</span><select${id.cal} onchange="_hk2CalChange()"><option value="${escapeHTML(r.book_calendar_id || '')}" selected>${escapeHTML(r.book_group || 'Loading calendars…')}</option></select></label>
+        <label><span>Slot</span><select${id.slot} onchange="_hk2Edited()"><option value="${escapeHTML(guessSlot)}" selected>${escapeHTML(guessSlot ? _hk2SlotLabel(guessSlot) : 'Loading open slots…')}</option></select></label>
+      </div>
+      <div class="hk2-note">Only this academy's trial calendars show here. Booking hands the lead to the Confirm agent (its reminders send from config).</div>`;
+  } else if (r._kind === 'ghost') {
+    body = `${_hk2ThreadHtml(r)}
+      <div class="hk2-note">Nothing sends now - the Ghosted automation takes over with its nudges. A reply bounces them straight back to Booking.</div>`;
+  } else if (r._kind === 'plan') {
+    body = `${_hk2ThreadHtml(r)}
+      <div class="hk2-lbl">The plan - every message editable · clear a box to drop that step</div>
+      ${(r.rows || []).map((row, i) => `<div class="hk2-lbl" style="margin-top:2px">Day ${i + 1}${i === r.rows.length - 1 ? ' · final, no-pressure' : ''}</div><textarea class="hk2-draft sm"${isTop ? ` id="hk2-plan-${i}"` : ''} oninput="_hk2Edited()">${escapeHTML(row.draft_message || '')}</textarea>`).join('')}`;
+  } else if (r._kind === 'handoff') {
+    const note = r.handoff_note ? `<div class="hk2-note"><b style="color:var(--text)">Reason:</b> ${escapeHTML(r.handoff_note)}</div>` : '';
+    body = `${_hk2ThreadHtml(r)}${note}
+      <div class="hk2-lbl">Acknowledgement to send (optional)</div>
+      <textarea class="hk2-draft"${id.draft} oninput="_hk2Edited()">${escapeHTML(r.draft_message || '')}</textarea>
+      <div class="hk2-note">One approve does BOTH: sends your note + hands the lead to Booking, and the Booking agent drafts the rebook text as its next action.</div>`;
+  } else if (r._kind === 'lost') {
+    const reason = r.lost_reason ? ` <span style="color:var(--red,#F07060);font-weight:700">${escapeHTML(r.lost_reason)}</span>` : '';
+    body = `${_hk2ThreadHtml(r)}
+      <div class="hk2-lbl">Optional goodbye - sends with the move${reason}</div>
+      <textarea class="hk2-draft"${id.draft} oninput="_hk2Edited()">${escapeHTML(r.draft_message || '')}</textarea>
+      <div class="hk2-note">Approving routes them to Nurture (the long game). You confirm - nothing moves on its own.</div>`;
+  } else {
+    body = `${_hk2ThreadHtml(r)}
+      <div class="hk2-lbl">${r._kind === 'enroll' ? 'The reply, sign-up link included · edit it right here' : 'Proposed message · edit it right here'}</div>
+      <textarea class="hk2-draft"${id.draft} oninput="_hk2Edited()">${escapeHTML(r.draft_message || '')}</textarea>
+      ${r._kind === 'enroll' ? '<div class="hk2-note">The opportunity is marked won automatically when they pay on the link.</div>' : ''}`;
+  }
+  const moves = _hk2Moves(r).map(([lab, op]) => `<button class="hk2-x" onclick="_hk2Move('${op}')">${lab}</button>`).join('');
+  return `
+    <div class="hk2-head">
+      <div class="hk2-av">${escapeHTML(_hk2Initials(r.contact_name))}</div>
+      <div style="flex:1;min-width:0"><div class="hk2-who">${escapeHTML(r.contact_name || 'Lead')}</div>
+        <div class="hk2-sub">${typeof r.confidence === 'number' ? Math.round(r.confidence * 100) + '% sure' : _HK2_META[_HK2.agent].label + ' agent'}</div></div>
+      <span class="hk2-pill" style="color:${km.color};background:color-mix(in srgb,${km.color} 14%,transparent)">${km.pill}</span>
+      <span class="hk2-prog">${pos} of ${total}</span>
+    </div>
+    ${esc}
+    ${ctx ? `<div class="hk2-ctx">${escapeHTML(ctx)}</div>` : ''}
+    ${body}
+    <input class="hk2-teach"${id.teach} style="display:none" placeholder="Required: teach the agent why you changed it (saved as a lesson)">
+    <div class="hk2-other"${id.other}><div class="hk2-other-in"><span class="hk2-lbl">Move the lead</span>${moves}</div></div>
+    <div class="hk2-bar">
+      <button class="hk2-otherbtn" onclick="_hk2ToggleOther(this)">Other</button>
+      <button class="hk2-go ${km.cls}"${id.go} onclick="_hk2Confirm()">${km.go}</button>
+    </div>`;
+}
+function _hk2Render() {
+  const host = document.getElementById('pl-hawkeye'); if (!host || !_HK2.q) return;
+  _HK2.edited = false; _HK2.otherOpen = false;
+  const tabs = _HK2_AGENTS.map(a => {
+    const n = _HK2.q[a].length, on = _HK2.agent === a;
+    return `<button class="hk2-tab${on ? ' on' : ''}" onclick="_hk2Pick('${a}')"><span class="hk2-tmain">${_HK2_META[a].label}${n ? `<span class="hk2-n">${n}</span>` : ''}</span><span class="hk2-tgear" onclick="event.stopPropagation();_hk2Gear('${a}')" title="Configure this stage">${_plIcon('gear', 14)}</span></button>`;
+  }).join('');
+  const q = _HK2.q[_HK2.agent];
+  const deck = !q.length
+    ? `<div class="hk2-clear"><div class="big">&#10003;</div><b>All clear</b><span>No actions waiting in this stage</span></div>`
+    : `${q[1] ? `<div class="hk2-card hk2-behind">${_hk2CardHtml(q[1], 2, q.length, false)}</div>` : ''}
+       <div class="hk2-card hk2-top" id="hk2-topcard">${_hk2CardHtml(q[0], 1, q.length, true)}</div>`;
+  host.innerHTML = `
+    <div class="hk2-topbar">
+      <button class="hk2-back" onclick="_hk2Back()">${_plIcon('collapse', 12)} Sales</button>
+      <div class="hk2-title">${_plIcon('eye', 17)} Hawkeye</div>
+    </div>
+    <div class="hk2-tabs">${tabs}</div>
+    <div class="hk2-deck">${deck}</div>
+    <div class="hk2-hint">every card resolves here - approve it or move the lead (no skip)<br>edits flip the button to "Confirm edits" and the teach-why note becomes required</div>`;
+  const top = _hk2Top();
+  if (top && top._kind === 'book') _hk2EnsureBookOpts();
+}
+// ── Book-it pickers: the academy's trial calendars + open slots ──
+async function _hk2EnsureBookOpts() {
+  if (_HK2.bookOpts) { _hk2FillBookOpts(); return; }
+  if (_HK2.bookOptsLoading) return;
+  _HK2.bookOptsLoading = true;
+  try { const j = await _apxPost('/api/agent-approvals', 'book-options', {}); _HK2.bookOpts = (j && j.calendars) || []; }
+  catch (_) { _HK2.bookOpts = []; }
+  _HK2.bookOptsLoading = false;
+  _hk2FillBookOpts();
+}
+function _hk2FillBookOpts() {
+  const r = _hk2Top(); if (!r || r._kind !== 'book') return;
+  const cal = document.getElementById('hk2-cal'); if (!cal) return;
+  const cals = _HK2.bookOpts || [];
+  if (!cals.length) return;   // keep the agent's guess-only options
+  cal.innerHTML = cals.map(c => `<option value="${escapeHTML(c.key)}"${String(c.key) === String(r.book_calendar_id || '') ? ' selected' : ''}>${escapeHTML(c.label)}</option>`).join('');
+  if (!cals.some(c => String(c.key) === String(r.book_calendar_id || '')) && r.book_calendar_id) {
+    cal.insertAdjacentHTML('afterbegin', `<option value="${escapeHTML(r.book_calendar_id)}" selected>${escapeHTML(r.book_group || 'Agent\'s pick')}</option>`);
+  }
+  _hk2FillSlots(r);
+}
+function _hk2FillSlots(r) {
+  const cal = document.getElementById('hk2-cal'), slot = document.getElementById('hk2-slot');
+  if (!cal || !slot) return;
+  const c = (_HK2.bookOpts || []).find(x => String(x.key) === String(cal.value));
+  const slots = ((c && c.slots) || []).slice();
+  const guessMs = r.book_slot_at && String(cal.value) === String(r.book_calendar_id || '') ? new Date(r.book_slot_at).getTime() : null;
+  if (guessMs && !slots.some(x => new Date(x).getTime() === guessMs)) slots.unshift(r.book_slot_at);
+  slot.innerHTML = slots.length
+    ? slots.map(x => `<option value="${escapeHTML(x)}"${guessMs && new Date(x).getTime() === guessMs ? ' selected' : ''}>${escapeHTML(_hk2SlotLabel(x))}</option>`).join('')
+    : '<option value="">No open slots found</option>';
+}
+function _hk2SlotLabel(iso) {
+  try { return new Date(iso).toLocaleString([], { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }); }
+  catch (_) { return String(iso); }
+}
+function _hk2CalChange() { const r = _hk2Top(); if (r) _hk2FillSlots(r); _hk2Edited(); }
+// ANY change away from the agent's guess: flip the confirm label + make the
+// teach-why note mandatory (Zoran 2026-07-08).
+function _hk2Edited() {
+  const t = document.getElementById('hk2-teach'); if (t) t.style.display = '';
+  if (_HK2.edited) return; _HK2.edited = true;
+  const r = _hk2Top(); if (!r) return;
+  const go = document.getElementById('hk2-go'); if (go) go.textContent = _HK2_KIND[r._kind].goEdit;
+}
+function _hk2ToggleOther(btn) {
+  const pnl = document.getElementById('hk2-other'); if (pnl) pnl.classList.toggle('open');
+  if (btn) btn.classList.toggle('on');
+}
+async function _hk2Teach(r, lesson, before, after) {
+  if (!lesson) return;
+  try {
+    await _apxPost('/api/agent-train', 'teach', { agent: _HK2.agent, lesson, kind: 'fix', context: { source: 'hawkeye-deck', contact: r.contact_name || null, ai_drafted: before || null, you_sent: after || null } });
+  } catch (_) { /* the action already landed - never block on the lesson */ }
+}
+function _hk2NoteOk() {
+  if (!_HK2.edited) return true;
+  const t = document.getElementById('hk2-teach');
+  if (t && t.value.trim()) return true;
+  if (t) { t.classList.add('hk2-miss'); t.style.display = ''; t.focus(); }
+  return false;
+}
+// Tinder behaviour (Zoran 2026-07-09): the card leaves the deck the moment you
+// act - the next card pops up right away and the tab badges update instantly.
+// The API work still rides the 6s undo window; undo puts the card back on top.
+function _hk2Resolve(r, agent) {
+  const q = _HK2.q[agent || _HK2.agent] || [];
+  const i = q.indexOf(r); if (i >= 0) q.splice(i, 1);
+  try { if (typeof _PL_NEEDS !== 'undefined' && _PL_NEEDS && r.ghl_contact_id) _PL_NEEDS.delete(String(r.ghl_contact_id)); } catch (_) {}
+  // Queue empty -> jump to the next agent that still has cards (no dead end).
+  if (!q.length) { const next = _HK2_AGENTS.find(a => (_HK2.q[a] || []).length); if (next) _HK2.agent = next; }
+  _hk2Render();
+  try { _plRenderAgentSection(); } catch (_) {}
+}
+// Undo within the 6s window: put the card back on top of its agent's queue.
+function _hk2Unresolve(agent, r) {
+  _HK2.agent = agent;
+  const q = _HK2.q[agent] || (_HK2.q[agent] = []);
+  if (!q.includes(r)) q.unshift(r);
+  try { if (typeof _PL_NEEDS !== 'undefined' && _PL_NEEDS && r.ghl_contact_id) _PL_NEEDS.set(String(r.ghl_contact_id), r.kind || 'reply'); } catch (_) {}
+  _hk2Render();
+  try { _plRenderAgentSection(); } catch (_) {}
+}
+// The confirm button: the card's primary action, per kind.
+function _hk2Confirm() {
+  const r = _hk2Top(); if (!r) return;
+  if (!_hk2NoteOk()) return;
+  const agent = _HK2.agent;
+  const ep = _HK2_META[agent].ep;
+  const teachEl = document.getElementById('hk2-teach');
+  const lesson = ((teachEl && teachEl.value) || '').trim();
+  const draftEl = document.getElementById('hk2-draft');
+  const reply = draftEl ? draftEl.value.trim() : (r.draft_message || '').trim();
+  const before = r.draft_message || '';
+  const k = r._kind;
+  if ((k === 'reply' || k === 'enroll') && !reply) { _apxToast('Message is empty', false); return; }
+  // Capture every input NOW - the deck advances to the next card immediately,
+  // which tears down this card's DOM before the deferred API call runs.
+  const calEl = document.getElementById('hk2-cal'), slotEl = document.getElementById('hk2-slot');
+  const calV = (calEl && calEl.value) || r.book_calendar_id, slotV = (slotEl && slotEl.value) || r.book_slot_at;
+  const planEdits = k === 'plan' ? (r.rows || []).map((row, i) => { const el = document.getElementById('hk2-plan-' + i); return { id: row.id, reply: (el ? el.value : row.draft_message || '').trim() }; }) : null;
+  const chk = resp => { if (resp && resp.error) throw new Error(resp.error); return resp; };
+  let undone = false;
+  _hawkDefer({ cardId: 'hk2-topcard', label: _HK2_KIND[k].go, restore: () => { undone = true; _hk2Unresolve(agent, r); }, run: async () => {
+    if (k === 'book') {
+      chk(await _apxPost(ep, 'confirm-book', { ready_id: r.id, calendar_id: calV, slot_at: slotV }));
+      _apxToast('Booked - handed to Confirm', true);
+    } else if (k === 'ghost') {
+      chk(await _apxPost(ep, 'confirm-ghost', { ready_id: r.id }));
+      try { _plMoveContactToInterested(r.ghl_contact_id); } catch (_) {}
+      _apxToast('Sent to Ghosted', true);
+    } else if (k === 'handoff') {
+      chk(await _apxPost(ep, 'confirm-handoff', { ready_id: r.id, reply, handoff_note: r.handoff_note }));
+      _apxToast('Handed back to Booking - rebook text drafts next', true);
+    } else if (k === 'enroll') {
+      chk(await _apxPost(ep, 'confirm-enroll', { ready_id: r.id, contact_id: r.ghl_contact_id, conversation_id: r.ghl_conversation_id, reply, contact_name: r.contact_name, enroll_note: r.enroll_note }));
+      _apxToast('Sent - won lands when they pay', true);
+    } else if (k === 'lost') {
+      chk(await _apxPost(ep, 'confirm-lost', { ready_id: r.id, reply, lost_reason: r.lost_reason || 'Other' }));
+      _apxToast('Marked lost - Nurture takes over', true);
+    } else if (k === 'plan') {
+      const edits = planEdits;
+      const token = await _mreqAuthToken();
+      const res = await fetch('/api/agent-closing', { method: 'POST', headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'approve-plan', client_id: CLIENT_ID, contact_id: r.ghl_contact_id, edits }) });
+      const j = await _safeJson(res); if (!res.ok) throw new Error(j.error || ('HTTP ' + res.status));
+      _apxToast(`Plan scheduled - ${j.scheduled} message(s), 1 day apart`, true);
+    } else {
+      // reply
+      let resp;
+      if (_HK2.agent === 'booking') {
+        resp = await _apxPost(ep, 'send', { contact_id: r.ghl_contact_id, reply, conversation_id: r.ghl_conversation_id || null, contact_name: r.contact_name || null, reasoning: r.reasoning || null, confidence: r.confidence, reply_count: r.reply_count, booking_asks: r.booking_asks, ready_id: r.id, adjusted: reply !== before, suggested_reply: before || null });
+      } else {
+        resp = await _apxPost(ep, 'send', { ready_id: r.id, contact_id: r.ghl_contact_id, conversation_id: r.ghl_conversation_id, reply, contact_name: r.contact_name, confidence: r.confidence, reasoning: r.reasoning });
+      }
+      chk(resp);
+      _apxToast(resp && resp.deferred ? _apxQuietMsg(resp.send_after) : (lesson ? 'Sent + taught' : 'Sent'), true);
+    }
+    if (lesson) await _hk2Teach(r, lesson, before, reply);
+  } });
+  // Advance the deck right after the fly-out beat - don't wait for the 6s flush.
+  setTimeout(() => { if (!undone) _hk2Resolve(r, agent); }, 480);
+}
+// "Other": move the lead somewhere else instead of the primary action.
+function _hk2Move(op) {
+  const r = _hk2Top(); if (!r) return;
+  const agent = _HK2.agent;
+  const ep = _HK2_META[agent].ep;
+  const readyId = r._kind === 'plan' ? (r.rows && r.rows[0] && r.rows[0].id) : r.id;
+  if (!readyId) return;
+  const chk = resp => { if (resp && resp.error) throw new Error(resp.error); return resp; };
+  const label = op === 'ghost' ? 'Sent to Ghosted' : op === 'handoff' ? 'Handed to Booking' : op === 'lost' ? 'Marked lost' : 'Unqualified';
+  let undone = false;
+  _hawkDefer({ cardId: 'hk2-topcard', label, restore: () => { undone = true; _hk2Unresolve(agent, r); }, run: async () => {
+    if (op === 'ghost') {
+      chk(await _apxPost(ep, 'confirm-ghost', { ready_id: readyId }));
+      try { _plMoveContactToInterested(r.ghl_contact_id); } catch (_) {}
+      _apxToast('Sent to Ghosted', true);
+    } else if (op === 'handoff') {
+      chk(await _apxPost(ep, 'confirm-handoff', { ready_id: readyId, reply: '', handoff_note: r.handoff_note || 'Needs a new time - rebook.' }));
+      _apxToast('Handed back to Booking', true);
+    } else if (op === 'lost') {
+      chk(await _apxPost(ep, 'confirm-lost', { ready_id: readyId, reply: '', lost_reason: r.lost_reason || 'Other' }));
+      _apxToast('Marked lost - Nurture takes over', true);
+    } else {
+      chk(await _apxPost(ep, 'confirm-abandoned', { ready_id: readyId }));
+      _apxToast('Marked unqualified', true);
+    }
+  } });
+  // Advance the deck right after the fly-out beat - don't wait for the 6s flush.
+  setTimeout(() => { if (!undone) _hk2Resolve(r, agent); }, 480);
+}
+
 // Pencil on a calendar entry point → open the Calendar page + highlight it.
 function _plGoCalendar(key) {
   const nav = document.querySelector('.nav-item[data-feature="calendar"]');
@@ -31575,7 +32449,7 @@ function _plGoCalendar(key) {
    stage opens on its own via _PL_STAGE_ONLY. Additive + V2-gated - V1.5
    keeps the plain board untouched.
    ══════════════════════════════════════════════════════════════════ */
-let _PL_SV = 'overview';     // 'overview' | 'board'
+let _PL_SV = 'overview';     // 'overview' | 'board' | 'focus' | 'hawkeye'
 let _PL_STAGE_ONLY = null;   // stage id -> board renders just that column
 
 function _plCap(s) { s = String(s || ''); return s ? s.charAt(0).toUpperCase() + s.slice(1) : s; }
@@ -31763,12 +32637,130 @@ function _plRenderOverview() {
     + `<div class="plo-kpi"><div class="plo-lab">Sales · 7 days</div><div class="plo-val">5 <span class="plo-trend">${_plIcon('up', 13)} +2</span></div><div class="plo-hint">sample · wiring to live KPI data</div></div>`
     + `</div>`;
 
-  // ── collapsed stage strip ──
-  const cells = _ploStripCells(stages, false);
+  // ── the SIMPLE VIEW strip (Zoran 2026-07-08): colour-coded pills, no cards.
+  // Click a stage -> its leads cascade below (highlights only); the pill morphs
+  // to an up arrow (collapse) + a 3-line config icon (top right -> focus mode).
+  // Pill order locked 2026-07-09: Nurture, Ghosted, Booking, Confirm, Closing -
+  // Member/terminal stages get no pill (_plo2Order). Pills shared with the
+  // command-center home strip (_plo2Pills).
+  const stages2 = _plo2Order(stages);
+  const built = _plo2Pills(stages2, { open: _PLO2_OPEN });
+  const pills = built.html, hawkTotal = built.hawk;
+  const openStage = _PLO2_OPEN ? stages2.find(s2 => s2.id === _PLO2_OPEN) : null;
 
   host.innerHTML = kpis
-    + `<div class="plo-plhead"><h3>Pipeline</h3><button class="plo-expand" onclick="_plSVExpand()">${_plIcon('expand', 13)} Expand board</button></div>`
-    + `<div class="plo-strip">${cells}</div>`;
+    + `<div class="plo-plhead"><h3>Pipeline</h3>
+        <button class="plo2-hawkbtn" onclick="_hk2Open()">${_plIcon('eye', 14)} Hawkeye${hawkTotal ? `<span class="cnt">${hawkTotal}</span>` : ''}</button>
+        <button class="plo-expand" onclick="_plSVExpand()">${_plIcon('expand', 13)} Expand board</button></div>`
+    + `<div class="plo2-strip">${pills}</div>`
+    + (openStage ? `<div class="plo2-casc">${_plo2Cascade(openStage)}</div>` : '');
+}
+
+// Pill order for the simple view + home strip (Zoran 2026-07-09): Nurture first,
+// then Ghosted, then Booking/Confirm/Closing in flow order. Member/Unqualified
+// (terminal) stages get NO pill; unmapped custom stages keep their pipeline
+// position after the known ones.
+function _plo2Order(stages) {
+  const ORD = { nurture: 0, interested: 1, responded: 2, scheduled_trial: 3, done_trial: 4 };
+  return stages
+    .filter(s => { const b = (typeof _plStageBot === 'function') ? _plStageBot(s.name) : null; return !(b && b.kind === 'terminal'); })
+    .map((s, i) => { const r = _plStageRole(s.name); return { s, k: (r && ORD[r] != null) ? ORD[r] : 10 + i }; })
+    .sort((a, b) => a.k - b.k)
+    .map(x => x.s);
+}
+// Build the pill cells. Shared by the Sales overview and the command-center home.
+// nav = { open, toggle, cfg }: the open stage id + handler NAMES, so the home
+// strip keeps its own open state and its config icon can leave cc-mode first.
+function _plo2Pills(stages, nav) {
+  const openId = nav && nav.open;
+  const toggle = (nav && nav.toggle) || '_plo2Toggle';
+  const cfg = (nav && nav.cfg) || '_plOpenFocus';
+  let hawk = 0;
+  const arrow = '<div class="plo2-arr"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg></div>';
+  const html = stages.map((s2, i) => {
+    const opps = s2.opportunities || [];
+    const bot = (typeof _plStageBot === 'function') ? _plStageBot(s2.name) : null;
+    const kind = bot ? bot.kind : 'human';
+    const sig = _plStageSignals(s2, opps);
+    if (kind === 'agent') hawk += sig.hawk;
+    const isOpen = openId === s2.id;
+    // Layout locked (Zoran 2026-07-09): stage top-left, engine wording under it
+    // ("Nurture automation" / "Closing agent"), total cards under that; the
+    // Hawkeye "N need you" sits centered on the right. Gold is the only colour.
+    const eng = bot ? `${bot.tag} ${kind === 'agent' ? 'agent' : kind === 'automation' ? 'automation' : ''}`.trim() : 'Manual';
+    const need = (kind === 'agent' && sig.hawk) ? `<span class="plo2-need">${sig.hawk} need you</span>` : '';
+    const inner = isOpen
+      ? `<div class="plo2-up"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m18 15-6-6-6 6"/></svg></div>
+         <span class="plo2-cfg" title="Configure this stage" onclick="event.stopPropagation();${cfg}('${escapeHTML(s2.id)}')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="21" y1="6" x2="7" y2="6"/><line x1="17" y1="12" x2="3" y2="12"/><line x1="21" y1="18" x2="7" y2="18"/><circle cx="4.5" cy="6" r="1.7"/><circle cx="19.5" cy="12" r="1.7"/><circle cx="4.5" cy="18" r="1.7"/></svg></span>`
+      : `<div class="plo2-l">
+           <div class="nm">${escapeHTML(_plCap(s2.name))}</div>
+           <div class="eng">${escapeHTML(eng)}</div>
+           <div class="cnt">${opps.length} card${opps.length === 1 ? '' : 's'}</div>
+         </div>${need}`;
+    const conn = i < stages.length - 1 ? arrow : '';
+    return `<div class="plo2-pill${kind === 'automation' ? ' auto' : ''}${isOpen ? ' active' : ''}${openId && !isOpen ? ' dim' : ''}" onclick="${toggle}('${escapeHTML(s2.id)}')">${inner}</div>${conn}`;
+  }).join('');
+  return { html, hawk };
+}
+let _PLO2_OPEN = null;   // stage id whose cascade is open on the simple view
+function _plo2Toggle(id) { _PLO2_OPEN = _PLO2_OPEN === id ? null : id; _plRenderOverview(); }
+// The cascade: highlight rows ONLY - no Hawkeye actions live here. A glowing
+// lead opens the Hawkeye deck on their card; a plain lead opens the drawer.
+function _plo2Cascade(stage, nav) {
+  // nav = { lead, card, more }: handler NAMES so the command-center home can
+  // route clicks through _ccOpenClassic before the deck / drawer / board opens.
+  const leadFn = nav && nav.lead;
+  const cardFn = (nav && nav.card) || '_plOpenCard';
+  const moreFn = (nav && nav.more) || '_plSVStage';
+  const opps = stage.opportunities || [];
+  const bot = (typeof _plStageBot === 'function') ? _plStageBot(stage.name) : null;
+  const kind = bot ? bot.kind : 'human';
+  const engTag = kind === 'agent' ? 'AGENT ENGINE' : kind === 'automation' ? 'AUTOMATION ENGINE' : kind === 'terminal' ? 'TERMINAL' : 'HUMAN ENGINE';
+  const NEED_TXT = {
+    reply: 'reply · draft ready', book: 'picked a time · ready to book', ghost: 'went quiet',
+    mark_lost: 'lost suggested', confirm: 'reply · draft ready', confirm_auto: 'reminder ready',
+    confirm_handoff: 'reschedule · needs a new time', confirm_lost: 'lost suggested',
+    closing: 'reply · draft ready', closing_enroll: 'ready to enroll', closing_lost: 'lost suggested',
+  };
+  const enr = (o) => (kind === 'automation' && typeof _PL_ENR !== 'undefined' && _PL_ENR) ? _PL_ENR.get(String(o.contactId || '')) : null;
+  const needy = [], plain = [];
+  for (const o of opps) {
+    const cid = String((o.contactId || ''));
+    const need = kind === 'agent' && _PL_NEEDS ? _PL_NEEDS.get(cid) : null;
+    (need ? needy : plain).push({ o, need });
+  }
+  // Automation stages: newest entries into the automation on top (Zoran 2026-07-09).
+  if (kind === 'automation') {
+    const at = (x) => { const e = enr(x.o); return e && e.entered_at ? new Date(e.entered_at).getTime() : 0; };
+    plain.sort((a, b) => at(b) - at(a));
+  }
+  const initials = (nm) => { const w = String(nm || '?').trim().split(/\s+/); return ((w[0] || '?')[0] + (w[1] ? w[1][0] : '')).toUpperCase(); };
+  const row = ({ o, need }, i) => {
+    const nm = (o.contact && o.contact.name) || o.name || 'Lead';
+    const e = enr(o);
+    const st = need ? (NEED_TXT[need] || 'needs you in Hawkeye')
+             : kind === 'agent' ? 'agent handling it'
+             : kind === 'automation' ? (e && e.step ? `enrolled · step ${e.step}${e.steps_total ? ' of ' + e.steps_total : ''}` : 'enrolled')
+             : (o.athlete ? 'athlete: ' + o.athlete : '');
+    const click = need
+      ? (leadFn ? `${leadFn}('${escapeHTML(String(o.contactId || ''))}')` : `_hk2Open(null, '${escapeHTML(String(o.contactId || ''))}')`)
+      : `${cardFn}('${escapeHTML(o.id)}')`;
+    return `<div class="plo2-row" style="animation-delay:${Math.min(i, 10) * 45}ms"><div class="plo2-lead${need ? ' needs' : ''}" onclick="${click}">
+      <div class="plo2-av">${escapeHTML(initials(nm))}</div>
+      <div style="min-width:0"><div class="who">${escapeHTML(nm)}</div>${st ? `<div class="st">${escapeHTML(st)}</div>` : ''}</div></div></div>`;
+  };
+  const all = [...needy, ...plain];
+  const rows = all.slice(0, 30).map(row).join('');
+  const more = all.length > 30 ? `<div class="plo2-more" onclick="${moreFn}('${escapeHTML(stage.id)}')">+ ${all.length - 30} more - open the board view</div>` : '';
+  const hint = kind === 'agent' ? 'gold ring = needs you in Hawkeye · tap it to handle · plain card = lead drawer'
+             : kind === 'automation' ? 'the automation runs this stage - tap a lead for the drawer'
+             : 'you run this stage - tap a lead for the drawer';
+  return `<div class="plo2-panel">
+    <div class="plo2-phead">${escapeHTML(_plCap(stage.name))}
+      <span class="plo2-eng">${engTag}</span></div>
+    <div class="plo2-rows">${rows || '<div class="plo2-none">No cards here yet.</div>'}${more}</div>
+    <div class="plo2-hint">${hint}</div>
+  </div>`;
 }
 
 // Build the collapsed stage-strip cells. Shared by the Sales overview and the
@@ -31806,6 +32798,26 @@ function _ccPipeFocus(id) { try { _ccOpenClassic('pipelines'); } catch (_) {} se
 function _ccPipeHawk(key) { try { _ccOpenClassic('pipelines'); } catch (_) {} setTimeout(() => { try { _plEngineHawk(key); } catch (_) {} }, 120); }
 const _CC_PIPE_NAV = { stage: '_ccPipeStage', gear: '_ccPipeFocus', hawk: '_ccPipeHawk', hideClear: true };
 
+// ── Command-center HOME pill strip (Zoran 2026-07-09) ──────────────────────
+// The simple-view pills render on the home Sales section in place of the old
+// stage cards. The cascade opens right here on home; anything deeper (config,
+// deck, drawer, board) leaves cc-mode into the classic Sales view first.
+let _CC2_STAGES = null;  // home copy of the stage list (set by _ccSalesLoad)
+let _CC2_OPEN = null;    // stage id whose cascade is open on home
+function _cc2Toggle(id) { _CC2_OPEN = _CC2_OPEN === id ? null : id; _cc2Render(); }
+function _cc2Lead(cid) { try { _ccOpenClassic('pipelines'); } catch (_) {} setTimeout(() => { try { _hk2Open(null, cid); } catch (_) {} }, 120); }
+function _cc2Card(id) { try { _ccOpenClassic('pipelines'); } catch (_) {} setTimeout(() => { try { _plOpenCard(id); } catch (_) {} }, 120); }
+const _CC2_CASC_NAV = { lead: '_cc2Lead', card: '_cc2Card', more: '_ccPipeStage' };
+function _cc2Render() {
+  const strip = document.getElementById('cc-sal-strip');
+  if (!strip || !_CC2_STAGES) return;
+  const st = _plo2Order(_CC2_STAGES);
+  const built = _plo2Pills(st, { open: _CC2_OPEN, toggle: '_cc2Toggle', cfg: '_ccPipeFocus' });
+  const openStage = _CC2_OPEN ? st.find(s => s.id === _CC2_OPEN) : null;
+  strip.innerHTML = `<div class="plo2-strip" style="width:100%">${built.html}</div>`
+    + (openStage ? `<div class="plo2-casc">${_plo2Cascade(openStage, _CC2_CASC_NAV)}</div>` : '');
+}
+
 // engine glyphs the strip needs that aren't in the base _plIcon set
 function _ploEngIcon(name) {
   const P = {
@@ -31823,12 +32835,14 @@ function _ploEngIcon(name) {
 function _plSVApply() {
   const ov = document.getElementById('pl-overview');
   const focus = document.getElementById('pl-focus');
+  const hawk = document.getElementById('pl-hawkeye');
   const tabs = document.getElementById('pl-pipeline-tabs');
   const board = document.getElementById('pl-board-container');
   if (!ov || !board) return;
-  if (!_plIsV2()) { ov.style.display = 'none'; if (focus) focus.style.display = 'none'; if (tabs) tabs.style.display = ''; board.style.display = ''; return; }
+  if (!_plIsV2()) { ov.style.display = 'none'; if (focus) focus.style.display = 'none'; if (hawk) hawk.style.display = 'none'; if (tabs) tabs.style.display = ''; board.style.display = ''; return; }
   const sv = _PL_SV;
   if (focus) focus.style.display = sv === 'focus' ? '' : 'none';
+  if (hawk) hawk.style.display = sv === 'hawkeye' ? '' : 'none';
   ov.style.display = sv === 'overview' ? '' : 'none';
   const boardShown = sv === 'board';
   if (tabs) tabs.style.display = boardShown ? '' : 'none';
@@ -32219,7 +33233,7 @@ function _renderPipelineBoard() {
     const fuBadge = _scanning
       ? `<div class="pl-card-fu" style="border-color:var(--border);color:var(--text-mute);cursor:default"><span class="req-spin"></span> scanning…</div>`
       : ((_isResp && _agentOn && _PL_NEEDS && _need)
-        ? `<button class="pl-card-fu pl-card-fu-action" title="Tap to handle in Hawkeye" onclick="event.stopPropagation(); _apxOpen('${escapeHTML(o.contactId || '')}')">${_needLabel}</button>`
+        ? `<button class="pl-card-fu pl-card-fu-action" title="Tap to handle in Hawkeye" onclick="event.stopPropagation(); _hk2Open(null, '${escapeHTML(o.contactId || '')}')">${_needLabel}</button>`
         : '');
     return `
       <div class="pl-card ${stale ? 'pl-card-stale' : ''} ${missingTrial ? 'pl-card-notrial' : ''} ${todayTrial ? 'pl-card-today' : ''}"
@@ -32357,9 +33371,9 @@ function _renderPipelineBoard() {
     if (!cardsHtml) cardsHtml = '<div class="pl-empty">No cards here yet.</div>';
     // Per-stage colour scheme removed - the engine label + border STYLE (dashed =
     // automation, solid = agent/manual) carry the meaning, colour stays neutral.
-    const _hawk = isResponded ? { fn: '_apxOpen()', c: 'var(--accent)' }
-                : isSchedTrial ? { fn: '_acxOpen()', c: 'var(--accent)' }
-                : isDoneStage  ? { fn: '_aclxOpen()', c: 'var(--accent)' }
+    const _hawk = isResponded ? { fn: "_hk2Open('booking')", c: 'var(--accent)' }
+                : isSchedTrial ? { fn: "_hk2Open('confirm')", c: 'var(--accent)' }
+                : isDoneStage  ? { fn: "_hk2Open('closing')", c: 'var(--accent)' }
                 : null;
     const hawkBtn = (_plV2 && _hawk)
       ? `<button onclick="${_hawk.fn}" title="Open this agent's Hawkeye approval queue" style="width:100%;box-sizing:border-box;margin-bottom:8px;background:transparent;color:${_hawk.c};border:1px solid ${_hawk.c};border-radius:8px;padding:9px;font-size:12.5px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px">${_plIcon('eye', 13)} Hawkeye</button>`
@@ -32421,7 +33435,7 @@ function _renderPipelineBoard() {
   const _btnStyle = "display:inline-flex;align-items:center;gap:6px;background:transparent;color:var(--text-sub);border:1px solid var(--border);border-radius:8px;padding:7px 13px;font-size:12.5px;font-weight:700;cursor:pointer;white-space:nowrap";
   // Hawkeye + Overview live on the full board only. (Show/Hide engine removed.)
   const scanBtn = (_plV2 && _agentOn)
-    ? `<button onclick="_apxOpen()" title="Open Hawkeye - review and approve every agent's drafted messages (Booking / Confirm / Closing tabs)" style="display:inline-flex;align-items:center;gap:6px;background:transparent;color:var(--accent);border:1px solid var(--accent);border-radius:8px;padding:7px 13px;font-size:12.5px;font-weight:700;cursor:pointer;white-space:nowrap">${_plIcon('eye', 13)} Hawkeye</button>`
+    ? `<button onclick="_hk2Open()" title="Open Hawkeye - review and approve every agent's drafted messages (Booking / Confirm / Closing tabs)" style="display:inline-flex;align-items:center;gap:6px;background:transparent;color:var(--accent);border:1px solid var(--accent);border-radius:8px;padding:7px 13px;font-size:12.5px;font-weight:700;cursor:pointer;white-space:nowrap">${_plIcon('eye', 13)} Hawkeye</button>`
     : '';
   const collapseBtn = (_plV2 && _PL_SV !== 'overview')
     ? `<button onclick="_plSVCollapse()" title="Back to Sales overview" style="${_btnStyle}">${_plIcon('collapse', 12)} Overview</button>`
@@ -33176,6 +34190,7 @@ function _acxReplyCard(r) {
     ${_acxBox(r)}
     <div style="display:flex;align-items:stretch;gap:8px;margin-top:10px">
       <button onclick="_acxSkip('${r.id}')" title="Skip" style="flex:1;background:transparent;border:1px solid var(--border);color:var(--red);border-radius:8px;padding:9px;font-size:17px;cursor:pointer">✕</button>
+      <button onclick="_acxUnqualified('${r.id}')" title="Remove from the pipeline as unqualified - no message, no nurture" style="background:transparent;border:1px solid var(--text-mute);color:var(--text-sub);border-radius:8px;padding:9px 11px;font-size:12px;cursor:pointer">Unqualified</button>
       <button onclick="_acxSend('${r.id}')" style="flex:2;background:var(--accent);border:1px solid var(--accent);color:#08080A;border-radius:8px;padding:9px;font-size:14px;font-weight:700;cursor:pointer">✓ Approve &amp; send</button>
     </div>
   </div>`;
@@ -33190,6 +34205,7 @@ function _acxHandoffCard(r) {
     ${_acxBox(r, 'optional warm message before handing off')}
     <div style="display:flex;align-items:stretch;gap:8px;margin-top:10px">
       <button onclick="_acxSkip('${r.id}')" title="Skip" style="flex:1;background:transparent;border:1px solid var(--border);color:var(--red);border-radius:8px;padding:9px;font-size:17px;cursor:pointer">✕</button>
+      <button onclick="_acxUnqualified('${r.id}')" title="Remove from the pipeline as unqualified - no message, no nurture" style="background:transparent;border:1px solid var(--text-mute);color:var(--text-sub);border-radius:8px;padding:9px 11px;font-size:12px;cursor:pointer">Unqualified</button>
       <button onclick="_acxHandoff('${r.id}')" style="flex:2;background:#5A8FB8;border:1px solid #5A8FB8;color:#08080A;border-radius:8px;padding:9px;font-size:14px;font-weight:700;cursor:pointer">↩ Approve handoff</button>
     </div>
   </div>`;
@@ -33204,6 +34220,7 @@ function _acxLostCard(r) {
     ${_acxBox(r, 'optional closing message')}
     <div style="display:flex;align-items:stretch;gap:8px;margin-top:10px">
       <button onclick="_acxSkip('${r.id}')" title="Skip" style="flex:1;background:transparent;border:1px solid var(--border);color:var(--text-sub);border-radius:8px;padding:9px;font-size:17px;cursor:pointer">✕</button>
+      <button onclick="_acxUnqualified('${r.id}')" title="Remove from the pipeline as unqualified - no message, no nurture" style="background:transparent;border:1px solid var(--text-mute);color:var(--text-sub);border-radius:8px;padding:9px 11px;font-size:12px;cursor:pointer">Unqualified</button>
       <button onclick="_acxLost('${r.id}')" style="flex:2;background:var(--red);border:1px solid var(--red);color:#fff;border-radius:8px;padding:9px;font-size:14px;font-weight:700;cursor:pointer">Mark lost</button>
     </div>
   </div>`;
@@ -33244,6 +34261,13 @@ function _acxLost(id) {
 function _acxSkip(id) {
   _hawkDefer({ cardId: 'acx-' + id, label: 'Skipped', restore: _acxRender, run: async () => {
     await _apxPost('/api/agent-confirm', 'skip-ready', { ready_id: id }); _acxRemove(id); _apxToast('Skipped', true);
+  } });
+}
+// Unqualified: the dead end (Zoran 2026-07-08: every agent can mark unqualified).
+// Closes the opp + stamps the GHL unqualified tag - no message, no nurture.
+function _acxUnqualified(id) {
+  _hawkDefer({ cardId: 'acx-' + id, label: 'Unqualified', restore: _acxRender, run: async () => {
+    await _apxPost('/api/agent-confirm', 'confirm-abandoned', { ready_id: id }); _acxRemove(id); _apxToast('Marked unqualified', true);
   } });
 }
 
@@ -33354,6 +34378,7 @@ function _aclxPlanCard(rows) {
     ${_aclxNotesBlock(first)}
     <div style="display:flex;align-items:stretch;gap:8px;margin-top:10px">
       <button onclick="_aclxSkipPlan('${escapeHTML(first.ghl_contact_id)}')" title="Skip the whole plan" style="flex:1;background:transparent;border:1px solid var(--border);color:var(--red);border-radius:8px;padding:9px;font-size:17px;cursor:pointer">✕</button>
+      <button onclick="_aclxUnqualifiedPlan('${escapeHTML(first.ghl_contact_id)}')" title="Remove from the pipeline as unqualified - no message, no nurture" style="background:transparent;border:1px solid var(--text-mute);color:var(--text-sub);border-radius:8px;padding:9px 11px;font-size:12px;cursor:pointer">Unqualified</button>
       <button onclick="_aclxApprovePlan('${escapeHTML(first.ghl_contact_id)}')" style="flex:2;background:var(--accent);border:1px solid var(--accent);color:#08080A;border-radius:8px;padding:9px;font-size:14px;font-weight:700;cursor:pointer">✓ Approve plan - sends 1 day apart</button>
     </div>
   </div>`;
@@ -33456,6 +34481,7 @@ function _aclxReplyCard(r) {
     ${_aclxNotesBlock(r)}
     <div style="display:flex;align-items:stretch;gap:8px;margin-top:10px">
       <button onclick="_aclxSkip('${r.id}')" title="Skip" style="flex:1;background:transparent;border:1px solid var(--border);color:var(--red);border-radius:8px;padding:9px;font-size:17px;cursor:pointer">✕</button>
+      <button onclick="_aclxUnqualified('${r.id}')" title="Remove from the pipeline as unqualified - no message, no nurture" style="background:transparent;border:1px solid var(--text-mute);color:var(--text-sub);border-radius:8px;padding:9px 11px;font-size:12px;cursor:pointer">Unqualified</button>
       <button onclick="_aclxSend('${r.id}')" style="flex:2;background:var(--accent);border:1px solid var(--accent);color:#08080A;border-radius:8px;padding:9px;font-size:14px;font-weight:700;cursor:pointer">✓ Approve &amp; send</button>
     </div>
   </div>`;
@@ -33464,14 +34490,15 @@ function _aclxEnrollCard(r) {
   const note = r.enroll_note ? `<div style="font-size:12px;color:var(--text-sub);background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:8px;padding:8px 10px;margin:4px 0 8px"><b style="color:var(--text)">Plan / context:</b> ${escapeHTML(r.enroll_note)}</div>` : '';
   return `<div id="aclx-${r.id}" style="background:var(--surface);border:1px solid #3DBE8B;border-radius:11px;padding:12px 14px;margin-bottom:9px">
     ${_aclxHeader(r, 'ready to enroll', '#3DBE8B')}
-    <div style="font-size:11.5px;color:#3DBE8B;margin-bottom:6px">${_plIcon('award', 12)} The close: sends the academy's enroll link. The opportunity is marked won automatically when they pay.</div>
+    <div style="font-size:11.5px;color:#3DBE8B;margin-bottom:6px">${_plIcon('award', 12)} The close: this reply includes the academy's sign-up link. The opportunity is marked won automatically when they pay.</div>
     ${_aclxContext(r)}${note}
-    <div style="text-align:center;font-size:9.5px;color:var(--text-mute);text-transform:uppercase;letter-spacing:.09em;margin:2px 0 5px">warm message before the link (optional)</div>
-    ${_aclxBox(r, 'optional warm message before the sign-up link')}
+    <div style="text-align:center;font-size:9.5px;color:var(--text-mute);text-transform:uppercase;letter-spacing:.09em;margin:2px 0 5px">the reply, sign-up link included · edit it right here</div>
+    ${_aclxBox(r, 'warm message with the sign-up link')}
     ${_aclxNotesBlock(r)}
     <div style="display:flex;align-items:stretch;gap:8px;margin-top:10px">
       <button onclick="_aclxSkip('${r.id}')" title="Skip" style="flex:1;background:transparent;border:1px solid var(--border);color:var(--red);border-radius:8px;padding:9px;font-size:17px;cursor:pointer">✕</button>
-      <button onclick="_aclxEnroll('${r.id}')" style="flex:2;background:#3DBE8B;border:1px solid #3DBE8B;color:#08080A;border-radius:8px;padding:9px;font-size:14px;font-weight:700;cursor:pointer">✓ Send enroll link</button>
+      <button onclick="_aclxUnqualified('${r.id}')" title="Remove from the pipeline as unqualified - no message, no nurture" style="background:transparent;border:1px solid var(--text-mute);color:var(--text-sub);border-radius:8px;padding:9px 11px;font-size:12px;cursor:pointer">Unqualified</button>
+      <button onclick="_aclxEnroll('${r.id}')" style="flex:2;background:#3DBE8B;border:1px solid #3DBE8B;color:#08080A;border-radius:8px;padding:9px;font-size:14px;font-weight:700;cursor:pointer">✓ Approve &amp; send</button>
     </div>
   </div>`;
 }
@@ -33486,6 +34513,7 @@ function _aclxLostCard(r) {
     ${_aclxNotesBlock(r)}
     <div style="display:flex;align-items:stretch;gap:8px;margin-top:10px">
       <button onclick="_aclxSkip('${r.id}')" title="Skip" style="flex:1;background:transparent;border:1px solid var(--border);color:var(--text-sub);border-radius:8px;padding:9px;font-size:17px;cursor:pointer">✕</button>
+      <button onclick="_aclxUnqualified('${r.id}')" title="Remove from the pipeline as unqualified - no message, no nurture" style="background:transparent;border:1px solid var(--text-mute);color:var(--text-sub);border-radius:8px;padding:9px 11px;font-size:12px;cursor:pointer">Unqualified</button>
       <button onclick="_aclxLost('${r.id}')" style="flex:2;background:var(--red);border:1px solid var(--red);color:#fff;border-radius:8px;padding:9px;font-size:14px;font-weight:700;cursor:pointer">Mark lost</button>
     </div>
   </div>`;
@@ -33529,8 +34557,26 @@ function _aclxSkip(id) {
     await _apxPost('/api/agent-closing', 'skip-ready', { ready_id: id }); _aclxRemove(id); _apxToast('Skipped', true);
   } });
 }
+// Unqualified: the dead end (Zoran 2026-07-08: every agent can mark unqualified).
+// Closes the opp + stamps the GHL unqualified tag - no message, no nurture.
+function _aclxUnqualified(id) {
+  _hawkDefer({ cardId: 'aclx-' + id, label: 'Unqualified', restore: _aclxRender, run: async () => {
+    await _apxPost('/api/agent-closing', 'confirm-abandoned', { ready_id: id }); _aclxRemove(id); _apxToast('Marked unqualified', true);
+  } });
+}
+// Unqualified from a follow-up PLAN card: one call closes the lead; the backend
+// cancels every open closing card for them, so the whole plan comes off the queue.
+function _aclxUnqualifiedPlan(contactId) {
+  const rows = _ACLX_DATA.filter(x => x.ghl_contact_id === contactId && x.status === 'pending');
+  if (!rows.length) return;
+  _hawkDefer({ cardId: 'aclx-plan-' + contactId, label: 'Unqualified', restore: _aclxRender, run: async () => {
+    await _apxPost('/api/agent-closing', 'confirm-abandoned', { ready_id: rows[0].id });
+    _ACLX_DATA = _ACLX_DATA.filter(x => x.ghl_contact_id !== contactId);
+    _aclxRender(); _apxToast('Marked unqualified', true);
+  } });
+}
 
-let _APX_TAB = 'followups';
+let _APX_TAB = 'ghost';   // follow-up nudges retired (Zoran 2026-07-08): quiet leads get a ghost proposal instead
 function _apxSetTab(t) { _APX_TAB = t; _apxRender(); document.getElementById('apx-body')?.scrollTo(0, 0); }
 function _apxEmpty(msg) { return `<div style="text-align:center;color:var(--text-mute);font-size:14px;padding:48px 10px">${escapeHTML(msg)}</div>`; }
 
@@ -33829,7 +34875,7 @@ async function _apxLoad() {
     const readyN = _APX_DATA.ready.length + (_APX_DATA.book || []).length;
     const ghostN = (_APX_DATA.ghost || []).length;
     if (ghostN) _APX_TAB = 'ghost';
-    else if (!_APX_DATA.followups.length) _APX_TAB = readyN ? 'ready' : ((_APX_DATA.lost || []).length ? 'lost' : 'followups');
+    else _APX_TAB = readyN ? 'ready' : ((_APX_DATA.lost || []).length ? 'lost' : 'ghost');
     _apxRender();
     const span = document.getElementById('apx-count');
     const n = _APX_DATA.followups.length + readyN + _APX_DATA.lost.length + ghostN;
@@ -33991,7 +35037,7 @@ function _apxLostCard(r) {
       <button onclick="_apxOpenCardThread('${r.id}')" style="background:transparent;border:1px solid var(--border);color:var(--text-mute);border-radius:8px;padding:5px 10px;font-size:12px;cursor:pointer">${_plIcon('msg', 12)} chat</button>
       <div style="flex:1"></div>
       <button onclick="_apxLostDismiss('${r.id}')" style="background:transparent;border:1px solid var(--border);color:var(--text-sub);border-radius:8px;padding:5px 11px;font-size:12px;cursor:pointer">✕ Dismiss</button>
-      <button onclick="_apxLostAbandon('${r.id}')" title="Remove from pipeline - no nurture" style="background:transparent;border:1px solid var(--text-mute);color:var(--text-sub);border-radius:8px;padding:5px 11px;font-size:12px;cursor:pointer">Abandon</button>
+      <button onclick="_apxLostAbandon('${r.id}')" title="Remove from pipeline as unqualified - no nurture" style="background:transparent;border:1px solid var(--text-mute);color:var(--text-sub);border-radius:8px;padding:5px 11px;font-size:12px;cursor:pointer">Unqualified</button>
       <button id="apx-lost-confirm-${r.id}" onclick="_apxLostConfirm('${r.id}')" title="Mark Lost - enters the nurture automation" style="background:var(--red);border:1px solid var(--red);color:#fff;border-radius:8px;padding:5px 13px;font-size:12px;font-weight:700;cursor:pointer">${_plIcon('ban', 12)} ${closing ? 'Send &amp; mark Lost' : 'Mark Lost'}</button>
     </div>
   </div>`;
@@ -34030,8 +35076,8 @@ function _apxLostDismiss(id) { _hawkDefer({ cardId: 'apx-' + id, label: 'Dismiss
 // closing message (vs Mark Lost, which enrolls them in the nurture automation).
 function _apxLostAbandon(id) {
   const r = _APX_DATA.lost.find(x => x.id === id); if (!r) return;
-  _hawkDefer({ cardId: 'apx-' + id, label: 'Abandoned', restore: _apxRender, run: async () => {
-    await _apxPost('/api/agent-approvals', 'confirm-abandoned', { ready_id: r.id }); _apxRemove(id); _apxToast('Abandoned', true);
+  _hawkDefer({ cardId: 'apx-' + id, label: 'Unqualified', restore: _apxRender, run: async () => {
+    await _apxPost('/api/agent-approvals', 'confirm-abandoned', { ready_id: r.id }); _apxRemove(id); _apxToast('Marked unqualified', true);
   } });
 }
 
@@ -34059,12 +35105,12 @@ function _apxBookCard(r) {
       <button onclick="_apxOpenCardThread('${r.id}')" style="background:transparent;border:1px solid var(--border);color:var(--text-mute);border-radius:8px;padding:5px 10px;font-size:12px;cursor:pointer">${_plIcon('msg', 12)} chat</button>
       <div style="flex:1"></div>
       <button onclick="_apxBookSkip('${r.id}')" style="background:transparent;border:1px solid var(--border);color:#e07070;border-radius:8px;padding:5px 11px;font-size:12px;cursor:pointer">✕ skip</button>
-      <button onclick="_apxBookAbandon('${r.id}')" title="Remove from the pipeline - no message, no nurture" style="background:transparent;border:1px solid var(--text-mute);color:var(--text-sub);border-radius:8px;padding:5px 11px;font-size:12px;cursor:pointer">Abandon</button>
+      <button onclick="_apxBookAbandon('${r.id}')" title="Remove from the pipeline as unqualified - no message, no nurture" style="background:transparent;border:1px solid var(--text-mute);color:var(--text-sub);border-radius:8px;padding:5px 11px;font-size:12px;cursor:pointer">Unqualified</button>
       <button onclick="_apxBookConfirm('${r.id}')" style="background:var(--blue,#5A8FB8);border:1px solid var(--blue,#5A8FB8);color:#fff;border-radius:8px;padding:5px 13px;font-size:12px;font-weight:700;cursor:pointer">${_plIcon('calendar', 12)} approve &amp; book</button>
     </div>
   </div>`;
 }
-function _apxBookAbandon(id) { _hawkDefer({ cardId: 'apx-' + id, label: 'Abandoned', restore: _apxRender, run: async () => { await _apxPost('/api/agent-approvals', 'confirm-abandoned', { ready_id: id }); _apxRemove(id); _apxToast('Abandoned', true); } }); }
+function _apxBookAbandon(id) { _hawkDefer({ cardId: 'apx-' + id, label: 'Unqualified', restore: _apxRender, run: async () => { await _apxPost('/api/agent-approvals', 'confirm-abandoned', { ready_id: id }); _apxRemove(id); _apxToast('Marked unqualified', true); } }); }
 function _apxBookConfirm(id) {
   const r = (_APX_DATA.book || []).find(x => x.id === id); if (!r) return;
   _hawkDefer({ cardId: 'apx-' + id, label: 'Booked', restore: _apxRender, run: async () => {
@@ -34091,7 +35137,7 @@ function _apxGhostCard(r) {
     <div style="display:flex;align-items:center;gap:7px;margin-top:8px;flex-wrap:wrap">
       <button onclick="_apxOpenCardThread('${r.id}')" style="background:transparent;border:1px solid var(--border);color:var(--text-mute);border-radius:8px;padding:5px 10px;font-size:12px;cursor:pointer">${_plIcon('msg', 12)} chat</button>
       <div style="flex:1"></div>
-      <button onclick="_apxGhostSkip('${r.id}')" title="Skip, mark Lost, or Abandon (and optionally teach why)" style="background:transparent;border:1px solid var(--border);color:var(--red);border-radius:8px;padding:5px 11px;font-size:12px;cursor:pointer">✕ other</button>
+      <button onclick="_apxGhostSkip('${r.id}')" title="Skip, mark Lost, or mark Unqualified (and optionally teach why)" style="background:transparent;border:1px solid var(--border);color:var(--red);border-radius:8px;padding:5px 11px;font-size:12px;cursor:pointer">✕ other</button>
       <button onclick="_apxGhostConfirm('${r.id}', this)" title="Send to the Ghosted automation" style="display:inline-flex;align-items:center;gap:6px;background:var(--gold,#D4B65C);border:1px solid var(--gold,#D4B65C);color:var(--on-gold);border-radius:8px;padding:5px 13px;font-size:12px;font-weight:700;cursor:pointer">${_plIcon('ghost', 12)} Send to Ghosted</button>
     </div>
   </div>`;
@@ -34115,7 +35161,7 @@ function _apxGhostConfirm(id, btn) {
     },
   });
 }
-// The ✕ on a ghost card: skip it, mark Lost, or Abandon - each with an optional
+// The ✕ on a ghost card: skip it, mark Lost, or mark Unqualified - each with an optional
 // "why" note that teaches the agent (e.g. "don't ghost - they asked us to wait").
 function _apxGhostSkip(id) {
   const r = (_APX_DATA.ghost || []).find(x => x.id === id); if (!r) return;
@@ -34140,7 +35186,7 @@ function _apxGhostSkip(id) {
     onAbandon: async () => {
       if (_PL_NEEDS && r.ghl_contact_id) _PL_NEEDS.delete(String(r.ghl_contact_id));
       _plCloseByContact(r.ghl_contact_id, 'abandoned');
-      _apxRemove(id); _apxToast('Abandoned', true);
+      _apxRemove(id); _apxToast('Marked unqualified', true);
       try { await _apxPost('/api/agent-approvals', 'confirm-abandoned', { ready_id: id }); }
       catch (e) { _apxToast(_apxErr(e), false); }
     },
@@ -34160,17 +35206,14 @@ function _apxRender() {
     };
     tabsEl.innerHTML = tab('ghost', 'Went quiet', ghostN, 'var(--gold,#D4B65C)')
       + tab('ready', 'Ready messages', readyN)
-      + tab('lost', 'Lost', lostN, '#e0654f')
-      + tab('followups', 'Follow-ups', followups.length);
+      + tab('lost', 'Lost', lostN, '#e0654f');
   }
 
   // Active tab content (centered to a readable width on wide screens).
   const body = document.getElementById('apx-body');
   if (!body) return;
   let inner = '';
-  if (_APX_TAB === 'followups') {
-    inner = followups.length ? followups.map(r => _apxCard('followup', r)).join('') : _apxEmpty('No follow-ups waiting.');
-  } else if (_APX_TAB === 'ready') {
+  if (_APX_TAB === 'ready') {
     if (bookN) {
       inner += `<div style="font-size:13px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:var(--blue,#5A8FB8);margin:2px 0 10px">Booking requests · ${bookN}</div>`
         + book.map(_apxBookCard).join('');
@@ -34322,8 +35365,8 @@ async function _apxFollowupSkip(id) {
       } catch (e) { _apxToast(_apxErr(e), false); }
     },
     onAbandon: async () => {
-      if (!r.ghl_contact_id) { _apxToast('No contact linked - can\'t Abandon', false); return; }
-      _apxRemove(id); _apxToast('Abandoned', true);   // instant
+      if (!r.ghl_contact_id) { _apxToast('No contact linked - can\'t mark Unqualified', false); return; }
+      _apxRemove(id); _apxToast('Marked unqualified', true);   // instant
       try {
         await _apxPost('/api/agent-followups', 'skip', { id });   // drop the nudge
         await _apxPost('/api/agent-approvals', 'confirm-abandoned', { contact_id: r.ghl_contact_id });
@@ -34394,14 +35437,14 @@ function _apxSkipModal(r, handlers) {
     <div id="apx-edit-overlay" onclick="if(event.target===this)this.remove()" style="position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9650;display:flex;align-items:flex-start;justify-content:center;padding:7vh 14px 0">
       <div style="background:var(--surface);border:1px solid var(--border);border-radius:16px;width:100%;max-width:520px;padding:18px;box-shadow:0 20px 60px rgba(0,0,0,.5)">
         <div style="font-size:15px;font-weight:700;margin-bottom:3px">Skip the draft for ${escapeHTML(r.contact_name || 'this lead')}?</div>
-        <div style="font-size:12px;color:var(--text-mute);margin-bottom:13px">Skip it, mark the lead Lost (nurture), or Abandon (remove). Teaching the agent why is optional.</div>
+        <div style="font-size:12px;color:var(--text-mute);margin-bottom:13px">Skip it, mark the lead Lost (nurture), or mark Unqualified (removed, no nurture). Teaching the agent why is optional.</div>
         <label style="display:block;font-size:11px;color:var(--text-mute);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">why? (teach the agent)</label>
         <input id="apx-skip-lesson" type="text" placeholder="e.g. they already said no / wrong number / picked another program" style="width:100%;background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);padding:10px 12px;font:inherit;font-size:13px;outline:none">
         <div id="apx-skip-note" style="font-size:11.5px;color:#e0654f;margin-top:6px;min-height:14px"></div>
         <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-top:8px;flex-wrap:wrap">
           <div style="display:flex;gap:8px;flex-wrap:wrap">
             <button id="apx-skip-lost" title="Lost - enters the nurture automation" style="background:rgba(224,90,66,0.08);border:1px solid #e0654f;color:#e0654f;border-radius:9px;padding:10px 14px;font:inherit;font-size:13.5px;font-weight:700;cursor:pointer">Mark lost</button>
-            ${handlers.onAbandon ? `<button id="apx-skip-abandon" title="Abandon - removed from pipeline, no nurture" style="background:transparent;border:1px solid var(--text-mute);color:var(--text-sub);border-radius:9px;padding:10px 14px;font:inherit;font-size:13.5px;cursor:pointer">Abandon</button>` : ''}
+            ${handlers.onAbandon ? `<button id="apx-skip-abandon" title="Unqualified - removed from pipeline, no nurture" style="background:transparent;border:1px solid var(--text-mute);color:var(--text-sub);border-radius:9px;padding:10px 14px;font:inherit;font-size:13.5px;cursor:pointer">Unqualified</button>` : ''}
           </div>
           <div style="display:flex;gap:10px">
             <button onclick="document.getElementById('apx-edit-overlay').remove()" style="background:transparent;border:1px solid var(--border);color:var(--text-sub);border-radius:9px;padding:10px 16px;font:inherit;font-size:13.5px;cursor:pointer">Cancel</button>
@@ -34441,7 +35484,7 @@ async function _apxReadySkip(id) {
       } catch (e) { _apxToast(_apxErr(e), false); }
     },
     onAbandon: async () => {
-      _apxRemove(id); _apxToast('Abandoned', true);   // instant
+      _apxRemove(id); _apxToast('Marked unqualified', true);   // instant
       try { await _apxPost('/api/agent-approvals', 'confirm-abandoned', { ready_id: id }); }
       catch (e) { _apxToast(_apxErr(e), false); }
     },
@@ -39406,14 +40449,31 @@ let _MEMBER_CF = null; // { contactId, memberId, byId: {fieldId: field} }
 async function _loadMemberCustomFields(m) {
   const sec = document.getElementById('member-cf-section');
   if (!sec || !m || !m.ghl_contact_id) return;
+  // Members see the MEMBER (onboarding-section) fields + academy-level fields.
+  // memberId overlays this athlete's own per-member answers (siblings differ).
+  await _loadContactCF(sec, { clientId: m.client_id, ghlContactId: m.ghl_contact_id, section: 'onboarding', memberId: m.id });
+}
+
+// Generic custom-field loader shared by the member drawer (section=onboarding)
+// and the lead/contact drawer (section=sales). Renders into `sec` and wires the
+// same inline editor (_MEMBER_CF holds whichever drawer is open - only one is).
+async function _loadContactCF(sec, { clientId, ghlContactId, contactId, section, memberId } = {}) {
+  if (!sec) return;
   try {
     const token = await _mreqAuthToken();
-    // member_id overlays this athlete's own answers over the shared parent
-    // contact - siblings under one parent each show/edit their own values.
-    const r = await fetch('/api/custom-fields?action=values&client_id=' + encodeURIComponent(m.client_id) + '&ghl_contact_id=' + encodeURIComponent(m.ghl_contact_id) + '&member_id=' + encodeURIComponent(m.id), { headers: { 'Authorization': 'Bearer ' + token } });
+    // memberId (member drawer only) overlays this athlete's own answers over the
+    // shared parent contact - siblings under one parent each show/edit their own.
+    const qs = ['action=values']
+      .concat(clientId ? ['client_id=' + encodeURIComponent(clientId)] : [])
+      .concat(ghlContactId ? ['ghl_contact_id=' + encodeURIComponent(ghlContactId)] : [])
+      .concat(contactId ? ['contact_id=' + encodeURIComponent(contactId)] : [])
+      .concat(section ? ['section=' + encodeURIComponent(section)] : [])
+      .concat(memberId ? ['member_id=' + encodeURIComponent(memberId)] : [])
+      .join('&');
+    const r = await fetch('/api/custom-fields?' + qs, { headers: { 'Authorization': 'Bearer ' + token } });
     const j = await _safeJson(r);
     if (!r.ok) throw new Error(j.error || ('HTTP ' + r.status));
-    _renderMemberCF(sec, j.contact_id, j.fields || [], m.id);
+    _renderMemberCF(sec, j.contact_id, j.fields || [], memberId || null);
   } catch (e) {
     sec.innerHTML = `<div style="font-size:12px;color:var(--text-mute)">Couldn't load custom fields - ${escapeHTML(e.message)}</div>`;
   }
@@ -46766,12 +47826,12 @@ function _ccStyle() {
     '.cc-pipe-pill b{background:var(--surface-el);border-radius:999px;min-width:22px;text-align:center;padding:2px 7px;font-family:var(--font-num);font-weight:800;font-size:12px}' +
     '.cc-pipe-pill.dim{color:var(--text-mute)}' +
     '.cc-btn-badge{display:inline-flex;min-width:18px;height:18px;align-items:center;justify-content:center;background:var(--gold);color:var(--on-gold,#131416);border-radius:999px;font-size:10.5px;font-weight:800;padding:0 5px;margin-left:8px}' +
-    '.cc-sal-feed{margin-top:16px}' +
-    '.cc-sal-feed-h{font-size:10px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--text-mute);margin-bottom:8px}' +
-    '.cc-sal-feed-row{display:flex;align-items:baseline;gap:8px;font-size:12.5px;color:var(--text-sub);padding:4px 0}' +
-    '.cc-sal-feed-nm{font-weight:700;color:var(--text)}' +
-    '.cc-sal-feed-arr{color:var(--gold)}' +
-    '.cc-sal-feed-t{margin-left:auto;font-size:11px;color:var(--text-mute)}' +
+    '.cc-sal-feed{margin-top:14px;opacity:.72}' +
+    '.cc-sal-feed-h{font-size:9.5px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--text-mute);margin-bottom:6px}' +
+    '.cc-sal-feed-row{display:flex;align-items:baseline;gap:8px;font-size:11.5px;color:var(--text-mute);padding:3px 0}' +
+    '.cc-sal-feed-nm{font-weight:600;color:var(--text-sub)}' +
+    '.cc-sal-feed-arr{color:var(--text-mute)}' +
+    '.cc-sal-feed-t{margin-left:auto;font-size:10.5px;color:var(--text-mute)}' +
     '.cc-qr-x{background:none;border:none;color:var(--text-mute);cursor:pointer;padding:6px;border-radius:8px;display:inline-flex;align-items:center;flex:none}' +
     '.cc-qr-x:hover{color:var(--text);background:var(--surface-el,rgba(0,0,0,.05))}' +
     '.cc-agent-bar{display:flex;align-items:center;gap:10px;width:100%;text-align:left;background:var(--surface);border:1px solid var(--border-med);border-radius:999px;padding:13px 20px;font:inherit;font-size:13px;color:var(--text-mute);cursor:text;margin-bottom:14px;transition:border-color .2s,box-shadow .2s}' +
@@ -46827,9 +47887,12 @@ function _ccStyle() {
     '.cc-fan{position:absolute;left:7px;bottom:62px;display:flex;flex-direction:column;gap:8px}' +
     '.cc-fan-btn{position:relative;width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--text-sub);opacity:0;transform:translateY(12px) scale(.8);pointer-events:none;transition:opacity .22s var(--es,ease),transform .22s var(--es,ease),color .15s}' +
     '.cc-dock.open .cc-fan-btn{opacity:1;transform:translateY(0) scale(1);pointer-events:auto}' +
-    '.cc-dock.open .cc-fan-btn:nth-child(1){transition-delay:.08s}' +
-    '.cc-dock.open .cc-fan-btn:nth-child(2){transition-delay:.04s}' +
-    '.cc-dock.open .cc-fan-btn:nth-child(3){transition-delay:0s}' +
+    '.cc-dock.open .cc-fan-btn:nth-child(1){transition-delay:.16s}' +
+    '.cc-dock.open .cc-fan-btn:nth-child(2){transition-delay:.12s}' +
+    '.cc-dock.open .cc-fan-btn:nth-child(3){transition-delay:.08s}' +
+    '.cc-dock.open .cc-fan-btn:nth-child(4){transition-delay:.04s}' +
+    '.cc-dock.open .cc-fan-btn:nth-child(5){transition-delay:0s}' +
+    '.cc-fan-btn .cc-fan-count{position:absolute;top:-3px;right:-3px;min-width:15px;height:15px;padding:0 4px;box-sizing:border-box;border-radius:9px;background:var(--gold);color:#0B0B0D;font-size:9px;font-weight:800;font-family:var(--mono);display:flex;align-items:center;justify-content:center;box-shadow:0 0 0 2px var(--bg)}' +
     '.cc-fan-btn:hover{color:var(--gold)}' +
     '.cc-fan-btn svg{width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}' +
     '.cc-fan-btn::after{content:attr(data-lab);position:absolute;left:48px;top:50%;transform:translateY(-50%) translateX(-4px);font-size:11px;font-weight:700;color:var(--text);background:color-mix(in srgb,var(--surface) 72%,transparent);backdrop-filter:blur(10px);border:1px solid var(--border);border-radius:8px;padding:4px 10px;white-space:nowrap;opacity:0;pointer-events:none;transition:opacity .15s,transform .15s}' +
@@ -47216,6 +48279,16 @@ function _ccReturn() {
   document.body.classList.remove('cc-classic', 'ib-scroll-lock');
   document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
   document.getElementById('view-cc').classList.add('active');
+  // The scroll-linked recede effect freezes while a classic view is open (its
+  // handler bails when view-cc is hidden), so sections came back wearing stale
+  // inline blur/opacity - the "blurry home" bug. Clear it, then let the next
+  // frame's scroll recompute for the real position.
+  document.querySelectorAll('#view-cc .cc-sec.cc-recede').forEach(s => {
+    s.classList.remove('cc-recede');
+    s.style.opacity = ''; s.style.filter = ''; s.style.transform = '';
+  });
+  const m = document.querySelector('.main');
+  if (m) requestAnimationFrame(() => m.dispatchEvent(new Event('scroll')));
 }
 function _ccExitBeta() {
   try { localStorage.setItem('bam_cc_optout', '1'); } catch (_) {}
@@ -47241,19 +48314,17 @@ let _ccAcctEmailOk = false;
 
 function _ccAcctBuild() {
   if (document.getElementById('cc-acct')) return;
+  // The switcher BUTTON lives in the navigation fan (#cc-fan-acct, Zoran
+  // 2026-07-08: "the academy switcher goes into the cascade"); this wrapper
+  // only anchors the pop list above the dock.
   const wrap = document.createElement('div');
   wrap.id = 'cc-acct';
-  wrap.innerHTML =
-    `<div id="cc-acct-pop" role="menu" aria-label="Switch academy"></div>
-     <button type="button" id="cc-acct-btn" aria-label="Switch academy" aria-haspopup="true" onclick="_ccAcctToggle()">
-       <svg viewBox="0 0 24 24"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>
-       <span class="cc-acct-count" id="cc-acct-count"></span>
-       <span class="cc-acct-hint">Switch academy</span>
-     </button>`;
+  wrap.innerHTML = `<div id="cc-acct-pop" role="menu" aria-label="Switch academy"></div>`;
   document.body.appendChild(wrap);
-  // Close when clicking anywhere outside the switcher.
+  // Close when clicking anywhere outside the switcher (the fan button toggles
+  // it, so clicks there must not immediately re-close it).
   document.addEventListener('click', e => {
-    if (e.target.closest('#cc-acct')) return;
+    if (e.target.closest('#cc-acct') || e.target.closest('#cc-fan-acct')) return;
     document.getElementById('cc-acct-pop')?.classList.remove('open');
   });
   // Reveal only for Zoran / Mike - match the signed-in auth email against the allowlist.
@@ -47273,7 +48344,9 @@ function _ccAcctSync() {
   const rows = (typeof CLIENT_ROWS !== 'undefined' && CLIENT_ROWS) ? CLIENT_ROWS : [];
   const ok = _ccAcctEmailOk === true && rows.length > 1;
   wrap.classList.toggle('show', ok);
-  const cnt = document.getElementById('cc-acct-count');
+  const fan = document.getElementById('cc-fan-acct');
+  if (fan) fan.style.display = ok ? '' : 'none';
+  const cnt = document.getElementById('cc-fan-acct-count');
   if (cnt) cnt.textContent = ok ? String(rows.length) : '';
   if (!ok) document.getElementById('cc-acct-pop')?.classList.remove('open');
 }
@@ -47354,11 +48427,14 @@ function _ccBuildChrome() {
        <button type="button" class="cc-fan-btn cc-glass" data-lab="Info" onclick="_ccDockPop('info')">${_ccIcons().info}</button>
        <button type="button" class="cc-fan-btn cc-glass" data-lab="Business blueprint" onclick="_ccOrbToggle(false);_ccOpenClassic('blueprint')">${_ccIcons().grid}</button>
        <button type="button" class="cc-fan-btn cc-glass" data-lab="Settings" onclick="_ccDockPop('settings')">${_ccIcons().gear}</button>
+       <button type="button" class="cc-fan-btn cc-glass" id="cc-fan-acct" data-lab="Switch academy" style="display:none" onclick="_ccAcctToggle(true)"><svg viewBox="0 0 24 24"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg><span class="cc-fan-count" id="cc-fan-acct-count"></span></button>
+       <button type="button" class="cc-fan-btn cc-glass" id="cc-fan-obf" data-lab="Finish onboarding" style="display:none" onclick="_ccOrbToggle(false);_obfOpen()"><span id="cc-fan-obf-ring" style="display:flex">${typeof _obfRing === 'function' ? _obfRing(0, 4, 18) : ''}</span></button>
      </div>
      <button type="button" class="cc-orb cc-glass" id="cc-orb" aria-label="Menu" onclick="_ccOrbToggle()"><svg viewBox="0 0 512 512" fill="currentColor" stroke="none"><path d="M 256 80 L 290 230 L 432 256 L 290 282 L 256 432 L 222 282 L 80 256 L 222 230 Z"/><circle cx="256" cy="256" r="14"/></svg><span class="cc-orb-hint">Menu</span></button>
      <div id="cc-dock-pop"></div>`;
   document.body.appendChild(dock);
-  _ccAcctBuild();   // BAM-staff academy switcher, stacked above the orb
+  _ccAcctBuild();   // academy switcher list (the button now lives in the fan)
+  _obfFanSync();    // onboarding ring fan button (V2 only, hides when complete)
   _ccKeys();
   // Entrance: orb springs in, "Menu" hint shows for a few seconds
   requestAnimationFrame(() => {
@@ -47694,16 +48770,19 @@ function _ccDockPop(kind) {
   if (pop.dataset.kind === kind && pop.classList.contains('open')) { pop.classList.remove('open'); return; }
   pop.dataset.kind = kind;
   pop.innerHTML = kind === 'settings'
-    ? `<button type="button" class="cc-pop-item" onclick="toggleTheme()">Toggle light / dark</button>` +
+    ? _obfPopItem() +
+      `<button type="button" class="cc-pop-item" onclick="toggleTheme()">Toggle light / dark</button>` +
       `<button type="button" class="cc-pop-item" onclick="this.textContent='Sounds: ' + (_SFX.toggleMute() ? 'off' : 'on')">Sounds: ${_SFX._isMuted() ? 'off' : 'on'}</button>` +
       `<button type="button" class="cc-pop-item" onclick="var off=localStorage.getItem('bam_haptics_off')==='1';localStorage.setItem('bam_haptics_off', off?'0':'1');this.textContent='Haptics: '+(off?'on':'off')">Haptics: ${(function(){try{return localStorage.getItem('bam_haptics_off')==='1'?'off':'on'}catch(_){return 'on'}})()}</button>` +
       `<button type="button" class="cc-pop-item" onclick="document.getElementById('cc-dock-pop').classList.remove('open');_edwOpenModal()">Domains (email + website)</button>` +
       `<button type="button" class="cc-pop-item" onclick="document.getElementById('cc-dock-pop').classList.remove('open');_igwOpenModal()">Instagram</button>` +
       `<button type="button" class="cc-pop-item" onclick="_ccExitBeta()">Exit command center beta</button>` +
       `<button type="button" class="cc-pop-item" onclick="signOut()">Sign out</button>`
-    : `<button type="button" class="cc-pop-item" onclick="document.getElementById('cc-dock-pop').classList.remove('open');startOnboardingTour()">Take the tour</button>` +
+    : _obfPopItem() +
+      `<button type="button" class="cc-pop-item" onclick="document.getElementById('cc-dock-pop').classList.remove('open');startOnboardingTour()">Take the tour</button>` +
       `<button type="button" class="cc-pop-item" onclick="document.getElementById('cc-dock-pop').classList.remove('open');_ccOpenClassic('messages')">Talk to BAM</button>`;
   pop.classList.add('open');
+  _obfPopRefresh();
 }
 
 // ── scroll: reveal sections + track the active rail dot ──
@@ -47879,9 +48958,6 @@ function _ccMountSales(host) {
         <div class="cc-stat"><div class="cc-stat-v" id="cc-sal-close">-</div><div class="cc-stat-l">Trial closing rate</div></div>
       </div>
       <div class="cc-pipe-strip" id="cc-sal-strip"></div>
-      <div class="cc-actions">
-        <button type="button" class="cc-btn primary" onclick="_ccOpenClassic('pipelines')">Open sales board</button>
-      </div>
       <div class="cc-sal-feed" id="cc-sal-feed"></div>
     </div>`;
   _ccLoadTrialsCount();
@@ -47966,7 +49042,20 @@ async function _ccSalesLoad() {
       let cardStages = (pl.stages || []).map(s => ({ ...s, opportunities: byStage[s.id] || [] }));
       if (typeof _isStageAllowed === 'function') cardStages = cardStages.filter(s => _isStageAllowed(s.id));
       const strip = document.getElementById('cc-sal-strip');
-      if (strip) { _ploCss(); strip.innerHTML = `<div class="plo-strip" style="width:100%">${_ploStripCells(cardStages, _CC_PIPE_NAV)}</div>`; }
+      if (strip) {
+        _ploCss();
+        if (_plIsV2()) {
+          // V2 home = the simple-view pills in place of the old stage cards
+          // (Zoran 2026-07-09). The needs map loads async, so the "N need you"
+          // counts fill in on the repaint.
+          _CC2_STAGES = cardStages;
+          _cc2Render();
+          if (!_PL_NEEDS) { try { _plLoadNeedsAction().then(() => _cc2Render()); } catch (_) {} }
+          if (!_PL_ENR) { try { _plLoadActiveAutomations().then(() => _cc2Render()); } catch (_) {} }
+        } else {
+          strip.innerHTML = `<div class="plo-strip" style="width:100%">${_ploStripCells(cardStages, _CC_PIPE_NAV)}</div>`;
+        }
+      }
       const feed = document.getElementById('cc-sal-feed');
       if (feed) {
         const stageName = {};
@@ -48513,13 +49602,16 @@ function _ccPulseRender(roster) {
 // (.mm-*) and both focus modals live at body level, so the existing
 // marketing focus mode works unchanged from here.
 function _ccMountMarketing(host) {
-  host.innerHTML = _ccHead('Marketing', 'Your machine: ads in, leads out.') + '<div id="cc-marketing-mount"></div>' +
-    `<div class="cc-actions"><button type="button" class="cc-btn" onclick="_ccOpenClassic('marketing')">Open full marketing</button></div>`;
+  // "Open full marketing" button removed (Zoran 2026-07-08) - the machine
+  // cards + other-funnels config ARE the marketing surface here.
+  host.innerHTML = _ccHead('Marketing', 'Your machine: ads in, leads out.') + '<div id="cc-marketing-mount"></div>';
   const mount = document.getElementById('cc-marketing-mount');
   const mm = document.getElementById('marketing-machine-card');
   const lm = document.getElementById('landing-machine-card');
+  const fn = document.getElementById('other-funnels-card');
   if (mm) mount.appendChild(mm);
   if (lm) mount.appendChild(lm);
+  if (fn) mount.appendChild(fn);
   try { _mmLoad(); } catch (e) { console.error('[cc] marketing', e); }
 }
 
@@ -49679,6 +50771,8 @@ function toggleTheme() {
     </label>
     <input type="file" id="inputAssetsFileInput" accept="image/*,video/*,.psd,.ai,.zip" multiple style="display:none" onchange="_inputAssetsAddFiles(this.files)" />
     <div id="inputAssetsFilesList" class="wizard-files-list" style="margin-top:8px"></div>
+    <!-- Edit mode only: files already on the request, removable -->
+    <div id="inputAssetsExistingList" class="wizard-files-list" style="margin-top:8px"></div>
 
     <label class="modal-label" for="inputAssetsDriveLink" style="margin-top:18px">Link to file <span style="color:var(--text-mute);font-weight:400">(use if your file is over 500MB - Drive, Dropbox, WeTransfer, OneDrive, etc.)</span></label>
     <input id="inputAssetsDriveLink" class="modal-input" type="url" placeholder="https://..." />
@@ -49761,7 +50855,7 @@ function toggleTheme() {
     <button type="button" class="mm-back-btn" onclick="closeLandingMachine()">&lsaquo; Back</button>
     <div class="mm-mod-head">
       <div>
-        <div class="modal-title" style="margin-bottom:0">Landing Page</div>
+        <div class="modal-title" id="lm-modal-title" style="margin-bottom:0">Landing Page</div>
       </div>
     </div>
     <div id="lm-modal-body"></div>
@@ -50197,6 +51291,7 @@ async function _mmLoad(force) {
   const host = document.getElementById('marketing-machine-card');
   if (!host) return;
   if (!(typeof V2_ACCESS !== 'undefined' && V2_ACCESS)) { host.style.display = 'none'; return; }
+  _fnLoad(force);   // other entry point funnels list (independent of the Meta fetch)
   if (_MM_LOADED && !force) { _mmRenderCard(); return; }
   host.style.display = 'block';
   host.innerHTML = '<div class="mm-card" style="cursor:default">' +
@@ -50462,6 +51557,13 @@ function _mmRenderLanding() {
 function _mmCollapsePageRest(card) {
   const content = card.parentElement;
   if (!content) return;
+  // Command center: the cards live in #cc-marketing-mount with nothing to
+  // collapse - no "guides, campaigns and requests" bar there (Zoran 2026-07-08).
+  if (content.id === 'cc-marketing-mount') {
+    const stray = document.getElementById('mm-page-toggle');
+    if (stray && content.contains(stray)) stray.remove();
+    return;
+  }
   let bar = document.getElementById('mm-page-toggle');
   if (!bar) {
     bar = document.createElement('div');
@@ -50479,16 +51581,17 @@ function _mmCollapsePageRest(card) {
     bar.onclick = () => {
       const open = bar.classList.toggle('open');
       Array.from(content.children).forEach((el) => {
-        if (el === card || el === bar || el.id === 'landing-machine-card') return;
+        if (el === card || el === bar || el.id === 'landing-machine-card' || el.id === 'other-funnels-card') return;
         el.style.display = open ? '' : 'none';
       });
     };
+    const otherEl = document.getElementById('other-funnels-card');
     const landingEl = document.getElementById('landing-machine-card');
-    (landingEl || card).after(bar);
+    (otherEl || landingEl || card).after(bar);
   }
   if (!bar.classList.contains('open')) {
     Array.from(content.children).forEach((el) => {
-      if (el === card || el === bar || el.id === 'landing-machine-card') return;
+      if (el === card || el === bar || el.id === 'landing-machine-card' || el.id === 'other-funnels-card') return;
       el.style.display = 'none';
     });
   }
@@ -50536,6 +51639,8 @@ function openMarketingMachine() {
 function closeMarketingMachine() { _mmCloseFocus('marketingMachineModal'); }
 function openLandingMachine(stage) {
   if (!_MM) return;
+  _FN_ACTIVE = null;   // main free-trial landing page, not an "other" funnel
+  const tt = document.getElementById('lm-modal-title'); if (tt) tt.textContent = 'Landing Page';
   _V2_OPEN = false; _V2_PINS = []; _V2_PENDING = null;   // annotator always starts collapsed
   _mmRenderLandingFocus(_MM);
   _mmOpenFocus('landingMachineModal', '#landing-machine-card .mm-action-panel');
@@ -50549,6 +51654,145 @@ function openLandingMachine(stage) {
   }
 }
 function closeLandingMachine() { _mmCloseFocus('landingMachineModal'); }
+
+/* ── Other entry point funnels (V2) ──
+   A funnel = one page on the academy site that hosts direct entry points
+   (forms, calendars). The main free-trial funnel has its own card above;
+   this dropdown lists the OTHER funnels that have entry points (GTA today:
+   the contact page) and opens each one in the same landing focus view so
+   it can be configured and annotated like the main page. Data:
+   GET /api/website/funnels (funnels + nested entry_points + url_resolved). */
+let _FN = null, _FN_LOADED = false, _FN_OPEN = false;
+let _FN_ACTIVE = null;   // funnel shown in the landing focus modal (null = main free-trial page)
+async function _fnLoad(force) {
+  const host = document.getElementById('other-funnels-card');
+  if (!host) return;
+  if (_FN_LOADED && !force) { _fnRenderOthers(); return; }
+  try {
+    const token = await _mreqAuthToken();
+    const res = await fetch('/api/website/funnels?client_id=' + encodeURIComponent(CLIENT_ID), {
+      headers: { 'Authorization': 'Bearer ' + token },
+    });
+    const json = await _safeJson(res);
+    if (!res.ok) throw new Error(json.error || ('HTTP ' + res.status));
+    _FN = json.funnels || []; _FN_LOADED = true;
+    _fnRenderOthers();
+  } catch (e) {
+    host.style.display = 'none';   // quiet fail: the rest of the page still works
+  }
+}
+function _fnOthers() {
+  return (_FN || []).filter((f) => !f.is_primary && f.enabled && (f.entry_points || []).length);
+}
+function _fnEpSummary(f) {
+  const eps = f.entry_points || [];
+  const forms = eps.filter((e) => e.type === 'website-form' || e.type === 'ghl-form').length;
+  const cals = eps.filter((e) => e.type === 'calendar').length;
+  const bits = [];
+  if (forms) bits.push(forms + (forms === 1 ? ' form' : ' forms'));
+  if (cals) bits.push(cals + (cals === 1 ? ' calendar' : ' calendars'));
+  return bits.join(' &middot; ') || 'no entry points';
+}
+function _fnRenderOthers() {
+  const host = document.getElementById('other-funnels-card');
+  if (!host) return;
+  if (!(typeof V2_ACCESS !== 'undefined' && V2_ACCESS)) { host.style.display = 'none'; return; }
+  const others = _fnOthers();
+  if (!others.length) { host.style.display = 'none'; return; }
+  const gearIco = '<svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="2.2"/><path d="M8 1.8v1.7M8 12.5v1.7M1.8 8h1.7M12.5 8h1.7M3.6 3.6l1.2 1.2M11.2 11.2l1.2 1.2M12.4 3.6l-1.2 1.2M4.8 11.2l-1.2 1.2"/></svg>';
+  const rows = others.map((f) =>
+    '<button type="button" class="fn-row" onclick="openFunnelConfig(\'' + f.id + '\')" ' +
+      'style="width:100%;display:flex;align-items:center;gap:12px;text-align:left;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px 15px;cursor:pointer;margin-top:8px">' +
+      '<span style="width:30px;height:30px;border-radius:50%;background:var(--surface-el);color:var(--text-sub);display:flex;align-items:center;justify-content:center;flex:0 0 auto">' + MM_ICONS.page + '</span>' +
+      '<span style="flex:1;min-width:0">' +
+        '<span style="display:block;font-family:var(--mm-ff);font-size:14px;font-weight:700;color:var(--text)">' + _escapeHtml(f.label) + '</span>' +
+        '<span style="display:block;font-family:var(--mm-ff);font-size:12px;color:var(--text-mute);margin-top:1px">' + _fnEpSummary(f) + '</span>' +
+      '</span>' +
+      '<span style="font-family:var(--mm-ff);font-size:13px;font-weight:600;color:var(--text-sub);flex:0 0 auto">Configure &rsaquo;</span>' +
+    '</button>'
+  ).join('');
+  host.innerHTML =
+    '<div class="mm-collapse-head' + (_FN_OPEN ? ' open' : '') + '" id="fn-toggle" onclick="_fnToggle()" style="margin-top:8px">' +
+      '<span class="mm-collapse-arrow">&#9662;</span>' +
+      '<span style="display:inline-flex;align-items:center;gap:7px">' + gearIco + 'Configure other entry point funnels</span>' +
+      '<span style="margin-left:auto;color:var(--text-sub)">' + others.length + '</span>' +
+    '</div>' +
+    '<div id="fn-list" style="display:' + (_FN_OPEN ? 'block' : 'none') + '">' + rows + '</div>';
+  host.style.display = 'block';
+}
+function _fnToggle() {
+  _FN_OPEN = !_FN_OPEN;
+  const bar = document.getElementById('fn-toggle'), list = document.getElementById('fn-list');
+  if (bar) bar.classList.toggle('open', _FN_OPEN);
+  if (list) list.style.display = _FN_OPEN ? 'block' : 'none';
+}
+function openFunnelConfig(id) {
+  const f = (_FN || []).find((x) => x.id === id);
+  if (!f) return;
+  _FN_ACTIVE = f;
+  const tt = document.getElementById('lm-modal-title'); if (tt) tt.textContent = f.label;
+  _V2_OPEN = false; _V2_PINS = []; _V2_PENDING = null;   // annotator always starts collapsed
+  _fnRenderFunnelFocus(f);
+  _mmOpenFocus('landingMachineModal', '#other-funnels-card');
+}
+function _fnRenderFunnelFocus(f) {
+  const body = document.getElementById('lm-modal-body');
+  if (!body || !f) return;
+  const ICO_FORM = '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="2" width="10" height="12" rx="1.5"/><path d="M5.5 6h5M5.5 8.5h5M5.5 11h3"/></svg>';
+  const ICO_CAL = '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="3" width="11" height="10.5" rx="1.5"/><path d="M2.5 6.5h11M5.5 1.5v3M10.5 1.5v3"/></svg>';
+  const eps = f.entry_points || [];
+  const epRows = eps.map((e) => {
+    let route;
+    if (e.pipeline_name && e.stage_name) route = _escapeHtml(e.pipeline_name) + ' &middot; ' + _escapeHtml(e.stage_name);
+    else if (e.ghl_workflow_name) route = 'routed by the "' + _escapeHtml(e.ghl_workflow_name) + '" workflow';
+    else route = 'not connected yet';
+    return '<div style="display:flex;align-items:center;gap:12px;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:11px 14px;margin-top:8px' + (e.enabled ? '' : ';opacity:.55') + '">' +
+      '<span style="width:30px;height:30px;border-radius:50%;background:var(--surface-el);color:var(--text-sub);display:flex;align-items:center;justify-content:center;flex:0 0 auto">' + (e.type === 'calendar' ? ICO_CAL : ICO_FORM) + '</span>' +
+      '<span style="flex:1;min-width:0">' +
+        '<span style="display:block;font-family:var(--mm-ff);font-size:13px;font-weight:700;color:var(--text)">' + _escapeHtml(e.label) + '</span>' +
+        '<span style="display:block;font-family:var(--mm-ff);font-size:12px;color:var(--text-mute);margin-top:1px">' + route + (e.enabled ? '' : ' &middot; off') + '</span>' +
+      '</span>' +
+    '</div>';
+  }).join('') || '<div style="font-size:13px;color:var(--text-mute);padding:10px 0">no entry points on this page yet</div>';
+  const urlVal = f.url || '';
+  const urlPh = f.url_resolved && !f.url ? f.url_resolved : 'https://yoursite.com/page';
+  body.innerHTML =
+    '<div style="font-family:var(--mm-ff);font-size:12px;color:var(--text-mute);margin-bottom:14px">Every form or calendar below feeds your pipeline from this page.</div>' +
+    '<div style="font-family:var(--mm-ff);font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--text-mute)">Page URL</div>' +
+    '<div style="display:flex;gap:8px;margin-top:6px">' +
+      '<input id="fn-url-input" type="url" value="' + _escapeHtml(urlVal) + '" placeholder="' + _escapeHtml(urlPh) + '" ' +
+        'style="flex:1;min-width:0;background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:9px 12px;font-family:var(--mm-fm);font-size:13px;color:var(--text)">' +
+      '<button type="button" onclick="_fnSaveUrl(\'' + f.id + '\')" ' +
+        'style="background:var(--gold);color:var(--on-gold);border:none;border-radius:8px;padding:9px 16px;font-family:var(--mm-ff);font-size:13px;font-weight:700;cursor:pointer">Save</button>' +
+    '</div>' +
+    '<div style="font-family:var(--mm-ff);font-size:11px;color:var(--text-mute);margin-top:5px">Used for the page preview below.</div>' +
+    '<div style="font-family:var(--mm-ff);font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--text-mute);margin-top:18px">Entry points on this page</div>' +
+    epRows +
+    _v2InlineHtml() +
+    _v2TicketsNudgeHtml();
+  _v2Sync();   // restore the annotator's open/closed state across a re-render
+}
+async function _fnSaveUrl(id) {
+  const inp = document.getElementById('fn-url-input');
+  if (!inp) return;
+  const val = inp.value.trim();
+  try {
+    const token = await _mreqAuthToken();
+    const res = await fetch('/api/website/funnels?client_id=' + encodeURIComponent(CLIENT_ID) + '&id=' + encodeURIComponent(id), {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+      body: JSON.stringify({ url: val || null }),
+    });
+    const json = await _safeJson(res);
+    if (!res.ok) throw new Error(json.error || ('HTTP ' + res.status));
+    const f = (_FN || []).find((x) => x.id === id);
+    if (f) { f.url = json.funnel.url; f.url_resolved = json.funnel.url || f.url_resolved; }
+    _mmToast('Page URL saved');
+    if (_FN_ACTIVE && _FN_ACTIVE.id === id) _fnRenderFunnelFocus(_FN_ACTIVE);
+  } catch (e) {
+    _mmToast('Could not save: ' + e.message);
+  }
+}
 
 /* ── Mini date picker for the Marketing Machine range ──
    Replaces the native date inputs with a styled calendar popover. The values
@@ -51270,8 +52514,11 @@ function _v2Toggle() {
 function _v2MountStage() {
   const fr = document.getElementById('v2ReqFrame'), hint = document.getElementById('v2ReqHint');
   // window._V2_PAGE_URL is a local-dev override (unset in prod) so we can point
-  // the annotator iframe at a local bam-client-sites server; else the real URL.
-  let url = window._V2_PAGE_URL || (typeof _MM !== 'undefined' && _MM && _MM.page && _MM.page.url) || '';
+  // the annotator iframe at a local bam-client-sites server. Otherwise: the
+  // active "other" funnel's page when one is open, else the main landing page.
+  let url = window._V2_PAGE_URL
+    || (typeof _FN_ACTIVE !== 'undefined' && _FN_ACTIVE && _FN_ACTIVE.url_resolved)
+    || (typeof _MM !== 'undefined' && _MM && _MM.page && _MM.page.url) || '';
   // annotate=1 tells the page (bam-client-sites) to turn on section hover-outline
   // + post section clicks back to us.
   if (url) url += (url.indexOf('?') === -1 ? '?' : '&') + 'annotate=1';
@@ -51448,12 +52695,14 @@ function _v2ReviewDel(i) { _V2_PINS.splice(i, 1); _v2RenderReview(); _v2RenderNo
 function _v2Submit() {
   const desc = (document.getElementById('v2ReqDesc')?.value || '').trim();
   if (!_V2_PINS.length && !desc) { _mmToast('Add a note or a line of context first'); return; }
+  const onOther = typeof _FN_ACTIVE !== 'undefined' && !!_FN_ACTIVE;   // annotating an "other" funnel page
   const payload = {
     module: 'landing-page', request_type: _V2_TYPE, source: 'v2_portal_oneclick',
     description: desc,
     context: {
-      page_url: (typeof _MM !== 'undefined' && _MM?.page?.url) || null,
-      metric_snapshot: (typeof _MM !== 'undefined' && _MM?.page) ? {
+      funnel: onOther ? _FN_ACTIVE.key : 'free-trial',
+      page_url: onOther ? (_FN_ACTIVE.url_resolved || null) : ((typeof _MM !== 'undefined' && _MM?.page?.url) || null),
+      metric_snapshot: (!onOther && typeof _MM !== 'undefined' && _MM?.page) ? {
         visitors: _MM.page.visitors, form_started: _MM.page.form_started,
         saw_calendar: _MM.page.saw_calendar, booked: _MM.page.booked_sessions,
       } : null,
@@ -51463,7 +52712,8 @@ function _v2Submit() {
   console.log('[v2-request] MOCK submit (no table yet):', payload);   // TODO: POST /api/v2-support-tickets
   _V2_PINS = []; _V2_OPEN = false; _v2NoteCancel(); _v2CloseReview();
   _mmToast('Request sent - staff will take a look');
-  if (typeof _mmRenderLandingFocus === 'function' && typeof _MM !== 'undefined') _mmRenderLandingFocus(_MM);
+  if (onOther) _fnRenderFunnelFocus(_FN_ACTIVE);
+  else if (typeof _mmRenderLandingFocus === 'function' && typeof _MM !== 'undefined') _mmRenderLandingFocus(_MM);
 }
 // Bridge listener: the client's V2 page (bam-client-sites) posts section hover/
 // click events when it loads in annotate mode. Until that ships this is dormant.
