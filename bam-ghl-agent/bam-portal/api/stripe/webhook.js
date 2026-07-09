@@ -340,6 +340,21 @@ function invoiceSubMetadata(inv) {
   return {};
 }
 
+// Stripe moved the invoice's subscription id the same way it moved the sub
+// metadata: classic API = top-level `invoice.subscription`; new API
+// (billing_mode: flexible, seen 2026-07 on returning-enroll subs) = only
+// `invoice.parent.subscription_details.subscription`. Without this fallback,
+// handleInvoiceSucceeded got subId=undefined and skipped the flip-live
+// activation (member stuck at "Signup in progress" until the reconcile cron).
+function invoiceSubId(inv) {
+  if (!inv) return null;
+  if (inv.subscription) return inv.subscription;
+  if (inv.parent && inv.parent.subscription_details && inv.parent.subscription_details.subscription) {
+    return inv.parent.subscription_details.subscription;
+  }
+  return null;
+}
+
 // ─────────────────────────────────────────────────────────
 // Credit engine (offer tie-in step D) — grant weekly credits from the paid
 // invoice's real lines. Gated per academy by clients.credit_engine_enabled.
@@ -744,7 +759,7 @@ async function handleSubUpdated(event, connectedAccount, res) {
 async function handleInvoiceFailed(event, connectedAccount, res) {
   const inv = event.data && event.data.object;
   if (!inv) return res.status(200).json({ skipped: "no invoice" });
-  const subId  = inv.subscription;
+  const subId  = invoiceSubId(inv);
   const custId = inv.customer;
 
   let member = null;
@@ -933,7 +948,7 @@ export async function activatePortalOnboardingMember({ member, onbSub, inv, conn
 async function handleInvoiceSucceeded(event, connectedAccount, res) {
   const inv = event.data && event.data.object;
   if (!inv) return res.status(200).json({ skipped: "no invoice" });
-  const subId  = inv.subscription;
+  const subId  = invoiceSubId(inv);
   const custId = inv.customer;
 
   let member = null;

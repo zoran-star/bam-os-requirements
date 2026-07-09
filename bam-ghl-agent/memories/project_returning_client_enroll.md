@@ -81,6 +81,29 @@ System prompt teaches: find_members-miss + enroll intent -> wizard, never
 change/pause/payment-link for brand-new members. `openEnrollDrawer(opts)` now
 takes `{elevated}`.
 
+## GOTCHA: new-Stripe-API invoices hide the sub id (Adam Fergani stall)
+
+First real enroll (Adam Fergani, 2026-07-09, $315.27 charged fine) stuck at
+"Signup in progress": subs now come back `billing_mode: flexible` (new Stripe
+API) where the invoice has NO top-level `subscription` - the id lives at
+`invoice.parent.subscription_details.subscription`. webhook.js read
+`inv.subscription` (undefined) so handleInvoiceSucceeded matched the member by
+customer but SKIPPED the flip-live activation branch. FIX: `invoiceSubId(inv)`
+helper (mirrors invoiceSubMetadata) used by handleInvoiceSucceeded +
+handleInvoiceFailed. Safety net that saved Adam: `reconcile-activations` cron
+(*/10 min) reads member.stripe_subscription_id directly and runs the identical
+activation - stuck enrolls self-heal within 10 min even if the webhook misses.
+
+## Pilot refinements (Zoran feedback, 2026-07-09)
+
+- Offer questions: ONBOARDING section only (sales questions like "close to
+  Oakville?" qualify leads - dropped from manual signup). `signupDefs` filters
+  `section=eq.onboarding` for offer defs.
+- Athlete name asked ONCE: core First/Last name defs (`isAutoNameDef`) are
+  never rendered; `autoFillNameDefs` splits the Athlete input into them at
+  enroll (skipped from the mandatory check when not derivable).
+- Review button always gold (dimmed via opacity when incomplete).
+
 ## GOTCHA: "live price" truth = offering archived flag, NOT the catalog
 
 Found during the Houssein pilot (2026-07-08): `pricing_catalog` rows stay
