@@ -689,6 +689,9 @@ async function handler(req, res) {
     if (resource === "refresh-windows") {
       return await handleRefreshWindows(req, res);
     }
+    if (resource === "client-media") {
+      return await handleClientMedia(req, res);
+    }
     return res.status(400).json({ error: "missing or invalid ?resource= (expected 'tickets' | 'guide-cards' | 'content-tickets' | 'meta-adaccounts' | 'meta-campaigns' | 'meta-kpis' | 'meta-report' | 'meta-insight' | 'meta-overview' | 'ghl-kpi-suggest' | 'ghl-kpis' | 'ghl-kpi-detail' | 'meta-creatives' | 'meta-staff-auth' | 'meta-staff-status' | 'onboarding')" });
   } catch (err) {
     return res.status(500).json({ error: err.message || "internal error" });
@@ -4447,6 +4450,62 @@ function refreshDeriveStatus(row, todayIso) {
   if (todayIso < row.window_start) return "upcoming";
   if (todayIso <= row.window_end) return "open";
   return "overdue";
+}
+
+// ─────────────────────────────────────────────────────────
+// Client media library - every raw file a client has ever sent
+// ─────────────────────────────────────────────────────────
+// Aggregates raw_files across ALL of a client's content tickets plus the
+// file links clients attach to action responses ("Attached:\n• name - url"
+// bullets in their messages). Discovery layer only - the files themselves
+// already live permanently in the ticket-files bucket. Solves "use the
+// b-roll I previously sent" without hunting through completed tickets.
+async function handleClientMedia(req, res) {
+  if (req.method !== "GET") return res.status(405).json({ error: "method not allowed" });
+  const ctx = await resolveUser(req);
+  if (ctx.error) return res.status(ctx.error.status).json({ error: ctx.error.message });
+  if (!hasRole(ctx.staff?.role, CONTENT_ROLES)) {
+    return res.status(403).json({ error: "marketing/content staff only" });
+  }
+  const clientId = req.query.client_id;
+  if (!clientId) return res.status(400).json({ error: "client_id is required" });
+
+  const rows = await sb(
+    `content_tickets?client_id=eq.${clientId}&select=id,title,type,channel,status,submitted_at,raw_files,messages&order=submitted_at.desc`
+  );
+  const files = [];
+  for (const t of rows || []) {
+    const origin = {
+      ticket_id: t.id,
+      code: String(t.id).slice(0, 3).toUpperCase(),
+      ticket_title: (t.title || "").trim() || null,
+      channel: t.channel,
+      ticket_status: t.status,
+    };
+    (Array.isArray(t.raw_files) ? t.raw_files : []).forEach(f => {
+      if (!f || !f.url) return;
+      files.push({
+        url: f.url, name: f.name || "file", type: f.type || "",
+        folder: (f.folder || "").trim(), source: "submission",
+        sent_at: t.submitted_at, ...origin,
+      });
+    });
+    // Action-response attachments arrive as "• name - url" bullets in the
+    // client's message body (see submitReqDetailResponse in the client portal).
+    (Array.isArray(t.messages) ? t.messages : []).forEach(m => {
+      if (!m || m.author_type !== "client" || typeof m.body !== "string") return;
+      for (const line of m.body.split("\n")) {
+        const match = line.match(/^• (.+) - (https?:\/\/\S+)$/);
+        if (match) {
+          files.push({
+            url: match[2], name: match[1], type: "", folder: "",
+            source: "response", sent_at: m.created_at || t.submitted_at, ...origin,
+          });
+        }
+      }
+    });
+  }
+  return res.status(200).json({ files });
 }
 
 async function handleRefreshWindows(req, res) {
