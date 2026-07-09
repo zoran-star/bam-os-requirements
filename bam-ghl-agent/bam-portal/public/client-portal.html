@@ -9104,6 +9104,12 @@ Then the call to action."]</div>
           .hk2-clear .big{width:56px;height:56px;border-radius:50%;background:rgba(76,199,106,.14);color:var(--green,#4CC76A);display:flex;align-items:center;justify-content:center;font-size:26px}
           .hk2-hint{font-size:11px;color:var(--text-mute);margin-top:12px;text-align:center;line-height:1.5}
           .hk2-load{min-height:300px;display:flex;align-items:center;justify-content:center;gap:8px;color:var(--text-sub);font-size:13px}
+          .hk2-seg{display:flex;gap:8px;margin-bottom:4px}
+          .hk2-segbtn{flex:1;background:var(--surface);border:1.5px solid var(--border-med);color:var(--text-sub);border-radius:8px;padding:9px 10px;font:inherit;font-size:12.5px;font-weight:700;cursor:pointer;transition:border-color .15s,background .15s}
+          .hk2-segbtn:hover{border-color:var(--accent)}
+          .hk2-segbtn.on{background:var(--accent);border-color:var(--accent);color:var(--on-gold,#131416)}
+          .hk2-check{display:flex;align-items:center;gap:8px;font-size:12.5px;font-weight:600;color:var(--text-sub);margin:6px 0 4px;cursor:pointer}
+          .hk2-check input{accent-color:var(--accent)}
           @media(max-width:560px){.hk2-tab{font-size:12px;padding:8px 8px}.hk2-thread{max-height:240px}}
           /* ── simple view strip + cascade (Zoran 2026-07-09 redesign: stage
                  top-left, engine wording, card count, Hawkeye need on the
@@ -9115,6 +9121,10 @@ Then the call to action."]</div>
           .plo2-pill{flex:1;position:relative;display:flex;align-items:center;justify-content:space-between;gap:8px;border-radius:12px;padding:10px 12px;text-align:left;cursor:pointer;border:1.5px solid var(--border-med);background:var(--surface);transition:all .22s ease;min-width:0;min-height:64px}
           .plo2-pill.auto{border-style:dashed}
           .plo2-pill:hover{border-color:var(--accent)}
+          /* a stage lights up gold while it has a Hawkeye action waiting */
+          .plo2-pill.needs{border-color:var(--accent);background:var(--gold-sheen,rgba(212,182,92,.06));box-shadow:0 0 0 1px var(--gold-glow,rgba(212,182,92,.12)),0 4px 16px rgba(212,182,92,.14);animation:plo2glow 2.4s ease-in-out infinite}
+          @keyframes plo2glow{0%,100%{box-shadow:0 0 0 1px var(--gold-glow,rgba(212,182,92,.12)),0 4px 16px rgba(212,182,92,.12)}50%{box-shadow:0 0 0 1px var(--accent),0 6px 22px rgba(212,182,92,.28)}}
+          @media(prefers-reduced-motion:reduce){.plo2-pill.needs{animation:none}}
           .plo2-pill.dim{opacity:.45}
           .plo2-pill.active{background:var(--accent);border-color:var(--accent);border-style:solid;color:var(--on-gold,#131416);justify-content:center}
           .plo2-pill .plo2-l{min-width:0}
@@ -16599,9 +16609,10 @@ const _HV2_ICONS = {
 };
 // Open the Hawkeye approval popup right over the home screen (× lands back home).
 function _hv2OpenHawkeye() {
-  // V2: the deck page on the Sales view. V1.5: the legacy overlay.
+  // V2: the deck opens as a focus overlay (standalone Sales page retired).
+  // V1.5: the legacy overlay.
   try {
-    if (typeof _plIsV2 === 'function' && _plIsV2()) { switchView('pipelines'); _hk2Open(); }
+    if (typeof _plIsV2 === 'function' && _plIsV2()) { _hk2Open(); }
     else { _apxOpen(); }
   } catch (_) { try { _apxOpen(); } catch (_) {} }
 }
@@ -32065,15 +32076,71 @@ const _HK2_KIND = {
   enroll:  { pill: 'Ready to enroll', color: 'var(--green,#4CC76A)',   cls: 'green', go: 'Approve and send',              goEdit: 'Confirm edits and send' },
   plan:    { pill: 'Follow-up plan',  color: 'var(--accent)',          cls: '',      go: 'Approve plan - sends 1 day apart', goEdit: 'Confirm edits and approve plan' },
   lost:    { pill: 'Suggested lost',  color: 'var(--red,#F07060)',     cls: 'red',   go: 'Mark lost',                     goEdit: 'Confirm edits and mark lost' },
+  form:    { pill: 'Post-trial form', color: 'var(--accent)',          cls: '',      go: 'Submit post-trial form',        goEdit: 'Submit post-trial form' },
 };
+
+// ── Sales focus overlays (Zoran 2026-07-09) ────────────────────────────────
+// The standalone V2 Sales page is RETIRED: Sales lives on the home page, and
+// Hawkeye + per-stage config open as mm-focus pages over it (same warp effect
+// as the marketing section). The existing hosts #pl-hawkeye and #pl-focus are
+// REPARENTED into this modal on first open so every render fn keeps working.
+let _SF_OPEN = null;   // 'hawkeye' | 'focus' | null
+function _sfUseOverlay() { return _plIsV2() && typeof _ccActive === 'function' && _ccActive(); }
+function _sfEnsure() {
+  if (document.getElementById('salesMachineModal')) return;
+  document.body.insertAdjacentHTML('beforeend', `
+    <div id="salesMachineModal" class="modal-backdrop mm-focus-page" style="display:none" onclick="if(event.target===this)closeSalesFocus()">
+      <div class="modal-card mm-modal-card" onclick="event.stopPropagation()">
+        <button type="button" class="mm-back-btn" onclick="closeSalesFocus()">&lsaquo; Back</button>
+        <div id="sf-body"></div>
+      </div>
+    </div>`);
+}
+function _sfOpen(which) {
+  _sfEnsure();
+  const body = document.getElementById('sf-body');
+  const hawk = document.getElementById('pl-hawkeye');
+  const focus = document.getElementById('pl-focus');
+  if (hawk && hawk.parentElement !== body) body.appendChild(hawk);
+  if (focus && focus.parentElement !== body) body.appendChild(focus);
+  if (hawk) hawk.style.display = which === 'hawkeye' ? '' : 'none';
+  if (focus) focus.style.display = which === 'focus' ? '' : 'none';
+  const already = !!_SF_OPEN;
+  _SF_OPEN = which;
+  if (!already) {
+    // Same warp-in as _mmOpenFocus, minus its _MM (marketing data) gate.
+    const modal = document.getElementById('salesMachineModal');
+    document.documentElement.classList.remove('mm-depth');
+    const mainEl = document.querySelector('.main');
+    if (mainEl) mainEl.classList.remove('mm-tease', 'mm-tease-ready');
+    document.documentElement.classList.add('mm-prewarm');
+    modal.style.display = 'flex';
+    try { _ccFocusHud('salesMachineModal'); } catch (_) {}
+    setTimeout(() => {
+      requestAnimationFrame(() => {
+        document.documentElement.classList.add('mm-focus-open');
+        modal.classList.add('mm-open');
+      });
+    }, 80);
+  }
+  const card = document.querySelector('#salesMachineModal .mm-modal-card');
+  if (card && already) card.scrollTo(0, 0);
+}
+function closeSalesFocus() {
+  if (!_SF_OPEN) return;
+  _SF_OPEN = null;
+  _mmCloseFocus('salesMachineModal');
+  // Home is right behind - refresh its Sales counts so they reflect the work done.
+  try { _cc2Render(); } catch (_) {}
+  try { _ccSalesHawk(); } catch (_) {}
+}
 
 function _hk2Open(agent, contactId) {
   if (typeof _plIsV2 !== 'function' || !_plIsV2()) { try { _apxOpen(contactId || undefined); } catch (_) {} return; }
   if (agent && _HK2_AGENTS.includes(agent)) _HK2.agent = agent;
   _HK2.focusContact = contactId ? String(contactId) : null;
-  _PL_SV = 'hawkeye';
-  _plSVApply();
-  window.scrollTo(0, 0);
+  if (_sfUseOverlay()) { _sfOpen('hawkeye'); }
+  else { _PL_SV = 'hawkeye'; _plSVApply(); window.scrollTo(0, 0); }
   _hk2Refresh();
 }
 async function _hk2Refresh() {
@@ -32101,7 +32168,7 @@ async function _hk2Load() {
   ]);
   const pend = r => ((r && r.ready) || []).filter(x => x.status === 'pending');
   const booking = pend(b).map(r => ({ ...r, _kind: r.kind === 'book' ? 'book' : r.kind === 'ghost' ? 'ghost' : r.kind === 'mark_lost' ? 'lost' : 'reply' }));
-  const confirm = pend(c).map(r => ({ ...r, _kind: r.kind === 'confirm_handoff' ? 'handoff' : r.kind === 'confirm_lost' ? 'lost' : 'reply' }));
+  const confirm = pend(c).map(r => ({ ...r, _kind: r.kind === 'confirm_handoff' ? 'handoff' : r.kind === 'confirm_lost' ? 'lost' : r.kind === 'post_trial' ? 'form' : 'reply' }));
   const clRows = pend(l);
   const plans = new Map(), rest = [];
   for (const r of clRows) {
@@ -32120,10 +32187,11 @@ async function _hk2Load() {
 }
 function _hk2Pick(a) { _HK2.agent = a; _hk2Render(); }
 // Back from the deck = the HOME page's Sales section (Zoran 2026-07-09), with
-// every cascade closed - not the standalone Sales page.
+// every cascade closed. With the overlay model, home is right behind the modal.
 function _hk2Back() {
   _PLO2_OPEN = null;
   try { _CC2_OPEN = null; } catch (_) {}
+  if (typeof _SF_OPEN !== 'undefined' && _SF_OPEN) { closeSalesFocus(); return; }
   _PL_SV = 'overview';
   try { _plRenderOverview(); } catch (_) {}
   _plSVApply();
@@ -32211,13 +32279,32 @@ function _hk2CardHtml(r, pos, total, isTop) {
       <div class="hk2-lbl">Optional goodbye - sends with the move${reason}</div>
       <textarea class="hk2-draft"${id.draft} oninput="_hk2Edited()">${escapeHTML(r.draft_message || '')}</textarea>
       <div class="hk2-note">Approving routes them to Nurture (the long game). You confirm - nothing moves on its own.</div>`;
+  } else if (r._kind === 'form') {
+    // The post-trial form, right in the deck (Zoran 2026-07-09). Same fields
+    // as the board form; submitting routes the lead via /api/ghl/post-trial.
+    const p = _HK2.ptf || {};
+    const seg = (grp, val, lab, on) => `<button type="button" class="hk2-segbtn${on ? ' on' : ''}"${isTop ? ` onclick="_hk2PtfPick('${grp}',${val})"` : ''}>${lab}</button>`;
+    body = `${_hk2ThreadHtml(r)}
+      <div class="hk2-lbl">Did ${escapeHTML(r.athlete_name || 'the athlete')} show up?</div>
+      <div class="hk2-seg">${seg('showed', true, 'Showed up', p.showed === true)}${seg('showed', false, 'No show', p.showed === false)}</div>
+      <div id="hk2-ptf-rest" style="display:${p.showed === true ? '' : 'none'}">
+        <div class="hk2-lbl">Was the trial a good fit?</div>
+        <div class="hk2-seg">${seg('fit', true, 'Good fit', p.fit === true)}${seg('fit', false, 'Not a fit', p.fit === false)}</div>
+        <div class="hk2-lbl">First message to the parent</div>
+        <textarea class="hk2-draft"${isTop ? ' id="hk2-ptf-msg"' : ''} placeholder="Great seeing you tonight - here's how to lock in a spot..."></textarea>
+        <label class="hk2-check"><input type="checkbox"${isTop ? ' id="hk2-ptf-link"' : ''} checked> Add the sign-up link at the bottom</label>
+        <div class="hk2-lbl">Special notes - the Closing agent reads these</div>
+        <textarea class="hk2-draft sm"${isTop ? ' id="hk2-ptf-notes"' : ''} placeholder="Loved the small-group drills, dad asked about Tuesdays..."></textarea>
+      </div>
+      <div class="hk2-note">One submit routes them: good fit moves to Done Trial, no-show hands Booking the rebook, not a fit closes as unqualified.</div>`;
   } else {
     body = `${_hk2ThreadHtml(r)}
       <div class="hk2-lbl">${r._kind === 'enroll' ? 'The reply, sign-up link included · edit it right here' : 'Proposed message · edit it right here'}</div>
       <textarea class="hk2-draft"${id.draft} oninput="_hk2Edited()">${escapeHTML(r.draft_message || '')}</textarea>
       ${r._kind === 'enroll' ? '<div class="hk2-note">The opportunity is marked won automatically when they pay on the link.</div>' : ''}`;
   }
-  const moves = _hk2Moves(r).map(([lab, op]) => `<button class="hk2-x" onclick="_hk2Move('${op}')">${lab}</button>`).join('');
+  const isForm = r._kind === 'form';
+  const moves = isForm ? '' : _hk2Moves(r).map(([lab, op]) => `<button class="hk2-x" onclick="_hk2Move('${op}')">${lab}</button>`).join('');
   return `
     <div class="hk2-head">
       <div class="hk2-av">${escapeHTML(_hk2Initials(r.contact_name))}</div>
@@ -32230,15 +32317,31 @@ function _hk2CardHtml(r, pos, total, isTop) {
     ${ctx ? `<div class="hk2-ctx">${escapeHTML(ctx)}</div>` : ''}
     ${body}
     <input class="hk2-teach"${id.teach} style="display:none" placeholder="Required: teach the agent why you changed it (saved as a lesson)">
-    <div class="hk2-other"${id.other}><div class="hk2-other-in"><span class="hk2-lbl">Move the lead</span>${moves}</div></div>
+    ${isForm ? '' : `<div class="hk2-other"${id.other}><div class="hk2-other-in"><span class="hk2-lbl">Move the lead</span>${moves}</div></div>`}
     <div class="hk2-bar">
-      <button class="hk2-otherbtn" onclick="_hk2ToggleOther(this)">Other</button>
+      ${isForm ? '' : `<button class="hk2-otherbtn" onclick="_hk2ToggleOther(this)">Other</button>`}
       <button class="hk2-go ${km.cls}"${id.go} onclick="_hk2Confirm()">${km.go}</button>
     </div>`;
 }
-function _hk2Render() {
+// Post-trial form segmented pickers: state on _HK2.ptf, re-render keeps it.
+function _hk2PtfPick(grp, val) {
+  if (!_HK2.ptf) _HK2.ptf = {};
+  // Preserve typed text across the re-render (the textareas are inside the card).
+  const msg = document.getElementById('hk2-ptf-msg'), notes = document.getElementById('hk2-ptf-notes'), link = document.getElementById('hk2-ptf-link');
+  _HK2.ptf[grp === 'showed' ? 'showed' : 'fit'] = val;
+  _HK2.ptf.msg = msg ? msg.value : (_HK2.ptf.msg || '');
+  _HK2.ptf.notes = notes ? notes.value : (_HK2.ptf.notes || '');
+  _HK2.ptf.link = link ? link.checked : (_HK2.ptf.link !== false);
+  _hk2Render({ keepPtf: true });
+  const m2 = document.getElementById('hk2-ptf-msg'), n2 = document.getElementById('hk2-ptf-notes'), l2 = document.getElementById('hk2-ptf-link');
+  if (m2) m2.value = _HK2.ptf.msg || '';
+  if (n2) n2.value = _HK2.ptf.notes || '';
+  if (l2) l2.checked = _HK2.ptf.link !== false;
+}
+function _hk2Render(opts) {
   const host = document.getElementById('pl-hawkeye'); if (!host || !_HK2.q) return;
   _HK2.edited = false; _HK2.otherOpen = false;
+  if (!(opts && opts.keepPtf)) _HK2.ptf = { showed: null, fit: null, link: true, msg: '', notes: '' };
   const tabs = _HK2_AGENTS.map(a => {
     const n = _HK2.q[a].length, on = _HK2.agent === a;
     return `<button class="hk2-tab${on ? ' on' : ''}" onclick="_hk2Pick('${a}')"><span class="hk2-tmain">${_HK2_META[a].label}${n ? `<span class="hk2-n">${n}</span>` : ''}</span><span class="hk2-tgear" onclick="event.stopPropagation();_hk2Gear('${a}')" title="Configure this stage">${_plIcon('gear', 14)}</span></button>`;
@@ -32360,6 +32463,22 @@ function _hk2Confirm() {
   const calEl = document.getElementById('hk2-cal'), slotEl = document.getElementById('hk2-slot');
   const calV = (calEl && calEl.value) || r.book_calendar_id, slotV = (slotEl && slotEl.value) || r.book_slot_at;
   const planEdits = k === 'plan' ? (r.rows || []).map((row, i) => { const el = document.getElementById('hk2-plan-' + i); return { id: row.id, reply: (el ? el.value : row.draft_message || '').trim() }; }) : null;
+  let ptf = null;
+  if (k === 'form') {
+    const p = _HK2.ptf || {};
+    if (p.showed !== true && p.showed !== false) { _apxToast('Pick Showed up or No show first', false); return; }
+    if (p.showed === true && p.fit !== true && p.fit !== false) { _apxToast('Pick Good fit or Not a fit', false); return; }
+    const msgEl = document.getElementById('hk2-ptf-msg'), notesEl = document.getElementById('hk2-ptf-notes'), linkEl = document.getElementById('hk2-ptf-link');
+    ptf = {
+      opportunity_id: r.opportunity_id,
+      showed_up: p.showed,
+      good_fit: p.showed === true ? p.fit : false,
+      trainer: '',
+      notes: (notesEl ? notesEl.value : '').trim(),
+      first_message: p.showed === true ? (msgEl ? msgEl.value : '').trim() : '',
+      send_onboarding_link: p.showed === true ? !!(linkEl && linkEl.checked) : false,
+    };
+  }
   const chk = resp => { if (resp && resp.error) throw new Error(resp.error); return resp; };
   let undone = false;
   _hawkDefer({ cardId: 'hk2-topcard', label: _HK2_KIND[k].go, restore: () => { undone = true; _hk2Unresolve(agent, r); }, run: async () => {
@@ -32379,6 +32498,11 @@ function _hk2Confirm() {
     } else if (k === 'lost') {
       chk(await _apxPost(ep, 'confirm-lost', { ready_id: r.id, reply, lost_reason: r.lost_reason || 'Other' }));
       _apxToast('Marked lost - Nurture takes over', true);
+    } else if (k === 'form') {
+      const token = await _mreqAuthToken();
+      const res = await fetch('/api/ghl/post-trial?client_id=' + encodeURIComponent(CLIENT_ID), { method: 'POST', headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' }, body: JSON.stringify(ptf) });
+      const j = await _safeJson(res); if (!res.ok) throw new Error((j && j.error) || ('HTTP ' + res.status));
+      _apxToast(ptf.showed_up === false ? 'No-show logged - Booking drafts the rebook' : ptf.good_fit ? 'Routed to Done Trial - Closing takes over' : 'Closed as not a fit', true);
     } else if (k === 'plan') {
       const edits = planEdits;
       const token = await _mreqAuthToken();
@@ -32698,11 +32822,20 @@ function _plo2Pills(stages, nav) {
            <div class="cnt">${opps.length} card${opps.length === 1 ? '' : 's'}</div>
          </div>${need}`;
     const conn = i < stages.length - 1 ? arrow : '';
-    return `<div class="plo2-pill${kind === 'automation' ? ' auto' : ''}${isOpen ? ' active' : ''}${openId && !isOpen ? ' dim' : ''}" onclick="${toggle}('${escapeHTML(s2.id)}')">${inner}</div>${conn}`;
+    const lit = (kind === 'agent' && sig.hawk) ? ' needs' : '';
+    return `<div class="plo2-pill${kind === 'automation' ? ' auto' : ''}${isOpen ? ' active' : ''}${lit}${openId && !isOpen ? ' dim' : ''}" onclick="${toggle}('${escapeHTML(s2.id)}')">${inner}</div>${conn}`;
   }).join('');
   return { html, hawk };
 }
 let _PLO2_OPEN = null;   // stage id whose cascade is open on the simple view
+// Stages whose cascade shows EVERYONE (the "+N more" was tapped). The board
+// view is retired as a destination - the cascade just expands in place.
+const _PLO2_SHOWALL = new Set();
+function _plo2ShowAll(id) {
+  _PLO2_SHOWALL.add(id);
+  try { if (typeof _cc2Render === 'function') _cc2Render(); } catch (_) {}
+  try { _plRenderOverview(); } catch (_) {}
+}
 function _plo2Toggle(id) { _PLO2_OPEN = _PLO2_OPEN === id ? null : id; _plRenderOverview(); }
 // The cascade: highlight rows ONLY - no Hawkeye actions live here. A glowing
 // lead opens the Hawkeye deck on their card; a plain lead opens the drawer.
@@ -32711,7 +32844,7 @@ function _plo2Cascade(stage, nav) {
   // route clicks through _ccOpenClassic before the deck / drawer / board opens.
   const leadFn = nav && nav.lead;
   const cardFn = (nav && nav.card) || '_plOpenCard';
-  const moreFn = (nav && nav.more) || '_plSVStage';
+  const moreFn = (nav && nav.more) || '_plo2ShowAll';
   const opps = stage.opportunities || [];
   const bot = (typeof _plStageBot === 'function') ? _plStageBot(stage.name) : null;
   const kind = bot ? bot.kind : 'human';
@@ -32721,6 +32854,7 @@ function _plo2Cascade(stage, nav) {
     mark_lost: 'lost suggested', confirm: 'reply · draft ready', confirm_auto: 'reminder ready',
     confirm_handoff: 'reschedule · needs a new time', confirm_lost: 'lost suggested',
     closing: 'reply · draft ready', closing_enroll: 'ready to enroll', closing_lost: 'lost suggested',
+    post_trial: 'post-trial form to fill',
   };
   const enr = (o) => (kind === 'automation' && typeof _PL_ENR !== 'undefined' && _PL_ENR) ? _PL_ENR.get(String(o.contactId || '')) : null;
   const needy = [], plain = [];
@@ -32750,8 +32884,10 @@ function _plo2Cascade(stage, nav) {
       <div style="min-width:0"><div class="who">${escapeHTML(nm)}</div>${st ? `<div class="st">${escapeHTML(st)}</div>` : ''}</div></div></div>`;
   };
   const all = [...needy, ...plain];
-  const rows = all.slice(0, 30).map(row).join('');
-  const more = all.length > 30 ? `<div class="plo2-more" onclick="${moreFn}('${escapeHTML(stage.id)}')">+ ${all.length - 30} more - open the board view</div>` : '';
+  const showAll = typeof _PLO2_SHOWALL !== 'undefined' && _PLO2_SHOWALL.has(stage.id);
+  const cap = showAll ? all.length : 30;
+  const rows = all.slice(0, cap).map(row).join('');
+  const more = all.length > cap ? `<div class="plo2-more" onclick="${moreFn}('${escapeHTML(stage.id)}')">+ ${all.length - cap} more - show everyone</div>` : '';
   const hint = kind === 'agent' ? 'gold ring = needs you in Hawkeye · tap it to handle · plain card = lead drawer'
              : kind === 'automation' ? 'the automation runs this stage - tap a lead for the drawer'
              : 'you run this stage - tap a lead for the drawer';
@@ -32793,9 +32929,11 @@ function _ploStripCells(stages, nav) {
 }
 // Command-center home strip handlers: leave cc-mode into the classic Sales view,
 // then focus the tapped stage / gear / hawkeye once it has mounted.
-function _ccPipeStage(id) { try { _ccOpenClassic('pipelines'); } catch (_) {} setTimeout(() => { try { _plSVStage(id); } catch (_) {} }, 120); }
-function _ccPipeFocus(id) { try { _ccOpenClassic('pipelines'); } catch (_) {} setTimeout(() => { try { _plOpenFocus(id); } catch (_) {} }, 120); }
-function _ccPipeHawk(key) { try { _ccOpenClassic('pipelines'); } catch (_) {} setTimeout(() => { try { _plEngineHawk(key); } catch (_) {} }, 120); }
+// V2: the standalone Sales page is retired - config + Hawkeye open as focus
+// overlays right over home. (V1.5 still routes through the classic view.)
+function _ccPipeStage(id) { if (_plIsV2()) { _cc2Toggle(id); return; } try { _ccOpenClassic('pipelines'); } catch (_) {} setTimeout(() => { try { _plSVStage(id); } catch (_) {} }, 120); }
+function _ccPipeFocus(id) { if (_plIsV2()) { try { _plOpenFocus(id); } catch (_) {} return; } try { _ccOpenClassic('pipelines'); } catch (_) {} setTimeout(() => { try { _plOpenFocus(id); } catch (_) {} }, 120); }
+function _ccPipeHawk(key) { if (_plIsV2()) { try { _plEngineHawk(key); } catch (_) {} return; } try { _ccOpenClassic('pipelines'); } catch (_) {} setTimeout(() => { try { _plEngineHawk(key); } catch (_) {} }, 120); }
 const _CC_PIPE_NAV = { stage: '_ccPipeStage', gear: '_ccPipeFocus', hawk: '_ccPipeHawk', hideClear: true };
 
 // ── Command-center HOME pill strip (Zoran 2026-07-09) ──────────────────────
@@ -32805,9 +32943,11 @@ const _CC_PIPE_NAV = { stage: '_ccPipeStage', gear: '_ccPipeFocus', hawk: '_ccPi
 let _CC2_STAGES = null;  // home copy of the stage list (set by _ccSalesLoad)
 let _CC2_OPEN = null;    // stage id whose cascade is open on home
 function _cc2Toggle(id) { _CC2_OPEN = _CC2_OPEN === id ? null : id; _cc2Render(); }
-function _cc2Lead(cid) { try { _ccOpenClassic('pipelines'); } catch (_) {} setTimeout(() => { try { _hk2Open(null, cid); } catch (_) {} }, 120); }
-function _cc2Card(id) { try { _ccOpenClassic('pipelines'); } catch (_) {} setTimeout(() => { try { _plOpenCard(id); } catch (_) {} }, 120); }
-const _CC2_CASC_NAV = { lead: '_cc2Lead', card: '_cc2Card', more: '_ccPipeStage' };
+// Standalone Sales page retired (Zoran 2026-07-09): the deck opens as a focus
+// overlay right here, and the lead drawer opens in place - no classic hop.
+function _cc2Lead(cid) { try { _hk2Open(null, cid); } catch (_) {} }
+function _cc2Card(id) { try { _plOpenCard(id); } catch (_) {} }
+const _CC2_CASC_NAV = { lead: '_cc2Lead', card: '_cc2Card', more: '_plo2ShowAll' };
 function _cc2Render() {
   const strip = document.getElementById('cc-sal-strip');
   if (!strip || !_CC2_STAGES) return;
@@ -32841,8 +32981,12 @@ function _plSVApply() {
   if (!ov || !board) return;
   if (!_plIsV2()) { ov.style.display = 'none'; if (focus) focus.style.display = 'none'; if (hawk) hawk.style.display = 'none'; if (tabs) tabs.style.display = ''; board.style.display = ''; return; }
   const sv = _PL_SV;
-  if (focus) focus.style.display = sv === 'focus' ? '' : 'none';
-  if (hawk) hawk.style.display = sv === 'hawkeye' ? '' : 'none';
+  // While a Sales focus overlay is up (#pl-focus / #pl-hawkeye live inside the
+  // modal), background refreshes must NOT touch those hosts' visibility.
+  if (typeof _SF_OPEN === 'undefined' || !_SF_OPEN) {
+    if (focus) focus.style.display = sv === 'focus' ? '' : 'none';
+    if (hawk) hawk.style.display = sv === 'hawkeye' ? '' : 'none';
+  }
   ov.style.display = sv === 'overview' ? '' : 'none';
   const boardShown = sv === 'board';
   if (tabs) tabs.style.display = boardShown ? '' : 'none';
@@ -32865,6 +33009,8 @@ function _plToBoard(stageId) {
 function _plSVExpand() { _plToBoard(null); }
 function _plSVStage(stageId) { _plToBoard(stageId); }
 function _plSVCollapse() {
+  // Inside a Sales focus overlay, "back" just closes the overlay - home is behind.
+  if (typeof _SF_OPEN !== 'undefined' && _SF_OPEN) { _PL_FOCUS = null; closeSalesFocus(); return; }
   _PL_STAGE_ONLY = null; _PL_FOCUS = null; _PL_SV = 'overview'; _plRenderOverview(); _plSVApply();
   const ov = document.getElementById('pl-overview');
   if (ov) { ov.classList.remove('enter'); void ov.offsetWidth; ov.classList.add('enter'); }
@@ -32882,12 +33028,17 @@ function _plOpenFocus(stageId) {
   const stage = stages[idx]; if (!stage) return;
   _PL_FOCUS = { stageId };
   _PL_EDGE_FORM = null;
-  _PL_SV = 'focus';
   _plRenderFocus(stage, stages, idx);
-  _plSVApply();
+  if (typeof _sfUseOverlay === 'function' && _sfUseOverlay()) {
+    // Config opens as a focus overlay over the home (standalone page retired).
+    _sfOpen('focus');
+  } else {
+    _PL_SV = 'focus';
+    _plSVApply();
+    window.scrollTo(0, 0);
+  }
   const f = document.getElementById('pl-focus');
   if (f) { f.classList.remove('plfin'); void f.offsetWidth; f.classList.add('plfin'); }
-  window.scrollTo(0, 0);
 }
 function _plRenderFocus(stage, stages, idx) {
   const host = document.getElementById('pl-focus'); if (!host) return;
@@ -47768,8 +47919,9 @@ function _ccStyle() {
     '.cc-sec.cc-visible{opacity:1;transform:none}' +
     '.cc-sec-head{margin-bottom:16px}' +
     '.cc-kicker{font-family:var(--mono);font-size:10px;font-weight:600;letter-spacing:.18em;text-transform:uppercase;color:var(--text-mute)}' +
-    '.cc-title{font-family:var(--font-num);font-size:24px;font-weight:800;color:var(--text);margin-top:2px}' +
+    '.cc-title{font-family:var(--font-num);font-size:44px;font-weight:900;letter-spacing:-.01em;line-height:1.05;color:var(--text);margin-top:2px}' +
     '.cc-sub{font-size:12.5px;color:var(--text-mute);margin-top:3px}' +
+    '@media(max-width:768px){.cc-title{font-size:34px}}' +
     /* stat tiles + action buttons */
     '.cc-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:14px}' +
     '.cc-stat{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:16px 18px;box-shadow:0 1px 3px rgba(0,0,0,.04)}' +
@@ -47806,6 +47958,25 @@ function _ccStyle() {
     '.cc-sal-names{display:flex;flex-wrap:wrap;gap:4px 10px;margin-top:8px}' +
     '.cc-sal-name{background:none;border:none;padding:0;font:inherit;font-size:12px;font-weight:600;color:var(--text-sub);cursor:pointer;white-space:nowrap}' +
     '.cc-sal-name:hover{color:var(--gold);text-decoration:underline}' +
+    // 2026-07-09 wireframe layout: two KPI cards + one pipeline panel
+    '.cc-sal-kpis{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px}' +
+    '.cc-sal-kpirow{display:flex;align-items:baseline;gap:10px}' +
+    '.cc-sal-kpirow+.cc-sal-kpirow{margin-top:6px}' +
+    '.cc-sal-list{display:flex;flex-direction:column;gap:6px;margin-top:10px}' +
+    '.cc-sal-li{font-size:12.5px;color:var(--text-sub);background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:7px 11px;display:flex;gap:9px;align-items:baseline;min-width:0}' +
+    '.cc-sal-li .t{font-size:11px;font-weight:700;color:var(--text-mute);white-space:nowrap}' +
+    '.cc-sal-li .n{font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}' +
+    '.cc-sal-li.click{cursor:pointer}' +
+    '.cc-sal-li.click:hover{border-color:var(--gold)}' +
+    '.cc-sal-pipe{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:14px;box-shadow:0 1px 3px rgba(0,0,0,.04)}' +
+    '.cc-sal-hawkbar{width:100%;display:flex;align-items:center;justify-content:center;gap:9px;background:transparent;border:1.5px solid var(--accent-border,rgba(212,182,92,.3));color:var(--text);border-radius:12px;padding:12px 14px;font:inherit;font-size:13px;font-weight:800;letter-spacing:.09em;cursor:pointer;margin-bottom:12px;transition:background .2s,border-color .2s}' +
+    '.cc-sal-hawkbar svg{color:var(--gold)}' +
+    '.cc-sal-hawkbar:hover{border-color:var(--gold);background:var(--gold-sheen,rgba(212,182,92,.06))}' +
+    '.cc-sal-hawkbar.has{background:var(--gold);border-color:var(--gold);color:var(--on-gold,#131416)}' +
+    '.cc-sal-hawkbar.has svg{color:var(--on-gold,#131416)}' +
+    '.cc-sal-hawkbar .hb-n{background:var(--on-gold,#131416);color:var(--gold);border-radius:999px;font-size:11px;font-weight:800;min-width:19px;height:19px;display:inline-flex;align-items:center;justify-content:center;padding:0 6px}' +
+    '.cc-sal-hawkbar .hb-top{font-size:11.5px;font-weight:600;letter-spacing:0;opacity:.8;margin-left:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}' +
+    '@media(max-width:768px){.cc-sal-kpis{grid-template-columns:1fr}.cc-sal-hawkbar .hb-top{display:none}}' +
     /* full-width Hawkeye action card: next queued action, opens focus mode on click */
     '.cc-hawk-card{display:flex;align-items:center;gap:20px;background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:16px 18px;box-shadow:0 1px 3px rgba(0,0,0,.04);margin-bottom:12px;cursor:pointer;transition:transform .2s var(--es,ease),box-shadow .2s,border-color .2s,background .2s}' +
     '.cc-hawk-card:hover{transform:translateY(-2px);box-shadow:0 4px 14px rgba(0,0,0,.06)}' +
@@ -48934,31 +49105,34 @@ function _ccMountHome(host) {
 // hawkeye actions, quick stats). PLOP-IN SLOT - Zoran's new Sales section
 // replaces the contents of #cc-sales-mount.
 function _ccMountSales(host) {
-  host.innerHTML = _ccHead('Sales', 'Pipeline, agents and trials.') + `
+  // Layout locked to Zoran's 2026-07-09 wireframe: two KPI cards up top
+  // (trials today with the list of names · close rate + this week's sales
+  // with names), then ONE pipeline panel: full-width HAWKEYE bar, the pill
+  // strip, and the lowkey recent-movement feed.
+  host.innerHTML = _ccHead('Sales') + `
     <div id="cc-sales-mount">
-      <div class="cc-sal-bench">
-        <span class="cc-sal-orb"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8"/><line x1="12" y1="2" x2="12" y2="6"/><line x1="12" y1="18" x2="12" y2="22"/><line x1="2" y1="12" x2="6" y2="12"/><line x1="18" y1="12" x2="22" y2="12"/><circle cx="12" cy="12" r="2"/></svg></span>
-        <div class="cc-sal-bench-t"><b>Hawk</b><span>Sales rep</span></div>
-      </div>
-      <div class="cc-hawk-card" id="cc-sal-hawkcard" onclick="_hv2OpenHawkeye()" title="Open Hawkeye focus mode">
-        <div class="cc-hawk-hero">
-          <div class="cc-hawk-n" id="cc-sal-hawkcard-n">-</div>
-          <div class="cc-hawk-lab">Hawkeye actions</div>
-        </div>
-        <div class="cc-hawk-body" id="cc-sal-hawkcard-body"><div class="cc-hawk-empty">Checking with Hawk...</div></div>
-        <span class="cc-hawk-go" id="cc-sal-hawkcard-go" style="display:none">Review &rsaquo;</span>
-      </div>
-      <div class="cc-stats">
+      <div class="cc-sal-kpis">
         <div class="cc-stat click" onclick="_ccOpenClassic('calendar')" title="Jump to the calendar">
-          <div class="cc-stat-v" id="cc-sal-trials">-</div>
-          <div class="cc-stat-l">Trials today</div>
+          <div class="cc-sal-kpirow"><div class="cc-stat-v" id="cc-sal-trials">-</div><div class="cc-stat-l">Trials today</div></div>
+          <div class="cc-sal-list" id="cc-sal-trials-list"></div>
           <div class="cc-stat-d" id="cc-sal-next"></div>
         </div>
-        <div class="cc-stat"><div class="cc-stat-v" id="cc-sal-7d">-</div><div class="cc-stat-l">Sales - 7 days</div><div class="cc-sal-names" id="cc-sal-7d-names"></div></div>
-        <div class="cc-stat"><div class="cc-stat-v" id="cc-sal-close">-</div><div class="cc-stat-l">Trial closing rate</div></div>
+        <div class="cc-stat">
+          <div class="cc-sal-kpirow"><div class="cc-stat-v" id="cc-sal-close">-</div><div class="cc-stat-l">Qualified trial close rate</div></div>
+          <div class="cc-sal-kpirow"><div class="cc-stat-v" id="cc-sal-7d">-</div><div class="cc-stat-l">Sales in the past week</div></div>
+          <div class="cc-sal-list" id="cc-sal-7d-names"></div>
+        </div>
       </div>
-      <div class="cc-pipe-strip" id="cc-sal-strip"></div>
-      <div class="cc-sal-feed" id="cc-sal-feed"></div>
+      <div class="cc-sal-pipe">
+        <button type="button" class="cc-sal-hawkbar" id="cc-sal-hawkbar" onclick="_hv2OpenHawkeye()" title="Open Hawkeye">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+          <span>HAWKEYE</span>
+          <span class="hb-n" id="cc-sal-hawkbar-n" style="display:none"></span>
+          <span class="hb-top" id="cc-sal-hawkbar-top"></span>
+        </button>
+        <div class="cc-pipe-strip" id="cc-sal-strip"></div>
+        <div class="cc-sal-feed" id="cc-sal-feed"></div>
+      </div>
     </div>`;
   _ccLoadTrialsCount();
   _ccSalesLoad();
@@ -48983,18 +49157,24 @@ async function _ccLoadTrialsCount() {
     }
   } catch (_) {}
 }
-// Compact sub-line under the Trials-today KPI: the soonest of today's trials
-// (time · athlete name). The full list lives one tap away on the calendar.
+// The full list of today's trials inside the KPI card (Zoran's wireframe):
+// one row per trial - time + athlete (parent in the sub position if no athlete).
 function _ccRenderTrialsList(trials, tz) {
-  const sub = document.getElementById('cc-sal-next'); if (!sub) return;
-  if (!trials || !trials.length) { sub.textContent = ''; return; }
-  const next = trials
+  const listEl = document.getElementById('cc-sal-trials-list');
+  const sub = document.getElementById('cc-sal-next');
+  if (sub) sub.textContent = '';
+  if (!listEl) return;
+  if (!trials || !trials.length) { listEl.innerHTML = ''; return; }
+  const rows = trials
     .filter(t => t.start)
-    .sort((a, b) => new Date(a.start) - new Date(b.start))[0] || trials[0];
-  let time = '';
-  try { if (next.start) time = new Date(next.start).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: tz || 'America/Toronto' }); } catch (_) {}
-  const nm = _ccCapName((next.athlete || next.contactName || 'Trial').split(' ').slice(0, 2).join(' '));
-  sub.textContent = (time ? time + ' · ' : '') + nm;
+    .sort((a, b) => new Date(a.start) - new Date(b.start))
+    .map(t => {
+      let time = '';
+      try { time = new Date(t.start).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: tz || 'America/Toronto' }); } catch (_) {}
+      const nm = _ccCapName(String(t.athlete || t.contactName || 'Trial').split(' ').slice(0, 2).join(' '));
+      return `<div class="cc-sal-li"><span class="t">${escapeHTML(time)}</span><span class="n">${escapeHTML(nm)}</span></div>`;
+    }).join('');
+  listEl.innerHTML = rows;
 }
 // "Trials today: 0" is a dead number - show the next booked trial instead.
 async function _ccNextTrial() {
@@ -49091,56 +49271,57 @@ async function _ccSalesKpis() {
     if (!r.ok) return;
     const s7 = document.getElementById('cc-sal-7d'); if (s7) s7.textContent = (j.sales_7d != null ? String(j.sales_7d) : '-');
     const cl = document.getElementById('cc-sal-close'); if (cl) cl.textContent = (j.closing_rate != null ? j.closing_rate + '%' : '-');
-    // The names behind the number - each opens the member drawer.
+    // The names behind the number - list rows, each opens the member drawer.
     const nm = document.getElementById('cc-sal-7d-names');
     if (nm) nm.innerHTML = (j.sales || []).map(s =>
-      `<button type="button" class="cc-sal-name" onclick="event.stopPropagation();openMemberPopup('${escapeHTML(s.id)}')">${escapeHTML(_ccCapName((s.name || 'Member').split(' ').filter(Boolean).slice(0, 2).join(' ')))}</button>`
+      `<div class="cc-sal-li click" onclick="event.stopPropagation();openMemberPopup('${escapeHTML(s.id)}')"><span class="n">${escapeHTML(_ccCapName((s.name || 'Member').split(' ').filter(Boolean).slice(0, 2).join(' ')))}</span></div>`
     ).join('');
   } catch (_) { /* leave the dashes */ }
 }
 function _ccHawkVerb(kind) {
-  return ({ reply: 'needs a reply', book: 'has a trial to confirm', ghost: 'should go to Ghosted', mark_lost: 'to confirm as lost' })[kind] || 'needs a look';
+  return ({
+    reply: 'needs a reply', book: 'has a trial to book', ghost: 'should go to Ghosted',
+    mark_lost: 'to confirm as lost', confirm: 'needs a reply', confirm_auto: 'has a reminder to approve',
+    confirm_handoff: 'needs a new time', confirm_lost: 'to confirm as lost',
+    closing: 'needs a reply', closing_enroll: 'is ready to enroll', closing_lost: 'to confirm as lost',
+    post_trial: 'needs the post-trial form',
+  })[kind] || 'needs a look';
 }
-// Hawk's live message on the right of the Sales bench: the top queued action +
-// how many are waiting. Tapping it opens the Hawkeye focus view. Fetches its own
-// data (the command center doesn't run the home rail loader).
+// The HAWKEYE bar on the home Sales panel: waiting-action count + the top
+// queued action, pulled from ALL THREE agents (followups are retired; the old
+// version only saw Booking, so Confirm/Closing actions never showed - fixed
+// 2026-07-09). Closing's followup_N rows group to one action per contact.
 async function _ccSalesHawk() {
   const items = [];
   try {
-    const [fu, rd] = await Promise.all([
-      _apxPost('/api/agent-followups', 'list', {}).catch(() => ({})),
+    const [b, c, l] = await Promise.all([
       _apxPost('/api/agent-approvals', 'list-ready', {}).catch(() => ({})),
+      _apxPost('/api/agent-confirm', 'list-ready', {}).catch(() => ({})),
+      _apxPost('/api/agent-closing', 'list-ready', {}).catch(() => ({})),
     ]);
-    const d = _apxSplit(fu, rd);
-    for (const r of (d.ready || []))     items.push({ name: r.contact_name, desc: _ccHawkVerb(r.kind) });
-    for (const f of (d.followups || [])) items.push({ name: f.contact_name, desc: 'has a follow-up ready' });
-    for (const b of (d.book || []))      items.push({ name: b.contact_name, desc: 'has a trial to confirm' });
-    for (const g of (d.ghost || []))     items.push({ name: g.contact_name, desc: 'should go to Ghosted' });
-    for (const l of (d.lost || []))      items.push({ name: l.contact_name, desc: 'to confirm as lost' });
+    const pend = r => ((r && r.ready) || []).filter(x => x.status === 'pending');
+    for (const r of pend(b)) items.push({ name: r.contact_name, desc: _ccHawkVerb(r.kind) });
+    for (const r of pend(c)) items.push({ name: r.contact_name, desc: _ccHawkVerb(r.kind) });
+    const planned = new Set();
+    for (const r of pend(l)) {
+      if ((r.step_key || '').startsWith('followup_')) {
+        const k = String(r.ghl_contact_id);
+        if (planned.has(k)) continue;
+        planned.add(k);
+        items.push({ name: r.contact_name, desc: 'has a follow-up plan to approve' });
+      } else items.push({ name: r.contact_name, desc: _ccHawkVerb(r.kind) });
+    }
   } catch (_) {}
   const total = items.length;
   window._hmHawkTotal = total;
   const top = total ? items[0] : null;
   const topNm = top ? escapeHTML(_hmStripEm(_ccHawkCleanName(top.name))) : '';
-
-  // Full-width Hawkeye action card is the single Hawkeye surface on the Sales
-  // page: big count + the next queued action, or an all-clear empty state.
-  // Tapping the card opens the Hawkeye focus view.
-  const cardN = document.getElementById('cc-sal-hawkcard-n');
-  const cardBody = document.getElementById('cc-sal-hawkcard-body');
-  const cardGo = document.getElementById('cc-sal-hawkcard-go');
-  const card = document.getElementById('cc-sal-hawkcard');
-  if (cardN) cardN.textContent = String(total);
-  if (card) card.classList.toggle('has', total > 0);
-  if (cardGo) cardGo.style.display = total > 0 ? '' : 'none';
-  if (cardBody) {
-    if (!total) {
-      cardBody.innerHTML = `<div class="cc-hawk-empty">All caught up. No Hawkeye actions waiting.</div>`;
-    } else {
-      const more = total > 1 ? `<div class="cc-hawk-more">+${total - 1} more waiting</div>` : '';
-      cardBody.innerHTML = `<div class="cc-hawk-top"><b>${topNm}</b> ${escapeHTML(top.desc)}</div>${more}`;
-    }
-  }
+  const bar = document.getElementById('cc-sal-hawkbar');
+  const barN = document.getElementById('cc-sal-hawkbar-n');
+  const barTop = document.getElementById('cc-sal-hawkbar-top');
+  if (bar) bar.classList.toggle('has', total > 0);
+  if (barN) { barN.style.display = total ? '' : 'none'; barN.textContent = String(total); }
+  if (barTop) barTop.innerHTML = total ? `<b>${topNm}</b> ${escapeHTML(top.desc)}` : 'all clear';
 }
 // A lead with no resolved name comes back as a raw phone/contact id - never show
 // that. Fall back to "A lead" so the card reads like a sentence.

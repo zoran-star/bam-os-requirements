@@ -181,7 +181,7 @@ async function threadMessages(token, conversationId) {
     text: m.body || m.message || "",
     direction: (m.direction || "").toLowerCase(),
     date: m.dateAdded || m.createdAt || m.timestamp || null,
-  })).filter(m => m.text);
+  })).filter(m => m.text && !(m.direction !== "outbound" && /^Liked\b/.test(m.text.trim())));   // inbound tapbacks never register (Zoran 2026-07-09)
   msgs.sort((a, b) => new Date(a.date || 0) - new Date(b.date || 0));
   return msgs.map(m => ({ role: m.direction === "outbound" ? "agent" : "parent", text: m.text, date: m.date }));
 }
@@ -762,6 +762,44 @@ async function handler(req, res) {
         }
         if (ids) list = list.filter(r => !r.ghl_contact_id || ids.has(r.ghl_contact_id));
       } catch (_) { /* fail open */ }
+      // Post-trial form cards (Zoran 2026-07-09): a trial that already ran with
+      // NO post_trial_reviews row = a Hawkeye action on the Confirm tab. The
+      // deck renders the form (showed up / good fit / first message / link /
+      // notes) and submits it through /api/ghl/post-trial. Portal-booking
+      // academies only - their trial spine lives in trial_bookings.
+      try {
+        const client = await loadClient(clientId);
+        if (client && client.booking_provider === "portal") {
+          const since = new Date(Date.now() - 7 * 86400000).toISOString();
+          const nowIso = new Date().toISOString();
+          const bks = await sb(`trial_bookings?tenant_id=eq.${clientId}&status=eq.BOOKED&select=id,ghl_contact_id,parent_name,athlete_name,schedule_slots(start_time,name)`) || [];
+          const due = (Array.isArray(bks) ? bks : []).filter(t => {
+            const st = t.schedule_slots && t.schedule_slots.start_time;
+            return st && st <= nowIso && st >= since;
+          });
+          if (due.length) {
+            const revs = await sb(`post_trial_reviews?client_id=eq.${clientId}&select=ghl_contact_id`) || [];
+            const reviewed = new Set((Array.isArray(revs) ? revs : []).map(r => String(r.ghl_contact_id || "")));
+            for (const t of due) {
+              const cid = String(t.ghl_contact_id || "");
+              if (!cid || reviewed.has(cid)) continue;
+              let oppId = null;
+              try { const o = await findOpenOpp(clientId, null, client.ghl_location_id, cid); oppId = o && (o.ghlOpportunityId || o.id) || null; } catch (_) {}
+              if (!oppId) continue;
+              let when = "";
+              try { when = new Date(t.schedule_slots.start_time).toLocaleString("en-US", { weekday: "short", hour: "numeric", minute: "2-digit", timeZone: client.time_zone || "America/Toronto" }); } catch (_) {}
+              list.push({
+                id: "ptf:" + t.id, kind: "post_trial", status: "pending",
+                ghl_contact_id: cid, contact_name: t.parent_name || t.athlete_name || "Lead",
+                athlete_name: t.athlete_name || null, opportunity_id: oppId,
+                trial_at: t.schedule_slots.start_time,
+                reasoning: `${t.athlete_name || "The athlete"}'s trial ran${when ? " " + when : ""}. The post-trial form routes them: good fit moves to Done Trial, no-show goes back to Booking for a rebook, not a fit closes as unqualified.`,
+                created_at: t.schedule_slots.start_time,
+              });
+            }
+          }
+        }
+      } catch (_) { /* form cards are additive - never block the queue */ }
       return res.status(200).json({ ready: list, count: list.length });
     }
     if (b.action === "skip-ready") {

@@ -103,6 +103,23 @@ scattered autonomy/config entry points. KEEPS: inline drawer suggestion on lead 
 - Home Sales section: "Open sales board" button gone; Recent movement lowkey.
   Cascade width:100% (home container .cc-pipe-strip is flex). _ccReturn clears
   the frozen scroll-recede blur (the "back from classic = blurry home" bug).
+- HOME = THE SALES PAGE (2026-07-09 wireframe): two KPI cards (Trials today
+  w/ name list from calendars-v15 trials-today - portal path reads
+  trial_bookings; close rate + weekly sales w/ names) + ONE pipeline panel:
+  gold HAWKEYE bar (all-3-agent count via _ccSalesHawk, gold fill when work
+  waits) over the pill strip + lowkey feed. Hawk bench/card removed.
+- STANDALONE SALES PAGE RETIRED on V2: Hawkeye + config open as mm-focus
+  overlays (#salesMachineModal; hosts reparented into #sf-body; _sfOpen/
+  closeSalesFocus; _plSVApply skips host displays while _SF_OPEN). Cascade
+  "+N more" expands in place (_plo2ShowAll) - board not a V2 destination.
+- POST-TRIAL FORM = Confirm-tab deck card (kind post_trial -> 'form'):
+  synthesized server-side in agent-confirm list-ready (portal provider:
+  trial_bookings BOOKED, slot past, <=7d, no post_trial_reviews row, open
+  opp); deck form submits /api/ghl/post-trial (3-way router). No Other btn.
+- 'Liked' TAPBACK RULE: isRealInbound (agent/_stage.js) - inbound text
+  starting with "Liked" never wakes an agent, never bounces Ghosted/Nurture
+  (ghl/inbound-webhook), never enters the Meta store, never reaches agent
+  thread context.
 - STILL TO DO: swipe gestures (open decision), GTA prod verification of the whole batch.
 
 ## Open item (ask Zoran before building)

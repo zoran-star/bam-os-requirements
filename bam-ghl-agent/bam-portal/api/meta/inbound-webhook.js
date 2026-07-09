@@ -94,6 +94,9 @@ async function storeEvent(cfg, channel, ev) {
   if (!text && !attachments.length) return null;
   const occurredAt = new Date(ev.timestamp || Date.now()).toISOString();
   const direction = isEcho ? "outbound" : "inbound";
+  // An IG/Messenger "Liked ..." tapback never registers as a message - keep it
+  // out of the store entirely so agents and threads never see it (Zoran 2026-07-09).
+  if (direction === "inbound" && /^Liked\b/.test(text.trim())) return null;
 
   // Thread upsert on (client_id, channel, psid).
   let thread = (await sb(`dm_threads?client_id=eq.${cfg.client_id}&channel=eq.${channel}&psid=eq.${encodeURIComponent(psid)}&select=id,contact_name&limit=1`))?.[0];

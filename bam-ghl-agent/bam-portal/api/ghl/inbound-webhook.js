@@ -106,6 +106,12 @@ async function handler(req, res) {
   // fetches the full thread from the inbox later; P1 only needs the event.
   const bodyRaw         = nested(["body"], "customData", "message");
   const body            = typeof bodyRaw === "string" ? bodyRaw : "";
+  // A tapback ("Liked ...") never registers as a reply: no draft-cancel, no
+  // Ghosted/Nurture bounce (Zoran 2026-07-09). Only filterable when the
+  // payload carries text - contact-detail triggers with an empty body pass.
+  if (/^Liked\b/.test(body.trim())) {
+    return res.status(200).json({ ok: true, skipped: "tapback" });
+  }
   const channelRaw      = nested(["messageType", "message_type", "channel"], "customData", "message");
   const channel         = channelRaw != null && channelRaw !== "" ? String(channelRaw).replace(/^TYPE_/i, "").toLowerCase() : null;
   const occurredAtRaw   = nested(["dateAdded", "createdAt", "timestamp", "date", "date_created"], "message");
