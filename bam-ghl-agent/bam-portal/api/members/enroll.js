@@ -121,14 +121,37 @@ async function writeAudit(row) {
   }
 }
 
-// LIVE offer prices only - same rule as the sorter's fix-payment buildTargets:
-// routable canonical pricing_catalog rows on non-archived offers.
+// Live vs archived for one catalog row, by the OFFER's archived flag on its
+// pricing_offerings - the SAME rule the roster's "Archived" pill and the
+// Change-plan dropdown use (_offerPriceStatus in client-portal.html). A
+// canonical + routable catalog row still reads ARCHIVED when its offering
+// (e.g. "Summer Unlimited") is archived in the offer's Pricing section.
+function offeringStatus(row, offerings) {
+  const hay = ((row.offer_price_key ? String(row.offer_price_key).split("|")[0] : "") + " " + (row.display_name || "")).toLowerCase();
+  let best = null;
+  for (const o of (offerings || [])) {
+    const t = String(o.title || "").trim().toLowerCase();
+    if (t && hay.indexOf(t) >= 0 && (!best || t.length > best.len)) best = { archived: !!o.archived, len: t.length };
+  }
+  if (best) return best.archived ? "legacy" : "live";
+  return (offerings && offerings.length) ? "legacy" : (row.is_routable === true ? "live" : "legacy");
+}
+
+// LIVE offer prices only: routable canonical pricing_catalog rows on
+// non-archived offers, whose OFFERING is not archived (offeringStatus above).
 async function liveTargets(clientId) {
-  const offers = await sb(`offers?client_id=eq.${encodeURIComponent(clientId)}&status=neq.archived&select=id`).catch(() => []) || [];
+  const offers = await sb(`offers?client_id=eq.${encodeURIComponent(clientId)}&status=neq.archived&select=id,data`).catch(() => []) || [];
   const liveOfferIds = new Set((offers || []).map(o => o.id));
+  const offeringsByOffer = {};
+  for (const o of (offers || [])) {
+    offeringsByOffer[o.id] = (o.data && o.data.pricing && o.data.pricing.pricing_offerings) || [];
+  }
+  // Single-offer academies: catalog rows sometimes carry a null offer_id -
+  // judge those against the one offer's offerings (mirrors the client map).
+  const soleOfferings = (offers || []).length === 1 ? offeringsByOffer[offers[0].id] : null;
   const rows = await sb(
     `pricing_catalog?client_id=eq.${encodeURIComponent(clientId)}&tier=eq.canonical&is_routable=is.true` +
-    `&offer_price_key=not.is.null&select=offer_price_key,stripe_price_id,amount_cents,currency,interval,offer_id`
+    `&offer_price_key=not.is.null&select=offer_price_key,display_name,stripe_price_id,amount_cents,currency,interval,offer_id,is_routable`
   ).catch(() => []) || [];
   const termLabel = (t) => (t === "monthly" || t === "4_weeks") ? "Monthly"
     : t === "3_months" ? "3 months" : t === "6_months" ? "6 months" : t === "12_months" ? "12 months" : String(t || "").replace("_", " ");
@@ -137,6 +160,8 @@ async function liveTargets(clientId) {
   for (const r of (rows || [])) {
     if (!r.offer_price_key || !r.stripe_price_id || seen.has(r.offer_price_key)) continue;
     if (r.offer_id && !liveOfferIds.has(r.offer_id)) continue; // offer archived -> skip
+    const offerings = (r.offer_id && offeringsByOffer[r.offer_id]) || soleOfferings || [];
+    if (offeringStatus(r, offerings) !== "live") continue;     // offering archived -> skip
     seen.add(r.offer_price_key);
     const [plan, term] = String(r.offer_price_key).split("|");
     out.push({
