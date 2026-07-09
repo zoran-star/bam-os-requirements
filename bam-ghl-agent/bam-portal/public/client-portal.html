@@ -14905,6 +14905,129 @@ async function _wdwCheck(btn) {
   _wdwRender();
 }
 
+// ── Academy onboarding flow (its own side page - leave any time) ──
+// Zoran 2026-07-08: onboarding lives OUTSIDE the regular V2 pages. Opened from
+// the navigation orb's pop ("Finish your onboarding" + a progress ring), and
+// every step auto-detects completion from live data - nothing is hand-checked.
+// Steps today (Detail Miami's remaining list): member import, email domain,
+// website domain, EIN. The list grows as more onboarding steps come online.
+let _OBF_STATE = null;   // { members, email, website, ein } after first fetch
+let _OBF_AT = 0;
+
+const _OBF_STEPS = [
+  { key: 'members', title: 'Import your members', sub: 'Bring your roster in - import from Stripe or CSV, clean it up, link contacts', cta: 'Import members', go: '_obfGoMembers()' },
+  { key: 'email',   title: 'Connect your email domain', sub: 'Emails send from your own domain - one DNS paste at your registrar', cta: 'Set up email', go: '_obfGoDomains()' },
+  { key: 'website', title: 'Launch your new website', sub: 'Point your domain at the rebuilt site - the old one retires on the flip', cta: 'Set up website', go: '_obfGoDomains()' },
+  { key: 'ein',     title: 'Send us your EIN', sub: 'Needed to publish your offers and finish the payments setup', cta: 'Send it in Messages', go: '_obfGoMessages()' },
+];
+
+function _obfIsV2() { return typeof V2_ACCESS !== 'undefined' && !!V2_ACCESS; }
+
+async function _obfFetchState() {
+  const token = await _mreqAuthToken();
+  const next = { members: false, email: false, website: false, ein: false };
+  const [mem, em, web] = await Promise.allSettled([
+    fetch('/api/members?scope=client&client_id=' + encodeURIComponent(CLIENT_ID), { headers: { Authorization: 'Bearer ' + token } }).then(_safeJson),
+    _edwApi('status'),
+    _wdwApi('status'),
+  ]);
+  if (mem.status === 'fulfilled') next.members = Array.isArray(mem.value.members) && mem.value.members.length > 0;
+  if (em.status === 'fulfilled') { next.email = em.value.status === 'live'; next.ein = !!em.value.ein_set; }
+  if (web.status === 'fulfilled') next.website = web.value.status === 'live';
+  _OBF_STATE = next; _OBF_AT = Date.now();
+  return next;
+}
+
+function _obfDone(st) { return _OBF_STEPS.filter(s => st && st[s.key]).length; }
+
+// Gold progress ring (SVG, r=8 -> circumference ~50.27).
+function _obfRing(done, total, px) {
+  const r = 8, c = 2 * Math.PI * r;
+  const frac = total ? Math.max(0, Math.min(1, done / total)) : 0;
+  return `<svg width="${px}" height="${px}" viewBox="0 0 20 20" style="flex:none;transform:rotate(-90deg)" aria-hidden="true">
+    <circle cx="10" cy="10" r="${r}" fill="none" stroke="var(--border-med)" stroke-width="2.5"/>
+    <circle cx="10" cy="10" r="${r}" fill="none" stroke="var(--gold)" stroke-width="2.5" stroke-linecap="round" stroke-dasharray="${c.toFixed(2)}" stroke-dashoffset="${(c * (1 - frac)).toFixed(2)}"/>
+  </svg>`;
+}
+
+// Deep links close the flow first; command-center vs classic aware.
+function _obfNav(view) {
+  _obfClose();
+  if (document.body.classList.contains('cc-mode') && !document.body.classList.contains('cc-classic') && typeof _ccOpenClassic === 'function') _ccOpenClassic(view);
+  else switchView(view);
+}
+function _obfGoMembers() { _obfNav('blueprint'); setTimeout(() => { try { _bbNavigate('member_onboarding'); } catch (_) { /* blueprint not rendered yet */ } }, 150); }
+function _obfGoDomains() { _obfClose(); _edwOpenModal(); }
+function _obfGoMessages() { _obfNav('messages'); }
+
+function _obfClose() { document.getElementById('obf-overlay')?.remove(); }
+
+async function _obfOpen() {
+  if (!_obfIsV2()) return;
+  _obfClose();
+  document.body.insertAdjacentHTML('beforeend', `<div id="obf-overlay" style="position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9000;display:flex;align-items:center;justify-content:center;padding:18px" onclick="if(event.target===this)_obfClose()">
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:24px;width:100%;max-width:620px;max-height:92vh;overflow-y:auto;padding:26px 26px 20px">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:12px">
+        <div>
+          <div style="font-size:10.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--text-mute)">Academy setup</div>
+          <div style="font-family:var(--font-num,inherit);font-size:20px;font-weight:800;color:var(--text)">Finish your onboarding</div>
+        </div>
+        <button onclick="_obfClose()" style="background:transparent;border:1px solid var(--border-med);border-radius:8px;color:var(--text);padding:7px 12px;font:inherit;font-size:12px;font-weight:600;cursor:pointer">Back to home</button>
+      </div>
+      <div id="obf-progress" style="display:flex;align-items:center;gap:10px;margin:16px 0 4px"></div>
+      <div id="obf-steps"><div class="req-empty" style="padding:14px 0"><span class="req-spin"></span> Checking your setup…</div></div>
+      <div style="margin-top:14px;font-size:11.5px;color:var(--text-mute)">Leave any time - progress saves itself. Steps turn gold as the system sees them done.</div>
+    </div></div>`);
+  let st = null;
+  try { st = await _obfFetchState(); } catch (_) { st = _OBF_STATE; }
+  _obfRender(st);
+}
+
+function _obfRender(st) {
+  const host = document.getElementById('obf-steps');
+  const prog = document.getElementById('obf-progress');
+  if (!host) return;
+  if (!st) { host.innerHTML = `<div style="font-size:12.5px;color:var(--red,#c96856)">Couldn't check your setup - try again in a minute.</div>`; return; }
+  const done = _obfDone(st), total = _OBF_STEPS.length;
+  if (prog) prog.innerHTML = `${_obfRing(done, total, 30)}<div style="font-size:13px;font-weight:700;color:var(--text)">${done} of ${total} done</div>` + (done === total ? `<div style="font-size:12px;color:var(--green,#7BC47F);font-weight:700">All set - your academy is fully onboarded</div>` : '');
+  host.innerHTML = _OBF_STEPS.map(s => {
+    const ok = !!st[s.key];
+    return `<div style="display:flex;align-items:center;gap:13px;padding:13px 14px;border:1px solid ${ok ? 'var(--accent-border,rgba(212,182,92,.25))' : 'var(--border)'};background:${ok ? 'var(--gold-sheen,rgba(212,182,92,.06))' : 'transparent'};border-radius:12px;margin-top:9px">
+      <span style="flex:none;width:22px;height:22px;border-radius:999px;display:flex;align-items:center;justify-content:center;${ok ? 'background:var(--gold);color:var(--on-gold,#1a1608)' : 'border:1.5px solid var(--border-med);color:transparent'}">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+      </span>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:13.5px;font-weight:700;color:var(--text)">${s.title}</div>
+        <div style="font-size:12px;color:var(--text-sub,var(--text-mute));margin-top:1px">${s.sub}</div>
+      </div>
+      ${ok ? '' : `<button onclick="${s.go}" style="flex:none;background:var(--gold);border:none;border-radius:8px;color:var(--on-gold,#1a1608);padding:8px 13px;font:inherit;font-size:12px;font-weight:700;cursor:pointer">${s.cta}</button>`}
+    </div>`;
+  }).join('');
+}
+
+// The navigation pop's entry: "Finish your onboarding" + live progress ring.
+// Rendered instantly from cache, refreshed in the background. Hidden for
+// non-V2 academies and once everything is done.
+function _obfPopItem() {
+  if (!_obfIsV2()) return '';
+  const st = _OBF_STATE, total = _OBF_STEPS.length;
+  const done = st ? _obfDone(st) : null;
+  if (st && done === total) return '';
+  const count = done == null ? '' : ` · ${done}/${total}`;
+  return `<button type="button" class="cc-pop-item" id="obf-pop-item" onclick="document.getElementById('cc-dock-pop').classList.remove('open');_obfOpen()">${_obfRing(done || 0, total, 15)} Finish your onboarding${count}</button>`;
+}
+function _obfPopRefresh() {
+  if (!_obfIsV2()) return;
+  if (_OBF_STATE && Date.now() - _OBF_AT < 120000) return;
+  _obfFetchState().then(() => {
+    const el = document.getElementById('obf-pop-item');
+    if (!el) return;
+    const done = _obfDone(_OBF_STATE), total = _OBF_STEPS.length;
+    if (done === total) { el.remove(); return; }
+    el.innerHTML = `${_obfRing(done, total, 15)} Finish your onboarding · ${done}/${total}`;
+  }).catch(() => {});
+}
+
 // ── Instagram connect wizard (client self-serve Meta OAuth) ──
 // Same shape as the email domain wizard above: a card that renders wherever a
 // #ig-connect-card div exists (Inbox Setup + the Settings dock modal), backed
@@ -48329,16 +48452,19 @@ function _ccDockPop(kind) {
   if (pop.dataset.kind === kind && pop.classList.contains('open')) { pop.classList.remove('open'); return; }
   pop.dataset.kind = kind;
   pop.innerHTML = kind === 'settings'
-    ? `<button type="button" class="cc-pop-item" onclick="toggleTheme()">Toggle light / dark</button>` +
+    ? _obfPopItem() +
+      `<button type="button" class="cc-pop-item" onclick="toggleTheme()">Toggle light / dark</button>` +
       `<button type="button" class="cc-pop-item" onclick="this.textContent='Sounds: ' + (_SFX.toggleMute() ? 'off' : 'on')">Sounds: ${_SFX._isMuted() ? 'off' : 'on'}</button>` +
       `<button type="button" class="cc-pop-item" onclick="var off=localStorage.getItem('bam_haptics_off')==='1';localStorage.setItem('bam_haptics_off', off?'0':'1');this.textContent='Haptics: '+(off?'on':'off')">Haptics: ${(function(){try{return localStorage.getItem('bam_haptics_off')==='1'?'off':'on'}catch(_){return 'on'}})()}</button>` +
       `<button type="button" class="cc-pop-item" onclick="document.getElementById('cc-dock-pop').classList.remove('open');_edwOpenModal()">Domains (email + website)</button>` +
       `<button type="button" class="cc-pop-item" onclick="document.getElementById('cc-dock-pop').classList.remove('open');_igwOpenModal()">Instagram</button>` +
       `<button type="button" class="cc-pop-item" onclick="_ccExitBeta()">Exit command center beta</button>` +
       `<button type="button" class="cc-pop-item" onclick="signOut()">Sign out</button>`
-    : `<button type="button" class="cc-pop-item" onclick="document.getElementById('cc-dock-pop').classList.remove('open');startOnboardingTour()">Take the tour</button>` +
+    : _obfPopItem() +
+      `<button type="button" class="cc-pop-item" onclick="document.getElementById('cc-dock-pop').classList.remove('open');startOnboardingTour()">Take the tour</button>` +
       `<button type="button" class="cc-pop-item" onclick="document.getElementById('cc-dock-pop').classList.remove('open');_ccOpenClassic('messages')">Talk to BAM</button>`;
   pop.classList.add('open');
+  _obfPopRefresh();
 }
 
 // ── scroll: reveal sections + track the active rail dot ──
