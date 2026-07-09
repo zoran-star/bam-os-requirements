@@ -368,20 +368,40 @@ function sanitizeAutomations(incoming, cur = {}) {
 async function fireScriptedStep({ client, token, locationId, mode, autos, cfg, item, contactId }) {
   const nowMs = Date.now();
 
+  // Resolve the CURRENT booked trial FIRST - all coverage checks below are scoped to
+  // THIS appointment so a REBOOKING to a new date re-arms the scripted confirm
+  // sequence (a fresh 'confirm' + 'same_day' for the new trial). Rows tied to an
+  // EARLIER trial must not count as coverage for this one. (Zoran 2026-07-09: a lead
+  // who rebooked got NEITHER touch because sentKeys was keyed only by step_key across
+  // all of the contact's confirm_auto rows, so once 'confirm'/'same_day' fired for an
+  // earlier trial they were treated as done forever.)
+  const appt = await nextAppointment(token, contactId, { nowMs, clientId: client.id });
+  const trialMs = appt && appt.startTime ? new Date(appt.startTime).getTime() : null;
+
+  // Does a prior row target the SAME trial start time (within a minute)? A row with no
+  // trial stamp (legacy / unresolved appt), or an unresolvable current trial, is
+  // treated as matching so we never blindly double-send when we can't tell them apart.
+  const sameTrial = (r) => {
+    if (!trialMs) return true;
+    if (!r.trial_at) return true;
+    const rMs = new Date(r.trial_at).getTime();
+    return Number.isFinite(rMs) ? Math.abs(rMs - trialMs) < 60000 : true;
+  };
+
   // What's already happened with this contact?
   let rows = [];
   try {
-    rows = await sb(`agent_confirm_replies?client_id=eq.${client.id}&ghl_contact_id=eq.${encodeURIComponent(contactId)}&select=kind,status,step_key&order=created_at.desc&limit=50`);
+    rows = await sb(`agent_confirm_replies?client_id=eq.${client.id}&ghl_contact_id=eq.${encodeURIComponent(contactId)}&select=kind,status,step_key,trial_at&order=created_at.desc&limit=50`);
   } catch (_) { rows = []; }
   rows = Array.isArray(rows) ? rows : [];
   if (rows.some(r => ["pending", "approved"].includes(r.status))) return "already has an active card";
-  // Any AI confirm/handoff/lost card means they've been in a live exchange - let the
-  // AI agent own it; don't cold-script on top of a conversation.
-  if (rows.some(r => ["confirm", "confirm_handoff", "confirm_lost"].includes(r.kind))) return "lead already in conversation";
-  const sentKeys = new Set(rows.filter(r => r.kind === "confirm_auto" && ["pending", "approved", "sent", "skipped"].includes(r.status)).map(r => r.step_key));
+  // Any AI confirm/handoff/lost card FOR THIS TRIAL means they've been in a live
+  // exchange about it - let the AI agent own it; don't cold-script on top. An AI card
+  // tied to an EARLIER trial (e.g. the handoff that produced this rebooking) must NOT
+  // block the new trial's confirmation.
+  if (rows.some(r => ["confirm", "confirm_handoff", "confirm_lost"].includes(r.kind) && sameTrial(r))) return "lead already in conversation";
+  const sentKeys = new Set(rows.filter(r => r.kind === "confirm_auto" && ["pending", "approved", "sent", "skipped"].includes(r.status) && sameTrial(r)).map(r => r.step_key));
 
-  const appt = await nextAppointment(token, contactId, { nowMs, clientId: client.id });
-  const trialMs = appt && appt.startTime ? new Date(appt.startTime).getTime() : null;
   const step = nextDueStep(autos, { nowMs, trialMs, sentKeys });
   if (!step) return "no scripted step due";
 
