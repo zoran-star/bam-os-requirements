@@ -9119,6 +9119,10 @@ Then the call to action."]</div>
           .plo2-pill{flex:1;position:relative;display:flex;align-items:center;justify-content:space-between;gap:8px;border-radius:12px;padding:10px 12px;text-align:left;cursor:pointer;border:1.5px solid var(--border-med);background:var(--surface);transition:all .22s ease;min-width:0;min-height:64px}
           .plo2-pill.auto{border-style:dashed}
           .plo2-pill:hover{border-color:var(--accent)}
+          /* a stage lights up gold while it has a Hawkeye action waiting */
+          .plo2-pill.needs{border-color:var(--accent);background:var(--gold-sheen,rgba(212,182,92,.06));box-shadow:0 0 0 1px var(--gold-glow,rgba(212,182,92,.12)),0 4px 16px rgba(212,182,92,.14);animation:plo2glow 2.4s ease-in-out infinite}
+          @keyframes plo2glow{0%,100%{box-shadow:0 0 0 1px var(--gold-glow,rgba(212,182,92,.12)),0 4px 16px rgba(212,182,92,.12)}50%{box-shadow:0 0 0 1px var(--accent),0 6px 22px rgba(212,182,92,.28)}}
+          @media(prefers-reduced-motion:reduce){.plo2-pill.needs{animation:none}}
           .plo2-pill.dim{opacity:.45}
           .plo2-pill.active{background:var(--accent);border-color:var(--accent);border-style:solid;color:var(--on-gold,#131416);justify-content:center}
           .plo2-pill .plo2-l{min-width:0}
@@ -32717,7 +32721,8 @@ function _plo2Pills(stages, nav) {
            <div class="cnt">${opps.length} card${opps.length === 1 ? '' : 's'}</div>
          </div>${need}`;
     const conn = i < stages.length - 1 ? arrow : '';
-    return `<div class="plo2-pill${kind === 'automation' ? ' auto' : ''}${isOpen ? ' active' : ''}${openId && !isOpen ? ' dim' : ''}" onclick="${toggle}('${escapeHTML(s2.id)}')">${inner}</div>${conn}`;
+    const lit = (kind === 'agent' && sig.hawk) ? ' needs' : '';
+    return `<div class="plo2-pill${kind === 'automation' ? ' auto' : ''}${isOpen ? ' active' : ''}${lit}${openId && !isOpen ? ' dim' : ''}" onclick="${toggle}('${escapeHTML(s2.id)}')">${inner}</div>${conn}`;
   }).join('');
   return { html, hawk };
 }
@@ -47794,8 +47799,9 @@ function _ccStyle() {
     '.cc-sec.cc-visible{opacity:1;transform:none}' +
     '.cc-sec-head{margin-bottom:16px}' +
     '.cc-kicker{font-family:var(--mono);font-size:10px;font-weight:600;letter-spacing:.18em;text-transform:uppercase;color:var(--text-mute)}' +
-    '.cc-title{font-family:var(--font-num);font-size:24px;font-weight:800;color:var(--text);margin-top:2px}' +
+    '.cc-title{font-family:var(--font-num);font-size:44px;font-weight:900;letter-spacing:-.01em;line-height:1.05;color:var(--text);margin-top:2px}' +
     '.cc-sub{font-size:12.5px;color:var(--text-mute);margin-top:3px}' +
+    '@media(max-width:768px){.cc-title{font-size:34px}}' +
     /* stat tiles + action buttons */
     '.cc-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:14px}' +
     '.cc-stat{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:16px 18px;box-shadow:0 1px 3px rgba(0,0,0,.04)}' +
@@ -48983,7 +48989,7 @@ function _ccMountSales(host) {
   // (trials today with the list of names · close rate + this week's sales
   // with names), then ONE pipeline panel: full-width HAWKEYE bar, the pill
   // strip, and the lowkey recent-movement feed.
-  host.innerHTML = _ccHead('Sales', 'Pipeline, agents and trials.') + `
+  host.innerHTML = _ccHead('Sales') + `
     <div id="cc-sales-mount">
       <div class="cc-sal-kpis">
         <div class="cc-stat click" onclick="_ccOpenClassic('calendar')" title="Jump to the calendar">
