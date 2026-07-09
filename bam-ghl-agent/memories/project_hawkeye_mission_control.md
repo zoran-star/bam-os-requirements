@@ -85,12 +85,24 @@ scattered autonomy/config entry points. KEEPS: inline drawer suggestion on lead 
   _ccPipeStage -> board). Old stage cards (_ploStripCells) = V1.5 fallback only.
 - PILL ORDER locked (_plo2Order, home + overview): Nurture, Ghosted, Booking,
   Confirm, Closing. NO Member pill - terminal stages never render in the strip.
-- STRIP LOOK LOCKED (2026-07-09): the ORIGINAL pill style - 1.5px colored border
-  per stage, dashed = automation, solid colour fill + dark text when open. A
-  design-system restyle (top bar + soft tint) shipped and was REVERTED the same
-  day on Zoran's ask; do not restyle without an explicit ask. Cascade keeps
-  width:100% (home container .cc-pipe-strip is flex). _ccReturn clears the
-  frozen scroll-recede blur (the "back from classic = blurry home" bug).
+- PILL DESIGN (2026-07-09, Zoran's redesign - current): stage name TOP-LEFT,
+  engine wording under it ("Nurture automation" / "Closing agent"), total cards
+  under that, gold "N need you" badge centered right. GOLD ONLY (per-stage
+  palette killed; _plo2Color removed); dashed border = automation; chevrons
+  between pills show the left-to-right flow; open pill = gold fill + up arrow
+  + config icon. History: a design-system restyle shipped and was reverted
+  earlier the same day - always confirm before restyling.
+- CASCADE (automation stages): rows show "enrolled · step N of M", newest
+  entries first, via automations.js `active-enrollments` -> _PL_ENR map
+  (loaded by _plLoadActiveAutomations; home kicks it too).
+- DECK = TINDER (2026-07-09): _hk2Confirm/_hk2Move capture inputs at click,
+  resolve the card ~0.5s later (badges update, empty queue auto-jumps to the
+  next agent with cards) while the API rides the 6s undo (_hk2Unresolve puts
+  it back). thread_tail cap now 2000 chars (was 320 - messages were cut off).
+  Config gear on EVERY deck tab. _hk2Back = home Sales section, cascades closed.
+- Home Sales section: "Open sales board" button gone; Recent movement lowkey.
+  Cascade width:100% (home container .cc-pipe-strip is flex). _ccReturn clears
+  the frozen scroll-recede blur (the "back from classic = blurry home" bug).
 - STILL TO DO: swipe gestures (open decision), GTA prod verification of the whole batch.
 
 ## Open item (ask Zoran before building)

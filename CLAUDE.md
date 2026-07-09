@@ -184,6 +184,8 @@ Both apps auto-deploy on every push to `main` via Vercel Git integration:
 
 **Deploy speed (2026-07-05):** every project's `vercel.json` has `"ignoreCommand": "git diff --quiet HEAD^ HEAD -- ."` so a push only builds the projects whose folder actually changed - no more all-projects build queue. If you add a new Vercel project to this repo, add the same ignoreCommand to its `vercel.json`.
 
+**Deploy speed round 2 (2026-07-09):** `bam-ghl-agent/bam-portal/vercel.json` additionally skips ALL preview builds (`[ "$VERCEL_ENV" != "production" ] || git diff ...`) - branch pushes no longer eat the team's single build slot; only merges to `main` build. Tradeoff: no Vercel preview links on bam-portal PRs (test locally). Also flip "Prioritize Production Builds" ON in the Vercel dashboard (bam-portal -> Settings -> Git) - dashboard setting, not in git.
+
 ## Whiteboard — Planning Tool
 
 The whiteboard is a standalone planning tool (Vite/React) at `whiteboard/`. It's used to run structured review sessions for any project. The tool itself lives in `whiteboard/` — but the session output files (HTML review pages) live inside each project's own folder, not in `whiteboard/`. For example, FullControl product sessions live in `prototype/sessions/`.
