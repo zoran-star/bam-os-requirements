@@ -135,6 +135,12 @@ scattered autonomy/config entry points. KEEPS: inline drawer suggestion on lead 
   match = no engine), Interested lead whose intro finished while Ghosted
   automation OFF, quiet Responded coverage needs booking agentMode ON + a
   configured ghosted_workflow. Must be verified per academy for full confidence.
+- SAFETY NET "not flowing" list (2026-07-09): home Sales panel shows a red
+  list (#cc-sal-stuck, _ccStuckCards/_ccRenderStuck) of any OPEN opp with NO
+  Hawkeye action (_PL_NEEDS), NO active automation enrollment (_PL_ENR), not
+  terminal, idle >= _CC_STUCK_IDLE_DAYS (3). Catches the config gaps above so
+  nothing is EVER silently stuck - read-only, client-side, oldest-idle first,
+  each row opens the lead drawer. Only renders when count > 0.
 - STILL TO DO: swipe gestures (open decision), GTA prod verification of the whole batch.
 
 ## Open item (ask Zoran before building)
