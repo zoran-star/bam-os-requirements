@@ -268,13 +268,23 @@ async function handler(req, res) {
     // (sales = lead form, onboarding = join form). One read, split in memory.
     let coreDefs = [], salesDefs = [], onbDefs = [];
     try {
+      // A def applies to this offer if offer_id = it OR a join row links it
+      // (custom_field_def_offers, multi-offer). Fetch all client defs once, then
+      // filter in memory - one extra tiny read for the links, degrades if the
+      // join table has not been migrated yet.
+      let linkedIds = new Set();
+      try {
+        const links = (await sbReq(`custom_field_def_offers?offer_id=eq.${offer.id}&select=field_id`)) || [];
+        linkedIds = new Set(links.map((l) => l.field_id).filter(Boolean));
+      } catch { /* join table not migrated yet - offer_id match still works */ }
       const defs = (await sbReq(
         `custom_field_defs?client_id=eq.${encodeURIComponent(client_id)}&archived=eq.false` +
-        `&or=(offer_id.is.null,offer_id.eq.${offer.id})` +
-        `&select=key,label,type,options,required,section,offer_id&order=position.asc`
+        `&select=id,key,label,type,options,required,section,offer_id&order=position.asc`
       )) || [];
       for (const d of defs) {
-        if (!d.offer_id) coreDefs.push(d);
+        const appliesToOffer = d.offer_id === offer.id || linkedIds.has(d.id);
+        if (!d.offer_id) coreDefs.push(d);          // academy-level: every offer
+        else if (!appliesToOffer) continue;          // another offer's field, not linked here
         else if (d.section === "sales") salesDefs.push(d);
         else onbDefs.push(d); // onboarding (or unsectioned) offer defs default to the join form
       }

@@ -14400,6 +14400,9 @@ function _ibOpenContactDrawer(a) {
         <div style="height:1px;background:var(--border);margin:20px 0"></div>
         <div style="font-size:11px;font-weight:700;color:var(--text-mute);letter-spacing:0.6px;text-transform:uppercase;margin-bottom:10px">Tags</div>
         <div id="ib-cd-tags"></div>
+        <div style="height:1px;background:var(--border);margin:20px 0"></div>
+        <div style="font-size:11px;font-weight:700;color:var(--text-mute);letter-spacing:0.6px;text-transform:uppercase;margin-bottom:10px">Custom fields</div>
+        <div id="ib-cd-cf"><div style="font-size:12px;color:var(--text-mute)">Loading…</div></div>
         <div id="ib-cd-dupes" style="margin-top:20px"></div>
         <div style="font-size:12px;color:var(--text-mute);margin-top:18px;line-height:1.5">Not a member yet. When they sign up they will show a Member pill and link to their full profile here.</div>
         ${ghlUrl ? `<a href="${escapeHTML(ghlUrl)}" target="_blank" rel="noopener" style="display:flex;align-items:center;justify-content:center;gap:8px;margin-top:18px;background:transparent;color:var(--text);border:1px solid var(--border);padding:10px 12px;font-weight:600;border-radius:6px;cursor:pointer;font-size:13px;text-decoration:none">Open in GHL ↗</a>` : ''}
@@ -14410,8 +14413,16 @@ function _ibOpenContactDrawer(a) {
     if (bd) bd.style.opacity = '1';
     if (dr) dr.style.transform = 'translateX(0)';
   });
-  if (a.contactId) { _renderTagEditorFetch('ib-cd-tags', a.contactId); _ibLoadDupes(a.contactId); }
-  else { const t = document.getElementById('ib-cd-tags'); if (t) t.innerHTML = '<span style="font-size:12px;color:var(--text-mute)">No GHL contact linked.</span>'; }
+  if (a.contactId) {
+    _renderTagEditorFetch('ib-cd-tags', a.contactId);
+    _ibLoadDupes(a.contactId);
+    // Leads see the LEAD (sales-section) fields + academy-level fields.
+    const cf = document.getElementById('ib-cd-cf');
+    if (cf) _loadContactCF(cf, { clientId: CLIENT_ID, ghlContactId: a.contactId, section: 'sales' });
+  } else {
+    const t = document.getElementById('ib-cd-tags'); if (t) t.innerHTML = '<span style="font-size:12px;color:var(--text-mute)">No GHL contact linked.</span>';
+    const cf = document.getElementById('ib-cd-cf'); if (cf) cf.innerHTML = '<span style="font-size:12px;color:var(--text-mute)">No contact linked yet.</span>';
+  }
 }
 
 // Duplicate contacts (same phone / name) for the contact whose drawer is open.
@@ -26538,6 +26549,7 @@ function _bbCqOpenAdd(offerId, sectionId, clientId) {
       <label style="${lbl}">Options (one per line)</label>
       <textarea id="bb-cq-opts" rows="3" placeholder="Small&#10;Medium&#10;Large" style="${inp};resize:vertical"></textarea>
     </div>
+    <div id="bb-cq-also-wrap" style="margin-bottom:14px"></div>
     <div style="display:flex;gap:10px;justify-content:flex-end">
       <button onclick="document.getElementById('bb-cq-modal').remove()" style="padding:9px 16px;background:transparent;border:1px solid var(--border);border-radius:6px;color:var(--text-sub);font-size:13px;font-weight:600;cursor:pointer">Cancel</button>
       <button id="bb-cq-save" onclick="_bbCqSave('${offerId}','${sectionId}','${clientId}')" style="padding:9px 18px;background:var(--gold);border:1px solid var(--gold);border-radius:6px;color:#1a1a1a;font-size:13px;font-weight:700;cursor:pointer">Add</button>
@@ -26546,6 +26558,20 @@ function _bbCqOpenAdd(offerId, sectionId, clientId) {
   wrap.onclick = (e) => { if (e.target === wrap) wrap.remove(); };
   document.body.appendChild(wrap);
   setTimeout(() => { document.getElementById('bb-cq-label')?.focus(); }, 0);
+  // "Also applies to" - attach this field to other offers too (multi-offer).
+  // The current offer is always included; here the owner ticks any extras.
+  _bbLoadOffersList().then(offers => {
+    const host = document.getElementById('bb-cq-also-wrap');
+    if (!host) return;
+    const others = (offers || []).filter(o => o.id !== offerId);
+    if (!others.length) return; // nothing else to attach to
+    host.innerHTML = `<label style="${lbl}">Also collect this on other offers (optional)</label>
+      <div style="display:flex;flex-direction:column;gap:6px;margin-top:6px;max-height:132px;overflow-y:auto;border:1px solid var(--border);border-radius:6px;padding:8px 10px">
+        ${others.map(o => `<label style="display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--text);cursor:pointer">
+          <input type="checkbox" class="bb-cq-also" value="${escapeHTML(o.id)}"> ${escapeHTML(o.title || o.type || 'Offer')}
+        </label>`).join('')}
+      </div>`;
+  }).catch(() => {});
 }
 
 async function _bbCqSave(offerId, sectionId, clientId) {
@@ -26554,6 +26580,7 @@ async function _bbCqSave(offerId, sectionId, clientId) {
   if (!label) { document.getElementById('bb-cq-label')?.focus(); return; }
   const optsRaw = document.getElementById('bb-cq-opts')?.value || '';
   const options = (type === 'select' || type === 'multiselect') ? optsRaw.split('\n').map(s => s.trim()).filter(Boolean) : [];
+  const alsoOfferIds = Array.from(document.querySelectorAll('.bb-cq-also:checked')).map(el => el.value).filter(Boolean);
   const btn = document.getElementById('bb-cq-save');
   if (btn) { btn.disabled = true; btn.style.opacity = '0.6'; btn.style.cursor = 'not-allowed'; btn.textContent = 'Adding…'; }
   try {
@@ -26561,7 +26588,7 @@ async function _bbCqSave(offerId, sectionId, clientId) {
     const r = await fetch('/api/custom-fields', {
       method: 'POST',
       headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ client_id: clientId, offer_id: offerId, section: sectionId, label, type, options }),
+      body: JSON.stringify({ client_id: clientId, offer_id: offerId, section: sectionId, label, type, options, also_offer_ids: alsoOfferIds }),
     });
     if (!r.ok) { const j = await r.json().catch(() => ({})); throw new Error(j.error || 'Save failed'); }
   } catch (e) {
@@ -26571,6 +26598,9 @@ async function _bbCqSave(offerId, sectionId, clientId) {
   }
   document.getElementById('bb-cq-modal')?.remove();
   delete _bbCqCache[offerId + ':' + sectionId];
+  // The field now also lives on the picked offers (same section) - drop their
+  // caches so it shows when the owner opens them.
+  alsoOfferIds.forEach(oid => { delete _bbCqCache[oid + ':' + sectionId]; });
   _bbRenderWizardBody();
 }
 
@@ -40394,9 +40424,24 @@ let _MEMBER_CF = null; // { contactId, byId: {fieldId: field} }
 async function _loadMemberCustomFields(m) {
   const sec = document.getElementById('member-cf-section');
   if (!sec || !m || !m.ghl_contact_id) return;
+  // Members see the MEMBER (onboarding-section) fields + academy-level fields.
+  await _loadContactCF(sec, { clientId: m.client_id, ghlContactId: m.ghl_contact_id, section: 'onboarding' });
+}
+
+// Generic custom-field loader shared by the member drawer (section=onboarding)
+// and the lead/contact drawer (section=sales). Renders into `sec` and wires the
+// same inline editor (_MEMBER_CF holds whichever drawer is open - only one is).
+async function _loadContactCF(sec, { clientId, ghlContactId, contactId, section } = {}) {
+  if (!sec) return;
   try {
     const token = await _mreqAuthToken();
-    const r = await fetch('/api/custom-fields?action=values&client_id=' + encodeURIComponent(m.client_id) + '&ghl_contact_id=' + encodeURIComponent(m.ghl_contact_id), { headers: { 'Authorization': 'Bearer ' + token } });
+    const qs = ['action=values']
+      .concat(clientId ? ['client_id=' + encodeURIComponent(clientId)] : [])
+      .concat(ghlContactId ? ['ghl_contact_id=' + encodeURIComponent(ghlContactId)] : [])
+      .concat(contactId ? ['contact_id=' + encodeURIComponent(contactId)] : [])
+      .concat(section ? ['section=' + encodeURIComponent(section)] : [])
+      .join('&');
+    const r = await fetch('/api/custom-fields?' + qs, { headers: { 'Authorization': 'Bearer ' + token } });
     const j = await _safeJson(r);
     if (!r.ok) throw new Error(j.error || ('HTTP ' + r.status));
     _renderMemberCF(sec, j.contact_id, j.fields || []);
