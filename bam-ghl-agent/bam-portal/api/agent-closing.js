@@ -528,6 +528,30 @@ async function detectForClient(client) {
 
   const cfg = await loadConfig(client.id);
   const mutedSet = await mutedContactIdSet(client.id, "closing");
+
+  // NEVER STARVE THE BACKLOG (Zoran 2026-07-09): DETECT_CAP used to slice a
+  // newest-first queue, so once the top DETECT_CAP Done-Trial cards were carded,
+  // every quiet lead past that position NEVER got a follow-up drafted - they sat
+  // in Done Trial with us as the last message and nothing queued. Fix: pull every
+  // LIVE closing card once, drop proactive leads that already have a pending/
+  // approved card (they're already handled), and order the rest LONGEST-SILENT
+  // first so the per-run cap always lands on the cards that actually need one.
+  // Reactive (inbound) leads stay in - a reply must always be answered.
+  let _activeCarded = new Set();
+  try {
+    const _live = await sb(`agent_closing_replies?client_id=eq.${client.id}&status=in.(pending,approved)&select=ghl_contact_id`);
+    for (const r of (Array.isArray(_live) ? _live : [])) if (r.ghl_contact_id) _activeCarded.add(String(r.ghl_contact_id));
+  } catch (_) {}
+  queue = queue
+    .filter(q => (q.last_direction || "") === "inbound" || !_activeCarded.has(String(q.contact_id)))
+    .sort((a, b) => {
+      const ar = (a.last_direction || "") === "inbound" ? 0 : 1;
+      const br = (b.last_direction || "") === "inbound" ? 0 : 1;
+      if (ar !== br) return ar - br;                                            // replies first
+      if (ar === 0) return new Date(b.last_at || 0) - new Date(a.last_at || 0); // newest inbound first
+      return new Date(a.last_at || 0) - new Date(b.last_at || 0);               // then oldest silence first
+    });
+
   let drafted = 0, autoSent = 0, skipped = 0, escalated = 0, enrollsProposed = 0, lostProposed = 0, deferred = 0;
   const reasons = [];
   let _first = true;

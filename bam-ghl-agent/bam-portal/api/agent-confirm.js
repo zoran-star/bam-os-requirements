@@ -528,6 +528,20 @@ async function detectForClient(client) {
   const autos = getConfirmAutomations(client);
   const scriptedLive = automationsLive(autos);
   const mutedSet = await mutedContactIdSet(client.id, "confirm");
+
+  // ANTI-STARVATION (Zoran 2026-07-09, same root cause as closing): DETECT_CAP
+  // sliced a newest-first queue, so once the top DETECT_CAP Scheduled-Trial cards
+  // were carded, quiet leads past that position never got a confirm/reminder card.
+  // Drop proactive leads that already have a live (pending/approved) card so the
+  // cap is spent only on leads that still need one; the rest drain over runs.
+  // Order is left as-is - confirm is appointment-time driven, not silence driven.
+  let _confActiveCarded = new Set();
+  try {
+    const _live = await sb(`agent_confirm_replies?client_id=eq.${client.id}&status=in.(pending,approved)&select=ghl_contact_id`);
+    for (const r of (Array.isArray(_live) ? _live : [])) if (r.ghl_contact_id) _confActiveCarded.add(String(r.ghl_contact_id));
+  } catch (_) {}
+  queue = queue.filter(q => (q.last_direction || "") === "inbound" || !_confActiveCarded.has(String(q.contact_id)));
+
   let drafted = 0, autoSent = 0, skipped = 0, escalated = 0, handoffs = 0, lostProposed = 0, deferred = 0;
   const reasons = [];
   let _first = true;

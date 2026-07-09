@@ -120,6 +120,21 @@ scattered autonomy/config entry points. KEEPS: inline drawer suggestion on lead 
   starting with "Liked" never wakes an agent, never bounces Ghosted/Nurture
   (ghl/inbound-webhook), never enters the Meta store, never reaches agent
   thread context.
+- DETECTOR STARVATION FIX (2026-07-09, all 3 agents): each detector did
+  `queue.slice(0, DETECT_CAP)` on a NEWEST-first queue, so once the top N cards
+  were carded the tail (oldest-quiet leads) NEVER got a card - Done-Trial leads
+  sat with us as last message and nothing queued. Fixes: closing filters
+  proactive carded leads + sorts LONGEST-SILENT first before the slice
+  (agent-closing.js ~529); confirm filters carded leads only, order kept
+  (appointment-time driven, agent-confirm.js ~531); ghost skips carded +
+  mid-intro leads in the candidate builder so DRAFT_CAP only counts new cards
+  (agent-followups.js ~136). Stable order + skip-carded => frontier advances
+  each run, whole backlog queues over a few 15-min cron cycles. Cron drains
+  automatically; no manual trigger.
+- REMAINING stuck buckets are CONFIG, not code: custom-named stage (no role
+  match = no engine), Interested lead whose intro finished while Ghosted
+  automation OFF, quiet Responded coverage needs booking agentMode ON + a
+  configured ghosted_workflow. Must be verified per academy for full confidence.
 - STILL TO DO: swipe gestures (open decision), GTA prod verification of the whole batch.
 
 ## Open item (ask Zoran before building)

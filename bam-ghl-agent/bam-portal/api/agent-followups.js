@@ -133,8 +133,33 @@ async function detectForClient(client) {
     } catch (e) { return { client_id: client.id, error: `conversations: ${e.message}` }; }
   }
 
+  // ANTI-STARVATION (Zoran 2026-07-09, same root cause as closing): the candidate
+  // builder capped at DRAFT_CAP but did NOT skip leads that already have a card or
+  // are mid-intro - so those filled the cap and the draft loop skipped them all,
+  // starving genuinely-quiet uncarded leads past the cap (they read "all good"
+  // forever). Build the skip-sets ONCE up front and skip them in the builder, so
+  // the cap only counts leads that will actually get a new ghost card. Stable
+  // roster order + skip-carded means each run advances the frontier -> the whole
+  // backlog drains over successive runs.
+  let _cardedSet = new Set();
+  try {
+    const _live = await sb(`agent_ready_replies?client_id=eq.${client.id}&status=in.(pending,approved)&select=ghl_contact_id`);
+    for (const r of (Array.isArray(_live) ? _live : [])) if (r.ghl_contact_id) _cardedSet.add(String(r.ghl_contact_id));
+  } catch (_) {}
+  let _introSet = new Set();
+  try {
+    const introAutos = await sb(`automations?client_id=eq.${client.id}&automation_key=in.(contact_form,trial_form)&select=id`);
+    const introIds = (Array.isArray(introAutos) ? introAutos : []).map(a => a.id);
+    if (introIds.length) {
+      const enr = await sb(`automation_enrollments?client_id=eq.${client.id}&automation_id=in.(${introIds.join(",")})&status=in.(active,completed)&select=contact_id`);
+      _introSet = new Set((Array.isArray(enr) ? enr : []).map(e => String(e.contact_id)));
+    }
+  } catch (_) { _introSet = new Set(); }
+
   const candidates = [];
   for (const cid of respondedIds) {
+    // Don't spend a cap slot on a lead that already has a card or is mid-intro.
+    if (_cardedSet.has(String(cid)) || _introSet.has(String(cid))) continue;
     let c = byContact.get(cid);
     if (!c && usingStore) {
       // Cold lead outside the newest-200 window: look their thread up directly.
@@ -160,29 +185,14 @@ async function detectForClient(client) {
   // INTRO HANDOFF GUARD: when an academy runs the form INTRO automation
   // (contact_form / trial_form), that timed first-touch owns the lead's first
   // contact. The ghost engine must NOT also queue a "Send to Ghosted" card while
-  // the intro is still scheduling/sending, or the lead gets double-texted once an
-  // intro is edited to span past the 24h quiet threshold (audit finding C2). The
-  // intro owns the first touch; the agent/ghost take over only on reply (reply
-  // engine) or after the intro completes and the lead still stays quiet. Skip any
-  // contact with an intro enrollment that's active (scheduled, mid-delay) or
-  // completed (sent). Loaded ONCE per client. Best-effort: a query failure leaves
-  // introSet empty so detection still runs. Naturally dormant when no
-  // contact_form/trial_form automations exist (introSet empty -> no behavior change).
-  let introSet = new Set();
-  try {
-    const introAutos = await sb(`automations?client_id=eq.${client.id}&automation_key=in.(contact_form,trial_form)&select=id`);
-    const introIds = (Array.isArray(introAutos) ? introAutos : []).map(a => a.id);
-    if (introIds.length) {
-      const enr = await sb(`automation_enrollments?client_id=eq.${client.id}&automation_id=in.(${introIds.join(",")})&status=in.(active,completed)&select=contact_id`);
-      introSet = new Set((Array.isArray(enr) ? enr : []).map(e => String(e.contact_id)));
-    }
-  } catch (_) { introSet = new Set(); }
-
+  // the intro is still scheduling/sending. `_introSet` (+ `_cardedSet`) are built
+  // up front and already filter the candidate list; the per-lead re-check below is
+  // kept as defense-in-depth in case a lead enrolled between build and draft.
   for (const c of candidates) {
     const contactId = c.contactId;
     if (!contactId) { skipped++; continue; }
     // Mid-intro lead: the form-intro automation owns the first touch. Don't ghost it.
-    if (introSet.has(String(contactId))) { skipped++; continue; }
+    if (_introSet.has(String(contactId))) { skipped++; continue; }
     // Skip if this lead already has ANY active card (reply / ghost / lost / book).
     try {
       const existing = await sb(`agent_ready_replies?client_id=eq.${client.id}&ghl_contact_id=eq.${encodeURIComponent(contactId)}&status=in.(pending,approved)&select=id&limit=1`);
