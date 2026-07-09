@@ -5,6 +5,14 @@
 import { ghl } from "../ghl/_core.js";
 import { resolveStage, queueOpps, contactInRole, pipelineFlags } from "./_store.js";
 
+// A message that starts with the exact text 'Liked' (an iMessage/IG tapback,
+// e.g. `Liked "see you tonight!"`) is NOT a real reply: no agent wakes on it
+// and it never counts as "the lead messaged last" (Zoran 2026-07-09). Shared
+// by every agent queue, the reply-bounce webhook, and the Meta inbound store.
+export function isRealInbound(text) {
+  return !/^Liked\b/.test(String(text || "").trim());
+}
+
 // Provider-aware opp-membership lookup for a stage. Returns a Set of contact ids
 // for the OPEN opps in `stage` (role `role`) when the academy is flipped to
 // provider='portal' - sourced from the portal store via queueOpps, ZERO GHL calls.
@@ -36,12 +44,16 @@ async function overlayPortalSmsRecency(queue, ids, ctx) {
     rows = await ctx.sb(`sms_threads?client_id=eq.${ctx.clientId}&select=ghl_contact_id,contact_name,last_message_at,last_direction,last_preview&order=last_message_at.desc&limit=500`);
   } catch (_) { return queue; }
   const byContact = new Map((Array.isArray(rows) ? rows : []).filter(t => t.ghl_contact_id).map(t => [t.ghl_contact_id, t]));
+  const tapSafeDir = (t) => {
+    const dir = String(t.last_direction || "").toLowerCase();
+    return (dir === "inbound" && !isRealInbound(t.last_preview)) ? "tapback" : dir;
+  };
   for (const q of queue) {
     const t = byContact.get(q.contact_id);
     if (!t || !t.last_message_at) continue;
     if (!q.last_at || new Date(t.last_message_at).getTime() > new Date(q.last_at).getTime()) {
       q.last_at = t.last_message_at;
-      q.last_direction = String(t.last_direction || "").toLowerCase();
+      q.last_direction = tapSafeDir(t);
       if (t.last_preview) q.last_message = t.last_preview;
     }
   }
@@ -52,7 +64,7 @@ async function overlayPortalSmsRecency(queue, ids, ctx) {
     if (!t) continue;   // truly thread-less contacts stay for the bare-append path
     queue.push({
       contact_id: id, conversation_id: null, name: t.contact_name || null,
-      last_message: t.last_preview || "", last_direction: String(t.last_direction || "").toLowerCase(),
+      last_message: t.last_preview || "", last_direction: tapSafeDir(t),
       last_at: t.last_message_at || null,
     });
     seen.add(id);
@@ -151,7 +163,7 @@ export async function computeQueue(token, locationId, ctx = {}) {
   const cd = await ghl("GET", `/conversations/search?${new URLSearchParams({ locationId, limit: "100" })}`, { token });
   const convos = cd.conversations || cd.data || [];
   const queue = convos
-    .filter(c => respondedContactIds.has(c.contactId) && String(c.lastMessageDirection || "").toLowerCase() === "inbound")
+    .filter(c => respondedContactIds.has(c.contactId) && String(c.lastMessageDirection || "").toLowerCase() === "inbound" && isRealInbound(c.lastMessageBody))
     .map(c => ({ contact_id: c.contactId, conversation_id: c.id, name: c.fullName || c.contactName || "Unknown", last_message: c.lastMessageBody || "", last_at: toIso(c.lastMessageDate || c.dateUpdated) }))
     .sort((a, b) => new Date(b.last_at || 0) - new Date(a.last_at || 0));
   return { rs, queue, respondedIds: respondedContactIds };
@@ -230,14 +242,18 @@ export async function computeConfirmQueue(token, locationId, ctx = {}) {
   const convos = cd.conversations || cd.data || [];
   const queue = convos
     .filter(c => ids.has(c.contactId))
-    .map(c => ({
-      contact_id: c.contactId,
-      conversation_id: c.id,
-      name: c.fullName || c.contactName || "Unknown",
-      last_message: c.lastMessageBody || "",
-      last_direction: String(c.lastMessageDirection || "").toLowerCase(),
-      last_at: toIso(c.lastMessageDate || c.dateUpdated),
-    }))
+    .map(c => {
+      const dir = String(c.lastMessageDirection || "").toLowerCase();
+      return {
+        contact_id: c.contactId,
+        conversation_id: c.id,
+        name: c.fullName || c.contactName || "Unknown",
+        last_message: c.lastMessageBody || "",
+        // a tapback never counts as "the lead messaged last"
+        last_direction: (dir === "inbound" && !isRealInbound(c.lastMessageBody)) ? "tapback" : dir,
+        last_at: toIso(c.lastMessageDate || c.dateUpdated),
+      };
+    })
     .sort((a, b) => new Date(b.last_at || 0) - new Date(a.last_at || 0));
   // Twilio academies: fold in the portal's own SMS recency (GHL's conversation
   // data freezes at the cutover and would lie about last_at / last_direction).
@@ -315,14 +331,18 @@ export async function computeClosingQueue(token, locationId, ctx = {}) {
   const convos = cd.conversations || cd.data || [];
   const queue = convos
     .filter(c => ids.has(c.contactId))
-    .map(c => ({
-      contact_id: c.contactId,
-      conversation_id: c.id,
-      name: c.fullName || c.contactName || "Unknown",
-      last_message: c.lastMessageBody || "",
-      last_direction: String(c.lastMessageDirection || "").toLowerCase(),
-      last_at: toIso(c.lastMessageDate || c.dateUpdated),
-    }))
+    .map(c => {
+      const dir = String(c.lastMessageDirection || "").toLowerCase();
+      return {
+        contact_id: c.contactId,
+        conversation_id: c.id,
+        name: c.fullName || c.contactName || "Unknown",
+        last_message: c.lastMessageBody || "",
+        // a tapback never counts as "the lead messaged last"
+        last_direction: (dir === "inbound" && !isRealInbound(c.lastMessageBody)) ? "tapback" : dir,
+        last_at: toIso(c.lastMessageDate || c.dateUpdated),
+      };
+    })
     .sort((a, b) => new Date(b.last_at || 0) - new Date(a.last_at || 0));
   // Twilio academies: fold in the portal's own SMS recency (GHL's conversation
   // data freezes at the cutover - a lead we answered via Twilio would look

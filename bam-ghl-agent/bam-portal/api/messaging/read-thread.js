@@ -23,11 +23,14 @@ export async function readStoreThreadAgent(clientId, ghlContactId) {
     const thread = await threadByContact(clientId, ghlContactId);
     if (!thread) return [];
     const msgs = await sb(`sms_messages?thread_id=eq.${thread.id}&channel=eq.sms&select=direction,body,occurred_at&order=occurred_at.asc&limit=300`);
-    return (msgs || []).filter((m) => m.body).map((m) => ({
-      role: m.direction === "outbound" ? "agent" : "parent",
-      text: m.body,
-      date: m.occurred_at,
-    }));
+    return (msgs || [])
+      // inbound tapbacks ("Liked ...") never register as messages (Zoran 2026-07-09)
+      .filter((m) => m.body && !(m.direction !== "outbound" && /^Liked\b/.test(String(m.body).trim())))
+      .map((m) => ({
+        role: m.direction === "outbound" ? "agent" : "parent",
+        text: m.body,
+        date: m.occurred_at,
+      }));
   } catch (e) { console.error("readStoreThreadAgent:", e.message); return []; }
 }
 

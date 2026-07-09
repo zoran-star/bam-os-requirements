@@ -243,7 +243,7 @@ async function threadMessages(token, conversationId) {
     text: m.body || m.message || "",
     direction: (m.direction || "").toLowerCase(),
     date: m.dateAdded || m.createdAt || m.timestamp || null,
-  })).filter(m => m.text);
+  })).filter(m => m.text && !(m.direction !== "outbound" && /^Liked\b/.test(m.text.trim())));   // inbound tapbacks never register (Zoran 2026-07-09)
   msgs.sort((a, b) => new Date(a.date || 0) - new Date(b.date || 0));
   return msgs.map(m => ({ role: m.direction === "outbound" ? "agent" : "parent", text: m.text, date: m.date }));
 }
