@@ -1445,6 +1445,11 @@ async function handleContentTickets(req, res) {
       if (ticket.status !== "active") {
         return res.status(409).json({ error: "ticket is not active" });
       }
+      // Once the content team has produced finals, the brief is locked.
+      // Direction changes go through the review/message flow instead.
+      if (Array.isArray(ticket.final_files) && ticket.final_files.length) {
+        return res.status(409).json({ error: "This creative is already in production. Message us to change direction." });
+      }
       const newRawFiles = Array.isArray(body.raw_files) ? body.raw_files : null;
       const noteText = (body.note || "").trim();
       const summaryParts = [];
@@ -1457,7 +1462,38 @@ async function handleContentTickets(req, res) {
         const removed = oldRaw.filter(f => !newUrls.has(f.url));
         if (added.length) summaryParts.push(`Added ${added.length} file${added.length === 1 ? "" : "s"}`);
         if (removed.length) summaryParts.push(`Removed ${removed.length} file${removed.length === 1 ? "" : "s"}`);
-        patch.raw_files = newRawFiles;
+        if (added.length || removed.length) patch.raw_files = newRawFiles;
+      }
+
+      if (typeof body.title === "string") {
+        const newTitle = body.title.trim().slice(0, 120) || null;
+        if (newTitle !== (ticket.title || null)) {
+          patch.title = newTitle;
+          summaryParts.push("Updated the title");
+        }
+      }
+      if (typeof body.notes === "string" && body.notes !== (ticket.notes || "")) {
+        patch.notes = body.notes;
+        summaryParts.push("Updated the notes");
+      }
+      // Brief details: whitelist client-editable context keys so internal
+      // context (source, campaign_title, systems_ticket_id...) can't be touched.
+      if (body.context && typeof body.context === "object") {
+        const prevCtx = ticket.context || {};
+        const nextCtx = { ...prevCtx };
+        let ctxChanged = false;
+        if (typeof body.context.format === "string" && body.context.format !== prevCtx.format) {
+          nextCtx.format = body.context.format;
+          ctxChanged = true;
+        }
+        if (typeof body.context.captions === "boolean" && body.context.captions !== !!prevCtx.captions) {
+          nextCtx.captions = body.context.captions;
+          ctxChanged = true;
+        }
+        if (ctxChanged) {
+          patch.context = nextCtx;
+          summaryParts.push("Updated the brief details");
+        }
       }
 
       if (!summaryParts.length && !noteText) {
@@ -1760,6 +1796,15 @@ async function handleContentTickets(req, res) {
     } else if (action === "respond") {
       staffSlackIdById(ticket.assigned_to).then(sid =>
         postContentMarketingSlack(`💬 *Client responded* - Content [${code}]${slackMention(sid) ? " " + slackMention(sid) : ""}`));
+    } else if (action === "edit") {
+      // Client changed the brief mid-flight - ping the owner so edits never
+      // slip through unseen (Zoran 2026-07-08, feedback ticket f4ba8f13).
+      const editWho = ctx.client?.business_name || "client";
+      staffSlackIdById(ticket.assigned_to).then(sid => {
+        if (sid) postStaffSlackDM(sid, `✏️ Request edited - ${editWho} [${code}]`, req);
+        const who = slackMention(sid);
+        postContentMarketingSlack(`✏️ *Request edited* - ${editWho} [${code}]${who ? " " + who : ""}`);
+      });
     } else if (action === "cancel") {
       postClientSlackNotification(ticket.client_id,
         `❌ Cancelled — Content [${code}]`, req);
