@@ -9101,6 +9101,7 @@ Then the call to action."]</div>
           .hk2-hint{font-size:11px;color:var(--text-mute);margin-top:12px;text-align:center;line-height:1.5}
           .hk2-load{min-height:300px;display:flex;align-items:center;justify-content:center;gap:8px;color:var(--text-sub);font-size:13px}
           @media(max-width:560px){.hk2-tab{font-size:12px;padding:8px 6px}.hk2-thread{max-height:160px}}
+<<<<<<< HEAD
           /* ── simple view strip + cascade (the LOCKED pill look, Zoran
                  2026-07-09: colored border per stage, solid colour fill when
                  open, dashed border = automation) ── */
@@ -9111,33 +9112,57 @@ Then the call to action."]</div>
           .plo2-pill{flex:1;position:relative;border-radius:12px;padding:11px 8px;text-align:center;cursor:pointer;border:1.5px solid var(--pc);background:var(--surface);transition:all .22s ease;min-width:0;min-height:56px}
           .plo2-pill.auto{border-style:dashed}
           .plo2-pill:hover{background:var(--bg)}
+=======
+          /* ── simple view strip + cascade (portal card DNA: surface + soft
+                 shadow + hover lift; the stage colour lives in a top bar,
+                 dashed = automation per the crew guardrails) ── */
+          .plo2-hawkbtn{display:inline-flex;align-items:center;gap:7px;background:var(--accent);color:var(--on-gold,#131416);border:none;border-radius:999px;padding:8px 16px;font:inherit;font-size:13px;font-weight:700;cursor:pointer;margin-left:auto;transition:transform .2s var(--es),box-shadow .2s}
+          .plo2-hawkbtn:hover{transform:translateY(-1px);box-shadow:0 6px 16px rgba(0,0,0,.12)}
+          .plo2-hawkbtn .cnt{background:var(--on-gold,#131416);color:var(--accent);border-radius:999px;font-size:11px;font-weight:800;min-width:18px;height:18px;display:inline-flex;align-items:center;justify-content:center;padding:0 5px}
+          .plo2-strip{display:flex;gap:10px}
+          .plo2-pill{flex:1;position:relative;border-radius:12px;padding:13px 10px 11px;text-align:center;cursor:pointer;border:1px solid var(--border);background:var(--surface);box-shadow:0 1px 3px rgba(0,0,0,.04);transition:transform .2s var(--es),box-shadow .2s,border-color .2s,background .2s,opacity .2s;min-width:0;min-height:58px;overflow:hidden}
+          .plo2-pill::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:var(--pc)}
+          .plo2-pill.auto::before{background:repeating-linear-gradient(90deg,var(--pc) 0 6px,transparent 6px 11px)}
+          .plo2-pill:hover{transform:translateY(-2px);box-shadow:0 6px 16px rgba(0,0,0,.08);border-color:color-mix(in srgb,var(--pc) 40%,var(--border))}
+>>>>>>> origin/main
           .plo2-pill.dim{opacity:.45}
-          .plo2-pill.active{background:var(--pc);border-style:solid;color:#131416}
+          .plo2-pill.active{background:color-mix(in srgb,var(--pc) 10%,var(--surface));border-color:color-mix(in srgb,var(--pc) 55%,var(--border));box-shadow:none}
+          .plo2-pill.active:hover{transform:none}
           .plo2-pill .nm{font-size:12.5px;font-weight:700;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-          .plo2-pill .sub{font-size:10.5px;margin-top:3px;color:var(--text-sub)}
+          .plo2-pill .sub{font-size:11px;margin-top:3px;color:var(--text-mute);font-weight:600}
           .plo2-pill .sub.hot{color:var(--red,#F07060);font-weight:800}
-          .plo2-up{display:flex;align-items:center;justify-content:center;min-height:34px}
-          .plo2-cfg{position:absolute;top:4px;right:5px;width:15px;height:15px;cursor:pointer;opacity:.75}
-          .plo2-cfg:hover{opacity:1}
+          .plo2-up{display:flex;align-items:center;justify-content:center;min-height:34px;color:var(--text)}
+          .plo2-cfg{position:absolute;top:7px;right:8px;width:15px;height:15px;cursor:pointer;color:var(--text-sub);opacity:.85}
+          .plo2-cfg:hover{opacity:1;color:var(--text)}
           .plo2-cfg svg{width:100%;height:100%;display:block}
           .plo2-casc{margin-top:14px;width:100%}
+<<<<<<< HEAD
           .plo2-panel{border-radius:16px;background:var(--surface);border:1px solid var(--border);padding:15px}
           .plo2-phead{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--text-mute);margin-bottom:11px;display:flex;align-items:center;gap:8px;font-weight:700}
+=======
+          .plo2-panel{border-radius:16px;background:var(--surface);border:1px solid var(--border);padding:16px 18px;box-shadow:0 1px 3px rgba(0,0,0,.04)}
+          .plo2-phead{font-size:11px;text-transform:uppercase;letter-spacing:.07em;color:var(--text-mute);margin-bottom:12px;display:flex;align-items:center;gap:8px;font-weight:700}
+>>>>>>> origin/main
           .plo2-eng{font-size:10px;font-weight:800;border-radius:6px;padding:3px 8px;letter-spacing:.05em}
-          .plo2-rows{display:flex;flex-direction:column;gap:7px}
-          .plo2-row{animation:plo2in .3s ease both}
+          .plo2-rows{display:flex;flex-direction:column;gap:8px}
+          .plo2-row{animation:plo2in .32s var(--es) both}
           @keyframes plo2in{from{opacity:0;transform:translateY(-7px)}to{opacity:1;transform:none}}
+<<<<<<< HEAD
           .plo2-lead{background:var(--bg);border:1px solid var(--border);border-radius:12px;padding:9px 13px;display:flex;align-items:center;gap:10px;cursor:pointer;transition:border-color .12s}
           .plo2-lead:hover{border-color:var(--border-str,rgba(255,255,255,.2))}
+=======
+          .plo2-lead{background:var(--bg);border:1px solid var(--border);border-radius:12px;padding:10px 14px;display:flex;align-items:center;gap:10px;cursor:pointer;transition:transform .2s var(--es),box-shadow .2s,border-color .2s}
+          .plo2-lead:hover{transform:translateY(-1px);box-shadow:0 4px 12px rgba(0,0,0,.06);border-color:var(--border-med)}
+>>>>>>> origin/main
           .plo2-lead.needs{border-color:var(--accent);box-shadow:0 0 0 1px var(--gold-glow,rgba(212,182,92,.12)),0 4px 14px rgba(212,182,92,.10)}
           .plo2-lead .who{font-size:13px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
           .plo2-lead .st{font-size:11px;color:var(--text-mute);margin-top:1px}
           .plo2-lead.needs .st{color:var(--accent)}
-          .plo2-av{width:28px;height:28px;border-radius:50%;background:var(--surface);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:10.5px;font-weight:700;color:var(--text-sub);flex-shrink:0}
-          .plo2-more{font-size:12px;color:var(--text-sub);text-align:center;padding:8px;cursor:pointer;border:1px dashed var(--border);border-radius:10px}
-          .plo2-more:hover{color:var(--text)}
+          .plo2-av{width:28px;height:28px;border-radius:999px;background:var(--surface-el,var(--surface));border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:10.5px;font-weight:700;color:var(--text-sub);flex-shrink:0}
+          .plo2-more{font-size:12px;color:var(--text-sub);text-align:center;padding:9px;cursor:pointer;border:1px dashed var(--border-med);border-radius:8px}
+          .plo2-more:hover{color:var(--text);border-color:var(--accent)}
           .plo2-none{font-size:12.5px;color:var(--text-mute);text-align:center;padding:14px}
-          .plo2-hint{font-size:10.5px;color:var(--text-mute);text-align:center;margin-top:10px}
+          .plo2-hint{font-size:10.5px;color:var(--text-mute);text-align:center;margin-top:11px}
           @media(max-width:640px){.plo2-strip{flex-wrap:wrap}.plo2-pill{flex:1 1 30%}}
         </style>
         <div id="pl-hawkeye" style="display:none"></div>
@@ -14901,6 +14926,129 @@ async function _wdwCheck(btn) {
     else _plToast('Not switched yet - DNS can take a few minutes to propagate.');
   } catch (e) { _plToast('Check failed: ' + e.message); }
   _wdwRender();
+}
+
+// ── Academy onboarding flow (its own side page - leave any time) ──
+// Zoran 2026-07-08: onboarding lives OUTSIDE the regular V2 pages. Opened from
+// the navigation orb's pop ("Finish your onboarding" + a progress ring), and
+// every step auto-detects completion from live data - nothing is hand-checked.
+// Steps today (Detail Miami's remaining list): member import, email domain,
+// website domain, EIN. The list grows as more onboarding steps come online.
+let _OBF_STATE = null;   // { members, email, website, ein } after first fetch
+let _OBF_AT = 0;
+
+const _OBF_STEPS = [
+  { key: 'members', title: 'Import your members', sub: 'Bring your roster in - import from Stripe or CSV, clean it up, link contacts', cta: 'Import members', go: '_obfGoMembers()' },
+  { key: 'email',   title: 'Connect your email domain', sub: 'Emails send from your own domain - one DNS paste at your registrar', cta: 'Set up email', go: '_obfGoDomains()' },
+  { key: 'website', title: 'Launch your new website', sub: 'Point your domain at the rebuilt site - the old one retires on the flip', cta: 'Set up website', go: '_obfGoDomains()' },
+  { key: 'ein',     title: 'Send us your EIN', sub: 'Needed to publish your offers and finish the payments setup', cta: 'Send it in Messages', go: '_obfGoMessages()' },
+];
+
+function _obfIsV2() { return typeof V2_ACCESS !== 'undefined' && !!V2_ACCESS; }
+
+async function _obfFetchState() {
+  const token = await _mreqAuthToken();
+  const next = { members: false, email: false, website: false, ein: false };
+  const [mem, em, web] = await Promise.allSettled([
+    fetch('/api/members?scope=client&client_id=' + encodeURIComponent(CLIENT_ID), { headers: { Authorization: 'Bearer ' + token } }).then(_safeJson),
+    _edwApi('status'),
+    _wdwApi('status'),
+  ]);
+  if (mem.status === 'fulfilled') next.members = Array.isArray(mem.value.members) && mem.value.members.length > 0;
+  if (em.status === 'fulfilled') { next.email = em.value.status === 'live'; next.ein = !!em.value.ein_set; }
+  if (web.status === 'fulfilled') next.website = web.value.status === 'live';
+  _OBF_STATE = next; _OBF_AT = Date.now();
+  return next;
+}
+
+function _obfDone(st) { return _OBF_STEPS.filter(s => st && st[s.key]).length; }
+
+// Gold progress ring (SVG, r=8 -> circumference ~50.27).
+function _obfRing(done, total, px) {
+  const r = 8, c = 2 * Math.PI * r;
+  const frac = total ? Math.max(0, Math.min(1, done / total)) : 0;
+  return `<svg width="${px}" height="${px}" viewBox="0 0 20 20" style="flex:none;transform:rotate(-90deg)" aria-hidden="true">
+    <circle cx="10" cy="10" r="${r}" fill="none" stroke="var(--border-med)" stroke-width="2.5"/>
+    <circle cx="10" cy="10" r="${r}" fill="none" stroke="var(--gold)" stroke-width="2.5" stroke-linecap="round" stroke-dasharray="${c.toFixed(2)}" stroke-dashoffset="${(c * (1 - frac)).toFixed(2)}"/>
+  </svg>`;
+}
+
+// Deep links close the flow first; command-center vs classic aware.
+function _obfNav(view) {
+  _obfClose();
+  if (document.body.classList.contains('cc-mode') && !document.body.classList.contains('cc-classic') && typeof _ccOpenClassic === 'function') _ccOpenClassic(view);
+  else switchView(view);
+}
+function _obfGoMembers() { _obfNav('blueprint'); setTimeout(() => { try { _bbNavigate('member_onboarding'); } catch (_) { /* blueprint not rendered yet */ } }, 150); }
+function _obfGoDomains() { _obfClose(); _edwOpenModal(); }
+function _obfGoMessages() { _obfNav('messages'); }
+
+function _obfClose() { document.getElementById('obf-overlay')?.remove(); }
+
+async function _obfOpen() {
+  if (!_obfIsV2()) return;
+  _obfClose();
+  document.body.insertAdjacentHTML('beforeend', `<div id="obf-overlay" style="position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9000;display:flex;align-items:center;justify-content:center;padding:18px" onclick="if(event.target===this)_obfClose()">
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:24px;width:100%;max-width:620px;max-height:92vh;overflow-y:auto;padding:26px 26px 20px">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:12px">
+        <div>
+          <div style="font-size:10.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--text-mute)">Academy setup</div>
+          <div style="font-family:var(--font-num,inherit);font-size:20px;font-weight:800;color:var(--text)">Finish your onboarding</div>
+        </div>
+        <button onclick="_obfClose()" style="background:transparent;border:1px solid var(--border-med);border-radius:8px;color:var(--text);padding:7px 12px;font:inherit;font-size:12px;font-weight:600;cursor:pointer">Back to home</button>
+      </div>
+      <div id="obf-progress" style="display:flex;align-items:center;gap:10px;margin:16px 0 4px"></div>
+      <div id="obf-steps"><div class="req-empty" style="padding:14px 0"><span class="req-spin"></span> Checking your setup…</div></div>
+      <div style="margin-top:14px;font-size:11.5px;color:var(--text-mute)">Leave any time - progress saves itself. Steps turn gold as the system sees them done.</div>
+    </div></div>`);
+  let st = null;
+  try { st = await _obfFetchState(); } catch (_) { st = _OBF_STATE; }
+  _obfRender(st);
+}
+
+function _obfRender(st) {
+  const host = document.getElementById('obf-steps');
+  const prog = document.getElementById('obf-progress');
+  if (!host) return;
+  if (!st) { host.innerHTML = `<div style="font-size:12.5px;color:var(--red,#c96856)">Couldn't check your setup - try again in a minute.</div>`; return; }
+  const done = _obfDone(st), total = _OBF_STEPS.length;
+  if (prog) prog.innerHTML = `${_obfRing(done, total, 30)}<div style="font-size:13px;font-weight:700;color:var(--text)">${done} of ${total} done</div>` + (done === total ? `<div style="font-size:12px;color:var(--green,#7BC47F);font-weight:700">All set - your academy is fully onboarded</div>` : '');
+  host.innerHTML = _OBF_STEPS.map(s => {
+    const ok = !!st[s.key];
+    return `<div style="display:flex;align-items:center;gap:13px;padding:13px 14px;border:1px solid ${ok ? 'var(--accent-border,rgba(212,182,92,.25))' : 'var(--border)'};background:${ok ? 'var(--gold-sheen,rgba(212,182,92,.06))' : 'transparent'};border-radius:12px;margin-top:9px">
+      <span style="flex:none;width:22px;height:22px;border-radius:999px;display:flex;align-items:center;justify-content:center;${ok ? 'background:var(--gold);color:var(--on-gold,#1a1608)' : 'border:1.5px solid var(--border-med);color:transparent'}">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+      </span>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:13.5px;font-weight:700;color:var(--text)">${s.title}</div>
+        <div style="font-size:12px;color:var(--text-sub,var(--text-mute));margin-top:1px">${s.sub}</div>
+      </div>
+      ${ok ? '' : `<button onclick="${s.go}" style="flex:none;background:var(--gold);border:none;border-radius:8px;color:var(--on-gold,#1a1608);padding:8px 13px;font:inherit;font-size:12px;font-weight:700;cursor:pointer">${s.cta}</button>`}
+    </div>`;
+  }).join('');
+}
+
+// The navigation pop's entry: "Finish your onboarding" + live progress ring.
+// Rendered instantly from cache, refreshed in the background. Hidden for
+// non-V2 academies and once everything is done.
+function _obfPopItem() {
+  if (!_obfIsV2()) return '';
+  const st = _OBF_STATE, total = _OBF_STEPS.length;
+  const done = st ? _obfDone(st) : null;
+  if (st && done === total) return '';
+  const count = done == null ? '' : ` · ${done}/${total}`;
+  return `<button type="button" class="cc-pop-item" id="obf-pop-item" onclick="document.getElementById('cc-dock-pop').classList.remove('open');_obfOpen()">${_obfRing(done || 0, total, 15)} Finish your onboarding${count}</button>`;
+}
+function _obfPopRefresh() {
+  if (!_obfIsV2()) return;
+  if (_OBF_STATE && Date.now() - _OBF_AT < 120000) return;
+  _obfFetchState().then(() => {
+    const el = document.getElementById('obf-pop-item');
+    if (!el) return;
+    const done = _obfDone(_OBF_STATE), total = _OBF_STEPS.length;
+    if (done === total) { el.remove(); return; }
+    el.innerHTML = `${_obfRing(done, total, 15)} Finish your onboarding · ${done}/${total}`;
+  }).catch(() => {});
 }
 
 // ── Instagram connect wizard (client self-serve Meta OAuth) ──
@@ -29856,8 +30004,8 @@ function _enrollRenderStep2(body) {
       <input type="tel" value="${escapeHTML(s.pphone)}" placeholder="Parent's phone" oninput="_ENROLL.pphone=this.value" style="${inputBase(false)}">
     </div>
     ${s.offerKey ? `
-    <div style="font-size:11px;font-weight:700;color:var(--text-mute);letter-spacing:0.5px;text-transform:uppercase;margin:16px 0 8px">Signup info <span style="font-weight:600;text-transform:none;letter-spacing:0">- all required, same as the signup form</span></div>
-    ${fieldsHtml || '<div style="font-size:12.5px;color:var(--text-mute)">This offer has no extra signup fields.</div>'}` : ''}
+    <div style="font-size:11px;font-weight:700;color:var(--text-mute);letter-spacing:0.5px;text-transform:uppercase;margin:16px 0 8px">Signup info <span style="font-weight:600;text-transform:none;letter-spacing:0">- onboarding questions, all required</span></div>
+    ${fieldsHtml || '<div style="font-size:12.5px;color:var(--text-mute)">This offer has no extra onboarding questions.</div>'}` : ''}
     <div style="font-size:11px;font-weight:700;color:var(--text-mute);letter-spacing:0.5px;text-transform:uppercase;margin:16px 0 8px">First charge</div>
     <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
       ${chip('now', 'Charge now')}
@@ -29869,7 +30017,7 @@ function _enrollRenderStep2(body) {
     ${s.chargeMode === 'on_date' ? `<div style="font-size:12px;color:var(--text-mute);margin-top:6px">No charge until that date. Billing then continues automatically.</div>` : ''}
     <div style="display:flex;gap:10px;margin-top:22px">
       <button onclick="_ENROLL.step=1;_enrollRender()" style="background:transparent;border:1px solid var(--border);color:var(--text);padding:10px 16px;font-size:13px;font-weight:600;border-radius:8px;cursor:pointer;font-family:inherit">Back</button>
-      <button onclick="_enrollToReview()" style="flex:1;background:${canContinue ? 'var(--gold,#D4B65C)' : 'var(--border)'};color:${canContinue ? '#0B0B0D' : 'var(--text-mute)'};border:none;padding:10px 16px;font-size:13.5px;font-weight:700;border-radius:8px;cursor:pointer;font-family:inherit">Review</button>
+      <button onclick="_enrollToReview()" style="flex:1;background:var(--gold,#D4B65C);color:#0B0B0D;border:none;padding:10px 16px;font-size:13.5px;font-weight:700;border-radius:8px;cursor:pointer;font-family:inherit;opacity:${canContinue ? '1' : '0.55'}">Review</button>
     </div>`;
 }
 
@@ -48327,16 +48475,19 @@ function _ccDockPop(kind) {
   if (pop.dataset.kind === kind && pop.classList.contains('open')) { pop.classList.remove('open'); return; }
   pop.dataset.kind = kind;
   pop.innerHTML = kind === 'settings'
-    ? `<button type="button" class="cc-pop-item" onclick="toggleTheme()">Toggle light / dark</button>` +
+    ? _obfPopItem() +
+      `<button type="button" class="cc-pop-item" onclick="toggleTheme()">Toggle light / dark</button>` +
       `<button type="button" class="cc-pop-item" onclick="this.textContent='Sounds: ' + (_SFX.toggleMute() ? 'off' : 'on')">Sounds: ${_SFX._isMuted() ? 'off' : 'on'}</button>` +
       `<button type="button" class="cc-pop-item" onclick="var off=localStorage.getItem('bam_haptics_off')==='1';localStorage.setItem('bam_haptics_off', off?'0':'1');this.textContent='Haptics: '+(off?'on':'off')">Haptics: ${(function(){try{return localStorage.getItem('bam_haptics_off')==='1'?'off':'on'}catch(_){return 'on'}})()}</button>` +
       `<button type="button" class="cc-pop-item" onclick="document.getElementById('cc-dock-pop').classList.remove('open');_edwOpenModal()">Domains (email + website)</button>` +
       `<button type="button" class="cc-pop-item" onclick="document.getElementById('cc-dock-pop').classList.remove('open');_igwOpenModal()">Instagram</button>` +
       `<button type="button" class="cc-pop-item" onclick="_ccExitBeta()">Exit command center beta</button>` +
       `<button type="button" class="cc-pop-item" onclick="signOut()">Sign out</button>`
-    : `<button type="button" class="cc-pop-item" onclick="document.getElementById('cc-dock-pop').classList.remove('open');startOnboardingTour()">Take the tour</button>` +
+    : _obfPopItem() +
+      `<button type="button" class="cc-pop-item" onclick="document.getElementById('cc-dock-pop').classList.remove('open');startOnboardingTour()">Take the tour</button>` +
       `<button type="button" class="cc-pop-item" onclick="document.getElementById('cc-dock-pop').classList.remove('open');_ccOpenClassic('messages')">Talk to BAM</button>`;
   pop.classList.add('open');
+  _obfPopRefresh();
 }
 
 // ── scroll: reveal sections + track the active rail dot ──
