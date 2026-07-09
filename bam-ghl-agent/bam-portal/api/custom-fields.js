@@ -182,7 +182,15 @@ async function handler(req, res) {
       const contact = await resolveContact(req.query.contact_id, req.query.client_id, req.query.ghl_contact_id);
       if (!contact) return res.status(200).json({ contact_id: null, fields: [] });
       if (!canAccess(ctx, contact.client_id)) return res.status(403).json({ error: "not your academy" });
-      const defs = await sb(`custom_field_defs?client_id=eq.${contact.client_id}&archived=eq.false&select=*&order=position.asc,created_at.asc`);
+      // Role-scoped view: a LEAD's drawer asks for section=sales, a MEMBER's for
+      // section=onboarding. Academy-level fields (offer_id null) always show;
+      // offer fields show only for the matching role. No section = every field
+      // (back-compat). offer_id filters further to one offer's fields.
+      const section = (req.query.section === "sales" || req.query.section === "onboarding") ? req.query.section : null;
+      let defsFilter = `custom_field_defs?client_id=eq.${contact.client_id}&archived=eq.false`;
+      if (section) defsFilter += `&or=(offer_id.is.null,section.eq.${section})`;
+      if (req.query.offer_id) defsFilter += `&or=(offer_id.is.null,offer_id.eq.${encodeURIComponent(req.query.offer_id)})`;
+      const defs = await sb(`${defsFilter}&select=*&order=position.asc,created_at.asc`);
       const vals = await sb(`contact_field_values?contact_id=eq.${contact.id}&select=field_id,value`);
       const vmap = new Map((vals || []).map(v => [v.field_id, v.value]));
       return res.status(200).json({
