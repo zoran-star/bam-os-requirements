@@ -239,10 +239,22 @@ async function handler(req, res) {
       if (!canAccess(ctx, clientId)) return res.status(403).json({ error: "not your academy" });
 
       // Optional filters: offer_id (wizard scopes to one offer) + section.
+      // Multi-offer: a field authored on another offer can ALSO apply here via
+      // custom_field_def_offers - fold those ids into the offer match. Degrades
+      // to offer_id-only if the join table has not been migrated yet.
       let filter = `custom_field_defs?client_id=eq.${clientId}`;
       const wizardRead = !!req.query.offer_id || req.query.scope === "academy";
-      if (req.query.offer_id) filter += `&offer_id=eq.${encodeURIComponent(req.query.offer_id)}`;
-      else if (req.query.scope === "academy") filter += `&offer_id=is.null`;
+      if (req.query.offer_id) {
+        const oid = encodeURIComponent(req.query.offer_id);
+        let alsoIds = [];
+        try {
+          const links = await sb(`custom_field_def_offers?offer_id=eq.${oid}&select=field_id`);
+          alsoIds = [...new Set((links || []).map(l => l.field_id).filter(Boolean))];
+        } catch (e) { console.error("custom_field_def_offers read non-fatal:", e?.message || e); }
+        filter += alsoIds.length
+          ? `&or=(offer_id.eq.${oid},id.in.(${alsoIds.map(encodeURIComponent).join(",")}))`
+          : `&offer_id=eq.${oid}`;
+      } else if (req.query.scope === "academy") filter += `&offer_id=is.null`;
       if (req.query.section) filter += `&section=eq.${encodeURIComponent(req.query.section)}`;
       // Wizard reads never want archived fields; the staff tab (no scope) shows them dimmed.
       if (wizardRead) filter += `&archived=eq.false`;
@@ -344,6 +356,21 @@ async function handler(req, res) {
         }),
       });
       const field = Array.isArray(rows) ? rows[0] : rows;
+
+      // Multi-offer: a field can also apply to other offers (custom_field_def_offers).
+      // The authoring offer_id anchors it; also_offer_ids adds the rest. Degrades
+      // to a no-op if the join table has not been migrated yet.
+      const alsoOffers = Array.isArray(b.also_offer_ids) ? [...new Set(b.also_offer_ids.filter(Boolean))] : [];
+      const joinOffers = [...new Set([offerId, ...alsoOffers].filter(Boolean))];
+      if (field && field.id && joinOffers.length) {
+        try {
+          await sb(`custom_field_def_offers?on_conflict=field_id,offer_id`, {
+            method: "POST",
+            headers: { Prefer: "resolution=ignore-duplicates,return=minimal" },
+            body: JSON.stringify(joinOffers.map(oid => ({ field_id: field.id, offer_id: oid }))),
+          });
+        } catch (e) { console.error("custom_field_def_offers write non-fatal:", e?.message || e); }
+      }
       return res.status(200).json({ field: { ...field, value_count: 0 } });
     }
 
