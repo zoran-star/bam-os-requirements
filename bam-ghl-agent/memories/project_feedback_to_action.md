@@ -150,11 +150,16 @@ explain where they were.
   by `window.__fbCtxInit`, to catch every page change). No `tier` field (staff isn't
   V2-tiered); adds `staff_email` from the session instead. `ContextPanel` in
   `FeedbackView.jsx` renders both shapes fine (it just reads whichever fields exist).
-  **`/v2-tickets`'s query stays `portal='client'` only** - staff feedback is a
-  different queue, not a "V2 ticket."
 - **`/v2-tickets` skill** (repo root `.claude/commands/v2-tickets.md`): one-by-one
-  triage of outstanding V2 tickets (`resolved_at is null`, `portal='client'`,
-  client `v2_access` or `context->>'tier'='v2'`, oldest first). Per ticket: visual
+  triage of outstanding tickets from BOTH sources (`resolved_at is null`, and
+  either `portal='client'` scoped to `v2_access`/`context->>'tier'='v2'` OR
+  `portal='staff'` with no tier gate), oldest first, one combined queue.
+  **2026-07-08 (later same day):** widened from client-only to both - Zoran wanted
+  staff bug reports triaged the same way. Each ticket card tags its source
+  (🧑‍💻 Client V2 / 🛠 Staff) since the two context shapes differ (client has
+  `tier`/`native_app`; staff has `staff_email`, and `view`/`view_trail` values are
+  the staff app's `?p=` page names, a different id space than client `view-*` ids -
+  don't cross-reference them). Per ticket: visual
   card + click path, plain-English proposal + effort pill, workshop with Zoran,
   then stamp the decision (`notes` append + status; `done`/`rejected` also set
   `resolved_at`/`resolved_by`). Skipped tickets stay in the queue.

@@ -1,12 +1,14 @@
 ---
-description: Triage all outstanding V2 tickets from the lil Zoran icon one by one - understand each, propose a fix in plain English, workshop it with Zoran, then move to the next until the queue is empty.
+description: Triage all outstanding tickets from the lil Zoran icon one by one - client-side V2 tickets AND staff-side bug reports - understand each, propose a fix in plain English, workshop it with Zoran, then move to the next until the queue is empty.
 ---
 
-Walk Zoran through every **outstanding V2 ticket** submitted via the feedback widget
-(the lil Zoran icon on the client portal, table `portal_feedback`), **one at a time**.
-For each ticket: gather ALL the context, propose an update/fix in **non-technical
-terms**, workshop it with Zoran, record the decision, then move to the next. Stop
-only when there are no outstanding tickets left.
+Walk Zoran through every **outstanding ticket** submitted via the feedback widget
+(the lil Zoran icon - lives on BOTH the client portal and the staff portal, same
+table `portal_feedback`), **one at a time**. Covers client-side V2 feature tickets
+AND staff-side internal bug reports in one combined queue. For each ticket: gather
+ALL the context, propose an update/fix in **non-technical terms**, workshop it with
+Zoran, record the decision, then move to the next. Stop only when there are no
+outstanding tickets left.
 
 ## Ground rules (read before starting)
 
@@ -34,16 +36,20 @@ Data lives in the bam-portal Supabase project, ref `jnojmfmpnsfmtqmwhopz`.
    alter table public.portal_feedback add column if not exists context jsonb;
    ```
 
-3. Fetch outstanding V2 tickets, **oldest first** (first in, first served):
+3. Fetch outstanding tickets from BOTH portals, **oldest first** (first in, first
+   served). Client-side is scoped to V2 (tier from `clients.v2_access` or the
+   context snapshot); staff-side has no tier gate - all open staff feedback counts:
    ```sql
    select f.id, f.created_at, f.kind, f.body, f.page, f.context,
           f.file_url, f.file_name, f.submitter_email, f.status, f.notes,
-          f.client_id, c.business_name, c.v2_access, c.v15_access
+          f.client_id, f.portal, c.business_name, c.v2_access, c.v15_access
    from portal_feedback f
    left join clients c on c.id = f.client_id
    where f.resolved_at is null
-     and f.portal = 'client'
-     and (c.v2_access = true or f.context->>'tier' = 'v2')
+     and (
+       (f.portal = 'client' and (c.v2_access = true or f.context->>'tier' = 'v2'))
+       or f.portal = 'staff'
+     )
    order by f.created_at asc;
    ```
 
@@ -52,36 +58,47 @@ Data lives in the bam-portal Supabase project, ref `jnojmfmpnsfmtqmwhopz`.
    select id from staff where email = 'zoran@byanymeansbball.com';
    ```
 
-5. Open with a queue summary, e.g. **"7 outstanding V2 tickets: 5 bugs, 2 features,
-   oldest from Jun 30."** If the queue is empty: say so, show the last 3 resolved as
-   proof of life, and stop.
+5. Open with a queue summary, split by source, e.g. **"9 outstanding tickets: 7
+   client V2 (5 bugs, 2 features), 2 staff bug reports, oldest from Jun 30."** If
+   the queue is empty: say so, show the last 3 resolved as proof of life, and stop.
 
 ## Step 1 - Per ticket: understand it fully (do this silently)
 
-Before saying anything to Zoran, collect everything useful:
+Before saying anything to Zoran, collect everything useful. **Branch on `f.portal`**
+- the two sources carry different context shapes:
 
-- **The ticket row**: body (verbatim), kind, who (submitter_email + business_name),
-  when, page, screenshot (`file_url`).
-- **The context snapshot** (`context` jsonb, if present): `tier`, `view` (which portal
-  view they were on), `view_trail` (views they moved through), `clicks` (the click
-  path - last 30 clicks with view + element label + seconds), `errors` (JS errors!),
-  `viewport`/`ua`/`native_app` (phone vs desktop vs app), `seconds_on_page`.
+- **The ticket row**: body (verbatim), kind, who (client: `submitter_email` +
+  `business_name`; staff: `submitter_email` is the staff member), when, page,
+  screenshot (`file_url`).
+- **The context snapshot** (`context` jsonb, if present):
+  - **Client tickets** (`portal='client'`): `tier`, `view`, `view_trail`, `clicks`
+    (last 30, `{t, view, el}`), `errors`, `viewport`/`ua`/`native_app`,
+    `seconds_on_page`.
+  - **Staff tickets** (`portal='staff'`): same shape minus `tier`/`native_app`, plus
+    `staff_email`. `view`/`view_trail` are the `?p=` page names from the staff React
+    app (e.g. `inbox`, `clients`, `marketing`) - not the same id space as client
+    `view-*` ids, don't confuse them.
   - A ticket with JS errors in context is almost certainly a real bug - start there.
-  - Older tickets (before context capture shipped 2026-07-08) won't have context.
-    Infer from body + page, and say confidence is lower.
-- **The code**: use the context to find the exact spot. Client portal views live in
-  `bam-ghl-agent/bam-portal/public/client-portal.html` (view ids match
-  `context.view`, e.g. `view-marketing`); staff views in `bam-ghl-agent/bam-portal/src/views/`;
-  APIs in `bam-ghl-agent/bam-portal/api/`. Read enough to understand the real cause
-  or feasibility - do not guess.
+  - Older tickets (client: before 2026-07-08; staff: before the staff-widget parity
+    shipped same day) won't have context. Infer from body + page, and say
+    confidence is lower.
+- **The code**: use the context to find the exact spot.
+  - Client tickets → `bam-ghl-agent/bam-portal/public/client-portal.html` (view ids
+    match `context.view`, e.g. `view-marketing`).
+  - Staff tickets → `bam-ghl-agent/bam-portal/src/views/` (page names match
+    `context.view`, e.g. `marketing` → `MarketingView.jsx`) or
+    `bam-ghl-agent/bam-portal/src/components/` for shared UI.
+  - APIs (either source) → `bam-ghl-agent/bam-portal/api/`.
+  - Read enough to understand the real cause or feasibility - do not guess.
 
 ## Step 2 - Present the ticket card + proposal
 
-One message, this shape:
+One message, this shape. Tag the source clearly (🧑‍💻 Client V2 vs 🛠 Staff) so
+Zoran instantly knows if this is a client-facing fix or an internal one:
 
 ```
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-🎫 TICKET 3 of 7 · 🐛 Bug · Jun 30
+🎫 TICKET 3 of 9 · 🧑‍💻 Client V2 · 🐛 Bug · Jun 30
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 👤 mike@detailmiami.com · DETAIL Miami · on their phone (app)
 📍 Was on: Marketing view
@@ -90,6 +107,17 @@ One message, this shape:
 
 💬 "the new campaign button doesnt do anything"
 📎 screenshot attached: [link]
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+```
+
+```
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🎫 TICKET 4 of 9 · 🛠 Staff · 🐛 Bug · Jun 30
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+👤 rosano (staff) · on the Clients page
+🖱 Click path: Inbox → Clients → opened DETAIL Miami → tapped "Save"
+
+💬 "save button spins forever on the client detail drawer"
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ```
 
@@ -121,10 +149,11 @@ set notes = coalesce(nullif(notes,''), '') || E'\n[triage 2026-07-08] <decision 
 where id = '<ticket id>';
 ```
 
-- **Build now** → make the change (client-portal edits: read
+- **Build now** → make the change. Either source: read
   `bam-ghl-agent/bam-portal/design-system/DESIGN.md` first, use tokens, no emojis in
-  product UI, no em dashes; after ANY client-portal.html edit run
-  `node bam-ghl-agent/bam-portal/scripts/verify-client-portal-ui.mjs`). When shipped:
+  product UI, no em dashes. Client-portal edits specifically: after ANY
+  `client-portal.html` edit run
+  `node bam-ghl-agent/bam-portal/scripts/verify-client-portal-ui.mjs`. When shipped:
   `status='done'`, set `resolved_at = now()` and `resolved_by = <Zoran's staff id>`.
 - **Queue it** → `status='approved'`, leave `resolved_at` null. Offer the existing
   spec engine ("Build spec" makes a GitHub issue) or a Notion Backlog item if it's a
@@ -148,12 +177,12 @@ Then IMMEDIATELY present the next ticket (back to Step 1).
 
 ```
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-📍 V2 TICKET TRIAGE — 3 of 7
+📍 TICKET TRIAGE — 3 of 9
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-1. Campaign button dead      ✅ built + shipped
-2. Add SMS blast idea        ✅ queued
-3. Funnel numbers look off   ⬅️ WORKSHOPPING
-4. …                         ⬜
+1. 🧑‍💻 Campaign button dead     ✅ built + shipped
+2. 🧑‍💻 Add SMS blast idea       ✅ queued
+3. 🛠  Client save spins forever ⬅️ WORKSHOPPING
+4. …                             ⬜
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 👉 TO MOVE FORWARD: [what Zoran needs to say/decide]
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
