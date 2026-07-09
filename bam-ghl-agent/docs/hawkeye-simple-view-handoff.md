@@ -110,6 +110,8 @@ to build for the page itself - just per-stage routing.
 | 2026-07-08 | Teach-why note is MANDATORY for any change away from the agent's guess (draft, plan message, booking detail) - confirm is blocked until the note is filled. Applies to every Hawkeye surface in the real build |
 | 2026-07-09 | HOME = the pill strip too: the command-center home Sales section renders the simple-view pills in place of the old stage cards (shared _plo2Pills/_plo2Cascade; home keeps its own open state _CC2_OPEN). Cascade opens in place on home; config / glowing lead / drawer / +N more leave cc-mode into the classic Sales view first (_ccPipeFocus/_cc2Lead/_cc2Card/_ccPipeStage) |
 | 2026-07-09 | Pill ORDER locked everywhere (_plo2Order): Nurture, Ghosted, Booking, Confirm, Closing. NO Member pill - terminal stages never render in the strip (home + Sales overview) |
+| 2026-07-09 | Strip restyled to the DESIGN SYSTEM (Zoran: "look like the rest of the portal, not the mockup"): pills = portal card DNA (surface bg, 1px --border, soft shadow, hover lift) with the stage colour as a 3px TOP BAR (dashed bar = automation); active pill = soft colour tint, not a solid fill. Cascade spans full width (cc-pipe-strip is flex - plo2-casc gets width:100%) |
+| 2026-07-09 | BUG FIX: back from a classic view left home blurry - the scroll-linked recede effect (inline blur/opacity on .cc-sec) freezes while view-cc is hidden. _ccReturn now clears frozen recede styles and re-fires the scroll recompute |
 
 ## Action model per agent (revised 2026-07-08, SHIPPED end to end)
 Mobile reference page (design-system styled): `bam-portal/public/hawkeye-actions.html`
