@@ -1,10 +1,10 @@
 ---
 name: hawkeye-mission-control
-description: 2026-07-08 V2 design LOCKED via clickable mockup - Sales simple view (strip, click-to-cascade, pill morphs to gear) + Tinder-style Hawkeye deck + popup modal, no Skip anywhere. Handoff doc + build order in docs/. NOT built yet.
+description: 2026-07-08 Hawkeye V2 BUILT + MERGED to main (PR #1298) - the _hk2* deck + _plo2* simple view in client-portal.html, revised action model shipped in the agent APIs. Open: swipe gestures decision + GTA prod verification.
 type: project
 ---
 
-# Hawkeye V2 + Sales simple view - DESIGN LOCKED 2026-07-08, not built
+# Hawkeye V2 + Sales simple view - BUILT + MERGED 2026-07-08 (PR #1298)
 
 **SOURCE OF TRUTH = [`docs/hawkeye-simple-view-handoff.md`](../docs/hawkeye-simple-view-handoff.md)**
 (full spec, decision log, build order, next-session prompt). Clickable mockup:
