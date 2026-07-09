@@ -11013,7 +11013,11 @@ async function openAssetsView() {
   host.innerHTML = _skelPanel(5, true);
   try {
     const [assets, offers, staff, locations] = await Promise.all([
-      _sb.from('client_assets').select('*').eq('client_id', CLIENT_ID).order('created_at', { ascending: false }),
+      // Ticket-sourced mirror rows (source='ticket') are excluded from the
+      // client-facing tab until the grouped "From your requests" section
+      // ships - otherwise every raw b-roll upload floods their curated
+      // brand assets. Staff + website surfaces read them freely.
+      _sb.from('client_assets').select('*').eq('client_id', CLIENT_ID).neq('source', 'ticket').order('created_at', { ascending: false }),
       _sb.from('offers').select('id,title').eq('client_id', CLIENT_ID).order('sort_order'),
       _sb.from('client_users').select('id,name,email').eq('client_id', CLIENT_ID).eq('hide_from_team', false),
       _sb.from('locations').select('id,title').eq('client_id', CLIENT_ID).order('sort_order'),
