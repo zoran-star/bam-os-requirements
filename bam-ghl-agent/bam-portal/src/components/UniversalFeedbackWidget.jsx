@@ -1,5 +1,6 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { supabase } from "../lib/supabase";
+import { initFeedbackContext, buildFeedbackContext } from "../lib/feedbackContext";
 
 // Universal Bug / Feature feedback widget.
 // Always visible in the bottom-right corner of the staff portal. Any staff
@@ -17,6 +18,8 @@ export default function UniversalFeedbackWidget({ tokens, session }) {
   const [err, setErr] = useState("");
   const [btnHover, setBtnHover] = useState(false);
   const fileInputRef = useRef(null);
+
+  useEffect(() => { initFeedbackContext(); }, []);
 
   const handleOpen = () => {
     setOpen(true);
@@ -69,6 +72,7 @@ export default function UniversalFeedbackWidget({ tokens, session }) {
           file_name: fileName,
           page: window.location.pathname + window.location.search,
           portal: "staff",
+          context: (() => { try { return buildFeedbackContext(session); } catch { return null; } })(),
         }),
       });
       const data = await res.json().catch(() => ({}));
@@ -85,14 +89,14 @@ export default function UniversalFeedbackWidget({ tokens, session }) {
 
   const bodyLabel = kind === "bug" ? "What's the bug?" : "What's the feature?";
   const bodyPh = kind === "bug"
-    ? "What you saw, what you expected, what page you were on..."
+    ? "Just describe what you saw and what you expected..."
     : "What would you like to be able to do? Who needs it, why...";
 
   return (
     <>
       {/* Floating button (always visible) */}
       {!open && (
-        <div style={{ position: "fixed", bottom: 24, right: 24, zIndex: 1800 }}>
+        <div data-feedback-widget style={{ position: "fixed", bottom: 24, right: 24, zIndex: 1800 }}>
           {/* Hover tooltip */}
           <div style={{
             position: "absolute", bottom: "calc(100% + 12px)", right: 0,
@@ -136,7 +140,7 @@ export default function UniversalFeedbackWidget({ tokens, session }) {
 
       {/* Expanded panel */}
       {open && (
-        <div style={{
+        <div data-feedback-widget style={{
           position: "fixed", bottom: 24, right: 24, zIndex: 1800,
           width: 380, maxWidth: "calc(100vw - 32px)",
           borderRadius: 12, background: t.surface,
@@ -203,9 +207,12 @@ export default function UniversalFeedbackWidget({ tokens, session }) {
                   border: `1px solid ${t.border}`, background: t.surfaceEl,
                   color: t.text, fontFamily: "inherit", fontSize: 13,
                   lineHeight: 1.55, resize: "vertical", outline: "none",
-                  boxSizing: "border-box", marginBottom: 12,
+                  boxSizing: "border-box", marginBottom: 4,
                 }}
               />
+              <div style={{ fontSize: 11, color: t.textMute, marginBottom: 12, lineHeight: 1.4 }}>
+                Your page and recent clicks are attached automatically, no need to explain where you were.
+              </div>
 
               {/* File pick */}
               <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
