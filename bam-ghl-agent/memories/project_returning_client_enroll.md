@@ -7,8 +7,14 @@ metadata:
 
 # Returning Client Enroll (Members V2)
 
-**State 2026-07-08 (late): ENROLL PHASE 1 CODE-COMPLETE (not live-tested).
-Next = apply the migration, deploy, then pilot for client Houssein.**
+**State 2026-07-09: LIVE + PILOT SUCCESSFUL.** Adam Fergani (parent Houssein
+Fergani) enrolled via the wizard on Summer Unlimited Monthly $315.27 (live on
+purpose), charged on the saved card, flipped Live (cron rescue; webhook subId
+fix now makes the flip instant). Migration applied by Zoran. All phases 1+2 +
+agent routing + buttons deployed via PRs #1288 #1296 #1300 #1301 #1302 #1304.
+NEXT per the locked sequencing: spec where the member import lives in V2 ->
+staff-side Stripe-contact cleanup; receipts track independent (starts with the
+fees-section tax rework).
 
 ## Phase 1 build (2026-07-08) - what shipped
 
