@@ -130,7 +130,10 @@ function rpcErrorStatus(status: number, message: string): number {
   if (normalized.includes("does not belong")) return 403;
   if (normalized.includes("no active entitlement")) return 403;
   if (normalized.includes("full")) return 409;
+  if (normalized.includes("active membership")) return 409;
+  if (normalized.includes("already has a booked trial")) return 409;
   if (normalized.includes("already booked")) return 409;
+  if (normalized.includes("already used")) return 409;
   if (normalized.includes("open spots")) return 409;
   if (normalized.includes("already started")) return 409;
   if (normalized.includes("no longer")) return 409;
@@ -166,9 +169,14 @@ const SAFE_RPC_ERROR_MESSAGES = new Set([
   "Slot is cancelled.",
   "Slot is full.",
   "Slot not found.",
+  "Student already has a booked trial.",
+  "Student already has an active membership.",
+  "Student has already used a free trial.",
   "Student does not belong to membership.",
   "Student does not belong to this parent.",
   "Thread not found.",
+  "Trial booking cannot be cancelled from its current status.",
+  "Trial booking not found.",
   "Waitlist entry cannot be removed from its current status.",
   "Waitlist entry not found.",
 ]);

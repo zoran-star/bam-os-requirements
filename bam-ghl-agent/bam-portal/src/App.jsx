@@ -30,6 +30,7 @@ const ResourcesView        = lazy(() => import('./views/ResourcesView'));
 const OurAdsView           = lazy(() => import('./views/OurAdsView'));
 const AgentTrainingView    = lazy(() => import('./views/AgentTrainingView'));
 const CustomFieldsView     = lazy(() => import('./views/CustomFieldsView'));
+const StripeContactLinkView = lazy(() => import('./views/StripeContactLinkView'));
 import AlertsPanel from './components/overlays/AlertsPanel';
 import LoginView from './views/LoginView';
 import UniversalFeedbackWidget from './components/UniversalFeedbackWidget';
@@ -173,6 +174,7 @@ export default function BAMPortal() {
   const canSeeMarketing = me && (me.role === "admin" || me.role === "scaling_manager" || me.role === "marketing_manager" || me.role === "marketing_executor");
   const canSeeTeam = me && (me.role === "admin" || me.role === "scaling_manager");
   const canSeeCustomFields = me && (me.role === "admin" || me.role === "scaling_manager");
+  const canSeeStripeLink = me && (me.role === "admin" || me.role === "scaling_manager");
   const canSeeContent = me && (me.role === "admin" || me.role === "scaling_manager" || me.role === "marketing_manager" || me.role === "marketing_executor" || me.role === "content_executor");
   const canSeeFinancials = me && (me.role === "admin" || me.role === "scaling_manager");
   // Resources: admins + the content/marketing team (they upload + manage the
@@ -264,12 +266,13 @@ export default function BAMPortal() {
       systems: canSeeSystems, marketing: canSeeMarketing, content: canSeeContent,
       team: canSeeTeam, resources: canSeeResources, feedback: canSeeFeedback,
       financials: canSeeFinancials, ourads: canSeeOurAds, customfields: canSeeCustomFields,
+      stripelink: canSeeStripeLink,
     };
     if (nav === "dashboard" || (Object.prototype.hasOwnProperty.call(gated, nav) && !gated[nav])) {
       // Content executors live in the Content tab — land them there, not Inbox.
       setNav(me.role === "content_executor" ? "content" : "inbox");
     }
-  }, [me, nav, canSeeSystems, canSeeMarketing, canSeeContent, canSeeTeam, canSeeResources, canSeeFeedback, canSeeFinancials, canSeeOurAds, canSeeCustomFields]);
+  }, [me, nav, canSeeSystems, canSeeMarketing, canSeeContent, canSeeTeam, canSeeResources, canSeeFeedback, canSeeFinancials, canSeeOurAds, canSeeCustomFields, canSeeStripeLink]);
 
   // (Legacy ?nav= deep-links are honored by the nav initializer above and
   // folded into ?p= by the URL-sync effect — no separate consumer needed.)
@@ -489,6 +492,7 @@ export default function BAMPortal() {
     content: ["Content", "Guide cards & ad creative content"],
     team: ["Team", "Staff members & roles"],
     customfields: ["Custom Fields", "Portal-native contact fields per academy"],
+    stripelink: ["Stripe Link-Up", "Match Stripe customers to contacts per academy"],
     feedback: ["Feedback", "Bug reports + portal feedback (admin only)"],
     ourads: ["Our Ads", "Our own ad campaigns"],
     resources: ["Resources", "Library shown to all clients"],
@@ -533,6 +537,7 @@ export default function BAMPortal() {
         ...(canSeeContent ? [{ label: "Content", key: "content" }] : []),
         ...(canSeeTeam ? [{ label: "Team", key: "team" }] : []),
         ...(canSeeCustomFields ? [{ label: "Custom Fields", key: "customfields" }] : []),
+        ...(canSeeStripeLink ? [{ label: "Stripe Link-Up", key: "stripelink" }] : []),
         ...(canSeeResources ? [{ label: "Resources", key: "resources" }] : []),
         ...(canSeeOurAds ? [{ label: "Our Ads", key: "ourads" }] : []),
         ...(canSeeFeedback ? [{ label: "Feedback", key: "feedback" }] : []),
@@ -877,6 +882,7 @@ export default function BAMPortal() {
               {nav === "marketing" && canSeeMarketing && <MarketingView tokens={tk} dark={dark} me={me} session={session} />}
               {nav === "team" && canSeeTeam && <TeamView tokens={tk} dark={dark} session={session} me={me} />}
               {nav === "customfields" && canSeeCustomFields && <CustomFieldsView tokens={tk} dark={dark} me={me} session={session} />}
+              {nav === "stripelink" && canSeeStripeLink && <StripeContactLinkView tokens={tk} dark={dark} me={me} session={session} />}
               {nav === "content" && canSeeContent && <ContentView tokens={tk} dark={dark} me={me} session={session} />}
               {nav === "feedback" && canSeeFeedback && <FeedbackView tokens={tk} dark={dark} session={session} />}
               {nav === "training" && canSeeFeedback && <AgentTrainingView tokens={tk} dark={dark} session={session} />}

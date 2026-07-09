@@ -27515,11 +27515,19 @@ function _organicStatusCard(t) {
     : '<span style="font-size:10px;font-weight:700;color:var(--text-mute);background:rgba(255,255,255,.05);padding:3px 9px;border-radius:999px;text-transform:uppercase;letter-spacing:.06em">In progress</span>';
   const title = ((t.notes || '').split('\n')[0] || 'Organic creative').slice(0, 80);
   const finalsHtml = (inReview && finals.length) ? `<div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:10px">${finals.map(_organicFileTile).join('')}</div>` : '';
+  // Edit/cancel are open until the content team produces finals; after that
+  // the brief is locked and direction changes go through review/messages.
+  const editable = !inReview && !finals.length;
   const actions = inReview ? `
     <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">
-      <button onclick="_organicRequestChanges('${t.id}')" style="background:transparent;border:1px solid var(--line);color:var(--text-sub);padding:8px 14px;border-radius:7px;font-size:12px;font-weight:600;cursor:pointer">Request changes</button>
-      <button onclick="_organicApprove('${t.id}')" style="background:var(--gold);border:none;color:#0B0B0D;padding:8px 16px;border-radius:7px;font-size:12px;font-weight:700;cursor:pointer">✓ Approve</button>
-    </div>` : '';
+      <button onclick="_organicRequestChanges('${t.id}')" style="background:transparent;border:1px solid var(--line);color:var(--text-sub);padding:8px 14px;border-radius:var(--r-sm,8px);font-size:12px;font-weight:600;cursor:pointer">Request changes</button>
+      <button onclick="_organicApprove('${t.id}')" style="background:var(--gold);border:none;color:var(--on-gold,#131416);padding:8px 16px;border-radius:var(--r-sm,8px);font-size:12px;font-weight:700;cursor:pointer">✓ Approve</button>
+    </div>` : editable ? `
+    <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">
+      <button onclick="_organicEdit('${t.id}')" style="background:transparent;border:1px solid var(--line);color:var(--text-sub);padding:8px 14px;border-radius:var(--r-sm,8px);font-size:12px;font-weight:600;cursor:pointer">Edit request</button>
+      <button onclick="_organicCancel('${t.id}')" style="background:transparent;border:1px solid var(--line);color:var(--red,#e06c6c);padding:8px 14px;border-radius:var(--r-sm,8px);font-size:12px;font-weight:600;cursor:pointer">Cancel request</button>
+    </div>` : `
+    <div style="font-size:11px;color:var(--text-mute);margin-top:8px">In production. Message us if you need a change of direction.</div>`;
   return `<div style="border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:10px;background:var(--surface)">
     <div style="display:flex;align-items:center;gap:10px">
       <span style="font-family:var(--mono);font-size:10px;color:var(--text-mute)">${code}</span>
@@ -27547,6 +27555,10 @@ function _organicFileTile(f) {
 
 // Request modal in organic mode (reuses the input-assets modal, tags channel=organic).
 let _inputAssetsChannel = 'ads';
+// Edit mode: id of the organic ticket being edited (null = creating new) and
+// its already-uploaded files, each with a _removed flag the client can toggle.
+let _inputAssetsEditId = null;
+let _inputAssetsExistingFiles = [];
 function openOrganicRequestModal() {
   openAddCreativeModal('organic');
 }
@@ -27609,6 +27621,71 @@ async function _organicRequestChanges(id) {
     if (!res.ok) { const j = await _safeJson(res); throw new Error(j.error || ('HTTP ' + res.status)); }
     _fetchAndRenderOrganic();
   } catch (e) { alert('Failed: ' + e.message); }
+}
+
+// ── Organic request edit / cancel (feedback ticket f4ba8f13, 2026-07-08) ──
+// Edit reuses the input-assets modal in "edit mode": prefilled fields, the
+// already-attached files listed with remove toggles, type locked (credits
+// count per type). Submitting PATCHes action=edit, which pings the team.
+function _organicEdit(id) {
+  const t = _ORGANIC_TICKETS.find(x => String(x.id) === String(id));
+  if (!t) return;
+  openAddCreativeModal('organic');   // full reset first, then layer edit mode on top
+  _inputAssetsEditId = String(id);
+  _inputAssetsExistingFiles = (Array.isArray(t.raw_files) ? t.raw_files : []).map(f => ({ ...f, _removed: false }));
+  const ttl = document.getElementById('inputAssetsTitle');
+  if (ttl) ttl.value = t.title || '';
+  const notes = document.getElementById('inputAssetsNotes');
+  if (notes) notes.value = t.notes || '';
+  const tctx = t.context || {};
+  const fmt = document.getElementById('inputAssetsFormat');
+  if (fmt && tctx.format) {
+    if (![...fmt.options].some(o => o.value === tctx.format)) fmt.add(new Option(tctx.format, tctx.format));
+    fmt.value = tctx.format;
+  }
+  const cap = document.getElementById('inputAssetsCaptions');
+  if (cap) cap.checked = !!tctx.captions;
+  // Lock the output type: organic credits count per type, so switching
+  // video<->graphic on an existing request would dodge the caps.
+  _selectInputAssetsType(t.type === 'video' ? 'video' : 'graphic');
+  _inputAssetsState.typeTouched = true;
+  document.querySelectorAll('#inputAssetsTypeToggle .binary-toggle-opt').forEach(b => {
+    b.disabled = true; b.style.opacity = '.5'; b.style.cursor = 'not-allowed';
+  });
+  const sub = document.getElementById('inputAssetsSub');
+  if (sub) sub.textContent = 'Update your request. The content team gets notified of your changes.';
+  const mtitle = document.querySelector('#inputAssetsModal .modal-title');
+  if (mtitle) mtitle.textContent = 'Edit request';
+  const btn = document.getElementById('inputAssetsSubmitBtn');
+  if (btn) btn.textContent = 'Save changes';
+  _renderInputAssetsExistingList();
+}
+
+function _renderInputAssetsExistingList() {
+  const el = document.getElementById('inputAssetsExistingList');
+  if (!el) return;
+  if (!_inputAssetsEditId || !_inputAssetsExistingFiles.length) { el.innerHTML = ''; return; }
+  el.innerHTML = '<div style="font-size:11px;color:var(--text-mute);margin:8px 0 4px;font-weight:600;text-transform:uppercase;letter-spacing:.04em">Already attached</div>' +
+    _inputAssetsExistingFiles.map((f, i) => `
+      <div class="wizard-file-item" style="${f._removed ? 'opacity:.45' : ''}">
+        <div class="wizard-file-name" style="${f._removed ? 'text-decoration:line-through' : ''}">${escapeHTML(f.name || 'File')}</div>
+        <button class="wizard-file-remove" onclick="_inputAssetsToggleExisting(${i})" aria-label="${f._removed ? 'Keep file' : 'Remove file'}" style="${f._removed ? 'font-size:10px;width:auto;padding:0 6px' : ''}">${f._removed ? 'Undo' : '×'}</button>
+      </div>`).join('');
+}
+
+function _inputAssetsToggleExisting(i) {
+  const f = _inputAssetsExistingFiles[i];
+  if (f) f._removed = !f._removed;
+  _renderInputAssetsExistingList();
+}
+
+async function _organicCancel(id) {
+  if (!confirm('Cancel this request? The credit it used goes back to your monthly allowance.')) return;
+  try {
+    await _ctkPatchTicket(id, { action: 'cancel' });
+    _fetchAndRenderOrganic();
+    showConfirmation('Request cancelled', 'Your credit is back in your monthly allowance.');
+  } catch (e) { alert('Cancel failed: ' + (e.message || e)); }
 }
 
 function toggleCreativeActions(tileEl) {
@@ -27759,6 +27836,17 @@ function openAddCreativeModal(channel) {
   // Kept name for backward compat with the existing button onclick (ads path).
   _inputAssetsChannel = (channel === 'organic' || channel === 'funnel') ? channel : 'ads';
   _inputAssetsState = { type: 'graphic', files: [] };
+  // Clear any leftover edit-mode chrome (edit layers on top of this reset).
+  _inputAssetsEditId = null;
+  _inputAssetsExistingFiles = [];
+  _renderInputAssetsExistingList();
+  document.querySelectorAll('#inputAssetsTypeToggle .binary-toggle-opt').forEach(b => {
+    b.disabled = false; b.style.opacity = ''; b.style.cursor = '';
+  });
+  const _mtitle = document.querySelector('#inputAssetsModal .modal-title');
+  if (_mtitle) _mtitle.textContent = 'Input assets';
+  const _sbtn = document.getElementById('inputAssetsSubmitBtn');
+  if (_sbtn) _sbtn.textContent = 'Submit';
   _selectInputAssetsType('graphic');
   _renderInputAssetsFilesList();
   const notes = document.getElementById('inputAssetsNotes');
@@ -27817,6 +27905,9 @@ function openAddCreativeModal(channel) {
 function closeInputAssetsModal() {
   document.getElementById('inputAssetsModal').style.display = 'none';
   _inputAssetsState = { type: 'graphic', files: [] };
+  _inputAssetsEditId = null;
+  _inputAssetsExistingFiles = [];
+  _renderInputAssetsExistingList();
   const input = document.getElementById('inputAssetsFileInput');
   if (input) input.value = '';
   const drive = document.getElementById('inputAssetsDriveLink');
@@ -28003,7 +28094,18 @@ async function submitInputAssets() {
     alert('That doesn\'t look like a valid URL. Paste a full link starting with https:// (Drive, Dropbox, WeTransfer, OneDrive - any host).');
     return;
   }
-  if (!_inputAssetsState.files.length && !hasDriveLink) {
+  // Edit mode: files are optional (the request keeps its existing ones), but
+  // at least one attachment must remain overall.
+  const editId = _inputAssetsEditId;
+  const keptFiles = editId
+    ? _inputAssetsExistingFiles.filter(f => !f._removed).map(f => { const c = { ...f }; delete c._removed; return c; })
+    : [];
+  if (editId) {
+    if (!keptFiles.length && !_inputAssetsState.files.length && !hasDriveLink) {
+      alert('Keep or add at least one file or link.');
+      return;
+    }
+  } else if (!_inputAssetsState.files.length && !hasDriveLink) {
     alert('Add at least one file or a share link to submit.');
     return;
   }
@@ -28023,13 +28125,29 @@ async function submitInputAssets() {
   const fileCount = filesToUpload.length;
   closeInputAssetsModal();
   showLoading(
-    `Uploading ${fileCount} file${fileCount === 1 ? '' : 's'}…`,
-    "This can take a minute for video. Don't close this tab."
+    fileCount ? `Uploading ${fileCount} file${fileCount === 1 ? '' : 's'}…` : 'Saving changes…',
+    fileCount ? "This can take a minute for video. Don't close this tab." : 'Just a moment.'
   );
   const channel = (typeof _inputAssetsChannel !== 'undefined') ? _inputAssetsChannel : 'ads';
   try {
-    const uploaded = await _mreqUploadFiles(filesToUpload, _uploadProgress(fileCount));
+    const uploaded = fileCount ? await _mreqUploadFiles(filesToUpload, _uploadProgress(fileCount)) : [];
     if (hasDriveLink) uploaded.push(_buildAssetLinkEntry(driveLinkRaw));
+    if (editId) {
+      // Editing an existing organic request: PATCH instead of creating a new
+      // ticket. The API records what changed and pings the content team.
+      await _ctkPatchTicket(editId, {
+        action: 'edit',
+        raw_files: [...keptFiles, ...uploaded],
+        title,
+        notes,
+        context: { format, captions },
+      });
+      hideLoading();
+      _fetchAndRenderOrganic();
+      showConfirmation('Changes saved',
+        'Your request is updated and the content team has been notified.');
+      return;   // the finally below resets the channel
+    }
     await _ctkCreateTicket({
       type: assetType,
       channel,
@@ -50450,6 +50568,8 @@ function toggleTheme() {
     </label>
     <input type="file" id="inputAssetsFileInput" accept="image/*,video/*,.psd,.ai,.zip" multiple style="display:none" onchange="_inputAssetsAddFiles(this.files)" />
     <div id="inputAssetsFilesList" class="wizard-files-list" style="margin-top:8px"></div>
+    <!-- Edit mode only: files already on the request, removable -->
+    <div id="inputAssetsExistingList" class="wizard-files-list" style="margin-top:8px"></div>
 
     <label class="modal-label" for="inputAssetsDriveLink" style="margin-top:18px">Link to file <span style="color:var(--text-mute);font-weight:400">(use if your file is over 500MB - Drive, Dropbox, WeTransfer, OneDrive, etc.)</span></label>
     <input id="inputAssetsDriveLink" class="modal-input" type="url" placeholder="https://..." />

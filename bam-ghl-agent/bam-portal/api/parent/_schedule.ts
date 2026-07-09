@@ -63,6 +63,19 @@ type Reservation = {
   cancelled_at: string | null;
 };
 
+type TrialBookingStatus = "BOOKED" | "CANCELLED" | "SHOWED" | "NO_SHOW" | "CONVERTED";
+
+type TrialBooking = {
+  id: string;
+  tenant_id: string;
+  slot_id: string;
+  customer_profile_id: string | null;
+  student_id: string | null;
+  status: TrialBookingStatus;
+  booked_at: string;
+  cancelled_at: string | null;
+};
+
 type WaitlistEntry = {
   id: string;
   slot_id: string;
@@ -83,6 +96,9 @@ type SlotState = {
   bookedCounts: Map<string, number>;
   waitlistCounts: Map<string, number>;
   reservationBySlotMembership: Map<string, Reservation>;
+  trialBySlotStudent: Map<string, TrialBooking>;
+  activeTrialByTenantStudent: Map<string, TrialBooking>;
+  usedTrialTenantStudentKeys: Set<string>;
   waitlistBySlotMembership: Map<string, WaitlistEntry>;
 };
 
@@ -92,12 +108,46 @@ type SlotSpotsTakenRow = {
 };
 
 export type CustomerSlotEnrollmentOut = {
-  membership_id: string;
+  booking_kind?: "reservation" | "trial";
+  membership_id: string | null;
   student_id: string | null;
   status: "CONFIRMED" | "WAITING";
   reservation_id: string | null;
+  trial_booking_id?: string | null;
   waitlist_id: string | null;
   can_cancel: boolean;
+};
+
+export type CustomerSlotChildActionOut = {
+  student_id: string;
+  action:
+    | "book_with_plan"
+    | "book_trial"
+    | "already_booked"
+    | "already_booked_trial"
+    | "waitlisted"
+    | "join_waitlist"
+    | "subscribe"
+    | "unavailable";
+  booking_kind: "reservation" | "trial" | null;
+  enabled: boolean;
+  reason:
+    | "active_membership"
+    | "trial_available"
+    | "trial_booked"
+    | "trial_used"
+    | "already_booked"
+    | "already_booked_trial"
+    | "already_waitlisted"
+    | "slot_full"
+    | "slot_cancelled"
+    | "slot_started"
+    | "no_active_membership";
+  membership_id?: string | null;
+  reservation_id?: string | null;
+  trial_booking_id?: string | null;
+  trial_slot_id?: string | null;
+  waitlist_id?: string | null;
 };
 
 export type CustomerSlotOut = {
@@ -116,6 +166,7 @@ export type CustomerSlotOut = {
   booked_count: number;
   waitlist_length: number;
   enrollments: CustomerSlotEnrollmentOut[];
+  child_actions: CustomerSlotChildActionOut[];
   my_status: "CONFIRMED" | "WAITING" | null;
   my_reservation_id: string | null;
   my_waitlist_id: string | null;
@@ -125,13 +176,15 @@ export type CustomerSlotOut = {
 };
 
 export type CustomerReservationOut = {
+  booking_kind: "reservation" | "trial";
   id: string;
   slot_id: string;
-  membership_id: string;
+  membership_id: string | null;
   student_id: string | null;
-  status: ReservationStatus;
+  status: ReservationStatus | TrialBookingStatus;
   booked_at: string;
   slot: CustomerSlotOut;
+  trial_booking_id?: string | null;
 };
 
 export type CustomerWaitlistOut = {
@@ -191,8 +244,9 @@ export async function listScheduleSlots(
     order: "asc",
     includeCancelled: false,
   });
-  const state = await getSlotState(slots);
-  return slots.map((slot) => toCustomerSlot(slot, state, memberships));
+  const trialStudentIds = trialStudentIdsForMemberships(context, memberships, Boolean(opts.membershipId));
+  const state = await getSlotState(slots, { studentIds: trialStudentIds });
+  return slots.map((slot) => toCustomerSlot(slot, state, memberships, trialStudentIds));
 }
 
 export async function getScheduleSlot(
@@ -207,8 +261,9 @@ export async function getScheduleSlot(
 
   ensureAcademyAccess(context, slot.tenant_id);
   const memberships = resolveMembershipsForAcademy(context, membershipId, slot.tenant_id);
-  const state = await getSlotState([slot]);
-  return toCustomerSlot(slot, state, memberships);
+  const trialStudentIds = trialStudentIdsForMemberships(context, memberships, Boolean(membershipId));
+  const state = await getSlotState([slot], { studentIds: trialStudentIds });
+  return toCustomerSlot(slot, state, memberships, trialStudentIds);
 }
 
 export async function bookScheduleSlot(
@@ -294,7 +349,7 @@ export async function listUpcomingReservations(
 ): Promise<CustomerReservationOut[]> {
   const memberships = resolveMemberships(context, opts.membershipId);
   const membershipIds = memberships.map((membership) => membership.id);
-  if (membershipIds.length === 0 || context.academyIds.length === 0) return [];
+  if (context.academyIds.length === 0) return [];
 
   const slotLimit = scanLimit(opts.limit);
   const slots = await getFutureSlotsAcrossAcademies(context.academyIds, {
@@ -306,19 +361,44 @@ export async function listUpcomingReservations(
   if (slots.length === 0) return [];
 
   const slotById = mapSlots(slots);
-  const reservations = await getReservations({
-    slotIds: slots.map((slot) => slot.id),
-    membershipIds,
-    statuses: ["CONFIRMED"],
-    limit: RESERVATION_SCAN_LIMIT,
-  });
-  const state = await getSlotState(slots);
+  const slotIds = slots.map((slot) => slot.id);
+  const trialStudentIds = trialStudentIdsForMemberships(context, memberships, Boolean(opts.membershipId));
+  const [reservations, trialBookings] = await Promise.all([
+    membershipIds.length > 0
+      ? getReservations({
+          slotIds,
+          membershipIds,
+          statuses: ["CONFIRMED"],
+          limit: RESERVATION_SCAN_LIMIT,
+        })
+      : Promise.resolve([]),
+    getTrialBookings({
+      slotIds,
+      statuses: ["BOOKED"],
+      studentIds: trialStudentIds,
+      limit: RESERVATION_SCAN_LIMIT,
+    }),
+  ]);
+  const state = await getSlotState(slots, { studentIds: trialStudentIds });
 
-  return reservations
-    .filter((reservation) => slotById.has(reservation.slot_id))
-    .map((reservation) =>
-      toReservationOut(reservation, slotById.get(reservation.slot_id), state, memberships),
-    )
+  return [
+    ...reservations
+      .filter((reservation) => slotById.has(reservation.slot_id))
+      .map((reservation) =>
+        toReservationOut(
+          reservation,
+          slotById.get(reservation.slot_id),
+          state,
+          memberships,
+          trialStudentIds,
+        ),
+      ),
+    ...trialBookings
+      .filter((trial) => slotById.has(trial.slot_id))
+      .map((trial) =>
+        toTrialBookingOut(trial, slotById.get(trial.slot_id), state, memberships, trialStudentIds),
+      ),
+  ]
     .sort((a, b) => compareSlotStart(a.slot, b.slot, "asc"))
     .slice(0, opts.limit);
 }
@@ -333,7 +413,7 @@ export async function listPastAppointments(
 ): Promise<CustomerReservationOut[]> {
   const memberships = resolveMemberships(context, opts.membershipId);
   const membershipIds = memberships.map((membership) => membership.id);
-  if (membershipIds.length === 0 || context.academyIds.length === 0) return [];
+  if (context.academyIds.length === 0) return [];
 
   const now = new Date();
   const slots = await getSlots({
@@ -347,19 +427,44 @@ export async function listPastAppointments(
   if (slots.length === 0) return [];
 
   const slotById = mapSlots(slots);
-  const reservations = await getReservations({
-    slotIds: slots.map((slot) => slot.id),
-    membershipIds,
-    statuses: ["CONFIRMED", "ATTENDED", "NO_SHOW"],
-    limit: RESERVATION_SCAN_LIMIT,
-  });
-  const state = await getSlotState(slots);
+  const slotIds = slots.map((slot) => slot.id);
+  const trialStudentIds = trialStudentIdsForMemberships(context, memberships, Boolean(opts.membershipId));
+  const [reservations, trialBookings] = await Promise.all([
+    membershipIds.length > 0
+      ? getReservations({
+          slotIds,
+          membershipIds,
+          statuses: ["CONFIRMED", "ATTENDED", "NO_SHOW"],
+          limit: RESERVATION_SCAN_LIMIT,
+        })
+      : Promise.resolve([]),
+    getTrialBookings({
+      slotIds,
+      statuses: ["BOOKED", "SHOWED", "NO_SHOW", "CONVERTED"],
+      studentIds: trialStudentIds,
+      limit: RESERVATION_SCAN_LIMIT,
+    }),
+  ]);
+  const state = await getSlotState(slots, { studentIds: trialStudentIds });
 
-  return reservations
-    .filter((reservation) => slotById.has(reservation.slot_id))
-    .map((reservation) =>
-      toReservationOut(reservation, slotById.get(reservation.slot_id), state, memberships),
-    )
+  return [
+    ...reservations
+      .filter((reservation) => slotById.has(reservation.slot_id))
+      .map((reservation) =>
+        toReservationOut(
+          reservation,
+          slotById.get(reservation.slot_id),
+          state,
+          memberships,
+          trialStudentIds,
+        ),
+      ),
+    ...trialBookings
+      .filter((trial) => slotById.has(trial.slot_id))
+      .map((trial) =>
+        toTrialBookingOut(trial, slotById.get(trial.slot_id), state, memberships, trialStudentIds),
+      ),
+  ]
     .sort((a, b) => compareSlotStart(a.slot, b.slot, "desc"))
     .slice(0, opts.limit);
 }
@@ -602,8 +707,8 @@ async function getReservationOutForContext(
 
   ensureAcademyAccess(context, slot.tenant_id);
   const memberships = resolveMembershipsForAcademy(context, undefined, slot.tenant_id);
-  const state = await getSlotState([slot]);
-  return toReservationOut(reservation, slot, state, memberships);
+  const state = await getSlotState([slot], { studentIds: context.studentIds });
+  return toReservationOut(reservation, slot, state, memberships, context.studentIds);
 }
 
 async function getWaitlistOutForContext(
@@ -622,8 +727,8 @@ async function getWaitlistOutForContext(
 
   ensureAcademyAccess(context, slot.tenant_id);
   const memberships = resolveMembershipsForAcademy(context, undefined, slot.tenant_id);
-  const state = await getSlotState([slot]);
-  return toWaitlistOut(waitlist, slot, state, memberships);
+  const state = await getSlotState([slot], { studentIds: context.studentIds });
+  return toWaitlistOut(waitlist, slot, state, memberships, context.studentIds);
 }
 
 async function getSlotById(slotId: string): Promise<ScheduleSlot | null> {
@@ -714,12 +819,17 @@ async function getFutureSlotsAcrossAcademies(
     .slice(0, opts.limit);
 }
 
-async function getSlotState(slots: Array<Pick<ScheduleSlot, "id" | "tenant_id">>): Promise<SlotState> {
+async function getSlotState(
+  slots: Array<Pick<ScheduleSlot, "id" | "tenant_id">>,
+  opts: { studentIds?: string[] } = {},
+): Promise<SlotState> {
   const empty = emptySlotState();
   const slotIds = uniqueValues(slots.map((slot) => slot.id));
   if (slotIds.length === 0) return empty;
+  const studentIds = uniqueValues((opts.studentIds ?? []).filter(isString));
 
-  const [reservations, waitlists, bookedCounts] = await Promise.all([
+  const academyIds = uniqueValues(slots.map((slot) => slot.tenant_id));
+  const [reservations, waitlists, bookedCounts, trialBookings, trialHistory] = await Promise.all([
     getReservations({
       slotIds,
       statuses: ["CONFIRMED"],
@@ -727,6 +837,18 @@ async function getSlotState(slots: Array<Pick<ScheduleSlot, "id" | "tenant_id">>
     }),
     getWaitlistEntries(slotIds),
     getBulkBookedCounts(slots),
+    getTrialBookings({
+      slotIds,
+      statuses: ["BOOKED"],
+      studentIds,
+      limit: RESERVATION_SCAN_LIMIT,
+    }),
+    getTrialBookingsForStudents({
+      academyIds,
+      statuses: ["BOOKED", "SHOWED", "NO_SHOW", "CONVERTED"],
+      studentIds,
+      limit: RESERVATION_SCAN_LIMIT,
+    }),
   ]);
 
   for (const [slotId, count] of bookedCounts) {
@@ -735,6 +857,27 @@ async function getSlotState(slots: Array<Pick<ScheduleSlot, "id" | "tenant_id">>
 
   for (const reservation of reservations) {
     empty.reservationBySlotMembership.set(slotMembershipKey(reservation), reservation);
+  }
+
+  for (const trial of trialBookings) {
+    if (trial.student_id) {
+      empty.trialBySlotStudent.set(
+        slotStudentKey({ slot_id: trial.slot_id, student_id: trial.student_id }),
+        trial,
+      );
+    }
+  }
+
+  for (const trial of trialHistory) {
+    if (!trial.student_id) continue;
+    const key = tenantStudentKey({ tenant_id: trial.tenant_id, student_id: trial.student_id });
+    if (trial.status === "BOOKED") {
+      if (!empty.activeTrialByTenantStudent.has(key)) {
+        empty.activeTrialByTenantStudent.set(key, trial);
+      }
+      continue;
+    }
+    empty.usedTrialTenantStudentKeys.add(key);
   }
 
   for (const waitlist of waitlists) {
@@ -799,6 +942,54 @@ async function getReservations(opts: {
   return Array.isArray(rows) ? rows : [];
 }
 
+async function getTrialBookings(opts: {
+  slotIds: string[];
+  statuses: TrialBookingStatus[];
+  studentIds: string[];
+  limit: number;
+}): Promise<TrialBooking[]> {
+  if (opts.slotIds.length === 0 || opts.studentIds.length === 0) return [];
+
+  const filters = [
+    `slot_id=in.(${inList(opts.slotIds)})`,
+    `student_id=in.(${inList(opts.studentIds)})`,
+    "source=eq.parent_app",
+    statusTextFilter(opts.statuses),
+  ];
+
+  const rows = await sb<TrialBooking[]>(
+    `trial_bookings?${filters.join("&")}` +
+      "&select=id,tenant_id,slot_id,customer_profile_id,student_id,status,booked_at,cancelled_at" +
+      `&limit=${opts.limit}`,
+  );
+
+  return Array.isArray(rows) ? rows : [];
+}
+
+async function getTrialBookingsForStudents(opts: {
+  academyIds: string[];
+  statuses: TrialBookingStatus[];
+  studentIds: string[];
+  limit: number;
+}): Promise<TrialBooking[]> {
+  if (opts.academyIds.length === 0 || opts.studentIds.length === 0) return [];
+
+  const filters = [
+    tenantFilter(opts.academyIds),
+    `student_id=in.(${inList(opts.studentIds)})`,
+    "source=eq.parent_app",
+    statusTextFilter(opts.statuses),
+  ];
+
+  const rows = await sb<TrialBooking[]>(
+    `trial_bookings?${filters.join("&")}` +
+      "&select=id,tenant_id,slot_id,customer_profile_id,student_id,status,booked_at,cancelled_at" +
+      `&order=booked_at.desc&limit=${opts.limit}`,
+  );
+
+  return Array.isArray(rows) ? rows : [];
+}
+
 async function getWaitlistEntries(slotIds: string[]): Promise<WaitlistEntry[]> {
   if (slotIds.length === 0) return [];
 
@@ -816,19 +1007,20 @@ function toCustomerSlot(
   slot: ScheduleSlot,
   state: SlotState,
   memberships: Membership[],
+  studentIds: string[] = [],
 ): CustomerSlotOut {
   const bookedCount = state.bookedCounts.get(slot.id) || 0;
   const waitlistLength = state.waitlistCounts.get(slot.id) || 0;
   const startsInFuture = isFuture(slot.start_time);
-  const enrollments = getSlotEnrollments(slot, state, memberships, startsInFuture);
+  const enrollments = getSlotEnrollments(slot, state, memberships, studentIds, startsInFuture);
+  const isFull = bookedCount >= slot.capacity;
   const primaryEnrollment = getPrimarySlotEnrollment(enrollments);
   const enrolledMembershipIds = new Set(
-    enrollments.map((enrollment) => enrollment.membership_id),
+    enrollments.map((enrollment) => enrollment.membership_id).filter(isString),
   );
   const hasActiveAvailableMembership = memberships.some(
     (membership) => membership.status === "ACTIVE" && !enrolledMembershipIds.has(membership.id),
   );
-  const isFull = bookedCount >= slot.capacity;
 
   return {
     id: slot.id,
@@ -846,6 +1038,14 @@ function toCustomerSlot(
     booked_count: bookedCount,
     waitlist_length: waitlistLength,
     enrollments,
+    child_actions: getSlotChildActions({
+      slot,
+      state,
+      memberships,
+      studentIds,
+      startsInFuture,
+      isFull,
+    }),
     my_status: primaryEnrollment?.status ?? null,
     my_reservation_id: primaryEnrollment?.reservation_id ?? null,
     my_waitlist_id: primaryEnrollment?.waitlist_id ?? null,
@@ -860,6 +1060,7 @@ function toReservationOut(
   slot: ScheduleSlot | undefined,
   state: SlotState,
   memberships: Membership[],
+  studentIds: string[],
 ): CustomerReservationOut {
   if (!slot) {
     throw new HttpError(500, "Reservation is missing its schedule slot.");
@@ -870,13 +1071,42 @@ function toReservationOut(
   );
 
   return {
+    booking_kind: "reservation",
     id: reservation.id,
     slot_id: reservation.slot_id,
     membership_id: reservation.membership_id,
     student_id: reservation.student_id,
     status: reservation.status,
     booked_at: reservation.booked_at,
-    slot: toCustomerSlot(slot, state, slotMemberships),
+    slot: toCustomerSlot(slot, state, slotMemberships, studentIds),
+  };
+}
+
+function toTrialBookingOut(
+  trial: TrialBooking,
+  slot: ScheduleSlot | undefined,
+  state: SlotState,
+  memberships: Membership[],
+  studentIds: string[],
+): CustomerReservationOut {
+  if (!slot) {
+    throw new HttpError(500, "Trial booking is missing its schedule slot.");
+  }
+
+  const slotMemberships = memberships.filter(
+    (membership) => membership.academy_id === slot.tenant_id,
+  );
+
+  return {
+    booking_kind: "trial",
+    id: trial.id,
+    slot_id: trial.slot_id,
+    membership_id: null,
+    student_id: trial.student_id,
+    status: trial.status,
+    booked_at: trial.booked_at,
+    slot: toCustomerSlot(slot, state, slotMemberships, studentIds),
+    trial_booking_id: trial.id,
   };
 }
 
@@ -885,6 +1115,7 @@ function toWaitlistOut(
   slot: ScheduleSlot,
   state: SlotState,
   memberships: Membership[],
+  studentIds: string[] = [],
 ): CustomerWaitlistOut {
   const slotMemberships = memberships.filter(
     (membership) => membership.academy_id === slot.tenant_id,
@@ -897,7 +1128,7 @@ function toWaitlistOut(
     student_id: waitlist.student_id,
     status: waitlist.status,
     created_at: waitlist.created_at,
-    slot: toCustomerSlot(slot, state, slotMemberships),
+    slot: toCustomerSlot(slot, state, slotMemberships, studentIds),
   };
 }
 
@@ -905,6 +1136,7 @@ function getSlotEnrollments(
   slot: ScheduleSlot,
   state: SlotState,
   memberships: Membership[],
+  studentIds: string[],
   startsInFuture: boolean,
 ): CustomerSlotEnrollmentOut[] {
   const enrollments: CustomerSlotEnrollmentOut[] = [];
@@ -914,10 +1146,12 @@ function getSlotEnrollments(
     const reservation = state.reservationBySlotMembership.get(key);
     if (reservation) {
       enrollments.push({
+        booking_kind: "reservation",
         membership_id: membership.id,
         student_id: reservation.student_id ?? membership.student_id,
         status: "CONFIRMED",
         reservation_id: reservation.id,
+        trial_booking_id: null,
         waitlist_id: null,
         can_cancel: startsInFuture && !slot.is_cancelled,
       });
@@ -931,10 +1165,29 @@ function getSlotEnrollments(
         student_id: waitlist.student_id ?? membership.student_id,
         status: "WAITING",
         reservation_id: null,
+        trial_booking_id: null,
         waitlist_id: waitlist.id,
         can_cancel: false,
       });
     }
+  }
+
+  const enrolledStudentIds = new Set(enrollments.map((enrollment) => enrollment.student_id).filter(isString));
+  for (const studentId of uniqueValues(studentIds)) {
+    if (enrolledStudentIds.has(studentId)) continue;
+    const trial = state.trialBySlotStudent.get(slotStudentKey({ slot_id: slot.id, student_id: studentId }));
+    if (!trial) continue;
+
+    enrollments.push({
+      booking_kind: "trial",
+      membership_id: null,
+      student_id: studentId,
+      status: "CONFIRMED",
+      reservation_id: null,
+      trial_booking_id: trial.id,
+      waitlist_id: null,
+      can_cancel: false,
+    });
   }
 
   return enrollments;
@@ -949,11 +1202,179 @@ function getPrimarySlotEnrollment(
   );
 }
 
+function getSlotChildActions(opts: {
+  slot: ScheduleSlot;
+  state: SlotState;
+  memberships: Membership[];
+  studentIds: string[];
+  startsInFuture: boolean;
+  isFull: boolean;
+}): CustomerSlotChildActionOut[] {
+  const { slot, state, memberships, studentIds, startsInFuture, isFull } = opts;
+  const activeMemberships = memberships.filter(
+    (membership) => membership.academy_id === slot.tenant_id && membership.status === "ACTIVE",
+  );
+
+  return uniqueValues(studentIds).map((studentId) => {
+    const activeMembership = activeMemberships.find(
+      (membership) => !membership.student_id || membership.student_id === studentId,
+    );
+    const reservation = activeMembership
+      ? getReservationForStudent(slot, state, activeMembership, studentId)
+      : undefined;
+    if (reservation) {
+      return {
+        student_id: studentId,
+        action: "already_booked",
+        booking_kind: "reservation",
+        enabled: false,
+        reason: "already_booked",
+        membership_id: activeMembership?.id ?? reservation.membership_id,
+        reservation_id: reservation.id,
+      };
+    }
+
+    const activeTrial = state.activeTrialByTenantStudent.get(
+      tenantStudentKey({ tenant_id: slot.tenant_id, student_id: studentId }),
+    );
+    if (activeTrial?.slot_id === slot.id) {
+      return {
+        student_id: studentId,
+        action: "already_booked_trial",
+        booking_kind: "trial",
+        enabled: false,
+        reason: "already_booked_trial",
+        membership_id: null,
+        trial_booking_id: activeTrial.id,
+        trial_slot_id: activeTrial.slot_id,
+      };
+    }
+
+    const waitlist = activeMembership
+      ? state.waitlistBySlotMembership.get(
+          slotMembershipKey({ slot_id: slot.id, membership_id: activeMembership.id }),
+        )
+      : undefined;
+    if (waitlist) {
+      return {
+        student_id: studentId,
+        action: "waitlisted",
+        booking_kind: "reservation",
+        enabled: false,
+        reason: "already_waitlisted",
+        membership_id: activeMembership?.id ?? waitlist.membership_id,
+        waitlist_id: waitlist.id,
+      };
+    }
+
+    if (slot.is_cancelled) {
+      return unavailableSlotAction(studentId, "slot_cancelled");
+    }
+    if (!startsInFuture) {
+      return unavailableSlotAction(studentId, "slot_started");
+    }
+
+    if (activeMembership) {
+      if (isFull) {
+        return {
+          student_id: studentId,
+          action: "join_waitlist",
+          booking_kind: "reservation",
+          enabled: true,
+          reason: "slot_full",
+          membership_id: activeMembership.id,
+        };
+      }
+
+      return {
+        student_id: studentId,
+        action: "book_with_plan",
+        booking_kind: "reservation",
+        enabled: true,
+        reason: "active_membership",
+        membership_id: activeMembership.id,
+      };
+    }
+
+    if (isFull) {
+      return unavailableSlotAction(studentId, "slot_full");
+    }
+
+    if (activeTrial) {
+      return {
+        student_id: studentId,
+        action: "subscribe",
+        booking_kind: null,
+        enabled: true,
+        reason: "trial_booked",
+        membership_id: null,
+        trial_booking_id: activeTrial.id,
+        trial_slot_id: activeTrial.slot_id,
+      };
+    }
+
+    if (
+      state.usedTrialTenantStudentKeys.has(
+        tenantStudentKey({ tenant_id: slot.tenant_id, student_id: studentId }),
+      )
+    ) {
+      return {
+        student_id: studentId,
+        action: "subscribe",
+        booking_kind: null,
+        enabled: true,
+        reason: "trial_used",
+        membership_id: null,
+      };
+    }
+
+    return {
+      student_id: studentId,
+      action: "book_trial",
+      booking_kind: "trial",
+      enabled: true,
+      reason: "trial_available",
+      membership_id: null,
+    };
+  });
+}
+
+function getReservationForStudent(
+  slot: ScheduleSlot,
+  state: SlotState,
+  membership: Membership,
+  studentId: string,
+): Reservation | undefined {
+  const reservation = state.reservationBySlotMembership.get(
+    slotMembershipKey({ slot_id: slot.id, membership_id: membership.id }),
+  );
+  if (!reservation) return undefined;
+  if (reservation.student_id) return reservation.student_id === studentId ? reservation : undefined;
+  if (membership.student_id) return membership.student_id === studentId ? reservation : undefined;
+  return reservation;
+}
+
+function unavailableSlotAction(
+  studentId: string,
+  reason: "slot_cancelled" | "slot_started" | "slot_full",
+): CustomerSlotChildActionOut {
+  return {
+    student_id: studentId,
+    action: "unavailable",
+    booking_kind: null,
+    enabled: false,
+    reason,
+  };
+}
+
 function emptySlotState(): SlotState {
   return {
     bookedCounts: new Map<string, number>(),
     waitlistCounts: new Map<string, number>(),
     reservationBySlotMembership: new Map<string, Reservation>(),
+    trialBySlotStudent: new Map<string, TrialBooking>(),
+    activeTrialByTenantStudent: new Map<string, TrialBooking>(),
+    usedTrialTenantStudentKeys: new Set<string>(),
     waitlistBySlotMembership: new Map<string, WaitlistEntry>(),
   };
 }
@@ -982,6 +1403,24 @@ function statusFilter(statuses: ReservationStatus[]): string {
   return `status=in.(${inList(statuses)})`;
 }
 
+function statusTextFilter(statuses: string[]): string {
+  if (statuses.length === 1) {
+    const status = statuses[0];
+    if (!status) throw new HttpError(500, "Status filter is empty.");
+    return `status=eq.${eq(status)}`;
+  }
+  return `status=in.(${inList(statuses)})`;
+}
+
+function trialStudentIdsForMemberships(
+  context: ParentScheduleContext,
+  memberships: Membership[],
+  hasMembershipFilter: boolean,
+): string[] {
+  if (!hasMembershipFilter) return context.studentIds;
+  return uniqueValues(memberships.map((membership) => membership.student_id).filter(isString));
+}
+
 function slotSelect(): string {
   return [
     "id",
@@ -1004,6 +1443,14 @@ function slotSelect(): string {
 
 function slotMembershipKey(row: { slot_id: string; membership_id: string }): string {
   return `${row.slot_id}:${row.membership_id}`;
+}
+
+function slotStudentKey(row: { slot_id: string; student_id: string }): string {
+  return `${row.slot_id}:${row.student_id}`;
+}
+
+function tenantStudentKey(row: { tenant_id: string; student_id: string }): string {
+  return `${row.tenant_id}:${row.student_id}`;
 }
 
 function academyTimeZone(timeZones: Map<string, string>, academyId: string): string {
@@ -1198,4 +1645,8 @@ function scanLimit(limit: number): number {
 
 function uniqueValues(values: string[]): string[] {
   return [...new Set(values)];
+}
+
+function isString(value: string | null | undefined): value is string {
+  return typeof value === "string" && value.length > 0;
 }

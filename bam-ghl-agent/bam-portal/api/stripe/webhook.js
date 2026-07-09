@@ -47,6 +47,7 @@ import { getClientGhlToken } from "../website/availability.js";
 import { getAccessSyncMode, syncAccessForMember } from "../_runtime/access-sync.js";
 import { applyInvoiceCreditGrants } from "../_runtime/credit-engine.js";
 import { createRuntimeSupabaseClient } from "../_runtime/supabase.js";
+import { resolveOrMintPortalContact } from "../_contacts.js";
 
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
@@ -471,6 +472,7 @@ async function handler(req, res) {
       case "invoice.paid":                  return await handleInvoiceSucceeded(event, connectedAccount, res);
       case "payment_method.attached":       return await handlePaymentMethodAttached(event, connectedAccount, res);
       case "charge.refunded":               return await handleChargeRefunded(event, connectedAccount, res);
+      case "customer.created":              return await handleCustomerCreated(event, connectedAccount, res);
       case "price.created":                 return await handlePriceUpserted(event, connectedAccount, res);
       case "price.updated":                 return await handlePriceUpserted(event, connectedAccount, res);
       default:                              return res.status(200).json({ skipped: event.type });
@@ -1205,6 +1207,58 @@ async function handleChargeRefunded(event, connectedAccount, res) {
 //     → tier='legacy_unknown', is_routable=false
 //   - existing row: tier/canonical_plan/is_routable are PRESERVED
 //     (owner classifications never silently overwritten by Stripe edits)
+// ── customer.created: keep the Stripe-contact link clean going forward ──────
+// The staff-side Stripe Link-Up sweep handles history; this keeps NEW Stripe
+// customers linked as they appear: a single exact-email contact match gets
+// contacts.stripe_customer_id stamped, no match mints a contact
+// (source='stripe-import'). Ambiguous cases are left for the next sweep -
+// no review row is written from webhook context. Best-effort, always 200.
+async function handleCustomerCreated(event, connectedAccount, res) {
+  const cust = event.data && event.data.object;
+  if (!cust || !cust.id) return res.status(200).json({ skipped: "no customer" });
+  try {
+    if (!connectedAccount) return res.status(200).json({ skipped: "platform-level customer" });
+    const cRows = await sb(`clients?stripe_connect_account_id=eq.${encodeURIComponent(connectedAccount)}&select=id&limit=1`);
+    const client = Array.isArray(cRows) && cRows[0];
+    if (!client) return res.status(200).json({ skipped: "no client for connected account" });
+
+    const email = String(cust.email || "").trim().toLowerCase();
+    if (email) {
+      const matches = await sb(
+        `contacts?client_id=eq.${client.id}&email=eq.${encodeURIComponent(email)}&select=id,stripe_customer_id&limit=2`
+      ) || [];
+      if (matches.length === 1 && (!matches[0].stripe_customer_id || matches[0].stripe_customer_id === cust.id)) {
+        await sb(`contacts?id=eq.${encodeURIComponent(matches[0].id)}`, {
+          method: "PATCH", headers: { Prefer: "return=minimal" },
+          body: JSON.stringify({ stripe_customer_id: cust.id, updated_at: nowIso() }),
+        });
+        return res.status(200).json({ ok: true, linked: matches[0].id });
+      }
+      if (matches.length > 1) return res.status(200).json({ skipped: "ambiguous email - next sweep reviews it" });
+      if (matches.length === 1) return res.status(200).json({ skipped: "contact linked to another customer - next sweep reviews it" });
+    }
+
+    // No contact -> mint one so the person exists portal-side (needs email or phone).
+    if (email || cust.phone) {
+      const parts = String(cust.name || "").trim().split(/\s+/).filter(Boolean);
+      const key = await resolveOrMintPortalContact(client.id, {
+        name: cust.name || null,
+        first_name: parts[0] || null,
+        last_name: parts.length > 1 ? parts.slice(1).join(" ") : null,
+        email: email || null,
+        phone: cust.phone || null,
+        stripe_customer_id: cust.id,
+        source: "stripe-import",
+      });
+      return res.status(200).json({ ok: true, minted: key || null });
+    }
+    return res.status(200).json({ skipped: "no email/phone to link or mint" });
+  } catch (e) {
+    console.error("[webhook] customer.created link failed:", e && e.message);
+    return res.status(200).json({ skipped: "link error (logged)" });
+  }
+}
+
 async function handlePriceUpserted(event, connectedAccount, res) {
   const price = event.data && event.data.object;
   if (!price) return res.status(200).json({ skipped: "no price object" });
