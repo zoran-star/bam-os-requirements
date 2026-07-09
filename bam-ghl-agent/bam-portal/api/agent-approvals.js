@@ -737,36 +737,14 @@ async function runDetect(res, onlyClientId) {
   return res.status(200).json({ ok: true, academies: out });
 }
 
-// 2-hourly approval digest: text each enabled academy's configured number the
-// count of chats waiting for approval (only when > 0).
-async function runDigest(res) {
-  const out = [];
-  let clients = [];
-  try {
-    clients = await sb(`clients?select=id,business_name,ghl_location_id,ghl_access_token,ghl_refresh_token,ghl_token_expires_at,ghl_kpi_config&v2_access=eq.true`);
-  } catch (_) {}
-  for (const client of (Array.isArray(clients) ? clients : [])) {
-    const cfg = client.ghl_kpi_config || {};
-    if (!cfg.agent_approvals_enabled || !cfg.agent_notify_phone) continue;
-    try {
-      const creds = await pickGhlToken(client);
-      if (!creds) continue;
-      const { queue } = await computeQueue(creds.token, creds.locationId, { clientId: client.id, sb });
-      if (queue.length > 0) {
-        const msg = `🤖 ${queue.length} chat${queue.length === 1 ? "" : "s"} waiting for your approval (${client.business_name || "academy"}). Open the portal → Inbox → 👁 Hawkeye.`;
-        const r = await sendSms({ client, toPhone: cfg.agent_notify_phone, message: msg, contactName: "BAM Agent" });
-        out.push({ client_id: client.id, count: queue.length, sent: !!r.ok });
-      } else {
-        out.push({ client_id: client.id, count: 0 });
-      }
-    } catch (e) { out.push({ client_id: client.id, error: e.message }); }
-  }
-  return res.status(200).json({ ok: true, academies: out });
-}
+// NOTE (Zoran 2026-07-08): the 2-hourly "chats waiting for your approval" digest
+// SMS is RETIRED - it only counted the Booking queue and the deck/pill counts in
+// the portal replace it. The instant "just replied" SMS (inbound webhooks) stays.
 
 async function handler(req, res) {
-  // Crons (Vercel sends Bearer CRON_SECRET): 2-hourly approval digest + the
-  // ready-reply detector (drafts replies for Responded leads; self-drive sends).
+  // Cron (Vercel sends Bearer CRON_SECRET): the ready-reply detector (drafts
+  // replies for Responded leads; self-drive sends). cron-digest is retired but
+  // answered harmlessly until the vercel.json cron change deploys.
   if (req.method === "GET" && (req.query.action === "cron-digest" || req.query.action === "detect")) {
     const got = (req.headers.authorization || "").replace(/^Bearer\s+/i, "");
     if (!process.env.CRON_SECRET || got !== process.env.CRON_SECRET) return res.status(401).json({ error: "unauthorized" });
@@ -774,7 +752,7 @@ async function handler(req, res) {
       if (!ANTHROPIC_KEY) return res.status(500).json({ error: "ANTHROPIC_API_KEY not configured" });
       return await runDetect(res, null);
     }
-    return await runDigest(res);
+    return res.status(200).json({ ok: true, retired: "digest SMS removed 2026-07-08" });
   }
   if (req.method !== "POST") return res.status(405).json({ error: "POST only" });
   // BAM staff OR the academy's own owner / can_train_agent member.
