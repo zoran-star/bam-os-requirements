@@ -114,8 +114,13 @@ async function handler(req, res) {
           `&select=funnel,url&order=created_at.desc&limit=2000`
         ),
       ]);
-      const derived = deriveUrls(beacons, client && client[0] && client[0].allowed_domains);
+      const domains = client && client[0] && client[0].allowed_domains;
+      const derived = deriveUrls(beacons, domains);
       const eps = Array.isArray(entryPoints) ? entryPoints : [];
+      // url_resolved priority: stored override -> most-common beacon page_view
+      // path on the branded domain. NO blind path guess: a wrong guess loads the
+      // wrong page. Pages with no beacons + no stored url resolve to null and the
+      // annotator shows an honest "we do not have this page yet" state.
       const out = (funnels || []).map((f) => ({
         ...f,
         url_resolved: f.url || derived[f.key] || null,
