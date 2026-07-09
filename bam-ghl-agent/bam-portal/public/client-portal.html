@@ -7164,6 +7164,8 @@
           <!-- ── Marketing Machine (V2 only) - Meta ads card + landing page card ── -->
           <div id="marketing-machine-card" style="display:none"></div>
           <div id="landing-machine-card" style="display:none"></div>
+          <!-- Other entry point funnels (contact page etc.) - dropdown config list -->
+          <div id="other-funnels-card" style="display:none"></div>
 
           <!-- ── Resource guides (collapsed PDFs - placeholder until walkthrough videos) ── -->
           <details class="guide-card">
@@ -49482,13 +49484,16 @@ function _ccPulseRender(roster) {
 // (.mm-*) and both focus modals live at body level, so the existing
 // marketing focus mode works unchanged from here.
 function _ccMountMarketing(host) {
-  host.innerHTML = _ccHead('Marketing', 'Your machine: ads in, leads out.') + '<div id="cc-marketing-mount"></div>' +
-    `<div class="cc-actions"><button type="button" class="cc-btn" onclick="_ccOpenClassic('marketing')">Open full marketing</button></div>`;
+  // "Open full marketing" button removed (Zoran 2026-07-08) - the machine
+  // cards + other-funnels config ARE the marketing surface here.
+  host.innerHTML = _ccHead('Marketing', 'Your machine: ads in, leads out.') + '<div id="cc-marketing-mount"></div>';
   const mount = document.getElementById('cc-marketing-mount');
   const mm = document.getElementById('marketing-machine-card');
   const lm = document.getElementById('landing-machine-card');
+  const fn = document.getElementById('other-funnels-card');
   if (mm) mount.appendChild(mm);
   if (lm) mount.appendChild(lm);
+  if (fn) mount.appendChild(fn);
   try { _mmLoad(); } catch (e) { console.error('[cc] marketing', e); }
 }
 
@@ -50732,7 +50737,7 @@ function toggleTheme() {
     <button type="button" class="mm-back-btn" onclick="closeLandingMachine()">&lsaquo; Back</button>
     <div class="mm-mod-head">
       <div>
-        <div class="modal-title" style="margin-bottom:0">Landing Page</div>
+        <div class="modal-title" id="lm-modal-title" style="margin-bottom:0">Landing Page</div>
       </div>
     </div>
     <div id="lm-modal-body"></div>
@@ -51168,6 +51173,7 @@ async function _mmLoad(force) {
   const host = document.getElementById('marketing-machine-card');
   if (!host) return;
   if (!(typeof V2_ACCESS !== 'undefined' && V2_ACCESS)) { host.style.display = 'none'; return; }
+  _fnLoad(force);   // other entry point funnels list (independent of the Meta fetch)
   if (_MM_LOADED && !force) { _mmRenderCard(); return; }
   host.style.display = 'block';
   host.innerHTML = '<div class="mm-card" style="cursor:default">' +
@@ -51433,6 +51439,13 @@ function _mmRenderLanding() {
 function _mmCollapsePageRest(card) {
   const content = card.parentElement;
   if (!content) return;
+  // Command center: the cards live in #cc-marketing-mount with nothing to
+  // collapse - no "guides, campaigns and requests" bar there (Zoran 2026-07-08).
+  if (content.id === 'cc-marketing-mount') {
+    const stray = document.getElementById('mm-page-toggle');
+    if (stray && content.contains(stray)) stray.remove();
+    return;
+  }
   let bar = document.getElementById('mm-page-toggle');
   if (!bar) {
     bar = document.createElement('div');
@@ -51450,16 +51463,17 @@ function _mmCollapsePageRest(card) {
     bar.onclick = () => {
       const open = bar.classList.toggle('open');
       Array.from(content.children).forEach((el) => {
-        if (el === card || el === bar || el.id === 'landing-machine-card') return;
+        if (el === card || el === bar || el.id === 'landing-machine-card' || el.id === 'other-funnels-card') return;
         el.style.display = open ? '' : 'none';
       });
     };
+    const otherEl = document.getElementById('other-funnels-card');
     const landingEl = document.getElementById('landing-machine-card');
-    (landingEl || card).after(bar);
+    (otherEl || landingEl || card).after(bar);
   }
   if (!bar.classList.contains('open')) {
     Array.from(content.children).forEach((el) => {
-      if (el === card || el === bar || el.id === 'landing-machine-card') return;
+      if (el === card || el === bar || el.id === 'landing-machine-card' || el.id === 'other-funnels-card') return;
       el.style.display = 'none';
     });
   }
@@ -51507,6 +51521,8 @@ function openMarketingMachine() {
 function closeMarketingMachine() { _mmCloseFocus('marketingMachineModal'); }
 function openLandingMachine(stage) {
   if (!_MM) return;
+  _FN_ACTIVE = null;   // main free-trial landing page, not an "other" funnel
+  const tt = document.getElementById('lm-modal-title'); if (tt) tt.textContent = 'Landing Page';
   _V2_OPEN = false; _V2_PINS = []; _V2_PENDING = null;   // annotator always starts collapsed
   _mmRenderLandingFocus(_MM);
   _mmOpenFocus('landingMachineModal', '#landing-machine-card .mm-action-panel');
@@ -51520,6 +51536,145 @@ function openLandingMachine(stage) {
   }
 }
 function closeLandingMachine() { _mmCloseFocus('landingMachineModal'); }
+
+/* ── Other entry point funnels (V2) ──
+   A funnel = one page on the academy site that hosts direct entry points
+   (forms, calendars). The main free-trial funnel has its own card above;
+   this dropdown lists the OTHER funnels that have entry points (GTA today:
+   the contact page) and opens each one in the same landing focus view so
+   it can be configured and annotated like the main page. Data:
+   GET /api/website/funnels (funnels + nested entry_points + url_resolved). */
+let _FN = null, _FN_LOADED = false, _FN_OPEN = false;
+let _FN_ACTIVE = null;   // funnel shown in the landing focus modal (null = main free-trial page)
+async function _fnLoad(force) {
+  const host = document.getElementById('other-funnels-card');
+  if (!host) return;
+  if (_FN_LOADED && !force) { _fnRenderOthers(); return; }
+  try {
+    const token = await _mreqAuthToken();
+    const res = await fetch('/api/website/funnels?client_id=' + encodeURIComponent(CLIENT_ID), {
+      headers: { 'Authorization': 'Bearer ' + token },
+    });
+    const json = await _safeJson(res);
+    if (!res.ok) throw new Error(json.error || ('HTTP ' + res.status));
+    _FN = json.funnels || []; _FN_LOADED = true;
+    _fnRenderOthers();
+  } catch (e) {
+    host.style.display = 'none';   // quiet fail: the rest of the page still works
+  }
+}
+function _fnOthers() {
+  return (_FN || []).filter((f) => !f.is_primary && f.enabled && (f.entry_points || []).length);
+}
+function _fnEpSummary(f) {
+  const eps = f.entry_points || [];
+  const forms = eps.filter((e) => e.type === 'website-form' || e.type === 'ghl-form').length;
+  const cals = eps.filter((e) => e.type === 'calendar').length;
+  const bits = [];
+  if (forms) bits.push(forms + (forms === 1 ? ' form' : ' forms'));
+  if (cals) bits.push(cals + (cals === 1 ? ' calendar' : ' calendars'));
+  return bits.join(' &middot; ') || 'no entry points';
+}
+function _fnRenderOthers() {
+  const host = document.getElementById('other-funnels-card');
+  if (!host) return;
+  if (!(typeof V2_ACCESS !== 'undefined' && V2_ACCESS)) { host.style.display = 'none'; return; }
+  const others = _fnOthers();
+  if (!others.length) { host.style.display = 'none'; return; }
+  const gearIco = '<svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="2.2"/><path d="M8 1.8v1.7M8 12.5v1.7M1.8 8h1.7M12.5 8h1.7M3.6 3.6l1.2 1.2M11.2 11.2l1.2 1.2M12.4 3.6l-1.2 1.2M4.8 11.2l-1.2 1.2"/></svg>';
+  const rows = others.map((f) =>
+    '<button type="button" class="fn-row" onclick="openFunnelConfig(\'' + f.id + '\')" ' +
+      'style="width:100%;display:flex;align-items:center;gap:12px;text-align:left;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px 15px;cursor:pointer;margin-top:8px">' +
+      '<span style="width:30px;height:30px;border-radius:50%;background:var(--surface-el);color:var(--text-sub);display:flex;align-items:center;justify-content:center;flex:0 0 auto">' + MM_ICONS.page + '</span>' +
+      '<span style="flex:1;min-width:0">' +
+        '<span style="display:block;font-family:var(--mm-ff);font-size:14px;font-weight:700;color:var(--text)">' + _escapeHtml(f.label) + '</span>' +
+        '<span style="display:block;font-family:var(--mm-ff);font-size:12px;color:var(--text-mute);margin-top:1px">' + _fnEpSummary(f) + '</span>' +
+      '</span>' +
+      '<span style="font-family:var(--mm-ff);font-size:13px;font-weight:600;color:var(--text-sub);flex:0 0 auto">Configure &rsaquo;</span>' +
+    '</button>'
+  ).join('');
+  host.innerHTML =
+    '<div class="mm-collapse-head' + (_FN_OPEN ? ' open' : '') + '" id="fn-toggle" onclick="_fnToggle()" style="margin-top:8px">' +
+      '<span class="mm-collapse-arrow">&#9662;</span>' +
+      '<span style="display:inline-flex;align-items:center;gap:7px">' + gearIco + 'Configure other entry point funnels</span>' +
+      '<span style="margin-left:auto;color:var(--text-sub)">' + others.length + '</span>' +
+    '</div>' +
+    '<div id="fn-list" style="display:' + (_FN_OPEN ? 'block' : 'none') + '">' + rows + '</div>';
+  host.style.display = 'block';
+}
+function _fnToggle() {
+  _FN_OPEN = !_FN_OPEN;
+  const bar = document.getElementById('fn-toggle'), list = document.getElementById('fn-list');
+  if (bar) bar.classList.toggle('open', _FN_OPEN);
+  if (list) list.style.display = _FN_OPEN ? 'block' : 'none';
+}
+function openFunnelConfig(id) {
+  const f = (_FN || []).find((x) => x.id === id);
+  if (!f) return;
+  _FN_ACTIVE = f;
+  const tt = document.getElementById('lm-modal-title'); if (tt) tt.textContent = f.label;
+  _V2_OPEN = false; _V2_PINS = []; _V2_PENDING = null;   // annotator always starts collapsed
+  _fnRenderFunnelFocus(f);
+  _mmOpenFocus('landingMachineModal', '#other-funnels-card');
+}
+function _fnRenderFunnelFocus(f) {
+  const body = document.getElementById('lm-modal-body');
+  if (!body || !f) return;
+  const ICO_FORM = '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="2" width="10" height="12" rx="1.5"/><path d="M5.5 6h5M5.5 8.5h5M5.5 11h3"/></svg>';
+  const ICO_CAL = '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="3" width="11" height="10.5" rx="1.5"/><path d="M2.5 6.5h11M5.5 1.5v3M10.5 1.5v3"/></svg>';
+  const eps = f.entry_points || [];
+  const epRows = eps.map((e) => {
+    let route;
+    if (e.pipeline_name && e.stage_name) route = _escapeHtml(e.pipeline_name) + ' &middot; ' + _escapeHtml(e.stage_name);
+    else if (e.ghl_workflow_name) route = 'routed by the "' + _escapeHtml(e.ghl_workflow_name) + '" workflow';
+    else route = 'not connected yet';
+    return '<div style="display:flex;align-items:center;gap:12px;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:11px 14px;margin-top:8px' + (e.enabled ? '' : ';opacity:.55') + '">' +
+      '<span style="width:30px;height:30px;border-radius:50%;background:var(--surface-el);color:var(--text-sub);display:flex;align-items:center;justify-content:center;flex:0 0 auto">' + (e.type === 'calendar' ? ICO_CAL : ICO_FORM) + '</span>' +
+      '<span style="flex:1;min-width:0">' +
+        '<span style="display:block;font-family:var(--mm-ff);font-size:13px;font-weight:700;color:var(--text)">' + _escapeHtml(e.label) + '</span>' +
+        '<span style="display:block;font-family:var(--mm-ff);font-size:12px;color:var(--text-mute);margin-top:1px">' + route + (e.enabled ? '' : ' &middot; off') + '</span>' +
+      '</span>' +
+    '</div>';
+  }).join('') || '<div style="font-size:13px;color:var(--text-mute);padding:10px 0">no entry points on this page yet</div>';
+  const urlVal = f.url || '';
+  const urlPh = f.url_resolved && !f.url ? f.url_resolved : 'https://yoursite.com/page';
+  body.innerHTML =
+    '<div style="font-family:var(--mm-ff);font-size:12px;color:var(--text-mute);margin-bottom:14px">Every form or calendar below feeds your pipeline from this page.</div>' +
+    '<div style="font-family:var(--mm-ff);font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--text-mute)">Page URL</div>' +
+    '<div style="display:flex;gap:8px;margin-top:6px">' +
+      '<input id="fn-url-input" type="url" value="' + _escapeHtml(urlVal) + '" placeholder="' + _escapeHtml(urlPh) + '" ' +
+        'style="flex:1;min-width:0;background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:9px 12px;font-family:var(--mm-fm);font-size:13px;color:var(--text)">' +
+      '<button type="button" onclick="_fnSaveUrl(\'' + f.id + '\')" ' +
+        'style="background:var(--gold);color:var(--on-gold);border:none;border-radius:8px;padding:9px 16px;font-family:var(--mm-ff);font-size:13px;font-weight:700;cursor:pointer">Save</button>' +
+    '</div>' +
+    '<div style="font-family:var(--mm-ff);font-size:11px;color:var(--text-mute);margin-top:5px">Used for the page preview below.</div>' +
+    '<div style="font-family:var(--mm-ff);font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--text-mute);margin-top:18px">Entry points on this page</div>' +
+    epRows +
+    _v2InlineHtml() +
+    _v2TicketsNudgeHtml();
+  _v2Sync();   // restore the annotator's open/closed state across a re-render
+}
+async function _fnSaveUrl(id) {
+  const inp = document.getElementById('fn-url-input');
+  if (!inp) return;
+  const val = inp.value.trim();
+  try {
+    const token = await _mreqAuthToken();
+    const res = await fetch('/api/website/funnels?client_id=' + encodeURIComponent(CLIENT_ID) + '&id=' + encodeURIComponent(id), {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+      body: JSON.stringify({ url: val || null }),
+    });
+    const json = await _safeJson(res);
+    if (!res.ok) throw new Error(json.error || ('HTTP ' + res.status));
+    const f = (_FN || []).find((x) => x.id === id);
+    if (f) { f.url = json.funnel.url; f.url_resolved = json.funnel.url || f.url_resolved; }
+    _mmToast('Page URL saved');
+    if (_FN_ACTIVE && _FN_ACTIVE.id === id) _fnRenderFunnelFocus(_FN_ACTIVE);
+  } catch (e) {
+    _mmToast('Could not save: ' + e.message);
+  }
+}
 
 /* ── Mini date picker for the Marketing Machine range ──
    Replaces the native date inputs with a styled calendar popover. The values
@@ -52241,8 +52396,11 @@ function _v2Toggle() {
 function _v2MountStage() {
   const fr = document.getElementById('v2ReqFrame'), hint = document.getElementById('v2ReqHint');
   // window._V2_PAGE_URL is a local-dev override (unset in prod) so we can point
-  // the annotator iframe at a local bam-client-sites server; else the real URL.
-  let url = window._V2_PAGE_URL || (typeof _MM !== 'undefined' && _MM && _MM.page && _MM.page.url) || '';
+  // the annotator iframe at a local bam-client-sites server. Otherwise: the
+  // active "other" funnel's page when one is open, else the main landing page.
+  let url = window._V2_PAGE_URL
+    || (typeof _FN_ACTIVE !== 'undefined' && _FN_ACTIVE && _FN_ACTIVE.url_resolved)
+    || (typeof _MM !== 'undefined' && _MM && _MM.page && _MM.page.url) || '';
   // annotate=1 tells the page (bam-client-sites) to turn on section hover-outline
   // + post section clicks back to us.
   if (url) url += (url.indexOf('?') === -1 ? '?' : '&') + 'annotate=1';
@@ -52419,12 +52577,14 @@ function _v2ReviewDel(i) { _V2_PINS.splice(i, 1); _v2RenderReview(); _v2RenderNo
 function _v2Submit() {
   const desc = (document.getElementById('v2ReqDesc')?.value || '').trim();
   if (!_V2_PINS.length && !desc) { _mmToast('Add a note or a line of context first'); return; }
+  const onOther = typeof _FN_ACTIVE !== 'undefined' && !!_FN_ACTIVE;   // annotating an "other" funnel page
   const payload = {
     module: 'landing-page', request_type: _V2_TYPE, source: 'v2_portal_oneclick',
     description: desc,
     context: {
-      page_url: (typeof _MM !== 'undefined' && _MM?.page?.url) || null,
-      metric_snapshot: (typeof _MM !== 'undefined' && _MM?.page) ? {
+      funnel: onOther ? _FN_ACTIVE.key : 'free-trial',
+      page_url: onOther ? (_FN_ACTIVE.url_resolved || null) : ((typeof _MM !== 'undefined' && _MM?.page?.url) || null),
+      metric_snapshot: (!onOther && typeof _MM !== 'undefined' && _MM?.page) ? {
         visitors: _MM.page.visitors, form_started: _MM.page.form_started,
         saw_calendar: _MM.page.saw_calendar, booked: _MM.page.booked_sessions,
       } : null,
@@ -52434,7 +52594,8 @@ function _v2Submit() {
   console.log('[v2-request] MOCK submit (no table yet):', payload);   // TODO: POST /api/v2-support-tickets
   _V2_PINS = []; _V2_OPEN = false; _v2NoteCancel(); _v2CloseReview();
   _mmToast('Request sent - staff will take a look');
-  if (typeof _mmRenderLandingFocus === 'function' && typeof _MM !== 'undefined') _mmRenderLandingFocus(_MM);
+  if (onOther) _fnRenderFunnelFocus(_FN_ACTIVE);
+  else if (typeof _mmRenderLandingFocus === 'function' && typeof _MM !== 'undefined') _mmRenderLandingFocus(_MM);
 }
 // Bridge listener: the client's V2 page (bam-client-sites) posts section hover/
 // click events when it loads in annotate mode. Until that ships this is dormant.

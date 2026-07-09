@@ -65,6 +65,7 @@ enabled = true
 sql_paths = [
   "./seeds/00_bam_gta_client.sql",
   "./seeds/10_bam_gta_training_offer.sql",
+  "./seeds/15_bam_gta_funnels.sql",
   "./seeds/20_bam_gta_entry_points.sql",
   "./pricing-catalog-gta-seed.sql",
   "./seeds/30_local_parent_app_fixture.sql",
