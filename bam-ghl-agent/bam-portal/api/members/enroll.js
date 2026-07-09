@@ -348,14 +348,38 @@ async function signupDefs(clientId, offerId) {
   ).catch(() => []) || [];
   let offerDefs = [];
   if (offerId) {
+    // ONBOARDING questions only. Sales-section questions qualify a lead
+    // ("close to Oakville?", "when can you start?") - pointless for a person
+    // staff is actively signing up (Zoran's call 2026-07-08).
     offerDefs = await sb(
-      `custom_field_defs?client_id=eq.${cid}&offer_id=eq.${encodeURIComponent(offerId)}&archived=eq.false&select=${sel}&order=position.asc,created_at.asc`
+      `custom_field_defs?client_id=eq.${cid}&offer_id=eq.${encodeURIComponent(offerId)}&section=eq.onboarding&archived=eq.false&select=${sel}&order=position.asc,created_at.asc`
     ).catch(() => []) || [];
   }
   return [
     ...core.map(d => ({ ...d, scope: "core" })),
     ...offerDefs.map(d => ({ ...d, scope: "offer" })),
   ];
+}
+
+// The core First/Last name defs duplicate the wizard's Athlete input - they're
+// auto-filled from it, never rendered or demanded ("shouldn't ask twice").
+function isAutoNameDef(d) {
+  const hay = `${d.key || ""} ${d.label || ""}`;
+  return /first[\s_]*name/i.test(hay) || /last[\s_]*name/i.test(hay);
+}
+
+// Fill first/last core defs from the typed athlete name (only when the staff
+// user didn't provide a value themselves).
+function autoFillNameDefs(defs, fieldValues, athleteName) {
+  const parts = String(athleteName || "").trim().split(/\s+/).filter(Boolean);
+  const first = parts[0] || "";
+  const last = parts.length > 1 ? parts.slice(1).join(" ") : "";
+  for (const d of defs) {
+    if (!isAutoNameDef(d) || !emptyFieldValue(fieldValues[d.id])) continue;
+    const hay = `${d.key || ""} ${d.label || ""}`;
+    const v = /last[\s_]*name/i.test(hay) ? last : first;
+    if (v) fieldValues[d.id] = v;
+  }
 }
 
 function emptyFieldValue(v) {
@@ -385,7 +409,9 @@ async function actionSignupFields(res, { clientId, body }) {
   }
   return res.status(200).json({
     contact_id: contactId,
-    fields: defs.map(d => ({ ...d, value: vmap.has(d.id) ? vmap.get(d.id) : null })),
+    // First/Last name defs are auto-filled from the Athlete input - never
+    // rendered, so the name is only asked once.
+    fields: defs.filter(d => !isAutoNameDef(d)).map(d => ({ ...d, value: vmap.has(d.id) ? vmap.get(d.id) : null })),
   });
 }
 
@@ -469,11 +495,13 @@ async function actionEnroll(res, req, { clientId, acct, ctx, body }) {
   const target = await resolveTarget(clientId, body.offer_price_key);
   if (!target) return res.status(409).json({ error: "That price isn't live for this academy anymore - re-pick the offer price." });
 
-  // MANDATORY signup info (locked decision): every core + offer custom field
-  // the offer collects at signup must be filled for a manual add too.
+  // MANDATORY signup info (locked decision): every core + onboarding custom
+  // field the offer collects at signup must be filled for a manual add too.
+  // First/Last name defs auto-fill from the athlete input (asked once).
   const defs = await signupDefs(clientId, target.offer_id);
   const fieldValues = (body.field_values && typeof body.field_values === "object") ? body.field_values : {};
-  const missing = defs.filter(d => emptyFieldValue(fieldValues[d.id]));
+  autoFillNameDefs(defs, fieldValues, athleteName);
+  const missing = defs.filter(d => !isAutoNameDef(d) && emptyFieldValue(fieldValues[d.id]));
   if (missing.length) {
     return res.status(400).json({
       error: `Missing signup info: ${missing.map(d => d.label || d.key).join(", ")}. Fill every field before enrolling.`,
