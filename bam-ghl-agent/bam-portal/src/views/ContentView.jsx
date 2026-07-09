@@ -1171,6 +1171,137 @@ function SubTab({ label, active, onClick, tk, red }) {
 // ─────────────────────────────────────────────────────────
 // Detail view — review raw assets, upload finals, ship
 // ─────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────
+// Client media library - every raw file across all their tickets
+// ─────────────────────────────────────────────────────────
+// Collapsible; fetches once on first expand. Grouped by the folder names
+// clients supply at upload, each file stamped with its origin ticket.
+function _cmIsVideo(f) {
+  return (f.type || "").startsWith("video/") || /\.(mp4|mov|webm|m4v)(\?|#|$)/i.test(f.url || f.name || "");
+}
+function _cmIsImage(f) {
+  return (f.type || "").startsWith("image/") || /\.(jpe?g|png|gif|webp|heic)(\?|#|$)/i.test(f.url || f.name || "");
+}
+function ClientMediaLibrary({ clientId, currentTicketId, tk, session }) {
+  const [open, setOpen] = useState(false);
+  const [files, setFiles] = useState(null);   // null = not fetched yet
+  const [loading, setLoading] = useState(false);
+  const [q, setQ] = useState("");
+  const [typeF, setTypeF] = useState("all");  // all | video | image
+
+  async function toggle() {
+    const next = !open;
+    setOpen(next);
+    if (next && files === null && !loading) {
+      setLoading(true);
+      try {
+        const res = await fetch(`/api/marketing?resource=client-media&client_id=${encodeURIComponent(clientId)}`, {
+          headers: { Authorization: `Bearer ${session?.access_token}` },
+        });
+        const json = await res.json();
+        setFiles(res.ok ? (json.files || []) : []);
+      } catch {
+        setFiles([]);
+      } finally {
+        setLoading(false);
+      }
+    }
+  }
+
+  const visible = (files || []).filter(f => {
+    if (typeF === "video" && !_cmIsVideo(f)) return false;
+    if (typeF === "image" && !_cmIsImage(f)) return false;
+    if (q.trim()) {
+      const hay = `${f.name} ${f.folder} ${f.ticket_title || ""} ${f.code}`.toLowerCase();
+      if (!hay.includes(q.trim().toLowerCase())) return false;
+    }
+    return true;
+  });
+  // Group by folder, folders ordered by their newest file.
+  const groups = [];
+  const byFolder = new Map();
+  for (const f of visible) {
+    const key = f.folder || "Ungrouped";
+    if (!byFolder.has(key)) { byFolder.set(key, []); groups.push(key); }
+    byFolder.get(key).push(f);
+  }
+
+  const dateStr = (iso) => iso ? new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric" }) : "";
+
+  return (
+    <Card tk={tk} style={{ marginBottom: 22, padding: 0 }}>
+      <div onClick={toggle} role="button" aria-expanded={open} style={{
+        display: "flex", alignItems: "center", gap: 10, padding: "14px 18px", cursor: "pointer",
+      }}>
+        <span style={{ fontSize: 13, fontWeight: 600, color: tk.text }}>Client media</span>
+        <span style={{ fontSize: 12, color: tk.textMute }}>
+          everything they&apos;ve sent, across all tickets{files ? ` · ${files.length} file${files.length === 1 ? "" : "s"}` : ""}
+        </span>
+        <span style={{ flex: 1 }} />
+        <span style={{ color: tk.textMute, fontSize: 13 }}>{open ? "˄" : "˅"}</span>
+      </div>
+      {open && (
+        <div style={{ padding: "0 18px 16px" }}>
+          <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", marginBottom: 12 }}>
+            {[["all", "All"], ["video", "Videos"], ["image", "Images"]].map(([id, label]) => (
+              <button key={id} onClick={() => setTypeF(id)} style={{
+                border: `1px solid ${typeF === id ? tk.accent : tk.border}`,
+                background: typeF === id ? `${tk.accent}1A` : "transparent",
+                color: typeF === id ? tk.accent : tk.textSub,
+                fontSize: 11, fontWeight: 600, padding: "4px 12px", borderRadius: 999, cursor: "pointer",
+              }}>{label}</button>
+            ))}
+            <input
+              value={q} onChange={e => setQ(e.target.value)} placeholder="Search name, folder, ticket…"
+              style={{
+                flex: 1, minWidth: 160, background: tk.surfaceEl, border: `1px solid ${tk.borderMed}`,
+                color: tk.text, fontSize: 12, padding: "6px 10px", borderRadius: 7, fontFamily: "inherit",
+              }}
+            />
+          </div>
+          {loading && <div style={{ color: tk.textSub, fontSize: 13, padding: "8px 0" }}>Loading media…</div>}
+          {files && !files.length && !loading && (
+            <div style={{ color: tk.textSub, fontSize: 13, padding: "8px 0", fontStyle: "italic" }}>No media from this client yet.</div>
+          )}
+          {files && files.length > 0 && !visible.length && (
+            <div style={{ color: tk.textSub, fontSize: 13, padding: "8px 0", fontStyle: "italic" }}>Nothing matches that filter.</div>
+          )}
+          {groups.map(g => (
+            <div key={g} style={{ marginBottom: 14 }}>
+              <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: tk.textMute, margin: "8px 0 8px" }}>
+                {g} <span style={{ fontWeight: 500 }}>({byFolder.get(g).length})</span>
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))", gap: 10 }}>
+                {byFolder.get(g).map((f, i) => (
+                  <a key={f.url + i} href={f.url} target="_blank" rel="noreferrer" title={`${f.name} - open in a new tab`} style={{
+                    display: "block", textDecoration: "none",
+                    border: `1px solid ${f.ticket_id === currentTicketId ? tk.accent : tk.border}`,
+                    borderRadius: 8, overflow: "hidden", background: tk.surfaceEl,
+                  }}>
+                    {_cmIsImage(f) ? (
+                      <img src={f.url} alt={f.name} loading="lazy" style={{ width: "100%", height: 84, objectFit: "cover", display: "block" }} />
+                    ) : (
+                      <div style={{ height: 84, display: "flex", alignItems: "center", justifyContent: "center", color: tk.textSub, fontSize: 11, fontWeight: 700, letterSpacing: "0.08em" }}>
+                        {_cmIsVideo(f) ? "▶ VIDEO" : "FILE"}
+                      </div>
+                    )}
+                    <div style={{ padding: "6px 8px" }}>
+                      <div style={{ fontSize: 11, color: tk.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{f.name}</div>
+                      <div style={{ fontSize: 10, color: tk.textMute, marginTop: 2 }}>
+                        {f.code}{f.ticket_id === currentTicketId ? " · this ticket" : ""} · {dateStr(f.sent_at)}{f.source === "response" ? " · from a response" : ""}
+                      </div>
+                    </div>
+                  </a>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </Card>
+  );
+}
+
 function ContentTicketDetail({ tk, session, ticket, me, owners = [], canReassign = false, onBack, onRefetch, patchTicket, showBanner }) {
   const [assignBusy, setAssignBusy] = useState(false);
   // Re-route this single creative to a specific owner (or "me"). Manager/admin only;
@@ -1556,6 +1687,10 @@ function ContentTicketDetail({ tk, session, ticket, me, owners = [], canReassign
           edit={editingCtx ? { draft: ctxDraft, setDraft: setCtxDraft, notesDraft, setNotesDraft } : null}
         />
       </Card>
+
+      {/* Everything this client has EVER sent, across all tickets - for the
+          "use the b-roll I previously sent" requests. Lazy-loads on expand. */}
+      <ClientMediaLibrary clientId={ticket.client_id} currentTicketId={ticket.id} tk={tk} session={session} />
 
       {/* Finals (current + new upload) */}
       <SectionLabel tk={tk}>Finals</SectionLabel>
