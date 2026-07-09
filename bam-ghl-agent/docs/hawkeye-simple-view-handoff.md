@@ -108,6 +108,8 @@ to build for the page itself - just per-stage routing.
 | 2026-07-08 | BUILT: the deck (step 1) in client-portal.html - _hk2* module, kind-aware cards, Other + morphing confirm, mandatory teach-why, calendar/slot pickers via new agent-approvals book-options action, plan grouping, deep-link from board badges, tab gear -> focus mode. Digest SMS retired || 2026-07-08 | BUILT: the simple view (step 3) - _plRenderOverview rewritten to colour-coded pills (agent solid / automation dashed, N need you), click = in-place cascade of highlight rows (needy first, gold ring, deep-links into the deck; plain rows open the drawer), pill morph (up arrow + 3-line -> focus mode), gold Hawkeye button with the cross-agent count. _PL_NEEDS merged across all 3 agents on V2. Board still reachable via Expand board |
 
 | 2026-07-08 | Teach-why note is MANDATORY for any change away from the agent's guess (draft, plan message, booking detail) - confirm is blocked until the note is filled. Applies to every Hawkeye surface in the real build |
+| 2026-07-09 | HOME = the pill strip too: the command-center home Sales section renders the simple-view pills in place of the old stage cards (shared _plo2Pills/_plo2Cascade; home keeps its own open state _CC2_OPEN). Cascade opens in place on home; config / glowing lead / drawer / +N more leave cc-mode into the classic Sales view first (_ccPipeFocus/_cc2Lead/_cc2Card/_ccPipeStage) |
+| 2026-07-09 | Pill ORDER locked everywhere (_plo2Order): Nurture, Ghosted, Booking, Confirm, Closing. NO Member pill - terminal stages never render in the strip (home + Sales overview) |
 
 ## Action model per agent (revised 2026-07-08, SHIPPED end to end)
 Mobile reference page (design-system styled): `bam-portal/public/hawkeye-actions.html`

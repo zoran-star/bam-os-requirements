@@ -77,8 +77,14 @@ scattered autonomy/config entry points. KEEPS: inline drawer suggestion on lead 
   -> _hk2Open(null, contactId); plain rows -> _plOpenCard drawer; 30-row cap -> board);
   active pill morphs (up arrow = collapse, 3-line icon -> _plOpenFocus); gold Hawkeye
   button w/ cross-agent count; Expand board kept. _plLoadNeedsAction now merges confirm +
-  closing ready queues into _PL_NEEDS on V2 (V1.5 stays booking-only). The home strip
-  (_ploStripCells) is untouched.
+  closing ready queues into _PL_NEEDS on V2 (V1.5 stays booking-only).
+- HOME STRIP (2026-07-09): the command-center home Sales section renders the SAME
+  simple-view pills (shared _plo2Pills/_plo2Cascade; home state = _CC2_OPEN,
+  _cc2Render into #cc-sal-strip). Cascade opens in place on home; deeper actions
+  leave cc-mode first (_ccPipeFocus config, _cc2Lead -> deck, _cc2Card -> drawer,
+  _ccPipeStage -> board). Old stage cards (_ploStripCells) = V1.5 fallback only.
+- PILL ORDER locked (_plo2Order, home + overview): Nurture, Ghosted, Booking,
+  Confirm, Closing. NO Member pill - terminal stages never render in the strip.
 - STILL TO DO: swipe gestures (open decision), GTA prod verification of the whole batch.
 
 ## Open item (ask Zoran before building)
