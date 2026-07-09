@@ -117,13 +117,21 @@ async function handler(req, res) {
       const domains = client && client[0] && client[0].allowed_domains;
       const derived = deriveUrls(beacons, domains);
       const eps = Array.isArray(entryPoints) ? entryPoints : [];
-      // url_resolved priority: stored override -> most-common beacon page_view
-      // path on the branded domain. NO blind path guess: a wrong guess loads the
-      // wrong page. Pages with no beacons + no stored url resolve to null and the
-      // annotator shows an honest "we do not have this page yet" state.
+      // Base origin = the PRIMARY funnel's live URL (its stored url or the domain
+      // its beacons actually load from). Reusing it means a funnel with no
+      // beacons resolves to the same proven-live domain rather than a guess.
+      const primary = (funnels || []).find((f) => f.is_primary);
+      const primaryUrl = primary && (primary.url || derived[primary.key]);
+      let baseOrigin = null;
+      if (primaryUrl) { try { baseOrigin = new URL(primaryUrl).origin; } catch (_) {} }
+      // url_resolved priority: stored override -> this funnel's own beacon path ->
+      // base origin + "/" + funnel key (the site's cleanUrls page slug, e.g.
+      // contact -> /contact). Only the slug is conventional; the DOMAIN is proven
+      // from the primary funnel, so we never load a wrong-domain page. Null (no
+      // primary either) -> annotator shows an honest "no page yet" state.
       const out = (funnels || []).map((f) => ({
         ...f,
-        url_resolved: f.url || derived[f.key] || null,
+        url_resolved: f.url || derived[f.key] || (baseOrigin ? baseOrigin + "/" + f.key : null),
         entry_points: eps.filter((e) => e.funnel_id === f.id),
       }));
       return res.status(200).json({ funnels: out });
