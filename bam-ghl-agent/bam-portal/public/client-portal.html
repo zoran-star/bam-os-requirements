@@ -9097,6 +9097,42 @@ Then the call to action."]</div>
           .hk2-hint{font-size:11px;color:var(--text-mute);margin-top:12px;text-align:center;line-height:1.5}
           .hk2-load{min-height:300px;display:flex;align-items:center;justify-content:center;gap:8px;color:var(--text-sub);font-size:13px}
           @media(max-width:560px){.hk2-tab{font-size:12px;padding:8px 6px}.hk2-thread{max-height:160px}}
+          /* ── simple view strip + cascade ── */
+          .plo2-hawkbtn{display:inline-flex;align-items:center;gap:7px;background:var(--accent);color:#0B0B0D;border:none;border-radius:999px;padding:8px 16px;font:inherit;font-size:13px;font-weight:800;cursor:pointer;margin-left:auto}
+          .plo2-hawkbtn:hover{filter:brightness(1.06)}
+          .plo2-hawkbtn .cnt{background:#0B0B0D;color:var(--accent);border-radius:999px;font-size:11px;font-weight:800;min-width:18px;height:18px;display:inline-flex;align-items:center;justify-content:center;padding:0 5px}
+          .plo2-strip{display:flex;gap:8px}
+          .plo2-pill{flex:1;position:relative;border-radius:12px;padding:11px 8px;text-align:center;cursor:pointer;border:1.5px solid var(--pc);background:var(--surface);transition:all .22s ease;min-width:0;min-height:56px}
+          .plo2-pill.auto{border-style:dashed}
+          .plo2-pill:hover{background:var(--bg)}
+          .plo2-pill.dim{opacity:.45}
+          .plo2-pill.active{background:var(--pc);border-style:solid;color:#131416}
+          .plo2-pill .nm{font-size:12.5px;font-weight:700;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+          .plo2-pill .sub{font-size:10.5px;margin-top:3px;color:var(--text-sub)}
+          .plo2-pill .sub.hot{color:var(--red,#F07060);font-weight:800}
+          .plo2-up{display:flex;align-items:center;justify-content:center;min-height:34px}
+          .plo2-cfg{position:absolute;top:4px;right:5px;width:15px;height:15px;cursor:pointer;opacity:.75}
+          .plo2-cfg:hover{opacity:1}
+          .plo2-cfg svg{width:100%;height:100%;display:block}
+          .plo2-casc{margin-top:14px}
+          .plo2-panel{border-radius:16px;background:var(--surface);border:1px solid var(--border);padding:15px}
+          .plo2-phead{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--text-mute);margin-bottom:11px;display:flex;align-items:center;gap:8px;font-weight:700}
+          .plo2-eng{font-size:10px;font-weight:800;border-radius:6px;padding:3px 8px;letter-spacing:.05em}
+          .plo2-rows{display:flex;flex-direction:column;gap:7px}
+          .plo2-row{animation:plo2in .3s ease both}
+          @keyframes plo2in{from{opacity:0;transform:translateY(-7px)}to{opacity:1;transform:none}}
+          .plo2-lead{background:var(--bg);border:1px solid var(--border);border-radius:12px;padding:9px 13px;display:flex;align-items:center;gap:10px;cursor:pointer;transition:border-color .12s}
+          .plo2-lead:hover{border-color:var(--border-str,rgba(255,255,255,.2))}
+          .plo2-lead.needs{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent-glow,rgba(212,182,92,.12)),0 4px 14px rgba(212,182,92,.10)}
+          .plo2-lead .who{font-size:13px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+          .plo2-lead .st{font-size:11px;color:var(--text-mute);margin-top:1px}
+          .plo2-lead.needs .st{color:var(--accent)}
+          .plo2-av{width:28px;height:28px;border-radius:50%;background:var(--surface);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:10.5px;font-weight:700;color:var(--text-sub);flex-shrink:0}
+          .plo2-more{font-size:12px;color:var(--text-sub);text-align:center;padding:8px;cursor:pointer;border:1px dashed var(--border);border-radius:10px}
+          .plo2-more:hover{color:var(--text)}
+          .plo2-none{font-size:12.5px;color:var(--text-mute);text-align:center;padding:14px}
+          .plo2-hint{font-size:10.5px;color:var(--text-mute);text-align:center;margin-top:10px}
+          @media(max-width:640px){.plo2-strip{flex-wrap:wrap}.plo2-pill{flex:1 1 30%}}
         </style>
         <div id="pl-hawkeye" style="display:none"></div>
         <div id="pl-pipeline-tabs" class="pl-tabs"></div>
@@ -29423,13 +29459,22 @@ let _PL_NEEDS = null;
 const _PL_NEED_PRIO = { book: 4, mark_lost: 3, reply: 2, ghost: 1 };
 async function _plLoadNeedsAction() {
   try {
-    const j = await _apxPost('/api/agent-approvals', 'list-ready', {});
+    // V2: the needs map spans ALL THREE agents (deck + simple-view highlights).
+    // V1.5 keeps the booking-only behaviour (its board only badges Responded).
+    const [j, jc, jl] = await Promise.all([
+      _apxPost('/api/agent-approvals', 'list-ready', {}),
+      _plIsV2() ? _apxPost('/api/agent-confirm', 'list-ready', {}).catch(() => ({})) : Promise.resolve({}),
+      _plIsV2() ? _apxPost('/api/agent-closing', 'list-ready', {}).catch(() => ({})) : Promise.resolve({}),
+    ]);
     const map = new Map();
-    for (const r of (j.ready || [])) {
-      if ((r.status !== 'pending' && r.status !== 'approved') || !r.ghl_contact_id) continue;
-      const id = String(r.ghl_contact_id), k = r.kind || 'reply', cur = map.get(id);
-      if (!cur || (_PL_NEED_PRIO[k] || 0) > (_PL_NEED_PRIO[cur] || 0)) map.set(id, k);
-    }
+    const add = (rows) => {
+      for (const r of (rows || [])) {
+        if ((r.status !== 'pending' && r.status !== 'approved') || !r.ghl_contact_id) continue;
+        const id = String(r.ghl_contact_id), k = r.kind || 'reply', cur = map.get(id);
+        if (!cur || (_PL_NEED_PRIO[k] || 0) > (_PL_NEED_PRIO[cur] || 0)) map.set(id, k);
+      }
+    };
+    add(j.ready); add(jc.ready); add(jl.ready);
     _PL_NEEDS = map;
   } catch (e) {
     // Permission denied → this viewer can't read agent status; hide the badges
@@ -31453,12 +31498,96 @@ function _plRenderOverview() {
     + `<div class="plo-kpi"><div class="plo-lab">Sales · 7 days</div><div class="plo-val">5 <span class="plo-trend">${_plIcon('up', 13)} +2</span></div><div class="plo-hint">sample · wiring to live KPI data</div></div>`
     + `</div>`;
 
-  // ── collapsed stage strip ──
-  const cells = _ploStripCells(stages, false);
+  // ── the SIMPLE VIEW strip (Zoran 2026-07-08): colour-coded pills, no cards.
+  // Click a stage -> its leads cascade below (highlights only); the pill morphs
+  // to an up arrow (collapse) + a 3-line config icon (top right -> focus mode).
+  let hawkTotal = 0;
+  const pills = stages.map(s2 => {
+    const opps = s2.opportunities || [];
+    const role = _plStageRole(s2.name);
+    const bot = (typeof _plStageBot === 'function') ? _plStageBot(s2.name) : null;
+    const kind = bot ? bot.kind : 'human';
+    const sig = _plStageSignals(s2, opps);
+    if (kind === 'agent') hawkTotal += sig.hawk;
+    const col = _plo2Color(role);
+    const isOpen = _PLO2_OPEN === s2.id;
+    const sub = kind === 'agent'
+      ? (sig.hawk ? `<div class="sub hot">${sig.hawk} need you</div>` : `<div class="sub">${opps.length} card${opps.length === 1 ? '' : 's'}</div>`)
+      : kind === 'automation' ? `<div class="sub">${opps.length} enrolled</div>`
+      : `<div class="sub">${opps.length} ${role === 'member' || kind === 'terminal' ? 'active' : 'cards'}</div>`;
+    const inner = isOpen
+      ? `<div class="plo2-up"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m18 15-6-6-6 6"/></svg></div>
+         <span class="plo2-cfg" title="Configure this stage" onclick="event.stopPropagation();_plOpenFocus('${escapeHTML(s2.id)}')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="21" y1="6" x2="7" y2="6"/><line x1="17" y1="12" x2="3" y2="12"/><line x1="21" y1="18" x2="7" y2="18"/><circle cx="4.5" cy="6" r="1.7"/><circle cx="19.5" cy="12" r="1.7"/><circle cx="4.5" cy="18" r="1.7"/></svg></span>`
+      : `<div class="nm">${escapeHTML(_plCap(s2.name))}</div>${sub}`;
+    return `<div class="plo2-pill${kind === 'automation' ? ' auto' : ''}${isOpen ? ' active' : ''}${_PLO2_OPEN && !isOpen ? ' dim' : ''}" style="--pc:${col}" onclick="_plo2Toggle('${escapeHTML(s2.id)}')">${inner}</div>`;
+  }).join('');
+  const openStage = _PLO2_OPEN ? stages.find(s2 => s2.id === _PLO2_OPEN) : null;
 
   host.innerHTML = kpis
-    + `<div class="plo-plhead"><h3>Pipeline</h3><button class="plo-expand" onclick="_plSVExpand()">${_plIcon('expand', 13)} Expand board</button></div>`
-    + `<div class="plo-strip">${cells}</div>`;
+    + `<div class="plo-plhead"><h3>Pipeline</h3>
+        <button class="plo2-hawkbtn" onclick="_hk2Open()">${_plIcon('eye', 14)} Hawkeye${hawkTotal ? `<span class="cnt">${hawkTotal}</span>` : ''}</button>
+        <button class="plo-expand" onclick="_plSVExpand()">${_plIcon('expand', 13)} Expand board</button></div>`
+    + `<div class="plo2-strip">${pills}</div>`
+    + (openStage ? `<div class="plo2-casc">${_plo2Cascade(openStage)}</div>` : '');
+}
+
+// Stage colour by role (matches the locked mockup's palette).
+function _plo2Color(role) {
+  return role === 'responded' ? '#5A8FB8'
+       : role === 'scheduled_trial' ? '#4CC76A'
+       : role === 'done_trial' ? '#A78BDA'
+       : role === 'interested' ? '#F0B84A'
+       : role === 'nurture' ? '#4A6FA5'
+       : '#E08BB0';
+}
+let _PLO2_OPEN = null;   // stage id whose cascade is open on the simple view
+function _plo2Toggle(id) { _PLO2_OPEN = _PLO2_OPEN === id ? null : id; _plRenderOverview(); }
+// The cascade: highlight rows ONLY - no Hawkeye actions live here. A glowing
+// lead opens the Hawkeye deck on their card; a plain lead opens the drawer.
+function _plo2Cascade(stage) {
+  const opps = stage.opportunities || [];
+  const bot = (typeof _plStageBot === 'function') ? _plStageBot(stage.name) : null;
+  const kind = bot ? bot.kind : 'human';
+  const engTag = kind === 'agent' ? 'AGENT ENGINE' : kind === 'automation' ? 'AUTOMATION ENGINE' : kind === 'terminal' ? 'TERMINAL' : 'HUMAN ENGINE';
+  const col = _plo2Color(_plStageRole(stage.name));
+  const NEED_TXT = {
+    reply: 'reply · draft ready', book: 'picked a time · ready to book', ghost: 'went quiet',
+    mark_lost: 'lost suggested', confirm: 'reply · draft ready', confirm_auto: 'reminder ready',
+    confirm_handoff: 'reschedule · needs a new time', confirm_lost: 'lost suggested',
+    closing: 'reply · draft ready', closing_enroll: 'ready to enroll', closing_lost: 'lost suggested',
+  };
+  const needy = [], plain = [];
+  for (const o of opps) {
+    const cid = String((o.contactId || ''));
+    const need = kind === 'agent' && _PL_NEEDS ? _PL_NEEDS.get(cid) : null;
+    (need ? needy : plain).push({ o, need });
+  }
+  const initials = (nm) => { const w = String(nm || '?').trim().split(/\s+/); return ((w[0] || '?')[0] + (w[1] ? w[1][0] : '')).toUpperCase(); };
+  const row = ({ o, need }, i) => {
+    const nm = (o.contact && o.contact.name) || o.name || 'Lead';
+    const st = need ? (NEED_TXT[need] || 'needs you in Hawkeye')
+             : kind === 'agent' ? 'agent handling it'
+             : kind === 'automation' ? 'enrolled · automation running'
+             : (o.athlete ? 'athlete: ' + o.athlete : '');
+    const click = need
+      ? `_hk2Open(null, '${escapeHTML(String(o.contactId || ''))}')`
+      : `_plOpenCard('${escapeHTML(o.id)}')`;
+    return `<div class="plo2-row" style="animation-delay:${Math.min(i, 10) * 45}ms"><div class="plo2-lead${need ? ' needs' : ''}" onclick="${click}">
+      <div class="plo2-av">${escapeHTML(initials(nm))}</div>
+      <div style="min-width:0"><div class="who">${escapeHTML(nm)}</div>${st ? `<div class="st">${escapeHTML(st)}</div>` : ''}</div></div></div>`;
+  };
+  const all = [...needy, ...plain];
+  const rows = all.slice(0, 30).map(row).join('');
+  const more = all.length > 30 ? `<div class="plo2-more" onclick="_plSVStage('${escapeHTML(stage.id)}')">+ ${all.length - 30} more - open the board view</div>` : '';
+  const hint = kind === 'agent' ? 'gold ring = needs you in Hawkeye · tap it to handle · plain card = lead drawer'
+             : kind === 'automation' ? 'the automation runs this stage - tap a lead for the drawer'
+             : 'you run this stage - tap a lead for the drawer';
+  return `<div class="plo2-panel">
+    <div class="plo2-phead">${escapeHTML(_plCap(stage.name))}
+      <span class="plo2-eng" style="color:${col};background:color-mix(in srgb,${col} 14%,transparent)">${engTag}</span></div>
+    <div class="plo2-rows">${rows || '<div class="plo2-none">No cards here yet.</div>'}${more}</div>
+    <div class="plo2-hint">${hint}</div>
+  </div>`;
 }
 
 // Build the collapsed stage-strip cells. Shared by the Sales overview and the

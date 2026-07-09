@@ -1,6 +1,6 @@
 # Hawkeye V2 + Sales Simple View - build handoff
 
-**Status: DESIGN LOCKED + BUILD STARTED 2026-07-08. The DECK (build step 1) IS BUILT in client-portal.html (V2-gated, `_hk2*`, view state `_PL_SV='hawkeye'`, host `#pl-hawkeye`) incl. the `book-options` API; V2 Hawkeye entries route to it, V1.5 keeps the legacy overlays. Swipe gestures deferred (open item) - buttons only. Steps 3-5 (simple view strip/cascade/pill morph, skip cleanup, mobile polish) still to build.**
+**Status: BUILT 2026-07-08 (steps 1 + 3). The DECK (`_hk2*`, `_PL_SV='hawkeye'`, `#pl-hawkeye`) and the SIMPLE VIEW (`_plRenderOverview` rewritten: colour pills + cascade highlights + pill morph + gold Hawkeye button, `_plo2*`) are in client-portal.html, V2-gated; `_PL_NEEDS` now spans all 3 agents on V2. V1.5 untouched (legacy overlays + booking-only needs). No skip anywhere on V2 (step 4: `skip-ready` backend kept for V1.5). Swipe gestures = the one open item (buttons only; layouts are mobile-ready). Remaining: GTA prod verification + swipe decision.**
 Mockup (open in browser, fully clickable): [`docs/hawkeye-simple-view-mockup.html`](hawkeye-simple-view-mockup.html)
 Also hosted: https://claude.ai/code/artifact/7a9a5268-048a-4dda-9750-62d9f69a4150
 Mockup v2 shows: kind-aware deck cards (Reply / Book it / Went quiet / Reschedule /
@@ -105,7 +105,8 @@ to build for the page itself - just per-stage routing.
 | 2026-07-08 | LATER SAME DAY: simple view = highlights only. Cascade shows plain lead rows (gold ring + status); clicking a glowing lead opens the Hawkeye PAGE on that card. Popup modal RETIRED - the deck is the only Hawkeye surface |
 | 2026-07-08 | Configure is PER STAGE, automations included: every 3-line icon / tab gear opens that stage's own focus-mode page (Ghosted + Nurture show their editable step sequences; Member = human, no config) |
 | 2026-07-08 | Scheduled Trial has TWO engines: the Confirm AGENT + the POST-TRIAL FORM (coach fills it; it routes the lead). The form lives in the stage's engine config for now; making it configurable comes later |
-| 2026-07-08 | BUILT: the deck (step 1) in client-portal.html - _hk2* module, kind-aware cards, Other + morphing confirm, mandatory teach-why, calendar/slot pickers via new agent-approvals book-options action, plan grouping, deep-link from board badges, tab gear -> focus mode. Digest SMS retired |
+| 2026-07-08 | BUILT: the deck (step 1) in client-portal.html - _hk2* module, kind-aware cards, Other + morphing confirm, mandatory teach-why, calendar/slot pickers via new agent-approvals book-options action, plan grouping, deep-link from board badges, tab gear -> focus mode. Digest SMS retired || 2026-07-08 | BUILT: the simple view (step 3) - _plRenderOverview rewritten to colour-coded pills (agent solid / automation dashed, N need you), click = in-place cascade of highlight rows (needy first, gold ring, deep-links into the deck; plain rows open the drawer), pill morph (up arrow + 3-line -> focus mode), gold Hawkeye button with the cross-agent count. _PL_NEEDS merged across all 3 agents on V2. Board still reachable via Expand board |
+
 | 2026-07-08 | Teach-why note is MANDATORY for any change away from the agent's guess (draft, plan message, booking detail) - confirm is blocked until the note is filled. Applies to every Hawkeye surface in the real build |
 
 ## Action model per agent (revised 2026-07-08, SHIPPED end to end)

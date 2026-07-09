@@ -71,8 +71,15 @@ scattered autonomy/config entry points. KEEPS: inline drawer suggestion on lead 
   hawk buttons/scanBtn); V1.5 keeps _apx/_acx/_aclx overlays. 2-hourly digest SMS retired.
 - Scheduled Trial = TWO engines: Confirm agent + post-trial form (in engine config for
   now; configurable later). Mockup config screen shows both.
-- STILL TO BUILD: simple view strip/cascade/pill morph (step 3), skip cleanup (step 4),
-  swipe gestures (open decision), GTA prod verification.
+- STEP 3 BUILT: _plRenderOverview rewritten to the simple view (_plo2* helpers): KPI row
+  kept; colour pills per stage role (_plo2Color; automation = dashed), "N need you" from
+  _plStageSignals; click = in-place cascade (_plo2Cascade: needy rows first w/ gold ring
+  -> _hk2Open(null, contactId); plain rows -> _plOpenCard drawer; 30-row cap -> board);
+  active pill morphs (up arrow = collapse, 3-line icon -> _plOpenFocus); gold Hawkeye
+  button w/ cross-agent count; Expand board kept. _plLoadNeedsAction now merges confirm +
+  closing ready queues into _PL_NEEDS on V2 (V1.5 stays booking-only). The home strip
+  (_ploStripCells) is untouched.
+- STILL TO DO: swipe gestures (open decision), GTA prod verification of the whole batch.
 
 ## Open item (ask Zoran before building)
 Swipe RIGHT commits the card's main action (can SEND) - confirm it's instant-commit.
