@@ -45,13 +45,31 @@ const CLIENT_ID_ARG = (() => { const i = argv.indexOf("--client-id"); return i >
 const TERMINAL_ROLES = new Set(["won", "unqualified", "lost", "member"]);
 const CARD_TABLES = ["agent_ready_replies", "agent_confirm_replies", "agent_closing_replies"];
 
-async function sb(path) {
+async function sbPage(path, offset, size) {
+  const from = offset, to = offset + size - 1;
   const res = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
-    headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` },
+    headers: {
+      apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`,
+      Range: `${from}-${to}`, "Range-Unit": "items",
+    },
   });
   if (!res.ok) throw new Error(`Supabase ${res.status} on ${path}: ${await res.text()}`);
   const txt = await res.text();
   return txt ? JSON.parse(txt) : [];
+}
+
+// Paginate past PostgREST's max-rows cap (often 1000) so we NEVER silently
+// truncate coverage data - a truncated page would falsely flag covered cards.
+async function sb(path) {
+  const PAGE = 1000;
+  let offset = 0, all = [];
+  for (;;) {
+    const page = await sbPage(path, offset, PAGE);
+    all = all.concat(page);
+    if (page.length < PAGE) break;
+    offset += PAGE;
+  }
+  return all;
 }
 
 function daysSince(iso) {
@@ -74,29 +92,32 @@ async function resolveClientId() {
 
 async function loadCoverage(clientId) {
   // One active enrollment => covered. Pull every active-enrolled contact_id.
-  const enr = await sb(`automation_enrollments?client_id=eq.${clientId}&status=eq.active&select=contact_id&limit=100000`);
+  const enr = await sb(`automation_enrollments?client_id=eq.${clientId}&status=eq.active&select=contact_id`);
   const enrolled = new Set(enr.map(r => String(r.contact_id)));
 
   // Any pending/approved card in any of the 3 agent tables => covered.
   const carded = new Set();
   for (const t of CARD_TABLES) {
-    const rows = await sb(`${t}?client_id=eq.${clientId}&status=in.(pending,approved)&select=ghl_contact_id&limit=100000`);
+    const rows = await sb(`${t}?client_id=eq.${clientId}&status=in.(pending,approved)&select=ghl_contact_id`);
     rows.forEach(r => r.ghl_contact_id && carded.add(String(r.ghl_contact_id)));
   }
   return { enrolled, carded };
 }
 
+// Known-closed opportunity statuses. We exclude ONLY these (plus terminal stage
+// roles) - never hide a card just because its status string is unfamiliar, since
+// a false "closed" would let a genuinely-stuck card slip past the safety check.
+const CLOSED_STATUSES = new Set(["won", "lost", "abandoned", "deleted", "closed"]);
+
 async function loadOpenCards(clientId) {
   const rows = await sb(
     `opportunities?client_id=eq.${clientId}` +
-    `&select=id,ghl_opportunity_id,ghl_contact_id,contact_name,athlete_name,stage_role,status,last_stage_change_at,updated_at` +
-    `&limit=100000`
+    `&select=id,ghl_opportunity_id,ghl_contact_id,contact_name,athlete_name,stage_role,status,last_stage_change_at,updated_at`
   );
-  // Open, non-terminal only. status column varies; treat anything not open/blank as closed.
   return rows.filter(o => {
     const st = String(o.status || "").toLowerCase();
-    const openish = st === "" || st === "open";
-    return openish && !TERMINAL_ROLES.has(String(o.stage_role || "").toLowerCase());
+    if (CLOSED_STATUSES.has(st)) return false;
+    return !TERMINAL_ROLES.has(String(o.stage_role || "").toLowerCase());
   });
 }
 
