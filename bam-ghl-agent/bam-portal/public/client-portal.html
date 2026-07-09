@@ -14919,11 +14919,21 @@ async function _wdwCheck(btn) {
 let _OBF_STATE = null;   // { members, email, website, ein } after first fetch
 let _OBF_AT = 0;
 
+// Steps carry a `group` so the flow separates GENERAL academy setup from the
+// per-offer setup (Zoran 2026-07-09: "training is one offer type, separate the
+// general stuff from the training offer"). Member import lives UNDER the
+// training offer (it maps the roster onto that offer's plans), reusing the
+// Member Onboarding card's UI. As more offer types come online each gets its
+// own group; general steps stay shared.
+const _OBF_GROUPS = [
+  { key: 'general',  label: 'Academy setup', sub: 'Shared across every offer you run' },
+  { key: 'training', label: 'Training offer', sub: 'Your first offer - members, schedule and enrollment' },
+];
 const _OBF_STEPS = [
-  { key: 'members', title: 'Import your members', sub: 'Bring your roster in - import from Stripe or CSV, clean it up, link contacts', cta: 'Import members', go: '_obfGoMembers()' },
-  { key: 'email',   title: 'Connect your email domain', sub: 'Emails send from your own domain - one DNS paste at your registrar', cta: 'Set up email', go: '_obfGoDomains()' },
-  { key: 'website', title: 'Launch your new website', sub: 'Point your domain at the rebuilt site - the old one retires on the flip', cta: 'Set up website', go: '_obfGoDomains()' },
-  { key: 'ein',     title: 'Add your EIN', sub: 'Your business tax ID (business number in Canada) - unlocks offer publishing and the payment paperwork', cta: 'Add it in Blueprint', go: '_obfGoGeneral()' },
+  { key: 'ein',     group: 'general',  title: 'Add your business tax ID', sub: 'EIN (US) or Business Number (Canada) - unlocks offer publishing and the payment paperwork. Canadian businesses without one can skip this for now.', cta: 'Add it in Blueprint', go: '_obfGoGeneral()', skippable: true },
+  { key: 'email',   group: 'general',  title: 'Connect your email domain', sub: 'Emails send from your own domain - one DNS paste at your registrar', cta: 'Set up email', go: '_obfGoDomains()' },
+  { key: 'website', group: 'general',  title: 'Launch your new website', sub: 'Point your domain at the rebuilt site - the old one retires on the flip', cta: 'Set up website', go: '_obfGoDomains()' },
+  { key: 'members', group: 'training', title: 'Import your members', sub: 'Bring your roster onto this offer - import from Stripe or CSV, clean it up, link contacts', cta: 'Import members', go: '_obfGoMembers()' },
 ];
 
 function _obfIsV2() { return typeof V2_ACCESS !== 'undefined' && !!V2_ACCESS; }
@@ -14937,7 +14947,7 @@ async function _obfFetchState() {
     _wdwApi('status'),
   ]);
   if (mem.status === 'fulfilled') next.members = Array.isArray(mem.value.members) && mem.value.members.length > 0;
-  if (em.status === 'fulfilled') { next.email = em.value.status === 'live'; next.ein = !!em.value.ein_set; }
+  if (em.status === 'fulfilled') { next.email = em.value.status === 'live'; next.ein = !!em.value.ein_set || _obfSkipped('ein'); }
   if (web.status === 'fulfilled') next.website = web.value.status === 'live';
   _OBF_STATE = next; _OBF_AT = Date.now();
   _obfFanSync();
@@ -14975,6 +14985,24 @@ function _obfRing(done, total, px) {
     <circle cx="10" cy="10" r="${r}" fill="none" stroke="var(--border-med)" stroke-width="2.5"/>
     <circle cx="10" cy="10" r="${r}" fill="none" stroke="var(--gold)" stroke-width="2.5" stroke-linecap="round" stroke-dasharray="${c.toFixed(2)}" stroke-dashoffset="${(c * (1 - frac)).toFixed(2)}"/>
   </svg>`;
+}
+
+// Per-client "not applicable" dismissal for optional steps (EIN today). Kept
+// local-only on purpose: it is a personal "hide this nudge," not academy data,
+// and it clears itself the moment the real thing lands (a saved EIN wins).
+function _obfSkipKey() { return 'bam_obf_skip_' + (typeof CLIENT_ID !== 'undefined' ? CLIENT_ID : ''); }
+function _obfSkipped(key) {
+  try { return (JSON.parse(localStorage.getItem(_obfSkipKey()) || '[]') || []).includes(key); } catch (_) { return false; }
+}
+function _obfSkip(key) {
+  try {
+    const set = new Set(JSON.parse(localStorage.getItem(_obfSkipKey()) || '[]'));
+    set.add(key);
+    localStorage.setItem(_obfSkipKey(), JSON.stringify([...set]));
+  } catch (_) {}
+  if (_OBF_STATE) _OBF_STATE[key] = true;
+  _obfRender(_OBF_STATE);
+  _obfFanSync();
 }
 
 // Deep links close the flow first; command-center vs classic aware.
@@ -15018,7 +15046,7 @@ function _obfRender(st) {
   if (!st) { host.innerHTML = `<div style="font-size:12.5px;color:var(--red,#c96856)">Couldn't check your setup - try again in a minute.</div>`; return; }
   const done = _obfDone(st), total = _OBF_STEPS.length;
   if (prog) prog.innerHTML = `${_obfRing(done, total, 30)}<div style="font-size:13px;font-weight:700;color:var(--text)">${done} of ${total} done</div>` + (done === total ? `<div style="font-size:12px;color:var(--green,#7BC47F);font-weight:700">All set - your academy is fully onboarded</div>` : '');
-  host.innerHTML = _OBF_STEPS.map(s => {
+  const stepRow = (s) => {
     const ok = !!st[s.key];
     return `<div style="display:flex;align-items:center;gap:13px;padding:13px 14px;border:1px solid ${ok ? 'var(--accent-border,rgba(212,182,92,.25))' : 'var(--border)'};background:${ok ? 'var(--gold-sheen,rgba(212,182,92,.06))' : 'transparent'};border-radius:12px;margin-top:9px">
       <span style="flex:none;width:22px;height:22px;border-radius:999px;display:flex;align-items:center;justify-content:center;${ok ? 'background:var(--gold);color:var(--on-gold,#1a1608)' : 'border:1.5px solid var(--border-med);color:transparent'}">
@@ -15027,8 +15055,24 @@ function _obfRender(st) {
       <div style="flex:1;min-width:0">
         <div style="font-size:13.5px;font-weight:700;color:var(--text)">${s.title}</div>
         <div style="font-size:12px;color:var(--text-sub,var(--text-mute));margin-top:1px">${s.sub}</div>
+        ${(!ok && s.skippable) ? `<button onclick="_obfSkip('${s.key}')" style="margin-top:6px;background:none;border:none;padding:0;font:inherit;font-size:11px;font-weight:600;color:var(--text-mute);text-decoration:underline;cursor:pointer">Not applicable - skip for now</button>` : ''}
       </div>
       ${ok ? '' : `<button onclick="${s.go}" style="flex:none;background:var(--gold);border:none;border-radius:8px;color:var(--on-gold,#1a1608);padding:8px 13px;font:inherit;font-size:12px;font-weight:700;cursor:pointer">${s.cta}</button>`}
+    </div>`;
+  };
+  // Render group by group; a group with no steps is skipped. Each header shows
+  // the group's own n/N so the offer vs general split reads at a glance.
+  host.innerHTML = _OBF_GROUPS.map(g => {
+    const steps = _OBF_STEPS.filter(s => s.group === g.key);
+    if (!steps.length) return '';
+    const gDone = steps.filter(s => !!st[s.key]).length;
+    return `<div style="margin-top:20px">
+      <div style="display:flex;align-items:baseline;gap:8px">
+        <div style="font-size:11px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--text-mute)">${g.label}</div>
+        <div style="font-size:11px;font-weight:700;color:${gDone === steps.length ? 'var(--green,#7BC47F)' : 'var(--text-mute)'}">${gDone}/${steps.length}</div>
+      </div>
+      <div style="font-size:11.5px;color:var(--text-mute);margin-top:1px">${g.sub}</div>
+      ${steps.map(stepRow).join('')}
     </div>`;
   }).join('');
 }
