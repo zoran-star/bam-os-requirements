@@ -30216,9 +30216,13 @@ async function _enrollPickCustomer(idx) {
   const c = s.results[idx]; if (!c) return;
   s.customer = c; s.error = null;
   s.pname = c.name || ''; s.pemail = c.email || ''; s.pphone = c.phone || '';
-  // Start with one athlete, name prefilled from what we already know.
+  // Names already LIVE on the roster (charged already) - don't re-add them as
+  // new signups (the backend would reject the batch). Shown read-only instead.
+  const enrolledNames = new Set((c.on_roster || []).map(r => String(r.athlete_name || '').trim().toLowerCase()).filter(Boolean));
+  // Start with one athlete, name prefilled ONLY if it isn't already enrolled.
   const known = (c.past_member && c.past_member.athlete_name) || (c.contact && c.contact.athlete_name) || '';
-  s.athletes = [_enrollNewAthlete(known)];
+  const prefill = (known && !enrolledNames.has(known.trim().toLowerCase())) ? known : '';
+  s.athletes = [_enrollNewAthlete(prefill)];
   s.showMissing = false;
   s.step = 2; s.busy = true; _enrollRender();
   if (!s.targets) {
@@ -30333,7 +30337,16 @@ function _enrollRenderStep2(body) {
       <input type="email" value="${escapeHTML(s.pemail)}" placeholder="Parent's email" oninput="_ENROLL.pemail=this.value" style="${_enrollInputBase(s.showMissing && !parentOk)}">
       <input type="tel" value="${escapeHTML(s.pphone)}" placeholder="Parent's phone" oninput="_ENROLL.pphone=this.value" style="${_enrollInputBase(false)}">
     </div>
-    <div style="font-size:11px;font-weight:700;color:var(--text-mute);letter-spacing:0.5px;text-transform:uppercase;margin-bottom:8px">Athletes <span style="font-weight:600;text-transform:none;letter-spacing:0">- onboarding questions all required</span></div>
+    ${(() => {
+      const roster = (s.customer && s.customer.on_roster) || [];
+      if (!roster.length) return '';
+      return `<div style="border:1px solid #1f7a3d;border-radius:12px;background:rgba(31,122,61,0.07);padding:12px 14px;margin-bottom:14px">
+        <div style="font-size:11px;font-weight:700;color:#7BC47F;letter-spacing:0.5px;text-transform:uppercase;margin-bottom:6px">Already on the roster</div>
+        ${roster.map(r => `<div style="font-size:13px;display:flex;justify-content:space-between;gap:10px;padding:2px 0"><span style="font-weight:600">${escapeHTML(r.athlete_name || 'Athlete')}</span><span style="color:var(--text-mute)">${escapeHTML(r.status || 'live')}</span></div>`).join('')}
+        <div style="font-size:12px;color:var(--text-mute);margin-top:6px">These are already signed up and won't be charged again. Add only NEW athletes below.</div>
+      </div>`;
+    })()}
+    <div style="font-size:11px;font-weight:700;color:var(--text-mute);letter-spacing:0.5px;text-transform:uppercase;margin-bottom:8px">New athletes <span style="font-weight:600;text-transform:none;letter-spacing:0">- onboarding questions all required</span></div>
     ${s.athletes.map((_, ai) => _enrollAthleteCard(ai)).join('')}
     <button onclick="_enrollAddAthlete()" style="width:100%;background:transparent;border:1px dashed var(--border);color:var(--gold,#D4B65C);padding:9px;font-size:13px;font-weight:700;border-radius:8px;cursor:pointer;font-family:inherit;margin-bottom:16px">+ Add another athlete</button>
     <div style="font-size:11px;font-weight:700;color:var(--text-mute);letter-spacing:0.5px;text-transform:uppercase;margin:0 0 8px">First charge <span style="font-weight:600;text-transform:none;letter-spacing:0">- applies to all</span></div>
