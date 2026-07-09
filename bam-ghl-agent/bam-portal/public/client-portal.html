@@ -48845,7 +48845,7 @@ function _mmaSend() {
 // Router: instant local paths for KPIs + bare-name lookups; everything that
 // smells like an ACTION or a follow-up in an ongoing conversation goes to the
 // real agent (/api/members-agent) which reasons + proposes → Confirm on desk.
-const _MMA_ACTION_RE = /\b(pause|unpause|resume|cancel|refund|change|upgrade|downgrade|coupon|discount|charge|credit|referr\w*|call|payment|link|card|set|update|adjust|switch|move|apply|remove|send|why|fail\w*|help|walk|next)\b/i;
+const _MMA_ACTION_RE = /\b(pause|unpause|resume|cancel|refund|change|upgrade|downgrade|coupon|discount|charge|credit|referr\w*|call|payment|link|card|set|update|adjust|switch|move|apply|remove|send|why|fail\w*|help|walk|next|sign\w*|enroll\w*|add|register)\b/i;
 async function _mmaHandle(qRaw) {
   const q = String(qRaw || '');
   const ql = q.toLowerCase();
