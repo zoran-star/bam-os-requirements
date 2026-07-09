@@ -103,7 +103,7 @@ async function handler(req, res) {
     if (!clientId) return res.status(400).json({ error: "client_id required" });
     if (!ctx.isStaff && !ctx.clientIds.includes(clientId)) return res.status(403).json({ error: "forbidden" });
 
-    const rows = await sb(`clients?id=eq.${encodeURIComponent(clientId)}&select=id,website_setup&limit=1`);
+    const rows = await sb(`clients?id=eq.${encodeURIComponent(clientId)}&select=id,website_setup,allowed_domains&limit=1`);
     const client = Array.isArray(rows) && rows[0];
     if (!client) return res.status(404).json({ error: "academy not found" });
     const action = String(body.action || "status");
@@ -121,7 +121,22 @@ async function handler(req, res) {
 
     if (action === "status") {
       const setup = client.website_setup;
-      if (!setup || !setup.domain) return res.status(200).json({ ok: true, status: "none" });
+      if (!setup || !setup.domain) {
+        // Pre-wizard sites (GTA): the domain was attached to the sites project
+        // by hand, so website_setup is empty even though the site is LIVE.
+        // Detect it from allowed_domains so status (and the onboarding flow's
+        // website step) reports the truth instead of "none".
+        const candidates = [...new Set((client.allowed_domains || []).map(normalizeDomain).filter(Boolean))].slice(0, 4);
+        for (const dom of candidates) {
+          const onProject = await vercel("GET", `/v9/projects/${encodeURIComponent(SITES_PROJECT)}/domains/${encodeURIComponent(dom)}${vercelQs()}`).catch(() => null);
+          if (!onProject || !onProject.name) continue; // not attached to our sites project
+          const cfg = await vercel("GET", `/v6/domains/${encodeURIComponent(dom)}/config${vercelQs()}`).catch(() => null);
+          if (cfg && cfg.misconfigured === false) {
+            return res.status(200).json({ ok: true, status: "live", domain: dom, records: [] });
+          }
+        }
+        return res.status(200).json({ ok: true, status: "none" });
+      }
       // verified = attached to the project AND DNS resolving to Vercel.
       const cfg = await vercel("GET", `/v6/domains/${encodeURIComponent(setup.domain)}/config${vercelQs()}`).catch(() => null);
       const live = cfg && cfg.misconfigured === false;

@@ -31,8 +31,11 @@ independent (starts with the fees-section tax rework).
   Link/Skip + merge-tool pointer.
 - Keep-clean: `customer.created` case in api/stripe/webhook.js (single
   exact-email match stamps, no match mints, ambiguous left for next sweep).
-  ⚠️ MANUAL: add `customer.created` to the Stripe Connect webhook endpoint's
-  event list in the dashboard (like price.created was).
+  Webhook event subscription is now PORTAL-MANAGED: "Sync webhook events"
+  button in Stripe Link-Up -> `api/stripe/ensure-webhook-events.js` (staff
+  only, platform-level - one endpoint covers ALL academies) unions
+  REQUIRED_EVENTS into the endpoint's enabled_events. KEEP REQUIRED_EVENTS in
+  sync with webhook.js's switch when adding handlers (receipts will).
 - Phase 4 merge tool: ALREADY EXISTED (`merge_contacts` PG fn 20260707 +
   api/ghl/merge-contacts.js + contact-card UI) - reused, not rebuilt.
 

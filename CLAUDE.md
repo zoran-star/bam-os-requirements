@@ -48,7 +48,7 @@ Slash commands available in this repo (in `.claude/commands/`, shared via git):
 - `/setup` — **one-time setup for a new portal team member** (Cole, Cam, etc.): session-recording config, jq, git identity + a verify check. Run this first on a new machine.
 - `/setup-project-memory <folder>` — scaffold CLAUDE.md + memories/ for a new project folder
 - `/memory-audit` — audit all CLAUDE.md + memories/ folders for drift, stale notes, broken links
-- `/v2-tickets` — triage outstanding V2 tickets from the lil Zoran icon one by one: full context, plain-English fix proposal, workshop with Zoran, record decision, repeat until the queue is empty
+- `/v2-tickets` — triage outstanding tickets from the lil Zoran icon one by one (client-side V2 + staff-side bug reports): full context, plain-English fix proposal, workshop with Zoran, record decision, repeat until the queue is empty
 
 **Portal build sessions** (in `bam-ghl-agent/`): `/showtime` primes the session (pulls latest, loads the engineering guide + safe-build rules) and starts recording; `/byebye` generates a test script for what changed, then saves the session to the staff review page.
 

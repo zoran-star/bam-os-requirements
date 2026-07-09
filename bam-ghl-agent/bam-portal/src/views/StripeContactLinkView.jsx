@@ -81,6 +81,19 @@ export default function StripeContactLinkView({ tokens, session }) {
     finally { setBusyRow(null); }
   }
 
+  // One click keeps the platform webhook subscribed to every event the portal
+  // handles (covers ALL academies at once - it's a platform-level endpoint).
+  const [whStatus, setWhStatus] = useState("");
+  async function syncWebhookEvents() {
+    setWhStatus("Checking…"); setErr("");
+    try {
+      const res = await fetch("/api/stripe/ensure-webhook-events", { method: "POST", headers: authHeaders(), body: "{}" });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(json.error || `HTTP ${res.status}`);
+      setWhStatus(json.added && json.added.length ? `Added: ${json.added.join(", ")}` : "Webhook already up to date");
+    } catch (e) { setWhStatus(""); setErr(e.message); }
+  }
+
   // ── styles ──────────────────────────────────────────────
   const card = { background: t.surface, border: `1px solid ${t.border}`, borderRadius: 12, padding: 20 };
   const input = {
@@ -117,6 +130,13 @@ export default function StripeContactLinkView({ tokens, session }) {
           style={{ ...btn(true), opacity: clientId && stripeReady && !sweeping ? 1 : 0.4, pointerEvents: clientId && stripeReady && !sweeping ? "auto" : "none" }}
           onClick={runSweep}
         >{sweeping ? "Sweeping…" : "Run sweep"}</button>
+      </div>
+
+      <div style={{ display: "flex", gap: 10, alignItems: "center", margin: "0 0 16px 4px", flexWrap: "wrap" }}>
+        <button style={btn(false)} onClick={syncWebhookEvents}>Sync webhook events</button>
+        <span style={{ fontSize: 12, color: t.textSub }}>
+          {whStatus || "One click, all academies: keeps the Stripe webhook subscribed to every event the portal handles."}
+        </span>
       </div>
 
       {err && <div style={{ ...card, borderColor: t.red, color: t.red, marginBottom: 16, padding: 12 }}>{err}</div>}
