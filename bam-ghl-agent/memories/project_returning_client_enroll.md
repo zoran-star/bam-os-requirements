@@ -81,11 +81,47 @@ System prompt teaches: find_members-miss + enroll intent -> wizard, never
 change/pause/payment-link for brand-new members. `openEnrollDrawer(opts)` now
 takes `{elevated}`.
 
+## GOTCHA: "live price" truth = offering archived flag, NOT the catalog
+
+Found during the Houssein pilot (2026-07-08): `pricing_catalog` rows stay
+`tier='canonical' + is_routable=true` even after the owner ARCHIVES the
+offering in the offer's Pricing section (Summer Unlimited showed as live in
+the wizard). The authoritative rule is `_offerPriceStatus` (client-portal):
+match the row's offer_price_key title / display_name against the offer's
+`data.pricing.pricing_offerings`, longest title wins, `archived` offering =
+legacy. `api/members/enroll.js liveTargets` now applies it server-side
+(fix merged same day). ⚠️ `api/sorter/fix-payment.js buildTargets` still has
+the old catalog-only rule - fix it next time the sorter is touched.
+
+## Phase 2 SHIPPED (2026-07-08, same day): mandatory signup fields + agent buttons
+
+- **Mandatory signup info** (Zoran's call: ALL fields required on manual add):
+  step 2 now collects the same set the public signup does - academy CORE
+  `custom_field_defs` (offer_id null) + the SELECTED offer's custom questions
+  (sales + onboarding sections), all archived=false. New enroll.js actions/
+  helpers: `signup-fields` (defs + values prefilled via contact email/phone
+  match), `signupDefs`, `writeSignupInfo`. Server HARD-validates: enroll 400s
+  listing missing labels if any def lacks a value. After the member row is
+  created: `resolveOrMintPortalContact` (finds by email/phone or mints,
+  stamps stripe_customer_id + source='returning-enroll') -> members.contact_id
+  + members.ghl_contact_id linked -> `contact_field_values` upserted
+  (on_conflict contact_id,field_id - same shape as custom-fields set-value).
+- **Wizard step 2 additions:** Parent contact inputs (name/email/phone,
+  prefilled from Stripe, name + email-or-phone required), per-type field
+  renderer (`_enrollFieldInput`: text/number/date/select/multiselect/boolean),
+  values in `_ENROLL.fieldVals` keyed by def id, red-border missing highlight
+  (`showMissing`) when Review is clicked incomplete, fields load on price pick
+  (`signup-fields` fetch per offer_id). Review shows "Signup info: N fields".
+- **Agent buttons:** `+ New member` outline button next to Send on the classic
+  Members agent bar (#magent-newmember) + gold `+ Sign up a client` chip first
+  in the CC focus-mode chip row; both -> `_enrollFromAgentButton(elevated?)`,
+  permission-gated with the "ask the owner" message.
+
 ## Still open in later phases
 
-- Phase 2: contact attach prefill beyond athlete name + the missing-info
-  mini-form (core custom_field_defs).
 - Phase 3: notify SMS + receipt hook (agent tool DONE - see above).
+- Multi-athlete nuance: field values live per CONTACT (parent) - two kids
+  under one parent share custom-field values. Revisit if it bites.
 - Door B follow-through: after the card link is used, staff re-run the
   wizard to complete (documented in the result screen). Auto-complete on
   `checkout.session.completed` is a candidate improvement.

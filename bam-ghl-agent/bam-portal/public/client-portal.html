@@ -7826,6 +7826,9 @@ Then the call to action."]</div>
             </div>
             <button id="magent-send" onclick="magentSend()"
               style="background:var(--accent,#D4B65C);color:#0B0B0D;border:none;border-radius:10px;padding:0 18px;font:inherit;font-size:14px;font-weight:700;cursor:pointer;white-space:nowrap">Send</button>
+            <button id="magent-newmember" onclick="_enrollFromAgentButton()"
+              title="Sign up a returning client - someone who has paid before in Stripe"
+              style="background:transparent;color:var(--accent,#D4B65C);border:1px solid var(--accent,#D4B65C);border-radius:10px;padding:0 14px;font:inherit;font-size:14px;font-weight:700;cursor:pointer;white-space:nowrap">+ New member</button>
           </div>
           <div id="magent-thread" style="display:none;margin-top:12px;flex-direction:column;gap:10px"></div>
         </div>
@@ -29624,6 +29627,9 @@ function openEnrollDrawer(opts = {}) {
     targets: null, offerKey: null, athlete: '', chargeMode: 'now',
     startDate: '', consent: false, preview: null, busy: false, error: null, result: null,
     couponCode: '', coupon: null, couponBusy: false, couponError: null,
+    pname: '', pemail: '', pphone: '',                    // parent contact (editable, required)
+    fields: null, fieldVals: {}, fieldsBusy: false,       // mandatory signup info (core + offer custom fields)
+    fieldsOfferId: null, showMissing: false,
   };
   // Elevated: opened from the members focus-mode chat (z 9999) - sit above it,
   // same trick as the member drawer's elevated mode.
@@ -29641,6 +29647,18 @@ function openEnrollDrawer(opts = {}) {
     if (dr) dr.style.transform = 'translateX(0)';
   });
   _enrollRender();
+}
+
+// Button next to the agent input (classic Members bar + CC focus-mode chips).
+// Same gate as the tool-driven path; tells the user why when they lack access.
+function _enrollFromAgentButton(elevated) {
+  if (!_canEnrollReturning()) {
+    const msg = "You don't have access to sign up returning clients - ask the account owner to enable it in the Team section.";
+    if (elevated && typeof _mmaSay === 'function') _mmaSay(msg, '');
+    else alert(msg);
+    return;
+  }
+  openEnrollDrawer(elevated ? { elevated: true } : {});
 }
 
 // Agent bridge: the members agent's start_returning_signup tool lands here.
@@ -29766,6 +29784,8 @@ async function _enrollPickCustomer(idx) {
   s.customer = c; s.error = null;
   // Prefill the athlete name from what we already know about this person.
   s.athlete = (c.past_member && c.past_member.athlete_name) || (c.contact && c.contact.athlete_name) || '';
+  s.pname = c.name || ''; s.pemail = c.email || ''; s.pphone = c.phone || '';
+  s.fields = null; s.fieldVals = {}; s.fieldsOfferId = null; s.showMissing = false;
   s.step = 2; s.busy = true; _enrollRender();
   if (!s.targets) {
     try {
@@ -29806,14 +29826,40 @@ function _enrollRenderStep2(body) {
     const on = s.chargeMode === mode;
     return `<button onclick="_enrollSetChargeMode('${mode}')" style="background:${on ? 'var(--gold,#D4B65C)' : 'transparent'};color:${on ? '#0B0B0D' : 'var(--text)'};border:1px solid ${on ? 'var(--gold,#D4B65C)' : 'var(--border)'};padding:7px 13px;font-size:12.5px;font-weight:700;border-radius:999px;cursor:pointer;font-family:inherit">${label}</button>`;
   };
-  const canContinue = s.offerKey && String(s.athlete || '').trim() && (s.chargeMode !== 'on_date' || s.startDate);
+  // Mandatory signup info: the same core + offer custom fields the public
+  // signup collects. Everything must be filled before Review.
+  const inputBase = (bad) => `width:100%;box-sizing:border-box;padding:9px 12px;background:var(--bg);border:1px solid ${bad ? '#9a3b2f' : 'var(--border)'};border-radius:8px;color:var(--text);font:inherit;font-size:13.5px;outline:none`;
+  const parentOk = String(s.pname || '').trim() && (String(s.pemail || '').trim() || String(s.pphone || '').trim());
+  let fieldsHtml = '';
+  if (s.offerKey) {
+    if (s.fieldsBusy || s.fields === null) {
+      fieldsHtml = `<div class="req-empty" style="padding:12px 0"><span class="req-spin"></span>Loading signup fields…</div>`;
+    } else if (s.fields.length) {
+      fieldsHtml = s.fields.map(d => `
+        <div style="margin-bottom:10px">
+          <div style="font-size:12px;font-weight:600;color:var(--text-sub);margin-bottom:4px">${escapeHTML(d.label || d.key)}${d.scope === 'offer' ? ' <span style="font-size:10px;color:var(--gold,#D4B65C);font-weight:700;text-transform:uppercase;letter-spacing:0.4px">offer</span>' : ''}</div>
+          ${_enrollFieldInput(d)}
+        </div>`).join('');
+    }
+  }
+  const fieldsOk = s.offerKey && Array.isArray(s.fields) && s.fields.every(d => !_enrollFieldEmpty(s.fieldVals[d.id]));
+  const canContinue = s.offerKey && String(s.athlete || '').trim() && parentOk && fieldsOk && (s.chargeMode !== 'on_date' || s.startDate);
   body.innerHTML = _enrollHeader('Offer and plan', `For <b>${escapeHTML(c.name || c.email || 'the selected client')}</b> · <a href="#" onclick="_ENROLL.step=1;_enrollRender();return false" style="color:var(--gold,#D4B65C)">change</a>`) + `
     <div style="font-size:11px;font-weight:700;color:var(--text-mute);letter-spacing:0.5px;text-transform:uppercase;margin-bottom:8px">Live offer prices</div>
     ${prices}
     <div style="font-size:11px;font-weight:700;color:var(--text-mute);letter-spacing:0.5px;text-transform:uppercase;margin:16px 0 8px">Athlete</div>
     <input id="enroll-athlete" type="text" value="${escapeHTML(s.athlete || '')}" placeholder="Athlete's full name"
            oninput="_ENROLL.athlete=this.value"
-           style="width:100%;box-sizing:border-box;padding:9px 12px;background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);font:inherit;font-size:13.5px;outline:none">
+           style="${inputBase(s.showMissing && !String(s.athlete || '').trim())}">
+    <div style="font-size:11px;font-weight:700;color:var(--text-mute);letter-spacing:0.5px;text-transform:uppercase;margin:16px 0 8px">Parent contact</div>
+    <div style="display:grid;gap:8px">
+      <input type="text" value="${escapeHTML(s.pname)}" placeholder="Parent's full name" oninput="_ENROLL.pname=this.value" style="${inputBase(s.showMissing && !String(s.pname || '').trim())}">
+      <input type="email" value="${escapeHTML(s.pemail)}" placeholder="Parent's email" oninput="_ENROLL.pemail=this.value" style="${inputBase(s.showMissing && !parentOk)}">
+      <input type="tel" value="${escapeHTML(s.pphone)}" placeholder="Parent's phone" oninput="_ENROLL.pphone=this.value" style="${inputBase(false)}">
+    </div>
+    ${s.offerKey ? `
+    <div style="font-size:11px;font-weight:700;color:var(--text-mute);letter-spacing:0.5px;text-transform:uppercase;margin:16px 0 8px">Signup info <span style="font-weight:600;text-transform:none;letter-spacing:0">- all required, same as the signup form</span></div>
+    ${fieldsHtml || '<div style="font-size:12.5px;color:var(--text-mute)">This offer has no extra signup fields.</div>'}` : ''}
     <div style="font-size:11px;font-weight:700;color:var(--text-mute);letter-spacing:0.5px;text-transform:uppercase;margin:16px 0 8px">First charge</div>
     <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
       ${chip('now', 'Charge now')}
@@ -29825,19 +29871,93 @@ function _enrollRenderStep2(body) {
     ${s.chargeMode === 'on_date' ? `<div style="font-size:12px;color:var(--text-mute);margin-top:6px">No charge until that date. Billing then continues automatically.</div>` : ''}
     <div style="display:flex;gap:10px;margin-top:22px">
       <button onclick="_ENROLL.step=1;_enrollRender()" style="background:transparent;border:1px solid var(--border);color:var(--text);padding:10px 16px;font-size:13px;font-weight:600;border-radius:8px;cursor:pointer;font-family:inherit">Back</button>
-      <button onclick="_enrollToReview()" ${canContinue ? '' : 'disabled'} style="flex:1;background:${canContinue ? 'var(--gold,#D4B65C)' : 'var(--border)'};color:${canContinue ? '#0B0B0D' : 'var(--text-mute)'};border:none;padding:10px 16px;font-size:13.5px;font-weight:700;border-radius:8px;cursor:${canContinue ? 'pointer' : 'not-allowed'};font-family:inherit">Review</button>
+      <button onclick="_enrollToReview()" style="flex:1;background:${canContinue ? 'var(--gold,#D4B65C)' : 'var(--border)'};color:${canContinue ? '#0B0B0D' : 'var(--text-mute)'};border:none;padding:10px 16px;font-size:13.5px;font-weight:700;border-radius:8px;cursor:pointer;font-family:inherit">Review</button>
     </div>`;
 }
 
-function _enrollSetPrice(key) { if (_ENROLL) { _ENROLL.offerKey = key; _enrollRender(); } }
+function _enrollSetPrice(key) {
+  const s = _ENROLL; if (!s) return;
+  s.offerKey = key;
+  _enrollRender();
+  // Load the offer's mandatory signup fields (core + offer custom questions),
+  // prefilled with anything the person's contact record already holds.
+  const t = (s.targets || []).find(x => x.key === key) || {};
+  const oid = t.offer_id || null;
+  if (s.fieldsOfferId !== oid || s.fields === null) {
+    s.fieldsOfferId = oid; s.fieldsBusy = true; s.fields = null; _enrollRender();
+    _enrollApi('signup-fields', { offer_id: oid, email: s.pemail || null, phone: s.pphone || null })
+      .then(json => {
+        s.fields = json.fields || [];
+        const vals = {};
+        s.fields.forEach(d => { if (d.value !== null && d.value !== undefined) vals[d.id] = d.value; });
+        s.fieldVals = { ...vals, ...s.fieldVals };
+      })
+      .catch(e => { s.fields = []; s.error = 'Couldn\'t load signup fields - ' + e.message; })
+      .finally(() => { s.fieldsBusy = false; _enrollRender(); });
+  }
+}
 function _enrollSetChargeMode(mode) { if (_ENROLL) { _ENROLL.chargeMode = mode; _enrollRender(); } }
+
+function _enrollFV(defId, value) { if (_ENROLL) _ENROLL.fieldVals[defId] = value; }
+function _enrollFVMulti(defId, opt, checked) {
+  const s = _ENROLL; if (!s) return;
+  const cur = Array.isArray(s.fieldVals[defId]) ? s.fieldVals[defId].slice() : [];
+  const i = cur.indexOf(opt);
+  if (checked && i < 0) cur.push(opt);
+  if (!checked && i >= 0) cur.splice(i, 1);
+  s.fieldVals[defId] = cur;
+}
+function _enrollFieldEmpty(v) {
+  return v === null || v === undefined || v === '' || (Array.isArray(v) && v.length === 0);
+}
+
+// One input per field def, by type. Values live in _ENROLL.fieldVals keyed by
+// def id (bound oninput/onchange so re-renders don't lose keystrokes).
+function _enrollFieldInput(d) {
+  const s = _ENROLL;
+  const v = s.fieldVals[d.id];
+  const missing = s.showMissing && _enrollFieldEmpty(v);
+  const base = `width:100%;box-sizing:border-box;padding:8px 11px;background:var(--bg);border:1px solid ${missing ? '#9a3b2f' : 'var(--border)'};border-radius:8px;color:var(--text);font:inherit;font-size:13px;outline:none`;
+  const id = `enroll-cf-${d.id}`;
+  if (d.type === 'select') {
+    return `<select id="${id}" onchange="_enrollFV('${d.id}', this.value)" style="${base}">
+      <option value="" ${_enrollFieldEmpty(v) ? 'selected' : ''}>Choose…</option>
+      ${(d.options || []).map(o => `<option value="${escapeHTML(o)}" ${v === o ? 'selected' : ''}>${escapeHTML(o)}</option>`).join('')}
+    </select>`;
+  }
+  if (d.type === 'multiselect') {
+    const cur = Array.isArray(v) ? v : [];
+    return `<div style="display:flex;gap:8px 16px;flex-wrap:wrap;padding:8px 11px;border:1px solid ${missing ? '#9a3b2f' : 'var(--border)'};border-radius:8px">
+      ${(d.options || []).map(o => `<label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer">
+        <input type="checkbox" ${cur.indexOf(o) >= 0 ? 'checked' : ''} onchange="_enrollFVMulti('${d.id}', '${escapeHTML(o).replace(/'/g, "\\'")}', this.checked)"> ${escapeHTML(o)}</label>`).join('')}
+    </div>`;
+  }
+  if (d.type === 'boolean') {
+    return `<select id="${id}" onchange="_enrollFV('${d.id}', this.value === '' ? '' : this.value === 'true')" style="${base}">
+      <option value="" ${_enrollFieldEmpty(v) ? 'selected' : ''}>Choose…</option>
+      <option value="true" ${v === true ? 'selected' : ''}>Yes</option>
+      <option value="false" ${v === false ? 'selected' : ''}>No</option>
+    </select>`;
+  }
+  const t = d.type === 'number' ? 'number' : d.type === 'date' ? 'date' : 'text';
+  return `<input id="${id}" type="${t}" value="${escapeHTML(v === null || v === undefined ? '' : String(v))}"
+    oninput="_enrollFV('${d.id}', ${t === 'number' ? 'this.value === \'\' ? \'\' : Number(this.value)' : 'this.value'})" style="${base}">`;
+}
 
 async function _enrollToReview() {
   const s = _ENROLL; if (!s) return;
   const input = document.getElementById('enroll-athlete');
   if (input) s.athlete = input.value;
-  if (!s.offerKey || !String(s.athlete || '').trim()) return;
-  if (s.chargeMode === 'on_date' && !s.startDate) return;
+  const parentOk = String(s.pname || '').trim() && (String(s.pemail || '').trim() || String(s.pphone || '').trim());
+  const fieldsOk = Array.isArray(s.fields) && s.fields.every(d => !_enrollFieldEmpty(s.fieldVals[d.id]));
+  if (!s.offerKey || !String(s.athlete || '').trim() || !parentOk || !fieldsOk || (s.chargeMode === 'on_date' && !s.startDate)) {
+    s.showMissing = true;
+    s.error = !s.offerKey ? 'Pick an offer price first.'
+      : !fieldsOk ? 'Fill every signup field - they\'re all required for a manual signup.'
+      : 'Fill the highlighted fields first.';
+    return _enrollRender();
+  }
+  s.showMissing = false;
   s.error = null; s.step = 3; s.preview = null; s.consent = false;
   s.coupon = null; s.couponCode = ''; s.couponError = null; // price may have changed - re-check any coupon
   _enrollRender();
@@ -29870,8 +29990,9 @@ function _enrollRenderStep3(body) {
   body.innerHTML = _enrollHeader('Review and confirm', '') + `
     ${dup ? `<div style="margin-bottom:14px;padding:11px 13px;border:1px solid #c47424;border-radius:10px;background:rgba(196,116,36,0.08);font-size:13px;color:#c79a4a"><b>${escapeHTML(dup.athlete_name || 'This athlete')}</b> is already on the roster (${escapeHTML(dup.status)}). Use Change plan on their member card instead.</div>` : ''}
     <div style="padding:4px 14px;border:1px solid var(--border);border-radius:12px;margin-bottom:16px">
-      ${line('Client', escapeHTML(s.customer.name || s.customer.email || '-'))}
+      ${line('Client', escapeHTML(s.pname || s.customer.name || s.customer.email || '-'))}
       ${line('Athlete', escapeHTML(s.athlete.trim()))}
+      ${Array.isArray(s.fields) && s.fields.length ? line('Signup info', `${s.fields.length} fields collected`) : ''}
       ${line('Plan', escapeHTML((s.targets.find(t => t.key === s.offerKey) || {}).label || s.offerKey))}
       ${s.coupon
         ? line('Price', `<s style="color:var(--text-mute);font-weight:400">${_enrollMoney(p.price.amount_cents, p.price.interval)}</s> <span style="color:var(--gold,#D4B65C)">${_enrollMoney(s.coupon.discounted_cents, p.price.interval)}</span>`)
@@ -29930,12 +30051,13 @@ async function _enrollConfirm() {
       customer_id: s.customer.id,
       offer_price_key: s.offerKey,
       athlete_name: s.athlete.trim(),
-      parent_name: s.customer.name || null,
-      parent_email: s.customer.email || null,
-      parent_phone: s.customer.phone || null,
+      parent_name: (s.pname || '').trim() || s.customer.name || null,
+      parent_email: (s.pemail || '').trim() || s.customer.email || null,
+      parent_phone: (s.pphone || '').trim() || s.customer.phone || null,
       charge_mode: s.chargeMode,
       start_date: s.chargeMode === 'on_date' ? s.startDate : null,
       coupon_code: s.coupon ? s.coupon.code : null,
+      field_values: s.fieldVals || {},
       consent_confirmed: true,
     });
   } catch (e) {
@@ -49087,6 +49209,7 @@ function _mmaEnsureModal() {
               <button type="button" class="mma-send" onclick="_mmaSend()" aria-label="Send">&#8593;</button>
             </div>
             <div class="mma-chips">
+              <button type="button" class="mma-chip" style="border-color:var(--gold,#D4B65C);color:var(--gold,#D4B65C)" onclick="_enrollFromAgentButton(true)">+ Sign up a client</button>
               <button type="button" class="mma-chip" onclick="_mmaChip(&quot;How's my roster?&quot;)">How's my roster?</button>
               <button type="button" class="mma-chip" onclick="_mmaChip('Who is at risk?')">Who's at risk?</button>
               <button type="button" class="mma-chip" onclick="_mmaChip('What is my MRR?')">What's my MRR?</button>
@@ -49519,7 +49642,7 @@ function _mmaSend() {
 // Router: instant local paths for KPIs + bare-name lookups; everything that
 // smells like an ACTION or a follow-up in an ongoing conversation goes to the
 // real agent (/api/members-agent) which reasons + proposes → Confirm on desk.
-const _MMA_ACTION_RE = /\b(pause|unpause|resume|cancel|refund|change|upgrade|downgrade|coupon|discount|charge|credit|referr\w*|call|payment|link|card|set|update|adjust|switch|move|apply|remove|send|why|fail\w*|help|walk|next)\b/i;
+const _MMA_ACTION_RE = /\b(pause|unpause|resume|cancel|refund|change|upgrade|downgrade|coupon|discount|charge|credit|referr\w*|call|payment|link|card|set|update|adjust|switch|move|apply|remove|send|why|fail\w*|help|walk|next|sign\w*|enroll\w*|add|register)\b/i;
 async function _mmaHandle(qRaw) {
   const q = String(qRaw || '');
   const ql = q.toLowerCase();
