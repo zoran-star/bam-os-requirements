@@ -7353,10 +7353,14 @@
               <label class="modal-label" style="margin-top:14px">Attach files (optional)</label>
               <label for="reqDetailRespondFiles" class="file-drop-label" style="padding:18px">
                 <span class="file-drop-icon">↑</span>
-                <span class="file-drop-text">Click to add files</span>
+                <span class="file-drop-text">Click to add files, or drag files or a folder here</span>
                 <span class="file-drop-meta">JPG · PNG · MP4 · MOV · PSD · AI · ZIP</span>
               </label>
               <input type="file" id="reqDetailRespondFiles" accept="image/*,video/*,.psd,.ai,.zip" multiple style="display:none" onchange="_reqDetailRespondAddFiles(this.files)" />
+              <div style="text-align:center;margin-top:6px">
+                <label for="reqDetailRespondFolderInput" style="cursor:pointer;color:var(--gold,#D4B65C);font-size:12px;font-weight:600">…or upload a whole folder</label>
+                <input type="file" id="reqDetailRespondFolderInput" webkitdirectory directory multiple style="display:none" onchange="_reqDetailRespondAddFiles(this.files)" />
+              </div>
               <div class="wizard-files-list" id="reqDetailRespondFilesList" style="margin-top:8px"></div>
 
               <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:16px">
@@ -7376,10 +7380,14 @@
                 <label class="modal-label" style="margin-top:14px">Add files (optional)</label>
                 <label for="reqDetailEditFilesInput" class="file-drop-label" style="padding:18px">
                   <span class="file-drop-icon">↑</span>
-                  <span class="file-drop-text">Click to add files</span>
+                  <span class="file-drop-text">Click to add files, or drag files or a folder here</span>
                   <span class="file-drop-meta">JPG · PNG · MP4 · MOV · PSD · AI · ZIP</span>
                 </label>
                 <input type="file" id="reqDetailEditFilesInput" accept="image/*,video/*,.psd,.ai,.zip" multiple style="display:none" onchange="_reqDetailEditAddFiles(this.files)" />
+                <div style="text-align:center;margin-top:6px">
+                  <label for="reqDetailEditFolderInput" style="cursor:pointer;color:var(--gold,#D4B65C);font-size:12px;font-weight:600">…or upload a whole folder</label>
+                  <input type="file" id="reqDetailEditFolderInput" webkitdirectory directory multiple style="display:none" onchange="_reqDetailEditAddFiles(this.files)" />
+                </div>
                 <div class="wizard-files-list" id="reqDetailEditFilesList" style="margin-top:8px"></div>
               </div>
 
@@ -28123,12 +28131,69 @@ function _deriveAssetType(files) {
   return 'graphic';
 }
 
+// ── Drag-and-drop folders (Drive-style) ────────────────────────────────
+// Walks a drop's DataTransfer via webkitGetAsEntry so a client can drag a
+// whole folder (or a mix of files and folders) onto any drop zone - no
+// zipping. Files from inside a folder come back tagged with `_folder` =
+// the top-level directory name, matching the "Upload a folder" picker.
+// Browsers cap readEntries at ~100 per call, hence the do/while drain.
+async function _readDroppedFiles(dataTransfer) {
+  const out = [];
+  const entries = Array.from(dataTransfer?.items || [])
+    .map(it => (it.webkitGetAsEntry ? it.webkitGetAsEntry() : null))
+    .filter(Boolean);
+  if (!entries.length) return Array.from(dataTransfer?.files || []);
+  async function walk(entry, parentPath) {
+    if (entry.isFile) {
+      const f = await new Promise((res, rej) => entry.file(res, rej));
+      if (parentPath) f._folder = parentPath.split('/')[0];
+      out.push(f);
+    } else if (entry.isDirectory) {
+      const dirPath = parentPath ? parentPath + '/' + entry.name : entry.name;
+      const reader = entry.createReader();
+      let batch;
+      do {
+        batch = await new Promise((res, rej) => reader.readEntries(res, rej));
+        for (const child of batch) await walk(child, dirPath);
+      } while (batch.length);
+    }
+  }
+  for (const e of entries) await walk(e, '');
+  return out;
+}
+
+// Make a drop zone accept dragged files/folders. Idempotent per element.
+function _wireDropZone(el, onFiles) {
+  if (!el || el._dropWired) return;
+  el._dropWired = true;
+  const hover = (on) => { el.style.borderColor = on ? 'var(--gold, #D4B65C)' : ''; };
+  ['dragover', 'dragenter'].forEach(ev => el.addEventListener(ev, e => { e.preventDefault(); hover(true); }));
+  el.addEventListener('dragleave', e => { e.preventDefault(); hover(false); });
+  el.addEventListener('drop', async e => {
+    e.preventDefault(); hover(false);
+    try {
+      const files = await _readDroppedFiles(e.dataTransfer);
+      if (files.length) onFiles(files);
+    } catch (_) { /* unreadable drop - ignore */ }
+  });
+}
+
+// Static drop zones (the dynamic wizard blocks wire themselves per render).
+function _wireStaticDropZones() {
+  _wireDropZone(document.querySelector('label[for="inputAssetsFileInput"]'), files => _inputAssetsAddFiles(files));
+  _wireDropZone(document.querySelector('label[for="reqDetailRespondFiles"]'), files => _reqDetailRespondAddFiles(files));
+  _wireDropZone(document.querySelector('label[for="reqDetailEditFilesInput"]'), files => _reqDetailEditAddFiles(files));
+}
+document.addEventListener('DOMContentLoaded', _wireStaticDropZones);
+
 function _inputAssetsAddFiles(filesList, fromFolderUpload) {
   const incoming = _filterOversizeFiles(filesList || []);
   // Tag each file with its folder: a folder upload keeps its own directory name,
-  // otherwise files inherit whatever's typed in the folder field.
+  // otherwise files inherit whatever's typed in the folder field. Files that a
+  // drop walker already tagged (dragged folders) keep their tag.
   const activeFolder = (document.getElementById('inputAssetsFolder')?.value || '').trim();
   incoming.forEach(f => {
+    if (f._folder) return;
     if (fromFolderUpload) {
       const rel = f.webkitRelativePath || '';
       f._folder = (rel.indexOf('/') !== -1 ? rel.slice(0, rel.indexOf('/')) : '') || activeFolder;
@@ -28445,12 +28510,14 @@ function _renderReqDetailUpdates(r) {
 
 // ── Inline respond form (used by both marketing + content detail views) ──
 function _reqDetailRespondAddFiles(filesList) {
-  const incoming = Array.from(filesList || []);
+  const incoming = _filterOversizeFiles(filesList || []);
   if (!incoming.length) return;
   _reqDetailRespondFiles = _reqDetailRespondFiles.concat(incoming);
   _renderReqDetailRespondFilesList();
   const input = document.getElementById('reqDetailRespondFiles');
   if (input) input.value = '';
+  const finput = document.getElementById('reqDetailRespondFolderInput');
+  if (finput) finput.value = '';
 }
 
 function _reqDetailRespondRemoveFile(idx) {
@@ -28504,12 +28571,14 @@ function _reqDetailEditConfigure(opts) {
 }
 
 function _reqDetailEditAddFiles(filesList) {
-  const incoming = Array.from(filesList || []);
+  const incoming = _filterOversizeFiles(filesList || []);
   if (!incoming.length) return;
   _reqDetailEditFiles = _reqDetailEditFiles.concat(incoming);
   _renderReqDetailEditFilesList();
   const input = document.getElementById('reqDetailEditFilesInput');
   if (input) input.value = '';
+  const finput = document.getElementById('reqDetailEditFolderInput');
+  if (finput) finput.value = '';
 }
 
 function _reqDetailEditRemoveStagedFile(idx) {
@@ -44265,7 +44334,7 @@ function _renderWizardCreatives() {
       <label class="modal-label">Upload assets or folder</label>
       <label for="wizardFiles_${c.id}" class="file-drop-label" style="padding:18px;margin-bottom:6px">
         <span class="file-drop-icon">↑</span>
-        <span class="file-drop-text">Click to upload files</span>
+        <span class="file-drop-text">Click to upload, or drag files or a folder here</span>
         <span class="file-drop-meta">JPG · PNG · MP4 · MOV · PSD · AI · ZIP</span>
       </label>
       <input type="file" id="wizardFiles_${c.id}" accept="image/*,video/*,.psd,.ai,.zip" multiple style="display:none" onchange="wizardCreativeAddFiles('${c.id}', this.files)" />
@@ -44300,6 +44369,13 @@ function _renderWizardCreatives() {
       <div style="font-size:11px;color:var(--text-mute);margin-top:4px;line-height:1.5">Helpful: creative direction · offer details (who it's for, benefits, dates) · speaker names · do's and don'ts.</div>
     </div>`;
   }).join('');
+
+  // Re-rendered HTML = fresh elements; wire drag-and-drop on each block's
+  // drop zone (folders flatten into the block, same as the folder picker).
+  list.querySelectorAll('label[for^="wizardFiles_"]').forEach(lab => {
+    const id = (lab.getAttribute('for') || '').replace('wizardFiles_', '');
+    if (id) _wireDropZone(lab, files => wizardCreativeAddFiles(id, files, true));
+  });
 
   _updateWizardContinueBtn();
 }
@@ -50947,7 +51023,7 @@ function toggleTheme() {
     <div style="font-size:11px;color:var(--text-mute);margin-bottom:8px">Type a group name for what you upload next, or upload a whole folder at once - keeps your categories for the team.</div>
     <label for="inputAssetsFileInput" class="file-drop-label">
       <span class="file-drop-icon">↑</span>
-      <span class="file-drop-text">Click to upload (you can pick multiple)</span>
+      <span class="file-drop-text">Click to upload, or drag files or a folder here</span>
       <span class="file-drop-meta">JPG · PNG · MP4 · MOV · PSD · AI</span>
     </label>
     <input type="file" id="inputAssetsFileInput" accept="image/*,video/*,.psd,.ai,.zip" multiple style="display:none" onchange="_inputAssetsAddFiles(this.files)" />
