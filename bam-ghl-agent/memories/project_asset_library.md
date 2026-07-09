@@ -80,3 +80,6 @@ A client reported the Assets picker wouldn't let them select videos — the file
 
 Related: [[project_offer_architecture]] (per-offer files in `offer_files`/`offers`
 bucket — separate from this academy-level library).
+
+## Ticket uploads mirror in (Option B, 2026-07-09)
+Every client-submitted ticket file (content-ticket create, edit additions, action-response attachments) now write-throughs into `client_assets` as a LINK row: `link_url` = the ticket-files URL (no object copy), `source='ticket'`, `source_ticket_id`, category video/photo/other from mime, folder = the client's upload label. Dedupe = partial unique index `(client_id, link_url)`. Migration `20260709184749` (applied) + one-time MCP backfill (152 historical files incl. response-attachment bullets). **View-only for clients** (RLS delete/update exclude source='ticket'; Cam's call - the ticket owns the file). **Client Assets tab currently EXCLUDES source='ticket'** (`.neq` in the load) until the grouped "From your requests" section ships (B3) - staff + website surfaces can read them now. Write-through lives in `api/marketing.js mirrorFilesToAssets()` (fire-and-forget, never blocks tickets).

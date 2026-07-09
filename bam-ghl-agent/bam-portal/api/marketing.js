@@ -1396,6 +1396,7 @@ async function handleContentTickets(req, res) {
     });
     const newCt = inserted?.[0] || null;
     if (newCt) {
+      mirrorFilesToAssets(ctx.client.id, newCt.id, newCt.raw_files);
       // DM the resolved owner that a new content request landed (carries the urgent flag).
       const code = String(newCt.id || "").slice(0, 3).toUpperCase();
       const pr = (context?.priority === "high") ? "⚡ HIGH priority " : "";
@@ -1466,6 +1467,7 @@ async function handleContentTickets(req, res) {
         if (added.length) summaryParts.push(`Added ${added.length} file${added.length === 1 ? "" : "s"}`);
         if (removed.length) summaryParts.push(`Removed ${removed.length} file${removed.length === 1 ? "" : "s"}`);
         if (added.length || removed.length) patch.raw_files = newRawFiles;
+        if (added.length) mirrorFilesToAssets(ticket.client_id, ticket.id, added);
       }
 
       if (typeof body.title === "string") {
@@ -1696,6 +1698,8 @@ async function handleContentTickets(req, res) {
         author_type: "client", author_name: authorName,
         body: message, is_action_request: false,
       });
+      // Response attachments arrive as "• name - url" bullets in the message.
+      mirrorFilesToAssets(ticket.client_id, ticket.id, attachmentBulletsFrom(message));
 
     } else if (action === "send-for-review") {
       // Content team sends the finished creative to the client to review.
@@ -4450,6 +4454,49 @@ function refreshDeriveStatus(row, todayIso) {
   if (todayIso < row.window_start) return "upcoming";
   if (todayIso <= row.window_end) return "open";
   return "overdue";
+}
+
+// Mirror client-submitted files into the per-academy asset library
+// (client_assets) as LINK rows - no object copies, link_url points at the
+// existing ticket-files upload. source='ticket' rows are view-only for
+// clients (RLS) and hidden from their Assets tab until the grouped section
+// ships. Fire-and-forget: an insert failure (usually the dedupe index) must
+// never block ticket flow.
+function mirrorFilesToAssets(clientId, ticketId, files) {
+  const rows = (Array.isArray(files) ? files : [])
+    .filter(f => f && f.url)
+    .map(f => ({
+      client_id: clientId,
+      label: (f.name || "").trim() || "file",
+      category: (f.type || "").startsWith("video/") ? "video"
+        : (f.type || "").startsWith("image/") ? "photo" : "other",
+      mime_type: f.type || null,
+      folder: (f.folder || "").trim() || null,
+      link_url: f.url,
+      source: "ticket",
+      source_ticket_id: ticketId,
+    }));
+  if (!rows.length) return;
+  (async () => {
+    try {
+      await sb("client_assets", { method: "POST", body: JSON.stringify(rows) });
+    } catch (_) {
+      // Bulk insert hit the dedupe index - retry row-by-row so new files land.
+      for (const r of rows) {
+        try { await sb("client_assets", { method: "POST", body: JSON.stringify([r]) }); } catch (_) { /* duplicate */ }
+      }
+    }
+  })().catch(() => {});
+}
+
+// Pull "• name - url" attachment bullets out of a client response message.
+function attachmentBulletsFrom(messageBody) {
+  const out = [];
+  for (const line of String(messageBody || "").split("\n")) {
+    const m = line.match(/^• (.+) - (https?:\/\/\S+)$/);
+    if (m) out.push({ name: m[1], url: m[2], type: "" });
+  }
+  return out;
 }
 
 // ─────────────────────────────────────────────────────────
