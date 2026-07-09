@@ -8,6 +8,8 @@ type: project
 
 Clients **don't** submit finished creatives. They submit **raw assets** (graphics, video, notes) and the **content team** turns them into the finished creative. Once the content team uploads finals and hits "Send to Marketing," the **marketing team** sees them and launches the campaign.
 
+**2026-07-09: Client media library (staff).** `?resource=client-media&client_id=` (GET, CONTENT_ROLES) aggregates raw_files across ALL of a client's content tickets + the "• name - url" attachment bullets from client action-response messages. Rendered as a collapsible `ClientMediaLibrary` card in ContentTicketDetail (lazy-fetch on expand, folder groups, video/image filter, search, origin ticket code, gold border = current ticket). Solves "use the b-roll I previously sent" - no migration, files were always retained in ticket-files; this is discovery.
+
 **2026-07-05: third channel `funnel`** - website content. Content team produces finals, then **Send to Systems** (new `send-to-systems` action) creates a Change ticket in `tickets` with the finals attached and closes the content ticket. See [[project_organic_content]] "The three pipelines" for the full triple-channel model + the client-side Ads | Funnel | Organic split.
 
 ## Tables
