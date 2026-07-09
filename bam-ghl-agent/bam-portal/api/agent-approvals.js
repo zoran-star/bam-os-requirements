@@ -737,36 +737,14 @@ async function runDetect(res, onlyClientId) {
   return res.status(200).json({ ok: true, academies: out });
 }
 
-// 2-hourly approval digest: text each enabled academy's configured number the
-// count of chats waiting for approval (only when > 0).
-async function runDigest(res) {
-  const out = [];
-  let clients = [];
-  try {
-    clients = await sb(`clients?select=id,business_name,ghl_location_id,ghl_access_token,ghl_refresh_token,ghl_token_expires_at,ghl_kpi_config&v2_access=eq.true`);
-  } catch (_) {}
-  for (const client of (Array.isArray(clients) ? clients : [])) {
-    const cfg = client.ghl_kpi_config || {};
-    if (!cfg.agent_approvals_enabled || !cfg.agent_notify_phone) continue;
-    try {
-      const creds = await pickGhlToken(client);
-      if (!creds) continue;
-      const { queue } = await computeQueue(creds.token, creds.locationId, { clientId: client.id, sb });
-      if (queue.length > 0) {
-        const msg = `🤖 ${queue.length} chat${queue.length === 1 ? "" : "s"} waiting for your approval (${client.business_name || "academy"}). Open the portal → Inbox → 👁 Hawkeye.`;
-        const r = await sendSms({ client, toPhone: cfg.agent_notify_phone, message: msg, contactName: "BAM Agent" });
-        out.push({ client_id: client.id, count: queue.length, sent: !!r.ok });
-      } else {
-        out.push({ client_id: client.id, count: 0 });
-      }
-    } catch (e) { out.push({ client_id: client.id, error: e.message }); }
-  }
-  return res.status(200).json({ ok: true, academies: out });
-}
+// NOTE (Zoran 2026-07-08): the 2-hourly "chats waiting for your approval" digest
+// SMS is RETIRED - it only counted the Booking queue and the deck/pill counts in
+// the portal replace it. The instant "just replied" SMS (inbound webhooks) stays.
 
 async function handler(req, res) {
-  // Crons (Vercel sends Bearer CRON_SECRET): 2-hourly approval digest + the
-  // ready-reply detector (drafts replies for Responded leads; self-drive sends).
+  // Cron (Vercel sends Bearer CRON_SECRET): the ready-reply detector (drafts
+  // replies for Responded leads; self-drive sends). cron-digest is retired but
+  // answered harmlessly until the vercel.json cron change deploys.
   if (req.method === "GET" && (req.query.action === "cron-digest" || req.query.action === "detect")) {
     const got = (req.headers.authorization || "").replace(/^Bearer\s+/i, "");
     if (!process.env.CRON_SECRET || got !== process.env.CRON_SECRET) return res.status(401).json({ error: "unauthorized" });
@@ -774,7 +752,7 @@ async function handler(req, res) {
       if (!ANTHROPIC_KEY) return res.status(500).json({ error: "ANTHROPIC_API_KEY not configured" });
       return await runDetect(res, null);
     }
-    return await runDigest(res);
+    return res.status(200).json({ ok: true, retired: "digest SMS removed 2026-07-08" });
   }
   if (req.method !== "POST") return res.status(405).json({ error: "POST only" });
   // BAM staff OR the academy's own owner / can_train_agent member.
@@ -1028,6 +1006,23 @@ async function handler(req, res) {
       try { await sb(`agent_ready_replies?client_id=eq.${clientId}&ghl_contact_id=eq.${encodeURIComponent(contactId)}&status=in.(pending,approved)`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ status: "sent", approved_by: staffEmail, approved_at: new Date().toISOString(), sent_at: new Date().toISOString(), updated_at: new Date().toISOString() }) }); } catch (_) {}
       try { await sb(`agent_followups?client_id=eq.${clientId}&ghl_contact_id=eq.${encodeURIComponent(contactId)}&status=in.(pending,approved)`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ status: "canceled", send_error: "abandoned", updated_at: new Date().toISOString() }) }); } catch (_) {}
       return res.status(200).json({ ok: true, marked_abandoned: true, unqualified: true, opportunity_id: oppId, reason });
+    }
+
+    // Options for the Hawkeye deck's Book-it pickers (Zoran 2026-07-08): the
+    // academy's trial calendars (the offer-tied calendar entry points) + each
+    // calendar's open slots for the next 2 weeks. Read-only.
+    if (b.action === "book-options") {
+      const cals = await loadCalendars(sb, clientId);
+      const out = [];
+      for (const c of cals) {
+        let slots = [];
+        try {
+          const byDay = await freeSlots(token, c.key, { clientId, calLabel: c.label, days: 14 });
+          slots = summarizeSlots(byDay, 24);
+        } catch (_) {}
+        out.push({ key: c.key, label: c.label, group: c.group || null, slots });
+      }
+      return res.status(200).json({ calendars: out });
     }
 
     // The Unqualified switch (portal ⟷ GHL `unqualified` tag), without changing the

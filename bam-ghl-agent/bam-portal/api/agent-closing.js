@@ -38,12 +38,8 @@ import {
 import { enrollContact, isAutomationLive, resolveContactInfo } from "./automations.js";
 import { moveStage, setStatus, findOpenOpp as findOpenOppStore, resolveStage } from "./agent/_store.js";
 import { routeTransition } from "./agent/_router.js";
-import {
-  DEFAULT_CLOSING_AUTOMATIONS, getClosingAutomations,
-  automationsLive as closingAutomationsLive, nextDueStep as nextDueClosingStep,
-} from "./agent/closing-automations.js";
-import { resolveMergeVars, locFor } from "./email-shells.js";
-import { closingAgentMode, modeIsOn, shouldAutoSend, shouldAutoSendScripted } from "./agent/_mode.js";
+import { closingAgentMode, modeIsOn, shouldAutoSend } from "./agent/_mode.js";
+import { markUnqualified } from "./agent/_tags.js";
 import { mutedContactIdSet, isMuted } from "./agent/_mutes.js";
 import { withinQuietHours, nextSendableTime } from "./agent/_quiet.js";
 import { resolveAgentActor } from "./agent/_auth.js";
@@ -89,8 +85,9 @@ const CLOSING_TRAILER =
   `You are drafting the next SMS to a REAL lead whose athlete just ATTENDED a free trial and was marked a GOOD FIT (they're in the "Done Trial" stage). Your goal is to convert them into a PAYING MEMBER — a warm post-trial follow-up, handle price/schedule objections, and guide them to enroll. The close = sending the academy's sign-up link (from your config). You do NOT take payment yourself. A human reviews your draft before it sends. ` +
   `Respond ONLY by calling propose_reply: 'reply' = the exact text to send; 'reasoning' = 1-2 sentence why; 'confidence' = 0..1; ` +
   `'escalate' = true (with 'escalate_reason', reply empty) if your guardrails say to hand to a human. ` +
-  `If the lead is READY to enroll, set 'recommend_enroll' = true with a short 'enroll_note' (which plan/frequency they want, if known) and put a warm message in 'reply' — on approval a human sends the sign-up link. ` +
+  `If the lead is READY to enroll, set 'recommend_enroll' = true with a short 'enroll_note' (which plan/frequency they want, if known) and put a warm message in 'reply' — the academy's sign-up link is appended to your message and a human approves before it sends. ` +
   `If your closing_lost criteria say the good-fit attendee won't enroll, set 'recommend_lost' = true with a short 'lost_reason' and put your warm closing message in 'reply'. A human confirms enroll/lost before anything changes. ` +
+  `Silence alone is NEVER a lost signal: quiet leads are handled by the follow-up loop, which recommends Lost automatically after 3 unanswered follow-ups. Reserve 'recommend_lost' for an explicit no (too expensive, chose another program, not interested). ` +
   `Follow-up timing: proactive follow-ups default to the NEXT DAY. But if the lead names a specific date or timeframe for their decision ("we'll decide after the weekend", "after the 15th", "once report cards are out"), set 'followup_on' (YYYY-MM-DD) to the day right after it so we don't nag them before they said they'd know.\n</live_closing>`;
 function buildSystem({ lessons, overrides, examples }) {
   return buildAgentSystem({ lessons, overrides, examples, trailer: CLOSING_TRAILER, agent: "closing" });
@@ -347,80 +344,33 @@ async function isLiveMember(clientId, contactId, token) {
   return false;
 }
 
-// Persist only the safe, editable slice of a closing-automations override:
-// per-step enabled + template (known keys only), sequence enabled, approve flag.
-function sanitizeAutomations(incoming, cur = {}) {
-  const defByKey = new Map(DEFAULT_CLOSING_AUTOMATIONS.steps.map(s => [s.key, s]));
-  const inSteps = Array.isArray(incoming.steps) ? incoming.steps : [];
-  const steps = [];
-  for (const s of inSteps) {
-    if (!s || !defByKey.has(s.key)) continue;
-    const def = defByKey.get(s.key);
-    steps.push({
-      key: s.key,
-      enabled: typeof s.enabled === "boolean" ? s.enabled : def.enabled,
-      template: typeof s.template === "string" ? s.template.slice(0, 800) : def.template,
-    });
-  }
-  return {
-    enabled: typeof incoming.enabled === "boolean" ? incoming.enabled
-      : (typeof cur.enabled === "boolean" ? cur.enabled : DEFAULT_CLOSING_AUTOMATIONS.enabled),
-    approved: incoming.approved === true,
-    steps: steps.length ? steps : (Array.isArray(cur.steps) ? cur.steps : []),
-  };
-}
+// NOTE (Zoran 2026-07-08): the scripted "closing initial automations" sequence is
+// RETIRED - there are no preplanned automations in Done Trial. The only preplanned
+// touch is the post-trial form itself (the trainer's first message + optional
+// sign-up link, api/ghl/post-trial.js). Everything after that is the AI closing
+// agent: opener (when the form didn't text), replies, and the follow-up plan.
+// agent/closing-automations.js is kept only as historical reference.
 
-// Fire (or queue) the next due SCRIPTED post-trial step for one proactive Done-Trial
-// lead. Timing is relative to the sequence start (first step's created_at). SMS-only;
-// the only token is {{contact.first_name}}, resolved here so the stored card is final
-// text. The instant the lead replies, the AI closing agent owns the thread.
-async function fireScriptedStep({ client, token, mode, autos, item, contactId }) {
-  const nowMs = Date.now();
-  let rows = [];
+// Resolve the academy's sign-up link with tracking params (client/contact/opp) so a
+// payment ties back to THIS opportunity. Returns empty strings when no link is set.
+async function buildEnrollUrl(clientId, token, locationId, contactId) {
+  let signupUrl = "";
   try {
-    rows = await sb(`agent_closing_replies?client_id=eq.${client.id}&ghl_contact_id=eq.${encodeURIComponent(contactId)}&select=kind,status,step_key,created_at&order=created_at.asc&limit=50`);
-  } catch (_) { rows = []; }
-  rows = Array.isArray(rows) ? rows : [];
-  if (rows.some(r => ["pending", "approved"].includes(r.status))) return "already has an active card";
-  if (rows.some(r => ["closing", "closing_enroll", "closing_lost"].includes(r.kind))) return "lead already in conversation";
-  const autoRows = rows.filter(r => r.kind === "closing_auto" && ["pending", "approved", "sent", "skipped"].includes(r.status));
-  const sentKeys = new Set(autoRows.map(r => r.step_key));
-  const startedMs = autoRows.length ? Math.min(...autoRows.map(r => new Date(r.created_at).getTime())) : null;
-
-  const step = nextDueClosingStep(autos, { nowMs, startedMs, sentKeys });
-  if (!step) return "no scripted step due";
-
-  const info = await resolveContactInfo(token, contactId).catch(() => ({ email: null, firstName: null, fullName: null }));
-  const message = resolveMergeVars(step.template, locFor(client.id), { first_name: info.firstName, full_name: info.fullName });
-  if (!message || !message.trim()) return "rendered template empty";
-
-  const baseRow = {
-    client_id: client.id, ghl_contact_id: String(contactId), contact_name: item.name || null,
-    kind: "closing_auto", step_key: step.key, draft_message: message, confidence: 1,
-    last_lead_at: item.last_at || null, reasoning: `Scripted initial automation: ${step.label}`,
-  };
-
-  // Scripted + pre-approved (automationsLive gated this run): auto-send whenever the agent
-  // is on, bypassing the global self-drive kill-switch (that net is for AI freeform replies).
-  const auto = shouldAutoSendScripted(mode);
-  if (auto && !withinQuietHours()) {
-    await sb(`agent_closing_replies`, { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify([{
-      ...baseRow, status: "approved", send_after: nextSendableTime().toISOString(), created_by: "self-drive",
-    }]) });
-    return "deferred";
-  }
-  if (auto) {
-    await sendReplyViaGhl(token, contactId, message, client.id);
-    await sb(`agent_closing_replies`, { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify([{
-      ...baseRow, status: "sent", auto_sent: true, sent_at: new Date().toISOString(), created_by: "self-drive",
-    }]) });
-    await logApproval({ client_id: client.id, ghl_contact_id: contactId, contact_name: item.name || null, final_reply: message, reasoning: baseRow.reasoning, confidence: 1, adjusted: false, status: "sent", created_by: "closing-auto" });
-    return "sent";
-  }
-  await sb(`agent_closing_replies`, { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify([{
-    ...baseRow, status: "pending", created_by: "detector",
-  }]) });
-  return "queued";
+    const offers = await sb(`offers?client_id=eq.${encodeURIComponent(clientId)}&type=eq.training&select=data&order=sort_order.asc&limit=1`);
+    signupUrl = ((offers && offers[0] && offers[0].data && offers[0].data.signup_url) || "").trim();
+  } catch (_) {}
+  if (!signupUrl) return { signupUrl: "", enrollUrl: "", oppId: null };
+  let oppId = null;
+  try { const _r = await findOpenOpp(clientId, token, locationId, contactId); oppId = _r && (_r.ghlOpportunityId || _r.id) || null; } catch (_) {}
+  let enrollUrl = signupUrl;
+  try {
+    const u = new URL(enrollUrl);
+    u.searchParams.set("client_id", clientId);
+    if (contactId) u.searchParams.set("contact_id", String(contactId));
+    if (oppId) u.searchParams.set("opp_id", String(oppId));
+    enrollUrl = u.toString();
+  } catch (_) { /* not a valid absolute URL - use as-is */ }
+  return { signupUrl, enrollUrl, oppId };
 }
 
 // ── Proactive follow-up loop (Zoran, 2026-07-02) ────────────────────────────
@@ -577,8 +527,6 @@ async function detectForClient(client) {
   }
 
   const cfg = await loadConfig(client.id);
-  const autos = getClosingAutomations(client);
-  const scriptedLive = closingAutomationsLive(autos);
   const mutedSet = await mutedContactIdSet(client.id, "closing");
   let drafted = 0, autoSent = 0, skipped = 0, escalated = 0, enrollsProposed = 0, lostProposed = 0, deferred = 0;
   const reasons = [];
@@ -614,29 +562,34 @@ async function detectForClient(client) {
       } catch (_) {}
     }
 
-    // SCRIPTED INITIAL AUTOMATIONS (proactive only). When the academy's sequence is
-    // live + approved, the timed scripted touches OWN the proactive path (they replace
-    // the AI opener). The instant the lead replies, the AI closing agent takes over.
-    if (!reactive && scriptedLive) {
-      let r = null;
-      try { r = await fireScriptedStep({ client, token, mode, autos, item, contactId }); }
-      catch (e) { skipped++; reasons.push(`${item.name || contactId}: scripted - ${e.message}`); continue; }
-      if (r === "sent") { autoSent++; continue; }
-      if (r === "deferred") { deferred++; continue; }
-      if (r === "queued") { drafted++; continue; }
-      if (r !== "no scripted step due" && r !== "lead already in conversation") {
-        skipped++; reasons.push(`${item.name || contactId}: ${r}`); continue;
-      }
-      // Scripted has nothing (more) to send OR the AI already owns this thread and
-      // the lead went quiet - the proactive follow-up loop takes over: ONE fresh,
-      // Hawkeye-approved nudge at a time; after FOLLOWUP_MAX unanswered → Nurture.
+    // PROACTIVE path (Zoran 2026-07-08: NO scripted automations in Done Trial - the
+    // post-trial form's trainer text + optional sign-up link is the only preplanned
+    // touch). Once the lead has been opened - by any closing card OR by the
+    // post-trial form's first message - the quiet cadence belongs to the follow-up
+    // loop: one AI-drafted plan at a time, and after FOLLOWUP_MAX unanswered
+    // follow-ups it recommends Lost. A lead nobody has opened yet falls through to
+    // the AI opener below (whose A6 guard skips it if the form already texted).
+    if (!reactive) {
+      let engaged = false;
       try {
-        const fu = await maybeFollowUpOrNurture({ client, token, locationId, dts, cfg, item, contactId });
-        if (fu === "plan-drafted" || fu === "drafted") drafted++;
-        else if (fu === "lost-recommended") { lostProposed++; reasons.push(`${item.name || contactId}: ${FOLLOWUP_MAX} follow-ups unanswered - Lost recommended in Hawkeye`); }
-        else { skipped++; reasons.push(`${item.name || contactId}: ${fu}`); }
-      } catch (e) { skipped++; reasons.push(`${item.name || contactId}: follow-up - ${e.message}`); }
-      continue;
+        const ex = await sb(`agent_closing_replies?client_id=eq.${client.id}&ghl_contact_id=eq.${encodeURIComponent(contactId)}&select=id&limit=1`);
+        engaged = Array.isArray(ex) && ex.length > 0;
+      } catch (_) {}
+      if (!engaged) {
+        try {
+          const rev = await sb(`post_trial_reviews?client_id=eq.${client.id}&ghl_contact_id=eq.${encodeURIComponent(contactId)}&select=signup_text_status&order=created_at.desc&limit=1`);
+          engaged = !!(Array.isArray(rev) && rev[0] && rev[0].signup_text_status === "sent");
+        } catch (_) {}
+      }
+      if (engaged) {
+        try {
+          const fu = await maybeFollowUpOrNurture({ client, token, locationId, dts, cfg, item, contactId });
+          if (fu === "plan-drafted" || fu === "drafted") drafted++;
+          else if (fu === "lost-recommended") { lostProposed++; reasons.push(`${item.name || contactId}: ${FOLLOWUP_MAX} follow-ups unanswered - Lost recommended in Hawkeye`); }
+          else { skipped++; reasons.push(`${item.name || contactId}: ${fu}`); }
+        } catch (e) { skipped++; reasons.push(`${item.name || contactId}: follow-up - ${e.message}`); }
+        continue;
+      }
     }
 
     try {
@@ -665,12 +618,21 @@ async function detectForClient(client) {
       followup_not_before: d.followup_on ? `${d.followup_on}T14:00:00Z` : null,
     };
 
-    // Enroll: lead is ready → ALWAYS queue for a human (send link + mark won on ✓).
+    // Enroll: lead is ready → ALWAYS queue for a human. The card is just a REPLY
+    // with the sign-up link (Zoran 2026-07-08): the link (with tracking params) is
+    // embedded in the editable draft so the reviewer sees exactly what goes out.
+    // The win still lands on payment via the enroll flow, not here.
     if (d.recommend_enroll) {
       try {
+        let draft = (d.reply && String(d.reply).trim()) ? String(d.reply).trim() : "";
+        try {
+          const { signupUrl, enrollUrl } = await buildEnrollUrl(client.id, token, locationId, contactId);
+          const base = signupUrl ? signupUrl.split("?")[0] : "";
+          if (enrollUrl && !(base && draft.includes(base))) draft = [draft, enrollUrl].filter(Boolean).join("\n\n");
+        } catch (_) {}
         await sb(`agent_closing_replies`, { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify([{
           ...baseRow, kind: "closing_enroll", enroll_note: d.enroll_note || null,
-          draft_message: (d.reply && String(d.reply).trim()) ? d.reply : "", status: "pending", created_by: "detector",
+          draft_message: draft, status: "pending", created_by: "detector",
         }]) });
         enrollsProposed++;
       } catch (e) { skipped++; reasons.push(`${item.name || contactId}: enroll-insert failed — ${e.message}`); }
@@ -802,25 +764,8 @@ async function handler(req, res) {
       return res.status(200).json({ ok: true });
     }
 
-    // Initial-automations editor (the scripted post-trial sequence) — read.
-    if (b.action === "automations-get") {
-      const client = await loadClient(clientId);
-      if (!client) return res.status(404).json({ error: "academy not found" });
-      return res.status(200).json({ automations: getClosingAutomations(client), mode: closingAgentMode(client) });
-    }
-    // Initial-automations editor — save (per-step enabled + copy, sequence enable,
-    // approve toggle). Timing is fixed; copy never contains an em dash.
-    if (b.action === "automations-set") {
-      const client = await loadClient(clientId);
-      if (!client) return res.status(404).json({ error: "academy not found" });
-      const cur = (client.ghl_kpi_config && client.ghl_kpi_config.closing_initial_automations) || {};
-      const merged = sanitizeAutomations(b.automations && typeof b.automations === "object" ? b.automations : {}, cur);
-      const cfg = { ...(client.ghl_kpi_config || {}), closing_initial_automations: merged };
-      try {
-        await sb(`clients?id=eq.${clientId}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ ghl_kpi_config: cfg }) });
-      } catch (e) { return res.status(500).json({ error: `couldn't save: ${e.message}` }); }
-      return res.status(200).json({ ok: true, automations: getClosingAutomations({ ghl_kpi_config: cfg }) });
-    }
+    // NOTE: the "automations-get"/"automations-set" editor actions are gone with the
+    // scripted sequence (Zoran 2026-07-08) - Done Trial has no preplanned automations.
   } catch (e) {
     console.error("[agent-closing]", e);
     return res.status(500).json({ error: e.message || "internal error" });
@@ -942,31 +887,16 @@ async function handler(req, res) {
         contactId = row.ghl_contact_id;
       }
       if (!contactId) return res.status(400).json({ error: "ready_id or contact_id required" });
-      let signupUrl = "";
-      try {
-        const offers = await sb(`offers?client_id=eq.${encodeURIComponent(clientId)}&type=eq.training&select=data&order=sort_order.asc&limit=1`);
-        signupUrl = ((offers && offers[0] && offers[0].data && offers[0].data.signup_url) || "").trim();
-      } catch (_) {}
-      // Resolve the opp (for the link param + the note) but DON'T change its status —
-      // the enroll flow's webhook owns the win on real payment.
-      let oppId = null;
-      try { const _r = await findOpenOpp(clientId, token, locationId, contactId); oppId = _r && (_r.ghlOpportunityId || _r.id) || null; } catch (_) {}
-      // Append identifiers so payment ties back to THIS opportunity (harmless extra
-      // query params until the enroll page/checkout read them — P2b-plus, cross-repo).
-      let enrollUrl = signupUrl;
-      if (enrollUrl) {
-        try {
-          const u = new URL(enrollUrl);
-          u.searchParams.set("client_id", clientId);
-          if (contactId) u.searchParams.set("contact_id", String(contactId));
-          if (oppId) u.searchParams.set("opp_id", String(oppId));
-          enrollUrl = u.toString();
-        } catch (_) { /* not a valid absolute URL — send as-is */ }
-      }
+      // Resolve the sign-up link (with tracking params). The opp status does NOT
+      // change here - the enroll flow's webhook owns the win on real payment.
+      const { signupUrl, enrollUrl, oppId } = await buildEnrollUrl(clientId, token, locationId, contactId);
       const draft = (typeof b.reply === "string" ? b.reply : (row ? row.draft_message : "")) || "";
+      // The detector now embeds the link in the draft ("just a reply with the link",
+      // Zoran 2026-07-08) - only append when the (possibly edited) draft lost it.
+      const base = signupUrl ? signupUrl.split("?")[0] : "";
       const parts = [];
       if (draft.trim()) parts.push(draft.trim());
-      if (enrollUrl) parts.push(enrollUrl);
+      if (enrollUrl && !(base && draft.includes(base))) parts.push(enrollUrl);
       const msg = parts.join("\n\n");
       if (msg.trim()) { try { await sendReplyViaGhl(token, contactId, msg, clientId); } catch (e) { return res.status(e.status || 502).json({ error: `send failed: ${e.message}` }); } }
       // Note for the team + the agent's own memory (so it won't re-pitch): the link
@@ -1037,6 +967,35 @@ async function handler(req, res) {
       }
       await clearClosingCards(clientId, contactId, "marked lost");
       return res.status(200).json({ ok: true, marked_lost: !routedToNurture, routed_to_nurture: routedToNurture, opportunity_id: oppId, reason });
+    }
+
+    // Mark Unqualified (Zoran 2026-07-08: every agent can mark unqualified). The
+    // dead end: close the opp (abandoned + role unqualified), stamp the GHL
+    // `unqualified` tag, log the outcome, drop the closing cards. No nurture, no
+    // message. Mirrors agent-approvals' confirm-abandoned.
+    if (b.action === "confirm-abandoned") {
+      let row = null, contactId = b.contact_id || null;
+      if (b.ready_id) {
+        [row] = await sb(`agent_closing_replies?id=eq.${encodeURIComponent(b.ready_id)}&client_id=eq.${clientId}&select=*`);
+        if (!row) return res.status(404).json({ error: "not found" });
+        contactId = row.ghl_contact_id;
+      }
+      if (!contactId) return res.status(400).json({ error: "ready_id or contact_id required" });
+      let oppId = null, oppRef = null;
+      try { oppRef = await findOpenOpp(clientId, token, locationId, contactId); oppId = oppRef && (oppRef.ghlOpportunityId || oppRef.id) || null; }
+      catch (e) { return res.status(e.status || 502).json({ error: `find opp: ${e.message}` }); }
+      if (!oppRef) return res.status(200).json({ error: "No opportunity found for this contact - nothing to close." });
+      const reason = (b.reason || (row && row.lost_reason) || "").toString().trim() || null;
+      try {
+        await setStatus({ clientId, ghl, token, oppRef, status: "abandoned", role: "unqualified", contactId, reason });
+      } catch (e) { return res.status(e.status || 502).json({ error: `mark unqualified: ${e.message}` }); }
+      try { await markUnqualified(token, contactId, clientId); } catch (_) {}
+      try { await sb(`pipeline_outcomes`, { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify([{ client_id: clientId, opportunity_id: oppId, status: "abandoned", reason }]) }); } catch (_) {}
+      if (b.ready_id) {
+        try { await sb(`agent_closing_replies?id=eq.${encodeURIComponent(b.ready_id)}&client_id=eq.${clientId}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ status: "sent", approved_by: staffEmail, approved_at: new Date().toISOString(), sent_at: new Date().toISOString(), updated_at: new Date().toISOString() }) }); } catch (_) {}
+      }
+      await clearClosingCards(clientId, contactId, "marked unqualified");
+      return res.status(200).json({ ok: true, marked_abandoned: true, unqualified: true, opportunity_id: oppId, reason });
     }
 
     return res.status(400).json({ error: "unknown action" });

@@ -1,5 +1,13 @@
 # Sales Focus Mode (V2) — design spec (locked 2026-07-05)
 
+## ⚠️ 2026-07-08 action-model revision (see [[project_hawkeye_mission_control]])
+Closing initial automations RETIRED (agent-closing.js scripted path + automations-get/set
++ the closing "Initial automations" focus-mode editor are gone; `hasAutos` = confirm +
+booking only). Booking follow-up nudges retired (ghost proposal is the chase path).
+Enroll card = reply with the sign-up link embedded in the draft. Closing proactive path:
+opener -> follow-up plan -> Lost after 3 unanswered (now runs for every engaged lead,
+including leads the post-trial form opened). NOT prod-verified on GTA yet.
+
 ## ▶ NEXT SESSION — START HERE (state @ 2026-07-06)
 
 **LIVE ON GTA PROD** (deployed 2026-07-06, PR #1178 → main): V2 Sales **overview**

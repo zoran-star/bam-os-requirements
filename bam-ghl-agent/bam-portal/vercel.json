@@ -57,10 +57,6 @@
       "schedule": "30 13 * * *"
     },
     {
-      "path": "/api/agent-approvals?action=cron-digest",
-      "schedule": "0 */2 * * *"
-    },
-    {
       "path": "/api/agent-approvals?action=detect",
       "schedule": "*/15 * * * *"
     },
