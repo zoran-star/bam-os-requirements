@@ -14916,7 +14916,7 @@ const _OBF_STEPS = [
   { key: 'members', title: 'Import your members', sub: 'Bring your roster in - import from Stripe or CSV, clean it up, link contacts', cta: 'Import members', go: '_obfGoMembers()' },
   { key: 'email',   title: 'Connect your email domain', sub: 'Emails send from your own domain - one DNS paste at your registrar', cta: 'Set up email', go: '_obfGoDomains()' },
   { key: 'website', title: 'Launch your new website', sub: 'Point your domain at the rebuilt site - the old one retires on the flip', cta: 'Set up website', go: '_obfGoDomains()' },
-  { key: 'ein',     title: 'Send us your EIN', sub: 'Needed to publish your offers and finish the payments setup', cta: 'Send it in Messages', go: '_obfGoMessages()' },
+  { key: 'ein',     title: 'Add your EIN', sub: 'Your business tax ID (business number in Canada) - unlocks offer publishing and the payment paperwork', cta: 'Add it in Blueprint', go: '_obfGoGeneral()' },
 ];
 
 function _obfIsV2() { return typeof V2_ACCESS !== 'undefined' && !!V2_ACCESS; }
@@ -14977,6 +14977,7 @@ function _obfNav(view) {
   else switchView(view);
 }
 function _obfGoMembers() { _obfNav('blueprint'); setTimeout(() => { try { _bbNavigate('member_onboarding'); } catch (_) { /* blueprint not rendered yet */ } }, 150); }
+function _obfGoGeneral() { _obfNav('blueprint'); setTimeout(() => { try { _bbNavigate('general'); } catch (_) { /* blueprint not rendered yet */ } }, 150); }
 function _obfGoDomains() { _obfClose(); _edwOpenModal(); }
 function _obfGoMessages() { _obfNav('messages'); }
 
