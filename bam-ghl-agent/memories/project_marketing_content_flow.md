@@ -10,6 +10,8 @@ Clients **don't** submit finished creatives. They submit **raw assets** (graphic
 
 **2026-07-09: Client media library (staff).** `?resource=client-media&client_id=` (GET, CONTENT_ROLES) aggregates raw_files across ALL of a client's content tickets + the "• name - url" attachment bullets from client action-response messages. Rendered as a collapsible `ClientMediaLibrary` card in ContentTicketDetail (lazy-fetch on expand, folder groups, video/image filter, search, origin ticket code, gold border = current ticket). Solves "use the b-roll I previously sent" - no migration, files were always retained in ticket-files; this is discovery.
 
+**2026-07-09: folder uploads everywhere.** All client drop zones (Add-Creative modal, wizard blocks, respond form, add-note-or-files form) now accept **dragged folders** Drive-style (`_readDroppedFiles` walks `webkitGetAsEntry`, tags files with `_folder` = top dir; `_wireDropZone` is idempotent, wizard blocks re-wire per render). Respond + edit forms also got the "upload a whole folder" picker + the oversize filter. Client action responses attach files as LINKS in the response message (not raw_files tiles) - known nuance.
+
 **2026-07-05: third channel `funnel`** - website content. Content team produces finals, then **Send to Systems** (new `send-to-systems` action) creates a Change ticket in `tickets` with the finals attached and closes the content ticket. See [[project_organic_content]] "The three pipelines" for the full triple-channel model + the client-side Ads | Funnel | Organic split.
 
 ## Tables
