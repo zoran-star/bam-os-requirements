@@ -1,5 +1,6 @@
 import { withSentryApiRoute } from "../_sentry.js";
 import { applyDiscountToCents, normCode, couponFromPromo } from "../_coupon-guardrails.js";
+import { resolveOrMintPortalContact } from "../_contacts.js";
 export const maxDuration = 60; // Stripe search + customer + sub writes
 
 // Vercel Serverless Function - Returning Client Enroll (Members V2)
@@ -334,6 +335,103 @@ async function actionPreview(res, { clientId, acct, body }) {
   });
 }
 
+// ── Signup info: the fields the offer collects at signup ───
+// Same set the public funnel collects: academy-level CORE custom fields
+// (offer_id null) + the offer's own custom questions (sales + onboarding
+// sections). ALL of them are MANDATORY for a manual signup (locked decision
+// 2026-07-08): staff fill what the parent would have filled on the form.
+async function signupDefs(clientId, offerId) {
+  const cid = encodeURIComponent(clientId);
+  const sel = "id,key,label,type,options,section,offer_id,position";
+  const core = await sb(
+    `custom_field_defs?client_id=eq.${cid}&offer_id=is.null&archived=eq.false&select=${sel}&order=position.asc,created_at.asc`
+  ).catch(() => []) || [];
+  let offerDefs = [];
+  if (offerId) {
+    offerDefs = await sb(
+      `custom_field_defs?client_id=eq.${cid}&offer_id=eq.${encodeURIComponent(offerId)}&archived=eq.false&select=${sel}&order=position.asc,created_at.asc`
+    ).catch(() => []) || [];
+  }
+  return [
+    ...core.map(d => ({ ...d, scope: "core" })),
+    ...offerDefs.map(d => ({ ...d, scope: "offer" })),
+  ];
+}
+
+function emptyFieldValue(v) {
+  return v === null || v === undefined || v === "" || (Array.isArray(v) && v.length === 0);
+}
+
+// action=signup-fields { offer_id, email?, phone? } -> the defs to collect,
+// with existing values prefilled when the person already has a contact record.
+async function actionSignupFields(res, { clientId, body }) {
+  const defs = await signupDefs(clientId, body.offer_id || null);
+  let contactId = null;
+  const email = String(body.email || "").trim().toLowerCase();
+  const phone = String(body.phone || "").trim();
+  const cid = encodeURIComponent(clientId);
+  if (email) {
+    const r = await sb(`contacts?client_id=eq.${cid}&email=eq.${encodeURIComponent(email)}&select=id&limit=1`).catch(() => []);
+    contactId = (r && r[0] && r[0].id) || null;
+  }
+  if (!contactId && phone) {
+    const r = await sb(`contacts?client_id=eq.${cid}&phone=eq.${encodeURIComponent(phone)}&select=id&limit=1`).catch(() => []);
+    contactId = (r && r[0] && r[0].id) || null;
+  }
+  let vmap = new Map();
+  if (contactId && defs.length) {
+    const vals = await sb(`contact_field_values?contact_id=eq.${encodeURIComponent(contactId)}&select=field_id,value`).catch(() => []);
+    vmap = new Map((vals || []).map(v => [v.field_id, v.value]));
+  }
+  return res.status(200).json({
+    contact_id: contactId,
+    fields: defs.map(d => ({ ...d, value: vmap.has(d.id) ? vmap.get(d.id) : null })),
+  });
+}
+
+// Ensure the person has a portal contact (found by email/phone or minted),
+// link the member row to it, and write the collected field values. Best-effort
+// after validation - a contact hiccup must not undo a created subscription.
+async function writeSignupInfo({ clientId, memberId, athleteName, parentName, parentEmail, parentPhone, customerId, defs, fieldValues }) {
+  const nameParts = String(parentName || "").trim().split(/\s+/);
+  const contactKey = await resolveOrMintPortalContact(clientId, {
+    name: parentName || null,
+    first_name: nameParts[0] || null,
+    last_name: nameParts.length > 1 ? nameParts.slice(1).join(" ") : null,
+    email: parentEmail || null,
+    phone: parentPhone || null,
+    athlete_name: athleteName || null,
+    stripe_customer_id: customerId || null,
+    source: "returning-enroll",
+  });
+  if (!contactKey) return { contact_id: null };
+  const rows = await sb(
+    `contacts?client_id=eq.${encodeURIComponent(clientId)}&ghl_contact_id=eq.${encodeURIComponent(contactKey)}&select=id&limit=1`
+  ).catch(() => []);
+  const contactId = (rows && rows[0] && rows[0].id) || null;
+  if (!contactId) return { contact_id: null };
+
+  await sb(`members?id=eq.${encodeURIComponent(memberId)}`, {
+    method: "PATCH", headers: { Prefer: "return=minimal" },
+    body: JSON.stringify({ contact_id: contactId, ghl_contact_id: contactKey, updated_at: nowIso() }),
+  }).catch(() => {});
+
+  const upserts = [];
+  for (const d of defs) {
+    const v = fieldValues[d.id];
+    if (emptyFieldValue(v)) continue;
+    upserts.push({ contact_id: contactId, field_id: d.id, value: v, updated_at: nowIso() });
+  }
+  if (upserts.length) {
+    await sb(`contact_field_values?on_conflict=contact_id,field_id`, {
+      method: "POST",
+      headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
+      body: JSON.stringify(upserts),
+    }).catch(e => console.error("[enroll] field values write failed:", e.message));
+  }
+  return { contact_id: contactId, values_written: upserts.length };
+}
+
 // ── action: check-coupon ───────────────────────────────────
 async function actionCheckCoupon(res, { clientId, acct, body }) {
   const target = await resolveTarget(clientId, body.offer_price_key);
@@ -370,6 +468,18 @@ async function actionEnroll(res, req, { clientId, acct, ctx, body }) {
   }
   const target = await resolveTarget(clientId, body.offer_price_key);
   if (!target) return res.status(409).json({ error: "That price isn't live for this academy anymore - re-pick the offer price." });
+
+  // MANDATORY signup info (locked decision): every core + offer custom field
+  // the offer collects at signup must be filled for a manual add too.
+  const defs = await signupDefs(clientId, target.offer_id);
+  const fieldValues = (body.field_values && typeof body.field_values === "object") ? body.field_values : {};
+  const missing = defs.filter(d => emptyFieldValue(fieldValues[d.id]));
+  if (missing.length) {
+    return res.status(400).json({
+      error: `Missing signup info: ${missing.map(d => d.label || d.key).join(", ")}. Fill every field before enrolling.`,
+      missing_field_ids: missing.map(d => d.id),
+    });
+  }
 
   // Optional coupon - re-validated server-side at enroll time (never trust a
   // stale client-side check; the code could expire between Review and Confirm).
@@ -431,6 +541,13 @@ async function actionEnroll(res, req, { clientId, acct, ctx, body }) {
     performed_by: ctx.user.id, performed_by_name: ctx.staff?.name || null,
   };
 
+  // Contact link + collected signup info (validated above; write is
+  // best-effort so a contacts hiccup never blocks the billing step).
+  const signupInfo = await writeSignupInfo({
+    clientId, memberId, athleteName, parentName, parentEmail, parentPhone,
+    customerId, defs, fieldValues,
+  });
+
   // ── Door B: no usable card -> pending member + setup Checkout link ──
   if (!pm) {
     const base = setupLinkBase(req);
@@ -448,6 +565,7 @@ async function actionEnroll(res, req, { clientId, acct, ctx, body }) {
         door: "card_link", offer_price_key: target.key, charge_mode: chargeMode, start_date: startDate,
         consent_confirmed: true, customer_id: customerId,
         coupon_code: promo ? promo.code : null,
+        contact_id: signupInfo.contact_id, signup_values_written: signupInfo.values_written || 0,
       },
       stripe_response: { checkout_session: session.id },
       db_changes: { members: { status: "payment_method_required", created: !resumable } },
@@ -530,6 +648,7 @@ async function actionEnroll(res, req, { clientId, acct, ctx, body }) {
       amount_cents: target.amount_cents,
       coupon_code: promo ? promo.code : null,
       discount_cents: promo ? promo.discount_cents : null,
+      contact_id: signupInfo.contact_id, signup_values_written: signupInfo.values_written || 0,
     },
     stripe_response: { id: sub.id, status: sub.status, promotion_code: promo ? promo.pc.id : null },
     db_changes: { members: { created: !resumable, stripe_subscription_id: sub.id } },
@@ -579,6 +698,7 @@ async function handler(req, res) {
       case "find-customer": return await actionFindCustomer(res, { clientId, acct, body });
       case "targets":       return res.status(200).json({ targets: await liveTargets(clientId) });
       case "preview":       return await actionPreview(res, { clientId, acct, body });
+      case "signup-fields": return await actionSignupFields(res, { clientId, body });
       case "check-coupon":  return await actionCheckCoupon(res, { clientId, acct, body });
       case "enroll":        return await actionEnroll(res, req, { clientId, acct, ctx, body });
       default:              return res.status(400).json({ error: `unknown action: ${body.action || "(none)"}` });
