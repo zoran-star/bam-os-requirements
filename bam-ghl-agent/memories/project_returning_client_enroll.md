@@ -7,8 +7,34 @@ metadata:
 
 # Returning Client Enroll (Members V2)
 
-**State 2026-07-08 (late): ENROLL PHASE 1 CODE-COMPLETE (not live-tested).
-Next = apply the migration, deploy, then pilot for client Houssein.**
+**State 2026-07-09: LIVE + PILOT SUCCESSFUL.** Adam Fergani (parent Houssein
+Fergani) enrolled via the wizard on Summer Unlimited Monthly $315.27 (live on
+purpose), charged on the saved card, flipped Live (cron rescue; webhook subId
+fix now makes the flip instant). Migration applied by Zoran. All phases 1+2 +
+agent routing + buttons deployed via PRs #1288 #1296 #1300 #1301 #1302 #1304.
+Member-import V2 placement: SKIPPED here (handled in an onboarding-flow chat).
+Stripe-contact cleanup: BUILT 2026-07-09 (see below). Receipts track still
+independent (starts with the fees-section tax rework).
+
+## Stripe-contact cleanup BUILD (2026-07-09) - phases 1-3 shipped
+
+- Migration `20260709120000_stripe_link_reviews.sql` (NOT yet applied): review
+  queue table, unique (client_id, stripe_customer_id), staff-only RLS.
+- `api/contacts/stripe-link.js` (STAFF only): sweep (pages 500 customers/call,
+  cursor continues; exact-email single match auto-links silently; multi-email /
+  phone-match / conflicting-link -> stripe_link_reviews pending rows;
+  no match -> resolveOrMintPortalContact with source='stripe-import';
+  audit row per sweep call), list / link / skip actions.
+- Staff portal: new "Stripe Link-Up" nav (admin/scaling_manager, key
+  `stripelink`, `src/views/StripeContactLinkView.jsx`): academy picker, Run
+  sweep (loops until has_more=false, summary tiles), review cards with
+  Link/Skip + merge-tool pointer.
+- Keep-clean: `customer.created` case in api/stripe/webhook.js (single
+  exact-email match stamps, no match mints, ambiguous left for next sweep).
+  ⚠️ MANUAL: add `customer.created` to the Stripe Connect webhook endpoint's
+  event list in the dashboard (like price.created was).
+- Phase 4 merge tool: ALREADY EXISTED (`merge_contacts` PG fn 20260707 +
+  api/ghl/merge-contacts.js + contact-card UI) - reused, not rebuilt.
 
 ## Phase 1 build (2026-07-08) - what shipped
 
