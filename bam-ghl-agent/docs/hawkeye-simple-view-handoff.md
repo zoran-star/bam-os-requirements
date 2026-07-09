@@ -70,11 +70,15 @@ Click a glowing card -> centered popup:
 - Approve **auto-advances to the next waiting action** in that stage ("1 of 5" counter) so the
   whole queue can be cleared without closing the popup.
 
-### Configure (the gear, everywhere)
+### Configure (the 3-line icon + tab gear, everywhere) - PER STAGE
 **Already live in prod** - it's focus mode (`_plOpenFocus`/`_plRenderFocus`, shipped 2026-07-06,
 PR #1178): Entry points -> Engine -> Exit points per stage. Zoran chose **full page** (not drawer).
-The gear on the morphed pill + the gear on the active Hawkeye tab both route there. Nothing new
-to build for config itself.
+The 3-line icon on the morphed pill + the gear on the active Hawkeye tab route to THAT stage's
+config - including the AUTOMATION stages (Zoran 2026-07-08): Ghosted shows its day 1/3/7
+sequence (copy editable per step) + exit strategy (reply -> Booking, silent -> Nurture); Nurture
+shows its week 1/3/5/8 sequence + reply -> Booking. Confirm's config carries the reminder
+templates; Closing's config has NO automations section; Member = human, no config. Nothing new
+to build for the page itself - just per-stage routing.
 
 ## Decision log
 | Date | Decision |
@@ -99,6 +103,7 @@ to build for config itself.
 | 2026-07-08 | Book-it cards = PICKERS, not free text: a Calendar select limited to the calendars tied to the lead's OFFER + a Slot select (that calendar's open slots, with spots-left counts). Switching either = an edit (mandatory note) |
 | 2026-07-08 | The popup modal shares the deck card's kind-aware guts: Book-it popup shows the same Calendar + Slot pickers, ghost/plan kinds swap the reply box, and the same edited-label + mandatory-note rule applies |
 | 2026-07-08 | LATER SAME DAY: simple view = highlights only. Cascade shows plain lead rows (gold ring + status); clicking a glowing lead opens the Hawkeye PAGE on that card. Popup modal RETIRED - the deck is the only Hawkeye surface |
+| 2026-07-08 | Configure is PER STAGE, automations included: every 3-line icon / tab gear opens that stage's own focus-mode page (Ghosted + Nurture show their editable step sequences; Member = human, no config) |
 | 2026-07-08 | Teach-why note is MANDATORY for any change away from the agent's guess (draft, plan message, booking detail) - confirm is blocked until the note is filled. Applies to every Hawkeye surface in the real build |
 
 ## Action model per agent (revised 2026-07-08, SHIPPED end to end)

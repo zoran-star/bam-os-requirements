@@ -118,6 +118,10 @@
   .cfg-sec p{font-size:12.5px;color:var(--text-sub);line-height:1.55}
   .chip{display:inline-block;font-size:11px;border:1px solid var(--border-med);border-radius:999px;
     padding:4px 10px;margin:3px 4px 0 0;color:var(--text-sub)}
+  .cfg-step{display:flex;gap:10px;align-items:center;background:var(--surface-el);border:1px solid var(--border-med);
+    border-radius:10px;padding:9px 12px;margin-top:8px;font-size:12.5px}
+  .cfg-step .when{flex:0 0 84px;font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--text-mute);font-weight:700}
+  .cfg-step .tx{flex:1;color:var(--text-sub);line-height:1.45}
   .live-badge{font-size:10px;font-weight:800;letter-spacing:.06em;background:var(--green-soft);color:var(--green);
     border-radius:6px;padding:3px 8px;text-transform:uppercase}
   .hint{font-size:11.5px;color:var(--text-mute);margin-top:10px;text-align:center}
@@ -246,32 +250,32 @@
       <div class="pill auto a-ghosted" data-stage="ghosted" onclick="toggleStage(this)">
         <div class="nm">Ghosted</div><div class="sub">18 enrolled</div>
         <div class="gearwrap"><svg class="up-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m18 15-6-6-6 6"/></svg></div>
-        <div class="cfg3" onclick="event.stopPropagation();show('scr-config')" title="Configure this stage"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="21" y1="6" x2="7" y2="6"/><line x1="17" y1="12" x2="3" y2="12"/><line x1="21" y1="18" x2="7" y2="18"/><circle cx="4.5" cy="6" r="1.7"/><circle cx="19.5" cy="12" r="1.7"/><circle cx="4.5" cy="18" r="1.7"/></svg></div>
+        <div class="cfg3" onclick="event.stopPropagation();openConfig('ghosted')" title="Configure this stage"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="21" y1="6" x2="7" y2="6"/><line x1="17" y1="12" x2="3" y2="12"/><line x1="21" y1="18" x2="7" y2="18"/><circle cx="4.5" cy="6" r="1.7"/><circle cx="19.5" cy="12" r="1.7"/><circle cx="4.5" cy="18" r="1.7"/></svg></div>
       </div>
       <div class="pill auto a-nurture" data-stage="nurture" onclick="toggleStage(this)">
         <div class="nm">Nurture</div><div class="sub">42 enrolled</div>
         <div class="gearwrap"><svg class="up-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m18 15-6-6-6 6"/></svg></div>
-        <div class="cfg3" onclick="event.stopPropagation();show('scr-config')" title="Configure this stage"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="21" y1="6" x2="7" y2="6"/><line x1="17" y1="12" x2="3" y2="12"/><line x1="21" y1="18" x2="7" y2="18"/><circle cx="4.5" cy="6" r="1.7"/><circle cx="19.5" cy="12" r="1.7"/><circle cx="4.5" cy="18" r="1.7"/></svg></div>
+        <div class="cfg3" onclick="event.stopPropagation();openConfig('nurture')" title="Configure this stage"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="21" y1="6" x2="7" y2="6"/><line x1="17" y1="12" x2="3" y2="12"/><line x1="21" y1="18" x2="7" y2="18"/><circle cx="4.5" cy="6" r="1.7"/><circle cx="19.5" cy="12" r="1.7"/><circle cx="4.5" cy="18" r="1.7"/></svg></div>
       </div>
       <div class="pill g-booking" data-stage="booking" onclick="toggleStage(this)">
         <div class="nm">Booking</div><div class="sub hot">4 need you</div>
         <div class="gearwrap"><svg class="up-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m18 15-6-6-6 6"/></svg></div>
-        <div class="cfg3" onclick="event.stopPropagation();show('scr-config')" title="Configure this stage"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="21" y1="6" x2="7" y2="6"/><line x1="17" y1="12" x2="3" y2="12"/><line x1="21" y1="18" x2="7" y2="18"/><circle cx="4.5" cy="6" r="1.7"/><circle cx="19.5" cy="12" r="1.7"/><circle cx="4.5" cy="18" r="1.7"/></svg></div>
+        <div class="cfg3" onclick="event.stopPropagation();openConfig('booking')" title="Configure this stage"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="21" y1="6" x2="7" y2="6"/><line x1="17" y1="12" x2="3" y2="12"/><line x1="21" y1="18" x2="7" y2="18"/><circle cx="4.5" cy="6" r="1.7"/><circle cx="19.5" cy="12" r="1.7"/><circle cx="4.5" cy="18" r="1.7"/></svg></div>
       </div>
       <div class="pill g-confirm" data-stage="confirm" onclick="toggleStage(this)">
         <div class="nm">Confirm</div><div class="sub hot">2 need you</div>
         <div class="gearwrap"><svg class="up-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m18 15-6-6-6 6"/></svg></div>
-        <div class="cfg3" onclick="event.stopPropagation();show('scr-config')" title="Configure this stage"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="21" y1="6" x2="7" y2="6"/><line x1="17" y1="12" x2="3" y2="12"/><line x1="21" y1="18" x2="7" y2="18"/><circle cx="4.5" cy="6" r="1.7"/><circle cx="19.5" cy="12" r="1.7"/><circle cx="4.5" cy="18" r="1.7"/></svg></div>
+        <div class="cfg3" onclick="event.stopPropagation();openConfig('confirm')" title="Configure this stage"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="21" y1="6" x2="7" y2="6"/><line x1="17" y1="12" x2="3" y2="12"/><line x1="21" y1="18" x2="7" y2="18"/><circle cx="4.5" cy="6" r="1.7"/><circle cx="19.5" cy="12" r="1.7"/><circle cx="4.5" cy="18" r="1.7"/></svg></div>
       </div>
       <div class="pill g-closing" data-stage="closing" onclick="toggleStage(this)">
         <div class="nm">Closing</div><div class="sub hot">3 need you</div>
         <div class="gearwrap"><svg class="up-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m18 15-6-6-6 6"/></svg></div>
-        <div class="cfg3" onclick="event.stopPropagation();show('scr-config')" title="Configure this stage"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="21" y1="6" x2="7" y2="6"/><line x1="17" y1="12" x2="3" y2="12"/><line x1="21" y1="18" x2="7" y2="18"/><circle cx="4.5" cy="6" r="1.7"/><circle cx="19.5" cy="12" r="1.7"/><circle cx="4.5" cy="18" r="1.7"/></svg></div>
+        <div class="cfg3" onclick="event.stopPropagation();openConfig('closing')" title="Configure this stage"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="21" y1="6" x2="7" y2="6"/><line x1="17" y1="12" x2="3" y2="12"/><line x1="21" y1="18" x2="7" y2="18"/><circle cx="4.5" cy="6" r="1.7"/><circle cx="19.5" cy="12" r="1.7"/><circle cx="4.5" cy="18" r="1.7"/></svg></div>
       </div>
       <div class="pill h-member" data-stage="member" onclick="toggleStage(this)">
         <div class="nm">Member</div><div class="sub">31 active</div>
         <div class="gearwrap"><svg class="up-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m18 15-6-6-6 6"/></svg></div>
-        <div class="cfg3" onclick="event.stopPropagation();show('scr-config')" title="Configure this stage"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="21" y1="6" x2="7" y2="6"/><line x1="17" y1="12" x2="3" y2="12"/><line x1="21" y1="18" x2="7" y2="18"/><circle cx="4.5" cy="6" r="1.7"/><circle cx="19.5" cy="12" r="1.7"/><circle cx="4.5" cy="18" r="1.7"/></svg></div>
+        <div class="cfg3" onclick="event.stopPropagation();openConfig('member')" title="Configure this stage"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="21" y1="6" x2="7" y2="6"/><line x1="17" y1="12" x2="3" y2="12"/><line x1="21" y1="18" x2="7" y2="18"/><circle cx="4.5" cy="6" r="1.7"/><circle cx="19.5" cy="12" r="1.7"/><circle cx="4.5" cy="18" r="1.7"/></svg></div>
       </div>
     </div>
 
@@ -376,40 +380,16 @@
       <div class="spacer"></div>
     </div>
     <div class="hk-toggle">
-      <button class="hk-tab sel" id="hkt-booking" onclick="hkPick('booking')">Booking <span class="n" id="hkn-booking">4</span> <svg class="gear-ic tgear" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px" onclick="event.stopPropagation();show('scr-config')"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z"/></svg></button>
-      <button class="hk-tab" id="hkt-confirm" onclick="hkPick('confirm')">Confirm <span class="n" id="hkn-confirm">2</span> <svg class="gear-ic tgear" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px" onclick="event.stopPropagation();show('scr-config')"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z"/></svg></button>
-      <button class="hk-tab" id="hkt-closing" onclick="hkPick('closing')">Closing <span class="n" id="hkn-closing">3</span> <svg class="gear-ic tgear" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px" onclick="event.stopPropagation();show('scr-config')"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z"/></svg></button>
+      <button class="hk-tab sel" id="hkt-booking" onclick="hkPick('booking')">Booking <span class="n" id="hkn-booking">4</span> <svg class="gear-ic tgear" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px" onclick="event.stopPropagation();openConfig('booking')"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z"/></svg></button>
+      <button class="hk-tab" id="hkt-confirm" onclick="hkPick('confirm')">Confirm <span class="n" id="hkn-confirm">2</span> <svg class="gear-ic tgear" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px" onclick="event.stopPropagation();openConfig('confirm')"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z"/></svg></button>
+      <button class="hk-tab" id="hkt-closing" onclick="hkPick('closing')">Closing <span class="n" id="hkn-closing">3</span> <svg class="gear-ic tgear" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px" onclick="event.stopPropagation();openConfig('closing')"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z"/></svg></button>
     </div>
     <div class="deck" id="hk-deck"></div>
     <div class="hint">two buttons: Other (cascades up) + confirm - edits flip it to "Confirm edits" and the teach-why note becomes required<br>mobile swipe: right = main action, left = move (exact behavior = open decision)</div>
   </div>
 
-  <!-- ============ SCREEN 3: CONFIGURE (existing focus mode) ============ -->
-  <div class="screen" id="scr-config">
-    <div class="topbar">
-      <button class="back-btn" onclick="show('scr-simple')">&#8592; Back</button>
-      <h1 style="font-size:22px">Configure · Booking</h1>
-      <span class="live-badge">Already live in prod</span>
-      <div class="spacer"></div>
-    </div>
-    <div class="cfg-sec"><h3>Entry points</h3>
-      <p>How leads land in this stage (read-only, auto-linked from other stages' exits).</p>
-      <span class="chip">New lead - form or inbound text</span><span class="chip">Rebook - no-show or can't make it</span><span class="chip">Re-engaged - replied to Ghosted or Nurture</span>
-    </div>
-    <div class="cfg-sec"><h3>Engine <span class="engine-tag" style="background:var(--blue-soft);color:var(--blue)">AGENT</span></h3>
-      <p>Everything editable: autonomy mode (Off / Hawkeye), initial automations per entry point, brain and offer data, lessons, test sandbox.</p>
-      <span class="chip">Autonomy: Hawkeye</span><span class="chip">Initial automations: 3 entry openers</span><span class="chip">Brain</span><span class="chip">Lessons</span><span class="chip">Test chat</span>
-    </div>
-    <div class="cfg-sec"><h3>Exit points</h3>
-      <p>Where leads go next (editable branches).</p>
-      <span class="chip">Books a time &#8594; Confirm</span><span class="chip">Goes quiet &#8594; Ghosted</span><span class="chip">Not interested &#8594; Nurture</span><span class="chip">Unqualified &#8594; out</span>
-    </div>
-    <div class="cfg-sec" style="border-style:dashed"><h3>Per-agent config differences</h3>
-      <p><b style="color:var(--text)">Confirm</b>: reminder templates (booking confirmation + same-day check-in) live HERE - approved once, then they self-send. Never Hawkeye cards.<br>
-      <b style="color:var(--text)">Closing</b>: NO automations section. The post-trial form (trainer's message + optional sign-up link + notes for the agent) is the only preplanned touch.</p>
-    </div>
-    <div class="hint">This is the focus-mode page that shipped 2026-07-06 - the gear simply routes here.</div>
-  </div>
+  <!-- ============ SCREEN 3: CONFIGURE (existing focus mode, PER STAGE) ============ -->
+  <div class="screen" id="scr-config"><div id="cfg-body"></div></div>
 
 </div>
 <script>
@@ -418,6 +398,68 @@
     document.getElementById(id).classList.add('on');
     window.scrollTo({top:0});
   }
+  // ── Per-stage configure screens (the focus-mode page, one per stage) ──
+  var CFG={
+    booking:{title:'Booking · Responded',eng:'AGENT',engc:'var(--blue)',engbg:'var(--blue-soft)',
+      entries:['New lead - form or inbound text','Rebook - no-show or can\'t make it','Re-engaged - replied to Ghosted or Nurture'],
+      engdesc:'Everything editable: autonomy mode (Off / Hawkeye), initial automations per entry point, brain and offer data, lessons, test sandbox.',
+      chips:['Autonomy: Hawkeye','Initial automations: 3 entry openers','Brain','Lessons','Test chat'],
+      exits:['Books a time &#8594; Confirm','Goes quiet &#8594; Ghosted','Not interested &#8594; Nurture','Unqualified &#8594; out']},
+    confirm:{title:'Confirm · Scheduled Trial',eng:'AGENT',engc:'var(--green)',engbg:'var(--green-soft)',
+      entries:['Booked - the Booking agent locked a day + time'],
+      engdesc:'Autonomy mode, brain, lessons, test sandbox - plus the REMINDER TEMPLATES. Approve them once here and they self-send; they never appear in Hawkeye.',
+      chips:['Autonomy: Hawkeye','Brain','Lessons','Test chat'],
+      steps:[['On booking','Booking confirmation - SMS + email: date, time, location, add-to-calendar links'],
+             ['9am trial day','Same-day check-in - "good to go for today?"']],
+      stepslbl:'Reminder templates (approved once, then they self-send)',
+      exits:['Showed + good fit &#8594; Done Trial (post-trial form)','Showed + not a fit &#8594; Unqualified','No-show &#8594; back to Booking (rebook)','Can\'t make it &#8594; back to Booking (rebook)','No longer wants &#8594; Nurture']},
+    closing:{title:'Closing · Done Trial',eng:'AGENT',engc:'var(--purple)',engbg:'var(--purple-soft)',
+      entries:['Good fit - post-trial form: showed up + coach says fit (coach notes ride along for the agent)'],
+      engdesc:'Autonomy mode, brain, lessons, test sandbox. NO automations in this stage - the post-trial form (trainer\'s message + optional sign-up link) is the only preplanned touch. Quiet leads get the follow-up plan (3 messages, 1 day apart); after 3 unanswered the agent suggests Lost.',
+      chips:['Autonomy: Hawkeye','Follow-up plan: 3 messages, 1/day','Lost after 3 unanswered','Brain','Lessons','Test chat'],
+      exits:['Enrolls (pays on the sign-up link) &#8594; Member','Says no &#8594; Nurture','Unqualified &#8594; out']},
+    ghosted:{title:'Ghosted · Interested',eng:'AUTOMATION',engc:'var(--amber)',engbg:'var(--amber-soft)',
+      entries:['Went quiet - the Booking agent proposed it, you approved'],
+      engdesc:'A short, aggressive chase. Every step\'s copy is editable; the timing is the cadence below. The moment they reply, the Booking agent takes over.',
+      steps:[['Day 1','SMS - quick nudge: "still want that free trial for {{athlete}}?"'],
+             ['Day 3','SMS - different angle: spots filling up this week'],
+             ['Day 7','Email - last call, warm and no-pressure']],
+      stepslbl:'The sequence (copy editable per step)',
+      exits:['Replies &#8594; back to Booking','Runs out silent (after day 7) &#8594; Nurture']},
+    nurture:{title:'Nurture',eng:'AUTOMATION',engc:'var(--deep)',engbg:'var(--deep-soft)',
+      entries:['Not interested / no longer wants / says no - any agent\'s Mark Lost','Ghosted ran out silent'],
+      engdesc:'The long game: sparse, valuable touches over 8 weeks. Copy editable per step. A reply at ANY point bounces them straight back to the Booking agent.',
+      steps:[['Week 1','Email - value: what parents see after 3 months of training'],
+             ['Week 3','Email - story: an athlete\'s progress + light CTA'],
+             ['Week 5','SMS - short check-in, zero pressure'],
+             ['Week 8','Email - door\'s always open + next season dates']],
+      stepslbl:'The sequence (copy editable per step)',
+      exits:['Replies &#8594; back to Booking','Sequence ends &#8594; stays here, dormant (never auto-deleted)']},
+    member:{title:'Member',eng:'HUMAN',engc:'var(--pink)',engbg:'var(--pink-soft)',
+      entries:['Enrolled - payment landed on the sign-up link (marked won automatically)'],
+      engdesc:'You run this stage - no bot, no automation. Member operations (billing, schedules, retention) live in their own tabs.',
+      chips:['No agent','No automation'],
+      exits:['(terminal stage - no exits)']},
+  };
+  function openConfig(k){
+    var c=CFG[k]||CFG.booking;
+    var chips=function(a){return a.map(function(x){return '<span class="chip">'+x+'</span>';}).join('');};
+    var html='<div class="topbar">'
+      +'<button class="back-btn" onclick="show(\'scr-simple\')">&#8592; Back</button>'
+      +'<h1 style="font-size:22px">Configure · '+c.title.split(' ·')[0]+'</h1>'
+      +'<span class="live-badge">Focus mode - live in prod</span><div class="spacer"></div></div>'
+      +'<div class="cfg-sec"><h3>Entry points</h3><p>How leads land in this stage (read-only, auto-linked from other stages\' exits).</p>'+chips(c.entries)+'</div>'
+      +'<div class="cfg-sec"><h3>Engine <span class="engine-tag" style="background:'+c.engbg+';color:'+c.engc+'">'+c.eng+'</span></h3>'
+      +'<p>'+c.engdesc+'</p>'+(c.chips?chips(c.chips):'')
+      +(c.steps?('<div style="font-size:10px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--text-mute);margin-top:12px">'+c.stepslbl+'</div>'
+        +c.steps.map(function(st){return '<div class="cfg-step"><span class="when">'+st[0]+'</span><span class="tx">'+st[1]+'</span></div>';}).join('')):'')
+      +'</div>'
+      +'<div class="cfg-sec"><h3>Exit points</h3><p>Where leads go next (editable branches).</p>'+chips(c.exits)+'</div>'
+      +'<div class="hint">'+c.title+' - this is the focus-mode page that shipped 2026-07-06; every gear and 3-line icon routes here, per stage.</div>';
+    document.getElementById('cfg-body').innerHTML=html;
+    show('scr-config');
+  }
+
   var openStage=null;
   function toggleStage(pill){
     var stage=pill.dataset.stage;
