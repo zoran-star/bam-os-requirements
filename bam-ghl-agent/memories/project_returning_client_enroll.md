@@ -169,6 +169,39 @@ the old catalog-only rule - fix it next time the sorter is touched.
   in the CC focus-mode chip row; both -> `_enrollFromAgentButton(elevated?)`,
   permission-gated with the "ask the owner" message.
 
+## MULTI-ATHLETE (siblings) - BUILT 2026-07-09
+
+One parent (one Stripe customer + card + consent + charge-timing), MULTIPLE
+athletes each with their own offer price, onboarding answers, coupon, member
+row, and subscription. Zoran's calls: "all on one screen" (list every kid,
+one Confirm) + "store per athlete" (no shared-contact collision).
+
+- **Migration `20260709160000_member_field_values.sql`** (NOT yet applied):
+  `member_field_values(member_id, field_id, value jsonb, unique)` - athlete-
+  specific answers live here, NOT on the shared parent `contact_field_values`.
+- **enroll.js**: `enroll` now takes `athletes[{athlete_name, offer_price_key,
+  coupon_code, field_values}]` (legacy single body still wrapped to 1). Shared:
+  customer, card, parent contact (resolved ONCE via `ensureParentContact`),
+  consent, charge_mode/start_date. Per athlete: validate + create sub + member
+  + `writeMemberFieldValues`. All athletes prepared/validated BEFORE any create
+  (bad field rejects whole batch). Subs created SEQUENTIALLY; a per-athlete
+  failure is captured (result.ok=false) and the rest continue - returns
+  `{ results:[...], any_failed }`. Door B (no card): one setup link + all
+  pending members.
+- **custom-fields.js**: `?action=values` accepts `member_id` -> overlays
+  member_field_values over contact values (member wins); `set-value` accepts
+  `member_id` -> writes member_field_values. Member drawer passes `m.id` so
+  each athlete shows/edits their own answers.
+- **Wizard**: step 2 = shared Parent contact + shared First-charge timing +
+  repeatable athlete cards (name, plan `<select>`, per-offer onboarding fields,
+  per-athlete coupon, Remove) + "+ Add another athlete". Review = per-athlete
+  rows + family total + ONE consent. Result = per-athlete outcome list
+  (charged/scheduled/failed). `_ENROLL.athletes[]` state; `_enrollNewAthlete`,
+  `_enrollAddAthlete`/`_enrollRemoveAthlete`, per-index field/coupon helpers.
+- ⚠️ Before use: apply `20260709160000` (+ the earlier `20260708190000`,
+  `20260709120000`) in Supabase SQL editor. member_field_values read is
+  overlay-only, so pre-migration it just shows contact values (no crash).
+
 ## Still open in later phases
 
 - Phase 3: notify SMS + receipt hook (agent tool DONE - see above).
