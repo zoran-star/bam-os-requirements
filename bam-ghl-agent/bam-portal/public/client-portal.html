@@ -33036,10 +33036,21 @@ function _cc2Render() {
 // is off, an agent whose mode is off. Read-only: it only surfaces them.
 const _CC_STUCK_IDLE_DAYS = 3;
 function _ccStuckCards() {
-  const p = (typeof _plActivePipeline === 'function') ? _plActivePipeline() : null;
-  if (!p) return [];
+  // Source: _CC2_STAGES (built by _ccSalesLoad WITH opps grouped per stage).
+  // NB: do NOT read _plActivePipeline().stages - those stage objects never carry
+  // .opportunities (opps live at the pipeline level), so that path silently
+  // returned [] and the safety net never surfaced anything (2026-07-09b fix).
+  let stages = (typeof _CC2_STAGES !== 'undefined' && Array.isArray(_CC2_STAGES)) ? _CC2_STAGES : null;
+  if (!stages) {
+    // Fallback: group the pipeline-level opps by stageId ourselves.
+    const p = (typeof _plActivePipeline === 'function') ? _plActivePipeline() : null;
+    if (!p) return [];
+    const by = {}; (p.stages || []).forEach(s => { by[s.id] = { ...s, opportunities: [] }; });
+    for (const o of (p.opportunities || [])) { if (by[o.stageId]) by[o.stageId].opportunities.push(o); }
+    stages = Object.values(by);
+  }
   const now = Date.now(), IDLE = _CC_STUCK_IDLE_DAYS * 86400000, out = [];
-  for (const s of (p.stages || [])) {
+  for (const s of stages) {
     const bot = (typeof _plStageBot === 'function') ? _plStageBot(s.name) : null;
     if (bot && bot.kind === 'terminal') continue;                 // Member / Unqualified / Won = done
     for (const o of (s.opportunities || [])) {
@@ -33048,7 +33059,9 @@ function _ccStuckCards() {
       if (typeof _PL_NEEDS !== 'undefined' && _PL_NEEDS && _PL_NEEDS.get(cid)) continue;   // has a Hawkeye action
       if (typeof _PL_ENR !== 'undefined' && _PL_ENR && _PL_ENR.get(cid)) continue;         // in a running automation
       const lm = (typeof _PL_LASTMSG !== 'undefined' && _PL_LASTMSG) ? _PL_LASTMSG.get(cid) : null;
-      const last = lm && lm.date ? new Date(lm.date).getTime() : (o.updatedAt ? new Date(o.updatedAt).getTime() : 0);
+      const last = lm && lm.date ? new Date(lm.date).getTime()
+                 : (o.updatedAt ? new Date(o.updatedAt).getTime()
+                 : (o.lastStageChangeAt ? new Date(o.lastStageChangeAt).getTime() : 0));
       if (last && (now - last) < IDLE) continue;                  // still inside a normal cadence window
       out.push({ id: o.id, name: (o.contact && o.contact.name) || o.name || 'Lead', stage: _plCap(s.name), custom: !bot, idleDays: last ? Math.floor((now - last) / 86400000) : null });
     }
