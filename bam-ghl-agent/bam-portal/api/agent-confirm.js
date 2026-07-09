@@ -32,7 +32,7 @@ import { readStoreThreadAgent } from "./messaging/read-thread.js";
 import { buildAgentSystem } from "./agent/brain.js";
 import { loadMergedOverrides } from "./agent/_sections.js";
 import { loadContactMemory } from "./agent/contact-memory.js";
-import { nextAppointment } from "./agent/booking.js";
+import { nextAppointment, passedTrialContactIds } from "./agent/booking.js";
 import {
   scheduledTrialStage, contactInRespondedStage, computeConfirmQueue,
   scheduledTrialContactIdSetCached, peekScheduledTrialIdSet, respondedStage, nurtureStage, toIso,
@@ -487,13 +487,23 @@ async function detectForClient(client) {
   catch (e) { return { client_id: client.id, error: `queue: ${e.message}` }; }
   if (!sts) return { client_id: client.id, skipped: "no Scheduled-Trial stage" };
 
+  // Leads whose booked trial already RAN (portal spine, <=7d, no review yet):
+  // they belong to the post-trial form card on this tab now - no more confirm
+  // replies/openers/reminders (Zoran 2026-07-09, mirrors the Booking handoff).
+  // Empty set for non-portal academies, so V1/V1.5 behavior is unchanged.
+  const passedTrial = await passedTrialContactIds(client.id);
+
   // Prune: cancel pending confirm cards whose lead has LEFT the Scheduled-Trial
-  // stage (showed up, handed off, lost…). Scoped to THIS agent's table only.
+  // stage (showed up, handed off, lost…) or whose trial has already run (the
+  // post-trial form owns them now). Scoped to THIS agent's table only.
   let pruned = 0;
   try {
     const pend = await sb(`agent_confirm_replies?client_id=eq.${client.id}&status=eq.pending&select=id,ghl_contact_id`);
     for (const row of (Array.isArray(pend) ? pend : [])) {
-      if (row.ghl_contact_id && !scheduledIds.has(row.ghl_contact_id)) {
+      if (row.ghl_contact_id && passedTrial.has(String(row.ghl_contact_id))) {
+        await sb(`agent_confirm_replies?id=eq.${row.id}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ status: "canceled", send_error: "trial ran - handed to post-trial form", updated_at: new Date().toISOString() }) });
+        pruned++;
+      } else if (row.ghl_contact_id && !scheduledIds.has(row.ghl_contact_id)) {
         await sb(`agent_confirm_replies?id=eq.${row.id}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ status: "canceled", send_error: "left Scheduled-Trial stage", updated_at: new Date().toISOString() }) });
         pruned++;
       }
@@ -506,6 +516,12 @@ async function detectForClient(client) {
     try {
       const held = await sb(`agent_confirm_replies?client_id=eq.${client.id}&status=eq.approved&send_after=lte.${new Date().toISOString()}&select=id,ghl_contact_id,draft_message&order=send_after.asc&limit=40`);
       for (const row of (Array.isArray(held) ? held : [])) {
+        // Never flush a held confirm at a lead whose trial already ran - "see
+        // you Tuesday!" landing on Wednesday. The post-trial form owns them.
+        if (row.ghl_contact_id && passedTrial.has(String(row.ghl_contact_id))) {
+          await sb(`agent_confirm_replies?id=eq.${row.id}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ status: "canceled", send_error: "trial ran - handed to post-trial form", updated_at: new Date().toISOString() }) });
+          continue;
+        }
         if (row.ghl_contact_id && !scheduledIds.has(row.ghl_contact_id)) {
           await sb(`agent_confirm_replies?id=eq.${row.id}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ status: "canceled", send_error: "left Scheduled-Trial stage", updated_at: new Date().toISOString() }) });
           continue;
@@ -551,6 +567,10 @@ async function detectForClient(client) {
     const contactId = item.contact_id;
     if (!contactId) { skipped++; reasons.push(`${item.name || "?"}: no contactId`); continue; }
     if (mutedSet.has(String(contactId))) { skipped++; reasons.push(`${item.name || contactId}: bot muted on this lead`); continue; }
+    // Trial already ran: reactive replies included - answering "are we still
+    // good?" two days after the session reads wrong. The post-trial form card
+    // (list-ready synthesis) is the ONE action for this lead now.
+    if (passedTrial.has(String(contactId))) { skipped++; reasons.push(`${item.name || contactId}: trial already ran - post-trial form`); continue; }
     // O6: never keep chasing a paid member. If the won-mark was skipped, a live
     // member can sit open in Scheduled-Trial - skip them outright (independent of GHL won).
     if (await isLiveMember(client.id, contactId, token)) { skipped++; reasons.push(`${item.name || contactId}: already a live member`); continue; }
@@ -680,6 +700,9 @@ async function detectForClient(client) {
       const contactId = item.contact_id;
       if (!contactId) continue;
       if (mutedSet.has(String(contactId))) continue;
+      // Portal academies: these leads already get the REAL post-trial form card
+      // in list-ready - an overdue "did they show up?" nag would be a duplicate.
+      if (passedTrial.has(String(contactId))) continue;
       // Already carded? (a) any active confirm card -> leave it (the unique index
       // allows only one). (b) we already raised an overdue card -> never nag twice.
       let cards = [];
@@ -794,6 +817,13 @@ async function handler(req, res) {
           if (due.length) {
             const revs = await sb(`post_trial_reviews?client_id=eq.${clientId}&select=ghl_contact_id`) || [];
             const reviewed = new Set((Array.isArray(revs) ? revs : []).map(r => String(r.ghl_contact_id || "")));
+            // Read-time gate (Zoran 2026-07-09, mirrors Booking's): once the
+            // trial has run, this agent's own reply/handoff/reminder cards for
+            // that lead are stale - a pre-trial "see you Tuesday!" draft must
+            // not sit in the deck on Thursday. Hide them so the form card
+            // pushed below is THE card; the detector cron cancels them for real.
+            const passed = new Set(due.map(t => String(t.ghl_contact_id || "")).filter(cid => cid && !reviewed.has(cid)));
+            if (passed.size) list = list.filter(r => !r.ghl_contact_id || !passed.has(String(r.ghl_contact_id)));
             for (const t of due) {
               const cid = String(t.ghl_contact_id || "");
               if (!cid || reviewed.has(cid)) continue;

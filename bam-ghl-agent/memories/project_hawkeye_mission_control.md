@@ -159,6 +159,19 @@ scattered autonomy/config entry points. KEEPS: inline drawer suggestion on lead 
   adding booking_provider + time_zone to that select (post-trial cards + correct
   TZ now work). Data-verified on GTA (Josh MCGILVERY, trial Jul 7, still a Booking
   reply pre-fix).
+- CONFIRM HANDS OFF PASSED TRIALS TOO (2026-07-09, later): same rule applied to
+  the Confirm agent's OWN cards - Josh's pre-trial reply card ("see you Tuesday
+  at 8pm!") was still deck card 1 of 7 on Jul 9 because nothing retired confirm
+  cards when the trial ran (the stage prune only fires when the lead LEAVES
+  Scheduled-Trial, and no review = never leaves; it also blocked the A3 overdue
+  card). `passedTrialContactIds` MOVED to agent/booking.js (shared export; both
+  agents import it). agent-confirm now: detector skips passed-trial leads
+  (reactive included) + prunes their pending cards + quiet-flush cancels their
+  held sends ("trial ran - handed to post-trial form") + A3 overdue pass skips
+  them (real ptf card covers portal academies); list-ready read-gates this
+  agent's own stale rows BEFORE appending ptf form cards, so the form card is
+  the ONE card per passed-trial lead, instantly. Non-portal academies: empty
+  set, zero change.
 - STILL TO DO: swipe gestures (open decision), GTA prod verification of the whole batch.
 
 ## Open item (ask Zoran before building)

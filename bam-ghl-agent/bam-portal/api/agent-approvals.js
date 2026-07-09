@@ -24,7 +24,7 @@ import { assemblePrompt } from "./agent/prompt-structure.js";
 import { buildAgentSystem } from "./agent/brain.js";
 import { loadMergedOverrides } from "./agent/_sections.js";
 import { loadContactMemory } from "./agent/contact-memory.js";
-import { loadCalendars, calendarForGroup, freeSlots, summarizeSlots, bookingProviderOf, bookPortalTrial } from "./agent/booking.js";
+import { loadCalendars, calendarForGroup, freeSlots, summarizeSlots, bookingProviderOf, bookPortalTrial, passedTrialContactIds } from "./agent/booking.js";
 import { respondedStage, contactInRespondedStage, computeQueue, respondedContactIdSetCached, peekRespondedIdSet, interestedStage, nurtureStage, scheduledTrialStage, toIso } from "./agent/_stage.js";
 import { markUnqualified, unmarkUnqualified } from "./agent/_tags.js";
 import { enrollContact, isAutomationLive } from "./automations.js";
@@ -409,30 +409,9 @@ async function logApproval(row) {
   } catch (_) {}
 }
 
-// Contacts whose BOOKED trial time has already PASSED with no post-trial review
-// yet: Booking hands off once the trial runs (Zoran 2026-07-09), so these leads
-// belong to the post-trial form on the Confirm tab, NOT a Booking reply. We skip
-// drafting them and hide any lingering Booking card. Portal-booking academies
-// only (their trial spine lives in trial_bookings); window matches the Confirm
-// agent's post-trial detector (trials within the last 7 days). Fails to an empty
-// set so a lookup hiccup never wrongly hides live Booking cards.
-async function passedTrialContactIds(clientId) {
-  try {
-    if (!clientId) return new Set();
-    if ((await bookingProviderOf(clientId)) !== "portal") return new Set();
-    const since = new Date(Date.now() - 7 * 86400000).toISOString();
-    const nowIso = new Date().toISOString();
-    const bks = await sb(`trial_bookings?tenant_id=eq.${clientId}&status=eq.BOOKED&select=ghl_contact_id,schedule_slots(start_time)`) || [];
-    const due = (Array.isArray(bks) ? bks : []).filter(t => {
-      const st = t.schedule_slots && t.schedule_slots.start_time;
-      return t.ghl_contact_id && st && st <= nowIso && st >= since;
-    });
-    if (!due.length) return new Set();
-    const revs = await sb(`post_trial_reviews?client_id=eq.${clientId}&select=ghl_contact_id`) || [];
-    const reviewed = new Set((Array.isArray(revs) ? revs : []).map(r => String(r.ghl_contact_id || "")));
-    return new Set(due.map(t => String(t.ghl_contact_id)).filter(cid => cid && !reviewed.has(cid)));
-  } catch (_) { return new Set(); }
-}
+// Passed-trial handoff set (Zoran 2026-07-09): shared with the Confirm agent -
+// see passedTrialContactIds in ./agent/booking.js. Booking skips drafting these
+// leads and hides any lingering Booking card; the post-trial form owns them.
 
 // ── Detector: pre-draft replies for Responded leads who just messaged ──
 // Hawkeye → queue as pending (a human approves in the inbox).
@@ -460,7 +439,7 @@ async function detectForClient(client) {
     const pend = await sb(`agent_ready_replies?client_id=eq.${client.id}&status=eq.pending&select=id,ghl_contact_id`);
     for (const row of (Array.isArray(pend) ? pend : [])) {
       if (row.ghl_contact_id && passedTrial.has(String(row.ghl_contact_id))) {
-        await sb(`agent_ready_replies?id=eq.${row.id}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ status: "canceled", send_error: "trial ran — handed to post-trial form", updated_at: new Date().toISOString() }) });
+        await sb(`agent_ready_replies?id=eq.${row.id}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ status: "canceled", send_error: "trial ran - handed to post-trial form", updated_at: new Date().toISOString() }) });
         pruned++;
       } else if (row.ghl_contact_id && !respondedIds.has(row.ghl_contact_id)) {
         await sb(`agent_ready_replies?id=eq.${row.id}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ status: "canceled", send_error: "left Responded stage", updated_at: new Date().toISOString() }) });
