@@ -47823,13 +47823,16 @@ function _ccPulseRender(roster) {
 // (.mm-*) and both focus modals live at body level, so the existing
 // marketing focus mode works unchanged from here.
 function _ccMountMarketing(host) {
-  host.innerHTML = _ccHead('Marketing', 'Your machine: ads in, leads out.') + '<div id="cc-marketing-mount"></div>' +
-    `<div class="cc-actions"><button type="button" class="cc-btn" onclick="_ccOpenClassic('marketing')">Open full marketing</button></div>`;
+  // "Open full marketing" button removed (Zoran 2026-07-08) - the machine
+  // cards + other-funnels config ARE the marketing surface here.
+  host.innerHTML = _ccHead('Marketing', 'Your machine: ads in, leads out.') + '<div id="cc-marketing-mount"></div>';
   const mount = document.getElementById('cc-marketing-mount');
   const mm = document.getElementById('marketing-machine-card');
   const lm = document.getElementById('landing-machine-card');
+  const fn = document.getElementById('other-funnels-card');
   if (mm) mount.appendChild(mm);
   if (lm) mount.appendChild(lm);
+  if (fn) mount.appendChild(fn);
   try { _mmLoad(); } catch (e) { console.error('[cc] marketing', e); }
 }
 
@@ -49766,6 +49769,13 @@ function _mmRenderLanding() {
 function _mmCollapsePageRest(card) {
   const content = card.parentElement;
   if (!content) return;
+  // Command center: the cards live in #cc-marketing-mount with nothing to
+  // collapse - no "guides, campaigns and requests" bar there (Zoran 2026-07-08).
+  if (content.id === 'cc-marketing-mount') {
+    const stray = document.getElementById('mm-page-toggle');
+    if (stray && content.contains(stray)) stray.remove();
+    return;
+  }
   let bar = document.getElementById('mm-page-toggle');
   if (!bar) {
     bar = document.createElement('div');
