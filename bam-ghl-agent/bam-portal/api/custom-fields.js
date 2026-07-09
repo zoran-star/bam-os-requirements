@@ -177,7 +177,9 @@ async function handler(req, res) {
     const ctx = await resolveUser(req);
 
     // ── GET ?action=values: a contact's field defs + current values ────────
-    // Accepts contact_id (portal uuid) OR client_id + ghl_contact_id.
+    // Accepts contact_id (portal uuid) OR client_id + ghl_contact_id. Optional
+    // member_id: athlete-specific answers in member_field_values OVERLAY the
+    // contact-level values (so siblings under one parent show their own data).
     if (req.method === "GET" && req.query && req.query.action === "values") {
       const contact = await resolveContact(req.query.contact_id, req.query.client_id, req.query.ghl_contact_id);
       if (!contact) return res.status(200).json({ contact_id: null, fields: [] });
@@ -185,13 +187,20 @@ async function handler(req, res) {
       const defs = await sb(`custom_field_defs?client_id=eq.${contact.client_id}&archived=eq.false&select=*&order=position.asc,created_at.asc`);
       const vals = await sb(`contact_field_values?contact_id=eq.${contact.id}&select=field_id,value`);
       const vmap = new Map((vals || []).map(v => [v.field_id, v.value]));
+      const memberId = req.query.member_id ? String(req.query.member_id) : null;
+      if (memberId) {
+        const mvals = await sb(`member_field_values?member_id=eq.${encodeURIComponent(memberId)}&select=field_id,value`).catch(() => []);
+        for (const v of (mvals || [])) vmap.set(v.field_id, v.value); // member value wins
+      }
       return res.status(200).json({
-        contact_id: contact.id,
+        contact_id: contact.id, member_id: memberId,
         fields: (defs || []).map(d => ({ ...d, value: vmap.has(d.id) ? vmap.get(d.id) : null })),
       });
     }
 
-    // ── POST ?action=set-value: upsert (or clear) one value for a contact ──
+    // ── POST ?action=set-value: upsert (or clear) one value ────────────────
+    // With member_id -> writes member_field_values (per-athlete). Without ->
+    // contact_field_values (parent-level, unchanged).
     if (req.method === "POST" && (req.body || {}).action === "set-value") {
       const b = req.body || {};
       if (!b.contact_id || !b.field_id) return res.status(400).json({ error: "contact_id and field_id required" });
@@ -201,16 +210,25 @@ async function handler(req, res) {
       const def = await sb(`custom_field_defs?id=eq.${b.field_id}&client_id=eq.${contact.client_id}&select=id&limit=1`);
       if (!def || !def[0]) return res.status(400).json({ error: "field not on this academy" });
 
+      const memberId = b.member_id ? String(b.member_id) : null;
+      if (memberId) {
+        const mrows = await sb(`members?id=eq.${encodeURIComponent(memberId)}&client_id=eq.${contact.client_id}&select=id&limit=1`).catch(() => []);
+        if (!mrows || !mrows[0]) return res.status(400).json({ error: "member not on this academy" });
+      }
+      const table = memberId ? "member_field_values" : "contact_field_values";
+      const keyCol = memberId ? "member_id" : "contact_id";
+      const keyVal = memberId ? memberId : contact.id;
+
       const v = b.value;
       const isEmpty = v === null || v === undefined || v === "" || (Array.isArray(v) && v.length === 0);
       if (isEmpty) {
-        await sb(`contact_field_values?contact_id=eq.${contact.id}&field_id=eq.${b.field_id}`, { method: "DELETE", headers: { Prefer: "return=minimal" } });
+        await sb(`${table}?${keyCol}=eq.${encodeURIComponent(keyVal)}&field_id=eq.${b.field_id}`, { method: "DELETE", headers: { Prefer: "return=minimal" } });
         return res.status(200).json({ ok: true, cleared: true });
       }
-      await sb(`contact_field_values?on_conflict=contact_id,field_id`, {
+      await sb(`${table}?on_conflict=${keyCol},field_id`, {
         method: "POST",
         headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
-        body: JSON.stringify([{ contact_id: contact.id, field_id: b.field_id, value: v, updated_at: new Date().toISOString() }]),
+        body: JSON.stringify([{ [keyCol]: keyVal, field_id: b.field_id, value: v, updated_at: new Date().toISOString() }]),
       });
       return res.status(200).json({ ok: true });
     }

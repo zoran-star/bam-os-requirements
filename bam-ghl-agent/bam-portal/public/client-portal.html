@@ -29500,12 +29500,10 @@ function openEnrollDrawer(opts = {}) {
   }
   _ENROLL = {
     step: 1, q: '', searching: false, results: null, customer: null,
-    targets: null, offerKey: null, athlete: '', chargeMode: 'now',
-    startDate: '', consent: false, preview: null, busy: false, error: null, result: null,
-    couponCode: '', coupon: null, couponBusy: false, couponError: null,
-    pname: '', pemail: '', pphone: '',                    // parent contact (editable, required)
-    fields: null, fieldVals: {}, fieldsBusy: false,       // mandatory signup info (core + offer custom fields)
-    fieldsOfferId: null, showMissing: false,
+    targets: null, chargeMode: 'now', startDate: '', consent: false,
+    busy: false, error: null, result: null, showMissing: false,
+    pname: '', pemail: '', pphone: '',                    // parent contact (shared, required)
+    athletes: [],                                          // one entry per kid (see _enrollNewAthlete)
   };
   // Elevated: opened from the members focus-mode chat (z 9999) - sit above it,
   // same trick as the member drawer's elevated mode.
@@ -29654,14 +29652,23 @@ async function _enrollSearch() {
   s.searching = false; _enrollRender();
 }
 
+function _enrollNewAthlete(name) {
+  return {
+    name: name || '', offerKey: null,
+    fields: null, fieldsBusy: false, fieldsOfferId: null, fieldVals: {},
+    couponCode: '', coupon: null, couponBusy: false, couponError: null,
+  };
+}
+
 async function _enrollPickCustomer(idx) {
   const s = _ENROLL; if (!s || !Array.isArray(s.results)) return;
   const c = s.results[idx]; if (!c) return;
   s.customer = c; s.error = null;
-  // Prefill the athlete name from what we already know about this person.
-  s.athlete = (c.past_member && c.past_member.athlete_name) || (c.contact && c.contact.athlete_name) || '';
   s.pname = c.name || ''; s.pemail = c.email || ''; s.pphone = c.phone || '';
-  s.fields = null; s.fieldVals = {}; s.fieldsOfferId = null; s.showMissing = false;
+  // Start with one athlete, name prefilled from what we already know.
+  const known = (c.past_member && c.past_member.athlete_name) || (c.contact && c.contact.athlete_name) || '';
+  s.athletes = [_enrollNewAthlete(known)];
+  s.showMissing = false;
   s.step = 2; s.busy = true; _enrollRender();
   if (!s.targets) {
     try {
@@ -29672,6 +29679,17 @@ async function _enrollPickCustomer(idx) {
   s.busy = false; _enrollRender();
 }
 
+function _enrollAddAthlete() {
+  const s = _ENROLL; if (!s) return;
+  s.athletes.push(_enrollNewAthlete(''));
+  _enrollRender();
+}
+function _enrollRemoveAthlete(ai) {
+  const s = _ENROLL; if (!s || s.athletes.length <= 1) return;
+  s.athletes.splice(ai, 1);
+  _enrollRender();
+}
+
 // ── Step 2: offer price + athlete + start ──
 function _enrollMoney(cents, interval) {
   const dollars = (Number(cents || 0) / 100);
@@ -29680,67 +29698,98 @@ function _enrollMoney(cents, interval) {
   return amt + (map[interval] || '');
 }
 
+const _enrollInputBase = (bad) => `width:100%;box-sizing:border-box;padding:9px 12px;background:var(--bg);border:1px solid ${bad ? '#9a3b2f' : 'var(--border)'};border-radius:8px;color:var(--text);font:inherit;font-size:13.5px;outline:none`;
+
+function _enrollFieldEmpty(v) {
+  return v === null || v === undefined || v === '' || (Array.isArray(v) && v.length === 0);
+}
+function _enrollAthleteComplete(at) {
+  if (!at || !String(at.name || '').trim() || !at.offerKey) return false;
+  if (!Array.isArray(at.fields)) return false; // fields still loading
+  return at.fields.every(d => !_enrollFieldEmpty(at.fieldVals[d.id]));
+}
+function _enrollParentOk() {
+  const s = _ENROLL;
+  return String(s.pname || '').trim() && (String(s.pemail || '').trim() || String(s.pphone || '').trim());
+}
+
+// One athlete card: name, plan select, per-offer onboarding fields, coupon.
+function _enrollAthleteCard(ai) {
+  const s = _ENROLL;
+  const at = s.athletes[ai];
+  const t = (s.targets || []).find(x => x.key === at.offerKey) || null;
+  let fieldsHtml = '';
+  if (at.offerKey) {
+    if (at.fieldsBusy || at.fields === null) {
+      fieldsHtml = `<div class="req-empty" style="padding:10px 0"><span class="req-spin"></span>Loading questions…</div>`;
+    } else if (at.fields.length) {
+      fieldsHtml = at.fields.map(d => `
+        <div style="margin-bottom:9px">
+          <div style="font-size:12px;font-weight:600;color:var(--text-sub);margin-bottom:4px">${escapeHTML(d.label || d.key)}${d.scope === 'offer' ? ' <span style="font-size:10px;color:var(--gold,#D4B65C);font-weight:700;text-transform:uppercase;letter-spacing:0.4px">offer</span>' : ''}</div>
+          ${_enrollFieldInput(ai, d)}
+        </div>`).join('');
+    }
+  }
+  const couponBlock = !at.offerKey ? '' : (at.coupon ? `
+    <div style="font-size:12px;color:var(--gold,#D4B65C);margin-top:8px">Coupon ${escapeHTML(at.coupon.code)} · ${escapeHTML(at.coupon.label || '')} <a href="#" onclick="_enrollRemoveCoupon(${ai});return false" style="color:var(--text-mute);margin-left:4px">remove</a></div>` : `
+    <div style="display:flex;gap:8px;margin-top:8px">
+      <input id="enroll-coupon-${ai}" type="text" value="${escapeHTML(at.couponCode)}" placeholder="Coupon code (optional)"
+             onkeydown="if(event.key==='Enter')_enrollApplyCoupon(${ai})"
+             style="flex:1;padding:7px 11px;background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);font:inherit;font-size:12.5px;outline:none;text-transform:uppercase">
+      <button onclick="_enrollApplyCoupon(${ai})" ${at.couponBusy ? 'disabled' : ''} style="background:transparent;border:1px solid var(--border);color:var(--text);padding:7px 13px;font-size:12px;font-weight:700;border-radius:8px;cursor:pointer;font-family:inherit">${at.couponBusy ? '…' : 'Apply'}</button>
+    </div>
+    ${at.couponError ? `<div style="font-size:11.5px;color:#e08a7d;margin-top:5px">${escapeHTML(at.couponError)}</div>` : ''}`);
+  return `
+    <div style="border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:12px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+        <div style="font-size:11px;font-weight:700;color:var(--text-mute);letter-spacing:0.5px;text-transform:uppercase">Athlete ${ai + 1}</div>
+        ${s.athletes.length > 1 ? `<button onclick="_enrollRemoveAthlete(${ai})" style="background:transparent;border:none;color:var(--text-mute);font-size:12px;cursor:pointer">Remove</button>` : ''}
+      </div>
+      <input type="text" value="${escapeHTML(at.name || '')}" placeholder="Athlete's full name"
+             oninput="_enrollSetAthleteName(${ai}, this.value)"
+             style="${_enrollInputBase(s.showMissing && !String(at.name || '').trim())};margin-bottom:8px">
+      <select onchange="_enrollSetPrice(${ai}, this.value)" style="${_enrollInputBase(s.showMissing && !at.offerKey)};cursor:pointer">
+        <option value="">Choose a plan…</option>
+        ${(s.targets || []).map(x => `<option value="${escapeHTML(x.key)}" ${at.offerKey === x.key ? 'selected' : ''}>${escapeHTML(x.label)} - ${_enrollMoney(x.amount_cents, x.interval)}</option>`).join('')}
+      </select>
+      ${at.offerKey ? `<div style="margin-top:12px">${fieldsHtml || '<div style="font-size:12px;color:var(--text-mute)">No extra questions for this plan.</div>'}</div>` : ''}
+      ${couponBlock}
+    </div>`;
+}
+
 function _enrollRenderStep2(body) {
   const s = _ENROLL;
   const c = s.customer || {};
-  let prices;
   if (s.busy || s.targets === null) {
-    prices = `<div class="req-empty" style="padding:16px 0"><span class="req-spin"></span>Loading live prices…</div>`;
-  } else if (!s.targets.length) {
-    prices = `<div style="padding:12px;border:1px solid #c47424;border-radius:10px;font-size:13px;color:#c79a4a">No live prices found. Confirm prices in Blueprint > Offers > Pricing (Stripe Matcher) first.</div>`;
-  } else {
-    prices = s.targets.map(t => {
-      const on = s.offerKey === t.key;
-      return `
-        <div onclick="_enrollSetPrice('${escapeHTML(t.key).replace(/'/g, "\\'")}')" style="display:flex;justify-content:space-between;align-items:center;padding:11px 13px;border:1px solid ${on ? 'var(--gold,#D4B65C)' : 'var(--border)'};border-radius:10px;margin-bottom:7px;cursor:pointer;background:${on ? 'rgba(212,182,92,0.08)' : 'transparent'}">
-          <div style="font-weight:600;font-size:13.5px">${escapeHTML(t.label)}</div>
-          <div style="font-size:13px;font-weight:700;color:${on ? 'var(--gold,#D4B65C)' : 'var(--text-sub)'}">${_enrollMoney(t.amount_cents, t.interval)}</div>
-        </div>`;
-    }).join('');
+    body.innerHTML = _enrollHeader('Athletes and plans', '') + `<div class="req-empty" style="padding:16px 0"><span class="req-spin"></span>Loading live prices…</div>`;
+    return;
+  }
+  if (!s.targets.length) {
+    body.innerHTML = _enrollHeader('Athletes and plans', '') + `<div style="padding:12px;border:1px solid #c47424;border-radius:10px;font-size:13px;color:#c79a4a">No live prices found. Confirm prices in Blueprint > Offers > Pricing (Stripe Matcher) first.</div>`;
+    return;
   }
   const chip = (mode, label) => {
     const on = s.chargeMode === mode;
     return `<button onclick="_enrollSetChargeMode('${mode}')" style="background:${on ? 'var(--gold,#D4B65C)' : 'transparent'};color:${on ? '#0B0B0D' : 'var(--text)'};border:1px solid ${on ? 'var(--gold,#D4B65C)' : 'var(--border)'};padding:7px 13px;font-size:12.5px;font-weight:700;border-radius:999px;cursor:pointer;font-family:inherit">${label}</button>`;
   };
-  // Mandatory signup info: the same core + offer custom fields the public
-  // signup collects. Everything must be filled before Review.
-  const inputBase = (bad) => `width:100%;box-sizing:border-box;padding:9px 12px;background:var(--bg);border:1px solid ${bad ? '#9a3b2f' : 'var(--border)'};border-radius:8px;color:var(--text);font:inherit;font-size:13.5px;outline:none`;
-  const parentOk = String(s.pname || '').trim() && (String(s.pemail || '').trim() || String(s.pphone || '').trim());
-  let fieldsHtml = '';
-  if (s.offerKey) {
-    if (s.fieldsBusy || s.fields === null) {
-      fieldsHtml = `<div class="req-empty" style="padding:12px 0"><span class="req-spin"></span>Loading signup fields…</div>`;
-    } else if (s.fields.length) {
-      fieldsHtml = s.fields.map(d => `
-        <div style="margin-bottom:10px">
-          <div style="font-size:12px;font-weight:600;color:var(--text-sub);margin-bottom:4px">${escapeHTML(d.label || d.key)}${d.scope === 'offer' ? ' <span style="font-size:10px;color:var(--gold,#D4B65C);font-weight:700;text-transform:uppercase;letter-spacing:0.4px">offer</span>' : ''}</div>
-          ${_enrollFieldInput(d)}
-        </div>`).join('');
-    }
-  }
-  const fieldsOk = s.offerKey && Array.isArray(s.fields) && s.fields.every(d => !_enrollFieldEmpty(s.fieldVals[d.id]));
-  const canContinue = s.offerKey && String(s.athlete || '').trim() && parentOk && fieldsOk && (s.chargeMode !== 'on_date' || s.startDate);
-  body.innerHTML = _enrollHeader('Offer and plan', `For <b>${escapeHTML(c.name || c.email || 'the selected client')}</b> · <a href="#" onclick="_ENROLL.step=1;_enrollRender();return false" style="color:var(--gold,#D4B65C)">change</a>`) + `
-    <div style="font-size:11px;font-weight:700;color:var(--text-mute);letter-spacing:0.5px;text-transform:uppercase;margin-bottom:8px">Live offer prices</div>
-    ${prices}
-    <div style="font-size:11px;font-weight:700;color:var(--text-mute);letter-spacing:0.5px;text-transform:uppercase;margin:16px 0 8px">Athlete</div>
-    <input id="enroll-athlete" type="text" value="${escapeHTML(s.athlete || '')}" placeholder="Athlete's full name"
-           oninput="_ENROLL.athlete=this.value"
-           style="${inputBase(s.showMissing && !String(s.athlete || '').trim())}">
-    <div style="font-size:11px;font-weight:700;color:var(--text-mute);letter-spacing:0.5px;text-transform:uppercase;margin:16px 0 8px">Parent contact</div>
-    <div style="display:grid;gap:8px">
-      <input type="text" value="${escapeHTML(s.pname)}" placeholder="Parent's full name" oninput="_ENROLL.pname=this.value" style="${inputBase(s.showMissing && !String(s.pname || '').trim())}">
-      <input type="email" value="${escapeHTML(s.pemail)}" placeholder="Parent's email" oninput="_ENROLL.pemail=this.value" style="${inputBase(s.showMissing && !parentOk)}">
-      <input type="tel" value="${escapeHTML(s.pphone)}" placeholder="Parent's phone" oninput="_ENROLL.pphone=this.value" style="${inputBase(false)}">
+  const parentOk = _enrollParentOk();
+  const allComplete = s.athletes.length && s.athletes.every(_enrollAthleteComplete);
+  const canContinue = parentOk && allComplete && (s.chargeMode !== 'on_date' || s.startDate);
+  body.innerHTML = _enrollHeader('Athletes and plans', `For <b>${escapeHTML(c.name || c.email || 'the selected client')}</b> · <a href="#" onclick="_ENROLL.step=1;_enrollRender();return false" style="color:var(--gold,#D4B65C)">change</a>`) + `
+    <div style="font-size:11px;font-weight:700;color:var(--text-mute);letter-spacing:0.5px;text-transform:uppercase;margin-bottom:8px">Parent contact <span style="font-weight:600;text-transform:none;letter-spacing:0">- shared by all athletes</span></div>
+    <div style="display:grid;gap:8px;margin-bottom:18px">
+      <input type="text" value="${escapeHTML(s.pname)}" placeholder="Parent's full name" oninput="_ENROLL.pname=this.value" style="${_enrollInputBase(s.showMissing && !String(s.pname || '').trim())}">
+      <input type="email" value="${escapeHTML(s.pemail)}" placeholder="Parent's email" oninput="_ENROLL.pemail=this.value" style="${_enrollInputBase(s.showMissing && !parentOk)}">
+      <input type="tel" value="${escapeHTML(s.pphone)}" placeholder="Parent's phone" oninput="_ENROLL.pphone=this.value" style="${_enrollInputBase(false)}">
     </div>
-    ${s.offerKey ? `
-    <div style="font-size:11px;font-weight:700;color:var(--text-mute);letter-spacing:0.5px;text-transform:uppercase;margin:16px 0 8px">Signup info <span style="font-weight:600;text-transform:none;letter-spacing:0">- onboarding questions, all required</span></div>
-    ${fieldsHtml || '<div style="font-size:12.5px;color:var(--text-mute)">This offer has no extra onboarding questions.</div>'}` : ''}
-    <div style="font-size:11px;font-weight:700;color:var(--text-mute);letter-spacing:0.5px;text-transform:uppercase;margin:16px 0 8px">First charge</div>
+    <div style="font-size:11px;font-weight:700;color:var(--text-mute);letter-spacing:0.5px;text-transform:uppercase;margin-bottom:8px">Athletes <span style="font-weight:600;text-transform:none;letter-spacing:0">- onboarding questions all required</span></div>
+    ${s.athletes.map((_, ai) => _enrollAthleteCard(ai)).join('')}
+    <button onclick="_enrollAddAthlete()" style="width:100%;background:transparent;border:1px dashed var(--border);color:var(--gold,#D4B65C);padding:9px;font-size:13px;font-weight:700;border-radius:8px;cursor:pointer;font-family:inherit;margin-bottom:16px">+ Add another athlete</button>
+    <div style="font-size:11px;font-weight:700;color:var(--text-mute);letter-spacing:0.5px;text-transform:uppercase;margin:0 0 8px">First charge <span style="font-weight:600;text-transform:none;letter-spacing:0">- applies to all</span></div>
     <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
       ${chip('now', 'Charge now')}
       ${chip('on_date', 'Start on a date')}
-      ${s.chargeMode === 'on_date' ? `<input id="enroll-date" type="date" value="${escapeHTML(s.startDate)}" min="${new Date().toISOString().slice(0, 10)}"
+      ${s.chargeMode === 'on_date' ? `<input type="date" value="${escapeHTML(s.startDate)}" min="${new Date().toISOString().slice(0, 10)}"
         onchange="_ENROLL.startDate=this.value;_enrollRender()"
         style="padding:7px 10px;background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);font:inherit;font-size:13px;outline:none">` : ''}
     </div>
@@ -29751,52 +29800,48 @@ function _enrollRenderStep2(body) {
     </div>`;
 }
 
-function _enrollSetPrice(key) {
-  const s = _ENROLL; if (!s) return;
-  s.offerKey = key;
-  _enrollRender();
-  // Load the offer's mandatory signup fields (core + offer custom questions),
-  // prefilled with anything the person's contact record already holds.
+function _enrollSetAthleteName(ai, value) { if (_ENROLL && _ENROLL.athletes[ai]) _ENROLL.athletes[ai].name = value; }
+
+function _enrollSetPrice(ai, key) {
+  const s = _ENROLL; if (!s || !s.athletes[ai]) return;
+  const at = s.athletes[ai];
+  at.offerKey = key || null;
+  at.coupon = null; at.couponCode = ''; at.couponError = null; // price changed - drop any coupon
+  if (!key) { at.fields = null; at.fieldsOfferId = null; _enrollRender(); return; }
   const t = (s.targets || []).find(x => x.key === key) || {};
   const oid = t.offer_id || null;
-  if (s.fieldsOfferId !== oid || s.fields === null) {
-    s.fieldsOfferId = oid; s.fieldsBusy = true; s.fields = null; _enrollRender();
-    _enrollApi('signup-fields', { offer_id: oid, email: s.pemail || null, phone: s.pphone || null })
-      .then(json => {
-        s.fields = json.fields || [];
-        const vals = {};
-        s.fields.forEach(d => { if (d.value !== null && d.value !== undefined) vals[d.id] = d.value; });
-        s.fieldVals = { ...vals, ...s.fieldVals };
-      })
-      .catch(e => { s.fields = []; s.error = 'Couldn\'t load signup fields - ' + e.message; })
-      .finally(() => { s.fieldsBusy = false; _enrollRender(); });
-  }
+  at.fieldsOfferId = oid; at.fieldsBusy = true; at.fields = null; _enrollRender();
+  _enrollApi('signup-fields', { offer_id: oid, email: s.pemail || null, phone: s.pphone || null })
+    .then(json => {
+      at.fields = json.fields || [];
+      const vals = {};
+      at.fields.forEach(d => { if (d.value !== null && d.value !== undefined) vals[d.id] = d.value; });
+      at.fieldVals = { ...vals, ...at.fieldVals };
+    })
+    .catch(e => { at.fields = []; s.error = 'Couldn\'t load questions - ' + e.message; })
+    .finally(() => { at.fieldsBusy = false; _enrollRender(); });
 }
 function _enrollSetChargeMode(mode) { if (_ENROLL) { _ENROLL.chargeMode = mode; _enrollRender(); } }
 
-function _enrollFV(defId, value) { if (_ENROLL) _ENROLL.fieldVals[defId] = value; }
-function _enrollFVMulti(defId, opt, checked) {
-  const s = _ENROLL; if (!s) return;
-  const cur = Array.isArray(s.fieldVals[defId]) ? s.fieldVals[defId].slice() : [];
+function _enrollFV(ai, defId, value) { if (_ENROLL && _ENROLL.athletes[ai]) _ENROLL.athletes[ai].fieldVals[defId] = value; }
+function _enrollFVMulti(ai, defId, opt, checked) {
+  const at = _ENROLL && _ENROLL.athletes[ai]; if (!at) return;
+  const cur = Array.isArray(at.fieldVals[defId]) ? at.fieldVals[defId].slice() : [];
   const i = cur.indexOf(opt);
   if (checked && i < 0) cur.push(opt);
   if (!checked && i >= 0) cur.splice(i, 1);
-  s.fieldVals[defId] = cur;
-}
-function _enrollFieldEmpty(v) {
-  return v === null || v === undefined || v === '' || (Array.isArray(v) && v.length === 0);
+  at.fieldVals[defId] = cur;
 }
 
-// One input per field def, by type. Values live in _ENROLL.fieldVals keyed by
-// def id (bound oninput/onchange so re-renders don't lose keystrokes).
-function _enrollFieldInput(d) {
-  const s = _ENROLL;
-  const v = s.fieldVals[d.id];
-  const missing = s.showMissing && _enrollFieldEmpty(v);
+// One input per field def, by type. Values live in athletes[ai].fieldVals keyed
+// by def id (bound oninput/onchange so re-renders don't lose keystrokes).
+function _enrollFieldInput(ai, d) {
+  const at = _ENROLL.athletes[ai];
+  const v = at.fieldVals[d.id];
+  const missing = _ENROLL.showMissing && _enrollFieldEmpty(v);
   const base = `width:100%;box-sizing:border-box;padding:8px 11px;background:var(--bg);border:1px solid ${missing ? '#9a3b2f' : 'var(--border)'};border-radius:8px;color:var(--text);font:inherit;font-size:13px;outline:none`;
-  const id = `enroll-cf-${d.id}`;
   if (d.type === 'select') {
-    return `<select id="${id}" onchange="_enrollFV('${d.id}', this.value)" style="${base}">
+    return `<select onchange="_enrollFV(${ai}, '${d.id}', this.value)" style="${base}">
       <option value="" ${_enrollFieldEmpty(v) ? 'selected' : ''}>Choose…</option>
       ${(d.options || []).map(o => `<option value="${escapeHTML(o)}" ${v === o ? 'selected' : ''}>${escapeHTML(o)}</option>`).join('')}
     </select>`;
@@ -29805,118 +29850,88 @@ function _enrollFieldInput(d) {
     const cur = Array.isArray(v) ? v : [];
     return `<div style="display:flex;gap:8px 16px;flex-wrap:wrap;padding:8px 11px;border:1px solid ${missing ? '#9a3b2f' : 'var(--border)'};border-radius:8px">
       ${(d.options || []).map(o => `<label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer">
-        <input type="checkbox" ${cur.indexOf(o) >= 0 ? 'checked' : ''} onchange="_enrollFVMulti('${d.id}', '${escapeHTML(o).replace(/'/g, "\\'")}', this.checked)"> ${escapeHTML(o)}</label>`).join('')}
+        <input type="checkbox" ${cur.indexOf(o) >= 0 ? 'checked' : ''} onchange="_enrollFVMulti(${ai}, '${d.id}', '${escapeHTML(o).replace(/'/g, "\\'")}', this.checked)"> ${escapeHTML(o)}</label>`).join('')}
     </div>`;
   }
   if (d.type === 'boolean') {
-    return `<select id="${id}" onchange="_enrollFV('${d.id}', this.value === '' ? '' : this.value === 'true')" style="${base}">
+    return `<select onchange="_enrollFV(${ai}, '${d.id}', this.value === '' ? '' : this.value === 'true')" style="${base}">
       <option value="" ${_enrollFieldEmpty(v) ? 'selected' : ''}>Choose…</option>
       <option value="true" ${v === true ? 'selected' : ''}>Yes</option>
       <option value="false" ${v === false ? 'selected' : ''}>No</option>
     </select>`;
   }
   const t = d.type === 'number' ? 'number' : d.type === 'date' ? 'date' : 'text';
-  return `<input id="${id}" type="${t}" value="${escapeHTML(v === null || v === undefined ? '' : String(v))}"
-    oninput="_enrollFV('${d.id}', ${t === 'number' ? 'this.value === \'\' ? \'\' : Number(this.value)' : 'this.value'})" style="${base}">`;
+  return `<input type="${t}" value="${escapeHTML(v === null || v === undefined ? '' : String(v))}"
+    oninput="_enrollFV(${ai}, '${d.id}', ${t === 'number' ? 'this.value === \'\' ? \'\' : Number(this.value)' : 'this.value'})" style="${base}">`;
 }
 
-async function _enrollToReview() {
+async function _enrollApplyCoupon(ai) {
+  const s = _ENROLL; const at = s && s.athletes[ai]; if (!at || at.couponBusy) return;
+  const input = document.getElementById('enroll-coupon-' + ai);
+  at.couponCode = input ? input.value.trim().toUpperCase() : at.couponCode;
+  if (!at.couponCode) { at.couponError = 'Type a code first.'; return _enrollRender(); }
+  at.couponBusy = true; at.couponError = null; _enrollRender();
+  try {
+    const json = await _enrollApi('check-coupon', { offer_price_key: at.offerKey, code: at.couponCode });
+    at.coupon = json.coupon || null;
+  } catch (e) { at.coupon = null; at.couponError = e.message; }
+  at.couponBusy = false; _enrollRender();
+}
+function _enrollRemoveCoupon(ai) {
+  const at = _ENROLL && _ENROLL.athletes[ai]; if (!at) return;
+  at.coupon = null; at.couponCode = ''; at.couponError = null; _enrollRender();
+}
+
+function _enrollToReview() {
   const s = _ENROLL; if (!s) return;
-  const input = document.getElementById('enroll-athlete');
-  if (input) s.athlete = input.value;
-  const parentOk = String(s.pname || '').trim() && (String(s.pemail || '').trim() || String(s.pphone || '').trim());
-  const fieldsOk = Array.isArray(s.fields) && s.fields.every(d => !_enrollFieldEmpty(s.fieldVals[d.id]));
-  if (!s.offerKey || !String(s.athlete || '').trim() || !parentOk || !fieldsOk || (s.chargeMode === 'on_date' && !s.startDate)) {
+  if (!_enrollParentOk() || !s.athletes.every(_enrollAthleteComplete) || (s.chargeMode === 'on_date' && !s.startDate)) {
     s.showMissing = true;
-    s.error = !s.offerKey ? 'Pick an offer price first.'
-      : !fieldsOk ? 'Fill every signup field - they\'re all required for a manual signup.'
-      : 'Fill the highlighted fields first.';
+    s.error = !_enrollParentOk() ? 'Fill the parent contact (name + email or phone).'
+      : (s.chargeMode === 'on_date' && !s.startDate) ? 'Pick a start date.'
+      : 'Every athlete needs a plan and all their questions answered.';
     return _enrollRender();
   }
-  s.showMissing = false;
-  s.error = null; s.step = 3; s.preview = null; s.consent = false;
-  s.coupon = null; s.couponCode = ''; s.couponError = null; // price may have changed - re-check any coupon
-  _enrollRender();
-  try {
-    s.preview = await _enrollApi('preview', {
-      customer_id: s.customer.id, offer_price_key: s.offerKey, athlete_name: s.athlete.trim(),
-    });
-  } catch (e) {
-    s.error = e.message; s.step = 2;
-  }
+  s.showMissing = false; s.error = null; s.consent = false; s.step = 3;
   _enrollRender();
 }
 
-// ── Step 3: review + consent + confirm ──
+// ── Step 3: family review + one consent + confirm ──
 function _enrollRenderStep3(body) {
   const s = _ENROLL;
-  const p = s.preview;
-  if (!p) {
-    body.innerHTML = _enrollHeader('Review', '') + `<div class="req-empty" style="padding:18px 0"><span class="req-spin"></span>Checking Stripe…</div>`;
-    return;
-  }
-  const dup = Array.isArray(p.duplicates) && p.duplicates.length ? p.duplicates[0] : null;
-  const line = (k, v) => `<div style="display:flex;justify-content:space-between;gap:12px;padding:7px 0;border-bottom:1px solid var(--border);font-size:13.5px"><span style="color:var(--text-mute)">${k}</span><span style="font-weight:600;text-align:right">${v}</span></div>`;
+  const line = (k, v) => `<div style="display:flex;justify-content:space-between;gap:12px;padding:6px 0;font-size:13px"><span style="color:var(--text-mute)">${k}</span><span style="font-weight:600;text-align:right">${v}</span></div>`;
   const firstCharge = s.chargeMode === 'on_date' ? escapeHTML(s.startDate) : 'Today';
-  const cardLine = p.needs_card
-    ? `<span style="color:#c79a4a">No usable card - a secure card link will be created</span>`
-    : escapeHTML(((p.card_brand || 'Card') + ' ').replace(/^\w/, ch => ch.toUpperCase()) + '···· ' + (p.card_last4 || ''));
-  const confirmLabel = p.needs_card ? 'Add as pending + create card link' : (s.chargeMode === 'on_date' ? 'Confirm - schedule the signup' : 'Confirm - charge the card');
-  const canConfirm = s.consent && !s.busy && !dup;
-  body.innerHTML = _enrollHeader('Review and confirm', '') + `
-    ${dup ? `<div style="margin-bottom:14px;padding:11px 13px;border:1px solid #c47424;border-radius:10px;background:rgba(196,116,36,0.08);font-size:13px;color:#c79a4a"><b>${escapeHTML(dup.athlete_name || 'This athlete')}</b> is already on the roster (${escapeHTML(dup.status)}). Use Change plan on their member card instead.</div>` : ''}
-    <div style="padding:4px 14px;border:1px solid var(--border);border-radius:12px;margin-bottom:16px">
-      ${line('Client', escapeHTML(s.pname || s.customer.name || s.customer.email || '-'))}
-      ${line('Athlete', escapeHTML(s.athlete.trim()))}
-      ${Array.isArray(s.fields) && s.fields.length ? line('Signup info', `${s.fields.length} fields collected`) : ''}
-      ${line('Plan', escapeHTML((s.targets.find(t => t.key === s.offerKey) || {}).label || s.offerKey))}
-      ${s.coupon
-        ? line('Price', `<s style="color:var(--text-mute);font-weight:400">${_enrollMoney(p.price.amount_cents, p.price.interval)}</s> <span style="color:var(--gold,#D4B65C)">${_enrollMoney(s.coupon.discounted_cents, p.price.interval)}</span>`)
-        : line('Price', _enrollMoney(p.price.amount_cents, p.price.interval))}
-      ${s.coupon ? line('Coupon', `${escapeHTML(s.coupon.code)} · ${escapeHTML(s.coupon.label || '')} <a href="#" onclick="_enrollRemoveCoupon();return false" style="color:var(--text-mute);margin-left:6px">remove</a>`) : ''}
-      ${line('First charge', firstCharge)}
-      <div style="display:flex;justify-content:space-between;gap:12px;padding:7px 0;font-size:13.5px"><span style="color:var(--text-mute)">Payment</span><span style="font-weight:600;text-align:right">${cardLine}</span></div>
-    </div>
-    ${s.coupon ? '' : `
-    <div style="margin-bottom:16px">
-      <div style="display:flex;gap:8px">
-        <input id="enroll-coupon" type="text" value="${escapeHTML(s.couponCode)}" placeholder="Coupon code (optional)"
-               onkeydown="if(event.key==='Enter')_enrollApplyCoupon()"
-               style="flex:1;padding:8px 12px;background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);font:inherit;font-size:13px;outline:none;text-transform:uppercase">
-        <button onclick="_enrollApplyCoupon()" ${s.couponBusy ? 'disabled' : ''} style="background:transparent;border:1px solid var(--border);color:var(--text);padding:8px 14px;font-size:12.5px;font-weight:700;border-radius:8px;cursor:pointer;font-family:inherit">${s.couponBusy ? 'Checking…' : 'Apply'}</button>
-      </div>
-      ${s.couponError ? `<div style="font-size:12px;color:#e08a7d;margin-top:6px">${escapeHTML(s.couponError)}</div>` : ''}
-    </div>`}
+  let totalCents = 0;
+  const rows = s.athletes.map(at => {
+    const t = (s.targets || []).find(x => x.key === at.offerKey) || {};
+    const cents = at.coupon ? at.coupon.discounted_cents : t.amount_cents;
+    totalCents += Number(cents || 0);
+    const priceHtml = at.coupon
+      ? `<s style="color:var(--text-mute);font-weight:400">${_enrollMoney(t.amount_cents, t.interval)}</s> <span style="color:var(--gold,#D4B65C)">${_enrollMoney(at.coupon.discounted_cents, t.interval)}</span>`
+      : _enrollMoney(t.amount_cents, t.interval);
+    return `<div style="border:1px solid var(--border);border-radius:10px;padding:11px 13px;margin-bottom:8px">
+      <div style="font-weight:700;font-size:14px;margin-bottom:4px">${escapeHTML(at.name.trim())}</div>
+      ${line('Plan', escapeHTML(t.label || at.offerKey))}
+      ${line('Price', priceHtml)}
+      ${at.coupon ? line('Coupon', escapeHTML(at.coupon.code)) : ''}
+      ${Array.isArray(at.fields) && at.fields.length ? line('Questions', `${at.fields.length} answered`) : ''}
+    </div>`;
+  }).join('');
+  const consentTxt = `I confirm the parent agreed to ${s.athletes.length > 1 ? 'these signups' : 'this signup'} and to the charge on their saved card.`;
+  const canConfirm = s.consent && !s.busy;
+  const confirmLabel = s.chargeMode === 'on_date' ? `Confirm - schedule ${s.athletes.length}` : `Confirm - charge ${s.athletes.length}`;
+  body.innerHTML = _enrollHeader('Review and confirm', `${escapeHTML(s.pname || s.customer.name || '-')} · ${s.athletes.length} athlete${s.athletes.length > 1 ? 's' : ''}`) + `
+    ${rows}
+    <div style="display:flex;justify-content:space-between;padding:8px 2px 0;font-size:14px;font-weight:800;border-top:1px solid var(--border);margin-bottom:6px"><span>First charge total</span><span>${_enrollMoney(totalCents, null)}</span></div>
+    <div style="font-size:12px;color:var(--text-mute);margin-bottom:16px">First charge: ${firstCharge}. Each athlete bills on their own plan after that.</div>
     <label style="display:flex;gap:10px;align-items:flex-start;padding:12px 13px;border:1px solid ${s.consent ? 'var(--gold,#D4B65C)' : 'var(--border)'};border-radius:10px;cursor:pointer;margin-bottom:16px">
       <input type="checkbox" ${s.consent ? 'checked' : ''} onchange="_ENROLL.consent=this.checked;_enrollRender()" style="margin-top:2px">
-      <span style="font-size:13px;line-height:1.45">I confirm the parent agreed to this signup${p.needs_card ? '' : ' and to the charge on their saved card'}.</span>
+      <span style="font-size:13px;line-height:1.45">${consentTxt}</span>
     </label>
+    ${s.error ? `<div style="margin-bottom:12px;font-size:12.5px;color:#e08a7d">${escapeHTML(s.error)}</div>` : ''}
     <div style="display:flex;gap:10px">
       <button onclick="_ENROLL.step=2;_enrollRender()" style="background:transparent;border:1px solid var(--border);color:var(--text);padding:10px 16px;font-size:13px;font-weight:600;border-radius:8px;cursor:pointer;font-family:inherit">Back</button>
       <button onclick="_enrollConfirm()" ${canConfirm ? '' : 'disabled'} style="flex:1;background:${canConfirm ? 'var(--gold,#D4B65C)' : 'var(--border)'};color:${canConfirm ? '#0B0B0D' : 'var(--text-mute)'};border:none;padding:10px 16px;font-size:13.5px;font-weight:700;border-radius:8px;cursor:${canConfirm ? 'pointer' : 'not-allowed'};font-family:inherit">${s.busy ? 'Working…' : confirmLabel}</button>
     </div>`;
-}
-
-// Validate the coupon against the chosen plan price server-side, show the
-// discounted price on the review lines. Re-validated again at enroll time.
-async function _enrollApplyCoupon() {
-  const s = _ENROLL; if (!s || s.couponBusy) return;
-  const input = document.getElementById('enroll-coupon');
-  s.couponCode = input ? input.value.trim().toUpperCase() : s.couponCode;
-  if (!s.couponCode) { s.couponError = 'Type a code first.'; return _enrollRender(); }
-  s.couponBusy = true; s.couponError = null; _enrollRender();
-  try {
-    const json = await _enrollApi('check-coupon', { offer_price_key: s.offerKey, code: s.couponCode });
-    s.coupon = json.coupon || null;
-  } catch (e) {
-    s.coupon = null; s.couponError = e.message;
-  }
-  s.couponBusy = false; _enrollRender();
-}
-
-function _enrollRemoveCoupon() {
-  const s = _ENROLL; if (!s) return;
-  s.coupon = null; s.couponCode = ''; s.couponError = null; _enrollRender();
 }
 
 async function _enrollConfirm() {
@@ -29925,16 +29940,18 @@ async function _enrollConfirm() {
   try {
     s.result = await _enrollApi('enroll', {
       customer_id: s.customer.id,
-      offer_price_key: s.offerKey,
-      athlete_name: s.athlete.trim(),
       parent_name: (s.pname || '').trim() || s.customer.name || null,
       parent_email: (s.pemail || '').trim() || s.customer.email || null,
       parent_phone: (s.pphone || '').trim() || s.customer.phone || null,
       charge_mode: s.chargeMode,
       start_date: s.chargeMode === 'on_date' ? s.startDate : null,
-      coupon_code: s.coupon ? s.coupon.code : null,
-      field_values: s.fieldVals || {},
       consent_confirmed: true,
+      athletes: s.athletes.map(at => ({
+        athlete_name: at.name.trim(),
+        offer_price_key: at.offerKey,
+        coupon_code: at.coupon ? at.coupon.code : null,
+        field_values: at.fieldVals || {},
+      })),
     });
   } catch (e) {
     s.error = e.message;
@@ -29945,30 +29962,38 @@ async function _enrollConfirm() {
 function _enrollRenderResult(body) {
   const s = _ENROLL;
   const r = s.result;
+  const done = `<button onclick="closeEnrollDrawer()" style="width:100%;background:var(--gold,#D4B65C);color:#0B0B0D;border:none;padding:10px 16px;font-size:13.5px;font-weight:700;border-radius:8px;cursor:pointer;font-family:inherit;margin-top:4px">Done</button>`;
+
   if (r.mode === 'card_link') {
+    const names = (r.results || []).map(x => x.athlete_name).join(', ') || 'The athlete(s)';
     body.innerHTML = _enrollHeader('Pending - card link created', '') + `
       <div style="padding:13px 14px;border:1px solid #c47424;border-radius:12px;background:rgba(199,154,74,0.08);font-size:13.5px;line-height:1.5;margin-bottom:14px">
-        <b>${escapeHTML(s.athlete.trim())}</b> was added as <b>Signup in progress</b>. ${escapeHTML(s.customer.name || 'The parent')} has no usable card in Stripe, so nothing was charged. Send them this secure link - once the card is saved, run this signup again and it completes.
+        <b>${escapeHTML(names)}</b> added as <b>Signup in progress</b>. ${escapeHTML(s.customer.name || 'The parent')} has no usable card, so nothing was charged. Send this secure link - once the card is saved, run this signup again and it completes.
       </div>
       <div style="display:flex;gap:8px;margin-bottom:12px">
         <input id="enroll-link" type="text" readonly value="${escapeHTML(r.url || '')}" style="flex:1;padding:9px 12px;background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:12px;outline:none">
         <button onclick="const i=document.getElementById('enroll-link');i.select();document.execCommand('copy');this.textContent='Copied'" style="background:var(--gold,#D4B65C);color:#0B0B0D;border:none;padding:9px 14px;font-size:12.5px;font-weight:700;border-radius:8px;cursor:pointer;font-family:inherit">Copy</button>
       </div>
-      ${r.suggested && r.suggested.sms_text ? `<div style="font-size:11px;font-weight:700;color:var(--text-mute);letter-spacing:0.5px;text-transform:uppercase;margin-bottom:6px">Suggested text</div>
-      <div style="padding:11px 13px;border:1px solid var(--border);border-radius:10px;font-size:13px;color:var(--text-sub);margin-bottom:16px">${escapeHTML(r.suggested.sms_text)}</div>` : ''}
-      <button onclick="closeEnrollDrawer()" style="width:100%;background:transparent;border:1px solid var(--border);color:var(--text);padding:10px 16px;font-size:13.5px;font-weight:700;border-radius:8px;cursor:pointer;font-family:inherit">Done</button>`;
+      ${r.suggested && r.suggested.sms_text ? `<div style="padding:11px 13px;border:1px solid var(--border);border-radius:10px;font-size:13px;color:var(--text-sub);margin-bottom:16px">${escapeHTML(r.suggested.sms_text)}</div>` : ''}
+      ${done}`;
     return;
   }
+
+  const results = r.results || [];
+  const ok = results.filter(x => x.ok);
+  const failed = results.filter(x => x.ok === false);
   const scheduled = r.mode === 'scheduled';
-  body.innerHTML = _enrollHeader(scheduled ? 'Signup scheduled' : 'Signed up', '') + `
-    <div style="padding:13px 14px;border:1px solid #1f7a3d;border-radius:12px;background:rgba(31,122,61,0.08);font-size:13.5px;line-height:1.5;margin-bottom:14px">
-      <b>${escapeHTML(s.athlete.trim())}</b> is on the roster. ${scheduled
-        ? `First charge of <b>${_enrollMoney(r.amount_cents, null)}</b> on <b>${escapeHTML(r.first_charge_iso || s.startDate)}</b>, then billing runs automatically.`
-        : `<b>${_enrollMoney(r.amount_cents, null)}</b> charged to the card on file${r.card_last4 ? ' (···· ' + escapeHTML(r.card_last4) + ')' : ''}. Billing runs automatically from here.`}
-      ${r.coupon ? ` Coupon <b>${escapeHTML(r.coupon.code)}</b> applied (${escapeHTML(r.coupon.label || '')}).` : ''}
-    </div>
-    ${r.warning ? `<div style="margin-bottom:14px;padding:11px 13px;border:1px solid #9a3b2f;border-radius:10px;background:rgba(154,59,47,0.1);color:#e08a7d;font-size:13px">${escapeHTML(r.warning)}</div>` : ''}
-    <button onclick="closeEnrollDrawer()" style="width:100%;background:var(--gold,#D4B65C);color:#0B0B0D;border:none;padding:10px 16px;font-size:13.5px;font-weight:700;border-radius:8px;cursor:pointer;font-family:inherit">Done</button>`;
+  const okRows = ok.map(x => `<div style="padding:10px 13px;border:1px solid #1f7a3d;border-radius:10px;background:rgba(31,122,61,0.08);font-size:13px;margin-bottom:8px">
+      <b>${escapeHTML(x.athlete_name)}</b> - ${scheduled ? `${_enrollMoney(x.amount_cents, null)} on ${escapeHTML(x.first_charge_iso || s.startDate)}` : `${_enrollMoney(x.amount_cents, null)} charged`}${x.coupon ? ` · coupon ${escapeHTML(x.coupon.code)}` : ''}${x.warning ? `<div style="color:#e08a7d;margin-top:4px">${escapeHTML(x.warning)}</div>` : ''}
+    </div>`).join('');
+  const failRows = failed.map(x => `<div style="padding:10px 13px;border:1px solid #9a3b2f;border-radius:10px;background:rgba(154,59,47,0.1);font-size:13px;margin-bottom:8px">
+      <b>${escapeHTML(x.athlete_name)}</b> - didn't go through: ${escapeHTML(x.error || 'unknown error')}
+    </div>`).join('');
+  body.innerHTML = _enrollHeader(failed.length ? 'Signed up (with issues)' : (scheduled ? 'Signup scheduled' : 'Signed up'), `${ok.length} of ${results.length} on the roster`) + `
+    ${okRows}
+    ${failRows}
+    ${failed.length ? `<div style="font-size:12.5px;color:var(--text-mute);margin-bottom:14px">The failed athletes were added as Signup in progress - reopen the wizard for them, or fix the card and retry.</div>` : ''}
+    ${done}`;
 }
 
 // Divider that labels the signup-in-progress group and spells out that these
@@ -39376,26 +39401,28 @@ async function _memberCallSlotUpgrade(m) {
 
 // ─── Per-member custom fields (portal contact_field_values, editable inline) ──
 // Reads/writes /api/custom-fields (?action=values + {action:'set-value'}).
-let _MEMBER_CF = null; // { contactId, byId: {fieldId: field} }
+let _MEMBER_CF = null; // { contactId, memberId, byId: {fieldId: field} }
 
 async function _loadMemberCustomFields(m) {
   const sec = document.getElementById('member-cf-section');
   if (!sec || !m || !m.ghl_contact_id) return;
   try {
     const token = await _mreqAuthToken();
-    const r = await fetch('/api/custom-fields?action=values&client_id=' + encodeURIComponent(m.client_id) + '&ghl_contact_id=' + encodeURIComponent(m.ghl_contact_id), { headers: { 'Authorization': 'Bearer ' + token } });
+    // member_id overlays this athlete's own answers over the shared parent
+    // contact - siblings under one parent each show/edit their own values.
+    const r = await fetch('/api/custom-fields?action=values&client_id=' + encodeURIComponent(m.client_id) + '&ghl_contact_id=' + encodeURIComponent(m.ghl_contact_id) + '&member_id=' + encodeURIComponent(m.id), { headers: { 'Authorization': 'Bearer ' + token } });
     const j = await _safeJson(r);
     if (!r.ok) throw new Error(j.error || ('HTTP ' + r.status));
-    _renderMemberCF(sec, j.contact_id, j.fields || []);
+    _renderMemberCF(sec, j.contact_id, j.fields || [], m.id);
   } catch (e) {
     sec.innerHTML = `<div style="font-size:12px;color:var(--text-mute)">Couldn't load custom fields - ${escapeHTML(e.message)}</div>`;
   }
 }
 
-function _renderMemberCF(sec, contactId, fields) {
+function _renderMemberCF(sec, contactId, fields, memberId) {
   if (!contactId) { sec.innerHTML = `<div style="font-size:12px;color:var(--text-mute)">No portal contact linked yet.</div>`; return; }
   if (!fields.length) { sec.innerHTML = `<div style="font-size:12px;color:var(--text-mute)">No custom fields set up for this academy.</div>`; return; }
-  _MEMBER_CF = { contactId, byId: {} };
+  _MEMBER_CF = { contactId, memberId: memberId || null, byId: {} };
   fields.forEach(f => { _MEMBER_CF.byId[f.id] = f; });
   const rows = fields.map(f => `<div style="display:grid;grid-template-columns:130px 1fr;gap:10px 12px;align-items:center;margin-bottom:9px">
       <div style="font-size:12px;color:var(--text-mute)">${escapeHTML(f.label)}</div>
@@ -39447,7 +39474,7 @@ async function _memberCFSave(fieldId, value) {
   const flash = document.getElementById('member-cf-flash');
   try {
     const token = await _mreqAuthToken();
-    const r = await fetch('/api/custom-fields', { method: 'POST', headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'set-value', contact_id: _MEMBER_CF.contactId, field_id: fieldId, value }) });
+    const r = await fetch('/api/custom-fields', { method: 'POST', headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'set-value', contact_id: _MEMBER_CF.contactId, member_id: _MEMBER_CF.memberId || undefined, field_id: fieldId, value }) });
     if (!r.ok) { const j = await _safeJson(r); throw new Error(j.error || ('HTTP ' + r.status)); }
     if (_MEMBER_CF.byId[fieldId]) _MEMBER_CF.byId[fieldId].value = value;
     if (flash) { flash.textContent = 'Saved'; flash.style.color = '#7BC47F'; setTimeout(() => { if (flash) flash.textContent = ''; }, 1500); }
