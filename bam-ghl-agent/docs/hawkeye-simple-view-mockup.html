@@ -275,44 +275,23 @@
       </div>
     </div>
 
-    <!-- BOOKING: agent stage. Cards slide LEFT, each card's hawkeye action sits to its right -->
+    <!-- BOOKING: agent stage. The cascade only HIGHLIGHTS who needs Hawkeye -
+         no actions here. Clicking a glowing lead opens the Hawkeye page on their card. -->
     <div class="panel" id="panel-booking">
       <div class="panel-inner">
         <div class="panel-head">Booking · Responded
           <span class="engine-tag" style="background:var(--blue-soft);color:var(--blue)">AGENT ENGINE</span>
-          <span style="flex:1"></span><span style="text-transform:none;letter-spacing:0">gold ring = needs you · no follow-up nudges, quiet leads go to Ghosted</span>
+          <span style="flex:1"></span><span style="text-transform:none;letter-spacing:0">gold ring = needs you in Hawkeye</span>
         </div>
         <div class="rows">
-          <div class="row split">
-            <div class="lead needs" onclick="openHawk('jordan')"><div class="avatar">JM</div><div><div class="who">Jordan M.</div><div class="st">reply · draft ready</div></div></div>
-            <div class="action">
-              <div class="draft">Saturday works! We have a 10am group at Linbrook. Want me to lock it in for Aiden?</div>
-              <div class="abtns"><button class="abtn go">Approve and send</button><button class="abtn" onclick="event.stopPropagation();openHawk(hkKeyFromRow(this))">Review</button></div>
-            </div>
-          </div>
-          <div class="row split">
-            <div class="lead needs" onclick="openHawk('marco')"><div class="avatar">MV</div><div><div class="who">Marco V.</div><div class="st">picked Sat 10am</div></div></div>
-            <div class="action">
-              <div class="abtns"><button class="abtn go">Approve and book</button><button class="abtn" onclick="event.stopPropagation();openHawk(hkKeyFromRow(this))">Review</button></div>
-            </div>
-          </div>
-          <div class="row split">
-            <div class="lead needs" onclick="openHawk('sam')"><div class="avatar">SK</div><div><div class="who">Sam K.</div><div class="st">went quiet 2 days</div></div></div>
-            <div class="action">
-              <div class="abtns"><button class="abtn go">Send to Ghosted</button><button class="abtn">Mark lost</button><button class="abtn">Unqualified</button></div>
-            </div>
-          </div>
-          <div class="row split">
-            <div class="lead needs" onclick="openHawk('dana')"><div class="avatar">DT</div><div><div class="who">Dana T.</div><div class="st">reply · draft ready</div></div></div>
-            <div class="action">
-              <div class="draft">Totally get it! Weeknights we run 6pm and 7:30pm groups. Would either work for Maya?</div>
-              <div class="abtns"><button class="abtn go">Approve and send</button><button class="abtn" onclick="event.stopPropagation();openHawk(hkKeyFromRow(this))">Review</button></div>
-            </div>
-          </div>
+          <div class="row"><div class="lead needs" onclick="openHawkAt('jordan')"><div class="avatar">JM</div><div><div class="who">Jordan M.</div><div class="st">reply · draft ready</div></div></div></div>
+          <div class="row"><div class="lead needs" onclick="openHawkAt('marco')"><div class="avatar">MV</div><div><div class="who">Marco V.</div><div class="st">picked Sat 10am · ready to book</div></div></div></div>
+          <div class="row"><div class="lead needs" onclick="openHawkAt('sam')"><div class="avatar">SK</div><div><div class="who">Sam K.</div><div class="st">went quiet 2 days</div></div></div></div>
+          <div class="row"><div class="lead needs" onclick="openHawkAt('dana')"><div class="avatar">DT</div><div><div class="who">Dana T.</div><div class="st">reply · draft ready</div></div></div></div>
           <div class="row"><div class="lead"><div class="avatar">PS</div><div><div class="who">Priya S.</div><div class="st">agent handling it</div></div></div></div>
           <div class="row"><div class="lead"><div class="avatar">MT</div><div><div class="who">Marcus T.</div><div class="st">agent handling it</div></div></div></div>
         </div>
-        <div class="hint">glowing card = Hawkeye popup · plain card = lead drawer</div>
+        <div class="hint">glowing card = opens Hawkeye on their card · plain card = lead drawer</div>
       </div>
     </div>
 
@@ -347,56 +326,32 @@
       </div>
     </div>
 
-    <!-- CONFIRM: agent stage. Reminders live in config, not here -->
+    <!-- CONFIRM: agent stage. Reminders live in config; highlights only. -->
     <div class="panel" id="panel-confirm">
       <div class="panel-inner">
         <div class="panel-head">Confirm · Scheduled Trial
           <span class="engine-tag" style="background:var(--green-soft);color:var(--green)">AGENT ENGINE</span>
-          <span style="flex:1"></span><span style="text-transform:none;letter-spacing:0">reminders auto-send from config · only replies + reschedules land here</span>
+          <span style="flex:1"></span><span style="text-transform:none;letter-spacing:0">reminders auto-send from config</span>
         </div>
         <div class="rows">
-          <div class="row split">
-            <div class="lead needs" onclick="openHawk('rachel')"><div class="avatar">RB</div><div><div class="who">Rachel B.</div><div class="st">reply · draft ready</div></div></div>
-            <div class="action"><div class="draft">Just runners, a water bottle and a ball if she has one - we have spares! See you at 1079 Linbrook Rd.</div>
-            <div class="abtns"><button class="abtn go">Approve and send</button><button class="abtn" onclick="event.stopPropagation();openHawk(hkKeyFromRow(this))">Review</button></div></div>
-          </div>
-          <div class="row split">
-            <div class="lead needs" onclick="openHawk('owen')"><div class="avatar">OC</div><div><div class="who">Owen C.</div><div class="st">can't make Friday</div></div></div>
-            <div class="action">
-              <div class="abtns"><button class="abtn go">Approve handoff</button><button class="abtn" onclick="event.stopPropagation();openHawk(hkKeyFromRow(this))">Review</button></div>
-            </div>
-          </div>
+          <div class="row"><div class="lead needs" onclick="openHawkAt('rachel')"><div class="avatar">RB</div><div><div class="who">Rachel B.</div><div class="st">reply · draft ready</div></div></div></div>
+          <div class="row"><div class="lead needs" onclick="openHawkAt('owen')"><div class="avatar">OC</div><div><div class="who">Owen C.</div><div class="st">can't make Friday · reschedule</div></div></div></div>
           <div class="row"><div class="lead"><div class="avatar">SW</div><div><div class="who">Sara W.</div><div class="st">trial Tuesday · confirmation sent from config</div></div></div></div>
         </div>
       </div>
     </div>
 
-    <!-- CLOSING: agent stage. No automations - stacked reply -> plan -> lost -->
+    <!-- CLOSING: agent stage. No automations; highlights only. -->
     <div class="panel" id="panel-closing">
       <div class="panel-inner">
         <div class="panel-head">Closing · Done Trial
           <span class="engine-tag" style="background:var(--purple-soft);color:var(--purple)">AGENT ENGINE</span>
-          <span style="flex:1"></span><span style="text-transform:none;letter-spacing:0">no automations · post-trial form is the only preplanned touch</span>
+          <span style="flex:1"></span><span style="text-transform:none;letter-spacing:0">post-trial form is the only preplanned touch</span>
         </div>
         <div class="rows">
-          <div class="row split">
-            <div class="lead needs" onclick="openHawk('kayla')"><div class="avatar">KH</div><div><div class="who">Kayla H.</div><div class="st">ready to enroll · link in draft</div></div></div>
-            <div class="action"><div class="draft">Amazing! Here is the sign-up link to grab Aiden's spot in the fall group.
-bamgta.com/join/fall-group</div>
-            <div class="abtns"><button class="abtn go">Approve and send</button><button class="abtn" onclick="event.stopPropagation();openHawk(hkKeyFromRow(this))">Review</button></div></div>
-          </div>
-          <div class="row split">
-            <div class="lead needs" onclick="openHawk('devon')"><div class="avatar">DP</div><div><div class="who">Devon P.</div><div class="st">follow-up plan ready · 3 messages</div></div></div>
-            <div class="action">
-              <div class="abtns"><button class="abtn go">Approve plan</button><button class="abtn" onclick="event.stopPropagation();openHawk(hkKeyFromRow(this))">Review</button></div>
-            </div>
-          </div>
-          <div class="row split">
-            <div class="lead needs" onclick="openHawk('mia')"><div class="avatar">MF</div><div><div class="who">Mia F.</div><div class="st">3 follow-ups unanswered</div></div></div>
-            <div class="action">
-              <div class="abtns"><button class="abtn">Mark lost</button><button class="abtn">Unqualified</button><button class="abtn" onclick="event.stopPropagation();openHawk(hkKeyFromRow(this))">Review</button></div>
-            </div>
-          </div>
+          <div class="row"><div class="lead needs" onclick="openHawkAt('kayla')"><div class="avatar">KH</div><div><div class="who">Kayla H.</div><div class="st">ready to enroll · link in draft</div></div></div></div>
+          <div class="row"><div class="lead needs" onclick="openHawkAt('devon')"><div class="avatar">DP</div><div><div class="who">Devon P.</div><div class="st">follow-up plan ready · 3 messages</div></div></div></div>
+          <div class="row"><div class="lead needs" onclick="openHawkAt('mia')"><div class="avatar">MF</div><div><div class="who">Mia F.</div><div class="st">3 follow-ups unanswered · lost suggested</div></div></div></div>
         </div>
       </div>
     </div>
@@ -454,37 +409,6 @@ bamgta.com/join/fall-group</div>
       <b style="color:var(--text)">Closing</b>: NO automations section. The post-trial form (trainer's message + optional sign-up link + notes for the agent) is the only preplanned touch.</p>
     </div>
     <div class="hint">This is the focus-mode page that shipped 2026-07-06 - the gear simply routes here.</div>
-  </div>
-
-  <!-- ============ HAWKEYE POPUP MODAL ============ -->
-  <div class="hk-overlay" id="hk-overlay" onclick="if(event.target===this)closeHawk()">
-    <div class="hk-modal" style="position:relative">
-      <button class="hk-close" onclick="closeHawk()" aria-label="Close">&times;</button>
-      <div class="hk-left">
-        <div class="bigav" id="hkm-av">JM</div>
-        <div><h2 id="hkm-name">Jordan M.</h2><div class="sub" id="hkm-sub">Parent of Aiden (9)</div></div>
-        <div class="hk-fact"><span>Stage</span><b id="hkm-stage">Responded</b></div>
-        <div class="hk-fact"><span>Phone</span><b id="hkm-phone">(416) 555-0184</b></div>
-        <div class="hk-fact"><span>Last active</span><b id="hkm-last">14 min ago</b></div>
-        <div class="hk-ctx" id="hkm-ctx">Entry: new lead - website form. 3 days in stage.</div>
-        <div class="hk-exits" id="hkm-exits">
-          <div class="lbl">Move the lead</div>
-        </div>
-      </div>
-      <div class="hk-right">
-        <div class="thread" id="hkm-thread"></div>
-        <div class="hk-compose">
-          <div id="hkm-extra"></div>
-          <textarea id="hkm-draft" oninput="modalEdited()"></textarea>
-          <input class="hk-teach" id="hkm-teach" placeholder="Required when you change anything: why? (saved as a lesson)">
-          <div class="hk-actions">
-            <button class="hk-send" id="hkm-send" onclick="nextHawk()">Approve and send</button>
-            <button class="hk-lesson">Save as lesson only</button>
-            <span class="hk-prog" id="hkm-prog">1 of 4 in Booking</span>
-          </div>
-        </div>
-      </div>
-    </div>
   </div>
 
 </div>
@@ -587,108 +511,16 @@ bamgta.com/join/fall-group</div>
       draft:'Totally understand life gets busy! We\'d love to have Ava back whenever it works.'}
   };
 
-  function openHawk(key){
-    var d=HK[key]; if(!d) d=HK.jordan;
-    document.getElementById('hkm-av').textContent=d.av;
-    document.getElementById('hkm-name').textContent=d.name;
-    document.getElementById('hkm-sub').textContent=d.sub;
-    document.getElementById('hkm-stage').textContent=d.stage;
-    document.getElementById('hkm-phone').textContent=d.phone;
-    document.getElementById('hkm-last').textContent=d.last;
-    document.getElementById('hkm-ctx').textContent=d.ctx;
-    var q=HK_QUEUES[d.agent];
-    document.getElementById('hkm-prog').textContent=(q.indexOf(key)+1)+' of '+q.length+' in '+(d.agent.charAt(0).toUpperCase()+d.agent.slice(1));
-    // Per-agent move buttons
-    var ex=document.getElementById('hkm-exits');
-    ex.innerHTML='<div class="lbl">Move the lead</div>'+MOVES[d.agent].map(function(m){
-      return '<button class="xbtn" style="border-color:'+m[1]+'" onclick="closeHawk()">'+m[0]+'</button>';
-    }).join('');
-    var th=document.getElementById('hkm-thread'); th.innerHTML='';
-    d.thread.forEach(function(m){
-      var b=document.createElement('div');
-      b.className='bub '+(m[0]==='in'?'in':'bot');
-      if(m[0]==='bot'){var t=document.createElement('span');t.className='tag';t.textContent='Agent';b.appendChild(t);}
-      b.appendChild(document.createTextNode(m[1]));
-      th.appendChild(b);
-    });
-    if(d.draft){
-      var sug=document.createElement('div');sug.className='bub bot';sug.style.opacity='.75';
-      var tg=document.createElement('span');tg.className='tag';tg.textContent='Suggested reply - edit below';
-      sug.appendChild(tg);sug.appendChild(document.createTextNode(d.draft));th.appendChild(sug);
-    }
-    // Kind-specific guts (same content as the deck card): Book it = calendar +
-    // slot pickers tied to the offer; Went quiet + plan hide the reply box.
-    var extra=document.getElementById('hkm-extra');
-    var draftEl=document.getElementById('hkm-draft');
-    mkEditedFlag=false; mkKey=key;
-    if(d.kind==='book'){
-      var calOpts=d.cals.map(function(c,i){return '<option value="'+i+'"'+(i===0?' selected':'')+'>'+c.name+'</option>';}).join('');
-      var slotOpts=d.cals[0].slots.map(function(t,i){return '<option value="'+i+'"'+(i===0?' selected':'')+'>'+t+'</option>';}).join('');
-      extra.innerHTML='<div class="dc-lbl" style="margin-bottom:6px">Booking details - the agent\'s pick, change if needed</div>'
-        +'<div class="dc-fields">'
-        +'<label><span>Calendar</span><select id="hkm-cal" onchange="mkCalChange(this)">'+calOpts+'</select></label>'
-        +'<label><span>Slot</span><select id="hkm-slot" onchange="modalEdited()">'+slotOpts+'</select></label>'
-        +'</div>'
-        +'<div class="dc-note" style="margin-top:6px">Only calendars tied to this lead\'s offer ('+d.offer+') show here.</div>';
-      draftEl.style.display='none';
-    } else if(d.kind==='ghost'){
-      extra.innerHTML='<div class="dc-note">Nothing sends now - Ghosted takes over with the day 1 / 3 / 7 nudges. A reply bounces them straight back to Booking.</div>';
-      draftEl.style.display='none';
-    } else if(d.kind==='plan'){
-      extra.innerHTML='<div class="dc-lbl" style="margin-bottom:6px">The plan - every message editable</div>'
-        +d.plan.map(function(t,i){return '<div class="dc-lbl" style="margin:4px 0 3px">Day '+(i+1)+(i===d.plan.length-1?' · final, no-pressure':'')+'</div><textarea class="dc-draft sm" style="width:100%" oninput="modalEdited()">'+t+'</textarea>';}).join('');
-      draftEl.style.display='none';
-    } else {
-      extra.innerHTML='';
-      draftEl.style.display='';
-      draftEl.value=d.draft||'';
-    }
-    var teach=document.getElementById('hkm-teach');
-    teach.style.display='none'; teach.value=''; teach.classList.remove('miss');
-    var send=document.getElementById('hkm-send');
-    send.textContent=PRIMARY[d.kind][0];
-    send.className='hk-send '+PRIMARY[d.kind][2];
-    document.getElementById('hk-overlay').classList.add('on');
-    th.scrollTop=th.scrollHeight;
-  }
-  var mkEditedFlag=false, mkKey=null;
-  // Same rule as the deck: any change away from the agent's pick flips the button
-  // to "Confirm edits ..." and the teach-why note becomes MANDATORY.
-  function modalEdited(){
-    var t=document.getElementById('hkm-teach');
-    if(t)t.style.display='block';
-    if(mkEditedFlag)return; mkEditedFlag=true;
-    var d=HK[mkKey]||HK.jordan;
-    var send=document.getElementById('hkm-send');
-    if(send)send.textContent=PRIMARY[d.kind][1];
-  }
-  function mkCalChange(sel){
-    var d=HK[mkKey]||{};
-    var slot=document.getElementById('hkm-slot');
-    if(d.cals && slot){
-      var c=d.cals[Number(sel.value)]||d.cals[0];
-      slot.innerHTML=c.slots.map(function(t,i){return '<option value="'+i+'"'+(i===0?' selected':'')+'>'+t+'</option>';}).join('');
-    }
-    modalEdited();
-  }
-  function closeHawk(){document.getElementById('hk-overlay').classList.remove('on')}
-  var HK_ORDER=['jordan','marco','sam','dana','rachel','owen','kayla','devon','mia'];
-  function nextHawk(){
-    if(mkEditedFlag){
-      var t=document.getElementById('hkm-teach');
-      if(!t || !t.value.trim()){ if(t){t.classList.add('miss');t.style.display='block';t.focus();} return; }
-    }
-    var cur=document.getElementById('hkm-name').textContent;
-    var idx=HK_ORDER.findIndex(function(k){return HK[k].name===cur});
-    if(idx>=0&&idx<HK_ORDER.length-1){openHawk(HK_ORDER[idx+1]);}else{closeHawk();}
+  // Clicking a glowing lead in the cascade opens the HAWKEYE PAGE with that
+  // lead's card on top (no actions live on the simple view anymore).
+  function openHawkAt(key){
+    var agent=(HK[key]||{}).agent||'booking';
+    var idx=HK_QUEUES[agent].indexOf(key);
+    hkPos[agent]=idx<0?0:idx;
+    show('scr-hawkeye');
+    hkPick(agent);
   }
 
-  function hkKeyFromRow(btn){
-    var row=btn.closest('.row')||btn.closest('.deckcard');
-    var av=row?row.querySelector('.avatar'):null;
-    var map={JM:'jordan',MV:'marco',SK:'sam',DT:'dana',RB:'rachel',OC:'owen',KH:'kayla',DP:'devon',MF:'mia'};
-    return av&&map[av.textContent]?map[av.textContent]:'jordan';
-  }
   var HK_QUEUES={booking:['jordan','marco','sam','dana'],confirm:['rachel','owen'],closing:['kayla','devon','mia']};
   var hkStage='booking', hkPos={booking:0,confirm:0,closing:0};
   function hkPick(stage){

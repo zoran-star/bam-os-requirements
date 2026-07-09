@@ -28,14 +28,15 @@ the Train Agent picker as a destination, and the scattered config entry points.
   replaces the earlier gear-only morph.)
 - Cascade layout depends on the stage's ENGINE (agent / automation / human - the
   entry-exit-engines model, see [[project_sales_focus_mode]]):
-  - **Agent stage** (Booking/Confirm/Closing): cards slide LEFT, each needs-action card gets its
-    Hawkeye action attached to its RIGHT (draft preview + Approve and send + Review). Clean cards
-    ("agent handling it") are full-width rows below.
+  - **Agent stage** (Booking/Confirm/Closing): single-column lead rows, NO actions on this
+    page (Zoran 2026-07-08, supersedes the split cards-left/actions-right layout). Gold ring =
+    needs Hawkeye, with a short status line ("reply - draft ready", "picked Sat 10am").
+    Clicking a glowing lead OPENS THE HAWKEYE PAGE with that lead's card on top.
   - **Automation stage** (Ghosted/Nurture): enrolled people cascade straight down, single column,
     with per-person step status ("step 2 of 3 - SMS sends tomorrow").
   - **Human stage** (Member): plain cards straight down, "you run this stage - no bot".
-- Gold ring/glow on a card = needs you. Click a glowing card = Hawkeye popup modal.
-  Click a plain card = existing lead drawer.
+- Gold ring/glow on a card = needs you. Click a glowing card = the Hawkeye page opens on
+  that lead's card (the popup modal is RETIRED for now). Click a plain card = existing lead drawer.
 - Visual language kept: agent = solid border, automation = DASHED border (guardrails doc).
 
 ### 2. Hawkeye focus page (gold button, top of simple view)
@@ -57,7 +58,10 @@ the Train Agent picker as a destination, and the scattered config entry points.
 - ⚠️ OPEN ITEM: swipe-left has 3 destinations (Ghosted/Nurture/Unqualified) - real build should
   pop the 3 options before committing, not fly away blind. Confirm exact behavior with Zoran.
 
-### 3. Hawkeye popup modal (from the simple view cascade)
+### 3. Hawkeye popup modal - RETIRED (Zoran 2026-07-08, later same day)
+The simple view carries no Hawkeye actions at all: a glowing cascade card now routes into
+the Hawkeye PAGE on that lead's card instead of opening a popup. The deck is the single
+Hawkeye surface. (Original popup spec kept below for reference only.)
 Click a glowing card -> centered popup:
 - **LEFT: contact info** - avatar, name, athlete, stage, phone, last active, entry context,
   and the move-the-lead buttons (Ghosted / Nurture / Unqualified).
@@ -94,6 +98,7 @@ to build for config itself.
 | 2026-07-08 | Deck card footer = TWO buttons: "Other" (bottom left, cascades UP to every other option) + confirm (bottom right; label flips to "Confirm edits and send/book/..." the moment the user edits anything) |
 | 2026-07-08 | Book-it cards = PICKERS, not free text: a Calendar select limited to the calendars tied to the lead's OFFER + a Slot select (that calendar's open slots, with spots-left counts). Switching either = an edit (mandatory note) |
 | 2026-07-08 | The popup modal shares the deck card's kind-aware guts: Book-it popup shows the same Calendar + Slot pickers, ghost/plan kinds swap the reply box, and the same edited-label + mandatory-note rule applies |
+| 2026-07-08 | LATER SAME DAY: simple view = highlights only. Cascade shows plain lead rows (gold ring + status); clicking a glowing lead opens the Hawkeye PAGE on that card. Popup modal RETIRED - the deck is the only Hawkeye surface |
 | 2026-07-08 | Teach-why note is MANDATORY for any change away from the agent's guess (draft, plan message, booking detail) - confirm is blocked until the note is filled. Applies to every Hawkeye surface in the real build |
 
 ## Action model per agent (revised 2026-07-08, SHIPPED end to end)
@@ -123,8 +128,8 @@ Mobile reference page (design-system styled): `bam-portal/public/hawkeye-actions
 ## Suggested build order
 1. **Hawkeye deck page** (new view in client-portal.html, V2-gated) reading the 3 agents'
    ready queues; retire the `_apx`/`_acx`/`_aclx` overlay buttons.
-2. **Popup modal** (shared component; deck and cascade both use its guts).
-3. **Simple view interactions**: pill morph + cascade panels + agent split rows.
+2. ~~Popup modal~~ RETIRED 2026-07-08 - glowing cascade cards deep-link into the deck instead.
+3. **Simple view interactions**: pill morph + cascade panels (highlight rows + deck deep-link).
 4. **Remove Skip** from all Hawkeye surfaces (decide: keep `skip-ready` backend action or kill).
 5. Mobile pass IN THE SAME PR (Zoran hard rule: mobile parity same pass) - swipe gestures here.
 

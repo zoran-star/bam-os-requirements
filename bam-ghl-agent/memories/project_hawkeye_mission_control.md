@@ -19,8 +19,9 @@ hosted at https://claude.ai/code/artifact/7a9a5268-048a-4dda-9750-62d9f69a4150
 3. **Hawkeye page** (gold button) = TINDER DECK: 3 agent tabs span the top (Booking/Confirm/
    Closing, gear on active), ONE card at a time, next peeks behind, approve flies right,
    move flies left, swipe on mobile, buttons on desktop. Automations never appear here.
-4. **Popup modal** (glowing card in cascade): contact info left, chat + editable suggested
-   reply + teach-why + move-lead right. Approve auto-advances through the queue.
+4. **Popup modal RETIRED (2026-07-08 later)**: the cascade shows highlight rows only (no
+   actions); clicking a glowing lead opens the Hawkeye PAGE on that lead's card. The deck
+   is the single Hawkeye surface.
 5. **NO SKIP anywhere** - every Hawkeye action must be resolved (approve or move).
 6. Configure page = the LIVE focus mode (Entry->Engine->Exit, PR #1178) - reuse, don't rebuild.
 
