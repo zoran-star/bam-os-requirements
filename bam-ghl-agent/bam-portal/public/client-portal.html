@@ -32100,27 +32100,13 @@ function _plRenderOverview() {
   // ── the SIMPLE VIEW strip (Zoran 2026-07-08): colour-coded pills, no cards.
   // Click a stage -> its leads cascade below (highlights only); the pill morphs
   // to an up arrow (collapse) + a 3-line config icon (top right -> focus mode).
-  let hawkTotal = 0;
-  const pills = stages.map(s2 => {
-    const opps = s2.opportunities || [];
-    const role = _plStageRole(s2.name);
-    const bot = (typeof _plStageBot === 'function') ? _plStageBot(s2.name) : null;
-    const kind = bot ? bot.kind : 'human';
-    const sig = _plStageSignals(s2, opps);
-    if (kind === 'agent') hawkTotal += sig.hawk;
-    const col = _plo2Color(role);
-    const isOpen = _PLO2_OPEN === s2.id;
-    const sub = kind === 'agent'
-      ? (sig.hawk ? `<div class="sub hot">${sig.hawk} need you</div>` : `<div class="sub">${opps.length} card${opps.length === 1 ? '' : 's'}</div>`)
-      : kind === 'automation' ? `<div class="sub">${opps.length} enrolled</div>`
-      : `<div class="sub">${opps.length} ${role === 'member' || kind === 'terminal' ? 'active' : 'cards'}</div>`;
-    const inner = isOpen
-      ? `<div class="plo2-up"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m18 15-6-6-6 6"/></svg></div>
-         <span class="plo2-cfg" title="Configure this stage" onclick="event.stopPropagation();_plOpenFocus('${escapeHTML(s2.id)}')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="21" y1="6" x2="7" y2="6"/><line x1="17" y1="12" x2="3" y2="12"/><line x1="21" y1="18" x2="7" y2="18"/><circle cx="4.5" cy="6" r="1.7"/><circle cx="19.5" cy="12" r="1.7"/><circle cx="4.5" cy="18" r="1.7"/></svg></span>`
-      : `<div class="nm">${escapeHTML(_plCap(s2.name))}</div>${sub}`;
-    return `<div class="plo2-pill${kind === 'automation' ? ' auto' : ''}${isOpen ? ' active' : ''}${_PLO2_OPEN && !isOpen ? ' dim' : ''}" style="--pc:${col}" onclick="_plo2Toggle('${escapeHTML(s2.id)}')">${inner}</div>`;
-  }).join('');
-  const openStage = _PLO2_OPEN ? stages.find(s2 => s2.id === _PLO2_OPEN) : null;
+  // Pill order locked 2026-07-09: Nurture, Ghosted, Booking, Confirm, Closing -
+  // Member/terminal stages get no pill (_plo2Order). Pills shared with the
+  // command-center home strip (_plo2Pills).
+  const stages2 = _plo2Order(stages);
+  const built = _plo2Pills(stages2, { open: _PLO2_OPEN });
+  const pills = built.html, hawkTotal = built.hawk;
+  const openStage = _PLO2_OPEN ? stages2.find(s2 => s2.id === _PLO2_OPEN) : null;
 
   host.innerHTML = kpis
     + `<div class="plo-plhead"><h3>Pipeline</h3>
@@ -32139,11 +32125,57 @@ function _plo2Color(role) {
        : role === 'nurture' ? '#4A6FA5'
        : '#E08BB0';
 }
+// Pill order for the simple view + home strip (Zoran 2026-07-09): Nurture first,
+// then Ghosted, then Booking/Confirm/Closing in flow order. Member/Unqualified
+// (terminal) stages get NO pill; unmapped custom stages keep their pipeline
+// position after the known ones.
+function _plo2Order(stages) {
+  const ORD = { nurture: 0, interested: 1, responded: 2, scheduled_trial: 3, done_trial: 4 };
+  return stages
+    .filter(s => { const b = (typeof _plStageBot === 'function') ? _plStageBot(s.name) : null; return !(b && b.kind === 'terminal'); })
+    .map((s, i) => { const r = _plStageRole(s.name); return { s, k: (r && ORD[r] != null) ? ORD[r] : 10 + i }; })
+    .sort((a, b) => a.k - b.k)
+    .map(x => x.s);
+}
+// Build the pill cells. Shared by the Sales overview and the command-center home.
+// nav = { open, toggle, cfg }: the open stage id + handler NAMES, so the home
+// strip keeps its own open state and its config icon can leave cc-mode first.
+function _plo2Pills(stages, nav) {
+  const openId = nav && nav.open;
+  const toggle = (nav && nav.toggle) || '_plo2Toggle';
+  const cfg = (nav && nav.cfg) || '_plOpenFocus';
+  let hawk = 0;
+  const html = stages.map(s2 => {
+    const opps = s2.opportunities || [];
+    const role = _plStageRole(s2.name);
+    const bot = (typeof _plStageBot === 'function') ? _plStageBot(s2.name) : null;
+    const kind = bot ? bot.kind : 'human';
+    const sig = _plStageSignals(s2, opps);
+    if (kind === 'agent') hawk += sig.hawk;
+    const col = _plo2Color(role);
+    const isOpen = openId === s2.id;
+    const sub = kind === 'agent'
+      ? (sig.hawk ? `<div class="sub hot">${sig.hawk} need you</div>` : `<div class="sub">${opps.length} card${opps.length === 1 ? '' : 's'}</div>`)
+      : kind === 'automation' ? `<div class="sub">${opps.length} enrolled</div>`
+      : `<div class="sub">${opps.length} ${role === 'member' || kind === 'terminal' ? 'active' : 'cards'}</div>`;
+    const inner = isOpen
+      ? `<div class="plo2-up"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m18 15-6-6-6 6"/></svg></div>
+         <span class="plo2-cfg" title="Configure this stage" onclick="event.stopPropagation();${cfg}('${escapeHTML(s2.id)}')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="21" y1="6" x2="7" y2="6"/><line x1="17" y1="12" x2="3" y2="12"/><line x1="21" y1="18" x2="7" y2="18"/><circle cx="4.5" cy="6" r="1.7"/><circle cx="19.5" cy="12" r="1.7"/><circle cx="4.5" cy="18" r="1.7"/></svg></span>`
+      : `<div class="nm">${escapeHTML(_plCap(s2.name))}</div>${sub}`;
+    return `<div class="plo2-pill${kind === 'automation' ? ' auto' : ''}${isOpen ? ' active' : ''}${openId && !isOpen ? ' dim' : ''}" style="--pc:${col}" onclick="${toggle}('${escapeHTML(s2.id)}')">${inner}</div>`;
+  }).join('');
+  return { html, hawk };
+}
 let _PLO2_OPEN = null;   // stage id whose cascade is open on the simple view
 function _plo2Toggle(id) { _PLO2_OPEN = _PLO2_OPEN === id ? null : id; _plRenderOverview(); }
 // The cascade: highlight rows ONLY - no Hawkeye actions live here. A glowing
 // lead opens the Hawkeye deck on their card; a plain lead opens the drawer.
-function _plo2Cascade(stage) {
+function _plo2Cascade(stage, nav) {
+  // nav = { lead, card, more }: handler NAMES so the command-center home can
+  // route clicks through _ccOpenClassic before the deck / drawer / board opens.
+  const leadFn = nav && nav.lead;
+  const cardFn = (nav && nav.card) || '_plOpenCard';
+  const moreFn = (nav && nav.more) || '_plSVStage';
   const opps = stage.opportunities || [];
   const bot = (typeof _plStageBot === 'function') ? _plStageBot(stage.name) : null;
   const kind = bot ? bot.kind : 'human';
@@ -32169,15 +32201,15 @@ function _plo2Cascade(stage) {
              : kind === 'automation' ? 'enrolled · automation running'
              : (o.athlete ? 'athlete: ' + o.athlete : '');
     const click = need
-      ? `_hk2Open(null, '${escapeHTML(String(o.contactId || ''))}')`
-      : `_plOpenCard('${escapeHTML(o.id)}')`;
+      ? (leadFn ? `${leadFn}('${escapeHTML(String(o.contactId || ''))}')` : `_hk2Open(null, '${escapeHTML(String(o.contactId || ''))}')`)
+      : `${cardFn}('${escapeHTML(o.id)}')`;
     return `<div class="plo2-row" style="animation-delay:${Math.min(i, 10) * 45}ms"><div class="plo2-lead${need ? ' needs' : ''}" onclick="${click}">
       <div class="plo2-av">${escapeHTML(initials(nm))}</div>
       <div style="min-width:0"><div class="who">${escapeHTML(nm)}</div>${st ? `<div class="st">${escapeHTML(st)}</div>` : ''}</div></div></div>`;
   };
   const all = [...needy, ...plain];
   const rows = all.slice(0, 30).map(row).join('');
-  const more = all.length > 30 ? `<div class="plo2-more" onclick="_plSVStage('${escapeHTML(stage.id)}')">+ ${all.length - 30} more - open the board view</div>` : '';
+  const more = all.length > 30 ? `<div class="plo2-more" onclick="${moreFn}('${escapeHTML(stage.id)}')">+ ${all.length - 30} more - open the board view</div>` : '';
   const hint = kind === 'agent' ? 'gold ring = needs you in Hawkeye · tap it to handle · plain card = lead drawer'
              : kind === 'automation' ? 'the automation runs this stage - tap a lead for the drawer'
              : 'you run this stage - tap a lead for the drawer';
@@ -32223,6 +32255,26 @@ function _ccPipeStage(id) { try { _ccOpenClassic('pipelines'); } catch (_) {} se
 function _ccPipeFocus(id) { try { _ccOpenClassic('pipelines'); } catch (_) {} setTimeout(() => { try { _plOpenFocus(id); } catch (_) {} }, 120); }
 function _ccPipeHawk(key) { try { _ccOpenClassic('pipelines'); } catch (_) {} setTimeout(() => { try { _plEngineHawk(key); } catch (_) {} }, 120); }
 const _CC_PIPE_NAV = { stage: '_ccPipeStage', gear: '_ccPipeFocus', hawk: '_ccPipeHawk', hideClear: true };
+
+// ── Command-center HOME pill strip (Zoran 2026-07-09) ──────────────────────
+// The simple-view pills render on the home Sales section in place of the old
+// stage cards. The cascade opens right here on home; anything deeper (config,
+// deck, drawer, board) leaves cc-mode into the classic Sales view first.
+let _CC2_STAGES = null;  // home copy of the stage list (set by _ccSalesLoad)
+let _CC2_OPEN = null;    // stage id whose cascade is open on home
+function _cc2Toggle(id) { _CC2_OPEN = _CC2_OPEN === id ? null : id; _cc2Render(); }
+function _cc2Lead(cid) { try { _ccOpenClassic('pipelines'); } catch (_) {} setTimeout(() => { try { _hk2Open(null, cid); } catch (_) {} }, 120); }
+function _cc2Card(id) { try { _ccOpenClassic('pipelines'); } catch (_) {} setTimeout(() => { try { _plOpenCard(id); } catch (_) {} }, 120); }
+const _CC2_CASC_NAV = { lead: '_cc2Lead', card: '_cc2Card', more: '_ccPipeStage' };
+function _cc2Render() {
+  const strip = document.getElementById('cc-sal-strip');
+  if (!strip || !_CC2_STAGES) return;
+  const st = _plo2Order(_CC2_STAGES);
+  const built = _plo2Pills(st, { open: _CC2_OPEN, toggle: '_cc2Toggle', cfg: '_ccPipeFocus' });
+  const openStage = _CC2_OPEN ? st.find(s => s.id === _CC2_OPEN) : null;
+  strip.innerHTML = `<div class="plo2-strip" style="width:100%">${built.html}</div>`
+    + (openStage ? `<div class="plo2-casc">${_plo2Cascade(openStage, _CC2_CASC_NAV)}</div>` : '');
+}
 
 // engine glyphs the strip needs that aren't in the base _plIcon set
 function _ploEngIcon(name) {
@@ -48413,7 +48465,19 @@ async function _ccSalesLoad() {
       let cardStages = (pl.stages || []).map(s => ({ ...s, opportunities: byStage[s.id] || [] }));
       if (typeof _isStageAllowed === 'function') cardStages = cardStages.filter(s => _isStageAllowed(s.id));
       const strip = document.getElementById('cc-sal-strip');
-      if (strip) { _ploCss(); strip.innerHTML = `<div class="plo-strip" style="width:100%">${_ploStripCells(cardStages, _CC_PIPE_NAV)}</div>`; }
+      if (strip) {
+        _ploCss();
+        if (_plIsV2()) {
+          // V2 home = the simple-view pills in place of the old stage cards
+          // (Zoran 2026-07-09). The needs map loads async, so the "N need you"
+          // counts fill in on the repaint.
+          _CC2_STAGES = cardStages;
+          _cc2Render();
+          if (!_PL_NEEDS) { try { _plLoadNeedsAction().then(() => _cc2Render()); } catch (_) {} }
+        } else {
+          strip.innerHTML = `<div class="plo-strip" style="width:100%">${_ploStripCells(cardStages, _CC_PIPE_NAV)}</div>`;
+        }
+      }
       const feed = document.getElementById('cc-sal-feed');
       if (feed) {
         const stageName = {};
