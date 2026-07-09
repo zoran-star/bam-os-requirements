@@ -1,6 +1,6 @@
-# Stripe-Contact Link Cleanup - Design Scope (DECISIONS LOCKED 2026-07-08)
+# Stripe-Contact Link Cleanup - Design Scope (BUILT 2026-07-09)
 
-**Status:** C1-C4 answered by Zoran 2026-07-08. Not built.
+**Status:** Phases 1-3 CODE-COMPLETE 2026-07-09 (sweep + review UI + keep-clean webhook); Phase 4 merge tool already existed (api/ghl/merge-contacts.js + merge_contacts PG fn). Run migration `20260709120000_stripe_link_reviews.sql` + add `customer.created` to the Stripe webhook events, then sweep academies from the staff portal's "Stripe Link-Up" tab.
 **Where it lives:** STAFF portal, attached to the GHL contact import (Zoran's C1 call - see Decisions)
 **One-liner:** Link every Stripe customer in the academy's account to their contact record from the GoHighLevel contact import, and keep those links clean going forward.
 
