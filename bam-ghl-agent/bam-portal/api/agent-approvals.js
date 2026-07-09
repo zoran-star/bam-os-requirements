@@ -409,6 +409,31 @@ async function logApproval(row) {
   } catch (_) {}
 }
 
+// Contacts whose BOOKED trial time has already PASSED with no post-trial review
+// yet: Booking hands off once the trial runs (Zoran 2026-07-09), so these leads
+// belong to the post-trial form on the Confirm tab, NOT a Booking reply. We skip
+// drafting them and hide any lingering Booking card. Portal-booking academies
+// only (their trial spine lives in trial_bookings); window matches the Confirm
+// agent's post-trial detector (trials within the last 7 days). Fails to an empty
+// set so a lookup hiccup never wrongly hides live Booking cards.
+async function passedTrialContactIds(clientId) {
+  try {
+    if (!clientId) return new Set();
+    if ((await bookingProviderOf(clientId)) !== "portal") return new Set();
+    const since = new Date(Date.now() - 7 * 86400000).toISOString();
+    const nowIso = new Date().toISOString();
+    const bks = await sb(`trial_bookings?tenant_id=eq.${clientId}&status=eq.BOOKED&select=ghl_contact_id,schedule_slots(start_time)`) || [];
+    const due = (Array.isArray(bks) ? bks : []).filter(t => {
+      const st = t.schedule_slots && t.schedule_slots.start_time;
+      return t.ghl_contact_id && st && st <= nowIso && st >= since;
+    });
+    if (!due.length) return new Set();
+    const revs = await sb(`post_trial_reviews?client_id=eq.${clientId}&select=ghl_contact_id`) || [];
+    const reviewed = new Set((Array.isArray(revs) ? revs : []).map(r => String(r.ghl_contact_id || "")));
+    return new Set(due.map(t => String(t.ghl_contact_id)).filter(cid => cid && !reviewed.has(cid)));
+  } catch (_) { return new Set(); }
+}
+
 // ── Detector: pre-draft replies for Responded leads who just messaged ──
 // Hawkeye → queue as pending (a human approves in the inbox).
 // Self-drive → high-confidence drafts send themselves; unsure ones still queue.
@@ -424,13 +449,20 @@ async function detectForClient(client) {
   catch (e) { return { client_id: client.id, error: `queue: ${e.message}` }; }
   if (!rs) return { client_id: client.id, skipped: "no Responded stage" };
 
+  // Leads whose booked trial has already run: Booking hands them to the post-trial
+  // form (Confirm tab) instead of drafting another reply.
+  const passedTrial = await passedTrialContactIds(client.id);
+
   // Prune stale cards: cancel pending drafts whose lead has LEFT the Responded
   // stage (booked, moved, lost…) so Hawkeye only ever shows current Responded leads.
   let pruned = 0;
   try {
     const pend = await sb(`agent_ready_replies?client_id=eq.${client.id}&status=eq.pending&select=id,ghl_contact_id`);
     for (const row of (Array.isArray(pend) ? pend : [])) {
-      if (row.ghl_contact_id && !respondedIds.has(row.ghl_contact_id)) {
+      if (row.ghl_contact_id && passedTrial.has(String(row.ghl_contact_id))) {
+        await sb(`agent_ready_replies?id=eq.${row.id}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ status: "canceled", send_error: "trial ran — handed to post-trial form", updated_at: new Date().toISOString() }) });
+        pruned++;
+      } else if (row.ghl_contact_id && !respondedIds.has(row.ghl_contact_id)) {
         await sb(`agent_ready_replies?id=eq.${row.id}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ status: "canceled", send_error: "left Responded stage", updated_at: new Date().toISOString() }) });
         pruned++;
       }
@@ -472,6 +504,7 @@ async function detectForClient(client) {
     const contactId = item.contact_id;
     if (!contactId) { skipped++; reasons.push(`${item.name || "?"}: no contactId in queue item`); continue; }
     if (mutedSet.has(String(contactId))) { skipped++; reasons.push(`${item.name || contactId}: bot muted on this lead`); continue; }
+    if (passedTrial.has(String(contactId))) { skipped++; reasons.push(`${item.name || contactId}: trial already ran → post-trial form`); continue; }
     // Fresh inbound only: if the lead's last message is ≥24h old, we dropped the
     // ball — hand them to the ghost engine (Send to Ghosted) instead of a late
     // reply. Keeps the two engines from fighting and stops stale leads falling
@@ -789,7 +822,49 @@ async function handler(req, res) {
         }
         if (ids) list = list.filter(r => !r.ghl_contact_id || ids.has(r.ghl_contact_id));
       } catch (_) { /* fail open */ }
+      // Read-time post-trial gate: a lead whose booked trial has run belongs to
+      // the post-trial form (Confirm tab), not a Booking reply. Hide their card
+      // until the detector cron cancels it. Fail open on any lookup error.
+      try {
+        const passed = await passedTrialContactIds(clientId);
+        if (passed.size) list = list.filter(r => !r.ghl_contact_id || !passed.has(String(r.ghl_contact_id)));
+      } catch (_) { /* fail open */ }
       return res.status(200).json({ ready: list, count: list.length });
+    }
+    // Deck header names (Zoran 2026-07-09): the Hawkeye card shows the ATHLETE on
+    // top + the PARENT underneath. trial_bookings carries both for any lead with a
+    // trial; the contacts read table backfills athlete_name/name for the rest.
+    // Returns { names: { [ghl_contact_id]: { parent, athlete } } }.
+    if (b.action === "deck-names") {
+      const ids = Array.isArray(b.contact_ids) ? [...new Set(b.contact_ids.map(String).map(s => s.trim()).filter(Boolean))].slice(0, 200) : [];
+      const names = {};
+      if (ids.length) {
+        const inList = `(${ids.map(encodeURIComponent).join(",")})`;
+        // Authoritative source: the portal trial spine (parent + athlete typed at booking).
+        try {
+          const bks = await sb(`trial_bookings?tenant_id=eq.${clientId}&ghl_contact_id=in.${inList}&select=ghl_contact_id,parent_name,athlete_name,created_at&order=created_at.desc`);
+          for (const t of (Array.isArray(bks) ? bks : [])) {
+            const cid = String(t.ghl_contact_id || ""); if (!cid || names[cid]) continue;
+            names[cid] = { parent: t.parent_name || null, athlete: t.athlete_name || null };
+          }
+        } catch (_) {}
+        // Backfill anyone without a trial from the contacts read table.
+        try {
+          const missing = ids.filter(cid => { const e = names[cid]; return !e || (!e.athlete && !e.parent); });
+          if (missing.length) {
+            const tbl = await contactsReadTable(clientId);
+            const rows = await sb(`${tbl}?client_id=eq.${clientId}&ghl_contact_id=in.(${missing.map(encodeURIComponent).join(",")})&select=ghl_contact_id,name,athlete_name`);
+            for (const c of (Array.isArray(rows) ? rows : [])) {
+              const cid = String(c.ghl_contact_id || ""); if (!cid) continue;
+              const cur = names[cid] || { parent: null, athlete: null };
+              if (!cur.athlete && c.athlete_name) cur.athlete = c.athlete_name;
+              if (!cur.parent && c.name) cur.parent = c.name;
+              names[cid] = cur;
+            }
+          }
+        } catch (_) {}
+      }
+      return res.status(200).json({ names });
     }
     if (b.action === "skip-ready") {
       if (!b.ready_id) return res.status(400).json({ error: "ready_id required" });

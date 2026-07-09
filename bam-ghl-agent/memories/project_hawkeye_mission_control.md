@@ -141,6 +141,24 @@ scattered autonomy/config entry points. KEEPS: inline drawer suggestion on lead 
   terminal, idle >= _CC_STUCK_IDLE_DAYS (3). Catches the config gaps above so
   nothing is EVER silently stuck - read-only, client-side, oldest-idle first,
   each row opens the lead drawer. Only renders when count > 0.
+- DECK HEADER NAMES (2026-07-09, Zoran): card header is now TWO lines - athlete
+  on top (hk2-who), parent + confidence underneath (hk2-sub) - instead of a lone
+  "Lead". Names come from a batched `deck-names` action on agent-approvals
+  (trial_bookings parent_name/athlete_name first, contacts read table backfill);
+  _hk2Load stamps parent_name/athlete_name onto every card. No athlete name =
+  old single-name + confidence look. post_trial cards already carried athlete_name.
+- BOOKING HANDS OFF PASSED TRIALS (2026-07-09, Zoran): a Responded lead whose
+  BOOKED trial time has passed (<=7d, no post_trial_reviews row) no longer gets a
+  Booking reply card - they belong to the post-trial form on the Confirm tab.
+  New `passedTrialContactIds(clientId)` helper in agent-approvals (uses
+  bookingProviderOf, portal-only) drives: detector skips + cancels their pending
+  Booking cards ("trial ran - handed to post-trial form"); list-ready read gate
+  hides them; both fail open. Root cause found: agent-confirm `loadClient` was NOT
+  selecting `booking_provider`, so the post_trial gate (`client.booking_provider
+  === "portal"`) was ALWAYS false and the form card never generated. FIXED by
+  adding booking_provider + time_zone to that select (post-trial cards + correct
+  TZ now work). Data-verified on GTA (Josh MCGILVERY, trial Jul 7, still a Booking
+  reply pre-fix).
 - STILL TO DO: swipe gestures (open decision), GTA prod verification of the whole batch.
 
 ## Open item (ask Zoran before building)
