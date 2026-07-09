@@ -51187,6 +51187,22 @@ function toggleTheme() {
   </div>
 </div>
 
+<!-- ── Request a change focus session (V2) ──
+     Opens FROM the landing / funnel-config focus as its own camera-pan screen
+     (the annotator that used to be an inline accordion). Reuses the same
+     v2req-* element IDs so the _v2* helpers drive it unchanged. -->
+<div id="changeRequestModal" class="modal-backdrop mm-focus-page" style="display:none" onclick="if(event.target===this)closeChangeRequest()">
+  <div class="modal-card mm-modal-card" onclick="event.stopPropagation()">
+    <button type="button" class="mm-back-btn" onclick="closeChangeRequest()">&lsaquo; Back</button>
+    <div class="mm-mod-head">
+      <div>
+        <div class="modal-title" id="cr-modal-title" style="margin-bottom:0">Request a change</div>
+      </div>
+    </div>
+    <div id="cr-modal-body"></div>
+  </div>
+</div>
+
 <!-- ── New-creative / replace-creative request modal (Meta Ads support ticket) ──
      Centered modal (design system idiom); content rendered by _mmcRender.
      Submit MOCKED until v2_support_tickets lands. -->
@@ -52079,43 +52095,93 @@ function _fnRenderFunnelFocus(f) {
       '</span>' +
     '</div>';
   }).join('') || '<div style="font-size:13px;color:var(--text-mute);padding:10px 0">no entry points on this page yet</div>';
-  const urlVal = f.url || '';
-  const urlPh = f.url_resolved && !f.url ? f.url_resolved : 'https://yoursite.com/page';
+  // No owner-typed URL - the page is resolved in the backend from the funnel
+  // <-> entry point <-> offer link (Zoran 2026-07-08). Just show what feeds the
+  // pipeline, then "Request a change" opens its own focus session.
   body.innerHTML =
-    '<div style="font-family:var(--mm-ff);font-size:12px;color:var(--text-mute);margin-bottom:14px">Every form or calendar below feeds your pipeline from this page.</div>' +
-    '<div style="font-family:var(--mm-ff);font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--text-mute)">Page URL</div>' +
-    '<div style="display:flex;gap:8px;margin-top:6px">' +
-      '<input id="fn-url-input" type="url" value="' + _escapeHtml(urlVal) + '" placeholder="' + _escapeHtml(urlPh) + '" ' +
-        'style="flex:1;min-width:0;background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:9px 12px;font-family:var(--mm-fm);font-size:13px;color:var(--text)">' +
-      '<button type="button" onclick="_fnSaveUrl(\'' + f.id + '\')" ' +
-        'style="background:var(--gold);color:var(--on-gold);border:none;border-radius:8px;padding:9px 16px;font-family:var(--mm-ff);font-size:13px;font-weight:700;cursor:pointer">Save</button>' +
-    '</div>' +
-    '<div style="font-family:var(--mm-ff);font-size:11px;color:var(--text-mute);margin-top:5px">Used for the page preview below.</div>' +
-    '<div style="font-family:var(--mm-ff);font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--text-mute);margin-top:18px">Entry points on this page</div>' +
+    '<div style="font-family:var(--mm-ff);font-size:12px;color:var(--text-mute);margin-bottom:16px">Every form or calendar below feeds your pipeline from this page.</div>' +
+    '<div style="font-family:var(--mm-ff);font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--text-mute)">Entry points on this page</div>' +
     epRows +
-    _v2InlineHtml() +
+    _crTriggerHtml() +
     _v2TicketsNudgeHtml();
-  _v2Sync();   // restore the annotator's open/closed state across a re-render
 }
-async function _fnSaveUrl(id) {
-  const inp = document.getElementById('fn-url-input');
-  if (!inp) return;
-  const val = inp.value.trim();
-  try {
-    const token = await _mreqAuthToken();
-    const res = await fetch('/api/website/funnels?client_id=' + encodeURIComponent(CLIENT_ID) + '&id=' + encodeURIComponent(id), {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
-      body: JSON.stringify({ url: val || null }),
-    });
-    const json = await _safeJson(res);
-    if (!res.ok) throw new Error(json.error || ('HTTP ' + res.status));
-    const f = (_FN || []).find((x) => x.id === id);
-    if (f) { f.url = json.funnel.url; f.url_resolved = json.funnel.url || f.url_resolved; }
-    _mmToast('Page URL saved');
-    if (_FN_ACTIVE && _FN_ACTIVE.id === id) _fnRenderFunnelFocus(_FN_ACTIVE);
-  } catch (e) {
-    _mmToast('Could not save: ' + e.message);
+// Gold "Focus mode" button that opens the Request-a-change focus session.
+// Used by BOTH the free-trial landing focus and the other-funnel config focus.
+function _crTriggerHtml() {
+  const expand = '<svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M2 5.5V2.5h3M14 5.5V2.5h-3M2 10.5v3h3M14 10.5v3h-3"/></svg>';
+  return '<div style="display:flex;justify-content:flex-end;margin-top:18px">' +
+    '<button type="button" onclick="openChangeRequest()" style="border:1px solid var(--gold);background:var(--gold-glow,rgba(212,182,92,.15));border-radius:12px;padding:8px 16px;text-align:right;cursor:pointer;font-family:var(--mm-ff)">' +
+      '<span style="display:block;font-size:9.5px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:var(--gold)">Focus mode</span>' +
+      '<span style="display:inline-flex;align-items:center;gap:7px;font-size:14px;font-weight:800;color:var(--text);margin-top:1px">Request a change ' + expand + '</span>' +
+    '</button>' +
+  '</div>';
+}
+// The annotator body, reusing the exact v2req-* element IDs the _v2* helpers
+// target (iframe preview, stage flow, device tabs, notes, submit).
+function _crBodyHtml() {
+  const spark = '<svg width="17" height="17" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3.5V9M6 9l-2 .3 3.4 4.2 1.2-2.6 2.4 1L8 6.8 6 9z"/><path d="M6 3.5a2.3 2.3 0 1 0-2.3 2.3"/></svg>';
+  return '<div class="v2req-nudge">' + spark +
+      '<span>Scroll your page below, then <b>click any section</b> to leave a note on it.</span>' +
+    '</div>' +
+    '<div class="v2req-body">' +
+      '<div class="v2req-stagecol">' +
+        '<div class="v2req-flow" id="v2ReqStages"></div>' +
+        '<div class="v2req-devtab" id="v2ReqDevice">' +
+          '<button type="button" class="v2req-devbtn is-on" data-d="desktop" onclick="_v2SetDevice(\'desktop\')"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="1.5" y="2.5" width="13" height="9" rx="1"/><path d="M6 14h4M8 11.5V14"/></svg>Desktop</button>' +
+          '<button type="button" class="v2req-devbtn" data-d="mobile" onclick="_v2SetDevice(\'mobile\')"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="4.5" y="1.5" width="7" height="13" rx="1.5"/><path d="M7 12.5h2"/></svg>Mobile</button>' +
+        '</div>' +
+        '<div class="v2req-frame v2req-frame--desktop" id="v2ReqDeviceFrame">' +
+          '<div class="v2req-screen" id="v2ReqStage">' +
+            '<div class="v2req-stage-hint" id="v2ReqHint">loading your page&hellip;</div>' +
+            '<div class="v2req-scaler" id="v2ReqScaler"><iframe id="v2ReqFrame" title="Your page" referrerpolicy="no-referrer"></iframe></div>' +
+          '</div>' +
+          '<div class="v2req-stand"><span class="v2req-neck"></span><span class="v2req-base"></span></div>' +
+        '</div>' +
+      '</div>' +
+      '<div class="v2req-side">' +
+        '<div class="v2req-label">Your notes</div>' +
+        '<div class="v2req-notes" id="v2ReqNotes"></div>' +
+      '</div>' +
+    '</div>' +
+    '<div class="v2req-foot">' +
+      '<button type="button" class="v2req-send" id="v2ReqSubmit" onclick="_v2OpenReview()">Review and send &rarr;</button>' +
+    '</div>';
+}
+// Open the annotator as its own focus screen. We are always called from inside
+// the landing/funnel config focus (documentElement already has mm-focus-open),
+// so we SWAP the visible modal and keep the camera panned - no second pan.
+function openChangeRequest() {
+  if (!_MM) return;
+  _V2_OPEN = true; _V2_PINS = []; _V2_PENDING = null; _V2_STEPS = []; _V2_STAGE = null;
+  const t = document.getElementById('cr-modal-title');
+  if (t) t.textContent = 'Request a change · ' + (_FN_ACTIVE ? _FN_ACTIVE.label : 'Free trial');
+  const b = document.getElementById('cr-modal-body');
+  if (b) b.innerHTML = _crBodyHtml();
+  const cfg = document.getElementById('landingMachineModal');
+  const cr = document.getElementById('changeRequestModal');
+  if (!cr) return;
+  const panned = document.documentElement.classList.contains('mm-focus-open');
+  if (cfg) { cfg.classList.remove('mm-open'); cfg.style.display = 'none'; }
+  if (panned) {
+    cr.style.display = 'flex';
+    requestAnimationFrame(() => requestAnimationFrame(() => cr.classList.add('mm-open')));
+  } else {
+    // fallback: opened cold (not from a config focus) - do the full pan
+    _mmOpenFocus('changeRequestModal', '#landing-machine-card .mm-action-panel');
+  }
+  setTimeout(() => { try { _v2MountStage(); } catch (e) {} }, 80);
+}
+// Back from the annotator - return to the config screen we came from, keeping
+// the pan (the config's own Back button is what exits to the main surface).
+function closeChangeRequest() {
+  _V2_OPEN = false; _v2NoteCancel(); _v2CloseReview();
+  const cfg = document.getElementById('landingMachineModal');
+  const cr = document.getElementById('changeRequestModal');
+  if (cr) { cr.classList.remove('mm-open'); setTimeout(() => { cr.style.display = 'none'; }, 500); }
+  if (_FN_ACTIVE) _fnRenderFunnelFocus(_FN_ACTIVE); else _mmRenderLandingFocus(_MM);
+  if (cfg && document.documentElement.classList.contains('mm-focus-open')) {
+    cfg.style.display = 'flex';
+    requestAnimationFrame(() => cfg.classList.add('mm-open'));
   }
 }
 
@@ -52726,9 +52792,8 @@ function _mmRenderLandingFocus(d) {
   body.innerHTML =
     '<div class="mm-month" style="margin-bottom:14px"><span class="mm-month-meta">last ' + (d.range?.days || 14) + ' days</span></div>' +
     rows +
-    _v2InlineHtml() +
+    _crTriggerHtml() +
     _v2TicketsNudgeHtml();
-  _v2Sync();   // restore the annotator's open/closed state across a re-render
 }
 
 /* ── V2 "Request a change" annotator + client action items ──
@@ -53038,10 +53103,9 @@ function _v2Submit() {
     },
   };
   console.log('[v2-request] MOCK submit (no table yet):', payload);   // TODO: POST /api/v2-support-tickets
-  _V2_PINS = []; _V2_OPEN = false; _v2NoteCancel(); _v2CloseReview();
+  _V2_PINS = []; _v2NoteCancel(); _v2CloseReview();
   _mmToast('Request sent - staff will take a look');
-  if (onOther) _fnRenderFunnelFocus(_FN_ACTIVE);
-  else if (typeof _mmRenderLandingFocus === 'function' && typeof _MM !== 'undefined') _mmRenderLandingFocus(_MM);
+  closeChangeRequest();   // leave the annotator focus, back to the config screen
 }
 // Bridge listener: the client's V2 page (bam-client-sites) posts section hover/
 // click events when it loads in annotate mode. Until that ships this is dormant.
