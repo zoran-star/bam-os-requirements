@@ -7164,6 +7164,8 @@
           <!-- ── Marketing Machine (V2 only) - Meta ads card + landing page card ── -->
           <div id="marketing-machine-card" style="display:none"></div>
           <div id="landing-machine-card" style="display:none"></div>
+          <!-- Other entry point funnels (contact page etc.) - dropdown config list -->
+          <div id="other-funnels-card" style="display:none"></div>
 
           <!-- ── Resource guides (collapsed PDFs - placeholder until walkthrough videos) ── -->
           <details class="guide-card">
@@ -14408,6 +14410,9 @@ function _ibOpenContactDrawer(a) {
         <div style="height:1px;background:var(--border);margin:20px 0"></div>
         <div style="font-size:11px;font-weight:700;color:var(--text-mute);letter-spacing:0.6px;text-transform:uppercase;margin-bottom:10px">Tags</div>
         <div id="ib-cd-tags"></div>
+        <div style="height:1px;background:var(--border);margin:20px 0"></div>
+        <div style="font-size:11px;font-weight:700;color:var(--text-mute);letter-spacing:0.6px;text-transform:uppercase;margin-bottom:10px">Custom fields</div>
+        <div id="ib-cd-cf"><div style="font-size:12px;color:var(--text-mute)">Loading…</div></div>
         <div id="ib-cd-dupes" style="margin-top:20px"></div>
         <div style="font-size:12px;color:var(--text-mute);margin-top:18px;line-height:1.5">Not a member yet. When they sign up they will show a Member pill and link to their full profile here.</div>
         ${ghlUrl ? `<a href="${escapeHTML(ghlUrl)}" target="_blank" rel="noopener" style="display:flex;align-items:center;justify-content:center;gap:8px;margin-top:18px;background:transparent;color:var(--text);border:1px solid var(--border);padding:10px 12px;font-weight:600;border-radius:6px;cursor:pointer;font-size:13px;text-decoration:none">Open in GHL ↗</a>` : ''}
@@ -14418,8 +14423,16 @@ function _ibOpenContactDrawer(a) {
     if (bd) bd.style.opacity = '1';
     if (dr) dr.style.transform = 'translateX(0)';
   });
-  if (a.contactId) { _renderTagEditorFetch('ib-cd-tags', a.contactId); _ibLoadDupes(a.contactId); }
-  else { const t = document.getElementById('ib-cd-tags'); if (t) t.innerHTML = '<span style="font-size:12px;color:var(--text-mute)">No GHL contact linked.</span>'; }
+  if (a.contactId) {
+    _renderTagEditorFetch('ib-cd-tags', a.contactId);
+    _ibLoadDupes(a.contactId);
+    // Leads see the LEAD (sales-section) fields + academy-level fields.
+    const cf = document.getElementById('ib-cd-cf');
+    if (cf) _loadContactCF(cf, { clientId: CLIENT_ID, ghlContactId: a.contactId, section: 'sales' });
+  } else {
+    const t = document.getElementById('ib-cd-tags'); if (t) t.innerHTML = '<span style="font-size:12px;color:var(--text-mute)">No GHL contact linked.</span>';
+    const cf = document.getElementById('ib-cd-cf'); if (cf) cf.innerHTML = '<span style="font-size:12px;color:var(--text-mute)">No contact linked yet.</span>';
+  }
 }
 
 // Duplicate contacts (same phone / name) for the contact whose drawer is open.
@@ -14927,11 +14940,21 @@ async function _wdwCheck(btn) {
 let _OBF_STATE = null;   // { members, email, website, ein } after first fetch
 let _OBF_AT = 0;
 
+// Steps carry a `group` so the flow separates GENERAL academy setup from the
+// per-offer setup (Zoran 2026-07-09: "training is one offer type, separate the
+// general stuff from the training offer"). Member import lives UNDER the
+// training offer (it maps the roster onto that offer's plans), reusing the
+// Member Onboarding card's UI. As more offer types come online each gets its
+// own group; general steps stay shared.
+const _OBF_GROUPS = [
+  { key: 'general',  label: 'Academy setup', sub: 'Shared across every offer you run' },
+  { key: 'training', label: 'Training offer', sub: 'Your first offer - members, schedule and enrollment' },
+];
 const _OBF_STEPS = [
-  { key: 'members', title: 'Import your members', sub: 'Bring your roster in - import from Stripe or CSV, clean it up, link contacts', cta: 'Import members', go: '_obfGoMembers()' },
-  { key: 'email',   title: 'Connect your email domain', sub: 'Emails send from your own domain - one DNS paste at your registrar', cta: 'Set up email', go: '_obfGoDomains()' },
-  { key: 'website', title: 'Launch your new website', sub: 'Point your domain at the rebuilt site - the old one retires on the flip', cta: 'Set up website', go: '_obfGoDomains()' },
-  { key: 'ein',     title: 'Add your EIN', sub: 'Your business tax ID (business number in Canada) - unlocks offer publishing and the payment paperwork', cta: 'Add it in Blueprint', go: '_obfGoGeneral()' },
+  { key: 'ein',     group: 'general',  title: 'Add your business tax ID', sub: 'EIN (US) or Business Number (Canada) - unlocks offer publishing and the payment paperwork. Canadian businesses without one can skip this for now.', cta: 'Add it in Blueprint', go: '_obfGoGeneral()', skippable: true },
+  { key: 'email',   group: 'general',  title: 'Connect your email domain', sub: 'Emails send from your own domain - one DNS paste at your registrar', cta: 'Set up email', go: '_obfGoDomains()' },
+  { key: 'website', group: 'general',  title: 'Launch your new website', sub: 'Point your domain at the rebuilt site - the old one retires on the flip', cta: 'Set up website', go: '_obfGoDomains()' },
+  { key: 'members', group: 'training', title: 'Import your members', sub: 'Bring your roster onto this offer - import from Stripe or CSV, clean it up, link contacts', cta: 'Import members', go: '_obfGoMembers()' },
 ];
 
 function _obfIsV2() { return typeof V2_ACCESS !== 'undefined' && !!V2_ACCESS; }
@@ -14945,7 +14968,7 @@ async function _obfFetchState() {
     _wdwApi('status'),
   ]);
   if (mem.status === 'fulfilled') next.members = Array.isArray(mem.value.members) && mem.value.members.length > 0;
-  if (em.status === 'fulfilled') { next.email = em.value.status === 'live'; next.ein = !!em.value.ein_set; }
+  if (em.status === 'fulfilled') { next.email = em.value.status === 'live'; next.ein = !!em.value.ein_set || _obfSkipped('ein'); }
   if (web.status === 'fulfilled') next.website = web.value.status === 'live';
   _OBF_STATE = next; _OBF_AT = Date.now();
   _obfFanSync();
@@ -14983,6 +15006,24 @@ function _obfRing(done, total, px) {
     <circle cx="10" cy="10" r="${r}" fill="none" stroke="var(--border-med)" stroke-width="2.5"/>
     <circle cx="10" cy="10" r="${r}" fill="none" stroke="var(--gold)" stroke-width="2.5" stroke-linecap="round" stroke-dasharray="${c.toFixed(2)}" stroke-dashoffset="${(c * (1 - frac)).toFixed(2)}"/>
   </svg>`;
+}
+
+// Per-client "not applicable" dismissal for optional steps (EIN today). Kept
+// local-only on purpose: it is a personal "hide this nudge," not academy data,
+// and it clears itself the moment the real thing lands (a saved EIN wins).
+function _obfSkipKey() { return 'bam_obf_skip_' + (typeof CLIENT_ID !== 'undefined' ? CLIENT_ID : ''); }
+function _obfSkipped(key) {
+  try { return (JSON.parse(localStorage.getItem(_obfSkipKey()) || '[]') || []).includes(key); } catch (_) { return false; }
+}
+function _obfSkip(key) {
+  try {
+    const set = new Set(JSON.parse(localStorage.getItem(_obfSkipKey()) || '[]'));
+    set.add(key);
+    localStorage.setItem(_obfSkipKey(), JSON.stringify([...set]));
+  } catch (_) {}
+  if (_OBF_STATE) _OBF_STATE[key] = true;
+  _obfRender(_OBF_STATE);
+  _obfFanSync();
 }
 
 // Deep links close the flow first; command-center vs classic aware.
@@ -15026,7 +15067,7 @@ function _obfRender(st) {
   if (!st) { host.innerHTML = `<div style="font-size:12.5px;color:var(--red,#c96856)">Couldn't check your setup - try again in a minute.</div>`; return; }
   const done = _obfDone(st), total = _OBF_STEPS.length;
   if (prog) prog.innerHTML = `${_obfRing(done, total, 30)}<div style="font-size:13px;font-weight:700;color:var(--text)">${done} of ${total} done</div>` + (done === total ? `<div style="font-size:12px;color:var(--green,#7BC47F);font-weight:700">All set - your academy is fully onboarded</div>` : '');
-  host.innerHTML = _OBF_STEPS.map(s => {
+  const stepRow = (s) => {
     const ok = !!st[s.key];
     return `<div style="display:flex;align-items:center;gap:13px;padding:13px 14px;border:1px solid ${ok ? 'var(--accent-border,rgba(212,182,92,.25))' : 'var(--border)'};background:${ok ? 'var(--gold-sheen,rgba(212,182,92,.06))' : 'transparent'};border-radius:12px;margin-top:9px">
       <span style="flex:none;width:22px;height:22px;border-radius:999px;display:flex;align-items:center;justify-content:center;${ok ? 'background:var(--gold);color:var(--on-gold,#1a1608)' : 'border:1.5px solid var(--border-med);color:transparent'}">
@@ -15035,8 +15076,24 @@ function _obfRender(st) {
       <div style="flex:1;min-width:0">
         <div style="font-size:13.5px;font-weight:700;color:var(--text)">${s.title}</div>
         <div style="font-size:12px;color:var(--text-sub,var(--text-mute));margin-top:1px">${s.sub}</div>
+        ${(!ok && s.skippable) ? `<button onclick="_obfSkip('${s.key}')" style="margin-top:6px;background:none;border:none;padding:0;font:inherit;font-size:11px;font-weight:600;color:var(--text-mute);text-decoration:underline;cursor:pointer">Not applicable - skip for now</button>` : ''}
       </div>
       ${ok ? '' : `<button onclick="${s.go}" style="flex:none;background:var(--gold);border:none;border-radius:8px;color:var(--on-gold,#1a1608);padding:8px 13px;font:inherit;font-size:12px;font-weight:700;cursor:pointer">${s.cta}</button>`}
+    </div>`;
+  };
+  // Render group by group; a group with no steps is skipped. Each header shows
+  // the group's own n/N so the offer vs general split reads at a glance.
+  host.innerHTML = _OBF_GROUPS.map(g => {
+    const steps = _OBF_STEPS.filter(s => s.group === g.key);
+    if (!steps.length) return '';
+    const gDone = steps.filter(s => !!st[s.key]).length;
+    return `<div style="margin-top:20px">
+      <div style="display:flex;align-items:baseline;gap:8px">
+        <div style="font-size:11px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--text-mute)">${g.label}</div>
+        <div style="font-size:11px;font-weight:700;color:${gDone === steps.length ? 'var(--green,#7BC47F)' : 'var(--text-mute)'}">${gDone}/${steps.length}</div>
+      </div>
+      <div style="font-size:11.5px;color:var(--text-mute);margin-top:1px">${g.sub}</div>
+      ${steps.map(stepRow).join('')}
     </div>`;
   }).join('');
 }
@@ -26503,6 +26560,7 @@ function _bbCqOpenAdd(offerId, sectionId, clientId) {
       <label style="${lbl}">Options (one per line)</label>
       <textarea id="bb-cq-opts" rows="3" placeholder="Small&#10;Medium&#10;Large" style="${inp};resize:vertical"></textarea>
     </div>
+    <div id="bb-cq-also-wrap" style="margin-bottom:14px"></div>
     <div style="display:flex;gap:10px;justify-content:flex-end">
       <button onclick="document.getElementById('bb-cq-modal').remove()" style="padding:9px 16px;background:transparent;border:1px solid var(--border);border-radius:6px;color:var(--text-sub);font-size:13px;font-weight:600;cursor:pointer">Cancel</button>
       <button id="bb-cq-save" onclick="_bbCqSave('${offerId}','${sectionId}','${clientId}')" style="padding:9px 18px;background:var(--gold);border:1px solid var(--gold);border-radius:6px;color:#1a1a1a;font-size:13px;font-weight:700;cursor:pointer">Add</button>
@@ -26511,6 +26569,20 @@ function _bbCqOpenAdd(offerId, sectionId, clientId) {
   wrap.onclick = (e) => { if (e.target === wrap) wrap.remove(); };
   document.body.appendChild(wrap);
   setTimeout(() => { document.getElementById('bb-cq-label')?.focus(); }, 0);
+  // "Also applies to" - attach this field to other offers too (multi-offer).
+  // The current offer is always included; here the owner ticks any extras.
+  _bbLoadOffersList().then(offers => {
+    const host = document.getElementById('bb-cq-also-wrap');
+    if (!host) return;
+    const others = (offers || []).filter(o => o.id !== offerId);
+    if (!others.length) return; // nothing else to attach to
+    host.innerHTML = `<label style="${lbl}">Also collect this on other offers (optional)</label>
+      <div style="display:flex;flex-direction:column;gap:6px;margin-top:6px;max-height:132px;overflow-y:auto;border:1px solid var(--border);border-radius:6px;padding:8px 10px">
+        ${others.map(o => `<label style="display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--text);cursor:pointer">
+          <input type="checkbox" class="bb-cq-also" value="${escapeHTML(o.id)}"> ${escapeHTML(o.title || o.type || 'Offer')}
+        </label>`).join('')}
+      </div>`;
+  }).catch(() => {});
 }
 
 async function _bbCqSave(offerId, sectionId, clientId) {
@@ -26519,6 +26591,7 @@ async function _bbCqSave(offerId, sectionId, clientId) {
   if (!label) { document.getElementById('bb-cq-label')?.focus(); return; }
   const optsRaw = document.getElementById('bb-cq-opts')?.value || '';
   const options = (type === 'select' || type === 'multiselect') ? optsRaw.split('\n').map(s => s.trim()).filter(Boolean) : [];
+  const alsoOfferIds = Array.from(document.querySelectorAll('.bb-cq-also:checked')).map(el => el.value).filter(Boolean);
   const btn = document.getElementById('bb-cq-save');
   if (btn) { btn.disabled = true; btn.style.opacity = '0.6'; btn.style.cursor = 'not-allowed'; btn.textContent = 'Adding…'; }
   try {
@@ -26526,7 +26599,7 @@ async function _bbCqSave(offerId, sectionId, clientId) {
     const r = await fetch('/api/custom-fields', {
       method: 'POST',
       headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ client_id: clientId, offer_id: offerId, section: sectionId, label, type, options }),
+      body: JSON.stringify({ client_id: clientId, offer_id: offerId, section: sectionId, label, type, options, also_offer_ids: alsoOfferIds }),
     });
     if (!r.ok) { const j = await r.json().catch(() => ({})); throw new Error(j.error || 'Save failed'); }
   } catch (e) {
@@ -26536,6 +26609,9 @@ async function _bbCqSave(offerId, sectionId, clientId) {
   }
   document.getElementById('bb-cq-modal')?.remove();
   delete _bbCqCache[offerId + ':' + sectionId];
+  // The field now also lives on the picked offers (same section) - drop their
+  // caches so it shows when the owner opens them.
+  alsoOfferIds.forEach(oid => { delete _bbCqCache[oid + ':' + sectionId]; });
   _bbRenderWizardBody();
 }
 
@@ -29902,12 +29978,10 @@ function openEnrollDrawer(opts = {}) {
   }
   _ENROLL = {
     step: 1, q: '', searching: false, results: null, customer: null,
-    targets: null, offerKey: null, athlete: '', chargeMode: 'now',
-    startDate: '', consent: false, preview: null, busy: false, error: null, result: null,
-    couponCode: '', coupon: null, couponBusy: false, couponError: null,
-    pname: '', pemail: '', pphone: '',                    // parent contact (editable, required)
-    fields: null, fieldVals: {}, fieldsBusy: false,       // mandatory signup info (core + offer custom fields)
-    fieldsOfferId: null, showMissing: false,
+    targets: null, chargeMode: 'now', startDate: '', consent: false,
+    busy: false, error: null, result: null, showMissing: false,
+    pname: '', pemail: '', pphone: '',                    // parent contact (shared, required)
+    athletes: [],                                          // one entry per kid (see _enrollNewAthlete)
   };
   // Elevated: opened from the members focus-mode chat (z 9999) - sit above it,
   // same trick as the member drawer's elevated mode.
@@ -30056,14 +30130,23 @@ async function _enrollSearch() {
   s.searching = false; _enrollRender();
 }
 
+function _enrollNewAthlete(name) {
+  return {
+    name: name || '', offerKey: null,
+    fields: null, fieldsBusy: false, fieldsOfferId: null, fieldVals: {},
+    couponCode: '', coupon: null, couponBusy: false, couponError: null,
+  };
+}
+
 async function _enrollPickCustomer(idx) {
   const s = _ENROLL; if (!s || !Array.isArray(s.results)) return;
   const c = s.results[idx]; if (!c) return;
   s.customer = c; s.error = null;
-  // Prefill the athlete name from what we already know about this person.
-  s.athlete = (c.past_member && c.past_member.athlete_name) || (c.contact && c.contact.athlete_name) || '';
   s.pname = c.name || ''; s.pemail = c.email || ''; s.pphone = c.phone || '';
-  s.fields = null; s.fieldVals = {}; s.fieldsOfferId = null; s.showMissing = false;
+  // Start with one athlete, name prefilled from what we already know.
+  const known = (c.past_member && c.past_member.athlete_name) || (c.contact && c.contact.athlete_name) || '';
+  s.athletes = [_enrollNewAthlete(known)];
+  s.showMissing = false;
   s.step = 2; s.busy = true; _enrollRender();
   if (!s.targets) {
     try {
@@ -30074,6 +30157,17 @@ async function _enrollPickCustomer(idx) {
   s.busy = false; _enrollRender();
 }
 
+function _enrollAddAthlete() {
+  const s = _ENROLL; if (!s) return;
+  s.athletes.push(_enrollNewAthlete(''));
+  _enrollRender();
+}
+function _enrollRemoveAthlete(ai) {
+  const s = _ENROLL; if (!s || s.athletes.length <= 1) return;
+  s.athletes.splice(ai, 1);
+  _enrollRender();
+}
+
 // ── Step 2: offer price + athlete + start ──
 function _enrollMoney(cents, interval) {
   const dollars = (Number(cents || 0) / 100);
@@ -30082,67 +30176,98 @@ function _enrollMoney(cents, interval) {
   return amt + (map[interval] || '');
 }
 
+const _enrollInputBase = (bad) => `width:100%;box-sizing:border-box;padding:9px 12px;background:var(--bg);border:1px solid ${bad ? '#9a3b2f' : 'var(--border)'};border-radius:8px;color:var(--text);font:inherit;font-size:13.5px;outline:none`;
+
+function _enrollFieldEmpty(v) {
+  return v === null || v === undefined || v === '' || (Array.isArray(v) && v.length === 0);
+}
+function _enrollAthleteComplete(at) {
+  if (!at || !String(at.name || '').trim() || !at.offerKey) return false;
+  if (!Array.isArray(at.fields)) return false; // fields still loading
+  return at.fields.every(d => !_enrollFieldEmpty(at.fieldVals[d.id]));
+}
+function _enrollParentOk() {
+  const s = _ENROLL;
+  return String(s.pname || '').trim() && (String(s.pemail || '').trim() || String(s.pphone || '').trim());
+}
+
+// One athlete card: name, plan select, per-offer onboarding fields, coupon.
+function _enrollAthleteCard(ai) {
+  const s = _ENROLL;
+  const at = s.athletes[ai];
+  const t = (s.targets || []).find(x => x.key === at.offerKey) || null;
+  let fieldsHtml = '';
+  if (at.offerKey) {
+    if (at.fieldsBusy || at.fields === null) {
+      fieldsHtml = `<div class="req-empty" style="padding:10px 0"><span class="req-spin"></span>Loading questions…</div>`;
+    } else if (at.fields.length) {
+      fieldsHtml = at.fields.map(d => `
+        <div style="margin-bottom:9px">
+          <div style="font-size:12px;font-weight:600;color:var(--text-sub);margin-bottom:4px">${escapeHTML(d.label || d.key)}${d.scope === 'offer' ? ' <span style="font-size:10px;color:var(--gold,#D4B65C);font-weight:700;text-transform:uppercase;letter-spacing:0.4px">offer</span>' : ''}</div>
+          ${_enrollFieldInput(ai, d)}
+        </div>`).join('');
+    }
+  }
+  const couponBlock = !at.offerKey ? '' : (at.coupon ? `
+    <div style="font-size:12px;color:var(--gold,#D4B65C);margin-top:8px">Coupon ${escapeHTML(at.coupon.code)} · ${escapeHTML(at.coupon.label || '')} <a href="#" onclick="_enrollRemoveCoupon(${ai});return false" style="color:var(--text-mute);margin-left:4px">remove</a></div>` : `
+    <div style="display:flex;gap:8px;margin-top:8px">
+      <input id="enroll-coupon-${ai}" type="text" value="${escapeHTML(at.couponCode)}" placeholder="Coupon code (optional)"
+             onkeydown="if(event.key==='Enter')_enrollApplyCoupon(${ai})"
+             style="flex:1;padding:7px 11px;background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);font:inherit;font-size:12.5px;outline:none;text-transform:uppercase">
+      <button onclick="_enrollApplyCoupon(${ai})" ${at.couponBusy ? 'disabled' : ''} style="background:transparent;border:1px solid var(--border);color:var(--text);padding:7px 13px;font-size:12px;font-weight:700;border-radius:8px;cursor:pointer;font-family:inherit">${at.couponBusy ? '…' : 'Apply'}</button>
+    </div>
+    ${at.couponError ? `<div style="font-size:11.5px;color:#e08a7d;margin-top:5px">${escapeHTML(at.couponError)}</div>` : ''}`);
+  return `
+    <div style="border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:12px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+        <div style="font-size:11px;font-weight:700;color:var(--text-mute);letter-spacing:0.5px;text-transform:uppercase">Athlete ${ai + 1}</div>
+        ${s.athletes.length > 1 ? `<button onclick="_enrollRemoveAthlete(${ai})" style="background:transparent;border:none;color:var(--text-mute);font-size:12px;cursor:pointer">Remove</button>` : ''}
+      </div>
+      <input type="text" value="${escapeHTML(at.name || '')}" placeholder="Athlete's full name"
+             oninput="_enrollSetAthleteName(${ai}, this.value)"
+             style="${_enrollInputBase(s.showMissing && !String(at.name || '').trim())};margin-bottom:8px">
+      <select onchange="_enrollSetPrice(${ai}, this.value)" style="${_enrollInputBase(s.showMissing && !at.offerKey)};cursor:pointer">
+        <option value="">Choose a plan…</option>
+        ${(s.targets || []).map(x => `<option value="${escapeHTML(x.key)}" ${at.offerKey === x.key ? 'selected' : ''}>${escapeHTML(x.label)} - ${_enrollMoney(x.amount_cents, x.interval)}</option>`).join('')}
+      </select>
+      ${at.offerKey ? `<div style="margin-top:12px">${fieldsHtml || '<div style="font-size:12px;color:var(--text-mute)">No extra questions for this plan.</div>'}</div>` : ''}
+      ${couponBlock}
+    </div>`;
+}
+
 function _enrollRenderStep2(body) {
   const s = _ENROLL;
   const c = s.customer || {};
-  let prices;
   if (s.busy || s.targets === null) {
-    prices = `<div class="req-empty" style="padding:16px 0"><span class="req-spin"></span>Loading live prices…</div>`;
-  } else if (!s.targets.length) {
-    prices = `<div style="padding:12px;border:1px solid #c47424;border-radius:10px;font-size:13px;color:#c79a4a">No live prices found. Confirm prices in Blueprint > Offers > Pricing (Stripe Matcher) first.</div>`;
-  } else {
-    prices = s.targets.map(t => {
-      const on = s.offerKey === t.key;
-      return `
-        <div onclick="_enrollSetPrice('${escapeHTML(t.key).replace(/'/g, "\\'")}')" style="display:flex;justify-content:space-between;align-items:center;padding:11px 13px;border:1px solid ${on ? 'var(--gold,#D4B65C)' : 'var(--border)'};border-radius:10px;margin-bottom:7px;cursor:pointer;background:${on ? 'rgba(212,182,92,0.08)' : 'transparent'}">
-          <div style="font-weight:600;font-size:13.5px">${escapeHTML(t.label)}</div>
-          <div style="font-size:13px;font-weight:700;color:${on ? 'var(--gold,#D4B65C)' : 'var(--text-sub)'}">${_enrollMoney(t.amount_cents, t.interval)}</div>
-        </div>`;
-    }).join('');
+    body.innerHTML = _enrollHeader('Athletes and plans', '') + `<div class="req-empty" style="padding:16px 0"><span class="req-spin"></span>Loading live prices…</div>`;
+    return;
+  }
+  if (!s.targets.length) {
+    body.innerHTML = _enrollHeader('Athletes and plans', '') + `<div style="padding:12px;border:1px solid #c47424;border-radius:10px;font-size:13px;color:#c79a4a">No live prices found. Confirm prices in Blueprint > Offers > Pricing (Stripe Matcher) first.</div>`;
+    return;
   }
   const chip = (mode, label) => {
     const on = s.chargeMode === mode;
     return `<button onclick="_enrollSetChargeMode('${mode}')" style="background:${on ? 'var(--gold,#D4B65C)' : 'transparent'};color:${on ? '#0B0B0D' : 'var(--text)'};border:1px solid ${on ? 'var(--gold,#D4B65C)' : 'var(--border)'};padding:7px 13px;font-size:12.5px;font-weight:700;border-radius:999px;cursor:pointer;font-family:inherit">${label}</button>`;
   };
-  // Mandatory signup info: the same core + offer custom fields the public
-  // signup collects. Everything must be filled before Review.
-  const inputBase = (bad) => `width:100%;box-sizing:border-box;padding:9px 12px;background:var(--bg);border:1px solid ${bad ? '#9a3b2f' : 'var(--border)'};border-radius:8px;color:var(--text);font:inherit;font-size:13.5px;outline:none`;
-  const parentOk = String(s.pname || '').trim() && (String(s.pemail || '').trim() || String(s.pphone || '').trim());
-  let fieldsHtml = '';
-  if (s.offerKey) {
-    if (s.fieldsBusy || s.fields === null) {
-      fieldsHtml = `<div class="req-empty" style="padding:12px 0"><span class="req-spin"></span>Loading signup fields…</div>`;
-    } else if (s.fields.length) {
-      fieldsHtml = s.fields.map(d => `
-        <div style="margin-bottom:10px">
-          <div style="font-size:12px;font-weight:600;color:var(--text-sub);margin-bottom:4px">${escapeHTML(d.label || d.key)}${d.scope === 'offer' ? ' <span style="font-size:10px;color:var(--gold,#D4B65C);font-weight:700;text-transform:uppercase;letter-spacing:0.4px">offer</span>' : ''}</div>
-          ${_enrollFieldInput(d)}
-        </div>`).join('');
-    }
-  }
-  const fieldsOk = s.offerKey && Array.isArray(s.fields) && s.fields.every(d => !_enrollFieldEmpty(s.fieldVals[d.id]));
-  const canContinue = s.offerKey && String(s.athlete || '').trim() && parentOk && fieldsOk && (s.chargeMode !== 'on_date' || s.startDate);
-  body.innerHTML = _enrollHeader('Offer and plan', `For <b>${escapeHTML(c.name || c.email || 'the selected client')}</b> · <a href="#" onclick="_ENROLL.step=1;_enrollRender();return false" style="color:var(--gold,#D4B65C)">change</a>`) + `
-    <div style="font-size:11px;font-weight:700;color:var(--text-mute);letter-spacing:0.5px;text-transform:uppercase;margin-bottom:8px">Live offer prices</div>
-    ${prices}
-    <div style="font-size:11px;font-weight:700;color:var(--text-mute);letter-spacing:0.5px;text-transform:uppercase;margin:16px 0 8px">Athlete</div>
-    <input id="enroll-athlete" type="text" value="${escapeHTML(s.athlete || '')}" placeholder="Athlete's full name"
-           oninput="_ENROLL.athlete=this.value"
-           style="${inputBase(s.showMissing && !String(s.athlete || '').trim())}">
-    <div style="font-size:11px;font-weight:700;color:var(--text-mute);letter-spacing:0.5px;text-transform:uppercase;margin:16px 0 8px">Parent contact</div>
-    <div style="display:grid;gap:8px">
-      <input type="text" value="${escapeHTML(s.pname)}" placeholder="Parent's full name" oninput="_ENROLL.pname=this.value" style="${inputBase(s.showMissing && !String(s.pname || '').trim())}">
-      <input type="email" value="${escapeHTML(s.pemail)}" placeholder="Parent's email" oninput="_ENROLL.pemail=this.value" style="${inputBase(s.showMissing && !parentOk)}">
-      <input type="tel" value="${escapeHTML(s.pphone)}" placeholder="Parent's phone" oninput="_ENROLL.pphone=this.value" style="${inputBase(false)}">
+  const parentOk = _enrollParentOk();
+  const allComplete = s.athletes.length && s.athletes.every(_enrollAthleteComplete);
+  const canContinue = parentOk && allComplete && (s.chargeMode !== 'on_date' || s.startDate);
+  body.innerHTML = _enrollHeader('Athletes and plans', `For <b>${escapeHTML(c.name || c.email || 'the selected client')}</b> · <a href="#" onclick="_ENROLL.step=1;_enrollRender();return false" style="color:var(--gold,#D4B65C)">change</a>`) + `
+    <div style="font-size:11px;font-weight:700;color:var(--text-mute);letter-spacing:0.5px;text-transform:uppercase;margin-bottom:8px">Parent contact <span style="font-weight:600;text-transform:none;letter-spacing:0">- shared by all athletes</span></div>
+    <div style="display:grid;gap:8px;margin-bottom:18px">
+      <input type="text" value="${escapeHTML(s.pname)}" placeholder="Parent's full name" oninput="_ENROLL.pname=this.value" style="${_enrollInputBase(s.showMissing && !String(s.pname || '').trim())}">
+      <input type="email" value="${escapeHTML(s.pemail)}" placeholder="Parent's email" oninput="_ENROLL.pemail=this.value" style="${_enrollInputBase(s.showMissing && !parentOk)}">
+      <input type="tel" value="${escapeHTML(s.pphone)}" placeholder="Parent's phone" oninput="_ENROLL.pphone=this.value" style="${_enrollInputBase(false)}">
     </div>
-    ${s.offerKey ? `
-    <div style="font-size:11px;font-weight:700;color:var(--text-mute);letter-spacing:0.5px;text-transform:uppercase;margin:16px 0 8px">Signup info <span style="font-weight:600;text-transform:none;letter-spacing:0">- onboarding questions, all required</span></div>
-    ${fieldsHtml || '<div style="font-size:12.5px;color:var(--text-mute)">This offer has no extra onboarding questions.</div>'}` : ''}
-    <div style="font-size:11px;font-weight:700;color:var(--text-mute);letter-spacing:0.5px;text-transform:uppercase;margin:16px 0 8px">First charge</div>
+    <div style="font-size:11px;font-weight:700;color:var(--text-mute);letter-spacing:0.5px;text-transform:uppercase;margin-bottom:8px">Athletes <span style="font-weight:600;text-transform:none;letter-spacing:0">- onboarding questions all required</span></div>
+    ${s.athletes.map((_, ai) => _enrollAthleteCard(ai)).join('')}
+    <button onclick="_enrollAddAthlete()" style="width:100%;background:transparent;border:1px dashed var(--border);color:var(--gold,#D4B65C);padding:9px;font-size:13px;font-weight:700;border-radius:8px;cursor:pointer;font-family:inherit;margin-bottom:16px">+ Add another athlete</button>
+    <div style="font-size:11px;font-weight:700;color:var(--text-mute);letter-spacing:0.5px;text-transform:uppercase;margin:0 0 8px">First charge <span style="font-weight:600;text-transform:none;letter-spacing:0">- applies to all</span></div>
     <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
       ${chip('now', 'Charge now')}
       ${chip('on_date', 'Start on a date')}
-      ${s.chargeMode === 'on_date' ? `<input id="enroll-date" type="date" value="${escapeHTML(s.startDate)}" min="${new Date().toISOString().slice(0, 10)}"
+      ${s.chargeMode === 'on_date' ? `<input type="date" value="${escapeHTML(s.startDate)}" min="${new Date().toISOString().slice(0, 10)}"
         onchange="_ENROLL.startDate=this.value;_enrollRender()"
         style="padding:7px 10px;background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);font:inherit;font-size:13px;outline:none">` : ''}
     </div>
@@ -30153,52 +30278,48 @@ function _enrollRenderStep2(body) {
     </div>`;
 }
 
-function _enrollSetPrice(key) {
-  const s = _ENROLL; if (!s) return;
-  s.offerKey = key;
-  _enrollRender();
-  // Load the offer's mandatory signup fields (core + offer custom questions),
-  // prefilled with anything the person's contact record already holds.
+function _enrollSetAthleteName(ai, value) { if (_ENROLL && _ENROLL.athletes[ai]) _ENROLL.athletes[ai].name = value; }
+
+function _enrollSetPrice(ai, key) {
+  const s = _ENROLL; if (!s || !s.athletes[ai]) return;
+  const at = s.athletes[ai];
+  at.offerKey = key || null;
+  at.coupon = null; at.couponCode = ''; at.couponError = null; // price changed - drop any coupon
+  if (!key) { at.fields = null; at.fieldsOfferId = null; _enrollRender(); return; }
   const t = (s.targets || []).find(x => x.key === key) || {};
   const oid = t.offer_id || null;
-  if (s.fieldsOfferId !== oid || s.fields === null) {
-    s.fieldsOfferId = oid; s.fieldsBusy = true; s.fields = null; _enrollRender();
-    _enrollApi('signup-fields', { offer_id: oid, email: s.pemail || null, phone: s.pphone || null })
-      .then(json => {
-        s.fields = json.fields || [];
-        const vals = {};
-        s.fields.forEach(d => { if (d.value !== null && d.value !== undefined) vals[d.id] = d.value; });
-        s.fieldVals = { ...vals, ...s.fieldVals };
-      })
-      .catch(e => { s.fields = []; s.error = 'Couldn\'t load signup fields - ' + e.message; })
-      .finally(() => { s.fieldsBusy = false; _enrollRender(); });
-  }
+  at.fieldsOfferId = oid; at.fieldsBusy = true; at.fields = null; _enrollRender();
+  _enrollApi('signup-fields', { offer_id: oid, email: s.pemail || null, phone: s.pphone || null })
+    .then(json => {
+      at.fields = json.fields || [];
+      const vals = {};
+      at.fields.forEach(d => { if (d.value !== null && d.value !== undefined) vals[d.id] = d.value; });
+      at.fieldVals = { ...vals, ...at.fieldVals };
+    })
+    .catch(e => { at.fields = []; s.error = 'Couldn\'t load questions - ' + e.message; })
+    .finally(() => { at.fieldsBusy = false; _enrollRender(); });
 }
 function _enrollSetChargeMode(mode) { if (_ENROLL) { _ENROLL.chargeMode = mode; _enrollRender(); } }
 
-function _enrollFV(defId, value) { if (_ENROLL) _ENROLL.fieldVals[defId] = value; }
-function _enrollFVMulti(defId, opt, checked) {
-  const s = _ENROLL; if (!s) return;
-  const cur = Array.isArray(s.fieldVals[defId]) ? s.fieldVals[defId].slice() : [];
+function _enrollFV(ai, defId, value) { if (_ENROLL && _ENROLL.athletes[ai]) _ENROLL.athletes[ai].fieldVals[defId] = value; }
+function _enrollFVMulti(ai, defId, opt, checked) {
+  const at = _ENROLL && _ENROLL.athletes[ai]; if (!at) return;
+  const cur = Array.isArray(at.fieldVals[defId]) ? at.fieldVals[defId].slice() : [];
   const i = cur.indexOf(opt);
   if (checked && i < 0) cur.push(opt);
   if (!checked && i >= 0) cur.splice(i, 1);
-  s.fieldVals[defId] = cur;
-}
-function _enrollFieldEmpty(v) {
-  return v === null || v === undefined || v === '' || (Array.isArray(v) && v.length === 0);
+  at.fieldVals[defId] = cur;
 }
 
-// One input per field def, by type. Values live in _ENROLL.fieldVals keyed by
-// def id (bound oninput/onchange so re-renders don't lose keystrokes).
-function _enrollFieldInput(d) {
-  const s = _ENROLL;
-  const v = s.fieldVals[d.id];
-  const missing = s.showMissing && _enrollFieldEmpty(v);
+// One input per field def, by type. Values live in athletes[ai].fieldVals keyed
+// by def id (bound oninput/onchange so re-renders don't lose keystrokes).
+function _enrollFieldInput(ai, d) {
+  const at = _ENROLL.athletes[ai];
+  const v = at.fieldVals[d.id];
+  const missing = _ENROLL.showMissing && _enrollFieldEmpty(v);
   const base = `width:100%;box-sizing:border-box;padding:8px 11px;background:var(--bg);border:1px solid ${missing ? '#9a3b2f' : 'var(--border)'};border-radius:8px;color:var(--text);font:inherit;font-size:13px;outline:none`;
-  const id = `enroll-cf-${d.id}`;
   if (d.type === 'select') {
-    return `<select id="${id}" onchange="_enrollFV('${d.id}', this.value)" style="${base}">
+    return `<select onchange="_enrollFV(${ai}, '${d.id}', this.value)" style="${base}">
       <option value="" ${_enrollFieldEmpty(v) ? 'selected' : ''}>Choose…</option>
       ${(d.options || []).map(o => `<option value="${escapeHTML(o)}" ${v === o ? 'selected' : ''}>${escapeHTML(o)}</option>`).join('')}
     </select>`;
@@ -30207,118 +30328,88 @@ function _enrollFieldInput(d) {
     const cur = Array.isArray(v) ? v : [];
     return `<div style="display:flex;gap:8px 16px;flex-wrap:wrap;padding:8px 11px;border:1px solid ${missing ? '#9a3b2f' : 'var(--border)'};border-radius:8px">
       ${(d.options || []).map(o => `<label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer">
-        <input type="checkbox" ${cur.indexOf(o) >= 0 ? 'checked' : ''} onchange="_enrollFVMulti('${d.id}', '${escapeHTML(o).replace(/'/g, "\\'")}', this.checked)"> ${escapeHTML(o)}</label>`).join('')}
+        <input type="checkbox" ${cur.indexOf(o) >= 0 ? 'checked' : ''} onchange="_enrollFVMulti(${ai}, '${d.id}', '${escapeHTML(o).replace(/'/g, "\\'")}', this.checked)"> ${escapeHTML(o)}</label>`).join('')}
     </div>`;
   }
   if (d.type === 'boolean') {
-    return `<select id="${id}" onchange="_enrollFV('${d.id}', this.value === '' ? '' : this.value === 'true')" style="${base}">
+    return `<select onchange="_enrollFV(${ai}, '${d.id}', this.value === '' ? '' : this.value === 'true')" style="${base}">
       <option value="" ${_enrollFieldEmpty(v) ? 'selected' : ''}>Choose…</option>
       <option value="true" ${v === true ? 'selected' : ''}>Yes</option>
       <option value="false" ${v === false ? 'selected' : ''}>No</option>
     </select>`;
   }
   const t = d.type === 'number' ? 'number' : d.type === 'date' ? 'date' : 'text';
-  return `<input id="${id}" type="${t}" value="${escapeHTML(v === null || v === undefined ? '' : String(v))}"
-    oninput="_enrollFV('${d.id}', ${t === 'number' ? 'this.value === \'\' ? \'\' : Number(this.value)' : 'this.value'})" style="${base}">`;
+  return `<input type="${t}" value="${escapeHTML(v === null || v === undefined ? '' : String(v))}"
+    oninput="_enrollFV(${ai}, '${d.id}', ${t === 'number' ? 'this.value === \'\' ? \'\' : Number(this.value)' : 'this.value'})" style="${base}">`;
 }
 
-async function _enrollToReview() {
+async function _enrollApplyCoupon(ai) {
+  const s = _ENROLL; const at = s && s.athletes[ai]; if (!at || at.couponBusy) return;
+  const input = document.getElementById('enroll-coupon-' + ai);
+  at.couponCode = input ? input.value.trim().toUpperCase() : at.couponCode;
+  if (!at.couponCode) { at.couponError = 'Type a code first.'; return _enrollRender(); }
+  at.couponBusy = true; at.couponError = null; _enrollRender();
+  try {
+    const json = await _enrollApi('check-coupon', { offer_price_key: at.offerKey, code: at.couponCode });
+    at.coupon = json.coupon || null;
+  } catch (e) { at.coupon = null; at.couponError = e.message; }
+  at.couponBusy = false; _enrollRender();
+}
+function _enrollRemoveCoupon(ai) {
+  const at = _ENROLL && _ENROLL.athletes[ai]; if (!at) return;
+  at.coupon = null; at.couponCode = ''; at.couponError = null; _enrollRender();
+}
+
+function _enrollToReview() {
   const s = _ENROLL; if (!s) return;
-  const input = document.getElementById('enroll-athlete');
-  if (input) s.athlete = input.value;
-  const parentOk = String(s.pname || '').trim() && (String(s.pemail || '').trim() || String(s.pphone || '').trim());
-  const fieldsOk = Array.isArray(s.fields) && s.fields.every(d => !_enrollFieldEmpty(s.fieldVals[d.id]));
-  if (!s.offerKey || !String(s.athlete || '').trim() || !parentOk || !fieldsOk || (s.chargeMode === 'on_date' && !s.startDate)) {
+  if (!_enrollParentOk() || !s.athletes.every(_enrollAthleteComplete) || (s.chargeMode === 'on_date' && !s.startDate)) {
     s.showMissing = true;
-    s.error = !s.offerKey ? 'Pick an offer price first.'
-      : !fieldsOk ? 'Fill every signup field - they\'re all required for a manual signup.'
-      : 'Fill the highlighted fields first.';
+    s.error = !_enrollParentOk() ? 'Fill the parent contact (name + email or phone).'
+      : (s.chargeMode === 'on_date' && !s.startDate) ? 'Pick a start date.'
+      : 'Every athlete needs a plan and all their questions answered.';
     return _enrollRender();
   }
-  s.showMissing = false;
-  s.error = null; s.step = 3; s.preview = null; s.consent = false;
-  s.coupon = null; s.couponCode = ''; s.couponError = null; // price may have changed - re-check any coupon
-  _enrollRender();
-  try {
-    s.preview = await _enrollApi('preview', {
-      customer_id: s.customer.id, offer_price_key: s.offerKey, athlete_name: s.athlete.trim(),
-    });
-  } catch (e) {
-    s.error = e.message; s.step = 2;
-  }
+  s.showMissing = false; s.error = null; s.consent = false; s.step = 3;
   _enrollRender();
 }
 
-// ── Step 3: review + consent + confirm ──
+// ── Step 3: family review + one consent + confirm ──
 function _enrollRenderStep3(body) {
   const s = _ENROLL;
-  const p = s.preview;
-  if (!p) {
-    body.innerHTML = _enrollHeader('Review', '') + `<div class="req-empty" style="padding:18px 0"><span class="req-spin"></span>Checking Stripe…</div>`;
-    return;
-  }
-  const dup = Array.isArray(p.duplicates) && p.duplicates.length ? p.duplicates[0] : null;
-  const line = (k, v) => `<div style="display:flex;justify-content:space-between;gap:12px;padding:7px 0;border-bottom:1px solid var(--border);font-size:13.5px"><span style="color:var(--text-mute)">${k}</span><span style="font-weight:600;text-align:right">${v}</span></div>`;
+  const line = (k, v) => `<div style="display:flex;justify-content:space-between;gap:12px;padding:6px 0;font-size:13px"><span style="color:var(--text-mute)">${k}</span><span style="font-weight:600;text-align:right">${v}</span></div>`;
   const firstCharge = s.chargeMode === 'on_date' ? escapeHTML(s.startDate) : 'Today';
-  const cardLine = p.needs_card
-    ? `<span style="color:#c79a4a">No usable card - a secure card link will be created</span>`
-    : escapeHTML(((p.card_brand || 'Card') + ' ').replace(/^\w/, ch => ch.toUpperCase()) + '···· ' + (p.card_last4 || ''));
-  const confirmLabel = p.needs_card ? 'Add as pending + create card link' : (s.chargeMode === 'on_date' ? 'Confirm - schedule the signup' : 'Confirm - charge the card');
-  const canConfirm = s.consent && !s.busy && !dup;
-  body.innerHTML = _enrollHeader('Review and confirm', '') + `
-    ${dup ? `<div style="margin-bottom:14px;padding:11px 13px;border:1px solid #c47424;border-radius:10px;background:rgba(196,116,36,0.08);font-size:13px;color:#c79a4a"><b>${escapeHTML(dup.athlete_name || 'This athlete')}</b> is already on the roster (${escapeHTML(dup.status)}). Use Change plan on their member card instead.</div>` : ''}
-    <div style="padding:4px 14px;border:1px solid var(--border);border-radius:12px;margin-bottom:16px">
-      ${line('Client', escapeHTML(s.pname || s.customer.name || s.customer.email || '-'))}
-      ${line('Athlete', escapeHTML(s.athlete.trim()))}
-      ${Array.isArray(s.fields) && s.fields.length ? line('Signup info', `${s.fields.length} fields collected`) : ''}
-      ${line('Plan', escapeHTML((s.targets.find(t => t.key === s.offerKey) || {}).label || s.offerKey))}
-      ${s.coupon
-        ? line('Price', `<s style="color:var(--text-mute);font-weight:400">${_enrollMoney(p.price.amount_cents, p.price.interval)}</s> <span style="color:var(--gold,#D4B65C)">${_enrollMoney(s.coupon.discounted_cents, p.price.interval)}</span>`)
-        : line('Price', _enrollMoney(p.price.amount_cents, p.price.interval))}
-      ${s.coupon ? line('Coupon', `${escapeHTML(s.coupon.code)} · ${escapeHTML(s.coupon.label || '')} <a href="#" onclick="_enrollRemoveCoupon();return false" style="color:var(--text-mute);margin-left:6px">remove</a>`) : ''}
-      ${line('First charge', firstCharge)}
-      <div style="display:flex;justify-content:space-between;gap:12px;padding:7px 0;font-size:13.5px"><span style="color:var(--text-mute)">Payment</span><span style="font-weight:600;text-align:right">${cardLine}</span></div>
-    </div>
-    ${s.coupon ? '' : `
-    <div style="margin-bottom:16px">
-      <div style="display:flex;gap:8px">
-        <input id="enroll-coupon" type="text" value="${escapeHTML(s.couponCode)}" placeholder="Coupon code (optional)"
-               onkeydown="if(event.key==='Enter')_enrollApplyCoupon()"
-               style="flex:1;padding:8px 12px;background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);font:inherit;font-size:13px;outline:none;text-transform:uppercase">
-        <button onclick="_enrollApplyCoupon()" ${s.couponBusy ? 'disabled' : ''} style="background:transparent;border:1px solid var(--border);color:var(--text);padding:8px 14px;font-size:12.5px;font-weight:700;border-radius:8px;cursor:pointer;font-family:inherit">${s.couponBusy ? 'Checking…' : 'Apply'}</button>
-      </div>
-      ${s.couponError ? `<div style="font-size:12px;color:#e08a7d;margin-top:6px">${escapeHTML(s.couponError)}</div>` : ''}
-    </div>`}
+  let totalCents = 0;
+  const rows = s.athletes.map(at => {
+    const t = (s.targets || []).find(x => x.key === at.offerKey) || {};
+    const cents = at.coupon ? at.coupon.discounted_cents : t.amount_cents;
+    totalCents += Number(cents || 0);
+    const priceHtml = at.coupon
+      ? `<s style="color:var(--text-mute);font-weight:400">${_enrollMoney(t.amount_cents, t.interval)}</s> <span style="color:var(--gold,#D4B65C)">${_enrollMoney(at.coupon.discounted_cents, t.interval)}</span>`
+      : _enrollMoney(t.amount_cents, t.interval);
+    return `<div style="border:1px solid var(--border);border-radius:10px;padding:11px 13px;margin-bottom:8px">
+      <div style="font-weight:700;font-size:14px;margin-bottom:4px">${escapeHTML(at.name.trim())}</div>
+      ${line('Plan', escapeHTML(t.label || at.offerKey))}
+      ${line('Price', priceHtml)}
+      ${at.coupon ? line('Coupon', escapeHTML(at.coupon.code)) : ''}
+      ${Array.isArray(at.fields) && at.fields.length ? line('Questions', `${at.fields.length} answered`) : ''}
+    </div>`;
+  }).join('');
+  const consentTxt = `I confirm the parent agreed to ${s.athletes.length > 1 ? 'these signups' : 'this signup'} and to the charge on their saved card.`;
+  const canConfirm = s.consent && !s.busy;
+  const confirmLabel = s.chargeMode === 'on_date' ? `Confirm - schedule ${s.athletes.length}` : `Confirm - charge ${s.athletes.length}`;
+  body.innerHTML = _enrollHeader('Review and confirm', `${escapeHTML(s.pname || s.customer.name || '-')} · ${s.athletes.length} athlete${s.athletes.length > 1 ? 's' : ''}`) + `
+    ${rows}
+    <div style="display:flex;justify-content:space-between;padding:8px 2px 0;font-size:14px;font-weight:800;border-top:1px solid var(--border);margin-bottom:6px"><span>First charge total</span><span>${_enrollMoney(totalCents, null)}</span></div>
+    <div style="font-size:12px;color:var(--text-mute);margin-bottom:16px">First charge: ${firstCharge}. Each athlete bills on their own plan after that.</div>
     <label style="display:flex;gap:10px;align-items:flex-start;padding:12px 13px;border:1px solid ${s.consent ? 'var(--gold,#D4B65C)' : 'var(--border)'};border-radius:10px;cursor:pointer;margin-bottom:16px">
       <input type="checkbox" ${s.consent ? 'checked' : ''} onchange="_ENROLL.consent=this.checked;_enrollRender()" style="margin-top:2px">
-      <span style="font-size:13px;line-height:1.45">I confirm the parent agreed to this signup${p.needs_card ? '' : ' and to the charge on their saved card'}.</span>
+      <span style="font-size:13px;line-height:1.45">${consentTxt}</span>
     </label>
+    ${s.error ? `<div style="margin-bottom:12px;font-size:12.5px;color:#e08a7d">${escapeHTML(s.error)}</div>` : ''}
     <div style="display:flex;gap:10px">
       <button onclick="_ENROLL.step=2;_enrollRender()" style="background:transparent;border:1px solid var(--border);color:var(--text);padding:10px 16px;font-size:13px;font-weight:600;border-radius:8px;cursor:pointer;font-family:inherit">Back</button>
       <button onclick="_enrollConfirm()" ${canConfirm ? '' : 'disabled'} style="flex:1;background:${canConfirm ? 'var(--gold,#D4B65C)' : 'var(--border)'};color:${canConfirm ? '#0B0B0D' : 'var(--text-mute)'};border:none;padding:10px 16px;font-size:13.5px;font-weight:700;border-radius:8px;cursor:${canConfirm ? 'pointer' : 'not-allowed'};font-family:inherit">${s.busy ? 'Working…' : confirmLabel}</button>
     </div>`;
-}
-
-// Validate the coupon against the chosen plan price server-side, show the
-// discounted price on the review lines. Re-validated again at enroll time.
-async function _enrollApplyCoupon() {
-  const s = _ENROLL; if (!s || s.couponBusy) return;
-  const input = document.getElementById('enroll-coupon');
-  s.couponCode = input ? input.value.trim().toUpperCase() : s.couponCode;
-  if (!s.couponCode) { s.couponError = 'Type a code first.'; return _enrollRender(); }
-  s.couponBusy = true; s.couponError = null; _enrollRender();
-  try {
-    const json = await _enrollApi('check-coupon', { offer_price_key: s.offerKey, code: s.couponCode });
-    s.coupon = json.coupon || null;
-  } catch (e) {
-    s.coupon = null; s.couponError = e.message;
-  }
-  s.couponBusy = false; _enrollRender();
-}
-
-function _enrollRemoveCoupon() {
-  const s = _ENROLL; if (!s) return;
-  s.coupon = null; s.couponCode = ''; s.couponError = null; _enrollRender();
 }
 
 async function _enrollConfirm() {
@@ -30327,16 +30418,18 @@ async function _enrollConfirm() {
   try {
     s.result = await _enrollApi('enroll', {
       customer_id: s.customer.id,
-      offer_price_key: s.offerKey,
-      athlete_name: s.athlete.trim(),
       parent_name: (s.pname || '').trim() || s.customer.name || null,
       parent_email: (s.pemail || '').trim() || s.customer.email || null,
       parent_phone: (s.pphone || '').trim() || s.customer.phone || null,
       charge_mode: s.chargeMode,
       start_date: s.chargeMode === 'on_date' ? s.startDate : null,
-      coupon_code: s.coupon ? s.coupon.code : null,
-      field_values: s.fieldVals || {},
       consent_confirmed: true,
+      athletes: s.athletes.map(at => ({
+        athlete_name: at.name.trim(),
+        offer_price_key: at.offerKey,
+        coupon_code: at.coupon ? at.coupon.code : null,
+        field_values: at.fieldVals || {},
+      })),
     });
   } catch (e) {
     s.error = e.message;
@@ -30347,30 +30440,38 @@ async function _enrollConfirm() {
 function _enrollRenderResult(body) {
   const s = _ENROLL;
   const r = s.result;
+  const done = `<button onclick="closeEnrollDrawer()" style="width:100%;background:var(--gold,#D4B65C);color:#0B0B0D;border:none;padding:10px 16px;font-size:13.5px;font-weight:700;border-radius:8px;cursor:pointer;font-family:inherit;margin-top:4px">Done</button>`;
+
   if (r.mode === 'card_link') {
+    const names = (r.results || []).map(x => x.athlete_name).join(', ') || 'The athlete(s)';
     body.innerHTML = _enrollHeader('Pending - card link created', '') + `
       <div style="padding:13px 14px;border:1px solid #c47424;border-radius:12px;background:rgba(199,154,74,0.08);font-size:13.5px;line-height:1.5;margin-bottom:14px">
-        <b>${escapeHTML(s.athlete.trim())}</b> was added as <b>Signup in progress</b>. ${escapeHTML(s.customer.name || 'The parent')} has no usable card in Stripe, so nothing was charged. Send them this secure link - once the card is saved, run this signup again and it completes.
+        <b>${escapeHTML(names)}</b> added as <b>Signup in progress</b>. ${escapeHTML(s.customer.name || 'The parent')} has no usable card, so nothing was charged. Send this secure link - once the card is saved, run this signup again and it completes.
       </div>
       <div style="display:flex;gap:8px;margin-bottom:12px">
         <input id="enroll-link" type="text" readonly value="${escapeHTML(r.url || '')}" style="flex:1;padding:9px 12px;background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:12px;outline:none">
         <button onclick="const i=document.getElementById('enroll-link');i.select();document.execCommand('copy');this.textContent='Copied'" style="background:var(--gold,#D4B65C);color:#0B0B0D;border:none;padding:9px 14px;font-size:12.5px;font-weight:700;border-radius:8px;cursor:pointer;font-family:inherit">Copy</button>
       </div>
-      ${r.suggested && r.suggested.sms_text ? `<div style="font-size:11px;font-weight:700;color:var(--text-mute);letter-spacing:0.5px;text-transform:uppercase;margin-bottom:6px">Suggested text</div>
-      <div style="padding:11px 13px;border:1px solid var(--border);border-radius:10px;font-size:13px;color:var(--text-sub);margin-bottom:16px">${escapeHTML(r.suggested.sms_text)}</div>` : ''}
-      <button onclick="closeEnrollDrawer()" style="width:100%;background:transparent;border:1px solid var(--border);color:var(--text);padding:10px 16px;font-size:13.5px;font-weight:700;border-radius:8px;cursor:pointer;font-family:inherit">Done</button>`;
+      ${r.suggested && r.suggested.sms_text ? `<div style="padding:11px 13px;border:1px solid var(--border);border-radius:10px;font-size:13px;color:var(--text-sub);margin-bottom:16px">${escapeHTML(r.suggested.sms_text)}</div>` : ''}
+      ${done}`;
     return;
   }
+
+  const results = r.results || [];
+  const ok = results.filter(x => x.ok);
+  const failed = results.filter(x => x.ok === false);
   const scheduled = r.mode === 'scheduled';
-  body.innerHTML = _enrollHeader(scheduled ? 'Signup scheduled' : 'Signed up', '') + `
-    <div style="padding:13px 14px;border:1px solid #1f7a3d;border-radius:12px;background:rgba(31,122,61,0.08);font-size:13.5px;line-height:1.5;margin-bottom:14px">
-      <b>${escapeHTML(s.athlete.trim())}</b> is on the roster. ${scheduled
-        ? `First charge of <b>${_enrollMoney(r.amount_cents, null)}</b> on <b>${escapeHTML(r.first_charge_iso || s.startDate)}</b>, then billing runs automatically.`
-        : `<b>${_enrollMoney(r.amount_cents, null)}</b> charged to the card on file${r.card_last4 ? ' (···· ' + escapeHTML(r.card_last4) + ')' : ''}. Billing runs automatically from here.`}
-      ${r.coupon ? ` Coupon <b>${escapeHTML(r.coupon.code)}</b> applied (${escapeHTML(r.coupon.label || '')}).` : ''}
-    </div>
-    ${r.warning ? `<div style="margin-bottom:14px;padding:11px 13px;border:1px solid #9a3b2f;border-radius:10px;background:rgba(154,59,47,0.1);color:#e08a7d;font-size:13px">${escapeHTML(r.warning)}</div>` : ''}
-    <button onclick="closeEnrollDrawer()" style="width:100%;background:var(--gold,#D4B65C);color:#0B0B0D;border:none;padding:10px 16px;font-size:13.5px;font-weight:700;border-radius:8px;cursor:pointer;font-family:inherit">Done</button>`;
+  const okRows = ok.map(x => `<div style="padding:10px 13px;border:1px solid #1f7a3d;border-radius:10px;background:rgba(31,122,61,0.08);font-size:13px;margin-bottom:8px">
+      <b>${escapeHTML(x.athlete_name)}</b> - ${scheduled ? `${_enrollMoney(x.amount_cents, null)} on ${escapeHTML(x.first_charge_iso || s.startDate)}` : `${_enrollMoney(x.amount_cents, null)} charged`}${x.coupon ? ` · coupon ${escapeHTML(x.coupon.code)}` : ''}${x.warning ? `<div style="color:#e08a7d;margin-top:4px">${escapeHTML(x.warning)}</div>` : ''}
+    </div>`).join('');
+  const failRows = failed.map(x => `<div style="padding:10px 13px;border:1px solid #9a3b2f;border-radius:10px;background:rgba(154,59,47,0.1);font-size:13px;margin-bottom:8px">
+      <b>${escapeHTML(x.athlete_name)}</b> - didn't go through: ${escapeHTML(x.error || 'unknown error')}
+    </div>`).join('');
+  body.innerHTML = _enrollHeader(failed.length ? 'Signed up (with issues)' : (scheduled ? 'Signup scheduled' : 'Signed up'), `${ok.length} of ${results.length} on the roster`) + `
+    ${okRows}
+    ${failRows}
+    ${failed.length ? `<div style="font-size:12.5px;color:var(--text-mute);margin-bottom:14px">The failed athletes were added as Signup in progress - reopen the wizard for them, or fix the card and retry.</div>` : ''}
+    ${done}`;
 }
 
 // Divider that labels the signup-in-progress group and spells out that these
@@ -40494,26 +40595,45 @@ async function _memberCallSlotUpgrade(m) {
 
 // ─── Per-member custom fields (portal contact_field_values, editable inline) ──
 // Reads/writes /api/custom-fields (?action=values + {action:'set-value'}).
-let _MEMBER_CF = null; // { contactId, byId: {fieldId: field} }
+let _MEMBER_CF = null; // { contactId, memberId, byId: {fieldId: field} }
 
 async function _loadMemberCustomFields(m) {
   const sec = document.getElementById('member-cf-section');
   if (!sec || !m || !m.ghl_contact_id) return;
+  // Members see the MEMBER (onboarding-section) fields + academy-level fields.
+  // memberId overlays this athlete's own per-member answers (siblings differ).
+  await _loadContactCF(sec, { clientId: m.client_id, ghlContactId: m.ghl_contact_id, section: 'onboarding', memberId: m.id });
+}
+
+// Generic custom-field loader shared by the member drawer (section=onboarding)
+// and the lead/contact drawer (section=sales). Renders into `sec` and wires the
+// same inline editor (_MEMBER_CF holds whichever drawer is open - only one is).
+async function _loadContactCF(sec, { clientId, ghlContactId, contactId, section, memberId } = {}) {
+  if (!sec) return;
   try {
     const token = await _mreqAuthToken();
-    const r = await fetch('/api/custom-fields?action=values&client_id=' + encodeURIComponent(m.client_id) + '&ghl_contact_id=' + encodeURIComponent(m.ghl_contact_id), { headers: { 'Authorization': 'Bearer ' + token } });
+    // memberId (member drawer only) overlays this athlete's own answers over the
+    // shared parent contact - siblings under one parent each show/edit their own.
+    const qs = ['action=values']
+      .concat(clientId ? ['client_id=' + encodeURIComponent(clientId)] : [])
+      .concat(ghlContactId ? ['ghl_contact_id=' + encodeURIComponent(ghlContactId)] : [])
+      .concat(contactId ? ['contact_id=' + encodeURIComponent(contactId)] : [])
+      .concat(section ? ['section=' + encodeURIComponent(section)] : [])
+      .concat(memberId ? ['member_id=' + encodeURIComponent(memberId)] : [])
+      .join('&');
+    const r = await fetch('/api/custom-fields?' + qs, { headers: { 'Authorization': 'Bearer ' + token } });
     const j = await _safeJson(r);
     if (!r.ok) throw new Error(j.error || ('HTTP ' + r.status));
-    _renderMemberCF(sec, j.contact_id, j.fields || []);
+    _renderMemberCF(sec, j.contact_id, j.fields || [], memberId || null);
   } catch (e) {
     sec.innerHTML = `<div style="font-size:12px;color:var(--text-mute)">Couldn't load custom fields - ${escapeHTML(e.message)}</div>`;
   }
 }
 
-function _renderMemberCF(sec, contactId, fields) {
+function _renderMemberCF(sec, contactId, fields, memberId) {
   if (!contactId) { sec.innerHTML = `<div style="font-size:12px;color:var(--text-mute)">No portal contact linked yet.</div>`; return; }
   if (!fields.length) { sec.innerHTML = `<div style="font-size:12px;color:var(--text-mute)">No custom fields set up for this academy.</div>`; return; }
-  _MEMBER_CF = { contactId, byId: {} };
+  _MEMBER_CF = { contactId, memberId: memberId || null, byId: {} };
   fields.forEach(f => { _MEMBER_CF.byId[f.id] = f; });
   const rows = fields.map(f => `<div style="display:grid;grid-template-columns:130px 1fr;gap:10px 12px;align-items:center;margin-bottom:9px">
       <div style="font-size:12px;color:var(--text-mute)">${escapeHTML(f.label)}</div>
@@ -40565,7 +40685,7 @@ async function _memberCFSave(fieldId, value) {
   const flash = document.getElementById('member-cf-flash');
   try {
     const token = await _mreqAuthToken();
-    const r = await fetch('/api/custom-fields', { method: 'POST', headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'set-value', contact_id: _MEMBER_CF.contactId, field_id: fieldId, value }) });
+    const r = await fetch('/api/custom-fields', { method: 'POST', headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'set-value', contact_id: _MEMBER_CF.contactId, member_id: _MEMBER_CF.memberId || undefined, field_id: fieldId, value }) });
     if (!r.ok) { const j = await _safeJson(r); throw new Error(j.error || ('HTTP ' + r.status)); }
     if (_MEMBER_CF.byId[fieldId]) _MEMBER_CF.byId[fieldId].value = value;
     if (flash) { flash.textContent = 'Saved'; flash.style.color = '#7BC47F'; setTimeout(() => { if (flash) flash.textContent = ''; }, 1500); }
@@ -49663,13 +49783,16 @@ function _ccPulseRender(roster) {
 // (.mm-*) and both focus modals live at body level, so the existing
 // marketing focus mode works unchanged from here.
 function _ccMountMarketing(host) {
-  host.innerHTML = _ccHead('Marketing', 'Your machine: ads in, leads out.') + '<div id="cc-marketing-mount"></div>' +
-    `<div class="cc-actions"><button type="button" class="cc-btn" onclick="_ccOpenClassic('marketing')">Open full marketing</button></div>`;
+  // "Open full marketing" button removed (Zoran 2026-07-08) - the machine
+  // cards + other-funnels config ARE the marketing surface here.
+  host.innerHTML = _ccHead('Marketing', 'Your machine: ads in, leads out.') + '<div id="cc-marketing-mount"></div>';
   const mount = document.getElementById('cc-marketing-mount');
   const mm = document.getElementById('marketing-machine-card');
   const lm = document.getElementById('landing-machine-card');
+  const fn = document.getElementById('other-funnels-card');
   if (mm) mount.appendChild(mm);
   if (lm) mount.appendChild(lm);
+  if (fn) mount.appendChild(fn);
   try { _mmLoad(); } catch (e) { console.error('[cc] marketing', e); }
 }
 
@@ -50913,7 +51036,7 @@ function toggleTheme() {
     <button type="button" class="mm-back-btn" onclick="closeLandingMachine()">&lsaquo; Back</button>
     <div class="mm-mod-head">
       <div>
-        <div class="modal-title" style="margin-bottom:0">Landing Page</div>
+        <div class="modal-title" id="lm-modal-title" style="margin-bottom:0">Landing Page</div>
       </div>
     </div>
     <div id="lm-modal-body"></div>
@@ -51349,6 +51472,7 @@ async function _mmLoad(force) {
   const host = document.getElementById('marketing-machine-card');
   if (!host) return;
   if (!(typeof V2_ACCESS !== 'undefined' && V2_ACCESS)) { host.style.display = 'none'; return; }
+  _fnLoad(force);   // other entry point funnels list (independent of the Meta fetch)
   if (_MM_LOADED && !force) { _mmRenderCard(); return; }
   host.style.display = 'block';
   host.innerHTML = '<div class="mm-card" style="cursor:default">' +
@@ -51614,6 +51738,13 @@ function _mmRenderLanding() {
 function _mmCollapsePageRest(card) {
   const content = card.parentElement;
   if (!content) return;
+  // Command center: the cards live in #cc-marketing-mount with nothing to
+  // collapse - no "guides, campaigns and requests" bar there (Zoran 2026-07-08).
+  if (content.id === 'cc-marketing-mount') {
+    const stray = document.getElementById('mm-page-toggle');
+    if (stray && content.contains(stray)) stray.remove();
+    return;
+  }
   let bar = document.getElementById('mm-page-toggle');
   if (!bar) {
     bar = document.createElement('div');
@@ -51631,16 +51762,17 @@ function _mmCollapsePageRest(card) {
     bar.onclick = () => {
       const open = bar.classList.toggle('open');
       Array.from(content.children).forEach((el) => {
-        if (el === card || el === bar || el.id === 'landing-machine-card') return;
+        if (el === card || el === bar || el.id === 'landing-machine-card' || el.id === 'other-funnels-card') return;
         el.style.display = open ? '' : 'none';
       });
     };
+    const otherEl = document.getElementById('other-funnels-card');
     const landingEl = document.getElementById('landing-machine-card');
-    (landingEl || card).after(bar);
+    (otherEl || landingEl || card).after(bar);
   }
   if (!bar.classList.contains('open')) {
     Array.from(content.children).forEach((el) => {
-      if (el === card || el === bar || el.id === 'landing-machine-card') return;
+      if (el === card || el === bar || el.id === 'landing-machine-card' || el.id === 'other-funnels-card') return;
       el.style.display = 'none';
     });
   }
@@ -51688,6 +51820,8 @@ function openMarketingMachine() {
 function closeMarketingMachine() { _mmCloseFocus('marketingMachineModal'); }
 function openLandingMachine(stage) {
   if (!_MM) return;
+  _FN_ACTIVE = null;   // main free-trial landing page, not an "other" funnel
+  const tt = document.getElementById('lm-modal-title'); if (tt) tt.textContent = 'Landing Page';
   _V2_OPEN = false; _V2_PINS = []; _V2_PENDING = null;   // annotator always starts collapsed
   _mmRenderLandingFocus(_MM);
   _mmOpenFocus('landingMachineModal', '#landing-machine-card .mm-action-panel');
@@ -51701,6 +51835,145 @@ function openLandingMachine(stage) {
   }
 }
 function closeLandingMachine() { _mmCloseFocus('landingMachineModal'); }
+
+/* ── Other entry point funnels (V2) ──
+   A funnel = one page on the academy site that hosts direct entry points
+   (forms, calendars). The main free-trial funnel has its own card above;
+   this dropdown lists the OTHER funnels that have entry points (GTA today:
+   the contact page) and opens each one in the same landing focus view so
+   it can be configured and annotated like the main page. Data:
+   GET /api/website/funnels (funnels + nested entry_points + url_resolved). */
+let _FN = null, _FN_LOADED = false, _FN_OPEN = false;
+let _FN_ACTIVE = null;   // funnel shown in the landing focus modal (null = main free-trial page)
+async function _fnLoad(force) {
+  const host = document.getElementById('other-funnels-card');
+  if (!host) return;
+  if (_FN_LOADED && !force) { _fnRenderOthers(); return; }
+  try {
+    const token = await _mreqAuthToken();
+    const res = await fetch('/api/website/funnels?client_id=' + encodeURIComponent(CLIENT_ID), {
+      headers: { 'Authorization': 'Bearer ' + token },
+    });
+    const json = await _safeJson(res);
+    if (!res.ok) throw new Error(json.error || ('HTTP ' + res.status));
+    _FN = json.funnels || []; _FN_LOADED = true;
+    _fnRenderOthers();
+  } catch (e) {
+    host.style.display = 'none';   // quiet fail: the rest of the page still works
+  }
+}
+function _fnOthers() {
+  return (_FN || []).filter((f) => !f.is_primary && f.enabled && (f.entry_points || []).length);
+}
+function _fnEpSummary(f) {
+  const eps = f.entry_points || [];
+  const forms = eps.filter((e) => e.type === 'website-form' || e.type === 'ghl-form').length;
+  const cals = eps.filter((e) => e.type === 'calendar').length;
+  const bits = [];
+  if (forms) bits.push(forms + (forms === 1 ? ' form' : ' forms'));
+  if (cals) bits.push(cals + (cals === 1 ? ' calendar' : ' calendars'));
+  return bits.join(' &middot; ') || 'no entry points';
+}
+function _fnRenderOthers() {
+  const host = document.getElementById('other-funnels-card');
+  if (!host) return;
+  if (!(typeof V2_ACCESS !== 'undefined' && V2_ACCESS)) { host.style.display = 'none'; return; }
+  const others = _fnOthers();
+  if (!others.length) { host.style.display = 'none'; return; }
+  const gearIco = '<svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="2.2"/><path d="M8 1.8v1.7M8 12.5v1.7M1.8 8h1.7M12.5 8h1.7M3.6 3.6l1.2 1.2M11.2 11.2l1.2 1.2M12.4 3.6l-1.2 1.2M4.8 11.2l-1.2 1.2"/></svg>';
+  const rows = others.map((f) =>
+    '<button type="button" class="fn-row" onclick="openFunnelConfig(\'' + f.id + '\')" ' +
+      'style="width:100%;display:flex;align-items:center;gap:12px;text-align:left;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px 15px;cursor:pointer;margin-top:8px">' +
+      '<span style="width:30px;height:30px;border-radius:50%;background:var(--surface-el);color:var(--text-sub);display:flex;align-items:center;justify-content:center;flex:0 0 auto">' + MM_ICONS.page + '</span>' +
+      '<span style="flex:1;min-width:0">' +
+        '<span style="display:block;font-family:var(--mm-ff);font-size:14px;font-weight:700;color:var(--text)">' + _escapeHtml(f.label) + '</span>' +
+        '<span style="display:block;font-family:var(--mm-ff);font-size:12px;color:var(--text-mute);margin-top:1px">' + _fnEpSummary(f) + '</span>' +
+      '</span>' +
+      '<span style="font-family:var(--mm-ff);font-size:13px;font-weight:600;color:var(--text-sub);flex:0 0 auto">Configure &rsaquo;</span>' +
+    '</button>'
+  ).join('');
+  host.innerHTML =
+    '<div class="mm-collapse-head' + (_FN_OPEN ? ' open' : '') + '" id="fn-toggle" onclick="_fnToggle()" style="margin-top:8px">' +
+      '<span class="mm-collapse-arrow">&#9662;</span>' +
+      '<span style="display:inline-flex;align-items:center;gap:7px">' + gearIco + 'Configure other entry point funnels</span>' +
+      '<span style="margin-left:auto;color:var(--text-sub)">' + others.length + '</span>' +
+    '</div>' +
+    '<div id="fn-list" style="display:' + (_FN_OPEN ? 'block' : 'none') + '">' + rows + '</div>';
+  host.style.display = 'block';
+}
+function _fnToggle() {
+  _FN_OPEN = !_FN_OPEN;
+  const bar = document.getElementById('fn-toggle'), list = document.getElementById('fn-list');
+  if (bar) bar.classList.toggle('open', _FN_OPEN);
+  if (list) list.style.display = _FN_OPEN ? 'block' : 'none';
+}
+function openFunnelConfig(id) {
+  const f = (_FN || []).find((x) => x.id === id);
+  if (!f) return;
+  _FN_ACTIVE = f;
+  const tt = document.getElementById('lm-modal-title'); if (tt) tt.textContent = f.label;
+  _V2_OPEN = false; _V2_PINS = []; _V2_PENDING = null;   // annotator always starts collapsed
+  _fnRenderFunnelFocus(f);
+  _mmOpenFocus('landingMachineModal', '#other-funnels-card');
+}
+function _fnRenderFunnelFocus(f) {
+  const body = document.getElementById('lm-modal-body');
+  if (!body || !f) return;
+  const ICO_FORM = '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="2" width="10" height="12" rx="1.5"/><path d="M5.5 6h5M5.5 8.5h5M5.5 11h3"/></svg>';
+  const ICO_CAL = '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="3" width="11" height="10.5" rx="1.5"/><path d="M2.5 6.5h11M5.5 1.5v3M10.5 1.5v3"/></svg>';
+  const eps = f.entry_points || [];
+  const epRows = eps.map((e) => {
+    let route;
+    if (e.pipeline_name && e.stage_name) route = _escapeHtml(e.pipeline_name) + ' &middot; ' + _escapeHtml(e.stage_name);
+    else if (e.ghl_workflow_name) route = 'routed by the "' + _escapeHtml(e.ghl_workflow_name) + '" workflow';
+    else route = 'not connected yet';
+    return '<div style="display:flex;align-items:center;gap:12px;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:11px 14px;margin-top:8px' + (e.enabled ? '' : ';opacity:.55') + '">' +
+      '<span style="width:30px;height:30px;border-radius:50%;background:var(--surface-el);color:var(--text-sub);display:flex;align-items:center;justify-content:center;flex:0 0 auto">' + (e.type === 'calendar' ? ICO_CAL : ICO_FORM) + '</span>' +
+      '<span style="flex:1;min-width:0">' +
+        '<span style="display:block;font-family:var(--mm-ff);font-size:13px;font-weight:700;color:var(--text)">' + _escapeHtml(e.label) + '</span>' +
+        '<span style="display:block;font-family:var(--mm-ff);font-size:12px;color:var(--text-mute);margin-top:1px">' + route + (e.enabled ? '' : ' &middot; off') + '</span>' +
+      '</span>' +
+    '</div>';
+  }).join('') || '<div style="font-size:13px;color:var(--text-mute);padding:10px 0">no entry points on this page yet</div>';
+  const urlVal = f.url || '';
+  const urlPh = f.url_resolved && !f.url ? f.url_resolved : 'https://yoursite.com/page';
+  body.innerHTML =
+    '<div style="font-family:var(--mm-ff);font-size:12px;color:var(--text-mute);margin-bottom:14px">Every form or calendar below feeds your pipeline from this page.</div>' +
+    '<div style="font-family:var(--mm-ff);font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--text-mute)">Page URL</div>' +
+    '<div style="display:flex;gap:8px;margin-top:6px">' +
+      '<input id="fn-url-input" type="url" value="' + _escapeHtml(urlVal) + '" placeholder="' + _escapeHtml(urlPh) + '" ' +
+        'style="flex:1;min-width:0;background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:9px 12px;font-family:var(--mm-fm);font-size:13px;color:var(--text)">' +
+      '<button type="button" onclick="_fnSaveUrl(\'' + f.id + '\')" ' +
+        'style="background:var(--gold);color:var(--on-gold);border:none;border-radius:8px;padding:9px 16px;font-family:var(--mm-ff);font-size:13px;font-weight:700;cursor:pointer">Save</button>' +
+    '</div>' +
+    '<div style="font-family:var(--mm-ff);font-size:11px;color:var(--text-mute);margin-top:5px">Used for the page preview below.</div>' +
+    '<div style="font-family:var(--mm-ff);font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--text-mute);margin-top:18px">Entry points on this page</div>' +
+    epRows +
+    _v2InlineHtml() +
+    _v2TicketsNudgeHtml();
+  _v2Sync();   // restore the annotator's open/closed state across a re-render
+}
+async function _fnSaveUrl(id) {
+  const inp = document.getElementById('fn-url-input');
+  if (!inp) return;
+  const val = inp.value.trim();
+  try {
+    const token = await _mreqAuthToken();
+    const res = await fetch('/api/website/funnels?client_id=' + encodeURIComponent(CLIENT_ID) + '&id=' + encodeURIComponent(id), {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+      body: JSON.stringify({ url: val || null }),
+    });
+    const json = await _safeJson(res);
+    if (!res.ok) throw new Error(json.error || ('HTTP ' + res.status));
+    const f = (_FN || []).find((x) => x.id === id);
+    if (f) { f.url = json.funnel.url; f.url_resolved = json.funnel.url || f.url_resolved; }
+    _mmToast('Page URL saved');
+    if (_FN_ACTIVE && _FN_ACTIVE.id === id) _fnRenderFunnelFocus(_FN_ACTIVE);
+  } catch (e) {
+    _mmToast('Could not save: ' + e.message);
+  }
+}
 
 /* ── Mini date picker for the Marketing Machine range ──
    Replaces the native date inputs with a styled calendar popover. The values
@@ -52422,8 +52695,11 @@ function _v2Toggle() {
 function _v2MountStage() {
   const fr = document.getElementById('v2ReqFrame'), hint = document.getElementById('v2ReqHint');
   // window._V2_PAGE_URL is a local-dev override (unset in prod) so we can point
-  // the annotator iframe at a local bam-client-sites server; else the real URL.
-  let url = window._V2_PAGE_URL || (typeof _MM !== 'undefined' && _MM && _MM.page && _MM.page.url) || '';
+  // the annotator iframe at a local bam-client-sites server. Otherwise: the
+  // active "other" funnel's page when one is open, else the main landing page.
+  let url = window._V2_PAGE_URL
+    || (typeof _FN_ACTIVE !== 'undefined' && _FN_ACTIVE && _FN_ACTIVE.url_resolved)
+    || (typeof _MM !== 'undefined' && _MM && _MM.page && _MM.page.url) || '';
   // annotate=1 tells the page (bam-client-sites) to turn on section hover-outline
   // + post section clicks back to us.
   if (url) url += (url.indexOf('?') === -1 ? '?' : '&') + 'annotate=1';
@@ -52600,12 +52876,14 @@ function _v2ReviewDel(i) { _V2_PINS.splice(i, 1); _v2RenderReview(); _v2RenderNo
 function _v2Submit() {
   const desc = (document.getElementById('v2ReqDesc')?.value || '').trim();
   if (!_V2_PINS.length && !desc) { _mmToast('Add a note or a line of context first'); return; }
+  const onOther = typeof _FN_ACTIVE !== 'undefined' && !!_FN_ACTIVE;   // annotating an "other" funnel page
   const payload = {
     module: 'landing-page', request_type: _V2_TYPE, source: 'v2_portal_oneclick',
     description: desc,
     context: {
-      page_url: (typeof _MM !== 'undefined' && _MM?.page?.url) || null,
-      metric_snapshot: (typeof _MM !== 'undefined' && _MM?.page) ? {
+      funnel: onOther ? _FN_ACTIVE.key : 'free-trial',
+      page_url: onOther ? (_FN_ACTIVE.url_resolved || null) : ((typeof _MM !== 'undefined' && _MM?.page?.url) || null),
+      metric_snapshot: (!onOther && typeof _MM !== 'undefined' && _MM?.page) ? {
         visitors: _MM.page.visitors, form_started: _MM.page.form_started,
         saw_calendar: _MM.page.saw_calendar, booked: _MM.page.booked_sessions,
       } : null,
@@ -52615,7 +52893,8 @@ function _v2Submit() {
   console.log('[v2-request] MOCK submit (no table yet):', payload);   // TODO: POST /api/v2-support-tickets
   _V2_PINS = []; _V2_OPEN = false; _v2NoteCancel(); _v2CloseReview();
   _mmToast('Request sent - staff will take a look');
-  if (typeof _mmRenderLandingFocus === 'function' && typeof _MM !== 'undefined') _mmRenderLandingFocus(_MM);
+  if (onOther) _fnRenderFunnelFocus(_FN_ACTIVE);
+  else if (typeof _mmRenderLandingFocus === 'function' && typeof _MM !== 'undefined') _mmRenderLandingFocus(_MM);
 }
 // Bridge listener: the client's V2 page (bam-client-sites) posts section hover/
 // click events when it loads in annotate mode. Until that ships this is dormant.

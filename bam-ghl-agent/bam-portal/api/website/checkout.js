@@ -29,6 +29,7 @@
 import { withSentryApiRoute } from "../_sentry.js";
 import { renderAgreementPdf, uploadAgreementPdf } from "../_lib/agreement-pdf.js";
 import { applyDiscountToCents, normCode, couponFromPromo } from "../_coupon-guardrails.js";
+import { resolveOrMintPortalContact, writePortalFieldValues } from "../_contacts.js";
 
 const SB_URL = (process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || "").trim();
 const SB_KEY = (process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY || "").trim();
@@ -412,6 +413,18 @@ async function handler(req, res) {
         }]),
       });
     } catch { /* non-fatal */ }
+
+    // Persist the enroll intake custom-field answers onto the member's portal
+    // contact (best-effort, after payment setup - never blocks the charge).
+    // Mirrors the lead form's write loop: mint/find the portal contact, then
+    // writePortalFieldValues matches each intake key to a custom_field_defs row
+    // by its portal key (captures brand-new wizard questions with no ghl id).
+    try {
+      if (intake && Object.keys(intake).length) {
+        const contactId = await resolveOrMintPortalContact(clientId, { email: parentEmail, phone: parentPhone, name: parentName });
+        if (contactId) await writePortalFieldValues(clientId, contactId, null, intake);
+      }
+    } catch { /* non-fatal - the member + payment are already saved */ }
 
     return res.status(200).json({
       ok: true, member_id: member && member.id, subscription_id: sub.id, customer_id: customerId,

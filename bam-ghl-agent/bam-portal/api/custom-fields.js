@@ -177,21 +177,38 @@ async function handler(req, res) {
     const ctx = await resolveUser(req);
 
     // ── GET ?action=values: a contact's field defs + current values ────────
-    // Accepts contact_id (portal uuid) OR client_id + ghl_contact_id.
+    // Accepts contact_id (portal uuid) OR client_id + ghl_contact_id. Optional
+    // member_id: athlete-specific answers in member_field_values OVERLAY the
+    // contact-level values (so siblings under one parent show their own data).
     if (req.method === "GET" && req.query && req.query.action === "values") {
       const contact = await resolveContact(req.query.contact_id, req.query.client_id, req.query.ghl_contact_id);
       if (!contact) return res.status(200).json({ contact_id: null, fields: [] });
       if (!canAccess(ctx, contact.client_id)) return res.status(403).json({ error: "not your academy" });
-      const defs = await sb(`custom_field_defs?client_id=eq.${contact.client_id}&archived=eq.false&select=*&order=position.asc,created_at.asc`);
+      // Role-scoped view: a LEAD's drawer asks for section=sales, a MEMBER's for
+      // section=onboarding. Academy-level fields (offer_id null) always show;
+      // offer fields show only for the matching role. No section = every field
+      // (back-compat). offer_id filters further to one offer's fields.
+      const section = (req.query.section === "sales" || req.query.section === "onboarding") ? req.query.section : null;
+      let defsFilter = `custom_field_defs?client_id=eq.${contact.client_id}&archived=eq.false`;
+      if (section) defsFilter += `&or=(offer_id.is.null,section.eq.${section})`;
+      if (req.query.offer_id) defsFilter += `&or=(offer_id.is.null,offer_id.eq.${encodeURIComponent(req.query.offer_id)})`;
+      const defs = await sb(`${defsFilter}&select=*&order=position.asc,created_at.asc`);
       const vals = await sb(`contact_field_values?contact_id=eq.${contact.id}&select=field_id,value`);
       const vmap = new Map((vals || []).map(v => [v.field_id, v.value]));
+      const memberId = req.query.member_id ? String(req.query.member_id) : null;
+      if (memberId) {
+        const mvals = await sb(`member_field_values?member_id=eq.${encodeURIComponent(memberId)}&select=field_id,value`).catch(() => []);
+        for (const v of (mvals || [])) vmap.set(v.field_id, v.value); // member value wins
+      }
       return res.status(200).json({
-        contact_id: contact.id,
+        contact_id: contact.id, member_id: memberId,
         fields: (defs || []).map(d => ({ ...d, value: vmap.has(d.id) ? vmap.get(d.id) : null })),
       });
     }
 
-    // ── POST ?action=set-value: upsert (or clear) one value for a contact ──
+    // ── POST ?action=set-value: upsert (or clear) one value ────────────────
+    // With member_id -> writes member_field_values (per-athlete). Without ->
+    // contact_field_values (parent-level, unchanged).
     if (req.method === "POST" && (req.body || {}).action === "set-value") {
       const b = req.body || {};
       if (!b.contact_id || !b.field_id) return res.status(400).json({ error: "contact_id and field_id required" });
@@ -201,16 +218,25 @@ async function handler(req, res) {
       const def = await sb(`custom_field_defs?id=eq.${b.field_id}&client_id=eq.${contact.client_id}&select=id&limit=1`);
       if (!def || !def[0]) return res.status(400).json({ error: "field not on this academy" });
 
+      const memberId = b.member_id ? String(b.member_id) : null;
+      if (memberId) {
+        const mrows = await sb(`members?id=eq.${encodeURIComponent(memberId)}&client_id=eq.${contact.client_id}&select=id&limit=1`).catch(() => []);
+        if (!mrows || !mrows[0]) return res.status(400).json({ error: "member not on this academy" });
+      }
+      const table = memberId ? "member_field_values" : "contact_field_values";
+      const keyCol = memberId ? "member_id" : "contact_id";
+      const keyVal = memberId ? memberId : contact.id;
+
       const v = b.value;
       const isEmpty = v === null || v === undefined || v === "" || (Array.isArray(v) && v.length === 0);
       if (isEmpty) {
-        await sb(`contact_field_values?contact_id=eq.${contact.id}&field_id=eq.${b.field_id}`, { method: "DELETE", headers: { Prefer: "return=minimal" } });
+        await sb(`${table}?${keyCol}=eq.${encodeURIComponent(keyVal)}&field_id=eq.${b.field_id}`, { method: "DELETE", headers: { Prefer: "return=minimal" } });
         return res.status(200).json({ ok: true, cleared: true });
       }
-      await sb(`contact_field_values?on_conflict=contact_id,field_id`, {
+      await sb(`${table}?on_conflict=${keyCol},field_id`, {
         method: "POST",
         headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
-        body: JSON.stringify([{ contact_id: contact.id, field_id: b.field_id, value: v, updated_at: new Date().toISOString() }]),
+        body: JSON.stringify([{ [keyCol]: keyVal, field_id: b.field_id, value: v, updated_at: new Date().toISOString() }]),
       });
       return res.status(200).json({ ok: true });
     }
@@ -231,10 +257,22 @@ async function handler(req, res) {
       if (!canAccess(ctx, clientId)) return res.status(403).json({ error: "not your academy" });
 
       // Optional filters: offer_id (wizard scopes to one offer) + section.
+      // Multi-offer: a field authored on another offer can ALSO apply here via
+      // custom_field_def_offers - fold those ids into the offer match. Degrades
+      // to offer_id-only if the join table has not been migrated yet.
       let filter = `custom_field_defs?client_id=eq.${clientId}`;
       const wizardRead = !!req.query.offer_id || req.query.scope === "academy";
-      if (req.query.offer_id) filter += `&offer_id=eq.${encodeURIComponent(req.query.offer_id)}`;
-      else if (req.query.scope === "academy") filter += `&offer_id=is.null`;
+      if (req.query.offer_id) {
+        const oid = encodeURIComponent(req.query.offer_id);
+        let alsoIds = [];
+        try {
+          const links = await sb(`custom_field_def_offers?offer_id=eq.${oid}&select=field_id`);
+          alsoIds = [...new Set((links || []).map(l => l.field_id).filter(Boolean))];
+        } catch (e) { console.error("custom_field_def_offers read non-fatal:", e?.message || e); }
+        filter += alsoIds.length
+          ? `&or=(offer_id.eq.${oid},id.in.(${alsoIds.map(encodeURIComponent).join(",")}))`
+          : `&offer_id=eq.${oid}`;
+      } else if (req.query.scope === "academy") filter += `&offer_id=is.null`;
       if (req.query.section) filter += `&section=eq.${encodeURIComponent(req.query.section)}`;
       // Wizard reads never want archived fields; the staff tab (no scope) shows them dimmed.
       if (wizardRead) filter += `&archived=eq.false`;
@@ -336,6 +374,21 @@ async function handler(req, res) {
         }),
       });
       const field = Array.isArray(rows) ? rows[0] : rows;
+
+      // Multi-offer: a field can also apply to other offers (custom_field_def_offers).
+      // The authoring offer_id anchors it; also_offer_ids adds the rest. Degrades
+      // to a no-op if the join table has not been migrated yet.
+      const alsoOffers = Array.isArray(b.also_offer_ids) ? [...new Set(b.also_offer_ids.filter(Boolean))] : [];
+      const joinOffers = [...new Set([offerId, ...alsoOffers].filter(Boolean))];
+      if (field && field.id && joinOffers.length) {
+        try {
+          await sb(`custom_field_def_offers?on_conflict=field_id,offer_id`, {
+            method: "POST",
+            headers: { Prefer: "resolution=ignore-duplicates,return=minimal" },
+            body: JSON.stringify(joinOffers.map(oid => ({ field_id: field.id, offer_id: oid }))),
+          });
+        } catch (e) { console.error("custom_field_def_offers write non-fatal:", e?.message || e); }
+      }
       return res.status(200).json({ field: { ...field, value_count: 0 } });
     }
 

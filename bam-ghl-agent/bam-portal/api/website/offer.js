@@ -82,33 +82,79 @@ function inferField(label) {
   return base;
 }
 
-function buildIntakeFields(offer) {
-  const onb = (offer.data && offer.data.onboarding) || {};
-  const selected = Array.isArray(onb.intake_form_fields) ? onb.intake_form_fields : [];
-  const custom = Array.isArray(onb.intake_form_fields_custom) ? onb.intake_form_fields_custom : [];
+// custom_field_defs.type (the owner's explicit choice in the offer wizard) →
+// the funnel form's input vocabulary (see enroll.jsx's renderer: textarea /
+// select / tel / email / date / text). The owner picked the type, so we honor
+// it rather than re-inferring from the label.
+function cfDefType(def) {
+  const t = String(def && def.type || "").toLowerCase();
+  if (t === "email") return { type: "email", placeholder: "you@email.com" };
+  if (t === "phone") return { type: "tel", placeholder: "(289) 000-0000" };
+  if (t === "date") return { type: "date" };
+  if (t === "select" || t === "multiselect") {
+    const options = Array.isArray(def.options) ? def.options.map(String).filter(Boolean) : [];
+    return { type: "select", ...(options.length ? { options } : {}) };
+  }
+  if (t === "boolean") return { type: "select", options: ["Yes", "No"] };
+  return { type: "text" }; // text / number / url → plain input
+}
 
-  // Defaults first (always on), then the academy's checked add-ons, then any
-  // custom fields. Drop the "Add custom" toggle itself and de-dupe by label.
-  const labels = [];
+// Turn a custom_field_defs row into a funnel field. Academy-core defs (offer_id
+// null) + this offer's section-scoped defs both come through here.
+function cfDefToField(def) {
+  const label = String(def && def.label || "").trim();
+  return {
+    key: def.key || fieldKey(label),
+    label,
+    required: def.required === true,
+    ...cfDefType(def),
+  };
+}
+
+// Build the funnel field list for one section ("onboarding" = the join/enroll
+// intake form, "sales" = the lead-capture form). Combines:
+//   1. the training defaults (onboarding only - always-on contact basics)
+//   2. the legacy offer.data JSON add-ons (kept for backward compat)
+//   3. the academy-core + offer custom_field_defs the wizard now writes
+// De-duped by label; contact basics stay required.
+function buildFields(offer, customDefs, section) {
+  const onb = (offer.data && offer.data.onboarding) || {};
+  const legacySelected = section === "onboarding" && Array.isArray(onb.intake_form_fields) ? onb.intake_form_fields : [];
+  const legacyCustom = section === "onboarding" && Array.isArray(onb.intake_form_fields_custom) ? onb.intake_form_fields_custom : [];
+
+  const out = [];
   const seen = new Set();
-  const push = (lbl) => {
+  const pushLabelField = (lbl) => {
     const s = String(lbl || "").trim();
     if (!s || /^add (custom|another)/i.test(s)) return;
     const k = s.toLowerCase();
     if (seen.has(k)) return;
     seen.add(k);
-    labels.push(s);
+    const f = inferField(s);
+    if (/^(parent name|email|phone|name)$/i.test(s)) f.required = true;
+    out.push(f);
   };
-  TRAINING_INTAKE_DEFAULTS.forEach(push);
-  selected.forEach(push);
-  custom.forEach((c) => push(typeof c === "string" ? c : (c && c.name)));
+  const pushDefField = (def) => {
+    const f = cfDefToField(def);
+    if (!f.label) return;
+    const k = f.label.toLowerCase();
+    if (seen.has(k)) return;
+    seen.add(k);
+    out.push(f);
+  };
 
-  return labels.map((lbl, i) => {
-    const f = inferField(lbl);
-    // Contact basics are required; everything else optional by default.
-    if (/^(parent name|email|phone)$/i.test(lbl)) f.required = true;
-    return { ...f, key: `${f.key}__${i}` };
-  });
+  if (section === "onboarding") TRAINING_INTAKE_DEFAULTS.forEach(pushLabelField);
+  legacySelected.forEach(pushLabelField);
+  legacyCustom.forEach((c) => pushLabelField(typeof c === "string" ? c : (c && c.name)));
+  (customDefs || []).forEach(pushDefField);
+
+  // Stable, unique keys for the form (label collisions already filtered above).
+  return out.map((f, i) => ({ ...f, key: `${f.key}__${i}` }));
+}
+
+// Back-compat shim: the intake (onboarding) form.
+function buildIntakeFields(offer, customDefs) {
+  return buildFields(offer, customDefs, "onboarding");
 }
 
 // ── Pricing ──────────────────────────────────────────────────────────────────
@@ -216,6 +262,34 @@ async function handler(req, res) {
       `&select=offer_price_key,canonical_plan,interval,tier,is_routable,amount_cents,currency,stripe_price_id`
     );
 
+    // Custom fields the owner defined in the offer wizard (the NEW system that
+    // superseded the offer.data JSON list). Academy-core defs (offer_id null)
+    // are collected on every offer; the offer's own defs are section-scoped
+    // (sales = lead form, onboarding = join form). One read, split in memory.
+    let coreDefs = [], salesDefs = [], onbDefs = [];
+    try {
+      // A def applies to this offer if offer_id = it OR a join row links it
+      // (custom_field_def_offers, multi-offer). Fetch all client defs once, then
+      // filter in memory - one extra tiny read for the links, degrades if the
+      // join table has not been migrated yet.
+      let linkedIds = new Set();
+      try {
+        const links = (await sbReq(`custom_field_def_offers?offer_id=eq.${offer.id}&select=field_id`)) || [];
+        linkedIds = new Set(links.map((l) => l.field_id).filter(Boolean));
+      } catch { /* join table not migrated yet - offer_id match still works */ }
+      const defs = (await sbReq(
+        `custom_field_defs?client_id=eq.${encodeURIComponent(client_id)}&archived=eq.false` +
+        `&select=id,key,label,type,options,required,section,offer_id&order=position.asc`
+      )) || [];
+      for (const d of defs) {
+        const appliesToOffer = d.offer_id === offer.id || linkedIds.has(d.id);
+        if (!d.offer_id) coreDefs.push(d);          // academy-level: every offer
+        else if (!appliesToOffer) continue;          // another offer's field, not linked here
+        else if (d.section === "sales") salesDefs.push(d);
+        else onbDefs.push(d); // onboarding (or unsectioned) offer defs default to the join form
+      }
+    } catch { /* additive - a defs failure never breaks the offer page */ }
+
     // Typed runtime rows: the authoritative "what can checkout sell" list
     // (offer tie-in step E). Frontends can send purchasable[].offer_price_id
     // to /api/website/checkout instead of the legacy offer_price_key.
@@ -287,7 +361,8 @@ async function handler(req, res) {
         type: offer.type,
         sales_path: (offer.data && offer.data.sales && offer.data.sales.sales_path) || null,
       },
-      intake_fields: buildIntakeFields(offer),
+      intake_fields: buildIntakeFields(offer, [...coreDefs, ...onbDefs]),
+      lead_fields: buildFields(offer, [...coreDefs, ...salesDefs], "sales"),
       pricing: buildPricing(offer, catalogRows),
       purchasable,
       trial,

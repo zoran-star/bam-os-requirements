@@ -418,7 +418,9 @@ async function actionSignupFields(res, { clientId, body }) {
 // Ensure the person has a portal contact (found by email/phone or minted),
 // link the member row to it, and write the collected field values. Best-effort
 // after validation - a contact hiccup must not undo a created subscription.
-async function writeSignupInfo({ clientId, memberId, athleteName, parentName, parentEmail, parentPhone, customerId, defs, fieldValues }) {
+// Resolve (or mint) the ONE parent contact for the whole family - the parent is
+// the Stripe customer, so every athlete under them links to the same contact.
+async function ensureParentContact(clientId, { parentName, parentEmail, parentPhone, customerId, firstAthlete }) {
   const nameParts = String(parentName || "").trim().split(/\s+/);
   const contactKey = await resolveOrMintPortalContact(clientId, {
     name: parentName || null,
@@ -426,36 +428,34 @@ async function writeSignupInfo({ clientId, memberId, athleteName, parentName, pa
     last_name: nameParts.length > 1 ? nameParts.slice(1).join(" ") : null,
     email: parentEmail || null,
     phone: parentPhone || null,
-    athlete_name: athleteName || null,
+    athlete_name: firstAthlete || null,
     stripe_customer_id: customerId || null,
     source: "returning-enroll",
   });
-  if (!contactKey) return { contact_id: null };
+  if (!contactKey) return { contactKey: null, contactId: null };
   const rows = await sb(
     `contacts?client_id=eq.${encodeURIComponent(clientId)}&ghl_contact_id=eq.${encodeURIComponent(contactKey)}&select=id&limit=1`
   ).catch(() => []);
-  const contactId = (rows && rows[0] && rows[0].id) || null;
-  if (!contactId) return { contact_id: null };
+  return { contactKey, contactId: (rows && rows[0] && rows[0].id) || null };
+}
 
-  await sb(`members?id=eq.${encodeURIComponent(memberId)}`, {
-    method: "PATCH", headers: { Prefer: "return=minimal" },
-    body: JSON.stringify({ contact_id: contactId, ghl_contact_id: contactKey, updated_at: nowIso() }),
-  }).catch(() => {});
-
+// Per-athlete onboarding answers go to member_field_values (keyed by MEMBER),
+// NOT the shared parent contact - so siblings never overwrite each other's
+// Age / offer-question answers.
+async function writeMemberFieldValues(memberId, defs, fieldValues) {
   const upserts = [];
   for (const d of defs) {
     const v = fieldValues[d.id];
     if (emptyFieldValue(v)) continue;
-    upserts.push({ contact_id: contactId, field_id: d.id, value: v, updated_at: nowIso() });
+    upserts.push({ member_id: memberId, field_id: d.id, value: v, updated_at: nowIso() });
   }
-  if (upserts.length) {
-    await sb(`contact_field_values?on_conflict=contact_id,field_id`, {
-      method: "POST",
-      headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
-      body: JSON.stringify(upserts),
-    }).catch(e => console.error("[enroll] field values write failed:", e.message));
-  }
-  return { contact_id: contactId, values_written: upserts.length };
+  if (!upserts.length) return 0;
+  await sb(`member_field_values?on_conflict=member_id,field_id`, {
+    method: "POST",
+    headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
+    body: JSON.stringify(upserts),
+  }).catch(e => console.error("[enroll] member field values write failed:", e.message));
+  return upserts.length;
 }
 
 // ── action: check-coupon ───────────────────────────────────
@@ -473,17 +473,42 @@ async function actionCheckCoupon(res, { clientId, acct, body }) {
   });
 }
 
+// Insert (or reuse a pending) member row for one athlete. Returns member_id.
+async function upsertAthleteMember({ clientId, athleteName, parentName, parentEmail, parentPhone, customerId, plan, contactId, contactKey, resumable }) {
+  const baseRow = {
+    athlete_name: athleteName, parent_name: parentName, parent_email: parentEmail,
+    parent_phone: parentPhone, plan, stripe_customer_id: customerId,
+    contact_id: contactId || undefined, ghl_contact_id: contactKey || undefined,
+    updated_at: nowIso(),
+  };
+  if (resumable) {
+    await sb(`members?id=eq.${encodeURIComponent(resumable.id)}`, {
+      method: "PATCH", headers: { Prefer: "return=minimal" },
+      body: JSON.stringify(baseRow),
+    });
+    return resumable.id;
+  }
+  const inserted = await sb(`members?select=id`, {
+    method: "POST", headers: { Prefer: "return=representation" },
+    body: JSON.stringify([{
+      ...baseRow, client_id: clientId, status: "payment_method_required",
+      joined_date: new Date().toISOString().slice(0, 10), created_at: nowIso(),
+    }]),
+  });
+  return Array.isArray(inserted) && inserted[0] && inserted[0].id;
+}
+
 // ── action: enroll ─────────────────────────────────────────
+// One parent (Stripe customer + card + consent), ONE OR MORE athletes. Each
+// athlete gets its own offer price, onboarding answers, coupon, subscription,
+// and member row. Subs are created sequentially; a per-athlete failure is
+// captured and the rest continue (the UI shows which succeeded).
 async function actionEnroll(res, req, { clientId, acct, ctx, body }) {
-  // Consent gate - locked decision: the staff user must confirm the parent
-  // agreed to this signup and charge. No consent, no enroll.
   if (body.consent_confirmed !== true) {
     return res.status(400).json({ error: "consent confirmation required - tick the consent box before enrolling" });
   }
   const customerId = body.customer_id;
   if (!customerId) return res.status(400).json({ error: "customer_id required" });
-  const athleteName = String(body.athlete_name || "").trim();
-  if (!athleteName) return res.status(400).json({ error: "athlete_name required" });
   const chargeMode = body.charge_mode === "on_date" ? "on_date" : "now";
   let startDate = null;
   if (chargeMode === "on_date") {
@@ -492,207 +517,179 @@ async function actionEnroll(res, req, { clientId, acct, ctx, body }) {
     }
     startDate = body.start_date;
   }
-  const target = await resolveTarget(clientId, body.offer_price_key);
-  if (!target) return res.status(409).json({ error: "That price isn't live for this academy anymore - re-pick the offer price." });
 
-  // MANDATORY signup info (locked decision): every core + onboarding custom
-  // field the offer collects at signup must be filled for a manual add too.
-  // First/Last name defs auto-fill from the athlete input (asked once).
-  const defs = await signupDefs(clientId, target.offer_id);
-  const fieldValues = (body.field_values && typeof body.field_values === "object") ? body.field_values : {};
-  autoFillNameDefs(defs, fieldValues, athleteName);
-  const missing = defs.filter(d => !isAutoNameDef(d) && emptyFieldValue(fieldValues[d.id]));
-  if (missing.length) {
-    return res.status(400).json({
-      error: `Missing signup info: ${missing.map(d => d.label || d.key).join(", ")}. Fill every field before enrolling.`,
-      missing_field_ids: missing.map(d => d.id),
-    });
+  // Normalize to an athletes[] list (legacy single-athlete body still works).
+  let athletes = Array.isArray(body.athletes) && body.athletes.length
+    ? body.athletes
+    : [{ athlete_name: body.athlete_name, offer_price_key: body.offer_price_key, coupon_code: body.coupon_code, field_values: body.field_values }];
+  athletes = athletes.map(a => ({
+    athlete_name: String(a.athlete_name || "").trim(),
+    offer_price_key: a.offer_price_key,
+    coupon_code: a.coupon_code || null,
+    field_values: (a.field_values && typeof a.field_values === "object") ? a.field_values : {},
+  }));
+  if (!athletes.length) return res.status(400).json({ error: "at least one athlete required" });
+  if (athletes.some(a => !a.athlete_name)) return res.status(400).json({ error: "every athlete needs a name" });
+  const nameSet = new Set(athletes.map(a => a.athlete_name.toLowerCase()));
+  if (nameSet.size !== athletes.length) return res.status(400).json({ error: "two athletes have the same name - give each a distinct name" });
+
+  // PREPARE + validate every athlete BEFORE creating anything, so a bad field
+  // or dead price rejects the whole batch cleanly (nothing charged).
+  const prepared = [];
+  for (const a of athletes) {
+    const target = await resolveTarget(clientId, a.offer_price_key);
+    if (!target) return res.status(409).json({ error: `The price for ${a.athlete_name} isn't live anymore - re-pick their offer price.` });
+    const defs = await signupDefs(clientId, target.offer_id);
+    autoFillNameDefs(defs, a.field_values, a.athlete_name);
+    const missing = defs.filter(d => !isAutoNameDef(d) && emptyFieldValue(a.field_values[d.id]));
+    if (missing.length) {
+      return res.status(400).json({
+        error: `Missing signup info for ${a.athlete_name}: ${missing.map(d => d.label || d.key).join(", ")}.`,
+        athlete_name: a.athlete_name, missing_field_ids: missing.map(d => d.id),
+      });
+    }
+    let promo = null;
+    if (a.coupon_code) promo = await resolvePromo(a.coupon_code, acct, target.amount_cents);
+    prepared.push({ a, target, defs, promo });
   }
 
-  // Optional coupon - re-validated server-side at enroll time (never trust a
-  // stale client-side check; the code could expire between Review and Confirm).
-  let promo = null;
-  if (body.coupon_code) {
-    promo = await resolvePromo(body.coupon_code, acct, target.amount_cents);
-  }
-
+  // Card + parent identity (once for the family).
   const { customer, pm, last4 } = await findCard(customerId, acct);
   const parentEmail = String(body.parent_email || customer.email || "").toLowerCase().trim() || null;
   const parentName = String(body.parent_name || customer.name || "").trim() || null;
   const parentPhone = String(body.parent_phone || customer.phone || "").trim() || null;
 
-  const { blocking, resumable } = await findExisting(clientId, { customerId, parentEmail, athleteName });
-  if (blocking.length) {
-    return res.status(409).json({
-      error: `${blocking[0].athlete_name || "This athlete"} is already on the roster (${blocking[0].status}). Use Change plan on their member card instead.`,
-      duplicates: blocking.map(b => ({ member_id: b.id, athlete_name: b.athlete_name, status: b.status })),
-    });
+  // Duplicate guard + resumable-row capture per athlete.
+  for (const p of prepared) {
+    const { blocking, resumable } = await findExisting(clientId, { customerId, parentEmail, athleteName: p.a.athlete_name });
+    if (blocking.length) {
+      return res.status(409).json({
+        error: `${blocking[0].athlete_name || "That athlete"} is already on the roster (${blocking[0].status}). Use Change plan on their member card instead.`,
+        duplicates: blocking.map(b => ({ member_id: b.id, athlete_name: b.athlete_name, status: b.status })),
+      });
+    }
+    p.resumable = resumable;
   }
 
-  const plan = planFromKey(target.key);
+  const parent = await ensureParentContact(clientId, { parentName, parentEmail, parentPhone, customerId, firstAthlete: prepared[0].a.athlete_name });
   const today = new Date().toISOString().slice(0, 10);
-  const baseRow = {
-    athlete_name: athleteName,
-    parent_name: parentName,
-    parent_email: parentEmail,
-    parent_phone: parentPhone,
-    plan,
-    stripe_customer_id: customerId,
-    updated_at: nowIso(),
-  };
+  const clientRows = await sb(`clients?id=eq.${encodeURIComponent(clientId)}&select=business_name&limit=1`).catch(() => []);
+  const academyName = (clientRows && clientRows[0] && clientRows[0].business_name) || "your academy";
 
-  // Upsert the member row FIRST (pending state) so the Stripe webhook always
-  // finds it. Reuse an earlier no-card pending row instead of duplicating.
-  let memberId = resumable ? resumable.id : null;
-  if (memberId) {
-    await sb(`members?id=eq.${memberId}`, {
-      method: "PATCH", headers: { Prefer: "return=minimal" },
-      body: JSON.stringify(baseRow),
-    });
-  } else {
-    const inserted = await sb(`members?select=id`, {
-      method: "POST", headers: { Prefer: "return=representation" },
-      body: JSON.stringify([{
-        ...baseRow,
-        client_id: clientId,
-        status: "payment_method_required",
-        joined_date: today,
-        created_at: nowIso(),
-      }]),
-    });
-    memberId = Array.isArray(inserted) && inserted[0] && inserted[0].id;
-    if (!memberId) return res.status(500).json({ error: "couldn't create the member row" });
-  }
-
-  const auditBase = {
-    client_id: clientId, member_id: memberId,
-    performed_by: ctx.user.id, performed_by_name: ctx.staff?.name || null,
-  };
-
-  // Contact link + collected signup info (validated above; write is
-  // best-effort so a contacts hiccup never blocks the billing step).
-  const signupInfo = await writeSignupInfo({
-    clientId, memberId, athleteName, parentName, parentEmail, parentPhone,
-    customerId, defs, fieldValues,
-  });
-
-  // ── Door B: no usable card -> pending member + setup Checkout link ──
+  // ── Door B: no usable card -> pending members for all + ONE setup link ──
   if (!pm) {
     const base = setupLinkBase(req);
     const session = await stripeFetch(`/checkout/sessions`, {
       method: "POST", stripeAccount: acct,
       body: {
-        mode: "setup", currency: target.currency || "cad", customer: customerId,
+        mode: "setup", currency: prepared[0].target.currency || "cad", customer: customerId,
         success_url: `${base}/client-portal.html?card=saved`,
         cancel_url: `${base}/client-portal.html?card=cancelled`,
       },
     });
-    await writeAudit({
-      ...auditBase, action_type: "enroll-returning",
-      args: {
-        door: "card_link", offer_price_key: target.key, charge_mode: chargeMode, start_date: startDate,
-        consent_confirmed: true, customer_id: customerId,
-        coupon_code: promo ? promo.code : null,
-        contact_id: signupInfo.contact_id, signup_values_written: signupInfo.values_written || 0,
-      },
-      stripe_response: { checkout_session: session.id },
-      db_changes: { members: { status: "payment_method_required", created: !resumable } },
-    });
-    const clientRows = await sb(`clients?id=eq.${encodeURIComponent(clientId)}&select=business_name&limit=1`).catch(() => []);
-    const academyName = (clientRows && clientRows[0] && clientRows[0].business_name) || "your academy";
+    const results = [];
+    for (const p of prepared) {
+      const memberId = await upsertAthleteMember({
+        clientId, athleteName: p.a.athlete_name, parentName, parentEmail, parentPhone,
+        customerId, plan: planFromKey(p.target.key), contactId: parent.contactId, contactKey: parent.contactKey, resumable: p.resumable,
+      });
+      if (memberId) await writeMemberFieldValues(memberId, p.defs, p.a.field_values);
+      await writeAudit({
+        client_id: clientId, member_id: memberId, performed_by: ctx.user.id, performed_by_name: ctx.staff?.name || null,
+        action_type: "enroll-returning",
+        args: { door: "card_link", offer_price_key: p.target.key, charge_mode: chargeMode, start_date: startDate, consent_confirmed: true, customer_id: customerId, coupon_code: p.promo ? p.promo.code : null },
+        stripe_response: { checkout_session: session.id },
+      });
+      results.push({ ok: true, athlete_name: p.a.athlete_name, member_id: memberId, mode: "card_link" });
+    }
+    const names = prepared.map(p => p.a.athlete_name).join(", ");
     return res.status(200).json({
-      ok: true, mode: "card_link", member_id: memberId, url: session.url,
+      ok: true, mode: "card_link", url: session.url, results,
       parent: { name: parentName, email: parentEmail, phone: parentPhone },
       suggested: {
-        sms_text: `Hi, here's the secure link to add your card and finish ${athleteName}'s signup with ${academyName}: ${session.url}`,
-        email_subject: `Finish ${athleteName}'s signup - ${academyName}`,
+        sms_text: `Hi, here's the secure link to add your card and finish signing up ${names} with ${academyName}: ${session.url}`,
+        email_subject: `Finish signup - ${academyName}`,
       },
-      note: promo
-        ? `No usable card on file. Send the link; once the card is saved, run this signup again WITH coupon ${promo.code} and it will complete at the discounted price.`
-        : "No usable card on file. Send the link; once the card is saved, run this signup again and it will complete.",
+      note: "No usable card on file. Send the link; once the card is saved, run this signup again and it completes.",
     });
   }
 
-  // ── Door A: saved card -> create the portal-owned subscription ──
+  // ── Door A: saved card -> a subscription per athlete ──
   let trialEnd = null;
   if (chargeMode === "on_date") {
-    const t = Math.floor(new Date(`${startDate}T12:00:00Z`).getTime() / 1000);
+    const tsec = Math.floor(new Date(`${startDate}T12:00:00Z`).getTime() / 1000);
     const floor = Math.floor(Date.now() / 1000) + 60;
-    trialEnd = Math.min(Math.max(t, floor), Math.floor(Date.now() / 1000) + STRIPE_TRIAL_MAX_SECS);
+    trialEnd = Math.min(Math.max(tsec, floor), Math.floor(Date.now() / 1000) + STRIPE_TRIAL_MAX_SECS);
   }
-  const subBody = {
-    customer: customerId,
-    "items[0][price]": target.stripe_price_id,
-    default_payment_method: pm,
-    // origin=fullcontrol-portal = the standard portal-owned marker (webhook +
-    // members.js read it); import_silent=1 flips live WITHOUT the new-signup
-    // welcome activations - this is a returning client, not a funnel signup.
-    "metadata[origin]": "fullcontrol-portal",
-    "metadata[import_silent]": "1",
-    "metadata[source]": "fullcontrol-returning-enroll",
-    "metadata[offer_price_key]": target.key,
-    "metadata[member_email]": parentEmail || undefined,
-    "metadata[enroll_consent]": "1",
-  };
-  if (trialEnd) subBody.trial_end = trialEnd;
-  if (promo) subBody["discounts[0][promotion_code]"] = promo.pc.id;
-
-  let sub;
-  try {
-    sub = await stripeFetch(`/subscriptions`, {
-      method: "POST", stripeAccount: acct,
-      idempotencyKey: `enroll-${clientId}-${customerId}-${target.stripe_price_id}-${trialEnd || "now"}`.slice(0, 200),
-      body: subBody,
-    });
-  } catch (e) {
-    await writeAudit({
-      ...auditBase, action_type: "enroll-returning-failed",
-      args: { door: "subscription", offer_price_key: target.key, consent_confirmed: true, error: e.message },
-    });
-    throw e;
-  }
-
-  // Stamp the sub onto the member row. Status stays payment_method_required -
-  // the invoice.paid webhook (activatePortalOnboardingMember, import_silent
-  // branch) flips it live + runs access/credit sync, same as every other
-  // portal-owned signup. Charge-now pays within seconds; a scheduled start
-  // pays its $0 trial invoice immediately, so both doors flip fast.
-  await sb(`members?id=eq.${memberId}`, {
-    method: "PATCH", headers: { Prefer: "return=minimal" },
-    body: JSON.stringify({
-      stripe_subscription_id: sub.id,
-      stripe_price_id: target.stripe_price_id,
-      stripe_joined_at: sub.created ? new Date(sub.created * 1000).toISOString() : nowIso(),
-      billing_portal_owned: true,
-      updated_at: nowIso(),
-    }),
-  });
-
-  await writeAudit({
-    ...auditBase, action_type: "enroll-returning",
-    args: {
-      door: "subscription", offer_price_key: target.key, charge_mode: chargeMode,
-      start_date: startDate, consent_confirmed: true, customer_id: customerId,
-      amount_cents: target.amount_cents,
-      coupon_code: promo ? promo.code : null,
-      discount_cents: promo ? promo.discount_cents : null,
-      contact_id: signupInfo.contact_id, signup_values_written: signupInfo.values_written || 0,
-    },
-    stripe_response: { id: sub.id, status: sub.status, promotion_code: promo ? promo.pc.id : null },
-    db_changes: { members: { created: !resumable, stripe_subscription_id: sub.id } },
-  });
-
   const firstChargeIso = trialEnd ? new Date(trialEnd * 1000).toISOString().slice(0, 10) : today;
+
+  const results = [];
+  for (const p of prepared) {
+    const { a, target, promo } = p;
+    const auditBase = { client_id: clientId, performed_by: ctx.user.id, performed_by_name: ctx.staff?.name || null };
+    let memberId = null;
+    try {
+      memberId = await upsertAthleteMember({
+        clientId, athleteName: a.athlete_name, parentName, parentEmail, parentPhone,
+        customerId, plan: planFromKey(target.key), contactId: parent.contactId, contactKey: parent.contactKey, resumable: p.resumable,
+      });
+      if (!memberId) throw new Error("couldn't create the member row");
+
+      const subBody = {
+        customer: customerId,
+        "items[0][price]": target.stripe_price_id,
+        default_payment_method: pm,
+        "metadata[origin]": "fullcontrol-portal",
+        "metadata[import_silent]": "1",
+        "metadata[source]": "fullcontrol-returning-enroll",
+        "metadata[offer_price_key]": target.key,
+        "metadata[member_email]": parentEmail || undefined,
+        "metadata[enroll_consent]": "1",
+      };
+      if (trialEnd) subBody.trial_end = trialEnd;
+      if (promo) subBody["discounts[0][promotion_code]"] = promo.pc.id;
+
+      const sub = await stripeFetch(`/subscriptions`, {
+        method: "POST", stripeAccount: acct,
+        idempotencyKey: `enroll-${clientId}-${customerId}-${target.stripe_price_id}-${trialEnd || "now"}`.slice(0, 200),
+        body: subBody,
+      });
+
+      await sb(`members?id=eq.${memberId}`, {
+        method: "PATCH", headers: { Prefer: "return=minimal" },
+        body: JSON.stringify({
+          stripe_subscription_id: sub.id, stripe_price_id: target.stripe_price_id,
+          stripe_joined_at: sub.created ? new Date(sub.created * 1000).toISOString() : nowIso(),
+          billing_portal_owned: true, updated_at: nowIso(),
+        }),
+      });
+      await writeMemberFieldValues(memberId, p.defs, a.field_values);
+      await writeAudit({
+        ...auditBase, member_id: memberId, action_type: "enroll-returning",
+        args: { door: "subscription", offer_price_key: target.key, charge_mode: chargeMode, start_date: startDate, consent_confirmed: true, customer_id: customerId, amount_cents: target.amount_cents, coupon_code: promo ? promo.code : null, discount_cents: promo ? promo.discount_cents : null },
+        stripe_response: { id: sub.id, status: sub.status, promotion_code: promo ? promo.pc.id : null },
+      });
+      results.push({
+        ok: true, athlete_name: a.athlete_name, member_id: memberId,
+        mode: chargeMode === "on_date" ? "scheduled" : "charged",
+        subscription_id: sub.id,
+        amount_cents: promo ? promo.discounted_cents : target.amount_cents, currency: target.currency,
+        coupon: promo ? { code: promo.code, label: promo.label } : null,
+        first_charge_iso: firstChargeIso,
+        warning: (sub.status === "incomplete" || sub.status === "incomplete_expired")
+          ? "The first charge did not go through - the card on file was declined. Send a card link from their member card."
+          : null,
+      });
+    } catch (e) {
+      await writeAudit({ ...auditBase, member_id: memberId, action_type: "enroll-returning-failed", args: { door: "subscription", offer_price_key: target.key, consent_confirmed: true, error: e.message } });
+      results.push({ ok: false, athlete_name: a.athlete_name, member_id: memberId, error: e.message });
+    }
+  }
+
+  const anyFailed = results.some(r => r.ok === false);
   return res.status(200).json({
-    ok: true,
-    mode: chargeMode === "on_date" ? "scheduled" : "charged",
-    member_id: memberId, subscription_id: sub.id, subscription_status: sub.status,
-    amount_cents: promo ? promo.discounted_cents : target.amount_cents, currency: target.currency,
-    coupon: promo ? { code: promo.code, label: promo.label, discount_cents: promo.discount_cents } : null,
-    first_charge_iso: firstChargeIso, card_last4: last4,
-    warning: (sub.status === "incomplete" || sub.status === "incomplete_expired")
-      ? "The first charge did not go through - the card on file was declined. Send a card link from the member card."
-      : null,
+    ok: !anyFailed, mode: chargeMode === "on_date" ? "scheduled" : "charged",
+    results, any_failed: anyFailed, card_last4: last4, first_charge_iso: firstChargeIso,
   });
 }
 
