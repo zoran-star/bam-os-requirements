@@ -533,17 +533,26 @@ async function detectForClient(client) {
   // newest-first queue, so once the top DETECT_CAP Done-Trial cards were carded,
   // every quiet lead past that position NEVER got a follow-up drafted - they sat
   // in Done Trial with us as the last message and nothing queued. Fix: pull every
-  // LIVE closing card once, drop proactive leads that already have a pending/
-  // approved card (they're already handled), and order the rest LONGEST-SILENT
-  // first so the per-run cap always lands on the cards that actually need one.
-  // Reactive (inbound) leads stay in - a reply must always be answered.
-  let _activeCarded = new Set();
+  // LIVE closing card once, drop leads whose live card ALREADY covers their
+  // current state (proactive carded = already queued; reactive whose pending card
+  // already answers THIS inbound), and order the rest LONGEST-SILENT first so the
+  // per-run cap always lands on cards that actually need one. Reactive leads with
+  // a NEW inbound (newer than their card) stay in - a fresh reply must be answered.
+  // (2026-07-09b: also drop reactive-already-answered leads - they were sorting to
+  // the front every run and eating all 10 cap slots, re-starving the quiet tail.)
+  let _cardByContact = new Map();
   try {
-    const _live = await sb(`agent_closing_replies?client_id=eq.${client.id}&status=in.(pending,approved)&select=ghl_contact_id`);
-    for (const r of (Array.isArray(_live) ? _live : [])) if (r.ghl_contact_id) _activeCarded.add(String(r.ghl_contact_id));
+    const _live = await sb(`agent_closing_replies?client_id=eq.${client.id}&status=in.(pending,approved)&select=ghl_contact_id,last_lead_at,created_at&order=created_at.desc`);
+    for (const r of (Array.isArray(_live) ? _live : [])) { const cid = String(r.ghl_contact_id || ""); if (cid && !_cardByContact.has(cid)) _cardByContact.set(cid, r); }
   } catch (_) {}
   queue = queue
-    .filter(q => (q.last_direction || "") === "inbound" || !_activeCarded.has(String(q.contact_id)))
+    .filter(q => {
+      const card = _cardByContact.get(String(q.contact_id || ""));
+      if (!card) return true;                                                  // no live card -> needs one
+      if ((q.last_direction || "") !== "inbound") return false;                // proactive + carded -> already queued
+      const answered = card.last_lead_at && q.last_at && new Date(card.last_lead_at).getTime() === new Date(q.last_at).getTime();
+      return !answered;                                                        // reactive: keep only a NEW inbound
+    })
     .sort((a, b) => {
       const ar = (a.last_direction || "") === "inbound" ? 0 : 1;
       const br = (b.last_direction || "") === "inbound" ? 0 : 1;
