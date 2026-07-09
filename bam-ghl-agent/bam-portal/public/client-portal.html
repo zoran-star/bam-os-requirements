@@ -52839,17 +52839,20 @@ function _v2Toggle() {
 function _v2MountStage() {
   const fr = document.getElementById('v2ReqFrame'), hint = document.getElementById('v2ReqHint');
   // window._V2_PAGE_URL is a local-dev override (unset in prod) so we can point
-  // the annotator iframe at a local bam-client-sites server. Otherwise: the
-  // active "other" funnel's page when one is open, else the main landing page.
-  let url = window._V2_PAGE_URL
-    || (typeof _FN_ACTIVE !== 'undefined' && _FN_ACTIVE && _FN_ACTIVE.url_resolved)
-    || (typeof _MM !== 'undefined' && _MM && _MM.page && _MM.page.url) || '';
+  // the annotator iframe at a local bam-client-sites server. For an "other"
+  // funnel we ONLY use that funnel's own resolved page - never fall back to the
+  // free-trial page (that would show the wrong page for e.g. the contact funnel).
+  // For the main free-trial focus (_FN_ACTIVE null) we use _MM.page.url.
+  let url;
+  if (window._V2_PAGE_URL) url = window._V2_PAGE_URL;
+  else if (typeof _FN_ACTIVE !== 'undefined' && _FN_ACTIVE) url = _FN_ACTIVE.url_resolved || '';
+  else url = (typeof _MM !== 'undefined' && _MM && _MM.page && _MM.page.url) || '';
   // annotate=1 tells the page (bam-client-sites) to turn on section hover-outline
   // + post section clicks back to us.
   if (url) url += (url.indexOf('?') === -1 ? '?' : '&') + 'annotate=1';
   if (fr) {
     if (url) { if (fr.getAttribute('src') !== url) fr.setAttribute('src', url); fr.style.display = 'block'; if (hint) hint.style.display = 'none'; }
-    else { fr.removeAttribute('src'); fr.style.display = 'none'; if (hint) { hint.style.display = 'flex'; hint.textContent = 'your page preview will appear here'; } }
+    else { fr.removeAttribute('src'); fr.style.display = 'none'; if (hint) { hint.style.display = 'flex'; hint.textContent = 'we do not have this page yet - tell your BAM team the page link'; } }
   }
   _v2ReflectDevice();
   _v2RenderStages();
