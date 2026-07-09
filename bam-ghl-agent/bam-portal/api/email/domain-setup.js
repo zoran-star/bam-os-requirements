@@ -91,10 +91,13 @@ async function handler(req, res) {
     if (!clientId) return res.status(400).json({ error: "client_id required" });
     if (!ctx.isStaff && !ctx.clientIds.includes(clientId)) return res.status(403).json({ error: "forbidden" });
 
-    const rows = await sb(`clients?id=eq.${encodeURIComponent(clientId)}&select=id,email_provider,email_domain,email_setup&limit=1`);
+    const rows = await sb(`clients?id=eq.${encodeURIComponent(clientId)}&select=id,email_provider,email_domain,email_setup,ein&limit=1`);
     const client = Array.isArray(rows) && rows[0];
     if (!client) return res.status(404).json({ error: "academy not found" });
     const action = String(body.action || "status");
+    // The onboarding flow's business-info check rides on this status call (one
+    // fewer roundtrip than a dedicated endpoint for a single boolean).
+    const einSet = !!(client.ein && String(client.ein).trim());
 
     if (action === "create") {
       const root = normalizeDomain(body.domain);
@@ -115,9 +118,9 @@ async function handler(req, res) {
     if (action === "status") {
       const setup = client.email_setup;
       if (client.email_provider === "resend" && client.email_domain) {
-        return res.status(200).json({ ok: true, status: "live", domain: client.email_domain, records: (setup && setup.records) || [] });
+        return res.status(200).json({ ok: true, status: "live", domain: client.email_domain, records: (setup && setup.records) || [], ein_set: einSet });
       }
-      if (!setup || !setup.resend_domain_id) return res.status(200).json({ ok: true, status: "none" });
+      if (!setup || !setup.resend_domain_id) return res.status(200).json({ ok: true, status: "none", ein_set: einSet });
       // Nudge Resend to re-check while pending (best-effort), then read.
       try { await resend("POST", `/domains/${encodeURIComponent(setup.resend_domain_id)}/verify`); } catch (_) {}
       const d = await resend("GET", `/domains/${encodeURIComponent(setup.resend_domain_id)}`);
@@ -133,7 +136,7 @@ async function handler(req, res) {
       } else {
         await saveSetup(clientId, next);
       }
-      return res.status(200).json({ ok: true, status: flipped ? "live" : status, domain: setup.domain, records: next.records, flipped });
+      return res.status(200).json({ ok: true, status: flipped ? "live" : status, domain: setup.domain, records: next.records, flipped, ein_set: einSet });
     }
 
     return res.status(400).json({ error: "unknown action (create|status)" });
