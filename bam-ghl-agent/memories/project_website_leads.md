@@ -109,17 +109,31 @@ client site form
   `contact` (contact form), `enroll` (no entry points). Local seed:
   `15_bam_gta_funnels.sql` + funnel_id update in `20_bam_gta_entry_points.sql`.
 - **API `GET/PATCH /api/website/funnels?client_id=`** - funnels with nested
-  entry_points + `url_resolved` (stored url, else most-common page_view path
-  joined to allowed_domains, same derivation as meta-machine pageUrl). PATCH
-  saves label/url/enabled.
+  entry_points + `url_resolved`. Resolution (2026-07-09): stored `funnels.url`
+  override -> this funnel's own beacon `page_view` path -> **PRIMARY funnel's
+  live origin + "/" + funnel key** (the site's cleanUrls page slug; key == slug,
+  GTA `contact` -> `/contact`). Domain is taken from the primary funnel's
+  proven-live URL, never guessed; only the slug is conventional. Null when no
+  primary URL either. **NO owner-typed URL** (Zoran). PATCH still saves
+  label/url/enabled (staff override).
 - **UI (V2 Marketing page)**: `#other-funnels-card` below the landing page
-  card - "Configure other entry point funnels" dropdown (mm-collapse-head
-  idiom) listing non-primary funnels that HAVE entry points (GTA: contact
-  page). Click = `openFunnelConfig()` opens the landing focus modal with
-  `_fnRenderFunnelFocus()`: page URL editor, entry point list (routing per
-  row), and the same "Request a change" annotator as the main page
-  (`_FN_ACTIVE` switches the iframe URL + submit context). Functions all
-  `_fn*` in client-portal.html; loaded via `_fnLoad()` from `_mmLoad()`.
+  card - "Configure other entry point funnels" dropdown listing non-primary
+  funnels that HAVE entry points (GTA: contact page). Click = `openFunnelConfig()`
+  opens the landing focus modal (`_fnRenderFunnelFocus()`): NO URL editor, just
+  the entry point list (routing per row) + a gold "Focus mode / Request a change"
+  button (`_crTriggerHtml`). That button opens **`#changeRequestModal` as its own
+  camera-pan focus session** (`openChangeRequest`/`closeChangeRequest`, shared
+  `_crBodyHtml` reusing the `v2req-*` IDs) - applied to BOTH the free-trial
+  landing focus and the other-funnel config. Frontend NEVER falls back to the
+  free-trial page for an "other" funnel (that bug showed free-trial for contact);
+  no resolved page -> honest empty hint. `_fn*` fns loaded via `_fnLoad()` from
+  `_mmLoad()`. Dead now: `_v2InlineHtml`/`_v2Toggle`/`_v2Sync`.
+- **Funnel steps come from the PAGE, not the portal.** Each bam-client-sites
+  page posts `{type:'fc-annotate', action:'steps', steps:[...]}` in annotate mode
+  (`?annotate=1` in an iframe); the portal renders the pills + drives previews via
+  `set-step`. `freetrial.jsx` = Form/Calendar/Confirmation; **`contact.jsx` now
+  announces Form/Confirmation** (bam-client-sites PR #55, 2026-07-09). A page that
+  does not announce shows no steps.
 
 ## Key decisions (Jun 2026)
 - **Save-first, not GHL-first.** Lead history must live in our system so
