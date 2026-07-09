@@ -85,11 +85,12 @@ scattered autonomy/config entry points. KEEPS: inline drawer suggestion on lead 
   _ccPipeStage -> board). Old stage cards (_ploStripCells) = V1.5 fallback only.
 - PILL ORDER locked (_plo2Order, home + overview): Nurture, Ghosted, Booking,
   Confirm, Closing. NO Member pill - terminal stages never render in the strip.
-- STRIP = design-system styled (2026-07-09): pills are portal cards (surface,
-  1px border, soft shadow, hover lift) with the stage colour as a 3px top bar
-  (dashed = automation); active = soft tint. Cascade is width:100% (the home
-  container .cc-pipe-strip is flex). _ccReturn clears the frozen scroll-recede
-  blur (the "back from classic = blurry home" bug).
+- STRIP LOOK LOCKED (2026-07-09): the ORIGINAL pill style - 1.5px colored border
+  per stage, dashed = automation, solid colour fill + dark text when open. A
+  design-system restyle (top bar + soft tint) shipped and was REVERTED the same
+  day on Zoran's ask; do not restyle without an explicit ask. Cascade keeps
+  width:100% (home container .cc-pipe-strip is flex). _ccReturn clears the
+  frozen scroll-recede blur (the "back from classic = blurry home" bug).
 - STILL TO DO: swipe gestures (open decision), GTA prod verification of the whole batch.
 
 ## Open item (ask Zoran before building)
