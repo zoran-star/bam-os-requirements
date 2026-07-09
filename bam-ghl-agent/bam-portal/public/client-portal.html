@@ -14933,7 +14933,29 @@ async function _obfFetchState() {
   if (em.status === 'fulfilled') { next.email = em.value.status === 'live'; next.ein = !!em.value.ein_set; }
   if (web.status === 'fulfilled') next.website = web.value.status === 'live';
   _OBF_STATE = next; _OBF_AT = Date.now();
+  _obfFanSync();
   return next;
+}
+
+// The navigation fan's onboarding circle: the progress ring IS the icon.
+// Shown for V2 academies with steps left; hides itself once complete. First
+// call (no state yet) shows an empty ring and kicks a background check.
+let _OBF_FETCHING = false;
+function _obfFanSync() {
+  const btn = document.getElementById('cc-fan-obf');
+  if (!btn) return;
+  if (!_obfIsV2()) { btn.style.display = 'none'; return; }
+  const total = _OBF_STEPS.length;
+  const done = _OBF_STATE ? _obfDone(_OBF_STATE) : 0;
+  if (_OBF_STATE && done === total) { btn.style.display = 'none'; return; }
+  btn.style.display = '';
+  const ring = document.getElementById('cc-fan-obf-ring');
+  if (ring) ring.innerHTML = _obfRing(done, total, 18);
+  btn.dataset.lab = _OBF_STATE ? `Finish onboarding · ${done}/${total}` : 'Finish onboarding';
+  if (!_OBF_STATE && !_OBF_FETCHING) {
+    _OBF_FETCHING = true;
+    _obfFetchState().catch(() => {}).finally(() => { _OBF_FETCHING = false; });
+  }
 }
 
 function _obfDone(st) { return _OBF_STEPS.filter(s => st && st[s.key]).length; }
@@ -47691,9 +47713,12 @@ function _ccStyle() {
     '.cc-fan{position:absolute;left:7px;bottom:62px;display:flex;flex-direction:column;gap:8px}' +
     '.cc-fan-btn{position:relative;width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--text-sub);opacity:0;transform:translateY(12px) scale(.8);pointer-events:none;transition:opacity .22s var(--es,ease),transform .22s var(--es,ease),color .15s}' +
     '.cc-dock.open .cc-fan-btn{opacity:1;transform:translateY(0) scale(1);pointer-events:auto}' +
-    '.cc-dock.open .cc-fan-btn:nth-child(1){transition-delay:.08s}' +
-    '.cc-dock.open .cc-fan-btn:nth-child(2){transition-delay:.04s}' +
-    '.cc-dock.open .cc-fan-btn:nth-child(3){transition-delay:0s}' +
+    '.cc-dock.open .cc-fan-btn:nth-child(1){transition-delay:.16s}' +
+    '.cc-dock.open .cc-fan-btn:nth-child(2){transition-delay:.12s}' +
+    '.cc-dock.open .cc-fan-btn:nth-child(3){transition-delay:.08s}' +
+    '.cc-dock.open .cc-fan-btn:nth-child(4){transition-delay:.04s}' +
+    '.cc-dock.open .cc-fan-btn:nth-child(5){transition-delay:0s}' +
+    '.cc-fan-btn .cc-fan-count{position:absolute;top:-3px;right:-3px;min-width:15px;height:15px;padding:0 4px;box-sizing:border-box;border-radius:9px;background:var(--gold);color:#0B0B0D;font-size:9px;font-weight:800;font-family:var(--mono);display:flex;align-items:center;justify-content:center;box-shadow:0 0 0 2px var(--bg)}' +
     '.cc-fan-btn:hover{color:var(--gold)}' +
     '.cc-fan-btn svg{width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}' +
     '.cc-fan-btn::after{content:attr(data-lab);position:absolute;left:48px;top:50%;transform:translateY(-50%) translateX(-4px);font-size:11px;font-weight:700;color:var(--text);background:color-mix(in srgb,var(--surface) 72%,transparent);backdrop-filter:blur(10px);border:1px solid var(--border);border-radius:8px;padding:4px 10px;white-space:nowrap;opacity:0;pointer-events:none;transition:opacity .15s,transform .15s}' +
@@ -48115,19 +48140,17 @@ let _ccAcctEmailOk = false;
 
 function _ccAcctBuild() {
   if (document.getElementById('cc-acct')) return;
+  // The switcher BUTTON lives in the navigation fan (#cc-fan-acct, Zoran
+  // 2026-07-08: "the academy switcher goes into the cascade"); this wrapper
+  // only anchors the pop list above the dock.
   const wrap = document.createElement('div');
   wrap.id = 'cc-acct';
-  wrap.innerHTML =
-    `<div id="cc-acct-pop" role="menu" aria-label="Switch academy"></div>
-     <button type="button" id="cc-acct-btn" aria-label="Switch academy" aria-haspopup="true" onclick="_ccAcctToggle()">
-       <svg viewBox="0 0 24 24"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>
-       <span class="cc-acct-count" id="cc-acct-count"></span>
-       <span class="cc-acct-hint">Switch academy</span>
-     </button>`;
+  wrap.innerHTML = `<div id="cc-acct-pop" role="menu" aria-label="Switch academy"></div>`;
   document.body.appendChild(wrap);
-  // Close when clicking anywhere outside the switcher.
+  // Close when clicking anywhere outside the switcher (the fan button toggles
+  // it, so clicks there must not immediately re-close it).
   document.addEventListener('click', e => {
-    if (e.target.closest('#cc-acct')) return;
+    if (e.target.closest('#cc-acct') || e.target.closest('#cc-fan-acct')) return;
     document.getElementById('cc-acct-pop')?.classList.remove('open');
   });
   // Reveal only for Zoran / Mike - match the signed-in auth email against the allowlist.
@@ -48147,7 +48170,9 @@ function _ccAcctSync() {
   const rows = (typeof CLIENT_ROWS !== 'undefined' && CLIENT_ROWS) ? CLIENT_ROWS : [];
   const ok = _ccAcctEmailOk === true && rows.length > 1;
   wrap.classList.toggle('show', ok);
-  const cnt = document.getElementById('cc-acct-count');
+  const fan = document.getElementById('cc-fan-acct');
+  if (fan) fan.style.display = ok ? '' : 'none';
+  const cnt = document.getElementById('cc-fan-acct-count');
   if (cnt) cnt.textContent = ok ? String(rows.length) : '';
   if (!ok) document.getElementById('cc-acct-pop')?.classList.remove('open');
 }
@@ -48228,11 +48253,14 @@ function _ccBuildChrome() {
        <button type="button" class="cc-fan-btn cc-glass" data-lab="Info" onclick="_ccDockPop('info')">${_ccIcons().info}</button>
        <button type="button" class="cc-fan-btn cc-glass" data-lab="Business blueprint" onclick="_ccOrbToggle(false);_ccOpenClassic('blueprint')">${_ccIcons().grid}</button>
        <button type="button" class="cc-fan-btn cc-glass" data-lab="Settings" onclick="_ccDockPop('settings')">${_ccIcons().gear}</button>
+       <button type="button" class="cc-fan-btn cc-glass" id="cc-fan-acct" data-lab="Switch academy" style="display:none" onclick="_ccAcctToggle(true)"><svg viewBox="0 0 24 24"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg><span class="cc-fan-count" id="cc-fan-acct-count"></span></button>
+       <button type="button" class="cc-fan-btn cc-glass" id="cc-fan-obf" data-lab="Finish onboarding" style="display:none" onclick="_ccOrbToggle(false);_obfOpen()"><span id="cc-fan-obf-ring" style="display:flex">${typeof _obfRing === 'function' ? _obfRing(0, 4, 18) : ''}</span></button>
      </div>
      <button type="button" class="cc-orb cc-glass" id="cc-orb" aria-label="Menu" onclick="_ccOrbToggle()"><svg viewBox="0 0 512 512" fill="currentColor" stroke="none"><path d="M 256 80 L 290 230 L 432 256 L 290 282 L 256 432 L 222 282 L 80 256 L 222 230 Z"/><circle cx="256" cy="256" r="14"/></svg><span class="cc-orb-hint">Menu</span></button>
      <div id="cc-dock-pop"></div>`;
   document.body.appendChild(dock);
-  _ccAcctBuild();   // BAM-staff academy switcher, stacked above the orb
+  _ccAcctBuild();   // academy switcher list (the button now lives in the fan)
+  _obfFanSync();    // onboarding ring fan button (V2 only, hides when complete)
   _ccKeys();
   // Entrance: orb springs in, "Menu" hint shows for a few seconds
   requestAnimationFrame(() => {

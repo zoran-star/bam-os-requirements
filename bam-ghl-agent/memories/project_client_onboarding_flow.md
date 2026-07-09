@@ -25,6 +25,13 @@ Academy-level: locations · staff/team invites · branding/assets · Stripe Conn
 Per-offer (repeat per offer; Training is ONE type): offer wizard done · pricing matched/sellable · entry points · landing page · pipeline tied · automations/agent copy.
 Later: Twilio number (GHL until then).
 
+## Navigation cascade (2026-07-08, same day)
+Zoran: the navigation orb's CASCADE (the fan that springs up from the circle) is the home for these entries, not floating buttons:
+- **Academy switcher moved into the cascade** (`#cc-fan-acct`, layers icon + count badge). The old standalone `#cc-acct-btn` circle above the orb is GONE; `#cc-acct` now only anchors the pop list. Still Zoran/Mike-only + multi-academy-only (`_ccAcctSync` drives the fan button).
+- **Onboarding circle in the cascade** (`#cc-fan-obf`): the progress ring IS the icon, label shows "Finish onboarding · n/N", hides when complete or non-V2 (`_obfFanSync`, called from `_obfFetchState` + dock build).
+- Fan cascade delays extended to 5 children; `.cc-fan-count` badge style added.
+- Gotcha: the acct pop's click-outside closer must ignore `#cc-fan-acct` or the fan click instantly re-closes it.
+
 ## Gotchas
 - The pop only exists in command-center mode (the orb is `cc-mode` only); classic mode has no entry yet - add a sidebar nav item when non-CC academies reach V2.
 - Completion is data-derived: a step can UN-complete if the underlying state regresses (that is intentional).
