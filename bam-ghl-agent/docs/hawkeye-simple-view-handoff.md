@@ -1,6 +1,6 @@
 # Hawkeye V2 + Sales Simple View - build handoff
 
-**Status: DESIGN LOCKED 2026-07-08 via clickable mockup (v2, updated same day to the revised action model). Deck/cascade UI not built yet; the action-model backend changes ARE shipped.**
+**Status: DESIGN LOCKED + BUILD STARTED 2026-07-08. The DECK (build step 1) IS BUILT in client-portal.html (V2-gated, `_hk2*`, view state `_PL_SV='hawkeye'`, host `#pl-hawkeye`) incl. the `book-options` API; V2 Hawkeye entries route to it, V1.5 keeps the legacy overlays. Swipe gestures deferred (open item) - buttons only. Steps 3-5 (simple view strip/cascade/pill morph, skip cleanup, mobile polish) still to build.**
 Mockup (open in browser, fully clickable): [`docs/hawkeye-simple-view-mockup.html`](hawkeye-simple-view-mockup.html)
 Also hosted: https://claude.ai/code/artifact/7a9a5268-048a-4dda-9750-62d9f69a4150
 Mockup v2 shows: kind-aware deck cards (Reply / Book it / Went quiet / Reschedule /
@@ -104,6 +104,8 @@ to build for the page itself - just per-stage routing.
 | 2026-07-08 | The popup modal shares the deck card's kind-aware guts: Book-it popup shows the same Calendar + Slot pickers, ghost/plan kinds swap the reply box, and the same edited-label + mandatory-note rule applies |
 | 2026-07-08 | LATER SAME DAY: simple view = highlights only. Cascade shows plain lead rows (gold ring + status); clicking a glowing lead opens the Hawkeye PAGE on that card. Popup modal RETIRED - the deck is the only Hawkeye surface |
 | 2026-07-08 | Configure is PER STAGE, automations included: every 3-line icon / tab gear opens that stage's own focus-mode page (Ghosted + Nurture show their editable step sequences; Member = human, no config) |
+| 2026-07-08 | Scheduled Trial has TWO engines: the Confirm AGENT + the POST-TRIAL FORM (coach fills it; it routes the lead). The form lives in the stage's engine config for now; making it configurable comes later |
+| 2026-07-08 | BUILT: the deck (step 1) in client-portal.html - _hk2* module, kind-aware cards, Other + morphing confirm, mandatory teach-why, calendar/slot pickers via new agent-approvals book-options action, plan grouping, deep-link from board badges, tab gear -> focus mode. Digest SMS retired |
 | 2026-07-08 | Teach-why note is MANDATORY for any change away from the agent's guess (draft, plan message, booking detail) - confirm is blocked until the note is filled. Applies to every Hawkeye surface in the real build |
 
 ## Action model per agent (revised 2026-07-08, SHIPPED end to end)

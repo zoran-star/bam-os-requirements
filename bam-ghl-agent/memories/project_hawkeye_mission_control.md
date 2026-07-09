@@ -59,6 +59,21 @@ scattered autonomy/config entry points. KEEPS: inline drawer suggestion on lead 
   Pill morph = up arrow center (collapse) + 3-line config icon top-right.
 ⚠️ NOT prod-verified on GTA yet (live behavior change if GTA had closing autos approved).
 
+## BUILD STATUS (2026-07-08)
+- STEP 1 BUILT: the deck lives in client-portal.html as the `_hk2*` module (V2-gated).
+  View state: `_PL_SV='hawkeye'` + host `#pl-hawkeye` (sibling of pl-focus). Cards are
+  kind-aware (reply/book/ghost/handoff/enroll/plan/lost), footer = Other + morphing
+  confirm, teach-why MANDATORY on any edit (agent-scoped lesson via agent-train),
+  Book-it uses the NEW `book-options` action on agent-approvals (trial calendars +
+  open slots), closing followup_N rows group into one plan card, board badges deep-link
+  (_hk2Open(null, contactId)), tab gear -> _plOpenFocus for that stage. All commits ride
+  _hawkDefer (6s undo). V2 entries repointed (_hv2OpenHawkeye/_plEngineHawk/board
+  hawk buttons/scanBtn); V1.5 keeps _apx/_acx/_aclx overlays. 2-hourly digest SMS retired.
+- Scheduled Trial = TWO engines: Confirm agent + post-trial form (in engine config for
+  now; configurable later). Mockup config screen shows both.
+- STILL TO BUILD: simple view strip/cascade/pill morph (step 3), skip cleanup (step 4),
+  swipe gestures (open decision), GTA prod verification.
+
 ## Open item (ask Zoran before building)
 Swipe RIGHT commits the card's main action (can SEND) - confirm it's instant-commit.
 Swipe LEFT destinations differ per agent: Booking Ghosted/Nurture/Unqualified ·

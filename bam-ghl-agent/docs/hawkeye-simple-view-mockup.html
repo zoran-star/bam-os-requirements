@@ -412,6 +412,8 @@
       steps:[['On booking','Booking confirmation - SMS + email: date, time, location, add-to-calendar links'],
              ['9am trial day','Same-day check-in - "good to go for today?"']],
       stepslbl:'Reminder templates (approved once, then they self-send)',
+      eng2:{tag:'POST-TRIAL FORM',desc:'This stage\'s SECOND engine: after trial day the coach fills the form - showed up? good fit? trainer, notes the Closing agent reads, a personal first message + the optional sign-up link. It routes the lead automatically (the exits below). Making it configurable comes later - for now it lives here.',
+        chips:['Showed up? + Good fit?','Trainer','Notes &#8594; Closing agent','First message + optional sign-up link']},
       exits:['Showed + good fit &#8594; Done Trial (post-trial form)','Showed + not a fit &#8594; Unqualified','No-show &#8594; back to Booking (rebook)','Can\'t make it &#8594; back to Booking (rebook)','No longer wants &#8594; Nurture']},
     closing:{title:'Closing · Done Trial',eng:'AGENT',engc:'var(--purple)',engbg:'var(--purple-soft)',
       entries:['Good fit - post-trial form: showed up + coach says fit (coach notes ride along for the agent)'],
@@ -454,6 +456,8 @@
       +(c.steps?('<div style="font-size:10px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--text-mute);margin-top:12px">'+c.stepslbl+'</div>'
         +c.steps.map(function(st){return '<div class="cfg-step"><span class="when">'+st[0]+'</span><span class="tx">'+st[1]+'</span></div>';}).join('')):'')
       +'</div>'
+      +(c.eng2?('<div class="cfg-sec"><h3>Engine 2 <span class="engine-tag" style="background:'+c.engbg+';color:'+c.engc+'">'+c.eng2.tag+'</span></h3>'
+        +'<p>'+c.eng2.desc+'</p>'+chips(c.eng2.chips)+'</div>'):'')
       +'<div class="cfg-sec"><h3>Exit points</h3><p>Where leads go next (editable branches).</p>'+chips(c.exits)+'</div>'
       +'<div class="hint">'+c.title+' - this is the focus-mode page that shipped 2026-07-06; every gear and 3-line icon routes here, per stage.</div>';
     document.getElementById('cfg-body').innerHTML=html;

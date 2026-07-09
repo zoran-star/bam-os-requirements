@@ -1008,6 +1008,23 @@ async function handler(req, res) {
       return res.status(200).json({ ok: true, marked_abandoned: true, unqualified: true, opportunity_id: oppId, reason });
     }
 
+    // Options for the Hawkeye deck's Book-it pickers (Zoran 2026-07-08): the
+    // academy's trial calendars (the offer-tied calendar entry points) + each
+    // calendar's open slots for the next 2 weeks. Read-only.
+    if (b.action === "book-options") {
+      const cals = await loadCalendars(sb, clientId);
+      const out = [];
+      for (const c of cals) {
+        let slots = [];
+        try {
+          const byDay = await freeSlots(token, c.key, { clientId, calLabel: c.label, days: 14 });
+          slots = summarizeSlots(byDay, 24);
+        } catch (_) {}
+        out.push({ key: c.key, label: c.label, group: c.group || null, slots });
+      }
+      return res.status(200).json({ calendars: out });
+    }
+
     // The Unqualified switch (portal ⟷ GHL `unqualified` tag), without changing the
     // opportunity. On → stamp the tag; off → remove it. Bidirectional mirror so a
     // staff toggle and a GHL-side tag stay in sync. (To ALSO drop the lead from the
