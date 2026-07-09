@@ -130,6 +130,30 @@ Mobile reference page (design-system styled): `bam-portal/public/hawkeye-actions
 - **Design system** - `bam-portal/design-system/DESIGN.md` + `tokens.css` (gold #D4B65C, no emojis,
   radius scale). The mockup already uses the real tokens.
 
+## Pre-build lead-flow gap analysis (2026-07-08, code-verified)
+
+Verified WIRED end to end: intro automations own first touch (no reply -> auto-roll to
+Ghosted); reply -> Booking reactive drafts (webhook cancels stale drafts on every new
+inbound); Approve & book -> portal RPC or GHL appt (confirm-book already accepts
+calendar_id + slot_at overrides for the deck pickers) -> Scheduled Trial; reminders from
+config; reschedule -> rebook chain; post-trial form 3-way router + escalation cron;
+closing opener (A6) -> follow-up plan -> lost after 3; enroll link tracking params read
+by stripe/webhook.js + isLiveMember auto-won safety net; Ghosted/Nurture are portal
+automations (editable steps) with ran-out -> Nurture; reply from Ghosted/Nurture ->
+webhook exits enrollment + moves to Responded + SMS-notifies the owner.
+
+GAPS to close or decide:
+| # | Sev | Gap | Suggested fix |
+|---|---|---|---|
+| G1 | HIGH | The daily digest SMS (agent-approvals cron-digest) counts ONLY the Booking queue; Confirm + Closing cards land silently. With no-skip + the deck replacing the 3 buttons, unseen cards rot | Make the digest sum all 3 ready queues; consider push notification when a card lands |
+| G2 | DECIDE | Serial no-show loop: no-show -> rebook -> books -> no-show... has NO cap; a chronic no-show cycles forever | e.g. 2nd no-show -> suggest Lost or Unqualified card |
+| G3 | DECIDE | Unqualified is a true dead end: if that person texts back later there is no pipeline re-entry and no flag that they were unqualified | Decide: stay dead, or surface "unqualified lead replied" to a human |
+| G4 | DECIDE | Nurture ends silently at week 8: dormant leads are never resurfaced (no list, no seasonal re-run) | A "dormant" view or periodic re-enroll is a later feature; confirm intentional |
+| G5 | LOW | The Booking "re-engaged" scripted opener never fires (no caller writes that entry note; the reactive reply engine answers instead). Config advertises 3 openers, one is dead | Drop it from the config UI or wire it as a fallback |
+| G6 | BUILD | Deck Book-it pickers need a data source: "calendars tied to the lead's offer + that calendar's open slots". Machinery exists (agent/booking.js availability + calendarForGroup) but no staff-facing list action | Add a small `book-options` action to agent-approvals |
+| G7 | BUILD | Unqualified on a card with no open opp returns 200 + {error} and the UI still toasts success (pre-existing pattern) | Check resp.error in the _hawkDefer runs during the deck build |
+| G8 | VERIFY | Not prod-verified on GTA: closing scripted retirement, follow-up loop for form-opened leads, no-show rebook chain (Phase B-E), booking followups tab removal | Verify batch on GTA before/with the deck build |
+
 ## Suggested build order
 1. **Hawkeye deck page** (new view in client-portal.html, V2-gated) reading the 3 agents'
    ready queues; retire the `_apx`/`_acx`/`_aclx` overlay buttons.
