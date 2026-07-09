@@ -141,6 +141,17 @@ explain where they were.
   to full click path, view trail, errors, device.
 - **Widget copy** updated: placeholder no longer asks which page they were on;
   note under the textarea says page + clicks are attached automatically.
+- **Staff portal parity (2026-07-08, same day):** the staff-side widget
+  (`UniversalFeedbackWidget.jsx`) got the identical treatment via a shared module
+  `src/lib/feedbackContext.js` (`initFeedbackContext()` / `buildFeedbackContext()`).
+  Same ring-buffer shapes (clicks/errors/view_trail, 30/10/15 caps), but "view" comes
+  from the `?p=`/`?nav=` URL param (App.jsx has no react-router, drives nav via
+  `history.pushState`/`replaceState` directly - both are monkey-patched once, guarded
+  by `window.__fbCtxInit`, to catch every page change). No `tier` field (staff isn't
+  V2-tiered); adds `staff_email` from the session instead. `ContextPanel` in
+  `FeedbackView.jsx` renders both shapes fine (it just reads whichever fields exist).
+  **`/v2-tickets`'s query stays `portal='client'` only** - staff feedback is a
+  different queue, not a "V2 ticket."
 - **`/v2-tickets` skill** (repo root `.claude/commands/v2-tickets.md`): one-by-one
   triage of outstanding V2 tickets (`resolved_at is null`, `portal='client'`,
   client `v2_access` or `context->>'tier'='v2'`, oldest first). Per ticket: visual
