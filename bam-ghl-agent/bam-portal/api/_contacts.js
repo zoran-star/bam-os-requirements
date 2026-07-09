@@ -204,27 +204,38 @@ function coerceValue(type, v) {
 }
 
 // Close the write loop: on a form submit, write the collected custom-field
-// values straight into portal contact_field_values, keyed by custom_field_defs
-// (matched via each def's ghl_field_id bridge). Portal-native + real-time, so
-// the portal no longer depends on the GHL sync+fold to hold a lead's field
-// values. Archived defs are skipped. Best-effort; never throws.
+// values straight into portal contact_field_values, keyed by custom_field_defs.
+// Two ways a submission key resolves to a def:
+//   1. the def's own portal KEY (funnel forms submit by field.key, possibly
+//      with a "__<index>" suffix from api/website/offer.js) - this is what
+//      captures brand-new wizard questions that have NO ghl_field_id.
+//   2. the legacy ghl_field_id BRIDGE via fieldMap (submission key -> ghl id) -
+//      still used by GHL-imported fields.
+// Portal-native + real-time, so the portal no longer depends on GHL sync+fold.
+// Archived defs are skipped. Best-effort; never throws.
 export async function writePortalFieldValues(clientId, portalContactId, fieldMap, fields) {
   try {
-    if (!SB_URL || !SB_KEY || !clientId || !portalContactId || !fieldMap || !fields) return;
-    const ghlIds = [...new Set(Object.values(fieldMap).filter(Boolean))];
-    if (!ghlIds.length) return;
+    if (!SB_URL || !SB_KEY || !clientId || !portalContactId || !fields) return;
+    const entries = Object.entries(fields).filter(([k]) => k != null && k !== "");
+    if (!entries.length) return;
+    // All the academy's live defs; match by key first, then the ghl bridge.
     const defs = await get(
-      `custom_field_defs?client_id=eq.${clientId}&archived=eq.false&ghl_field_id=in.(${ghlIds.join(",")})&select=id,type,ghl_field_id`,
+      `custom_field_defs?client_id=eq.${clientId}&archived=eq.false&select=id,type,key,ghl_field_id`,
     );
     if (!Array.isArray(defs) || !defs.length) return;
-    const byGhl = new Map(defs.map((d) => [d.ghl_field_id, d]));
+    const byKey = new Map(defs.map((d) => [d.key, d]));
+    const byGhl = new Map(defs.filter((d) => d.ghl_field_id).map((d) => [d.ghl_field_id, d]));
+    const stripIdx = (k) => String(k).replace(/__\d+$/, "");
     const now = new Date().toISOString();
+    const seen = new Set();
     const rows = [];
-    for (const [key, ghlFieldId] of Object.entries(fieldMap)) {
-      const def = byGhl.get(ghlFieldId);
-      if (!def) continue;
-      const val = coerceValue(def.type, fields[key]);
+    for (const [subKey, raw] of entries) {
+      let def = byKey.get(subKey) || byKey.get(stripIdx(subKey));
+      if (!def && fieldMap && fieldMap[subKey]) def = byGhl.get(fieldMap[subKey]);
+      if (!def || seen.has(def.id)) continue;
+      const val = coerceValue(def.type, raw);
       if (val === null || (Array.isArray(val) && !val.length)) continue;
+      seen.add(def.id);
       rows.push({ contact_id: portalContactId, field_id: def.id, value: val, updated_at: now });
     }
     if (!rows.length) return;
