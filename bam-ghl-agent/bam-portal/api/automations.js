@@ -595,6 +595,29 @@ async function handler(req, res) {
       return res.status(200).json({ people });
     }
 
+    // Active enrollments with step ordinal + entry time, for the simple-view
+    // cascade ("enrolled · step 2 of 3", newest entries on top). Step positions
+    // can have gaps, so each is mapped to its 1-based ordinal per automation.
+    if (b.action === "active-enrollments") {
+      const autos = await sb(`automations?client_id=eq.${clientId}&select=id,automation_key`) || [];
+      const posMap = {};
+      for (const a of (Array.isArray(autos) ? autos : [])) {
+        const steps = await loadSteps(a.id);
+        const m = {}; steps.forEach((s, i) => { m[s.position] = i + 1; });
+        posMap[a.id] = { m, total: steps.length, key: a.automation_key };
+      }
+      const rows = await sb(`automation_enrollments?client_id=eq.${clientId}&status=eq.active&select=contact_id,automation_id,current_position,entered_at&order=entered_at.desc&limit=5000`) || [];
+      const enrollments = (Array.isArray(rows) ? rows : []).map(r => {
+        const p = posMap[r.automation_id] || {};
+        return {
+          contact_id: String(r.contact_id), automation_key: p.key || null,
+          step: (p.m && p.m[r.current_position]) || null, steps_total: p.total || null,
+          entered_at: r.entered_at,
+        };
+      });
+      return res.status(200).json({ enrollments });
+    }
+
     // Distinct contacts with an ACTIVE enrollment in ANY automation. Powers the
     // pipeline board's "!" alert (a lead nobody is messaging) - one cheap query.
     if (b.action === "active-contacts") {

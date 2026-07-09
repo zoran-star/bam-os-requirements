@@ -9047,12 +9047,14 @@ Then the call to action."]</div>
           .hk2-back:hover{color:var(--text)}
           .hk2-title{display:flex;align-items:center;gap:8px;font-size:19px;font-weight:800;color:var(--text)}
           .hk2-tabs{display:flex;gap:8px;margin-bottom:14px}
-          .hk2-tab{flex:1;display:flex;align-items:center;justify-content:center;gap:7px;border-radius:999px;border:1.5px solid var(--border);background:var(--surface);color:var(--text-sub);padding:9px 10px;font:inherit;font-size:13px;font-weight:700;cursor:pointer;min-width:0}
-          .hk2-tab.on{background:var(--accent);border-color:var(--accent);color:#0B0B0D}
-          .hk2-n{background:rgba(240,112,96,.14);color:var(--red,#F07060);border-radius:999px;font-size:11px;font-weight:800;min-width:18px;height:18px;display:inline-flex;align-items:center;justify-content:center;padding:0 5px}
-          .hk2-tab.on .hk2-n{background:#0B0B0D;color:var(--accent)}
-          .hk2-tgear{display:inline-flex;margin-left:2px;cursor:pointer;opacity:.85}
+          .hk2-tab{flex:1;display:flex;align-items:center;justify-content:space-between;gap:7px;border-radius:999px;border:1.5px solid var(--border);background:var(--surface);color:var(--text-sub);padding:9px 14px;font:inherit;font-size:13px;font-weight:700;cursor:pointer;min-width:0}
+          .hk2-tab.on{background:var(--accent);border-color:var(--accent);color:var(--on-gold,#131416)}
+          .hk2-tmain{display:inline-flex;align-items:center;gap:7px;min-width:0;flex:1;justify-content:center}
+          .hk2-n{background:var(--gold-glow,rgba(212,182,92,.14));color:var(--accent);border-radius:999px;font-size:11px;font-weight:800;min-width:18px;height:18px;display:inline-flex;align-items:center;justify-content:center;padding:0 5px}
+          .hk2-tab.on .hk2-n{background:var(--on-gold,#131416);color:var(--accent)}
+          .hk2-tgear{display:inline-flex;cursor:pointer;opacity:.6;flex-shrink:0}
           .hk2-tgear:hover{opacity:1}
+          .hk2-tab.on .hk2-tgear{opacity:.85}
           .hk2-deck{position:relative;min-height:420px}
           .hk2-card{background:var(--surface);border:1px solid var(--border-str,rgba(255,255,255,.16));border-radius:16px;padding:16px;display:flex;flex-direction:column;gap:10px;box-shadow:0 12px 40px rgba(0,0,0,.22)}
           .hk2-behind{position:absolute;inset:0;transform:scale(.96) translateY(14px);opacity:.4;pointer-events:none;overflow:hidden}
@@ -9065,7 +9067,7 @@ Then the call to action."]</div>
           .hk2-prog{font-size:11px;color:var(--text-mute);margin-left:auto;white-space:nowrap}
           .hk2-ctx{font-size:11.5px;color:var(--text-mute);background:var(--bg);border:1px dashed var(--border);border-radius:10px;padding:8px 10px;line-height:1.5}
           .hk2-esc{font-size:11.5px;color:#e0a020}
-          .hk2-thread{max-height:200px;overflow-y:auto;display:flex;flex-direction:column;gap:7px;padding:2px}
+          .hk2-thread{max-height:340px;overflow-y:auto;display:flex;flex-direction:column;gap:7px;padding:2px}
           .hk2-bub{font-size:13px;line-height:1.5;padding:8px 12px;border-radius:13px;max-width:82%;white-space:pre-wrap;word-break:break-word}
           .hk2-bub.in{background:rgba(255,255,255,.05);border:1px solid var(--border);color:var(--text);border-bottom-left-radius:4px;align-self:flex-start}
           .hk2-bub.bot{background:var(--accent-glow,rgba(212,182,92,.10));border:1px solid var(--accent-border,rgba(212,182,92,.3));color:var(--text);border-bottom-right-radius:4px;align-self:flex-end}
@@ -9100,30 +9102,33 @@ Then the call to action."]</div>
           .hk2-clear .big{width:56px;height:56px;border-radius:50%;background:rgba(76,199,106,.14);color:var(--green,#4CC76A);display:flex;align-items:center;justify-content:center;font-size:26px}
           .hk2-hint{font-size:11px;color:var(--text-mute);margin-top:12px;text-align:center;line-height:1.5}
           .hk2-load{min-height:300px;display:flex;align-items:center;justify-content:center;gap:8px;color:var(--text-sub);font-size:13px}
-          @media(max-width:560px){.hk2-tab{font-size:12px;padding:8px 6px}.hk2-thread{max-height:160px}}
-          /* ── simple view strip + cascade (the LOCKED pill look, Zoran
-                 2026-07-09: colored border per stage, solid colour fill when
-                 open, dashed border = automation) ── */
+          @media(max-width:560px){.hk2-tab{font-size:12px;padding:8px 8px}.hk2-thread{max-height:240px}}
+          /* ── simple view strip + cascade (Zoran 2026-07-09 redesign: stage
+                 top-left, engine wording, card count, Hawkeye need on the
+                 right; GOLD is the only colour; chevrons show the flow) ── */
           .plo2-hawkbtn{display:inline-flex;align-items:center;gap:7px;background:var(--accent);color:var(--on-gold,#131416);border:none;border-radius:999px;padding:8px 16px;font:inherit;font-size:13px;font-weight:800;cursor:pointer;margin-left:auto}
           .plo2-hawkbtn:hover{filter:brightness(1.06)}
           .plo2-hawkbtn .cnt{background:var(--on-gold,#131416);color:var(--accent);border-radius:999px;font-size:11px;font-weight:800;min-width:18px;height:18px;display:inline-flex;align-items:center;justify-content:center;padding:0 5px}
-          .plo2-strip{display:flex;gap:8px}
-          .plo2-pill{flex:1;position:relative;border-radius:12px;padding:11px 8px;text-align:center;cursor:pointer;border:1.5px solid var(--pc);background:var(--surface);transition:all .22s ease;min-width:0;min-height:56px}
+          .plo2-strip{display:flex;gap:6px;align-items:stretch}
+          .plo2-pill{flex:1;position:relative;display:flex;align-items:center;justify-content:space-between;gap:8px;border-radius:12px;padding:10px 12px;text-align:left;cursor:pointer;border:1.5px solid var(--border-med);background:var(--surface);transition:all .22s ease;min-width:0;min-height:64px}
           .plo2-pill.auto{border-style:dashed}
-          .plo2-pill:hover{background:var(--bg)}
+          .plo2-pill:hover{border-color:var(--accent)}
           .plo2-pill.dim{opacity:.45}
-          .plo2-pill.active{background:var(--pc);border-style:solid;color:#131416}
-          .plo2-pill .nm{font-size:12.5px;font-weight:700;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-          .plo2-pill .sub{font-size:10.5px;margin-top:3px;color:var(--text-sub)}
-          .plo2-pill .sub.hot{color:var(--red,#F07060);font-weight:800}
+          .plo2-pill.active{background:var(--accent);border-color:var(--accent);border-style:solid;color:var(--on-gold,#131416);justify-content:center}
+          .plo2-pill .plo2-l{min-width:0}
+          .plo2-pill .nm{font-size:12.5px;font-weight:800;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+          .plo2-pill .eng{font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--text-sub);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+          .plo2-pill .cnt{font-size:10.5px;color:var(--text-mute);margin-top:3px;white-space:nowrap}
+          .plo2-need{font-size:10.5px;font-weight:800;color:var(--accent);background:var(--gold-glow,rgba(212,182,92,.12));border:1px solid var(--accent-border,rgba(212,182,92,.25));border-radius:999px;padding:3px 9px;white-space:nowrap;flex-shrink:0}
+          .plo2-arr{display:flex;align-items:center;color:var(--text-mute);opacity:.55;flex-shrink:0}
           .plo2-up{display:flex;align-items:center;justify-content:center;min-height:34px}
-          .plo2-cfg{position:absolute;top:4px;right:5px;width:15px;height:15px;cursor:pointer;opacity:.75}
+          .plo2-cfg{position:absolute;top:6px;right:7px;width:15px;height:15px;cursor:pointer;opacity:.8}
           .plo2-cfg:hover{opacity:1}
           .plo2-cfg svg{width:100%;height:100%;display:block}
           .plo2-casc{margin-top:14px;width:100%}
           .plo2-panel{border-radius:16px;background:var(--surface);border:1px solid var(--border);padding:15px}
           .plo2-phead{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--text-mute);margin-bottom:11px;display:flex;align-items:center;gap:8px;font-weight:700}
-          .plo2-eng{font-size:10px;font-weight:800;border-radius:6px;padding:3px 8px;letter-spacing:.05em}
+          .plo2-eng{font-size:10px;font-weight:800;border-radius:6px;padding:3px 8px;letter-spacing:.05em;color:var(--text-sub);background:var(--surface-el,var(--bg));border:1px solid var(--border)}
           .plo2-rows{display:flex;flex-direction:column;gap:7px}
           .plo2-row{animation:plo2in .3s ease both}
           @keyframes plo2in{from{opacity:0;transform:translateY(-7px)}to{opacity:1;transform:none}}
@@ -9138,7 +9143,7 @@ Then the call to action."]</div>
           .plo2-more:hover{color:var(--text)}
           .plo2-none{font-size:12.5px;color:var(--text-mute);text-align:center;padding:14px}
           .plo2-hint{font-size:10.5px;color:var(--text-mute);text-align:center;margin-top:10px}
-          @media(max-width:640px){.plo2-strip{flex-wrap:wrap}.plo2-pill{flex:1 1 30%}}
+          @media(max-width:640px){.plo2-strip{flex-wrap:wrap}.plo2-pill{flex:1 1 44%}.plo2-arr{display:none}}
         </style>
         <div id="pl-hawkeye" style="display:none"></div>
         <div id="pl-pipeline-tabs" class="pl-tabs"></div>
@@ -30454,13 +30459,20 @@ let _PL_LASTMSG = null;   // contactId → { direction, date }
 // Powers the Interested-stage "!" - the REAL "is anybody messaging this lead"
 // check. null until loaded; on failure the badge falls back to message age.
 let _PL_AUTO = null;      // Set<contactId>
+// Active enrollment detail per contact: { step, steps_total, entered_at }.
+// Powers the simple-view cascade rows ("enrolled · step 2 of 3", newest first).
+let _PL_ENR = null;       // Map<contactId, enrollment>
 // V2-only flow gate for the pipelines board. V1.5 = plain GHL mirror.
 function _plIsV2() { return typeof V2_ACCESS !== 'undefined' && V2_ACCESS; }
 async function _plLoadActiveAutomations() {
   if (!_plIsV2()) return;
   try {
-    const j = await _autoApi('active-contacts');
-    _PL_AUTO = new Set((j.contact_ids || []).map(String));
+    const j = await _autoApi('active-enrollments');
+    const rows = (j && j.enrollments) || [];
+    const map = new Map();
+    for (const r of rows) { const k = String(r.contact_id); if (!map.has(k)) map.set(k, r); }
+    _PL_ENR = map;
+    _PL_AUTO = new Set(rows.map(r => String(r.contact_id)));
     try { if (typeof _renderPipelineBoard === 'function') _renderPipelineBoard(); } catch (_) {}
   } catch (_) { /* leave null - "!" falls back to the message-age rule */ }
 }
@@ -31983,6 +31995,21 @@ async function _hk2Load() {
   return { booking, confirm, closing };
 }
 function _hk2Pick(a) { _HK2.agent = a; _hk2Render(); }
+// Back from the deck = the HOME page's Sales section (Zoran 2026-07-09), with
+// every cascade closed - not the standalone Sales page.
+function _hk2Back() {
+  _PLO2_OPEN = null;
+  try { _CC2_OPEN = null; } catch (_) {}
+  _PL_SV = 'overview';
+  try { _plRenderOverview(); } catch (_) {}
+  _plSVApply();
+  if (typeof _ccActive === 'function' && _ccActive()) {
+    _ccReturn();
+    try { _cc2Render(); } catch (_) {}
+    setTimeout(() => { try { _ccScrollTo('sales'); } catch (_) {} }, 80);
+  }
+  window.scrollTo(0, 0);
+}
 // The gear on the active tab = that stage's focus-mode config page.
 function _hk2Gear(a) {
   try {
@@ -32090,7 +32117,7 @@ function _hk2Render() {
   _HK2.edited = false; _HK2.otherOpen = false;
   const tabs = _HK2_AGENTS.map(a => {
     const n = _HK2.q[a].length, on = _HK2.agent === a;
-    return `<button class="hk2-tab${on ? ' on' : ''}" onclick="_hk2Pick('${a}')">${_HK2_META[a].label}${n ? `<span class="hk2-n">${n}</span>` : ''}${on ? `<span class="hk2-tgear" onclick="event.stopPropagation();_hk2Gear('${a}')" title="Configure this stage">${_plIcon('gear', 14)}</span>` : ''}</button>`;
+    return `<button class="hk2-tab${on ? ' on' : ''}" onclick="_hk2Pick('${a}')"><span class="hk2-tmain">${_HK2_META[a].label}${n ? `<span class="hk2-n">${n}</span>` : ''}</span><span class="hk2-tgear" onclick="event.stopPropagation();_hk2Gear('${a}')" title="Configure this stage">${_plIcon('gear', 14)}</span></button>`;
   }).join('');
   const q = _HK2.q[_HK2.agent];
   const deck = !q.length
@@ -32099,7 +32126,7 @@ function _hk2Render() {
        <div class="hk2-card hk2-top" id="hk2-topcard">${_hk2CardHtml(q[0], 1, q.length, true)}</div>`;
   host.innerHTML = `
     <div class="hk2-topbar">
-      <button class="hk2-back" onclick="_plSVCollapse()">${_plIcon('collapse', 12)} Sales</button>
+      <button class="hk2-back" onclick="_hk2Back()">${_plIcon('collapse', 12)} Sales</button>
       <div class="hk2-title">${_plIcon('eye', 17)} Hawkeye</div>
     </div>
     <div class="hk2-tabs">${tabs}</div>
@@ -32170,10 +32197,24 @@ function _hk2NoteOk() {
   if (t) { t.classList.add('hk2-miss'); t.style.display = ''; t.focus(); }
   return false;
 }
-function _hk2Resolve(r) {
-  const q = _HK2.q[_HK2.agent];
+// Tinder behaviour (Zoran 2026-07-09): the card leaves the deck the moment you
+// act - the next card pops up right away and the tab badges update instantly.
+// The API work still rides the 6s undo window; undo puts the card back on top.
+function _hk2Resolve(r, agent) {
+  const q = _HK2.q[agent || _HK2.agent] || [];
   const i = q.indexOf(r); if (i >= 0) q.splice(i, 1);
   try { if (typeof _PL_NEEDS !== 'undefined' && _PL_NEEDS && r.ghl_contact_id) _PL_NEEDS.delete(String(r.ghl_contact_id)); } catch (_) {}
+  // Queue empty -> jump to the next agent that still has cards (no dead end).
+  if (!q.length) { const next = _HK2_AGENTS.find(a => (_HK2.q[a] || []).length); if (next) _HK2.agent = next; }
+  _hk2Render();
+  try { _plRenderAgentSection(); } catch (_) {}
+}
+// Undo within the 6s window: put the card back on top of its agent's queue.
+function _hk2Unresolve(agent, r) {
+  _HK2.agent = agent;
+  const q = _HK2.q[agent] || (_HK2.q[agent] = []);
+  if (!q.includes(r)) q.unshift(r);
+  try { if (typeof _PL_NEEDS !== 'undefined' && _PL_NEEDS && r.ghl_contact_id) _PL_NEEDS.set(String(r.ghl_contact_id), r.kind || 'reply'); } catch (_) {}
   _hk2Render();
   try { _plRenderAgentSection(); } catch (_) {}
 }
@@ -32181,7 +32222,8 @@ function _hk2Resolve(r) {
 function _hk2Confirm() {
   const r = _hk2Top(); if (!r) return;
   if (!_hk2NoteOk()) return;
-  const ep = _HK2_META[_HK2.agent].ep;
+  const agent = _HK2.agent;
+  const ep = _HK2_META[agent].ep;
   const teachEl = document.getElementById('hk2-teach');
   const lesson = ((teachEl && teachEl.value) || '').trim();
   const draftEl = document.getElementById('hk2-draft');
@@ -32189,11 +32231,16 @@ function _hk2Confirm() {
   const before = r.draft_message || '';
   const k = r._kind;
   if ((k === 'reply' || k === 'enroll') && !reply) { _apxToast('Message is empty', false); return; }
+  // Capture every input NOW - the deck advances to the next card immediately,
+  // which tears down this card's DOM before the deferred API call runs.
+  const calEl = document.getElementById('hk2-cal'), slotEl = document.getElementById('hk2-slot');
+  const calV = (calEl && calEl.value) || r.book_calendar_id, slotV = (slotEl && slotEl.value) || r.book_slot_at;
+  const planEdits = k === 'plan' ? (r.rows || []).map((row, i) => { const el = document.getElementById('hk2-plan-' + i); return { id: row.id, reply: (el ? el.value : row.draft_message || '').trim() }; }) : null;
   const chk = resp => { if (resp && resp.error) throw new Error(resp.error); return resp; };
-  _hawkDefer({ cardId: 'hk2-topcard', label: _HK2_KIND[k].go, restore: _hk2Render, run: async () => {
+  let undone = false;
+  _hawkDefer({ cardId: 'hk2-topcard', label: _HK2_KIND[k].go, restore: () => { undone = true; _hk2Unresolve(agent, r); }, run: async () => {
     if (k === 'book') {
-      const cal = document.getElementById('hk2-cal'), slot = document.getElementById('hk2-slot');
-      chk(await _apxPost(ep, 'confirm-book', { ready_id: r.id, calendar_id: (cal && cal.value) || r.book_calendar_id, slot_at: (slot && slot.value) || r.book_slot_at }));
+      chk(await _apxPost(ep, 'confirm-book', { ready_id: r.id, calendar_id: calV, slot_at: slotV }));
       _apxToast('Booked - handed to Confirm', true);
     } else if (k === 'ghost') {
       chk(await _apxPost(ep, 'confirm-ghost', { ready_id: r.id }));
@@ -32209,7 +32256,7 @@ function _hk2Confirm() {
       chk(await _apxPost(ep, 'confirm-lost', { ready_id: r.id, reply, lost_reason: r.lost_reason || 'Other' }));
       _apxToast('Marked lost - Nurture takes over', true);
     } else if (k === 'plan') {
-      const edits = (r.rows || []).map((row, i) => { const el = document.getElementById('hk2-plan-' + i); return { id: row.id, reply: (el ? el.value : row.draft_message || '').trim() }; });
+      const edits = planEdits;
       const token = await _mreqAuthToken();
       const res = await fetch('/api/agent-closing', { method: 'POST', headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'approve-plan', client_id: CLIENT_ID, contact_id: r.ghl_contact_id, edits }) });
       const j = await _safeJson(res); if (!res.ok) throw new Error(j.error || ('HTTP ' + res.status));
@@ -32226,18 +32273,21 @@ function _hk2Confirm() {
       _apxToast(resp && resp.deferred ? _apxQuietMsg(resp.send_after) : (lesson ? 'Sent + taught' : 'Sent'), true);
     }
     if (lesson) await _hk2Teach(r, lesson, before, reply);
-    _hk2Resolve(r);
   } });
+  // Advance the deck right after the fly-out beat - don't wait for the 6s flush.
+  setTimeout(() => { if (!undone) _hk2Resolve(r, agent); }, 480);
 }
 // "Other": move the lead somewhere else instead of the primary action.
 function _hk2Move(op) {
   const r = _hk2Top(); if (!r) return;
-  const ep = _HK2_META[_HK2.agent].ep;
+  const agent = _HK2.agent;
+  const ep = _HK2_META[agent].ep;
   const readyId = r._kind === 'plan' ? (r.rows && r.rows[0] && r.rows[0].id) : r.id;
   if (!readyId) return;
   const chk = resp => { if (resp && resp.error) throw new Error(resp.error); return resp; };
   const label = op === 'ghost' ? 'Sent to Ghosted' : op === 'handoff' ? 'Handed to Booking' : op === 'lost' ? 'Marked lost' : 'Unqualified';
-  _hawkDefer({ cardId: 'hk2-topcard', label, restore: _hk2Render, run: async () => {
+  let undone = false;
+  _hawkDefer({ cardId: 'hk2-topcard', label, restore: () => { undone = true; _hk2Unresolve(agent, r); }, run: async () => {
     if (op === 'ghost') {
       chk(await _apxPost(ep, 'confirm-ghost', { ready_id: readyId }));
       try { _plMoveContactToInterested(r.ghl_contact_id); } catch (_) {}
@@ -32252,8 +32302,9 @@ function _hk2Move(op) {
       chk(await _apxPost(ep, 'confirm-abandoned', { ready_id: readyId }));
       _apxToast('Marked unqualified', true);
     }
-    _hk2Resolve(r);
   } });
+  // Advance the deck right after the fly-out beat - don't wait for the 6s flush.
+  setTimeout(() => { if (!undone) _hk2Resolve(r, agent); }, 480);
 }
 
 // Pencil on a calendar entry point → open the Calendar page + highlight it.
@@ -32481,15 +32532,6 @@ function _plRenderOverview() {
     + (openStage ? `<div class="plo2-casc">${_plo2Cascade(openStage)}</div>` : '');
 }
 
-// Stage colour by role (matches the locked mockup's palette).
-function _plo2Color(role) {
-  return role === 'responded' ? '#5A8FB8'
-       : role === 'scheduled_trial' ? '#4CC76A'
-       : role === 'done_trial' ? '#A78BDA'
-       : role === 'interested' ? '#F0B84A'
-       : role === 'nurture' ? '#4A6FA5'
-       : '#E08BB0';
-}
 // Pill order for the simple view + home strip (Zoran 2026-07-09): Nurture first,
 // then Ghosted, then Booking/Confirm/Closing in flow order. Member/Unqualified
 // (terminal) stages get NO pill; unmapped custom stages keep their pipeline
@@ -32510,24 +32552,29 @@ function _plo2Pills(stages, nav) {
   const toggle = (nav && nav.toggle) || '_plo2Toggle';
   const cfg = (nav && nav.cfg) || '_plOpenFocus';
   let hawk = 0;
-  const html = stages.map(s2 => {
+  const arrow = '<div class="plo2-arr"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg></div>';
+  const html = stages.map((s2, i) => {
     const opps = s2.opportunities || [];
-    const role = _plStageRole(s2.name);
     const bot = (typeof _plStageBot === 'function') ? _plStageBot(s2.name) : null;
     const kind = bot ? bot.kind : 'human';
     const sig = _plStageSignals(s2, opps);
     if (kind === 'agent') hawk += sig.hawk;
-    const col = _plo2Color(role);
     const isOpen = openId === s2.id;
-    const sub = kind === 'agent'
-      ? (sig.hawk ? `<div class="sub hot">${sig.hawk} need you</div>` : `<div class="sub">${opps.length} card${opps.length === 1 ? '' : 's'}</div>`)
-      : kind === 'automation' ? `<div class="sub">${opps.length} enrolled</div>`
-      : `<div class="sub">${opps.length} ${role === 'member' || kind === 'terminal' ? 'active' : 'cards'}</div>`;
+    // Layout locked (Zoran 2026-07-09): stage top-left, engine wording under it
+    // ("Nurture automation" / "Closing agent"), total cards under that; the
+    // Hawkeye "N need you" sits centered on the right. Gold is the only colour.
+    const eng = bot ? `${bot.tag} ${kind === 'agent' ? 'agent' : kind === 'automation' ? 'automation' : ''}`.trim() : 'Manual';
+    const need = (kind === 'agent' && sig.hawk) ? `<span class="plo2-need">${sig.hawk} need you</span>` : '';
     const inner = isOpen
       ? `<div class="plo2-up"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m18 15-6-6-6 6"/></svg></div>
          <span class="plo2-cfg" title="Configure this stage" onclick="event.stopPropagation();${cfg}('${escapeHTML(s2.id)}')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="21" y1="6" x2="7" y2="6"/><line x1="17" y1="12" x2="3" y2="12"/><line x1="21" y1="18" x2="7" y2="18"/><circle cx="4.5" cy="6" r="1.7"/><circle cx="19.5" cy="12" r="1.7"/><circle cx="4.5" cy="18" r="1.7"/></svg></span>`
-      : `<div class="nm">${escapeHTML(_plCap(s2.name))}</div>${sub}`;
-    return `<div class="plo2-pill${kind === 'automation' ? ' auto' : ''}${isOpen ? ' active' : ''}${openId && !isOpen ? ' dim' : ''}" style="--pc:${col}" onclick="${toggle}('${escapeHTML(s2.id)}')">${inner}</div>`;
+      : `<div class="plo2-l">
+           <div class="nm">${escapeHTML(_plCap(s2.name))}</div>
+           <div class="eng">${escapeHTML(eng)}</div>
+           <div class="cnt">${opps.length} card${opps.length === 1 ? '' : 's'}</div>
+         </div>${need}`;
+    const conn = i < stages.length - 1 ? arrow : '';
+    return `<div class="plo2-pill${kind === 'automation' ? ' auto' : ''}${isOpen ? ' active' : ''}${openId && !isOpen ? ' dim' : ''}" onclick="${toggle}('${escapeHTML(s2.id)}')">${inner}</div>${conn}`;
   }).join('');
   return { html, hawk };
 }
@@ -32545,25 +32592,31 @@ function _plo2Cascade(stage, nav) {
   const bot = (typeof _plStageBot === 'function') ? _plStageBot(stage.name) : null;
   const kind = bot ? bot.kind : 'human';
   const engTag = kind === 'agent' ? 'AGENT ENGINE' : kind === 'automation' ? 'AUTOMATION ENGINE' : kind === 'terminal' ? 'TERMINAL' : 'HUMAN ENGINE';
-  const col = _plo2Color(_plStageRole(stage.name));
   const NEED_TXT = {
     reply: 'reply · draft ready', book: 'picked a time · ready to book', ghost: 'went quiet',
     mark_lost: 'lost suggested', confirm: 'reply · draft ready', confirm_auto: 'reminder ready',
     confirm_handoff: 'reschedule · needs a new time', confirm_lost: 'lost suggested',
     closing: 'reply · draft ready', closing_enroll: 'ready to enroll', closing_lost: 'lost suggested',
   };
+  const enr = (o) => (kind === 'automation' && typeof _PL_ENR !== 'undefined' && _PL_ENR) ? _PL_ENR.get(String(o.contactId || '')) : null;
   const needy = [], plain = [];
   for (const o of opps) {
     const cid = String((o.contactId || ''));
     const need = kind === 'agent' && _PL_NEEDS ? _PL_NEEDS.get(cid) : null;
     (need ? needy : plain).push({ o, need });
   }
+  // Automation stages: newest entries into the automation on top (Zoran 2026-07-09).
+  if (kind === 'automation') {
+    const at = (x) => { const e = enr(x.o); return e && e.entered_at ? new Date(e.entered_at).getTime() : 0; };
+    plain.sort((a, b) => at(b) - at(a));
+  }
   const initials = (nm) => { const w = String(nm || '?').trim().split(/\s+/); return ((w[0] || '?')[0] + (w[1] ? w[1][0] : '')).toUpperCase(); };
   const row = ({ o, need }, i) => {
     const nm = (o.contact && o.contact.name) || o.name || 'Lead';
+    const e = enr(o);
     const st = need ? (NEED_TXT[need] || 'needs you in Hawkeye')
              : kind === 'agent' ? 'agent handling it'
-             : kind === 'automation' ? 'enrolled · automation running'
+             : kind === 'automation' ? (e && e.step ? `enrolled · step ${e.step}${e.steps_total ? ' of ' + e.steps_total : ''}` : 'enrolled')
              : (o.athlete ? 'athlete: ' + o.athlete : '');
     const click = need
       ? (leadFn ? `${leadFn}('${escapeHTML(String(o.contactId || ''))}')` : `_hk2Open(null, '${escapeHTML(String(o.contactId || ''))}')`)
@@ -32580,7 +32633,7 @@ function _plo2Cascade(stage, nav) {
              : 'you run this stage - tap a lead for the drawer';
   return `<div class="plo2-panel">
     <div class="plo2-phead">${escapeHTML(_plCap(stage.name))}
-      <span class="plo2-eng" style="color:${col};background:color-mix(in srgb,${col} 14%,transparent)">${engTag}</span></div>
+      <span class="plo2-eng">${engTag}</span></div>
     <div class="plo2-rows">${rows || '<div class="plo2-none">No cards here yet.</div>'}${more}</div>
     <div class="plo2-hint">${hint}</div>
   </div>`;
@@ -47630,12 +47683,12 @@ function _ccStyle() {
     '.cc-pipe-pill b{background:var(--surface-el);border-radius:999px;min-width:22px;text-align:center;padding:2px 7px;font-family:var(--font-num);font-weight:800;font-size:12px}' +
     '.cc-pipe-pill.dim{color:var(--text-mute)}' +
     '.cc-btn-badge{display:inline-flex;min-width:18px;height:18px;align-items:center;justify-content:center;background:var(--gold);color:var(--on-gold,#131416);border-radius:999px;font-size:10.5px;font-weight:800;padding:0 5px;margin-left:8px}' +
-    '.cc-sal-feed{margin-top:16px}' +
-    '.cc-sal-feed-h{font-size:10px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--text-mute);margin-bottom:8px}' +
-    '.cc-sal-feed-row{display:flex;align-items:baseline;gap:8px;font-size:12.5px;color:var(--text-sub);padding:4px 0}' +
-    '.cc-sal-feed-nm{font-weight:700;color:var(--text)}' +
-    '.cc-sal-feed-arr{color:var(--gold)}' +
-    '.cc-sal-feed-t{margin-left:auto;font-size:11px;color:var(--text-mute)}' +
+    '.cc-sal-feed{margin-top:14px;opacity:.72}' +
+    '.cc-sal-feed-h{font-size:9.5px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--text-mute);margin-bottom:6px}' +
+    '.cc-sal-feed-row{display:flex;align-items:baseline;gap:8px;font-size:11.5px;color:var(--text-mute);padding:3px 0}' +
+    '.cc-sal-feed-nm{font-weight:600;color:var(--text-sub)}' +
+    '.cc-sal-feed-arr{color:var(--text-mute)}' +
+    '.cc-sal-feed-t{margin-left:auto;font-size:10.5px;color:var(--text-mute)}' +
     '.cc-qr-x{background:none;border:none;color:var(--text-mute);cursor:pointer;padding:6px;border-radius:8px;display:inline-flex;align-items:center;flex:none}' +
     '.cc-qr-x:hover{color:var(--text);background:var(--surface-el,rgba(0,0,0,.05))}' +
     '.cc-agent-bar{display:flex;align-items:center;gap:10px;width:100%;text-align:left;background:var(--surface);border:1px solid var(--border-med);border-radius:999px;padding:13px 20px;font:inherit;font-size:13px;color:var(--text-mute);cursor:text;margin-bottom:14px;transition:border-color .2s,box-shadow .2s}' +
@@ -48756,9 +48809,6 @@ function _ccMountSales(host) {
         <div class="cc-stat"><div class="cc-stat-v" id="cc-sal-close">-</div><div class="cc-stat-l">Trial closing rate</div></div>
       </div>
       <div class="cc-pipe-strip" id="cc-sal-strip"></div>
-      <div class="cc-actions">
-        <button type="button" class="cc-btn primary" onclick="_ccOpenClassic('pipelines')">Open sales board</button>
-      </div>
       <div class="cc-sal-feed" id="cc-sal-feed"></div>
     </div>`;
   _ccLoadTrialsCount();
@@ -48852,6 +48902,7 @@ async function _ccSalesLoad() {
           _CC2_STAGES = cardStages;
           _cc2Render();
           if (!_PL_NEEDS) { try { _plLoadNeedsAction().then(() => _cc2Render()); } catch (_) {} }
+          if (!_PL_ENR) { try { _plLoadActiveAutomations().then(() => _cc2Render()); } catch (_) {} }
         } else {
           strip.innerHTML = `<div class="plo-strip" style="width:100%">${_ploStripCells(cardStages, _CC_PIPE_NAV)}</div>`;
         }
