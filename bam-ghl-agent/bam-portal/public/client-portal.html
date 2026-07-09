@@ -33025,6 +33025,45 @@ function _cc2Render() {
   const openStage = _CC2_OPEN ? st.find(s => s.id === _CC2_OPEN) : null;
   strip.innerHTML = `<div class="plo2-strip" style="width:100%">${built.html}</div>`
     + (openStage ? `<div class="plo2-casc">${_plo2Cascade(openStage, _CC2_CASC_NAV)}</div>` : '');
+  try { _ccRenderStuck(); } catch (_) {}
+}
+
+// ── SAFETY NET: cards that are NOT FLOWING (Zoran 2026-07-09) ───────────────
+// Full-confidence backstop so no card is ever SILENTLY stuck: any open opp that
+// has NO Hawkeye action queued, NO active automation enrollment, isn't terminal,
+// and has been idle 3+ days. Catches the config-level gaps code can't fix -
+// a custom stage with no engine, an automation that ended while its next stage
+// is off, an agent whose mode is off. Read-only: it only surfaces them.
+const _CC_STUCK_IDLE_DAYS = 3;
+function _ccStuckCards() {
+  const p = (typeof _plActivePipeline === 'function') ? _plActivePipeline() : null;
+  if (!p) return [];
+  const now = Date.now(), IDLE = _CC_STUCK_IDLE_DAYS * 86400000, out = [];
+  for (const s of (p.stages || [])) {
+    const bot = (typeof _plStageBot === 'function') ? _plStageBot(s.name) : null;
+    if (bot && bot.kind === 'terminal') continue;                 // Member / Unqualified / Won = done
+    for (const o of (s.opportunities || [])) {
+      if (String(o.status || 'open').toLowerCase() !== 'open') continue;
+      const cid = String(o.contactId || ''); if (!cid) continue;
+      if (typeof _PL_NEEDS !== 'undefined' && _PL_NEEDS && _PL_NEEDS.get(cid)) continue;   // has a Hawkeye action
+      if (typeof _PL_ENR !== 'undefined' && _PL_ENR && _PL_ENR.get(cid)) continue;         // in a running automation
+      const lm = (typeof _PL_LASTMSG !== 'undefined' && _PL_LASTMSG) ? _PL_LASTMSG.get(cid) : null;
+      const last = lm && lm.date ? new Date(lm.date).getTime() : (o.updatedAt ? new Date(o.updatedAt).getTime() : 0);
+      if (last && (now - last) < IDLE) continue;                  // still inside a normal cadence window
+      out.push({ id: o.id, name: (o.contact && o.contact.name) || o.name || 'Lead', stage: _plCap(s.name), custom: !bot, idleDays: last ? Math.floor((now - last) / 86400000) : null });
+    }
+  }
+  return out.sort((a, b) => (b.idleDays || 0) - (a.idleDays || 0));
+}
+function _ccRenderStuck() {
+  const el = document.getElementById('cc-sal-stuck'); if (!el) return;
+  let list = []; try { list = _ccStuckCards(); } catch (_) {}
+  if (!list.length) { el.innerHTML = ''; return; }
+  const rows = list.slice(0, 15).map(x =>
+    `<div class="cc-stuck-row" onclick="_cc2Card('${escapeHTML(x.id)}')"><span class="nm">${escapeHTML(x.name)}</span><span class="sg">${escapeHTML(x.stage)}${x.custom ? ' · no engine' : ''}</span>${x.idleDays != null ? `<span class="ag">${x.idleDays}d idle</span>` : ''}</div>`
+  ).join('');
+  const more = list.length > 15 ? `<div class="cc-stuck-more">+ ${list.length - 15} more</div>` : '';
+  el.innerHTML = `<div class="cc-stuck"><div class="cc-stuck-h">${_plIcon('alert', 13)} ${list.length} not flowing - no agent, no automation, idle ${_CC_STUCK_IDLE_DAYS}+ days</div>${rows}${more}</div>`;
 }
 
 // engine glyphs the strip needs that aren't in the base _plIcon set
@@ -48053,6 +48092,16 @@ function _ccStyle() {
     '.cc-sal-hawkbar .hb-n{background:var(--on-gold,#131416);color:var(--gold);border-radius:999px;font-size:11px;font-weight:800;min-width:19px;height:19px;display:inline-flex;align-items:center;justify-content:center;padding:0 6px}' +
     '.cc-sal-hawkbar .hb-top{font-size:11.5px;font-weight:600;letter-spacing:0;opacity:.8;margin-left:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}' +
     '@media(max-width:768px){.cc-sal-kpis{grid-template-columns:1fr}.cc-sal-hawkbar .hb-top{display:none}}' +
+    // "Not flowing" safety-net list (red, only shows when >0)
+    '.cc-stuck{margin-top:12px;border:1px solid var(--red,#F07060);background:color-mix(in srgb,var(--red,#F07060) 7%,transparent);border-radius:12px;padding:11px 13px}' +
+    '.cc-stuck-h{display:flex;align-items:center;gap:7px;font-size:11px;font-weight:800;letter-spacing:.03em;text-transform:uppercase;color:var(--red,#F07060);margin-bottom:9px}' +
+    '.cc-stuck-h svg{width:13px;height:13px}' +
+    '.cc-stuck-row{display:flex;align-items:baseline;gap:10px;font-size:12.5px;padding:6px 0;border-top:1px solid color-mix(in srgb,var(--red,#F07060) 15%,transparent);cursor:pointer}' +
+    '.cc-stuck-row:hover .nm{color:var(--red,#F07060)}' +
+    '.cc-stuck-row .nm{font-weight:700;color:var(--text)}' +
+    '.cc-stuck-row .sg{color:var(--text-mute);font-size:11.5px}' +
+    '.cc-stuck-row .ag{margin-left:auto;font-size:11px;color:var(--red,#F07060);font-weight:700;white-space:nowrap}' +
+    '.cc-stuck-more{font-size:11.5px;color:var(--text-mute);padding-top:7px}' +
     /* full-width Hawkeye action card: next queued action, opens focus mode on click */
     '.cc-hawk-card{display:flex;align-items:center;gap:20px;background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:16px 18px;box-shadow:0 1px 3px rgba(0,0,0,.04);margin-bottom:12px;cursor:pointer;transition:transform .2s var(--es,ease),box-shadow .2s,border-color .2s,background .2s}' +
     '.cc-hawk-card:hover{transform:translateY(-2px);box-shadow:0 4px 14px rgba(0,0,0,.06)}' +
@@ -49207,6 +49256,7 @@ function _ccMountSales(host) {
           <span class="hb-top" id="cc-sal-hawkbar-top"></span>
         </button>
         <div class="cc-pipe-strip" id="cc-sal-strip"></div>
+        <div id="cc-sal-stuck"></div>
         <div class="cc-sal-feed" id="cc-sal-feed"></div>
       </div>
     </div>`;
@@ -49308,6 +49358,7 @@ async function _ccSalesLoad() {
           _cc2Render();
           if (!_PL_NEEDS) { try { _plLoadNeedsAction().then(() => _cc2Render()); } catch (_) {} }
           if (!_PL_ENR) { try { _plLoadActiveAutomations().then(() => _cc2Render()); } catch (_) {} }
+          if (!_PL_LASTMSG) { try { _plLoadLastMessages().then(() => _cc2Render()); } catch (_) {} }   // idle age for the not-flowing check
         } else {
           strip.innerHTML = `<div class="plo-strip" style="width:100%">${_ploStripCells(cardStages, _CC_PIPE_NAV)}</div>`;
         }
