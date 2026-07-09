@@ -286,5 +286,5 @@
       "destination": "/index.html"
     }
   ],
-  "ignoreCommand": "git diff --quiet HEAD^ HEAD -- ."
+  "ignoreCommand": "[ \"$VERCEL_ENV\" != \"production\" ] || git diff --quiet HEAD^ HEAD -- ."
 }
