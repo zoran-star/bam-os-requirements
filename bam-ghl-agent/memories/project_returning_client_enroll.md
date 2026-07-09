@@ -81,6 +81,18 @@ System prompt teaches: find_members-miss + enroll intent -> wizard, never
 change/pause/payment-link for brand-new members. `openEnrollDrawer(opts)` now
 takes `{elevated}`.
 
+## GOTCHA: "live price" truth = offering archived flag, NOT the catalog
+
+Found during the Houssein pilot (2026-07-08): `pricing_catalog` rows stay
+`tier='canonical' + is_routable=true` even after the owner ARCHIVES the
+offering in the offer's Pricing section (Summer Unlimited showed as live in
+the wizard). The authoritative rule is `_offerPriceStatus` (client-portal):
+match the row's offer_price_key title / display_name against the offer's
+`data.pricing.pricing_offerings`, longest title wins, `archived` offering =
+legacy. `api/members/enroll.js liveTargets` now applies it server-side
+(fix merged same day). ⚠️ `api/sorter/fix-payment.js buildTargets` still has
+the old catalog-only rule - fix it next time the sorter is touched.
+
 ## Still open in later phases
 
 - Phase 2: contact attach prefill beyond athlete name + the missing-info
