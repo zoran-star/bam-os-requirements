@@ -49,5 +49,50 @@ Zoran: the navigation orb's CASCADE (the fan that springs up from the circle) is
 - Completion is data-derived: a step can UN-complete if the underlying state regresses (that is intentional).
 - When adding a step: add the registry row + a detector in `_obfFetchState()`; keep detectors to existing endpoints where possible.
 
+## Onboarding architecture & roadmap (thoughts to continue - Zoran, 2026-07-09)
+
+**The mental model: GENERAL (once per academy) vs PER-OFFER (repeats; Training is ONE offer type).**
+The whole onboarding is being built around this split. Other offer types coming (the `bookable_programs.program_type` enum already allows: TRAINING, TEAM, CAMP_CLINIC, LEAGUE, TOURNAMENT, GYM_RENTAL). Each offer type will have its own block; general stuff stays shared.
+
+### Full action-item list (the target flow)
+**GENERAL (academy-level, once):**
+1. Business info: name, legal name, address, **tax ID (EIN US / Business Number Canada - see below)**, time zone
+2. Locations
+3. Staff + team invites (roles)
+4. Branding / assets (logo, colors, photos)
+5. Stripe Connect
+6. Contact import (GHL sub-account for now; portal-native after Twilio)
+7. Email domain (→ Resend)
+8. Website domain (→ Vercel, retires GHL site)
+9. Meta ads + KPI wiring
+
+**PER-OFFER (repeat for each offer; Training = first type):**
+- a. Offer wizard (general info, schedule, capacity)
+- b. Sales setup: pricing plans, **lead custom fields**, entry points/funnels
+- c. Onboarding setup: waiver, **member custom fields**, welcome messaging
+- d. Pricing matched → make-sellable (program + typed prices) *(auto via cron)*
+- e. Calendar live *(auto via cron-activate-booking once approved)*
+- f. **Member import** (substep under the offer - maps roster onto the offer's plans)
+- g. Landing page live
+
+**LATER:** automations/agent copy (gated on Hawkeye/GTA pattern + Mike's message copy), Twilio number (GHL until then).
+
+### EIN / tax ID - Canada research (2026-07-09)
+Canadian academies do NOT have an EIN. The equivalent is the CRA **Business Number (BN)**, 9 digits, and it's only mandatory once they register for GST/HST, payroll, or incorporate. Stripe Canada already collects the tax ID during Connect verification. So the field is relabeled "business tax ID - EIN (US) / Business Number (Canada)" and the onboarding step is **skippable** (leave empty for now for CA businesses without one). Sources: Stripe verification-requirements-canada, canada.ca BN "when you need a BN".
+
+### Custom values (custom_field_defs) - the model, now COMPLETE end to end
+- Authored **per offer** in the offer wizard's Sales + Onboarding sections. `section` = 'sales' (lead form) | 'onboarding' (member/join form); academy-core defs have offer_id null + section null (always collected).
+- **Multi-offer:** a def can apply to many offers via the `custom_field_def_offers` join table (migration `20260709140000` - NEEDS `supabase db push` to reach prod). `offer_id` is the authoring anchor; wizard "Also collect on other offers" multi-select adds the rest.
+- **Role-scoped drawers:** lead drawer shows sales fields; member drawer shows onboarding fields (both + academy-core). `?action=values&section=...`.
+- **Funnel tie:** `api/website/offer.js` returns `intake_fields` (onboarding) + `lead_fields` (sales); enroll.jsx renders `intake_fields`.
+- **Write-back CLOSED:** `writePortalFieldValues` matches submitted keys by the def's portal key (tolerating `__<index>`) then the ghl bridge; enroll (`checkout.js`) + lead (`leads.js`) forms both persist. Full detail in [[project_contacts_store.md]] under "P4c".
+
+### What's BUILT vs PENDING (as of 2026-07-09)
+Built into the flow: tax ID, email domain, website domain, member import (all with live detectors). Automation exists for: make-sellable (cron), calendar activation (cron-activate-booking ACTIVATIONS list), the whole custom-values loop.
+Pending / to add as steps: locations, staff invites, branding, Stripe Connect check, contact import, Meta/KPI, and the per-offer substeps (offer wizard done, pricing matched, entry points, landing page, pipeline tied). The `_OBF_GROUPS`/`_OBF_STEPS` registry is where new steps + detectors get added.
+
+### Detail Miami status (the live proving ground)
+Steps 1+2 of the activation checklist DONE (sellable + booking flipped to portal, tested end to end). Remaining for Detail = Mike's manual work: member import (Sorter), email+website DNS pastes, EIN, sales-workflow copy (gated on Hawkeye/GTA). See [[project_detail_portal_native_plan.md]] + the handoff doc.
+
 ## When to update this note
-New steps, detector changes, moving the flow off the modal onto a routed view, or a classic-mode entry point.
+New steps, detector changes, moving the flow off the modal onto a routed view, a classic-mode entry point, a new offer type joining the per-offer block, or any change to the general-vs-per-offer model.
