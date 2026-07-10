@@ -9104,6 +9104,7 @@ Then the call to action."]</div>
           .hk2-otherbtn.on,.hk2-otherbtn:hover{color:var(--text);border-color:var(--border-str,rgba(255,255,255,.2))}
           .hk2-go{flex:1;background:var(--accent);color:#0B0B0D;border:none;border-radius:999px;padding:10px 16px;font:inherit;font-size:13.5px;font-weight:800;cursor:pointer}
           .hk2-go:hover{filter:brightness(1.06)}
+          .hk2-go.alt{background:var(--bg);border:1px solid var(--border);color:var(--text)}
           .hk2-go.blue{background:var(--blue,#5A8FB8);color:#fff}
           .hk2-go.green{background:var(--green,#4CC76A);color:#0B0B0D}
           .hk2-go.red{background:var(--red,#F07060);color:#fff}
@@ -32459,13 +32460,15 @@ function _hk2CardHtml(r, pos, total, isTop) {
       <div id="hk2-ptf-rest" style="display:${p.showed === true ? '' : 'none'}">
         <div class="hk2-lbl">Was the trial a good fit?</div>
         <div class="hk2-seg">${seg('fit', true, 'Good fit', p.fit === true)}${seg('fit', false, 'Not a fit', p.fit === false)}</div>
-        <div class="hk2-lbl">First message to the parent</div>
-        <textarea class="hk2-draft"${isTop ? ' id="hk2-ptf-msg"' : ''} placeholder="Great seeing you tonight - here's how to lock in a spot..."></textarea>
-        <label class="hk2-check"><input type="checkbox"${isTop ? ' id="hk2-ptf-link"' : ''} checked> Add the sign-up link at the bottom</label>
-        <div class="hk2-lbl">Special notes - the Closing agent reads these</div>
-        <textarea class="hk2-draft sm"${isTop ? ' id="hk2-ptf-notes"' : ''} placeholder="Loved the small-group drills, dad asked about Tuesdays..."></textarea>
+        <div id="hk2-ptf-fitfields" style="display:${p.fit === false ? 'none' : ''}">
+          <div class="hk2-lbl">First message to the parent</div>
+          <textarea class="hk2-draft"${isTop ? ' id="hk2-ptf-msg"' : ''} placeholder="Great seeing you tonight - here's how to lock in a spot..."></textarea>
+          <label class="hk2-check"><input type="checkbox"${isTop ? ' id="hk2-ptf-link"' : ''} checked> Add the sign-up link at the bottom</label>
+          <div class="hk2-lbl">Special notes - the Closing agent reads these</div>
+          <textarea class="hk2-draft sm"${isTop ? ' id="hk2-ptf-notes"' : ''} placeholder="Loved the small-group drills, dad asked about Tuesdays..."></textarea>
+        </div>
       </div>
-      <div class="hk2-note">One submit routes them: good fit moves to Done Trial, no-show hands Booking the rebook, not a fit closes as unqualified.</div>`;
+      <div class="hk2-note">One submit routes them: good fit moves to Done Trial, no-show hands Booking the rebook, not a fit closes as unqualified or lost.</div>`;
   } else {
     body = `${_hk2ThreadHtml(r)}
       <div class="hk2-lbl">${r._kind === 'enroll' ? 'The reply, sign-up link included · edit it right here' : 'Proposed message · edit it right here'}</div>
@@ -32473,6 +32476,10 @@ function _hk2CardHtml(r, pos, total, isTop) {
       ${r._kind === 'enroll' ? '<div class="hk2-note">The opportunity is marked won automatically when they pay on the link.</div>' : ''}`;
   }
   const isForm = r._kind === 'form';
+  // Post-trial form, "Not a fit" picked: skip the message fields and split the
+  // primary button into the two terminal closes (Zoran 2026-07-10).
+  const _pp = _HK2.ptf || {};
+  const ptfNotFit = isForm && _pp.showed === true && _pp.fit === false;
   const moves = isForm ? '' : _hk2Moves(r).map(([lab, op]) => op === 'write' ? `<button class="hk2-x" onclick="_hk2Write()">${lab}</button>` : `<button class="hk2-x" onclick="_hk2Move('${op}')">${lab}</button>`).join('');
   // Two-line header: athlete on top, parent underneath. No athlete name = fall
   // back to the single contact name + confidence, exactly as before.
@@ -32498,7 +32505,9 @@ function _hk2CardHtml(r, pos, total, isTop) {
     ${isForm ? '' : `<div class="hk2-other"${id.other}><div class="hk2-other-in"><span class="hk2-lbl">Move the lead</span>${moves}</div></div>`}
     <div class="hk2-bar">
       ${isForm ? '' : `<button class="hk2-otherbtn" onclick="_hk2ToggleOther(this)">Other</button>`}
-      <button class="hk2-go ${km.cls}"${id.go} onclick="_hk2Confirm()">${km.go}</button>
+      ${ptfNotFit
+        ? `<button class="hk2-go alt" onclick="_hk2PtfClose('unqualified')">Mark unqualified</button><button class="hk2-go ${km.cls}" onclick="_hk2PtfClose('lost')">Mark lost</button>`
+        : `<button class="hk2-go ${km.cls}"${id.go} onclick="_hk2Confirm()">${km.go}</button>`}
     </div>`;
 }
 // Post-trial form segmented pickers: state on _HK2.ptf, re-render keeps it.
@@ -32516,11 +32525,18 @@ function _hk2PtfPick(grp, val) {
   if (n2) n2.value = _HK2.ptf.notes || '';
   if (l2) l2.checked = _HK2.ptf.link !== false;
 }
+// Not-a-fit terminal closes: stamp the chosen outcome and run the same submit
+// path. 'unqualified' = quiet dead-end; 'lost' = Lead Nurture takes over.
+function _hk2PtfClose(outcome) {
+  if (!_HK2.ptf) _HK2.ptf = {};
+  _HK2.ptf.outcome = outcome === 'lost' ? 'lost' : 'unqualified';
+  _hk2Confirm();
+}
 function _hk2Render(opts) {
   const host = document.getElementById('pl-hawkeye'); if (!host || !_HK2.q) return;
   _HK2.edited = false; _HK2.touched = false; _HK2.otherOpen = false;
   const _t0 = (_HK2.q[_HK2.agent] || [])[0]; if (_t0) _t0._writeMode = false;
-  if (!(opts && opts.keepPtf)) _HK2.ptf = { showed: null, fit: null, link: true, msg: '', notes: '' };
+  if (!(opts && opts.keepPtf)) _HK2.ptf = { showed: null, fit: null, link: true, msg: '', notes: '', outcome: null };
   const tabs = _HK2_AGENTS.map(a => {
     const n = _HK2.q[a].length, on = _HK2.agent === a;
     return `<button class="hk2-tab${on ? ' on' : ''}" onclick="_hk2Pick('${a}')"><span class="hk2-tmain">${_HK2_META[a].label}${n ? `<span class="hk2-n">${n}</span>` : ''}</span><span class="hk2-tgear" onclick="event.stopPropagation();_hk2Gear('${a}')" title="Configure this stage">${_plIcon('gear', 14)}</span></button>`;
@@ -32678,14 +32694,18 @@ function _hk2Confirm() {
     if (p.showed !== true && p.showed !== false) { _apxToast('Pick Showed up or No show first', false); return; }
     if (p.showed === true && p.fit !== true && p.fit !== false) { _apxToast('Pick Good fit or Not a fit', false); return; }
     const msgEl = document.getElementById('hk2-ptf-msg'), notesEl = document.getElementById('hk2-ptf-notes'), linkEl = document.getElementById('hk2-ptf-link');
+    const notFit = p.showed === true && p.fit === false;
     ptf = {
       opportunity_id: r.opportunity_id,
       showed_up: p.showed,
       good_fit: p.showed === true ? p.fit : false,
       trainer: '',
-      notes: (notesEl ? notesEl.value : '').trim(),
-      first_message: p.showed === true ? (msgEl ? msgEl.value : '').trim() : '',
-      send_onboarding_link: p.showed === true ? !!(linkEl && linkEl.checked) : false,
+      notes: notFit ? '' : (notesEl ? notesEl.value : '').trim(),
+      first_message: (p.showed === true && !notFit) ? (msgEl ? msgEl.value : '').trim() : '',
+      send_onboarding_link: (p.showed === true && !notFit) ? !!(linkEl && linkEl.checked) : false,
+      // Not a fit splits into two terminal closes: unqualified (quiet dead-end)
+      // or lost (Lead Nurture takes over). Backend ignores it unless not-a-fit.
+      outcome: notFit ? (p.outcome === 'lost' ? 'lost' : 'unqualified') : undefined,
     };
   }
   const chk = resp => { if (resp && resp.error) throw new Error(resp.error); return resp; };
@@ -32720,7 +32740,7 @@ function _hk2Confirm() {
       // A good-fit whose stage move failed server-side (move_ok === false): warn,
       // don't claim success - the review saved but the lead didn't reach Done Trial.
       if (ptf.good_fit && j && j.move_ok === false) throw new Error('Saved, but the move to Done Trial did not land - reopen the card and retry.');
-      _apxToast(ptf.showed_up === false ? 'No-show logged - Booking drafts the rebook' : ptf.good_fit ? 'Routed to Done Trial - Closing takes over' : 'Closed as not a fit', true);
+      _apxToast(ptf.showed_up === false ? 'No-show logged - Booking drafts the rebook' : ptf.good_fit ? 'Routed to Done Trial - Closing takes over' : ptf.outcome === 'lost' ? 'Marked lost - Nurture takes over' : 'Closed as unqualified', true);
     } else if (k === 'plan') {
       const edits = planEdits;
       const token = await _mreqAuthToken();
