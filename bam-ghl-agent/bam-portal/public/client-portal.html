@@ -9052,11 +9052,9 @@ Then the call to action."]</div>
         <!-- Hawkeye deck (V2): the single Hawkeye surface - one card at a time. -->
         <style>
           #pl-hawkeye{max-width:680px;margin:0 auto;padding:4px 0 44px}
-          .hk2-topbar{display:flex;align-items:center;gap:12px;margin:2px 0 14px}
-          .hk2-back{display:inline-flex;align-items:center;gap:6px;background:var(--surface);color:var(--text-sub);border:1px solid var(--border);border-radius:999px;padding:8px 15px;font:inherit;font-size:13px;font-weight:600;cursor:pointer}
-          .hk2-back:hover{color:var(--text)}
-          .hk2-title{display:flex;align-items:center;gap:8px;font-size:19px;font-weight:800;color:var(--text)}
-          .hk2-tabs{display:flex;gap:8px;margin-bottom:14px}
+          .hk2-topbar{display:flex;align-items:center;gap:16px;margin:2px 0 14px;flex-wrap:wrap}
+          .hk2-title{display:flex;align-items:center;gap:8px;font-size:19px;font-weight:800;color:var(--text);flex:0 0 auto}
+          .hk2-tabs{display:flex;gap:8px;flex:1 1 auto;min-width:0}
           .hk2-tab{flex:1;display:flex;align-items:center;justify-content:space-between;gap:7px;border-radius:999px;border:1.5px solid var(--border);background:var(--surface);color:var(--text-sub);padding:9px 14px;font:inherit;font-size:13px;font-weight:700;cursor:pointer;min-width:0}
           .hk2-tab.on{background:var(--accent);border-color:var(--accent);color:var(--on-gold,#131416)}
           .hk2-tmain{display:inline-flex;align-items:center;gap:7px;min-width:0;flex:1;justify-content:center}
@@ -32259,7 +32257,6 @@ function _sfOpen(which) {
     if (mainEl) mainEl.classList.remove('mm-tease', 'mm-tease-ready');
     document.documentElement.classList.add('mm-prewarm');
     modal.style.display = 'flex';
-    try { _ccFocusHud('salesMachineModal'); } catch (_) {}
     setTimeout(() => {
       requestAnimationFrame(() => {
         document.documentElement.classList.add('mm-focus-open');
@@ -32551,10 +32548,9 @@ function _hk2Render(opts) {
        <div class="hk2-card hk2-top" id="hk2-topcard">${_hk2CardHtml(q[0], 1, q.length, true)}</div>`;
   host.innerHTML = `
     <div class="hk2-topbar">
-      <button class="hk2-back" onclick="_hk2Back()">${_plIcon('collapse', 12)} Sales</button>
       <div class="hk2-title">${_plIcon('eye', 17)} Hawkeye</div>
+      <div class="hk2-tabs">${tabs}</div>
     </div>
-    <div class="hk2-tabs">${tabs}</div>
     <div class="hk2-deck">${deck}</div>
     <div class="hk2-hint">every card resolves here - approve it or move the lead (no skip)<br>edits flip the button to "Confirm edits" and the teach-why note becomes required</div>`;
   const top = _hk2Top();
