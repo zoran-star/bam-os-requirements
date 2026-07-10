@@ -103,6 +103,19 @@ clients at onboarding. Changes shipped:
   readers (resolveStage/resolveEdge/buildPortalBoard/shadowUpsertStageRegistry)
   still key by (client, role) - making them offer-aware + adding offer_id to the
   pipeline_stages unique + backfilling the 2 live pipelines' offers = NEXT (Phase 3).
+- **Phase 3a SHIPPED (2026-07-10):** offer data + read seam. Backfilled the 20 BAM GTA
+  `stage_transitions` edges to the Training offer (pipeline_stages + opportunities were
+  ALREADY offer-backfilled by the offer-spine wave; both live academies map to Training
+  per Zoran). Added a DORMANT optional `offerId` filter to `resolveFromRegistry`/
+  `resolveStage` (`api/agent/_store.js`) + `resolveEdge`/`routeTransition`
+  (`api/agent/_router.js`) - no caller passes it, so prod is byte-identical (grep-verified).
+  Pipeline_stages unique + self-seed UNCHANGED (still one pipeline per academy).
+- **Phase 3b NOT built (the risky remainder, spec in docs/core-handoff/pipeline-presets.md):**
+  collapse the 3 agent APIs into one detector parameterized by (academy, offer, stage,
+  agent_template); thread per-opp offer_id through queues/self-seed; flip pipeline_stages
+  unique to (client, offer, role) + shadowUpsertStageRegistry on_conflict. Held on purpose -
+  it rewrites LIVE SMS routing for BAM GTA + DETAIL Miami, needs a focused/canaried effort,
+  NOT a blind autonomous rewrite. This is what actually enables one-academy-two-pipelines.
 
 ## ⭐ LESSON MODEL REVISED (2026-07-10, Zoran) - consolidation skill replaces auto-promote
 The old "AI classifier -> promotion_status=pending -> staff approves -> scope flips

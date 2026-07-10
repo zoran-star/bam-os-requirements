@@ -6,8 +6,48 @@ core_parity: not-reviewed
 last_reviewed: "2026-07-10"
 prototype_commit: working-tree
 core_commit_reviewed: unavailable
-phases_done: [1, 2]
+phases_done: [1, 2, "3a"]
 ---
+
+## Phase 3a SHIPPED (2026-07-10) — offer data + read seam
+
+- **Backfill:** both live pipelines map to their Training offer (Zoran). `pipeline_stages`
+  + `opportunities` were ALREADY offer-backfilled by the offer-spine wave; this run
+  backfilled the 20 BAM GTA `stage_transitions` edges (DETAIL has none), derived from
+  each academy's own `pipeline_stages.offer_id` (guarded to academies with exactly one
+  pipeline offer — no hardcoded ids). Verified: 20/20 tagged, 0 null, no dup edges.
+- **Offer-aware read seam (DORMANT):** `resolveFromRegistry` / `resolveStage`
+  (`api/agent/_store.js`) and `resolveEdge` / `routeTransition` (`api/agent/_router.js`)
+  take an optional `offerId` that adds `&offer_id=eq.` ONLY when provided. No caller
+  passes it, so prod is byte-identical (grep-verified). Because offer_id is fully
+  backfilled, a filtered lookup returns the same row/edge an unfiltered one does today.
+- **What this does NOT change:** the pipeline_stages unique stays `(client_id, role)`;
+  `shadowUpsertStageRegistry` still upserts on `(client_id, role)` and does not thread
+  offer; the 3 agent APIs are untouched. So each academy still runs exactly ONE pipeline.
+
+## Phase 3b — the agent engine (NOT built; the risky remainder)
+
+Deliberately not done autonomously: it rewrites LIVE SMS routing for BAM GTA +
+DETAIL Miami and can't be integration-tested from here. Precise spec so it can be
+a focused, canaried effort:
+
+1. **Thread per-opportunity offer.** Every queue/move/create path already has the
+   opp (which carries `offer_id`). Pass `offerId` into `resolveStage` / `resolveEdge`
+   / `routeTransition` (seam ready) and into `shadowUpsertStageRegistry` /
+   `portalStageRowId` so the self-seed writes the right offer.
+2. **Offer-scope the registry unique.** `pipeline_stages` unique →
+   `(client_id, offer_id, role)` NULLS NOT DISTINCT; update
+   `shadowUpsertStageRegistry`'s `on_conflict` to `client_id,offer_id,role`. Safe
+   because all live rows already have a non-null offer (no NULL-vs-value dup), but
+   MUST land together with step 1 or the self-seed makes duplicate stage rows.
+3. **Collapse the 3 agent APIs** (`agent-approvals` reply bot, `agent-confirm`,
+   `agent-closing`) into one detector/drafter parameterized by (academy, offer,
+   stage, agent_template from `presets.js`). Each detector run iterates the
+   academy's offers × the preset's agent stages.
+4. **Hawkeye UI** renders tabs from the academy's offer pipelines instead of the
+   hardcoded booking/confirm/closing.
+5. Canary on BAM GTA (single offer — behavior must stay identical) before any
+   academy runs a second offer pipeline.
 
 ## Phase 2 SHIPPED (2026-07-10) — registry + apply_preset, applied to prod
 

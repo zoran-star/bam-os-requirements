@@ -246,9 +246,16 @@
   </div>
 
   <div class="phase">
-    <div class="ph-badge p3">Phase 3<small>generic workers</small></div>
-    <div class="ph-body"><b class="k">One engine, many agents.</b> Collapse the 3 copy-pasted agent APIs into one detector/drafter parameterized by (academy, offer, stage, agent_template). Hawkeye's tabs render from the offer's actual stages instead of hardcoded booking/confirm/closing.
-      <span class="unlock">A 4th agent (or a 5-stage preset) is a registry entry, not a new API file.</span></div>
+    <div class="ph-badge p0">Phase 3a<small>done ✓ 2026-07-10</small></div>
+    <div class="ph-body"><b class="k">Offer data + read seam. SHIPPED.</b> Both live pipelines are now fully offer-tagged (Zoran: both map to their Training offer) - <code>pipeline_stages</code> + <code>opportunities</code> were already backfilled by the offer-spine wave; this backfilled the 20 <code>stage_transitions</code> edges too, derived from each academy's own pipeline offer (no hardcoded ids). <code>resolveStage</code> / <code>resolveEdge</code> / <code>routeTransition</code> gained an optional <code>offerId</code> filter - DORMANT (no caller passes it yet, so prod is byte-identical), the seam the engine flips on.
+      <span class="unlock">Every stage, edge, and lead is now attributed to its offer; the readers can filter by offer the moment the engine asks.</span></div>
+  </div>
+
+  <div class="phase">
+    <div class="ph-badge p3">Phase 3b<small>the engine — NOT done</small></div>
+    <div class="ph-body"><b class="k">One engine, many agents.</b> Collapse the 3 copy-pasted agent APIs (<code>agent-approvals</code> / <code>agent-confirm</code> / <code>agent-closing</code>) into one detector/drafter parameterized by (academy, offer, stage, agent_template); thread each opportunity's <code>offer_id</code> through the queues + self-seed (<code>shadowUpsertStageRegistry</code>); flip the <code>pipeline_stages</code> unique to <code>(client, offer, role)</code>; Hawkeye tabs render from the offer's stages.
+      <span class="unlock">This is what lets ONE academy run TWO offer pipelines that route correctly.</span>
+      <span class="risk">⚠ Held on purpose: rewrites LIVE SMS routing for 2 production academies. Can't be integration-tested from here - wants a focused, canaried effort, not a blind autonomous rewrite. Spec in the core handoff.</span></div>
   </div>
 
   <div class="phase">
