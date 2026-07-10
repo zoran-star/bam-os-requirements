@@ -1199,6 +1199,12 @@ async function handler(req, res) {
       try { oppRef = await findOpenOpp(clientId, token, locationId, contactId); oppId = oppRef && (oppRef.ghlOpportunityId || oppRef.id) || null; }
       catch (e) { return res.status(e.status || 502).json({ error: `find opp: ${e.message}` }); }
       if (!oppRef) return res.status(200).json({ error: "No opportunity found for this contact - nothing to close." });
+      // Optional goodbye: write a message + mark unqualified in ONE action (Zoran
+      // 2026-07-10). Sends only when explicitly provided; sent BEFORE the close,
+      // like confirm-lost, so send guards still see an open opp.
+      const closing = (typeof b.reply === "string" ? b.reply : "").trim();
+      let goodbyeSent = false;
+      if (closing) { try { await sendReplyViaGhl(token, contactId, closing, clientId); goodbyeSent = true; } catch (_) {} }
       const reason = (b.reason || (row && row.lost_reason) || "").toString().trim() || null;
       try {
         await setStatus({ clientId, ghl, token, oppRef, status: "abandoned", role: "unqualified", contactId, reason });
@@ -1206,8 +1212,11 @@ async function handler(req, res) {
       try { await markUnqualified(token, contactId, clientId); } catch (_) {}
       try { await sb(`pipeline_outcomes`, { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify([{ client_id: clientId, opportunity_id: oppId, status: "abandoned", reason }]) }); } catch (_) {}
       if (b.ready_id) {
-        // Nothing is texted on Unqualified - the acted card is 'canceled', never fake-'sent'.
-        try { await sb(`agent_confirm_replies?id=eq.${encodeURIComponent(b.ready_id)}&client_id=eq.${clientId}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ status: "canceled", send_error: "marked unqualified", approved_by: staffEmail, updated_at: new Date().toISOString() }) }); } catch (_) {}
+        // 'sent' only when the goodbye actually went out; a silent close is 'canceled'.
+        const done = goodbyeSent
+          ? { status: "sent", approved_by: staffEmail, approved_at: new Date().toISOString(), sent_at: new Date().toISOString(), updated_at: new Date().toISOString() }
+          : { status: "canceled", send_error: "marked unqualified", approved_by: staffEmail, updated_at: new Date().toISOString() };
+        try { await sb(`agent_confirm_replies?id=eq.${encodeURIComponent(b.ready_id)}&client_id=eq.${clientId}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify(done) }); } catch (_) {}
       }
       await clearConfirmCards(clientId, contactId, "marked unqualified");
       return res.status(200).json({ ok: true, marked_abandoned: true, unqualified: true, opportunity_id: oppId, reason });

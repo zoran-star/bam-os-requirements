@@ -190,6 +190,15 @@ scattered autonomy/config entry points. KEEPS: inline drawer suggestion on lead 
   gates since the bounce is intentional). STILL SEND IMMEDIATELY on after-hours
   ✓ (Zoran's call: leave for now): lost-card warm goodbyes (all 3 agents),
   closing enroll-link message, post-trial form first message (+link).
+- MOVE + MESSAGE IN ONE (2026-07-10, Zoran: "write a message and mark someone
+  unqualified at the same time"): deck Nurture/Unqualified moves now SEND the
+  message box when it has text - labels flip live to "Send message + Nurture"/
+  "Send message + Unqualified" (empty box = silent move, ghost move never
+  sends). Backend: confirm-abandoned takes optional `reply` on ALL 3 agent APIs
+  (additive - V1.5 overlays omit it, silent close unchanged); goodbye sends
+  BEFORE the close like confirm-lost, quiet-hours exempt (matches lost-card
+  goodbyes, Zoran's standing call). Two-tap arm flow kept ("Confirm: Send
+  message + Unqualified"); optional teach lesson logs the sent text.
 - AGENT CONTEXT BLINDNESS (2026-07-10, found via Zoran's "didn't card in Hawkeye"
   report): the GHL history import's channelOf read numeric `type` first, but in
   GHL 1=CALL, 2=SMS, 3=EMAIL - so 12,763 real imported SMS rows sat channel
