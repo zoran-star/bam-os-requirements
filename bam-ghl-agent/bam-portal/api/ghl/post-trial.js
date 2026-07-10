@@ -135,14 +135,38 @@ async function handler(req, res) {
     oppRef = { ghlOpportunityId: oppId };
   }
 
-  // Record the review (one per opportunity).
+  // Resolve the specific trial this review is for (portal academies) so the
+  // post-trial form card keys on the TRIAL, not the contact - a rebooked lead's
+  // prior-trial review must never suppress the new trial's card (Zoran 2026-07-10).
+  // Rule: the contact's most recent BOOKED trial whose session has started (1h
+  // grace for early submits). Reused for the SHOWED/NO_SHOW outcome stamp below.
+  let trialBookingTarget = null;
+  if (contactId && client.booking_provider === "portal") {
+    try {
+      const tbs = await sb(
+        `trial_bookings?tenant_id=eq.${encodeURIComponent(clientId)}&ghl_contact_id=eq.${encodeURIComponent(contactId)}&status=eq.BOOKED&select=id,slot_id&limit=25`
+      );
+      if (Array.isArray(tbs) && tbs.length) {
+        const slotIds = tbs.map(t => t.slot_id).filter(Boolean);
+        const slots = slotIds.length ? await sb(`schedule_slots?id=in.(${slotIds.map(encodeURIComponent).join(",")})&select=id,start_time`) : [];
+        const startById = new Map((slots || []).map(s => [s.id, new Date(s.start_time).getTime()]));
+        trialBookingTarget = tbs
+          .map(t => ({ ...t, startMs: startById.get(t.slot_id) || 0 }))
+          .filter(t => t.startMs && t.startMs <= Date.now() + 60 * 60_000)   // session started (1h grace)
+          .sort((a, b) => b.startMs - a.startMs)[0] || null;
+      }
+    } catch (e) { console.error("resolve trial_booking for review failed (non-fatal):", e.message); }
+  }
+
+  // Record the review (one per opportunity). trial_booking_id ties it to the
+  // specific trial so the Confirm-tab form card is per-trial, not per-contact.
   try {
     await sb("post_trial_reviews?on_conflict=client_id,opportunity_id", {
       method: "POST",
       headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
       body: JSON.stringify({
         client_id: clientId, opportunity_id: oppId, ghl_contact_id: contactId,
-        offer_id: oppOfferId,
+        offer_id: oppOfferId, trial_booking_id: trialBookingTarget?.id || null,
         good_fit: goodFit, showed_up: showedUp, trainer, notes,
         signup_text_status: sendLink ? "queued" : "skipped",
         created_by: ctx.staff?.name || ctx.user?.email || null,
@@ -165,26 +189,11 @@ async function handler(req, res) {
   // Calendars-off-GHL ④: on a portal-booking academy, stamp the outcome onto the
   // contact's trial_bookings row too (SHOWED / NO_SHOW via Luka's set_trial_outcome
   // RPC - never a direct update), so the portal calendar + conversion lineage agree
-  // with the coach's form. Targets the most recent BOOKED trial whose session has
-  // started. Best-effort: a miss must never fail the review submit.
-  if (showedUp !== null && contactId && client.booking_provider === "portal") {
+  // with the coach's form. Reuses trialBookingTarget resolved above (same "most
+  // recent started BOOKED trial" rule). Best-effort: a miss must never fail submit.
+  if (showedUp !== null && trialBookingTarget) {
     try {
-      const tbs = await sb(
-        `trial_bookings?tenant_id=eq.${encodeURIComponent(clientId)}&ghl_contact_id=eq.${encodeURIComponent(contactId)}&status=eq.BOOKED&select=id,slot_id&limit=25`
-      );
-      if (Array.isArray(tbs) && tbs.length) {
-        const slotIds = tbs.map(t => t.slot_id).filter(Boolean);
-        const slots = slotIds.length ? await sb(`schedule_slots?id=in.(${slotIds.map(encodeURIComponent).join(",")})&select=id,start_time`) : [];
-        const startById = new Map((slots || []).map(s => [s.id, new Date(s.start_time).getTime()]));
-        const started = tbs
-          .map(t => ({ ...t, startMs: startById.get(t.slot_id) || 0 }))
-          .filter(t => t.startMs && t.startMs <= Date.now() + 60 * 60_000)   // session started (1h grace for early submits)
-          .sort((a, b) => b.startMs - a.startMs);
-        const target = started[0] || null;
-        if (target) {
-          await sb(`rpc/set_trial_outcome`, { method: "POST", body: JSON.stringify({ p_tenant_id: clientId, p_trial_booking_id: target.id, p_status: showedUp ? "SHOWED" : "NO_SHOW" }) });
-        }
-      }
+      await sb(`rpc/set_trial_outcome`, { method: "POST", body: JSON.stringify({ p_tenant_id: clientId, p_trial_booking_id: trialBookingTarget.id, p_status: showedUp ? "SHOWED" : "NO_SHOW" }) });
     } catch (e) { console.error("trial_bookings outcome stamp failed (non-fatal):", e.message); }
   }
 
