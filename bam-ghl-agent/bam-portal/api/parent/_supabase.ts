@@ -9,6 +9,7 @@ type SupabaseInit = RequestInit & {
 export type SupabaseUser = {
   id: string;
   email?: string;
+  email_confirmed_at?: string | null;
   app_metadata?: Record<string, unknown>;
   user_metadata?: Record<string, unknown>;
 };
@@ -98,6 +99,34 @@ export async function verifySupabaseUser(req: ParentApiRequest): Promise<Supabas
   }
 
   return user;
+}
+
+export async function updateSupabaseUserAppMetadata(
+  user: SupabaseUser,
+  patch: Record<string, unknown>,
+): Promise<SupabaseUser> {
+  const key = serviceKey();
+  const appMetadata = { ...(user.app_metadata ?? {}), ...patch };
+  const res = await fetch(`${supabaseUrl()}/auth/v1/admin/users/${encodeURIComponent(user.id)}`, {
+    method: "PUT",
+    headers: {
+      apikey: key,
+      Authorization: `Bearer ${key}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ app_metadata: appMetadata }),
+  });
+
+  const text = await res.text();
+  if (!res.ok) {
+    throw new HttpError(502, "Supabase Auth update failed", {
+      status: res.status,
+      body: text,
+    });
+  }
+
+  const updated = (text ? JSON.parse(text) : null) as SupabaseUser | null;
+  return updated?.id ? updated : { ...user, app_metadata: appMetadata };
 }
 
 export function eq(value: string | number): string {

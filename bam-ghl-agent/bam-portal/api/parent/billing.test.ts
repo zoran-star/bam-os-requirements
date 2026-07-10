@@ -396,7 +396,7 @@ function parentContextResponses({
   students?: unknown[];
 } = {}) {
   const responses = [
-    { body: { id: userId }, match: "/auth/v1/user" },
+    { body: { id: userId, app_metadata: { role: "parent" } }, match: "/auth/v1/user" },
     { body: [profile], match: "/rest/v1/customer_profiles" },
     { body: students, match: "/rest/v1/students?parent_id" },
     { body: memberships, match: "/rest/v1/academy_memberships?customer_id" },

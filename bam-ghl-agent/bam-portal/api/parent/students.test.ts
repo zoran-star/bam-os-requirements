@@ -32,6 +32,18 @@ const existingStudent = {
   updated_at: "2026-07-02T12:00:00.000Z",
 };
 
+const profileMembership = {
+  academy_id: "30000000-0000-4000-8000-000000000001",
+  customer_id: profile.id,
+  ghl_contact_id: "ghl-parent",
+  id: "40000000-0000-4000-8000-000000000001",
+  joined_at: "2026-07-02T12:00:00.000Z",
+  plan_id: null,
+  status: "ACTIVE",
+  stripe_customer_id: null,
+  student_id: null,
+};
+
 describe("POST /api/parent/students", () => {
   beforeEach(() => {
     process.env.VITE_SUPABASE_URL = "http://127.0.0.1:54321";
@@ -41,10 +53,10 @@ describe("POST /api/parent/students", () => {
 
   it("returns an existing matching student instead of creating a duplicate", async () => {
     const fetchMock = mockSupabaseFetch([
-      { body: { id: "user-1" }, match: "/auth/v1/user" },
+      { body: { id: "user-1", app_metadata: { role: "parent" } }, match: "/auth/v1/user" },
       { body: [profile], match: "/rest/v1/customer_profiles" },
       { body: [existingStudent], match: "/rest/v1/students?parent_id" },
-      { body: [], match: "/rest/v1/academy_memberships?customer_id" },
+      { body: [profileMembership], match: "/rest/v1/academy_memberships?customer_id" },
       { body: [], match: "/rest/v1/academy_memberships?student_id" },
     ]);
 
@@ -67,10 +79,10 @@ describe("POST /api/parent/students", () => {
 
   it("creates a student through the service-role REST API", async () => {
     const fetchMock = mockSupabaseFetch([
-      { body: { id: "user-1" }, match: "/auth/v1/user" },
+      { body: { id: "user-1", app_metadata: { role: "parent" } }, match: "/auth/v1/user" },
       { body: [profile], match: "/rest/v1/customer_profiles" },
       { body: [], match: "/rest/v1/students?parent_id" },
-      { body: [], match: "/rest/v1/academy_memberships?customer_id" },
+      { body: [profileMembership], match: "/rest/v1/academy_memberships?customer_id" },
       { body: [], match: "/rest/v1/students?id=eq" },
       { body: [existingStudent], match: "/rest/v1/students?select=" },
     ]);
@@ -102,6 +114,29 @@ describe("POST /api/parent/students", () => {
       notes: null,
       parent_id: profile.id,
     });
+  });
+
+  it("requires an academy attachment before creating a child", async () => {
+    const fetchMock = mockSupabaseFetch([
+      { body: { id: "user-1", app_metadata: { role: "parent" } }, match: "/auth/v1/user" },
+      { body: [profile], match: "/rest/v1/customer_profiles" },
+      { body: [], match: "/rest/v1/students?parent_id" },
+      { body: [], match: "/rest/v1/academy_memberships?customer_id" },
+    ]);
+
+    const res = await invoke({
+      body: {
+        date_of_birth: "2014-03-10",
+        first_name: "Alex",
+        last_name: "Rivera",
+      },
+      headers: { authorization: "Bearer parent-token" },
+      method: "POST",
+    });
+
+    expect(res.statusCode).toBe(409);
+    expect(res.body).toEqual({ error: "Academy invite required before adding a child." });
+    expect(fetchMock.mock.calls.some(([, init]) => init?.method === "POST")).toBe(false);
   });
 });
 
