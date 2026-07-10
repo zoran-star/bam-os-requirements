@@ -25,6 +25,9 @@ async function handler(req: ParentApiRequest, res: ParentApiResponse) {
 
   try {
     const context = await getParentReadContext(req);
+    if (!context.memberships.some((membership) => membership.status !== "CANCELLED")) {
+      throw new HttpError(409, "Academy invite required before adding a child.");
+    }
     const request = readAddStudentRequest(req.body);
     const existing = findMatchingStudent(context.students, request);
     if (existing) return res.status(200).json(existing);

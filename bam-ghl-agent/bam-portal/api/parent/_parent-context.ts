@@ -1,21 +1,12 @@
 import { HttpError } from "./_errors.js";
+import {
+  resolveParentIdentityForUser,
+  type ParentIdentityProfile,
+} from "./_parent-identity.js";
 import { eq, inList, sb, verifySupabaseUser, type SupabaseUser } from "./_supabase.js";
 import type { ParentApiRequest } from "./_types.js";
 
-const MISSING_CUSTOMER_PROFILE_MESSAGE =
-  "No customer profile found. Please register to continue.";
-
-export type ParentReadProfile = {
-  id: string;
-  supabase_user_id: string;
-  first_name: string;
-  last_name: string;
-  email: string;
-  phone: string | null;
-  profile_type: "PARENT" | "STUDENT";
-  created_at: string;
-  updated_at: string;
-};
+export type ParentReadProfile = ParentIdentityProfile;
 
 export type ParentReadStudent = {
   id: string;
@@ -50,7 +41,13 @@ export type ParentReadContext = {
 
 export async function getParentReadContext(req: ParentApiRequest): Promise<ParentReadContext> {
   const user = await verifySupabaseUser(req);
-  const profile = await getCustomerProfile(user.id);
+  return getParentReadContextForUser(user);
+}
+
+export async function getParentReadContextForUser(
+  user: SupabaseUser,
+): Promise<ParentReadContext> {
+  const { profile } = await resolveParentIdentityForUser(user);
   const students = await getStudents(profile.id);
   const memberships = await getMemberships(profile.id, students.map((student) => student.id));
 
@@ -92,21 +89,6 @@ export function partitionMemberships<TMembership extends { customer_id: string |
     profile_memberships: memberships.filter((membership) => Boolean(membership.customer_id)),
     student_memberships: memberships.filter((membership) => Boolean(membership.student_id)),
   };
-}
-
-async function getCustomerProfile(supabaseUserId: string): Promise<ParentReadProfile> {
-  const rows = await sb<ParentReadProfile[]>(
-    `customer_profiles?supabase_user_id=eq.${eq(supabaseUserId)}` +
-      "&select=id,supabase_user_id,first_name,last_name,email,phone,profile_type,created_at,updated_at" +
-      "&limit=1",
-  );
-  const profile = Array.isArray(rows) ? rows[0] : null;
-
-  if (!profile) {
-    throw new HttpError(403, MISSING_CUSTOMER_PROFILE_MESSAGE, MISSING_CUSTOMER_PROFILE_MESSAGE);
-  }
-
-  return profile;
 }
 
 async function getStudents(parentId: string): Promise<ParentReadStudent[]> {

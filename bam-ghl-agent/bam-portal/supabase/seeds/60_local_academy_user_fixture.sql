@@ -113,3 +113,80 @@ on conflict (user_id, client_id) do update set
   role = excluded.role,
   status = excluded.status,
   updated_at = now();
+
+-- Parent-app invite candidate, linked to the existing contacts + pipeline
+-- model. No customer profile is seeded; registration creates it after claim.
+insert into public.contacts (
+  id,
+  client_id,
+  ghl_contact_id,
+  first_name,
+  last_name,
+  name,
+  email,
+  athlete_name,
+  source
+)
+values (
+  'a8200000-0000-4000-8000-000000000001',
+  '39875f07-0a4b-4429-a201-2249bc1f24df',
+  'ghl_local_parent_invite',
+  'Jordan',
+  'Lee',
+  'Jordan Lee',
+  'parent.new.invited@example.test',
+  'Invite Child',
+  'local-parent-invite'
+)
+on conflict (id) do update set
+  client_id = excluded.client_id,
+  ghl_contact_id = excluded.ghl_contact_id,
+  first_name = excluded.first_name,
+  last_name = excluded.last_name,
+  name = excluded.name,
+  email = excluded.email,
+  athlete_name = excluded.athlete_name,
+  source = excluded.source,
+  updated_at = now();
+
+insert into public.opportunities (
+  id,
+  client_id,
+  contact_id,
+  ghl_contact_id,
+  contact_phone,
+  contact_name,
+  athlete_name,
+  stage_role,
+  status,
+  source,
+  entry_point,
+  ghl_opportunity_id
+)
+values (
+  'a8300000-0000-4000-8000-000000000001',
+  '39875f07-0a4b-4429-a201-2249bc1f24df',
+  'a8200000-0000-4000-8000-000000000001',
+  'ghl_local_parent_invite',
+  '+14165550110',
+  'Jordan Lee',
+  'Invite Child',
+  'interested',
+  'open',
+  'local-parent-invite',
+  'free-trial',
+  'ghl_opp_local_parent_invite'
+)
+on conflict (id) do update set
+  client_id = excluded.client_id,
+  contact_id = excluded.contact_id,
+  ghl_contact_id = excluded.ghl_contact_id,
+  contact_phone = excluded.contact_phone,
+  contact_name = excluded.contact_name,
+  athlete_name = excluded.athlete_name,
+  stage_role = excluded.stage_role,
+  status = excluded.status,
+  source = excluded.source,
+  entry_point = excluded.entry_point,
+  ghl_opportunity_id = excluded.ghl_opportunity_id,
+  updated_at = now();

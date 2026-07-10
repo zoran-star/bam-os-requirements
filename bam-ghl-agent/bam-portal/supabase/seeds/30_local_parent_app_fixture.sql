@@ -11,7 +11,8 @@
 -- Local login credentials:
 --   parent.alex.rivera@example.test / local-password
 --   parent.jamie.chen@example.test / local-password
---   parent.taylor.morgan@example.test / local-password
+--   parent.taylor.morgan@example.test / local-password (preloaded, unclaimed)
+--   parent.new.invited@example.test  / local-password (auth only; invite required)
 --   staff.admin@example.test        / local-password
 
 insert into auth.users (
@@ -98,8 +99,30 @@ values
     '',
     0,
     '',
-    '{"provider":"email","providers":["email"],"role":"parent"}'::jsonb,
+    '{"provider":"email","providers":["email"]}'::jsonb,
     '{"first_name":"Taylor","last_name":"Morgan"}'::jsonb,
+    now(),
+    now()
+  ),
+  (
+    '00000000-0000-0000-0000-000000000000',
+    'a8100000-0000-4000-8000-000000000001',
+    'authenticated',
+    'authenticated',
+    'parent.new.invited@example.test',
+    extensions.crypt('local-password', extensions.gen_salt('bf')),
+    now(),
+    '',
+    '',
+    '',
+    '',
+    '',
+    '',
+    '',
+    0,
+    '',
+    '{"provider":"email","providers":["email"]}'::jsonb,
+    '{"first_name":"Jordan","last_name":"Lee"}'::jsonb,
     now(),
     now()
   ),
@@ -184,6 +207,16 @@ values
     now()
   ),
   (
+    'a8100000-0000-4000-8000-000000000001',
+    'a8100000-0000-4000-8000-000000000001',
+    'a8100000-0000-4000-8000-000000000001',
+    '{"sub":"a8100000-0000-4000-8000-000000000001","email":"parent.new.invited@example.test","email_verified":true,"phone_verified":false}'::jsonb,
+    'email',
+    now(),
+    now(),
+    now()
+  ),
+  (
     '8d3b7b5f-02e3-48f6-9a91-5a7d51e6c3f2',
     '8d3b7b5f-02e3-48f6-9a91-5a7d51e6c3f2',
     '8d3b7b5f-02e3-48f6-9a91-5a7d51e6c3f2',
@@ -256,13 +289,13 @@ values
   ),
   (
     '7c269b89-17df-4f7d-9258-c2d442f1b6df',
-    'f7a7d6e5-7c6d-4dd1-95c2-1c7f5d72e9a4',
+    null,
     'Taylor',
     'Morgan',
     'parent.taylor.morgan@example.test',
     '+14165550103',
     'PARENT',
-    now()
+    null
   )
 on conflict (id) do update set
   supabase_user_id = excluded.supabase_user_id,

@@ -1,19 +1,15 @@
 import { HttpError } from "./_errors.js";
+import {
+  resolveParentIdentityForUser,
+  type ParentIdentityProfile,
+} from "./_parent-identity.js";
 import { eq, inList, rpc, sb, verifySupabaseUser } from "./_supabase.js";
 import type { ParentApiRequest } from "./_types.js";
-
-const MISSING_CUSTOMER_PROFILE_MESSAGE =
-  "No customer profile found. Please register to continue.";
 
 const SLOT_SCAN_LIMIT = 1_000;
 const RESERVATION_SCAN_LIMIT = 1_000;
 const UTC_TIME_ZONE = "UTC";
 const DATE_ONLY_PATTERN = /^(\d{4})-(\d{2})-(\d{2})$/;
-
-type CustomerProfile = {
-  id: string;
-  supabase_user_id: string;
-};
 
 type Student = {
   id: string;
@@ -86,7 +82,7 @@ type WaitlistEntry = {
 };
 
 type ParentScheduleContext = {
-  profile: CustomerProfile;
+  profile: ParentIdentityProfile;
   memberships: Membership[];
   studentIds: string[];
   academyIds: string[];
@@ -206,7 +202,7 @@ export async function getParentScheduleContext(
   req: ParentApiRequest,
 ): Promise<ParentScheduleContext> {
   const user = await verifySupabaseUser(req);
-  const profile = await getCustomerProfile(user.id);
+  const { profile } = await resolveParentIdentityForUser(user);
   const students = await getStudents(profile.id);
   const memberships = await getMemberships(profile.id, students.map((student) => student.id));
 
@@ -548,19 +544,6 @@ function optionalBodyString(body: Record<string, unknown>, name: string): string
     throw new HttpError(400, `Invalid body field: ${name}.`);
   }
   return value.trim();
-}
-
-async function getCustomerProfile(supabaseUserId: string): Promise<CustomerProfile> {
-  const rows = await sb<CustomerProfile[]>(
-    `customer_profiles?supabase_user_id=eq.${eq(supabaseUserId)}` +
-      "&select=id,supabase_user_id" +
-      "&limit=1",
-  );
-  const profile = Array.isArray(rows) ? rows[0] : null;
-  if (!profile) {
-    throw new HttpError(403, MISSING_CUSTOMER_PROFILE_MESSAGE, MISSING_CUSTOMER_PROFILE_MESSAGE);
-  }
-  return profile;
 }
 
 async function getStudents(parentId: string): Promise<Student[]> {
