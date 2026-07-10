@@ -75,7 +75,16 @@ async function loadSteps(automationId) {
 const enabledSteps = (steps) => steps.filter(s => s.enabled).sort((a, b) => a.position - b.position);
 
 // Schedule the job for one step of one enrollment. Idempotent via the dedupe_key
-// unique index (re-scheduling the same step is a no-op).
+// UNIQUE CONSTRAINT (re-scheduling the same step is a no-op via ignore-duplicates).
+//
+// ⚠️ Postmortem (2026-07-10): dedupe was originally a PARTIAL unique index
+// (where dedupe_key is not null). PostgREST's on_conflict=dedupe_key emits plain
+// ON CONFLICT (dedupe_key), which Postgres REJECTS against a partial index
+// (42P10) - so EVERY job insert failed, the silent catch below ate it, and the
+// whole automation engine stopped queueing for a week while enrollments looked
+// "active". Fixed by the fix_automation_jobs_dedupe_constraint migration (plain
+// unique constraint) + this catch now LOGS. With ignore-duplicates a true dupe
+// returns 200 (no throw), so anything landing in the catch is a REAL failure.
 async function scheduleStepJob({ clientId, automationId, enrollmentId, step, contactId, fromDate }) {
   const runAfter = nextSendableTime(addWait(fromDate || new Date(), step.wait_amount, step.wait_unit));
   const row = {
@@ -85,7 +94,9 @@ async function scheduleStepJob({ clientId, automationId, enrollmentId, step, con
   };
   try {
     await sb(`automation_jobs?on_conflict=dedupe_key`, { method: "POST", headers: { Prefer: "resolution=ignore-duplicates,return=minimal" }, body: JSON.stringify([row]) });
-  } catch (_) { /* duplicate dedupe_key — already scheduled */ }
+  } catch (e) {
+    console.error(`[automations] scheduleStepJob FAILED (enrollment ${enrollmentId}, step ${step.id}): ${e.message}`);
+  }
   return runAfter;
 }
 
