@@ -190,6 +190,18 @@ scattered autonomy/config entry points. KEEPS: inline drawer suggestion on lead 
   gates since the bounce is intentional). STILL SEND IMMEDIATELY on after-hours
   ✓ (Zoran's call: leave for now): lost-card warm goodbyes (all 3 agents),
   closing enroll-link message, post-trial form first message (+link).
+- BOOK-IT NOW TEXTS THE PARENT (2026-07-10, Mike Sandhu case): on portal-booking
+  academies confirm-book claimed the slot but sent NOTHING (GHL academies get
+  GHL's toNotify; portal leads who said "yes please" heard silence until the
+  next confirm card was approved). FIXED: portal branch sends the card's
+  confirmation text right after booking (deck's edited box via b.reply, falls
+  back to the detector draft; immediate send, same exemption as lost goodbyes).
+  Deck book cards now SHOW an editable "Confirmation text - sends the moment
+  you book it" box (edits demand the teach note like any message edit). Cards
+  with a FUTURE trial_at render a gold "✓ Trial on the books: <local time>"
+  bar so a reviewer can tell "we texted about a time" from "the slot is
+  actually claimed" - the exact confusion behind Zoran's report. Lesson saved
+  for the booking agent (clear yes on a time -> Book-it action, never words).
 - MOVE + MESSAGE IN ONE (2026-07-10, Zoran: "write a message and mark someone
   unqualified at the same time"): deck Nurture/Unqualified moves now SEND the
   message box when it has text - labels flip live to "Send message + Nurture"/
