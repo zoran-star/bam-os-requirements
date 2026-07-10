@@ -56,6 +56,16 @@ clients at onboarding. Changes shipped:
   (lessons per academy, % edited, % edits-with-lesson from agent_approvals),
   can_train_agent staff toggle UI, V1.5 optional-teach surfaces, GHL-direct
   replies bypassing the loop.
+- **Pipeline-preset architecture DESIGNED (2026-07-10, not built):** target =
+  pipeline_presets + preset_stages (open role_key, not the 7-value enum) +
+  preset_transitions + agent_templates, stamped per academy by apply_preset;
+  preset-scoped training. Design page `docs/agent-preset-architecture.html`
+  (+ training explainer `docs/agent-training-architecture.html`, both served by
+  the `agent-docs` launch config, port 5178); core handoff
+  `docs/core-handoff/pipeline-presets.md` (ready-for-review; fc-core-srvc
+  UNREACHABLE from zoran-star account - parity unverified). Open Loop (High)
+  logged in Notion with the 4 product decisions (preset per academy vs per
+  offer; who authors; customization envelope; what preset #2 is).
 
 ## ⭐ LESSON MODEL REVISED (2026-07-10, Zoran) - consolidation skill replaces auto-promote
 The old "AI classifier -> promotion_status=pending -> staff approves -> scope flips
