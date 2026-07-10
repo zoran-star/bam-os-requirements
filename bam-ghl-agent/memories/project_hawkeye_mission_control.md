@@ -190,6 +190,16 @@ scattered autonomy/config entry points. KEEPS: inline drawer suggestion on lead 
   gates since the bounce is intentional). STILL SEND IMMEDIATELY on after-hours
   ✓ (Zoran's call: leave for now): lost-card warm goodbyes (all 3 agents),
   closing enroll-link message, post-trial form first message (+link).
+- PORTAL SEND-GUARD BUG (2026-07-10, caught live by Zoran on GTA): _stage.js
+  contactInRespondedStage's portal branch HARDCODED role "responded", but the
+  helper also guards Confirm (scheduled_trial) + Closing (done_trial) drafts
+  and sends - so on a pipeline_provider='portal' academy EVERY Confirm/Closing
+  approve 409'd "no longer in the ... stage" (store row has stage_role
+  done_trial/scheduled_trial, never responded). FIX: helper takes ctx.role
+  (default "responded"); the 5 Confirm/Closing call sites pass their role.
+  GHL route matches stage id, role-agnostic - non-portal academies unaffected.
+  GOTCHA: despite its name, contactInRespondedStage guards ALL THREE stages -
+  pass ctx.role for anything portal-side that isn't Responded.
 - STILL TO DO: swipe gestures (open decision), GTA prod verification of the whole batch.
 
 ## Open item (ask Zoran before building)

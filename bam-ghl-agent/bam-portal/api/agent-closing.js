@@ -211,7 +211,7 @@ async function threadMessages(token, conversationId) {
 async function draftForContact(token, locationId, clientId, contactId, cfg, opts = {}) {
   const dts = opts.dts || await doneTrialStage(token, locationId, { clientId, sb });
   if (!dts) return { error: "No Done-Trial stage found in the Training Pipeline." };
-  if (!opts.skipStageGuard && !(await contactInRespondedStage(token, locationId, contactId, dts, { clientId, sb }))) {
+  if (!opts.skipStageGuard && !(await contactInRespondedStage(token, locationId, contactId, dts, { clientId, sb, role: "done_trial" }))) {
     return { error: "This lead isn't in the Done-Trial stage — the closing agent only works good-fit attendees." };
   }
   // Twilio academies: read the thread from the own-store (no GHL conversation).
@@ -839,7 +839,7 @@ async function handler(req, res) {
     if (b.action === "approve-plan") {
       if (!b.contact_id || !Array.isArray(b.edits) || !b.edits.length) return res.status(400).json({ error: "contact_id and edits required" });
       const dtsP = await doneTrialStage(token, locationId, { clientId, sb });
-      if (!dtsP || !(await contactInRespondedStage(token, locationId, b.contact_id, dtsP, { clientId, sb }))) {
+      if (!dtsP || !(await contactInRespondedStage(token, locationId, b.contact_id, dtsP, { clientId, sb, role: "done_trial" }))) {
         return res.status(409).json({ error: "This lead is no longer in the Done-Trial stage - not scheduling." });
       }
       let planRows = await sb(`agent_closing_replies?client_id=eq.${clientId}&ghl_contact_id=eq.${encodeURIComponent(b.contact_id)}&status=eq.pending&select=id,step_key,followup_not_before&order=created_at.asc`);
@@ -872,7 +872,7 @@ async function handler(req, res) {
       if (!b.contact_id || !b.reply || !String(b.reply).trim()) return res.status(400).json({ error: "contact_id and reply required" });
       // HARD GUARD: only send to a lead still in the Done-Trial stage.
       const dts = await doneTrialStage(token, locationId, { clientId, sb });
-      if (!dts || !(await contactInRespondedStage(token, locationId, b.contact_id, dts, { clientId, sb }))) {
+      if (!dts || !(await contactInRespondedStage(token, locationId, b.contact_id, dts, { clientId, sb, role: "done_trial" }))) {
         return res.status(409).json({ error: "This lead is no longer in the Done-Trial stage — not sending." });
       }
       // Quiet hours: hold an after-hours approval until morning.

@@ -120,11 +120,17 @@ export async function nurtureStage(token, locationId, ctx = {}) {
 export async function contactInRespondedStage(token, locationId, contactId, rs, ctx = {}) {
   // Portal route: delegate the membership check to the store. Engages only when a
   // ctx { clientId, sb } is threaded in AND the academy is on provider='portal'.
+  // The stage ROLE comes from ctx.role: despite the name, this helper also guards
+  // Confirm (scheduled_trial) and Closing (done_trial) drafts/sends. It used to
+  // hardcode "responded", which made EVERY portal-academy Confirm/Closing send 409
+  // "no longer in the ... stage" (caught live on GTA 2026-07-10). The GHL route
+  // below is role-agnostic (matches the stage id), so only this branch needs it.
   if (ctx && ctx.clientId) {
     let provider = "ghl";
     try { provider = (await pipelineFlags(ctx.clientId)).provider; } catch (_) { provider = "ghl"; }
     if (provider === "portal") {
-      return contactInRole({ clientId: ctx.clientId, sb: ctx.sb, contactId, stage: { ...rs, role: "responded" }, role: "responded" });
+      const role = ctx.role || "responded";
+      return contactInRole({ clientId: ctx.clientId, sb: ctx.sb, contactId, stage: { ...rs, role }, role });
     }
   }
   // GHL route - byte-identical to the pre-seam body.
