@@ -32,7 +32,7 @@ import { readStoreThreadAgent } from "./messaging/read-thread.js";
 import { buildAgentSystem } from "./agent/brain.js";
 import { loadMergedOverrides } from "./agent/_sections.js";
 import { loadContactMemory } from "./agent/contact-memory.js";
-import { nextAppointment, passedTrialContactIds } from "./agent/booking.js";
+import { nextAppointment, passedTrialContactIds, bookingProviderOf } from "./agent/booking.js";
 import {
   scheduledTrialStage, contactInRespondedStage, computeConfirmQueue,
   scheduledTrialContactIdSetCached, peekScheduledTrialIdSet, respondedStage, nurtureStage, toIso,
@@ -523,6 +523,9 @@ async function detectForClient(client) {
     }
   } catch (_) {}
 
+  // Loaded before the flush so a held send at a MUTED lead is canceled, not sent.
+  const mutedSet = await mutedContactIdSet(client.id, "confirm");
+
   // Flush quiet-hours holds (approved confirm cards whose send time arrived).
   let flushed = 0;
   if (withinQuietHours()) {
@@ -533,6 +536,11 @@ async function detectForClient(client) {
         // both gates below: the handoff already bounced this lead out of
         // Scheduled-Trial on purpose - that's the plan, not staleness.
         const handoffAck = row.kind === "confirm_handoff";
+        // Bot muted on this lead after the send was approved: cancel, don't send.
+        if (row.ghl_contact_id && mutedSet.has(String(row.ghl_contact_id))) {
+          await sb(`agent_confirm_replies?id=eq.${row.id}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ status: "canceled", send_error: "bot muted on this lead", updated_at: new Date().toISOString() }) });
+          continue;
+        }
         // Never flush a held confirm at a lead whose trial already ran - "see
         // you Tuesday!" landing on Wednesday. The post-trial form owns them.
         if (!handoffAck && row.ghl_contact_id && passedTrial.has(String(row.ghl_contact_id))) {
@@ -563,7 +571,6 @@ async function detectForClient(client) {
   const cfg = await loadConfig(client.id);
   const autos = getConfirmAutomations(client);
   const scriptedLive = automationsLive(autos);
-  const mutedSet = await mutedContactIdSet(client.id, "confirm");
 
   // ANTI-STARVATION (Zoran 2026-07-09, same root cause as closing): DETECT_CAP
   // sliced a newest-first queue, so once the top DETECT_CAP Scheduled-Trial cards
@@ -618,7 +625,8 @@ async function detectForClient(client) {
       const existing = await sb(`agent_confirm_replies?client_id=eq.${client.id}&ghl_contact_id=eq.${encodeURIComponent(contactId)}&order=created_at.desc&select=id,status,last_lead_at&limit=1`);
       const last = Array.isArray(existing) && existing[0];
       if (last && ["pending", "approved"].includes(last.status)) { skipped++; reasons.push(`${item.name || contactId}: already has a ${last.status} card`); continue; }
-      if (reactive && last && last.last_lead_at && item.last_at && new Date(last.last_lead_at).getTime() === new Date(item.last_at).getTime()) { skipped++; reasons.push(`${item.name || contactId}: already answered this inbound`); continue; }
+      // Skip = snooze (Zoran 2026-07-10): a skipped card re-drafts next run.
+      if (reactive && last && last.status !== "skipped" && last.last_lead_at && item.last_at && new Date(last.last_lead_at).getTime() === new Date(item.last_at).getTime()) { skipped++; reasons.push(`${item.name || contactId}: already answered this inbound`); continue; }
       if (!reactive && last) { skipped++; reasons.push(`${item.name || contactId}: already opened a confirmation`); continue; }
     } catch (e) { reasons.push(`${item.name || contactId}: dedup error — ${e.message}`); }
 
@@ -1073,6 +1081,24 @@ async function handler(req, res) {
           if (rs && oppRef) { await moveStage({ clientId, ghl, token, oppRef, stage: rs, role: "responded", contactId, reason: note.slice(0, 300) }); moved = true; }
         }
       } catch (_) {}
+      // Cancel the DROPPED trial booking (portal spine). Without this the slot
+      // stays BOOKED, and once its start time passes passedTrialContactIds counts
+      // it as a passed-with-no-review trial and spawns a bogus post-trial form
+      // card for a session the lead already told us they'd miss. Best-effort +
+      // portal-only (GHL academies have no trial_bookings row). The rebook creates
+      // a fresh booking; this only voids the one they can't make.
+      try {
+        if ((await bookingProviderOf(clientId)) === "portal") {
+          const nowIso = new Date().toISOString();
+          const bks = await sb(`trial_bookings?tenant_id=eq.${clientId}&ghl_contact_id=eq.${encodeURIComponent(contactId)}&status=eq.BOOKED&select=id,schedule_slots(start_time)&order=created_at.desc`);
+          // Void only the UPCOMING dropped slot(s); never a trial that already ran.
+          for (const t of (Array.isArray(bks) ? bks : [])) {
+            const st = t.schedule_slots && t.schedule_slots.start_time;
+            if (st && st <= nowIso) continue;
+            await sb(`rpc/cancel_trial_booking`, { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ p_tenant_id: clientId, p_trial_booking_id: t.id }) });
+          }
+        }
+      } catch (_) { /* best-effort - the bounce + notes are the parts that must land */ }
       try { if (oppId) await sb(`pipeline_outcomes`, { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify([{ client_id: clientId, opportunity_id: oppId, status: "rebook", reason: note.slice(0, 300) }]) }); } catch (_) {}
       if (b.ready_id && !holdAck) {
         try { await sb(`agent_confirm_replies?id=eq.${encodeURIComponent(b.ready_id)}&client_id=eq.${clientId}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ status: "sent", approved_by: staffEmail, approved_at: new Date().toISOString(), sent_at: new Date().toISOString(), updated_at: new Date().toISOString() }) }); } catch (_) {}

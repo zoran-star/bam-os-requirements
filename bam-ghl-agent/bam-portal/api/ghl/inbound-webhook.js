@@ -213,10 +213,16 @@ async function handler(req, res) {
   try { occurredAt = occurredAtRaw ? new Date(occurredAtRaw).toISOString() : new Date().toISOString(); }
   catch (_) { occurredAt = new Date().toISOString(); }
 
+  // return=representation so a DUPLICATE delivery (same client_id + ghl_message_id)
+  // comes back as 0 rows: GHL retries webhooks, and re-firing the owner/agent
+  // notify SMS on every retry spammed the academy. Only a genuinely NEW row runs
+  // the side-effects below. A missing message id can't dedup, so it's treated as
+  // new (fires once, same as before).
+  let isNewMessage = true;
   try {
-    await sb(`ghl_inbound_messages?on_conflict=client_id,ghl_message_id`, {
+    const ins = await sb(`ghl_inbound_messages?on_conflict=client_id,ghl_message_id`, {
       method: "POST",
-      headers: { Prefer: "resolution=ignore-duplicates,return=minimal" },
+      headers: { Prefer: "resolution=ignore-duplicates,return=representation" },
       body: JSON.stringify([{
         client_id:           client.id,
         ghl_location_id:     String(locationId),
@@ -230,10 +236,14 @@ async function handler(req, res) {
         raw:                 p,
       }]),
     });
+    if (messageId) isNewMessage = Array.isArray(ins) && ins.length > 0;
   } catch (e) {
     console.error("ghl inbound-webhook insert error:", e.message);
     return res.status(200).json({ error: e.message });
   }
+  // A duplicate delivery: the row already exists and every side-effect already
+  // ran on the first delivery. Ack and stop so nothing re-fires.
+  if (!isNewMessage) return res.status(200).json({ ok: true, client_id: client.id, duplicate: true });
 
   // Owner/staff SMS (V1.5/V2, per notification_prefs). Non-fatal. A snippet of
   // the reply so the owner knows someone messaged the academy.

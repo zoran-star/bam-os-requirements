@@ -511,7 +511,10 @@ async function detectForClient(client) {
       const existing = await sb(`agent_ready_replies?client_id=eq.${client.id}&ghl_contact_id=eq.${encodeURIComponent(contactId)}&order=created_at.desc&select=id,status,last_lead_at&limit=1`);
       const last = Array.isArray(existing) && existing[0];
       if (last && ["pending", "approved"].includes(last.status)) { skipped++; reasons.push(`${item.name || contactId}: already has a ${last.status} draft`); continue; }
-      if (last && last.last_lead_at && item.last_at && new Date(last.last_lead_at).getTime() === new Date(item.last_at).getTime()) { skipped++; reasons.push(`${item.name || contactId}: already answered this inbound (timestamp match)`); continue; }
+      // A SKIPPED card no longer suppresses forever (Zoran 2026-07-10): skip = snooze,
+      // so the detector re-drafts this message on its next run (the new pending card
+      // then waits for approval). Only a still-active or already-sent answer blocks.
+      if (last && last.status !== "skipped" && last.last_lead_at && item.last_at && new Date(last.last_lead_at).getTime() === new Date(item.last_at).getTime()) { skipped++; reasons.push(`${item.name || contactId}: already answered this inbound (timestamp match)`); continue; }
     } catch (e) { reasons.push(`${item.name || contactId}: dedup-check error — ${e.message}`); }
 
     let d;

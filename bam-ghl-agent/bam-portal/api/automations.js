@@ -21,6 +21,7 @@ import { nextSessionLabel } from "./_next_session.js";
 import { sendOn } from "./_send.js";
 import { renderEmail } from "./email-shells.js";
 import { withinQuietHours, nextSendableTime } from "./agent/_quiet.js";
+import { isMuted } from "./agent/_mutes.js";
 import { resolveAgentActor } from "./agent/_auth.js";
 import { FORM_INTRO_DEFAULTS } from "./form-intro-automations.js";
 
@@ -366,6 +367,16 @@ async function runWork(res) {
         await finish({ status: "skipped", last_error: "step missing/disabled" });
         await advance(steps, step ? step.position : (enrollment.current_position || 0));
         continue;
+      }
+
+      // Bot muted on this lead (global mute): stop the whole sequence - a spam-
+      // marked lead shouldn't keep getting ghosted/nurture/form-intro drips. Exit
+      // the enrollment so it never re-queues. Agent-specific mutes don't apply
+      // here (automations aren't one agent); a global "mute all bots" does.
+      if (await isMuted(job.client_id, job.contact_id, null)) {
+        await finish({ status: "canceled", last_error: "bot muted on this lead" });
+        try { await sb(`automation_enrollments?id=eq.${job.enrollment_id}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ status: "exited", exited_at: new Date().toISOString(), exit_reason: "bot muted on this lead" }) }); } catch (_) {}
+        canceled++; continue;
       }
 
       // Quiet hours: never send outside the window — defer this job to next morning

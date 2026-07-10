@@ -286,9 +286,20 @@ async function handler(req, res) {
           // store does the shadow mirror internally (replacing the manual shadowMirrorMove).
           await moveStage({ clientId, sb, ghl, token, oppRef, stage, role: "done_trial", contactId });
           result.moved = true;
+        } else {
+          result.move_warning = "could not resolve the Done Trial stage";
         }
       }
-    } catch (e) { console.error("done-trial move failed (non-fatal):", e.message); }
+    } catch (e) {
+      console.error("done-trial move failed:", e.message);
+      // Surface it: the review row already saved (killing the never-expiring form
+      // card), so a silent move failure would strand the good-fit lead in
+      // Scheduled-Trial while the UI cheerfully said "Routed to Done Trial".
+      result.move_warning = e.message;
+    }
+    // move_ok = did the good-fit lead actually reach Done Trial? The deck/board
+    // read this to warn (retry needed) instead of claiming success on a failure.
+    result.move_ok = !!result.moved;
 
     // Write the trainer to the contact's "Lead Sales Person" field (GTA convention).
     if (contactId && trainer && contactProv !== "portal") {
@@ -300,7 +311,6 @@ async function handler(req, res) {
         }
       } catch (e) { console.error("trainer write failed (non-fatal):", e.message); }
     }
-
   }
 
   // Showed up, but NOT a fit -> the dead end. Route the post_trial_not_fit edge
