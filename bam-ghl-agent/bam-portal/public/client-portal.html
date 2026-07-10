@@ -31558,6 +31558,8 @@ async function _ptfSubmit() {
     });
     const json = await _safeJson(r);
     if (!r.ok) throw new Error(json.error || ('HTTP ' + r.status));
+    // Good fit but the stage move failed server-side: don't pretend it worked.
+    if (_PTF_FIT === true && json.move_ok === false) throw new Error('Saved, but the move to Done Trial did not land - retry from the card.');
     if (_PTF_SENDLINK && json.signup_text === 'no_link') { alert('Saved - but no sign-up link is set yet, so nothing was texted. Add it in KPIs → Setup → Offers (or the Blueprint training Sales section).'); }
     _ptfClose();
     closePipelineDrawer();
@@ -32468,7 +32470,7 @@ function _hk2PtfPick(grp, val) {
 }
 function _hk2Render(opts) {
   const host = document.getElementById('pl-hawkeye'); if (!host || !_HK2.q) return;
-  _HK2.edited = false; _HK2.otherOpen = false;
+  _HK2.edited = false; _HK2.touched = false; _HK2.otherOpen = false;
   if (!(opts && opts.keepPtf)) _HK2.ptf = { showed: null, fit: null, link: true, msg: '', notes: '' };
   const tabs = _HK2_AGENTS.map(a => {
     const n = _HK2.q[a].length, on = _HK2.agent === a;
@@ -32526,14 +32528,20 @@ function _hk2SlotLabel(iso) {
   try { return new Date(iso).toLocaleString([], { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }); }
   catch (_) { return String(iso); }
 }
-function _hk2CalChange() { const r = _hk2Top(); if (r) _hk2FillSlots(r); _hk2Edited(); }
-// ANY change away from the agent's guess: flip the confirm label + make the
-// teach-why note mandatory (Zoran 2026-07-08).
-function _hk2Edited() {
-  const t = document.getElementById('hk2-teach'); if (t) t.style.display = '';
-  if (_HK2.edited) return; _HK2.edited = true;
+function _hk2CalChange() { const r = _hk2Top(); if (r) _hk2FillSlots(r); _hk2Edited(true); }
+// A change away from the agent's guess flips the confirm label. A MESSAGE edit
+// also makes the teach-why note mandatory; a SLOT/calendar change does NOT
+// (Zoran 2026-07-10 - picking a different time is logistics, not agent error).
+function _hk2Edited(isSlot) {
   const r = _hk2Top(); if (!r) return;
-  const go = document.getElementById('hk2-go'); if (go) go.textContent = _HK2_KIND[r._kind].goEdit;
+  if (!isSlot && !_HK2.edited) {
+    _HK2.edited = true;
+    const t = document.getElementById('hk2-teach'); if (t) t.style.display = '';
+  }
+  if (!_HK2.touched) {
+    _HK2.touched = true;
+    const go = document.getElementById('hk2-go'); if (go) go.textContent = _HK2_KIND[r._kind].goEdit;
+  }
 }
 function _hk2ToggleOther(btn) {
   const pnl = document.getElementById('hk2-other'); if (pnl) pnl.classList.toggle('open');
@@ -32641,6 +32649,9 @@ function _hk2Confirm() {
       const token = await _mreqAuthToken();
       const res = await fetch('/api/ghl/post-trial?client_id=' + encodeURIComponent(CLIENT_ID), { method: 'POST', headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' }, body: JSON.stringify(ptf) });
       const j = await _safeJson(res); if (!res.ok) throw new Error((j && j.error) || ('HTTP ' + res.status));
+      // A good-fit whose stage move failed server-side (move_ok === false): warn,
+      // don't claim success - the review saved but the lead didn't reach Done Trial.
+      if (ptf.good_fit && j && j.move_ok === false) throw new Error('Saved, but the move to Done Trial did not land - reopen the card and retry.');
       _apxToast(ptf.showed_up === false ? 'No-show logged - Booking drafts the rebook' : ptf.good_fit ? 'Routed to Done Trial - Closing takes over' : 'Closed as not a fit', true);
     } else if (k === 'plan') {
       const edits = planEdits;

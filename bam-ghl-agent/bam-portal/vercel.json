@@ -61,14 +61,6 @@
       "schedule": "*/15 * * * *"
     },
     {
-      "path": "/api/agent-followups?action=detect",
-      "schedule": "*/30 * * * *"
-    },
-    {
-      "path": "/api/agent-followups?action=work",
-      "schedule": "* * * * *"
-    },
-    {
       "path": "/api/agent-confirm?action=detect",
       "schedule": "7,22,37,52 * * * *"
     },

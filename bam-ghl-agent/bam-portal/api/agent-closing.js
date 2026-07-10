@@ -501,11 +501,17 @@ async function detectForClient(client) {
   // Approved follow-up PLAN steps ride this too: they sit 'approved' with
   // send_after staggered 1 day apart, and the flush delivers each when due.
   let flushed = 0;
+  // Loaded before the flush so a held send at a MUTED lead is canceled, not sent.
+  const mutedSet = await mutedContactIdSet(client.id, "closing");
   const _inboundLast = new Set(queue.filter(q => (q.last_direction || "") === "inbound").map(q => q.contact_id));
   if (withinQuietHours()) {
     try {
       const held = await sb(`agent_closing_replies?client_id=eq.${client.id}&status=eq.approved&send_after=lte.${new Date().toISOString()}&select=id,ghl_contact_id,draft_message,step_key&order=send_after.asc&limit=40`);
       for (const row of (Array.isArray(held) ? held : [])) {
+        if (row.ghl_contact_id && mutedSet.has(String(row.ghl_contact_id))) {
+          await sb(`agent_closing_replies?id=eq.${row.id}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ status: "canceled", send_error: "bot muted on this lead", updated_at: new Date().toISOString() }) });
+          continue;
+        }
         if (row.ghl_contact_id && !doneIds.has(row.ghl_contact_id)) {
           await sb(`agent_closing_replies?id=eq.${row.id}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ status: "canceled", send_error: "left Done-Trial stage", updated_at: new Date().toISOString() }) });
           continue;
@@ -527,7 +533,6 @@ async function detectForClient(client) {
   }
 
   const cfg = await loadConfig(client.id);
-  const mutedSet = await mutedContactIdSet(client.id, "closing");
 
   // NEVER STARVE THE BACKLOG (Zoran 2026-07-09): DETECT_CAP used to slice a
   // newest-first queue, so once the top DETECT_CAP Done-Trial cards were carded,
@@ -578,7 +583,14 @@ async function detectForClient(client) {
       // cancel any open closing cards for them.
       try {
         const oppRef = await findOpenOpp(client.id, token, locationId, contactId);
-        if (oppRef) await setStatus({ clientId: client.id, ghl, token, oppRef, status: "won", contactId, reason: "auto: already a paying member" });
+        if (oppRef) {
+          await setStatus({ clientId: client.id, ghl, token, oppRef, status: "won", contactId, reason: "auto: already a paying member" });
+          // Record the win like every other terminal path so it's counted in the
+          // funnel (this auto-won branch previously wrote nothing - wins were
+          // undercounted vs enroll/lost/abandoned which all log an outcome).
+          const oppId = oppRef.ghlOpportunityId || oppRef.id || null;
+          if (oppId) { try { await sb(`pipeline_outcomes`, { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify([{ client_id: client.id, opportunity_id: oppId, status: "won", reason: "auto: already a paying member" }]) }); } catch (_) {} }
+        }
         await clearClosingCards(client.id, contactId, "auto-won: already a paying member");
         skipped++; reasons.push(`${item.name || contactId}: paying member - auto-marked won`);
       } catch (e) { skipped++; reasons.push(`${item.name || contactId}: member auto-won failed - ${e.message}`); }
@@ -640,7 +652,8 @@ async function detectForClient(client) {
       const existing = await sb(`agent_closing_replies?client_id=eq.${client.id}&ghl_contact_id=eq.${encodeURIComponent(contactId)}&order=created_at.desc&select=id,status,last_lead_at&limit=1`);
       const last = Array.isArray(existing) && existing[0];
       if (last && ["pending", "approved"].includes(last.status)) { skipped++; reasons.push(`${item.name || contactId}: already has a ${last.status} card`); continue; }
-      if (reactive && last && last.last_lead_at && item.last_at && new Date(last.last_lead_at).getTime() === new Date(item.last_at).getTime()) { skipped++; reasons.push(`${item.name || contactId}: already answered this inbound`); continue; }
+      // Skip = snooze (Zoran 2026-07-10): a skipped card re-drafts next run.
+      if (reactive && last && last.status !== "skipped" && last.last_lead_at && item.last_at && new Date(last.last_lead_at).getTime() === new Date(item.last_at).getTime()) { skipped++; reasons.push(`${item.name || contactId}: already answered this inbound`); continue; }
       if (!reactive && last) { skipped++; reasons.push(`${item.name || contactId}: already opened a follow-up`); continue; }
     } catch (e) { reasons.push(`${item.name || contactId}: dedup error — ${e.message}`); }
 

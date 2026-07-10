@@ -35,12 +35,18 @@ async function handler(req, res) {
 
   let clients = [];
   try {
-    clients = await sb(`clients?or=(v15_access.eq.true,v2_access.eq.true)&select=id,business_name,ghl_location_id,ghl_access_token,ghl_refresh_token,ghl_token_expires_at,ghl_kpi_config,notification_prefs`);
+    clients = await sb(`clients?or=(v15_access.eq.true,v2_access.eq.true)&select=id,business_name,ghl_location_id,ghl_access_token,ghl_refresh_token,ghl_token_expires_at,ghl_kpi_config,notification_prefs,booking_provider`);
   } catch (e) { return res.status(200).json({ error: e.message }); }
 
   const out = [];
   for (const client of (Array.isArray(clients) ? clients : [])) {
     try {
+      // Portal-booking academies (Zoran 2026-07-10): the never-expiring Hawkeye
+      // post-trial FORM CARD is the "did they show up?" nudge - it sits in the
+      // Confirm deck until filled. This GHL-calendar escalation SMS is the V1.5/
+      // GHL-native path only; skip portal academies so there's no double nagging
+      // (their trials aren't in GHL calendars anyway, so this always no-op'd).
+      if (client.booking_provider === "portal") continue;
       const recips = ((client.notification_prefs || {}).post_trial_escalation) || [];
       if (!recips.length) continue;
       const calIds = (client.ghl_kpi_config || {}).booking_calendar_ids || [];
