@@ -3,16 +3,16 @@ import { withSentryApiRoute } from "./_sentry.js";
 //
 //   POST /api/agent-train { action, ... }   (Supabase bearer)
 //
-// Who can call it: a client_users row that is status='active' AND
-// can_train_agent=true for the target academy (or BAM staff, for testing).
+// Who can call it: a client_users row that is status='active' AND (role='owner'
+// OR can_train_agent=true) for the target academy (or BAM staff, for testing).
 //
 //   "chat"           { messages, client_id?, lead_context? }
 //                      → role-play test. Proposes the agent's next reply (NOT sent).
 //   "teach"          { lesson, client_id? }
-//                      → save an academy lesson (born scope='academy', applies now).
-//                        An AI classifier decides if it is GENERAL sales-craft; if so
-//                        it is flagged promotion_status='pending' for BAM-admin approval
-//                        to spread it to the shared brain. Local facts stay local.
+//                      → save an academy lesson (born scope='academy', applies now,
+//                        promotion_status always 'none'). An AI classifier still runs
+//                        but its verdict is stored ONLY as a promotion_reason hint for
+//                        the /consolidate-lessons skill - there is no approval queue.
 //   "lessons"        { client_id? }            → this academy's lessons (active).
 //   "forget"         { id }                    → deactivate one of this academy's lessons.
 //   "sections"       { client_id? }            → brain sections; only location/offer are editable.
@@ -20,7 +20,8 @@ import { withSentryApiRoute } from "./_sentry.js";
 //   "reset-section"  { key, client_id? }       → revert a LOCAL section to default.
 //
 // ⚠️ LOCAL ONLY. This endpoint can never write a general-layer brain section or a
-// general-scope lesson. Global strategy changes go through the admin approval queue.
+// general-scope lesson. General lessons are created only by /consolidate-lessons;
+// global brain sections go through agent/_sections.js gating.
 
 import { assemblePrompt, SECTIONS, AGENT_SPECS, sectionKeysForAgent } from "./agent/prompt-structure.js";
 import { buildAgentSystem } from "./agent/brain.js";
@@ -51,7 +52,10 @@ async function sb(path, init = {}) {
 }
 
 // bearer → { user, isStaff, grants: [{ id, client_id }] } where grants are the
-// academies this user is allowed to TRAIN (active + can_train_agent).
+// academies this user is allowed to TRAIN (active + owner OR can_train_agent).
+// The grant set MUST match resolveAgentActor in api/agent/_auth.js: owners can
+// work the Hawkeye deck, so their teach-why must save too - a narrower gate here
+// 403'd owner lessons and the fire-and-forget teach callers swallowed the loss.
 async function resolveTrainer(req) {
   const token = (req.headers.authorization || "").replace(/^Bearer\s+/i, "");
   if (!token) throw Object.assign(new Error("no token"), { status: 401 });
@@ -61,7 +65,10 @@ async function resolveTrainer(req) {
   let staff = await sb(`staff?user_id=eq.${user.id}&select=role&limit=1`);
   if ((!staff || !staff[0]) && user.email) staff = await sb(`staff?email=eq.${encodeURIComponent(user.email)}&select=role&limit=1`);
   const isStaff = Array.isArray(staff) && !!staff[0];
-  const rows = await sb(`client_users?user_id=eq.${user.id}&status=eq.active&can_train_agent=is.true&select=id,client_id`);
+  let rows = await sb(`client_users?user_id=eq.${user.id}&status=eq.active&or=(role.eq.owner,can_train_agent.eq.true)&select=id,client_id`);
+  if ((!rows || !rows.length) && user.email) {
+    rows = await sb(`client_users?email=eq.${encodeURIComponent(user.email)}&status=eq.active&or=(role.eq.owner,can_train_agent.eq.true)&select=id,client_id`);
+  }
   const grants = Array.isArray(rows) ? rows : [];
   return { user, isStaff, grants };
 }
@@ -89,8 +96,11 @@ function pickAcademy(ctx, bodyClientId) {
 }
 
 async function activeLessons(clientId, agent = "booking") {
+  // Same shape as the LIVE readers (agent-approvals/confirm/closing + brain.js):
+  // this academy's own lessons + the shared general set, so the Train-tab test
+  // chat previews the same brain that actually sends.
   try {
-    const rows = await sb(`agent_lessons?client_id=eq.${clientId}&agent=eq.${agent}&active=eq.true&select=lesson,kind&order=created_at.asc`);
+    const rows = await sb(`agent_lessons?or=(client_id.eq.${clientId},and(client_id.is.null,scope.eq.general))&agent=eq.${agent}&active=eq.true&select=lesson,kind&order=created_at.asc`);
     return Array.isArray(rows) ? rows : [];
   } catch (_) { return []; }
 }
@@ -234,8 +244,11 @@ async function handler(req, res) {
           lesson: text,
           context: b.context || {},
           scope: "academy",                                   // always born local
-          promotion_status: cls.global ? "pending" : "none",  // AI routes global → admin queue
-          promotion_reason: cls.reason || null,
+          // Promote-to-general is RETIRED (2026-07-10): /consolidate-lessons does the
+          // classification in batch. The per-teach classifier verdict is kept only as
+          // a hint for that skill (promotion_reason), never as a pending queue.
+          promotion_status: "none",
+          promotion_reason: cls.reason ? `${cls.global ? "[general-craft?]" : "[local]"} ${cls.reason}` : null,
           submitted_by_client_user: clientUserId,
           created_by: ctx.user.email || "client-trainer",
         }]),

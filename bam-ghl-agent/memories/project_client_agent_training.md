@@ -2,6 +2,54 @@
 
 Two related changes to the BAM GTA booking agent, both V2/agent-only (zero V1 impact).
 
+## ⭐ TRAINING LOOP AUDIT + PRESET MODEL (2026-07-10, later session)
+Zoran's framing (authoritative): today's agents implement ONLY the **training
+offer + free trial sales system presets**; more presets come later for academies
+that sell differently. So "general" lessons are preset-relative, and every
+academy-specific lesson is ALSO a signal for what BAM must collect from future
+clients at onboarding. Changes shipped:
+- **/consolidate-lessons rewritten**: 4-way routing (brain FACT -> update the 9
+  agent_prompt_sections fact sections, never keep facts as OVERRIDE lessons /
+  academy lesson / general lesson with `context.preset` = free_trial|universal /
+  drop), plus a mandatory **Step 4 intake-gap mining** step: every academy
+  lesson answers "which client fact collected at onboarding would have prevented
+  this?" -> candidates ledger `docs/onboarding-intake-candidates.md` (IC-xxx,
+  rejected-is-final) -> accepted ones become rows in the Notion Onboarding Data
+  Points DB (49be4ce65ada4d45b736070e11452edb).
+- **lessons-io.mjs hardened**: FIXED broken archive (patched a nonexistent
+  updated_at column -> every archive silently failed; verified column absent in
+  prod); dump now requires clientId, exports `context`+`promotion_reason`
+  (ai_drafted/you_sent = classification evidence), separates kind='good' rows,
+  and warns on legacy scope=general+client_id rows (2 exist for GTA, they need
+  reclassification on the next run); apply validates agent enum + em-dash/emoji,
+  scopes archive PATCHes by client, stamps lineage context {source_ids,
+  intake_gap, preset}, counts real archived rows (exit 1 on failure), and writes
+  a plan.applied re-run guard.
+- **Owner teach 403 FIXED**: agent-train resolveTrainer now matches _auth.js
+  (role=owner OR can_train_agent, + email fallback). Before, an academy OWNER
+  editing in Hawkeye had their teach-why silently dropped (fire-and-forget catch
+  swallowed the 403). _hk2Teach/_apxTeach now toast on save failure.
+- **Auto-promote fully retired in code**: agent-train teach always writes
+  promotion_status='none' (classifier verdict kept only as a [local]/[general-
+  craft?] prefix in promotion_reason as a consolidation hint); client copy no
+  longer says "sent to BAM to review".
+- **Preview = live**: agent-train + agent-sandbox activeLessons now use the same
+  or=(client_id.eq.X,and(client_id.is.null,scope.eq.general)) + agent filter as
+  the live readers; sandbox teach now stamps the right `agent`.
+- **Slot-only edits no longer force a teach-why** (hk2 slot select passes
+  isSlot=true, per Zoran's 2026-07-10 rule); teach placeholders now nudge for
+  the missing FACT (price/schedule/capacity).
+- **Rollout checklist**: `docs/agent-academy-rollout.md` = ordered steps to get
+  any academy onto Hawkeye (access -> brain fill with no-GTA-defaults check ->
+  GHL prep -> mode -> verify the lesson loop -> consolidation cadence).
+- Cadence: run /consolidate-lessons at 15+ raw lessons per agent or every 2
+  weeks per live academy.
+- STILL OPEN (deliberately not built): preset column + reader filtering (tag
+  lives in context.preset until preset #2 exists), training-health metrics
+  (lessons per academy, % edited, % edits-with-lesson from agent_approvals),
+  can_train_agent staff toggle UI, V1.5 optional-teach surfaces, GHL-direct
+  replies bypassing the loop.
+
 ## ⭐ LESSON MODEL REVISED (2026-07-10, Zoran) - consolidation skill replaces auto-promote
 The old "AI classifier -> promotion_status=pending -> staff approves -> scope flips
 to general" flow is RETIRED, and the audit-flagged gap ("global scope was just a
