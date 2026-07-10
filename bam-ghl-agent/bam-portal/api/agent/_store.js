@@ -626,8 +626,13 @@ export async function moveStage(opts = {}) {
       updated_at: now,
     };
     if (reason != null) patch.reason = reason;
-    await sbRest(filter, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify(patch) });
-    if (role === "scheduled_trial") await kpiTrialBooked(clientId, oppRef, contactId);
+    // return=representation so a 0-row PATCH (missing/mismatched store row) is
+    // VISIBLE: log the drift and skip the trial-booked KPI - counting a booking
+    // whose card never actually moved corrupted the funnel numbers.
+    const hitRows = await sbRest(filter + "&select=id", { method: "PATCH", headers: { Prefer: "return=representation" }, body: JSON.stringify(patch) });
+    const moved = Array.isArray(hitRows) && hitRows.length > 0;
+    if (!moved) console.error(`[moveStage] portal PATCH matched 0 rows - store drift? client=${clientId} oppRef=${JSON.stringify(oppRef)} role=${role || "?"}`);
+    if (moved && role === "scheduled_trial") await kpiTrialBooked(clientId, oppRef, contactId);
     return oppRef;
   }
 
@@ -668,7 +673,8 @@ export async function setStatus(opts = {}) {
     else if (status === "open") patch.closed_at = null;   // reopen
     if (role != null) patch.stage_role = role;
     if (reason != null) patch.reason = reason;
-    await sbRest(filter, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify(patch) });
+    const hitRows = await sbRest(filter + "&select=id", { method: "PATCH", headers: { Prefer: "return=representation" }, body: JSON.stringify(patch) });
+    if (!Array.isArray(hitRows) || !hitRows.length) console.error(`[setStatus] portal PATCH matched 0 rows - store drift? client=${clientId} oppRef=${JSON.stringify(oppRef)} status=${status}`);
     return oppRef;
   }
 

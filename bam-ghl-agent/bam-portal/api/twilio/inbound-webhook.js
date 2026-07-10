@@ -14,7 +14,7 @@ import { withSentryApiRoute } from "../_sentry.js";
 import crypto from "node:crypto";
 import { pickGhlToken, sendSms, ghl } from "../ghl/_core.js";
 import { notifyOwners } from "../_notify-owners.js";
-import { respondedStage, contactInRespondedStage, interestedStage, nurtureStage } from "../agent/_stage.js";
+import { respondedStage, contactInRespondedStage, interestedStage, nurtureStage, isRealInbound } from "../agent/_stage.js";
 import { moveStage, pipelineFlags } from "../agent/_store.js";
 import { agentMode, modeIsOn } from "../agent/_mode.js";
 import { exitEnrollment } from "../automations.js";
@@ -103,6 +103,11 @@ async function handler(req, res) {
   // carrier level; we just record and skip the "wake the agent" side-effects.
   const norm = bodyText.trim().toLowerCase().replace(/\s+/g, " ");
   if (STOP_WORDS.has(norm) || START_WORDS.has(norm)) return xmlOk(res);
+
+  // 'Liked' tapback rule (Zoran 2026-07-09, parity with the GHL webhook): a
+  // tapback is stored above but NEVER wakes an agent, cancels approved cards,
+  // exits an automation, or bounces a Ghosted/Nurture lead.
+  if (!isRealInbound(bodyText)) return xmlOk(res);
 
   if (!client) return xmlOk(res);
 

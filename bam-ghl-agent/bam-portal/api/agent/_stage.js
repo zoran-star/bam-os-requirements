@@ -153,9 +153,10 @@ export function toIso(v) {
 
 // The queue for one academy: Responded-stage contacts whose last message is inbound.
 // Optional trailing ctx { clientId, sb } routes the opp-MEMBERSHIP half (which
-// contacts sit in the Responded stage) through the portal store on provider='portal';
-// the /conversations/search last-message join is LEFT AS-IS (messaging is a separate
-// effort). With no ctx (every caller today) this is byte-identical to before.
+// contacts sit in the Responded stage) through the portal store on provider='portal',
+// and the last-message join folds in portal SMS recency (overlayPortalSmsRecency)
+// so Twilio-academy replies surface here just like confirm/closing. With no ctx
+// the overlay no-ops and this is byte-identical to before.
 export async function computeQueue(token, locationId, ctx = {}) {
   const rs = await respondedStage(token, locationId, ctx);
   if (!rs) return { rs: null, queue: [] };
@@ -168,9 +169,29 @@ export async function computeQueue(token, locationId, ctx = {}) {
   }
   const cd = await ghl("GET", `/conversations/search?${new URLSearchParams({ locationId, limit: "100" })}`, { token });
   const convos = cd.conversations || cd.data || [];
-  const queue = convos
-    .filter(c => respondedContactIds.has(c.contactId) && String(c.lastMessageDirection || "").toLowerCase() === "inbound" && isRealInbound(c.lastMessageBody))
-    .map(c => ({ contact_id: c.contactId, conversation_id: c.id, name: c.fullName || c.contactName || "Unknown", last_message: c.lastMessageBody || "", last_at: toIso(c.lastMessageDate || c.dateUpdated) }))
+  // Map ALL Responded conversations first (direction tagged, tapback-safe), then
+  // fold in the portal's own SMS recency BEFORE the inbound-only gate. On a
+  // Twilio academy GHL's conversation data freezes at the cutover: a lead who
+  // replies via Twilio either has NO GHL conversation or a frozen outbound-last
+  // one, so the old pre-filtered queue never saw them and the Booking agent
+  // never drafted a reply (caught on GTA 2026-07-10). Pure-GHL academies are
+  // unchanged: the overlay only wins when strictly newer, and the post-overlay
+  // inbound filter reproduces the old result exactly.
+  let queue = convos
+    .filter(c => respondedContactIds.has(c.contactId))
+    .map(c => {
+      const dir = String(c.lastMessageDirection || "").toLowerCase();
+      return {
+        contact_id: c.contactId, conversation_id: c.id,
+        name: c.fullName || c.contactName || "Unknown",
+        last_message: c.lastMessageBody || "",
+        last_direction: (dir === "inbound" && !isRealInbound(c.lastMessageBody)) ? "tapback" : dir,
+        last_at: toIso(c.lastMessageDate || c.dateUpdated),
+      };
+    });
+  await overlayPortalSmsRecency(queue, respondedContactIds, ctx);
+  queue = queue
+    .filter(q => q.last_direction === "inbound")
     .sort((a, b) => new Date(b.last_at || 0) - new Date(a.last_at || 0));
   return { rs, queue, respondedIds: respondedContactIds };
 }
@@ -237,11 +258,16 @@ export async function respondedContactIdSetCached(token, locationId, ttlMs = 600
 export async function computeConfirmQueue(token, locationId, ctx = {}) {
   const sts = await scheduledTrialStage(token, locationId, ctx);
   if (!sts) return { sts: null, queue: [] };
+  // idsTrusted: false when the stage-membership fetch FAILED (as opposed to a
+  // genuinely empty stage). Callers must not treat a failed fetch's empty set
+  // as "every lead left the stage" - the confirm detector's prune once mass-
+  // canceled every pending card on a transient GHL blip because of exactly that.
+  let idsTrusted = true;
   let ids = await portalStageContactIds(sts, "scheduled_trial", ctx);
   if (ids === null) {
     const oppParams = new URLSearchParams({ location_id: locationId, pipeline_id: sts.pipelineId, pipeline_stage_id: sts.stageId, limit: "100" });
     let opps = [];
-    try { const od = await ghl("GET", `/opportunities/search?${oppParams}`, { token }); opps = od.opportunities || od.data || []; } catch (_) {}
+    try { const od = await ghl("GET", `/opportunities/search?${oppParams}`, { token }); opps = od.opportunities || od.data || []; } catch (_) { idsTrusted = false; }
     ids = openOppContactIds(opps);
   }
   const cd = await ghl("GET", `/conversations/search?${new URLSearchParams({ locationId, limit: "100" })}`, { token });
@@ -275,7 +301,7 @@ export async function computeConfirmQueue(token, locationId, ctx = {}) {
   for (const id of ids) {
     if (!_inQueue.has(id)) queue.push({ contact_id: id, conversation_id: null, name: null, last_message: "", last_direction: "", last_at: null });
   }
-  return { sts, queue, scheduledIds: ids };
+  return { sts, queue, scheduledIds: ids, idsTrusted };
 }
 
 // Throws on GHL failure (callers fail open), null when there's no Scheduled-Trial

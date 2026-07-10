@@ -212,7 +212,7 @@ async function draftForContact(token, locationId, clientId, contactId, cfg, opts
   const dts = opts.dts || await doneTrialStage(token, locationId, { clientId, sb });
   if (!dts) return { error: "No Done-Trial stage found in the Training Pipeline." };
   if (!opts.skipStageGuard && !(await contactInRespondedStage(token, locationId, contactId, dts, { clientId, sb, role: "done_trial" }))) {
-    return { error: "This lead isn't in the Done-Trial stage — the closing agent only works good-fit attendees." };
+    return { error: "This lead isn't in the Done-Trial stage - the closing agent only works good-fit attendees." };
   }
   // Twilio academies: read the thread from the own-store (no GHL conversation).
   // conversationId MUST live at function scope: the returns below reference it,
@@ -587,11 +587,20 @@ async function detectForClient(client) {
 
     const reactive = item.last_direction === "inbound";
     if (reactive) {
-      // A reply cancels whatever plan was scheduled - the agent answers the
-      // conversation as it actually is, then re-plans once it goes quiet again.
+      // A reply cancels whatever plan was scheduled AND any stale reply/enroll/
+      // lost card drafted for an OLDER inbound: those made the dedup below skip
+      // this lead every run, so the fresh message never got an answer and the
+      // DETECT_CAP slot was burned for nothing. The card already drafted for
+      // THIS inbound (same last_lead_at) survives, so re-runs don't churn it.
       try {
-        await sb(`agent_closing_replies?client_id=eq.${client.id}&ghl_contact_id=eq.${encodeURIComponent(contactId)}&status=in.(pending,approved)&step_key=like.followup*`,
-          { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ status: "canceled", send_error: "lead replied - plan canceled", updated_at: new Date().toISOString() }) });
+        const live = await sb(`agent_closing_replies?client_id=eq.${client.id}&ghl_contact_id=eq.${encodeURIComponent(contactId)}&status=in.(pending,approved)&select=id,step_key,last_lead_at`);
+        const inbMs = item.last_at ? new Date(item.last_at).getTime() : null;
+        for (const row of (Array.isArray(live) ? live : [])) {
+          const isPlan = String(row.step_key || "").startsWith("followup");
+          const sameInbound = row.last_lead_at && inbMs != null && new Date(row.last_lead_at).getTime() === inbMs;
+          if (!isPlan && sameInbound) continue;   // already drafted for THIS message
+          await sb(`agent_closing_replies?id=eq.${row.id}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ status: "canceled", send_error: isPlan ? "lead replied - plan canceled" : "lead replied - re-drafting", updated_at: new Date().toISOString() }) });
+        }
       } catch (_) {}
     }
 
@@ -689,8 +698,10 @@ async function detectForClient(client) {
       if (d.escalate) {
         escalated++;
         try {
+          // draft_message stays EMPTY: the card explains itself via
+          // escalate_reason, and an empty draft can't be one-tap texted.
           await sb(`agent_closing_replies`, { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify([{
-            ...baseRow, kind: "closing", draft_message: "(agent escalated — needs a human)",
+            ...baseRow, kind: "closing", draft_message: "",
             escalate: true, escalate_reason: d.escalate_reason || null, status: "pending", created_by: "detector",
           }]) });
         } catch (_) {}
@@ -710,7 +721,7 @@ async function detectForClient(client) {
       } catch (e) { skipped++; reasons.push(`${item.name || contactId}: defer-insert failed — ${e.message}`); }
     } else if (auto) {
       try {
-        await sendReplyViaGhl(token, contactId, d.reply);
+        await sendReplyViaGhl(token, contactId, d.reply, client.id);
         await sb(`agent_closing_replies`, { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify([{
           ...baseRow, kind: "closing", draft_message: d.reply, status: "sent", auto_sent: true, sent_at: new Date().toISOString(), created_by: "self-drive",
         }]) });
@@ -870,10 +881,15 @@ async function handler(req, res) {
 
     if (b.action === "send") {
       if (!b.contact_id || !b.reply || !String(b.reply).trim()) return res.status(400).json({ error: "contact_id and reply required" });
+      // Never text an internal note at a parent (legacy escalation rows seeded a
+      // sendable "(agent escalated ...)" placeholder as the draft).
+      if (/^\((agent escalated|post-trial review needed)/i.test(String(b.reply).trim())) {
+        return res.status(400).json({ error: "That's an internal note, not a message - write the reply you want to send." });
+      }
       // HARD GUARD: only send to a lead still in the Done-Trial stage.
       const dts = await doneTrialStage(token, locationId, { clientId, sb });
       if (!dts || !(await contactInRespondedStage(token, locationId, b.contact_id, dts, { clientId, sb, role: "done_trial" }))) {
-        return res.status(409).json({ error: "This lead is no longer in the Done-Trial stage — not sending." });
+        return res.status(409).json({ error: "This lead is no longer in the Done-Trial stage - not sending." });
       }
       // Quiet hours: hold an after-hours approval until morning.
       if (!withinQuietHours()) {
@@ -920,6 +936,17 @@ async function handler(req, res) {
         contactId = row.ghl_contact_id;
       }
       if (!contactId) return res.status(400).json({ error: "ready_id or contact_id required" });
+      // HARD GUARD (mirrors "send"): only enroll a lead still in the Done-Trial
+      // stage, and never re-pitch a paying member (the won-mark can be skipped -
+      // same case as the detector's O6 guard). A stale enroll card must not text
+      // a sign-up link at someone who already left the stage or already pays.
+      const dtsE = await doneTrialStage(token, locationId, { clientId, sb });
+      if (!dtsE || !(await contactInRespondedStage(token, locationId, contactId, dtsE, { clientId, sb, role: "done_trial" }))) {
+        return res.status(409).json({ error: "This lead is no longer in the Done-Trial stage - not sending the link." });
+      }
+      if (await isLiveMember(clientId, contactId, token)) {
+        return res.status(409).json({ error: "This lead is already a paying member - no sign-up link needed." });
+      }
       // Resolve the sign-up link (with tracking params). The opp status does NOT
       // change here - the enroll flow's webhook owns the win on real payment.
       const { signupUrl, enrollUrl, oppId } = await buildEnrollUrl(clientId, token, locationId, contactId);
@@ -938,7 +965,7 @@ async function handler(req, res) {
       try {
         await sb(`agent_contact_notes`, { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify([{
           client_id: clientId, ghl_contact_id: String(contactId), active: true,
-          note: `Enrollment link sent (closing agent)${note ? ` — ${note}` : ""}. Awaiting payment: the enroll flow creates the member + marks this won when they pay.`,
+          note: `Enrollment link sent (closing agent)${note ? ` - ${note}` : ""}. Awaiting payment: the enroll flow creates the member + marks this won when they pay.`,
           created_by: staffEmail || "closing-agent",
         }]) });
       } catch (_) {}
@@ -963,7 +990,7 @@ async function handler(req, res) {
       let oppId = null, oppRef = null;
       try { oppRef = await findOpenOpp(clientId, token, locationId, contactId); oppId = oppRef && (oppRef.ghlOpportunityId || oppRef.id) || null; }
       catch (e) { return res.status(e.status || 502).json({ error: `find opp: ${e.message}` }); }
-      if (!oppRef) return res.status(200).json({ error: "No opportunity found for this contact — nothing to mark lost." });
+      if (!oppRef) return res.status(200).json({ error: "No opportunity found for this contact - nothing to mark lost." });
       const closing = (typeof b.reply === "string" ? b.reply : (row ? row.draft_message : "")) || "";
       if (closing.trim()) { try { await sendReplyViaGhl(token, contactId, closing.trim(), clientId); } catch (_) {} }
       const reason = (b.lost_reason || (row && row.lost_reason) || "").toString().trim() || null;

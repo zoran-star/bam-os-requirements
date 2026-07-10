@@ -258,14 +258,18 @@ async function draftForContact(token, locationId, clientId, contactId, cfg, opts
   const rs = opts.rs || await respondedStage(token, locationId, { clientId, sb });
   if (!rs) return { error: "No Responded stage found in the Training Pipeline." };
   if (!opts.skipStageGuard && !(await contactInRespondedStage(token, locationId, contactId, rs, { clientId, sb }))) {
-    return { error: "This lead isn't in the Responded stage — the bot only replies to Responded-stage leads." };
+    return { error: "This lead isn't in the Responded stage - the bot only replies to Responded-stage leads." };
   }
   // Twilio academies: read the thread from the own-store (no GHL conversation).
+  // conversationId MUST live at function scope: the return below references it,
+  // and the Twilio branch never declared it - every AI draft on a Twilio academy
+  // crashed with "conversationId is not defined" (same bug as agent-confirm and
+  // agent-closing, fixed there in #1074 but missed here).
+  let conversationId = opts.conversationId || null;
   let messages;
   if ((await smsProvider(clientId)) === "twilio") {
     messages = await readStoreThreadAgent(clientId, contactId);
   } else {
-    let conversationId = opts.conversationId;
     if (!conversationId) {
       const convo = await findConversation(token, locationId, contactId);
       if (!convo) return { error: "no conversation for contact" };
@@ -449,16 +453,26 @@ async function detectForClient(client) {
   } catch (_) {}
 
   const cfg = await loadConfig(client.id);
-  let drafted = 0, autoSent = 0, skipped = 0, escalated = 0, lostProposed = 0, deferred = 0, flushed = 0;
+  let drafted = 0, autoSent = 0, skipped = 0, escalated = 0, lostProposed = 0, deferred = 0, flushed = 0, escalationCards = 0;
   const reasons = [];   // diagnostic: why each contact was skipped
+  const mutedSet = await mutedContactIdSet(client.id, "booking");
 
   // Flush held replies: drafts parked during quiet hours (8:00am-9:30pm) whose
   // send time has now arrived. Only inside the window; only if the lead is STILL in
-  // Responded (else cancel — they booked/moved/lost while we waited).
+  // Responded (else cancel — they booked/moved/lost while we waited), not muted,
+  // and their trial hasn't run in the meantime (post-trial form owns them then).
   if (withinQuietHours()) {
     try {
-      const held = await sb(`agent_ready_replies?client_id=eq.${client.id}&status=eq.approved&send_after=lte.${new Date().toISOString()}&select=id,ghl_contact_id,draft_message&order=send_after.asc&limit=40`);
+      const held = await sb(`agent_ready_replies?client_id=eq.${client.id}&status=eq.approved&send_after=lte.${new Date().toISOString()}&select=id,ghl_contact_id,draft_message,approved_by&order=send_after.asc&limit=40`);
       for (const row of (Array.isArray(held) ? held : [])) {
+        if (row.ghl_contact_id && passedTrial.has(String(row.ghl_contact_id))) {
+          await sb(`agent_ready_replies?id=eq.${row.id}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ status: "canceled", send_error: "trial ran - handed to post-trial form", updated_at: new Date().toISOString() }) });
+          continue;
+        }
+        if (row.ghl_contact_id && mutedSet.has(String(row.ghl_contact_id))) {
+          await sb(`agent_ready_replies?id=eq.${row.id}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ status: "canceled", send_error: "bot muted on this lead", updated_at: new Date().toISOString() }) });
+          continue;
+        }
         if (row.ghl_contact_id && !respondedIds.has(row.ghl_contact_id)) {
           await sb(`agent_ready_replies?id=eq.${row.id}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ status: "canceled", send_error: "left Responded stage", updated_at: new Date().toISOString() }) });
           continue;
@@ -466,7 +480,9 @@ async function detectForClient(client) {
         if (!row.draft_message || !String(row.draft_message).trim()) continue;
         try {
           await sendReplyViaGhl(token, row.ghl_contact_id, row.draft_message, client.id);
-          await sb(`agent_ready_replies?id=eq.${row.id}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ status: "sent", auto_sent: true, sent_at: new Date().toISOString(), updated_at: new Date().toISOString() }) });
+          // auto_sent marks SELF-DRIVE sends; a human-approved row parked after
+          // hours (approved_by set) keeps its human attribution when it flushes.
+          await sb(`agent_ready_replies?id=eq.${row.id}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ status: "sent", auto_sent: !row.approved_by, sent_at: new Date().toISOString(), updated_at: new Date().toISOString() }) });
           flushed++;
         } catch (e) { reasons.push(`flush ${row.ghl_contact_id}: send failed — ${e.message}`); }
       }
@@ -475,7 +491,6 @@ async function detectForClient(client) {
 
   // Cap how many contacts we draft per run so a big Responded queue can't burst
   // GHL's rate limit (each draft hits GHL for the thread + Claude).
-  const mutedSet = await mutedContactIdSet(client.id, "booking");
   let _first = true;
   for (const item of queue.slice(0, DETECT_CAP)) {
     if (!_first) await new Promise(r => setTimeout(r, 300));  // smooth GHL bursts
@@ -542,16 +557,19 @@ async function detectForClient(client) {
 
     if (d.error || !d.reply || !String(d.reply).trim()) {
       if (d.escalate) escalated++; else { skipped++; reasons.push(`${item.name || contactId}: ${d.error || "agent returned empty reply"}`); }
-      // Still queue an escalation so a human sees it (no message to auto-send).
+      // Still queue an escalation so a human sees it. draft_message stays EMPTY:
+      // the card explains itself via escalate_reason, and an empty draft can't be
+      // one-tap texted to the parent (a "(agent escalated ...)" placeholder was).
       if (d.escalate) {
         try {
           await sb(`agent_ready_replies`, { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify([{
             client_id: client.id, ghl_contact_id: String(contactId), ghl_conversation_id: d.conversation_id || null,
-            contact_name: item.name || null, draft_message: "(agent escalated — needs a human)", reasoning: d.reasoning || null,
+            contact_name: item.name || null, draft_message: "", reasoning: d.reasoning || null,
             confidence: d.confidence, escalate: true, escalate_reason: d.escalate_reason || null,
             last_message: d.last_message || null, last_outbound: d.last_outbound || null, summary: d.summary || null, thread_tail: d.thread_tail || null,
             last_lead_at: item.last_at || null, status: "pending", created_by: "detector",
           }]) });
+          escalationCards++;
         } catch (_) {}
       }
       continue;
@@ -725,7 +743,7 @@ async function detectForClient(client) {
     }
   } catch (e) { reasons.push(`rebook pass: ${e.message}`); }
 
-  return { client_id: client.id, business: client.business_name, mode, queued: queue.length, drafted, openers, rebook_openers: rebookOpeners, auto_sent: autoSent, deferred, flushed, escalated, lost_proposed: lostProposed, skipped, pruned, reasons };
+  return { client_id: client.id, business: client.business_name, mode, queued: queue.length, drafted, openers, rebook_openers: rebookOpeners, auto_sent: autoSent, deferred, flushed, escalated, escalation_cards: escalationCards, lost_proposed: lostProposed, skipped, pruned, reasons };
 }
 
 async function runDetect(res, onlyClientId) {
@@ -740,8 +758,11 @@ async function runDetect(res, onlyClientId) {
     try {
       const r = await detectForClient(client);
       out.push(r);
-      // New drafts landed in Hawkeye this run -> one push per client per run.
-      const fresh = (r.drafted || 0) + (r.lost_proposed || 0);
+      // New cards landed in Hawkeye this run -> one push per client per run.
+      // Count EVERY card kind the detector can queue: replies/books, lost
+      // proposals, escalations, and the opener/rebook-opener passes (these
+      // queued silently before, so staff got no push for them).
+      const fresh = (r.drafted || 0) + (r.lost_proposed || 0) + (r.escalation_cards || 0) + (r.openers || 0) + (r.rebook_openers || 0);
       if (fresh > 0) notifyClientPush(client.id, "hawkeye-ready", { count: fresh }).catch(() => {});
     }
     catch (e) { out.push({ client_id: client.id, error: e.message }); }
@@ -908,10 +929,15 @@ async function handler(req, res) {
 
     if (b.action === "send") {
       if (!b.contact_id || !b.reply || !String(b.reply).trim()) return res.status(400).json({ error: "contact_id and reply required" });
+      // Never text an internal note at a parent (legacy escalation rows seeded a
+      // sendable "(agent escalated ...)" placeholder as the draft).
+      if (/^\((agent escalated|post-trial review needed)/i.test(String(b.reply).trim())) {
+        return res.status(400).json({ error: "That's an internal note, not a message - write the reply you want to send." });
+      }
       // HARD GUARD: refuse to send unless the lead is still in the Responded stage.
       const rsSend = await respondedStage(token, locationId, { clientId, sb });
       if (!rsSend || !(await contactInRespondedStage(token, locationId, b.contact_id, rsSend, { clientId, sb }))) {
-        return res.status(409).json({ error: "This lead is no longer in the Responded stage — not sending." });
+        return res.status(409).json({ error: "This lead is no longer in the Responded stage - not sending." });
       }
       // QUIET HOURS: a human approved this after 9:30pm / before 8am. Don't text the
       // parent now — hold the approved reply and let the detect cron flush it at 8am.
@@ -928,7 +954,33 @@ async function handler(req, res) {
           if (b.ready_id) await sb(`agent_ready_replies?id=eq.${encodeURIComponent(b.ready_id)}&client_id=eq.${clientId}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify(held) });
           else await sb(`agent_ready_replies`, { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify([{ ...held, created_by: staffEmail }]) });
         } catch (e) { return res.status(500).json({ error: `couldn't schedule: ${e.message}` }); }
-        return res.status(200).json({ ok: true, sent: false, deferred: true, send_after: sendAfter });
+        // A parked approval is still a human decision: save the lesson and log it
+        // (status 'scheduled') so after-hours approvals don't vanish from the
+        // audit trail and the teach-why isn't lost with them.
+        let heldLessonId = null;
+        if (b.lesson && String(b.lesson).trim()) {
+          try {
+            const [lrow] = await sb(`agent_lessons`, {
+              method: "POST", headers: { Prefer: "return=representation" },
+              body: JSON.stringify([{ client_id: clientId, kind: "fix", scope: "academy", lesson: String(b.lesson).trim(), created_by: staffEmail, context: { contact_id: b.contact_id, suggested: b.suggested_reply || null, sent: b.reply } }]),
+            });
+            heldLessonId = lrow?.id || null;
+          } catch (_) {}
+        }
+        try {
+          await sb(`agent_approvals`, {
+            method: "POST", headers: { Prefer: "return=minimal" },
+            body: JSON.stringify([{
+              client_id: clientId, ghl_contact_id: b.contact_id, ghl_conversation_id: b.conversation_id || null,
+              contact_name: b.contact_name || null, suggested_reply: b.suggested_reply || null, final_reply: b.reply,
+              reasoning: b.reasoning || null, confidence: typeof b.confidence === "number" ? b.confidence : null,
+              reply_count: typeof b.reply_count === "number" ? b.reply_count : null,
+              booking_asks: typeof b.booking_asks === "number" ? b.booking_asks : null,
+              adjusted: !!b.adjusted, status: "scheduled", lesson_id: heldLessonId, created_by: staffEmail,
+            }]),
+          });
+        } catch (_) {}
+        return res.status(200).json({ ok: true, sent: false, deferred: true, send_after: sendAfter, lesson_id: heldLessonId });
       }
       // Send (human-approved) - Twilio academy via own number, else GHL.
       try {
@@ -986,7 +1038,7 @@ async function handler(req, res) {
       let oppId = null, oppRef = null;
       try { oppRef = await findOpenOpp({ clientId, ghl, token, locationId, contactId }); oppId = oppRef && (oppRef.ghlOpportunityId || oppRef.id) || null; }
       catch (e) { return res.status(e.status || 502).json({ error: `find opp: ${e.message}` }); }
-      if (!oppRef) return res.status(200).json({ error: "No opportunity found for this contact — nothing to mark lost." });
+      if (!oppRef) return res.status(200).json({ error: "No opportunity found for this contact - nothing to mark lost." });
       // Send a closing message only if one was explicitly provided.
       const closing = (typeof b.reply === "string" ? b.reply : (row ? row.draft_message : "")) || "";
       if (closing.trim()) { try { await sendReplyViaGhl(token, contactId, closing.trim(), clientId); } catch (_) {} }
@@ -1048,7 +1100,7 @@ async function handler(req, res) {
       let oppId = null, oppRef = null;
       try { oppRef = await findOpenOpp({ clientId, ghl, token, locationId, contactId }); oppId = oppRef && (oppRef.ghlOpportunityId || oppRef.id) || null; }
       catch (e) { return res.status(e.status || 502).json({ error: `find opp: ${e.message}` }); }
-      if (!oppRef) return res.status(200).json({ error: "No opportunity found for this contact — nothing to abandon." });
+      if (!oppRef) return res.status(200).json({ error: "No opportunity found for this contact - nothing to abandon." });
       const reason = (b.reason || (row && row.lost_reason) || "").toString().trim() || null;
       try {
         await setStatus({ clientId, ghl, token, oppRef, status: "abandoned", role: "unqualified", contactId, reason });

@@ -30645,6 +30645,10 @@ let _PL_AGENT_MODE = null;   // 'off' | 'hawkeye' | 'self_drive' | null(unknown)
 // ('reply' | 'ghost' | 'mark_lost' | 'book'). Drives the per-card badge: any
 // pending card → Needs action (labelled by kind); none → All good.
 let _PL_NEEDS = null;
+// Contacts with an APPROVED (after-hours parked) send waiting for the 8am flush.
+// Not "needs you" (staff already acted), but the system owns them - the stuck-
+// list safety net must not flag these leads as "not flowing".
+let _PL_HELD = null;
 // If one lead somehow has more than one pending card, show the most decisive one.
 const _PL_NEED_PRIO = { book: 4, mark_lost: 3, reply: 2, ghost: 1 };
 async function _plLoadNeedsAction() {
@@ -30656,16 +30660,25 @@ async function _plLoadNeedsAction() {
       _plIsV2() ? _apxPost('/api/agent-confirm', 'list-ready', {}).catch(() => ({})) : Promise.resolve({}),
       _plIsV2() ? _apxPost('/api/agent-closing', 'list-ready', {}).catch(() => ({})) : Promise.resolve({}),
     ]);
-    const map = new Map();
+    // PENDING rows = a card the deck will actually show ("N need you" must match
+    // the deck exactly - counting approved rows sent staff to an All-clear deck).
+    // APPROVED rows = after-hours parked sends (incl. held handoff acks): the
+    // system owns those leads, so they go in _PL_HELD to keep the stuck-list
+    // safety net from flagging them, but they never count as "need you".
+    const map = new Map(), heldSet = new Set();
     const add = (rows) => {
       for (const r of (rows || [])) {
-        if ((r.status !== 'pending' && r.status !== 'approved') || !r.ghl_contact_id) continue;
-        const id = String(r.ghl_contact_id), k = r.kind || 'reply', cur = map.get(id);
+        if (!r.ghl_contact_id) continue;
+        const id = String(r.ghl_contact_id);
+        if (r.status === 'approved') { heldSet.add(id); continue; }
+        if (r.status !== 'pending') continue;
+        const k = r.kind || 'reply', cur = map.get(id);
         if (!cur || (_PL_NEED_PRIO[k] || 0) > (_PL_NEED_PRIO[cur] || 0)) map.set(id, k);
       }
     };
     add(j.ready); add(jc.ready); add(jl.ready);
     _PL_NEEDS = map;
+    _PL_HELD = heldSet;
   } catch (e) {
     // Permission denied → this viewer can't read agent status; hide the badges
     // entirely (don't paint everything green). Transient error → keep prior.
@@ -31408,7 +31421,7 @@ function _plPostTrialForm(oppId) {
         <textarea id="ptf-notes" class="ptf-input" rows="3" placeholder="Anything worth noting about this trial…"></textarea>
       </div>
       <div class="ptf-err" id="ptf-err"></div>
-      <div class="ptf-note">On a good fit the card moves to Done Trial. A no-show moves to Interested and fires the missed-trial automation. Your "first message" is texted to the parent; with the sign-up link on, the link is added at the bottom - set the link in KPIs → Setup → Offers (or the Blueprint training Sales section).</div>
+      <div class="ptf-note">On a good fit the card moves to Done Trial and the Closing agent takes over. A no-show goes back to Booking for a rebook. Not a fit closes as unqualified. Your "first message" is texted to the parent; with the sign-up link on, the link is added at the bottom - set the link in KPIs → Setup → Offers (or the Blueprint training Sales section).</div>
       <button class="ptf-submit" id="ptf-submit" onclick="_ptfSubmit()">Submit post trial form</button>
     </div>`;
   ov.classList.add('open');
@@ -32231,6 +32244,10 @@ function _hk2Open(agent, contactId) {
 }
 async function _hk2Refresh() {
   const host = document.getElementById('pl-hawkeye'); if (!host) return;
+  // Commit any action still riding the 6s undo BEFORE reloading: list-ready
+  // still returns that row as pending, so a refresh mid-window resurrected the
+  // just-resolved card (and undo then re-added a duplicate object).
+  try { if (typeof _HAWK_PENDING !== 'undefined' && _HAWK_PENDING) await _hawkFlush(); } catch (_) {}
   if (!_HK2.q) host.innerHTML = '<div class="hk2-load"><span class="req-spin"></span> Loading Hawkeye…</div>';
   try { _HK2.q = await _hk2Load(); }
   catch (e) { host.innerHTML = `<div class="hk2-load">Couldn't load - ${escapeHTML(_apxErr(e))}</div>`; return; }
@@ -32522,10 +32539,13 @@ function _hk2ToggleOther(btn) {
   const pnl = document.getElementById('hk2-other'); if (pnl) pnl.classList.toggle('open');
   if (btn) btn.classList.toggle('on');
 }
-async function _hk2Teach(r, lesson, before, after) {
+async function _hk2Teach(r, lesson, before, after, agent) {
   if (!lesson) return;
   try {
-    await _apxPost('/api/agent-train', 'teach', { agent: _HK2.agent, lesson, kind: 'fix', context: { source: 'hawkeye-deck', contact: r.contact_name || null, ai_drafted: before || null, you_sent: after || null } });
+    // agent = the CARD's tab captured at click time. Reading _HK2.agent here
+    // instead saved lessons to the WRONG agent whenever the deck auto-jumped
+    // tabs (resolve fires at 480ms, this call up to 6s later on the undo flush).
+    await _apxPost('/api/agent-train', 'teach', { agent: agent || _HK2.agent, lesson, kind: 'fix', context: { source: 'hawkeye-deck', contact: r.contact_name || null, ai_drafted: before || null, you_sent: after || null } });
   } catch (_) { /* the action already landed - never block on the lesson */ }
 }
 function _hk2NoteOk() {
@@ -32540,7 +32560,10 @@ function _hk2NoteOk() {
 // The API work still rides the 6s undo window; undo puts the card back on top.
 function _hk2Resolve(r, agent) {
   const q = _HK2.q[agent || _HK2.agent] || [];
-  const i = q.indexOf(r); if (i >= 0) q.splice(i, 1);
+  // Match by id, not object identity: a _hk2Refresh mid-undo replaces the queue
+  // with fresh row objects, and indexOf(r) then missed - the resolved card came
+  // back from the dead.
+  const i = q.findIndex(x => String(x.id) === String(r.id)); if (i >= 0) q.splice(i, 1);
   try { if (typeof _PL_NEEDS !== 'undefined' && _PL_NEEDS && r.ghl_contact_id) _PL_NEEDS.delete(String(r.ghl_contact_id)); } catch (_) {}
   // Queue empty -> jump to the next agent that still has cards (no dead end).
   if (!q.length) { const next = _HK2_AGENTS.find(a => (_HK2.q[a] || []).length); if (next) _HK2.agent = next; }
@@ -32551,7 +32574,7 @@ function _hk2Resolve(r, agent) {
 function _hk2Unresolve(agent, r) {
   _HK2.agent = agent;
   const q = _HK2.q[agent] || (_HK2.q[agent] = []);
-  if (!q.includes(r)) q.unshift(r);
+  if (!q.some(x => String(x.id) === String(r.id))) q.unshift(r);
   try { if (typeof _PL_NEEDS !== 'undefined' && _PL_NEEDS && r.ghl_contact_id) _PL_NEEDS.set(String(r.ghl_contact_id), r.kind || 'reply'); } catch (_) {}
   _hk2Render();
   try { _plRenderAgentSection(); } catch (_) {}
@@ -32560,6 +32583,11 @@ function _hk2Unresolve(agent, r) {
 function _hk2Confirm() {
   const r = _hk2Top(); if (!r) return;
   if (!_hk2NoteOk()) return;
+  // Re-entry guard: a double-tap on the go button queued the SAME action twice
+  // (_hawkDefer flushes the first run immediately, defers the duplicate - the
+  // parent got the message twice). One commit per card; undo re-arms it.
+  if (r._hk2Busy) return;
+  r._hk2Busy = true;
   const agent = _HK2.agent;
   const ep = _HK2_META[agent].ep;
   const teachEl = document.getElementById('hk2-teach');
@@ -32592,7 +32620,7 @@ function _hk2Confirm() {
   }
   const chk = resp => { if (resp && resp.error) throw new Error(resp.error); return resp; };
   let undone = false;
-  _hawkDefer({ cardId: 'hk2-topcard', label: _HK2_KIND[k].go, restore: () => { undone = true; _hk2Unresolve(agent, r); }, run: async () => {
+  _hawkDefer({ cardId: 'hk2-topcard', label: _HK2_KIND[k].go, restore: () => { undone = true; r._hk2Busy = false; _hk2Unresolve(agent, r); }, run: async () => {
     if (k === 'book') {
       chk(await _apxPost(ep, 'confirm-book', { ready_id: r.id, calendar_id: calV, slot_at: slotV }));
       _apxToast('Booked - handed to Confirm', true);
@@ -32631,7 +32659,7 @@ function _hk2Confirm() {
       chk(resp);
       _apxToast(resp && resp.deferred ? _apxQuietMsg(resp.send_after) : (lesson ? 'Sent + taught' : 'Sent'), true);
     }
-    if (lesson) await _hk2Teach(r, lesson, before, reply);
+    if (lesson) await _hk2Teach(r, lesson, before, reply, agent);
   } });
   // Advance the deck right after the fly-out beat - don't wait for the 6s flush.
   setTimeout(() => { if (!undone) _hk2Resolve(r, agent); }, 480);
@@ -32639,6 +32667,11 @@ function _hk2Confirm() {
 // "Other": move the lead somewhere else instead of the primary action.
 function _hk2Move(op) {
   const r = _hk2Top(); if (!r) return;
+  // Re-entry guard (shared with _hk2Confirm): a double-tap on the same card
+  // queued the SAME action twice (_hawkDefer flushes the first immediately and
+  // defers the second - double SMS / double move). One commit per card.
+  if (r._hk2Busy) return;
+  r._hk2Busy = true;
   const agent = _HK2.agent;
   const ep = _HK2_META[agent].ep;
   const readyId = r._kind === 'plan' ? (r.rows && r.rows[0] && r.rows[0].id) : r.id;
@@ -32646,7 +32679,7 @@ function _hk2Move(op) {
   const chk = resp => { if (resp && resp.error) throw new Error(resp.error); return resp; };
   const label = op === 'ghost' ? 'Sent to Ghosted' : op === 'handoff' ? 'Handed to Booking' : op === 'lost' ? 'Marked lost' : 'Unqualified';
   let undone = false;
-  _hawkDefer({ cardId: 'hk2-topcard', label, restore: () => { undone = true; _hk2Unresolve(agent, r); }, run: async () => {
+  _hawkDefer({ cardId: 'hk2-topcard', label, restore: () => { undone = true; r._hk2Busy = false; _hk2Unresolve(agent, r); }, run: async () => {
     if (op === 'ghost') {
       chk(await _apxPost(ep, 'confirm-ghost', { ready_id: readyId }));
       try { _plMoveContactToInterested(r.ghl_contact_id); } catch (_) {}
@@ -32718,14 +32751,17 @@ function _plStageSignals(stage, opps) {
 function _plTrialsToday() {
   const p = _plActivePipeline(); if (!p) return [];
   const out = [];
-  for (const s of (p.stages || [])) {
-    for (const o of (s.opportunities || [])) {
-      if (typeof _plIsTrialToday === 'function' && _plIsTrialToday(o.trialDate)) {
-        const tr = (typeof _plTrialInfo === 'function') ? _plTrialInfo(o.trialDate) : { str: '' };
-        const parts = String(tr.str || '').split('·');
-        const time = parts.length > 1 ? parts[1].trim() : (tr.str || 'today');
-        out.push({ time, parent: (o.contact && o.contact.name) || o.name || 'Lead', athlete: o.athlete || '', id: o.id });
-      }
+  // Opps live at the PIPELINE level (stage objects carry none) - read both so
+  // this works on raw API data and on the home strip's enriched stages alike.
+  const all = (p.opportunities && p.opportunities.length)
+    ? p.opportunities
+    : (p.stages || []).flatMap(s => s.opportunities || []);
+  for (const o of all) {
+    if (typeof _plIsTrialToday === 'function' && _plIsTrialToday(o.trialDate)) {
+      const tr = (typeof _plTrialInfo === 'function') ? _plTrialInfo(o.trialDate) : { str: '' };
+      const parts = String(tr.str || '').split('·');
+      const time = parts.length > 1 ? parts[1].trim() : (tr.str || 'today');
+      out.push({ time, parent: (o.contact && o.contact.name) || o.name || 'Lead', athlete: o.athlete || '', id: o.id });
     }
   }
   return out;
@@ -32855,7 +32891,18 @@ function _plRenderOverview() {
   _ploCss();
   const p = _plActivePipeline();
   if (!p) { host.innerHTML = '<div class="req-empty" style="padding:20px 0">No pipeline yet.</div>'; return; }
-  const stages = (p.stages || []).filter(s => (typeof _isStageAllowed !== 'function') || _isStageAllowed(s.id));
+  // The API attaches opportunities at the PIPELINE level - stage objects carry
+  // none. Group open opps per stage (same as the home strip, _ccSalesLoad does
+  // it at load time) - without this every pill, signal, and cascade on THIS
+  // view read from s.opportunities and showed 0 cards everywhere.
+  const _oppsByStage = {};
+  for (const o of (p.opportunities || [])) {
+    if (String(o.status || 'open').toLowerCase() !== 'open') continue;
+    (_oppsByStage[o.stageId] = _oppsByStage[o.stageId] || []).push(o);
+  }
+  const stages = (p.stages || [])
+    .filter(s => (typeof _isStageAllowed !== 'function') || _isStageAllowed(s.id))
+    .map(s => (s.opportunities && s.opportunities.length) ? s : { ...s, opportunities: _oppsByStage[s.id] || [] });
 
   // ── KPIs ──
   const trials = _plTrialsToday();
@@ -33091,6 +33138,12 @@ function _ccStuckCards() {
     for (const o of (p.opportunities || [])) { if (by[o.stageId]) by[o.stageId].opportunities.push(o); }
     stages = Object.values(by);
   }
+  // No verdict without evidence: until BOTH the Hawkeye needs map and the
+  // enrollment map have actually loaded, render nothing. Treating null as
+  // "no cards, no automations" flashed a false red "N not flowing" on every
+  // home load (and permanently for viewers whose agent reads 403).
+  if (typeof _PL_NEEDS === 'undefined' || !_PL_NEEDS) return [];
+  if (typeof _PL_ENR === 'undefined' || !_PL_ENR) return [];
   const now = Date.now(), IDLE = _CC_STUCK_IDLE_DAYS * 86400000, out = [];
   for (const s of stages) {
     const bot = (typeof _plStageBot === 'function') ? _plStageBot(s.name) : null;
@@ -33099,6 +33152,7 @@ function _ccStuckCards() {
       if (String(o.status || 'open').toLowerCase() !== 'open') continue;
       const cid = String(o.contactId || ''); if (!cid) continue;
       if (typeof _PL_NEEDS !== 'undefined' && _PL_NEEDS && _PL_NEEDS.get(cid)) continue;   // has a Hawkeye action
+      if (typeof _PL_HELD !== 'undefined' && _PL_HELD && _PL_HELD.has(cid)) continue;      // parked send awaits the 8am flush
       if (typeof _PL_ENR !== 'undefined' && _PL_ENR && _PL_ENR.get(cid)) continue;         // in a running automation
       const lm = (typeof _PL_LASTMSG !== 'undefined' && _PL_LASTMSG) ? _PL_LASTMSG.get(cid) : null;
       const last = lm && lm.date ? new Date(lm.date).getTime()
@@ -35491,7 +35545,7 @@ function _apxGhostSkip(id) {
     onLost: async (lesson) => {
       if (_PL_NEEDS && r.ghl_contact_id) _PL_NEEDS.delete(String(r.ghl_contact_id));
       _plCloseByContact(r.ghl_contact_id, 'lost');
-      _apxRemove(id); _apxToast(lesson ? '🚫 Marked Lost + taught' : 'Marked Lost', true);
+      _apxRemove(id); _apxToast(lesson ? 'Marked Lost + taught' : 'Marked Lost', true);
       try {
         await _apxPost('/api/agent-approvals', 'confirm-lost', { ready_id: id, reply: '', lost_reason: 'Other' });
         if (lesson) await _apxTeach(lesson, '', '', { source: 'hawkeye-ghost-lost', contact: r.contact_name || null });
@@ -35671,7 +35725,7 @@ async function _apxFollowupSkip(id) {
     },
     onLost: async (lesson) => {
       if (!r.ghl_contact_id) { _apxToast('No contact linked - can\'t mark Lost', false); return; }
-      _apxRemove(id); _apxToast(lesson ? '🚫 Marked Lost + taught' : 'Marked Lost', true);   // instant
+      _apxRemove(id); _apxToast(lesson ? 'Marked Lost + taught' : 'Marked Lost', true);   // instant
       try {
         await _apxPost('/api/agent-followups', 'skip', { id });   // drop the nudge
         await _apxPost('/api/agent-approvals', 'confirm-lost', { contact_id: r.ghl_contact_id, reply: '', lost_reason: 'Other' });
@@ -35791,7 +35845,7 @@ async function _apxReadySkip(id) {
       } catch (e) { _apxToast(_apxErr(e), false); }
     },
     onLost: async (lesson) => {
-      _apxRemove(id); _apxToast(lesson ? '🚫 Marked Lost + taught' : 'Marked Lost', true);   // instant
+      _apxRemove(id); _apxToast(lesson ? 'Marked Lost + taught' : 'Marked Lost', true);   // instant
       try {
         await _apxPost('/api/agent-approvals', 'confirm-lost', { ready_id: id, reply: '', lost_reason: 'Other' });
         if (lesson) await _apxTeach(lesson, r.draft_message, '', { source: 'hawkeye-skip-lost', contact: r.contact_name || null });

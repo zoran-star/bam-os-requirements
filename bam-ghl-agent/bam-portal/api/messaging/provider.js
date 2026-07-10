@@ -70,10 +70,16 @@ function twilioCreds(cfg) {
 }
 
 async function upsertThread(clientId, phone, ghlContactId, name) {
+  // merge-duplicates OVERWRITES columns present in the body: a caller that only
+  // knows the phone (missed-call auto-text, owner notify) must not null out an
+  // existing thread's contact link/name - include the keys only when known.
+  const row = { client_id: clientId, contact_phone: phone };
+  if (ghlContactId) row.ghl_contact_id = ghlContactId;
+  if (name) row.contact_name = name;
   const rows = await sb(`sms_threads?on_conflict=client_id,contact_phone`, {
     method: "POST",
     headers: { Prefer: "resolution=merge-duplicates,return=representation" },
-    body: JSON.stringify([{ client_id: clientId, contact_phone: phone, ghl_contact_id: ghlContactId || null, contact_name: name || null }]),
+    body: JSON.stringify([row]),
   });
   return Array.isArray(rows) ? rows[0] : null;
 }
