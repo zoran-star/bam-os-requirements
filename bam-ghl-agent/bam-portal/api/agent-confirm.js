@@ -487,10 +487,11 @@ async function detectForClient(client) {
   catch (e) { return { client_id: client.id, error: `queue: ${e.message}` }; }
   if (!sts) return { client_id: client.id, skipped: "no Scheduled-Trial stage" };
 
-  // Leads whose booked trial already RAN (portal spine, <=7d, no review yet):
-  // they belong to the post-trial form card on this tab now - no more confirm
-  // replies/openers/reminders (Zoran 2026-07-09, mirrors the Booking handoff).
-  // Empty set for non-portal academies, so V1/V1.5 behavior is unchanged.
+  // Leads whose booked trial already RAN with no review yet (portal spine, no
+  // expiry, rebooked leads excluded): they belong to the post-trial form card
+  // on this tab now - no more confirm replies/openers/reminders (Zoran
+  // 2026-07-09, mirrors the Booking handoff). Empty set for non-portal
+  // academies, so V1/V1.5 behavior is unchanged.
   const passedTrial = await passedTrialContactIds(client.id);
 
   // Prune: cancel pending confirm cards whose lead has LEFT the Scheduled-Trial
@@ -804,16 +805,20 @@ async function handler(req, res) {
       // deck renders the form (showed up / good fit / first message / link /
       // notes) and submits it through /api/ghl/post-trial. Portal-booking
       // academies only - their trial spine lives in trial_bookings.
+      // NO expiry (Zoran 2026-07-10): the card stays in the deck until the form
+      // is filled or the opp closes (open-opp check below) - it never silently
+      // ages out. A contact who REBOOKED (has an upcoming slot) is skipped:
+      // the new trial owns them and makes its own form card when it runs.
+      // Must mirror passedTrialContactIds (agent/booking.js) - same rules drive
+      // the card-hiding gates on both agents.
       try {
         const client = await loadClient(clientId);
         if (client && client.booking_provider === "portal") {
-          const since = new Date(Date.now() - 7 * 86400000).toISOString();
           const nowIso = new Date().toISOString();
           const bks = await sb(`trial_bookings?tenant_id=eq.${clientId}&status=eq.BOOKED&select=id,ghl_contact_id,parent_name,athlete_name,schedule_slots(start_time,name)`) || [];
-          const due = (Array.isArray(bks) ? bks : []).filter(t => {
-            const st = t.schedule_slots && t.schedule_slots.start_time;
-            return st && st <= nowIso && st >= since;
-          });
+          const rows = (Array.isArray(bks) ? bks : []).filter(t => t.schedule_slots && t.schedule_slots.start_time);
+          const upcoming = new Set(rows.filter(t => t.schedule_slots.start_time > nowIso).map(t => String(t.ghl_contact_id || "")));
+          const due = rows.filter(t => t.schedule_slots.start_time <= nowIso && !upcoming.has(String(t.ghl_contact_id || "")));
           if (due.length) {
             const revs = await sb(`post_trial_reviews?client_id=eq.${clientId}&select=ghl_contact_id`) || [];
             const reviewed = new Set((Array.isArray(revs) ? revs : []).map(r => String(r.ghl_contact_id || "")));

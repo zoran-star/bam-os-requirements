@@ -114,8 +114,10 @@ scattered autonomy/config entry points. KEEPS: inline drawer suggestion on lead 
   "+N more" expands in place (_plo2ShowAll) - board not a V2 destination.
 - POST-TRIAL FORM = Confirm-tab deck card (kind post_trial -> 'form'):
   synthesized server-side in agent-confirm list-ready (portal provider:
-  trial_bookings BOOKED, slot past, <=7d, no post_trial_reviews row, open
-  opp); deck form submits /api/ghl/post-trial (3-way router). No Other btn.
+  trial_bookings BOOKED, slot past, no post_trial_reviews row, open opp,
+  NO upcoming rebooked slot); deck form submits /api/ghl/post-trial (3-way
+  router). No Other btn. NO EXPIRY (Zoran 2026-07-10, was <=7d): the card
+  stays until the form is filled or the opp closes.
 - 'Liked' TAPBACK RULE: isRealInbound (agent/_stage.js) - inbound text
   starting with "Liked" never wakes an agent, never bounces Ghosted/Nurture
   (ghl/inbound-webhook), never enters the Meta store, never reaches agent
@@ -171,7 +173,14 @@ scattered autonomy/config entry points. KEEPS: inline drawer suggestion on lead 
   them (real ptf card covers portal academies); list-ready read-gates this
   agent's own stale rows BEFORE appending ptf form cards, so the form card is
   the ONE card per passed-trial lead, instantly. Non-portal academies: empty
-  set, zero change.
+  set, zero change. NO EXPIRY (Zoran 2026-07-10): passedTrialContactIds + the
+  form synthesis dropped the 7-day window - an unreviewed trial stays carded
+  until the form lands or the opp closes. EXCEPTION baked into both: a contact
+  with an UPCOMING BOOKED slot (rebooked) leaves the set, so an old unfilled
+  form never starves the new trial's confirmations; the new trial cards itself
+  after it runs. (Backups beyond the deck were verified dead for portal
+  academies: A3 overdue + 15-min escalation SMS both read GHL calendars only;
+  the red Home "not flowing" list was the lone catch-all.)
 - STILL TO DO: swipe gestures (open decision), GTA prod verification of the whole batch.
 
 ## Open item (ask Zoran before building)
