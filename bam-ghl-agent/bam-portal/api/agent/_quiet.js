@@ -37,6 +37,15 @@ function atLocalTime(date, targetMin, tz, dayOffset) {
   return new Date(guessUTC - off * 60000);
 }
 
+// The academy's quiet-hours timezone: clients.time_zone if set, else the
+// default (America/Toronto). Pass a client row (or any object with time_zone).
+// Every send path resolves this once and threads it into withinQuietHours /
+// nextSendableTime so a non-Toronto academy holds against ITS local window.
+export function quietTz(client) {
+  const tz = client && client.time_zone;
+  return (typeof tz === "string" && tz.trim()) ? tz.trim() : QUIET_TZ;
+}
+
 // Is `date` inside the allowed send window?
 export function withinQuietHours(date = new Date(), tz = QUIET_TZ) {
   const mins = localMinutes(date, tz);

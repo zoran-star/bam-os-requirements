@@ -49,7 +49,7 @@ import { resolveMergeVars, locFor } from "./email-shells.js";
 import { confirmAgentMode, modeIsOn, shouldAutoSend, shouldAutoSendScripted } from "./agent/_mode.js";
 import { markUnqualified } from "./agent/_tags.js";
 import { mutedContactIdSet, isMuted } from "./agent/_mutes.js";
-import { withinQuietHours, nextSendableTime } from "./agent/_quiet.js";
+import { withinQuietHours, nextSendableTime, quietTz } from "./agent/_quiet.js";
 import { resolveAgentActor } from "./agent/_auth.js";
 
 const SUPABASE_URL         = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
@@ -442,11 +442,11 @@ async function fireScriptedStep({ client, token, locationId, mode, autos, cfg, i
   // agent is on, bypassing the global self-drive kill-switch (that net is for AI freeform
   // replies, not fixed pre-approved copy). AI replies below still use shouldAutoSend.
   const auto = shouldAutoSendScripted(mode);
-  if (auto && !withinQuietHours()) {
+  if (auto && !withinQuietHours(new Date(), quietTz(client))) {
     // After-hours: hold the SMS until morning; the email isn't quiet-gated, send it now.
     await sendScriptedEmail();
     await sb(`agent_confirm_replies`, { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify([{
-      ...baseRow, status: "approved", send_after: nextSendableTime().toISOString(), created_by: "self-drive",
+      ...baseRow, status: "approved", send_after: nextSendableTime(new Date(), quietTz(client)).toISOString(), created_by: "self-drive",
     }]) });
     return "deferred";
   }
@@ -528,7 +528,7 @@ async function detectForClient(client) {
 
   // Flush quiet-hours holds (approved confirm cards whose send time arrived).
   let flushed = 0;
-  if (withinQuietHours()) {
+  if (withinQuietHours(new Date(), quietTz(client))) {
     try {
       const held = await sb(`agent_confirm_replies?client_id=eq.${client.id}&status=eq.approved&send_after=lte.${new Date().toISOString()}&select=id,ghl_contact_id,draft_message,kind&order=send_after.asc&limit=40`);
       for (const row of (Array.isArray(held) ? held : [])) {
@@ -689,10 +689,10 @@ async function detectForClient(client) {
     // A plain confirmation reply. Self-drive may auto-send high-confidence ones;
     // quiet hours hold until morning. Everything else queues for approval.
     const auto = shouldAutoSend(mode, { confidence: d.confidence, escalate: d.escalate });
-    if (auto && !withinQuietHours()) {
+    if (auto && !withinQuietHours(new Date(), quietTz(client))) {
       try {
         await sb(`agent_confirm_replies`, { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify([{
-          ...baseRow, kind: "confirm", draft_message: d.reply, status: "approved", send_after: nextSendableTime().toISOString(), created_by: "self-drive",
+          ...baseRow, kind: "confirm", draft_message: d.reply, status: "approved", send_after: nextSendableTime(new Date(), quietTz(client)).toISOString(), created_by: "self-drive",
         }]) });
         deferred++;
       } catch (e) { skipped++; reasons.push(`${item.name || contactId}: defer-insert failed — ${e.message}`); }
@@ -786,7 +786,7 @@ async function runDetect(res, onlyClientId) {
   try {
     clients = onlyClientId
       ? [await loadClient(onlyClientId)].filter(Boolean)
-      : await sb(`clients?select=id,business_name,address,ghl_location_id,ghl_access_token,ghl_refresh_token,ghl_token_expires_at,ghl_kpi_config&v2_access=eq.true`);
+      : await sb(`clients?select=id,business_name,address,ghl_location_id,ghl_access_token,ghl_refresh_token,ghl_token_expires_at,ghl_kpi_config,time_zone&v2_access=eq.true`);
   } catch (_) {}
   const out = [];
   for (const client of (Array.isArray(clients) ? clients : [])) {
@@ -982,8 +982,8 @@ async function handler(req, res) {
       // Quiet hours: hold an after-hours approval until morning (email isn't
       // quiet-gated, it goes now). The PATCH claims the row with a status
       // precondition so a double-tap or a stale deck can't re-park a sent card.
-      if (!withinQuietHours()) {
-        const sendAfter = nextSendableTime().toISOString();
+      if (!withinQuietHours(new Date(), quietTz(client))) {
+        const sendAfter = nextSendableTime(new Date(), quietTz(client)).toISOString();
         const held = {
           ghl_conversation_id: b.conversation_id || null,
           contact_name: b.contact_name || null, draft_message: String(b.reply), reasoning: b.reasoning || null,
@@ -1041,7 +1041,7 @@ async function handler(req, res) {
       // (confirm_handoff rows are exempt from the flush's stage gates, since
       // this lead just left Scheduled-Trial on purpose).
       const closing = (typeof b.reply === "string" ? b.reply : (row ? row.draft_message : "")) || "";
-      const holdAck = !!closing.trim() && !withinQuietHours();
+      const holdAck = !!closing.trim() && !withinQuietHours(new Date(), quietTz(client));
       if (closing.trim() && !holdAck) { try { await sendReplyViaGhl(token, contactId, closing.trim(), clientId); } catch (_) {} }
       // Write the context note (this is how the booking agent gets full context —
       // contact-memory.js injects agent_contact_notes into the booking prompt).
@@ -1110,7 +1110,7 @@ async function handler(req, res) {
       // handoffs insert a fresh row. Best-effort: the handoff itself landed.
       let ackAfter = null;
       if (holdAck) {
-        ackAfter = nextSendableTime().toISOString();
+        ackAfter = nextSendableTime(new Date(), quietTz(client)).toISOString();
         const parked = {
           kind: "confirm_handoff", draft_message: closing.trim(), status: "approved", send_after: ackAfter,
           approved_by: staffEmail, approved_at: new Date().toISOString(), send_error: null, updated_at: new Date().toISOString(),

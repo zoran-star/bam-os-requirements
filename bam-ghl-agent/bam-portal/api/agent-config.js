@@ -122,6 +122,36 @@ async function handler(req, res) {
     } catch (e) { console.error("[agent-config set-entry-routing]", e); return res.status(500).json({ error: e.message || "internal error" }); }
   }
 
+  // Quiet-hours timezone (clients.time_zone). The agents only text a parent inside
+  // 8:00am-9:30pm of THIS zone (agent/_quiet.js). Read + write, scoped to the
+  // academy's own owner / can_train_agent member or BAM staff. Default America/
+  // Toronto when unset - so a GTA-era academy is unchanged.
+  if (b.action === "get-timezone") {
+    const actor = await resolveAgentActor(req);
+    if (!actor) return res.status(401).json({ error: "sign in required" });
+    if (!b.client_id) return res.status(400).json({ error: "client_id required" });
+    if (!actor.canActOn(b.client_id)) return res.status(403).json({ error: "not your academy" });
+    try {
+      const [row] = await sb(`clients?id=eq.${encodeURIComponent(b.client_id)}&select=time_zone&limit=1`);
+      return res.status(200).json({ time_zone: (row && row.time_zone) || null, default_time_zone: "America/Toronto" });
+    } catch (e) { return res.status(500).json({ error: e.message }); }
+  }
+  if (b.action === "set-timezone") {
+    const actor = await resolveAgentActor(req);
+    if (!actor) return res.status(401).json({ error: "sign in required" });
+    if (!b.client_id) return res.status(400).json({ error: "client_id required" });
+    if (!actor.canActOn(b.client_id)) return res.status(403).json({ error: "not your academy" });
+    const tz = String(b.time_zone || "").trim();
+    if (!tz) return res.status(400).json({ error: "time_zone required" });
+    // Validate it's a real IANA zone so a typo can't silently break quiet hours.
+    try { new Intl.DateTimeFormat("en-US", { timeZone: tz }); }
+    catch (_) { return res.status(400).json({ error: `"${tz}" is not a valid timezone` }); }
+    try {
+      await sb(`clients?id=eq.${encodeURIComponent(b.client_id)}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ time_zone: tz }) });
+      return res.status(200).json({ ok: true, time_zone: tz });
+    } catch (e) { console.error("[agent-config set-timezone]", e); return res.status(500).json({ error: e.message || "internal error" }); }
+  }
+
   const staffEmail = await requireStaff(req);
   if (!staffEmail) return res.status(401).json({ error: "staff only" });
 
