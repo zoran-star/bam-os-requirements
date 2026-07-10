@@ -200,7 +200,7 @@ function fmtTrial(iso) {
 async function draftForContact(token, locationId, clientId, contactId, cfg, opts = {}) {
   const sts = opts.sts || await scheduledTrialStage(token, locationId, { clientId, sb });
   if (!sts) return { error: "No Scheduled-Trial stage found in the Training Pipeline." };
-  if (!opts.skipStageGuard && !(await contactInRespondedStage(token, locationId, contactId, sts, { clientId, sb }))) {
+  if (!opts.skipStageGuard && !(await contactInRespondedStage(token, locationId, contactId, sts, { clientId, sb, role: "scheduled_trial" }))) {
     return { error: "This lead isn't in the Scheduled-Trial stage — the confirm agent only works booked leads." };
   }
   // Twilio academies: read the thread from the own-store (no GHL conversation).
@@ -918,7 +918,7 @@ async function handler(req, res) {
       if (!b.contact_id || !b.reply || !String(b.reply).trim()) return res.status(400).json({ error: "contact_id and reply required" });
       // HARD GUARD: only send to a lead still in the Scheduled-Trial stage.
       const sts = await scheduledTrialStage(token, locationId, { clientId, sb });
-      if (!sts || !(await contactInRespondedStage(token, locationId, b.contact_id, sts, { clientId, sb }))) {
+      if (!sts || !(await contactInRespondedStage(token, locationId, b.contact_id, sts, { clientId, sb, role: "scheduled_trial" }))) {
         return res.status(409).json({ error: "This lead is no longer in the Scheduled-Trial stage — not sending." });
       }
       // For a scripted initial-automation card, the booking-confirmation step also
