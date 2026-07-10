@@ -299,7 +299,7 @@ async function handler(req, res) {
       if (b.body == null || !String(b.body).trim()) return res.status(400).json({ error: "body required" });
       if (isGlobalSection(b.key)) {
         // GLOBAL section: editing it changes EVERY academy's agents. Gate on a global editor.
-        if (!canEditGlobalBrain(ctx, clientId)) return res.status(403).json({ error: "that section is managed by BAM (global) — not editable here" });
+        if (!canEditGlobalBrain(ctx, clientId)) return res.status(403).json({ error: "that section is managed by BAM (global) - not editable here" });
         await setGlobalSection(b.key, b.body, ctx.user.email);
         return res.status(200).json({ ok: true, scope: "global" });
       }
@@ -314,7 +314,7 @@ async function handler(req, res) {
     if (b.action === "reset-section") {
       if (!b.key) return res.status(400).json({ error: "key required" });
       if (isGlobalSection(b.key)) {
-        if (!canEditGlobalBrain(ctx, clientId)) return res.status(403).json({ error: "that section is managed by BAM (global) — not editable here" });
+        if (!canEditGlobalBrain(ctx, clientId)) return res.status(403).json({ error: "that section is managed by BAM (global) - not editable here" });
         await deleteGlobalSection(b.key);   // revert the GLOBAL section to its BAM default (for all academies)
         return res.status(200).json({ ok: true, scope: "global" });
       }

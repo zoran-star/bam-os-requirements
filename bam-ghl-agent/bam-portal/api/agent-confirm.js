@@ -201,7 +201,7 @@ async function draftForContact(token, locationId, clientId, contactId, cfg, opts
   const sts = opts.sts || await scheduledTrialStage(token, locationId, { clientId, sb });
   if (!sts) return { error: "No Scheduled-Trial stage found in the Training Pipeline." };
   if (!opts.skipStageGuard && !(await contactInRespondedStage(token, locationId, contactId, sts, { clientId, sb, role: "scheduled_trial" }))) {
-    return { error: "This lead isn't in the Scheduled-Trial stage — the confirm agent only works booked leads." };
+    return { error: "This lead isn't in the Scheduled-Trial stage - the confirm agent only works booked leads." };
   }
   // Twilio academies: read the thread from the own-store (no GHL conversation).
   // conversationId MUST live at function scope: the return below references it,
@@ -367,21 +367,28 @@ function sanitizeAutomations(incoming, cur = {}) {
 // thread, so scripted touches stop. Mirrors the AI path's mode/quiet-hours handling.
 async function fireScriptedStep({ client, token, locationId, mode, autos, cfg, item, contactId }) {
   const nowMs = Date.now();
+  const appt = await nextAppointment(token, contactId, { nowMs, clientId: client.id });
+  const trialMs = appt && appt.startTime ? new Date(appt.startTime).getTime() : null;
 
-  // What's already happened with this contact?
+  // What's already happened with this contact - FOR THIS TRIAL? A rebooked lead
+  // (no-show, rebook, second slot) carries the whole first trial's history, and
+  // scoping the gates to the CURRENT appointment is what lets trial #2 get its
+  // own confirmation + reminders (rows from trial #1 previously suppressed every
+  // scripted touch forever). Rows with no trial_at (legacy) conservatively count
+  // as this trial so we never double-send on old data. Compare EPOCH MS, never
+  // ISO strings (timestamptz "+00:00" vs toIso "Z" suffixes differ in form).
   let rows = [];
   try {
-    rows = await sb(`agent_confirm_replies?client_id=eq.${client.id}&ghl_contact_id=eq.${encodeURIComponent(contactId)}&select=kind,status,step_key&order=created_at.desc&limit=50`);
+    rows = await sb(`agent_confirm_replies?client_id=eq.${client.id}&ghl_contact_id=eq.${encodeURIComponent(contactId)}&select=kind,status,step_key,trial_at&order=created_at.desc&limit=50`);
   } catch (_) { rows = []; }
   rows = Array.isArray(rows) ? rows : [];
   if (rows.some(r => ["pending", "approved"].includes(r.status))) return "already has an active card";
-  // Any AI confirm/handoff/lost card means they've been in a live exchange - let the
-  // AI agent own it; don't cold-script on top of a conversation.
-  if (rows.some(r => ["confirm", "confirm_handoff", "confirm_lost"].includes(r.kind))) return "lead already in conversation";
-  const sentKeys = new Set(rows.filter(r => r.kind === "confirm_auto" && ["pending", "approved", "sent", "skipped"].includes(r.status)).map(r => r.step_key));
+  const sameTrial = r => r.trial_at == null || (trialMs != null && new Date(r.trial_at).getTime() === trialMs);
+  // An AI confirm/handoff/lost card ABOUT THIS TRIAL means they're in a live
+  // exchange - let the AI agent own it; don't cold-script on top of it.
+  if (rows.some(r => ["confirm", "confirm_handoff", "confirm_lost"].includes(r.kind) && sameTrial(r))) return "lead already in conversation";
+  const sentKeys = new Set(rows.filter(r => r.kind === "confirm_auto" && ["pending", "approved", "sent", "skipped"].includes(r.status) && sameTrial(r)).map(r => r.step_key));
 
-  const appt = await nextAppointment(token, contactId, { nowMs, clientId: client.id });
-  const trialMs = appt && appt.startTime ? new Date(appt.startTime).getTime() : null;
   const step = nextDueStep(autos, { nowMs, trialMs, sentKeys });
   if (!step) return "no scripted step due";
 
@@ -482,10 +489,15 @@ async function detectForClient(client) {
   if (!creds) return { client_id: client.id, skipped: "no GHL token" };
   const { token, locationId } = creds;
 
-  let sts, queue, scheduledIds;
-  try { ({ sts, queue, scheduledIds } = await computeConfirmQueue(token, locationId, { clientId: client.id, sb })); }
+  let sts, queue, scheduledIds, idsTrusted;
+  try { ({ sts, queue, scheduledIds, idsTrusted } = await computeConfirmQueue(token, locationId, { clientId: client.id, sb })); }
   catch (e) { return { client_id: client.id, error: `queue: ${e.message}` }; }
   if (!sts) return { client_id: client.id, skipped: "no Scheduled-Trial stage" };
+  // Only trust "this lead LEFT the stage" when the membership fetch actually
+  // succeeded AND returned someone. A transient GHL blip used to hand back an
+  // empty set here, and the prune/flush below then mass-canceled EVERY pending
+  // and held confirm card for the academy in one run.
+  const stageSetTrusted = idsTrusted !== false && scheduledIds.size > 0;
 
   // Leads whose booked trial already RAN with no review yet (portal spine, no
   // expiry, rebooked leads excluded): they belong to the post-trial form card
@@ -504,7 +516,7 @@ async function detectForClient(client) {
       if (row.ghl_contact_id && passedTrial.has(String(row.ghl_contact_id))) {
         await sb(`agent_confirm_replies?id=eq.${row.id}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ status: "canceled", send_error: "trial ran - handed to post-trial form", updated_at: new Date().toISOString() }) });
         pruned++;
-      } else if (row.ghl_contact_id && !scheduledIds.has(row.ghl_contact_id)) {
+      } else if (row.ghl_contact_id && stageSetTrusted && !scheduledIds.has(row.ghl_contact_id)) {
         await sb(`agent_confirm_replies?id=eq.${row.id}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ status: "canceled", send_error: "left Scheduled-Trial stage", updated_at: new Date().toISOString() }) });
         pruned++;
       }
@@ -528,6 +540,9 @@ async function detectForClient(client) {
           continue;
         }
         if (!handoffAck && row.ghl_contact_id && !scheduledIds.has(row.ghl_contact_id)) {
+          // Untrusted stage set: don't cancel, just hold this round (skip the
+          // send too - we can't verify the lead is still in the stage).
+          if (!stageSetTrusted) continue;
           await sb(`agent_confirm_replies?id=eq.${row.id}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ status: "canceled", send_error: "left Scheduled-Trial stage", updated_at: new Date().toISOString() }) });
           continue;
         }
@@ -646,13 +661,16 @@ async function detectForClient(client) {
       continue;
     }
 
-    // Escalation: no message to send, but a human should see it.
+    // Escalation: no message to send, but a human should see it. draft_message
+    // stays EMPTY - the card explains itself via escalate_reason, and an empty
+    // draft can't be one-tap texted to the parent (the old "(agent escalated ...)"
+    // placeholder was a sendable message).
     if (d.error || !d.reply || !String(d.reply).trim()) {
       if (d.escalate) {
         escalated++;
         try {
           await sb(`agent_confirm_replies`, { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify([{
-            ...baseRow, kind: "confirm", draft_message: "(agent escalated — needs a human)",
+            ...baseRow, kind: "confirm", draft_message: "",
             escalate: true, escalate_reason: d.escalate_reason || null, status: "pending", created_by: "detector",
           }]) });
         } catch (_) {}
@@ -672,7 +690,7 @@ async function detectForClient(client) {
       } catch (e) { skipped++; reasons.push(`${item.name || contactId}: defer-insert failed — ${e.message}`); }
     } else if (auto) {
       try {
-        await sendReplyViaGhl(token, contactId, d.reply);
+        await sendReplyViaGhl(token, contactId, d.reply, client.id);
         await sb(`agent_confirm_replies`, { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify([{
           ...baseRow, kind: "confirm", draft_message: d.reply, status: "sent", auto_sent: true, sent_at: new Date().toISOString(), created_by: "self-drive",
         }]) });
@@ -739,7 +757,7 @@ async function detectForClient(client) {
         await sb(`agent_confirm_replies`, { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify([{
           client_id: client.id, ghl_contact_id: String(contactId), ghl_conversation_id: item.conversation_id || null,
           contact_name: item.name || null, kind: "confirm",
-          draft_message: "(post-trial review needed - log via the post-trial form)",
+          draft_message: "",
           escalate: true, escalate_reason: instruction, summary: instruction,
           handoff_note: oppId ? `post_trial_form opportunity_id=${oppId}` : null,
           trial_at: toIso(lastPast.startIso), last_lead_at: item.last_at || null,
@@ -822,7 +840,18 @@ async function handler(req, res) {
           const bks = await sb(`trial_bookings?tenant_id=eq.${clientId}&status=eq.BOOKED&select=id,ghl_contact_id,parent_name,athlete_name,schedule_slots(start_time,name)`) || [];
           const rows = (Array.isArray(bks) ? bks : []).filter(t => t.schedule_slots && t.schedule_slots.start_time);
           const upcoming = new Set(rows.filter(t => t.schedule_slots.start_time > nowIso).map(t => String(t.ghl_contact_id || "")));
-          const due = rows.filter(t => t.schedule_slots.start_time <= nowIso && !upcoming.has(String(t.ghl_contact_id || "")));
+          let due = rows.filter(t => t.schedule_slots.start_time <= nowIso && !upcoming.has(String(t.ghl_contact_id || "")));
+          // ONE form card per lead: a contact with several passed BOOKED rows
+          // (data quirks, repeat no-shows) keeps only the LATEST slot. Epoch
+          // compare - timestamptz offsets make ISO string compare unreliable.
+          const latestByCid = new Map();
+          for (const t of due) {
+            const cid = String(t.ghl_contact_id || "");
+            if (!cid) continue;
+            const prev = latestByCid.get(cid);
+            if (!prev || new Date(t.schedule_slots.start_time).getTime() > new Date(prev.schedule_slots.start_time).getTime()) latestByCid.set(cid, t);
+          }
+          due = [...latestByCid.values()];
           if (due.length) {
             const revs = await sb(`post_trial_reviews?client_id=eq.${clientId}&select=ghl_contact_id`) || [];
             const reviewed = new Set((Array.isArray(revs) ? revs : []).map(r => String(r.ghl_contact_id || "")));
@@ -919,42 +948,70 @@ async function handler(req, res) {
       // HARD GUARD: only send to a lead still in the Scheduled-Trial stage.
       const sts = await scheduledTrialStage(token, locationId, { clientId, sb });
       if (!sts || !(await contactInRespondedStage(token, locationId, b.contact_id, sts, { clientId, sb, role: "scheduled_trial" }))) {
-        return res.status(409).json({ error: "This lead is no longer in the Scheduled-Trial stage — not sending." });
+        return res.status(409).json({ error: "This lead is no longer in the Scheduled-Trial stage - not sending." });
+      }
+      // Post-trial gate (mirrors the detector skip, prune, flush, and list-ready):
+      // once the booked trial has RUN, the form card owns this lead - a stale
+      // pre-trial card in an old browser tab must not text "see you Tuesday!"
+      // after it. Empty set for non-portal academies; fails open by design.
+      if ((await passedTrialContactIds(clientId)).has(String(b.contact_id))) {
+        return res.status(409).json({ error: "This lead's trial already ran - use their post-trial form card instead." });
+      }
+      // Never text an internal note at a parent (legacy escalation/overdue rows
+      // seeded a sendable "(agent escalated ...)" placeholder as the draft).
+      if (/^\((agent escalated|post-trial review needed)/i.test(String(b.reply).trim())) {
+        return res.status(400).json({ error: "That's an internal note, not a message - write the reply you want to send." });
       }
       // For a scripted initial-automation card, the booking-confirmation step also
-      // emails (same copy). Pull that payload so approving the touch sends both.
-      let card = null;
-      if (b.ready_id) { try { [card] = await sb(`agent_confirm_replies?id=eq.${encodeURIComponent(b.ready_id)}&client_id=eq.${clientId}&select=*`); } catch (_) {} }
-      const fireCardEmail = async () => {
+      // emails (same copy) - the payload rides on the row the claim returns below.
+      const fireCardEmail = async (card) => {
         if (!card || !card.email_body) return;
         try {
           const info = await resolveContactInfo(token, b.contact_id);
           if (info && info.email) await sendOn({ channel: "email", clientId, toEmail: info.email, subject: card.email_subject || "Your free trial is booked!", body: card.email_body, vars: {} });
         } catch (_) {}
       };
-      // Quiet hours: hold an after-hours approval until morning (email isn't quiet-gated, send it now).
+      // Quiet hours: hold an after-hours approval until morning (email isn't
+      // quiet-gated, it goes now). The PATCH claims the row with a status
+      // precondition so a double-tap or a stale deck can't re-park a sent card.
       if (!withinQuietHours()) {
-        await fireCardEmail();
         const sendAfter = nextSendableTime().toISOString();
         const held = {
-          client_id: clientId, ghl_contact_id: b.contact_id, ghl_conversation_id: b.conversation_id || null,
-          contact_name: b.contact_name || null, kind: (card && card.kind) || "confirm", draft_message: String(b.reply), reasoning: b.reasoning || null,
+          ghl_conversation_id: b.conversation_id || null,
+          contact_name: b.contact_name || null, draft_message: String(b.reply), reasoning: b.reasoning || null,
           confidence: typeof b.confidence === "number" ? b.confidence : null,
           status: "approved", send_after: sendAfter, approved_by: staffEmail, approved_at: new Date().toISOString(), updated_at: new Date().toISOString(),
         };
         try {
-          if (b.ready_id) await sb(`agent_confirm_replies?id=eq.${encodeURIComponent(b.ready_id)}&client_id=eq.${clientId}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify(held) });
-          else await sb(`agent_confirm_replies`, { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify([{ ...held, created_by: staffEmail }]) });
+          if (b.ready_id) {
+            const rows = await sb(`agent_confirm_replies?id=eq.${encodeURIComponent(b.ready_id)}&client_id=eq.${clientId}&status=in.(pending,approved)`, { method: "PATCH", headers: { Prefer: "return=representation" }, body: JSON.stringify(held) });
+            const rowNow = Array.isArray(rows) && rows[0];
+            if (!rowNow) return res.status(409).json({ error: "This card was already handled." });
+            await fireCardEmail(rowNow);
+          } else {
+            await sb(`agent_confirm_replies`, { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify([{ ...held, client_id: clientId, ghl_contact_id: b.contact_id, kind: "confirm", created_by: staffEmail }]) });
+          }
         } catch (e) { return res.status(500).json({ error: `couldn't schedule: ${e.message}` }); }
         return res.status(200).json({ ok: true, sent: false, deferred: true, send_after: sendAfter });
       }
-      try { await sendReplyViaGhl(token, b.contact_id, String(b.reply), clientId); }
-      catch (e) { return res.status(e.status || 502).json({ error: `GHL send: ${e.message}` }); }
-      await fireCardEmail();
-      try { await logApproval({ client_id: clientId, ghl_contact_id: b.contact_id, ghl_conversation_id: b.conversation_id || null, contact_name: b.contact_name || null, final_reply: b.reply, reasoning: b.reasoning || null, confidence: typeof b.confidence === "number" ? b.confidence : null, adjusted: !!b.adjusted, status: "sent", created_by: staffEmail }); } catch (_) {}
+      // CLAIM the row first (atomic: only one caller can flip pending/approved ->
+      // sent), then send. On a send failure the claim is reverted so the card
+      // comes back instead of silently reading as sent.
+      let claimed = null;
       if (b.ready_id) {
-        try { await sb(`agent_confirm_replies?id=eq.${encodeURIComponent(b.ready_id)}&client_id=eq.${clientId}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ status: "sent", approved_by: staffEmail, approved_at: new Date().toISOString(), sent_at: new Date().toISOString(), updated_at: new Date().toISOString() }) }); } catch (_) {}
+        try {
+          const rows = await sb(`agent_confirm_replies?id=eq.${encodeURIComponent(b.ready_id)}&client_id=eq.${clientId}&status=in.(pending,approved)`, { method: "PATCH", headers: { Prefer: "return=representation" }, body: JSON.stringify({ status: "sent", approved_by: staffEmail, approved_at: new Date().toISOString(), sent_at: new Date().toISOString(), updated_at: new Date().toISOString() }) });
+          claimed = (Array.isArray(rows) && rows[0]) || null;
+        } catch (e) { return res.status(500).json({ error: `claim failed: ${e.message}` }); }
+        if (!claimed) return res.status(409).json({ error: "This card was already handled." });
       }
+      try { await sendReplyViaGhl(token, b.contact_id, String(b.reply), clientId); }
+      catch (e) {
+        if (claimed) { try { await sb(`agent_confirm_replies?id=eq.${encodeURIComponent(b.ready_id)}&client_id=eq.${clientId}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ status: "pending", sent_at: null, send_error: String((e && e.message) || e).slice(0, 300), updated_at: new Date().toISOString() }) }); } catch (_) {} }
+        return res.status(e.status || 502).json({ error: `GHL send: ${e.message}` });
+      }
+      await fireCardEmail(claimed);
+      try { await logApproval({ client_id: clientId, ghl_contact_id: b.contact_id, ghl_conversation_id: b.conversation_id || null, contact_name: b.contact_name || null, final_reply: b.reply, reasoning: b.reasoning || null, confidence: typeof b.confidence === "number" ? b.confidence : null, adjusted: !!b.adjusted, status: "sent", created_by: staffEmail }); } catch (_) {}
       return res.status(200).json({ ok: true, sent: true });
     }
 
@@ -1058,7 +1115,7 @@ async function handler(req, res) {
       let oppId = null, oppRef = null;
       try { oppRef = await findOpenOpp(clientId, token, locationId, contactId); oppId = oppRef && (oppRef.ghlOpportunityId || oppRef.id) || null; }
       catch (e) { return res.status(e.status || 502).json({ error: `find opp: ${e.message}` }); }
-      if (!oppRef) return res.status(200).json({ error: "No opportunity found for this contact — nothing to mark lost." });
+      if (!oppRef) return res.status(200).json({ error: "No opportunity found for this contact - nothing to mark lost." });
       const closing = (typeof b.reply === "string" ? b.reply : (row ? row.draft_message : "")) || "";
       if (closing.trim()) { try { await sendReplyViaGhl(token, contactId, closing.trim(), clientId); } catch (_) {} }
       const reason = (b.lost_reason || (row && row.lost_reason) || "").toString().trim() || null;

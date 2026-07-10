@@ -204,12 +204,24 @@ async function runWork(res) {
   const calCache    = new Map();   // clientId -> first calendar entry-point key | null
   let sent = 0, deferred = 0, advanced = 0, completed = 0, failed = 0, canceled = 0, lost = 0, nurtureLost = 0, ghostedLost = 0, formToGhosted = 0;
 
+  // RECLAIM stuck claims: a worker that crashed or timed out between claiming a
+  // job ('sending') and finishing it left the job in 'sending' FOREVER - the
+  // pending-only picker above never saw it again and the enrollment stalled.
+  // Any 'sending' job untouched for 15+ min goes back to pending (run_after
+  // restamped so it runs next tick). The atomic claim below still guarantees
+  // only one worker wins it.
+  try {
+    const staleIso = new Date(Date.now() - 15 * 60000).toISOString();
+    await sb(`automation_jobs?status=eq.sending&run_after=lte.${staleIso}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ status: "pending", run_after: nowIso }) });
+  } catch (_) { /* best-effort - next run retries */ }
+
   for (const job of jobs) {
     // ATOMIC CLAIM: flip pending->sending ONLY if still pending. If 0 rows come
-    // back, another worker already took it — skip (never double-send).
+    // back, another worker already took it — skip (never double-send). The claim
+    // restamps run_after so a crashed worker's job is reclaimable (see above).
     let claimed;
     try {
-      claimed = await sb(`automation_jobs?id=eq.${job.id}&status=eq.pending`, { method: "PATCH", headers: { Prefer: "return=representation" }, body: JSON.stringify({ status: "sending" }) });
+      claimed = await sb(`automation_jobs?id=eq.${job.id}&status=eq.pending`, { method: "PATCH", headers: { Prefer: "return=representation" }, body: JSON.stringify({ status: "sending", run_after: nowIso }) });
     } catch (_) { continue; }
     if (!Array.isArray(claimed) || !claimed.length) { lost++; continue; }
 
@@ -248,7 +260,12 @@ async function runWork(res) {
             if (creds && creds.token) {
               const is = await interestedStage(creds.token, creds.locationId, { clientId: job.client_id, sb });
               const oppRef = await findOpenOppRef(job.client_id, creds.token, creds.locationId, job.contact_id);
-              if (is && oppRef) await moveStage({ clientId: job.client_id, ghl, token: creds.token, oppRef, stage: is, role: "ghosted", contactId: job.contact_id, reason: "intro form sent, no reply - rolled into ghosted" });
+              // role MUST be "interested" - that's the canonical stage_role for the
+              // Ghosted-automation stage everywhere (seed, enum, reply-bounce guards).
+              // Stamping "ghosted" here left portal-store opps invisible to every
+              // guard that checks stage_role=interested, so a reply from Ghosted
+              // exited the automation but never bounced back to Booking.
+              if (is && oppRef) await moveStage({ clientId: job.client_id, ghl, token: creds.token, oppRef, stage: is, role: "interested", contactId: job.contact_id, reason: "intro form sent, no reply - rolled into ghosted" });
             }
             await logEvent({ clientId: job.client_id, contactId: job.contact_id, automationId: job.automation_id, type: "form_intro_to_ghosted", payload: { automation_key: a.automation_key } });
             formToGhosted++;

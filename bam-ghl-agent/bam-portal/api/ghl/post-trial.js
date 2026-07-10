@@ -11,6 +11,7 @@
 // Auth: Supabase JWT — staff, or client_users membership for client_id.
 
 import { withSentryApiRoute } from "../_sentry.js";
+import { maybeSendSmsViaProvider } from "../messaging/provider.js";
 import { moveStage, pipelineFlags, oppMatchClause, resolveStage } from "../agent/_store.js";
 import { routeTransition } from "../agent/_router.js";
 import { markUnqualified } from "../agent/_tags.js";
@@ -339,7 +340,12 @@ async function handler(req, res) {
       if (!msg) {
         result.signup_text = sendLink ? "no_link" : "none";   // link asked for but none set, and no note typed
       } else {
-        await ghl("POST", `/conversations/messages`, { token, body: { type: "SMS", contactId, message: msg } });
+        // Provider seam (same as every agent send): a Twilio academy sends from
+        // its own number and the outbound lands in the portal thread. A raw GHL
+        // send here went out on the old LC number and split the conversation.
+        const g = await maybeSendSmsViaProvider(clientId, { ghlContactId: contactId, body: msg, sentBy: ctx.staff?.name || ctx.user?.email || "post-trial-form" });
+        if (g.handled) { if (!g.ok) throw new Error(g.error); }
+        else await ghl("POST", `/conversations/messages`, { token, body: { type: "SMS", contactId, message: msg } });
         result.signup_text = "sent";
         try {
           await sb(`post_trial_reviews?client_id=eq.${encodeURIComponent(clientId)}&opportunity_id=eq.${encodeURIComponent(oppId)}`, {

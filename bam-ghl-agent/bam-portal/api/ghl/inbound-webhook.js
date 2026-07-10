@@ -2,7 +2,7 @@ import { withSentryApiRoute } from "../_sentry.js";
 import { pickGhlToken, sendSms, ghl } from "./_core.js";
 import { notifyOwners } from "../_notify-owners.js";
 import { respondedStage, contactInRespondedStage, scheduledTrialStage, interestedStage, nurtureStage } from "../agent/_stage.js";
-import { moveStage } from "../agent/_store.js";
+import { moveStage, pipelineFlags } from "../agent/_store.js";
 import { agentMode, modeIsOn } from "../agent/_mode.js";
 import { exitEnrollment } from "../automations.js";
 // Vercel Serverless Function — GHL inbound-message webhook  ("P1 Spine")
@@ -167,7 +167,7 @@ async function handler(req, res) {
       if (startRaw) { const d = new Date(startRaw); if (!isNaN(d.getTime())) when = d.toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short" }); }
       const what = a.title || a.calendarName || a.calendar || "appointment";
       const lines = [
-        `📅 New booking — ${what}`,
+        `📅 New booking - ${what}`,
         cName ? `Who: ${cName}${cPhone ? " · " + cPhone : ""}${cEmail ? " · " + cEmail : ""}` : "",
         when ? `When: ${when}` : "",
       ].filter(Boolean);
@@ -277,20 +277,32 @@ async function handler(req, res) {
         const creds = await pickGhlToken(client);
         if (creds) {
           const rs = await respondedStage(creds.token, creds.locationId);
-          const d = await ghl("GET", `/opportunities/search?${new URLSearchParams({ location_id: creds.locationId, contact_id: String(contactId), limit: "20" })}`, { token: creds.token });
-          const opps = d.opportunities || d.data || [];
-          const opp = opps.find(o => String(o.status || "").toLowerCase() === "open") || null;
-          if (rs && opp) {
-            const curStageId = opp.pipelineStageId || opp.stageId || null;
-            const [is, ns] = await Promise.all([
-              interestedStage(creds.token, creds.locationId).catch(() => null),
-              nurtureStage(creds.token, creds.locationId).catch(() => null),
-            ]);
-            const ghostStageIds = new Set([is && is.stageId, ns && ns.stageId].filter(Boolean));
-            if (ghostStageIds.has(curStageId)) {
-              // Guard preserved exactly (open opp currently in Interested/Nurture). The
-              // move runs through the provider-aware store; on ghl it is the identical PUT.
-              await moveStage({ clientId: client.id, sb, ghl, token: creds.token, oppRef: { ghlOpportunityId: opp.id }, stage: rs, role: "responded", contactId: String(contactId) });
+          const { provider } = await pipelineFlags(client.id).catch(() => ({ provider: "ghl" }));
+          if (rs && provider === "portal") {
+            // Portal store: the GHL board is frozen on these academies - read the
+            // open opp + its role from the store (mirrors twilio/inbound-webhook).
+            // Same guard: bounce to Responded ONLY from a ghost/nurture stage.
+            const rows = await sb(`opportunities?client_id=eq.${encodeURIComponent(client.id)}&ghl_contact_id=eq.${encodeURIComponent(String(contactId))}&status=eq.open&select=id,ghl_opportunity_id,stage_role&limit=1`);
+            const opp = Array.isArray(rows) && rows[0];
+            if (opp && (opp.stage_role === "interested" || opp.stage_role === "nurture")) {
+              await moveStage({ clientId: client.id, sb, ghl, token: creds.token, oppRef: { id: opp.id, ghlOpportunityId: opp.ghl_opportunity_id }, stage: rs, role: "responded", contactId: String(contactId) });
+            }
+          } else if (rs) {
+            const d = await ghl("GET", `/opportunities/search?${new URLSearchParams({ location_id: creds.locationId, contact_id: String(contactId), limit: "20" })}`, { token: creds.token });
+            const opps = d.opportunities || d.data || [];
+            const opp = opps.find(o => String(o.status || "").toLowerCase() === "open") || null;
+            if (opp) {
+              const curStageId = opp.pipelineStageId || opp.stageId || null;
+              const [is, ns] = await Promise.all([
+                interestedStage(creds.token, creds.locationId).catch(() => null),
+                nurtureStage(creds.token, creds.locationId).catch(() => null),
+              ]);
+              const ghostStageIds = new Set([is && is.stageId, ns && ns.stageId].filter(Boolean));
+              if (ghostStageIds.has(curStageId)) {
+                // Guard preserved exactly (open opp currently in Interested/Nurture). The
+                // move runs through the provider-aware store; on ghl it is the identical PUT.
+                await moveStage({ clientId: client.id, sb, ghl, token: creds.token, oppRef: { ghlOpportunityId: opp.id }, stage: rs, role: "responded", contactId: String(contactId) });
+              }
             }
           }
         }
