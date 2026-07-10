@@ -33,7 +33,7 @@ import { routeTransition } from "./agent/_router.js";
 import { DEFAULT_BOOKING_AUTOMATIONS, getBookingAutomations, automationsLive as bookingAutosLive, nextDueStep as bookingNextStep } from "./agent/booking-automations.js";
 import { agentMode, modeIsOn, shouldAutoSend } from "./agent/_mode.js";
 import { mutedContactIdSet, isMuted } from "./agent/_mutes.js";
-import { withinQuietHours, nextSendableTime } from "./agent/_quiet.js";
+import { withinQuietHours, nextSendableTime, quietTz } from "./agent/_quiet.js";
 import { resolveAgentActor } from "./agent/_auth.js";
 
 const SUPABASE_URL         = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
@@ -69,14 +69,14 @@ async function requireStaff(req) {
 }
 
 async function loadClient(clientId) {
-  const rows = await sb(`clients?id=eq.${clientId}&select=id,business_name,ghl_location_id,ghl_access_token,ghl_refresh_token,ghl_token_expires_at,ghl_kpi_config&limit=1`);
+  const rows = await sb(`clients?id=eq.${clientId}&select=id,business_name,ghl_location_id,ghl_access_token,ghl_refresh_token,ghl_token_expires_at,ghl_kpi_config,time_zone&limit=1`);
   return Array.isArray(rows) && rows[0];
 }
 
 // ── agent config (same brain as the sandbox) ──
 async function loadConfig(clientId) {
   const [lessons, overrides, exRows] = await Promise.all([
-    sb(`agent_lessons?client_id=eq.${clientId}&agent=eq.booking&active=eq.true&select=lesson,kind&order=created_at.asc`).catch(() => []),
+    sb(`agent_lessons?or=(client_id.eq.${clientId},and(client_id.is.null,scope.eq.general))&agent=eq.booking&active=eq.true&select=lesson,kind&order=created_at.asc`).catch(() => []),
     loadMergedOverrides(clientId),   // global brain (general/goal) + this academy's own (location/offer)
     sb(`agent_examples?client_id=eq.${clientId}&agent=eq.booking&select=parent_text,agent_text&order=created_at.asc`).catch(() => []),
   ]);
@@ -461,7 +461,7 @@ async function detectForClient(client) {
   // send time has now arrived. Only inside the window; only if the lead is STILL in
   // Responded (else cancel — they booked/moved/lost while we waited), not muted,
   // and their trial hasn't run in the meantime (post-trial form owns them then).
-  if (withinQuietHours()) {
+  if (withinQuietHours(new Date(), quietTz(client))) {
     try {
       const held = await sb(`agent_ready_replies?client_id=eq.${client.id}&status=eq.approved&send_after=lte.${new Date().toISOString()}&select=id,ghl_contact_id,draft_message,approved_by&order=send_after.asc&limit=40`);
       for (const row of (Array.isArray(held) ? held : [])) {
@@ -579,7 +579,7 @@ async function detectForClient(client) {
     }
 
     const auto = shouldAutoSend(mode, { confidence: d.confidence, escalate: d.escalate });
-    if (auto && !withinQuietHours()) {
+    if (auto && !withinQuietHours(new Date(), quietTz(client))) {
       // Quiet hours: don't text a parent after 9:30pm / before 8am. Hold the
       // approved draft and let the flush step send it in the morning.
       try {
@@ -587,7 +587,7 @@ async function detectForClient(client) {
           client_id: client.id, ghl_contact_id: String(contactId), ghl_conversation_id: d.conversation_id || null,
           contact_name: item.name || null, draft_message: d.reply, reasoning: d.reasoning || null, confidence: d.confidence,
           asked_to_book: d.asked_to_book, reply_count: d.reply_count, booking_asks: d.booking_asks, last_message: d.last_message || null, last_outbound: d.last_outbound || null, summary: d.summary || null, thread_tail: d.thread_tail || null,
-          last_lead_at: item.last_at || null, status: "approved", send_after: nextSendableTime().toISOString(), created_by: "self-drive",
+          last_lead_at: item.last_at || null, status: "approved", send_after: nextSendableTime(new Date(), quietTz(client)).toISOString(), created_by: "self-drive",
         }]) });
         deferred++;
       } catch (e) { skipped++; reasons.push(`${item.name || contactId}: defer-insert failed — ${e.message}`); }
@@ -754,7 +754,7 @@ async function runDetect(res, onlyClientId) {
   try {
     clients = onlyClientId
       ? [await loadClient(onlyClientId)].filter(Boolean)
-      : await sb(`clients?select=id,business_name,ghl_location_id,ghl_access_token,ghl_refresh_token,ghl_token_expires_at,ghl_kpi_config&v2_access=eq.true`);
+      : await sb(`clients?select=id,business_name,ghl_location_id,ghl_access_token,ghl_refresh_token,ghl_token_expires_at,ghl_kpi_config,time_zone&v2_access=eq.true`);
   } catch (_) {}
   const out = [];
   for (const client of (Array.isArray(clients) ? clients : [])) {
@@ -944,8 +944,8 @@ async function handler(req, res) {
       }
       // QUIET HOURS: a human approved this after 9:30pm / before 8am. Don't text the
       // parent now — hold the approved reply and let the detect cron flush it at 8am.
-      if (!withinQuietHours()) {
-        const sendAfter = nextSendableTime().toISOString();
+      if (!withinQuietHours(new Date(), quietTz(client))) {
+        const sendAfter = nextSendableTime(new Date(), quietTz(client)).toISOString();
         const held = {
           client_id: clientId, ghl_contact_id: b.contact_id, ghl_conversation_id: b.conversation_id || null,
           contact_name: b.contact_name || null, draft_message: String(b.reply), reasoning: b.reasoning || null,

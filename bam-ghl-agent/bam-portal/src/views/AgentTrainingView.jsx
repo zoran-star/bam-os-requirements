@@ -25,7 +25,6 @@ export default function AgentTrainingView({ tokens }) {
   const F = "Inter, sans-serif";
 
   const [lessons, setLessons] = useState(null);
-  const [pending, setPending] = useState([]);
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(null);
   const [mode, setMode] = useState("manage");   // 'manage' | 'sandbox'
@@ -43,9 +42,10 @@ export default function AgentTrainingView({ tokens }) {
   useEffect(() => { load(); }, []);
   async function load() {
     try {
-      const [d, p] = await Promise.all([api("list"), api("list-promotions").catch(() => ({ pending: [] }))]);
+      // Classification/promotion is handled by the /consolidate-lessons skill now;
+      // this view just lists, edits, and archives individual lessons.
+      const d = await api("list");
       setLessons(d.lessons || []);
-      setPending(p.pending || []);
     } catch (e) { setErr(e.message); }
   }
   async function act(fn, id) { setBusy(id); try { await fn(); await load(); } catch (e) { alert(e.message); } finally { setBusy(null); } }
@@ -92,29 +92,8 @@ export default function AgentTrainingView({ tokens }) {
       <Tabs />
       <div style={{ fontSize: 20, fontWeight: 700, marginBottom: 4 }}>🤖 Agent training</div>
       <div style={{ fontSize: 13, color: sub, marginBottom: 12, lineHeight: 1.6, maxWidth: 660 }}>
-        Lessons the booking agent has learned, per academy. <b style={{ color: text }}>Academy</b> lessons stay local (their offer, pricing, local facts). Mark a general sales-craft lesson <b style={{ color: accent }}>general</b> to flag it for the shared brain. Archive ones that no longer apply.
+        Lessons the agents have learned, per academy. <b style={{ color: text }}>Academy</b> lessons stay local (their offer, pricing, local facts); <b style={{ color: accent }}>general</b> lessons are shared sales-craft loaded by every academy. Classification + dedup is done in one pass by the <b style={{ color: text }}>/consolidate-lessons</b> skill (run it when the pile grows). Here you can read, edit, or archive individual lessons.
       </div>
-      {pending.length > 0 && (
-        <div style={{ border: `1px solid ${accent}`, borderRadius: 12, padding: "14px 16px", marginBottom: 22, background: "rgba(232,197,71,.05)" }}>
-          <div style={{ fontSize: 14, fontWeight: 700, color: accent, marginBottom: 4 }}>🌐 Pending global approvals · {pending.length}</div>
-          <div style={{ fontSize: 12.5, color: sub, marginBottom: 12, lineHeight: 1.5 }}>
-            A client trainer taught these, and the AI judged them general sales-craft. Approve to promote to the shared brain (all academies). Reject to keep it local to their academy.
-          </div>
-          {pending.map(l => (
-            <div key={l.id} style={{ background: surface, border: `1px solid ${border}`, borderRadius: 10, padding: "12px 14px", marginBottom: 8 }}>
-              <div style={{ fontSize: 13.5, lineHeight: 1.5 }}>{l.lesson}</div>
-              {l.reason && <div style={{ fontSize: 11.5, color: mute, marginTop: 6, fontStyle: "italic" }}>AI: {l.reason}</div>}
-              <div style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 8, flexWrap: "wrap" }}>
-                <span style={{ fontSize: 10.5, fontFamily: "JetBrains Mono, monospace", color: mute }}>{l.business_name || "(academy)"} · {l.created_by || ""}</span>
-                <div style={{ flex: 1 }} />
-                <button disabled={busy === l.id} onClick={() => { const t = prompt("Edit lesson before approving:", l.lesson); if (t && t.trim() && t.trim() !== l.lesson) act(() => api("edit", { id: l.id, lesson: t.trim() }), l.id); }} style={btn(sub, border)}>✎ edit</button>
-                <button disabled={busy === l.id} onClick={() => act(() => api("approve-promotion", { id: l.id }), l.id)} style={btn(accent, accent)}>✓ approve → global</button>
-                <button disabled={busy === l.id} onClick={() => act(() => api("reject-promotion", { id: l.id }), l.id)} style={btn(sub, border)}>✕ keep local</button>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
       {!active.length && <div style={{ color: mute, fontSize: 14, padding: "20px 0" }}>No learnings yet across any academy.</div>}
       {Object.keys(byAcademy).sort().map(ac => (
         <div key={ac} style={{ marginBottom: 22 }}>
@@ -123,11 +102,8 @@ export default function AgentTrainingView({ tokens }) {
             <div key={l.id} style={{ background: surface, border: `1px solid ${border}`, borderRadius: 10, padding: "12px 14px", marginBottom: 8 }}>
               <div style={{ fontSize: 13.5, lineHeight: 1.5 }}>{l.lesson}</div>
               <div style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 8, flexWrap: "wrap" }}>
-                <span style={{ fontSize: 10.5, fontFamily: "JetBrains Mono, monospace", padding: "2px 8px", borderRadius: 99, border: `1px solid ${l.scope === "general" ? accent : border}`, color: l.scope === "general" ? accent : mute }}>{l.scope === "general" ? "general · promotable" : "academy"}</span>
+                <span style={{ fontSize: 10.5, fontFamily: "JetBrains Mono, monospace", padding: "2px 8px", borderRadius: 99, border: `1px solid ${l.scope === "general" ? accent : border}`, color: l.scope === "general" ? accent : mute }}>{l.scope === "general" ? "general · shared brain" : "academy"}</span>
                 <div style={{ flex: 1 }} />
-                {l.scope === "general"
-                  ? <button disabled={busy === l.id} onClick={() => act(() => api("set-scope", { id: l.id, scope: "academy" }), l.id)} style={btn(sub, border)}>↩ make academy</button>
-                  : <button disabled={busy === l.id} onClick={() => act(() => api("set-scope", { id: l.id, scope: "general" }), l.id)} style={btn(accent, accent)}>⭐ mark general</button>}
                 <button disabled={busy === l.id} onClick={() => { const t = prompt("Edit lesson:", l.lesson); if (t && t.trim()) act(() => api("edit", { id: l.id, lesson: t.trim() }), l.id); }} style={btn(sub, border)}>✎ edit</button>
                 <button disabled={busy === l.id} onClick={() => { if (confirm("Archive this learning?")) act(() => api("archive", { id: l.id, active: false }), l.id); }} style={btn(red, border)}>archive</button>
               </div>

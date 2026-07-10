@@ -16,7 +16,7 @@ import { assemblePrompt } from "./prompt-structure.js";
 // lessons + approved examples. `sb` is the caller's Supabase REST helper.
 export async function loadBrainConfig(sb, clientId, agent = "booking") {
   const [lessons, ovRows, exRows] = await Promise.all([
-    sb(`agent_lessons?client_id=eq.${clientId}&agent=eq.${agent}&active=eq.true&select=lesson,kind&order=created_at.asc`).catch(() => []),
+    sb(`agent_lessons?or=(client_id.eq.${clientId},and(client_id.is.null,scope.eq.general))&agent=eq.${agent}&active=eq.true&select=lesson,kind&order=created_at.asc`).catch(() => []),
     sb(`agent_prompt_sections?client_id=eq.${clientId}&select=section_key,body`).catch(() => []),
     sb(`agent_examples?client_id=eq.${clientId}&agent=eq.${agent}&select=parent_text,agent_text&order=created_at.asc`).catch(() => []),
   ]);

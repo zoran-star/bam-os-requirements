@@ -22770,12 +22770,17 @@ async function _taRenderMode() {
   const p = document.getElementById('ta-panel'); if (!p) return;
   const agent = _taIsAgent() ? _TA.target : 'booking';
   p.innerHTML = `<div style="color:var(--text-mute);font-size:13px"><span class="req-spin"></span> Loading…</div>`;
-  let cur = 'off', selfDriveOn = false;
+  let cur = 'off', selfDriveOn = false, tz = null, tzDefault = 'America/Toronto';
   try {
     // get-mode (not list): readable by the academy's own owner, not just BAM staff.
-    const d = await _taConfigApi('get-mode', { client_id: CLIENT_ID });
+    // Timezone rides alongside (academy-wide quiet-hours zone).
+    const [d, tzd] = await Promise.all([
+      _taConfigApi('get-mode', { client_id: CLIENT_ID }),
+      _taConfigApi('get-timezone', { client_id: CLIENT_ID }).catch(() => ({})),
+    ]);
     cur = d[_TA_MODE_FIELD[agent]] || 'off';
     selfDriveOn = !!d.self_drive_enabled;   // global kill-switch
+    tz = tzd.time_zone || null; tzDefault = tzd.default_time_zone || tzDefault;
   } catch (e) { p.innerHTML = `<div style="color:#e07070;font-size:13px">Couldn't load - ${escapeHTML(e.message)}</div>`; return; }
   _TA.mode = cur; _TA.selfDriveOn = selfDriveOn;
   const modes = _TA_MODES.filter(m => selfDriveOn || m.key !== 'self_drive');
@@ -22788,7 +22793,43 @@ async function _taRenderMode() {
     <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">
       ${modes.map(m => `<button onclick="_taSetMode('${m.key}')" style="${seg(cur === m.key, m.key === 'self_drive')}">${m.label}</button>`).join('')}
     </div>
-    <div style="font-size:13px;color:${cur === 'self_drive' ? '#e05a42' : 'var(--text-sub)'};line-height:1.5">${escapeHTML(curMode.hint)}</div>`;
+    <div style="font-size:13px;color:${cur === 'self_drive' ? '#e05a42' : 'var(--text-sub)'};line-height:1.5">${escapeHTML(curMode.hint)}</div>
+    ${_taTimezoneHtml(tz, tzDefault)}`;
+}
+
+// Academy quiet-hours timezone (clients.time_zone). The agents only text a parent
+// inside 8:00am-9:30pm of THIS zone. Applies to ALL agents, so it shows once in the
+// Autonomy panel. Unset = the default (America/Toronto), so a GTA-era academy is
+// unchanged until it picks its own zone.
+const _TA_ZONES = [
+  ['America/Toronto', 'Eastern - Toronto'],
+  ['America/New_York', 'Eastern - New York'],
+  ['America/Halifax', 'Atlantic - Halifax'],
+  ['America/St_Johns', 'Newfoundland - St. Johns'],
+  ['America/Chicago', 'Central - Chicago'],
+  ['America/Winnipeg', 'Central - Winnipeg'],
+  ['America/Denver', 'Mountain - Denver'],
+  ['America/Edmonton', 'Mountain - Edmonton'],
+  ['America/Los_Angeles', 'Pacific - Los Angeles'],
+  ['America/Vancouver', 'Pacific - Vancouver'],
+];
+function _taTimezoneHtml(tz, tzDefault) {
+  const effective = tz || tzDefault;
+  const known = _TA_ZONES.some(z => z[0] === effective);
+  const opts = _TA_ZONES.map(z => `<option value="${escapeHTML(z[0])}"${z[0] === effective ? ' selected' : ''}>${escapeHTML(z[1])}</option>`).join('')
+    + (known ? '' : `<option value="${escapeHTML(effective)}" selected>${escapeHTML(effective)}</option>`);
+  return `<div style="margin-top:18px;padding-top:16px;border-top:1px solid var(--border);max-width:620px">
+      <div style="font-size:12.5px;font-weight:700;color:var(--text);margin-bottom:4px">Quiet-hours timezone</div>
+      <div style="font-size:12px;color:var(--text-mute);line-height:1.5;margin-bottom:9px">Agents only text a parent between <b style="color:var(--text-sub)">8:00am and 9:30pm</b> in this zone. Applies to every agent.${tz ? '' : ` Currently using the default (${escapeHTML(tzDefault)}).`}</div>
+      <select id="ta-tz" onchange="_taSaveTimezone(this.value)" style="background:var(--surface);color:var(--text);border:1px solid var(--border);border-radius:9px;padding:9px 12px;font-size:13.5px;font-family:inherit;min-width:240px;cursor:pointer">${opts}</select>
+    </div>`;
+}
+async function _taSaveTimezone(tz) {
+  if (!tz) return;
+  const sel = document.getElementById('ta-tz'); if (sel) sel.disabled = true;
+  try { await _taConfigApi('set-timezone', { client_id: CLIENT_ID, time_zone: tz }); _plToast('Quiet-hours timezone set'); }
+  catch (e) { alert(e.message); }
+  if (sel) sel.disabled = false;
 }
 
 async function _taSetMode(mode) {

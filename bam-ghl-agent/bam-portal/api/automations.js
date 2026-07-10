@@ -20,7 +20,7 @@ import { routeTransition } from "./agent/_router.js";
 import { nextSessionLabel } from "./_next_session.js";
 import { sendOn } from "./_send.js";
 import { renderEmail } from "./email-shells.js";
-import { withinQuietHours, nextSendableTime } from "./agent/_quiet.js";
+import { withinQuietHours, nextSendableTime, quietTz } from "./agent/_quiet.js";
 import { isMuted } from "./agent/_mutes.js";
 import { resolveAgentActor } from "./agent/_auth.js";
 import { FORM_INTRO_DEFAULTS } from "./form-intro-automations.js";
@@ -379,16 +379,19 @@ async function runWork(res) {
         canceled++; continue;
       }
 
+      // Load the client BEFORE the quiet-hours check: quiet hours are evaluated in
+      // the academy's own timezone (clients.time_zone), so `client` must exist here.
+      if (!clientCache.has(job.client_id)) clientCache.set(job.client_id, await loadClient(job.client_id));
+      const client = clientCache.get(job.client_id);
+
       // Quiet hours: never send outside the window — defer this job to next morning
       // (re-queue as pending; do NOT advance until it actually sends).
-      if (!withinQuietHours()) {
-        await finish({ status: "pending", run_after: nextSendableTime().toISOString() });
+      if (!withinQuietHours(new Date(), quietTz(client))) {
+        await finish({ status: "pending", run_after: nextSendableTime(new Date(), quietTz(client)).toISOString() });
         deferred++; continue;
       }
 
       // creds + contact info
-      if (!clientCache.has(job.client_id)) clientCache.set(job.client_id, await loadClient(job.client_id));
-      const client = clientCache.get(job.client_id);
       if (!tokenCache.has(job.client_id)) tokenCache.set(job.client_id, client ? await pickGhlToken(client) : null);
       const creds = tokenCache.get(job.client_id);
       const token = creds && creds.token;
@@ -449,7 +452,7 @@ async function runWork(res) {
       // Send/processing failed — retry up to MAX_ATTEMPTS, else mark failed.
       const attempts = (job.attempts || 0) + 1;
       if (attempts >= MAX_ATTEMPTS) { await finish({ status: "failed", attempts, last_error: String(e.message || e).slice(0, 300) }); failed++; }
-      else { await finish({ status: "pending", attempts, last_error: String(e.message || e).slice(0, 300), run_after: nextSendableTime(new Date(Date.now() + RETRY_BACKOFF_MS)).toISOString() }); }
+      else { await finish({ status: "pending", attempts, last_error: String(e.message || e).slice(0, 300), run_after: nextSendableTime(new Date(Date.now() + RETRY_BACKOFF_MS), quietTz(client)).toISOString() }); }
     }
   }
   return res.status(200).json({ ok: true, picked: jobs.length, sent, deferred, advanced, completed, failed, canceled, nurture_lost: nurtureLost, ghosted_lost: ghostedLost, form_to_ghosted: formToGhosted, lost_race: lost });

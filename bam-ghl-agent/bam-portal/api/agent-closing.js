@@ -41,7 +41,7 @@ import { routeTransition } from "./agent/_router.js";
 import { closingAgentMode, modeIsOn, shouldAutoSend } from "./agent/_mode.js";
 import { markUnqualified } from "./agent/_tags.js";
 import { mutedContactIdSet, isMuted } from "./agent/_mutes.js";
-import { withinQuietHours, nextSendableTime } from "./agent/_quiet.js";
+import { withinQuietHours, nextSendableTime, quietTz } from "./agent/_quiet.js";
 import { resolveAgentActor } from "./agent/_auth.js";
 
 const SUPABASE_URL         = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
@@ -62,7 +62,7 @@ async function sb(path, init = {}) {
 }
 
 async function loadClient(clientId) {
-  const rows = await sb(`clients?id=eq.${clientId}&select=id,business_name,ghl_location_id,ghl_access_token,ghl_refresh_token,ghl_token_expires_at,ghl_kpi_config&limit=1`);
+  const rows = await sb(`clients?id=eq.${clientId}&select=id,business_name,ghl_location_id,ghl_access_token,ghl_refresh_token,ghl_token_expires_at,ghl_kpi_config,time_zone&limit=1`);
   return Array.isArray(rows) && rows[0];
 }
 
@@ -74,7 +74,7 @@ async function loadClient(clientId) {
 async function loadConfig(clientId) {
   const [overrides, lessonRows, exRows] = await Promise.all([
     loadMergedOverrides(clientId),   // global brain (general/goal) + this academy's own (location/offer)
-    sb(`agent_lessons?client_id=eq.${clientId}&agent=eq.closing&active=eq.true&select=lesson,kind&order=created_at.asc`).catch(() => []),
+    sb(`agent_lessons?or=(client_id.eq.${clientId},and(client_id.is.null,scope.eq.general))&agent=eq.closing&active=eq.true&select=lesson,kind&order=created_at.asc`).catch(() => []),
     sb(`agent_examples?client_id=eq.${clientId}&agent=eq.closing&select=parent_text,agent_text&order=created_at.asc`).catch(() => []),
   ]);
   return { lessons: Array.isArray(lessonRows) ? lessonRows : [], overrides, examples: Array.isArray(exRows) ? exRows : [] };
@@ -504,7 +504,7 @@ async function detectForClient(client) {
   // Loaded before the flush so a held send at a MUTED lead is canceled, not sent.
   const mutedSet = await mutedContactIdSet(client.id, "closing");
   const _inboundLast = new Set(queue.filter(q => (q.last_direction || "") === "inbound").map(q => q.contact_id));
-  if (withinQuietHours()) {
+  if (withinQuietHours(new Date(), quietTz(client))) {
     try {
       const held = await sb(`agent_closing_replies?client_id=eq.${client.id}&status=eq.approved&send_after=lte.${new Date().toISOString()}&select=id,ghl_contact_id,draft_message,step_key&order=send_after.asc&limit=40`);
       for (const row of (Array.isArray(held) ? held : [])) {
@@ -725,10 +725,10 @@ async function detectForClient(client) {
     // A plain closing/nurture reply. Self-drive may auto-send high-confidence ones;
     // quiet hours hold until morning. Everything else queues for approval.
     const auto = shouldAutoSend(mode, { confidence: d.confidence, escalate: d.escalate });
-    if (auto && !withinQuietHours()) {
+    if (auto && !withinQuietHours(new Date(), quietTz(client))) {
       try {
         await sb(`agent_closing_replies`, { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify([{
-          ...baseRow, kind: "closing", draft_message: d.reply, status: "approved", send_after: nextSendableTime().toISOString(), created_by: "self-drive",
+          ...baseRow, kind: "closing", draft_message: d.reply, status: "approved", send_after: nextSendableTime(new Date(), quietTz(client)).toISOString(), created_by: "self-drive",
         }]) });
         deferred++;
       } catch (e) { skipped++; reasons.push(`${item.name || contactId}: defer-insert failed — ${e.message}`); }
@@ -769,7 +769,7 @@ async function runDetect(res, onlyClientId) {
   try {
     clients = onlyClientId
       ? [await loadClient(onlyClientId)].filter(Boolean)
-      : await sb(`clients?select=id,business_name,ghl_location_id,ghl_access_token,ghl_refresh_token,ghl_token_expires_at,ghl_kpi_config&v2_access=eq.true`);
+      : await sb(`clients?select=id,business_name,ghl_location_id,ghl_access_token,ghl_refresh_token,ghl_token_expires_at,ghl_kpi_config,time_zone&v2_access=eq.true`);
   } catch (_) {}
   const out = [];
   for (const client of (Array.isArray(clients) ? clients : [])) {
@@ -882,7 +882,7 @@ async function handler(req, res) {
           dropped++;
           continue;
         }
-        const sendAfter = nextSendableTime(new Date(base + dayIdx * 86400000)).toISOString();
+        const sendAfter = nextSendableTime(new Date(base + dayIdx * 86400000), quietTz(client)).toISOString();
         await sb(`agent_closing_replies?id=eq.${encodeURIComponent(row.id)}&client_id=eq.${clientId}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({
           status: "approved", draft_message: text, send_after: sendAfter,
           approved_by: staffEmail, approved_at: new Date().toISOString(), updated_at: new Date().toISOString(),
@@ -905,8 +905,8 @@ async function handler(req, res) {
         return res.status(409).json({ error: "This lead is no longer in the Done-Trial stage - not sending." });
       }
       // Quiet hours: hold an after-hours approval until morning.
-      if (!withinQuietHours()) {
-        const sendAfter = nextSendableTime().toISOString();
+      if (!withinQuietHours(new Date(), quietTz(client))) {
+        const sendAfter = nextSendableTime(new Date(), quietTz(client)).toISOString();
         const held = {
           client_id: clientId, ghl_contact_id: b.contact_id, ghl_conversation_id: b.conversation_id || null,
           contact_name: b.contact_name || null, kind: "closing", draft_message: String(b.reply), reasoning: b.reasoning || null,
