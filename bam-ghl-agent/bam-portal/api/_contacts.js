@@ -41,6 +41,37 @@ async function post(path, body, prefer) {
   return txt ? JSON.parse(txt) : null;
 }
 
+// athlete_name at write time (Zoran 2026-07-10): portal-native contacts never
+// pass through the GHL contact sync, so cards like Mike Boam's showed no athlete
+// even though the name sat in custom_fields. Whenever a write carries
+// custom_fields without an athlete_name, resolve it from the academy's mapped
+// field ids (v15_config.athlete_name_field_ids, first non-empty wins - the same
+// precedence as cron-sync-contacts). Best-effort: never blocks a write.
+const _athleteFieldsCache = new Map();   // clientId -> string[] (process lifetime)
+async function athleteFieldIds(clientId) {
+  if (_athleteFieldsCache.has(clientId)) return _athleteFieldsCache.get(clientId);
+  let ids = [];
+  try {
+    const r = await get(`clients?id=eq.${encodeURIComponent(clientId)}&select=v15_config&limit=1`);
+    const v = Array.isArray(r) && r[0] && r[0].v15_config;
+    if (v && Array.isArray(v.athlete_name_field_ids)) ids = v.athlete_name_field_ids.map(String);
+  } catch (_) { return ids; /* don't cache a lookup blip */ }
+  _athleteFieldsCache.set(clientId, ids);
+  return ids;
+}
+async function withAthleteName(clientId, fields) {
+  try {
+    const cf = fields && fields.custom_fields;
+    if (!cf || typeof cf !== "object" || Array.isArray(cf)) return fields;
+    if (fields.athlete_name && String(fields.athlete_name).trim()) return fields;
+    for (const fid of await athleteFieldIds(clientId)) {
+      const v = cf[fid];
+      if (v != null && String(v).trim()) return { ...fields, athlete_name: String(v).trim() };
+    }
+  } catch (_) { /* name resolution is a nicety - never block the write */ }
+  return fields;
+}
+
 // PORTAL-NATIVE contact creation (Stage 4 of contacts-off-GHL). Finds the person
 // in the portal store by email (preferred) or phone; if found, merge-updates the
 // row (never clobbering good data) and returns its ghl_contact_id - which for a
@@ -53,6 +84,7 @@ async function post(path, body, prefer) {
 export async function resolveOrMintPortalContact(clientId, fields = {}) {
   try {
     if (!SB_URL || !SB_KEY || !clientId) return null;
+    fields = await withAthleteName(clientId, fields);
     const email = (fields.email || "").trim().toLowerCase() || null;
     const phone = (fields.phone || "").trim() || null;
     if (!email && !phone) return null;
@@ -102,6 +134,7 @@ export async function resolveOrMintPortalContact(clientId, fields = {}) {
 export async function upsertPortalContact(clientId, ghlContactId, fields = {}) {
   try {
     if (!SB_URL || !SB_KEY || !clientId || !ghlContactId) return null;
+    fields = await withAthleteName(clientId, fields);
     const row = {
       client_id: clientId,
       ghl_contact_id: ghlContactId,
@@ -255,7 +288,11 @@ export async function bulkUpsertPortalContacts(rows) {
   try {
     if (!SB_URL || !SB_KEY || !Array.isArray(rows) || rows.length === 0) return;
     const now = new Date().toISOString();
-    const clean_rows = rows
+    // Cron rows arrive with athlete_name already resolved, so withAthleteName
+    // no-ops there; the per-client field-id cache keeps this one lookup per client.
+    const named = [];
+    for (const r of rows) named.push(r && r.client_id ? await withAthleteName(r.client_id, r) : r);
+    const clean_rows = named
       .map((r) => ({ ...clean(r), updated_at: now }))
       .filter((r) => r.client_id && r.ghl_contact_id);
     if (!clean_rows.length) return;
