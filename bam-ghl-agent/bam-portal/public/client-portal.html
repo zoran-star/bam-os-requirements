@@ -32486,7 +32486,7 @@ function _hk2CardHtml(r, pos, total, isTop) {
   // primary button into the two terminal closes (Zoran 2026-07-10).
   const _pp = _HK2.ptf || {};
   const ptfNotFit = isForm && _pp.showed === true && _pp.fit === false;
-  const moves = isForm ? '' : _hk2Moves(r).map(([lab, op]) => op === 'write' ? `<button class="hk2-x" onclick="_hk2Write()">${lab}</button>` : `<button class="hk2-x" onclick="_hk2Move('${op}')">${lab}</button>`).join('');
+  const moves = isForm ? '' : _hk2Moves(r).map(([lab, op]) => op === 'write' ? `<button class="hk2-x" onclick="_hk2Write()">${lab}</button>` : `<button class="hk2-x" data-orig="${escapeHTML(lab)}" onclick="_hk2Move('${op}', this)">${lab}</button>`).join('');
   // Two-line header: athlete on top, parent underneath. No athlete name = fall
   // back to the single contact name + confidence, exactly as before.
   const athlete = r.athlete_name ? String(r.athlete_name).trim() : '';
@@ -32549,7 +32549,7 @@ function _hk2PtfClose(outcome) {
 function _hk2Render(opts) {
   const host = document.getElementById('pl-hawkeye'); if (!host || !_HK2.q) return;
   _HK2.edited = false; _HK2.touched = false; _HK2.otherOpen = false;
-  const _t0 = (_HK2.q[_HK2.agent] || [])[0]; if (_t0) _t0._writeMode = false;
+  const _t0 = (_HK2.q[_HK2.agent] || [])[0]; if (_t0) { _t0._writeMode = false; _t0._moveArm = null; }
   if (!(opts && opts.keepPtf)) _HK2.ptf = { showed: null, fit: null, link: true, msg: '', notes: '', outcome: null };
   const tabs = _HK2_AGENTS.map(a => {
     const n = _HK2.q[a].length, on = _HK2.agent === a;
@@ -32777,8 +32777,20 @@ function _hk2Confirm() {
   setTimeout(() => { if (!undone) _hk2Resolve(r, agent); }, 480);
 }
 // "Other": move the lead somewhere else instead of the primary action.
-function _hk2Move(op) {
+function _hk2Move(op, btn) {
   const r = _hk2Top(); if (!r) return;
+  // Lost/Unqualified are two-tap (Zoran 2026-07-10): the first tap arms the
+  // button ("Confirm: ...") and reveals an OPTIONAL teach-why box, so a lesson
+  // can ride along with the close. The second tap commits + saves the lesson.
+  if ((op === 'lost' || op === 'unq') && r._moveArm !== op) {
+    const pnl = document.getElementById('hk2-other');
+    if (pnl && pnl.querySelectorAll) pnl.querySelectorAll('.hk2-x[data-orig]').forEach(b => { b.textContent = b.dataset.orig; });
+    r._moveArm = op;
+    if (btn) btn.textContent = 'Confirm: ' + (btn.dataset.orig || btn.textContent);
+    const t = document.getElementById('hk2-teach');
+    if (t) { t.placeholder = 'Optional: teach the agent why (saved as a lesson)'; t.classList.remove('hk2-miss'); t.style.display = ''; t.focus(); }
+    return;
+  }
   // Re-entry guard (shared with _hk2Confirm): a double-tap on the same card
   // queued the SAME action twice (_hawkDefer flushes the first immediately and
   // defers the second - double SMS / double move). One commit per card.
@@ -32788,6 +32800,9 @@ function _hk2Move(op) {
   const ep = _HK2_META[agent].ep;
   const readyId = r._kind === 'plan' ? (r.rows && r.rows[0] && r.rows[0].id) : r.id;
   if (!readyId) return;
+  // Capture the lesson NOW - the deck advances at 480ms and tears this DOM down.
+  const teachEl = document.getElementById('hk2-teach');
+  const lesson = (op === 'lost' || op === 'unq') && teachEl ? teachEl.value.trim() : '';
   const chk = resp => { if (resp && resp.error) throw new Error(resp.error); return resp; };
   const label = op === 'ghost' ? 'Sent to Ghosted' : op === 'handoff' ? 'Handed to Booking' : op === 'lost' ? 'Marked lost' : 'Unqualified';
   let undone = false;
@@ -32801,11 +32816,12 @@ function _hk2Move(op) {
       _apxToast('Handed back to Booking', true);
     } else if (op === 'lost') {
       chk(await _apxPost(ep, 'confirm-lost', { ready_id: readyId, reply: '', lost_reason: r.lost_reason || 'Other' }));
-      _apxToast('Marked lost - Nurture takes over', true);
+      _apxToast(lesson ? 'Marked lost + taught' : 'Marked lost - Nurture takes over', true);
     } else {
       chk(await _apxPost(ep, 'confirm-abandoned', { ready_id: readyId }));
-      _apxToast('Marked unqualified', true);
+      _apxToast(lesson ? 'Marked unqualified + taught' : 'Marked unqualified', true);
     }
+    if (lesson) await _hk2Teach(r, lesson, r.draft_message || null, op === 'lost' ? '(marked lost)' : '(marked unqualified)', agent);
   } });
   // Advance the deck right after the fly-out beat - don't wait for the 6s flush.
   setTimeout(() => { if (!undone) _hk2Resolve(r, agent); }, 480);
