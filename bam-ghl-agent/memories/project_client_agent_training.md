@@ -44,6 +44,13 @@ clients at onboarding. Changes shipped:
   GHL prep -> mode -> verify the lesson loop -> consolidation cadence).
 - Cadence: run /consolidate-lessons at 15+ raw lessons per agent or every 2
   weeks per live academy.
+- Zoran refinements (2026-07-10, same day): (1) assume EVERYTHING is the
+  free_trial preset for now - don't agonize over free_trial vs universal tags;
+  (2) intake-gap candidates are only DONE when built: the skill must recommend
+  a concrete V2 UI placement (BB card / offer setup / onboarding side page /
+  Knowledge section wording / Settings), workshop it with Zoran via popup, then
+  BUILD the question with storage wired in the same session. Ledger status
+  'accepted' = question exists in the UI.
 - STILL OPEN (deliberately not built): preset column + reader filtering (tag
   lives in context.preset until preset #2 exists), training-health metrics
   (lessons per academy, % edited, % edits-with-lesson from agent_approvals),

@@ -13,10 +13,13 @@ Today's agents implement exactly TWO presets: the **training offer** and the
 **free trial sales system**. Other presets will come later for academies that do
 not run free trials or sell differently. Consequences:
 
-- "General" does NOT mean universal. A lesson like "when they hesitate on the
-  trial, offer a specific day" is general **to the free-trial preset**. Tag it
-  `preset: "free_trial"`. Only motion-agnostic craft (tone, pacing, empathy,
-  texting style) is `preset: "universal"`.
+- **For now, assume everything is the free-trial preset** (Zoran 2026-07-10).
+  The apply script tags every general lesson `context.preset = 'free_trial'` by
+  default - do not agonize over the tag. Only mark a lesson
+  `preset: "universal"` when it is trivially motion-agnostic (pure tone /
+  texting craft with zero mention of trials or booking). The tag exists so that
+  when preset #2 ships we can split the shared brain without re-reading
+  every lesson.
 - Academy-specific lessons are a DOUBLE signal: they fix that academy AND they
   flag a fact BAM should collect from every future client. That mining step is
   mandatory (Step 4), not optional.
@@ -113,12 +116,14 @@ Disposition is one of five:
 
 1. **Onboarding question** - a static fact every academy should be asked up
    front -> row in the Notion Onboarding Data Points DB
-   (`49be4ce65ada4d45b736070e11452edb`).
+   (`49be4ce65ada4d45b736070e11452edb`) AND a real question in the V2 UI (see
+   below).
 2. **Brain section default** - the fact belongs in one of the 9 fact sections;
    improve that section's default/template wording so the Knowledge tab prompts
    every new academy for it.
 3. **Config default** - a timer / threshold / cadence setting (root CLAUDE.md
-   "configuration settings" rule) -> also an Onboarding Data Points row.
+   "configuration settings" rule) -> also an Onboarding Data Points row + a V2
+   Settings control.
 4. **Global default** - actually true for every academy -> fix the shared brain
    section or code default instead; nothing to collect.
 5. **Live data** - changes weekly (capacity, current openings). NOT an intake
@@ -126,6 +131,26 @@ Disposition is one of five:
 
 When a lesson spawned a candidate, put the candidate's ledger ID (e.g. `IC-003`)
 on that plan entry as `intake_gap`.
+
+**V2 UI placement (mandatory for dispositions 1 and 3).** A candidate is not
+done when it lands in Notion - the question must actually get ASKED. For each
+onboarding-question / config-default candidate, recommend ONE concrete home in
+the V2 client portal and say why:
+
+| Surface | Use it for |
+|---|---|
+| **BB card** (General / Staff / Locations / Brand / KPIs / Offers / Member Onboarding, `clients.*_data` jsonb) | Business-level facts the owner types once |
+| **Offer setup** (per-offer fields) | Facts that vary per offer (Training is one offer type) - pricing details, group capacity, trial policy |
+| **"Finish your onboarding" side page / Action Items step** | Anything that must be COMPLETED (connect, upload, confirm), not just typed |
+| **Train Agent > Knowledge section wording** | Agent-only facts - improve the section template so the tab prompts for it |
+| **V2 Settings** | Config defaults: timers, thresholds, channels, quiet hours |
+
+Recommend the surface, the exact field label + input type, and where in that
+surface it sits. Then **workshop it with Zoran** (AskUserQuestion popup:
+placement options + your recommended one first). Once he picks, **build it in
+the same session**: add the field/step to the V2 UI with storage wired, plus
+the Notion row and the ledger entry. A candidate's Status only becomes
+`accepted` when the question exists in the UI.
 
 ## Step 5 - Confirm with Zoran BEFORE writing
 
@@ -187,19 +212,26 @@ Apply the brain-fact section updates now too (Knowledge tab or
 `agent_prompt_sections` upsert), and archive those source lessons via
 `archive_ids` in the same plan.
 
-## Step 7 - Record the intake candidates
+## Step 7 - Record AND build the intake candidates
 
 - Append the new candidates to
   `bam-ghl-agent/docs/onboarding-intake-candidates.md` with Zoran's decisions
-  (proposed / accepted / rejected / deferred) and the source lesson quotes.
-- For each **accepted** onboarding-question or config-default candidate, create
-  the row in the Notion Onboarding Data Points DB
-  (`49be4ce65ada4d45b736070e11452edb`): Field Name, Description, Category,
-  Collection Phase, Input Type, Source = `lesson-mining /consolidate-lessons
-  <date> <academy>`, BAM GTA Example = the raw lesson quote, Blocks = "agent
-  gives wrong answers about <topic>", FC Modules = "Sales agents". Paste the
-  Notion link back into the ledger row.
-- Commit the ledger in the same session.
+  (proposed / accepted / rejected / deferred), the source lesson quotes, and
+  the agreed V2 UI placement.
+- For each **accepted** onboarding-question or config-default candidate:
+  1. **Build the question into the V2 UI** at the workshopped placement (BB
+     card field, offer-setup field, onboarding side-page step, Knowledge
+     section wording, or Settings control) with storage wired end to end.
+     Follow the design system (`bam-portal/design-system/DESIGN.md`) and update
+     mobile in the same pass.
+  2. Create the row in the Notion Onboarding Data Points DB
+     (`49be4ce65ada4d45b736070e11452edb`): Field Name, Description, Category,
+     Collection Phase, Input Type, Source = `lesson-mining /consolidate-lessons
+     <date> <academy>`, BAM GTA Example = the raw lesson quote, Blocks = "agent
+     gives wrong answers about <topic>", FC Modules = "Sales agents". Paste the
+     Notion link back into the ledger row.
+  3. Mark the ledger row `accepted` only once the UI field exists.
+- Commit the ledger + UI changes in the same session.
 
 ## Step 8 - Report
 
@@ -209,6 +241,7 @@ Confirm, all mandatory:
   every academy's matching agent (new academies inherit them automatically).
 - Brain sections updated: `<keys or "none">`.
 - Intake candidates: N proposed / M accepted / K rejected or deferred.
+- V2 UI questions built: `<field + surface, or "none">`.
 - Ledger committed: yes/no. Notion rows created: `<links or "none">`.
 
 ## When to run
