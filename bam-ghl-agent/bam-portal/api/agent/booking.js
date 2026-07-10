@@ -46,6 +46,33 @@ export async function bookingProviderOf(clientId) {
   } catch (_) { return "ghl"; }
 }
 
+// Contacts whose BOOKED trial time has already PASSED with no post-trial review
+// yet: once the trial runs, the lead belongs to the post-trial form card on the
+// Confirm tab (Zoran 2026-07-09) - NOT another Booking reply or Confirm touch.
+// Both agents use this set to skip drafting and to retire lingering cards.
+// Portal-booking academies only (their trial spine lives in trial_bookings).
+// NO expiry (Zoran 2026-07-10): the lead stays in this set until the form is
+// filled - an unreviewed trial never silently ages out of the deck. EXCEPT a
+// contact with an UPCOMING booked slot (they rebooked): they're back in confirm
+// land - never starve the new trial's confirmations on an old unreviewed one;
+// the new trial makes its own form card when it runs.
+// Fails to an empty set so a lookup hiccup never wrongly hides live cards.
+export async function passedTrialContactIds(clientId) {
+  try {
+    if (!clientId) return new Set();
+    if ((await bookingProviderOf(clientId)) !== "portal") return new Set();
+    const nowIso = new Date().toISOString();
+    const bks = await sbFetch(`trial_bookings?tenant_id=eq.${clientId}&status=eq.BOOKED&select=ghl_contact_id,schedule_slots(start_time)`) || [];
+    const rows = (Array.isArray(bks) ? bks : []).filter(t => t.ghl_contact_id && t.schedule_slots && t.schedule_slots.start_time);
+    const upcoming = new Set(rows.filter(t => t.schedule_slots.start_time > nowIso).map(t => String(t.ghl_contact_id)));
+    const due = rows.filter(t => t.schedule_slots.start_time <= nowIso && !upcoming.has(String(t.ghl_contact_id)));
+    if (!due.length) return new Set();
+    const revs = await sbFetch(`post_trial_reviews?client_id=eq.${clientId}&select=ghl_contact_id`) || [];
+    const reviewed = new Set((Array.isArray(revs) ? revs : []).map(r => String(r.ghl_contact_id || "")));
+    return new Set(due.map(t => String(t.ghl_contact_id)).filter(cid => cid && !reviewed.has(cid)));
+  } catch (_) { return new Set(); }
+}
+
 // Normalize a calendar label to a group key the agent uses.
 function groupOf(label) {
   const s = String(label || "").toLowerCase();

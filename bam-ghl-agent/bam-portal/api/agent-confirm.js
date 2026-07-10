@@ -32,7 +32,7 @@ import { readStoreThreadAgent } from "./messaging/read-thread.js";
 import { buildAgentSystem } from "./agent/brain.js";
 import { loadMergedOverrides } from "./agent/_sections.js";
 import { loadContactMemory } from "./agent/contact-memory.js";
-import { nextAppointment } from "./agent/booking.js";
+import { nextAppointment, passedTrialContactIds } from "./agent/booking.js";
 import {
   scheduledTrialStage, contactInRespondedStage, computeConfirmQueue,
   scheduledTrialContactIdSetCached, peekScheduledTrialIdSet, respondedStage, nurtureStage, toIso,
@@ -487,13 +487,24 @@ async function detectForClient(client) {
   catch (e) { return { client_id: client.id, error: `queue: ${e.message}` }; }
   if (!sts) return { client_id: client.id, skipped: "no Scheduled-Trial stage" };
 
+  // Leads whose booked trial already RAN with no review yet (portal spine, no
+  // expiry, rebooked leads excluded): they belong to the post-trial form card
+  // on this tab now - no more confirm replies/openers/reminders (Zoran
+  // 2026-07-09, mirrors the Booking handoff). Empty set for non-portal
+  // academies, so V1/V1.5 behavior is unchanged.
+  const passedTrial = await passedTrialContactIds(client.id);
+
   // Prune: cancel pending confirm cards whose lead has LEFT the Scheduled-Trial
-  // stage (showed up, handed off, lost…). Scoped to THIS agent's table only.
+  // stage (showed up, handed off, lost…) or whose trial has already run (the
+  // post-trial form owns them now). Scoped to THIS agent's table only.
   let pruned = 0;
   try {
     const pend = await sb(`agent_confirm_replies?client_id=eq.${client.id}&status=eq.pending&select=id,ghl_contact_id`);
     for (const row of (Array.isArray(pend) ? pend : [])) {
-      if (row.ghl_contact_id && !scheduledIds.has(row.ghl_contact_id)) {
+      if (row.ghl_contact_id && passedTrial.has(String(row.ghl_contact_id))) {
+        await sb(`agent_confirm_replies?id=eq.${row.id}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ status: "canceled", send_error: "trial ran - handed to post-trial form", updated_at: new Date().toISOString() }) });
+        pruned++;
+      } else if (row.ghl_contact_id && !scheduledIds.has(row.ghl_contact_id)) {
         await sb(`agent_confirm_replies?id=eq.${row.id}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ status: "canceled", send_error: "left Scheduled-Trial stage", updated_at: new Date().toISOString() }) });
         pruned++;
       }
@@ -504,9 +515,19 @@ async function detectForClient(client) {
   let flushed = 0;
   if (withinQuietHours()) {
     try {
-      const held = await sb(`agent_confirm_replies?client_id=eq.${client.id}&status=eq.approved&send_after=lte.${new Date().toISOString()}&select=id,ghl_contact_id,draft_message&order=send_after.asc&limit=40`);
+      const held = await sb(`agent_confirm_replies?client_id=eq.${client.id}&status=eq.approved&send_after=lte.${new Date().toISOString()}&select=id,ghl_contact_id,draft_message,kind&order=send_after.asc&limit=40`);
       for (const row of (Array.isArray(held) ? held : [])) {
-        if (row.ghl_contact_id && !scheduledIds.has(row.ghl_contact_id)) {
+        // A held HANDOFF acknowledgement (approved after 9:30pm) is exempt from
+        // both gates below: the handoff already bounced this lead out of
+        // Scheduled-Trial on purpose - that's the plan, not staleness.
+        const handoffAck = row.kind === "confirm_handoff";
+        // Never flush a held confirm at a lead whose trial already ran - "see
+        // you Tuesday!" landing on Wednesday. The post-trial form owns them.
+        if (!handoffAck && row.ghl_contact_id && passedTrial.has(String(row.ghl_contact_id))) {
+          await sb(`agent_confirm_replies?id=eq.${row.id}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ status: "canceled", send_error: "trial ran - handed to post-trial form", updated_at: new Date().toISOString() }) });
+          continue;
+        }
+        if (!handoffAck && row.ghl_contact_id && !scheduledIds.has(row.ghl_contact_id)) {
           await sb(`agent_confirm_replies?id=eq.${row.id}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ status: "canceled", send_error: "left Scheduled-Trial stage", updated_at: new Date().toISOString() }) });
           continue;
         }
@@ -551,6 +572,10 @@ async function detectForClient(client) {
     const contactId = item.contact_id;
     if (!contactId) { skipped++; reasons.push(`${item.name || "?"}: no contactId`); continue; }
     if (mutedSet.has(String(contactId))) { skipped++; reasons.push(`${item.name || contactId}: bot muted on this lead`); continue; }
+    // Trial already ran: reactive replies included - answering "are we still
+    // good?" two days after the session reads wrong. The post-trial form card
+    // (list-ready synthesis) is the ONE action for this lead now.
+    if (passedTrial.has(String(contactId))) { skipped++; reasons.push(`${item.name || contactId}: trial already ran - post-trial form`); continue; }
     // O6: never keep chasing a paid member. If the won-mark was skipped, a live
     // member can sit open in Scheduled-Trial - skip them outright (independent of GHL won).
     if (await isLiveMember(client.id, contactId, token)) { skipped++; reasons.push(`${item.name || contactId}: already a live member`); continue; }
@@ -680,6 +705,9 @@ async function detectForClient(client) {
       const contactId = item.contact_id;
       if (!contactId) continue;
       if (mutedSet.has(String(contactId))) continue;
+      // Portal academies: these leads already get the REAL post-trial form card
+      // in list-ready - an overdue "did they show up?" nag would be a duplicate.
+      if (passedTrial.has(String(contactId))) continue;
       // Already carded? (a) any active confirm card -> leave it (the unique index
       // allows only one). (b) we already raised an overdue card -> never nag twice.
       let cards = [];
@@ -781,19 +809,30 @@ async function handler(req, res) {
       // deck renders the form (showed up / good fit / first message / link /
       // notes) and submits it through /api/ghl/post-trial. Portal-booking
       // academies only - their trial spine lives in trial_bookings.
+      // NO expiry (Zoran 2026-07-10): the card stays in the deck until the form
+      // is filled or the opp closes (open-opp check below) - it never silently
+      // ages out. A contact who REBOOKED (has an upcoming slot) is skipped:
+      // the new trial owns them and makes its own form card when it runs.
+      // Must mirror passedTrialContactIds (agent/booking.js) - same rules drive
+      // the card-hiding gates on both agents.
       try {
         const client = await loadClient(clientId);
         if (client && client.booking_provider === "portal") {
-          const since = new Date(Date.now() - 7 * 86400000).toISOString();
           const nowIso = new Date().toISOString();
           const bks = await sb(`trial_bookings?tenant_id=eq.${clientId}&status=eq.BOOKED&select=id,ghl_contact_id,parent_name,athlete_name,schedule_slots(start_time,name)`) || [];
-          const due = (Array.isArray(bks) ? bks : []).filter(t => {
-            const st = t.schedule_slots && t.schedule_slots.start_time;
-            return st && st <= nowIso && st >= since;
-          });
+          const rows = (Array.isArray(bks) ? bks : []).filter(t => t.schedule_slots && t.schedule_slots.start_time);
+          const upcoming = new Set(rows.filter(t => t.schedule_slots.start_time > nowIso).map(t => String(t.ghl_contact_id || "")));
+          const due = rows.filter(t => t.schedule_slots.start_time <= nowIso && !upcoming.has(String(t.ghl_contact_id || "")));
           if (due.length) {
             const revs = await sb(`post_trial_reviews?client_id=eq.${clientId}&select=ghl_contact_id`) || [];
             const reviewed = new Set((Array.isArray(revs) ? revs : []).map(r => String(r.ghl_contact_id || "")));
+            // Read-time gate (Zoran 2026-07-09, mirrors Booking's): once the
+            // trial has run, this agent's own reply/handoff/reminder cards for
+            // that lead are stale - a pre-trial "see you Tuesday!" draft must
+            // not sit in the deck on Thursday. Hide them so the form card
+            // pushed below is THE card; the detector cron cancels them for real.
+            const passed = new Set(due.map(t => String(t.ghl_contact_id || "")).filter(cid => cid && !reviewed.has(cid)));
+            if (passed.size) list = list.filter(r => !r.ghl_contact_id || !passed.has(String(r.ghl_contact_id)));
             for (const t of due) {
               const cid = String(t.ghl_contact_id || "");
               if (!cid || reviewed.has(cid)) continue;
@@ -931,8 +970,14 @@ async function handler(req, res) {
       }
       if (!contactId) return res.status(400).json({ error: "ready_id or contact_id required" });
       // Send the warm acknowledgement only if one was provided / drafted.
+      // QUIET HOURS (Zoran 2026-07-10): an after-hours ✓ still hands off NOW
+      // (notes + stage bounce below run immediately), but the parent-facing text
+      // PARKS until morning - the detect cron's flush sends it at 8am
+      // (confirm_handoff rows are exempt from the flush's stage gates, since
+      // this lead just left Scheduled-Trial on purpose).
       const closing = (typeof b.reply === "string" ? b.reply : (row ? row.draft_message : "")) || "";
-      if (closing.trim()) { try { await sendReplyViaGhl(token, contactId, closing.trim(), clientId); } catch (_) {} }
+      const holdAck = !!closing.trim() && !withinQuietHours();
+      if (closing.trim() && !holdAck) { try { await sendReplyViaGhl(token, contactId, closing.trim(), clientId); } catch (_) {} }
       // Write the context note (this is how the booking agent gets full context —
       // contact-memory.js injects agent_contact_notes into the booking prompt).
       const note = (b.handoff_note || (row && row.handoff_note) || "Couldn't make their booked trial — needs to rebook.").toString().trim();
@@ -972,11 +1017,33 @@ async function handler(req, res) {
         }
       } catch (_) {}
       try { if (oppId) await sb(`pipeline_outcomes`, { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify([{ client_id: clientId, opportunity_id: oppId, status: "rebook", reason: note.slice(0, 300) }]) }); } catch (_) {}
-      if (b.ready_id) {
+      if (b.ready_id && !holdAck) {
         try { await sb(`agent_confirm_replies?id=eq.${encodeURIComponent(b.ready_id)}&client_id=eq.${clientId}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ status: "sent", approved_by: staffEmail, approved_at: new Date().toISOString(), sent_at: new Date().toISOString(), updated_at: new Date().toISOString() }) }); } catch (_) {}
       }
       await clearConfirmCards(clientId, contactId, "handed off to booking");
-      return res.status(200).json({ ok: true, handed_off: true, moved_to_responded: moved, opportunity_id: oppId });
+      // Park the held acknowledgement AFTER the card sweep above, so it's the
+      // contact's one active row (partial unique index: one pending/approved
+      // per contact). PATCH revives the just-cleared ready row; contact-direct
+      // handoffs insert a fresh row. Best-effort: the handoff itself landed.
+      let ackAfter = null;
+      if (holdAck) {
+        ackAfter = nextSendableTime().toISOString();
+        const parked = {
+          kind: "confirm_handoff", draft_message: closing.trim(), status: "approved", send_after: ackAfter,
+          approved_by: staffEmail, approved_at: new Date().toISOString(), send_error: null, updated_at: new Date().toISOString(),
+        };
+        try {
+          if (b.ready_id) {
+            await sb(`agent_confirm_replies?id=eq.${encodeURIComponent(b.ready_id)}&client_id=eq.${clientId}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify(parked) });
+          } else {
+            await sb(`agent_confirm_replies`, { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify([{
+              ...parked, client_id: clientId, ghl_contact_id: String(contactId), contact_name: b.contact_name || null,
+              handoff_note: note, reasoning: "After-hours handoff: warm acknowledgement held to morning.", created_by: staffEmail,
+            }]) });
+          }
+        } catch (_) {}
+      }
+      return res.status(200).json({ ok: true, handed_off: true, moved_to_responded: moved, opportunity_id: oppId, ack_deferred: holdAck, ack_send_after: ackAfter });
     }
 
     // Confirm a Lost suggestion: optional warm closing, then mark the opp Lost.

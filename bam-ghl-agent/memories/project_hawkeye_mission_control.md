@@ -114,8 +114,10 @@ scattered autonomy/config entry points. KEEPS: inline drawer suggestion on lead 
   "+N more" expands in place (_plo2ShowAll) - board not a V2 destination.
 - POST-TRIAL FORM = Confirm-tab deck card (kind post_trial -> 'form'):
   synthesized server-side in agent-confirm list-ready (portal provider:
-  trial_bookings BOOKED, slot past, <=7d, no post_trial_reviews row, open
-  opp); deck form submits /api/ghl/post-trial (3-way router). No Other btn.
+  trial_bookings BOOKED, slot past, no post_trial_reviews row, open opp,
+  NO upcoming rebooked slot); deck form submits /api/ghl/post-trial (3-way
+  router). No Other btn. NO EXPIRY (Zoran 2026-07-10, was <=7d): the card
+  stays until the form is filled or the opp closes.
 - 'Liked' TAPBACK RULE: isRealInbound (agent/_stage.js) - inbound text
   starting with "Liked" never wakes an agent, never bounces Ghosted/Nurture
   (ghl/inbound-webhook), never enters the Meta store, never reaches agent
@@ -159,6 +161,35 @@ scattered autonomy/config entry points. KEEPS: inline drawer suggestion on lead 
   adding booking_provider + time_zone to that select (post-trial cards + correct
   TZ now work). Data-verified on GTA (Josh MCGILVERY, trial Jul 7, still a Booking
   reply pre-fix).
+- CONFIRM HANDS OFF PASSED TRIALS TOO (2026-07-09, later): same rule applied to
+  the Confirm agent's OWN cards - Josh's pre-trial reply card ("see you Tuesday
+  at 8pm!") was still deck card 1 of 7 on Jul 9 because nothing retired confirm
+  cards when the trial ran (the stage prune only fires when the lead LEAVES
+  Scheduled-Trial, and no review = never leaves; it also blocked the A3 overdue
+  card). `passedTrialContactIds` MOVED to agent/booking.js (shared export; both
+  agents import it). agent-confirm now: detector skips passed-trial leads
+  (reactive included) + prunes their pending cards + quiet-flush cancels their
+  held sends ("trial ran - handed to post-trial form") + A3 overdue pass skips
+  them (real ptf card covers portal academies); list-ready read-gates this
+  agent's own stale rows BEFORE appending ptf form cards, so the form card is
+  the ONE card per passed-trial lead, instantly. Non-portal academies: empty
+  set, zero change. NO EXPIRY (Zoran 2026-07-10): passedTrialContactIds + the
+  form synthesis dropped the 7-day window - an unreviewed trial stays carded
+  until the form lands or the opp closes. EXCEPTION baked into both: a contact
+  with an UPCOMING BOOKED slot (rebooked) leaves the set, so an old unfilled
+  form never starves the new trial's confirmations; the new trial cards itself
+  after it runs. (Backups beyond the deck were verified dead for portal
+  academies: A3 overdue + 15-min escalation SMS both read GHL calendars only;
+  the red Home "not flowing" list was the lone catch-all.)
+- QUIET-HOURS AUDIT (2026-07-10, Zoran asked): reply-card approvals, scripted
+  reminders, ghost send-now, self-drive and every automation step all HOLD to
+  the 8:00am-9:30pm Toronto window (agent/_quiet.js, flushed by the 15-min
+  detect crons). FIXED: confirm-handoff's warm ack now parks too (after-hours
+  ✓ = notes + bounce run NOW, ack rides the ready row as approved+send_after;
+  the confirm flush exempts kind confirm_handoff from its stage/passed-trial
+  gates since the bounce is intentional). STILL SEND IMMEDIATELY on after-hours
+  ✓ (Zoran's call: leave for now): lost-card warm goodbyes (all 3 agents),
+  closing enroll-link message, post-trial form first message (+link).
 - STILL TO DO: swipe gestures (open decision), GTA prod verification of the whole batch.
 
 ## Open item (ask Zoran before building)
