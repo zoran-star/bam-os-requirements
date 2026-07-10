@@ -6,7 +6,40 @@ core_parity: not-reviewed
 last_reviewed: "2026-07-10"
 prototype_commit: working-tree
 core_commit_reviewed: unavailable
+phases_done: [1, 2]
 ---
+
+## Phase 2 SHIPPED (2026-07-10) — registry + apply_preset, applied to prod
+
+- **Code registry** `bam-portal/api/agent/presets.js`: `AGENT_TEMPLATES` (reusable
+  worker defs = runtime + mission + lessonKey) + `PRESETS`. `free_trial` is
+  today's exact model (dry-run reproduces the live 5 stages + 20 edges verbatim);
+  `discovery_trial` (preset #2) defined too (6 stages incl. `discovery_call_booked`,
+  26 edges, reuses `trial_confirm` + `closing`). `applyPreset({clientId, offerId,
+  presetKey, dryRun})` + `buildPresetRows()` (pure). CLI `scripts/apply-preset.mjs`
+  (`--list`, `--dry-run`). This replaces the one-off `seed_default_stage_transitions`
+  (kept, still works, now legacy).
+- **Migration** `20260710180000_stage_transitions_offer_id.sql` (applied to prod):
+  added `offer_id` to `stage_transitions` (pipeline_stages + opportunities already
+  had it from the offer-spine wave); recreated the edge unique as
+  `UNIQUE NULLS NOT DISTINCT (client_id, offer_id, from_stage_role, trigger,
+  to_kind, to_stage_role, to_terminal)` — same name so the legacy seed's
+  `ON CONFLICT ON CONSTRAINT` still works. This ALSO fixes a latent bug: every
+  edge key holds a NULL, and the old NULLS-distinct unique never matched, so a
+  re-stamp/re-seed would have duplicated all edges.
+- **Verified in prod (rolled back)**: dry-run free_trial == live model; the new
+  unique makes a same-offer re-stamp idempotent (dupe entry edge → 1 row) and
+  allows the same edge under a different offer (per-offer scope); zero leak, BAM
+  GTA still 20 edges / 0 offer-tagged.
+- **Scope boundary (honest):** the board/router/agents still key the pipeline by
+  `(client_id, role)` and ignore offer_id (resolveStage / resolveEdge /
+  buildPortalBoard / shadowUpsertStageRegistry). So applyPreset targets a NEW
+  academy (one offer, one pipeline — no collision) or an idempotent re-stamp of
+  the same offer. ONE academy running TWO offer pipelines at once needs those
+  readers to go offer-aware + the pipeline_stages unique to gain offer_id =
+  **Phase 3**. applyPreset REFUSES the multi-offer case rather than corrupt a
+  reader that can't yet disambiguate. The existing pipelines (BAM GTA, DETAIL
+  Miami) keep offer_id NULL until Zoran picks each one's offer (deferred backfill).
 
 ## Phase 1 SHIPPED (2026-07-10) — applied to prod
 
@@ -104,15 +137,20 @@ a code preset uses a new role (Phase 2).
    section above). `stage_role` enum → text + soft format check; closed CHECKs
    dropped. Was the ONE non-additive change; done as widening-only, no data
    rewritten.
-2. **Preset registry in code + per-offer instances:** write the registry,
-   codify `free_trial` from today's exact model; `apply_preset(client, offer,
-   preset)` replaces `seed_default_stage_transitions`; add `offer_id` to
-   `pipeline_stages` / `stage_transitions` / agent config (⚠ unique-key change
-   + BAM GTA backfill: map its existing rows to its Training offer).
-3. **Generic workers:** collapse the 3 copy-pasted agent APIs
-   (agent-approvals/confirm/closing) into one detector/drafter parameterized by
-   (academy, offer, stage, agent_template); Hawkeye tabs render from the
-   offer's stages.
+2. **Preset registry in code + apply_preset:** ✅ DONE 2026-07-10 (see Phase 2
+   section above). Registry `api/agent/presets.js`, `applyPreset`, migration
+   `20260710180000` (offer_id on stage_transitions + per-offer NULLS NOT DISTINCT
+   edge unique). Deferred within this phase: the pipeline_stages unique gaining
+   offer_id and the existing-pipeline offer backfill — both belong with the
+   offer-aware readers in Phase 3, and applyPreset guards the multi-offer case
+   until then.
+3. **Generic workers + offer-aware readers:** collapse the 3 copy-pasted agent
+   APIs (agent-approvals/confirm/closing) into one detector/drafter parameterized
+   by (academy, offer, stage, agent_template); make resolveStage / resolveEdge /
+   buildPortalBoard / shadowUpsertStageRegistry offer-aware (key by client +
+   offer + role); add offer_id to the pipeline_stages unique; backfill the two
+   live academies' pipelines to their chosen offer; Hawkeye tabs render from the
+   offer's stages. THIS is what lets one academy run two offer pipelines.
 4. **Template-scoped training:** `agent_lessons.agent` → agent_template key,
    reader filters by template, per-template `/consolidate-lessons` + intake
    mining.

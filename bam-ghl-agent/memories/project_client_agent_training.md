@@ -81,11 +81,28 @@ clients at onboarding. Changes shipped:
   opened the closed stage-role vocabulary - dropped the 7-value CHECKs on
   `pipeline_stages.role` + `opportunities.stage_role`, converted
   `stage_transitions` from/to_stage_role enum→text, dropped the `stage_role`
-  enum, added a `^[a-z][a-z0-9_]*$` soft format check. Applied via supabase MCP
-  apply_migration; verified in prod (new role inserts, garbage rejects, all rows
-  intact, free-trial byte-identical). Idempotent, widening-only, V2-only. NEXT =
-  Phase 2 (preset registry in code + apply_preset + offer_id on the pipeline
-  tables).
+  enum, added a `^[a-z][a-z0-9_]*$` soft format check. Idempotent, widening-only,
+  V2-only.
+- **Phase 2 SHIPPED + applied to prod (2026-07-10):** the preset registry lives
+  in CODE at `bam-portal/api/agent/presets.js` = `AGENT_TEMPLATES` (reusable
+  worker = runtime + mission + lessonKey) + `PRESETS`. `free_trial` = today's
+  exact model (dry-run reproduces the live 5 stages + 20 edges verbatim);
+  `discovery_trial` (preset #2) defined (6 stages incl. discovery_call_booked,
+  26 edges, reuses trial_confirm + closing). `applyPreset({clientId, offerId,
+  presetKey, dryRun})` + pure `buildPresetRows()`; CLI `scripts/apply-preset.mjs`
+  (`--list`, `--dry-run`). Migration
+  `20260710180000_stage_transitions_offer_id.sql`: added `offer_id` to
+  stage_transitions (pipeline_stages + opportunities already had it from the
+  offer-spine wave) + recreated the edge unique as `UNIQUE NULLS NOT DISTINCT
+  (client_id, offer_id, from/trigger/to...)` - same name so the legacy seed's
+  ON CONFLICT still works, AND it fixes a latent dup bug (every edge key has a
+  NULL, old NULLS-distinct unique never matched). Verified in prod + rolled back:
+  dry-run == live, same-offer re-stamp idempotent, same edge OK under 2 offers,
+  BAM GTA untouched (20 edges / 0 offer-tagged). SCOPE: works for NEW academies
+  (1 offer/pipeline); applyPreset REFUSES one-academy-two-offers because the
+  readers (resolveStage/resolveEdge/buildPortalBoard/shadowUpsertStageRegistry)
+  still key by (client, role) - making them offer-aware + adding offer_id to the
+  pipeline_stages unique + backfilling the 2 live pipelines' offers = NEXT (Phase 3).
 
 ## ⭐ LESSON MODEL REVISED (2026-07-10, Zoran) - consolidation skill replaces auto-promote
 The old "AI classifier -> promotion_status=pending -> staff approves -> scope flips

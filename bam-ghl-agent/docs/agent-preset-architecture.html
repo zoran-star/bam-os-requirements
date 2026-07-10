@@ -239,10 +239,10 @@
   </div>
 
   <div class="phase">
-    <div class="ph-badge p2">Phase 2<small>the preset noun</small></div>
-    <div class="ph-body"><b class="k">Preset registry in code + per-OFFER instances.</b> A versioned code registry defines presets (stages, transitions, worker per stage) and reusable agent templates; <b>free_trial</b> is written down from today's exact model. <code>apply_preset(academy, offer, preset)</code> replaces the one-off seeder. Schema side: <code>pipeline_stages</code> / <code>stage_transitions</code> / agent config gain <b>offer_id</b> (keys become client + offer + role).
-      <span class="unlock">A second playbook is a code file; stamping an academy's offer with it is one call.</span>
-      <span class="risk">⚠ adding offer_id to live keyed tables (unique constraints) - additive but needs a careful backfill for BAM GTA</span></div>
+    <div class="ph-badge p0">Phase 2<small>done ✓ 2026-07-10</small></div>
+    <div class="ph-body"><b class="k">Preset registry in code + apply_preset. SHIPPED.</b> <code>api/agent/presets.js</code> = the versioned code registry: <code>AGENT_TEMPLATES</code> (reusable workers) + <code>PRESETS</code>. <b>free_trial</b> is today's exact model (verified: a dry-run reproduces the live 5 stages + 20 edges byte-for-byte); <b>discovery_trial</b> (preset #2) is defined too (6 stages, 26 edges, reusing trial_confirm + closing). <code>applyPreset(client, offer, preset)</code> stamps <code>pipeline_stages</code> + <code>stage_transitions</code> for an offer, idempotently, via <code>scripts/apply-preset.mjs</code>. Migration <code>20260710180000</code>: <code>offer_id</code> on stage_transitions (already on pipeline_stages / opportunities) + a per-offer <code>NULLS NOT DISTINCT</code> edge-unique (also fixes a latent re-stamp dup bug). Proven in prod + rolled back; BAM GTA untouched.
+      <span class="unlock">A new playbook is now a code file, and stamping an academy's offer with it is one call.</span>
+      <span class="risk">Scope: works for NEW academies (one offer / pipeline). ONE academy running TWO offer pipelines at once needs offer-aware readers - that's Phase 3. applyPreset refuses it for now.</span></div>
   </div>
 
   <div class="phase">
