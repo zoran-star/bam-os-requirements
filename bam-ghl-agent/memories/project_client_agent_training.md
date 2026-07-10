@@ -110,12 +110,14 @@ clients at onboarding. Changes shipped:
   `resolveStage` (`api/agent/_store.js`) + `resolveEdge`/`routeTransition`
   (`api/agent/_router.js`) - no caller passes it, so prod is byte-identical (grep-verified).
   Pipeline_stages unique + self-seed UNCHANGED (still one pipeline per academy).
-- **Phase 3b NOT built (the risky remainder, spec in docs/core-handoff/pipeline-presets.md):**
-  collapse the 3 agent APIs into one detector parameterized by (academy, offer, stage,
-  agent_template); thread per-opp offer_id through queues/self-seed; flip pipeline_stages
-  unique to (client, offer, role) + shadowUpsertStageRegistry on_conflict. Held on purpose -
-  it rewrites LIVE SMS routing for BAM GTA + DETAIL Miami, needs a focused/canaried effort,
-  NOT a blind autonomous rewrite. This is what actually enables one-academy-two-pipelines.
+- **Phase 3b PARKED (Zoran, 2026-07-10) - spec ready in docs/core-handoff/pipeline-presets.md.**
+  TRIGGER to build: the first gym that sells with a non-free-trial motion (e.g. discovery-call)
+  signs up and needs its own preset live. The work: collapse the 3 agent APIs into one detector
+  parameterized by (academy, offer, stage, agent_template); thread per-opp offer_id through
+  queues/self-seed; flip pipeline_stages unique to (client, offer, role) + shadowUpsertStageRegistry
+  on_conflict. Parked because it rewrites LIVE SMS routing for BAM GTA + DETAIL Miami and isn't worth
+  the risk while every gym is single-preset. Build it as a focused/canaried effort (canary BAM GTA
+  single-offer = behavior must stay identical). This is what enables one-academy-two-pipelines.
 
 ## ⭐ LESSON MODEL REVISED (2026-07-10, Zoran) - consolidation skill replaces auto-promote
 The old "AI classifier -> promotion_status=pending -> staff approves -> scope flips

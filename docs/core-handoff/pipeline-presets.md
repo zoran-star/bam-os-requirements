@@ -25,11 +25,18 @@ phases_done: [1, 2, "3a"]
   `shadowUpsertStageRegistry` still upserts on `(client_id, role)` and does not thread
   offer; the 3 agent APIs are untouched. So each academy still runs exactly ONE pipeline.
 
-## Phase 3b — the agent engine (NOT built; the risky remainder)
+## Phase 3b — the agent engine (PARKED until a gym needs a second preset)
 
-Deliberately not done autonomously: it rewrites LIVE SMS routing for BAM GTA +
-DETAIL Miami and can't be integration-tested from here. Precise spec so it can be
-a focused, canaried effort:
+**Status (Zoran, 2026-07-10): PARKED.** Not worth the live-SMS-routing risk while
+every gym runs the single free-trial preset. **Trigger to build:** the first gym
+that sells with a non-free-trial motion (e.g. discovery-call) signs up and needs
+its own preset live. Everything below is a ready spec; when triggered, build it as
+a focused, canaried effort (canary on BAM GTA single-offer first - behavior must
+stay identical). Phases 1 / 2 / 3a already laid all the groundwork (open roles,
+code registry + applyPreset, offer-tagged data + dormant offer-aware read seam),
+so this is the only remaining piece before one academy can run two offer pipelines.
+
+Precise spec:
 
 1. **Thread per-opportunity offer.** Every queue/move/create path already has the
    opp (which carries `offer_id`). Pass `offerId` into `resolveStage` / `resolveEdge`

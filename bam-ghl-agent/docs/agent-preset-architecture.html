@@ -252,10 +252,10 @@
   </div>
 
   <div class="phase">
-    <div class="ph-badge p3">Phase 3b<small>the engine — NOT done</small></div>
+    <div class="ph-badge p3">Phase 3b<small>PARKED until needed</small></div>
     <div class="ph-body"><b class="k">One engine, many agents.</b> Collapse the 3 copy-pasted agent APIs (<code>agent-approvals</code> / <code>agent-confirm</code> / <code>agent-closing</code>) into one detector/drafter parameterized by (academy, offer, stage, agent_template); thread each opportunity's <code>offer_id</code> through the queues + self-seed (<code>shadowUpsertStageRegistry</code>); flip the <code>pipeline_stages</code> unique to <code>(client, offer, role)</code>; Hawkeye tabs render from the offer's stages.
       <span class="unlock">This is what lets ONE academy run TWO offer pipelines that route correctly.</span>
-      <span class="risk">⚠ Held on purpose: rewrites LIVE SMS routing for 2 production academies. Can't be integration-tested from here - wants a focused, canaried effort, not a blind autonomous rewrite. Spec in the core handoff.</span></div>
+      <span class="risk">⏸ PARKED (Zoran, 2026-07-10): not worth the live-SMS risk until a gym actually needs a second preset. TRIGGER to build: the first gym that sells with a non-free-trial motion signs up. Full spec is ready in the core handoff - pick it up then, canary on BAM GTA first.</span></div>
   </div>
 
   <div class="phase">
