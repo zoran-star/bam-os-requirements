@@ -298,7 +298,7 @@ export default function MarketingDashboard({ clientId, tokens, session, compact 
         <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
           {view === "history" && (
             <select value={monthKey || ""} onChange={e => setMonthKey(e.target.value)} style={{ background: t.surfaceEl, color: t.text, border: `1px solid ${t.borderMed}`, borderRadius: 8, padding: "8px 10px", fontSize: 12 }}>
-              {monthly.periods.map(p => <option key={p.key} value={p.key}>{p.label}</option>)}
+              {monthly.periods.map(p => <option key={p.key} value={p.key}>{p.label}{p.empty ? " (no data)" : ""}</option>)}
             </select>
           )}
           <div style={{ display: "inline-flex", background: t.surfaceEl, border: `1px solid ${t.borderMed}`, borderRadius: 999, padding: 3 }}>
@@ -309,6 +309,11 @@ export default function MarketingDashboard({ clientId, tokens, session, compact 
 
       {data.empty ? (
         <div style={{ padding: 18, color: t.textSub }}>No campaign data yet{data.reason === "no_ad_account" ? " — connect this client's ad account in Setup." : data.reason === "no_campaigns_selected" ? " — pick this client's campaigns in the Campaigns tab." : "."}</div>
+      ) : period.empty ? (
+        <div style={{ padding: "22px 20px", border: `1px solid ${t.border}`, background: t.surface, borderRadius: 12, lineHeight: 1.55 }}>
+          <div style={{ fontSize: 15, color: t.text, marginBottom: 6 }}>No ad spend recorded for {period.label}.</div>
+          <div style={{ fontSize: 13, color: t.textSub }}>This client's selected campaigns had no activity this month. If ads did run, add that month's campaign under Setup so it shows up here.</div>
+        </div>
       ) : (
         <>
           <div style={{ display: "flex", gap: 14, alignItems: "flex-start", border: `1px solid ${t.border}`, background: t.surface, borderRadius: 12, padding: "18px 20px", marginBottom: 16 }}>

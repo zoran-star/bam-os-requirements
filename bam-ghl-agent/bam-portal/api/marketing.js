@@ -2536,16 +2536,29 @@ async function handleMetaReport(req, res) {
     sumRowInto(m.get(row.campaign_id).acc, row);
   }
 
-  const periods = [...monthsMap.keys()].sort().reverse().map((key) => {
-    const campaigns = [...monthsMap.get(key).entries()].map(([id, v]) => ({ id, name: v.name, ...finalizeMetrics(v.acc) }));
+  // Emit EVERY month in the requested window (newest first), not just months
+  // that happened to have spend on the selected campaigns. A month with no data
+  // for this client used to silently vanish, which read as a broken/missing
+  // report (staff would see May but not June and assume June was broken). Now the
+  // empty month still appears, flagged so the UI can say "no spend / no active
+  // campaign" instead of hiding it. See feedback ticket 88f31680.
+  const periods = [];
+  for (let i = 0; i < months; i++) {
+    const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - i, 1));
+    const key = fmt(d).slice(0, 7); // "YYYY-MM"
+    const bucket = monthsMap.get(key);
+    const campaigns = bucket
+      ? [...bucket.entries()].map(([id, v]) => ({ id, name: v.name, ...finalizeMetrics(v.acc) }))
+      : [];
     const [yy, mm] = key.split("-");
-    return {
+    periods.push({
       key,
       label: `${MONTH_NAMES[parseInt(mm, 10) - 1]} ${yy}`,
       campaigns,
       totals: totalsFromCampaigns(campaigns),
-    };
-  });
+      empty: campaigns.length === 0,
+    });
+  }
 
   return res.status(200).json({ ad_account: adAcct, view: "monthly", periods, ...base });
 }
