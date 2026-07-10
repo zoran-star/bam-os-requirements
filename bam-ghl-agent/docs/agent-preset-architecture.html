@@ -233,10 +233,9 @@
   </div>
 
   <div class="phase">
-    <div class="ph-badge p1">Phase 1<small>open the roles</small></div>
-    <div class="ph-body"><b class="k">Unweld the stage list + move agent prose into data.</b> Widen <code>stage_role</code> from a 7-value enum to open text validated against the registry, and move the free-trial prompt defaults from code constants into seeded rows.
-      <span class="unlock">New stage names become possible; the free-trial "mission" becomes editable content.</span>
-      <span class="risk">⚠ enum→text touches live prod tables - needs its own careful migration + core review</span></div>
+    <div class="ph-badge p0">Phase 1<small>done ✓ 2026-07-10</small></div>
+    <div class="ph-body"><b class="k">Unweld the stage list. SHIPPED + applied to prod.</b> Migration <code>20260710170000_open_stage_role_vocabulary</code>: dropped the closed 7-value CHECKs on <code>pipeline_stages.role</code> + <code>opportunities.stage_role</code>, converted <code>stage_transitions</code>' <code>stage_role</code> enum to text, dropped the enum, added a soft lowercase-snake_case format check. Verified in prod: a new role (<code>discovery_call_booked</code>) inserts, garbage rejects, all 119 existing rows intact, free-trial flow byte-identical.
+      <span class="unlock">New stage names are now POSSIBLE - the database no longer rejects them. Dormant until a code preset uses one.</span></div>
   </div>
 
   <div class="phase">

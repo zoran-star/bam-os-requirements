@@ -74,8 +74,18 @@ clients at onboarding. Changes shipped:
   ghosted/nurture automations; reuses trial_confirm + closing agent templates
   as-is; new = call_booking mission + call_confirm agent. Training scopes by
   AGENT TEMPLATE (shared templates share craft across presets; different
-  missions never bleed). Remaining: build phases 1-4, core review, BAM GTA
+  missions never bleed). Remaining: build phases 2-4, core review, BAM GTA
   offer_id backfill.
+- **Phase 1 SHIPPED + applied to prod (2026-07-10):** migration
+  `bam-portal/supabase/migrations/20260710170000_open_stage_role_vocabulary.sql`
+  opened the closed stage-role vocabulary - dropped the 7-value CHECKs on
+  `pipeline_stages.role` + `opportunities.stage_role`, converted
+  `stage_transitions` from/to_stage_role enum→text, dropped the `stage_role`
+  enum, added a `^[a-z][a-z0-9_]*$` soft format check. Applied via supabase MCP
+  apply_migration; verified in prod (new role inserts, garbage rejects, all rows
+  intact, free-trial byte-identical). Idempotent, widening-only, V2-only. NEXT =
+  Phase 2 (preset registry in code + apply_preset + offer_id on the pipeline
+  tables).
 
 ## ⭐ LESSON MODEL REVISED (2026-07-10, Zoran) - consolidation skill replaces auto-promote
 The old "AI classifier -> promotion_status=pending -> staff approves -> scope flips

@@ -1,12 +1,33 @@
 ---
 domain: pipeline-presets
 review_state: ready-for-review
-prototype_status: planned
+prototype_status: partial
 core_parity: not-reviewed
 last_reviewed: "2026-07-10"
 prototype_commit: working-tree
 core_commit_reviewed: unavailable
 ---
+
+## Phase 1 SHIPPED (2026-07-10) — applied to prod
+
+Migration `bam-portal/supabase/migrations/20260710170000_open_stage_role_vocabulary.sql`
+applied to the linked project (`jnojmfmpnsfmtqmwhopz`) via MCP `apply_migration`.
+Opened the closed stage-role vocabulary so code presets can add new roles:
+- dropped the 7-value CHECKs on `pipeline_stages.role` and `opportunities.stage_role`;
+- converted `stage_transitions.from_stage_role` / `to_stage_role` from the
+  `stage_role` **enum** to **text** (rebuilds the unique constraint + index
+  automatically) and **dropped the now-unused enum**;
+- added a soft `^[a-z][a-z0-9_]*$` format check on all three (nullable-tolerant
+  on stage_transitions).
+Verified in prod: enum gone, columns text, a new role (`discovery_call_booked`)
+inserts, invalid (`BadRole`) rejects, all rows intact (pipeline_stages 9 /
+stage_transitions 20 / opportunities 90), free-trial roles unchanged. Widening
+only, no data rewritten. **Migration is idempotent** (drop-if-exists +
+do/exception guards + type-drop-if-exists), so a future `db push` re-run is
+harmless; mark it `migration repair --status applied` on linked when convenient
+to keep history tidy (MCP recorded it under its own timestamp). No code change
+needed - the free-trial preset behaves identically; the unlock is dormant until
+a code preset uses a new role (Phase 2).
 
 # Domain: Pipeline Presets (sales-system templates) — Prototype-to-Core Handoff
 
@@ -78,10 +99,11 @@ core_commit_reviewed: unavailable
 
 0. **Done:** stage registry, transition graph + router, automations engine,
    brain-as-data, preset-tagged lessons, Hawkeye training loop.
-1. **Open the roles:** widen `stage_role` enum → text validated against the
-   registry (needed for `discovery_call_booked`, `trial_booked`). ⚠ The
-   enum→text widening is the ONE non-additive change - prod migration on live
-   tables (`stage_transitions`, `pipeline_stages` CHECK) needs explicit review.
+1. **Open the roles:** ✅ DONE 2026-07-10 (migration
+   `20260710170000_open_stage_role_vocabulary`, applied to prod - see the Phase 1
+   section above). `stage_role` enum → text + soft format check; closed CHECKs
+   dropped. Was the ONE non-additive change; done as widening-only, no data
+   rewritten.
 2. **Preset registry in code + per-offer instances:** write the registry,
    codify `free_trial` from today's exact model; `apply_preset(client, offer,
    preset)` replaces `seed_default_stage_transitions`; add `offer_id` to
