@@ -9070,6 +9070,13 @@ Then the call to action."]</div>
           .hk2-head{display:flex;align-items:center;gap:11px;flex-wrap:wrap}
           .hk2-av{width:42px;height:42px;border-radius:50%;background:var(--accent-glow,rgba(212,182,92,.12));color:var(--accent);display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:800;flex-shrink:0}
           .hk2-who{font-size:16px;font-weight:700;color:var(--text)}
+          /* Clickable name block -> contact drawer. The chevron is the always-on
+             affordance (mobile has no hover); hover shifts name + chevron gold. */
+          .hk2-namelink{cursor:pointer}
+          .hk2-open-ind{color:var(--text-mute);font-size:14px;font-weight:700;opacity:.7;display:inline-block;margin-left:4px;transition:transform .18s ease,color .18s ease}
+          .hk2-namelink:hover .hk2-who,.hk2-namelink:hover .hk2-open-ind{color:var(--gold,#D4B65C)}
+          .hk2-namelink:hover .hk2-open-ind{transform:translateX(2px);opacity:1}
+          .hk2-namelink:active{opacity:.75}
           .hk2-sub{font-size:12px;color:var(--text-sub);margin-top:1px}
           .hk2-athlete{font-size:12px;color:var(--text-mute,#6E6B63);margin-top:1px;font-weight:600}
           .hk2-pill{font-size:9.5px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;border-radius:999px;padding:3px 9px;white-space:nowrap}
@@ -32502,12 +32509,15 @@ function _hk2CardHtml(r, pos, total, isTop) {
   // automations panel's by-contact-id opener; ids/names ride data attributes so
   // quotes in names can't break the inline handler.
   const nameClick = r.ghl_contact_id
-    ? ` onclick="_hk2OpenContact(this.dataset.cid, this.dataset.nm)" data-cid="${escapeHTML(String(r.ghl_contact_id))}" data-nm="${escapeHTML(bigName)}" style="flex:1;min-width:0;cursor:pointer" title="Open contact"`
+    ? ` class="hk2-namelink" onclick="_hk2OpenContact(this.dataset.cid, this.dataset.nm)" data-cid="${escapeHTML(String(r.ghl_contact_id))}" data-nm="${escapeHTML(bigName)}" style="flex:1;min-width:0" title="Open contact"`
     : ' style="flex:1;min-width:0"';
+  // The chevron makes the tap target discoverable (shipped clickable 2026-07-10
+  // but nothing signaled it - Zoran asked for the feature twice).
+  const openInd = r.ghl_contact_id ? '<span class="hk2-open-ind">›</span>' : '';
   return `
     <div class="hk2-head">
       <div class="hk2-av">${escapeHTML(_hk2Initials(bigName))}</div>
-      <div${nameClick}><div class="hk2-who">${escapeHTML(bigName)}</div>
+      <div${nameClick}><div class="hk2-who">${escapeHTML(bigName)}${openInd}</div>
         <div class="hk2-sub">${sub}</div>${athleteLine}</div>
       <span class="hk2-pill" style="color:${km.color};background:color-mix(in srgb,${km.color} 14%,transparent)">${km.pill}</span>
       <span class="hk2-prog">${pos} of ${total}</span>
