@@ -31,10 +31,20 @@ if flipped AND `client_twilio_config.status='active'`; else falls back to 'ghl'
 - `messaging/import-ghl-history.js` — `POST {client_id}` (staff): pages GHL convos
   → sms_threads/sms_messages. Idempotent. Triggered by a 1-click button in staff
   Settings → "Messaging migration" (`src/components/MessagingMigrationPanel.jsx`).
+  ⚠️ GOTCHA (fixed 2026-07-10): channel must come from the messageType STRING
+  (TYPE_SMS/TYPE_EMAIL/TYPE_CALL); GHL's numeric `type` is 1=CALL, 2=SMS, 3=EMAIL.
+  The old `type ?? messageType` mapping labeled every imported SMS 'other' (+calls
+  'sms'), starving readStoreThreadAgent (channel=eq.sms) = all agents drafted
+  blind on GTA. Prod relabeled 12,763 sms + 712 call rows from raw->>'messageType'.
 - `messaging/read-thread.js` — read a thread from the store (agent shape + inbox shape).
-- `twilio/inbound-webhook.js` — replies in: signature-verified, STOP/START, store +
+- `twilio/inbound-webhook.js` — replies in: signature-verified, STOP words, store +
   same side-effects as GHL webhook (cancel drafts, exit automations→Responded,
   notify owner, wake agent). `twilio/status.js` — delivery receipts by twilio_sid.
+  ⚠️ GOTCHA (fixed 2026-07-10): the early-return used to cover START opt-in words
+  too - a lead answering a ghost nudge with a bare "Yes" was stored but got ZERO
+  side-effects (no automation exit, no bounce to Responded, no Hawkeye card) and
+  the next ghost nudge stayed queued (caught live: Augustina on GTA; side-effects
+  replayed by hand). Only STOP words skip the agent-wake now.
 - Outbound gate wired into: `_send.js`, `mass-send.js`, `ghl/send-message.js`,
   `ghl/_core.js sendSms`, and agents (`agent-followups`, `agent-approvals`,
   `agent-confirm`, `agent-closing` via `sendReplyViaGhl(token,contactId,reply,clientId)`).

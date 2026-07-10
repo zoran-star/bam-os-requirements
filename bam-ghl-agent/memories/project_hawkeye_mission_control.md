@@ -190,6 +190,31 @@ scattered autonomy/config entry points. KEEPS: inline drawer suggestion on lead 
   gates since the bounce is intentional). STILL SEND IMMEDIATELY on after-hours
   ✓ (Zoran's call: leave for now): lost-card warm goodbyes (all 3 agents),
   closing enroll-link message, post-trial form first message (+link).
+- AGENT CONTEXT BLINDNESS (2026-07-10, found via Zoran's "didn't card in Hawkeye"
+  report): the GHL history import's channelOf read numeric `type` first, but in
+  GHL 1=CALL, 2=SMS, 3=EMAIL - so 12,763 real imported SMS rows sat channel
+  'other' and 712 calls sat 'sms'. readStoreThreadAgent (ALL 3 agents + ghost
+  detector) reads channel=eq.sms only -> every draft for a pre-cutover GTA lead
+  was near-blind (Dhananjay: agent saw 2 of 13 msgs, re-sent a "still
+  interested?" ignoring his Jun 30 "on hold" reply -> his "Don't send repeat
+  message" complaint). FIXED: import maps messageType-string first (TYPE_SMS/
+  TYPE_EMAIL/TYPE_CALL; reaction != sms), prod rows relabeled by raw->>
+  'messageType' (12,763 sms + 712 call), inbox unaffected (no channel filter).
+  GOTCHA: never trust GHL's numeric message `type`; sms_messages.channel is the
+  agents' context gate.
+- FAKE-'SENT' SWEEPS FIXED (2026-07-10, same session): confirm-lost/abandoned/
+  ghost swept a lead's pending cards to status 'sent' + sent_at even when
+  NOTHING was texted (deck "Not interested: Nurture" sends reply:'') - looked
+  like sent messages in the DB and poisons draft-vs-sent training data. Now:
+  acted-on row is 'sent' only when a goodbye actually went out, everything else
+  'canceled' + send_error ('marked lost'/'marked unqualified'/'sent to
+  ghosted'), approved_by kept for attribution. All 3 agent endpoints.
+- WHY MESSAGES "DIDN'T POP UP" (2026-07-10 diagnosis, for the record): they DID
+  card - Revathy carded 7 min after her text and Zoran deck-moved her to Nurture
+  2 min later; Dhananjay carded on the next 15-min cron, 2 min AFTER Zoran's
+  screenshot. Perception gap = detector cadence (up to ~15 min inbound->card) +
+  the inbox never shows a "handled in Hawkeye" state on a thread. Open UX ideas:
+  handled-badge in the inbox, instant reactive carding on webhook.
 - PORTAL SEND-GUARD BUG (2026-07-10, caught live by Zoran on GTA): _stage.js
   contactInRespondedStage's portal branch HARDCODED role "responded", but the
   helper also guards Confirm (scheduled_trial) + Closing (done_trial) drafts

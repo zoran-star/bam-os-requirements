@@ -30,7 +30,6 @@ async function sb(path, init = {}) {
 }
 
 const STOP_WORDS  = new Set(["stop", "stopall", "stop all", "unsubscribe", "cancel", "end", "quit", "revoke", "optout", "opt out", "opt-out"]);
-const START_WORDS = new Set(["start", "unstop", "unstop all", "yes", "resume"]);
 
 // Twilio request signature: base64(HMAC-SHA1(authToken, url + sorted(k+v)…)).
 function validSignature(authToken, url, params, signature) {
@@ -99,10 +98,16 @@ async function handler(req, res) {
 
   const ghlContactId = thread?.ghl_contact_id || null;
 
-  // Compliance: STOP/START. Twilio's Advanced Opt-Out blocks further sends at the
-  // carrier level; we just record and skip the "wake the agent" side-effects.
+  // Compliance: a STOP is recorded but never wakes an agent (Twilio's Advanced
+  // Opt-Out already blocks further sends at the carrier level). START-style
+  // opt-in keywords are deliberately NOT swallowed: a bare "Yes" is one of the
+  // most common REAL replies ("still interested?" -> "Yes") and the old early
+  // return threw the hottest signal away - no automation exit, no bounce to
+  // Responded, no Hawkeye card (caught live on GTA 2026-07-10: lead Augustina
+  // answered a ghost nudge with "Yes" and stayed stuck in Interested). A true
+  // re-opt-in ("start"/"unstop") re-engaging the agent is desired behavior.
   const norm = bodyText.trim().toLowerCase().replace(/\s+/g, " ");
-  if (STOP_WORDS.has(norm) || START_WORDS.has(norm)) return xmlOk(res);
+  if (STOP_WORDS.has(norm)) return xmlOk(res);
 
   // 'Liked' tapback rule (Zoran 2026-07-09, parity with the GHL webhook): a
   // tapback is stored above but NEVER wakes an agent, cancels approved cards,

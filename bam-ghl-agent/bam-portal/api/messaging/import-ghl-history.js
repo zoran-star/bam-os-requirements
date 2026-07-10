@@ -39,12 +39,23 @@ async function requireStaff(req) {
   return Array.isArray(staff) && staff[0] ? (user.email || "staff") : null;
 }
 
-// Best-effort channel tag from GHL message type (number or string).
+// Channel tag from a GHL message. messageType (the "TYPE_SMS" string) is
+// authoritative. The numeric `type` is NOT what it looks like - in GHL's
+// payload 1=CALL, 2=SMS, 3=EMAIL - so it's only a last-resort fallback.
+// TYPE_SMS_REACTION (a tapback) is deliberately NOT 'sms': agents read the
+// thread via channel=eq.sms and a reaction is noise, not a message.
 function channelOf(m) {
-  const t = String(m.type ?? m.messageType ?? "").toLowerCase();
-  if (t.includes("sms") || t === "1") return "sms";
-  if (t.includes("email") || t === "3") return "email";
-  if (t.includes("call")) return "call";
+  const s = String(m.messageType ?? "").toUpperCase();
+  if (s) {
+    if (s === "TYPE_SMS") return "sms";
+    if (s === "TYPE_EMAIL") return "email";
+    if (s === "TYPE_CALL" || s === "TYPE_CAMPAIGN_CALL") return "call";
+    return "other";
+  }
+  const t = String(m.type ?? "");
+  if (t === "2") return "sms";
+  if (t === "3") return "email";
+  if (t === "1" || t === "8") return "call";
   return "other";
 }
 const norm = (v) => (v == null ? "" : String(v));
