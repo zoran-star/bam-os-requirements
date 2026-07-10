@@ -9073,6 +9073,7 @@ Then the call to action."]</div>
           .hk2-av{width:42px;height:42px;border-radius:50%;background:var(--accent-glow,rgba(212,182,92,.12));color:var(--accent);display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:800;flex-shrink:0}
           .hk2-who{font-size:16px;font-weight:700;color:var(--text)}
           .hk2-sub{font-size:12px;color:var(--text-sub);margin-top:1px}
+          .hk2-athlete{font-size:12px;color:var(--text-mute,#6E6B63);margin-top:1px;font-weight:600}
           .hk2-pill{font-size:9.5px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;border-radius:999px;padding:3px 9px;white-space:nowrap}
           .hk2-prog{font-size:11px;color:var(--text-mute);margin-left:auto;white-space:nowrap}
           .hk2-ctx{font-size:11.5px;color:var(--text-mute);background:var(--bg);border:1px dashed var(--border);border-radius:10px;padding:8px 10px;line-height:1.5}
@@ -32485,16 +32486,18 @@ function _hk2CardHtml(r, pos, total, isTop) {
   // back to the single contact name + confidence, exactly as before.
   const athlete = r.athlete_name ? String(r.athlete_name).trim() : '';
   const parent = String(r.parent_name || r.contact_name || '').trim();
-  const bigName = athlete || parent || 'Lead';
+  // PARENT is the headline - every text goes to them (Zoran 2026-07-10). The
+  // athlete gets its own explicitly-labeled line so the roles are never ambiguous.
+  const bigName = parent || athlete || 'Lead';
   const conf = typeof r.confidence === 'number' ? Math.round(r.confidence * 100) + '% sure' : _HK2_META[_HK2.agent].label + ' agent';
-  const sub = (athlete && parent)
-    ? `${escapeHTML(parent)} <span style="opacity:.6">· ${conf}</span>`
-    : conf;
+  const roleWord = parent ? 'Parent' : (athlete ? 'Athlete' : '');
+  const sub = [roleWord, conf].filter(Boolean).join(' · ');
+  const athleteLine = (athlete && parent) ? `<div class="hk2-athlete">Athlete: ${escapeHTML(athlete)}</div>` : '';
   return `
     <div class="hk2-head">
       <div class="hk2-av">${escapeHTML(_hk2Initials(bigName))}</div>
       <div style="flex:1;min-width:0"><div class="hk2-who">${escapeHTML(bigName)}</div>
-        <div class="hk2-sub">${sub}</div></div>
+        <div class="hk2-sub">${sub}</div>${athleteLine}</div>
       <span class="hk2-pill" style="color:${km.color};background:color-mix(in srgb,${km.color} 14%,transparent)">${km.pill}</span>
       <span class="hk2-prog">${pos} of ${total}</span>
     </div>

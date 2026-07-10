@@ -28,17 +28,33 @@ async function fieldLabels({ ghl, token, locationId } = {}) {
 export async function loadContactMemory(sb, clientId, contactId, opts = {}) {
   if (!clientId || !contactId) return "";
   const cid = encodeURIComponent(contactId);
-  let contact = null, ptr = null, notes = [];
+  let contact = null, ptr = null, notes = [], booking = null;
   try {
-    [contact, ptr, notes] = await Promise.all([
+    [contact, ptr, notes, booking] = await Promise.all([
       sb(`${await contactsReadTable(clientId)}?client_id=eq.${clientId}&ghl_contact_id=eq.${cid}&select=name,athlete_name,tags,custom_fields&limit=1`).then(r => (Array.isArray(r) ? r[0] : null)).catch(() => null),
       sb(`post_trial_reviews?client_id=eq.${clientId}&ghl_contact_id=eq.${cid}&select=showed_up,good_fit,trainer,notes,created_at&order=created_at.desc&limit=1`).then(r => (Array.isArray(r) ? r[0] : null)).catch(() => null),
       sb(`agent_contact_notes?client_id=eq.${clientId}&ghl_contact_id=eq.${cid}&active=eq.true&select=note,created_by,created_at&order=created_at.desc&limit=20`).then(r => (Array.isArray(r) ? r : [])).catch(() => []),
+      // Authoritative parent + athlete names from the portal trial spine (typed at
+      // booking). Portal academies only; empty for GHL, where we fall back to name.
+      sb(`trial_bookings?tenant_id=eq.${clientId}&ghl_contact_id=eq.${cid}&select=parent_name,athlete_name&order=created_at.desc&limit=1`).then(r => (Array.isArray(r) ? r[0] : null)).catch(() => null),
     ]);
   } catch (_) { /* best-effort — never block a draft */ }
 
   const lines = [];
-  if (contact?.athlete_name) lines.push(`Athlete: ${contact.athlete_name}`);
+  // WHO YOU'RE TEXTING: always the PARENT/guardian, addressed by their first name.
+  // The athlete is their child, referenced in the third person - never greeted
+  // directly (Zoran 2026-07-10). Parent name is authoritative from the booking,
+  // then the contact record.
+  const parentName = String((booking && booking.parent_name) || contact?.name || "").trim();
+  const athleteName = String(contact?.athlete_name || (booking && booking.athlete_name) || "").trim();
+  if (parentName) {
+    const pf = parentName.split(/\s+/)[0];
+    lines.push(`You are texting ${parentName} - the PARENT/guardian, and the person every message goes to. Greet and address them by their first name, ${pf}. Do not open a message to the athlete.`);
+  }
+  if (athleteName) {
+    const af = athleteName.split(/\s+/)[0];
+    lines.push(`Their child, the athlete, is ${athleteName}. Refer to ${af} in the third person (e.g. "how did ${af} find the session?") - never address the athlete directly; you're talking to the parent.`);
+  }
   if (Array.isArray(contact?.tags) && contact.tags.length) lines.push(`Tags: ${contact.tags.join(", ")}`);
 
   // Form answers (custom fields) → resolve GHL field ids to labels.
