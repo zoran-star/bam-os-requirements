@@ -1005,7 +1005,8 @@ async function handler(req, res) {
       catch (e) { return res.status(e.status || 502).json({ error: `find opp: ${e.message}` }); }
       if (!oppRef) return res.status(200).json({ error: "No opportunity found for this contact - nothing to mark lost." });
       const closing = (typeof b.reply === "string" ? b.reply : (row ? row.draft_message : "")) || "";
-      if (closing.trim()) { try { await sendReplyViaGhl(token, contactId, closing.trim(), clientId); } catch (_) {} }
+      let goodbyeSent = false;
+      if (closing.trim()) { try { await sendReplyViaGhl(token, contactId, closing.trim(), clientId); goodbyeSent = true; } catch (_) {} }
       const reason = (b.lost_reason || (row && row.lost_reason) || "").toString().trim() || null;
       // Model: a non-Unqualified Lost lead flows into 💔 Lead Nurture. If the portal
       // nurture sequence is LIVE + a Lead Nurture stage exists, route them there (opp
@@ -1036,7 +1037,12 @@ async function handler(req, res) {
       }
       try { await sb(`pipeline_outcomes`, { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify([{ client_id: clientId, opportunity_id: oppId, status: routedToNurture ? "nurture" : "lost", reason }]) }); } catch (_) {}
       if (b.ready_id) {
-        try { await sb(`agent_closing_replies?id=eq.${encodeURIComponent(b.ready_id)}&client_id=eq.${clientId}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ status: "sent", approved_by: staffEmail, approved_at: new Date().toISOString(), sent_at: new Date().toISOString(), updated_at: new Date().toISOString() }) }); } catch (_) {}
+        // 'sent' only when the goodbye actually went out; a bare move is 'canceled'
+        // (fake sent_at rows poisoned the draft-vs-sent training data).
+        const done = goodbyeSent
+          ? { status: "sent", approved_by: staffEmail, approved_at: new Date().toISOString(), sent_at: new Date().toISOString(), updated_at: new Date().toISOString() }
+          : { status: "canceled", send_error: "marked lost", approved_by: staffEmail, updated_at: new Date().toISOString() };
+        try { await sb(`agent_closing_replies?id=eq.${encodeURIComponent(b.ready_id)}&client_id=eq.${clientId}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify(done) }); } catch (_) {}
       }
       await clearClosingCards(clientId, contactId, "marked lost");
       return res.status(200).json({ ok: true, marked_lost: !routedToNurture, routed_to_nurture: routedToNurture, opportunity_id: oppId, reason });
@@ -1065,7 +1071,8 @@ async function handler(req, res) {
       try { await markUnqualified(token, contactId, clientId); } catch (_) {}
       try { await sb(`pipeline_outcomes`, { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify([{ client_id: clientId, opportunity_id: oppId, status: "abandoned", reason }]) }); } catch (_) {}
       if (b.ready_id) {
-        try { await sb(`agent_closing_replies?id=eq.${encodeURIComponent(b.ready_id)}&client_id=eq.${clientId}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ status: "sent", approved_by: staffEmail, approved_at: new Date().toISOString(), sent_at: new Date().toISOString(), updated_at: new Date().toISOString() }) }); } catch (_) {}
+        // Nothing is texted on Unqualified - the acted card is 'canceled', never fake-'sent'.
+        try { await sb(`agent_closing_replies?id=eq.${encodeURIComponent(b.ready_id)}&client_id=eq.${clientId}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ status: "canceled", send_error: "marked unqualified", approved_by: staffEmail, updated_at: new Date().toISOString() }) }); } catch (_) {}
       }
       await clearClosingCards(clientId, contactId, "marked unqualified");
       return res.status(200).json({ ok: true, marked_abandoned: true, unqualified: true, opportunity_id: oppId, reason });

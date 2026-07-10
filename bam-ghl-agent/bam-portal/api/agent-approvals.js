@@ -1044,7 +1044,8 @@ async function handler(req, res) {
       if (!oppRef) return res.status(200).json({ error: "No opportunity found for this contact - nothing to mark lost." });
       // Send a closing message only if one was explicitly provided.
       const closing = (typeof b.reply === "string" ? b.reply : (row ? row.draft_message : "")) || "";
-      if (closing.trim()) { try { await sendReplyViaGhl(token, contactId, closing.trim(), clientId); } catch (_) {} }
+      let goodbyeSent = false;
+      if (closing.trim()) { try { await sendReplyViaGhl(token, contactId, closing.trim(), clientId); goodbyeSent = true; } catch (_) {} }
       const reason = (b.lost_reason || (row && row.lost_reason) || "").toString().trim() || null;
       // Model: "Lost" is no longer terminal - a non-Unqualified lost lead flows into
       // 💔 Lead Nurture. If this academy has the portal nurture sequence LIVE and a
@@ -1082,7 +1083,13 @@ async function handler(req, res) {
       }
       try { await sb(`pipeline_outcomes`, { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify([{ client_id: clientId, opportunity_id: oppId, status: routedToNurture ? "nurture" : "lost", reason }]) }); } catch (_) {}
       // Clear ALL of this lead's queued cards (replies + follow-ups) - they're done in Responded now.
-      try { await sb(`agent_ready_replies?client_id=eq.${clientId}&ghl_contact_id=eq.${encodeURIComponent(contactId)}&status=in.(pending,approved)`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ status: "sent", approved_by: staffEmail, approved_at: new Date().toISOString(), sent_at: new Date().toISOString(), updated_at: new Date().toISOString() }) }); } catch (_) {}
+      // Truthful bookkeeping: only the acted-on row where a goodbye actually went out is
+      // 'sent'; every other swept card is 'canceled' (nothing was texted). Stamping the
+      // whole sweep 'sent' faked sent_at rows and poisoned the draft-vs-sent training data.
+      try {
+        if (row && goodbyeSent) await sb(`agent_ready_replies?id=eq.${encodeURIComponent(row.id)}&client_id=eq.${clientId}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ status: "sent", approved_by: staffEmail, approved_at: new Date().toISOString(), sent_at: new Date().toISOString(), updated_at: new Date().toISOString() }) });
+        await sb(`agent_ready_replies?client_id=eq.${clientId}&ghl_contact_id=eq.${encodeURIComponent(contactId)}&status=in.(pending,approved)`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ status: "canceled", send_error: "marked lost", approved_by: staffEmail, updated_at: new Date().toISOString() }) });
+      } catch (_) {}
       try { await sb(`agent_followups?client_id=eq.${clientId}&ghl_contact_id=eq.${encodeURIComponent(contactId)}&status=in.(pending,approved)`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ status: "canceled", send_error: "marked lost", updated_at: new Date().toISOString() }) }); } catch (_) {}
       return res.status(200).json({ ok: true, marked_lost: !routedToNurture, routed_to_nurture: routedToNurture, opportunity_id: oppId, reason });
     }
@@ -1112,7 +1119,8 @@ async function handler(req, res) {
       // a tag failure must not 500 the action).
       try { await markUnqualified(token, contactId, clientId); } catch (_) {}
       try { await sb(`pipeline_outcomes`, { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify([{ client_id: clientId, opportunity_id: oppId, status: "abandoned", reason }]) }); } catch (_) {}
-      try { await sb(`agent_ready_replies?client_id=eq.${clientId}&ghl_contact_id=eq.${encodeURIComponent(contactId)}&status=in.(pending,approved)`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ status: "sent", approved_by: staffEmail, approved_at: new Date().toISOString(), sent_at: new Date().toISOString(), updated_at: new Date().toISOString() }) }); } catch (_) {}
+      // Nothing is texted on Unqualified - swept cards are 'canceled', never fake-'sent'.
+      try { await sb(`agent_ready_replies?client_id=eq.${clientId}&ghl_contact_id=eq.${encodeURIComponent(contactId)}&status=in.(pending,approved)`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ status: "canceled", send_error: "marked unqualified", approved_by: staffEmail, updated_at: new Date().toISOString() }) }); } catch (_) {}
       try { await sb(`agent_followups?client_id=eq.${clientId}&ghl_contact_id=eq.${encodeURIComponent(contactId)}&status=in.(pending,approved)`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ status: "canceled", send_error: "abandoned", updated_at: new Date().toISOString() }) }); } catch (_) {}
       return res.status(200).json({ ok: true, marked_abandoned: true, unqualified: true, opportunity_id: oppId, reason });
     }
@@ -1256,7 +1264,8 @@ async function handler(req, res) {
       } catch (_) {}
       try { if (oppId) await sb(`pipeline_outcomes`, { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify([{ client_id: clientId, opportunity_id: oppId, status: "ghosted", reason: "sent to ghosted automation" }]) }); } catch (_) {}
       // Clear ALL of this lead's queued cards (replies + follow-ups) — they've left Responded.
-      try { await sb(`agent_ready_replies?client_id=eq.${clientId}&ghl_contact_id=eq.${encodeURIComponent(contactId)}&status=in.(pending,approved)`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ status: "sent", approved_by: staffEmail, approved_at: new Date().toISOString(), sent_at: new Date().toISOString(), updated_at: new Date().toISOString() }) }); } catch (_) {}
+      // Ghosting sends nothing itself - swept cards are 'canceled', never fake-'sent'.
+      try { await sb(`agent_ready_replies?client_id=eq.${clientId}&ghl_contact_id=eq.${encodeURIComponent(contactId)}&status=in.(pending,approved)`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ status: "canceled", send_error: "sent to ghosted", approved_by: staffEmail, updated_at: new Date().toISOString() }) }); } catch (_) {}
       try { await sb(`agent_followups?client_id=eq.${clientId}&ghl_contact_id=eq.${encodeURIComponent(contactId)}&status=in.(pending,approved)`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ status: "canceled", send_error: "sent to ghosted", updated_at: new Date().toISOString() }) }); } catch (_) {}
       return res.status(200).json({ ok: true, ghosted: true, portal: portalGhosted, workflow_id: workflowId, opportunity_id: oppId });
     }
