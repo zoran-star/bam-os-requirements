@@ -32396,6 +32396,9 @@ function _hk2Top() { return (_HK2.q && _HK2.q[_HK2.agent] || [])[0] || null; }
 function _hk2Moves(r) {
   const a = _HK2.agent, k = r._kind, m = [];
   if (a === 'booking') {
+    // Ghost is the recommended action here - give a manual escape hatch to
+    // write a message instead of handing them to the automation (Zoran 2026-07-10).
+    if (k === 'ghost') m.push(['Write a message', 'write']);
     if (k !== 'ghost') m.push(['Send to Ghosted', 'ghost']);
     if (k !== 'lost') m.push(['Not interested: Nurture', 'lost']);
   } else if (a === 'confirm') {
@@ -32424,7 +32427,11 @@ function _hk2CardHtml(r, pos, total, isTop) {
       <div class="hk2-note">Only this academy's trial calendars show here. Booking hands the lead to the Confirm agent (its reminders send from config).</div>`;
   } else if (r._kind === 'ghost') {
     body = `${_hk2ThreadHtml(r)}
-      <div class="hk2-note">Nothing sends now - the Ghosted automation takes over with its nudges. A reply bounces them straight back to Booking.</div>`;
+      <div class="hk2-note">Nothing sends now - the Ghosted automation takes over with its nudges. A reply bounces them straight back to Booking.</div>
+      <div class="hk2-write"${isTop ? ' id="hk2-write"' : ''} style="display:none">
+        <div class="hk2-lbl">Your message - sends now and keeps them in Booking</div>
+        <textarea class="hk2-draft"${id.draft} placeholder="Write a message instead of ghosting..."></textarea>
+      </div>`;
   } else if (r._kind === 'plan') {
     body = `${_hk2ThreadHtml(r)}
       <div class="hk2-lbl">The plan - every message editable · clear a box to drop that step</div>
@@ -32466,7 +32473,7 @@ function _hk2CardHtml(r, pos, total, isTop) {
       ${r._kind === 'enroll' ? '<div class="hk2-note">The opportunity is marked won automatically when they pay on the link.</div>' : ''}`;
   }
   const isForm = r._kind === 'form';
-  const moves = isForm ? '' : _hk2Moves(r).map(([lab, op]) => `<button class="hk2-x" onclick="_hk2Move('${op}')">${lab}</button>`).join('');
+  const moves = isForm ? '' : _hk2Moves(r).map(([lab, op]) => op === 'write' ? `<button class="hk2-x" onclick="_hk2Write()">${lab}</button>` : `<button class="hk2-x" onclick="_hk2Move('${op}')">${lab}</button>`).join('');
   // Two-line header: athlete on top, parent underneath. No athlete name = fall
   // back to the single contact name + confidence, exactly as before.
   const athlete = r.athlete_name ? String(r.athlete_name).trim() : '';
@@ -32512,6 +32519,7 @@ function _hk2PtfPick(grp, val) {
 function _hk2Render(opts) {
   const host = document.getElementById('pl-hawkeye'); if (!host || !_HK2.q) return;
   _HK2.edited = false; _HK2.touched = false; _HK2.otherOpen = false;
+  const _t0 = (_HK2.q[_HK2.agent] || [])[0]; if (_t0) _t0._writeMode = false;
   if (!(opts && opts.keepPtf)) _HK2.ptf = { showed: null, fit: null, link: true, msg: '', notes: '' };
   const tabs = _HK2_AGENTS.map(a => {
     const n = _HK2.q[a].length, on = _HK2.agent === a;
@@ -32628,6 +32636,18 @@ function _hk2Unresolve(agent, r) {
   _hk2Render();
   try { _plRenderAgentSection(); } catch (_) {}
 }
+// "Write a message" on a ghost card: reveal a compose box and turn the primary
+// button into Send message. Sending keeps the lead in Booking instead of
+// handing them to the Ghosted automation (Zoran 2026-07-10).
+function _hk2Write() {
+  const r = _hk2Top(); if (!r) return;
+  r._writeMode = true;
+  const w = document.getElementById('hk2-write'); if (w) w.style.display = '';
+  const pnl = document.getElementById('hk2-other'); if (pnl) pnl.classList.remove('open');
+  const ob = document.querySelector('.hk2-otherbtn.on'); if (ob) ob.classList.remove('on');
+  const go = document.getElementById('hk2-go'); if (go) go.textContent = 'Send message';
+  const d = document.getElementById('hk2-draft'); if (d) d.focus();
+}
 // The confirm button: the card's primary action, per kind.
 function _hk2Confirm() {
   const r = _hk2Top(); if (!r) return;
@@ -32645,7 +32665,8 @@ function _hk2Confirm() {
   const reply = draftEl ? draftEl.value.trim() : (r.draft_message || '').trim();
   const before = r.draft_message || '';
   const k = r._kind;
-  if ((k === 'reply' || k === 'enroll') && !reply) { _apxToast('Message is empty', false); return; }
+  const writeMode = k === 'ghost' && r._writeMode;
+  if ((k === 'reply' || k === 'enroll' || writeMode) && !reply) { _apxToast('Message is empty', false); r._hk2Busy = false; return; }
   // Capture every input NOW - the deck advances to the next card immediately,
   // which tears down this card's DOM before the deferred API call runs.
   const calEl = document.getElementById('hk2-cal'), slotEl = document.getElementById('hk2-slot');
@@ -32669,14 +32690,20 @@ function _hk2Confirm() {
   }
   const chk = resp => { if (resp && resp.error) throw new Error(resp.error); return resp; };
   let undone = false;
-  _hawkDefer({ cardId: 'hk2-topcard', label: _HK2_KIND[k].go, restore: () => { undone = true; r._hk2Busy = false; _hk2Unresolve(agent, r); }, run: async () => {
+  _hawkDefer({ cardId: 'hk2-topcard', label: writeMode ? 'Send message' : _HK2_KIND[k].go, restore: () => { undone = true; r._hk2Busy = false; _hk2Unresolve(agent, r); }, run: async () => {
     if (k === 'book') {
       chk(await _apxPost(ep, 'confirm-book', { ready_id: r.id, calendar_id: calV, slot_at: slotV }));
       _apxToast('Booked - handed to Confirm', true);
     } else if (k === 'ghost') {
-      chk(await _apxPost(ep, 'confirm-ghost', { ready_id: r.id }));
-      try { _plMoveContactToInterested(r.ghl_contact_id); } catch (_) {}
-      _apxToast('Sent to Ghosted', true);
+      if (writeMode) {
+        // Manual message instead of ghosting: send it, keep the lead in Booking.
+        chk(await _apxPost(ep, 'send', { contact_id: r.ghl_contact_id, reply, conversation_id: r.ghl_conversation_id || null, contact_name: r.contact_name || null, reasoning: r.reasoning || null, confidence: r.confidence, reply_count: r.reply_count, booking_asks: r.booking_asks, ready_id: r.id, adjusted: true, suggested_reply: null }));
+        _apxToast('Message sent - still in Booking', true);
+      } else {
+        chk(await _apxPost(ep, 'confirm-ghost', { ready_id: r.id }));
+        try { _plMoveContactToInterested(r.ghl_contact_id); } catch (_) {}
+        _apxToast('Sent to Ghosted', true);
+      }
     } else if (k === 'handoff') {
       chk(await _apxPost(ep, 'confirm-handoff', { ready_id: r.id, reply, handoff_note: r.handoff_note }));
       _apxToast('Handed back to Booking - rebook text drafts next', true);
