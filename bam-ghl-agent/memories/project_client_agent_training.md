@@ -64,8 +64,18 @@ clients at onboarding. Changes shipped:
   the `agent-docs` launch config, port 5178); core handoff
   `docs/core-handoff/pipeline-presets.md` (ready-for-review; fc-core-srvc
   UNREACHABLE from zoran-star account - parity unverified). Open Loop (High)
-  logged in Notion with the 4 product decisions (preset per academy vs per
-  offer; who authors; customization envelope; what preset #2 is).
+  logged in Notion. **DECISIONS LOCKED (Zoran, same day):** (1) preset hangs on
+  the OFFER (pipeline_stages/stage_transitions/agent config gain offer_id;
+  entry_points already routes by offer); (2) presets authored by BAM in CODE
+  (versioned registry, NO template tables, no authoring UI); (3) per-instance
+  tuning = automations + agent training ONLY, structure locked (BAM can
+  re-stamp preset upgrades safely); (4) preset #2 = discovery_trial: responded
+  -> discovery_call_booked (NEW stage) -> trial_booked -> done_trial + same
+  ghosted/nurture automations; reuses trial_confirm + closing agent templates
+  as-is; new = call_booking mission + call_confirm agent. Training scopes by
+  AGENT TEMPLATE (shared templates share craft across presets; different
+  missions never bleed). Remaining: build phases 1-4, core review, BAM GTA
+  offer_id backfill.
 
 ## ⭐ LESSON MODEL REVISED (2026-07-10, Zoran) - consolidation skill replaces auto-promote
 The old "AI classifier -> promotion_status=pending -> staff approves -> scope flips

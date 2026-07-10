@@ -160,74 +160,63 @@
 
 <!-- C: TARGET ENTITY MAP -->
 <section class="stage sC">
-  <div class="stage-tab"><span class="n">C</span> TARGET STATE &mdash; the entity map</div>
-  <div class="stage-sub">preset = template · academy = an instance of it</div>
+  <div class="stage-tab"><span class="n">C</span> TARGET STATE &mdash; the entity map <span style="font-family:var(--hand);font-weight:400">(updated with Zoran's decisions)</span></div>
+  <div class="stage-sub">presets live in CODE · an academy's OFFER runs an instance</div>
 
   <div class="row">
     <div class="entity e-preset">
-      <div class="eh">pipeline_presets <span class="tag">the playbook</span></div>
+      <div class="eh">preset definitions <span class="tag">in code, BAM-only</span></div>
       <ul>
-        <li><b>key</b> 'free_trial', 'paid_assessment'...</li>
-        <li><b>name</b> + description + status</li>
-        <li>BAM-authored template, owned globally</li>
+        <li>a versioned code registry (like <b>prompt-structure.js</b> today), not DB rows - only BAM edits it, in git</li>
+        <li>each preset = <b>key</b> ('free_trial', 'discovery_trial') + stage list (open <b>role_key</b>s) + transition graph + which worker runs each stage</li>
+        <li>no authoring UI to build or secure - a preset ships like a feature</li>
       </ul>
     </div>
-    <div class="arrow">→</div>
-    <div class="entity e-preset">
-      <div class="eh">preset_stages <span class="tag">its columns</span></div>
+    <div class="arrow">＋</div>
+    <div class="entity e-tpl">
+      <div class="eh">agent templates <span class="tag">in code, reusable</span></div>
       <ul>
-        <li><b>role_key</b> open text (not an enum!)</li>
-        <li><b>position</b>, label, is_terminal</li>
-        <li><b>worker_kind</b> agent | automation | human</li>
-        <li>→ which <b>agent_template</b> or automation works it</li>
-      </ul>
-    </div>
-    <div class="arrow">→</div>
-    <div class="entity e-preset">
-      <div class="eh">preset_transitions <span class="tag">its arrows</span></div>
-      <ul>
-        <li><b>(from_role, trigger) → to_role/terminal</b></li>
-        <li>the default edge graph for this playbook</li>
-        <li>same shape as today's live table</li>
+        <li><b>key</b> 'trial_booking', 'call_confirm', 'trial_confirm', 'closing'...</li>
+        <li>mission + default prompt sections + tool config (reply / book / schedule / suggest-lost)</li>
+        <li><b>shared across presets</b>: preset #2 reuses trial_confirm + closing verbatim - only its booking mission is new</li>
       </ul>
     </div>
   </div>
 
-  <div class="arrow d">＋</div>
+  <div class="arrow d">⇒ <span style="font-family:var(--hand);font-size:14px">apply_preset(academy, OFFER, preset_key) stamps the instance</span></div>
 
   <div class="row">
-    <div class="entity e-tpl">
-      <div class="eh">agent_templates <span class="tag">the workers</span></div>
+    <div class="entity e-inst">
+      <div class="eh">per-OFFER instance <span class="tag">what actually runs</span></div>
       <ul>
-        <li><b>key</b> 'ft_booking', 'pa_closer'...</li>
-        <li>mission + default prompt sections (moves the free-trial prose OUT of code into seeded data)</li>
-        <li>tool config: reply / book / schedule / suggest-lost</li>
-        <li>today's 3 agents become the free_trial preset's seeded rows</li>
+        <li>pipelines hang on the <b>offer</b>, not the academy - one academy can run free-trial youth training AND a discovery-call elite program side by side</li>
+        <li><b>pipeline_stages</b> + <b>stage_transitions</b> (both live today) gain an <b>offer_id</b>; keys become (client, offer, role)</li>
+        <li><b>client_agents</b>: (client × offer × agent_template) + mode (off / hawkeye / self_drive)</li>
+        <li>leads already route by offer: <b>entry_points</b> has offer_id today</li>
       </ul>
     </div>
-    <div class="arrow">⇒<span style="font-family:var(--hand);font-size:13px;display:block">apply_preset(academy)</span></div>
+    <div class="arrow">→</div>
     <div class="entity e-inst">
-      <div class="eh">per-academy instance <span class="tag">the copy they run</span></div>
+      <div class="eh">customization envelope <span class="tag">locked vs open</span></div>
       <ul>
-        <li><b>pipeline_stages</b> rows stamped from preset_stages (role becomes open text)</li>
-        <li><b>stage_transitions</b> stamped from preset_transitions (already exists!)</li>
-        <li><b>client_agents</b>: academy × agent_template + mode (off/hawkeye/self_drive) + brain overrides</li>
-        <li>academy can tweak THEIR copy without touching the template</li>
+        <li>🔒 stages + transitions + agent missions: <b>locked to the preset</b> (BAM re-stamps safely on preset upgrades)</li>
+        <li>🔓 <b>automations</b>: timings + message copy tunable per instance</li>
+        <li>🔓 <b>agent training</b>: lessons, brain facts, examples, mode - fully per academy</li>
       </ul>
     </div>
     <div class="arrow">→</div>
     <div class="entity e-train">
-      <div class="eh">training <span class="tag">per preset</span></div>
+      <div class="eh">training <span class="tag">scoped by template</span></div>
       <ul>
-        <li><b>agent_lessons.preset</b> real column (backfill 'free_trial')</li>
         <li>lessons key on <b>agent_template</b>, not a hardcoded name</li>
-        <li>readers load: academy lessons + general lessons WHERE preset matches</li>
-        <li>/consolidate-lessons runs per preset - free-trial craft never leaks into paid-assessment academies</li>
+        <li>general lessons attach to the TEMPLATE - craft taught to trial_confirm helps EVERY preset that reuses trial_confirm, automatically</li>
+        <li>booking-for-trial vs booking-for-call are different templates, so their craft never cross-bleeds</li>
+        <li>/consolidate-lessons runs per template; intake mining feeds preset-specific onboarding questions</li>
       </ul>
     </div>
   </div>
 
-  <div class="callout"><b>Why "template + instance" and not just config flags:</b> <span class="why">a preset is authored once and stamped many times.</span> When BAM improves the free-trial playbook, new academies get the improved stamp while existing academies keep their tuned copy. Same pattern as the brain sections today (default in template, override per academy) - just promoted one level up.</div>
+  <div class="callout"><b>Why code-authored presets simplify everything:</b> <span class="why">no template tables, no authoring UI, no permissions.</span> A preset is reviewed and shipped like code (because it is code). And because academies can't restructure stages or transitions, BAM can safely RE-STAMP an improved preset onto existing instances - only automations + training are per-academy, and those survive the re-stamp.</div>
 </section>
 
 <div class="between"><span class="lab">how we get there without breaking BAM GTA ↓</span><span class="big">↓</span></div>
@@ -252,37 +241,53 @@
 
   <div class="phase">
     <div class="ph-badge p2">Phase 2<small>the preset noun</small></div>
-    <div class="ph-body"><b class="k">Create the template entities.</b> <code>pipeline_presets</code> + <code>preset_stages</code> + <code>preset_transitions</code> + <code>agent_templates</code>; seed <b>free_trial</b> from today's exact model; replace the one-off seed function with <code>apply_preset(academy, preset)</code>.
-      <span class="unlock">You can now CREATE a second playbook and stamp a new academy with it in one step.</span></div>
+    <div class="ph-body"><b class="k">Preset registry in code + per-OFFER instances.</b> A versioned code registry defines presets (stages, transitions, worker per stage) and reusable agent templates; <b>free_trial</b> is written down from today's exact model. <code>apply_preset(academy, offer, preset)</code> replaces the one-off seeder. Schema side: <code>pipeline_stages</code> / <code>stage_transitions</code> / agent config gain <b>offer_id</b> (keys become client + offer + role).
+      <span class="unlock">A second playbook is a code file; stamping an academy's offer with it is one call.</span>
+      <span class="risk">⚠ adding offer_id to live keyed tables (unique constraints) - additive but needs a careful backfill for BAM GTA</span></div>
   </div>
 
   <div class="phase">
     <div class="ph-badge p3">Phase 3<small>generic workers</small></div>
-    <div class="ph-body"><b class="k">One engine, many agents.</b> Collapse the 3 copy-pasted agent APIs into one detector/drafter parameterized by (academy, stage, agent_template). Hawkeye's tabs render from the academy's actual stages instead of hardcoded booking/confirm/closing.
-      <span class="unlock">A 4th agent (or a 2-agent preset) is a data row, not a new API file.</span></div>
+    <div class="ph-body"><b class="k">One engine, many agents.</b> Collapse the 3 copy-pasted agent APIs into one detector/drafter parameterized by (academy, offer, stage, agent_template). Hawkeye's tabs render from the offer's actual stages instead of hardcoded booking/confirm/closing.
+      <span class="unlock">A 4th agent (or a 5-stage preset) is a registry entry, not a new API file.</span></div>
   </div>
 
   <div class="phase">
-    <div class="ph-badge p4">Phase 4<small>train per preset</small></div>
-    <div class="ph-body"><b class="k">Preset-scoped training.</b> <code>agent_lessons.preset</code> column (backfill free_trial), readers filter general lessons by the academy's preset, /consolidate-lessons runs per preset, intake-gap mining feeds preset-specific onboarding questions.
-      <span class="unlock">Every preset develops its own shared brain - free-trial wisdom never contaminates a no-trial academy.</span></div>
+    <div class="ph-badge p4">Phase 4<small>train per template</small></div>
+    <div class="ph-body"><b class="k">Template-scoped training.</b> <code>agent_lessons.agent</code> becomes the agent_template key (backfill today's 3), readers load general lessons by template, /consolidate-lessons runs per template, intake-gap mining feeds preset-specific onboarding questions.
+      <span class="unlock">Craft taught to a shared template (trial_confirm, closing) upgrades EVERY preset that uses it - while different missions never cross-bleed.</span></div>
   </div>
 
-  <p class="note">Order matters: 1 before 2 (templates need open roles), 2 before 3 (the engine needs templates to read), 4 can start any time after 2.</p>
+  <p class="note">Order matters: 1 before 2 (open roles first), 2 before 3 (the engine reads the registry), 4 can start any time after 2.</p>
 </section>
 
-<div class="between"><span class="lab">decisions only Zoran can make ↓</span><span class="big">↓</span></div>
+<div class="between"><span class="lab">Zoran decided (2026-07-10) ↓</span><span class="big">↓</span></div>
 
-<!-- E: DECISIONS -->
+<!-- E: DECISIONS (DECIDED) -->
 <section class="stage sE">
-  <div class="stage-tab"><span class="n">E</span> OPEN DECISIONS &mdash; product calls, not tech calls</div>
-  <div class="stage-sub">these shape the schema - decide before Phase 2</div>
+  <div class="stage-tab"><span class="n">E</span> DECISIONS &mdash; locked by Zoran, 2026-07-10</div>
+  <div class="stage-sub">these shaped the map above</div>
   <div class="decisions">
-    <div class="dec"><b>1 · Preset per academy, or per OFFER?</b> Today one academy = one pipeline. But offers already exist as their own thing (Training is one offer type). <span class="q">Can one academy run free-trial for youth training AND paid-assessment for elite? That decides where the preset hangs.</span></div>
-    <div class="dec"><b>2 · Who authors presets?</b> BAM-only templates, or can big academies fork their own? <span class="q">Recommend: BAM-only until preset #3 exists. Forks multiply the training surfaces.</span></div>
-    <div class="dec"><b>3 · How much can an academy customize their copy?</b> Rename stages? Re-wire transitions? Swap an agent for a human? <span class="q">Every degree of freedom here is support burden later. Recommend: transitions + agent mode yes, stage structure no.</span></div>
-    <div class="dec"><b>4 · What's preset #2, really?</b> Designing the abstraction against ONE real second case (paid assessment? drop-in classes? memberships-direct?) beats designing in the abstract. <span class="q">Pick the next academy type you actually want to sign.</span></div>
+    <div class="dec" style="background:var(--green)"><b>1 · Preset hangs on the OFFER ✓</b> One academy can run multiple offers, each with its own pipeline preset. <span class="q" style="color:#1f5f22">Schema consequence: pipeline_stages / stage_transitions / agent config gain offer_id. Leads already route by offer via entry_points.</span></div>
+    <div class="dec" style="background:var(--green)"><b>2 · Presets are authored by BAM, in CODE ✓</b> No authoring UI, no DB templates - a preset is a reviewed, versioned code file. <span class="q" style="color:#1f5f22">Kills a whole class of build work and permissions questions.</span></div>
+    <div class="dec" style="background:var(--green)"><b>3 · Per-instance tuning = automations + agent training ONLY ✓</b> Stage structure, transitions, and agent missions stay locked to the preset. <span class="q" style="color:#1f5f22">Means BAM can safely re-stamp preset upgrades onto live academies - tuning survives, structure refreshes.</span></div>
+    <div class="dec" style="background:var(--green)"><b>4 · Preset #2 outlined ✓</b> The discovery-call motion, sketched below. <span class="q" style="color:#1f5f22">Reuses nurture + ghosted automations and the trial-confirm + closing agents as-is.</span></div>
   </div>
+
+  <div class="arrow d">↓</div>
+  <div class="row" style="gap:6px">
+    <div style="width:100%;text-align:center;font-weight:800;font-size:15px;margin-bottom:2px">Preset #2 sketch: <span class="tterm">discovery_trial</span> <span style="font-family:var(--hand);font-weight:400;font-size:14px">(the discovery-call motion)</span></div>
+    <div class="card b" style="width:172px"><div class="h">1 · Responded</div><div class="t">Booking agent - mission: book a <b>discovery call</b> (new template: <code>call_booking</code>).</div><span class="say">New mission, same muscle.</span></div>
+    <div class="arrow">→</div>
+    <div class="card b" style="width:172px"><div class="h">2 · Call Booked</div><div class="t">NEW stage <code>discovery_call_booked</code> - confirm-style agent gets them to show up to the call (<code>call_confirm</code>).</div><span class="say">New stage, new confirm twin.</span></div>
+    <div class="arrow">→</div>
+    <div class="card g" style="width:172px"><div class="h">3 · Trial Booked</div><div class="t">Same as today's scheduled_trial - reuses <code>trial_confirm</code> template AS-IS.</div><span class="say">Borrowed from free-trial.</span></div>
+    <div class="arrow">→</div>
+    <div class="card g" style="width:172px"><div class="h">4 · Done Trial</div><div class="t">Reuses the <code>closing</code> template AS-IS.</div><span class="say">Borrowed as-is.</span></div>
+    <div class="arrow">＋</div>
+    <div class="card g" style="width:180px"><div class="h">Ghosted + Nurture</div><div class="t">Same automations as the free-trial preset, unchanged.</div><span class="say">Shared plumbing.</span></div>
+  </div>
+  <p class="note">Only 2 genuinely new pieces: the call_booking mission and the call_confirm stage/agent. Everything else is reuse - which is exactly what validates the template model.</p>
 </section>
 
 <div class="between"><span class="lab">and one blocker to clear ↓</span><span class="big">↓</span></div>

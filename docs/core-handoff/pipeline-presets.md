@@ -46,33 +46,54 @@ core_commit_reviewed: unavailable
   `Full-Control/fc-core-srvc`; same blocker as sales-flow.md). Core parity is
   UNVERIFIED; review required before Phase 1 ships.
 
-## Intended Model
+## Decisions (Zoran, 2026-07-10) — these are LOCKED
+
+1. **Preset hangs on the OFFER, not the academy.** One academy can run multiple
+   offers, each with its own pipeline preset. Instance keys become
+   (client_id, offer_id, role_key). Lead routing by offer already exists
+   (`entry_points.offer_id`).
+2. **Presets are authored by BAM, in CODE.** A versioned code registry (like
+   `prompt-structure.js` today), not DB template tables and not an authoring
+   UI. The earlier `pipeline_presets`/`preset_stages`/`preset_transitions`
+   TABLE idea is superseded by a code registry + a stamp function.
+3. **Per-instance customization = automations + agent training ONLY.** Stage
+   structure, transitions, and agent missions stay locked to the preset, so
+   BAM can safely re-stamp preset upgrades onto live instances.
+4. **Preset #2 = the discovery-call motion** (`discovery_trial`): responded →
+   discovery_call_booked (NEW) → trial_booked → done_trial, with the same
+   ghosted + nurture automations. Reuses `trial_confirm` + `closing` agent
+   templates as-is; new pieces are only the `call_booking` mission and the
+   `call_confirm` stage/agent.
+
+## Intended Model (updated for the decisions)
 
 | Concept | Purpose | Relationships and scope |
 |---|---|---|
-| `pipeline_presets` | The authored playbook (template) | Global (BAM-owned), keyed `free_trial`, `paid_assessment`, ...; status lifecycle |
-| `preset_stages` | Template stage list | preset_id FK; **open `role_key` text** (replaces the closed 7-value `stage_role` enum); position; `worker_kind` agent \| automation \| human; agent_template_id / automation ref |
-| `preset_transitions` | Template edge graph | Same shape as live `stage_transitions`: (from_role, trigger) → stage \| terminal |
-| `agent_templates` | Reusable agent definition | key, mission, default prompt sections (moves the free-trial prose OUT of code constants into seeded data), tool config (reply/book/schedule/suggest-lost). Today's booking/confirm/closing become the free_trial preset's seeded rows |
-| per-academy instance | The copy an academy runs | `apply_preset(client_id, preset)` stamps `pipeline_stages` + `stage_transitions` (both EXIST already) + new `client_agents` (client_id × agent_template + mode + brain overrides) |
-| preset-scoped training | Lessons per motion | `agent_lessons.preset` real column (backfill `free_trial` from context tag); lessons key on agent_template; readers filter general lessons by the academy's preset |
+| preset registry (CODE) | The authored playbook | Versioned code module, BAM-only; per preset: key, stage list (open `role_key`s), transition graph, worker per stage (agent template \| automation \| human) |
+| agent templates (CODE) | Reusable agent definitions, shared ACROSS presets | key (`trial_booking`, `call_booking`, `call_confirm`, `trial_confirm`, `closing`), mission, default prompt sections, tool config. Today's 3 agents become the free_trial preset's entries |
+| per-OFFER instance | The copy that runs | `apply_preset(client_id, offer_id, preset_key)` stamps `pipeline_stages` + `stage_transitions` (both EXIST; gain `offer_id`) + new `client_agents` (client × offer × agent_template + mode) |
+| template-scoped training | Lessons per agent template | `agent_lessons.agent` becomes the agent_template key (backfill today's 3); general lessons attach to the TEMPLATE, so craft taught to a shared template (e.g. trial_confirm) benefits every preset that reuses it, while different missions never cross-bleed |
 
 ## Phased path (each phase ships alone)
 
 0. **Done:** stage registry, transition graph + router, automations engine,
    brain-as-data, preset-tagged lessons, Hawkeye training loop.
 1. **Open the roles:** widen `stage_role` enum → text validated against the
-   registry; move agent prompt defaults from code into seeded rows. ⚠ The
+   registry (needed for `discovery_call_booked`, `trial_booked`). ⚠ The
    enum→text widening is the ONE non-additive change - prod migration on live
    tables (`stage_transitions`, `pipeline_stages` CHECK) needs explicit review.
-2. **Preset entities:** create the 4 template tables; seed `free_trial` from
-   today's exact model; `apply_preset` replaces `seed_default_stage_transitions`.
+2. **Preset registry in code + per-offer instances:** write the registry,
+   codify `free_trial` from today's exact model; `apply_preset(client, offer,
+   preset)` replaces `seed_default_stage_transitions`; add `offer_id` to
+   `pipeline_stages` / `stage_transitions` / agent config (⚠ unique-key change
+   + BAM GTA backfill: map its existing rows to its Training offer).
 3. **Generic workers:** collapse the 3 copy-pasted agent APIs
    (agent-approvals/confirm/closing) into one detector/drafter parameterized by
-   (academy, stage, agent_template); Hawkeye tabs render from the academy's
-   stages.
-4. **Preset-scoped training:** `agent_lessons.preset` column, reader filters,
-   per-preset `/consolidate-lessons` + intake mining.
+   (academy, offer, stage, agent_template); Hawkeye tabs render from the
+   offer's stages.
+4. **Template-scoped training:** `agent_lessons.agent` → agent_template key,
+   reader filters by template, per-template `/consolidate-lessons` + intake
+   mining.
 
 ## Production data guardrails
 
@@ -88,15 +109,14 @@ core_commit_reviewed: unavailable
 - Idempotency: `apply_preset` upserts on (client_id, role_key) exactly like the
   current seeders.
 
-## Open decisions (product - Zoran)
+## Remaining open items
 
-1. Preset hangs on the **academy or the offer**? (Offers are already first-class;
-   one academy might want two motions.) This decides the FK shape - decide
-   before Phase 2.
-2. Who authors presets - BAM only, or academy forks?
-3. Customization envelope for an academy's instance (recommend: transitions +
-   agent mode editable; stage structure locked).
-4. What is preset #2 in reality (design the abstraction against a real case).
+1. Core parity review (blocked on `fc-core-srvc` access - see References).
+2. BAM GTA backfill mapping when `offer_id` lands (its current rows map to the
+   Training offer).
+3. Same academy, two offers on the SAME preset: academy-scoped lessons are per
+   (client, agent_template) - confirm they should be shared across that
+   academy's offers (current lean: yes, academy facts are academy-wide).
 
 ## Parity gaps / shortcuts
 
