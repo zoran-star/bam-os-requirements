@@ -32347,6 +32347,14 @@ async function _hk2Load() {
   return { booking, confirm, closing };
 }
 function _hk2Pick(a) { _HK2.agent = a; _hk2Render(); }
+// Name tap on a deck card -> the contact drawer. The drawer overlay sits at
+// z-index 9000; on mobile the deck modal is 10050, so raise the overlay above
+// it or the drawer would open BEHIND the deck.
+function _hk2OpenContact(cid, nm) {
+  try { _autoOpenContact(cid, nm); } catch (_) { return; }
+  const ov = document.getElementById('contacts-drawer-ov');
+  if (ov) ov.style.zIndex = '10060';
+}
 // Back from the deck = the HOME page's Sales section (Zoran 2026-07-09), with
 // every cascade closed. With the overlay model, home is right behind the modal.
 function _hk2Back() {
@@ -32490,10 +32498,16 @@ function _hk2CardHtml(r, pos, total, isTop) {
   const roleWord = parent ? 'Parent' : (athlete ? 'Athlete' : '');
   const sub = [roleWord, conf].filter(Boolean).join(' · ');
   const athleteLine = (athlete && parent) ? `<div class="hk2-athlete">Athlete: ${escapeHTML(athlete)}</div>` : '';
+  // Tap the name block -> the contact drawer (Zoran 2026-07-10). Reuses the
+  // automations panel's by-contact-id opener; ids/names ride data attributes so
+  // quotes in names can't break the inline handler.
+  const nameClick = r.ghl_contact_id
+    ? ` onclick="_hk2OpenContact(this.dataset.cid, this.dataset.nm)" data-cid="${escapeHTML(String(r.ghl_contact_id))}" data-nm="${escapeHTML(bigName)}" style="flex:1;min-width:0;cursor:pointer" title="Open contact"`
+    : ' style="flex:1;min-width:0"';
   return `
     <div class="hk2-head">
       <div class="hk2-av">${escapeHTML(_hk2Initials(bigName))}</div>
-      <div style="flex:1;min-width:0"><div class="hk2-who">${escapeHTML(bigName)}</div>
+      <div${nameClick}><div class="hk2-who">${escapeHTML(bigName)}</div>
         <div class="hk2-sub">${sub}</div>${athleteLine}</div>
       <span class="hk2-pill" style="color:${km.color};background:color-mix(in srgb,${km.color} 14%,transparent)">${km.pill}</span>
       <span class="hk2-prog">${pos} of ${total}</span>
