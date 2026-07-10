@@ -12,9 +12,11 @@
 
 import { withSentryApiRoute } from "../_sentry.js";
 import { maybeSendSmsViaProvider } from "../messaging/provider.js";
-import { moveStage, pipelineFlags, oppMatchClause, resolveStage } from "../agent/_store.js";
+import { moveStage, pipelineFlags, oppMatchClause, resolveStage, setStatus } from "../agent/_store.js";
 import { routeTransition } from "../agent/_router.js";
 import { markUnqualified } from "../agent/_tags.js";
+import { nurtureStage } from "../agent/_stage.js";
+import { isAutomationLive, enrollContact } from "../automations.js";
 import { contactProvider } from "../_contacts.js";
 import { recordKpiEvent } from "../_kpi.js";
 
@@ -106,6 +108,9 @@ async function handler(req, res) {
   const trainer = (b.trainer || "").trim() || null;
   const notes = (b.notes || "").trim() || null;
   const sendLink = !!b.send_onboarding_link;
+  // Not-a-fit terminal outcome: "unqualified" (quiet dead-end, default) or "lost"
+  // (Lead Nurture takes over). Only consulted when showed up + not a good fit.
+  const notFitOutcome = b.outcome === "lost" ? "lost" : "unqualified";
 
   const rows = await sb(`clients?id=eq.${clientId}&select=id,ghl_location_id,ghl_access_token,ghl_refresh_token,ghl_token_expires_at,booking_provider&limit=1`);
   const client = rows?.[0];
@@ -322,14 +327,40 @@ async function handler(req, res) {
     }
   }
 
-  // Showed up, but NOT a fit -> the dead end. Route the post_trial_not_fit edge
-  // through the router's terminal path (GTA seed = scheduled_trial -> Unqualified):
-  // close the opp (setStatus abandoned + role:unqualified) and stamp the GHL
-  // unqualified tag + an outcome row, mirroring the confirm-abandoned action.
-  // Only fires when the coach explicitly marked showed-up + not-a-fit; a paused or
-  // missing edge leaves the lead put (no legacy behavior to preserve here). No
-  // message is sent - it's a quiet close.
-  if (showedUp === true && !goodFit) {
+  // Showed up but NOT a fit -> a terminal close. The coach picks which one on the
+  // form: "lost" (Lead Nurture takes over) or "unqualified" (quiet dead-end).
+  if (showedUp === true && !goodFit && notFitOutcome === "lost") {
+    // Showed up but LOST (qualified, not proceeding): same terminal as the Confirm
+    // agent's Mark Lost - route into 💔 Lead Nurture if that sequence is live + a
+    // Lead Nurture stage exists (opp stays OPEN), else GHL-native status=lost.
+    // Quiet close, no message. (Zoran 2026-07-10)
+    const lostReason = (b.lost_reason || "").toString().trim() || "post-trial: lost";
+    let routedToNurture = false;
+    try {
+      if (await isAutomationLive(clientId, "nurture")) {
+        const ns = await nurtureStage(token, client.ghl_location_id, { clientId, sb });
+        if (ns) {
+          await moveStage({ clientId, sb, ghl, token, oppRef, stage: ns, role: "nurture", contactId, reason: lostReason });
+          await enrollContact({ clientId, automationKey: "nurture", contactId });
+          routedToNurture = true;
+        }
+      }
+    } catch (e) { console.error("post-trial lost -> nurture failed (falling back to status=lost):", e.message); }
+    if (!routedToNurture) {
+      try { await setStatus({ clientId, ghl, token, oppRef, status: "lost", contactId, reason: lostReason }); }
+      catch (e) { console.error("post-trial mark lost failed (non-fatal):", e.message); }
+    }
+    result.lost = true;
+    result.routed_to_nurture = routedToNurture;
+    try { await sb(`pipeline_outcomes`, { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify([{ client_id: clientId, opportunity_id: oppId, status: routedToNurture ? "nurture" : "lost", reason: lostReason }]) }); } catch (_) {}
+  } else if (showedUp === true && !goodFit) {
+    // Showed up but NOT a fit -> the dead end. Route the post_trial_not_fit edge
+    // through the router's terminal path (GTA seed = scheduled_trial -> Unqualified):
+    // close the opp (setStatus abandoned + role:unqualified) and stamp the GHL
+    // unqualified tag + an outcome row, mirroring the confirm-abandoned action.
+    // Only fires when the coach explicitly marked showed-up + not-a-fit; a paused or
+    // missing edge leaves the lead put (no legacy behavior to preserve here). No
+    // message is sent - it's a quiet close.
     try {
       const routed = await routeTransition({ clientId, sb, ghl, token, locationId: client.ghl_location_id, fromRole: "scheduled_trial", trigger: "post_trial_not_fit", contactId, oppRef, allowTerminal: true, reason: "post-trial: showed up, not a fit" });
       if (routed.matched && routed.terminal === "unqualified" && routed.moved) {
