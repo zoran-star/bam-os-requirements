@@ -1184,11 +1184,20 @@ async function handler(req, res) {
       // Provider branch: booking_provider='portal' books onto OUR slot via the
       // capacity-safe book_trial_slot RPC (no GHL appointment at all); every
       // other academy keeps the exact GHL appointment POST.
-      let appt = null, trialBookingId = null;
+      let appt = null, trialBookingId = null, confirmationSent = false;
       if ((await bookingProviderOf(clientId)) === "portal") {
         try {
           trialBookingId = await bookPortalTrial(clientId, { slotAtIso: startIso, group: row.book_group, contactId, contactName: row.contact_name });
         } catch (e) { return res.status(502).json({ error: `book: ${e.message}` }); }
+        // Tell the parent it's locked in. GHL academies get GHL's own calendar
+        // notification (toNotify below); portal academies got NOTHING - the card's
+        // confirmation draft was never sent anywhere, so a lead who said "yes
+        // please" heard silence until a human approved the next confirm card
+        // (caught live on GTA 2026-07-10, Mike Sandhu). Prefers the deck's edited
+        // text (b.reply), falls back to the detector's draft. Human-approved +
+        // time-sensitive -> sends immediately (same exemption as lost goodbyes).
+        const confirmMsg = ((typeof b.reply === "string" ? b.reply : "") || row.draft_message || "").trim();
+        if (confirmMsg) { try { await sendReplyViaGhl(token, contactId, confirmMsg, clientId); confirmationSent = true; } catch (_) {} }
       } else {
         try {
           appt = await ghl("POST", `/calendars/events/appointments`, { token, body: {
@@ -1226,8 +1235,8 @@ async function handler(req, res) {
         }
       } catch (_) {}
       try { await sb(`agent_ready_replies?id=eq.${encodeURIComponent(b.ready_id)}&client_id=eq.${clientId}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ status: "sent", approved_by: staffEmail, approved_at: new Date().toISOString(), sent_at: new Date().toISOString(), updated_at: new Date().toISOString() }) }); } catch (_) {}
-      try { await logApproval({ client_id: clientId, ghl_contact_id: contactId, contact_name: row.contact_name || null, final_reply: `[booked ${row.book_group || "trial"} @ ${startIso}]`, status: "sent", created_by: staffEmail }); } catch (_) {}
-      return res.status(200).json({ ok: true, booked: true, appointment_id: appt?.id || appt?.appointment?.id || trialBookingId || null, slot_at: startIso });
+      try { await logApproval({ client_id: clientId, ghl_contact_id: contactId, contact_name: row.contact_name || null, final_reply: `[booked ${row.book_group || "trial"} @ ${startIso}]${confirmationSent ? " + confirmation text sent" : ""}`, status: "sent", created_by: staffEmail }); } catch (_) {}
+      return res.status(200).json({ ok: true, booked: true, confirmation_sent: confirmationSent, appointment_id: appt?.id || appt?.appointment?.id || trialBookingId || null, slot_at: startIso });
     }
 
     // Human ✓ on a Ghost card → enroll the lead in the academy's Ghosted automation

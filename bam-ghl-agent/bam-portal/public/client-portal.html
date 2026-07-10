@@ -9082,6 +9082,8 @@ Then the call to action."]</div>
           .hk2-pill{font-size:9.5px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;border-radius:999px;padding:3px 9px;white-space:nowrap}
           .hk2-prog{font-size:11px;color:var(--text-mute);margin-left:auto;white-space:nowrap}
           .hk2-ctx{font-size:11.5px;color:var(--text-mute);background:var(--bg);border:1px dashed var(--border);border-radius:10px;padding:8px 10px;line-height:1.5}
+          .hk2-booked{font-size:12px;font-weight:600;color:var(--text-sub);background:color-mix(in srgb,var(--gold,#D4B65C) 8%,transparent);border:1px solid color-mix(in srgb,var(--gold,#D4B65C) 35%,transparent);border-radius:8px;padding:7px 10px;display:flex;align-items:center;gap:7px}
+          .hk2-booked-check{color:var(--gold,#D4B65C);font-weight:800}
           .hk2-esc{font-size:11.5px;color:#e0a020}
           .hk2-thread{max-height:340px;overflow-y:auto;display:flex;flex-direction:column;gap:7px;padding:2px}
           .hk2-bub{font-size:13px;line-height:1.5;padding:8px 12px;border-radius:13px;max-width:82%;white-space:pre-wrap;word-break:break-word}
@@ -32469,7 +32471,9 @@ function _hk2CardHtml(r, pos, total, isTop) {
         <label><span>Calendar</span><select${id.cal} onchange="_hk2CalChange()"><option value="${escapeHTML(r.book_calendar_id || '')}" selected>${escapeHTML(r.book_group || 'Loading calendars…')}</option></select></label>
         <label><span>Slot</span><select${id.slot} onchange="_hk2Edited()"><option value="${escapeHTML(guessSlot)}" selected>${escapeHTML(guessSlot ? _hk2SlotLabel(guessSlot) : 'Loading open slots…')}</option></select></label>
       </div>
-      <div class="hk2-note">Only this academy's trial calendars show here. Booking hands the lead to the Confirm agent (its reminders send from config).</div>`;
+      <div class="hk2-lbl">Confirmation text - sends the moment you book it</div>
+      <textarea class="hk2-draft"${id.draft} oninput="_hk2Edited()">${escapeHTML(r.draft_message || '')}</textarea>
+      <div class="hk2-note">Only this academy's trial calendars show here. Book it = the slot is claimed, your confirmation text sends, and the Confirm agent takes over (reminders send from config).</div>`;
   } else if (r._kind === 'ghost') {
     body = `${_hk2ThreadHtml(r)}
       <div class="hk2-note">Nothing sends now - the Ghosted automation takes over with its nudges. A reply bounces them straight back to Booking.</div>
@@ -32545,6 +32549,13 @@ function _hk2CardHtml(r, pos, total, isTop) {
   // The chevron makes the tap target discoverable (shipped clickable 2026-07-10
   // but nothing signaled it - Zoran asked for the feature twice).
   const openInd = r.ghl_contact_id ? '<span class="hk2-open-ind">›</span>' : '';
+  // A live system booking exists for this lead - SHOW it. Without this line a
+  // reviewer can't tell "we texted about a time" from "the slot is actually
+  // claimed" (caught 2026-07-10: a booked lead's confirm card looked like the
+  // system never booked anything). Future trials only - a past trial_at on a
+  // stale card would just confuse.
+  const trialLine = (r.trial_at && new Date(r.trial_at).getTime() > Date.now())
+    ? `<div class="hk2-booked"><span class="hk2-booked-check">✓</span> Trial on the books: ${escapeHTML(_hk2SlotLabel(r.trial_at))}</div>` : '';
   return `
     <div class="hk2-head">
       <div class="hk2-av">${escapeHTML(_hk2Initials(bigName))}</div>
@@ -32554,6 +32565,7 @@ function _hk2CardHtml(r, pos, total, isTop) {
       <span class="hk2-prog">${pos} of ${total}</span>
     </div>
     ${esc}
+    ${trialLine}
     ${ctx ? `<div class="hk2-ctx">${escapeHTML(ctx)}</div>` : ''}
     ${body}
     <input class="hk2-teach"${id.teach} style="display:none" placeholder="Required: teach the agent why you changed it (saved as a lesson)">
@@ -32767,8 +32779,8 @@ function _hk2Confirm() {
   let undone = false;
   _hawkDefer({ cardId: 'hk2-topcard', label: writeMode ? 'Send message' : _HK2_KIND[k].go, restore: () => { undone = true; r._hk2Busy = false; _hk2Unresolve(agent, r); }, run: async () => {
     if (k === 'book') {
-      chk(await _apxPost(ep, 'confirm-book', { ready_id: r.id, calendar_id: calV, slot_at: slotV }));
-      _apxToast('Booked - handed to Confirm', true);
+      const resp = chk(await _apxPost(ep, 'confirm-book', { ready_id: r.id, calendar_id: calV, slot_at: slotV, reply }));
+      _apxToast(resp && resp.confirmation_sent ? 'Booked + confirmation sent - Confirm takes over' : 'Booked - handed to Confirm', true);
     } else if (k === 'ghost') {
       if (writeMode) {
         // Manual message instead of ghosting: send it, keep the lead in Booking.
