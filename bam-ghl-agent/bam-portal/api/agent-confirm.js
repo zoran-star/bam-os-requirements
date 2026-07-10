@@ -515,15 +515,19 @@ async function detectForClient(client) {
   let flushed = 0;
   if (withinQuietHours()) {
     try {
-      const held = await sb(`agent_confirm_replies?client_id=eq.${client.id}&status=eq.approved&send_after=lte.${new Date().toISOString()}&select=id,ghl_contact_id,draft_message&order=send_after.asc&limit=40`);
+      const held = await sb(`agent_confirm_replies?client_id=eq.${client.id}&status=eq.approved&send_after=lte.${new Date().toISOString()}&select=id,ghl_contact_id,draft_message,kind&order=send_after.asc&limit=40`);
       for (const row of (Array.isArray(held) ? held : [])) {
+        // A held HANDOFF acknowledgement (approved after 9:30pm) is exempt from
+        // both gates below: the handoff already bounced this lead out of
+        // Scheduled-Trial on purpose - that's the plan, not staleness.
+        const handoffAck = row.kind === "confirm_handoff";
         // Never flush a held confirm at a lead whose trial already ran - "see
         // you Tuesday!" landing on Wednesday. The post-trial form owns them.
-        if (row.ghl_contact_id && passedTrial.has(String(row.ghl_contact_id))) {
+        if (!handoffAck && row.ghl_contact_id && passedTrial.has(String(row.ghl_contact_id))) {
           await sb(`agent_confirm_replies?id=eq.${row.id}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ status: "canceled", send_error: "trial ran - handed to post-trial form", updated_at: new Date().toISOString() }) });
           continue;
         }
-        if (row.ghl_contact_id && !scheduledIds.has(row.ghl_contact_id)) {
+        if (!handoffAck && row.ghl_contact_id && !scheduledIds.has(row.ghl_contact_id)) {
           await sb(`agent_confirm_replies?id=eq.${row.id}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ status: "canceled", send_error: "left Scheduled-Trial stage", updated_at: new Date().toISOString() }) });
           continue;
         }
@@ -966,8 +970,14 @@ async function handler(req, res) {
       }
       if (!contactId) return res.status(400).json({ error: "ready_id or contact_id required" });
       // Send the warm acknowledgement only if one was provided / drafted.
+      // QUIET HOURS (Zoran 2026-07-10): an after-hours ✓ still hands off NOW
+      // (notes + stage bounce below run immediately), but the parent-facing text
+      // PARKS until morning - the detect cron's flush sends it at 8am
+      // (confirm_handoff rows are exempt from the flush's stage gates, since
+      // this lead just left Scheduled-Trial on purpose).
       const closing = (typeof b.reply === "string" ? b.reply : (row ? row.draft_message : "")) || "";
-      if (closing.trim()) { try { await sendReplyViaGhl(token, contactId, closing.trim(), clientId); } catch (_) {} }
+      const holdAck = !!closing.trim() && !withinQuietHours();
+      if (closing.trim() && !holdAck) { try { await sendReplyViaGhl(token, contactId, closing.trim(), clientId); } catch (_) {} }
       // Write the context note (this is how the booking agent gets full context —
       // contact-memory.js injects agent_contact_notes into the booking prompt).
       const note = (b.handoff_note || (row && row.handoff_note) || "Couldn't make their booked trial — needs to rebook.").toString().trim();
@@ -1007,11 +1017,33 @@ async function handler(req, res) {
         }
       } catch (_) {}
       try { if (oppId) await sb(`pipeline_outcomes`, { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify([{ client_id: clientId, opportunity_id: oppId, status: "rebook", reason: note.slice(0, 300) }]) }); } catch (_) {}
-      if (b.ready_id) {
+      if (b.ready_id && !holdAck) {
         try { await sb(`agent_confirm_replies?id=eq.${encodeURIComponent(b.ready_id)}&client_id=eq.${clientId}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ status: "sent", approved_by: staffEmail, approved_at: new Date().toISOString(), sent_at: new Date().toISOString(), updated_at: new Date().toISOString() }) }); } catch (_) {}
       }
       await clearConfirmCards(clientId, contactId, "handed off to booking");
-      return res.status(200).json({ ok: true, handed_off: true, moved_to_responded: moved, opportunity_id: oppId });
+      // Park the held acknowledgement AFTER the card sweep above, so it's the
+      // contact's one active row (partial unique index: one pending/approved
+      // per contact). PATCH revives the just-cleared ready row; contact-direct
+      // handoffs insert a fresh row. Best-effort: the handoff itself landed.
+      let ackAfter = null;
+      if (holdAck) {
+        ackAfter = nextSendableTime().toISOString();
+        const parked = {
+          kind: "confirm_handoff", draft_message: closing.trim(), status: "approved", send_after: ackAfter,
+          approved_by: staffEmail, approved_at: new Date().toISOString(), send_error: null, updated_at: new Date().toISOString(),
+        };
+        try {
+          if (b.ready_id) {
+            await sb(`agent_confirm_replies?id=eq.${encodeURIComponent(b.ready_id)}&client_id=eq.${clientId}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify(parked) });
+          } else {
+            await sb(`agent_confirm_replies`, { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify([{
+              ...parked, client_id: clientId, ghl_contact_id: String(contactId), contact_name: b.contact_name || null,
+              handoff_note: note, reasoning: "After-hours handoff: warm acknowledgement held to morning.", created_by: staffEmail,
+            }]) });
+          }
+        } catch (_) {}
+      }
+      return res.status(200).json({ ok: true, handed_off: true, moved_to_responded: moved, opportunity_id: oppId, ack_deferred: holdAck, ack_send_after: ackAfter });
     }
 
     // Confirm a Lost suggestion: optional warm closing, then mark the opp Lost.

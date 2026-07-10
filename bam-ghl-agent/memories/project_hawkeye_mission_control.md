@@ -181,6 +181,15 @@ scattered autonomy/config entry points. KEEPS: inline drawer suggestion on lead 
   after it runs. (Backups beyond the deck were verified dead for portal
   academies: A3 overdue + 15-min escalation SMS both read GHL calendars only;
   the red Home "not flowing" list was the lone catch-all.)
+- QUIET-HOURS AUDIT (2026-07-10, Zoran asked): reply-card approvals, scripted
+  reminders, ghost send-now, self-drive and every automation step all HOLD to
+  the 8:00am-9:30pm Toronto window (agent/_quiet.js, flushed by the 15-min
+  detect crons). FIXED: confirm-handoff's warm ack now parks too (after-hours
+  ✓ = notes + bounce run NOW, ack rides the ready row as approved+send_after;
+  the confirm flush exempts kind confirm_handoff from its stage/passed-trial
+  gates since the bounce is intentional). STILL SEND IMMEDIATELY on after-hours
+  ✓ (Zoran's call: leave for now): lost-card warm goodbyes (all 3 agents),
+  closing enroll-link message, post-trial form first message (+link).
 - STILL TO DO: swipe gestures (open decision), GTA prod verification of the whole batch.
 
 ## Open item (ask Zoran before building)
