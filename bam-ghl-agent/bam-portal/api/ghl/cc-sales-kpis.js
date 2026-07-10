@@ -1,21 +1,27 @@
 // Vercel Serverless Function - command-center Sales KPIs (off-GHL, V2).
 //
 //   GET /api/ghl/cc-sales-kpis?client_id=<uuid>
-//     → { sales_7d, sales: [{id,name,joined_date}], converted_45d, not_a_fit_45d, closing_rate }
+//     → { sales_7d, sales: [{id,name,joined_date}],
+//         qualified_won, qualified_lost, qualified_pool, closing_rate }
 //
 // Fully off GHL - sourced from the portal's own tables:
 //   sales_7d      = new PAYING members in the last 7 calendar days
 //                   (members.joined_date, status in live/paused/payment_failed -
 //                   payment_method_required = never completed checkout, not a sale)
 //   sales         = those members listed out (id + athlete name) for the UI
-//   closing_rate  = trial closing rate over the last 45 days, BY RESOLUTION DATE
-//                   (so conversion lag can't distort it):
-//                     converted  = new members joined in the last 45 days
-//                     not_a_fit  = post-trial reviews marked NOT a fit in 45 days
-//                     rate       = converted / (converted + not_a_fit)   [null if 0]
-//   NOTE: "lost" today = not-a-fit only. Good-fit trials that later ghosted / said
-//   no are not yet counted (no trial->member link in the data); the true rate may be
-//   a touch lower. Tighten once conversions link back to their trial.
+//   closing_rate  = QUALIFIED TRIAL CLOSE RATE over the last 45 days (Zoran's
+//                   definition, 2026-07-10). Population = post-trial cards marked
+//                   SHOWED UP + GOOD FIT. Of those:
+//                     won  = the lead became a paying member (ground truth), or an
+//                            opportunity/outcome marks it won
+//                     lost = the lead's opportunity/outcome is marked lost
+//                     rate = won / (won + lost)   [null if 0; pending cards excluded]
+//                   Computed by the cc_qualified_close_rate() SQL function, which
+//                   bridges the mixed portal-UUID / GHL-id opportunity ids through
+//                   the opportunities table (post_trial_reviews.opportunity_id can be
+//                   either form, but members / pipeline_outcomes key on GHL ids).
+//                   "won" is read from the members table first because
+//                   opportunities.status lags the actual sale.
 //
 // Auth: Supabase JWT - staff (any academy) or a client_users member of client_id.
 
@@ -71,18 +77,22 @@ async function handler(req, res) {
   const PAID = "status=in.(live,paused,payment_failed)";
 
   try {
-    const [m7, m45, notFit] = await Promise.all([
+    const [m7, rate] = await Promise.all([
       sb(`members?client_id=eq.${cid}&${PAID}&joined_date=gte.${c7}&select=id,athlete_name,joined_date&order=joined_date.desc`),
-      sb(`members?client_id=eq.${cid}&${PAID}&joined_date=gte.${c45}&select=id`),
-      sb(`post_trial_reviews?client_id=eq.${cid}&good_fit=eq.false&created_at=gte.${c45}&select=id`),
+      // Qualified trial close rate over the rolling 45-day window. The SQL function
+      // does the full showed-up + good-fit -> won/lost scoring (see header). Returns
+      // a single row {pool, won, lost}; GET works because the function is STABLE.
+      sb(`rpc/cc_qualified_close_rate?p_client_id=${cid}&p_since=${encodeURIComponent(c45)}`),
     ]);
     const sales = (m7 || []).map((m) => ({ id: m.id, name: m.athlete_name || "Member", joined_date: m.joined_date }));
     const sales_7d = sales.length;
-    const converted_45d = (m45 || []).length;
-    const not_a_fit_45d = (notFit || []).length;
-    const denom = converted_45d + not_a_fit_45d;
-    const closing_rate = denom > 0 ? Math.round((converted_45d / denom) * 100) : null;
-    return res.status(200).json({ sales_7d, sales, converted_45d, not_a_fit_45d, closing_rate });
+    const r = (Array.isArray(rate) ? rate[0] : rate) || {};
+    const qualified_won = r.won || 0;
+    const qualified_lost = r.lost || 0;
+    const qualified_pool = r.pool || 0;
+    const denom = qualified_won + qualified_lost;
+    const closing_rate = denom > 0 ? Math.round((qualified_won / denom) * 100) : null;
+    return res.status(200).json({ sales_7d, sales, qualified_won, qualified_lost, qualified_pool, closing_rate });
   } catch (e) {
     return res.status(500).json({ error: e.message || "internal error" });
   }
