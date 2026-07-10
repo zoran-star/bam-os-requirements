@@ -110,6 +110,18 @@ clients at onboarding. Changes shipped:
   `resolveStage` (`api/agent/_store.js`) + `resolveEdge`/`routeTransition`
   (`api/agent/_router.js`) - no caller passes it, so prod is byte-identical (grep-verified).
   Pipeline_stages unique + self-seed UNCHANGED (still one pipeline per academy).
+- **Phase 4 SHIPPED (2026-07-10): template-scoped training.** Turned out lessons were
+  ALREADY template-scoped by the Phase 2 design - `agent_lessons.agent` = the agent
+  template's lessonKey, and free_trial's templates reuse the runtime names
+  (trial_booking→'booking', trial_confirm→'confirm', closing→'closing'), so the readers
+  already isolate by agent=eq.<templateKey> and a general call_booking lesson never loads
+  in the booking runtime. ZERO backfill (verified: prod lessons key on booking/closing =
+  valid template keys). Wired lessons-io.mjs to validate `agent` against
+  presets.js AGENT_TEMPLATES lessonKeys (booking|confirm|closing|call_booking|call_confirm)
+  - renamed internal AGENTS→TEMPLATE_KEYS, motion-tag list →PRESET_TAGS. consolidate-lessons.md
+  gained a "scoped by agent TEMPLATE" section + requires stating a general lesson's BLAST
+  RADIUS (template + which presets reuse it). Gated on the parked engine only for LOADING a
+  new template's lessons at runtime (the runtime must identify as that template = Phase 3b).
 - **Phase 3b PARKED (Zoran, 2026-07-10) - spec ready in docs/core-handoff/pipeline-presets.md.**
   TRIGGER to build: the first gym that sells with a non-free-trial motion (e.g. discovery-call)
   signs up and needs its own preset live. The work: collapse the 3 agent APIs into one detector

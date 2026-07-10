@@ -259,9 +259,9 @@
   </div>
 
   <div class="phase">
-    <div class="ph-badge p4">Phase 4<small>train per template</small></div>
-    <div class="ph-body"><b class="k">Template-scoped training.</b> <code>agent_lessons.agent</code> becomes the agent_template key (backfill today's 3), readers load general lessons by template, /consolidate-lessons runs per template, intake-gap mining feeds preset-specific onboarding questions.
-      <span class="unlock">Craft taught to a shared template (trial_confirm, closing) upgrades EVERY preset that uses it - while different missions never cross-bleed.</span></div>
+    <div class="ph-badge p0">Phase 4<small>done ✓ 2026-07-10</small></div>
+    <div class="ph-body"><b class="k">Template-scoped training. SHIPPED.</b> Turns out lessons were ALREADY template-scoped by the Phase 2 design: <code>agent_lessons.agent</code> holds the template's lessonKey, and free_trial's templates reuse the runtime names (booking = trial_booking, etc.) - so NO backfill, and the readers already isolate correctly (a general <code>call_booking</code> lesson never loads into the trial-booking runtime). This wired it to the registry: <code>lessons-io.mjs</code> now validates every lesson's template against <code>presets.js</code> (accepts new templates, catches typos), and <code>/consolidate-lessons</code> reasons in templates + states each general lesson's blast radius (which presets reuse it).
+      <span class="unlock">Craft taught to a shared template (trial_confirm, closing) upgrades EVERY preset that uses it; different missions never cross-bleed. Verified in prod: today's lessons key on booking/closing = valid template keys, zero backfill.</span></div>
   </div>
 
   <p class="note">Order matters: 1 before 2 (open roles first), 2 before 3 (the engine reads the registry), 4 can start any time after 2.</p>

@@ -24,6 +24,30 @@ not run free trials or sell differently. Consequences:
   flag a fact BAM should collect from every future client. That mining step is
   mandatory (Step 4), not optional.
 
+## Lessons are scoped by agent TEMPLATE (Phase 4)
+
+A lesson's `agent` field is the **agent template's lessonKey**, not a runtime
+agent. Templates live in the code registry
+(`bam-ghl-agent/bam-portal/api/agent/presets.js` → `AGENT_TEMPLATES`). Today the
+free-trial templates reuse the runtime names, so the keys you will see are
+`booking` (= `trial_booking`), `confirm` (= `trial_confirm`), `closing`. When a
+second preset ships you may also see `call_booking`, `call_confirm`, etc.
+
+Why this matters when you write a GENERAL lesson: a general lesson attaches to a
+**template**, and it then rides in **every preset that reuses that template**.
+
+- `trial_confirm` and `closing` are shared - a general lesson on them upgrades
+  every preset that includes those stages. High blast radius: eyeball carefully.
+- `trial_booking` (book a trial) and `call_booking` (book a discovery call) are
+  DIFFERENT templates even though both use the booking runtime - their craft
+  never cross-bleeds. A "how to get them to book" lesson is usually
+  motion-specific: keep it on the right template, and if it names the trial, tag
+  `context.preset` (see the preset model above).
+
+When you promote a general lesson in Step 5, **state its blast radius**: name the
+template and which presets currently reuse it. The apply script validates every
+lesson's `agent` against the registry's template keys, so a typo is rejected.
+
 ## The four routing buckets
 
 | Bucket | Test | Where it goes |
@@ -163,8 +187,9 @@ Closing:  11 raw  ->  3 academy + 2 general                    (6 archived)
 Intake candidates: 4 new (IC-007..IC-010)
 ```
 
-- List every new **general** lesson in full with its preset tag - those affect
-  EVERY academy, so Zoran must eyeball them.
+- List every new **general** lesson in full with its **template + blast radius**
+  (which presets reuse that template) and its preset tag - those affect EVERY
+  academy running an affected preset, so Zoran must eyeball them.
 - List every **brain fact** section update (section key + new wording).
 - Any id in `archive_general_ids` (deactivating a SHARED lesson) needs Zoran's
   explicit yes - it changes every academy's prompt.

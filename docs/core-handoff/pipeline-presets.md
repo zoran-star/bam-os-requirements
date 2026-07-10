@@ -6,8 +6,36 @@ core_parity: not-reviewed
 last_reviewed: "2026-07-10"
 prototype_commit: working-tree
 core_commit_reviewed: unavailable
-phases_done: [1, 2, "3a"]
+phases_done: [1, 2, "3a", 4]
 ---
+
+## Phase 4 SHIPPED (2026-07-10) — template-scoped training
+
+Lessons were ALREADY template-scoped by the Phase 2 design: `agent_lessons.agent`
+holds an agent template's lessonKey, and free_trial's templates reuse the runtime
+names (`trial_booking`→'booking', `trial_confirm`→'confirm', `closing`→'closing').
+So the readers (loadConfig in agent-approvals/confirm/closing + brain.js) already
+filter by `agent=eq.<templateKey>` and isolate correctly — a general `call_booking`
+lesson (agent='call_booking') never loads into the booking runtime (agent=eq.booking).
+Verified in prod: existing lessons key on `booking` / `closing` = valid template
+keys → **zero backfill**.
+
+What this phase wired up:
+- `bam-portal/scripts/lessons-io.mjs` now imports `AGENT_TEMPLATES` from
+  `api/agent/presets.js` and validates every plan lesson's `agent` against the
+  registry's template lessonKeys (`booking|confirm|closing|call_booking|call_confirm`)
+  — accepts a new preset's templates automatically, rejects a typo. Renamed the
+  internal `AGENTS` const to `TEMPLATE_KEYS`; the general-lesson motion tag list is
+  now `PRESET_TAGS` (context.preset = free_trial|universal), unchanged.
+- `.claude/commands/consolidate-lessons.md` gained a "Lessons are scoped by agent
+  TEMPLATE" section: general lessons attach to a template and ride every preset
+  reusing it; the confirm step must state each general lesson's **blast radius**
+  (template + which presets reuse it); shared templates (trial_confirm, closing)
+  = high blast radius, booking-vs-call missions never cross-bleed.
+
+Gated on the parked engine (Phase 3b): a runtime only LOADS a non-free-trial
+template's lessons (e.g. call_booking) once it identifies as that template, which
+is the engine's job. Until then the data model + skill are ready and correct.
 
 ## Phase 3a SHIPPED (2026-07-10) — offer data + read seam
 

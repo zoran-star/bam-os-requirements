@@ -50,6 +50,7 @@
 
 import { readFileSync, writeFileSync, existsSync } from "node:fs";
 import { createHash } from "node:crypto";
+import { AGENT_TEMPLATES } from "../api/agent/presets.js";
 
 const SB_URL = (process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || "").trim().replace(/\/$/, "");
 const SB_KEY = (process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY || "").trim();
@@ -68,8 +69,15 @@ async function sb(path, init = {}) {
   return t ? JSON.parse(t) : null;
 }
 
-const AGENTS = ["booking", "confirm", "closing"];
-const PRESETS = ["free_trial", "universal"];
+// Phase 4: lessons are scoped by AGENT TEMPLATE, not runtime agent. The `agent`
+// column holds a template's lessonKey - so craft taught to a shared template
+// (e.g. trial_confirm) helps every preset that reuses it, while different
+// missions (trial_booking vs call_booking) never cross-bleed. The valid keys are
+// the registry's template lessonKeys, so a new preset's templates are accepted
+// automatically and a typo'd key is caught. free_trial's templates reuse the
+// runtime names (booking/confirm/closing), so today's lessons need no backfill.
+const TEMPLATE_KEYS = [...new Set(Object.values(AGENT_TEMPLATES).map((t) => t.lessonKey))];
+const PRESET_TAGS = ["free_trial", "universal"]; // motion scope on a GENERAL lesson (context.preset)
 const SEL = "id,client_id,agent,scope,kind,lesson,context,promotion_reason,promotion_status,created_by,created_at";
 
 // Repo hard rules: lessons ride prompts and can echo into parent-facing SMS.
@@ -94,7 +102,7 @@ async function dump(clientId) {
   const general = (await sb(`agent_lessons?client_id=is.null&scope=eq.general&active=eq.true&select=${SEL}&order=agent.asc,created_at.asc`)) || [];
   const byAgent = {};
   const warnings = [];
-  for (const a of AGENTS) byAgent[a] = { academy: [], good: [], general: [] };
+  for (const a of TEMPLATE_KEYS) byAgent[a] = { academy: [], good: [], general: [] };
   for (const l of own) {
     const a = byAgent[l.agent] || (byAgent[l.agent] = { academy: [], good: [], general: [] });
     // kind='good' rows are positive examples handled by a DIFFERENT mechanism
@@ -129,12 +137,12 @@ function validatePlan(plan) {
     list.forEach((l, i) => {
       const where = `${bucket}[${i}]`;
       if (!l || typeof l !== "object") { errs.push(`${where}: not an object`); return; }
-      if (!AGENTS.includes(l.agent)) errs.push(`${where}: agent '${l.agent}' is not one of ${AGENTS.join("|")}`);
+      if (!TEMPLATE_KEYS.includes(l.agent)) errs.push(`${where}: agent '${l.agent}' is not a known template lessonKey (${TEMPLATE_KEYS.join("|")})`);
       const text = String(l.lesson || "").trim();
       if (!text) errs.push(`${where}: empty lesson text`);
       for (const p of lessonTextProblems(text)) errs.push(`${where}: ${p}`);
-      if (bucket === "general" && l.preset && !PRESETS.includes(l.preset)) {
-        errs.push(`${where}: preset '${l.preset}' is not one of ${PRESETS.join("|")}`);
+      if (bucket === "general" && l.preset && !PRESET_TAGS.includes(l.preset)) {
+        errs.push(`${where}: preset '${l.preset}' is not one of ${PRESET_TAGS.join("|")}`);
       }
     });
   }
