@@ -30734,8 +30734,8 @@ let _PL_LASTMSG = null;   // contactId → { direction, date }
 // Powers the Interested-stage "!" - the REAL "is anybody messaging this lead"
 // check. null until loaded; on failure the badge falls back to message age.
 let _PL_AUTO = null;      // Set<contactId>
-// Active enrollment detail per contact: { step, steps_total, entered_at }.
-// Powers the simple-view cascade rows ("enrolled · step 2 of 3", newest first).
+// Active enrollment detail per contact: { step, steps_total, entered_at, next_run_after }.
+// Powers the simple-view cascade rows ("next step in 2 days", newest first).
 let _PL_ENR = null;       // Map<contactId, enrollment>
 // V2-only flow gate for the pipelines board. V1.5 = plain GHL mirror.
 function _plIsV2() { return typeof V2_ACCESS !== 'undefined' && V2_ACCESS; }
@@ -33113,6 +33113,20 @@ function _plo2Cascade(stage, nav) {
     post_trial: 'post-trial form to fill',
   };
   const enr = (o) => (kind === 'automation' && typeof _PL_ENR !== 'undefined' && _PL_ENR) ? _PL_ENR.get(String(o.contactId || '')) : null;
+  // Subtitle for an automation-stage lead: WHEN the next step fires, not step
+  // counters (Zoran 2026-07-10). Overdue/imminent reads "sending soon" - the
+  // worker cron picks it up within a minute (or holds it through quiet hours).
+  const nextStepTxt = (e) => {
+    if (!e || !e.next_run_after) return 'enrolled';
+    const ms = new Date(e.next_run_after).getTime() - Date.now();
+    if (!isFinite(ms) || ms <= 60000) return 'next step sending soon';
+    const mins = Math.round(ms / 60000);
+    if (mins < 60) return `next step in ${mins} min`;
+    const hrs = Math.round(mins / 60);
+    if (hrs < 24) return `next step in ${hrs} hour${hrs === 1 ? '' : 's'}`;
+    const days = Math.round(hrs / 24);
+    return `next step in ${days} day${days === 1 ? '' : 's'}`;
+  };
   const needy = [], plain = [];
   for (const o of opps) {
     const cid = String((o.contactId || ''));
@@ -33130,7 +33144,7 @@ function _plo2Cascade(stage, nav) {
     const e = enr(o);
     const st = need ? (NEED_TXT[need] || 'needs you in Hawkeye')
              : kind === 'agent' ? 'agent handling it'
-             : kind === 'automation' ? (e && e.step ? `enrolled · step ${e.step}${e.steps_total ? ' of ' + e.steps_total : ''}` : 'enrolled')
+             : kind === 'automation' ? nextStepTxt(e)
              : (o.athlete ? 'athlete: ' + o.athlete : '');
     const click = need
       ? (leadFn ? `${leadFn}('${escapeHTML(String(o.contactId || ''))}')` : `_hk2Open(null, '${escapeHTML(String(o.contactId || ''))}')`)

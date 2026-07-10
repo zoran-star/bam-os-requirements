@@ -648,13 +648,22 @@ async function handler(req, res) {
         const m = {}; steps.forEach((s, i) => { m[s.position] = i + 1; });
         posMap[a.id] = { m, total: steps.length, key: a.automation_key };
       }
-      const rows = await sb(`automation_enrollments?client_id=eq.${clientId}&status=eq.active&select=contact_id,automation_id,current_position,entered_at&order=entered_at.desc&limit=5000`) || [];
+      const rows = await sb(`automation_enrollments?client_id=eq.${clientId}&status=eq.active&select=id,contact_id,automation_id,current_position,entered_at&order=entered_at.desc&limit=5000`) || [];
+      // When the next step fires: earliest pending job per enrollment. The stage
+      // list shows "next step in 2d" instead of step counters (Zoran 2026-07-10).
+      const nextByEnrollment = {};
+      try {
+        const jobs = await sb(`automation_jobs?client_id=eq.${clientId}&status=eq.pending&select=enrollment_id,run_after&order=run_after.asc&limit=5000`) || [];
+        for (const j of (Array.isArray(jobs) ? jobs : [])) {
+          if (j.enrollment_id && !nextByEnrollment[j.enrollment_id]) nextByEnrollment[j.enrollment_id] = j.run_after;
+        }
+      } catch (_) { /* next-step time is a nicety - never block the list */ }
       const enrollments = (Array.isArray(rows) ? rows : []).map(r => {
         const p = posMap[r.automation_id] || {};
         return {
           contact_id: String(r.contact_id), automation_key: p.key || null,
           step: (p.m && p.m[r.current_position]) || null, steps_total: p.total || null,
-          entered_at: r.entered_at,
+          entered_at: r.entered_at, next_run_after: nextByEnrollment[r.id] || null,
         };
       });
       return res.status(200).json({ enrollments });
