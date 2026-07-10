@@ -62,14 +62,17 @@ export async function passedTrialContactIds(clientId) {
     if (!clientId) return new Set();
     if ((await bookingProviderOf(clientId)) !== "portal") return new Set();
     const nowIso = new Date().toISOString();
-    const bks = await sbFetch(`trial_bookings?tenant_id=eq.${clientId}&status=eq.BOOKED&select=ghl_contact_id,schedule_slots(start_time)`) || [];
+    const bks = await sbFetch(`trial_bookings?tenant_id=eq.${clientId}&status=eq.BOOKED&select=id,ghl_contact_id,schedule_slots(start_time)`) || [];
     const rows = (Array.isArray(bks) ? bks : []).filter(t => t.ghl_contact_id && t.schedule_slots && t.schedule_slots.start_time);
     const upcoming = new Set(rows.filter(t => t.schedule_slots.start_time > nowIso).map(t => String(t.ghl_contact_id)));
     const due = rows.filter(t => t.schedule_slots.start_time <= nowIso && !upcoming.has(String(t.ghl_contact_id)));
     if (!due.length) return new Set();
-    const revs = await sbFetch(`post_trial_reviews?client_id=eq.${clientId}&select=ghl_contact_id`) || [];
-    const reviewed = new Set((Array.isArray(revs) ? revs : []).map(r => String(r.ghl_contact_id || "")));
-    return new Set(due.map(t => String(t.ghl_contact_id)).filter(cid => cid && !reviewed.has(cid)));
+    // Key on the TRIAL, not the CONTACT (Zoran 2026-07-10): reviews carry
+    // trial_booking_id, so a rebooked lead's prior-trial review no longer marks
+    // the new trial reviewed. Mirrors the list-ready gate in api/agent-confirm.js.
+    const revs = await sbFetch(`post_trial_reviews?client_id=eq.${clientId}&select=trial_booking_id`) || [];
+    const reviewedBookings = new Set((Array.isArray(revs) ? revs : []).map(r => String(r.trial_booking_id || "")).filter(Boolean));
+    return new Set(due.filter(t => !reviewedBookings.has(String(t.id))).map(t => String(t.ghl_contact_id)).filter(Boolean));
   } catch (_) { return new Set(); }
 }
 

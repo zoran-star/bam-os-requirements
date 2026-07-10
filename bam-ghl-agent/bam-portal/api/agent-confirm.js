@@ -861,18 +861,24 @@ async function handler(req, res) {
           }
           due = [...latestByCid.values()];
           if (due.length) {
-            const revs = await sb(`post_trial_reviews?client_id=eq.${clientId}&select=ghl_contact_id`) || [];
-            const reviewed = new Set((Array.isArray(revs) ? revs : []).map(r => String(r.ghl_contact_id || "")));
+            // Key the card on the TRIAL, not the CONTACT (Zoran 2026-07-10):
+            // reviews carry trial_booking_id, so a lead who no-showed one trial
+            // and rebooked isn't suppressed by the old review - the new booking
+            // is a different id. The per-opp review upsert makes trial_booking_id
+            // follow the latest reviewed trial, so filling the form still hides it.
+            const revs = await sb(`post_trial_reviews?client_id=eq.${clientId}&select=trial_booking_id`) || [];
+            const reviewedBookings = new Set((Array.isArray(revs) ? revs : []).map(r => String(r.trial_booking_id || "")).filter(Boolean));
+            const unreviewed = due.filter(t => !reviewedBookings.has(String(t.id)));
             // Read-time gate (Zoran 2026-07-09, mirrors Booking's): once the
             // trial has run, this agent's own reply/handoff/reminder cards for
             // that lead are stale - a pre-trial "see you Tuesday!" draft must
             // not sit in the deck on Thursday. Hide them so the form card
             // pushed below is THE card; the detector cron cancels them for real.
-            const passed = new Set(due.map(t => String(t.ghl_contact_id || "")).filter(cid => cid && !reviewed.has(cid)));
+            const passed = new Set(unreviewed.map(t => String(t.ghl_contact_id || "")).filter(Boolean));
             if (passed.size) list = list.filter(r => !r.ghl_contact_id || !passed.has(String(r.ghl_contact_id)));
-            for (const t of due) {
+            for (const t of unreviewed) {
               const cid = String(t.ghl_contact_id || "");
-              if (!cid || reviewed.has(cid)) continue;
+              if (!cid) continue;
               let oppId = null;
               try { const o = await findOpenOpp(clientId, null, client.ghl_location_id, cid); oppId = o && (o.ghlOpportunityId || o.id) || null; } catch (_) {}
               if (!oppId) continue;
