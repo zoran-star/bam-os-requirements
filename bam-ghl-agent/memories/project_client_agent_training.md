@@ -2,6 +2,27 @@
 
 Two related changes to the BAM GTA booking agent, both V2/agent-only (zero V1 impact).
 
+## ⭐ LESSON MODEL REVISED (2026-07-10, Zoran) - consolidation skill replaces auto-promote
+The old "AI classifier -> promotion_status=pending -> staff approves -> scope flips
+to general" flow is RETIRED, and the audit-flagged gap ("global scope was just a
+flag, no cross-academy sink") is CLOSED.
+- **General lessons now actually load for every academy.** Storage: an agent_lessons
+  row with `client_id IS NULL, scope='general', agent=<x>`. The four readers
+  (loadConfig in agent-approvals/confirm/closing + brain.loadBrainConfig) now query
+  `or=(client_id.eq.<academy>,and(client_id.is.null,scope.eq.general))` filtered by
+  agent, so a general **closing** lesson never bleeds into **booking**.
+- **`/consolidate-lessons` skill** (`bam-ghl-agent/.claude/commands/consolidate-lessons.md`
+  + `bam-portal/scripts/lessons-io.mjs`) is the new path: dump the raw teach-why pile
+  for an academy -> Claude clusters/dedups/classifies into academy-specific vs general
+  -> confirm with Zoran -> apply. Consolidated rows stamped `created_by='consolidate-skill'`;
+  raw sources set `active=false` (history kept, prompts stay lean). We no longer hoard
+  every raw lesson.
+- **Promote-to-general UI REMOVED** from `src/views/AgentTrainingView.jsx` (the pending-
+  approvals queue + mark-general/make-academy toggles). The view is now read/edit/archive
+  only + points at the skill. agent-learnings.js's set-scope/list-promotions/approve-
+  promotion/reject-promotion endpoints are now inert (no caller) - left in place, harmless.
+- Below is the ORIGINAL 2026-06-20 model, kept for history.
+
 ## 1. Follow-ups are now brain-configurable (PR #588)
 `bam-portal/api/agent/prompt-structure.js` — replaced the two loose follow-up
 prose sections (`follow_up_logic`, `follow_up_config`) with THREE structured,
