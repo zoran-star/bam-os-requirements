@@ -17606,6 +17606,36 @@ function _hmHawkIndex(res) {
   return idx;
 }
 
+// The same person can surface as more than one conversation row - own-store
+// academies merge SMS + email + social + DM threads server-side, and GHL can
+// return more than one thread per contact. Collapse to ONE row per contact so
+// the Home inbox never lists a lead twice (Zoran). Keep the newest-message row
+// in its (server-sorted) slot, OR-in unread from any duplicate, and never drop
+// a Hawkeye-flagged contact (the flag is keyed by contact, so any surviving row
+// keeps it).
+function _hmContactKey(c) {
+  if (c.contactId) return 'c:' + c.contactId;
+  const p = String(c.phone || '').replace(/\D+/g, '').slice(-10);
+  if (p.length === 10) return 'p:' + p;
+  const nm = String(c.contactName || c.fullName || '').trim().toLowerCase();
+  return nm ? 'n:' + nm : 'id:' + c.id;
+}
+function _hmDedupeConvos(list) {
+  const seen = new Map(), order = [];
+  for (const c of (list || [])) {
+    const k = _hmContactKey(c);
+    const cur = seen.get(k);
+    if (!cur) { seen.set(k, c); order.push(k); continue; }
+    const curT = cur.lastMessageDate ? new Date(cur.lastMessageDate).getTime() : 0;
+    const newT = c.lastMessageDate ? new Date(c.lastMessageDate).getTime() : 0;
+    const unread = Math.max(cur.unreadCount || 0, c.unreadCount || 0);
+    const keep = newT > curT ? c : cur;   // show the most recent message
+    keep.unreadCount = unread;
+    seen.set(k, keep);
+  }
+  return order.map(k => seen.get(k));
+}
+
 async function _hmLoadInboxPreview() {
   const body = document.getElementById('hv2-inbox-body');
   const pill = document.getElementById('hv2-inbox-n');
@@ -17621,7 +17651,7 @@ async function _hmLoadInboxPreview() {
     if (!r.ok || !j.conversations) throw new Error('no data');
     const hawk = _hmHawkIndex(hawkRes);
     const hawkAgentFor = c => hawk ? (hawk.byConv[String(c.id || '')] || (c.contactId && hawk.byContact[String(c.contactId)]) || null) : null;
-    const all = j.conversations || [];
+    const all = _hmDedupeConvos(j.conversations || []);
     const convos = all.slice(0, 8);
     // Line up with Hawkeye: a conversation with a pending deck card must make
     // the preview even when newer chatter would push it out - swap the oldest
@@ -18055,37 +18085,29 @@ document.addEventListener('click', function(e) { if (!e.target.closest('.hm-stat
 // ── Right rail bottom: Hawkeye feed (if active) or marketing snapshot (fallback) ──
 async function _hmLoadRailBottom() {
   const host = document.getElementById('hm-rail-bottom'); if (!host) return;
-  // Try Hawkeye first
-  let hawkData = null, hawkTotal = 0;
   try {
-    const [fu, hk] = await Promise.all([
-      _apxPost('/api/agent-followups', 'list', {}).catch(() => ({})),
-      _hmHawkFetch(),
-    ]);
-    const [rd, cf, cl] = hk;
-    hawkData = _apxSplit(fu, rd);
-    // Confirm + closing queues too, so Home shows the same workload as the
-    // Hawkeye deck (_hk2Load) - it was booking-only and the counts drifted.
+    const [rd, cf, cl] = await _hmHawkFetch();
+    // Mirror the Hawkeye deck (_hk2Load) EXACTLY: the SAME three pending queues,
+    // closing followup_N rows collapsed to one plan card per contact. No
+    // agent-followups - booking nudges are retired and scheduled followups were
+    // never deck cards, so listing them drifted Home away from Hawkeye (the feed
+    // showed rows the deck/count didn't have). total == rows == deck card count.
     const pend = r => ((r && r.ready) || []).filter(x => x.status === 'pending');
-    hawkData.confirm = pend(cf);
-    hawkData.closing = [];
-    const clSeen = new Set();
+    const booking = pend(rd), confirm = pend(cf);
+    const closing = [], clSeen = new Set();
     for (const r of pend(cl)) {
       if ((r.step_key || '').startsWith('followup_')) {   // one plan card per contact, like the deck
         const k = String(r.ghl_contact_id);
         if (clSeen.has(k)) continue;
         clSeen.add(k);
-        hawkData.closing.push({ ...r, _plan: true });
-      } else hawkData.closing.push(r);
+        closing.push({ ...r, _plan: true });
+      } else closing.push(r);
     }
-    // Total = what the deck would show: pending booking rows + confirm rows +
-    // closing cards. Scheduled (not-yet-due) followups render in the feed but
-    // don't count - they aren't deck cards waiting on the owner.
-    hawkTotal = pend(rd).length + hawkData.confirm.length + hawkData.closing.length;
-    // Check if Hawkeye is actually configured: if both APIs returned valid
-    // structures (even if empty), Hawkeye is on. If they errored, fall back.
-    const hawkOn = (fu && (fu.followups || fu.error === undefined)) || (rd && (rd.ready || rd.error === undefined));
-    if (hawkOn) { _hmRenderHawkFeed(host, hawkData, hawkTotal); return; }
+    const total = booking.length + confirm.length + closing.length;
+    // Hawkeye is "on" if any list-ready call returned a valid structure (even
+    // empty). If they all errored, fall back to the marketing snapshot.
+    const ok = r => r && (r.ready || r.error === undefined);
+    if (ok(rd) || ok(cf) || ok(cl)) { _hmRenderHawkFeed(host, { booking, confirm, closing }, total); return; }
   } catch (_) {}
   // Fallback: marketing snapshot
   _hmRenderMktSnapshot(host);
@@ -18093,29 +18115,20 @@ async function _hmLoadRailBottom() {
 
 function _hmRenderHawkFeed(host, d, total) {
   const items = [];
-  const kindMap = { book: { icon: 'hm-feed-ic-book', svg: _HV2_ICONS.check, verb: 'Booking to confirm' },
-                    ghost: { icon: 'hm-feed-ic-ghost', svg: _HV2_ICONS.ghost, verb: 'Mark as ghosted' },
-                    mark_lost: { icon: 'hm-feed-ic-lost', svg: _HV2_ICONS.x, verb: 'Mark as lost' } };
-  for (const r of (d.ready || [])) {
-    const k = kindMap[r.kind] || { icon: 'hm-feed-ic-reply', svg: _HV2_ICONS.mail, verb: 'Reply drafted' };
-    items.push({ name: r.contact_name || 'Lead', desc: k.verb, icon: k.icon, svg: k.svg, agent: 'booking', cid: r.ghl_contact_id });
+  const bookVerb = k => k === 'book' ? 'Trial booking to confirm' : k === 'ghost' ? 'Move to ghosted' : k === 'mark_lost' ? 'Confirm as lost' : k === 'reignite' ? 'Reignite later, parked' : k === 'reignite_due' ? 'Reignition day' : 'Reply drafted';
+  const bookIcon = k => k === 'book' ? { icon: 'hm-feed-ic-book', svg: _HV2_ICONS.check } : k === 'ghost' ? { icon: 'hm-feed-ic-ghost', svg: _HV2_ICONS.ghost } : k === 'mark_lost' ? { icon: 'hm-feed-ic-lost', svg: _HV2_ICONS.x } : { icon: 'hm-feed-ic-reply', svg: _HV2_ICONS.mail };
+  for (const r of (d.booking || [])) {
+    const ic = bookIcon(r.kind);
+    items.push({ name: r.contact_name || 'Lead', desc: bookVerb(r.kind), icon: ic.icon, svg: ic.svg, agent: 'booking', cid: r.ghl_contact_id });
   }
   for (const r of (d.confirm || [])) {
-    const verb = r.kind === 'confirm_handoff' ? 'Handoff to booking' : r.kind === 'confirm_lost' ? 'Confirm as lost' : r.kind === 'post_trial' ? 'Post-trial form to send' : 'Trial confirmation drafted';
+    const verb = r.kind === 'confirm_handoff' ? 'Handoff to booking' : r.kind === 'confirm_lost' ? 'Confirm as lost' : r.kind === 'post_trial' ? 'Post-trial form to send' : r.kind === 'reignite' ? 'Reignite later, parked' : r.kind === 'reignite_due' ? 'Reignition day' : 'Trial confirmation drafted';
     items.push({ name: r.contact_name || 'Lead', desc: verb, icon: 'hm-feed-ic-book', svg: _HV2_ICONS.check, agent: 'confirm', cid: r.ghl_contact_id });
   }
   for (const r of (d.closing || [])) {
-    const verb = r._plan ? 'Follow-up plan to approve' : r.kind === 'closing_enroll' ? 'Enroll in closing plan' : r.kind === 'closing_lost' ? 'Confirm as lost' : 'Closing reply drafted';
+    const verb = r._plan ? 'Follow-up plan to approve' : r.kind === 'closing_enroll' ? 'Enroll in closing plan' : r.kind === 'closing_lost' ? 'Confirm as lost' : r.kind === 'reignite' ? 'Reignite later, parked' : r.kind === 'reignite_due' ? 'Reignition day' : 'Closing reply drafted';
     items.push({ name: r.contact_name || 'Lead', desc: verb, icon: 'hm-feed-ic-reply', svg: _HV2_ICONS.mail, agent: 'closing', cid: r.ghl_contact_id });
   }
-  for (const f of (d.followups || [])) {
-    const when = f.scheduled_at ? new Date(f.scheduled_at) : null;
-    const desc = when ? 'Follow-up ' + when.toLocaleDateString(undefined, { weekday: 'short', hour: 'numeric', minute: '2-digit' }) : 'Follow-up queued';
-    items.push({ name: f.contact_name || 'Lead', desc, icon: 'hm-feed-ic-fu', svg: _HV2_ICONS.refresh });
-  }
-  for (const b of (d.book || [])) items.push({ name: b.contact_name || 'Lead', desc: 'Trial booking to confirm', icon: 'hm-feed-ic-book', svg: _HV2_ICONS.check, agent: 'booking', cid: b.ghl_contact_id });
-  for (const g of (d.ghost || [])) items.push({ name: g.contact_name || 'Lead', desc: 'Move to ghosted', icon: 'hm-feed-ic-ghost', svg: _HV2_ICONS.ghost, agent: 'booking', cid: g.ghl_contact_id });
-  for (const l of (d.lost || [])) items.push({ name: l.contact_name || 'Lead', desc: 'Confirm as lost', icon: 'hm-feed-ic-lost', svg: _HV2_ICONS.x, agent: 'booking', cid: l.ghl_contact_id });
 
   // Each row deep-links to its own card in the deck (agent tab + contact on top).
   const rows = items.slice(0, 8).map(i => {
@@ -18200,7 +18213,24 @@ function _hmCountUp(el, target, prefix, duration, suffix) {
 let _hmScoreInterval = null;
 function _hmStartScoreRefresh() {
   if (_hmScoreInterval) clearInterval(_hmScoreInterval);
-  _hmScoreInterval = setInterval(() => { _hmLoadScoreboard(); }, 60000);
+  _hmScoreInterval = setInterval(() => { _hmLoadScoreboard(); _hmRefreshLive(); }, 60000);
+  _hmBindLiveRefresh();
+}
+// The Home inbox preview + Hawkeye activity feed loaded ONCE on mount, so a new
+// message (Tara) or a freshly-carded action never showed until a full reload
+// (Zoran: "conversations don't get updated"). Refresh them on the scoreboard
+// cadence and the moment the app regains focus.
+function _hmRefreshLive() {
+  const hv = document.getElementById('home-v2');
+  if (!hv || hv.style.display === 'none' || document.hidden) return;
+  if (window._hmActiveTab === 'inbox') { try { _hmLoadInboxPreview(); } catch (_) {} }
+  try { _hmLoadRailBottom(); } catch (_) {}
+}
+function _hmBindLiveRefresh() {
+  if (window._hmLiveBound) return;
+  window._hmLiveBound = true;
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) _hmRefreshLive(); });
+  window.addEventListener('focus', () => _hmRefreshLive());
 }
 
 // ── UI #7: Nav card notification dots ──
@@ -32573,6 +32603,7 @@ function _sfOpen(which) {
 }
 function closeSalesFocus() {
   if (!_SF_OPEN) return;
+  _hk2StopPoll();
   _SF_OPEN = null;
   _mmCloseFocus('salesMachineModal');
   // Home is right behind - refresh its Sales counts so they reflect the work done.
@@ -32597,6 +32628,9 @@ async function _hk2Refresh() {
   if (!_HK2.q) host.innerHTML = '<div class="hk2-load"><span class="req-spin"></span> Loading Hawkeye…</div>';
   try { _HK2.q = await _hk2Load(); }
   catch (e) { host.innerHTML = `<div class="hk2-load">Couldn't load - ${escapeHTML(_apxErr(e))}</div>`; return; }
+  // Seed the live-poll's "already shown" set with this fresh load so it only
+  // ever surfaces cards that appear AFTER the deck opened.
+  _HK2.seen = new Set(_HK2_AGENTS.flatMap(a => (_HK2.q[a] || []).map(_hk2CardKey)));
   // Deep link from a board card: surface that lead's card on top of its queue.
   if (_HK2.focusContact) {
     for (const a of _HK2_AGENTS) {
@@ -32606,6 +32640,7 @@ async function _hk2Refresh() {
     _HK2.focusContact = null;
   }
   _hk2Render();
+  _hk2StartPoll();
 }
 // Normalize the 3 ready queues into kind-tagged cards. Closing's pending
 // followup_N rows for one contact collapse into ONE plan card.
@@ -32679,6 +32714,7 @@ function _hk2OpenContact(cid, nm) {
 // Back from the deck = the HOME page's Sales section (Zoran 2026-07-09), with
 // every cascade closed. With the overlay model, home is right behind the modal.
 function _hk2Back() {
+  _hk2StopPoll();
   _PLO2_OPEN = null;
   try { _CC2_OPEN = null; } catch (_) {}
   if (typeof _SF_OPEN !== 'undefined' && _SF_OPEN) { closeSalesFocus(); return; }
@@ -32974,15 +33010,80 @@ function _hk2PtfClose(outcome) {
   _HK2.ptf.outcome = outcome === 'lost' ? 'lost' : 'unqualified';
   _hk2Confirm();
 }
+// The three agent tabs with their live card counts. Extracted so the live poll
+// (_hk2Poll) can refresh just the counts without re-rendering the deck below
+// (which would wipe an in-progress edit on the open card).
+function _hk2TabsHtml() {
+  return _HK2_AGENTS.map(a => {
+    const n = (_HK2.q && _HK2.q[a] ? _HK2.q[a].length : 0), on = _HK2.agent === a;
+    return `<button class="hk2-tab${on ? ' on' : ''}" onclick="_hk2Pick('${a}')"><span class="hk2-tmain">${_HK2_META[a].label}${n ? `<span class="hk2-n">${n}</span>` : ''}</span><span class="hk2-tgear" onclick="event.stopPropagation();_hk2Gear('${a}')" title="Configure this stage">${_plIcon('gear', 14)}</span></button>`;
+  }).join('');
+}
+// ── Live deck refresh ──────────────────────────────────────────────────────
+// The deck only loaded on open, so a freshly-carded action (the 15-min cron)
+// never appeared until the owner exited and reopened (Zoran). Poll the same
+// three queues while the deck is open and MERGE any genuinely-new cards onto the
+// back of their agent's queue. Non-destructive by design: the card on top (and
+// any edit the owner is mid-typing) is never re-rendered - only the tab counts
+// update, unless the active tab was empty (nothing to disturb). A per-open
+// `seen` set means a just-resolved card that list-ready still returns during its
+// 6s commit is never resurrected.
+let _HK2_POLL = null;
+function _hk2IsOpen() {
+  if (typeof _SF_OPEN !== 'undefined' && _SF_OPEN === 'hawkeye') return true;
+  return typeof _PL_SV !== 'undefined' && _PL_SV === 'hawkeye';
+}
+function _hk2StartPoll() {
+  if (_HK2_POLL) clearInterval(_HK2_POLL);
+  _HK2_POLL = setInterval(_hk2Poll, 30000);
+  if (!window._hk2PollBound) {
+    window._hk2PollBound = true;
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) _hk2Poll(); });
+    window.addEventListener('focus', () => _hk2Poll());
+  }
+}
+function _hk2StopPoll() { if (_HK2_POLL) { clearInterval(_HK2_POLL); _HK2_POLL = null; } }
+function _hk2CardKey(r) { return String(r && r.id != null ? r.id : (r && r._kind === 'plan' ? 'plan:' + r.ghl_contact_id : (r && r.ghl_contact_id) || '')); }
+async function _hk2Poll() {
+  if (!_hk2IsOpen()) { _hk2StopPoll(); return; }
+  if (typeof _HAWK_PENDING !== 'undefined' && _HAWK_PENDING) return;   // don't disturb an active undo
+  if (!_HK2.q) return;
+  let fresh;
+  try { fresh = await _hk2Load(); } catch (_) { return; }
+  // Re-check after the await: the owner may have closed the deck, armed an undo,
+  // or a full refresh may have swapped the queue out from under us.
+  if (!_hk2IsOpen() || !_HK2.q) return;
+  if (typeof _HAWK_PENDING !== 'undefined' && _HAWK_PENDING) return;
+  _HK2.seen = _HK2.seen || new Set();
+  const activeWasEmpty = !((_HK2.q[_HK2.agent] || []).length);
+  let added = 0;
+  for (const a of _HK2_AGENTS) {
+    const have = new Set((_HK2.q[a] || []).map(_hk2CardKey));
+    for (const r of (fresh[a] || [])) {
+      const k = _hk2CardKey(r);
+      if (have.has(k) || _HK2.seen.has(k)) continue;   // already shown, or a resolved card list-ready still echoes
+      (_HK2.q[a] = _HK2.q[a] || []).push(r);
+      _HK2.seen.add(k);
+      added++;
+    }
+  }
+  if (fresh.quiet !== undefined) _HK2.q.quiet = fresh.quiet || null;
+  if (!added) return;
+  // Surface a new card only when the active tab had nothing (no edit to lose).
+  // Otherwise refresh just the tab counts - the new card waits its turn.
+  if (activeWasEmpty && (_HK2.q[_HK2.agent] || []).length && !_HK2.edited && !_HK2.touched) {
+    _hk2Render();
+  } else {
+    const bar = document.querySelector('#pl-hawkeye .hk2-tabs');
+    if (bar) bar.innerHTML = _hk2TabsHtml();
+  }
+}
 function _hk2Render(opts) {
   const host = document.getElementById('pl-hawkeye'); if (!host || !_HK2.q) return;
   _HK2.edited = false; _HK2.touched = false; _HK2.otherOpen = false;
   const _t0 = (_HK2.q[_HK2.agent] || [])[0]; if (_t0) { _t0._writeMode = false; _t0._moveArm = null; }
   if (!(opts && opts.keepPtf)) _HK2.ptf = { showed: null, fit: null, link: true, msg: '', notes: '', outcome: null };
-  const tabs = _HK2_AGENTS.map(a => {
-    const n = _HK2.q[a].length, on = _HK2.agent === a;
-    return `<button class="hk2-tab${on ? ' on' : ''}" onclick="_hk2Pick('${a}')"><span class="hk2-tmain">${_HK2_META[a].label}${n ? `<span class="hk2-n">${n}</span>` : ''}</span><span class="hk2-tgear" onclick="event.stopPropagation();_hk2Gear('${a}')" title="Configure this stage">${_plIcon('gear', 14)}</span></button>`;
-  }).join('');
+  const tabs = _hk2TabsHtml();
   const q = _HK2.q[_HK2.agent];
   const deck = !q.length
     ? `<div class="hk2-clear"><div class="big">&#10003;</div><b>All clear</b><span>No actions waiting in this stage</span></div>`
