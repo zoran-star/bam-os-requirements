@@ -33368,6 +33368,10 @@ function _ccStuckCards() {
       if (typeof _PL_NEEDS !== 'undefined' && _PL_NEEDS && _PL_NEEDS.get(cid)) continue;   // has a Hawkeye action
       if (typeof _PL_HELD !== 'undefined' && _PL_HELD && _PL_HELD.has(cid)) continue;      // parked send awaits the 8am flush
       if (typeof _PL_ENR !== 'undefined' && _PL_ENR && _PL_ENR.get(cid)) continue;         // in a running automation
+      // Booked trial still ahead = FLOWING: the confirm sequence's same-day
+      // check-in is queued for 9am on trial day, so quiet days in between are
+      // by design, not a stall (Zoran 2026-07-10).
+      if (o.trialDate && new Date(o.trialDate).getTime() > now) continue;
       const lm = (typeof _PL_LASTMSG !== 'undefined' && _PL_LASTMSG) ? _PL_LASTMSG.get(cid) : null;
       const last = lm && lm.date ? new Date(lm.date).getTime()
                  : (o.updatedAt ? new Date(o.updatedAt).getTime()
