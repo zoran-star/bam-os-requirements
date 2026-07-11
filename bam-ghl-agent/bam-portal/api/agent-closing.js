@@ -1066,6 +1066,44 @@ async function handler(req, res) {
       return res.status(200).json({ ok: true, sent: true });
     }
 
+    // Fire an already-drafted/approved follow-up RIGHT NOW instead of waiting for
+    // its scheduled send_after. Same guards as the flush + send paths: the lead
+    // must still be in Done-Trial, the bot mustn't be muted on them, and an
+    // after-hours "send now" defers to the morning window (never texts a parent at
+    // night). Works on a pending OR approved followup_N plan row.
+    if (b.action === "send-now") {
+      if (!b.id) return res.status(400).json({ error: "id required" });
+      const [row] = await sb(`agent_closing_replies?id=eq.${encodeURIComponent(b.id)}&client_id=eq.${clientId}&select=*`);
+      if (!row) return res.status(404).json({ error: "not found" });
+      if (!["pending", "approved"].includes(row.status)) return res.status(409).json({ error: `already ${row.status}` });
+      // Staff may tweak the text in the box before firing; fall back to the draft.
+      const text = (b.reply && String(b.reply).trim()) ? String(b.reply).trim() : String(row.draft_message || "").trim();
+      if (!text) return res.status(400).json({ error: "nothing to send - this card has no drafted message" });
+      if (/^\((agent escalated|post-trial review needed)/i.test(text)) {
+        return res.status(400).json({ error: "That's an internal note, not a message - write the reply you want to send." });
+      }
+      // HARD GUARD: only send to a lead still in the Done-Trial stage.
+      const dts = await doneTrialStage(token, locationId, { clientId, sb });
+      if (!dts || !(await contactInRespondedStage(token, locationId, row.ghl_contact_id, dts, { clientId, sb, role: "done_trial" }))) {
+        return res.status(409).json({ error: "This lead is no longer in the Done-Trial stage - not sending." });
+      }
+      if (row.ghl_contact_id && await isMuted(clientId, row.ghl_contact_id, "closing")) {
+        return res.status(409).json({ error: "bot is muted on this lead - not sending." });
+      }
+      // Quiet hours: a human hit "send now" after hours. Don't text now - approve it
+      // and reschedule to the morning so the flush delivers it in-window (keeps any edit).
+      if (!withinQuietHours(new Date(), quietTz(client))) {
+        const sendAfter = nextSendableTime(new Date(), quietTz(client)).toISOString();
+        await sb(`agent_closing_replies?id=eq.${encodeURIComponent(row.id)}&client_id=eq.${clientId}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ status: "approved", draft_message: text, send_after: sendAfter, approved_by: staffEmail, approved_at: new Date().toISOString(), updated_at: new Date().toISOString() }) });
+        return res.status(200).json({ ok: true, sent: false, deferred: true, send_after: sendAfter });
+      }
+      try { await sendReplyViaGhl(token, row.ghl_contact_id, text, clientId); }
+      catch (e) { return res.status(e.status || 502).json({ error: `GHL send: ${e.message}` }); }
+      await sb(`agent_closing_replies?id=eq.${encodeURIComponent(row.id)}&client_id=eq.${clientId}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ status: "sent", draft_message: text, approved_by: staffEmail, approved_at: new Date().toISOString(), sent_at: new Date().toISOString(), updated_at: new Date().toISOString() }) });
+      try { await logApproval({ client_id: clientId, ghl_contact_id: row.ghl_contact_id, contact_name: row.contact_name || null, final_reply: text, reasoning: row.reasoning || null, confidence: typeof row.confidence === "number" ? row.confidence : null, status: "sent", created_by: staffEmail }); } catch (_) {}
+      return res.status(200).json({ ok: true, sent: true });
+    }
+
     // Confirm an ENROLL: the good-fit attendee is ready. Send the academy's enroll
     // link (offers.data.signup_url) preceded by any warm drafted reply.
     //
