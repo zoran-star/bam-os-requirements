@@ -346,11 +346,16 @@ async function handler(req, res) {
         }
       }
     } catch (e) { console.error("post-trial lost -> nurture failed (falling back to status=lost):", e.message); }
+    // lost_ok = did the close actually land? The deck reads this to warn (retry
+    // needed) instead of claiming "Marked lost" when both writes silently failed
+    // (mirrors move_ok on the good-fit path).
+    let lostLanded = routedToNurture;
     if (!routedToNurture) {
-      try { await setStatus({ clientId, ghl, token, oppRef, status: "lost", contactId, reason: lostReason }); }
+      try { await setStatus({ clientId, ghl, token, oppRef, status: "lost", contactId, reason: lostReason }); lostLanded = true; }
       catch (e) { console.error("post-trial mark lost failed (non-fatal):", e.message); }
     }
     result.lost = true;
+    result.lost_ok = lostLanded;
     result.routed_to_nurture = routedToNurture;
     try { await sb(`pipeline_outcomes`, { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify([{ client_id: clientId, opportunity_id: oppId, status: routedToNurture ? "nurture" : "lost", reason: lostReason }]) }); } catch (_) {}
   } else if (showedUp === true && !goodFit) {
@@ -361,14 +366,20 @@ async function handler(req, res) {
     // Only fires when the coach explicitly marked showed-up + not-a-fit; a paused or
     // missing edge leaves the lead put (no legacy behavior to preserve here). No
     // message is sent - it's a quiet close.
+    // unqualified_ok = did the close actually land? A paused/unseeded edge (or a
+    // lookup blip -> resolveEdge returns null) leaves the lead PUT with nothing
+    // closed; the deck reads this to warn instead of falsely toasting "Closed as
+    // unqualified" (Zoran 2026-07-10).
+    let uqLanded = false;
     try {
       const routed = await routeTransition({ clientId, sb, ghl, token, locationId: client.ghl_location_id, fromRole: "scheduled_trial", trigger: "post_trial_not_fit", contactId, oppRef, allowTerminal: true, reason: "post-trial: showed up, not a fit" });
       if (routed.matched && routed.terminal === "unqualified" && routed.moved) {
-        result.unqualified = true;
+        result.unqualified = true; uqLanded = true;
         if (contactId) { try { await markUnqualified(token, contactId, clientId); } catch (_) {} }
         try { await sb(`pipeline_outcomes`, { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify([{ client_id: clientId, opportunity_id: oppId, status: "abandoned", reason: "post-trial: not a fit" }]) }); } catch (_) {}
       }
     } catch (e) { console.error("not-a-fit unqualified close failed (non-fatal):", e.message); }
+    result.unqualified_ok = uqLanded;
   }
 
   // Send the trainer's first follow-up message: their personal note (TOP) + the

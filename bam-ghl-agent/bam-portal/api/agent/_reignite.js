@@ -87,6 +87,35 @@ export async function reigniteContactIdSet(clientId) {
   return set;
 }
 
+// Like reigniteContactIdSet, but carries each park's created_at so a detector can
+// tell a GENUINE new reply (inbound AFTER the park) from a lead who is simply
+// still inbound-last because their park was silent (no ack) or the ack send failed.
+// Cancelling on mere queue membership wrongly killed silent parks every cron
+// (Zoran 2026-07-10). Fails OPEN (empty map). Map<cid, { created_at, reignite_at }>.
+export async function reigniteParkMap(clientId) {
+  const map = new Map();
+  if (!clientId) return map;
+  try {
+    const rows = await sb(`agent_reignitions?client_id=eq.${clientId}&status=eq.scheduled&select=ghl_contact_id,created_at,reignite_at`);
+    for (const r of (Array.isArray(rows) ? rows : [])) if (r.ghl_contact_id) map.set(String(r.ghl_contact_id), { created_at: r.created_at || null, reignite_at: r.reignite_at || null });
+  } catch (e) {
+    console.error("[_reignite] reigniteParkMap failed (failing open):", e.message);
+  }
+  return map;
+}
+
+// Did the lead genuinely reply AFTER we parked them? True only when we can prove
+// a new inbound landed after the park's created_at. No park row or no lead
+// timestamp => false (KEEP the park - cancelling on ambiguity is the harm we are
+// fixing; the inbound webhook is the authoritative canceller for real replies).
+export function repliedAfterPark(park, lastInboundAt) {
+  if (!park || !park.created_at || !lastInboundAt) return false;
+  const parked = new Date(park.created_at).getTime();
+  const last = new Date(lastInboundAt).getTime();
+  if (!Number.isFinite(parked) || !Number.isFinite(last)) return false;
+  return last > parked;
+}
+
 // Due rows for ONE agent's detect cron (reignite_at has arrived, still scheduled).
 // Fails soft (empty list).
 export async function dueReignitions(clientId, agent, { limit = 10 } = {}) {

@@ -47,9 +47,17 @@ async function requireStaff(req) {
 function channelOf(m) {
   const s = String(m.messageType ?? "").toUpperCase();
   if (s) {
-    if (s === "TYPE_SMS") return "sms";
-    if (s === "TYPE_EMAIL") return "email";
-    if (s === "TYPE_CALL" || s === "TYPE_CAMPAIGN_CALL") return "call";
+    // A tapback is NOT a message - agents read channel=eq.sms and a reaction is
+    // noise. Check this BEFORE the SMS-family match below (it contains "SMS").
+    if (s === "TYPE_SMS_REACTION") return "other";
+    // GHL sends real SMS under several messageTypes (TYPE_SMS, TYPE_CAMPAIGN_SMS,
+    // TYPE_CUSTOM_SMS, TYPE_SMS_REVIEW_REQUEST, ...). Matching only TYPE_SMS dropped
+    // campaign/custom SMS to 'other', hiding them from agent thread context and
+    // re-introducing the repeat-message blindness (Zoran 2026-07-10). Match the
+    // whole SMS family; same for the EMAIL and CALL families.
+    if (s.includes("SMS")) return "sms";
+    if (s.includes("EMAIL")) return "email";
+    if (s.includes("CALL")) return "call";
     return "other";
   }
   const t = String(m.type ?? "");

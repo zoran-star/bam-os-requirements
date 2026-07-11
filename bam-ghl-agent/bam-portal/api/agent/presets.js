@@ -188,7 +188,7 @@ export function buildPresetRows(presetKey, clientId, offerId) {
 // re-stamp of the SAME offer. If the academy already has stages tagged to a
 // DIFFERENT offer, it refuses: running two offer pipelines in one academy needs
 // the offer-aware readers + per-offer unique keys built in Phase 3.
-export async function applyPreset({ clientId, offerId, presetKey, dryRun = false, sb = sbRest, log = console.log } = {}) {
+export async function applyPreset({ clientId, offerId, presetKey, dryRun = false, force = false, sb = sbRest, log = console.log } = {}) {
   const { stageRows, transitionRows } = buildPresetRows(presetKey, clientId, offerId);
 
   // Multi-offer-per-academy guard.
@@ -202,6 +202,40 @@ export async function applyPreset({ clientId, offerId, presetKey, dryRun = false
       `Running a SECOND offer pipeline in one academy needs offer-aware readers + per-offer ` +
       `unique keys (Phase 3). Refusing to overwrite.`
     );
+  }
+
+  // Edge-conflict guard: the edge unique key INCLUDES the destination columns, so
+  // stamping a DIFFERENT preset (or a same-preset "upgrade" that moves an edge's
+  // destination) onto this offer does NOT conflict-update the old edge - it INSERTS
+  // a second enabled edge for the same (from, trigger). Two enabled edges with
+  // different destinations route a live event nondeterministically (a booked lead
+  // silently goes to a stage no agent works). Detect that BEFORE writing anything.
+  const sameOffer = (a, b) => (a || null) === (b || null);
+  const newByFromTrig = new Map();
+  for (const t of transitionRows) newByFromTrig.set(`${t.from_stage_role || ""}|${t.trigger}`, `${t.to_kind}|${t.to_stage_role || ""}|${t.to_terminal || ""}`);
+  let conflicts = [];
+  try {
+    const edges = (await sb(`stage_transitions?client_id=eq.${encodeURIComponent(clientId)}&select=offer_id,from_stage_role,trigger,to_kind,to_stage_role,to_terminal,enabled`)) || [];
+    conflicts = edges.filter((e) => {
+      if (!sameOffer(e.offer_id, offerId) || e.enabled === false) return false;
+      const key = `${e.from_stage_role || ""}|${e.trigger}`;
+      const cur = `${e.to_kind}|${e.to_stage_role || ""}|${e.to_terminal || ""}`;
+      return newByFromTrig.has(key) && newByFromTrig.get(key) !== cur;
+    });
+  } catch (_) { /* if the read fails, fall through - the upsert still runs */ }
+  if (conflicts.length && !force) {
+    const list = conflicts.map((e) => `  ${e.from_stage_role || "(entry)"} --${e.trigger}--> ${e.to_kind === "stage" ? e.to_stage_role : "@" + e.to_terminal}`).join("\n");
+    throw new Error(
+      `academy ${clientId} offer ${offerId || "(none)"} already has ${conflicts.length} edge(s) whose destination differs from preset '${presetKey}':\n${list}\n` +
+      `Upserting would leave BOTH enabled (nondeterministic routing). Re-run with force:true to REPLACE this offer's edges cleanly.`
+    );
+  }
+  // force: wipe this offer's existing edges so the preset is a clean replace, not
+  // an additive merge that strands the old preset's edges alongside the new ones.
+  if (force && !dryRun) {
+    const offerFilter = offerId ? `offer_id=eq.${encodeURIComponent(offerId)}` : `offer_id=is.null`;
+    await sb(`stage_transitions?client_id=eq.${encodeURIComponent(clientId)}&${offerFilter}`, { method: "DELETE", headers: { Prefer: "return=minimal" } });
+    log(`[force] cleared existing edges for client ${clientId} offer ${offerId || "(none)"} before re-stamping`);
   }
 
   if (dryRun) {

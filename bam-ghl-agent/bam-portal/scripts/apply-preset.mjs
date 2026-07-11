@@ -18,6 +18,7 @@ import { PRESETS, applyPreset, buildPresetRows } from "../api/agent/presets.js";
 
 const args = process.argv.slice(2);
 const dryRun = args.includes("--dry-run");
+const force = args.includes("--force");
 const list = args.includes("--list");
 const [clientId, offerId, presetKey] = args.filter((a) => !a.startsWith("--"));
 
@@ -30,7 +31,7 @@ if (list) {
 }
 
 if (!presetKey || !clientId) {
-  console.error("usage: node scripts/apply-preset.mjs <clientId> <offerId> <presetKey> [--dry-run]");
+  console.error("usage: node scripts/apply-preset.mjs <clientId> <offerId> <presetKey> [--dry-run] [--force]");
   console.error("       node scripts/apply-preset.mjs --list");
   process.exit(1);
 }
@@ -58,7 +59,7 @@ if (dryRun && !hasEnv) {
 }
 
 try {
-  const res = await applyPreset({ clientId, offerId: offerId || null, presetKey, dryRun });
+  const res = await applyPreset({ clientId, offerId: offerId || null, presetKey, dryRun, force });
   console.log(res.dryRun ? "\n(dry run — nothing written)" : `\nDone: ${res.stages} stages + ${res.transitions} edges.`);
 } catch (e) {
   console.error(`apply-preset failed: ${e.message}`);
