@@ -9053,6 +9053,8 @@ Then the call to action."]</div>
         <style>
           #pl-hawkeye{max-width:680px;margin:0 auto;padding:4px 0 44px}
           .hk2-topbar{display:flex;align-items:center;gap:16px;margin:2px 0 14px;flex-wrap:wrap}
+          .hk2-back{display:inline-flex;align-items:center;gap:5px;flex:0 0 auto;border:1.5px solid var(--border);background:var(--surface);color:var(--text-sub);border-radius:999px;padding:7px 13px 7px 10px;font:inherit;font-size:13px;font-weight:700;cursor:pointer}
+          .hk2-back:hover{color:var(--text);border-color:var(--border-med)}
           .hk2-title{display:flex;align-items:center;gap:8px;font-size:19px;font-weight:800;color:var(--text);flex:0 0 auto}
           .hk2-tabs{display:flex;gap:8px;flex:1 1 auto;min-width:0}
           .hk2-tab{flex:1;display:flex;align-items:center;justify-content:space-between;gap:7px;border-radius:999px;border:1.5px solid var(--border);background:var(--surface);color:var(--text-sub);padding:9px 14px;font:inherit;font-size:13px;font-weight:700;cursor:pointer;min-width:0}
@@ -9121,6 +9123,7 @@ Then the call to action."]</div>
           .hk2-clear b{color:var(--text);font-size:16px}
           .hk2-clear .big{width:56px;height:56px;border-radius:50%;background:rgba(76,199,106,.14);color:var(--green,#4CC76A);display:flex;align-items:center;justify-content:center;font-size:26px}
           .hk2-hint{font-size:11px;color:var(--text-mute);margin-top:12px;text-align:center;line-height:1.5}
+          .hk2-quietbar{display:flex;align-items:center;gap:7px;margin:0 0 12px;padding:8px 12px;border:1px solid color-mix(in srgb, var(--gold) 45%, transparent);background:color-mix(in srgb, var(--gold) 10%, transparent);color:var(--gold);border-radius:var(--r-8,8px);font-size:12px;font-weight:600}
           .hk2-load{min-height:300px;display:flex;align-items:center;justify-content:center;gap:8px;color:var(--text-sub);font-size:13px}
           .hk2-seg{display:flex;gap:8px;margin-bottom:4px}
           .hk2-segbtn{flex:1;background:var(--surface);border:1.5px solid var(--border-med);color:var(--text-sub);border-radius:8px;padding:9px 10px;font:inherit;font-size:12.5px;font-weight:700;cursor:pointer;transition:border-color .15s,background .15s}
@@ -13590,6 +13593,18 @@ function _ibStatusIcon(msg) {
   return '<span class="v15ib-status sent"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg></span>';
 }
 
+// Caption for a status:'scheduled' thread bubble - an approved Hawkeye send
+// parked by quiet hours (send_after). "Scheduled - sends Sat 8:00 AM".
+function _ibSchedLabel(m) {
+  try {
+    const t = m && m.send_after ? new Date(m.send_after) : null;
+    if (t && !isNaN(t.getTime()) && t.getTime() > Date.now()) {
+      return 'Scheduled - sends ' + t.toLocaleString([], { weekday: 'short', hour: 'numeric', minute: '2-digit' });
+    }
+  } catch (_) {}
+  return 'Approved - sending soon';
+}
+
 // Initials for the row avatar - first letters of up to two name words; falls
 // back to a generic glyph for phone-number / nameless contacts.
 function _ibInitials(name) {
@@ -14336,7 +14351,7 @@ async function _ibEnsureMembers() {
       : '?scope=client';
     const r = await fetch('/api/members' + qs, { headers: { Authorization: 'Bearer ' + token } });
     const j = await _safeJson(r);
-    if (r.ok && Array.isArray(j.members)) { _MEMBERS_ALL = j.members; _IB_MEMBER_IDX = null; }
+    if (r.ok && Array.isArray(j.members)) { _MEMBERS_ALL = j.members; _IB_MEMBER_IDX = null; _PL_MEMBERS_LOADED = true; }
   } catch (_) { /* members optional - inbox still works without the pill */ }
 }
 // Small gold "Member" pill. `small` trims it for the dense conversation list.
@@ -14581,18 +14596,20 @@ function _v15ibRenderThread() {
         lastDateLabel = dl;
       }
       const out = (m.direction || '').toLowerCase() === 'outbound';
+      const sched = m.status === 'scheduled';
       const tailParts = [];
       if (m._unconfirmed) tailParts.push('not confirmed in GHL');
       else if (m._optimistic) tailParts.push('sending...');
+      else if (sched) tailParts.push(escapeHTML(_ibSchedLabel(m)));
       else {
         tailParts.push(escapeHTML(_ghlChannelLabel(m.type)));
         if (m.date) tailParts.push(escapeHTML(new Date(m.date).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })));
       }
-      // #14: Delivery status for outbound
-      const statusHtml = out ? _ibStatusIcon(m) : '';
+      // #14: Delivery status for outbound (scheduled = not sent yet, no check)
+      const statusHtml = out && !sched ? _ibStatusIcon(m) : '';
       const tailClass = m._unconfirmed ? 'v15ib-tail warn' : 'v15ib-tail';
       const bubbleClass = out ? 'v15ib-bubble out' : 'v15ib-bubble in';
-      bubblesHtml += `<div class="${bubbleClass}">${escapeHTML((m.body || '(no body)').trim())}<div class="${tailClass}">${tailParts.join(' · ')}${statusHtml}</div></div>`;
+      bubblesHtml += `<div class="${bubbleClass}"${sched ? ' style="opacity:.65"' : ''}>${escapeHTML((m.body || '(no body)').trim())}<div class="${tailClass}">${tailParts.join(' · ')}${statusHtml}</div></div>`;
     });
   } else {
     bubblesHtml = '<div style="color:var(--text-mute);font-size:13px;text-align:center;padding:20px">No messages yet.</div>';
@@ -15648,16 +15665,21 @@ async function _contactsOpenDrawer(idx) {
   } catch (e) {
     _CDRAWER.ghl = { name: c.name, email: c.email, phone: c.phone, tags: c.tags || [], _error: e.message || String(e) };
   }
-  // Entry points like Hawkeye / automations / voicemail seed a stub row with
-  // null email/phone (only ghl_contact_id + name). The fetch above has the real
-  // values on _CDRAWER.ghl - backfill the seed row so the composer, Stripe
-  // lookup, and SMS/Email default all use them instead of showing "no phone or
-  // email on file". Only fills blanks, so full Contacts-list rows are untouched.
-  const _g = _CDRAWER.ghl || {};
-  if (_g.name && !c.name) c.name = _g.name;
-  if (_g.email && !c.email) c.email = _g.email;
-  if (_g.phone && !c.phone) c.phone = _g.phone;
-  if (!_CDRAWER.msgType || (_CDRAWER.msgType === 'Email' && c.phone)) _CDRAWER.msgType = c.phone ? 'SMS' : 'Email';
+  // Entry points like Hawkeye / automations / voicemail seed a stub row with null
+  // email/phone (only ghl_contact_id + name). The fetch above has the real values
+  // on _CDRAWER.ghl - backfill the seed row so the composer, Stripe lookup, tag
+  // editor, and SMS/Email default all use them instead of showing "no phone or
+  // email on file - can't message". Only fills blanks, so full Contacts-list rows
+  // are untouched. (_cdComposer/_contactsMsgType/_contactsSendMsg + Stripe all
+  // read _CDRAWER.contact.)
+  if (_CDRAWER.ghl && !_CDRAWER.ghl._error) {
+    const _g = _CDRAWER.ghl;
+    if (_g.name && !c.name) c.name = _g.name;
+    if (_g.phone && !c.phone) c.phone = _g.phone;
+    if (_g.email && !c.email) c.email = _g.email;
+    if ((!c.tags || !c.tags.length) && Array.isArray(_g.tags)) c.tags = _g.tags;
+    if (!_CDRAWER.msgType || (_CDRAWER.msgType === 'Email' && c.phone)) _CDRAWER.msgType = c.phone ? 'SMS' : 'Email';
+  }
   const body = document.getElementById('contacts-drawer-body');
   if (body) body.innerHTML = _cdBody();
   _renderTagEditor('cd-tags', c.ghl_contact_id, (_CDRAWER.ghl && _CDRAWER.ghl.tags) || c.tags || []);
@@ -15733,6 +15755,17 @@ async function _cdReigniteChip(cid) {
 }
 async function _cdReigniteCancel(id, cid) {
   try {
+    // A just-parked lead may still carry the 'fresh' placeholder id (or none) if
+    // the park response didn't return the row - resolve the real id from the
+    // server before cancelling, else PostgREST 400s on the invalid uuid.
+    if (!id || id === 'fresh') {
+      try {
+        const j = await _apxPost('/api/agent-approvals', 'list-reignitions', {});
+        const hit = ((j && j.reignitions) || []).find(x => String(x.ghl_contact_id) === String(cid));
+        if (hit && hit.id) id = hit.id;
+      } catch (_) {}
+    }
+    if (!id || id === 'fresh') throw new Error('still saving - try again in a moment');
     await _apxPost('/api/agent-approvals', 'cancel-reignition', { reignition_id: id });
     if (_PL_REIGN) _PL_REIGN.delete(String(cid));
     const el = document.getElementById('cd-reignite'); if (el) el.remove();
@@ -17405,7 +17438,9 @@ async function _hmMsgPeek(convId, focusReply) {
       .sort((a, b) => new Date(a.date || 0) - new Date(b.date || 0))
       .slice(-8);
     box.innerHTML = msgs.length
-      ? msgs.map(m => `<div class="hm-peek-bub ${String(m.direction || '').toLowerCase() === 'inbound' ? 'in' : 'out'}">${escapeHTML(m.body)}</div>`).join('')
+      ? msgs.map(m => m.status === 'scheduled'
+          ? `<div class="hm-peek-bub out" style="opacity:.6">${escapeHTML(m.body)}<div style="font-size:10px;margin-top:3px;color:var(--text-mute)">${escapeHTML(_ibSchedLabel(m))}</div></div>`
+          : `<div class="hm-peek-bub ${String(m.direction || '').toLowerCase() === 'inbound' ? 'in' : 'out'}">${escapeHTML(m.body)}</div>`).join('')
       : '<div class="req-empty" style="padding:12px 0">No messages to show.</div>';
     box.scrollTop = box.scrollHeight;
   } catch (e) {
@@ -17732,6 +17767,41 @@ function _hmHawkIndex(res) {
   return idx;
 }
 
+// The same person can surface as more than one conversation row - own-store
+// academies merge SMS + email + social + DM threads server-side, and GHL can
+// return more than one thread per contact. Collapse to ONE row per contact so
+// the Home inbox never lists a lead twice (Zoran). Keep the newest-message row
+// in its (server-sorted) slot, OR-in unread from any duplicate, and never drop
+// a Hawkeye-flagged contact (the flag is keyed by contact, so any surviving row
+// keeps it).
+function _hmContactKey(c) {
+  if (c.contactId) return 'c:' + c.contactId;
+  const p = String(c.phone || '').replace(/\D+/g, '').slice(-10);
+  if (p.length === 10) return 'p:' + p;
+  const nm = String(c.contactName || c.fullName || '').trim().toLowerCase();
+  // Only merge on a REAL name. Unnamed threads share a sentinel ("Lead" from the
+  // DM/social stores, "Unknown" from GHL) or are a bare number/email - two
+  // DISTINCT nameless leads must NOT collapse into one row, so fall back to the
+  // per-conversation id, which is unique.
+  const nameless = !nm || nm === 'lead' || nm === 'unknown' || /^[\s()+.\-\d]+$/.test(nm) || (nm.includes('@') && !nm.includes(' '));
+  return nameless ? 'id:' + c.id : 'n:' + nm;
+}
+function _hmDedupeConvos(list) {
+  const seen = new Map(), order = [];
+  for (const c of (list || [])) {
+    const k = _hmContactKey(c);
+    const cur = seen.get(k);
+    if (!cur) { seen.set(k, c); order.push(k); continue; }
+    const curT = cur.lastMessageDate ? new Date(cur.lastMessageDate).getTime() : 0;
+    const newT = c.lastMessageDate ? new Date(c.lastMessageDate).getTime() : 0;
+    const unread = Math.max(cur.unreadCount || 0, c.unreadCount || 0);
+    const keep = newT > curT ? c : cur;   // show the most recent message
+    keep.unreadCount = unread;
+    seen.set(k, keep);
+  }
+  return order.map(k => seen.get(k));
+}
+
 async function _hmLoadInboxPreview() {
   const body = document.getElementById('hv2-inbox-body');
   const pill = document.getElementById('hv2-inbox-n');
@@ -17747,7 +17817,7 @@ async function _hmLoadInboxPreview() {
     if (!r.ok || !j.conversations) throw new Error('no data');
     const hawk = _hmHawkIndex(hawkRes);
     const hawkAgentFor = c => hawk ? (hawk.byConv[String(c.id || '')] || (c.contactId && hawk.byContact[String(c.contactId)]) || null) : null;
-    const all = j.conversations || [];
+    const all = _hmDedupeConvos(j.conversations || []);
     const convos = all.slice(0, 8);
     // Line up with Hawkeye: a conversation with a pending deck card must make
     // the preview even when newer chatter would push it out - swap the oldest
@@ -18181,37 +18251,29 @@ document.addEventListener('click', function(e) { if (!e.target.closest('.hm-stat
 // ── Right rail bottom: Hawkeye feed (if active) or marketing snapshot (fallback) ──
 async function _hmLoadRailBottom() {
   const host = document.getElementById('hm-rail-bottom'); if (!host) return;
-  // Try Hawkeye first
-  let hawkData = null, hawkTotal = 0;
   try {
-    const [fu, hk] = await Promise.all([
-      _apxPost('/api/agent-followups', 'list', {}).catch(() => ({})),
-      _hmHawkFetch(),
-    ]);
-    const [rd, cf, cl] = hk;
-    hawkData = _apxSplit(fu, rd);
-    // Confirm + closing queues too, so Home shows the same workload as the
-    // Hawkeye deck (_hk2Load) - it was booking-only and the counts drifted.
+    const [rd, cf, cl] = await _hmHawkFetch();
+    // Mirror the Hawkeye deck (_hk2Load) EXACTLY: the SAME three pending queues,
+    // closing followup_N rows collapsed to one plan card per contact. No
+    // agent-followups - booking nudges are retired and scheduled followups were
+    // never deck cards, so listing them drifted Home away from Hawkeye (the feed
+    // showed rows the deck/count didn't have). total == rows == deck card count.
     const pend = r => ((r && r.ready) || []).filter(x => x.status === 'pending');
-    hawkData.confirm = pend(cf);
-    hawkData.closing = [];
-    const clSeen = new Set();
+    const booking = pend(rd), confirm = pend(cf);
+    const closing = [], clSeen = new Set();
     for (const r of pend(cl)) {
       if ((r.step_key || '').startsWith('followup_')) {   // one plan card per contact, like the deck
         const k = String(r.ghl_contact_id);
         if (clSeen.has(k)) continue;
         clSeen.add(k);
-        hawkData.closing.push({ ...r, _plan: true });
-      } else hawkData.closing.push(r);
+        closing.push({ ...r, _plan: true });
+      } else closing.push(r);
     }
-    // Total = what the deck would show: pending booking rows + confirm rows +
-    // closing cards. Scheduled (not-yet-due) followups render in the feed but
-    // don't count - they aren't deck cards waiting on the owner.
-    hawkTotal = pend(rd).length + hawkData.confirm.length + hawkData.closing.length;
-    // Check if Hawkeye is actually configured: if both APIs returned valid
-    // structures (even if empty), Hawkeye is on. If they errored, fall back.
-    const hawkOn = (fu && (fu.followups || fu.error === undefined)) || (rd && (rd.ready || rd.error === undefined));
-    if (hawkOn) { _hmRenderHawkFeed(host, hawkData, hawkTotal); return; }
+    const total = booking.length + confirm.length + closing.length;
+    // Hawkeye is "on" if any list-ready call returned a valid structure (even
+    // empty). If they all errored, fall back to the marketing snapshot.
+    const ok = r => r && (r.ready || r.error === undefined);
+    if (ok(rd) || ok(cf) || ok(cl)) { _hmRenderHawkFeed(host, { booking, confirm, closing }, total); return; }
   } catch (_) {}
   // Fallback: marketing snapshot
   _hmRenderMktSnapshot(host);
@@ -18219,29 +18281,20 @@ async function _hmLoadRailBottom() {
 
 function _hmRenderHawkFeed(host, d, total) {
   const items = [];
-  const kindMap = { book: { icon: 'hm-feed-ic-book', svg: _HV2_ICONS.check, verb: 'Booking to confirm' },
-                    ghost: { icon: 'hm-feed-ic-ghost', svg: _HV2_ICONS.ghost, verb: 'Mark as ghosted' },
-                    mark_lost: { icon: 'hm-feed-ic-lost', svg: _HV2_ICONS.x, verb: 'Mark as lost' } };
-  for (const r of (d.ready || [])) {
-    const k = kindMap[r.kind] || { icon: 'hm-feed-ic-reply', svg: _HV2_ICONS.mail, verb: 'Reply drafted' };
-    items.push({ name: r.contact_name || 'Lead', desc: k.verb, icon: k.icon, svg: k.svg, agent: 'booking', cid: r.ghl_contact_id });
+  const bookVerb = k => k === 'book' ? 'Trial booking to confirm' : k === 'ghost' ? 'Move to ghosted' : k === 'mark_lost' ? 'Confirm as lost' : k === 'reignite' ? 'Reignite later, parked' : k === 'reignite_due' ? 'Reignition day' : 'Reply drafted';
+  const bookIcon = k => k === 'book' ? { icon: 'hm-feed-ic-book', svg: _HV2_ICONS.check } : k === 'ghost' ? { icon: 'hm-feed-ic-ghost', svg: _HV2_ICONS.ghost } : k === 'mark_lost' ? { icon: 'hm-feed-ic-lost', svg: _HV2_ICONS.x } : { icon: 'hm-feed-ic-reply', svg: _HV2_ICONS.mail };
+  for (const r of (d.booking || [])) {
+    const ic = bookIcon(r.kind);
+    items.push({ name: r.contact_name || 'Lead', desc: bookVerb(r.kind), icon: ic.icon, svg: ic.svg, agent: 'booking', cid: r.ghl_contact_id });
   }
   for (const r of (d.confirm || [])) {
-    const verb = r.kind === 'confirm_handoff' ? 'Handoff to booking' : r.kind === 'confirm_lost' ? 'Confirm as lost' : r.kind === 'post_trial' ? 'Post-trial form to send' : 'Trial confirmation drafted';
+    const verb = r.kind === 'confirm_handoff' ? 'Handoff to booking' : r.kind === 'confirm_lost' ? 'Confirm as lost' : r.kind === 'post_trial' ? 'Post-trial form to send' : r.kind === 'reignite' ? 'Reignite later, parked' : r.kind === 'reignite_due' ? 'Reignition day' : 'Trial confirmation drafted';
     items.push({ name: r.contact_name || 'Lead', desc: verb, icon: 'hm-feed-ic-book', svg: _HV2_ICONS.check, agent: 'confirm', cid: r.ghl_contact_id });
   }
   for (const r of (d.closing || [])) {
-    const verb = r._plan ? 'Follow-up plan to approve' : r.kind === 'closing_enroll' ? 'Enroll in closing plan' : r.kind === 'closing_lost' ? 'Confirm as lost' : 'Closing reply drafted';
+    const verb = r._plan ? 'Follow-up plan to approve' : r.kind === 'closing_enroll' ? 'Enroll in closing plan' : r.kind === 'closing_lost' ? 'Confirm as lost' : r.kind === 'reignite' ? 'Reignite later, parked' : r.kind === 'reignite_due' ? 'Reignition day' : 'Closing reply drafted';
     items.push({ name: r.contact_name || 'Lead', desc: verb, icon: 'hm-feed-ic-reply', svg: _HV2_ICONS.mail, agent: 'closing', cid: r.ghl_contact_id });
   }
-  for (const f of (d.followups || [])) {
-    const when = f.scheduled_at ? new Date(f.scheduled_at) : null;
-    const desc = when ? 'Follow-up ' + when.toLocaleDateString(undefined, { weekday: 'short', hour: 'numeric', minute: '2-digit' }) : 'Follow-up queued';
-    items.push({ name: f.contact_name || 'Lead', desc, icon: 'hm-feed-ic-fu', svg: _HV2_ICONS.refresh });
-  }
-  for (const b of (d.book || [])) items.push({ name: b.contact_name || 'Lead', desc: 'Trial booking to confirm', icon: 'hm-feed-ic-book', svg: _HV2_ICONS.check, agent: 'booking', cid: b.ghl_contact_id });
-  for (const g of (d.ghost || [])) items.push({ name: g.contact_name || 'Lead', desc: 'Move to ghosted', icon: 'hm-feed-ic-ghost', svg: _HV2_ICONS.ghost, agent: 'booking', cid: g.ghl_contact_id });
-  for (const l of (d.lost || [])) items.push({ name: l.contact_name || 'Lead', desc: 'Confirm as lost', icon: 'hm-feed-ic-lost', svg: _HV2_ICONS.x, agent: 'booking', cid: l.ghl_contact_id });
 
   // Each row deep-links to its own card in the deck (agent tab + contact on top).
   const rows = items.slice(0, 8).map(i => {
@@ -18326,7 +18379,32 @@ function _hmCountUp(el, target, prefix, duration, suffix) {
 let _hmScoreInterval = null;
 function _hmStartScoreRefresh() {
   if (_hmScoreInterval) clearInterval(_hmScoreInterval);
-  _hmScoreInterval = setInterval(() => { _hmLoadScoreboard(); }, 60000);
+  _hmScoreInterval = setInterval(() => { _hmLoadScoreboard(); _hmRefreshLive(); }, 60000);
+  _hmBindLiveRefresh();
+}
+// The Home inbox preview + Hawkeye activity feed loaded ONCE on mount, so a new
+// message (Tara) or a freshly-carded action never showed until a full reload
+// (Zoran: "conversations don't get updated"). Refresh them on the scoreboard
+// cadence and the moment the app regains focus.
+function _hmRefreshLive() {
+  const hv = document.getElementById('home-v2');
+  // offsetParent is null when the element OR any ancestor is display:none. The
+  // classic view hides #view-home via a CLASS (home-v2's own inline display
+  // stays ''), so checking home-v2.style.display missed it and refreshed
+  // off-screen; offsetParent catches both. document.hidden = tab backgrounded.
+  if (!hv || hv.offsetParent === null || document.hidden) return;
+  // focus + visibilitychange both fire when the app foregrounds - fetch once.
+  const now = Date.now();
+  if (window._hmLiveLast && now - window._hmLiveLast < 3000) return;
+  window._hmLiveLast = now;
+  if (window._hmActiveTab === 'inbox') { try { _hmLoadInboxPreview(); } catch (_) {} }
+  try { _hmLoadRailBottom(); } catch (_) {}
+}
+function _hmBindLiveRefresh() {
+  if (window._hmLiveBound) return;
+  window._hmLiveBound = true;
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) _hmRefreshLive(); });
+  window.addEventListener('focus', () => _hmRefreshLive());
 }
 
 // ── UI #7: Nav card notification dots ──
@@ -23003,7 +23081,8 @@ function openTrainAgentView() {
   // academy too - they can turn their own agents off / Hawkeye (self-drive stays
   // blocked); the server enforces it's their own academy.
   if (isAgent) {
-    if (!['test', 'lessons', 'knowledge', 'mode'].includes(_TA.tab)) _TA.tab = 'test';
+    const okTabs = _TA.target === 'closing' ? ['test', 'lessons', 'followups', 'knowledge', 'mode'] : ['test', 'lessons', 'knowledge', 'mode'];
+    if (!okTabs.includes(_TA.tab)) _TA.tab = 'test';
   }
   const pill = (k, label, active) => `<button onclick="_taPick('${k}')" style="background:${active ? 'var(--gold)' : 'transparent'};color:${active ? '#0B0B0D' : 'var(--text-sub)'};border:1px solid ${active ? 'var(--gold)' : 'var(--border)'};border-radius:8px;padding:7px 13px;font-size:13px;font-weight:700;cursor:pointer">${label}</button>`;
   const tab = (k, label) => `<button onclick="_taTab('${k}')" style="background:${_TA.tab === k ? 'var(--gold)' : 'transparent'};color:${_TA.tab === k ? '#0B0B0D' : 'var(--text-sub)'};border:1px solid ${_TA.tab === k ? 'var(--gold)' : 'var(--border)'};border-radius:8px;padding:7px 14px;font-size:13px;font-weight:600;cursor:pointer">${label}</button>`;
@@ -23029,6 +23108,7 @@ function openTrainAgentView() {
     ${isAgent ? `<div style="display:flex;gap:8px;margin-bottom:18px;flex-wrap:wrap">
       ${tab('test', 'Test')}
       ${tab('lessons', 'Lessons')}
+      ${_TA.target === 'closing' ? tab('followups', 'Follow-ups') : ''}
       ${tab('knowledge', 'Knowledge')}
       ${tab('mode', 'Autonomy')}
     </div>` : ''}
@@ -23042,6 +23122,7 @@ function _taRenderPanel() {
   if (_taIsEntry()) return _taRenderEntryPoints();     // an entry point -> its routing config
   if (!_taIsAgent()) return _taRenderAutomations();   // an automation is selected -> its step-builder
   if (_TA.tab === 'lessons') return _taRenderLessons();
+  if (_TA.tab === 'followups' && _TA.target === 'closing') return _taRenderFollowups();
   if (_TA.tab === 'knowledge') return _taRenderKnowledge();
   if (_TA.tab === 'mode') return _taRenderMode();
   return _taRenderTest();
@@ -23202,6 +23283,112 @@ async function _taEpApi(action, extra) {
   if (!r.ok) throw new Error(json.error || ('HTTP ' + r.status));
   return json;
 }
+// ── Follow-ups tab: the closing agent's quiet-lead strategy (Zoran 2026-07-10) ─
+// Two halves, one page: the SCHEDULE (day gaps between follow-ups + how long the
+// final one waits before the Lost suggestion; stored per academy via
+// agent-config closing_followups) and the WORDING (the trainable
+// closing_followup brain section - same store the Knowledge tab edits). Every
+// quiet Done-Trial lead ALWAYS gets this plan as a Hawkeye card; this page
+// shapes what that card proposes.
+let _TA_FU = null;
+async function _taRenderFollowups() {
+  const p = document.getElementById('ta-panel'); if (!p) return;
+  p.innerHTML = `<div style="color:var(--text-mute);font-size:13px"><span class="req-spin"></span> Loading…</div>`;
+  let gaps = [1, 2], lostAfter = 2, sec = null;
+  try {
+    const [c, secs] = await Promise.all([
+      _taConfigApi('get-closing-followups', { client_id: CLIENT_ID }),
+      _taApi('sections', {}),
+    ]);
+    if (c && Array.isArray(c.gaps) && c.gaps.length) { gaps = c.gaps; lostAfter = c.lost_after || 2; }
+    sec = ((secs && secs.sections) || []).find(s => s.key === 'closing_followup') || null;
+  } catch (e) { p.innerHTML = `<div style="color:var(--red);font-size:13px">Could not load - ${escapeHTML(e.message || String(e))}</div>`; return; }
+  _TA_FU = { gaps: gaps.slice(), lost_after: lostAfter, sec };
+  _taFuPaint();
+}
+function _taFuPaint() {
+  const p = document.getElementById('ta-panel'); if (!p || !_TA_FU) return;
+  const f = _TA_FU;
+  const node = (title, sub, color) => `
+    <div style="background:var(--surface);border:1px solid ${color || 'var(--border)'};border-radius:12px;padding:11px 14px">
+      <div style="font-weight:700;font-size:13.5px">${title}</div>
+      ${sub ? `<div style="font-size:12px;color:var(--text-sub);margin-top:2px;line-height:1.45">${sub}</div>` : ''}
+    </div>`;
+  const gapRow = (i) => `
+    <div style="display:flex;align-items:center;gap:8px;padding:2px 0 2px 22px">
+      <span style="width:1px;align-self:stretch;background:var(--border);margin-right:8px"></span>
+      <span style="font-size:12px;color:var(--text-sub)">after</span>
+      <input type="number" min="1" max="14" value="${f.gaps[i]}" onchange="_taFuGap(${i}, this.value)" style="width:56px;background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);padding:6px 8px;font:inherit;font-size:13px;text-align:center">
+      <span style="font-size:12px;color:var(--text-sub)">quiet day${f.gaps[i] === 1 ? '' : 's'}</span>
+    </div>`;
+  const fuNode = (i) => {
+    const last = i === f.gaps.length - 1;
+    const hint = i === 0 && f.gaps.length > 1 ? 'Light did-you-see-my-message check-in'
+      : last ? 'Asks if they are still interested - leaves the door open' : 'A fresh angle - value, schedule fit, or a light question';
+    return `<div style="display:flex;align-items:center;gap:8px">
+      <div style="flex:1">${node(`Follow-up ${i + 1}`, hint, 'var(--accent-border,rgba(212,182,92,.35))')}</div>
+      ${f.gaps.length > 1 ? `<button title="Remove this follow-up" onclick="_taFuRemove(${i})" style="background:transparent;border:1px solid var(--border);color:var(--text-mute);border-radius:8px;padding:7px 10px;font-size:12px;cursor:pointer">Remove</button>` : ''}
+    </div>`;
+  };
+  const secWarn = f.sec && f.sec.scope === 'global'
+    ? `<div style="font-size:11.5px;color:var(--gold);background:rgba(212,182,92,.08);border:1px solid rgba(212,182,92,.33);border-radius:8px;padding:7px 10px;margin:0 0 8px;line-height:1.45">This wording is <b>global</b> - saving changes it for every academy's closing agent, not just yours.</div>` : '';
+  p.innerHTML = `
+    <p style="color:var(--text-mute);font-size:12.5px;margin:0 0 14px;line-height:1.55;max-width:640px">When a Done-Trial lead goes quiet, the agent always queues this plan in Hawkeye - you approve it once and the messages send themselves on the schedule below, each only if the lead still hasn't replied. A reply cancels the rest instantly.</p>
+    <div style="display:flex;flex-direction:column;gap:6px;max-width:560px">
+      ${node('Our last message goes unanswered', 'The clock starts at the most recent message in the thread.')}
+      ${f.gaps.map((_, i) => gapRow(i) + fuNode(i)).join('')}
+      <div style="display:flex;align-items:center;gap:8px;padding:2px 0 2px 22px">
+        <span style="width:1px;align-self:stretch;background:var(--border);margin-right:8px"></span>
+        <span style="font-size:12px;color:var(--text-sub)">after</span>
+        <input type="number" min="1" max="14" value="${f.lost_after}" onchange="_taFuLost(this.value)" style="width:56px;background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);padding:6px 8px;font:inherit;font-size:13px;text-align:center">
+        <span style="font-size:12px;color:var(--text-sub)">more quiet day${f.lost_after === 1 ? '' : 's'}</span>
+      </div>
+      ${node('Suggest marking Lost', 'A card asks you to confirm - approving routes them to the long-game nurture texts. Nothing moves on its own.', 'rgba(240,112,96,.4)')}
+    </div>
+    <div style="display:flex;gap:10px;margin-top:12px;align-items:center;flex-wrap:wrap">
+      ${f.gaps.length < 5 ? `<button style="${_TA_BTN2}" onclick="_taFuAdd()">+ Add a follow-up</button>` : ''}
+      <button style="${_TA_BTN}" onclick="_taFuSaveSchedule()">Save schedule</button>
+      <span id="ta-fu-note" style="font-size:12px"></span>
+    </div>
+    <div style="margin-top:26px;max-width:640px">
+      <div style="font-weight:700;font-size:14px;margin-bottom:4px">What the follow-ups say</div>
+      <p style="color:var(--text-mute);font-size:12.5px;margin:0 0 8px;line-height:1.5">The agent writes each message fresh per lead, guided by this. Teach it the style you want - the schedule above controls when, this controls what.</p>
+      ${secWarn}
+      ${!f.sec
+        ? `<div style="font-size:12.5px;color:var(--text-sub)">The wording lives in Knowledge - open the Knowledge tab and edit "Closing agent - Follow-up strategy".</div>`
+        : f.sec.editable
+        ? `<textarea id="ta-fu-wording" rows="9" style="width:100%;box-sizing:border-box;background:var(--surface-el,#222);border:1px solid var(--border);border-radius:10px;padding:10px 12px;color:var(--text);font-size:13px;resize:vertical;font-family:inherit;line-height:1.5">${escapeHTML(f.sec.body || '')}</textarea>
+          <div style="display:flex;gap:10px;margin-top:8px;align-items:center">
+            <button style="${_TA_BTN}" onclick="_taFuSaveWording()">Save wording</button>
+            <span id="ta-fu-wnote" style="font-size:12px"></span>
+          </div>`
+        : `<div style="font-size:12.5px;color:var(--text-sub);background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:10px 12px;line-height:1.5">The follow-up wording is managed by BAM. Your schedule above is fully yours to set.</div>`}
+    </div>`;
+}
+function _taFuGap(i, v) { if (!_TA_FU) return; _TA_FU.gaps[i] = Math.max(1, Math.min(14, Math.round(Number(v) || 1))); _taFuPaint(); }
+function _taFuLost(v) { if (!_TA_FU) return; _TA_FU.lost_after = Math.max(1, Math.min(14, Math.round(Number(v) || 1))); _taFuPaint(); }
+function _taFuAdd() { if (!_TA_FU || _TA_FU.gaps.length >= 5) return; _TA_FU.gaps.push(2); _taFuPaint(); }
+function _taFuRemove(i) { if (!_TA_FU || _TA_FU.gaps.length <= 1) return; _TA_FU.gaps.splice(i, 1); _taFuPaint(); }
+async function _taFuSaveSchedule() {
+  if (!_TA_FU) return;
+  const note = document.getElementById('ta-fu-note');
+  try {
+    await _taConfigApi('set-closing-followups', { client_id: CLIENT_ID, gaps: _TA_FU.gaps, lost_after: _TA_FU.lost_after });
+    if (note) { note.style.color = 'var(--green,#4CC76A)'; note.textContent = 'Saved - new plans use this schedule.'; setTimeout(() => { if (note) note.textContent = ''; }, 3500); }
+  } catch (e) { if (note) { note.style.color = 'var(--red)'; note.textContent = e.message || 'Could not save'; } }
+}
+async function _taFuSaveWording() {
+  if (!_TA_FU || !_TA_FU.sec) return;
+  const ta = document.getElementById('ta-fu-wording');
+  const note = document.getElementById('ta-fu-wnote');
+  if (!ta) return;
+  try {
+    await _taApi('update-section', { key: 'closing_followup', body: ta.value });
+    _TA_FU.sec.body = ta.value;
+    if (note) { note.style.color = 'var(--green,#4CC76A)'; note.textContent = 'Saved - the agent uses this on its next drafts.'; setTimeout(() => { if (note) note.textContent = ''; }, 3500); }
+  } catch (e) { if (note) { note.style.color = 'var(--red)'; note.textContent = e.message || 'Could not save'; } }
+}
+
 async function _taRenderEntryPoints() {
   const p = document.getElementById('ta-panel');
   if (!p) return;
@@ -29242,6 +29429,10 @@ async function _safeJson(res) {
 // Members tab - list view state (module-scope so search/filter survive
 // re-renders without re-fetching).
 let _MEMBERS_ALL = [];
+// True once the member roster has actually loaded (either loader below). The
+// not-flowing safety net needs this to tell a converted paying member apart
+// from an empty roster - `_MEMBERS_ALL = []` alone can't (init vs. zero members).
+let _PL_MEMBERS_LOADED = false;
 let _MEMBERS_SORTER = null; // import-strip done-flags from /api/members `sorter`
 let _MEMBERS_SUBS_TO_CANCEL = 0; // open "cancel old Stripe sub" action items (banner)
 let _MEMBERS_CIQ = { enabled: false, signup_url: null }; // CoachIQ config for "Set up CoachIQ"
@@ -29772,6 +29963,7 @@ async function fetchAndRenderMembers() {
     renderStripeConnectButton(json.stripe || { status: 'not_connected' });
     renderGhlConnectButton(json.ghl || { status: 'not_connected' });
     _MEMBERS_ALL = Array.isArray(json.members) ? json.members : [];
+    _PL_MEMBERS_LOADED = true;
     _IB_MEMBER_IDX = null; // roster changed - rebuild the inbox member-match index lazily
     _MEMBERS_SORTER = json.sorter || null;
     _MEMBERS_SUBS_TO_CANCEL = json.subs_to_cancel || 0;
@@ -31690,7 +31882,11 @@ function _plSelectPipeline(pipelineId) {
 // trials up top + glow" treatment on the Sales board.
 function _plIsTrialToday(raw) {
   if (!raw) return false;
-  const d = new Date(raw); if (isNaN(d.getTime())) return false;
+  // Date-only ("2026-06-13") must parse as LOCAL midnight, not UTC - a raw
+  // new Date() shifts it to the evening before in Toronto and flags "today" a
+  // day early (same fix as _plTrialInfo).
+  const dateOnly = /^\d{4}-\d{2}-\d{2}$/.test(String(raw).trim());
+  const d = new Date(dateOnly ? raw + 'T00:00:00' : raw); if (isNaN(d.getTime())) return false;
   const n = new Date();
   return d.getFullYear() === n.getFullYear() && d.getMonth() === n.getMonth() && d.getDate() === n.getDate();
 }
@@ -32531,7 +32727,7 @@ const _HK2_KIND = {
   ghost:   { pill: 'Went quiet',      color: 'var(--gold,#D4B65C)',    cls: '',      go: 'Send to Ghosted',               goEdit: 'Send to Ghosted' },
   handoff: { pill: 'Reschedule',      color: 'var(--blue,#5A8FB8)',    cls: 'green', go: 'Approve handoff',               goEdit: 'Confirm edits and hand off' },
   enroll:  { pill: 'Ready to enroll', color: 'var(--green,#4CC76A)',   cls: 'green', go: 'Approve and send',              goEdit: 'Confirm edits and send' },
-  plan:    { pill: 'Follow-up plan',  color: 'var(--accent)',          cls: '',      go: 'Approve plan - sends 1 day apart', goEdit: 'Confirm edits and approve plan' },
+  plan:    { pill: 'Follow-up plan',  color: 'var(--accent)',          cls: '',      go: 'Approve follow-up schedule', goEdit: 'Confirm edits and schedule' },
   lost:    { pill: 'Suggested lost',  color: 'var(--red,#F07060)',     cls: 'red',   go: 'Mark lost',                     goEdit: 'Confirm edits and mark lost' },
   form:    { pill: 'Post-trial form', color: 'var(--accent)',          cls: '',      go: 'Submit post-trial form',        goEdit: 'Submit post-trial form' },
   reignite:     { pill: 'Wants to start later', color: 'var(--gold,#D4B65C)', cls: '', go: 'Send ack + schedule reignite', goEdit: 'Confirm edits and schedule' },
@@ -32586,6 +32782,7 @@ function _sfOpen(which) {
 }
 function closeSalesFocus() {
   if (!_SF_OPEN) return;
+  _hk2StopPoll();
   _SF_OPEN = null;
   _mmCloseFocus('salesMachineModal');
   // Home is right behind - refresh its Sales counts so they reflect the work done.
@@ -32610,6 +32807,9 @@ async function _hk2Refresh() {
   if (!_HK2.q) host.innerHTML = '<div class="hk2-load"><span class="req-spin"></span> Loading Hawkeye…</div>';
   try { _HK2.q = await _hk2Load(); }
   catch (e) { host.innerHTML = `<div class="hk2-load">Couldn't load - ${escapeHTML(_apxErr(e))}</div>`; return; }
+  // Seed the live-poll's "already shown" set with this fresh load so it only
+  // ever surfaces cards that appear AFTER the deck opened.
+  _HK2.seen = new Set(_HK2_AGENTS.flatMap(a => (_HK2.q[a] || []).map(_hk2CardKey)));
   // Deep link from a board card: surface that lead's card on top of its queue.
   if (_HK2.focusContact) {
     for (const a of _HK2_AGENTS) {
@@ -32619,6 +32819,7 @@ async function _hk2Refresh() {
     _HK2.focusContact = null;
   }
   _hk2Render();
+  _hk2StartPoll();
 }
 // Normalize the 3 ready queues into kind-tagged cards. Closing's pending
 // followup_N rows for one contact collapse into ONE plan card.
@@ -32662,9 +32863,25 @@ async function _hk2Load() {
       }
     } catch (_) { /* names are a nicety - never block the deck */ }
   }
-  return { booking, confirm, closing };
+  // Quiet-hours state (from list-ready): outside 8:00am-9:30pm the deck warns
+  // upfront that approvals park until morning - the deferred toast alone was
+  // missed (approved 9:38pm, "message never sent" report, 2026-07-10).
+  // booking_provider drives the Book-it card copy (portal sends the confirmation
+  // text from the deck; GHL lets its own automation send it - #3).
+  _HK2.bookingProvider = (b && b.booking_provider) || 'ghl';
+  return { booking, confirm, closing, quiet: (b && b.quiet) || null };
 }
 function _hk2Pick(a) { _HK2.agent = a; _hk2Render(); }
+// "tomorrow at 8:00 AM" / "Sat at 8:00 AM" for the after-hours deck bar.
+function _hk2QuietWhen(iso) {
+  try {
+    const t = new Date(iso); if (isNaN(t.getTime())) return 'in the morning';
+    const day = t.toDateString() === new Date().toDateString() ? 'today'
+      : t.toDateString() === new Date(Date.now() + 86400000).toDateString() ? 'tomorrow'
+      : t.toLocaleDateString([], { weekday: 'short' });
+    return day + ' at ' + t.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+  } catch (_) { return 'in the morning'; }
+}
 // Name tap on a deck card -> the contact drawer. The drawer overlay sits at
 // z-index 9000; on mobile the deck modal is 10050, so raise the overlay above
 // it or the drawer would open BEHIND the deck.
@@ -32676,6 +32893,7 @@ function _hk2OpenContact(cid, nm) {
 // Back from the deck = the HOME page's Sales section (Zoran 2026-07-09), with
 // every cascade closed. With the overlay model, home is right behind the modal.
 function _hk2Back() {
+  _hk2StopPoll();
   _PLO2_OPEN = null;
   try { _CC2_OPEN = null; } catch (_) {}
   if (typeof _SF_OPEN !== 'undefined' && _SF_OPEN) { closeSalesFocus(); return; }
@@ -32793,15 +33011,23 @@ function _hk2CardHtml(r, pos, total, isTop) {
   let body = '';
   if (r._kind === 'book') {
     const guessSlot = r.book_slot_at || '';
+    // Only portal-booking academies send the confirmation text from the deck. On
+    // GHL-calendar academies GHL's own booked-trial automation sends it, so we
+    // must NOT show an editable "sends the moment you book it" box that then gets
+    // dropped on the floor (#3). Copy is provider-aware.
+    const isPortalBooking = (_HK2 && _HK2.bookingProvider) === 'portal';
+    const confBlock = isPortalBooking
+      ? `<div class="hk2-lbl">Confirmation text - sends the moment you book it</div>
+      <textarea class="hk2-draft"${id.draft} oninput="_hk2Edited()">${escapeHTML(r.draft_message || '')}</textarea>
+      <div class="hk2-note">Only this academy's trial calendars show here. Book it = the slot is claimed, your confirmation text sends, and the Confirm agent takes over (reminders send from config).</div>`
+      : `<div class="hk2-note">Only this academy's trial calendars show here. Book it = the slot is claimed in your calendar and its booked-trial automation sends the confirmation + location. The Confirm agent then takes over.</div>`;
     body = `${_hk2ThreadHtml(r)}
       <div class="hk2-lbl">Booking details - the agent's pick, change if needed</div>
       <div class="hk2-fields">
         <label><span>Calendar</span><select${id.cal} onchange="_hk2CalChange()"><option value="${escapeHTML(r.book_calendar_id || '')}" selected>${escapeHTML(r.book_group || 'Loading calendars…')}</option></select></label>
         <label><span>Slot</span><select${id.slot} onchange="_hk2Edited(true)"><option value="${escapeHTML(guessSlot)}" selected>${escapeHTML(guessSlot ? _hk2SlotLabel(guessSlot) : 'Loading open slots…')}</option></select></label>
       </div>
-      <div class="hk2-lbl">Confirmation text - sends the moment you book it</div>
-      <textarea class="hk2-draft"${id.draft} oninput="_hk2Edited()">${escapeHTML(r.draft_message || '')}</textarea>
-      <div class="hk2-note">Only this academy's trial calendars show here. Book it = the slot is claimed, your confirmation text sends, and the Confirm agent takes over (reminders send from config).</div>`;
+      ${confBlock}`;
   } else if (r._kind === 'ghost') {
     body = `${_hk2ThreadHtml(r)}
       <div class="hk2-note">Nothing sends now - the Ghosted automation takes over with its nudges. A reply bounces them straight back to Booking.</div>
@@ -32810,9 +33036,13 @@ function _hk2CardHtml(r, pos, total, isTop) {
         <textarea class="hk2-draft"${id.draft} oninput="_hk2SyncMoveLabels()" placeholder="Write a message instead of ghosting..."></textarea>
       </div>`;
   } else if (r._kind === 'plan') {
+    // Each row carries its planned send time (stamped at draft on the academy's
+    // cadence) - show the real day so approving reads as locking a schedule.
+    const _fuDay = iso => { if (!iso) return null; const d = new Date(iso); return isNaN(d) ? null : d.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' }); };
     body = `${_hk2ThreadHtml(r)}
       <div class="hk2-lbl">The plan - every message editable · clear a box to drop that step</div>
-      ${(r.rows || []).map((row, i) => `<div class="hk2-lbl" style="margin-top:2px">Day ${i + 1}${i === r.rows.length - 1 ? ' · final, no-pressure' : ''}</div><textarea class="hk2-draft sm"${isTop ? ` id="hk2-plan-${i}"` : ''} oninput="_hk2Edited()">${escapeHTML(row.draft_message || '')}</textarea>`).join('')}`;
+      ${(r.rows || []).map((row, i) => { const when = _fuDay(row.send_after); const last = i === r.rows.length - 1; return `<div class="hk2-lbl" style="margin-top:2px">${when ? `Sends ${when}` : `Message ${i + 1}`} · only if still no reply${last ? ' · final, no-pressure' : ''}</div><textarea class="hk2-draft sm"${isTop ? ` id="hk2-plan-${i}"` : ''} oninput="_hk2Edited()">${escapeHTML(row.draft_message || '')}</textarea>`; }).join('')}
+      <div class="hk2-note">Approve = the schedule locks in and each message sends itself on its day, only while the lead stays quiet. A reply cancels the rest instantly. Change the cadence in the stage config (gear) under Follow-ups.</div>`;
   } else if (r._kind === 'handoff') {
     const note = r.handoff_note ? `<div class="hk2-note"><b style="color:var(--text)">Reason:</b> ${escapeHTML(r.handoff_note)}</div>` : '';
     body = `${_hk2ThreadHtml(r)}${note}
@@ -32959,25 +33189,97 @@ function _hk2PtfClose(outcome) {
   _HK2.ptf.outcome = outcome === 'lost' ? 'lost' : 'unqualified';
   _hk2Confirm();
 }
+// The three agent tabs with their live card counts. Extracted so the live poll
+// (_hk2Poll) can refresh just the counts without re-rendering the deck below
+// (which would wipe an in-progress edit on the open card).
+function _hk2TabsHtml() {
+  return _HK2_AGENTS.map(a => {
+    const n = (_HK2.q && _HK2.q[a] ? _HK2.q[a].length : 0), on = _HK2.agent === a;
+    return `<button class="hk2-tab${on ? ' on' : ''}" onclick="_hk2Pick('${a}')"><span class="hk2-tmain">${_HK2_META[a].label}${n ? `<span class="hk2-n">${n}</span>` : ''}</span><span class="hk2-tgear" onclick="event.stopPropagation();_hk2Gear('${a}')" title="Configure this stage">${_plIcon('gear', 14)}</span></button>`;
+  }).join('');
+}
+// ── Live deck refresh ──────────────────────────────────────────────────────
+// The deck only loaded on open, so a freshly-carded action (the 15-min cron)
+// never appeared until the owner exited and reopened (Zoran). Poll the same
+// three queues while the deck is open and MERGE any genuinely-new cards onto the
+// back of their agent's queue. Non-destructive by design: the card on top (and
+// any edit the owner is mid-typing) is never re-rendered - only the tab counts
+// update, unless the active tab was empty (nothing to disturb). A per-open
+// `seen` set means a just-resolved card that list-ready still returns during its
+// 6s commit is never resurrected.
+let _HK2_POLL = null;
+function _hk2IsOpen() {
+  if (typeof _SF_OPEN !== 'undefined' && _SF_OPEN === 'hawkeye') return true;
+  return typeof _PL_SV !== 'undefined' && _PL_SV === 'hawkeye';
+}
+function _hk2StartPoll() {
+  if (_HK2_POLL) clearInterval(_HK2_POLL);
+  _HK2_POLL = setInterval(_hk2Poll, 30000);
+  if (!window._hk2PollBound) {
+    window._hk2PollBound = true;
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) _hk2Poll(); });
+    window.addEventListener('focus', () => _hk2Poll());
+  }
+}
+function _hk2StopPoll() { if (_HK2_POLL) { clearInterval(_HK2_POLL); _HK2_POLL = null; } }
+function _hk2CardKey(r) { return String(r && r.id != null ? r.id : (r && r._kind === 'plan' ? 'plan:' + r.ghl_contact_id : (r && r.ghl_contact_id) || '')); }
+async function _hk2Poll() {
+  if (!_hk2IsOpen()) { _hk2StopPoll(); return; }
+  if (typeof _HAWK_PENDING !== 'undefined' && _HAWK_PENDING) return;   // don't disturb an active undo
+  if (!_HK2.q) return;
+  let fresh;
+  try { fresh = await _hk2Load(); } catch (_) { return; }
+  // Re-check after the await: the owner may have closed the deck, armed an undo,
+  // or a full refresh may have swapped the queue out from under us.
+  if (!_hk2IsOpen() || !_HK2.q) return;
+  if (typeof _HAWK_PENDING !== 'undefined' && _HAWK_PENDING) return;
+  _HK2.seen = _HK2.seen || new Set();
+  const activeWasEmpty = !((_HK2.q[_HK2.agent] || []).length);
+  let added = 0;
+  for (const a of _HK2_AGENTS) {
+    const have = new Set((_HK2.q[a] || []).map(_hk2CardKey));
+    for (const r of (fresh[a] || [])) {
+      const k = _hk2CardKey(r);
+      if (have.has(k) || _HK2.seen.has(k)) continue;   // already shown, or a resolved card list-ready still echoes
+      (_HK2.q[a] = _HK2.q[a] || []).push(r);
+      _HK2.seen.add(k);
+      added++;
+    }
+  }
+  if (fresh.quiet !== undefined) _HK2.q.quiet = fresh.quiet || null;
+  if (!added) return;
+  // Surface a new card only when the active tab had nothing (no edit to lose).
+  // Otherwise refresh just the tab counts - the new card waits its turn.
+  if (activeWasEmpty && (_HK2.q[_HK2.agent] || []).length && !_HK2.edited && !_HK2.touched) {
+    _hk2Render();
+  } else {
+    const bar = document.querySelector('#pl-hawkeye .hk2-tabs');
+    if (bar) bar.innerHTML = _hk2TabsHtml();
+  }
+}
 function _hk2Render(opts) {
   const host = document.getElementById('pl-hawkeye'); if (!host || !_HK2.q) return;
   _HK2.edited = false; _HK2.touched = false; _HK2.otherOpen = false;
   const _t0 = (_HK2.q[_HK2.agent] || [])[0]; if (_t0) { _t0._writeMode = false; _t0._moveArm = null; }
   if (!(opts && opts.keepPtf)) _HK2.ptf = { showed: null, fit: null, link: true, msg: '', notes: '', outcome: null };
-  const tabs = _HK2_AGENTS.map(a => {
-    const n = _HK2.q[a].length, on = _HK2.agent === a;
-    return `<button class="hk2-tab${on ? ' on' : ''}" onclick="_hk2Pick('${a}')"><span class="hk2-tmain">${_HK2_META[a].label}${n ? `<span class="hk2-n">${n}</span>` : ''}</span><span class="hk2-tgear" onclick="event.stopPropagation();_hk2Gear('${a}')" title="Configure this stage">${_plIcon('gear', 14)}</span></button>`;
-  }).join('');
+  const tabs = _hk2TabsHtml();
   const q = _HK2.q[_HK2.agent];
   const deck = !q.length
     ? `<div class="hk2-clear"><div class="big">&#10003;</div><b>All clear</b><span>No actions waiting in this stage</span></div>`
     : `${q[1] ? `<div class="hk2-card hk2-behind">${_hk2CardHtml(q[1], 2, q.length, false)}</div>` : ''}
        <div class="hk2-card hk2-top" id="hk2-topcard">${_hk2CardHtml(q[0], 1, q.length, true)}</div>`;
+  const quietBar = _HK2.q.quiet ? `<div class="hk2-quietbar"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>After hours - approved messages will send ${escapeHTML(_hk2QuietWhen(_HK2.q.quiet.until))}</div>` : '';
+  // In the overlay path (command center on) the outer modal has its own Back. In
+  // the inline path (cc opted out) the deck fills the pipelines view with NO way
+  // back - add an in-deck Back so the user isn't trapped (Zoran 2026-07-10).
+  const inlineBack = (typeof _sfUseOverlay === 'function' && _sfUseOverlay()) ? '' : `<button class="hk2-back" onclick="_hk2Back()" title="Back to Sales"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg> Sales</button>`;
   host.innerHTML = `
     <div class="hk2-topbar">
+      ${inlineBack}
       <div class="hk2-title">${_plIcon('eye', 17)} Hawkeye</div>
       <div class="hk2-tabs">${tabs}</div>
     </div>
+    ${quietBar}
     <div class="hk2-deck">${deck}</div>
     <div class="hk2-hint">every card resolves here - approve it or move the lead (no skip)<br>edits flip the button to "Confirm edits" and the teach-why note becomes required</div>`;
   const top = _hk2Top();
@@ -33133,8 +33435,10 @@ function _hk2Confirm() {
   let ptf = null;
   if (k === 'form') {
     const p = _HK2.ptf || {};
-    if (p.showed !== true && p.showed !== false) { _apxToast('Pick Showed up or No show first', false); return; }
-    if (p.showed === true && p.fit !== true && p.fit !== false) { _apxToast('Pick Good fit or Not a fit', false); return; }
+    // Reset the re-entry latch on every early-return or the card wedges: all later
+    // taps hit `if (r._hk2Busy) return` and do nothing (Zoran 2026-07-10).
+    if (p.showed !== true && p.showed !== false) { _apxToast('Pick Showed up or No show first', false); r._hk2Busy = false; return; }
+    if (p.showed === true && p.fit !== true && p.fit !== false) { _apxToast('Pick Good fit or Not a fit', false); r._hk2Busy = false; return; }
     const msgEl = document.getElementById('hk2-ptf-msg'), notesEl = document.getElementById('hk2-ptf-notes'), linkEl = document.getElementById('hk2-ptf-link');
     const notFit = p.showed === true && p.fit === false;
     ptf = {
@@ -33179,27 +33483,36 @@ function _hk2Confirm() {
       // 🔥 Park it: ack (if any) sends now, the message fires as a new card on
       // the date. Works from an agent-proposed reignite card OR any card flipped
       // via "Reignite later" (contact_id covers the synthesized ones).
-      chk(await _apxPost(ep, 'confirm-reignite', {
+      const reigResp = chk(await _apxPost(ep, 'confirm-reignite', {
         ready_id: reigReadyId || undefined, contact_id: r.ghl_contact_id, contact_name: r.contact_name || null,
         reignite_at: reigDate, message: reigMsg, reply, reason: r.reasoning || null,
       }));
       const nice = (() => { try { return new Date(reigDate + 'T12:00:00').toLocaleDateString([], { month: 'short', day: 'numeric' }); } catch (_) { return reigDate; } })();
-      _apxToast(reply ? `Ack sent + reignite set for ${nice}` : `Reignite set for ${nice}`, true);
-      try { if (_PL_REIGN && r.ghl_contact_id) _PL_REIGN.set(String(r.ghl_contact_id), { id: 'fresh', ghl_contact_id: String(r.ghl_contact_id), reignite_at: reigDate + 'T14:00:00Z', agent }); } catch (_) {}
+      // Honest toast: the park is set, but if the ack was requested and did NOT
+      // send, say so - don't claim "Ack sent" off the box being non-empty.
+      if (reply && reigResp && reigResp.ack_sent === false) _apxToast(`Reignite set for ${nice}, but the ack did NOT send`, false);
+      else _apxToast(reply ? `Ack sent + reignite set for ${nice}` : `Reignite set for ${nice}`, true);
+      // Stamp the REAL reignition id (not the 'fresh' placeholder) so the contact
+      // drawer's Cancel works immediately after parking - 'fresh' 400'd (Zoran 2026-07-10).
+      try { if (_PL_REIGN && r.ghl_contact_id) _PL_REIGN.set(String(r.ghl_contact_id), { id: (reigResp && reigResp.reignition_id) || 'fresh', ghl_contact_id: String(r.ghl_contact_id), reignite_at: reigDate + 'T14:00:00Z', agent }); } catch (_) {}
     } else if (k === 'form') {
       const token = await _mreqAuthToken();
       const res = await fetch('/api/ghl/post-trial?client_id=' + encodeURIComponent(CLIENT_ID), { method: 'POST', headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' }, body: JSON.stringify(ptf) });
       const j = await _safeJson(res); if (!res.ok) throw new Error((j && j.error) || ('HTTP ' + res.status));
-      // A good-fit whose stage move failed server-side (move_ok === false): warn,
-      // don't claim success - the review saved but the lead didn't reach Done Trial.
+      // A terminal write that failed server-side (move_ok / lost_ok / unqualified_ok
+      // === false): warn, don't claim success - the review saved (form card gone)
+      // but the lead never actually moved/closed, so it must be retried.
+      const notFit = ptf.showed_up === true && ptf.good_fit === false;
       if (ptf.good_fit && j && j.move_ok === false) throw new Error('Saved, but the move to Done Trial did not land - reopen the card and retry.');
+      if (notFit && ptf.outcome === 'lost' && j && j.lost_ok === false) throw new Error('Saved, but the Lost close did not land - reopen the card and retry.');
+      if (notFit && ptf.outcome !== 'lost' && j && j.unqualified_ok === false) throw new Error("Saved, but the Unqualified close did not land (no post-trial not-a-fit route set up) - use Mark lost, or set up the route.");
       _apxToast(ptf.showed_up === false ? 'No-show logged - Booking drafts the rebook' : ptf.good_fit ? 'Routed to Done Trial - Closing takes over' : ptf.outcome === 'lost' ? 'Marked lost - Nurture takes over' : 'Closed as unqualified', true);
     } else if (k === 'plan') {
       const edits = planEdits;
       const token = await _mreqAuthToken();
       const res = await fetch('/api/agent-closing', { method: 'POST', headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'approve-plan', client_id: CLIENT_ID, contact_id: r.ghl_contact_id, edits }) });
       const j = await _safeJson(res); if (!res.ok) throw new Error(j.error || ('HTTP ' + res.status));
-      _apxToast(`Plan scheduled - ${j.scheduled} message(s), 1 day apart`, true);
+      _apxToast(`Follow-up schedule locked in - ${j.scheduled} message(s)`, true);
     } else {
       // reply
       let resp;
@@ -33249,10 +33562,22 @@ function _hk2Move(op, btn) {
   // button label said so); an empty box keeps the move silent.
   const teachEl = document.getElementById('hk2-teach');
   const lesson = (op === 'lost' || op === 'unq') && teachEl ? teachEl.value.trim() : '';
-  const reply = (op === 'lost' || op === 'unq') ? (((document.getElementById('hk2-draft') || {}).value) || '').trim() : '';
+  // Only capture the box as a goodbye on kinds whose move LABEL discloses the send
+  // (the same allow-list _hk2Moves uses for hasMsg). A book/reignite/reignite_due
+  // card has a PREFILLED box but silent-labeled moves - capturing it would text the
+  // parent a confirmation/re-engagement they never approved (Zoran 2026-07-10).
+  const canSendOnMove = ['reply', 'enroll', 'lost', 'handoff'].includes(r._kind);
+  const reply = ((op === 'lost' || op === 'unq') && canSendOnMove) ? (((document.getElementById('hk2-draft') || {}).value) || '').trim() : '';
   const chk = resp => { if (resp && resp.error) throw new Error(resp.error); return resp; };
   const label = op === 'ghost' ? 'Sent to Ghosted' : op === 'handoff' ? 'Handed to Booking'
     : op === 'lost' ? (reply ? 'Sent + Nurture' : 'Marked lost') : (reply ? 'Sent + Unqualified' : 'Unqualified');
+  // Honest toast: the close is the primary action and it succeeded, but if a
+  // goodbye was requested and the backend reports it did NOT send, say so - never
+  // claim "Message sent" off the request payload alone (Zoran's #1 complaint class).
+  const goodbyeToast = (resp, okMsg) => {
+    if (reply && resp && resp.goodbye_requested && resp.goodbye_sent === false) _apxToast('Done, but the message did NOT send - text them another way', false);
+    else _apxToast(okMsg, true);
+  };
   let undone = false;
   _hawkDefer({ cardId: 'hk2-topcard', label, restore: () => { undone = true; r._hk2Busy = false; _hk2Unresolve(agent, r); }, run: async () => {
     if (op === 'ghost') {
@@ -33263,11 +33588,11 @@ function _hk2Move(op, btn) {
       chk(await _apxPost(ep, 'confirm-handoff', { ready_id: readyId, reply: '', handoff_note: r.handoff_note || 'Needs a new time - rebook.' }));
       _apxToast('Handed back to Booking', true);
     } else if (op === 'lost') {
-      chk(await _apxPost(ep, 'confirm-lost', { ready_id: readyId, reply, lost_reason: r.lost_reason || 'Other' }));
-      _apxToast(reply ? 'Message sent + moved to Nurture' : (lesson ? 'Marked lost + taught' : 'Marked lost - Nurture takes over'), true);
+      const resp = chk(await _apxPost(ep, 'confirm-lost', { ready_id: readyId, reply, lost_reason: r.lost_reason || 'Other' }));
+      goodbyeToast(resp, reply ? 'Message sent + moved to Nurture' : (lesson ? 'Marked lost + taught' : 'Marked lost - Nurture takes over'));
     } else {
-      chk(await _apxPost(ep, 'confirm-abandoned', { ready_id: readyId, reply }));
-      _apxToast(reply ? 'Message sent + marked unqualified' : (lesson ? 'Marked unqualified + taught' : 'Marked unqualified'), true);
+      const resp = chk(await _apxPost(ep, 'confirm-abandoned', { ready_id: readyId, reply }));
+      goodbyeToast(resp, reply ? 'Message sent + marked unqualified' : (lesson ? 'Marked unqualified + taught' : 'Marked unqualified'));
     }
     if (lesson) await _hk2Teach(r, lesson, r.draft_message || null, reply || (op === 'lost' ? '(marked lost)' : '(marked unqualified)'), agent);
   } });
@@ -33741,6 +34066,12 @@ function _ccStuckCards() {
   // home load (and permanently for viewers whose agent reads 403).
   if (typeof _PL_NEEDS === 'undefined' || !_PL_NEEDS) return [];
   if (typeof _PL_ENR === 'undefined' || !_PL_ENR) return [];
+  // Same rule for the member roster: a contact who already converted (active
+  // subscription) but whose GHL opp was never moved to a Member/Won stage would
+  // otherwise show up as "not flowing". Until the roster loads we can't tell
+  // them apart from a real stuck lead, so surface nothing rather than a false
+  // positive (this is what flagged paid member Bashir Popal - Zoran 2026-07-11).
+  if (typeof _PL_MEMBERS_LOADED === 'undefined' || !_PL_MEMBERS_LOADED) return [];
   const now = Date.now(), IDLE = _CC_STUCK_IDLE_DAYS * 86400000, out = [];
   for (const s of stages) {
     const bot = (typeof _plStageBot === 'function') ? _plStageBot(s.name) : null;
@@ -33752,10 +34083,19 @@ function _ccStuckCards() {
       if (typeof _PL_HELD !== 'undefined' && _PL_HELD && _PL_HELD.has(cid)) continue;      // parked send awaits the 8am flush
       if (typeof _PL_REIGN !== 'undefined' && _PL_REIGN && _PL_REIGN.get(cid)) continue;   // parked for reignition - silence is the plan
       if (typeof _PL_ENR !== 'undefined' && _PL_ENR && _PL_ENR.get(cid)) continue;         // in a running automation
+      // Already converted: an active paying member (any live/paused/dunning/
+      // cancelling status = still subscribed) isn't a stuck lead - their opp
+      // just wasn't moved to a Member/Won stage. Skip anything but a fully
+      // cancelled member so paid members don't trip the alert (Zoran 2026-07-11).
+      const _mem = (typeof _ibMemberOf === 'function') ? _ibMemberOf({ contactId: cid, phone: o.contact && o.contact.phone, email: o.contact && o.contact.email }) : null;
+      if (_mem && !/^(cancel(l?ed)?|churned|former|lost|inactive)$/i.test(String(_mem.status || ''))) continue;
       // Booked trial still ahead = FLOWING: the confirm sequence's same-day
       // check-in is queued for 9am on trial day, so quiet days in between are
-      // by design, not a stall (Zoran 2026-07-10).
-      if (o.trialDate && new Date(o.trialDate).getTime() > now) continue;
+      // by design, not a stall (Zoran 2026-07-10). Use _plTrialInfo so a DATE-ONLY
+      // trialDate ("2026-06-13") stays exempt through end of trial day - a raw
+      // new Date() parses it as UTC midnight and expired the exemption the evening
+      // before (Toronto), re-flagging the lead all evening + trial-day morning.
+      if (o.trialDate) { const _tr = _plTrialInfo(o.trialDate); if (_tr && !_tr.passed) continue; }
       const lm = (typeof _PL_LASTMSG !== 'undefined' && _PL_LASTMSG) ? _PL_LASTMSG.get(cid) : null;
       const last = lm && lm.date ? new Date(lm.date).getTime()
                  : (o.updatedAt ? new Date(o.updatedAt).getTime()
@@ -33877,6 +34217,8 @@ function _plRenderFocus(stage, stages, idx) {
   let engineBody;
   if (kind === 'agent') {
     const tabs = [['test', 'Test'], ['lessons', 'Lessons'], ['knowledge', 'Knowledge'], ['mode', 'Autonomy']];
+    // The closing agent's quiet-lead cadence is configurable (Zoran 2026-07-10).
+    if (bot.key === 'closing') tabs.splice(2, 0, ['followups', 'Follow-ups']);
     engineBody = `<div class="plf-tabs">${tabs.map(([k, l]) => `<button class="plf-tab${_TA.tab === k ? ' on' : ''}" data-tab="${k}" onclick="_plFocusTab('${k}')">${l}</button>`).join('')}</div><div id="ta-panel"></div>`;
   } else if (kind === 'automation') {
     engineBody = `<div id="ta-panel"></div>`;
@@ -33894,7 +34236,8 @@ function _plRenderFocus(stage, stages, idx) {
     ${exitSec}`;
   if (kind === 'agent' || kind === 'automation') {
     _TA.target = bot.key;
-    if (kind === 'agent' && !['test', 'lessons', 'knowledge', 'mode'].includes(_TA.tab)) _TA.tab = 'test';
+    const okTabs = bot.key === 'closing' ? ['test', 'lessons', 'followups', 'knowledge', 'mode'] : ['test', 'lessons', 'knowledge', 'mode'];
+    if (kind === 'agent' && !okTabs.includes(_TA.tab)) _TA.tab = 'test';
     try { _taRenderPanel(); } catch (e) { const pp = document.getElementById('ta-panel'); if (pp) pp.innerHTML = '<div style="color:var(--red);font-size:13px">Could not load - ' + escapeHTML(e.message || String(e)) + '</div>'; }
   }
 }
@@ -34717,12 +35060,14 @@ function _plRenderThread(messages) {
   host.innerHTML = sorted.length
     ? sorted.map(m => {
         const out = (m.direction || '').toLowerCase() === 'outbound';
+        const sched = m.status === 'scheduled';
         const atts = _ibRenderAttachments(m.attachments);
         const hasBody = (m.body || '').trim().length > 0;
         const sender = out ? 'You' : escapeHTML(contactFirst);
         const channel = escapeHTML(_ghlChannelLabel(m.type));
         const when = escapeHTML(_ibFormatDate(m.date));
-        return `<div class="ib-msg ${out ? 'ib-msg-out' : 'ib-msg-in'}">${hasBody ? escapeHTML(m.body.trim()) : (atts ? '' : '(no body)')}${atts}<div class="ib-msg-meta">${sender} · ${channel}${when ? ' · ' + when : ''}</div></div>`;
+        const meta = sched ? `${sender} · ${escapeHTML(_ibSchedLabel(m))}` : `${sender} · ${channel}${when ? ' · ' + when : ''}`;
+        return `<div class="ib-msg ${out ? 'ib-msg-out' : 'ib-msg-in'}"${sched ? ' style="opacity:.65"' : ''}>${hasBody ? escapeHTML(m.body.trim()) : (atts ? '' : '(no body)')}${atts}<div class="ib-msg-meta">${meta}</div></div>`;
       }).join('')
     : `<div style="color:var(--text-mute);font-size:13px">No messages yet - send the first one below.</div>`;
   // Scroll the whole thread (messages + the inline agent suggestion at the bottom).
@@ -35315,7 +35660,7 @@ function _aclxRender() {
   if (!body) return;
   if (!_ACLX_DATA.length) { body.innerHTML = '<div style="max-width:860px;margin:0 auto">' + _apxEmpty('All clear - no closings waiting.') + '</div>'; return; }
   // Follow-up PLAN grouping: a contact with 2+ pending followup_N rows renders
-  // as ONE plan card (all messages editable, approved together, sent 1 day apart).
+  // as ONE plan card (all messages editable, approved together, sent on the cadence).
   const _isPlanRow = r => (r.step_key || '').startsWith('followup_') && r.status === 'pending';
   const _planCount = new Map();
   for (const r of _ACLX_DATA) if (_isPlanRow(r)) _planCount.set(r.ghl_contact_id, (_planCount.get(r.ghl_contact_id) || 0) + 1);
@@ -35326,6 +35671,9 @@ function _aclxRender() {
       _planRendered.add(r.ghl_contact_id);
       return _aclxPlanCard(_ACLX_DATA.filter(x => _isPlanRow(x) && x.ghl_contact_id === r.ghl_contact_id));
     }
+    // Already approved and sitting on its cadence - render a "scheduled" card that
+    // shows when it sends and lets staff fire it early (Send now) or drop it.
+    if (r.status === 'approved' && r.kind !== 'closing_enroll' && r.kind !== 'closing_lost') return _aclxScheduledCard(r);
     return r.kind === 'closing_enroll' ? _aclxEnrollCard(r) : r.kind === 'closing_lost' ? _aclxLostCard(r) : _aclxReplyCard(r);
   }).join('');
   body.innerHTML = '<div style="max-width:860px;margin:0 auto">' + cards + '</div>';
@@ -35333,15 +35681,17 @@ function _aclxRender() {
   _ACLX_DATA.forEach(r => { if (!_notesDone.has(r.ghl_contact_id)) { _notesDone.add(r.ghl_contact_id); _aclxLoadNotes(r); } });   // lazy-fill team notes (one per lead)
 }
 
-// One card for the whole follow-up plan: every message editable, one ✓ schedules
-// them 1 day apart (the agent cancels the rest the moment the lead replies).
+// One card for the whole follow-up plan: every message editable, one ✓ locks the
+// schedule in (each row carries its planned send day; the agent cancels the rest
+// the moment the lead replies).
 function _aclxPlanCard(rows) {
   const first = rows[0];
+  const _fuDay = iso => { if (!iso) return null; const d = new Date(iso); return isNaN(d) ? null : d.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' }); };
   const boxes = rows.map((r, i) => `
-    <div style="font-size:10px;color:var(--text-mute);text-transform:uppercase;letter-spacing:.09em;margin:${i ? '10px' : '2px'} 0 4px">Day ${i + 1}${i === rows.length - 1 ? ' · final, no-pressure' : ''} · clear the box to drop this step</div>
+    <div style="font-size:10px;color:var(--text-mute);text-transform:uppercase;letter-spacing:.09em;margin:${i ? '10px' : '2px'} 0 4px">${_fuDay(r.send_after) ? 'sends ' + _fuDay(r.send_after) : 'message ' + (i + 1)}${i === rows.length - 1 ? ' · final, no-pressure' : ''} · clear the box to drop this step</div>
     ${_aclxBox(r)}`).join('');
   return `<div id="aclx-plan-${escapeHTML(first.ghl_contact_id)}" style="background:var(--surface);border:1px solid var(--accent-border,rgba(212,182,92,.3));border-radius:11px;padding:12px 14px;margin-bottom:9px">
-    ${_aclxHeader(first, `follow-up plan · ${rows.length} messages, 1 day apart`, 'var(--accent)')}
+    ${_aclxHeader(first, `follow-up plan · ${rows.length} messages`, 'var(--accent)')}
     ${first.reasoning ? `<div style="font-size:11.5px;color:var(--text-sub);margin-bottom:6px">${escapeHTML(first.reasoning)}</div>` : ''}
     ${_aclxContext(first)}
     ${boxes}
@@ -35349,7 +35699,7 @@ function _aclxPlanCard(rows) {
     <div style="display:flex;align-items:stretch;gap:8px;margin-top:10px">
       <button onclick="_aclxSkipPlan('${escapeHTML(first.ghl_contact_id)}')" title="Skip the whole plan" style="flex:1;background:transparent;border:1px solid var(--border);color:var(--red);border-radius:8px;padding:9px;font-size:17px;cursor:pointer">✕</button>
       <button onclick="_aclxUnqualifiedPlan('${escapeHTML(first.ghl_contact_id)}')" title="Remove from the pipeline as unqualified - no message, no nurture" style="background:transparent;border:1px solid var(--text-mute);color:var(--text-sub);border-radius:8px;padding:9px 11px;font-size:12px;cursor:pointer">Unqualified</button>
-      <button onclick="_aclxApprovePlan('${escapeHTML(first.ghl_contact_id)}')" style="flex:2;background:var(--accent);border:1px solid var(--accent);color:#08080A;border-radius:8px;padding:9px;font-size:14px;font-weight:700;cursor:pointer">✓ Approve plan - sends 1 day apart</button>
+      <button onclick="_aclxApprovePlan('${escapeHTML(first.ghl_contact_id)}')" style="flex:2;background:var(--accent);border:1px solid var(--accent);color:#08080A;border-radius:8px;padding:9px;font-size:14px;font-weight:700;cursor:pointer">✓ Approve follow-up schedule</button>
     </div>
   </div>`;
 }
@@ -35364,7 +35714,7 @@ async function _aclxApprovePlan(contactId) {
     if (!res.ok) throw new Error(j.error || ('HTTP ' + res.status));
     _ACLX_DATA = _ACLX_DATA.filter(x => !rows.some(r => r.id === x.id));
     document.getElementById('aclx-plan-' + contactId)?.remove();
-    _apxToast(`Plan scheduled - ${j.scheduled} message(s), 1 day apart`, true);
+    _apxToast(`Follow-up schedule locked in - ${j.scheduled} message(s)`, true);
     if (!_ACLX_DATA.length) _aclxRender();
   } catch (e) { alert('Could not schedule the plan: ' + (e.message || e)); }
 }
@@ -35441,9 +35791,9 @@ function _aclxBox(r, ph) {
 function _aclxReplyCard(r) {
   const esc = r.escalate ? `<div style="font-size:11.5px;color:#e0a020;margin-bottom:6px">agent escalated${r.escalate_reason ? ': ' + escapeHTML(r.escalate_reason) : ''}</div>` : '';
   // Proactive follow-up loop cards carry step_key 'followup_N' - badge shows
-  // where the lead is in the 3-strike cadence.
+  // where the lead is in the cadence.
   const _fu = /^followup_(\d+)$/.exec(r.step_key || '');
-  const _pill = r.kind === 'closing_auto' ? 'automated reminder' : _fu ? `follow-up ${_fu[1]} of 3` : 'follow-up';
+  const _pill = r.kind === 'closing_auto' ? 'automated reminder' : _fu ? `follow-up ${_fu[1]}` : 'follow-up';
   return `<div id="aclx-${r.id}" style="background:var(--surface);border:1px solid var(--accent-border,rgba(212,182,92,.3));border-radius:11px;padding:12px 14px;margin-bottom:9px">
     ${_aclxHeader(r, _pill, 'var(--accent)')}${esc}${_aclxContext(r)}
     <div style="text-align:center;font-size:9.5px;color:var(--text-mute);text-transform:uppercase;letter-spacing:.09em;margin:2px 0 5px">proposed message · edit it right here</div>
@@ -35453,6 +35803,26 @@ function _aclxReplyCard(r) {
       <button onclick="_aclxSkip('${r.id}')" title="Skip" style="flex:1;background:transparent;border:1px solid var(--border);color:var(--red);border-radius:8px;padding:9px;font-size:17px;cursor:pointer">✕</button>
       <button onclick="_aclxUnqualified('${r.id}')" title="Remove from the pipeline as unqualified - no message, no nurture" style="background:transparent;border:1px solid var(--text-mute);color:var(--text-sub);border-radius:8px;padding:9px 11px;font-size:12px;cursor:pointer">Unqualified</button>
       <button onclick="_aclxSend('${r.id}')" style="flex:2;background:var(--accent);border:1px solid var(--accent);color:#08080A;border-radius:8px;padding:9px;font-size:14px;font-weight:700;cursor:pointer">✓ Approve &amp; send</button>
+    </div>
+  </div>`;
+}
+// An already-approved follow-up waiting on its cadence (status 'approved',
+// send_after in the future). The detector's flush delivers it when due - this card
+// just shows when that is and lets staff fire it early or drop it. The box stays
+// editable; Send now uses whatever's in it.
+function _aclxScheduledCard(r) {
+  const _fu = /^followup_(\d+)$/.exec(r.step_key || '');
+  const pill = r.kind === 'closing_auto' ? 'automated reminder' : _fu ? `follow-up ${_fu[1]}` : 'follow-up';
+  const future = r.send_after && new Date(r.send_after).getTime() > Date.now();
+  const when = r.send_after ? (future ? 'sends ' + _apxWhen(r.send_after) : 'due now') : 'scheduled';
+  return `<div id="aclx-${r.id}" style="background:var(--surface);border:1px solid var(--border);border-radius:11px;padding:12px 14px;margin-bottom:9px">
+    ${_aclxHeader(r, pill, 'var(--accent)')}${_aclxContext(r)}
+    <div style="text-align:center;font-size:9.5px;color:var(--text-mute);text-transform:uppercase;letter-spacing:.09em;margin:2px 0 5px">⏰ scheduled · ${escapeHTML(when)} · edit below, then send whenever</div>
+    ${_aclxBox(r)}
+    ${_aclxNotesBlock(r)}
+    <div style="display:flex;align-items:stretch;gap:8px;margin-top:10px">
+      <button onclick="_aclxSkip('${r.id}')" title="Skip this scheduled message" style="flex:1;background:transparent;border:1px solid var(--border);color:var(--red);border-radius:8px;padding:9px;font-size:17px;cursor:pointer">✕</button>
+      <button onclick="_aclxSendNow('${r.id}')" title="Send now instead of waiting for the scheduled time" style="flex:2;background:var(--accent);border:1px solid var(--accent);color:#08080A;border-radius:8px;padding:9px;font-size:14px;font-weight:700;cursor:pointer">Send now</button>
     </div>
   </div>`;
 }
@@ -35502,6 +35872,19 @@ function _aclxSend(id) {
   if (!reply) { _apxToast('Message is empty', false); return; }
   _hawkDefer({ cardId: 'aclx-' + id, label: 'Sent', restore: _aclxRender, run: async () => {
     const resp = await _apxPost('/api/agent-closing', 'send', { ready_id: id, contact_id: r.ghl_contact_id, conversation_id: r.ghl_conversation_id, reply, contact_name: r.contact_name, confidence: r.confidence, reasoning: r.reasoning });
+    _aclxRemove(id); _apxToast(resp && resp.deferred ? _apxQuietMsg(resp.send_after) : '✓ Sent', true);
+  } });
+}
+// Fire an already-scheduled follow-up right now (its send_after is in the future).
+// Sends whatever is in the box; the backend still defers to morning in quiet hours.
+function _aclxSendNow(id) {
+  if (!_sendGuard('aclxSendNow-' + id)) return;
+  const r = _ACLX_DATA.find(x => x.id === id); if (!r) return;
+  const ta = document.getElementById('aclx-edit-' + id);
+  const reply = (ta ? ta.value : (r.draft_message || '')).trim();
+  if (!reply) { _apxToast('Message is empty', false); return; }
+  _hawkDefer({ cardId: 'aclx-' + id, label: 'Sent now', restore: _aclxRender, run: async () => {
+    const resp = await _apxPost('/api/agent-closing', 'send-now', { id, reply });
     _aclxRemove(id); _apxToast(resp && resp.deferred ? _apxQuietMsg(resp.send_after) : '✓ Sent', true);
   } });
 }
@@ -36252,6 +36635,13 @@ function _hawkUndo() {
   try { e.restore(); } catch (_) {}
   _apxToast('↩ Undone', true);
 }
+// The 6s undo timer FREEZES when the app backgrounds (phone lock, app switch),
+// and iOS can kill the page before it resumes - the approved action would
+// silently evaporate while the deck already showed it done. Commit any pending
+// action the moment the page hides: forfeits the rest of the undo window,
+// guarantees the send.
+document.addEventListener('visibilitychange', () => { if (document.hidden) _hawkFlush(); });
+window.addEventListener('pagehide', () => { _hawkFlush(); });
 function _hawkUndoPill() {
   let pill = document.getElementById('hawk-undo-pill');
   if (!_HAWK_PENDING) { if (pill) pill.remove(); return; }
@@ -50115,6 +50505,7 @@ async function _ccSalesLoad() {
           if (!_PL_NEEDS) { try { _plLoadNeedsAction().then(() => _cc2Render()); } catch (_) {} }
           if (!_PL_ENR) { try { _plLoadActiveAutomations().then(() => _cc2Render()); } catch (_) {} }
           if (!_PL_LASTMSG) { try { _plLoadLastMessages().then(() => _cc2Render()); } catch (_) {} }   // idle age for the not-flowing check
+          if (!_PL_MEMBERS_LOADED) { try { _ibEnsureMembers().then(() => _cc2Render()); } catch (_) {} }  // so converted paying members are skipped by the not-flowing check
         } else {
           strip.innerHTML = `<div class="plo-strip" style="width:100%">${_ploStripCells(cardStages, _CC_PIPE_NAV)}</div>`;
         }
@@ -50232,8 +50623,10 @@ function _ccCRRow(x, kind) {
   const sub = [_ccCRDay(x.trial_date), x.trainer].filter(Boolean).join(' · ');
   const plan = kind === 'won' && x.plan ? `<div class="cccr-plan">${escapeHTML(x.plan)}</div>` : '';
   const name = _ccCapName(String(x.name || 'Athlete').split(' ').filter(Boolean).slice(0, 2).join(' '));
-  const cid = escapeHTML(String(x.contact_id || ''));
-  const onclick = x.contact_id ? `onclick="event.stopPropagation();_hk2OpenContact('${cid}','${escapeHTML(name)}')"` : '';
+  // Pass the (lead-typed) name via dataset, NOT interpolated into the JS string -
+  // an apostrophe broke the tap and a crafted name was click-triggered XSS. Same
+  // safe pattern as the deck name-link (line ~32673).
+  const onclick = x.contact_id ? `onclick="event.stopPropagation();_hk2OpenContact(this.dataset.cid,this.dataset.nm)" data-cid="${escapeHTML(String(x.contact_id))}" data-nm="${escapeHTML(name)}"` : '';
   return `<div class="cccr-row" ${onclick}>
     <div class="cccr-av ${kind}">${escapeHTML(_ccCRInitials(name))}</div>
     <div class="cccr-rn"><div class="n">${escapeHTML(name)}</div><div class="s">${escapeHTML(sub)}</div>${plan}</div>
@@ -50255,10 +50648,13 @@ function _ccCRRender(j, picked) {
     const ar = d > 0 ? '▲' : d < 0 ? '▼' : '=';
     trend = `<div class="cccr-trend ${cls}">${ar} ${Math.abs(d)} pts vs prior period</div>`;
   }
-  // Date inputs: default to the response's own range (to is exclusive, so the
-  // displayed end is one day back).
+  // Date inputs: default to the response's own range. On the DEFAULT load the
+  // server's `to` is "now" (data INCLUDES today), so the To input must show TODAY -
+  // subtracting a day showed yesterday, and tapping Apply then dropped today's
+  // trials out of the window (Zoran 2026-07-10). After an explicit Apply we use the
+  // user's picked dates verbatim.
   const fromY = picked ? picked.from : _ccCRymd(Date.parse(j.range && j.range.from) || (Date.now() - 45 * 86400000));
-  const toY = picked ? picked.to : _ccCRymd((Date.parse(j.range && j.range.to) || Date.now()) - 86400000);
+  const toY = picked ? picked.to : _ccCRymd(Date.parse(j.range && j.range.to) || Date.now());
   const numd = (nWon + nLost > 0)
     ? `<div class="a">${nWon} of ${nWon + nLost} closed</div><div class="b">${pend.length} still pending</div>`
     : `<div class="a">No resolved trials</div><div class="b">${pend.length} still pending</div>`;
@@ -50271,8 +50667,7 @@ function _ccCRRender(j, picked) {
   const chips = pend.length
     ? pend.map(x => {
         const name = _ccCapName(String(x.name || 'Athlete').split(' ').filter(Boolean).slice(0, 2).join(' '));
-        const cid = escapeHTML(String(x.contact_id || ''));
-        const oc = x.contact_id ? `onclick="_hk2OpenContact('${cid}','${escapeHTML(name)}')"` : '';
+        const oc = x.contact_id ? `onclick="_hk2OpenContact(this.dataset.cid,this.dataset.nm)" data-cid="${escapeHTML(String(x.contact_id))}" data-nm="${escapeHTML(name)}"` : '';
         return `<div class="cccr-chip" ${oc}><div class="cccr-av pend">${escapeHTML(_ccCRInitials(name))}</div><span class="n">${escapeHTML(name)}</span></div>`;
       }).join('')
     : '<div class="cccr-empty">No pending good-fit trials</div>';

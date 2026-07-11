@@ -302,8 +302,33 @@ scattered autonomy/config entry points. KEEPS: inline drawer suggestion on lead 
   _plLoadNeedsAction (list-reignitions), cascade rows show "reignite Sep 1 ·
   parked until then", contact drawer gets a gold chip + Cancel
   (_cdReigniteChip), stuck list exempts parked leads. NOT prod-verified yet.
+- 🔥 CLOSING FOLLOW-UPS ALWAYS SCHEDULED + CONFIGURABLE (2026-07-11, Zoran: Done-Trial
+  cards had NO follow-up action showing). TWO bugs found: (1) the plan insert 409'd on
+  `agent_closing_replies_one_active_per_contact` - it was unique on (client_id,
+  ghl_contact_id) for active rows, so a multi-row followup_N plan could never insert
+  (migration 20260711030000 widened it to include coalesce(step_key,'') - reply/enroll/
+  lost/reignite all share the '' bucket = still one active card, but plan rows coexist).
+  (2) the follow-up loop had a 24h silence GATE (`silenceDays < 1 -> "waiting on the
+  lead"`), so a quiet lead sat card-less for a day. FIX: the plan now cards the MOMENT
+  we're waiting (our msg last + no active card) - a Done-Trial lead ALWAYS has its next
+  follow-up either scheduled or awaiting ✓. CADENCE is per-academy configurable at
+  clients.ghl_kpi_config.closing_followups = { gaps:[1,2], lost_after:2 } (gaps[i] =
+  days between follow-up i and the prior msg; default = next day "did you see my msg",
+  then +2 days "still interested?", then Lost suggestion 2 quiet days after the last
+  follow-up -> Nurture on approve). `closingFollowupStrategy(client)` in agent-closing.js;
+  PLAN_TOOL is now buildPlanTool(gapsLeft) (dynamic count + per-field send timing);
+  send_after stamped at DRAFT on the cadence (deck + V1.5 plan card show the real send
+  DAY, not "Day 1/2/3"); approve-plan preserves spacing + slides forward if approved
+  late. Config API: agent-config get/set-closing-followups (owner or staff). WORDING is
+  the trainable closing_followup brain section (relabeled "Follow-up strategy", layer
+  goal = GLOBAL/BAM-managed, GTA can edit as a global editor). NEW "Follow-ups" tab
+  (closing agent only) in BOTH the focus-mode Engine tabs and the Train Agent view
+  (`_taRenderFollowups`/`_taFuPaint`): a schedule timeline editor (day gaps + lost_after)
+  + the wording editor (gated on section.editable). All "1 day apart" copy killed.
+  Nothing auto-sends (GTA closing_mode=hawkeye, self-drive globally off) - safe. Applied
+  to GTA (default cadence). NOT prod-verified end-to-end yet.
 - STILL TO DO: swipe gestures (open decision), GTA prod verification of the whole batch
-  incl. reignition end-to-end.
+  incl. reignition + always-scheduled closing follow-ups end-to-end.
 - HOME <-> HAWKEYE ALIGNMENT (2026-07-10, Zoran: "make sure the home inbox lines up
   with hawkeye + lil hawkeye buttons"): V2 Home inbox preview rows whose contact has
   a pending deck card get a gold eye chip (`hm-ib-hawk`, hover twin `hm-ib-act-hawk`)
@@ -315,6 +340,103 @@ scattered autonomy/config entry points. KEEPS: inline drawer suggestion on lead 
   deck-card count (pending booking rows + confirm rows + closing cards, plans
   collapsed; scheduled followups render but don't count) and each feed row
   deep-links to its card.
+- HOME <-> HAWKEYE SYNC PASS 2 (2026-07-11, Zoran: home didn't match Hawkeye -
+  leads listed twice, convos went stale, feed != deck, deck didn't live-update).
+  All in client-portal.html. FIXED:
+  * Inbox listed a lead TWICE: `/api/ghl/inbox` merges SMS+email+social+DM stores
+    (own-store academies like GTA) + GHL can return >1 thread/contact, no dedupe.
+    New `_hmDedupeConvos`/`_hmContactKey` in `_hmLoadInboxPreview` collapse to ONE
+    row per contact (contactId -> last-10 phone -> lc name), keep newest message
+    in the server-sorted slot, OR-in unread; hawk flag is contact-keyed so no
+    flagged lead drops. Dedupe runs BEFORE the slice(0,8) + flagged-swap.
+  * Stale convos (Tara): inbox preview + Hawkeye feed loaded once on mount.
+    `_hmStartScoreRefresh` now also runs `_hmRefreshLive` on the 60s tick +
+    `_hmBindLiveRefresh` refreshes both on focus/visibilitychange. Inbox refresh
+    gated to `window._hmActiveTab==='inbox'` + home visible.
+  * Feed != deck: `_hmLoadRailBottom`/`_hmRenderHawkFeed` rendered agent-followups
+    (RETIRED, never deck cards) -> extra rows past the count/deck. Now render
+    EXACTLY the 3 deck queues (booking+confirm+closing, followup_N collapsed);
+    total==rows==deck; reignite/reignite_due labeled. agent-followups DROPPED from
+    the feed (`_apxSplit` no longer used here). Supersedes the "scheduled
+    followups render but don't count" line above.
+  * Deck didn't live-update (had to exit+reopen): NEW `_hk2Poll` (30s +
+    focus/visibility) re-reads the 3 queues while open and MERGES only new cards
+    onto queue backs + refreshes tab counts (`_hk2TabsHtml` extracted). Non-
+    destructive: never re-renders the open card / in-progress DOM edit unless the
+    active tab was empty. Resurrection guard = per-open `_HK2.seen` set (seeded in
+    `_hk2Refresh`) + the `_HAWK_PENDING` skip, so a just-resolved card that
+    list-ready still echoes during its 6s commit is never re-added. Started in
+    `_hk2Refresh`, stopped in `_hk2Back`+`closeSalesFocus`; `_hk2IsOpen` = overlay
+    `_SF_OPEN==='hawkeye'` or inline `_PL_SV==='hawkeye'`. Known low edge: a plan
+    re-created for the same contact within one open session shares key
+    `plan:<cid>` and waits for reopen (self-heals). NOT prod-verified on GTA yet.
+  * 2 REVIEW FIXES (adversarial pass on this diff, both were real): (a) dedupe
+    key must NOT merge on a non-identifying sentinel - `_hmContactKey` only
+    merges on a REAL name now; unnamed rows ("Lead" from DM/social stores,
+    "Unknown" from GHL, bare number/email) fall to `id:<convId>` so two distinct
+    nameless leads don't collapse into one. (b) `_hmRefreshLive` visibility gate
+    was `home-v2.style.display==='none'` which never trips (classic view hides
+    the ANCESTOR `#view-home` via a class) - now `hv.offsetParent === null` +
+    a 3s debounce so focus+visibilitychange don't double-fetch. Deck-poll pass
+    (resurrection/edit-wipe/lifecycle/null-derefs) reviewed clean.
+- 🐞 BUG SWEEP (2026-07-11, 41-agent adversarial review of the 2026-07-10 batch;
+  27 confirmed). FIXED this pass:
+  * CRIT: silent parks self-canceled every detector cron - a park with an empty
+    ack (or a failed ack) stays inbound-last on the ORIGINAL "later" text, and all
+    3 detectors canceled on mere queue membership. Now compare item.last_at to the
+    park's created_at (new `reigniteParkMap`/`repliedAfterPark` in _reignite.js);
+    no fresh inbound => keep the park + skip drafting.
+  * HIGH: booking+closing fire loops canceled due parks against an UNTRUSTED/empty
+    stage set (a GHL blip = permanent park death). Added `idsTrusted` to
+    computeQueue/computeClosingQueue + `stageSetTrusted` gate (confirm already had it).
+  * HIGH/MED send-honesty: confirm-lost/abandoned/reignite now return
+    goodbye_sent/ack_sent + record the send error on the row; the deck toasts the
+    TRUTH ("Done, but the message did NOT send") instead of "Message sent" off the
+    payload. Book/reignite/reignite_due cards no longer send their prefilled box on
+    a silent-labeled Nurture/Unqualified move (reply capture gated to the same
+    hasMsg kinds). Cleared Book-it confirmation box no longer resurrects the draft.
+  * HIGH: post-trial form card wedge - the two form validations leaked the
+    _hk2Busy latch (all later taps dead). Reset on every early-return.
+  * HIGH: close-rate popup rows/chips passed lead-typed names into an inline
+    onclick (apostrophe broke taps; crafted name = click XSS). Now dataset + safe
+    handler (same pattern as the deck name-link).
+  * HIGH: applyPreset silently corrupted a live pipeline (duplicate enabled edges,
+    nondeterministic routing). Added an edge-conflict guard that refuses by default
+    + a `--force` clean-replace (deletes the offer's edges first).
+  * MED: post-trial "Mark lost"/"Mark unqualified" claimed success on a failed
+    close - added lost_ok/unqualified_ok flags; deck warns instead.
+  * MED: deck name-tap drawer showed "no phone on file" + hid the composer for its
+    own hydrated contact - backfill phone/email onto _CDRAWER.contact after hydration.
+  * MED (infra): cc_qualified_trials/cc_qualified_close_rate were applied to prod
+    but never committed - any migration-built env 500'd cc-sales-kpis. Committed
+    both as migrations (20260710224022 + 20260711013742).
+  * LOW: channelOf dropped campaign/custom SMS variants to 'other' (agent blindness)
+    - now matches the whole SMS/EMAIL/CALL family (reaction still excluded first).
+    Date-only trialDate parsed as UTC midnight (not-flowing exemption expired the
+    evening before) - use _plTrialInfo end-of-day. Close-rate default To showed
+    yesterday. Deck had no Back in the cc-opted-out inline path. Drawer Cancel
+    failed on the 'fresh' placeholder id (now returns/resolves the real id).
+  * ALSO shipped (original Tara report): scheduled-send bubbles in inbox threads
+    (read-thread.js scheduledStoreMessages + 3 renderers), a quiet-hours bar on the
+    deck (list-ready returns `quiet`), and a pagehide/visibilitychange flush of the
+    6s undo so backgrounding the app never drops an approved send.
+  * SECOND PASS (2026-07-11, the deferred 8 - all fixed): #3 Book-it card copy is
+    now provider-aware (list-ready returns booking_provider; GHL academies see "GHL
+    sends the confirmation" instead of an editable box that got dropped). #10 fired
+    confirm reignite_due cards are exempt from the passed-trial prune/list-ready
+    gate/send guard (kind reignite_due survives a lingering passed slot). #11
+    Book-it now also sends the "Your free trial is booked!" EMAIL on portal
+    academies (resolveContactInfo + sendOn), not just the SMS. #12 normalizeProposal
+    is async + verifies the proposed slot against a live freeSlots read (drops the
+    structured proposal if it isn't genuinely open - no more "verified open slot"
+    label on a hallucinated time). #20 the send action + 8am flush refuse/cancel a
+    proposal whose stamped book_slot_at already passed. #19 website/leads.js +
+    website/trial-booking.ts cancel a scheduled reignition on a self-serve booking
+    (parent-app path books with null contact, can't link). #23 contact-memory no
+    longer greets the parent by the athlete's name when contacts.name == athlete_name
+    (ADAPT-minted) - falls to a nameless warm greeting. #27 scheduleStepJob returns
+    an ok flag; enrollContact/advance exit the enrollment with a visible reason
+    instead of leaving a phantom-active enrollment with zero pending jobs.
 
 ## Open item (ask Zoran before building)
 Swipe RIGHT commits the card's main action (can SEND) - confirm it's instant-commit.
