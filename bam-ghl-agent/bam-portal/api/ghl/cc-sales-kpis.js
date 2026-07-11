@@ -1,22 +1,30 @@
 // Vercel Serverless Function - command-center Sales KPIs (off-GHL, V2).
 //
-//   GET /api/ghl/cc-sales-kpis?client_id=<uuid>
+//   GET /api/ghl/cc-sales-kpis?client_id=<uuid>[&from=<iso>&to=<iso>]
 //     → { sales_7d, sales: [{id,name,joined_date}],
-//         qualified_won, qualified_lost, qualified_pool, closing_rate }
+//         closing_rate, prev_closing_rate,
+//         qualified_won, qualified_lost, qualified_pending,
+//         won: [...], lost: [...], pending: [...],   // {name, contact_id, trainer, trial_date, plan?}
+//         range: { from, to } }
 //
 // Fully off GHL - sourced from the portal's own tables:
 //   sales_7d      = new PAYING members in the last 7 calendar days
 //                   (members.joined_date, status in live/paused/payment_failed -
 //                   payment_method_required = never completed checkout, not a sale)
 //   sales         = those members listed out (id + athlete name) for the UI
-//   closing_rate  = QUALIFIED TRIAL CLOSE RATE over the last 45 days (Zoran's
-//                   definition, 2026-07-10). Population = post-trial cards marked
-//                   SHOWED UP + GOOD FIT. Of those:
+//   closing_rate  = QUALIFIED TRIAL CLOSE RATE (Zoran's definition, 2026-07-10)
+//                   over [from, to) - defaults to the last 45 days. Population =
+//                   post-trial cards marked SHOWED UP + GOOD FIT. Of those:
 //                     won  = the lead became a paying member (ground truth), or an
 //                            opportunity/outcome marks it won
 //                     lost = the lead's opportunity/outcome is marked lost
-//                     rate = won / (won + lost)   [null if 0; pending cards excluded]
-//                   Computed by the cc_qualified_close_rate() SQL function, which
+//                     pending = neither yet (excluded from the rate)
+//                     rate = won / (won + lost)   [null if 0]
+//                   won/lost/pending are the actual trials behind the number, for
+//                   the client-portal popup (each row opens the contact drawer).
+//                   prev_closing_rate = the same rate over the immediately preceding
+//                   equal-length window, for the trend arrow.
+//                   Rows come from the cc_qualified_trials() SQL function, which
 //                   bridges the mixed portal-UUID / GHL-id opportunity ids through
 //                   the opportunities table (post_trial_reviews.opportunity_id can be
 //                   either form, but members / pipeline_outcomes key on GHL ids).
@@ -71,28 +79,60 @@ async function handler(req, res) {
   // or the 7-day window drifts with the time of day the endpoint is hit.
   const day = (days) => new Date(Date.now() - days * 86400000).toISOString().slice(0, 10);
   const cid = encodeURIComponent(clientId);
-  const c7 = day(6), c45 = day(44); // inclusive: today + the N-1 days before it
+  const c7 = day(6); // inclusive: today + the N-1 days before it
   // A "sale" is a member who completed checkout. payment_method_required rows
   // signed up but never paid - they are not sales (and test rows live there too).
   const PAID = "status=in.(live,paused,payment_failed)";
 
+  // Close-rate window: [from, to). Defaults to the last 45 days. The popup's
+  // date picker passes explicit from/to (to is exclusive - the frontend sends the
+  // day AFTER the selected end). Guard against garbage / inverted ranges.
+  const now = Date.now();
+  const parseTs = (v, fallback) => { const t = Date.parse(v); return Number.isFinite(t) ? t : fallback; };
+  let toMs = parseTs(req.query.to, now);
+  let fromMs = parseTs(req.query.from, now - 45 * 86400000);
+  if (fromMs >= toMs) { fromMs = toMs - 45 * 86400000; } // bad range -> fall back to 45d
+  const span = toMs - fromMs;                            // for the previous equal-length window
+  const iso = (ms) => new Date(ms).toISOString();
+  const qtrials = (fromT, toT) =>
+    sb(`rpc/cc_qualified_trials?p_client_id=${cid}&p_from=${encodeURIComponent(iso(fromT))}&p_to=${encodeURIComponent(iso(toT))}`);
+  const rateOf = (rows) => {
+    const won = rows.filter(x => x.outcome === "won").length;
+    const lost = rows.filter(x => x.outcome === "lost").length;
+    return (won + lost) > 0 ? Math.round((won / (won + lost)) * 100) : null;
+  };
+
   try {
-    const [m7, rate] = await Promise.all([
+    const [m7, curRows, prevRows] = await Promise.all([
       sb(`members?client_id=eq.${cid}&${PAID}&joined_date=gte.${c7}&select=id,athlete_name,joined_date&order=joined_date.desc`),
-      // Qualified trial close rate over the rolling 45-day window. The SQL function
-      // does the full showed-up + good-fit -> won/lost scoring (see header). Returns
-      // a single row {pool, won, lost}; GET works because the function is STABLE.
-      sb(`rpc/cc_qualified_close_rate?p_client_id=${cid}&p_since=${encodeURIComponent(c45)}`),
+      qtrials(fromMs, toMs),                 // trials in the selected window
+      qtrials(fromMs - span, fromMs),        // the preceding equal-length window (trend)
     ]);
     const sales = (m7 || []).map((m) => ({ id: m.id, name: m.athlete_name || "Member", joined_date: m.joined_date }));
     const sales_7d = sales.length;
-    const r = (Array.isArray(rate) ? rate[0] : rate) || {};
-    const qualified_won = r.won || 0;
-    const qualified_lost = r.lost || 0;
-    const qualified_pool = r.pool || 0;
-    const denom = qualified_won + qualified_lost;
-    const closing_rate = denom > 0 ? Math.round((qualified_won / denom) * 100) : null;
-    return res.status(200).json({ sales_7d, sales, qualified_won, qualified_lost, qualified_pool, closing_rate });
+
+    // Shape each row for the UI (contact_id opens the drawer), newest trial first,
+    // split by outcome. plan is won-only so it is dropped from lost/pending.
+    const list = (o) => (Array.isArray(curRows) ? curRows : [])
+      .filter(x => x.outcome === o)
+      .sort((a, b) => new Date(b.trial_date) - new Date(a.trial_date))
+      .map(x => ({ name: x.name, contact_id: x.ghl_contact_id, trainer: x.trainer || null, trial_date: x.trial_date, ...(o === "won" ? { plan: x.plan || null } : {}) }));
+    const wonList = list("won");
+    const lostList = list("lost");
+    const pendingList = list("pending");
+
+    const closing_rate = rateOf(Array.isArray(curRows) ? curRows : []);
+    const prev_closing_rate = rateOf(Array.isArray(prevRows) ? prevRows : []);
+
+    return res.status(200).json({
+      sales_7d, sales,
+      closing_rate, prev_closing_rate,
+      qualified_won: wonList.length,
+      qualified_lost: lostList.length,
+      qualified_pending: pendingList.length,
+      won: wonList, lost: lostList, pending: pendingList,
+      range: { from: iso(fromMs), to: iso(toMs) },
+    });
   } catch (e) {
     return res.status(500).json({ error: e.message || "internal error" });
   }
