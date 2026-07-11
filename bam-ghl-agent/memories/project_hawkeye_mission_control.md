@@ -304,6 +304,17 @@ scattered autonomy/config entry points. KEEPS: inline drawer suggestion on lead 
   (_cdReigniteChip), stuck list exempts parked leads. NOT prod-verified yet.
 - STILL TO DO: swipe gestures (open decision), GTA prod verification of the whole batch
   incl. reignition end-to-end.
+- HOME <-> HAWKEYE ALIGNMENT (2026-07-10, Zoran: "make sure the home inbox lines up
+  with hawkeye + lil hawkeye buttons"): V2 Home inbox preview rows whose contact has
+  a pending deck card get a gold eye chip (`hm-ib-hawk`, hover twin `hm-ib-act-hawk`)
+  that deep-links `_hk2Open(agent, contactId)`; flagged convos are guaranteed a slot
+  in the 8-row preview (oldest non-flagged row swapped out). Shared fetch
+  `_hmHawkFetch()` (5s-coalesced, same 3 list-ready queues as `_hk2Load`) +
+  `_hmHawkIndex()` map. Right-rail "Hawkeye activity" feed now includes confirm +
+  closing queues (was booking-only - counts drifted from the deck); `_hmHawkTotal` =
+  deck-card count (pending booking rows + confirm rows + closing cards, plans
+  collapsed; scheduled followups render but don't count) and each feed row
+  deep-links to its card.
 
 ## Open item (ask Zoran before building)
 Swipe RIGHT commits the card's main action (can SEND) - confirm it's instant-commit.
