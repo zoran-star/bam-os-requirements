@@ -48525,6 +48525,49 @@ function _ccStyle() {
     '.cc-sal-li .n{font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}' +
     '.cc-sal-li.click{cursor:pointer}' +
     '.cc-sal-li.click:hover{border-color:var(--gold)}' +
+    /* close-rate box tap hint + the Closed/Lost/Pending popup it opens */
+    '.cc-sal-closehint{margin-top:9px;display:flex;align-items:center;gap:6px;font-size:12px;font-weight:600;color:var(--text-mute)}' +
+    '.cc-sal-closehint svg{width:13px;height:13px;opacity:.7}' +
+    '.cccr-ov{position:fixed;inset:0;background:rgba(0,0,0,.55);opacity:0;pointer-events:none;transition:opacity .2s;z-index:9400;display:flex;align-items:flex-start;justify-content:center;padding:22px 14px;overflow-y:auto}' +
+    '.cccr-ov.on{opacity:1;pointer-events:auto}' +
+    '.cccr{width:560px;max-width:100%;background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:18px 17px 20px;position:relative;box-shadow:0 12px 40px rgba(0,0,0,.35)}' +
+    '.cccr-x{position:absolute;top:13px;right:13px;width:30px;height:30px;border-radius:999px;border:1px solid var(--border);background:var(--bg);color:var(--text-sub);display:flex;align-items:center;justify-content:center;cursor:pointer}' +
+    '.cccr-x:hover{border-color:var(--gold);color:var(--gold)}' +
+    '.cccr-t{font-size:13px;font-weight:600;color:var(--text-sub);margin-bottom:11px}' +
+    '.cccr-num{background:var(--bg);border-radius:12px;padding:14px 16px;display:flex;align-items:center;gap:15px;margin-bottom:13px}' +
+    '.cccr-numv{font-size:34px;font-weight:800;line-height:1;color:var(--text)}' +
+    '.cccr-numd{border-left:1px solid var(--border);padding-left:14px}' +
+    '.cccr-numd .a{font-size:13px;color:var(--text)}' +
+    '.cccr-numd .b{font-size:12px;color:var(--text-mute);margin-top:2px}' +
+    '.cccr-trend{display:inline-flex;align-items:center;gap:3px;font-size:11.5px;font-weight:700;margin-top:4px}' +
+    '.cccr-trend.up{color:var(--green)}.cccr-trend.dn{color:var(--red)}.cccr-trend.fl{color:var(--text-mute)}' +
+    '.cccr-range{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:15px}' +
+    '.cccr-range label{font-size:11px;font-weight:700;letter-spacing:.03em;text-transform:uppercase;color:var(--text-mute)}' +
+    '.cccr-range input{background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:6px 9px;color:var(--text);font:inherit;font-size:12.5px;color-scheme:dark}' +
+    '.cccr-range .go{margin-left:auto;background:var(--gold);color:var(--on-gold,#131416);border:none;border-radius:8px;padding:7px 14px;font:inherit;font-size:12.5px;font-weight:800;cursor:pointer}' +
+    '.cccr-cols{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:13px}' +
+    '.cccr-colh{display:flex;align-items:center;justify-content:space-between;border-radius:8px;padding:6px 10px;margin-bottom:6px;font-size:12px;font-weight:800}' +
+    '.cccr-colh.won{background:color-mix(in srgb,var(--green) 13%,transparent);color:var(--green)}' +
+    '.cccr-colh.lost{background:color-mix(in srgb,var(--red) 13%,transparent);color:var(--red)}' +
+    '.cccr-pendh{display:flex;align-items:center;justify-content:space-between;border-radius:8px;padding:6px 10px;margin-bottom:8px;font-size:12px;font-weight:800;background:var(--surface-el);color:var(--text-sub)}' +
+    '.cccr-row{display:flex;align-items:center;gap:9px;padding:7px 5px;border-bottom:1px solid var(--border);cursor:pointer;border-radius:6px}' +
+    '.cccr-row:last-child{border-bottom:none}' +
+    '.cccr-row:hover{background:var(--surface-hov)}' +
+    '.cccr-av{width:27px;height:27px;border-radius:999px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;flex-shrink:0}' +
+    '.cccr-av.won{background:color-mix(in srgb,var(--green) 15%,transparent);color:var(--green)}' +
+    '.cccr-av.lost{background:color-mix(in srgb,var(--red) 15%,transparent);color:var(--red)}' +
+    '.cccr-av.pend{background:var(--surface-el);color:var(--text-sub)}' +
+    '.cccr-rn{min-width:0;flex:1}' +
+    '.cccr-rn .n{font-size:13px;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}' +
+    '.cccr-rn .s{font-size:11px;color:var(--text-mute);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}' +
+    '.cccr-plan{display:inline-block;margin-top:3px;font-size:10px;font-weight:700;color:var(--green);background:color-mix(in srgb,var(--green) 13%,transparent);border-radius:4px;padding:1px 6px}' +
+    '.cccr-chevr{color:var(--text-mute);flex-shrink:0}' +
+    '.cccr-chips{display:flex;flex-wrap:wrap;gap:6px}' +
+    '.cccr-chip{display:flex;align-items:center;gap:6px;border:1px solid var(--border);border-radius:999px;padding:4px 11px 4px 4px;cursor:pointer}' +
+    '.cccr-chip:hover{border-color:var(--gold)}' +
+    '.cccr-chip .n{font-size:12px;color:var(--text)}' +
+    '.cccr-empty{font-size:12px;color:var(--text-mute);padding:10px 5px;text-align:center}' +
+    '.cccr-foot{margin-top:14px;font-size:11.5px;color:var(--text-mute);text-align:center}' +
     '.cc-sal-pipe{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:14px;box-shadow:0 1px 3px rgba(0,0,0,.04)}' +
     '.cc-sal-hawkbar{width:100%;display:flex;align-items:center;justify-content:center;gap:9px;background:transparent;border:1.5px solid var(--accent-border,rgba(212,182,92,.3));color:var(--text);border-radius:12px;padding:12px 14px;font:inherit;font-size:13px;font-weight:800;letter-spacing:.09em;cursor:pointer;margin-bottom:12px;transition:background .2s,border-color .2s}' +
     '.cc-sal-hawkbar svg{color:var(--gold)}' +
@@ -49684,11 +49727,14 @@ function _ccMountSales(host) {
           <div class="cc-sal-list" id="cc-sal-trials-list"></div>
           <div class="cc-stat-d" id="cc-sal-next"></div>
         </div>
-        <div class="cc-stat">
+        <div class="cc-stat click" id="cc-sal-close-box" onclick="_ccOpenCloseRate()" title="See who closed and who was lost">
           <div class="cc-sal-kpirow"><div class="cc-stat-v" id="cc-sal-close">-</div><div class="cc-stat-l">Qualified trial close rate</div></div>
-          <div class="cc-sal-kpirow"><div class="cc-stat-v" id="cc-sal-7d">-</div><div class="cc-stat-l">Sales in the past week</div></div>
-          <div class="cc-sal-list" id="cc-sal-7d-names"></div>
+          <div class="cc-sal-closehint" id="cc-sal-close-hint"></div>
         </div>
+      </div>
+      <div class="cc-stat" style="margin-bottom:14px">
+        <div class="cc-sal-kpirow"><div class="cc-stat-v" id="cc-sal-7d">-</div><div class="cc-stat-l">Sales in the past week</div></div>
+        <div class="cc-sal-list" id="cc-sal-7d-names"></div>
       </div>
       <div class="cc-sal-pipe">
         <button type="button" class="cc-sal-hawkbar" id="cc-sal-hawkbar" onclick="_hv2OpenHawkeye()" title="Open Hawkeye">
@@ -49832,20 +49878,160 @@ async function _ccSalesLoad() {
   _ccSalesKpis();
 }
 // Sales - 7 days + Trial closing rate (off-GHL, from api/ghl/cc-sales-kpis).
+// Stashes the default (last-45-day) response so the close-rate popup can open
+// instantly, then re-fetches per its own date range.
 async function _ccSalesKpis() {
   try {
     const token = await _mreqAuthToken();
     const r = await fetch('/api/ghl/cc-sales-kpis?client_id=' + encodeURIComponent(CLIENT_ID), { headers: { Authorization: 'Bearer ' + token } });
     const j = await _safeJson(r);
     if (!r.ok) return;
+    window._ccCRData = j;
     const s7 = document.getElementById('cc-sal-7d'); if (s7) s7.textContent = (j.sales_7d != null ? String(j.sales_7d) : '-');
     const cl = document.getElementById('cc-sal-close'); if (cl) cl.textContent = (j.closing_rate != null ? j.closing_rate + '%' : '-');
-    // The names behind the number - list rows, each opens the member drawer.
+    _ccCRHint(j);
+    // The names behind the "Sales this week" number - each opens the member drawer.
     const nm = document.getElementById('cc-sal-7d-names');
     if (nm) nm.innerHTML = (j.sales || []).map(s =>
       `<div class="cc-sal-li click" onclick="event.stopPropagation();openMemberPopup('${escapeHTML(s.id)}')"><span class="n">${escapeHTML(_ccCapName((s.name || 'Member').split(' ').filter(Boolean).slice(0, 2).join(' ')))}</span></div>`
     ).join('');
   } catch (_) { /* leave the dashes */ }
+}
+// The little "4 of 6 closed - tap to see" line under the close-rate number.
+function _ccCRHint(j) {
+  const el = document.getElementById('cc-sal-close-hint');
+  if (!el) return;
+  const won = j.qualified_won || 0, lost = j.qualified_lost || 0, pend = j.qualified_pending || 0;
+  const chev = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>';
+  let txt;
+  if (won + lost > 0) txt = `${won} of ${won + lost} closed`;
+  else if (pend > 0) txt = `${pend} pending, none resolved yet`;
+  else txt = 'No qualified trials yet';
+  el.innerHTML = `<span>${txt}</span>${chev}`;
+}
+// ── Qualified trial close-rate popup: Closed | Lost + a Pending list, over an
+//    adjustable date range, with the trend vs the previous equal-length window.
+//    Each name opens that contact's drawer (_hk2OpenContact). (Zoran 2026-07-10)
+function _ccCRymd(ms) { const d = new Date(ms); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; }
+function _ccCRDay(ts) { try { return new Date(ts).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }); } catch (_) { return ''; } }
+function _ccCRInitials(name) {
+  const p = String(name || '').trim().split(/\s+/).filter(Boolean);
+  return ((p[0] || '')[0] || '') + ((p[1] || '')[0] || '') || '?';
+}
+async function _ccOpenCloseRate() {
+  let ov = document.getElementById('cccr-ov');
+  if (!ov) {
+    ov = document.createElement('div');
+    ov.id = 'cccr-ov'; ov.className = 'cccr-ov';
+    ov.addEventListener('click', (e) => { if (e.target === ov) _ccCRClose(); });
+    document.body.appendChild(ov);
+  }
+  ov.innerHTML = '<div class="cccr"><button type="button" class="cccr-x" aria-label="Close" onclick="_ccCRClose()"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6L6 18M6 6l12 12"/></svg></button><div id="cccr-body"></div></div>';
+  requestAnimationFrame(() => ov.classList.add('on'));
+  // Render the stashed default immediately, then it can be re-fetched by range.
+  _ccCRRender(window._ccCRData || null);
+  if (!window._ccCRData) { const j = await _ccCRFetch(); if (j) { window._ccCRData = j; _ccCRRender(j); } }
+}
+function _ccCRClose() {
+  const ov = document.getElementById('cccr-ov');
+  if (!ov) return;
+  ov.classList.remove('on');
+  setTimeout(() => { if (ov && !ov.classList.contains('on')) ov.remove(); }, 220);
+}
+async function _ccCRFetch(fromISO, toISO) {
+  try {
+    const token = await _mreqAuthToken();
+    let url = '/api/ghl/cc-sales-kpis?client_id=' + encodeURIComponent(CLIENT_ID);
+    if (fromISO && toISO) url += '&from=' + encodeURIComponent(fromISO) + '&to=' + encodeURIComponent(toISO);
+    const r = await fetch(url, { headers: { Authorization: 'Bearer ' + token } });
+    const j = await _safeJson(r);
+    return r.ok ? j : null;
+  } catch (_) { return null; }
+}
+async function _ccCRApplyRange() {
+  const f = document.getElementById('cccr-from'), t = document.getElementById('cccr-to');
+  if (!f || !t || !f.value || !t.value) return;
+  const fromISO = new Date(f.value + 'T00:00:00').toISOString();
+  // `to` is exclusive - send the day AFTER the selected end so it's inclusive to the user.
+  const toISO = new Date(new Date(t.value + 'T00:00:00').getTime() + 86400000).toISOString();
+  const body = document.getElementById('cccr-body');
+  if (body) body.style.opacity = '.5';
+  const j = await _ccCRFetch(fromISO, toISO);
+  if (body) body.style.opacity = '';
+  if (j) _ccCRRender(j, { from: f.value, to: t.value });
+}
+function _ccCRRow(x, kind) {
+  const sub = [_ccCRDay(x.trial_date), x.trainer].filter(Boolean).join(' · ');
+  const plan = kind === 'won' && x.plan ? `<div class="cccr-plan">${escapeHTML(x.plan)}</div>` : '';
+  const name = _ccCapName(String(x.name || 'Athlete').split(' ').filter(Boolean).slice(0, 2).join(' '));
+  const cid = escapeHTML(String(x.contact_id || ''));
+  const onclick = x.contact_id ? `onclick="event.stopPropagation();_hk2OpenContact('${cid}','${escapeHTML(name)}')"` : '';
+  return `<div class="cccr-row" ${onclick}>
+    <div class="cccr-av ${kind}">${escapeHTML(_ccCRInitials(name))}</div>
+    <div class="cccr-rn"><div class="n">${escapeHTML(name)}</div><div class="s">${escapeHTML(sub)}</div>${plan}</div>
+    <svg class="cccr-chevr" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
+  </div>`;
+}
+function _ccCRRender(j, picked) {
+  const body = document.getElementById('cccr-body');
+  if (!body) return;
+  if (!j) { body.innerHTML = '<div class="cccr-empty">Couldn\'t load the trials.</div>'; return; }
+  const won = j.won || [], lost = j.lost || [], pend = j.pending || [];
+  const nWon = won.length, nLost = lost.length;
+  const rate = j.closing_rate;
+  // Trend vs the previous equal-length window.
+  let trend = '';
+  if (rate != null && j.prev_closing_rate != null) {
+    const d = rate - j.prev_closing_rate;
+    const cls = d > 0 ? 'up' : d < 0 ? 'dn' : 'fl';
+    const ar = d > 0 ? '▲' : d < 0 ? '▼' : '=';
+    trend = `<div class="cccr-trend ${cls}">${ar} ${Math.abs(d)} pts vs prior period</div>`;
+  }
+  // Date inputs: default to the response's own range (to is exclusive, so the
+  // displayed end is one day back).
+  const fromY = picked ? picked.from : _ccCRymd(Date.parse(j.range && j.range.from) || (Date.now() - 45 * 86400000));
+  const toY = picked ? picked.to : _ccCRymd((Date.parse(j.range && j.range.to) || Date.now()) - 86400000);
+  const numd = (nWon + nLost > 0)
+    ? `<div class="a">${nWon} of ${nWon + nLost} closed</div><div class="b">${pend.length} still pending</div>`
+    : `<div class="a">No resolved trials</div><div class="b">${pend.length} still pending</div>`;
+  const colWon = nWon
+    ? won.map(x => _ccCRRow(x, 'won')).join('')
+    : '<div class="cccr-empty">None yet</div>';
+  const colLost = nLost
+    ? lost.map(x => _ccCRRow(x, 'lost')).join('')
+    : '<div class="cccr-empty">None yet</div>';
+  const chips = pend.length
+    ? pend.map(x => {
+        const name = _ccCapName(String(x.name || 'Athlete').split(' ').filter(Boolean).slice(0, 2).join(' '));
+        const cid = escapeHTML(String(x.contact_id || ''));
+        const oc = x.contact_id ? `onclick="_hk2OpenContact('${cid}','${escapeHTML(name)}')"` : '';
+        return `<div class="cccr-chip" ${oc}><div class="cccr-av pend">${escapeHTML(_ccCRInitials(name))}</div><span class="n">${escapeHTML(name)}</span></div>`;
+      }).join('')
+    : '<div class="cccr-empty">No pending good-fit trials</div>';
+  body.innerHTML = `
+    <div class="cccr-t">Qualified trial close rate</div>
+    <div class="cccr-num">
+      <div class="cccr-numv">${rate != null ? rate + '%' : '-'}</div>
+      <div class="cccr-numd">${numd}${trend}</div>
+    </div>
+    <div class="cccr-range">
+      <label for="cccr-from">From</label><input type="date" id="cccr-from" value="${fromY}">
+      <label for="cccr-to">To</label><input type="date" id="cccr-to" value="${toY}">
+      <button type="button" class="go" onclick="_ccCRApplyRange()">Apply</button>
+    </div>
+    <div class="cccr-cols">
+      <div>
+        <div class="cccr-colh won"><span>Closed</span><span>${nWon}</span></div>
+        ${colWon}
+      </div>
+      <div>
+        <div class="cccr-colh lost"><span>Lost</span><span>${nLost}</span></div>
+        ${colLost}
+      </div>
+    </div>
+    <div class="cccr-pendh"><span>Pending, still deciding</span><span>${pend.length}</span></div>
+    <div class="cccr-chips">${chips}</div>
+    <div class="cccr-foot">Tap a name to open their contact drawer</div>`;
 }
 function _ccHawkVerb(kind) {
   return ({
